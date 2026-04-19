@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Directorio Comida Colombia – ExploraCO</title>
+<meta name="description" content="Los mejores comida de Colombia. Filtra por ciudad, precio, rating y más. 17 opciones.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://exploracо.co/directorio-comida.html">
+<meta property="og:title" content="Directorio de Comida – ExploraCO">
+<meta property="og:description" content="17 comida seleccionados en Colombia.">
+<meta property="og:image" content="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--cat:#EF4444;--cat-bg:#FEF2F2}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text)}
+nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
+.tbc a,.tbc span{font-size:11px;color:rgba(255,255,255,.5);text-decoration:none}
+.tbc span{margin:0 5px}
+.tbc em{font-style:normal;color:rgba(255,255,255,.8)}
+.nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
+.nav-back:hover{border-color:var(--gold);color:var(--gold)}
+.page-header{background:var(--black);padding:28px 4% 24px;border-bottom:1px solid rgba(255,255,255,.06)}
+.ph-eyebrow{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2.5px;color:#EF4444;margin-bottom:8px}
+.ph-title{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:900;letter-spacing:-1px;color:#fff;line-height:1.05}
+.ph-title em{color:var(--gold);font-style:normal}
+.ph-sub{font-size:13px;color:rgba(255,255,255,.5);margin-top:6px}
+.ph-stats{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap}
+.ph-stat-n{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff}
+.ph-stat-l{font-size:9px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1px}
+.page-body{display:flex;max-width:1400px;margin:0 auto}
+.filters-sidebar{width:256px;flex-shrink:0;padding:18px 14px;border-right:1px solid var(--border);background:var(--white);position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;scrollbar-width:thin}
+.fs-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.fs-reset{font-size:10px;color:var(--gold);cursor:pointer;font-weight:700;text-transform:none;letter-spacing:0}
+.dir-filter-group{margin-bottom:16px}
+.dir-filter-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:6px}
+.dir-filter-sel{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:'Outfit',sans-serif;background:var(--bg);outline:none;color:var(--text);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.dir-filter-sel:focus{border-color:var(--black)}
+.dir-check-group{display:flex;flex-direction:column;gap:5px}
+.dir-check{display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer}
+.dir-check input{accent-color:var(--black);width:14px;height:14px;flex-shrink:0}
+.rpill,.ppill{display:inline-block;padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;color:var(--muted);background:var(--white);transition:all .12s;margin:2px}
+.rpill:hover,.ppill:hover{border-color:var(--black);color:var(--black)}
+.rpill.on,.ppill.on{background:var(--black);border-color:var(--black);color:var(--white)}
+.results-area{flex:1;padding:18px 22px;min-width:0}
+.results-topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.results-search{display:flex;align-items:center;gap:8px;background:var(--white);border:1.5px solid var(--border);border-radius:6px;padding:7px 12px;flex:1;min-width:180px;max-width:400px;transition:border-color .15s}
+.results-search:focus-within{border-color:var(--black)}
+.results-search input{border:none;background:transparent;outline:none;font-size:12px;font-family:'Outfit',sans-serif;color:var(--text);flex:1}
+.rcount{font-size:12px;color:var(--muted)}
+.rcount b{color:var(--text)}
+.sort-sel{border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:11px;font-family:'Outfit',sans-serif;outline:none;background:var(--white)}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;min-height:0}
+.chip{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:var(--black);color:#fff;font-size:10px;font-weight:600}
+.chip-x{cursor:pointer;opacity:.6;margin-left:1px}
+.chip-x:hover{opacity:1}
+.dir-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1100px){.dir-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.dir-grid{grid-template-columns:1fr}.filters-sidebar{display:none}.results-area{padding:12px 14px}}
+.dcard{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;text-decoration:none;display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s}
+.dcard:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);transform:translateY(-2px)}
+.is-featured{border-color:rgba(232,160,32,.4);box-shadow:0 0 0 2px rgba(232,160,32,.15)}
+.dcard-img{position:relative;aspect-ratio:4/3;overflow:hidden;background:#1a1a1a;flex-shrink:0}
+.dcard-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.dcard-emoji{position:absolute;top:10px;left:10px;font-size:20px;z-index:2}
+.dcard-badge{position:absolute;bottom:10px;left:10px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;background:var(--cat-bg);color:var(--cat)}
+.dcard-feat-star{position:absolute;top:10px;right:10px;background:var(--gold);color:#000;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px}
+.dcard-save{position:absolute;bottom:10px;right:10px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:#fff;transition:background .15s;z-index:3}
+.dcard-save:hover,.dcard-save.saved{background:var(--gold);color:#000}
+.dcard-body{padding:11px 13px 7px;flex:1}
+.dcard-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;line-height:1.3}
+.dcard-loc{font-size:10px;color:var(--muted);margin-bottom:5px}
+.dst{color:#ddd;font-size:12px}.dst.on{color:#E8A020}
+.dcard-rv{font-size:10px;color:var(--muted)}
+.dcard-footer{display:flex;align-items:center;justify-content:space-between;padding:7px 13px;border-top:1px solid var(--border);background:var(--bg)}
+.dcard-price{font-size:11px;font-weight:700;color:var(--text)}
+.dcard-arrow{font-size:13px;color:var(--muted)}
+.dir-empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.pg{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:24px;padding-bottom:28px;flex-wrap:wrap}
+.pgb{padding:7px 14px;border:1px solid var(--border);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;background:var(--white);color:var(--text);transition:all .15s}
+.pgb:hover{background:var(--black);color:#fff;border-color:var(--black)}
+.pgb.on{background:var(--black);color:#fff;border-color:var(--black)}
+.pgb:disabled{opacity:.35;cursor:not-allowed}
+.mob-filt-btn{display:none;align-items:center;gap:6px;padding:8px 14px;background:var(--black);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+@media(max-width:640px){.mob-filt-btn{display:flex}}
+.mob-filt-drawer{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6)}
+.mob-filt-drawer.open{display:flex;align-items:flex-end}
+.mob-filt-inner{background:var(--white);width:100%;max-height:82vh;border-radius:16px 16px 0 0;padding:20px;overflow-y:auto}
+.mob-filt-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="tbc">
+    <a href="index.html">Inicio</a><span>›</span>
+    <a href="index.html#recs">Directorio</a><span>›</span>
+    <em>🍽️ Comida</em>
+  </div>
+  <a href="index.html#recs" class="nav-back">← Inicio</a>
+</nav>
+
+<div class="page-header">
+  <div class="ph-eyebrow">🍽️ Comida · Colombia</div>
+  <div class="ph-title">Directorio de <em>Comida</em></div>
+  <div class="ph-sub">Los mejores comida seleccionados — filtra por ciudad, precio y más</div>
+  <div class="ph-stats">
+    <div class="ph-stat"><div class="ph-stat-n" id="ph-shown">—</div><div class="ph-stat-l">Mostrando</div></div>
+    <div class="ph-stat"><div class="ph-stat-n">17</div><div class="ph-stat-l">Total</div></div>
+    <div class="ph-stat"><div class="ph-stat-n">7</div><div class="ph-stat-l">Ciudades</div></div>
+    <div class="ph-stat"><div class="ph-stat-n" id="ph-avg">—</div><div class="ph-stat-l">Rating prom.</div></div>
+  </div>
+</div>
+
+<div class="page-body">
+  <aside class="filters-sidebar" id="filters-sidebar">
+    <div class="fs-title">Filtros <span class="fs-reset" onclick="resetFilters()">Limpiar</span></div>
+    <div class="dir-filter-group">
+      <label class="dir-filter-label">Ciudad</label>
+      <select class="dir-filter-sel" id="filt-city" onchange="applyFilters()">
+        <option value="">Todas las ciudades</option>
+        <option value="Bogotá">Bogotá</option>
+<option value="Cali">Cali</option>
+<option value="Cartagena">Cartagena</option>
+<option value="Medellín">Medellín</option>
+<option value="Salento">Salento</option>
+<option value="San Gil">San Gil</option>
+<option value="Santa Marta">Santa Marta</option>
+      </select>
+    </div>
+    <div class="dir-filter-group">
+      <label class="dir-filter-label">Departamento</label>
+      <select class="dir-filter-sel" id="filt-region" onchange="applyFilters()">
+        <option value="">Todos</option>
+        <option value="Antioquia">Antioquia</option>
+<option value="Bolívar">Bolívar</option>
+<option value="Cundinamarca">Cundinamarca</option>
+<option value="Magdalena">Magdalena</option>
+<option value="Quindío">Quindío</option>
+<option value="Santander">Santander</option>
+<option value="Valle del Cauca">Valle del Cauca</option>
+      </select>
+    </div>
+    <div class="dir-filter-group">
+      <label class="dir-filter-label">Rating mínimo</label>
+      <div>
+        <span class="rpill on" data-v="0" onclick="setR(this,0)">Todos</span>
+        <span class="rpill" data-v="4" onclick="setR(this,4)">4.0+</span>
+        <span class="rpill" data-v="4.5" onclick="setR(this,4.5)">4.5+</span>
+        <span class="rpill" data-v="4.8" onclick="setR(this,4.8)">4.8+</span>
+        <span class="rpill" data-v="5" onclick="setR(this,5)">5.0 ★</span>
+      </div>
+    </div>
+    <div class="dir-filter-group">
+      <label class="dir-filter-label">Precio</label>
+      <div>
+        <span class="ppill on" data-v="" onclick="setP(this,'')">Todos</span>
+        <span class="ppill" data-v="gratis" onclick="setP(this,'gratis')">Gratis</span>
+        <span class="ppill" data-v="low" onclick="setP(this,'low')">Económico</span>
+        <span class="ppill" data-v="high" onclick="setP(this,'high')">Premium</span>
+      </div>
+    </div>
+    
+        <div class="dir-filter-group">
+          <label class="dir-filter-label">Tipo de cocina</label>
+          <select class="dir-filter-sel" id="filt-tipo" onchange="applyFilters()">
+            <option value="">Todas las cocinas</option>
+            <option value="colombiana">Colombiana</option>
+            <option value="mariscos">Mariscos</option>
+            <option value="internacional">Internacional</option>
+            <option value="vegana">Vegana / Vegetariana</option>
+            <option value="cafe">Café de especialidad</option>
+          </select>
+        </div>
+        <div class="dir-filter-group">
+          <label class="dir-filter-label">Opciones</label>
+          <div class="dir-check-group">
+            <label class="dir-check"><input type="checkbox" value="delivery" onchange="applyFilters()"> Delivery</label>
+            <label class="dir-check"><input type="checkbox" value="reserva" onchange="applyFilters()"> Con reserva</label>
+            <label class="dir-check"><input type="checkbox" value="terraza" onchange="applyFilters()"> Terraza exterior</label>
+          </div>
+        </div>
+  </aside>
+
+  <main class="results-area">
+    <div class="results-topbar">
+      <button class="mob-filt-btn" onclick="openMob()">⚙️ Filtros</button>
+      <div class="results-search">
+        <span style="color:var(--muted);font-size:14px">🔍</span>
+        <input type="text" id="dir-search" placeholder="Buscar por nombre o ciudad…" oninput="applyFilters()" autocomplete="off">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:11px;color:var(--muted)">
+        Ordenar: <select class="sort-sel" id="dir-sort" onchange="applyFilters()">
+          <option value="featured">Destacados</option>
+          <option value="rating">Mayor rating</option>
+          <option value="reviews">Más reseñas</option>
+          <option value="name">Nombre A–Z</option>
+        </select>
+      </div>
+      <div class="rcount"><b id="dir-count">17</b> resultados</div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="dir-grid" id="dir-grid"></div>
+    <div class="dir-empty" id="dir-empty" style="display:none">
+      <div style="font-size:36px;margin-bottom:12px;opacity:.4">🔍</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">Sin resultados</div>
+      <div style="font-size:13px">Prueba cambiando los filtros</div>
+    </div>
+    <div class="pg" id="pg"></div>
+  </main>
+</div>
+
+<div class="mob-filt-drawer" id="mob-filt" onclick="if(event.target===this)closeMob()">
+  <div class="mob-filt-inner">
+    <div class="mob-filt-hdr">
+      <b>Filtros</b>
+      <button onclick="closeMob()" style="background:none;border:none;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div id="mob-filt-body"></div>
+    <button onclick="closeMob()" style="width:100%;padding:12px;background:var(--black);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px">Aplicar filtros →</button>
+  </div>
+</div>
+
+<script>
+/* PL data injected from index */
+const PL=[{"id": 1, "slug": "hostal-casa-medina", "name": "Hostal Casa Medina", "cat": "hostal", "city": "Bogot\u00e1", "region": "Cundinamarca", "rating": 4.8, "rev": 42, "price": "Desde $45.000", "emoji": "\ud83c\udfe8", "hero_bg": "linear-gradient(135deg,#1a3a5c,#2a4a7c)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=75", "cap": "Fachada colonial"}]}, {"id": 2, "slug": "el-cielo-restaurante", "name": "El Cielo Restaurante", "cat": "comida", "city": "Medell\u00edn", "region": "Antioquia", "rating": 4.9, "rev": 178, "price": "Desde $280.000", "emoji": "\ud83c\udf7d\ufe0f", "hero_bg": "linear-gradient(135deg,#3a1a0a,#4a2a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=75", "cap": "Gastronom\u00eda"}]}, {"id": 3, "slug": "ciudad-perdida", "name": "Ciudad Perdida", "cat": "sitio", "city": "Sierra Nevada", "region": "Magdalena", "rating": 5.0, "rev": 312, "price": "Desde $1.400.000", "emoji": "\ud83c\udfd4\ufe0f", "hero_bg": "linear-gradient(135deg,#0a2a1a,#1a3a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75", "cap": "Selva"}]}, {"id": 4, "slug": "feria-de-las-flores", "name": "Feria de las Flores", "cat": "evento", "city": "Medell\u00edn", "region": "Antioquia", "rating": 4.9, "rev": 891, "price": "Entrada gratuita", "emoji": "\ud83c\udf89", "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75", "cap": "Feria"}]}, {"id": 5, "slug": "hostal-walled-city", "name": "Hostal Walled City", "cat": "hostal", "city": "Cartagena", "region": "Bol\u00edvar", "rating": 4.7, "rev": 203, "price": "Desde $80.000", "emoji": "\ud83c\udff0", "hero_bg": "linear-gradient(135deg,#3a2a1a,#4a3a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=600&q=75", "cap": "Cartagena"}]}, {"id": 6, "slug": "la-puerta-grande", "name": "La Puerta Grande", "cat": "comida", "city": "Cartagena", "region": "Bol\u00edvar", "rating": 4.6, "rev": 156, "price": "Desde $35.000", "emoji": "\ud83e\udd9e", "hero_bg": "linear-gradient(135deg,#3a0a0a,#4a1a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=75", "cap": "Mariscos"}]}, {"id": 7, "slug": "valle-del-cocora", "name": "Valle del Cocora", "cat": "sitio", "city": "Salento", "region": "Quind\u00edo", "rating": 4.9, "rev": 540, "price": "Entrada libre", "emoji": "\ud83c\udf34", "hero_bg": "linear-gradient(135deg,#0a2a0a,#1a3a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=600&q=75", "cap": "Palmas"}]}, {"id": 8, "slug": "carnaval-barranquilla", "name": "Carnaval de Barranquilla", "cat": "evento", "city": "Barranquilla", "region": "Atl\u00e1ntico", "rating": 4.8, "rev": 623, "price": "Palcos desde $200.000", "emoji": "\ud83d\udc83", "hero_bg": "linear-gradient(135deg,#1a051a,#2a0a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75", "cap": "Carnaval"}]}, {"id": 9, "slug": "cano-cristales", "name": "Ca\u00f1o Cristales", "cat": "sitio", "city": "La Macarena", "region": "Meta", "rating": 5.0, "rev": 287, "price": "Desde $1.800.000", "emoji": "\ud83c\udf08", "hero_bg": "linear-gradient(135deg,#0a2a3a,#0a1a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1535530992830-e25d07cfa780?w=600&q=75", "cap": "R\u00edo"}]}, {"id": 10, "slug": "cafe-quindio-boutique", "name": "Caf\u00e9 Quind\u00edo Boutique", "cat": "hostal", "city": "Montenegro", "region": "Quind\u00edo", "rating": 4.8, "rev": 119, "price": "Desde $350.000", "emoji": "\u2615", "hero_bg": "linear-gradient(135deg,#2a1a0a,#3a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=75", "cap": "Caf\u00e9"}]},
+  {"id": 11, "slug": "parque-tayrona", "name": "Parque Tayrona", "cat": "sitio", "city": "Santa Marta", "region": "Magdalena", "rating": 4.9, "rev": 892, "price": "Desde $56.000", "emoji": "\ud83c\udfd6\ufe0f", "hero_bg": "linear-gradient(135deg,#0a3a2a,#0a2a3a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=75", "cap": "Playa Cristal"}]},
+  {"id": 12, "slug": "salsa-cali-centro", "name": "Salsa en el Centro · Cali", "cat": "evento", "city": "Cali", "region": "Valle del Cauca", "rating": 4.8, "rev": 456, "price": "Desde $15.000", "emoji": "\ud83d\udd7a", "hero_bg": "linear-gradient(135deg,#2a0a1a,#3a0a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75", "cap": "Salsa Cali"}]},
+  {"id": 13, "slug": "san-agustin-huila", "name": "San Agust\u00edn · Arqueológico", "cat": "sitio", "city": "San Agust\u00edn", "region": "Huila", "rating": 4.9, "rev": 348, "price": "Desde $30.000", "emoji": "\ud83d\uddff", "hero_bg": "linear-gradient(135deg,#1a2a0a,#2a3a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75", "cap": "Parque arqueol\u00f3gico"}]},
+  {"id": 14, "slug": "isla-baru", "name": "Islas del Rosario · Bar\u00fa", "cat": "sitio", "city": "Cartagena", "region": "Bol\u00edvar", "rating": 4.7, "rev": 623, "price": "Desde $120.000", "emoji": "\ud83c\udf0a", "hero_bg": "linear-gradient(135deg,#0a1a3a,#0a2a4a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=75", "cap": "Playa Bar\u00fa"}]},
+  {"id": 15, "slug": "desierto-tatacoa", "name": "Desierto de la Tatacoa", "cat": "sitio", "city": "Villavieja", "region": "Huila", "rating": 4.8, "rev": 267, "price": "Entrada libre", "emoji": "\ud83c\udfdc\ufe0f", "hero_bg": "linear-gradient(135deg,#3a1a0a,#4a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=75", "cap": "Desierto Tatacoa"}]},
+  {"id": 16, "slug": "guatape-piedra", "name": "Guatap\u00e9 · La Piedra del Pe\u00f1ol", "cat": "sitio", "city": "Guatap\u00e9", "region": "Antioquia", "rating": 4.8, "rev": 1240, "price": "Desde $25.000", "emoji": "\ud83d\uddfb", "hero_bg": "linear-gradient(135deg,#0a2a3a,#1a3a4a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=75", "cap": "Piedra del Pe\u00f1ol"}]},
+  {"id": 17, "slug": "mompox-colonial", "name": "Mompox · Ciudad Colonial", "cat": "sitio", "city": "Mompox", "region": "Bol\u00edvar", "rating": 4.9, "rev": 189, "price": "Entrada libre", "emoji": "\ud83c\udfdb\ufe0f", "hero_bg": "linear-gradient(135deg,#2a1a0a,#3a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=75", "cap": "Mompox colonial"}]},
+  {"id": 18, "slug": "providencia-isla", "name": "Isla Providencia", "cat": "sitio", "city": "Providencia", "region": "San Andr\u00e9s", "rating": 5.0, "rev": 143, "price": "Desde $350.000", "emoji": "\ud83c\udf34", "hero_bg": "linear-gradient(135deg,#0a3a2a,#0a4a3a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=75", "cap": "Playa Providencia"}]},
+  {"id": 19, "slug": "barichara-pueblo", "name": "Barichara · El Pueblo m\u00e1s Lindo", "cat": "sitio", "city": "Barichara", "region": "Santander", "rating": 4.9, "rev": 534, "price": "Entrada libre", "emoji": "\ud83c\udfd8\ufe0f", "hero_bg": "linear-gradient(135deg,#2a1a0a,#3a1a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=600&q=75", "cap": "Barichara"}]},
+  {"id": 20, "slug": "capurgana-selva", "name": "Capurgan\u00e1 · Selva y Mar", "cat": "sitio", "city": "Capurgan\u00e1", "region": "Choc\u00f3", "rating": 4.9, "rev": 98, "price": "Desde $250.000", "emoji": "\ud83c\udf3f", "hero_bg": "linear-gradient(135deg,#0a2a1a,#0a3a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=75", "cap": "Capurgan\u00e1"}]},
+  {"id":21,"slug":"selina-medellin","name":"Selina Medellín El Poblado","cat":"hostal","city":"Medellín","region":"Antioquia","rating":4.7,"rev":321,"price":"Desde $65.000","emoji":"🏨","hero_bg":"linear-gradient(135deg,#1a3a5c,#2a4a7c)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=900&q=80","cap":"Selina Medellín El Poblado"},{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=700&q=75","cap":"Selina Medellín El Poblado"}]},
+  {"id":22,"slug":"masaya-cartagena","name":"Masaya Hostel Cartagena","cat":"hostal","city":"Cartagena","region":"Bolívar","rating":4.8,"rev":445,"price":"Desde $70.000","emoji":"🏰","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=900&q=80","cap":"Masaya Hostel Cartagena"},{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=700&q=75","cap":"Masaya Hostel Cartagena"}]},
+  {"id":23,"slug":"lulo-hotel-bogota","name":"Lulo Hotel Bogotá","cat":"hostal","city":"Bogotá","region":"Cundinamarca","rating":4.9,"rev":267,"price":"Desde $280.000","emoji":"🌿","hero_bg":"linear-gradient(135deg,#0a2a1a,#1a3a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80","cap":"Lulo Hotel Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75","cap":"Lulo Hotel Bogotá"}]},
+  {"id":24,"slug":"hostal-ciudad-santa-marta","name":"Hostal Ciudad Santa Marta","cat":"hostal","city":"Santa Marta","region":"Magdalena","rating":4.6,"rev":198,"price":"Desde $40.000","emoji":"🌊","hero_bg":"linear-gradient(135deg,#0a1a3a,#1a2a4a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=900&q=80","cap":"Hostal Ciudad Santa Marta"},{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=700&q=75","cap":"Hostal Ciudad Santa Marta"}]},
+  {"id":25,"slug":"patio-del-mundo-medellin","name":"Patio del Mundo Medellín","cat":"hostal","city":"Medellín","region":"Antioquia","rating":4.7,"rev":312,"price":"Desde $45.000","emoji":"🌸","hero_bg":"linear-gradient(135deg,#1a0a2a,#2a1a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80","cap":"Patio del Mundo Medellín"},{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75","cap":"Patio del Mundo Medellín"}]},
+  {"id":26,"slug":"coffee-hostal-armenia","name":"Coffee Hostal Armenia","cat":"hostal","city":"Armenia","region":"Quindío","rating":4.7,"rev":189,"price":"Desde $38.000","emoji":"☕","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&q=80","cap":"Coffee Hostal Armenia"},{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=700&q=75","cap":"Coffee Hostal Armenia"}]},
+  {"id":27,"slug":"nomad-hostel-cali","name":"Nomad Hostel Cali","cat":"hostal","city":"Cali","region":"Valle del Cauca","rating":4.6,"rev":234,"price":"Desde $35.000","emoji":"🕺","hero_bg":"linear-gradient(135deg,#1a0a2a,#3a0a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=900&q=80","cap":"Nomad Hostel Cali"},{"type":"photo","url":"https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=700&q=75","cap":"Nomad Hostel Cali"}]},
+  {"id":28,"slug":"canopy-hostel-salento","name":"Canopy Hostel Salento","cat":"hostal","city":"Salento","region":"Quindío","rating":4.8,"rev":178,"price":"Desde $42.000","emoji":"🌴","hero_bg":"linear-gradient(135deg,#0a2a0a,#1a3a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=900&q=80","cap":"Canopy Hostel Salento"},{"type":"photo","url":"https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=700&q=75","cap":"Canopy Hostel Salento"}]},
+  {"id":29,"slug":"the-wild-hostel-tayrona","name":"The Wild Hostel Tayrona","cat":"hostal","city":"Buritaca","region":"Magdalena","rating":4.7,"rev":156,"price":"Desde $55.000","emoji":"🌊","hero_bg":"linear-gradient(135deg,#0a2a2a,#0a3a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80","cap":"The Wild Hostel Tayrona"},{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75","cap":"The Wild Hostel Tayrona"}]},
+  {"id":30,"slug":"casa-vieja-popayan","name":"Casa Vieja Popayán","cat":"hostal","city":"Popayán","region":"Cauca","rating":4.8,"rev":143,"price":"Desde $35.000","emoji":"⛪","hero_bg":"linear-gradient(135deg,#2a2a2a,#3a3a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80","cap":"Casa Vieja Popayán"},{"type":"photo","url":"https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=700&q=75","cap":"Casa Vieja Popayán"}]},
+  {"id":31,"slug":"barichara-hostal-guane","name":"Hostal El Camino Barichara","cat":"hostal","city":"Barichara","region":"Santander","rating":4.9,"rev":112,"price":"Desde $48.000","emoji":"🏘️","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=900&q=80","cap":"Hostal El Camino Barichara"},{"type":"photo","url":"https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=700&q=75","cap":"Hostal El Camino Barichara"}]},
+  {"id":32,"slug":"amazon-lodge-leticia","name":"Amazon Lodge Leticia","cat":"hostal","city":"Leticia","region":"Amazonas","rating":4.8,"rev":89,"price":"Desde $120.000","emoji":"🌿","hero_bg":"linear-gradient(135deg,#0a2a0a,#0a3a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1542401886-65d6c61db217?w=900&q=80","cap":"Amazon Lodge Leticia"},{"type":"photo","url":"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=700&q=75","cap":"Amazon Lodge Leticia"}]},
+  {"id":33,"slug":"hostal-villa-de-leyva","name":"Hostal Plaza Mayor Villa de Leyva","cat":"hostal","city":"Villa de Leyva","region":"Boyacá","rating":4.8,"rev":234,"price":"Desde $50.000","emoji":"🏛️","hero_bg":"linear-gradient(135deg,#1a1a2a,#2a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=900&q=80","cap":"Hostal Plaza Mayor Villa de Leyva"},{"type":"photo","url":"https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=700&q=75","cap":"Hostal Plaza Mayor Villa de Leyva"}]},
+  {"id":34,"slug":"hostal-san-gil-aventura","name":"Hostal Aventura San Gil","cat":"hostal","city":"San Gil","region":"Santander","rating":4.7,"rev":278,"price":"Desde $42.000","emoji":"🤿","hero_bg":"linear-gradient(135deg,#0a2a3a,#1a3a4a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=900&q=80","cap":"Hostal Aventura San Gil"},{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75","cap":"Hostal Aventura San Gil"}]},
+  {"id":35,"slug":"oceano-hostel-taganga","name":"Océano Hostel Taganga","cat":"hostal","city":"Taganga","region":"Magdalena","rating":4.6,"rev":167,"price":"Desde $38.000","emoji":"🤿","hero_bg":"linear-gradient(135deg,#0a1a3a,#0a2a4a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&q=80","cap":"Océano Hostel Taganga"},{"type":"photo","url":"https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75","cap":"Océano Hostel Taganga"}]},
+  {"id":36,"slug":"prudencia-bogota","name":"Prudencia Restaurante Bogotá","cat":"comida","city":"Bogotá","region":"Cundinamarca","rating":4.9,"rev":312,"price":"Desde $85.000","emoji":"🍽️","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Prudencia Restaurante Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=700&q=75","cap":"Prudencia Restaurante Bogotá"}]},
+  {"id":37,"slug":"mini-mal-bogota","name":"Mini Mal Restaurante","cat":"comida","city":"Bogotá","region":"Cundinamarca","rating":4.8,"rev":456,"price":"Desde $70.000","emoji":"🌿","hero_bg":"linear-gradient(135deg,#0a1a0a,#1a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Mini Mal Restaurante"},{"type":"photo","url":"https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75","cap":"Mini Mal Restaurante"}]},
+  {"id":38,"slug":"los-balcones-cartagena","name":"Los Balcones Cartagena","cat":"comida","city":"Cartagena","region":"Bolívar","rating":4.8,"rev":523,"price":"Desde $65.000","emoji":"🦞","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a0a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Los Balcones Cartagena"},{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75","cap":"Los Balcones Cartagena"}]},
+  {"id":39,"slug":"pesquera-jaramillo-medellin","name":"Pesquera Jaramillo Medellín","cat":"comida","city":"Medellín","region":"Antioquia","rating":4.7,"rev":678,"price":"Desde $45.000","emoji":"🐟","hero_bg":"linear-gradient(135deg,#0a1a2a,#0a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=900&q=80","cap":"Pesquera Jaramillo Medellín"},{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75","cap":"Pesquera Jaramillo Medellín"}]},
+  {"id":40,"slug":"canton-chino-cali","name":"Cantón Chino Cali","cat":"comida","city":"Cali","region":"Valle del Cauca","rating":4.6,"rev":389,"price":"Desde $25.000","emoji":"🥢","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a0a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Cantón Chino Cali"},{"type":"photo","url":"https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75","cap":"Cantón Chino Cali"}]},
+  {"id":41,"slug":"matiz-santa-marta","name":"Matiz Restaurante Santa Marta","cat":"comida","city":"Santa Marta","region":"Magdalena","rating":4.8,"rev":234,"price":"Desde $55.000","emoji":"🌴","hero_bg":"linear-gradient(135deg,#1a2a0a,#2a3a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Matiz Restaurante Santa Marta"},{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75","cap":"Matiz Restaurante Santa Marta"}]},
+  {"id":42,"slug":"taller-de-cafe-bogota","name":"Taller de Café Bogotá","cat":"comida","city":"Bogotá","region":"Cundinamarca","rating":4.9,"rev":567,"price":"Desde $12.000","emoji":"☕","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&q=80","cap":"Taller de Café Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75","cap":"Taller de Café Bogotá"}]},
+  {"id":43,"slug":"la-tienda-de-teresa-medellin","name":"La Tienda de Teresa Medellín","cat":"comida","city":"Medellín","region":"Antioquia","rating":4.8,"rev":445,"price":"Desde $18.000","emoji":"🫘","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"La Tienda de Teresa Medellín"},{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75","cap":"La Tienda de Teresa Medellín"}]},
+  {"id":44,"slug":"restaurante-quipu-bogota","name":"Quipu Restaurante Bogotá","cat":"comida","city":"Bogotá","region":"Cundinamarca","rating":4.7,"rev":289,"price":"Desde $60.000","emoji":"🌽","hero_bg":"linear-gradient(135deg,#0a1a0a,#1a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=900&q=80","cap":"Quipu Restaurante Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75","cap":"Quipu Restaurante Bogotá"}]},
+  {"id":45,"slug":"cacao-y-coco-cartagena","name":"Cacao y Coco Cartagena","cat":"comida","city":"Cartagena","region":"Bolívar","rating":4.7,"rev":378,"price":"Desde $30.000","emoji":"🍫","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Cacao y Coco Cartagena"},{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75","cap":"Cacao y Coco Cartagena"}]},
+  {"id":46,"slug":"arepas-del-parque-bogota","name":"Arepas del Parque Bogotá","cat":"comida","city":"Bogotá","region":"Cundinamarca","rating":4.6,"rev":892,"price":"Desde $8.000","emoji":"🫓","hero_bg":"linear-gradient(135deg,#1a1a0a,#2a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Arepas del Parque Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75","cap":"Arepas del Parque Bogotá"}]},
+  {"id":47,"slug":"el-rancherito-salento","name":"El Rancherito Salento","cat":"comida","city":"Salento","region":"Quindío","rating":4.8,"rev":567,"price":"Desde $22.000","emoji":"🍗","hero_bg":"linear-gradient(135deg,#1a1a0a,#2a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=900&q=80","cap":"El Rancherito Salento"},{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75","cap":"El Rancherito Salento"}]},
+  {"id":48,"slug":"la-loncheria-medellin","name":"La Lonchería Medellín","cat":"comida","city":"Medellín","region":"Antioquia","rating":4.7,"rev":423,"price":"Desde $20.000","emoji":"🥗","hero_bg":"linear-gradient(135deg,#1a2a0a,#2a3a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"La Lonchería Medellín"},{"type":"photo","url":"https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=700&q=75","cap":"La Lonchería Medellín"}]},
+  {"id":49,"slug":"rio-cali-restaurante","name":"Río Restaurante Cali","cat":"comida","city":"Cali","region":"Valle del Cauca","rating":4.8,"rev":298,"price":"Desde $55.000","emoji":"🌊","hero_bg":"linear-gradient(135deg,#0a1a2a,#0a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Río Restaurante Cali"},{"type":"photo","url":"https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75","cap":"Río Restaurante Cali"}]},
+  {"id":50,"slug":"sancocho-santandereano","name":"Sancocho Santandereano San Gil","cat":"comida","city":"San Gil","region":"Santander","rating":4.7,"rev":345,"price":"Desde $18.000","emoji":"🍲","hero_bg":"linear-gradient(135deg,#1a1a0a,#2a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80","cap":"Sancocho Santandereano San Gil"},{"type":"photo","url":"https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75","cap":"Sancocho Santandereano San Gil"}]},
+  {"id":51,"slug":"nevado-del-ruiz","name":"Nevado del Ruiz","cat":"sitio","city":"Manizales","region":"Caldas","rating":4.8,"rev":445,"price":"Desde $30.000","emoji":"🏔️","hero_bg":"linear-gradient(135deg,#0a1a2a,#0a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=900&q=80","cap":"Nevado del Ruiz"},{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=700&q=75","cap":"Nevado del Ruiz"}]},
+  {"id":52,"slug":"laguna-la-cocha","name":"Laguna La Cocha Nariño","cat":"sitio","city":"Pasto","region":"Nariño","rating":4.8,"rev":234,"price":"Entrada libre","emoji":"🌊","hero_bg":"linear-gradient(135deg,#0a1a3a,#0a2a4a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=900&q=80","cap":"Laguna La Cocha Nariño"},{"type":"photo","url":"https://images.unsplash.com/photo-1501854140801-50d01698950b?w=700&q=75","cap":"Laguna La Cocha Nariño"}]},
+  {"id":53,"slug":"cienaga-grande-santa-marta","name":"Ciénaga Grande de Santa Marta","cat":"sitio","city":"Ciénaga","region":"Magdalena","rating":4.7,"rev":167,"price":"Desde $80.000","emoji":"🐦","hero_bg":"linear-gradient(135deg,#0a1a2a,#1a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&q=80","cap":"Ciénaga Grande de Santa Marta"},{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=700&q=75","cap":"Ciénaga Grande de Santa Marta"}]},
+  {"id":54,"slug":"serrania-chiribiquete","name":"Serranía de Chiribiquete","cat":"sitio","city":"San José del Guaviare","region":"Caquetá","rating":5.0,"rev":89,"price":"Desde $2.500.000","emoji":"🎨","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a0a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1501854140801-50d01698950b?w=900&q=80","cap":"Serranía de Chiribiquete"},{"type":"photo","url":"https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=700&q=75","cap":"Serranía de Chiribiquete"}]},
+  {"id":55,"slug":"cascada-juan-curi","name":"Cascada Juan Curi Santander","cat":"sitio","city":"Charalá","region":"Santander","rating":4.8,"rev":312,"price":"Desde $10.000","emoji":"💦","hero_bg":"linear-gradient(135deg,#0a1a2a,#0a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=900&q=80","cap":"Cascada Juan Curi Santander"},{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=700&q=75","cap":"Cascada Juan Curi Santander"}]},
+  {"id":56,"slug":"cabo-san-juan-tayrona","name":"Cabo San Juan del Guía Tayrona","cat":"sitio","city":"Santa Marta","region":"Magdalena","rating":4.9,"rev":1240,"price":"Incluido en Tayrona $56.000","emoji":"🌅","hero_bg":"linear-gradient(135deg,#0a2a3a,#0a3a4a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=900&q=80","cap":"Cabo San Juan del Guía Tayrona"},{"type":"photo","url":"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=700&q=75","cap":"Cabo San Juan del Guía Tayrona"}]},
+  {"id":57,"slug":"laguna-tota-boyaca","name":"Laguna de Tota Boyacá","cat":"sitio","city":"Aquitania","region":"Boyacá","rating":4.7,"rev":289,"price":"Entrada libre","emoji":"🏞️","hero_bg":"linear-gradient(135deg,#0a1a2a,#1a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=900&q=80","cap":"Laguna de Tota Boyacá"},{"type":"photo","url":"https://images.unsplash.com/photo-1501854140801-50d01698950b?w=700&q=75","cap":"Laguna de Tota Boyacá"}]},
+  {"id":58,"slug":"pico-cristobal-colon","name":"Pico Cristóbal Colón Sierra Nevada","cat":"sitio","city":"Santa Marta","region":"Magdalena","rating":5.0,"rev":45,"price":"Desde $4.500.000","emoji":"⛰️","hero_bg":"linear-gradient(135deg,#0a0a1a,#1a1a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=900&q=80","cap":"Pico Cristóbal Colón Sierra Nevada"},{"type":"photo","url":"https://images.unsplash.com/photo-1501854140801-50d01698950b?w=700&q=75","cap":"Pico Cristóbal Colón Sierra Nevada"}]},
+  {"id":59,"slug":"rio-claro-antioquia","name":"Río Claro Antioquia","cat":"sitio","city":"Doradal","region":"Antioquia","rating":4.9,"rev":678,"price":"Desde $45.000","emoji":"🦋","hero_bg":"linear-gradient(135deg,#0a2a1a,#1a3a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=900&q=80","cap":"Río Claro Antioquia"},{"type":"photo","url":"https://images.unsplash.com/photo-1542401886-65d6c61db217?w=700&q=75","cap":"Río Claro Antioquia"}]},
+  {"id":60,"slug":"paramo-de-chingaza","name":"Páramo de Chingaza Bogotá","cat":"sitio","city":"Bogotá","region":"Cundinamarca","rating":4.8,"rev":456,"price":"Desde $20.000","emoji":"🌿","hero_bg":"linear-gradient(135deg,#0a1a0a,#1a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1501854140801-50d01698950b?w=900&q=80","cap":"Páramo de Chingaza Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=700&q=75","cap":"Páramo de Chingaza Bogotá"}]},
+  {"id":61,"slug":"palomino-caribe","name":"Palomino Playa y Río","cat":"sitio","city":"Palomino","region":"La Guajira","rating":4.8,"rev":567,"price":"Desde $30.000","emoji":"🏖️","hero_bg":"linear-gradient(135deg,#0a2a1a,#0a3a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&q=80","cap":"Palomino Playa y Río"},{"type":"photo","url":"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=700&q=75","cap":"Palomino Playa y Río"}]},
+  {"id":62,"slug":"alta-guajira-cabo-la-vela","name":"Alta Guajira y Cabo de la Vela","cat":"sitio","city":"Uribía","region":"La Guajira","rating":4.9,"rev":234,"price":"Desde $800.000","emoji":"🌵","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=900&q=80","cap":"Alta Guajira y Cabo de la Vela"},{"type":"photo","url":"https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=700&q=75","cap":"Alta Guajira y Cabo de la Vela"}]},
+  {"id":63,"slug":"parque-national-los-flamencos","name":"Parque Salamanca y Flamencos","cat":"sitio","city":"Ciénaga","region":"Magdalena","rating":4.7,"rev":178,"price":"Desde $15.000","emoji":"🦩","hero_bg":"linear-gradient(135deg,#0a1a2a,#1a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=900&q=80","cap":"Parque Salamanca y Flamencos"},{"type":"photo","url":"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=700&q=75","cap":"Parque Salamanca y Flamencos"}]},
+  {"id":64,"slug":"inirida-guainia","name":"Inírida y El Tuparro Guainía","cat":"sitio","city":"Inírida","region":"Guainía","rating":5.0,"rev":67,"price":"Desde $2.000.000","emoji":"🌺","hero_bg":"linear-gradient(135deg,#0a1a0a,#1a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1542401886-65d6c61db217?w=900&q=80","cap":"Inírida y El Tuparro Guainía"},{"type":"photo","url":"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=700&q=75","cap":"Inírida y El Tuparro Guainía"}]},
+  {"id":65,"slug":"quebrada-la-vieja-bogota","name":"Quebrada La Vieja Bogotá","cat":"sitio","city":"Bogotá","region":"Cundinamarca","rating":4.6,"rev":1890,"price":"Entrada libre","emoji":"🌿","hero_bg":"linear-gradient(135deg,#0a1a0a,#1a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1501854140801-50d01698950b?w=900&q=80","cap":"Quebrada La Vieja Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=700&q=75","cap":"Quebrada La Vieja Bogotá"}]},
+  {"id":66,"slug":"feria-libro-bogota","name":"Feria Internacional del Libro Bogotá","cat":"evento","city":"Bogotá","region":"Cundinamarca","rating":4.8,"rev":1240,"price":"Desde $15.000","emoji":"📚","hero_bg":"linear-gradient(135deg,#1a0a2a,#2a1a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Feria Internacional del Libro Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Feria Internacional del Libro Bogotá"}]},
+  {"id":67,"slug":"festival-petronio-alvarez","name":"Festival Petronio Álvarez Cali","cat":"evento","city":"Cali","region":"Valle del Cauca","rating":4.9,"rev":678,"price":"Gratis","emoji":"🥁","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Festival Petronio Álvarez Cali"},{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Festival Petronio Álvarez Cali"}]},
+  {"id":68,"slug":"festival-del-humor-santa-marta","name":"Festival de Cine Santa Marta","cat":"evento","city":"Santa Marta","region":"Magdalena","rating":4.7,"rev":234,"price":"Desde $15.000","emoji":"🎬","hero_bg":"linear-gradient(135deg,#0a0a1a,#1a1a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=80","cap":"Festival de Cine Santa Marta"},{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=700&q=75","cap":"Festival de Cine Santa Marta"}]},
+  {"id":69,"slug":"feria-artesanias-bogota","name":"Feria Artesanías de Colombia","cat":"evento","city":"Bogotá","region":"Cundinamarca","rating":4.8,"rev":892,"price":"Gratis ingreso","emoji":"🎨","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Feria Artesanías de Colombia"},{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Feria Artesanías de Colombia"}]},
+  {"id":70,"slug":"festival-teatro-callejero-medellin","name":"Festival Teatro Callejero Medellín","cat":"evento","city":"Medellín","region":"Antioquia","rating":4.8,"rev":456,"price":"Gratis","emoji":"🎭","hero_bg":"linear-gradient(135deg,#1a0a1a,#2a0a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=80","cap":"Festival Teatro Callejero Medellín"},{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=700&q=75","cap":"Festival Teatro Callejero Medellín"}]},
+  {"id":71,"slug":"fiestas-san-pedro-huila","name":"Fiestas de San Pedro Huila","cat":"evento","city":"Neiva","region":"Huila","rating":4.7,"rev":345,"price":"Gratis","emoji":"🐎","hero_bg":"linear-gradient(135deg,#2a1a0a,#3a2a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Fiestas de San Pedro Huila"},{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Fiestas de San Pedro Huila"}]},
+  {"id":72,"slug":"marathon-bogota","name":"Media Maratón de Bogotá","cat":"evento","city":"Bogotá","region":"Cundinamarca","rating":4.7,"rev":1890,"price":"Desde $80.000","emoji":"🏃","hero_bg":"linear-gradient(135deg,#0a0a1a,#1a1a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=80","cap":"Media Maratón de Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=700&q=75","cap":"Media Maratón de Bogotá"}]},
+  {"id":73,"slug":"semana-santa-popayan","name":"Semana Santa Popayán","cat":"evento","city":"Popayán","region":"Cauca","rating":5.0,"rev":456,"price":"Gratis","emoji":"⛪","hero_bg":"linear-gradient(135deg,#2a2a2a,#3a3a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=900&q=80","cap":"Semana Santa Popayán"},{"type":"photo","url":"https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=700&q=75","cap":"Semana Santa Popayán"}]},
+  {"id":74,"slug":"festival-internacional-jazz-cartagena","name":"Festival Jazz Cartagena","cat":"evento","city":"Cartagena","region":"Bolívar","rating":4.8,"rev":289,"price":"Desde $0","emoji":"🎷","hero_bg":"linear-gradient(135deg,#0a0a1a,#1a1a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=80","cap":"Festival Jazz Cartagena"},{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=700&q=75","cap":"Festival Jazz Cartagena"}]},
+  {"id":75,"slug":"festival-del-viento-villa-leyva","name":"Festival del Viento Villa de Leyva","cat":"evento","city":"Villa de Leyva","region":"Boyacá","rating":4.7,"rev":378,"price":"Gratis","emoji":"🪁","hero_bg":"linear-gradient(135deg,#0a0a2a,#1a1a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Festival del Viento Villa de Leyva"},{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Festival del Viento Villa de Leyva"}]},
+  {"id":76,"slug":"kayak-rio-suarez","name":"Kayak Río Suárez Santander","cat":"evento","city":"San Gil","region":"Santander","rating":4.8,"rev":234,"price":"Desde $120.000","emoji":"🚣","hero_bg":"linear-gradient(135deg,#0a1a2a,#0a2a3a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=900&q=80","cap":"Kayak Río Suárez Santander"},{"type":"photo","url":"https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=700&q=75","cap":"Kayak Río Suárez Santander"}]},
+  {"id":77,"slug":"ciclovía-bogota","name":"Ciclovía de Bogotá","cat":"evento","city":"Bogotá","region":"Cundinamarca","rating":4.9,"rev":5420,"price":"Gratis","emoji":"🚴","hero_bg":"linear-gradient(135deg,#0a1a0a,#1a2a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=80","cap":"Ciclovía de Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=700&q=75","cap":"Ciclovía de Bogotá"}]},
+  {"id":78,"slug":"guateke-festival-electronico","name":"Guateke Festival Electrónico","cat":"evento","city":"Bogotá","region":"Cundinamarca","rating":4.7,"rev":567,"price":"Desde $80.000","emoji":"🎧","hero_bg":"linear-gradient(135deg,#0a0a1a,#1a0a2a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=900&q=80","cap":"Guateke Festival Electrónico"},{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=700&q=75","cap":"Guateke Festival Electrónico"}]},
+  {"id":79,"slug":"corralejas-sincelejo","name":"Corralejas de Sincelejo","cat":"evento","city":"Sincelejo","region":"Sucre","rating":4.6,"rev":234,"price":"Desde $20.000","emoji":"🐂","hero_bg":"linear-gradient(135deg,#2a0a0a,#3a1a0a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Corralejas de Sincelejo"},{"type":"photo","url":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Corralejas de Sincelejo"}]},
+  {"id":80,"slug":"worldchefs-bogota","name":"Cumbre Gastronómica Bogotá","cat":"evento","city":"Bogotá","region":"Cundinamarca","rating":4.8,"rev":189,"price":"Desde $150.000","emoji":"👨‍🍳","hero_bg":"linear-gradient(135deg,#1a0a0a,#2a1a1a)","photos":[{"type":"photo","url":"https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=900&q=80","cap":"Cumbre Gastronómica Bogotá"},{"type":"photo","url":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75","cap":"Cumbre Gastronómica Bogotá"}]}];
+
+
+var PLACES = [{"id": 2, "slug": "el-cielo-restaurante", "name": "El Cielo Restaurante", "cat": "comida", "city": "Medellín", "region": "Antioquia", "rating": 4.9, "rev": 178, "price": "Desde $280.000", "emoji": "🍽️", "hero_bg": "linear-gradient(135deg,#3a1a0a,#4a2a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=75", "cap": "Gastronomía"}]}, {"id": 6, "slug": "la-puerta-grande", "name": "La Puerta Grande", "cat": "comida", "city": "Cartagena", "region": "Bolívar", "rating": 4.6, "rev": 156, "price": "Desde $35.000", "emoji": "🦞", "hero_bg": "linear-gradient(135deg,#3a0a0a,#4a1a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=75", "cap": "Mariscos"}]}, {"id": 36, "slug": "prudencia-bogota", "name": "Prudencia Restaurante Bogotá", "cat": "comida", "city": "Bogotá", "region": "Cundinamarca", "rating": 4.9, "rev": 312, "price": "Desde $85.000", "emoji": "🍽️", "hero_bg": "linear-gradient(135deg,#1a0a0a,#2a1a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Prudencia Restaurante Bogotá"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=700&q=75", "cap": "Prudencia Restaurante Bogotá"}]}, {"id": 37, "slug": "mini-mal-bogota", "name": "Mini Mal Restaurante", "cat": "comida", "city": "Bogotá", "region": "Cundinamarca", "rating": 4.8, "rev": 456, "price": "Desde $70.000", "emoji": "🌿", "hero_bg": "linear-gradient(135deg,#0a1a0a,#1a2a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Mini Mal Restaurante"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75", "cap": "Mini Mal Restaurante"}]}, {"id": 38, "slug": "los-balcones-cartagena", "name": "Los Balcones Cartagena", "cat": "comida", "city": "Cartagena", "region": "Bolívar", "rating": 4.8, "rev": 523, "price": "Desde $65.000", "emoji": "🦞", "hero_bg": "linear-gradient(135deg,#1a0a0a,#2a0a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Los Balcones Cartagena"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75", "cap": "Los Balcones Cartagena"}]}, {"id": 39, "slug": "pesquera-jaramillo-medellin", "name": "Pesquera Jaramillo Medellín", "cat": "comida", "city": "Medellín", "region": "Antioquia", "rating": 4.7, "rev": 678, "price": "Desde $45.000", "emoji": "🐟", "hero_bg": "linear-gradient(135deg,#0a1a2a,#0a2a3a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=900&q=80", "cap": "Pesquera Jaramillo Medellín"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75", "cap": "Pesquera Jaramillo Medellín"}]}, {"id": 40, "slug": "canton-chino-cali", "name": "Cantón Chino Cali", "cat": "comida", "city": "Cali", "region": "Valle del Cauca", "rating": 4.6, "rev": 389, "price": "Desde $25.000", "emoji": "🥢", "hero_bg": "linear-gradient(135deg,#1a0a0a,#2a0a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Cantón Chino Cali"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75", "cap": "Cantón Chino Cali"}]}, {"id": 41, "slug": "matiz-santa-marta", "name": "Matiz Restaurante Santa Marta", "cat": "comida", "city": "Santa Marta", "region": "Magdalena", "rating": 4.8, "rev": 234, "price": "Desde $55.000", "emoji": "🌴", "hero_bg": "linear-gradient(135deg,#1a2a0a,#2a3a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Matiz Restaurante Santa Marta"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75", "cap": "Matiz Restaurante Santa Marta"}]}, {"id": 42, "slug": "taller-de-cafe-bogota", "name": "Taller de Café Bogotá", "cat": "comida", "city": "Bogotá", "region": "Cundinamarca", "rating": 4.9, "rev": 567, "price": "Desde $12.000", "emoji": "☕", "hero_bg": "linear-gradient(135deg,#1a0a0a,#2a1a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&q=80", "cap": "Taller de Café Bogotá"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75", "cap": "Taller de Café Bogotá"}]}, {"id": 43, "slug": "la-tienda-de-teresa-medellin", "name": "La Tienda de Teresa Medellín", "cat": "comida", "city": "Medellín", "region": "Antioquia", "rating": 4.8, "rev": 445, "price": "Desde $18.000", "emoji": "🫘", "hero_bg": "linear-gradient(135deg,#2a1a0a,#3a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "La Tienda de Teresa Medellín"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75", "cap": "La Tienda de Teresa Medellín"}]}, {"id": 44, "slug": "restaurante-quipu-bogota", "name": "Quipu Restaurante Bogotá", "cat": "comida", "city": "Bogotá", "region": "Cundinamarca", "rating": 4.7, "rev": 289, "price": "Desde $60.000", "emoji": "🌽", "hero_bg": "linear-gradient(135deg,#0a1a0a,#1a2a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=900&q=80", "cap": "Quipu Restaurante Bogotá"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75", "cap": "Quipu Restaurante Bogotá"}]}, {"id": 45, "slug": "cacao-y-coco-cartagena", "name": "Cacao y Coco Cartagena", "cat": "comida", "city": "Cartagena", "region": "Bolívar", "rating": 4.7, "rev": 378, "price": "Desde $30.000", "emoji": "🍫", "hero_bg": "linear-gradient(135deg,#2a1a0a,#3a1a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Cacao y Coco Cartagena"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75", "cap": "Cacao y Coco Cartagena"}]}, {"id": 46, "slug": "arepas-del-parque-bogota", "name": "Arepas del Parque Bogotá", "cat": "comida", "city": "Bogotá", "region": "Cundinamarca", "rating": 4.6, "rev": 892, "price": "Desde $8.000", "emoji": "🫓", "hero_bg": "linear-gradient(135deg,#1a1a0a,#2a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Arepas del Parque Bogotá"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75", "cap": "Arepas del Parque Bogotá"}]}, {"id": 47, "slug": "el-rancherito-salento", "name": "El Rancherito Salento", "cat": "comida", "city": "Salento", "region": "Quindío", "rating": 4.8, "rev": 567, "price": "Desde $22.000", "emoji": "🍗", "hero_bg": "linear-gradient(135deg,#1a1a0a,#2a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=900&q=80", "cap": "El Rancherito Salento"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=75", "cap": "El Rancherito Salento"}]}, {"id": 48, "slug": "la-loncheria-medellin", "name": "La Lonchería Medellín", "cat": "comida", "city": "Medellín", "region": "Antioquia", "rating": 4.7, "rev": 423, "price": "Desde $20.000", "emoji": "🥗", "hero_bg": "linear-gradient(135deg,#1a2a0a,#2a3a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "La Lonchería Medellín"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=700&q=75", "cap": "La Lonchería Medellín"}]}, {"id": 49, "slug": "rio-cali-restaurante", "name": "Río Restaurante Cali", "cat": "comida", "city": "Cali", "region": "Valle del Cauca", "rating": 4.8, "rev": 298, "price": "Desde $55.000", "emoji": "🌊", "hero_bg": "linear-gradient(135deg,#0a1a2a,#0a2a3a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Río Restaurante Cali"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75", "cap": "Río Restaurante Cali"}]}, {"id": 50, "slug": "sancocho-santandereano", "name": "Sancocho Santandereano San Gil", "cat": "comida", "city": "San Gil", "region": "Santander", "rating": 4.7, "rev": 345, "price": "Desde $18.000", "emoji": "🍲", "hero_bg": "linear-gradient(135deg,#1a1a0a,#2a1a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Sancocho Santandereano San Gil"}, {"type": "photo", "url": "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=700&q=75", "cap": "Sancocho Santandereano San Gil"}]}];
+var FEAT   = [3, 7, 9, 8, 2, 4, 11, 15, 16, 18];
+var PHOTOS = {
+  1:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=75',
+  2:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=75',
+  3:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75',
+  4:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75',
+  5:'https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=600&q=75',
+  6:'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=75',
+  7:'https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=600&q=75',
+  8:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75',
+  9:'https://images.unsplash.com/photo-1535530992830-e25d07cfa780?w=600&q=75',
+  10:'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=75',
+  11:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=75',
+  12:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75',
+  13:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75',
+  14:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=75',
+  15:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=75',
+  16:'https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=75',
+  17:'https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=75',
+  18:'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=75',
+  19:'https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=600&q=75',
+  20:'https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=75',
+  21:'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&q=80',
+  22:'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
+  23:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
+  24:'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
+  25:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
+  26:'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80',
+  27:'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&q=80',
+  28:'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
+  29:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
+  30:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
+  31:'https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=600&q=80',
+  32:'https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=80',
+  33:'https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=80',
+  34:'https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=80',
+  35:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+  36:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  37:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  38:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  39:'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80',
+  40:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  41:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  42:'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80',
+  43:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  44:'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=600&q=80',
+  45:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  46:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  47:'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80',
+  48:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  49:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  50:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  51:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80',
+  52:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
+  53:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+  54:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80',
+  55:'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&q=80',
+  56:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
+  57:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
+  58:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80',
+  59:'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&q=80',
+  60:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80',
+  61:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+  62:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80',
+  63:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
+  64:'https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=80',
+  65:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80',
+  66:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
+  67:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
+  68:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  69:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
+  70:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  71:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
+  72:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  73:'https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=80',
+  74:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  75:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
+  76:'https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=80',
+  77:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  78:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
+  79:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
+  80:'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=600&q=80'
+
+};
+var PAGE_SIZE = 18;
+var fCity='',fRegion='',fRating=0,fPrice='',fSearch='',fSort='featured',curPage=1;
+var mmSaved=[];
+try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
+
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  var q=p.get('q');if(q){fSearch=q;var el=document.getElementById('dir-search');if(el)el.value=q;}
+})();
+
+function applyFilters(){
+  var s=document.getElementById('dir-search'),so=document.getElementById('dir-sort');
+  if(s)fSearch=s.value.toLowerCase();if(so)fSort=so.value;
+  fCity=(document.getElementById('filt-city')||{}).value||'';
+  fRegion=(document.getElementById('filt-region')||{}).value||'';
+  curPage=1;renderDir();updateChips();
+}
+function getFiltered(){
+  return PLACES.filter(function(p){
+    if(fCity&&p.city!==fCity)return false;
+    if(fRegion&&p.region!==fRegion)return false;
+    if(fRating&&p.rating<fRating)return false;
+    if(fPrice==='gratis'&&!p.price.toLowerCase().match(/grat|libre/))return false;
+    if(fPrice==='low'&&p.price.toLowerCase().match(/grat|libre/))return false;
+    if(fSearch&&p.name.toLowerCase().indexOf(fSearch)<0&&(p.city||'').toLowerCase().indexOf(fSearch)<0&&(p.region||'').toLowerCase().indexOf(fSearch)<0)return false;
+    return true;
+  });
+}
+function sorted(list){
+  return list.slice().sort(function(a,b){
+    if(fSort==='featured'){var af=FEAT.indexOf(a.id)!==-1,bf=FEAT.indexOf(b.id)!==-1;if(af&&!bf)return -1;if(!af&&bf)return 1;return b.rating-a.rating;}
+    if(fSort==='rating')return b.rating-a.rating;
+    if(fSort==='reviews')return(b.rev||0)-(a.rev||0);
+    if(fSort==='name')return a.name.localeCompare(b.name);
+    return 0;
+  });
+}
+function stars(r){var s='';for(var i=1;i<=5;i++)s+='<span class="dst'+(i<=Math.round(r)?' on':'')+'">★</span>';return s;}
+function renderDir(){
+  var grid=document.getElementById('dir-grid'),empty=document.getElementById('dir-empty');
+  var cnt=document.getElementById('dir-count'),sh=document.getElementById('ph-shown'),av=document.getElementById('ph-avg');
+  if(!grid)return;
+  var f=sorted(getFiltered()),total=f.length,pages=Math.ceil(total/PAGE_SIZE);
+  if(curPage>pages)curPage=1;
+  var sl=f.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  if(cnt)cnt.textContent=total;if(sh)sh.textContent=sl.length;
+  if(av&&total)av.textContent=(f.reduce(function(s,p){return s+p.rating;},0)/total).toFixed(1);
+  if(!sl.length){grid.style.display='none';if(empty)empty.style.display='block';renderPg(0,0);return;}
+  grid.style.display='grid';if(empty)empty.style.display='none';
+  grid.innerHTML=sl.map(function(p){
+    var ph=PHOTOS[p.id]||'',isFeat=FEAT.indexOf(p.id)!==-1,isSaved=mmSaved.indexOf(p.id)!==-1;
+    var img=ph?'<img src="'+ph+'" alt="'+p.name+'" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">':'';
+    return '<a class="dcard'+(isFeat?' is-featured':'')+(isSaved?' is-saved':'')+'" href="'+p.slug+'.html">'
+      +'<div class="dcard-img" style="background:'+(p.hero_bg||'#111')+'">'+img
+      +'<span class="dcard-emoji">'+(p.emoji||'📍')+'</span>'
+      +'<div class="dcard-badge">Comida</div>'
+      +(isFeat?'<div class="dcard-feat-star">⭐ Destacado</div>':'')
+      +'<div class="dcard-save'+(isSaved?' saved':'')+'" onclick="event.preventDefault();tSave('+p.id+',this)">'+(isSaved?'♥':'♡')+'</div>'
+      +'</div>'
+      +'<div class="dcard-body"><div class="dcard-name">'+p.name+'</div>'
+      +'<div class="dcard-loc">📍 '+p.city+', '+(p.region||'Colombia')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:4px">'+stars(p.rating)+'<span class="dcard-rv">('+p.rev+')</span></div>'
+      +'</div>'
+      +'<div class="dcard-footer"><span class="dcard-price">'+p.price+'</span><span class="dcard-arrow">→</span></div>'
+      +'</a>';
+  }).join('');
+  renderPg(pages,curPage);
+}
+function renderPg(pages,cur){
+  var pg=document.getElementById('pg');if(!pg)return;
+  if(pages<=1){pg.innerHTML='';return;}
+  var h='<button class="pgb" onclick="gp('+(cur-1)+')" '+(cur<=1?'disabled':'')+'>← Ant</button>';
+  for(var i=1;i<=pages;i++){
+    if(pages<=7||Math.abs(i-cur)<=2||i===1||i===pages)h+='<button class="pgb'+(i===cur?' on':'')+'" onclick="gp('+i+')">'+i+'</button>';
+    else if(Math.abs(i-cur)===3)h+='<span style="padding:0 4px;color:var(--muted)">…</span>';
+  }
+  h+='<button class="pgb" onclick="gp('+(cur+1)+')" '+(cur>=pages?'disabled':'')+'>Sig →</button>';
+  pg.innerHTML=h;
+}
+function gp(p){curPage=p;renderDir();window.scrollTo({top:0,behavior:'smooth'});}
+function setR(btn,v){fRating=parseFloat(v);document.querySelectorAll('.rpill').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');applyFilters();}
+function setP(btn,v){fPrice=v;document.querySelectorAll('.ppill').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');applyFilters();}
+function resetFilters(){
+  fCity='';fRegion='';fRating=0;fPrice='';fSearch='';fSort='featured';
+  ['filt-city','filt-region','dir-search'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  var so=document.getElementById('dir-sort');if(so)so.value='featured';
+  document.querySelectorAll('.rpill').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('.ppill').forEach(function(b){b.classList.remove('on');});
+  var rAll=document.querySelector('.rpill[data-v="0"]'),pAll=document.querySelector('.ppill[data-v=""]');
+  if(rAll)rAll.classList.add('on');if(pAll)pAll.classList.add('on');
+  curPage=1;renderDir();updateChips();
+}
+function updateChips(){
+  var c=document.getElementById('chips');if(!c)return;
+  var chips=[];
+  if(fCity)chips.push({l:'Ciudad: '+fCity,fn:function(){fCity='';document.getElementById('filt-city').value='';applyFilters();}});
+  if(fRegion)chips.push({l:'Dpto: '+fRegion,fn:function(){fRegion='';document.getElementById('filt-region').value='';applyFilters();}});
+  if(fRating)chips.push({l:'Rating '+fRating+'+',fn:function(){fRating=0;document.querySelector('.rpill[data-v="0"]').classList.add('on');applyFilters();}});
+  if(fPrice)chips.push({l:'Precio: '+fPrice,fn:function(){fPrice='';document.querySelector('.ppill[data-v=""]').classList.add('on');applyFilters();}});
+  c.innerHTML=chips.map(function(ch,i){return '<div class="chip">'+ch.l+'<span class="chip-x" data-i="'+i+'">✕</span></div>';}).join('');
+  c.querySelectorAll('.chip-x').forEach(function(x){var i=parseInt(x.dataset.i);x.onclick=chips[i].fn;});
+}
+/* ── tSave with XP ── */
+function tSave(id, btn) {
+  var idx = mmSaved.indexOf(id);
+  var isNew = idx === -1;
+  if(isNew) {
+    mmSaved.push(id);
+    btn.textContent = '♥';
+    btn.classList.add('saved');
+  } else {
+    mmSaved.splice(idx, 1);
+    btn.textContent = '♡';
+    btn.classList.remove('saved');
+  }
+  try { localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); } catch(e) {}
+  // Award XP for new saves
+  if(isNew) {
+    try {
+      var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+      pts.xp = (pts.xp||0) + 5;
+      pts.saved = (pts.saved||0) + 1;
+      if(!pts.history) pts.history = [];
+      pts.history.unshift({action:'guardar',xp:5,label:'Lugar guardado en Mi Mapa',ts:Date.now()});
+      if(pts.history.length > 50) pts.history.length = 50;
+      localStorage.setItem('user_points', JSON.stringify(pts));
+    } catch(e) {}
+    // Show XP toast
+    var t = document.getElementById('xp-dir-toast');
+    if(!t) {
+      t = document.createElement('div');
+      t.id = 'xp-dir-toast';
+      t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none;opacity:0;transform:translateY(20px);transition:all .2s';
+      document.body.appendChild(t);
+    }
+    t.textContent = '+5 XP — Guardado en Mi Mapa ♥';
+    t.style.opacity = '1'; t.style.transform = 'translateY(0)';
+    clearTimeout(t._t);
+    t._t = setTimeout(function() {
+      t.style.opacity = '0'; t.style.transform = 'translateY(20px)';
+    }, 2500);
+  }
+}
+function openMob(){
+  var d=document.getElementById('mob-filt'),b=document.getElementById('mob-filt-body'),s=document.getElementById('filters-sidebar');
+  if(b&&s)b.innerHTML=s.innerHTML;if(d)d.classList.add('open');
+}
+function closeMob(){document.getElementById('mob-filt').classList.remove('open');}
+document.querySelector('.rpill[data-v="0"]').classList.add('on');
+document.querySelector('.ppill[data-v=""]').classList.add('on');
+renderDir();
+
+/* ── BACK TO TOP ── */
+(function(){
+  var btn = document.getElementById('btt-btn');
+  if(!btn) return;
+  window.addEventListener('scroll', function() {
+    btn.style.display = window.scrollY > 400 ? 'flex' : 'none';
+  }, {passive: true});
+  btn.onmouseenter = function() { this.style.background='#333'; this.style.color='#fff'; };
+  btn.onmouseleave = function() { this.style.background='var(--black)'; this.style.color='rgba(255,255,255,.6)'; };
+})();
+</script>
+
+<!-- Back to top -->
+<button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
+  style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.3)">↑</button>
+</body>
+</html>

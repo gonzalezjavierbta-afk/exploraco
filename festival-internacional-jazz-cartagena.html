@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+  <!-- SEO + Open Graph -->
+  <meta name="description" content="Festival Jazz Cartagena en Cartagena, Bolívar. Descubre lo mejor de Colombia.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://exploracо.co/festival-internacional-jazz-cartagena.html">
+  <!-- Open Graph -->
+  <meta property="og:type"        content="event">
+  <meta property="og:site_name"   content="ExploraCO">
+  <meta property="og:title"       content="Festival Jazz Cartagena – ExploraCO">
+  <meta property="og:description" content="Festival Jazz Cartagena en Cartagena, Bolívar. Descubre lo mejor de Colombia.">
+  <meta property="og:image"       content="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&h=630&fit=crop&q=80">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url"         content="https://exploracо.co/festival-internacional-jazz-cartagena.html">
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Festival Jazz Cartagena – ExploraCO">
+  <meta name="twitter:description" content="Festival Jazz Cartagena en Cartagena, Bolívar. Descubre lo mejor de Colombia.">
+  <meta name="twitter:image"       content="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&h=630&fit=crop&q=80">
+  <!-- Font preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Structured data -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "Festival Jazz Cartagena",
+  "description": "Festival Jazz Cartagena en Cartagena, Bolívar. Descubre lo mejor de Colombia.",
+  "image": "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&h=630&fit=crop&q=80",
+  "location": {
+    "@type": "Place",
+    "name": "Cartagena",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Cartagena",
+      "addressRegion": "Bolívar",
+      "addressCountry": "CO"
+    }
+  },
+  "organizer": {
+    "@type": "Organization",
+    "name": "ExploraCO"
+  },
+  "url": "https://exploracо.co/festival-internacional-jazz-cartagena.html"
+}
+  </script><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Festival Jazz Cartagena – ExploraCO</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}
+.bc{font-family:'Barlow Condensed',sans-serif}
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none;flex-shrink:0}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}
+.tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}
+.tbc a{color:rgba(255,255,255,.4);text-decoration:none}.tbc a:hover{color:var(--gold)}
+.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}
+.tra{display:flex;gap:8px;align-items:center;margin-left:auto}
+.tact{width:32px;height:32px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+.tact:hover{background:rgba(255,255,255,.14)}
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);cursor:pointer}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff}
+.hero{background:var(--black);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:420px}
+.hl{display:flex;flex-direction:column;justify-content:center;gap:18px}
+.hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}
+.htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.9;letter-spacing:.5px}
+.htitle em{color:var(--gold);font-style:italic;display:block}
+.hsub{font-size:13px;color:rgba(255,255,255,.42);line-height:1.8;max-width:480px}
+.hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}
+.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.45)}
+.hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.hbtn:hover{background:var(--gold-dark)}
+.hobtn{background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}
+.hobtn:hover{border-color:rgba(255,255,255,.45);color:#fff}
+.hr{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.psm{height:210px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer}
+.psm img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.psm:hover img{transform:scale(1.04)}
+.psp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:62px}
+.pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.pexp{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;cursor:pointer}
+.prow{display:flex;gap:8px;height:94px}
+.pth{flex:1;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;transition:opacity .15s}
+.pth:hover{opacity:.85}
+.pth img{width:100%;height:100%;object-fit:cover}
+.pthp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px}
+.pvpl{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+.pvic{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:13px}
+.pmore::after{content:attr(data-more);position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:'Barlow Condensed',sans-serif}
+.gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}
+.gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}
+.gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}
+.gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}
+.gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}
+.gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}
+.gsdate{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.75);font-size:11px}
+.gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}
+.gscta:hover{background:#f5f0e8}
+.ssec{padding:44px 4%}
+.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.sin{max-width:860px;margin:0 auto}
+.strow{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.sgl{width:36px;height:3px;background:var(--gold);flex-shrink:0;border-radius:2px}
+.stitle{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:2.5px;color:var(--text)}
+.stnum{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}
+.slead{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}
+.stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px}
+.hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:22px 0;display:flex;align-items:flex-start;gap:12px}
+.hbico{font-size:20px;flex-shrink:0;margin-top:2px}
+.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}
+.hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}
+.tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;transition:box-shadow .2s,transform .2s}
+.icard:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);transform:translateY(-3px)}
+.iico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px}
+.ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)}
+.ival{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.1}
+.isub{font-size:10px;color:var(--muted);margin-top:2px}
+#mapel{width:100%;height:300px;border-radius:8px;border:1px solid var(--border)}
+.mapacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mabtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .15s;text-decoration:none}
+.mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.gold:hover{background:var(--gold-dark)}
+.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.mabtn.dark:hover{background:#333}
+.mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.green:hover{background:#f0fff5}
+.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}.mabtn.outline:hover{border-color:var(--text)}
+.rblock{display:flex;gap:24px;align-items:flex-start;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px}
+.rbavg{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;color:var(--gold);line-height:1;text-align:center}
+.rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}
+.rbst{font-size:18px;color:#DDD}.rbst.on{color:var(--gold)}
+.rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}
+.rbbars{flex:1}.rbbr{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rbbl{font-size:11px;color:var(--muted);min-width:20px;font-weight:600}
+.rbbt{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.rbbf{height:100%;background:var(--gold);border-radius:3px}
+.rbbn{font-size:11px;font-weight:700;color:var(--text);min-width:24px;text-align:right}
+.rvlist{display:flex;flex-direction:column;gap:14px}
+.rvitem{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.rvhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.rvav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;flex-shrink:0}
+.rvname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text)}
+.rvdate{font-size:9px;color:var(--muted)}
+.rvstars{display:flex;gap:1px;margin-left:auto}
+.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold)}
+.rvtag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.rvtx{font-size:13px;color:#444;line-height:1.7}
+.wr{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-top:20px}
+.wrtitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);margin-bottom:14px}
+.wrfields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.wrff{grid-column:1/-1}
+.wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}
+.wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;transition:border-color .15s}
+.wrinp:focus{border-color:var(--gold)}.wrinp::placeholder{color:#CCC}
+textarea.wrinp{resize:vertical;min-height:88px}
+.sprow{display:flex;gap:5px;margin-bottom:12px}
+.spk{font-size:26px;cursor:pointer;color:#DDD;transition:color .1s,transform .1s;user-select:none}
+.spk:hover,.spk.h,.spk.s{color:var(--gold);transform:scale(1.16)}
+.wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.wrsub:hover{background:#333}
+.wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .2s;text-decoration:none}
+.cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.gold:hover{background:var(--gold-dark);transform:translateY(-2px)}
+.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.cbtn.dark:hover{background:#222;transform:translateY(-2px)}
+.cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.green:hover{background:#f0fff5;transform:translateY(-2px)}
+.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}.cbtn.blue:hover{background:#f0f7ff;transform:translateY(-2px)}
+.nbgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nbcard{background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .18s;text-decoration:none;display:block}
+.nbcard:hover{box-shadow:0 8px 24px rgba(0,0,0,.1);transform:translateY(-3px)}
+.nbimg{height:80px;display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden}
+.nbimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.nbemoji{position:relative;z-index:1}
+.nbbdg{position:absolute;top:6px;left:6px;z-index:2;padding:2px 6px;border-radius:3px;font-size:7px;font-weight:700;text-transform:uppercase}
+.nbbody{padding:9px 10px}
+.nbname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text);line-height:1.1;margin-bottom:2px}
+.nbloc{font-size:9px;color:var(--muted)}
+.nbstars{display:flex;align-items:center;gap:2px;margin-top:3px}
+.nbst{font-size:9px;color:#DDD}.nbst.on{color:var(--gold)}
+.footer{background:var(--black);border-top:3px solid var(--gold);padding:36px 4% 20px}
+.ftop{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:4%;margin-bottom:28px}
+.flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:10px;text-decoration:none;display:inline-block}
+.flogo em{color:var(--gold);font-style:normal}
+.fdesc{font-size:11px;color:rgba(255,255,255,.28);line-height:1.8;margin-bottom:14px}
+.fctl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.22);margin-bottom:12px}
+.flinks{display:flex;flex-direction:column;gap:7px}
+.flink{font-size:11px;color:rgba(255,255,255,.38);cursor:pointer;text-decoration:none;transition:color .15s}.flink:hover{color:var(--gold)}
+.fbot{border-top:1px solid rgba(255,255,255,.07);padding-top:16px;display:flex;align-items:center;justify-content:space-between}
+.fcopy{font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links{display:flex;gap:4%;font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links a{color:inherit;text-decoration:none}.fb-links a:hover{color:var(--gold)}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column}
+.lb.open{display:flex}
+.lbcl{position:absolute;top:16px;right:20px;color:#fff;font-size:26px;cursor:pointer;background:none;border:none}
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lbnav:hover{background:rgba(255,255,255,.2)}.lbprev{left:16px}.lbnext{right:16px}
+.lbm{display:flex;align-items:center;justify-content:center;width:min(700px,92vw);height:min(500px,74vh);border-radius:8px;overflow:hidden}
+.lbm img{width:100%;height:100%;object-fit:cover}
+.lbmp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px}
+.lbcp{color:rgba(255,255,255,.55);font-size:12px;margin-top:10px}
+@media(max-width:860px){.hi{grid-template-columns:1fr;gap:20px}.hr{display:none}.igrid{grid-template-columns:1fr 1fr}.nbgrid{grid-template-columns:1fr 1fr}.ftop{grid-template-columns:1fr 1fr;gap:5%}.wrfields{grid-template-columns:1fr}}
+@media(max-width:600px){.cgrid{grid-template-columns:1fr}.igrid{grid-template-columns:1fr}.gsdiv{display:none}}
+
+:root{--cat-color:#A855F7;--cat-bg:#FAF5FF;--cat-tc:#581c87}
+
+/* ── GUARDAR EN MI MAPA ── */
+.save-fab{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;align-items:center;gap:8px;padding:12px 20px;border-radius:50px;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:all .2s}
+.save-fab.unsaved{background:#fff;color:var(--black);border:2px solid rgba(0,0,0,.12)}
+.save-fab.unsaved:hover{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved{background:var(--gold);color:#fff;border:2px solid var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved:hover{background:var(--gold-dark);border-color:var(--gold-dark)}
+.save-fab-icon{font-size:16px;transition:transform .2s}
+.save-fab.saved .save-fab-icon{transform:scale(1.15)}
+.save-fab-toast{position:fixed;bottom:80px;right:24px;z-index:501;background:var(--black);color:#fff;font-size:12px;padding:8px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .3s;font-family:'Outfit',sans-serif;border-left:3px solid var(--gold)}
+.save-fab-toast.show{opacity:1}
+
+
+/* ══════════════════════════════════════════════════════
+   EVENTO TEMPLATE V2
+   Countdown · Lineup · Agenda · Entradas · Tips
+   Transporte · Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --purple:#8B5CF6;--purple-l:rgba(139,92,246,.08);--purple-d:#6D28D9;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --green:#22C55E;--red:#EF4444;--blue:#3B82F6;
+}
+
+/* ── TIPO EVENTO BADGES ── */
+.ev-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.ev-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.evb-festival{background:#FAF5FF;color:#6D28D9}
+.evb-musica{background:#EFF6FF;color:#1D4ED8}
+.evb-gastro{background:#FEF2F2;color:#DC2626}
+.evb-cultura{background:#FFFBEB;color:#92400E}
+.evb-deporte{background:#F0FDF4;color:#166534}
+.evb-electronica{background:#1a0a2a;color:#C4B5FD}
+.evb-folclor{background:#FFF7ED;color:#C2410C}
+.evb-gratis{background:#F0FDF4;border:1px solid #BBF7D0;color:#166534}
+.evb-familiar{background:#EFF6FF;color:#1D4ED8}
+.evb-nocturno{background:#0f0f1a;color:#818CF8}
+
+/* ── COUNTDOWN ── */
+.countdown-wrap{background:var(--black);border-radius:10px;padding:20px 18px;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.cd-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.4)}
+.cd-units{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.cd-unit{text-align:center}
+.cd-num{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;color:var(--sand);line-height:1;min-width:52px;display:block}
+.cd-unit-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);display:block;margin-top:2px}
+.cd-sep{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;color:rgba(255,255,255,.2);align-self:flex-start;margin-top:4px}
+.cd-date-line{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px}
+
+/* ── ENTRADAS EVENTO ── */
+.ticket-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
+.ticket-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s,border-color .15s}
+.ticket-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:#ddd}
+.ticket-card.featured{border-color:var(--gold);border-width:2px}
+.ticket-card.agotado{opacity:.55}
+.tc-top{padding:14px 16px;border-bottom:1px solid var(--border)}
+.tc-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:4px}
+.tc-name{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:var(--black);line-height:1}
+.tc-price-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.tc-price.gratis{color:var(--green)}
+.tc-body{padding:10px 16px;flex:1}
+.tc-perks{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.tc-perk{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.tc-perk::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-avail{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:8px}
+.avail-ok{background:#F0FDF4;color:#166534}
+.avail-few{background:#FFFBEB;color:#92400E}
+.avail-out{background:#FEF2F2;color:#DC2626}
+.tc-buy-btn{display:block;width:100%;padding:9px;background:var(--black);color:var(--white);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:background .15s;text-align:center;text-decoration:none}
+.tc-buy-btn:hover{background:#333}
+.tc-buy-btn.gold{background:var(--gold)}
+.tc-buy-btn.gold:hover{background:var(--gold-d)}
+.tc-buy-btn.disabled{background:#ccc;cursor:not-allowed}
+.ticket-nota{font-size:10px;color:var(--muted);margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── LINEUP / ARTISTAS ── */
+.lineup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:12px}
+.lineup-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.lineup-card:hover{border-color:var(--purple)}
+.lineup-card.headliner{border-color:var(--gold);border-width:2px;background:#FFFBEB}
+.lu-emoji{font-size:36px;margin-bottom:6px;display:block}
+.lu-name{font-size:12px;font-weight:700;color:var(--black);margin-bottom:2px}
+.lu-role{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.lu-detail{font-size:10px;color:var(--muted);line-height:1.5}
+.lu-badge{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.lb-head{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.lb-inv{background:#FAF5FF;color:#6D28D9;border:1px solid #E9D5FF}
+.lb-loc{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+
+/* ── AGENDA / PROGRAMA ── */
+.agenda-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.agenda-tabs::-webkit-scrollbar{display:none}
+.atab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.atab:hover{color:var(--black)}
+.atab.on{color:var(--black);border-bottom-color:var(--purple)}
+.agenda-panel{display:none}
+.agenda-panel.on{display:block}
+.agenda-timeline{display:flex;flex-direction:column;gap:0}
+.ag-step{display:flex;gap:12px;padding-bottom:14px;position:relative}
+.ag-step:not(:last-child)::after{content:'';position:absolute;left:15px;top:32px;bottom:0;width:2px;background:var(--border)}
+.ag-time-col{width:56px;flex-shrink:0;text-align:right;padding-top:6px}
+.ag-time{font-size:10px;font-weight:700;color:var(--purple)}
+.ag-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;background:var(--white);border:2px solid var(--border);box-shadow:0 0 0 3px var(--bg);z-index:1}
+.ag-dot.main{border-color:var(--purple);box-shadow:0 0 0 3px var(--purple-l)}
+.ag-body{flex:1;min-width:0;padding-top:4px}
+.ag-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:2px}
+.ag-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.ag-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.ag-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+.ag-tag.main-tag{background:var(--purple-l);border-color:rgba(139,92,246,.2);color:var(--purple-d)}
+
+/* ── TRANSPORTE ── */
+.transport-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px}
+.transport-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px}
+.tc-icon{font-size:20px;flex-shrink:0}
+.tc-body{}
+.tc-title{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.tc-detail{font-size:10px;color:var(--muted);line-height:1.6}
+.tc-time{font-size:10px;font-weight:700;color:var(--gold)}
+
+/* ── QUÉ LLEVAR EVENTO ── */
+.llevar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.llevar-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.llevar-item.si{background:var(--bg);border-color:var(--border)}
+.llevar-item.no{background:#FEF2F2;border-color:#FECACA}
+.llevar-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.llevar-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.llevar-sub{font-size:9px;color:var(--muted)}
+
+/* ── HOTELES CERCANOS ── */
+.hoteles-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.hotel-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;transition:border-color .15s}
+.hotel-item:hover{border-color:var(--gold)}
+.hotel-emoji{font-size:22px;flex-shrink:0}
+.hotel-info{flex:1;min-width:0}
+.hotel-name{font-size:12px;font-weight:700;color:var(--black)}
+.hotel-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.hotel-price{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--black);flex-shrink:0}
+.hotel-dist{font-size:9px;color:var(--muted);text-align:right}
+
+/* ── EDICIONES / HISTORIA ── */
+.ediciones-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px}
+.edicion-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+.ed-year{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:var(--black);line-height:1}
+.ed-stat{font-size:11px;font-weight:700;color:var(--purple);margin-top:2px}
+.ed-detail{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.5}
+
+/* ── SCORE EVENTO ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-link{font-size:10px;color:var(--purple);text-decoration:none;padding:3px 8px;border:1px solid #E9D5FF;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--purple-l)}
+
+/* ── REVIEWS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ── MOBILE NAV DETAIL PAGES ── */
+.ham-btn{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;background:transparent;border:none;cursor:pointer;padding:4px;flex-shrink:0;z-index:400;margin-left:auto}
+.ham-btn span{display:block;width:22px;height:2px;background:rgba(255,255,255,.7);border-radius:2px;transition:all .25s;transform-origin:center}
+.ham-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.ham-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.ham-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mobile-drawer{position:fixed;top:0;left:0;right:0;bottom:0;z-index:350;display:flex;flex-direction:column;background:rgba(0,0,0,.97);transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.mobile-drawer.open{transform:translateX(0)}
+.md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
+.md-logo em{color:var(--gold);font-style:normal}
+.md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
+.md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
+.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link-icon{font-size:18px;width:24px;text-align:center}
+.md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
+.md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
+@media(max-width:768px){
+  .ham-btn{display:flex}
+  .tbc,.tra{display:none!important}
+  .topbar{padding:0 14px}
+}
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+.sec-nav{position:sticky;top:52px;z-index:200;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
+.sec-nav::-webkit-scrollbar{display:none}
+.sec-nav-inner{display:flex;gap:0;min-width:max-content;padding:0 4%}
+.sn-link{padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+.sn-link:hover{color:var(--black)}
+.sn-link.active{color:var(--black);border-bottom-color:var(--gold)}
+/* Progress bar */
+.page-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:500;background:transparent}
+.page-progress-fill{height:100%;background:var(--gold);width:0%;transition:width .1s linear;border-radius:0 2px 2px 0}
+@media(max-width:768px){
+  .sn-link{padding:10px 12px;font-size:10px}
+  .sec-nav-inner{padding:0 16px}
+}
+
+
+/* ── SHARE BUTTON ── */
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;text-transform:uppercase}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+.tshare-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#111;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px;min-width:180px;z-index:400;display:none;flex-direction:column;gap:2px}
+.tshare-dropdown.open{display:flex}
+.tsd-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);cursor:pointer;transition:background .1s;text-decoration:none}
+.tsd-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.tshare-wrap{position:relative}
+
+</style></head><body>
+
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="tbc">
+    <a href="index.html">Inicio</a><span>›</span>
+    <a href="index.html">Eventos</a><span>›</span>
+    <a href="index.html">Barranquilla</a><span>›</span>
+    <em>Carnaval de Barranquilla</em>
+  </div>
+  <div class="tra">
+    <div class="tact">♥</div>
+    <div class="tshare-wrap">
+    <button class="tshare" onclick="toggleShareMenu(this)">↗ Compartir</button>
+    <div class="tshare-dropdown" id="share-dropdown">
+      <div class="tsd-item" onclick="sharePlace()">📋 Copiar link</div>
+      <div class="tsd-item" onclick="shareToWhatsApp()">💬 WhatsApp</div>
+      <a class="tsd-item" href="javascript:void(0)" onclick="if(navigator.share)sharePlace()">↗ Compartir</a>
+    </div>
+  </div>
+  </div>
+<button class="ham-btn" id="ham-btn" onclick="toggleDrawer()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<!-- Scroll progress bar -->
+<div class="page-progress"><div class="page-progress-fill" id="prog-fill"></div></div>
+<!-- Sticky section nav -->
+<div class="sec-nav" id="sec-nav">
+  <div class="sec-nav-inner">
+    <a class="sn-link" href="#descripcion">Sobre</a><a class="sn-link" href="#galeria">Fotos</a><a class="sn-link" href="#fechas">Fechas</a><a class="sn-link" href="#entradas">Entradas</a><a class="sn-link" href="#lineup">Lineup</a><a class="sn-link" href="#agenda-evento">Programa</a><a class="sn-link" href="#transporte">Transporte</a><a class="sn-link" href="#mapa">Mapa</a><a class="sn-link" href="#faq">FAQ</a><a class="sn-link" href="#resenas">Reseñas</a>
+  </div>
+</div>
+<!-- Mobile drawer -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div class="md-header">
+    <div class="md-logo">EXPLORA<em>CO</em></div>
+    <button class="md-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="md-links">
+    <a class="md-link" href="index.html"><span class="md-link-icon">🏠</span>Inicio</a>
+    <a class="md-link" href="index.html#recs"><span class="md-link-icon">🧭</span>Explorar destinos</a>
+    <a class="md-link" href="index.html#mapa-section"><span class="md-link-icon">🗺️</span>Mapa interactivo</a>
+    <a class="md-link" href="agenda.html"><span class="md-link-icon">📅</span>Agenda cultural</a>
+    <a class="md-link" href="index.html#mymapa-section"><span class="md-link-icon">❤️</span>Mi Viaje</a>
+    <a class="md-link" href="index.html#social-section"><span class="md-link-icon">👥</span>Comunidad</a>
+  </div>
+  <div class="md-footer">
+    <a href="index.html" class="md-back-btn">← Volver al directorio</a>
+  </div>
+</div>
+
+<section class="hero">
+<div class="hi">
+  <div class="hl">
+    <div class="hew">💃 Evento</div>
+    <h1 class="htitle bc">Festival<em>Jazz Cartagena</em></h1>
+    <p class="hsub">Jazz en las plazas coloniales de la ciudad amurallada. Conciertos gratuitos cada enero en Cartagena.</p>
+    <div class="hqi-row">
+      <div class="hqi">📍 Cartagena, Bolívar</div>
+      <div class="hqi">⭐ 4.8 · 289 reseñas</div>
+      <div class="hqi">💰 Desde $0</div>
+      <div class="hqi">⏰ Jueves–Martes antes del Miércoles de Cen</div>
+    </div>
+    <div class="hctar">
+      <button class="hbtn" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">🗺️ Cómo llegar</button>
+      <button class="hobtn" onclick="document.getElementById('galeria').scrollIntoView({behavior:'smooth'})">Ver galería →</button>
+    </div>
+  </div>
+  <div class="hr"><div class="psm" onclick="openLB(0)">
+        <img src="https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80" alt="Carnaval de Barranquilla 2026"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <div class="psp" style="background:linear-gradient(135deg,#1a051a,#2a0a2a);display:none">💃</div>
+        <div class="pbadge">📷 Fotos</div>
+        <div class="pexp">⛶ Ver galería</div>
+    </div>
+    <div class="prow"><div class="pth" onclick="openLB(1)"><img src="https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=700&q=75" alt="Danzas tradicionales del Caribe" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#1a051a,#2a0a2a);display:none">💃</div></div><div class="pth" onclick="openLB(2)"><div class="pthp" style="background:#1a051a">▶️</div><div class="pvpl"><div class="pvic">▶</div></div></div><div class="pth" onclick="openLB(3)"><img src="https://images.unsplash.com/photo-1504609813442-a8924e83f76e?w=700&q=75" alt="Disfraces y tradición caribeña" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#1a051a,#2a0a2a);display:none">💃</div></div></div></div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="descripcion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">1</div></div>
+  <p class="slead bc">El segundo carnaval del mundo. Cuatro días de cumbia, mapalé y danzas afrocolombianas.</p>
+  <p class="stext">El Carnaval de Barranquilla es la mayor expresión de la cultura popular colombiana, declarado Patrimonio Oral e Inmaterial de la Humanidad por la UNESCO en 2003. Durante cuatro días extraordinarios, más de 3.000 artistas fusionan las tradiciones musicales y danzarinas de los pueblos indígenas americanos, africanos y europeos. La Batalla de Flores abre el carnaval, seguida del Gran Desfile de la 44, la Noche de Gaitas y el entierro de Joselito Carnaval.</p>
+  <div class="hbox">
+    <span class="hbico">⭐</span>
+    <div><div class="hblbl">Patrimonio de la Humanidad</div><div class="hbtx">UNESCO 2003 · +3.000 artistas · Segundo carnaval más importante del mundo</div></div>
+  </div>
+  <div class="tagrow"><div class="tpill" style="background:#FAF5FF;color:#581c87">UNESCO</div><div class="tpill" style="background:#FAF5FF;color:#581c87">Febrero / Marzo</div><div class="tpill" style="background:#FAF5FF;color:#581c87">Cumbia</div><div class="tpill" style="background:#FAF5FF;color:#581c87">Mapalé</div><div class="tpill" style="background:#FAF5FF;color:#581c87">Gratuito</div></div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="galeria">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galería de fotos y videos</h2><div class="stnum">2</div></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">
+    <div onclick="openLB(0)" style="border-radius:6px;overflow:hidden;cursor:pointer;grid-row:1/3;aspect-ratio:unset;background:linear-gradient(135deg,#1a051a,#2a0a2a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80" alt="Carnaval de Barranquilla 2026" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">💃</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(1)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a051a,#2a0a2a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=700&q=75" alt="Danzas tradicionales del Caribe" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">💃</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(2)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a051a,#2a0a2a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">▶️</div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:18px">▶</div></div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">▶ VIDEO</div>
+    </div><div onclick="openLB(3)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a051a,#2a0a2a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1504609813442-a8924e83f76e?w=700&q=75" alt="Disfraces y tradición caribeña" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">💃</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ COUNTDOWN + FECHAS ════ -->
+<section class="ssec bwarm" id="fechas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Cuándo es<span class="section-new-badge">Nuevo</span></h2><div class="stnum">3</div></div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Inicio</div>
+      <div style="font-size:15px;font-weight:700;color:var(--black)">Sáb 31 de enero</div>
+      <div style="font-size:11px;color:var(--muted)">2026 · 8:00am</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Cierre</div>
+      <div style="font-size:15px;font-weight:700;color:var(--black)">Mar 3 de febrero</div>
+      <div style="font-size:11px;color:var(--muted)">2026 · 11:59pm</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Duración</div>
+      <div style="font-size:15px;font-weight:700;color:var(--black)">4 días</div>
+      <div style="font-size:11px;color:var(--muted)">Barranquilla, Atlántico</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Edición</div>
+      <div style="font-size:15px;font-weight:700;color:var(--black)">#113</div>
+      <div style="font-size:11px;color:var(--muted)">Desde 1903</div>
+    </div>
+  </div>
+
+  <!-- Countdown -->
+  <div class="countdown-wrap" id="countdown-wrap">
+    <div class="cd-label">Faltan para el Carnaval</div>
+    <div class="cd-units">
+      <div class="cd-unit"><span class="cd-num" id="cd-days">--</span><span class="cd-unit-lbl">Días</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-unit"><span class="cd-num" id="cd-hours">--</span><span class="cd-unit-lbl">Horas</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-unit"><span class="cd-num" id="cd-mins">--</span><span class="cd-unit-lbl">Min</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-unit"><span class="cd-num" id="cd-secs">--</span><span class="cd-unit-lbl">Seg</span></div>
+    </div>
+    <div class="cd-date-line">Sábado 31 de enero 2026 · 8:00am · Vía 40, Barranquilla</div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ ENTRADAS Y PRECIOS ════ -->
+<section class="ssec bwhite" id="entradas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios<span class="section-new-badge">Nuevo</span></h2><div class="stnum">4</div></div>
+  <div class="ticket-grid">
+
+    <div class="ticket-card">
+      <div class="tc-top">
+        <div class="tc-type">Acceso general</div>
+        <div class="tc-name">Palco Popular</div>
+        <div class="tc-price gratis">Gratis</div>
+        <div class="tc-price-sub">Acceso libre al desfile en Vía 40</div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-perks">
+          <div class="tc-perk">Desfile de Batalla de Flores</div>
+          <div class="tc-perk">Gran Parada 1 y 2</div>
+          <div class="tc-perk">Calle 17 carnaval</div>
+        </div>
+        <span class="tc-avail avail-ok">✓ Siempre disponible</span>
+        <a class="tc-buy-btn" href="https://wa.me/573001234567" target="_blank">Ver ubicaciones gratuitas</a>
+      </div>
+    </div>
+
+    <div class="ticket-card featured">
+      <div class="tc-top">
+        <div class="tc-type">⭐ Más popular</div>
+        <div class="tc-name">Palco Tribuna VIP</div>
+        <div class="tc-price">$280.000</div>
+        <div class="tc-price-sub">por persona · por desfile</div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-perks">
+          <div class="tc-perk">Silla numerada con vista frontal</div>
+          <div class="tc-perk">Acceso zona techada</div>
+          <div class="tc-perk">Servicios sanitarios exclusivos</div>
+          <div class="tc-perk">Catering opcional (+$80.000)</div>
+        </div>
+        <span class="tc-avail avail-few">⚡ Últimas unidades</span>
+        <a class="tc-buy-btn gold" href="https://wa.me/573001234567" target="_blank">Comprar por WhatsApp</a>
+      </div>
+    </div>
+
+    <div class="ticket-card">
+      <div class="tc-top">
+        <div class="tc-type">Premium</div>
+        <div class="tc-name">Palco Empresarial</div>
+        <div class="tc-price">$850.000</div>
+        <div class="tc-price-sub">por persona · paquete 4 desfiles</div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-perks">
+          <div class="tc-perk">Los 4 desfiles incluidos</div>
+          <div class="tc-perk">Zona VIP exclusiva</div>
+          <div class="tc-perk">Open bar + catering</div>
+          <div class="tc-perk">Parking reservado</div>
+        </div>
+        <span class="tc-avail avail-few">⚡ Muy limitado</span>
+        <a class="tc-buy-btn" href="https://wa.me/573001234567" target="_blank">Consultar por WhatsApp</a>
+      </div>
+    </div>
+
+    <div class="ticket-card agotado">
+      <div class="tc-top">
+        <div class="tc-type">Agotado</div>
+        <div class="tc-name">Palco Balcón Colonial</div>
+        <div class="tc-price">$420.000</div>
+        <div class="tc-price-sub">por persona · por desfile</div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-perks">
+          <div class="tc-perk">Vista desde balcón histórico</div>
+          <div class="tc-perk">Incluye desayuno tradicional</div>
+        </div>
+        <span class="tc-avail avail-out">✗ Agotado</span>
+        <button class="tc-buy-btn disabled" disabled>Agotado — lista de espera</button>
+      </div>
+    </div>
+
+  </div>
+  <div class="ticket-nota">💡 Los desfiles gratuitos tienen la misma calidad visual que los palcos. La diferencia es comodidad, sombra y servicios. Si es tu primera vez, el palco popular es suficiente para vivir el Carnaval.</div>
+</div>
+</section>
+
+
+<!-- ════ LINEUP / ARTISTAS ════ -->
+<section class="ssec bwarm" id="lineup">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Artistas y protagonistas<span class="section-new-badge">Nuevo</span></h2><div class="stnum">5</div></div>
+  <div class="lineup-grid">
+    <div class="lineup-card headliner">
+      <span class="lu-emoji">👑</span>
+      <div class="lu-name">Rey Momo y Reina del Carnaval</div>
+      <div class="lu-role">Protagonistas oficiales</div>
+      <div class="lu-detail">Elegidos anualmente por el Distrito. Presiden todos los desfiles y actos oficiales.</div>
+      <span class="lu-badge lb-head">Headliner</span>
+    </div>
+    <div class="lineup-card headliner">
+      <span class="lu-emoji">🎭</span>
+      <div class="lu-name">Joselito Carnaval</div>
+      <div class="lu-role">Símbolo del Carnaval</div>
+      <div class="lu-detail">El personaje central del Carnaval. Vive durante los 4 días y es enterrado el miércoles de ceniza.</div>
+      <span class="lu-badge lb-head">Icónico</span>
+    </div>
+    <div class="lineup-card">
+      <span class="lu-emoji">💃</span>
+      <div class="lu-name">Marimonda y Garabato</div>
+      <div class="lu-role">Personajes tradicionales</div>
+      <div class="lu-detail">Disfraces típicos barranquilleros que llenan las calles durante toda la celebración.</div>
+      <span class="lu-badge lb-loc">Folklore</span>
+    </div>
+    <div class="lineup-card">
+      <span class="lu-emoji">🥁</span>
+      <div class="lu-name">Grandes Cumbias y Mapales</div>
+      <div class="lu-role">Música en vivo</div>
+      <div class="lu-detail">Más de 200 agrupaciones musicales de cumbia, mapalé, porro y champeta en los desfiles.</div>
+      <span class="lu-badge lb-inv">Música</span>
+    </div>
+    <div class="lineup-card">
+      <span class="lu-emoji">🎪</span>
+      <div class="lu-name">Comparsas internacionales</div>
+      <div class="lu-role">Invitados especiales</div>
+      <div class="lu-detail">Delegaciones de Brasil, Cuba, Venezuela y Bolivia participan en la Gran Parada.</div>
+      <span class="lu-badge lb-inv">Internacional</span>
+    </div>
+    <div class="lineup-card">
+      <span class="lu-emoji">🎶</span>
+      <div class="lu-name">Festival de Orquestas</div>
+      <div class="lu-role">Noche de música</div>
+      <div class="lu-detail">El gran concierto nocturno de la Vía 40 con orquestas de salsa, vallenato y cumbia.</div>
+      <span class="lu-badge lb-loc">Concierto</span>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ PROGRAMA / AGENDA ════ -->
+<section class="ssec bwhite" id="agenda-evento">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Programa del evento<span class="section-new-badge">Nuevo</span></h2><div class="stnum">6</div></div>
+  <div class="agenda-tabs" id="agenda-ev-tabs">
+    <div class="atab on" onclick="switchAgenda(this,'a1')">Sáb 31 Ene</div>
+    <div class="atab" onclick="switchAgenda(this,'a2')">Dom 1 Feb</div>
+    <div class="atab" onclick="switchAgenda(this,'a3')">Lun 2 Feb</div>
+    <div class="atab" onclick="switchAgenda(this,'a4')">Mar 3 Feb</div>
+  </div>
+
+  <div class="agenda-panel on" id="agenda-a1">
+    <div class="agenda-timeline">
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">8am</div></div>
+        <div class="ag-dot main">🎺</div>
+        <div class="ag-body">
+          <div class="ag-title">Batalla de Flores — El desfile inaugural</div>
+          <div class="ag-desc">El desfile más importante del Carnaval abre la temporada oficial. Comparsas, disfraces y música en vivo por toda la Vía 40. Dura aproximadamente 6 horas.</div>
+          <div class="ag-tags"><span class="ag-tag main-tag">⭐ Desfile principal</span><span class="ag-tag">🎭 Disfraces</span><span class="ag-tag">🆓 Gratis</span></div>
+        </div>
+      </div>
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">4pm</div></div>
+        <div class="ag-dot">🎶</div>
+        <div class="ag-body">
+          <div class="ag-title">Festival de Orquestas — Concierto Vía 40</div>
+          <div class="ag-desc">Noche de orquestas con las mejores bandas de salsa, vallenato y cumbia del Caribe colombiano. Palcos y zona gratuita disponibles.</div>
+          <div class="ag-tags"><span class="ag-tag">🎵 Música en vivo</span><span class="ag-tag">🌙 Nocturno</span></div>
+        </div>
+      </div>
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">10pm</div></div>
+        <div class="ag-dot">🪅</div>
+        <div class="ag-body">
+          <div class="ag-title">Calle 17 — La noche más loca del Carnaval</div>
+          <div class="ag-desc">La calle más famosa de Barranquilla durante el Carnaval. Música hasta las 4am, disfraces espontáneos y ambiente desbordante en todo el barrio El Prado.</div>
+          <div class="ag-tags"><span class="ag-tag">🌙 Toda la noche</span><span class="ag-tag">⚠️ Cuidado con objetos de valor</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="agenda-panel" id="agenda-a2">
+    <div class="agenda-timeline">
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">9am</div></div>
+        <div class="ag-dot main">🎭</div>
+        <div class="ag-body">
+          <div class="ag-title">Gran Parada de Tradición y Folclor</div>
+          <div class="ag-desc">El segundo gran desfile celebra las raíces del Carnaval. Grupos de cumbia, mapalé y porro tradicional. Incluye delegaciones internacionales.</div>
+          <div class="ag-tags"><span class="ag-tag main-tag">⭐ Desfile principal</span><span class="ag-tag">🌎 Internacional</span></div>
+        </div>
+      </div>
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">3pm</div></div>
+        <div class="ag-dot">🎨</div>
+        <div class="ag-body">
+          <div class="ag-title">Congo de Oro — Premiación de comparsas</div>
+          <div class="ag-desc">La ceremonia más esperada por los grupos de danza. El Congo de Oro es el galardón más importante del Carnaval. Transmisión en vivo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="agenda-panel" id="agenda-a3">
+    <div class="agenda-timeline">
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">9am</div></div>
+        <div class="ag-dot main">👑</div>
+        <div class="ag-body">
+          <div class="ag-title">Gran Parada de Fantasía</div>
+          <div class="ag-desc">El desfile más elaborado del Carnaval. Disfraces de fantasía con meses de preparación, carrozas temáticas y el despliegue más visual de los cuatro días.</div>
+          <div class="ag-tags"><span class="ag-tag main-tag">⭐ El más espectacular</span><span class="ag-tag">📸 Mejor para fotos</span></div>
+        </div>
+      </div>
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">8pm</div></div>
+        <div class="ag-dot">🎪</div>
+        <div class="ag-body">
+          <div class="ag-title">Garabato y Noche de Comparsas</div>
+          <div class="ag-desc">La noche del Garabato, el disfraz más icónico de Barranquilla. Presentaciones de comparsas independientes en el Club Campestre y plazas del centro.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="agenda-panel" id="agenda-a4">
+    <div class="agenda-timeline">
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">10am</div></div>
+        <div class="ag-dot main">😢</div>
+        <div class="ag-body">
+          <div class="ag-title">Entierro de Joselito Carnaval</div>
+          <div class="ag-desc">El acto más emotivo del Carnaval. Las "viudas de Joselito" lloran con humor y exageración el fin de la celebración. Un ritual único en el mundo.</div>
+          <div class="ag-tags"><span class="ag-tag main-tag">⭐ Imperdible</span><span class="ag-tag">😂 Único en el mundo</span></div>
+        </div>
+      </div>
+      <div class="ag-step">
+        <div class="ag-time-col"><div class="ag-time">12pm</div></div>
+        <div class="ag-dot">✝️</div>
+        <div class="ag-body">
+          <div class="ag-title">Miércoles de Ceniza — Fin oficial del Carnaval</div>
+          <div class="ag-desc">Con el Miércoles de Ceniza termina el Carnaval y comienza la Cuaresma. La ciudad vuelve a la calma hasta el año siguiente.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ CÓMO LLEGAR ════ -->
+<section class="ssec bwarm" id="transporte">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Cómo llegar al evento<span class="section-new-badge">Nuevo</span></h2><div class="stnum">7</div></div>
+  <div class="transport-grid">
+    <div class="transport-card">
+      <div class="tc-icon">✈️</div>
+      <div class="tc-body">
+        <div class="tc-title">Aeropuerto Ernesto Cortissoz</div>
+        <div class="tc-detail">Vuelos directos desde Bogotá (1h), Medellín (1h), Cali (1h20). Taxi al centro $25.000–$35.000. Recomendado: InDriver.</div>
+        <div class="tc-time">🕐 25 min al centro</div>
+      </div>
+    </div>
+    <div class="transport-card">
+      <div class="tc-icon">🚌</div>
+      <div class="tc-body">
+        <div class="tc-title">Terminal de Transporte</div>
+        <div class="tc-detail">Buses desde Cartagena (2h), Santa Marta (2h30), Medellín (14h). Taxis del terminal al centro $8.000.</div>
+        <div class="tc-time">🕐 10 min al centro</div>
+      </div>
+    </div>
+    <div class="transport-card">
+      <div class="tc-icon">🚇</div>
+      <div class="tc-body">
+        <div class="tc-title">TransMetro (BRT)</div>
+        <div class="tc-detail">Sistema de buses rápido. Línea troncal pasa cerca de la Vía 40. Tarifa $2.800. Muy concurrido en Carnaval.</div>
+        <div class="tc-time">🕐 Variable</div>
+      </div>
+    </div>
+    <div class="transport-card">
+      <div class="tc-icon">🅿️</div>
+      <div class="tc-body">
+        <div class="tc-title">Parqueadero en Carnaval</div>
+        <div class="tc-detail">Zonas de parqueo habilitadas en colegios y lotes cercanos a la Vía 40. Precio $20.000–$40.000/día. Llegar antes de las 7am.</div>
+        <div class="tc-time">⚠️ Llegar muy temprano</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;font-size:10px;color:var(--muted);padding:8px 10px;background:var(--bg);border-radius:5px;border-left:2px solid var(--gold)">
+    💡 Durante el Carnaval el tráfico de Barranquilla colapsa. La mejor estrategia: hospedarte en el centro (a pie de los desfiles) o llegar muy temprano y quedarte todo el día.
+  </div>
+</div>
+</section>
+
+
+<!-- ════ QUÉ LLEVAR / DRESS CODE ════ -->
+<section class="ssec bwhite" id="llevar">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Qué llevar y dress code<span class="section-new-badge">Nuevo</span></h2><div class="stnum">8</div></div>
+  <div class="llevar-grid">
+    <div class="llevar-item si"><div class="llevar-icon">🎭</div><div><div class="llevar-text">Disfraz o ropa colorida</div><div class="llevar-sub">Estar de civil se ve raro. Únete a la fiesta.</div></div></div>
+    <div class="llevar-item si"><div class="llevar-icon">☀️</div><div><div class="llevar-text">Protector solar FPS 50+</div><div class="llevar-sub">Barranquilla en enero: 38°C y sol brutal</div></div></div>
+    <div class="llevar-item si"><div class="llevar-icon">💧</div><div><div class="llevar-text">Agua (2L mínimo)</div><div class="llevar-sub">Hidratación constante bajo el sol</div></div></div>
+    <div class="llevar-item si"><div class="llevar-icon">💵</div><div><div class="llevar-text">Efectivo</div><div class="llevar-sub">Muchos vendedores solo efectivo</div></div></div>
+    <div class="llevar-item si"><div class="llevar-icon">👟</div><div><div class="llevar-text">Zapatos cómodos cerrados</div><div class="llevar-sub">Horas de pie en asfalto caliente</div></div></div>
+    <div class="llevar-item si"><div class="llevar-icon">🎒</div><div><div class="llevar-text">Mochila pequeña</div><div class="llevar-sub">Lo necesario y nada más</div></div></div>
+    <div class="llevar-item no"><div class="llevar-icon">📱</div><div><div class="llevar-text">No sacar celular en zonas masivas</div><div class="llevar-sub">Riesgo de robo en zonas de mucho flujo</div></div></div>
+    <div class="llevar-item no"><div class="llevar-icon">💍</div><div><div class="llevar-text">No llevar joyas o relojes caros</div><div class="llevar-sub">Déjalos en el hotel sin excepción</div></div></div>
+    <div class="llevar-item no"><div class="llevar-icon">👜</div><div><div class="llevar-text">No llevar bolsos abiertos o visibles</div><div class="llevar-sub">Usar mochila con cierre al frente del cuerpo</div></div></div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ HOSPEDAJE CERCANO ════ -->
+<section class="ssec bwarm" id="hospedaje-cercano">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Dónde hospedarse<span class="section-new-badge">Nuevo</span></h2><div class="stnum">9</div></div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Hospedarse en el centro te permite ir a los desfiles a pie y evitar el caos de tráfico. Reservar con 3+ meses de anticipación — el Carnaval agota la ciudad.</div>
+  <div class="hoteles-list">
+    <a class="hotel-item" href="hostal-walled-city.html">
+      <div class="hotel-emoji">🏨</div>
+      <div class="hotel-info">
+        <div class="hotel-name">Hostal Walled City</div>
+        <div class="hotel-meta">⭐ 4.7 · Centro histórico · A pie de la Vía 40</div>
+      </div>
+      <div>
+        <div class="hotel-price">$55.000</div>
+        <div class="hotel-dist">300m al desfile</div>
+      </div>
+    </a>
+    <div class="hotel-item">
+      <div class="hotel-emoji">🏩</div>
+      <div class="hotel-info">
+        <div class="hotel-name">Hotel El Prado (Histórico)</div>
+        <div class="hotel-meta">⭐ 4.8 · El Prado · El hotel más tradicional del Carnaval</div>
+      </div>
+      <div>
+        <div class="hotel-price">$380.000</div>
+        <div class="hotel-dist">600m al desfile</div>
+      </div>
+    </div>
+    <div class="hotel-item">
+      <div class="hotel-emoji">🛎️</div>
+      <div class="hotel-info">
+        <div class="hotel-name">Airbnb en Barranquilla</div>
+        <div class="hotel-meta">Apartamentos en El Prado y Altos del Prado</div>
+      </div>
+      <div>
+        <div class="hotel-price">$120.000+</div>
+        <div class="hotel-dist">Variable</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;font-size:10px;color:var(--muted);padding:8px 10px;background:var(--bg);border-radius:5px;border-left:2px solid var(--gold)">
+    ⚠️ En Carnaval los precios se multiplican por 3–5. Si llegas sin reserva, encuentra precios de $300.000+ por noche en habitaciones básicas. Reserva con mínimo 4 meses de anticipación.
+  </div>
+</div>
+</section>
+
+
+<!-- ════ HISTORIA / EDICIONES ════ -->
+<section class="ssec bwhite" id="historia">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Historia y ediciones<span class="section-new-badge">Nuevo</span></h2><div class="stnum">10</div></div>
+  <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:14px">El Carnaval de Barranquilla fue declarado Patrimonio Oral e Inmaterial de la Humanidad por la UNESCO en 2003. Es la segunda celebración de Carnaval más grande del mundo tras el de Río de Janeiro, con más de 2 millones de personas en las calles durante los 4 días.</p>
+  <div class="ediciones-grid">
+    <div class="edicion-card">
+      <div class="ed-year">1903</div>
+      <div class="ed-stat">Primera edición</div>
+      <div class="ed-detail">Primer registro oficial del Carnaval en Barranquilla</div>
+    </div>
+    <div class="edicion-card">
+      <div class="ed-year">2003</div>
+      <div class="ed-stat">UNESCO</div>
+      <div class="ed-detail">Declarado Patrimonio Inmaterial de la Humanidad</div>
+    </div>
+    <div class="edicion-card">
+      <div class="ed-year">2M+</div>
+      <div class="ed-stat">Visitantes</div>
+      <div class="ed-detail">Afluencia promedio en los 4 días</div>
+    </div>
+    <div class="edicion-card">
+      <div class="ed-year">113</div>
+      <div class="ed-stat">Edición 2026</div>
+      <div class="ed-detail">Años consecutivos de celebración</div>
+    </div>
+    <div class="edicion-card">
+      <div class="ed-year">#2</div>
+      <div class="ed-stat">En el mundo</div>
+      <div class="ed-detail">Segundo Carnaval más grande del mundo</div>
+    </div>
+    <div class="edicion-card">
+      <div class="ed-year">200+</div>
+      <div class="ed-stat">Agrupaciones</div>
+      <div class="ed-detail">Grupos musicales y de danza participantes</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ PUNTUACIÓN ════ -->
+<section class="ssec bwarm" id="puntuacion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Experiencia de asistentes</div><div class="stnum">11</div></div>
+  <div class="score-overall">
+    <div class="so-number">4.9</div>
+    <div class="so-meta">
+      <div class="so-stars">★★★★★</div>
+      <div class="so-label">Excepcional · 2.340 reseñas</div>
+      <div class="so-count">Uno de los eventos más valorados de Colombia</div>
+    </div>
+  </div>
+  <div class="score-grid">
+    <div class="score-label">Desfiles</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:100%;background:#8B5CF6"></div></div>
+    <div class="score-val">5.0</div>
+    <div class="score-label">Ambiente</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:100%;background:#8B5CF6"></div></div>
+    <div class="score-val">5.0</div>
+    <div class="score-label">Organización</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:88%;background:#E8A020"></div></div>
+    <div class="score-val">4.4</div>
+    <div class="score-label">Seguridad</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:84%;background:#3B82F6"></div></div>
+    <div class="score-val">4.2</div>
+    <div class="score-label">Valor / precio</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:96%;background:#22C55E"></div></div>
+    <div class="score-val">4.8</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="mapa">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicación y cómo llegar</h2><div class="stnum">12</div></div>
+  <div id="mapel"></div>
+  <div class="mapacts">
+    <a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination=10.4238,-75.5494" target="_blank">🗺️ Google Maps</a>
+    <a class="mabtn dark" href="https://maps.apple.com/?daddr=10.4238,-75.5494" target="_blank">🍎 Apple Maps</a>
+    <a class="mabtn green" href="https://wa.me/573312345679" target="_blank">💬 WhatsApp</a>
+    <a class="mabtn outline" href="tel:+57 331 234 5679">📞 +57 331 234 5679</a>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ QUIÉN VA ════ -->
+<section class="ssec bwarm" id="quienva">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">¿Quién va este año?<span class="section-new-badge">Social</span></h2><div class="stnum">13</div></div>
+  <div class="quien-va-box">
+    <div class="qv-title">Viajeros de ExploraCO que planean ir al Carnaval 2026</div>
+    <div class="qv-travellers" id="evento-viajeros"></div>
+    <div style="font-size:10px;color:var(--gold);font-weight:600;margin-top:10px;cursor:pointer" onclick="window.location.href='index.html#social-section'">
+      💬 Únete al chat del Carnaval — coordina con otros viajeros →
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ PREGUNTAS FRECUENTES ════ -->
+<section class="ssec bwhite" id="faq">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes<span class="section-new-badge">Nuevo</span></h2><div class="stnum">14</div></div>
+  <div class="faq-list">
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Es seguro el Carnaval de Barranquilla? <span class="faq-arrow">▼</span></div><div class="faq-a">El Carnaval es seguro con precauciones básicas: no sacar celular ni cámara en zonas muy masivas, no llevar joyas ni relojes, usar mochila al frente. En los palcos y zonas de acceso controlado la seguridad es alta. La policía tiene despliegue masivo durante los 4 días.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Con cuánto tiempo de anticipación reservar hotel? <span class="faq-arrow">▼</span></div><div class="faq-a">Mínimo 4 meses antes. El Carnaval agota toda la oferta hotelera de Barranquilla y ciudades cercanas. En enero los precios se multiplican por 3–5. Si viajas en familia o grupo, un apartamento en Airbnb en El Prado suele ser más económico que varios cuartos de hotel.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Se puede ir con niños? <span class="faq-arrow">▼</span></div><div class="faq-a">Sí, el Carnaval es un evento familiar. Los desfiles del día (Batalla de Flores, Gran Parada) son perfectos para niños. Evita las noches en la Calle 17 con menores. La mejor experiencia para familias es el sábado desde las 8am hasta las 5pm.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Qué desfile es el mejor para ver por primera vez? <span class="faq-arrow">▼</span></div><div class="faq-a">La Gran Parada de Fantasía del lunes es la más espectacular visualmente — los disfraces son elaboradísimos. Si quieres el desfile más tradicional e histórico, la Batalla de Flores del sábado es el inaugural y el más emblemático. El Entierro de Joselito del martes es el más único e irrepetible.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Dónde comprar los palcos? <span class="faq-arrow">▼</span></div><div class="faq-a">Los palcos oficiales se venden a través de la Fundación Carnaval de Barranquilla (carnavaldebarranquilla.org) y agencias autorizadas. Cuidado con los revendedores en los días del evento que suelen cobrar 2–3 veces el precio oficial. Comprar con anticipación directamente en la página oficial.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Cuánto dinero llevar para 4 días? <span class="faq-arrow">▼</span></div><div class="faq-a">Presupuesto aproximado por persona (sin hotel): Palcos: $280.000–$850.000 según tipo · Comida y bebida: $80.000–$150.000/día · Transporte: $50.000 total · Disfraz: $30.000–$200.000 · Total estimado: $800.000–$2.000.000 dependiendo del nivel de comodidad.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Se puede ver desde la calle sin pagar palco? <span class="faq-arrow">▼</span></div><div class="faq-a">Completamente. Los desfiles pasan por la Vía 40 y hay miles de zonas de acceso libre. La calidad visual es muy buena desde la calle si llegas temprano (antes de las 7am) para ubicarte. El ambiente en la calle, con empanadas y aguardiente, es parte integral de la experiencia del Carnaval.</div></div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ COMPARAR EVENTOS ════ -->
+<section class="ssec bwarm" id="comparar">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Comparar con otros eventos<span class="section-new-badge">Nuevo</span></h2><div class="stnum">15</div></div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Evento</th>
+        <th>Score</th>
+        <th>Precio desde</th>
+        <th>Duración</th>
+        <th>Ciudad</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="current-row">
+        <td>Carnaval de Barranquilla<div style="font-size:9px;color:#777">Atlántico · Ene–Feb</div></td>
+        <td style="font-weight:700">4.9</td>
+        <td>Gratis</td>
+        <td style="font-size:10px">4 días</td>
+        <td style="font-size:10px">Barranquilla</td>
+        <td><span style="font-size:10px;color:#92400E;font-weight:700">← Estás aquí</span></td>
+      </tr>
+      <tr>
+        <td>Feria de Cali<div style="font-size:9px;color:#777">Valle del Cauca · Diciembre</div></td>
+        <td style="font-weight:700">4.9</td>
+        <td>Gratis</td>
+        <td style="font-size:10px">6 días</td>
+        <td style="font-size:10px">Cali</td>
+        <td><a class="cmp-link" href="feria-cali.html">Ver →</a></td>
+      </tr>
+      <tr>
+        <td>Feria de las Flores<div style="font-size:9px;color:#777">Antioquia · Agosto</div></td>
+        <td style="font-weight:700">4.8</td>
+        <td>Gratis</td>
+        <td style="font-size:10px">10 días</td>
+        <td style="font-size:10px">Medellín</td>
+        <td><a class="cmp-link" href="feria-de-las-flores.html">Ver →</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+
+<!-- ════ RESEÑAS V2 ════ -->
+<section class="ssec bwhite" id="resenas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reseñas de asistentes</div><div class="stnum">16</div></div>
+  <div id="rvlist"></div>
+  <div class="wrvbox" style="margin-top:20px">
+    <div class="wrv-title">Escribir una reseña</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Fuiste como:</div>
+      <div class="rv-traveller-type">
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Solo')">🧳 Solo</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Pareja')">❤️ Pareja</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Amigos')">👥 Amigos</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Familia')">👨‍👩‍👧 Familia</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Primera vez')">✨ Primera vez</div>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Califica el evento:</div>
+      <div class="rv-score-selector">
+        <div class="rv-dim"><div class="rv-dim-label">Desfiles</div><div class="rv-stars-row" data-dim="desfiles"><span class="rv-star" data-v="1" onclick="setDimScore('desfiles',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('desfiles',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('desfiles',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('desfiles',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('desfiles',5)">★</span></div></div>
+        <div class="rv-dim"><div class="rv-dim-label">Ambiente</div><div class="rv-stars-row" data-dim="ambiente"><span class="rv-star" data-v="1" onclick="setDimScore('ambiente',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('ambiente',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('ambiente',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('ambiente',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('ambiente',5)">★</span></div></div>
+        <div class="rv-dim"><div class="rv-dim-label">Organización</div><div class="rv-stars-row" data-dim="organizacion"><span class="rv-star" data-v="1" onclick="setDimScore('organizacion',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('organizacion',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('organizacion',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('organizacion',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('organizacion',5)">★</span></div></div>
+        <div class="rv-dim"><div class="rv-dim-label">Valor / precio</div><div class="rv-stars-row" data-dim="valor"><span class="rv-star" data-v="1" onclick="setDimScore('valor',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('valor',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('valor',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('valor',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('valor',5)">★</span></div></div>
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Puntuación general:</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px"><span class="spk" data-v="1" onclick="spS(1)" onmouseenter="spH(1)" onmouseleave="spO()">★</span><span class="spk" data-v="2" onclick="spS(2)" onmouseenter="spH(2)" onmouseleave="spO()">★</span><span class="spk" data-v="3" onclick="spS(3)" onmouseenter="spH(3)" onmouseleave="spO()">★</span><span class="spk" data-v="4" onclick="spS(4)" onmouseenter="spH(4)" onmouseleave="spO()">★</span><span class="spk" data-v="5" onclick="spS(5)" onmouseenter="spH(5)" onmouseleave="spO()">★</span></div>
+    </div>
+    <input id="wrn" type="text" placeholder="Tu nombre (opcional)" class="wrinp" style="margin-bottom:8px">
+    <textarea id="wrt" placeholder="¿Qué fue lo más memorable? ¿Qué consejo le darías a alguien que va por primera vez?" class="wrinp wrtxa"></textarea>
+    <button class="wrsub" onclick="subRv()">Publicar reseña →</button>
+    <div id="wrok" style="display:none;color:#22C55E;font-size:12px;margin-top:8px">✓ Reseña publicada</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="contact">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">17</div></div>
+  <p class="stext" style="margin-bottom:18px">Usa cualquiera de estas opciones para obtener información, reservar o llegar al lugar.</p>
+  <div class="cgrid">
+    <a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination=10.4238,-75.5494" target="_blank">🗺️ Google Maps</a>
+    <a class="cbtn dark" href="https://maps.apple.com/?daddr=10.4238,-75.5494" target="_blank">🍎 Apple Maps</a>
+    <a class="cbtn green" href="https://wa.me/573312345679" target="_blank">💬 WhatsApp</a>
+    <a class="cbtn blue" href="tel:+57 331 234 5679">📞 +57 331 234 5679</a>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">También te puede interesar</h2><div class="stnum">18</div></div>
+  <div class="nbgrid"><a class="nbcard" href="feria-de-las-flores.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#1a051a,#3a1a3a)">
+                <img src="https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80" alt="Feria de las Flores" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🎉</span>
+                <div class="nbbdg" style="background:#FAF5FF;color:#581c87">Evento</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Feria de las Flores</div>
+                <div class="nbloc">📍 Medellín, Antioquia</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.9 (891)</span></div>
+            </div>
+        </a><a class="nbcard" href="la-puerta-grande.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#3a0a0a,#4a1a1a)">
+                <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&q=80" alt="La Puerta Grande" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🦞</span>
+                <div class="nbbdg" style="background:#FEF2F2;color:#7f1d1d">Restaurante</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">La Puerta Grande</div>
+                <div class="nbloc">📍 Cartagena, Bolívar</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.6 (156)</span></div>
+            </div>
+        </a><a class="nbcard" href="hostal-walled-city.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#3a2a1a,#4a3a2a)">
+                <img src="https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=900&q=80" alt="Hostal Walled City" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🏰</span>
+                <div class="nbbdg" style="background:#EFF6FF;color:#1e3a8a">Hostal</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Hostal Walled City</div>
+                <div class="nbloc">📍 Cartagena, Bolívar</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.7 (203)</span></div>
+            </div>
+        </a></div>
+</div>
+</section>
+
+
+<footer class="footer">
+<div class="ftop">
+  <div>
+    <a href="index.html" class="flogo">EXPLORA<em>CO</em></a>
+    <p class="fdesc">El directorio turístico más completo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
+  </div>
+  <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="index.html">Hostales</a><a class="flink" href="index.html">Gastronomía</a><a class="flink" href="index.html">Sitios turísticos</a><a class="flink" href="index.html">Eventos</a><a class="flink" href="index.html">Mapa cultural</a></div></div>
+  <div><div class="fctl">Destinos</div><div class="flinks"><a class="flink" href="hostal-casa-medina.html">Bogotá</a><a class="flink" href="el-cielo-restaurante.html">Medellín</a><a class="flink" href="ciudad-perdida.html">Sierra Nevada</a><a class="flink" href="feria-de-las-flores.html">Medellín</a><a class="flink" href="hostal-walled-city.html">Cartagena</a></div></div>
+  <div><div class="fctl">Plataforma</div><div class="flinks"><a class="flink" href="#">Publicar lugar</a><a class="flink" href="#">Acerca de</a><a class="flink" href="#">Contacto</a><a class="flink" href="#">Términos</a></div></div>
+</div>
+<div class="fbot">
+  <div class="fcopy">© 2026 ExploraCO · Hecho con ❤️ en Colombia</div>
+  <div class="fb-links"><a href="#">Términos</a><a href="#">Privacidad</a></div>
+</div>
+</footer>
+
+<div class="lb" id="lb">
+  <button class="lbcl" onclick="closeLB()">✕</button>
+  <button class="lbnav lbprev" onclick="lbNav(-1)">‹</button>
+  <button class="lbnav lbnext" onclick="lbNav(1)">›</button>
+  <div id="lbm"></div>
+  <div class="lbcp" id="lbcp"></div>
+</div>
+
+<script>
+const MEDIA=[{"type":"photo","src":"https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80","cap":"Festival Jazz Cartagena"},{"type":"photo","src":"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=700&q=75","cap":"Festival Jazz Cartagena ambiente"}];
+var lbIdx=0;
+function openLB(i){lbIdx=i;renderLB();document.getElementById('lb').classList.add('open');}
+function renderLB(){
+  var m=MEDIA[lbIdx],el=document.getElementById('lbm');
+  if(m.type==='photo'&&m.src){el.innerHTML='<img src="'+m.src+'" alt="'+m.cap+'" onerror="this.style.display=\'none\'">';}
+  else{el.innerHTML='<div class="lbmp" style="background:'+(m.bg||'#111')+'">'+(m.emoji||'▶️')+'</div>';}
+  document.getElementById('lbcp').textContent=(lbIdx+1)+'/'+MEDIA.length+' · '+m.cap;
+}
+function lbNav(d){lbIdx=(lbIdx+d+MEDIA.length)%MEDIA.length;renderLB();}
+function closeLB(){document.getElementById('lb').classList.remove('open');}
+document.getElementById('lb').addEventListener('click',function(e){if(e.target===document.getElementById('lb'))closeLB();});
+
+// Map
+var map=L.map('mapel',{zoomControl:true,scrollWheelZoom:false}).setView([10.4238,-75.5494],14);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:19}).addTo(map);
+var ico=L.divIcon({html:'<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#A855F7;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:16px">🎉</span></div>',iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-40],className:''});
+L.marker([10.4238,-75.5494],{icon:ico}).addTo(map).bindPopup('<b style="font-size:13px">Festival Jazz Cartagena</b><br><span style="font-size:11px;color:#666">📍 Cartagena, Bolívar</span>',{maxWidth:220}).openPopup();
+
+// Stars
+var ps=0;
+function spS(v){ps=v;document.querySelectorAll('.spk').forEach(function(s){var sv=parseInt(s.dataset.v);s.classList.toggle('s',sv<=v);s.classList.remove('h');});}
+function spH(v){document.querySelectorAll('.spk').forEach(function(s){var sv=parseInt(s.dataset.v);s.classList.toggle('h',sv<=v&&!(ps&&sv<=ps));});}
+function spO(){document.querySelectorAll('.spk').forEach(function(s){s.classList.remove('h');});}
+
+// Save/Visit
+var PLACE_ID=74;
+var mmSaved=[],mmVisited=[];
+try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
+try{mmVisited=JSON.parse(localStorage.getItem('mm_visited')||'[]');}catch(e){}
+function updateSaveBtn(){
+  var btn=document.getElementById('save-fab');if(!btn)return;
+  var saved=mmSaved.indexOf(PLACE_ID)!==-1;
+  btn.className='save-fab '+(saved?'saved':'unsaved');
+  var icon=btn.querySelector('.save-fab-icon');if(icon)icon.textContent=saved?'♥':'♡';
+  var lbl=document.getElementById('save-fab-lbl');
+  if(lbl)lbl.textContent=saved?'Guardado ✓':'Guardar en Mi Mapa';
+}
+function toggleSave(){
+  var idx=mmSaved.indexOf(PLACE_ID),saving=idx===-1;
+  if(saving)mmSaved.push(PLACE_ID);else mmSaved.splice(idx,1);
+  try{localStorage.setItem('mm_saved',JSON.stringify(mmSaved));}catch(e){}
+  updateSaveBtn();showToast(saving?'♥ Guardado en tu Mi Mapa':'Eliminado de Mi Mapa');
+}
+function toggleVisited(){
+  var idx=mmVisited.indexOf(PLACE_ID);
+  if(idx===-1){mmVisited.push(PLACE_ID);if(mmSaved.indexOf(PLACE_ID)===-1)mmSaved.push(PLACE_ID);}
+  else mmVisited.splice(idx,1);
+  try{localStorage.setItem('mm_visited',JSON.stringify(mmVisited));}catch(e){}
+  try{localStorage.setItem('mm_saved',JSON.stringify(mmSaved));}catch(e){}
+  updateSaveBtn();updateVisitedBtn();
+}
+function updateVisitedBtn(){
+  var btn=document.getElementById('visited-btn');if(!btn)return;
+  var v=mmVisited.indexOf(PLACE_ID)!==-1;
+  btn.textContent=v?'✓ Ya asistí':'📍 Marcar como asistido';
+  btn.style.background=v?'rgba(34,197,94,.15)':'';
+  btn.style.color=v?'#22C55E':'';btn.style.borderColor=v?'rgba(34,197,94,.4)':'';
+}
+function showToast(msg){
+  var t=document.getElementById('save-toast');if(!t)return;
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2200);
+}
+updateSaveBtn();updateVisitedBtn();
+
+// Countdown
+(function(){
+  var target=new Date('2026-01-31T08:00:00-05:00');
+  function update(){
+    var now=new Date(),diff=target-now;
+    if(diff<=0){
+      var w=document.getElementById('countdown-wrap');
+      if(w)w.innerHTML='<div style="color:#E8A020;font-size:14px;font-weight:700;padding:10px">🎉 ¡El Carnaval está ocurriendo ahora!</div>';
+      return;
+    }
+    var d=Math.floor(diff/86400000);
+    var h=Math.floor((diff%86400000)/3600000);
+    var m=Math.floor((diff%3600000)/60000);
+    var s=Math.floor((diff%60000)/1000);
+    var pad=function(n){return n<10?'0'+n:n;};
+    var el=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
+    el('cd-days',d);el('cd-hours',pad(h));el('cd-mins',pad(m));el('cd-secs',pad(s));
+  }
+  update();
+  setInterval(update,1000);
+})();
+
+// Agenda tabs
+function switchAgenda(btn,panel){
+  document.querySelectorAll('.atab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('.agenda-panel').forEach(function(p){p.classList.remove('on');});
+  btn.classList.add('on');
+  var el=document.getElementById('agenda-'+panel);if(el)el.classList.add('on');
+}
+
+// FAQ
+function toggleFaq(el){el.parentElement.classList.toggle('open');}
+
+// Reviews dims
+var dimScores={desfiles:0,ambiente:0,organizacion:0,valor:0};
+var travellerType='';
+function setDimScore(dim,val){
+  dimScores[dim]=val;
+  var row=document.querySelector('.rv-stars-row[data-dim="'+dim+'"]');if(!row)return;
+  row.querySelectorAll('.rv-star').forEach(function(s){s.classList.toggle('on',parseInt(s.dataset.v)<=val);});
+}
+function selectTravellerType(btn,type){
+  travellerType=type;
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+}
+
+// Quién va
+(function(){
+  var c=document.getElementById('evento-viajeros');if(!c)return;
+  var u=[{i:'CM',bg:'#1a3a5c',tc:'#7eb8f0',n:'Carlos'},{i:'SK',bg:'#0a2a1a',tc:'#7ef0b8',n:'Sarah'},
+         {i:'AV',bg:'#3a1a0a',tc:'#f0a87e',n:'Andrea'},{i:'JW',bg:'#1a051a',tc:'#f07ef0',n:'James'},
+         {i:'MR',bg:'#0a1a3a',tc:'#7ea8f0',n:'María'}];
+  c.innerHTML=u.map(function(u){return '<div class="qv-person"><div class="qv-av" style="background:'+u.bg+';color:'+u.tc+'">'+u.i+'</div><div class="qv-name">'+u.n+'</div></div>';}).join('');
+})();
+
+// Reviews
+var urvs=[];
+try{urvs=JSON.parse(localStorage.getItem('rv_festival-internacional-jazz-cartagena')||'[]');}catch(e){}
+
+function addRv(r){
+  var cols=['#1a3a5c','#3a1a0a','#0a2a1a','#1a051a','#0a1a3a'];
+  var tcs=['#7eb8f0','#f0a87e','#7ef0b8','#f07ef0','#7ea8f0'];
+  var i=document.getElementById('rvlist').children.length%5;
+  var init=r.n.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+  var stH=[1,2,3,4,5].map(function(x){return '<span class="rvst'+(x<=r.s?' on':'')+'">\u2605</span>';}).join('');
+  var typeTag=r.travType?'<span style="background:#F1EFE8;color:#777;font-size:9px;padding:2px 7px;border-radius:3px;margin-right:4px">'+r.travType+'</span>':'';
+  var dimsHtml='';
+  if(r.dims&&r.dims.desfiles){
+    dimsHtml='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px">'+Object.keys(r.dims).filter(function(k){return r.dims[k]>0;}).map(function(k){return '<span style="font-size:9px;color:#777">'+k.charAt(0).toUpperCase()+k.slice(1)+': <b style="color:#1a1a1a">'+r.dims[k]+'\u2605</b></span>';}).join('')+'</div>';
+  }
+  var div=document.createElement('div');div.className='rvitem';
+  div.innerHTML='<div class="rvhead"><div class="rvav" style="background:'+cols[i]+';color:'+tcs[i]+'">'+init+'</div><div><div class="rvname">'+r.n+'</div><div class="rvdate">'+r.d+'</div></div><div class="rvstars">'+stH+'</div></div><div style="margin:5px 0 3px">'+typeTag+'<span class="rvtag" style="background:#FAF5FF;color:#6D28D9;font-size:9px;padding:2px 7px;border-radius:3px">🎉 Evento</span></div>'+dimsHtml+'<div class="rvtx">'+r.t+'</div>';
+  document.getElementById('rvlist').insertBefore(div,document.getElementById('rvlist').firstChild);
+}
+document.getElementById('rvlist').innerHTML='';
+urvs.forEach(function(r){addRv(r);});
+
+function subRv(){
+  var n=(document.getElementById('wrn').value||'').trim();
+  var t=(document.getElementById('wrt').value||'').trim();
+  if(!ps){alert('Selecciona estrellas ★');return;}
+  if(t.length<15){alert('Escribe al menos 15 caracteres.');return;}
+  var now=new Date(),ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var rv={n:n||'Asistente',s:ps,t:t,d:ms[now.getMonth()]+' '+now.getFullYear(),travType:travellerType,dims:Object.assign({},dimScores)};
+  urvs.push(rv);
+  try{localStorage.setItem('rv_festival-internacional-jazz-cartagena',JSON.stringify(urvs));}catch(e){}
+  addRv(rv);
+  document.getElementById('wrn').value='';document.getElementById('wrt').value='';
+  ps=0;document.querySelectorAll('.spk').forEach(function(s){s.classList.remove('s','h');});
+  dimScores={desfiles:0,ambiente:0,organizacion:0,valor:0};
+  document.querySelectorAll('.rv-star').forEach(function(s){s.classList.remove('on');});
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){b.classList.remove('on');});
+  travellerType='';
+  var ok=document.getElementById('wrok'),btn=document.querySelector('.wrsub');
+  btn.style.display='none';ok.style.display='block';
+  setTimeout(function(){btn.style.display='';ok.style.display='none';},3000);
+}
+
+/* ── HAMBURGER MENU ── */
+function toggleDrawer(){
+  var btn=document.getElementById('ham-btn');
+  var drawer=document.getElementById('mobile-drawer');
+  var open=drawer.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){var d=document.getElementById('mobile-drawer');if(d&&d.classList.contains('open'))toggleDrawer();}
+});
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+(function(){
+  var fill = document.getElementById('prog-fill');
+  var links = document.querySelectorAll('.sn-link');
+
+  function updateProgress(){
+    var s = window.scrollY;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = h > 0 ? Math.round(s/h*100) : 0;
+    if(fill) fill.style.width = pct + '%';
+  }
+
+  function updateActiveLink(){
+    var sections = [];
+    links.forEach(function(a){
+      var id = a.getAttribute('href');
+      var el = id ? document.querySelector(id) : null;
+      if(el) sections.push({el:el, a:a});
+    });
+    var scrollY = window.scrollY + 120;
+    var active = null;
+    sections.forEach(function(s){
+      if(s.el.offsetTop <= scrollY) active = s;
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(active) {
+      active.a.classList.add('active');
+      // Scroll active link into view in sticky nav
+      active.a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+  }
+
+  window.addEventListener('scroll', function(){
+    updateProgress();
+    updateActiveLink();
+  }, {passive:true});
+
+  updateProgress();
+  updateActiveLink();
+})();
+
+/* ── BACK TO TOP ── */
+(function(){
+  var btn = document.getElementById('btt-btn');
+  if(!btn) return;
+  window.addEventListener('scroll', function() {
+    btn.style.display = window.scrollY > 400 ? 'flex' : 'none';
+  }, {passive: true});
+  btn.onmouseenter = function() { this.style.background='#333'; this.style.color='#fff'; };
+  btn.onmouseleave = function() { this.style.background='var(--black)'; this.style.color='rgba(255,255,255,.6)'; };
+})();
+
+/* ── XP for reviews (patch from index) ── */
+(function(){
+  var origSubRv = typeof subRv === 'function' ? subRv : null;
+  if(origSubRv) {
+    subRv = function() {
+      var hadError = false;
+      try { origSubRv(); } catch(e) { hadError = true; }
+      if(!hadError) {
+        // Award XP via localStorage — index.html picks it up next visit
+        try {
+          var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+          pts.xp = (pts.xp||0) + 25;
+          pts.reviews = (pts.reviews||0) + 1;
+          if(!pts.history) pts.history = [];
+          pts.history.unshift({action:'resena',xp:25,label:'Reseña publicada',ts:Date.now(),meta:{name:document.title}});
+          if(pts.history.length > 50) pts.history.length = 50;
+          // Check once flags
+          if(!pts.doneOnce) pts.doneOnce = {};
+          localStorage.setItem('user_points', JSON.stringify(pts));
+        } catch(e) {}
+        // Show mini toast
+        var t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none';
+        t.textContent = '+25 XP — ¡Reseña publicada!';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 3000);
+      }
+    };
+  }
+})();
+
+/* ── XP patch for share in detail pages ── */
+(function(){
+  var _origShare = typeof sharePlace === 'function' ? sharePlace : null;
+  if(_origShare) {
+    sharePlace = function() {
+      _origShare();
+      try {
+        var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+        pts.xp = (pts.xp||0) + 8;
+        pts.shares = (pts.shares||0) + 1;
+        if(!pts.history) pts.history = [];
+        var pname = document.title.replace(' – ExploraCO','').replace(' - ExploraCO','');
+        pts.history.unshift({action:'compartir',xp:8,label:'Lugar compartido',ts:Date.now(),meta:{name:pname}});
+        if(pts.history.length > 50) pts.history.length = 50;
+        localStorage.setItem('user_points', JSON.stringify(pts));
+      } catch(e) {}
+    };
+  }
+})();
+</script>
+<!-- ════ GUARDAR EN MI MAPA ════ -->
+<button class="save-fab unsaved" id="save-fab" onclick="toggleSave()">
+  <span class="save-fab-icon">♡</span>
+  <span id="save-fab-lbl">Guardar en Mi Mapa</span>
+</button>
+<div class="save-fab-toast" id="save-toast"></div>
+
+
+<!-- Back to top -->
+<button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
+  style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.3)">↑</button>
+</body></html>
