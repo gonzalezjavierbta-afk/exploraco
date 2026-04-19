@@ -1,0 +1,33 @@
+{
+  "name": "ExploraCO — Directorio turístico Colombia",
+  "short_name": "ExploraCO",
+  "description": "El directorio turístico más completo de Colombia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#E8A020",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=192&h=192&fit=crop&q=80",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=512&h=512&fit=crop&q=80",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["travel", "tourism", "lifestyle"],
+  "lang": "es",
+  "dir": "ltr",
+  "screenshots": [
+    {
+      "src": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=390&h=844&fit=crop&q=80",
+      "sizes": "390x844",
+      "type": "image/png",
+      "platform": "narrow"
+    }
+  ]
+}
