@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Agenda Cultural Colombia 2025–2026 – ExploraCO</title>
+<meta name="description" content="Calendario completo de festivales, eventos culturales, gastronómicos y de naturaleza en Colombia.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--black:#111;--sky:#0A1628;--sand:#F5E6D0;--bg:#F8F7F3;--border:#E5E3DD;--muted:#888}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-height:100vh}
+
+/* NAV */
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);padding:0 4%;display:flex;align-items:center;height:52px;gap:0;position:sticky;top:0;z-index:100}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:18px;background:rgba(255,255,255,.15);margin:0 16px}
+.tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px}
+.tbc a{color:rgba(255,255,255,.4);text-decoration:none}
+.tbc a:hover{color:rgba(255,255,255,.7)}
+.back-btn{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.5);padding:6px 14px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;text-decoration:none;transition:all .15s}
+.back-btn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* HERO */
+.agenda-hero{background:var(--black);padding:48px 4% 36px;border-bottom:1px solid rgba(255,255,255,.07)}
+.ah-eyebrow{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:3px;color:var(--gold);margin-bottom:8px}
+.ah-title{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;letter-spacing:3px;color:var(--sand);line-height:1.05;margin-bottom:12px}
+.ah-title em{color:var(--gold);font-style:normal}
+.ah-sub{font-size:14px;color:rgba(255,255,255,.45);max-width:520px;line-height:1.7;margin-bottom:20px}
+.ah-stats{display:flex;gap:24px;flex-wrap:wrap}
+.ah-stat{text-align:center}
+.ah-stat-n{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:var(--sand);line-height:1}
+.ah-stat-l{font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}
+
+/* FILTERS BAR */
+.filters-bar{background:#fff;border-bottom:1px solid var(--border);padding:14px 4%;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:52px;z-index:90}
+.fb-group{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.fb-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);white-space:nowrap}
+.fb-btn{padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:11px;font-weight:600;cursor:pointer;transition:all .12s;background:#fff;white-space:nowrap}
+.fb-btn:hover{border-color:var(--gold)}
+.fb-btn.on{background:var(--black);border-color:var(--black);color:#fff}
+.fb-sep{width:1px;height:24px;background:var(--border)}
+.search-wrap{margin-left:auto;position:relative}
+.search-inp{border:1.5px solid var(--border);border-radius:20px;padding:6px 14px 6px 32px;font-size:12px;font-family:'Outfit',sans-serif;outline:none;width:200px;transition:border-color .15s}
+.search-inp:focus{border-color:var(--gold)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted)}
+
+/* COUNT BAR */
+.count-bar{padding:12px 4%;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);background:#fff}
+.count-bar b{color:#1a1a1a}
+
+/* CALENDAR MONTHS */
+.calendar-body{padding:28px 4% 60px;max-width:1200px}
+.month-block{margin-bottom:40px}
+.month-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--border)}
+.month-name{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;letter-spacing:2px;color:#1a1a1a;text-transform:uppercase}
+.month-count{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:3px 10px;background:var(--bg);border-radius:20px;border:1px solid var(--border)}
+.month-events{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+
+/* EVENT CARD */
+.ev-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s,border-color .15s;text-decoration:none;color:inherit}
+.ev-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);border-color:#ddd}
+.ev-card.featured{border-width:2px}
+.ev-header{padding:12px 14px 0;display:flex;align-items:flex-start;gap:10px}
+.ev-date-box{background:var(--bg);border-radius:8px;padding:6px 10px;text-align:center;flex-shrink:0;border:1px solid var(--border)}
+.ev-day{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;line-height:1;color:#1a1a1a}
+.ev-month-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700}
+.ev-meta{flex:1;min-width:0}
+.ev-cat-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ev-name{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;line-height:1.2;color:#1a1a1a;margin-bottom:2px}
+.ev-city{font-size:10px;color:var(--muted)}
+.ev-body{padding:8px 14px 12px;flex:1}
+.ev-details{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.ev-detail{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px}
+.ev-featured-badge{display:inline-block;background:var(--gold-l);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.ev-link-btn{display:block;margin:0 14px 12px;background:var(--black);color:#fff;text-align:center;padding:8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.ev-link-btn:hover{background:#333}
+.ev-link-btn.external{background:var(--bg);color:var(--muted);border:1px solid var(--border)}
+
+/* EMPTY STATE */
+.no-events{text-align:center;padding:60px 20px;color:var(--muted)}
+.ne-icon{font-size:40px;margin-bottom:12px}
+.ne-text{font-size:14px}
+
+/* MONTH LETTER */
+.month-strip{display:flex;gap:4px;flex-wrap:wrap;padding:16px 4%;background:#fff;border-bottom:1px solid var(--border);overflow-x:auto}
+.ms-btn{padding:5px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border);transition:all .12s;white-space:nowrap;background:#fff;color:var(--muted)}
+.ms-btn:hover{border-color:var(--gold);color:#1a1a1a}
+.ms-btn.has-events{color:#1a1a1a;border-color:#ccc}
+.ms-btn.active{background:var(--black);border-color:var(--black);color:#fff}
+
+@media(max-width:600px){.ah-title{font-size:32px}.month-events{grid-template-columns:1fr}.filters-bar{flex-direction:column;align-items:flex-start}.search-wrap{margin-left:0;width:100%}.search-inp{width:100%}}
+
+/* ── MOBILE NAV DETAIL PAGES ── */
+.ham-btn{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;background:transparent;border:none;cursor:pointer;padding:4px;flex-shrink:0;z-index:400;margin-left:auto}
+.ham-btn span{display:block;width:22px;height:2px;background:rgba(255,255,255,.7);border-radius:2px;transition:all .25s;transform-origin:center}
+.ham-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.ham-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.ham-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mobile-drawer{position:fixed;top:0;left:0;right:0;bottom:0;z-index:350;display:flex;flex-direction:column;background:rgba(0,0,0,.97);transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.mobile-drawer.open{transform:translateX(0)}
+.md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
+.md-logo em{color:var(--gold);font-style:normal}
+.md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
+.md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
+.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link-icon{font-size:18px;width:24px;text-align:center}
+.md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
+.md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
+@media(max-width:768px){
+  .ham-btn{display:flex}
+  .tbc,.tra{display:none!important}
+  .topbar{padding:0 14px}
+}
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+.sec-nav{position:sticky;top:52px;z-index:200;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
+.sec-nav::-webkit-scrollbar{display:none}
+.sec-nav-inner{display:flex;gap:0;min-width:max-content;padding:0 4%}
+.sn-link{padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+.sn-link:hover{color:var(--black)}
+.sn-link.active{color:var(--black);border-bottom-color:var(--gold)}
+/* Progress bar */
+.page-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:500;background:transparent}
+.page-progress-fill{height:100%;background:var(--gold);width:0%;transition:width .1s linear;border-radius:0 2px 2px 0}
+@media(max-width:768px){
+  .sn-link{padding:10px 12px;font-size:10px}
+  .sec-nav-inner{padding:0 16px}
+}
+
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="tbc">
+    <a href="index.html">Inicio</a><span>›</span><span>Agenda Cultural</span>
+  </div>
+  <a href="index.html" class="back-btn">← Volver al inicio</a>
+<button class="ham-btn" id="ham-btn" onclick="toggleDrawer()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<!-- Scroll progress bar -->
+<div class="page-progress"><div class="page-progress-fill" id="prog-fill"></div></div>
+<!-- Sticky section nav -->
+<div class="sec-nav" id="sec-nav">
+  <div class="sec-nav-inner">
+    
+  </div>
+</div>
+<!-- Mobile drawer -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div class="md-header">
+    <div class="md-logo">EXPLORA<em>CO</em></div>
+    <button class="md-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="md-links">
+    <a class="md-link" href="index.html"><span class="md-link-icon">🏠</span>Inicio</a>
+    <a class="md-link" href="index.html#recs"><span class="md-link-icon">🧭</span>Explorar destinos</a>
+    <a class="md-link" href="index.html#mapa-section"><span class="md-link-icon">🗺️</span>Mapa interactivo</a>
+    <a class="md-link" href="agenda.html"><span class="md-link-icon">📅</span>Agenda cultural</a>
+    <a class="md-link" href="index.html#mymapa-section"><span class="md-link-icon">❤️</span>Mi Viaje</a>
+    <a class="md-link" href="index.html#social-section"><span class="md-link-icon">👥</span>Comunidad</a>
+  </div>
+  <div class="md-footer">
+    <a href="index.html" class="md-back-btn">← Volver al directorio</a>
+  </div>
+</div>
+
+<div class="agenda-hero">
+  <div class="ah-eyebrow">📅 Calendario Colombia 2025–2026</div>
+  <h1 class="ah-title">Agenda <em>cultural</em><br>completa</h1>
+  <p class="ah-sub">Festivales, eventos de música, gastronomía y naturaleza en todo Colombia. Actualizado mensualmente.</p>
+  <div class="ah-stats">
+    <div class="ah-stat"><div class="ah-stat-n" id="total-stat">16</div><div class="ah-stat-l">Eventos</div></div>
+    <div class="ah-stat"><div class="ah-stat-n">12</div><div class="ah-stat-l">Ciudades</div></div>
+    <div class="ah-stat"><div class="ah-stat-n">5</div><div class="ah-stat-l">Categorías</div></div>
+    <div class="ah-stat"><div class="ah-stat-n" id="featured-stat">6</div><div class="ah-stat-l">Destacados</div></div>
+  </div>
+</div>
+
+<!-- Month strip -->
+<div class="month-strip" id="month-strip"></div>
+
+<!-- Filters bar -->
+<div class="filters-bar">
+  <div class="fb-group">
+    <span class="fb-label">Cat:</span>
+    <div class="fb-btn on" data-cat="all" onclick="setCat(this,'all')">Todos</div>
+    <div class="fb-btn" data-cat="festival" onclick="setCat(this,'festival')">🎉 Festivales</div>
+    <div class="fb-btn" data-cat="musica" onclick="setCat(this,'musica')">🎵 Música</div>
+    <div class="fb-btn" data-cat="gastro" onclick="setCat(this,'gastro')">🍽️ Comida</div>
+    <div class="fb-btn" data-cat="naturaleza" onclick="setCat(this,'naturaleza')">🏔️ Naturaleza</div>
+  </div>
+  <div class="fb-sep"></div>
+  <div class="fb-group">
+    <span class="fb-label">Ciudad:</span>
+    <select id="city-sel" onchange="setCity(this.value)" style="border:1.5px solid var(--border);border-radius:4px;padding:5px 10px;font-size:11px;font-family:Outfit,sans-serif;outline:none;cursor:pointer">
+      <option value="">Todas</option>
+    </select>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-inp" id="search-inp" placeholder="Buscar evento…" oninput="setSearch(this.value)">
+  </div>
+</div>
+
+<div class="count-bar"><span>Mostrando <b id="count-lbl">0</b> eventos</span></div>
+
+<div class="calendar-body" id="calendar-body"></div>
+
+<script>
+const AGENDA_EVENTS=[
+  /* ── FESTIVALES ── */
+  {id:1, name:'Carnaval de Barranquilla',         cat:'festival',  city:'Barranquilla', day:14, month:'Feb', time:'Todo el día',   price:'Palcos $200.000', loc:'Vía 40, Barranquilla',             emoji:'💃', color:'#A855F7', url:'carnaval-barranquilla.html', featured:true},
+  {id:2, name:'Feria de las Flores',               cat:'festival',  city:'Medellín',     day:1,  month:'Ago', time:'10am–10pm',    price:'Gratis',          loc:'Centro, Medellín',                 emoji:'🌸', color:'#A855F7', url:'feria-de-las-flores.html',    featured:true},
+  {id:3, name:'Festival Iberoamericano de Teatro', cat:'festival',  city:'Bogotá',       day:3,  month:'Mar', time:'Varios horarios',price:'Desde $30.000',  loc:'Teatros de Bogotá',                emoji:'🎭', color:'#A855F7', url:'index.html',                  featured:true},
+  {id:4, name:'Festival de Jazz de Bogotá',        cat:'musica',    city:'Bogotá',       day:10, month:'Oct', time:'6pm–11pm',     price:'Desde $0',        loc:'Teatro Nacional, Bogotá',          emoji:'🎷', color:'#3B82F6', url:'index.html',                  featured:false},
+  {id:5, name:'Feria de Cali · Salsa y cultura',   cat:'festival',  city:'Cali',         day:25, month:'Dic', time:'Todo el día',  price:'Gratis',          loc:'Centro histórico, Cali',           emoji:'🕺', color:'#A855F7', url:'index.html',                  featured:true},
+  {id:6, name:'Festival Vallenato · Valledupar',   cat:'musica',    city:'Valledupar',   day:27, month:'Abr', time:'Todo el día',  price:'Gratis + palcos', loc:'Parque de la Leyenda, Valledupar', emoji:'🎸', color:'#3B82F6', url:'index.html',                  featured:true},
+  /* ── MÚSICA ── */
+  {id:7, name:'Noche de Gaitas · Ciudad Amurallada',cat:'musica',   city:'Cartagena',    day:20, month:'Mar', time:'7pm–11pm',    price:'$25.000',         loc:'Plaza Trinidad, Cartagena',        emoji:'🎵', color:'#3B82F6', url:'hostal-walled-city.html',     featured:false},
+  {id:8, name:'Concierto Sinfónico al Aire Libre',  cat:'musica',   city:'Medellín',     day:12, month:'Sep', time:'5pm–8pm',     price:'Gratis',          loc:'Parque de los Deseos, Medellín',   emoji:'🎼', color:'#3B82F6', url:'index.html',                  featured:false},
+  {id:9, name:'Rock al Parque',                     cat:'musica',   city:'Bogotá',       day:7,  month:'Jun', time:'12pm–10pm',   price:'Gratis',          loc:'Parque Simón Bolívar, Bogotá',     emoji:'🎸', color:'#3B82F6', url:'index.html',                  featured:false},
+  /* ── GASTRO ── */
+  {id:10,name:'Mercado Gastronómico La Candelaria', cat:'gastro',   city:'Bogotá',       day:22, month:'Mar', time:'9am–5pm',     price:'Gratis',          loc:'Chorro de Quevedo, Bogotá',        emoji:'🍽️',color:'#EF4444', url:'hostal-casa-medina.html',     featured:false},
+  {id:11,name:'Feria del Café · Armenia',           cat:'gastro',   city:'Armenia',      day:15, month:'Jul', time:'Todo el día', price:'Gratis',          loc:'Parque Centenario, Armenia',       emoji:'☕', color:'#EF4444', url:'cafe-quindio-boutique.html',  featured:false},
+  {id:12,name:'Festival Gastronómico del Pacífico', cat:'gastro',   city:'Buenaventura', day:5,  month:'Nov', time:'10am–8pm',    price:'Gratis',          loc:'Malecón, Buenaventura',            emoji:'🦞', color:'#EF4444', url:'index.html',                  featured:false},
+  {id:13,name:'Ruta Gastronómica · Eje Cafetero',   cat:'gastro',   city:'Salento',      day:8,  month:'Abr', time:'9am–6pm',     price:'Desde $50.000',   loc:'Salento, Quindío',                 emoji:'🌿', color:'#EF4444', url:'valle-del-cocora.html',        featured:false},
+  /* ── NATURALEZA / AVENTURA ── */
+  {id:14,name:'Trek Ciudad Perdida · Salida grupal',cat:'naturaleza',city:'Santa Marta', day:25, month:'Mar', time:'Salida 6am',  price:'$1.400.000',      loc:'Terminal, Santa Marta',            emoji:'🏔️',color:'#22C55E', url:'ciudad-perdida.html',          featured:false},
+  {id:15,name:'Avistamiento Ballenas · Bahía Solano',cat:'naturaleza',city:'Bahía Solano',day:10,month:'Jul',time:'6am–12pm',    price:'Desde $180.000',  loc:'Bahía Solano, Chocó',              emoji:'🐋', color:'#22C55E', url:'index.html',                  featured:true},
+  {id:16,name:'Caño Cristales · Temporada de colores',cat:'naturaleza',city:'La Macarena',day:15,month:'Jun',time:'Todo el día', price:'Desde $1.800.000',loc:'La Macarena, Meta',                emoji:'🌈', color:'#22C55E', url:'cano-cristales.html',          featured:true},
+];
+
+var MONTH_ORDER = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+var catFilter = 'all';
+var cityFilter = '';
+var searchFilter = '';
+var monthFilter = '';
+
+function setCat(btn, cat) {
+  document.querySelectorAll('.fb-btn[data-cat]').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  catFilter = cat;
+  render();
+}
+function setCity(v) { cityFilter = v; render(); }
+function setSearch(v) { searchFilter = v.toLowerCase(); render(); }
+function setMonth(m) {
+  monthFilter = monthFilter === m ? '' : m;
+  document.querySelectorAll('.ms-btn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.m === monthFilter);
+  });
+  render();
+}
+
+function filtered() {
+  return AGENDA_EVENTS.filter(function(e) {
+    if(catFilter !== 'all' && e.cat !== catFilter) return false;
+    if(cityFilter && e.city !== cityFilter) return false;
+    if(searchFilter && e.name.toLowerCase().indexOf(searchFilter) === -1 && e.city.toLowerCase().indexOf(searchFilter) === -1) return false;
+    if(monthFilter && e.month !== monthFilter) return false;
+    return true;
+  });
+}
+
+function catStyle(cat) {
+  var styles = {
+    festival: {bg:'#FAF5FF',color:'#7c3aed'},
+    musica:   {bg:'#EFF6FF',color:'#1d4ed8'},
+    gastro:   {bg:'#FEF2F2',color:'#b91c1c'},
+    naturaleza:{bg:'#F0FDF4',color:'#15803d'},
+  };
+  return styles[cat] || {bg:'#F8F7F3',color:'#555'};
+}
+
+function render() {
+  var evs = filtered();
+  document.getElementById('count-lbl').textContent = evs.length;
+  document.getElementById('total-stat').textContent = AGENDA_EVENTS.length;
+  document.getElementById('featured-stat').textContent = AGENDA_EVENTS.filter(function(e){ return e.featured; }).length;
+  
+  // Group by month
+  var byMonth = {};
+  evs.forEach(function(e) {
+    if(!byMonth[e.month]) byMonth[e.month] = [];
+    byMonth[e.month].push(e);
+  });
+  
+  var body = document.getElementById('calendar-body');
+  if(!evs.length) {
+    body.innerHTML = '<div class="no-events"><div class="ne-icon">📭</div><div class="ne-text">Sin eventos con estos filtros. Prueba cambiando la categoría o ciudad.</div></div>';
+    return;
+  }
+  
+  var html = '';
+  MONTH_ORDER.forEach(function(m) {
+    if(!byMonth[m]) return;
+    var mes = byMonth[m];
+    html += '<div class="month-block" id="month-'+m+'">';
+    html += '<div class="month-header"><div class="month-name">'+m+'</div><div class="month-count">'+mes.length+' evento'+(mes.length!==1?'s':'')+'</div></div>';
+    html += '<div class="month-events">';
+    mes.forEach(function(e) {
+      var cs = catStyle(e.cat);
+      var hasPage = e.url !== 'index.html';
+      var catLabels = {festival:'Festival',musica:'Música',gastro:'Gastro',naturaleza:'Naturaleza'};
+      html += '<'+(hasPage?'a href="'+e.url+'"':'div')+' class="ev-card'+(e.featured?' featured':'')+'"'+(e.featured?' style="border-color:'+e.color+'"':'')+' >';
+      html += '<div class="ev-header">';
+      html += '<div class="ev-date-box"><div class="ev-day">'+e.day+'</div><div class="ev-month-lbl">'+e.month+'</div></div>';
+      html += '<div class="ev-meta">';
+      html += '<div class="ev-cat-pill" style="background:'+cs.bg+';color:'+cs.color+'">'+e.emoji+' '+(catLabels[e.cat]||e.cat)+'</div>';
+      html += '<div class="ev-name">'+e.name+'</div>';
+      html += '<div class="ev-city">📍 '+e.loc+'</div>';
+      html += '</div></div>';
+      html += '<div class="ev-body">';
+      html += '<div class="ev-details">';
+      html += '<div class="ev-detail">🕐 '+e.time+'</div>';
+      html += '<div class="ev-detail">💰 '+e.price+'</div>';
+      html += '</div>';
+      if(e.featured) html += '<div class="ev-featured-badge">⭐ Destacado</div>';
+      html += '</div>';
+      if(hasPage) {
+        html += '<a href="'+e.url+'" class="ev-link-btn">Ver detalles →</a>';
+        html += '</a>';
+      } else {
+        html += '<div class="ev-link-btn external">Próximamente</div>';
+        html += '</div>';
+      }
+    });
+    html += '</div></div>';
+  });
+  body.innerHTML = html;
+}
+
+function buildMonthStrip() {
+  var strip = document.getElementById('month-strip');
+  var evsByMonth = {};
+  AGENDA_EVENTS.forEach(function(e){ evsByMonth[e.month] = (evsByMonth[e.month]||0)+1; });
+  strip.innerHTML = '';
+  MONTH_ORDER.forEach(function(m) {
+    var has = evsByMonth[m] > 0;
+    var btn = document.createElement('div');
+    btn.className = 'ms-btn' + (has ? ' has-events' : '');
+    btn.setAttribute('data-m', m);
+    btn.textContent = m + (has ? ' (' + evsByMonth[m] + ')' : '');
+    btn.onclick = (function(mm){ return function(){ setMonth(mm); }; })(m);
+    strip.appendChild(btn);
+  });
+}
+
+function buildCitySelect() {
+  var cities = [...new Set(AGENDA_EVENTS.map(function(e){ return e.city; }))].sort();
+  var sel = document.getElementById('city-sel');
+  cities.forEach(function(c) {
+    var opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+}
+
+buildMonthStrip();
+buildCitySelect();
+render();
+
+/* ── HAMBURGER MENU ── */
+function toggleDrawer(){
+  var btn=document.getElementById('ham-btn');
+  var drawer=document.getElementById('mobile-drawer');
+  var open=drawer.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){var d=document.getElementById('mobile-drawer');if(d&&d.classList.contains('open'))toggleDrawer();}
+});
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+(function(){
+  var fill = document.getElementById('prog-fill');
+  var links = document.querySelectorAll('.sn-link');
+
+  function updateProgress(){
+    var s = window.scrollY;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = h > 0 ? Math.round(s/h*100) : 0;
+    if(fill) fill.style.width = pct + '%';
+  }
+
+  function updateActiveLink(){
+    var sections = [];
+    links.forEach(function(a){
+      var id = a.getAttribute('href');
+      var el = id ? document.querySelector(id) : null;
+      if(el) sections.push({el:el, a:a});
+    });
+    var scrollY = window.scrollY + 120;
+    var active = null;
+    sections.forEach(function(s){
+      if(s.el.offsetTop <= scrollY) active = s;
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(active) {
+      active.a.classList.add('active');
+      // Scroll active link into view in sticky nav
+      active.a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+  }
+
+  window.addEventListener('scroll', function(){
+    updateProgress();
+    updateActiveLink();
+  }, {passive:true});
+
+  updateProgress();
+  updateActiveLink();
+})();
+</script>
+</body>
+</html>

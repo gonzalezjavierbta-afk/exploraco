@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Comunidad de viajeros – ExploraCO</title>
+<meta name="description" content="Únete a la comunidad de viajeros de ExploraCO. Chat, feed, planes colectivos y matching con otros viajeros. Gana puntos y desbloquea badges.">
+<meta name="robots" content="index, follow">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E8A020">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
+body{font-family:'Outfit',sans-serif;background:var(--black);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+/* ── NAV ── */
+nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px;flex-shrink:0}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
+.nav-label{font-size:11px;color:rgba(255,255,255,.5)}
+.nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
+.nav-back:hover{border-color:var(--gold);color:var(--gold)}
+/* ── GATE (shown when not registered) ── */
+#gate{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--black)}
+.gate-inner{max-width:540px;width:100%;text-align:center}
+.gate-logo{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:6px}
+.gate-logo em{color:var(--gold);font-style:normal}
+.gate-badge{display:inline-block;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:10px;font-weight:700;padding:4px 14px;border-radius:20px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:18px}
+.gate-title{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:900;line-height:1.05;color:#fff;margin-bottom:10px}
+.gate-title em{color:var(--gold);font-style:normal}
+.gate-sub{font-size:14px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:28px;max-width:420px;margin-left:auto;margin-right:auto}
+/* Perks grid */
+.gate-perks{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px;text-align:left}
+.gate-perk{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px}
+.gp-icon{font-size:24px;flex-shrink:0}
+.gp-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
+.gp-desc{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5}
+.gp-xp{display:inline-block;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.2);color:var(--gold);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+/* Levels preview */
+.gate-levels{display:flex;gap:6px;justify-content:center;margin-bottom:24px;flex-wrap:wrap}
+.gate-level{display:flex;align-items:center;gap:5px;padding:5px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;font-size:11px;color:rgba(255,255,255,.6)}
+.gate-level span{font-size:15px}
+/* Form */
+.gate-form{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:24px;margin-bottom:14px}
+.gate-form-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.gate-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:11px 14px;font-size:13px;color:#fff;font-family:'Outfit',sans-serif;outline:none;margin-bottom:10px;transition:border-color .15s}
+.gate-inp:focus{border-color:var(--gold)}
+.gate-btn{width:100%;padding:14px;background:var(--gold);border:none;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;cursor:pointer;transition:opacity .15s;color:var(--black)}
+.gate-btn:hover{opacity:.88}
+.gate-enter{display:block;text-align:center;margin-top:10px;font-size:12px;color:rgba(255,255,255,.3);cursor:pointer;transition:color .12s}
+.gate-enter:hover{color:rgba(255,255,255,.6)}
+.gate-enter b{color:rgba(255,255,255,.5)}
+/* ── COMMUNITY (shown when registered) ── */
+#community{flex:1;display:none;flex-direction:column}
+.comm-header{padding:20px 4% 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.comm-user-bar{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.comm-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;border:2px solid var(--gold);flex-shrink:0}
+.comm-info{flex:1;min-width:0}
+.comm-name{font-size:14px;font-weight:700;color:#fff}
+.comm-level{font-size:11px;color:var(--gold);margin-top:1px}
+.comm-xp-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:5px;overflow:hidden}
+.comm-xp-fill{height:100%;border-radius:2px;background:var(--gold);transition:width .4s ease}
+.comm-stats{display:flex;gap:16px;margin-bottom:14px}
+.comm-stat{text-align:center}
+.comm-stat-n{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#fff}
+.comm-stat-l{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px}
+/* Tabs */
+.comm-tabs{display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+.comm-tabs::-webkit-scrollbar{display:none}
+.ctab{padding:10px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.ctab:hover{color:rgba(255,255,255,.8)}
+.ctab.on{color:var(--gold);border-bottom-color:var(--gold)}
+/* Tab panels */
+.comm-panels{flex:1;overflow-y:auto}
+.cpanel{display:none;padding:20px 4%;min-height:300px}
+.cpanel.on{display:block}
+/* Chat */
+.chat-rooms{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.chat-room{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px}
+.chat-room:hover,.chat-room.on{background:rgba(232,160,32,.08);border-color:rgba(232,160,32,.2)}
+.cr-icon{font-size:20px;flex-shrink:0}
+.cr-info{flex:1;min-width:0}
+.cr-name{font-size:12px;font-weight:700;color:#fff}
+.cr-last{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-badge{background:var(--gold);color:var(--black);font-size:9px;font-weight:900;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cr-online{width:8px;height:8px;border-radius:50%;background:#22C55E;flex-shrink:0}
+/* Chat messages */
+.chat-window{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;height:260px;overflow-y:auto;padding:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:10px}
+.chat-msg{display:flex;gap:8px;align-items:flex-end}
+.chat-msg.own{flex-direction:row-reverse}
+.msg-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;flex-shrink:0}
+.msg-bubble{max-width:70%;padding:8px 12px;border-radius:10px;font-size:11px;line-height:1.5;color:#fff;background:rgba(255,255,255,.08)}
+.chat-msg.own .msg-bubble{background:rgba(232,160,32,.2);border:1px solid rgba(232,160,32,.2)}
+.msg-time{font-size:9px;color:rgba(255,255,255,.25);margin-top:3px;text-align:right}
+.chat-input-row{display:flex;gap:8px}
+.chat-inp{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:10px 12px;font-size:12px;color:#fff;font-family:'Outfit',sans-serif;outline:none;transition:border-color .15s}
+.chat-inp:focus{border-color:var(--gold)}
+.chat-send{padding:10px 16px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;cursor:pointer;color:var(--black);transition:opacity .15s;flex-shrink:0}
+.chat-send:hover{opacity:.85}
+/* Planes */
+.planes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.plan-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s}
+.plan-card:hover{border-color:rgba(232,160,32,.3);background:rgba(232,160,32,.04)}
+.plan-dest{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px}
+.plan-dates{font-size:10px;color:var(--gold);margin-bottom:8px}
+.plan-members{display:flex;gap:-6px;margin-bottom:8px}
+.plan-av{width:24px;height:24px;border-radius:50%;border:2px solid var(--black);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;margin-left:-6px;first:margin-left:0}
+.plan-av:first-child{margin-left:0}
+.plan-meta{font-size:10px;color:rgba(255,255,255,.35)}
+.plan-join-btn{width:100%;padding:8px;background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;margin-top:10px;transition:all .15s;font-family:'Outfit',sans-serif}
+.plan-join-btn:hover,.plan-join-btn.joined{background:var(--gold);border-color:var(--gold);color:var(--black)}
+/* Badges */
+.badges-grid-comm{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.bgc-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
+.bgc-card.earned{border-color:rgba(232,160,32,.3);background:rgba(232,160,32,.06)}
+.bgc-emoji{font-size:28px;margin-bottom:6px}
+.bgc-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
+.bgc-desc{font-size:9px;color:rgba(255,255,255,.35);line-height:1.4}
+/* XP history */
+.xp-hist-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.xph-icon{font-size:16px;flex-shrink:0}
+.xph-label{flex:1;font-size:11px;color:rgba(255,255,255,.7)}
+.xph-xp{font-size:13px;font-weight:900;color:var(--gold);flex-shrink:0}
+/* XP toast */
+#xp-toast-comm{position:fixed;bottom:20px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(232,160,32,.3)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <span class="nav-label">👥 Comunidad de viajeros</span>
+  <a href="index.html" class="nav-back">← Inicio</a>
+</nav>
+
+<!-- ─── GATE (not registered) ─── -->
+<div id="gate">
+  <div class="gate-inner">
+    <div class="gate-logo">EXPLORA<em>CO</em></div>
+    <div class="gate-badge">👥 Comunidad de viajeros</div>
+    <h1 class="gate-title">Únete. Explora.<br><em>Gana puntos.</em></h1>
+    <p class="gate-sub">Conecta con otros viajeros colombianos y del mundo. Comparte experiencias, crea planes colectivos y desbloquea badges al explorar Colombia.</p>
+
+    <!-- Levels preview -->
+    <div class="gate-levels">
+      <div class="gate-level"><span>🌱</span> Viajero novato</div>
+      <div class="gate-level"><span>🧭</span> Explorador</div>
+      <div class="gate-level"><span>🏔️</span> Aventurero</div>
+      <div class="gate-level"><span>🦅</span> Embajador</div>
+      <div class="gate-level"><span>👑</span> Maestro</div>
+    </div>
+
+    <!-- Perks -->
+    <div class="gate-perks">
+      <div class="gate-perk">
+        <div class="gp-icon">⚡</div>
+        <div>
+          <div class="gp-title">Sistema de puntos</div>
+          <div class="gp-desc">Gana XP por guardar lugares, escribir reseñas, compartir y explorar Colombia.</div>
+          <span class="gp-xp">+50 XP al registrarte</span>
+        </div>
+      </div>
+      <div class="gate-perk">
+        <div class="gp-icon">🏅</div>
+        <div>
+          <div class="gp-title">12 badges únicos</div>
+          <div class="gp-desc">Desbloquea desde "Primer destino" hasta "Maestro ExploraCO" explorando Colombia.</div>
+          <span class="gp-xp">Costa Caribe, Andino y más</span>
+        </div>
+      </div>
+      <div class="gate-perk">
+        <div class="gp-icon">💬</div>
+        <div>
+          <div class="gp-title">Chat por destino</div>
+          <div class="gp-desc">Chats en tiempo real para cada destino. Coordina con quienes van al mismo lugar.</div>
+          <span class="gp-xp">+3 XP por mensaje</span>
+        </div>
+      </div>
+      <div class="gate-perk">
+        <div class="gp-icon">🗺️</div>
+        <div>
+          <div class="gp-title">Planes colectivos</div>
+          <div class="gp-desc">Crea o únete a planes de viaje con otros viajeros. Viaja acompañado o coordina grupos.</div>
+          <span class="gp-xp">+20 XP por plan</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Registration form -->
+    <div class="gate-form">
+      <div class="gate-form-title">Crea tu perfil — es gratis</div>
+      <input class="gate-inp" id="gate-name" type="text" placeholder="Tu nombre (ej: Carlos Mendoza)" autocomplete="given-name">
+      <input class="gate-inp" id="gate-origin" type="text" placeholder="¿De dónde eres? (ej: Bogotá, Colombia)" autocomplete="off">
+      <button class="gate-btn" onclick="registerFromGate()">🎁 Empezar — 50 XP de bienvenida</button>
+    </div>
+    <span class="gate-enter" onclick="enterWithoutRegister()">Ya tengo perfil · <b>Entrar sin registrarme</b></span>
+  </div>
+</div>
+
+<!-- ─── COMMUNITY (registered) ─── -->
+<div id="community">
+  <!-- User bar -->
+  <div class="comm-header">
+    <div class="comm-user-bar">
+      <div class="comm-av" id="comm-av" style="background:#1a2e4a;color:#7eb8f0">TÚ</div>
+      <div class="comm-info">
+        <div class="comm-name" id="comm-name">Viajero</div>
+        <div class="comm-level" id="comm-level">🌱 Viajero novato · 0 XP</div>
+        <div class="comm-xp-bar"><div class="comm-xp-fill" id="comm-xp-fill" style="width:0%"></div></div>
+      </div>
+      <button onclick="editCommProfile()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 12px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='rgba(255,255,255,.6)'">✏️ Editar</button>
+    </div>
+    <div class="comm-stats">
+      <div class="comm-stat"><div class="comm-stat-n" id="comm-xp-n">0</div><div class="comm-stat-l">XP total</div></div>
+      <div class="comm-stat"><div class="comm-stat-n" id="comm-badges-n">0</div><div class="comm-stat-l">Badges</div></div>
+      <div class="comm-stat"><div class="comm-stat-n" id="comm-saved-n">0</div><div class="comm-stat-l">Guardados</div></div>
+      <div class="comm-stat"><div class="comm-stat-n" id="comm-visited-n">0</div><div class="comm-stat-l">Visitados</div></div>
+    </div>
+    <!-- Tabs -->
+    <div class="comm-tabs">
+      <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
+      <div class="ctab" onclick="showCommTab('planes')">🗺️ Planes</div>
+      <div class="ctab" onclick="showCommTab('logros')">🏅 Logros</div>
+      <div class="ctab" onclick="showCommTab('viajeros')">👤 Viajeros</div>
+    </div>
+  </div>
+
+  <!-- Tab panels -->
+  <div class="comm-panels">
+
+    <!-- CHAT -->
+    <div class="cpanel on" id="cpanel-chat">
+      <div class="chat-rooms" id="chat-rooms-list"></div>
+      <div id="chat-active-window" style="display:none">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <button onclick="document.getElementById('chat-active-window').style.display='none';document.getElementById('chat-rooms-list').style.display='flex'" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 10px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">← Volver</button>
+          <div style="font-size:13px;font-weight:700;color:#fff" id="chat-room-title">Chat</div>
+        </div>
+        <div class="chat-window" id="chat-window"></div>
+        <div class="chat-input-row">
+          <input class="chat-inp" id="chat-inp" type="text" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChatMsg()">
+          <button class="chat-send" onclick="sendChatMsg()">Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLANES -->
+    <div class="cpanel" id="cpanel-planes">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:12px;color:rgba(255,255,255,.4)">Planes de viaje colectivos</div>
+        <button onclick="createPlan()" style="padding:7px 14px;background:var(--gold);border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:var(--black);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.8px">+ Crear plan</button>
+      </div>
+      <div class="planes-grid" id="planes-grid"></div>
+    </div>
+
+    <!-- LOGROS -->
+    <div class="cpanel" id="cpanel-logros">
+      <!-- XP progress -->
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div id="logros-level" style="font-size:15px;font-weight:700;color:#fff">Viajero novato</div>
+            <div id="logros-next" style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">Próximo nivel en 100 XP</div>
+          </div>
+          <div id="logros-emoji" style="font-size:42px">🌱</div>
+        </div>
+        <div style="height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
+          <div id="logros-bar" style="height:100%;border-radius:4px;background:var(--gold);width:0%;transition:width .6s ease"></div>
+        </div>
+      </div>
+      <!-- Badges -->
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);margin-bottom:10px">Badges desbloqueados</div>
+      <div class="badges-grid-comm" id="comm-badges-grid"></div>
+      <!-- XP History -->
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);margin:0 0 8px">Próximo XP disponible</div>
+      <div id="comm-quick-actions" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);margin:8px 0 8px">Historial de XP</div>
+      <div id="comm-xp-history"></div>
+    </div>
+
+    <!-- VIAJEROS -->
+    <div class="cpanel" id="cpanel-viajeros">
+      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:14px">Viajeros activos en ExploraCO</div>
+      <div id="viajeros-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="xp-toast-comm"></div>
+
+<script>
+/* ── POINTS CONFIG (same as index.html) ── */
+var XP_LEVELS = [
+  {min:0,max:99,nombre:'Viajero novato',emoji:'🌱'},
+  {min:100,max:299,nombre:'Explorador',emoji:'🧭'},
+  {min:300,max:599,nombre:'Aventurero',emoji:'🏔️'},
+  {min:600,max:999,nombre:'Embajador Colombia',emoji:'🦅'},
+  {min:1000,max:1999,nombre:'Leyenda viajera',emoji:'🌟'},
+  {min:2000,max:99999,nombre:'Maestro ExploraCO',emoji:'👑'},
+];
+var XP_BADGES = [
+  {id:'primer_lugar',emoji:'📍',nombre:'Primer destino',desc:'Guardaste tu primer lugar',check:function(u){return u.saved>=1;}},
+  {id:'explorador5',emoji:'🧭',nombre:'Explorador x5',desc:'5 lugares guardados',check:function(u){return u.saved>=5;}},
+  {id:'viajero10',emoji:'✈️',nombre:'Gran viajero',desc:'10 lugares guardados',check:function(u){return u.saved>=10;}},
+  {id:'primer_resena',emoji:'✍️',nombre:'Primera reseña',desc:'Publicaste tu primera reseña',check:function(u){return u.reviews>=1;}},
+  {id:'critico',emoji:'⭐',nombre:'Crítico viajero',desc:'5 reseñas publicadas',check:function(u){return u.reviews>=5;}},
+  {id:'visitado3',emoji:'🏅',nombre:'Ya estuve',desc:'3 lugares visitados',check:function(u){return u.visited>=3;}},
+  {id:'caribe',emoji:'🌊',nombre:'Costa Caribe',desc:'3 destinos del Caribe guardados',check:function(u){return u.caribe>=3;}},
+  {id:'andino',emoji:'⛰️',nombre:'Corazón andino',desc:'3 destinos andinos guardados',check:function(u){return u.andino>=3;}},
+  {id:'compartido',emoji:'📢',nombre:'Difusor',desc:'Compartiste 3 lugares',check:function(u){return u.shares>=3;}},
+  {id:'plan_maestro',emoji:'📋',nombre:'Planificador',desc:'Creaste tu primer plan de viaje',check:function(u){return u.plans>=1;}},
+  {id:'social',emoji:'💬',nombre:'Alma social',desc:'Enviaste 10 mensajes en el chat',check:function(u){return u.chats>=10;}},
+  {id:'colombiano',emoji:'🇨🇴',nombre:'Orgullo colombiano',desc:'Eres viajero local de Colombia',check:function(u){return u.origin&&u.origin.includes('Colombia');}},
+];
+
+/* ── STATE ── */
+var socialUser = {name:'',origin:'🇨🇴 Colombia',initials:'TÚ',interests:[]};
+var userPoints = {xp:0,saved:0,visited:0,reviews:0,shares:0,plans:0,chats:0,caribe:0,andino:0,origin:'',badges:[],history:[],doneOnce:{}};
+var mmSaved = [], mmVisited = [];
+var chatMessages = {};
+var activeChatRoom = 'ciudad-perdida';
+
+try{socialUser=JSON.parse(localStorage.getItem('soc_user')||'{}');socialUser.name=socialUser.name||'';socialUser.initials=socialUser.initials||'TÚ';socialUser.origin=socialUser.origin||'🇨🇴 Colombia';}catch(e){}
+try{userPoints=Object.assign({xp:0,saved:0,visited:0,reviews:0,shares:0,plans:0,chats:0,caribe:0,andino:0,origin:'',badges:[],history:[],doneOnce:{}},JSON.parse(localStorage.getItem('user_points')||'{}'));}catch(e){}
+try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
+try{mmVisited=JSON.parse(localStorage.getItem('mm_visited')||'[]');}catch(e){}
+
+/* ── GATE LOGIC ── */
+function checkGate() {
+  var hasName = socialUser && socialUser.name;
+  if(hasName) {
+    showCommunity();
+  } else {
+    document.getElementById('gate').style.display = 'flex';
+    document.getElementById('community').style.display = 'none';
+  }
+}
+
+function registerFromGate() {
+  var name   = (document.getElementById('gate-name').value||'').trim();
+  var origin = (document.getElementById('gate-origin').value||'').trim();
+  if(!name) {
+    var inp = document.getElementById('gate-name');
+    inp.style.borderColor = 'var(--gold)';
+    inp.focus(); return;
+  }
+  socialUser.name     = name;
+  socialUser.initials = name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+  socialUser.origin   = origin || '🇨🇴 Colombia';
+  try{localStorage.setItem('soc_user',JSON.stringify(socialUser));}catch(e){}
+  // Award XP
+  if(!userPoints.doneOnce.registro) {
+    userPoints.doneOnce.registro = true;
+    userPoints.xp += 50;
+    userPoints.history.unshift({action:'registro',xp:50,label:'¡Bienvenido a ExploraCO!',ts:Date.now()});
+  }
+  userPoints.origin = socialUser.origin;
+  savePoints();
+  showXPToastComm('+50 XP — ¡Bienvenido ' + name + '!');
+  showCommunity();
+}
+
+function enterWithoutRegister() {
+  showCommunity();
+}
+
+function showCommunity() {
+  document.getElementById('gate').style.display = 'none';
+  var comm = document.getElementById('community');
+  comm.style.display = 'flex';
+  updateCommUI();
+  renderChatRooms();
+  renderPlanes();
+  renderViajeros();
+}
+
+/* ── COMMUNITY UI ── */
+function updateCommUI() {
+  var lvl = getLevel(userPoints.xp);
+  var pct = getLevelPct(userPoints.xp);
+  var next = getNextLevel(userPoints.xp);
+
+  // Set avatar colors
+  var colors = ['#1a3a5c','#0a2a1a','#3a1a0a','#1a051a','#0a1a3a'];
+  var av = document.getElementById('comm-av');
+  if(av) { av.textContent = socialUser.initials||'TÚ'; av.style.background = colors[0]; av.style.color = '#7eb8f0'; }
+
+  setText('comm-name', socialUser.name || 'Viajero');
+  setText('comm-level', lvl.emoji + ' ' + lvl.nombre + ' · ' + userPoints.xp + ' XP');
+  setStyle('comm-xp-fill', 'width', pct + '%');
+  setText('comm-xp-n', userPoints.xp);
+  setText('comm-badges-n', userPoints.badges.length);
+  setText('comm-saved-n', Math.max(userPoints.saved, mmSaved.length));
+  setText('comm-visited-n', Math.max(userPoints.visited, mmVisited.length));
+
+  // Logros tab
+  setText('logros-level', lvl.nombre);
+  setText('logros-next', 'Próximo nivel en ' + Math.max(0, next.min - userPoints.xp) + ' XP');
+  var le = document.getElementById('logros-emoji');
+  if(le) le.textContent = lvl.emoji;
+  setStyle('logros-bar', 'width', pct + '%');
+
+  renderCommBadges();
+  renderXPHistory();
+}
+
+function getLevel(xp) {
+  for(var i=XP_LEVELS.length-1;i>=0;i--) if(xp>=XP_LEVELS[i].min) return XP_LEVELS[i];
+  return XP_LEVELS[0];
+}
+function getNextLevel(xp) {
+  var cur = getLevel(xp);
+  for(var i=0;i<XP_LEVELS.length;i++) if(XP_LEVELS[i].min>cur.min) return XP_LEVELS[i];
+  return cur;
+}
+function getLevelPct(xp) {
+  var lvl = getLevel(xp);
+  var range = lvl.max - lvl.min;
+  if(range>=99999) return 100;
+  return Math.round((xp-lvl.min)/range*100);
+}
+
+function renderCommBadges() {
+  var grid = document.getElementById('comm-badges-grid');
+  if(!grid) return;
+  grid.innerHTML = XP_BADGES.map(function(b) {
+    var earned = userPoints.badges.indexOf(b.id) !== -1;
+    return '<div class="bgc-card'+(earned?' earned':'')+'" title="'+b.desc+'">'
+      +'<div class="bgc-emoji">'+(earned?b.emoji:'🔒')+'</div>'
+      +'<div class="bgc-name">'+b.nombre+'</div>'
+      +'<div class="bgc-desc">'+b.desc+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderXPHistory() {
+  var list = document.getElementById('comm-xp-history');
+  if(!list) return;
+  if(!userPoints.history.length) {
+    list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Empieza a ganar XP guardando lugares y escribiendo reseñas 🇨🇴</div>';
+    return;
+  }
+  list.innerHTML = userPoints.history.slice(0,20).map(function(h) {
+    var d = new Date(h.ts), ds = d.getDate()+'/'+(d.getMonth()+1);
+    return '<div class="xp-hist-item"><div class="xph-icon">⚡</div>'
+      +'<div class="xph-label">'+h.label+(h.meta&&h.meta.name?' · '+h.meta.name:'')+'<br><span style="font-size:9px;color:rgba(255,255,255,.25)">'+ds+'</span></div>'
+      +'<div class="xph-xp">+'+h.xp+'</div></div>';
+  }).join('');
+}
+
+/* ── CHAT ── */
+var CHAT_ROOMS = [
+  {id:'general',     icon:'🇨🇴', name:'Chat general',      desc:'Todos los viajeros de ExploraCO',   online:12},
+  {id:'bogota',      icon:'🏙️', name:'Bogotá',              desc:'Destinos y tips de la capital',     online:5},
+  {id:'cartagena',   icon:'🏰', name:'Cartagena',           desc:'Ciudad amurallada y playas',         online:8},
+  {id:'medellin',    icon:'🌺', name:'Medellín',             desc:'Ciudad de la eterna primavera',      online:7},
+  {id:'caribe',      icon:'🌊', name:'Costa Caribe',        desc:'Tayrona, Barranquilla, Santa Marta', online:4},
+  {id:'naturaleza',  icon:'🏔️', name:'Naturaleza y trekking',desc:'Ciudad Perdida, Cocora, Cristales', online:6},
+];
+
+var MOCK_MESSAGES = {
+  general: [
+    {user:'Carlos M.',init:'CM',bg:'#1a3a5c',tc:'#7eb8f0',text:'¿Alguien viaja a Ciudad Perdida en marzo?',time:'10:32'},
+    {user:'Sarah K.',init:'SK',bg:'#0a2a1a',tc:'#7ef0b8',text:'Yo! Tengo el trek del 15 al 18. Se unen?',time:'10:35'},
+    {user:'Andrea V.',init:'AV',bg:'#3a1a0a',tc:'#f0a87e',text:'Qué operadora recomiendan para el trek?',time:'10:41'},
+    {user:'Carlos M.',init:'CM',bg:'#1a3a5c',tc:'#7eb8f0',text:'Wiwa Tour es excelente, los kogui son increíbles como guías',time:'10:44'},
+  ],
+  cartagena: [
+    {user:'María R.',init:'MR',bg:'#0a1a3a',tc:'#7ea8f0',text:'El Hostal Walled City es ideal para salir a pie a la ciudad',time:'09:15'},
+    {user:'James W.',init:'JW',bg:'#1a051a',tc:'#f07ef0',text:'Barú vale la pena? O es mejor Rosario?',time:'09:22'},
+    {user:'María R.',init:'MR',bg:'#0a1a3a',tc:'#7ea8f0',text:'Rosario es más tranquilo. Barú tiene más turistas pero también es bonito',time:'09:28'},
+  ],
+};
+
+function renderChatRooms() {
+  var list = document.getElementById('chat-rooms-list');
+  if(!list) return;
+  list.style.display = 'flex';
+  list.innerHTML = '';
+  CHAT_ROOMS.forEach(function(r) {
+    var msgs = MOCK_MESSAGES[r.id] || [];
+    var lastText = msgs.length ? msgs[msgs.length-1].text : 'Sin mensajes aun';
+    var div = document.createElement('div');
+    div.className = 'chat-room';
+    var icon = document.createElement('div'); icon.className = 'cr-icon'; icon.textContent = r.icon;
+    var info = document.createElement('div'); info.className = 'cr-info';
+    var nm = document.createElement('div'); nm.className = 'cr-name'; nm.textContent = r.name;
+    var lt = document.createElement('div'); lt.className = 'cr-last';
+    lt.textContent = lastText.slice(0,50) + (lastText.length > 50 ? '...' : '');
+    info.appendChild(nm); info.appendChild(lt);
+    var dot = document.createElement('div'); dot.className = 'cr-online';
+    div.appendChild(icon); div.appendChild(info); div.appendChild(dot);
+    div.onclick = (function(rid){ return function(){ openChatRoom(rid); }; })(r.id);
+    list.appendChild(div);
+  });
+}
+
+function openChatRoom(roomId) {
+  var room = CHAT_ROOMS.find(function(r){return r.id===roomId;});
+  if(!room) return;
+  activeChatRoom = roomId;
+  document.getElementById('chat-rooms-list').style.display = 'none';
+  document.getElementById('chat-active-window').style.display = 'block';
+  setText('chat-room-title', room.icon+' '+room.name);
+  renderChatMessages(roomId);
+  var inp = document.getElementById('chat-inp');
+  if(inp) inp.focus();
+}
+
+function renderChatMessages(roomId) {
+  var win = document.getElementById('chat-window');
+  if(!win) return;
+  var msgs = chatMessages[roomId] || MOCK_MESSAGES[roomId] || [];
+  var myInit = socialUser.initials || 'TÚ';
+  win.innerHTML = msgs.map(function(m) {
+    var own = m.init === myInit;
+    return '<div class="chat-msg'+(own?' own':'')+'">'
+      +'<div class="msg-av" style="background:'+m.bg+';color:'+m.tc+'">'+m.init+'</div>'
+      +'<div><div class="msg-bubble">'+m.text+'</div>'
+      +'<div class="msg-time">'+m.user+' · '+m.time+'</div></div>'
+      +'</div>';
+  }).join('');
+  win.scrollTop = win.scrollHeight;
+}
+
+function sendChatMsg() {
+  var inp = document.getElementById('chat-inp');
+  if(!inp) return;
+  var text = inp.value.trim();
+  if(!text) return;
+  inp.value = '';
+  var now = new Date();
+  var time = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+  var msg = {
+    user: socialUser.name||'Tú', init: socialUser.initials||'TÚ',
+    bg:'#E8A020', tc:'#000', text:text, time:time
+  };
+  if(!chatMessages[activeChatRoom]) chatMessages[activeChatRoom] = (MOCK_MESSAGES[activeChatRoom]||[]).slice();
+  chatMessages[activeChatRoom].push(msg);
+  renderChatMessages(activeChatRoom);
+  // Award XP
+  userPoints.chats = (userPoints.chats||0) + 1;
+  userPoints.xp += 3;
+  userPoints.history.unshift({action:'chat',xp:3,label:'Mensaje enviado',ts:Date.now()});
+  savePoints();
+  if(userPoints.chats === 10) showXPToastComm('🏅 Badge desbloqueado: Alma social!');
+  else showXPToastComm('+3 XP — Mensaje enviado');
+  updateCommUI();
+}
+
+/* ── PLANES ── */
+var PLANES_DATA = [
+  {dest:'Trek Ciudad Perdida',dates:'15–18 Mar 2026',spots:3,members:[{i:'CM',bg:'#1a3a5c',c:'#7eb8f0'},{i:'SK',bg:'#0a2a1a',c:'#7ef0b8'}],desc:'4 días de trek. Cupos disponibles.'},
+  {dest:'Atardecer en Cartagena',dates:'22–24 Mar 2026',spots:4,members:[{i:'MR',bg:'#0a1a3a',c:'#7ea8f0'}],desc:'City tour y playas. Perfecto para parejas o amigos.'},
+  {dest:'Ruta del Café — Eje Cafetero',dates:'5–7 Abr 2026',spots:2,members:[{i:'AV',bg:'#3a1a0a',c:'#f0a87e'},{i:'JW',bg:'#1a051a',c:'#f07ef0'},{i:'CM',bg:'#1a3a5c',c:'#7eb8f0'}],desc:'Salento, Cocora y fincas cafeteras.'},
+  {dest:'Semana Santa en Popayán',dates:'1–5 Abr 2026',spots:5,members:[{i:'SK',bg:'#0a2a1a',c:'#7ef0b8'}],desc:'Procesiones y ciudad colonial. Patrimonio UNESCO.'},
+];
+var joinedPlans = [];
+
+function renderPlanes() {
+  var grid = document.getElementById('planes-grid');
+  if(!grid) return;
+  grid.innerHTML = PLANES_DATA.map(function(p,i) {
+    var joined = joinedPlans.indexOf(i) !== -1;
+    return '<div class="plan-card">'
+      +'<div class="plan-dest">'+p.dest+'</div>'
+      +'<div class="plan-dates">📅 '+p.dates+' · '+p.spots+' cupos</div>'
+      +'<div class="plan-members">'+p.members.map(function(m){
+        return '<div class="plan-av" style="background:'+m.bg+';color:'+m.c+'">'+m.i+'</div>';
+      }).join('')+'</div>'
+      +'<div class="plan-meta">'+p.desc+'</div>'
+      +'<button class="plan-join-btn'+(joined?' joined':'')+'" onclick="joinPlanComm('+i+',this)">'
+      +(joined?'✓ Unido al plan':'+ Unirme al plan')+'</button>'
+      +'</div>';
+  }).join('');
+}
+
+function joinPlanComm(idx, btn) {
+  if(joinedPlans.indexOf(idx) !== -1) return;
+  joinedPlans.push(idx);
+  btn.textContent = '✓ Unido al plan';
+  btn.classList.add('joined');
+  userPoints.plans = (userPoints.plans||0) + 1;
+  userPoints.xp += 20;
+  userPoints.history.unshift({action:'plan',xp:20,label:'Plan de viaje creado',ts:Date.now()});
+  savePoints();
+  showXPToastComm('+20 XP — Plan de viaje!');
+  updateCommUI();
+}
+
+function createPlan() {
+  var dest = prompt('¿A dónde quieres ir?');
+  if(!dest) return;
+  var dates = prompt('¿Cuándo? (ej: 15–18 Mar 2026)');
+  PLANES_DATA.unshift({dest:dest,dates:dates||'Por definir',spots:5,members:[{i:socialUser.initials||'TÚ',bg:'#E8A020',c:'#000'}],desc:'Plan creado por '+( socialUser.name||'ti')});
+  renderPlanes();
+  userPoints.plans = (userPoints.plans||0) + 1;
+  userPoints.xp += 20;
+  userPoints.history.unshift({action:'plan',xp:20,label:'Plan creado: '+dest,ts:Date.now()});
+  savePoints();
+  showXPToastComm('+20 XP — Plan creado!');
+  updateCommUI();
+}
+
+/* ── VIAJEROS ── */
+var MOCK_VIAJEROS = [
+  {init:'CM',bg:'#1a3a5c',tc:'#7eb8f0',name:'Carlos M.',origin:'Bogotá',lvl:'🧭 Explorador'},
+  {init:'SK',bg:'#0a2a1a',tc:'#7ef0b8',name:'Sarah K.',origin:'Alemania',lvl:'🏔️ Aventurero'},
+  {init:'AV',bg:'#3a1a0a',tc:'#f0a87e',name:'Andrea V.',origin:'Medellín',lvl:'🌱 Novato'},
+  {init:'JW',bg:'#1a051a',tc:'#f07ef0',name:'James W.',origin:'Francia',lvl:'🧭 Explorador'},
+  {init:'MR',bg:'#0a1a3a',tc:'#7ea8f0',name:'María R.',origin:'Cartagena',lvl:'🦅 Embajador'},
+  {init:'LP',bg:'#2a1a0a',tc:'#f0c87e',name:'Luis P.',origin:'Cali',lvl:'🌱 Novato'},
+];
+
+function renderViajeros() {
+  var grid = document.getElementById('viajeros-grid');
+  if(!grid) return;
+  var all = MOCK_VIAJEROS.slice();
+  if(socialUser.name) {
+    var myLvl = getLevel(userPoints.xp);
+    all.unshift({init:socialUser.initials||'TU',bg:'#E8A020',tc:'#000',
+      name:socialUser.name+' (tu)',origin:socialUser.origin||'Colombia',
+      lvl:myLvl.emoji+' '+myLvl.nombre});
+  }
+  grid.innerHTML = '';
+  all.forEach(function(v) {
+    var card = document.createElement('div');
+    card.style.cssText = 'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;text-align:center';
+    var av = document.createElement('div');
+    av.style.cssText = 'width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;margin:0 auto 8px';
+    av.style.background = v.bg; av.style.color = v.tc; av.textContent = v.init;
+    var nm = document.createElement('div');
+    nm.style.cssText = 'font-size:12px;font-weight:700;color:#fff;margin-bottom:2px'; nm.textContent = v.name;
+    var og = document.createElement('div');
+    og.style.cssText = 'font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px'; og.textContent = v.origin;
+    var lv = document.createElement('div');
+    lv.style.cssText = 'font-size:10px;color:#E8A020'; lv.textContent = v.lvl;
+    card.appendChild(av); card.appendChild(nm); card.appendChild(og); card.appendChild(lv);
+    grid.appendChild(card);
+  });
+}
+
+/* ── TAB SWITCHING ── */
+function showCommTab(tab) {
+  document.querySelectorAll('.ctab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('.cpanel').forEach(function(p){p.classList.remove('on');});
+  // Find tab button by data attribute or text content
+  document.querySelectorAll('.ctab').forEach(function(t){
+    if(t.getAttribute('onclick') && t.getAttribute('onclick').indexOf(tab) !== -1) {
+      t.classList.add('on');
+    }
+  });
+  var panel = document.getElementById('cpanel-'+tab);
+  if(panel) panel.classList.add('on');
+  if(tab === 'logros') renderQuickActions();
+}
+
+/* ── HELPERS ── */
+function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
+function setStyle(id,prop,val){var e=document.getElementById(id);if(e)e.style[prop]=val;}
+function savePoints(){try{localStorage.setItem('user_points',JSON.stringify(userPoints));}catch(e){}}
+function editCommProfile(){
+  var name=prompt('Tu nombre:',socialUser.name||'');
+  if(name){socialUser.name=name;socialUser.initials=name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);try{localStorage.setItem('soc_user',JSON.stringify(socialUser));}catch(e){}updateCommUI();}
+}
+function showXPToastComm(msg){
+  var t=document.getElementById('xp-toast-comm');
+  if(!t)return;
+  t.textContent=msg;
+  t.style.transform='translateY(0)';t.style.opacity='1';
+  clearTimeout(t._t);
+  t._t=setTimeout(function(){t.style.transform='translateY(40px)';t.style.opacity='0';},2800);
+}
+
+/* ── INIT ── */
+checkGate();
+
+function renderQuickActions() {
+  var el = document.getElementById('comm-quick-actions');
+  if(!el) return;
+  var actions = [];
+  // Check if user hasn't written a review yet
+  if(!userPoints.doneOnce || !userPoints.doneOnce.primer_resena_hint) {
+    actions.push({
+      emoji: '✍️', label: 'Escribe una reseña', xp: '+25 XP',
+      hint: 'Abre cualquier lugar y usa la sección de reseñas',
+      action: function() { window.location.href = 'ciudad-perdida.html#resenas'; }
+    });
+  }
+  if(mmSaved.length === 0) {
+    actions.push({
+      emoji: '📍', label: 'Guarda tu primer lugar', xp: '+5 XP',
+      hint: 'Abre cualquier página de destino y presiona ♥',
+      action: function() { window.location.href = 'directorio.html'; }
+    });
+  }
+  if(mmSaved.length > 0 && mmVisited.length === 0) {
+    actions.push({
+      emoji: '✅', label: 'Marca un lugar como visitado', xp: '+10 XP',
+      hint: 'En Mi Mapa personal > Lista > botón "Ya fui"',
+      action: function() { window.location.href = 'index.html#mymapa-section'; }
+    });
+  }
+  if(!userPoints.shares || userPoints.shares === 0) {
+    actions.push({
+      emoji: '📢', label: 'Comparte un lugar por WhatsApp', xp: '+8 XP',
+      hint: 'Usa el botón "↗ Compartir" en cualquier página',
+      action: null
+    });
+  }
+  if(actions.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);padding:8px 0">¡Vas muy bien! Sigue explorando Colombia 🇨🇴</div>';
+    return;
+  }
+  el.innerHTML = actions.map(function(a, i) {
+    return '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="doQuickAction(' + i + ')">'
+      + '<div style="font-size:20px;flex-shrink:0">' + a.emoji + '</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#fff">' + a.label + '</div>'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px">' + a.hint + '</div></div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--gold);flex-shrink:0">' + a.xp + '</div>'
+      + '</div>';
+  }).join('');
+  window._quickActions = actions;
+}
+function doQuickAction(i) {
+  var a = (window._quickActions || [])[i];
+  if(a && a.action) a.action();
+}
+</script>
+</body>
+</html>

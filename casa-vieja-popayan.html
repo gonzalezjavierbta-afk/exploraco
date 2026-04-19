@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+  <!-- SEO + Open Graph -->
+  <meta name="description" content="Casa Vieja Popayán en Popayán, Cauca. Descubre lo mejor de Colombia.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://exploracо.co/casa-vieja-popayan.html">
+  <!-- Open Graph -->
+  <meta property="og:type"        content="place">
+  <meta property="og:site_name"   content="ExploraCO">
+  <meta property="og:title"       content="Casa Vieja Popayán – ExploraCO">
+  <meta property="og:description" content="Casa Vieja Popayán en Popayán, Cauca. Descubre lo mejor de Colombia.">
+  <meta property="og:image"       content="https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=1200&h=630&fit=crop&q=80">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url"         content="https://exploracо.co/casa-vieja-popayan.html">
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Casa Vieja Popayán – ExploraCO">
+  <meta name="twitter:description" content="Casa Vieja Popayán en Popayán, Cauca. Descubre lo mejor de Colombia.">
+  <meta name="twitter:image"       content="https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=1200&h=630&fit=crop&q=80">
+  <!-- Font preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Structured data -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LodgingBusiness",
+  "name": "Casa Vieja Popayán",
+  "description": "Casa Vieja Popayán en Popayán, Cauca. Descubre lo mejor de Colombia.",
+  "image": "https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=1200&h=630&fit=crop&q=80",
+  "priceRange": "Desde $35.000",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 4.8,
+    "reviewCount": 143
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Popayán",
+    "addressRegion": "Cauca",
+    "addressCountry": "CO"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 4.5981,
+    "longitude": -74.0759
+  },
+  "url": "https://exploracо.co/casa-vieja-popayan.html"
+}
+  </script><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Casa Vieja Popayán – ExploraCO</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}
+.bc{font-family:'Barlow Condensed',sans-serif}
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none;flex-shrink:0}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}
+.tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}
+.tbc a{color:rgba(255,255,255,.4);text-decoration:none}.tbc a:hover{color:var(--gold)}
+.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}
+.tra{display:flex;gap:8px;align-items:center;margin-left:auto}
+.tact{width:32px;height:32px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+.tact:hover{background:rgba(255,255,255,.14)}
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);cursor:pointer}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff}
+.hero{background:var(--black);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:420px}
+.hl{display:flex;flex-direction:column;justify-content:center;gap:18px}
+.hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}
+.htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.9;letter-spacing:.5px}
+.htitle em{color:var(--gold);font-style:italic;display:block}
+.hsub{font-size:13px;color:rgba(255,255,255,.42);line-height:1.8;max-width:480px}
+.hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}
+.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.45)}
+.hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.hbtn:hover{background:var(--gold-dark)}
+.hobtn{background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}
+.hobtn:hover{border-color:rgba(255,255,255,.45);color:#fff}
+.hr{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.psm{height:210px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer}
+.psm img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.psm:hover img{transform:scale(1.04)}
+.psp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:62px}
+.pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.pexp{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;cursor:pointer}
+.prow{display:flex;gap:8px;height:94px}
+.pth{flex:1;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;transition:opacity .15s}
+.pth:hover{opacity:.85}
+.pth img{width:100%;height:100%;object-fit:cover}
+.pthp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px}
+.pvpl{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+.pvic{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:13px}
+.pmore::after{content:attr(data-more);position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:'Barlow Condensed',sans-serif}
+.gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}
+.gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}
+.gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}
+.gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}
+.gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}
+.gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}
+.gsdate{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.75);font-size:11px}
+.gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}
+.gscta:hover{background:#f5f0e8}
+.ssec{padding:44px 4%}
+.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.sin{max-width:860px;margin:0 auto}
+.strow{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.sgl{width:36px;height:3px;background:var(--gold);flex-shrink:0;border-radius:2px}
+.stitle{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:2.5px;color:var(--text)}
+.stnum{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}
+.slead{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}
+.stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px}
+.hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:22px 0;display:flex;align-items:flex-start;gap:12px}
+.hbico{font-size:20px;flex-shrink:0;margin-top:2px}
+.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}
+.hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}
+.tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;transition:box-shadow .2s,transform .2s}
+.icard:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);transform:translateY(-3px)}
+.iico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px}
+.ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)}
+.ival{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.1}
+.isub{font-size:10px;color:var(--muted);margin-top:2px}
+#mapel{width:100%;height:300px;border-radius:8px;border:1px solid var(--border)}
+.mapacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mabtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .15s;text-decoration:none}
+.mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.gold:hover{background:var(--gold-dark)}
+.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.mabtn.dark:hover{background:#333}
+.mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.green:hover{background:#f0fff5}
+.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}.mabtn.outline:hover{border-color:var(--text)}
+.rblock{display:flex;gap:24px;align-items:flex-start;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px}
+.rbavg{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;color:var(--gold);line-height:1;text-align:center}
+.rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}
+.rbst{font-size:18px;color:#DDD}.rbst.on{color:var(--gold)}
+.rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}
+.rbbars{flex:1}.rbbr{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rbbl{font-size:11px;color:var(--muted);min-width:20px;font-weight:600}
+.rbbt{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.rbbf{height:100%;background:var(--gold);border-radius:3px}
+.rbbn{font-size:11px;font-weight:700;color:var(--text);min-width:24px;text-align:right}
+.rvlist{display:flex;flex-direction:column;gap:14px}
+.rvitem{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.rvhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.rvav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;flex-shrink:0}
+.rvname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text)}
+.rvdate{font-size:9px;color:var(--muted)}
+.rvstars{display:flex;gap:1px;margin-left:auto}
+.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold)}
+.rvtag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.rvtx{font-size:13px;color:#444;line-height:1.7}
+.wr{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-top:20px}
+.wrtitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);margin-bottom:14px}
+.wrfields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.wrff{grid-column:1/-1}
+.wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}
+.wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;transition:border-color .15s}
+.wrinp:focus{border-color:var(--gold)}.wrinp::placeholder{color:#CCC}
+textarea.wrinp{resize:vertical;min-height:88px}
+.sprow{display:flex;gap:5px;margin-bottom:12px}
+.spk{font-size:26px;cursor:pointer;color:#DDD;transition:color .1s,transform .1s;user-select:none}
+.spk:hover,.spk.h,.spk.s{color:var(--gold);transform:scale(1.16)}
+.wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.wrsub:hover{background:#333}
+.wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .2s;text-decoration:none}
+.cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.gold:hover{background:var(--gold-dark);transform:translateY(-2px)}
+.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.cbtn.dark:hover{background:#222;transform:translateY(-2px)}
+.cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.green:hover{background:#f0fff5;transform:translateY(-2px)}
+.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}.cbtn.blue:hover{background:#f0f7ff;transform:translateY(-2px)}
+.nbgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nbcard{background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .18s;text-decoration:none;display:block}
+.nbcard:hover{box-shadow:0 8px 24px rgba(0,0,0,.1);transform:translateY(-3px)}
+.nbimg{height:80px;display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden}
+.nbimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.nbemoji{position:relative;z-index:1}
+.nbbdg{position:absolute;top:6px;left:6px;z-index:2;padding:2px 6px;border-radius:3px;font-size:7px;font-weight:700;text-transform:uppercase}
+.nbbody{padding:9px 10px}
+.nbname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text);line-height:1.1;margin-bottom:2px}
+.nbloc{font-size:9px;color:var(--muted)}
+.nbstars{display:flex;align-items:center;gap:2px;margin-top:3px}
+.nbst{font-size:9px;color:#DDD}.nbst.on{color:var(--gold)}
+.footer{background:var(--black);border-top:3px solid var(--gold);padding:36px 4% 20px}
+.ftop{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:4%;margin-bottom:28px}
+.flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:10px;text-decoration:none;display:inline-block}
+.flogo em{color:var(--gold);font-style:normal}
+.fdesc{font-size:11px;color:rgba(255,255,255,.28);line-height:1.8;margin-bottom:14px}
+.fctl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.22);margin-bottom:12px}
+.flinks{display:flex;flex-direction:column;gap:7px}
+.flink{font-size:11px;color:rgba(255,255,255,.38);cursor:pointer;text-decoration:none;transition:color .15s}.flink:hover{color:var(--gold)}
+.fbot{border-top:1px solid rgba(255,255,255,.07);padding-top:16px;display:flex;align-items:center;justify-content:space-between}
+.fcopy{font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links{display:flex;gap:4%;font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links a{color:inherit;text-decoration:none}.fb-links a:hover{color:var(--gold)}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column}
+.lb.open{display:flex}
+.lbcl{position:absolute;top:16px;right:20px;color:#fff;font-size:26px;cursor:pointer;background:none;border:none}
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lbnav:hover{background:rgba(255,255,255,.2)}.lbprev{left:16px}.lbnext{right:16px}
+.lbm{display:flex;align-items:center;justify-content:center;width:min(700px,92vw);height:min(500px,74vh);border-radius:8px;overflow:hidden}
+.lbm img{width:100%;height:100%;object-fit:cover}
+.lbmp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px}
+.lbcp{color:rgba(255,255,255,.55);font-size:12px;margin-top:10px}
+@media(max-width:860px){.hi{grid-template-columns:1fr;gap:20px}.hr{display:none}.igrid{grid-template-columns:1fr 1fr}.nbgrid{grid-template-columns:1fr 1fr}.ftop{grid-template-columns:1fr 1fr;gap:5%}.wrfields{grid-template-columns:1fr}}
+@media(max-width:600px){.cgrid{grid-template-columns:1fr}.igrid{grid-template-columns:1fr}.gsdiv{display:none}}
+
+:root{--cat-color:#3B82F6;--cat-bg:#EFF6FF;--cat-tc:#1e3a8a}
+
+/* ── GUARDAR EN MI MAPA ── */
+.save-fab{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;align-items:center;gap:8px;padding:12px 20px;border-radius:50px;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:all .2s}
+.save-fab.unsaved{background:#fff;color:var(--black);border:2px solid rgba(0,0,0,.12)}
+.save-fab.unsaved:hover{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved{background:var(--gold);color:#fff;border:2px solid var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved:hover{background:var(--gold-dark);border-color:var(--gold-dark)}
+.save-fab-icon{font-size:16px;transition:transform .2s}
+.save-fab.saved .save-fab-icon{transform:scale(1.15)}
+.save-fab-toast{position:fixed;bottom:80px;right:24px;z-index:501;background:var(--black);color:#fff;font-size:12px;padding:8px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .3s;font-family:'Outfit',sans-serif;border-left:3px solid var(--gold)}
+.save-fab-toast.show{opacity:1}
+
+
+/* ══════════════════════════════════════════════════════════════
+   HOSTAL TEMPLATE V2 — Competitive upgrade
+   Score multidim · Rooms table · Vibe · Amenities grid
+   Plataformas · Quién va · FAQ · Comparar · Eventos
+══════════════════════════════════════════════════════════════ */
+:root{--gold:#E8A020;--gold-d:#C8860A;--gold-l:rgba(232,160,32,.1);--black:#111;--sky:#0A1628;--sand:#F5E6D0;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--green:#22C55E;--blue:#3B82F6;--red:#EF4444}
+
+/* ── VIBE BADGE ── */
+.vibe-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-right:6px;margin-bottom:6px}
+.vibe-social{background:#FEF3C7;color:#92400E}
+.vibe-chill{background:#D1FAE5;color:#065F46}
+.vibe-nomad{background:#EDE9FE;color:#5B21B6}
+.vibe-eco{background:#DCFCE7;color:#166534}
+.vibe-boutique{background:#FCE7F3;color:#9D174D}
+.vibe-row{display:flex;flex-wrap:wrap;margin-top:6px}
+
+/* ── CANCELACIÓN CHIP ── */
+.cancel-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;border:1px solid}
+.cancel-free{background:#F0FDF4;border-color:#BBF7D0;color:#15803D}
+.cancel-strict{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+.cancel-deposit{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+
+/* ── HERO ENHANCEMENTS ── */
+.hero-badges-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.hbadge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.hbadge-eco{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.hbadge-lgbtq{background:#FFF7ED;border-color:#FED7AA;color:#C2410C}
+.hbadge-female{background:#FDF2F8;border-color:#FBCFE8;color:#9D174D}
+.hbadge-verified{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.hbadge-award{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+
+/* ── BOOKING CTA SECTION ── */
+.booking-section{background:var(--white);border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px}
+.booking-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.booking-title{font-size:13px;font-weight:700;color:var(--black)}
+.booking-direct{font-size:10px;color:var(--green);font-weight:600}
+.booking-platforms{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 18px}
+.bk-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-radius:6px;border:1.5px solid var(--border);font-size:11px;font-weight:700;text-decoration:none;transition:all .15s;color:var(--black);flex-direction:column}
+.bk-btn:hover{border-color:var(--gold);background:var(--gold-l)}
+.bk-logo{font-size:18px}
+.bk-name{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.bk-price{font-size:11px;font-weight:700;color:var(--black)}
+.bk-btn.whatsapp{border-color:#25D366;background:#F0FDF4}
+.bk-btn.whatsapp:hover{background:#DCFCE7}
+.bk-btn.whatsapp .bk-name{color:#166534}
+.booking-note{padding:10px 18px;background:#FFFBEB;border-top:1px solid #FDE68A;font-size:10px;color:#92400E;display:flex;align-items:center;gap:5px}
+
+/* ── SCORE MULTIDIMENSIONAL ── */
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right;white-space:nowrap}
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-meta{}
+.so-label{font-size:11px;color:var(--muted)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-count{font-size:10px;color:var(--muted)}
+
+/* ── ROOMS TABLE ── */
+.rooms-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.rooms-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.rooms-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.rooms-table tr:last-child td{border-bottom:none}
+.rooms-table tr:hover td{background:#FAFAF8}
+.room-type{font-weight:600;color:var(--black)}
+.room-type-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.room-badge{display:inline-block;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:700}
+.rb-female{background:#FDF2F8;color:#9D174D}
+.rb-popular{background:#FFFBEB;color:#92400E}
+.rb-quiet{background:#EDE9FE;color:#5B21B6}
+.room-price{font-size:14px;font-weight:700;color:var(--black)}
+.room-price-sub{font-size:9px;color:var(--muted)}
+.room-avail{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 7px;border-radius:3px}
+.avail-yes{background:#F0FDF4;color:#166634}
+.avail-few{background:#FFFBEB;color:#92400E}
+.room-book-btn{padding:6px 14px;background:var(--black);color:var(--white);border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;transition:background .15s}
+.room-book-btn:hover{background:#333}
+.rooms-note{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:4px;border-left:2px solid var(--gold)}
+
+/* ── AMENITIES GRID ── */
+.amenity-section{margin-bottom:16px}
+.amenity-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px}
+.amenity-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
+.amenity-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:5px;font-size:11px;border:1px solid transparent;transition:background .1s}
+.amenity-item.yes{background:var(--bg);border-color:var(--border);color:var(--black)}
+.amenity-item.no{color:#CCC;text-decoration:line-through}
+.amenity-icon{font-size:14px;flex-shrink:0;width:20px;text-align:center}
+.amenity-label{font-size:11px}
+
+/* ── QUIÉN VA THIS WEEK ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:transform .12s}
+.qv-person:hover{transform:translateY(-2px)}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qv-cta{font-size:10px;color:var(--gold);font-weight:600;margin-top:8px;cursor:pointer}
+.qv-cta:hover{text-decoration:underline}
+.qv-empty{font-size:11px;color:var(--muted);font-style:italic}
+
+/* ── FAQ ACCORDION ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARE NEARBY ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr.current-row td:first-child::before{content:"★ ";color:var(--gold)}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--blue);text-decoration:none;display:inline-block;padding:3px 8px;border:1px solid #BFDBFE;border-radius:3px;transition:background .12s}
+.cmp-link:hover{background:#EFF6FF}
+.cmp-vibe-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px}
+
+/* ── EVENTOS DEL HOSTAL ── */
+.hostal-events-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.he-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border-radius:6px;border:1px solid var(--border);transition:border-color .12s}
+.he-item:hover{border-color:var(--gold)}
+.he-day{background:var(--black);color:var(--white);border-radius:4px;padding:4px 8px;text-align:center;flex-shrink:0}
+.he-day-name{font-size:8px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.he-day-time{font-size:12px;font-weight:900;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
+.he-info{flex:1;min-width:0}
+.he-name{font-size:12px;font-weight:600;color:var(--black)}
+.he-desc{font-size:10px;color:var(--muted);margin-top:2px}
+.he-free{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:#F0FDF4;color:#166634;flex-shrink:0}
+.he-join-btn{padding:6px 12px;background:var(--black);color:var(--white);border:none;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;transition:background .15s}
+.he-join-btn:hover{background:#333}
+
+/* ── TRANSPORTE SECTION ── */
+.transport-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px}
+.transport-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
+.tc-icon{font-size:20px;flex-shrink:0}
+.tc-body{}
+.tc-title{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.tc-detail{font-size:10px;color:var(--muted);line-height:1.6}
+.tc-time{font-size:10px;font-weight:700;color:var(--gold)}
+
+/* ── REVIEWS V2 (con dimensiones) ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION NUMBERS UPDATE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ── MOBILE NAV DETAIL PAGES ── */
+.ham-btn{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;background:transparent;border:none;cursor:pointer;padding:4px;flex-shrink:0;z-index:400;margin-left:auto}
+.ham-btn span{display:block;width:22px;height:2px;background:rgba(255,255,255,.7);border-radius:2px;transition:all .25s;transform-origin:center}
+.ham-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.ham-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.ham-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mobile-drawer{position:fixed;top:0;left:0;right:0;bottom:0;z-index:350;display:flex;flex-direction:column;background:rgba(0,0,0,.97);transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.mobile-drawer.open{transform:translateX(0)}
+.md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
+.md-logo em{color:var(--gold);font-style:normal}
+.md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
+.md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
+.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link-icon{font-size:18px;width:24px;text-align:center}
+.md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
+.md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
+@media(max-width:768px){
+  .ham-btn{display:flex}
+  .tbc,.tra{display:none!important}
+  .topbar{padding:0 14px}
+}
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+.sec-nav{position:sticky;top:52px;z-index:200;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
+.sec-nav::-webkit-scrollbar{display:none}
+.sec-nav-inner{display:flex;gap:0;min-width:max-content;padding:0 4%}
+.sn-link{padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+.sn-link:hover{color:var(--black)}
+.sn-link.active{color:var(--black);border-bottom-color:var(--gold)}
+/* Progress bar */
+.page-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:500;background:transparent}
+.page-progress-fill{height:100%;background:var(--gold);width:0%;transition:width .1s linear;border-radius:0 2px 2px 0}
+@media(max-width:768px){
+  .sn-link{padding:10px 12px;font-size:10px}
+  .sec-nav-inner{padding:0 16px}
+}
+
+
+/* ── SHARE BUTTON ── */
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;text-transform:uppercase}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+.tshare-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#111;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px;min-width:180px;z-index:400;display:none;flex-direction:column;gap:2px}
+.tshare-dropdown.open{display:flex}
+.tsd-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);cursor:pointer;transition:background .1s;text-decoration:none}
+.tsd-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.tshare-wrap{position:relative}
+
+</style></head><body>
+
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="tbc">
+    <a href="index.html">Inicio</a><span>›</span>
+    <a href="index.html">Hostals</a><span>›</span>
+    <a href="index.html">Bogotá</a><span>›</span>
+    <em>Hostal Casa Medina</em>
+  </div>
+  <div class="tra">
+    <div class="tact">♥</div>
+    <div class="tshare-wrap">
+    <button class="tshare" onclick="toggleShareMenu(this)">↗ Compartir</button>
+    <div class="tshare-dropdown" id="share-dropdown">
+      <div class="tsd-item" onclick="sharePlace()">📋 Copiar link</div>
+      <div class="tsd-item" onclick="shareToWhatsApp()">💬 WhatsApp</div>
+      <a class="tsd-item" href="javascript:void(0)" onclick="if(navigator.share)sharePlace()">↗ Compartir</a>
+    </div>
+  </div>
+  </div>
+<button class="ham-btn" id="ham-btn" onclick="toggleDrawer()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<!-- Scroll progress bar -->
+<div class="page-progress"><div class="page-progress-fill" id="prog-fill"></div></div>
+<!-- Sticky section nav -->
+<div class="sec-nav" id="sec-nav">
+  <div class="sec-nav-inner">
+    <a class="sn-link" href="#descripcion">Sobre</a><a class="sn-link" href="#galeria">Fotos</a><a class="sn-link" href="#habitaciones">Habitaciones</a><a class="sn-link" href="#reservar">Reservar</a><a class="sn-link" href="#servicios">Servicios</a><a class="sn-link" href="#mapa">Mapa</a><a class="sn-link" href="#faq">FAQ</a><a class="sn-link" href="#resenas">Reseñas</a>
+  </div>
+</div>
+<!-- Mobile drawer -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div class="md-header">
+    <div class="md-logo">EXPLORA<em>CO</em></div>
+    <button class="md-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="md-links">
+    <a class="md-link" href="index.html"><span class="md-link-icon">🏠</span>Inicio</a>
+    <a class="md-link" href="index.html#recs"><span class="md-link-icon">🧭</span>Explorar destinos</a>
+    <a class="md-link" href="index.html#mapa-section"><span class="md-link-icon">🗺️</span>Mapa interactivo</a>
+    <a class="md-link" href="agenda.html"><span class="md-link-icon">📅</span>Agenda cultural</a>
+    <a class="md-link" href="index.html#mymapa-section"><span class="md-link-icon">❤️</span>Mi Viaje</a>
+    <a class="md-link" href="index.html#social-section"><span class="md-link-icon">👥</span>Comunidad</a>
+  </div>
+  <div class="md-footer">
+    <a href="index.html" class="md-back-btn">← Volver al directorio</a>
+  </div>
+</div>
+
+<section class="hero">
+<div class="hi">
+  <div class="hl">
+    <div class="hew">🏨 Hospedaje</div>
+    <h1 class="htitle bc">Casa Vieja<em>Popayán</em></h1>
+    <p class="hsub">En la Ciudad Blanca, a pasos de la catedral colonial del siglo XVII.</p>
+    <div class="hqi-row">
+      <div class="hqi">📍 Popayán, Cauca</div>
+      <div class="hqi">⭐ 4.8 · 143 reseñas</div>
+      <div class="hqi">💰 Desde $35.000</div>
+      <div class="hqi">⏰ Check-in 2pm / 11am</div>
+    </div>
+    <div class="hctar">
+      <button class="hbtn" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">🗺️ Cómo llegar</button>
+      <button class="hobtn" onclick="document.getElementById('galeria').scrollIntoView({behavior:'smooth'})">Ver galería →</button>
+    </div>
+  </div>
+  <div class="hr"><div class="psm" onclick="openLB(0)">
+        <img src="https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80" alt="Fachada colonial – La Candelaria"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <div class="psp" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c);display:none">🏨</div>
+        <div class="pbadge">📷 Fotos</div>
+        <div class="pexp">⛶ Ver galería</div>
+    </div>
+    <div class="prow"><div class="pth" onclick="openLB(1)"><img src="https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75" alt="Habitación doble con vista" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c);display:none">🏨</div></div><div class="pth" onclick="openLB(2)"><img src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=700&q=75" alt="Terraza con vista a los cerros" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c);display:none">🏨</div></div><div class="pth pmore" onclick="openLB(3)" data-more="+ 1 más"><div class="pthp" style="background:#0d1b2a">▶️</div><div class="pvpl"><div class="pvic">▶</div></div></div></div></div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="descripcion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">1</div></div>
+  <p class="slead bc">Hostal boutique en el corazón de La Candelaria, el barrio más histórico de Bogotá.</p>
+  <p class="stext">Ubicado en una casona colonial del siglo XVIII, el Hostal Casa Medina combina el encanto histórico de La Candelaria con todas las comodidades modernas. La terraza con vista a los cerros orientales es el punto de encuentro de viajeros de todo el mundo. Desayuno casero incluido cada mañana con productos frescos del mercado local. A dos cuadras del Museo del Oro y a tres del centro histórico.</p>
+  <div class="hbox">
+    <span class="hbico">⭐</span>
+    <div><div class="hblbl">Lo más destacado</div><div class="hbtx">Desayuno incluido · Vista a los cerros de Bogotá · Ambiente colonial auténtico</div></div>
+  </div>
+  <div class="tagrow"><div class="tpill" style="background:#EFF6FF;color:#1e3a8a">Desayuno incluido</div><div class="tpill" style="background:#EFF6FF;color:#1e3a8a">WiFi</div><div class="tpill" style="background:#EFF6FF;color:#1e3a8a">Terraza</div><div class="tpill" style="background:#EFF6FF;color:#1e3a8a">Céntrico</div><div class="tpill" style="background:#EFF6FF;color:#1e3a8a">Colonial</div></div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="galeria">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galería de fotos y videos</h2><div class="stnum">2</div></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">
+    <div onclick="openLB(0)" style="border-radius:6px;overflow:hidden;cursor:pointer;grid-row:1/3;aspect-ratio:unset;background:linear-gradient(135deg,#1a3a5c,#2a4a7c);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80" alt="Fachada colonial – La Candelaria" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">🏨</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(1)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a3a5c,#2a4a7c);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75" alt="Habitación doble con vista" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🏨</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(2)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a3a5c,#2a4a7c);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=700&q=75" alt="Terraza con vista a los cerros" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🏨</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(3)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a3a5c,#2a4a7c);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">▶️</div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:18px">▶</div></div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">▶ VIDEO</div>
+    </div><div onclick="openLB(4)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a3a5c,#2a4a7c);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=700&q=75" alt="Desayuno incluido" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🏨</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="habitaciones">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tipos de habitación<span class="section-new-badge">Nuevo</span></h2><div class="stnum">3</div></div>
+  <table class="rooms-table">
+    <thead>
+      <tr>
+        <th>Habitación</th>
+        <th>Camas</th>
+        <th>Precio / persona</th>
+        <th>Disponibilidad</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="room-type">Dorm Mixto</div>
+          <div class="room-type-sub">Baño compartido · A/C · Lockers</div>
+          <span class="room-badge rb-popular">⭐ Más popular</span>
+        </td>
+        <td style="color:#777;font-size:11px">🛏 6 camas</td>
+        <td>
+          <div class="room-price">$45.000</div>
+          <div class="room-price-sub">por persona / noche</div>
+        </td>
+        <td><span class="room-avail avail-yes">✓ Disponible</span></td>
+        <td><button class="room-book-btn" onclick="window.open('https://wa.me/573210123456','_blank')">Reservar</button></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="room-type">Dorm Femenino</div>
+          <div class="room-type-sub">Solo mujeres · Baño privado · Lockers</div>
+          <span class="room-badge rb-female">♀ Solo mujeres</span>
+        </td>
+        <td style="color:#777;font-size:11px">🛏 4 camas</td>
+        <td>
+          <div class="room-price">$52.000</div>
+          <div class="room-price-sub">por persona / noche</div>
+        </td>
+        <td><span class="room-avail avail-few">⚡ Últimas camas</span></td>
+        <td><button class="room-book-btn" onclick="window.open('https://wa.me/573210123456','_blank')">Reservar</button></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="room-type">Privada Doble</div>
+          <div class="room-type-sub">Baño privado · A/C · Vista patio</div>
+          <span class="room-badge rb-quiet">🌿 Tranquila</span>
+        </td>
+        <td style="color:#777;font-size:11px">🛏 1 cama doble</td>
+        <td>
+          <div class="room-price">$120.000</div>
+          <div class="room-price-sub">habitación completa</div>
+        </td>
+        <td><span class="room-avail avail-yes">✓ Disponible</span></td>
+        <td><button class="room-book-btn" onclick="window.open('https://wa.me/573210123456','_blank')">Reservar</button></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="room-type">Dorm Premium</div>
+          <div class="room-type-sub">Camas tipo pod · Cortina · Luz propia</div>
+        </td>
+        <td style="color:#777;font-size:11px">🛏 4 camas</td>
+        <td>
+          <div class="room-price">$68.000</div>
+          <div class="room-price-sub">por persona / noche</div>
+        </td>
+        <td><span class="room-avail avail-yes">✓ Disponible</span></td>
+        <td><button class="room-book-btn" onclick="window.open('https://wa.me/573210123456','_blank')">Reservar</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="rooms-note">💡 Check-in 2pm · Check-out 11am · Check-in tardío disponible con aviso previo por WhatsApp</div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="reservar">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reservar<span class="section-new-badge">Nuevo</span></h2><div class="stnum">4</div></div>
+  <div class="booking-section">
+    <div class="booking-header">
+      <div class="booking-title">Elige dónde reservar</div>
+      <div class="booking-direct">💬 Reserva directo = sin comisión</div>
+    </div>
+    <div class="booking-platforms">
+      <a class="bk-btn" href="https://www.booking.com" target="_blank">
+        <div class="bk-logo">🏨</div>
+        <div class="bk-name">Booking.com</div>
+        <div class="bk-price">Desde $52.000</div>
+      </a>
+      <a class="bk-btn" href="https://www.hostelworld.com" target="_blank">
+        <div class="bk-logo">🌍</div>
+        <div class="bk-name">Hostelworld</div>
+        <div class="bk-price">Desde $48.000</div>
+      </a>
+      <a class="bk-btn whatsapp" href="https://wa.me/573210123456" target="_blank">
+        <div class="bk-logo">💬</div>
+        <div class="bk-name">WhatsApp directo</div>
+        <div class="bk-price">Desde $45.000</div>
+      </a>
+    </div>
+    <div class="booking-note">
+      💡 Reservar directo por WhatsApp suele ser 10–15% más barato porque no pagan comisión a plataformas.
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="puntuacion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Puntuación<span class="section-new-badge">Nuevo</span></h2><div class="stnum">5</div></div>
+  <div class="score-overall">
+    <div class="so-number">4.8</div>
+    <div class="so-meta">
+      <div class="so-stars">★★★★★</div>
+      <div class="so-label">Excelente · Basado en 143 reseñas</div>
+      <div class="so-count">Top 5% de hostales en Bogotá</div>
+    </div>
+  </div>
+  <div class="score-grid">
+    <div class="score-label">Atmósfera</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:96%;background:#E8A020"></div></div>
+    <div class="score-val">4.8</div>
+    <div class="score-label">Personal</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:100%;background:#22C55E"></div></div>
+    <div class="score-val">5.0</div>
+    <div class="score-label">Limpieza</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:92%;background:#3B82F6"></div></div>
+    <div class="score-val">4.6</div>
+    <div class="score-label">Seguridad</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:94%;background:#8B5CF6"></div></div>
+    <div class="score-val">4.7</div>
+    <div class="score-label">Valor</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:96%;background:#EF4444"></div></div>
+    <div class="score-val">4.8</div>
+    <div class="score-label">Ubicación</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:98%;background:#F59E0B"></div></div>
+    <div class="score-val">4.9</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="servicios">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Servicios<span class="section-new-badge">Nuevo</span></h2><div class="stnum">6</div></div>
+  <!-- CONECTIVIDAD -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">📶 Conectividad</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">📶</span><span class="amenity-label">WiFi gratis (100Mbps)</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">💻</span><span class="amenity-label">Área coworking</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🔌</span><span class="amenity-label">Enchufes por cama</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🖨️</span><span class="amenity-label">Impresora</span></div>
+    </div>
+  </div>
+  <!-- COCINA -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">🍳 Cocina y comida</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">🍳</span><span class="amenity-label">Cocina equipada</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">☕</span><span class="amenity-label">Desayuno incluido</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🧊</span><span class="amenity-label">Nevera comunitaria</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🍽️</span><span class="amenity-label">Restaurante propio</span></div>
+    </div>
+  </div>
+  <!-- BAÑOS Y HABITACIONES -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">🛁 Habitaciones y baños</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">🔒</span><span class="amenity-label">Lockers individuales</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">❄️</span><span class="amenity-label">Aire acondicionado</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🚿</span><span class="amenity-label">Agua caliente 24h</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🛏️</span><span class="amenity-label">Ropa de cama incluida</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🛁</span><span class="amenity-label">Bañera</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🧹</span><span class="amenity-label">Limpieza diaria</span></div>
+    </div>
+  </div>
+  <!-- SOCIAL Y ACTIVIDADES -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">🎉 Social y actividades</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">🍺</span><span class="amenity-label">Bar en terraza</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🗺️</span><span class="amenity-label">Tours organizados</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🎮</span><span class="amenity-label">Sala de juegos</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">📚</span><span class="amenity-label">Biblioteca viajera</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🏊</span><span class="amenity-label">Piscina</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🎵</span><span class="amenity-label">Sala de música</span></div>
+    </div>
+  </div>
+  <!-- SEGURIDAD Y ACCESO -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">🔐 Seguridad y acceso</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">👥</span><span class="amenity-label">Recepción 24h</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">📹</span><span class="amenity-label">CCTV en áreas comunes</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🔑</span><span class="amenity-label">Tarjeta de acceso</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🅿️</span><span class="amenity-label">Parqueadero</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🧳</span><span class="amenity-label">Guarda equipaje</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">♿</span><span class="amenity-label">Acceso silla de ruedas</span></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="mapa">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicación y cómo llegar</h2><div class="stnum">7</div></div>
+  <div id="mapel"></div>
+  <div class="mapacts">
+    <a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination=2.4448,-76.6147" target="_blank">🗺️ Google Maps</a>
+    <a class="mabtn dark" href="https://maps.apple.com/?daddr=2.4448,-76.6147" target="_blank">🍎 Apple Maps</a>
+    <a class="mabtn green" href="https://wa.me/573210123456" target="_blank">💬 WhatsApp</a>
+    <a class="mabtn outline" href="tel:+57 321 012 3456">📞 +57 321 012 3456</a>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="transporte">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Cómo llegar<span class="section-new-badge">Nuevo</span></h2><div class="stnum">8</div></div>
+  <div class="transport-grid">
+    <div class="transport-card">
+      <div class="tc-icon">✈️</div>
+      <div class="tc-body">
+        <div class="tc-title">Aeropuerto El Dorado</div>
+        <div class="tc-detail">TransMilenio · Ruta 290 → Portal Norte → Cra 7<br>Taxi: ~$35.000 · 30 min sin tráfico</div>
+        <div class="tc-time">🕐 40–60 min</div>
+      </div>
+    </div>
+    <div class="transport-card">
+      <div class="tc-icon">🚌</div>
+      <div class="tc-body">
+        <div class="tc-title">TransMilenio</div>
+        <div class="tc-detail">Estación Las Aguas o Calle 26 (Troncal Caracas) · 5 min a pie al hostal</div>
+        <div class="tc-time">🕐 5 min caminando</div>
+      </div>
+    </div>
+    <div class="transport-card">
+      <div class="tc-icon">🚗</div>
+      <div class="tc-body">
+        <div class="tc-title">Taxi / InDriver</div>
+        <div class="tc-detail">Desde El Nogal: $12.000 · Desde Chapinero: $10.000 · Estacionamiento en vía disponible</div>
+        <div class="tc-time">🕐 Variable según tráfico</div>
+      </div>
+    </div>
+    <div class="transport-card">
+      <div class="tc-icon">🚶</div>
+      <div class="tc-body">
+        <div class="tc-title">Desde el centro</div>
+        <div class="tc-detail">Museo del Oro: 2 cuadras · Plaza de Bolívar: 5 min · Monserrate teleférico: 15 min a pie</div>
+        <div class="tc-time">🕐 Zona 100% caminable</div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="quienva">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">¿Quién se hospeda esta semana?<span class="section-new-badge">Social</span></h2><div class="stnum">9</div></div>
+  <div class="quien-va-box">
+    <div class="qv-title">Viajeros que planean ir o ya reservaron</div>
+    <div class="qv-travellers" id="hostal-viajeros">
+      <!-- rendered by JS -->
+    </div>
+    <div class="qv-cta" onclick="window.location.href='index.html#social-section'">
+      💬 Únete al chat del hostal para conocerlos antes de llegar →
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="eventos-hostal">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Eventos del hostal<span class="section-new-badge">Social</span></h2><div class="stnum">10</div></div>
+  <div class="hostal-events-list">
+    <div class="he-item">
+      <div class="he-day"><div class="he-day-name">Lun</div><div class="he-day-time">9am</div></div>
+      <div class="he-info">
+        <div class="he-name">🗺️ Free Walking Tour La Candelaria</div>
+        <div class="he-desc">Recorre el barrio colonial con nuestro guía local. Propina a voluntad. Sal desde la recepción.</div>
+      </div>
+      <span class="he-free">Gratis</span>
+      <button class="he-join-btn" onclick="window.location.href='index.html#social-section'">Apuntarse</button>
+    </div>
+    <div class="he-item">
+      <div class="he-day"><div class="he-day-name">Mié</div><div class="he-day-time">7pm</div></div>
+      <div class="he-info">
+        <div class="he-name">🍳 Cooking Class Cocina Colombiana</div>
+        <div class="he-desc">Aprende a preparar ajiaco, bandeja paisa y obleas con nuestra cocinera. Incluye cena.</div>
+      </div>
+      <span class="he-free" style="background:#FFFBEB;color:#92400E">$25.000</span>
+      <button class="he-join-btn" onclick="window.open('https://wa.me/573210123456','_blank')">Reservar</button>
+    </div>
+    <div class="he-item">
+      <div class="he-day"><div class="he-day-name">Jue</div><div class="he-day-time">8pm</div></div>
+      <div class="he-info">
+        <div class="he-name">🍺 Pub Crawl La Candelaria – Chapinero</div>
+        <div class="he-desc">4 bares emblemáticos de Bogotá. Shot de bienvenida incluido. Vuelta al hostal garantizada.</div>
+      </div>
+      <span class="he-free" style="background:#EFF6FF;color:#1D4ED8">$35.000</span>
+      <button class="he-join-btn" onclick="window.open('https://wa.me/573210123456','_blank')">Reservar</button>
+    </div>
+    <div class="he-item">
+      <div class="he-day"><div class="he-day-name">Sáb</div><div class="he-day-time">6am</div></div>
+      <div class="he-info">
+        <div class="he-name">🌄 Subida a Monserrate al amanecer</div>
+        <div class="he-desc">Sube el cerro en grupo antes del turismo masivo. Desayuno en la cumbre incluido.</div>
+      </div>
+      <span class="he-free">Gratis</span>
+      <button class="he-join-btn" onclick="window.location.href='index.html#social-section'">Apuntarse</button>
+    </div>
+    <div class="he-item">
+      <div class="he-day"><div class="he-day-name">Dom</div><div class="he-day-time">7am</div></div>
+      <div class="he-info">
+        <div class="he-name">🚴 Ciclovía Bogotá en grupo</div>
+        <div class="he-desc">120km de vías cerradas cada domingo. Bicicletas disponibles en el hostal ($10.000/día).</div>
+      </div>
+      <span class="he-free">Gratis</span>
+      <button class="he-join-btn" onclick="window.location.href='index.html#social-section'">Apuntarse</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="faq">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes<span class="section-new-badge">Nuevo</span></h2><div class="stnum">11</div></div>
+  <div class="faq-list" id="faq-list">
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Se pueden traer mascotas? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">No admitimos mascotas en las áreas comunes ni en los dormitorios. Si tienes animales de servicio, contáctanos por WhatsApp antes de reservar.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Hay check-in tardío después de las 10pm? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí. Tenemos recepción 24 horas. Si llegas después de las 10pm, avísanos por WhatsApp para que tengamos tu cama lista y el personal te espere.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Cuál es la política de cancelación? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Cancelación gratuita hasta 48 horas antes del check-in. Cancelaciones dentro de las 48 horas tienen un cargo equivalente a 1 noche. No-shows se cobran al 100%.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Admiten grupos grandes? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí, tenemos capacidad para grupos de hasta 40 personas. Para grupos mayores a 8, contáctanos directamente por WhatsApp para obtener una tarifa grupal y bloquear habitaciones.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Hay parqueadero disponible? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">No tenemos parqueadero propio. Sin embargo, hay varios parqueaderos cubiertos a 1-2 cuadras del hostal desde $8.000 por día. La zona de La Candelaria tiene restricción de pico y placa.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Es segura La Candelaria? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">La Candelaria es segura durante el día para turistas. De noche te recomendamos no caminar solo por calles poco iluminadas. El hostal tiene CCTV, recepción 24h y seguimos todos los protocolos de seguridad. Nuestro personal te puede orientar sobre zonas específicas.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿El desayuno está incluido en todas las habitaciones? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">El desayuno continental está incluido en todas las habitaciones: pan artesanal, queso, jugo de fruta de temporada, huevos y café. Se sirve de 7am a 10am en la terraza del segundo piso.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Puedo guardar el equipaje antes del check-in o después del check-out? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí, ofrecemos servicio gratuito de guarda equipaje. Puedes dejar tus maletas desde las 8am y recogerlas hasta las 8pm, incluso si ya hiciste check-out.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="comparar">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Comparar hostales en Bogotá<span class="section-new-badge">Nuevo</span></h2><div class="stnum">12</div></div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Hospedaje</th>
+        <th>Score</th>
+        <th>Precio desde</th>
+        <th>Vibe</th>
+        <th>Distancia centro</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="current-row">
+        <td>Casa Medina<div style="font-size:9px;color:#777">La Candelaria</div></td>
+        <td class="cmp-score">4.8</td>
+        <td>$45.000</td>
+        <td><span style="font-size:10px">🎉 Social</span></td>
+        <td style="font-size:10px;color:#777">En el centro</td>
+        <td><span style="font-size:10px;color:#92400E;font-weight:700">← Estás aquí</span></td>
+      </tr>
+      <tr>
+        <td>Selina Medellín<div style="font-size:9px;color:#777">El Poblado · Medellín</div></td>
+        <td class="cmp-score">4.7</td>
+        <td>$65.000</td>
+        <td><span style="font-size:10px">💻 Nómada</span></td>
+        <td style="font-size:10px;color:#777">El Poblado</td>
+        <td><a class="cmp-link" href="selina-medellin.html">Ver →</a></td>
+      </tr>
+      <tr>
+        <td>Masaya Cartagena<div style="font-size:9px;color:#777">Ciudad amurallada</div></td>
+        <td class="cmp-score">4.8</td>
+        <td>$70.000</td>
+        <td><span style="font-size:10px">🏰 Boutique</span></td>
+        <td style="font-size:10px;color:#777">Amurallada</td>
+        <td><a class="cmp-link" href="masaya-cartagena.html">Ver →</a></td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="font-size:10px;color:#AAA;margin-top:8px">Precios por persona/noche en temporada baja. Ver disponibilidad real en Booking o WhatsApp.</div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="resenas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reseñas</h2><div class="stnum">13</div></div>
+  <div id="rvlist"></div>
+  <div class="wrvbox" style="margin-top:20px">
+    <div class="wrv-title">Escribir una reseña</div>
+    <!-- Tipo de viajero -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Viajaste como:</div>
+      <div class="rv-traveller-type" id="rv-traveller-type">
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Solo')">🧳 Solo</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Pareja')">❤️ Pareja</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Amigos')">👥 Amigos</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Nómada')">💻 Nómada</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Familia')">👨‍👩‍👧 Familia</div>
+      </div>
+    </div>
+    <!-- Multi-dim score -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Puntuación por categoría:</div>
+      <div class="rv-score-selector">
+        <div class="rv-dim">
+          <div class="rv-dim-label">Atmósfera</div>
+          <div class="rv-stars-row" data-dim="atmosfera">
+            <span class="rv-star" data-v="1" onclick="setDimScore('atmosfera',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('atmosfera',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('atmosfera',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('atmosfera',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('atmosfera',5)">★</span>
+          </div>
+        </div>
+        <div class="rv-dim">
+          <div class="rv-dim-label">Personal</div>
+          <div class="rv-stars-row" data-dim="personal">
+            <span class="rv-star" data-v="1" onclick="setDimScore('personal',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('personal',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('personal',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('personal',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('personal',5)">★</span>
+          </div>
+        </div>
+        <div class="rv-dim">
+          <div class="rv-dim-label">Limpieza</div>
+          <div class="rv-stars-row" data-dim="limpieza">
+            <span class="rv-star" data-v="1" onclick="setDimScore('limpieza',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('limpieza',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('limpieza',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('limpieza',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('limpieza',5)">★</span>
+          </div>
+        </div>
+        <div class="rv-dim">
+          <div class="rv-dim-label">Seguridad</div>
+          <div class="rv-stars-row" data-dim="seguridad">
+            <span class="rv-star" data-v="1" onclick="setDimScore('seguridad',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('seguridad',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('seguridad',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('seguridad',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('seguridad',5)">★</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Overall + text -->
+    <div style="margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Puntuación general:</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <span class="spk" data-v="1" onclick="spS(1)" onmouseenter="spH(1)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="2" onclick="spS(2)" onmouseenter="spH(2)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="3" onclick="spS(3)" onmouseenter="spH(3)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="4" onclick="spS(4)" onmouseenter="spH(4)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="5" onclick="spS(5)" onmouseenter="spH(5)" onmouseleave="spO()">★</span>
+      </div>
+    </div>
+    <input id="wrn" type="text" placeholder="Tu nombre (opcional)" class="wrinp" style="margin-bottom:8px">
+    <textarea id="wrt" placeholder="Cuenta tu experiencia en el hostal... (mín. 15 caracteres)" class="wrinp wrtxa"></textarea>
+    <button class="wrsub" onclick="subRv()">Publicar reseña →</button>
+    <div id="wrok" style="display:none;color:#22C55E;font-size:12px;margin-top:8px">✓ Reseña publicada</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="contact">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">14</div></div>
+  <p class="stext" style="margin-bottom:18px">Usa cualquiera de estas opciones para obtener información, reservar o llegar al lugar.</p>
+  <div class="cgrid">
+    <a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination=2.4448,-76.6147" target="_blank">🗺️ Google Maps</a>
+    <a class="cbtn dark" href="https://maps.apple.com/?daddr=2.4448,-76.6147" target="_blank">🍎 Apple Maps</a>
+    <a class="cbtn green" href="https://wa.me/573210123456" target="_blank">💬 WhatsApp</a>
+    <a class="cbtn blue" href="tel:+57 321 012 3456">📞 +57 321 012 3456</a>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">También te puede interesar</h2><div class="stnum">15</div></div>
+  <div class="nbgrid"><a class="nbcard" href="el-cielo-restaurante.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#3a1a0a,#4a2a1a)">
+                <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80" alt="El Cielo Restaurante" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🍽️</span>
+                <div class="nbbdg" style="background:#FEF2F2;color:#7f1d1d">Restaurante</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">El Cielo Restaurante</div>
+                <div class="nbloc">📍 Medellín, Antioquia</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.9 (178)</span></div>
+            </div>
+        </a><a class="nbcard" href="ciudad-perdida.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#0a2a1a,#1a3a2a)">
+                <img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=900&q=80" alt="Ciudad Perdida" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🏔️</span>
+                <div class="nbbdg" style="background:#F0FDF4;color:#14532d">Sitio turístico</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Ciudad Perdida</div>
+                <div class="nbloc">📍 Sierra Nevada, Magdalena</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">5.0 (312)</span></div>
+            </div>
+        </a><a class="nbcard" href="valle-del-cocora.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#0a2a0a,#1a3a1a)">
+                <img src="https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=900&q=80" alt="Valle del Cocora" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🌴</span>
+                <div class="nbbdg" style="background:#F0FDF4;color:#14532d">Sitio turístico</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Valle del Cocora</div>
+                <div class="nbloc">📍 Salento, Quindío</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.9 (540)</span></div>
+            </div>
+        </a></div>
+</div>
+</section>
+
+
+<footer class="footer">
+<div class="ftop">
+  <div>
+    <a href="index.html" class="flogo">EXPLORA<em>CO</em></a>
+    <p class="fdesc">El directorio turístico más completo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
+  </div>
+  <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="index.html">Hostales</a><a class="flink" href="index.html">Gastronomía</a><a class="flink" href="index.html">Sitios turísticos</a><a class="flink" href="index.html">Eventos</a><a class="flink" href="index.html">Mapa cultural</a></div></div>
+  <div><div class="fctl">Destinos</div><div class="flinks"><a class="flink" href="hostal-casa-medina.html">Bogotá</a><a class="flink" href="el-cielo-restaurante.html">Medellín</a><a class="flink" href="ciudad-perdida.html">Sierra Nevada</a><a class="flink" href="feria-de-las-flores.html">Medellín</a><a class="flink" href="hostal-walled-city.html">Cartagena</a></div></div>
+  <div><div class="fctl">Plataforma</div><div class="flinks"><a class="flink" href="#">Publicar lugar</a><a class="flink" href="#">Acerca de</a><a class="flink" href="#">Contacto</a><a class="flink" href="#">Términos</a></div></div>
+</div>
+<div class="fbot">
+  <div class="fcopy">© 2026 ExploraCO · Hecho con ❤️ en Colombia</div>
+  <div class="fb-links"><a href="#">Términos</a><a href="#">Privacidad</a></div>
+</div>
+</footer>
+
+<div class="lb" id="lb">
+  <button class="lbcl" onclick="closeLB()">✕</button>
+  <button class="lbnav lbprev" onclick="lbNav(-1)">‹</button>
+  <button class="lbnav lbnext" onclick="lbNav(1)">›</button>
+  <div id="lbm"></div>
+  <div class="lbcp" id="lbcp"></div>
+</div>
+
+<script>
+const MEDIA=[{"type": "photo", "src": "https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=900&q=80", "cap": "Fachada colonial \u2013 La Candelaria"}, {"type": "photo", "src": "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=700&q=75", "cap": "Habitaci\u00f3n doble con vista"}, {"type": "photo", "src": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=700&q=75", "cap": "Terraza con vista a los cerros"}, {"type": "video", "emoji": "\u25b6\ufe0f", "bg": "#0d1b2a", "cap": "Tour virtual del hostal"}, {"type": "photo", "src": "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=700&q=75", "cap": "Desayuno incluido"}];
+var lbIdx=0;
+function openLB(i){lbIdx=i;renderLB();document.getElementById('lb').classList.add('open')}
+function renderLB(){
+  const m=MEDIA[lbIdx],el=document.getElementById('lbm');
+  if(m.type==='photo'&&m.src){
+    el.innerHTML=`<img src="${m.src}" alt="${m.cap}" onerror="this.style.display='none'">`;
+  }else{
+    el.innerHTML=`<div class="lbmp" style="background:${m.bg||'#111'}">${m.emoji||'▶️'}</div>`;
+  }
+  document.getElementById('lbcp').textContent=`${lbIdx+1}/${MEDIA.length} · ${m.cap}`;
+}
+function lbNav(d){lbIdx=(lbIdx+d+MEDIA.length)%MEDIA.length;renderLB()}
+function closeLB(){document.getElementById('lb').classList.remove('open')}
+document.getElementById('lb').addEventListener('click',e=>{if(e.target===document.getElementById('lb'))closeLB()});
+// Map
+const map=L.map('mapel',{zoomControl:true,scrollWheelZoom:false}).setView([2.4448,-76.6147],14);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:19}).addTo(map);
+const ico=L.divIcon({html:`<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#3B82F6;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:16px">🏨</span></div>`,iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-40],className:''});
+L.marker([2.4448,-76.6147],{icon:ico}).addTo(map).bindPopup(`<b style="font-size:13px">Hostal Casa Medina</b><br><span style="font-size:11px;color:#666">📍 Cra 7 #22-43, La Candelaria, Bogotá</span>`,{maxWidth:220}).openPopup();
+// Stars
+var ps=0;
+function spS(v){ps=v;document.querySelectorAll('.spk').forEach(s=>{const sv=parseInt(s.dataset.v);s.classList.toggle('s',sv<=v);s.classList.remove('h')})}
+function spH(v){document.querySelectorAll('.spk').forEach(s=>{const sv=parseInt(s.dataset.v);s.classList.toggle('h',sv<=v&&!(ps&&sv<=ps))})}
+function spO(){document.querySelectorAll('.spk').forEach(s=>s.classList.remove('h'))}
+// Review
+let urvs=[];try{urvs=JSON.parse(localStorage.getItem('rv_casa-vieja-popayan')||'[]')}catch(e){}
+urvs.forEach(r=>addRv(r));
+function subRv(){
+  const n=(document.getElementById('wrn').value||'').trim();
+  const t=(document.getElementById('wrt').value||'').trim();
+  if(!ps){alert('Selecciona estrellas ★');return}
+  if(t.length<15){alert('Escribe al menos 15 caracteres.');return}
+  const now=new Date(),ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const rv={n:n||'Viajero',s:ps,t,d:ms[now.getMonth()]+' '+now.getFullYear()};
+  urvs.push(rv);try{localStorage.setItem('rv_casa-vieja-popayan',JSON.stringify(urvs))}catch(e){}
+  addRv(rv);
+  document.getElementById('wrn').value='';document.getElementById('wrt').value='';
+  ps=0;document.querySelectorAll('.spk').forEach(s=>s.classList.remove('s','h'));
+  const ok=document.getElementById('wrok'),btn=document.querySelector('.wrsub');
+  btn.style.display='none';ok.style.display='block';
+  setTimeout(()=>{btn.style.display='';ok.style.display='none'},3000);
+}
+function addRv(r){
+  const cols=['#1a3a5c','#3a1a0a','#0a2a1a','#1a051a','#0a1a3a'],tcs=['#7eb8f0','#f0a87e','#7ef0b8','#f07ef0','#7ea8f0'];
+  const i=document.getElementById('rvlist').children.length%5;
+  const init=r.n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const stH=[1,2,3,4,5].map(x=>`<span class="rvst${x<=r.s?' on':''}">★</span>`).join('');
+  const div=document.createElement('div');div.className='rvitem';
+  div.innerHTML=`<div class="rvhead"><div class="rvav" style="background:${cols[i]};color:${tcs[i]}">${init}</div><div><div class="rvname">${r.n}</div><div class="rvdate">${r.d}</div></div><div class="rvstars">${stH}</div></div><div class="rvtag" style="background:#EFF6FF;color:#1e3a8a">🏨 Hostal Casa Medina</div><div class="rvtx">${r.t}</div>`;
+  document.getElementById('rvlist').insertBefore(div,document.getElementById('rvlist').firstChild);
+}
+
+/* ── GUARDAR EN MI MAPA ── */
+var PLACE_ID = 30;
+var mmSaved  = [];
+var mmVisited = [];
+try { mmSaved   = JSON.parse(localStorage.getItem('mm_saved')   || '[]'); } catch(e) {}
+try { mmVisited = JSON.parse(localStorage.getItem('mm_visited') || '[]'); } catch(e) {}
+
+function updateSaveBtn() {
+  var btn  = document.getElementById('save-fab');
+  var lbl  = document.getElementById('save-fab-lbl');
+  if(!btn) return;
+  var saved = mmSaved.indexOf(PLACE_ID) !== -1;
+  btn.className   = 'save-fab ' + (saved ? 'saved' : 'unsaved');
+  var icon = btn.querySelector('.save-fab-icon'); if(icon) icon.textContent = saved ? '♥' : '♡';
+  lbl.textContent = saved ? 'Guardado ✓' : 'Guardar en Mi Mapa';
+}
+
+function toggleSave() {
+  var idx = mmSaved.indexOf(PLACE_ID);
+  var saving = idx === -1;
+  if(saving) {
+    mmSaved.push(PLACE_ID);
+  } else {
+    mmSaved.splice(idx, 1);
+  }
+  try { localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); } catch(e) {}
+  updateSaveBtn();
+  showToast(saving ? '♥ Guardado en tu Mi Mapa' : 'Eliminado de Mi Mapa');
+}
+
+function toggleVisited() {
+  var idx = mmVisited.indexOf(PLACE_ID);
+  if(idx === -1) {
+    mmVisited.push(PLACE_ID);
+    // auto-save too if not already saved
+    if(mmSaved.indexOf(PLACE_ID) === -1) mmSaved.push(PLACE_ID);
+  } else {
+    mmVisited.splice(idx, 1);
+  }
+  try { localStorage.setItem('mm_visited', JSON.stringify(mmVisited)); } catch(e) {}
+  try { localStorage.setItem('mm_saved',   JSON.stringify(mmSaved));   } catch(e) {}
+  updateSaveBtn();
+  var vis = mmVisited.indexOf(PLACE_ID) !== -1;
+  showToast(vis ? '✓ Marcado como visitado' : 'Desmarcado como visitado');
+  updateVisitedBtn();
+}
+
+function updateVisitedBtn() {
+  var btn = document.getElementById('visited-btn');
+  if(!btn) return;
+  var visited = mmVisited.indexOf(PLACE_ID) !== -1;
+  btn.textContent = visited ? '✓ Ya lo visité' : '📍 Marcar como visitado';
+  btn.style.background = visited ? 'rgba(34,197,94,.15)' : '';
+  btn.style.color      = visited ? '#22C55E' : '';
+  btn.style.borderColor= visited ? 'rgba(34,197,94,.4)' : '';
+}
+
+function showToast(msg) {
+  var t = document.getElementById('save-toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+updateSaveBtn();
+updateVisitedBtn();
+
+/* ── FAQ ACCORDION ── */
+function toggleFaq(el) {
+  var item = el.parentElement;
+  item.classList.toggle('open');
+}
+
+/* ── REVIEWS V2: DIMENSION SCORES ── */
+var dimScores = {atmosfera:0, personal:0, limpieza:0, seguridad:0};
+var travellerType = '';
+
+function setDimScore(dim, val) {
+  dimScores[dim] = val;
+  var row = document.querySelector('.rv-stars-row[data-dim="'+dim+'"]');
+  if(!row) return;
+  row.querySelectorAll('.rv-star').forEach(function(s) {
+    s.classList.toggle('on', parseInt(s.dataset.v) <= val);
+  });
+}
+
+function selectTravellerType(btn, type) {
+  travellerType = type;
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+}
+
+/* ── QUIÉN VA THIS HOSTAL ── */
+var QV_USERS = [
+  {name:'Carlos M.',initials:'CM',color:'#1a3a5c',tc:'#7eb8f0',origin:'🇨🇴'},
+  {name:'Sarah K.',initials:'SK',color:'#0a2a1a',tc:'#7ef0b8',origin:'🇩🇪'},
+  {name:'Andrea V.',initials:'AV',color:'#3a1a0a',tc:'#f0a87e',origin:'🇨🇴'},
+  {name:'James W.',initials:'JW',color:'#2a1a0a',tc:'#f0c87e',origin:'🇺🇸'},
+];
+
+function renderHostalQuienVa() {
+  var container = document.getElementById('hostal-viajeros');
+  if(!container) return;
+  if(!QV_USERS.length) {
+    container.innerHTML = '<div class="qv-empty">Sé el primero en guardar este hostal en tu Mi Mapa</div>';
+    return;
+  }
+  container.innerHTML = QV_USERS.map(function(u) {
+    return '<div class="qv-person">'
+      +'<div class="qv-av" style="background:'+u.color+';color:'+u.tc+'">'+u.initials+'</div>'
+      +'<div class="qv-name">'+u.name.split(' ')[0]+'</div>'
+      +'<div style="font-size:8px">'+u.origin+'</div>'
+      +'</div>';
+  }).join('');
+}
+renderHostalQuienVa();
+
+/* ── OVERRIDE subRv TO INCLUDE DIMENSIONS ── */
+var _origSubRv = typeof subRv !== 'undefined' ? subRv : null;
+function subRv() {
+  var n=(document.getElementById('wrn').value||'').trim();
+  var t=(document.getElementById('wrt').value||'').trim();
+  if(!ps){alert('Selecciona estrellas ★');return;}
+  if(t.length<15){alert('Escribe al menos 15 caracteres.');return;}
+  var now=new Date(),ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var rv={
+    n:n||'Viajero',s:ps,t:t,
+    d:ms[now.getMonth()]+' '+now.getFullYear(),
+    travType: travellerType,
+    dims: Object.assign({},dimScores)
+  };
+  urvs.push(rv);
+  try{localStorage.setItem('rv_casa-vieja-popayan',JSON.stringify(urvs))}catch(e){}
+  addRv(rv);
+  document.getElementById('wrn').value='';
+  document.getElementById('wrt').value='';
+  ps=0;
+  document.querySelectorAll('.spk').forEach(function(s){s.classList.remove('s','h');});
+  dimScores={atmosfera:0,personal:0,limpieza:0,seguridad:0};
+  document.querySelectorAll('.rv-star').forEach(function(s){s.classList.remove('on');});
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){b.classList.remove('on');});
+  travellerType='';
+  var ok=document.getElementById('wrok'),btn=document.querySelector('.wrsub');
+  btn.style.display='none';ok.style.display='block';
+  setTimeout(function(){btn.style.display='';ok.style.display='none';},3000);
+}
+
+/* ── OVERRIDE addRv TO SHOW TRAVELLER TYPE ── */
+function addRv(r) {
+  var cols=['#1a3a5c','#3a1a0a','#0a2a1a','#1a051a','#0a1a3a'];
+  var tcs=['#7eb8f0','#f0a87e','#7ef0b8','#f07ef0','#7ea8f0'];
+  var i=document.getElementById('rvlist').children.length%5;
+  var init=r.n.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+  var stH=[1,2,3,4,5].map(function(x){return '<span class="rvst'+(x<=r.s?' on':'')+'">★</span>';}).join('');
+  var typeTag = r.travType ? '<span style="background:#F1EFE8;color:#777;font-size:9px;padding:2px 7px;border-radius:3px;margin-right:4px">'+r.travType+'</span>' : '';
+  var dimsHtml = '';
+  if(r.dims && (r.dims.atmosfera||r.dims.personal)) {
+    dimsHtml = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px">'
+      + Object.keys(r.dims).filter(function(k){return r.dims[k]>0;}).map(function(k){
+          return '<span style="font-size:9px;color:#777">'+k.charAt(0).toUpperCase()+k.slice(1)+': <b style="color:#1a1a1a">'+r.dims[k]+'★</b></span>';
+        }).join('')
+      + '</div>';
+  }
+  var div=document.createElement('div');
+  div.className='rvitem';
+  div.innerHTML='<div class="rvhead"><div class="rvav" style="background:'+cols[i]+';color:'+tcs[i]+'">'+init+'</div>'
+    +'<div><div class="rvname">'+r.n+'</div><div class="rvdate">'+r.d+'</div></div>'
+    +'<div class="rvstars">'+stH+'</div></div>'
+    +'<div style="margin:5px 0 3px">'+typeTag+'<span class="rvtag" style="background:#EFF6FF;color:#1e3a8a;font-size:9px;padding:2px 7px;border-radius:3px">🏨 Hostal Casa Medina</span></div>'
+    +dimsHtml
+    +'<div class="rvtx">'+r.t+'</div>';
+  document.getElementById('rvlist').insertBefore(div,document.getElementById('rvlist').firstChild);
+}
+
+/* Re-render existing reviews with new format */
+var urvs2=[];try{urvs2=JSON.parse(localStorage.getItem('rv_casa-vieja-popayan')||'[]')}catch(e){}
+document.getElementById('rvlist').innerHTML='';
+urvs2.forEach(function(r){addRv(r);});
+
+/* ── HAMBURGER MENU ── */
+function toggleDrawer(){
+  var btn=document.getElementById('ham-btn');
+  var drawer=document.getElementById('mobile-drawer');
+  var open=drawer.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){var d=document.getElementById('mobile-drawer');if(d&&d.classList.contains('open'))toggleDrawer();}
+});
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+(function(){
+  var fill = document.getElementById('prog-fill');
+  var links = document.querySelectorAll('.sn-link');
+
+  function updateProgress(){
+    var s = window.scrollY;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = h > 0 ? Math.round(s/h*100) : 0;
+    if(fill) fill.style.width = pct + '%';
+  }
+
+  function updateActiveLink(){
+    var sections = [];
+    links.forEach(function(a){
+      var id = a.getAttribute('href');
+      var el = id ? document.querySelector(id) : null;
+      if(el) sections.push({el:el, a:a});
+    });
+    var scrollY = window.scrollY + 120;
+    var active = null;
+    sections.forEach(function(s){
+      if(s.el.offsetTop <= scrollY) active = s;
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(active) {
+      active.a.classList.add('active');
+      // Scroll active link into view in sticky nav
+      active.a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+  }
+
+  window.addEventListener('scroll', function(){
+    updateProgress();
+    updateActiveLink();
+  }, {passive:true});
+
+  updateProgress();
+  updateActiveLink();
+})();
+
+/* ── BACK TO TOP ── */
+(function(){
+  var btn = document.getElementById('btt-btn');
+  if(!btn) return;
+  window.addEventListener('scroll', function() {
+    btn.style.display = window.scrollY > 400 ? 'flex' : 'none';
+  }, {passive: true});
+  btn.onmouseenter = function() { this.style.background='#333'; this.style.color='#fff'; };
+  btn.onmouseleave = function() { this.style.background='var(--black)'; this.style.color='rgba(255,255,255,.6)'; };
+})();
+
+/* ── XP for reviews (patch from index) ── */
+(function(){
+  var origSubRv = typeof subRv === 'function' ? subRv : null;
+  if(origSubRv) {
+    subRv = function() {
+      var hadError = false;
+      try { origSubRv(); } catch(e) { hadError = true; }
+      if(!hadError) {
+        // Award XP via localStorage — index.html picks it up next visit
+        try {
+          var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+          pts.xp = (pts.xp||0) + 25;
+          pts.reviews = (pts.reviews||0) + 1;
+          if(!pts.history) pts.history = [];
+          pts.history.unshift({action:'resena',xp:25,label:'Reseña publicada',ts:Date.now(),meta:{name:document.title}});
+          if(pts.history.length > 50) pts.history.length = 50;
+          // Check once flags
+          if(!pts.doneOnce) pts.doneOnce = {};
+          localStorage.setItem('user_points', JSON.stringify(pts));
+        } catch(e) {}
+        // Show mini toast
+        var t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none';
+        t.textContent = '+25 XP — ¡Reseña publicada!';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 3000);
+      }
+    };
+  }
+})();
+
+/* ── XP patch for share in detail pages ── */
+(function(){
+  var _origShare = typeof sharePlace === 'function' ? sharePlace : null;
+  if(_origShare) {
+    sharePlace = function() {
+      _origShare();
+      try {
+        var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+        pts.xp = (pts.xp||0) + 8;
+        pts.shares = (pts.shares||0) + 1;
+        if(!pts.history) pts.history = [];
+        var pname = document.title.replace(' – ExploraCO','').replace(' - ExploraCO','');
+        pts.history.unshift({action:'compartir',xp:8,label:'Lugar compartido',ts:Date.now(),meta:{name:pname}});
+        if(pts.history.length > 50) pts.history.length = 50;
+        localStorage.setItem('user_points', JSON.stringify(pts));
+      } catch(e) {}
+    };
+  }
+})();
+</script>
+<!-- ════ GUARDAR EN MI MAPA ════ -->
+<button class="save-fab unsaved" id="save-fab" onclick="toggleSave()">
+  <span class="save-fab-icon">♡</span>
+  <span id="save-fab-lbl">Guardar en Mi Mapa</span>
+</button>
+<div class="save-fab-toast" id="save-toast"></div>
+
+
+<!-- Back to top -->
+<button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
+  style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.3)">↑</button>
+</body></html>
