@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+  <!-- SEO + Open Graph -->
+  <meta name="description" content="Río Restaurante Cali en Cali, Valle del Cauca. Descubre lo mejor de Colombia.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://exploracо.co/rio-cali-restaurante.html">
+  <!-- Open Graph -->
+  <meta property="og:type"        content="place">
+  <meta property="og:site_name"   content="ExploraCO">
+  <meta property="og:title"       content="Río Restaurante Cali – ExploraCO">
+  <meta property="og:description" content="Río Restaurante Cali en Cali, Valle del Cauca. Descubre lo mejor de Colombia.">
+  <meta property="og:image"       content="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&h=630&fit=crop&q=80">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url"         content="https://exploracо.co/rio-cali-restaurante.html">
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Río Restaurante Cali – ExploraCO">
+  <meta name="twitter:description" content="Río Restaurante Cali en Cali, Valle del Cauca. Descubre lo mejor de Colombia.">
+  <meta name="twitter:image"       content="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&h=630&fit=crop&q=80">
+  <!-- Font preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Structured data -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Restaurant",
+  "name": "Río Restaurante Cali",
+  "description": "Río Restaurante Cali en Cali, Valle del Cauca. Descubre lo mejor de Colombia.",
+  "image": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&h=630&fit=crop&q=80",
+  "priceRange": "Desde $55.000",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 4.8,
+    "reviewCount": 298
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Cali",
+    "addressRegion": "Valle del Cauca",
+    "addressCountry": "CO"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 4.5981,
+    "longitude": -74.0759
+  },
+  "url": "https://exploracо.co/rio-cali-restaurante.html"
+}
+  </script><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Río Restaurante Cali – ExploraCO</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}
+.bc{font-family:'Barlow Condensed',sans-serif}
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none;flex-shrink:0}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}
+.tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}
+.tbc a{color:rgba(255,255,255,.4);text-decoration:none}.tbc a:hover{color:var(--gold)}
+.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}
+.tra{display:flex;gap:8px;align-items:center;margin-left:auto}
+.tact{width:32px;height:32px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+.tact:hover{background:rgba(255,255,255,.14)}
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);cursor:pointer}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff}
+.hero{background:var(--black);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:420px}
+.hl{display:flex;flex-direction:column;justify-content:center;gap:18px}
+.hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}
+.htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.9;letter-spacing:.5px}
+.htitle em{color:var(--gold);font-style:italic;display:block}
+.hsub{font-size:13px;color:rgba(255,255,255,.42);line-height:1.8;max-width:480px}
+.hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}
+.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.45)}
+.hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.hbtn:hover{background:var(--gold-dark)}
+.hobtn{background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}
+.hobtn:hover{border-color:rgba(255,255,255,.45);color:#fff}
+.hr{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.psm{height:210px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer}
+.psm img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.psm:hover img{transform:scale(1.04)}
+.psp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:62px}
+.pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.pexp{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;cursor:pointer}
+.prow{display:flex;gap:8px;height:94px}
+.pth{flex:1;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;transition:opacity .15s}
+.pth:hover{opacity:.85}
+.pth img{width:100%;height:100%;object-fit:cover}
+.pthp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px}
+.pvpl{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+.pvic{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:13px}
+.pmore::after{content:attr(data-more);position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:'Barlow Condensed',sans-serif}
+.gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}
+.gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}
+.gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}
+.gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}
+.gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}
+.gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}
+.gsdate{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.75);font-size:11px}
+.gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}
+.gscta:hover{background:#f5f0e8}
+.ssec{padding:44px 4%}
+.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.sin{max-width:860px;margin:0 auto}
+.strow{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.sgl{width:36px;height:3px;background:var(--gold);flex-shrink:0;border-radius:2px}
+.stitle{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:2.5px;color:var(--text)}
+.stnum{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}
+.slead{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}
+.stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px}
+.hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:22px 0;display:flex;align-items:flex-start;gap:12px}
+.hbico{font-size:20px;flex-shrink:0;margin-top:2px}
+.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}
+.hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}
+.tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;transition:box-shadow .2s,transform .2s}
+.icard:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);transform:translateY(-3px)}
+.iico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px}
+.ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)}
+.ival{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.1}
+.isub{font-size:10px;color:var(--muted);margin-top:2px}
+#mapel{width:100%;height:300px;border-radius:8px;border:1px solid var(--border)}
+.mapacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mabtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .15s;text-decoration:none}
+.mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.gold:hover{background:var(--gold-dark)}
+.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.mabtn.dark:hover{background:#333}
+.mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.green:hover{background:#f0fff5}
+.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}.mabtn.outline:hover{border-color:var(--text)}
+.rblock{display:flex;gap:24px;align-items:flex-start;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px}
+.rbavg{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;color:var(--gold);line-height:1;text-align:center}
+.rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}
+.rbst{font-size:18px;color:#DDD}.rbst.on{color:var(--gold)}
+.rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}
+.rbbars{flex:1}.rbbr{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rbbl{font-size:11px;color:var(--muted);min-width:20px;font-weight:600}
+.rbbt{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.rbbf{height:100%;background:var(--gold);border-radius:3px}
+.rbbn{font-size:11px;font-weight:700;color:var(--text);min-width:24px;text-align:right}
+.rvlist{display:flex;flex-direction:column;gap:14px}
+.rvitem{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.rvhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.rvav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;flex-shrink:0}
+.rvname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text)}
+.rvdate{font-size:9px;color:var(--muted)}
+.rvstars{display:flex;gap:1px;margin-left:auto}
+.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold)}
+.rvtag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.rvtx{font-size:13px;color:#444;line-height:1.7}
+.wr{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-top:20px}
+.wrtitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);margin-bottom:14px}
+.wrfields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.wrff{grid-column:1/-1}
+.wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}
+.wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;transition:border-color .15s}
+.wrinp:focus{border-color:var(--gold)}.wrinp::placeholder{color:#CCC}
+textarea.wrinp{resize:vertical;min-height:88px}
+.sprow{display:flex;gap:5px;margin-bottom:12px}
+.spk{font-size:26px;cursor:pointer;color:#DDD;transition:color .1s,transform .1s;user-select:none}
+.spk:hover,.spk.h,.spk.s{color:var(--gold);transform:scale(1.16)}
+.wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.wrsub:hover{background:#333}
+.wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .2s;text-decoration:none}
+.cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.gold:hover{background:var(--gold-dark);transform:translateY(-2px)}
+.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.cbtn.dark:hover{background:#222;transform:translateY(-2px)}
+.cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.green:hover{background:#f0fff5;transform:translateY(-2px)}
+.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}.cbtn.blue:hover{background:#f0f7ff;transform:translateY(-2px)}
+.nbgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nbcard{background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .18s;text-decoration:none;display:block}
+.nbcard:hover{box-shadow:0 8px 24px rgba(0,0,0,.1);transform:translateY(-3px)}
+.nbimg{height:80px;display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden}
+.nbimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.nbemoji{position:relative;z-index:1}
+.nbbdg{position:absolute;top:6px;left:6px;z-index:2;padding:2px 6px;border-radius:3px;font-size:7px;font-weight:700;text-transform:uppercase}
+.nbbody{padding:9px 10px}
+.nbname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text);line-height:1.1;margin-bottom:2px}
+.nbloc{font-size:9px;color:var(--muted)}
+.nbstars{display:flex;align-items:center;gap:2px;margin-top:3px}
+.nbst{font-size:9px;color:#DDD}.nbst.on{color:var(--gold)}
+.footer{background:var(--black);border-top:3px solid var(--gold);padding:36px 4% 20px}
+.ftop{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:4%;margin-bottom:28px}
+.flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:10px;text-decoration:none;display:inline-block}
+.flogo em{color:var(--gold);font-style:normal}
+.fdesc{font-size:11px;color:rgba(255,255,255,.28);line-height:1.8;margin-bottom:14px}
+.fctl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.22);margin-bottom:12px}
+.flinks{display:flex;flex-direction:column;gap:7px}
+.flink{font-size:11px;color:rgba(255,255,255,.38);cursor:pointer;text-decoration:none;transition:color .15s}.flink:hover{color:var(--gold)}
+.fbot{border-top:1px solid rgba(255,255,255,.07);padding-top:16px;display:flex;align-items:center;justify-content:space-between}
+.fcopy{font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links{display:flex;gap:4%;font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links a{color:inherit;text-decoration:none}.fb-links a:hover{color:var(--gold)}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column}
+.lb.open{display:flex}
+.lbcl{position:absolute;top:16px;right:20px;color:#fff;font-size:26px;cursor:pointer;background:none;border:none}
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lbnav:hover{background:rgba(255,255,255,.2)}.lbprev{left:16px}.lbnext{right:16px}
+.lbm{display:flex;align-items:center;justify-content:center;width:min(700px,92vw);height:min(500px,74vh);border-radius:8px;overflow:hidden}
+.lbm img{width:100%;height:100%;object-fit:cover}
+.lbmp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px}
+.lbcp{color:rgba(255,255,255,.55);font-size:12px;margin-top:10px}
+@media(max-width:860px){.hi{grid-template-columns:1fr;gap:20px}.hr{display:none}.igrid{grid-template-columns:1fr 1fr}.nbgrid{grid-template-columns:1fr 1fr}.ftop{grid-template-columns:1fr 1fr;gap:5%}.wrfields{grid-template-columns:1fr}}
+@media(max-width:600px){.cgrid{grid-template-columns:1fr}.igrid{grid-template-columns:1fr}.gsdiv{display:none}}
+
+:root{--cat-color:#EF4444;--cat-bg:#FEF2F2;--cat-tc:#7f1d1d}
+
+/* ── GUARDAR EN MI MAPA ── */
+.save-fab{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;align-items:center;gap:8px;padding:12px 20px;border-radius:50px;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:all .2s}
+.save-fab.unsaved{background:#fff;color:var(--black);border:2px solid rgba(0,0,0,.12)}
+.save-fab.unsaved:hover{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved{background:var(--gold);color:#fff;border:2px solid var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved:hover{background:var(--gold-dark);border-color:var(--gold-dark)}
+.save-fab-icon{font-size:16px;transition:transform .2s}
+.save-fab.saved .save-fab-icon{transform:scale(1.15)}
+.save-fab-toast{position:fixed;bottom:80px;right:24px;z-index:501;background:var(--black);color:#fff;font-size:12px;padding:8px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .3s;font-family:'Outfit',sans-serif;border-left:3px solid var(--gold)}
+.save-fab-toast.show{opacity:1}
+
+
+/* ══════════════════════════════════════════════════════
+   COMIDA TEMPLATE V2 — Página de punto de comida
+   Menú visual · Delivery · Reservas · Score · FAQ
+   Compara · Social · Accesibilidad
+══════════════════════════════════════════════════════ */
+:root{
+  --red:#EF4444;--red-d:#DC2626;--red-l:rgba(239,68,68,.08);
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+}
+
+/* ── TIPO / VIBE BADGES ── */
+.cuisine-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-right:5px;margin-bottom:5px}
+.cb-colombiana{background:#FEF3C7;color:#92400E}
+.cb-mariscos{background:#EFF6FF;color:#1D4ED8}
+.cb-internacional{background:#F3E8FF;color:#6D28D9}
+.cb-fusion{background:#ECFDF5;color:#065F46}
+.cb-paisa{background:#FFF7ED;color:#C2410C}
+.cb-vegano{background:#F0FDF4;color:#15803D}
+.cb-rapido{background:#FEF2F2;color:#DC2626}
+.cb-cafe{background:#FDF4E7;color:#92400E}
+
+/* ── PRECIO PROMEDIO CHIP ── */
+.precio-nivel{display:inline-flex;align-items:center;gap:3px;padding:4px 10px;border-radius:4px;border:1px solid;font-size:10px;font-weight:700;margin-right:6px}
+.pn-economico{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.pn-medio{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.pn-alto{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+.pn-premium{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DELIVERY / RESERVAS SECTION ── */
+.dr-section{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.dr-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.dr-title{font-size:13px;font-weight:700;color:var(--black)}
+.dr-time{font-size:10px;color:var(--green);font-weight:600;display:flex;align-items:center;gap:4px}
+.dr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:14px 18px}
+.dr-btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 8px;border-radius:8px;border:1.5px solid var(--border);text-decoration:none;transition:all .15s;cursor:pointer;background:var(--white)}
+.dr-btn:hover{border-color:var(--red);background:var(--red-l)}
+.dr-btn.primary{border-color:var(--red);background:var(--red-l)}
+.dr-btn.whatsapp{border-color:#25D366;background:#F0FDF4}
+.dr-btn.whatsapp:hover{background:#DCFCE7}
+.dr-btn-logo{font-size:22px;line-height:1}
+.dr-btn-name{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.dr-btn-detail{font-size:10px;font-weight:700;color:var(--black)}
+.dr-nota{padding:9px 18px;background:#FFFBEB;border-top:1px solid #FDE68A;font-size:10px;color:#92400E;display:flex;align-items:center;gap:5px}
+
+/* ── MENÚ SECTION ── */
+.menu-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:16px}
+.menu-tabs::-webkit-scrollbar{display:none}
+.mtab{padding:9px 18px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.mtab:hover{color:var(--black)}
+.mtab.on{color:var(--black);border-bottom-color:var(--red)}
+.menu-panel{display:none}
+.menu-panel.on{display:block}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.menu-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;transition:border-color .15s,box-shadow .15s}
+.menu-item:hover{border-color:#ddd;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.menu-item-img{width:90px;flex-shrink:0;position:relative;background:var(--border);overflow:hidden}
+.menu-item-img img{width:100%;height:100%;object-fit:cover;display:block}
+.menu-item-img .no-img{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px;background:linear-gradient(135deg,#f8f0e8,#f0e8d8)}
+.menu-item-body{padding:10px 12px;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+.menu-item-name{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px;line-height:1.3}
+.menu-item-desc{font-size:10px;color:var(--muted);line-height:1.55;margin-bottom:6px}
+.menu-item-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.menu-item-price{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px}
+.menu-item-tags{display:flex;gap:4px;flex-wrap:wrap}
+.mit{font-size:8px;padding:2px 5px;border-radius:3px;font-weight:700}
+.mit-vegano{background:#F0FDF4;color:#166534}
+.mit-estrella{background:#FFFBEB;color:#92400E}
+.mit-nuevo{background:#EFF6FF;color:#1D4ED8}
+.mit-picante{background:#FEF2F2;color:#DC2626}
+.mit-sin-gluten{background:#FAF5FF;color:#6D28D9}
+.menu-nota{font-size:10px;color:var(--muted);margin-top:12px;padding:8px 10px;background:var(--bg);border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── HORARIOS ── */
+.horarios-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:10px}
+.horario-day{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:9px 12px;display:flex;flex-direction:column;gap:2px;transition:border-color .12s}
+.horario-day.hoy{border-color:var(--green);background:var(--green-l)}
+.horario-day.cerrado{opacity:.5}
+.hd-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.hd-time{font-size:12px;font-weight:700;color:var(--black)}
+.hd-badge{font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;display:inline-block;width:fit-content}
+.hd-open{background:#F0FDF4;color:#166634}
+.hd-closed{background:#FEF2F2;color:#DC2626}
+.hd-today{background:var(--green);color:var(--white);font-size:7px;padding:1px 5px;border-radius:3px;display:inline-block}
+
+/* ── SCORE COMIDA ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── AMENIDADES RESTAURANTE ── */
+.amenity-section{margin-bottom:14px}
+.amenity-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:7px}
+.amenity-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px}
+.amenity-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:5px;font-size:11px;border:1px solid transparent}
+.amenity-item.yes{background:var(--bg);border-color:var(--border);color:var(--black)}
+.amenity-item.no{color:#CCC;text-decoration:line-through}
+.amenity-icon{font-size:14px;flex-shrink:0;width:20px;text-align:center}
+
+/* ── ACCESIBILIDAD / DIETA ── */
+.diet-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.diet-badge{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid}
+.db-vegano{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.db-vegetariano{background:#ECFDF5;border-color:#A7F3D0;color:#065F46}
+.db-singluten{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+.db-sin-lactosa{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.db-halal{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.db-no{background:var(--bg);border-color:var(--border);color:#AAA;text-decoration:line-through}
+
+/* ── FAQ COMIDA ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR RESTAURANTES ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--red);text-decoration:none;display:inline-block;padding:3px 8px;border:1px solid #FECACA;border-radius:3px;transition:background .12s}
+.cmp-link:hover{background:var(--red-l)}
+
+/* ── QUIÉN VIENE ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── REVIEWS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:#C8860A;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ── MOBILE NAV DETAIL PAGES ── */
+.ham-btn{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;background:transparent;border:none;cursor:pointer;padding:4px;flex-shrink:0;z-index:400;margin-left:auto}
+.ham-btn span{display:block;width:22px;height:2px;background:rgba(255,255,255,.7);border-radius:2px;transition:all .25s;transform-origin:center}
+.ham-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.ham-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.ham-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mobile-drawer{position:fixed;top:0;left:0;right:0;bottom:0;z-index:350;display:flex;flex-direction:column;background:rgba(0,0,0,.97);transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.mobile-drawer.open{transform:translateX(0)}
+.md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
+.md-logo em{color:var(--gold);font-style:normal}
+.md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
+.md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
+.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link-icon{font-size:18px;width:24px;text-align:center}
+.md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
+.md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
+@media(max-width:768px){
+  .ham-btn{display:flex}
+  .tbc,.tra{display:none!important}
+  .topbar{padding:0 14px}
+}
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+.sec-nav{position:sticky;top:52px;z-index:200;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
+.sec-nav::-webkit-scrollbar{display:none}
+.sec-nav-inner{display:flex;gap:0;min-width:max-content;padding:0 4%}
+.sn-link{padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+.sn-link:hover{color:var(--black)}
+.sn-link.active{color:var(--black);border-bottom-color:var(--gold)}
+/* Progress bar */
+.page-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:500;background:transparent}
+.page-progress-fill{height:100%;background:var(--gold);width:0%;transition:width .1s linear;border-radius:0 2px 2px 0}
+@media(max-width:768px){
+  .sn-link{padding:10px 12px;font-size:10px}
+  .sec-nav-inner{padding:0 16px}
+}
+
+
+/* ── SHARE BUTTON ── */
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;text-transform:uppercase}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+.tshare-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#111;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px;min-width:180px;z-index:400;display:none;flex-direction:column;gap:2px}
+.tshare-dropdown.open{display:flex}
+.tsd-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);cursor:pointer;transition:background .1s;text-decoration:none}
+.tsd-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.tshare-wrap{position:relative}
+
+</style></head><body>
+
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="tbc">
+    <a href="index.html">Inicio</a><span>›</span>
+    <a href="index.html">Restaurantes</a><span>›</span>
+    <a href="index.html">Medellín</a><span>›</span>
+    <em>El Cielo Restaurante</em>
+  </div>
+  <div class="tra">
+    <div class="tact">♥</div>
+    <div class="tshare-wrap">
+    <button class="tshare" onclick="toggleShareMenu(this)">↗ Compartir</button>
+    <div class="tshare-dropdown" id="share-dropdown">
+      <div class="tsd-item" onclick="sharePlace()">📋 Copiar link</div>
+      <div class="tsd-item" onclick="shareToWhatsApp()">💬 WhatsApp</div>
+      <a class="tsd-item" href="javascript:void(0)" onclick="if(navigator.share)sharePlace()">↗ Compartir</a>
+    </div>
+  </div>
+  </div>
+<button class="ham-btn" id="ham-btn" onclick="toggleDrawer()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<!-- Scroll progress bar -->
+<div class="page-progress"><div class="page-progress-fill" id="prog-fill"></div></div>
+<!-- Sticky section nav -->
+<div class="sec-nav" id="sec-nav">
+  <div class="sec-nav-inner">
+    <a class="sn-link" href="#descripcion">Sobre</a><a class="sn-link" href="#galeria">Fotos</a><a class="sn-link" href="#menu">Menú</a><a class="sn-link" href="#delivery-reservas">Reservas</a><a class="sn-link" href="#horarios">Horarios</a><a class="sn-link" href="#mapa">Mapa</a><a class="sn-link" href="#faq">FAQ</a><a class="sn-link" href="#resenas">Reseñas</a>
+  </div>
+</div>
+<!-- Mobile drawer -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div class="md-header">
+    <div class="md-logo">EXPLORA<em>CO</em></div>
+    <button class="md-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="md-links">
+    <a class="md-link" href="index.html"><span class="md-link-icon">🏠</span>Inicio</a>
+    <a class="md-link" href="index.html#recs"><span class="md-link-icon">🧭</span>Explorar destinos</a>
+    <a class="md-link" href="index.html#mapa-section"><span class="md-link-icon">🗺️</span>Mapa interactivo</a>
+    <a class="md-link" href="agenda.html"><span class="md-link-icon">📅</span>Agenda cultural</a>
+    <a class="md-link" href="index.html#mymapa-section"><span class="md-link-icon">❤️</span>Mi Viaje</a>
+    <a class="md-link" href="index.html#social-section"><span class="md-link-icon">👥</span>Comunidad</a>
+  </div>
+  <div class="md-footer">
+    <a href="index.html" class="md-back-btn">← Volver al directorio</a>
+  </div>
+</div>
+
+<section class="hero">
+<div class="hi">
+  <div class="hl">
+    <div class="hew">🍽️ Comida</div>
+    <h1 class="htitle bc">Río<em>Restaurante Cali</em></h1>
+    <p class="hsub">Cocina del Pacífico colombiano. Piangua ancestral, chontaduro y cacao afro.</p>
+    <div class="hqi-row">
+      <div class="hqi">📍 Cali, Valle del Cauca</div>
+      <div class="hqi">⭐ 4.8 · 298 reseñas</div>
+      <div class="hqi">💰 Desde $55.000</div>
+      <div class="hqi">⏰ Mar–Dom 12pm–9pm</div>
+    </div>
+    <div class="hctar">
+      <button class="hbtn" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">🗺️ Cómo llegar</button>
+      <button class="hobtn" onclick="document.getElementById('galeria').scrollIntoView({behavior:'smooth'})">Ver galería →</button>
+    </div>
+  </div>
+  <div class="hr"><div class="psm" onclick="openLB(0)">
+        <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80" alt="Menú degustación 2026"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <div class="psp" style="background:linear-gradient(135deg,#3a1a0a,#4a2a1a);display:none">🍽️</div>
+        <div class="pbadge">📷 Fotos</div>
+        <div class="pexp">⛶ Ver galería</div>
+    </div>
+    <div class="prow"><div class="pth" onclick="openLB(1)"><img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=700&q=75" alt="Ingredientes colombianos frescos" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#3a1a0a,#4a2a1a);display:none">🍽️</div></div><div class="pth" onclick="openLB(2)"><div class="pthp" style="background:#1a0a00">▶️</div><div class="pvpl"><div class="pvic">▶</div></div></div><div class="pth" onclick="openLB(3)"><img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75" alt="Sala principal del restaurante" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#3a1a0a,#4a2a1a);display:none">🍽️</div></div></div></div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="descripcion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">1</div></div>
+  <p class="slead bc">Cocina de autor colombiana con técnicas de vanguardia y menú degustación de 12 tiempos.</p>
+  <p class="stext">El Cielo Restaurante es la experiencia gastronómica más reconocida de Colombia. El chef Juan Manuel Barrientos fusiona ingredientes locales como el cacao del Pacífico, la guanábana del Valle y el maracuyá de los Llanos con técnicas de alta cocina. El menú degustación de 12 tiempos es una narrativa gastronómica que cambia cada temporada, celebrando la biodiversidad colombiana. Reserva con anticipación mínima de 2 semanas.</p>
+  <div class="hbox">
+    <span class="hbico">⭐</span>
+    <div><div class="hblbl">Por qué es especial</div><div class="hbtx">Menú degustación de 12 tiempos · Ingredientes 100% colombianos · Premio al mejor restaurante</div></div>
+  </div>
+  <div class="tagrow"><div class="tpill" style="background:#FEF2F2;color:#7f1d1d">Gastronomía de autor</div><div class="tpill" style="background:#FEF2F2;color:#7f1d1d">Menú degustación</div><div class="tpill" style="background:#FEF2F2;color:#7f1d1d">Reserva requerida</div><div class="tpill" style="background:#FEF2F2;color:#7f1d1d">Smart casual</div></div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="galeria">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galería de fotos y videos</h2><div class="stnum">2</div></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">
+    <div onclick="openLB(0)" style="border-radius:6px;overflow:hidden;cursor:pointer;grid-row:1/3;aspect-ratio:unset;background:linear-gradient(135deg,#3a1a0a,#4a2a1a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80" alt="Menú degustación 2026" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">🍽️</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(1)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#3a1a0a,#4a2a1a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=700&q=75" alt="Ingredientes colombianos frescos" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🍽️</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(2)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#3a1a0a,#4a2a1a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">▶️</div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:18px">▶</div></div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">▶ VIDEO</div>
+    </div><div onclick="openLB(3)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#3a1a0a,#4a2a1a);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75" alt="Sala principal del restaurante" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none '">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🍽️</div>
+        
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ DELIVERY Y RESERVAS ════ -->
+<section class="ssec bwarm" id="delivery-reservas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Pedir y reservar<span class="section-new-badge">Nuevo</span></h2><div class="stnum">3</div></div>
+
+  <!-- Reservas -->
+  <div class="dr-section">
+    <div class="dr-header">
+      <div class="dr-title">🗓️ Reservar mesa</div>
+      <div class="dr-time">🟢 Abierto ahora · Cierra 10pm</div>
+    </div>
+    <div class="dr-grid">
+      <a class="dr-btn primary" href="https://wa.me/573229012345" target="_blank">
+        <div class="dr-btn-logo">💬</div>
+        <div class="dr-btn-name">WhatsApp</div>
+        <div class="dr-btn-detail">Reserva directa</div>
+      </a>
+      <a class="dr-btn" href="tel:+57 322 901 2345">
+        <div class="dr-btn-logo">📞</div>
+        <div class="dr-btn-name">Llamar</div>
+        <div class="dr-btn-detail">+57 320 987 6543</div>
+      </a>
+      <a class="dr-btn" href="https://www.opentable.com" target="_blank">
+        <div class="dr-btn-logo">🍽️</div>
+        <div class="dr-btn-name">OpenTable</div>
+        <div class="dr-btn-detail">Ver disponibilidad</div>
+      </a>
+    </div>
+    <div class="dr-nota">⚠️ Requiere reserva con mínimo 2 semanas de anticipación. Grupos de 6+ personas requieren depósito.</div>
+  </div>
+
+  <!-- Delivery -->
+  <div class="dr-section">
+    <div class="dr-header">
+      <div class="dr-title">🛵 Domicilio / Delivery</div>
+      <div class="dr-time">🟢 Disponible · 12pm–9pm</div>
+    </div>
+    <div class="dr-grid">
+      <a class="dr-btn whatsapp" href="https://wa.me/573229012345" target="_blank">
+        <div class="dr-btn-logo">💬</div>
+        <div class="dr-btn-name">WhatsApp</div>
+        <div class="dr-btn-detail">Desde Desde $50.000</div>
+      </a>
+      <a class="dr-btn" href="https://www.rappi.com.co" target="_blank">
+        <div class="dr-btn-logo">🦅</div>
+        <div class="dr-btn-name">Rappi</div>
+        <div class="dr-btn-detail">40–55 min</div>
+      </a>
+      <a class="dr-btn" href="https://www.ifood.com.co" target="_blank">
+        <div class="dr-btn-logo">🟥</div>
+        <div class="dr-btn-name">iFood</div>
+        <div class="dr-btn-detail">25–40 min</div>
+      </a>
+    </div>
+    <div class="dr-nota">💡 Pedir directo por WhatsApp evita la comisión de las apps. Mismo tiempo de entrega, precio más justo para el restaurante.</div>
+  </div>
+
+</div>
+</section>
+
+
+<!-- ════ MENÚ ════ -->
+<section class="ssec bwhite" id="menu">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Carta y menú<span class="section-new-badge">Nuevo</span></h2><div class="stnum">4</div></div>
+
+  <!-- Tabs de categorías del menú -->
+  <div class="menu-tabs" id="menu-tabs">
+    <div class="mtab on" onclick="switchMenu(this,'entrantes')">Entrantes</div>
+    <div class="mtab" onclick="switchMenu(this,'principales')">Principales</div>
+    <div class="mtab" onclick="switchMenu(this,'postres')">Postres</div>
+    <div class="mtab" onclick="switchMenu(this,'bebidas')">Bebidas</div>
+    <div class="mtab" onclick="switchMenu(this,'degustacion')">Menú degustación</div>
+  </div>
+
+  <!-- ENTRANTES -->
+  <div class="menu-panel on" id="mp-entrantes">
+    <div class="menu-grid">
+      <div class="menu-item">
+        <div class="menu-item-img"><img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200&q=70" alt="Ceviche" loading="lazy" onerror="this.parentElement.innerHTML='<div class=no-img>🦐</div>'"></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Ceviche de camarón del Pacífico</div>
+            <div class="menu-item-desc">Camarón fresco, leche de tigre de lulo, aguacate criollo y patacón tostado</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$48.000</div>
+            <div class="menu-item-tags"><span class="mit mit-estrella">⭐ Estrella</span><span class="mit mit-sin-gluten">Sin gluten</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🌿</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Ensalada de copoazú y queso costeño</div>
+            <div class="menu-item-desc">Fruta amazónica, queso costeño artesanal, rúcula y reducción de maracuyá</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$38.000</div>
+            <div class="menu-item-tags"><span class="mit mit-vegano">🌱 Vegano</span><span class="mit mit-nuevo">Nuevo</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🍳</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Huevo pochado con trufa y arepa de chócolo</div>
+            <div class="menu-item-desc">Huevo pochado 63°, espuma de papa criolla, trufa negra y arepa de chócolo</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$52.000</div>
+            <div class="menu-item-tags"><span class="mit mit-estrella">⭐ Chef</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🦀</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Cangrejo de mar del Chocó</div>
+            <div class="menu-item-desc">Cangrejo azul, mantequilla de ají amarillo, hierbas de monte y limón Tahití</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$68.000</div>
+            <div class="menu-item-tags"><span class="mit mit-sin-gluten">Sin gluten</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINCIPALES -->
+  <div class="menu-panel" id="mp-principales">
+    <div class="menu-grid">
+      <div class="menu-item">
+        <div class="menu-item-img"><img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&q=70" alt="Pez espada" loading="lazy" onerror="this.parentElement.innerHTML='<div class=no-img>🐟</div>'"></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Pez espada a la parrilla con salsa de coco y lulo</div>
+            <div class="menu-item-desc">Pez espada del Pacífico, salsa de coco del Chocó, lulo asado y arroz con coco negro</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$98.000</div>
+            <div class="menu-item-tags"><span class="mit mit-estrella">⭐ Estrella</span><span class="mit mit-sin-gluten">Sin gluten</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🥩</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Costilla de res wagyu de la sabana</div>
+            <div class="menu-item-desc">Costilla colombiana 48h, puré de papa pastusa ahumada y chimichurri de hierbas de páramo</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$145.000</div>
+            <div class="menu-item-tags"><span class="mit mit-sin-gluten">Sin gluten</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🌮</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Bandeja interpretada · El Cielo</div>
+            <div class="menu-item-desc">Reinterpretación del plato más emblemático de Antioquia con técnicas de vanguardia</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$88.000</div>
+            <div class="menu-item-tags"><span class="mit mit-estrella">⭐ Chef</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🥕</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Raíces del páramo · menú vegetariano</div>
+            <div class="menu-item-desc">Papas nativas, ullucos, remolacha del Macizo, quínoa y salsa de hierbas de monte</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$72.000</div>
+            <div class="menu-item-tags"><span class="mit mit-vegano">🌱 Vegano</span><span class="mit mit-sin-gluten">Sin gluten</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POSTRES -->
+  <div class="menu-panel" id="mp-postres">
+    <div class="menu-grid">
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🍫</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Volcán de cacao del Chocó</div>
+            <div class="menu-item-desc">Fondant de cacao 75% Tumaco, helado de brevas y sal de Manaure</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$38.000</div>
+            <div class="menu-item-tags"><span class="mit mit-estrella">⭐ Estrella</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🍮</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Cajeta de leche con arequipe y obleas</div>
+            <div class="menu-item-desc">Postre tradicional boyacense revisitado con técnica moderna y helado de guanábana</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$32.000</div>
+            <div class="menu-item-tags"><span class="mit mit-sin-gluten">Sin gluten</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BEBIDAS -->
+  <div class="menu-panel" id="mp-bebidas">
+    <div class="menu-grid">
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">☕</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Café de especialidad – degustación</div>
+            <div class="menu-item-desc">Tres expresiones del café colombiano: honey Huila, natural Nariño, washed Cauca</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$28.000</div>
+            <div class="menu-item-tags"><span class="mit mit-vegano">🌱 Vegano</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🍹</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Cóctel de lulo y aguardiente artesanal</div>
+            <div class="menu-item-desc">Aguardiente Cristal, lulo asado, jengibre del Huila y espuma de maracuyá</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$35.000</div>
+            <div class="menu-item-tags"><span class="mit mit-nuevo">Nuevo</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div class="menu-item-img"><div class="no-img">🧃</div></div>
+        <div class="menu-item-body">
+          <div>
+            <div class="menu-item-name">Jugo de frutas exóticas de Colombia</div>
+            <div class="menu-item-desc">Copoazú, chontaduro, borojó o maracuyá · Selección del día según disponibilidad</div>
+          </div>
+          <div class="menu-item-footer">
+            <div class="menu-item-price">$18.000</div>
+            <div class="menu-item-tags"><span class="mit mit-vegano">🌱 Vegano</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEGUSTACIÓN -->
+  <div class="menu-panel" id="mp-degustacion">
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:700;color:var(--black)">Menú degustación 12 tiempos</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black)">$280.000 <span style="font-size:11px;font-weight:400;color:var(--muted)">/ persona</span></div>
+      </div>
+      <div style="padding:12px 18px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Tiempos incluidos:</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">01 · Bienvenida · Bocado tierra</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">02 · Ceviche del Pacífico</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">03 · Huevo y trufa</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">04 · Cangrejo del Chocó</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">05 · Sopa fría de lulo</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">06 · Pez espada Pacífico</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">07 · Sorbete de maracuyá</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">08 · Costilla wagyu</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">09 · Quesos colombianos</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">10 · Pre-postre · Cacao</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">11 · Volcán de cacao</div>
+          <div style="font-size:11px;padding:6px 10px;background:var(--white);border-radius:4px;border-left:2px solid var(--red)">12 · Petits fours · Despedida</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;padding:8px 10px;background:var(--white);border-radius:5px;border-left:2px solid var(--gold)">
+          💡 Maridaje opcional: $120.000/persona · 5 vinos colombianos y latinoamericanos seleccionados por el sommelier. Duración: 3–3.5 horas.
+        </div>
+      </div>
+      <div style="padding:10px 18px;border-top:1px solid var(--border)">
+        <a href="https://wa.me/573229012345" target="_blank" style="display:block;background:var(--black);color:var(--white);text-align:center;padding:10px;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#333'" onmouseout="this.style.background='var(--black)'">
+          Reservar menú degustación por WhatsApp →
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="menu-nota">📋 La carta puede variar según disponibilidad estacional de ingredientes. Consultar opciones para alérgenos y dietas especiales al reservar.</div>
+</div>
+</section>
+
+
+<!-- ════ HORARIOS ════ -->
+<section class="ssec bwarm" id="horarios">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Horarios<span class="section-new-badge">Nuevo</span></h2><div class="stnum">5</div></div>
+  <div class="horarios-grid" id="horarios-grid">
+    <div class="horario-day cerrado"><div class="hd-name">Lunes</div><div class="hd-time">Cerrado</div><span class="hd-badge hd-closed">Cerrado</span></div>
+    <div class="horario-day"><div class="hd-name">Martes</div><div class="hd-time">12pm – 10pm</div><span class="hd-badge hd-open">Abierto</span></div>
+    <div class="horario-day"><div class="hd-name">Miércoles</div><div class="hd-time">12pm – 10pm</div><span class="hd-badge hd-open">Abierto</span></div>
+    <div class="horario-day"><div class="hd-name">Jueves</div><div class="hd-time">12pm – 10pm</div><span class="hd-badge hd-open">Abierto</span></div>
+    <div class="horario-day"><div class="hd-name">Viernes</div><div class="hd-time">12pm – 11pm</div><span class="hd-badge hd-open">Abierto</span></div>
+    <div class="horario-day"><div class="hd-name">Sábado</div><div class="hd-time">1pm – 11pm</div><span class="hd-badge hd-open">Abierto</span></div>
+    <div class="horario-day"><div class="hd-name">Domingo</div><div class="hd-time">1pm – 8pm</div><span class="hd-badge hd-open">Abierto</span></div>
+  </div>
+  <div style="margin-top:10px;font-size:10px;color:var(--muted);padding:8px 10px;background:var(--bg);border-radius:5px;border-left:2px solid var(--gold)">
+    📅 Último pedido 45 minutos antes del cierre. Festivos con horario especial — consultar por WhatsApp.
+  </div>
+</div>
+</section>
+
+
+<!-- ════ PUNTUACIÓN ════ -->
+<section class="ssec bwhite" id="puntuacion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Puntuación</h2><div class="stnum">6</div></div>
+  <div class="score-overall">
+    <div class="so-number">4.8</div>
+    <div class="so-meta">
+      <div class="so-stars">★★★★★</div>
+      <div class="so-label">Excepcional · 298 reseñas</div>
+      <div class="so-count">Top 3% de restaurantes en Medellín</div>
+    </div>
+  </div>
+  <div class="score-grid">
+    <div class="score-label">Comida</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:100%;background:#EF4444"></div></div>
+    <div class="score-val">5.0</div>
+    <div class="score-label">Servicio</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:98%;background:#E8A020"></div></div>
+    <div class="score-val">4.9</div>
+    <div class="score-label">Ambiente</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:96%;background:#8B5CF6"></div></div>
+    <div class="score-val">4.8</div>
+    <div class="score-label">Valor</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:90%;background:#3B82F6"></div></div>
+    <div class="score-val">4.5</div>
+    <div class="score-label">Ubicación</div>
+    <div class="score-bar-wrap"><div class="score-bar-fill" style="width:96%;background:#22C55E"></div></div>
+    <div class="score-val">4.8</div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ SERVICIOS Y AMBIENTE ════ -->
+<section class="ssec bwarm" id="servicios">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Servicios y ambiente<span class="section-new-badge">Nuevo</span></h2><div class="stnum">7</div></div>
+
+  <!-- Opciones dietéticas -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">🌱 Opciones dietéticas</div>
+    <div class="diet-grid">
+      <div class="diet-badge db-vegano">🌱 Vegano (disponible)</div>
+      <div class="diet-badge db-vegetariano">🥦 Vegetariano</div>
+      <div class="diet-badge db-singluten">🌾 Sin gluten (consultar)</div>
+      <div class="diet-badge db-sin-lactosa">🥛 Sin lactosa (consultar)</div>
+      <div class="diet-badge db-no">🥩 Sin opciones sin carne roja</div>
+    </div>
+  </div>
+
+  <!-- Ambiente -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">🏛️ Ambiente y espacio</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">🕯️</span><span>Ambiente romántico</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🏛️</span><span>Sala privada eventos</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">♿</span><span>Accesible sillas ruedas</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🅿️</span><span>Parqueadero cerca</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🌿</span><span>Terraza exterior</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">❄️</span><span>A/C en todo el salón</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">📸</span><span>Instagram-friendly</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">🐶</span><span>Mascotas bienvenidas</span></div>
+    </div>
+  </div>
+
+  <!-- Pagos y práctico -->
+  <div class="amenity-section">
+    <div class="amenity-section-title">💳 Pagos y práctico</div>
+    <div class="amenity-grid">
+      <div class="amenity-item yes"><span class="amenity-icon">💳</span><span>Tarjetas débito/crédito</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">📱</span><span>Nequi / Daviplata</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">💵</span><span>Efectivo</span></div>
+      <div class="amenity-item no"><span class="amenity-icon">📶</span><span>WiFi para clientes</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🍷</span><span>Carta de vinos</span></div>
+      <div class="amenity-item yes"><span class="amenity-icon">🎂</span><span>Celebraciones</span></div>
+    </div>
+  </div>
+
+  <!-- Capacidad -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:6px">
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;line-height:1;color:var(--black)">30</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px">Puestos</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;line-height:1;color:var(--black)">1</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px">Sala privada</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;line-height:1;color:var(--black)">3h</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px">Duración menú</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;line-height:1;color:var(--black)">12</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px">Tiempos degustar</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="mapa">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicación y cómo llegar</h2><div class="stnum">8</div></div>
+  <div id="mapel"></div>
+  <div class="mapacts">
+    <a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination=3.445,-76.528" target="_blank">🗺️ Google Maps</a>
+    <a class="mabtn dark" href="https://maps.apple.com/?daddr=3.445,-76.528" target="_blank">🍎 Apple Maps</a>
+    <a class="mabtn green" href="https://wa.me/573229012345" target="_blank">💬 WhatsApp</a>
+    <a class="mabtn outline" href="tel:+57 322 901 2345">📞 +57 322 901 2345</a>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ QUIÉN VIENE ESTA SEMANA ════ -->
+<section class="ssec bwarm" id="quienva">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">¿Quién viene esta semana?<span class="section-new-badge">Social</span></h2><div class="stnum">9</div></div>
+  <div class="quien-va-box">
+    <div class="qv-title">Viajeros que tienen este lugar guardado</div>
+    <div class="qv-travellers" id="rest-viajeros"></div>
+    <div style="font-size:10px;color:var(--gold);font-weight:600;margin-top:10px;cursor:pointer" onclick="window.location.href='index.html#social-section'">
+      💬 Conecta con otros foodies en el chat de ExploraCO →
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ PREGUNTAS FRECUENTES ════ -->
+<section class="ssec bwhite" id="faq">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes<span class="section-new-badge">Nuevo</span></h2><div class="stnum">10</div></div>
+  <div class="faq-list">
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Es obligatorio reservar? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí, completamente obligatorio con mínimo 2 semanas de anticipación. El restaurante tiene solo 30 puestos y se llena con mucha anticipación, especialmente los fines de semana y festivos.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Tienen opciones para vegetarianos y veganos? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí. El menú de degustación tiene versión vegetariana disponible con anticipación. Dentro de la carta hay platos específicamente veganos y vegetarianos. Avisarnos al reservar para preparar las opciones correctas.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Cuál es la política de cancelación? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Cancelación gratuita hasta 72 horas antes. Cancelaciones dentro de las 72 horas pierden el depósito equivalente al 50% del valor por persona. No-shows se cobran al 100%.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Hacen domicilios / delivery? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí, con cobertura en El Poblado, Laureles, El Centro y Envigado. Disponible por Rappi, iFood o directamente por WhatsApp (sin comisión). Pedido mínimo $50.000. Tiempo de entrega 30–50 minutos.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Admiten niños? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí, niños bienvenidos. Tenemos menú infantil disponible a $45.000 por niño. El menú degustación completo no se recomienda para menores de 10 años por la duración (3+ horas).</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Hay parqueadero? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">No tenemos parqueadero propio, pero hay varios parqueaderos cubiertos a menos de 100 metros. El Centro Comercial El Tesoro tiene parqueadero a 2 cuadras.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Pueden organizar eventos corporativos o celebraciones? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Sí, tenemos una sala privada para hasta 12 personas ideal para cumpleaños, aniversarios y cenas de negocios. Incluye decoración personalizada, menú especial y servicio exclusivo. Contactar con 3 semanas de anticipación.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">¿Cuál es el código de vestimenta? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Smart casual. No se permiten pantalonetas, camisetas sin mangas ni chancletas. Para cenas especiales o el menú degustación se recomienda ropa más formal.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ════ COMPARAR RESTAURANTES ════ -->
+<section class="ssec bwarm" id="comparar">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Comparar restaurantes en Medellín<span class="section-new-badge">Nuevo</span></h2><div class="stnum">11</div></div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Restaurante</th>
+        <th>Score</th>
+        <th>Precio promedio</th>
+        <th>Tipo</th>
+        <th>Delivery</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="current-row">
+        <td>El Cielo<div style="font-size:9px;color:#777">El Poblado · Medellín</div></td>
+        <td class="cmp-score">4.9</td>
+        <td>$280.000</td>
+        <td style="font-size:10px">🇨🇴 Alta cocina</td>
+        <td style="font-size:10px">✓ Disponible</td>
+        <td><span style="font-size:10px;color:#92400E;font-weight:700">← Estás aquí</span></td>
+      </tr>
+      <tr>
+        <td>La Tienda de Teresa<div style="font-size:9px;color:#777">Manrique · Medellín</div></td>
+        <td class="cmp-score">4.8</td>
+        <td>$18.000</td>
+        <td style="font-size:10px">🍽️ Cocina paisa</td>
+        <td style="font-size:10px">✗ No</td>
+        <td><a class="cmp-link" href="la-tienda-de-teresa-medellin.html">Ver →</a></td>
+      </tr>
+      <tr>
+        <td>Pesquera Jaramillo<div style="font-size:9px;color:#777">Buenos Aires · Medellín</div></td>
+        <td class="cmp-score">4.7</td>
+        <td>$45.000</td>
+        <td style="font-size:10px">🐟 Mariscos</td>
+        <td style="font-size:10px">✓ Rappi</td>
+        <td><a class="cmp-link" href="pesquera-jaramillo-medellin.html">Ver →</a></td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="font-size:10px;color:#AAA;margin-top:8px">Precio promedio por persona incluye entrada + principal + bebida. Sin maridaje.</div>
+</div>
+</section>
+
+
+<!-- ════ RESEÑAS V2 ════ -->
+<section class="ssec bwhite" id="resenas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reseñas</h2><div class="stnum">12</div></div>
+  <div id="rvlist"></div>
+  <div class="wrvbox" style="margin-top:20px">
+    <div class="wrv-title">Escribir una reseña</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Fuiste como:</div>
+      <div class="rv-traveller-type" id="rv-traveller-type">
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Solo')">🧳 Solo</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Pareja')">❤️ Pareja</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Amigos')">👥 Amigos</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Familia')">👨‍👩‍👧 Familia</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Negocio')">💼 Negocio</div>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Puntuación por categoría:</div>
+      <div class="rv-score-selector">
+        <div class="rv-dim">
+          <div class="rv-dim-label">Comida</div>
+          <div class="rv-stars-row" data-dim="comida">
+            <span class="rv-star" data-v="1" onclick="setDimScore('comida',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('comida',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('comida',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('comida',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('comida',5)">★</span>
+          </div>
+        </div>
+        <div class="rv-dim">
+          <div class="rv-dim-label">Servicio</div>
+          <div class="rv-stars-row" data-dim="servicio">
+            <span class="rv-star" data-v="1" onclick="setDimScore('servicio',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('servicio',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('servicio',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('servicio',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('servicio',5)">★</span>
+          </div>
+        </div>
+        <div class="rv-dim">
+          <div class="rv-dim-label">Ambiente</div>
+          <div class="rv-stars-row" data-dim="ambiente">
+            <span class="rv-star" data-v="1" onclick="setDimScore('ambiente',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('ambiente',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('ambiente',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('ambiente',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('ambiente',5)">★</span>
+          </div>
+        </div>
+        <div class="rv-dim">
+          <div class="rv-dim-label">Valor / precio</div>
+          <div class="rv-stars-row" data-dim="valor">
+            <span class="rv-star" data-v="1" onclick="setDimScore('valor',1)">★</span>
+            <span class="rv-star" data-v="2" onclick="setDimScore('valor',2)">★</span>
+            <span class="rv-star" data-v="3" onclick="setDimScore('valor',3)">★</span>
+            <span class="rv-star" data-v="4" onclick="setDimScore('valor',4)">★</span>
+            <span class="rv-star" data-v="5" onclick="setDimScore('valor',5)">★</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Puntuación general:</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <span class="spk" data-v="1" onclick="spS(1)" onmouseenter="spH(1)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="2" onclick="spS(2)" onmouseenter="spH(2)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="3" onclick="spS(3)" onmouseenter="spH(3)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="4" onclick="spS(4)" onmouseenter="spH(4)" onmouseleave="spO()">★</span>
+        <span class="spk" data-v="5" onclick="spS(5)" onmouseenter="spH(5)" onmouseleave="spO()">★</span>
+      </div>
+    </div>
+    <input id="wrn" type="text" placeholder="Tu nombre (opcional)" class="wrinp" style="margin-bottom:8px">
+    <textarea id="wrt" placeholder="¿Qué pediste? ¿Cómo fue la experiencia? (mín. 15 caracteres)" class="wrinp wrtxa"></textarea>
+    <button class="wrsub" onclick="subRv()">Publicar reseña →</button>
+    <div id="wrok" style="display:none;color:#22C55E;font-size:12px;margin-top:8px">✓ Reseña publicada</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="contact">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">13</div></div>
+  <p class="stext" style="margin-bottom:18px">Usa cualquiera de estas opciones para obtener información, reservar o llegar al lugar.</p>
+  <div class="cgrid">
+    <a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination=3.445,-76.528" target="_blank">🗺️ Google Maps</a>
+    <a class="cbtn dark" href="https://maps.apple.com/?daddr=3.445,-76.528" target="_blank">🍎 Apple Maps</a>
+    <a class="cbtn green" href="https://wa.me/573229012345" target="_blank">💬 WhatsApp</a>
+    <a class="cbtn blue" href="tel:+57 322 901 2345">📞 +57 322 901 2345</a>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">También te puede interesar</h2><div class="stnum">14</div></div>
+  <div class="nbgrid"><a class="nbcard" href="feria-de-las-flores.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#1a051a,#3a1a3a)">
+                <img src="https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80" alt="Feria de las Flores" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🎉</span>
+                <div class="nbbdg" style="background:#FAF5FF;color:#581c87">Evento</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Feria de las Flores</div>
+                <div class="nbloc">📍 Medellín, Antioquia</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.9 (891)</span></div>
+            </div>
+        </a><a class="nbcard" href="hostal-walled-city.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#3a2a1a,#4a3a2a)">
+                <img src="https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=900&q=80" alt="Hostal Walled City" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🏰</span>
+                <div class="nbbdg" style="background:#EFF6FF;color:#1e3a8a">Hostal</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Hostal Walled City</div>
+                <div class="nbloc">📍 Cartagena, Bolívar</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.7 (203)</span></div>
+            </div>
+        </a><a class="nbcard" href="carnaval-barranquilla.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#1a051a,#2a0a2a)">
+                <img src="https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=900&q=80" alt="Carnaval de Barranquilla" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">💃</span>
+                <div class="nbbdg" style="background:#FAF5FF;color:#581c87">Evento</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Carnaval de Barranquilla</div>
+                <div class="nbloc">📍 Barranquilla, Atlántico</div>
+                <div class="nbstars"><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span><span class="nbst on"">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.8 (623)</span></div>
+            </div>
+        </a></div>
+</div>
+</section>
+
+
+<footer class="footer">
+<div class="ftop">
+  <div>
+    <a href="index.html" class="flogo">EXPLORA<em>CO</em></a>
+    <p class="fdesc">El directorio turístico más completo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
+  </div>
+  <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="index.html">Hostales</a><a class="flink" href="index.html">Gastronomía</a><a class="flink" href="index.html">Sitios turísticos</a><a class="flink" href="index.html">Eventos</a><a class="flink" href="index.html">Mapa cultural</a></div></div>
+  <div><div class="fctl">Destinos</div><div class="flinks"><a class="flink" href="hostal-casa-medina.html">Bogotá</a><a class="flink" href="el-cielo-restaurante.html">Medellín</a><a class="flink" href="ciudad-perdida.html">Sierra Nevada</a><a class="flink" href="feria-de-las-flores.html">Medellín</a><a class="flink" href="hostal-walled-city.html">Cartagena</a></div></div>
+  <div><div class="fctl">Plataforma</div><div class="flinks"><a class="flink" href="#">Publicar lugar</a><a class="flink" href="#">Acerca de</a><a class="flink" href="#">Contacto</a><a class="flink" href="#">Términos</a></div></div>
+</div>
+<div class="fbot">
+  <div class="fcopy">© 2026 ExploraCO · Hecho con ❤️ en Colombia</div>
+  <div class="fb-links"><a href="#">Términos</a><a href="#">Privacidad</a></div>
+</div>
+</footer>
+
+<div class="lb" id="lb">
+  <button class="lbcl" onclick="closeLB()">✕</button>
+  <button class="lbnav lbprev" onclick="lbNav(-1)">‹</button>
+  <button class="lbnav lbnext" onclick="lbNav(1)">›</button>
+  <div id="lbm"></div>
+  <div class="lbcp" id="lbcp"></div>
+</div>
+
+<script>
+const MEDIA=[{"type": "photo", "src": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80", "cap": "Men\u00fa degustaci\u00f3n 2026"}, {"type": "photo", "src": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=700&q=75", "cap": "Ingredientes colombianos frescos"}, {"type": "video", "emoji": "\u25b6\ufe0f", "bg": "#1a0a00", "cap": "Chef Juan Manuel en cocina"}, {"type": "photo", "src": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=700&q=75", "cap": "Sala principal del restaurante"}];
+var lbIdx=0;
+function openLB(i){lbIdx=i;renderLB();document.getElementById('lb').classList.add('open')}
+function renderLB(){
+  const m=MEDIA[lbIdx],el=document.getElementById('lbm');
+  if(m.type==='photo'&&m.src){
+    el.innerHTML=`<img src="${m.src}" alt="${m.cap}" onerror="this.style.display='none'">`;
+  }else{
+    el.innerHTML=`<div class="lbmp" style="background:${m.bg||'#111'}">${m.emoji||'▶️'}</div>`;
+  }
+  document.getElementById('lbcp').textContent=`${lbIdx+1}/${MEDIA.length} · ${m.cap}`;
+}
+function lbNav(d){lbIdx=(lbIdx+d+MEDIA.length)%MEDIA.length;renderLB()}
+function closeLB(){document.getElementById('lb').classList.remove('open')}
+document.getElementById('lb').addEventListener('click',e=>{if(e.target===document.getElementById('lb'))closeLB()});
+// Map
+const map=L.map('mapel',{zoomControl:true,scrollWheelZoom:false}).setView([3.445,-76.528],14);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:19}).addTo(map);
+const ico=L.divIcon({html:`<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#EF4444;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:16px">🍽️</span></div>`,iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-40],className:''});
+L.marker([3.445,-76.528],{icon:ico}).addTo(map).bindPopup(`<b style="font-size:13px">El Cielo Restaurante</b><br><span style="font-size:11px;color:#666">📍 Calle 7D #43C-26, El Poblado, Medellín</span>`,{maxWidth:220}).openPopup();
+// Stars
+var ps=0;
+function spS(v){ps=v;document.querySelectorAll('.spk').forEach(s=>{const sv=parseInt(s.dataset.v);s.classList.toggle('s',sv<=v);s.classList.remove('h')})}
+function spH(v){document.querySelectorAll('.spk').forEach(s=>{const sv=parseInt(s.dataset.v);s.classList.toggle('h',sv<=v&&!(ps&&sv<=ps))})}
+function spO(){document.querySelectorAll('.spk').forEach(s=>s.classList.remove('h'))}
+// Review
+let urvs=[];try{urvs=JSON.parse(localStorage.getItem('rv_rio-cali-restaurante')||'[]')}catch(e){}
+urvs.forEach(r=>addRv(r));
+function subRv(){
+  const n=(document.getElementById('wrn').value||'').trim();
+  const t=(document.getElementById('wrt').value||'').trim();
+  if(!ps){alert('Selecciona estrellas ★');return}
+  if(t.length<15){alert('Escribe al menos 15 caracteres.');return}
+  const now=new Date(),ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const rv={n:n||'Viajero',s:ps,t,d:ms[now.getMonth()]+' '+now.getFullYear()};
+  urvs.push(rv);try{localStorage.setItem('rv_rio-cali-restaurante',JSON.stringify(urvs))}catch(e){}
+  addRv(rv);
+  document.getElementById('wrn').value='';document.getElementById('wrt').value='';
+  ps=0;document.querySelectorAll('.spk').forEach(s=>s.classList.remove('s','h'));
+  const ok=document.getElementById('wrok'),btn=document.querySelector('.wrsub');
+  btn.style.display='none';ok.style.display='block';
+  setTimeout(()=>{btn.style.display='';ok.style.display='none'},3000);
+}
+function addRv(r){
+  const cols=['#1a3a5c','#3a1a0a','#0a2a1a','#1a051a','#0a1a3a'],tcs=['#7eb8f0','#f0a87e','#7ef0b8','#f07ef0','#7ea8f0'];
+  const i=document.getElementById('rvlist').children.length%5;
+  const init=r.n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const stH=[1,2,3,4,5].map(x=>`<span class="rvst${x<=r.s?' on':''}">★</span>`).join('');
+  const div=document.createElement('div');div.className='rvitem';
+  div.innerHTML=`<div class="rvhead"><div class="rvav" style="background:${cols[i]};color:${tcs[i]}">${init}</div><div><div class="rvname">${r.n}</div><div class="rvdate">${r.d}</div></div><div class="rvstars">${stH}</div></div><div class="rvtag" style="background:#FEF2F2;color:#7f1d1d">🍽️ Río Restaurante Cali Restaurante</div><div class="rvtx">${r.t}</div>`;
+  document.getElementById('rvlist').insertBefore(div,document.getElementById('rvlist').firstChild);
+}
+
+/* ── GUARDAR EN MI MAPA ── */
+var PLACE_ID = 49;
+var mmSaved  = [];
+var mmVisited = [];
+try { mmSaved   = JSON.parse(localStorage.getItem('mm_saved')   || '[]'); } catch(e) {}
+try { mmVisited = JSON.parse(localStorage.getItem('mm_visited') || '[]'); } catch(e) {}
+
+function updateSaveBtn() {
+  var btn  = document.getElementById('save-fab');
+  var lbl  = document.getElementById('save-fab-lbl');
+  if(!btn) return;
+  var saved = mmSaved.indexOf(PLACE_ID) !== -1;
+  btn.className   = 'save-fab ' + (saved ? 'saved' : 'unsaved');
+  btn.querySelector('.save-fab-icon').textContent = saved ? '♥' : '♡';
+  lbl.textContent = saved ? 'Guardado ✓' : 'Guardar en Mi Mapa';
+}
+
+function toggleSave() {
+  var idx = mmSaved.indexOf(PLACE_ID);
+  var saving = idx === -1;
+  if(saving) {
+    mmSaved.push(PLACE_ID);
+  } else {
+    mmSaved.splice(idx, 1);
+  }
+  try { localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); } catch(e) {}
+  updateSaveBtn();
+  showToast(saving ? '♥ Guardado en tu Mi Mapa' : 'Eliminado de Mi Mapa');
+}
+
+function toggleVisited() {
+  var idx = mmVisited.indexOf(PLACE_ID);
+  if(idx === -1) {
+    mmVisited.push(PLACE_ID);
+    // auto-save too if not already saved
+    if(mmSaved.indexOf(PLACE_ID) === -1) mmSaved.push(PLACE_ID);
+  } else {
+    mmVisited.splice(idx, 1);
+  }
+  try { localStorage.setItem('mm_visited', JSON.stringify(mmVisited)); } catch(e) {}
+  try { localStorage.setItem('mm_saved',   JSON.stringify(mmSaved));   } catch(e) {}
+  updateSaveBtn();
+  var vis = mmVisited.indexOf(PLACE_ID) !== -1;
+  showToast(vis ? '✓ Marcado como visitado' : 'Desmarcado como visitado');
+  updateVisitedBtn();
+}
+
+function updateVisitedBtn() {
+  var btn = document.getElementById('visited-btn');
+  if(!btn) return;
+  var visited = mmVisited.indexOf(PLACE_ID) !== -1;
+  btn.textContent = visited ? '✓ Ya lo visité' : '📍 Marcar como visitado';
+  btn.style.background = visited ? 'rgba(34,197,94,.15)' : '';
+  btn.style.color      = visited ? '#22C55E' : '';
+  btn.style.borderColor= visited ? 'rgba(34,197,94,.4)' : '';
+}
+
+function showToast(msg) {
+  var t = document.getElementById('save-toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+updateSaveBtn();
+updateVisitedBtn();
+
+/* ── MENÚ TABS ── */
+function switchMenu(btn, panel) {
+  document.querySelectorAll('.mtab').forEach(function(t){ t.classList.remove('on'); });
+  document.querySelectorAll('.menu-panel').forEach(function(p){ p.classList.remove('on'); });
+  btn.classList.add('on');
+  var el = document.getElementById('mp-'+panel);
+  if(el) el.classList.add('on');
+}
+
+/* ── FAQ ACCORDION ── */
+function toggleFaq(el) {
+  el.parentElement.classList.toggle('open');
+}
+
+/* ── HORARIOS: highlight today ── */
+(function() {
+  var days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  var today = days[new Date().getDay()];
+  var cards = document.querySelectorAll('.horario-day');
+  cards.forEach(function(c) {
+    var name = c.querySelector('.hd-name');
+    if(name && name.textContent === today) {
+      c.classList.add('hoy');
+      var badge = c.querySelector('.hd-badge');
+      if(badge) {
+        var span = document.createElement('span');
+        span.className = 'hd-today';
+        span.textContent = 'Hoy';
+        c.insertBefore(span, c.firstChild);
+      }
+    }
+  });
+})();
+
+/* ── REVIEWS V2 ── */
+var dimScores = {comida:0, servicio:0, ambiente:0, valor:0};
+var travellerType = '';
+
+function setDimScore(dim, val) {
+  dimScores[dim] = val;
+  var row = document.querySelector('.rv-stars-row[data-dim="'+dim+'"]');
+  if(!row) return;
+  row.querySelectorAll('.rv-star').forEach(function(s){
+    s.classList.toggle('on', parseInt(s.dataset.v) <= val);
+  });
+}
+
+function selectTravellerType(btn, type) {
+  travellerType = type;
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+}
+
+/* ── QUIÉN VIENE ── */
+var QV_USERS = [
+  {name:'Carlos M.',initials:'CM',color:'#1a3a5c',tc:'#7eb8f0'},
+  {name:'Sarah K.',initials:'SK',color:'#0a2a1a',tc:'#7ef0b8'},
+  {name:'Marta T.',initials:'MT',color:'#1a051a',tc:'#f07ef0'},
+  {name:'James W.',initials:'JW',color:'#2a1a0a',tc:'#f0c87e'},
+];
+(function() {
+  var c = document.getElementById('rest-viajeros');
+  if(!c) return;
+  c.innerHTML = QV_USERS.map(function(u){
+    return '<div class="qv-person">'
+      +'<div class="qv-av" style="background:'+u.color+';color:'+u.tc+'">'+u.initials+'</div>'
+      +'<div class="qv-name">'+u.name.split(' ')[0]+'</div>'
+      +'</div>';
+  }).join('');
+})();
+
+/* ── OVERRIDE subRv ── */
+var origSubRv = null;
+function subRv() {
+  var n = (document.getElementById('wrn').value||'').trim();
+  var t = (document.getElementById('wrt').value||'').trim();
+  if(!ps){ alert('Selecciona estrellas ★'); return; }
+  if(t.length<15){ alert('Escribe al menos 15 caracteres.'); return; }
+  var now=new Date(), ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var rv={n:n||'Comensal',s:ps,t:t,d:ms[now.getMonth()]+' '+now.getFullYear(),
+          travType:travellerType,dims:Object.assign({},dimScores)};
+  urvs.push(rv);
+  try{localStorage.setItem('rv_rio-cali-restaurante',JSON.stringify(urvs))}catch(e){}
+  addRv(rv);
+  document.getElementById('wrn').value='';
+  document.getElementById('wrt').value='';
+  ps=0;
+  document.querySelectorAll('.spk').forEach(function(s){s.classList.remove('s','h');});
+  dimScores={comida:0,servicio:0,ambiente:0,valor:0};
+  document.querySelectorAll('.rv-star').forEach(function(s){s.classList.remove('on');});
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){b.classList.remove('on');});
+  travellerType='';
+  var ok=document.getElementById('wrok'),btn=document.querySelector('.wrsub');
+  btn.style.display='none'; ok.style.display='block';
+  setTimeout(function(){btn.style.display='';ok.style.display='none';},3000);
+}
+
+function addRv(r) {
+  var cols=['#1a3a5c','#3a1a0a','#0a2a1a','#1a051a','#0a1a3a'];
+  var tcs=['#7eb8f0','#f0a87e','#7ef0b8','#f07ef0','#7ea8f0'];
+  var i=document.getElementById('rvlist').children.length%5;
+  var init=r.n.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+  var stH=[1,2,3,4,5].map(function(x){return '<span class="rvst'+(x<=r.s?' on':'')+'">★</span>';}).join('');
+  var typeTag=r.travType?'<span style="background:#F1EFE8;color:#777;font-size:9px;padding:2px 7px;border-radius:3px;margin-right:4px">'+r.travType+'</span>':'';
+  var dimsHtml='';
+  if(r.dims&&(r.dims.comida||r.dims.servicio)){
+    dimsHtml='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px">'
+      +Object.keys(r.dims).filter(function(k){return r.dims[k]>0;}).map(function(k){
+        return '<span style="font-size:9px;color:#777">'+k.charAt(0).toUpperCase()+k.slice(1)+': <b style="color:#1a1a1a">'+r.dims[k]+'★</b></span>';
+      }).join('')+'</div>';
+  }
+  var div=document.createElement('div');
+  div.className='rvitem';
+  div.innerHTML='<div class="rvhead">'
+    +'<div class="rvav" style="background:'+cols[i]+';color:'+tcs[i]+'">'+init+'</div>'
+    +'<div><div class="rvname">'+r.n+'</div><div class="rvdate">'+r.d+'</div></div>'
+    +'<div class="rvstars">'+stH+'</div></div>'
+    +'<div style="margin:5px 0 3px">'+typeTag+'<span class="rvtag" style="background:#FEF2F2;color:#DC2626;font-size:9px;padding:2px 7px;border-radius:3px">🍽️ Río Restaurante Cali</span></div>'
+    +dimsHtml
+    +'<div class="rvtx">'+r.t+'</div>';
+  document.getElementById('rvlist').insertBefore(div,document.getElementById('rvlist').firstChild);
+}
+
+var urvs2=[];try{urvs2=JSON.parse(localStorage.getItem('rv_rio-cali-restaurante')||'[]')}catch(e){}
+document.getElementById('rvlist').innerHTML='';
+urvs2.forEach(function(r){addRv(r);});
+
+/* ── HAMBURGER MENU ── */
+function toggleDrawer(){
+  var btn=document.getElementById('ham-btn');
+  var drawer=document.getElementById('mobile-drawer');
+  var open=drawer.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){var d=document.getElementById('mobile-drawer');if(d&&d.classList.contains('open'))toggleDrawer();}
+});
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+(function(){
+  var fill = document.getElementById('prog-fill');
+  var links = document.querySelectorAll('.sn-link');
+
+  function updateProgress(){
+    var s = window.scrollY;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = h > 0 ? Math.round(s/h*100) : 0;
+    if(fill) fill.style.width = pct + '%';
+  }
+
+  function updateActiveLink(){
+    var sections = [];
+    links.forEach(function(a){
+      var id = a.getAttribute('href');
+      var el = id ? document.querySelector(id) : null;
+      if(el) sections.push({el:el, a:a});
+    });
+    var scrollY = window.scrollY + 120;
+    var active = null;
+    sections.forEach(function(s){
+      if(s.el.offsetTop <= scrollY) active = s;
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(active) {
+      active.a.classList.add('active');
+      // Scroll active link into view in sticky nav
+      active.a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+  }
+
+  window.addEventListener('scroll', function(){
+    updateProgress();
+    updateActiveLink();
+  }, {passive:true});
+
+  updateProgress();
+  updateActiveLink();
+})();
+
+/* ── BACK TO TOP ── */
+(function(){
+  var btn = document.getElementById('btt-btn');
+  if(!btn) return;
+  window.addEventListener('scroll', function() {
+    btn.style.display = window.scrollY > 400 ? 'flex' : 'none';
+  }, {passive: true});
+  btn.onmouseenter = function() { this.style.background='#333'; this.style.color='#fff'; };
+  btn.onmouseleave = function() { this.style.background='var(--black)'; this.style.color='rgba(255,255,255,.6)'; };
+})();
+
+/* ── XP for reviews (patch from index) ── */
+(function(){
+  var origSubRv = typeof subRv === 'function' ? subRv : null;
+  if(origSubRv) {
+    subRv = function() {
+      var hadError = false;
+      try { origSubRv(); } catch(e) { hadError = true; }
+      if(!hadError) {
+        // Award XP via localStorage — index.html picks it up next visit
+        try {
+          var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+          pts.xp = (pts.xp||0) + 25;
+          pts.reviews = (pts.reviews||0) + 1;
+          if(!pts.history) pts.history = [];
+          pts.history.unshift({action:'resena',xp:25,label:'Reseña publicada',ts:Date.now(),meta:{name:document.title}});
+          if(pts.history.length > 50) pts.history.length = 50;
+          // Check once flags
+          if(!pts.doneOnce) pts.doneOnce = {};
+          localStorage.setItem('user_points', JSON.stringify(pts));
+        } catch(e) {}
+        // Show mini toast
+        var t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none';
+        t.textContent = '+25 XP — ¡Reseña publicada!';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 3000);
+      }
+    };
+  }
+})();
+
+/* ── XP patch for share in detail pages ── */
+(function(){
+  var _origShare = typeof sharePlace === 'function' ? sharePlace : null;
+  if(_origShare) {
+    sharePlace = function() {
+      _origShare();
+      try {
+        var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
+        pts.xp = (pts.xp||0) + 8;
+        pts.shares = (pts.shares||0) + 1;
+        if(!pts.history) pts.history = [];
+        var pname = document.title.replace(' – ExploraCO','').replace(' - ExploraCO','');
+        pts.history.unshift({action:'compartir',xp:8,label:'Lugar compartido',ts:Date.now(),meta:{name:pname}});
+        if(pts.history.length > 50) pts.history.length = 50;
+        localStorage.setItem('user_points', JSON.stringify(pts));
+      } catch(e) {}
+    };
+  }
+})();
+</script>
+<!-- ════ GUARDAR EN MI MAPA ════ -->
+<button class="save-fab unsaved" id="save-fab" onclick="toggleSave()">
+  <span class="save-fab-icon">♡</span>
+  <span id="save-fab-lbl">Guardar en Mi Mapa</span>
+</button>
+<div class="save-fab-toast" id="save-toast"></div>
+
+
+<!-- Back to top -->
+<button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
+  style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.3)">↑</button>
+</body></html>
