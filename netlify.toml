@@ -1,29 +1,39 @@
 [build]
-  publish = "."
+  command   = "npm run build"
+  publish   = "dist"
+  functions = "netlify/functions"
 
-[[headers]]
-  for = "/*.html"
-  [headers.values]
-    Cache-Control = "public, max-age=3600"
-    X-Frame-Options = "SAMEORIGIN"
-    X-Content-Type-Options = "nosniff"
+[dev]
+  command = "npm run dev"
+  port    = 4321
 
-[[headers]]
-  for = "/sitemap.xml"
-  [headers.values]
-    Cache-Control = "public, max-age=86400"
-
+# Redirigir /api/* a las funciones de Netlify
 [[redirects]]
-  from = "/directorio"
-  to   = "/directorio.html"
+  from   = "/api/destinos"
+  to     = "/.netlify/functions/destinos"
   status = 200
 
 [[redirects]]
-  from = "/hostal/*"
-  to   = "/:splat.html"
+  from   = "/api/usuarios"
+  to     = "/.netlify/functions/usuarios"
   status = 200
 
 [[redirects]]
-  from = "/*"
-  to   = "/404.html"
-  status = 404
+  from   = "/api/interacciones"
+  to     = "/.netlify/functions/interacciones"
+  status = 200
+
+# Variables de entorno requeridas (se definen en Netlify dashboard)
+# DATABASE_URL           — URL pooled de Neon (producción)
+# DATABASE_URL_UNPOOLED  — URL directa de Neon (solo migraciones)
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@neondatabase/serverless"]
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin  = "*"
+    Access-Control-Allow-Methods = "GET, POST, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
