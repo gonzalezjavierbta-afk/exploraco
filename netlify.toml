@@ -1,0 +1,23 @@
+[build]
+  publish   = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from   = "/api/destinos"
+  to     = "/.netlify/functions/destinos"
+  status = 200
+
+[[redirects]]
+  from   = "/api/usuarios"
+  to     = "/.netlify/functions/usuarios"
+  status = 200
+
+[[redirects]]
+  from   = "/api/interacciones"
+  to     = "/.netlify/functions/interacciones"
+  status = 200
+
+[[redirects]]
+  from   = "/api/admin/destinos"
+  to     = "/.netlify/functions/admin-destinos"
+  status = 200
