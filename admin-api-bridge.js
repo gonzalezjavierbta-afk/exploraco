@@ -185,10 +185,10 @@
 
       if (uuid) {
         // Actualizar en DB
-        result = await apiPut('/api/admin/destinos?id=' + uuid, payload);
+        result = await apiPut('/api/admin-destinos?id=' + uuid, payload);
       } else {
         // Crear en DB
-        result = await apiPost('/api/admin/destinos', payload);
+        result = await apiPost('/api/admin-destinos', payload);
         if (result.ok && result.data && result.data.id) {
           localToUUID[place.id] = result.data.id;
           localStorage.setItem('local_to_uuid', JSON.stringify(localToUUID));
@@ -214,7 +214,7 @@
     if (!uuid) return;
 
     try {
-      await apiDelete('/api/admin/destinos?id=' + uuid);
+      await apiDelete('/api/admin-destinos?id=' + uuid);
       delete localToUUID[localId];
       localStorage.setItem('local_to_uuid', JSON.stringify(localToUUID));
     } catch (err) {
@@ -227,7 +227,7 @@
     showSyncBadge('⏳ Cargando desde DB...', '#3b82f6');
 
     try {
-      var data = await apiGet('/api/admin/destinos?limit=500');
+      var data = await apiGet('/api/admin-destinos?limit=500');
       if (!data.ok || !data.data) throw new Error('Sin datos');
 
       // Reconstruir el mapa local→UUID
@@ -358,9 +358,9 @@
             var payload = placeToApi(p);
             var result;
             if (uuid) {
-              result = await apiPut('/api/admin/destinos?id=' + uuid, payload);
+              result = await apiPut('/api/admin-destinos?id=' + uuid, payload);
             } else {
-              result = await apiPost('/api/admin/destinos', payload);
+              result = await apiPost('/api/admin-destinos', payload);
               if (result.ok && result.data) {
                 localToUUID[p.id] = result.data.id;
               }
