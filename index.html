@@ -1106,7 +1106,23 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <a class="nl" href="#mymapa-section">Mi Viaje</a>
     <a class="nl nl-comunidad" href="comunidad.html">👥 Comunidad</a>
   </div>
-  <a href="admin.html" style="padding:6px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s;margin-right:8px" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(255,255,255,.4)'">⚙️ Admin</a><div class="hna">
+  <a href="admin.html" style="padding:6px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s;margin-right:8px" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(255,255,255,.4)'">⚙️ Admin</a>
+  <!-- Login viajero -->
+  <button id="btn-login-viajero" class="login-trigger" style="
+    padding:6px 14px;background:#E8A020;color:#000;border:none;
+    border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;
+    font-family:inherit;margin-left:8px
+  ">🗺️ Mi cuenta</button>
+  <div id="btn-perfil-viajero" style="
+    display:none;align-items:center;gap:8px;
+    padding:4px 12px;background:rgba(255,255,255,.08);
+    border-radius:20px;cursor:pointer;margin-left:8px
+  " onclick="window.ExploraCO && window.ExploraCO.mostrarLogin()">
+    <div style="font-size:11px;color:rgba(255,255,255,.7)">
+      <span id="perfil-nombre" style="font-weight:700;color:#fff"></span>
+      <span id="perfil-xp" style="color:#E8A020;margin-left:4px"></span>
+    </div>
+  </div><div class="hna">
     <div class="hnsb" onclick="document.getElementById('sinp').focus();window.scrollTo({top:0,behavior:'smooth'})">🔍 Buscar…</div>
     <button class="hncta" onclick="window.location.href='publicar.html'">Publicar lugar</button>
   </div>
@@ -2203,8 +2219,23 @@ function renderDest() {
 
 function toggleDestSave(id, el) {
   var idx = mmSaved.indexOf(id);
-  if(idx===-1){ mmSaved.push(id); el.textContent='♥'; el.classList.add('saved'); }
-  else { mmSaved.splice(idx,1); el.textContent='♡'; el.classList.remove('saved'); }
+  if(idx===-1){
+    mmSaved.push(id);
+    el.textContent='♥'; el.classList.add('saved');
+    // Guardar en DB si hay sesión
+    if(window.ExploraCO && window.ExploraCO.usuario) {
+      // Buscar UUID del destino por posición en PL
+      var destino = (typeof PL !== 'undefined') ? PL[id-1] : null;
+      var uuid = destino ? (destino._uuid || null) : null;
+      if(uuid) window.ExploraCO.guardarDestino(uuid);
+      else if(window.ExploraCO) window.ExploraCO.mostrarToast('♥ Guardado localmente', '#E8A020');
+    } else if(window.ExploraCO) {
+      window.ExploraCO.mostrarLogin('Inicia sesión para guardar este lugar permanentemente');
+    }
+  } else {
+    mmSaved.splice(idx,1);
+    el.textContent='♡'; el.classList.remove('saved');
+  }
   try{ localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); }catch(e){}
   renderMyMap();
 }
@@ -4415,5 +4446,6 @@ function submitBlog() {
   style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:2px solid var(--gold);color:var(--gold);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.4)">↑</button>
 
   <script src="index-api-connector.js"></script>
+  <script src="usuario-session.js"></script>
 </body>
 </html>
