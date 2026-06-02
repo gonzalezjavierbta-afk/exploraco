@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Viajeros Destacados · ExploraCO</title>
+<meta name="description" content="Conoce a los viajeros más activos de ExploraCO. Escribe reseñas, guarda lugares y sube de nivel.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--bg:#F8F7F3;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+html{scroll-behavior:smooth}
+body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden;margin:0}
+.bc{font-family:'Barlow Condensed',sans-serif}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:30}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.5px}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{flex:1}
+.topbar-nav{display:flex;gap:6px}
+.topbar-nav a{color:rgba(255,255,255,.7);text-decoration:none;font-size:12px;padding:5px 12px;border-radius:4px;transition:all .2s}
+.topbar-nav a:hover,.topbar-nav a.active{color:#fff;background:rgba(255,255,255,.1)}
+
+/* ── HERO ── */
+.hero-viajeros{background:linear-gradient(135deg,#0d1117 0%,#1a2a1a 50%,#0d1117 100%);padding:64px 4% 48px;text-align:center;position:relative;overflow:hidden}
+.hero-viajeros::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23E8A020' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.hero-eyebrow{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:3px;color:var(--gold);margin-bottom:12px}
+.hero-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,8vw,72px);font-weight:900;color:#fff;line-height:1;margin-bottom:16px}
+.hero-title em{color:var(--gold);font-style:normal}
+.hero-sub{font-size:16px;color:rgba(255,255,255,.6);max-width:520px;margin:0 auto 32px;line-height:1.6}
+.hero-btn{display:inline-block;padding:12px 28px;background:var(--gold);color:#000;font-weight:700;font-size:14px;border-radius:6px;text-decoration:none;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.hero-btn:hover{background:var(--gold-dark);transform:translateY(-1px)}
+
+/* ── XP GUIDE ── */
+.xp-guide{background:#fff;border-bottom:1px solid var(--border);padding:20px 4%}
+.xp-guide-inner{max-width:900px;margin:0 auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.xp-pill{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--warm);border:1px solid var(--border);border-radius:20px;font-size:12px}
+.xp-pill-emoji{font-size:16px}
+.xp-pill-label{color:var(--muted)}
+.xp-pill-val{font-weight:700;color:var(--gold)}
+
+/* ── MAIN LAYOUT ── */
+.main{max-width:960px;margin:0 auto;padding:40px 4% 80px;display:grid;grid-template-columns:1fr 280px;gap:32px;align-items:start}
+@media(max-width:720px){.main{grid-template-columns:1fr;padding:24px 4%}}
+
+/* ── LEADERBOARD ── */
+.section-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;margin-bottom:6px}
+.section-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+
+.lb-list{display:flex;flex-direction:column;gap:8px}
+
+.lb-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;transition:all .2s;text-decoration:none;color:inherit}
+.lb-card:hover{border-color:var(--gold);box-shadow:0 4px 16px rgba(232,160,32,.12);transform:translateY(-1px)}
+.lb-card.top-1{border-color:#FFD700;background:linear-gradient(135deg,#fffbeb,#fff)}
+.lb-card.top-2{border-color:#C0C0C0}
+.lb-card.top-3{border-color:#CD7F32}
+.lb-card.es-yo{border-color:var(--gold);background:var(--gold-light)}
+
+.lb-pos{width:36px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:var(--muted);flex-shrink:0}
+.lb-pos.medal{font-size:24px}
+
+.lb-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;border:2px solid transparent}
+
+.lb-info{flex:1;min-width:0}
+.lb-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.lb-badge-tag{font-size:9px;background:var(--black);color:#fff;padding:2px 7px;border-radius:10px;font-weight:700;white-space:nowrap}
+.lb-yo-tag{font-size:9px;background:var(--gold);color:#000;padding:2px 7px;border-radius:10px;font-weight:700}
+.lb-stats{font-size:11px;color:var(--muted);margin-top:2px}
+
+.lb-xp{text-align:right;flex-shrink:0}
+.lb-xp-num{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;line-height:1}
+.lb-xp-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+/* Barra de progreso */
+.lb-progress{margin-top:6px;height:3px;background:#f0f0f0;border-radius:2px;overflow:hidden}
+.lb-progress-bar{height:100%;border-radius:2px;transition:width .5s ease}
+
+/* ── SIDEBAR ── */
+.sidebar{display:flex;flex-direction:column;gap:16px}
+
+/* Mi perfil */
+.perfil-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.perfil-header{background:linear-gradient(135deg,#0d1117,#1a3a5c);padding:20px;text-align:center}
+.perfil-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;margin:0 auto 10px;border:3px solid var(--gold)}
+.perfil-nombre{color:#fff;font-weight:700;font-size:15px;margin-bottom:2px}
+.perfil-badge-text{color:var(--gold);font-size:11px;font-weight:700}
+.perfil-body{padding:16px}
+.perfil-xp-big{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;text-align:center;line-height:1;margin-bottom:2px}
+.perfil-xp-label{font-size:10px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.perfil-prog-wrap{margin-bottom:14px}
+.perfil-prog-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px}
+.perfil-prog{height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden}
+.perfil-prog-bar{height:100%;border-radius:3px;transition:width .6s ease}
+.perfil-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.perfil-stat{background:var(--warm);border-radius:6px;padding:10px;text-align:center}
+.perfil-stat-num{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900}
+.perfil-stat-lbl{font-size:10px;color:var(--muted)}
+.perfil-login-prompt{padding:20px;text-align:center}
+.perfil-login-prompt p{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+
+/* Cómo ganar XP */
+.xp-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px}
+.xp-card-title{font-weight:700;font-size:13px;margin-bottom:12px}
+.xp-item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.xp-item:last-child{border-bottom:none;padding-bottom:0}
+.xp-item-icon{font-size:18px;width:24px;text-align:center}
+.xp-item-label{flex:1;color:var(--muted)}
+.xp-item-val{font-weight:700;color:var(--gold)}
+
+/* Niveles */
+.niveles-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px}
+.niveles-card-title{font-weight:700;font-size:13px;margin-bottom:12px}
+.nivel-row{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12px}
+.nivel-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.nivel-name{flex:1;font-weight:600}
+.nivel-xp{color:var(--muted)}
+
+/* Loading skeleton */
+.lb-skeleton{background:#f0f0f0;border-radius:10px;height:74px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Empty state */
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-state-icon{font-size:48px;margin-bottom:12px}
+.empty-state-title{font-weight:700;font-size:16px;margin-bottom:6px;color:var(--text)}
+.empty-state-sub{font-size:13px;line-height:1.6}
+
+/* Footer */
+.footer{background:var(--black);color:rgba(255,255,255,.6);padding:40px 4% 20px}
+.ftop{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:32px;margin-bottom:32px}
+@media(max-width:720px){.ftop{grid-template-columns:1fr 1fr}}
+.flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;text-decoration:none}
+.flogo em{color:var(--gold);font-style:normal}
+.fdesc{font-size:12px;color:rgba(255,255,255,.4);margin-top:8px;line-height:1.6}
+.fctl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.3);margin-bottom:10px}
+.flinks{display:flex;flex-direction:column;gap:6px}
+.flink{color:rgba(255,255,255,.5);text-decoration:none;font-size:12px;transition:color .2s}
+.flink:hover{color:#fff}
+.fbot{max-width:1100px;margin:0 auto;border-top:1px solid rgba(255,255,255,.08);padding-top:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.fcopy{font-size:11px}
+.fb-links{display:flex;gap:16px}
+.fb-links a{font-size:11px;color:rgba(255,255,255,.4);text-decoration:none}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="topbar-nav">
+    <a href="index.html">Inicio</a>
+    <a href="directorio-hostal.html">Hostales</a>
+    <a href="viajeros.html" class="active">Viajeros</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero-viajeros">
+  <div class="hero-eyebrow">Comunidad ExploraCO</div>
+  <h1 class="hero-title bc">VIAJEROS<br><em>DESTACADOS</em></h1>
+  <p class="hero-sub">Explora Colombia, escribe reseñas y guarda tus lugares favoritos. Cada acción suma XP y te acerca a convertirte en Leyenda Colombiana.</p>
+  <button class="hero-btn login-trigger">🗺️ Crear mi perfil gratis</button>
+</div>
+
+<!-- XP GUIDE BAR -->
+<div class="xp-guide">
+  <div class="xp-guide-inner">
+    <div class="xp-pill"><span class="xp-pill-emoji">⭐</span><span class="xp-pill-label">Reseña con texto</span><span class="xp-pill-val">+25 XP</span></div>
+    <div class="xp-pill"><span class="xp-pill-emoji">★</span><span class="xp-pill-label">Solo puntuación</span><span class="xp-pill-val">+10 XP</span></div>
+    <div class="xp-pill"><span class="xp-pill-emoji">♥</span><span class="xp-pill-label">Guardar lugar</span><span class="xp-pill-val">+5 XP</span></div>
+    <div class="xp-pill"><span class="xp-pill-emoji">📍</span><span class="xp-pill-label">Check-in visita</span><span class="xp-pill-val">+20 XP</span></div>
+    <div class="xp-pill"><span class="xp-pill-emoji">📸</span><span class="xp-pill-label">Foto subida</span><span class="xp-pill-val">+15 XP</span></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEADERBOARD -->
+  <div>
+    <div class="section-title bc">🏆 RANKING DE VIAJEROS</div>
+    <div class="section-sub">Actualizado en tiempo real · Top 20 viajeros más activos</div>
+    <div class="lb-list" id="lb-list">
+      <!-- Skeletons mientras carga -->
+      <div class="lb-skeleton"></div>
+      <div class="lb-skeleton"></div>
+      <div class="lb-skeleton"></div>
+      <div class="lb-skeleton"></div>
+      <div class="lb-skeleton"></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Mi perfil -->
+    <div class="perfil-card" id="perfil-card">
+      <!-- Se rellena por JS según si hay sesión o no -->
+      <div class="perfil-login-prompt">
+        <div style="font-size:40px;margin-bottom:12px">🗺️</div>
+        <p>Crea tu perfil de viajero gratis y acumula XP explorando Colombia.</p>
+        <button class="hero-btn login-trigger" style="width:100%">Comenzar →</button>
+      </div>
+    </div>
+
+    <!-- Cómo ganar XP -->
+    <div class="xp-card">
+      <div class="xp-card-title">⚡ Cómo ganar XP</div>
+      <div class="xp-item"><span class="xp-item-icon">⭐</span><span class="xp-item-label">Reseña con texto (+50 chars)</span><span class="xp-item-val">+25 XP</span></div>
+      <div class="xp-item"><span class="xp-item-icon">★</span><span class="xp-item-label">Puntuación sin texto</span><span class="xp-item-val">+10 XP</span></div>
+      <div class="xp-item"><span class="xp-item-icon">♥</span><span class="xp-item-label">Guardar lugar en Tu Mapa</span><span class="xp-item-val">+5 XP</span></div>
+      <div class="xp-item"><span class="xp-item-icon">📍</span><span class="xp-item-label">Registrar visita</span><span class="xp-item-val">+20 XP</span></div>
+      <div class="xp-item"><span class="xp-item-icon">📸</span><span class="xp-item-label">Subir foto del lugar</span><span class="xp-item-val">+15 XP</span></div>
+    </div>
+
+    <!-- Niveles -->
+    <div class="niveles-card">
+      <div class="niveles-card-title">🎖️ Sistema de niveles</div>
+      <div class="nivel-row"><div class="nivel-dot" style="background:#94a3b8"></div><div class="nivel-name">Viajero Novato</div><div class="nivel-xp">0 XP</div></div>
+      <div class="nivel-row"><div class="nivel-dot" style="background:#60a5fa"></div><div class="nivel-name">Explorador</div><div class="nivel-xp">50 XP</div></div>
+      <div class="nivel-row"><div class="nivel-dot" style="background:#34d399"></div><div class="nivel-name">Aventurero</div><div class="nivel-xp">100 XP</div></div>
+      <div class="nivel-row"><div class="nivel-dot" style="background:#f59e0b"></div><div class="nivel-name">Viajero Avanzado</div><div class="nivel-xp">250 XP</div></div>
+      <div class="nivel-row"><div class="nivel-dot" style="background:#f97316"></div><div class="nivel-name">Explorador Pro</div><div class="nivel-xp">500 XP</div></div>
+      <div class="nivel-row"><div class="nivel-dot" style="background:#e879f9"></div><div class="nivel-name">Leyenda Colombiana</div><div class="nivel-xp">1000 XP</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="ftop">
+    <div>
+      <a href="index.html" class="flogo">EXPLORA<em>CO</em></a>
+      <p class="fdesc">El directorio turístico más completo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
+    </div>
+    <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="directorio-hostal.html">Hostales</a><a class="flink" href="directorio-comida.html">Gastronomía</a><a class="flink" href="directorio-sitio.html">Sitios</a><a class="flink" href="directorio-evento.html">Eventos</a></div></div>
+    <div><div class="fctl">Comunidad</div><div class="flinks"><a class="flink" href="viajeros.html">Viajeros destacados</a><a class="flink" href="index.html#mymapa-section">Mi Mapa</a><a class="flink" href="publicar.html">Publicar lugar</a></div></div>
+    <div><div class="fctl">Plataforma</div><div class="flinks"><a class="flink" href="admin.html">Panel admin</a><a class="flink" href="#">Contacto</a><a class="flink" href="#">Términos</a></div></div>
+  </div>
+  <div class="fbot">
+    <div class="fcopy">© 2026 ExploraCO · Hecho con ❤️ en Colombia</div>
+    <div class="fb-links"><a href="#">Términos</a><a href="#">Privacidad</a></div>
+  </div>
+</footer>
+
+<script src="usuario-session.js"></script>
+<script>
+// ── Colores y emojis por nivel ────────────────────────────
+var NIVEL_COLORS = {
+  'Viajero Novato':    '#94a3b8',
+  'Explorador':        '#60a5fa',
+  'Aventurero':        '#34d399',
+  'Viajero Avanzado':  '#f59e0b',
+  'Explorador Pro':    '#f97316',
+  'Leyenda Colombiana':'#e879f9',
+};
+var PERFIL_EMOJI = {
+  explorador:'🧭', fotografo:'📸', gastronomico:'🍽️',
+  aventurero:'⛰️', cultural:'🏛️', trekking:'🥾',
+};
+
+// ── XP para siguiente nivel ───────────────────────────────
+function xpProgresoNivel(xpTotal) {
+  var umbrales = [0,50,100,250,500,1000,9999];
+  var nivel = 0;
+  for(var i=0;i<umbrales.length-1;i++){
+    if(xpTotal >= umbrales[i]) nivel = i;
+  }
+  var base     = umbrales[nivel];
+  var tope     = umbrales[nivel+1] || umbrales[umbrales.length-1];
+  var pct      = Math.min(100, Math.round(((xpTotal-base)/(tope-base))*100));
+  return { base:base, tope:tope, pct:pct };
+}
+
+// ── Iniciales del nombre ──────────────────────────────────
+function initiales(nombre) {
+  return (nombre||'V').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);
+}
+
+// ── Renderizar tarjeta de leaderboard ────────────────────
+function renderLbCard(u, pos, esYo) {
+  var medallas  = ['🥇','🥈','🥉'];
+  var posText   = pos <= 3 ? medallas[pos-1] : '#'+pos;
+  var color     = NIVEL_COLORS[u.badge_actual] || '#94a3b8';
+  var emoji     = PERFIL_EMOJI[u.perfil_tipo]  || '🧭';
+  var prog      = xpProgresoNivel(u.xp_total);
+  var xpFmt     = u.xp_total.toLocaleString('es-CO');
+
+  var cls = 'lb-card';
+  if(pos===1) cls+=' top-1';
+  else if(pos===2) cls+=' top-2';
+  else if(pos===3) cls+=' top-3';
+  if(esYo) cls+=' es-yo';
+
+  var div = document.createElement('div');
+  div.className = cls;
+  div.innerHTML = [
+    '<div class="lb-pos '+(pos<=3?'medal':'')+'">' + posText + '</div>',
+    '<div class="lb-avatar" style="background:'+ color +'22;border-color:'+ color +';font-size:18px">' + emoji + '</div>',
+    '<div class="lb-info">',
+    '  <div class="lb-name">',
+    '    ' + (u.nombre||'Viajero'),
+    '    <span class="lb-badge-tag">' + (u.badge_actual||'Viajero Novato') + '</span>',
+    '    ' + (esYo ? '<span class="lb-yo-tag">TÚ</span>' : ''),
+    '  </div>',
+    '  <div class="lb-stats">' + (u.total_resenas||0) + ' reseñas · ' + (u.total_guardados||0) + ' guardados</div>',
+    '  <div class="lb-progress"><div class="lb-progress-bar" style="width:'+prog.pct+'%;background:'+color+'"></div></div>',
+    '</div>',
+    '<div class="lb-xp">',
+    '  <div class="lb-xp-num" style="color:'+color+'">' + xpFmt + '</div>',
+    '  <div class="lb-xp-label">XP</div>',
+    '</div>',
+  ].join('');
+  return div;
+}
+
+// ── Cargar leaderboard desde API ─────────────────────────
+async function cargarLeaderboard() {
+  var list = document.getElementById('lb-list');
+  try {
+    var res  = await fetch('/api/usuarios?tipo=leaderboard&limit=20');
+    var data = await res.json();
+
+    list.innerHTML = '';
+
+    if(!data.ok || !data.data || !data.data.length) {
+      list.innerHTML = [
+        '<div class="empty-state">',
+        '  <div class="empty-state-icon">🗺️</div>',
+        '  <div class="empty-state-title">Aún no hay viajeros registrados</div>',
+        '  <div class="empty-state-sub">¡Sé el primero en explorar y ganar XP!<br>Escribe una reseña en cualquier hostal.</div>',
+        '</div>',
+      ].join('');
+      return;
+    }
+
+    var usuario = window.ExploraCO && window.ExploraCO.usuario;
+    data.data.forEach(function(u, i) {
+      var esYo = usuario && usuario.id === u.id;
+      list.appendChild(renderLbCard(u, i+1, esYo));
+    });
+
+  } catch(err) {
+    list.innerHTML = [
+      '<div class="empty-state">',
+      '  <div class="empty-state-icon">⚠️</div>',
+      '  <div class="empty-state-title">No se pudo cargar el ranking</div>',
+      '  <div class="empty-state-sub">' + err.message + '<br><br>',
+      '    <button onclick="cargarLeaderboard()" style="padding:8px 18px;border:1px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:12px">Reintentar</button>',
+      '  </div>',
+      '</div>',
+    ].join('');
+  }
+}
+
+// ── Renderizar perfil del usuario en sidebar ─────────────
+function renderPerfil() {
+  var card    = document.getElementById('perfil-card');
+  var usuario = window.ExploraCO && window.ExploraCO.usuario;
+
+  if(!usuario) {
+    card.innerHTML = [
+      '<div class="perfil-login-prompt">',
+      '  <div style="font-size:40px;margin-bottom:12px">🗺️</div>',
+      '  <p>Crea tu perfil de viajero gratis y acumula XP explorando Colombia.</p>',
+      '  <button class="hero-btn login-trigger" style="width:100%">Comenzar →</button>',
+      '</div>',
+    ].join('');
+    // Re-attach listener
+    card.querySelector('.login-trigger').onclick = function() {
+      window.ExploraCO && window.ExploraCO.mostrarLogin();
+    };
+    return;
+  }
+
+  var color  = NIVEL_COLORS[usuario.badge_actual] || '#94a3b8';
+  var emoji  = PERFIL_EMOJI[usuario.perfil_tipo]  || '🧭';
+  var prog   = xpProgresoNivel(usuario.xp_total || 0);
+  var xpFmt  = (usuario.xp_total||0).toLocaleString('es-CO');
+
+  card.innerHTML = [
+    '<div class="perfil-header">',
+    '  <div class="perfil-avatar" style="background:'+color+'44;border-color:'+color+'">' + emoji + '</div>',
+    '  <div class="perfil-nombre">' + (usuario.nombre||'Viajero') + '</div>',
+    '  <div class="perfil-badge-text">' + (usuario.badge_actual||'Viajero Novato') + '</div>',
+    '</div>',
+    '<div class="perfil-body">',
+    '  <div class="perfil-xp-big" style="color:'+color+'">' + xpFmt + '</div>',
+    '  <div class="perfil-xp-label">XP Total</div>',
+    '  <div class="perfil-prog-wrap">',
+    '    <div class="perfil-prog-label"><span>Nivel '+(usuario.nivel||1)+'</span><span>'+prog.pct+'%</span></div>',
+    '    <div class="perfil-prog"><div class="perfil-prog-bar" style="width:'+prog.pct+'%;background:'+color+'"></div></div>',
+    '  </div>',
+    '  <div class="perfil-stats">',
+    '    <div class="perfil-stat"><div class="perfil-stat-num">'+(usuario.total_resenas||0)+'</div><div class="perfil-stat-lbl">Reseñas</div></div>',
+    '    <div class="perfil-stat"><div class="perfil-stat-num">'+(usuario.total_guardados||0)+'</div><div class="perfil-stat-lbl">Guardados</div></div>',
+    '    <div class="perfil-stat"><div class="perfil-stat-num">'+(usuario.nivel||1)+'</div><div class="perfil-stat-lbl">Nivel</div></div>',
+    '  </div>',
+    '  <button onclick="window.ExploraCO.cerrarSesion();renderPerfil();cargarLeaderboard();" style="',
+    '    width:100%;margin-top:14px;padding:8px;border:1px solid var(--border);',
+    '    border-radius:6px;background:transparent;cursor:pointer;font-size:11px;color:var(--muted);font-family:inherit',
+    '  ">Cerrar sesión</button>',
+    '</div>',
+  ].join('');
+}
+
+// ── Event listeners ────────────────────────────────────────
+document.querySelectorAll('.login-trigger').forEach(function(btn) {
+  btn.onclick = function() {
+    if(window.ExploraCO) window.ExploraCO.mostrarLogin();
+  };
+});
+
+// Cuando el usuario inicia sesión, actualizar perfil y ranking
+var _origLogin = null;
+if(window.ExploraCO && window.ExploraCO.loginConEmail) {
+  _origLogin = window.ExploraCO.loginConEmail;
+  window.ExploraCO.loginConEmail = async function(email, nombre) {
+    var user = await _origLogin(email, nombre);
+    if(user) { renderPerfil(); cargarLeaderboard(); }
+    return user;
+  };
+}
+
+// ── Inicializar ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  renderPerfil();
+  cargarLeaderboard();
+});
+</script>
+</body>
+</html>
