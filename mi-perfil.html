@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mi Perfil · ExploraCO</title>
+<meta name="description" content="Tu perfil de viajero en ExploraCO. Tus lugares guardados, reseñas publicadas y progreso de XP.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--bg:#F8F7F3;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}
+.bc{font-family:'Barlow Condensed',sans-serif}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:30}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.5px}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{flex:1}
+.topbar-nav{display:flex;gap:6px}
+.topbar-nav a{color:rgba(255,255,255,.7);text-decoration:none;font-size:12px;padding:5px 12px;border-radius:4px;transition:all .2s}
+.topbar-nav a:hover,.topbar-nav a.active{color:#fff;background:rgba(255,255,255,.1)}
+
+/* ── NO SESIÓN ── */
+.no-sesion{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:40px}
+.no-sesion-inner{max-width:400px}
+.no-sesion-icon{font-size:64px;margin-bottom:20px}
+.no-sesion h2{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;margin-bottom:10px}
+.no-sesion p{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:24px}
+.btn-gold{display:inline-block;padding:12px 28px;background:var(--gold);color:#000;font-weight:700;font-size:14px;border-radius:6px;text-decoration:none;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-gold:hover{background:var(--gold-dark)}
+.btn-outline{display:inline-block;padding:10px 20px;border:1px solid var(--border);color:var(--muted);font-size:12px;border-radius:6px;text-decoration:none;background:none;cursor:pointer;font-family:inherit;margin-left:8px}
+
+/* ── HERO PERFIL ── */
+.perfil-hero{background:linear-gradient(135deg,#0d1117,#1a3a5c);padding:40px 4% 0;position:relative}
+.perfil-hero-inner{max-width:960px;margin:0 auto;display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap}
+.perfil-av-wrap{position:relative;margin-bottom:-28px}
+.perfil-av{width:96px;height:96px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;border:4px solid var(--gold);background:#1a3a5c}
+.perfil-av-nivel{position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid var(--black)}
+.perfil-info{flex:1;padding-bottom:32px}
+.perfil-nombre{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:#fff;line-height:1;margin-bottom:4px}
+.perfil-badge{color:var(--gold);font-size:13px;font-weight:700;margin-bottom:4px}
+.perfil-email{color:rgba(255,255,255,.4);font-size:11px}
+.perfil-hero-actions{padding-bottom:16px;display:flex;gap:8px;align-items:flex-end}
+
+/* ── TABS ── */
+.tabs-wrap{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:20}
+.tabs-inner{max-width:960px;margin:0 auto;display:flex;padding:0 4%;overflow-x:auto}
+.tab-btn{padding:14px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;white-space:nowrap;font-family:inherit;transition:all .15s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--black);border-bottom-color:var(--gold)}
+
+/* ── MAIN ── */
+.perfil-main{max-width:960px;margin:0 auto;padding:32px 4% 80px}
+
+/* ── STATS GRID ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+@media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+.stat-num{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;line-height:1;margin-bottom:4px}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── XP PROGRESS ── */
+.xp-section{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px}
+.xp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.xp-title{font-weight:700;font-size:14px}
+.xp-total{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900}
+.xp-prog-wrap{margin-bottom:10px}
+.xp-prog-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:6px}
+.xp-prog{height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden}
+.xp-prog-bar{height:100%;border-radius:4px;transition:width .8s ease}
+.xp-milestones{display:flex;gap:6px;flex-wrap:wrap}
+.xp-milestone{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid}
+
+/* ── TAB PANELS ── */
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── MI MAPA ── */
+.mapa-section{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px}
+.mapa-toolbar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.mapa-toolbar-title{font-weight:700;font-size:13px}
+.mapa-filters{display:flex;gap:5px}
+.mapa-filter-btn{padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--warm);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--muted);transition:all .15s}
+.mapa-filter-btn.active{background:var(--black);color:#fff;border-color:var(--black)}
+#mi-mapa-el{height:320px;background:#f0f0f0}
+.guardados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px}
+.guardado-card{border:1px solid var(--border);border-radius:8px;overflow:hidden;text-decoration:none;color:inherit;display:block;transition:all .2s}
+.guardado-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.guardado-hero{height:110px;object-fit:cover;width:100%}
+.guardado-body{padding:10px}
+.guardado-name{font-weight:700;font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guardado-meta{font-size:11px;color:var(--muted)}
+.guardado-empty{grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)}
+
+/* ── RESEÑAS ── */
+.resenas-list{display:flex;flex-direction:column;gap:12px}
+.rv-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px}
+.rv-card-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.rv-lugar-img{width:52px;height:52px;border-radius:6px;object-fit:cover;background:var(--warm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--border)}
+.rv-lugar-info{flex:1}
+.rv-lugar-name{font-weight:700;font-size:14px}
+.rv-lugar-city{font-size:11px;color:var(--muted)}
+.rv-stars{color:#E8A020;font-size:16px;margin-bottom:4px}
+.rv-texto{font-size:13px;color:#555;line-height:1.6}
+.rv-fecha{font-size:10px;color:var(--muted);margin-top:6px}
+.rv-xp-badge{display:inline-flex;align-items:center;gap:4px;background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;margin-top:6px}
+.resenas-empty{text-align:center;padding:48px;color:var(--muted)}
+.resenas-empty-icon{font-size:40px;margin-bottom:12px}
+
+/* ── ACTIVIDAD / HISTORIAL XP ── */
+.xp-log-list{display:flex;flex-direction:column;gap:0}
+.xp-log-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.xp-log-item:last-child{border-bottom:none}
+.xp-log-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--warm)}
+.xp-log-info{flex:1}
+.xp-log-desc{font-size:13px;font-weight:500}
+.xp-log-fecha{font-size:10px;color:var(--muted);margin-top:2px}
+.xp-log-delta{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#16a34a}
+
+/* Footer */
+.footer{background:var(--black);color:rgba(255,255,255,.6);padding:40px 4% 20px}
+.ftop{max-width:960px;margin:0 auto;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:32px;margin-bottom:32px}
+@media(max-width:720px){.ftop{grid-template-columns:1fr 1fr}}
+.flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;text-decoration:none}
+.flogo em{color:var(--gold);font-style:normal}
+.fdesc{font-size:12px;color:rgba(255,255,255,.4);margin-top:8px;line-height:1.6}
+.fctl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.3);margin-bottom:10px}
+.flinks{display:flex;flex-direction:column;gap:6px}
+.flink{color:rgba(255,255,255,.5);text-decoration:none;font-size:12px;transition:color .2s}
+.flink:hover{color:#fff}
+.fbot{max-width:960px;margin:0 auto;border-top:1px solid rgba(255,255,255,.08);padding-top:16px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.fcopy{font-size:11px}
+
+/* Skeletons */
+.skeleton{background:#f0f0f0;border-radius:8px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="topbar-nav">
+    <a href="index.html">Inicio</a>
+    <a href="viajeros.html">🏆 Viajeros</a>
+    <a href="mi-perfil.html" class="active">Mi Perfil</a>
+  </div>
+</nav>
+
+<!-- NO SESIÓN -->
+<div class="no-sesion" id="no-sesion-view" style="display:none">
+  <div class="no-sesion-inner">
+    <div class="no-sesion-icon">🗺️</div>
+    <h2 class="bc">TU PERFIL<br>DE VIAJERO</h2>
+    <p>Inicia sesión para ver tus lugares guardados, tus reseñas publicadas y tu progreso de XP en ExploraCO.</p>
+    <button class="btn-gold login-trigger">Iniciar sesión</button>
+    <a href="index.html" class="btn-outline">Explorar sin cuenta</a>
+  </div>
+</div>
+
+<!-- PERFIL COMPLETO -->
+<div id="perfil-view" style="display:none">
+
+  <!-- Hero -->
+  <div class="perfil-hero">
+    <div class="perfil-hero-inner">
+      <div class="perfil-av-wrap">
+        <div class="perfil-av" id="ph-avatar">🧭</div>
+        <div class="perfil-av-nivel" id="ph-nivel-dot">1</div>
+      </div>
+      <div class="perfil-info">
+        <div class="perfil-nombre" id="ph-nombre">—</div>
+        <div class="perfil-badge" id="ph-badge">Viajero Novato</div>
+        <div class="perfil-email" id="ph-email"></div>
+      </div>
+      <div class="perfil-hero-actions">
+        <button onclick="window.ExploraCO.cerrarSesion();mostrarVista();" style="
+          padding:8px 16px;border:1px solid rgba(255,255,255,.2);
+          border-radius:6px;background:transparent;color:rgba(255,255,255,.6);
+          font-size:11px;cursor:pointer;font-family:inherit">
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-wrap">
+    <div class="tabs-inner">
+      <button class="tab-btn active" onclick="activarTab('resumen')">📊 Resumen</button>
+      <button class="tab-btn" onclick="activarTab('mapa')">🗺️ Mi Mapa</button>
+      <button class="tab-btn" onclick="activarTab('resenas')">⭐ Mis Reseñas</button>
+      <button class="tab-btn" onclick="activarTab('actividad')">⚡ Actividad XP</button>
+    </div>
+  </div>
+
+  <div class="perfil-main">
+
+    <!-- TAB: RESUMEN -->
+    <div class="tab-panel active" id="tab-resumen">
+
+      <!-- Stats grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-num" id="st-xp" style="color:var(--gold)">0</div>
+          <div class="stat-lbl">XP Total</div>
+          <div class="stat-sub" id="st-nivel">Nivel 1</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="st-resenas">0</div>
+          <div class="stat-lbl">Reseñas</div>
+          <div class="stat-sub">Escritas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="st-guardados">0</div>
+          <div class="stat-lbl">Guardados</div>
+          <div class="stat-sub">En Mi Mapa</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="st-visitas">0</div>
+          <div class="stat-lbl">Visitas</div>
+          <div class="stat-sub">Registradas</div>
+        </div>
+      </div>
+
+      <!-- XP Progress -->
+      <div class="xp-section">
+        <div class="xp-header">
+          <div class="xp-title">⚡ Progreso de XP</div>
+          <div class="xp-total" id="xp-total-big" style="color:var(--gold)">0 XP</div>
+        </div>
+        <div class="xp-prog-wrap">
+          <div class="xp-prog-labels">
+            <span id="xp-nivel-actual">Nivel 1</span>
+            <span id="xp-prog-pct">0%</span>
+          </div>
+          <div class="xp-prog">
+            <div class="xp-prog-bar" id="xp-prog-bar" style="width:0%;background:var(--gold)"></div>
+          </div>
+          <div style="text-align:right;font-size:10px;color:var(--muted);margin-top:4px" id="xp-siguiente-label">Siguiente nivel</div>
+        </div>
+        <div class="xp-milestones" id="xp-milestones"></div>
+      </div>
+
+      <!-- Mini mapa preview -->
+      <div class="mapa-section">
+        <div class="mapa-toolbar">
+          <div class="mapa-toolbar-title">🗺️ Tu Mapa Personal</div>
+          <button class="btn-outline" onclick="activarTab('mapa')" style="font-size:11px">Ver completo →</button>
+        </div>
+        <div id="mini-mapa-preview" style="height:200px;background:var(--warm);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">
+          Cargando tu mapa...
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB: MI MAPA -->
+    <div class="tab-panel" id="tab-mapa">
+      <div class="mapa-section">
+        <div class="mapa-toolbar">
+          <div class="mapa-toolbar-title">🗺️ Lugares Guardados</div>
+          <div class="mapa-filters" id="mapa-filtros">
+            <button class="mapa-filter-btn active" onclick="filtrarMapa('all',this)">Todos</button>
+            <button class="mapa-filter-btn" onclick="filtrarMapa('hostal',this)">🏨</button>
+            <button class="mapa-filter-btn" onclick="filtrarMapa('comida',this)">🍽️</button>
+            <button class="mapa-filter-btn" onclick="filtrarMapa('sitio',this)">🏛️</button>
+            <button class="mapa-filter-btn" onclick="filtrarMapa('evento',this)">🎉</button>
+          </div>
+        </div>
+        <div id="mi-mapa-el"></div>
+      </div>
+
+      <!-- Grid de lugares guardados -->
+      <div style="font-weight:700;font-size:15px;margin-bottom:14px" id="guardados-count">Lugares guardados</div>
+      <div class="guardados-grid" id="guardados-grid">
+        <div class="skeleton" style="height:180px;border-radius:8px"></div>
+        <div class="skeleton" style="height:180px;border-radius:8px"></div>
+        <div class="skeleton" style="height:180px;border-radius:8px"></div>
+      </div>
+    </div>
+
+    <!-- TAB: MIS RESEÑAS -->
+    <div class="tab-panel" id="tab-resenas">
+      <div class="resenas-list" id="resenas-list">
+        <div class="skeleton" style="height:100px;border-radius:10px"></div>
+        <div class="skeleton" style="height:100px;border-radius:10px"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ACTIVIDAD XP -->
+    <div class="tab-panel" id="tab-actividad">
+      <div style="font-weight:700;font-size:15px;margin-bottom:16px">⚡ Historial de XP</div>
+      <div class="xp-log-list" id="xp-log-list">
+        <div class="skeleton" style="height:56px;border-radius:8px;margin-bottom:1px"></div>
+        <div class="skeleton" style="height:56px;border-radius:8px;margin-bottom:1px"></div>
+        <div class="skeleton" style="height:56px;border-radius:8px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="ftop">
+    <div>
+      <a href="index.html" class="flogo">EXPLORA<em>CO</em></a>
+      <p class="fdesc">El directorio turístico más completo de Colombia.</p>
+    </div>
+    <div><div class="fctl">Explorar</div><div class="flinks">
+      <a class="flink" href="directorio-hostal.html">Hospedajes</a>
+      <a class="flink" href="directorio-comida.html">Gastronomía</a>
+      <a class="flink" href="directorio-sitio.html">Sitios</a>
+      <a class="flink" href="directorio-evento.html">Eventos</a>
+    </div></div>
+    <div><div class="fctl">Comunidad</div><div class="flinks">
+      <a class="flink" href="viajeros.html">Viajeros destacados</a>
+      <a class="flink" href="mi-perfil.html">Mi Perfil</a>
+      <a class="flink" href="publicar.html">Publicar lugar</a>
+    </div></div>
+    <div><div class="fctl">Plataforma</div><div class="flinks">
+      <a class="flink" href="admin.html">Panel admin</a>
+    </div></div>
+  </div>
+  <div class="fbot">
+    <div class="fcopy">© 2026 ExploraCO · Hecho con ❤️ en Colombia</div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="usuario-session.js"></script>
+<script>
+var API = '';
+var miMapa = null;
+var misGuardados = [];
+var misResenas   = [];
+var xpLog        = [];
+var catFiltro    = 'all';
+
+var NIVEL_COLORS = {
+  'Viajero Novato':'#94a3b8','Explorador':'#60a5fa','Aventurero':'#34d399',
+  'Viajero Avanzado':'#f59e0b','Explorador Pro':'#f97316','Leyenda Colombiana':'#e879f9'
+};
+var CAT_COLORS = {hostal:'#3B82F6',comida:'#EF4444',sitio:'#8B5CF6',evento:'#F59E0B'};
+var CAT_EMOJI  = {hostal:'🏨',comida:'🍽️',sitio:'🏛️',evento:'🎉'};
+var PERFIL_EMOJI = {explorador:'🧭',fotografo:'📸',gastronomico:'🍽️',aventurero:'⛰️',cultural:'🏛️',trekking:'🥾'};
+
+// ── XP helpers ──────────────────────────────────────────
+function xpProgreso(xpTotal) {
+  var umbrales = [0,50,100,250,500,1000,9999];
+  var badges   = ['Viajero Novato','Explorador','Aventurero','Viajero Avanzado','Explorador Pro','Leyenda Colombiana'];
+  var nivel = 0;
+  for(var i=0;i<umbrales.length-1;i++) if(xpTotal>=umbrales[i]) nivel=i;
+  var base = umbrales[nivel], tope = umbrales[nivel+1]||9999;
+  return {
+    nivel:  nivel+1,
+    badge:  badges[nivel],
+    base:   base,
+    tope:   tope,
+    pct:    Math.min(100,Math.round(((xpTotal-base)/(tope-base))*100)),
+    faltan: Math.max(0, tope-xpTotal),
+    nextBadge: badges[nivel+1]||'Máximo nivel'
+  };
+}
+
+// ── Mostrar vista según sesión ───────────────────────────
+function mostrarVista() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  document.getElementById('no-sesion-view').style.display = u ? 'none' : 'flex';
+  document.getElementById('perfil-view').style.display    = u ? 'block' : 'none';
+  if(u) rellenarPerfil(u);
+}
+
+// ── Rellenar hero con datos del usuario ─────────────────
+function rellenarPerfil(u) {
+  var color  = NIVEL_COLORS[u.badge_actual] || '#94a3b8';
+  var emoji  = PERFIL_EMOJI[u.perfil_tipo]  || '🧭';
+  var prog   = xpProgreso(u.xp_total || 0);
+
+  document.getElementById('ph-avatar').textContent    = emoji;
+  document.getElementById('ph-nombre').textContent    = u.nombre || 'Viajero';
+  document.getElementById('ph-badge').textContent     = u.badge_actual || 'Viajero Novato';
+  document.getElementById('ph-badge').style.color     = color;
+  document.getElementById('ph-email').textContent     = u.email || '';
+  document.getElementById('ph-nivel-dot').textContent = prog.nivel;
+  document.getElementById('ph-nivel-dot').style.background = color;
+
+  // Stats
+  document.getElementById('st-xp').textContent       = (u.xp_total||0).toLocaleString('es-CO');
+  document.getElementById('st-xp').style.color        = color;
+  document.getElementById('st-resenas').textContent   = u.total_resenas  || 0;
+  document.getElementById('st-guardados').textContent = u.total_guardados|| 0;
+  document.getElementById('st-visitas').textContent   = u.total_visitas  || 0;
+  document.getElementById('st-nivel').textContent     = 'Nivel ' + prog.nivel;
+
+  // XP Progress
+  document.getElementById('xp-total-big').textContent     = (u.xp_total||0).toLocaleString('es-CO') + ' XP';
+  document.getElementById('xp-total-big').style.color     = color;
+  document.getElementById('xp-nivel-actual').textContent  = prog.badge + ' · Nivel ' + prog.nivel;
+  document.getElementById('xp-prog-pct').textContent      = prog.pct + '%';
+  document.getElementById('xp-prog-bar').style.width      = prog.pct + '%';
+  document.getElementById('xp-prog-bar').style.background = color;
+  document.getElementById('xp-siguiente-label').textContent =
+    prog.faltan > 0 ? 'Faltan ' + prog.faltan + ' XP para "' + prog.nextBadge + '"' : '🏆 Nivel máximo alcanzado';
+
+  // Milestones
+  var milestones = [
+    {xp:50,badge:'Explorador'},{xp:100,badge:'Aventurero'},
+    {xp:250,badge:'Viajero Avanzado'},{xp:500,badge:'Explorador Pro'},
+    {xp:1000,badge:'Leyenda Colombiana'}
+  ];
+  var html = milestones.map(function(m){
+    var done = (u.xp_total||0) >= m.xp;
+    var c    = NIVEL_COLORS[m.badge]||'#888';
+    return '<div class="xp-milestone" style="background:'+(done?c+'22':'transparent')+';border-color:'+(done?c:var(--border))+'";color:'+(done?c:'var(--muted)')+'">'+
+      (done?'✓ ':'')+ m.badge + ' · ' + m.xp+'XP</div>';
+  }).join('');
+  document.getElementById('xp-milestones').innerHTML = html;
+}
+
+// ── Cargar datos del usuario desde DB ───────────────────
+async function cargarDatosUsuario() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) return;
+
+  // Cargar en paralelo
+  var [guardadosRes, resenasRes] = await Promise.allSettled([
+    fetch(API+'/api/interacciones?tipo=mapa&usuario_id='+u.id).then(r=>r.json()),
+    fetch(API+'/api/interacciones?tipo=resenas&destino_id=all&limit=50').then(r=>r.json()),
+  ]);
+
+  if(guardadosRes.status==='fulfilled' && guardadosRes.value.ok) {
+    misGuardados = guardadosRes.value.data || [];
+  }
+
+  renderGuardados();
+  renderMiniMapaPreview();
+  iniciarMapa();
+}
+
+// ── Renderizar grid de guardados ─────────────────────────
+function renderGuardados() {
+  var grid = document.getElementById('guardados-grid');
+  var count = document.getElementById('guardados-count');
+  var filtrados = catFiltro==='all' ? misGuardados
+    : misGuardados.filter(function(d){return d.categoria_slug===catFiltro;});
+
+  if(count) count.textContent = filtrados.length + ' lugar' + (filtrados.length!==1?'es':'') + ' guardado' + (filtrados.length!==1?'s':'');
+
+  if(!filtrados.length) {
+    grid.innerHTML = '<div class="guardado-empty"><div style="font-size:36px;margin-bottom:10px">♡</div><div style="font-weight:700;margin-bottom:4px">Aún no has guardado lugares</div><div style="font-size:12px">Haz clic en ♡ en cualquier tarjeta para guardar</div><a href="index.html" style="display:inline-block;margin-top:14px;padding:8px 18px;background:var(--gold);color:#000;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700">Explorar lugares →</a></div>';
+    return;
+  }
+
+  grid.innerHTML = filtrados.map(function(d) {
+    var foto = d.foto_hero || '';
+    var heroStyle = foto
+      ? 'style="background:url('+foto+') center/cover;height:110px"'
+      : 'style="background:'+( d.hero_bg||'linear-gradient(135deg,#111,#222)')+';height:110px;display:flex;align-items:center;justify-content:center;font-size:28px"';
+    return [
+      '<a class="guardado-card" href="'+d.slug+'.html">',
+      '  <div class="guardado-hero" '+heroStyle+'>'+(foto?'':( d.emoji||'📍'))+'</div>',
+      '  <div class="guardado-body">',
+      '    <div class="guardado-name">'+(d.nombre||d.name||'')+'</div>',
+      '    <div class="guardado-meta">📍 '+(d.ciudad||'')+(d.categoria_slug?' · '+(CAT_EMOJI[d.categoria_slug]||''):'')+'</div>',
+      '    '+(d.rating?'<div style="font-size:11px;color:#E8A020;margin-top:3px">★ '+parseFloat(d.rating).toFixed(1)+'</div>':''),
+      '  </div>',
+      '</a>',
+    ].join('');
+  }).join('');
+}
+
+// ── Mini mapa preview en tab Resumen ────────────────────
+function renderMiniMapaPreview() {
+  var el = document.getElementById('mini-mapa-preview');
+  var conCoords = misGuardados.filter(function(d){return d.lat&&d.lng;});
+  if(!conCoords.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">Guarda lugares con coordenadas para verlos en el mapa</div>';
+    return;
+  }
+  el.innerHTML = '';
+  el.style.padding = '0';
+  var mapDiv = document.createElement('div');
+  mapDiv.style.height = '200px';
+  el.appendChild(mapDiv);
+  if(typeof L === 'undefined') return;
+  var miniMap = L.map(mapDiv,{zoomControl:false,scrollWheelZoom:false,attributionControl:false});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(miniMap);
+  var group = [];
+  conCoords.forEach(function(d){
+    var color = CAT_COLORS[d.categoria_slug]||'#E8A020';
+    var icon = L.divIcon({
+      html:'<div style="width:24px;height:24px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;border:2px solid #fff;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,.3)">'+(CAT_EMOJI[d.categoria_slug]||'📍')+'</div>',
+      iconSize:[24,24],iconAnchor:[12,12],className:''
+    });
+    var m = L.marker([d.lat,d.lng],{icon:icon}).addTo(miniMap);
+    m.bindPopup('<b style="font-size:12px">'+(d.nombre||d.name||'')+'</b>');
+    group.push(m);
+  });
+  if(group.length) {
+    var fg = L.featureGroup(group);
+    miniMap.fitBounds(fg.getBounds().pad(0.3));
+  }
+}
+
+// ── Mapa completo (tab Mi Mapa) ──────────────────────────
+function iniciarMapa() {
+  var el = document.getElementById('mi-mapa-el');
+  if(!el || typeof L === 'undefined') return;
+  el.style.height = '350px';
+  if(miMapa) { miMapa.invalidateSize(); actualizarMarcadores(); return; }
+  miMapa = L.map('mi-mapa-el',{center:[4.5,-74],zoom:5,scrollWheelZoom:false,attributionControl:false});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'© CARTO'}).addTo(miMapa);
+  actualizarMarcadores();
+}
+
+function actualizarMarcadores() {
+  if(!miMapa) return;
+  miMapa.eachLayer(function(l){if(l instanceof L.Marker)miMapa.removeLayer(l);});
+  var filtrados = catFiltro==='all' ? misGuardados
+    : misGuardados.filter(function(d){return d.categoria_slug===catFiltro;});
+  var markers = [];
+  filtrados.forEach(function(d){
+    if(!d.lat||!d.lng) return;
+    var color = CAT_COLORS[d.categoria_slug]||'#E8A020';
+    var icon = L.divIcon({
+      html:'<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:'+color+';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3);border:2px solid #fff"><span style="transform:rotate(45deg);font-size:13px">'+(CAT_EMOJI[d.categoria_slug]||'📍')+'</span></div>',
+      iconSize:[32,32],iconAnchor:[16,32],className:''
+    });
+    var m = L.marker([d.lat,d.lng],{icon:icon}).addTo(miMapa)
+      .bindPopup([
+        '<div style="min-width:150px;font-family:sans-serif">',
+        '<div style="font-weight:700;font-size:13px;margin-bottom:4px">'+(d.nombre||d.name||'')+'</div>',
+        '<div style="font-size:11px;color:#888;margin-bottom:8px">📍 '+(d.ciudad||'')+'</div>',
+        '<a href="'+(d.slug||'')+'.html" style="display:block;text-align:center;background:#E8A020;color:#000;padding:5px;border-radius:5px;text-decoration:none;font-size:11px;font-weight:700">Ver →</a>',
+        '</div>',
+      ].join(''));
+    markers.push(m);
+  });
+  if(markers.length) {
+    var fg = L.featureGroup(markers);
+    miMapa.fitBounds(fg.getBounds().pad(0.2));
+  }
+}
+
+function filtrarMapa(cat, btn) {
+  catFiltro = cat;
+  document.querySelectorAll('.mapa-filter-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  renderGuardados();
+  actualizarMarcadores();
+}
+
+// ── Cargar y renderizar reseñas del usuario ──────────────
+async function cargarResenas() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) return;
+  var list = document.getElementById('resenas-list');
+  try {
+    // Cargar los destinos donde el usuario ha hecho reseñas
+    // Usamos los guardados como proxy (mejora futura: endpoint específico)
+    var res  = await fetch(API+'/api/destinos?limit=200');
+    var data = await res.json();
+    if(!data.ok) throw new Error('Sin datos');
+
+    // Buscar reseñas en las interacciones
+    var resenasRes = await fetch(API+'/api/interacciones?tipo=resenas&destino_id='
+      + (data.data[0]?.id||'') + '&limit=1');
+    // Nota: el API actual no filtra por usuario — mostramos mensaje orientativo
+    list.innerHTML = [
+      '<div class="resenas-empty">',
+      '  <div class="resenas-empty-icon">⭐</div>',
+      '  <div style="font-weight:700;margin-bottom:6px">Tus reseñas publicadas</div>',
+      '  <div style="font-size:12px;color:var(--muted);line-height:1.6">',
+      '    Visita los hostales y lugares que hayas visitado y escribe tu experiencia.<br>',
+      '    Cada reseña suma <strong>+25 XP</strong> a tu perfil.',
+      '  </div>',
+      '  <a href="directorio-hostal.html" style="display:inline-block;margin-top:16px;padding:9px 20px;background:var(--gold);color:#000;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700">',
+      '    Explorar hospedajes →',
+      '  </a>',
+      '</div>',
+    ].join('');
+  } catch(err) {
+    list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12px">Error cargando reseñas: '+err.message+'</div>';
+  }
+}
+
+// ── Cargar historial XP ──────────────────────────────────
+async function cargarXPLog() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) return;
+  var logEl = document.getElementById('xp-log-list');
+
+  // XP log viene de las interacciones del usuario
+  // Mostramos sus acciones locales como historial aproximado
+  var actions = [];
+  if(u.total_resenas>0)   actions.push({icon:'⭐',desc:'Reseñas publicadas ('+u.total_resenas+')',xp:u.total_resenas*20});
+  if(u.total_guardados>0) actions.push({icon:'♥', desc:'Lugares guardados ('+u.total_guardados+')',xp:u.total_guardados*5});
+  if(u.total_visitas>0)   actions.push({icon:'📍',desc:'Visitas registradas ('+u.total_visitas+')',xp:u.total_visitas*20});
+
+  if(!actions.length) {
+    logEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">'+
+      '<div style="font-size:36px;margin-bottom:10px">⚡</div>'+
+      'Aún no tienes actividad registrada.<br>'+
+      '<a href="directorio-hostal.html" style="color:var(--gold);font-weight:700">Empieza a explorar →</a></div>';
+    return;
+  }
+
+  logEl.innerHTML = actions.map(function(a) {
+    return [
+      '<div class="xp-log-item">',
+      '  <div class="xp-log-icon">'+a.icon+'</div>',
+      '  <div class="xp-log-info">',
+      '    <div class="xp-log-desc">'+a.desc+'</div>',
+      '    <div class="xp-log-fecha">Acumulado</div>',
+      '  </div>',
+      '  <div class="xp-log-delta">+'+a.xp+'</div>',
+      '</div>',
+    ].join('');
+  }).join('') +
+  '<div class="xp-log-item" style="background:var(--gold-light);border-radius:6px;padding:12px">'+
+  '  <div class="xp-log-icon">🏆</div>'+
+  '  <div class="xp-log-info"><div class="xp-log-desc" style="font-weight:700">XP Total</div></div>'+
+  '  <div class="xp-log-delta" style="font-size:28px">'+(u.xp_total||0)+'</div>'+
+  '</div>';
+}
+
+// ── Tabs ─────────────────────────────────────────────────
+function activarTab(nombre) {
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('tab-'+nombre).classList.add('active');
+  // Activar el botón correcto
+  document.querySelectorAll('.tab-btn').forEach(function(b){
+    if(b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'"+nombre+"'")!==-1)
+      b.classList.add('active');
+  });
+  // Lazy load
+  if(nombre==='mapa') setTimeout(iniciarMapa,100);
+  if(nombre==='resenas') cargarResenas();
+  if(nombre==='actividad') cargarXPLog();
+}
+
+// ── Login triggers ────────────────────────────────────────
+document.querySelectorAll('.login-trigger').forEach(function(btn){
+  btn.onclick = function(){ window.ExploraCO && window.ExploraCO.mostrarLogin(); };
+});
+
+// ── Inicializar ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  mostrarVista();
+  if(window.ExploraCO && window.ExploraCO.usuario) {
+    cargarDatosUsuario();
+  }
+  // Cuando el usuario inicia sesión en esta página
+  var _orig = window.ExploraCO && window.ExploraCO.loginConEmail;
+  if(_orig) {
+    window.ExploraCO.loginConEmail = async function(email, nombre) {
+      var user = await _orig(email, nombre);
+      if(user){ mostrarVista(); cargarDatosUsuario(); }
+      return user;
+    };
+  }
+});
+</script>
+</body>
+</html>
