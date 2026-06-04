@@ -356,6 +356,7 @@ var PERFIL_EMOJI = {explorador:'🧭',fotografo:'📸',gastronomico:'🍽️',av
 
 // ── XP helpers ──────────────────────────────────────────
 function xpProgreso(xpTotal) {
+  xpTotal = parseInt(xpTotal) || 0;
   var umbrales = [0,50,100,250,500,1000,9999];
   var badges   = ['Viajero Novato','Explorador','Aventurero','Viajero Avanzado','Explorador Pro','Leyenda Colombiana'];
   var nivel = 0;
@@ -395,7 +396,7 @@ function rellenarPerfil(u) {
   document.getElementById('ph-nivel-dot').style.background = color;
 
   // Stats
-  document.getElementById('st-xp').textContent       = (u.xp_total||0).toLocaleString('es-CO');
+  document.getElementById('st-xp').textContent       = (parseInt(u.xp_total)||0).toLocaleString('es-CO');
   document.getElementById('st-xp').style.color        = color;
   document.getElementById('st-resenas').textContent   = u.total_resenas  || 0;
   document.getElementById('st-guardados').textContent = u.total_guardados|| 0;
@@ -403,7 +404,7 @@ function rellenarPerfil(u) {
   document.getElementById('st-nivel').textContent     = 'Nivel ' + prog.nivel;
 
   // XP Progress
-  document.getElementById('xp-total-big').textContent     = (u.xp_total||0).toLocaleString('es-CO') + ' XP';
+  document.getElementById('xp-total-big').textContent     = (parseInt(u.xp_total)||0).toLocaleString('es-CO') + ' XP';
   document.getElementById('xp-total-big').style.color     = color;
   document.getElementById('xp-nivel-actual').textContent  = prog.badge + ' · Nivel ' + prog.nivel;
   document.getElementById('xp-prog-pct').textContent      = prog.pct + '%';
@@ -421,8 +422,9 @@ function rellenarPerfil(u) {
   var html = milestones.map(function(m){
     var done = (u.xp_total||0) >= m.xp;
     var c    = NIVEL_COLORS[m.badge]||'#888';
-    return '<div class="xp-milestone" style="background:'+(done?c+'22':'transparent')+';border-color:'+(done?c:var(--border))+'";color:'+(done?c:'var(--muted)')+'">'+
-      (done?'✓ ':'')+ m.badge + ' · ' + m.xp+'XP</div>';
+    var bc   = done ? c : '#e5e0d8';
+    var bg   = done ? c+'22' : 'transparent';
+    return '<div class="xp-milestone" style="background:'+bg+';border-color:'+bc+';color:'+(done?c:'#888')+'">'+(done?'✓ ':'')+m.badge+' · '+m.xp+' XP</div>';
   }).join('');
   document.getElementById('xp-milestones').innerHTML = html;
 }
