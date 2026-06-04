@@ -266,6 +266,7 @@ var PERFIL_EMOJI = {
 
 // ── XP para siguiente nivel ───────────────────────────────
 function xpProgresoNivel(xpTotal) {
+  xpTotal = parseInt(xpTotal) || 0;
   var umbrales = [0,50,100,250,500,1000,9999];
   var nivel = 0;
   for(var i=0;i<umbrales.length-1;i++){
@@ -289,7 +290,7 @@ function renderLbCard(u, pos, esYo) {
   var color     = NIVEL_COLORS[u.badge_actual] || '#94a3b8';
   var emoji     = PERFIL_EMOJI[u.perfil_tipo]  || '🧭';
   var prog      = xpProgresoNivel(u.xp_total);
-  var xpFmt     = u.xp_total.toLocaleString('es-CO');
+  var xpFmt     = (parseInt(u.xp_total)||0).toLocaleString('es-CO');
 
   var cls = 'lb-card';
   if(pos===1) cls+=' top-1';

@@ -98,19 +98,22 @@
       var data = await res.json();
       if (!data.ok) return;
 
-      // Mapa de posición → UUID
+      // Mapa de posición Y de id local → UUID
       var uuidMap = {};
       data.data.forEach(function (d, i) {
-        uuidMap[i + 1] = d.id;  // id local (1-based) → UUID
+        uuidMap[i + 1] = d.id;        // posición 1-based → UUID
+        if (d.id_local) uuidMap[d.id_local] = d.id;  // id local si existe
       });
 
       // Guardar cada uno en DB
+      var synced = 0;
       for (var i = 0; i < localSaved.length; i++) {
         var localId = localSaved[i];
         var uuid = uuidMap[localId];
-        if (!uuid) continue;
+        if (!uuid || typeof uuid !== 'string' || uuid.length < 10) continue;
+        if (!usuario.id || usuario.id.length < 10) continue;
         try {
-          await fetch(API + '/api/interacciones', {
+          var syncRes = await fetch(API + '/api/interacciones', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -119,9 +122,12 @@
               destino_id: uuid,
             }),
           });
-        } catch (e) {}
+          if (syncRes.ok) synced++;
+        } catch (e) {
+          console.warn('[session] sync error for id', localId, e.message);
+        }
       }
-      mostrarToast('✓ ' + localSaved.length + ' lugares sincronizados con tu cuenta', '#16a34a');
+      if (synced > 0) mostrarToast('✓ ' + synced + ' lugares sincronizados con tu cuenta', '#16a34a');
     } catch (err) {
       console.warn('[session] Sync error:', err.message);
     }
@@ -329,7 +335,7 @@
         var xpEl   = document.getElementById('perfil-xp');
         var badge  = document.getElementById('perfil-badge');
         if (nameEl) nameEl.textContent = usuario.nombre;
-        if (xpEl)   xpEl.textContent   = (usuario.xp_total || 0) + ' XP';
+        if (xpEl)   xpEl.textContent   = (parseInt(usuario.xp_total) || 0) + ' XP';
         if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
       }
     } else {
