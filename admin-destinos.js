@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   const auth = req.headers.authorization || '';
-  const ADMIN_SECRET = process.env.ADMIN_SECRET || 'exploraco-admin-2024';
+  const ADMIN_SECRET = process.env.ADMIN_SECRET || 'exploraco12345';
   if (auth !== 'Bearer ' + ADMIN_SECRET) {
     return res.status(401).json({ ok: false, error: 'No autorizado' });
   }
