@@ -403,6 +403,11 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="tb-right">
     <button onclick="publishAll()" style="background:#16a34a;color:#fff;border:none;padding:6px 14px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px">🚀 Publicar todo</button>
     <a href="index.html" target="_blank" class="tb-preview-btn">↗ Ver sitio</a>
+    <span id="db-status-badge" style="
+      display:none;padding:3px 10px;border-radius:20px;
+      font-size:10px;font-weight:700;color:#fff;
+      margin-left:8px;cursor:pointer;font-family:inherit
+    " onclick="syncFromNeon()" title="Estado de Neon DB — clic para sincronizar"></span>
   </div>
 </header>
 
@@ -1392,6 +1397,8 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
 
 
+
+
 // ═══════════════════════════════════════════════════════════
 //  ExploraCO Admin V2 — Complete CMS
 // ═══════════════════════════════════════════════════════════
@@ -2210,13 +2217,18 @@ function savePlace() {
   if(idx === -1) places.push(p); else places[idx] = p;
   savePlaces();
   updateNavCounts();
-  showAdminToast('✓ ' + p.name + ' guardado', 'success');
-  setTimeout(function(){
-    var toast = document.getElementById('admin-toast');
-    if(toast) toast.innerHTML = '✓ Guardado — <span style="color:var(--gold);cursor:pointer;text-decoration:underline" onclick="generateAndDownloadPage('+p.id+')">⬇️ Generar página .html</span>';
-  }, 800);
+  showAdminToast('⏳ Guardando en Neon...', '');
   renderDashboard();
-  setTimeout(function(){ showScreen('tabla'); }, 600);
+  // Sync to Neon DB asynchronously
+  _syncToNeon(p).then(function(result) {
+    if(result && result.ok) {
+      showAdminToast('✓ ' + p.name + ' publicado online', 'success');
+      _showDBStatus('● DB · actualizado', '#16a34a');
+    } else {
+      showAdminToast('✓ Guardado local — sin conexión a DB', '');
+    }
+  });
+  setTimeout(function(){ showScreen('tabla'); }, 400);
 }
 
 function saveAsDraft() {
@@ -3418,78 +3430,25 @@ function buildFeatCode(cat) {
 function publishAll() {
   var pub = places.filter(function(p){ return p.status==='published'; });
   if(!pub.length){ showAdminToast('Sin lugares publicados','error'); return; }
-  showAdminToast('⏳ Preparando publicación ('+pub.length+' lugares)...');
 
-  /* Build all data strings */
-  var globalPL   = buildPlCode();
-  var globalMapa = (function(){
-    var arr = places.filter(function(p){return p.status==='published';}).map(function(p,i){
-      function esc(s){return s?String(s).replace(/"/g,'\"').replace(/\n/g,' '):''}
-      return '{id:'+(i+1)+',slug:"'+esc(p.slug||'')+'",name:"'+esc(p.name||'')+'",cat:"'+(p.cat||'')+'",city:"'+esc(p.city||'')+'",region:"'+esc(p.region||'')+'",rating:'+(p.rating||4.8)+',emoji:"'+(p.emoji||'📍')+'",lat:'+(p.lat||0)+',lng:'+(p.lng||0)+',lead:"'+esc(p.lead||'')+'",price:"'+esc(p.price||'')+'",hero_bg:"'+esc(p.hero_bg||'')+'"}';
-    }).join(',\n  ');
-    return 'const MAPA_PLACES=[\n  '+arr+'\n];';
-  })();
+  showAdminToast('⏳ Publicando '+pub.length+' lugares en Neon...','');
+  _showDBStatus('⏳ Sincronizando...','#f59e0b');
 
-  var cats = ['hostal','comida','sitio','evento'];
-  var dirData = {};
-  cats.forEach(function(cat){
-    dirData[cat] = {
-      pl:    buildDirPL(cat),
-      photos:buildPhotosCode(cat),
-      feat:  buildFeatCode(cat)
-    };
-  });
+  var promises = pub.map(function(p){ return _syncToNeon(p); });
 
-  /* Use fetch to get current files, update their arrays, and collect results */
-  var files = {};
-
-  function replaceArrays(src, newPL, newPhotos, newFeat, newMapa) {
-    var r = src;
-    if(newPL)     r = r.replace(/(?:var|const)\s+PL\s*=\s*\[[\s\S]*?\];/, newPL);
-    if(newPhotos) r = r.replace(/var\s+PHOTOS\s*=\s*\{[\s\S]*?\};/, newPhotos);
-    if(newFeat)   r = r.replace(/var\s+FEAT\s*=\s*\[[^\]]*\];/, newFeat);
-    if(newMapa)   r = r.replace(/(?:var|const)\s+MAPA_PLACES\s*=\s*\[[\s\S]*?\];/, newMapa);
-    return r;
-  }
-
-  /* Fetch all 5 HTML files and update them */
-  var fetches = [
-    fetch('index.html').then(function(r){return r.text();}).then(function(src){
-      files['index.html'] = replaceArrays(src, globalPL, null, null, globalMapa);
-    }),
-    fetch('directorio-hostal.html').then(function(r){return r.text();}).then(function(src){
-      files['directorio-hostal.html'] = replaceArrays(src, dirData.hostal.pl, dirData.hostal.photos, dirData.hostal.feat);
-    }),
-    fetch('directorio-comida.html').then(function(r){return r.text();}).then(function(src){
-      files['directorio-comida.html'] = replaceArrays(src, dirData.comida.pl, dirData.comida.photos, dirData.comida.feat);
-    }),
-    fetch('directorio-sitio.html').then(function(r){return r.text();}).then(function(src){
-      files['directorio-sitio.html'] = replaceArrays(src, dirData.sitio.pl, dirData.sitio.photos, dirData.sitio.feat);
-    }),
-    fetch('directorio-evento.html').then(function(r){return r.text();}).then(function(src){
-      files['directorio-evento.html'] = replaceArrays(src, dirData.evento.pl, dirData.evento.photos, dirData.evento.feat);
-    }),
-  ];
-
-  Promise.all(fetches).then(function(){
-    /* Generate individual pages for published places */
-    var hostalPlaces = places.filter(function(p){return p.status==='published'&&p.cat==='hostal';});
-    hostalPlaces.forEach(function(p){
-      try {
-        var html = buildHostalPage(p);
-        if(html) files[p.slug+'.html'] = html;
-      } catch(e){ console.warn('Error generating '+p.slug, e); }
-    });
-
-    /* Download as ZIP using JSZip */
-    downloadAsZip(files);
+  Promise.all(promises).then(function(results) {
+    var ok    = results.filter(function(r){ return r&&r.ok; }).length;
+    var errors = results.length - ok;
+    _showDBStatus('● DB · '+ok+' publicados','#16a34a');
+    if(errors===0) {
+      showAdminToast('✓ '+ok+' lugares publicados online — el sitio se actualiza automáticamente','success');
+    } else {
+      showAdminToast('✓ '+ok+' publicados · '+errors+' errores — revisa la consola','');
+    }
   }).catch(function(err){
-    /* If fetch fails (file:// protocol), offer individual downloads */
-    showAdminToast('Descarga individual: usa los botones de exportar','error');
-    showScreen('exportar');
+    showAdminToast('Error al publicar: '+err.message,'error');
   });
 }
-
 function buildHostalPage(pl) {
   /* Simple page builder using PCSS/PJS */
   return generateAndDownloadPage(pl.id, true);
@@ -3542,10 +3501,149 @@ function _downloadIndividual(files) {
   next();
 }
 
+
+
+/* ════════════════════════════════════════════════════════
+   ADMIN ONLINE — Sincronización automática con Neon DB
+   Cada save/delete se refleja inmediatamente en el sitio
+════════════════════════════════════════════════════════ */
+
+var ADMIN_SECRET = localStorage.getItem('admin_secret') || 'exploracо-admin-2024';
+var _localToUUID = {};
+try { _localToUUID = JSON.parse(localStorage.getItem('admin_local_to_uuid')||'{}'); } catch(e){}
+
+function _adminHeaders() {
+  return { 'Content-Type':'application/json', 'Authorization':'Bearer '+ADMIN_SECRET };
+}
+
+function _placeToAPI(p) {
+  return {
+    slug:          p.slug||'',
+    nombre:        p.name||'',
+    categoria_slug:p.cat||'sitio',
+    lead:          p.lead||'',
+    desc:          p.desc||'',
+    highlight:     p.highlight||'',
+    city:          p.city||'',
+    region:        p.region||'',
+    barrio:        p.barrio||'',
+    address:       p.address||'',
+    lat:           p.lat||null,
+    lng:           p.lng||null,
+    whatsapp:      p.whatsapp||'',
+    tel:           p.tel||'',
+    email:         p.email||'',
+    web:           p.web||'',
+    instagram:     p.instagram||'',
+    booking:       p.booking||'',
+    price:         p.price||'',
+    emoji:         p.emoji||'📍',
+    hero_bg:       p.hero_bg||'',
+    foto_hero:     (p.photos&&p.photos[0]) ? (typeof p.photos[0]==='string'?p.photos[0]:(p.photos[0].url||'')) : '',
+    rating:        p.rating||0,
+    reviews:       p.reviews||0,
+    status:        p.status||'published',
+    destacado:     p.destacado||false,
+    // Hostal
+    habs:          p.habs||[],
+    amenities:     p.amenities||[],
+    scores:        p.scores||{},
+    faqs:          p.faqs||[],
+    transport:     p.transport||[],
+    hostalEvents:  p.hostalEvents||[],
+    checkin:       p.checkin||'',
+    checkout:      p.checkout||'',
+    bookingUrl:    p.bookingUrl||'',
+    hostelworld:   p.hostelworld||'',
+    airbnb:        p.airbnb||'',
+  };
+}
+
+async function _syncToNeon(p) {
+  var uuid = _localToUUID[p.id];
+  var payload = _placeToAPI(p);
+  try {
+    var res, data;
+    if(uuid) {
+      // UPDATE
+      res  = await fetch('/api/admin-destinos?id='+uuid, {
+        method:'PUT', headers:_adminHeaders(), body:JSON.stringify(payload)
+      });
+    } else {
+      // CREATE
+      res  = await fetch('/api/admin-destinos', {
+        method:'POST', headers:_adminHeaders(), body:JSON.stringify(payload)
+      });
+      data = await res.json();
+      if(data.ok && data.data && data.data.id) {
+        _localToUUID[p.id] = data.data.id;
+        localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
+      }
+      return data;
+    }
+    return await res.json();
+  } catch(err) {
+    console.warn('[admin-online] syncToNeon error:', err.message);
+    return { ok:false, error:err.message };
+  }
+}
+
+async function _deleteFromNeon(localId) {
+  var uuid = _localToUUID[localId];
+  if(!uuid) return;
+  try {
+    await fetch('/api/admin-destinos?id='+uuid, {
+      method:'DELETE', headers:_adminHeaders()
+    });
+    delete _localToUUID[localId];
+    localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
+  } catch(err) {
+    console.warn('[admin-online] deleteFromNeon error:', err.message);
+  }
+}
+
+/* ── Mostrar badge de estado DB en el topbar ── */
+function _showDBStatus(text, color) {
+  var badge = document.getElementById('db-status-badge');
+  if(!badge) return;
+  badge.textContent = text;
+  badge.style.background = color||'#888';
+  badge.style.display = 'inline-block';
+}
+
+/* ── Sincronización inicial: cargar UUIDs desde DB ── */
+async function syncFromNeon() {
+  _showDBStatus('⏳ Conectando...', '#f59e0b');
+  try {
+    var res  = await fetch('/api/admin-destinos?limit=500', { headers:_adminHeaders() });
+    var data = await res.json();
+    if(!data.ok) throw new Error(data.error||'Error');
+
+    // Mapear slugs/nombres locales → UUIDs de Neon
+    data.data.forEach(function(d) {
+      // Buscar por slug en places locales
+      var local = places.find(function(p){ return p.slug===d.slug || p.name===d.nombre; });
+      if(local) _localToUUID[local.id] = d.id;
+    });
+    localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
+
+    var synced = Object.keys(_localToUUID).length;
+    _showDBStatus('● DB · '+data.total+' lugares', '#16a34a');
+    console.log('[admin-online] Sincronizado: '+synced+' UUIDs mapeados');
+  } catch(err) {
+    _showDBStatus('⚠️ Offline', '#ef4444');
+    console.warn('[admin-online] syncFromNeon error:', err.message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   showScreen('dashboard');
   updateNavCounts();
+  // Connect to Neon DB
+  setTimeout(syncFromNeon, 1000);
 });
+
+
 
 
 
