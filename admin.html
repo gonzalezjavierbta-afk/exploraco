@@ -1400,6 +1400,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
 
 
+
 // ═══════════════════════════════════════════════════════════
 //  ExploraCO Admin V2 — Complete CMS
 // ═══════════════════════════════════════════════════════════
@@ -3514,11 +3515,7 @@ var _localToUUID = {};
 try { _localToUUID = JSON.parse(localStorage.getItem('admin_local_to_uuid')||'{}'); } catch(e){}
 
 function _adminHeaders() {
-  // Encode secret to ASCII-safe string for HTTP headers
-  var secret = ADMIN_SECRET.replace(/[^ -]/g, function(c){
-    return encodeURIComponent(c);
-  });
-  return { 'Content-Type':'application/json', 'Authorization':'Bearer '+secret };
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET };
 }
 
 function _placeToAPI(p) {
@@ -3647,6 +3644,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Connect to Neon DB
   setTimeout(syncFromNeon, 1000);
 });
+
 
 
 
