@@ -340,6 +340,36 @@
 /* ── MAP PICKER MODAL OPEN ── */
 #map-picker-modal[style*="flex"] { display: flex !important; }
 
+/* ══ MODERACIÓN ══════════════════════════════════════ */
+.mod-filter-btn{padding:5px 14px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted);transition:all .15s;font-family:'Outfit',sans-serif;letter-spacing:.3px}
+.mod-filter-btn:hover{border-color:var(--black);color:var(--black)}
+.mod-filter-btn.active{background:var(--black);border-color:var(--black);color:var(--white)}
+.mod-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;transition:box-shadow .15s}
+.mod-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.mod-card.pending{border-left:4px solid #F59E0B}
+.mod-card.published{border-left:4px solid var(--green)}
+.mod-card.rejected{border-left:4px solid var(--red)}
+.mod-card-body{display:flex;gap:12px;padding:14px 16px}
+.mod-card-img{width:80px;height:80px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg)}
+.mod-card-img-ph{width:80px;height:80px;border-radius:6px;background:var(--bg);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:26px}
+.mod-card-info{flex:1;min-width:0}
+.mod-card-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mod-card-meta{font-size:11px;color:var(--muted);margin-bottom:5px}
+.mod-card-desc{font-size:11px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mod-card-footer{padding:8px 14px;border-top:1px solid var(--border);background:var(--bg2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mod-status-tag{font-size:9px;font-weight:800;padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-left:auto;white-space:nowrap}
+.mod-st-pending{background:#FFFBEB;color:#92400E}
+.mod-st-published{background:#F0FDF4;color:#166634}
+.mod-st-rejected{background:#FEF2F2;color:#991B1B}
+.snav-badge{background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:auto}
+.snav-item.active .snav-badge{background:#C41515}
+.mod-empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.mod-empty-icon{font-size:36px;margin-bottom:10px;opacity:.5}
+.mod-pagination{display:flex;justify-content:center;gap:6px;padding:16px 0}
+.mod-page-btn{padding:5px 12px;border:1.5px solid var(--border);border-radius:6px;background:var(--white);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.mod-page-btn.active{background:var(--black);border-color:var(--black);color:var(--white)}
+.mod-page-btn:hover:not(.active){border-color:var(--black)}
+
 
 
 
@@ -443,6 +473,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('reviews')" id="snav-reviews">
     <span class="snav-icon">⭐</span>Reseñas
   </div>
+  <div class="snav-item" onclick="showScreen('moderacion')" id="snav-moderacion">
+    <span class="snav-icon">🔔</span>Solicitudes<span class="snav-badge" id="badge-pending" style="display:none">0</span>
+  </div>
   <div class="snav-item" onclick="showScreen('importar')" id="snav-importar">
     <span class="snav-icon">📥</span>Importar
   </div>
@@ -506,6 +539,10 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
     <div class="qa-card" onclick="showScreen('reviews')">
       <div class="qa-icon">⭐</div>
       <div><div class="qa-label">Ver reseñas</div><div class="qa-sub">Gestionar comentarios</div></div>
+    </div>
+    <div class="qa-card" onclick="showScreen('moderacion')">
+      <div class="qa-icon">🔔</div>
+      <div><div class="qa-label">Solicitudes</div><div class="qa-sub" id="qa-mod-sub">Aprobar publicaciones</div></div>
     </div>
   </div>
   <!-- Recent + category breakdown -->
@@ -1358,6 +1395,35 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   </div>
 </div>
 
+<!-- ════ SCREEN: MODERACIÓN ════ -->
+<div class="ws-screen" id="screen-moderacion">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">SOLICITUDES</div>
+      <div class="ws-subtitle">Lugares enviados por el formulario público — aprueba para publicar</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="loadPendientes()">↺ Actualizar</button>
+      <a href="publicar.html" target="_blank" class="btn btn-ghost btn-sm">↗ Ver formulario</a>
+    </div>
+  </div>
+
+  <div style="padding:14px 28px;background:var(--white);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
+    <button class="mod-filter-btn active" data-mod-status="pending" onclick="setModFilter('pending',this)">⏳ Pendientes</button>
+    <button class="mod-filter-btn" data-mod-status="published" onclick="setModFilter('published',this)">✅ Aprobados</button>
+    <button class="mod-filter-btn" data-mod-status="rejected" onclick="setModFilter('rejected',this)">❌ Rechazados</button>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:10px" id="mod-lista">
+    <div class="mod-empty">
+      <div class="mod-empty-icon">⏳</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">Cargando solicitudes...</div>
+    </div>
+  </div>
+
+  <div class="mod-pagination" id="mod-paginacion"></div>
+</div>
+
 <!-- ════ MAP PICKER MODAL ════ -->
 <div id="map-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;width:min(680px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
@@ -1520,6 +1586,7 @@ function showScreen(name) {
   if(name === 'tabla') renderTabla();
   if(name === 'exportar') generateExportCode();
   if(name === 'reviews') renderReviews();
+  if(name === 'moderacion') loadPendientes();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
     return;
@@ -3643,7 +3710,212 @@ document.addEventListener('DOMContentLoaded', function() {
   updateNavCounts();
   // Connect to Neon DB
   setTimeout(syncFromNeon, 1000);
+  // Cargar badge de solicitudes pendientes
+  setTimeout(_checkPendingBadge, 2000);
 });
+
+/* ════════════════════════════════════════════════════════
+   MODERACIÓN — Gestión de solicitudes del formulario público
+════════════════════════════════════════════════════════ */
+
+var _modFilter = 'pending';
+var _modPage   = 0;
+var _modLimit  = 15;
+
+function setModFilter(status, btn) {
+  _modFilter = status;
+  _modPage   = 0;
+  document.querySelectorAll('.mod-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  loadPendientes();
+}
+
+async function loadPendientes() {
+  var lista = document.getElementById('mod-lista');
+  if(!lista) return;
+  lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">⏳</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">Cargando...</div></div>';
+
+  try {
+    var url = '/api/moderar-destinos?status='+_modFilter+'&limit='+_modLimit+'&offset='+(_modPage*_modLimit);
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = await resp.json();
+    if(!data.ok) throw new Error(data.error || 'Error al cargar');
+
+    // Actualizar badge en nav
+    if(_modFilter === 'pending') {
+      _updatePendingBadge(data.total);
+    }
+
+    if(!data.items || data.items.length === 0) {
+      var labels = {pending:'solicitudes pendientes',published:'lugares aprobados',rejected:'solicitudes rechazadas'};
+      lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">📭</div>'
+        +'<div style="font-size:13px;font-weight:600;margin-bottom:4px">Sin '+( labels[_modFilter]||'resultados')+'</div>'
+        +'<div style="font-size:11px">'+( _modFilter==='pending'?'Los nuevos formularios aparecerán aquí automáticamente':'')+'</div></div>';
+      document.getElementById('mod-paginacion').innerHTML = '';
+      return;
+    }
+
+    lista.innerHTML = data.items.map(function(item){ return _renderModCard(item); }).join('');
+
+    // Paginación
+    var pag = document.getElementById('mod-paginacion');
+    var totalPages = Math.ceil(data.total / _modLimit);
+    if(totalPages > 1) {
+      var html = '';
+      for(var i = 0; i < totalPages; i++) {
+        html += '<button class="mod-page-btn'+(i===_modPage?' active':'')+'" onclick="_modGoPage('+i+')">'+( i+1)+'</button>';
+      }
+      pag.innerHTML = html;
+    } else {
+      pag.innerHTML = '';
+    }
+
+  } catch(err) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">⚠️</div>'
+      +'<div style="font-size:13px;font-weight:600;color:var(--red)">Error al cargar</div>'
+      +'<div style="font-size:11px;color:var(--muted)">'+escH(err.message)+'</div></div>';
+  }
+}
+
+function _modGoPage(n) {
+  _modPage = n;
+  loadPendientes();
+}
+
+function _renderModCard(item) {
+  var d = item.detalles || {};
+  var fecha = item.created_at
+    ? new Date(item.created_at).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})
+    : '—';
+  var catIcons = {hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉'};
+  var icon = catIcons[item.categoria] || '📍';
+  var statusColors = {pending:'#F59E0B', published:'#22C55E', rejected:'#EF4444'};
+  var statusLabels = {pending:'⏳ Pendiente', published:'✅ Publicado', rejected:'❌ Rechazado'};
+  var statusCls    = {pending:'mod-st-pending', published:'mod-st-published', rejected:'mod-st-rejected'};
+
+  var foto = item.foto_principal || '';
+  var imgHtml = foto
+    ? '<img class="mod-card-img" src="'+escH(foto)+'" alt="" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">'
+      +'<div class="mod-card-img-ph" style="display:none">'+icon+'</div>'
+    : '<div class="mod-card-img-ph">'+icon+'</div>';
+
+  // Botones de acción
+  var btns = '<a href="/'+escH(item.slug)+'.html" target="_blank" class="btn btn-ghost btn-sm">👁️ Ver</a>';
+  if(item.status !== 'published') {
+    btns += '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;cursor:pointer" onclick="moderarDestino(\''+item.id+'\',\'aprobar\')">✅ Aprobar</button>';
+  }
+  if(item.status !== 'rejected') {
+    btns += '<button class="btn btn-danger btn-sm" onclick="moderarDestino(\''+item.id+'\',\'rechazar\')">❌ Rechazar</button>';
+  }
+  if(item.status !== 'pending') {
+    btns += '<button class="btn btn-ghost btn-sm" onclick="moderarDestino(\''+item.id+'\',\'pendiente\')">⏳ Pendiente</button>';
+  }
+  btns += '<button class="btn btn-ghost btn-sm" onclick="_copySlug(\''+escH(item.slug)+'\')">⎘ URL</button>';
+
+  // Info de contacto
+  var contacto = '';
+  if(d.whatsapp) contacto = '💬 <a href="https://wa.me/'+escH(d.whatsapp)+'" target="_blank" style="color:var(--green);font-weight:600">'+escH(d.whatsapp)+'</a>';
+  else if(d.email) contacto = '✉️ '+escH(d.email);
+
+  var precio = item.precio_desde ? '$'+Number(item.precio_desde).toLocaleString('es-CO') : '';
+
+  return '<div class="mod-card '+escH(item.status)+'" id="mod-card-'+escH(item.id)+'">'
+    +'<div class="mod-card-body">'
+      +imgHtml
+      +'<div class="mod-card-info">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px">'
+          +'<div class="mod-card-name">'+icon+' '+escH(item.nombre)+'</div>'
+          +'<span class="mod-status-tag '+( statusCls[item.status]||'')+'">'+( statusLabels[item.status]||item.status)+'</span>'
+        +'</div>'
+        +'<div class="mod-card-meta">'
+          +'📍 '+escH(item.ciudad||'—')+(item.departamento?', '+escH(item.departamento):'')
+          +' &nbsp;·&nbsp; '+(item.categoria_nombre||item.categoria||'—')
+          +(precio?' &nbsp;·&nbsp; 💰 '+precio:'')
+          +' &nbsp;·&nbsp; 📅 '+fecha
+        +'</div>'
+        +'<div class="mod-card-desc">'+escH(item.descripcion_corta||'Sin descripción')+'</div>'
+        +(contacto?'<div style="font-size:10px;margin-top:5px">'+contacto+'</div>':'')
+      +'</div>'
+    +'</div>'
+    +'<div class="mod-card-footer">'+btns+'</div>'
+  +'</div>';
+}
+
+async function moderarDestino(id, accion) {
+  var card = document.getElementById('mod-card-'+id);
+  if(card) card.style.opacity = '.5';
+
+  try {
+    var resp = await fetch('/api/moderar-destinos', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: id, accion: accion })
+    });
+    var data = await resp.json();
+    if(!data.ok) throw new Error(data.error || 'Error');
+
+    var msgs = {
+      aprobar:   '✅ Publicado en el directorio',
+      rechazar:  '❌ Solicitud rechazada',
+      pendiente: '⏳ Movido a pendientes'
+    };
+    showAdminToast(msgs[accion] || 'OK', accion==='aprobar'?'success':'');
+
+    // Recargar lista
+    loadPendientes();
+
+    // Actualizar badge si se aprobó o rechazó desde "pending"
+    if(accion !== 'pendiente') {
+      var badge = document.getElementById('badge-pending');
+      if(badge && badge.style.display !== 'none') {
+        var n = Math.max(0, parseInt(badge.textContent||'0') - 1);
+        _updatePendingBadge(n);
+      }
+    }
+
+  } catch(err) {
+    if(card) card.style.opacity = '1';
+    showAdminToast('Error: '+err.message, 'error');
+  }
+}
+
+function _updatePendingBadge(n) {
+  var badge = document.getElementById('badge-pending');
+  if(!badge) return;
+  if(n > 0) {
+    badge.textContent = n;
+    badge.style.display = 'inline';
+    // Actualizar quick action sub
+    var sub = document.getElementById('qa-mod-sub');
+    if(sub) sub.textContent = n+' pendiente'+(n===1?'':'s');
+  } else {
+    badge.style.display = 'none';
+    var sub = document.getElementById('qa-mod-sub');
+    if(sub) sub.textContent = 'Aprobar publicaciones';
+  }
+}
+
+async function _checkPendingBadge() {
+  try {
+    var resp = await fetch('/api/moderar-destinos?status=pending&limit=1', { headers: _adminHeaders() });
+    var data = await resp.json();
+    if(data.ok) _updatePendingBadge(data.total);
+  } catch(e) {}
+}
+
+function _copySlug(slug) {
+  var url = window.location.origin+'/'+slug+'.html';
+  navigator.clipboard.writeText(url).then(function(){
+    showAdminToast('URL copiada: /'+slug+'.html', 'success');
+  }).catch(function(){
+    showAdminToast('/'+slug+'.html', '');
+  });
+}
+
+function escH(s) {
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 
 
