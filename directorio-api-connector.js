@@ -1,174 +1,172 @@
-/**
- * ExploraCO — Directorio API Connector
- * Reemplaza los arrays PL[], PHOTOS{} y FEAT[] hardcodeados
- * con datos reales desde /api/destinos
- *
- * Incluir en cada directorio-*.html ANTES del </body>:
- * <script src="directorio-api-connector.js"></script>
- *
- * El script detecta la categoría automáticamente según el slug del archivo.
- */
+// directorio-api-connector.js  v4
+// Se incluye al final de cada directorio HTML:
+//   directorio-hostal.html, directorio-comida.html,
+//   directorio-sitio.html,  directorio-evento.html
+//
+// Detecta automáticamente la categoría por la URL o por window.DIR_CAT
+// Reemplaza PL[], FOTOS{} y FEAT[] con datos reales de /api/destinos
 
-(function () {
+(function() {
   'use strict';
 
-  var API_BASE = '';  // mismo dominio Netlify
+  var API = '/api/destinos';
 
-  // Detectar categoría según la URL actual
-  var path = window.location.pathname;
-  var categoria = 'hostal';
-  if (path.indexOf('comida') !== -1)  categoria = 'comida';
-  if (path.indexOf('sitio') !== -1)   categoria = 'sitio';
-  if (path.indexOf('evento') !== -1)  categoria = 'evento';
+  // ── Detectar categoría desde URL o variable global ───────────────
+  function detectarCategoria() {
+    // 1. Variable explícita en el HTML: <script>window.DIR_CAT='hostal'</script>
+    if (window.DIR_CAT) return window.DIR_CAT;
 
-  // ── Convertir destino de API → formato del directorio ──────
-  function apiToLocal(d, index) {
+    // 2. Por nombre del archivo en la URL
+    var path = window.location.pathname.toLowerCase();
+    if (path.includes('hostal'))  return 'hostal';
+    if (path.includes('comida'))  return 'comida';
+    if (path.includes('sitio'))   return 'sitio';
+    if (path.includes('evento'))  return 'evento';
+
+    return null;  // Sin filtro → todos
+  }
+
+  // ── Convertir al formato PL[] que usan los directorios ───────────
+  function toPlaceFormat(d) {
     return {
-      id:       index + 1,              // ID numérico local para PHOTOS/FEAT
-      _uuid:    d.id,                   // UUID real de Neon
-      slug:     d.slug,
-      name:     d.nombre,
-      cat:      d.categoria_slug,
-      city:     d.ciudad,
-      region:   d.region || 'Colombia',
-      lead:     d.lead || '',
-      price:    d.precio_desde || '',
-      emoji:    d.emoji || '📍',
-      hero_bg:  d.hero_bg || 'linear-gradient(135deg,#111,#222)',
-      rating:   parseFloat(d.rating) || 0,
-      rev:      parseInt(d.total_resenas) || 0,
-      destacado: d.destacado || false,
-      lat:      parseFloat(d.lat) || 0,
-      lng:      parseFloat(d.lng) || 0,
-      whatsapp: d.whatsapp || '',
-      web:      d.web || '',
-      instagram: d.instagram || '',
-      // Hostal-specific (si vienen en el response)
-      checkin:  d.checkin || '',
-      checkout: d.checkout || '',
+      id:        d.id,
+      slug:      d.slug,
+      name:      d.name,
+      cat:       d.cat,
+      city:      d.city,
+      region:    d.region     || '',
+      barrio:    d.barrio     || '',
+      lead:      d.lead       || '',
+      desc:      d.desc       || d.lead || '',
+      highlight: d.highlight  || '',
+      price:     d.price      || '',
+      emoji:     d.emoji      || '📍',
+      hero_bg:   d.hero_bg    || 'linear-gradient(135deg,#1a1a2e,#16213e)',
+      lat:       d.lat        || 0,
+      lng:       d.lng        || 0,
+      rating:    d.rating     || 0,
+      reviews:   d.reviews    || 0,
+      destacado: d.destacado  || false,
+      verificado:d.verificado || false,
+      whatsapp:  d.whatsapp   || '',
+      web:       d.web        || '',
+      instagram: d.instagram  || '',
+      booking:   d.booking    || '',
+      hostelworld:d.hostelworld || '',
+      airbnb:    d.airbnb     || '',
+      tipo:      d.tipo       || '',
+      horario:   d.horario    || '',
+      capacidad: d.capacidad  || '',
+      photos:    d.photos     || [],
+      amenities: d.amenities  || [],
+      habs:      d.habs       || [],
+      faqs:      d.faqs       || [],
     };
   }
 
-  // ── Mostrar estado de carga ─────────────────────────────────
-  function showLoading(msg) {
-    var grid = document.getElementById('dir-grid');
-    if (!grid) return;
-    grid.style.display = 'block';
-    grid.innerHTML = '<div style="'
-      + 'grid-column:1/-1;text-align:center;padding:60px 20px;'
-      + 'color:#888;font-size:14px;font-family:inherit'
-      + '">'
-      + '<div style="font-size:32px;margin-bottom:12px">⏳</div>'
-      + '<div>' + msg + '</div>'
-      + '</div>';
+  // ── Construir FOTOS{} — mapa de slug → array de fotos ───────────
+  function buildFotos(lugares) {
+    var fotos = {};
+    lugares.forEach(function(p) {
+      if (p.photos && p.photos.length > 0) {
+        fotos[p.slug] = p.photos.map(function(f) {
+          return typeof f === 'string' ? f : (f.url || '');
+        });
+      }
+    });
+    return fotos;
   }
 
-  function showError(msg) {
-    var grid = document.getElementById('dir-grid');
-    if (!grid) return;
-    grid.innerHTML = '<div style="'
-      + 'grid-column:1/-1;text-align:center;padding:60px 20px;'
-      + 'color:#ef4444;font-size:13px'
-      + '">'
-      + '<div style="font-size:28px;margin-bottom:10px">⚠️</div>'
-      + '<div>' + msg + '</div>'
-      + '<button onclick="location.reload()" style="'
-      + 'margin-top:14px;padding:8px 18px;border:1px solid #e5e0d8;'
-      + 'border-radius:20px;background:#fff;cursor:pointer;font-size:12px'
-      + '">Reintentar</button>'
-      + '</div>';
+  // ── Construir FEAT[] — lugares destacados ────────────────────────
+  function buildFeat(lugares) {
+    return lugares.filter(function(p) { return p.destacado; });
   }
 
-  // ── Cargar datos desde la API ───────────────────────────────
-  function cargarDesdeAPI() {
-    // Solo ejecutar si estamos en Netlify (no en file://)
-    if (window.location.protocol === 'file:') {
-      console.log('[directorio-api] Modo local (file://) — usando datos hardcodeados');
-      return;
+  // ── Actualizar contador del header del directorio ────────────────
+  function updateCounter(total, cat) {
+    var labels = {
+      hostal: 'hospedajes',
+      comida: 'restaurantes y cafés',
+      sitio:  'sitios turísticos',
+      evento: 'eventos',
+    };
+    var label = labels[cat] || 'destinos';
+
+    // Buscar elementos con clase o data-attr de contador
+    document.querySelectorAll('.dir-count, [data-dir-count]').forEach(function(el) {
+      el.textContent = total + ' ' + label;
+    });
+    document.querySelectorAll('.dir-total').forEach(function(el) {
+      el.textContent = total;
+    });
+  }
+
+  // ── Re-render: llamar funciones del directorio si existen ────────
+  function reinitDir(lugares, cat) {
+    if (typeof window.renderDir      === 'function') window.renderDir();
+    if (typeof window.renderCards    === 'function') window.renderCards();
+    if (typeof window.renderGrid     === 'function') window.renderGrid();
+    if (typeof window.initFilters    === 'function') window.initFilters();
+    if (typeof window.filterByCity   === 'function') window.filterByCity('all');
+    if (typeof window.initSort       === 'function') window.initSort();
+  }
+
+  // ── Mostrar skeleton mientras carga ─────────────────────────────
+  function showSkeleton() {
+    var grid = document.querySelector('.dir-grid, .cards-grid, #dir-cards, #cards-container');
+    if (!grid || grid.children.length > 0) return;
+    var sk = '';
+    for (var i = 0; i < 6; i++) {
+      sk += '<div class="card-skeleton" style="height:280px;background:#f0f0f0;border-radius:12px;animation:pulse 1.5s infinite"></div>';
     }
+    grid.innerHTML = sk;
+    if (!document.getElementById('sk-style')) {
+      var style = document.createElement('style');
+      style.id = 'sk-style';
+      style.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}';
+      document.head.appendChild(style);
+    }
+  }
 
-    showLoading('Cargando lugares desde la base de datos...');
+  // ── Fetch y actualizar ───────────────────────────────────────────
+  function loadDirectorio() {
+    var cat = detectarCategoria();
+    var url = API + '?limit=500' + (cat ? '&categoria=' + cat : '');
 
-    var url = API_BASE + '/api/destinos?categoria=' + categoria + '&limit=200';
+    showSkeleton();
 
     fetch(url)
-      .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (!res.ok || !res.data) {
+          console.warn('[directorio-api] Sin datos:', url);
+          return;
+        }
+
+        var lugares = res.data.map(toPlaceFormat);
+
+        // Reemplazar arrays globales
+        window.PL   = lugares;
+        window.FOTOS = buildFotos(lugares);
+        window.FEAT  = buildFeat(lugares);
+
+        // Actualizar contador
+        updateCounter(res.total || lugares.length, cat);
+
+        console.log('[directorio-api] ' + lugares.length + ' lugares cargados' + (cat ? ' (cat: ' + cat + ')' : ''));
+
+        // Re-render
+        reinitDir(lugares, cat);
       })
-      .then(function (data) {
-        if (!data.ok || !data.data || !data.data.length) {
-          throw new Error('Sin datos disponibles');
-        }
-
-        var destinos = data.data;
-        console.log('[directorio-api] ' + destinos.length + ' lugares cargados desde DB');
-
-        // Convertir al formato del directorio
-        var newPL     = destinos.map(apiToLocal);
-        var newPHOTOS = {};
-        var newFEAT   = [];
-
-        destinos.forEach(function (d, i) {
-          var localId = i + 1;
-          // PHOTOS: usar foto_hero si existe
-          if (d.foto_hero) {
-            newPHOTOS[localId] = d.foto_hero;
-          } else if (d.photos && d.photos.length) {
-            var ph = d.photos[0];
-            newPHOTOS[localId] = typeof ph === 'string' ? ph : (ph.url || '');
-          }
-          // FEAT: los destacados van primero
-          if (d.destacado) newFEAT.push(localId);
-        });
-
-        // Reemplazar los arrays globales
-        window.PL     = newPL;
-        window.PHOTOS = newPHOTOS;
-        window.FEAT   = newFEAT.length ? newFEAT : [1, 2, 3];
-
-        // Re-renderizar el directorio
-        if (typeof window.renderDir === 'function') {
-          window.renderDir();
-        } else {
-          // Si renderDir aún no está definido, esperar un momento
-          setTimeout(function () {
-            if (typeof window.renderDir === 'function') {
-              window.renderDir();
-            }
-          }, 500);
-        }
-
-        // Actualizar contador en el header si existe
-        var countEl = document.getElementById('dir-count');
-        if (countEl) countEl.textContent = destinos.length;
-
-        // Badge de estado
-        var badge = document.getElementById('api-status-badge');
-        if (badge) {
-          badge.textContent = '🟢 ' + destinos.length + ' lugares en vivo';
-          badge.style.color = '#16a34a';
-        }
-      })
-      .catch(function (err) {
-        console.warn('[directorio-api] Error cargando desde API:', err.message);
-        // Fallback: usar PL hardcodeado si existe
-        if (window.PL && window.PL.length) {
-          console.log('[directorio-api] Usando datos locales como fallback (' + window.PL.length + ' lugares)');
-          if (typeof window.renderDir === 'function') window.renderDir();
-        } else {
-          showError('No se pudieron cargar los lugares. ' + err.message);
-        }
+      .catch(function(e) {
+        console.warn('[directorio-api] Error:', e.message);
       });
   }
 
-  // ── Esperar a que el DOM esté listo ─────────────────────────
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      setTimeout(cargarDesdeAPI, 100);
-    });
+    document.addEventListener('DOMContentLoaded', loadDirectorio);
   } else {
-    setTimeout(cargarDesdeAPI, 100);
+    loadDirectorio();
   }
 
 })();
