@@ -1,221 +1,250 @@
-// /api/pagina-destino.js  v4 — schema real de Neon
-// Columnas reales: lead, descripcion, highlight, foto_hero, region,
-//   categoria_slug, booking, hostelworld, airbnb, tipo, tags(jsonb), creado_en
+// api/pagina-destino.js
+// Sirve /{slug}.html dinámicamente desde Neon DB
+// vercel.json rewrite: { "source":"/:slug.html", "destination":"/api/pagina-destino?slug=:slug" }
+// Archivos estáticos existentes tienen prioridad sobre el rewrite — retrocompatible.
 
 const { neon } = require('@neondatabase/serverless');
 
-var CAT_ICONS  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉' };
-var CAT_LABELS = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
-var CAT_DIR    = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
+const ICONS  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉' };
+const LABELS = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
+const DIRS   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
 
-function esc(s) {
+function e(s) {
   if (s===null||s===undefined) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function buildHTML(d, fotos, resenas) {
-  // d = fila de destinos con alias ya correctos
-  var catSlug = d.categoria_slug || 'sitio';
-  var icon    = CAT_ICONS[catSlug]  || '📍';
-  var catLbl  = CAT_LABELS[catSlug] || 'Destino';
-  var catDir  = CAT_DIR[catSlug]    || 'index.html';
-  var foto0   = d.foto_hero || 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80';
-  var rating  = d.rating ? Number(d.rating).toFixed(1) : null;
-  var nRes    = parseInt(d.total_resenas||0);
-  var precio  = d.precio_desde || null;
+function html(d, fotos, resenas) {
+  var cat    = d.categoria_slug || 'sitio';
+  var icon   = ICONS[cat]  || '📍';
+  var label  = LABELS[cat] || 'Destino';
+  var dir    = DIRS[cat]   || 'index.html';
+  var hero   = d.foto_hero || 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80';
+  var rat    = d.rating ? Number(d.rating).toFixed(1) : null;
+  var nRes   = parseInt(d.total_resenas||0);
+  var precio = d.precio_desde || null;
 
-  // tags JSONB puede contener amenidades, habitaciones, faqs, checkin, checkout
+  // Tags JSONB
   var tags = {};
-  if (d.tags) {
-    try { tags = typeof d.tags === 'string' ? JSON.parse(d.tags) : d.tags; } catch(e) {}
-  }
-  var amenidades  = tags.amenidades  || [];
-  var habitaciones= tags.habitaciones|| [];
-  var faqs        = tags.faqs        || [];
+  if (d.tags) { try { tags = typeof d.tags==='string' ? JSON.parse(d.tags) : d.tags; } catch(_){} }
+  var amenidades   = tags.amenidades   || [];
+  var habitaciones = tags.habitaciones || [];
+  var faqs         = tags.faqs         || [];
 
-  // Galería
-  var galHTML = (fotos||[]).map(function(f){
-    return '<div class="gi"><img src="'+esc(f.url)+'" alt="'+esc(f.caption||d.nombre)+'" loading="lazy"></div>';
-  }).join('');
+  // Bloques de contenido
+  var galHTML = (fotos||[]).map(f =>
+    `<div class="gi"><img src="${e(f.url)}" alt="${e(f.caption||d.nombre)}" loading="lazy"></div>`
+  ).join('');
 
-  // Habitaciones
-  var habHTML = habitaciones.length ? `<section id="habitaciones" class="sec">
+  var habHTML = habitaciones.length ? `
+  <section id="habitaciones" class="sec">
     <h2>${icon} Habitaciones</h2>
-    <div class="tbl-w"><table class="tbl">
-    <thead><tr><th>Tipo</th><th>Camas</th><th>Precio</th><th></th></tr></thead>
-    <tbody>${habitaciones.map(function(h){
-      return '<tr><td><b>'+esc(h.nombre)+'</b></td><td>'+esc(h.camas||'')+'</td><td>'+(h.precio||'—')+'</td>'
-        +'<td>'+(d.whatsapp?'<a href="https://wa.me/'+esc(d.whatsapp)+'" class="bwa" target="_blank">Reservar</a>':'')+'</td></tr>';
-    }).join('')}</tbody></table></div></section>` : '';
+    <div class="tblw"><table class="tbl">
+      <thead><tr><th>Tipo</th><th>Camas</th><th>Precio</th><th></th></tr></thead>
+      <tbody>${habitaciones.map(h=>`<tr>
+        <td><b>${e(h.nombre)}</b></td>
+        <td>${e(h.camas||'')}</td>
+        <td>${h.precio||'—'}</td>
+        <td>${d.whatsapp?`<a href="https://wa.me/${e(d.whatsapp)}" class="bwa" target="_blank">Reservar</a>`:''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </section>` : '';
 
-  // Servicios
-  var amenHTML = amenidades.length ? `<section id="servicios" class="sec">
-    <h2>✅ Servicios</h2>
-    <div class="chips">${amenidades.map(function(a){return '<span class="chip">✓ '+esc(a)+'</span>';}).join('')}</div>
-    </section>` : '';
+  var amenHTML = amenidades.length ? `
+  <section id="servicios" class="sec">
+    <h2>✅ Servicios incluidos</h2>
+    <div class="chips">${amenidades.map(a=>`<span class="chip">✓ ${e(a)}</span>`).join('')}</div>
+  </section>` : '';
 
-  // FAQs
-  var faqHTML = faqs.length ? `<section id="faq" class="sec"><h2>❓ Preguntas frecuentes</h2>
-    ${faqs.map(function(f){return '<details class="faq"><summary>'+esc(f.pregunta)+'</summary><p>'+esc(f.respuesta)+'</p></details>';}).join('')}
-    </section>` : '';
+  var faqHTML = faqs.length ? `
+  <section id="faq" class="sec">
+    <h2>❓ Preguntas frecuentes</h2>
+    ${faqs.map(f=>`<details class="faq"><summary>${e(f.pregunta)}</summary><p>${e(f.respuesta)}</p></details>`).join('')}
+  </section>` : '';
 
-  // Reservar
-  var rLinks = [];
-  if (d.whatsapp)    rLinks.push('<a href="https://wa.me/'+esc(d.whatsapp)+'" class="rbtn wa" target="_blank">💬 WhatsApp</a>');
-  if (d.booking)     rLinks.push('<a href="'+esc(d.booking)+'" class="rbtn bk" target="_blank">🏨 Booking.com</a>');
-  if (d.hostelworld) rLinks.push('<a href="'+esc(d.hostelworld)+'" class="rbtn hw" target="_blank">🌍 Hostelworld</a>');
-  if (d.airbnb)      rLinks.push('<a href="'+esc(d.airbnb)+'" class="rbtn ab" target="_blank">🏡 Airbnb</a>');
-  var reservarHTML = rLinks.length ? `<section id="reservar" class="sec"><h2>📅 Reservar</h2>
-    <div class="rbtns">${rLinks.join('')}</div></section>` : '';
+  var rbtns = [];
+  if(d.whatsapp)    rbtns.push(`<a href="https://wa.me/${e(d.whatsapp)}" class="rbtn rwa" target="_blank">💬 Reservar por WhatsApp</a>`);
+  if(d.booking)     rbtns.push(`<a href="${e(d.booking)}" class="rbtn rbk" target="_blank">🏨 Booking.com</a>`);
+  if(d.hostelworld) rbtns.push(`<a href="${e(d.hostelworld)}" class="rbtn rhw" target="_blank">🌍 Hostelworld</a>`);
+  if(d.airbnb)      rbtns.push(`<a href="${e(d.airbnb)}" class="rbtn rab" target="_blank">🏡 Airbnb</a>`);
+  var reservarHTML = rbtns.length ? `
+  <section id="reservar" class="sec">
+    <h2>📅 Reservar</h2>
+    <div class="rbtns">${rbtns.join('')}</div>
+  </section>` : '';
 
-  // Mapa
-  var mapaHTML = (d.lat && d.lng) ? `<section id="mapa" class="sec"><h2>🗺️ Ubicación</h2>
+  var mapaHTML = (d.lat && d.lng) ? `
+  <section id="mapa" class="sec">
+    <h2>🗺️ Ubicación</h2>
     <iframe width="100%" height="280" style="border:0;border-radius:10px" loading="lazy"
-    src="https://www.google.com/maps?q=${d.lat},${d.lng}&z=15&output=embed"></iframe>
-    </section>` : '';
+      src="https://www.google.com/maps?q=${d.lat},${d.lng}&z=15&output=embed"></iframe>
+  </section>` : '';
 
-  // Reseñas
-  var resenasHTML = (resenas||[]).length
-    ? `<section id="resenas" class="sec"><h2>💬 Reseñas ${rating?'<span class="rbadge">⭐ '+rating+'</span>':''}</h2>
-      ${resenas.map(function(r){
-        return '<div class="rv"><div class="rvh"><span class="av">'+esc((r.usuario_nombre||'V').slice(0,2).toUpperCase())+'</span>'
-          +'<div><b>'+esc(r.usuario_nombre||'Viajero')+'</b>'
-          +'<span class="stars">'+'★'.repeat(r.puntuacion||5)+'☆'.repeat(5-(r.puntuacion||5))+'</span></div></div>'
-          +(r.texto?'<p>'+esc(r.texto)+'</p>':'')+'</div>';
-      }).join('')}</section>`
-    : '<section id="resenas" class="sec"><h2>💬 Reseñas</h2><p style="color:#888;font-size:.875rem">Sé el primero en dejar una reseña.</p></section>';
+  var rvHTML = (resenas||[]).length ? `
+  <section id="resenas" class="sec">
+    <h2>💬 Reseñas ${rat?`<span class="rbadge">⭐ ${e(rat)}</span>`:''}</h2>
+    ${resenas.map(r=>`<div class="rv">
+      <div class="rvh">
+        <span class="av">${e((r.usuario_nombre||'V').slice(0,2).toUpperCase())}</span>
+        <div>
+          <b>${e(r.usuario_nombre||'Viajero')}</b>
+          <span class="stars">${'★'.repeat(r.puntuacion||5)}${'☆'.repeat(5-(r.puntuacion||5))}</span>
+        </div>
+      </div>
+      ${r.texto?`<p>${e(r.texto)}</p>`:''}
+    </div>`).join('')}
+  </section>` : `
+  <section id="resenas" class="sec">
+    <h2>💬 Reseñas</h2>
+    <p style="color:#888;font-size:.875rem">Sé el primero en dejar una reseña.</p>
+  </section>`;
 
-  // Contacto aside
-  var ctLinks = [];
-  if (d.whatsapp)  ctLinks.push('<a href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">💬 WhatsApp</a>');
-  if (d.instagram) ctLinks.push('<a href="https://instagram.com/'+esc((d.instagram||'').replace('@',''))+'" target="_blank">📷 @'+esc((d.instagram||'').replace('@',''))+'</a>');
-  if (d.web)       ctLinks.push('<a href="'+esc(d.web)+'" target="_blank">🌐 Sitio web</a>');
-  if (d.email)     ctLinks.push('<a href="mailto:'+esc(d.email)+'">✉️ '+esc(d.email)+'</a>');
+  var ctHTML = [];
+  if(d.whatsapp)  ctHTML.push(`<a href="https://wa.me/${e(d.whatsapp)}" target="_blank">💬 WhatsApp</a>`);
+  if(d.instagram) ctHTML.push(`<a href="https://instagram.com/${e((d.instagram||'').replace('@',''))}" target="_blank">📷 @${e((d.instagram||'').replace('@',''))}</a>`);
+  if(d.web)       ctHTML.push(`<a href="${e(d.web)}" target="_blank">🌐 Sitio web</a>`);
+  if(d.email)     ctHTML.push(`<a href="mailto:${e(d.email)}">✉️ ${e(d.email)}</a>`);
 
-  // Anchor nav
   var anchors = ['<a href="#descripcion">Sobre</a>'];
-  if (fotos&&fotos.length) anchors.push('<a href="#galeria">Fotos</a>');
-  if (habitaciones.length) anchors.push('<a href="#habitaciones">Habitaciones</a>');
-  if (rLinks.length)       anchors.push('<a href="#reservar">Reservar</a>');
-  if (amenidades.length)   anchors.push('<a href="#servicios">Servicios</a>');
-  if (d.lat && d.lng)      anchors.push('<a href="#mapa">Mapa</a>');
-  if (faqs.length)         anchors.push('<a href="#faq">FAQ</a>');
+  if(fotos&&fotos.length)    anchors.push('<a href="#galeria">Fotos</a>');
+  if(habitaciones.length)    anchors.push('<a href="#habitaciones">Habitaciones</a>');
+  if(rbtns.length)           anchors.push('<a href="#reservar">Reservar</a>');
+  if(amenidades.length)      anchors.push('<a href="#servicios">Servicios</a>');
+  if(d.lat && d.lng)         anchors.push('<a href="#mapa">Mapa</a>');
+  if(faqs.length)            anchors.push('<a href="#faq">FAQ</a>');
   anchors.push('<a href="#resenas">Reseñas</a>');
-
-  var css = `
-:root{--g:#E8A020;--gd:#c47c0a;--bg:#f9f7f4;--card:#fff;--text:#1a1a1a;--muted:#666;--r:12px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
-a{color:var(--gd);text-decoration:none}a:hover{text-decoration:underline}
-.nav{background:#fff;border-bottom:1px solid #eee;padding:0 1rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
-.logo{font-size:1.2rem;font-weight:900;letter-spacing:-.5px}.logo em{color:var(--g);font-style:normal}
-.bc{padding:.5rem 1rem;font-size:.78rem;color:var(--muted);max-width:900px;margin:0 auto}.bc a{color:var(--muted)}
-.hero{height:320px;background:#111;overflow:hidden;position:relative}
-@media(min-width:600px){.hero{height:440px}}
-.hero img{width:100%;height:100%;object-fit:cover;opacity:.82}
-.hero-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.08) 60%)}
-.hero-c{position:absolute;bottom:0;left:0;right:0;padding:1.25rem;max-width:900px;margin:0 auto}
-.hcat{display:inline-block;background:var(--g);color:#fff;font-size:.7rem;font-weight:800;padding:2px 9px;border-radius:20px;margin-bottom:.35rem;letter-spacing:.5px}
-.htitle{font-size:1.875rem;font-weight:900;color:#fff;line-height:1.1;margin-bottom:.35rem}
-@media(min-width:600px){.htitle{font-size:2.5rem}}
-.hsub{color:rgba(255,255,255,.8);font-size:.875rem;margin-bottom:.5rem}
-.hmeta{display:flex;flex-wrap:wrap;gap:.5rem;color:rgba(255,255,255,.85);font-size:.8rem}
-.anav{background:#fff;border-bottom:1px solid #eee;overflow-x:auto;white-space:nowrap}
-.anav a{display:inline-block;padding:.7rem .875rem;font-size:.8125rem;color:var(--muted);border-bottom:3px solid transparent;transition:all .15s}
-.anav a:hover{color:var(--text);text-decoration:none;border-color:var(--g)}
-.body{max-width:900px;margin:0 auto;padding:1.25rem 1rem 3rem;display:flex;gap:1.5rem;flex-direction:column}
-@media(min-width:768px){.body{flex-direction:row}}
-.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1.5rem}
-.aside{width:100%}@media(min-width:768px){.aside{width:268px;flex-shrink:0}}
-.sec{background:var(--card);border-radius:var(--r);padding:1.375rem;box-shadow:0 2px 12px rgba(0,0,0,.07)}
-.sec h2{font-size:1rem;font-weight:700;margin-bottom:.875rem}
-.dtxt{font-size:.9375rem;line-height:1.7;color:#333}
-.hl{background:#fff8ec;border-left:4px solid var(--g);padding:.8rem 1rem;border-radius:0 var(--r) var(--r) 0;margin-bottom:.875rem}
-.hl p{font-size:.875rem;color:#7a5000;font-style:italic}
-.gal{display:grid;grid-template-columns:repeat(2,1fr);gap:.375rem}
-@media(min-width:480px){.gal{grid-template-columns:repeat(3,1fr)}}
-.gi img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:7px;cursor:pointer;transition:opacity .15s}
-.gi img:hover{opacity:.85}
-.tbl-w{overflow-x:auto}.tbl{width:100%;border-collapse:collapse;font-size:.8125rem}
-.tbl th{background:#f5f5f5;padding:.5rem .625rem;text-align:left;font-weight:700;border-bottom:2px solid #eee}
-.tbl td{padding:.5rem .625rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-.bwa{display:inline-block;background:#25D366;color:#fff!important;padding:.3rem .7rem;border-radius:7px;font-size:.78rem;font-weight:600}
-.chips{display:flex;flex-wrap:wrap;gap:.4rem}
-.chip{background:#f0faf0;color:#2d6a2d;border:1px solid #c8e6c9;padding:.3rem .65rem;border-radius:20px;font-size:.78rem;font-weight:500}
-.faq{border:1px solid #eee;border-radius:8px;margin-bottom:.4rem}
-.faq summary{padding:.7rem .875rem;cursor:pointer;font-weight:500;font-size:.875rem;list-style:none;display:flex;justify-content:space-between}
-.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+"}
-.faq[open] summary::after{content:"−"}.faq p{padding:.5rem .875rem .875rem;font-size:.8125rem;color:#444;line-height:1.6}
-.rbtns{display:flex;flex-direction:column;gap:.5rem}
-.rbtn{display:block;text-align:center;padding:.75rem;border-radius:9px;font-weight:600;font-size:.9rem;color:#fff!important;transition:opacity .15s}
-.rbtn:hover{opacity:.88;text-decoration:none}.wa{background:#25D366}.bk{background:#003580}.hw{background:#f0593a}.ab{background:#FF5A5F}
-.rbadge{background:var(--g);color:#fff;font-size:.72rem;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:5px}
-.rv{border:1px solid #f0f0f0;border-radius:9px;padding:.875rem;margin-bottom:.625rem;background:#fafafa}
-.rvh{display:flex;align-items:center;gap:.625rem;margin-bottom:.4rem}
-.av{width:34px;height:34px;border-radius:50%;background:var(--g);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.78rem;flex-shrink:0}
-.stars{color:#f5a623;font-size:.78rem;margin-top:1px;display:block}.rv p{font-size:.8125rem;color:#444;line-height:1.5}
-.ac{background:var(--card);border-radius:var(--r);padding:1.125rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:.875rem}
-.ac h3{font-size:.9375rem;font-weight:700;margin-bottom:.75rem}
-.ir{display:flex;gap:.5rem;margin-bottom:.5rem;font-size:.8125rem;color:#444}
-.ir .ic{width:20px;text-align:center;flex-shrink:0}
-.ctl{display:flex;flex-direction:column;gap:.375rem}
-.ctl a{display:block;padding:.6rem .875rem;background:#f5f5f5;border-radius:7px;font-size:.875rem;color:var(--text)!important;transition:background .15s}
-.ctl a:hover{background:#ebebeb;text-decoration:none}
-.frv{display:flex;flex-direction:column;gap:.6rem}
-.frv label{font-size:.78rem;font-weight:700;color:var(--muted)}
-.frv input,.frv textarea{width:100%;padding:.5rem .7rem;border:1.5px solid #ddd;border-radius:8px;font-size:.875rem;font-family:inherit;transition:border-color .15s}
-.frv input:focus,.frv textarea:focus{outline:none;border-color:var(--g)}
-.sinp{display:flex;gap:3px;flex-direction:row-reverse;justify-content:flex-end}
-.sinp input{display:none}
-.sinp label{font-size:1.375rem;color:#ddd;cursor:pointer;transition:color .12s}
-.sinp input:checked~label,.sinp label:hover,.sinp label:hover~label{color:#f5a623}
-.btnrv{background:var(--g);color:#fff;border:none;padding:.7rem;border-radius:9px;font-weight:700;font-size:.9rem;cursor:pointer;width:100%;transition:background .15s}
-.btnrv:hover{background:var(--gd)}.btnrv:disabled{background:#ccc;cursor:not-allowed}
-.rvok{display:none;background:#d4edda;color:#155724;padding:.875rem;border-radius:9px;text-align:center;font-weight:700;font-size:.875rem}
-.foot{background:#111;color:rgba(255,255,255,.5);padding:1.75rem 1rem;text-align:center;font-size:.78rem}
-.flogo{font-size:1.2rem;font-weight:900;color:#fff;margin-bottom:.35rem}
-.flogo em{color:var(--g);font-style:normal}
-.pbanner{background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:.75rem 1.1rem;border-radius:10px;font-size:.875rem;text-align:center}
-`;
 
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>${esc(d.nombre)} – ExploraCO</title>
-<meta name="description" content="${esc(d.lead||d.nombre)}">
-<meta property="og:title" content="${esc(d.nombre)} – ExploraCO">
-<meta property="og:description" content="${esc(d.lead||'')}">
-<meta property="og:image" content="${esc(foto0)}">
+<title>${e(d.nombre)} – ExploraCO</title>
+<meta name="description" content="${e(d.lead||d.nombre)}">
+<meta property="og:title" content="${e(d.nombre)} – ExploraCO">
+<meta property="og:description" content="${e(d.lead||'')}">
+<meta property="og:image" content="${e(hero)}">
+<meta property="og:type" content="place">
 <meta name="theme-color" content="#E8A020">
-<link rel="canonical" href="https://exploraco.vercel.app/${esc(d.slug)}.html">
-<style>${css}</style>
+<link rel="canonical" href="https://exploraco.co/${e(d.slug)}.html">
+<style>
+:root{--g:#E8A020;--gd:#c47c0a;--bg:#f9f7f4;--card:#fff;--text:#1a1a1a;--mu:#666;--r:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+a{color:var(--gd);text-decoration:none}a:hover{text-decoration:underline}
+img{display:block;max-width:100%}
+/* NAV */
+.nav{background:#fff;border-bottom:1px solid #eee;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.logo{font-size:1.2rem;font-weight:900;letter-spacing:-.5px;color:var(--text)}.logo em{color:var(--g);font-style:normal}
+.nav-back{font-size:.8125rem;color:var(--mu)}
+/* BREADCRUMB */
+.bc{padding:.5rem 1.25rem;font-size:.78rem;color:var(--mu);max-width:960px;margin:0 auto}.bc a{color:var(--mu)}
+/* HERO */
+.hero{position:relative;height:320px;background:#111;overflow:hidden}
+@media(min-width:600px){.hero{height:440px}}
+.hero img{width:100%;height:100%;object-fit:cover;opacity:.82}
+.hero-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.08) 65%)}
+.hero-c{position:absolute;bottom:0;left:0;right:0;padding:1.5rem 1.25rem;max-width:960px;margin:0 auto}
+.hcat{display:inline-block;background:var(--g);color:#fff;font-size:.7rem;font-weight:800;padding:2px 10px;border-radius:20px;margin-bottom:.4rem;letter-spacing:.5px}
+.htitle{font-size:1.875rem;font-weight:900;color:#fff;line-height:1.1;margin-bottom:.4rem}
+@media(min-width:600px){.htitle{font-size:2.5rem}}
+.hsub{color:rgba(255,255,255,.82);font-size:.9rem;margin-bottom:.55rem}
+.hmeta{display:flex;flex-wrap:wrap;gap:.55rem;color:rgba(255,255,255,.85);font-size:.8rem}
+/* PENDING BANNER */
+.pbanner{background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:.75rem 1.25rem;border-radius:10px;font-size:.875rem;text-align:center}
+/* ANCHOR NAV */
+.anav{background:#fff;border-bottom:1px solid #eee;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.anav a{display:inline-block;padding:.75rem .875rem;font-size:.8125rem;color:var(--mu);border-bottom:3px solid transparent;transition:all .15s}
+.anav a:hover{color:var(--text);text-decoration:none;border-color:var(--g)}
+/* LAYOUT */
+.body{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem;display:flex;gap:1.75rem;flex-direction:column}
+@media(min-width:768px){.body{flex-direction:row}}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1.5rem}
+.aside{width:100%}@media(min-width:768px){.aside{width:276px;flex-shrink:0}}
+/* SECTION CARDS */
+.sec{background:var(--card);border-radius:var(--r);padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.sec h2{font-size:1.0625rem;font-weight:700;margin-bottom:1rem}
+.dtxt{font-size:.9375rem;line-height:1.75;color:#333}
+.hl{background:#fff8ec;border-left:4px solid var(--g);padding:.875rem 1rem;border-radius:0 var(--r) var(--r) 0;margin-bottom:.875rem}
+.hl p{font-size:.875rem;color:#7a5000;font-style:italic;line-height:1.6}
+/* GALERÍA */
+.gal{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem}
+@media(min-width:480px){.gal{grid-template-columns:repeat(3,1fr)}}
+.gi img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;cursor:pointer;transition:opacity .15s}
+.gi img:hover{opacity:.85}
+/* TABLA HABITACIONES */
+.tblw{overflow-x:auto}.tbl{width:100%;border-collapse:collapse;font-size:.8125rem}
+.tbl th{background:#f5f5f5;padding:.5rem .625rem;text-align:left;font-weight:700;border-bottom:2px solid #eee}
+.tbl td{padding:.5rem .625rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.bwa{display:inline-block;background:#25D366;color:#fff!important;padding:.3rem .75rem;border-radius:7px;font-size:.78rem;font-weight:600}
+/* AMENIDADES */
+.chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.chip{background:#f0faf0;color:#1e5c1e;border:1px solid #c3e6c3;padding:.3rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500}
+/* FAQ */
+.faq{border:1px solid #eee;border-radius:8px;margin-bottom:.4rem}
+.faq summary{padding:.75rem .875rem;cursor:pointer;font-weight:600;font-size:.875rem;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:'+';font-size:1.1rem;color:var(--g)}
+.faq[open] summary::after{content:'−'}.faq p{padding:.5rem .875rem .875rem;font-size:.8125rem;color:#444;line-height:1.6}
+/* RESERVAR */
+.rbtns{display:flex;flex-direction:column;gap:.5rem}
+.rbtn{display:block;text-align:center;padding:.875rem;border-radius:10px;font-weight:700;font-size:.9rem;color:#fff!important;transition:opacity .15s}
+.rbtn:hover{opacity:.88;text-decoration:none}
+.rwa{background:#25D366}.rbk{background:#003580}.rhw{background:#f0593a}.rab{background:#FF5A5F}
+/* RESEÑAS */
+.rbadge{background:var(--g);color:#fff;font-size:.72rem;padding:2px 8px;border-radius:20px;font-weight:700;margin-left:6px}
+.rv{border:1px solid #f0f0f0;border-radius:10px;padding:.875rem;margin-bottom:.625rem;background:#fafafa}
+.rvh{display:flex;align-items:center;gap:.625rem;margin-bottom:.4rem}
+.av{width:36px;height:36px;border-radius:50%;background:var(--g);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+.stars{color:#f5a623;font-size:.78rem;display:block;margin-top:1px}.rv p{font-size:.8125rem;color:#444;line-height:1.55}
+/* ASIDE */
+.ac{background:var(--card);border-radius:var(--r);padding:1.25rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1rem}
+.ac h3{font-size:.9375rem;font-weight:700;margin-bottom:.75rem}
+.ir{display:flex;gap:.5rem;margin-bottom:.5rem;font-size:.8125rem;color:#444}
+.ir .ic{width:22px;text-align:center;flex-shrink:0}
+.ctl{display:flex;flex-direction:column;gap:.375rem}
+.ctl a{display:block;padding:.625rem .875rem;background:#f5f5f5;border-radius:8px;font-size:.875rem;color:var(--text)!important;transition:background .15s}
+.ctl a:hover{background:#ebebeb;text-decoration:none}
+/* FORM RESEÑA */
+.frv{display:flex;flex-direction:column;gap:.625rem}
+.frv label{font-size:.78rem;font-weight:700;color:var(--mu)}
+.frv input,.frv textarea{width:100%;padding:.55rem .75rem;border:1.5px solid #ddd;border-radius:8px;font-size:.875rem;font-family:inherit;transition:border-color .15s}
+.frv input:focus,.frv textarea:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(232,160,32,.12)}
+.sinp{display:flex;gap:3px;flex-direction:row-reverse;justify-content:flex-end}
+.sinp input{display:none}
+.sinp label{font-size:1.5rem;color:#ddd;cursor:pointer;transition:color .12s}
+.sinp input:checked~label,.sinp label:hover,.sinp label:hover~label{color:#f5a623}
+.btnrv{background:var(--g);color:#fff;border:none;padding:.75rem;border-radius:10px;font-weight:700;font-size:.9375rem;cursor:pointer;width:100%;transition:background .15s}
+.btnrv:hover{background:var(--gd)}.btnrv:disabled{background:#ccc;cursor:not-allowed}
+.rvok{display:none;background:#d4edda;color:#155724;padding:.875rem;border-radius:10px;text-align:center;font-weight:600;font-size:.875rem}
+/* FOOTER */
+.foot{background:#111;color:rgba(255,255,255,.5);padding:2rem 1.25rem;text-align:center;font-size:.8rem}
+.flogo{font-size:1.2rem;font-weight:900;color:#fff;margin-bottom:.375rem}.flogo em{color:var(--g);font-style:normal}
+</style>
 </head>
 <body>
 
 <nav class="nav">
   <a class="logo" href="/index.html">EXPLORA<em>CO</em></a>
-  <a href="/${esc(catDir)}" style="font-size:.8rem;color:var(--muted)">← ${esc(catLbl)}</a>
+  <a class="nav-back" href="/${e(dir)}">← ${e(label)}</a>
 </nav>
 
 <div class="bc">
-  <a href="/index.html">Inicio</a> › <a href="/${esc(catDir)}">${icon} ${esc(catLbl)}</a> › ${esc(d.nombre)}
+  <a href="/index.html">Inicio</a> › <a href="/${e(dir)}">${icon} ${e(label)}</a> › ${e(d.nombre)}
 </div>
 
-${d.status==='pending'?`<div style="max-width:900px;margin:.5rem auto;padding:0 1rem"><div class="pbanner">⏳ Este lugar está pendiente de revisión.</div></div>`:''}
+${d.status==='pending'?`<div style="max-width:960px;margin:.5rem auto;padding:0 1.25rem"><div class="pbanner">⏳ Este lugar está pendiente de revisión por el equipo de ExploraCO.</div></div>`:''}
 
 <div class="hero">
-  <img src="${esc(foto0)}" alt="${esc(d.nombre)}" loading="eager">
+  <img src="${e(hero)}" alt="${e(d.nombre)}" loading="eager">
   <div class="hero-ov"></div>
   <div class="hero-c">
-    <span class="hcat">${icon} ${esc(catLbl)}</span>
-    <h1 class="htitle">${esc(d.nombre)}</h1>
-    <p class="hsub">${esc(d.lead||'')}</p>
+    <span class="hcat">${icon} ${e(label)}</span>
+    <h1 class="htitle">${e(d.nombre)}</h1>
+    <p class="hsub">${e(d.lead||'')}</p>
     <div class="hmeta">
-      <span>📍 ${esc(d.ciudad||'Colombia')}${d.region?', '+esc(d.region):''}</span>
-      ${nRes>0?`<span>⭐ ${esc(String(rating))} · ${nRes} reseñas</span>`:''}
-      ${precio?`<span>💰 Desde ${esc(precio)}</span>`:''}
+      <span>📍 ${e(d.ciudad||'Colombia')}${d.region?', '+e(d.region):''}</span>
+      ${nRes>0?`<span>⭐ ${e(String(rat))} · ${nRes} reseñas</span>`:''}
+      ${precio?`<span>💰 Desde ${e(precio)}</span>`:''}
     </div>
   </div>
 </div>
@@ -227,40 +256,44 @@ ${d.status==='pending'?`<div style="max-width:900px;margin:.5rem auto;padding:0 
 
   <section id="descripcion" class="sec">
     <h2>📋 Sobre este lugar</h2>
-    ${d.highlight?`<div class="hl"><p>${esc(d.highlight)}</p></div>`:''}
-    <p class="dtxt">${esc(d.descripcion||d.lead||'').replace(/\n/g,'<br>')}</p>
-    ${d.como_llegar?`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #f0f0f0"><h3 style="font-size:.875rem;font-weight:700;margin-bottom:.5rem">🚌 Cómo llegar</h3><p style="font-size:.875rem;color:#444;line-height:1.6">${esc(d.como_llegar)}</p></div>`:''}
+    ${d.highlight?`<div class="hl"><p>${e(d.highlight)}</p></div>`:''}
+    <p class="dtxt">${e(d.descripcion||d.lead||'').replace(/\n/g,'<br>')}</p>
+    ${d.como_llegar?`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #f0f0f0">
+      <h3 style="font-size:.9rem;font-weight:700;margin-bottom:.5rem">🚌 Cómo llegar</h3>
+      <p style="font-size:.875rem;color:#444;line-height:1.65">${e(d.como_llegar)}</p>
+    </div>`:''}
   </section>
 
-  ${(fotos&&fotos.length)?`<section id="galeria" class="sec"><h2>📷 Fotos</h2><div class="gal">${galHTML}</div></section>`:''}
+  ${(fotos&&fotos.length)?`<section id="galeria" class="sec"><h2>📷 Galería</h2><div class="gal">${galHTML}</div></section>`:''}
   ${habHTML}
   ${reservarHTML}
   ${amenHTML}
   ${mapaHTML}
   ${faqHTML}
-  ${resenasHTML}
+  ${rvHTML}
 
 </main>
 <aside class="aside">
 
   <div class="ac">
     <h3>ℹ️ Información</h3>
-    ${d.ciudad?`<div class="ir"><span class="ic">📍</span><span>${esc(d.ciudad)}${d.region?', '+esc(d.region):''}</span></div>`:''}
-    ${d.barrio?`<div class="ir"><span class="ic">🏘️</span><span>${esc(d.barrio)}</span></div>`:''}
-    ${d.tipo?`<div class="ir"><span class="ic">🏠</span><span>${esc(d.tipo)}</span></div>`:''}
-    ${tags.checkin?`<div class="ir"><span class="ic">⏰</span><span>Check-in ${esc(tags.checkin)} · Out ${esc(tags.checkout||'?')}</span></div>`:''}
-    ${precio?`<div class="ir"><span class="ic">💰</span><span>Desde <b>${esc(precio)}</b></span></div>`:''}
-    ${d.horario?`<div class="ir"><span class="ic">🕐</span><span>${esc(d.horario)}</span></div>`:''}
-    ${nRes>0?`<div class="ir"><span class="ic">⭐</span><span>${esc(String(rating))} · ${nRes} reseñas</span></div>`:''}
+    ${d.ciudad?`<div class="ir"><span class="ic">📍</span><span>${e(d.ciudad)}${d.region?', '+e(d.region):''}</span></div>`:''}
+    ${d.barrio?`<div class="ir"><span class="ic">🏘️</span><span>${e(d.barrio)}</span></div>`:''}
+    ${d.tipo?`<div class="ir"><span class="ic">🏠</span><span>${e(d.tipo)}</span></div>`:''}
+    ${tags.checkin?`<div class="ir"><span class="ic">⏰</span><span>Check-in ${e(tags.checkin)} · Out ${e(tags.checkout||'?')}</span></div>`:''}
+    ${d.horario?`<div class="ir"><span class="ic">🕐</span><span>${e(d.horario)}</span></div>`:''}
+    ${precio?`<div class="ir"><span class="ic">💰</span><span>Desde <b>${e(precio)}</b></span></div>`:''}
+    ${nRes>0?`<div class="ir"><span class="ic">⭐</span><span>${e(String(rat))} · ${nRes} reseñas</span></div>`:''}
   </div>
 
-  ${ctLinks.length?`<div class="ac"><h3>📞 Contacto</h3><div class="ctl">${ctLinks.join('')}</div></div>`:''}
+  ${ctHTML.length?`<div class="ac"><h3>📞 Contacto</h3><div class="ctl">${ctHTML.join('')}</div></div>`:''}
 
   <div class="ac">
     <h3>✍️ Escribe una reseña</h3>
     <div class="frv" id="frv">
-      <div><label>Tu nombre</label><input type="text" id="rvn" placeholder="Ej: María García"></div>
-      <div><label>Puntuación</label>
+      <div><label>Tu nombre</label><input type="text" id="rvn" placeholder="Ej: María García" autocomplete="name"></div>
+      <div>
+        <label>Puntuación</label>
         <div class="sinp">
           <input type="radio" name="st" id="s5" value="5"><label for="s5">★</label>
           <input type="radio" name="st" id="s4" value="4"><label for="s4">★</label>
@@ -283,34 +316,37 @@ ${d.status==='pending'?`<div style="max-width:900px;margin:.5rem auto;padding:0 
   <p>El directorio turístico más completo de Colombia</p>
   <p style="margin-top:.4rem">
     <a href="/index.html" style="color:var(--g)">Inicio</a> ·
-    <a href="/${esc(catDir)}" style="color:var(--g)">${esc(catLbl)}</a> ·
+    <a href="/${e(dir)}" style="color:var(--g)">${e(label)}</a> ·
     <a href="/admin.html" style="color:var(--g)">Admin</a>
   </p>
 </footer>
 
 <script>
-var DID="${esc(String(d.id))}";
+var DID="${e(String(d.id))}";
 function submitRv(){
-  var nom=document.getElementById("rvn").value.trim();
-  var txt=document.getElementById("rvt").value.trim();
-  var st=document.querySelector("input[name=st]:checked");
-  if(!st){alert("Selecciona una puntuación");return;}
-  if(!nom){alert("Ingresa tu nombre");return;}
-  var btn=document.querySelector(".btnrv");
-  btn.disabled=true;btn.textContent="Publicando...";
-  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({tipo:"resena",destino_id:DID,usuario_nombre:nom,puntuacion:parseInt(st.value),texto:txt||null})
-  }).then(function(r){return r.json();}).then(function(data){
+  var nom=document.getElementById('rvn').value.trim();
+  var txt=document.getElementById('rvt').value.trim();
+  var st=document.querySelector('input[name=st]:checked');
+  if(!st){alert('Selecciona una puntuación');return;}
+  if(!nom){alert('Ingresa tu nombre');return;}
+  var btn=document.querySelector('.btnrv');
+  btn.disabled=true;btn.textContent='Publicando...';
+  fetch('/api/interacciones',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tipo:'resena',destino_id:DID,usuario_nombre:nom,puntuacion:parseInt(st.value),texto:txt||null})
+  }).then(r=>r.json()).then(data=>{
     if(data.ok||data.id){
-      document.getElementById("rvok").style.display="block";
-      document.getElementById("frv").style.opacity=".4";
-      document.getElementById("frv").style.pointerEvents="none";
-    } else {
-      btn.disabled=false;btn.textContent="Publicar reseña →";
-      alert("Error: "+(data.error||"No se pudo publicar"));
+      document.getElementById('rvok').style.display='block';
+      document.getElementById('frv').style.opacity='.4';
+      document.getElementById('frv').style.pointerEvents='none';
+    }else{
+      btn.disabled=false;btn.textContent='Publicar reseña →';
+      alert('Error: '+(data.error||'No se pudo publicar'));
     }
-  }).catch(function(){
-    btn.disabled=false;btn.textContent="Publicar reseña →";alert("Error de conexión");
+  }).catch(()=>{
+    btn.disabled=false;btn.textContent='Publicar reseña →';
+    alert('Error de conexión. Intenta de nuevo.');
   });
 }
 </script>
@@ -321,7 +357,7 @@ function submitRv(){
 }
 
 module.exports = async function handler(req, res) {
-  var slug = (req.query.slug||'').trim();
+  var slug = (req.query.slug||'').trim().replace(/\.html$/,'');
   if (!slug) return res.status(400).send('<h1>400 — Slug requerido</h1>');
 
   try {
@@ -335,28 +371,24 @@ module.exports = async function handler(req, res) {
       [slug]
     );
 
-    if (!rows.length) {
-      return res.status(404).send(
-        `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-        <title>No encontrado – ExploraCO</title>
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#f9f7f4}a{color:#E8A020}</style>
-        </head><body>
-        <h1 style="font-size:2.5rem;margin-bottom:1rem">404</h1>
-        <p>El destino <b>${esc(slug)}</b> no existe o fue eliminado.</p>
-        <p style="margin-top:1.5rem"><a href="/index.html">← Volver al inicio</a></p>
-        </body></html>`
-      );
-    }
+    if (!rows.length) return res.status(404).send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>No encontrado – ExploraCO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#f9f7f4}a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
+</head><body>
+<h1>404</h1>
+<p>El lugar <b>${e(slug)}</b> no existe o fue eliminado.</p>
+<p style="margin-top:1.5rem"><a href="/index.html">← Volver al inicio</a></p>
+</body></html>`);
 
     var d = rows[0];
 
-    var fotosRows = await sql(
-      'SELECT url, caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC LIMIT 12',
+    var fotos = await sql(
+      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC LIMIT 12',
       [d.id]
     );
 
-    var resenasRows = await sql(
+    var resenas = await sql(
       `SELECT i.puntuacion, i.texto,
               COALESCE(u.nombre, i.usuario_nombre, 'Viajero') AS usuario_nombre
        FROM interacciones i
@@ -366,20 +398,18 @@ module.exports = async function handler(req, res) {
       [d.id]
     );
 
-    var html = buildHTML(d, fotosRows, resenasRows);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    return res.status(200).send(html);
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=600');
+    return res.status(200).send(html(d, fotos, resenas));
 
   } catch(err) {
-    console.error('[pagina-destino] ERROR:', err.message);
-    return res.status(500).send(
-      `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title></head>
-      <body style="font-family:sans-serif;padding:2rem">
-      <h1>Error interno</h1>
-      <pre style="background:#f5f5f5;padding:1rem;border-radius:8px;margin-top:1rem">${esc(err.message)}</pre>
-      <p style="margin-top:1rem"><a href="/index.html">← Inicio</a></p>
-      </body></html>`
-    );
+    console.error('[pagina-destino]', err.message);
+    return res.status(500).send(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Error – ExploraCO</title></head>
+<body style="font-family:sans-serif;padding:2rem">
+<h1>Error interno</h1>
+<pre style="background:#f5f5f5;padding:1rem;border-radius:8px;margin-top:1rem;overflow-x:auto">${e(err.message)}</pre>
+<p style="margin-top:1rem"><a href="/index.html">← Inicio</a></p>
+</body></html>`);
   }
 };
