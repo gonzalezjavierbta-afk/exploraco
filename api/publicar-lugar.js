@@ -86,7 +86,7 @@ module.exports = async function handler(req, res) {
         $19,
         $20,$21,$22,
         $23,$24,
-        'pending',false,false,
+        'draft',false,false,
         NOW(),NOW()
       ) RETURNING id, slug`,
       [
@@ -136,9 +136,10 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       mensaje: '¡Solicitud recibida! El equipo revisará y publicará tu lugar en 24-48h.',
-      slug: destino.slug,
-      id:   destino.id,
-      url:  'https://exploraco.vercel.app/' + destino.slug + '.html',
+      slug:   destino.slug,
+      id:     destino.id,
+      status: 'draft',
+      url:    'https://exploraco.vercel.app/' + destino.slug + '.html',
     });
 
   } catch(err) {

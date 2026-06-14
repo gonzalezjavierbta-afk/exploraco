@@ -1409,9 +1409,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   </div>
 
   <div style="padding:14px 28px;background:var(--white);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
-    <button class="mod-filter-btn active" data-mod-status="pending" onclick="setModFilter('pending',this)">⏳ Pendientes</button>
+    <button class="mod-filter-btn active" data-mod-status="draft" onclick="setModFilter('draft',this)">⏳ Borradores</button>
     <button class="mod-filter-btn" data-mod-status="published" onclick="setModFilter('published',this)">✅ Aprobados</button>
-    <button class="mod-filter-btn" data-mod-status="rejected" onclick="setModFilter('rejected',this)">❌ Rechazados</button>
+    <button class="mod-filter-btn" data-mod-status="archived" onclick="setModFilter('archived',this)">🗄️ Archivados</button>
   </div>
 
   <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:10px" id="mod-lista">
@@ -3718,7 +3718,7 @@ document.addEventListener('DOMContentLoaded', function() {
    MODERACIÓN — Gestión de solicitudes del formulario público
 ════════════════════════════════════════════════════════ */
 
-var _modFilter = 'pending';
+var _modFilter = 'draft';
 var _modPage   = 0;
 var _modLimit  = 15;
 
@@ -3742,15 +3742,15 @@ async function loadPendientes() {
     if(!data.ok) throw new Error(data.error || 'Error al cargar');
 
     // Actualizar badge en nav
-    if(_modFilter === 'pending') {
+    if(_modFilter === 'draft') {
       _updatePendingBadge(data.total);
     }
 
     if(!data.items || data.items.length === 0) {
-      var labels = {pending:'solicitudes pendientes',published:'lugares aprobados',rejected:'solicitudes rechazadas'};
+      var labels = {draft:'borradores',published:'lugares aprobados',archived:'archivados'};
       lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">📭</div>'
         +'<div style="font-size:13px;font-weight:600;margin-bottom:4px">Sin '+( labels[_modFilter]||'resultados')+'</div>'
-        +'<div style="font-size:11px">'+( _modFilter==='pending'?'Los nuevos formularios aparecerán aquí automáticamente':'')+'</div></div>';
+        +'<div style="font-size:11px">'+( _modFilter==='draft'?'Los nuevos formularios aparecerán aquí automáticamente':'')+'</div></div>';
       document.getElementById('mod-paginacion').innerHTML = '';
       return;
     }
@@ -3789,9 +3789,9 @@ function _renderModCard(item) {
     : '—';
   var catIcons = {hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉'};
   var icon = catIcons[item.categoria] || '📍';
-  var statusColors = {pending:'#F59E0B', published:'#22C55E', rejected:'#EF4444'};
-  var statusLabels = {pending:'⏳ Pendiente', published:'✅ Publicado', rejected:'❌ Rechazado'};
-  var statusCls    = {pending:'mod-st-pending', published:'mod-st-published', rejected:'mod-st-rejected'};
+  var statusColors = {draft:'#F59E0B', published:'#22C55E', archived:'#6B7280'};
+  var statusLabels = {draft:'⏳ Borrador', published:'✅ Publicado', archived:'🗄️ Archivado'};
+  var statusCls = {draft:'mod-st-pending', published:'mod-st-published', archived:'mod-st-rejected'};
 
   var foto = item.foto_principal || '';
   var imgHtml = foto
@@ -3804,10 +3804,10 @@ function _renderModCard(item) {
   if(item.status !== 'published') {
     btns += '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;cursor:pointer" onclick="moderarDestino(\''+item.id+'\',\'aprobar\')">✅ Aprobar</button>';
   }
-  if(item.status !== 'rejected') {
+  if(item.status !== 'archived') {
     btns += '<button class="btn btn-danger btn-sm" onclick="moderarDestino(\''+item.id+'\',\'rechazar\')">❌ Rechazar</button>';
   }
-  if(item.status !== 'pending') {
+  if(item.status !== 'draft') {
     btns += '<button class="btn btn-ghost btn-sm" onclick="moderarDestino(\''+item.id+'\',\'pendiente\')">⏳ Pendiente</button>';
   }
   btns += '<button class="btn btn-ghost btn-sm" onclick="_copySlug(\''+escH(item.slug)+'\')">⎘ URL</button>';
@@ -3865,7 +3865,7 @@ async function moderarDestino(id, accion) {
     loadPendientes();
 
     // Actualizar badge si se aprobó o rechazó desde "pending"
-    if(accion !== 'pendiente') {
+    if(accion !== 'pendiente' && accion !== 'draft') {
       var badge = document.getElementById('badge-pending');
       if(badge && badge.style.display !== 'none') {
         var n = Math.max(0, parseInt(badge.textContent||'0') - 1);
@@ -3897,7 +3897,7 @@ function _updatePendingBadge(n) {
 
 async function _checkPendingBadge() {
   try {
-    var resp = await fetch('/api/moderar-destinos?status=pending&limit=1', { headers: _adminHeaders() });
+    var resp = await fetch('/api/moderar-destinos?status=draft&limit=1', { headers: _adminHeaders() });
     var data = await resp.json();
     if(data.ok) _updatePendingBadge(data.total);
   } catch(e) {}

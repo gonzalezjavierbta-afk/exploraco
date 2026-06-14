@@ -21,9 +21,9 @@ module.exports = async function handler(req, res) {
 
     // ── GET ──────────────────────────────────────────────────────
     if (req.method === 'GET') {
-      var status  = req.query.status || 'pending';
-      var allowed = ['pending','published','draft','rejected','archived'];
-      if (!allowed.includes(status)) status = 'pending';
+      var status  = req.query.status || 'draft';
+      var allowed = ['draft','published','archived'];
+      if (!allowed.includes(status)) status = 'draft';
       var limit  = Math.min(parseInt(req.query.limit)  || 15, 100);
       var offset = Math.max(parseInt(req.query.offset) || 0,  0);
 
@@ -67,7 +67,8 @@ module.exports = async function handler(req, res) {
       if (!body.id || !body.accion)
         return res.status(400).json({ ok:false, error:'Falta id o accion' });
 
-      var acciones = { aprobar:'published', rechazar:'rejected', pendiente:'pending' };
+      // Solo los 3 valores que acepta el CHECK CONSTRAINT de la tabla
+      var acciones = { aprobar:'published', rechazar:'archived', pendiente:'draft' };
       if (!acciones[body.accion])
         return res.status(400).json({ ok:false, error:'accion debe ser: aprobar, rechazar, pendiente' });
 
@@ -86,8 +87,8 @@ module.exports = async function handler(req, res) {
 
       var msgs = {
         published: '✅ Publicado — ya aparece en el directorio y en el mapa',
-        rejected:  '❌ Rechazado',
-        pending:   '⏳ Movido a pendientes',
+        archived:  '🗄️ Archivado',
+        draft:     '⏳ Movido a borradores',
       };
 
       return res.status(200).json({

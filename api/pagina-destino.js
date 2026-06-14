@@ -232,7 +232,7 @@ img{display:block;max-width:100%}
   <a href="/index.html">Inicio</a> › <a href="/${e(dir)}">${icon} ${e(label)}</a> › ${e(d.nombre)}
 </div>
 
-${d.status==='pending'?`<div style="max-width:960px;margin:.5rem auto;padding:0 1.25rem"><div class="pbanner">⏳ Este lugar está pendiente de revisión por el equipo de ExploraCO.</div></div>`:''}
+${d.status==='draft'?`<div style="max-width:960px;margin:.5rem auto;padding:0 1.25rem"><div class="pbanner">⏳ Este lugar está pendiente de revisión por el equipo de ExploraCO.</div></div>`:''}
 
 <div class="hero">
   <img src="${e(hero)}" alt="${e(d.nombre)}" loading="eager">
