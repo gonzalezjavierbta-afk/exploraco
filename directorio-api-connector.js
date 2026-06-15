@@ -1,137 +1,141 @@
-// directorio-api-connector.js  v4
-// Se incluye al final de cada directorio HTML:
-//   directorio-hostal.html, directorio-comida.html,
-//   directorio-sitio.html,  directorio-evento.html
-//
-// Detecta automáticamente la categoría por la URL o por window.DIR_CAT
-// Reemplaza PL[], FOTOS{} y FEAT[] con datos reales de /api/destinos
+// directorio-api-connector.js  v5
+// Formato exacto que usan los directorios generados por el admin:
+//   PL[]:   id(num), rev(num), photos[]{type,url,cap}, hero_bg, emoji
+//   FOTOS{}: { id_numerico: 'url_string' }  — alias de DEST_PHOTOS en index
+//   FEAT[]:  array de ids numéricos destacados
+//   Función de render: renderDir() o renderCards()
 
 (function() {
   'use strict';
 
-  var API = '/api/destinos';
+  var CAT_COLORS = {
+    hostal: 'linear-gradient(135deg,#1a3a5c,#2a4a7c)',
+    comida: 'linear-gradient(135deg,#3a1a0a,#4a2a1a)',
+    sitio:  'linear-gradient(135deg,#0a2a1a,#1a3a2a)',
+    evento: 'linear-gradient(135deg,#1a051a,#3a1a3a)',
+  };
 
-  // ── Detectar categoría desde URL o variable global ───────────────
-  function detectarCategoria() {
-    // 1. Variable explícita en el HTML: <script>window.DIR_CAT='hostal'</script>
+  // Detectar categoría del directorio actual
+  function detectarCat() {
     if (window.DIR_CAT) return window.DIR_CAT;
-
-    // 2. Por nombre del archivo en la URL
     var path = window.location.pathname.toLowerCase();
     if (path.includes('hostal'))  return 'hostal';
     if (path.includes('comida'))  return 'comida';
     if (path.includes('sitio'))   return 'sitio';
     if (path.includes('evento'))  return 'evento';
-
-    return null;  // Sin filtro → todos
+    return null;
   }
 
-  // ── Convertir al formato PL[] que usan los directorios ───────────
-  function toPlaceFormat(d) {
+  // Formato EXACTO de PL[] que genera el admin para los directorios
+  function toPlaceFormat(d, idx) {
+    var foto = d.foto || (d.photos && d.photos[0] ? d.photos[0].url : '') || '';
+    var photos = foto ? [{ type:'photo', url: foto, cap: d.name || '' }] : [];
+
     return {
-      id:        d.id,
-      slug:      d.slug,
-      name:      d.name,
-      cat:       d.cat,
-      city:      d.city,
+      id:        idx + 1,
+      _uuid:     d.id,
+      slug:      d.slug       || '',
+      name:      d.name       || '',
+      cat:       d.cat        || 'sitio',
+      city:      d.city       || '',
       region:    d.region     || '',
       barrio:    d.barrio     || '',
+      address:   '',
       lead:      d.lead       || '',
       desc:      d.desc       || d.lead || '',
       highlight: d.highlight  || '',
       price:     d.price      || '',
       emoji:     d.emoji      || '📍',
-      hero_bg:   d.hero_bg    || 'linear-gradient(135deg,#1a1a2e,#16213e)',
-      lat:       d.lat        || 0,
-      lng:       d.lng        || 0,
+      hero_bg:   d.hero_bg    || CAT_COLORS[d.cat] || CAT_COLORS.sitio,
       rating:    d.rating     || 0,
-      reviews:   d.reviews    || 0,
-      destacado: d.destacado  || false,
-      verificado:d.verificado || false,
+      rev:       d.reviews    || 0,   // "rev" no "reviews"
       whatsapp:  d.whatsapp   || '',
+      tel:       d.tel        || '',
+      email:     d.email      || '',
       web:       d.web        || '',
       instagram: d.instagram  || '',
       booking:   d.booking    || '',
-      hostelworld:d.hostelworld || '',
+      hostelworld: d.hostelworld || '',
       airbnb:    d.airbnb     || '',
       tipo:      d.tipo       || '',
       horario:   d.horario    || '',
       capacidad: d.capacidad  || '',
-      photos:    d.photos     || [],
+      lat:       d.lat        || 0,
+      lng:       d.lng        || 0,
+      photos:    photos,
       amenities: d.amenities  || [],
       habs:      d.habs       || [],
       faqs:      d.faqs       || [],
+      scores:    {},
+      status:    'published',
+      destacado: d.destacado  || false,
     };
   }
 
-  // ── Construir FOTOS{} — mapa de slug → array de fotos ───────────
+  // Construye FOTOS{ id_numerico: url } — igual que DEST_PHOTOS en el index
   function buildFotos(lugares) {
     var fotos = {};
     lugares.forEach(function(p) {
-      if (p.photos && p.photos.length > 0) {
-        fotos[p.slug] = p.photos.map(function(f) {
-          return typeof f === 'string' ? f : (f.url || '');
-        });
+      if (p.photos && p.photos.length > 0 && p.photos[0].url) {
+        fotos[p.id] = p.photos[0].url;
       }
     });
     return fotos;
   }
 
-  // ── Construir FEAT[] — lugares destacados ────────────────────────
+  // FEAT[] — ids de los destacados
   function buildFeat(lugares) {
-    return lugares.filter(function(p) { return p.destacado; });
+    var featIds = lugares.filter(function(p) { return p.destacado; }).map(function(p) { return p.id; });
+    if (!featIds.length) {
+      // Sin destacados: usar los 5 con mejor rating
+      featIds = lugares.slice().sort(function(a,b){ return b.rating - a.rating; })
+        .slice(0, 5).map(function(p){ return p.id; });
+    }
+    return featIds;
   }
 
-  // ── Actualizar contador del header del directorio ────────────────
+  // Actualizar contador del header del directorio
   function updateCounter(total, cat) {
-    var labels = {
-      hostal: 'hospedajes',
-      comida: 'restaurantes y cafés',
-      sitio:  'sitios turísticos',
-      evento: 'eventos',
-    };
-    var label = labels[cat] || 'destinos';
-
-    // Buscar elementos con clase o data-attr de contador
-    document.querySelectorAll('.dir-count, [data-dir-count]').forEach(function(el) {
-      el.textContent = total + ' ' + label;
-    });
-    document.querySelectorAll('.dir-total').forEach(function(el) {
-      el.textContent = total;
+    var labels = { hostal:'hospedajes', comida:'restaurantes y cafés', sitio:'sitios turísticos', evento:'eventos' };
+    var label  = labels[cat] || 'destinos';
+    // Buscar por clase o data-attr
+    document.querySelectorAll('.dir-count, [data-dir-count], .dir-total').forEach(function(el) {
+      if (el.classList.contains('dir-total')) el.textContent = total;
+      else el.textContent = total + ' ' + label;
     });
   }
 
-  // ── Re-render: llamar funciones del directorio si existen ────────
-  function reinitDir(lugares, cat) {
-    if (typeof window.renderDir      === 'function') window.renderDir();
-    if (typeof window.renderCards    === 'function') window.renderCards();
-    if (typeof window.renderGrid     === 'function') window.renderGrid();
-    if (typeof window.initFilters    === 'function') window.initFilters();
-    if (typeof window.filterByCity   === 'function') window.filterByCity('all');
-    if (typeof window.initSort       === 'function') window.initSort();
+  // Re-renderizar el directorio
+  function reinitDir() {
+    if (typeof window.renderDir   === 'function') { window.renderDir();   return; }
+    if (typeof window.renderCards === 'function') { window.renderCards(); return; }
+    if (typeof window.renderGrid  === 'function') { window.renderGrid();  return; }
+    if (typeof window.render      === 'function') { window.render();      return; }
+    // Fallback: disparar evento
+    document.dispatchEvent(new CustomEvent('exploraco:reload'));
   }
 
-  // ── Mostrar skeleton mientras carga ─────────────────────────────
+  // Mostrar skeleton mientras carga
   function showSkeleton() {
-    var grid = document.querySelector('.dir-grid, .cards-grid, #dir-cards, #cards-container');
-    if (!grid || grid.children.length > 0) return;
+    var grid = document.querySelector('#dir-grid, .dir-grid, #cards-container, .cards-grid');
+    if (!grid || grid.children.length > 2) return;
     var sk = '';
     for (var i = 0; i < 6; i++) {
-      sk += '<div class="card-skeleton" style="height:280px;background:#f0f0f0;border-radius:12px;animation:pulse 1.5s infinite"></div>';
+      sk += '<div style="height:280px;background:#f0f0f0;border-radius:12px;animation:pulse 1.5s ease-in-out infinite"></div>';
     }
     grid.innerHTML = sk;
-    if (!document.getElementById('sk-style')) {
-      var style = document.createElement('style');
-      style.id = 'sk-style';
-      style.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}';
-      document.head.appendChild(style);
+    if (!document.getElementById('sk-css')) {
+      var s = document.createElement('style');
+      s.id = 'sk-css';
+      s.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}';
+      document.head.appendChild(s);
     }
   }
 
-  // ── Fetch y actualizar ───────────────────────────────────────────
+  // ── Fetch y actualizar ──────────────────────────────────────────
   function loadDirectorio() {
-    var cat = detectarCategoria();
-    var url = API + '?limit=500' + (cat ? '&categoria=' + cat : '');
+    var cat = detectarCat();
+    var url = '/api/destinos?limit=500' + (cat ? '&categoria=' + encodeURIComponent(cat) : '');
 
     showSkeleton();
 
@@ -139,24 +143,60 @@
       .then(function(r) { return r.json(); })
       .then(function(res) {
         if (!res.ok || !res.data) {
-          console.warn('[directorio-api] Sin datos:', url);
+          console.warn('[directorio-api] Sin datos:', url, res);
           return;
         }
 
+        // Convertir al formato exacto de PL[]
         var lugares = res.data.map(toPlaceFormat);
 
-        // Reemplazar arrays globales
-        window.PL   = lugares;
-        window.FOTOS = buildFotos(lugares);
-        window.FEAT  = buildFeat(lugares);
+        // Actualizar PL[] — puede ser const en directorios generados
+        if (typeof PL !== 'undefined') {
+          PL.length = 0;
+          lugares.forEach(function(p) { PL.push(p); });
+        } else {
+          window.PL = lugares;
+        }
 
-        // Actualizar contador
+        // FOTOS{}
+        var fotos = buildFotos(lugares);
+        if (typeof FOTOS !== 'undefined') {
+          Object.keys(FOTOS).forEach(function(k) { delete FOTOS[k]; });
+          Object.assign(FOTOS, fotos);
+        } else {
+          window.FOTOS = fotos;
+        }
+        // Alias DEST_PHOTOS por si el directorio lo usa con ese nombre
+        if (typeof DEST_PHOTOS !== 'undefined') {
+          Object.keys(DEST_PHOTOS).forEach(function(k) { delete DEST_PHOTOS[k]; });
+          Object.assign(DEST_PHOTOS, fotos);
+        } else {
+          window.DEST_PHOTOS = fotos;
+        }
+
+        // FEAT[]
+        var feat = buildFeat(lugares);
+        if (typeof FEAT !== 'undefined') {
+          FEAT.length = 0;
+          feat.forEach(function(id) { FEAT.push(id); });
+        } else {
+          window.FEAT = feat;
+        }
+        // Alias DEST_FEATURED_IDS
+        if (typeof DEST_FEATURED_IDS !== 'undefined') {
+          DEST_FEATURED_IDS.length = 0;
+          feat.forEach(function(id) { DEST_FEATURED_IDS.push(id); });
+        } else {
+          window.DEST_FEATURED_IDS = feat;
+        }
+
+        // Contador
         updateCounter(res.total || lugares.length, cat);
 
-        console.log('[directorio-api] ' + lugares.length + ' lugares cargados' + (cat ? ' (cat: ' + cat + ')' : ''));
+        console.log('[directorio-api] ' + lugares.length + ' lugares cargados' + (cat ? ' (cat:' + cat + ')' : ''));
 
         // Re-render
-        reinitDir(lugares, cat);
+        reinitDir();
       })
       .catch(function(e) {
         console.warn('[directorio-api] Error:', e.message);
@@ -164,9 +204,9 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadDirectorio);
+    document.addEventListener('DOMContentLoaded', function() { setTimeout(loadDirectorio, 100); });
   } else {
-    loadDirectorio();
+    setTimeout(loadDirectorio, 100);
   }
 
 })();
