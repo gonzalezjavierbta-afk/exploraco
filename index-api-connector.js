@@ -1,5 +1,10 @@
-// index-api-connector.js  v7 — código exacto confirmado funcional en consola
+// index-api-connector.js  v8 — completo y definitivo
+// Actualiza: PL[], DEST_PHOTOS{}, MAPA_PLACES[], DEST_FEATURED_IDS[],
+//            AGENDA_EVENTS[] (sección eventos), stats reales, búsqueda en tiempo real
+
 (function () {
+  'use strict';
+
   var CAT_COLORS = {
     hostal: 'linear-gradient(135deg,#1a3a5c,#2a4a7c)',
     comida: 'linear-gradient(135deg,#3a1a0a,#4a2a1a)',
@@ -7,124 +12,277 @@
     evento: 'linear-gradient(135deg,#1a051a,#3a1a3a)',
   };
 
-  function loadAndRender() {
-    fetch('/api/destinos?limit=500')
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (!d.ok || !d.data || !d.data.length) {
-          console.warn('[index-api] sin datos:', d.error || 'vacío');
+  // Color del pin del mapa por categoría — MAPA_PLACES necesita p.color
+  var PIN_COLORS = {
+    hostal: '#2196F3',
+    comida: '#FF9800',
+    sitio:  '#4CAF50',
+    evento: '#A855F7',
+  };
+
+  // Mapeo cat DB → cat de agenda (para AGENDA_EVENTS)
+  var AGENDA_CAT_MAP = {
+    hostal:  'alojamiento',
+    comida:  'gastro',
+    sitio:   'naturaleza',
+    evento:  'festival',
+  };
+
+  // Formato exacto de PL[] confirmado del index.html real
+  function toPlace(item, idx) {
+    var foto = item.foto
+      || (item.photos && item.photos[0] ? item.photos[0].url : '')
+      || '';
+    return {
+      id:        idx + 1,
+      _uuid:     item.id,
+      slug:      item.slug       || '',
+      name:      item.name       || '',
+      cat:       item.cat        || 'sitio',
+      city:      item.city       || '',
+      region:    item.region     || '',
+      barrio:    item.barrio     || '',
+      address:   '',
+      lead:      item.lead       || '',
+      desc:      item.desc       || item.lead || '',
+      highlight: item.highlight  || '',
+      price:     item.price      || '',
+      emoji:     item.emoji      || '📍',
+      hero_bg:   item.hero_bg    || CAT_COLORS[item.cat] || CAT_COLORS.sitio,
+      rating:    item.rating     || 0,
+      rev:       item.reviews    || 0,
+      whatsapp:  item.whatsapp   || '',
+      tel:       item.tel        || '',
+      email:     item.email      || '',
+      web:       item.web        || '',
+      instagram: item.instagram  || '',
+      booking:   item.booking    || '',
+      hostelworld: item.hostelworld || '',
+      airbnb:    item.airbnb     || '',
+      lat:       item.lat        || 0,
+      lng:       item.lng        || 0,
+      photos:    foto ? [{ type: 'photo', url: foto, cap: item.name || '' }] : [],
+      scores:    {},
+      status:    'published',
+      destacado: item.destacado  || false,
+    };
+  }
+
+  // Formato MAPA_PLACES[] — necesita p.color para los pins de Leaflet
+  function toMapPlace(item, idx) {
+    return {
+      id:      idx + 1,
+      _uuid:   item.id,
+      slug:    item.slug    || '',
+      name:    item.name    || '',
+      cat:     item.cat     || 'sitio',
+      city:    item.city    || '',
+      region:  item.region  || '',
+      rating:  item.rating  || 0,
+      emoji:   item.emoji   || '📍',
+      lat:     parseFloat(item.lat) || 0,
+      lng:     parseFloat(item.lng) || 0,
+      lead:    item.lead    || '',
+      price:   item.price   || '',
+      hero_bg: item.hero_bg || CAT_COLORS[item.cat] || CAT_COLORS.sitio,
+      color:   PIN_COLORS[item.cat] || '#666666', // ← campo requerido por initMapaSection()
+    };
+  }
+
+  // Convierte lugar de DB al formato AGENDA_EVENTS[] que usa renderAgenda()
+  // Solo para lugares con cat='evento'
+  function toAgendaEvent(item, idx) {
+    var d = new Date();
+    return {
+      id:       1000 + idx,
+      name:     item.name || '',
+      cat:      AGENDA_CAT_MAP[item.cat] || 'festival',
+      city:     item.city || '',
+      day:      item.day   || d.getDate(),
+      month:    item.month || ['Ene','Feb','Mar','Abr','May','Jun',
+                               'Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()],
+      time:     item.horario || 'Consultar',
+      price:    item.price || 'Consultar',
+      loc:      item.barrio
+                  ? (item.barrio + ', ' + (item.city || ''))
+                  : (item.city || ''),
+      emoji:    item.emoji   || '🎉',
+      color:    PIN_COLORS.evento,
+      url:      item.slug + '.html',
+      featured: item.destacado || false,
+    };
+  }
+
+  // Actualizar stats con IDs añadidos al HTML
+  function updateStats(stats) {
+    var get = function (id) { return document.getElementById(id); };
+    if (get('stat-destinos') && stats.destinos) get('stat-destinos').textContent = stats.destinos;
+    if (get('stat-ciudades') && stats.ciudades) get('stat-ciudades').textContent = stats.ciudades;
+    if (get('stat-resenas')  && stats.resenas) {
+      get('stat-resenas').textContent = stats.resenas >= 1000
+        ? (stats.resenas / 1000).toFixed(1) + 'K'
+        : stats.resenas;
+    }
+    if (get('stat-rating') && stats.rating) {
+      get('stat-rating').textContent = stats.rating + '★';
+    }
+  }
+
+  // Reemplazar array const sin romper referencias
+  function replArr(name, newArr) {
+    if (typeof window[name] !== 'undefined' && Array.isArray(window[name])) {
+      window[name].length = 0;
+      newArr.forEach(function (i) { window[name].push(i); });
+    } else {
+      window[name] = newArr;
+    }
+  }
+
+  // Reemplazar objeto sin romper referencias
+  function replObj(name, newObj) {
+    if (typeof window[name] !== 'undefined' && typeof window[name] === 'object') {
+      Object.keys(window[name]).forEach(function (k) { delete window[name][k]; });
+      Object.keys(newObj).forEach(function (k) { window[name][k] = newObj[k]; });
+    } else {
+      window[name] = newObj;
+    }
+  }
+
+  // ── BÚSQUEDA EN TIEMPO REAL ────────────────────────────────────
+  // Conectar el input del hero (#sinp) y el input de destinos (#dest-input)
+  // a la API con debounce 300ms
+  var searchTimer = null;
+
+  function setupSearch() {
+    var inputs = [
+      document.getElementById('sinp'),
+      document.getElementById('dest-input'),
+    ].filter(Boolean);
+
+    inputs.forEach(function (inp) {
+      inp.addEventListener('input', function (e) {
+        var q = e.target.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length === 0) {
+          // Sin búsqueda — restaurar PL completo
+          loadAndRender();
           return;
         }
-
-        var apiData = d.data;
-
-        // ── Reemplazar PL[] ─────────────────────────────────────────
-        PL.length = 0;
-        apiData.forEach(function(item, i) {
-          var foto = item.foto
-            || (item.photos && item.photos[0] ? item.photos[0].url : '')
-            || '';
-          PL.push({
-            id:        i + 1,
-            _uuid:     item.id,
-            slug:      item.slug       || '',
-            name:      item.name       || '',
-            cat:       item.cat        || 'sitio',
-            city:      item.city       || '',
-            region:    item.region     || '',
-            barrio:    item.barrio     || '',
-            address:   '',
-            lead:      item.lead       || '',
-            desc:      item.desc       || item.lead || '',
-            highlight: item.highlight  || '',
-            price:     item.price      || '',
-            emoji:     item.emoji      || '📍',
-            hero_bg:   item.hero_bg    || CAT_COLORS[item.cat] || CAT_COLORS.sitio,
-            rating:    item.rating     || 0,
-            rev:       item.reviews    || 0,
-            whatsapp:  item.whatsapp   || '',
-            tel:       item.tel        || '',
-            email:     item.email      || '',
-            web:       item.web        || '',
-            instagram: item.instagram  || '',
-            booking:   item.booking    || '',
-            hostelworld: item.hostelworld || '',
-            airbnb:    item.airbnb     || '',
-            lat:       item.lat        || 0,
-            lng:       item.lng        || 0,
-            photos:    foto ? [{ type: 'photo', url: foto, cap: item.name || '' }] : [],
-            scores:    {},
-            status:    'published',
-            destacado: item.destacado  || false,
-          });
-          // DEST_PHOTOS{ id_num: url }
-          if (foto) DEST_PHOTOS[i + 1] = foto;
-        });
-
-        // ── DEST_FEATURED_IDS[] ─────────────────────────────────────
-        var featIds = PL
-          .filter(function(p) { return p.destacado; })
-          .map(function(p) { return p.id; });
-        if (!featIds.length) {
-          featIds = PL.slice()
-            .sort(function(a, b) { return b.rating - a.rating; })
-            .slice(0, 10)
-            .map(function(p) { return p.id; });
-        }
-        DEST_FEATURED_IDS.length = 0;
-        featIds.forEach(function(id) { DEST_FEATURED_IDS.push(id); });
-
-        // ── MAPA_PLACES[] ───────────────────────────────────────────
-        MAPA_PLACES.length = 0;
-        apiData.forEach(function(item, i) {
-          if (!item.lat || !item.lng || item.lat === 0 || item.lng === 0) return;
-          MAPA_PLACES.push({
-            id:      i + 1,
-            slug:    item.slug    || '',
-            name:    item.name    || '',
-            cat:     item.cat     || 'sitio',
-            city:    item.city    || '',
-            region:  item.region  || '',
-            rating:  item.rating  || 0,
-            emoji:   item.emoji   || '📍',
-            lat:     parseFloat(item.lat),
-            lng:     parseFloat(item.lng),
-            lead:    item.lead    || '',
-            price:   item.price   || '',
-            hero_bg: item.hero_bg || CAT_COLORS[item.cat] || CAT_COLORS.sitio,
-          });
-        });
-
-        // ── Stats reales ─────────────────────────────────────────────
-        if (d.stats) {
-          var el = function(id) { return document.getElementById(id); };
-          if (el('stat-destinos')) el('stat-destinos').textContent = d.stats.destinos;
-          if (el('stat-ciudades')) el('stat-ciudades').textContent = d.stats.ciudades;
-          if (el('stat-resenas') && d.stats.resenas) {
-            el('stat-resenas').textContent = d.stats.resenas >= 1000
-              ? (d.stats.resenas / 1000).toFixed(1) + 'K'
-              : d.stats.resenas;
-          }
-          if (el('stat-rating') && d.stats.rating) {
-            el('stat-rating').textContent = d.stats.rating + '★';
-          }
-        }
-
-        console.log('[index-api] ✓ ' + PL.length + ' destinos | ' + MAPA_PLACES.length + ' markers');
-
-        // ── Re-render ────────────────────────────────────────────────
-        if (typeof renderDest      === 'function') renderDest();
-        if (typeof initMapaSection === 'function') initMapaSection();
-      })
-      .catch(function(e) {
-        console.warn('[index-api] Error:', e.message);
+        if (q.length < 2) return; // esperar al menos 2 chars
+        searchTimer = setTimeout(function () {
+          fetchAndUpdate(q);
+        }, 300);
       });
+    });
   }
 
-  // Ejecutar después de que el JS inline del index esté listo
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { setTimeout(loadAndRender, 200); });
-  } else {
-    setTimeout(loadAndRender, 200);
+  // ── FETCH Y ACTUALIZAR ─────────────────────────────────────────
+  function fetchAndUpdate(q) {
+    var url = '/api/destinos?limit=500' + (q ? '&q=' + encodeURIComponent(q) : '');
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) { applyData(d, q); })
+      .catch(function (e) { console.warn('[index-api] Error:', e.message); });
   }
+
+  function applyData(d, q) {
+    if (!d.ok || !d.data) {
+      console.warn('[index-api] Sin datos:', d.error || 'vacío');
+      return;
+    }
+
+    var apiData = d.data;
+
+    // 1. PL[]
+    var nuevoPL = apiData.map(toPlace);
+    replArr('PL', nuevoPL);
+
+    // 2. DEST_PHOTOS{}
+    var nuevosPhotos = {};
+    nuevoPL.forEach(function (p) {
+      if (p.photos && p.photos[0]) nuevosPhotos[p.id] = p.photos[0].url;
+    });
+    replObj('DEST_PHOTOS', nuevosPhotos);
+
+    // 3. MAPA_PLACES[] — solo con coords + campo color
+    var nuevoMapa = apiData
+      .filter(function (item) { return item.lat && item.lng && item.lat !== 0 && item.lng !== 0; })
+      .map(function (item) {
+        var idx = apiData.indexOf(item);
+        return toMapPlace(item, idx);
+      });
+    replArr('MAPA_PLACES', nuevoMapa);
+
+    // 4. DEST_FEATURED_IDS[]
+    var featIds = nuevoPL
+      .filter(function (p) { return p.destacado; })
+      .map(function (p) { return p.id; });
+    if (!featIds.length) {
+      featIds = nuevoPL.slice()
+        .sort(function (a, b) { return b.rating - a.rating; })
+        .slice(0, 10)
+        .map(function (p) { return p.id; });
+    }
+    replArr('DEST_FEATURED_IDS', featIds);
+
+    // 5. AGENDA_EVENTS[] — eventos de la DB + los hardcodeados originales
+    var eventosDB = apiData
+      .filter(function (item) { return item.cat === 'evento'; })
+      .map(toAgendaEvent);
+
+    if (eventosDB.length > 0 && typeof AGENDA_EVENTS !== 'undefined') {
+      // Mantener eventos hardcodeados, añadir los de DB al principio si no son duplicados
+      var slugsDB = eventosDB.map(function (e) { return e.url; });
+      var eventosOriginalesFiltrados = AGENDA_EVENTS.filter(function (e) {
+        return !slugsDB.includes(e.url);
+      });
+      replArr('AGENDA_EVENTS', eventosDB.concat(eventosOriginalesFiltrados));
+    }
+
+    // 6. Stats reales (solo en carga inicial, no en búsquedas)
+    if (!q && d.stats) updateStats(d.stats);
+
+    console.log('[index-api] ✓ PL:' + nuevoPL.length
+      + ' | mapa:' + nuevoMapa.length
+      + (q ? ' | búsqueda:"' + q + '"' : ''));
+
+    // 7. Re-render
+    if (typeof renderDest      === 'function') renderDest();
+    if (typeof renderAgenda    === 'function') renderAgenda(
+      typeof agendaCat !== 'undefined' ? agendaCat : 'all'
+    );
+    // Reiniciar mapa solo en carga inicial (no en búsquedas)
+    if (!q) {
+      if (typeof mapaMap !== 'undefined' && mapaMap) {
+        // Mapa ya inicializado — actualizar markers
+        if (typeof mapaMarkers !== 'undefined') {
+          Object.keys(mapaMarkers).forEach(function (k) {
+            try { mapaMap.removeLayer(mapaMarkers[k]); } catch (_) {}
+          });
+          window.mapaMarkers = {};
+        }
+        if (typeof initMapaSection === 'function') {
+          window.mapaMap = null; // forzar re-init
+          initMapaSection();
+        }
+      }
+    }
+  }
+
+  function loadAndRender() {
+    fetchAndUpdate('');
+  }
+
+  // ── INIT ───────────────────────────────────────────────────────
+  function init() {
+    loadAndRender();
+    setupSearch();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 200); });
+  } else {
+    setTimeout(init, 200);
+  }
+
 }());
