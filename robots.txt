@@ -1,5 +1,11 @@
 User-agent: *
 Allow: /
 Disallow: /admin.html
+Disallow: /api/
+Disallow: /diagnostico
 
-Sitemap: https://exploracо.co/sitemap.xml
+# Permitir el sitemap a todos los bots
+Sitemap: https://exploraco.co/sitemap.xml
+
+# Crawl-delay para bots que lo respetan
+Crawl-delay: 1
