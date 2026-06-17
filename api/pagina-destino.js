@@ -446,3 +446,10 @@ a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
 </body></html>`);
   }
 };
+
+// Registrar visita
+fetch('/api/visitas', {
+  method: 'POST',
+  headers: {'Content-Type':'application/json'},
+  body: JSON.stringify({ destino_id: DID })
+}).catch(function(){});
