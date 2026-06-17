@@ -565,34 +565,75 @@ function filtrarMapa(cat, btn) {
 // ── Cargar y renderizar reseñas del usuario ──────────────
 async function cargarResenas() {
   var u = window.ExploraCO && window.ExploraCO.usuario;
-  if(!u) return;
+  if (!u) return;
   var list = document.getElementById('resenas-list');
-  try {
-    // Cargar los destinos donde el usuario ha hecho reseñas
-    // Usamos los guardados como proxy (mejora futura: endpoint específico)
-    var res  = await fetch(API+'/api/destinos?limit=200');
-    var data = await res.json();
-    if(!data.ok) throw new Error('Sin datos');
+  list.innerHTML = '<div class="skeleton" style="height:100px;border-radius:10px;margin-bottom:10px"></div>'
+    + '<div class="skeleton" style="height:100px;border-radius:10px"></div>';
 
-    // Buscar reseñas en las interacciones
-    var resenasRes = await fetch(API+'/api/interacciones?tipo=resenas&destino_id='
-      + (data.data[0]?.id||'') + '&limit=1');
-    // Nota: el API actual no filtra por usuario — mostramos mensaje orientativo
-    list.innerHTML = [
-      '<div class="resenas-empty">',
-      '  <div class="resenas-empty-icon">⭐</div>',
-      '  <div style="font-weight:700;margin-bottom:6px">Tus reseñas publicadas</div>',
-      '  <div style="font-size:12px;color:var(--muted);line-height:1.6">',
-      '    Visita los hostales y lugares que hayas visitado y escribe tu experiencia.<br>',
-      '    Cada reseña suma <strong>+25 XP</strong> a tu perfil.',
-      '  </div>',
-      '  <a href="directorio-hostal.html" style="display:inline-block;margin-top:16px;padding:9px 20px;background:var(--gold);color:#000;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700">',
-      '    Explorar hospedajes →',
-      '  </a>',
-      '</div>',
-    ].join('');
+  try {
+    var res  = await fetch(API + '/api/mis-resenas?usuario_id=' + u.id);
+    var data = await res.json();
+
+    if (!data.ok) throw new Error(data.error || 'Error al cargar');
+
+    if (!data.data || !data.data.length) {
+      list.innerHTML = [
+        '<div class="resenas-empty">',
+        '  <div class="resenas-empty-icon">⭐</div>',
+        '  <div style="font-weight:700;margin-bottom:6px">Aún no tienes reseñas</div>',
+        '  <div style="font-size:12px;color:var(--muted);line-height:1.6">',
+        '    Visita hostales y lugares, y comparte tu experiencia.<br>',
+        '    Cada reseña suma <strong>+25 XP</strong> a tu perfil.',
+        '  </div>',
+        '  <a href="directorio-hostal.html" style="display:inline-block;margin-top:16px;padding:9px 20px;background:var(--gold);color:#000;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700">',
+        '    Explorar lugares →',
+        '  </a>',
+        '</div>',
+      ].join('');
+      return;
+    }
+
+    // Guardar para el XP log
+    misResenas = data.data;
+
+    // Renderizar tarjetas de reseña
+    list.innerHTML = data.data.map(function(r) {
+      var stars = [1,2,3,4,5].map(function(x){
+        return '<span style="color:'+(x<=Math.round(r.rating||0)?'#E8A020':'#ddd')+'">★</span>';
+      }).join('');
+      var fecha = r.fecha
+        ? new Date(r.fecha).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})
+        : '';
+      var foto = r.destino.foto || '';
+      var heroStyle = foto
+        ? 'background:url('+foto+') center/cover;height:60px;border-radius:8px 8px 0 0'
+        : 'background:linear-gradient(135deg,#1a1a2e,#16213e);height:60px;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff';
+
+      return [
+        '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)">',
+        '  <div style="'+heroStyle+'">'+(foto?'':'(CAT_EMOJI[r.destino.categoria]||"📍")')+'</div>',
+        '  <div style="padding:12px 14px">',
+        '    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">',
+        '      <a href="'+r.destino.slug+'.html" style="font-size:13px;font-weight:700;color:var(--text);text-decoration:none">'+r.destino.nombre+'</a>',
+        '      <span style="font-size:10px;color:var(--muted);white-space:nowrap">'+fecha+'</span>',
+        '    </div>',
+        '    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">📍 '+r.destino.ciudad+'</div>',
+        '    <div style="margin-bottom:6px">'+stars+'</div>',
+        '    '+(r.texto ? '<div style="font-size:12px;color:#444;line-height:1.55;background:#f9f7f4;border-radius:6px;padding:8px">'+r.texto+'</div>' : '<div style="font-size:11px;color:var(--muted);font-style:italic">Solo puntuación</div>'),
+        '    <div style="font-size:10px;color:#22c55e;font-weight:700;margin-top:6px">+'+( r.xp||0)+' XP ganado</div>',
+        '  </div>',
+        '</div>',
+      ].join('');
+    }).join('');
+
+    // Actualizar contador en stats del resumen
+    var stResenas = document.getElementById('st-resenas');
+    if (stResenas) stResenas.textContent = data.total;
+
   } catch(err) {
-    list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12px">Error cargando reseñas: '+err.message+'</div>';
+    list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center">'
+      + '<div style="font-size:24px;margin-bottom:8px">⚠️</div>'
+      + 'Error cargando reseñas: '+err.message+'</div>';
   }
 }
 
