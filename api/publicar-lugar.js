@@ -133,6 +133,30 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // Notificar al admin de nueva solicitud (fire & forget)
+    try {
+      fetch(
+        (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app')
+        + '/api/notificaciones',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Secret': process.env.ADMIN_SECRET || 'exploraco12345',
+          },
+          body: JSON.stringify({
+            tipo:             'solicitud',
+            nombre:           String(data.nombre).trim(),
+            categoria:        catSlug,
+            ciudad:           String(data.ciudad).trim(),
+            whatsapp:         data.whatsapp || '',
+            descripcion_corta:String(data.descripcion_corta).trim(),
+            precio_desde:     precio || '',
+          }),
+        }
+      ).catch(function() {});
+    } catch(_) {}
+
     return res.status(200).json({
       ok: true,
       mensaje: '¡Solicitud recibida! El equipo revisará y publicará tu lugar en 24-48h.',

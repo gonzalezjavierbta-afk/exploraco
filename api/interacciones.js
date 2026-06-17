@@ -146,6 +146,36 @@ module.exports = async function handler(req, res) {
           ).catch(function(){});
         }
 
+        // Notificar al admin (no bloquea la respuesta)
+        try {
+          var destinoInfo = await sql(
+            'SELECT nombre, ciudad, slug FROM destinos WHERE id=$1 LIMIT 1',
+            [destinoId2]
+          );
+          if (destinoInfo.length > 0) {
+            fetch(
+              (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app')
+              + '/api/notificaciones',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Internal-Secret': process.env.ADMIN_SECRET || 'exploraco12345',
+                },
+                body: JSON.stringify({
+                  tipo:            'resena',
+                  rating:          ratingVal,
+                  texto:           textoFinal,
+                  usuario_nombre:  body.usuario_nombre || 'Visitante',
+                  destino_nombre:  destinoInfo[0].nombre,
+                  destino_ciudad:  destinoInfo[0].ciudad,
+                  destino_slug:    destinoInfo[0].slug,
+                }),
+              }
+            ).catch(function() {}); // fire & forget
+          }
+        } catch(_) {}
+
         return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado });
       }
 

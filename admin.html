@@ -1368,28 +1368,21 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="ws-header">
     <div>
       <div class="ws-title">RESEÑAS</div>
-      <div class="ws-subtitle">Reseñas de viajeros por lugar</div>
+      <div class="ws-subtitle">Reseñas de viajeros — leídas en tiempo real desde Neon DB</div>
     </div>
     <div class="ws-actions">
-      <button class="btn btn-ghost btn-sm" onclick="renderReviews()">⟳ Actualizar</button>
+      <input type="text" id="rv-filter-slug" placeholder="Filtrar por slug de lugar..."
+        style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;width:220px;font-family:'Outfit',sans-serif"
+        oninput="_rvSlugFilter=this.value.trim();_rvPage=0;renderReviews()">
+      <button class="btn btn-ghost btn-sm" onclick="_rvSlugFilter='';_rvPage=0;document.getElementById('rv-filter-slug').value='';renderReviews()">✕ Limpiar</button>
+      <button class="btn btn-ghost btn-sm" onclick="renderReviews()">↺ Actualizar</button>
     </div>
   </div>
-  <div class="ws-body" style="padding:20px">
-    <div id="reviews-container" style="display:flex;flex-direction:column;gap:12px">
-      <div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">
-        Selecciona un lugar para ver sus reseñas
-        <div style="margin-top:20px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px">
-          <div style="font-weight:700;font-size:13px;color:#166534;margin-bottom:10px">🚀 Cómo publicar en Netlify</div>
-          <div style="font-size:12px;color:#166534;line-height:2.2">
-            <strong>✅ Opción A — Un clic (recomendada):</strong><br>
-            1. Clic en <strong>🚀 Publicar todo (ZIP)</strong><br>
-            2. Arrastra el ZIP a <a href="https://app.netlify.com" target="_blank" style="color:#166534;font-weight:700">app.netlify.com → Deploys → drag &amp; drop</a><br><br>
-            <strong>📋 Opción B — Manual:</strong><br>
-            1. Clic <strong>⟳ Regenerar código</strong> → Copiar <code>const PL[...]</code><br>
-            2. Pegar en <code>index.html</code> y en cada <code>directorio-*.html</code><br>
-            3. Subir archivos modificados a Netlify
-          </div>
-        </div>
+  <div class="ws-body" style="overflow-y:auto;flex:1;padding:20px">
+    <div id="reviews-container" style="display:flex;flex-direction:column;gap:10px">
+      <div style="text-align:center;padding:40px;color:var(--muted)">
+        <div style="font-size:24px;margin-bottom:8px">⭐</div>
+        <div style="font-size:13px">Cargando reseñas...</div>
       </div>
     </div>
   </div>
@@ -2961,61 +2954,112 @@ function restoreFromBackup(input) {
 }
 
 /* ── REVIEWS MANAGER ── */
-function renderReviews() {
+// ── renderReviews — lee de Neon DB (no de localStorage) ──────────
+var _rvPage = 0;
+var _rvLimit = 30;
+var _rvSlugFilter = '';
+
+async function renderReviews() {
   var c = document.getElementById('reviews-container');
-  var allRvs = [];
-  // Scan localStorage for all rv_ keys
-  for(var i=0;i<localStorage.length;i++){
-    var key = localStorage.key(i);
-    if(key && key.startsWith('rv_')) {
-      try {
-        var rvs = JSON.parse(localStorage.getItem(key)||'[]');
-        var slug = key.replace('rv_','');
-        rvs.forEach(function(r){
-          allRvs.push(Object.assign({},r,{slug:slug,lsKey:key}));
-        });
-      } catch(e){}
-    }
-  }
-  if(!allRvs.length) {
-    c.innerHTML='<div class="empty-state"><div class="es-icon">⭐</div><div class="es-text">Sin reseñas aún</div><div class="es-sub">Las reseñas publicadas por viajeros en el sitio aparecerán aquí</div></div>';
-    return;
-  }
-  allRvs.sort(function(a,b){ return (b.d||'').localeCompare(a.d||''); });
-  c.innerHTML = allRvs.map(function(r,i){
-    var stars = [1,2,3,4,5].map(function(x){ return '<span style="color:'+(x<=r.s?'var(--gold)':'var(--border)')+'">★</span>'; }).join('');
-    return '<div class="rv-manage-card">'
-      +'<div style="flex:1">'
-      +'<div class="rvm-stars">'+stars+'</div>'
-      +'<div class="rvm-text">'+( r.t||'')+'</div>'
-      +'<div class="rvm-meta">'+r.n+' · '+r.d+' · <code style="font-size:10px">'+r.slug+'</code></div>'
-      +'</div>'
-      +'<button class="btn btn-danger btn-sm" onclick="deleteReview(\''+r.lsKey+'\','+i+')">✕</button>'
-      +'</div>';
-  }).join('');
-}
-function deleteReview(key, idx) {
+  c.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">⏳</div>Cargando reseñas desde DB...</div>';
+
   try {
-    var rvs = JSON.parse(localStorage.getItem(key)||'[]');
-    // Can't easily match by idx across slugs; clear all for this key
-    if(confirm('¿Eliminar esta reseña?')) {
-      rvs.splice(0,1); // simplified — removes first matching
-      localStorage.setItem(key, JSON.stringify(rvs));
-      renderReviews();
-      showAdminToast('Reseña eliminada');
+    var url = '/api/resenas-admin?limit='+_rvLimit+'&offset='+(_rvPage*_rvLimit);
+    if (_rvSlugFilter) url += '&slug=' + encodeURIComponent(_rvSlugFilter);
+
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = await resp.json();
+
+    if (!data.ok) throw new Error(data.error || 'Error al cargar');
+
+    // Stats banner
+    var st = data.stats || {};
+    var statsBanner = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
+      + _rvStatChip('Total', st.total || 0, 'var(--text)')
+      + _rvStatChip('Promedio', st.rating_promedio ? Number(st.rating_promedio).toFixed(1)+'⭐' : '—', '#E8A020')
+      + _rvStatChip('Positivas ≥4★', st.positivas || 0, 'var(--green)')
+      + _rvStatChip('Negativas ≤2★', st.negativas || 0, 'var(--red)')
+      + '</div>';
+
+    if (!data.data || !data.data.length) {
+      c.innerHTML = statsBanner
+        + '<div class="empty-state"><div class="es-icon">⭐</div>'
+        + '<div class="es-text">Sin reseñas'+(_rvSlugFilter?' para este lugar':'')+'</div>'
+        + '<div class="es-sub">Las reseñas de viajeros aparecen aquí en tiempo real</div></div>';
+      return;
     }
-  } catch(e) {}
-}
-function clearAllReviews() {
-  if(!confirm('¿Borrar TODAS las reseñas del sitio? Esta acción no se puede deshacer.')) return;
-  var keys = [];
-  for(var i=0;i<localStorage.length;i++){
-    var k=localStorage.key(i);
-    if(k&&k.startsWith('rv_')) keys.push(k);
+
+    var cards = data.data.map(function(r) {
+      var stars = [1,2,3,4,5].map(function(x){
+        return '<span style="color:'+(x<=Math.round(r.rating||0)?'#f5a623':'var(--border)')+'">★</span>';
+      }).join('');
+      var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+
+      return '<div class="rv-manage-card">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        + '<div class="rvm-stars">'+stars+'</div>'
+        + '<span style="font-size:11px;font-weight:700;color:var(--muted)">'+escH(r.usuario.nombre)+'</span>'
+        + '</div>'
+        + (r.texto ? '<div class="rvm-text">'+escH(r.texto)+'</div>' : '<div class="rvm-text" style="color:var(--muted);font-style:italic">Sin texto</div>')
+        + '<div class="rvm-meta">'
+        + '<a href="/'+escH(r.destino.slug)+'.html" target="_blank" style="color:var(--text);font-weight:600">'+escH(r.destino.nombre)+'</a>'
+        + ' · '+escH(r.destino.ciudad||'')
+        + ' · '+fecha
+        + ' · <span style="color:var(--green);font-weight:700">+'+( r.xp||0)+' XP</span>'
+        + '</div>'
+        + '</div>'
+        + '<button class="btn btn-danger btn-sm" onclick="deleteReviewDB(\''+escH(r.id)+'\')">✕</button>'
+        + '</div>';
+    }).join('');
+
+    // Paginación
+    var totalPages = Math.ceil((data.total || 0) / _rvLimit);
+    var pag = totalPages > 1
+      ? '<div style="display:flex;gap:6px;justify-content:center;margin-top:16px;flex-wrap:wrap">'
+        + Array.from({length: totalPages}, function(_, i) {
+            return '<button onclick="_rvPage='+i+';renderReviews()" style="padding:4px 10px;border:1.5px solid '
+              +(i===_rvPage?'var(--black)':'var(--border)')
+              +';border-radius:6px;background:'+(i===_rvPage?'var(--black)':'var(--white)')
+              +';color:'+(i===_rvPage?'var(--white)':'var(--text)')
+              +';cursor:pointer;font-size:11px">'+(i+1)+'</button>';
+          }).join('')
+        + '</div>'
+      : '';
+
+    c.innerHTML = statsBanner + cards + pag;
+
+  } catch(err) {
+    c.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div>'
+      + '<div class="es-text" style="color:var(--red)">'+escH(err.message)+'</div></div>';
   }
-  keys.forEach(function(k){ localStorage.removeItem(k); });
-  showAdminToast('✓ '+keys.length+' grupos de reseñas eliminados');
-  renderReviews();
+}
+
+function _rvStatChip(label, val, color) {
+  return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px">'
+    + '<div style="font-weight:800;font-size:16px;color:'+color+'">'+val+'</div>'
+    + '<div style="color:var(--muted);margin-top:2px">'+label+'</div>'
+    + '</div>';
+}
+
+async function deleteReviewDB(id) {
+  if (!confirm('¿Eliminar esta reseña? Esta acción no se puede deshacer.')) return;
+  try {
+    var resp = await fetch('/api/resenas-admin?id='+encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: _adminHeaders(),
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    showAdminToast('✓ Reseña eliminada');
+    renderReviews();
+  } catch(err) {
+    showAdminToast('Error: '+err.message, 'error');
+  }
+}
+
+function clearAllReviews() {
+  showAdminToast('Para eliminar reseñas, hazlo desde el panel de Reseñas una por una.');
 }
 
 /* ── HELPERS ── */
