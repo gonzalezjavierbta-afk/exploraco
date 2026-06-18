@@ -432,6 +432,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div style="padding:0 16px;font-size:11px;color:rgba(255,255,255,.4)">Panel de contenido</div>
   <div class="tb-right">
     <button onclick="publishAll()" style="background:#16a34a;color:#fff;border:none;padding:6px 14px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px">🚀 Publicar todo</button>
+    <button onclick="migrarFotosANeon()" title="Migrar fotos de galería de localStorage a Neon DB (Paso 17)" style="background:#6366f1;color:#fff;border:none;padding:6px 14px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px">🖼️ Migrar fotos</button>
     <a href="index.html" target="_blank" class="tb-preview-btn">↗ Ver sitio</a>
     <span id="db-status-badge" style="
       display:none;padding:3px 10px;border-radius:20px;
@@ -3630,6 +3631,23 @@ function _adminHeaders() {
 }
 
 function _placeToAPI(p) {
+  // Foto hero = primera foto del array
+  var fotoHero = '';
+  if (p.photos && p.photos.length > 0) {
+    var first = p.photos[0];
+    fotoHero = typeof first === 'string' ? first : (first.url || '');
+  }
+
+  // Galería = fotos 2 en adelante (excluye la hero)
+  var galeriaUrls = [];
+  if (p.photos && p.photos.length > 1) {
+    for (var i = 1; i < p.photos.length; i++) {
+      var f = p.photos[i];
+      var url = typeof f === 'string' ? f : (f.url || '');
+      if (url) galeriaUrls.push({ url: url, caption: f.cap || f.caption || '', orden: i });
+    }
+  }
+
   return {
     slug:          p.slug||'',
     nombre:        p.name||'',
@@ -3652,7 +3670,8 @@ function _placeToAPI(p) {
     price:         p.price||'',
     emoji:         p.emoji||'📍',
     hero_bg:       p.hero_bg||'',
-    foto_hero:     (p.photos&&p.photos[0]) ? (typeof p.photos[0]==='string'?p.photos[0]:(p.photos[0].url||'')) : '',
+    foto_hero:     fotoHero,
+    fotos_galeria: galeriaUrls,   // ← NUEVO: galería completa para destinos_fotos
     rating:        p.rating||0,
     reviews:       p.reviews||0,
     status:        p.status||'published',
@@ -3682,6 +3701,7 @@ async function _syncToNeon(p) {
       res  = await fetch('/api/admin-destinos?id='+uuid, {
         method:'PUT', headers:_adminHeaders(), body:JSON.stringify(payload)
       });
+      data = await res.json();
     } else {
       // CREATE
       res  = await fetch('/api/admin-destinos', {
@@ -3689,15 +3709,81 @@ async function _syncToNeon(p) {
       });
       data = await res.json();
       if(data.ok && data.data && data.data.id) {
-        _localToUUID[p.id] = data.data.id;
+        uuid = data.data.id;
+        _localToUUID[p.id] = uuid;
         localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
       }
-      return data;
     }
-    return await res.json();
+
+    // ── Sincronizar galería a destinos_fotos ──────────────────────
+    // Solo si hay uuid y hay fotos de galería (fotos 2 en adelante)
+    if (uuid && payload.fotos_galeria && payload.fotos_galeria.length > 0) {
+      _syncFotosGaleria(uuid, payload.fotos_galeria).catch(function(e){
+        console.warn('[admin-fotos] sync galería error:', e.message);
+      });
+    }
+
+    return data || await res.json();
   } catch(err) {
     console.warn('[admin-online] syncToNeon error:', err.message);
     return { ok:false, error:err.message };
+  }
+}
+
+// Sincroniza el array de fotos de galería a destinos_fotos en Neon
+async function _syncFotosGaleria(destinoUUID, fotos) {
+  try {
+    var r = await fetch('/api/fotos', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({
+        destino_id: destinoUUID,
+        fotos: fotos,
+      })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      console.log('[admin-fotos] '+d.mensaje);
+    }
+    return d;
+  } catch(e) {
+    console.warn('[admin-fotos] error:', e.message);
+  }
+}
+
+// Cargar fotos desde Neon al editar un lugar
+async function _cargarFotosDeNeon(destinoUUID, localId) {
+  if (!destinoUUID) return;
+  try {
+    var r = await fetch('/api/fotos?destino_id='+destinoUUID, {
+      headers: _adminHeaders()
+    });
+    var d = await r.json();
+    if (!d.ok || !d.data || !d.data.length) return;
+
+    // Buscar el lugar en PL[] y actualizar sus photos
+    var lugar = PL.find(function(p){ return p.id == localId; });
+    if (!lugar) return;
+
+    // Reconstruir photos[]: hero primero, luego galería ordenada
+    var todasFotos = d.data.map(function(f){
+      return { url: f.url, cap: f.caption || '', id_neon: f.id, es_hero: f.es_hero };
+    });
+
+    // Si no hay fotos en el array local, reemplazar con las de Neon
+    if (!lugar.photos || !lugar.photos.length) {
+      lugar.photos = todasFotos.map(function(f){ return { type:'photo', url:f.url, cap:f.cap }; });
+      // Guardar en localStorage para persistir
+      var lsKey = 'place_'+localId;
+      try {
+        var ls = JSON.parse(localStorage.getItem(lsKey)||'{}');
+        ls.photos = lugar.photos;
+        localStorage.setItem(lsKey, JSON.stringify(ls));
+      } catch(_) {}
+      console.log('[admin-fotos] '+todasFotos.length+' fotos cargadas de Neon para lugar '+localId);
+    }
+  } catch(e) {
+    console.warn('[admin-fotos] cargar error:', e.message);
   }
 }
 
@@ -3725,6 +3811,60 @@ function _showDBStatus(text, color) {
 }
 
 /* ── Sincronización inicial: cargar UUIDs desde DB ── */
+// ── MIGRACIÓN MASIVA: localStorage → Neon (Paso 17) ─────────────
+// Ejecutar UNA SOLA VEZ para migrar todas las fotos existentes
+async function migrarFotosANeon() {
+  var lugares = places.filter(function(p){
+    return p.photos && p.photos.length > 1; // solo los que tienen galería
+  });
+
+  if (!lugares.length) {
+    showAdminToast('No hay lugares con galería de fotos en localStorage', 'error');
+    return;
+  }
+
+  if (!confirm('Migrar fotos de galería de ' + lugares.length + ' lugares a Neon DB.\n\nEsto puede tardar unos segundos. ¿Continuar?')) return;
+
+  showAdminToast('⏳ Migrando fotos a Neon...', '');
+  var ok = 0, errors = 0, totalFotos = 0;
+
+  for (var i = 0; i < lugares.length; i++) {
+    var p    = lugares[i];
+    var uuid = _localToUUID[p.id];
+    if (!uuid) continue; // no está sincronizado aún
+
+    // Fotos 2 en adelante (la hero ya está en foto_hero)
+    var galeria = [];
+    for (var j = 1; j < p.photos.length; j++) {
+      var f = p.photos[j];
+      var url = typeof f === 'string' ? f : (f.url || '');
+      if (url) galeria.push({ url: url, caption: f.cap || f.caption || '', orden: j });
+    }
+
+    if (!galeria.length) continue;
+
+    try {
+      var r = await fetch('/api/fotos', {
+        method: 'POST',
+        headers: _adminHeaders(),
+        body: JSON.stringify({ destino_id: uuid, fotos: galeria })
+      });
+      var d = await r.json();
+      if (d.ok) { ok++; totalFotos += galeria.length; }
+      else { errors++; console.warn('[migrar-fotos] ' + p.name + ':', d.error); }
+    } catch(e) {
+      errors++;
+      console.warn('[migrar-fotos] ' + p.name + ':', e.message);
+    }
+  }
+
+  if (errors === 0) {
+    showAdminToast('✅ ' + totalFotos + ' fotos migradas de ' + ok + ' lugares a Neon', 'success');
+  } else {
+    showAdminToast('✓ ' + ok + ' ok · ' + errors + ' errores — ver consola', '');
+  }
+}
+
 async function syncFromNeon() {
   _showDBStatus('⏳ Conectando...', '#f59e0b');
   try {
@@ -3733,10 +3873,17 @@ async function syncFromNeon() {
     if(!data.ok) throw new Error(data.error||'Error');
 
     // Mapear slugs/nombres locales → UUIDs de Neon
+    // También cargar fotos de Neon para enriquecer lugares locales
     data.data.forEach(function(d) {
-      // Buscar por slug en places locales
       var local = places.find(function(p){ return p.slug===d.slug || p.name===d.nombre; });
-      if(local) _localToUUID[local.id] = d.id;
+      if (local) {
+        _localToUUID[local.id] = d.id;
+
+        // Si el lugar local no tiene fotos, cargarlas de Neon en background
+        if (!local.photos || !local.photos.length) {
+          _cargarFotosDeNeon(d.id, local.id);
+        }
+      }
     });
     localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
 
