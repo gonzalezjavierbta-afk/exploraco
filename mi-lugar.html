@@ -195,10 +195,10 @@ async function init() {
   try {
     // Cargar stats de visitas y destacado en paralelo
     var [visitasRes, destRes] = await Promise.all([
-      fetch(API+'/api/visitas?slug='+encodeURIComponent(slug), {
+      fetch(API+'/api/utilidades?tipo=visitas&slug='+encodeURIComponent(slug), {
         headers: { Authorization: 'Bearer exploraco12345' }
       }),
-      fetch(API+'/api/destacar?slug='+encodeURIComponent(slug), {
+      fetch(API+'/api/admin?recurso=destacado&slug='+encodeURIComponent(slug), {
         headers: { Authorization: 'Bearer exploraco12345' }
       }),
     ]);
@@ -311,7 +311,7 @@ async function renderResenas(slug) {
   panel.innerHTML = '<div class="skeleton" style="height:80px;margin-bottom:8px"></div>';
 
   try {
-    var res  = await fetch(API+'/api/resenas-admin?slug='+encodeURIComponent(slug)+'&limit=5', {
+    var res  = await fetch(API+'/api/admin?recurso=resenas&slug='+encodeURIComponent(slug)+'&limit=5', {
       headers: { Authorization: 'Bearer exploraco12345' }
     });
     var data = await res.json();

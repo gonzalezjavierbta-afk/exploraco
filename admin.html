@@ -2964,7 +2964,7 @@ async function renderReviews() {
   c.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">⏳</div>Cargando reseñas desde DB...</div>';
 
   try {
-    var url = '/api/resenas-admin?limit='+_rvLimit+'&offset='+(_rvPage*_rvLimit);
+    var url = '/api/admin?recurso=resenas&limit='+_rvLimit+'&offset='+(_rvPage*_rvLimit);
     if (_rvSlugFilter) url += '&slug=' + encodeURIComponent(_rvSlugFilter);
 
     var resp = await fetch(url, { headers: _adminHeaders() });
@@ -3045,7 +3045,7 @@ function _rvStatChip(label, val, color) {
 async function deleteReviewDB(id) {
   if (!confirm('¿Eliminar esta reseña? Esta acción no se puede deshacer.')) return;
   try {
-    var resp = await fetch('/api/resenas-admin?id='+encodeURIComponent(id), {
+    var resp = await fetch('/api/admin?recurso=resenas&id='+encodeURIComponent(id), {
       method: 'DELETE',
       headers: _adminHeaders(),
     });
@@ -3780,7 +3780,7 @@ async function loadPendientes() {
   lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">⏳</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">Cargando...</div></div>';
 
   try {
-    var url = '/api/moderar-destinos?status='+_modFilter+'&limit='+_modLimit+'&offset='+(_modPage*_modLimit);
+    var url = '/api/admin?recurso=solicitudes&status='+_modFilter+'&limit='+_modLimit+'&offset='+(_modPage*_modLimit);
     var resp = await fetch(url, { headers: _adminHeaders() });
     var data = await resp.json();
     if(!data.ok) throw new Error(data.error || 'Error al cargar');
@@ -3890,7 +3890,7 @@ async function moderarDestino(id, accion) {
   if(card) card.style.opacity = '.5';
 
   try {
-    var resp = await fetch('/api/moderar-destinos', {
+    var resp = await fetch('/api/admin?recurso=solicitudes', {
       method: 'POST',
       headers: _adminHeaders(),
       body: JSON.stringify({ id: id, accion: accion })
@@ -3941,7 +3941,7 @@ function _updatePendingBadge(n) {
 
 async function _checkPendingBadge() {
   try {
-    var resp = await fetch('/api/moderar-destinos?status=draft&limit=1', { headers: _adminHeaders() });
+    var resp = await fetch('/api/admin?recurso=solicitudes&status=draft&limit=1', { headers: _adminHeaders() });
     var data = await resp.json();
     if(data.ok) _updatePendingBadge(data.total);
   } catch(e) {}
