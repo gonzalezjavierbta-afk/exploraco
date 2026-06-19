@@ -491,38 +491,41 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 <!-- ════ DASHBOARD ════ -->
 <div class="ws-screen active" id="screen-dashboard">
   <div class="ws-header">
-    <div><div class="ws-title">DASHBOARD</div><div class="ws-subtitle">Resumen del contenido de ExploraCO</div></div>
+    <div><div class="ws-title">DASHBOARD</div><div class="ws-subtitle">Analítica en tiempo real desde Neon DB</div></div>
     <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="renderDashboard()">↺ Actualizar</button>
       <button class="btn btn-gold" onclick="showScreen('editor-nuevo')">+ Nuevo lugar</button>
     </div>
   </div>
-  <!-- Stats -->
+
+  <!-- Stats principales -->
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-num" id="ds-total">0</div>
+      <div class="stat-num" id="ds-total">—</div>
       <div class="stat-label">Total lugares</div>
-      <div class="stat-sub" id="ds-pub-sub">0 publicados</div>
+      <div class="stat-sub" id="ds-pub-sub">cargando...</div>
       <div class="stat-bar"><div class="stat-bar-fill" id="ds-pub-bar" style="width:0%;background:var(--green)"></div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-num" id="ds-pub">0</div>
-      <div class="stat-label">Publicados</div>
-      <div class="stat-sub">Visibles en el sitio</div>
-      <div class="stat-bar"><div class="stat-bar-fill" id="ds-pub-bar2" style="width:0%;background:var(--green)"></div></div>
+      <div class="stat-num" id="ds-resenas">—</div>
+      <div class="stat-label">Reseñas totales</div>
+      <div class="stat-sub" id="ds-rating-sub">rating promedio</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="ds-rat-bar" style="width:0%;background:var(--gold)"></div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-num" id="ds-draft">0</div>
-      <div class="stat-label">Borradores</div>
-      <div class="stat-sub">Pendientes de publicar</div>
-      <div class="stat-bar"><div class="stat-bar-fill" id="ds-dft-bar" style="width:0%;background:var(--gold)"></div></div>
+      <div class="stat-num" id="ds-visitas">—</div>
+      <div class="stat-label">Visitas (30 días)</div>
+      <div class="stat-sub" id="ds-visitas-sub">últimos 30 días</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="ds-vis-bar" style="width:0%;background:var(--blue)"></div></div>
     </div>
     <div class="stat-card">
-      <div class="stat-num" id="ds-cities">0</div>
-      <div class="stat-label">Ciudades</div>
-      <div class="stat-sub">Ciudades con contenido</div>
-      <div class="stat-bar"><div class="stat-bar-fill" id="ds-cit-bar" style="width:60%;background:var(--blue)"></div></div>
+      <div class="stat-num" id="ds-usuarios">—</div>
+      <div class="stat-label">Viajeros registrados</div>
+      <div class="stat-sub" id="ds-usuarios-sub">en la plataforma</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="ds-usr-bar" style="width:60%;background:#8b5cf6"></div></div>
     </div>
   </div>
+
   <!-- Quick actions -->
   <div class="quick-actions">
     <div class="qa-card" onclick="showScreen('editor-nuevo')">
@@ -533,10 +536,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div class="qa-icon">📥</div>
       <div><div class="qa-label">Importar CSV</div><div class="qa-sub">Subir varios a la vez</div></div>
     </div>
-    <div class="qa-card" onclick="showScreen('exportar')">
-      <div class="qa-icon">📤</div>
-      <div><div class="qa-label">Exportar código</div><div class="qa-sub">Actualizar index.html</div></div>
-    </div>
     <div class="qa-card" onclick="showScreen('reviews')">
       <div class="qa-icon">⭐</div>
       <div><div class="qa-label">Ver reseñas</div><div class="qa-sub">Gestionar comentarios</div></div>
@@ -546,17 +545,52 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div><div class="qa-label">Solicitudes</div><div class="qa-sub" id="qa-mod-sub">Aprobar publicaciones</div></div>
     </div>
   </div>
-  <!-- Recent + category breakdown -->
+
+  <!-- Analítica: fila 1 -->
   <div class="dashboard-body">
+    <!-- Top lugares más visitados -->
     <div class="dash-panel">
-      <div class="dp-header"><div class="dp-title">Últimos lugares editados</div><button class="btn btn-ghost btn-sm" onclick="showScreen('tabla')">Ver todos</button></div>
-      <div id="dp-recent-list"><div class="empty-state"><div class="es-icon">📝</div><div class="es-text">Sin lugares aún</div></div></div>
+      <div class="dp-header">
+        <div class="dp-title">🔥 Lugares más visitados (30 días)</div>
+      </div>
+      <div id="dp-top-visitas">
+        <div class="empty-state"><div class="es-icon">📊</div><div class="es-text">Cargando...</div></div>
+      </div>
     </div>
+    <!-- Reseñas recientes -->
     <div class="dash-panel">
-      <div class="dp-header"><div class="dp-title">Por categoría</div></div>
-      <div id="dp-cat-breakdown"></div>
+      <div class="dp-header">
+        <div class="dp-title">💬 Reseñas recientes</div>
+        <button class="btn btn-ghost btn-sm" onclick="showScreen('reviews')">Ver todas</button>
+      </div>
+      <div id="dp-resenas-recientes">
+        <div class="empty-state"><div class="es-icon">⭐</div><div class="es-text">Cargando...</div></div>
+      </div>
     </div>
   </div>
+
+  <!-- Analítica: fila 2 -->
+  <div class="dashboard-body" style="margin-top:0">
+    <!-- Por categoría -->
+    <div class="dash-panel">
+      <div class="dp-header"><div class="dp-title">📁 Por categoría</div></div>
+      <div id="dp-cat-breakdown"></div>
+    </div>
+    <!-- Top ciudades -->
+    <div class="dash-panel">
+      <div class="dp-header"><div class="dp-title">📍 Top ciudades</div></div>
+      <div id="dp-top-ciudades">
+        <div class="empty-state"><div class="es-icon">🏙️</div><div class="es-text">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solicitudes pendientes (si hay) -->
+  <div id="dp-pendientes-banner" style="display:none;margin:0 0 16px;background:#fff8ec;border:1.5px solid var(--gold);border-radius:var(--r);padding:14px 18px;display:none;align-items:center;justify-content:space-between;gap:12px">
+    <div style="font-size:13px;font-weight:600">🔔 Tienes <span id="dp-pendientes-n">0</span> solicitude(s) pendientes de aprobación</div>
+    <button class="btn btn-gold btn-sm" onclick="showScreen('moderacion')">Revisar →</button>
+  </div>
+
 </div>
 
 <!-- ════ TABLA ════ -->
@@ -1602,56 +1636,133 @@ function showScreenCat(screen, cat) {
 }
 
 /* ── DASHBOARD ── */
-function renderDashboard() {
-  var pub = places.filter(function(p){return p.status==='published';}).length;
-  var dft = places.filter(function(p){return p.status==='draft';}).length;
-  var cities = [...new Set(places.map(function(p){return p.city;}))].filter(Boolean).length;
+async function renderDashboard() {
+  // Stats locales inmediatos
+  var pub   = places.filter(function(p){return p.status==='published';}).length;
+  var dft   = places.filter(function(p){return p.status==='draft';}).length;
   var total = places.length;
-  var pct = total ? Math.round(pub/total*100) : 0;
-
-  setText('ds-total', total);
-  setText('ds-pub', pub);
-  setText('ds-draft', dft);
-  setText('ds-cities', cities);
-  setText('ds-pub-sub', pub+' publicados · '+dft+' borradores');
+  var pct   = total ? Math.round(pub/total*100) : 0;
+  setText('ds-total',   total);
+  setText('ds-pub-sub', pub+' publicados \xb7 '+dft+' borradores');
   setStyle('ds-pub-bar','width',pct+'%');
-  setStyle('ds-pub-bar2','width',pct+'%');
-  setStyle('ds-dft-bar','width',(total?Math.round(dft/total*100):0)+'%');
+  updateNavCounts();
 
-  // Recent list
-  var recent = places.slice(-8).reverse();
-  var rl = document.getElementById('dp-recent-list');
-  if(!recent.length) {
-    rl.innerHTML = '<div class="empty-state"><div class="es-icon">📝</div><div class="es-text">Sin lugares aún</div></div>';
-  } else {
-    rl.innerHTML = recent.map(function(p){
-      return '<div class="dp-item" onclick="editPlace('+p.id+')">'
-        +'<div class="dp-emoji">'+( p.emoji||catEmoji(p.cat))+'</div>'
-        +'<div class="dp-info"><div class="dp-name">'+p.name+'</div><div class="dp-meta">'+p.city+' · '+catLabel(p.cat)+'</div></div>'
-        +'<span class="dp-status-dot '+(p.status==='published'?'dot-pub':'dot-dft')+'"></span>'
-        +'</div>';
+  // Categorías locales
+  var cats   = ['hostal','comida','sitio','evento'];
+  var clbls  = {hostal:'\ud83c\udfe8 Hospedajes',comida:'\ud83c\udf7d\ufe0f Comida',sitio:'\u26f0\ufe0f Lugares',evento:'\ud83c\udf89 Eventos'};
+  var bd     = document.getElementById('dp-cat-breakdown');
+  if (bd) {
+    bd.innerHTML = cats.map(function(c){
+      var n    = places.filter(function(p){return p.cat===c;}).length;
+      var pct2 = total ? Math.round(n/total*100) : 0;
+      return '<div class="dp-item" onclick="showScreenCat(\'tabla\',\''+c+'\')">'
+        +'<div class="dp-emoji">'+catEmoji(c)+'</div>'
+        +'<div class="dp-info"><div class="dp-name">'+clbls[c]+'</div>'
+        +'<div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;width:100%;max-width:180px;overflow:hidden">'
+        +'<div style="height:100%;width:'+pct2+'%;background:'+catColor(c)+';border-radius:2px"></div></div></div>'
+        +'<b style="font-size:13px">'+n+'</b></div>';
     }).join('');
   }
 
-  // Cat breakdown
-  var cats = ['hostal','comida','sitio','evento'];
-  var labels = {hostal:'🏨 Hospedajes',comida:'🍽️ Comida',sitio:'🏔️ Lugares',evento:'🎉 Eventos'};
-  var bd = document.getElementById('dp-cat-breakdown');
-  bd.innerHTML = cats.map(function(c){
-    var n = places.filter(function(p){return p.cat===c;}).length;
-    var pct2 = total ? Math.round(n/total*100) : 0;
-    return '<div class="dp-item" onclick="showScreenCat(\'tabla\',\''+c+'\')">'
-      +'<div class="dp-emoji">'+catEmoji(c)+'</div>'
-      +'<div class="dp-info"><div class="dp-name">'+labels[c]+'</div>'
-      +'<div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;width:100%;max-width:200px;overflow:hidden">'
-      +'<div style="height:100%;width:'+pct2+'%;background:'+catColor(c)+';border-radius:2px"></div></div></div>'
-      +'<b style="font-size:13px;color:var(--text)">'+n+'</b>'
-      +'</div>';
-  }).join('');
+  // Datos de Neon (asincronos)
+  try {
+    // Stats globales
+    var r1 = await fetch('/api/destinos?limit=1', { headers: _adminHeaders() });
+    var d1 = await r1.json();
+    if (d1.ok && d1.stats) {
+      var st = d1.stats;
+      setText('ds-resenas',    (st.resenas||0).toLocaleString('es-CO'));
+      setText('ds-rating-sub', 'rating promedio: '+(st.rating||0)+'\u2b50');
+      setStyle('ds-rat-bar','width',Math.min(100,(st.rating||0)*20)+'%');
+      setText('ds-usuarios',     st.destinos||total);
+      setText('ds-usuarios-sub', 'publicados en el sitio');
+    }
 
-  updateNavCounts();
+    // Visitas (desde utilidades)
+    try {
+      var rv = await fetch('/api/utilidades?tipo=visitas&slug=_check_', { headers: _adminHeaders() });
+    } catch(_) {}
+    setText('ds-visitas',     '\u2014');
+    setText('ds-visitas-sub', 'ver mi-lugar.html?slug=X');
+
+    // Top lugares por reseñas
+    var r4 = await fetch('/api/destinos?limit=200', { headers: _adminHeaders() });
+    var d4 = await r4.json();
+    if (d4.ok && d4.data) {
+      var all = d4.data;
+
+      // Top visitas (por reseñas como proxy)
+      var topEl = document.getElementById('dp-top-visitas');
+      if (topEl) {
+        var top5 = all.filter(function(d){return d.reviews>0;})
+          .sort(function(a,b){return b.reviews-a.reviews;}).slice(0,5);
+        if (!top5.length) {
+          topEl.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:12px 0">Sin actividad todavía</div>';
+        } else {
+          var mx = top5[0].reviews||1;
+          topEl.innerHTML = top5.map(function(d,i){
+            var pb = Math.round((d.reviews/mx)*100);
+            return '<div class="dp-item" onclick="window.open('/'+d.slug+'.html',\'_blank\')" style="cursor:pointer">'
+              +'<div class="dp-emoji" style="font-size:11px;font-weight:800;color:var(--muted);width:20px">'+(i+1)+'</div>'
+              +'<div class="dp-info" style="flex:1"><div class="dp-name">'+escH(d.name)+'</div>'
+              +'<div class="dp-meta">'+escH(d.city)+' \xb7 '+d.reviews+' rese\xf1as \xb7 \u2b50'+(d.rating?Number(d.rating).toFixed(1):'\u2014')+'</div>'
+              +'<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px">'
+              +'<div style="height:100%;width:'+pb+'%;background:var(--gold);border-radius:2px"></div></div>'
+              +'</div></div>';
+          }).join('');
+        }
+      }
+
+      // Top ciudades
+      var ciudEl = document.getElementById('dp-top-ciudades');
+      if (ciudEl) {
+        var cmap = {};
+        all.forEach(function(d){if(d.city) cmap[d.city]=(cmap[d.city]||0)+1;});
+        var carr = Object.keys(cmap).map(function(c){return{ciudad:c,n:cmap[c]};})
+          .sort(function(a,b){return b.n-a.n;}).slice(0,6);
+        var mx2 = carr[0]?carr[0].n:1;
+        ciudEl.innerHTML = carr.map(function(c){
+          var pb = Math.round((c.n/mx2)*100);
+          return '<div class="dp-item"><div class="dp-emoji">\ud83d\udccd</div>'
+            +'<div class="dp-info" style="flex:1"><div class="dp-name">'+escH(c.ciudad)+'</div>'
+            +'<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px">'
+            +'<div style="height:100%;width:'+pb+'%;background:#3b82f6;border-radius:2px"></div></div></div>'
+            +'<b style="font-size:12px;color:var(--muted)">'+c.n+'</b></div>';
+        }).join('');
+      }
+    }
+
+    // Reseñas recientes
+    var r5 = await fetch('/api/admin?recurso=resenas&limit=5', { headers: _adminHeaders() });
+    var d5 = await r5.json();
+    var rvEl = document.getElementById('dp-resenas-recientes');
+    if (rvEl && d5.ok && d5.data && d5.data.length) {
+      rvEl.innerHTML = d5.data.map(function(r){
+        var st2 = '\u2605'.repeat(Math.round(r.rating||0))+'\u2606'.repeat(5-Math.round(r.rating||0));
+        var fch = r.fecha ? new Date(r.fecha).toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : '';
+        return '<div class="dp-item"><div class="dp-emoji" style="color:var(--gold);font-size:11px">'+st2+'</div>'
+          +'<div class="dp-info"><div class="dp-name" style="font-size:11px">'
+          +'<a href="/'+escH(r.destino.slug)+'.html" target="_blank" style="color:var(--text);text-decoration:none">'+escH(r.destino.nombre)+'</a>'
+          +'</div><div class="dp-meta">'+(r.texto?escH(r.texto.slice(0,55))+'\u2026':'Sin texto')+' \xb7 '+fch+'</div>'
+          +'</div></div>';
+      }).join('');
+    } else if (rvEl) {
+      rvEl.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:12px 0">Sin rese\xf1as todav\xeda</div>';
+    }
+
+    // Banner pendientes
+    var r6 = await fetch('/api/admin?recurso=solicitudes&status=draft&limit=1', { headers: _adminHeaders() });
+    var d6 = await r6.json();
+    if (d6.ok && d6.total > 0) {
+      var pb2 = document.getElementById('dp-pendientes-banner');
+      var pn  = document.getElementById('dp-pendientes-n');
+      if (pb2 && pn) { pn.textContent=d6.total; pb2.style.display='flex'; }
+    }
+
+  } catch(err) {
+    console.warn('[dashboard]', err.message);
+  }
 }
-
 function updateNavCounts() {
   var total = places.length;
   var cats = ['hostal','comida','sitio','evento'];
