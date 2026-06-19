@@ -3844,7 +3844,7 @@ async function _syncToNeon(p) {
 // Sincroniza el array de fotos de galería a destinos_fotos en Neon
 async function _syncFotosGaleria(destinoUUID, fotos) {
   try {
-    var r = await fetch('/api/fotos', {
+    var r = await fetch('/api/utilidades?tipo=fotos', {
       method: 'POST',
       headers: _adminHeaders(),
       body: JSON.stringify({
@@ -3866,7 +3866,7 @@ async function _syncFotosGaleria(destinoUUID, fotos) {
 async function _cargarFotosDeNeon(destinoUUID, localId) {
   if (!destinoUUID) return;
   try {
-    var r = await fetch('/api/fotos?destino_id='+destinoUUID, {
+    var r = await fetch('/api/utilidades?tipo=fotos&destino_id='+destinoUUID, {
       headers: _adminHeaders()
     });
     var d = await r.json();
@@ -3955,7 +3955,7 @@ async function migrarFotosANeon() {
     if (!galeria.length) continue;
 
     try {
-      var r = await fetch('/api/fotos', {
+      var r = await fetch('/api/utilidades?tipo=fotos', {
         method: 'POST',
         headers: _adminHeaders(),
         body: JSON.stringify({ destino_id: uuid, fotos: galeria })
