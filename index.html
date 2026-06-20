@@ -1184,13 +1184,13 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="hcat" data-cat="evento">🎉 Eventos</div>
     </div>
     <div class="hstats">
-      <div><div class="hstn" id="stat-destinos">312</div><div class="hstl">Destinos</div></div>
+      <div><div class="hstn">312</div><div class="hstl">Destinos</div></div>
       <div class="hstdiv"></div>
-      <div><div class="hstn" id="stat-resenas">18.4K</div><div class="hstl">Reseñas</div></div>
+      <div><div class="hstn">18.4K</div><div class="hstl">Reseñas</div></div>
       <div class="hstdiv"></div>
-      <div><div class="hstn" id="stat-ciudades">32</div><div class="hstl">Ciudades</div></div>
+      <div><div class="hstn">32</div><div class="hstl">Ciudades</div></div>
       <div class="hstdiv"></div>
-      <div><div class="hstn" id="stat-rating">4.8★</div><div class="hstl">Promedio</div></div>
+      <div><div class="hstn">4.8★</div><div class="hstl">Promedio</div></div>
     </div>
   </div>
   <div class="hdots" id="hdots"><button class="hdot  on" onclick="goSlide(0)"></button>
@@ -2518,30 +2518,16 @@ function joinPlan(btn, name) {
 /* ── MAPA INTERACTIVO LEAFLET ── */
 function initMapaSection() {
   var mapEl = document.getElementById('leaflet-map');
-  if(!mapEl || mapaMap || typeof L === 'undefined') return;
+  if(!mapEl || typeof L === 'undefined') return;
+
+  // Si el mapa ya existe, solo refrescar markers con los nuevos datos
+  if(mapaMap) { refreshMapaMarkers(); return; }
 
   mapaMap = L.map('leaflet-map', {center:[5.5,-74.5], zoom:6, scrollWheelZoom:false});
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19}).addTo(mapaMap);
 
-  MAPA_PLACES.forEach(function(p){
-    var isSaved = mmSaved.indexOf(p.id) !== -1;
-    var ico = L.divIcon({
-      html: '<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:'+p.color+';display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:12px;display:block">'+p.emoji+'</span></div>',
-      iconSize:[30,30], iconAnchor:[15,30], popupAnchor:[0,-32], className:''
-    });
-    var popup = '<div style="min-width:160px;font-family:Outfit,sans-serif">'
-      +'<div class="lp-name">'+p.emoji+' '+p.name+'</div>'
-      +'<div class="lp-loc">📍 '+p.city+', '+p.region+'</div>'
-      +'<div class="lp-stars">'+starHtml(p.rating)+' '+p.rating.toFixed(1)+'</div>'
-      +'<a class="lp-btn" href="'+p.slug+'.html">Ver lugar →</a>'
-      +'<button class="lp-save-btn'+(isSaved?' saved':'')+'" id="lpsave-'+p.id+'" onclick="toggleMapaSave('+p.id+',this)">'+(isSaved?'♥ Guardado':'♡ Guardar en Mi Viaje')+'</button>'
-      +'</div>';
-    var marker = L.marker([p.lat,p.lng],{icon:ico}).addTo(mapaMap).bindPopup(popup,{maxWidth:210});
-    marker.on('click', function(){ setMapaActive(p.id); });
-    mapaMarkers[p.id] = marker;
-  });
-  renderMapaList('all');
+  refreshMapaMarkers();
 
   document.querySelectorAll('.mf-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -2552,6 +2538,45 @@ function initMapaSection() {
       filterMapaPins(mapaActiveCat);
     });
   });
+}
+
+// Redibuja todos los markers desde MAPA_PLACES[] — llamado en init y al actualizar datos
+function refreshMapaMarkers() {
+  if(!mapaMap || typeof L === 'undefined') return;
+  // Limpiar markers existentes
+  Object.keys(mapaMarkers).forEach(function(k) {
+    try { mapaMap.removeLayer(mapaMarkers[k]); } catch(_) {}
+  });
+  mapaMarkers = {};
+
+  var places = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
+  if(!places.length) { console.warn('[mapa] MAPA_PLACES vacío'); return; }
+
+  places.forEach(function(p){
+    if(!p.lat || !p.lng || p.lat===0 || p.lng===0) return;
+    var isSaved = mmSaved.indexOf(p.id) !== -1;
+    var color   = p.color || '#E8A020';
+    var emoji   = p.emoji || '\ud83d\udccd';
+    var rating  = parseFloat(p.rating||0);
+    var ico = L.divIcon({
+      html: '<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:'+color+';display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:12px;display:block">'+emoji+'</span></div>',
+      iconSize:[30,30], iconAnchor:[15,30], popupAnchor:[0,-32], className:''
+    });
+    var popup = '<div style="min-width:160px;font-family:Outfit,sans-serif">'
+      +'<div class="lp-name">'+emoji+' '+(p.name||'')+'</div>'
+      +'<div class="lp-loc">\ud83d\udccd '+(p.city||'')+(p.region?', '+p.region:'')+'</div>'
+      +'<div class="lp-stars">'+starHtml(rating)+' '+rating.toFixed(1)+'</div>'
+      +'<a class="lp-btn" href="'+(p.slug||'')+'.html">Ver lugar \u2192</a>'
+      +'<button class="lp-save-btn'+(isSaved?' saved':'')+'" id="lpsave-'+p.id+'" onclick="toggleMapaSave('+p.id+',this)">'+(isSaved?'\u2665 Guardado':'\u2661 Guardar en Mi Viaje')+'</button>'
+      +'</div>';
+    try {
+      var marker = L.marker([p.lat,p.lng],{icon:ico}).addTo(mapaMap).bindPopup(popup,{maxWidth:210});
+      marker.on('click', function(){ setMapaActive(p.id); });
+      mapaMarkers[p.id] = marker;
+    } catch(_) {}
+  });
+  renderMapaList(mapaActiveCat||'all');
+  console.log('[mapa] ' + Object.keys(mapaMarkers).length + ' markers de ' + places.length + ' lugares');
 }
 
 function renderMapaList(cat) {

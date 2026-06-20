@@ -251,21 +251,13 @@
     if (typeof renderAgenda    === 'function') renderAgenda(
       typeof agendaCat !== 'undefined' ? agendaCat : 'all'
     );
-    // Reiniciar mapa solo en carga inicial (no en búsquedas)
-    if (!q) {
-      if (typeof mapaMap !== 'undefined' && mapaMap) {
-        // Mapa ya inicializado — actualizar markers
-        if (typeof mapaMarkers !== 'undefined') {
-          Object.keys(mapaMarkers).forEach(function (k) {
-            try { mapaMap.removeLayer(mapaMarkers[k]); } catch (_) {}
-          });
-          window.mapaMarkers = {};
-        }
-        if (typeof initMapaSection === 'function') {
-          window.mapaMap = null; // forzar re-init
-          initMapaSection();
-        }
-      }
+    // Mapa: refreshMapaMarkers() redibuja sin reinicializar
+    if (typeof refreshMapaMarkers === 'function') {
+      refreshMapaMarkers();
+    } else if (typeof initMapaSection === 'function') {
+      // Fallback si refreshMapaMarkers no existe aún
+      window.mapaMap = null;
+      initMapaSection();
     }
   }
 
