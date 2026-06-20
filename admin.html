@@ -1701,14 +1701,15 @@ async function renderDashboard() {
         } else {
           var mx = top5[0].reviews||1;
           topEl.innerHTML = top5.map(function(d,i){
-            var pb = Math.round((d.reviews/mx)*100);
-            return '<div class="dp-item" onclick="window.open('/'+d.slug+'.html',\'_blank\')" style="cursor:pointer">'
+            var pb  = Math.round((d.reviews/mx)*100);
+            var url = '/' + d.slug + '.html';
+            return '<a class="dp-item" href="'+url+'" target="_blank" style="cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
               +'<div class="dp-emoji" style="font-size:11px;font-weight:800;color:var(--muted);width:20px">'+(i+1)+'</div>'
               +'<div class="dp-info" style="flex:1"><div class="dp-name">'+escH(d.name)+'</div>'
-              +'<div class="dp-meta">'+escH(d.city)+' \xb7 '+d.reviews+' rese\xf1as \xb7 \u2b50'+(d.rating?Number(d.rating).toFixed(1):'\u2014')+'</div>'
+              +'<div class="dp-meta">'+escH(d.city)+' &middot; '+d.reviews+' reseñas &middot; ⭐'+(d.rating?Number(d.rating).toFixed(1):'—')+'</div>'
               +'<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px">'
               +'<div style="height:100%;width:'+pb+'%;background:var(--gold);border-radius:2px"></div></div>'
-              +'</div></div>';
+              +'</div></a>';
           }).join('');
         }
       }
