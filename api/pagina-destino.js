@@ -20,6 +20,123 @@ function safeJSON(val) {
   try { return JSON.parse(val); } catch(_) { return null; }
 }
 
+// Schema.org JSON-LD por tipo de lugar
+function buildSchemaLD(d, detalles, fotos, resenas, catSlug) {
+  var BASE    = 'https://exploraco.co';
+  var url     = BASE + '/' + (d.slug || '') + '.html';
+  var foto    = d.foto_hero || '';
+  var rat     = d.rating    ? parseFloat(d.rating).toFixed(1) : null;
+  var nRes    = parseInt(d.total_resenas || 0);
+  var det     = detalles || {};
+
+  // Tipo de Schema según categoría
+  var typeMap = {
+    hostal: 'LodgingBusiness',
+    comida: 'FoodEstablishment',
+    sitio:  'TouristAttraction',
+    evento: 'Event',
+  };
+  var schemaType = typeMap[catSlug] || 'TouristAttraction';
+
+  // Base común
+  var schema = {
+    '@context':    'https://schema.org',
+    '@type':       schemaType,
+    'name':        d.nombre   || '',
+    'description': d.lead     || d.descripcion || '',
+    'url':         url,
+  };
+
+  if (foto) schema['image'] = foto;
+
+  // Dirección
+  if (d.ciudad) {
+    schema['address'] = {
+      '@type':           'PostalAddress',
+      'addressLocality': d.ciudad  || '',
+      'addressRegion':   d.region  || '',
+      'addressCountry':  'CO',
+    };
+    if (d.barrio || d.direccion) {
+      schema['address']['streetAddress'] = d.barrio || d.direccion || '';
+    }
+  }
+
+  // Coordenadas
+  if (d.lat && d.lng) {
+    schema['geo'] = {
+      '@type':     'GeoCoordinates',
+      'latitude':  parseFloat(d.lat),
+      'longitude': parseFloat(d.lng),
+    };
+  }
+
+  // Rating agregado
+  if (rat && nRes > 0) {
+    schema['aggregateRating'] = {
+      '@type':       'AggregateRating',
+      'ratingValue': rat,
+      'ratingCount': nRes,
+      'bestRating':  '5',
+      'worstRating': '1',
+    };
+  }
+
+  // Precio
+  if (d.precio_desde) {
+    schema['priceRange'] = d.precio_desde;
+  }
+
+  // Contacto
+  if (d.telefono) schema['telephone'] = d.telefono;
+  if (d.email)    schema['email']     = d.email;
+  if (d.web)      schema['url']       = d.web;
+
+  // Horario
+  if (d.horario) {
+    schema['openingHours'] = d.horario;
+  }
+
+  // Campos específicos por tipo
+  if (catSlug === 'hostal' && d.precio_desde) {
+    schema['checkinTime']  = det.checkin  || 'T14:00';
+    schema['checkoutTime'] = det.checkout || 'T11:00';
+  }
+
+  if (catSlug === 'comida') {
+    schema['servesCuisine'] = 'Colombian';
+  }
+
+  // Reseñas individuales (máx 3 para no inflar el JSON-LD)
+  if (resenas && resenas.length > 0) {
+    schema['review'] = resenas.slice(0, 3).map(function(r) {
+      return {
+        '@type':       'Review',
+        'author':      { '@type': 'Person', 'name': r.usuario_nombre || 'Viajero' },
+        'reviewRating': {
+          '@type':       'Rating',
+          'ratingValue': String(r.rating || 5),
+          'bestRating':  '5',
+        },
+        'reviewBody': r.texto || '',
+      };
+    });
+  }
+
+  // Organización publicadora
+  schema['publisher'] = {
+    '@type': 'Organization',
+    'name':  'ExploraCO',
+    'url':   BASE,
+    'logo':  BASE + '/favicon.png',
+  };
+
+  return '<script type="application/ld+json">\n'
+    + JSON.stringify(schema, null, 2)
+    + '\n</script>';
+}
+
+
 function buildHTML(d, detalles, fotos, resenas) {
   var cat    = d.categoria_slug || 'sitio';
   var icon   = ICONS[cat]  || '📍';
@@ -231,6 +348,7 @@ a{color:var(--gd);text-decoration:none}a:hover{text-decoration:underline}img{dis
 <meta property="og:type" content="place">
 <meta name="theme-color" content="#E8A020">
 <link rel="canonical" href="https://exploraco.co/${e(d.slug)}.html">
+${buildSchemaLD(d, detalles, fotosRows, resenasRows, cat)}
 <style>${css}</style>
 </head>
 <body>
@@ -448,7 +566,7 @@ a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
 };
 
 // Registrar visita
-fetch('/api/visitas', {
+fetch('/api/utilidades?tipo=visitas', {
   method: 'POST',
   headers: {'Content-Type':'application/json'},
   body: JSON.stringify({ destino_id: DID })
