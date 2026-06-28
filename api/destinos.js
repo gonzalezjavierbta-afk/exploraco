@@ -136,7 +136,7 @@ module.exports = async function handler(req, res) {
         `SELECT id, slug, nombre, categoria_slug, ciudad, region,
                 lat, lng, emoji, hero_bg, foto_hero, rating, total_resenas, destacado
          FROM destinos d
-         WHERE ${where} AND lat IS NOT NULL AND lng IS NOT NULL
+         WHERE ${where} AND lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0
          ORDER BY destacado DESC, rating DESC NULLS LAST
          LIMIT $${pi} OFFSET $${pi+1}`,
         [...params, limit, offset]
