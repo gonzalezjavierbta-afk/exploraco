@@ -2669,18 +2669,82 @@ function livePreview() {
 /* ── MINI MAP (in editor sidebar) ── */
 function updateMiniMap() {
   var lat = parseFloat(v('f-lat')), lng = parseFloat(v('f-lng'));
-  if(!lat || !lng) return;
   var el = document.getElementById('esb-mini-map');
   if(!el) return;
-  if(!miniMap) {
-    miniMap = L.map('esb-mini-map',{zoomControl:false,scrollWheelZoom:false,dragging:false}).setView([lat,lng],12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'',maxZoom:19}).addTo(miniMap);
-    miniMarker = L.marker([lat,lng]).addTo(miniMap);
-  } else {
-    miniMap.setView([lat,lng],12);
-    miniMarker.setLatLng([lat,lng]);
+
+  // Sin coords — mostrar placeholder con botón de ayuda
+  if(!lat || !lng || isNaN(lat) || isNaN(lng)) {
+    if(!miniMap) {
+      el.innerHTML = '<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:12px;background:var(--bg2);border-radius:var(--r)">'
+        +'<span style="font-size:24px">📍</span>'
+        +'<span>Ingresa lat/lng para ver el mapa</span>'
+        +'<button onclick="buscarCoordenadas()" style="padding:5px 12px;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">🔍 Buscar por ciudad</button>'
+        +'</div>';
+    }
+    return;
   }
-  setTimeout(function(){ if(miniMap) miniMap.invalidateSize(); },100);
+
+  if(!miniMap) {
+    // Limpiar placeholder si existe
+    el.innerHTML = '';
+    try {
+      miniMap = L.map('esb-mini-map', {
+        zoomControl: true,
+        scrollWheelZoom: false,
+        dragging: true,
+        tap: false
+      }).setView([lat, lng], 13);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        {attribution:'', maxZoom:19}).addTo(miniMap);
+      miniMarker = L.marker([lat, lng], {draggable: true}).addTo(miniMap);
+      // Al arrastrar el marker, actualizar los inputs
+      miniMarker.on('dragend', function(e) {
+        var pos = e.target.getLatLng();
+        var latEl = document.getElementById('f-lat');
+        var lngEl = document.getElementById('f-lng');
+        if(latEl) latEl.value = pos.lat.toFixed(6);
+        if(lngEl) lngEl.value = pos.lng.toFixed(6);
+      });
+    } catch(e) {
+      console.warn('[minimap]', e.message);
+      return;
+    }
+  } else {
+    miniMap.setView([lat, lng], 13);
+    if(miniMarker) miniMarker.setLatLng([lat, lng]);
+  }
+  setTimeout(function(){ if(miniMap) miniMap.invalidateSize(); }, 150);
+}
+
+// Buscar coordenadas por nombre de ciudad usando Nominatim (gratuito)
+function buscarCoordenadas() {
+  var ciudad = v('f-city') || v('f-nombre') || '';
+  if(!ciudad) { showAdminToast('Primero escribe la ciudad del lugar', 'error'); return; }
+  var query = ciudad + ', Colombia';
+  fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(query)+'&limit=1', {
+    headers: { 'Accept-Language': 'es', 'User-Agent': 'ExploraCO/1.0' }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(results) {
+    if(!results || !results.length) {
+      showAdminToast('No se encontraron coordenadas para "'+ciudad+'"', 'error');
+      return;
+    }
+    var res = results[0];
+    var lat = parseFloat(res.lat);
+    var lng = parseFloat(res.lon);
+    var latEl = document.getElementById('f-lat');
+    var lngEl = document.getElementById('f-lng');
+    if(latEl) latEl.value = lat.toFixed(6);
+    if(lngEl) lngEl.value = lng.toFixed(6);
+    // Destruir mapa anterior para reinicializar
+    if(miniMap) { miniMap.remove(); miniMap = null; miniMarker = null; }
+    updateMiniMap();
+    showAdminToast('📍 Coordenadas de '+ciudad+' cargadas — arrastra el pin para ajustar');
+  })
+  .catch(function(e) {
+    showAdminToast('Error al buscar: ' + e.message, 'error');
+  });
 }
 
 /* ── MAP PICKER ── */
@@ -3760,45 +3824,47 @@ function _placeToAPI(p) {
   }
 
   return {
-    slug:          p.slug||'',
-    nombre:        p.name||'',
-    categoria_slug:p.cat||'sitio',
-    lead:          p.lead||'',
-    desc:          p.desc||'',
-    highlight:     p.highlight||'',
-    city:          p.city||'',
-    region:        p.region||'',
-    barrio:        p.barrio||'',
-    address:       p.address||'',
-    lat:           p.lat||null,
-    lng:           p.lng||null,
-    whatsapp:      p.whatsapp||'',
-    tel:           p.tel||'',
-    email:         p.email||'',
-    web:           p.web||'',
-    instagram:     p.instagram||'',
-    booking:       p.booking||'',
-    price:         p.price||'',
-    emoji:         p.emoji||'📍',
-    hero_bg:       p.hero_bg||'',
-    foto_hero:     fotoHero,
-    fotos_galeria: galeriaUrls,   // ← NUEVO: galería completa para destinos_fotos
-    rating:        p.rating||0,
-    reviews:       p.reviews||0,
-    status:        p.status||'published',
-    destacado:     p.destacado||false,
-    // Hostal
-    habs:          p.habs||[],
-    amenities:     p.amenities||[],
-    scores:        p.scores||{},
-    faqs:          p.faqs||[],
-    transport:     p.transport||[],
-    hostalEvents:  p.hostalEvents||[],
-    checkin:       p.checkin||'',
-    checkout:      p.checkout||'',
-    bookingUrl:    p.bookingUrl||'',
-    hostelworld:   p.hostelworld||'',
-    airbnb:        p.airbnb||'',
+    // Campos principales — nombres exactos del schema Neon
+    slug:           p.slug||'',
+    nombre:         p.name||'',
+    categoria_slug: p.cat||'sitio',
+    lead:           p.lead||'',
+    descripcion:    p.desc||'',           // desc → descripcion
+    highlight:      p.highlight||'',
+    ciudad:         p.city||'',           // city → ciudad
+    region:         p.region||'',
+    barrio:         p.barrio||'',
+    lat:            p.lat||null,
+    lng:            p.lng||null,
+    whatsapp:       p.whatsapp||'',
+    telefono:       p.tel||'',            // tel → telefono
+    email:          p.email||'',
+    web:            p.web||'',
+    instagram:      p.instagram||'',
+    booking:        p.booking||'',
+    hostelworld:    p.hostelworld||'',
+    airbnb:         p.airbnb||'',
+    precio_desde:   p.price||'',          // price → precio_desde
+    horario:        p.horario||'',
+    emoji:          p.emoji||'📍',
+    hero_bg:        p.hero_bg||'',
+    foto_hero:      fotoHero,
+    fotos_galeria:  galeriaUrls,
+    tipo:           p.tipo||'',
+    capacidad:      p.capacidad||'',
+    como_llegar:    p.como_llegar||'',
+    status:         p.status||'published',
+    destacado:      p.destacado||false,
+    // Detalles (destinos_detalles) — nombres exactos
+    habitaciones:   p.habs||[],           // habs → habitaciones
+    amenidades:     p.amenities||[],      // amenities → amenidades
+    scores:         p.scores||{},
+    faqs:           p.faqs||[],
+    transporte:     p.transport||[],      // transport → transporte
+    eventos_hostal: p.hostalEvents||[],   // hostalEvents → eventos_hostal
+    checkin:        p.checkin||'',
+    checkout:       p.checkout||'',
+    booking_url:    p.bookingUrl||'',     // bookingUrl → booking_url
   };
 }
 
@@ -3989,7 +4055,16 @@ async function syncFromNeon() {
       var local = places.find(function(p){ return p.slug===d.slug || p.name===d.nombre; });
       if (local) {
         _localToUUID[local.id] = d.id;
-
+        // Actualizar campos locales con datos reales de Neon
+        local.city    = d.ciudad        || local.city;
+        local.region  = d.region        || local.region;
+        local.price   = d.precio_desde  || local.price;
+        local.tel     = d.telefono      || local.tel;
+        local.desc    = d.descripcion   || local.desc;
+        local.rating  = d.rating        ? parseFloat(d.rating)      : local.rating;
+        local.rev     = d.total_resenas ? parseInt(d.total_resenas)  : local.rev;
+        local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;
+        local.lng     = d.lng           ? parseFloat(d.lng)         : local.lng;
         // Si el lugar local no tiene fotos, cargarlas de Neon en background
         if (!local.photos || !local.photos.length) {
           _cargarFotosDeNeon(d.id, local.id);
