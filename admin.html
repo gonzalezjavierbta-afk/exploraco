@@ -418,6 +418,8 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 .ftab-panel.on{display:flex;flex-direction:column}
 
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 
 <body>
@@ -1678,11 +1680,8 @@ async function renderDashboard() {
       setText('ds-usuarios-sub', 'publicados en el sitio');
     }
 
-    // Visitas (desde utilidades)
-    try {
-      var rv = await fetch('/api/utilidades?tipo=visitas&slug=_check_', { headers: _adminHeaders() });
-    } catch(_) {}
-    setText('ds-visitas',     '\u2014');
+    // Visitas — mostrar placeholder (ver mi-lugar.html?slug=X para stats por lugar)
+    setText('ds-visitas',     '📊');
     setText('ds-visitas-sub', 'ver mi-lugar.html?slug=X');
 
     // Top lugares por reseñas

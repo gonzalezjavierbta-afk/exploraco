@@ -496,6 +496,20 @@ function submitRv(){
 module.exports = async function handler(req, res) {
   var slug = (req.query.slug||'').trim().replace(/\.html$/,'');
   if (!slug) return res.status(400).send('<h1>400 — Slug requerido</h1>');
+  
+  // Rechazar slugs que claramente no son válidos (solo números, demasiado cortos)
+  if (/^[0-9]+$/.test(slug) || slug.length < 3) {
+    return res.status(404).send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>No encontrado – ExploraCO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#f9f7f4}
+a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
+</head><body>
+<h1>404</h1>
+<p>El lugar <b>${slug}</b> no existe.</p>
+<p style="margin-top:1.5rem"><a href="/index.html">← Volver al inicio</a></p>
+</body></html>`);
+  }
 
   try {
     var sql = neon(process.env.DATABASE_URL);
@@ -555,12 +569,25 @@ a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
 
   } catch(err) {
     console.error('[pagina-destino]', err.message);
+    // Distinguir entre "no encontrado" y error real
+    if (err.message && (err.message.includes('no rows') || err.message.includes('0 rows'))) {
+      return res.status(404).send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>No encontrado – ExploraCO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#f9f7f4}
+a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
+</head><body>
+<h1>404</h1>
+<p>Este lugar no existe o fue eliminado.</p>
+<p style="margin-top:1.5rem"><a href="/index.html">← Volver al inicio</a></p>
+</body></html>`);
+    }
     return res.status(500).send(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Error – ExploraCO</title></head>
-<body style="font-family:sans-serif;padding:2rem">
-<h1>Error interno</h1>
-<pre style="background:#f5f5f5;padding:1rem;border-radius:8px;margin-top:1rem;overflow-x:auto">${e(err.message)}</pre>
-<p style="margin-top:1rem"><a href="/index.html">← Inicio</a></p>
+<body style="font-family:sans-serif;padding:2rem;background:#f9f7f4">
+<h1 style="color:#E8A020">⚠️ Error temporal</h1>
+<p style="margin-top:1rem">No pudimos cargar este lugar. Por favor intenta de nuevo.</p>
+<p style="margin-top:1rem"><a href="/index.html" style="color:#E8A020">← Volver al inicio</a></p>
 </body></html>`);
   }
 };
