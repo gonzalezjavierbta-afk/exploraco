@@ -5,7 +5,7 @@
 const { neon } = require('@neondatabase/serverless');
 
 var BASE    = 'https://exploraco.co';
-var CAT_ICON  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉' };
+var CAT_ICON  = { hostal:'\u{1F3E8}', comida:'\u{1F37D}\uFE0F', sitio:'\u{1F3D4}\uFE0F', evento:'\u{1F389}' };
 var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
 var CAT_DIR   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
 
@@ -26,7 +26,7 @@ function safeJSON(v) {
 
 function stars(n) {
   var r = Math.min(5, Math.max(0, Math.round(parseFloat(n)||0)));
-  return '★'.repeat(r) + '☆'.repeat(5-r);
+  return '\u2605'.repeat(r) + '\u2606'.repeat(5-r);
 }
 
 function schemaLD(d, cat, fotos, resenas) {
@@ -51,7 +51,7 @@ function schemaLD(d, cat, fotos, resenas) {
 
 function renderHTML(d, det, fotos, resenas) {
   var cat   = d.categoria_slug || 'sitio';
-  var icon  = CAT_ICON[cat]  || '📍';
+  var icon  = CAT_ICON[cat]  || '\u{1F4CD}';
   var label = CAT_LABEL[cat] || 'Destino';
   var dir   = CAT_DIR[cat]   || 'index.html';
   var hero  = d.foto_hero    || 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80';
@@ -78,24 +78,24 @@ function renderHTML(d, det, fotos, resenas) {
 
   // Botones de reserva
   var rbtns = [];
-  if (d.whatsapp)  rbtns.push('<a href="https://wa.me/'+esc(d.whatsapp)+'" class="rbtn rwa" target="_blank">💬 Reservar por WhatsApp</a>');
-  if (bookingUrl)  rbtns.push('<a href="'+esc(bookingUrl)+'" class="rbtn rbk" target="_blank">🏨 Booking.com</a>');
-  if (hwUrl)       rbtns.push('<a href="'+esc(hwUrl)+'" class="rbtn rhw" target="_blank">🌍 Hostelworld</a>');
-  if (airbnbUrl)   rbtns.push('<a href="'+esc(airbnbUrl)+'" class="rbtn rab" target="_blank">🏡 Airbnb</a>');
+  if (d.whatsapp)  rbtns.push('<a href="https://wa.me/'+esc(d.whatsapp)+'" class="rbtn rwa" target="_blank">\u{1F4AC} Reservar por WhatsApp</a>');
+  if (bookingUrl)  rbtns.push('<a href="'+esc(bookingUrl)+'" class="rbtn rbk" target="_blank">\u{1F3E8} Booking.com</a>');
+  if (hwUrl)       rbtns.push('<a href="'+esc(hwUrl)+'" class="rbtn rhw" target="_blank">\u{1F30D} Hostelworld</a>');
+  if (airbnbUrl)   rbtns.push('<a href="'+esc(airbnbUrl)+'" class="rbtn rab" target="_blank">\u{1F3E1} Airbnb</a>');
 
   // Mapa con coordenadas reales
   var mapaHTML = '';
   if (d.lat && d.lng && parseFloat(d.lat) !== 0 && parseFloat(d.lng) !== 0) {
     mapaHTML = '<section id="mapa" class="sec">'
-      + '<h2>🗺️ Ubicación</h2>'
+      + '<h2>\u{1F5FA}\uFE0F Ubicaci\u00f3n</h2>'
       + '<iframe width="100%" height="280" style="border:0;border-radius:10px" loading="lazy" '
       + 'src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe>'
       + '</section>';
   }
 
-  // Reseñas
+  // Rese\u00f1as
   var rvHTML = (resenas||[]).length
-    ? '<section id="resenas" class="sec"><h2>💬 Reseñas'+(rat?' <span class="rbadge">⭐ '+esc(rat)+'</span>':'')+'</h2>'
+    ? '<section id="resenas" class="sec"><h2>\u{1F4AC} Rese\u00f1as'+(rat?' <span class="rbadge">\u2B50 '+esc(rat)+'</span>':'')+'</h2>'
       + resenas.map(function(r){
           var nombre = r.usuario_nombre || 'Viajero';
           var texto  = r.texto || '';
@@ -108,7 +108,7 @@ function renderHTML(d, det, fotos, resenas) {
             + '</div>'+(texto?'<p>'+esc(texto)+'</p>':'')+'</div>';
         }).join('')
       + '</section>'
-    : '<section id="resenas" class="sec"><h2>💬 Reseñas</h2><p style="color:#888;font-size:.875rem">Sé el primero en dejar una reseña.</p></section>';
+    : '<section id="resenas" class="sec"><h2>\u{1F4AC} Rese\u00f1as</h2><p style="color:#888;font-size:.875rem">S\u00e9 el primero en dejar una rese\u00f1a.</p></section>';
 
   var css = ':root{--g:#E8A020;--gd:#c47c0a;--bg:#f9f7f4;--card:#fff;--text:#1a1a1a;--mu:#666;--r:12px}'
     + '*{box-sizing:border-box;margin:0;padding:0}'
@@ -146,7 +146,7 @@ function renderHTML(d, det, fotos, resenas) {
     + '.faq{border:1px solid #eee;border-radius:8px;margin-bottom:.4rem}'
     + '.faq summary{padding:.75rem .875rem;cursor:pointer;font-weight:600;font-size:.875rem;list-style:none;display:flex;justify-content:space-between}'
     + '.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";color:var(--g)}'
-    + '.faq[open] summary::after{content:"−"}.faq p{padding:.5rem .875rem .875rem;font-size:.8125rem;color:#444;line-height:1.6}'
+    + '.faq[open] summary::after{content:"\u2212"}.faq p{padding:.5rem .875rem .875rem;font-size:.8125rem;color:#444;line-height:1.6}'
     + '.rbtns{display:flex;flex-direction:column;gap:.5rem}'
     + '.rbtn{display:block;text-align:center;padding:.875rem;border-radius:10px;font-weight:700;font-size:.9rem;color:#fff!important}'
     + '.rwa{background:#25D366}.rbk{background:#003580}.rhw{background:#f0593a}.rab{background:#FF5A5F}'
@@ -262,7 +262,7 @@ function renderHTML(d, det, fotos, resenas) {
     // INFO
     + '<div class="ac"><h3>\u2139\ufe0f Informaci\u00f3n</h3>\n'
     + (d.ciudad ? '<div class="ir"><span class="ic">\ud83d\udccd</span><span>'+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</span></div>\n' : '')
-    + (d.barrio ? '<div class="ir"><span class="ic">\ud83c\udfe˜</span><span>'+esc(d.barrio)+'</span></div>\n' : '')
+    + (d.barrio ? '<div class="ir"><span class="ic">\ud83c\udfe0</span><span>'+esc(d.barrio)+'</span></div>\n' : '')
     + (d.tipo   ? '<div class="ir"><span class="ic">\ud83c\udfe0</span><span>'+esc(d.tipo)+'</span></div>\n' : '')
     + (checkin  ? '<div class="ir"><span class="ic">\u23f0</span><span>Check-in '+esc(checkin)+' \u00b7 Out '+esc(checkout||'?')+'</span></div>\n' : '')
     + (d.horario? '<div class="ir"><span class="ic">\ud83d\udd50</span><span>'+esc(d.horario)+'</span></div>\n' : '')
@@ -379,7 +379,7 @@ module.exports = async function handler(req, res) {
       [d.id]
     );
 
-    // Reseñas
+    // Rese\u00f1as
     var resenasRows = await sql(
       'SELECT i.rating, i.texto, u.nombre AS usuario_nombre FROM interacciones i LEFT JOIN usuarios u ON i.usuario_id=u.id WHERE i.destino_id=$1 AND i.tipo=\'resena\' ORDER BY i.creado_en DESC LIMIT 10',
       [d.id]
