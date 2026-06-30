@@ -1820,6 +1820,7 @@ function renderTabla() {
       +'<td><div class="dt-actions">'
       +'<button class="btn btn-ghost btn-icon btn-sm" onclick="editPlace('+p.id+')" title="Editar">✏️</button>'
       +'<a class="btn btn-ghost btn-icon btn-sm" href="'+(p.slug||'#')+'.html" target="_blank" title="Ver página">↗</a>'
+      +'<button class="btn-feat btn-ghost btn-icon btn-sm" onclick="toggleDestacadoId('+p.id+')" title="'+(p.destacado?'Quitar destacado':'Destacar este lugar')+'" style="'+(p.destacado?'color:#E8A020':'')+'">'+(p.destacado?'⭐':'☆')+'</button>'
       +'<button class="btn btn-ghost btn-icon btn-sm" onclick="duplicatePlaceId('+p.id+')" title="Duplicar">⎘</button>'
       +'<button class="btn btn-ghost btn-icon btn-sm" onclick="generateAndDownloadPage('+p.id+')" title="Generar .html">⬇️</button>'+'<button class="btn btn-danger btn-icon btn-sm" onclick="deletePlaceId('+p.id+')" title="Eliminar">✕</button>'
       +'</div></td>'
@@ -2435,12 +2436,78 @@ function deletePlace() {
   deletePlaceId(currentId);
   showScreen('tabla');
 }
-function deletePlaceId(id) {
-  places = places.filter(function(p){ return p.id!==id; });
+async function deletePlaceId(id) {
+  var p = places.find(function(x){ return x.id===id; });
+  if(!p) return;
+  if(!confirm('¿Eliminar "'+p.name+'" definitivamente? Esta acción no se puede deshacer.')) return;
+
+  // Borrar de Neon si está sincronizado
+  var uuid = _localToUUID[id];
+  if(uuid) {
+    try {
+      var r = await fetch('/api/admin-destinos?id='+uuid, { method:'DELETE', headers:_adminHeaders() });
+      var d = await r.json();
+      if(!d.ok) {
+        showAdminToast('Error al borrar de la base de datos: '+(d.error||'desconocido'), 'error');
+        return;
+      }
+    } catch(e) {
+      showAdminToast('Error de conexión al borrar: '+e.message, 'error');
+      return;
+    }
+  }
+
+  // Borrar localmente solo si Neon confirmó (o si nunca se sincronizó)
+  places = places.filter(function(x){ return x.id!==id; });
+  delete _localToUUID[id];
+  localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
   savePlaces();
   renderTabla();
   updateNavCounts();
-  showAdminToast('Lugar eliminado');
+  showAdminToast('✓ "'+p.name+'" eliminado del sitio');
+}
+
+// Toggle destacado — activa/desactiva desde la tabla con un clic
+async function toggleDestacadoId(id) {
+  var p = places.find(function(x){ return x.id===id; });
+  if(!p) return;
+  var uuid = _localToUUID[id];
+  if(!uuid) {
+    showAdminToast('Primero publica este lugar para poder destacarlo', 'error');
+    return;
+  }
+
+  var nuevoEstado = !p.destacado;
+  var btn = document.querySelector('#tr-'+id+' .btn-feat');
+  if(btn) btn.disabled = true;
+
+  try {
+    if(nuevoEstado) {
+      // Activar destacado — plan mensual por defecto, admin puede cambiar luego
+      var r = await fetch('/api/admin?recurso=destacado', {
+        method:'POST', headers:_adminHeaders(),
+        body: JSON.stringify({ slug: p.slug, plan: 'mensual' })
+      });
+      var d = await r.json();
+      if(!d.ok) throw new Error(d.error||'Error al destacar');
+      p.destacado = true;
+      showAdminToast('⭐ "'+p.name+'" ahora aparece destacado');
+    } else {
+      var r2 = await fetch('/api/admin?recurso=destacado&slug='+encodeURIComponent(p.slug), {
+        method:'DELETE', headers:_adminHeaders()
+      });
+      var d2 = await r2.json();
+      if(!d2.ok) throw new Error(d2.error||'Error al quitar destacado');
+      p.destacado = false;
+      showAdminToast('Destacado removido de "'+p.name+'"');
+    }
+    savePlaces();
+    renderTabla();
+  } catch(e) {
+    showAdminToast('Error: '+e.message, 'error');
+  } finally {
+    if(btn) btn.disabled = false;
+  }
 }
 
 function duplicatePlace() { if(currentId) duplicatePlaceId(currentId); }

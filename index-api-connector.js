@@ -178,7 +178,7 @@
 
   // ── FETCH Y ACTUALIZAR ─────────────────────────────────────────
   function fetchAndUpdate(q) {
-    var url = '/api/destinos?limit=500' + (q ? '&q=' + encodeURIComponent(q) : '');
+    var url = '/api/destinos?limit=500&_t=' + Date.now() + (q ? '&q=' + encodeURIComponent(q) : '');
     fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (d) { applyData(d, q); })

@@ -112,7 +112,7 @@
 
   function loadDirectorio() {
     var cat = detectCat();
-    var url = '/api/destinos?limit=500' + (cat ? '&categoria=' + encodeURIComponent(cat) : '');
+    var url = '/api/destinos?limit=500&_t=' + Date.now() + (cat ? '&categoria=' + encodeURIComponent(cat) : '');
 
     fetch(url)
       .then(function (r) { return r.json(); })
