@@ -62,6 +62,17 @@ module.exports = async function handler(req, res) {
     if (body.checkin)      tags.checkin      = body.checkin;
     if (body.checkout)     tags.checkout     = body.checkout;
     if (body.contacto_nombre) tags.contacto_nombre = body.contacto_nombre;
+    // Campos específicos de sitio turístico
+    if (body.sitio_tipo_actividad) tags.tipo_actividad  = body.sitio_tipo_actividad;
+    if (body.sitio_dificultad)     tags.dificultad      = body.sitio_dificultad;
+    if (body.sitio_duracion)       tags.duracion        = body.sitio_duracion;
+    if (body.sitio_horario)        tags.horario_visita  = body.sitio_horario;
+    if (body.sitio_precio_entrada) tags.precio_entrada  = body.sitio_precio_entrada;
+    if (body.sitio_distancia)      tags.distancia       = body.sitio_distancia;
+    if (body.sitio_como_llegar)    tags.como_llegar     = body.sitio_como_llegar;
+    if (body.sitio_permisos)       tags.permisos        = body.sitio_permisos;
+    if (body.sitio_equipamiento && body.sitio_equipamiento.length) tags.equipamiento = body.sitio_equipamiento;
+    if (body.sitio_temporada    && body.sitio_temporada.length)    tags.temporada    = body.sitio_temporada;
 
     var rows = await sql(
       `INSERT INTO destinos (

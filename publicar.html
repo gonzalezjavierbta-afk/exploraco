@@ -511,6 +511,107 @@
       <button class="btn-add" onclick="addHabitacion()">+ Agregar tipo de habitación</button>
     </div>
 
+    <!-- DETALLES SITIO TURÍSTICO (solo sitio) -->
+    <div class="form-card" id="card-sitio" style="display:none">
+      <div class="form-card-title">🏔️ Detalles del sitio turístico</div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Tipo de actividad</label>
+          <select id="sitio_tipo_actividad">
+            <option value="">Seleccionar...</option>
+            <option value="Senderismo">🥾 Senderismo / Trekking</option>
+            <option value="Naturaleza">🌿 Naturaleza y ecoturismo</option>
+            <option value="Playa">🏖️ Playa y acuático</option>
+            <option value="Aventura">🧗 Aventura / Deportes</option>
+            <option value="Cultural">🏛️ Cultural / Histórico</option>
+            <option value="Religioso">⛪ Religioso / Espiritual</option>
+            <option value="Miradores">🔭 Miradores / Paisajes</option>
+            <option value="Arqueología">🗿 Arqueología</option>
+            <option value="Parque nacional">🌲 Parque nacional</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nivel de dificultad</label>
+          <select id="sitio_dificultad">
+            <option value="">Seleccionar...</option>
+            <option value="Fácil">🟢 Fácil — Apto para todos</option>
+            <option value="Moderado">🟡 Moderado — Algo de esfuerzo</option>
+            <option value="Difícil">🔴 Difícil — Buena condición física</option>
+            <option value="Experto">⚫ Experto — Solo con guía</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Duración aproximada</label>
+          <input type="text" id="sitio_duracion" placeholder="Ej: 2-3 horas · Todo el día · 4 días / 3 noches">
+        </div>
+        <div class="field">
+          <label>Horario de visita</label>
+          <input type="text" id="sitio_horario" placeholder="Ej: Lun-Dom 6am–5pm">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Precio de entrada (COP)</label>
+          <input type="text" id="sitio_precio_entrada" placeholder="Ej: Gratis · $15.000 · $25.000 extranjeros">
+        </div>
+        <div class="field">
+          <label>Distancia desde ciudad principal</label>
+          <input type="text" id="sitio_distancia" placeholder="Ej: 35 km de Bogotá · 2h desde Medellín">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cómo llegar</label>
+        <textarea id="sitio_como_llegar" rows="3" placeholder="Indica cómo llegar: transporte público, carro, moto, si se necesita guía..."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Equipamiento recomendado</label>
+        <div class="am-chips" id="sitio-equip-chips">
+          <span class="am-chip" data-val="Ropa impermeable">🧥 Ropa impermeable</span>
+          <span class="am-chip" data-val="Botas de trekking">🥾 Botas de trekking</span>
+          <span class="am-chip" data-val="Bloqueador solar">🌞 Bloqueador solar</span>
+          <span class="am-chip" data-val="Repelente">🦟 Repelente</span>
+          <span class="am-chip" data-val="Agua suficiente">💧 Agua suficiente</span>
+          <span class="am-chip" data-val="Snacks energéticos">🍫 Snacks energéticos</span>
+          <span class="am-chip" data-val="Linterna">🔦 Linterna</span>
+          <span class="am-chip" data-val="Carpa y sleeping">⛺ Carpa y sleeping</span>
+          <span class="am-chip" data-val="Guía local obligatorio">👤 Guía local obligatorio</span>
+          <span class="am-chip" data-val="Permiso especial">📋 Permiso especial</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Mejor época para visitar</label>
+        <div class="am-chips" id="sitio-temporada-chips">
+          <span class="am-chip" data-val="Enero">Ene</span>
+          <span class="am-chip" data-val="Febrero">Feb</span>
+          <span class="am-chip" data-val="Marzo">Mar</span>
+          <span class="am-chip" data-val="Abril">Abr</span>
+          <span class="am-chip" data-val="Mayo">May</span>
+          <span class="am-chip" data-val="Junio">Jun</span>
+          <span class="am-chip" data-val="Julio">Jul</span>
+          <span class="am-chip" data-val="Agosto">Ago</span>
+          <span class="am-chip" data-val="Septiembre">Sep</span>
+          <span class="am-chip" data-val="Octubre">Oct</span>
+          <span class="am-chip" data-val="Noviembre">Nov</span>
+          <span class="am-chip" data-val="Diciembre">Dic</span>
+        </div>
+        <p class="field-hint">Selecciona los meses recomendados para visitar este lugar</p>
+      </div>
+
+      <div class="field">
+        <label>¿Se necesita reserva o permiso previo?</label>
+        <textarea id="sitio_permisos" rows="2" placeholder="Ej: Sí, se debe reservar con mínimo 3 días de anticipación a través de..."></textarea>
+      </div>
+    </div>
+
     <!-- FAQs -->
     <div class="form-card">
       <div class="form-card-title">❓ Preguntas frecuentes <span style="font-size:.8rem;font-weight:400;color:var(--muted)">opcionales</span></div>
@@ -672,10 +773,14 @@ document.querySelectorAll('.tipo-chip[data-cat]').forEach(function(chip) {
     document.querySelectorAll('.tipo-chip[data-cat]').forEach(function(c) { c.classList.remove('selected'); });
     chip.classList.add('selected');
     var cat = chip.getAttribute('data-cat');
+    // Hostal: mostrar tipo alojamiento, check-in, habitaciones
     document.getElementById('f-tipo-aloj').style.display = cat === 'hostal' ? 'block' : 'none';
     document.getElementById('f-checkin').style.display = cat === 'hostal' ? 'block' : 'none';
     var cardHab = document.getElementById('card-habitaciones');
     if (cardHab) cardHab.style.display = cat === 'hostal' ? 'block' : 'none';
+    // Sitio: mostrar detalles específicos de sitio turístico
+    var cardSitio = document.getElementById('card-sitio');
+    if (cardSitio) cardSitio.style.display = cat === 'sitio' ? 'block' : 'none';
   });
 });
 
@@ -898,7 +1003,18 @@ async function submitForm() {
     airbnb_url: v('airbnb_url') || null,
     amenidades: amenidades,
     habitaciones: habitaciones,
-    faqs: faqs
+    faqs: faqs,
+    // Campos específicos de sitio turístico
+    sitio_tipo_actividad: v('sitio_tipo_actividad') || null,
+    sitio_dificultad: v('sitio_dificultad') || null,
+    sitio_duracion: v('sitio_duracion') || null,
+    sitio_horario: v('sitio_horario') || null,
+    sitio_precio_entrada: v('sitio_precio_entrada') || null,
+    sitio_distancia: v('sitio_distancia') || null,
+    sitio_como_llegar: v('sitio_como_llegar') || null,
+    sitio_equipamiento: Array.from(document.querySelectorAll('#sitio-equip-chips .am-chip.selected')).map(function(c){ return c.getAttribute('data-val'); }),
+    sitio_temporada: Array.from(document.querySelectorAll('#sitio-temporada-chips .am-chip.selected')).map(function(c){ return c.getAttribute('data-val'); }),
+    sitio_permisos: v('sitio_permisos') || null
   };
 
   try {
