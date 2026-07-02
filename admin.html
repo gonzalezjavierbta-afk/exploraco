@@ -1133,22 +1133,62 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div class="cat-panel" id="cat-sitio-dificultad">
             <div class="form-row">
               <div class="form-group">
+                <label class="form-label">Tipo de actividad</label>
+                <select class="form-input form-select" id="f-tipo-actividad">
+                  <option value="">Seleccionar...</option>
+                  <option value="Senderismo">🥾 Senderismo / Trekking</option>
+                  <option value="Naturaleza">🌿 Naturaleza y ecoturismo</option>
+                  <option value="Playa">🏖️ Playa y acuático</option>
+                  <option value="Aventura">🧗 Aventura / Deportes</option>
+                  <option value="Cultural">🏛️ Cultural / Histórico</option>
+                  <option value="Religioso">⛪ Religioso / Espiritual</option>
+                  <option value="Miradores">🔭 Miradores / Paisajes</option>
+                  <option value="Arqueología">🗿 Arqueología</option>
+                  <option value="Parque nacional">🌲 Parque nacional</option>
+                </select>
+              </div>
+              <div class="form-group">
                 <label class="form-label">Nivel de dificultad</label>
                 <select class="form-input form-select" id="f-dificultad">
-                  <option value="1">🟢 Fácil</option>
-                  <option value="2">🟡 Moderado</option>
-                  <option value="3">🟠 Difícil</option>
-                  <option value="4">🔴 Técnico</option>
+                  <option value="">Seleccionar...</option>
+                  <option value="Fácil">🟢 Fácil — Apto para todos</option>
+                  <option value="Moderado">🟡 Moderado — Algo de esfuerzo</option>
+                  <option value="Difícil">🔴 Difícil — Buena condición física</option>
+                  <option value="Experto">⚫ Experto — Solo con guía</option>
                 </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Duración aproximada</label>
+                <input class="form-input" id="f-duracion" type="text" placeholder="Ej: 2-3 horas · 4 días / 3 noches">
               </div>
               <div class="form-group">
                 <label class="form-label">Altitud m.s.n.m.</label>
                 <input class="form-input" id="f-altitud" type="number" placeholder="2600">
               </div>
             </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Precio de entrada</label>
+                <input class="form-input" id="f-entrada-precio" type="text" placeholder="Ej: Gratis · $15.000 · $25.000 extranjeros">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Distancia desde ciudad</label>
+                <input class="form-input" id="f-distancia-sitio" type="text" placeholder="Ej: 35 km de Bogotá · 2h desde Medellín">
+              </div>
+            </div>
             <div class="form-group">
-              <label class="form-label">Nota de temporada</label>
-              <textarea class="form-input" id="f-temporada" rows="2" placeholder="Mejor época: diciembre–marzo. Evitar en lluvias…"></textarea>
+              <label class="form-label">Cómo llegar</label>
+              <textarea class="form-input" id="f-como-llegar-sitio" rows="2" placeholder="Transporte público, carro, si necesita guía..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Permisos y reserva previa</label>
+              <textarea class="form-input" id="f-permisos-sitio" rows="2" placeholder="¿Se necesita reserva anticipada o permiso especial?"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mejor época / Temporada</label>
+              <textarea class="form-input" id="f-temporada" rows="2" placeholder="Ej: Mejor época: dic–mar (temporada seca). Evitar abr–may (lluvias)."></textarea>
             </div>
           </div>
         </div>
@@ -1919,6 +1959,7 @@ function clearForm() {
              'f-whatsapp','f-tel','f-email','f-web','f-instagram','f-booking',
              'f-rating','f-reviews','f-lat','f-lng','f-photo-hero','f-hero-bg',
              'f-rappi','f-ifood','f-delivery-zona','f-dificultad','f-altitud','f-temporada',
+             'f-tipo-actividad','f-entrada-precio','f-distancia-sitio','f-como-llegar-sitio','f-permisos-sitio',
              'f-fecha-ini','f-fecha-fin','f-edicion','f-sede',
              /* hostal-specific */
              'f-checkin','f-checkout','f-recepcion','f-cancelacion',
@@ -2126,6 +2167,60 @@ function loadForm(p) {
         });
       }
     },100);
+
+  if(p.cat === 'sitio') {
+    setTimeout(function(){
+      // Cargar campos específicos de sitio
+      var sitioMap = {
+        'f-tipo-actividad': p.tipo_actividad || '',
+        'f-dificultad':     p.dificultad || '',
+        'f-duracion':       p.duracion || '',
+        'f-altitud':        p.altitud || '',
+        'f-temporada':      p.temporada || '',
+        'f-entrada-precio': p.entradaPrecio || '',
+        'f-distancia-sitio':p.distancia_sitio || '',
+        'f-como-llegar-sitio': p.como_llegar_sitio || p.como_llegar || '',
+        'f-permisos-sitio': p.permisos_sitio || '',
+      };
+      Object.keys(sitioMap).forEach(function(id){
+        var el = document.getElementById(id);
+        if (el && sitioMap[id]) el.value = sitioMap[id];
+      });
+      // Cargar tours
+      var tourList = document.getElementById('tour-list-admin');
+      if (tourList && p.tours && p.tours.length) {
+        tourList.innerHTML = '';
+        p.tours.forEach(function(t){
+          var row = document.createElement('div');
+          row.className = 'tour-admin-row';
+          row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 100px auto;gap:6px;margin-bottom:6px';
+          row.innerHTML = '<input class="form-input" value="'+_esc(t.nombre||t.name||'')+'" placeholder="Nombre del tour">'
+            +'<input class="form-input" value="'+_esc(t.duracion||'')+'" placeholder="Duración">'
+            +'<input class="form-input" value="'+_esc(t.precio||'')+'" placeholder="Precio">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          tourList.appendChild(row);
+        });
+      }
+      // Cargar checklist/equipamiento
+      var checkList = document.getElementById('checklist-admin');
+      if (checkList && p.checklist && p.checklist.length) {
+        checkList.innerHTML = '';
+        p.checklist.forEach(function(item){
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;gap:6px;align-items:center';
+          row.innerHTML = '<input class="form-input checklist-item-row" value="'+_esc(typeof item==='string'?item:(item.item||item.nombre||''))+'" placeholder="Ítem" style="flex:1">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          checkList.appendChild(row);
+        });
+      }
+      // Cargar servicios/amenidades de sitio
+      if (p.amenities && p.amenities.length) {
+        document.querySelectorAll('#sitio-amenities-check input').forEach(function(cb){
+          cb.checked = p.amenities.indexOf(cb.value) !== -1;
+        });
+      }
+    }, 100);
+  }
 
   if(p.cat === 'evento') {
     setTimeout(function(){
@@ -2365,10 +2460,14 @@ function savePlace() {
 
   /* ── SITIO SPECIFIC ── */
   if(cat === 'sitio') {
+    p.tipo_actividad = v('f-tipo-actividad');
     p.dificultad = v('f-dificultad');
     p.altitud = v('f-altitud');
     p.temporada = v('f-temporada');
     p.duracion = v('f-duracion');
+    p.distancia_sitio = v('f-distancia-sitio');
+    p.como_llegar_sitio = v('f-como-llegar-sitio');
+    p.permisos_sitio = v('f-permisos-sitio');
     p.tours = collectTourItems();
     p.checklist = collectChecklistItems();
     p.amenities = collectAmenities('sitio-amenities-check');
@@ -3890,48 +3989,72 @@ function _placeToAPI(p) {
     }
   }
 
+  // Tags JSONB — datos específicos por categoría
+  var tagsObj = {};
+  // Hostal
+  if (p.checkin)       tagsObj.checkin       = p.checkin;
+  if (p.checkout)      tagsObj.checkout      = p.checkout;
+  if (p.habs && p.habs.length) tagsObj.habitaciones = p.habs;
+  if (p.amenities && p.amenities.length) tagsObj.amenidades = p.amenities;
+  if (p.faqs && p.faqs.length) tagsObj.faqs = p.faqs;
+  // Sitio turístico
+  if (p.cat === 'sitio') {
+    if (p.tipo_actividad)   tagsObj.tipo_actividad  = p.tipo_actividad;
+    if (p.dificultad)       tagsObj.dificultad      = p.dificultad;
+    if (p.duracion)         tagsObj.duracion        = p.duracion;
+    if (p.altitud)          tagsObj.altitud         = p.altitud;
+    if (p.temporada)        tagsObj.temporada       = p.temporada;
+    if (p.entradaPrecio)    tagsObj.precio_entrada  = p.entradaPrecio;
+    if (p.distancia_sitio)  tagsObj.distancia       = p.distancia_sitio;
+    if (p.como_llegar_sitio) tagsObj.como_llegar    = p.como_llegar_sitio;
+    if (p.permisos_sitio)   tagsObj.permisos        = p.permisos_sitio;
+    if (p.tours && p.tours.length) tagsObj.tours    = p.tours;
+    if (p.checklist && p.checklist.length) tagsObj.equipamiento = p.checklist;
+  }
+
   return {
     // Campos principales — nombres exactos del schema Neon
     slug:           p.slug||'',
     nombre:         p.name||'',
     categoria_slug: p.cat||'sitio',
     lead:           p.lead||'',
-    descripcion:    p.desc||'',           // desc → descripcion
+    descripcion:    p.desc||'',
     highlight:      p.highlight||'',
-    ciudad:         p.city||'',           // city → ciudad
+    ciudad:         p.city||'',
     region:         p.region||'',
     barrio:         p.barrio||'',
     lat:            p.lat||null,
     lng:            p.lng||null,
     whatsapp:       p.whatsapp||'',
-    telefono:       p.tel||'',            // tel → telefono
+    telefono:       p.tel||'',
     email:          p.email||'',
     web:            p.web||'',
     instagram:      p.instagram||'',
     booking:        p.booking||'',
     hostelworld:    p.hostelworld||'',
     airbnb:         p.airbnb||'',
-    precio_desde:   p.price||'',          // price → precio_desde
+    precio_desde:   p.price||'',
     horario:        p.horario||'',
-    emoji:          p.emoji||'📍',
+    emoji:          p.emoji||'',
     hero_bg:        p.hero_bg||'',
     foto_hero:      fotoHero,
     fotos_galeria:  galeriaUrls,
     tipo:           p.tipo||'',
     capacidad:      p.capacidad||'',
-    como_llegar:    p.como_llegar||'',
+    como_llegar:    p.como_llegar_sitio || p.como_llegar || '',
     status:         p.status||'published',
     destacado:      p.destacado||false,
-    // Detalles (destinos_detalles) — nombres exactos
-    habitaciones:   p.habs||[],           // habs → habitaciones
-    amenidades:     p.amenities||[],      // amenities → amenidades
+    tags:           tagsObj,
+    // Detalles (destinos_detalles)
+    habitaciones:   p.habs||[],
+    amenidades:     p.amenities||[],
     scores:         p.scores||{},
     faqs:           p.faqs||[],
-    transporte:     p.transport||[],      // transport → transporte
-    eventos_hostal: p.hostalEvents||[],   // hostalEvents → eventos_hostal
+    transporte:     p.transport||[],
+    eventos_hostal: p.hostalEvents||[],
     checkin:        p.checkin||'',
     checkout:       p.checkout||'',
-    booking_url:    p.bookingUrl||'',     // bookingUrl → booking_url
+    booking_url:    p.bookingUrl||'',
   };
 }
 
