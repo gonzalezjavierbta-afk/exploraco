@@ -1,5 +1,7 @@
-// api/pagina-destino.js — v8 PREMIUM
-// Sistema de diseño: Barlow Condensed + Outfit, paleta dorada/negra editorial
+// api/pagina-destino.js -- v9.20260702
+// CAMBIOS: diseno premium Barlow Condensed, seccion sitio turistico, tags JSONB, sin backticks
+
+// Sistema de diseno: Barlow Condensed + Outfit, paleta dorada/negra editorial
 // 100% basado en datos reales del formulario publicar.html y schema Neon
 // Sin contenido inventado: solo secciones con datos disponibles se renderizan
 
@@ -159,7 +161,7 @@ function buildHTML(d, det, fotos, resenas) {
   var faqs         = safeJSON(det.faqs);         if(!Array.isArray(faqs))         faqs=[];
   var checkin  = det.checkin  || '';
   var checkout = det.checkout || '';
-  // Campos específicos de sitio turístico desde tags JSONB
+  // Campos especificos de sitio turistico desde tags JSONB
   var tags = (d.tags && typeof d.tags === 'object') ? d.tags : {};
   var tipoActividad  = tags.tipo_actividad  || '';
   var dificultad     = tags.dificultad      || '';
@@ -181,7 +183,7 @@ function buildHTML(d, det, fotos, resenas) {
 
   var hasLatLng = d.lat && d.lng && parseFloat(d.lat)!==0 && parseFloat(d.lng)!==0;
 
-  // ── HERO: imagen principal + grid de hasta 3 más ──────────────
+  // -- HERO: imagen principal + grid de hasta 3 mas --------------
   var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
   var heroThumbs = '';
   if (galAll.length > 1) {
@@ -196,7 +198,7 @@ function buildHTML(d, det, fotos, resenas) {
   if (d.precio_desde) hqi.push('<div class="hqi">\\ud83d\\udcb0 Desde '+esc(money(d.precio_desde))+'</div>');
   if (d.horario) hqi.push('<div class="hqi">\\u23f0 '+esc(d.horario)+'</div>');
 
-  // ── GSTRIP (rating sticky bar) ─────────────────────────────────
+  // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
   if (nRes > 0 || d.precio_desde) {
     var starsHtml = [1,2,3,4,5].map(function(i){
@@ -212,7 +214,7 @@ function buildHTML(d, det, fotos, resenas) {
   var secNum = 1;
   function nextNum() { return secNum++; }
 
-  // ── SECCIÓN: Descripción ────────────────────────────────────────
+  // -- SECCI??N: Descripcion ----------------------------------------
   var secDescripcion = '<section class="ssec bwarm" id="descripcion"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">'+nextNum()+'</div></div>'
     + (d.lead ? '<p class="slead bc">'+esc(d.lead)+'</p>' : '')
@@ -221,7 +223,7 @@ function buildHTML(d, det, fotos, resenas) {
     + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
     + '</div></section>';
 
-  // ── SECCIÓN: Info rápida (iconos) ───────────────────────────────
+  // -- SECCI??N: Info rapida (iconos) -------------------------------
   var infoCards = [];
   if (d.tipo)     infoCards.push({ico:'\\ud83c\\udfe0',lbl:'Tipo',val:d.tipo});
   if (checkin)    infoCards.push({ico:'\\u23f0',lbl:'Check-in',val:checkin+(checkout?' / '+checkout:'')});
@@ -236,8 +238,8 @@ function buildHTML(d, det, fotos, resenas) {
         return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
       }).join('')+'</div></div></section>' : '';
 
-  // ── SECCIÓN: Galería ─────────────────────────────────────────────
-  // ── SECCIÓN: Datos específicos del sitio turístico ──────────────
+  // -- SECCI??N: Galeria ---------------------------------------------
+  // -- SECCI??N: Datos especificos del sitio turistico --------------
   var secSitio = '';
   if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
     var sitioCards = [];
@@ -264,7 +266,7 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="gal">'+galAll.map(function(u){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"></div>'; }).join('')+'</div>'
     + '</div></section>' : '';
 
-  // ── SECCIÓN: Habitaciones / precios (solo hostal) ────────────────
+  // -- SECCI??N: Habitaciones / precios (solo hostal) ----------------
   var secHabitaciones = '';
   if (habitaciones.length) {
     secHabitaciones = '<section class="ssec bwhite" id="habitaciones"><div class="sin">'
@@ -279,7 +281,7 @@ function buildHTML(d, det, fotos, resenas) {
       + '</tbody></table></div></section>';
   }
 
-  // ── SECCIÓN: Reservar / links externos ────────────────────────────
+  // -- SECCI??N: Reservar / links externos ----------------------------
   var rbtns = [];
   if (d.whatsapp) rbtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\\ud83d\\udcac WhatsApp</a>');
   if (bookingUrl) rbtns.push('<a class="cbtn dark" href="'+esc(bookingUrl)+'" target="_blank">\\ud83c\\udfe8 Booking.com</a>');
@@ -290,7 +292,7 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reservar</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+rbtns.join('')+'</div></div></section>' : '';
 
-  // ── SECCIÓN: Mapa ──────────────────────────────────────────────
+  // -- SECCI??N: Mapa ----------------------------------------------
   var secMapa = '';
   if (hasLatLng) {
     var mapBtns = [];
@@ -305,13 +307,13 @@ function buildHTML(d, det, fotos, resenas) {
       + '</div></section>';
   }
 
-  // ── SECCIÓN: FAQ ───────────────────────────────────────────────
+  // -- SECCI??N: FAQ -----------------------------------------------
   var secFaq = faqs.length ? '<section class="ssec bwarm" id="faq"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes</h2><div class="stnum">'+nextNum()+'</div></div>'
     + faqs.map(function(f){ return '<details class="faqi"><summary>'+esc(f.pregunta||f.q||'')+'</summary><p>'+esc(f.respuesta||f.a||'')+'</p></details>'; }).join('')
     + '</div></section>' : '';
 
-  // ── SECCIÓN: Reseñas ────────────────────────────────────────────
+  // -- SECCI??N: Resenas --------------------------------------------
   var rvHtml = '';
   if ((resenas||[]).length) {
     rvHtml = (resenas||[]).map(function(r){
@@ -345,7 +347,7 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="wrok" id="rvok">\\u2705 \\u00a1Gracias por tu rese\\u00f1a!</div>'
     + '</div></div></section>';
 
-  // ── SECCIÓN: Contacto ────────────────────────────────────────────
+  // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
   if (hasLatLng) ctBtns.push('<a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\\ud83d\\uddfa\\ufe0f Google Maps</a>');
   if (d.whatsapp) ctBtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\\ud83d\\udcac WhatsApp</a>');
@@ -358,7 +360,7 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+ctBtns.join('')+'</div></div></section>' : '';
 
-  // ── ENSAMBLAR ────────────────────────────────────────────────────
+  // -- ENSAMBLAR ----------------------------------------------------
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
     + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
     + '<title>'+esc(d.nombre)+' \\u2013 ExploraCO</title>\n'

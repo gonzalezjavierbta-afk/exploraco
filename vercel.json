@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/sitemap.xml",       "destination": "/api/utilidades?tipo=sitemap"    },
-    { "source": "/:slug.html",        "destination": "/api/pagina-destino?slug=:slug"  }
+    { "source": "/sitemap.xml",  "destination": "/api/utilidades?tipo=sitemap" },
+    { "source": "/:slug.html",   "destination": "/api/pagina-destino?slug=:slug" }
   ],
   "headers": [
     {
@@ -13,8 +13,17 @@
       ]
     },
     {
+      "source": "/admin.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "Pragma",        "value": "no-cache" }
+      ]
+    },
+    {
       "source": "/(.*)\\.js",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=86400" }]
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
     },
     {
       "source": "/robots.txt",

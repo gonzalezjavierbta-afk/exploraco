@@ -4492,6 +4492,29 @@ function escH(s) {
 
 
 
+
+// ── AUTO-DIAGNÓSTICO DE VERSIÓN ──────────────────────────────────
+(function checkVersion() {
+  var VERSION = 'admin-v9.20260702';
+  var checks = [
+    ['f-tipo-actividad', !!document.getElementById('f-tipo-actividad'),   'Campo tipo actividad (sitio)'],
+    ['f-distancia-sitio',!!document.getElementById('f-distancia-sitio'),  'Campo distancia (sitio)'],
+    ['f-permisos-sitio', !!document.getElementById('f-permisos-sitio'),   'Campo permisos (sitio)'],
+    ['toggleDestacadoId',typeof toggleDestacadoId === 'function',         'Botón destacar en tabla'],
+    ['deletePlaceId-neon',typeof deletePlaceId === 'function',            'Borrar en Neon'],
+    ['renderDashboard-async', typeof renderDashboard === 'function',      'Dashboard analítica'],
+  ];
+  var allOk = checks.every(function(c){ return c[1]; });
+  var icon = allOk ? '✅' : '⚠️';
+  console.groupCollapsed(icon + ' ExploraCO Admin ' + VERSION + (allOk ? ' — todo OK' : ' — revisar checks'));
+  checks.forEach(function(c){
+    console.log((c[1] ? '  ✅' : '  ❌') + ' ' + c[2] + ' [' + c[0] + ']');
+  });
+  if (!allOk) {
+    console.warn('⚠️  Algunos checks fallaron. Haz Ctrl+Shift+R para forzar recarga sin caché.');
+  }
+  console.groupEnd();
+})();
 </script>
 </body>
 </html>
