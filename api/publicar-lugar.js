@@ -148,20 +148,20 @@ module.exports = async function handler(req, res) {
     try {
       fetch(
         (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app')
-        + '/api/notificaciones',
+        + '/api/admin?recurso=notificaciones',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Internal-Secret': process.env.ADMIN_SECRET || 'exploraco12345',
+            'Authorization': 'Bearer ' + (process.env.ADMIN_SECRET || 'exploraco12345'),
           },
           body: JSON.stringify({
             tipo:             'solicitud',
-            nombre:           String(data.nombre).trim(),
+            nombre:           String(body.nombre).trim(),
             categoria:        catSlug,
-            ciudad:           String(data.ciudad).trim(),
-            whatsapp:         data.whatsapp || '',
-            descripcion_corta:String(data.descripcion_corta).trim(),
+            ciudad:           String(body.ciudad).trim(),
+            whatsapp:         body.whatsapp || '',
+            descripcion_corta:String(body.descripcion_corta||'').trim(),
             precio_desde:     precio || '',
           }),
         }
