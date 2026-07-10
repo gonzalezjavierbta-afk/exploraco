@@ -152,7 +152,16 @@ function buildHTML(d, det, fotos, resenas) {
   var label = CAT_LABEL[cat] || 'Destino';
   var dir   = CAT_DIR[cat]   || 'index.html';
   var grad  = d.hero_bg || CAT_GRAD[cat] || CAT_GRAD.sitio;
-  var hero  = d.foto_hero || '';
+  // foto_hero puede venir como foto_hero, foto, o photos[0]
+  var hero = d.foto_hero || d.foto || '';
+  // Si no hay foto, usar un Unsplash generico por categoria
+  var heroFallbacks = {
+    hostal: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
+    comida: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80',
+    sitio:  'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    evento: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&q=80',
+  };
+  if (!hero) hero = heroFallbacks[cat] || heroFallbacks.sitio;
   var rat   = d.rating ? parseFloat(d.rating) : 0;
   var nRes  = parseInt(d.total_resenas||0);
 
@@ -178,8 +187,10 @@ function buildHTML(d, det, fotos, resenas) {
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
   var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
 
-  var galAll = (fotos||[]).map(function(f){ return f.url; }).filter(Boolean);
+  var galAll = (fotos||[]).map(function(f){ return f.url || f; }).filter(Boolean);
   if (hero && galAll.indexOf(hero) === -1) galAll.unshift(hero);
+  // Si no hay galeria, usar el hero como unica foto
+  if (!galAll.length && hero) galAll = [hero];
 
   var hasLatLng = d.lat && d.lng && parseFloat(d.lat)!==0 && parseFloat(d.lng)!==0;
 
@@ -475,7 +486,7 @@ module.exports = async function handler(req, res) {
 
     var html = buildHTML(d, det, fotosRows, resenasRows);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);
 
   } catch (err) {
