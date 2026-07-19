@@ -1118,9 +1118,12 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
         <div id="especifico-sitio" class="cat-panel">
           <div class="cat-editor-tabs">
-            <div class="cetab on" onclick="showCatTab('sitio-tours')">🧭 Tours</div>
-            <div class="cetab" onclick="showCatTab('sitio-checklist')">🎒 Qué llevar</div>
-            <div class="cetab" onclick="showCatTab('sitio-dificultad')">📊 Dificultad y época</div>
+            <div class="cetab on" onclick="showCatTab('sitio-tours')">Tours</div>
+            <div class="cetab" onclick="showCatTab('sitio-checklist')">Que llevar</div>
+            <div class="cetab" onclick="showCatTab('sitio-dificultad')">Dificultad</div>
+            <div class="cetab" onclick="showCatTab('sitio-entradas')">Entradas</div>
+            <div class="cetab" onclick="showCatTab('sitio-itinerario')">Itinerario</div>
+            <div class="cetab" onclick="showCatTab('sitio-extras')">Extras</div>
           </div>
           <div class="cat-panel on" id="cat-sitio-tours">
             <div id="tour-list-admin" style="margin-bottom:8px"></div>
@@ -1192,6 +1195,36 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             </div>
           </div>
         </div>
+
+          <!-- ENTRADAS Y PRECIOS -->
+          <div class="cat-panel" id="cat-sitio-entradas">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Agrega tipos de entrada con precio. Ej: Nacional adulto, Extranjero, Estudiante...</p>
+            <div id="entradas-list-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addEntradaItem()">+ Agregar tipo de entrada</button>
+          </div>
+
+          <!-- ITINERARIO DIA A DIA -->
+          <div class="cat-panel" id="cat-sitio-itinerario">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Describe el itinerario dia a dia. Ej: Dia 1: Llegada y acampada...</p>
+            <div id="itinerario-list-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addItinerarioItem()">+ Agregar dia</button>
+          </div>
+
+          <!-- EXTRAS: fauna, secretos, regulaciones -->
+          <div class="cat-panel" id="cat-sitio-extras">
+            <div class="form-group">
+              <label class="form-label">Fauna y flora destacada</label>
+              <textarea class="form-input" id="f-fauna-flora" rows="3" placeholder="Ej: Colibries, orquideas, monos titi, dantas... Separar por comas."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lo que nadie te dice (secretos y tips)</label>
+              <textarea class="form-input" id="f-secretos" rows="3" placeholder="Ej: Llevar efectivo, el sendero del medio es mas facil, reservar con 2 semanas de anticipacion..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Permisos y regulaciones</label>
+              <textarea class="form-input" id="f-regulaciones" rows="3" placeholder="Ej: Cupo maximo 200 personas/dia. No se permiten mascotas. Guia obligatorio..."></textarea>
+            </div>
+          </div>
 
         <div id="especifico-evento" class="cat-panel">
           <div class="cat-editor-tabs">
@@ -1959,7 +1992,7 @@ function clearForm() {
              'f-whatsapp','f-tel','f-email','f-web','f-instagram','f-booking',
              'f-rating','f-reviews','f-lat','f-lng','f-photo-hero','f-hero-bg',
              'f-rappi','f-ifood','f-delivery-zona','f-dificultad','f-altitud','f-temporada',
-             'f-tipo-actividad','f-entrada-precio','f-distancia-sitio','f-como-llegar-sitio','f-permisos-sitio',
+             'f-tipo-actividad','f-entrada-precio','f-distancia-sitio','f-como-llegar-sitio','f-permisos-sitio','f-fauna-flora','f-secretos','f-regulaciones',
              'f-fecha-ini','f-fecha-fin','f-edicion','f-sede',
              /* hostal-specific */
              'f-checkin','f-checkout','f-recepcion','f-cancelacion',
@@ -2219,6 +2252,43 @@ function loadForm(p) {
           cb.checked = p.amenities.indexOf(cb.value) !== -1;
         });
       }
+      // Cargar campos extras
+      var extrasMap = {
+        'f-fauna-flora': p.fauna_flora || '',
+        'f-secretos':    p.secretos    || '',
+        'f-regulaciones':p.regulaciones|| '',
+      };
+      Object.keys(extrasMap).forEach(function(id){
+        var el = document.getElementById(id);
+        if(el && extrasMap[id]) el.value = extrasMap[id];
+      });
+      // Cargar entradas
+      var entList = document.getElementById('entradas-list-admin');
+      if(entList && p.entradas && p.entradas.length) {
+        entList.innerHTML = '';
+        p.entradas.forEach(function(e){
+          var row = document.createElement('div');
+          row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 80px auto;gap:6px';
+          row.innerHTML = '<input class="form-input entrada-tipo" value="'+(e.tipo||'')+'" placeholder="Tipo">'
+            +'<input class="form-input entrada-precio" value="'+(e.precio||'')+'" placeholder="Precio">'
+            +'<input class="form-input entrada-nota" value="'+(e.nota||'')+'" placeholder="Nota">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">x</button>';
+          entList.appendChild(row);
+        });
+      }
+      // Cargar itinerario
+      var itiList = document.getElementById('itinerario-list-admin');
+      if(itiList && p.itinerario && p.itinerario.length) {
+        itiList.innerHTML = '';
+        p.itinerario.forEach(function(it){
+          var row = document.createElement('div');
+          row.style.cssText = 'display:grid;grid-template-columns:80px 1fr auto;gap:6px';
+          row.innerHTML = '<input class="form-input itinerario-dia" value="'+(it.dia||'')+'" placeholder="Dia">'
+            +'<textarea class="form-input itinerario-desc" rows="2" placeholder="Descripcion...">'+(it.descripcion||'')+'</textarea>'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="height:36px">x</button>';
+          itiList.appendChild(row);
+        });
+      }
     }, 100);
   }
 
@@ -2473,6 +2543,12 @@ function savePlace() {
     p.amenities = collectAmenities('sitio-amenities-check');
     var _el = document.getElementById('f-entrada-libre'); p.entradaLibre = _el ? _el.checked : false;
     p.entradaPrecio = v('f-entrada-precio');
+    // Nuevos campos
+    p.entradas = collectEntradas ? collectEntradas() : [];
+    p.itinerario = collectItinerario ? collectItinerario() : [];
+    p.fauna_flora = v('f-fauna-flora');
+    p.secretos = v('f-secretos');
+    p.regulaciones = v('f-regulaciones');
   }
 
   /* ── EVENTO SPECIFIC ── */
@@ -2535,6 +2611,57 @@ function deletePlace() {
   deletePlaceId(currentId);
   showScreen('tabla');
 }
+function addEntradaItem() {
+  var list = document.getElementById('entradas-list-admin');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 80px auto;gap:6px';
+  row.innerHTML = '<input class="form-input entrada-tipo" placeholder="Tipo (Ej: Nacional adulto)">'
+    +'<input class="form-input entrada-precio" placeholder="Precio (Ej: $26.000)">'
+    +'<input class="form-input entrada-nota" placeholder="Nota">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">x</button>';
+  list.appendChild(row);
+}
+
+function collectEntradas() {
+  var rows = document.querySelectorAll('#entradas-list-admin > div');
+  var result = [];
+  rows.forEach(function(row) {
+    var tipo = row.querySelector('.entrada-tipo');
+    var precio = row.querySelector('.entrada-precio');
+    var nota = row.querySelector('.entrada-nota');
+    if(tipo && tipo.value.trim()) {
+      result.push({tipo: tipo.value.trim(), precio: precio ? precio.value.trim() : '', nota: nota ? nota.value.trim() : ''});
+    }
+  });
+  return result;
+}
+
+function addItinerarioItem() {
+  var list = document.getElementById('itinerario-list-admin');
+  if(!list) return;
+  var n = list.children.length + 1;
+  var row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:80px 1fr auto;gap:6px';
+  row.innerHTML = '<input class="form-input itinerario-dia" value="Dia '+n+'" placeholder="Dia">'
+    +'<textarea class="form-input itinerario-desc" rows="2" placeholder="Descripcion del dia '+n+'..."></textarea>'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="height:36px">x</button>';
+  list.appendChild(row);
+}
+
+function collectItinerario() {
+  var rows = document.querySelectorAll('#itinerario-list-admin > div');
+  var result = [];
+  rows.forEach(function(row) {
+    var dia = row.querySelector('.itinerario-dia');
+    var desc = row.querySelector('.itinerario-desc');
+    if(dia && dia.value.trim()) {
+      result.push({dia: dia.value.trim(), descripcion: desc ? desc.value.trim() : ''});
+    }
+  });
+  return result;
+}
+
 async function deletePlaceId(id) {
   var p = places.find(function(x){ return x.id===id; });
   if(!p) return;
@@ -4008,8 +4135,13 @@ function _placeToAPI(p) {
     if (p.distancia_sitio)  tagsObj.distancia       = p.distancia_sitio;
     if (p.como_llegar_sitio) tagsObj.como_llegar    = p.como_llegar_sitio;
     if (p.permisos_sitio)   tagsObj.permisos        = p.permisos_sitio;
-    if (p.tours && p.tours.length) tagsObj.tours    = p.tours;
-    if (p.checklist && p.checklist.length) tagsObj.equipamiento = p.checklist;
+    if (p.tours && p.tours.length)         tagsObj.tours         = p.tours;
+    if (p.checklist && p.checklist.length) tagsObj.equipamiento   = p.checklist;
+    if (p.entradas && p.entradas.length)   tagsObj.entradas       = p.entradas;
+    if (p.itinerario && p.itinerario.length) tagsObj.itinerario   = p.itinerario;
+    if (p.fauna_flora)  tagsObj.fauna_flora  = p.fauna_flora;
+    if (p.secretos)     tagsObj.secretos     = p.secretos;
+    if (p.regulaciones) tagsObj.regulaciones = p.regulaciones;
   }
 
   return {

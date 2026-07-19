@@ -182,6 +182,12 @@ function buildHTML(d, det, fotos, resenas) {
   var permisos       = tags.permisos        || '';
   var equipamiento   = safeJSON(tags.equipamiento); if(!Array.isArray(equipamiento)) equipamiento=[];
   var temporada      = safeJSON(tags.temporada);    if(!Array.isArray(temporada))    temporada=[];
+  var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
+  var tours          = safeJSON(tags.tours);         if(!Array.isArray(tours))        tours=[];
+  var itinerario     = safeJSON(tags.itinerario);   if(!Array.isArray(itinerario))   itinerario=[];
+  var faunaFlora     = tags.fauna_flora  || '';
+  var secretos       = tags.secretos     || '';
+  var regulaciones   = tags.regulaciones || '';
 
   var bookingUrl = det.booking_url     || d.booking     || '';
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
@@ -272,7 +278,106 @@ function buildHTML(d, det, fotos, resenas) {
       + '</div></section>';
   }
 
-    var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
+    // -- SECCION: Entradas y precios ----------------------------
+  var secEntradas = '';
+  if (cat === 'sitio' && entradas.length) {
+    secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Nota</th></tr></thead><tbody>'
+      + entradas.map(function(e){
+          return '<tr><td class="entrada-tipo">'+esc(e.tipo||'')+'</td>'
+            + '<td class="entrada-precio">'+esc(e.precio||'')+'</td>'
+            + '<td style="font-size:12px;color:#666">'+esc(e.nota||'')+'</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+      + (d.whatsapp ? '<p style="margin-top:12px;font-size:12px;color:#666">Reservas: <a href="https://wa.me/'+esc(d.whatsapp)+'" style="color:var(--gold-dark);font-weight:700">WhatsApp</a></p>' : '')
+      + '</div></section>';
+  }
+
+  // -- SECCION: Tours disponibles -------------------------------
+  var secTours = '';
+  if (cat === 'sitio' && tours.length) {
+    secTours = '<section class="ssec bwarm" id="tours"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tours disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="igrid">'
+      + tours.map(function(t){
+          return '<div class="icard">'
+            + '<div class="iico">[tour]</div>'
+            + '<div class="ival">'+esc(t.nombre||t.name||'')+'</div>'
+            + (t.duracion ? '<div class="ilbl">'+esc(t.duracion)+'</div>' : '')
+            + (t.precio ? '<div style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:900;color:var(--gold-dark)">'+esc(t.precio)+'</div>' : '')
+            + '</div>';
+        }).join('')
+      + '</div></div></section>';
+  }
+
+  // -- SECCION: Que llevar --------------------------------------
+  var secChecklist = '';
+  if (cat === 'sitio' && equipamiento.length) {
+    secChecklist = '<section class="ssec bwhite" id="checklist"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que llevar</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="tagrow">'
+      + equipamiento.map(function(e){
+          return '<span class="tpill">[ok] '+esc(typeof e==='string'?e:(e.item||e.nombre||e))+'</span>';
+        }).join('')
+      + '</div></div></section>';
+  }
+
+  // -- SECCION: Itinerario --------------------------------------
+  var secItinerario = '';
+  if (cat === 'sitio' && itinerario.length) {
+    secItinerario = '<section class="ssec bwarm" id="itinerario"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Itinerario</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div style="display:flex;flex-direction:column;gap:14px">'
+      + itinerario.map(function(it, i){
+          return '<div style="display:flex;gap:14px;align-items:flex-start">'
+            + '<div style="width:32px;height:32px;border-radius:50%;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Barlow Condensed,sans-serif;font-weight:900;font-size:14px;flex-shrink:0">'+(i+1)+'</div>'
+            + '<div><div style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">'+esc(it.dia||('Dia '+(i+1)))+'</div>'
+            + '<p style="font-size:13px;color:#444;line-height:1.7">'+esc(it.descripcion||'')+'</p></div>'
+            + '</div>';
+        }).join('')
+      + '</div></div></section>';
+  }
+
+  // -- SECCION: Fauna y flora -----------------------------------
+  var secFauna = '';
+  if (cat === 'sitio' && faunaFlora) {
+    var faunaItems = faunaFlora.split(',').map(function(f){ return f.trim(); }).filter(Boolean);
+    secFauna = '<section class="ssec bwhite" id="fauna"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Fauna y flora</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + (faunaItems.length > 1
+          ? '<div class="tagrow">'+faunaItems.map(function(f){ return '<span class="tpill" style="background:#F0FDF4;color:#14532d">[planta] '+esc(f)+'</span>'; }).join('')+'</div>'
+          : '<p class="stext">'+esc(faunaFlora)+'</p>')
+      + '</div></section>';
+  }
+
+  // -- SECCION: Secretos y tips ---------------------------------
+  var secSecretos = '';
+  if (cat === 'sitio' && secretos) {
+    var secretosList = secretos.split(/[.\n]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 5; });
+    secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + (secretosList.length > 1
+          ? '<div style="display:flex;flex-direction:column;gap:8px">'+secretosList.map(function(s){
+              return '<div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--gold);font-weight:900;flex-shrink:0">[ok]</span><span style="font-size:13px;color:#444;line-height:1.6">'+esc(s)+'</span></div>';
+            }).join('')+'</div>'
+          : '<p class="stext">'+esc(secretos)+'</p>')
+      + '</div></section>';
+  }
+
+  // -- SECCION: Permisos y regulaciones -------------------------
+  var secRegulaciones = '';
+  if (cat === 'sitio' && regulaciones) {
+    secRegulaciones = '<section class="ssec bwhite" id="regulaciones"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Permisos y regulaciones</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="hbox" style="background:#FEF3C7;border-color:#D97706">'
+      + '<span class="hbico">[aviso]</span>'
+      + '<div><div class="hblbl" style="color:#92400E">Importante</div>'
+      + '<div class="hbtx" style="color:#78350F">'+esc(regulaciones).replace(/\n/g,'<br>')+'</div></div></div>'
+      + '</div></section>';
+  }
+
+  var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="gal">'+galAll.map(function(u){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"></div>'; }).join('')+'</div>'
     + '</div></section>' : '';
@@ -408,6 +513,13 @@ function buildHTML(d, det, fotos, resenas) {
     + secDescripcion + '\n'
     + secInfo + '\n'
     + secSitio + '\n'
+    + secEntradas + '\n'
+    + secTours + '\n'
+    + secChecklist + '\n'
+    + secItinerario + '\n'
+    + secFauna + '\n'
+    + secSecretos + '\n'
+    + secRegulaciones + '\n'
     + secGaleria + '\n'
     + secHabitaciones + '\n'
     + secReservar + '\n'
