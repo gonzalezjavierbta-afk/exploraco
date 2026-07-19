@@ -1194,20 +1194,19 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <textarea class="form-input" id="f-temporada" rows="2" placeholder="Ej: Mejor epoca: dic-mar (temporada seca). Evitar abr-may (lluvias)."></textarea>
             </div>
           </div>
-        </div>
-
-          <!-- ENTRADAS Y PRECIOS -->
+        
+!-- ENTRADAS Y PRECIOS -->
           <div class="cat-panel" id="cat-sitio-entradas">
             <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Agrega tipos de entrada con precio. Ej: Nacional adulto, Extranjero, Estudiante...</p>
             <div id="entradas-list-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
-            <button class="btn btn-ghost btn-sm" onclick="addEntradaItem()">+ Agregar tipo de entrada</button>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioEntradaItem()">+ Agregar tipo de entrada</button>
           </div>
 
           <!-- ITINERARIO DIA A DIA -->
           <div class="cat-panel" id="cat-sitio-itinerario">
             <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Describe el itinerario dia a dia. Ej: Dia 1: Llegada y acampada...</p>
             <div id="itinerario-list-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
-            <button class="btn btn-ghost btn-sm" onclick="addItinerarioItem()">+ Agregar dia</button>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioItinerarioItem()">+ Agregar dia</button>
           </div>
 
           <!-- EXTRAS: fauna, secretos, regulaciones -->
@@ -1226,7 +1225,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             </div>
           </div>
 
-        <div id="especifico-evento" class="cat-panel">
+        <div         </div>
+
+        id="especifico-evento" class="cat-panel">
           <div class="cat-editor-tabs">
             <div class="cetab on" onclick="showCatTab('evento-info')">📅 Fechas y sede</div>
             <div class="cetab" onclick="showCatTab('evento-lineup')">🎤 Lineup / Artistas</div>
@@ -2544,8 +2545,8 @@ function savePlace() {
     var _el = document.getElementById('f-entrada-libre'); p.entradaLibre = _el ? _el.checked : false;
     p.entradaPrecio = v('f-entrada-precio');
     // Nuevos campos
-    p.entradas = collectEntradas ? collectEntradas() : [];
-    p.itinerario = collectItinerario ? collectItinerario() : [];
+    p.entradas = collectSitioEntradas ? collectSitioEntradas() : [];
+    p.itinerario = collectSitioItinerario ? collectSitioItinerario() : [];
     p.fauna_flora = v('f-fauna-flora');
     p.secretos = v('f-secretos');
     p.regulaciones = v('f-regulaciones');
@@ -2611,7 +2612,7 @@ function deletePlace() {
   deletePlaceId(currentId);
   showScreen('tabla');
 }
-function addEntradaItem() {
+function addSitioEntradaItem() {
   var list = document.getElementById('entradas-list-admin');
   if(!list) return;
   var row = document.createElement('div');
@@ -2623,7 +2624,7 @@ function addEntradaItem() {
   list.appendChild(row);
 }
 
-function collectEntradas() {
+function collectSitioEntradas() {
   var rows = document.querySelectorAll('#entradas-list-admin > div');
   var result = [];
   rows.forEach(function(row) {
@@ -2637,7 +2638,7 @@ function collectEntradas() {
   return result;
 }
 
-function addItinerarioItem() {
+function addSitioItinerarioItem() {
   var list = document.getElementById('itinerario-list-admin');
   if(!list) return;
   var n = list.children.length + 1;
@@ -2649,7 +2650,7 @@ function addItinerarioItem() {
   list.appendChild(row);
 }
 
-function collectItinerario() {
+function collectSitioItinerario() {
   var rows = document.querySelectorAll('#itinerario-list-admin > div');
   var result = [];
   rows.forEach(function(row) {
