@@ -1,455 +1,676 @@
-// api/pagina-destino.js  v5 — schema 100% real confirmado
-// interacciones: rating (no puntuacion), creado_en (no created_at), sin usuario_nombre
-// destinos_detalles: habitaciones, amenidades, faqs como JSONB separados
-// destinos: tags JSONB para datos extra del formulario público
+// api/pagina-destino.js -- v9.20260702
+// CAMBIOS: diseno premium Barlow Condensed, seccion sitio turistico, tags JSONB, sin backticks
+
+// Sistema de diseno: Barlow Condensed + Outfit, paleta dorada/negra editorial
+// 100% basado en datos reales del formulario publicar.html y schema Neon
+// Sin contenido inventado: solo secciones con datos disponibles se renderizan
 
 const { neon } = require('@neondatabase/serverless');
 
-const ICONS  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉' };
-const LABELS = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
-const DIRS   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
+var BASE = 'https://exploraco.co';
+var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
+var CAT_DIR   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
+var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'linear-gradient(135deg,#3a1a0a,#4a2a1a)', sitio:'linear-gradient(135deg,#0a2a1a,#1a3a2a)', evento:'linear-gradient(135deg,#1a051a,#3a1a3a)' };
 
-function e(s) {
-  if (s===null||s===undefined) return '';
+function esc(s) {
+  if (s === null || s === undefined) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-function safeJSON(val) {
-  if (!val) return null;
-  if (typeof val === 'object') return val;
-  try { return JSON.parse(val); } catch(_) { return null; }
+function safeJSON(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'object') return v;
+  try { var r = JSON.parse(v); return r; } catch(_) { return []; }
+}
+function money(n) {
+  if (!n) return '';
+  var s = String(n).replace(/[^0-9]/g, '');
+  if (!s) return esc(n);
+  return '$' + parseInt(s,10).toLocaleString('es-CO');
 }
 
-function buildHTML(d, detalles, fotos, resenas) {
-  var cat    = d.categoria_slug || 'sitio';
-  var icon   = ICONS[cat]  || '📍';
-  var label  = LABELS[cat] || 'Destino';
-  var dir    = DIRS[cat]   || 'index.html';
-  var hero   = d.foto_hero || 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80';
-  var rat    = d.rating ? Number(d.rating).toFixed(1) : null;
-  var nRes   = parseInt(d.total_resenas||0);
-  var precio = d.precio_desde || null;
+function schemaLD(d, cat) {
+  var tipos = { hostal:'LodgingBusiness', comida:'FoodEstablishment', sitio:'TouristAttraction', evento:'Event' };
+  var schema = {
+    '@context':'https://schema.org', '@type':tipos[cat]||'TouristAttraction',
+    'name': d.nombre||'', 'description': d.lead||'', 'url': BASE+'/'+(d.slug||'')+'.html'
+  };
+  if (d.foto_hero) schema['image'] = d.foto_hero;
+  if (d.ciudad) schema['address'] = { '@type':'PostalAddress','addressLocality':d.ciudad,'addressCountry':'CO' };
+  if (d.lat && d.lng && parseFloat(d.lat)!==0) schema['geo'] = { '@type':'GeoCoordinates','latitude':parseFloat(d.lat),'longitude':parseFloat(d.lng) };
+  if (d.rating && d.total_resenas>0) schema['aggregateRating'] = { '@type':'AggregateRating','ratingValue':parseFloat(d.rating).toFixed(1),'ratingCount':d.total_resenas,'bestRating':'5','worstRating':'1' };
+  if (d.precio_desde) schema['priceRange'] = d.precio_desde;
+  if (d.telefono) schema['telephone'] = d.telefono;
+  return '<script type="application/ld+json">\n'+JSON.stringify(schema,null,2)+'\n<\/script>';
+}
 
-  // Datos de destinos_detalles (columnas JSONB separadas)
-  var det       = detalles || {};
-  var amenidades   = safeJSON(det.amenidades)   || [];
-  var habitaciones = safeJSON(det.habitaciones) || [];
-  var faqs         = safeJSON(det.faqs)         || [];
-  var checkin      = det.checkin  || '';
-  var checkout     = det.checkout || '';
+var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');"
++"*{box-sizing:border-box;margin:0;padding:0}"
++":root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}"
++"html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}"
++".bc{font-family:'Barlow Condensed',sans-serif}"
++"a{color:inherit;text-decoration:none}img{display:block;max-width:100%}"
++".topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}"
++".tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;flex-shrink:0}.tl em{color:var(--gold);font-style:normal}"
++".tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}"
++".tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}"
++".tbc a{color:rgba(255,255,255,.4)}.tbc a:hover{color:var(--gold)}.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}"
++".tra{display:flex;gap:8px;align-items:center;margin-left:auto}"
++".tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6)}"
++".hero{background:var(--black);position:relative;overflow:hidden}"
++".hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:380px}"
++"@media(max-width:760px){.hi{grid-template-columns:1fr;min-height:auto;padding:8% 5%}}"
++".hl{display:flex;flex-direction:column;justify-content:center;gap:16px}"
++".hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}"
++".htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(34px,6vw,62px);font-weight:900;color:#fff;line-height:.95;letter-spacing:.5px}"
++".hsub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.8;max-width:480px}"
++".hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}"
++".hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}"
++".hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}"
++".hobtn{background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}"
++".hr{display:flex;flex-direction:column;gap:8px;justify-content:center}"
++".psm{height:200px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
++".psm img{width:100%;height:100%;object-fit:cover}"
++".pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}"
++".prow{display:flex;gap:8px;height:88px}"
++".pth{flex:1;border-radius:6px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
++".pth img{width:100%;height:100%;object-fit:cover}"
++".gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}"
++".gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}"
++".gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}"
++".gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}"
++".gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}"
++".gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}"
++".gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
++".ssec{padding:40px 4%}.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}"
++".sin{max-width:860px;margin:0 auto}"
++".strow{display:flex;align-items:center;gap:14px;margin-bottom:22px}"
++".sgl{width:36px;height:3px;background:var(--gold);flex-shrink:0;border-radius:2px}"
++".stitle{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:900;text-transform:uppercase;letter-spacing:2.5px;color:var(--text)}"
++".stnum{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}"
++".slead{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}"
++".stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px;white-space:pre-line}"
++".hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:20px 0;display:flex;align-items:flex-start;gap:12px}"
++".hbico{font-size:20px;flex-shrink:0;margin-top:2px}.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}"
++".hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}"
++".tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}"
++".tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:#F0FDF4;color:#14532d}"
++".igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px}"
++".icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}"
++".iico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--gold-light)}"
++".ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted)}"
++".ival{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--text);line-height:1.2}"
++".gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}"
++".gal-i{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center}"
++".gal-i img{width:100%;height:100%;object-fit:cover}"
++".entradas-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--border)}"
++".entradas-table th{background:var(--black);color:#fff;padding:10px 14px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px}"
++".entradas-table td{padding:12px 14px;border-bottom:1px solid var(--border)}"
++".entrada-tipo{font-weight:700}.entrada-precio{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold-dark)}"
++".entrada-link{color:#25D366;font-weight:700;font-size:11px}"
++"#mapel iframe{width:100%;height:300px;border-radius:8px;border:1px solid var(--border)}"
++".mapacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}"
++".mabtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .15s}"
++".mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
++".mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}"
++".rblock{display:flex;gap:24px;align-items:center;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}"
++".rbavg{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:var(--gold);line-height:1;text-align:center}"
++".rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}.rbst{font-size:16px;color:#DDD}.rbst.on{color:var(--gold)}"
++".rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}"
++".rvlist{display:flex;flex-direction:column;gap:14px}"
++".rvitem{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}"
++".rvhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}"
++".rvav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;flex-shrink:0;background:var(--gold);color:#fff}"
++".rvname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text)}"
++".rvstars{display:flex;gap:1px;margin-left:auto}.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold)}"
++".rvtx{font-size:13px;color:#444;line-height:1.7}"
++".wr{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-top:20px}"
++".wrtitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);margin-bottom:14px}"
++".wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}"
++".wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;margin-bottom:12px}"
++".wrinp:focus{border-color:var(--gold)}textarea.wrinp{resize:vertical;min-height:88px}"
++".sprow{display:flex;gap:5px;margin-bottom:12px}.spk{font-size:26px;cursor:pointer;color:#DDD;user-select:none}.spk.on{color:var(--gold)}"
++".wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:100%}"
++".wrsub:disabled{background:#ccc;cursor:not-allowed}"
++".wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px;margin-top:10px}"
++".cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}"
++".cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid}"
++".cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
++".cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}"
++".faqi{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff}"
++".faqi summary{padding:14px 16px;cursor:pointer;font-weight:700;font-size:13px;list-style:none;display:flex;justify-content:space-between}"
++".faqi summary::-webkit-details-marker{display:none}.faqi summary::after{content:'+';color:var(--gold);font-weight:900}"
++".faqi[open] summary::after{content:'\\2212'}.faqi p{padding:0 16px 14px;font-size:12px;color:#555;line-height:1.7}"
++".pbanner{background:#fff3cd;border-top:3px solid #ffc107;color:#856404;padding:.7rem 4%;font-size:12px;text-align:center}"
++".itab{padding:8px 16px;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}.itin-panel{display:none}.itin-panel.on{display:block}.itab.on{color:var(--gold);border-color:var(--gold)}.itin-timeline{display:flex;flex-direction:column;gap:0;position:relative}.itin-step{display:flex;gap:14px;padding-bottom:20px;position:relative}.itin-dot{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1}.itin-dot.on{border-color:var(--gold);background:var(--gold-light)}.itin-body{flex:1;padding-top:4px}.itin-time{font-size:10px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}.itin-title{font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:5px}.itin-desc{font-size:12px;color:#555;line-height:1.65;margin-bottom:8px}.itin-tags{display:flex;flex-wrap:wrap;gap:5px}.itin-tag{background:var(--warm);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text)}.tip-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}.tip-icon{font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center}.tip-title{font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}.tip-text{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px}.tip-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.tip-gold{background:#FDF3E0;color:#92400E}.tip-red{background:#FEE2E2;color:#991B1B}.tip-green{background:#D1FAE5;color:#065F46}.tip-blue{background:#DBEAFE;color:#1E3A5F}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
++".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
++".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
++".fcopy a{color:rgba(255,255,255,.45)}";
 
-  // Datos extra del formulario (guardados en tags JSONB de destinos)
-  var tags = safeJSON(d.tags) || {};
-  // Merge: destinos_detalles tiene prioridad sobre tags
-  if (!amenidades.length   && tags.amenidades)   amenidades   = tags.amenidades;
-  if (!habitaciones.length && tags.habitaciones) habitaciones = tags.habitaciones;
-  if (!faqs.length         && tags.faqs)         faqs         = tags.faqs;
-  if (!checkin             && tags.checkin)       checkin      = tags.checkin;
-  if (!checkout            && tags.checkout)      checkout     = tags.checkout;
+function buildHTML(d, det, fotos, resenas) {
+  var cat   = d.categoria_slug || 'sitio';
+  var label = CAT_LABEL[cat] || 'Destino';
+  var dir   = CAT_DIR[cat]   || 'index.html';
+  var grad  = d.hero_bg || CAT_GRAD[cat] || CAT_GRAD.sitio;
+  // foto_hero puede venir como foto_hero, foto, o photos[0]
+  var hero = d.foto_hero || d.foto || '';
+  // Si no hay foto, usar un Unsplash generico por categoria
+  var heroFallbacks = {
+    hostal: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
+    comida: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80',
+    sitio:  'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    evento: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&q=80',
+  };
+  if (!hero) hero = heroFallbacks[cat] || heroFallbacks.sitio;
+  var rat   = d.rating ? parseFloat(d.rating) : 0;
+  var nRes  = parseInt(d.total_resenas||0);
 
-  // Links de reserva — destinos_detalles o columnas directas
-  var bookingUrl     = det.booking_url     || d.booking     || '';
-  var hostelworldUrl = det.hostelworld_url || d.hostelworld || '';
-  var airbnbUrl      = det.airbnb_url      || d.airbnb      || '';
+  var amenidades   = safeJSON(det.amenidades);   if(!Array.isArray(amenidades))   amenidades=[];
+  var habitaciones = safeJSON(det.habitaciones); if(!Array.isArray(habitaciones)) habitaciones=[];
+  var faqs         = safeJSON(det.faqs);         if(!Array.isArray(faqs))         faqs=[];
+  var checkin  = det.checkin  || '';
+  var checkout = det.checkout || '';
+  // Campos especificos de sitio turistico desde tags JSONB
+  var tags = (d.tags && typeof d.tags === 'object') ? d.tags : {};
+  var tipoActividad  = tags.tipo_actividad  || '';
+  var dificultad     = tags.dificultad      || '';
+  var duracion       = tags.duracion        || '';
+  var horarioVisita  = tags.horario_visita  || d.horario || '';
+  var precioEntrada  = tags.precio_entrada  || d.precio_desde || '';
+  var distancia      = tags.distancia       || '';
+  var comoLlegar     = tags.como_llegar     || d.como_llegar || '';
+  var permisos       = tags.permisos        || '';
+  var equipamiento   = safeJSON(tags.equipamiento); if(!Array.isArray(equipamiento)) equipamiento=[];
+  var temporada      = safeJSON(tags.temporada);    if(!Array.isArray(temporada))    temporada=[];
+  var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
+  var tours          = safeJSON(tags.tours);         if(!Array.isArray(tours))        tours=[];
+  var itinerario     = safeJSON(tags.itinerario);   if(!Array.isArray(itinerario))   itinerario=[];
+  var faunaFlora     = tags.fauna_flora  || '';
+  var secretos       = tags.secretos     || '';
+  var regulaciones   = tags.regulaciones || '';
 
-  // Galería
-  var galHTML = (fotos||[]).map(f =>
-    `<div class="gi"><img src="${e(f.url)}" alt="${e(f.caption||d.nombre)}" loading="lazy"></div>`
-  ).join('');
+  var bookingUrl = det.booking_url     || d.booking     || '';
+  var hwUrl      = det.hostelworld_url || d.hostelworld || '';
+  var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
 
-  // Habitaciones
-  var habHTML = habitaciones.length ? `
-  <section id="habitaciones" class="sec">
-    <h2>${icon} Habitaciones</h2>
-    <div class="tblw"><table class="tbl">
-      <thead><tr><th>Tipo</th><th>Camas</th><th>Precio</th><th></th></tr></thead>
-      <tbody>${habitaciones.map(h=>`<tr>
-        <td><b>${e(h.nombre||h.name||'')}</b></td>
-        <td>${e(h.camas||h.beds||'')}</td>
-        <td>${e(h.precio||h.price||'—')}</td>
-        <td>${d.whatsapp?`<a href="https://wa.me/${e(d.whatsapp)}" class="bwa" target="_blank">Reservar</a>`:''}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>
-  </section>` : '';
+  var galAll = (fotos||[]).map(function(f){ return f.url || f; }).filter(Boolean);
+  if (hero && galAll.indexOf(hero) === -1) galAll.unshift(hero);
+  // Si no hay galeria, usar el hero como unica foto
+  if (!galAll.length && hero) galAll = [hero];
 
-  // Servicios
-  var amenHTML = amenidades.length ? `
-  <section id="servicios" class="sec">
-    <h2>✅ Servicios incluidos</h2>
-    <div class="chips">${amenidades.map(a=>`<span class="chip">✓ ${e(typeof a==='string'?a:a.nombre||'')}</span>`).join('')}</div>
-  </section>` : '';
+  var hasLatLng = d.lat && d.lng && parseFloat(d.lat)!==0 && parseFloat(d.lng)!==0;
 
-  // FAQs
-  var faqHTML = faqs.length ? `
-  <section id="faq" class="sec">
-    <h2>❓ Preguntas frecuentes</h2>
-    ${faqs.map(f=>`<details class="faq"><summary>${e(f.pregunta||f.q||'')}</summary><p>${e(f.respuesta||f.a||'')}</p></details>`).join('')}
-  </section>` : '';
+  // -- HERO: imagen principal + grid de hasta 3 mas --------------
+  var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
+  var heroThumbs = '';
+  if (galAll.length > 1) {
+    heroThumbs = galAll.slice(1,4).map(function(u){
+      return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"></div>';
+    }).join('');
+  }
 
-  // Reservar
-  var rbtns = [];
-  if(d.whatsapp)   rbtns.push(`<a href="https://wa.me/${e(d.whatsapp)}" class="rbtn rwa" target="_blank">💬 Reservar por WhatsApp</a>`);
-  if(bookingUrl)   rbtns.push(`<a href="${e(bookingUrl)}" class="rbtn rbk" target="_blank">🏨 Booking.com</a>`);
-  if(hostelworldUrl) rbtns.push(`<a href="${e(hostelworldUrl)}" class="rbtn rhw" target="_blank">🌍 Hostelworld</a>`);
-  if(airbnbUrl)    rbtns.push(`<a href="${e(airbnbUrl)}" class="rbtn rab" target="_blank">🏡 Airbnb</a>`);
-  var reservarHTML = rbtns.length ? `
-  <section id="reservar" class="sec">
-    <h2>📅 Reservar</h2>
-    <div class="rbtns">${rbtns.join('')}</div>
-  </section>` : '';
+  var hqi = [];
+  if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
+  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' &middot; '+nRes+' resenas</div>');
+  if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
+  if (d.horario) hqi.push('<div class="hqi">(tiempo) '+esc(d.horario)+'</div>');
 
-  // Mapa
-  var mapaHTML = (d.lat && d.lng) ? `
-  <section id="mapa" class="sec">
-    <h2>🗺️ Ubicación</h2>
-    <iframe width="100%" height="280" style="border:0;border-radius:10px" loading="lazy"
-      src="https://www.google.com/maps?q=${d.lat},${d.lng}&z=15&output=embed"></iframe>
-  </section>` : '';
+  // -- GSTRIP (rating sticky bar) ---------------------------------
+  var gstrip = '';
+  if (nRes > 0 || d.precio_desde) {
+    var starsHtml = [1,2,3,4,5].map(function(i){
+      return '<span class="gstar'+(i<=Math.round(rat)?' on':'')+'">*</span>';
+    }).join('');
+    gstrip = '<div class="gstrip">'
+      + (nRes>0 ? '<div><div class="gsavg">'+rat.toFixed(1)+'</div><div class="gstars">'+starsHtml+'</div><div class="gsrv">'+nRes+' resenas</div></div><div class="gsdiv"></div>' : '')
+      + (d.precio_desde ? '<div class="gsprice"><div class="gspl">Desde</div><div class="gspv">'+esc(money(d.precio_desde))+'</div></div>' : '')
+      + (d.whatsapp ? '<button class="gscta" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">Reservar -></button>' : '')
+      + '</div>';
+  }
 
-  // Reseñas — rating (no puntuacion), creado_en (no created_at), nombre de usuario
-  var rvHTML = (resenas||[]).length ? `
-  <section id="resenas" class="sec">
-    <h2>💬 Reseñas ${rat?`<span class="rbadge">⭐ ${e(rat)}</span>`:''}</h2>
-    ${resenas.map(r=>`<div class="rv">
-      <div class="rvh">
-        <span class="av">${e((r.usuario_nombre||'V').slice(0,2).toUpperCase())}</span>
-        <div>
-          <b>${e(r.usuario_nombre||'Viajero')}</b>
-          <span class="stars">${'★'.repeat(Math.round(r.rating||0))}${'☆'.repeat(5-Math.round(r.rating||0))}</span>
-        </div>
-      </div>
-      ${r.texto?`<p>${e(r.texto)}</p>`:''}
-    </div>`).join('')}
-  </section>` : `
-  <section id="resenas" class="sec">
-    <h2>💬 Reseñas</h2>
-    <p style="color:#888;font-size:.875rem">Sé el primero en dejar una reseña.</p>
-  </section>`;
+  var secNum = 1;
+  function nextNum() { return secNum++; }
 
-  // Contacto aside
-  var ctHTML = [];
-  if(d.whatsapp)  ctHTML.push(`<a href="https://wa.me/${e(d.whatsapp)}" target="_blank">💬 WhatsApp</a>`);
-  if(d.instagram) ctHTML.push(`<a href="https://instagram.com/${e((d.instagram||'').replace('@',''))}" target="_blank">📷 @${e((d.instagram||'').replace('@',''))}</a>`);
-  if(d.web)       ctHTML.push(`<a href="${e(d.web)}" target="_blank">🌐 Sitio web</a>`);
-  if(d.email)     ctHTML.push(`<a href="mailto:${e(d.email)}">✉️ ${e(d.email)}</a>`);
+  // -- SECCI??N: Descripcion ----------------------------------------
+  var secDescripcion = '<section class="ssec bwarm" id="descripcion"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + (d.lead ? '<p class="slead bc">'+esc(d.lead)+'</p>' : '')
+    + (d.descripcion ? '<p class="stext">'+esc(d.descripcion)+'</p>' : '')
+    + (d.highlight ? '<div class="hbox"><span class="hbico">\u2605</span><div><div class="hblbl">Destacado</div><div class="hbtx">'+esc(d.highlight)+'</div></div></div>' : '')
+    + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
+    + '</div></section>';
 
-  var anchors = ['<a href="#descripcion">Sobre</a>'];
-  if(fotos&&fotos.length)  anchors.push('<a href="#galeria">Fotos</a>');
-  if(habitaciones.length)  anchors.push('<a href="#habitaciones">Habitaciones</a>');
-  if(rbtns.length)         anchors.push('<a href="#reservar">Reservar</a>');
-  if(amenidades.length)    anchors.push('<a href="#servicios">Servicios</a>');
-  if(d.lat && d.lng)       anchors.push('<a href="#mapa">Mapa</a>');
-  if(faqs.length)          anchors.push('<a href="#faq">FAQ</a>');
-  anchors.push('<a href="#resenas">Reseñas</a>');
+  // -- SECCI??N: Info rapida (iconos) -------------------------------
+  var infoCards = [];
+  if (d.tipo)     infoCards.push({ico:'\u2302',lbl:'Tipo',val:d.tipo});
+  if (checkin)    infoCards.push({ico:'(tiempo)',lbl:'Check-in',val:checkin+(checkout?' / '+checkout:'')});
+  if (d.capacidad)infoCards.push({ico:'\u0047\u0072',lbl:'Capacidad',val:d.capacidad});
+  if (d.horario)  infoCards.push({ico:'\u23F0',lbl:'Horario',val:d.horario});
+  if (d.precio_desde) infoCards.push({ico:'\u0024',lbl:'Precio desde',val:money(d.precio_desde)});
+  if (d.barrio)   infoCards.push({ico:'\u29BF',lbl:'Zona',val:d.barrio});
 
-  var css = `
-:root{--g:#E8A020;--gd:#c47c0a;--bg:#f9f7f4;--card:#fff;--text:#1a1a1a;--mu:#666;--r:12px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
-a{color:var(--gd);text-decoration:none}a:hover{text-decoration:underline}img{display:block;max-width:100%}
-.nav{background:#fff;border-bottom:1px solid #eee;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
-.logo{font-size:1.2rem;font-weight:900;letter-spacing:-.5px;color:var(--text)}.logo em{color:var(--g);font-style:normal}
-.bc{padding:.5rem 1.25rem;font-size:.78rem;color:var(--mu);max-width:960px;margin:0 auto}.bc a{color:var(--mu)}
-.hero{position:relative;height:320px;background:#111;overflow:hidden}
-@media(min-width:600px){.hero{height:440px}}
-.hero img{width:100%;height:100%;object-fit:cover;opacity:.82}
-.hero-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.08) 65%)}
-.hero-c{position:absolute;bottom:0;left:0;right:0;padding:1.5rem 1.25rem;max-width:960px;margin:0 auto}
-.hcat{display:inline-block;background:var(--g);color:#fff;font-size:.7rem;font-weight:800;padding:2px 10px;border-radius:20px;margin-bottom:.4rem;letter-spacing:.5px}
-.htitle{font-size:1.875rem;font-weight:900;color:#fff;line-height:1.1;margin-bottom:.4rem}
-@media(min-width:600px){.htitle{font-size:2.5rem}}
-.hsub{color:rgba(255,255,255,.82);font-size:.9rem;margin-bottom:.55rem}
-.hmeta{display:flex;flex-wrap:wrap;gap:.55rem;color:rgba(255,255,255,.85);font-size:.8rem}
-.pbanner{background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:.75rem 1.25rem;border-radius:10px;font-size:.875rem;text-align:center}
-.anav{background:#fff;border-bottom:1px solid #eee;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
-.anav a{display:inline-block;padding:.75rem .875rem;font-size:.8125rem;color:var(--mu);border-bottom:3px solid transparent;transition:all .15s}
-.anav a:hover{color:var(--text);text-decoration:none;border-color:var(--g)}
-.body{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem;display:flex;gap:1.75rem;flex-direction:column}
-@media(min-width:768px){.body{flex-direction:row}}
-.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1.5rem}
-.aside{width:100%}@media(min-width:768px){.aside{width:276px;flex-shrink:0}}
-.sec{background:var(--card);border-radius:var(--r);padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.07)}
-.sec h2{font-size:1.0625rem;font-weight:700;margin-bottom:1rem}
-.dtxt{font-size:.9375rem;line-height:1.75;color:#333}
-.hl{background:#fff8ec;border-left:4px solid var(--g);padding:.875rem 1rem;border-radius:0 var(--r) var(--r) 0;margin-bottom:.875rem}
-.hl p{font-size:.875rem;color:#7a5000;font-style:italic;line-height:1.6}
-.gal{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem}
-@media(min-width:480px){.gal{grid-template-columns:repeat(3,1fr)}}
-.gi img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;cursor:pointer;transition:opacity .15s}
-.gi img:hover{opacity:.85}
-.tblw{overflow-x:auto}.tbl{width:100%;border-collapse:collapse;font-size:.8125rem}
-.tbl th{background:#f5f5f5;padding:.5rem .625rem;text-align:left;font-weight:700;border-bottom:2px solid #eee}
-.tbl td{padding:.5rem .625rem;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-.bwa{display:inline-block;background:#25D366;color:#fff!important;padding:.3rem .75rem;border-radius:7px;font-size:.78rem;font-weight:600}
-.chips{display:flex;flex-wrap:wrap;gap:.4rem}
-.chip{background:#f0faf0;color:#1e5c1e;border:1px solid #c3e6c3;padding:.3rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500}
-.faq{border:1px solid #eee;border-radius:8px;margin-bottom:.4rem}
-.faq summary{padding:.75rem .875rem;cursor:pointer;font-weight:600;font-size:.875rem;list-style:none;display:flex;justify-content:space-between;align-items:center}
-.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:'+';font-size:1.1rem;color:var(--g)}
-.faq[open] summary::after{content:'−'}.faq p{padding:.5rem .875rem .875rem;font-size:.8125rem;color:#444;line-height:1.6}
-.rbtns{display:flex;flex-direction:column;gap:.5rem}
-.rbtn{display:block;text-align:center;padding:.875rem;border-radius:10px;font-weight:700;font-size:.9rem;color:#fff!important;transition:opacity .15s}
-.rbtn:hover{opacity:.88;text-decoration:none}
-.rwa{background:#25D366}.rbk{background:#003580}.rhw{background:#f0593a}.rab{background:#FF5A5F}
-.rbadge{background:var(--g);color:#fff;font-size:.72rem;padding:2px 8px;border-radius:20px;font-weight:700;margin-left:6px}
-.rv{border:1px solid #f0f0f0;border-radius:10px;padding:.875rem;margin-bottom:.625rem;background:#fafafa}
-.rvh{display:flex;align-items:center;gap:.625rem;margin-bottom:.4rem}
-.av{width:36px;height:36px;border-radius:50%;background:var(--g);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
-.stars{color:#f5a623;font-size:.78rem;display:block;margin-top:1px}.rv p{font-size:.8125rem;color:#444;line-height:1.55}
-.ac{background:var(--card);border-radius:var(--r);padding:1.25rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1rem}
-.ac h3{font-size:.9375rem;font-weight:700;margin-bottom:.75rem}
-.ir{display:flex;gap:.5rem;margin-bottom:.5rem;font-size:.8125rem;color:#444}
-.ir .ic{width:22px;text-align:center;flex-shrink:0}
-.ctl{display:flex;flex-direction:column;gap:.375rem}
-.ctl a{display:block;padding:.625rem .875rem;background:#f5f5f5;border-radius:8px;font-size:.875rem;color:var(--text)!important;transition:background .15s}
-.ctl a:hover{background:#ebebeb;text-decoration:none}
-.frv{display:flex;flex-direction:column;gap:.625rem}
-.frv label{font-size:.78rem;font-weight:700;color:var(--mu)}
-.frv input,.frv textarea{width:100%;padding:.55rem .75rem;border:1.5px solid #ddd;border-radius:8px;font-size:.875rem;font-family:inherit;transition:border-color .15s}
-.frv input:focus,.frv textarea:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(232,160,32,.12)}
-.sinp{display:flex;gap:3px;flex-direction:row-reverse;justify-content:flex-end}
-.sinp input{display:none}
-.sinp label{font-size:1.5rem;color:#ddd;cursor:pointer;transition:color .12s}
-.sinp input:checked~label,.sinp label:hover,.sinp label:hover~label{color:#f5a623}
-.btnrv{background:var(--g);color:#fff;border:none;padding:.75rem;border-radius:10px;font-weight:700;font-size:.9375rem;cursor:pointer;width:100%;transition:background .15s}
-.btnrv:hover{background:var(--gd)}.btnrv:disabled{background:#ccc;cursor:not-allowed}
-.rvok{display:none;background:#d4edda;color:#155724;padding:.875rem;border-radius:10px;text-align:center;font-weight:600;font-size:.875rem}
-.foot{background:#111;color:rgba(255,255,255,.5);padding:2rem 1.25rem;text-align:center;font-size:.8rem}
-.flogo{font-size:1.2rem;font-weight:900;color:#fff;margin-bottom:.375rem}.flogo em{color:var(--g);font-style:normal}
-`;
+  var secInfo = infoCards.length ? '<section class="ssec bwhite" id="info"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Informacion rapida</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="igrid">'+infoCards.map(function(c){
+        return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
+      }).join('')+'</div></div></section>' : '';
 
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>${e(d.nombre)} – ExploraCO</title>
-<meta name="description" content="${e(d.lead||d.nombre)}">
-<meta property="og:title" content="${e(d.nombre)} – ExploraCO">
-<meta property="og:description" content="${e(d.lead||'')}">
-<meta property="og:image" content="${e(hero)}">
-<meta property="og:type" content="place">
-<meta name="theme-color" content="#E8A020">
-<link rel="canonical" href="https://exploraco.co/${e(d.slug)}.html">
-<style>${css}</style>
-</head>
-<body>
+  // -- SECCI??N: Galeria ---------------------------------------------
+  // -- SECCI??N: Datos especificos del sitio turistico --------------
+  var secSitio = '';
+  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
+    var sitioCards = [];
+    if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
+    if (dificultad)    sitioCards.push({ico:'\ud83d\udcca',lbl:'Dificultad',val:dificultad});
+    if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
+    if (distancia)     sitioCards.push({ico:'\ud83d\udce6',lbl:'Distancia',val:distancia});
+    if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
+    if (precioEntrada) sitioCards.push({ico:'\ud83c\udfab',lbl:'Entrada',val:precioEntrada});
 
-<nav class="nav">
-  <a class="logo" href="/index.html">EXPLORA<em>CO</em></a>
-  <a href="/${e(dir)}" style="font-size:.8rem;color:var(--mu)">← ${e(label)}</a>
-</nav>
+    secSitio = '<section class="ssec bwhite" id="sitio-info"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Datos del sitio</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="igrid">'+sitioCards.map(function(c){
+          return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
+        }).join('')+'</div>'
+      + (equipamiento.length ? '<div class="hbox" style="margin-top:16px"><span class="hbico">\ud83c\udfa7</span><div><div class="hblbl">Equipo recomendado</div><div class="tagrow">'+equipamiento.map(function(e){return '<span class="tpill">'+esc(e)+'</span>';}).join('')+'</div></div></div>' : '')
+      + (temporada.length ? '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div><div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div></div>' : '')
+      + (permisos ? '<div class="hbox" style="margin-top:16px;background:#FEF3C7;border-color:#D97706"><span class="hbico">\ud83d\udccb</span><div><div class="hblbl" style="color:#92400E">Permisos y reservas</div><div class="hbtx" style="color:#78350F">'+esc(permisos)+'</div></div></div>' : '')
+      + '</div></section>';
+  }
 
-<div class="bc">
-  <a href="/index.html">Inicio</a> › <a href="/${e(dir)}">${icon} ${e(label)}</a> › ${e(d.nombre)}
-</div>
+    // -- SECCION: Entradas y precios ----------------------------
+  var secEntradas = '';
+  if (cat === 'sitio' && entradas.length) {
+    secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Nota</th></tr></thead><tbody>'
+      + entradas.map(function(e){
+          return '<tr><td class="entrada-tipo">'+esc(e.tipo||'')+'</td>'
+            + '<td class="entrada-precio">'+esc(e.precio||'')+'</td>'
+            + '<td style="font-size:12px;color:#666">'+esc(e.nota||'')+'</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+      + (d.whatsapp ? '<p style="margin-top:12px;font-size:12px;color:#666">Reservas: <a href="https://wa.me/'+esc(d.whatsapp)+'" style="color:var(--gold-dark);font-weight:700">WhatsApp</a></p>' : '')
+      + '</div></section>';
+  }
 
-${d.status==='draft'?`<div style="max-width:960px;margin:.5rem auto;padding:0 1.25rem"><div class="pbanner">⏳ Este lugar está pendiente de revisión por el equipo de ExploraCO.</div></div>`:''}
+  // -- SECCION: Tours disponibles -------------------------------
+  var secTours = '';
+  if (cat === 'sitio' && tours.length) {
+    secTours = '<section class="ssec bwarm" id="tours"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tours disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="igrid">'
+      + tours.map(function(t){
+          return '<div class="icard">'
+            + '<div class="iico">\u2605</div>'
+            + '<div class="ival">'+esc(t.nombre||t.name||'')+'</div>'
+            + (t.duracion ? '<div class="ilbl">'+esc(t.duracion)+'</div>' : '')
+            + (t.precio ? '<div style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:900;color:var(--gold-dark)">'+esc(t.precio)+'</div>' : '')
+            + '</div>';
+        }).join('')
+      + '</div></div></section>';
+  }
 
-<div class="hero">
-  <img src="${e(hero)}" alt="${e(d.nombre)}" loading="eager">
-  <div class="hero-ov"></div>
-  <div class="hero-c">
-    <span class="hcat">${icon} ${e(label)}</span>
-    <h1 class="htitle">${e(d.nombre)}</h1>
-    <p class="hsub">${e(d.lead||'')}</p>
-    <div class="hmeta">
-      <span>📍 ${e(d.ciudad||'Colombia')}${d.region?', '+e(d.region):''}</span>
-      ${nRes>0?`<span>⭐ ${e(String(rat))} · ${nRes} reseñas</span>`:''}
-      ${precio?`<span>💰 Desde ${e(precio)}</span>`:''}
-    </div>
-  </div>
-</div>
+  // -- SECCION: Que llevar --------------------------------------
+  var secChecklist = '';
+  if (cat === 'sitio' && equipamiento.length) {
+    secChecklist = '<section class="ssec bwhite" id="checklist"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que llevar</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="tagrow">'
+      + equipamiento.map(function(e){
+          return '<span class="tpill">\u2713 '+esc(typeof e==='string'?e:(e.item||e.nombre||e))+'</span>';
+        }).join('')
+      + '</div></div></section>';
+  }
 
-<nav class="anav">${anchors.join('')}</nav>
+  // -- SECCION: Itinerario --------------------------------------
+  // -- Itinerario con tabs por dia, hora y tags --
+  var secItinerario = '';
+  if (cat === 'sitio' && itinerario.length) {
+    // Agrupar pasos por dia
+    var diasMap = {};
+    var diasOrder = [];
+    itinerario.forEach(function(it) {
+      var dia = it.dia || 'Dia 1';
+      if (!diasMap[dia]) { diasMap[dia] = []; diasOrder.push(dia); }
+      diasMap[dia].push(it);
+    });
+    var tabsHTML = diasOrder.map(function(dia, i) {
+      return '<div class="itab'+(i===0?' on':'')+'" onclick="switchItin(this,\'itin-d'+i+'\')"'
+        +' style="padding:8px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;'
+        +'text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:none;background:none;'
+        +'color:'+(i===0?'var(--gold)':'var(--muted)')+';border-bottom:3px solid '+(i===0?'var(--gold)':'transparent')+';margin-bottom:-1px">'+esc(dia)+'</div>';
+    }).join('');
+    var panelsHTML = diasOrder.map(function(dia, i) {
+      var pasos = diasMap[dia];
+      var stepsHTML = pasos.map(function(p) {
+        var hora = p.hora || p.time || '';
+        var titulo = p.titulo || p.title || p.descripcion || '';
+        var desc = p.detalle || p.descripcion_larga || '';
+        var ico = p.icono || p.icon || '\u25CF';
+        var ptags = p.tags ? (Array.isArray(p.tags) ? p.tags : String(p.tags).split(',').map(function(t){return t.trim();})) : [];
+        return '<div class="itin-step" style="display:flex;gap:14px;padding-bottom:20px">'
+          +'<div class="itin-dot'+(hora?' on':'')+'" style="width:32px;height:32px;border-radius:50%;background:'+(hora?'var(--gold-light)':'#fff')+';border:2px solid '+(hora?'var(--gold)':'var(--border)')+';display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;z-index:1">'+esc(ico)+'</div>'
+          +'<div style="flex:1;padding-top:4px">'
+          +(hora?'<div style="font-size:10px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">'+esc(hora)+'</div>':'')
+          +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:5px">'+esc(titulo)+'</div>'
+          +(desc?'<div style="font-size:12px;color:#555;line-height:1.65;margin-bottom:8px">'+esc(desc)+'</div>':'')
+          +(ptags.length?'<div style="display:flex;flex-wrap:wrap;gap:5px">'+ptags.map(function(t){return '<span style="background:var(--warm);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text)">'+esc(t)+'</span>';}).join('')+'</div>':'')
+          +'</div></div>';
+      }).join('');
+      return '<div class="itin-panel'+(i===0?' on':'')+'" id="itin-d'+i+'">'
+        +'<div>'+stepsHTML+'</div></div>';
+    }).join('');
+    secItinerario = '<section class="ssec bwarm" id="itinerario"><div class="sin">'
+      +'<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Itinerario dia a dia</h2><div class="stnum">'+nextNum()+'</div></div>'
+      +'<div style="border-bottom:1px solid var(--border);display:flex;overflow-x:auto;margin-bottom:16px">'+tabsHTML+'</div>'
+      +panelsHTML
+      +'</div></section>';
+  }
 
-<div class="body">
-<main class="main">
-
-  <section id="descripcion" class="sec">
-    <h2>📋 Sobre este lugar</h2>
-    ${d.highlight?`<div class="hl"><p>${e(d.highlight)}</p></div>`:''}
-    <p class="dtxt">${e(d.descripcion||d.lead||'').replace(/\n/g,'<br>')}</p>
-    ${d.como_llegar?`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #f0f0f0">
-      <h3 style="font-size:.9rem;font-weight:700;margin-bottom:.5rem">🚌 Cómo llegar</h3>
-      <p style="font-size:.875rem;color:#444;line-height:1.65">${e(d.como_llegar)}</p>
-    </div>`:''}
-  </section>
-
-  ${(fotos&&fotos.length)?`<section id="galeria" class="sec"><h2>📷 Galería</h2><div class="gal">${galHTML}</div></section>`:''}
-  ${habHTML}
-  ${reservarHTML}
-  ${amenHTML}
-  ${mapaHTML}
-  ${faqHTML}
-  ${rvHTML}
-
-</main>
-<aside class="aside">
-
-  <div class="ac">
-    <h3>ℹ️ Información</h3>
-    ${d.ciudad?`<div class="ir"><span class="ic">📍</span><span>${e(d.ciudad)}${d.region?', '+e(d.region):''}</span></div>`:''}
-    ${d.barrio?`<div class="ir"><span class="ic">🏘️</span><span>${e(d.barrio)}</span></div>`:''}
-    ${d.tipo?`<div class="ir"><span class="ic">🏠</span><span>${e(d.tipo)}</span></div>`:''}
-    ${checkin?`<div class="ir"><span class="ic">⏰</span><span>Check-in ${e(checkin)} · Out ${e(checkout||'?')}</span></div>`:''}
-    ${d.horario?`<div class="ir"><span class="ic">🕐</span><span>${e(d.horario)}</span></div>`:''}
-    ${precio?`<div class="ir"><span class="ic">💰</span><span>Desde <b>${e(precio)}</b></span></div>`:''}
-    ${nRes>0?`<div class="ir"><span class="ic">⭐</span><span>${e(String(rat))} · ${nRes} reseñas</span></div>`:''}
-  </div>
-
-  ${ctHTML.length?`<div class="ac"><h3>📞 Contacto</h3><div class="ctl">${ctHTML.join('')}</div></div>`:''}
-
-  <div class="ac">
-    <h3>✍️ Escribe una reseña</h3>
-    <div class="frv" id="frv">
-      <div><label>Tu nombre</label><input type="text" id="rvn" placeholder="Ej: María García" autocomplete="name"></div>
-      <div>
-        <label>Puntuación</label>
-        <div class="sinp">
-          <input type="radio" name="st" id="s5" value="5"><label for="s5">★</label>
-          <input type="radio" name="st" id="s4" value="4"><label for="s4">★</label>
-          <input type="radio" name="st" id="s3" value="3"><label for="s3">★</label>
-          <input type="radio" name="st" id="s2" value="2"><label for="s2">★</label>
-          <input type="radio" name="st" id="s1" value="1"><label for="s1">★</label>
-        </div>
-      </div>
-      <div><label>Tu experiencia</label><textarea id="rvt" rows="4" placeholder="¿Qué te pareció este lugar?"></textarea></div>
-      <button class="btnrv" onclick="submitRv()">Publicar reseña →</button>
-      <div class="rvok" id="rvok">🎉 ¡Gracias por tu reseña!</div>
-    </div>
-  </div>
-
-</aside>
-</div>
-
-<footer class="foot">
-  <div class="flogo">EXPLORA<em>CO</em></div>
-  <p>El directorio turístico más completo de Colombia</p>
-  <p style="margin-top:.4rem">
-    <a href="/index.html" style="color:var(--g)">Inicio</a> ·
-    <a href="/${e(dir)}" style="color:var(--g)">${e(label)}</a> ·
-    <a href="/admin.html" style="color:var(--g)">Admin</a>
-  </p>
-</footer>
-
-<script>
-var DID="${e(String(d.id))}";
-function submitRv(){
-  var nom=document.getElementById('rvn').value.trim();
-  var txt=document.getElementById('rvt').value.trim();
-  var st=document.querySelector('input[name=st]:checked');
-  if(!st){alert('Selecciona una puntuación');return;}
-  if(!nom){alert('Ingresa tu nombre');return;}
-  var btn=document.querySelector('.btnrv');
-  btn.disabled=true;btn.textContent='Publicando...';
-  // usuario_nombre no existe en interacciones — guardamos en texto
-  // tipo='resena', rating=valor numérico (1-5)
-  fetch('/api/interacciones',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      tipo:'resena',
-      destino_id:DID,
-      rating:parseInt(st.value),
-      texto:(nom+': '+txt).slice(0,1000)||null
-    })
-  }).then(r=>r.json()).then(data=>{
-    if(data.ok||data.id){
-      document.getElementById('rvok').style.display='block';
-      document.getElementById('frv').style.opacity='.4';
-      document.getElementById('frv').style.pointerEvents='none';
-    }else{
-      btn.disabled=false;btn.textContent='Publicar reseña →';
-      alert('Error: '+(data.error||'No se pudo publicar'));
+  // -- SECCION: Fauna y flora con cards o chips --
+  var secFauna = '';
+  if (cat === 'sitio' && faunaFlora) {
+    var faunaContent = '';
+    try {
+      var faunaArr = JSON.parse(faunaFlora);
+      if (Array.isArray(faunaArr) && faunaArr.length) {
+        faunaContent = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">'
+          + faunaArr.map(function(f) {
+            return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">'
+              +'<span style="font-size:26px;margin-bottom:6px;display:block">'+esc(f.emoji||'\u2731')+'</span>'
+              +'<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px">'+esc(f.nombre||f.name||'')+'</div>'
+              +(f.hecho||f.fact?'<div style="font-size:10px;color:var(--muted);line-height:1.5">'+esc(f.hecho||f.fact)+'</div>':'')
+              +'</div>';
+          }).join('') + '</div>';
+      }
+    } catch(_) {
+      var faunaItems = faunaFlora.split(',').map(function(f){ return f.trim(); }).filter(Boolean);
+      faunaContent = '<div class="tagrow">' + faunaItems.map(function(f){
+        return '<span class="tpill" style="background:#F0FDF4;color:#14532d">\u2731 '+esc(f)+'</span>';
+      }).join('') + '</div>';
     }
-  }).catch(()=>{
-    btn.disabled=false;btn.textContent='Publicar reseña →';
-    alert('Error de conexión. Intenta de nuevo.');
-  });
-}
-</script>
-<script src="/pagina-connector.js" onerror="void 0"></script>
-<script src="/usuario-session.js" onerror="void 0"></script>
-</body>
-</html>`;
+    secFauna = '<section class="ssec bwhite" id="fauna"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Fauna y flora</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + faunaContent + '</div></section>';
+  }
+
+  // -- SECCION: Secretos con tip-cards o lista --
+  var secSecretos = '';
+  if (cat === 'sitio' && secretos) {
+    var tipsContent = '';
+    try {
+      var tipsArr = JSON.parse(secretos);
+      if (Array.isArray(tipsArr) && tipsArr.length) {
+        var tagColors = {gold:'#FDF3E0;color:#92400E', red:'#FEE2E2;color:#991B1B', green:'#D1FAE5;color:#065F46', blue:'#DBEAFE;color:#1E3A5F'};
+        tipsContent = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'
+          + tipsArr.map(function(t) {
+            var tc = t.tag_color || 'gold';
+            var tagStyle = tagColors[tc] || tagColors.gold;
+            return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start">'
+              +'<div style="font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center">'+esc(t.icono||'\u2605')+'</div>'
+              +'<div style="flex:1"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px">'+esc(t.titulo||'')+'</div>'
+              +'<div style="font-size:12px;color:#555;line-height:1.6;margin-bottom:8px">'+esc(t.texto||'')+'</div>'
+              +(t.tag?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;background:'+tagStyle+'">'+esc(t.tag)+'</span>':'')
+              +'</div></div>';
+          }).join('') + '</div>';
+      }
+    } catch(_) {
+      var secretosList = secretos.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 5; });
+      if (secretosList.length > 1) {
+        tipsContent = '<div style="display:flex;flex-direction:column;gap:8px">' + secretosList.map(function(s) {
+          return '<div style="display:flex;gap:10px;align-items:flex-start">'
+            +'<span style="color:var(--gold);font-weight:900;flex-shrink:0">\u2713</span>'
+            +'<span style="font-size:13px;color:#444;line-height:1.6">'+esc(s)+'</span></div>';
+        }).join('') + '</div>';
+      } else {
+        tipsContent = '<p class="stext">'+esc(secretos)+'</p>';
+      }
+    }
+    secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + tipsContent + '</div></section>';
+  }
+
+  // -- SECCION: Permisos y regulaciones -------------------------
+  var secRegulaciones = '';
+  if (cat === 'sitio' && regulaciones) {
+    secRegulaciones = '<section class="ssec bwhite" id="regulaciones"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Permisos y regulaciones</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="hbox" style="background:#FEF3C7;border-color:#D97706">'
+      + '<span class="hbico">\u26A0</span>'
+      + '<div><div class="hblbl" style="color:#92400E">Importante</div>'
+      + '<div class="hbtx" style="color:#78350F">'+esc(regulaciones).replace(/\n/g,'<br>')+'</div></div></div>'
+      + '</div></section>';
+  }
+
+  var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="gal">'+galAll.map(function(u){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"></div>'; }).join('')+'</div>'
+    + '</div></section>' : '';
+
+  // -- SECCI??N: Habitaciones / precios (solo hostal) ----------------
+  var secHabitaciones = '';
+  if (habitaciones.length) {
+    secHabitaciones = '<section class="ssec bwhite" id="habitaciones"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Habitaciones y precios</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Camas</th><th>Precio</th><th>Reservar</th></tr></thead><tbody>'
+      + habitaciones.map(function(h){
+          return '<tr><td><div class="entrada-tipo">'+esc(h.nombre||h.name||'')+'</div></td>'
+            + '<td>'+esc(h.camas||h.beds||'')+'</td>'
+            + '<td><div class="entrada-precio">'+esc(money(h.precio||h.price))+'</div></td>'
+            + '<td>'+(d.whatsapp?'<a class="entrada-link" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>':'')+'</td></tr>';
+        }).join('')
+      + '</tbody></table></div></section>';
+  }
+
+  // -- SECCI??N: Reservar / links externos ----------------------------
+  var rbtns = [];
+  if (d.whatsapp) rbtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
+  if (bookingUrl) rbtns.push('<a class="cbtn dark" href="'+esc(bookingUrl)+'" target="_blank">[hostal] Booking.com</a>');
+  if (hwUrl)      rbtns.push('<a class="cbtn dark" href="'+esc(hwUrl)+'" target="_blank"> Hostelworld</a>');
+  if (airbnbUrl)  rbtns.push('<a class="cbtn gold" href="'+esc(airbnbUrl)+'" target="_blank">[casa2] Airbnb</a>');
+
+  var secReservar = rbtns.length ? '<section class="ssec bwarm" id="reservar"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reservar</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="cgrid">'+rbtns.join('')+'</div></div></section>' : '';
+
+  // -- SECCI??N: Mapa ----------------------------------------------
+  var secMapa = '';
+  if (hasLatLng) {
+    var mapBtns = [];
+    mapBtns.push('<a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
+    if (d.whatsapp) mapBtns.push('<a class="mabtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
+    if (d.telefono) mapBtns.push('<a class="mabtn outline" href="tel:'+esc(d.telefono)+'">\u2706 '+esc(d.telefono)+'</a>');
+    secMapa = '<section class="ssec bwhite" id="mapa"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicacion y como llegar</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div id="mapel"><iframe loading="lazy" src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe></div>'
+      + (comoLlegar ? '<p class="stext" style="margin-top:14px">'+esc(comoLlegar)+'</p>' : '')
+      + '<div class="mapacts">'+mapBtns.join('')+'</div>'
+      + '</div></section>';
+  }
+
+  // -- SECCI??N: FAQ -----------------------------------------------
+  var secFaq = faqs.length ? '<section class="ssec bwarm" id="faq"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + faqs.map(function(f){ return '<details class="faqi"><summary>'+esc(f.pregunta||f.q||'')+'</summary><p>'+esc(f.respuesta||f.a||'')+'</p></details>'; }).join('')
+    + '</div></section>' : '';
+
+  // -- SECCI??N: Resenas --------------------------------------------
+  var rvHtml = '';
+  if ((resenas||[]).length) {
+    rvHtml = (resenas||[]).map(function(r){
+      var nombre = 'Viajero';
+      var texto  = r.texto || '';
+      var m = texto.match(/^\[([^\]]+)\]\s*/);
+      if (m) { nombre = m[1]; texto = texto.slice(m[0].length); }
+      if (r.usuario_nombre) nombre = r.usuario_nombre;
+      var rs = Math.round(r.rating||0);
+      var starsR = [1,2,3,4,5].map(function(i){ return '<span class="rvst'+(i<=rs?' on':'')+'">*</span>'; }).join('');
+      return '<div class="rvitem"><div class="rvhead">'
+        + '<div class="rvav">'+esc(nombre.slice(0,2).toUpperCase())+'</div>'
+        + '<div class="rvname">'+esc(nombre)+'</div>'
+        + '<div class="rvstars">'+starsR+'</div></div>'
+        + (texto?'<div class="rvtx">'+esc(texto)+'</div>':'')
+        + '</div>';
+    }).join('');
+  }
+
+  var secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + (nRes>0 ? '<div class="rblock"><div><div class="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt">'+nRes+' resenas</div></div></div>' : '')
+    + (rvHtml ? '<div class="rvlist">'+rvHtml+'</div>' : '<p class="stext">Se el primero en dejar una resena.</p>')
+    + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
+    + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
+    + '<div class="sprow" id="rv-stars">'
+    + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">*</span>'; }).reverse().join('')
+    + '</div>'
+    + '<textarea id="rvt" placeholder="Que te parecio este lugar?" class="wrinp"></textarea>'
+    + '<button class="wrsub" onclick="submitRv()">Publicar resena -></button>'
+    + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
+    + '</div></div></section>';
+
+  // -- SECCI??N: Contacto --------------------------------------------
+  var ctBtns = [];
+  if (hasLatLng) ctBtns.push('<a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
+  if (d.whatsapp) ctBtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
+  if (d.telefono) ctBtns.push('<a class="cbtn dark" href="tel:'+esc(d.telefono)+'">\u2706 Llamar</a>');
+  if (d.web)       ctBtns.push('<a class="cbtn blue" href="'+esc(d.web)+'" target="_blank">\u25CB Sitio web</a>');
+  if (d.instagram) ctBtns.push('<a class="cbtn blue" href="https://instagram.com/'+esc((d.instagram||'').replace('@',''))+'" target="_blank">[foto] Instagram</a>');
+  if (d.email)     ctBtns.push('<a class="cbtn dark" href="mailto:'+esc(d.email)+'">\u0040 Email</a>');
+
+  var secContact = ctBtns.length ? '<section class="ssec bwarm" id="contact"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="cgrid">'+ctBtns.join('')+'</div></div></section>' : '';
+
+  // -- ENSAMBLAR ----------------------------------------------------
+  return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
+    + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
+    + '<title>'+esc(d.nombre)+'  ExploraCO</title>\n'
+    + '<meta name="description" content="'+esc(d.lead||d.nombre)+'">\n'
+    + '<meta property="og:title" content="'+esc(d.nombre)+'  ExploraCO">\n'
+    + '<meta property="og:description" content="'+esc(d.lead||'')+'">\n'
+    + (hero ? '<meta property="og:image" content="'+esc(hero)+'">\n' : '')
+    + '<meta property="og:type" content="place">\n'
+    + '<meta name="theme-color" content="#E8A020">\n'
+    + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
+    + schemaLD(d, cat) + '\n'
+    + '<style>'+CSS+'</style>\n</head>\n<body>\n\n'
+
+    + '<div class="topbar"><a class="tl" href="/index.html">EXPLORA<em>CO</em></a><div class="tsep"></div>'
+    + '<div class="tbc"><a href="/index.html">Inicio</a><span>/</span><a href="/'+esc(dir)+'">'+esc(label)+'</a><span>/</span><em>'+esc(d.nombre)+'</em></div>'
+    + '<div class="tra"><a class="tshare" href="/'+esc(dir)+'"><- '+esc(label)+'</a></div></div>\n\n'
+
+    + (d.status==='draft' ? '<div class="pbanner">(reloj) Este lugar esta pendiente de revision por el equipo de ExploraCO.</div>\n' : '')
+
+    + '<section class="hero"><div class="hi">\n'
+    + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
+    + '<h1 class="htitle bc">'+esc(d.nombre)+'</h1>'
+    + (d.lead ? '<p class="hsub">'+esc(d.lead)+'</p>' : '')
+    + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
+    + '<div class="hctar">'
+    + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
+    + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
+    + '</div></div>\n'
+    + '<div class="hr"><div class="psm" style="'+heroMainStyle+'">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
+    + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
+    + '</div>\n</div></section>\n\n'
+
+    + gstrip + '\n\n'
+    + secDescripcion + '\n'
+    + secInfo + '\n'
+    + secSitio + '\n'
+    + secEntradas + '\n'
+    + secTours + '\n'
+    + secChecklist + '\n'
+    + secItinerario + '\n'
+    + secFauna + '\n'
+    + secSecretos + '\n'
+    + secRegulaciones + '\n'
+    + secGaleria + '\n'
+    + secHabitaciones + '\n'
+    + secReservar + '\n'
+    + secMapa + '\n'
+    + secFaq + '\n'
+    + secResenas + '\n'
+    + secContact + '\n\n'
+
+    + '<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>'
+    + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
+    + '<div class="fcopy"><a href="/index.html">Inicio</a> &middot; <a href="/'+esc(dir)+'">'+esc(label)+'</a></div></footer>\n\n'
+
+    + '<script>\n'
+    + 'var DID="'+esc(String(d.id))+'";\n'
+    + 'var rvScore=0;\n'
+    + 'function setRvScore(n){rvScore=n;document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=n);});}\n'
+    + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");t.style.color="var(--muted)";t.style.borderColor="transparent";});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");el.style.color="var(--gold)";el.style.borderColor="var(--gold)";var panel=document.getElementById(id);if(panel)panel.classList.add("on");}
+function submitRv(){\n'
+    + '  var nom=document.getElementById("rvn").value.trim();\n'
+    + '  var txt=document.getElementById("rvt").value.trim();\n'
+    + '  if(!rvScore){alert("Selecciona una puntuacion");return;}\n'
+    + '  if(!nom){alert("Ingresa tu nombre");return;}\n'
+    + '  var btn=document.querySelector(".wrsub");\n'
+    + '  btn.disabled=true;btn.textContent="Publicando...";\n'
+    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},'
+    + '  body:JSON.stringify({tipo:"resena",destino_id:DID,rating:rvScore,texto:"["+nom+"] "+txt})})\n'
+    + '  .then(function(r){return r.json();})\n'
+    + '  .then(function(d){\n'
+    + '    if(d.ok||d.id){\n'
+    + '      document.getElementById("rvok").style.display="block";\n'
+    + '    }else{btn.disabled=false;btn.textContent="Publicar resena ->";alert("Error: "+(d.error||"No se pudo publicar"));}\n'
+    + '  }).catch(function(){btn.disabled=false;btn.textContent="Publicar resena ->";alert("Error de conexion.");});\n'
+    + '}\n'
+    + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'
+    + '<\/script>\n</body>\n</html>';
 }
 
 module.exports = async function handler(req, res) {
-  var slug = (req.query.slug||'').trim().replace(/\.html$/,'');
-  if (!slug) return res.status(400).send('<h1>400 — Slug requerido</h1>');
+  var slug = (req.query.slug || '').trim().replace(/\.html$/, '');
+
+  if (!slug || slug.length < 3 || /^[0-9]+$/.test(slug)) {
+    return res.status(404).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>No encontrado \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:3rem;margin-bottom:1rem">404</h1><p>P\u00e1gina no encontrada.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
+  }
 
   try {
     var sql = neon(process.env.DATABASE_URL);
+    var rows = await sql('SELECT d.* FROM destinos d WHERE d.slug = $1 LIMIT 1', [slug]);
 
-    // Destino principal
-    var rows = await sql(
-      `SELECT d.*, c.nombre AS categoria_nombre
-       FROM destinos d
-       LEFT JOIN categorias c ON c.slug = d.categoria_slug
-       WHERE d.slug = $1 LIMIT 1`,
-      [slug]
-    );
-
-    if (!rows.length) return res.status(404).send(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>No encontrado – ExploraCO</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#f9f7f4}
-a{color:#E8A020}h1{font-size:3rem;margin-bottom:1rem}</style>
-</head><body>
-<h1>404</h1>
-<p>El lugar <b>${e(slug)}</b> no existe o fue eliminado.</p>
-<p style="margin-top:1.5rem"><a href="/index.html">← Volver al inicio</a></p>
-</body></html>`);
+    if (!rows.length) {
+      return res.status(404).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>No encontrado \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:3rem;margin-bottom:1rem">404</h1><p>El lugar <b>'+esc(slug)+'</b> no existe o fue eliminado.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
+    }
 
     var d = rows[0];
+    var detRows = await sql('SELECT * FROM destinos_detalles WHERE destino_id=$1 LIMIT 1', [d.id]);
+    var det = detRows.length ? detRows[0] : {};
 
-    // Detalles (columnas separadas en destinos_detalles)
-    var detRows = await sql(
-      `SELECT * FROM destinos_detalles WHERE destino_id=$1 LIMIT 1`,
-      [d.id]
-    );
-    var detalles = detRows.length ? detRows[0] : {};
+    // Fallback: si destinos_detalles no tiene datos, usar tags JSONB de destinos
+    if (!det.amenidades && d.tags) {
+      var tg = safeJSON(d.tags);
+      if (!Array.isArray(tg) && typeof tg === 'object') {
+        det.amenidades   = tg.amenidades;
+        det.habitaciones = tg.habitaciones;
+        det.faqs         = tg.faqs;
+        det.checkin      = tg.checkin;
+        det.checkout     = tg.checkout;
+      }
+    }
 
-    // Fotos de galería
     var fotosRows = await sql(
-      `SELECT url, caption FROM destinos_fotos
-       WHERE destino_id=$1 AND (es_hero IS NULL OR es_hero=false)
-       ORDER BY orden ASC NULLS LAST LIMIT 12`,
+      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 12',
       [d.id]
     );
-
-    // Reseñas — columnas reales: rating (no puntuacion), creado_en (no created_at)
-    // usuario_nombre no existe → tomar de texto o usar nombre de usuario
     var resenasRows = await sql(
-      `SELECT i.rating, i.texto, u.nombre AS usuario_nombre
-       FROM interacciones i
-       LEFT JOIN usuarios u ON i.usuario_id = u.id
-       WHERE i.destino_id=$1 AND i.tipo='resena'
-       ORDER BY i.creado_en DESC LIMIT 10`,
+      'SELECT i.rating, i.texto, u.nombre AS usuario_nombre FROM interacciones i LEFT JOIN usuarios u ON i.usuario_id=u.id WHERE i.destino_id=$1 AND i.tipo=\'resena\' ORDER BY i.creado_en DESC LIMIT 10',
       [d.id]
     );
 
-    var html = buildHTML(d, detalles, fotosRows, resenasRows);
-    res.setHeader('Content-Type','text/html; charset=utf-8');
-    res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=600');
+    var html = buildHTML(d, det, fotosRows, resenasRows);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);
 
-  } catch(err) {
+  } catch (err) {
     console.error('[pagina-destino]', err.message);
-    return res.status(500).send(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Error – ExploraCO</title></head>
-<body style="font-family:sans-serif;padding:2rem">
-<h1>Error interno</h1>
-<pre style="background:#f5f5f5;padding:1rem;border-radius:8px;margin-top:1rem;overflow-x:auto">${e(err.message)}</pre>
-<p style="margin-top:1rem"><a href="/index.html">← Inicio</a></p>
-</body></html>`);
+    return res.status(500).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:2rem;margin-bottom:1rem">\u26a0\ufe0f Error temporal</h1><p>No pudimos cargar esta p\u00e1gina. Por favor intenta de nuevo.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
   }
 };
-
-// Registrar visita
-fetch('/api/utilidades?tipo=visitas', {
-  method: 'POST',
-  headers: {'Content-Type':'application/json'},
-  body: JSON.stringify({ destino_id: DID })
-}).catch(function(){});

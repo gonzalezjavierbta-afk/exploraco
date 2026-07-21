@@ -787,14 +787,23 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <label class="form-label">Foto hero principal <span class="req">*</span></label>
           <div class="field-with-btn">
             <input class="form-input" id="f-photo-hero" type="url"
-              placeholder="https://images.unsplash.com/photo-…?w=900&q=80"
+              placeholder="https://images.unsplash.com/photo-...?w=900&q=80"
               oninput="previewHero(this.value)">
-            <button class="btn btn-ghost btn-sm" onclick="pickUnsplash('hero')">🖼️ Unsplash</button>
+            <button class="btn btn-ghost btn-sm" onclick="pickUnsplash('hero')">Unsplash</button>
           </div>
-          <div class="form-hint">URL de imagen. Recomendado: Unsplash 900px. La primera foto de galería se usa si no hay hero.</div>
+          <div class="form-hint">URL de imagen para el hero. Usar Unsplash, Cloudinary u otro CDN de imagenes.</div>
           <div id="hero-preview" style="margin-top:8px;display:none">
             <img id="hero-preview-img" style="width:100%;height:160px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border)" alt="Hero preview">
           </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Buscar foto por palabra clave (Unsplash)</label>
+          <div class="field-with-btn">
+            <input class="form-input" id="f-unsplash-query" placeholder="Ej: monserrate bogota, selva colombia, ciudad perdida..."
+              onkeydown="if(event.key==='Enter'){event.preventDefault();searchUnsplashAdmin();}">
+            <button class="btn btn-ghost btn-sm" onclick="searchUnsplashAdmin()">Buscar</button>
+          </div>
+          <div id="unsplash-results" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Gradiente de fondo del hero</label>
@@ -803,23 +812,24 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               placeholder="linear-gradient(135deg,#1a3a5c,#2a4a7c)"
               oninput="livePreview()">
           </div>
-          <div class="form-hint">Presets:</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#1a3a5c,#2a4a7c)')" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c);color:#fff;border:none;font-size:10px">🏨 Azul hostal</button>
-            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#2a1a0a,#3a2a0a)')" style="background:linear-gradient(135deg,#2a1a0a,#3a2a0a);color:#fff;border:none;font-size:10px">🌿 Café</button>
-            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#0d1117,#1a2a3a)')" style="background:linear-gradient(135deg,#0d1117,#1a2a3a);color:#fff;border:none;font-size:10px">🌙 Negro</button>
-            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#1a0a2a,#2a1a3a)')" style="background:linear-gradient(135deg,#1a0a2a,#2a1a3a);color:#fff;border:none;font-size:10px">💜 Morado</button>
-            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#0a2a1a,#1a4a2a)')" style="background:linear-gradient(135deg,#0a2a1a,#1a4a2a);color:#fff;border:none;font-size:10px">🌲 Verde</button>
+            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#1a3a5c,#2a4a7c)')" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c);color:#fff;border:none;font-size:10px">Azul hostal</button>
+            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#2a1a0a,#3a2a0a)')" style="background:linear-gradient(135deg,#2a1a0a,#3a2a0a);color:#fff;border:none;font-size:10px">Cafe</button>
+            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#0d1117,#1a2a3a)')" style="background:linear-gradient(135deg,#0d1117,#1a2a3a);color:#fff;border:none;font-size:10px">Negro</button>
+            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#1a0a2a,#2a1a3a)')" style="background:linear-gradient(135deg,#1a0a2a,#2a1a3a);color:#fff;border:none;font-size:10px">Morado</button>
+            <button class="btn btn-ghost btn-sm" onclick="setGradient('linear-gradient(135deg,#0a2a1a,#1a4a2a)')" style="background:linear-gradient(135deg,#0a2a1a,#1a4a2a);color:#fff;border:none;font-size:10px">Verde</button>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Galería de fotos</label>
-          <div class="form-hint">La primera foto se usa como imagen del hero si no hay URL de hero arriba.</div>
+          <label class="form-label">Galeria de fotos</label>
+          <div class="form-hint">Agrega URLs de imagenes para la galeria. La primera se usa como hero si no hay URL de hero arriba.</div>
           <div class="photo-list" id="photo-list"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="addPhotoField()">+ URL manual</button>
-            <button class="btn btn-ghost btn-sm" onclick="pickUnsplash('gallery')">🖼️ Unsplash</button>
+            <button class="btn btn-ghost btn-sm" onclick="pickUnsplash('gallery')">Unsplash</button>
+            <button class="btn btn-ghost btn-sm" onclick="showPhotoGrid()">Ver galeria</button>
           </div>
+          <div id="photo-grid-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-top:8px"></div>
         </div>
       </div><!-- /fpanel-media -->
       <div class="ftab-panel" id="fpanel-contenido">
@@ -1076,9 +1086,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <button class="btn btn-ghost btn-sm" onclick="addFaqRow()">+ Añadir pregunta</button>
           </div>
 
-        </div>
-
-        <div id="especifico-comida" class="cat-panel">
+        id="especifico-comida" class="cat-panel">
           <div class="cat-editor-tabs">
             <div class="cetab on" onclick="showCatTab('comida-menu')">🍽️ Carta / Menú</div>
             <div class="cetab" onclick="showCatTab('comida-horarios')">🕐 Horarios</div>
@@ -1206,27 +1214,33 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
           <!-- ITINERARIO DIA A DIA -->
           <div class="cat-panel" id="cat-sitio-itinerario">
-            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Describe el itinerario dia a dia. Ej: Dia 1: Llegada y acampada...</p>
-            <div id="itinerario-list-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
-            <button class="btn btn-ghost btn-sm" onclick="addSitioItinerarioItem()">+ Agregar dia</button>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Agrega cada paso del itinerario. Puedes agrupar varios pasos bajo el mismo dia.</p>
+            <div id="itinerario-list-admin" style="display:flex;flex-direction:column;gap:10px;margin-bottom:8px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSitioItinerarioItem()">+ Agregar paso</button>
           </div>
 
           <!-- EXTRAS: fauna, secretos, regulaciones -->
           <div class="cat-panel" id="cat-sitio-extras">
             <div class="form-group">
-              <label class="form-label">Fauna y flora destacada</label>
-              <textarea class="form-input" id="f-fauna-flora" rows="3" placeholder="Ej: Colibries, orquideas, monos titi, dantas... Separar por comas."></textarea>
+              <label class="form-label">Fauna y flora</label>
+              <p style="font-size:10px;color:var(--muted);margin-bottom:6px">Opcion 1: texto simple separado por comas (Ej: Colibries, orquideas, dantas)<br>Opcion 2 (cards visuales): JSON array [{emoji,nombre,hecho}]<br>Ej: [{"emoji":"🦜","nombre":"Colibrí","hecho":"500 especies en Colombia"}]</p>
+              <textarea class="form-input" id="f-fauna-flora" rows="4" placeholder='Colibries, orquideas, monos titi, dantas...'></textarea>
             </div>
-            <div class="form-group">
-              <label class="form-label">Lo que nadie te dice (secretos y tips)</label>
-              <textarea class="form-input" id="f-secretos" rows="3" placeholder="Ej: Llevar efectivo, el sendero del medio es mas facil, reservar con 2 semanas de anticipacion..."></textarea>
+            <div class="form-group" style="margin-top:12px">
+              <label class="form-label">Lo que nadie te dice</label>
+              <p style="font-size:10px;color:var(--muted);margin-bottom:6px">Opcion 1: texto simple, una linea por tip<br>Opcion 2 (cards con icono y tag): JSON array [{icono,titulo,texto,tag,tag_color}]<br>tag_color: gold | red | green | blue<br>Ej: [{"icono":"📸","titulo":"Mejor foto a las 7am","texto":"La neblina es increible","tag":"Foto perfecta","tag_color":"gold"}]</p>
+              <div id="secretos-list-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+              <button class="btn btn-ghost btn-sm" onclick="addSitioSecretoItem()">+ Agregar tip</button>
+              <details style="margin-top:8px">
+                <summary style="font-size:10px;color:var(--muted);cursor:pointer">O pegar JSON directamente</summary>
+                <textarea class="form-input" id="f-secretos" rows="4" placeholder='[{"icono":"📸","titulo":"Tip 1","texto":"Descripcion","tag":"Gold","tag_color":"gold"}]' style="margin-top:6px"></textarea>
+              </details>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top:12px">
               <label class="form-label">Permisos y regulaciones</label>
               <textarea class="form-input" id="f-regulaciones" rows="3" placeholder="Ej: Cupo maximo 200 personas/dia. No se permiten mascotas. Guia obligatorio..."></textarea>
             </div>
           </div>
-
         </div>
 
         <div id="especifico-evento" class="cat-panel">
@@ -2550,7 +2564,7 @@ function savePlace() {
     p.entradas = collectSitioEntradas ? collectSitioEntradas() : [];
     p.itinerario = collectSitioItinerario ? collectSitioItinerario() : [];
     p.fauna_flora = v('f-fauna-flora');
-    p.secretos = v('f-secretos');
+    p.secretos = collectSitioSecretos ? collectSitioSecretos() : v('f-secretos');
     p.regulaciones = v('f-regulaciones');
   }
 
@@ -2614,6 +2628,120 @@ function deletePlace() {
   deletePlaceId(currentId);
   showScreen('tabla');
 }
+function searchUnsplashAdmin() {
+  var q = document.getElementById('f-unsplash-query');
+  if(!q || !q.value.trim()) return;
+  var query = q.value.trim();
+  var container = document.getElementById('unsplash-results');
+  if(!container) return;
+  container.innerHTML = '<span style="font-size:11px;color:var(--muted)">Buscando...</span>';
+  // Usar API publica de Unsplash Source (no requiere auth)
+  var imgs = [
+    'https://source.unsplash.com/featured/400x300/?'+encodeURIComponent(query)+'&'+Date.now(),
+    'https://source.unsplash.com/featured/400x300/?'+encodeURIComponent(query+' colombia')+'&'+Date.now(),
+    'https://source.unsplash.com/featured/400x300/?'+encodeURIComponent(query+' travel')+'&'+Date.now(),
+    'https://source.unsplash.com/featured/400x300/?'+encodeURIComponent(query+' landscape')+'&'+Date.now(),
+    'https://source.unsplash.com/featured/400x300/?'+encodeURIComponent(query+' nature')+'&'+Date.now(),
+    'https://source.unsplash.com/featured/400x300/?'+encodeURIComponent(query+' adventure')+'&'+Date.now(),
+  ];
+  container.innerHTML = imgs.map(function(url) {
+    return '<div style="position:relative;cursor:pointer" onclick="selectUnsplashImg(\''+url+'\',this)">'
+      +'<img src="'+url+'" style="width:100%;height:70px;object-fit:cover;border-radius:6px;border:2px solid transparent" '
+      +'onload="this.style.border=\'2px solid var(--border)\'" onerror="this.parentElement.style.display=\'none\'">'
+      +'<div style="position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:16px;opacity:0" '
+      +'onmouseover="this.style.background=\'rgba(0,0,0,0.3)\';this.style.opacity=1" '
+      +'onmouseout="this.style.background=\'rgba(0,0,0,0)\';this.style.opacity=0">+</div>'
+      +'</div>';
+  }).join('');
+}
+
+function selectUnsplashImg(url, el) {
+  // Preguntar si usar como hero o galeria
+  var hero = document.getElementById('f-photo-hero');
+  if(hero && !hero.value.trim()) {
+    hero.value = url;
+    previewHero(url);
+    showAdminToast('Imagen puesta como foto hero');
+  } else {
+    // Agregar a galeria
+    addPhotoFieldWithUrl(url);
+    showAdminToast('Imagen agregada a la galeria');
+  }
+  // Resaltar seleccionada
+  el.querySelector('img').style.border = '2px solid var(--gold)';
+}
+
+function addPhotoFieldWithUrl(url) {
+  var list = document.getElementById('photo-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className = 'photo-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center';
+  row.innerHTML = '<img src="'+url+'" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);flex-shrink:0">'
+    +'<input class="form-input photo-url-input" type="url" value="'+url+'" style="flex:1;font-size:11px">'
+    +'<input class="form-input photo-caption-input" type="text" placeholder="Caption (opcional)" style="width:140px;font-size:11px">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this.parentElement)">x</button>';
+  list.appendChild(row);
+  showPhotoGrid();
+}
+
+function showPhotoGrid() {
+  var grid = document.getElementById('photo-grid-preview');
+  if(!grid) return;
+  var urls = Array.from(document.querySelectorAll('#photo-list .photo-url-input')).map(function(i){return i.value.trim();}).filter(Boolean);
+  if(!urls.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = urls.map(function(url) {
+    return '<img src="'+url+'" style="width:100%;height:64px;object-fit:cover;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">';
+  }).join('');
+}
+
+function addSitioSecretoItem() {
+  var list = document.getElementById('secretos-list-admin');
+  if(!list) return;
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px';
+  wrap.innerHTML = '<div style="display:grid;grid-template-columns:40px 1fr 100px 80px auto;gap:6px">'
+    +'<input class="form-input secreto-icono" placeholder="Ico" title="Emoji" style="font-size:14px;text-align:center">'
+    +'<input class="form-input secreto-titulo" placeholder="Titulo del tip...">'
+    +'<input class="form-input secreto-tag" placeholder="Tag (ej: Gold)">'
+    +'<select class="form-input form-select secreto-color" style="font-size:11px">'
+    +'<option value="gold">Gold</option><option value="green">Verde</option>'
+    +'<option value="red">Rojo</option><option value="blue">Azul</option>'
+    +'</select>'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this.parentElement.parentElement)">x</button>'
+    +'</div>'
+    +'<textarea class="form-input secreto-texto" rows="2" placeholder="Descripcion del tip..."></textarea>';
+  list.appendChild(wrap);
+}
+
+function collectSitioSecretos() {
+  // Verificar si hay lista de cards
+  var rows = document.querySelectorAll('#secretos-list-admin > div');
+  if(rows.length > 0) {
+    var result = [];
+    rows.forEach(function(row) {
+      var ico   = row.querySelector('.secreto-icono');
+      var tit   = row.querySelector('.secreto-titulo');
+      var txt   = row.querySelector('.secreto-texto');
+      var tag   = row.querySelector('.secreto-tag');
+      var color = row.querySelector('.secreto-color');
+      if(tit && tit.value.trim()) {
+        result.push({
+          icono:     ico ? ico.value.trim() : '',
+          titulo:    tit.value.trim(),
+          texto:     txt ? txt.value.trim() : '',
+          tag:       tag ? tag.value.trim() : '',
+          tag_color: color ? color.value : 'gold'
+        });
+      }
+    });
+    if(result.length) return JSON.stringify(result);
+  }
+  // Fallback: texto directo del textarea
+  var direct = document.getElementById('f-secretos');
+  return direct ? direct.value.trim() : '';
+}
+
 function addSitioEntradaItem() {
   var list = document.getElementById('entradas-list-admin');
   if(!list) return;
@@ -2644,22 +2772,43 @@ function addSitioItinerarioItem() {
   var list = document.getElementById('itinerario-list-admin');
   if(!list) return;
   var n = list.children.length + 1;
-  var row = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:80px 1fr auto;gap:6px';
-  row.innerHTML = '<input class="form-input itinerario-dia" value="Dia '+n+'" placeholder="Dia">'
-    +'<textarea class="form-input itinerario-desc" rows="2" placeholder="Descripcion del dia '+n+'..."></textarea>'
-    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="height:36px">x</button>';
-  list.appendChild(row);
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px';
+  wrap.innerHTML = '<div style="display:grid;grid-template-columns:80px 50px 1fr auto;gap:6px">'
+    +'<input class="form-input itinerario-dia" value="Dia '+n+'" placeholder="Dia" style="font-size:11px">'
+    +'<input class="form-input itinerario-hora" placeholder="Hora" style="font-size:11px">'
+    +'<input class="form-input itinerario-titulo" placeholder="Titulo del paso..." style="font-size:11px">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this.parentElement.parentElement)">x</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:40px 1fr;gap:6px">'
+    +'<input class="form-input itinerario-icono" placeholder="Ico" title="Emoji o simbolo" style="font-size:13px;text-align:center">'
+    +'<textarea class="form-input itinerario-detalle" rows="2" placeholder="Descripcion detallada del paso..." style="font-size:11px"></textarea>'
+    +'</div>'
+    +'<input class="form-input itinerario-tags" placeholder="Tags separados por comas: 6h caminata, 30C, Cruce rio..." style="font-size:10px">';
+  list.appendChild(wrap);
 }
 
 function collectSitioItinerario() {
   var rows = document.querySelectorAll('#itinerario-list-admin > div');
   var result = [];
   rows.forEach(function(row) {
-    var dia = row.querySelector('.itinerario-dia');
-    var desc = row.querySelector('.itinerario-desc');
+    var dia    = row.querySelector('.itinerario-dia');
+    var hora   = row.querySelector('.itinerario-hora');
+    var titulo = row.querySelector('.itinerario-titulo');
+    var icono  = row.querySelector('.itinerario-icono');
+    var detalle= row.querySelector('.itinerario-detalle');
+    var tagsEl = row.querySelector('.itinerario-tags');
+    var tituloVal = titulo ? titulo.value.trim() : (row.querySelector('.itinerario-desc') ? row.querySelector('.itinerario-desc').value.trim() : '');
     if(dia && dia.value.trim()) {
-      result.push({dia: dia.value.trim(), descripcion: desc ? desc.value.trim() : ''});
+      var obj = {dia: dia.value.trim()};
+      if(hora && hora.value.trim())    obj.hora    = hora.value.trim();
+      if(tituloVal)                    obj.titulo   = tituloVal;
+      if(icono && icono.value.trim())  obj.icono   = icono.value.trim();
+      if(detalle && detalle.value.trim()) obj.detalle = detalle.value.trim();
+      if(tagsEl && tagsEl.value.trim()) {
+        obj.tags = tagsEl.value.split(',').map(function(t){return t.trim();}).filter(Boolean);
+      }
+      result.push(obj);
     }
   });
   return result;
