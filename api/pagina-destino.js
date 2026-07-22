@@ -354,22 +354,27 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCION: Secretos y tips ---------------------------------
   var secSecretos = '';
   if (cat === 'sitio' && secretos) {
-        let sData = (typeof secretos === 'string' && secretos.trim().startsWith('[')) ? JSON.parse(secretos) : secretos;
-        secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">8</div></div>';
-        
-        if (Array.isArray(sData)) {
-            // Renderizado visual v9 (Tip Cards) - Referente Tayrona
-            secSecretos += '<div class="tips-grid">' + sData.map(function(t){
-                return '<div class="tip-card"><div class="tip-icon">'+esc(t.icono || '\u2605')+'</div><div class="tip-body"><div class="tip-title">'+esc(t.titulo)+'</div><div class="tip-text">'+esc(t.texto)+'</div><span class="tip-tag tip-'+esc(t.tag_color || 'gold')+'">'+esc(t.tag || 'Tip')+'</span></div></div>';
-            }).join('') + '</div>';
-        } else {
-            // Fallback para texto plano antiguo (Evita Error 500)
-            var sList = sData.split(/[.\n]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 5; });
-            secSecretos += '<div style="display:flex;flex-direction:column;gap:8px">' + sList.map(function(s){
-                return '<div class="hbox"><span class="hbico">\\u2713</span><p class="hbtx">'+esc(s)+'</p></div>';
-            }).join('') + '</div>';
+        try {
+            var sData = (typeof secretos === 'string' && secretos.trim().startsWith('[')) ? JSON.parse(secretos) : secretos;
+            secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">8</div></div>';
+            
+            if (Array.isArray(sData)) {
+                // RENDERIZADO VISUAL v9 (Referente Tayrona)
+                secSecretos += '<div class="tips-grid">' + sData.map(function(t){
+                    return '<div class="tip-card"><div class="tip-icon">'+esc(t.icono || '\u2605')+'</div><div class="tip-body"><div class="tip-title">'+esc(t.titulo)+'</div><div class="tip-text">'+esc(t.texto)+'</div><span class="tip-tag tip-'+esc(t.tag_color || 'gold')+'">'+esc(t.tag || 'Tip')+'</span></div></div>';
+                }).join('') + '</div>';
+            } else {
+                // FALLBACK TEXTO PLANO (Seguro contra Error 500)
+                var sList = (typeof sData === 'string') ? sData.split(/[.\n]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 5; }) : [];
+                secSecretos += '<div style="display:flex;flex-direction:column;gap:8px">' + sList.map(function(s){
+                    return '<div class="hbox"><span class="hbico">\\u2713</span><p class="hbtx">'+esc(s)+'</p></div>';
+                }).join('') + '</div>';
+            }
+            secSecretos += '</div></section>';
+        } catch (err) {
+            console.error("ExploraCO_Error_v21:", err.message);
+            secSecretos = '<!-- Error en renderizado: ' + err.message + ' -->';
         }
-        secSecretos += '</div></section>';
     }
 
   // -- SECCION: Permisos y regulaciones -------------------------
