@@ -185,7 +185,7 @@ function buildHTML(d, det, fotos, resenas) {
   var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
   var tours          = safeJSON(tags.tours);         if(!Array.isArray(tours))        tours=[];
   var itinerario     = safeJSON(tags.itinerario);   if(!Array.isArray(itinerario))   itinerario=[];
-  var faunaFlora     = tags.fauna_flora  || '';
+  var faunaFlora = (typeof tags.fauna_flora === 'string' && tags.fauna_flora.startsWith('[')) ? JSON.parse(tags.fauna_flora) : (tags.fauna_flora || []);
   var secretos       = tags.secretos     || '';
   var regulaciones   = tags.regulaciones || '';
 
@@ -354,16 +354,23 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCION: Secretos y tips ---------------------------------
   var secSecretos = '';
   if (cat === 'sitio' && secretos) {
-    var secretosList = secretos.split(/[.\n]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 5; });
-    secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + (secretosList.length > 1
-          ? '<div style="display:flex;flex-direction:column;gap:8px">'+secretosList.map(function(s){
-              return '<div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--gold);font-weight:900;flex-shrink:0">[ok]</span><span style="font-size:13px;color:#444;line-height:1.6">'+esc(s)+'</span></div>';
-            }).join('')+'</div>'
-          : '<p class="stext">'+esc(secretos)+'</p>')
-      + '</div></section>';
-  }
+        let sData = (typeof secretos === 'string' && secretos.trim().startsWith('[')) ? JSON.parse(secretos) : secretos;
+        secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">8</div></div>';
+        
+        if (Array.isArray(sData)) {
+            // Renderizado visual v9 (Tip Cards) - Referente Tayrona
+            secSecretos += '<div class="tips-grid">' + sData.map(function(t){
+                return '<div class="tip-card"><div class="tip-icon">'+esc(t.icono || '\u2605')+'</div><div class="tip-body"><div class="tip-title">'+esc(t.titulo)+'</div><div class="tip-text">'+esc(t.texto)+'</div><span class="tip-tag tip-'+esc(t.tag_color || 'gold')+'">'+esc(t.tag || 'Tip')+'</span></div></div>';
+            }).join('') + '</div>';
+        } else {
+            // Fallback para texto plano antiguo (Evita Error 500)
+            var sList = sData.split(/[.\n]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 5; });
+            secSecretos += '<div style="display:flex;flex-direction:column;gap:8px">' + sList.map(function(s){
+                return '<div class="hbox"><span class="hbico">\\u2713</span><p class="hbtx">'+esc(s)+'</p></div>';
+            }).join('') + '</div>';
+        }
+        secSecretos += '</div></section>';
+    }
 
   // -- SECCION: Permisos y regulaciones -------------------------
   var secRegulaciones = '';
