@@ -55,8 +55,6 @@ function safeArr(v) {
 }
 
 // Limpiar emojis de un string para uso seguro en JS del servidor
-// cleanStr removed
-
 function money(n) {
   if (!n) return '';
   var s = String(n).replace(/[^0-9]/g, '');
