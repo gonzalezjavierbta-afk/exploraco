@@ -1,4 +1,4 @@
-// api/admin-destinos.js — Vercel Serverless Function
+// api/admin-destinos.js \u2014 Vercel Serverless Function
 const { neon } = require('@neondatabase/serverless');
 
 module.exports = async (req, res) => {
@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
           ${b.lead||''}, ${b.desc||''}, ${b.city||''}, ${b.region||''},
           ${b.lat||null}, ${b.lng||null}, ${b.whatsapp||''},
           ${b.email||''}, ${b.web||''}, ${b.instagram||''},
-          ${b.booking||''}, ${b.price||''}, ${b.emoji||'📍'},
+          ${b.booking||''}, ${b.price||''}, ${b.emoji||'\uD83D\uDCCD'},
           ${b.hero_bg||'linear-gradient(135deg,#111,#222)'},
           ${b.rating||0}, ${b.reviews||0},
           ${b.status||'draft'}, ${b.destacado||false}
@@ -87,7 +87,7 @@ module.exports = async (req, res) => {
       return res.json({ ok: true });
     }
 
-    return res.status(405).json({ ok: false, error: 'Método no permitido' });
+    return res.status(405).json({ ok: false, error: 'M\u00e9todo no permitido' });
 
   } catch (err) {
     console.error('[admin-destinos]', err.message);

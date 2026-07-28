@@ -671,8 +671,8 @@ function buildHTML(d, det, fotos, resenas) {
     + 'var DID="'+esc(String(d.id))+'";\n'
     + 'var rvScore=0;\n'
     + 'function setRvScore(n){rvScore=n;document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=n);});}\n'
-    + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");t.style.color="var(--muted)";t.style.borderColor="transparent";});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");el.style.color="var(--gold)";el.style.borderColor="var(--gold)";var panel=document.getElementById(id);if(panel)panel.classList.add("on");}
-function submitRv(){\n'
+    + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");t.style.color="var(--muted)";t.style.borderColor="transparent";});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");el.style.color="var(--gold)";el.style.borderColor="var(--gold)";var panel=document.getElementById(id);if(panel)panel.classList.add("on");}\n'
+    + 'function submitRv(){\n'
     + '  var nom=document.getElementById("rvn").value.trim();\n'
     + '  var txt=document.getElementById("rvt").value.trim();\n'
     + '  if(!rvScore){alert("Selecciona una puntuacion");return;}\n'
