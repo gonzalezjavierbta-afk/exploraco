@@ -59,7 +59,14 @@ function money(n) {
   if (!n) return '';
   var s = String(n).replace(/[^0-9]/g, '');
   if (!s) return esc(n);
-  return '$' + parseInt(s,10).toLocaleString('es-CO');
+  var n = parseInt(s, 10);
+  var parts = [];
+  var str = String(n);
+  for (var k = str.length - 1, c = 0; k >= 0; k--, c++) {
+    if (c > 0 && c % 3 === 0) parts.unshift('.');
+    parts.unshift(str[k]);
+  }
+  return '$' + parts.join('');
 }
 
 function schemaLD(d, cat) {
@@ -732,6 +739,7 @@ module.exports = async function handler(req, res) {
 
   } catch (err) {
     console.error('[pagina-destino]', err.message);
-    return res.status(500).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:2rem;margin-bottom:1rem">\u26a0\ufe0f Error temporal</h1><p>No pudimos cargar esta p\u00e1gina. Por favor intenta de nuevo.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
+    console.error('[pagina-destino] slug='+slug+' err='+err.message+' stack='+err.stack);
+    return res.status(500).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}pre{text-align:left;background:#f5f5f5;padding:1rem;border-radius:8px;font-size:11px;overflow-x:auto}</style></head><body><h1 style="font-size:2rem;margin-bottom:1rem">\u26a0\ufe0f Error temporal</h1><p>No pudimos cargar esta p\u00e1gina.</p><pre>'+err.message+'</pre><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
   }
 };
