@@ -229,17 +229,20 @@ function buildHTML(d, det, fotos, resenas) {
   var distancia      = tags.distancia       || '';
   var comoLlegar     = tags.como_llegar     || d.como_llegar || '';
   var permisos       = tags.permisos        || '';
-    // --- CODIGO DE CONTEXTO ---
-  var permisos = tags.permisos || '';
-  // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+  // BUG-A fix (ver ANALISIS_PARIDAD): safeJSON() es el parser primario; si tags.equipamiento
+  // llega como string separado por comas (dato legado o de publicar-lugar.js) y no es JSON
+  // valido, safeJSON devuelve el string tal cual -- en ese caso se hace el split manual.
+  // Antes existian DOS declaraciones de "var equipamiento": la segunda pisaba en silencio
+  // el resultado de la primera y el fallback de comas nunca se ejecutaba.
   var equipRaw = tags.equipamiento;
-  var equipamiento = [];
-  if (Array.isArray(equipRaw)) equipamiento = equipRaw;
-  else if (typeof equipRaw === 'string' && equipRaw.length > 2) {
-      equipamiento = equipRaw.split(',').map(function(t){ return t.trim(); });
+  var equipamiento = safeJSON(equipRaw);
+  if (!Array.isArray(equipamiento)) {
+    if (typeof equipRaw === 'string' && equipRaw.length > 2) {
+      equipamiento = equipRaw.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
+    } else {
+      equipamiento = [];
+    }
   }
-// --- FIN DEL BLOQUE ---
-  var equipamiento   = safeJSON(tags.equipamiento); if(!Array.isArray(equipamiento)) equipamiento=[];
   var temporada      = safeJSON(tags.temporada);    if(!Array.isArray(temporada))    temporada=[];
   var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
   var tours          = safeJSON(tags.tours);         if(!Array.isArray(tours))        tours=[];
@@ -273,7 +276,7 @@ function buildHTML(d, det, fotos, resenas) {
     // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
   var hqi = []; 
   if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
-  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' · '+nRes+' rese\u00f1as</div>');
+  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' \u00b7 '+nRes+' rese\u00f1as</div>');
   if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
 
   var heroBtns = '<div class="hctar">' + 
@@ -327,7 +330,7 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCI??N: Galeria ---------------------------------------------
   // -- SECCI??N: Datos especificos del sitio turistico --------------
   var secSitio = '';
-  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
+  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada || temporada.length || permisos)) {
     var sitioCards = [];
     if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
     if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
@@ -391,7 +394,7 @@ function buildHTML(d, det, fotos, resenas) {
 // --- FIN DEL BLOQUE ---
 
 
-  // -- SECCION: Tours disponibles -------------------------------
+  // -- SECCION: Tours disponibles (v2: desc, incluye[], link) ---
   var secTours = '';
   if (cat === 'sitio' && tours.length) {
     secTours = '<section class="ssec bwarm" id="tours"><div class="sin">'
@@ -399,8 +402,12 @@ function buildHTML(d, det, fotos, resenas) {
       + '<div class="igrid">'
       + tours.map(function(t){
           var nombreTour = t.nombre || t.name || '';
+          var incluyeArr = Array.isArray(t.incluye) ? t.incluye
+            : (typeof t.incluye === 'string' && t.incluye ? t.incluye.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : []);
           var cta = '';
-          if (d.whatsapp) {
+          if (t.link) {
+            cta = '<a class="hbtn" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box" href="'+esc(t.link)+'" target="_blank">\uD83D\uDCAC Reservar</a>';
+          } else if (d.whatsapp) {
             var msg = encodeURIComponent('Hola, quiero reservar el tour "'+nombreTour+'" en '+(d.nombre||'')+'.');
             cta = '<button class="hbtn" style="margin-top:8px;width:100%;display:block;text-align:center" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'\',\'_blank\')">\uD83D\uDCAC Reservar</button>';
           }
@@ -409,6 +416,8 @@ function buildHTML(d, det, fotos, resenas) {
             + '<div class="ival">'+esc(nombreTour)+'</div>'
             + (t.duracion ? '<div class="ilbl">'+esc(t.duracion)+'</div>' : '')
             + (t.precio ? '<div style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:900;color:var(--gold-dark)">'+esc(t.precio)+'</div>' : '')
+            + (t.desc ? '<div class="stext" style="font-size:11px;margin-top:6px;text-align:left">'+esc(t.desc)+'</div>' : '')
+            + (incluyeArr.length ? '<div style="text-align:left;margin-top:6px">'+incluyeArr.map(function(inc){ return '<div style="font-size:11px;color:#444;margin-top:2px">\u2713 '+esc(inc)+'</div>'; }).join('')+'</div>' : '')
             + cta
             + '</div>';
         }).join('')
