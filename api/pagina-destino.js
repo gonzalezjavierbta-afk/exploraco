@@ -327,6 +327,15 @@ var heroThumbs = '';
   if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
     var sitioCards = [];
     if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
+    if (dificultad) {
+    var difNum = parseInt(dificultad) || 3;
+    var bars = [3-7].map(function(i){ 
+        return '<div style="width:12px;height:4px;border-radius:2px;background:'+(i<=difNum?'var(--gold)':'#eee')+'"></div>';
+    }).join('');
+    sitioCards.push({ico:'\ud83d\udcca', lbl:'Dificultad', val:'<div style="display:flex;gap:3px;margin-top:4px">'+bars+'</div>'});
+}
+// --- FIN DEL BLOQUE ---
+
     if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
     if (distancia)     sitioCards.push({ico:'\ud83d\udce6',lbl:'Distancia',val:distancia});
     if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
