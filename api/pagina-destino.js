@@ -130,13 +130,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".secnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:280;padding:0 4%;height:46px;display:flex;align-items:center;overflow-x:auto;gap:22px;scrollbar-width:none}.secnav::-webkit-scrollbar{display:none}"
 +".snlink{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);white-space:nowrap;cursor:pointer;padding:14px 0;border-bottom:3px solid transparent}.snlink:hover{color:var(--gold)}.snlink.on{color:var(--gold);border-color:var(--gold)}"
 // --- FIN DEL BLOQUE ---
-+".gstrip{background:var(--gold);position:sticky;top:98px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}"
-+".gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}"
-+".gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}"
-+".gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}"
-+".gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}"
-+".gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}"
-+".gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
+
 +".ssec{padding:40px 4%}.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}"
 +".sin{max-width:860px;margin:0 auto}"
 +".strow{display:flex;align-items:center;gap:14px;margin-bottom:22px}"
