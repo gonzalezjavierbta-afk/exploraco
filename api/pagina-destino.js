@@ -270,12 +270,20 @@ function buildHTML(d, det, fotos, resenas) {
     }).join('');
   }
 
-  var hqi = [];
+    // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+  var hqi = []; 
   if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
-  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' &middot; '+nRes+' resenas</div>');
-  if (d.precio_desde) hqi.push('<div class="hqi">\uD83D\uDCB0 Desde '+esc(money(d.precio_desde))+'</div>');
-  if (d.horario) hqi.push('<div class="hqi">\u23F0 '+esc(d.horario)+'</div>');
+  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' · '+nRes+' rese\u00f1as</div>');
+  if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
 
+  var heroBtns = '<div class="hctar">' + 
+      (hasLatLng ? '<button class="hbtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+d.lat+','+d.lng+'\',\'_blank\')">\ud83d\udccd C\u00f3mo llegar</button>' : '') +
+      (galAll.length > 1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">\ud83d\udcf7 Ver galer\u00eda</button>' : '') +
+  '</div>';
+
+  var heroThumbs = '';
+  // --- FIN DEL BLOQUE ---
+ 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
   if (nRes > 0 || d.precio_desde) {
@@ -322,6 +330,15 @@ function buildHTML(d, det, fotos, resenas) {
   if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
     var sitioCards = [];
     if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
+// --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+  if (dificultad) {
+      var difNum = parseInt(dificultad) || 3;
+      var bars = [3-7].map(function(i){ 
+          return '<div style="width:12px;height:4px;border-radius:2px;background:'+(i<=difNum?'var(--gold)':'#eee')+'"></div>';
+      }).join('');
+      sitioCards.push({ico:'\ud83d\udcca', lbl:'Dificultad', val:'<div style="display:flex;gap:3px;margin-top:4px">'+bars+'</div>'});
+  }
+// --- FIN DEL BLOQUE ---
     if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
     if (distancia)     sitioCards.push({ico:'\ud83d\udce6',lbl:'Distancia',val:distancia});
     if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
