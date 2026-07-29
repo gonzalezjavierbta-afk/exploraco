@@ -229,6 +229,16 @@ function buildHTML(d, det, fotos, resenas) {
   var distancia      = tags.distancia       || '';
   var comoLlegar     = tags.como_llegar     || d.como_llegar || '';
   var permisos       = tags.permisos        || '';
+    // --- CODIGO DE CONTEXTO ---
+  var permisos = tags.permisos || '';
+  // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+  var equipRaw = tags.equipamiento;
+  var equipamiento = [];
+  if (Array.isArray(equipRaw)) equipamiento = equipRaw;
+  else if (typeof equipRaw === 'string' && equipRaw.length > 2) {
+      equipamiento = equipRaw.split(',').map(function(t){ return t.trim(); });
+  }
+// --- FIN DEL BLOQUE ---
   var equipamiento   = safeJSON(tags.equipamiento); if(!Array.isArray(equipamiento)) equipamiento=[];
   var temporada      = safeJSON(tags.temporada);    if(!Array.isArray(temporada))    temporada=[];
   var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
