@@ -115,7 +115,11 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".prow{display:flex;gap:8px;height:88px}"
 +".pth{flex:1;border-radius:6px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
 +".pth img{width:100%;height:100%;object-fit:cover}"
-+".gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}"
++".subnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:260;display:flex;gap:4px;overflow-x:auto;padding:0 4%;-ms-overflow-style:none;scrollbar-width:none}"
++".subnav::-webkit-scrollbar{display:none}"
++".snlink{flex-shrink:0;padding:14px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}"
++".snlink.on{color:var(--gold-dark);border-color:var(--gold)}"
++".gstrip{background:var(--gold);position:sticky;top:98px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}"
 +".gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}"
 +".gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}"
 +".gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}"
@@ -254,8 +258,8 @@ function buildHTML(d, det, fotos, resenas) {
   var hqi = [];
   if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
   if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' &middot; '+nRes+' resenas</div>');
-  if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
-  if (d.horario) hqi.push('<div class="hqi">(tiempo) '+esc(d.horario)+'</div>');
+  if (d.precio_desde) hqi.push('<div class="hqi">\uD83D\uDCB0 Desde '+esc(money(d.precio_desde))+'</div>');
+  if (d.horario) hqi.push('<div class="hqi">\u23F0 '+esc(d.horario)+'</div>');
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
@@ -285,10 +289,10 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCI??N: Info rapida (iconos) -------------------------------
   var infoCards = [];
   if (d.tipo)     infoCards.push({ico:'\u2302',lbl:'Tipo',val:d.tipo});
-  if (checkin)    infoCards.push({ico:'(tiempo)',lbl:'Check-in',val:checkin+(checkout?' / '+checkout:'')});
-  if (d.capacidad)infoCards.push({ico:'\u0047\u0072',lbl:'Capacidad',val:d.capacidad});
+  if (checkin)    infoCards.push({ico:'\uD83D\uDD11',lbl:'Check-in',val:checkin+(checkout?' / '+checkout:'')});
+  if (d.capacidad)infoCards.push({ico:'\uD83D\uDC65',lbl:'Capacidad',val:d.capacidad});
   if (d.horario)  infoCards.push({ico:'\u23F0',lbl:'Horario',val:d.horario});
-  if (d.precio_desde) infoCards.push({ico:'\u0024',lbl:'Precio desde',val:money(d.precio_desde)});
+  if (d.precio_desde) infoCards.push({ico:'\uD83D\uDCB0',lbl:'Precio desde',val:money(d.precio_desde)});
   if (d.barrio)   infoCards.push({ico:'\u29BF',lbl:'Zona',val:d.barrio});
 
   var secInfo = infoCards.length ? '<section class="ssec bwhite" id="info"><div class="sin">'
@@ -303,7 +307,6 @@ function buildHTML(d, det, fotos, resenas) {
   if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
     var sitioCards = [];
     if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
-    if (dificultad)    sitioCards.push({ico:'\ud83d\udcca',lbl:'Dificultad',val:dificultad});
     if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
     if (distancia)     sitioCards.push({ico:'\ud83d\udce6',lbl:'Distancia',val:distancia});
     if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
@@ -314,9 +317,37 @@ function buildHTML(d, det, fotos, resenas) {
       + '<div class="igrid">'+sitioCards.map(function(c){
           return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
         }).join('')+'</div>'
-      + (equipamiento.length ? '<div class="hbox" style="margin-top:16px"><span class="hbico">\ud83c\udfa7</span><div><div class="hblbl">Equipo recomendado</div><div class="tagrow">'+equipamiento.map(function(e){return '<span class="tpill">'+esc(e)+'</span>';}).join('')+'</div></div></div>' : '')
       + (temporada.length ? '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div><div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div></div>' : '')
       + (permisos ? '<div class="hbox" style="margin-top:16px;background:#FEF3C7;border-color:#D97706"><span class="hbico">\ud83d\udccb</span><div><div class="hblbl" style="color:#92400E">Permisos y reservas</div><div class="hbtx" style="color:#78350F">'+esc(permisos)+'</div></div></div>' : '')
+      + '</div></section>';
+  }
+
+  // -- SECCION: Dificultad (escala visual) -----------------------
+  var secDificultad = '';
+  if (cat === 'sitio' && dificultad) {
+    var diffScale = [
+      {key:'facil',     label:'Facil',     color:'#16a34a'},
+      {key:'moderado',  label:'Moderado',  color:'#d97706'},
+      {key:'dificil',   label:'Dificil',   color:'#dc2626'},
+      {key:'extremo',   label:'Extremo',   color:'#7c2d12'}
+    ];
+    var normKey = dificultad.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var matchIdx = -1;
+    diffScale.forEach(function(lv, i){ if (lv.key === normKey) matchIdx = i; });
+    var activeColor = matchIdx >= 0 ? diffScale[matchIdx].color : 'var(--gold-dark)';
+    var barsHTML = diffScale.map(function(lv, i){
+      var isOn = matchIdx >= 0 && i <= matchIdx;
+      var bg = isOn ? diffScale[matchIdx].color : '#E5E7EB';
+      return '<div style="flex:1;height:10px;border-radius:5px;background:'+bg+'"></div>';
+    }).join('');
+    secDificultad = '<section class="ssec bwarm" id="dificultad"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Nivel de dificultad</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="hbox" style="border-color:'+activeColor+';background:'+activeColor+'12">'
+      + '<span class="hbico">\ud83d\udcca</span><div style="flex:1">'
+      + '<div class="hblbl" style="color:'+activeColor+'">'+esc(matchIdx>=0?diffScale[matchIdx].label:dificultad)+'</div>'
+      + '<div style="display:flex;gap:5px;margin:8px 0 4px">'+barsHTML+'</div>'
+      + (matchIdx<0 ? '<div class="hbtx">'+esc(dificultad)+'</div>' : '')
+      + '</div></div>'
       + '</div></section>';
   }
 
@@ -325,14 +356,22 @@ function buildHTML(d, det, fotos, resenas) {
   if (cat === 'sitio' && entradas.length) {
     secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Nota</th></tr></thead><tbody>'
+      + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Incluye</th><th>Comprar</th></tr></thead><tbody>'
       + entradas.map(function(e){
+          var incluye = e.incluye || e.nota || '';
+          var waLink = '';
+          if (d.whatsapp) {
+            var msg = encodeURIComponent('Hola, quiero comprar entrada "'+(e.tipo||'')+'" para '+(d.nombre||'')+'.');
+            waLink = '<a class="entrada-link" href="https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'" target="_blank">\uD83D\uDCAC WhatsApp</a>';
+          } else {
+            waLink = '&mdash;';
+          }
           return '<tr><td class="entrada-tipo">'+esc(e.tipo||'')+'</td>'
             + '<td class="entrada-precio">'+esc(e.precio||'')+'</td>'
-            + '<td style="font-size:12px;color:#666">'+esc(e.nota||'')+'</td></tr>';
+            + '<td style="font-size:12px;color:#666">'+esc(incluye)+'</td>'
+            + '<td>'+waLink+'</td></tr>';
         }).join('')
       + '</tbody></table>'
-      + (d.whatsapp ? '<p style="margin-top:12px;font-size:12px;color:#666">Reservas: <a href="https://wa.me/'+esc(d.whatsapp)+'" style="color:var(--gold-dark);font-weight:700">WhatsApp</a></p>' : '')
       + '</div></section>';
   }
 
@@ -343,11 +382,18 @@ function buildHTML(d, det, fotos, resenas) {
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tours disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
       + '<div class="igrid">'
       + tours.map(function(t){
+          var nombreTour = t.nombre || t.name || '';
+          var cta = '';
+          if (d.whatsapp) {
+            var msg = encodeURIComponent('Hola, quiero reservar el tour "'+nombreTour+'" en '+(d.nombre||'')+'.');
+            cta = '<button class="hbtn" style="margin-top:8px;width:100%;display:block;text-align:center" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'\',\'_blank\')">\uD83D\uDCAC Reservar</button>';
+          }
           return '<div class="icard">'
             + '<div class="iico">\u2605</div>'
-            + '<div class="ival">'+esc(t.nombre||t.name||'')+'</div>'
+            + '<div class="ival">'+esc(nombreTour)+'</div>'
             + (t.duracion ? '<div class="ilbl">'+esc(t.duracion)+'</div>' : '')
             + (t.precio ? '<div style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:900;color:var(--gold-dark)">'+esc(t.precio)+'</div>' : '')
+            + cta
             + '</div>';
         }).join('')
       + '</div></div></section>';
@@ -356,11 +402,20 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCION: Que llevar --------------------------------------
   var secChecklist = '';
   if (cat === 'sitio' && equipamiento.length) {
+    var prioClass = { 'obligatorio':'tip-red', 'recomendado':'tip-gold', 'opcional':'tip-blue', 'prohibido':'tip-red' };
     secChecklist = '<section class="ssec bwhite" id="checklist"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que llevar</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="tagrow">'
+      + '<div class="tips-grid">'
       + equipamiento.map(function(e){
-          return '<span class="tpill">\u2713 '+esc(typeof e==='string'?e:(e.item||e.nombre||e))+'</span>';
+          var isObj = e && typeof e === 'object';
+          var nombre = isObj ? (e.item || e.nombre || '') : String(e);
+          var prio = isObj ? (e.prioridad || e.priority || '') : '';
+          var prioKey = prio.toString().toLowerCase();
+          var cls = prioClass[prioKey] || 'tip-gold';
+          return '<div class="tip-card"><div class="tip-icon">\u2713</div><div>'
+            + '<div class="tip-title">'+esc(nombre)+'</div>'
+            + (prio ? '<span class="tip-tag '+cls+'">'+esc(prio)+'</span>' : '')
+            + '</div></div>';
         }).join('')
       + '</div></div></section>';
   }
@@ -611,6 +666,25 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+ctBtns.join('')+'</div></div></section>' : '';
 
+  // -- SUBNAV STICKY: anclas solo a secciones que van a existir ------
+  var subnavItems = [
+    {id:'descripcion', label:'Sobre',       has:!!secDescripcion},
+    {id:'galeria',     label:'Fotos',       has:!!secGaleria},
+    {id:'dificultad',  label:'Dificultad',  has:!!secDificultad},
+    {id:'entradas',    label:'Entradas',    has:!!secEntradas},
+    {id:'tours',       label:'Tours',       has:!!secTours},
+    {id:'checklist',   label:'Que llevar',  has:!!secChecklist},
+    {id:'itinerario',  label:'Itinerario',  has:!!secItinerario},
+    {id:'mapa',        label:'Mapa',        has:!!secMapa},
+    {id:'faq',         label:'FAQ',         has:!!secFaq},
+    {id:'resenas',     label:'Resenas',     has:!!secResenas}
+  ].filter(function(it){ return it.has; });
+  var subnav = subnavItems.length > 1 ? '<nav class="subnav">'
+    + subnavItems.map(function(it, i){
+        return '<a class="snlink'+(i===0?' on':'')+'" href="#'+it.id+'" onclick="document.querySelectorAll(\'.snlink\').forEach(function(l){l.classList.remove(\'on\')});this.classList.add(\'on\')">'+esc(it.label)+'</a>';
+      }).join('')
+    + '</nav>' : '';
+
   // -- ENSAMBLAR ----------------------------------------------------
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
     + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
@@ -631,6 +705,8 @@ function buildHTML(d, det, fotos, resenas) {
 
     + (d.status==='draft' ? '<div class="pbanner">(reloj) Este lugar esta pendiente de revision por el equipo de ExploraCO.</div>\n' : '')
 
+    + subnav + '\n\n'
+
     + '<section class="hero"><div class="hi">\n'
     + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
     + '<h1 class="htitle bc">'+esc(d.nombre)+'</h1>'
@@ -638,6 +714,7 @@ function buildHTML(d, det, fotos, resenas) {
     + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
     + '<div class="hctar">'
     + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
+    + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
     + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
     + '</div></div>\n'
     + '<div class="hr"><div class="psm" style="'+heroMainStyle+'">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
@@ -648,6 +725,7 @@ function buildHTML(d, det, fotos, resenas) {
     + secDescripcion + '\n'
     + secInfo + '\n'
     + secSitio + '\n'
+    + secDificultad + '\n'
     + secEntradas + '\n'
     + secTours + '\n'
     + secChecklist + '\n'

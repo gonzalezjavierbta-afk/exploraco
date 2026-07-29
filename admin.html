@@ -2257,9 +2257,18 @@ function loadForm(p) {
       if (checkList && p.checklist && p.checklist.length) {
         checkList.innerHTML = '';
         p.checklist.forEach(function(item){
+          var isObj = item && typeof item === 'object';
+          var nombreItem = isObj ? (item.item || item.nombre || '') : String(item);
+          var prioItem = isObj ? (item.prioridad || item.priority || 'Recomendado') : 'Recomendado';
           var row = document.createElement('div');
-          row.style.cssText = 'display:flex;gap:6px;align-items:center';
-          row.innerHTML = '<input class="form-input checklist-item-row" value="'+_esc(typeof item==='string'?item:(item.item||item.nombre||''))+'" placeholder="Ítem" style="flex:1">'
+          row.className = 'checklist-item-row';
+          row.style.cssText = 'display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center';
+          row.innerHTML = '<input class="form-input checklist-item-input" value="'+_esc(nombreItem)+'" placeholder="Ítem" style="font-size:11px;padding:5px 8px">'
+            +'<select class="form-input form-select checklist-item-prio" style="font-size:11px;padding:5px 8px">'
+            +'<option value="Obligatorio"'+(prioItem==='Obligatorio'?' selected':'')+'>Obligatorio</option>'
+            +'<option value="Recomendado"'+(prioItem==='Recomendado'?' selected':'')+'>Recomendado</option>'
+            +'<option value="Opcional"'+(prioItem==='Opcional'?' selected':'')+'>Opcional</option>'
+            +'</select>'
             +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
           checkList.appendChild(row);
         });
@@ -2437,8 +2446,11 @@ function collectTourItems() {
 function collectChecklistItems() {
   var items = [];
   document.querySelectorAll('.checklist-item-row').forEach(function(row) {
-    var inp = row.querySelector('input[type=text]');
-    if(inp && inp.value.trim()) items.push(inp.value.trim());
+    var inp = row.querySelector('.checklist-item-input');
+    var sel = row.querySelector('.checklist-item-prio');
+    if (inp && inp.value.trim()) {
+      items.push({ item: inp.value.trim(), prioridad: sel ? sel.value : 'Recomendado' });
+    }
   });
   return items;
 }
@@ -3296,8 +3308,9 @@ function addTourItem() {
 function addChecklistItem() {
   var list = document.getElementById('checklist-admin');
   var item = document.createElement('div');
+  item.className = 'checklist-item-row';
   item.style.cssText='display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center';
-  item.innerHTML='<input class="form-input" placeholder="Nombre del ítem" style="font-size:11px;padding:5px 8px"><select class="form-input form-select" style="font-size:11px;padding:5px 8px"><option>Obligatorio</option><option>Recomendado</option><option>Opcional</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  item.innerHTML='<input class="form-input checklist-item-input" placeholder="Nombre del ítem" style="font-size:11px;padding:5px 8px"><select class="form-input form-select checklist-item-prio" style="font-size:11px;padding:5px 8px"><option value="Obligatorio">Obligatorio</option><option value="Recomendado" selected>Recomendado</option><option value="Opcional">Opcional</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
   list.appendChild(item);
 }
 
@@ -3906,7 +3919,6 @@ function collectHostalEvents(){var rows=document.querySelectorAll('#hostal-event
 function collectMenuItems(){var rows=document.querySelectorAll('.menu-item-row');var m=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())m.push({nombre:i[0].value.trim(),precio:i[1]?i[1].value.trim():'',desc:i[2]?i[2].value.trim():''});});return m;}
 function collectHorariosDias(){var rows=document.querySelectorAll('.horario-row');var h=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())h.push({dia:i[0].value.trim(),apertura:i[1]?i[1].value.trim():'',cierre:i[2]?i[2].value.trim():''});});return h;}
 function collectTourItems(){var rows=document.querySelectorAll('.tour-item');var t=[];rows.forEach(function(row){var i=row.querySelectorAll('input,textarea');if(i[0]&&i[0].value.trim())t.push({nombre:i[0].value.trim(),duracion:i[1]?i[1].value.trim():'',precio:i[2]?i[2].value.trim():'',desc:i[3]?i[3].value.trim():''});});return t;}
-function collectChecklistItems(){var items=[];document.querySelectorAll('.checklist-item-row').forEach(function(row){var inp=row.querySelector('input[type=text]');if(inp&&inp.value.trim())items.push(inp.value.trim());});return items;}
 function collectLineupItems(){var items=[];document.querySelectorAll('.lineup-item').forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())items.push({nombre:i[0].value.trim(),escenario:i[1]?i[1].value.trim():'',hora:i[2]?i[2].value.trim():''});});return items;}
 function collectAgendaItems(){var items=[];document.querySelectorAll('.agenda-row').forEach(function(row){var i=row.querySelectorAll('input,select');if(i[0]&&i[0].value.trim())items.push({dia:i[0].value.trim(),hora:i[1]?i[1].value.trim():'',actividad:i[2]?i[2].value.trim():''});});return items;}
 function collectFaqs(){var f=[];document.querySelectorAll('#faq-builder-list .faq-builder-row').forEach(function(row){var q=row.querySelector('.faq-q-inp'),a=row.querySelector('.faq-a-inp');if(q&&q.value.trim())f.push({q:q.value.trim(),a:a?a.value.trim():''});});return f;}
