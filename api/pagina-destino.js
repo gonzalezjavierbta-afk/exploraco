@@ -266,11 +266,20 @@ else if (typeof equipRaw === 'string' && equipRaw.length > 2) {
     }).join('');
   }
 
-  var hqi = [];
-  if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
-  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' &middot; '+nRes+' resenas</div>');
-  if (d.precio_desde) hqi.push('<div class="hqi">\uD83D\uDCB0 Desde '+esc(money(d.precio_desde))+'</div>');
-  if (d.horario) hqi.push('<div class="hqi">\u23F0 '+esc(d.horario)+'</div>');
+// --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+var hqi = []; 
+if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
+if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' · '+nRes+' rese\u00f1as</div>');
+if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
+
+var heroBtns = '<div class="hctar">' + 
+    (hasLatLng ? '<button class="hbtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+d.lat+','+d.lng+'\',\'_blank\')">\ud83d\udccd C\u00f3mo llegar</button>' : '') +
+    (galAll.length > 1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">\ud83d\udcf7 Ver galer\u00eda</button>' : '') +
+'</div>';
+
+var heroThumbs = '';
+// --- FIN DEL BLOQUE ---
+
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
