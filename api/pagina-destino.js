@@ -374,29 +374,22 @@ function buildHTML(d, det, fotos, resenas) {
       + '</div></section>';
   }
 
-    // -- SECCION: Entradas y precios ----------------------------
-  var secEntradas = '';
-  if (cat === 'sitio' && entradas.length) {
-    secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Incluye</th><th>Comprar</th></tr></thead><tbody>'
-      + entradas.map(function(e){
-          var incluye = e.incluye || e.nota || '';
-          var waLink = '';
-          if (d.whatsapp) {
-            var msg = encodeURIComponent('Hola, quiero comprar entrada "'+(e.tipo||'')+'" para '+(d.nombre||'')+'.');
-            waLink = '<a class="entrada-link" href="https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'" target="_blank">\uD83D\uDCAC WhatsApp</a>';
-          } else {
-            waLink = '&mdash;';
-          }
-          return '<tr><td class="entrada-tipo">'+esc(e.tipo||'')+'</td>'
-            + '<td class="entrada-precio">'+esc(e.precio||'')+'</td>'
-            + '<td style="font-size:12px;color:#666">'+esc(incluye)+'</td>'
-            + '<td>'+waLink+'</td></tr>';
-        }).join('')
-      + '</tbody></table>'
-      + '</div></section>';
+  // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+  var secEntradas = ''; 
+  if (cat === 'sitio' && entradas.length) { 
+      secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">' + 
+      '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>' + 
+      '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Incluye</th><th>Comprar</th></tr></thead><tbody>' + 
+      entradas.map(function(e){ 
+          return '<tr><td class="entrada-tipo">'+esc(e.tipo)+'</td>' + 
+          '<td class="entrada-precio">'+esc(money(e.precio))+'</td>' +
+          '<td style="font-size:11px;color:#666">'+esc(e.incluye || 'Acceso general')+'</td>' +
+          '<td><a class="entrada-link" href="'+(e.link || 'https://wa.me/'+d.whatsapp)+'" target="_blank">\ud83c\udfab Comprar</a></td></tr>';
+      }).join('') + '</tbody></table>' + 
+      '</div></section>'; 
   }
+// --- FIN DEL BLOQUE ---
+
 
   // -- SECCION: Tours disponibles -------------------------------
   var secTours = '';
