@@ -130,7 +130,14 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".secnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:280;padding:0 4%;height:46px;display:flex;align-items:center;overflow-x:auto;gap:22px;scrollbar-width:none}.secnav::-webkit-scrollbar{display:none}"
 +".snlink{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);white-space:nowrap;cursor:pointer;padding:14px 0;border-bottom:3px solid transparent}.snlink:hover{color:var(--gold)}.snlink.on{color:var(--gold);border-color:var(--gold)}"
 // --- FIN DEL BLOQUE ---
-
++".gstrip{background:var(--gold);position:sticky;top:98px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}"
++".gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}"
++".gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}"
++".gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}"
++".gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}"
++".gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}"
++".gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
++".ssec{padding:40px 4%}.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}"
 +".sin{max-width:860px;margin:0 auto}"
 +".strow{display:flex;align-items:center;gap:14px;margin-bottom:22px}"
 +".sgl{width:36px;height:3px;background:var(--gold);flex-shrink:0;border-radius:2px}"
@@ -228,14 +235,7 @@ function buildHTML(d, det, fotos, resenas) {
   var distancia      = tags.distancia       || '';
   var comoLlegar     = tags.como_llegar     || d.como_llegar || '';
   var permisos       = tags.permisos        || '';
-  // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
-var equipRaw = tags.equipamiento;
-var equipamiento = [];
-if (Array.isArray(equipRaw)) equipamiento = equipRaw;
-else if (typeof equipRaw === 'string' && equipRaw.length > 2) {
-    equipamiento = equipRaw.split(',').map(function(t){ return t.trim(); });
-}
-// --- FIN DEL BLOQUE ---
+  var equipamiento   = safeJSON(tags.equipamiento); if(!Array.isArray(equipamiento)) equipamiento=[];
   var temporada      = safeJSON(tags.temporada);    if(!Array.isArray(temporada))    temporada=[];
   var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
   var tours          = safeJSON(tags.tours);         if(!Array.isArray(tours))        tours=[];
@@ -266,23 +266,6 @@ else if (typeof equipRaw === 'string' && equipRaw.length > 2) {
     }).join('');
   }
 
-
-
-  // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
-  var secEntradas = ''; 
-  if (cat === 'sitio' && entradas.length) { 
-      secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">' + 
-      '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>' + 
-      '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Incluye</th><th>Comprar</th></tr></thead><tbody>' + 
-      entradas.map(function(e){ 
-          return '<tr><td class="entrada-tipo">'+esc(e.tipo)+'</td>' + 
-          '<td class="entrada-precio">'+esc(money(e.precio))+'</td>' +
-          '<td style="font-size:11px;color:#666">'+esc(e.incluye || 'Acceso general')+'</td>' +
-          '<td><a class="entrada-link" href="'+(e.link || 'https://wa.me/'+d.whatsapp)+'" target="_blank">\ud83c\udfab Comprar</a></td></tr>';
-      }).join('') + '</tbody></table>' + 
-      '</div></section>'; 
-  }
-// --- FIN DEL BLOQUE ---
   var hqi = [];
   if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
   if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' &middot; '+nRes+' resenas</div>');
