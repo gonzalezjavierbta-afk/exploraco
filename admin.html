@@ -2243,12 +2243,15 @@ function loadForm(p) {
         tourList.innerHTML = '';
         p.tours.forEach(function(t){
           var row = document.createElement('div');
-          row.className = 'tour-admin-row';
-          row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 100px auto;gap:6px;margin-bottom:6px';
-          row.innerHTML = '<input class="form-input" value="'+_esc(t.nombre||t.name||'')+'" placeholder="Nombre del tour">'
-            +'<input class="form-input" value="'+_esc(t.duracion||'')+'" placeholder="Duración">'
-            +'<input class="form-input" value="'+_esc(t.precio||'')+'" placeholder="Precio">'
-            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          row.className = 'tour-item';
+          row.innerHTML = _tourRowHTML({
+            nombre:       t.nombre || t.name || '',
+            precio:       t.precio || '',
+            duracion:     t.duracion || '',
+            descripcion:  t.descripcion || t.desc || '',
+            incluye:      t.incluye || '',
+            link_reserva: t.link_reserva || t.link || ''
+          });
           tourList.appendChild(row);
         });
       }
@@ -2427,18 +2430,17 @@ function collectHorariosDias() {
 }
 
 function collectTourItems() {
-  var rows = document.querySelectorAll('.tour-item');
+  var rows = document.querySelectorAll('#tour-list-admin .tour-item');
   var tours = [];
   rows.forEach(function(row) {
-    var inputs = row.querySelectorAll('input,textarea');
-    if(inputs[0] && inputs[0].value.trim()) {
-      tours.push({
-        nombre: inputs[0].value.trim(),
-        duracion: inputs[1] ? inputs[1].value.trim() : '',
-        precio: inputs[2] ? inputs[2].value.trim() : '',
-        desc: inputs[3] ? inputs[3].value.trim() : ''
-      });
-    }
+    var nombreEl = row.querySelector('[data-field="nombre"]');
+    if (!nombreEl || !nombreEl.value.trim()) return;
+    var t = {};
+    row.querySelectorAll('[data-field]').forEach(function(el) {
+      var val = el.value.trim();
+      if (val) t[el.dataset.field] = val;
+    });
+    tours.push(t);
   });
   return tours;
 }
@@ -3295,12 +3297,29 @@ function addHostalEvent() {
 }
 
 // Tours
+function _tourRowHTML(t) {
+  t = t || {};
+  return '<div class="tour-item-header">'
+    +'<input class="form-input" data-field="nombre" placeholder="Nombre del tour" style="font-size:12px;font-weight:700;flex:1;margin-right:8px" value="'+_esc(t.nombre||'')+'">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>'
+    +'</div>'
+    +'<div class="form-row">'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Precio</label><input class="form-input" data-field="precio" placeholder="$1.400.000" value="'+_esc(t.precio||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Duración</label><input class="form-input" data-field="duracion" placeholder="4 días / 3 noches" value="'+_esc(t.duracion||'')+'"></div>'
+    +'</div>'
+    +'<div class="form-row">'
+    +'<div class="form-group" style="flex:1"><label class="form-label" style="font-size:9px">Descripción</label><textarea class="form-input" data-field="descripcion" rows="2" placeholder="Que incluye la experiencia...">'+_esc(t.descripcion||'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="form-row">'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Incluye</label><input class="form-input" data-field="incluye" placeholder="Transporte, guia, almuerzo..." value="'+_esc(t.incluye||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Link de reserva</label><input class="form-input" data-field="link_reserva" placeholder="https://..." value="'+_esc(t.link_reserva||'')+'"></div>'
+    +'</div>';
+}
 function addTourItem() {
   var list = document.getElementById('tour-list-admin');
   var item = document.createElement('div');
   item.className='tour-item';
-  item.innerHTML='<div class="tour-item-header"><input class="form-input" placeholder="Nombre del tour" style="font-size:12px;font-weight:700;flex:1;margin-right:8px"><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button></div>'
-    +'<div class="form-row"><div class="form-group"><label class="form-label" style="font-size:9px">Precio</label><input class="form-input" placeholder="$1.400.000"></div><div class="form-group"><label class="form-label" style="font-size:9px">Duración</label><input class="form-input" placeholder="4 días / 3 noches"></div></div>';
+  item.innerHTML=_tourRowHTML();
   list.appendChild(item);
 }
 
@@ -3918,7 +3937,6 @@ function collectAmenities(cid) {
 function collectHostalEvents(){var rows=document.querySelectorAll('#hostal-events-list .hostal-event-row');var ev=[];rows.forEach(function(row){var i=row.querySelectorAll('input,textarea');if(i[0]&&i[0].value.trim())ev.push({titulo:i[0].value.trim(),fecha:i[1]?i[1].value.trim():'',desc:i[2]?i[2].value.trim():''});});return ev;}
 function collectMenuItems(){var rows=document.querySelectorAll('.menu-item-row');var m=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())m.push({nombre:i[0].value.trim(),precio:i[1]?i[1].value.trim():'',desc:i[2]?i[2].value.trim():''});});return m;}
 function collectHorariosDias(){var rows=document.querySelectorAll('.horario-row');var h=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())h.push({dia:i[0].value.trim(),apertura:i[1]?i[1].value.trim():'',cierre:i[2]?i[2].value.trim():''});});return h;}
-function collectTourItems(){var rows=document.querySelectorAll('.tour-item');var t=[];rows.forEach(function(row){var i=row.querySelectorAll('input,textarea');if(i[0]&&i[0].value.trim())t.push({nombre:i[0].value.trim(),duracion:i[1]?i[1].value.trim():'',precio:i[2]?i[2].value.trim():'',desc:i[3]?i[3].value.trim():''});});return t;}
 function collectLineupItems(){var items=[];document.querySelectorAll('.lineup-item').forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())items.push({nombre:i[0].value.trim(),escenario:i[1]?i[1].value.trim():'',hora:i[2]?i[2].value.trim():''});});return items;}
 function collectAgendaItems(){var items=[];document.querySelectorAll('.agenda-row').forEach(function(row){var i=row.querySelectorAll('input,select');if(i[0]&&i[0].value.trim())items.push({dia:i[0].value.trim(),hora:i[1]?i[1].value.trim():'',actividad:i[2]?i[2].value.trim():''});});return items;}
 function collectFaqs(){var f=[];document.querySelectorAll('#faq-builder-list .faq-builder-row').forEach(function(row){var q=row.querySelector('.faq-q-inp'),a=row.querySelector('.faq-a-inp');if(q&&q.value.trim())f.push({q:q.value.trim(),a:a?a.value.trim():''});});return f;}
@@ -4553,8 +4571,8 @@ async function syncFromNeon() {
         local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;
         local.lng     = d.lng           ? parseFloat(d.lng)         : local.lng;
 
-        // --- FIX EDICION (jul 2026): campos base que _placeToAPI() ya
-        // envia a Neon pero que antes nunca volvian al objeto local ---
+        // --- Campos base que _placeToAPI() ya envia a Neon pero antes
+        // nunca volvian al objeto local ---
         local.highlight    = d.highlight    || local.highlight;
         local.barrio       = d.barrio       || local.barrio;
         local.lead         = d.lead         || local.lead;
@@ -4570,14 +4588,17 @@ async function syncFromNeon() {
         local.horario      = d.horario      || local.horario;
         local.tipo         = d.tipo         || local.tipo;
         local.capacidad    = d.capacidad    || local.capacidad;
-        local.como_llegar  = d.como_llegar  || local.como_llegar;
         local.status       = d.status       || local.status;
         if (d.destacado !== undefined && d.destacado !== null) local.destacado = d.destacado;
 
-        // --- FIX EDICION (jul 2026): desanidar tags JSONB hacia las
-        // propiedades planas que loadForm() y _placeToAPI() ya usan.
-        // Sin esto los datos existen en Neon pero nunca llegan al
-        // formulario del tab ESPECIFICO (ver BLUEPRINT.md seccion 4). ---
+        // --- Desanidar tags JSONB hacia propiedades planas ---
+        // NOTA: no es un spread 1:1 generico. _placeToAPI() renombra 5
+        // campos de sitio al armar tags (checklist->equipamiento,
+        // distancia_sitio->distancia, como_llegar_sitio->como_llegar,
+        // permisos_sitio->permisos, entradaPrecio->precio_entrada).
+        // Ese mapeo inverso se mantiene explicito aqui para no romper
+        // filas ya guardadas en Neon con esas keys. tours[] SI es
+        // 100% generico (nunca tuvo ese renombrado).
         var tags = d.tags;
         if (typeof tags === 'string') { try { tags = JSON.parse(tags); } catch(e){ tags = {}; } }
         tags = tags || {};
@@ -4596,14 +4617,12 @@ async function syncFromNeon() {
           if (tags.equipamiento && tags.equipamiento.length) local.checklist  = tags.equipamiento;
           if (tags.entradas && tags.entradas.length)         local.entradas   = tags.entradas;
           if (tags.itinerario && tags.itinerario.length)     local.itinerario = tags.itinerario;
-          local.fauna_flora  = tags.fauna_flora  || local.fauna_flora;
-          local.secretos      = tags.secretos     || local.secretos;
-          local.regulaciones  = tags.regulaciones || local.regulaciones;
+          local.fauna_flora = tags.fauna_flora || local.fauna_flora;
+          local.secretos     = tags.secretos    || local.secretos;
+          local.regulaciones = tags.regulaciones|| local.regulaciones;
         }
 
-        // Detalles de destinos_detalles -- el JOIN de /api/admin-destinos
-        // ya los trae en cada fila (hoy usados por Hostal; TASK-001 los
-        // necesitara igual, asi que quedan listos sin trabajo extra)
+        // Detalles de destinos_detalles -- el JOIN ya los trae en cada fila
         local.checkin    = d.checkin     || local.checkin;
         local.checkout   = d.checkout    || local.checkout;
         local.bookingUrl = d.booking_url || local.bookingUrl;
