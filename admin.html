@@ -4552,6 +4552,65 @@ async function syncFromNeon() {
         local.rev     = d.total_resenas ? parseInt(d.total_resenas)  : local.rev;
         local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;
         local.lng     = d.lng           ? parseFloat(d.lng)         : local.lng;
+
+        // --- FIX EDICION (jul 2026): campos base que _placeToAPI() ya
+        // envia a Neon pero que antes nunca volvian al objeto local ---
+        local.highlight    = d.highlight    || local.highlight;
+        local.barrio       = d.barrio       || local.barrio;
+        local.lead         = d.lead         || local.lead;
+        local.whatsapp     = d.whatsapp     || local.whatsapp;
+        local.email        = d.email        || local.email;
+        local.web          = d.web          || local.web;
+        local.instagram    = d.instagram    || local.instagram;
+        local.booking      = d.booking      || local.booking;
+        local.hostelworld  = d.hostelworld  || local.hostelworld;
+        local.airbnb       = d.airbnb       || local.airbnb;
+        local.emoji        = d.emoji        || local.emoji;
+        local.hero_bg      = d.hero_bg      || local.hero_bg;
+        local.horario      = d.horario      || local.horario;
+        local.tipo         = d.tipo         || local.tipo;
+        local.capacidad    = d.capacidad    || local.capacidad;
+        local.como_llegar  = d.como_llegar  || local.como_llegar;
+        local.status       = d.status       || local.status;
+        if (d.destacado !== undefined && d.destacado !== null) local.destacado = d.destacado;
+
+        // --- FIX EDICION (jul 2026): desanidar tags JSONB hacia las
+        // propiedades planas que loadForm() y _placeToAPI() ya usan.
+        // Sin esto los datos existen en Neon pero nunca llegan al
+        // formulario del tab ESPECIFICO (ver BLUEPRINT.md seccion 4). ---
+        var tags = d.tags;
+        if (typeof tags === 'string') { try { tags = JSON.parse(tags); } catch(e){ tags = {}; } }
+        tags = tags || {};
+
+        if (d.categoria_slug === 'sitio') {
+          local.tipo_actividad    = tags.tipo_actividad    || local.tipo_actividad;
+          local.dificultad        = tags.dificultad        || local.dificultad;
+          local.duracion          = tags.duracion          || local.duracion;
+          local.altitud           = tags.altitud           || local.altitud;
+          local.temporada         = tags.temporada         || local.temporada;
+          local.entradaPrecio     = tags.precio_entrada    || local.entradaPrecio;
+          local.distancia_sitio   = tags.distancia         || local.distancia_sitio;
+          local.como_llegar_sitio = tags.como_llegar       || local.como_llegar_sitio;
+          local.permisos_sitio    = tags.permisos          || local.permisos_sitio;
+          if (tags.tours && tags.tours.length)               local.tours      = tags.tours;
+          if (tags.equipamiento && tags.equipamiento.length) local.checklist  = tags.equipamiento;
+          if (tags.entradas && tags.entradas.length)         local.entradas   = tags.entradas;
+          if (tags.itinerario && tags.itinerario.length)     local.itinerario = tags.itinerario;
+          local.fauna_flora  = tags.fauna_flora  || local.fauna_flora;
+          local.secretos      = tags.secretos     || local.secretos;
+          local.regulaciones  = tags.regulaciones || local.regulaciones;
+        }
+
+        // Detalles de destinos_detalles -- el JOIN de /api/admin-destinos
+        // ya los trae en cada fila (hoy usados por Hostal; TASK-001 los
+        // necesitara igual, asi que quedan listos sin trabajo extra)
+        local.checkin    = d.checkin     || local.checkin;
+        local.checkout   = d.checkout    || local.checkout;
+        local.bookingUrl = d.booking_url || local.bookingUrl;
+        if (d.habitaciones && d.habitaciones.length) local.habs      = d.habitaciones;
+        if (d.amenidades   && d.amenidades.length)   local.amenities = d.amenidades;
+        if (d.faqs         && d.faqs.length)         local.faqs      = d.faqs;
+
         // Si el lugar local no tiene fotos, cargarlas de Neon en background
         if (!local.photos || !local.photos.length) {
           _cargarFotosDeNeon(d.id, local.id);
