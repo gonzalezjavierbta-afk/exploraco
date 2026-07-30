@@ -1,9 +1,9 @@
-// api/admin-destinos.js v2
-// GET    ?limit=N           → listar destinos (auth)
-// GET    ?id=UUID           → obtener uno
-// POST                      → crear destino
-// PUT    ?id=UUID           → actualizar destino
-// DELETE ?id=UUID           → eliminar destino
+// api/admin-destinos.js v2.1 (ASCII-safe: 0 backticks, 0 no-ASCII)
+// GET    ?limit=N           -> listar destinos (auth)
+// GET    ?id=UUID           -> obtener uno
+// POST                      -> crear destino
+// PUT    ?id=UUID           -> actualizar destino
+// DELETE ?id=UUID           -> eliminar destino
 // DIAGNOSTICO: buscar 'admin-destinos-v2' en consola para confirmar version
 
 const { neon } = require('@neondatabase/serverless');
@@ -32,16 +32,16 @@ module.exports = async function handler(req, res) {
     var sql = neon(process.env.DATABASE_URL);
     var b   = req.body || {};
 
-    // ── GET: listar o buscar uno ─────────────────────────────────
+    // -- GET: listar o buscar uno --------------------------------
     if (req.method === 'GET') {
       if (req.query.id) {
         var rows = await sql(
-          `SELECT d.*,
-                  dd.checkin, dd.checkout, dd.habitaciones, dd.amenidades,
-                  dd.faqs, dd.booking_url, dd.hostelworld_url, dd.airbnb_url, dd.scores
-           FROM destinos d
-           LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id
-           WHERE d.id = $1 LIMIT 1`,
+          'SELECT d.*, '
+          + 'dd.checkin, dd.checkout, dd.habitaciones, dd.amenidades, '
+          + 'dd.faqs, dd.booking_url, dd.hostelworld_url, dd.airbnb_url, dd.scores '
+          + 'FROM destinos d '
+          + 'LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id '
+          + 'WHERE d.id = $1 LIMIT 1',
           [req.query.id]
         );
         if (!rows.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -57,20 +57,20 @@ module.exports = async function handler(req, res) {
       var pi = params.length + 1;
 
       var rows2 = await sql(
-        `SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region,
-                d.lead, d.descripcion, d.highlight, d.foto_hero, d.hero_bg,
-                d.lat, d.lng, d.whatsapp, d.telefono, d.email, d.web, d.instagram,
-                d.precio_desde, d.horario, d.emoji, d.status, d.destacado,
-                d.booking, d.hostelworld, d.airbnb, d.tipo, d.capacidad,
-                d.como_llegar, d.tags, d.rating, d.total_resenas,
-                d.creado_en, d.actualizado_en,
-                dd.checkin, dd.checkout, dd.habitaciones, dd.amenidades,
-                dd.faqs, dd.booking_url, dd.hostelworld_url, dd.airbnb_url
-         FROM destinos d
-         LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id
-         ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
-         ORDER BY d.creado_en DESC
-         LIMIT $${pi} OFFSET $${pi+1}`,
+        'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region, '
+        + 'd.lead, d.descripcion, d.highlight, d.foto_hero, d.hero_bg, '
+        + 'd.lat, d.lng, d.whatsapp, d.telefono, d.email, d.web, d.instagram, '
+        + 'd.precio_desde, d.horario, d.emoji, d.status, d.destacado, '
+        + 'd.booking, d.hostelworld, d.airbnb, d.tipo, d.capacidad, '
+        + 'd.como_llegar, d.tags, d.rating, d.total_resenas, '
+        + 'd.creado_en, d.actualizado_en, '
+        + 'dd.checkin, dd.checkout, dd.habitaciones, dd.amenidades, '
+        + 'dd.faqs, dd.booking_url, dd.hostelworld_url, dd.airbnb_url '
+        + 'FROM destinos d '
+        + 'LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id '
+        + (conds.length ? 'WHERE ' + conds.join(' AND ') : '') + ' '
+        + 'ORDER BY d.creado_en DESC '
+        + 'LIMIT $' + pi + ' OFFSET $' + (pi + 1),
         [...params, limit, offset]
       );
 
@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, total: parseInt((total[0]||{}).n||0), data: rows2 });
     }
 
-    // ── POST: crear destino ──────────────────────────────────────
+    // -- POST: crear destino --------------------------------------
     if (req.method === 'POST') {
       if (!b.slug || !b.nombre) {
         return res.status(400).json({ ok: false, error: 'slug y nombre son requeridos' });
@@ -97,33 +97,33 @@ module.exports = async function handler(req, res) {
       var tags = safeJSON(b.tags) || {};
 
       var inserted = await sql(
-        `INSERT INTO destinos (
-           slug, nombre, categoria_slug,
-           lead, descripcion, highlight,
-           ciudad, region, barrio,
-           lat, lng,
-           whatsapp, telefono, email, web, instagram,
-           precio_desde, horario, emoji, hero_bg, foto_hero,
-           booking, hostelworld, airbnb,
-           tipo, capacidad, como_llegar,
-           status, destacado, tags,
-           creado_en, actualizado_en
-         ) VALUES (
-           $1, $2, $3,
-           $4, $5, $6,
-           $7, $8, $9,
-           $10, $11,
-           $12, $13, $14, $15, $16,
-           $17, $18, $19, $20, $21,
-           $22, $23, $24,
-           $25, $26, $27,
-           $28, $29, $30,
-           NOW(), NOW()
-         )
-         ON CONFLICT (slug) DO UPDATE SET
-           nombre = EXCLUDED.nombre,
-           actualizado_en = NOW()
-         RETURNING id, slug, nombre, status`,
+        'INSERT INTO destinos ( '
+        + 'slug, nombre, categoria_slug, '
+        + 'lead, descripcion, highlight, '
+        + 'ciudad, region, barrio, '
+        + 'lat, lng, '
+        + 'whatsapp, telefono, email, web, instagram, '
+        + 'precio_desde, horario, emoji, hero_bg, foto_hero, '
+        + 'booking, hostelworld, airbnb, '
+        + 'tipo, capacidad, como_llegar, '
+        + 'status, destacado, tags, '
+        + 'creado_en, actualizado_en '
+        + ') VALUES ( '
+        + '$1, $2, $3, '
+        + '$4, $5, $6, '
+        + '$7, $8, $9, '
+        + '$10, $11, '
+        + '$12, $13, $14, $15, $16, '
+        + '$17, $18, $19, $20, $21, '
+        + '$22, $23, $24, '
+        + '$25, $26, $27, '
+        + '$28, $29, $30, '
+        + 'NOW(), NOW() '
+        + ') '
+        + 'ON CONFLICT (slug) DO UPDATE SET '
+        + 'nombre = EXCLUDED.nombre, '
+        + 'actualizado_en = NOW() '
+        + 'RETURNING id, slug, nombre, status',
         [
           slug,
           String(b.nombre||'').trim(),
@@ -166,12 +166,12 @@ module.exports = async function handler(req, res) {
       var faqs  = safeJSON(b.faqs) || [];
       if (habs.length || amens.length || faqs.length || b.checkin) {
         await sql(
-          `INSERT INTO destinos_detalles (destino_id, checkin, checkout, habitaciones, amenidades, faqs, booking_url, hostelworld_url, airbnb_url)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-           ON CONFLICT (destino_id) DO UPDATE SET
-             checkin=EXCLUDED.checkin, checkout=EXCLUDED.checkout,
-             habitaciones=EXCLUDED.habitaciones, amenidades=EXCLUDED.amenidades,
-             faqs=EXCLUDED.faqs`,
+          'INSERT INTO destinos_detalles (destino_id, checkin, checkout, habitaciones, amenidades, faqs, booking_url, hostelworld_url, airbnb_url) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) '
+          + 'ON CONFLICT (destino_id) DO UPDATE SET '
+          + 'checkin=EXCLUDED.checkin, checkout=EXCLUDED.checkout, '
+          + 'habitaciones=EXCLUDED.habitaciones, amenidades=EXCLUDED.amenidades, '
+          + 'faqs=EXCLUDED.faqs',
           [newId, b.checkin||null, b.checkout||null,
            JSON.stringify(habs), JSON.stringify(amens), JSON.stringify(faqs),
            b.booking_url||null, b.hostelworld_url||null, b.airbnb_url||null]
@@ -184,8 +184,8 @@ module.exports = async function handler(req, res) {
           var fg = b.fotos_galeria[i];
           if (!fg.url) continue;
           await sql(
-            `INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en)
-             VALUES ($1,$2,$3,$4,false,NOW()) ON CONFLICT DO NOTHING`,
+            'INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en) '
+            + 'VALUES ($1,$2,$3,$4,false,NOW()) ON CONFLICT DO NOTHING',
             [newId, fg.url, fg.caption||'', fg.orden||i]
           ).catch(function(){});
         }
@@ -194,14 +194,14 @@ module.exports = async function handler(req, res) {
       return res.status(201).json({ ok: true, data: inserted[0] });
     }
 
-    // ── PUT: actualizar destino ──────────────────────────────────
+    // -- PUT: actualizar destino -----------------------------------
     if (req.method === 'PUT') {
       var id = req.query.id;
       if (!id) return res.status(400).json({ ok: false, error: 'id requerido' });
 
       var tags2 = safeJSON(b.tags) || {};
 
-      // Construir SET dinámico — solo actualizar campos que vienen en el body
+      // Construir SET dinamico -- solo actualizar campos que vienen en el body
       var sets = ['actualizado_en = NOW()'];
       var vals = [];
       var pi2  = 1;
@@ -239,7 +239,7 @@ module.exports = async function handler(req, res) {
         }
       });
 
-      // Campos numéricos
+      // Campos numericos
       if (b.lat !== undefined && b.lat !== null) {
         sets.push('lat = $' + pi2++);
         vals.push(parseFloat(b.lat) || null);
@@ -253,7 +253,7 @@ module.exports = async function handler(req, res) {
         vals.push(Boolean(b.destacado));
       }
 
-      // Tags JSONB — merge con los existentes
+      // Tags JSONB -- merge con los existentes
       if (Object.keys(tags2).length > 0) {
         sets.push('tags = COALESCE(tags, \'{}\'::jsonb) || $' + pi2++ + '::jsonb');
         vals.push(JSON.stringify(tags2));
@@ -262,7 +262,8 @@ module.exports = async function handler(req, res) {
       vals.push(id); // WHERE id = $N
 
       var updated = await sql(
-        `UPDATE destinos SET ${sets.join(', ')} WHERE id = $${pi2} RETURNING id, slug, nombre, ciudad, foto_hero, lat, lng, status`,
+        'UPDATE destinos SET ' + sets.join(', ') + ' WHERE id = $' + pi2
+        + ' RETURNING id, slug, nombre, ciudad, foto_hero, lat, lng, status',
         vals
       );
 
@@ -274,15 +275,15 @@ module.exports = async function handler(req, res) {
       var faqs2  = safeJSON(b.faqs) || null;
       if (habs2 || amens2 || faqs2 || b.checkin || b.booking_url) {
         await sql(
-          `INSERT INTO destinos_detalles (destino_id, checkin, checkout, habitaciones, amenidades, faqs, booking_url, hostelworld_url, airbnb_url)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-           ON CONFLICT (destino_id) DO UPDATE SET
-             checkin=COALESCE(EXCLUDED.checkin, destinos_detalles.checkin),
-             checkout=COALESCE(EXCLUDED.checkout, destinos_detalles.checkout),
-             habitaciones=COALESCE(EXCLUDED.habitaciones, destinos_detalles.habitaciones),
-             amenidades=COALESCE(EXCLUDED.amenidades, destinos_detalles.amenidades),
-             faqs=COALESCE(EXCLUDED.faqs, destinos_detalles.faqs),
-             booking_url=COALESCE(EXCLUDED.booking_url, destinos_detalles.booking_url)`,
+          'INSERT INTO destinos_detalles (destino_id, checkin, checkout, habitaciones, amenidades, faqs, booking_url, hostelworld_url, airbnb_url) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) '
+          + 'ON CONFLICT (destino_id) DO UPDATE SET '
+          + 'checkin=COALESCE(EXCLUDED.checkin, destinos_detalles.checkin), '
+          + 'checkout=COALESCE(EXCLUDED.checkout, destinos_detalles.checkout), '
+          + 'habitaciones=COALESCE(EXCLUDED.habitaciones, destinos_detalles.habitaciones), '
+          + 'amenidades=COALESCE(EXCLUDED.amenidades, destinos_detalles.amenidades), '
+          + 'faqs=COALESCE(EXCLUDED.faqs, destinos_detalles.faqs), '
+          + 'booking_url=COALESCE(EXCLUDED.booking_url, destinos_detalles.booking_url)',
           [id, b.checkin||null, b.checkout||null,
            habs2 ? JSON.stringify(habs2) : null,
            amens2 ? JSON.stringify(amens2) : null,
@@ -297,8 +298,8 @@ module.exports = async function handler(req, res) {
           var fg2 = b.fotos_galeria[j];
           if (!fg2.url) continue;
           await sql(
-            `INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en)
-             VALUES ($1,$2,$3,$4,false,NOW()) ON CONFLICT DO NOTHING`,
+            'INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en) '
+            + 'VALUES ($1,$2,$3,$4,false,NOW()) ON CONFLICT DO NOTHING',
             [id, fg2.url, fg2.caption||'', fg2.orden||j]
           ).catch(function(){});
         }
@@ -307,7 +308,7 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, data: updated[0] });
     }
 
-    // ── DELETE ───────────────────────────────────────────────────
+    // -- DELETE -------------------------------------------------------
     if (req.method === 'DELETE') {
       var delId = req.query.id;
       if (!delId) return res.status(400).json({ ok: false, error: 'id requerido' });

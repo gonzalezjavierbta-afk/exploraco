@@ -1201,8 +1201,15 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <textarea class="form-input" id="f-permisos-sitio" rows="2" placeholder="Se necesita reserva anticipada o permiso especial?"></textarea>
             </div>
             <div class="form-group">
-              <label class="form-label">Mejor epoca / Temporada</label>
-              <textarea class="form-input" id="f-temporada" rows="2" placeholder="Ej: Mejor epoca: dic-mar (temporada seca). Evitar abr-may (lluvias)."></textarea>
+              <label class="form-label">Mejor epoca / Temporada (selecciona una o varias)</label>
+              <select class="form-input" id="f-temporada" data-tag-multi="1" multiple size="6">
+                <option value="Diciembre-Marzo (seca)">Diciembre-Marzo (temporada seca)</option>
+                <option value="Abril-Mayo (lluvias)">Abril-Mayo (lluvias)</option>
+                <option value="Junio-Agosto (seca)">Junio-Agosto (temporada seca)</option>
+                <option value="Septiembre-Noviembre (lluvias)">Septiembre-Noviembre (lluvias)</option>
+                <option value="Diciembre (alta turistica)">Diciembre (temporada alta turistica)</option>
+                <option value="Todo el ano">Todo el ano (sin restriccion)</option>
+              </select>
             </div>
           </div>
         
@@ -1988,7 +1995,7 @@ function newPlace() {
     if(el){ el.style.display='none'; el.classList.remove('on'); }
   });
 }
-function editPlace(id) {
+async function editPlace(id) {
   var p = places.find(function(x){ return x.id===id; });
   if(!p) return;
   currentId = id;
@@ -2000,6 +2007,21 @@ function editPlace(id) {
   setEditorMeta(p);
   showFormTab('general');
   updateCatUI();
+
+  // TSK-012: refresco puntual desde Neon por UUID. Corrige el bug de
+  // asimetria donde los campos de tags (tours, checklist, itinerario,
+  // etc.) aparecian vacios si el editor se abria antes de que
+  // syncFromNeon() -- que solo corre una vez, 1s despues de cargar la
+  // pagina -- terminara. El formulario se re-renderiza solo si el
+  // usuario sigue en este mismo lugar cuando la respuesta llega (si ya
+  // cambio de pantalla, se descarta para no pisar otra edicion).
+  if (_localToUUID[id]) {
+    await _fetchAndMergeDestino(p);
+    if (currentId === id) {
+      loadForm(p);
+      updateCatUI();
+    }
+  }
 }
 
 function clearForm() {
@@ -2104,6 +2126,199 @@ function clearForm() {
   var heroP = document.getElementById('hero-preview');
   if(heroP) heroP.style.display = 'none';
 }
+/* ════════════════════════════════════════════════════════
+   TSK-012 — MOTOR GENERICO DE CAMPOS POR CATEGORIA (tags JSONB)
+   ════════════════════════════════════════════════════════
+   Fuente unica de verdad para los campos especificos de cada
+   categoria que viven dentro de destinos.tags (JSONB). Antes,
+   estos campos estaban triplicados a mano en loadForm(),
+   savePlace() y _placeToAPI(), y el desanidado en syncFromNeon()
+   solo cubria "sitio" (BUG de asimetria, ver DECISIONS.md ADR-003
+   y BUGS_HISTORICOS.md). Agregar Hostal/Comida/Evento (TASK-001,
+   TASK-002, TASK-003) ahora solo requiere llenar el arreglo
+   correspondiente aqui abajo -- nunca tocar loadForm/savePlace/
+   _placeToAPI/syncFromNeon a mano de nuevo para esto.
+
+   CATEGORY_TAG_FIELDS: campos escalares (texto/numero/select).
+     key:      nombre de la propiedad dentro de tags JSONB en Neon
+     id:       id del elemento en el DOM (admin.html)
+     localKey: nombre de la propiedad en el objeto local "p"
+               (solo si difiere de "key" -- casos heredados)
+     multi:    true si el input es un <select multiple> que debe
+               guardarse como arreglo (ej. temporada)
+
+   CATEGORY_TAG_LISTS: listas de objetos armadas por un
+     "list-builder" propio (filas dinamicas: tours, checklist,
+     entradas, itinerario...). El nombre y la forma de cada fila
+     son distintos entre categorias, asi que el collector/render
+     de cada una sigue siendo especifico -- lo que se centraliza
+     aqui es solo el MAPEO de nombres (tags.X <-> local.Y), que es
+     lo que se rompia al agregar categorias nuevas.
+     key:       nombre de la propiedad dentro de tags JSONB
+     localKey:  nombre de la propiedad en el objeto local "p"
+     collector: function() -> array, lee las filas del DOM
+*/
+var CATEGORY_TAG_FIELDS = {
+  sitio: [
+    { key:'tipo_actividad', id:'f-tipo-actividad' },
+    { key:'dificultad',     id:'f-dificultad' },
+    { key:'duracion',       id:'f-duracion' },
+    { key:'altitud',        id:'f-altitud' },
+    { key:'temporada',      id:'f-temporada', multi:true },
+    { key:'precio_entrada', id:'f-entrada-precio', localKey:'entradaPrecio' },
+    { key:'distancia',      id:'f-distancia-sitio', localKey:'distancia_sitio' },
+    { key:'como_llegar',    id:'f-como-llegar-sitio', localKey:'como_llegar_sitio' },
+    { key:'permisos',       id:'f-permisos-sitio', localKey:'permisos_sitio' },
+    { key:'fauna_flora',    id:'f-fauna-flora' },
+    /* secretos tiene un collector propio: puede venir de un
+       card-list (#secretos-list-admin) o, si no hay filas, del
+       textarea simple f-secretos. Ver collectSitioSecretos(). */
+    { key:'secretos',       id:'f-secretos',
+      collector: function(){ return (typeof collectSitioSecretos==='function') ? collectSitioSecretos() : ''; } },
+    { key:'regulaciones',   id:'f-regulaciones' }
+  ],
+  /* TASK-001: llenar al agregar los inputs de tipo_alojamiento,
+     reglas_casa, politica_cancelacion, edad_minima, mascotas,
+     cocina_compartida en especifico-hostal. */
+  hostal: [],
+  /* TASK-002: tipo_comida, cocina, precio_promedio, ambiente,
+     terraza, domicilio en especifico-comida. */
+  comida: [],
+  /* TASK-003: fecha_inicio, fecha_fin, edicion, sede, capacidad
+     en especifico-evento. */
+  evento: []
+};
+
+var CATEGORY_TAG_LISTS = {
+  sitio: [
+    { key:'tours',        localKey:'tours',
+      collector: function(){ return (typeof collectTourItems==='function') ? collectTourItems() : []; } },
+    { key:'equipamiento', localKey:'checklist',
+      collector: function(){ return (typeof collectChecklistItems==='function') ? collectChecklistItems() : []; } },
+    { key:'entradas',     localKey:'entradas',
+      collector: function(){ return (typeof collectSitioEntradas==='function') ? collectSitioEntradas() : []; } },
+    { key:'itinerario',   localKey:'itinerario',
+      collector: function(){ return (typeof collectSitioItinerario==='function') ? collectSitioItinerario() : []; } }
+  ],
+  hostal: [], /* TASK-001: ej. actividades[], que_incluye[] */
+  comida:  [], /* TASK-002: ej. menu_destacado[], opciones_dieta[] */
+  evento:  []  /* TASK-003: ej. lineup[], agenda[], categorias_entrada[] */
+};
+
+/* Lee un <select multiple> y devuelve el arreglo de values seleccionados */
+function _readMultiSelect(el) {
+  var out = [];
+  if (!el || !el.options) return out;
+  for (var i = 0; i < el.options.length; i++) {
+    if (el.options[i].selected) out.push(el.options[i].value);
+  }
+  return out;
+}
+
+/* Marca como seleccionadas las opciones de un <select multiple>
+   cuyo value este dentro del arreglo "vals" */
+function _writeMultiSelect(el, vals) {
+  if (!el || !el.options) return;
+  var arr = Array.isArray(vals) ? vals : (vals ? [vals] : []);
+  for (var i = 0; i < el.options.length; i++) {
+    el.options[i].selected = arr.indexOf(el.options[i].value) !== -1;
+  }
+}
+
+/* READ: vuelca los valores de "p" (objeto local) en los inputs
+   del DOM para la categoria dada. Reemplaza los "sitioMap" /
+   "extrasMap" que antes se armaban a mano en loadForm(). */
+function applyCategoryTagFields(p, cat) {
+  var defs = CATEGORY_TAG_FIELDS[cat] || [];
+  defs.forEach(function(d){
+    var el = document.getElementById(d.id);
+    if (!el) return;
+    var localKey = d.localKey || d.key;
+    var val = p[localKey];
+    if (d.multi) { _writeMultiSelect(el, val); return; }
+    if (val !== undefined && val !== null && val !== '') el.value = val;
+  });
+}
+
+/* WRITE: lee los inputs del DOM y los escribe en "p" (objeto
+   local). Reemplaza los bloques "p.tipo_actividad = v(...)" que
+   antes se repetian a mano en savePlace(). */
+function collectCategoryTagFields(p, cat) {
+  var defs = CATEGORY_TAG_FIELDS[cat] || [];
+  defs.forEach(function(d){
+    var el = document.getElementById(d.id);
+    if (!el) return;
+    var localKey = d.localKey || d.key;
+    if (d.collector) { p[localKey] = d.collector(); return; }
+    p[localKey] = d.multi ? _readMultiSelect(el) : el.value;
+  });
+  var listDefs = CATEGORY_TAG_LISTS[cat] || [];
+  listDefs.forEach(function(d){
+    p[d.localKey] = d.collector();
+  });
+}
+
+/* Arma el objeto tags JSONB a partir de "p" para el POST/PUT a
+   /api/admin-destinos. Reemplaza el bloque
+   "if (p.cat === 'sitio') { tagsObj.x = p.x ... }" en
+   _placeToAPI(), que era el que quedaba desactualizado cada vez
+   que se agregaba una categoria nueva. */
+function _buildTagsObj(p) {
+  var tagsObj = {};
+  /* Hostal -- destinos_detalles ya cubre esto por separado, se
+     mantiene igual para no romper el contrato con el backend */
+  if (p.checkin)  tagsObj.checkin  = p.checkin;
+  if (p.checkout) tagsObj.checkout = p.checkout;
+  if (p.habs && p.habs.length) tagsObj.habitaciones = p.habs;
+  if (p.amenities && p.amenities.length) tagsObj.amenidades = p.amenities;
+  if (p.faqs && p.faqs.length) tagsObj.faqs = p.faqs;
+
+  var defs = CATEGORY_TAG_FIELDS[p.cat] || [];
+  defs.forEach(function(d){
+    var localKey = d.localKey || d.key;
+    var val = p[localKey];
+    if (d.multi) {
+      if (Array.isArray(val) && val.length) tagsObj[d.key] = val;
+    } else if (val) {
+      tagsObj[d.key] = val;
+    }
+  });
+
+  var listDefs = CATEGORY_TAG_LISTS[p.cat] || [];
+  listDefs.forEach(function(d){
+    var val = p[d.localKey];
+    if (val && val.length) tagsObj[d.key] = val;
+  });
+
+  return tagsObj;
+}
+
+/* Desanida destinos.tags (JSONB de Neon) hacia propiedades planas
+   del objeto local "p"/"local". Reemplaza el bloque
+   "if (d.categoria_slug === 'sitio') { local.x = tags.x ... }"
+   en syncFromNeon(), unico punto que antes tenia el desanidado y
+   que jamas cubrio hostal/comida/evento. Tambien la usa
+   _fetchAndMergeDestino() para el fetch puntual al editar. */
+function _applyTagsToLocal(local, tags, cat) {
+  tags = tags || {};
+  var defs = CATEGORY_TAG_FIELDS[cat] || [];
+  defs.forEach(function(d){
+    var localKey = d.localKey || d.key;
+    var val = tags[d.key];
+    if (val === undefined || val === null) return;
+    if (d.multi) {
+      if (Array.isArray(val)) local[localKey] = val;
+    } else if (val) {
+      local[localKey] = val;
+    }
+  });
+  var listDefs = CATEGORY_TAG_LISTS[cat] || [];
+  listDefs.forEach(function(d){
+    var val = tags[d.key];
+    if (val && val.length) local[d.localKey] = val;
+  });
+}
+
 function loadForm(p) {
   var map = {
     'f-name':p.name,'f-slug':p.slug,'f-cat':p.cat,'f-city':p.city,'f-region':p.region,
@@ -2221,22 +2436,10 @@ function loadForm(p) {
 
   if(p.cat === 'sitio') {
     setTimeout(function(){
-      // Cargar campos específicos de sitio
-      var sitioMap = {
-        'f-tipo-actividad': p.tipo_actividad || '',
-        'f-dificultad':     p.dificultad || '',
-        'f-duracion':       p.duracion || '',
-        'f-altitud':        p.altitud || '',
-        'f-temporada':      p.temporada || '',
-        'f-entrada-precio': p.entradaPrecio || '',
-        'f-distancia-sitio':p.distancia_sitio || '',
-        'f-como-llegar-sitio': p.como_llegar_sitio || p.como_llegar || '',
-        'f-permisos-sitio': p.permisos_sitio || '',
-      };
-      Object.keys(sitioMap).forEach(function(id){
-        var el = document.getElementById(id);
-        if (el && sitioMap[id]) el.value = sitioMap[id];
-      });
+      // Cargar campos específicos de sitio (TSK-012: motor generico,
+      // ver CATEGORY_TAG_FIELDS mas arriba en este archivo)
+      if (p.como_llegar_sitio === undefined) p.como_llegar_sitio = p.como_llegar || '';
+      applyCategoryTagFields(p, 'sitio');
       // Cargar tours
       var tourList = document.getElementById('tour-list-admin');
       if (tourList && p.tours && p.tours.length) {
@@ -2282,16 +2485,6 @@ function loadForm(p) {
           cb.checked = p.amenities.indexOf(cb.value) !== -1;
         });
       }
-      // Cargar campos extras
-      var extrasMap = {
-        'f-fauna-flora': p.fauna_flora || '',
-        'f-secretos':    p.secretos    || '',
-        'f-regulaciones':p.regulaciones|| '',
-      };
-      Object.keys(extrasMap).forEach(function(id){
-        var el = document.getElementById(id);
-        if(el && extrasMap[id]) el.value = extrasMap[id];
-      });
       // Cargar entradas
       var entList = document.getElementById('entradas-list-admin');
       if(entList && p.entradas && p.entradas.length) {
@@ -2562,25 +2755,14 @@ function savePlace() {
 
   /* ── SITIO SPECIFIC ── */
   if(cat === 'sitio') {
-    p.tipo_actividad = v('f-tipo-actividad');
-    p.dificultad = v('f-dificultad');
-    p.altitud = v('f-altitud');
-    p.temporada = v('f-temporada');
-    p.duracion = v('f-duracion');
-    p.distancia_sitio = v('f-distancia-sitio');
-    p.como_llegar_sitio = v('f-como-llegar-sitio');
-    p.permisos_sitio = v('f-permisos-sitio');
-    p.tours = collectTourItems();
-    p.checklist = collectChecklistItems();
+    // TSK-012: motor generico -- llena tipo_actividad, dificultad,
+    // duracion, altitud, temporada[], entradaPrecio, distancia_sitio,
+    // como_llegar_sitio, permisos_sitio, fauna_flora, secretos,
+    // regulaciones, tours, checklist, entradas, itinerario. Ver
+    // CATEGORY_TAG_FIELDS / CATEGORY_TAG_LISTS mas arriba.
+    collectCategoryTagFields(p, 'sitio');
     p.amenities = collectAmenities('sitio-amenities-check');
     var _el = document.getElementById('f-entrada-libre'); p.entradaLibre = _el ? _el.checked : false;
-    p.entradaPrecio = v('f-entrada-precio');
-    // Nuevos campos
-    p.entradas = collectSitioEntradas ? collectSitioEntradas() : [];
-    p.itinerario = collectSitioItinerario ? collectSitioItinerario() : [];
-    p.fauna_flora = v('f-fauna-flora');
-    p.secretos = collectSitioSecretos ? collectSitioSecretos() : v('f-secretos');
-    p.regulaciones = v('f-regulaciones');
   }
 
   /* ── EVENTO SPECIFIC ── */
@@ -3401,7 +3583,7 @@ function generateExportCode() {
       +(p.rangoPrecio?',"rangoPrecio":"'+esc(p.rangoPrecio)+'"':'')
       +(p.dificultad?',"dificultad":"'+esc(p.dificultad)+'"':'')
       +(p.altitud?',"altitud":"'+esc(p.altitud)+'"':'')
-      +(p.temporada?',"temporada":"'+esc(p.temporada)+'"':'')
+      +(p.temporada&&p.temporada.length?',"temporada":'+JSON.stringify(p.temporada):'')
       +(p.tours&&p.tours.length?',"tours":'+JSON.stringify(p.tours):'')
       +(p.fechaIni?',"fechaIni":"'+esc(p.fechaIni)+'"':'')
       +(p.fechaFin?',"fechaFin":"'+esc(p.fechaFin)+'"':'')
@@ -4300,32 +4482,10 @@ function _placeToAPI(p) {
   }
 
   // Tags JSONB — datos específicos por categoría
-  var tagsObj = {};
-  // Hostal
-  if (p.checkin)       tagsObj.checkin       = p.checkin;
-  if (p.checkout)      tagsObj.checkout      = p.checkout;
-  if (p.habs && p.habs.length) tagsObj.habitaciones = p.habs;
-  if (p.amenities && p.amenities.length) tagsObj.amenidades = p.amenities;
-  if (p.faqs && p.faqs.length) tagsObj.faqs = p.faqs;
-  // Sitio turístico
-  if (p.cat === 'sitio') {
-    if (p.tipo_actividad)   tagsObj.tipo_actividad  = p.tipo_actividad;
-    if (p.dificultad)       tagsObj.dificultad      = p.dificultad;
-    if (p.duracion)         tagsObj.duracion        = p.duracion;
-    if (p.altitud)          tagsObj.altitud         = p.altitud;
-    if (p.temporada)        tagsObj.temporada       = p.temporada;
-    if (p.entradaPrecio)    tagsObj.precio_entrada  = p.entradaPrecio;
-    if (p.distancia_sitio)  tagsObj.distancia       = p.distancia_sitio;
-    if (p.como_llegar_sitio) tagsObj.como_llegar    = p.como_llegar_sitio;
-    if (p.permisos_sitio)   tagsObj.permisos        = p.permisos_sitio;
-    if (p.tours && p.tours.length)         tagsObj.tours         = p.tours;
-    if (p.checklist && p.checklist.length) tagsObj.equipamiento   = p.checklist;
-    if (p.entradas && p.entradas.length)   tagsObj.entradas       = p.entradas;
-    if (p.itinerario && p.itinerario.length) tagsObj.itinerario   = p.itinerario;
-    if (p.fauna_flora)  tagsObj.fauna_flora  = p.fauna_flora;
-    if (p.secretos)     tagsObj.secretos     = p.secretos;
-    if (p.regulaciones) tagsObj.regulaciones = p.regulaciones;
-  }
+  // TSK-012: motor generico, ver _buildTagsObj() / CATEGORY_TAG_FIELDS
+  // mas arriba en este archivo. Cubre automaticamente cualquier
+  // categoria que tenga entradas en CATEGORY_TAG_FIELDS/_LISTS.
+  var tagsObj = _buildTagsObj(p);
 
   return {
     // Campos principales — nombres exactos del schema Neon
@@ -4547,6 +4707,94 @@ async function migrarFotosANeon() {
   }
 }
 
+/* Fusiona una fila de Neon (destinos + JOIN destinos_detalles +
+   tags JSONB crudo) dentro de un objeto local "p"/"local". Punto
+   UNICO de este merge -- lo usan tanto la sincronizacion masiva
+   (syncFromNeon) como el fetch puntual al editar
+   (_fetchAndMergeDestino), para que ambos caminos queden
+   simetricos con lo que escribe _placeToAPI(). Antes esta logica
+   vivia solo dentro de syncFromNeon() y solo cubria "sitio". */
+function _mergeNeonRowIntoLocal(local, d) {
+  local.city    = d.ciudad        || local.city;
+  local.region  = d.region        || local.region;
+  local.price   = d.precio_desde  || local.price;
+  local.tel     = d.telefono      || local.tel;
+  local.desc    = d.descripcion   || local.desc;
+  local.rating  = d.rating        ? parseFloat(d.rating)      : local.rating;
+  local.rev     = d.total_resenas ? parseInt(d.total_resenas)  : local.rev;
+  local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;
+  local.lng     = d.lng           ? parseFloat(d.lng)         : local.lng;
+
+  local.highlight    = d.highlight    || local.highlight;
+  local.barrio       = d.barrio       || local.barrio;
+  local.lead         = d.lead         || local.lead;
+  local.whatsapp     = d.whatsapp     || local.whatsapp;
+  local.email        = d.email        || local.email;
+  local.web          = d.web          || local.web;
+  local.instagram    = d.instagram    || local.instagram;
+  local.booking      = d.booking      || local.booking;
+  local.hostelworld  = d.hostelworld  || local.hostelworld;
+  local.airbnb       = d.airbnb       || local.airbnb;
+  local.emoji        = d.emoji        || local.emoji;
+  local.hero_bg      = d.hero_bg      || local.hero_bg;
+  local.horario      = d.horario      || local.horario;
+  local.tipo         = d.tipo         || local.tipo;
+  local.capacidad    = d.capacidad    || local.capacidad;
+  local.status       = d.status       || local.status;
+  local.categoria_slug = d.categoria_slug || local.cat;
+  local.cat = d.categoria_slug || local.cat;
+  if (d.destacado !== undefined && d.destacado !== null) local.destacado = d.destacado;
+
+  // Desanidar tags JSONB -- TSK-012: motor generico (ver
+  // CATEGORY_TAG_FIELDS / _applyTagsToLocal), cubre cualquier
+  // categoria que tenga entradas definidas alli, no solo "sitio".
+  var tags = d.tags;
+  if (typeof tags === 'string') { try { tags = JSON.parse(tags); } catch(e){ tags = {}; } }
+  tags = tags || {};
+  _applyTagsToLocal(local, tags, d.categoria_slug);
+
+  // Detalles de destinos_detalles -- el JOIN ya los trae en cada fila
+  local.checkin    = d.checkin     || local.checkin;
+  local.checkout   = d.checkout    || local.checkout;
+  local.bookingUrl = d.booking_url || local.bookingUrl;
+  if (d.habitaciones && d.habitaciones.length) local.habs      = d.habitaciones;
+  if (d.amenidades   && d.amenidades.length)   local.amenities = d.amenidades;
+  if (d.faqs         && d.faqs.length)         local.faqs      = d.faqs;
+
+  // Escudo GOLD -- TRACE/INFO: cuantas llaves de tags llegaron de Neon
+  var tagKeys = Object.keys(tags);
+  console.log('%c[TRACE]', 'color:#f59e0b;font-weight:bold',
+    '(tags) '+(d.slug||d.id)+': '+tagKeys.length+' llave(s) recuperada(s) de Neon'+
+    (tagKeys.length ? ' -> '+tagKeys.join(', ') : ' (vacio)'));
+  console.log('%c[INFO]', 'color:#16a34a;font-weight:bold',
+    'Lugar sincronizado: '+(d.slug||'(sin slug)')+' <-> '+d.id);
+
+  // Si el lugar local no tiene fotos, cargarlas de Neon en background
+  if (!local.photos || !local.photos.length) {
+    _cargarFotosDeNeon(d.id, local.id);
+  }
+  return local;
+}
+
+/* Fetch puntual de UN destino por UUID, usado antes de abrir el
+   editor (ver editPlace). TSK-012: cierra la condicion de carrera
+   de syncFromNeon(), que antes corria una sola vez 1s despues de
+   cargar la pagina -- abrir el editor antes de que terminara ese
+   fetch dejaba el formulario sin los campos de tags aunque los
+   datos SI estuvieran bien guardados en Neon. */
+async function _fetchAndMergeDestino(local) {
+  var uuid = _localToUUID[local.id];
+  if (!uuid) return local;
+  try {
+    var res  = await fetch('/api/admin-destinos?id='+uuid, { headers:_adminHeaders() });
+    var data = await res.json();
+    if (data.ok && data.data) _mergeNeonRowIntoLocal(local, data.data);
+  } catch(err) {
+    console.warn('[admin-online] fetch puntual error:', err.message);
+  }
+  return local;
+}
+
 async function syncFromNeon() {
   _showDBStatus('⏳ Conectando...', '#f59e0b');
   try {
@@ -4554,93 +4802,32 @@ async function syncFromNeon() {
     var data = await res.json();
     if(!data.ok) throw new Error(data.error||'Error');
 
-    // Mapear slugs/nombres locales → UUIDs de Neon
-    // También cargar fotos de Neon para enriquecer lugares locales
+    // Mapear slugs/nombres locales → UUIDs de Neon y enriquecer
+    // lugares locales. TSK-012: si un destino existe en Neon pero
+    // no hay ningun lugar local que haga match por slug/nombre
+    // (ej. creado desde otro dispositivo u otra sesion de admin),
+    // antes quedaba invisible para editar en este navegador -- se
+    // agrega ahora como entrada local nueva.
+    var nuevos = 0;
     data.data.forEach(function(d) {
       var local = places.find(function(p){ return p.slug===d.slug || p.name===d.nombre; });
-      if (local) {
-        _localToUUID[local.id] = d.id;
-        // Actualizar campos locales con datos reales de Neon
-        local.city    = d.ciudad        || local.city;
-        local.region  = d.region        || local.region;
-        local.price   = d.precio_desde  || local.price;
-        local.tel     = d.telefono      || local.tel;
-        local.desc    = d.descripcion   || local.desc;
-        local.rating  = d.rating        ? parseFloat(d.rating)      : local.rating;
-        local.rev     = d.total_resenas ? parseInt(d.total_resenas)  : local.rev;
-        local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;
-        local.lng     = d.lng           ? parseFloat(d.lng)         : local.lng;
-
-        // --- Campos base que _placeToAPI() ya envia a Neon pero antes
-        // nunca volvian al objeto local ---
-        local.highlight    = d.highlight    || local.highlight;
-        local.barrio       = d.barrio       || local.barrio;
-        local.lead         = d.lead         || local.lead;
-        local.whatsapp     = d.whatsapp     || local.whatsapp;
-        local.email        = d.email        || local.email;
-        local.web          = d.web          || local.web;
-        local.instagram    = d.instagram    || local.instagram;
-        local.booking      = d.booking      || local.booking;
-        local.hostelworld  = d.hostelworld  || local.hostelworld;
-        local.airbnb       = d.airbnb       || local.airbnb;
-        local.emoji        = d.emoji        || local.emoji;
-        local.hero_bg      = d.hero_bg      || local.hero_bg;
-        local.horario      = d.horario      || local.horario;
-        local.tipo         = d.tipo         || local.tipo;
-        local.capacidad    = d.capacidad    || local.capacidad;
-        local.status       = d.status       || local.status;
-        if (d.destacado !== undefined && d.destacado !== null) local.destacado = d.destacado;
-
-        // --- Desanidar tags JSONB hacia propiedades planas ---
-        // NOTA: no es un spread 1:1 generico. _placeToAPI() renombra 5
-        // campos de sitio al armar tags (checklist->equipamiento,
-        // distancia_sitio->distancia, como_llegar_sitio->como_llegar,
-        // permisos_sitio->permisos, entradaPrecio->precio_entrada).
-        // Ese mapeo inverso se mantiene explicito aqui para no romper
-        // filas ya guardadas en Neon con esas keys. tours[] SI es
-        // 100% generico (nunca tuvo ese renombrado).
-        var tags = d.tags;
-        if (typeof tags === 'string') { try { tags = JSON.parse(tags); } catch(e){ tags = {}; } }
-        tags = tags || {};
-
-        if (d.categoria_slug === 'sitio') {
-          local.tipo_actividad    = tags.tipo_actividad    || local.tipo_actividad;
-          local.dificultad        = tags.dificultad        || local.dificultad;
-          local.duracion          = tags.duracion          || local.duracion;
-          local.altitud           = tags.altitud           || local.altitud;
-          local.temporada         = tags.temporada         || local.temporada;
-          local.entradaPrecio     = tags.precio_entrada    || local.entradaPrecio;
-          local.distancia_sitio   = tags.distancia         || local.distancia_sitio;
-          local.como_llegar_sitio = tags.como_llegar       || local.como_llegar_sitio;
-          local.permisos_sitio    = tags.permisos          || local.permisos_sitio;
-          if (tags.tours && tags.tours.length)               local.tours      = tags.tours;
-          if (tags.equipamiento && tags.equipamiento.length) local.checklist  = tags.equipamiento;
-          if (tags.entradas && tags.entradas.length)         local.entradas   = tags.entradas;
-          if (tags.itinerario && tags.itinerario.length)     local.itinerario = tags.itinerario;
-          local.fauna_flora = tags.fauna_flora || local.fauna_flora;
-          local.secretos     = tags.secretos    || local.secretos;
-          local.regulaciones = tags.regulaciones|| local.regulaciones;
-        }
-
-        // Detalles de destinos_detalles -- el JOIN ya los trae en cada fila
-        local.checkin    = d.checkin     || local.checkin;
-        local.checkout   = d.checkout    || local.checkout;
-        local.bookingUrl = d.booking_url || local.bookingUrl;
-        if (d.habitaciones && d.habitaciones.length) local.habs      = d.habitaciones;
-        if (d.amenidades   && d.amenidades.length)   local.amenities = d.amenidades;
-        if (d.faqs         && d.faqs.length)         local.faqs      = d.faqs;
-
-        // Si el lugar local no tiene fotos, cargarlas de Neon en background
-        if (!local.photos || !local.photos.length) {
-          _cargarFotosDeNeon(d.id, local.id);
-        }
+      if (!local) {
+        local = { id: Date.now()+Math.random(), status: d.status||'draft',
+                   name: d.nombre, slug: d.slug, cat: d.categoria_slug||'sitio',
+                   photos: [], tags: [] };
+        places.push(local);
+        nuevos++;
       }
+      _localToUUID[local.id] = d.id;
+      _mergeNeonRowIntoLocal(local, d);
     });
+    if (nuevos) savePlaces();
     localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
 
     var synced = Object.keys(_localToUUID).length;
     _showDBStatus('● DB · '+data.total+' lugares', '#16a34a');
-    console.log('[admin-online] Sincronizado: '+synced+' UUIDs mapeados');
+    console.log('[admin-online] Sincronizado: '+synced+' UUIDs mapeados'+
+      (nuevos ? ' ('+nuevos+' nuevos importados desde Neon)' : ''));
   } catch(err) {
     _showDBStatus('⚠️ Offline', '#ef4444');
     console.warn('[admin-online] syncFromNeon error:', err.message);
