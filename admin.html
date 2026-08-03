@@ -2035,19 +2035,22 @@ async function editPlace(id) {
   showFormTab('general');
   updateCatUI();
 
-  // TSK-012: refresco puntual desde Neon por UUID. Corrige el bug de
-  // asimetria donde los campos de tags (tours, checklist, itinerario,
-  // etc.) aparecian vacios si el editor se abria antes de que
-  // syncFromNeon() -- que solo corre una vez, 1s despues de cargar la
-  // pagina -- terminara. El formulario se re-renderiza solo si el
-  // usuario sigue en este mismo lugar cuando la respuesta llega (si ya
+  // TSK-012 / BUG-015: refresco puntual desde Neon. Si ya conocemos
+  // el UUID de este lugar, se refresca por id (mas rapido). Si no
+  // (localStorage limpiado, otra sesion/dispositivo, o syncFromNeon
+  // aun no corrio), se resuelve por slug/nombre como respaldo -- el
+  // formulario ya no depende de que _localToUUID haya sido poblado
+  // de antemano. El formulario se re-renderiza solo si el usuario
+  // sigue en este mismo lugar cuando la respuesta llega (si ya
   // cambio de pantalla, se descarta para no pisar otra edicion).
   if (_localToUUID[id]) {
     await _fetchAndMergeDestino(p);
-    if (currentId === id) {
-      loadForm(p);
-      updateCatUI();
-    }
+  } else {
+    await _resolveAndMergeBySlug(p);
+  }
+  if (currentId === id) {
+    loadForm(p);
+    updateCatUI();
   }
 }
 
@@ -4916,6 +4919,30 @@ async function _fetchAndMergeDestino(local) {
     if (data.ok && data.data) _mergeNeonRowIntoLocal(local, data.data);
   } catch(err) {
     console.warn('[admin-online] fetch puntual error:', err.message);
+  }
+  return local;
+}
+
+/* BUG-015 fix (ver BUGS_HISTORICOS.md): si _localToUUID no tiene el
+   mapeo para este lugar (localStorage limpiado, editado antes desde
+   otro dispositivo/sesion, o syncFromNeon nunca corrio con exito),
+   _fetchAndMergeDestino() no tenia forma de recuperar los datos --
+   el tab "Especifico" se quedaba con lo que hubiera en la cache local,
+   que puede ser nada. Este respaldo busca el destino por slug/nombre
+   en la lista completa de Neon (mismo criterio de match que usa
+   syncFromNeon) y arma el mapeo de UUID en el momento. */
+async function _resolveAndMergeBySlug(local) {
+  try {
+    var res  = await fetch('/api/admin-destinos?limit=500', { headers:_adminHeaders() });
+    var data = await res.json();
+    if (!data.ok || !data.data) return local;
+    var match = data.data.find(function(d){ return d.slug === local.slug || d.nombre === local.name; });
+    if (!match) return local;
+    _localToUUID[local.id] = match.id;
+    localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
+    _mergeNeonRowIntoLocal(local, match);
+  } catch(err) {
+    console.warn('[admin-online] resolucion por slug error:', err.message);
   }
   return local;
 }
