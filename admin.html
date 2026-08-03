@@ -1172,6 +1172,15 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
                 </select>
               </div>
             </div>
+            <div class="form-group">
+              <label class="form-label">Descripción de la dificultad</label>
+              <textarea class="form-input" id="f-dificultad-desc" rows="2" placeholder="Ej: Trek de 4 días por selva densa con cruces de río. Ascenso y descenso continuos..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Aptitudes y restricciones</label>
+              <div id="dificultad-tags-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+              <button class="btn btn-ghost btn-sm" onclick="addDificultadTagItem()">+ Añadir aptitud/restricción</button>
+            </div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Duracion aproximada</label>
@@ -1201,15 +1210,33 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <textarea class="form-input" id="f-permisos-sitio" rows="2" placeholder="Se necesita reserva anticipada o permiso especial?"></textarea>
             </div>
             <div class="form-group">
-              <label class="form-label">Mejor epoca / Temporada (selecciona una o varias)</label>
-              <select class="form-input" id="f-temporada" data-tag-multi="1" multiple size="6">
-                <option value="Diciembre-Marzo (seca)">Diciembre-Marzo (temporada seca)</option>
-                <option value="Abril-Mayo (lluvias)">Abril-Mayo (lluvias)</option>
-                <option value="Junio-Agosto (seca)">Junio-Agosto (temporada seca)</option>
-                <option value="Septiembre-Noviembre (lluvias)">Septiembre-Noviembre (lluvias)</option>
-                <option value="Diciembre (alta turistica)">Diciembre (temporada alta turistica)</option>
-                <option value="Todo el ano">Todo el ano (sin restriccion)</option>
-              </select>
+              <label class="form-label">Mejor época para visitar (mes a mes)</label>
+              <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+                <div class="form-group"><label class="form-label" style="font-size:9px">Ene</label><select class="form-input form-select" id="f-temporada-ene"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Feb</label><select class="form-input form-select" id="f-temporada-feb"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Mar</label><select class="form-input form-select" id="f-temporada-mar"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Abr</label><select class="form-input form-select" id="f-temporada-abr"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">May</label><select class="form-input form-select" id="f-temporada-may"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Jun</label><select class="form-input form-select" id="f-temporada-jun"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Jul</label><select class="form-input form-select" id="f-temporada-jul"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Ago</label><select class="form-input form-select" id="f-temporada-ago"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Sep</label><select class="form-input form-select" id="f-temporada-sep"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Oct</label><select class="form-input form-select" id="f-temporada-oct"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Nov</label><select class="form-input form-select" id="f-temporada-nov"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+                <div class="form-group"><label class="form-label" style="font-size:9px">Dic</label><select class="form-input form-select" id="f-temporada-dic"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
+              </div>
+              <p style="font-size:10px;color:var(--muted);margin-top:6px">Ideal = temporada seca · Posible = lluvias moderadas · Evitar = lluvias intensas</p>
+              <details style="margin-top:10px">
+                <summary style="font-size:11px;color:var(--muted);cursor:pointer">Selector antiguo (compatibilidad con datos previos)</summary>
+                <select class="form-input" id="f-temporada" data-tag-multi="1" multiple size="6" style="margin-top:8px">
+                  <option value="Diciembre-Marzo (seca)">Diciembre-Marzo (temporada seca)</option>
+                  <option value="Abril-Mayo (lluvias)">Abril-Mayo (lluvias)</option>
+                  <option value="Junio-Agosto (seca)">Junio-Agosto (temporada seca)</option>
+                  <option value="Septiembre-Noviembre (lluvias)">Septiembre-Noviembre (lluvias)</option>
+                  <option value="Diciembre (alta turistica)">Diciembre (temporada alta turistica)</option>
+                  <option value="Todo el ano">Todo el ano (sin restriccion)</option>
+                </select>
+              </details>
             </div>
           </div>
         
@@ -2162,6 +2189,7 @@ var CATEGORY_TAG_FIELDS = {
   sitio: [
     { key:'tipo_actividad', id:'f-tipo-actividad' },
     { key:'dificultad',     id:'f-dificultad' },
+    { key:'dificultad_desc', id:'f-dificultad-desc' },
     { key:'duracion',       id:'f-duracion' },
     { key:'altitud',        id:'f-altitud' },
     { key:'temporada',      id:'f-temporada', multi:true },
@@ -2198,7 +2226,9 @@ var CATEGORY_TAG_LISTS = {
     { key:'entradas',     localKey:'entradas',
       collector: function(){ return (typeof collectSitioEntradas==='function') ? collectSitioEntradas() : []; } },
     { key:'itinerario',   localKey:'itinerario',
-      collector: function(){ return (typeof collectSitioItinerario==='function') ? collectSitioItinerario() : []; } }
+      collector: function(){ return (typeof collectSitioItinerario==='function') ? collectSitioItinerario() : []; } },
+    { key:'dificultad_tags', localKey:'dificultadTags',
+      collector: function(){ return (typeof collectDificultadTags==='function') ? collectDificultadTags() : []; } }
   ],
   hostal: [], /* TASK-001: ej. actividades[], que_incluye[] */
   comida:  [], /* TASK-002: ej. menu_destacado[], opciones_dieta[] */
@@ -2290,6 +2320,13 @@ function _buildTagsObj(p) {
     if (val && val.length) tagsObj[d.key] = val;
   });
 
+  /* temporada_matriz es un objeto {Ene:'ideal',...}, no un arreglo:
+     no encaja en CATEGORY_TAG_LISTS (que asume .length). Se mapea
+     a mano, igual que el bloque de Hostal arriba en esta funcion. */
+  if (p.cat === 'sitio' && p.temporadaMatriz && Object.keys(p.temporadaMatriz).length) {
+    tagsObj.temporada_matriz = p.temporadaMatriz;
+  }
+
   return tagsObj;
 }
 
@@ -2317,6 +2354,9 @@ function _applyTagsToLocal(local, tags, cat) {
     var val = tags[d.key];
     if (val && val.length) local[d.localKey] = val;
   });
+  if (cat === 'sitio' && tags.temporada_matriz && typeof tags.temporada_matriz === 'object') {
+    local.temporadaMatriz = tags.temporada_matriz;
+  }
 }
 
 function loadForm(p) {
@@ -2440,6 +2480,7 @@ function loadForm(p) {
       // ver CATEGORY_TAG_FIELDS mas arriba en este archivo)
       if (p.como_llegar_sitio === undefined) p.como_llegar_sitio = p.como_llegar || '';
       applyCategoryTagFields(p, 'sitio');
+      _writeTemporadaMatriz(p.temporadaMatriz);
       // Cargar tours
       var tourList = document.getElementById('tour-list-admin');
       if (tourList && p.tours && p.tours.length) {
@@ -2453,7 +2494,10 @@ function loadForm(p) {
             duracion:     t.duracion || '',
             descripcion:  t.descripcion || t.desc || '',
             incluye:      t.incluye || '',
-            link_reserva: t.link_reserva || t.link || ''
+            link_reserva: t.link_reserva || t.link || '',
+            tipo_tour:    t.tipo_tour || '',
+            idioma:       t.idioma || '',
+            max_personas: t.max_personas || ''
           });
           tourList.appendChild(row);
         });
@@ -2477,6 +2521,18 @@ function loadForm(p) {
             +'</select>'
             +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
           checkList.appendChild(row);
+        });
+      }
+      // Cargar aptitudes/restricciones de dificultad
+      var dtagList = document.getElementById('dificultad-tags-admin');
+      if (dtagList && p.dificultadTags && p.dificultadTags.length) {
+        dtagList.innerHTML = '';
+        p.dificultadTags.forEach(function(t){
+          var row = document.createElement('div');
+          row.className = 'dtag-item-row';
+          row.style.cssText = 'display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:center';
+          row.innerHTML = _dificultadTagRowHTML(t);
+          dtagList.appendChild(row);
         });
       }
       // Cargar servicios/amenidades de sitio
@@ -2650,6 +2706,44 @@ function collectChecklistItems() {
   return items;
 }
 
+/* Dificultad: aptitudes/restricciones (Sprint 2, pilar B). Cada fila
+   es { texto, apto:boolean }. Mismo patron que collectChecklistItems. */
+function collectDificultadTags() {
+  var items = [];
+  document.querySelectorAll('#dificultad-tags-admin .dtag-item-row').forEach(function(row) {
+    var txt = row.querySelector('.dtag-texto');
+    var apt = row.querySelector('.dtag-apto');
+    if (txt && txt.value.trim()) {
+      items.push({ texto: txt.value.trim(), apto: apt ? apt.value === '1' : true });
+    }
+  });
+  return items;
+}
+
+/* Temporada: matriz de 12 meses (Sprint 2, pilar B). Objeto plano
+   {Ene:'ideal', Feb:'posible', ...}; no usa CATEGORY_TAG_LISTS porque
+   esa tabla asume arreglos con .length, no un objeto de 12 llaves. */
+var TEMPORADA_MESES = [
+  {k:'ene',l:'Ene'},{k:'feb',l:'Feb'},{k:'mar',l:'Mar'},{k:'abr',l:'Abr'},
+  {k:'may',l:'May'},{k:'jun',l:'Jun'},{k:'jul',l:'Jul'},{k:'ago',l:'Ago'},
+  {k:'sep',l:'Sep'},{k:'oct',l:'Oct'},{k:'nov',l:'Nov'},{k:'dic',l:'Dic'}
+];
+function collectTemporadaMatriz() {
+  var out = {};
+  TEMPORADA_MESES.forEach(function(m){
+    var el = document.getElementById('f-temporada-'+m.k);
+    if (el && el.value) out[m.l] = el.value;
+  });
+  return out;
+}
+function _writeTemporadaMatriz(matriz) {
+  matriz = matriz || {};
+  TEMPORADA_MESES.forEach(function(m){
+    var el = document.getElementById('f-temporada-'+m.k);
+    if (el && matriz[m.l] !== undefined) el.value = matriz[m.l];
+  });
+}
+
 function collectLineupItems() {
   var items = [];
   document.querySelectorAll('.lineup-item').forEach(function(row) {
@@ -2761,6 +2855,7 @@ function savePlace() {
     // regulaciones, tours, checklist, entradas, itinerario. Ver
     // CATEGORY_TAG_FIELDS / CATEGORY_TAG_LISTS mas arriba.
     collectCategoryTagFields(p, 'sitio');
+    p.temporadaMatriz = (typeof collectTemporadaMatriz==='function') ? collectTemporadaMatriz() : {};
     p.amenities = collectAmenities('sitio-amenities-check');
     var _el = document.getElementById('f-entrada-libre'); p.entradaLibre = _el ? _el.checked : false;
   }
@@ -3490,6 +3585,16 @@ function _tourRowHTML(t) {
     +'<div class="form-group"><label class="form-label" style="font-size:9px">Duración</label><input class="form-input" data-field="duracion" placeholder="4 días / 3 noches" value="'+_esc(t.duracion||'')+'"></div>'
     +'</div>'
     +'<div class="form-row">'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Tipo de tour</label><select class="form-input form-select" data-field="tipo_tour">'
+    +'<option value=""'+(!t.tipo_tour?' selected':'')+'>Seleccionar...</option>'
+    +'<option value="Grupal"'+(t.tipo_tour==='Grupal'?' selected':'')+'>Grupal</option>'
+    +'<option value="Privado"'+(t.tipo_tour==='Privado'?' selected':'')+'>Privado</option>'
+    +'<option value="Personalizado"'+(t.tipo_tour==='Personalizado'?' selected':'')+'>Personalizado</option>'
+    +'</select></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Idioma</label><input class="form-input" data-field="idioma" placeholder="Español / Inglés" value="'+_esc(t.idioma||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Máx. personas</label><input class="form-input" data-field="max_personas" placeholder="Máx 12 personas" value="'+_esc(t.max_personas||'')+'"></div>'
+    +'</div>'
+    +'<div class="form-row">'
     +'<div class="form-group" style="flex:1"><label class="form-label" style="font-size:9px">Descripción</label><textarea class="form-input" data-field="descripcion" rows="2" placeholder="Que incluye la experiencia...">'+_esc(t.descripcion||'')+'</textarea></div>'
     +'</div>'
     +'<div class="form-row">'
@@ -3512,6 +3617,26 @@ function addChecklistItem() {
   item.className = 'checklist-item-row';
   item.style.cssText='display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center';
   item.innerHTML='<input class="form-input checklist-item-input" placeholder="Nombre del ítem" style="font-size:11px;padding:5px 8px"><select class="form-input form-select checklist-item-prio" style="font-size:11px;padding:5px 8px"><option value="Obligatorio">Obligatorio</option><option value="Recomendado" selected>Recomendado</option><option value="Opcional">Opcional</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(item);
+}
+
+// Dificultad: aptitudes/restricciones (Sprint 2, pilar B)
+function _dificultadTagRowHTML(t) {
+  t = t || {};
+  var apto = t.apto !== false;
+  return '<input class="form-input dtag-texto" placeholder="Ej: Buena condición física" style="font-size:11px;padding:5px 8px" value="'+_esc(t.texto||'')+'">'
+    +'<select class="form-input form-select dtag-apto" style="font-size:11px;padding:5px 8px">'
+    +'<option value="1"'+(apto?' selected':'')+'>✓ Apto</option>'
+    +'<option value="0"'+(!apto?' selected':'')+'>✗ No apto</option>'
+    +'</select>'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+}
+function addDificultadTagItem() {
+  var list = document.getElementById('dificultad-tags-admin');
+  var item = document.createElement('div');
+  item.className = 'dtag-item-row';
+  item.style.cssText = 'display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:center';
+  item.innerHTML = _dificultadTagRowHTML();
   list.appendChild(item);
 }
 

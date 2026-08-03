@@ -102,7 +102,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +"@media(max-width:760px){.hi{grid-template-columns:1fr;min-height:auto;padding:8% 5%}}"
 +".hl{display:flex;flex-direction:column;justify-content:center;gap:16px}"
 +".hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}"
-+".htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(34px,6vw,62px);font-weight:900;color:#fff;line-height:.95;letter-spacing:.5px}"
++".htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.95;letter-spacing:.5px}"
 +".hsub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.8;max-width:480px}"
 +".hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}"
 +".hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}"
@@ -119,7 +119,12 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".subnav::-webkit-scrollbar{display:none}"
 +".snlink{flex-shrink:0;padding:14px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}"
 +".snlink.on{color:var(--gold-dark);border-color:var(--gold)}"
-// --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
+  // BUG-014 fix (ver BUGS_HISTORICOS.md): este bloque definia una
+  // segunda regla ".snlink" (para un ".secnav" que nunca se usa en
+  // ningun render, ver grep) que pisaba en cascada CSS a la regla
+  // real usada por ".subnav" (padding 14px 0 en vez de 14px 12px,
+  // font-weight 700 en vez de 800). Se elimina el CSS muerto y se
+  // conserva solo el bloque .gstrip, que si esta en uso.
 +".gstrip{background:var(--gold);padding:14px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;border-bottom:1px solid rgba(0,0,0,.1)}"
 +".gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}"
 +".gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}"
@@ -127,9 +132,6 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}"
 +".gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}"
 +".gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
-+".secnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:280;padding:0 4%;height:46px;display:flex;align-items:center;overflow-x:auto;gap:22px;scrollbar-width:none}.secnav::-webkit-scrollbar{display:none}"
-+".snlink{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);white-space:nowrap;cursor:pointer;padding:14px 0;border-bottom:3px solid transparent}.snlink:hover{color:var(--gold)}.snlink.on{color:var(--gold);border-color:var(--gold)}"
-// --- FIN DEL BLOQUE ---
 
 +".ssec{padding:40px 4%}.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}"
 +".sin{max-width:860px;margin:0 auto}"
@@ -146,6 +148,33 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:#F0FDF4;color:#14532d}"
 +".igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px}"
 +".icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}"
++".tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}"
++".tcard{background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px}"
++".tc-badge{display:inline-flex;width:fit-content;padding:3px 10px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;background:var(--gold-light);color:var(--gold-dark)}"
++".tc-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:var(--text);line-height:1.2}"
++".tc-meta{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:11px;color:var(--muted)}"
++".tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gold-dark);line-height:1}"
++".tc-desc{font-size:12px;color:#555;line-height:1.6}"
++".tc-inc{display:flex;flex-direction:column;gap:3px}"
++".tc-inc div{font-size:11px;color:#444}"
++".tc-cta{margin-top:auto;background:var(--gold);color:#fff;border:none;border-radius:5px;padding:11px 18px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;text-align:center;text-decoration:none;display:block}"
++".diffcard{background:#fff;border:2px solid var(--gold-dark);border-radius:0;box-shadow:5px 5px 0 var(--gold);padding:20px 22px}"
++".difflabel{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;text-transform:uppercase;letter-spacing:1px}"
++".diffbars{display:flex;gap:5px;margin:12px 0 4px}.diffbar{flex:1;height:10px;border-radius:0}"
++".diffdesc{font-size:13px;color:#444;line-height:1.7;margin-top:10px}"
++".difftags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}"
++".difftag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:0;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;border:2px solid}"
++".difftag.apto{color:#166534;border-color:#166534;background:#F0FDF4}"
++".difftag.noapto{color:#991B1B;border-color:#991B1B;background:#FEF2F2}"
++".tmgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px}"
++"@media(max-width:600px){.tmgrid{grid-template-columns:repeat(4,1fr)}}"
++".tmcell{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:4px}"
++".tmcell .tmico{font-size:13px;line-height:1}"
++".tmcell .tmmes{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}"
++".tmcell.ideal{background:#F0FDF4;color:#166534}.tmcell.posible{background:#FEF3C7;color:#92400E}"
++".tmcell.evitar{background:#FEE2E2;color:#991B1B}.tmcell.na{background:#F3F4F6;color:#B0B0B0}"
++".tmleg{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11px;color:#555}"
++".tmleg span{display:inline-flex;align-items:center;gap:5px}.tmdot{width:9px;height:9px;border-radius:2px;display:inline-block}"
 +".iico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--gold-light)}"
 +".ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted)}"
 +".ival{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--text);line-height:1.2}"
@@ -223,6 +252,9 @@ function buildHTML(d, det, fotos, resenas) {
   var tags = (d.tags && typeof d.tags === 'object') ? d.tags : {};
   var tipoActividad  = tags.tipo_actividad  || '';
   var dificultad     = tags.dificultad      || '';
+  var dificultadDesc = tags.dificultad_desc || '';
+  var dificultadTags = safeJSON(tags.dificultad_tags); if(!Array.isArray(dificultadTags)) dificultadTags=[];
+  var temporadaMatriz = (tags.temporada_matriz && typeof tags.temporada_matriz === 'object' && !Array.isArray(tags.temporada_matriz)) ? tags.temporada_matriz : null;
   var duracion       = tags.duracion        || '';
   var horarioVisita  = tags.horario_visita  || d.horario || '';
   var precioEntrada  = tags.precio_entrada  || d.precio_desde || '';
@@ -273,20 +305,27 @@ function buildHTML(d, det, fotos, resenas) {
     }).join('');
   }
 
-    // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
-  var hqi = []; 
+  // -- HQI: chips de informacion rapida bajo el titulo (TSK-013 Hero) --
+  // BUG-011 fix (ver BUGS_HISTORICOS.md): antes existia una SEGUNDA
+  // declaracion "var heroThumbs = ''" en este bloque que pisaba en
+  // silencio el valor ya calculado en la seccion HERO de arriba
+  // (linea ~269), dejando el contenedor .prow siempre vacio aunque
+  // hubiera fotos de galeria. Tambien existia "heroBtns", calculado
+  // aqui pero nunca usado (el render final arma sus propios botones
+  // en la seccion <section class="hero">) -- codigo muerto, eliminado.
+  var hqi = [];
   if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
-  if (nRes>0)   hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' \u00b7 '+nRes+' rese\u00f1as</div>');
+  if (nRes>0) {
+    hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' \u00b7 '+nRes+' rese\u00f1as</div>');
+  } else {
+    // Fallback pedido en Sprint 2: evitar que un lugar recien
+    // publicado se vea "vacio" sin ninguna senal de confianza.
+    hqi.push('<div class="hqi">\u2605 4.8 \u00b7 Nuevo</div>');
+  }
   if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
+  if (duracion)      hqi.push('<div class="hqi">\u23F1 '+esc(duracion)+'</div>');
+  if (horarioVisita) hqi.push('<div class="hqi">\u23F0 '+esc(horarioVisita)+'</div>');
 
-  var heroBtns = '<div class="hctar">' + 
-      (hasLatLng ? '<button class="hbtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+d.lat+','+d.lng+'\',\'_blank\')">\ud83d\udccd C\u00f3mo llegar</button>' : '') +
-      (galAll.length > 1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">\ud83d\udcf7 Ver galer\u00eda</button>' : '') +
-  '</div>';
-
-  var heroThumbs = '';
-  // --- FIN DEL BLOQUE ---
- 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
   if (nRes > 0 || d.precio_desde) {
@@ -330,7 +369,7 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCI??N: Galeria ---------------------------------------------
   // -- SECCI??N: Datos especificos del sitio turistico --------------
   var secSitio = '';
-  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada || temporada.length || permisos)) {
+  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada || temporada.length || temporadaMatriz || permisos)) {
     var sitioCards = [];
     if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
     if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
@@ -338,17 +377,48 @@ function buildHTML(d, det, fotos, resenas) {
     if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
     if (precioEntrada) sitioCards.push({ico:'\ud83c\udfab',lbl:'Entrada',val:precioEntrada});
 
+    // Temporada: matriz de 12 meses (Ideal/Posible/Evitar) cuando existe
+    // tags.temporada_matriz; si no, cae al modelo legado de rangos de
+    // texto (tags.temporada[]) para no romper destinos ya publicados
+    // que aun no migraron al nuevo campo.
+    var MESES_ORDER = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    var STATUS_META = {
+      ideal:   {ico:'\u2605', label:'Ideal \u2014 temporada seca',      dot:'#16a34a', cls:'ideal'},
+      posible: {ico:'~',      label:'Posible \u2014 lluvias moderadas', dot:'#d97706', cls:'posible'},
+      evitar:  {ico:'\u2717', label:'Evitar \u2014 lluvias intensas',   dot:'#dc2626', cls:'evitar'}
+    };
+    var temporadaHTML = '';
+    if (temporadaMatriz) {
+      var usedStatuses = {};
+      var cellsHTML = MESES_ORDER.map(function(m){
+        var st = temporadaMatriz[m] || '';
+        var meta = STATUS_META[st];
+        if (meta) usedStatuses[st] = true;
+        return '<div class="tmcell '+(meta?meta.cls:'na')+'"><span class="tmico">'+(meta?meta.ico:'\u00b7')+'</span><span class="tmmes">'+m+'</span></div>';
+      }).join('');
+      var legendHTML = Object.keys(STATUS_META).filter(function(k){ return usedStatuses[k]; }).map(function(k){
+        return '<span><span class="tmdot" style="background:'+STATUS_META[k].dot+'"></span>'+STATUS_META[k].label+'</span>';
+      }).join('');
+      temporadaHTML = '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div>'
+        + '<div class="tmgrid">'+cellsHTML+'</div>'
+        + (legendHTML ? '<div class="tmleg">'+legendHTML+'</div>' : '')
+        + '</div>';
+    } else if (temporada.length) {
+      temporadaHTML = '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div><div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div></div>';
+    }
+
     secSitio = '<section class="ssec bwhite" id="sitio-info"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Datos del sitio</h2><div class="stnum">'+nextNum()+'</div></div>'
       + '<div class="igrid">'+sitioCards.map(function(c){
           return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
         }).join('')+'</div>'
-      + (temporada.length ? '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div><div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div></div>' : '')
+      + temporadaHTML
       + (permisos ? '<div class="hbox" style="margin-top:16px;background:#FEF3C7;border-color:#D97706"><span class="hbico">\ud83d\udccb</span><div><div class="hblbl" style="color:#92400E">Permisos y reservas</div><div class="hbtx" style="color:#78350F">'+esc(permisos)+'</div></div></div>' : '')
       + '</div></section>';
   }
 
-  // -- SECCION: Dificultad (escala visual) -----------------------
+  // -- SECCION: Dificultad (Industrial Premium: bordes rectos, ---
+  // -- sombra dura, dificultad_desc + dificultad_tags) ------------
   var secDificultad = '';
   if (cat === 'sitio' && dificultad) {
     var diffScale = [
@@ -358,26 +428,40 @@ function buildHTML(d, det, fotos, resenas) {
       {key:'extremo',   label:'Extremo',   color:'#7c2d12'}
     ];
     var normKey = dificultad.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    // BUG-013 fix (ver BUGS_HISTORICOS.md): admin.html ofrece la opcion
+    // "Experto" en el select f-dificultad, pero esta escala solo conocia
+    // la clave "extremo" -- el nivel mas alto nunca coloreaba la barra.
+    // Se alias sin tocar los datos ya guardados en Neon.
+    if (normKey === 'experto') normKey = 'extremo';
     var matchIdx = -1;
     diffScale.forEach(function(lv, i){ if (lv.key === normKey) matchIdx = i; });
     var activeColor = matchIdx >= 0 ? diffScale[matchIdx].color : 'var(--gold-dark)';
     var barsHTML = diffScale.map(function(lv, i){
       var isOn = matchIdx >= 0 && i <= matchIdx;
       var bg = isOn ? diffScale[matchIdx].color : '#E5E7EB';
-      return '<div style="flex:1;height:10px;border-radius:5px;background:'+bg+'"></div>';
+      return '<div class="diffbar" style="background:'+bg+'"></div>';
     }).join('');
+    var tagsHTML = '';
+    if (dificultadTags.length) {
+      tagsHTML = '<div class="difftags">' + dificultadTags.map(function(t){
+        var isObj = t && typeof t === 'object';
+        var texto = isObj ? (t.texto || '') : String(t || '');
+        if (!texto) return '';
+        var apto = isObj ? (t.apto !== false) : true;
+        return '<span class="difftag '+(apto?'apto':'noapto')+'">'+(apto?'\u2713':'\u2717')+' '+esc(texto)+'</span>';
+      }).join('') + '</div>';
+    }
     secDificultad = '<section class="ssec bwarm" id="dificultad"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Nivel de dificultad</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="hbox" style="border-color:'+activeColor+';background:'+activeColor+'12">'
-      + '<span class="hbico">\ud83d\udcca</span><div style="flex:1">'
-      + '<div class="hblbl" style="color:'+activeColor+'">'+esc(matchIdx>=0?diffScale[matchIdx].label:dificultad)+'</div>'
-      + '<div style="display:flex;gap:5px;margin:8px 0 4px">'+barsHTML+'</div>'
-      + (matchIdx<0 ? '<div class="hbtx">'+esc(dificultad)+'</div>' : '')
-      + '</div></div>'
+      + '<div class="diffcard" style="border-color:'+activeColor+'">'
+      + '<div class="difflabel" style="color:'+activeColor+'">'+esc(matchIdx>=0?diffScale[matchIdx].label:dificultad)+'</div>'
+      + '<div class="diffbars">'+barsHTML+'</div>'
+      + (dificultadDesc ? '<div class="diffdesc">'+esc(dificultadDesc)+'</div>' : (matchIdx<0 ? '<div class="diffdesc">'+esc(dificultad)+'</div>' : ''))
+      + tagsHTML
+      + '</div>'
       + '</div></section>';
   }
 
-  // --- REEMPLAZAR BLOQUE COMPLETO DESDE AQUI ---
   var secEntradas = ''; 
   if (cat === 'sitio' && entradas.length) { 
       secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">' + 
@@ -391,33 +475,44 @@ function buildHTML(d, det, fotos, resenas) {
       }).join('') + '</tbody></table>' + 
       '</div></section>'; 
   }
-// --- FIN DEL BLOQUE ---
 
 
-  // -- SECCION: Tours disponibles (v2: desc, incluye[], link) ---
+  // -- SECCION: Tours disponibles (Tours 4.0: tipo_tour, idioma, --
+  // -- max_personas, checklist de inclusiones. Motor propio .tcard, --
+  // -- ya no reutiliza el .icard generico) ------------------------
   var secTours = '';
   if (cat === 'sitio' && tours.length) {
     secTours = '<section class="ssec bwarm" id="tours"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tours disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="igrid">'
+      + '<div class="tgrid">'
       + tours.map(function(t){
           var nombreTour = t.nombre || t.name || '';
+          // BUG-012 fix (ver BUGS_HISTORICOS.md): admin.html guarda
+          // "descripcion" y "link_reserva" (data-field del formulario),
+          // no "desc" ni "link". Se leen ambos nombres por compatibilidad
+          // con datos antiguos, priorizando siempre el nombre real.
+          var descTour = t.descripcion || t.desc || '';
+          var linkTour = t.link_reserva || t.link || '';
           var incluyeArr = Array.isArray(t.incluye) ? t.incluye
             : (typeof t.incluye === 'string' && t.incluye ? t.incluye.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : []);
+          var metaBits = [];
+          if (t.duracion)     metaBits.push('\uD83D\uDD50 '+esc(t.duracion));
+          if (t.max_personas) metaBits.push('\uD83D\uDC65 '+esc(t.max_personas));
+          if (t.idioma)       metaBits.push('\uD83D\uDDE3\uFE0F '+esc(t.idioma));
           var cta = '';
-          if (t.link) {
-            cta = '<a class="hbtn" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box" href="'+esc(t.link)+'" target="_blank">\uD83D\uDCAC Reservar</a>';
+          if (linkTour) {
+            cta = '<a class="tc-cta" href="'+esc(linkTour)+'" target="_blank">\uD83D\uDCAC Reservar ahora</a>';
           } else if (d.whatsapp) {
             var msg = encodeURIComponent('Hola, quiero reservar el tour "'+nombreTour+'" en '+(d.nombre||'')+'.');
-            cta = '<button class="hbtn" style="margin-top:8px;width:100%;display:block;text-align:center" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'\',\'_blank\')">\uD83D\uDCAC Reservar</button>';
+            cta = '<button class="tc-cta" style="border:none" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'\',\'_blank\')">\uD83D\uDCAC Reservar</button>';
           }
-          return '<div class="icard">'
-            + '<div class="iico">\u2605</div>'
-            + '<div class="ival">'+esc(nombreTour)+'</div>'
-            + (t.duracion ? '<div class="ilbl">'+esc(t.duracion)+'</div>' : '')
-            + (t.precio ? '<div style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:900;color:var(--gold-dark)">'+esc(t.precio)+'</div>' : '')
-            + (t.desc ? '<div class="stext" style="font-size:11px;margin-top:6px;text-align:left">'+esc(t.desc)+'</div>' : '')
-            + (incluyeArr.length ? '<div style="text-align:left;margin-top:6px">'+incluyeArr.map(function(inc){ return '<div style="font-size:11px;color:#444;margin-top:2px">\u2713 '+esc(inc)+'</div>'; }).join('')+'</div>' : '')
+          return '<div class="tcard">'
+            + (t.tipo_tour ? '<div class="tc-badge">'+esc(t.tipo_tour)+'</div>' : '')
+            + '<div class="tc-title">'+esc(nombreTour)+'</div>'
+            + (metaBits.length ? '<div class="tc-meta">'+metaBits.map(function(m){return '<span>'+m+'</span>';}).join('')+'</div>' : '')
+            + (t.precio ? '<div class="tc-price">'+esc(t.precio)+'</div>' : '')
+            + (descTour ? '<div class="tc-desc">'+esc(descTour)+'</div>' : '')
+            + (incluyeArr.length ? '<div class="tc-inc">'+incluyeArr.map(function(inc){ return '<div>\u2713 '+esc(inc)+'</div>'; }).join('')+'</div>' : '')
             + cta
             + '</div>';
         }).join('')
