@@ -285,6 +285,20 @@ function buildHTML(d, det, fotos, resenas) {
   var secretos       = tags.secretos     || '';
   var regulaciones   = tags.regulaciones || '';
 
+  // Campos especificos de hostal desde tags JSONB (TASK-001)
+  var tipoAlojamiento  = tags.tipo_alojamiento    || '';
+  var reglasCasa       = tags.reglas_casa         || '';
+  var politicaCancel   = tags.politica_cancelacion|| '';
+  var edadMinima       = tags.edad_minima         || '';
+  var mascotas         = tags.mascotas            || '';
+  var cocinaCompartida = tags.cocina_compartida   || '';
+  var recepcionInfo    = tags.recepcion           || '';
+  var barrioDescripcion= tags.barrio_descripcion  || '';
+  var actividadesHostal = safeJSON(tags.actividades);    if(!Array.isArray(actividadesHostal)) actividadesHostal=[];
+  var queIncluye        = safeJSON(tags.que_incluye);    if(!Array.isArray(queIncluye))        queIncluye=[];
+  var transporteHostal  = safeJSON(tags.transporte);     if(!Array.isArray(transporteHostal))  transporteHostal=[];
+  var eventosHostal     = safeJSON(tags.eventos_hostal); if(!Array.isArray(eventosHostal))     eventosHostal=[];
+
   var bookingUrl = det.booking_url     || d.booking     || '';
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
   var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
@@ -692,20 +706,93 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="gal">'+galAll.map(function(u){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"></div>'; }).join('')+'</div>'
     + '</div></section>' : '';
 
-  // -- SECCI??N: Habitaciones / precios (solo hostal) ----------------
+  // -- SECCION: Habitaciones / precios (solo hostal) ----------------
+  var HAB_BADGE = {popular:'\u2605 Mas popular', female:'Solo mujeres', quiet:'Tranquila', premium:'Premium'};
   var secHabitaciones = '';
   if (habitaciones.length) {
     secHabitaciones = '<section class="ssec bwhite" id="habitaciones"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Habitaciones y precios</h2><div class="stnum">'+nextNum()+'</div></div>'
       + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Camas</th><th>Precio</th><th>Reservar</th></tr></thead><tbody>'
       + habitaciones.map(function(h){
-          return '<tr><td><div class="entrada-tipo">'+esc(h.nombre||h.name||'')+'</div></td>'
+          var tipoTxt = h.tipo || h.nombre || h.name || '';
+          var badgeTxt = h.badge ? (HAB_BADGE[h.badge] || h.badge) : '';
+          return '<tr><td><div class="entrada-tipo">'+esc(tipoTxt)+'</div>'
+            + (h.subtitulo ? '<div class="entrada-sub" style="font-size:12px;color:var(--muted);margin-top:2px">'+esc(h.subtitulo)+'</div>' : '')
+            + (badgeTxt ? '<span class="tpill" style="margin-top:6px;display:inline-block">'+esc(badgeTxt)+'</span>' : '')
+            + '</td>'
             + '<td>'+esc(h.camas||h.beds||'')+'</td>'
             + '<td><div class="entrada-precio">'+esc(money(h.precio||h.price))+'</div></td>'
             + '<td>'+(d.whatsapp?'<a class="entrada-link" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>':'')+'</td></tr>';
         }).join('')
-      + '</tbody></table></div></section>';
+      + '</tbody></table>'
+      + ((checkin || checkout || recepcionInfo) ? '<div class="tagrow" style="margin-top:14px">'
+          + (checkin ? '<span class="tpill">\u23F0 Check-in: '+esc(checkin)+(checkout?' / Check-out: '+esc(checkout):'')+'</span>' : '')
+          + (recepcionInfo ? '<span class="tpill">Recepcion: '+esc(recepcionInfo)+'</span>' : '')
+          + '</div>' : '')
+      + '</div></section>';
   }
+
+  // -- SECCION: Reglas de la casa (TASK-001, solo hostal) -----------
+  var reglasQuickFacts = [];
+  if (tipoAlojamiento)  reglasQuickFacts.push({ico:'\uD83C\uDFE0', lbl:'Tipo',    val:tipoAlojamiento});
+  if (edadMinima)       reglasQuickFacts.push({ico:'\uD83D\uDD1E', lbl:'Edad minima', val:String(edadMinima)+' anios'});
+  if (mascotas)         reglasQuickFacts.push({ico:'\uD83D\uDC3E', lbl:'Mascotas', val:mascotas});
+  if (cocinaCompartida) reglasQuickFacts.push({ico:'\uD83C\uDF73', lbl:'Cocina compartida', val:cocinaCompartida});
+
+  var reglasCasaItems = reglasCasa ? reglasCasa.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l; }) : [];
+
+  var secReglasCasa = (reglasCasaItems.length || politicaCancel || reglasQuickFacts.length) ?
+    '<section class="ssec bwarm" id="reglas-casa"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reglas de la casa</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + (reglasQuickFacts.length ? '<div class="igrid" style="margin-bottom:18px">'+reglasQuickFacts.map(function(c){
+        return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
+      }).join('')+'</div>' : '')
+    + (reglasCasaItems.length ? '<ul class="rcasa-list" style="list-style:none;padding:0;margin:0 0 16px">'
+        + reglasCasaItems.map(function(l){ return '<li style="padding:8px 0;border-bottom:1px solid var(--border)">\u2713 '+esc(l)+'</li>'; }).join('')
+        + '</ul>' : '')
+    + (politicaCancel ? '<div class="hbox"><strong>Politica de cancelacion:</strong> '+esc(politicaCancel)+'</div>' : '')
+    + '</div></section>' : '';
+
+  // -- SECCION: Actividades disponibles + Que incluye (TASK-001) ----
+  var secActividadesHostal = (actividadesHostal.length || queIncluye.length) ?
+    '<section class="ssec bwhite" id="actividades"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Actividades disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + (actividadesHostal.length ? '<div class="igrid">'+actividadesHostal.map(function(a){
+        return '<div class="icard"><div class="iico">'+esc(a.icono||'\u2728')+'</div><div class="ilbl">'+esc(a.nombre||'')+'</div>'
+          + (a.descripcion ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(a.descripcion)+'</div>' : '')
+          + '</div>';
+      }).join('')+'</div>' : '')
+    + (queIncluye.length ? '<div style="margin-top:'+(actividadesHostal.length?'22px':'0')+'">'
+        + '<div class="tagrow">'+queIncluye.map(function(qi){
+            return '<span class="tpill">\u2713 '+esc(typeof qi==='string'?qi:(qi.texto||''))+'</span>';
+          }).join('')+'</div></div>' : '')
+    + '</div></section>' : '';
+
+  // -- SECCION: Como llegar / Transporte (TASK-001, BUG-C) -----------
+  var secTransporteHostal = transporteHostal.length ?
+    '<section class="ssec bwarm" id="como-llegar"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Como llegar</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + (barrioDescripcion ? '<p style="margin-bottom:16px;color:var(--muted)">'+esc(barrioDescripcion)+'</p>' : '')
+    + '<div class="igrid">'+transporteHostal.map(function(t){
+        return '<div class="icard"><div class="iico">'+esc(t.icon||'\uD83D\uDE8C')+'</div><div class="ilbl">'+esc(t.title||'')+'</div>'
+          + (t.detail ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(t.detail)+'</div>' : '')
+          + '</div>';
+      }).join('')+'</div>'
+    + '</div></section>' : '';
+
+  // -- SECCION: Eventos del hostal (TASK-001, BUG-C) -----------------
+  var secEventosHostal = eventosHostal.length ?
+    '<section class="ssec bwhite" id="eventos-hostal"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Eventos del hostal</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<table class="entradas-table"><thead><tr><th>Dia</th><th>Hora</th><th>Evento</th><th>Precio</th></tr></thead><tbody>'
+    + eventosHostal.map(function(ev){
+        return '<tr><td>'+esc(ev.dia||'')+'</td><td>'+esc(ev.hora||'')+'</td>'
+          + '<td><div class="entrada-tipo">'+esc(ev.titulo||'')+'</div>'
+          + (ev.desc ? '<div class="entrada-sub" style="font-size:12px;color:var(--muted);margin-top:2px">'+esc(ev.desc)+'</div>' : '')
+          + '</td>'
+          + '<td><div class="entrada-precio">'+esc(ev.precio||'Gratis')+'</div></td></tr>';
+      }).join('')
+    + '</tbody></table></div></section>' : '';
 
   // -- SECCI??N: Reservar / links externos ----------------------------
   var rbtns = [];
@@ -795,6 +882,12 @@ function buildHTML(d, det, fotos, resenas) {
     {id:'tours',       label:'Tours',       has:!!secTours},
     {id:'checklist',   label:'Que llevar',  has:!!secChecklist},
     {id:'itinerario',  label:'Itinerario',  has:!!secItinerario},
+    {id:'habitaciones',label:'Habitaciones',has:!!secHabitaciones},
+    {id:'reglas-casa', label:'Reglas',      has:!!secReglasCasa},
+    {id:'actividades', label:'Actividades', has:!!secActividadesHostal},
+    {id:'como-llegar', label:'Como llegar', has:!!secTransporteHostal},
+    {id:'eventos-hostal', label:'Eventos',  has:!!secEventosHostal},
+    {id:'reservar',    label:'Reservar',    has:!!secReservar},
     {id:'mapa',        label:'Mapa',        has:!!secMapa},
     {id:'faq',         label:'FAQ',         has:!!secFaq},
     {id:'resenas',     label:'Resenas',     has:!!secResenas}
@@ -855,6 +948,10 @@ function buildHTML(d, det, fotos, resenas) {
     + secRegulaciones + '\n'
     + secGaleria + '\n'
     + secHabitaciones + '\n'
+    + secReglasCasa + '\n'
+    + secActividadesHostal + '\n'
+    + secTransporteHostal + '\n'
+    + secEventosHostal + '\n'
     + secReservar + '\n'
     + secMapa + '\n'
     + secFaq + '\n'

@@ -868,6 +868,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="cetab"      onclick="showCatTab('hostal-transporte')">🚌 Cómo llegar</div>
             <div class="cetab"      onclick="showCatTab('hostal-events')">🎉 Eventos</div>
             <div class="cetab"      onclick="showCatTab('hostal-faq')">❓ FAQs</div>
+            <div class="cetab"      onclick="showCatTab('hostal-politicas')">📋 Políticas</div>
           </div>
 
           <!-- ── HABITACIONES ── -->
@@ -1084,6 +1085,76 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               </div>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="addFaqRow()">+ Añadir pregunta</button>
+          </div>
+
+          <!-- ── POLITICAS Y EXTRAS (TASK-001) ── -->
+          <div class="cat-panel" id="cat-hostal-politicas">
+            <div class="form-hint">Datos generales del hostal, politicas de convivencia y actividades incluidas. Aparecen en las secciones "Reglas de la casa" y "Actividades disponibles" de la pagina publica.</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Tipo de alojamiento</label>
+                <select class="form-input form-select" id="f-tipo-alojamiento">
+                  <option value="">Selecciona...</option>
+                  <option value="Hostal">Hostal</option>
+                  <option value="Hotel boutique">Hotel boutique</option>
+                  <option value="Guesthouse">Guesthouse</option>
+                  <option value="Casa de huespedes">Casa de huespedes</option>
+                  <option value="Camping / Glamping">Camping / Glamping</option>
+                  <option value="Apart-hotel">Apart-hotel</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Edad minima</label>
+                <input class="form-input" id="f-edad-minima" type="number" min="0" placeholder="18">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Mascotas</label>
+                <select class="form-input form-select" id="f-mascotas">
+                  <option value="">Selecciona...</option>
+                  <option value="Si">Si, se permiten</option>
+                  <option value="No">No se permiten</option>
+                  <option value="Con restricciones">Con restricciones</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cocina compartida</label>
+                <select class="form-input form-select" id="f-cocina-compartida">
+                  <option value="">Selecciona...</option>
+                  <option value="Si">Si</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group wide">
+                <label class="form-label">Reglas de la casa</label>
+                <textarea class="form-input" id="f-reglas-casa" rows="4" placeholder="Una regla por linea. Ej:&#10;No se permiten fiestas despues de las 11pm&#10;Silencio en dormitorios despues de las 10pm&#10;Prohibido fumar en habitaciones"></textarea>
+              </div>
+            </div>
+
+            <div class="form-section-divider" style="margin-top:16px">Que incluye el precio</div>
+            <div class="form-hint">Cada fila = un item de la lista "Que incluye" en la pagina publica.</div>
+            <div id="que-incluye-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+              <div class="que-incluye-row" style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center">
+                <input class="form-input" placeholder="Ej: Toallas y sabanas incluidas">
+                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="addHostalQueIncluye()">+ Añadir item</button>
+
+            <div class="form-section-divider" style="margin-top:16px">Actividades disponibles</div>
+            <div class="form-hint">Actividades fijas que ofrece el hostal (no recurrentes por dia, ver tab Eventos para eso). Ej: gimnasio, tour propio, clases.</div>
+            <div id="hostal-actividades-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+              <div class="hostal-actividad-row" style="display:grid;grid-template-columns:50px 1fr 2fr auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)">
+                <input class="form-input" value="🧘" placeholder="🧘" style="text-align:center;font-size:18px">
+                <input class="form-input" value="Yoga en la terraza" placeholder="Nombre de la actividad">
+                <input class="form-input" placeholder="Descripción breve">
+                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="addHostalActividad()">+ Añadir actividad</button>
           </div>
         </div>
 
@@ -2068,6 +2139,8 @@ function clearForm() {
              'f-checkin','f-checkout','f-recepcion','f-cancelacion',
              'f-booking-url','f-hostelworld','f-airbnb','f-precio-booking','f-booking-msg',
              'f-barrio-desc',
+             /* hostal-specific (TASK-001) */
+             'f-tipo-alojamiento','f-edad-minima','f-mascotas','f-cocina-compartida','f-reglas-casa',
              'f-score-atmosfera','f-score-seguridad','f-score-ubicacion',
              'f-score-limpieza','f-score-personal','f-score-precio'];
   ids.forEach(function(id){
@@ -2120,6 +2193,12 @@ function clearForm() {
   /* ── Reset hostal events to 1 example row ── */
   var evList = document.getElementById('hostal-events-list');
   if(evList) evList.innerHTML = '';
+
+  /* ── Reset hostal actividades / que incluye (TASK-001) ── */
+  var actList = document.getElementById('hostal-actividades-list');
+  if(actList) actList.innerHTML = '';
+  var qiList = document.getElementById('que-incluye-list');
+  if(qiList) qiList.innerHTML = '';
 
   /* ── Reset FAQ list ── */
   var faqList = document.getElementById('faq-builder-list');
@@ -2208,10 +2287,28 @@ var CATEGORY_TAG_FIELDS = {
       collector: function(){ return (typeof collectSitioSecretos==='function') ? collectSitioSecretos() : ''; } },
     { key:'regulaciones',   id:'f-regulaciones' }
   ],
-  /* TASK-001: llenar al agregar los inputs de tipo_alojamiento,
-     reglas_casa, politica_cancelacion, edad_minima, mascotas,
-     cocina_compartida en especifico-hostal. */
-  hostal: [],
+  /* TASK-001 (completado). Los primeros 6 son los campos nuevos del
+     TODO original. Los ultimos 4 (recepcion, politica_cancelacion,
+     precio_booking_ref, booking_mensaje, barrio_descripcion) son
+     inputs que YA EXISTIAN en especifico-hostal (f-recepcion,
+     f-cancelacion, f-precio-booking, f-booking-msg, f-barrio-desc)
+     pero se recolectaban a mano en savePlace() sin nunca llegar a
+     _placeToAPI() -- se perdian siempre al guardar (BUG-B, ver
+     BUGS_HISTORICOS.md BUG-016). Registrarlos aqui los conecta al
+     mismo tiempo que se agregan los campos nuevos, sin duplicar el
+     input de politica_cancelacion (reutiliza f-cancelacion). */
+  hostal: [
+    { key:'tipo_alojamiento',   id:'f-tipo-alojamiento' },
+    { key:'reglas_casa',        id:'f-reglas-casa' },
+    { key:'edad_minima',        id:'f-edad-minima' },
+    { key:'mascotas',           id:'f-mascotas' },
+    { key:'cocina_compartida',  id:'f-cocina-compartida' },
+    { key:'politica_cancelacion', id:'f-cancelacion', localKey:'cancelacion' },
+    { key:'recepcion',          id:'f-recepcion' },
+    { key:'precio_booking_ref', id:'f-precio-booking', localKey:'precioBooking' },
+    { key:'booking_mensaje',    id:'f-booking-msg',    localKey:'bookingMsg' },
+    { key:'barrio_descripcion', id:'f-barrio-desc',    localKey:'barrioDesc' }
+  ],
   /* TASK-002: tipo_comida, cocina, precio_promedio, ambiente,
      terraza, domicilio en especifico-comida. */
   comida: [],
@@ -2233,7 +2330,21 @@ var CATEGORY_TAG_LISTS = {
     { key:'dificultad_tags', localKey:'dificultadTags',
       collector: function(){ return (typeof collectDificultadTags==='function') ? collectDificultadTags() : []; } }
   ],
-  hostal: [], /* TASK-001: ej. actividades[], que_incluye[] */
+  hostal: [
+    { key:'actividades',  localKey:'actividades',
+      collector: function(){ return (typeof collectHostalActividades==='function') ? collectHostalActividades() : []; } },
+    { key:'que_incluye',  localKey:'queIncluye',
+      collector: function(){ return (typeof collectHostalQueIncluye==='function') ? collectHostalQueIncluye() : []; } },
+    /* BUG-C fix: transporte y eventos_hostal viajaban en el payload de
+       _placeToAPI() pero admin-destinos.js nunca los escribia en Neon
+       (no hay columna transporte/eventos_hostal en destinos_detalles).
+       Al pasar por aqui quedan dentro de tags JSONB, que si se persiste
+       via el MERGE existente (ADR-003) -- cero cambios de backend. */
+    { key:'transporte',      localKey:'transport',
+      collector: function(){ return (typeof collectTransport==='function') ? collectTransport() : []; } },
+    { key:'eventos_hostal',  localKey:'hostalEvents',
+      collector: function(){ return (typeof collectHostalEvents==='function') ? collectHostalEvents() : []; } }
+  ],
   comida:  [], /* TASK-002: ej. menu_destacado[], opciones_dieta[] */
   evento:  []  /* TASK-003: ej. lineup[], agenda[], categorias_entrada[] */
 };
@@ -2407,15 +2518,20 @@ function loadForm(p) {
         });
       }
       /* check-in/out */
-      ['checkin','checkout','recepcion','cancelacion'].forEach(function(f){
+      ['checkin','checkout'].forEach(function(f){
         var el=document.getElementById('f-'+f); if(el&&p[f]) el.value=p[f];
       });
       /* plataformas */
-      var bkMap={'booking-url':'bookingUrl','hostelworld':'hostelworld','airbnb':'airbnb',
-                 'precio-booking':'precioBooking','booking-msg':'bookingMsg'};
+      var bkMap={'booking-url':'bookingUrl','hostelworld':'hostelworld','airbnb':'airbnb'};
       Object.keys(bkMap).forEach(function(fid){
         var el=document.getElementById('f-'+fid); if(el&&p[bkMap[fid]]) el.value=p[bkMap[fid]];
       });
+      /* TASK-001 / BUG-B: motor generico -- precarga tipo_alojamiento,
+         reglas_casa, edad_minima, mascotas, cocina_compartida,
+         recepcion, cancelacion, precioBooking, bookingMsg, barrioDesc.
+         Reemplaza lo que antes eran 3 bloques manuales dispersos (que
+         nunca cubrian los campos nuevos de TASK-001). */
+      applyCategoryTagFields(p, 'hostal');
       /* scores */
       var sc=p.scores||{};
       ['atmosfera','seguridad','ubicacion','limpieza','personal','precio'].forEach(function(k){
@@ -2442,8 +2558,34 @@ function loadForm(p) {
           tList.appendChild(row);
         });
       }
-      var bdesc=document.getElementById('f-barrio-desc');
-      if(bdesc&&p.barrioDesc) bdesc.value=p.barrioDesc;
+      /* actividades (TASK-001) */
+      var actList=document.getElementById('hostal-actividades-list');
+      if(actList&&p.actividades&&p.actividades.length){
+        actList.innerHTML='';
+        p.actividades.forEach(function(a){
+          var row=document.createElement('div');
+          row.className='hostal-actividad-row';
+          row.style.cssText='display:grid;grid-template-columns:50px 1fr 2fr auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+          row.innerHTML='<input class="form-input" value="'+_esc(a.icono||'')+'" placeholder="🧘" style="text-align:center;font-size:18px">'
+            +'<input class="form-input" value="'+_esc(a.nombre||'')+'" placeholder="Nombre de la actividad">'
+            +'<input class="form-input" value="'+_esc(a.descripcion||'')+'" placeholder="Descripción breve">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          actList.appendChild(row);
+        });
+      }
+      /* que incluye (TASK-001) */
+      var qiList=document.getElementById('que-incluye-list');
+      if(qiList&&p.queIncluye&&p.queIncluye.length){
+        qiList.innerHTML='';
+        p.queIncluye.forEach(function(qi){
+          var row=document.createElement('div');
+          row.className='que-incluye-row';
+          row.style.cssText='display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+          row.innerHTML='<input class="form-input" value="'+_esc(typeof qi==='string'?qi:(qi.texto||''))+'" placeholder="Ej: Toallas y sábanas incluidas">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          qiList.appendChild(row);
+        });
+      }
       /* events */
       var evList=document.getElementById('hostal-events-list');
       if(evList&&p.hostalEvents&&p.hostalEvents.length){
@@ -2616,38 +2758,23 @@ function collectHabs() {
   });
   return habs;
 }
-function collectAmenities(containerId) {
-  var items = [];
-  var container = document.getElementById(containerId);
-  if(!container) {
-    // fallback: all checked amenity checkboxes
-    document.querySelectorAll('.amenity-check:checked').forEach(function(cb){
-      items.push(cb.value || cb.dataset.val || cb.nextSibling && cb.nextSibling.textContent || '');
-    });
-    return items;
-  }
-  container.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb){
-    var label = cb.closest('label') || cb.parentElement;
-    items.push(cb.value || label.textContent.trim());
-  });
-  return items;
-}
+/* Cleanup (TASK-001): existia una segunda declaracion de collectAmenities()
+   aqui, con fallback a la clase ".amenity-check" que no existe en ningun
+   HTML real del proyecto (el HTML real usa ".srv-check", ver especifico-hostal
+   > Servicios). Esa version quedaba muerta por el hoisting de JS -- ganaba
+   siempre la declaracion posterior (linea ~4230), que si usa ".srv-check".
+   Eliminada para dejar una sola fuente de verdad. */
 
-function collectHostalEvents() {
-  var rows = document.querySelectorAll('#hostal-events-list .hostal-event-row');
-  var events = [];
-  rows.forEach(function(row) {
-    var inputs = row.querySelectorAll('input,textarea');
-    if(inputs[0] && inputs[0].value.trim()) {
-      events.push({
-        titulo: inputs[0].value.trim(),
-        fecha: inputs[1] ? inputs[1].value.trim() : '',
-        desc: inputs[2] ? inputs[2].value.trim() : ''
-      });
-    }
-  });
-  return events;
-}
+/* BUG-A2 fix (TASK-001): collectHostalEvents() leia inputs[0]/[1]/[2] como
+   titulo/fecha/desc, pero la fila real (ver addHostalEvent() y la fila de
+   ejemplo en especifico-hostal > Eventos) tiene 5 campos en este orden:
+   dia, hora, titulo, descripcion, precio. Habia TRES declaraciones de esta
+   funcion en el archivo (aqui, en el bloque "FUNCIONES FALTANTES", y en la
+   zona "improved" junto a collectTransport/addHostalEvent) -- dos de ellas
+   con el bug de campos cruzados. Se deja una sola version corregida, en la
+   zona "improved" (ver mas abajo, junto a collectTransport()), para no
+   duplicar la logica de collectHabs()/collectAmenities() en dos lugares.
+   Ver BUGS_HISTORICOS.md BUG-016. */
 
 function collectMenuItems() {
   var rows = document.querySelectorAll('.menu-item-row');
@@ -2814,19 +2941,21 @@ function savePlace() {
   if(cat === 'hostal') {
     p.habs          = collectHabs();
     p.amenities     = collectAmenities('servicios-grid');  /* reads .srv-check inputs */
-    p.hostalEvents  = collectHostalEvents();
-    p.transport     = collectTransport();
     p.faqs          = collectFaqs();
     p.checkin       = v('f-checkin');
     p.checkout      = v('f-checkout');
-    p.recepcion     = v('f-recepcion');
-    p.cancelacion   = v('f-cancelacion');
     p.bookingUrl    = v('f-booking-url');
     p.hostelworld   = v('f-hostelworld');
     p.airbnb        = v('f-airbnb');
-    p.precioBooking = v('f-precio-booking');
-    p.bookingMsg    = v('f-booking-msg');
-    p.barrioDesc    = v('f-barrio-desc');
+    /* TASK-001 / BUG-B / BUG-C: motor generico (ver CATEGORY_TAG_FIELDS
+       y CATEGORY_TAG_LISTS mas arriba). Llena tipo_alojamiento,
+       reglas_casa, edad_minima, mascotas, cocina_compartida,
+       politica_cancelacion (via p.cancelacion), recepcion,
+       precioBooking, bookingMsg, barrioDesc, actividades, queIncluye,
+       transport y hostalEvents. Antes estas ultimas 7 se leian a mano
+       aqui mismo, pero 5 nunca llegaban a _placeToAPI() (BUG-B) y 2
+       llegaban pero el backend las descartaba (BUG-C). */
+    collectCategoryTagFields(p, 'hostal');
     p.scores = {
       atmosfera: parseFloat(v('f-score-atmosfera'))||0,
       seguridad: parseFloat(v('f-score-seguridad'))||0,
@@ -3567,14 +3696,12 @@ function addMenuItem() {
   list.appendChild(row);
 }
 
-// Hostal events
-function addHostalEvent() {
-  var list = document.getElementById('hostal-events-list');
-  var item = document.createElement('div');
-  item.style.cssText='display:grid;grid-template-columns:80px 1fr auto;gap:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px';
-  item.innerHTML='<input class="form-input" placeholder="Lunes 9am" style="font-size:11px;padding:5px 8px"><input class="form-input" placeholder="Nombre del evento" style="font-size:11px;padding:5px 8px"><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
-  list.appendChild(item);
-}
+// Hostal events: ver addHostalEvent() "improved" mas abajo (junto a
+// collectTransport/collectHostalEvents) -- existia una version vieja aqui
+// que creaba filas de solo 2 columnas, sin coincidir con las 5 columnas
+// reales de .hostal-event-row. Quedaba muerta por hoisting de JS y se
+// elimino para no dejar una fuente de confusion futura (BUGS_HISTORICOS.md
+// BUG-016).
 
 // Tours
 function _tourRowHTML(t) {
@@ -4226,7 +4353,11 @@ function openEmojiPicker(){
 
 
 /* ── COLLECT FUNCTIONS (all categories) ── */
-function collectHabs(){var rows=document.querySelectorAll('#hab-list tr');var h=[];rows.forEach(function(tr){var i=tr.querySelectorAll('input,select');if(i.length>=3&&i[0].value.trim())h.push({tipo:i[0].value.trim(),camas:i[1].value.trim(),precio:i[2].value.trim(),badge:i[3]?i[3].value:''});});return h;}
+/* BUG-A fix (TASK-001): esta zona tenia una segunda declaracion de
+   collectHabs() que pisaba en silencio a la correcta (ver linea ~2602).
+   La version aqui desalineaba camas/precio/badge y perdia el campo
+   "Servicios del cuarto". Eliminada -- la unica version activa ahora
+   es la de la linea ~2602. Ver BUGS_HISTORICOS.md BUG-016. */
 function collectAmenities(cid) {
   var items = [];
   /* 1. Try specific container by ID */
@@ -4244,7 +4375,6 @@ function collectAmenities(cid) {
   });
   return items;
 }
-function collectHostalEvents(){var rows=document.querySelectorAll('#hostal-events-list .hostal-event-row');var ev=[];rows.forEach(function(row){var i=row.querySelectorAll('input,textarea');if(i[0]&&i[0].value.trim())ev.push({titulo:i[0].value.trim(),fecha:i[1]?i[1].value.trim():'',desc:i[2]?i[2].value.trim():''});});return ev;}
 function collectMenuItems(){var rows=document.querySelectorAll('.menu-item-row');var m=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())m.push({nombre:i[0].value.trim(),precio:i[1]?i[1].value.trim():'',desc:i[2]?i[2].value.trim():''});});return m;}
 function collectHorariosDias(){var rows=document.querySelectorAll('.horario-row');var h=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())h.push({dia:i[0].value.trim(),apertura:i[1]?i[1].value.trim():'',cierre:i[2]?i[2].value.trim():''});});return h;}
 function collectLineupItems(){var items=[];document.querySelectorAll('.lineup-item').forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())items.push({nombre:i[0].value.trim(),escenario:i[1]?i[1].value.trim():'',hora:i[2]?i[2].value.trim():''});});return items;}
@@ -4279,6 +4409,57 @@ function addTransportRow() {
     +'<input class="form-input" placeholder="Detalle (TransMilenio · 40-60 min)">'
     +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
   list.appendChild(row);
+}
+
+/* ── ADD HOSTAL ACTIVIDAD ROW (TASK-001) ── */
+function addHostalActividad() {
+  var list = document.getElementById('hostal-actividades-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className = 'hostal-actividad-row';
+  row.style.cssText = 'display:grid;grid-template-columns:50px 1fr 2fr auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+  row.innerHTML = '<input class="form-input" placeholder="🧘" style="text-align:center;font-size:18px">'
+    +'<input class="form-input" placeholder="Nombre de la actividad">'
+    +'<input class="form-input" placeholder="Descripción breve">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
+}
+
+/* ── COLLECT HOSTAL ACTIVIDADES (TASK-001) ── */
+function collectHostalActividades() {
+  var items = [];
+  document.querySelectorAll('#hostal-actividades-list .hostal-actividad-row').forEach(function(row) {
+    var inputs = row.querySelectorAll('input');
+    if(inputs[1] && inputs[1].value.trim()) {
+      items.push({
+        icono:      inputs[0] ? inputs[0].value.trim() : '',
+        nombre:     inputs[1] ? inputs[1].value.trim() : '',
+        descripcion:inputs[2] ? inputs[2].value.trim() : ''
+      });
+    }
+  });
+  return items;
+}
+
+/* ── ADD QUE INCLUYE ROW (TASK-001) ── */
+function addHostalQueIncluye() {
+  var list = document.getElementById('que-incluye-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className = 'que-incluye-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+  row.innerHTML = '<input class="form-input" placeholder="Ej: Toallas y sábanas incluidas">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
+}
+
+/* ── COLLECT QUE INCLUYE (TASK-001) ── */
+function collectHostalQueIncluye() {
+  var items = [];
+  document.querySelectorAll('#que-incluye-list .que-incluye-row input').forEach(function(inp) {
+    if(inp.value.trim()) items.push(inp.value.trim());
+  });
+  return items;
 }
 
 /* ── ADD FAQ ROW ── */
@@ -4653,8 +4834,12 @@ function _placeToAPI(p) {
     amenidades:     p.amenities||[],
     scores:         p.scores||{},
     faqs:           p.faqs||[],
-    transporte:     p.transport||[],
-    eventos_hostal: p.hostalEvents||[],
+    /* BUG-C fix (TASK-001): transporte y eventos_hostal ya no viajan
+       aqui -- admin-destinos.js v2.1 nunca tuvo columna para ellos en
+       destinos_detalles y los descartaba siempre en el servidor. Ahora
+       viven dentro de "tags" (tagsObj.transporte / tagsObj.eventos_hostal,
+       ver CATEGORY_TAG_LISTS.hostal), que si persiste via el MERGE JSONB
+       de admin-destinos.js (ADR-003). Ver BUGS_HISTORICOS.md BUG-016. */
     checkin:        p.checkin||'',
     checkout:       p.checkout||'',
     booking_url:    p.bookingUrl||'',
