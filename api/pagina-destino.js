@@ -299,6 +299,31 @@ function buildHTML(d, det, fotos, resenas) {
   var transporteHostal  = safeJSON(tags.transporte);     if(!Array.isArray(transporteHostal))  transporteHostal=[];
   var eventosHostal     = safeJSON(tags.eventos_hostal); if(!Array.isArray(eventosHostal))     eventosHostal=[];
 
+  // Campos especificos de comida desde tags JSONB (TASK-002)
+  var tipoComida      = tags.tipo_comida     || '';
+  var cocinaTipo       = tags.cocina          || '';
+  var precioPromedio   = tags.precio_promedio || '';
+  var ambienteComida   = tags.ambiente        || '';
+  var terrazaComida    = tags.terraza         || '';
+  var reservasComida   = tags.reservas        || '';
+  var domicilioComida  = tags.domicilio       || '';
+  var rappiUrl         = tags.rappi           || '';
+  var ifoodUrl         = tags.ifood           || '';
+  var domicilioZona    = tags.domicilio_zona  || '';
+  var menuDestacado = safeJSON(tags.menu_destacado); if(!Array.isArray(menuDestacado)) menuDestacado=[];
+  var opcionesDieta = safeJSON(tags.opciones_dieta); if(!Array.isArray(opcionesDieta)) opcionesDieta=[];
+  var domicilioPlataformas = safeJSON(tags.domicilio_plataformas); if(!Array.isArray(domicilioPlataformas)) domicilioPlataformas=[];
+  // horario_detallado es un objeto {dia:{abre,cierra,estado}}, no un arreglo
+  var horarioDetallado = (tags.horario_detallado && typeof tags.horario_detallado === 'object' && !Array.isArray(tags.horario_detallado)) ? tags.horario_detallado : null;
+
+  if (cat === 'comida') {
+    console.log('[TRACE][pagina-comida]',
+      'platos=' + menuDestacado.length,
+      'opciones_dieta=' + opcionesDieta.length,
+      'horario_detallado=' + (horarioDetallado ? Object.keys(horarioDetallado).length : 0),
+      'domicilio_plataformas=' + domicilioPlataformas.length);
+  }
+
   var bookingUrl = det.booking_url     || d.booking     || '';
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
   var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
@@ -794,6 +819,80 @@ function buildHTML(d, det, fotos, resenas) {
       }).join('')
     + '</tbody></table></div></section>' : '';
 
+  // -- SECCION: Perfil gastronomico (TASK-002, solo comida) -----------
+  var MENU_BADGE = { popular:'\u2b50 Mas popular', vegano:'\ud83c\udf31 Vegano', sin_gluten:'Sin gluten' };
+  var perfilComidaCards = [];
+  if (tipoComida)     perfilComidaCards.push({ ico:'\ud83c\udf7d', lbl:'Tipo',            val:tipoComida });
+  if (cocinaTipo)      perfilComidaCards.push({ ico:'\ud83c\udf74', lbl:'Cocina',           val:cocinaTipo });
+  if (precioPromedio)  perfilComidaCards.push({ ico:'\ud83d\udcb0', lbl:'Precio promedio',  val:precioPromedio });
+  if (ambienteComida)  perfilComidaCards.push({ ico:'\u2728',       lbl:'Ambiente',         val:ambienteComida });
+  if (terrazaComida === 'Si')  perfilComidaCards.push({ ico:'\u2600', lbl:'Terraza',   val:'Si' });
+  if (reservasComida === 'Si') perfilComidaCards.push({ ico:'\ud83d\udcc5', lbl:'Reservas', val:'Acepta reservas' });
+
+  var secPerfilComida = perfilComidaCards.length ?
+    '<section class="ssec bwhite" id="perfil-comida"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Cocina y ambiente</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="igrid">'+perfilComidaCards.map(function(c){
+        return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
+      }).join('')+'</div>'
+    + '</div></section>' : '';
+
+  // -- SECCION: Menu destacado (TASK-002, solo comida) -----------------
+  var secMenuDestacado = menuDestacado.length ?
+    '<section class="ssec bwarm" id="menu"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Menu destacado</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="igrid">'+menuDestacado.map(function(m){
+        var badgeTxt = m.badge ? (MENU_BADGE[m.badge] || m.badge) : '';
+        var photoDiv = m.foto ? '<div style="width:100%;height:110px;border-radius:8px;margin-bottom:10px;background-size:cover;background-position:center;background-image:url(\''+esc(m.foto)+'\')"></div>' : '';
+        return '<div class="icard" style="text-align:left">'
+          + photoDiv
+          + '<div class="ilbl">'+esc(m.nombre||'')+'</div>'
+          + '<div class="ival">'+esc(m.precio||'')+'</div>'
+          + (badgeTxt ? '<span class="tpill" style="margin-top:6px;display:inline-block">'+badgeTxt+'</span>' : '')
+          + '</div>';
+      }).join('')+'</div>'
+    + '</div></section>' : '';
+
+  // -- SECCION: Horarios por dia (TASK-002, solo comida) ---------------
+  var DIAS_ORDEN = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+  var DIAS_LABEL = { Miercoles:'Mi\u00e9rcoles', Sabado:'S\u00e1bado' };
+  var secHorariosComida = '';
+  if (horarioDetallado) {
+    var horarioRows = DIAS_ORDEN.map(function(dia){
+      var h = horarioDetallado[dia];
+      if (!h) return '';
+      var estadoTxt = h.estado || 'Abierto';
+      // fila "tocada" = tiene horas cargadas O el admin marco Cerrado a
+      // proposito. Una fila 100% default (Abierto + horas vacias, que es
+      // lo que trae la tabla estatica sin editar) no se muestra --
+      // asi el bloque completo se degrada a "sin datos" si nadie llena
+      // el tab de Horarios.
+      if (!h.abre && !h.cierra && estadoTxt !== 'Cerrado') return '';
+      var horasTxt = (estadoTxt === 'Cerrado') ? 'Cerrado' : (esc(h.abre||'')+' - '+esc(h.cierra||''));
+      return '<tr><td style="font-weight:600">'+(DIAS_LABEL[dia]||dia)+'</td><td>'+horasTxt+'</td></tr>';
+    }).join('');
+    if (horarioRows) {
+      secHorariosComida = '<section class="ssec bwhite" id="horarios"><div class="sin">'
+        + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Horarios</h2><div class="stnum">'+nextNum()+'</div></div>'
+        + '<table class="entradas-table"><thead><tr><th>Dia</th><th>Horario</th></tr></thead><tbody>'+horarioRows+'</tbody></table>'
+        + '</div></section>';
+    }
+  }
+
+  // -- SECCION: Opciones dieteticas y domicilio (TASK-002, solo comida) --
+  var deliveryBtnsComida = [];
+  if (rappiUrl) deliveryBtnsComida.push('<a class="cbtn dark" href="'+esc(rappiUrl)+'" target="_blank">Rappi</a>');
+  if (ifoodUrl) deliveryBtnsComida.push('<a class="cbtn dark" href="'+esc(ifoodUrl)+'" target="_blank">iFood</a>');
+
+  var secDeliveryComida = (opcionesDieta.length || domicilioComida === 'Si' || deliveryBtnsComida.length || domicilioPlataformas.length || domicilioZona) ?
+    '<section class="ssec bwarm" id="delivery"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Opciones dieteticas y domicilio</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + (opcionesDieta.length ? '<div class="tagrow" style="margin-bottom:16px">'+opcionesDieta.map(function(o){ return '<span class="tpill">\ud83c\udf31 '+esc(o)+'</span>'; }).join('')+'</div>' : '')
+    + (domicilioComida === 'Si' ? '<div class="hbox"><strong>Domicilio:</strong> '+(domicilioZona ? 'Cobertura en '+esc(domicilioZona) : 'Disponible')
+        + (domicilioPlataformas.length ? ' \u00b7 Tambien en: '+domicilioPlataformas.map(esc).join(', ') : '') + '</div>' : '')
+    + (deliveryBtnsComida.length ? '<div class="cgrid" style="margin-top:14px">'+deliveryBtnsComida.join('')+'</div>' : '')
+    + '</div></section>' : '';
+
   // -- SECCI??N: Reservar / links externos ----------------------------
   var rbtns = [];
   if (d.whatsapp) rbtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
@@ -887,6 +986,10 @@ function buildHTML(d, det, fotos, resenas) {
     {id:'actividades', label:'Actividades', has:!!secActividadesHostal},
     {id:'como-llegar', label:'Como llegar', has:!!secTransporteHostal},
     {id:'eventos-hostal', label:'Eventos',  has:!!secEventosHostal},
+    {id:'perfil-comida', label:'Cocina',    has:!!secPerfilComida},
+    {id:'menu',        label:'Menu',        has:!!secMenuDestacado},
+    {id:'horarios',    label:'Horarios',    has:!!secHorariosComida},
+    {id:'delivery',    label:'Domicilio',   has:!!secDeliveryComida},
     {id:'reservar',    label:'Reservar',    has:!!secReservar},
     {id:'mapa',        label:'Mapa',        has:!!secMapa},
     {id:'faq',         label:'FAQ',         has:!!secFaq},
@@ -952,6 +1055,10 @@ function buildHTML(d, det, fotos, resenas) {
     + secActividadesHostal + '\n'
     + secTransporteHostal + '\n'
     + secEventosHostal + '\n'
+    + secPerfilComida + '\n'
+    + secMenuDestacado + '\n'
+    + secHorariosComida + '\n'
+    + secDeliveryComida + '\n'
     + secReservar + '\n'
     + secMapa + '\n'
     + secFaq + '\n'

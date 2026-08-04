@@ -1163,6 +1163,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="cetab on" onclick="showCatTab('comida-menu')">🍽️ Carta / Menú</div>
             <div class="cetab" onclick="showCatTab('comida-horarios')">🕐 Horarios</div>
             <div class="cetab" onclick="showCatTab('comida-delivery')">🛵 Delivery</div>
+            <div class="cetab" onclick="showCatTab('comida-perfil')">🍴 Perfil</div>
           </div>
           <div class="cat-panel on" id="cat-comida-menu">
             <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
@@ -1172,20 +1173,20 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <button class="btn btn-ghost btn-sm" onclick="addMenuItem()">+ Plato</button>
             </div>
             <div class="menu-item-list" id="menu-item-list">
-              <div class="menu-item-row"><input placeholder="Nombre del plato"><input placeholder="$45.000"><select><option>Normal</option><option>⭐ Estrella</option><option>🌱 Vegano</option><option>Sin gluten</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button></div>
+              <div class="menu-item-row"><input data-field="nombre" placeholder="Nombre del plato"><input data-field="precio" placeholder="$45.000"><input data-field="foto" placeholder="URL foto (opcional)"><select data-field="badge"><option value="">Normal</option><option value="popular">⭐ Estrella</option><option value="vegano">🌱 Vegano</option><option value="sin_gluten">Sin gluten</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button></div>
             </div>
           </div>
           <div class="cat-panel" id="cat-comida-horarios">
             <table class="hab-table">
               <thead><tr><th>Día</th><th>Abre</th><th>Cierra</th><th>Estado</th></tr></thead>
               <tbody id="horarios-list">
-                <tr><td style="font-weight:600;white-space:nowrap">Lunes</td><td><input placeholder="12pm" style="width:80px"></td><td><input placeholder="10pm" style="width:80px"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
-                <tr><td style="font-weight:600">Martes</td><td><input placeholder="12pm" style="width:80px" value="12pm"></td><td><input placeholder="10pm" style="width:80px" value="10pm"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
-                <tr><td style="font-weight:600">Miércoles</td><td><input placeholder="12pm" style="width:80px" value="12pm"></td><td><input placeholder="10pm" style="width:80px" value="10pm"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
-                <tr><td style="font-weight:600">Jueves</td><td><input placeholder="12pm" style="width:80px" value="12pm"></td><td><input placeholder="10pm" style="width:80px" value="10pm"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
-                <tr><td style="font-weight:600">Viernes</td><td><input placeholder="12pm" style="width:80px" value="12pm"></td><td><input placeholder="11pm" style="width:80px" value="11pm"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
-                <tr><td style="font-weight:600">Sábado</td><td><input placeholder="1pm" style="width:80px" value="1pm"></td><td><input placeholder="11pm" style="width:80px" value="11pm"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
-                <tr><td style="font-weight:600">Domingo</td><td><input placeholder="1pm" style="width:80px" value="1pm"></td><td><input placeholder="8pm" style="width:80px" value="8pm"></td><td><select style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Lunes"><td style="font-weight:600;white-space:nowrap">Lunes</td><td><input data-field="abre" placeholder="12pm" style="width:80px"></td><td><input data-field="cierra" placeholder="10pm" style="width:80px"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Martes"><td style="font-weight:600">Martes</td><td><input data-field="abre" placeholder="12pm" style="width:80px" value="12pm"></td><td><input data-field="cierra" placeholder="10pm" style="width:80px" value="10pm"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Miercoles"><td style="font-weight:600">Miércoles</td><td><input data-field="abre" placeholder="12pm" style="width:80px" value="12pm"></td><td><input data-field="cierra" placeholder="10pm" style="width:80px" value="10pm"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Jueves"><td style="font-weight:600">Jueves</td><td><input data-field="abre" placeholder="12pm" style="width:80px" value="12pm"></td><td><input data-field="cierra" placeholder="10pm" style="width:80px" value="10pm"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Viernes"><td style="font-weight:600">Viernes</td><td><input data-field="abre" placeholder="12pm" style="width:80px" value="12pm"></td><td><input data-field="cierra" placeholder="11pm" style="width:80px" value="11pm"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Sabado"><td style="font-weight:600">Sábado</td><td><input data-field="abre" placeholder="1pm" style="width:80px" value="1pm"></td><td><input data-field="cierra" placeholder="11pm" style="width:80px" value="11pm"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
+                <tr class="horario-row" data-dia="Domingo"><td style="font-weight:600">Domingo</td><td><input data-field="abre" placeholder="1pm" style="width:80px" value="1pm"></td><td><input data-field="cierra" placeholder="8pm" style="width:80px" value="8pm"></td><td><select data-field="estado" style="width:100px"><option>Abierto</option><option>Cerrado</option></select></td></tr>
               </tbody>
             </table>
           </div>
@@ -1194,7 +1195,94 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <div class="form-group"><label class="form-label">Rappi URL</label><input class="form-input" id="f-rappi" placeholder="https://rappi.com/…"></div>
               <div class="form-group"><label class="form-label">iFood URL</label><input class="form-input" id="f-ifood" placeholder="https://ifood.com.co/…"></div>
             </div>
-            <div class="form-group"><label class="form-label">Zona de cobertura delivery</label><input class="form-input" id="f-delivery-zona" placeholder="El Poblado, Laureles, Envigado"></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Ofrece domicilio</label>
+                <select class="form-input form-select" id="f-domicilio">
+                  <option value="">Selecciona...</option>
+                  <option value="Si">Si</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="form-group"><label class="form-label">Zona de cobertura delivery</label><input class="form-input" id="f-delivery-zona" placeholder="El Poblado, Laureles, Envigado"></div>
+            </div>
+
+            <div class="form-section-divider" style="margin-top:16px">Otras plataformas de domicilio</div>
+            <div class="form-hint">Ademas de Rappi/iFood. Ej: Domicilios.com, Uber Eats.</div>
+            <div id="comida-plataformas-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+              <div class="comida-plataforma-row" style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center">
+                <input class="form-input" placeholder="Ej: Domicilios.com, Uber Eats">
+                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="addComidaPlataforma()">+ Añadir plataforma</button>
+          </div>
+
+          <!-- ── PERFIL (TASK-002) ── -->
+          <div class="cat-panel" id="cat-comida-perfil">
+            <div class="form-hint">Perfil general del lugar: tipo de cocina, ambiente y opciones dieteticas. Alimenta las secciones "Cocina y ambiente" y "Opciones dieteticas" de la pagina publica.</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Tipo de establecimiento</label>
+                <select class="form-input form-select" id="f-tipo-comida">
+                  <option value="">Selecciona...</option>
+                  <option value="Restaurante">Restaurante</option>
+                  <option value="Cafe">Cafe</option>
+                  <option value="Bar">Bar</option>
+                  <option value="Food truck">Food truck</option>
+                  <option value="Panaderia / Reposteria">Panaderia / Reposteria</option>
+                  <option value="Heladeria">Heladeria</option>
+                  <option value="Bar de vinos">Bar de vinos</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Tipo de cocina</label>
+                <input class="form-input" id="f-cocina" placeholder="Colombiana, Mariscos, Italiana...">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Precio promedio</label>
+                <input class="form-input" id="f-precio-promedio" placeholder="$45.000 por persona">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ambiente</label>
+                <select class="form-input form-select" id="f-ambiente">
+                  <option value="">Selecciona...</option>
+                  <option value="Casual">Casual</option>
+                  <option value="Elegante">Elegante</option>
+                  <option value="Familiar">Familiar</option>
+                  <option value="Romantico">Romantico</option>
+                  <option value="Rooftop / Vista">Rooftop / Vista</option>
+                  <option value="Rustico">Rustico</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Terraza</label>
+                <select class="form-input form-select" id="f-terraza">
+                  <option value="">Selecciona...</option>
+                  <option value="Si">Si</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Acepta reservas</label>
+                <select class="form-input form-select" id="f-reservas">
+                  <option value="">Selecciona...</option>
+                  <option value="Si">Si</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="srv-group" id="comida-dieta-check" style="margin-top:16px">
+              <div class="srv-group-title">🌱 Opciones dieteticas (toda la carta)</div>
+              <label class="srv-check"><input type="checkbox" value="Vegano"> Vegano</label>
+              <label class="srv-check"><input type="checkbox" value="Vegetariano"> Vegetariano</label>
+              <label class="srv-check"><input type="checkbox" value="Sin gluten"> Sin gluten</label>
+              <label class="srv-check"><input type="checkbox" value="Sin lactosa"> Sin lactosa</label>
+            </div>
           </div>
         </div>
 
@@ -2309,9 +2397,24 @@ var CATEGORY_TAG_FIELDS = {
     { key:'booking_mensaje',    id:'f-booking-msg',    localKey:'bookingMsg' },
     { key:'barrio_descripcion', id:'f-barrio-desc',    localKey:'barrioDesc' }
   ],
-  /* TASK-002: tipo_comida, cocina, precio_promedio, ambiente,
-     terraza, domicilio en especifico-comida. */
-  comida: [],
+  /* TASK-002: motor generico. horario_detallado NO va aqui porque es
+     un objeto {dia: {...}}, no un valor simple -- se mapea a mano en
+     _buildTagsObj()/_applyTagsToLocal(), igual que temporada_matriz
+     de Sitio. rappi/ifood/domicilio_zona viven en tags (no hay columna
+     dedicada en destinos para comida, a diferencia de booking/
+     hostelworld/airbnb de Hostal). */
+  comida: [
+    { key:'tipo_comida',     id:'f-tipo-comida' },
+    { key:'cocina',          id:'f-cocina' },
+    { key:'precio_promedio', id:'f-precio-promedio' },
+    { key:'ambiente',        id:'f-ambiente' },
+    { key:'terraza',         id:'f-terraza' },
+    { key:'reservas',        id:'f-reservas' },
+    { key:'domicilio',       id:'f-domicilio' },
+    { key:'rappi',           id:'f-rappi' },
+    { key:'ifood',           id:'f-ifood' },
+    { key:'domicilio_zona',  id:'f-delivery-zona', localKey:'deliveryZona' }
+  ],
   /* TASK-003: fecha_inicio, fecha_fin, edicion, sede, capacidad
      en especifico-evento. */
   evento: []
@@ -2345,7 +2448,14 @@ var CATEGORY_TAG_LISTS = {
     { key:'eventos_hostal',  localKey:'hostalEvents',
       collector: function(){ return (typeof collectHostalEvents==='function') ? collectHostalEvents() : []; } }
   ],
-  comida:  [], /* TASK-002: ej. menu_destacado[], opciones_dieta[] */
+  comida: [
+    { key:'menu_destacado', localKey:'menu',
+      collector: function(){ return (typeof collectMenuItems==='function') ? collectMenuItems() : []; } },
+    { key:'opciones_dieta', localKey:'opcionesDieta',
+      collector: function(){ return (typeof collectAmenities==='function') ? collectAmenities('comida-dieta-check') : []; } },
+    { key:'domicilio_plataformas', localKey:'domicilioPlataformas',
+      collector: function(){ return (typeof collectComidaPlataformas==='function') ? collectComidaPlataformas() : []; } }
+  ],
   evento:  []  /* TASK-003: ej. lineup[], agenda[], categorias_entrada[] */
 };
 
@@ -2441,6 +2551,13 @@ function _buildTagsObj(p) {
     tagsObj.temporada_matriz = p.temporadaMatriz;
   }
 
+  /* horario_detallado (TASK-002) es un objeto {dia:{abre,cierra,estado}},
+     no un arreglo: no encaja en CATEGORY_TAG_LISTS (que asume .length).
+     Mismo patron que temporada_matriz arriba. */
+  if (p.cat === 'comida' && p.horarioDetallado && Object.keys(p.horarioDetallado).length) {
+    tagsObj.horario_detallado = p.horarioDetallado;
+  }
+
   return tagsObj;
 }
 
@@ -2470,6 +2587,9 @@ function _applyTagsToLocal(local, tags, cat) {
   });
   if (cat === 'sitio' && tags.temporada_matriz && typeof tags.temporada_matriz === 'object') {
     local.temporadaMatriz = tags.temporada_matriz;
+  }
+  if (cat === 'comida' && tags.horario_detallado && typeof tags.horario_detallado === 'object') {
+    local.horarioDetallado = tags.horario_detallado;
   }
 }
 
@@ -2618,6 +2738,69 @@ function loadForm(p) {
         });
       }
     },100);
+  }
+
+  if(p.cat === 'comida') {
+    setTimeout(function(){
+      /* TASK-002: motor generico -- precarga tipo_comida, cocina,
+         precio_promedio, ambiente, terraza, reservas, domicilio,
+         rappi, ifood, deliveryZona. */
+      applyCategoryTagFields(p, 'comida');
+      /* menu destacado */
+      var menuList = document.getElementById('menu-item-list');
+      if (menuList && p.menu && p.menu.length) {
+        menuList.innerHTML = '';
+        p.menu.forEach(function(m){
+          var row = document.createElement('div');
+          row.className = 'menu-item-row';
+          row.innerHTML = '<input data-field="nombre" value="'+_esc(m.nombre||'')+'" placeholder="Nombre del plato">'
+            +'<input data-field="precio" value="'+_esc(m.precio||'')+'" placeholder="$45.000">'
+            +'<input data-field="foto" value="'+_esc(m.foto||'')+'" placeholder="URL foto (opcional)">'
+            +'<select data-field="badge">'
+            +'<option value=""'+(!m.badge?' selected':'')+'>Normal</option>'
+            +'<option value="popular"'+(m.badge==='popular'?' selected':'')+'>⭐ Estrella</option>'
+            +'<option value="vegano"'+(m.badge==='vegano'?' selected':'')+'>🌱 Vegano</option>'
+            +'<option value="sin_gluten"'+(m.badge==='sin_gluten'?' selected':'')+'>Sin gluten</option>'
+            +'</select>'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          menuList.appendChild(row);
+        });
+      }
+      /* horarios por dia (objeto, no arreglo) */
+      if (p.horarioDetallado && Object.keys(p.horarioDetallado).length) {
+        document.querySelectorAll('#horarios-list .horario-row').forEach(function(row){
+          var dia = row.getAttribute('data-dia');
+          var h = dia ? p.horarioDetallado[dia] : null;
+          if (!h) return;
+          var abre = row.querySelector('[data-field="abre"]');
+          var cierra = row.querySelector('[data-field="cierra"]');
+          var estado = row.querySelector('[data-field="estado"]');
+          if (abre && h.abre) abre.value = h.abre;
+          if (cierra && h.cierra) cierra.value = h.cierra;
+          if (estado && h.estado) estado.value = h.estado;
+        });
+      }
+      /* opciones dieteticas (checkboxes) */
+      if (p.opcionesDieta && p.opcionesDieta.length) {
+        document.querySelectorAll('#comida-dieta-check input').forEach(function(cb){
+          cb.checked = p.opcionesDieta.indexOf(cb.value) !== -1;
+        });
+      }
+      /* otras plataformas de domicilio */
+      var platList = document.getElementById('comida-plataformas-list');
+      if (platList && p.domicilioPlataformas && p.domicilioPlataformas.length) {
+        platList.innerHTML = '';
+        p.domicilioPlataformas.forEach(function(pl){
+          var row = document.createElement('div');
+          row.className = 'comida-plataforma-row';
+          row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+          row.innerHTML = '<input class="form-input" value="'+_esc(pl)+'" placeholder="Ej: Domicilios.com, Uber Eats">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          platList.appendChild(row);
+        });
+      }
+    },100);
+  }
 
   if(p.cat === 'sitio') {
     setTimeout(function(){
@@ -2737,7 +2920,6 @@ function loadForm(p) {
       }
     },100);
   }
-  }
 }
 
 function _esc(s){ return s?String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'):''; }
@@ -2776,36 +2958,53 @@ function collectHabs() {
    duplicar la logica de collectHabs()/collectAmenities() en dos lugares.
    Ver BUGS_HISTORICOS.md BUG-016. */
 
+/* TASK-002 fix: version anterior leia por indice posicional de
+   ".menu-item-row input" -- el 3er campo del plato es un <select>
+   (etiqueta), no un <input>, asi que nunca se capturaba. Ahora lee
+   por [data-field] (mismo patron que _tourRowHTML de Sitio) e incluye
+   el campo "foto" nuevo. */
 function collectMenuItems() {
-  var rows = document.querySelectorAll('.menu-item-row');
+  var rows = document.querySelectorAll('#menu-item-list .menu-item-row');
   var items = [];
   rows.forEach(function(row) {
-    var inputs = row.querySelectorAll('input');
-    if(inputs[0] && inputs[0].value.trim()) {
+    var nombreEl = row.querySelector('[data-field="nombre"]');
+    var precioEl = row.querySelector('[data-field="precio"]');
+    var fotoEl   = row.querySelector('[data-field="foto"]');
+    var badgeEl  = row.querySelector('[data-field="badge"]');
+    if (nombreEl && nombreEl.value.trim()) {
       items.push({
-        nombre: inputs[0].value.trim(),
-        precio: inputs[1] ? inputs[1].value.trim() : '',
-        desc: inputs[2] ? inputs[2].value.trim() : ''
+        nombre: nombreEl.value.trim(),
+        precio: precioEl ? precioEl.value.trim() : '',
+        foto:   fotoEl   ? fotoEl.value.trim()   : '',
+        badge:  badgeEl  ? badgeEl.value         : ''
       });
     }
   });
   return items;
 }
 
+/* TASK-002 fix: version anterior buscaba filas ".horario-row", pero
+   las 7 filas reales de la tabla (id="horarios-list") nunca tenian esa
+   clase -- devolvia [] siempre y los horarios jamas se guardaban.
+   Ahora las filas SI tienen class="horario-row" + data-dia (ver HTML
+   de especifico-comida) y se devuelve un objeto {dia:{abre,cierra,
+   estado}}, que es la forma de "horario_detallado{}" pedida en
+   TASK-002 (no un arreglo). */
 function collectHorariosDias() {
-  var rows = document.querySelectorAll('.horario-row');
-  var horarios = [];
-  rows.forEach(function(row) {
-    var inputs = row.querySelectorAll('input');
-    if(inputs[0] && inputs[0].value.trim()) {
-      horarios.push({
-        dia: inputs[0].value.trim(),
-        apertura: inputs[1] ? inputs[1].value.trim() : '',
-        cierre: inputs[2] ? inputs[2].value.trim() : ''
-      });
-    }
+  var out = {};
+  document.querySelectorAll('#horarios-list .horario-row').forEach(function(row) {
+    var dia = row.getAttribute('data-dia');
+    if (!dia) return;
+    var abre   = row.querySelector('[data-field="abre"]');
+    var cierra = row.querySelector('[data-field="cierra"]');
+    var estado = row.querySelector('[data-field="estado"]');
+    out[dia] = {
+      abre:   abre   ? abre.value.trim()   : '',
+      cierra: cierra ? cierra.value.trim() : '',
+      estado: estado ? estado.value        : 'Abierto'
+    };
   });
-  return horarios;
+  return out;
 }
 
 function collectTourItems() {
@@ -2970,13 +3169,17 @@ function savePlace() {
 
   /* ── COMIDA SPECIFIC ── */
   if(cat === 'comida') {
-    p.rappi = v('f-rappi'); p.ifood = v('f-ifood');
-    p.deliveryZona = v('f-delivery-zona');
-    p.tipoCocina = v('f-tipo-cocina');
-    p.rangoPrecio = v('f-rango-precio');
-    p.menu = collectMenuItems();
-    p.amenities = collectAmenities('comida-amenities-check');
-    p.horariosDias = collectHorariosDias();
+    /* TASK-002: motor generico (ver CATEGORY_TAG_FIELDS/LISTS mas
+       arriba). Llena tipo_comida, cocina, precio_promedio, ambiente,
+       terraza, reservas, domicilio, rappi, ifood, deliveryZona, menu,
+       opcionesDieta, domicilioPlataformas. Antes esta funcion leia
+       f-tipo-cocina/f-rango-precio/comida-amenities-check -- ninguno
+       de esos 3 IDs existia en el DOM (dato siempre vacio, BUG-B) -- y
+       aunque hubieran existido, el resultado tampoco llegaba nunca a
+       _placeToAPI() porque CATEGORY_TAG_FIELDS.comida/
+       CATEGORY_TAG_LISTS.comida estaban vacios ([]). */
+    collectCategoryTagFields(p, 'comida');
+    p.horarioDetallado = (typeof collectHorariosDias==='function') ? collectHorariosDias() : {};
   }
 
   /* ── SITIO SPECIFIC ── */
@@ -4375,8 +4578,6 @@ function collectAmenities(cid) {
   });
   return items;
 }
-function collectMenuItems(){var rows=document.querySelectorAll('.menu-item-row');var m=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())m.push({nombre:i[0].value.trim(),precio:i[1]?i[1].value.trim():'',desc:i[2]?i[2].value.trim():''});});return m;}
-function collectHorariosDias(){var rows=document.querySelectorAll('.horario-row');var h=[];rows.forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())h.push({dia:i[0].value.trim(),apertura:i[1]?i[1].value.trim():'',cierre:i[2]?i[2].value.trim():''});});return h;}
 function collectLineupItems(){var items=[];document.querySelectorAll('.lineup-item').forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())items.push({nombre:i[0].value.trim(),escenario:i[1]?i[1].value.trim():'',hora:i[2]?i[2].value.trim():''});});return items;}
 function collectAgendaItems(){var items=[];document.querySelectorAll('.agenda-row').forEach(function(row){var i=row.querySelectorAll('input,select');if(i[0]&&i[0].value.trim())items.push({dia:i[0].value.trim(),hora:i[1]?i[1].value.trim():'',actividad:i[2]?i[2].value.trim():''});});return items;}
 function collectFaqs(){var f=[];document.querySelectorAll('#faq-builder-list .faq-builder-row').forEach(function(row){var q=row.querySelector('.faq-q-inp'),a=row.querySelector('.faq-a-inp');if(q&&q.value.trim())f.push({q:q.value.trim(),a:a?a.value.trim():''});});return f;}
@@ -4457,6 +4658,26 @@ function addHostalQueIncluye() {
 function collectHostalQueIncluye() {
   var items = [];
   document.querySelectorAll('#que-incluye-list .que-incluye-row input').forEach(function(inp) {
+    if(inp.value.trim()) items.push(inp.value.trim());
+  });
+  return items;
+}
+
+/* ── OTRAS PLATAFORMAS DE DOMICILIO (TASK-002, mismo patron que
+   que_incluye de Hostal) ── */
+function addComidaPlataforma() {
+  var list = document.getElementById('comida-plataformas-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className = 'comida-plataforma-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+  row.innerHTML = '<input class="form-input" placeholder="Ej: Domicilios.com, Uber Eats">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
+}
+function collectComidaPlataformas() {
+  var items = [];
+  document.querySelectorAll('#comida-plataformas-list .comida-plataforma-row input').forEach(function(inp) {
     if(inp.value.trim()) items.push(inp.value.trim());
   });
   return items;
