@@ -1442,6 +1442,8 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="cetab on" onclick="showCatTab('evento-info')">📅 Fechas y sede</div>
             <div class="cetab" onclick="showCatTab('evento-lineup')">🎤 Lineup / Artistas</div>
             <div class="cetab" onclick="showCatTab('evento-agenda')">📋 Agenda</div>
+            <div class="cetab" onclick="showCatTab('evento-entradas')">🎫 Tipos de entrada</div>
+            <div class="cetab" onclick="showCatTab('evento-prep')">🎒 Que llevar</div>
           </div>
 
           <!-- Fechas y sede -->
@@ -1466,17 +1468,13 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
                 <input class="form-input" id="f-sede" placeholder="Parque Simón Bolívar, Bogotá">
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Entrada desde</label>
-                <input class="form-input" id="f-entrada-desde" placeholder="Desde $80.000">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Capacidad / Aforo</label>
-                <input class="form-input" id="f-aforo" placeholder="80.000 personas">
-              </div>
-            </div>
-            <div class="form-hint" style="margin-top:8px">📞 Contacto, redes y ubicación → pestaña <strong>Contacto</strong></div>
+            <!-- BUG-019 fix: "Entrada desde" y "Capacidad/Aforo" se
+                 eliminaron de aqui -- duplicaban f-price (pestana
+                 General) y f-capacidad (pestana Contacto), que ya
+                 existen, ya se guardan, y aplican a las 4 categorias.
+                 Los inputs de este panel nunca llegaban a Neon. -->
+            <div class="form-hint" style="margin-top:8px">💲 Precio de entrada → pestaña <strong>General</strong> (campo "Desde $") · 👥 Capacidad / aforo → pestaña <strong>Contacto</strong></div>
+            <div class="form-hint" style="margin-top:4px">📞 Contacto, redes y ubicación → pestaña <strong>Contacto</strong></div>
           </div>
 
           <!-- Lineup -->
@@ -1491,6 +1489,25 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="form-hint">Programa del evento día a día. Aparecen en la sección "Agenda del evento".</div>
             <div id="evento-agenda-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
             <button class="btn btn-ghost btn-sm" onclick="addAgendaRow()">+ Añadir actividad</button>
+          </div>
+
+          <!-- Tipos de entrada (TASK-003) -->
+          <div class="cat-panel" id="cat-evento-entradas" style="display:none">
+            <div class="form-hint">Tipos de ticket disponibles y su disponibilidad. Aparecen en la sección "Tipos de entrada".</div>
+            <div id="entradas-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addEntradaItem()">+ Añadir tipo de entrada</button>
+          </div>
+
+          <!-- Que llevar / Prohibido (TASK-003) -->
+          <div class="cat-panel" id="cat-evento-prep" style="display:none">
+            <div class="form-hint">Checklist de recomendaciones y restricciones. Aparecen en la sección "Que llevar".</div>
+            <label class="form-label" style="margin-top:4px;display:block">Qué llevar</label>
+            <div id="que-llevar-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addQueLlevarRow()">+ Añadir recomendación</button>
+
+            <label class="form-label" style="margin-top:16px;display:block">Prohibido / restricciones</label>
+            <div id="prohibido-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addProhibidoRow()">+ Añadir restricción</button>
           </div>
         </div><!-- /especifico-evento -->
       </div><!-- /fpanel-especifico -->
@@ -2312,6 +2329,12 @@ function clearForm() {
   if(lineupList) lineupList.innerHTML = '';
   var agendaList = document.getElementById('evento-agenda-list');
   if(agendaList) agendaList.innerHTML = '';
+  var entradasEvList = document.getElementById('entradas-admin');
+  if(entradasEvList) entradasEvList.innerHTML = '';
+  var queLlevarList = document.getElementById('que-llevar-list');
+  if(queLlevarList) queLlevarList.innerHTML = '';
+  var prohibidoListEl = document.getElementById('prohibido-list');
+  if(prohibidoListEl) prohibidoListEl.innerHTML = '';
 
   /* ── Other resets ── */
   currentTags = [];
@@ -2415,9 +2438,19 @@ var CATEGORY_TAG_FIELDS = {
     { key:'ifood',           id:'f-ifood' },
     { key:'domicilio_zona',  id:'f-delivery-zona', localKey:'deliveryZona' }
   ],
-  /* TASK-003: fecha_inicio, fecha_fin, edicion, sede, capacidad
-     en especifico-evento. */
-  evento: []
+  /* TASK-003 (completado). "capacidad" y "entrada desde" NO se
+     registran aqui: existian como f-aforo/f-entrada-desde dentro de
+     especifico-evento, duplicando sin conectar los campos genericos
+     f-capacidad (columna destinos.capacidad, compartida con Hostal)
+     y f-price (columna destinos.precio_desde, compartida por las 4
+     categorias). Se eliminaron los inputs duplicados y se reusan los
+     genericos -- ver BUGS_HISTORICOS.md BUG-019. */
+  evento: [
+    { key:'fecha_inicio', id:'f-fecha-ini', localKey:'fechaIni' },
+    { key:'fecha_fin',    id:'f-fecha-fin', localKey:'fechaFin' },
+    { key:'edicion',      id:'f-edicion' },
+    { key:'sede',         id:'f-sede' }
+  ]
 };
 
 var CATEGORY_TAG_LISTS = {
@@ -2456,7 +2489,19 @@ var CATEGORY_TAG_LISTS = {
     { key:'domicilio_plataformas', localKey:'domicilioPlataformas',
       collector: function(){ return (typeof collectComidaPlataformas==='function') ? collectComidaPlataformas() : []; } }
   ],
-  evento:  []  /* TASK-003: ej. lineup[], agenda[], categorias_entrada[] */
+  /* TASK-003 (completado). */
+  evento: [
+    { key:'lineup', localKey:'lineup',
+      collector: function(){ return (typeof collectLineupItems==='function') ? collectLineupItems() : []; } },
+    { key:'agenda', localKey:'agendaEvento',
+      collector: function(){ return (typeof collectAgendaItems==='function') ? collectAgendaItems() : []; } },
+    { key:'categorias_entrada', localKey:'categoriasEntrada',
+      collector: function(){ return (typeof collectEntradasEvento==='function') ? collectEntradasEvento() : []; } },
+    { key:'que_llevar', localKey:'queLlevar',
+      collector: function(){ return (typeof collectQueLlevarEvento==='function') ? collectQueLlevarEvento() : []; } },
+    { key:'prohibido', localKey:'prohibidoEvento',
+      collector: function(){ return (typeof collectProhibidoEvento==='function') ? collectProhibidoEvento() : []; } }
+  ]
 };
 
 /* Lee un <select multiple> y devuelve el arreglo de values seleccionados */
@@ -2901,9 +2946,10 @@ function loadForm(p) {
 
   if(p.cat === 'evento') {
     setTimeout(function(){
-      ['fecha-ini','fecha-fin','edicion','sede','entrada-desde','aforo'].forEach(function(f){
-        var el=document.getElementById('f-'+f); if(el&&p[f.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();})]) el.value=p[f.replace(/-([a-z])/g,function(m,c){return c.toUpperCase();})];
-      });
+      // TASK-003: motor generico (ver CATEGORY_TAG_FIELDS.evento mas
+      // arriba). Llena fecha_inicio, fecha_fin, edicion, sede.
+      applyCategoryTagFields(p, 'evento');
+
       /* lineup */
       var lineup=document.getElementById('lineup-list');
       if(lineup&&p.lineup&&p.lineup.length){
@@ -2916,6 +2962,66 @@ function loadForm(p) {
             +'<input class="form-input" value="'+_esc(l.hora||'')+'" placeholder="Hora">'
             +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
           lineup.appendChild(row);
+        });
+      }
+
+      /* agenda -- BUG-019 fix: antes NO se precargaba (solo lineup) */
+      var agendaL=document.getElementById('evento-agenda-list');
+      if(agendaL&&p.agendaEvento&&p.agendaEvento.length){
+        agendaL.innerHTML='';
+        p.agendaEvento.forEach(function(a){
+          var row=document.createElement('div');row.className='agenda-row';
+          row.style.cssText='display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:6px;align-items:center;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+          row.innerHTML='<input class="form-input" value="'+_esc(a.dia||'')+'" placeholder="Dia">'
+            +'<input class="form-input" value="'+_esc(a.hora||'')+'" placeholder="Hora">'
+            +'<input class="form-input" value="'+_esc(a.actividad||'')+'" placeholder="Actividad">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          agendaL.appendChild(row);
+        });
+      }
+
+      /* tipos de entrada (categorias_entrada) */
+      var entL=document.getElementById('entradas-admin');
+      if(entL&&p.categoriasEntrada&&p.categoriasEntrada.length){
+        entL.innerHTML='';
+        p.categoriasEntrada.forEach(function(e){
+          var item=document.createElement('div');item.className='entrada-evento-row';
+          item.style.cssText='display:grid;grid-template-columns:1fr 100px 100px auto;gap:8px;align-items:center;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px';
+          item.innerHTML='<input class="form-input" value="'+_esc(e.tipo||'')+'" placeholder="Tipo de entrada" style="font-size:11px;padding:5px 8px">'
+            +'<input class="form-input" value="'+_esc(e.precio||'')+'" placeholder="Precio" style="font-size:11px;padding:5px 8px">'
+            +'<select class="form-input form-select" style="font-size:11px;padding:5px 8px">'
+            +'<option'+((e.disponibilidad==='Disponible'||!e.disponibilidad)?' selected':'')+'>Disponible</option>'
+            +'<option'+(e.disponibilidad==='Pocas'?' selected':'')+'>Pocas</option>'
+            +'<option'+(e.disponibilidad==='Agotado'?' selected':'')+'>Agotado</option>'
+            +'</select>'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          entL.appendChild(item);
+        });
+      }
+
+      /* que llevar */
+      var qlL=document.getElementById('que-llevar-list');
+      if(qlL&&p.queLlevar&&p.queLlevar.length){
+        qlL.innerHTML='';
+        p.queLlevar.forEach(function(t){
+          var row=document.createElement('div');row.className='que-llevar-row';
+          row.style.cssText='display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+          row.innerHTML='<input class="form-input" value="'+_esc(t)+'" placeholder="Ej: Protector solar">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          qlL.appendChild(row);
+        });
+      }
+
+      /* prohibido */
+      var prL=document.getElementById('prohibido-list');
+      if(prL&&p.prohibidoEvento&&p.prohibidoEvento.length){
+        prL.innerHTML='';
+        p.prohibidoEvento.forEach(function(t){
+          var row=document.createElement('div');row.className='prohibido-row';
+          row.style.cssText='display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+          row.innerHTML='<input class="form-input" value="'+_esc(t)+'" placeholder="Ej: Ingreso de bebidas">'
+            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          prL.appendChild(row);
         });
       }
     },100);
@@ -3197,12 +3303,16 @@ function savePlace() {
 
   /* ── EVENTO SPECIFIC ── */
   if(cat === 'evento') {
-    p.fechaIni = v('f-fecha-ini'); p.fechaFin = v('f-fecha-fin');
-    p.edicion = v('f-edicion'); p.sede = v('f-sede');
-    p.entradaDesde = v('f-entrada-desde');
-    p.lineup = collectLineupItems();
-    p.agendaEvento = collectAgendaItems();
-    p.amenities = collectAmenities('evento-amenities-check');
+    /* TASK-003: motor generico (ver CATEGORY_TAG_FIELDS.evento /
+       CATEGORY_TAG_LISTS.evento mas arriba). Llena fecha_inicio,
+       fecha_fin, edicion, sede, lineup, agenda, categorias_entrada,
+       que_llevar, prohibido -- los 5 primeros bugs de BUG-019 eran
+       justamente que nada de esto llegaba nunca a _buildTagsObj().
+       "Entrada desde" y "Aforo" ya no se leen aqui: duplicaban
+       f-price/f-capacidad (genericos, las 4 categorias) sin nunca
+       guardarse. p.amenities tampoco se lee: apuntaba a un
+       contenedor (#evento-amenities-check) que nunca existio. */
+    collectCategoryTagFields(p, 'evento');
   }
 
   /* ── FAQs (all categories) ── */
@@ -3973,22 +4083,75 @@ function addDificultadTagItem() {
   list.appendChild(item);
 }
 
-// Lineup
-function addLineupItem() {
-  var list = document.getElementById('lineup-admin');
-  var item = document.createElement('div');
-  item.className='lineup-item';
-  item.innerHTML='<input placeholder="Nombre del artista / acto"><select><option>Artista</option><option>Headliner</option><option>Agrupación</option><option>Invitado</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
-  list.appendChild(item);
+// Lineup -- BUG-019 fix (TASK-003): addLineupItem() (nombre viejo)
+// era codigo huerfano: apuntaba a #lineup-admin (no existe en el DOM
+// actual) y su forma (1 input + select) no coincidia con lo que lee
+// collectLineupItems() (3 inputs: nombre/escenario/hora). El boton
+// real del admin ("+ Anadir artista") llama a addLineupRow().
+function addLineupRow() {
+  var list = document.getElementById('lineup-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className='lineup-item';
+  row.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:center;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+  row.innerHTML='<input class="form-input" placeholder="Artista">'
+    +'<input class="form-input" placeholder="Escenario">'
+    +'<input class="form-input" placeholder="Hora">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
 }
 
-// Entradas evento
+// Agenda del evento -- BUG-019 fix: el boton "+ Anadir actividad"
+// llamaba a addAgendaRow(), que tampoco existia en el archivo.
+function addAgendaRow() {
+  var list = document.getElementById('evento-agenda-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className='agenda-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:6px;align-items:center;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+  row.innerHTML='<input class="form-input" placeholder="Dia">'
+    +'<input class="form-input" placeholder="Hora">'
+    +'<input class="form-input" placeholder="Actividad">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
+}
+
+// Entradas evento -- BUG-019 fix: ahora tiene un contenedor real
+// (#entradas-admin, agregado dentro de especifico-evento) y una
+// clase (.entrada-evento-row) para que collectEntradasEvento() pueda
+// leer las filas de forma confiable. Misma estructura Tipo/Precio/
+// Disponibilidad que ya tenia la funcion original.
 function addEntradaItem() {
   var list = document.getElementById('entradas-admin');
+  if(!list) return;
   var item = document.createElement('div');
+  item.className='entrada-evento-row';
   item.style.cssText='display:grid;grid-template-columns:1fr 100px 100px auto;gap:8px;align-items:center;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px';
   item.innerHTML='<input class="form-input" placeholder="Tipo de entrada" style="font-size:11px;padding:5px 8px"><input class="form-input" placeholder="Precio" style="font-size:11px;padding:5px 8px"><select class="form-input form-select" style="font-size:11px;padding:5px 8px"><option>Disponible</option><option>Pocas</option><option>Agotado</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
   list.appendChild(item);
+}
+
+// Que llevar / Prohibido -- mismo patron simple que
+// addHostalQueIncluye() (1 input + boton quitar)
+function addQueLlevarRow() {
+  var list = document.getElementById('que-llevar-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className='que-llevar-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+  row.innerHTML='<input class="form-input" placeholder="Ej: Protector solar">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
+}
+function addProhibidoRow() {
+  var list = document.getElementById('prohibido-list');
+  if(!list) return;
+  var row = document.createElement('div');
+  row.className='prohibido-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
+  row.innerHTML='<input class="form-input" placeholder="Ej: Ingreso de bebidas">'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  list.appendChild(row);
 }
 
 function removeRow(btn) { btn.closest('tr,div[class]')?.remove() || btn.parentElement.remove(); }
@@ -4578,8 +4741,13 @@ function collectAmenities(cid) {
   });
   return items;
 }
-function collectLineupItems(){var items=[];document.querySelectorAll('.lineup-item').forEach(function(row){var i=row.querySelectorAll('input');if(i[0]&&i[0].value.trim())items.push({nombre:i[0].value.trim(),escenario:i[1]?i[1].value.trim():'',hora:i[2]?i[2].value.trim():''});});return items;}
-function collectAgendaItems(){var items=[];document.querySelectorAll('.agenda-row').forEach(function(row){var i=row.querySelectorAll('input,select');if(i[0]&&i[0].value.trim())items.push({dia:i[0].value.trim(),hora:i[1]?i[1].value.trim():'',actividad:i[2]?i[2].value.trim():''});});return items;}
+/* BUG-019 fix (TASK-003): collectLineupItems()/collectAgendaItems()
+   estaban declaradas 2 veces (la version activa, identica, sigue en
+   la linea ~3076/~3091). Mismo patron que BUG-006/BUG-018. Esta zona
+   ahora trae solo los 3 collectors nuevos de Evento. */
+function collectEntradasEvento(){var items=[];document.querySelectorAll('#entradas-admin .entrada-evento-row').forEach(function(row){var i=row.querySelectorAll('input');var sel=row.querySelector('select');if(i[0]&&i[0].value.trim())items.push({tipo:i[0].value.trim(),precio:i[1]?i[1].value.trim():'',disponibilidad:sel?sel.value:'Disponible'});});return items;}
+function collectQueLlevarEvento(){var items=[];document.querySelectorAll('#que-llevar-list .que-llevar-row input').forEach(function(inp){if(inp.value.trim())items.push(inp.value.trim());});return items;}
+function collectProhibidoEvento(){var items=[];document.querySelectorAll('#prohibido-list .prohibido-row input').forEach(function(inp){if(inp.value.trim())items.push(inp.value.trim());});return items;}
 function collectFaqs(){var f=[];document.querySelectorAll('#faq-builder-list .faq-builder-row').forEach(function(row){var q=row.querySelector('.faq-q-inp'),a=row.querySelector('.faq-a-inp');if(q&&q.value.trim())f.push({q:q.value.trim(),a:a?a.value.trim():''});});return f;}
 
 /* ── TRIGGER HELPERS ── */

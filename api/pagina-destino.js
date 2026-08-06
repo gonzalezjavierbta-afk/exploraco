@@ -324,6 +324,38 @@ function buildHTML(d, det, fotos, resenas) {
       'domicilio_plataformas=' + domicilioPlataformas.length);
   }
 
+  // Campos especificos de evento desde tags JSONB (TASK-003)
+  var fechaInicioEvento = tags.fecha_inicio || '';
+  var fechaFinEvento    = tags.fecha_fin    || '';
+  var edicionEvento     = tags.edicion      || '';
+  var sedeEvento        = tags.sede         || '';
+  var lineupEvento            = safeJSON(tags.lineup);             if(!Array.isArray(lineupEvento))            lineupEvento=[];
+  var agendaEventoTags        = safeJSON(tags.agenda);             if(!Array.isArray(agendaEventoTags))        agendaEventoTags=[];
+  var categoriasEntradaEvento = safeJSON(tags.categorias_entrada); if(!Array.isArray(categoriasEntradaEvento)) categoriasEntradaEvento=[];
+  var queLlevarEvento         = safeJSON(tags.que_llevar);         if(!Array.isArray(queLlevarEvento))         queLlevarEvento=[];
+  var prohibidoEvento         = safeJSON(tags.prohibido);          if(!Array.isArray(prohibidoEvento))         prohibidoEvento=[];
+
+  if (cat === 'evento') {
+    console.log('[TRACE][pagina-evento]',
+      'lineup=' + lineupEvento.length,
+      'agenda=' + agendaEventoTags.length,
+      'categorias_entrada=' + categoriasEntradaEvento.length,
+      'que_llevar=' + queLlevarEvento.length,
+      'prohibido=' + prohibidoEvento.length);
+  }
+
+  // Formatea fecha ISO (YYYY-MM-DD) a "5 de Diciembre de 2026".
+  // Degrada al valor crudo si no matchea el formato esperado (TASK-003).
+  var MESES_LARGOS_EVENTO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  function fmtFechaEvento(iso) {
+    if (!iso) return '';
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return iso;
+    var y = parseInt(m[1],10), mo = parseInt(m[2],10), da = parseInt(m[3],10);
+    if (!mo || mo < 1 || mo > 12) return iso;
+    return da + ' de ' + MESES_LARGOS_EVENTO[mo-1] + ' de ' + y;
+  }
+
   var bookingUrl = det.booking_url     || d.booking     || '';
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
   var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
@@ -893,6 +925,82 @@ function buildHTML(d, det, fotos, resenas) {
     + (deliveryBtnsComida.length ? '<div class="cgrid" style="margin-top:14px">'+deliveryBtnsComida.join('')+'</div>' : '')
     + '</div></section>' : '';
 
+  // -- SECCION: Fecha y sede (TASK-003, solo evento) -------------------
+  var infoEventoCards = [];
+  if (fechaInicioEvento) {
+    var fechasTxt = fmtFechaEvento(fechaInicioEvento);
+    if (fechaFinEvento && fechaFinEvento !== fechaInicioEvento) fechasTxt += ' - ' + fmtFechaEvento(fechaFinEvento);
+    infoEventoCards.push({ ico:'\ud83d\udcc5', lbl:'Fecha', val:fechasTxt });
+  }
+  if (edicionEvento) infoEventoCards.push({ ico:'\ud83c\udfc6', lbl:'Edicion', val:edicionEvento });
+  if (sedeEvento)    infoEventoCards.push({ ico:'\ud83d\udccd', lbl:'Sede', val:sedeEvento });
+
+  var secEventoInfo = infoEventoCards.length ?
+    '<section class="ssec bwhite" id="evento-fechas"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Fecha y sede</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="igrid">'+infoEventoCards.map(function(c){
+        return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
+      }).join('')+'</div>'
+    + '</div></section>' : '';
+
+  // -- SECCION: Lineup / Artistas (TASK-003, solo evento) --------------
+  var secLineupEvento = lineupEvento.length ?
+    '<section class="ssec bwarm" id="lineup"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lineup / Artistas</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="igrid">'+lineupEvento.map(function(l){
+        var detalle = [l.escenario, l.hora].filter(Boolean).join(' \u00b7 ');
+        return '<div class="icard"><div class="iico">\ud83c\udfa4</div><div class="ilbl">'+esc(l.nombre||'')+'</div>'
+          + (detalle ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(detalle)+'</div>' : '')
+          + '</div>';
+      }).join('')+'</div>'
+    + '</div></section>' : '';
+
+  // -- SECCION: Agenda del evento (TASK-003, solo evento) ---------------
+  // Se muestra en el orden en que el admin cargo las filas (secuencial),
+  // igual que secEventosHostal / itinerario de Sitio.
+  var secAgendaEvento = agendaEventoTags.length ?
+    '<section class="ssec bwhite" id="agenda"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Agenda del evento</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<table class="entradas-table"><thead><tr><th>Dia</th><th>Hora</th><th>Actividad</th></tr></thead><tbody>'
+    + agendaEventoTags.map(function(a){
+        return '<tr><td>'+esc(a.dia||'')+'</td><td>'+esc(a.hora||'')+'</td><td>'+esc(a.actividad||'')+'</td></tr>';
+      }).join('')
+    + '</tbody></table></div></section>' : '';
+
+  // -- SECCION: Tipos de entrada (TASK-003, solo evento) -----------------
+  var DISPONIBILIDAD_CLASS_EVENTO = { 'Disponible':'tip-blue', 'Pocas':'tip-gold', 'Agotado':'tip-red' };
+  var secEntradasEvento = categoriasEntradaEvento.length ?
+    '<section class="ssec bwarm" id="tipos-entrada"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tipos de entrada</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Disponibilidad</th><th>Precio</th></tr></thead><tbody>'
+    + categoriasEntradaEvento.map(function(e){
+        var disp = e.disponibilidad || 'Disponible';
+        var cls = DISPONIBILIDAD_CLASS_EVENTO[disp] || 'tip-blue';
+        return '<tr><td><div class="entrada-tipo">'+esc(e.tipo||'')+'</div></td>'
+          + '<td><span class="tip-tag '+cls+'">'+esc(disp)+'</span></td>'
+          + '<td><div class="entrada-precio">'+esc(e.precio||'Consultar')+'</div></td></tr>';
+      }).join('')
+    + '</tbody></table></div></section>' : '';
+
+  // -- SECCION: Que llevar y prohibiciones (TASK-003, solo evento) -------
+  var secPrepEvento = (queLlevarEvento.length || prohibidoEvento.length) ?
+    '<section class="ssec bwhite" id="que-llevar"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que llevar</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="tips-grid">'
+    + queLlevarEvento.map(function(t){
+        return '<div class="tip-card"><div class="tip-icon">\u2713</div><div>'
+          + '<div class="tip-title">'+esc(t)+'</div>'
+          + '<span class="tip-tag tip-blue">Recomendado</span>'
+          + '</div></div>';
+      }).join('')
+    + prohibidoEvento.map(function(t){
+        return '<div class="tip-card"><div class="tip-icon">\u26a0</div><div>'
+          + '<div class="tip-title">'+esc(t)+'</div>'
+          + '<span class="tip-tag tip-red">Prohibido</span>'
+          + '</div></div>';
+      }).join('')
+    + '</div></div></section>' : '';
+
   // -- SECCI??N: Reservar / links externos ----------------------------
   var rbtns = [];
   if (d.whatsapp) rbtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
@@ -990,6 +1098,11 @@ function buildHTML(d, det, fotos, resenas) {
     {id:'menu',        label:'Menu',        has:!!secMenuDestacado},
     {id:'horarios',    label:'Horarios',    has:!!secHorariosComida},
     {id:'delivery',    label:'Domicilio',   has:!!secDeliveryComida},
+    {id:'evento-fechas', label:'Fecha y sede', has:!!secEventoInfo},
+    {id:'lineup',      label:'Lineup',      has:!!secLineupEvento},
+    {id:'agenda',      label:'Agenda',      has:!!secAgendaEvento},
+    {id:'tipos-entrada', label:'Entradas',  has:!!secEntradasEvento},
+    {id:'que-llevar',  label:'Que llevar',  has:!!secPrepEvento},
     {id:'reservar',    label:'Reservar',    has:!!secReservar},
     {id:'mapa',        label:'Mapa',        has:!!secMapa},
     {id:'faq',         label:'FAQ',         has:!!secFaq},
@@ -1059,6 +1172,11 @@ function buildHTML(d, det, fotos, resenas) {
     + secMenuDestacado + '\n'
     + secHorariosComida + '\n'
     + secDeliveryComida + '\n'
+    + secEventoInfo + '\n'
+    + secLineupEvento + '\n'
+    + secAgendaEvento + '\n'
+    + secEntradasEvento + '\n'
+    + secPrepEvento + '\n'
     + secReservar + '\n'
     + secMapa + '\n'
     + secFaq + '\n'
