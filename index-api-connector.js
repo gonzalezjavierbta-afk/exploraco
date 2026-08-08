@@ -128,24 +128,34 @@
     }
   }
 
-  // Reemplazar array const sin romper referencias
-  function replArr(name, newArr) {
-    if (typeof window[name] !== 'undefined' && Array.isArray(window[name])) {
-      window[name].length = 0;
-      newArr.forEach(function (i) { window[name].push(i); });
-    } else {
-      window[name] = newArr;
-    }
+  // Reemplazar array sin romper la referencia (mutacion in-place).
+  // IMPORTANTE: recibe el ARRAY REAL por referencia (ej. PL, no
+  // 'PL' como string). PL/MAPA_PLACES/AGENDA_EVENTS estan declarados
+  // con `const` en index.html -- las declaraciones `const`/`let` de
+  // nivel superior en un <script> NO se exponen como propiedades de
+  // `window` (solo `var` y las funciones si lo hacen). Buscar por
+  // `window[name]` con esos tres arrays SIEMPRE fallaba el chequeo
+  // `typeof window[name] !== 'undefined'` y terminaba creando una
+  // propiedad `window.PL`/`window.MAPA_PLACES`/`window.AGENDA_EVENTS`
+  // nueva y desconectada -- que nada mas en la pagina lee -- mientras
+  // el `const PL`/`const MAPA_PLACES`/`const AGENDA_EVENTS` real (el
+  // que usan renderDest()/refreshMapaMarkers()/renderAgenda()) se
+  // quedaba vacio para siempre. Por eso el log mostraba "PL:95" pero
+  // la grilla y el mapa nunca se poblaban (ver BUGS_HISTORICOS.md
+  // BUG-020). Recibir el array por referencia evita el problema por
+  // completo, sin importar si fue declarado con var/let/const.
+  function replArr(targetArr, newArr) {
+    if (!Array.isArray(targetArr)) return;
+    targetArr.length = 0;
+    newArr.forEach(function (i) { targetArr.push(i); });
   }
 
-  // Reemplazar objeto sin romper referencias
-  function replObj(name, newObj) {
-    if (typeof window[name] !== 'undefined' && typeof window[name] === 'object') {
-      Object.keys(window[name]).forEach(function (k) { delete window[name][k]; });
-      Object.keys(newObj).forEach(function (k) { window[name][k] = newObj[k]; });
-    } else {
-      window[name] = newObj;
-    }
+  // Reemplazar objeto sin romper la referencia (mismo razonamiento que
+  // replArr -- recibe el OBJETO REAL, no un string).
+  function replObj(targetObj, newObj) {
+    if (!targetObj || typeof targetObj !== 'object') return;
+    Object.keys(targetObj).forEach(function (k) { delete targetObj[k]; });
+    Object.keys(newObj).forEach(function (k) { targetObj[k] = newObj[k]; });
   }
 
   // ── BÚSQUEDA EN TIEMPO REAL ────────────────────────────────────
@@ -195,14 +205,14 @@
 
     // 1. PL[]
     var nuevoPL = apiData.map(toPlace);
-    replArr('PL', nuevoPL);
+    if (typeof PL !== 'undefined') replArr(PL, nuevoPL);
 
     // 2. DEST_PHOTOS{}
     var nuevosPhotos = {};
     nuevoPL.forEach(function (p) {
       if (p.photos && p.photos[0]) nuevosPhotos[p.id] = p.photos[0].url;
     });
-    replObj('DEST_PHOTOS', nuevosPhotos);
+    if (typeof DEST_PHOTOS !== 'undefined') replObj(DEST_PHOTOS, nuevosPhotos);
 
     // 3. MAPA_PLACES[] — solo con coords + campo color
     var nuevoMapa = apiData
@@ -211,7 +221,7 @@
         var idx = apiData.indexOf(item);
         return toMapPlace(item, idx);
       });
-    replArr('MAPA_PLACES', nuevoMapa);
+    if (typeof MAPA_PLACES !== 'undefined') replArr(MAPA_PLACES, nuevoMapa);
 
     // 4. DEST_FEATURED_IDS[]
     var featIds = nuevoPL
@@ -223,7 +233,7 @@
         .slice(0, 10)
         .map(function (p) { return p.id; });
     }
-    replArr('DEST_FEATURED_IDS', featIds);
+    if (typeof DEST_FEATURED_IDS !== 'undefined') replArr(DEST_FEATURED_IDS, featIds);
 
     // 5. AGENDA_EVENTS[] — eventos de la DB + los hardcodeados originales
     var eventosDB = apiData
@@ -236,7 +246,7 @@
       var eventosOriginalesFiltrados = AGENDA_EVENTS.filter(function (e) {
         return !slugsDB.includes(e.url);
       });
-      replArr('AGENDA_EVENTS', eventosDB.concat(eventosOriginalesFiltrados));
+      replArr(AGENDA_EVENTS, eventosDB.concat(eventosOriginalesFiltrados));
     }
 
     // 6. Stats reales (solo en carga inicial, no en búsquedas)
@@ -251,12 +261,16 @@
     if (typeof renderAgenda    === 'function') renderAgenda(
       typeof agendaCat !== 'undefined' ? agendaCat : 'all'
     );
-    // Mapa: refreshMapaMarkers() redibuja sin reinicializar
-    if (typeof refreshMapaMarkers === 'function') {
-      refreshMapaMarkers();
+    // Mapa: si el Leaflet map YA existe (mapaMap truthy), solo refrescar
+    // markers. Si TODAVIA no existe, inicializarlo ahora mismo en vez
+    // de esperar a que el usuario llegue a la seccion de mapa via
+    // scroll/IntersectionObserver/timeout de 2s. initMapaSection() ya
+    // llama a refreshMapaMarkers() internamente, y MAPA_PLACES ya esta
+    // poblado en este punto del codigo (mapaMap SI esta declarado con
+    // var en index.html, por eso window.mapaMap funciona aqui).
+    if (typeof window.mapaMap !== 'undefined' && window.mapaMap) {
+      if (typeof refreshMapaMarkers === 'function') refreshMapaMarkers();
     } else if (typeof initMapaSection === 'function') {
-      // Fallback si refreshMapaMarkers no existe aún
-      window.mapaMap = null;
       initMapaSection();
     }
   }
