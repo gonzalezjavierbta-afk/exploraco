@@ -3,15 +3,16 @@
 
 const { neon } = require('@neondatabase/serverless');
 
-const CAT_EMOJI  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉' };
+const CAT_EMOJI  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉', blog:'📝' };
 const CAT_COLORS = {
   hostal: 'linear-gradient(135deg,#1a3a5c,#2a4a7c)',
   comida: 'linear-gradient(135deg,#3a1a0a,#4a2a1a)',
   sitio:  'linear-gradient(135deg,#0a2a1a,#1a3a2a)',
   evento: 'linear-gradient(135deg,#1a051a,#3a1a3a)',
+  blog:   'linear-gradient(135deg,#3a0a1a,#4a1a2a)',
 };
 const PIN_COLORS = {
-  hostal:'#2196F3', comida:'#FF9800', sitio:'#4CAF50', evento:'#A855F7',
+  hostal:'#2196F3', comida:'#FF9800', sitio:'#4CAF50', evento:'#A855F7', blog:'#EC4899',
 };
 
 function safeJSON(val) {
@@ -74,6 +75,10 @@ function toPlace(row) {
     checkin:     row.checkin          || (tags.checkin  || ''),
     checkout:    row.checkout         || (tags.checkout || ''),
     amenities:   amenidades,
+    // Blog (Sprint Inspirate): tema es el sub-filtro del modal
+    // "Comparte tu experiencia" (aventura/gastro/cultura/naturaleza/
+    // tips), ver publicar-lugar.js BLOG_TEMAS.
+    tema:        tags.tema || '',
     habs:        habitaciones,
     faqs:        faqs,
     // Campos específicos para AGENDA_EVENTS (eventos)
@@ -111,6 +116,12 @@ module.exports = async function handler(req, res) {
     if (cat) {
       conds.push('d.categoria_slug = $' + pi++);
       params.push(cat);
+    } else {
+      // Blog vive en su propia seccion (Inspirate), no en el listado
+      // general ni en el mapa. Solo aparece si se pide ?categoria=blog
+      // explicitamente. Sin este filtro, un post publicado se coleria
+      // en el grid/mapa principal con lat/lng vacios.
+      conds.push("d.categoria_slug != 'blog'");
     }
     if (ciudad) {
       conds.push('d.ciudad ILIKE $' + pi++);
@@ -196,7 +207,7 @@ module.exports = async function handler(req, res) {
          COUNT(DISTINCT ciudad)            AS total_ciudades,
          COALESCE(SUM(total_resenas), 0)  AS total_resenas,
          ROUND(AVG(rating)::numeric, 1)   AS rating_promedio
-       FROM destinos WHERE status = 'published'`
+       FROM destinos WHERE status = 'published' AND categoria_slug != 'blog'`
     );
     var st = statsRows[0] || {};
 

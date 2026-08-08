@@ -1351,7 +1351,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <div class="insp-grid" id="insp-grid">
 
       <!-- FEATURED -->
-      <a class="insp-feat" href="ciudad-perdida.html">
+      <a class="insp-feat" href="ciudad-perdida.html" data-if="aventura">
         <div class="insp-feat-img" style="background:linear-gradient(135deg,#0a2a1a,#1a3a2a)">
           <img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&q=80" alt="Ciudad Perdida" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.8">
           <div class="insp-feat-cat">🏔️ Aventura</div>
@@ -1369,9 +1369,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
       </a>
 
       <!-- SMALL CARDS -->
-      <div class="insp-smalls">
+      <div class="insp-smalls" id="insp-smalls-list">
 
-        <a class="insp-small" href="carnaval-barranquilla.html">
+        <a class="insp-small" href="carnaval-barranquilla.html" data-if="cultura">
           <div class="insp-small-img" style="background:linear-gradient(135deg,#1a0a3a,#3a1a5a)">
             <img src="https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6a3?w=400&q=80" alt="Carnaval" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.75">
           </div>
@@ -1382,7 +1382,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
           </div>
         </a>
 
-        <a class="insp-small" href="valle-del-cocora.html">
+        <a class="insp-small" href="valle-del-cocora.html" data-if="naturaleza">
           <div class="insp-small-img" style="background:linear-gradient(135deg,#0a2a0a,#1a4a1a)">
             <img src="https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400&q=80" alt="Cocora" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.8">
           </div>
@@ -1393,7 +1393,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
           </div>
         </a>
 
-        <a class="insp-small" href="el-cielo-restaurante.html">
+        <a class="insp-small" href="el-cielo-restaurante.html" data-if="gastro">
           <div class="insp-small-img" style="background:linear-gradient(135deg,#2a1a0a,#3a2a0a)">
             <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80" alt="Gastronomía" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.8">
           </div>
@@ -1404,7 +1404,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
           </div>
         </a>
 
-        <a class="insp-small" href="cano-cristales.html">
+        <a class="insp-small" href="cano-cristales.html" data-if="tips">
           <div class="insp-small-img" style="background:linear-gradient(135deg,#1a0a0a,#3a1a1a)">
             <img src="https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=400&q=80" alt="Caño Cristales" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.8">
           </div>
@@ -2594,11 +2594,87 @@ function toggleAgendaExpand() {
   }
 }
 
+/* ── INSPIRATE: posts reales desde Neon ──────────────────────────
+   Antes esta seccion era 100% estatica y los pills de filtro solo
+   cambiaban de estilo (no filtraban nada). Blog vive fuera del
+   listado general (ver destinos.js), asi que se pide aparte con
+   ?categoria=blog. Los posts reales se anteponen a los 5 de ejemplo
+   sin borrarlos -- mismo patron ya usado por AGENDA_EVENTS (ver
+   BLUEPRINT.md seccion 5-bis). */
+var INSPIRATE_POSTS = [];
+var INSPIRATE_LOADED = false;
+var TEMA_LABEL_JS = { aventura:'Aventura', gastro:'Gastronomía', cultura:'Cultura', naturaleza:'Naturaleza', tips:'Tips' };
+var TEMA_EMOJI_JS = { aventura:'🏔️', gastro:'🍽️', cultura:'🎭', naturaleza:'🌿', tips:'💡' };
+
+function inspEsc(s) {
+  return s ? String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+}
+
+function inspirateTiempoLectura(texto) {
+  var n = (texto||'').trim().split(/\s+/).filter(Boolean).length;
+  return n ? Math.max(1, Math.round(n/200)) : 0;
+}
+
+function inspirateCardHTML(p) {
+  var tema  = inspEsc(p.tema || '');
+  var emoji = TEMA_EMOJI_JS[p.tema] || '📍';
+  var label = TEMA_LABEL_JS[p.tema] || 'Blog';
+  var min   = inspirateTiempoLectura(p.desc);
+  var bg    = inspEsc(p.hero_bg || 'linear-gradient(135deg,#3a0a1a,#4a1a2a)');
+  var img   = p.foto ? '<img src="'+inspEsc(p.foto)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.8">' : '';
+  return '<a class="insp-small" href="'+inspEsc(p.slug)+'.html" data-if="'+tema+'">'
+    + '<div class="insp-small-img" style="background:'+bg+'">'+img+'</div>'
+    + '<div class="insp-small-body">'
+    +   '<div class="insp-small-cat">'+emoji+' '+inspEsc(label)+'</div>'
+    +   '<div class="insp-small-title">'+inspEsc(p.name)+'</div>'
+    +   '<div class="insp-small-meta">'+inspEsc(p.city||'ExploraCO')+(min?' · '+min+' min lectura':'')+'</div>'
+    + '</div></a>';
+}
+
+function renderInspirate(filter) {
+  filter = filter || 'all';
+  // Tarjetas de ejemplo (estaticas): se filtran por data-if, nunca se borran.
+  document.querySelectorAll('#insp-grid [data-if]').forEach(function(card){
+    var esEjemplo = !card.hasAttribute('data-inspirate-real');
+    if (esEjemplo) {
+      card.style.display = (filter === 'all' || card.getAttribute('data-if') === filter) ? '' : 'none';
+    }
+  });
+  // Tarjetas reales: se reconstruyen segun el filtro actual.
+  var list = document.getElementById('insp-smalls-list');
+  if (!list) return;
+  list.querySelectorAll('[data-inspirate-real]').forEach(function(el){ el.remove(); });
+  var posts = filter === 'all' ? INSPIRATE_POSTS : INSPIRATE_POSTS.filter(function(p){ return p.tema === filter; });
+  var html = posts.map(inspirateCardHTML).join('');
+  if (html) {
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    Array.prototype.slice.call(wrap.children).forEach(function(el){
+      el.setAttribute('data-inspirate-real', '1');
+      list.insertBefore(el, list.firstChild);
+    });
+  }
+}
+
+function cargarInspirate() {
+  fetch('/api/destinos?categoria=blog&limit=12')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      INSPIRATE_POSTS = (res && res.ok && Array.isArray(res.data)) ? res.data : [];
+      INSPIRATE_LOADED = true;
+      renderInspirate(currentInspirateFilter);
+    })
+    .catch(function(){ INSPIRATE_LOADED = true; });
+}
+
 /* ── INSPÍRATE FILTERS ── */
+var currentInspirateFilter = 'all';
 document.querySelectorAll('.if-btn').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('.if-btn').forEach(function(b){ b.classList.remove('on'); });
     btn.classList.add('on');
+    currentInspirateFilter = btn.getAttribute('data-if') || 'all';
+    renderInspirate(currentInspirateFilter);
   });
 });
 
@@ -2622,6 +2698,7 @@ renderDest();
 buildCalStrip();
 renderAgenda('all');
 renderMyMap();
+cargarInspirate();
 /* ════════════════════════════════════════════════════
    SOCIAL FEATURES JS — ExploraCO
    1. Chat por lugar/ciudad
@@ -3970,57 +4047,11 @@ function registerUser() {
   }, {passive:true});
 })();
 
-/* ── BLOG MODAL ── */
-function openBlogModal() {
-  var m = document.getElementById('blog-modal');
-  if(!m) return;
-  m.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  setTimeout(function(){ var inp=document.getElementById('blog-title'); if(inp) inp.focus(); }, 200);
-}
-function closeBlogModal() {
-  var m = document.getElementById('blog-modal');
-  if(!m) return;
-  m.style.display = 'none';
-  document.body.style.overflow = '';
-  ['blog-title','blog-dest','blog-text','blog-name','blog-email'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.value='';
-  });
-  var cat=document.getElementById('blog-cat'); if(cat) cat.value='';
-  var err=document.getElementById('blog-error'); if(err) err.style.display='none';
-  var succ=document.getElementById('blog-success'); if(succ) succ.style.display='none';
-  var btns=document.getElementById('blog-btns'); if(btns) btns.style.display='flex';
-}
-function submitBlog() {
-  var title = (document.getElementById('blog-title')||{}).value||'';
-  var dest  = (document.getElementById('blog-dest') ||{}).value||'';
-  var cat   = (document.getElementById('blog-cat')  ||{}).value||'';
-  var text  = (document.getElementById('blog-text') ||{}).value||'';
-  var name  = (document.getElementById('blog-name') ||{}).value||'Anónimo';
-  var email = (document.getElementById('blog-email')||{}).value||'';
-  var err   = document.getElementById('blog-error');
-  if(!title.trim()){if(err){err.textContent='Escribe un título.';err.style.display='block';}return;}
-  if(!dest.trim()){if(err){err.textContent='Indica el destino.';err.style.display='block';}return;}
-  if(!cat){if(err){err.textContent='Selecciona una categoría.';err.style.display='block';}return;}
-  if(text.trim().length < 60){if(err){err.textContent='Escribe un poco más (mínimo 60 caracteres).';err.style.display='block';}return;}
-  if(err) err.style.display='none';
-  // Save locally
-  try {
-    var posts = JSON.parse(localStorage.getItem('blog_submissions')||'[]');
-    posts.unshift({title:title,dest:dest,cat:cat,text:text,name:name,email:email,ts:Date.now()});
-    localStorage.setItem('blog_submissions', JSON.stringify(posts));
-  } catch(e) {}
-  // Award XP
-  if(typeof awardXP === 'function') awardXP('resena', {name: title});
-  // Show success
-  var btns=document.getElementById('blog-btns'); if(btns) btns.style.display='none';
-  var succ=document.getElementById('blog-success'); if(succ) succ.style.display='block';
-}
-document.addEventListener('click', function(e){
-  var m = document.getElementById('blog-modal');
-  if(m && e.target === m) closeBlogModal();
-});
-
+/* BLOG MODAL: la declaracion real vive mas abajo, junto al flujo de
+   PUBLICAR LUGAR (buscar "BLOG MODAL" mas adelante en este archivo).
+   Antes habia una segunda declaracion identica aqui arriba -- mismo
+   patron que BUG-006/018/019 en BUGS_HISTORICOS.md. Se elimino para
+   dejar una sola fuente de verdad. */
 
 
 /* ── PUBLICAR LUGAR — 3-STEP NAVIGATION ── */
@@ -4124,27 +4155,59 @@ function closeBlogModal() {
   var succ=document.getElementById('blog-success'); if(succ) succ.style.display='none';
   var btns=document.getElementById('blog-btns'); if(btns) btns.style.display='flex';
 }
+// Envia la historia a /api/publicar-lugar (categoria_slug='blog',
+// ver BLOG_TEMAS en publicar-lugar.js). Antes esta funcion solo
+// guardaba en localStorage y nunca llegaba a Neon -- el modal se veia
+// completo pero no estaba conectado al backend (mismo patron que
+// BUG-016/017/018/019 en BUGS_HISTORICOS.md).
 function submitBlog() {
   var title = (document.getElementById('blog-title')||{}).value||'';
   var dest  = (document.getElementById('blog-dest') ||{}).value||'';
   var cat   = (document.getElementById('blog-cat')  ||{}).value||'';
   var text  = (document.getElementById('blog-text') ||{}).value||'';
-  var name  = (document.getElementById('blog-name') ||{}).value||'Anónimo';
+  var name  = (document.getElementById('blog-name') ||{}).value||'';
   var email = (document.getElementById('blog-email')||{}).value||'';
   var err   = document.getElementById('blog-error');
   if(!title.trim()){if(err){err.textContent='Escribe un título.';err.style.display='block';}return;}
   if(!dest.trim()) {if(err){err.textContent='Indica el destino.';err.style.display='block';}return;}
   if(!cat)         {if(err){err.textContent='Selecciona una categoría.';err.style.display='block';}return;}
   if(text.trim().length < 60){if(err){err.textContent='Escribe un poco más (mínimo 60 caracteres).';err.style.display='block';}return;}
+  if(!email.trim() || email.indexOf('@') === -1){if(err){err.textContent='Escribe un email valido -- lo usamos para avisarte cuando se publique.';err.style.display='block';}return;}
   if(err) err.style.display='none';
-  try {
-    var posts = JSON.parse(localStorage.getItem('blog_submissions')||'[]');
-    posts.unshift({title:title,dest:dest,cat:cat,text:text,name:name,email:email,ts:Date.now()});
-    localStorage.setItem('blog_submissions', JSON.stringify(posts));
-  } catch(e) {}
-  if(typeof awardXP === 'function') awardXP('resena', {name: title});
-  var btns=document.getElementById('blog-btns'); if(btns) btns.style.display='none';
-  var succ=document.getElementById('blog-success'); if(succ) succ.style.display='block';
+
+  var btns = document.getElementById('blog-btns');
+  var btn  = btns ? btns.querySelector('button') : null;
+  if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+
+  fetch('/api/publicar-lugar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre:             title.trim(),
+      categoria:          cat,
+      ciudad:             dest.trim(),
+      descripcion_corta:  text.trim(),
+      email:              email.trim(),
+      contacto_nombre:    name.trim() || 'Anónimo'
+    })
+  })
+    .then(function(r){ return r.json().then(function(data){ return { ok: r.ok, data: data }; }); })
+    .then(function(res){
+      if(!res.ok || !res.data || res.data.ok !== true) {
+        var msg = (res.data && (res.data.error || res.data.mensaje)) || 'No se pudo enviar. Intenta de nuevo.';
+        if(err){ err.textContent = msg; err.style.display = 'block'; }
+        if(btn){ btn.disabled = false; btn.textContent = 'Enviar experiencia →'; }
+        return;
+      }
+      if(typeof awardXP === 'function') awardXP('resena', {name: title});
+      if(btns) btns.style.display = 'none';
+      var succ = document.getElementById('blog-success');
+      if(succ) succ.style.display = 'block';
+    })
+    .catch(function(){
+      if(err){ err.textContent = 'Error de conexión. Intenta de nuevo.'; err.style.display = 'block'; }
+      if(btn){ btn.disabled = false; btn.textContent = 'Enviar experiencia →'; }
+    });
 }
 
 /* ── SOCIAL INIT (after all functions defined) ── */

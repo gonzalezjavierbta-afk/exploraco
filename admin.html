@@ -615,6 +615,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div class="fpill" data-cat="comida" onclick="setTablaFilter(this,'comida')">🍽️ Comida</div>
       <div class="fpill" data-cat="sitio" onclick="setTablaFilter(this,'sitio')">🏔️ Lugares</div>
       <div class="fpill" data-cat="evento" onclick="setTablaFilter(this,'evento')">🎉 Eventos</div>
+      <div class="fpill" data-cat="blog" onclick="setTablaFilter(this,'blog')">📝 Blog</div>
     </div>
     <div class="filter-pills" style="margin-left:auto">
       <div class="fpill on" data-status="all" onclick="setStatusFilter(this,'all')">Todos estados</div>
@@ -703,6 +704,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <option value="comida">🍽️ Comida</option>
               <option value="sitio">🏔️ Lugar</option>
               <option value="evento">🎉 Evento</option>
+              <option value="blog">📝 Blog</option>
             </select>
             <div class="form-error-msg">Selecciona una categoría</div>
           </div>
@@ -1510,6 +1512,59 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <button class="btn btn-ghost btn-sm" onclick="addProhibidoRow()">+ Añadir restricción</button>
           </div>
         </div><!-- /especifico-evento -->
+
+        <!-- Sprint Inspirate (Blog). Mismo patron que las 4 categorias
+             anteriores: cat-editor-tabs + cat-panel, balance de divs
+             verificado (Reglas de Oro v5, punto 2). -->
+        <div id="especifico-blog" class="cat-panel">
+          <div class="cat-editor-tabs">
+            <div class="cetab on" onclick="showCatTab('blog-historia')">📝 Historia</div>
+            <div class="cetab" onclick="showCatTab('blog-autor')">✍️ Autor</div>
+          </div>
+
+          <!-- Historia: tema, video. El cuerpo y el resumen NO se
+               repiten aqui -- son los mismos f-lead / f-desc del tab
+               CONTENIDO que ya usan las otras 4 categorias (evita
+               duplicar el input, ver leccion BUG-019 en
+               BUGS_HISTORICOS.md). Las fotos usan el mismo gestor de
+               galeria del tab FOTOS (destinos_fotos), sin un array
+               aparte. -->
+          <div class="cat-panel on" id="cat-blog-historia" style="display:block">
+            <div class="form-hint">El titular usa el campo <b>Nombre</b> (tab General), el resumen el campo <b>Resumen</b> y el cuerpo completo el campo <b>Descripción</b> (tab Contenido). Las fotos se administran igual que en las demás categorías, desde el tab Fotos.</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Tema</label>
+                <select class="form-input form-select" id="f-blog-tema">
+                  <option value="">-- Seleccionar --</option>
+                  <option value="aventura">🏔️ Aventura</option>
+                  <option value="gastro">🍽️ Gastronomía</option>
+                  <option value="cultura">🎭 Cultura</option>
+                  <option value="naturaleza">🌿 Naturaleza</option>
+                  <option value="tips">💡 Tips</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Video (YouTube o Vimeo)</label>
+                <input class="form-input" id="f-blog-video" type="url" placeholder="https://www.youtube.com/watch?v=…">
+              </div>
+            </div>
+          </div>
+
+          <!-- Autor: busca entre usuarios ya registrados en la
+               plataforma (no crea perfiles nuevos desde aqui -- la
+               firma del articulo es el mismo perfil con el que la
+               persona ya se registro, ver DECISIONS.md). -->
+          <div class="cat-panel" id="cat-blog-autor" style="display:none">
+            <div class="form-hint">Busca por nombre o email entre los usuarios ya registrados en ExploraCO. La firma del artículo usa ese mismo perfil (nombre, bio y foto).</div>
+            <div class="form-group">
+              <label class="form-label">Buscar autor</label>
+              <input class="form-input" id="f-blog-autor-buscar" type="text" placeholder="Nombre o email…" oninput="blogBuscarAutor(this.value)" autocomplete="off">
+              <div id="blog-autor-resultados" style="display:none;border:1px solid var(--border,#EDE8E0);border-radius:8px;margin-top:6px;max-height:220px;overflow-y:auto"></div>
+            </div>
+            <input type="hidden" id="f-blog-autor-id" value="">
+            <div id="blog-autor-seleccionado" style="display:none;margin-top:10px"></div>
+          </div>
+        </div><!-- /especifico-blog -->
       </div><!-- /fpanel-especifico -->
 
       <!-- TAB: CONTACTO -->
@@ -1951,8 +2006,8 @@ async function renderDashboard() {
   updateNavCounts();
 
   // Categorías locales
-  var cats   = ['hostal','comida','sitio','evento'];
-  var clbls  = {hostal:'\ud83c\udfe8 Hospedajes',comida:'\ud83c\udf7d\ufe0f Comida',sitio:'\u26f0\ufe0f Lugares',evento:'\ud83c\udf89 Eventos'};
+  var cats   = ['hostal','comida','sitio','evento','blog'];
+  var clbls  = {hostal:'\ud83c\udfe8 Hospedajes',comida:'\ud83c\udf7d\ufe0f Comida',sitio:'\u26f0\ufe0f Lugares',evento:'\ud83c\udf89 Eventos',blog:'\ud83d\udcdd Blog'};
   var bd     = document.getElementById('dp-cat-breakdown');
   if (bd) {
     bd.innerHTML = cats.map(function(c){
@@ -2066,7 +2121,7 @@ async function renderDashboard() {
 }
 function updateNavCounts() {
   var total = places.length;
-  var cats = ['hostal','comida','sitio','evento'];
+  var cats = ['hostal','comida','sitio','evento','blog'];
   setText('snav-count-tabla', total);
   cats.forEach(function(c){
     var n = places.filter(function(p){return p.cat===c;}).length;
@@ -2192,7 +2247,7 @@ function newPlace() {
   document.getElementById('editor-subtitle').textContent = 'Completa la información del lugar';
   setEditorMeta();
   /* reset category display */
-  var cats = ['hostal','comida','sitio','evento'];
+  var cats = ['hostal','comida','sitio','evento','blog'];
   cats.forEach(function(c){
     var el = document.getElementById('especifico-'+c);
     if(el){ el.style.display='none'; el.classList.remove('on'); }
@@ -2450,6 +2505,18 @@ var CATEGORY_TAG_FIELDS = {
     { key:'fecha_fin',    id:'f-fecha-fin', localKey:'fechaFin' },
     { key:'edicion',      id:'f-edicion' },
     { key:'sede',         id:'f-sede' }
+  ],
+  /* Sprint Inspirate (Blog). cuerpo_historia y tiempo_lectura NO se
+     registran aqui: el cuerpo reusa el campo generico f-desc (misma
+     columna "descripcion" que usan las otras 4 categorias) y el
+     tiempo de lectura se calcula en pagina-destino.js a partir del
+     conteo de palabras -- no son datos propios de blog, son reuso
+     de columnas ya existentes y un valor derivado (ver DECISIONS.md,
+     leccion de BUG-019 sobre no duplicar campos genericos). */
+  blog: [
+    { key:'tema',      id:'f-blog-tema' },
+    { key:'video_url', id:'f-blog-video' },
+    { key:'id_autor',  id:'f-blog-autor-id' }
   ]
 };
 
@@ -3024,6 +3091,16 @@ function loadForm(p) {
           prL.appendChild(row);
         });
       }
+    },100);
+  }
+
+  if(p.cat === 'blog') {
+    setTimeout(function(){
+      // Sprint Inspirate: motor generico llena tema/video_url/id_autor
+      applyCategoryTagFields(p, 'blog');
+      // El id ya quedo en f-blog-autor-id arriba; esto solo resuelve
+      // nombre/bio/foto para mostrar la tarjeta de vista previa.
+      blogPrecargarAutor(p.id_autor || '');
     },100);
   }
 }
@@ -3663,7 +3740,7 @@ function showFormTab(tab) {
 /* ── CATEGORY UI ── */
 function updateCatUI() {
   var cat = v('f-cat');
-  var cats = ['hostal','comida','sitio','evento'];
+  var cats = ['hostal','comida','sitio','evento','blog'];
   cats.forEach(function(c){
     var el = document.getElementById('especifico-'+c);
     if(el){
@@ -3675,16 +3752,19 @@ function updateCatUI() {
   if(cat === 'hostal') {
     showCatTab('hostal-hab');
   }
+  if(cat === 'blog') {
+    showCatTab('blog-historia');
+  }
   updateTagSuggestions(cat);
 }
 function catLabel(c) {
-  return {hostal:'Hospedaje',comida:'Comida',sitio:'Lugar',evento:'Evento'}[c]||c;
+  return {hostal:'Hospedaje',comida:'Comida',sitio:'Lugar',evento:'Evento',blog:'Blog'}[c]||c;
 }
 function catEmoji(c) {
-  return {hostal:'🏨',comida:'🍽️',sitio:'🏔️',evento:'🎉'}[c]||'📍';
+  return {hostal:'🏨',comida:'🍽️',sitio:'🏔️',evento:'🎉',blog:'📝'}[c]||'📍';
 }
 function catColor(c) {
-  return {hostal:'#3B82F6',comida:'#EF4444',sitio:'#22C55E',evento:'#A855F7'}[c]||'#888';
+  return {hostal:'#3B82F6',comida:'#EF4444',sitio:'#22C55E',evento:'#A855F7',blog:'#EC4899'}[c]||'#888';
 }
 
 /* ── SLUG AUTO-GENERATE ── */
@@ -4568,7 +4648,7 @@ function patchPage(html, p) {
   var barrio  = _esc(p.barrio||p.city||'');
   var tipo    = _esc(p.tipo||({hostal:'Hospedaje',comida:'Gastronomia',sitio:'Lugar natural',evento:'Evento'}[p.cat]||''));
   var horario = _esc(p.horario||'Consultar disponibilidad');
-  var catEyebrow = {hostal:'\ud83c\udfe8 Hospedaje',comida:'\ud83c\udf7d\ufe0f Comida',sitio:'\ud83c\udfd4\ufe0f Lugar',evento:'\ud83c\udf89 Evento'}[p.cat]||'\ud83d\udccd Lugar';
+  var catEyebrow = {hostal:'\ud83c\udfe8 Hospedaje',comida:'\ud83c\udf7d\ufe0f Comida',sitio:'\ud83c\udfd4\ufe0f Lugar',evento:'\ud83c\udf89 Evento',blog:'\ud83d\udcdd Blog'}[p.cat]||'\ud83d\udccd Lugar';
   var words   = (p.name||'').trim().split(' ');
   var mid     = Math.max(1,Math.floor(words.length/2));
   var n1      = words.slice(0,mid).join(' ');
@@ -5161,6 +5241,85 @@ function _adminHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET };
 }
 
+/* ── BLOG: buscador de autor (Sprint Inspirate) ──────────────────
+   Prefijo "blog" para evitar colision de nombres (Reglas de Oro v5,
+   punto 3 / BUGS_HISTORICOS.md BUG-006). Busca SOLO entre usuarios
+   ya registrados -- no crea perfiles nuevos desde el admin, la firma
+   del articulo usa el mismo perfil con el que la persona se registro
+   (ver DECISIONS.md). Contrato asumido de /api/usuarios?buscar=X
+   pendiente de confirmar contra el archivo real -- ver nota de
+   entrega si el endpoint responde distinto. */
+var _blogAutorBuscarTimer = null;
+function blogBuscarAutor(query) {
+  clearTimeout(_blogAutorBuscarTimer);
+  var resultsEl = document.getElementById('blog-autor-resultados');
+  if (!query || query.trim().length < 2) {
+    if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+    return;
+  }
+  _blogAutorBuscarTimer = setTimeout(function() {
+    fetch('/api/usuarios?buscar=' + encodeURIComponent(query.trim()) + '&limit=8', { headers: _adminHeaders() })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        var items = (res && res.data) ? res.data : [];
+        if (!resultsEl) return;
+        if (!items.length) {
+          resultsEl.style.display = 'block';
+          resultsEl.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted,#888)">Sin resultados. La persona debe estar registrada en ExploraCO.</div>';
+          return;
+        }
+        resultsEl.style.display = 'block';
+        resultsEl.innerHTML = items.map(function(u){
+          return '<div class="blog-autor-opt" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border,#EDE8E0)" '
+            + 'onclick="blogSeleccionarAutor(\''+_esc(u.id)+'\',\''+_esc(u.nombre||'')+'\',\''+_esc(u.bio||'')+'\',\''+_esc(u.foto_url||'')+'\')">'
+            + '<b>'+_esc(u.nombre||'(sin nombre)')+'</b> <span style="color:var(--muted,#888);font-size:11px">'+_esc(u.email||'')+'</span></div>';
+        }).join('');
+      })
+      .catch(function(){
+        if (resultsEl) {
+          resultsEl.style.display = 'block';
+          resultsEl.innerHTML = '<div style="padding:10px;font-size:12px;color:#c0392b">No se pudo buscar. Verifica /api/usuarios.</div>';
+        }
+      });
+  }, 300);
+}
+function blogSeleccionarAutor(id, nombre, bio, fotoUrl) {
+  var idEl = document.getElementById('f-blog-autor-id');
+  if (idEl) idEl.value = id;
+  var resultsEl = document.getElementById('blog-autor-resultados');
+  if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+  var buscarEl = document.getElementById('f-blog-autor-buscar');
+  if (buscarEl) buscarEl.value = '';
+  var sel = document.getElementById('blog-autor-seleccionado');
+  if (sel) {
+    sel.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--bg,#FBF8F2);border:1px solid var(--border,#EDE8E0);border-radius:8px;padding:10px;margin-top:10px';
+    sel.innerHTML = (fotoUrl ? '<img src="'+_esc(fotoUrl)+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--gold-light,#FDF3E0);display:flex;align-items:center;justify-content:center;font-weight:800">'+_esc((nombre||'?').charAt(0).toUpperCase())+'</div>')
+      + '<div style="flex:1"><div style="font-weight:700">'+_esc(nombre)+'</div>'+(bio?'<div style="font-size:11px;color:var(--muted,#888)">'+_esc(bio)+'</div>':'')+'</div>'
+      + '<button class="btn btn-ghost btn-icon btn-sm" onclick="blogLimpiarAutor()" title="Quitar autor">✕</button>';
+  }
+  if (typeof livePreview === 'function') livePreview();
+}
+function blogLimpiarAutor() {
+  var idEl = document.getElementById('f-blog-autor-id');
+  if (idEl) idEl.value = '';
+  var sel = document.getElementById('blog-autor-seleccionado');
+  if (sel) { sel.style.display = 'none'; sel.innerHTML = ''; }
+  if (typeof livePreview === 'function') livePreview();
+}
+/* Precarga la tarjeta de autor al editar un post existente -- el id
+   ya llega a f-blog-autor-id via applyCategoryTagFields() (motor
+   generico); esto solo resuelve nombre/bio/foto para la vista previa. */
+function blogPrecargarAutor(idAutor) {
+  if (!idAutor) return;
+  fetch('/api/usuarios?id=' + encodeURIComponent(idAutor), { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var u = (res && res.data) ? res.data : null;
+      if (u) blogSeleccionarAutor(u.id, u.nombre||'', u.bio||'', u.foto_url||'');
+    })
+    .catch(function(){ /* no fatal -- el id ya quedo guardado igual */ });
+}
+
 function _placeToAPI(p) {
   // Foto hero = primera foto del array
   var fotoHero = '';
@@ -5642,7 +5801,7 @@ function _renderModCard(item) {
   var fecha = item.created_at
     ? new Date(item.created_at).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})
     : '—';
-  var catIcons = {hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉'};
+  var catIcons = {hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉', blog:'📝'};
   var icon = catIcons[item.categoria] || '📍';
   var statusColors = {draft:'#F59E0B', published:'#22C55E', archived:'#6B7280'};
   var statusLabels = {draft:'⏳ Borrador', published:'✅ Publicado', archived:'🗄️ Archivado'};

@@ -8,9 +8,12 @@
 const { neon } = require('@neondatabase/serverless');
 
 var BASE = 'https://exploraco.co';
-var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
-var CAT_DIR   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
-var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'linear-gradient(135deg,#3a1a0a,#4a2a1a)', sitio:'linear-gradient(135deg,#0a2a1a,#1a3a2a)', evento:'linear-gradient(135deg,#1a051a,#3a1a3a)' };
+var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos', blog:'Inspirate' };
+var CAT_DIR   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html', blog:'index.html#inspirate-section' };
+var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'linear-gradient(135deg,#3a1a0a,#4a2a1a)', sitio:'linear-gradient(135deg,#0a2a1a,#1a3a2a)', evento:'linear-gradient(135deg,#1a051a,#3a1a3a)', blog:'linear-gradient(135deg,#3a0a1a,#4a1a2a)' };
+// Temas de Blog (sub-categoria dentro de tags.tema, ver publicar-lugar.js BLOG_TEMAS)
+var TEMA_BLOG_LABEL = { aventura:'Aventura', gastro:'Gastronomia', cultura:'Cultura', naturaleza:'Naturaleza', tips:'Tips' };
+var TEMA_BLOG_EMOJI = { aventura:'\ud83c\udfd4\ufe0f', gastro:'\ud83c\udf7d\ufe0f', cultura:'\ud83c\udfad', naturaleza:'\ud83c\udf3f', tips:'\ud83d\udca1' };
 
 function esc(s) {
   if (s === null || s === undefined) return '';
@@ -69,18 +72,32 @@ function money(n) {
   return '$' + parts.join('');
 }
 
-function schemaLD(d, cat) {
-  var tipos = { hostal:'LodgingBusiness', comida:'FoodEstablishment', sitio:'TouristAttraction', evento:'Event' };
+function schemaLD(d, cat, autor) {
+  var tipos = { hostal:'LodgingBusiness', comida:'FoodEstablishment', sitio:'TouristAttraction', evento:'Event', blog:'BlogPosting' };
   var schema = {
     '@context':'https://schema.org', '@type':tipos[cat]||'TouristAttraction',
     'name': d.nombre||'', 'description': d.lead||'', 'url': BASE+'/'+(d.slug||'')+'.html'
   };
   if (d.foto_hero) schema['image'] = d.foto_hero;
-  if (d.ciudad) schema['address'] = { '@type':'PostalAddress','addressLocality':d.ciudad,'addressCountry':'CO' };
-  if (d.lat && d.lng && parseFloat(d.lat)!==0) schema['geo'] = { '@type':'GeoCoordinates','latitude':parseFloat(d.lat),'longitude':parseFloat(d.lng) };
-  if (d.rating && d.total_resenas>0) schema['aggregateRating'] = { '@type':'AggregateRating','ratingValue':parseFloat(d.rating).toFixed(1),'ratingCount':d.total_resenas,'bestRating':'5','worstRating':'1' };
-  if (d.precio_desde) schema['priceRange'] = d.precio_desde;
-  if (d.telefono) schema['telephone'] = d.telefono;
+  if (cat === 'blog') {
+    // BlogPosting: E-E-A-T se apoya en autor, fecha y extension real
+    // del articulo -- no en address/geo/aggregateRating, que son de
+    // un lugar fisico, no de un articulo editorial.
+    schema['headline']      = d.nombre||'';
+    schema['datePublished'] = d.creado_en || undefined;
+    schema['dateModified']  = d.actualizado_en || d.creado_en || undefined;
+    if (autor && autor.nombre) {
+      schema['author'] = { '@type':'Person', 'name': autor.nombre };
+    }
+    var cuerpoWc = (d.descripcion || d.lead || '');
+    if (cuerpoWc) schema['wordCount'] = cuerpoWc.trim().split(/\s+/).filter(Boolean).length;
+  } else {
+    if (d.ciudad) schema['address'] = { '@type':'PostalAddress','addressLocality':d.ciudad,'addressCountry':'CO' };
+    if (d.lat && d.lng && parseFloat(d.lat)!==0) schema['geo'] = { '@type':'GeoCoordinates','latitude':parseFloat(d.lat),'longitude':parseFloat(d.lng) };
+    if (d.rating && d.total_resenas>0) schema['aggregateRating'] = { '@type':'AggregateRating','ratingValue':parseFloat(d.rating).toFixed(1),'ratingCount':d.total_resenas,'bestRating':'5','worstRating':'1' };
+    if (d.precio_desde) schema['priceRange'] = d.precio_desde;
+    if (d.telefono) schema['telephone'] = d.telefono;
+  }
   return '<script type="application/ld+json">\n'+JSON.stringify(schema,null,2)+'\n<\/script>';
 }
 
@@ -220,12 +237,12 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".faqi summary::-webkit-details-marker{display:none}.faqi summary::after{content:'+';color:var(--gold);font-weight:900}"
 +".faqi[open] summary::after{content:'\\2212'}.faqi p{padding:0 16px 14px;font-size:12px;color:#555;line-height:1.7}"
 +".pbanner{background:#fff3cd;border-top:3px solid #ffc107;color:#856404;padding:.7rem 4%;font-size:12px;text-align:center}"
-+".itab{padding:8px 16px;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}.itin-panel{display:none}.itin-panel.on{display:block}.itab.on{color:var(--gold);border-color:var(--gold)}.itin-timeline{display:flex;flex-direction:column;gap:0;position:relative}.itin-step{display:flex;gap:14px;padding-bottom:20px;position:relative}.itin-dot{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1}.itin-dot.on{border-color:var(--gold);background:var(--gold-light)}.itin-body{flex:1;padding-top:4px}.itin-time{font-size:10px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}.itin-title{font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:5px}.itin-desc{font-size:12px;color:#555;line-height:1.65;margin-bottom:8px}.itin-tags{display:flex;flex-wrap:wrap;gap:5px}.itin-tag{background:var(--warm);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text)}.tip-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}.tip-icon{font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center}.tip-title{font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}.tip-text{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px}.tip-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.tip-gold{background:#FDF3E0;color:#92400E}.tip-red{background:#FEE2E2;color:#991B1B}.tip-green{background:#D1FAE5;color:#065F46}.tip-blue{background:#DBEAFE;color:#1E3A5F}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
++".itab{padding:8px 16px;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}.itin-panel{display:none}.itin-panel.on{display:block}.itab.on{color:var(--gold);border-color:var(--gold)}.itin-timeline{display:flex;flex-direction:column;gap:0;position:relative}.itin-step{display:flex;gap:14px;padding-bottom:20px;position:relative}.itin-dot{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1}.itin-dot.on{border-color:var(--gold);background:var(--gold-light)}.itin-body{flex:1;padding-top:4px}.itin-time{font-size:10px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}.itin-title{font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:5px}.itin-desc{font-size:12px;color:#555;line-height:1.65;margin-bottom:8px}.itin-tags{display:flex;flex-wrap:wrap;gap:5px}.itin-tag{background:var(--warm);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text)}.tip-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}.tip-icon{font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center}.tip-title{font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}.tip-text{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px}.tip-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.tip-gold{background:#FDF3E0;color:#92400E}.tip-red{background:#FEE2E2;color:#991B1B}.tip-green{background:#D1FAE5;color:#065F46}.tip-blue{background:#DBEAFE;color:#1E3A5F}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.blog-video-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;margin:0}.blog-video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.blog-autor-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin:0}.blog-autor-foto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0}.blog-autor-ph{display:flex;align-items:center;justify-content:center;background:var(--gold-light);color:var(--gold-dark);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px}.blog-autor-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--text)}.blog-autor-bio{font-size:12px;color:#555;line-height:1.6;margin-top:3px}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
 +".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
 +".fcopy a{color:rgba(255,255,255,.45)}";
 
-function buildHTML(d, det, fotos, resenas) {
+function buildHTML(d, det, fotos, resenas, autor) {
   var cat   = d.categoria_slug || 'sitio';
   var label = CAT_LABEL[cat] || 'Destino';
   var dir   = CAT_DIR[cat]   || 'index.html';
@@ -344,6 +361,22 @@ function buildHTML(d, det, fotos, resenas) {
       'prohibido=' + prohibidoEvento.length);
   }
 
+  // Campos especificos de blog desde tags JSONB (Sprint Inspirate)
+  // cuerpo_historia y tiempo_lectura NO son campos propios: se
+  // reusan columnas genericas ya existentes (descripcion) o se
+  // calculan en el momento, en vez de duplicar datos en tags -- ver
+  // DECISIONS.md y la leccion de BUG-019 (no duplicar campos
+  // genericos ya existentes).
+  var temaBlog     = tags.tema      || '';
+  var videoUrlBlog = tags.video_url || '';
+  var cuerpoBlog    = d.descripcion || d.lead || '';
+  var palabrasBlog  = cuerpoBlog ? cuerpoBlog.trim().split(/\s+/).filter(Boolean).length : 0;
+  var tiempoLecturaBlog = palabrasBlog ? Math.max(1, Math.round(palabrasBlog / 200)) : 0;
+
+  if (cat === 'blog') {
+    console.log('[TRACE][pagina-blog]', 'Blog cargado | ' + palabrasBlog + ' palabras detectadas | Autor: ' + (autor && autor.nombre ? autor.nombre : 'Sin autor'));
+  }
+
   // Formatea fecha ISO (YYYY-MM-DD) a "5 de Diciembre de 2026".
   // Degrada al valor crudo si no matchea el formato esperado (TASK-003).
   var MESES_LARGOS_EVENTO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -385,17 +418,27 @@ function buildHTML(d, det, fotos, resenas) {
   // aqui pero nunca usado (el render final arma sus propios botones
   // en la seccion <section class="hero">) -- codigo muerto, eliminado.
   var hqi = [];
-  if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
-  if (nRes>0) {
-    hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' \u00b7 '+nRes+' rese\u00f1as</div>');
+  if (cat === 'blog') {
+    // Blog no usa rating/precio -- un articulo no se "califica con
+    // estrellas" como un lugar. Chips propios: tema, tiempo de
+    // lectura y autor (senal de E-E-A-T visible desde el hero).
+    if (temaBlog) hqi.push('<div class="hqi">'+(TEMA_BLOG_EMOJI[temaBlog]||'\u270D\ufe0f')+' '+esc(TEMA_BLOG_LABEL[temaBlog]||temaBlog)+'</div>');
+    if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
+    if (tiempoLecturaBlog) hqi.push('<div class="hqi">\u23F1 '+tiempoLecturaBlog+' min de lectura</div>');
+    if (autor && autor.nombre) hqi.push('<div class="hqi">\u270D\ufe0f '+esc(autor.nombre)+'</div>');
   } else {
-    // Fallback pedido en Sprint 2: evitar que un lugar recien
-    // publicado se vea "vacio" sin ninguna senal de confianza.
-    hqi.push('<div class="hqi">\u2605 4.8 \u00b7 Nuevo</div>');
+    if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
+    if (nRes>0) {
+      hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' \u00b7 '+nRes+' rese\u00f1as</div>');
+    } else {
+      // Fallback pedido en Sprint 2: evitar que un lugar recien
+      // publicado se vea "vacio" sin ninguna senal de confianza.
+      hqi.push('<div class="hqi">\u2605 4.8 \u00b7 Nuevo</div>');
+    }
+    if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
+    if (duracion)      hqi.push('<div class="hqi">\u23F1 '+esc(duracion)+'</div>');
+    if (horarioVisita) hqi.push('<div class="hqi">\u23F0 '+esc(horarioVisita)+'</div>');
   }
-  if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
-  if (duracion)      hqi.push('<div class="hqi">\u23F1 '+esc(duracion)+'</div>');
-  if (horarioVisita) hqi.push('<div class="hqi">\u23F0 '+esc(horarioVisita)+'</div>');
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
@@ -414,13 +457,65 @@ function buildHTML(d, det, fotos, resenas) {
   function nextNum() { return secNum++; }
 
   // -- SECCI??N: Descripcion ----------------------------------------
+  var descTitleGeneric = cat === 'blog' ? 'La historia' : 'Sobre este lugar';
   var secDescripcion = '<section class="ssec bwarm" id="descripcion"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+descTitleGeneric+'</h2><div class="stnum">'+nextNum()+'</div></div>'
     + (d.lead ? '<p class="slead bc">'+esc(d.lead)+'</p>' : '')
     + (d.descripcion ? '<p class="stext">'+esc(d.descripcion)+'</p>' : '')
     + (d.highlight ? '<div class="hbox"><span class="hbico">\u2605</span><div><div class="hblbl">Destacado</div><div class="hbtx">'+esc(d.highlight)+'</div></div></div>' : '')
     + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
     + '</div></section>';
+
+  // -- SECCION (Blog): Video embebido --------------------------------
+  // Convierte la URL cruda a un embed src construido en servidor a
+  // partir de un host+id validados -- nunca se inyecta la URL del
+  // usuario directamente en el src del iframe.
+  function videoEmbedUrlBlog(raw) {
+    try {
+      var url = new URL(String(raw));
+      var host = url.hostname.toLowerCase().replace(/^www\./, '');
+      if (host === 'youtu.be') {
+        var id1 = url.pathname.replace(/^\//, '');
+        return id1 ? 'https://www.youtube.com/embed/' + id1 : '';
+      }
+      if (host === 'youtube.com') {
+        var id2 = url.searchParams.get('v');
+        return id2 ? 'https://www.youtube.com/embed/' + id2 : '';
+      }
+      if (host === 'vimeo.com') {
+        var id3 = url.pathname.replace(/^\//, '');
+        return id3 ? 'https://player.vimeo.com/video/' + id3 : '';
+      }
+    } catch (e) {}
+    return '';
+  }
+  var secBlogVideo = '';
+  if (cat === 'blog' && videoUrlBlog) {
+    var embedSrcBlog = videoEmbedUrlBlog(videoUrlBlog);
+    if (embedSrcBlog) {
+      secBlogVideo = '<section class="ssec bwhite" id="video"><div class="sin">'
+        + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Video</h2><div class="stnum">'+nextNum()+'</div></div>'
+        + '<div class="blog-video-wrap"><iframe src="'+esc(embedSrcBlog)+'" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>'
+        + '</div></section>';
+    }
+  }
+
+  // -- SECCION (Blog): Quien escribe (autor) --------------------------
+  // E-E-A-T: firma visible con nombre + bio/foto si el usuario-autor
+  // (tags.id_autor) tiene perfil ampliado. autor llega ya resuelto
+  // desde el handler (JOIN contra usuarios), no se hace fetch aqui.
+  var secBlogAutor = '';
+  if (cat === 'blog' && autor && autor.nombre) {
+    secBlogAutor = '<section class="ssec bwarm" id="autor"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Quien escribe</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="blog-autor-card">'
+      + (autor.foto_url
+          ? '<img class="blog-autor-foto" src="'+esc(autor.foto_url)+'" alt="'+esc(autor.nombre)+'">'
+          : '<div class="blog-autor-foto blog-autor-ph">'+esc((autor.nombre||'?').charAt(0).toUpperCase())+'</div>')
+      + '<div><div class="blog-autor-nombre">'+esc(autor.nombre)+'</div>'
+      + (autor.bio ? '<div class="blog-autor-bio">'+esc(autor.bio)+'</div>' : '')
+      + '</div></div></div></section>';
+  }
 
   // -- SECCI??N: Info rapida (iconos) -------------------------------
   var infoCards = [];
@@ -1053,19 +1148,25 @@ function buildHTML(d, det, fotos, resenas) {
     }).join('');
   }
 
-  var secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + (nRes>0 ? '<div class="rblock"><div><div class="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt">'+nRes+' resenas</div></div></div>' : '')
-    + (rvHtml ? '<div class="rvlist">'+rvHtml+'</div>' : '<p class="stext">Se el primero en dejar una resena.</p>')
-    + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
-    + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
-    + '<div class="sprow" id="rv-stars">'
-    + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">*</span>'; }).reverse().join('')
-    + '</div>'
-    + '<textarea id="rvt" placeholder="Que te parecio este lugar?" class="wrinp"></textarea>'
-    + '<button class="wrsub" onclick="submitRv()">Publicar resena -></button>'
-    + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
-    + '</div></div></section>';
+  // Blog no muestra resenas de "lugar" -- un articulo no se califica
+  // con estrellas como un hostal o un sitio turistico. Se omite por
+  // completo en vez de mostrar un widget que no aplica.
+  var secResenas = '';
+  if (cat !== 'blog') {
+    secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + (nRes>0 ? '<div class="rblock"><div><div class="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt">'+nRes+' resenas</div></div></div>' : '')
+      + (rvHtml ? '<div class="rvlist">'+rvHtml+'</div>' : '<p class="stext">Se el primero en dejar una resena.</p>')
+      + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
+      + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
+      + '<div class="sprow" id="rv-stars">'
+      + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">*</span>'; }).reverse().join('')
+      + '</div>'
+      + '<textarea id="rvt" placeholder="Que te parecio este lugar?" class="wrinp"></textarea>'
+      + '<button class="wrsub" onclick="submitRv()">Publicar resena -></button>'
+      + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
+      + '</div></div></section>';
+  }
 
   // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
@@ -1106,7 +1207,9 @@ function buildHTML(d, det, fotos, resenas) {
     {id:'reservar',    label:'Reservar',    has:!!secReservar},
     {id:'mapa',        label:'Mapa',        has:!!secMapa},
     {id:'faq',         label:'FAQ',         has:!!secFaq},
-    {id:'resenas',     label:'Resenas',     has:!!secResenas}
+    {id:'resenas',     label:'Resenas',     has:!!secResenas},
+    {id:'autor',       label:'Autor',       has:!!secBlogAutor},
+    {id:'video',       label:'Video',       has:!!secBlogVideo}
   ].filter(function(it){ return it.has; });
   var subnav = subnavItems.length > 1 ? '<nav class="subnav">'
     + subnavItems.map(function(it, i){
@@ -1125,7 +1228,7 @@ function buildHTML(d, det, fotos, resenas) {
     + '<meta property="og:type" content="place">\n'
     + '<meta name="theme-color" content="#E8A020">\n'
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
-    + schemaLD(d, cat) + '\n'
+    + schemaLD(d, cat, autor) + '\n'
     + '<style>'+CSS+'</style>\n</head>\n<body>\n\n'
 
     + '<div class="topbar"><a class="tl" href="/index.html">EXPLORA<em>CO</em></a><div class="tsep"></div>'
@@ -1152,6 +1255,8 @@ function buildHTML(d, det, fotos, resenas) {
 
     + gstrip + '\n\n'
     + secDescripcion + '\n'
+    + secBlogVideo + '\n'
+    + secBlogAutor + '\n'
     + secInfo + '\n'
     + secSitio + '\n'
     + secDificultad + '\n'
@@ -1252,7 +1357,25 @@ module.exports = async function handler(req, res) {
       [d.id]
     );
 
-    var html = buildHTML(d, det, fotosRows, resenasRows);
+    // Autor del blog (tags.id_autor -> usuarios.id). Envuelto en
+    // try/catch propio: si la migracion de usuarios.bio/foto_url
+    // (ver nota de entrega) todavia no corrio en Neon, la pagina debe
+    // seguir renderizando sin firma de autor en vez de devolver 500.
+    var autor = null;
+    if (d.categoria_slug === 'blog') {
+      try {
+        var tagsForAutor = safeJSON(d.tags);
+        var idAutorBlog = (tagsForAutor && typeof tagsForAutor === 'object' && !Array.isArray(tagsForAutor)) ? tagsForAutor.id_autor : null;
+        if (idAutorBlog) {
+          var autorRows = await sql('SELECT id, nombre, bio, foto_url FROM usuarios WHERE id=$1 LIMIT 1', [idAutorBlog]);
+          if (autorRows.length) autor = autorRows[0];
+        }
+      } catch (eAutor) {
+        console.error('[pagina-destino] autor blog fallo (posible migracion pendiente): ' + eAutor.message);
+      }
+    }
+
+    var html = buildHTML(d, det, fotosRows, resenasRows, autor);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);
