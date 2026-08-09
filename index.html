@@ -981,6 +981,14 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .badge-emoji{font-size:22px;margin-bottom:4px}
 .badge-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
 .badge-desc{font-size:9px;color:rgba(255,255,255,.35);line-height:1.4}
+.profile-xp-side{display:flex;flex-direction:column;gap:14px}
+.xpc-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px 16px}
+.xpc-head{display:flex;justify-content:space-between;align-items:center;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;color:var(--sand);margin-bottom:8px}
+.xpc-head span:last-child{color:var(--gold)}
+.xpc-track{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.xpc-fill{height:100%;background:var(--gold);border-radius:4px;transition:width .4s;width:0%}
+.badges-head{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin:2px 0 2px}
+.badges-head span{color:var(--gold)}
 #badges-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
 /* XP bar */
 .xp-bar-wrap{height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin:6px 0;overflow:hidden}
@@ -1119,10 +1127,11 @@ textarea.wrinp{resize:vertical;min-height:88px}
     display:none;align-items:center;gap:8px;
     padding:4px 12px;background:rgba(255,255,255,.08);
     border-radius:20px;cursor:pointer;margin-left:8px
-  " onclick="window.ExploraCO && window.ExploraCO.mostrarLogin()">
+  " onclick="document.getElementById('social-section').scrollIntoView({behavior:'smooth'})">
     <div style="font-size:11px;color:rgba(255,255,255,.7)">
       <span id="perfil-nombre" style="font-weight:700;color:#fff"></span>
       <span id="perfil-xp" style="color:#E8A020;margin-left:4px"></span>
+      <span id="perfil-badge" style="color:rgba(255,255,255,.45);margin-left:4px"></span>
     </div>
   </div><div class="hna">
     <div class="hnsb" onclick="document.getElementById('sinp').focus();window.scrollTo({top:0,behavior:'smooth'})">🔍 Buscar…</div>
@@ -2797,11 +2806,11 @@ function initSocialTabs() {
       tab.classList.add('on');
       var panel = document.getElementById('panel-'+tab.dataset.tab);
       if(panel) panel.classList.add('on');
-      // Lazy init
-      if(tab.dataset.tab === 'quienva') initQuienVaMap();
-      if(tab.dataset.tab === 'perfil')  renderTravellers();
-      if(tab.dataset.tab === 'feed')    try{ renderFeed(); }catch(e){}
-      if(tab.dataset.tab === 'matching') renderMatching();
+      // Lazy init (antes: 'perfil' disparaba por error renderTravellers();
+      // quienva/feed/matching no tienen pestana en esta version acotada).
+      if(tab.dataset.tab === 'perfil')   { try{ renderProfileTab(); }catch(e){} }
+      if(tab.dataset.tab === 'viajeros') renderTravellers();
+      if(tab.dataset.tab === 'chat')     { renderChatRooms(''); selectChatRoom(activeChatRoom); }
     });
   });
 }
@@ -4198,11 +4207,112 @@ function submitBlog() {
     <div id="ob-step-1">
       <input class="ob-inp" id="ob-name" type="text" placeholder="Tu nombre (ej: Carlos Mendoza)" autocomplete="given-name">
       <input class="ob-inp" id="ob-origin" type="text" placeholder="¿De dónde eres? (ej: Bogotá, Colombia)" autocomplete="off">
-      <button class="ob-btn" onclick="registerUser()">Empezar — 50 XP de bienvenida 🎁</button>
+      <button class="ob-btn" onclick="registerUser()">Empezar a explorar →</button>
       <span class="ob-skip" onclick="closeOnboarding()">Continuar sin registrarme</span>
     </div>
   </div>
 </div>
+<section class="social-section" id="social-section">
+  <div class="social-inner">
+
+    <div class="user-bar">
+      <div class="user-av" id="user-av-display">TÚ</div>
+      <div>
+        <div class="user-name" id="user-name-display">Tu perfil de viajero</div>
+        <div class="user-since">Viajero de ExploraCO</div>
+      </div>
+      <div class="user-stats">
+        <div class="ust"><div class="ust-n" id="soc-saved-n">0</div><div class="ust-l">Guardados</div></div>
+        <div class="ust"><div class="ust-n" id="soc-visited-n">0</div><div class="ust-l">Visitados</div></div>
+        <div class="ust"><div class="ust-n" id="soc-following-n">0</div><div class="ust-l">Siguiendo</div></div>
+      </div>
+      <button class="user-edit-btn" onclick="openEditProfile()">Editar perfil</button>
+    </div>
+
+    <div class="social-tabs">
+      <div class="stab on" data-tab="perfil">Mi perfil</div>
+      <div class="stab" data-tab="viajeros">Viajeros</div>
+      <div class="stab" data-tab="chat">Chat</div>
+    </div>
+
+    <!-- ── PERFIL: unica pestana con datos 100% reales (window.ExploraCO.usuario
+         via usuario-session.js, mas mmSaved/mmVisited). Ver nota de entrega. ── -->
+    <div class="social-panel on" id="panel-perfil">
+      <div class="profile-layout">
+        <div class="profile-card">
+          <div class="profile-cover">
+            <div class="profile-av-wrap"><div class="profile-av" id="my-profile-av">TÚ</div></div>
+          </div>
+          <div class="profile-body">
+            <div class="profile-name" id="my-profile-name">Mi perfil</div>
+            <div class="profile-origin" id="my-profile-origin">🇨🇴 Colombia</div>
+            <div class="profile-tags" id="my-profile-tags"></div>
+            <div class="profile-next">Próximo destino: <span id="my-next-dest">Por definir</span></div>
+            <div class="profile-stat-row">
+              <div class="pst"><div class="pst-n" id="prof-saved">0</div><div class="pst-l">Guardados</div></div>
+              <div class="pst"><div class="pst-n" id="prof-visited">0</div><div class="pst-l">Visitados</div></div>
+              <div class="pst"><div class="pst-n" id="prof-plans">0</div><div class="pst-l">Planes</div></div>
+            </div>
+            <div class="profile-actions">
+              <div class="prof-btn follow" onclick="openEditProfile()">Editar perfil</div>
+            </div>
+            <div class="profile-map-section">
+              <div class="pms-title">Mapa de guardados</div>
+              <div class="profile-mini-map" id="profile-mini-map"><div class="pmm-grid"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-xp-side">
+          <div class="xpc-card">
+            <div class="xpc-head"><span id="pts-level">🌱 Viajero novato</span><span id="pts-xp">0 XP</span></div>
+            <div class="xpc-track"><div class="xpc-fill" id="pts-bar"></div></div>
+          </div>
+          <div class="badges-head">Insignias · <span id="pts-badges-count">0</span>/7</div>
+          <div id="badges-grid"></div>
+          <div id="xp-history"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── VIAJEROS: datos de muestra (MOCK_USERS), sin backend real detras ── -->
+    <div class="social-panel" id="panel-viajeros">
+      <div class="travellers-grid" id="travellers-grid"></div>
+    </div>
+
+    <!-- ── CHAT: salas y mensajes de muestra (CHAT_ROOMS/CHAT_MESSAGES), sin
+         backend real -- lo que escribas se guarda solo en esta pestana mientras
+         no recargues la pagina ── -->
+    <div class="social-panel" id="panel-chat">
+      <div class="chat-layout">
+        <div class="chat-sidebar">
+          <div class="chat-sidebar-hd">
+            <div class="chat-sidebar-title">Salas</div>
+            <input class="chat-search" placeholder="Buscar sala..." oninput="filterChatRooms(this.value)">
+          </div>
+          <div class="chat-list" id="chat-room-list"></div>
+        </div>
+        <div class="chat-main">
+          <div class="chat-main-hd">
+            <span class="cm-emoji" id="chat-room-emoji"></span>
+            <div>
+              <div class="cm-name" id="chat-room-name"></div>
+              <div class="cm-meta" id="chat-room-meta"></div>
+            </div>
+          </div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-bar">
+            <input class="chat-inp" id="chat-inp" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')sendMsg()">
+            <button class="chat-send-btn" onclick="sendMsg()">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+<div id="social-toast" class="social-toast"></div>
+
 <footer class="footer">
 <div class="ftop">
   <div>
