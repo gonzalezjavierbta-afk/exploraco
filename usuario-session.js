@@ -339,6 +339,30 @@
     }
   };
 
+  // ── Quitar destino guardado en DB (sin necesitar un boton con estado,
+  // a diferencia de toggleGuardado) ──────────────────────────────
+  window.ExploraCO.quitarGuardado = async function (destinoUUID) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) return false;
+    try {
+      var res = await fetch(API + '/api/interacciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo:       'quitar_guardado',
+          usuario_id: usuario.id,
+          destino_id: destinoUUID,
+        }),
+      });
+      var data = await res.json();
+      if (data.ok) mostrarToast('Quitado de Tu Mapa', '#888');
+      return !!data.ok;
+    } catch (err) {
+      console.warn('[session] quitarGuardado error:', err.message);
+      return false;
+    }
+  };
+
   // ── Modal de login ─────────────────────────────────────────
   function mostrarModalLogin(mensaje) {
     var modal = document.getElementById('login-modal');
@@ -460,6 +484,15 @@
     document.querySelectorAll('[data-save-uuid]').forEach(function (btn) {
       // Los botones se actualizan individualmente cuando se interactúa
     });
+
+    // Hook para paginas con su propio widget de nivel/insignias (ej.
+    // index.html, ver updatePointsUI + window.onExploraCOUpdate ahi).
+    // Se usa un hook global en vez de un evento porque este script se
+    // carga al final del body: sin el hook, la pagina que lo incluye
+    // no tendria forma de saber cuando termino de cargar la sesion.
+    if (typeof window.onExploraCOUpdate === 'function') {
+      try { window.onExploraCOUpdate(); } catch (e) {}
+    }
   }
 
   // ── Inicializar ────────────────────────────────────────────

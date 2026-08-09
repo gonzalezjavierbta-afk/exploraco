@@ -3623,23 +3623,13 @@ renderMyMap = function() {
 
 
 /* ══════════════════════════════════════════════════════
-   EXPLORACО — SISTEMA DE PUNTOS Y GAMIFICACIÓN
-   XP, Niveles, Badges, Leaderboard
+   EXPLORACO — SISTEMA DE PUNTOS Y GAMIFICACION
+   v2: fuente de verdad = usuarios.xp_total en Neon, via
+   window.ExploraCO (usuario-session.js). Antes esta seccion escribia
+   todo en localStorage ('user_points') sin llamar nunca a
+   /api/interacciones ni /api/usuarios: el XP mostrado aqui nunca
+   coincidia con el XP real del leaderboard. Ver nota de entrega.
 ══════════════════════════════════════════════════════ */
-
-/* ── POINTS CONFIG ── */
-var XP_ACTIONS = {
-  registro:      { xp: 50,  label: '¡Bienvenido a ExploraCO!', once: true },
-  perfil:        { xp: 30,  label: 'Perfil completo', once: true },
-  guardar:       { xp: 5,   label: 'Lugar guardado' },
-  visitar:       { xp: 10,  label: 'Lugar marcado como visitado' },
-  resena:        { xp: 25,  label: 'Reseña publicada' },
-  foto:          { xp: 15,  label: 'Foto agregada' },
-  compartir:     { xp: 8,   label: 'Lugar compartido' },
-  plan:          { xp: 20,  label: 'Plan creado' },
-  chat:          { xp: 3,   label: 'Mensaje enviado' },
-  login_streak:  { xp: 10,  label: 'Racha de visitas' },
-};
 
 var XP_LEVELS = [
   { min: 0,    max: 99,   nombre: 'Viajero novato',     emoji: '🌱', color: '#22C55E' },
@@ -3650,85 +3640,24 @@ var XP_LEVELS = [
   { min: 2000, max: 99999,nombre: 'Maestro ExploraCO',   emoji: '👑', color: '#E8A020' },
 ];
 
+// Insignias recortadas frente a v1: se quitaron 'compartido',
+// 'plan_maestro' y 'social' (compartir/plan/chat nunca tuvieron un
+// endpoint real detras -- habrian quedado bloqueadas para siempre) y
+// las de region 'caribe'/'andino' (total_guardados en Neon no
+// distingue region por destino todavia). Quedan solo las que se
+// pueden calcular con datos reales: total_guardados, total_resenas,
+// total_visitas, y el origen auto-declarado en el onboarding.
 var XP_BADGES = [
-  { id: 'primer_lugar',   emoji: '📍', nombre: 'Primer destino',    desc: 'Guardaste tu primer lugar',         check: function(u){ return u.saved >= 1; } },
-  { id: 'explorador5',    emoji: '🧭', nombre: 'Explorador x5',    desc: '5 lugares guardados',                check: function(u){ return u.saved >= 5; } },
-  { id: 'viajero10',      emoji: '✈️', nombre: 'Gran viajero',     desc: '10 lugares guardados',               check: function(u){ return u.saved >= 10; } },
-  { id: 'primer_resena',  emoji: '✍️', nombre: 'Primer reseña',    desc: 'Publicaste tu primera reseña',       check: function(u){ return u.reviews >= 1; } },
-  { id: 'critico',        emoji: '⭐', nombre: 'Crítico viajero',   desc: '5 reseñas publicadas',               check: function(u){ return u.reviews >= 5; } },
-  { id: 'visitado3',      emoji: '🏅', nombre: 'Ya estuve',        desc: '3 lugares visitados',                check: function(u){ return u.visited >= 3; } },
-  { id: 'caribe',         emoji: '🌊', nombre: 'Costa Caribe',     desc: 'Guardaste 3 destinos del Caribe',    check: function(u){ return u.caribe >= 3; } },
-  { id: 'andino',         emoji: '⛰️', nombre: 'Corazón andino',   desc: 'Guardaste 3 destinos andinos',       check: function(u){ return u.andino >= 3; } },
-  { id: 'compartido',     emoji: '📢', nombre: 'Difusor',          desc: 'Compartiste 3 lugares',              check: function(u){ return u.shares >= 3; } },
-  { id: 'plan_maestro',   emoji: '📋', nombre: 'Planificador',     desc: 'Creaste tu primer plan de viaje',    check: function(u){ return u.plans >= 1; } },
-  { id: 'social',         emoji: '💬', nombre: 'Alma social',      desc: 'Enviaste 10 mensajes en el chat',    check: function(u){ return u.chats >= 10; } },
-  { id: 'colombiano',     emoji: '🇨🇴', nombre: 'Orgullo colombiano', desc: 'Eres viajero local de Colombia', check: function(u){ return u.origin && u.origin.includes('Colombia'); } },
+  { id: 'primer_lugar',  emoji: '📍', nombre: 'Primer destino',      desc: 'Guardaste tu primer lugar',       check: function(u){ return u.saved >= 1; } },
+  { id: 'explorador5',   emoji: '🧭', nombre: 'Explorador x5',       desc: '5 lugares guardados',              check: function(u){ return u.saved >= 5; } },
+  { id: 'viajero10',     emoji: '✈️', nombre: 'Gran viajero',        desc: '10 lugares guardados',             check: function(u){ return u.saved >= 10; } },
+  { id: 'primer_resena', emoji: '✍️', nombre: 'Primera reseña',      desc: 'Publicaste tu primera reseña',     check: function(u){ return u.reviews >= 1; } },
+  { id: 'critico',       emoji: '⭐', nombre: 'Crítico viajero',     desc: '5 reseñas publicadas',             check: function(u){ return u.reviews >= 5; } },
+  { id: 'visitado3',     emoji: '🏅', nombre: 'Ya estuve',           desc: '3 lugares visitados',              check: function(u){ return u.visited >= 3; } },
+  { id: 'colombiano',    emoji: '🇨🇴', nombre: 'Orgullo colombiano', desc: 'Eres viajero local de Colombia',   check: function(u){ return u.origin && u.origin.indexOf('Colombia') !== -1; } },
 ];
 
-/* ── POINTS STATE ── */
-var userPoints = { xp: 0, saved: 0, visited: 0, reviews: 0, shares: 0,
-                   plans: 0, chats: 0, caribe: 0, andino: 0, origin: '',
-                   badges: [], history: [], doneOnce: {} };
-
-try {
-  var saved_pts = localStorage.getItem('user_points');
-  if(saved_pts) userPoints = JSON.parse(saved_pts);
-  // Sync with existing mm_ data
-  userPoints.saved   = Math.max(userPoints.saved,   mmSaved.length);
-  userPoints.visited = Math.max(userPoints.visited, mmVisited.length);
-  userPoints.origin  = userPoints.origin || socialUser.origin || '';
-} catch(e) {}
-
-/* ── AWARD XP ── */
-function awardXP(action, meta) {
-  var cfg = XP_ACTIONS[action];
-  if(!cfg) return;
-  if(cfg.once && userPoints.doneOnce[action]) return;
-  if(cfg.once) userPoints.doneOnce[action] = true;
-
-  var prev_level = getLevel(userPoints.xp);
-  userPoints.xp += cfg.xp;
-
-  // Track specific counters
-  if(action === 'guardar')    userPoints.saved++;
-  if(action === 'visitar')    userPoints.visited++;
-  if(action === 'resena')     userPoints.reviews++;
-  if(action === 'compartir')  userPoints.shares++;
-  if(action === 'plan')       userPoints.plans++;
-  if(action === 'chat')       userPoints.chats++;
-
-  // Track geo badges
-  if(meta && meta.region) {
-    var caribeRegions = ['Atlántico','Bolívar','Magdalena','Córdoba','Sucre','César','La Guajira'];
-    var andinoRegions = ['Cundinamarca','Antioquia','Valle del Cauca','Caldas','Risaralda','Quindío','Boyacá','Nariño','Cauca','Huila','Santander','Norte de Santander'];
-    if(caribeRegions.indexOf(meta.region) !== -1) userPoints.caribe++;
-    if(andinoRegions.indexOf(meta.region) !== -1) userPoints.andino++;
-  }
-
-  // History entry
-  userPoints.history.unshift({
-    action: action, xp: cfg.xp, label: cfg.label,
-    ts: Date.now(), meta: meta || {}
-  });
-  if(userPoints.history.length > 50) userPoints.history.length = 50;
-
-  savePoints();
-
-  // Show XP toast
-  showXPToast('+' + cfg.xp + ' XP — ' + cfg.label);
-
-  // Check level up
-  var new_level = getLevel(userPoints.xp);
-  if(new_level.min > prev_level.min) {
-    setTimeout(function() { showLevelUpModal(new_level); }, 1200);
-  }
-
-  // Check new badges
-  checkAndAwardBadges();
-  updatePointsUI();
-}
-
-/* ── LEVEL LOGIC ── */
+/* ── LEVEL LOGIC (se conserva igual, ahora opera sobre xp real) ── */
 function getLevel(xp) {
   for(var i = XP_LEVELS.length - 1; i >= 0; i--) {
     if(xp >= XP_LEVELS[i].min) return XP_LEVELS[i];
@@ -3749,25 +3678,20 @@ function getNextLevel(xp) {
   return cur;
 }
 
-/* ── BADGE LOGIC ── */
-function checkAndAwardBadges() {
-  XP_BADGES.forEach(function(badge) {
-    if(userPoints.badges.indexOf(badge.id) !== -1) return;
-    userPoints.origin = socialUser.origin || userPoints.origin;
-    if(badge.check(userPoints)) {
-      userPoints.badges.push(badge.id);
-      savePoints();
-      setTimeout(function() { showBadgeToast(badge); }, 800);
-    }
-  });
+/* ── Snapshot para calcular insignias: viene de window.ExploraCO
+   (sesion real), no de un contador local. Sin sesion, todo en 0. ── */
+function puntosUsuarioActual() {
+  var u = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  return {
+    xp:      u ? (parseInt(u.xp_total)        || 0) : 0,
+    saved:   u ? (parseInt(u.total_guardados) || 0) : 0,
+    reviews: u ? (parseInt(u.total_resenas)   || 0) : 0,
+    visited: u ? (parseInt(u.total_visitas)   || 0) : 0,
+    origin:  (socialUser && socialUser.origin) || '',
+  };
 }
 
-/* ── SAVE ── */
-function savePoints() {
-  try { localStorage.setItem('user_points', JSON.stringify(userPoints)); } catch(e) {}
-}
-
-/* ── XP TOAST ── */
+/* ── XP TOAST (utilitario generico, se conserva) ── */
 function showXPToast(msg) {
   var t = document.getElementById('xp-toast');
   if(!t) {
@@ -3786,7 +3710,7 @@ function showXPToast(msg) {
   }, 2500);
 }
 
-/* ── BADGE TOAST ── */
+/* ── BADGE TOAST (se conserva) ── */
 function showBadgeToast(badge) {
   var t = document.getElementById('badge-toast');
   if(!t) {
@@ -3808,8 +3732,8 @@ function showBadgeToast(badge) {
   }, 4000);
 }
 
-/* ── LEVEL UP MODAL ── */
-function showLevelUpModal(level) {
+/* ── LEVEL UP MODAL (se conserva) ── */
+function showLevelUpModal(level, xpActual) {
   var m = document.getElementById('levelup-modal');
   if(!m) return;
   var em = m.querySelector('.lu-emoji');
@@ -3817,7 +3741,7 @@ function showLevelUpModal(level) {
   var xm = m.querySelector('.lu-xp');
   if(em) em.textContent = level.emoji;
   if(nm) nm.textContent = level.nombre;
-  if(xm) xm.textContent = userPoints.xp + ' XP';
+  if(xm) xm.textContent = xpActual + ' XP';
   m.style.display = 'flex';
   setTimeout(function() { m.style.opacity = '1'; }, 10);
 }
@@ -3826,40 +3750,50 @@ function closeLevelUp() {
   if(m) { m.style.opacity = '0'; setTimeout(function(){ m.style.display='none'; }, 300); }
 }
 
-/* ── UPDATE POINTS UI ── */
-function updatePointsUI() {
-  var lvl   = getLevel(userPoints.xp);
-  var pct   = getLevelProgress(userPoints.xp);
-  var next  = getNextLevel(userPoints.xp);
-  var xpToNext = next.min - userPoints.xp;
+// Insignias y nivel ya mostrados en este dispositivo, solo para no
+// repetir el mismo toast en cada refresco de la UI (no es estado de
+// juego, es puramente de presentacion).
+var _badgesVistos = {};
+try {
+  var _bv = localStorage.getItem('badges_vistos');
+  if(_bv) _badgesVistos = JSON.parse(_bv);
+} catch(e) {}
+function _marcarBadgeVisto(id) {
+  _badgesVistos[id] = true;
+  try { localStorage.setItem('badges_vistos', JSON.stringify(_badgesVistos)); } catch(e) {}
+}
+var _ultimoNivelVisto = null;
 
-  // Update profile tab stats
+/* ── UPDATE POINTS UI ──
+   Unico punto que lee window.ExploraCO.usuario. Se llama despues de
+   login, de guardar/quitar/visitar, de publicar resena y al cargar la
+   pagina (ver window.onExploraCOUpdate mas abajo, que usuario-session.js
+   invoca cada vez que actualiza su propio estado). */
+function updatePointsUI() {
+  var pu  = puntosUsuarioActual();
+  var lvl = getLevel(pu.xp);
+  var pct = getLevelProgress(pu.xp);
+  var earnedBadges = XP_BADGES.filter(function(b){ return b.check(pu); });
+
   var xpEl  = document.getElementById('pts-xp');
   var lvlEl = document.getElementById('pts-level');
   var barEl = document.getElementById('pts-bar');
   var bdgEl = document.getElementById('pts-badges-count');
-  if(xpEl)  xpEl.textContent  = userPoints.xp + ' XP';
+  if(xpEl)  xpEl.textContent  = pu.xp + ' XP';
   if(lvlEl) lvlEl.textContent = lvl.emoji + ' ' + lvl.nombre;
   if(barEl) barEl.style.width = pct + '%';
-  if(bdgEl) bdgEl.textContent = userPoints.badges.length;
+  if(bdgEl) bdgEl.textContent = earnedBadges.length;
 
-  // Update nav badge if shown
   var navXP = document.getElementById('nav-xp-badge');
-  if(navXP) navXP.textContent = userPoints.xp + ' XP';
+  if(navXP) navXP.textContent = pu.xp + ' XP';
 
-  // Sync counters with mm_ data
-  userPoints.saved   = Math.max(userPoints.saved,   mmSaved.length);
-  userPoints.visited = Math.max(userPoints.visited, mmVisited.length);
-
-  // Update profile tab
   var savedN   = document.getElementById('soc-saved-n');
   var visitedN = document.getElementById('soc-visited-n');
   if(savedN)   savedN.textContent   = mmSaved.length;
   if(visitedN) visitedN.textContent = mmVisited.length;
 
-  renderBadgesGrid();
-  renderXPHistory();
-  // Update mymapa-left XP mini widget
+  renderBadgesGrid(pu, earnedBadges);
+
   var mle = document.getElementById('mm-level-emoji');
   var mln = document.getElementById('mm-level-name');
   var mxt = document.getElementById('mm-xp-total');
@@ -3867,20 +3801,39 @@ function updatePointsUI() {
   var mxb = document.getElementById('mm-xp-mini-badges');
   if(mle) mle.textContent = lvl.emoji;
   if(mln) mln.textContent = lvl.nombre;
-  if(mxt) mxt.textContent = userPoints.xp + ' XP';
+  if(mxt) mxt.textContent = pu.xp + ' XP';
   if(mxf) mxf.style.width = pct + '%';
-  if(mxb) mxb.innerHTML = userPoints.badges.slice(0,6).map(function(bid) {
-    var b = XP_BADGES.find(function(x){return x.id===bid;});
-    return b ? '<span title="'+b.nombre+'">'+b.emoji+'</span>' : '';
+  if(mxb) mxb.innerHTML = earnedBadges.slice(0,6).map(function(b) {
+    return '<span title="'+b.nombre+'">'+b.emoji+'</span>';
   }).join('');
+
+  // Toast por cada insignia nueva que no se haya mostrado antes en
+  // este dispositivo.
+  earnedBadges.forEach(function(b) {
+    if(!_badgesVistos[b.id]) {
+      _marcarBadgeVisto(b.id);
+      setTimeout(function(){ showBadgeToast(b); }, 400);
+    }
+  });
+
+  // Modal de subida de nivel, comparando contra el ultimo nivel visto
+  // en esta sesion de pagina (no persiste entre recargas a proposito:
+  // evita mostrar el modal de nuevo solo por refrescar).
+  if(_ultimoNivelVisto !== null && lvl.min > _ultimoNivelVisto) {
+    setTimeout(function(){ showLevelUpModal(lvl, pu.xp); }, 800);
+  }
+  _ultimoNivelVisto = lvl.min;
 }
 
 /* ── BADGES GRID ── */
-function renderBadgesGrid() {
+function renderBadgesGrid(pu, earnedBadges) {
   var grid = document.getElementById('badges-grid');
   if(!grid) return;
+  pu = pu || puntosUsuarioActual();
+  earnedBadges = earnedBadges || XP_BADGES.filter(function(b){ return b.check(pu); });
+  var earnedIds = earnedBadges.map(function(b){ return b.id; });
   grid.innerHTML = XP_BADGES.map(function(b) {
-    var earned = userPoints.badges.indexOf(b.id) !== -1;
+    var earned = earnedIds.indexOf(b.id) !== -1;
     return '<div class="badge-card' + (earned ? ' earned' : ' locked') + '" title="' + b.desc + '">'
       + '<div class="badge-emoji">' + (earned ? b.emoji : '🔒') + '</div>'
       + '<div class="badge-name">' + b.nombre + '</div>'
@@ -3889,28 +3842,29 @@ function renderBadgesGrid() {
   }).join('');
 }
 
-/* ── XP HISTORY ── */
+/* ── XP HISTORY ──
+   v1 mostraba un historial local evento-por-evento (userPoints.history).
+   No tiene equivalente en Neon sin un endpoint nuevo (la tabla
+   interacciones si tiene los datos, pero no hay una ruta que la
+   devuelva paginada por usuario) -- se deja como placeholder honesto
+   en vez de simularlo con datos falsos. Candidato natural para Fase 3. */
 function renderXPHistory() {
   var list = document.getElementById('xp-history');
   if(!list) return;
-  if(!userPoints.history.length) {
-    list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Empieza a ganar XP guardando lugares, escribiendo reseñas y explorando Colombia 🇨🇴</div>';
-    return;
-  }
-  list.innerHTML = userPoints.history.slice(0,15).map(function(h) {
-    var d = new Date(h.ts);
-    var ds = d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
-      + '<div style="font-size:20px;flex-shrink:0">⚡</div>'
-      + '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">' + h.label + '</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.3)">' + ds + (h.meta && h.meta.name ? ' · ' + h.meta.name : '') + '</div></div>'
-      + '<div style="font-size:13px;font-weight:900;color:#E8A020;flex-shrink:0">+' + h.xp + '</div>'
-      + '</div>';
-  }).join('');
+  list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Guarda lugares, escribe reseñas y marca visitas para ganar XP 🇨🇴</div>';
 }
 
-/* ── PATCH existing actions to award XP ── */
-// Patch toggleSave (index.html version)
+/* ── PATCH existing actions: reconectar con la sesion real ──
+   _uuidRe distingue un id real de Neon de un id local/posicional. Sin
+   confirmar index-api-connector.js (no forma parte de esta entrega,
+   ver nota de entrega) no se puede asumir que MAPA_PLACES[].id sea
+   siempre un UUID real -- por eso el guardado local (mm_saved) sigue
+   funcionando igual que antes en cualquier caso, y la sincronizacion
+   con el backend solo se intenta cuando el id si tiene forma de UUID.
+   Si no hay sesion, tampoco se fuerza el login: se prioriza no
+   interrumpir a alguien que solo esta explorando. */
+var _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 var _origToggleDestSave = typeof toggleDestSave !== 'undefined' ? toggleDestSave : null;
 function toggleDestSave(id, btn) {
   var wasNew = mmSaved.indexOf(id) === -1;
@@ -3922,14 +3876,13 @@ function toggleDestSave(id, btn) {
     try{ localStorage.setItem('mm_saved',JSON.stringify(mmSaved)); }catch(e){}
     renderMyMap();
   }
-  if(wasNew) {
-    var src = typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : [];
-    var place = src.find(function(p){ return p.id === id; });
-    awardXP('guardar', place ? {name: place.name, region: place.region} : {});
+  var usuario = window.ExploraCO && window.ExploraCO.usuario;
+  if(usuario && typeof id === 'string' && _uuidRe.test(id)) {
+    var accion = wasNew ? window.ExploraCO.guardarDestino(id) : window.ExploraCO.quitarGuardado(id);
+    Promise.resolve(accion).then(function(){ updatePointsUI(); });
   }
 }
 
-// Patch toggleVisit (Mi Mapa)
 var _origMmToggleVisited = typeof mmToggleVisited !== 'undefined' ? mmToggleVisited : null;
 function mmToggleVisited(id) {
   var wasNew = mmVisited.indexOf(id) === -1;
@@ -3942,37 +3895,40 @@ function mmToggleVisited(id) {
     try{ localStorage.setItem('mm_saved',JSON.stringify(mmSaved)); }catch(e){}
     renderMyMap(); renderMMList();
   }
-  if(wasNew) {
-    var src = typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : [];
-    var place = src.find(function(p){ return p.id === id; });
-    awardXP('visitar', place ? {name: place.name, region: place.region} : {});
+  // Solo se marca visita real al pasar de no-visitado a visitado: no
+  // existe (ni tiene sentido) un 'quitar_visita' en el backend.
+  var usuario = window.ExploraCO && window.ExploraCO.usuario;
+  if(wasNew && usuario && typeof id === 'string' && _uuidRe.test(id)) {
+    window.ExploraCO.marcarVisitado(id).then(function(){ updatePointsUI(); });
   }
 }
 
-// Patch saveProfile to award XP on completion
+// Patch saveProfile: ya no otorga XP local (no existe una accion de
+// backend equivalente a "completar perfil"), pero si refresca la
+// insignia 'colombiano', que depende de socialUser.origin.
 var _origSaveProfile = typeof saveProfile !== 'undefined' ? saveProfile : null;
 if(_origSaveProfile) {
   var _wrappedSaveProfile = _origSaveProfile;
   saveProfile = function() {
-    var hadName = !!(socialUser && socialUser.name);
     _wrappedSaveProfile();
-    if(!hadName) awardXP('registro');
-    awardXP('perfil');
-    userPoints.origin = socialUser.origin || '';
-    checkAndAwardBadges();
-    savePoints();
+    updatePointsUI();
   };
 }
 
+/* ── Refrescar cuando cambia la sesion real ──
+   usuario-session.js llama a window.onExploraCOUpdate() al final de su
+   propia actualizarUI() (ver usuario-session.js) cada vez que cambia
+   el usuario logueado o su xp_total. Se usa un hook global en vez de
+   encadenar llamadas directas porque usuario-session.js se carga como
+   <script src> al final del body, despues de este bloque: sin el
+   hook, updatePointsUI() podria ejecutarse antes de que la sesion
+   real termine de cargar. */
+window.onExploraCOUpdate = function(){ try{ updatePointsUI(); }catch(e){} };
+
 /* ── INIT POINTS ON PAGE LOAD ── */
 (function initPoints() {
-  // Award first-time bonus if user has a name but never got it
-  if(socialUser && socialUser.name && !userPoints.doneOnce.registro) {
-    awardXP('registro');
-  }
-  // Sync badges with current state
-  checkAndAwardBadges();
   updatePointsUI();
+  renderXPHistory();
 })();
 
 
@@ -4011,13 +3967,13 @@ function registerUser() {
   socialUser.initials = name.split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0,2);
   socialUser.origin   = origin || '🇨🇴 Colombia';
   try { localStorage.setItem('soc_user', JSON.stringify(socialUser)); } catch(e) {}
-  // Award XP
-  awardXP('registro');
-  if(origin.includes('Colombia')) checkAndAwardBadges();
   updateUserBar();
   try{ renderProfileTab(); }catch(e){}
+  updatePointsUI();
   closeOnboarding();
-  showXPToast('🎉 ¡Bienvenido ' + name + '! +50 XP');
+  // Ya no se promete "+XP" aqui: completar este formulario no tiene
+  // una accion de backend equivalente todavia (ver nota de entrega).
+  showXPToast('🎉 ¡Bienvenido ' + name + '!');
 }
 
 /* ── Show onboarding on first visit ── */
@@ -4199,7 +4155,6 @@ function submitBlog() {
         if(btn){ btn.disabled = false; btn.textContent = 'Enviar experiencia →'; }
         return;
       }
-      if(typeof awardXP === 'function') awardXP('resena', {name: title});
       if(btns) btns.style.display = 'none';
       var succ = document.getElementById('blog-success');
       if(succ) succ.style.display = 'block';
