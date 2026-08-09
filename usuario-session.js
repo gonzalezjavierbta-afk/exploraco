@@ -218,10 +218,123 @@
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
+      } else {
+        // Antes un rechazo del backend (ej. reseña duplicada, ver
+        // api/interacciones.js v3) quedaba en silencio para el usuario.
+        mostrarToast(data.error || 'No se pudo publicar tu reseña', '#ef4444');
       }
       return data.ok;
     } catch (err) {
       console.warn('[session] publicarResena error:', err.message);
+      mostrarToast('Error de conexión', '#ef4444');
+      return false;
+    }
+  };
+
+  // ── Guardar / quitar destino en DB (toggle) ────────────────
+  window.ExploraCO.toggleGuardado = async function (destinoUUID, btnEl) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) {
+      mostrarModalLogin('Inicia sesión para guardar este lugar en Tu Mapa');
+      return false;
+    }
+
+    var estabaGuardado = !!(btnEl && btnEl.classList.contains('activo'));
+    var tipoAccion = estabaGuardado ? 'quitar_guardado' : 'guardado';
+    if (btnEl) btnEl.disabled = true;
+
+    try {
+      var res = await fetch(API + '/api/interacciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo:       tipoAccion,
+          usuario_id: usuario.id,
+          destino_id: destinoUUID,
+        }),
+      });
+      var data = await res.json();
+      if (!data.ok) {
+        mostrarToast(data.error || 'No se pudo actualizar', '#ef4444');
+        return false;
+      }
+
+      var ahoraGuardado = !estabaGuardado;
+      if (btnEl) btnEl.classList.toggle('activo', ahoraGuardado);
+
+      if (ahoraGuardado) {
+        if (data.xp > 0) {
+          mostrarToast('♥ Guardado · +' + data.xp + ' XP', '#E8A020');
+          window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp;
+          guardarSesion(window.ExploraCO.usuario);
+          actualizarUI();
+        } else {
+          mostrarToast('♥ Guardado de nuevo en Tu Mapa', '#E8A020');
+        }
+      } else {
+        mostrarToast('Quitado de Tu Mapa', '#888');
+      }
+      return true;
+    } catch (err) {
+      console.warn('[session] toggleGuardado error:', err.message);
+      mostrarToast('Error de conexión', '#ef4444');
+      return false;
+    } finally {
+      if (btnEl) btnEl.disabled = false;
+    }
+  };
+
+  // ── Consultar si el usuario actual ya guardo este destino ──
+  window.ExploraCO.estaGuardado = async function (destinoUUID) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) return false;
+    try {
+      var res = await fetch(
+        API + '/api/interacciones?tipo=is_guardado&destino_id=' + encodeURIComponent(destinoUUID)
+        + '&usuario_id=' + encodeURIComponent(usuario.id)
+      );
+      var data = await res.json();
+      return !!(data.ok && data.guardado);
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // ── Marcar destino como visitado (accion deliberada del usuario, ──
+  // ── no el contador automatico de vistas de pagina) ─────────────
+  window.ExploraCO.marcarVisitado = async function (destinoUUID) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) {
+      mostrarModalLogin('Inicia sesión para marcar que estuviste aquí');
+      return false;
+    }
+    try {
+      var res = await fetch(API + '/api/interacciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo:       'visita',
+          usuario_id: usuario.id,
+          destino_id: destinoUUID,
+        }),
+      });
+      var data = await res.json();
+      if (!data.ok) {
+        mostrarToast(data.error || 'No se pudo registrar la visita', '#ef4444');
+        return false;
+      }
+      if (data.xp > 0) {
+        mostrarToast('✓ Visita registrada · +' + data.xp + ' XP', '#16a34a');
+        window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp;
+        guardarSesion(window.ExploraCO.usuario);
+        actualizarUI();
+      } else if (data.ya_visitado) {
+        mostrarToast('Ya habías marcado que estuviste aquí', '#888');
+      }
+      return true;
+    } catch (err) {
+      console.warn('[session] marcarVisitado error:', err.message);
+      mostrarToast('Error de conexión', '#ef4444');
       return false;
     }
   };

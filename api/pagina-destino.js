@@ -125,6 +125,8 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}"
 +".hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}"
 +".hobtn{background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}"
++".hobtn.activo{background:rgba(232,160,32,.15);color:var(--gold);border-color:var(--gold)}"
++".hobtn:disabled{opacity:.5;cursor:default}"
 +".hr{display:flex;flex-direction:column;gap:8px;justify-content:center}"
 +".psm{height:200px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
 +".psm img{width:100%;height:100%;object-fit:cover}"
@@ -1248,6 +1250,8 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
     + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
     + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
+    + '<button class="hobtn" id="btn-guardar" onclick="toggleGuardar(this)">\u2661 Guardar</button>'
+    + '<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>'
     + '</div></div>\n'
     + '<div class="hr"><div class="psm" style="'+heroMainStyle+'">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
     + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
@@ -1292,6 +1296,7 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
     + '<div class="fcopy"><a href="/index.html">Inicio</a> &middot; <a href="/'+esc(dir)+'">'+esc(label)+'</a></div></footer>\n\n'
 
+    + '<script src="/usuario-session.js"><\/script>\n'
     + '<script>\n'
     + 'var DID="'+esc(String(d.id))+'";\n'
     + 'var rvScore=0;\n'
@@ -1302,17 +1307,32 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + '  var txt=document.getElementById("rvt").value.trim();\n'
     + '  if(!rvScore){alert("Selecciona una puntuacion");return;}\n'
     + '  if(!nom){alert("Ingresa tu nombre");return;}\n'
+    + '  if(!window.ExploraCO){alert("Aun cargando, intenta de nuevo en un segundo");return;}\n'
     + '  var btn=document.querySelector(".wrsub");\n'
     + '  btn.disabled=true;btn.textContent="Publicando...";\n'
-    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},'
-    + '  body:JSON.stringify({tipo:"resena",destino_id:DID,rating:rvScore,texto:"["+nom+"] "+txt})})\n'
-    + '  .then(function(r){return r.json();})\n'
-    + '  .then(function(d){\n'
-    + '    if(d.ok||d.id){\n'
-    + '      document.getElementById("rvok").style.display="block";\n'
-    + '    }else{btn.disabled=false;btn.textContent="Publicar resena ->";alert("Error: "+(d.error||"No se pudo publicar"));}\n'
-    + '  }).catch(function(){btn.disabled=false;btn.textContent="Publicar resena ->";alert("Error de conexion.");});\n'
+    // Antes esto era un fetch directo a /api/interacciones sin usuario_id,
+    // por lo que toda resena real quedaba anonima (ver nota de entrega).
+    // window.ExploraCO.publicarResena ya trae el usuario_id de la sesion
+    // real y muestra sus propios mensajes de exito/error via toast.
+    + '  window.ExploraCO.publicarResena(DID,rvScore,txt,nom).then(function(ok){\n'
+    + '    if(ok){document.getElementById("rvok").style.display="block";}\n'
+    + '    else{btn.disabled=false;btn.textContent="Publicar resena ->";}\n'
+    + '  });\n'
     + '}\n'
+    + 'function toggleGuardar(btn){\n'
+    + '  if(!window.ExploraCO){return;}\n'
+    + '  window.ExploraCO.toggleGuardado(DID,btn);\n'
+    + '}\n'
+    + 'function marcarVisitadoBtn(btn){\n'
+    + '  if(!window.ExploraCO){return;}\n'
+    + '  btn.disabled=true;\n'
+    + '  window.ExploraCO.marcarVisitado(DID).then(function(ok){btn.disabled=false;if(ok)btn.classList.add("activo");});\n'
+    + '}\n'
+    // Estado inicial del boton de guardar (si el visitante ya tiene
+    // sesion y ya habia guardado este destino antes). El boton de
+    // "Estuve aqui" no necesita este chequeo: el backend ya deduplica
+    // sin importar el estado visual (ver api/interacciones.js v3).
+    + 'if(window.ExploraCO){window.ExploraCO.estaGuardado(DID).then(function(g){if(g){var b=document.getElementById("btn-guardar");if(b)b.classList.add("activo");}});}\n'
     + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'
     + '<\/script>\n</body>\n</html>';
 }
