@@ -3864,15 +3864,27 @@ function renderXPHistory() {
 }
 
 /* ── PATCH existing actions: reconectar con la sesion real ──
-   _uuidRe distingue un id real de Neon de un id local/posicional. Sin
-   confirmar index-api-connector.js (no forma parte de esta entrega,
-   ver nota de entrega) no se puede asumir que MAPA_PLACES[].id sea
-   siempre un UUID real -- por eso el guardado local (mm_saved) sigue
-   funcionando igual que antes en cualquier caso, y la sincronizacion
-   con el backend solo se intenta cuando el id si tiene forma de UUID.
-   Si no hay sesion, tampoco se fuerza el login: se prioriza no
-   interrumpir a alguien que solo esta explorando. */
+   index-api-connector.js (v8, confirmado) asigna a MAPA_PLACES[]/PL[].id
+   un indice de posicion (idx+1), no el UUID real de Neon -- el UUID
+   real viaja aparte en el campo _uuid de cada item. _uuidDeId() lo
+   busca ahi; probar 'id' directamente (como se hacia antes de ver este
+   archivo) nunca iba a encontrar un UUID real, porque nunca lo es. Si
+   no se encuentra un _uuid con forma valida, el guardado local
+   (mm_saved) sigue funcionando igual que antes -- no se fuerza login
+   ni se interrumpe a alguien que solo esta explorando. */
 var _uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function _uuidDeId(id) {
+  var fuentes = [
+    typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : null,
+    typeof PL !== 'undefined' ? PL : null,
+  ];
+  for(var i = 0; i < fuentes.length; i++) {
+    if(!fuentes[i]) continue;
+    var item = fuentes[i].find(function(p){ return p.id === id; });
+    if(item && item._uuid && _uuidRe.test(item._uuid)) return item._uuid;
+  }
+  return null;
+}
 
 var _origToggleDestSave = typeof toggleDestSave !== 'undefined' ? toggleDestSave : null;
 function toggleDestSave(id, btn) {
@@ -3886,8 +3898,9 @@ function toggleDestSave(id, btn) {
     renderMyMap();
   }
   var usuario = window.ExploraCO && window.ExploraCO.usuario;
-  if(usuario && typeof id === 'string' && _uuidRe.test(id)) {
-    var accion = wasNew ? window.ExploraCO.guardarDestino(id) : window.ExploraCO.quitarGuardado(id);
+  var uuid = usuario ? _uuidDeId(id) : null;
+  if(uuid) {
+    var accion = wasNew ? window.ExploraCO.guardarDestino(uuid) : window.ExploraCO.quitarGuardado(uuid);
     Promise.resolve(accion).then(function(){ updatePointsUI(); });
   }
 }
@@ -3907,8 +3920,9 @@ function mmToggleVisited(id) {
   // Solo se marca visita real al pasar de no-visitado a visitado: no
   // existe (ni tiene sentido) un 'quitar_visita' en el backend.
   var usuario = window.ExploraCO && window.ExploraCO.usuario;
-  if(wasNew && usuario && typeof id === 'string' && _uuidRe.test(id)) {
-    window.ExploraCO.marcarVisitado(id).then(function(){ updatePointsUI(); });
+  var uuid = (wasNew && usuario) ? _uuidDeId(id) : null;
+  if(uuid) {
+    window.ExploraCO.marcarVisitado(uuid).then(function(){ updatePointsUI(); });
   }
 }
 
