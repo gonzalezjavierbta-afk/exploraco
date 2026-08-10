@@ -1,12 +1,14 @@
-// api/interacciones.js  v3 - fix de fraude (visita/guardado/resena)
+// api/interacciones.js  v4 - motor de misiones (Fase 3)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
 // rating CHECK: 1-5
 // usuario_nombre NO existe - se guarda en texto como prefijo
 //
-// REQUIERE MIGRACION ANTES DE DESPLEGAR (ver nota de entrega):
+// REQUIERE MIGRACION ANTES DE DESPLEGAR (acumulativa desde v3):
 //   ALTER TABLE interacciones
 //     ADD COLUMN IF NOT EXISTS activo boolean NOT NULL DEFAULT true;
+//   ALTER TABLE usuarios
+//     ADD COLUMN IF NOT EXISTS progreso_misiones jsonb NOT NULL DEFAULT '{}'::jsonb;
 //
 // v3: cierra 3 vectores de fraude de XP encontrados en v2:
 //  1) 'visita' ahora requiere usuario_id y se deduplica (antes: XP
@@ -17,8 +19,147 @@
 //  3) 'resena' ahora deduplica por usuario_id+destino_id cuando hay
 //     usuario_id (antes: resenas repetidas del mismo usuario sumaban XP
 //     sin limite y distorsionaban el rating promedio del destino).
+//
+// v4: motor de misiones. El catalogo (MISIONES, mas abajo) es codigo
+// estatico, no una fila JSONB editable por request: la evaluacion de
+// dependencias (DAG via 'requiere') y de cada condicion corre siempre en
+// servidor, nunca se le confia al cliente. El progreso POR USUARIO si
+// vive en Neon (usuarios.progreso_misiones), fusionado con el operador
+// '||' (Reglas de Oro punto 3 / ADR-003), nunca reemplazado. No se creo
+// un endpoint nuevo (el presupuesto de 8 funciones de Vercel Hobby ya
+// esta consumido, ver BLUEPRINT.md): evaluarMisiones() corre dentro de
+// esta misma invocacion, justo despues de que 'resena'/'guardado'/
+// 'visita' ya hayan sumado su XP base.
 
 const { neon } = require('@neondatabase/serverless');
+
+// -- Catalogo de misiones (Fase 3) ---------------------------------
+// requiere: ids de misiones que deben estar 'completada' antes de que
+// esta se evalue siquiera (evita gastar consultas de mas). check()
+// recibe el contexto ya cargado (ctx) y devuelve una Promise<boolean>.
+var CIUDAD_META    = 'Bogota';
+var TAG_COWORKING  = 'coworking'; // enum cerrado v1: unico valor soportado hoy;
+                                   // pendiente extenderlo cuando el admin
+                                   // deje de aceptar texto libre en tags
+
+var MISIONES = [
+  {
+    id: 'mis_primer_guardado', grupo: 'general', requiere: [],
+    nombre: 'Primer lugar guardado', xp: 15,
+    check: function(ctx) { return Promise.resolve(ctx.totalGuardados >= 1); },
+  },
+  {
+    id: 'mis_primera_resena', grupo: 'general', requiere: [],
+    nombre: 'Primera rese\u00f1a sustancial', xp: 20,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT id FROM interacciones WHERE usuario_id=$1 AND tipo=\'resena\' AND xp_ganado>=25 LIMIT 1',
+        [ctx.usuarioId]
+      ).then(function(r){ return r.length > 0; });
+    },
+  },
+  {
+    id: 'mis_primera_visita', grupo: 'general', requiere: [],
+    nombre: 'Primera visita confirmada', xp: 15,
+    check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 1); },
+  },
+  {
+    id: 'mis_explorador_bogota', grupo: 'ciudad', requiere: ['mis_primer_guardado'],
+    nombre: 'Explorador de Bogota', xp: 40,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true AND d.ciudad=$2',
+        [ctx.usuarioId, CIUDAD_META]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 5); });
+    },
+  },
+  {
+    // Requiere amplitud (guardar + resenar), no solo volumen -- ver nota
+    // de entrega sobre la curva de dificultad Explorador -> Organizador.
+    id: 'mis_organizador_bogota', grupo: 'ciudad',
+    requiere: ['mis_explorador_bogota', 'mis_primera_resena'],
+    nombre: 'Organizador de Bogota', xp: 100, desbloquea: 'organizar_actividad',
+    check: function(ctx) {
+      if (ctx.xpTotal < 300) return Promise.resolve(false);
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true AND d.ciudad=$2',
+        [ctx.usuarioId, CIUDAD_META]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 8); });
+    },
+  },
+  {
+    id: 'mis_nomada_digital', grupo: 'categoria', requiere: ['mis_primer_guardado'],
+    nombre: 'N\u00f3mada digital', xp: 30,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true'
+        + '   AND d.categoria_slug=\'hostal\''
+        + '   AND (d.tags->\'actividades\' ? $2 OR d.tags->\'que_incluye\' ? $2)',
+        [ctx.usuarioId, TAG_COWORKING]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 3); });
+    },
+  },
+];
+
+// Evalua el catalogo completo para un usuario y persiste lo nuevo que se
+// haya completado. Nunca lanza: un fallo aqui no debe tumbar la accion
+// principal (resena/guardado/visita) que ya se registro con exito.
+function evaluarMisiones(sql, usuarioId) {
+  return sql(
+    'SELECT xp_total, total_guardados, total_visitas, progreso_misiones FROM usuarios WHERE id=$1',
+    [usuarioId]
+  ).then(function(rows) {
+    if (!rows.length) return [];
+    var u = rows[0];
+    var progreso = u.progreso_misiones || {};
+    var ctx = {
+      sql: sql,
+      usuarioId: usuarioId,
+      xpTotal: parseInt(u.xp_total) || 0,
+      totalGuardados: parseInt(u.total_guardados) || 0,
+      totalVisitas: parseInt(u.total_visitas) || 0,
+    };
+    var completadas = {};
+    Object.keys(progreso).forEach(function(k) {
+      if (progreso[k] && progreso[k].estado === 'completada') completadas[k] = true;
+    });
+
+    var nuevas = [];
+    var cadena = Promise.resolve();
+    MISIONES.forEach(function(m) {
+      cadena = cadena.then(function() {
+        if (completadas[m.id]) return;
+        var okRequisitos = m.requiere.every(function(r){ return completadas[r]; });
+        if (!okRequisitos) return;
+        return m.check(ctx).then(function(cumplida) {
+          if (!cumplida) return;
+          completadas[m.id] = true;
+          progreso[m.id] = { estado: 'completada', en: new Date().toISOString() };
+          nuevas.push(m);
+          console.log('TRACE: Hito detectado | Accion: ' + m.id + ' | Recompensa: ' + m.xp + ' XP');
+        });
+      });
+    });
+
+    return cadena.then(function() {
+      if (!nuevas.length) return [];
+      var xpBonus = nuevas.reduce(function(s, m){ return s + m.xp; }, 0);
+      return sql(
+        'UPDATE usuarios SET'
+        + '   progreso_misiones = COALESCE(progreso_misiones,\'{}\'::jsonb) || $1::jsonb,'
+        + '   xp_total = xp_total + $2'
+        + ' WHERE id = $3',
+        [JSON.stringify(progreso), xpBonus, usuarioId]
+      ).then(function() { return nuevas; });
+    });
+  }).catch(function(err) {
+    console.error('[misiones]', err.message);
+    return [];
+  });
+}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -161,6 +302,7 @@ module.exports = async function handler(req, res) {
         );
 
         // Sumar XP al usuario si está logueado
+        var misionesNuevas = [];
         if (usuarioId2) {
           await sql(
             `UPDATE usuarios SET
@@ -170,6 +312,7 @@ module.exports = async function handler(req, res) {
              WHERE id = $2`,
             [xpGanado, usuarioId2]
           ).catch(function(){});
+          misionesNuevas = await evaluarMisiones(sql, usuarioId2);
         }
 
         // Notificar al admin (no bloquea la respuesta)
@@ -202,7 +345,7 @@ module.exports = async function handler(req, res) {
           }
         } catch(_) {}
 
-        return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado });
+        return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado, misiones: misionesNuevas });
       }
 
       // ── Guardado ──
@@ -219,7 +362,7 @@ module.exports = async function handler(req, res) {
         );
 
         if (existe.length > 0 && existe[0].activo)
-          return res.status(200).json({ ok: true, ya_guardado: true });
+          return res.status(200).json({ ok: true, ya_guardado: true, misiones: [] });
 
         if (existe.length > 0 && !existe[0].activo) {
           // Reactivar un guardado previamente quitado. Cero Borrado
@@ -230,7 +373,7 @@ module.exports = async function handler(req, res) {
             'UPDATE interacciones SET activo=true WHERE id=$1',
             [existe[0].id]
           );
-          return res.status(200).json({ ok: true, reactivado: true, xp: 0 });
+          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [] });
         }
 
         var xpGuardado = 5;
@@ -249,7 +392,8 @@ module.exports = async function handler(req, res) {
           [xpGuardado, usuarioId2]
         ).catch(function(){});
 
-        return res.status(200).json({ ok: true, xp: xpGuardado });
+        var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: xpGuardado, misiones: misionesGuardado });
       }
 
       // ── Quitar guardado ──
@@ -298,7 +442,8 @@ module.exports = async function handler(req, res) {
           [usuarioId2]
         ).catch(function(){});
 
-        return res.status(200).json({ ok: true, xp: 20 });
+        var misionesVisita = await evaluarMisiones(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita });
       }
 
       // ── Solo rating (sin texto) ──

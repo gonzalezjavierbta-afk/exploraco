@@ -165,14 +165,20 @@
         }),
       });
       var data = await res.json();
-      if (data.ok && data.xp_ganado > 0) {
-        mostrarToast('♥ Guardado · +' + data.xp_ganado + ' XP', '#E8A020');
-        // Actualizar perfil local con nuevo XP
+      if (data.ok && data.xp > 0) {
+        // Antes decia data.xp_ganado, pero interacciones.js siempre
+        // devuelve el campo como 'xp' -- este toast nunca disparaba con
+        // el XP real (quedaba en silencio, ok seguia siendo true).
+        mostrarToast('♥ Guardado · +' + data.xp + ' XP', '#E8A020');
+        // Actualizar perfil local con nuevo XP (accion + bonus de misiones)
         if (window.ExploraCO.usuario) {
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp_ganado;
+          var misionesXp = sumaMisionesXp(data.misiones);
+          aplicarDesbloqueos(data.misiones);
+          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp + misionesXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
+        mostrarMisionesToast(data.misiones);
       }
       return data.ok;
     } catch (err) {
@@ -212,12 +218,17 @@
       });
       var data = await res.json();
       if (data.ok) {
-        mostrarToast('⭐ Reseña publicada · +' + (data.xp_ganado || 0) + ' XP', '#16a34a');
+        // Mismo bug de nombre de campo que guardarDestino: era
+        // data.xp_ganado, interacciones.js devuelve 'xp'.
+        mostrarToast('⭐ Reseña publicada · +' + (data.xp || 0) + ' XP', '#16a34a');
         if (window.ExploraCO.usuario) {
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp_ganado || 0);
+          var misionesXp = sumaMisionesXp(data.misiones);
+          aplicarDesbloqueos(data.misiones);
+          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
+        mostrarMisionesToast(data.misiones);
       } else {
         // Antes un rechazo del backend (ej. reseña duplicada, ver
         // api/interacciones.js v3) quedaba en silencio para el usuario.
@@ -265,9 +276,12 @@
       if (ahoraGuardado) {
         if (data.xp > 0) {
           mostrarToast('♥ Guardado · +' + data.xp + ' XP', '#E8A020');
-          window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp;
+          var misionesXp = sumaMisionesXp(data.misiones);
+          aplicarDesbloqueos(data.misiones);
+          window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
+          mostrarMisionesToast(data.misiones);
         } else {
           mostrarToast('♥ Guardado de nuevo en Tu Mapa', '#E8A020');
         }
@@ -325,9 +339,12 @@
       }
       if (data.xp > 0) {
         mostrarToast('✓ Visita registrada · +' + data.xp + ' XP', '#16a34a');
-        window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp;
+        var misionesXp = sumaMisionesXp(data.misiones);
+          aplicarDesbloqueos(data.misiones);
+        window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp;
         guardarSesion(window.ExploraCO.usuario);
         actualizarUI();
+        mostrarMisionesToast(data.misiones);
       } else if (data.ya_visitado) {
         mostrarToast('Ya habías marcado que estuviste aquí', '#888');
       }
@@ -455,6 +472,31 @@
   }
 
   window.ExploraCO.mostrarToast = mostrarToast;
+
+  // ── Misiones (Fase 3) ───────────────────────────────────────
+  // Las respuestas de /api/interacciones ahora pueden traer un array
+  // 'misiones' con los hitos que se completaron en esa misma llamada
+  // (ver api/interacciones.js, evaluarMisiones()). El XP de mision ya
+  // esta sumado en Neon; aqui solo se refleja localmente y se avisa.
+  function sumaMisionesXp(misiones) {
+    if (!misiones || !misiones.length) return 0;
+    return misiones.reduce(function (s, m) { return s + (parseInt(m.xp) || 0); }, 0);
+  }
+  function aplicarDesbloqueos(misiones) {
+    if (!misiones || !misiones.length || !window.ExploraCO.usuario) return;
+    window.ExploraCO.usuario.capacidades = window.ExploraCO.usuario.capacidades || {};
+    misiones.forEach(function (m) {
+      if (m.desbloquea) window.ExploraCO.usuario.capacidades[m.desbloquea] = true;
+    });
+  }
+  function mostrarMisionesToast(misiones) {
+    if (!misiones || !misiones.length) return;
+    misiones.forEach(function (m, i) {
+      setTimeout(function () {
+        mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + m.xp + ' XP', '#E8A020');
+      }, i * 1600);
+    });
+  }
 
   // ── Actualizar UI según estado de sesión ───────────────────
   function actualizarUI() {

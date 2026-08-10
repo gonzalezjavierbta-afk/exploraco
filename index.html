@@ -736,6 +736,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .prof-btn.follow:hover{background:var(--gold-dark)}
 .prof-btn.msg{background:transparent;border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}
 .prof-btn.msg:hover{border-color:var(--gold);color:var(--gold)}
+.prof-btn.locked{background:transparent;border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.3);cursor:default}
+.prof-btn.desbloqueado{background:transparent;border-color:var(--gold);color:var(--gold);cursor:pointer}
+.prof-btn.desbloqueado:hover{background:var(--gold);color:#fff}
 /* Visited map on profile */
 .profile-map-section{margin-top:14px}
 .pms-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.3);margin-bottom:8px}
@@ -3802,6 +3805,7 @@ function updatePointsUI() {
   if(visitedN) visitedN.textContent = mmVisited.length;
 
   renderBadgesGrid(pu, earnedBadges);
+  renderOrganizarBtn();
 
   var mle = document.getElementById('mm-level-emoji');
   var mln = document.getElementById('mm-level-name');
@@ -3834,7 +3838,37 @@ function updatePointsUI() {
   _ultimoNivelVisto = lvl.min;
 }
 
-/* ── BADGES GRID ── */
+/* ── ORGANIZAR ACTIVIDAD (Fase 3: Interfaz Adaptativa / Divulgacion
+   Progresiva) ──
+   Visible siempre, bloqueado con un tooltip de que falta hasta que se
+   completa la mision 'mis_organizador_bogota' (api/interacciones.js),
+   que llega via window.ExploraCO.usuario.capacidades.organizar_actividad
+   (usuarios.js la calcula a partir de progreso_misiones). No se oculta
+   del todo: mostrar la meta bloqueada es lo que realmente transmite
+   progresion, no esconderla. */
+function renderOrganizarBtn() {
+  var btn = document.getElementById('btn-organizar');
+  if(!btn) return;
+  var usuario = window.ExploraCO && window.ExploraCO.usuario;
+  var desbloqueado = !!(usuario && usuario.capacidades && usuario.capacidades.organizar_actividad);
+  if(desbloqueado) {
+    btn.className = 'prof-btn desbloqueado';
+    btn.textContent = '📋 Organizar actividad';
+    btn.title = '¡Desbloqueado! Guardaste 8+ lugares en Bogotá y publicaste una reseña.';
+    btn.onclick = abrirOrganizarActividad;
+  } else {
+    btn.className = 'prof-btn locked';
+    btn.textContent = '🔒 Organizar actividad';
+    btn.title = 'Guarda 8 lugares en Bogotá y publica una reseña sustancial para desbloquear';
+    btn.onclick = null;
+  }
+}
+function abrirOrganizarActividad() {
+  // La capacidad ya esta desbloqueada; el flujo en si (crear y publicar
+  // una actividad) todavia no existe -- se deja como siguiente paso
+  // honesto en vez de simular una funcion que no esta construida.
+  showXPToast('🎉 ¡Desbloqueaste Organizar Actividad! Función completa próximamente');
+}
 function renderBadgesGrid(pu, earnedBadges) {
   var grid = document.getElementById('badges-grid');
   if(!grid) return;
@@ -4269,6 +4303,7 @@ function submitBlog() {
             </div>
             <div class="profile-actions">
               <div class="prof-btn follow" onclick="openEditProfile()">Editar perfil</div>
+              <div class="prof-btn locked" id="btn-organizar" title="Guarda 8 lugares en Bogotá y publica una reseña sustancial para desbloquear">🔒 Organizar actividad</div>
             </div>
             <div class="profile-map-section">
               <div class="pms-title">Mapa de guardados</div>

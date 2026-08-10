@@ -33,6 +33,26 @@ function conNivel(row) {
   return row;
 }
 
+// Misiones que desbloquean capacidades de UI (Fase 3, ver
+// api/interacciones.js MISIONES). Se declara solo el mapeo id -> nombre
+// de la capacidad, no todo el catalogo: este endpoint no necesita
+// evaluar condiciones (check()), solo leer que ya quedo 'completada'
+// en usuarios.progreso_misiones.
+const DESBLOQUEOS = { mis_organizador_bogota: 'organizar_actividad' };
+
+function conMisiones(row) {
+  if (!row) return row;
+  const progreso = row.progreso_misiones || {};
+  const capacidades = {};
+  Object.keys(DESBLOQUEOS).forEach((misionId) => {
+    if (progreso[misionId] && progreso[misionId].estado === 'completada') {
+      capacidades[DESBLOQUEOS[misionId]] = true;
+    }
+  });
+  row.capacidades = capacidades;
+  return row;
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -58,7 +78,7 @@ module.exports = async (req, res) => {
       if (id) {
         const rows = await sql`SELECT * FROM usuarios WHERE id = ${id}`;
         if (!rows.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
-        return res.json({ ok: true, data: conNivel(rows[0]) });
+        return res.json({ ok: true, data: conMisiones(conNivel(rows[0])) });
       }
       return res.status(400).json({ ok: false, error: 'Falta id o tipo' });
     }
@@ -77,7 +97,7 @@ module.exports = async (req, res) => {
           ultimo_acceso = NOW()
         RETURNING *
       `;
-      return res.json({ ok: true, data: conNivel(rows[0]) });
+      return res.json({ ok: true, data: conMisiones(conNivel(rows[0])) });
     }
 
     return res.status(405).json({ ok: false, error: 'Método no permitido' });
