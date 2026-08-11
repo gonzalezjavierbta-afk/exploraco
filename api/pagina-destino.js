@@ -1157,8 +1157,9 @@ function buildHTML(d, det, fotos, resenas, autor) {
   if (cat !== 'blog') {
     secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + (nRes>0 ? '<div class="rblock"><div><div class="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt">'+nRes+' resenas</div></div></div>' : '')
-      + (rvHtml ? '<div class="rvlist">'+rvHtml+'</div>' : '<p class="stext">Se el primero en dejar una resena.</p>')
+      + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+nRes+' resenas</div></div></div>'
+      + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
+      + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">Se el primero en dejar una resena.</p>'
       + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
       + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
       + '<div class="sprow" id="rv-stars">'
@@ -1299,9 +1300,37 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + '<script src="/usuario-session.js"><\/script>\n'
     + '<script>\n'
     + 'var DID="'+esc(String(d.id))+'";\n'
+    + 'var RV_AVG='+rat+';\n'
+    + 'var RV_COUNT='+nRes+';\n'
     + 'var rvScore=0;\n'
     + 'function setRvScore(n){rvScore=n;document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=n);});}\n'
     + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");t.style.color="var(--muted)";t.style.borderColor="transparent";});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");el.style.color="var(--gold)";el.style.borderColor="var(--gold)";var panel=document.getElementById(id);if(panel)panel.classList.add("on");}\n'
+    // Inserta la resena recien publicada en el DOM y actualiza el
+    // bloque de promedio/contador sin esperar a un reload -- antes el
+    // unico feedback era el mensaje "Gracias", pero la lista y el
+    // promedio en pantalla quedaban desactualizados hasta el proximo
+    // request al servidor (que si trae los datos correctos, gracias a
+    // Cache-Control: no-store, pero solo si el usuario recarga).
+    + 'function addRvOptimista(nom,score,txt){\n'
+    + '  var list=document.getElementById("rvlist");\n'
+    + '  var stars=[1,2,3,4,5].map(function(i){return \'<span class="rvst\'+(i<=score?" on":"")+\'">*</span>\';}).join("");\n'
+    + '  var div=document.createElement("div");\n'
+    + '  div.className="rvitem";\n'
+    + '  div.innerHTML=\'<div class="rvhead"><div class="rvav"></div><div class="rvname"></div><div class="rvstars">\'+stars+\'</div></div><div class="rvtx"></div>\';\n'
+    + '  div.querySelector(".rvav").textContent=nom.slice(0,2).toUpperCase();\n'
+    + '  div.querySelector(".rvname").textContent=nom;\n'
+    + '  var tx=div.querySelector(".rvtx");\n'
+    + '  if(txt){tx.textContent=txt;}else{tx.remove();}\n'
+    + '  if(list)list.insertBefore(div,list.firstChild);\n'
+    + '  var empty=document.getElementById("rvempty"); if(empty)empty.style.display="none";\n'
+    + '  var rblock=document.getElementById("rblock"); if(rblock)rblock.style.display="";\n'
+    + '  RV_COUNT=RV_COUNT+1;\n'
+    + '  RV_AVG=((RV_AVG*(RV_COUNT-1))+score)/RV_COUNT;\n'
+    + '  var rbavg=document.getElementById("rbavg"); if(rbavg)rbavg.textContent=RV_AVG.toFixed(1);\n'
+    + '  var rbcnt=document.getElementById("rbcnt"); if(rbcnt)rbcnt.textContent=RV_COUNT+" resenas";\n'
+    + '  var rbstars=document.getElementById("rbstars");\n'
+    + '  if(rbstars)rbstars.innerHTML=[1,2,3,4,5].map(function(i){return \'<span class="rbst\'+(i<=Math.round(RV_AVG)?" on":"")+\'">*</span>\';}).join("");\n'
+    + '}\n'
     + 'function submitRv(){\n'
     + '  var nom=document.getElementById("rvn").value.trim();\n'
     + '  var txt=document.getElementById("rvt").value.trim();\n'
@@ -1309,14 +1338,22 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + '  if(!nom){alert("Ingresa tu nombre");return;}\n'
     + '  if(!window.ExploraCO){alert("Aun cargando, intenta de nuevo en un segundo");return;}\n'
     + '  var btn=document.querySelector(".wrsub");\n'
+    + '  var scoreEnviado=rvScore, nomEnviado=nom, txtEnviado=txt;\n'
     + '  btn.disabled=true;btn.textContent="Publicando...";\n'
     // Antes esto era un fetch directo a /api/interacciones sin usuario_id,
     // por lo que toda resena real quedaba anonima (ver nota de entrega).
     // window.ExploraCO.publicarResena ya trae el usuario_id de la sesion
     // real y muestra sus propios mensajes de exito/error via toast.
     + '  window.ExploraCO.publicarResena(DID,rvScore,txt,nom).then(function(ok){\n'
-    + '    if(ok){document.getElementById("rvok").style.display="block";}\n'
-    + '    else{btn.disabled=false;btn.textContent="Publicar resena ->";}\n'
+    + '    if(ok){\n'
+    + '      addRvOptimista(nomEnviado,scoreEnviado,txtEnviado);\n'
+    + '      document.getElementById("rvok").style.display="block";\n'
+    + '      document.getElementById("rvn").value="";\n'
+    + '      document.getElementById("rvt").value="";\n'
+    + '      rvScore=0;\n'
+    + '      document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.remove("on");});\n'
+    + '      btn.textContent="Ya resenaste este lugar";\n'
+    + '    }else{btn.disabled=false;btn.textContent="Publicar resena ->";}\n'
     + '  });\n'
     + '}\n'
     + 'function toggleGuardar(btn){\n'

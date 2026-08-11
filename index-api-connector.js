@@ -116,14 +116,19 @@
   // Actualizar stats con IDs añadidos al HTML
   function updateStats(stats) {
     var get = function (id) { return document.getElementById(id); };
-    if (get('stat-destinos') && stats.destinos) get('stat-destinos').textContent = stats.destinos;
-    if (get('stat-ciudades') && stats.ciudades) get('stat-ciudades').textContent = stats.ciudades;
-    if (get('stat-resenas')  && stats.resenas) {
+    // Antes usaba "&& stats.X" (truthiness), asi que un valor real de 0
+    // (ej. 0 resenas antes de que existiera la tabla interacciones) se
+    // trataba como "sin dato" y dejaba el placeholder hardcodeado del
+    // HTML (18.4K) para siempre. "!= null" cubre null/undefined sin
+    // excluir el 0 legitimo.
+    if (get('stat-destinos') && stats.destinos != null) get('stat-destinos').textContent = stats.destinos;
+    if (get('stat-ciudades') && stats.ciudades != null) get('stat-ciudades').textContent = stats.ciudades;
+    if (get('stat-resenas')  && stats.resenas != null) {
       get('stat-resenas').textContent = stats.resenas >= 1000
         ? (stats.resenas / 1000).toFixed(1) + 'K'
         : stats.resenas;
     }
-    if (get('stat-rating') && stats.rating) {
+    if (get('stat-rating') && stats.rating != null) {
       get('stat-rating').textContent = stats.rating + '★';
     }
   }
