@@ -1,4 +1,4 @@
-// api/interacciones.js  v4 - motor de misiones (Fase 3)
+// api/interacciones.js  v4 - motor de misiones (Fase 3) (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
 // rating CHECK: 1-5
@@ -170,22 +170,22 @@ module.exports = async function handler(req, res) {
   try {
     var sql = neon(process.env.DATABASE_URL);
 
-    // ── GET ──────────────────────────────────────────────────────
+    // -- GET ----------------------------------------------------------
     if (req.method === 'GET') {
       var tipo     = req.query.tipo       || null;
       var destinoId= req.query.destino_id || null;
       var usuarioId= req.query.usuario_id || null;
 
-      // Reseñas de un destino
+      // Resenas de un destino
       if (tipo === 'resenas' && destinoId) {
         var rows = await sql(
-          `SELECT i.id, i.rating, i.texto, i.creado_en,
-                  u.nombre AS usuario_nombre, u.badge_actual
-           FROM interacciones i
-           LEFT JOIN usuarios u ON i.usuario_id = u.id
-           WHERE i.destino_id = $1 AND i.tipo = 'resena'
-           ORDER BY i.creado_en DESC
-           LIMIT 20`,
+          'SELECT i.id, i.rating, i.texto, i.creado_en, '
+          + 'u.nombre AS usuario_nombre, u.badge_actual '
+          + 'FROM interacciones i '
+          + 'LEFT JOIN usuarios u ON i.usuario_id = u.id '
+          + 'WHERE i.destino_id = $1 AND i.tipo = \'resena\' '
+          + 'ORDER BY i.creado_en DESC '
+          + 'LIMIT 20',
           [destinoId]
         );
         return res.status(200).json({ ok: true, data: rows });
@@ -205,7 +205,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: guardados });
       }
 
-      // ¿Está guardado?
+      // Esta guardado?
       if (tipo === 'is_guardado' && destinoId && usuarioId) {
         var check = await sql(
           'SELECT id FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'guardado\' AND activo=true LIMIT 1',
@@ -227,10 +227,10 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      return res.status(400).json({ ok: false, error: 'Parámetros insuficientes' });
+      return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
-    // ── POST ─────────────────────────────────────────────────────
+    // -- POST ---------------------------------------------------------
     if (req.method === 'POST') {
       var body = req.body || {};
       var tipo2     = body.tipo;
@@ -243,9 +243,9 @@ module.exports = async function handler(req, res) {
       // Validar tipo contra constraint real
       var tiposValidos = ['resena','guardado','visita','foto','rating'];
       if (!tiposValidos.includes(tipo2))
-        return res.status(400).json({ ok: false, error: 'tipo inválido: ' + tipo2 });
+        return res.status(400).json({ ok: false, error: 'tipo inv\u00e1lido: ' + tipo2 });
 
-      // ── Reseña ──
+      // -- Resena --
       if (tipo2 === 'resena') {
         var ratingVal = parseInt(body.rating || body.puntuacion || 0);
         if (ratingVal < 1 || ratingVal > 5)
@@ -265,7 +265,7 @@ module.exports = async function handler(req, res) {
             return res.status(409).json({ ok: false, error: 'Ya rese\u00f1aste este lugar', ya_reseno: true });
         }
 
-        // usuario_nombre no existe en la tabla → guardarlo en texto como prefijo
+        // usuario_nombre no existe en la tabla -> guardarlo en texto como prefijo
         var nombrePrefijo = body.usuario_nombre
           ? '[' + body.usuario_nombre.slice(0,50) + '] '
           : '';
@@ -277,39 +277,39 @@ module.exports = async function handler(req, res) {
           ? 25 : 10;
 
         var result = await sql(
-          `INSERT INTO interacciones
-             (destino_id, usuario_id, tipo, rating, texto, xp_ganado, creado_en)
-           VALUES ($1, $2, 'resena', $3, $4, $5, NOW())
-           RETURNING id`,
+          'INSERT INTO interacciones '
+          + '(destino_id, usuario_id, tipo, rating, texto, xp_ganado, creado_en) '
+          + 'VALUES ($1, $2, \'resena\', $3, $4, $5, NOW()) '
+          + 'RETURNING id',
           [destinoId2, usuarioId2, ratingVal, textoFinal, xpGanado]
         );
 
         // Actualizar rating promedio y total_resenas en destinos
         await sql(
-          `UPDATE destinos SET
-             rating = (
-               SELECT ROUND(AVG(rating)::numeric, 2)
-               FROM interacciones
-               WHERE destino_id=$1 AND tipo='resena' AND rating IS NOT NULL
-             ),
-             total_resenas = (
-               SELECT COUNT(*) FROM interacciones
-               WHERE destino_id=$1 AND tipo='resena'
-             ),
-             actualizado_en = NOW()
-           WHERE id = $1`,
+          'UPDATE destinos SET '
+          + 'rating = ('
+          + '  SELECT ROUND(AVG(rating)::numeric, 2)'
+          + '  FROM interacciones'
+          + '  WHERE destino_id=$1 AND tipo=\'resena\' AND rating IS NOT NULL'
+          + '), '
+          + 'total_resenas = ('
+          + '  SELECT COUNT(*) FROM interacciones'
+          + '  WHERE destino_id=$1 AND tipo=\'resena\''
+          + '), '
+          + 'actualizado_en = NOW() '
+          + 'WHERE id = $1',
           [destinoId2]
         );
 
-        // Sumar XP al usuario si está logueado
+        // Sumar XP al usuario si esta logueado
         var misionesNuevas = [];
         if (usuarioId2) {
           await sql(
-            `UPDATE usuarios SET
-               xp_total = xp_total + $1,
-               total_resenas = total_resenas + 1,
-               ultimo_acceso = NOW()
-             WHERE id = $2`,
+            'UPDATE usuarios SET '
+            + 'xp_total = xp_total + $1, '
+            + 'total_resenas = total_resenas + 1, '
+            + 'ultimo_acceso = NOW() '
+            + 'WHERE id = $2',
             [xpGanado, usuarioId2]
           ).catch(function(){});
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
@@ -348,7 +348,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado, misiones: misionesNuevas });
       }
 
-      // ── Guardado ──
+      // -- Guardado --
       if (tipo2 === 'guardado') {
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido para guardar' });
@@ -396,7 +396,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, xp: xpGuardado, misiones: misionesGuardado });
       }
 
-      // ── Quitar guardado ──
+      // -- Quitar guardado --
       if (tipo2 === 'quitar_guardado') {
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
@@ -413,7 +413,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
-      // ── Visita ──
+      // -- Visita --
       if (tipo2 === 'visita') {
         // Antes se podia llamar sin usuario_id y sin limite: cada POST
         // sencillo otorgaba +20 XP de forma infinita. Ahora requiere
@@ -446,24 +446,24 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita });
       }
 
-      // ── Solo rating (sin texto) ──
+      // -- Solo rating (sin texto) --
       if (tipo2 === 'rating') {
         var rVal = parseInt(body.rating || 0);
         if (rVal < 1 || rVal > 5)
           return res.status(400).json({ ok: false, error: 'rating debe ser 1-5' });
 
         await sql(
-          `INSERT INTO interacciones (destino_id, usuario_id, tipo, rating, xp_ganado, creado_en)
-           VALUES ($1, $2, 'rating', $3, 10, NOW())`,
+          'INSERT INTO interacciones (destino_id, usuario_id, tipo, rating, xp_ganado, creado_en) '
+          + 'VALUES ($1, $2, \'rating\', $3, 10, NOW())',
           [destinoId2, usuarioId2, rVal]
         );
 
         await sql(
-          `UPDATE destinos SET
-             rating = (SELECT ROUND(AVG(rating)::numeric,2) FROM interacciones
-                       WHERE destino_id=$1 AND tipo IN ('resena','rating') AND rating IS NOT NULL),
-             actualizado_en = NOW()
-           WHERE id=$1`,
+          'UPDATE destinos SET '
+          + 'rating = (SELECT ROUND(AVG(rating)::numeric,2) FROM interacciones '
+          + '          WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\') AND rating IS NOT NULL), '
+          + 'actualizado_en = NOW() '
+          + 'WHERE id=$1',
           [destinoId2]
         ).catch(function(){});
 

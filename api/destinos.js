@@ -1,9 +1,9 @@
-// api/destinos.js  v6 — schema real, completo y definitivo
+// api/destinos.js  v6 -- schema real, completo y definitivo (ASCII-safe: 0 backticks, 0 no-ASCII)
 // JOIN destinos_detalles, stats reales, modo=mapa con color, campos evento
 
 const { neon } = require('@neondatabase/serverless');
 
-const CAT_EMOJI  = { hostal:'🏨', comida:'🍽️', sitio:'🏔️', evento:'🎉', blog:'📝' };
+const CAT_EMOJI  = { hostal:'\ud83c\udfe8', comida:'\ud83c\udf7d\ufe0f', sitio:'\ud83c\udfd4\ufe0f', evento:'\ud83c\udf89', blog:'\ud83d\udcdd' };
 const CAT_COLORS = {
   hostal: 'linear-gradient(135deg,#1a3a5c,#2a4a7c)',
   comida: 'linear-gradient(135deg,#3a1a0a,#4a2a1a)',
@@ -23,7 +23,7 @@ function safeJSON(val) {
 
 function toPlace(row) {
   var cat   = row.categoria_slug || 'sitio';
-  var emoji = row.emoji || CAT_EMOJI[cat] || '📍';
+  var emoji = row.emoji || CAT_EMOJI[cat] || '\ud83d\udccd';
   var foto  = row.foto_hero || '';
 
   var amenidades   = safeJSON(row.amenidades)   || [];
@@ -68,7 +68,7 @@ function toPlace(row) {
     como_llegar: row.como_llegar   || '',
     tipo:        row.tipo          || '',
     capacidad:   row.capacidad     || '',
-    // Links de reserva — destinos_detalles > columnas directas
+    // Links de reserva -- destinos_detalles > columnas directas
     booking:     row.booking_url      || row.booking     || '',
     hostelworld: row.hostelworld_url  || row.hostelworld || '',
     airbnb:      row.airbnb_url       || row.airbnb      || '',
@@ -81,7 +81,7 @@ function toPlace(row) {
     tema:        tags.tema || '',
     habs:        habitaciones,
     faqs:        faqs,
-    // Campos específicos para AGENDA_EVENTS (eventos)
+    // Campos especificos para AGENDA_EVENTS (eventos)
     day:         row.event_day        || null,
     month:       row.event_month      || null,
     time:        row.horario          || 'Consultar',
@@ -92,7 +92,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  // Cache corto en CDN — los datos cambian frecuentemente (nuevos lugares, ediciones)
+  // Cache corto en CDN -- los datos cambian frecuentemente (nuevos lugares, ediciones)
   res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=30');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -108,7 +108,7 @@ module.exports = async function handler(req, res) {
     var limit    = Math.min(parseInt(req.query.limit)    || 500, 500);
     var offset   = Math.max(parseInt(req.query.offset)   || 0, 0);
 
-    // WHERE dinámico
+    // WHERE dinamico
     var conds  = ["d.status = 'published'"];
     var params = [];
     var pi     = 1;
@@ -143,15 +143,15 @@ module.exports = async function handler(req, res) {
 
     var where = conds.join(' AND ');
 
-    // ── Modo mapa: campos mínimos + color ────────────────────────
+    // -- Modo mapa: campos minimos + color --------------------------
     if (modo === 'mapa') {
       var mapaRows = await sql(
-        `SELECT id, slug, nombre, categoria_slug, ciudad, region,
-                lat, lng, emoji, hero_bg, foto_hero, rating, total_resenas, destacado
-         FROM destinos d
-         WHERE ${where} AND lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0
-         ORDER BY destacado DESC, rating DESC NULLS LAST
-         LIMIT $${pi} OFFSET $${pi+1}`,
+        'SELECT id, slug, nombre, categoria_slug, ciudad, region, '
+        + 'lat, lng, emoji, hero_bg, foto_hero, rating, total_resenas, destacado '
+        + 'FROM destinos d '
+        + 'WHERE ' + where + ' AND lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0 '
+        + 'ORDER BY destacado DESC, rating DESC NULLS LAST '
+        + 'LIMIT $' + pi + ' OFFSET $' + (pi + 1),
         [...params, limit, offset]
       );
 
@@ -169,9 +169,9 @@ module.exports = async function handler(req, res) {
             region:   d.region || '',
             lat:      parseFloat(d.lat),
             lng:      parseFloat(d.lng),
-            emoji:    d.emoji   || CAT_EMOJI[cat] || '📍',
+            emoji:    d.emoji   || CAT_EMOJI[cat] || '\ud83d\udccd',
             hero_bg:  d.hero_bg || CAT_COLORS[cat] || '',
-            color:    PIN_COLORS[cat] || '#666',   // ← requerido por Leaflet markers
+            color:    PIN_COLORS[cat] || '#666',   // <- requerido por Leaflet markers
             foto:     d.foto_hero || '',
             rating:   d.rating ? parseFloat(d.rating) : 0,
             reviews:  d.total_resenas ? parseInt(d.total_resenas) : 0,
@@ -181,33 +181,33 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // ── Modo normal: JOIN con destinos_detalles ───────────────────
+    // -- Modo normal: JOIN con destinos_detalles ---------------------
     var rows = await sql(
-      `SELECT d.*,
-              dd.checkin, dd.checkout,
-              dd.habitaciones, dd.amenidades, dd.faqs,
-              dd.booking_url, dd.hostelworld_url, dd.airbnb_url
-       FROM destinos d
-       LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id
-       WHERE ${where}
-       ORDER BY d.destacado DESC, d.rating DESC NULLS LAST, d.creado_en DESC
-       LIMIT $${pi} OFFSET $${pi+1}`,
+      'SELECT d.*, '
+      + 'dd.checkin, dd.checkout, '
+      + 'dd.habitaciones, dd.amenidades, dd.faqs, '
+      + 'dd.booking_url, dd.hostelworld_url, dd.airbnb_url '
+      + 'FROM destinos d '
+      + 'LEFT JOIN destinos_detalles dd ON dd.destino_id = d.id '
+      + 'WHERE ' + where + ' '
+      + 'ORDER BY d.destacado DESC, d.rating DESC NULLS LAST, d.creado_en DESC '
+      + 'LIMIT $' + pi + ' OFFSET $' + (pi + 1),
       [...params, limit, offset]
     );
 
     var countRows = await sql(
-      `SELECT COUNT(*) AS n FROM destinos d WHERE ${where}`,
+      'SELECT COUNT(*) AS n FROM destinos d WHERE ' + where,
       params
     );
 
     // Stats reales para homepage
     var statsRows = await sql(
-      `SELECT
-         COUNT(*)                          AS total_destinos,
-         COUNT(DISTINCT ciudad)            AS total_ciudades,
-         COALESCE(SUM(total_resenas), 0)  AS total_resenas,
-         ROUND(AVG(rating)::numeric, 1)   AS rating_promedio
-       FROM destinos WHERE status = 'published' AND categoria_slug != 'blog'`
+      'SELECT '
+      + '  COUNT(*) AS total_destinos, '
+      + '  COUNT(DISTINCT ciudad) AS total_ciudades, '
+      + '  COALESCE(SUM(total_resenas), 0) AS total_resenas, '
+      + '  ROUND(AVG(rating)::numeric, 1) AS rating_promedio '
+      + 'FROM destinos WHERE status = \'published\' AND categoria_slug != \'blog\''
     );
     var st = statsRows[0] || {};
 

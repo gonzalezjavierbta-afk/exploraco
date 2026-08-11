@@ -1,4 +1,4 @@
-// api/usuarios.js — Vercel Serverless Function
+// api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
 const { neon } = require('@neondatabase/serverless');
 
 // Mismos umbrales que XP_LEVELS en index.html (linea ~3625 del motor de
@@ -66,17 +66,18 @@ module.exports = async (req, res) => {
 
     if (req.method === 'GET') {
       if (tipo === 'leaderboard') {
-        const rows = await sql`
-          SELECT id, nombre, avatar_url, perfil_tipo, xp_total, nivel,
-                 badge_actual, total_resenas, total_guardados
-          FROM usuarios WHERE activo = true
-          ORDER BY xp_total DESC
-          LIMIT ${parseInt(limit)}
-        `;
+        const rows = await sql(
+          'SELECT id, nombre, avatar_url, perfil_tipo, xp_total, nivel, '
+          + 'badge_actual, total_resenas, total_guardados '
+          + 'FROM usuarios WHERE activo = true '
+          + 'ORDER BY xp_total DESC '
+          + 'LIMIT $1',
+          [parseInt(limit)]
+        );
         return res.json({ ok: true, data: rows.map(conNivel) });
       }
       if (id) {
-        const rows = await sql`SELECT * FROM usuarios WHERE id = ${id}`;
+        const rows = await sql('SELECT * FROM usuarios WHERE id = $1', [id]);
         if (!rows.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
         return res.json({ ok: true, data: conMisiones(conNivel(rows[0])) });
       }
@@ -88,19 +89,20 @@ module.exports = async (req, res) => {
       if (!auth_id || !email || !nombre) {
         return res.status(400).json({ ok: false, error: 'Faltan: auth_id, email, nombre' });
       }
-      const rows = await sql`
-        INSERT INTO usuarios (auth_id, email, nombre, avatar_url, auth_provider)
-        VALUES (${auth_id}, ${email}, ${nombre}, ${avatar_url || null}, ${auth_provider || 'email'})
-        ON CONFLICT (auth_id) DO UPDATE SET
-          nombre = EXCLUDED.nombre,
-          avatar_url = COALESCE(EXCLUDED.avatar_url, usuarios.avatar_url),
-          ultimo_acceso = NOW()
-        RETURNING *
-      `;
+      const rows = await sql(
+        'INSERT INTO usuarios (auth_id, email, nombre, avatar_url, auth_provider) '
+        + 'VALUES ($1, $2, $3, $4, $5) '
+        + 'ON CONFLICT (auth_id) DO UPDATE SET '
+        + 'nombre = EXCLUDED.nombre, '
+        + 'avatar_url = COALESCE(EXCLUDED.avatar_url, usuarios.avatar_url), '
+        + 'ultimo_acceso = NOW() '
+        + 'RETURNING *',
+        [auth_id, email, nombre, avatar_url || null, auth_provider || 'email']
+      );
       return res.json({ ok: true, data: conMisiones(conNivel(rows[0])) });
     }
 
-    return res.status(405).json({ ok: false, error: 'Método no permitido' });
+    return res.status(405).json({ ok: false, error: 'M\u00e9todo no permitido' });
 
   } catch (err) {
     console.error('[usuarios]', err.message);
