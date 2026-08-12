@@ -1,0 +1,1867 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+  <!-- SEO + Open Graph -->
+  <meta name="description" content="Monserrate en Bogotá, Cundinamarca. Sube a 3.152 m, visita la Basílica del Señor Caído y disfruta la mejor vista de la ciudad. Guía completa de horarios, precios y cómo llegar.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://exploraco.co/monserrate2.html">
+  <!-- Open Graph -->
+  <meta property="og:type"        content="place">
+  <meta property="og:site_name"   content="ExploraCO">
+  <meta property="og:title"       content="Monserrate – ExploraCO">
+  <meta property="og:description" content="Monserrate en Bogotá, Cundinamarca. Sube a 3.152 m, visita la Basílica del Señor Caído y disfruta la mejor vista de la ciudad. Guía completa de horarios, precios y cómo llegar.">
+  <meta property="og:image"       content="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg/1200px-2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="800">
+  <meta property="og:url"         content="https://exploraco.co/monserrate2.html">
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Monserrate – ExploraCO">
+  <meta name="twitter:description" content="Monserrate en Bogotá, Cundinamarca. Sube a 3.152 m, visita la Basílica del Señor Caído y disfruta la mejor vista de la ciudad. Guía completa de horarios, precios y cómo llegar.">
+  <meta name="twitter:image"       content="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg/1200px-2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg">
+  <!-- Font preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Structured data -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TouristAttraction",
+  "name": "Monserrate",
+  "description": "Monserrate en Bogotá, Cundinamarca. Sube a 3.152 m, visita la Basílica del Señor Caído y disfruta la mejor vista de la ciudad. Guía completa de horarios, precios y cómo llegar.",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg/1200px-2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 4.9,
+    "reviewCount": 4820
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Bogotá",
+    "addressRegion": "Cundinamarca",
+    "addressCountry": "CO"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 4.605833,
+    "longitude": -74.056389
+  },
+  "url": "https://exploraco.co/monserrate2.html",
+  "touristType": "Lugar turístico",
+  "isAccessibleForFree": "False"
+}
+  </script><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Monserrate – ExploraCO</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}
+.bc{font-family:'Barlow Condensed',sans-serif}
+.topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none;flex-shrink:0}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}
+.tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}
+.tbc a{color:rgba(255,255,255,.4);text-decoration:none}.tbc a:hover{color:var(--gold)}
+.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}
+.tra{display:flex;gap:8px;align-items:center;margin-left:auto}
+.tact{width:32px;height:32px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+.tact:hover{background:rgba(255,255,255,.14)}
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);cursor:pointer}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff}
+.hero{background:var(--black);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:420px}
+.hl{display:flex;flex-direction:column;justify-content:center;gap:18px}
+.hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}
+.htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.9;letter-spacing:.5px}
+.htitle em{color:var(--gold);font-style:italic;display:block}
+.hsub{font-size:13px;color:rgba(255,255,255,.42);line-height:1.8;max-width:480px}
+.hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}
+.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.45)}
+.hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.hbtn:hover{background:var(--gold-dark)}
+.hobtn{background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}
+.hobtn:hover{border-color:rgba(255,255,255,.45);color:#fff}
+.hr{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.psm{height:210px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer}
+.psm img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.psm:hover img{transform:scale(1.04)}
+.psp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:62px}
+.pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.pexp{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;cursor:pointer}
+.prow{display:flex;gap:8px;height:94px}
+.pth{flex:1;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;transition:opacity .15s}
+.pth:hover{opacity:.85}
+.pth img{width:100%;height:100%;object-fit:cover}
+.pthp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px}
+.pvpl{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+.pvic{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:13px}
+.pmore::after{content:attr(data-more);position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:'Barlow Condensed',sans-serif}
+.gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}
+.gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}
+.gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}
+.gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}
+.gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}
+.gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}
+.gsdate{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.75);font-size:11px}
+.gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}
+.gscta:hover{background:#f5f0e8}
+.ssec{padding:44px 4%}
+.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.sin{max-width:860px;margin:0 auto}
+.strow{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.sgl{width:36px;height:3px;background:var(--gold);flex-shrink:0;border-radius:2px}
+.stitle{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:2.5px;color:var(--text)}
+.stnum{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}
+.slead{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}
+.stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px}
+.hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:22px 0;display:flex;align-items:flex-start;gap:12px}
+.hbico{font-size:20px;flex-shrink:0;margin-top:2px}
+.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}
+.hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}
+.tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;transition:box-shadow .2s,transform .2s}
+.icard:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);transform:translateY(-3px)}
+.iico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px}
+.ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)}
+.ival{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.1}
+.isub{font-size:10px;color:var(--muted);margin-top:2px}
+#mapel{width:100%;height:300px;border-radius:8px;border:1px solid var(--border)}
+.mapacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mabtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .15s;text-decoration:none}
+.mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.gold:hover{background:var(--gold-dark)}
+.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.mabtn.dark:hover{background:#333}
+.mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.green:hover{background:#f0fff5}
+.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}.mabtn.outline:hover{border-color:var(--text)}
+.rblock{display:flex;gap:24px;align-items:flex-start;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px}
+.rbavg{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;color:var(--gold);line-height:1;text-align:center}
+.rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}
+.rbst{font-size:18px;color:#DDD}.rbst.on{color:var(--gold)}
+.rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}
+.rbbars{flex:1}.rbbr{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rbbl{font-size:11px;color:var(--muted);min-width:20px;font-weight:600}
+.rbbt{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.rbbf{height:100%;background:var(--gold);border-radius:3px}
+.rbbn{font-size:11px;font-weight:700;color:var(--text);min-width:24px;text-align:right}
+.rvlist{display:flex;flex-direction:column;gap:14px}
+.rvitem{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.rvhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.rvav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;flex-shrink:0}
+.rvname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text)}
+.rvdate{font-size:9px;color:var(--muted)}
+.rvstars{display:flex;gap:1px;margin-left:auto}
+.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold)}
+.rvtag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.rvtx{font-size:13px;color:#444;line-height:1.7}
+.wr{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-top:20px}
+.wrtitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);margin-bottom:14px}
+.wrfields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.wrff{grid-column:1/-1}
+.wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}
+.wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;transition:border-color .15s}
+.wrinp:focus{border-color:var(--gold)}.wrinp::placeholder{color:#CCC}
+textarea.wrinp{resize:vertical;min-height:88px}
+.sprow{display:flex;gap:5px;margin-bottom:12px}
+.spk{font-size:26px;cursor:pointer;color:#DDD;transition:color .1s,transform .1s;user-select:none}
+.spk:hover,.spk.h,.spk.s{color:var(--gold);transform:scale(1.16)}
+.wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.wrsub:hover{background:#333}
+.wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid;transition:all .2s;text-decoration:none}
+.cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.gold:hover{background:var(--gold-dark);transform:translateY(-2px)}
+.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}.cbtn.dark:hover{background:#222;transform:translateY(-2px)}
+.cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.green:hover{background:#f0fff5;transform:translateY(-2px)}
+.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}.cbtn.blue:hover{background:#f0f7ff;transform:translateY(-2px)}
+.nbgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nbcard{background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:box-shadow .18s,transform .18s;text-decoration:none;display:block}
+.nbcard:hover{box-shadow:0 8px 24px rgba(0,0,0,.1);transform:translateY(-3px)}
+.nbimg{height:80px;display:flex;align-items:center;justify-content:center;font-size:30px;position:relative;overflow:hidden}
+.nbimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.nbemoji{position:relative;z-index:1}
+.nbbdg{position:absolute;top:6px;left:6px;z-index:2;padding:2px 6px;border-radius:3px;font-size:7px;font-weight:700;text-transform:uppercase}
+.nbbody{padding:9px 10px}
+.nbname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text);line-height:1.1;margin-bottom:2px}
+.nbloc{font-size:9px;color:var(--muted)}
+.nbstars{display:flex;align-items:center;gap:2px;margin-top:3px}
+.nbst{font-size:9px;color:#DDD}.nbst.on{color:var(--gold)}
+.footer{background:var(--black);border-top:3px solid var(--gold);padding:36px 4% 20px}
+.ftop{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:4%;margin-bottom:28px}
+.flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:10px;text-decoration:none;display:inline-block}
+.flogo em{color:var(--gold);font-style:normal}
+.fdesc{font-size:11px;color:rgba(255,255,255,.28);line-height:1.8;margin-bottom:14px}
+.fctl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.22);margin-bottom:12px}
+.flinks{display:flex;flex-direction:column;gap:7px}
+.flink{font-size:11px;color:rgba(255,255,255,.38);cursor:pointer;text-decoration:none;transition:color .15s}.flink:hover{color:var(--gold)}
+.fbot{border-top:1px solid rgba(255,255,255,.07);padding-top:16px;display:flex;align-items:center;justify-content:space-between}
+.fcopy{font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links{display:flex;gap:4%;font-size:9px;color:rgba(255,255,255,.18)}
+.fb-links a{color:inherit;text-decoration:none}.fb-links a:hover{color:var(--gold)}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column}
+.lb.open{display:flex}
+.lbcl{position:absolute;top:16px;right:20px;color:#fff;font-size:26px;cursor:pointer;background:none;border:none}
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lbnav:hover{background:rgba(255,255,255,.2)}.lbprev{left:16px}.lbnext{right:16px}
+.lbm{display:flex;align-items:center;justify-content:center;width:min(700px,92vw);height:min(500px,74vh);border-radius:8px;overflow:hidden}
+.lbm img{width:100%;height:100%;object-fit:cover}
+.lbmp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px}
+.lbcp{color:rgba(255,255,255,.55);font-size:12px;margin-top:10px}
+@media(max-width:860px){.hi{grid-template-columns:1fr;gap:20px}.hr{display:none}.igrid{grid-template-columns:1fr 1fr}.nbgrid{grid-template-columns:1fr 1fr}.ftop{grid-template-columns:1fr 1fr;gap:5%}.wrfields{grid-template-columns:1fr}}
+@media(max-width:600px){.cgrid{grid-template-columns:1fr}.igrid{grid-template-columns:1fr}.gsdiv{display:none}}
+
+:root{--cat-color:#22C55E;--cat-bg:#F0FDF4;--cat-tc:#14532d}
+
+/* ── GUARDAR EN MI MAPA ── */
+.save-fab{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;align-items:center;gap:8px;padding:12px 20px;border-radius:50px;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:all .2s}
+.save-fab.unsaved{background:#fff;color:var(--black);border:2px solid rgba(0,0,0,.12)}
+.save-fab.unsaved:hover{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved{background:var(--gold);color:#fff;border:2px solid var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.saved:hover{background:var(--gold-dark);border-color:var(--gold-dark)}
+.save-fab-icon{font-size:16px;transition:transform .2s}
+.save-fab.saved .save-fab-icon{transform:scale(1.15)}
+.save-fab-toast{position:fixed;bottom:80px;right:24px;z-index:501;background:var(--black);color:#fff;font-size:12px;padding:8px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .3s;font-family:'Outfit',sans-serif;border-left:3px solid var(--gold)}
+.save-fab-toast.show{opacity:1}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ══════════════════════════════════════════════════════
+   LUGAR TEMPLATE V2 — Página de destino turístico
+   Tipo · Dificultad · Época · Entradas · Tours
+   Checklist · Itinerario · Tips · Fauna · Permisos
+   Social · FAQ · Comparar · Reseñas V2
+══════════════════════════════════════════════════════ */
+:root{
+  --green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;
+  --gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;
+  --black:#111;--bg:#F8F7F3;--white:#fff;
+  --border:#E5E3DD;--muted:#777;--sand:#F5E6D0;
+  --blue:#3B82F6;--red:#EF4444;--purple:#8B5CF6;
+}
+
+/* ── TIPO / SUBTIPO BADGES ── */
+.lugar-type-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.lt-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lt-trek{background:#F0FDF4;color:#166534}
+.lt-playa{background:#EFF6FF;color:#1D4ED8}
+.lt-arqueologico{background:#FDF4FF;color:#7E22CE}
+.lt-ecoturismo{background:#ECFDF5;color:#065F46}
+.lt-aventura{background:#FFF7ED;color:#C2410C}
+.lt-cultural{background:#FAF5FF;color:#6D28D9}
+.lt-unesco{background:#FFFBEB;color:#92400E}
+.lt-parque{background:#F0FDF4;color:#15803D}
+.lt-patrimonio{background:#FEF2F2;color:#DC2626}
+/* certificaciones */
+.cert-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;border:1px solid}
+.cb-unesco{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.cb-pnn{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.cb-ramsar{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8}
+.cb-patrimonio{background:#FAF5FF;border-color:#E9D5FF;color:#6D28D9}
+
+/* ── DIFICULTAD ── */
+.dificultad-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}
+.dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+.dif-bar{display:flex;gap:4px;margin-bottom:8px}
+.dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}
+.dif-seg.active{background:var(--green)}
+.dif-seg.active.medio{background:var(--gold)}
+.dif-seg.active.dificil{background:var(--red)}
+.dif-seg.active.tecnico{background:#7C3AED}
+.dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}
+.dif-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}
+.dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── ÉPOCA IDEAL ── */
+.epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}
+.mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
+.mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}
+.mes-fill.ideal{background:#22C55E;color:#fff}
+.mes-fill.posible{background:#F59E0B;color:#fff}
+.mes-fill.evitar{background:#EF4444;color:#fff}
+.mes-fill.ok{background:#3B82F6;color:#fff}
+.epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── ENTRADAS ── */
+.entradas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.entradas-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:#FAFAF8}
+.entradas-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.entradas-table tr:last-child td{border-bottom:none}
+.entradas-table tr:hover td{background:#FAFAF8}
+.entrada-tipo{font-weight:600;color:var(--black)}
+.entrada-precio{font-size:14px;font-weight:900;color:var(--black);font-family:'Barlow Condensed',sans-serif}
+.entrada-gratis{color:var(--green);font-size:14px;font-weight:900}
+.entrada-link{display:inline-block;padding:5px 12px;background:var(--black);color:var(--white);border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;transition:background .15s}
+.entrada-link:hover{background:#333}
+.entradas-nota{font-size:10px;color:var(--muted);margin-top:8px;padding:8px 10px;background:#FFFBEB;border-radius:5px;border-left:2px solid var(--gold)}
+
+/* ── TOURS ── */
+.tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.tour-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.tour-card.featured{border-color:var(--gold);border-width:1.5px}
+.tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+.tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.tc-badge-grup{background:#EFF6FF;color:#1D4ED8}
+.tc-badge-priv{background:#FAF5FF;color:#6D28D9}
+.tc-badge-eco{background:#ECFDF5;color:#065F46}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--black);text-align:right;flex-shrink:0}
+.tc-price-sub{font-size:9px;color:var(--muted);text-align:right}
+.tc-body{padding:10px 14px}
+.tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}
+.tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}
+.tc-incl.yes::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.tc-incl.no::before{content:'✗';color:var(--red);font-weight:700;flex-shrink:0}
+.tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--black);color:var(--white);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.tc-book-btn:hover{background:#333}
+
+/* ── CHECKLIST ── */
+.checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}
+.cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}
+.cl-item.recomendado{background:var(--bg);border-color:var(--border)}
+.cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}
+.cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}
+.cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}
+.cl-sub{font-size:9px;color:var(--muted)}
+.cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}
+.req-ob{background:#FEE2E2;color:#DC2626}
+.req-re{background:#FEF3C7;color:#92400E}
+.req-op{background:#F3F4F6;color:#9CA3AF}
+
+/* ── ITINERARIO ── */
+.itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.itinerario-tabs::-webkit-scrollbar{display:none}
+.itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}
+.itab:hover{color:var(--black)}
+.itab.on{color:var(--black);border-bottom-color:var(--green)}
+.itin-panel{display:none}
+.itin-panel.on{display:block}
+.itin-timeline{display:flex;flex-direction:column;gap:0}
+.itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+.itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}
+.itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}
+.itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}
+.itin-body{flex:1;min-width:0;padding-top:4px}
+.itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}
+.itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}
+.itin-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+
+/* ── TIPS ── */
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}
+.tip-card:hover{border-color:#ccc}
+.tip-icon{font-size:22px;flex-shrink:0;line-height:1}
+.tip-body{}
+.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.tip-text{font-size:11px;color:var(--muted);line-height:1.6}
+.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}
+.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+/* ── FAUNA / FLORA ── */
+.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}
+.fauna-card:hover{border-color:#ccc}
+.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}
+.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}
+.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}
+.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── PERMISOS ── */
+.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}
+.permiso-item.requerido{border-left:3px solid var(--red)}
+.permiso-item.recomendado{border-left:3px solid var(--gold)}
+.permiso-item.info{border-left:3px solid var(--blue)}
+.permiso-icon{font-size:20px;flex-shrink:0}
+.permiso-body{flex:1;min-width:0}
+.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}
+.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}
+.permiso-link:hover{text-decoration:underline}
+.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}
+
+/* ── SCORE ── */
+.score-overall{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)}
+.so-number{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;line-height:1;color:var(--black)}
+.so-stars{font-size:14px;color:var(--gold);letter-spacing:1px}
+.so-label{font-size:11px;color:var(--muted)}
+.so-count{font-size:10px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px}
+.score-label{font-size:11px;color:var(--black);font-weight:500;white-space:nowrap}
+.score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-val{font-size:11px;font-weight:700;color:var(--black);text-align:right}
+
+/* ── QUIÉN VA ── */
+.quien-va-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px}
+.qv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.qv-travellers{display:flex;flex-wrap:wrap;gap:8px}
+.qv-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;border:2px solid var(--white)}
+.qv-person{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.qv-name{font-size:8px;color:var(--muted);text-align:center;max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FAQ ── */
+.faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}
+.faq-q:hover{background:var(--bg)}
+.faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}
+.faq-item.open .faq-a{display:block}
+
+/* ── COMPARAR ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.compare-table th{padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.compare-table td:first-child{text-align:left;font-weight:600}
+.compare-table tr.current-row td{background:#FFFBEB}
+.compare-table tr:last-child td{border-bottom:none}
+.cmp-score{font-weight:700;color:var(--black)}
+.cmp-link{font-size:10px;color:var(--green);text-decoration:none;padding:3px 8px;border:1px solid #BBF7D0;border-radius:3px;transition:background .12s;display:inline-block}
+.cmp-link:hover{background:var(--green-l)}
+
+/* ── RESEÑAS V2 ── */
+.rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rv-dim{display:flex;flex-direction:column;gap:3px}
+.rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rv-stars-row{display:flex;gap:2px}
+.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star.on,.rv-star:hover{color:var(--gold)}
+.rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
+.rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
+
+/* ── SECTION BADGE ── */
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* ── MOBILE NAV DETAIL PAGES ── */
+.ham-btn{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;background:transparent;border:none;cursor:pointer;padding:4px;flex-shrink:0;z-index:400;margin-left:auto}
+.ham-btn span{display:block;width:22px;height:2px;background:rgba(255,255,255,.7);border-radius:2px;transition:all .25s;transform-origin:center}
+.ham-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.ham-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.ham-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mobile-drawer{position:fixed;top:0;left:0;right:0;bottom:0;z-index:350;display:flex;flex-direction:column;background:rgba(0,0,0,.97);transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.mobile-drawer.open{transform:translateX(0)}
+.md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
+.md-logo em{color:var(--gold);font-style:normal}
+.md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
+.md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
+.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link-icon{font-size:18px;width:24px;text-align:center}
+.md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
+.md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
+@media(max-width:768px){
+  .ham-btn{display:flex}
+  .tbc,.tra{display:none!important}
+  .topbar{padding:0 14px}
+}
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+.sec-nav{position:sticky;top:52px;z-index:200;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
+.sec-nav::-webkit-scrollbar{display:none}
+.sec-nav-inner{display:flex;gap:0;min-width:max-content;padding:0 4%}
+.sn-link{padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+.sn-link:hover{color:var(--black)}
+.sn-link.active{color:var(--black);border-bottom-color:var(--gold)}
+/* Progress bar */
+.page-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:500;background:transparent}
+.page-progress-fill{height:100%;background:var(--gold);width:0%;transition:width .1s linear;border-radius:0 2px 2px 0}
+@media(max-width:768px){
+  .sn-link{padding:10px 12px;font-size:10px}
+  .sec-nav-inner{padding:0 16px}
+}
+
+
+/* ── SHARE BUTTON ── */
+.tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;text-transform:uppercase}
+.tshare:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+.tshare-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#111;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px;min-width:180px;z-index:400;display:none;flex-direction:column;gap:2px}
+.tshare-dropdown.open{display:flex}
+.tsd-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);cursor:pointer;transition:background .1s;text-decoration:none}
+.tsd-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.tshare-wrap{position:relative}
+
+</style></head><body>
