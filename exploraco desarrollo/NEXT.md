@@ -4,44 +4,53 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-Se completo TSK-015 (M\u00f3dulos de puntuaci\u00f3n din\u00e1mica -
-Quick-Rating): un widget de voto rapido 1-5 estrellas sin texto en la
-pagina publica de destino, con dedup simetrico (una calificacion por
-usuario y destino) y `total_resenas` alineado al promedio. Detalle y
-decisiones de producto en TASKS.md (TSK-015, COMPLETADO) y
-DECISIONS.md (ADR-007). Archivos tocados: `api/interacciones.js`
-(POST tipo=rating requiere usuario_id, dedup contra resena+rating con
-409 `ya_votado`+`voto_previo`, +10 XP + evaluarMisiones, GET
-tipo=mi_rating, AVG/COUNT alineados), `api/admin.js` (recalculo del
-DELETE sobre resena+rating), `usuario-session.js` (metodos
-`votar`/`obtenerMiVoto`), `api/pagina-destino.js` (widget `#qr-stars`
-solo si `cat !== 'blog'`, funciones inline `pintarQR`/`votarDID`/
-`precargarMiVoto`, guard de presencia de `#qr-stars`).
+### Sesion actual (Agosto 2026) - Fix critico de produccion en BD + TSK-017 Comparador
 
-IMPORTANTE (ADR-006): la implementacion previa de esta tarea se
-reporto completa pero NO persistio en disco (sesiones de subagente
-expiradas). Se reimplemento contra los archivos reales y se verifico
-con `git diff` (161 inserciones en 4 archivos), `node --check`,
-ASCII-safety y 22 smoke tests de buildHTML. Antes de continuar
-cualquier tarea, verificar siempre el archivo real en disco.
+Se verifico el flujo de TSK-015 (Quick-Rating) en produccion y se
+descubrio que los 4 POST de interaccion (`resena`, `rating`, `visita`,
+`guardado`) fallaban con 500. Causa raiz: un trigger de base de datos
+`trg_xp_on_interaccion`/`fn_actualizar_xp()` (residuo de una sesion de
+IA anterior, que NO existe en el repo) insertaba en `xp_historial` con
+valores que violaban NOT NULL/FK; ademas la migracion documentada en
+`api/interacciones.js:9` (`interacciones.activo`,
+`usuarios.progreso_misiones`) nunca se habia aplicado a produccion.
+Fix: SQL directo en Neon (DROP del trigger/funcion + 2 ALTER
+acumulativos con `IF NOT EXISTS`). El codigo de `api/interacciones.js`
+NO cambio. Ver BUGS_HISTORICOS.md BUG-021 y DECISIONS.md ADR-008
+(nueva politica: toda alteracion de schema/trigger debe vivir en el
+repo como `.sql` versionado, nunca SQL suelto en Neon). Verificado
+post-fix: visita +20 XP + mision, guardado +5 XP dedup via `activo`,
+rating +10 XP, resena duplicada 409.
+
+Ademas se implemento TSK-017 (Comparador de lugares similares, ver
+TASKS.md): carrusel horizontal de 3 cards al final de la pagina de
+detalle con hermanos de la misma `categoria_slug`, rankeados por
+Jaccard sobre las claves de match por categoria (sitio:
+tipo_actividad/dificultad/duracion/temporada; hostal:
+tipo_alojamiento/reglas_casa/ciudad; comida:
+tipo_comida/cocina/ambiente/precio_promedio/terraza; evento:
+sede/edicion/ciudad), con relleno por rating si hay menos de 3 con
+score > 0. Sin endpoint nuevo (presupuesto 8/8 agotado): el query de
+hermanos vive dentro de `api/pagina-destino.js`.
 
 ## Que sigue (proxima accion inmediata)
 
-1. Verificar en produccion (Vercel) el deploy de los 4 archivos
-   modificados: correr el Escudo GOLD (node --check, ASCII-safety,
-   balance de divs) sobre los archivos ya desplegados y probar el
-   flujo completo (voto rapido con sesion, 409 de doble voto, precarga
-   del voto al recargar, ausencia del widget en blogs).
-2. Quedan pendientes del backlog Social: TSK-016 (Widget "Quien va
-   este mes") y TSK-017 (Comparador de lugares similares), ambos con
-   dependencia en TSK-015 ya cerrada.
-3. Infraestructura sin dependencias de categoria: TASK-004/005/006
+1. Desplegar `api/pagina-destino.js` con el comparador (TSK-017) y
+   correr el Escudo GOLD sobre el archivo ya desplegado. Cargar tags
+   reales en los destinos de comida/hostal/evento (varios estan vacios,
+   lo que degrada el comparador a "relleno por rating").
+2. Queda pendiente del backlog Social: TSK-016 (Widget "Quien va este
+   mes"), con dependencia en TSK-015 ya cerrada.
+3. Materializar ADR-008: crear la carpeta `db/migrations/` con el SQL
+   del fix de BUG-021 versionado (DROP trigger/funcion + ALTER
+   acumulativos), como repositorio unico de la estructura de BD.
+4. Infraestructura sin dependencias de categoria: TASK-004/005/006
    (dominio propio, Search Console, RESEND_API_KEY).
-4. Candidatos ya listados en Riesgos activos abajo: `renderMyMap()`
+5. Candidatos ya listados en Riesgos activos abajo: `renderMyMap()`
    fuera del ciclo de refresco de `index-api-connector.js`, desfase
    de IDs de `MM_PINS[]`, y `usuario-session.js` (que YA se modifico
-   en esta entrega con `votar`/`obtenerMiVoto`) sigue pendiente de
-   verificacion visual en index.html.
+   con `votar`/`obtenerMiVoto`) sigue pendiente de verificacion visual
+   en index.html.
 
 Antes de iniciar cualquier tarea nueva, seguir el mismo protocolo de
 verificacion que revelo BUG-016/017/018/019 y, en esta entrega, la

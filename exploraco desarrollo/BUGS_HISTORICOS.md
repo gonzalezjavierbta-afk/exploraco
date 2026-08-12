@@ -344,3 +344,29 @@ significa un tab vacio en el HTML.
 **Fix:** `replArr(targetArr, newArr)`/`replObj(targetObj, newObj)` ahora reciben el array/objeto REAL por referencia (ej. `replArr(PL, nuevoPL)`, no `replArr('PL', nuevoPL)`) en vez de un nombre de string resuelto via `window[...]`. La mutacion in-place (`.length=0` + `.push()`) sigue siendo la misma -- solo cambia que ahora apunta al binding correcto, sin importar si fue declarado con `var`, `let` o `const`. De paso se corrigio tambien el fallback de inicializacion del mapa (el chequeo `typeof refreshMapaMarkers === 'function'` era siempre verdadero porque esa funcion siempre existe, asi que el `else if` a `initMapaSection()` nunca se ejecutaba de verdad aunque el mapa Leaflet no estuviera creado todavia -- ver script de fix).
 
 **Estado:** Resuelto. Prevencion: al verificar codigo que mezcla `window[nombreString]` con variables declaradas `const`/`let` de nivel superior, no asumir que ambos apuntan al mismo binding -- probarlo (ej. con Node `vm` simulando el scope real), no solo leerlo. Aplica en general a cualquier script externo que intente mutar globals de una pagina por nombre de string.
+## BUG-021: Interacciones en produccion con 500 -- trigger huerfano trg_xp_on_interaccion/fn_actualizar_xp + migracion 'activo'/'progreso_misiones' nunca aplicada
+
+**Contexto:** Al verificar el flujo de TSK-015 en produccion (Vercel + Neon), los 4 POST de interaccion fallaban con error 500 interno de Neon (sin detalle visible para el usuario): `resena`, `rating`, `visita` y `guardado`. El problema NO estaba en el codigo de `api/interacciones.js` (v4, motor de misiones), que paso el Escudo GOLD, sino en el estado de la base de datos de produccion.
+
+**Sintoma (error real de Neon):** al POSTear cualquier interaccion, el servidor respondia 500 porque un trigger de base de datos fallaba al insertar en `xp_historial` (violacion de NOT NULL / FK invalida). El caso `guardado` fallaba ADEMAS con `column "activo" does not exist` en la tabla `interacciones`.
+
+**Causa raiz (2 problemas acumulados):**
+1) **Trigger huerfano fuera del repo:** existia en produccion un trigger `trg_xp_on_interaccion` con su funcion `fn_actualizar_xp()`, residuo de una sesion de IA anterior que intento implementar un sistema de XP via base de datos. Ese trigger insertaba en `xp_historial` con valores (ej. `interaccion_id`) que no satisfacian las restricciones de la tabla, por lo que TODA interaccion que disparaba el trigger terminaba en 500. El trigger NO existe en ningun archivo del repositorio -- es la primera incidencia documentada de "codigo de BD viviendo fuera del repo" (mismo patron de riesgo que los `<script src>` no documentados que revelo TASK-007).
+2) **Migracion documentada pero nunca aplicada:** `api/interacciones.js` (v3+) documenta en su cabecera (linea 7-11) una migracion acumulativa que agrega `interacciones.activo` y `usuarios.progreso_misiones`. Esa migracion nunca se ejecuto en la base de produccion, por lo que el codigo que usa `activo` (Cero Borrado Logico de guardados) y `progreso_misiones` (motor de misiones v4) no tenia columnas donde persistir.
+
+**Fix (SQL directo en Neon):**
+1. `DROP TRIGGER IF EXISTS trg_xp_on_interaccion ON interacciones;` (elimina el trigger huerfano).
+2. `DROP FUNCTION IF EXISTS fn_actualizar_xp();` (elimina la funcion del trigger, que quedo sin referencias).
+3. `ALTER TABLE interacciones ADD COLUMN IF NOT EXISTS activo boolean NOT NULL DEFAULT true;` (aplica la migracion documentada en interacciones.js:9).
+4. `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS progreso_misiones jsonb NOT NULL DEFAULT '{}'::jsonb;` (aplica la migracion documentada en interacciones.js:11).
+No se toco el codigo de `api/interacciones.js` -- el bug era 100% de estado de BD.
+
+**Verificacion (post-fix, contra API de produccion):**
+- `POST visita` con sesion -> 201, +20 XP y mision "Primer viaje" evaluada y otorgada.
+- `POST guardado` -> 201, +5 XP y mision evaluada; un segundo `guardado`/`quitar_guardado` correctamente deduplicado via `activo`.
+- `POST rating` -> 201, +10 XP.
+- `POST resena` duplicada -> 409 `ya_votado` (dedup simetrico, ver ADR-007).
+- `node --check` y ASCII-safety sobre interacciones.js: limpios (el codigo no cambio).
+
+**Estado:** Resuelto. Prevencion: se crea ADR-008 (ver DECISIONS.md): toda alteracion de schema o trigger debe vivir en el repositorio como archivo `.sql` versionado y aplicarse via migracion acumulativa, NUNCA como SQL suelto en la consola de Neon -- y todo codigo nuevo de BD debe registrarse en BUGS_HISTORICOS.md/DECISIONS.md al crearse.
+

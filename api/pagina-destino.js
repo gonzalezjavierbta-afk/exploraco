@@ -234,6 +234,19 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid}"
 +".cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
 +".cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}"
++".rcscroll{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;-ms-overflow-style:none;scrollbar-width:none}"
++".rcscroll::-webkit-scrollbar{display:none}"
++".rcard{flex:0 0 240px;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;text-decoration:none;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}"
++".rcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.08)}"
++".rcimg{height:120px;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}"
++".rcemoji{font-size:40px}"
++".rcbody{padding:14px;display:flex;flex-direction:column;gap:5px}"
++".rcbadge{align-self:flex-start;background:var(--gold-light);color:var(--gold-dark);padding:3px 8px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}"
++".rctitle{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);line-height:1.2}"
++".rcmeta{font-size:11px;color:var(--muted)}"
++".rcrate{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:6px}"
++".rcstars{display:flex;gap:2px}.rcst{font-size:11px;color:#DDD}.rcst.on{color:var(--gold)}"
++".rcn{font-size:10px;color:var(--muted)}"
 +".faqi{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff}"
 +".faqi summary{padding:14px 16px;cursor:pointer;font-weight:700;font-size:13px;list-style:none;display:flex;justify-content:space-between}"
 +".faqi summary::-webkit-details-marker{display:none}.faqi summary::after{content:'+';color:var(--gold);font-weight:900}"
@@ -244,8 +257,62 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
 +".fcopy a{color:rgba(255,255,255,.45)}";
 
-function buildHTML(d, det, fotos, resenas, autor) {
+// -- COMPARADOR DE LUGARES SIMILARES (TSK-017) ------------------------
+// Top 3 hermanos de la misma categoria raiz, rankeados por overlap de
+// tags (Jaccard sobre los valores relevantes de cada categoria).
+var COMPARADOR_KEYS = {
+  sitio:  ['tipo_actividad','dificultad','duracion','temporada'],
+  hostal: ['tipo_alojamiento','reglas_casa','ciudad'],
+  comida: ['tipo_comida','cocina','ambiente','precio_promedio','terraza'],
+  evento: ['sede','edicion','ciudad']
+};
+
+function comparadorValores(x) {
+  var tags = (x.tags && typeof x.tags === 'object' && !Array.isArray(x.tags)) ? x.tags : {};
+  var keys = COMPARADOR_KEYS[x.categoria_slug] || [];
+  var set = {};
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var v = (k === 'ciudad') ? (x.ciudad || '') : tags[k];
+    if (v === null || v === undefined) continue;
+    var arr = Array.isArray(v) ? v : [v];
+    for (var j = 0; j < arr.length; j++) {
+      var s = String(arr[j]).trim().toLowerCase();
+      if (s) set[s] = true;
+    }
+  }
+  return set;
+}
+
+function topRelacionados(d, candidatos, n) {
+  var n = n || 3;
+  var meta = comparadorValores(d);
+  var metaKeys = Object.keys(meta);
+  var scored = [];
+  for (var i = 0; i < candidatos.length; i++) {
+    var c = candidatos[i];
+    var cSet = comparadorValores(c);
+    var inter = 0;
+    var union = metaKeys.length;
+    for (var k in cSet) {
+      if (meta[k]) inter++;
+      else union++;
+    }
+    var score = union > 0 ? (inter / union) : 0;
+    var r = parseFloat(c.rating) || 0;
+    scored.push({ row: c, score: score, rating: r });
+  }
+  scored.sort(function(a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.rating !== a.rating) return b.rating - a.rating;
+    return (a.row.nombre||'').localeCompare(b.row.nombre||'');
+  });
+  return scored.slice(0, n).map(function(s){ return s.row; });
+}
+
+function buildHTML(d, det, fotos, resenas, autor, relacionados) {
   var cat   = d.categoria_slug || 'sitio';
+  var relacionados = relacionados || [];
   var label = CAT_LABEL[cat] || 'Destino';
   var dir   = CAT_DIR[cat]   || 'index.html';
   var grad  = d.hero_bg || CAT_GRAD[cat] || CAT_GRAD.sitio;
@@ -1190,6 +1257,35 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+ctBtns.join('')+'</div></div></section>' : '';
 
+  // -- SECCI??N: Lugares similares (TSK-017) --------------------------
+  // Carrusel horizontal con los top 3 hermanos de la misma categoria
+  // raiz, rankeados por overlap de tags (ver topRelacionados arriba).
+  var secRelacionados = '';
+  if (relacionados.length && cat !== 'blog') {
+    var rcCards = relacionados.map(function(r){
+      var rHero = r.foto_hero || r.foto || '';
+      var rImg = rHero
+        ? '<div class="rcimg" style="background-image:url(\''+esc(rHero)+'\')"></div>'
+        : '<div class="rcimg" style="'+grad+'"><span class="rcemoji">'+esc(r.emoji||'')+'</span></div>';
+      var rRat = parseFloat(r.rating) || 0;
+      var rN = parseInt(r.total_resenas||0, 10) || 0;
+      var rStars = rN > 0 ? [1,2,3,4,5].map(function(i){ return '<span class="rcst'+(i<=Math.round(rRat)?' on':'')+'">*</span>'; }).join('') : '';
+      var rMeta = (r.ciudad ? esc(r.ciudad) : '');
+      if (r.region && r.region !== r.ciudad) rMeta = rMeta ? rMeta + ' - ' + esc(r.region) : esc(r.region);
+      return '<a class="rcard" href="/'+esc(r.slug)+'.html">'
+        + rImg
+        + '<div class="rcbody">'
+        + '<span class="rcbadge">'+esc(label)+'</span>'
+        + '<div class="rctitle">'+esc(r.nombre)+'</div>'
+        + (rMeta ? '<div class="rcmeta">'+rMeta+'</div>' : '')
+        + (rN > 0 ? '<div class="rcrate"><span class="rcstars">'+rStars+'</span><span class="rcn">'+rRat.toFixed(1)+' ('+rN+')</span></div>' : '')
+        + '</div></a>';
+    }).join('');
+    secRelacionados = '<section class="ssec bwhite" id="relacionados"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tambien te puede interesar</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + '<div class="rcscroll">'+rcCards+'</div></div></section>';
+  }
+
   // -- SUBNAV STICKY: anclas solo a secciones que van a existir ------
   var subnavItems = [
     {id:'descripcion', label:'Sobre',       has:!!secDescripcion},
@@ -1297,7 +1393,8 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + secMapa + '\n'
     + secFaq + '\n'
     + secResenas + '\n'
-    + secContact + '\n\n'
+    + secContact + '\n'
+    + secRelacionados + '\n\n'
 
     + '<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>'
     + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
@@ -1466,7 +1563,21 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    var html = buildHTML(d, det, fotosRows, resenasRows, autor);
+    // Comparador (TSK-017): hermanos de la misma categoria raiz.
+    // Blog se excluye (sin comparador). Se consulta un pool de
+    // candidatos y topRelacionados() rankea por overlap de tags y
+    // recorta a 3; si hay pocos hermanos con overlap, el relleno por
+    // rating garantiza "compartiendo la categoria raiz" (evidencia).
+    var relacionados = [];
+    if (d.categoria_slug && d.categoria_slug !== 'blog') {
+      var relRows = await sql(
+        "SELECT id, slug, nombre, ciudad, region, foto_hero, emoji, hero_bg, rating, total_resenas, categoria_slug, tags FROM destinos WHERE categoria_slug=$1 AND status='published' AND id<>$2 ORDER BY rating DESC NULLS LAST LIMIT 50",
+        [d.categoria_slug, d.id]
+      );
+      relacionados = topRelacionados(d, relRows, 3);
+    }
+
+    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);
