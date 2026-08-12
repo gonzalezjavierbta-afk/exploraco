@@ -1185,7 +1185,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
         <span class="sico">🔍</span>
         <input id="sinp" type="text" autocomplete="off" placeholder="Ciudad Perdida, hostal en Cartagena, Feria de las Flores…">
         <button class="scl" id="scl" onclick="clrS()">✕</button>
-        <button class="sbtn" onclick="document.getElementById('recs').scrollIntoView({behavior:'smooth'})">Buscar ahora</button>
+        <button class="sbtn" onclick="goBuscar()">Buscar ahora</button>
       </div>
       <div class="hdd" id="hdd"><div id="hddi"></div></div>
     </div>
@@ -1820,11 +1820,17 @@ function pickPlace(name){
 }
 
 function clrS(){
-  searchQ=''; destSearch='';
-  if(sinp) sinp.value='';
-  if(scl) scl.classList.remove('vis');
-  if(hdd) hdd.classList.remove('open');
-  renderDest();
+searchQ=''; destSearch='';
+if(sinp) sinp.value='';
+if(scl) scl.classList.remove('vis');
+if(hdd) hdd.classList.remove('open');
+renderDest();
+}
+function goBuscar(){
+var q=(sinp&&sinp.value)?sinp.value.trim():'';
+if(q){ location.href='/buscar?q='+encodeURIComponent(q); return; }
+var recs=document.getElementById('recs');
+if(recs) recs.scrollIntoView({behavior:'smooth'});
 }
 
 /* ── CATEGORY FILTERS ── */

@@ -4,7 +4,7 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Agosto 2026) - Fix critico de produccion en BD + TSK-017 Comparador
+### Sesion actual (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
 
 Se verifico el flujo de TSK-015 (Quick-Rating) en produccion y se
 descubrio que los 4 POST de interaccion (`resena`, `rating`, `visita`,
@@ -33,6 +33,20 @@ sede/edicion/ciudad), con relleno por rating si hay menos de 3 con
 score > 0. Sin endpoint nuevo (presupuesto 8/8 agotado): el query de
 hermanos vive dentro de `api/pagina-destino.js`.
 
+
+Ademas se implemento TASK-008 (Paginas indexables de busqueda
+`/buscar?q=...`, ver TASKS.md). Sin endpoint nuevo (presupuesto 8/8):
+bloque `?tipo=buscar` SSR en `api/utilidades.js` (GET sin auth) +
+rewrite `{ "source": "/buscar", "destination": "/api/utilidades?tipo=buscar" }`
+en `vercel.json` + `goBuscar()` en `index.html` que conecta el boton
+"Buscar ahora" del hero (si `#sinp` tiene texto navega a `/buscar?q=...`,
+si no conserva el scroll a `#recs`). Pagina indexable con `<title>`/
+`og:title` dinamicos segun `q`, canonical, form GET y grid de cards
+(img/emoji/badge de categoria/estrellas/ciudad-region-Colombia/precio).
+Alcance de busqueda completo: nombre, ciudad, region, barrio y
+`tags::text` ILIKE con escape de comodines y SQL parametrizado.
+Verificado con smoke test `smoke_buscar.js` 29/29 PASS y ASCII-safety
+intacto (680 bytes >127 pre-existentes). Pendiente desplegar.
 ## Que sigue (proxima accion inmediata)
 
 1. Desplegar `api/pagina-destino.js` con el comparador (TSK-017) y
