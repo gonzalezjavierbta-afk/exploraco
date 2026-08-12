@@ -227,6 +227,18 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // Voto del usuario en un destino (resena o voto rapido sin texto)
+      if (tipo === 'mi_rating' && destinoId && usuarioId) {
+        var miVoto = await sql(
+          'SELECT rating, tipo FROM interacciones '
+          + 'WHERE destino_id=$1 AND usuario_id=$2 '
+          + 'AND tipo IN (\'resena\',\'rating\') '
+          + 'ORDER BY (tipo=\'resena\') DESC LIMIT 1',
+          [destinoId, usuarioId]
+        );
+        return res.status(200).json({ ok: true, voto: miVoto.length > 0 ? miVoto[0] : null });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -251,18 +263,26 @@ module.exports = async function handler(req, res) {
         if (ratingVal < 1 || ratingVal > 5)
           return res.status(400).json({ ok: false, error: 'rating debe ser entre 1 y 5' });
 
-        // Un usuario identificado solo puede resenar un destino una vez
+        // Un usuario identificado solo puede calificar un destino una vez,
+        // ya sea con resena (texto) o con voto rapido sin texto (TSK-015).
         // (BUG de fraude: antes se podian repetir resenas y sumar XP sin
         // limite). Si usuario_id es null (resena anonima, caso actual de
         // produccion en pagina-destino.js) no hay como deduplicar todavia
         // -- queda cubierto cuando se conecte la sesion real ahi.
         if (usuarioId2) {
           var yaReseno = await sql(
-            'SELECT id FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'resena\' LIMIT 1',
+            'SELECT rating, tipo FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 '
+            + 'AND tipo IN (\'resena\',\'rating\') LIMIT 1',
             [destinoId2, usuarioId2]
           );
           if (yaReseno.length > 0)
-            return res.status(409).json({ ok: false, error: 'Ya rese\u00f1aste este lugar', ya_reseno: true });
+            return res.status(409).json({
+              ok: false,
+              error: 'Ya calificaste este lugar',
+              ya_reseno: true,
+              ya_votado: true,
+              voto_previo: { rating: yaReseno[0].rating, tipo: yaReseno[0].tipo }
+            });
         }
 
         // usuario_nombre no existe en la tabla -> guardarlo en texto como prefijo
@@ -284,17 +304,19 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2, ratingVal, textoFinal, xpGanado]
         );
 
-        // Actualizar rating promedio y total_resenas en destinos
+        // Actualizar rating promedio y total_resenas en destinos.
+        // Ambos se recalcularon sobre resena+rating para que el contador
+        // no quede desfasado del promedio (v5, TSK-015).
         await sql(
           'UPDATE destinos SET '
           + 'rating = ('
           + '  SELECT ROUND(AVG(rating)::numeric, 2)'
           + '  FROM interacciones'
-          + '  WHERE destino_id=$1 AND tipo=\'resena\' AND rating IS NOT NULL'
+          + '  WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\') AND rating IS NOT NULL'
           + '), '
           + 'total_resenas = ('
           + '  SELECT COUNT(*) FROM interacciones'
-          + '  WHERE destino_id=$1 AND tipo=\'resena\''
+          + '  WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\')'
           + '), '
           + 'actualizado_en = NOW() '
           + 'WHERE id = $1',
@@ -446,11 +468,30 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita });
       }
 
-      // -- Solo rating (sin texto) --
+      // -- Solo rating (sin texto) - quick-rating v5 (TSK-015) ---------
       if (tipo2 === 'rating') {
         var rVal = parseInt(body.rating || 0);
         if (rVal < 1 || rVal > 5)
           return res.status(400).json({ ok: false, error: 'rating debe ser 1-5' });
+
+        // El voto rapido requiere sesion: cierra el vector de votos
+        // anonimos infinitos que distorsionaban el promedio.
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+
+        // Dedup simetrico (una calificacion por usuario y destino).
+        var yaVoto = await sql(
+          'SELECT rating, tipo FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 '
+          + 'AND tipo IN (\'resena\',\'rating\') LIMIT 1',
+          [destinoId2, usuarioId2]
+        );
+        if (yaVoto.length > 0)
+          return res.status(409).json({
+            ok: false,
+            error: 'Ya calificaste este lugar',
+            ya_votado: true,
+            voto_previo: { rating: yaVoto[0].rating, tipo: yaVoto[0].tipo }
+          });
 
         await sql(
           'INSERT INTO interacciones (destino_id, usuario_id, tipo, rating, xp_ganado, creado_en) '
@@ -458,16 +499,28 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2, rVal]
         );
 
+        // Alinear AVG y COUNT sobre resena+rating para que el contador
+        // coincida con el numerador del promedio (v5).
         await sql(
           'UPDATE destinos SET '
           + 'rating = (SELECT ROUND(AVG(rating)::numeric,2) FROM interacciones '
           + '          WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\') AND rating IS NOT NULL), '
+          + 'total_resenas = (SELECT COUNT(*) FROM interacciones '
+          + '          WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\')), '
           + 'actualizado_en = NOW() '
           + 'WHERE id=$1',
           [destinoId2]
         ).catch(function(){});
 
-        return res.status(200).json({ ok: true, xp: 10 });
+        // Sumar XP al usuario logueado y evaluar misiones (como resena).
+        var misionesRating = [];
+        await sql(
+          'UPDATE usuarios SET xp_total=xp_total+10, ultimo_acceso=NOW() WHERE id=$1',
+          [usuarioId2]
+        ).catch(function(){});
+        misionesRating = await evaluarMisiones(sql, usuarioId2);
+
+        return res.status(200).json({ ok: true, xp: 10, misiones: misionesRating });
       }
 
       return res.status(400).json({ ok: false, error: 'tipo no implementado: ' + tipo2 });

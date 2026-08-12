@@ -1168,6 +1168,12 @@ function buildHTML(d, det, fotos, resenas, autor) {
       + '<textarea id="rvt" placeholder="Que te parecio este lugar?" class="wrinp"></textarea>'
       + '<button class="wrsub" onclick="submitRv()">Publicar resena -></button>'
       + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
+      + '<div class="wr" id="qrwrap" style="margin-top:8px">'
+      + '<div class="wrtitle">Califica este lugar</div>'
+      + '<div class="sprow" id="qr-stars">'
+      + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="votarDID('+i+')">\u2606</span>'; }).join('')
+      + '</div>'
+      + '<div class="wrok" id="qrok" style="display:none">\u2713 Gracias por tu voto!</div>'
       + '</div></div></section>';
   }
 
@@ -1356,6 +1362,33 @@ function buildHTML(d, det, fotos, resenas, autor) {
     + '    }else{btn.disabled=false;btn.textContent="Publicar resena ->";}\n'
     + '  });\n'
     + '}\n'
+    + 'var qrVotoActual=0;\n'
+    + 'function pintarQR(){\n'
+    + '  var spans=document.querySelectorAll("#qr-stars .spk");\n'
+    + '  for(var i=0;i<spans.length;i++){var v=parseInt(spans[i].getAttribute("data-v"))||0;if(v<=qrVotoActual){spans[i].textContent="\u2605";spans[i].classList.add("on");}else{spans[i].textContent="\u2606";spans[i].classList.remove("on");}}\n'
+    + '}\n'
+    + 'function qrBloquear(){\n'
+    + '  var qs=document.getElementById("qr-stars");if(qs)qs.style.pointerEvents="none";\n'
+    + '}\n'
+    + 'function votarDID(n){\n'
+    + '  if(!document.getElementById("qr-stars")){return;}\n'
+    + '  if(!window.ExploraCO){alert("Aun cargando, intenta de nuevo en un segundo");return;}\n'
+    + '  window.ExploraCO.votar(DID,n).then(function(res){\n'
+    + '    if(res.ok){qrVotoActual=n;pintarQR();qrBloquear();\n'
+    + '      var qrok=document.getElementById("qrok");if(qrok)qrok.style.display="block";\n'
+    + '      var rbavg=document.getElementById("rbavg");var rbcnt=document.getElementById("rbcnt");var rblock=document.getElementById("rblock");var rbstars=document.getElementById("rbstars");\n'
+    + '      var na=RV_AVG*RV_COUNT;var nc=RV_COUNT+1;RV_AVG=(na+n)/nc;RV_COUNT=nc;\n'
+    + '      if(rbavg)rbavg.textContent=RV_AVG.toFixed(1);\n'
+    + '      if(rbcnt)rbcnt.textContent=RV_COUNT+" resenas";\n'
+    + '      if(rblock)rblock.style.display="";\n'
+    + '      if(rbstars)rbstars.innerHTML=[1,2,3,4,5].map(function(i){return \'<span class="rbst\'+(i<=Math.round(RV_AVG)?" on":"")+\'">*</span>\';}).join("");\n'
+    + '    }else if(res.ya_votado){if(res.voto_previo&&res.voto_previo.rating){qrVotoActual=res.voto_previo.rating;pintarQR();qrBloquear();}}\n'
+    + '  });\n'
+    + '}\n'
+    + 'function precargarMiVoto(){\n'
+    + '  if(!window.ExploraCO){return;}\n'
+    + '  window.ExploraCO.obtenerMiVoto(DID).then(function(r){if(r&&r.ok&&r.voto){qrVotoActual=r.voto.rating;pintarQR();qrBloquear();}});\n'
+    + '}\n'
     + 'function toggleGuardar(btn){\n'
     + '  if(!window.ExploraCO){return;}\n'
     + '  window.ExploraCO.toggleGuardado(DID,btn);\n'
@@ -1370,6 +1403,7 @@ function buildHTML(d, det, fotos, resenas, autor) {
     // "Estuve aqui" no necesita este chequeo: el backend ya deduplica
     // sin importar el estado visual (ver api/interacciones.js v3).
     + 'if(window.ExploraCO){window.ExploraCO.estaGuardado(DID).then(function(g){if(g){var b=document.getElementById("btn-guardar");if(b)b.classList.add("activo");}});}\n'
+    + 'if(document.getElementById("qr-stars")){precargarMiVoto();}\n'
     + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'
     + '<\/script>\n</body>\n</html>';
 }

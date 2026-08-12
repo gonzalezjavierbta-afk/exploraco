@@ -176,10 +176,12 @@ module.exports = async function handler(req, res) {
       var rv = await sql('SELECT destino_id FROM interacciones WHERE id=$1 LIMIT 1',[rid]);
       if (!rv.length) return res.status(404).json({ ok:false, error:'No encontrada' });
       await sql('DELETE FROM interacciones WHERE id=$1',[rid]);
+      // Recalcular sobre resena+rating para que AVG y COUNT sigan alineados
+      // cuando un usuario conserva su fila de voto rapido (v5, TSK-015).
       await sql(
         'UPDATE destinos SET '
-        + 'rating=(SELECT ROUND(AVG(rating)::numeric,2) FROM interacciones WHERE destino_id=$1 AND tipo=\'resena\' AND rating IS NOT NULL), '
-        + 'total_resenas=(SELECT COUNT(*) FROM interacciones WHERE destino_id=$1 AND tipo=\'resena\'), '
+        + 'rating=(SELECT ROUND(AVG(rating)::numeric,2) FROM interacciones WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\') AND rating IS NOT NULL), '
+        + 'total_resenas=(SELECT COUNT(*) FROM interacciones WHERE destino_id=$1 AND tipo IN (\'resena\',\'rating\')), '
         + 'actualizado_en=NOW() WHERE id=$1',
         [rv[0].destino_id]
       ).catch(function(){});

@@ -380,6 +380,68 @@
     }
   };
 
+  // ── Voto rápido (1-5 estrellas, sin texto) en DB ──────────
+  // TSK-015: el voto rápido es SOLO para usuarios con sesión.
+  // Si no hay sesión se abre el modal de login (no se crea sesión
+  // temporal, a diferencia de publicarResena).
+  window.ExploraCO.votar = async function (destinoUUID, rating) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) {
+      mostrarModalLogin('Inicia sesión para calificar este lugar');
+      return { ok: false, necesita_login: true };
+    }
+
+    try {
+      var res = await fetch(API + '/api/interacciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo:       'rating',
+          usuario_id: usuario.id,
+          destino_id: destinoUUID,
+          rating:     rating,
+        }),
+      });
+      var data = await res.json();
+      if (data.ok) {
+        mostrarToast('⭐ Voto guardado · +' + (data.xp || 0) + ' XP', '#16a34a');
+        if (window.ExploraCO.usuario) {
+          var misionesXp = sumaMisionesXp(data.misiones);
+          aplicarDesbloqueos(data.misiones);
+          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp;
+          guardarSesion(window.ExploraCO.usuario);
+          actualizarUI();
+        }
+        mostrarMisionesToast(data.misiones);
+        return { ok: true };
+      }
+      if (data.ya_votado) {
+        mostrarToast(data.error || 'Ya calificaste este lugar', '#888');
+        return { ok: false, ya_votado: true, voto_previo: data.voto_previo || null };
+      }
+      mostrarToast(data.error || 'No se pudo guardar tu voto', '#ef4444');
+      return { ok: false, error: data.error || 'No se pudo guardar tu voto' };
+    } catch (err) {
+      console.warn('[session] votar error:', err.message);
+      mostrarToast('Error de conexión', '#ef4444');
+      return { ok: false, error: 'Error de conexión' };
+    }
+  };
+
+  // ── Consultar el voto del usuario en un destino (precarga) ─
+  window.ExploraCO.obtenerMiVoto = async function (destinoUUID) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) return { ok: true, voto: null };
+    try {
+      var res = await fetch(API + '/api/interacciones?tipo=mi_rating&destino_id=' + destinoUUID + '&usuario_id=' + usuario.id);
+      var data = await res.json();
+      return { ok: true, voto: data.voto || null };
+    } catch (err) {
+      console.warn('[session] obtenerMiVoto error:', err.message);
+      return { ok: false, error: 'Error de conexión' };
+    }
+  };
+
   // ── Modal de login ─────────────────────────────────────────
   function mostrarModalLogin(mensaje) {
     var modal = document.getElementById('login-modal');
