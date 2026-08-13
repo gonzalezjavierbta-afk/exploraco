@@ -38,7 +38,7 @@
 |---|---|
 | `f-tipo-actividad` | Religioso |
 | `f-dificultad` | Moderado |
-| `f-dificultad-desc` | Sendero de ~2,3 km con desnivel de ~580 m y escalinatas en la parte alta; el ascenso toma entre 1 h 30 y 2 h 30 según el ritmo. Requiere buena condición física y calzado con agarre. |
+| `f-dificultad-desc` | El sendero peatonal sube 2,4 km con pendientes fuertes (600 m de desnivel). El funicular y el teleférico son aptos para todos. La altura (3.152 m) puede causar fatiga y falta de aire. |
 | `f-duracion` | ½ día (3–5 h) |
 | `f-altitud` | 3152 |
 | `f-entrada-precio` | Funicular/teleférico L–S $35.000 · Dom $21.000 · Adulto mayor $29.500 · Fast pass $96.500 · Grupos 20+ $29.500 · Deportista (5:30–9:00 am) $10.500–$11.500 · Sendero Paramuno $77.000 / residente $34.500 |
@@ -50,17 +50,19 @@
 
 | Ene | Feb | Mar | Abr | May | Jun | Jul | Ago | Sep | Oct | Nov | Dic |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| ideal | ideal | ideal | posible | posible | ideal | ideal | ideal | posible | posible | posible | ideal |
+| ideal | ideal | ideal | posible | evitar | evitar | evitar | posible | posible | evitar | posible | ideal |
 
 Selector antiguo `f-temporada` (multi): Diciembre-Marzo (seca) · Junio-Agosto (seca) · Diciembre (alta turistica)
 
+| `f-temporada-nota` | Enero–marzo y diciembre son los mejores meses: cielo despejado y visibilidad hasta 40 km. En temporada de lluvias la niebla puede tapar la vista en la cima. |
+
 ### `dificultad_tags` (dificultad-tags-admin, `{texto, apto}`)
 
-- Apto para niños y adultos acompañados · apto
-- Funicular y teleférico aptos para todo público · apto
-- Envíe su subida al cerro con calma por la altitud (3.152 m) · apto
-- No apto para personas con vértigo en el teleférico · no apto
-- No apto para quienes no pueden subir escalinatas · no apto
+- Aptos funicular y teleférico · apto
+- Apto para niños · apto
+- Apto silla de ruedas (teleférico) · apto
+- Sendero exige buen estado físico · no apto
+- La altura afecta a personas sensibles · no apto
 
 ### `checklist` (checklist-admin, `{item, prioridad}`)
 
