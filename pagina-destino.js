@@ -46,7 +46,7 @@ function schemaLD(d, cat) {
 
 var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');"
 +"*{box-sizing:border-box;margin:0;padding:0}"
-+":root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A;--green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;--bg:#F8F7F3}"
++":root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A;--green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;--bg:#F8F7F3;--red:#EF4444;--blue:#3B82F6}"
 +"html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}"
 +".bc{font-family:'Barlow Condensed',sans-serif}"
 +"a{color:inherit;text-decoration:none}img{display:block;max-width:100%}"
@@ -195,7 +195,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}"
 +".itin-desc{font-size:11px;color:var(--muted);line-height:1.6}"
 +".itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}"
-+".itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}.tip-card:hover{border-color:#ccc}.tip-icon{font-size:22px;flex-shrink:0;line-height:1}.tip-body{flex:1;min-width:0}.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.tip-text{font-size:11px;color:var(--muted);line-height:1.6}.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
++".itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}.tip-card:hover{border-color:#ccc}.tip-icon{font-size:22px;flex-shrink:0;line-height:1}.tip-body{flex:1;min-width:0}.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.tip-text{font-size:11px;color:var(--muted);line-height:1.6}.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}.fauna-card:hover{border-color:#ccc}.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}.permiso-item.requerido{border-left:3px solid var(--red)}.permiso-item.recomendado{border-left:3px solid var(--gold)}.permiso-item.info{border-left:3px solid var(--blue)}.permiso-icon{font-size:20px;flex-shrink:0}.permiso-body{flex:1;min-width:0}.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}.permiso-link:hover{text-decoration:underline}.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
 +".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
 +".fcopy a{color:rgba(255,255,255,.45)}";
@@ -491,12 +491,13 @@ function buildHTML(d, det, fotos, resenas) {
     try {
       var faunaArr = JSON.parse(faunaFlora);
       if (Array.isArray(faunaArr) && faunaArr.length) {
-        faunaContent = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">'
+        faunaContent = '<div class="fauna-grid">'
           + faunaArr.map(function(f) {
-            return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">'
-              +'<span style="font-size:26px;margin-bottom:6px;display:block">'+esc(f.emoji||'\u2731')+'</span>'
-              +'<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px">'+esc(f.nombre||f.name||'')+'</div>'
-              +(f.hecho||f.fact?'<div style="font-size:10px;color:var(--muted);line-height:1.5">'+esc(f.hecho||f.fact)+'</div>':'')
+            return '<div class="fauna-card">'
+              +'<span class="fauna-emoji">'+esc(f.emoji||'\u2731')+'</span>'
+              +'<div class="fauna-name">'+esc(f.nombre||f.name||'')+'</div>'
+              +(f.sci?'<div class="fauna-sci">'+esc(f.sci)+'</div>':'')
+              +(f.hecho||f.fact?'<div class="fauna-fact">'+esc(f.hecho||f.fact)+'</div>':'')
               +'</div>';
           }).join('') + '</div>';
       }
@@ -550,13 +551,51 @@ function buildHTML(d, det, fotos, resenas) {
   // -- SECCION: Permisos y regulaciones -------------------------
   var secRegulaciones = '';
   if (cat === 'sitio' && regulaciones) {
-    secRegulaciones = '<section class="ssec bwhite" id="regulaciones"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Permisos y regulaciones</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="hbox" style="background:#FEF3C7;border-color:#D97706">'
-      + '<span class="hbico">\u26A0</span>'
-      + '<div><div class="hblbl" style="color:#92400E">Importante</div>'
-      + '<div class="hbtx" style="color:#78350F">'+esc(regulaciones).replace(/\n/g,'<br>')+'</div></div></div>'
-      + '</div></section>';
+    var regContent = '';
+    var regArr = null;
+    var regClean = regulaciones;
+    if (typeof regClean === 'string' && regClean.charAt(0) === '"') {
+      try { regClean = JSON.parse(regClean); } catch(_) {}
+    }
+    if (typeof regClean === 'string') {
+      try {
+        var parsed = JSON.parse(regClean);
+        if (Array.isArray(parsed)) regArr = parsed;
+      } catch(_) {}
+    } else if (Array.isArray(regClean)) {
+      regArr = regClean;
+    }
+    if (regArr && regArr.length) {
+      var permisoClases = {requerido:'requerido', obligatorio:'requerido', recomendado:'recomendado', info:'info', cumplir:'info'};
+      regContent = '<div class="permiso-list">'
+        + regArr.map(function(pr) {
+            var tipo = pr.tipo || pr.tipo_permiso || '';
+            var cls = permisoClases[tipo] || 'info';
+            var time = pr.time || pr.etiqueta || pr.badge || '';
+            return '<div class="permiso-item '+cls+'">'
+              +'<div class="permiso-icon">'+esc(pr.icono||pr.icon||'\u2731')+'</div>'
+              +'<div class="permiso-body">'
+              +'<div class="permiso-title">'+esc(pr.titulo||pr.title||'')+'</div>'
+              +(pr.desc||pr.detalle?'<div class="permiso-desc">'+esc(pr.desc||pr.detalle)+'</div>':'')
+              +(pr.link?'<a class="permiso-link" href="'+esc(pr.link)+'" target="_blank">\u2197 '+esc(pr.linktext||'Ver mas')+'</a>':'')
+              +'</div>'
+              +(time?'<div class="permiso-time">'+esc(time)+'</div>':'')
+              +'</div>';
+          }).join('') + '</div>';
+    }
+    if (regContent) {
+      secRegulaciones = '<section class="ssec bwhite" id="regulaciones"><div class="sin">'
+        + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Permisos y regulaciones</h2><div class="stnum">'+nextNum()+'</div></div>'
+        + regContent + '</div></section>';
+    } else {
+      secRegulaciones = '<section class="ssec bwhite" id="regulaciones"><div class="sin">'
+        + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Permisos y regulaciones</h2><div class="stnum">'+nextNum()+'</div></div>'
+        + '<div class="hbox" style="background:#FEF3C7;border-color:#D97706">'
+        + '<span class="hbico">\u26A0</span>'
+        + '<div><div class="hblbl" style="color:#92400E">Importante</div>'
+        + '<div class="hbtx" style="color:#78350F">'+esc(regulaciones).replace(/\n/g,'<br>')+'</div></div></div>'
+        + '</div></section>';
+    }
   }
 
   var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
