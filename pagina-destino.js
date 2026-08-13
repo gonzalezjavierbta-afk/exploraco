@@ -370,9 +370,9 @@ function buildHTML(d, det, fotos, resenas) {
             + '<div class="tc-body">'
             +   (descTour ? '<div class="tc-desc">'+esc(descTour)+'</div>' : '')
             +   ((incluyeArr.length || noIncluyeArr.length) ? '<div class="tc-incl-row">'
-            +     + incluyeArr.map(function(inc){ return '<div class="tc-incl yes">\u2713 '+esc(inc)+'</div>'; }).join('')
-            +     + noIncluyeArr.map(function(inc){ return '<div class="tc-incl no">\u2717 '+esc(inc)+'</div>'; }).join('')
-            +   + '</div>' : '')
+            +     incluyeArr.map(function(inc){ return '<div class="tc-incl yes">\u2713 '+esc(inc)+'</div>'; }).join('')
+            +     noIncluyeArr.map(function(inc){ return '<div class="tc-incl no">\u2717 '+esc(inc)+'</div>'; }).join('')
+            +   '</div>' : '')
             +   (cta ? cta : '')
             + '</div>'
             + '</div>';
