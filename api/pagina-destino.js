@@ -14,6 +14,15 @@ var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'line
 // Temas de Blog (sub-categoria dentro de tags.tema, ver publicar-lugar.js BLOG_TEMAS)
 var TEMA_BLOG_LABEL = { aventura:'Aventura', gastro:'Gastronomia', cultura:'Cultura', naturaleza:'Naturaleza', tips:'Tips' };
 var TEMA_BLOG_EMOJI = { aventura:'\ud83c\udfd4\ufe0f', gastro:'\ud83c\udf7d\ufe0f', cultura:'\ud83c\udfad', naturaleza:'\ud83c\udf3f', tips:'\ud83d\udca1' };
+// Dimensiones de rese\u00f1as V2 por categoria (clave interna -> etiqueta visible).
+// Se usan en el formulario (selectores de estrellas) y en las barras de puntuacion.
+var DIM_BY_CAT = {
+  sitio:  [ ['experiencia','Experiencia'], ['guias','Guias'], ['acceso','Accesibilidad'], ['valor','Valor / precio'] ],
+  hostal: [ ['atmosfera','Atmosfera'], ['personal','Personal'], ['limpieza','Limpieza'], ['seguridad','Seguridad'] ],
+  comida: [ ['comida','Comida'], ['servicio','Servicio'], ['ambiente','Ambiente'], ['valor','Valor / precio'] ],
+  evento: [ ['desfiles','Desfiles'], ['ambiente','Ambiente'], ['organizacion','Organizacion'], ['valor','Valor / precio'] ]
+};
+var DIM_COLORS = ['#22C55E', '#3B82F6', '#E8A020', '#8B5CF6'];
 
 function esc(s) {
   if (s === null || s === undefined) return '';
@@ -257,6 +266,28 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;margin-bottom:12px}"
 +".wrinp:focus{border-color:var(--gold)}textarea.wrinp{resize:vertical;min-height:88px}"
 +".sprow{display:flex;gap:5px;margin-bottom:12px}.spk{font-size:26px;cursor:pointer;color:#DDD;user-select:none}.spk.on{color:var(--gold)}"
++".rvtag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:var(--gold-light);color:var(--gold-dark);margin:2px 6px 2px 0}"
++".rvdims{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px;font-size:9px;color:var(--muted)}"
++".rvdims b{color:var(--text)}"
++".score-overall{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--warm);border-radius:8px;border:1px solid var(--border);width:100%}"
++".so-number{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;line-height:1;color:var(--gold);text-align:center;min-width:70px}"
++".so-meta{flex:1}.so-stars{font-size:15px;color:var(--gold);letter-spacing:1px}"
++".so-label{font-size:13px;font-weight:700;color:var(--text);margin:2px 0}"
++".so-count{font-size:11px;color:var(--muted)}"
++".score-grid{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;margin-top:12px;width:100%}"
++".score-label{font-size:11px;color:var(--text);font-weight:500;white-space:nowrap}"
++".score-bar-wrap{height:7px;background:#F1EFE8;border-radius:4px;overflow:hidden}"
++".score-bar-fill{height:100%;border-radius:4px}"
++".score-val{font-size:11px;font-weight:700;color:var(--text);text-align:right}"
++".rv-score-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}"
++".rv-dim{display:flex;flex-direction:column;gap:3px}"
++".rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}"
++".rv-stars-row{display:flex;gap:2px}"
++".rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}"
++".rv-star.on,.rv-star:hover{color:var(--gold)}"
++".rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}"
++".rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}"
++".rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}"
 +".wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:100%}"
 +".wrsub:disabled{background:#ccc;cursor:not-allowed}"
 +".wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px;margin-top:10px}"
@@ -362,7 +393,7 @@ function topRelacionados(d, candidatos, n) {
   return scored.slice(0, n).map(function(s){ return s.row; });
 }
 
-function buildHTML(d, det, fotos, resenas, autor, relacionados) {
+function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   var cat   = d.categoria_slug || 'sitio';
   var relacionados = relacionados || [];
   var label = CAT_LABEL[cat] || 'Destino';
@@ -380,6 +411,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
   if (!hero) hero = heroFallbacks[cat] || heroFallbacks.sitio;
   var rat   = d.rating ? parseFloat(d.rating) : 0;
   var nRes  = parseInt(d.total_resenas||0);
+  var dimDefs = DIM_BY_CAT[cat] || DIM_BY_CAT.sitio;
+  var dimLabelMap = {};
+  dimDefs.forEach(function(dd){ dimLabelMap[dd[0]] = dd[1]; });
+  dimsAvg = (dimsAvg && typeof dimsAvg === 'object') ? dimsAvg : {};
 
   var amenidades   = safeJSON(det.amenidades);   if(!Array.isArray(amenidades))   amenidades=[];
   var habitaciones = safeJSON(det.habitaciones); if(!Array.isArray(habitaciones)) habitaciones=[];
@@ -1314,10 +1349,18 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
       if (r.usuario_nombre) nombre = r.usuario_nombre;
       var rs = Math.round(r.rating||0);
       var starsR = [1,2,3,4,5].map(function(i){ return '<span class="rvst'+(i<=rs?' on':'')+'">*</span>'; }).join('');
+      var travTag = r.traveller_type ? '<span class="rvtag">'+esc(r.traveller_type)+'</span>' : '';
+      var rDims = (r.dims && typeof r.dims === 'object' && !Array.isArray(r.dims)) ? r.dims : {};
+      var dimsHtml = '';
+      var dimParts = dimDefs.filter(function(dd){ return parseInt(rDims[dd[0]],10) > 0; })
+        .map(function(dd){ return '<span>'+esc(dd[1])+': <b>'+parseInt(rDims[dd[0]],10)+'\u2605</b></span>'; });
+      if (dimParts.length) dimsHtml = '<div class="rvdims">'+dimParts.join('')+'</div>';
+      var metaExtra = (travTag || dimsHtml) ? '<div style="margin:2px 0 4px">'+travTag+'</div>'+dimsHtml : '';
       return '<div class="rvitem"><div class="rvhead">'
         + '<div class="rvav">'+esc(nombre.slice(0,2).toUpperCase())+'</div>'
         + '<div class="rvname">'+esc(nombre)+'</div>'
         + '<div class="rvstars">'+starsR+'</div></div>'
+        + metaExtra
         + (texto?'<div class="rvtx">'+esc(texto)+'</div>':'')
         + '</div>';
     }).join('');
@@ -1328,17 +1371,51 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
   // completo en vez de mostrar un widget que no aplica.
   var secResenas = '';
   if (cat !== 'blog') {
+    // Barras de puntuacion por dimension (promedios calculados en el handler)
+    var scoreBars = '';
+    var barRows = [];
+    dimDefs.forEach(function(dd, i){
+      var v = parseFloat(dimsAvg[dd[0]] || '');
+      if (!v || isNaN(v)) return;
+      var pct = Math.round(v/5*100);
+      barRows.push('<div class="score-label">'+esc(dd[1])+'</div>'
+        + '<div class="score-bar-wrap"><div class="score-bar-fill" style="width:'+pct+'%;background:'+DIM_COLORS[i%DIM_COLORS.length]+'"></div></div>'
+        + '<div class="score-val">'+v.toFixed(1)+'</div>');
+    });
+    if (barRows.length) {
+      scoreBars = '<div style="flex:1;min-width:220px"><div class="score-grid">'+barRows.join('')+'</div></div>';
+    }
+
+    // Selector de tipo de viajero + puntuacion por dimension en el formulario
+    var travTypes = ['Solo','Pareja','Amigos','Familia','Mochilero'];
+    var travBtns = travTypes.map(function(t){
+      return '<div class="rv-type-btn" onclick="selectTravellerType(this,\''+t+'\')">'+esc(t)+'</div>';
+    }).join('');
+    var dimStarsHtml = dimDefs.map(function(dd){
+      var rowStars = [1,2,3,4,5].map(function(v){
+        return '<span class="rv-star" data-v="'+v+'" onclick="setDimScore(\''+dd[0]+'\','+v+')">\u2605</span>';
+      }).join('');
+      return '<div class="rv-dim"><div class="rv-dim-label">'+esc(dd[1])+'</div><div class="rv-stars-row" data-dim="'+dd[0]+'">'+rowStars+'</div></div>';
+    }).join('');
+
     secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+nRes+' resenas</div></div></div>'
+      + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+nRes+' resenas</div></div>'
+      + (scoreBars||'')
+      + '</div>'
       + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
       + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">Se el primero en dejar una resena.</p>'
       + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
-      + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
+      + '<label class="wrlbl">Fuiste como:</label>'
+      + '<div class="rv-traveller-type" id="rv-traveller-type">'+travBtns+'</div>'
+      + '<label class="wrlbl">Califica por categoria:</label>'
+      + '<div class="rv-score-selector">'+dimStarsHtml+'</div>'
+      + '<label class="wrlbl">Puntuacion general:</label>'
       + '<div class="sprow" id="rv-stars">'
-      + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">*</span>'; }).reverse().join('')
+      + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">\u2605</span>'; }).join('')
       + '</div>'
-      + '<textarea id="rvt" placeholder="Que te parecio este lugar?" class="wrinp"></textarea>'
+      + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
+      + '<textarea id="rvt" placeholder="Que te parecio este lugar? Que consejo darias?" class="wrinp"></textarea>'
       + '<button class="wrsub" onclick="submitRv()">Publicar resena -></button>'
       + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
       + '<div class="wr" id="qrwrap" style="margin-top:8px">'
@@ -1511,6 +1588,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     + 'var RV_COUNT='+nRes+';\n'
     + 'var rvScore=0;\n'
     + 'function setRvScore(n){rvScore=n;document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=n);});}\n'
+    + 'var dimScores={};\n'
+    + 'var travellerType=""\n'
+    + 'var DIM_LABELS='+JSON.stringify(dimLabelMap)+';\n'
+    + 'function setDimScore(dim,val){dimScores[dim]=val;var row=document.querySelector(\'.rv-stars-row[data-dim="\'+dim+\'"]\');if(!row)return;row.querySelectorAll(".rv-star").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=val);});}\n'
+    + 'function selectTravellerType(btn,type){travellerType=type;document.querySelectorAll(".rv-type-btn").forEach(function(b){b.classList.remove("on");});btn.classList.add("on");}\n'
     + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");var panel=document.getElementById(id);if(panel)panel.classList.add("on");}\n'
     + 'function toggleFaq(el){el.parentElement.classList.toggle("open");}\n'
     // Inserta la resena recien publicada en el DOM y actualiza el
@@ -1519,12 +1601,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     // promedio en pantalla quedaban desactualizados hasta el proximo
     // request al servidor (que si trae los datos correctos, gracias a
     // Cache-Control: no-store, pero solo si el usuario recarga).
-    + 'function addRvOptimista(nom,score,txt){\n'
+    + 'function addRvOptimista(nom,score,txt,dims,trav){\n'
     + '  var list=document.getElementById("rvlist");\n'
     + '  var stars=[1,2,3,4,5].map(function(i){return \'<span class="rvst\'+(i<=score?" on":"")+\'">*</span>\';}).join("");\n'
+    + '  var travHtml=trav?\'<span class="rvtag">\'+trav+\'</span>\':\'\';\n'
+    + '  var dimsHtml=\'\';\n'
+    + '  if(dims){var parts=Object.keys(dims).filter(function(k){return parseInt(dims[k],10)>0;}).map(function(k){return \'<span>\'+(DIM_LABELS[k]||k.charAt(0).toUpperCase()+k.slice(1))+\': <b>\'+dims[k]+\'\\u2605</b></span>\';});if(parts.length)dimsHtml=\'<div class="rvdims">\'+parts.join("")+\'</div>\';}\n'
     + '  var div=document.createElement("div");\n'
     + '  div.className="rvitem";\n'
-    + '  div.innerHTML=\'<div class="rvhead"><div class="rvav"></div><div class="rvname"></div><div class="rvstars">\'+stars+\'</div></div><div class="rvtx"></div>\';\n'
+    + '  div.innerHTML=\'<div class="rvhead"><div class="rvav"></div><div class="rvname"></div><div class="rvstars">\'+stars+\'</div></div>\'+(travHtml||dimsHtml?\'<div style="margin:2px 0 4px">\'+travHtml+\'</div>\'+dimsHtml:\'\')+\'<div class="rvtx"></div>\';\n'
     + '  div.querySelector(".rvav").textContent=nom.slice(0,2).toUpperCase();\n'
     + '  div.querySelector(".rvname").textContent=nom;\n'
     + '  var tx=div.querySelector(".rvtx");\n'
@@ -1546,20 +1631,24 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     + '  if(!nom){alert("Ingresa tu nombre");return;}\n'
     + '  if(!window.ExploraCO){alert("Aun cargando, intenta de nuevo en un segundo");return;}\n'
     + '  var btn=document.querySelector(".wrsub");\n'
-    + '  var scoreEnviado=rvScore, nomEnviado=nom, txtEnviado=txt;\n'
+    + '  var scoreEnviado=rvScore, nomEnviado=nom, txtEnviado=txt, dimsEnviadas=Object.assign({},dimScores), travEnviado=travellerType;\n'
     + '  btn.disabled=true;btn.textContent="Publicando...";\n'
     // Antes esto era un fetch directo a /api/interacciones sin usuario_id,
     // por lo que toda resena real quedaba anonima (ver nota de entrega).
     // window.ExploraCO.publicarResena ya trae el usuario_id de la sesion
     // real y muestra sus propios mensajes de exito/error via toast.
-    + '  window.ExploraCO.publicarResena(DID,rvScore,txt,nom).then(function(ok){\n'
+    + '  window.ExploraCO.publicarResena(DID,rvScore,txt,nom,dimsEnviadas,travEnviado).then(function(ok){\n'
     + '    if(ok){\n'
-    + '      addRvOptimista(nomEnviado,scoreEnviado,txtEnviado);\n'
+    + '      addRvOptimista(nomEnviado,scoreEnviado,txtEnviado,dimsEnviadas,travEnviado);\n'
     + '      document.getElementById("rvok").style.display="block";\n'
     + '      document.getElementById("rvn").value="";\n'
     + '      document.getElementById("rvt").value="";\n'
     + '      rvScore=0;\n'
+    + '      dimScores={};\n'
+    + '      travellerType="";\n'
     + '      document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.remove("on");});\n'
+    + '      document.querySelectorAll(".rv-star").forEach(function(s){s.classList.remove("on");});\n'
+    + '      document.querySelectorAll(".rv-type-btn").forEach(function(b){b.classList.remove("on");});\n'
     + '      btn.textContent="Ya resenaste este lugar";\n'
     + '    }else{btn.disabled=false;btn.textContent="Publicar resena ->";}\n'
     + '  });\n'
@@ -1646,9 +1735,31 @@ module.exports = async function handler(req, res) {
       [d.id]
     );
     var resenasRows = await sql(
-      'SELECT i.rating, i.texto, u.nombre AS usuario_nombre FROM interacciones i LEFT JOIN usuarios u ON i.usuario_id=u.id WHERE i.destino_id=$1 AND i.tipo=\'resena\' ORDER BY i.creado_en DESC LIMIT 10',
+      'SELECT i.rating, i.texto, i.dims, i.traveller_type, u.nombre AS usuario_nombre FROM interacciones i LEFT JOIN usuarios u ON i.usuario_id=u.id WHERE i.destino_id=$1 AND i.tipo=\'resena\' ORDER BY i.creado_en DESC LIMIT 10',
       [d.id]
     );
+
+    // Promedio por dimension (resenas V2) para las barras de puntuacion.
+    // Se construye el SELECT con las claves de la categoria para no traer
+    // keys irrelevantes ni romper si la migracion 003 no ha corrido.
+    var dimsAvg = {};
+    try {
+      var catH = d.categoria_slug || 'sitio';
+      var dimDefsH = DIM_BY_CAT[catH] || DIM_BY_CAT.sitio;
+      var dimSel = dimDefsH.map(function(dd){
+        return 'ROUND(AVG(NULLIF(dims->>\''+dd[0]+'\',\'\')::numeric),1) AS "'+dd[0]+'"';
+      }).join(', ');
+      if (dimSel) {
+        var dimsAvgRows = await sql(
+          'SELECT '+dimSel+' FROM interacciones WHERE destino_id=$1 AND tipo=\'resena\' AND dims IS NOT NULL AND dims != \'{}\'::jsonb',
+          [d.id]
+        );
+        if (dimsAvgRows.length) dimsAvg = dimsAvgRows[0] || {};
+      }
+    } catch (eDims) {
+      // Si la migracion 003 no corrio, dims no existe -> mostrar sin barras
+      console.warn('[pagina-destino] dims_avg fallo (migracion 003 pendiente?): ' + eDims.message);
+    }
 
     // Autor del blog (tags.id_autor -> usuarios.id). Envuelto en
     // try/catch propio: si la migracion de usuarios.bio/foto_url
@@ -1682,7 +1793,7 @@ module.exports = async function handler(req, res) {
       relacionados = topRelacionados(d, relRows, 3);
     }
 
-    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados);
+    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados, dimsAvg);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);

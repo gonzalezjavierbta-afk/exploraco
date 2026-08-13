@@ -179,7 +179,7 @@ module.exports = async function handler(req, res) {
       // Resenas de un destino
       if (tipo === 'resenas' && destinoId) {
         var rows = await sql(
-          'SELECT i.id, i.rating, i.texto, i.creado_en, '
+          'SELECT i.id, i.rating, i.texto, i.creado_en, i.dims, i.traveller_type, '
           + 'u.nombre AS usuario_nombre, u.badge_actual '
           + 'FROM interacciones i '
           + 'LEFT JOIN usuarios u ON i.usuario_id = u.id '
@@ -189,6 +189,23 @@ module.exports = async function handler(req, res) {
           [destinoId]
         );
         return res.status(200).json({ ok: true, data: rows });
+      }
+
+      // Promedios de dimensiones de un destino (para las barras de puntuacion)
+      if (tipo === 'dims_avg' && destinoId) {
+        var dimsAvgRows = await sql(
+          'SELECT '
+          + 'ROUND(AVG(NULLIF(dims->>\'experiencia\',\'\')::numeric),1) AS experiencia, '
+          + 'ROUND(AVG(NULLIF(dims->>\'guias\',\'\')::numeric),1) AS guias, '
+          + 'ROUND(AVG(NULLIF(dims->>\'acceso\',\'\')::numeric),1) AS acceso, '
+          + 'ROUND(AVG(NULLIF(dims->>\'valor\',\'\')::numeric),1) AS valor, '
+          + 'ROUND(AVG(NULLIF(dims->>\'vistas\',\'\')::numeric),1) AS vistas, '
+          + 'ROUND(AVG(NULLIF(dims->>\'seguridad\',\'\')::numeric),1) AS seguridad '
+          + 'FROM interacciones '
+          + 'WHERE destino_id=$1 AND tipo=\'resena\' AND dims IS NOT NULL AND dims != \'{}\'::jsonb',
+          [destinoId]
+        );
+        return res.status(200).json({ ok: true, data: dimsAvgRows[0] || {} });
       }
 
       // Guardados de un usuario
@@ -293,15 +310,27 @@ module.exports = async function handler(req, res) {
           ? (nombrePrefijo + body.texto).slice(0, 2000)
           : (body.usuario_nombre ? nombrePrefijo.trim() : null);
 
+        // Dimensiones (puntuaciones por categoria, JSONB) y tipo de viajero
+        var dimsFinal = {};
+        if (body.dims && typeof body.dims === 'object' && !Array.isArray(body.dims)) {
+          Object.keys(body.dims).forEach(function(k) {
+            var v = parseInt(body.dims[k], 10);
+            if (v >= 1 && v <= 5) dimsFinal[k] = v;
+          });
+        }
+        var travTypeFinal = body.traveller_type
+          ? String(body.traveller_type).slice(0, 30)
+          : null;
+
         var xpGanado = textoFinal && textoFinal.replace(nombrePrefijo,'').trim().length > 50
           ? 25 : 10;
 
         var result = await sql(
           'INSERT INTO interacciones '
-          + '(destino_id, usuario_id, tipo, rating, texto, xp_ganado, creado_en) '
-          + 'VALUES ($1, $2, \'resena\', $3, $4, $5, NOW()) '
+          + '(destino_id, usuario_id, tipo, rating, texto, dims, traveller_type, xp_ganado, creado_en) '
+          + 'VALUES ($1, $2, \'resena\', $3, $4, $5, $6, $7, NOW()) '
           + 'RETURNING id',
-          [destinoId2, usuarioId2, ratingVal, textoFinal, xpGanado]
+          [destinoId2, usuarioId2, ratingVal, textoFinal, dimsFinal, travTypeFinal, xpGanado]
         );
 
         // Actualizar rating promedio y total_resenas en destinos.

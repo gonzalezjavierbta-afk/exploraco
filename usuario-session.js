@@ -188,7 +188,7 @@
   };
 
   // ── Publicar reseña en DB ──────────────────────────────────
-  window.ExploraCO.publicarResena = async function (destinoUUID, rating, texto, nombre) {
+  window.ExploraCO.publicarResena = async function (destinoUUID, rating, texto, nombre, dims, travellerType) {
     var usuario = window.ExploraCO.usuario;
 
     // Si no hay sesión, crear una temporal con el nombre
@@ -209,11 +209,13 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipo:       'resena',
-          usuario_id: usuario.id,
-          destino_id: destinoUUID,
-          rating:     rating,
-          texto:      texto,
+          tipo:           'resena',
+          usuario_id:     usuario.id,
+          destino_id:     destinoUUID,
+          rating:         rating,
+          texto:          texto,
+          dims:           dims || {},
+          traveller_type: travellerType || null,
         }),
       });
       var data = await res.json();
