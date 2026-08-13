@@ -1387,6 +1387,10 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
                 <div class="form-group"><label class="form-label" style="font-size:9px">Dic</label><select class="form-input form-select" id="f-temporada-dic"><option value="">-</option><option value="ideal">Ideal</option><option value="posible">Posible</option><option value="evitar">Evitar</option></select></div>
               </div>
               <p style="font-size:10px;color:var(--muted);margin-top:6px">Ideal = temporada seca · Posible = lluvias moderadas · Evitar = lluvias intensas</p>
+              <div class="form-group" style="margin-top:12px">
+                <label class="form-label">Nota de temporada (tip publico)</label>
+                <textarea class="form-input" id="f-temporada-nota" rows="2" placeholder="Ej: Enero–marzo y diciembre son los mejores meses: cielo despejado y visibilidad hasta 40 km..."></textarea>
+              </div>
               <details style="margin-top:10px">
                 <summary style="font-size:11px;color:var(--muted);cursor:pointer">Selector antiguo (compatibilidad con datos previos)</summary>
                 <select class="form-input" id="f-temporada" data-tag-multi="1" multiple size="6" style="margin-top:8px">
@@ -2451,6 +2455,7 @@ var CATEGORY_TAG_FIELDS = {
     { key:'distancia',      id:'f-distancia-sitio', localKey:'distancia_sitio' },
     { key:'como_llegar',    id:'f-como-llegar-sitio', localKey:'como_llegar_sitio' },
     { key:'permisos',       id:'f-permisos-sitio', localKey:'permisos_sitio' },
+    { key:'temporada_nota', id:'f-temporada-nota' },
     { key:'fauna_flora',    id:'f-fauna-flora' },
     /* secretos tiene un collector propio: puede venir de un
        card-list (#secretos-list-admin) o, si no hay filas, del
