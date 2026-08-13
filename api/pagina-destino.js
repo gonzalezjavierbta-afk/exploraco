@@ -167,16 +167,29 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:#F0FDF4;color:#14532d}"
 +".igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px}"
 +".icard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}"
-+".tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}"
-+".tcard{background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px}"
-+".tc-badge{display:inline-flex;width:fit-content;padding:3px 10px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;background:var(--gold-light);color:var(--gold-dark)}"
-+".tc-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:var(--text);line-height:1.2}"
-+".tc-meta{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:11px;color:var(--muted)}"
-+".tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gold-dark);line-height:1}"
-+".tc-desc{font-size:12px;color:#555;line-height:1.6}"
-+".tc-inc{display:flex;flex-direction:column;gap:3px}"
-+".tc-inc div{font-size:11px;color:#444}"
-+".tc-cta{margin-top:auto;background:var(--gold);color:#fff;border:none;border-radius:5px;padding:11px 18px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;text-align:center;text-decoration:none;display:block}"
++".tour-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}"
++".tour-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}"
++".tour-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}"
++".tour-card.featured{border-color:var(--gold);border-width:1.5px}"
++".tc-header{padding:12px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}"
++".tc-badge{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;font-family:'Barlow Condensed',sans-serif}"
++".tc-badge-grup{background:#EFF6FF;color:#1D4ED8}"
++".tc-badge-priv{background:#FAF5FF;color:#6D28D9}"
++".tc-badge-eco{background:#ECFDF5;color:#065F46}"
++".tc-badge-pers{background:#FFFBEB;color:#92400E}"
++".tc-info{flex:1;min-width:0}"
++".tc-name{font-size:13px;font-weight:700;color:#111;margin-bottom:3px}"
++".tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}"
++".tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#111;text-align:right;flex-shrink:0}"
++".tc-price-sub{font-size:9px;color:var(--muted);text-align:right}"
++".tc-body{padding:10px 14px}"
++".tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}"
++".tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}"
++".tc-incl.yes{color:#166534}"
++".tc-incl.no{color:#B91C1C}"
++".tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#111;color:#fff;border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s;cursor:pointer}"
++".tc-book-btn:hover{background:#333}"
++".tc-desc{font-size:11px;color:#555;line-height:1.6;margin-bottom:10px}"
 +".dificultad-section{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}"
 +".dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}"
 +".dif-bar{display:flex;gap:4px;margin-bottom:8px}"
@@ -733,14 +746,21 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
   }
 
 
-  // -- SECCION: Tours disponibles (Tours 4.0: tipo_tour, idioma, --
-  // -- max_personas, checklist de inclusiones. Motor propio .tcard, --
-  // -- ya no reutiliza el .icard generico) ------------------------
+  // -- SECCION: Tours disponibles (estilo Monserrate3: .tour-card, --
+  // -- badge por tipo, meta, precio, incluye/no_incluye, CTA) -----
   var secTours = '';
   if (cat === 'sitio' && tours.length) {
+    var badgeClassMap = { 'Grupal':'tc-badge-grup', 'Privado':'tc-badge-priv', 'Ecoturismo':'tc-badge-eco', 'Personalizado':'tc-badge-pers' };
+    function _tourList(arr) {
+      if (Array.isArray(arr)) return arr.filter(Boolean);
+      if (typeof arr === 'string' && arr) {
+        return arr.split(/\n|,/).map(function(s){ return s.replace(/^[-+•\s]+/,'').trim(); }).filter(Boolean);
+      }
+      return [];
+    }
     secTours = '<section class="ssec bwarm" id="tours"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tours disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="tgrid">'
+      + '<div class="tour-list">'
       + tours.map(function(t){
           var nombreTour = t.nombre || t.name || '';
           // BUG-012 fix (ver BUGS_HISTORICOS.md): admin.html guarda
@@ -749,27 +769,45 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
           // con datos antiguos, priorizando siempre el nombre real.
           var descTour = t.descripcion || t.desc || '';
           var linkTour = t.link_reserva || t.link || '';
-          var incluyeArr = Array.isArray(t.incluye) ? t.incluye
-            : (typeof t.incluye === 'string' && t.incluye ? t.incluye.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : []);
+          var whatsappTour = t.whatsapp_tour || d.whatsapp || '';
+          var incluyeArr = _tourList(t.incluye);
+          var noIncluyeArr = _tourList(t.no_incluye);
+          var tipoKey = (t.tipo_tour || 'Grupal').toString();
+          var badgeCls = badgeClassMap[tipoKey] || 'tc-badge-grup';
+          var badgeTxt = t.tipo_tour || 'Grupal';
+          var featured = (t.featured === true || t.featured === 'true' || t.featured === 'on');
           var metaBits = [];
-          if (t.duracion)     metaBits.push('\uD83D\uDD50 '+esc(t.duracion));
-          if (t.max_personas) metaBits.push('\uD83D\uDC65 '+esc(t.max_personas));
-          if (t.idioma)       metaBits.push('\uD83D\uDDE3\uFE0F '+esc(t.idioma));
+          if (t.duracion)      metaBits.push('\uD83D\uDD50 '+esc(t.duracion));
+          if (t.max_personas)  metaBits.push('\uD83D\uDC65 '+esc(t.max_personas));
+          if (t.idioma)        metaBits.push('\uD83D\uDDE3\uFE0F '+esc(t.idioma));
+          if (t.rating) {
+            var rv = t.review_count ? ' ('+esc(t.review_count)+' rese\u00f1as)' : '';
+            metaBits.push('\u2B50 '+esc(t.rating)+rv);
+          }
           var cta = '';
           if (linkTour) {
-            cta = '<a class="tc-cta" href="'+esc(linkTour)+'" target="_blank">\uD83D\uDCAC Reservar ahora</a>';
-          } else if (d.whatsapp) {
+            cta = '<a class="tc-book-btn" href="'+esc(linkTour)+'" target="_blank">\uD83D\uDCAC Reservar ahora</a>';
+          } else if (whatsappTour) {
             var msg = encodeURIComponent('Hola, quiero reservar el tour "'+nombreTour+'" en '+(d.nombre||'')+'.');
-            cta = '<button class="tc-cta" style="border:none" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'?text='+msg+'\',\'_blank\')">\uD83D\uDCAC Reservar</button>';
+            cta = '<button class="tc-book-btn" onclick="window.open(\'https://wa.me/'+esc(whatsappTour)+'?text='+msg+'\',\'_blank\')">\uD83D\uDCAC Reservar por WhatsApp</button>';
           }
-          return '<div class="tcard">'
-            + (t.tipo_tour ? '<div class="tc-badge">'+esc(t.tipo_tour)+'</div>' : '')
-            + '<div class="tc-title">'+esc(nombreTour)+'</div>'
-            + (metaBits.length ? '<div class="tc-meta">'+metaBits.map(function(m){return '<span>'+m+'</span>';}).join('')+'</div>' : '')
-            + (t.precio ? '<div class="tc-price">'+esc(t.precio)+'</div>' : '')
-            + (descTour ? '<div class="tc-desc">'+esc(descTour)+'</div>' : '')
-            + (incluyeArr.length ? '<div class="tc-inc">'+incluyeArr.map(function(inc){ return '<div>\u2713 '+esc(inc)+'</div>'; }).join('')+'</div>' : '')
-            + cta
+          return '<div class="tour-card'+(featured?' featured':'')+'">'
+            + '<div class="tc-header">'
+            +   '<span class="tc-badge '+badgeCls+'">'+esc(badgeTxt)+'</span>'
+            +   '<div class="tc-info">'
+            +     '<div class="tc-name">'+esc(nombreTour)+'</div>'
+            +     (metaBits.length ? '<div class="tc-meta">'+metaBits.map(function(m){return '<span>'+m+'</span>';}).join('')+'</div>' : '')
+            +   '</div>'
+            +   (t.precio ? '<div><div class="tc-price">'+esc(t.precio)+'</div>'+(t.precio_sub ? '<div class="tc-price-sub">'+esc(t.precio_sub)+'</div>' : '')+'</div>' : '')
+            + '</div>'
+            + '<div class="tc-body">'
+            +   (descTour ? '<div class="tc-desc">'+esc(descTour)+'</div>' : '')
+            +   ((incluyeArr.length || noIncluyeArr.length) ? '<div class="tc-incl-row">'
+            +     + incluyeArr.map(function(inc){ return '<div class="tc-incl yes">\u2713 '+esc(inc)+'</div>'; }).join('')
+            +     + noIncluyeArr.map(function(inc){ return '<div class="tc-incl no">\u2717 '+esc(inc)+'</div>'; }).join('')
+            +   + '</div>' : '')
+            +   (cta ? cta : '')
+            + '</div>'
             + '</div>';
         }).join('')
       + '</div></div></section>';

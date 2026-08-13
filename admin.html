@@ -2940,15 +2940,21 @@ function loadForm(p) {
           var row = document.createElement('div');
           row.className = 'tour-item';
           row.innerHTML = _tourRowHTML({
-            nombre:       t.nombre || t.name || '',
-            precio:       t.precio || '',
-            duracion:     t.duracion || '',
-            descripcion:  t.descripcion || t.desc || '',
-            incluye:      t.incluye || '',
-            link_reserva: t.link_reserva || t.link || '',
-            tipo_tour:    t.tipo_tour || '',
-            idioma:       t.idioma || '',
-            max_personas: t.max_personas || ''
+            nombre:        t.nombre || t.name || '',
+            precio:        t.precio || '',
+            precio_sub:    t.precio_sub || '',
+            duracion:      t.duracion || '',
+            descripcion:   t.descripcion || t.desc || '',
+            incluye:       t.incluye || '',
+            no_incluye:    t.no_incluye || '',
+            link_reserva:  t.link_reserva || t.link || '',
+            tipo_tour:     t.tipo_tour || '',
+            idioma:        t.idioma || '',
+            max_personas:  t.max_personas || '',
+            rating:        t.rating || '',
+            review_count:  t.review_count || '',
+            whatsapp_tour: t.whatsapp_tour || '',
+            featured:      t.featured || ''
           });
           tourList.appendChild(row);
         });
@@ -3209,7 +3215,7 @@ function collectTourItems() {
     if (!nombreEl || !nombreEl.value.trim()) return;
     var t = {};
     row.querySelectorAll('[data-field]').forEach(function(el) {
-      var val = el.value.trim();
+      var val = (el.type === 'checkbox') ? (el.checked ? 'true' : '') : el.value.trim();
       if (val) t[el.dataset.field] = val;
     });
     tours.push(t);
@@ -4110,12 +4116,17 @@ function addMenuItem() {
 // Tours
 function _tourRowHTML(t) {
   t = t || {};
+  var feats = (t.featured === true || t.featured === 'true' || t.featured === 'on');
+  var incl = (Array.isArray(t.incluye) ? t.incluye.join('\n') : t.incluye || '');
+  var noincl = (Array.isArray(t.no_incluye) ? t.no_incluye.join('\n') : t.no_incluye || '');
   return '<div class="tour-item-header">'
     +'<input class="form-input" data-field="nombre" placeholder="Nombre del tour" style="font-size:12px;font-weight:700;flex:1;margin-right:8px" value="'+_esc(t.nombre||'')+'">'
+    +'<label style="display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--gold-dark);margin-right:8px;white-space:nowrap"><input type="checkbox" data-field="featured"'+(feats?' checked':'')+'> Destacado</label>'
     +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>'
     +'</div>'
     +'<div class="form-row">'
     +'<div class="form-group"><label class="form-label" style="font-size:9px">Precio</label><input class="form-input" data-field="precio" placeholder="$1.400.000" value="'+_esc(t.precio||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Sub del precio</label><input class="form-input" data-field="precio_sub" placeholder="por persona" value="'+_esc(t.precio_sub||'')+'"></div>'
     +'<div class="form-group"><label class="form-label" style="font-size:9px">Duración</label><input class="form-input" data-field="duracion" placeholder="4 días / 3 noches" value="'+_esc(t.duracion||'')+'"></div>'
     +'</div>'
     +'<div class="form-row">'
@@ -4124,16 +4135,23 @@ function _tourRowHTML(t) {
     +'<option value="Grupal"'+(t.tipo_tour==='Grupal'?' selected':'')+'>Grupal</option>'
     +'<option value="Privado"'+(t.tipo_tour==='Privado'?' selected':'')+'>Privado</option>'
     +'<option value="Personalizado"'+(t.tipo_tour==='Personalizado'?' selected':'')+'>Personalizado</option>'
+    +'<option value="Ecoturismo"'+(t.tipo_tour==='Ecoturismo'?' selected':'')+'>Ecoturismo</option>'
     +'</select></div>'
     +'<div class="form-group"><label class="form-label" style="font-size:9px">Idioma</label><input class="form-input" data-field="idioma" placeholder="Español / Inglés" value="'+_esc(t.idioma||'')+'"></div>'
     +'<div class="form-group"><label class="form-label" style="font-size:9px">Máx. personas</label><input class="form-input" data-field="max_personas" placeholder="Máx 12 personas" value="'+_esc(t.max_personas||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Calificación</label><input class="form-input" data-field="rating" type="number" step="0.1" min="0" max="5" placeholder="4.7" value="'+_esc(t.rating||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">Nº reseñas</label><input class="form-input" data-field="review_count" type="number" min="0" placeholder="4820" value="'+_esc(t.review_count||'')+'"></div>'
     +'</div>'
     +'<div class="form-row">'
     +'<div class="form-group" style="flex:1"><label class="form-label" style="font-size:9px">Descripción</label><textarea class="form-input" data-field="descripcion" rows="2" placeholder="Que incluye la experiencia...">'+_esc(t.descripcion||'')+'</textarea></div>'
     +'</div>'
     +'<div class="form-row">'
-    +'<div class="form-group"><label class="form-label" style="font-size:9px">Incluye</label><input class="form-input" data-field="incluye" placeholder="Transporte, guia, almuerzo..." value="'+_esc(t.incluye||'')+'"></div>'
+    +'<div class="form-group" style="flex:1"><label class="form-label" style="font-size:9px">Incluye (una por línea)</label><textarea class="form-input" data-field="incluye" rows="4" placeholder="Subida en funicular&#10;Guía local certificado&#10;Entradas incluidas">'+_esc(incl)+'</textarea></div>'
+    +'<div class="form-group" style="flex:1"><label class="form-label" style="font-size:9px">No incluye (una por línea)</label><textarea class="form-input" data-field="no_incluye" rows="4" placeholder="Vuelos / transporte aéreo&#10;Seguro de viaje">'+_esc(noincl)+'</textarea></div>'
+    +'</div>'
+    +'<div class="form-row">'
     +'<div class="form-group"><label class="form-label" style="font-size:9px">Link de reserva</label><input class="form-input" data-field="link_reserva" placeholder="https://..." value="'+_esc(t.link_reserva||'')+'"></div>'
+    +'<div class="form-group"><label class="form-label" style="font-size:9px">WhatsApp del tour (opcional)</label><input class="form-input" data-field="whatsapp_tour" placeholder="573015678901" value="'+_esc(t.whatsapp_tour||'')+'"></div>'
     +'</div>';
 }
 function addTourItem() {

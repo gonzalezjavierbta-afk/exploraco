@@ -118,16 +118,18 @@ Selector antiguo `f-temporada` (multi): Diciembre-Marzo (seca) · Junio-Agosto (
 
 > Nota de paridad: el form guarda `nota`; el motor lee `incluye` y `link`. En las páginas estáticas se usan las llaves del motor (`incluye`/`link`).
 
-### `tours` (tour-list-admin, `{nombre, precio, duracion, tipo_tour, idioma, max_personas, descripcion, incluye, link_reserva}`)
+### `tours` (tour-list-admin, `{nombre, precio, precio_sub, duracion, tipo_tour, idioma, max_personas, rating, review_count, descripcion, incluye, no_incluye, link_reserva, whatsapp_tour, featured}`)
+
+> `incluye`/`no_incluye` se guardan como texto (una por línea) o array; el motor los divide por salto de línea o coma. `featured` = checkbox. `tipo_tour` mapea al badge: Grupal→grup, Privado→priv, Ecoturismo→eco, Personalizado→pers.
 
 1. **Ascenso por el Sendero Paramuno**
-   - precio: $77.000 · duracion: 3 horas · tipo_tour: Grupal · idioma: Español / Inglés · max_personas: Máx 25
-   - descripcion: Caminata guiada por el sendero ancestral entre niebla y frailejones hasta la cima a 3.152 m.
-   - incluye: Guía, seguro, entrada, hidratación · link_reserva: https://monserrate.co
+   - precio: $77.000 · precio_sub: por persona · duracion: 3 horas · tipo_tour: Grupal · idioma: Español / Inglés · max_personas: Máx 25
+   - rating: 4.8 · review_count: 320 · descripcion: Caminata guiada por el sendero ancestral entre niebla y frailejones hasta la cima a 3.152 m.
+   - incluye: Guía certificado, Seguro, Entrada, Hidratación · no_incluye: Transporte desde tu hotel, Bebidas alcohólicas · link_reserva: https://monserrate.co
 2. **Tour privado del cerro sagrado**
-   - precio: $91.000 · duracion: 3+ horas · tipo_tour: Privado · idioma: Español / Inglés · max_personas: Máx 10
+   - precio: $91.000 · precio_sub: por persona · duracion: 3+ horas · tipo_tour: Privado · idioma: Español / Inglés · max_personas: Máx 10
    - descripcion: Recorrido privado con la historia muisca, la hermita de 1657 y la basílica de 1925.
-   - incluye: Guía privado, entrada, acceso prioritario · link_reserva: https://monserrate.co
+   - incluye: Guía privado, Entrada, Acceso prioritario · link_reserva: https://monserrate.co
 
 ### `itinerario` (itinerario-list-admin, `{dia, hora, titulo, icono, detalle, tags[]}`)
 
