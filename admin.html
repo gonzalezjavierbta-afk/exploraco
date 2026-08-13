@@ -1302,8 +1302,13 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <button class="btn btn-ghost btn-sm" onclick="addTourItem()">+ Añadir tour</button>
           </div>
           <div class="cat-panel" id="cat-sitio-checklist">
+            <div class="form-hint">Cada ítem: icono (emoji), nombre, detalle corto y prioridad.</div>
             <div id="checklist-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
             <button class="btn btn-ghost btn-sm" onclick="addChecklistItem()">+ Añadir ítem</button>
+            <div class="form-group" style="margin-top:14px">
+              <label class="form-label">Tip al pie de la sección</label>
+              <textarea class="form-input" id="f-checklist-tip" rows="2" placeholder="Ej: La cima está a 3.152 m: sube con calma, camina a paso lento y evita comidas pesadas antes de llegar."></textarea>
+            </div>
           </div>
           <div class="cat-panel" id="cat-sitio-dificultad">
             <div class="form-row">
@@ -2462,7 +2467,8 @@ var CATEGORY_TAG_FIELDS = {
        textarea simple f-secretos. Ver collectSitioSecretos(). */
     { key:'secretos',       id:'f-secretos',
       collector: function(){ return (typeof collectSitioSecretos==='function') ? collectSitioSecretos() : ''; } },
-    { key:'regulaciones',   id:'f-regulaciones' }
+    { key:'regulaciones',   id:'f-regulaciones' },
+    { key:'checklist_tip',  id:'f-checklist-tip' }
   ],
   /* TASK-001 (completado). Los primeros 6 son los campos nuevos del
      TODO original. Los ultimos 4 (recepcion, politica_cancelacion,
@@ -2964,19 +2970,10 @@ function loadForm(p) {
       if (checkList && p.checklist && p.checklist.length) {
         checkList.innerHTML = '';
         p.checklist.forEach(function(item){
-          var isObj = item && typeof item === 'object';
-          var nombreItem = isObj ? (item.item || item.nombre || '') : String(item);
-          var prioItem = isObj ? (item.prioridad || item.priority || 'Recomendado') : 'Recomendado';
           var row = document.createElement('div');
           row.className = 'checklist-item-row';
-          row.style.cssText = 'display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center';
-          row.innerHTML = '<input class="form-input checklist-item-input" value="'+_esc(nombreItem)+'" placeholder="Ítem" style="font-size:11px;padding:5px 8px">'
-            +'<select class="form-input form-select checklist-item-prio" style="font-size:11px;padding:5px 8px">'
-            +'<option value="Obligatorio"'+(prioItem==='Obligatorio'?' selected':'')+'>Obligatorio</option>'
-            +'<option value="Recomendado"'+(prioItem==='Recomendado'?' selected':'')+'>Recomendado</option>'
-            +'<option value="Opcional"'+(prioItem==='Opcional'?' selected':'')+'>Opcional</option>'
-            +'</select>'
-            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+          row.style.cssText = 'display:grid;grid-template-columns:46px 1fr 1.2fr 110px auto;gap:8px;align-items:center';
+          row.innerHTML = _checklistRowHTML(item);
           checkList.appendChild(row);
         });
       }
@@ -3227,9 +3224,16 @@ function collectChecklistItems() {
   var items = [];
   document.querySelectorAll('.checklist-item-row').forEach(function(row) {
     var inp = row.querySelector('.checklist-item-input');
-    var sel = row.querySelector('.checklist-item-prio');
     if (inp && inp.value.trim()) {
-      items.push({ item: inp.value.trim(), prioridad: sel ? sel.value : 'Recomendado' });
+      var icono = row.querySelector('.checklist-item-icono');
+      var sub = row.querySelector('.checklist-item-sub');
+      var sel = row.querySelector('.checklist-item-prio');
+      items.push({
+        icono: icono ? icono.value.trim() : '',
+        item: inp.value.trim(),
+        sub: sub ? sub.value.trim() : '',
+        prioridad: sel ? sel.value : 'Recomendado'
+      });
     }
   });
   return items;
@@ -4163,12 +4167,30 @@ function addTourItem() {
 }
 
 // Checklist
+function _checklistRowHTML(t) {
+  t = t || {};
+  var icono = t.icono || '';
+  var nombre = t.item || t.nombre || t.texto || '';
+  var sub = t.sub || t.detalle || '';
+  var prio = t.prioridad || t.priority || 'Recomendado';
+  function opt(v, lbl) {
+    return '<option value="'+lbl+'"'+(prio===lbl?' selected':'')+'>'+lbl+'</option>';
+  }
+  return '<input class="form-input checklist-item-icono" value="'+_esc(icono)+'" placeholder="Icono" style="font-size:11px;padding:5px 8px;width:46px;text-align:center">'
+    +'<input class="form-input checklist-item-input" value="'+_esc(nombre)+'" placeholder="Ítem" style="font-size:11px;padding:5px 8px">'
+    +'<input class="form-input checklist-item-sub" value="'+_esc(sub)+'" placeholder="Detalle corto" style="font-size:11px;padding:5px 8px">'
+    +'<select class="form-input form-select checklist-item-prio" style="font-size:11px;padding:5px 8px">'
+    +opt(prio,'Obligatorio')+opt(prio,'Recomendado')+opt(prio,'Opcional')+opt(prio,'Prohibido')
+    +'</select>'
+    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+}
+
 function addChecklistItem() {
   var list = document.getElementById('checklist-admin');
   var item = document.createElement('div');
   item.className = 'checklist-item-row';
-  item.style.cssText='display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center';
-  item.innerHTML='<input class="form-input checklist-item-input" placeholder="Nombre del ítem" style="font-size:11px;padding:5px 8px"><select class="form-input form-select checklist-item-prio" style="font-size:11px;padding:5px 8px"><option value="Obligatorio">Obligatorio</option><option value="Recomendado" selected>Recomendado</option><option value="Opcional">Opcional</option></select><button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
+  item.style.cssText='display:grid;grid-template-columns:46px 1fr 1.2fr 110px auto;gap:8px;align-items:center';
+  item.innerHTML = _checklistRowHTML();
   list.appendChild(item);
 }
 

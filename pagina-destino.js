@@ -123,6 +123,19 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#111;color:#fff;border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s;cursor:pointer}"
 +".tc-book-btn:hover{background:#333}"
 +".tc-desc{font-size:11px;color:#555;line-height:1.6;margin-bottom:10px}"
++".checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}"
++".cl-item{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border-radius:7px;border:1px solid}"
++".cl-item.obligatorio{background:#FEF2F2;border-color:#FECACA}"
++".cl-item.recomendado{background:var(--bg);border-color:var(--border)}"
++".cl-item.opcional{background:#F8F8F8;border-color:#E8E8E8;opacity:.75}"
++".cl-icon{font-size:16px;flex-shrink:0;line-height:1.2}"
++".cl-text{font-size:11px;font-weight:600;color:var(--black);line-height:1.3}"
++".cl-sub{font-size:9px;color:var(--muted)}"
++".cl-req{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;display:inline-block}"
++".req-ob{background:#FEE2E2;color:#DC2626}"
++".req-re{background:#FEF3C7;color:#92400E}"
++".req-op{background:#F3F4F6;color:#9CA3AF}"
++".cl-tip{font-size:10px;color:var(--muted);margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:5px;border-left:2px solid var(--gold)}"
 +".gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}"
 +".gal-i{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center}"
 +".gal-i img{width:100%;height:100%;object-fit:cover}"
@@ -208,6 +221,7 @@ function buildHTML(d, det, fotos, resenas) {
   var entradas       = safeJSON(tags.entradas);     if(!Array.isArray(entradas))     entradas=[];
   var tours          = safeJSON(tags.tours);         if(!Array.isArray(tours))        tours=[];
   var itinerario     = safeJSON(tags.itinerario);   if(!Array.isArray(itinerario))   itinerario=[];
+  var checklistTip   = tags.checklist_tip || tags.equipamiento_tip || '';
   var faunaFlora     = tags.fauna_flora  || '';
   var secretos       = tags.secretos     || '';
   var regulaciones   = tags.regulaciones || '';
@@ -325,7 +339,7 @@ function buildHTML(d, det, fotos, resenas) {
     function _tourList(arr) {
       if (Array.isArray(arr)) return arr.filter(Boolean);
       if (typeof arr === 'string' && arr) {
-        return arr.split(/\n|,/).map(function(s){ return s.replace(/^[-+•\s]+/,'').trim(); }).filter(Boolean);
+        return arr.split(/\n|,/).map(function(s){ return s.replace(/^[-\u002b\u2022\s]+/,'').trim(); }).filter(Boolean);
       }
       return [];
     }
@@ -380,16 +394,35 @@ function buildHTML(d, det, fotos, resenas) {
       + '</div></div></section>';
   }
 
-  // -- SECCION: Que llevar --------------------------------------
+  // -- SECCION: Que llevar (estilo Monserrate3: .checklist-grid, --
+  // -- .cl-item con icono, texto, sub y badge de prioridad) ------
   var secChecklist = '';
   if (cat === 'sitio' && equipamiento.length) {
+    var prioClass = { 'obligatorio':'req-ob', 'recomendado':'req-re', 'opcional':'req-op', 'prohibido':'req-op' };
+    var prioItemClass = { 'obligatorio':'obligatorio', 'recomendado':'recomendado', 'opcional':'opcional', 'prohibido':'opcional' };
     secChecklist = '<section class="ssec bwhite" id="checklist"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que llevar</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="tagrow">'
+      + '<div class="checklist-grid">'
       + equipamiento.map(function(e){
-          return '<span class="tpill">\u2713 '+esc(typeof e==='string'?e:(e.item||e.nombre||e))+'</span>';
+          var isObj = e && typeof e === 'object';
+          var nombre = isObj ? (e.item || e.nombre || e.texto || '') : String(e);
+          var icono = isObj ? (e.icono || '') : '';
+          var sub = isObj ? (e.sub || e.detalle || '') : '';
+          var prio = isObj ? (e.prioridad || e.priority || 'Recomendado') : 'Recomendado';
+          var prioKey = prio.toString().toLowerCase();
+          var itemCls = prioItemClass[prioKey] || 'recomendado';
+          var reqCls = prioClass[prioKey] || 'req-re';
+          return '<div class="cl-item '+itemCls+'">'
+            + (icono ? '<div class="cl-icon">'+icono+'</div>' : '')
+            + '<div>'
+            + '<div class="cl-text">'+esc(nombre)+'</div>'
+            + (sub ? '<div class="cl-sub">'+esc(sub)+'</div>' : '')
+            + '<span class="cl-req '+reqCls+'">'+esc(prio)+'</span>'
+            + '</div></div>';
         }).join('')
-      + '</div></div></section>';
+      + '</div>'
+      + (checklistTip ? '<div class="cl-tip">\uD83D\uDCA1 '+esc(checklistTip)+'</div>' : '')
+      + '</div></section>';
   }
 
   // -- SECCION: Itinerario --------------------------------------
