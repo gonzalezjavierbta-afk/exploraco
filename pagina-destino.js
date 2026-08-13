@@ -298,45 +298,7 @@ function buildHTML(d, det, fotos, resenas) {
     + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
     + '</div></section>';
 
-  // -- SECCI??N: Info rapida (iconos) -------------------------------
-  var infoCards = [];
-  if (d.tipo)     infoCards.push({ico:'\u2302',lbl:'Tipo',val:d.tipo});
-  if (checkin)    infoCards.push({ico:'(tiempo)',lbl:'Check-in',val:checkin+(checkout?' / '+checkout:'')});
-  if (d.capacidad)infoCards.push({ico:'\u0047\u0072',lbl:'Capacidad',val:d.capacidad});
-  if (d.horario)  infoCards.push({ico:'\u23F0',lbl:'Horario',val:d.horario});
-  if (d.precio_desde) infoCards.push({ico:'\u0024',lbl:'Precio desde',val:money(d.precio_desde)});
-  if (d.barrio)   infoCards.push({ico:'\u29BF',lbl:'Zona',val:d.barrio});
-
-  var secInfo = infoCards.length ? '<section class="ssec bwhite" id="info"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Informacion rapida</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="igrid">'+infoCards.map(function(c){
-        return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
-      }).join('')+'</div></div></section>' : '';
-
-  // -- SECCI??N: Galeria ---------------------------------------------
-  // -- SECCI??N: Datos especificos del sitio turistico --------------
-  var secSitio = '';
-  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada)) {
-    var sitioCards = [];
-    if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
-    if (dificultad)    sitioCards.push({ico:'\ud83d\udcca',lbl:'Dificultad',val:dificultad});
-    if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
-    if (distancia)     sitioCards.push({ico:'\ud83d\udce6',lbl:'Distancia',val:distancia});
-    if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
-    if (precioEntrada) sitioCards.push({ico:'\ud83c\udfab',lbl:'Entrada',val:precioEntrada});
-
-    secSitio = '<section class="ssec bwhite" id="sitio-info"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Datos del sitio</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="igrid">'+sitioCards.map(function(c){
-          return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
-        }).join('')+'</div>'
-      + (equipamiento.length ? '<div class="hbox" style="margin-top:16px"><span class="hbico">\ud83c\udfa7</span><div><div class="hblbl">Equipo recomendado</div><div class="tagrow">'+equipamiento.map(function(e){return '<span class="tpill">'+esc(e)+'</span>';}).join('')+'</div></div></div>' : '')
-      + (temporada.length ? '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div><div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div></div>' : '')
-      + (permisos ? '<div class="hbox" style="margin-top:16px;background:#FEF3C7;border-color:#D97706"><span class="hbico">\ud83d\udccb</span><div><div class="hblbl" style="color:#92400E">Permisos y reservas</div><div class="hbtx" style="color:#78350F">'+esc(permisos)+'</div></div></div>' : '')
-      + '</div></section>';
-  }
-
-    // -- SECCION: Entradas y precios ----------------------------
+  // -- SECCI??N: Entradas y precios ----------------------------
   var secEntradas = '';
   if (cat === 'sitio' && entradas.length) {
     secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">'
@@ -737,8 +699,6 @@ function buildHTML(d, det, fotos, resenas) {
 
     + gstrip + '\n\n'
     + secDescripcion + '\n'
-    + secInfo + '\n'
-    + secSitio + '\n'
     + secEntradas + '\n'
     + secTours + '\n'
     + secChecklist + '\n'

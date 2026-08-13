@@ -640,41 +640,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
       + '</div></div></div></section>';
   }
 
-  // -- SECCI??N: Info rapida (iconos) -------------------------------
-  var infoCards = [];
-  if (d.tipo)     infoCards.push({ico:'\u2302',lbl:'Tipo',val:d.tipo});
-  if (checkin)    infoCards.push({ico:'\uD83D\uDD11',lbl:'Check-in',val:checkin+(checkout?' / '+checkout:'')});
-  if (d.capacidad)infoCards.push({ico:'\uD83D\uDC65',lbl:'Capacidad',val:d.capacidad});
-  if (d.horario)  infoCards.push({ico:'\u23F0',lbl:'Horario',val:d.horario});
-  if (d.precio_desde) infoCards.push({ico:'\uD83D\uDCB0',lbl:'Precio desde',val:money(d.precio_desde)});
-  if (d.barrio)   infoCards.push({ico:'\u29BF',lbl:'Zona',val:d.barrio});
-
-  var secInfo = infoCards.length ? '<section class="ssec bwhite" id="info"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Informacion rapida</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="igrid">'+infoCards.map(function(c){
-        return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
-      }).join('')+'</div></div></section>' : '';
-
-  // -- SECCI??N: Galeria ---------------------------------------------
-  // -- SECCI??N: Datos especificos del sitio turistico --------------
-  var secSitio = '';
-  if (cat === 'sitio' && (tipoActividad || duracion || distancia || horarioVisita || precioEntrada || permisos)) {
-    var sitioCards = [];
-    if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
-    if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
-    if (distancia)     sitioCards.push({ico:'\ud83d\udce6',lbl:'Distancia',val:distancia});
-    if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
-    if (precioEntrada) sitioCards.push({ico:'\ud83c\udfab',lbl:'Entrada',val:precioEntrada});
-
-    secSitio = '<section class="ssec bwhite" id="sitio-info"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Datos del sitio</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="igrid">'+sitioCards.map(function(c){
-          return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
-        }).join('')+'</div>'
-      + (permisos ? '<div class="hbox" style="margin-top:16px;background:#FEF3C7;border-color:#D97706"><span class="hbico">\ud83d\udccb</span><div><div class="hblbl" style="color:#92400E">Permisos y reservas</div><div class="hbtx" style="color:#78350F">'+esc(permisos)+'</div></div></div>' : '')
-      + '</div></section>';
-  }
-
   // -- SECCION: Dificultad y epoca ideal (paridad con Monserrate3.html:
   // -- dificultad en tarjeta (barra 5 segmentos + nivel con emoji +
   // -- descripcion + chips apto/no apto) y epoca ideal (matriz 12 meses
@@ -1505,8 +1470,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     + secDescripcion + '\n'
     + secBlogVideo + '\n'
     + secBlogAutor + '\n'
-    + secInfo + '\n'
-    + secSitio + '\n'
     + secDificultad + '\n'
     + secEntradas + '\n'
     + secTours + '\n'
