@@ -177,23 +177,27 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".tc-inc{display:flex;flex-direction:column;gap:3px}"
 +".tc-inc div{font-size:11px;color:#444}"
 +".tc-cta{margin-top:auto;background:var(--gold);color:#fff;border:none;border-radius:5px;padding:11px 18px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;text-align:center;text-decoration:none;display:block}"
-+".diffcard{background:#fff;border:2px solid var(--gold-dark);border-radius:0;box-shadow:5px 5px 0 var(--gold);padding:20px 22px}"
-+".difflabel{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;text-transform:uppercase;letter-spacing:1px}"
-+".diffbars{display:flex;gap:5px;margin:12px 0 4px}.diffbar{flex:1;height:10px;border-radius:0}"
-+".diffdesc{font-size:13px;color:#444;line-height:1.7;margin-top:10px}"
-+".difftags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}"
-+".difftag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:0;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;border:2px solid}"
-+".difftag.apto{color:#166534;border-color:#166534;background:#F0FDF4}"
-+".difftag.noapto{color:#991B1B;border-color:#991B1B;background:#FEF2F2}"
-+".tmgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px}"
-+"@media(max-width:600px){.tmgrid{grid-template-columns:repeat(4,1fr)}}"
-+".tmcell{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:4px}"
-+".tmcell .tmico{font-size:13px;line-height:1}"
-+".tmcell .tmmes{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}"
-+".tmcell.ideal{background:#F0FDF4;color:#166534}.tmcell.posible{background:#FEF3C7;color:#92400E}"
-+".tmcell.evitar{background:#FEE2E2;color:#991B1B}.tmcell.na{background:#F3F4F6;color:#B0B0B0}"
-+".tmleg{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11px;color:#555}"
-+".tmleg span{display:inline-flex;align-items:center;gap:5px}.tmdot{width:9px;height:9px;border-radius:2px;display:inline-block}"
++".dificultad-section{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:14px}"
++".dif-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}"
++".dif-bar{display:flex;gap:4px;margin-bottom:8px}"
++".dif-seg{flex:1;height:10px;border-radius:3px;background:#E5E3DD;transition:background .3s}"
++".dif-level{font-size:14px;font-weight:700;color:var(--black);margin-bottom:4px}"
++".dif-desc{font-size:11px;color:var(--muted);line-height:1.6}"
++".dif-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}"
++".dif-chip{font-size:10px;padding:3px 9px;border-radius:3px;border:1px solid;font-weight:600}"
++".dc-fit{background:#F0FDF4;border-color:#BBF7D0;color:#166534}"
++".dc-notfit{background:#FEF2F2;border-color:#FECACA;color:#DC2626}"
++".epoca-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:10px}"
++".mes-bar{display:flex;flex-direction:column;align-items:center;gap:3px}"
++".mes-name{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase}"
++".mes-fill{width:100%;border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:opacity .2s}"
++".mes-fill.ideal{background:#16a34a;color:#fff}"
++".mes-fill.posible{background:#d97706;color:#fff}"
++".mes-fill.evitar{background:#dc2626;color:#fff}"
++".mes-fill.na{background:#F3F4F6;color:#B0B0B0}"
++".epoca-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}"
++".el{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}"
++".el-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}"
 +".iico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--gold-light)}"
 +".ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted)}"
 +".ival{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--text);line-height:1.2}"
@@ -341,6 +345,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
   var dificultadDesc = tags.dificultad_desc || '';
   var dificultadTags = safeJSON(tags.dificultad_tags); if(!Array.isArray(dificultadTags)) dificultadTags=[];
   var temporadaMatriz = (tags.temporada_matriz && typeof tags.temporada_matriz === 'object' && !Array.isArray(tags.temporada_matriz)) ? tags.temporada_matriz : null;
+  var temporadaNota   = tags.temporada_nota   || '';
   var duracion       = tags.duracion        || '';
   var horarioVisita  = tags.horario_visita  || d.horario || '';
   var precioEntrada  = tags.precio_entrada  || d.precio_desde || '';
@@ -604,7 +609,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
   // -- SECCI??N: Galeria ---------------------------------------------
   // -- SECCI??N: Datos especificos del sitio turistico --------------
   var secSitio = '';
-  if (cat === 'sitio' && (tipoActividad || dificultad || duracion || distancia || horarioVisita || precioEntrada || temporada.length || temporadaMatriz || permisos)) {
+  if (cat === 'sitio' && (tipoActividad || duracion || distancia || horarioVisita || precioEntrada || permisos)) {
     var sitioCards = [];
     if (tipoActividad) sitioCards.push({ico:'\ud83c\udf3f',lbl:'Actividad',val:tipoActividad});
     if (duracion)      sitioCards.push({ico:'\u23f1\ufe0f',lbl:'Duraci\u00f3n',val:duracion});
@@ -612,88 +617,104 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     if (horarioVisita) sitioCards.push({ico:'\u23f0',lbl:'Horario',val:horarioVisita});
     if (precioEntrada) sitioCards.push({ico:'\ud83c\udfab',lbl:'Entrada',val:precioEntrada});
 
-    // Temporada: matriz de 12 meses (Ideal/Posible/Evitar) cuando existe
-    // tags.temporada_matriz; si no, cae al modelo legado de rangos de
-    // texto (tags.temporada[]) para no romper destinos ya publicados
-    // que aun no migraron al nuevo campo.
-    var MESES_ORDER = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    var STATUS_META = {
-      ideal:   {ico:'\u2605', label:'Ideal \u2014 temporada seca',      dot:'#16a34a', cls:'ideal'},
-      posible: {ico:'~',      label:'Posible \u2014 lluvias moderadas', dot:'#d97706', cls:'posible'},
-      evitar:  {ico:'\u2717', label:'Evitar \u2014 lluvias intensas',   dot:'#dc2626', cls:'evitar'}
-    };
-    var temporadaHTML = '';
-    if (temporadaMatriz) {
-      var usedStatuses = {};
-      var cellsHTML = MESES_ORDER.map(function(m){
-        var st = temporadaMatriz[m] || '';
-        var meta = STATUS_META[st];
-        if (meta) usedStatuses[st] = true;
-        return '<div class="tmcell '+(meta?meta.cls:'na')+'"><span class="tmico">'+(meta?meta.ico:'\u00b7')+'</span><span class="tmmes">'+m+'</span></div>';
-      }).join('');
-      var legendHTML = Object.keys(STATUS_META).filter(function(k){ return usedStatuses[k]; }).map(function(k){
-        return '<span><span class="tmdot" style="background:'+STATUS_META[k].dot+'"></span>'+STATUS_META[k].label+'</span>';
-      }).join('');
-      temporadaHTML = '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div>'
-        + '<div class="tmgrid">'+cellsHTML+'</div>'
-        + (legendHTML ? '<div class="tmleg">'+legendHTML+'</div>' : '')
-        + '</div>';
-    } else if (temporada.length) {
-      temporadaHTML = '<div style="margin-top:14px"><div class="strow" style="margin-bottom:8px"><div class="sgl"></div><h3 class="stitle bc" style="font-size:14px">Mejor \u00e9poca para visitar</h3></div><div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div></div>';
-    }
-
     secSitio = '<section class="ssec bwhite" id="sitio-info"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Datos del sitio</h2><div class="stnum">'+nextNum()+'</div></div>'
       + '<div class="igrid">'+sitioCards.map(function(c){
           return '<div class="icard"><div class="iico">'+c.ico+'</div><div class="ilbl">'+esc(c.lbl)+'</div><div class="ival">'+esc(c.val)+'</div></div>';
         }).join('')+'</div>'
-      + temporadaHTML
       + (permisos ? '<div class="hbox" style="margin-top:16px;background:#FEF3C7;border-color:#D97706"><span class="hbico">\ud83d\udccb</span><div><div class="hblbl" style="color:#92400E">Permisos y reservas</div><div class="hbtx" style="color:#78350F">'+esc(permisos)+'</div></div></div>' : '')
       + '</div></section>';
   }
 
-  // -- SECCION: Dificultad (Industrial Premium: bordes rectos, ---
-  // -- sombra dura, dificultad_desc + dificultad_tags) ------------
+  // -- SECCION: Dificultad y epoca ideal (paridad con Monserrate3.html:
+  // -- dificultad en tarjeta (barra 5 segmentos + nivel con emoji +
+  // -- descripcion + chips apto/no apto) y epoca ideal (matriz 12 meses
+  // -- con leyenda y nota) reunidos en un solo bloque bwarm. ----------
   var secDificultad = '';
-  if (cat === 'sitio' && dificultad) {
-    var diffScale = [
-      {key:'facil',     label:'Facil',     color:'#16a34a'},
-      {key:'moderado',  label:'Moderado',  color:'#d97706'},
-      {key:'dificil',   label:'Dificil',   color:'#dc2626'},
-      {key:'extremo',   label:'Extremo',   color:'#7c2d12'}
-    ];
-    var normKey = dificultad.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    // BUG-013 fix (ver BUGS_HISTORICOS.md): admin.html ofrece la opcion
-    // "Experto" en el select f-dificultad, pero esta escala solo conocia
-    // la clave "extremo" -- el nivel mas alto nunca coloreaba la barra.
-    // Se alias sin tocar los datos ya guardados en Neon.
-    if (normKey === 'experto') normKey = 'extremo';
-    var matchIdx = -1;
-    diffScale.forEach(function(lv, i){ if (lv.key === normKey) matchIdx = i; });
-    var activeColor = matchIdx >= 0 ? diffScale[matchIdx].color : 'var(--gold-dark)';
-    var barsHTML = diffScale.map(function(lv, i){
-      var isOn = matchIdx >= 0 && i <= matchIdx;
-      var bg = isOn ? diffScale[matchIdx].color : '#E5E7EB';
-      return '<div class="diffbar" style="background:'+bg+'"></div>';
-    }).join('');
-    var tagsHTML = '';
-    if (dificultadTags.length) {
-      tagsHTML = '<div class="difftags">' + dificultadTags.map(function(t){
-        var isObj = t && typeof t === 'object';
-        var texto = isObj ? (t.texto || '') : String(t || '');
-        if (!texto) return '';
-        var apto = isObj ? (t.apto !== false) : true;
-        return '<span class="difftag '+(apto?'apto':'noapto')+'">'+(apto?'\u2713':'\u2717')+' '+esc(texto)+'</span>';
-      }).join('') + '</div>';
+  if (cat === 'sitio' && (dificultad || temporadaMatriz || temporada.length)) {
+    var diffBlock = '';
+    if (dificultad) {
+      var diffScale = [
+        {key:'facil',    label:'F\u00e1cil',    color:'#16a34a', emoji:'\ud83d\udfe2', segs:2},
+        {key:'moderado', label:'Moderado',      color:'#d97706', emoji:'\ud83d\udfe0', segs:3},
+        {key:'dificil',  label:'Dif\u00edcil',  color:'#dc2626', emoji:'\ud83d\udd34', segs:4},
+        {key:'extremo',  label:'Extremo',       color:'#7c2d12', emoji:'\u26ab',       segs:5}
+      ];
+      var normKey = dificultad.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      // BUG-013 fix (ver BUGS_HISTORICOS.md): admin.html ofrece la opcion
+      // "Experto" en el select f-dificultad, pero esta escala solo conocia
+      // la clave "extremo" -- el nivel mas alto nunca coloreaba la barra.
+      // Se alias sin tocar los datos ya guardados en Neon.
+      if (normKey === 'experto') normKey = 'extremo';
+      var matchIdx = -1;
+      diffScale.forEach(function(lv, i){ if (lv.key === normKey) matchIdx = i; });
+      var activeColor = matchIdx >= 0 ? diffScale[matchIdx].color : 'var(--gold-dark)';
+      var activeEmoji = matchIdx >= 0 ? diffScale[matchIdx].emoji : '';
+      var activeLabel = matchIdx >= 0 ? diffScale[matchIdx].label : dificultad;
+      var segsCount   = matchIdx >= 0 ? diffScale[matchIdx].segs : 0;
+      var barsHTML = '';
+      for (var s = 1; s <= 5; s++) {
+        var isOn = segsCount > 0 && s <= segsCount;
+        barsHTML += '<div class="dif-seg'+(isOn?' active':'')+'" style="background:'+(isOn?activeColor:'#E5E3DD')+'"></div>';
+      }
+      var chipsHTML = '';
+      if (dificultadTags.length) {
+        chipsHTML = '<div class="dif-chips">' + dificultadTags.map(function(t){
+          var isObj = t && typeof t === 'object';
+          var texto = isObj ? (t.texto || '') : String(t || '');
+          if (!texto) return '';
+          var apto = isObj ? (t.apto !== false) : true;
+          return '<span class="dif-chip '+(apto?'dc-fit':'dc-notfit')+'">'+(apto?'\u2713':'\u2717')+' '+esc(texto)+'</span>';
+        }).join('') + '</div>';
+      }
+      diffBlock = '<div class="dificultad-section">'
+        + '<div class="dif-label">Nivel de dificultad</div>'
+        + '<div class="dif-bar" id="dif-bar">'+barsHTML+'</div>'
+        + '<div class="dif-level">'+(activeEmoji?activeEmoji+' ':'')+esc(activeLabel)+'</div>'
+        + (dificultadDesc ? '<div class="dif-desc">'+esc(dificultadDesc)+'</div>' : (matchIdx<0 ? '<div class="dif-desc">'+esc(dificultad)+'</div>' : ''))
+        + chipsHTML
+        + '</div>';
     }
+
+    var epocaBlock = '';
+    if (temporadaMatriz) {
+      var MESES_ORDER = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      var STATUS_META = {
+        ideal:   {ico:'\u2605', cls:'ideal',   label:'Ideal \u2014 cielo despejado y vistas claras',   dot:'#16a34a'},
+        posible: {ico:'~',      cls:'posible', label:'Posible \u2014 lluvias moderadas',                dot:'#d97706'},
+        evitar:  {ico:'\u2717', cls:'evitar',  label:'Evitar \u2014 lluvias intensas y niebla',         dot:'#dc2626'}
+      };
+      var usedStatuses = {};
+      var cellsHTML = MESES_ORDER.map(function(m){
+        var st = temporadaMatriz[m] || '';
+        var meta = STATUS_META[st];
+        if (meta) usedStatuses[st] = true;
+        return '<div class="mes-bar"><div class="mes-fill '+(meta?meta.cls:'na')+'">'+(meta?meta.ico:'\u00b7')+'</div><div class="mes-name">'+m+'</div></div>';
+      }).join('');
+      var legendHTML = Object.keys(STATUS_META).filter(function(k){ return usedStatuses[k]; }).map(function(k){
+        return '<div class="el"><div class="el-dot" style="background:'+STATUS_META[k].dot+'"></div>'+STATUS_META[k].label+'</div>';
+      }).join('');
+      var tipHTML = '';
+      if (temporadaNota) {
+        tipHTML = '<div style="margin-top:10px;font-size:10px;color:var(--muted);padding:8px 10px;background:#fff;border-radius:5px;border-left:2px solid var(--gold)">\ud83d\udca1 '+esc(temporadaNota)+'</div>';
+      }
+      epocaBlock = '<div style="margin-top:18px">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">\u00c9poca ideal para visitar</div>'
+        + '<div class="epoca-grid">'+cellsHTML+'</div>'
+        + (legendHTML ? '<div class="epoca-legend">'+legendHTML+'</div>' : '')
+        + tipHTML
+        + '</div>';
+    } else if (temporada.length) {
+      epocaBlock = '<div style="margin-top:18px">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">\u00c9poca ideal para visitar</div>'
+        + '<div class="tagrow">'+temporada.map(function(m){return '<span class="tpill" style="background:#EEF2FF;color:#3730a3">\ud83d\udcc5 '+esc(m)+'</span>';}).join('')+'</div>'
+        + '</div>';
+    }
+
     secDificultad = '<section class="ssec bwarm" id="dificultad"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Nivel de dificultad</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="diffcard" style="border-color:'+activeColor+'">'
-      + '<div class="difflabel" style="color:'+activeColor+'">'+esc(matchIdx>=0?diffScale[matchIdx].label:dificultad)+'</div>'
-      + '<div class="diffbars">'+barsHTML+'</div>'
-      + (dificultadDesc ? '<div class="diffdesc">'+esc(dificultadDesc)+'</div>' : (matchIdx<0 ? '<div class="diffdesc">'+esc(dificultad)+'</div>' : ''))
-      + tagsHTML
-      + '</div>'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Dificultad y \u00e9poca ideal</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + diffBlock
+      + epocaBlock
       + '</div></section>';
   }
 
