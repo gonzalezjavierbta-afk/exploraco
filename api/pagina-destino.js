@@ -300,7 +300,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".itin-desc{font-size:11px;color:var(--muted);line-height:1.6}"
 +".itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}"
 +".itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}"
-+".tip-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}.tip-icon{font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center}.tip-title{font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}.tip-text{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px}.tip-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.tip-gold{background:#FDF3E0;color:#92400E}.tip-red{background:#FEE2E2;color:#991B1B}.tip-green{background:#D1FAE5;color:#065F46}.tip-blue{background:#DBEAFE;color:#1E3A5F}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.blog-video-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;margin:0}.blog-video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.blog-autor-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin:0}.blog-autor-foto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0}.blog-autor-ph{display:flex;align-items:center;justify-content:center;background:var(--gold-light);color:var(--gold-dark);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px}.blog-autor-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--text)}.blog-autor-bio{font-size:12px;color:#555;line-height:1.6;margin-top:3px}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
++".tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}.tip-card:hover{border-color:#ccc}.tip-icon{font-size:22px;flex-shrink:0;line-height:1}.tip-body{flex:1;min-width:0}.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.tip-text{font-size:11px;color:var(--muted);line-height:1.6}.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.blog-video-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;margin:0}.blog-video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.blog-autor-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin:0}.blog-autor-foto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0}.blog-autor-ph{display:flex;align-items:center;justify-content:center;background:var(--gold-light);color:var(--gold-dark);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px}.blog-autor-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--text)}.blog-autor-bio{font-size:12px;color:#555;line-height:1.6;margin-top:3px}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
 +".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
 +".fcopy a{color:rgba(255,255,255,.45)}";
@@ -978,16 +978,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     try {
       var tipsArr = JSON.parse(secretosClean);
       if (Array.isArray(tipsArr) && tipsArr.length) {
-        var tagColors = {gold:'#FDF3E0;color:#92400E', red:'#FEE2E2;color:#991B1B', green:'#D1FAE5;color:#065F46', blue:'#DBEAFE;color:#1E3A5F'};
-        tipsContent = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'
+        var tagClases = {gold:'tip-gold', red:'tip-red', green:'tip-green', blue:'tip-blue'};
+        tipsContent = '<div class="tips-grid">'
           + tipsArr.map(function(t) {
             var tc = t.tag_color || 'gold';
-            var tagStyle = tagColors[tc] || tagColors.gold;
-            return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start">'
-              +'<div style="font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center">'+esc(t.icono||'\u2605')+'</div>'
-              +'<div style="flex:1"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px">'+esc(t.titulo||'')+'</div>'
-              +'<div style="font-size:12px;color:#555;line-height:1.6;margin-bottom:8px">'+esc(t.texto||'')+'</div>'
-              +(t.tag?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;background:'+tagStyle+'">'+esc(t.tag)+'</span>':'')
+            var cls = tagClases[tc] || 'tip-gold';
+            return '<div class="tip-card"><div class="tip-icon">'+esc(t.icono||'\u2605')+'</div><div class="tip-body">'
+              +'<div class="tip-title">'+esc(t.titulo||'')+'</div>'
+              +'<div class="tip-text">'+esc(t.texto||'')+'</div>'
+              +(t.tag?'<span class="tip-tag '+cls+'">'+esc(t.tag)+'</span>':'')
               +'</div></div>';
           }).join('') + '</div>';
       }
@@ -1003,7 +1002,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
         tipsContent = '<p class="stext">'+esc(secretos)+'</p>';
       }
     }
-    secSecretos = '<section class="ssec bwarm" id="secretos"><div class="sin">'
+    secSecretos = '<section class="ssec bwhite" id="secretos"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice</h2><div class="stnum">'+nextNum()+'</div></div>'
       + tipsContent + '</div></section>';
   }
