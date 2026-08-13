@@ -4245,7 +4245,14 @@ function addProhibidoRow() {
   list.appendChild(row);
 }
 
-function removeRow(btn) { btn.closest('tr,div[class]')?.remove() || btn.parentElement.remove(); }
+function removeRow(btn) {
+  if (!btn || !btn.parentNode) return;
+  var row = btn;
+  if (/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(btn.tagName)) {
+    row = btn.closest ? (btn.closest('tr') || btn.closest('.tour-item') || btn.parentElement) : btn.parentElement;
+  }
+  if (row && row.parentNode) row.parentNode.removeChild(row);
+}
 
 /* ── IMPORT / EXPORT ── */
 function generateExportCode() {

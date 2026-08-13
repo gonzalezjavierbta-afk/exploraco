@@ -41,10 +41,35 @@
 | `f-dificultad-desc` | El sendero peatonal sube 2,4 km con pendientes fuertes (600 m de desnivel). El funicular y el teleférico son aptos para todos. La altura (3.152 m) puede causar fatiga y falta de aire. |
 | `f-duracion` | ½ día (3–5 h) |
 | `f-altitud` | 3152 |
-| `f-entrada-precio` | Funicular/teleférico L–S $35.000 · Dom $21.000 · Adulto mayor $29.500 · Fast pass $96.500 · Grupos 20+ $29.500 · Deportista (5:30–9:00 am) $10.500–$11.500 · Sendero Paramuno $77.000 / residente $34.500 |
+| `f-entrada-precio` | Funicular/teleférico L–S $32.000 · Dom $19.000 · Adulto mayor $27.000/$15.000 · Fast pass $87.500 · Grupos 20+ $27.000 · Deportista (5:30–9:00 am) $10.500 · Mascotas $11.500 · Sendero Paramuno $77.000 / residente $34.500 |
 | `f-distancia-sitio` | 3,7 km del centro de Bogotá · ~1 h 15 caminando desde La Candelaria |
 | `f-como-llegar-sitio` | En funicular o teleférico desde la estación Quinta de Bolívar. A pie por el Sendero Paramuno (2,3 km) saliendo desde la portería del cerro. TransMilenio: estación Las Aguas (línea K) y 15 min caminando. No hay parqueadero para visitantes en la cima. |
 | `f-permisos-sitio` | No se requiere reserva para funicular/teleférico (taquilla o venta en línea). El Sendero Paramuno exige reserva previa y pago de tarifa. La cima puede cerrar por tormenta eléctrica. |
+
+### `entradas` (entradas-list-admin, `{tipo, precio, incluye, link}`)
+
+Tarifas 2025 (fuente: monserrate.co/es/horarios-y-tarifas, bogota.gov.co, Caracol Radio abr-2025).
+
+| tipo | precio | incluye | link |
+|---|---|---|---|
+| Ida y regreso (L–S y festivos) | 32000 | Funicular o teleférico, ida y vuelta | https://monserrate.co/es/horarios-y-tarifas/ |
+| Ida y regreso (Domingos) | 19000 | Funicular o teleférico, ida y vuelta | https://monserrate.co/es/horarios-y-tarifas/ |
+| Un solo trayecto (L–S) | 19000 | Subida o bajada | https://monserrate.co/es/horarios-y-tarifas/ |
+| Un solo trayecto (Domingos) | 11000 | Subida o bajada | https://monserrate.co/es/horarios-y-tarifas/ |
+| Adulto mayor 62+ (L–S) | 27000 | Ida y regreso con cédula | https://monserrate.co/es/horarios-y-tarifas/ |
+| Adulto mayor 62+ (Domingos) | 15000 | Ida y regreso con cédula | https://monserrate.co/es/horarios-y-tarifas/ |
+| Fast Pass | 87500 | Acceso prioritario sin fila | https://monserrate.co/es/horarios-y-tarifas/ |
+| Grupos adultos (20+) | 27000 | Ida y regreso por persona, reserva previa | https://monserrate.co/es/horarios-y-tarifas/ |
+| Grupos colegios (20+) | 19000 | Ida y regreso por estudiante, reserva previa | https://monserrate.co/es/horarios-y-tarifas/ |
+| Deportistas (5:30–9:00 L–S) | 10500 | Solo descenso, no festivos, requiere tarjeta | https://monserrate.co/es/horarios-y-tarifas/ |
+| Mascotas (L–S) | 11500 | Ida y regreso en guacal, no domingos ni temporadas altas | https://monserrate.co/es/horarios-y-tarifas/ |
+| Artículo personal adicional | 7500 | Bulto extra | https://monserrate.co/es/horarios-y-tarifas/ |
+| Sendero Paramuno 3h (general) | 77000 | Ingreso + guianza + seguro, requiere reserva | https://monserrate.co/es/horarios-y-tarifas/ |
+| Sendero Paramuno 3h (residente) | 34500 | Ingreso + guianza, cédula colombiana | https://monserrate.co/es/horarios-y-tarifas/ |
+| Sendero Paramuno extendido 3+ h (general) | 91000 | Ingreso + guianza + seguro, requiere reserva | https://monserrate.co/es/horarios-y-tarifas/ |
+| Sendero Paramuno extendido 3+ h (residente) | 49500 | Ingreso + guianza, cédula colombiana | https://monserrate.co/es/horarios-y-tarifas/ |
+
+Nota: admin.html recoge esta fila como `{tipo, precio, nota}` (collectSitioEntradas); el renderer pagina-destino.js:729 lee `e.incluye` para la columna "Incluye". El seed escribe `incluye` para que la página muestre la descripción.
 
 ### Matriz de temporada `f-temporada-{mes}` (mes → ideal/posible/evitar)
 
