@@ -173,10 +173,14 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid}"
 +".cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
 +".cbtn.green{background:#fff;color:#25D366;border-color:#25D366}.cbtn.blue{background:#fff;color:#1a73e8;border-color:#1a73e8}"
-+".faqi{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff}"
-+".faqi summary{padding:14px 16px;cursor:pointer;font-weight:700;font-size:13px;list-style:none;display:flex;justify-content:space-between}"
-+".faqi summary::-webkit-details-marker{display:none}.faqi summary::after{content:'+';color:var(--gold);font-weight:900}"
-+".faqi[open] summary::after{content:'\\2212'}.faqi p{padding:0 16px 14px;font-size:12px;color:#555;line-height:1.7}"
++".faq-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}"
++".faq-item{background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}"
++".faq-q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--black);transition:background .12s;gap:10px}"
++".faq-q:hover{background:var(--bg)}"
++".faq-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}"
++".faq-item.open .faq-arrow{transform:rotate(180deg)}"
++".faq-a{display:none;padding:0 14px 12px;font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);background:var(--bg)}"
++".faq-item.open .faq-a{display:block}"
 +".pbanner{background:#fff3cd;border-top:3px solid #ffc107;color:#856404;padding:.7rem 4%;font-size:12px;text-align:center}"
 +".itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}"
 +".itinerario-tabs::-webkit-scrollbar{display:none}"
@@ -645,10 +649,11 @@ function buildHTML(d, det, fotos, resenas) {
   }
 
   // -- SECCI??N: FAQ -----------------------------------------------
-  var secFaq = faqs.length ? '<section class="ssec bwarm" id="faq"><div class="sin">'
+  var secFaq = faqs.length ? '<section class="ssec bwhite" id="faq"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + faqs.map(function(f){ return '<details class="faqi"><summary>'+esc(f.pregunta||f.q||'')+'</summary><p>'+esc(f.respuesta||f.a||'')+'</p></details>'; }).join('')
-    + '</div></section>' : '';
+    + '<div class="faq-list">'
+    + faqs.map(function(f){ return '<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">'+esc(f.pregunta||f.q||'')+' <span class="faq-arrow">\u25BC</span></div><div class="faq-a">'+esc(f.respuesta||f.a||'')+'</div></div>'; }).join('')
+    + '</div></div></section>' : '';
 
   // -- SECCI??N: Resenas --------------------------------------------
   var rvHtml = '';
@@ -758,6 +763,7 @@ function buildHTML(d, det, fotos, resenas) {
     + 'var rvScore=0;\n'
     + 'function setRvScore(n){rvScore=n;document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=n);});}\n'
     + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");var panel=document.getElementById(id);if(panel)panel.classList.add("on");}\n'
+    + 'function toggleFaq(el){el.parentElement.classList.toggle("open");}\n'
     + 'function submitRv(){\n'
     + '  var nom=document.getElementById("rvn").value.trim();\n'
     + '  var txt=document.getElementById("rvt").value.trim();\n'
