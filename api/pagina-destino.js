@@ -103,7 +103,7 @@ function schemaLD(d, cat, autor) {
 
 var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');"
 +"*{box-sizing:border-box;margin:0;padding:0}"
-+":root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}"
++":root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A;--green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;--bg:#F8F7F3}"
 +"html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}"
 +".bc{font-family:'Barlow Condensed',sans-serif}"
 +"a{color:inherit;text-decoration:none}img{display:block;max-width:100%}"
@@ -282,7 +282,25 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".faqi summary::-webkit-details-marker{display:none}.faqi summary::after{content:'+';color:var(--gold);font-weight:900}"
 +".faqi[open] summary::after{content:'\\2212'}.faqi p{padding:0 16px 14px;font-size:12px;color:#555;line-height:1.7}"
 +".pbanner{background:#fff3cd;border-top:3px solid #ffc107;color:#856404;padding:.7rem 4%;font-size:12px;text-align:center}"
-+".itab{padding:8px 16px;font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}.itin-panel{display:none}.itin-panel.on{display:block}.itab.on{color:var(--gold);border-color:var(--gold)}.itin-timeline{display:flex;flex-direction:column;gap:0;position:relative}.itin-step{display:flex;gap:14px;padding-bottom:20px;position:relative}.itin-dot{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1}.itin-dot.on{border-color:var(--gold);background:var(--gold-light)}.itin-body{flex:1;padding-top:4px}.itin-time{font-size:10px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}.itin-title{font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:5px}.itin-desc{font-size:12px;color:#555;line-height:1.65;margin-bottom:8px}.itin-tags{display:flex;flex-wrap:wrap;gap:5px}.itin-tag{background:var(--warm);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text)}.tip-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}.tip-icon{font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center}.tip-title{font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}.tip-text{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px}.tip-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.tip-gold{background:#FDF3E0;color:#92400E}.tip-red{background:#FEE2E2;color:#991B1B}.tip-green{background:#D1FAE5;color:#065F46}.tip-blue{background:#DBEAFE;color:#1E3A5F}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.blog-video-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;margin:0}.blog-video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.blog-autor-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin:0}.blog-autor-foto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0}.blog-autor-ph{display:flex;align-items:center;justify-content:center;background:var(--gold-light);color:var(--gold-dark);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px}.blog-autor-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--text)}.blog-autor-bio{font-size:12px;color:#555;line-height:1.6;margin-top:3px}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
++".itinerario-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-bottom:14px}"
++".itinerario-tabs::-webkit-scrollbar{display:none}"
++".itab{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;margin-bottom:-1px}"
++".itab:hover{color:var(--black)}"
++".itab.on{color:var(--black);border-bottom-color:var(--green)}"
++".itin-panel{display:none}"
++".itin-panel.on{display:block}"
++".itin-timeline{display:flex;flex-direction:column;gap:0}"
++".itin-step{display:flex;gap:14px;padding-bottom:16px;position:relative}"
++".itin-step:not(:last-child)::after{content:'';position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--border)}"
++".itin-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);background:var(--white);z-index:1}"
++".itin-dot.active{box-shadow:0 0 0 2px var(--green);background:var(--green-l)}"
++".itin-body{flex:1;min-width:0;padding-top:4px}"
++".itin-time{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:2px}"
++".itin-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:3px}"
++".itin-desc{font-size:11px;color:var(--muted);line-height:1.6}"
++".itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}"
++".itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}"
++".tip-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}.tip-icon{font-size:20px;flex-shrink:0;width:38px;height:38px;border-radius:8px;background:var(--warm);display:flex;align-items:center;justify-content:center}.tip-title{font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}.tip-text{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px}.tip-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}.tip-gold{background:#FDF3E0;color:#92400E}.tip-red{background:#FEE2E2;color:#991B1B}.tip-green{background:#D1FAE5;color:#065F46}.tip-blue{background:#DBEAFE;color:#1E3A5F}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.fauna-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}.fauna-emoji{font-size:26px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.blog-video-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;margin:0}.blog-video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.blog-autor-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin:0}.blog-autor-foto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0}.blog-autor-ph{display:flex;align-items:center;justify-content:center;background:var(--gold-light);color:var(--gold-dark);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px}.blog-autor-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--text)}.blog-autor-bio{font-size:12px;color:#555;line-height:1.6;margin-top:3px}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
 +".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
 +".fcopy a{color:rgba(255,255,255,.45)}";
@@ -858,8 +876,8 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
       + '</div></section>';
   }
 
-  // -- SECCION: Itinerario --------------------------------------
-  // -- Itinerario con tabs por dia, hora y tags --
+  // -- SECCION: Itinerario (estilo Monserrate3: tabs, timeline, --
+  // -- .itin-step con dot, hora, titulo, desc y tags) ------------
   var secItinerario = '';
   if (cat === 'sitio' && itinerario.length) {
     // Agrupar pasos por dia
@@ -871,10 +889,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
       diasMap[dia].push(it);
     });
     var tabsHTML = diasOrder.map(function(dia, i) {
-      return '<div class="itab'+(i===0?' on':'')+'" onclick="switchItin(this,\'itin-d'+i+'\')"'
-        +' style="padding:8px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;'
-        +'text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:none;background:none;'
-        +'color:'+(i===0?'var(--gold)':'var(--muted)')+';border-bottom:3px solid '+(i===0?'var(--gold)':'transparent')+';margin-bottom:-1px">'+esc(dia)+'</div>';
+      return '<div class="itab'+(i===0?' on':'')+'" onclick="switchItin(this,\'itin-d'+i+'\')">'+esc(dia)+'</div>';
     }).join('');
     var panelsHTML = diasOrder.map(function(dia, i) {
       var pasos = diasMap[dia];
@@ -884,21 +899,21 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
         var desc = p.detalle || p.descripcion_larga || '';
         var ico = p.icono || p.icon || '\u25CF';
         var ptags = p.tags ? (Array.isArray(p.tags) ? p.tags : String(p.tags).split(',').map(function(t){return t.trim();})) : [];
-        return '<div class="itin-step" style="display:flex;gap:14px;padding-bottom:20px">'
-          +'<div class="itin-dot'+(hora?' on':'')+'" style="width:32px;height:32px;border-radius:50%;background:'+(hora?'var(--gold-light)':'#fff')+';border:2px solid '+(hora?'var(--gold)':'var(--border)')+';display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;z-index:1">'+esc(ico)+'</div>'
-          +'<div style="flex:1;padding-top:4px">'
-          +(hora?'<div style="font-size:10px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">'+esc(hora)+'</div>':'')
-          +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:5px">'+esc(titulo)+'</div>'
-          +(desc?'<div style="font-size:12px;color:#555;line-height:1.65;margin-bottom:8px">'+esc(desc)+'</div>':'')
-          +(ptags.length?'<div style="display:flex;flex-wrap:wrap;gap:5px">'+ptags.map(function(t){return '<span style="background:var(--warm);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text)">'+esc(t)+'</span>';}).join('')+'</div>':'')
+        return '<div class="itin-step">'
+          +'<div class="itin-dot active">'+esc(ico)+'</div>'
+          +'<div class="itin-body">'
+          +(hora?'<div class="itin-time">'+esc(hora)+'</div>':'')
+          +'<div class="itin-title">'+esc(titulo)+'</div>'
+          +(desc?'<div class="itin-desc">'+esc(desc)+'</div>':'')
+          +(ptags.length?'<div class="itin-tags">'+ptags.map(function(t){return '<span class="itin-tag">'+esc(t)+'</span>';}).join('')+'</div>':'')
           +'</div></div>';
       }).join('');
       return '<div class="itin-panel'+(i===0?' on':'')+'" id="itin-d'+i+'">'
-        +'<div>'+stepsHTML+'</div></div>';
+        +'<div class="itin-timeline">'+stepsHTML+'</div></div>';
     }).join('');
     secItinerario = '<section class="ssec bwarm" id="itinerario"><div class="sin">'
-      +'<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Itinerario dia a dia</h2><div class="stnum">'+nextNum()+'</div></div>'
-      +'<div style="border-bottom:1px solid var(--border);display:flex;overflow-x:auto;margin-bottom:16px">'+tabsHTML+'</div>'
+      +'<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Itinerario sugerido</h2><div class="stnum">'+nextNum()+'</div></div>'
+      +'<div class="itinerario-tabs" id="itin-tabs">'+tabsHTML+'</div>'
       +panelsHTML
       +'</div></section>';
   }
@@ -1490,7 +1505,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados) {
     + 'var RV_COUNT='+nRes+';\n'
     + 'var rvScore=0;\n'
     + 'function setRvScore(n){rvScore=n;document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.toggle("on",parseInt(s.dataset.v)<=n);});}\n'
-    + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");t.style.color="var(--muted)";t.style.borderColor="transparent";});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");el.style.color="var(--gold)";el.style.borderColor="var(--gold)";var panel=document.getElementById(id);if(panel)panel.classList.add("on");}\n'
+    + 'function switchItin(el,id){document.querySelectorAll(".itab").forEach(function(t){t.classList.remove("on");});document.querySelectorAll(".itin-panel").forEach(function(p){p.classList.remove("on");});el.classList.add("on");var panel=document.getElementById(id);if(panel)panel.classList.add("on");}\n'
     // Inserta la resena recien publicada en el DOM y actualiza el
     // bloque de promedio/contador sin esperar a un reload -- antes el
     // unico feedback era el mensaje "Gracias", pero la lista y el
