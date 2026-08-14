@@ -1,0 +1,824 @@
+<nav class="topbar">
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="tbc">
+    <a href="index.html">Inicio</a><span>/</span>
+    <a href="directorio-sitio.html">Lugares &amp; Sitios</a><span>/</span>
+    <a href="directorio-sitio.html">Bogotá</a><span>/</span>
+    <em>La Candelaria</em>
+  </div>
+  <div class="tra">
+    <div class="tshare-wrap">
+      <button class="tshare" onclick="toggleShareMenu(this)">↗ Compartir</button>
+      <div class="tshare-dropdown" id="share-dropdown">
+        <div class="tsd-item" onclick="sharePlace()">🔗 Copiar link</div>
+        <div class="tsd-item" onclick="shareToWhatsApp()">💬 WhatsApp</div>
+      </div>
+    </div>
+  </div>
+  <button class="ham-btn" id="ham-btn" onclick="toggleDrawer()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<!-- Scroll progress bar -->
+<div class="page-progress"><div class="page-progress-fill" id="prog-fill"></div></div>
+<!-- Sticky section nav -->
+<div class="sec-nav" id="sec-nav">
+  <div class="sec-nav-inner">
+    <a class="sn-link" href="#descripcion">Sobre</a><a class="sn-link" href="#galeria">Fotos</a><a class="sn-link" href="#dificultad">Dificultad</a><a class="sn-link" href="#entradas">Entradas</a><a class="sn-link" href="#tours">Tours</a><a class="sn-link" href="#checklist">Qué llevar</a><a class="sn-link" href="#itinerario">Itinerario</a><a class="sn-link" href="#mapa">Mapa</a><a class="sn-link" href="#faq">FAQ</a><a class="sn-link" href="#resenas">Reseñas</a><a class="sn-link" href="#contact">Contacto</a>
+  </div>
+</div>
+<!-- Mobile drawer -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div class="md-header">
+    <div class="md-logo">EXPLORA<em>CO</em></div>
+    <button class="md-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="md-links">
+    <a class="md-link" href="index.html"><span class="md-link-icon">🏠</span>Inicio</a>
+    <a class="md-link" href="index.html#recs"><span class="md-link-icon">🧭</span>Explorar destinos</a>
+    <a class="md-link" href="index.html#mapa-section"><span class="md-link-icon">🗺️</span>Mapa interactivo</a>
+    <a class="md-link" href="agenda.html"><span class="md-link-icon">📅</span>Agenda cultural</a>
+    <a class="md-link" href="index.html#mymapa-section"><span class="md-link-icon">🛡️</span>Mi Viaje</a>
+    <a class="md-link" href="index.html#social-section"><span class="md-link-icon">💬</span>Comunidad</a>
+  </div>
+  <div class="md-footer">
+    <a href="directorio-sitio.html" class="md-back-btn">← Volver al directorio</a>
+  </div>
+</div>
+
+<section class="hero">
+<div class="hi">
+  <div class="hl">
+    <div class="hew">🏛️ Lugar</div>
+    <h1 class="htitle bc">La Candelaria<em>Bogotá</em></h1>
+    <p class="hsub">El centro histórico de Bogotá: fundado en 1538, con plazas coloniales, museos gratuitos y callejas llenas de arte urbano. Patrimonio y cultura a pocos pasos del centro.</p>
+    <div class="hqi-row">
+      <div class="hqi">📍 Bogotá, Cundinamarca</div>
+      <div class="hqi">⭐ 4.7 · 2.500+ reseñas</div>
+      <div class="hqi">💰 Desde $5.000</div>
+      <div class="hqi">🕐 2–4 horas · Tu–Sa 9AM–6PM</div>
+    </div>
+    <div class="hctar">
+      <button class="hbtn" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">🧭 Cómo llegar</button>
+      <button class="hobtn" onclick="document.getElementById('galeria').scrollIntoView({behavior:'smooth'})">Ver galería →</button>
+    </div>
+  </div>
+  <div class="hr"><div class="psm" onclick="openLB(0)">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg/1200px-Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg" alt="Plaza de Bolívar en La Candelaria, Bogotá" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="psp" style="background:linear-gradient(135deg,#1a2a3a,#2c3e50);display:none">🏛️</div>
+        <div class="pbadge">📷 Fotos</div>
+        <div class="pexp">▶ Ver galería</div>
+    </div>
+    <div class="prow"><div class="pth" onclick="openLB(1)"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Museo_del_Oro_Bogot%C3%A1.jpg/800px-Museo_del_Oro_Bogot%C3%A1.jpg" alt="Fachada del Museo del Oro" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#1a2a3a,#2c3e50);display:none">🏦</div></div><div class="pth" onclick="openLB(2)"><div class="pthp" style="background:#2c3e50">🎨</div><div class="pvpl"><div class="pvic">▶</div></div></div><div class="pth pmore" onclick="openLB(3)" data-more="+ 2 más"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Teatro_Col%C3%B3n_Bogot%C3%A1.jpg/800px-Teatro_Col%C3%B3n_Bogot%C3%A1.jpg" alt="Teatro Colón en La Candelaria" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="pthp" style="background:linear-gradient(135deg,#1a2a3a,#2c3e50);display:none">🎭</div></div></div></div>
+</div>
+</section>
+
+<div class="gstrip">
+  <div><div class="gsavg">4.7</div><div class="gstars"><span class="gstar on">★</span><span class="gstar on">★</span><span class="gstar on">★</span><span class="gstar on">★</span><span class="gstar">★</span></div><div class="gsrv">2.500+ reseñas</div></div>
+  <div class="gsdiv"></div>
+  <div class="gsprice"><div class="gspl">Desde</div><div class="gspv">$5.000</div></div>
+  <button class="gscta" onclick="document.getElementById('tours').scrollIntoView({behavior:'smooth'})">Ver tours →</button>
+</div>
+
+<section class="ssec bwarm" id="descripcion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">1</div></div>
+  <p class="slead bc">El centro histórico de Bogotá, cuna de la ciudad con plazas coloniales, museos gratuitos y callejas llenas de arte urbano.</p>
+  <p class="stext">La Candelaria es el barrio histórico de Bogotá, fundado en 1538 en El Chorro de Quevedo. Sus calles empedradas y fachadas coloniales guardan más de cuatro siglos de historia: aquí ocurrieron hechos cruciales de la independencia colombiana y hoy es el distrito universitario y cultural de la ciudad. Alberga el Museo del Oro, el Museo Botero, la Catedral Primada y la Plaza de Bolívar, todos a pocos pasos entre sí. Es un destino imperdible por su historia, arte callejero, cafés bohemios y gastronomía santafereña.</p>
+  <div class="lugar-type-row">
+    <span class="lt-badge lt-cultural">🏛️ Histórico</span>
+    <span class="lt-badge lt-cultural">🎨 Cultural</span>
+    <span class="lt-badge lt-patrimonio">🏛️ Patrimonio Nacional</span>
+    <span class="lt-badge lt-unesco">🎓 Universitario</span>
+  </div>
+  <div class="hbox">
+    <span class="hbico">🏛️</span>
+    <div><div class="hblbl">Experiencia única</div><div class="hbtx">Plazas coloniales · Museos gratuitos · Arte callejero · Ajiaco y chocolate santafereño</div></div>
+  </div>
+  <div class="tagrow">
+    <div class="tpill" style="background:#FDF4FF;color:#6D28D9">Histórico</div>
+    <div class="tpill" style="background:#FDF4FF;color:#6D28D9">Cultural</div>
+    <div class="tpill" style="background:#F0FDF4;color:#14532d">Museos</div>
+    <div class="tpill" style="background:#F0FDF4;color:#14532d">Arte callejero</div>
+    <div class="tpill" style="background:#FFFBEB;color:#92400E">Gastronomía</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="galeria">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galería de fotos</h2><div class="stnum">2</div></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">
+    <div onclick="openLB(0)" style="border-radius:6px;overflow:hidden;cursor:pointer;grid-row:1/3;position:relative;background:linear-gradient(135deg,#1a2a3a,#2c3e50);transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg/1200px-Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg" alt="Plaza de Bolívar con la Catedral Primada" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none'">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px">🏛️</div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(1)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a2a3a,#2c3e50);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Museo_del_Oro_Bogot%C3%A1.jpg/800px-Museo_del_Oro_Bogot%C3%A1.jpg" alt="Fachada del Museo del Oro" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none'">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🏦</div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(2)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a2a3a,#2c3e50);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Museo_Botero_Bogot%C3%A1.jpg/800px-Museo_Botero_Bogot%C3%A1.jpg" alt="Fachada del Museo Botero" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none'">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🎨</div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(3)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a2a3a,#2c3e50);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Teatro_Col%C3%B3n_Bogot%C3%A1.jpg/800px-Teatro_Col%C3%B3n_Bogot%C3%A1.jpg" alt="Teatro Colón" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none'">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🎭</div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div><div onclick="openLB(4)" style="border-radius:6px;overflow:hidden;cursor:pointer;aspect-ratio:16/7;background:linear-gradient(135deg,#1a2a3a,#2c3e50);position:relative;transition:transform .18s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Calle_empedrada_La_Candelaria.jpg/800px-Calle_empedrada_La_Candelaria.jpg" alt="Calle empedrada de La Candelaria" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none'">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">🕯️</div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:2px;font-weight:700">📷 FOTO</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="dificultad">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Dificultad y época ideal<span class="section-new-badge">Nuevo</span></h2><div class="stnum">3</div></div>
+
+  <!-- Dificultad -->
+  <div class="dificultad-section">
+    <div class="dif-label">Nivel de dificultad</div>
+    <div class="dif-bar" id="dif-bar">
+      <div class="dif-seg active medio"></div>
+      <div class="dif-seg active medio"></div>
+      <div class="dif-seg"></div>
+      <div class="dif-seg"></div>
+      <div class="dif-seg"></div>
+    </div>
+    <div class="dif-level">🟠 Media</div>
+    <div class="dif-desc">Barrio peatonal con calles empedradas y algunas pendientes por la topografía de Bogotá. Accesible para la mayoría de visitantes con calzado cómodo.</div>
+    <div class="dif-chips">
+      <span class="dif-chip dc-fit">✓ Apto para peatón</span>
+      <span class="dif-chip dc-fit">✓ Apto para niños</span>
+      <span class="dif-chip dc-notfit">✗ Algunas pendientes por topografía</span>
+      <span class="dif-chip dc-notfit">✗ Calle empedrada — usar calzado con agarre</span>
+      <span class="dif-chip dc-notfit">✗ Altitud 2.640 m — precaución los primeros días</span>
+    </div>
+  </div>
+
+  <!-- Época ideal -->
+  <div style="margin-top:18px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Época ideal para visitar</div>
+    <div class="epoca-grid">
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Ene</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Feb</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Mar</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Abr</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">May</div></div>
+      <div class="mes-bar"><div class="mes-fill ideal">★</div><div class="mes-name">Jun</div></div>
+      <div class="mes-bar"><div class="mes-fill ideal">★</div><div class="mes-name">Jul</div></div>
+      <div class="mes-bar"><div class="mes-fill ideal">★</div><div class="mes-name">Ago</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Sep</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Oct</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Nov</div></div>
+      <div class="mes-bar"><div class="mes-fill posible">~</div><div class="mes-name">Dic</div></div>
+    </div>
+    <div class="epoca-legend">
+      <span class="el"><span class="el-dot" style="background:#22C55E"></span>Ideal — temporada seca</span>
+      <span class="el"><span class="el-dot" style="background:#F59E0B"></span>Posible — clima estable todo el año</span>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="entradas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios<span class="section-new-badge">Nuevo</span></h2><div class="stnum">4</div></div>
+  <table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Incluye</th><th>Comprar</th></tr></thead><tbody>
+    <tr><td class="entrada-tipo">Museo del Oro (general)</td><td class="entrada-precio">$5.000</td><td style="font-size:10px;color:var(--muted)">Entrada al museo</td><td><a class="entrada-link" href="https://museodeloro.gov.co" target="_blank">🎫 Comprar</a></td></tr>
+    <tr><td class="entrada-tipo">Museo del Oro (estudiantes)</td><td class="entrada-precio">$3.000</td><td style="font-size:10px;color:var(--muted)">Entrada con descuento</td><td><a class="entrada-link" href="https://museodeloro.gov.co" target="_blank">🎫 Comprar</a></td></tr>
+    <tr><td class="entrada-tipo">Museo Botero</td><td class="entrada-precio"><span class="entrada-gratis">Gratis</span></td><td style="font-size:10px;color:var(--muted)">Entrada libre siempre</td><td><a class="entrada-link" href="https://museobotero.gov.co" target="_blank">🎫 Info</a></td></tr>
+    <tr><td class="entrada-tipo">Museo Colonial de Arte</td><td class="entrada-precio"><span class="entrada-gratis">Gratis</span></td><td style="font-size:10px;color:var(--muted)">Entrada libre</td><td><a class="entrada-link" href="https://museocolonial.gov.co" target="_blank">🎫 Info</a></td></tr>
+    <tr><td class="entrada-tipo">Museo Francisco José de Caldas</td><td class="entrada-precio"><span class="entrada-gratis">Gratis</span></td><td style="font-size:10px;color:var(--muted)">M–F 8AM–5PM</td><td><a class="entrada-link" href="https://user.gov.co" target="_blank">🎫 Info</a></td></tr>
+    <tr><td class="entrada-tipo">Tour histórico guiado</td><td class="entrada-precio">$35.000</td><td style="font-size:10px;color:var(--muted)">Guía + entrada a 2 museos</td><td><a class="entrada-link" href="https://bogota.tours" target="_blank">🎫 Comprar</a></td></tr>
+    <tr><td class="entrada-tipo">Tour de arte callejero</td><td class="entrada-precio">$25.000</td><td style="font-size:10px;color:var(--muted)">Ruta por murales y pasajes</td><td><a class="entrada-link" href="https://bogota.art" target="_blank">🎫 Comprar</a></td></tr>
+    <tr><td class="entrada-tipo">Tour gastronómico</td><td class="entrada-precio">$45.000</td><td style="font-size:10px;color:var(--muted)">Degustación de ajiaco y postres</td><td><a class="entrada-link" href="https://foodtours.co" target="_blank">🎫 Comprar</a></td></tr>
+  </tbody></table>
+  <div class="entradas-nota">⚠️ El Museo del Oro es gratis los domingos. La mayoría de museos del barrio son gratuitos. Precios confirmados 2025.</div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="tours">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Tours disponibles<span class="section-new-badge">Nuevo</span></h2><div class="stnum">5</div></div>
+  <div class="tour-list">
+    <div class="tour-card featured">
+      <div class="tc-header">
+        <span class="tc-badge tc-badge-grup">Grupal</span>
+        <div class="tc-info"><div class="tc-name">Caminata por el centro histórico</div><div class="tc-meta"><span>🕐 3 horas</span><span>👥 Máx 15</span><span>🗣️ Español</span></div></div>
+        <div><div class="tc-price">$35.000</div><div class="tc-price-sub">por persona</div></div>
+      </div>
+      <div class="tc-body">
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px">Recorrido a pie por Plaza de Bolívar, Museo del Oro, Museo Botero y Pasaje Rivas. Incluye introducción histórica y paradas fotográficas.</div>
+        <div class="tc-incl-row">
+          <div class="tc-incl yes">Guía certificado</div><div class="tc-incl yes">Introducción histórica</div>
+          <div class="tc-incl yes">Paradas fotográficas</div><div class="tc-incl no">Transporte</div>
+          <div class="tc-incl no">Comidas</div>
+        </div>
+        <a class="tc-book-btn" href="https://bogota.tours" target="_blank">💬 Reservar ahora</a>
+      </div>
+    </div>
+    <div class="tour-card">
+      <div class="tc-header">
+        <span class="tc-badge tc-badge-grup">Grupal</span>
+        <div class="tc-info"><div class="tc-name">Tour de arte callejero y pasajes</div><div class="tc-meta"><span>🕐 2 horas</span><span>👥 Máx 20</span><span>🗣️ Español</span></div></div>
+        <div><div class="tc-price">$25.000</div><div class="tc-price-sub">por persona</div></div>
+      </div>
+      <div class="tc-body">
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px">Recorrido por Pasaje Hernández, Pasaje Rivas, murales de la Calle 26 y el arte urbano que cubre las fachadas del barrio.</div>
+        <div class="tc-incl-row">
+          <div class="tc-incl yes">Guía de arte urbano</div><div class="tc-incl yes">Paradas en galería</div>
+          <div class="tc-incl yes">Agua</div><div class="tc-incl no">Transporte</div>
+          <div class="tc-incl no">Comidas</div>
+        </div>
+        <a class="tc-book-btn" href="https://bogota.art" target="_blank">💬 Reservar ahora</a>
+      </div>
+    </div>
+    <div class="tour-card">
+      <div class="tc-header">
+        <span class="tc-badge tc-badge-priv">Privado</span>
+        <div class="tc-info"><div class="tc-name">Tour gastronómico por La Candelaria</div><div class="tc-meta"><span>🕐 3 horas</span><span>👥 Máx 8</span><span>🗣️ Español</span></div></div>
+        <div><div class="tc-price">$45.000</div><div class="tc-price-sub">por persona</div></div>
+      </div>
+      <div class="tc-body">
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px">Degustación de ajiaco, chocolate santafereño, chicha y frutas locales en los cafés y restaurantes más tradicionales del barrio.</div>
+        <div class="tc-incl-row">
+          <div class="tc-incl yes">Guía gastronómico</div><div class="tc-incl yes">3 degustaciones</div>
+          <div class="tc-incl yes">Receta de ajiaco</div><div class="tc-incl no">Transporte</div>
+          <div class="tc-incl no">Comidas adicionales</div>
+        </div>
+        <a class="tc-book-btn" href="https://foodtours.co" target="_blank">💬 Reservar ahora</a>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="checklist">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Qué llevar<span class="section-new-badge">Nuevo</span></h2><div class="stnum">6</div></div>
+  <div class="checklist-grid">
+    <div class="cl-item obligatorio"><span class="cl-icon">👟</span><div><div class="cl-text">Zapatos cómodos con buen agarre</div><div class="cl-sub">Calles empedradas</div><span class="cl-req req-ob">Obligatorio</span></div></div>
+    <div class="cl-item obligatorio"><span class="cl-icon">💧</span><div><div class="cl-text">Agua (mínimo 500 ml)</div><div class="cl-sub">Altitud 2.640 m</div><span class="cl-req req-ob">Obligatorio</span></div></div>
+    <div class="cl-item recomendado"><span class="cl-icon">📷</span><div><div class="cl-text">Cámara o celular</div><div class="cl-sub">Plazas y murales</div><span class="cl-req req-re">Recomendado</span></div></div>
+    <div class="cl-item recomendado"><span class="cl-icon">🧢</span><div><div class="cl-text">Protector solar y gorra</div><div class="cl-sub">Sol de la sabana</div><span class="cl-req req-re">Recomendado</span></div></div>
+    <div class="cl-item recomendado"><span class="cl-icon">💵</span><div><div class="cl-text">Efectivo pequeño</div><div class="cl-sub">Para donaciones y artesanías</div><span class="cl-req req-re">Recomendado</span></div></div>
+    <div class="cl-item recomendado"><span class="cl-icon">🗺️</span><div><div class="cl-text">Mapa del recorrido</div><div class="cl-sub">O en tu celular</div><span class="cl-req req-re">Recomendado</span></div></div>
+    <div class="cl-item opcional"><span class="cl-icon">🚌</span><div><div class="cl-text">Aplicación de Transmilenio</div><div class="cl-sub">Tarjetas y rutas</div><span class="cl-req req-op">Opcional</span></div></div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="itinerario">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Itinerario sugerido<span class="section-new-badge">Nuevo</span></h2><div class="stnum">7</div></div>
+  <div class="itinerario-tabs" id="itin-tabs">
+    <div class="itab on" onclick="switchItin(this,'d1')">Mañana</div>
+    <div class="itab" onclick="switchItin(this,'d2')">Tarde</div>
+    <div class="itab" onclick="switchItin(this,'d3')">Noche</div>
+  </div>
+
+  <div class="itin-panel on" id="itin-d1">
+    <div class="itin-timeline">
+      <div class="itin-step"><div class="itin-dot active">🏛️</div><div class="itin-body"><div class="itin-time">9:00 am</div><div class="itin-title">Plaza de Bolívar y Catedral</div><div class="itin-desc">Punto de partida del recorrido. Visita la plaza principal, la Catedral Primada y el Capitolio Nacional, el corazón político del país.</div><div class="itin-tags"><span class="itin-tag">🏛️ Plaza</span><span class="itin-tag">⛪ Catedral</span></div></div></div>
+      <div class="itin-step"><div class="itin-dot active">🏦</div><div class="itin-body"><div class="itin-time">10:30 am</div><div class="itin-title">Museo del Oro</div><div class="itin-desc">La mejor colección de orfebrería precolombina del mundo: más de 34.000 piezas. Los domingos la entrada es gratis.</div><div class="itin-tags"><span class="itin-tag">🏦 Museo</span><span class="itin-tag">💛 Precolombino</span></div></div></div>
+      <div class="itin-step"><div class="itin-dot active">🍽️</div><div class="itin-body"><div class="itin-time">12:00 pm</div><div class="itin-title">Almuerzo de ajiaco</div><div class="itin-desc">Restaurante típico en la zona universitaria: ajiaco santafereño con guacamole, alcaparras y crema de leche.</div><div class="itin-tags"><span class="itin-tag">🍲 Ajiaco</span><span class="itin-tag">🎓 Universidad</span></div></div></div>
+    </div>
+  </div>
+
+  <div class="itin-panel" id="itin-d2">
+    <div class="itin-timeline">
+      <div class="itin-step"><div class="itin-dot active">🎨</div><div class="itin-body"><div class="itin-time">1:30 pm</div><div class="itin-title">Museo Botero</div><div class="itin-desc">Colección privada de Fernando Botero con obras del maestro y de Picasso, Monet y Dalí. Entrada libre siempre.</div><div class="itin-tags"><span class="itin-tag">🎨 Botero</span><span class="itin-tag">🖼️ Gratis</span></div></div></div>
+      <div class="itin-step"><div class="itin-dot active">🕯️</div><div class="itin-body"><div class="itin-time">3:00 pm</div><div class="itin-title">Pasaje Rivas y Pasaje Hernández</div><div class="itin-desc">Artesanías, galerías ocultas, tiendas de vinilo y cafés bohemios entre calles empedradas del siglo XVII.</div><div class="itin-tags"><span class="itin-tag">🕯️ Pasajes</span><span class="itin-tag">🎨 Arte</span></div></div></div>
+      <div class="itin-step"><div class="itin-dot active">🌅</div><div class="itin-body"><div class="itin-time">4:30 pm</div><div class="itin-title">Chorro de Quevedo</div><div class="itin-desc">El punto exacto donde fue fundada Bogotá en 1538. Pequeño mirador con vista al centro histórico y ambiente bohemio.</div><div class="itin-tags"><span class="itin-tag">🏛️ Historia</span><span class="itin-tag">1538</span></div></div></div>
+    </div>
+  </div>
+
+  <div class="itin-panel" id="itin-d3">
+    <div class="itin-timeline">
+      <div class="itin-step"><div class="itin-dot active">🎭</div><div class="itin-body"><div class="itin-time">7:00 pm</div><div class="itin-title">Cena y noche cultural</div><div class="itin-desc">Teatro Colón, cafés de tertulia y cena de cierre en la zona universitaria con chocolate santafereño de postre.</div><div class="itin-tags"><span class="itin-tag">🎭 Teatro Colón</span><span class="itin-tag">☕ Café</span></div></div></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="tips">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Lo que nadie te dice<span class="section-new-badge">Insider</span></h2><div class="stnum">8</div></div>
+  <div class="tips-grid">
+    <div class="tip-card"><div class="tip-icon">⛩️</div><div class="tip-body"><div class="tip-title">El Chorro de Quevedo, cuna de Bogotá</div><div class="tip-text">Aquí se fundó la ciudad en 1538. El mirador desde la plazoleta tiene una de las mejores vistas del centro al atardecer.</div><span class="tip-tag tip-gold">Historia</span></div></div>
+    <div class="tip-card"><div class="tip-icon">📚</div><div class="tip-body"><div class="tip-title">Librería Merlin</div><div class="tip-text">En la Carrera 8 con Calle 15 guarda libros raros y clásicos colombianos. Perfecta para un regalo con historia.</div><span class="tip-tag tip-green">Cultura</span></div></div>
+    <div class="tip-card"><div class="tip-icon">🕯️</div><div class="tip-body"><div class="tip-title">Pasaje Hernández, el secreto mejor guardado</div><div class="tip-text">Entre las carreras 8 y 9 se esconde un pasaje con galerías de arte, tiendas de vinilo y cafés bohemios que pocos turistas conocen.</div><span class="tip-tag tip-blue">Arte</span></div></div>
+    <div class="tip-card"><div class="tip-icon">🎨</div><div class="tip-body"><div class="tip-title">Fragmentos, arte y memoria</div><div class="tip-text">Espacio de arte y memoria construido con materiales del conflicto. Emocionante y parte del proceso de paz colombiano.</div><span class="tip-tag tip-blue">Memoria</span></div></div>
+    <div class="tip-card"><div class="tip-icon">🍲</div><div class="tip-body"><div class="tip-title">El mejor ajiaco de la ciudad</div><div class="tip-text">Los restaurantes universitarios de la zona sirven el ajiaco bogotano más auténtico: con guacamole, alcaparras y tres tipos de papa.</div><span class="tip-tag tip-gold">Sabores</span></div></div>
+    <div class="tip-card"><div class="tip-icon">🚶</div><div class="tip-body"><div class="tip-title">Madruga para las fotos</div><div class="tip-text">Antes de las 10:00 am las calles empedradas están casi vacías y la luz es perfecta para fotografiar las fachadas coloniales.</div><span class="tip-tag tip-red">Foto perfecta</span></div></div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="fauna">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Fauna, flora y ambiente<span class="section-new-badge">Nuevo</span></h2><div class="stnum">9</div></div>
+  <div class="fauna-grid">
+    <div class="fauna-card"><span class="fauna-emoji">🐦</span><div class="fauna-name">Colibríes</div><div class="fauna-sci">Plazas de La Candelaria</div><div class="fauna-fact">Variedad urbana que visita los jardines y plazoletas del barrio.</div></div>
+    <div class="fauna-card"><span class="fauna-emoji">🌿</span><div class="fauna-name">Árboles coloniales</div><div class="fauna-sci">Jacarandás y robles</div><div class="fauna-fact">Sombra y color en los parques y patios coloniales de la zona.</div></div>
+    <div class="fauna-card"><span class="fauna-emoji">🌺</span><div class="fauna-name">Flores de calle</div><div class="fauna-sci">Begonias y geranios</div><div class="fauna-fact">Adornan balcones y fachadas coloniales del centro histórico.</div></div>
+    <div class="fauna-card"><span class="fauna-emoji">📚</span><div class="fauna-name">Estudiantes</div><div class="fauna-sci">Univ. Nacional y Externado</div><div class="fauna-fact">La Candelaria es el distrito universitario de Bogotá.</div></div>
+    <div class="fauna-card"><span class="fauna-emoji">🎭</span><div class="fauna-name">Arte callejero</div><div class="fauna-sci">Murales y grafiti</div><div class="fauna-fact">Obras de arte urbano en fachadas, pasajes y calles empedradas.</div></div>
+    <div class="fauna-card"><span class="fauna-emoji">📖</span><div class="fauna-name">Librerías</div><div class="fauna-sci">Merlin y El Saber</div><div class="fauna-fact">Bolsillos culturales con libros raros y clásicos colombianos.</div></div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="permisos">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Permisos y regulaciones<span class="section-new-badge">Nuevo</span></h2><div class="stnum">10</div></div>
+  <div class="permiso-list">
+    <div class="permiso-item recomendado">
+      <div class="permiso-icon">🎟️</div>
+      <div class="permiso-body">
+        <div class="permiso-title">Entradas a museos</div>
+        <div class="permiso-desc">La mayoría de museos son gratuitos. El Museo del Oro cobra $5.000 (estudiantes $3.000) y es gratis los domingos. No requieren reserva previa.</div>
+      </div>
+      <div class="permiso-time">Gratis / desde $5.000</div>
+    </div>
+    <div class="permiso-item info">
+      <div class="permiso-icon">🕰️</div>
+      <div class="permiso-body">
+        <div class="permiso-title">Horarios de museos</div>
+        <div class="permiso-desc">La mayoría abre de martes a domingo, 9:00 am a 6:00 pm, y cierra los lunes. Verifica cada museo antes de tu visita.</div>
+      </div>
+      <div class="permiso-time">Info</div>
+    </div>
+    <div class="permiso-item info">
+      <div class="permiso-icon">🚶</div>
+      <div class="permiso-body">
+        <div class="permiso-title">Zona peatonal</div>
+        <div class="permiso-desc">Muchas calles del barrio son peatonales. Respeto por el patrimonio colonial: no tocar artefactos ni usar flash en algunas salas. No acampar ni hacer fogatas en las plazas.</div>
+      </div>
+      <div class="permiso-time">Cumplir</div>
+    </div>
+    <div class="permiso-item recomendado">
+      <div class="permiso-icon">🛡️</div>
+      <div class="permiso-body">
+        <div class="permiso-title">Seguridad personal</div>
+        <div class="permiso-desc">Barrio seguro de día, pero cuidado con los bolsillos en zonas concurridas y de noche. Guarda el celular en bolsillos interiores y evita joyas llamativas.</div>
+      </div>
+      <div class="permiso-time">Recomendado</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="puntuacion">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Puntuación de viajeros</h2><div class="stnum">11</div></div>
+  <div class="score-overall">
+    <div class="so-number">4.7</div>
+    <div class="so-meta">
+      <div class="so-stars">★★★★☆</div>
+      <div class="so-label">Excelente · 2.500+ reseñas</div>
+      <div class="so-count">El barrio histórico favorito de Bogotá según viajeros</div>
+    </div>
+  </div>
+  <div class="score-grid">
+    <div class="score-label">Experiencia</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:96%;background:#22C55E"></div></div><div class="score-val">4.8</div>
+    <div class="score-label">Guías</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:94%;background:#22C55E"></div></div><div class="score-val">4.7</div>
+    <div class="score-label">Accesibilidad</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:90%;background:#E8A020"></div></div><div class="score-val">4.5</div>
+    <div class="score-label">Valor / precio</div><div class="score-bar-wrap"><div class="score-bar-fill" style="width:98%;background:#3B82F6"></div></div><div class="score-val">4.9</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="mapa">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicación y cómo llegar</h2><div class="stnum">12</div></div>
+  <div id="mapel"></div>
+  <p class="stext" style="margin-top:14px">Transmilenio: Museo del Oro (línea K) o Las Aguas. A pie desde el centro histórico. Colectivos en Carrera 5 y Carrera 4. El barrio está ubicado en 4.7120, -74.0680, a 2.640 m sobre el nivel del mar.</p>
+  <div class="mapacts">
+    <a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination=4.7120,-74.0680" target="_blank">🗺️ Google Maps</a>
+    <a class="mabtn dark" href="https://maps.apple.com/?daddr=4.7120,-74.0680" target="_blank">🍎 Apple Maps</a>
+    <a class="mabtn blue" href="https://www.bogota.gov.co" target="_blank">○ Sitio web</a>
+    <a class="mabtn outline" href="https://instagram.com/lacandelaria" target="_blank">Instagram</a>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="quienva">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">¿Quién va este mes?<span class="section-new-badge">Social</span></h2><div class="stnum">13</div></div>
+  <div class="quien-va-box">
+    <div class="qv-title">Viajeros que planean visitar La Candelaria o que ya la han recorrido</div>
+    <div class="qv-travellers" id="lugar-viajeros"></div>
+    <div style="font-size:10px;color:var(--gold);font-weight:600;margin-top:10px;cursor:pointer" onclick="window.location.href='index.html#social-section'">
+      💬 Únete al chat de La Candelaria para coordinar tu visita →
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite" id="faq">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes<span class="section-new-badge">Nuevo</span></h2><div class="stnum">14</div></div>
+  <div class="faq-list">
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Cuál es el mejor museo para visitar en La Candelaria? <span class="faq-arrow">▼</span></div><div class="faq-a">El Museo del Oro es el más destacado con su colección de oro precolombino. El Museo Botero es gratuito y alberga la colección privada del artista. Ambos son imperdibles.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Es gratis entrar a La Candelaria? <span class="faq-arrow">▼</span></div><div class="faq-a">El barrio es público y gratuito para pasear. Los museos tienen entrada: el Museo del Oro cuesta $5.000, pero es gratis los domingos y muchos museos son gratuitos siempre.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿A qué hora abre el Museo del Oro? <span class="faq-arrow">▼</span></div><div class="faq-a">De martes a domingo de 9:00 am a 6:00 pm. Cerrado los lunes. Entrada general $5.000, estudiantes $3.000. Domingos gratis después de la 1:00 pm.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Se puede visitar La Candelaria en un día? <span class="faq-arrow">▼</span></div><div class="faq-a">Sí, el recorrido completo dura entre 2 y 4 horas caminando. Puedes combinarlo con el Museo del Oro y terminar con un ajiaco en los alrededores.</div></div>
+    <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Es seguro La Candelaria? <span class="faq-arrow">▼</span></div><div class="faq-a">Es el barrio más visitado de Bogotá y durante el día es seguro para turistas. De noche y en zonas poco concurridas, mantén las precauciones habituales de cualquier ciudad.</div></div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="comparar">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Comparar con lugares similares<span class="section-new-badge">Nuevo</span></h2><div class="stnum">15</div></div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Lugar</th><th>Score</th><th>Dificultad</th><th>Precio</th><th>Duración</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="current-row">
+        <td>La Candelaria<div style="font-size:9px;color:#777">Bogotá · Cundinamarca</div></td>
+        <td class="cmp-score">4.7</td>
+        <td style="font-size:10px">🟠 Media</td>
+        <td>$5.000</td>
+        <td style="font-size:10px">½ día</td>
+        <td><span style="font-size:10px;color:#92400E;font-weight:700">← Estás aquí</span></td>
+      </tr>
+      <tr>
+        <td>Monserrate<div style="font-size:9px;color:#777">Bogotá · Cundinamarca</div></td>
+        <td class="cmp-score">4.7</td>
+        <td style="font-size:10px">🟠 Media</td>
+        <td>$25.000</td>
+        <td style="font-size:10px">½ día</td>
+        <td><a class="cmp-link" href="Monserrate3.html">Ver →</a></td>
+      </tr>
+      <tr>
+        <td>Quebrada La Vieja<div style="font-size:9px;color:#777">Bogotá · Cundinamarca</div></td>
+        <td class="cmp-score">4.7</td>
+        <td style="font-size:10px">🟢 Fácil</td>
+        <td>Gratis</td>
+        <td style="font-size:10px">½ día</td>
+        <td><a class="cmp-link" href="quebrada-la-vieja-bogota.html">Ver →</a></td>
+      </tr>
+      <tr>
+        <td>Ciclovía de Bogotá<div style="font-size:9px;color:#777">Bogotá · Cundinamarca</div></td>
+        <td class="cmp-score">4.9</td>
+        <td style="font-size:10px">🟢 Fácil</td>
+        <td>Gratis</td>
+        <td style="font-size:10px">Domingos</td>
+        <td><a class="cmp-link" href="ciclovía-bogota.html">Ver →</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<section class="ssec bwhite" id="resenas">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reseñas de viajeros</h2><div class="stnum">16</div></div>
+  <div id="rvlist"></div>
+  <div class="wrvbox" style="margin-top:20px">
+    <div class="wrv-title">Escribir una reseña</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Fuiste como:</div>
+      <div class="rv-traveller-type" id="rv-traveller-type">
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Solo')">🧳 Solo</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Pareja')">❤️ Pareja</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Amigos')">👥 Amigos</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Familia')">👨‍👩‍👧 Familia</div>
+        <div class="rv-type-btn" onclick="selectTravellerType(this,'Mochilero')">🎒 Mochilero</div>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Califica por categoría:</div>
+      <div class="rv-score-selector">
+        <div class="rv-dim"><div class="rv-dim-label">Experiencia</div><div class="rv-stars-row" data-dim="experiencia"><span class="rv-star" data-v="1" onclick="setDimScore('experiencia',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('experiencia',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('experiencia',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('experiencia',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('experiencia',5)">★</span></div></div>
+        <div class="rv-dim"><div class="rv-dim-label">Guías</div><div class="rv-stars-row" data-dim="guias"><span class="rv-star" data-v="1" onclick="setDimScore('guias',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('guias',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('guias',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('guias',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('guias',5)">★</span></div></div>
+        <div class="rv-dim"><div class="rv-dim-label">Accesibilidad</div><div class="rv-stars-row" data-dim="acceso"><span class="rv-star" data-v="1" onclick="setDimScore('acceso',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('acceso',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('acceso',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('acceso',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('acceso',5)">★</span></div></div>
+        <div class="rv-dim"><div class="rv-dim-label">Valor / precio</div><div class="rv-stars-row" data-dim="valor"><span class="rv-star" data-v="1" onclick="setDimScore('valor',1)">★</span><span class="rv-star" data-v="2" onclick="setDimScore('valor',2)">★</span><span class="rv-star" data-v="3" onclick="setDimScore('valor',3)">★</span><span class="rv-star" data-v="4" onclick="setDimScore('valor',4)">★</span><span class="rv-star" data-v="5" onclick="setDimScore('valor',5)">★</span></div></div>
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:6px">Puntuación general:</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px"><span class="spk" data-v="1" onclick="spS(1)" onmouseenter="spH(1)" onmouseleave="spO()">★</span><span class="spk" data-v="2" onclick="spS(2)" onmouseenter="spH(2)" onmouseleave="spO()">★</span><span class="spk" data-v="3" onclick="spS(3)" onmouseenter="spH(3)" onmouseleave="spO()">★</span><span class="spk" data-v="4" onclick="spS(4)" onmouseenter="spH(4)" onmouseleave="spO()">★</span><span class="spk" data-v="5" onclick="spS(5)" onmouseenter="spH(5)" onmouseleave="spO()">★</span></div>
+    </div>
+    <input id="wrn" type="text" placeholder="Tu nombre (opcional)" class="wrinp" style="margin-bottom:8px">
+    <textarea id="wrt" placeholder="¿Qué fue lo más memorable? ¿Qué consejo darías? (mín. 15 caracteres)" class="wrinp"></textarea>
+    <button class="wrsub" onclick="subRv()">Publicar reseña →</button>
+    <div id="wrok" style="display:none;color:#22C55E;font-size:12px;margin-top:8px">✓ Reseña publicada</div>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwarm" id="contact">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">17</div></div>
+  <p class="stext" style="margin-bottom:18px">Usa cualquiera de estas opciones para obtener información, reservar o llegar al barrio histórico.</p>
+  <div class="cgrid">
+    <a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination=4.7120,-74.0680" target="_blank">🗺️ Google Maps</a>
+    <a class="cbtn dark" href="https://maps.apple.com/?daddr=4.7120,-74.0680" target="_blank">🍎 Apple Maps</a>
+    <a class="cbtn blue" href="https://www.bogota.gov.co" target="_blank">○ Sitio web</a>
+    <a class="cbtn blue" href="https://instagram.com/lacandelaria" target="_blank">Instagram</a>
+  </div>
+</div>
+</section>
+
+<section class="ssec bwhite">
+<div class="sin">
+  <div class="strow"><div class="sgl"></div><h2 class="stitle bc">También te puede interesar</h2><div class="stnum">18</div></div>
+  <div class="nbgrid"><a class="nbcard" href="Monserrate3.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c)">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg/1200px-2019_Bogot%C3%A1_-_Iglesia_de_Monserrate.jpg" alt="Monserrate" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">⛰️</span>
+                <div class="nbbdg" style="background:#F0FDF4;color:#14532d">Sitio turístico</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Monserrate</div>
+                <div class="nbloc">📍 Bogotá, Cundinamarca</div>
+                <div class="nbstars"><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.7 (4.820)</span></div>
+            </div>
+        </a><a class="nbcard" href="quebrada-la-vieja-bogota.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#0a2a1a,#1a3a2a)">
+                <img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=900&q=80" alt="Quebrada La Vieja" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🌿</span>
+                <div class="nbbdg" style="background:#F0FDF4;color:#14532d">Sitio turístico</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Quebrada La Vieja</div>
+                <div class="nbloc">📍 Bogotá, Cundinamarca</div>
+                <div class="nbstars"><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.7 (540)</span></div>
+            </div>
+        </a><a class="nbcard" href="ciclovía-bogota.html">
+            <div class="nbimg" style="background:linear-gradient(135deg,#0a2a3a,#0a1a2a)">
+                <img src="https://images.unsplash.com/photo-1516450360143-0f0a450e5acd?w=900&q=80" alt="Ciclovía de Bogotá" loading="lazy" onerror="this.style.display='none'">
+                <span class="nbemoji">🚴</span>
+                <div class="nbbdg" style="background:#EFF6FF;color:#1e3a8a">Experiencia</div>
+            </div>
+            <div class="nbbody">
+                <div class="nbname">Ciclovía de Bogotá</div>
+                <div class="nbloc">📍 Bogotá, Cundinamarca</div>
+                <div class="nbstars"><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span><span class="nbst on">★</span> <span style="font-size:9px;color:#888;margin-left:3px">4.9 (1.100)</span></div>
+            </div>
+        </a></div>
+</div>
+</section>
+
+<footer class="footer">
+<div class="ftop">
+  <div>
+    <a href="index.html" class="flogo">EXPLORA<em>CO</em></a>
+    <p class="fdesc">El directorio turístico más completo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
+  </div>
+  <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="index.html">Hostales</a><a class="flink" href="index.html">Gastronomía</a><a class="flink" href="index.html">Sitios turísticos</a><a class="flink" href="index.html">Eventos</a><a class="flink" href="index.html">Mapa cultural</a></div></div>
+  <div><div class="fctl">Destinos</div><div class="flinks"><a class="flink" href="Monserrate3.html">Bogotá</a><a class="flink" href="ciudad-perdida.html">Sierra Nevada</a><a class="flink" href="quebrada-la-vieja-bogota.html">Quebrada La Vieja</a><a class="flink" href="ciclovía-bogota.html">Ciclovía</a><a class="flink" href="hostal-walled-city.html">Cartagena</a></div></div>
+  <div><div class="fctl">Plataforma</div><div class="flinks"><a class="flink" href="publicar.html">Publicar lugar</a><a class="flink" href="sobre.html">Acerca de</a><a class="flink" href="contacto.html">Contacto</a><a class="flink" href="index.html">Términos</a></div></div>
+</div>
+<div class="fbot">
+  <div class="fcopy">© 2026 ExploraCO · Hecho con ❤️ en Colombia</div>
+  <div class="fb-links"><a href="index.html">Términos</a><a href="index.html">Privacidad</a></div>
+</div>
+</footer>
+
+<div class="lb" id="lb">
+  <button class="lbcl" onclick="closeLB()">✕</button>
+  <button class="lbnav lbprev" onclick="lbNav(-1)">‹</button>
+  <button class="lbnav lbnext" onclick="lbNav(1)">›</button>
+  <div id="lbm"></div>
+  <div class="lbcp" id="lbcp"></div>
+</div>
+
+<script>
+const MEDIA=[{"type":"photo","src":"https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg/1200px-Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg","cap":"Plaza de Bolívar y Catedral Primada"},{"type":"photo","src":"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Museo_del_Oro_Bogot%C3%A1.jpg/800px-Museo_del_Oro_Bogot%C3%A1.jpg","cap":"Fachada del Museo del Oro"},{"type":"photo","src":"https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Museo_Botero_Bogot%C3%A1.jpg/800px-Museo_Botero_Bogot%C3%A1.jpg","cap":"Fachada del Museo Botero"},{"type":"photo","src":"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Teatro_Col%C3%B3n_Bogot%C3%A1.jpg/800px-Teatro_Col%C3%B3n_Bogot%C3%A1.jpg","cap":"Teatro Colón"},{"type":"photo","src":"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Calle_empedrada_La_Candelaria.jpg/800px-Calle_empedrada_La_Candelaria.jpg","cap":"Calle empedrada de La Candelaria"}];
+var lbIdx=0;
+function openLB(i){lbIdx=i;renderLB();document.getElementById('lb').classList.add('open');}
+function renderLB(){
+  var m=MEDIA[lbIdx],el=document.getElementById('lbm');
+  if(m.type==='photo'&&m.src){
+    el.innerHTML='<img src="'+m.src+'" alt="'+m.cap+'" onerror="this.style.display=\'none\'">';
+  }else{
+    el.innerHTML='<div class="lbmp" style="background:#111">▶️</div>';
+  }
+  document.getElementById('lbcp').textContent=(lbIdx+1)+'/'+MEDIA.length+' · '+m.cap;
+}
+function lbNav(d){lbIdx=(lbIdx+d+MEDIA.length)%MEDIA.length;renderLB();}
+function closeLB(){document.getElementById('lb').classList.remove('open');}
+document.getElementById('lb').addEventListener('click',function(e){if(e.target===document.getElementById('lb'))closeLB();});
+
+// Map
+var map=L.map('mapel',{zoomControl:true,scrollWheelZoom:false}).setView([4.7120,-74.0680],14);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:19}).addTo(map);
+var ico=L.divIcon({html:'<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#E8A020;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:16px">🏛️</span></div>',iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-40],className:''});
+L.marker([4.7120,-74.0680],{icon:ico}).addTo(map).bindPopup('<b style="font-size:13px">La Candelaria</b><br><span style="font-size:11px;color:#666">📍 Bogotá, Cundinamarca</span>',{maxWidth:220}).openPopup();
+
+// Stars
+var ps=0;
+function spS(v){ps=v;document.querySelectorAll('.spk').forEach(function(s){var sv=parseInt(s.dataset.v);s.classList.toggle('s',sv<=v);s.classList.remove('h');});}
+function spH(v){document.querySelectorAll('.spk').forEach(function(s){var sv=parseInt(s.dataset.v);s.classList.toggle('h',sv<=v&&!(ps&&sv<=ps));});}
+function spO(){document.querySelectorAll('.spk').forEach(function(s){s.classList.remove('h');});}
+
+// Save/Visit
+var PLACE_ID=109;
+var mmSaved=[],mmVisited=[];
+try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
+try{mmVisited=JSON.parse(localStorage.getItem('mm_visited')||'[]');}catch(e){}
+function updateSaveBtn(){
+  var btn=document.getElementById('save-fab');
+  if(!btn)return;
+  var saved=mmSaved.indexOf(PLACE_ID)!==-1;
+  btn.className='save-fab '+(saved?'saved':'unsaved');
+  var icon=btn.querySelector('.save-fab-icon');
+  if(icon)icon.textContent=saved?'♥':'♡';
+  var lbl=document.getElementById('save-fab-lbl');
+  if(lbl)lbl.textContent=saved?'Guardado ✓':'Guardar en Mi Mapa';
+}
+function toggleSave(){
+  var idx=mmSaved.indexOf(PLACE_ID);
+  var saving=idx===-1;
+  if(saving)mmSaved.push(PLACE_ID);
+  else mmSaved.splice(idx,1);
+  try{localStorage.setItem('mm_saved',JSON.stringify(mmSaved));}catch(e){}
+  updateSaveBtn();
+  showToast(saving?'♥ Guardado en tu Mi Mapa':'Eliminado de Mi Mapa');
+}
+function showToast(msg){
+  var t=document.getElementById('save-toast');
+  if(!t)return;
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2200);
+}
+updateSaveBtn();
+
+// Itinerario tabs
+function switchItin(btn,panel){
+  document.querySelectorAll('.itab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('.itin-panel').forEach(function(p){p.classList.remove('on');});
+  btn.classList.add('on');
+  var el=document.getElementById('itin-'+panel);
+  if(el)el.classList.add('on');
+}
+
+// FAQ
+function toggleFaq(el){el.parentElement.classList.toggle('open');}
+
+// Dim scores (reviews)
+var dimScores={experiencia:0,guias:0,acceso:0,valor:0};
+var travellerType='';
+function setDimScore(dim,val){
+  dimScores[dim]=val;
+  var row=document.querySelector('.rv-stars-row[data-dim="'+dim+'"]');
+  if(!row)return;
+  row.querySelectorAll('.rv-star').forEach(function(s){s.classList.toggle('on',parseInt(s.dataset.v)<=val);});
+}
+function selectTravellerType(btn,type){
+  travellerType=type;
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+}
+
+// Quién va
+(function(){
+  var c=document.getElementById('lugar-viajeros');if(!c)return;
+  var users=[{i:'MR',bg:'#1a3a5c',tc:'#7eb8f0',n:'María'},{i:'CP',bg:'#3a1a0a',tc:'#f0a87e',n:'Carlos'},{i:'LA',bg:'#0a2a1a',tc:'#7ef0b8',n:'Laura'},{i:'DS',bg:'#1a051a',tc:'#f07ef0',n:'Diego'},{i:'VN',bg:'#0a1a3a',tc:'#7ea8f0',n:'Valentina'}];
+  c.innerHTML=users.map(function(u){return '<div class="qv-person"><div class="qv-av" style="background:'+u.bg+';color:'+u.tc+'">'+u.i+'</div><div class="qv-name">'+u.n+'</div></div>';}).join('');
+})();
+
+// Reviews
+var urvs=[];
+try{urvs=JSON.parse(localStorage.getItem('rv_lacandelaria')||'[]');}catch(e){}
+var seedRvs=[{n:'María',s:5,t:'Pasear por La Candelaria es como volver al siglo XIX. Las calles empedradas, el aroma a chocolate santafereño y los murales te transportan. El Museo del Oro al atardecer es mágico.',d:'Ene 2026',travType:'Pareja',dims:{experiencia:5,guias:4,acceso:4,valor:5}},{n:'Carlos',s:5,t:'Me enamoró el Pasaje Hernández y la Librería Merlin. La arquitectura colonial aquí es impresionante. Llevar zapatos cómodos, las calles son empedradas.',d:'Feb 2026',travType:'Solo',dims:{experiencia:5,guias:5,acceso:4,valor:5}},{n:'Laura',s:4,t:'Perfecto para un día cultural. Plaza de Bolívar, Catedral, Museo del Oro y el Chorro de Quevedo. Todo caminando y muy bonito. El ajiaco del almuerzo fue el mejor.',d:'Mar 2026',travType:'Amigos',dims:{experiencia:5,guias:4,acceso:5,valor:5}}];
+if(!urvs.length){urvs=seedRvs;try{localStorage.setItem('rv_lacandelaria',JSON.stringify(urvs));}catch(e){}}
+
+function addRv(r){
+  var cols=['#1a3a5c','#3a1a0a','#0a2a1a','#1a051a','#0a1a3a'];
+  var tcs=['#7eb8f0','#f0a87e','#7ef0b8','#f07ef0','#7ea8f0'];
+  var i=document.getElementById('rvlist').children.length%5;
+  var init=r.n.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+  var stH=[1,2,3,4,5].map(function(x){return '<span class="rvst'+(x<=r.s?' on':'')+'">\u2605</span>';}).join('');
+  var typeTag=r.travType?'<span style="background:#F1EFE8;color:#777;font-size:9px;padding:2px 7px;border-radius:3px;margin-right:4px">'+r.travType+'</span>':'';
+  var dimsHtml='';
+  if(r.dims&&r.dims.experiencia){
+    dimsHtml='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px">'+Object.keys(r.dims).filter(function(k){return r.dims[k]>0;}).map(function(k){return '<span style="font-size:9px;color:#777">'+k.charAt(0).toUpperCase()+k.slice(1)+': <b style="color:#1a1a1a">'+r.dims[k]+'\u2605</b></span>';}).join('')+'</div>';
+  }
+  var div=document.createElement('div');div.className='rvitem';
+  div.innerHTML='<div class="rvhead"><div class="rvav" style="background:'+cols[i]+';color:'+tcs[i]+'">'+init+'</div><div><div class="rvname">'+r.n+'</div><div class="rvdate">'+r.d+'</div></div><div class="rvstars">'+stH+'</div></div><div style="margin:5px 0 3px">'+typeTag+'<span class="rvtag" style="background:#F0FDF4;color:#166634;font-size:9px;padding:2px 7px;border-radius:3px">🏛️ Lugar</span></div>'+dimsHtml+'<div class="rvtx">'+r.t+'</div>';
+  document.getElementById('rvlist').insertBefore(div,document.getElementById('rvlist').firstChild);
+}
+document.getElementById('rvlist').innerHTML='';
+urvs.forEach(function(r){addRv(r);});
+
+function subRv(){
+  var n=(document.getElementById('wrn').value||'').trim();
+  var t=(document.getElementById('wrt').value||'').trim();
+  if(!ps){alert('Selecciona estrellas ★');return;}
+  if(t.length<15){alert('Escribe al menos 15 caracteres.');return;}
+  var now=new Date(),ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var rv={n:n||'Viajero',s:ps,t:t,d:ms[now.getMonth()]+' '+now.getFullYear(),travType:travellerType,dims:Object.assign({},dimScores)};
+  urvs.push(rv);
+  try{localStorage.setItem('rv_lacandelaria',JSON.stringify(urvs));}catch(e){}
+  addRv(rv);
+  document.getElementById('wrn').value='';document.getElementById('wrt').value='';
+  ps=0;document.querySelectorAll('.spk').forEach(function(s){s.classList.remove('s','h');});
+  dimScores={experiencia:0,guias:0,acceso:0,valor:0};
+  document.querySelectorAll('.rv-star').forEach(function(s){s.classList.remove('on');});
+  document.querySelectorAll('.rv-type-btn').forEach(function(b){b.classList.remove('on');});
+  travellerType='';
+  var ok=document.getElementById('wrok'),btn=document.querySelector('.wrsub');
+  btn.style.display='none';ok.style.display='block';
+  setTimeout(function(){btn.style.display='';ok.style.display='none';},3000);
+}
+
+/* ── HAMBURGER MENU ── */
+function toggleDrawer(){
+  var btn=document.getElementById('ham-btn');
+  var drawer=document.getElementById('mobile-drawer');
+  var open=drawer.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){var d=document.getElementById('mobile-drawer');if(d&&d.classList.contains('open'))toggleDrawer();}
+});
+
+/* ── STICKY SECTION NAV + PROGRESS ── */
+(function(){
+  var fill = document.getElementById('prog-fill');
+  var links = document.querySelectorAll('.sn-link');
+
+  function updateProgress(){
+    var s = window.scrollY;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = h > 0 ? Math.round(s/h*100) : 0;
+    if(fill) fill.style.width = pct + '%';
+  }
+
+  function updateActiveLink(){
+    var sections = [];
+    links.forEach(function(a){
+      var id = a.getAttribute('href');
+      var el = id ? document.querySelector(id) : null;
+      if(el) sections.push({el:el, a:a});
+    });
+    var scrollY = window.scrollY + 120;
+    var active = null;
+    sections.forEach(function(s){
+      if(s.el.offsetTop <= scrollY) active = s;
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(active) {
+      active.a.classList.add('active');
+      active.a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+  }
+
+  window.addEventListener('scroll', function(){
+    updateProgress();
+    updateActiveLink();
+  }, {passive:true});
+
+  updateProgress();
+  updateActiveLink();
+})();
+
+/* ── BACK TO TOP ── */
+(function(){
+  var btn = document.getElementById('btt-btn');
+  if(!btn) return;
+  window.addEventListener('scroll', function() {
+    btn.style.display = window.scrollY > 400 ? 'flex' : 'none';
+  }, {passive: true});
+  btn.onmouseenter = function() { this.style.background='#333'; this.style.color='#fff'; };
+  btn.onmouseleave = function() { this.style.background='var(--black)'; this.style.color='rgba(255,255,255,.6)'; };
+})();
+</script>
+<!-- ════ GUARDAR EN MI MAPA ════ -->
+<button class="save-fab unsaved" id="save-fab" onclick="toggleSave()">
+  <span class="save-fab-icon">♡</span>
+  <span id="save-fab-lbl">Guardar en Mi Mapa</span>
+</button>
+<div class="save-fab-toast" id="save-toast"></div>
+
+<!-- Back to top -->
+<button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
+  style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.3)">↑</button>
+<script>
+/* ══ COMPARTIR ══ */
+function toggleShareMenu(btn){var dd=document.getElementById('share-dropdown');if(dd)dd.classList.toggle('open');}
+function sharePlace(){
+  var url=location.href;
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url);}
+  showToast('🔗 Link copiado');
+}
+function shareToWhatsApp(){
+  window.open('https://wa.me/?text='+encodeURIComponent(location.href),'_blank');
+}
+</script>
+    <script src="usuario-session.js"></script>
+  <script src="pagina-connector.js"></script>
