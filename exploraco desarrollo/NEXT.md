@@ -61,13 +61,55 @@ Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
   Plaza de Eventos (Rock al Parque), Biblioteca Virgilio Barco, 3 tours, 9
   fotos. Fuente: ficha-parque-simon-bolivar.md. Archivos:
   `api/seed-parque-simon-bolivar.js` y `api/load-parque-simon-bolivar-api.js`.
+- **club-octava.html** (slug `club-octava`, cat sitio): el club de techno/house
+  de Fourvenues. Datos reales: Cra 8 No. 63-41 (Chapinero), 100+ eventos,
+  50.000+ asistentes, 200+ artistas, aforo 800, cocteles 30.000-65.000,
+  3 tours, 6 fotos. Fuente: ficha-club-octava.md. Archivos:
+  `api/seed-club-octava.js` y `api/load-club-octava-api.js`.
+- **theatron.html** (slug `theatron`, cat sitio): el megaclub LGBTQ+ mas grande
+  de Latinoamerica. Datos reales: 20 salas, capacidad 5.000-7.000, epicentro
+  del Chapigay, World's 100 Best Clubs 2024 (#68), cover 30.000/50.000,
+  3 tours, 6 fotos. Fuente: ficha-theatron.md. Archivos: `api/seed-theatron.js`
+  y `api/load-theatron-api.js`.
+- **video-club.html** (slug `video-club`, cat sitio): el club de la Cll 64
+  #13-09 frente al Cosmos. Datos reales: 3 ambientes (chill out, techno/house,
+  terraza), evento "Escandalo 25" ($104.000), Kevin Saunderson (may-2025),
+  3 tours, 6 fotos. Fuente: ficha-video-club.md. Archivos:
+  `api/seed-video-club.js` y `api/load-video-club-api.js`.
+- **mad-radio.html** (slug `mad-radio`, cat sitio): el club de 3 pisos del
+  Chico con tienda de vinilos. Datos reales: Cra 14A #82-42, tech-house,
+  reggae/rock, terraza, mie-sab desde 8PM, 3 tours, 6 fotos. Fuente:
+  ficha-mad-radio.md. Archivos: `api/seed-mad-radio.js` y
+  `api/load-mad-radio-api.js`.
+- **gate-club.html** (slug `gate-club`, cat sitio): el techno/house de
+  Ortezal. Datos reales: Tv. 39A #20A-69 (Puente Aranda), eventos 2026
+  (Energy Transfer, Europe Tour), cerveza $12.000, 3 tours, 6 fotos. Fuente:
+  ficha-gate-club.md. Archivos: `api/seed-gate-club.js` y
+  `api/load-gate-club-api.js`.
+- **radio-estrella.html** (slug `radio-estrella`, cat sitio): el trance/fast
+  techno/hard house/UKG del Chico. Datos reales: Cra 15 #99-23, a 81 m de
+  Chico Plaza, vie-sab 10PM-5AM, 3 tours, 6 fotos. Fuente:
+  ficha-radio-estrella.md. Archivos: `api/seed-radio-estrella.js` y
+  `api/load-radio-estrella-api.js`.
+- **espacio-kinder.html** (slug `espacio-kinder`, cat sitio): el megaclub
+  heredero del Kaputt Klub. Datos reales: abrio 31-oct-2025 en el excolegio
+  de la Av. Calle 63 #15-70 (Barrios Unidos), 5 pisos, 7 salas, galeria
+  250 m2, aforo hasta 4.500, bono 30.000, 3 tours, 9 fotos. Fuente:
+  ficha-espacio-kinder.md. Archivos: `api/seed-espacio-kinder.js` y
+  `api/load-espacio-kinder-api.js`.
+- **radio-berlin.html** (slug `radio-berlin`, cat sitio): "La Casa del
+  Techno". Datos reales: nacio 2010 frente a la Plaza de Toros (La Macarena,
+  cerro jul 2023), resucito en Cra 13 #64-13 (Chapinero), cabina-jaula,
+  capacidad 400-500, miercoles de house gratis, RadioBerlin Academy,
+  3 tours, 7 fotos. Fuente: ficha-radio-berlin.md. Archivos:
+  `api/seed-radio-berlin.js` y `api/load-radio-berlin-api.js`.
 
 Todas verificadas en produccion: render 200 con las 9 secciones del motor
 (descripcion, dificultad, entradas, tours, checklist, itinerario, fauna,
 secretos, regulaciones, galeria, mapa `#mapel`, FAQ, resenas vacio, contacto,
-relacionados), sitemap fresco (cache MISS) incluye los 10 slugs, y
+relacionados), sitemap fresco (cache MISS) incluye los 18 slugs, y
 `/api/destinos` las lista con `destacado=true` y `rating=0`. Total destinos:
-92.
+100.
 
 **BUG-022 (hallazgo al investigar imagenes de Bogota):** las URLs de
 Wikimedia Commons de lacandelaria usaban tamano de thumbnail `1200px` (no
@@ -91,6 +133,10 @@ Ver BUGS_HISTORICOS.md BUG-022.
 3. TSK-016 (Widget "Quien va este mes") del backlog Social.
 4. Materializar ADR-008: crear la carpeta `db/migrations/` con el SQL
    del fix de BUG-021 versionado, como repositorio unico de estructura BD.
+5. Diferido por decision de usuario: las paginas de categoría `evento`
+   para la escena electronica de Bogota (estos 8 venues quedaron en la
+   band "Lugares" con cat `sitio`; los eventos concretos se retomaran
+   en una tarea posterior).
 5. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
    RESEND_API_KEY).
 

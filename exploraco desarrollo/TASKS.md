@@ -146,6 +146,109 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   laguna, Rock al Parque y Virgilio Barco; sitemap (MISS) incluye el slug;
   `/api/destinos` lo lista destacado rating 0 (id f8085f9a-...).
 
+### TSK-028: Pagina dinamica club-octava.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Octava Club (cat sitio, slug `club-octava`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: club de
+  techno/house de Fourvenues en Cra 8 No. 63-41 (Chapinero), 100+ eventos,
+  50.000+ asistentes, 200+ artistas internacionales, aforo 800, cocteles
+  30.000-65.000, 3 tours, 6 fotos verificadas (curl 200), 5 FAQs. Fuente:
+  ficha-club-octava.md. Archivos: `api/seed-club-octava.js` y
+  `api/load-club-octava-api.js`.
+- **Evidencia:** `/club-octava.html` 200 (66KB, 9 secciones) con techno y
+  Fourvenues; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 6b1404c1-...).
+
+### TSK-029: Pagina dinamica theatron.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Theatron (cat sitio, slug `theatron`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales:
+  megaclub LGBTQ+ con 20 salas tematicas, capacidad 5.000-7.000, epicentro
+  del Chapigay, World's 100 Best Clubs 2024 (#68), cover 30.000 antes de las
+  10PM y 50.000 despues, shows drag, 3 tours, 6 fotos verificadas (curl 200),
+  5 FAQs. Fuente: ficha-theatron.md. Archivos: `api/seed-theatron.js` y
+  `api/load-theatron-api.js`.
+- **Evidencia:** `/theatron.html` 200 (66KB, 9 secciones) con 20 salas y
+  Chapigay; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
+  rating 0 (id 842c130f-...).
+
+### TSK-030: Pagina dinamica video-club.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Video Club (cat sitio, slug `video-club`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: club de
+  la Cll 64 #13-09 (Chapinero, frente al Cosmos), 3 ambientes (chill out,
+  techno/house, terraza), evento "Escandalo 25" ($104.000 anytime), Kevin
+  Saunderson (may-2025), 3 tours, 6 fotos verificadas (curl 200), 5 FAQs.
+  Fuente: ficha-video-club.md. Archivos: `api/seed-video-club.js` y
+  `api/load-video-club-api.js`.
+- **Evidencia:** `/video-club.html` 200 (67KB, 9 secciones) con chill out y
+  Escandalo; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id c4a1c21e-...).
+
+### TSK-031: Pagina dinamica mad-radio.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Mad Radio (cat sitio, slug `mad-radio`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: club de
+  la Cra 14A #82-42 (Chico/Chapinero), 3 pisos (barra, tech-house, reggae/rock
+  y terraza), tienda de vinilos, abierto mie-sab desde 8PM, fundado 2017,
+  3 tours, 6 fotos verificadas (curl 200), 5 FAQs. Fuente: ficha-mad-radio.md.
+  Archivos: `api/seed-mad-radio.js` y `api/load-mad-radio-api.js`.
+- **Evidencia:** `/mad-radio.html` 200 (66KB, 9 secciones) con vinilos y
+  tech-house; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 49e5208b-...).
+
+### TSK-032: Pagina dinamica gate-club.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Gate Club (cat sitio, slug `gate-club`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: club de
+  techno/house de la Tv. 39A #20A-69 (Ortezal, Puente Aranda), eventos 2026
+  (Energy Transfer, Europe Tour), cerveza $12.000, 3 tours, 6 fotos verificadas
+  (curl 200), 5 FAQs. Fuente: ficha-gate-club.md. Archivos:
+  `api/seed-gate-club.js` y `api/load-gate-club-api.js`.
+- **Evidencia:** `/gate-club.html` 200 (65KB, 9 secciones) con Ortezal y
+  Energy Transfer; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 02141eae-...).
+
+### TSK-033: Pagina dinamica radio-estrella.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Radio Estrella (cat sitio, slug `radio-estrella`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: club de
+  trance/fast techno/hard house/UKG de la Cra 15 #99-23 (Chico), abierto
+  vie-sab 10PM-5AM, a 81 m de Chico Plaza, 3 tours, 6 fotos verificadas (curl
+  200), 5 FAQs. Fuente: ficha-radio-estrella.md. Archivos:
+  `api/seed-radio-estrella.js` y `api/load-radio-estrella-api.js`.
+- **Evidencia:** `/radio-estrella.html` 200 (64KB, 9 secciones) con trance y
+  UKG; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
+  rating 0 (id afe9610d-...).
+
+### TSK-034: Pagina dinamica espacio-kinder.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Espacio Kinder (Proyecto Kinder, cat sitio, slug
+  `espacio-kinder`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: megaclub heredero del Kaputt Klub, abrio 31-oct-2025 en el ex
+  Colegio Nuestra Senora de Chiquinquira (Av. Calle 63 #15-70, Barrios
+  Unidos), 5 pisos, 7 salas, galeria 250 m2, auditorio 1.500, aforo hasta
+  4.500, bono 30.000 COP, 3 tours, 9 fotos verificadas (curl 200), 5 FAQs.
+  Fuente: ficha-espacio-kinder.md. Archivos: `api/seed-espacio-kinder.js` y
+  `api/load-espacio-kinder-api.js`.
+- **Evidencia:** `/espacio-kinder.html` 200 (69KB, 9 secciones) con Kaputt y
+  colegio; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
+  rating 0 (id 5a53a6cd-...).
+
+### TSK-035: Pagina dinamica radio-berlin.html (Lugares de electronica)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Radio Berlin (cat sitio, slug `radio-berlin`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: "La Casa
+  del Techno", nacio 2010 frente a la Plaza de Toros (La Macarena, cerro jul
+  2023) y resucito en Cra 13 #64-13 (Chapinero), cabina-jaula, capacidad
+  400-500, miercoles de house gratis, gratis antes de 22:00 los viernes,
+  RadioBerlin Academy, 3 tours, 7 fotos verificadas (curl 200), 5 FAQs.
+  Fuente: ficha-radio-berlin.md. Archivos: `api/seed-radio-berlin.js` y
+  `api/load-radio-berlin-api.js`.
+- **Evidencia:** `/radio-berlin.html` 200 (68KB, 9 secciones) con jaula,
+  Macarena y Academy; sitemap (MISS) incluye el slug; `/api/destinos` lo
+  lista destacado rating 0 (id 30e67f95-...).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
