@@ -6,7 +6,7 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ### Sesion actual (Agosto 2026) - Paginas dinamicas lacandelaria.html y bogota.html
 
-Se crearon dos paginas de destino dinamicas nuevas servidas por el motor
+Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
 `api/pagina-destino.js` (patron monserrate.html), cargadas en produccion:
 
 - **lacandelaria.html** (slug `lacandelaria`, cat sitio): pagina de La
@@ -21,13 +21,28 @@ Se crearon dos paginas de destino dinamicas nuevas servidas por el motor
   Colombia a escala ciudad con guia completa (itinerario 3 dias, 8 entradas
   de museos reales, 5 tours, 7 fotos, 5 FAQs). Fuente: ficha-bogota.md.
   Mismo patron de archivos: `api/seed-bogota.js` y `api/load-bogota-api.js`.
+- **museo-del-oro.html** (slug `museo-del-oro`, cat sitio): el museo mas
+  visitado de Colombia. Datos reales: Balsa Muisca (El Dorado), Poporo
+  Quimbaya, 4 salas permanentes, $5.000 (gratis domingos), 3 tours, 6 fotos.
+  Fuente: ficha-museo-del-oro.md. Archivos: `api/seed-museo-del-oro.js` y
+  `api/load-museo-del-oro-api.js`.
+- **museo-botero.html** (slug `museo-botero`, cat sitio): arte gratis de
+  clase mundial. Datos reales: 208 obras (123 Botero + 85 internacionales:
+  Picasso, Monet, Dali), entrada gratis, 3 tours, 4 fotos. Fuente:
+  ficha-museo-botero.md. Archivos: `api/seed-museo-botero.js` y
+  `api/load-museo-botero-api.js`.
+- **jardin-botanico-bogota.html** (slug `jardin-botanico-bogota`, cat sitio):
+  el pulmon verde. Datos reales: Tropicario (invernadero mas grande de
+  Suramerica), 34 colecciones vivas, tarifas 2026 ($6.000/$8.000), 3 tours,
+  4 fotos. Fuente: ficha-jardin-botanico.md. Archivos:
+  `api/seed-jardin-botanico.js` y `api/load-jardin-botanico-api.js`.
 
-Ambas paginas verificadas en produccion: render 200 con todas las secciones
-del motor (hero, dificultad+matriz, entradas, tours, checklist, itinerario,
-fauna, secretos, regulaciones, galeria, mapa `#mapel` iframe Google, FAQ,
-resenas vacio, contacto, relacionados), sitemap fresco (cache MISS) incluye
-ambos slugs, y `/api/destinos` las lista con `destacado=true` y `rating=0`.
-Total destinos: 84.
+Todas verificadas en produccion: render 200 con las 9 secciones del motor
+(descripcion, dificultad, entradas, tours, checklist, itinerario, fauna,
+secretos, regulaciones, galeria, mapa `#mapel`, FAQ, resenas vacio, contacto,
+relacionados), sitemap fresco (cache MISS) incluye los 5 slugs, y
+`/api/destinos` las lista con `destacado=true` y `rating=0`. Total destinos:
+87.
 
 **BUG-022 (hallazgo al investigar imagenes de Bogota):** las URLs de
 Wikimedia Commons de lacandelaria usaban tamano de thumbnail `1200px` (no

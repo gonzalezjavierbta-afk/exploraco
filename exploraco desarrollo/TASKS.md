@@ -46,6 +46,41 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   name=Bogota, cat=sitio, destacado=True, rating=0, published (id
   adc2225f-0086-4381-97b2-6f8bb157fe00). Total destinos: 84.
 
+### TSK-020: Pagina dinamica museo-del-oro.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Museo del Oro (cat sitio, slug `museo-del-oro`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales:
+  Balsa Muisca, Poporo Quimbaya, 4 salas permanentes, 5 entradas, 3 tours,
+  6 fotos verificadas (curl 200), 5 FAQs. Fuente: ficha-museo-del-oro.md.
+  Archivos: `api/seed-museo-del-oro.js` y `api/load-museo-del-oro-api.js`.
+- **Evidencia:** `/museo-del-oro.html` 200 (66KB, 9 secciones) con Balsa
+  Muisca, El Dorado y domingos gratis; sitemap (MISS) incluye el slug;
+  `/api/destinos` lo lista destacado rating 0 (id 508b0bc4-...).
+
+### TSK-021: Pagina dinamica museo-botero.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Museo Botero (cat sitio, slug `museo-botero`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales:
+  208 obras (123 Botero + 85 internacionales), entrada gratis siempre,
+  4 entradas, 3 tours, 4 fotos verificadas (curl 200), 5 FAQs. Fuente:
+  ficha-museo-botero.md. Archivos: `api/seed-museo-botero.js` y
+  `api/load-museo-botero-api.js`.
+- **Evidencia:** `/museo-botero.html` 200 (65KB, 9 secciones) con Picasso,
+  Monet y gratis; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 7fd0967b-...).
+
+### TSK-022: Pagina dinamica jardin-botanico-bogota.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Jardin Botanico Jose Celestino Mutis (cat sitio,
+  slug `jardin-botanico-bogota`, `status='published'`, `destacado=true`,
+  rating 0) con datos reales: Tropicario (invernadero mas grande de
+  Suramerica), 34 colecciones vivas, 6 entradas con tarifas 2026, 3 tours,
+  4 fotos verificadas (curl 200), 5 FAQs. Fuente: ficha-jardin-botanico.md.
+  Archivos: `api/seed-jardin-botanico.js` y `api/load-jardin-botanico-api.js`.
+- **Evidencia:** `/jardin-botanico-bogota.html` 200 (67KB, 9 secciones) con
+  Tropicario y Mutis; sitemap (MISS) incluye el slug; `/api/destinos` lo
+  lista destacado rating 0 (id ca5d7941-...).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
