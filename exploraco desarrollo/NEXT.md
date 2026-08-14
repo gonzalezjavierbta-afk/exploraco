@@ -4,7 +4,57 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
+### Sesion actual (Agosto 2026) - Paginas dinamicas lacandelaria.html y bogota.html
+
+Se crearon dos paginas de destino dinamicas nuevas servidas por el motor
+`api/pagina-destino.js` (patron monserrate.html), cargadas en produccion:
+
+- **lacandelaria.html** (slug `lacandelaria`, cat sitio): pagina de La
+  Candelaria con datos del formulario admin (fuente: ficha-lacandelaria.md),
+  `status='published'`, `destacado=true`, rating en 0 hasta resenas reales
+  (decision de producto, ver DECISIONS.md ADR-009). Carga via API de admin
+  (`POST /api/admin-destinos` con Bearer exploraco12345) porque no hay
+  DATABASE_URL local. Archivos: `api/seed-lacandelaria.js` (upsert SQL
+  idempotente, disponible para quien tenga la URL de Neon) y
+  `api/load-lacandelaria-api.js` (loader idempotente: borra previo + POST).
+- **bogota.html** (slug `bogota`, cat sitio): pagina de la capital de
+  Colombia a escala ciudad con guia completa (itinerario 3 dias, 8 entradas
+  de museos reales, 5 tours, 7 fotos, 5 FAQs). Fuente: ficha-bogota.md.
+  Mismo patron de archivos: `api/seed-bogota.js` y `api/load-bogota-api.js`.
+
+Ambas paginas verificadas en produccion: render 200 con todas las secciones
+del motor (hero, dificultad+matriz, entradas, tours, checklist, itinerario,
+fauna, secretos, regulaciones, galeria, mapa `#mapel` iframe Google, FAQ,
+resenas vacio, contacto, relacionados), sitemap fresco (cache MISS) incluye
+ambos slugs, y `/api/destinos` las lista con `destacado=true` y `rating=0`.
+Total destinos: 84.
+
+**BUG-022 (hallazgo al investigar imagenes de Bogota):** las URLs de
+Wikimedia Commons de lacandelaria usaban tamano de thumbnail `1200px` (no
+estandar; Commons solo acepta 20/40/60/120/250/330/500/960/1280/1920/3840)
+y un hash de directorio `6/6f` incorrecto para la hero -- ambas devuelven
+HTTP 400. Las URLs de bogota.html se verificaron con `curl.exe` (200) antes
+de guardarse. Pendiente: corregir las URLs de imagenes de lacandelaria
+(hero `Plaza_de_Bolivar` y galeria `Museo_del_Oro`/`Museo_Botero`/`Teatro_Colon`)
+usando tamano estandar 960px y los hashes reales de la API de Commons
+(`action=query&titles=File:...&prop=imageinfo&iiprop=url&iiurlwidth=960`).
+Ver BUGS_HISTORICOS.md BUG-022.
+
+## Que sigue (proxima accion inmediata)
+
+1. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
+   con curl y re-ejecutar `node api/load-lacandelaria-api.js` para que la
+   hero y la galeria carguen (hoy el HTML se renderiza pero las imagenes
+   del hero/galeria pueden estar rotas por tamano 1200px + hash 6/6f).
+2. Cargar tags reales en los destinos de comida/hostal/evento (varios
+   estan vacios, lo que degrada el comparador a "relleno por rating").
+3. TSK-016 (Widget "Quien va este mes") del backlog Social.
+4. Materializar ADR-008: crear la carpeta `db/migrations/` con el SQL
+   del fix de BUG-021 versionado, como repositorio unico de estructura BD.
+5. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
+   RESEND_API_KEY).
+
+### Sesion previa (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
 
 Se verifico el flujo de TSK-015 (Quick-Rating) en produccion y se
 descubrio que los 4 POST de interaccion (`resena`, `rating`, `visita`,

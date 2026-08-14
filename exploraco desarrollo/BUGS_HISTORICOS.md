@@ -370,3 +370,19 @@ No se toco el codigo de `api/interacciones.js` -- el bug era 100% de estado de B
 
 **Estado:** Resuelto. Prevencion: se crea ADR-008 (ver DECISIONS.md): toda alteracion de schema o trigger debe vivir en el repositorio como archivo `.sql` versionado y aplicarse via migracion acumulativa, NUNCA como SQL suelto en la consola de Neon -- y todo codigo nuevo de BD debe registrarse en BUGS_HISTORICOS.md/DECISIONS.md al crearse.
 
+## BUG-022: URLs de imagenes Wikimedia Commons con tamano de thumbnail invalido (1200px) + hash de archivo incorrecto
+
+**Contexto:** Al investigar imagenes para la pagina dinamica `bogota.html` (mismo patron que lacandelaria), se verificaron las URLs de Wikimedia Commons usadas en `seed-lacandelaria.js` y en `ficha-lacandelaria.md`. Las verificaciones con `curl.exe -w "%{http_code}"` sobre `https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg/1200px-...` devolvieron HTTP 400 con el cuerpo "Use thumbnail sizes listed on https://w.wiki/GHai".
+
+**Causa raiz (2 problemas):**
+1) **Tamano invalido:** Wikimedia Commons solo acepta thumbnails en los tamanos estandar definidos en $wgThumbnailSteps (20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840). La URL de lacandelaria usaba `1200px-` (y tambien `800px-` en las fotos de galeria), que NO estan en la lista -- hotlinking directo de un tamano no estandar devuelve 400. Las URLs que SI funcionan usan `960px-` (o el original sin /thumb/).
+2) **Hash de archivo incorrecto:** la URL de la hero de lacandelaria (`6/6f/Plaza_de_Bol%C3%ADvar%2C_Bogot%C3%A1.jpg`) apunta a un hash `6/6f` que NO corresponde al archivo real. El archivo correcto es `File:Plaza de Bolivar - Bogota.JPG` cuyo hash real es `6/64/` (verificado via API de Commons: `action=query&titles=File:...&prop=imageinfo&iiprop=url&iiurlwidth=960`). Con hash incorrecto la imagen no existe (los /thumb/ con hash equivocado devuelven 400/404).
+
+**Por que no se detecto antes:** las verificaciones previas de lacandelaria2/3 y de la pagina dinamica solo comprobaron que la cadena de la URL estuviera presente en el HTML (`$c.Contains(...)`), NO que la imagen realmente se descargara con HTTP 200. La pagina renderiza 200 igual (la imagen rota simplemente no se muestra, o cae al fallback hero_bg), por lo que el defecto era invisible en los smoke tests de estructura.
+
+**Fix:** para `bogota.html` se usaron SOLO URLs verificadas con `curl.exe` (HTTP 200) obtenidas via la API de Commons con `iiurlwidth=960` (tamano estandar), y se descarto el parametro `utm_source` que la API agrega (no es necesario para el hotlink). Para lacandelaria, la URL de la hero (`1200px` + hash `6/6f`) es sospechosa del mismo bug -- queda pendiente re-verificar con curl y corregir con el tamano estandar 960px y el hash real del archivo.
+
+**Verificacion:** con `curl.exe -s -o NUL -w "%{http_code}"` las 7 URLs de bogota.html devuelven 200 (skyline, plaza, teleferico, santuario, transmilenio, usaquen, museo del oro). Antes de esa verificacion, `curl` sobre el `1200px` de lacandelaria devolvia 400. La pagina dinamica bogota.html renderiza 200 y el hero muestra la imagen real.
+
+**Estado:** Resuelto para bogota (URLs verificadas). Pendiente conocido: re-verificar y corregir las URLs de las imagenes de lacandelaria (hero y galeria) que usan tamano 1200px/800px y el hash `6/6f` incorrecto. Prevencion: TODA URL de Wikimedia Commons en seeds/fichas debe verificarse con `curl.exe -w "%{http_code}"` (esperar 200) ANTES de guardarla, y usar tamano estandar 960px (o el original) -- nunca 1200px/800px inventados, y nunca un hash de directorio copiado de otra pagina.
+

@@ -10,6 +10,44 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+## Prioridad PAGINAS DINAMICAS - Paginas de destino servidas por el motor
+
+> Series de paginas de destino dinamicas (patron monserrate.html) cargadas
+> en produccion via `api/pagina-destino.js`. La carga se hace con la API de
+> admin (`POST /api/admin-destinos`, Bearer exploraco12345) porque no hay
+> DATABASE_URL local; el seed equivalente (`api/seed-*.js`, upsert SQL
+> idempotente) queda versionado para quien tenga la URL de Neon. Mismo
+> patron para ambas: seed (datos del formulario) + loader idempotente
+> (borra previo + POST). Ver DECISIONS.md ADR-009 (rating 0 hasta resenas
+> reales + destacado editorial) y BUGS_HISTORICOS.md BUG-022 (imagenes).
+
+### TSK-018: Pagina dinamica lacandelaria.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de La Candelaria (cat sitio, slug `lacandelaria`,
+  `status='published'`, `destacado=true`, rating 0). Datos del formulario
+  admin; fuente ficha-lacandelaria.md. Archivos: `api/seed-lacandelaria.js`
+  y `api/load-lacandelaria-api.js`.
+- **Evidencia:** `/lacandelaria.html` 200 con todas las secciones del motor;
+  sitemap (cache MISS) incluye el slug; `/api/destinos` lo lista destacado
+  rating 0 (id 72433a29-...). Pendiente conocido: corregir URLs de imagenes
+  (BUG-022) - ver NEXT.md.
+
+### TSK-019: Pagina dinamica bogota.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Bogota a escala ciudad (cat sitio, slug `bogota`,
+  `status='published'`, `destacado=true`, rating 0) con guia completa:
+  itinerario 3 dias, 8 entradas de museos reales (Museo del Oro, Botero,
+  Nacional, MAMBO, Monserrate), 5 tours, 7 fotos verificadas, 5 FAQs.
+  Fuente: ficha-bogota.md. Archivos: `api/seed-bogota.js` y
+  `api/load-bogota-api.js`.
+- **Evidencia:** `/bogota.html` 200 (74KB) con todas las secciones (canonical
+  exploraco.co/bogota.html, mapa #mapel, tours Monserrate, ajiaco);
+  sitemap (cache MISS) incluye el slug (91 urls); `/api/destinos` lo lista
+  name=Bogota, cat=sitio, destacado=True, rating=0, published (id
+  adc2225f-0086-4381-97b2-6f8bb157fe00). Total destinos: 84.
+
+---
+
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
 
 > Nota de cierre (Sprint 2 - Paridad Visual, ver DECISIONS.md ADR-006): las
