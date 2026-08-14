@@ -81,6 +81,71 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Tropicario y Mutis; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id ca5d7941-...).
 
+### TSK-023: Pagina dinamica plaza-de-bolivar.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de la Plaza de Bolivar (cat sitio, slug `plaza-de-bolivar`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: fundada
+  como Plaza Mayor en 1539, estatua de Tenerani, Catedral Primada, Capitolio,
+  Palacio de Justicia y Palacio Lievano, 5 entradas gratis, 3 tours, 7 fotos
+  verificadas (curl 200), 5 FAQs. Fuente: ficha-plaza-de-bolivar.md. Archivos:
+  `api/seed-plaza-de-bolivar.js` y `api/load-plaza-de-bolivar-api.js`.
+- **Evidencia:** `/plaza-de-bolivar.html` 200 (68KB, 9 secciones) con Capitolio,
+  Tenerani y acceso 24 horas; sitemap (MISS) incluye el slug; `/api/destinos`
+  lo lista destacado rating 0 (id 63586c9a-...).
+
+### TSK-024: Pagina dinamica museo-nacional.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Museo Nacional de Colombia (cat sitio, slug
+  `museo-nacional`, `status='published'`, `destacado=true`, rating 0) con datos
+  reales: fundado en 1823, antiguo Panoptico de Thomas Reed (Monumento Nacional
+  1975), 17 salas, tarifas 2026 ($6.000 colombianos / $15.000 extranjeros,
+  miercoles tarde gratis), 3 tours, 7 fotos verificadas (curl 200), 5 FAQs.
+  Fuente: ficha-museo-nacional.md. Archivos: `api/seed-museo-nacional.js` y
+  `api/load-museo-nacional-api.js`.
+- **Evidencia:** `/museo-nacional.html` 200 (67KB, 9 secciones) con 17 salas y
+  Thomas Reed; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 61c31f08-...).
+
+### TSK-025: Pagina dinamica quebrada-la-vieja.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de la Quebrada La Vieja (cat sitio, slug
+  `quebrada-la-vieja`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: sendero de 2,7 km hasta 3.200 m, registro previo obligatorio
+  (app Caminos de los Cerros Orientales / caminos.eaab.gov.co), aforos EAAB
+  (775/419), tramos Claro de Luna-La Virgen-Paramo, 3 tours, 7 fotos verificadas
+  (curl 200), 5 FAQs. Fuente: ficha-quebrada-la-vieja.md. Archivos:
+  `api/seed-quebrada-la-vieja.js` y `api/load-quebrada-la-vieja-api.js`.
+- **Evidencia:** `/quebrada-la-vieja.html` 200 (68KB, 9 secciones) con registro
+  y Rosales; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
+  rating 0 (id 5c763772-...).
+
+### TSK-026: Pagina dinamica cerro-de-guadalupe.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Cerro de Guadalupe (cat sitio, slug
+  `cerro-de-guadalupe`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: 3.360 m (mas alto que Monserrate), estatua de la Virgen (15 m)
+  de Gustavo Arcila Uribe, ermita, via carreteable de 1967, sin funicular
+  (correccion de dato erroneo), acceso gratis, 3 tours, 7 fotos verificadas
+  (curl 200), 5 FAQs. Fuente: ficha-cerro-de-guadalupe.md. Archivos:
+  `api/seed-cerro-de-guadalupe.js` y `api/load-cerro-de-guadalupe-api.js`.
+- **Evidencia:** `/cerro-de-guadalupe.html` 200 (67KB, 9 secciones) con 3.360,
+  Arcila y Choachi; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 3d85b44b-...).
+
+### TSK-027: Pagina dinamica parque-simon-bolivar.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Parque Metropolitano Simon Bolivar (cat sitio, slug
+  `parque-simon-bolivar`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: 113 hectareas (Ley 31 de 1979, inaugurado 1991 sobre la
+  Hacienda El Salitre), laguna navegable, 4 km de ciclorruta, Plaza de Eventos
+  (80.000-140.000, Rock al Parque), Biblioteca Virgilio Barco, 5 entradas, 3
+  tours, 9 fotos verificadas (curl 200), 5 FAQs. Fuente:
+  ficha-parque-simon-bolivar.md. Archivos: `api/seed-parque-simon-bolivar.js`
+  y `api/load-parque-simon-bolivar-api.js`.
+- **Evidencia:** `/parque-simon-bolivar.html` 200 (68KB, 9 secciones) con
+  laguna, Rock al Parque y Virgilio Barco; sitemap (MISS) incluye el slug;
+  `/api/destinos` lo lista destacado rating 0 (id f8085f9a-...).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend

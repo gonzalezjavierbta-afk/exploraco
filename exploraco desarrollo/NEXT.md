@@ -36,13 +36,38 @@ Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
   Suramerica), 34 colecciones vivas, tarifas 2026 ($6.000/$8.000), 3 tours,
   4 fotos. Fuente: ficha-jardin-botanico.md. Archivos:
   `api/seed-jardin-botanico.js` y `api/load-jardin-botanico-api.js`.
+- **plaza-de-bolivar.html** (slug `plaza-de-bolivar`, cat sitio): el corazon
+  civico de Colombia. Datos reales: Plaza Mayor 1539, estatua de Tenerani,
+  Catedral, Capitolio, Palacio de Justicia y Palacio Lievano, 3 tours, 7 fotos.
+  Fuente: ficha-plaza-de-bolivar.md. Archivos: `api/seed-plaza-de-bolivar.js`
+  y `api/load-plaza-de-bolivar-api.js`.
+- **museo-nacional.html** (slug `museo-nacional`, cat sitio): el museo mas
+  antiguo del pais en el antiguo Panoptico de Thomas Reed. Datos reales: 17
+  salas, tarifas 2026 ($6.000/$15.000, miercoles tarde gratis), 3 tours, 7
+  fotos. Fuente: ficha-museo-nacional.md. Archivos: `api/seed-museo-nacional.js`
+  y `api/load-museo-nacional-api.js`.
+- **quebrada-la-vieja.html** (slug `quebrada-la-vieja`, cat sitio): el sendero
+  mas famoso de Bogota. Datos reales: 2,7 km hasta 3.200 m, registro previo
+  obligatorio (caminos.eaab.gov.co), tramos Claro de Luna-La Virgen-Paramo, 3
+  tours, 7 fotos. Fuente: ficha-quebrada-la-vieja.md. Archivos:
+  `api/seed-quebrada-la-vieja.js` y `api/load-quebrada-la-vieja-api.js`.
+- **cerro-de-guadalupe.html** (slug `cerro-de-guadalupe`, cat sitio): el
+  mirador mas alto y gratis. Datos reales: 3.360 m, estatua de la Virgen (15 m)
+  de Arcila Uribe, via de 1967, SIN funicular (correccion de dato erroneo),
+  3 tours, 7 fotos. Fuente: ficha-cerro-de-guadalupe.md. Archivos:
+  `api/seed-cerro-de-guadalupe.js` y `api/load-cerro-de-guadalupe-api.js`.
+- **parque-simon-bolivar.html** (slug `parque-simon-bolivar`, cat sitio): el
+  pulmon de 113 hectareas. Datos reales: laguna navegable, 4 km de ciclorruta,
+  Plaza de Eventos (Rock al Parque), Biblioteca Virgilio Barco, 3 tours, 9
+  fotos. Fuente: ficha-parque-simon-bolivar.md. Archivos:
+  `api/seed-parque-simon-bolivar.js` y `api/load-parque-simon-bolivar-api.js`.
 
 Todas verificadas en produccion: render 200 con las 9 secciones del motor
 (descripcion, dificultad, entradas, tours, checklist, itinerario, fauna,
 secretos, regulaciones, galeria, mapa `#mapel`, FAQ, resenas vacio, contacto,
-relacionados), sitemap fresco (cache MISS) incluye los 5 slugs, y
+relacionados), sitemap fresco (cache MISS) incluye los 10 slugs, y
 `/api/destinos` las lista con `destacado=true` y `rating=0`. Total destinos:
-87.
+92.
 
 **BUG-022 (hallazgo al investigar imagenes de Bogota):** las URLs de
 Wikimedia Commons de lacandelaria usaban tamano de thumbnail `1200px` (no
