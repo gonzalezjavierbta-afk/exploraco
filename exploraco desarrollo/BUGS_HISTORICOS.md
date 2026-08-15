@@ -386,3 +386,29 @@ No se toco el codigo de `api/interacciones.js` -- el bug era 100% de estado de B
 
 **Estado:** Resuelto para bogota (URLs verificadas). Pendiente conocido: re-verificar y corregir las URLs de las imagenes de lacandelaria (hero y galeria) que usan tamano 1200px/800px y el hash `6/6f` incorrecto. Prevencion: TODA URL de Wikimedia Commons en seeds/fichas debe verificarse con `curl.exe -w "%{http_code}"` (esperar 200) ANTES de guardarla, y usar tamano estandar 960px (o el original) -- nunca 1200px/800px inventados, y nunca un hash de directorio copiado de otra pagina.
 
+## BUG-023: Seccion "Lo que nadie te dice" (secretos) mostrando el JSON crudo en vez de las tip-cards
+
+**Contexto:** Al cargar los 4 parques de Bogota (TSK-039..042) se detecto que la seccion "Lo que nadie te dice" de las paginas dinámicas mostraba el codigo JSON completo como texto plano (ej. `[{&quot;icono&quot;:...}]`) en vez de las tip-cards con titulo/texto/etiqueta. Afectaba a parque-nacional, el-virrey, el-tunal, parque-la-florida y a cualquier destino cuyo `tags.secretos` tuviera comillas dobles internas en los textos.
+
+**Causa raiz:** El valor de `tags.secretos` llega a `pagina-destino.js` doble-stringificado desde Neon: `admin-destinos.js` hace MERGE JSONB y guarda el string JSON con escapes (p.ej. `"[{\"icono\":\"⚰️\",\"texto\":\"...\\\"ciudad de hierro\\\"...\"}]"`). El codigo de la seccion hacia: (1) `JSON.parse` si el string empezaba con `"` (deshacia el primer nivel, dejando `[{"icono":...,"texto":"...\"ciudad...\"..."}]`), y luego (2) un `replace(/\\"/g, '"')` que destruia las comillas internas ya desescapadas de los textos (las convertia en comillas sueltas sin escapar). Ese replace rompia el JSON interno (p.ej. `...fue apodado la "ciudad de hierro" por...`) y el `JSON.parse` final fallaba con `Expected ',' or '}' after property value`, cayendo al fallback `<p class="stext">` que imprimia el JSON crudo escapado.
+
+**Por que no se detecto antes:** los destinos anteriores (electronica, museos) tenian textos de secretos SIN comillas dobles internas, por lo que el `replace(/\\"/g,'"')` no encontraba que romper y el `JSON.parse` funcionaba. Los textos con comillas internas (ej. la "ciudad de hierro", "la patria", "en peligro") son los que exponian el bug.
+
+**Fix:** en `pagina-destino.js`, eliminar el `replace(/\\"/g,'"')` destructivo del bloque de secretos y en su lugar deshacer el doble-stringify con un segundo `JSON.parse` controlado (solo si el valor sigue empezando con `"`). Asi se preservan las comillas internas de los textos.
+
+**Verificacion:** smoke test con el dato real de la API (doble stringify con comillas internas): las 5 tip-cards de parque-nacional se parsean OK y la seccion renderiza `tip-card`/`tip-tag` en vez del JSON crudo. Se probaron ademas el-virrey, el-tunal, parque-la-florida, museo-de-la-independencia y espacio-kinder (todos OK).
+
+**Estado:** Resuelto en `api/pagina-destino.js` (ver comentario BUG-024 en el codigo). Prevencion: al deshacer stringify anidado NUNCA usar regex sobre comillas; usar `JSON.parse` anidado controlado.
+
+## BUG-024: Dificultad "Media" no seleccionaba el color naranja en la barra
+
+**Contexto:** Las paginas cuyo `tags.dificultad` era "Media" (p.ej. espacio-kinder, cerro-de-guadalupe, y datos historicos de otros destinos) mostraban la barra de dificultad en el color fallback dorado en vez del naranja `#d97706` del nivel medio.
+
+**Causa raiz:** la escala `diffScale` de `pagina-destino.js` solo conocia las claves `facil`, `moderado`, `dificil` y `extremo` (esta ultima con el alias `experto` de BUG-013). El select `f-dificultad` de `admin.html` ofrece las opciones `Facil`, `Moderado`, `Dificil` y `Experto`, pero datos historicos y varios seeds guardaron el valor "Media" (y a veces "Fácil" con acento que ya normalizaba bien). Al normalizar "media" quedaba la clave `media`, que no existe en la escala, por lo que `matchIdx=-1` y el color caia a `var(--gold-dark)`.
+
+**Fix:** en `pagina-destino.js`, agregar el alias `media`/`medio` -> `moderado` (mismo patron de BUG-013 con `experto` -> `extremo`), sin tocar los datos guardados en Neon.
+
+**Verificacion:** simulacion de la escala con los valores Facil, Media, Moderado, Dificil, Experto, Facil(acento): Media y Moderado ahora matchean `moderado` con color `#d97706` (naranja). Smoke test incluido en BUG-023.
+
+**Estado:** Resuelto en `api/pagina-destino.js` (ver comentario BUG-024 en el codigo). Prevencion: al ampliar la escala de dificultad, cubrir todos los valores historicos y los ofrecidos por admin.html (Facil/Moderado/Dificil/Experto y los legados Media/Medio/Facil).
+

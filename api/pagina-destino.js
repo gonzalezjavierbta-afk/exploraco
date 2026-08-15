@@ -695,6 +695,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
       // la clave "extremo" -- el nivel mas alto nunca coloreaba la barra.
       // Se alias sin tocar los datos ya guardados en Neon.
       if (normKey === 'experto') normKey = 'extremo';
+      // BUG-024 fix: datos historicos guardaron "Media" en tags.dificultad
+      // (selects previos de admin y seeds), pero la escala solo conoce la
+      // clave "moderado" -- el nivel medio se pintaba dorado en vez de
+      // naranja. Alias media/medio -> moderado sin tocar los datos.
+      if (normKey === 'media' || normKey === 'medio') normKey = 'moderado';
       var matchIdx = -1;
       diffScale.forEach(function(lv, i){ if (lv.key === normKey) matchIdx = i; });
       var activeColor = matchIdx >= 0 ? diffScale[matchIdx].color : 'var(--gold-dark)';
@@ -971,14 +976,20 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   var secSecretos = '';
   if (cat === 'sitio' && secretos) {
     var tipsContent = '';
-    // Deshacer doble stringify si necesario
+    // BUG-024 fix: el valor de tags.secretos llega doble-stringificado desde
+    // Neon (admin-destinos.js hace JSONB merge y el string se guarda con
+    // escapes), p.ej. "[{\"icono\":...\"texto\":\"...\\\"comillas\\\"...\"}]".
+    // El viejo codigo hacia JSON.parse y luego un replace(/\\"/g,'"') que
+    // destruia las comillas internas de los textos (texto con comillas dobles
+    // escapadas) y rompia el JSON -> caia al fallback <p class="stext"> con el
+    // JSON crudo. Ahora se deshace el doble-stringify con un segundo JSON.parse
+    // sin tocar las comillas internas ya desescapadas.
     var secretosClean = secretos;
     if (typeof secretosClean === 'string' && secretosClean.charAt(0) === '"') {
       try { secretosClean = JSON.parse(secretosClean); } catch(_) {}
     }
-    // Si sigue siendo string con escapes
-    if (typeof secretosClean === 'string') {
-      secretosClean = secretosClean.replace(/\\"/g, '"').replace(/\\n/g,'');
+    if (typeof secretosClean === 'string' && secretosClean.charAt(0) === '"') {
+      try { secretosClean = JSON.parse(secretosClean); } catch(_) {}
     }
     try {
       var tipsArr = JSON.parse(secretosClean);
