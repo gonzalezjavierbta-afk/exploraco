@@ -123,13 +123,36 @@ Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
   Bogotazo, 3 tours, 5 fotos. Fuente: ficha-museo-de-la-independencia.md.
   Archivos: `api/seed-museo-de-la-independencia.js` y
   `api/load-museo-de-la-independencia-api.js`.
+- **parque-nacional.html** (slug `parque-nacional`, cat sitio): el primer gran
+  parque publico de Bogota. Datos reales: 1934 (Karl Brunner), 283 ha (141 de
+  reserva forestal), Monumento Nacional (1996), monumento a Rafael Uribe Uribe,
+  Torre del Reloj Suizo, Teatro El Parque (1936), mapa en relieve, 6AM-6PM,
+  gratis, 3 tours, 7 fotos. Fuente: ficha-parque-nacional.md. Archivos:
+  `api/seed-parque-nacional.js` y `api/load-parque-nacional-api.js`.
+- **el-virrey.html** (slug `el-virrey`, cat sitio): el pulmon verde del norte.
+  Datos reales: parque lineal (1999), 10,4 ha, >3.300 arboles, 71-100+ aves,
+  abeja andina cornuda, 5 murcielagos, escultura Gran Cascada de Negret,
+  prohibido futbol, gratis, 3 tours, 8 fotos. Fuente: ficha-el-virrey.md.
+  Archivos: `api/seed-el-virrey.js` y `api/load-el-virrey-api.js`.
+- **el-tunal.html** (slug `el-tunal`, cat sitio): el corazon verde del sur.
+  Datos reales: 55 ha en Tunjuelito, misa campal de Juan Pablo II (1986),
+  Biblioteca Gabriel Garcia Marquez (Biblored, +84.000 volumenes), lagos ~3 ha,
+  pista atletica, bicicross, skate, gratis (canchas con tarifa), 3 tours,
+  8 fotos. Fuente: ficha-el-tunal.md. Archivos: `api/seed-el-tunal.js` y
+  `api/load-el-tunal-api.js`.
+- **parque-la-florida.html** (slug `parque-la-florida`, cat sitio): santuario
+  de aves del occidente. Datos reales: 267 ha en Engativa, primer observatorio
+  permanente de aves de Bogota (2011, guadua), tingua bogotana (en peligro),
+  jilguero andino, vivero pedagogico, asadores y ciclorrutas, gratis, 3 tours,
+  8 fotos. Fuente: ficha-parque-la-florida.md. Archivos:
+  `api/seed-parque-la-florida.js` y `api/load-parque-la-florida-api.js`.
 
 Todas verificadas en produccion: render 200 con las 9 secciones del motor
 (descripcion, dificultad, entradas, tours, checklist, itinerario, fauna,
 secretos, regulaciones, galeria, mapa `#mapel`, FAQ, resenas vacio, contacto,
-relacionados), sitemap fresco (cache MISS) incluye los 21 slugs, y
+relacionados), sitemap fresco (cache MISS) incluye los 25 slugs, y
 `/api/destinos` las lista con `destacado=true` y `rating=0`. Total destinos:
-103.
+107.
 
 **BUG-022 (hallazgo al investigar imagenes de Bogota):** las URLs de
 Wikimedia Commons de lacandelaria usaban tamano de thumbnail `1200px` (no

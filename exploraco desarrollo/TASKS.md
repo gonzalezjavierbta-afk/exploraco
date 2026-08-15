@@ -297,6 +297,70 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Llorente y Bogotazo; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id 96f299d4-...).
 
+### TSK-039: Pagina dinamica parque-nacional.html (Parques de Bogota)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Parque Nacional Enrique Olaya Herrera (cat sitio,
+  slug `parque-nacional`, `status='published'`, `destacado=true`, rating 0)
+  con datos reales: primer parque publico de Bogota (1934, Ley 50/1931, Karl
+  Brunner), 283 ha (141 de reserva forestal de cerros), Monumento Nacional
+  (Dcto 1756/1996), monumento a Rafael Uribe Uribe (Victorio Macho 1940),
+  Torre del Reloj Suizo (1938), Teatro El Parque (1936, MN 1995), mapa en
+  relieve de Colombia, "Al Silencio" de Ramirez Villamizar y "Rita 5:30 p.m."
+  de Grau, horario IDRD 6AM-6PM, gratis, coords 4.622881, -74.060984, 3
+  tours, 7 fotos verificadas (200), 5 FAQs. Fuente:
+  ficha-parque-nacional.md. Archivos: `api/seed-parque-nacional.js` y
+  `api/load-parque-nacional-api.js`.
+- **Evidencia:** `/parque-nacional.html` 200 (66KB, hero/galeria/precios/
+  itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
+  (id d5ebbd0e-...); sitemap incluye el slug (114 urls).
+
+### TSK-040: Pagina dinamica el-virrey.html (Parques de Bogota)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Parque El Virrey (cat sitio, slug `el-virrey`,
+  `status='published'`, `destacado=true`, rating 0) con datos reales: parque
+  lineal y corredor ecologico de ronda (1999), 10,4 ha / ~1,7 km entre
+  Autopista Norte y carrera 7 (La Cabrera, Chapinero), >3.300 arboles, 71-100+
+  especies de aves (32 migratorias), abeja andina cornuda endemica, 5 especies
+  de murcielagos, Sendero Ambiental Gran Chico, escultura "Gran Cascada" de
+  Edgar Negret, prohibido futbol (Consejo de Estado 8201/2006), coords
+  4.67424, -74.0563, gratis, 3 tours, 8 fotos verificadas (200), 5 FAQs.
+  Fuente: ficha-el-virrey.md. Archivos: `api/seed-el-virrey.js` y
+  `api/load-el-virrey-api.js`.
+- **Evidencia:** `/el-virrey.html` 200 (65KB, hero/galeria/precios/
+  itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
+  (id d372c2ce-...); sitemap incluye el slug (114 urls).
+
+### TSK-041: Pagina dinamica el-tunal.html (Parques de Bogota)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Parque Metropolitano El Tunal (cat sitio, slug
+  `el-tunal`, `status='published'`, `destacado=true`, rating 0) con datos
+  reales: 55 ha en Tunjuelito, antigua hacienda, misa campal de Juan Pablo II
+  (1986, templete conservado), estadio de futbol anos 80, remodelacion
+  $12.000M (reapertura oct-2001), CC Ciudad Tunal (1984), Biblioteca Gabriel
+  Garcia Marquez (Biblored, +84.000 volumenes), >50.000 visitantes finde,
+  lagos ~3 ha, pista atletica, bicicross, skate, coords 4.574436, -74.133402,
+  Cll 48B Sur #22A-07, gratis (canchas con tarifa), 3 tours, 8 fotos
+  verificadas (200), 5 FAQs. Fuente: ficha-el-tunal.md. Archivos:
+  `api/seed-el-tunal.js` y `api/load-el-tunal-api.js`.
+- **Evidencia:** `/el-tunal.html` 200 (66KB, hero/galeria/precios/
+  itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
+  (id b5acbd21-...); sitemap incluye el slug (114 urls).
+
+### TSK-042: Pagina dinamica parque-la-florida.html (Parques de Bogota)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Parque Metropolitano La Florida (cat sitio, slug
+  `parque-la-florida`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: 267 ha en Engativa (limite Funza/Cota), lago + humedal +
+  bosques, primer observatorio de aves permanente de Bogota (10-nov-2011,
+  estructura de guadua), tingua bogotana (Rallus semiplumbeus, "en peligro"
+  Res 126/2024) y jilguero andino, 2.546 msnm, vivero pedagogico, asadores y
+  ciclorrutas, coords 4.720412, -74.129334, gratis, 3 tours, 8 fotos
+  verificadas (200), 5 FAQs. Fuente: ficha-parque-la-florida.md. Archivos:
+  `api/seed-parque-la-florida.js` y `api/load-parque-la-florida-api.js`.
+- **Evidencia:** `/parque-la-florida.html` 200 (66KB, hero/galeria/precios/
+  itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
+  (id 6035661b-...); sitemap incluye el slug (114 urls).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
