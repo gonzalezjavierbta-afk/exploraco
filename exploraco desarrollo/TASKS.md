@@ -249,6 +249,54 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Macarena y Academy; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id 30e67f95-...).
 
+### TSK-036: Pagina dinamica museo-santa-clara.html (Museos faltantes)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Museo de Santa Clara (cat sitio, slug
+  `museo-santa-clara`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: templo del Real Convento de Santa Clara (1647), barroco
+  santafere\u00f1o, 328 piezas (9 retablos: 1 mayor + 8 laterales, 112 \u00f3leos,
+  24 esculturas), oleos de Gregorio Vasquez de Arce y Ceballos, artesonado
+  mudejar con pentafolias, tarifas Res. 2137/2025 (adultos $6.000/$15.000),
+  gratis domingos, miercoles desde las 2PM, 20-jul y 7-ago, 3 tours, 7 fotos
+  verificadas (curl 200), 5 FAQs. Direccion corregida: Cra 8 No. 8-91.
+  Fuente: ficha-museo-santa-clara.md. Archivos: `api/seed-museo-santa-clara.js`
+  y `api/load-museo-santa-clara-api.js`.
+- **Evidencia:** `/museo-santa-clara.html` 200 (67KB, 9 secciones) con
+  pentafolia y retablos; sitemap (MISS) incluye el slug; `/api/destinos` lo
+  lista destacado rating 0 (id 508fc7be-...).
+
+### TSK-037: Pagina dinamica quinta-de-bolivar.html (Museos faltantes)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Casa Museo Quinta de Bolivar (cat sitio, slug
+  `quinta-de-bolivar`, `status='published'`, `destacado=true`, rating 0) con
+  datos reales: casa campestre entregada a Bolivar en 1820, habitada 423 dias,
+  espada de Bolivar (robada por el M-19 en 1974, regreso a la Quinta el
+  24-jul-2026), jardin historico patrimonio del paisaje (36 especies de aves),
+  tarifas Res. 0975 ($6.000/$15.000), gratis ultimo domingo, audioguia $2.000,
+  3 tours, 9 fotos verificadas (curl 200), 5 FAQs. Coordenadas OSM 4.6025734,
+  -74.0628512. Fuente: ficha-quinta-de-bolivar.md. Archivos:
+  `api/seed-quinta-de-bolivar.js` y `api/load-quinta-de-bolivar-api.js`.
+- **Evidencia:** `/quinta-de-bolivar.html` 200 (68KB, 9 secciones) con espada
+  y Monserrate; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
+  destacado rating 0 (id 1485ff1f-...).
+
+### TSK-038: Pagina dinamica museo-de-la-independencia.html (Museos faltantes)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de Museo de la Independencia - Casa del Florero (cat
+  sitio, slug `museo-de-la-independencia`, `status='published'`,
+  `destacado=true`, rating 0) con datos reales: casa colonial de +400 anos
+  (s. XVI), incidente del Florero de Llorente (20-jul-1810), fundado 1960 por
+  la Academia Colombiana de Historia, 2.360 obras, base del florero original,
+  candado de Llorente, balcon esquinado verde, sobrevivio al Bogotazo (1948),
+  tarifas Res. 2137/2025 ($6.000/$15.000), gratis miercoles 3-5PM, ultimo
+  domingo y 20-jul, 3 tours, 5 fotos verificadas (curl 200), 5 FAQs.
+  Coordenadas 4.5983, -74.0751. Fuente: ficha-museo-de-la-independencia.md.
+  Archivos: `api/seed-museo-de-la-independencia.js` y
+  `api/load-museo-de-la-independencia-api.js`.
+- **Evidencia:** `/museo-de-la-independencia.html` 200 (67KB, 9 secciones) con
+  Llorente y Bogotazo; sitemap (MISS) incluye el slug; `/api/destinos` lo
+  lista destacado rating 0 (id 96f299d4-...).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend

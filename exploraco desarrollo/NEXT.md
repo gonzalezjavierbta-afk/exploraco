@@ -103,13 +103,33 @@ Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
   capacidad 400-500, miercoles de house gratis, RadioBerlin Academy,
   3 tours, 7 fotos. Fuente: ficha-radio-berlin.md. Archivos:
   `api/seed-radio-berlin.js` y `api/load-radio-berlin-api.js`.
+- **museo-santa-clara.html** (slug `museo-santa-clara`, cat sitio): la joya del
+  barroco bogotano. Datos reales: templo del Real Convento de Santa Clara
+  (1647), 328 piezas (9 retablos), 112 oleos, artesonado mudejar con
+  pentafolias, Vasquez de Arce y Ceballos, tarifas Res. 2137/2025, gratis
+  domingos/miercoles, 3 tours, 7 fotos. Direccion Cra 8 No. 8-91. Fuente:
+  ficha-museo-santa-clara.md. Archivos: `api/seed-museo-santa-clara.js` y
+  `api/load-museo-santa-clara-api.js`.
+- **quinta-de-bolivar.html** (slug `quinta-de-bolivar`, cat sitio): la casa de
+  campo de Bolivar al pie de Monserrate. Datos reales: entregada a Bolivar en
+  1820 (habito 423 dias), espada robada por el M-19 en 1974 y de vuelta desde
+  el 24-jul-2026, jardin historico (36 especies de aves), tarifas Res. 0975,
+  3 tours, 9 fotos. Fuente: ficha-quinta-de-bolivar.md. Archivos:
+  `api/seed-quinta-de-bolivar.js` y `api/load-quinta-de-bolivar-api.js`.
+- **museo-de-la-independencia.html** (slug `museo-de-la-independencia`, cat
+  sitio): la casa del grito de independencia. Datos reales: casa colonial de
+  +400 anos, incidente del Florero de Llorente (1810), fundado 1960, 2.360
+  obras, base del florero original, balcon esquinado verde, sobrevivio al
+  Bogotazo, 3 tours, 5 fotos. Fuente: ficha-museo-de-la-independencia.md.
+  Archivos: `api/seed-museo-de-la-independencia.js` y
+  `api/load-museo-de-la-independencia-api.js`.
 
 Todas verificadas en produccion: render 200 con las 9 secciones del motor
 (descripcion, dificultad, entradas, tours, checklist, itinerario, fauna,
 secretos, regulaciones, galeria, mapa `#mapel`, FAQ, resenas vacio, contacto,
-relacionados), sitemap fresco (cache MISS) incluye los 18 slugs, y
+relacionados), sitemap fresco (cache MISS) incluye los 21 slugs, y
 `/api/destinos` las lista con `destacado=true` y `rating=0`. Total destinos:
-100.
+103.
 
 **BUG-022 (hallazgo al investigar imagenes de Bogota):** las URLs de
 Wikimedia Commons de lacandelaria usaban tamano de thumbnail `1200px` (no
