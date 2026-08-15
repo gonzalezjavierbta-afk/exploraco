@@ -1436,66 +1436,83 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     }).join('');
   }
 
-  // Blog no muestra resenas de "lugar" -- un articulo no se califica
-  // con estrellas como un hostal o un sitio turistico. Se omite por
-  // completo en vez de mostrar un widget que no aplica.
+  // -- Resenas de viajeros ----------------------------------------
+  // Blog muestra resenas SIMPLIFICADAS (estrellas 1-5 + comentario +
+  // nombre) -- un articulo no se califica por dimensiones como un
+  // hostal o sitio turistico, ni con "viajaste como", ni voto rapido.
+  // Las demas categorias conservan el widget completo (dims, tipo de
+  // viajero, voto rapido). El JS inline (submitRv/addRvOptimista) es
+  // generico: con dims/travellerType vacios funciona igual para blog.
   var secResenas = '';
-  if (cat !== 'blog') {
-    // Barras de puntuacion por dimension (promedios calculados en el handler)
-    var scoreBars = '';
-    var barRows = [];
-    dimDefs.forEach(function(dd, i){
-      var v = parseFloat(dimsAvg[dd[0]] || '');
-      if (!v || isNaN(v)) return;
-      var pct = Math.round(v/5*100);
-      barRows.push('<div class="score-label">'+esc(dd[1])+'</div>'
-        + '<div class="score-bar-wrap"><div class="score-bar-fill" style="width:'+pct+'%;background:'+DIM_COLORS[i%DIM_COLORS.length]+'"></div></div>'
-        + '<div class="score-val">'+v.toFixed(1)+'</div>');
-    });
-    if (barRows.length) {
-      scoreBars = '<div style="flex:1;min-width:220px"><div class="score-grid">'+barRows.join('')+'</div></div>';
-    }
+  var esBlogRes = cat === 'blog';
+  var scoreBars = '';
+  var barRows = [];
+  dimDefs.forEach(function(dd, i){
+    var v = parseFloat(dimsAvg[dd[0]] || '');
+    if (!v || isNaN(v)) return;
+    var pct = Math.round(v/5*100);
+    barRows.push('<div class="score-label">'+esc(dd[1])+'</div>'
+      + '<div class="score-bar-wrap"><div class="score-bar-fill" style="width:'+pct+'%;background:'+DIM_COLORS[i%DIM_COLORS.length]+'"></div></div>'
+      + '<div class="score-val">'+v.toFixed(1)+'</div>');
+  });
+  if (barRows.length && !esBlogRes) {
+    scoreBars = '<div style="flex:1;min-width:220px"><div class="score-grid">'+barRows.join('')+'</div></div>';
+  }
 
-    // Selector de tipo de viajero + puntuacion por dimension en el formulario
+  // Selector de tipo de viajero + puntuacion por dimension en el formulario
+  // (solo categorias no-blog; en blog se omiten).
+  var travBtns = '';
+  var dimStarsHtml = '';
+  if (!esBlogRes) {
     var travTypes = ['Solo','Pareja','Amigos','Familia','Mochilero'];
-    var travBtns = travTypes.map(function(t){
+    travBtns = travTypes.map(function(t){
       return '<div class="rv-type-btn" onclick="selectTravellerType(this,\''+t+'\')">'+esc(t)+'</div>';
     }).join('');
-    var dimStarsHtml = dimDefs.map(function(dd){
+    dimStarsHtml = dimDefs.map(function(dd){
       var rowStars = [1,2,3,4,5].map(function(v){
         return '<span class="rv-star" data-v="'+v+'" onclick="setDimScore(\''+dd[0]+'\','+v+')">\u2605</span>';
       }).join('');
       return '<div class="rv-dim"><div class="rv-dim-label">'+esc(dd[1])+'</div><div class="rv-stars-row" data-dim="'+dd[0]+'">'+rowStars+'</div></div>';
     }).join('');
+  }
 
-    secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+nRes+' resenas</div></div>'
-      + (scoreBars||'')
-      + '</div>'
-      + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
-      + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">Se el primero en dejar una resena.</p>'
-      + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
-      + '<label class="wrlbl">Fuiste como:</label>'
-      + '<div class="rv-traveller-type" id="rv-traveller-type">'+travBtns+'</div>'
-      + '<label class="wrlbl">Califica por categoria:</label>'
-      + '<div class="rv-score-selector">'+dimStarsHtml+'</div>'
-      + '<label class="wrlbl">Puntuacion general:</label>'
-      + '<div class="sprow" id="rv-stars">'
-      + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">\u2605</span>'; }).join('')
-      + '</div>'
-      + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
-      + '<textarea id="rvt" placeholder="Que te parecio este lugar? Que consejo darias?" class="wrinp"></textarea>'
-      + '<button class="wrsub" onclick="submitRv()">Publicar resena -></button>'
-      + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
-      + '<div class="wr" id="qrwrap" style="margin-top:8px">'
+  var tituloResenas = esBlogRes ? 'Resenas del articulo' : 'Resenas de viajeros';
+  var placeholderResenas = esBlogRes
+    ? 'Que te parecio el articulo? Te ayudo esta guia? Deja tu opinion.'
+    : 'Que te parecio este lugar? Que consejo darias?';
+  var btnResenas = esBlogRes ? 'Publicar resena ->' : 'Publicar resena ->';
+  var promptFuiste = esBlogRes ? '' : '<label class="wrlbl">Fuiste como:</label>'
+    + '<div class="rv-traveller-type" id="rv-traveller-type">'+travBtns+'</div>';
+  var promptDims = esBlogRes ? '' : '<label class="wrlbl">Califica por categoria:</label>'
+    + '<div class="rv-score-selector">'+dimStarsHtml+'</div>';
+
+  secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+tituloResenas+'</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+nRes+' resenas</div></div>'
+    + (scoreBars||'')
+    + '</div>'
+    + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
+    + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">Se el primero en dejar una resena.</p>'
+    + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
+    + promptFuiste
+    + promptDims
+    + '<label class="wrlbl">Puntuacion general:</label>'
+    + '<div class="sprow" id="rv-stars">'
+    + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="setRvScore('+i+')">\u2605</span>'; }).join('')
+    + '</div>'
+    + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
+    + '<textarea id="rvt" placeholder="'+placeholderResenas+'" class="wrinp"></textarea>'
+    + '<button class="wrsub" onclick="submitRv()">'+btnResenas+'</button>'
+    + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
+    + (esBlogRes ? '' : '<div class="wr" id="qrwrap" style="margin-top:8px">'
       + '<div class="wrtitle">Califica este lugar</div>'
       + '<div class="sprow" id="qr-stars">'
       + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="votarDID('+i+')">\u2606</span>'; }).join('')
       + '</div>'
       + '<div class="wrok" id="qrok" style="display:none">\u2713 Gracias por tu voto!</div>'
-      + '</div></div></section>';
-  }
+      + '</div>')
+    + '</div>'
+    + '</div></section>';
 
   // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
