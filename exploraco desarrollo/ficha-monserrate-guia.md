@@ -1,6 +1,6 @@
 # Ficha única Monserrate Guía — entrada de blog (categoria_slug='blog')
 
-> Fuente de datos para el seed `api/seed-monserrate-guia.js`. Es la primera entrada REAL
+> Fuente de datos para el seed `scripts/seed-monserrate-guia.js`. Es la primera entrada REAL
 > de la sección Inspírate. Reutiliza datos verificados de `ficha-monserrate.md` (sitio) y
 > de investigación web (monserrate.co, Wikipedia, El Tiempo, Semana, bogotavive.com).
 

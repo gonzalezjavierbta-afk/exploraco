@@ -15,7 +15,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 > Series de paginas de destino dinamicas (patron monserrate.html) cargadas
 > en produccion via `api/pagina-destino.js`. La carga se hace con la API de
 > admin (`POST /api/admin-destinos`, Bearer exploraco12345) porque no hay
-> DATABASE_URL local; el seed equivalente (`api/seed-*.js`, upsert SQL
+> DATABASE_URL local; el seed equivalente (`scripts/seed-*.js`, upsert SQL
 > idempotente) queda versionado para quien tenga la URL de Neon. Mismo
 > patron para ambas: seed (datos del formulario) + loader idempotente
 > (borra previo + POST). Ver DECISIONS.md ADR-009 (rating 0 hasta resenas
@@ -25,8 +25,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Estado:** COMPLETADA
 - **Detalle:** Pagina de La Candelaria (cat sitio, slug `lacandelaria`,
   `status='published'`, `destacado=true`, rating 0). Datos del formulario
-  admin; fuente ficha-lacandelaria.md. Archivos: `api/seed-lacandelaria.js`
-  y `api/load-lacandelaria-api.js`.
+  admin; fuente ficha-lacandelaria.md. Archivos: `scripts/seed-lacandelaria.js`
+  y `scripts/load-lacandelaria-api.js`.
 - **Evidencia:** `/lacandelaria.html` 200 con todas las secciones del motor;
   sitemap (cache MISS) incluye el slug; `/api/destinos` lo lista destacado
   rating 0 (id 72433a29-...). Pendiente conocido: corregir URLs de imagenes
@@ -38,8 +38,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   `status='published'`, `destacado=true`, rating 0) con guia completa:
   itinerario 3 dias, 8 entradas de museos reales (Museo del Oro, Botero,
   Nacional, MAMBO, Monserrate), 5 tours, 7 fotos verificadas, 5 FAQs.
-  Fuente: ficha-bogota.md. Archivos: `api/seed-bogota.js` y
-  `api/load-bogota-api.js`.
+  Fuente: ficha-bogota.md. Archivos: `scripts/seed-bogota.js` y
+  `scripts/load-bogota-api.js`.
 - **Evidencia:** `/bogota.html` 200 (74KB) con todas las secciones (canonical
   exploraco.co/bogota.html, mapa #mapel, tours Monserrate, ajiaco);
   sitemap (cache MISS) incluye el slug (91 urls); `/api/destinos` lo lista
@@ -52,7 +52,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   `status='published'`, `destacado=true`, rating 0) con datos reales:
   Balsa Muisca, Poporo Quimbaya, 4 salas permanentes, 5 entradas, 3 tours,
   6 fotos verificadas (curl 200), 5 FAQs. Fuente: ficha-museo-del-oro.md.
-  Archivos: `api/seed-museo-del-oro.js` y `api/load-museo-del-oro-api.js`.
+  Archivos: `scripts/seed-museo-del-oro.js` y `scripts/load-museo-del-oro-api.js`.
 - **Evidencia:** `/museo-del-oro.html` 200 (66KB, 9 secciones) con Balsa
   Muisca, El Dorado y domingos gratis; sitemap (MISS) incluye el slug;
   `/api/destinos` lo lista destacado rating 0 (id 508b0bc4-...).
@@ -63,8 +63,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   `status='published'`, `destacado=true`, rating 0) con datos reales:
   208 obras (123 Botero + 85 internacionales), entrada gratis siempre,
   4 entradas, 3 tours, 4 fotos verificadas (curl 200), 5 FAQs. Fuente:
-  ficha-museo-botero.md. Archivos: `api/seed-museo-botero.js` y
-  `api/load-museo-botero-api.js`.
+  ficha-museo-botero.md. Archivos: `scripts/seed-museo-botero.js` y
+  `scripts/load-museo-botero-api.js`.
 - **Evidencia:** `/museo-botero.html` 200 (65KB, 9 secciones) con Picasso,
   Monet y gratis; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 7fd0967b-...).
@@ -76,7 +76,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   rating 0) con datos reales: Tropicario (invernadero mas grande de
   Suramerica), 34 colecciones vivas, 6 entradas con tarifas 2026, 3 tours,
   4 fotos verificadas (curl 200), 5 FAQs. Fuente: ficha-jardin-botanico.md.
-  Archivos: `api/seed-jardin-botanico.js` y `api/load-jardin-botanico-api.js`.
+  Archivos: `scripts/seed-jardin-botanico.js` y `scripts/load-jardin-botanico-api.js`.
 - **Evidencia:** `/jardin-botanico-bogota.html` 200 (67KB, 9 secciones) con
   Tropicario y Mutis; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id ca5d7941-...).
@@ -88,7 +88,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   como Plaza Mayor en 1539, estatua de Tenerani, Catedral Primada, Capitolio,
   Palacio de Justicia y Palacio Lievano, 5 entradas gratis, 3 tours, 7 fotos
   verificadas (curl 200), 5 FAQs. Fuente: ficha-plaza-de-bolivar.md. Archivos:
-  `api/seed-plaza-de-bolivar.js` y `api/load-plaza-de-bolivar-api.js`.
+  `scripts/seed-plaza-de-bolivar.js` y `scripts/load-plaza-de-bolivar-api.js`.
 - **Evidencia:** `/plaza-de-bolivar.html` 200 (68KB, 9 secciones) con Capitolio,
   Tenerani y acceso 24 horas; sitemap (MISS) incluye el slug; `/api/destinos`
   lo lista destacado rating 0 (id 63586c9a-...).
@@ -100,8 +100,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   reales: fundado en 1823, antiguo Panoptico de Thomas Reed (Monumento Nacional
   1975), 17 salas, tarifas 2026 ($6.000 colombianos / $15.000 extranjeros,
   miercoles tarde gratis), 3 tours, 7 fotos verificadas (curl 200), 5 FAQs.
-  Fuente: ficha-museo-nacional.md. Archivos: `api/seed-museo-nacional.js` y
-  `api/load-museo-nacional-api.js`.
+  Fuente: ficha-museo-nacional.md. Archivos: `scripts/seed-museo-nacional.js` y
+  `scripts/load-museo-nacional-api.js`.
 - **Evidencia:** `/museo-nacional.html` 200 (67KB, 9 secciones) con 17 salas y
   Thomas Reed; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 61c31f08-...).
@@ -114,7 +114,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   (app Caminos de los Cerros Orientales / caminos.eaab.gov.co), aforos EAAB
   (775/419), tramos Claro de Luna-La Virgen-Paramo, 3 tours, 7 fotos verificadas
   (curl 200), 5 FAQs. Fuente: ficha-quebrada-la-vieja.md. Archivos:
-  `api/seed-quebrada-la-vieja.js` y `api/load-quebrada-la-vieja-api.js`.
+  `scripts/seed-quebrada-la-vieja.js` y `scripts/load-quebrada-la-vieja-api.js`.
 - **Evidencia:** `/quebrada-la-vieja.html` 200 (68KB, 9 secciones) con registro
   y Rosales; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
   rating 0 (id 5c763772-...).
@@ -127,7 +127,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   de Gustavo Arcila Uribe, ermita, via carreteable de 1967, sin funicular
   (correccion de dato erroneo), acceso gratis, 3 tours, 7 fotos verificadas
   (curl 200), 5 FAQs. Fuente: ficha-cerro-de-guadalupe.md. Archivos:
-  `api/seed-cerro-de-guadalupe.js` y `api/load-cerro-de-guadalupe-api.js`.
+  `scripts/seed-cerro-de-guadalupe.js` y `scripts/load-cerro-de-guadalupe-api.js`.
 - **Evidencia:** `/cerro-de-guadalupe.html` 200 (67KB, 9 secciones) con 3.360,
   Arcila y Choachi; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 3d85b44b-...).
@@ -140,8 +140,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Hacienda El Salitre), laguna navegable, 4 km de ciclorruta, Plaza de Eventos
   (80.000-140.000, Rock al Parque), Biblioteca Virgilio Barco, 5 entradas, 3
   tours, 9 fotos verificadas (curl 200), 5 FAQs. Fuente:
-  ficha-parque-simon-bolivar.md. Archivos: `api/seed-parque-simon-bolivar.js`
-  y `api/load-parque-simon-bolivar-api.js`.
+  ficha-parque-simon-bolivar.md. Archivos: `scripts/seed-parque-simon-bolivar.js`
+  y `scripts/load-parque-simon-bolivar-api.js`.
 - **Evidencia:** `/parque-simon-bolivar.html` 200 (68KB, 9 secciones) con
   laguna, Rock al Parque y Virgilio Barco; sitemap (MISS) incluye el slug;
   `/api/destinos` lo lista destacado rating 0 (id f8085f9a-...).
@@ -153,8 +153,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   techno/house de Fourvenues en Cra 8 No. 63-41 (Chapinero), 100+ eventos,
   50.000+ asistentes, 200+ artistas internacionales, aforo 800, cocteles
   30.000-65.000, 3 tours, 6 fotos verificadas (curl 200), 5 FAQs. Fuente:
-  ficha-club-octava.md. Archivos: `api/seed-club-octava.js` y
-  `api/load-club-octava-api.js`.
+  ficha-club-octava.md. Archivos: `scripts/seed-club-octava.js` y
+  `scripts/load-club-octava-api.js`.
 - **Evidencia:** `/club-octava.html` 200 (66KB, 9 secciones) con techno y
   Fourvenues; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 6b1404c1-...).
@@ -166,8 +166,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   megaclub LGBTQ+ con 20 salas tematicas, capacidad 5.000-7.000, epicentro
   del Chapigay, World's 100 Best Clubs 2024 (#68), cover 30.000 antes de las
   10PM y 50.000 despues, shows drag, 3 tours, 6 fotos verificadas (curl 200),
-  5 FAQs. Fuente: ficha-theatron.md. Archivos: `api/seed-theatron.js` y
-  `api/load-theatron-api.js`.
+  5 FAQs. Fuente: ficha-theatron.md. Archivos: `scripts/seed-theatron.js` y
+  `scripts/load-theatron-api.js`.
 - **Evidencia:** `/theatron.html` 200 (66KB, 9 secciones) con 20 salas y
   Chapigay; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
   rating 0 (id 842c130f-...).
@@ -179,8 +179,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   la Cll 64 #13-09 (Chapinero, frente al Cosmos), 3 ambientes (chill out,
   techno/house, terraza), evento "Escandalo 25" ($104.000 anytime), Kevin
   Saunderson (may-2025), 3 tours, 6 fotos verificadas (curl 200), 5 FAQs.
-  Fuente: ficha-video-club.md. Archivos: `api/seed-video-club.js` y
-  `api/load-video-club-api.js`.
+  Fuente: ficha-video-club.md. Archivos: `scripts/seed-video-club.js` y
+  `scripts/load-video-club-api.js`.
 - **Evidencia:** `/video-club.html` 200 (67KB, 9 secciones) con chill out y
   Escandalo; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id c4a1c21e-...).
@@ -192,7 +192,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   la Cra 14A #82-42 (Chico/Chapinero), 3 pisos (barra, tech-house, reggae/rock
   y terraza), tienda de vinilos, abierto mie-sab desde 8PM, fundado 2017,
   3 tours, 6 fotos verificadas (curl 200), 5 FAQs. Fuente: ficha-mad-radio.md.
-  Archivos: `api/seed-mad-radio.js` y `api/load-mad-radio-api.js`.
+  Archivos: `scripts/seed-mad-radio.js` y `scripts/load-mad-radio-api.js`.
 - **Evidencia:** `/mad-radio.html` 200 (66KB, 9 secciones) con vinilos y
   tech-house; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 49e5208b-...).
@@ -204,7 +204,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   techno/house de la Tv. 39A #20A-69 (Ortezal, Puente Aranda), eventos 2026
   (Energy Transfer, Europe Tour), cerveza $12.000, 3 tours, 6 fotos verificadas
   (curl 200), 5 FAQs. Fuente: ficha-gate-club.md. Archivos:
-  `api/seed-gate-club.js` y `api/load-gate-club-api.js`.
+  `scripts/seed-gate-club.js` y `scripts/load-gate-club-api.js`.
 - **Evidencia:** `/gate-club.html` 200 (65KB, 9 secciones) con Ortezal y
   Energy Transfer; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 02141eae-...).
@@ -216,7 +216,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   trance/fast techno/hard house/UKG de la Cra 15 #99-23 (Chico), abierto
   vie-sab 10PM-5AM, a 81 m de Chico Plaza, 3 tours, 6 fotos verificadas (curl
   200), 5 FAQs. Fuente: ficha-radio-estrella.md. Archivos:
-  `api/seed-radio-estrella.js` y `api/load-radio-estrella-api.js`.
+  `scripts/seed-radio-estrella.js` y `scripts/load-radio-estrella-api.js`.
 - **Evidencia:** `/radio-estrella.html` 200 (64KB, 9 secciones) con trance y
   UKG; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
   rating 0 (id afe9610d-...).
@@ -229,8 +229,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Colegio Nuestra Senora de Chiquinquira (Av. Calle 63 #15-70, Barrios
   Unidos), 5 pisos, 7 salas, galeria 250 m2, auditorio 1.500, aforo hasta
   4.500, bono 30.000 COP, 3 tours, 9 fotos verificadas (curl 200), 5 FAQs.
-  Fuente: ficha-espacio-kinder.md. Archivos: `api/seed-espacio-kinder.js` y
-  `api/load-espacio-kinder-api.js`.
+  Fuente: ficha-espacio-kinder.md. Archivos: `scripts/seed-espacio-kinder.js` y
+  `scripts/load-espacio-kinder-api.js`.
 - **Evidencia:** `/espacio-kinder.html` 200 (69KB, 9 secciones) con Kaputt y
   colegio; sitemap (MISS) incluye el slug; `/api/destinos` lo lista destacado
   rating 0 (id 5a53a6cd-...).
@@ -243,8 +243,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   2023) y resucito en Cra 13 #64-13 (Chapinero), cabina-jaula, capacidad
   400-500, miercoles de house gratis, gratis antes de 22:00 los viernes,
   RadioBerlin Academy, 3 tours, 7 fotos verificadas (curl 200), 5 FAQs.
-  Fuente: ficha-radio-berlin.md. Archivos: `api/seed-radio-berlin.js` y
-  `api/load-radio-berlin-api.js`.
+  Fuente: ficha-radio-berlin.md. Archivos: `scripts/seed-radio-berlin.js` y
+  `scripts/load-radio-berlin-api.js`.
 - **Evidencia:** `/radio-berlin.html` 200 (68KB, 9 secciones) con jaula,
   Macarena y Academy; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id 30e67f95-...).
@@ -259,8 +259,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   mudejar con pentafolias, tarifas Res. 2137/2025 (adultos $6.000/$15.000),
   gratis domingos, miercoles desde las 2PM, 20-jul y 7-ago, 3 tours, 7 fotos
   verificadas (curl 200), 5 FAQs. Direccion corregida: Cra 8 No. 8-91.
-  Fuente: ficha-museo-santa-clara.md. Archivos: `api/seed-museo-santa-clara.js`
-  y `api/load-museo-santa-clara-api.js`.
+  Fuente: ficha-museo-santa-clara.md. Archivos: `scripts/seed-museo-santa-clara.js`
+  y `scripts/load-museo-santa-clara-api.js`.
 - **Evidencia:** `/museo-santa-clara.html` 200 (67KB, 9 secciones) con
   pentafolia y retablos; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id 508fc7be-...).
@@ -275,7 +275,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   tarifas Res. 0975 ($6.000/$15.000), gratis ultimo domingo, audioguia $2.000,
   3 tours, 9 fotos verificadas (curl 200), 5 FAQs. Coordenadas OSM 4.6025734,
   -74.0628512. Fuente: ficha-quinta-de-bolivar.md. Archivos:
-  `api/seed-quinta-de-bolivar.js` y `api/load-quinta-de-bolivar-api.js`.
+  `scripts/seed-quinta-de-bolivar.js` y `scripts/load-quinta-de-bolivar-api.js`.
 - **Evidencia:** `/quinta-de-bolivar.html` 200 (68KB, 9 secciones) con espada
   y Monserrate; sitemap (MISS) incluye el slug; `/api/destinos` lo lista
   destacado rating 0 (id 1485ff1f-...).
@@ -291,8 +291,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   tarifas Res. 2137/2025 ($6.000/$15.000), gratis miercoles 3-5PM, ultimo
   domingo y 20-jul, 3 tours, 5 fotos verificadas (curl 200), 5 FAQs.
   Coordenadas 4.5983, -74.0751. Fuente: ficha-museo-de-la-independencia.md.
-  Archivos: `api/seed-museo-de-la-independencia.js` y
-  `api/load-museo-de-la-independencia-api.js`.
+  Archivos: `scripts/seed-museo-de-la-independencia.js` y
+  `scripts/load-museo-de-la-independencia-api.js`.
 - **Evidencia:** `/museo-de-la-independencia.html` 200 (67KB, 9 secciones) con
   Llorente y Bogotazo; sitemap (MISS) incluye el slug; `/api/destinos` lo
   lista destacado rating 0 (id 96f299d4-...).
@@ -308,8 +308,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   relieve de Colombia, "Al Silencio" de Ramirez Villamizar y "Rita 5:30 p.m."
   de Grau, horario IDRD 6AM-6PM, gratis, coords 4.622881, -74.060984, 3
   tours, 7 fotos verificadas (200), 5 FAQs. Fuente:
-  ficha-parque-nacional.md. Archivos: `api/seed-parque-nacional.js` y
-  `api/load-parque-nacional-api.js`.
+  ficha-parque-nacional.md. Archivos: `scripts/seed-parque-nacional.js` y
+  `scripts/load-parque-nacional-api.js`.
 - **Evidencia:** `/parque-nacional.html` 200 (66KB, hero/galeria/precios/
   itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
   (id d5ebbd0e-...); sitemap incluye el slug (114 urls).
@@ -324,8 +324,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   de murcielagos, Sendero Ambiental Gran Chico, escultura "Gran Cascada" de
   Edgar Negret, prohibido futbol (Consejo de Estado 8201/2006), coords
   4.67424, -74.0563, gratis, 3 tours, 8 fotos verificadas (200), 5 FAQs.
-  Fuente: ficha-el-virrey.md. Archivos: `api/seed-el-virrey.js` y
-  `api/load-el-virrey-api.js`.
+  Fuente: ficha-el-virrey.md. Archivos: `scripts/seed-el-virrey.js` y
+  `scripts/load-el-virrey-api.js`.
 - **Evidencia:** `/el-virrey.html` 200 (65KB, hero/galeria/precios/
   itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
   (id d372c2ce-...); sitemap incluye el slug (114 urls).
@@ -341,7 +341,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   lagos ~3 ha, pista atletica, bicicross, skate, coords 4.574436, -74.133402,
   Cll 48B Sur #22A-07, gratis (canchas con tarifa), 3 tours, 8 fotos
   verificadas (200), 5 FAQs. Fuente: ficha-el-tunal.md. Archivos:
-  `api/seed-el-tunal.js` y `api/load-el-tunal-api.js`.
+  `scripts/seed-el-tunal.js` y `scripts/load-el-tunal-api.js`.
 - **Evidencia:** `/el-tunal.html` 200 (66KB, hero/galeria/precios/
   itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
   (id b5acbd21-...); sitemap incluye el slug (114 urls).
@@ -356,7 +356,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Res 126/2024) y jilguero andino, 2.546 msnm, vivero pedagogico, asadores y
   ciclorrutas, coords 4.720412, -74.129334, gratis, 3 tours, 8 fotos
   verificadas (200), 5 FAQs. Fuente: ficha-parque-la-florida.md. Archivos:
-  `api/seed-parque-la-florida.js` y `api/load-parque-la-florida-api.js`.
+  `scripts/seed-parque-la-florida.js` y `scripts/load-parque-la-florida-api.js`.
 - **Evidencia:** `/parque-la-florida.html` 200 (66KB, hero/galeria/precios/
   itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
   (id 6035661b-...); sitemap incluye el slug (114 urls).
@@ -375,7 +375,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   'naturaleza','aventura','tips','gastro'], video_url:'https://youtu.be/
   Bgtc-bsl9II'}. SIN id_autor por decision de Javier (migracion 004
   pendiente; se asignara/editar a desde admin.html despues). Archivos:
-  `api/seed-monserrate-guia.js` (datos), `api/load-monserrate-guia-api.js`
+  `scripts/seed-monserrate-guia.js` (datos), `scripts/load-monserrate-guia-api.js`
   (loader idempotente DELETE+POST) y
   `exploraco desarrollo/ficha-monserrate-guia.md` (ficha con datos
   verificados). Carga via API de admin (no hay DATABASE_URL local), mismo
@@ -654,7 +654,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Responsable:** Project Manager (Javier)
 - **Estado:** PENDIENTE
 - **Dependencia:** Sesion de Chrome con GCM (gestor de credenciales) activa
-- **Detalle t\u00e9cnico:** Hacer commit y push al repo gonzalezjavierbta-afk/exploraco de los archivos de esta sesion: `api/seed-monserrate-guia.js`, `api/load-monserrate-guia-api.js`, `exploraco desarrollo/ficha-monserrate-guia.md`, `db/migrations/004_usuarios_blog_autor.sql`, mas los cambios multi-tema de `api/destinos.js`, `index.html`, `api/pagina-destino.js` y `admin.html`. El push depende de la sesion Chrome/GCM y no se pudo ejecutar en esta sesion.
+- **Detalle t\u00e9cnico:** Hacer commit y push al repo gonzalezjavierbta-afk/exploraco de los archivos de esta sesion: `scripts/seed-monserrate-guia.js`, `scripts/load-monserrate-guia-api.js`, `exploraco desarrollo/ficha-monserrate-guia.md`, `db/migrations/004_usuarios_blog_autor.sql`, mas los cambios multi-tema de `api/destinos.js`, `index.html`, `api/pagina-destino.js` y `admin.html`. El push depende de la sesion Chrome/GCM y no se pudo ejecutar en esta sesion.
 - **Evidencia f\u00edsica de \u00e9xito:** `git log --oneline -1` muestra el commit nuevo en el remoto.
 
 ---

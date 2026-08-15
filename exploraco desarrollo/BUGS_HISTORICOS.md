@@ -414,7 +414,7 @@ No se toco el codigo de `api/interacciones.js` -- el bug era 100% de estado de B
 
 ## BUG-025: Categoria 'blog' inexistente en la tabla categorias de Neon -- FK destinos_categoria_slug_fkey rechazaba el INSERT (error 500)
 
-**Contexto:** Al cargar la primera entrada real de blog (monserrate-guia-completa, TSK-043) via el loader `api/load-monserrate-guia-api.js` (DELETE+POST contra la API de admin), el POST fallaba con 500. El codigo de `admin-destinos.js` y del loader NO tenia el error: el problema estaba en el estado de la base de datos de produccion.
+**Contexto:** Al cargar la primera entrada real de blog (monserrate-guia-completa, TSK-043) via el loader `scripts/load-monserrate-guia-api.js` (DELETE+POST contra la API de admin), el POST fallaba con 500. El codigo de `admin-destinos.js` y del loader NO tenia el error: el problema estaba en el estado de la base de datos de produccion.
 
 **Sintoma (error real de Neon):** el INSERT en `destinos` violaba la restriccion `destinos_categoria_slug_fkey` (FK hacia `categorias.slug`): la fila `'blog'` NO existia en la tabla `categorias` de Neon. Todas las demas categorias (sitio, hostal, comida, evento) si existian porque habian sido insertadas en sesiones anteriores (algunas manualmente en la consola de Neon, por lo que tampoco estan en el repo -- el mismo patron de riesgo de "estado de BD no reproducible" que revelo ADR-008).
 

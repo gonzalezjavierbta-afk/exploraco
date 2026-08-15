@@ -23,8 +23,8 @@ el deploy de Vercel sigue bloqueado -- ver TASK-011):
   'gastro'], video_url:'https://youtu.be/Bgtc-bsl9II'}`. Sin `id_autor`
   por decision de Javier: la migracion 004 queda pendiente y el autor se
   podra asignar/editar desde admin.html despues (TASK-012/TASK-013).
-  Archivos: `api/seed-monserrate-guia.js` (datos),
-  `api/load-monserrate-guia-api.js` (loader idempotente DELETE+POST) y
+  Archivos: `scripts/seed-monserrate-guia.js` (datos),
+  `scripts/load-monserrate-guia-api.js` (loader idempotente DELETE+POST) y
   `exploraco desarrollo/ficha-monserrate-guia.md` (ficha con datos
   verificados). Verificado en produccion: GET /monserrate-guia-completa.html
   = 200 con JSON-LD BlogPosting, video embed, chip "Cultura", divs
@@ -72,138 +72,138 @@ Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
   `status='published'`, `destacado=true`, rating en 0 hasta resenas reales
   (decision de producto, ver DECISIONS.md ADR-009). Carga via API de admin
   (`POST /api/admin-destinos` con Bearer exploraco12345) porque no hay
-  DATABASE_URL local. Archivos: `api/seed-lacandelaria.js` (upsert SQL
+  DATABASE_URL local. Archivos: `scripts/seed-lacandelaria.js` (upsert SQL
   idempotente, disponible para quien tenga la URL de Neon) y
-  `api/load-lacandelaria-api.js` (loader idempotente: borra previo + POST).
+  `scripts/load-lacandelaria-api.js` (loader idempotente: borra previo + POST).
 - **bogota.html** (slug `bogota`, cat sitio): pagina de la capital de
   Colombia a escala ciudad con guia completa (itinerario 3 dias, 8 entradas
   de museos reales, 5 tours, 7 fotos, 5 FAQs). Fuente: ficha-bogota.md.
-  Mismo patron de archivos: `api/seed-bogota.js` y `api/load-bogota-api.js`.
+  Mismo patron de archivos: `scripts/seed-bogota.js` y `scripts/load-bogota-api.js`.
 - **museo-del-oro.html** (slug `museo-del-oro`, cat sitio): el museo mas
   visitado de Colombia. Datos reales: Balsa Muisca (El Dorado), Poporo
   Quimbaya, 4 salas permanentes, $5.000 (gratis domingos), 3 tours, 6 fotos.
-  Fuente: ficha-museo-del-oro.md. Archivos: `api/seed-museo-del-oro.js` y
-  `api/load-museo-del-oro-api.js`.
+  Fuente: ficha-museo-del-oro.md. Archivos: `scripts/seed-museo-del-oro.js` y
+  `scripts/load-museo-del-oro-api.js`.
 - **museo-botero.html** (slug `museo-botero`, cat sitio): arte gratis de
   clase mundial. Datos reales: 208 obras (123 Botero + 85 internacionales:
   Picasso, Monet, Dali), entrada gratis, 3 tours, 4 fotos. Fuente:
-  ficha-museo-botero.md. Archivos: `api/seed-museo-botero.js` y
-  `api/load-museo-botero-api.js`.
+  ficha-museo-botero.md. Archivos: `scripts/seed-museo-botero.js` y
+  `scripts/load-museo-botero-api.js`.
 - **jardin-botanico-bogota.html** (slug `jardin-botanico-bogota`, cat sitio):
   el pulmon verde. Datos reales: Tropicario (invernadero mas grande de
   Suramerica), 34 colecciones vivas, tarifas 2026 ($6.000/$8.000), 3 tours,
   4 fotos. Fuente: ficha-jardin-botanico.md. Archivos:
-  `api/seed-jardin-botanico.js` y `api/load-jardin-botanico-api.js`.
+  `scripts/seed-jardin-botanico.js` y `scripts/load-jardin-botanico-api.js`.
 - **plaza-de-bolivar.html** (slug `plaza-de-bolivar`, cat sitio): el corazon
   civico de Colombia. Datos reales: Plaza Mayor 1539, estatua de Tenerani,
   Catedral, Capitolio, Palacio de Justicia y Palacio Lievano, 3 tours, 7 fotos.
-  Fuente: ficha-plaza-de-bolivar.md. Archivos: `api/seed-plaza-de-bolivar.js`
-  y `api/load-plaza-de-bolivar-api.js`.
+  Fuente: ficha-plaza-de-bolivar.md. Archivos: `scripts/seed-plaza-de-bolivar.js`
+  y `scripts/load-plaza-de-bolivar-api.js`.
 - **museo-nacional.html** (slug `museo-nacional`, cat sitio): el museo mas
   antiguo del pais en el antiguo Panoptico de Thomas Reed. Datos reales: 17
   salas, tarifas 2026 ($6.000/$15.000, miercoles tarde gratis), 3 tours, 7
-  fotos. Fuente: ficha-museo-nacional.md. Archivos: `api/seed-museo-nacional.js`
-  y `api/load-museo-nacional-api.js`.
+  fotos. Fuente: ficha-museo-nacional.md. Archivos: `scripts/seed-museo-nacional.js`
+  y `scripts/load-museo-nacional-api.js`.
 - **quebrada-la-vieja.html** (slug `quebrada-la-vieja`, cat sitio): el sendero
   mas famoso de Bogota. Datos reales: 2,7 km hasta 3.200 m, registro previo
   obligatorio (caminos.eaab.gov.co), tramos Claro de Luna-La Virgen-Paramo, 3
   tours, 7 fotos. Fuente: ficha-quebrada-la-vieja.md. Archivos:
-  `api/seed-quebrada-la-vieja.js` y `api/load-quebrada-la-vieja-api.js`.
+  `scripts/seed-quebrada-la-vieja.js` y `scripts/load-quebrada-la-vieja-api.js`.
 - **cerro-de-guadalupe.html** (slug `cerro-de-guadalupe`, cat sitio): el
   mirador mas alto y gratis. Datos reales: 3.360 m, estatua de la Virgen (15 m)
   de Arcila Uribe, via de 1967, SIN funicular (correccion de dato erroneo),
   3 tours, 7 fotos. Fuente: ficha-cerro-de-guadalupe.md. Archivos:
-  `api/seed-cerro-de-guadalupe.js` y `api/load-cerro-de-guadalupe-api.js`.
+  `scripts/seed-cerro-de-guadalupe.js` y `scripts/load-cerro-de-guadalupe-api.js`.
 - **parque-simon-bolivar.html** (slug `parque-simon-bolivar`, cat sitio): el
   pulmon de 113 hectareas. Datos reales: laguna navegable, 4 km de ciclorruta,
   Plaza de Eventos (Rock al Parque), Biblioteca Virgilio Barco, 3 tours, 9
   fotos. Fuente: ficha-parque-simon-bolivar.md. Archivos:
-  `api/seed-parque-simon-bolivar.js` y `api/load-parque-simon-bolivar-api.js`.
+  `scripts/seed-parque-simon-bolivar.js` y `scripts/load-parque-simon-bolivar-api.js`.
 - **club-octava.html** (slug `club-octava`, cat sitio): el club de techno/house
   de Fourvenues. Datos reales: Cra 8 No. 63-41 (Chapinero), 100+ eventos,
   50.000+ asistentes, 200+ artistas, aforo 800, cocteles 30.000-65.000,
   3 tours, 6 fotos. Fuente: ficha-club-octava.md. Archivos:
-  `api/seed-club-octava.js` y `api/load-club-octava-api.js`.
+  `scripts/seed-club-octava.js` y `scripts/load-club-octava-api.js`.
 - **theatron.html** (slug `theatron`, cat sitio): el megaclub LGBTQ+ mas grande
   de Latinoamerica. Datos reales: 20 salas, capacidad 5.000-7.000, epicentro
   del Chapigay, World's 100 Best Clubs 2024 (#68), cover 30.000/50.000,
-  3 tours, 6 fotos. Fuente: ficha-theatron.md. Archivos: `api/seed-theatron.js`
-  y `api/load-theatron-api.js`.
+  3 tours, 6 fotos. Fuente: ficha-theatron.md. Archivos: `scripts/seed-theatron.js`
+  y `scripts/load-theatron-api.js`.
 - **video-club.html** (slug `video-club`, cat sitio): el club de la Cll 64
   #13-09 frente al Cosmos. Datos reales: 3 ambientes (chill out, techno/house,
   terraza), evento "Escandalo 25" ($104.000), Kevin Saunderson (may-2025),
   3 tours, 6 fotos. Fuente: ficha-video-club.md. Archivos:
-  `api/seed-video-club.js` y `api/load-video-club-api.js`.
+  `scripts/seed-video-club.js` y `scripts/load-video-club-api.js`.
 - **mad-radio.html** (slug `mad-radio`, cat sitio): el club de 3 pisos del
   Chico con tienda de vinilos. Datos reales: Cra 14A #82-42, tech-house,
   reggae/rock, terraza, mie-sab desde 8PM, 3 tours, 6 fotos. Fuente:
-  ficha-mad-radio.md. Archivos: `api/seed-mad-radio.js` y
-  `api/load-mad-radio-api.js`.
+  ficha-mad-radio.md. Archivos: `scripts/seed-mad-radio.js` y
+  `scripts/load-mad-radio-api.js`.
 - **gate-club.html** (slug `gate-club`, cat sitio): el techno/house de
   Ortezal. Datos reales: Tv. 39A #20A-69 (Puente Aranda), eventos 2026
   (Energy Transfer, Europe Tour), cerveza $12.000, 3 tours, 6 fotos. Fuente:
-  ficha-gate-club.md. Archivos: `api/seed-gate-club.js` y
-  `api/load-gate-club-api.js`.
+  ficha-gate-club.md. Archivos: `scripts/seed-gate-club.js` y
+  `scripts/load-gate-club-api.js`.
 - **radio-estrella.html** (slug `radio-estrella`, cat sitio): el trance/fast
   techno/hard house/UKG del Chico. Datos reales: Cra 15 #99-23, a 81 m de
   Chico Plaza, vie-sab 10PM-5AM, 3 tours, 6 fotos. Fuente:
-  ficha-radio-estrella.md. Archivos: `api/seed-radio-estrella.js` y
-  `api/load-radio-estrella-api.js`.
+  ficha-radio-estrella.md. Archivos: `scripts/seed-radio-estrella.js` y
+  `scripts/load-radio-estrella-api.js`.
 - **espacio-kinder.html** (slug `espacio-kinder`, cat sitio): el megaclub
   heredero del Kaputt Klub. Datos reales: abrio 31-oct-2025 en el excolegio
   de la Av. Calle 63 #15-70 (Barrios Unidos), 5 pisos, 7 salas, galeria
   250 m2, aforo hasta 4.500, bono 30.000, 3 tours, 9 fotos. Fuente:
-  ficha-espacio-kinder.md. Archivos: `api/seed-espacio-kinder.js` y
-  `api/load-espacio-kinder-api.js`.
+  ficha-espacio-kinder.md. Archivos: `scripts/seed-espacio-kinder.js` y
+  `scripts/load-espacio-kinder-api.js`.
 - **radio-berlin.html** (slug `radio-berlin`, cat sitio): "La Casa del
   Techno". Datos reales: nacio 2010 frente a la Plaza de Toros (La Macarena,
   cerro jul 2023), resucito en Cra 13 #64-13 (Chapinero), cabina-jaula,
   capacidad 400-500, miercoles de house gratis, RadioBerlin Academy,
   3 tours, 7 fotos. Fuente: ficha-radio-berlin.md. Archivos:
-  `api/seed-radio-berlin.js` y `api/load-radio-berlin-api.js`.
+  `scripts/seed-radio-berlin.js` y `scripts/load-radio-berlin-api.js`.
 - **museo-santa-clara.html** (slug `museo-santa-clara`, cat sitio): la joya del
   barroco bogotano. Datos reales: templo del Real Convento de Santa Clara
   (1647), 328 piezas (9 retablos), 112 oleos, artesonado mudejar con
   pentafolias, Vasquez de Arce y Ceballos, tarifas Res. 2137/2025, gratis
   domingos/miercoles, 3 tours, 7 fotos. Direccion Cra 8 No. 8-91. Fuente:
-  ficha-museo-santa-clara.md. Archivos: `api/seed-museo-santa-clara.js` y
-  `api/load-museo-santa-clara-api.js`.
+  ficha-museo-santa-clara.md. Archivos: `scripts/seed-museo-santa-clara.js` y
+  `scripts/load-museo-santa-clara-api.js`.
 - **quinta-de-bolivar.html** (slug `quinta-de-bolivar`, cat sitio): la casa de
   campo de Bolivar al pie de Monserrate. Datos reales: entregada a Bolivar en
   1820 (habito 423 dias), espada robada por el M-19 en 1974 y de vuelta desde
   el 24-jul-2026, jardin historico (36 especies de aves), tarifas Res. 0975,
   3 tours, 9 fotos. Fuente: ficha-quinta-de-bolivar.md. Archivos:
-  `api/seed-quinta-de-bolivar.js` y `api/load-quinta-de-bolivar-api.js`.
+  `scripts/seed-quinta-de-bolivar.js` y `scripts/load-quinta-de-bolivar-api.js`.
 - **museo-de-la-independencia.html** (slug `museo-de-la-independencia`, cat
   sitio): la casa del grito de independencia. Datos reales: casa colonial de
   +400 anos, incidente del Florero de Llorente (1810), fundado 1960, 2.360
   obras, base del florero original, balcon esquinado verde, sobrevivio al
   Bogotazo, 3 tours, 5 fotos. Fuente: ficha-museo-de-la-independencia.md.
-  Archivos: `api/seed-museo-de-la-independencia.js` y
-  `api/load-museo-de-la-independencia-api.js`.
+  Archivos: `scripts/seed-museo-de-la-independencia.js` y
+  `scripts/load-museo-de-la-independencia-api.js`.
 - **parque-nacional.html** (slug `parque-nacional`, cat sitio): el primer gran
   parque publico de Bogota. Datos reales: 1934 (Karl Brunner), 283 ha (141 de
   reserva forestal), Monumento Nacional (1996), monumento a Rafael Uribe Uribe,
   Torre del Reloj Suizo, Teatro El Parque (1936), mapa en relieve, 6AM-6PM,
   gratis, 3 tours, 7 fotos. Fuente: ficha-parque-nacional.md. Archivos:
-  `api/seed-parque-nacional.js` y `api/load-parque-nacional-api.js`.
+  `scripts/seed-parque-nacional.js` y `scripts/load-parque-nacional-api.js`.
 - **el-virrey.html** (slug `el-virrey`, cat sitio): el pulmon verde del norte.
   Datos reales: parque lineal (1999), 10,4 ha, >3.300 arboles, 71-100+ aves,
   abeja andina cornuda, 5 murcielagos, escultura Gran Cascada de Negret,
   prohibido futbol, gratis, 3 tours, 8 fotos. Fuente: ficha-el-virrey.md.
-  Archivos: `api/seed-el-virrey.js` y `api/load-el-virrey-api.js`.
+  Archivos: `scripts/seed-el-virrey.js` y `scripts/load-el-virrey-api.js`.
 - **el-tunal.html** (slug `el-tunal`, cat sitio): el corazon verde del sur.
   Datos reales: 55 ha en Tunjuelito, misa campal de Juan Pablo II (1986),
   Biblioteca Gabriel Garcia Marquez (Biblored, +84.000 volumenes), lagos ~3 ha,
   pista atletica, bicicross, skate, gratis (canchas con tarifa), 3 tours,
-  8 fotos. Fuente: ficha-el-tunal.md. Archivos: `api/seed-el-tunal.js` y
-  `api/load-el-tunal-api.js`.
+  8 fotos. Fuente: ficha-el-tunal.md. Archivos: `scripts/seed-el-tunal.js` y
+  `scripts/load-el-tunal-api.js`.
 - **parque-la-florida.html** (slug `parque-la-florida`, cat sitio): santuario
   de aves del occidente. Datos reales: 267 ha en Engativa, primer observatorio
   permanente de aves de Bogota (2011, guadua), tingua bogotana (en peligro),
   jilguero andino, vivero pedagogico, asadores y ciclorrutas, gratis, 3 tours,
   8 fotos. Fuente: ficha-parque-la-florida.md. Archivos:
-  `api/seed-parque-la-florida.js` y `api/load-parque-la-florida-api.js`.
+  `scripts/seed-parque-la-florida.js` y `scripts/load-parque-la-florida-api.js`.
 
 Todas verificadas en produccion: render 200 con las 9 secciones del motor
 (descripcion, dificultad, entradas, tours, checklist, itinerario, fauna,
@@ -238,7 +238,7 @@ Ver BUGS_HISTORICOS.md BUG-022.
    usuarios) cuando haya acceso a la URL de Neon. Luego asignar autor al
    post desde admin.html (TASK-013).
 4. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
-   con curl y re-ejecutar `node api/load-lacandelaria-api.js` para que la
+   con curl y re-ejecutar `node scripts/load-lacandelaria-api.js` para que la
    hero y la galeria carguen (hoy el HTML se renderiza pero las imagenes
    del hero/galeria pueden estar rotas por tamano 1200px + hash 6/6f).
 5. Cargar tags reales en los destinos de comida/hostal/evento (varios
@@ -364,7 +364,7 @@ Antes de proponer cualquier cambio, la siguiente IA debe:
 - **pagina-destino.js:** v9, ~1.800+ lineas (referencial; +bloque de blog con temasBlog multi-tema, schemaLD keywords y seccion "Quien escribe" condicional por id_autor). Los cambios multi-tema estan en el repo pero NO desplegados (TASK-011).
 - **api/destinos.js:** toPlace() ahora expone `temas` (tags.temas[] o [tags.tema]) y excluye `categoria_slug='blog'` del listado general y del mapa (solo aparece con ?categoria=blog). NO desplegado aun.
 - **admin-destinos.js:** v2.1, sin cambios -- el MERGE JSONB ya cubre tags.temas[]/tags.tema sin tocar el backend (ADR-003).
-- **Archivos nuevos de esta sesion:** `api/seed-monserrate-guia.js` (datos del post), `api/load-monserrate-guia-api.js` (loader idempotente DELETE+POST), `exploraco desarrollo/ficha-monserrate-guia.md` (ficha verificada), `db/migrations/004_usuarios_blog_autor.sql` (migracion PENDIENTE de aplicar en Neon).
+- **Archivos nuevos de esta sesion:** `scripts/seed-monserrate-guia.js` (datos del post), `scripts/load-monserrate-guia-api.js` (loader idempotente DELETE+POST), `exploraco desarrollo/ficha-monserrate-guia.md` (ficha verificada), `db/migrations/004_usuarios_blog_autor.sql` (migracion PENDIENTE de aplicar en Neon).
 - **publicar-lugar.js:** v3, guarda tags de sitio en JSONB.
 - **Paginas de referencia visual (hardcodeadas):** ciudad-perdida.html, parque-tayrona.html.
 - **index.html:** ~4.400 lineas (referencial); seccion Inspirate ahora usa multi-tema (`tArr[0]` y filtro por `tArr.indexOf`). Carga dinamica real vive en `index-api-connector.js` (ver BLUEPRINT.md seccion 5-bis), cargado via `<script src>` al final de `<body>`, junto con `usuario-session.js` (sin verificar, ver Riesgos activos).
