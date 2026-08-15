@@ -1542,15 +1542,15 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="form-hint">El titular usa el campo <b>Nombre</b> (tab General), el resumen el campo <b>Resumen</b> y el cuerpo completo el campo <b>Descripción</b> (tab Contenido). Las fotos se administran igual que en las demás categorías, desde el tab Fotos.</div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Tema</label>
-                <select class="form-input form-select" id="f-blog-tema">
-                  <option value="">-- Seleccionar --</option>
+                <label class="form-label">Temas (puedes elegir varios)</label>
+                <select class="form-input form-select" id="f-blog-tema" multiple>
                   <option value="aventura">🏔️ Aventura</option>
                   <option value="gastro">🍽️ Gastronomía</option>
                   <option value="cultura">🎭 Cultura</option>
                   <option value="naturaleza">🌿 Naturaleza</option>
                   <option value="tips">💡 Tips</option>
                 </select>
+                <div class="form-hint">Mantén Ctrl (Windows) o Cmd (Mac) para elegir varios. El primero se usa como tema principal.</div>
               </div>
               <div class="form-group">
                 <label class="form-label">Video (YouTube o Vimeo)</label>
@@ -2531,7 +2531,13 @@ var CATEGORY_TAG_FIELDS = {
      de columnas ya existentes y un valor derivado (ver DECISIONS.md,
      leccion de BUG-019 sobre no duplicar campos genericos). */
   blog: [
-    { key:'tema',      id:'f-blog-tema' },
+    /* Multi-tema: f-blog-tema es un <select multiple>. Se guarda en
+       tags.temas[] (array) y tags.tema conserva el primero como
+       principal (el grid/renderer actual leen tags.tema). Como el
+       motor generico escribe tags.temas, el primario se deriva en
+       _buildTagsObj() (_buildTagsObj escribe tags.tema = temas[0]) y
+       se desanida en _applyTagsToLocal(). */
+    { key:'temas',    id:'f-blog-tema', multi:true, localKey:'temas' },
     { key:'video_url', id:'f-blog-video' },
     { key:'id_autor',  id:'f-blog-autor-id' }
   ]
@@ -2673,6 +2679,13 @@ function _buildTagsObj(p) {
     if (val && val.length) tagsObj[d.key] = val;
   });
 
+  /* Blog multi-tema: tags.tema (primario) se deriva de tags.temas[]
+     para que el grid/renderer actuales (que leen tags.tema) sigan
+     funcionando sin cambios. */
+  if (p.cat === 'blog' && Array.isArray(p.temas) && p.temas.length) {
+    tagsObj.tema = p.temas[0];
+  }
+
   /* temporada_matriz es un objeto {Ene:'ideal',...}, no un arreglo:
      no encaja en CATEGORY_TAG_LISTS (que asume .length). Se mapea
      a mano, igual que el bloque de Hostal arriba en esta funcion. */
@@ -2719,6 +2732,12 @@ function _applyTagsToLocal(local, tags, cat) {
   }
   if (cat === 'comida' && tags.horario_detallado && typeof tags.horario_detallado === 'object') {
     local.horarioDetallado = tags.horario_detallado;
+  }
+  /* Blog multi-tema: el grid lee tags.tema (unico). Al editar un post
+     creado antes del multi-tema, tags.temas[] no existe -- se envuelve
+     el valor unico en un array para que el select multiple lo muestre. */
+  if (cat === 'blog') {
+    if (!local.temas && tags.tema) local.temas = [tags.tema];
   }
 }
 
@@ -3411,6 +3430,14 @@ function savePlace() {
        guardarse. p.amenities tampoco se lee: apuntaba a un
        contenedor (#evento-amenities-check) que nunca existio. */
     collectCategoryTagFields(p, 'evento');
+  }
+
+  /* ── BLOG SPECIFIC ── */
+  if(cat === 'blog') {
+    /* Sprint Inspirate: motor generico -- llena temas[] (multi-select
+       f-blog-tema), video_url e id_autor. El primario tags.tema se
+       deriva en _buildTagsObj() (ver CATEGORY_TAG_FIELDS.blog). */
+    collectCategoryTagFields(p, 'blog');
   }
 
   /* ── FAQs (all categories) ── */

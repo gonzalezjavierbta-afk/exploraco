@@ -4,7 +4,65 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Agosto 2026) - Paginas dinamicas lacandelaria.html y bogota.html
+### Sesion actual (Agosto 2026) - Primera entrada real de blog + multi-tema
+
+Se publico la PRIMERA entrada real de la seccion Inspirate (blog) en
+produccion y se implementaron los cambios multi-tema (aun NO desplegados,
+el deploy de Vercel sigue bloqueado -- ver TASK-011):
+
+- **monserrate-guia-completa.html** (slug `monserrate-guia-completa`,
+  `categoria_slug='blog'`, `status='published'`, `destacado=true`): post
+  "El cerro que vigila a Bogota: guia completa para subir a 3.152 m" con
+  cuerpo ~6.250 palabras (66 parrafos) en `descripcion` TEXT (parrafos
+  separados por `\n\n`, el renderer usa `white-space:pre-line`), lead +
+  highlight, 5 FAQs, 3 fotos de galeria + 1 hero (Wikimedia Commons,
+  thumbs 960px verificadas con curl), video
+  https://youtu.be/Bgtc-bsl9II (verificado via oEmbed, embed OK en
+  render) y tags JSONB multi-tema
+  `{tema:'cultura', temas:['cultura','naturaleza','aventura','tips',
+  'gastro'], video_url:'https://youtu.be/Bgtc-bsl9II'}`. Sin `id_autor`
+  por decision de Javier: la migracion 004 queda pendiente y el autor se
+  podra asignar/editar desde admin.html despues (TASK-012/TASK-013).
+  Archivos: `api/seed-monserrate-guia.js` (datos),
+  `api/load-monserrate-guia-api.js` (loader idempotente DELETE+POST) y
+  `exploraco desarrollo/ficha-monserrate-guia.md` (ficha con datos
+  verificados). Verificado en produccion: GET /monserrate-guia-completa.html
+  = 200 con JSON-LD BlogPosting, video embed, chip "Cultura", divs
+  balanceados 80/80; `/api/destinos?categoria=blog` devuelve el post con
+  `tema=cultura`; sitemap incluye el slug. Ver TASKS.md TSK-043.
+- **Multi-tema (TSK-044, implementado en repo, NO desplegado):** los
+  cambios transversales para que un destino/blog pueda tener varios temas
+  (tags.temas[]) ya estan en los archivos locales y pasan node --check +
+  ASCII-safety: `api/destinos.js` toPlace() expone `temas: tags.temas ||
+  [tags.tema]` (mantiene el campo `tema`); `index.html` inspirateCardHTML
+  usa `tArr[0]` (p.temas o p.tema) y renderInspirate filtra con
+  `tArr.indexOf(filter)>=0`; `api/pagina-destino.js` array `temasBlog`
+  normalizado + chips del hero con forEach + schemaLD agrega keywords
+  multi-tema con safeJSON(d.tags); `admin.html` campo `f-blog-tema` ahora
+  es `<select multiple>`, `CATEGORY_TAG_FIELDS.blog` usa
+  {key:'temas', multi:true, localKey:'temas'}, `_buildTagsObj()` deriva
+  `tags.tema = p.temas[0]`, `_applyTagsToLocal()` envuelve tags.tema en
+  local.temas y `savePlace()` agrega collectCategoryTagFields(p,'blog').
+  Ver DECISIONS.md ADR-010. El post publicado ya usa tags.temas[] porque
+  el loader lo envio directo a la API; el chip "Cultura" en produccion
+  sale de `temas[0]`/`tema` (compatibilidad).
+
+**Bugs encontrados en esta sesion (ver BUGS_HISTORICOS.md):** la tabla
+`categorias` de Neon NO tenia la fila `'blog'`, por lo que el FK
+`destinos_categoria_slug_fkey` rechazaba el INSERT con error 500 (bug
+latente: el modal publico de blog de `api/publicar-lugar.js` habria
+fallado igual). Se resolvio manualmente insertando la categoria via
+consola Neon (`INSERT ... ON CONFLICT (slug) DO NOTHING`); el loader de
+blog da error claro 500 si la categoria no existe. Ademas, leccion SQL
+nueva: en PostgreSQL `'\ud83d\udcdd'` SIN prefijo E es un literal de 12
+caracteres (backslash + texto) que revienta columnas varchar(10)
+(SQLSTATE 22001 "value too long") -- hay que usar `E'\ud83d\udcdd'` o el
+emoji real; aplica a la columna `emoji` de `categorias` y a cualquier
+varchar corto. Y hallazgo de auditoria: admin.html tiene un desbalance
+PRE-EXISTENTE de 1 div (632 abiertos vs 631 cerrados en git), no
+introducido por esta sesion -- ver Riesgos activos.
+
+### Sesion previa (Agosto 2026) - Paginas dinamicas lacandelaria.html y bogota.html
 
 Se crearon cinco paginas de destino dinamicas nuevas servidas por el motor
 `api/pagina-destino.js` (patron monserrate.html), cargadas en produccion:
@@ -167,20 +225,34 @@ Ver BUGS_HISTORICOS.md BUG-022.
 
 ## Que sigue (proxima accion inmediata)
 
-1. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
+1. **Desbloquear el deploy de Vercel (TASK-011, prioridad ALTA):** el deploy
+   automatico sigue fallando con causa desconocida (diagnostico en pausa).
+   Bloquea en produccion los cambios multi-tema de TSK-044 (api/destinos.js,
+   index.html, api/pagina-destino.js, admin.html) y los pendientes de
+   TASK-008/TSK-017 de sesiones previas. Revisar logs de build de Vercel
+   (dashboard o `vercel logs`) y comparar contra el ultimo deploy exitoso.
+2. **Push a GitHub (TASK-014):** commit y push de la sesion actual (blog +
+   multi-tema + migracion 004) -- pendiente de la sesion Chrome/GCM.
+3. **Aplicar migracion 004 en Neon (TASK-012):** ejecutar
+   `db/migrations/004_usuarios_blog_autor.sql` (foto_url + ciudad_base en
+   usuarios) cuando haya acceso a la URL de Neon. Luego asignar autor al
+   post desde admin.html (TASK-013).
+4. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
    con curl y re-ejecutar `node api/load-lacandelaria-api.js` para que la
    hero y la galeria carguen (hoy el HTML se renderiza pero las imagenes
    del hero/galeria pueden estar rotas por tamano 1200px + hash 6/6f).
-2. Cargar tags reales en los destinos de comida/hostal/evento (varios
+5. Cargar tags reales en los destinos de comida/hostal/evento (varios
    estan vacios, lo que degrada el comparador a "relleno por rating").
-3. TSK-016 (Widget "Quien va este mes") del backlog Social.
-4. Materializar ADR-008: crear la carpeta `db/migrations/` con el SQL
-   del fix de BUG-021 versionado, como repositorio unico de estructura BD.
-5. Diferido por decision de usuario: las paginas de categoría `evento`
-   para la escena electronica de Bogota (estos 8 venues quedaron en la
-   band "Lugares" con cat `sitio`; los eventos concretos se retomaran
-   en una tarea posterior).
-5. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
+6. TSK-016 (Widget "Quien va este mes") del backlog Social.
+7. Materializar ADR-008: completar la carpeta `db/migrations/` con el SQL
+   del fix de BUG-021 versionado (ya existe 003_interacciones_dims_traveller
+   y 004_usuarios_blog_autor; falta el fix de BUG-021) como repositorio
+   unico de estructura BD.
+8. Diferido por decision de usuario: las paginas de categoria `evento`
+   para la escena electronica de Bogota (los 8 venues quedaron en la band
+   "Lugares" con cat `sitio`; los eventos concretos se retomaran en una
+   tarea posterior).
+9. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
    RESEND_API_KEY).
 
 ### Sesion previa (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
@@ -255,9 +327,21 @@ por "pendiente", "completo" o "sin dependencias externas".
 
 ## Que problemas existen (riesgos activos)
 
+- **Deploy de Vercel bloqueado (NUEVO, TASK-011):** el deploy automatico
+  desde GitHub falla con causa desconocida (diagnostico en pausa). Todo
+  cambio en el repo queda local hasta desbloquearlo -- incluyendo el
+  multi-tema de TSK-044 y pendientes de TASK-008/TSK-017. Es el bloqueador
+  #1 del proyecto ahora mismo.
+- **Desbalance pre-existente de 1 div en admin.html (NUEVO, hallazgo de
+  auditoria):** 632 divs abiertos vs 631 cerrados segun git; NO fue
+  introducido por esta sesion (los cambios de admin.html de esta sesion
+  pasaron verificado de balance en el diff). Pendiente de localizar y
+  corregir en una sesion futura; no parece romper el render actual (los
+  navegadores toleran 1 cierre faltante), pero viola el Escudo GOLD y
+  cualquier adicion futura de divs puede empeorar el desbalance.
 - admin.html es un archivo grande (~7.800 lineas). Toda edicion debe hacerse con Python `str.replace()` exacto, nunca sed/bash sobre HTML complejo (Reglas de Oro ExploraCO v5, punto 2).
 - El presupuesto de funciones serverless de Vercel Hobby esta agotado (8/8). Nuevas necesidades de endpoint deben resolverse extendiendo un archivo existente via query params, no creando uno nuevo.
-- Bugs historicos documentados que no deben repetirse: ver BUGS_HISTORICOS.md (FUNCTION_INVOCATION_FAILED por no-ASCII, doble escape visible, HTML roto por comentarios/divs sin cerrar, sub-tabs que desaparecen, funciones duplicadas, nombres de campo incorrectos, motor generico registrado vacio, campos duplicados sin conectar).
+- Bugs historicos documentados que no deben repetirse: ver BUGS_HISTORICOS.md (FUNCTION_INVOCATION_FAILED por no-ASCII, doble escape visible, HTML roto por comentarios/divs sin cerrar, sub-tabs que desaparecen, funciones duplicadas, nombres de campo incorrectos, motor generico registrado vacio, campos duplicados sin conectar, categoria 'blog' faltante en Neon, emoji en varchar(10) sin prefijo E).
 - El dominio propio exploraco.co, Google Search Console y RESEND_API_KEY siguen sin configurar (TASK-004, TASK-005, TASK-006).
 - `scores` (calificaciones internas de Hostal) sigue sin persistir en el backend -- viaja en el payload pero `admin-destinos.js` nunca lo escribe (ver BUGS_HISTORICOS.md BUG-016, "Pendiente conocido"). Sigue fuera de alcance.
 - (Nuevo, TASK-007) `renderMyMap()` -- seccion personal "Mi Mapa" (guardados/visitados) -- no se re-invoca dentro de `index-api-connector.js` tras el fetch inicial; solo se refresca ante interaccion del usuario (guardar/quitar/limpiar). No genera errores, pero un usuario con lugares ya guardados podria ver esa seccion vacia/placeholder hasta su primera interaccion en la pagina.
@@ -276,12 +360,14 @@ Antes de proponer cualquier cambio, la siguiente IA debe:
 
 ## Baseline tecnico actual (referencia rapida)
 
-- **admin.html:** 5.808 lineas (antes 5.640; +168 por el Tab Especifico completo de Evento -- 2 sub-pestanas nuevas "Tipos de entrada" y "Que llevar", el registro en CATEGORY_TAG_FIELDS/LISTS.evento, la creacion de addLineupRow()/addAgendaRow() -- BUG-019 -- y la eliminacion de 2 campos duplicados (f-aforo/f-entrada-desde) que nunca se conectaron a nada, ver BUGS_HISTORICOS.md). Tab Especifico completo para las 4 categorias: Sitio (Sprint 2), Hostal (Sprint 3, TASK-001), Comida (Sprint 4, TASK-002) y Evento (Sprint 5, TASK-003).
-- **pagina-destino.js:** v9, 1.265 lineas (antes 1.147; +118 por 5 secciones nuevas de Evento -- Fecha y sede, Lineup/Artistas, Agenda del evento, Tipos de entrada, Que llevar -- y el helper `fmtFechaEvento()`).
-- **admin-destinos.js:** v2.1, sin cambios desde Sprint 2 -- el MERGE JSONB ya cubre los campos nuevos de Evento sin tocar el backend (mismo razonamiento que Sitio/Hostal/Comida).
+- **admin.html:** 5.894 lineas (referencial; +86 por el formulario de blog con select multiple de temas, campo video y buscador de autor -- ver TSK-043/TSK-044). Desbalance pre-existente de 1 div en git (632 vs 631), no introducido por esta sesion (ver Riesgos activos).
+- **pagina-destino.js:** v9, ~1.800+ lineas (referencial; +bloque de blog con temasBlog multi-tema, schemaLD keywords y seccion "Quien escribe" condicional por id_autor). Los cambios multi-tema estan en el repo pero NO desplegados (TASK-011).
+- **api/destinos.js:** toPlace() ahora expone `temas` (tags.temas[] o [tags.tema]) y excluye `categoria_slug='blog'` del listado general y del mapa (solo aparece con ?categoria=blog). NO desplegado aun.
+- **admin-destinos.js:** v2.1, sin cambios -- el MERGE JSONB ya cubre tags.temas[]/tags.tema sin tocar el backend (ADR-003).
+- **Archivos nuevos de esta sesion:** `api/seed-monserrate-guia.js` (datos del post), `api/load-monserrate-guia-api.js` (loader idempotente DELETE+POST), `exploraco desarrollo/ficha-monserrate-guia.md` (ficha verificada), `db/migrations/004_usuarios_blog_autor.sql` (migracion PENDIENTE de aplicar en Neon).
 - **publicar-lugar.js:** v3, guarda tags de sitio en JSONB.
 - **Paginas de referencia visual (hardcodeadas):** ciudad-perdida.html, parque-tayrona.html.
-- **index.html:** 4.373 lineas (antes 4.548; -175 por TASK-007 -- arrays `PL[]`/`MAPA_PLACES[]` vaciados a `const PL=[];`/`const MAPA_PLACES=[];`). Carga dinamica real vive en `index-api-connector.js` (ver BLUEPRINT.md seccion 5-bis), cargado via `<script src>` al final de `<body>`, junto con `usuario-session.js` (sin verificar, ver Riesgos activos).
+- **index.html:** ~4.400 lineas (referencial); seccion Inspirate ahora usa multi-tema (`tArr[0]` y filtro por `tArr.indexOf`). Carga dinamica real vive en `index-api-connector.js` (ver BLUEPRINT.md seccion 5-bis), cargado via `<script src>` al final de `<body>`, junto con `usuario-session.js` (sin verificar, ver Riesgos activos).
 
 #### Que se estaba haciendo (Sprint 2 - Paridad Visual)
 Se ejecuto el "Context Package Maestro de Paridad 1px (Sprint 2)": 3 bugs de produccion verificados y corregidos (ver BUGS_HISTORICOS.md BUG-011/012/013/014), mas 3 campos nuevos en el modelo de datos (dificultad_desc, dificultad_tags, temporada_matriz) y el upgrade de Tours 4.0 (tipo_tour, idioma, max_personas). admin-destinos.js no requirio cambios: los campos nuevos viven dentro de `tags` JSONB, ya cubierto por el merge existente.

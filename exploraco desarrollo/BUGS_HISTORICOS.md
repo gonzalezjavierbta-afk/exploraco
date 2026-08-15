@@ -412,3 +412,35 @@ No se toco el codigo de `api/interacciones.js` -- el bug era 100% de estado de B
 
 **Estado:** Resuelto en `api/pagina-destino.js` (ver comentario BUG-024 en el codigo). Prevencion: al ampliar la escala de dificultad, cubrir todos los valores historicos y los ofrecidos por admin.html (Facil/Moderado/Dificil/Experto y los legados Media/Medio/Facil).
 
+## BUG-025: Categoria 'blog' inexistente en la tabla categorias de Neon -- FK destinos_categoria_slug_fkey rechazaba el INSERT (error 500)
+
+**Contexto:** Al cargar la primera entrada real de blog (monserrate-guia-completa, TSK-043) via el loader `api/load-monserrate-guia-api.js` (DELETE+POST contra la API de admin), el POST fallaba con 500. El codigo de `admin-destinos.js` y del loader NO tenia el error: el problema estaba en el estado de la base de datos de produccion.
+
+**Sintoma (error real de Neon):** el INSERT en `destinos` violaba la restriccion `destinos_categoria_slug_fkey` (FK hacia `categorias.slug`): la fila `'blog'` NO existia en la tabla `categorias` de Neon. Todas las demas categorias (sitio, hostal, comida, evento) si existian porque habian sido insertadas en sesiones anteriores (algunas manualmente en la consola de Neon, por lo que tampoco estan en el repo -- el mismo patron de riesgo de "estado de BD no reproducible" que revelo ADR-008).
+
+**Por que es un bug latente:** cualquier insert de un destino con categoria blog habria fallado igual, incluyendo el modal publico de publicacion de blog de `api/publicar-lugar.js` (que permite al usuario publicar un lugar/blog desde el front-end). No se habia detectado antes porque nunca se habia insertado un destino con categoria blog en produccion.
+
+**Fix:** se inserto la categoria manualmente via consola de Neon con SQL idempotente:
+```sql
+INSERT INTO categorias (slug, nombre, emoji)
+VALUES ('blog', 'Blog', '...')
+ON CONFLICT (slug) DO NOTHING;
+```
+(La columna `emoji` es varchar(10); ver BUG-026 para el detalle del prefijo E.) No se toco codigo: el loader de blog da error claro 500 si la categoria no existe, lo cual se considera comportamiento aceptable (el error de FK de Neon llega al cliente).
+
+**Verificacion (post-fix):** el POST del loader completo OK y `/api/destinos?categoria=blog` devuelve el post; GET /monserrate-guia-completa.html = 200.
+
+**Estado:** Resuelto (categoria insertada en Neon). Prevencion: antes de sembrar contenido de una categoria nueva, verificar que la fila correspondiente exista en `categorias` (SELECT ... WHERE slug=...) o que el seed lo garantice; y, coherente con ADR-008, toda categoria nueva deberia materializarse como INSERT versionado en el repo (candidato a migracion futura), no solo en la consola de Neon.
+
+## BUG-026: Leccion SQL -- '\ud83d\udcdd' sin prefijo E es un literal de 12 caracteres en PostgreSQL y revienta columnas varchar(10) (SQLSTATE 22001)
+
+**Contexto:** Al insertar la categoria 'blog' en la tabla `categorias` (columna `emoji` varchar(10), ver BUG-025), se intento escribir el emoji de libreta como `'\ud83d\udcdd'` (el mismo escape Unicode que se usa en los strings JS de `api/*.js`, p.ej. `CAT_EMOJI` de `api/destinos.js`). En PostgreSQL ese string SIN el prefijo E es un literal de texto de 12 caracteres (backslash + "ud83d" + backslash + "udcdd"), no el emoji real.
+
+**Sintoma:** el INSERT fallaba con SQLSTATE 22001 "value too long for type character varying(10)": 12 caracteres no caben en varchar(10).
+
+**Causa raiz:** en PostgreSQL, `'\uXXXX'` (comilla simple simple) interpreta la barra invertida como caracter literal, a diferencia de JS (donde `'\uXXXX'` es un escape real). Para que PostgreSQL interprete escapes de la forma C (incluido \uXXXX) hay que usar el prefijo E: `E'\ud83d\udcdd'`. Alternativa equivalente: pegar el emoji real en el string SQL (pero viola el mandato ASCII de los archivos del repo; en la consola de Neon es valido).
+
+**Fix:** usar `E'\ud83d\udcdd'` en el INSERT de Neon, o directamente el emoji real (por ejemplo el glifo de libreta o de pluma) que es 1 solo caracter y cabe en varchar(10).
+
+**Estado:** Resuelto (leccion documentada; el INSERT final uso el emoji correcto). Prevencion: en SQL de Neon, usar SIEMPRE el prefijo E para escapes \uXXXX (`E'\ud83d\udcdd'`) o pegar el emoji real; nunca copiar el escape JS `'\ud83d\udcdd'` de `api/*.js` tal cual. Aplica a cualquier columna varchar corta (como `categorias.emoji`) y a cualquier INSERT/UPDATE manual en la consola de Neon.
+

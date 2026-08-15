@@ -2634,9 +2634,12 @@ function inspirateTiempoLectura(texto) {
 }
 
 function inspirateCardHTML(p) {
-  var tema  = inspEsc(p.tema || '');
-  var emoji = TEMA_EMOJI_JS[p.tema] || '📍';
-  var label = TEMA_LABEL_JS[p.tema] || 'Blog';
+  // Multi-tema: usa el primer tema del array (p.temas) si existe;
+  // cae al valor unico p.tema por compatibilidad.
+  var tArr  = (p.temas && p.temas.length) ? p.temas : (p.tema ? [p.tema] : []);
+  var tema  = inspEsc(tArr[0] || '');
+  var emoji = TEMA_EMOJI_JS[tArr[0]] || '📍';
+  var label = TEMA_LABEL_JS[tArr[0]] || 'Blog';
   var min   = inspirateTiempoLectura(p.desc);
   var bg    = inspEsc(p.hero_bg || 'linear-gradient(135deg,#3a0a1a,#4a1a2a)');
   var img   = p.foto ? '<img src="'+inspEsc(p.foto)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;opacity:.8">' : '';
@@ -2662,7 +2665,14 @@ function renderInspirate(filter) {
   var list = document.getElementById('insp-smalls-list');
   if (!list) return;
   list.querySelectorAll('[data-inspirate-real]').forEach(function(el){ el.remove(); });
-  var posts = filter === 'all' ? INSPIRATE_POSTS : INSPIRATE_POSTS.filter(function(p){ return p.tema === filter; });
+  var posts = filter === 'all'
+    ? INSPIRATE_POSTS
+    : INSPIRATE_POSTS.filter(function(p){
+        // Multi-tema: el post aparece en el filtro si p.temas incluye el
+        // tema; cae a p.tema === filter por compatibilidad.
+        var tArr = (p.temas && p.temas.length) ? p.temas : (p.tema ? [p.tema] : []);
+        return tArr.indexOf(filter) >= 0;
+      });
   var html = posts.map(inspirateCardHTML).join('');
   if (html) {
     var wrap = document.createElement('div');

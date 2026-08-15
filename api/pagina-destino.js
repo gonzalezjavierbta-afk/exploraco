@@ -98,6 +98,12 @@ function schemaLD(d, cat, autor) {
     if (autor && autor.nombre) {
       schema['author'] = { '@type':'Person', 'name': autor.nombre };
     }
+    // Multi-tema: keywords refleja tags.temas[] (o el tema unico).
+    var kwTags = (typeof d.tags === 'object' && d.tags) ? d.tags : safeJSON(d.tags) || {};
+    var kwArr = (Array.isArray(kwTags.temas) && kwTags.temas.length)
+                ? kwTags.temas
+                : (kwTags.tema ? [kwTags.tema] : []);
+    if (kwArr.length) schema['keywords'] = kwArr.join(', ');
     var cuerpoWc = (d.descripcion || d.lead || '');
     if (cuerpoWc) schema['wordCount'] = cuerpoWc.trim().split(/\s+/).filter(Boolean).length;
   } else {
@@ -526,6 +532,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   // DECISIONS.md y la leccion de BUG-019 (no duplicar campos
   // genericos ya existentes).
   var temaBlog     = tags.tema      || '';
+  // Multi-tema: tags.temas[] (array) manda; tags.tema conserva el
+  // principal para compatibilidad. temasaBlog = lista normalizada.
+  var temasBlog = (Array.isArray(tags.temas) && tags.temas.length)
+                  ? tags.temas
+                  : (temaBlog ? [temaBlog] : []);
   var videoUrlBlog = tags.video_url || '';
   var cuerpoBlog    = d.descripcion || d.lead || '';
   var palabrasBlog  = cuerpoBlog ? cuerpoBlog.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -580,7 +591,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     // Blog no usa rating/precio -- un articulo no se "califica con
     // estrellas" como un lugar. Chips propios: tema, tiempo de
     // lectura y autor (senal de E-E-A-T visible desde el hero).
-    if (temaBlog) hqi.push('<div class="hqi">'+(TEMA_BLOG_EMOJI[temaBlog]||'\u270D\ufe0f')+' '+esc(TEMA_BLOG_LABEL[temaBlog]||temaBlog)+'</div>');
+    temasBlog.forEach(function(t){
+      if (t) hqi.push('<div class="hqi">'+(TEMA_BLOG_EMOJI[t]||'\u270D\ufe0f')+' '+esc(TEMA_BLOG_LABEL[t]||t)+'</div>');
+    });
     if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
     if (tiempoLecturaBlog) hqi.push('<div class="hqi">\u23F1 '+tiempoLecturaBlog+' min de lectura</div>');
     if (autor && autor.nombre) hqi.push('<div class="hqi">\u270D\ufe0f '+esc(autor.nombre)+'</div>');

@@ -361,6 +361,53 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   itinerario/faqs); `/api/destinos` total=107 con el slug destacado rating 0
   (id 6035661b-...); sitemap incluye el slug (114 urls).
 
+### TSK-043: Primera entrada real de blog en produccion (monserrate-guia-completa.html)
+- **Estado:** COMPLETADA
+- **Detalle:** Primer post REAL de la seccion Inspirate (categoria blog,
+  slug `monserrate-guia-completa`, nombre "El cerro que vigila a Bogota:
+  guia completa para subir a 3.152 m", `status='published'`,
+  `destacado=true`). Cuerpo ~6.250 palabras (66 parrafos) en descripcion
+  TEXT (parrafos separados por \n\n, render con white-space:pre-line),
+  lead + highlight, 5 FAQs, 3 fotos de galeria + 1 hero (Wikimedia
+  Commons, thumbs 960px verificadas con curl), video
+  https://youtu.be/Bgtc-bsl9II (verificado via oEmbed, embed OK en
+  render), tags JSONB multi-tema {tema:'cultura', temas:['cultura',
+  'naturaleza','aventura','tips','gastro'], video_url:'https://youtu.be/
+  Bgtc-bsl9II'}. SIN id_autor por decision de Javier (migracion 004
+  pendiente; se asignara/editar a desde admin.html despues). Archivos:
+  `api/seed-monserrate-guia.js` (datos), `api/load-monserrate-guia-api.js`
+  (loader idempotente DELETE+POST) y
+  `exploraco desarrollo/ficha-monserrate-guia.md` (ficha con datos
+  verificados). Carga via API de admin (no hay DATABASE_URL local), mismo
+  patron que TSK-018..042. Ver DECISIONS.md ADR-010 (multi-tema).
+- **Evidencia:** GET /monserrate-guia-completa.html = 200 con JSON-LD
+  BlogPosting, video embed, chip "Cultura", divs balanceados 80/80;
+  /api/destinos?categoria=blog devuelve el post con tema=cultura; sitemap
+  incluye el slug. Nota: el post ya es visible en produccion porque el
+  loader llama a la API ya desplegada; los cambios multi-tema del repo
+  (temas[] en destinos.js/index.html/pagina-destino.js/admin.html) quedan
+  pendientes del deploy de Vercel (ver TSK-044 y NEXT.md).
+
+### TSK-044: Multi-tema (tags.temas[]) -- implementado en repo, pendiente de deploy
+- **Estado:** BLOQUEADA (implementado y verificado en repo; bloqueado por el
+  deploy de Vercel, causa desconocida y diagnostico en pausa)
+- **Detalle:** Cambios transversales para que un destino/blog pueda tener
+  varios temas: `api/destinos.js` toPlace() expone `temas: tags.temas ||
+  [tags.tema]` (mantiene el campo `tema` para compatibilidad); `index.html`
+  inspirateCardHTML usa `tArr[0]` (p.temas o p.tema) y renderInspirate
+  filtra con `tArr.indexOf(filter)>=0`; `api/pagina-destino.js` array
+  `temasBlog` normalizado + chips del hero con forEach + schemaLD agrega
+  keywords multi-tema con safeJSON(d.tags); `admin.html` campo
+  `f-blog-tema` ahora es `<select multiple>`, `CATEGORY_TAG_FIELDS.blog`
+  usa {key:'temas', multi:true, localKey:'temas'}, `_buildTagsObj()` deriva
+  `tags.tema = p.temas[0]`, `_applyTagsToLocal()` envuelve tags.tema en
+  local.temas y `savePlace()` agrega collectCategoryTagFields(p,'blog').
+  Todos pasan node --check y ASCII-safety (0 bytes>127, 0 backticks).
+- **Evidencia:** solo local por ahora -- los cambios NO estan desplegados
+  (deploy de Vercel sigue fallando). Tras el deploy: /api/destinos?categoria=blog
+  debe devolver el array temas[] y los chips/hero/filtro de Inspirate deben
+  mostrar los multiples temas. Ver DECISIONS.md ADR-010.
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
@@ -577,6 +624,38 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Sprint:** Sprint 5+[cite: 1]
 - **Detalle t\u00e9cnico:** Configurar un webhook de disparo hacia un proveedor de mensajer\u00eda cuando se modifique la columna de estado del lugar a aprobado.
 - **Evidencia f\u00edsica de \u00e9xito:** Recepci\u00f3n instant\u00e1nea del mensaje SMS o WhatsApp en un dispositivo m\u00f3vil de prueba tras guardar los cambios en el panel de administraci\u00f3n.
+
+### TASK-011: Desbloquear el deploy de Vercel (causa desconocida)
+- **Prioridad:** ALTA
+- **Responsable:** Project Manager (Javier) + Lead Developer
+- **Estado:** PENDIENTE (diagnostico en pausa)
+- **Dependencia:** Ninguna
+- **Detalle t\u00e9cnico:** El deploy automatico de Vercel desde GitHub sigue fallando sin causa identificada. Bloquea la visibilidad en produccion de los cambios multi-tema de TSK-044 (api/destinos.js, index.html, api/pagina-destino.js, admin.html) y de los cambios de TASK-008/TSK-017 pendientes desde sesiones previas. Diagnostico iniciado pero pausado: revisar logs de build de Vercel (dashboard o `vercel logs`) y comparar con el ultimo deploy exitoso. Posibles sospechosos: algun archivo nuevo que rompa el build de la funcion serverless, cambios en vercel.json, o limites del plan Hobby.
+- **Evidencia f\u00edsica de \u00e9xito:** Un commit nuevo a main (o redeploy manual) pasa el build de Vercel y queda visible en https://exploraco.vercel.app; `/api/destinos?categoria=blog` devuelve el post con `temas[]` (array multi-tema).
+
+### TASK-012: Aplicar migracion db/migrations/004_usuarios_blog_autor.sql en Neon
+- **Prioridad:** MEDIA
+- **Responsable:** Lead Developer (con acceso a la URL de Neon)
+- **Estado:** PENDIENTE (por decision del usuario queda pendiente)
+- **Dependencia:** Ninguna (el archivo ya existe en el repo, ADR-008 cumplido)
+- **Detalle t\u00e9cnico:** Aplicar en Neon la migracion versionada `db/migrations/004_usuarios_blog_autor.sql` que agrega `usuarios.foto_url` y `usuarios.ciudad_base` (requeridas por la seccion "Quien escribe" del renderer de blog y por el buscador de autor de admin.html). Es idempotente (`ADD COLUMN IF NOT EXISTS`). El post monserrate-guia-completa se creo SIN `id_autor` a proposito hasta que esta migracion se aplique.
+- **Evidencia f\u00edsica de \u00e9xito:** `SELECT column_name FROM information_schema.columns WHERE table_name='usuarios'` muestra `foto_url` y `ciudad_base`; al guardar el post desde admin.html con un autor asignado, la seccion "Quien escribe" aparece en /monserrate-guia-completa.html.
+
+### TASK-013: Asignar autor al post de blog monserrate-guia-completa desde admin.html
+- **Prioridad:** BAJA
+- **Responsable:** Project Manager (Javier)
+- **Estado:** PENDIENTE (depende de TASK-012)
+- **Dependencia:** TASK-012 (migracion 004 aplicada)
+- **Detalle t\u00e9cnico:** Editar el post monserrate-guia-completa desde admin.html usando el buscador de autor (que filtra usuarios ya registrados) y guardar. El renderer de blog omitira la seccion "Quien escribe" mientras el post no tenga `id_autor`.
+- **Evidencia f\u00edsica de \u00e9xito:** /monserrate-guia-completa.html muestra la seccion "Quien escribe" con nombre/foto/ciudad del autor.
+
+### TASK-014: Push a GitHub de la sesion actual (blog + multi-tema)
+- **Prioridad:** ALTA
+- **Responsable:** Project Manager (Javier)
+- **Estado:** PENDIENTE
+- **Dependencia:** Sesion de Chrome con GCM (gestor de credenciales) activa
+- **Detalle t\u00e9cnico:** Hacer commit y push al repo gonzalezjavierbta-afk/exploraco de los archivos de esta sesion: `api/seed-monserrate-guia.js`, `api/load-monserrate-guia-api.js`, `exploraco desarrollo/ficha-monserrate-guia.md`, `db/migrations/004_usuarios_blog_autor.sql`, mas los cambios multi-tema de `api/destinos.js`, `index.html`, `api/pagina-destino.js` y `admin.html`. El push depende de la sesion Chrome/GCM y no se pudo ejecutar en esta sesion.
+- **Evidencia f\u00edsica de \u00e9xito:** `git log --oneline -1` muestra el commit nuevo en el remoto.
 
 ---
 

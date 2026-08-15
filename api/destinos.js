@@ -77,8 +77,13 @@ function toPlace(row) {
     amenities:   amenidades,
     // Blog (Sprint Inspirate): tema es el sub-filtro del modal
     // "Comparte tu experiencia" (aventura/gastro/cultura/naturaleza/
-    // tips), ver publicar-lugar.js BLOG_TEMAS.
+    // tips), ver publicar-lugar.js BLOG_TEMAS. Un post puede tener
+    // varios temas (tags.temas[]); tema conserva el principal para
+    // compatibilidad con el grid actual.
     tema:        tags.tema || '',
+    temas:       (Array.isArray(tags.temas) && tags.temas.length)
+                 ? tags.temas
+                 : (tags.tema ? [tags.tema] : []),
     habs:        habitaciones,
     faqs:        faqs,
     // Campos especificos para AGENDA_EVENTS (eventos)
