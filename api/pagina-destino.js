@@ -175,6 +175,11 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".stnum{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}"
 +".slead{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}"
 +".stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px;white-space:pre-line}"
++".bfig{margin:24px 0}"
++".bfig img{width:100%;max-height:480px;object-fit:cover;border-radius:12px;display:block}"
++".bfig figcaption{text-align:center;font-size:11px;color:#999;margin-top:8px;font-style:italic}"
++".bvid{margin:24px 0;position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden}"
++".bvid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}"
 +".hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:20px 0;display:flex;align-items:flex-start;gap:12px}"
 +".hbico{font-size:20px;flex-shrink:0;margin-top:2px}.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}"
 +".hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}"
@@ -629,10 +634,13 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
 
   // -- SECCI??N: Descripcion ----------------------------------------
   var descTitleGeneric = cat === 'blog' ? 'La historia' : 'Sobre este lugar';
+  var cuerpoHTML = cat === 'blog'
+    ? parseBlogBody(d.descripcion || '')
+    : (d.descripcion ? '<p class="stext">'+esc(d.descripcion)+'</p>' : '');
   var secDescripcion = '<section class="ssec bwarm" id="descripcion"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+descTitleGeneric+'</h2><div class="stnum">'+nextNum()+'</div></div>'
     + (d.lead ? '<p class="slead bc">'+esc(d.lead)+'</p>' : '')
-    + (d.descripcion ? '<p class="stext">'+esc(d.descripcion)+'</p>' : '')
+    + cuerpoHTML
     + (d.highlight ? '<div class="hbox"><span class="hbico">\u2605</span><div><div class="hblbl">Destacado</div><div class="hbtx">'+esc(d.highlight)+'</div></div></div>' : '')
     + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
     + '</div></section>';
@@ -659,6 +667,44 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
       }
     } catch (e) {}
     return '';
+  }
+  // -- BLOG: parseBlogBody() -----------------------------------------
+  // Convierte el cuerpo del post (texto plano con parrafos separados
+  // por \n\n y marcadores inline) en HTML estructurado:
+  //   [foto:URL|texto]   -> figure con img + figcaption
+  //   [video:URL]        -> div con iframe (via videoEmbedUrlBlog)
+  // Cualquier otro bloque -> <p class="stext">. Los marcadores mal
+  // formados o con URLs invalidas se descartan sin romper el render.
+  // Solo se aplica a la categoria blog.
+  function parseBlogBody(texto) {
+    if (!texto) return '';
+    var bloques = String(texto).split(/\n\s*\n/);
+    var out = '';
+    for (var pi = 0; pi < bloques.length; pi++) {
+      var b = bloques[pi].trim();
+      if (!b) continue;
+      var fotoMatch = /^\[foto:(.*?)\|(.*?)\]$/.exec(b);
+      if (fotoMatch) {
+        var fotoUrl = fotoMatch[1].trim();
+        var fotoCap = fotoMatch[2].trim();
+        if (/^https?:\/\//i.test(fotoUrl)) {
+          out += '<figure class="bfig"><img src="'+esc(fotoUrl)+'" alt="'+esc(fotoCap||'Foto del articulo')+'" loading="lazy">'
+            + (fotoCap ? '<figcaption>'+esc(fotoCap)+'</figcaption>' : '')
+            + '</figure>';
+        }
+        continue;
+      }
+      var vidMatch = /^\[video:(.*?)\]$/.exec(b);
+      if (vidMatch) {
+        var vidSrc = videoEmbedUrlBlog(vidMatch[1].trim());
+        if (vidSrc) {
+          out += '<div class="bvid"><iframe src="'+esc(vidSrc)+'" title="Video del articulo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>';
+        }
+        continue;
+      }
+      out += '<p class="stext">'+esc(b)+'</p>';
+    }
+    return out;
   }
   var secBlogVideo = '';
   if (cat === 'blog' && videoUrlBlog) {

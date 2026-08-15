@@ -30,10 +30,17 @@ Fase 1 (EN CURSO, sin commit todavia):
 - Escudo GOLD del bloque nuevo: node --check OK, 0 no-ASCII nuevos, 0
   backticks nuevos, balance de divs 0, JSON embebido escapa `<` (test XSS
   con nombre `Guia <script>` confirma parse OK y sin `</script>` literal).
+- **Fase 2 COMPLETADA (local):** `parseBlogBody()` en api/pagina-destino.js
+  convierte `[foto:URL|texto]` -> figure.bfig (img+figcaption) y
+  `[video:URL]` -> div.bvid (iframe via videoEmbedUrlBlog). Solo blog.
+  CSS .bfig/.bvid agregado. Seed de Monserrate actualizado con 4 marcadores
+  [foto:] (basilica, funicular, vista cima, flora). Smoke fase2 16/16 PASS
+  (XSS, javascript: descartado, video invalido descartado, divs 0);
+  regresion blog 19/19 PASS. PENDIENTE: commit + push + re-sembrar post en
+  prod (node scripts/load-monserrate-guia-api.js tras el deploy).
 - **PENDIENTE:** commit + push; verificar `/blog.html` en prod (200, cards,
-  buscador). Despues fases 2-6 (marcadores inline parseBlogBody, resenas
-  blog estrellas, diseno moderno minimalista del post, recorte seed a
-  ~3000 palabras).
+  buscador). Despues fases 3-6 (resenas blog estrellas, diseno moderno
+  minimalista del post, recorte seed a ~3000 palabras).
 
 ### Sesion anterior (Agosto 2026) - Primera entrada real de blog + multi-tema
 
