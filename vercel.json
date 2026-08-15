@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/sitemap.xml",  "destination": "/api/utilidades?tipo=sitemap" },
+    { "source": "/blog.html",    "destination": "/api/utilidades?tipo=blog-lista" },
     { "source": "/:slug.html",   "destination": "/api/pagina-destino?slug=:slug" },
     { "source": "/buscar",       "destination": "/api/utilidades?tipo=buscar" }
   ],

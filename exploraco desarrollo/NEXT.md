@@ -4,7 +4,38 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Agosto 2026) - Primera entrada real de blog + multi-tema
+### Sesion actual (Fase 1) - Pagina /blog.html con listado SSR (blog-lista)
+
+La Fase 0 (desbloquear deploy) se completo: la causa era el limite de 12
+Serverless Functions del plan Hobby de Vercel -- cada `.js` en `/api` cuenta
+como funcion. Se movieron 57 scripts seed/load/test/patch de `api/` a
+`scripts/` (commit `fc6b4f7`) dejando 8 endpoints reales, y se elimino el
+`sitemap.xml` estatico corrupto (commit `a61cade`). Verificado en prod:
+`/api/destinos?categoria=blog` con `temas[]`, index `tArr=true`, render blog
+con keywords multi-tema, `/sitemap.xml` dinamico 17795 B.
+
+Fase 1 (EN CURSO, sin commit todavia):
+- **api/utilidades.js:** nuevo bloque `?tipo=blog-lista` (antes de
+  `diagnostico`) que hace SSR de `/blog.html`: buscador client-side
+  instantaneo (JSON embebido con `<` escapado a `\u003c` + script de filtro
+  por texto/tema), grid de cards sin estrellas (ADR-007/009) con fecha,
+  badge Destacado, min de lectura y ubicacion, chips multi-tema, LIMIT 50,
+  dos estados vacios, canonical `https://exploraco.co/blog.html`, robots
+  index. Ademas STATIC_PAGES suma `/blog.html` (priority 0.8, weekly) y
+  CAT_PRIORITY suma `blog:'0.80'`.
+- **vercel.json:** rewrite `/blog.html` -> `/api/utilidades?tipo=blog-lista`
+  ANTES de `/:slug.html`.
+- **index.html:** boton "Ver todos los articulos" (inspirate-section) de
+  `openBlogModal()` pasa a `href="blog.html"`.
+- Escudo GOLD del bloque nuevo: node --check OK, 0 no-ASCII nuevos, 0
+  backticks nuevos, balance de divs 0, JSON embebido escapa `<` (test XSS
+  con nombre `Guia <script>` confirma parse OK y sin `</script>` literal).
+- **PENDIENTE:** commit + push; verificar `/blog.html` en prod (200, cards,
+  buscador). Despues fases 2-6 (marcadores inline parseBlogBody, resenas
+  blog estrellas, diseno moderno minimalista del post, recorte seed a
+  ~3000 palabras).
+
+### Sesion anterior (Agosto 2026) - Primera entrada real de blog + multi-tema
 
 Se publico la PRIMERA entrada real de la seccion Inspirate (blog) en
 produccion y se implementaron los cambios multi-tema (aun NO desplegados,
