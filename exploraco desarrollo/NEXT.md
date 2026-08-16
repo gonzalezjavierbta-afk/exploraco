@@ -38,9 +38,15 @@ Fase 1 (EN CURSO, sin commit todavia):
   (XSS, javascript: descartado, video invalido descartado, divs 0);
   regresion blog 19/19 PASS. PENDIENTE: commit + push + re-sembrar post en
   prod (node scripts/load-monserrate-guia-api.js tras el deploy).
+- **Fase 3 COMPLETADA (local):** resenas habilitadas para blog con
+  formulario simplificado (estrellas 1-5 + nombre + comentario, sin dims,
+  sin traveller_type, sin quick-rating). Titulo "Resenas del articulo".
+  JS inline generico funciona igual (dims/traveller vacios). Smoke blog
+  23/23 PASS + regresion evento/sitio 13/13 PASS, balance divs 0.
+  PENDIENTE: commit + push + verificar en prod.
 - **PENDIENTE:** commit + push; verificar `/blog.html` en prod (200, cards,
-  buscador). Despues fases 3-6 (resenas blog estrellas, diseno moderno
-  minimalista del post, recorte seed a ~3000 palabras).
+  buscador). Despues fases 4-6 (diseno moderno minimalista del post,
+  recorte seed a ~3000 palabras).
 
 ### Sesion anterior (Agosto 2026) - Primera entrada real de blog + multi-tema
 
