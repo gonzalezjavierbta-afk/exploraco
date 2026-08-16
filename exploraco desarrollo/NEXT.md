@@ -38,7 +38,7 @@ Fases del blog ya COMMITEADAS y VERIFICADAS EN PROD:
   articulo". JS inline generico funciona igual (dims/traveller vacios).
   Smoke blog 23/23 PASS + regresion evento/sitio 13/13 PASS, balance divs 0.
   Prod verificado: seccion "Resenas del articulo" con formulario simplificado.
-- **Fase 4 (PENDIENTE commit + push):** variante de diseno moderno minimalista
+- **Fase 4 (commit `98eb7de`, verificada en prod):** variante de diseno moderno minimalista
   para `categoria_slug==='blog'` que distingue un articulo de un destino.
   Hero nuevo `.bhero`: foto de portada ancha (`.bcover` a todo el ancho,
   min(52vh,440px)) + bloque titulo/lead/chips limpio sobre fondo crema
@@ -50,11 +50,20 @@ Fases del blog ya COMMITEADAS y VERIFICADAS EN PROD:
   (`body.blog .stext{font-size:16px;line-height:1.8}`), oculta la numeracion
   dorada (`body.blog .stnum{display:none}`). Se conservan todas las secciones
   del articulo (La historia con .bfig, video, FAQs, resenas, autor).
-  Escudo GOLD: smoke blog 34/34 PASS (incluye 10 checks nuevos Fase 4),
-  regresion evento/sitio 13/13 PASS, node --check OK, ASCII 0/0, balance
-  divs 0. Preview visual aprobado por el usuario via companion.
-- **PENDIENTE:** commit + push Fase 4; verificar /monserrate-guia-completa.html
-  en prod; Fase 5 (recorte seed a ~3000 palabras); Fase 6 (docs + QA final).
+  Preview visual aprobado por el usuario via companion. Se agrego `.gitignore`
+  (excluye .superpowers/ y fake_neon temporales). Ver DECISIONS.md ADR-011.
+- **Fase 5 (commit `2ed18ff`, re-seed `cf9dea6d`, verificada en prod):**
+  recorte editorial del seed de Monserrate de 6.278 a 3.018 palabras
+  (conserva 35 parrafos, los 4 marcadores [foto:] y las 5 FAQs). Post
+  re-sembrado en prod (`node scripts/load-monserrate-guia-api.js`). Prod:
+  tiempo de lectura baja de 31 a 15 min, 4 figures bfig inline, HTML 61.0KB.
+  Nota: el re-seed DELETE+POST cambio el id del post a `cf9dea6d`, dejando
+  huerfanas las resenas de prueba del id anterior.
+- **Fase 6 (cierre documental):** TASKS.md con TASK-015..019 COMPLETADA,
+  DECISIONS.md con ADR-011, NEXT.md actualizado. QA final en prod OK
+  (blog.html 200 con BLDATA/buscador/canonical/robots index,follow/divs 10/10;
+  post 200 con BlogPosting/keywords/4 bfig/divs 91/91; sitemap con /blog.html
+  y el slug del post).
 
 ### Sesion anterior (Agosto 2026) - Primera entrada real de blog + multi-tema
 
@@ -277,41 +286,17 @@ Ver BUGS_HISTORICOS.md BUG-022.
 
 ## Que sigue (proxima accion inmediata)
 
-1. **Commit + push de la Fase 4 (diseno minimalista del post de blog):**
-   incluye `.gitignore` nuevo (excluye .superpowers/ y fake_neon temporales),
-   cambios en `api/pagina-destino.js` (hero bhero, body.blog, sin subnav/gstrip
-   para blog) y TASKS.md/NEXT.md. Luego verificar
-   `https://exploraco.vercel.app/monserrate-guia-completa.html` en prod (hero
-   de portada, columna de lectura, sin subnav ni gstrip).
-2. **Fase 5 (EN CURSO, falta commit + push + re-sembrar):** recorte del seed de
-   Monserrate de 6.278 a 3.018 palabras en `scripts/seed-monserrate-guia.js`
-   (script Node de reemplazo exacto, separador real `\n\n` dentro del string
-   JS). Conserva 35 parrafos, los 4 marcadores [foto:] y las 5 FAQs. Smoke blog
-   34/34 PASS (html 61.0KB). Re-sembrar en prod con
-   `node scripts/load-monserrate-guia-api.js`.
-3. **Fase 6:** QA final en prod (blog.html + post + sitemap) y cierre documental
-   (marcar TASK-018/019 COMPLETADA en TASKS.md, registrar en DECISIONS.md si aplica).
-4. **Aplicar migracion 004 en Neon (TASK-012):** ejecutar
-   `db/migrations/004_usuarios_blog_autor.sql` (foto_url + ciudad_base en
-   usuarios) cuando haya acceso a la URL de Neon. Luego asignar autor al
-   post desde admin.html (TASK-013).
-5. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
-   con curl y re-ejecutar `node scripts/load-lacandelaria-api.js` para que la
-   hero y la galeria carguen (hoy el HTML se renderiza pero las imagenes
-   del hero/galeria pueden estar rotas por tamano 1200px + hash 6/6f).
-6. Cargar tags reales en los destinos de comida/hostal/evento (varios
-   estan vacios, lo que degrada el comparador a "relleno por rating").
-7. TSK-016 (Widget "Quien va este mes") del backlog Social.
-8. Materializar ADR-008: completar la carpeta `db/migrations/` con el SQL
-   del fix de BUG-021 versionado (ya existe 003_interacciones_dims_traveller
-   y 004_usuarios_blog_autor; falta el fix de BUG-021) como repositorio
-   unico de estructura BD.
-9. Diferido por decision de usuario: las paginas de categoria `evento`
-   para la escena electronica de Bogota (los 8 venues quedaron en la band
-   "Lugares" con cat `sitio`; los eventos concretos se retomaran en una
-   tarea posterior).
-10. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
-    RESEND_API_KEY).
+1. **Commit + push del cierre documental (Fase 6):** DECISIONS.md con ADR-011,
+   TASKS.md con TASK-015..019 COMPLETADA y NEXT.md actualizado. (Esta entrega.)
+2. **Pendientes post-blog (sin bloqueo):** aplicar migracion
+   `db/migrations/004_usuarios_blog_autor.sql` en Neon (TASK-012) y asignar
+   autor al post desde admin.html (TASK-013); corregir URLs de imagenes de
+   lacandelaria (BUG-022); cargar tags reales en comida/hostal/evento;
+   infraestructura TASK-004/005/006.
+3. Los pendientes conocidos de sesiones previas siguen abiertos: TSK-016
+   (Widget "Quien va este mes"), desfase de ids en MM_PINS[], renderMyMap()
+   fuera del ciclo de refresco, usuario-session.js sin verificar, admin.html
+   con desbalance pre-existente de 1 div.
 
 ### Sesion previa (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
 
