@@ -283,11 +283,14 @@ Ver BUGS_HISTORICOS.md BUG-022.
    para blog) y TASKS.md/NEXT.md. Luego verificar
    `https://exploraco.vercel.app/monserrate-guia-completa.html` en prod (hero
    de portada, columna de lectura, sin subnav ni gstrip).
-2. **Fase 5:** recortar el seed de Monserrate de ~6.278 a ~3.000 palabras en
-   `scripts/seed-monserrate-guia.js` (conservar los 4 marcadores [foto:] y las
-   FAQs) y re-sembrar en prod con `node scripts/load-monserrate-guia-api.js`.
+2. **Fase 5 (EN CURSO, falta commit + push + re-sembrar):** recorte del seed de
+   Monserrate de 6.278 a 3.018 palabras en `scripts/seed-monserrate-guia.js`
+   (script Node de reemplazo exacto, separador real `\n\n` dentro del string
+   JS). Conserva 35 parrafos, los 4 marcadores [foto:] y las 5 FAQs. Smoke blog
+   34/34 PASS (html 61.0KB). Re-sembrar en prod con
+   `node scripts/load-monserrate-guia-api.js`.
 3. **Fase 6:** QA final en prod (blog.html + post + sitemap) y cierre documental
-   (marcar TASK-018 COMPLETADA en TASKS.md, registrar en DECISIONS.md si aplica).
+   (marcar TASK-018/019 COMPLETADA en TASKS.md, registrar en DECISIONS.md si aplica).
 4. **Aplicar migracion 004 en Neon (TASK-012):** ejecutar
    `db/migrations/004_usuarios_blog_autor.sql` (foto_url + ciudad_base en
    usuarios) cuando haya acceso a la URL de Neon. Luego asignar autor al
