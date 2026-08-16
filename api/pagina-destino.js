@@ -142,6 +142,20 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".hobtn{background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}"
 +".hobtn.activo{background:rgba(232,160,32,.15);color:var(--gold);border-color:var(--gold)}"
 +".hobtn:disabled{opacity:.5;cursor:default}"
++".bhero{background:var(--warm);padding:5% 0 0}"
++".bhin{max-width:860px;margin:0 auto;padding:0 5%}"
++".bhew{display:inline-flex;align-items:center;gap:8px;background:var(--gold-light);border:1px solid var(--gold);color:var(--gold-dark);padding:5px 14px;border-radius:20px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}"
++".bhtitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(34px,5vw,58px);font-weight:900;color:var(--text);line-height:1.02;letter-spacing:.5px;max-width:820px;margin-top:14px;text-transform:none}"
++".bhslead{font-size:16px;color:#555;line-height:1.75;max-width:680px;margin-top:16px;font-style:italic}"
++".bchips{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:20px}"
++".bchips .hqi{background:#fff;border:1px solid var(--border);border-radius:20px;padding:7px 15px;font-size:12px;color:var(--muted)}"
++".bcover{width:100%;height:min(52vh,440px);background-size:cover;background-position:center;margin-top:28px}"
++"body.blog .sin{max-width:720px}body.blog .stnum{display:none}body.blog .stitle{letter-spacing:1.8px}"
++"body.blog .stext{font-size:16px;line-height:1.8;color:#3a3a3a}"
++"body.blog .slead{font-size:18px;line-height:1.6}"
++"body.blog .ssec{padding:44px 5%}"
++"body.blog .bfig img{border-radius:14px}"
++"body.blog .bvid{border-radius:14px}"
 +".hr{display:flex;flex-direction:column;gap:8px;justify-content:center}"
 +".psm{height:200px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
 +".psm img{width:100%;height:100%;object-fit:cover}"
@@ -618,7 +632,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
-  if (nRes > 0 || d.precio_desde) {
+  if (cat !== 'blog' && (nRes > 0 || d.precio_desde)) {
     var starsHtml = [1,2,3,4,5].map(function(i){
       return '<span class="gstar'+(i<=Math.round(rat)?' on':'')+'">*</span>';
     }).join('');
@@ -1586,11 +1600,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     {id:'autor',       label:'Autor',       has:!!secBlogAutor},
     {id:'video',       label:'Video',       has:!!secBlogVideo}
   ].filter(function(it){ return it.has; });
-  var subnav = subnavItems.length > 1 ? '<nav class="subnav">'
+  var subnav = (cat === 'blog') ? '' : (subnavItems.length > 1 ? '<nav class="subnav">'
     + subnavItems.map(function(it, i){
         return '<a class="snlink'+(i===0?' on':'')+'" href="#'+it.id+'" onclick="document.querySelectorAll(\'.snlink\').forEach(function(l){l.classList.remove(\'on\')});this.classList.add(\'on\')">'+esc(it.label)+'</a>';
       }).join('')
-    + '</nav>' : '';
+    + '</nav>' : '');
 
   // -- ENSAMBLAR ----------------------------------------------------
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
@@ -1604,7 +1618,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '<meta name="theme-color" content="#E8A020">\n'
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
     + schemaLD(d, cat, autor) + '\n'
-    + '<style>'+CSS+'</style>\n</head>\n<body>\n\n'
+    + '<style>'+CSS+'</style>\n</head>\n<body'+(cat==='blog'?' class="blog"':'')+'>\n\n'
 
     + '<div class="topbar"><a class="tl" href="/index.html">EXPLORA<em>CO</em></a><div class="tsep"></div>'
     + '<div class="tbc"><a href="/index.html">Inicio</a><span>/</span><a href="/'+esc(dir)+'">'+esc(label)+'</a><span>/</span><em>'+esc(d.nombre)+'</em></div>'
@@ -1614,21 +1628,32 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
 
     + subnav + '\n\n'
 
-    + '<section class="hero"><div class="hi">\n'
-    + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
-    + '<h1 class="htitle bc">'+esc(d.nombre)+'</h1>'
-    + (d.lead ? '<p class="hsub">'+esc(d.lead)+'</p>' : '')
-    + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
-    + '<div class="hctar">'
-    + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
-    + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
-    + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
-    + '<button class="hobtn" id="btn-guardar" onclick="toggleGuardar(this)">\u2661 Guardar</button>'
-    + '<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>'
-    + '</div></div>\n'
-    + '<div class="hr"><div class="psm" style="'+heroMainStyle+'">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
-    + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
-    + '</div>\n</div></section>\n\n'
+    + (cat === 'blog'
+      ? '<section class="bhero">\n'
+      + '<div class="bhin">'
+      + '<div class="bhew">'+esc(label)+'</div>'
+      + '<h1 class="bhtitle">'+esc(d.nombre)+'</h1>'
+      + (d.lead ? '<p class="bhslead">'+esc(d.lead)+'</p>' : '')
+      + (hqi.length ? '<div class="bchips">'+hqi.join('')+'</div>' : '')
+      + '</div>'
+      + '<div class="bcover" style="'+heroMainStyle+'">'+(hero?'':'<div class="bph" style="background:'+grad+'"></div>')+'</div>'
+      + '</section>\n\n'
+      : '<section class="hero"><div class="hi">\n'
+      + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
+      + '<h1 class="htitle bc">'+esc(d.nombre)+'</h1>'
+      + (d.lead ? '<p class="hsub">'+esc(d.lead)+'</p>' : '')
+      + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
+      + '<div class="hctar">'
+      + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
+      + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
+      + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
+      + '<button class="hobtn" id="btn-guardar" onclick="toggleGuardar(this)">\u2661 Guardar</button>'
+      + '<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>'
+      + '</div>'
+      + '</div>\n'
+      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
+      + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
+      + '</div>\n</div></section>\n\n')
 
     + gstrip + '\n\n'
     + secDescripcion + '\n'

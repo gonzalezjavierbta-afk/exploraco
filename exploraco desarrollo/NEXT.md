@@ -4,7 +4,7 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Fase 1) - Pagina /blog.html con listado SSR (blog-lista)
+### Sesion actual (Fase 4) - Blog completo: listado + fotos/videos inline + resenas + diseno minimalista
 
 La Fase 0 (desbloquear deploy) se completo: la causa era el limite de 12
 Serverless Functions del plan Hobby de Vercel -- cada `.js` en `/api` cuenta
@@ -14,39 +14,47 @@ como funcion. Se movieron 57 scripts seed/load/test/patch de `api/` a
 `/api/destinos?categoria=blog` con `temas[]`, index `tArr=true`, render blog
 con keywords multi-tema, `/sitemap.xml` dinamico 17795 B.
 
-Fase 1 (EN CURSO, sin commit todavia):
-- **api/utilidades.js:** nuevo bloque `?tipo=blog-lista` (antes de
-  `diagnostico`) que hace SSR de `/blog.html`: buscador client-side
+Fases del blog ya COMMITEADAS y VERIFICADAS EN PROD:
+- **Fase 1 (commit `c3311d8`):** `api/utilidades.js` bloque `?tipo=blog-lista`
+  (antes de `diagnostico`) hace SSR de `/blog.html`: buscador client-side
   instantaneo (JSON embebido con `<` escapado a `\u003c` + script de filtro
   por texto/tema), grid de cards sin estrellas (ADR-007/009) con fecha,
   badge Destacado, min de lectura y ubicacion, chips multi-tema, LIMIT 50,
   dos estados vacios, canonical `https://exploraco.co/blog.html`, robots
-  index. Ademas STATIC_PAGES suma `/blog.html` (priority 0.8, weekly) y
-  CAT_PRIORITY suma `blog:'0.80'`.
-- **vercel.json:** rewrite `/blog.html` -> `/api/utilidades?tipo=blog-lista`
-  ANTES de `/:slug.html`.
-- **index.html:** boton "Ver todos los articulos" (inspirate-section) de
-  `openBlogModal()` pasa a `href="blog.html"`.
-- Escudo GOLD del bloque nuevo: node --check OK, 0 no-ASCII nuevos, 0
-  backticks nuevos, balance de divs 0, JSON embebido escapa `<` (test XSS
-  con nombre `Guia <script>` confirma parse OK y sin `</script>` literal).
-- **Fase 2 COMPLETADA (local):** `parseBlogBody()` en api/pagina-destino.js
+  index. STATIC_PAGES suma `/blog.html` (priority 0.8, weekly) y CAT_PRIORITY
+  suma `blog:'0.80'`. Rewrite en `vercel.json` ANTES de `/:slug.html`.
+  `index.html:1434` boton "Ver todos los articulos" -> `href="blog.html"`.
+  Prod: 200, cards, buscador OK.
+- **Fase 2 (commit `8f48f42`):** `parseBlogBody()` en api/pagina-destino.js
   convierte `[foto:URL|texto]` -> figure.bfig (img+figcaption) y
   `[video:URL]` -> div.bvid (iframe via videoEmbedUrlBlog). Solo blog.
   CSS .bfig/.bvid agregado. Seed de Monserrate actualizado con 4 marcadores
-  [foto:] (basilica, funicular, vista cima, flora). Smoke fase2 16/16 PASS
-  (XSS, javascript: descartado, video invalido descartado, divs 0);
-  regresion blog 19/19 PASS. PENDIENTE: commit + push + re-sembrar post en
-  prod (node scripts/load-monserrate-guia-api.js tras el deploy).
-- **Fase 3 COMPLETADA (local):** resenas habilitadas para blog con
-  formulario simplificado (estrellas 1-5 + nombre + comentario, sin dims,
-  sin traveller_type, sin quick-rating). Titulo "Resenas del articulo".
-  JS inline generico funciona igual (dims/traveller vacios). Smoke blog
-  23/23 PASS + regresion evento/sitio 13/13 PASS, balance divs 0.
-  PENDIENTE: commit + push + verificar en prod.
-- **PENDIENTE:** commit + push; verificar `/blog.html` en prod (200, cards,
-  buscador). Despues fases 4-6 (diseno moderno minimalista del post,
-  recorte seed a ~3000 palabras).
+  [foto:] (basilica, funicular, vista cima, flora). Post re-sembrado en prod
+  (`node scripts/load-monserrate-guia-api.js`). Prod: 4 figures con foto y
+  caption inline. Smoke fase2 16/16 PASS; regresion blog 19/19 PASS.
+- **Fase 3 (codigo `f09de13` + docs/limpieza `7e05b88`):** resenas habilitadas
+  para blog con formulario simplificado (estrellas 1-5 + nombre + comentario,
+  sin dims, sin traveller_type, sin quick-rating). Titulo "Resenas del
+  articulo". JS inline generico funciona igual (dims/traveller vacios).
+  Smoke blog 23/23 PASS + regresion evento/sitio 13/13 PASS, balance divs 0.
+  Prod verificado: seccion "Resenas del articulo" con formulario simplificado.
+- **Fase 4 (PENDIENTE commit + push):** variante de diseno moderno minimalista
+  para `categoria_slug==='blog'` que distingue un articulo de un destino.
+  Hero nuevo `.bhero`: foto de portada ancha (`.bcover` a todo el ancho,
+  min(52vh,440px)) + bloque titulo/lead/chips limpio sobre fondo crema
+  (`.bhin`/`.bhtitle`/`.bhslead`/`.bchips`), sin grid de 3 thumbs (`.prow`),
+  sin botones Contactar/Como llegar/Guardar/Estuve aqui, sin barra dorada de
+  rating (`.gstrip` desactivada para blog), sin subnav sticky (`subnav=''`
+  si cat==='blog'). `<body class="blog">` activa columna de lectura ~720px
+  (`body.blog .sin{max-width:720px}`), texto 16px/1.8
+  (`body.blog .stext{font-size:16px;line-height:1.8}`), oculta la numeracion
+  dorada (`body.blog .stnum{display:none}`). Se conservan todas las secciones
+  del articulo (La historia con .bfig, video, FAQs, resenas, autor).
+  Escudo GOLD: smoke blog 34/34 PASS (incluye 10 checks nuevos Fase 4),
+  regresion evento/sitio 13/13 PASS, node --check OK, ASCII 0/0, balance
+  divs 0. Preview visual aprobado por el usuario via companion.
+- **PENDIENTE:** commit + push Fase 4; verificar /monserrate-guia-completa.html
+  en prod; Fase 5 (recorte seed a ~3000 palabras); Fase 6 (docs + QA final).
 
 ### Sesion anterior (Agosto 2026) - Primera entrada real de blog + multi-tema
 
@@ -269,35 +277,38 @@ Ver BUGS_HISTORICOS.md BUG-022.
 
 ## Que sigue (proxima accion inmediata)
 
-1. **Desbloquear el deploy de Vercel (TASK-011, prioridad ALTA):** el deploy
-   automatico sigue fallando con causa desconocida (diagnostico en pausa).
-   Bloquea en produccion los cambios multi-tema de TSK-044 (api/destinos.js,
-   index.html, api/pagina-destino.js, admin.html) y los pendientes de
-   TASK-008/TSK-017 de sesiones previas. Revisar logs de build de Vercel
-   (dashboard o `vercel logs`) y comparar contra el ultimo deploy exitoso.
-2. **Push a GitHub (TASK-014):** commit y push de la sesion actual (blog +
-   multi-tema + migracion 004) -- pendiente de la sesion Chrome/GCM.
-3. **Aplicar migracion 004 en Neon (TASK-012):** ejecutar
+1. **Commit + push de la Fase 4 (diseno minimalista del post de blog):**
+   incluye `.gitignore` nuevo (excluye .superpowers/ y fake_neon temporales),
+   cambios en `api/pagina-destino.js` (hero bhero, body.blog, sin subnav/gstrip
+   para blog) y TASKS.md/NEXT.md. Luego verificar
+   `https://exploraco.vercel.app/monserrate-guia-completa.html` en prod (hero
+   de portada, columna de lectura, sin subnav ni gstrip).
+2. **Fase 5:** recortar el seed de Monserrate de ~6.278 a ~3.000 palabras en
+   `scripts/seed-monserrate-guia.js` (conservar los 4 marcadores [foto:] y las
+   FAQs) y re-sembrar en prod con `node scripts/load-monserrate-guia-api.js`.
+3. **Fase 6:** QA final en prod (blog.html + post + sitemap) y cierre documental
+   (marcar TASK-018 COMPLETADA en TASKS.md, registrar en DECISIONS.md si aplica).
+4. **Aplicar migracion 004 en Neon (TASK-012):** ejecutar
    `db/migrations/004_usuarios_blog_autor.sql` (foto_url + ciudad_base en
    usuarios) cuando haya acceso a la URL de Neon. Luego asignar autor al
    post desde admin.html (TASK-013).
-4. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
+5. Corregir las URLs de imagenes de lacandelaria (BUG-022): re-verificar
    con curl y re-ejecutar `node scripts/load-lacandelaria-api.js` para que la
    hero y la galeria carguen (hoy el HTML se renderiza pero las imagenes
    del hero/galeria pueden estar rotas por tamano 1200px + hash 6/6f).
-5. Cargar tags reales en los destinos de comida/hostal/evento (varios
+6. Cargar tags reales en los destinos de comida/hostal/evento (varios
    estan vacios, lo que degrada el comparador a "relleno por rating").
-6. TSK-016 (Widget "Quien va este mes") del backlog Social.
-7. Materializar ADR-008: completar la carpeta `db/migrations/` con el SQL
+7. TSK-016 (Widget "Quien va este mes") del backlog Social.
+8. Materializar ADR-008: completar la carpeta `db/migrations/` con el SQL
    del fix de BUG-021 versionado (ya existe 003_interacciones_dims_traveller
    y 004_usuarios_blog_autor; falta el fix de BUG-021) como repositorio
    unico de estructura BD.
-8. Diferido por decision de usuario: las paginas de categoria `evento`
+9. Diferido por decision de usuario: las paginas de categoria `evento`
    para la escena electronica de Bogota (los 8 venues quedaron en la band
    "Lugares" con cat `sitio`; los eventos concretos se retomaran en una
    tarea posterior).
-9. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
-   RESEND_API_KEY).
+10. Infraestructura: TASK-004/005/006 (dominio propio, Search Console,
+    RESEND_API_KEY).
 
 ### Sesion previa (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
 
