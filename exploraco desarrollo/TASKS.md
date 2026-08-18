@@ -466,6 +466,72 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Theatron, viajero, gastronomia, La Candelaria, parques). Total destinos
   en el sitio: 113 (107 destino + 6 blog).
 
+### TSK-050: Pagina dinamica candelario.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del bar-restaurante El Candelario (cat sitio, slug
+  `candelario`, `status='published'`, `destacado=true`, rating 0). Casa
+  colonial de +120 anos en la calle 12b con quinta (La Candelaria):
+  cocina criolla de dia, bar de noche, leyendas de fantasmas. Coordenadas
+  aprox. 4.5972, -74.0739. 6 fotos, 3 tours, 5 FAQs. Archivos:
+  `scripts/seed-candelario.js` y `scripts/load-candelario-api.js`.
+- **Evidencia:** GET /candelario.html = 200; presente en /api/destinos con
+  lat/lng. Publicado via POST /api/admin-destinos (id d4df574e-...).
+
+### TSK-051: Pagina dinamica klandestino.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del bar Klandestino (cat sitio, slug `klandestino`,
+  `status='published'`, `destacado=true`, rating 0). Cocteleria de
+  espiritu clandestino en el centro; contacto oficial via Instagram
+  @klandestinobogota (la info se publica ahi: horarios, eventos,
+  ubicacion exacta). Precios marcados como referencia. Coordenadas aprox.
+  4.5985, -74.0745. 5 fotos, 2 tours, 5 FAQs. Archivos:
+  `scripts/seed-klandestino.js` y `scripts/load-klandestino-api.js`.
+- **Evidencia:** GET /klandestino.html = 200; presente en /api/destinos.
+  Publicado via POST /api/admin-destinos (id 63f54ea9-...).
+- **Nota editorial:** no fue posible verificar el contenido del Instagram
+  (bloqueado); la pagina evita afirmaciones no confirmadas. Ojo: la
+  Alcaldia cerro en ago-2025 un bar homonimo en Restrepo (fachada de
+  sindicatos); el usuario confirmo que la pagina corresponde al perfil
+  @klandestinobogota.
+
+### TSK-052: Pagina dinamica quiebracanto.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del templo salsero Quiebracanto (cat sitio, slug
+  `quiebracanto`, `status='published'`, `destacado=true`, rating 0).
+  Fundado en 1979 (Las Aguas), en la carrera quinta desde 1982 (Cra 5
+  #17-76); orquestas en vivo los fines de semana, cover de referencia
+  5.000-10.000. Coordenadas aprox. 4.6030, -74.0715. 5 fotos, 3 tours,
+  5 FAQs. Archivos: `scripts/seed-quiebracanto.js` y
+  `scripts/load-quiebracanto-api.js`.
+- **Evidencia:** GET /quiebracanto.html = 200; presente en /api/destinos.
+  Publicado via POST /api/admin-destinos (id f2f7959d-...).
+
+### TSK-053: Pagina dinamica bellagio-bar.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Bellagio Bar (cat sitio, slug `bellagio-bar`,
+  `status='published'`, `destacado=true`, rating 0). Av Jimenez #3-87
+  frente al Parque de los Periodistas: cocteleria, cerveza artesanal,
+  rap en vivo y trivia. Instagram @bellagiobarbogota, tel +57 324 4651175.
+  Coordenadas aprox. 4.6068, -74.0725. 5 fotos, 3 tours, 5 FAQs.
+  Archivos: `scripts/seed-bellagio.js` y `scripts/load-bellagio-api.js`.
+- **Evidencia:** GET /bellagio-bar.html = 200; presente en /api/destinos.
+  Publicado via POST /api/admin-destinos (id 97741ed2-...).
+
+### TSK-054: Pagina dinamica cafe-cinema.html
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Cafe Cinema (cat sitio, slug `cafe-cinema`,
+  `status='published'`, `destacado=true`, rating 0). Cafe-bar de los
+  cinefilos del centro, fundado a principios de los 90 en la Terraza
+  Pasteur (cra 7 con calle 24, Local 207) por cinco directores de
+  cineclub. Coordenadas aprox. 4.6145, -74.0685. 5 fotos, 2 tours,
+  5 FAQs. Archivos: `scripts/seed-cafe-cinema.js` y
+  `scripts/load-cafe-cinema-api.js`.
+- **Evidencia:** GET /cafe-cinema.html = 200; presente en /api/destinos.
+  Publicado via POST /api/admin-destinos (id cbd3c919-...).
+- **Lotes de bares del centro en produccion:** candelario, klandestino,
+  quiebracanto, bellagio-bar y cafe-cinema (los 5 con rating 0 hasta
+  resenas reales, ADR-009).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
