@@ -655,7 +655,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+descTitleGeneric+'</h2><div class="stnum">'+nextNum()+'</div></div>'
     + (d.lead ? '<p class="slead bc">'+esc(d.lead)+'</p>' : '')
     + cuerpoHTML
-    + (d.highlight ? '<div class="hbox"><span class="hbico">\u2605</span><div><div class="hblbl">Destacado</div><div class="hbtx">'+esc(d.highlight)+'</div></div></div>' : '')
+    // En blog el recuadro "Destacado" no se muestra al final del
+    // articulo: el cuerpo del post ya termina en el cierre editorial.
+    + ((cat !== 'blog' && d.highlight) ? '<div class="hbox"><span class="hbico">\u2605</span><div><div class="hblbl">Destacado</div><div class="hbtx">'+esc(d.highlight)+'</div></div></div>' : '')
     + (amenidades.length ? '<div class="tagrow">'+amenidades.map(function(a){ return '<span class="tpill">'+esc(typeof a==='string'?a:(a.nombre||''))+'</span>'; }).join('')+'</div>' : '')
     + '</div></section>';
 
@@ -1416,7 +1418,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   }
 
   // -- SECCI??N: FAQ -----------------------------------------------
-  var secFaq = faqs.length ? '<section class="ssec bwhite" id="faq"><div class="sin">'
+  // En blog la seccion de preguntas frecuentes se omite: un articulo
+  // editorial no repite en acordeones lo que ya responde el cuerpo.
+  var secFaq = (cat !== 'blog' && faqs.length) ? '<section class="ssec bwhite" id="faq"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Preguntas frecuentes</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="faq-list">'
     + faqs.map(function(f){ return '<div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">'+esc(f.pregunta||f.q||'')+' <span class="faq-arrow">\u25BC</span></div><div class="faq-a">'+esc(f.respuesta||f.a||'')+'</div></div>'; }).join('')
@@ -1490,11 +1494,19 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     }).join('');
   }
 
-  var tituloResenas = esBlogRes ? 'Resenas del articulo' : 'Resenas de viajeros';
+  // En blog las resenas se llaman "opiniones": un articulo se comenta,
+  // no se "resena" como un lugar. Se reusa el mismo widget simplificado
+  // pero con terminologia editorial (ver pedido del area Inspirate).
+  var termOpinion = esBlogRes ? 'opinion' : 'resena';
+  var tituloResenas = esBlogRes ? 'Opinion' : 'Resenas de viajeros';
+  var textoRbcnt = esBlogRes ? nRes + ' opiniones' : nRes + ' resenas';
+  var textoRvEmpty = esBlogRes ? 'Se el primero en dejar tu opinion.' : 'Se el primero en dejar una resena.';
+  var textoWrTitle = esBlogRes ? 'Escribir tu opinion' : 'Escribir una resena';
+  var btnResenas = esBlogRes ? 'Publicar ' + termOpinion + ' ->' : 'Publicar ' + termOpinion + ' ->';
+  var textoRvOk = esBlogRes ? '\u2713 Gracias por tu opinion!' : '\u2713 Gracias por tu resena!';
   var placeholderResenas = esBlogRes
     ? 'Que te parecio el articulo? Te ayudo esta guia? Deja tu opinion.'
     : 'Que te parecio este lugar? Que consejo darias?';
-  var btnResenas = esBlogRes ? 'Publicar resena ->' : 'Publicar resena ->';
   var promptFuiste = esBlogRes ? '' : '<label class="wrlbl">Fuiste como:</label>'
     + '<div class="rv-traveller-type" id="rv-traveller-type">'+travBtns+'</div>';
   var promptDims = esBlogRes ? '' : '<label class="wrlbl">Califica por categoria:</label>'
@@ -1502,12 +1514,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
 
   secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+tituloResenas+'</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+nRes+' resenas</div></div>'
+    + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+textoRbcnt+'</div></div>'
     + (scoreBars||'')
     + '</div>'
     + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
-    + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">Se el primero en dejar una resena.</p>'
-    + '<div class="wr"><div class="wrtitle">Escribir una resena</div>'
+    + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">'+textoRvEmpty+'</p>'
+    + '<div class="wr"><div class="wrtitle">'+textoWrTitle+'</div>'
     + promptFuiste
     + promptDims
     + '<label class="wrlbl">Puntuacion general:</label>'
@@ -1517,7 +1529,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '<input id="rvn" type="text" placeholder="Tu nombre" class="wrinp">'
     + '<textarea id="rvt" placeholder="'+placeholderResenas+'" class="wrinp"></textarea>'
     + '<button class="wrsub" onclick="submitRv()">'+btnResenas+'</button>'
-    + '<div class="wrok" id="rvok">\u2713 Gracias por tu resena!</div>'
+    + '<div class="wrok" id="rvok">'+textoRvOk+'</div>'
     + (esBlogRes ? '' : '<div class="wr" id="qrwrap" style="margin-top:8px">'
       + '<div class="wrtitle">Califica este lugar</div>'
       + '<div class="sprow" id="qr-stars">'
@@ -1537,7 +1549,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   if (d.instagram) ctBtns.push('<a class="cbtn blue" href="https://instagram.com/'+esc((d.instagram||'').replace('@',''))+'" target="_blank">[foto] Instagram</a>');
   if (d.email)     ctBtns.push('<a class="cbtn dark" href="mailto:'+esc(d.email)+'">\u0040 Email</a>');
 
-  var secContact = ctBtns.length ? '<section class="ssec bwarm" id="contact"><div class="sin">'
+  // En blog el modulo de contacto no se muestra: un articulo no es un
+  // lugar con whatsapp/telefono/ubicacion, y el pie ya enlaza al blog.
+  var secContact = (cat !== 'blog' && ctBtns.length) ? '<section class="ssec bwarm" id="contact"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+ctBtns.join('')+'</div></div></section>' : '';
 
@@ -1732,7 +1746,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '  RV_COUNT=RV_COUNT+1;\n'
     + '  RV_AVG=((RV_AVG*(RV_COUNT-1))+score)/RV_COUNT;\n'
     + '  var rbavg=document.getElementById("rbavg"); if(rbavg)rbavg.textContent=RV_AVG.toFixed(1);\n'
-    + '  var rbcnt=document.getElementById("rbcnt"); if(rbcnt)rbcnt.textContent=RV_COUNT+" resenas";\n'
+    + '  var rbcnt=document.getElementById("rbcnt"); if(rbcnt)rbcnt.textContent=RV_COUNT+"'+(esBlogRes ? ' opiniones' : ' resenas')+'";\n'
     + '  var rbstars=document.getElementById("rbstars");\n'
     + '  if(rbstars)rbstars.innerHTML=[1,2,3,4,5].map(function(i){return \'<span class="rbst\'+(i<=Math.round(RV_AVG)?" on":"")+\'">*</span>\';}).join("");\n'
     + '}\n'
@@ -1761,8 +1775,8 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '      document.querySelectorAll("#rv-stars .spk").forEach(function(s){s.classList.remove("on");});\n'
     + '      document.querySelectorAll(".rv-star").forEach(function(s){s.classList.remove("on");});\n'
     + '      document.querySelectorAll(".rv-type-btn").forEach(function(b){b.classList.remove("on");});\n'
-    + '      btn.textContent="Ya resenaste este lugar";\n'
-    + '    }else{btn.disabled=false;btn.textContent="Publicar resena ->";}\n'
+    + '      btn.textContent="'+(esBlogRes ? 'Ya dejaste tu opinion' : 'Ya resenaste este lugar')+'";\n'
+    + '    }else{btn.disabled=false;btn.textContent="Publicar '+(esBlogRes ? 'opinion' : 'resena')+' ->";}\n'
     + '  });\n'
     + '}\n'
     + 'var qrVotoActual=0;\n'
