@@ -53,6 +53,17 @@ function conMisiones(row) {
   return row;
 }
 
+// total_logros: cuantos trofeos desbloqueo el usuario (conteo de claves
+// en progreso_logros). No se guarda en columna: se deriva en cada lectura
+// igual que nivel/badge_actual, para que nunca se desincronice con el
+// catalogo LOGROS de api/interacciones.js.
+function conLogros(row) {
+  if (!row) return row;
+  const progreso = row.progreso_logros || {};
+  row.total_logros = Object.keys(progreso).length;
+  return row;
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -79,7 +90,7 @@ module.exports = async (req, res) => {
       if (id) {
         const rows = await sql('SELECT * FROM usuarios WHERE id = $1', [id]);
         if (!rows.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
-        return res.json({ ok: true, data: conMisiones(conNivel(rows[0])) });
+        return res.json({ ok: true, data: conLogros(conMisiones(conNivel(rows[0]))) });
       }
       return res.status(400).json({ ok: false, error: 'Falta id o tipo' });
     }
@@ -99,7 +110,7 @@ module.exports = async (req, res) => {
         + 'RETURNING *',
         [auth_id, email, nombre, avatar_url || null, auth_provider || 'email']
       );
-      return res.json({ ok: true, data: conMisiones(conNivel(rows[0])) });
+      return res.json({ ok: true, data: conLogros(conMisiones(conNivel(rows[0]))) });
     }
 
     return res.status(405).json({ ok: false, error: 'M\u00e9todo no permitido' });

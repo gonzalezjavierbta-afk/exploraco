@@ -173,12 +173,14 @@
         // Actualizar perfil local con nuevo XP (accion + bonus de misiones)
         if (window.ExploraCO.usuario) {
           var misionesXp = sumaMisionesXp(data.misiones);
+          var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp + misionesXp;
+          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp + misionesXp + logrosXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
         mostrarMisionesToast(data.misiones);
+        mostrarLogrosToast(data.logros);
       }
       return data.ok;
     } catch (err) {
@@ -225,12 +227,14 @@
         mostrarToast('⭐ Reseña publicada · +' + (data.xp || 0) + ' XP', '#16a34a');
         if (window.ExploraCO.usuario) {
           var misionesXp = sumaMisionesXp(data.misiones);
+          var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp;
+          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp + logrosXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
         mostrarMisionesToast(data.misiones);
+        mostrarLogrosToast(data.logros);
       } else {
         // Antes un rechazo del backend (ej. reseña duplicada, ver
         // api/interacciones.js v3) quedaba en silencio para el usuario.
@@ -279,11 +283,13 @@
         if (data.xp > 0) {
           mostrarToast('♥ Guardado · +' + data.xp + ' XP', '#E8A020');
           var misionesXp = sumaMisionesXp(data.misiones);
+          var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp;
+          window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
           mostrarMisionesToast(data.misiones);
+          mostrarLogrosToast(data.logros);
         } else {
           mostrarToast('♥ Guardado de nuevo en Tu Mapa', '#E8A020');
         }
@@ -343,10 +349,12 @@
         mostrarToast('✓ Visita registrada · +' + data.xp + ' XP', '#16a34a');
         var misionesXp = sumaMisionesXp(data.misiones);
           aplicarDesbloqueos(data.misiones);
-        window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp;
+        var logrosXp = sumaLogrosXp(data.logros);
+        window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp;
         guardarSesion(window.ExploraCO.usuario);
         actualizarUI();
         mostrarMisionesToast(data.misiones);
+        mostrarLogrosToast(data.logros);
       } else if (data.ya_visitado) {
         mostrarToast('Ya habías marcado que estuviste aquí', '#888');
       }
@@ -409,12 +417,14 @@
         mostrarToast('⭐ Voto guardado · +' + (data.xp || 0) + ' XP', '#16a34a');
         if (window.ExploraCO.usuario) {
           var misionesXp = sumaMisionesXp(data.misiones);
+          var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp;
+          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp + logrosXp;
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
         mostrarMisionesToast(data.misiones);
+        mostrarLogrosToast(data.logros);
         return { ok: true };
       }
       if (data.ya_votado) {
@@ -559,6 +569,25 @@
       setTimeout(function () {
         mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + m.xp + ' XP', '#E8A020');
       }, i * 1600);
+    });
+  }
+
+  // ── Logros / trofeos (v5, estilo consola) ────────────────────
+  // Las respuestas de /api/interacciones ahora pueden traer un array
+  // 'logros' con los trofeos desbloqueados en esa misma llamada (ver
+  // api/interacciones.js, evaluarLogros()). El XP ya esta sumado en
+  // Neon; aqui solo se refleja localmente y se avisa con toast, con un
+  // pequeno desfase para que no pise los toasts de misiones.
+  function sumaLogrosXp(logros) {
+    if (!logros || !logros.length) return 0;
+    return logros.reduce(function (s, l) { return s + (parseInt(l.xp) || 0); }, 0);
+  }
+  function mostrarLogrosToast(logros) {
+    if (!logros || !logros.length) return;
+    logros.forEach(function (l, i) {
+      setTimeout(function () {
+        mostrarToast((l.emoji || '🏆') + ' Trofeo desbloqueado: ' + l.nombre + ' · +' + l.xp + ' XP', '#E8A020');
+      }, i * 1600 + 900);
     });
   }
 

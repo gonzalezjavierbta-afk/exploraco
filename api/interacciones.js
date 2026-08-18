@@ -1,14 +1,17 @@
-// api/interacciones.js  v4 - motor de misiones (Fase 3) (ASCII-safe: 0 backticks, 0 no-ASCII)
+// api/interacciones.js  v5 - motor de misiones + logros (Fase 3/Gaming)
+// (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
 // rating CHECK: 1-5
 // usuario_nombre NO existe - se guarda en texto como prefijo
 //
-// REQUIERE MIGRACION ANTES DE DESPLEGAR (acumulativa desde v3):
+// REQUIERE MIGRACION ANTES DE DESPLEGAR (acumulativa desde v4):
 //   ALTER TABLE interacciones
 //     ADD COLUMN IF NOT EXISTS activo boolean NOT NULL DEFAULT true;
 //   ALTER TABLE usuarios
 //     ADD COLUMN IF NOT EXISTS progreso_misiones jsonb NOT NULL DEFAULT '{}'::jsonb;
+//   ALTER TABLE usuarios
+//     ADD COLUMN IF NOT EXISTS progreso_logros jsonb NOT NULL DEFAULT '{}'::jsonb;
 //
 // v3: cierra 3 vectores de fraude de XP encontrados en v2:
 //  1) 'visita' ahora requiere usuario_id y se deduplica (antes: XP
@@ -30,6 +33,16 @@
 // esta consumido, ver BLUEPRINT.md): evaluarMisiones() corre dentro de
 // esta misma invocacion, justo despues de que 'resena'/'guardado'/
 // 'visita' ya hayan sumado su XP base.
+//
+// v5: catalogo LOGROS estilo consola (tier bronce/plata/oro/platino +
+// rareza % tipo Steam) y coleccion por ciudad estilo Upland. Mismo
+// patron que MISIONES: codigo estatico, DAG via 'requiere', progreso en
+// usuarios.progreso_logros (merge '||'), evaluacion server-side dentro
+// de esta invocacion (evaluarLogros), sin endpoint nuevo. El GET
+// tipo=logros devuelve el catalogo completo con estado/fecha/tier y la
+// rareza global calculada con jsonb_object_keys sobre usuarios activos.
+// Los nombres de ciudad se comparan NORMALIZADOS (sin tildes) porque en
+// Neon conviven 'Bogota' y 'Bogot\u00e1' segun el seed.
 
 const { neon } = require('@neondatabase/serverless');
 
@@ -104,6 +117,115 @@ var MISIONES = [
   },
 ];
 
+// -- Catalogo de logros (v5, estilo consola + Upland) ---------------
+// Mismo patron que MISIONES: codigo estatico, DAG via 'requiere',
+// check() server-side. Anade tier (bronce/plata/oro/platino) para el
+// UI y xp de recompensa. La rareza % se calcula en el GET tipo=logros
+// a partir de cuantos usuarios activos desbloquearon cada logro.
+//
+// Normalizacion de nombres de ciudad: en Neon conviven 'Bogota' y
+// 'Bogot\u00e1' segun el seed, asi que toda comparacion de ciudad usa
+// TRANSLATE para ignorar tildes y LOWER para ignorar mayusculas.
+var TRANSLATE_CIUDAD = "TRANSLATE(COALESCE(d.ciudad,''),'\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc','aeiouu')";
+var CIUDAD_NORM      = "LOWER(" + TRANSLATE_CIUDAD + ")";
+
+// Coleccion por ciudad (estilo Upland: juntar "propiedades" de una
+// ciudad en Tu Mapa). Umbrales por ciudad con los nombres canonizados
+// que existen en los seeds publicados.
+var CIUDADES_COLECCION = [
+  { ciudad: 'Bogota',      n: 12, id: 'logr_alcalde_bogota',        nombre: 'Alcalde de Bogota',             emoji: '\uD83C\uDFDB', tier: 'platino', xp: 100,
+    desc: 'Guarda 12 destinos de Bogota en Tu Mapa' },
+  { ciudad: 'Cartagena',   n: 8,  id: 'logr_conquistador_cartagena', nombre: 'Conquistador de Cartagena',      emoji: '\u2693',       tier: 'oro',     xp: 75,
+    desc: 'Guarda 8 destinos de Cartagena en Tu Mapa' },
+  { ciudad: 'Medellin',    n: 8,  id: 'logr_conquistador_medellin',  nombre: 'Conquistador de Medellin',       emoji: '\uD83C\uDFD4', tier: 'oro',     xp: 75,
+    desc: 'Guarda 8 destinos de Medellin en Tu Mapa' },
+  { ciudad: 'Santa Marta', n: 6,  id: 'logr_senor_santa_marta',      nombre: 'Se\u00f1or de Santa Marta',      emoji: '\uD83C\uDF34', tier: 'plata',   xp: 40,
+    desc: 'Guarda 6 destinos de Santa Marta en Tu Mapa' },
+  { ciudad: 'Cali',        n: 6,  id: 'logr_cali_es_colombia',       nombre: 'Cali es Colombia',               emoji: '\uD83D\uDC83', tier: 'plata',   xp: 40,
+    desc: 'Guarda 6 destinos de Cali en Tu Mapa' },
+];
+
+// Logros generales (voto rapido, blogs y conteos de progreso).
+var LOGROS = [
+  {
+    id: 'logr_primer_voto', grupo: 'general', requiere: [],
+    nombre: 'Primera calificaci\u00f3n',
+    desc: 'Califica por primera vez un lugar con el voto r\u00e1pido de 1 a 5 estrellas',
+    emoji: '\u2B50', tier: 'bronce', xp: 10,
+    check: function(ctx) { return ctx.totalVotos().then(function(n){ return n >= 1; }); },
+  },
+  {
+    id: 'logr_critico_10', grupo: 'general', requiere: ['logr_primer_voto'],
+    nombre: 'Cr\u00edtico', desc: 'Acumula 10 calificaciones en total',
+    emoji: '\uD83C\uDFAF', tier: 'plata', xp: 25,
+    check: function(ctx) { return ctx.totalVotos().then(function(n){ return n >= 10; }); },
+  },
+  {
+    id: 'logr_critico_25', grupo: 'general', requiere: ['logr_critico_10'],
+    nombre: 'Cr\u00edtico experto', desc: 'Acumula 25 calificaciones en total',
+    emoji: '\uD83C\uDFAF', tier: 'oro', xp: 50,
+    check: function(ctx) { return ctx.totalVotos().then(function(n){ return n >= 25; }); },
+  },
+  {
+    id: 'logr_opinion_blog', grupo: 'general', requiere: [],
+    nombre: 'Lector cr\u00edtico', desc: 'Deja tu primera opini\u00f3n en un art\u00edculo del blog',
+    emoji: '\uD83D\uDCDD', tier: 'bronce', xp: 10,
+    check: function(ctx) { return ctx.blogOpiniones().then(function(n){ return n >= 1; }); },
+  },
+  {
+    id: 'logr_votos_blog_5', grupo: 'general', requiere: ['logr_opinion_blog'],
+    nombre: 'Bibliotecario', desc: 'Califica 5 art\u00edculos del blog',
+    emoji: '\uD83D\uDCDA', tier: 'plata', xp: 25,
+    check: function(ctx) { return ctx.blogVotos().then(function(n){ return n >= 5; }); },
+  },
+  {
+    id: 'logr_votos_blog_10', grupo: 'general', requiere: ['logr_votos_blog_5'],
+    nombre: 'Curador de historias', desc: 'Califica 10 art\u00edculos del blog',
+    emoji: '\uD83D\uDCDA', tier: 'oro', xp: 50,
+    check: function(ctx) { return ctx.blogVotos().then(function(n){ return n >= 10; }); },
+  },
+  {
+    id: 'logr_coleccionista_10', grupo: 'coleccion', requiere: [],
+    nombre: 'Coleccionista', desc: 'Guarda 10 lugares en total',
+    emoji: '\uD83D\uDCBC', tier: 'bronce', xp: 15,
+    check: function(ctx) { return Promise.resolve(ctx.totalGuardados >= 10); },
+  },
+  {
+    id: 'logr_coleccionista_50', grupo: 'coleccion', requiere: ['logr_coleccionista_10'],
+    nombre: 'Magnate del mapa', desc: 'Guarda 50 lugares en total',
+    emoji: '\uD83C\uDFC6', tier: 'oro', xp: 75,
+    check: function(ctx) { return Promise.resolve(ctx.totalGuardados >= 50); },
+  },
+  {
+    id: 'logr_ciudades_5', grupo: 'coleccion', requiere: ['logr_coleccionista_10'],
+    nombre: 'Viajero multiciudad', desc: 'Guarda lugares en 5 ciudades distintas',
+    emoji: '\uD83D\uDDFA', tier: 'plata', xp: 30,
+    check: function(ctx) { return ctx.ciudadesDistintas().then(function(n){ return n >= 5; }); },
+  },
+  {
+    id: 'logr_visitas_5', grupo: 'coleccion', requiere: [],
+    nombre: 'Senderista', desc: 'Confirma 5 visitas a destinos',
+    emoji: '\uD83E\uDDBC', tier: 'bronce', xp: 15,
+    check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 5); },
+  },
+  {
+    id: 'logr_visitas_20', grupo: 'coleccion', requiere: ['logr_visitas_5'],
+    nombre: 'N\u00f3mada', desc: 'Confirma 20 visitas a destinos',
+    emoji: '\uD83E\uDDED', tier: 'oro', xp: 50,
+    check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 20); },
+  },
+];
+
+// Logros de coleccion por ciudad, generados desde CIUDADES_COLECCION
+// para mantener el catalogo data-driven dentro de codigo estatico.
+CIUDADES_COLECCION.forEach(function(c) {
+  LOGROS.push({
+    id: c.id, grupo: 'ciudad', requiere: ['logr_coleccionista_10'],
+    nombre: c.nombre, desc: c.desc, emoji: c.emoji, tier: c.tier, xp: c.xp,
+    check: function(ctx) { return ctx.guardadosCiudad(c.ciudad).then(function(n){ return n >= c.n; }); },
+  });
+});
+
 // Evalua el catalogo completo para un usuario y persiste lo nuevo que se
 // haya completado. Nunca lanza: un fallo aqui no debe tumbar la accion
 // principal (resena/guardado/visita) que ya se registro con exito.
@@ -157,6 +279,104 @@ function evaluarMisiones(sql, usuarioId) {
     });
   }).catch(function(err) {
     console.error('[misiones]', err.message);
+    return [];
+  });
+}
+
+// Evalua el catalogo LOGROS para un usuario y persiste lo nuevo. Mismo
+// patron de seguridad que evaluarMisiones: corre en servidor, nunca
+// lanza, y las consultas de agregados se memoizan (una por accion) para
+// no disparar una consulta por logro.
+function evaluarLogros(sql, usuarioId) {
+  return sql(
+    'SELECT xp_total, total_guardados, total_visitas, progreso_logros FROM usuarios WHERE id=$1',
+    [usuarioId]
+  ).then(function(rows) {
+    if (!rows.length) return [];
+    var u = rows[0];
+    var progreso = u.progreso_logros || {};
+    var cache = {};
+    function memo(key, query, params) {
+      if (!cache[key]) {
+        cache[key] = sql(query, params).then(function(r) {
+          return r[0] ? parseInt(r[0].n) || 0 : 0;
+        }).catch(function(){ return 0; });
+      }
+      return cache[key];
+    }
+    var ctx = {
+      sql: sql,
+      usuarioId: usuarioId,
+      xpTotal: parseInt(u.xp_total) || 0,
+      totalGuardados: parseInt(u.total_guardados) || 0,
+      totalVisitas: parseInt(u.total_visitas) || 0,
+      totalVotos: function() {
+        return memo('votos',
+          'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'rating\'',
+          [usuarioId]);
+      },
+      blogVotos: function() {
+        return memo('blogvotos',
+          'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+          + ' WHERE i.usuario_id=$1 AND i.tipo=\'rating\' AND d.categoria_slug=\'blog\'',
+          [usuarioId]);
+      },
+      blogOpiniones: function() {
+        return memo('blogopiniones',
+          'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+          + ' WHERE i.usuario_id=$1 AND i.tipo=\'resena\' AND d.categoria_slug=\'blog\'',
+          [usuarioId]);
+      },
+      ciudadesDistintas: function() {
+        return memo('ciudades',
+          'SELECT COUNT(DISTINCT ' + CIUDAD_NORM + ')::int AS n FROM interacciones i'
+          + ' JOIN destinos d ON d.id=i.destino_id'
+          + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true AND ' + CIUDAD_NORM + ' <> \'\'',
+          [usuarioId]);
+      },
+      guardadosCiudad: function(ciudad) {
+        var key = 'ciudad_' + ciudad;
+        return memo(key,
+          'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+          + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true AND ' + CIUDAD_NORM + ' = LOWER($2)',
+          [usuarioId, ciudad]);
+      },
+    };
+    var completados = {};
+    Object.keys(progreso).forEach(function(k) {
+      if (progreso[k] && progreso[k].estado === 'completada') completados[k] = true;
+    });
+
+    var nuevos = [];
+    var cadena = Promise.resolve();
+    LOGROS.forEach(function(l) {
+      cadena = cadena.then(function() {
+        if (completados[l.id]) return;
+        var okRequisitos = l.requiere.every(function(r){ return completados[r]; });
+        if (!okRequisitos) return;
+        return l.check(ctx).then(function(cumplido) {
+          if (!cumplido) return;
+          completados[l.id] = true;
+          progreso[l.id] = { estado: 'completada', en: new Date().toISOString() };
+          nuevos.push(l);
+          console.log('TRACE: Logro desbloqueado | ' + l.id + ' | +' + l.xp + ' XP');
+        });
+      });
+    });
+
+    return cadena.then(function() {
+      if (!nuevos.length) return [];
+      var xpBonus = nuevos.reduce(function(s, l){ return s + l.xp; }, 0);
+      return sql(
+        'UPDATE usuarios SET'
+        + '   progreso_logros = COALESCE(progreso_logros,\'{}\'::jsonb) || $1::jsonb,'
+        + '   xp_total = xp_total + $2'
+        + ' WHERE id = $3',
+        [JSON.stringify(progreso), xpBonus, usuarioId]
+      ).then(function() { return nuevos; });
+    });
+  }).catch(function(err) {
+    console.error('[logros]', err.message);
     return [];
   });
 }
@@ -254,6 +474,51 @@ module.exports = async function handler(req, res) {
           [destinoId, usuarioId]
         );
         return res.status(200).json({ ok: true, voto: miVoto.length > 0 ? miVoto[0] : null });
+      }
+
+      // Catalogo de logros del usuario (v5): estado, fecha, tier y
+      // rareza global estilo Steam (% de usuarios activos que lo
+      // desbloquearon). Una query agregada con jsonb_object_keys.
+      if (tipo === 'logros' && usuarioId) {
+        var usrLogros = await sql(
+          'SELECT progreso_logros FROM usuarios WHERE id=$1',
+          [usuarioId]
+        );
+        if (!usrLogros.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+        var rarezaRows = await sql(
+          'SELECT k AS id, COUNT(*)::int AS n FROM usuarios u,'
+          + ' LATERAL jsonb_object_keys(COALESCE(u.progreso_logros,\'{}\'::jsonb)) AS k'
+          + ' WHERE u.activo = true GROUP BY k'
+        ).catch(function(){ return []; });
+        var totalUsuarios = await sql(
+          'SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true'
+        );
+        var totalUsr = totalUsuarios[0] ? totalUsuarios[0].n : 0;
+        var rareza = {};
+        rarezaRows.forEach(function(r){ rareza[r.id] = totalUsr ? Math.round((r.n / totalUsr) * 1000) / 10 : 0; });
+
+        var progresoLogros = usrLogros[0].progreso_logros || {};
+        var desbloqueados = 0;
+        var dataLogros = LOGROS.map(function(l) {
+          var st = progresoLogros[l.id];
+          var done = !!(st && st.estado === 'completada');
+          if (done) desbloqueados++;
+          return {
+            id: l.id, grupo: l.grupo, nombre: l.nombre, desc: l.desc,
+            emoji: l.emoji, tier: l.tier, xp: l.xp, requiere: l.requiere,
+            estado: done ? 'completada' : 'pendiente',
+            en: done ? (st.en || null) : null,
+            rareza_pct: rareza[l.id] != null ? rareza[l.id] : 0,
+          };
+        });
+        return res.status(200).json({
+          ok: true,
+          data: dataLogros,
+          desbloqueados: desbloqueados,
+          total: LOGROS.length,
+        });
       }
 
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
@@ -354,6 +619,7 @@ module.exports = async function handler(req, res) {
 
         // Sumar XP al usuario si esta logueado
         var misionesNuevas = [];
+        var logrosNuevas = [];
         if (usuarioId2) {
           await sql(
             'UPDATE usuarios SET '
@@ -364,6 +630,7 @@ module.exports = async function handler(req, res) {
             [xpGanado, usuarioId2]
           ).catch(function(){});
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
+          logrosNuevas = await evaluarLogros(sql, usuarioId2);
         }
 
         // Notificar al admin (no bloquea la respuesta)
@@ -396,7 +663,7 @@ module.exports = async function handler(req, res) {
           }
         } catch(_) {}
 
-        return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado, misiones: misionesNuevas });
+        return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado, misiones: misionesNuevas, logros: logrosNuevas });
       }
 
       // -- Guardado --
@@ -413,7 +680,7 @@ module.exports = async function handler(req, res) {
         );
 
         if (existe.length > 0 && existe[0].activo)
-          return res.status(200).json({ ok: true, ya_guardado: true, misiones: [] });
+          return res.status(200).json({ ok: true, ya_guardado: true, misiones: [], logros: [] });
 
         if (existe.length > 0 && !existe[0].activo) {
           // Reactivar un guardado previamente quitado. Cero Borrado
@@ -424,7 +691,7 @@ module.exports = async function handler(req, res) {
             'UPDATE interacciones SET activo=true WHERE id=$1',
             [existe[0].id]
           );
-          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [] });
+          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [] });
         }
 
         var xpGuardado = 5;
@@ -444,7 +711,8 @@ module.exports = async function handler(req, res) {
         ).catch(function(){});
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: xpGuardado, misiones: misionesGuardado });
+        var logrosGuardado = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: xpGuardado, misiones: misionesGuardado, logros: logrosGuardado });
       }
 
       // -- Quitar guardado --
@@ -482,7 +750,7 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2]
         );
         if (yaVisitado.length > 0)
-          return res.status(200).json({ ok: true, ya_visitado: true, xp: 0 });
+          return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
 
         await sql(
           'INSERT INTO interacciones (destino_id, usuario_id, tipo, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', 20, NOW())',
@@ -494,7 +762,8 @@ module.exports = async function handler(req, res) {
         ).catch(function(){});
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita });
+        var logrosVisita = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita, logros: logrosVisita });
       }
 
       // -- Solo rating (sin texto) - quick-rating v5 (TSK-015) ---------
@@ -541,15 +810,17 @@ module.exports = async function handler(req, res) {
           [destinoId2]
         ).catch(function(){});
 
-        // Sumar XP al usuario logueado y evaluar misiones (como resena).
+        // Sumar XP al usuario logueado y evaluar misiones + logros.
         var misionesRating = [];
+        var logrosRating = [];
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+10, ultimo_acceso=NOW() WHERE id=$1',
           [usuarioId2]
         ).catch(function(){});
         misionesRating = await evaluarMisiones(sql, usuarioId2);
+        logrosRating = await evaluarLogros(sql, usuarioId2);
 
-        return res.status(200).json({ ok: true, xp: 10, misiones: misionesRating });
+        return res.status(200).json({ ok: true, xp: 10, misiones: misionesRating, logros: logrosRating });
       }
 
       return res.status(400).json({ ok: false, error: 'tipo no implementado: ' + tipo2 });

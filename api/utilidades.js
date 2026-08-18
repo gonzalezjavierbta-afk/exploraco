@@ -394,7 +394,7 @@ module.exports = async function handler(req, res) {
 if (tipo === 'blog-lista') {
     try {
       var bRows = await sql(
-        'SELECT slug, nombre, lead, descripcion, foto_hero, hero_bg, destacado, ciudad, region, tags, actualizado_en '
+        'SELECT slug, nombre, lead, descripcion, foto_hero, hero_bg, destacado, ciudad, region, tags, rating, total_resenas, actualizado_en '
         + 'FROM destinos WHERE categoria_slug=$1 AND status=$2 '
         + 'ORDER BY destacado DESC, actualizado_en DESC NULLS LAST LIMIT 50',
         ['blog', 'published']
@@ -468,6 +468,9 @@ if (tipo === 'blog-lista') {
           + '<div class="blmeta">'
           + (fecha ? '<span>'+bxe(fecha)+'</span>' : '')
           + (min ? '<span>'+min+' min de lectura</span>' : '')
+          + (((parseInt(br.total_resenas,10)||0) > 0 && br.rating)
+              ? '<span class="blmeta-rate">\u2b50 '+parseFloat(br.rating).toFixed(1)+' ('+(parseInt(br.total_resenas,10)||0)+')</span>'
+              : '')
           + (loc ? '<span class="blloc">\ud83d\udccd '+bxe(loc)+'</span>' : '')
           + '</div></div></a>';
 
@@ -529,6 +532,7 @@ if (tipo === 'blog-lista') {
         + '.blead{font-size:12.5px;color:#777;line-height:1.5;margin:0 0 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
         + '.blmeta{font-size:11px;color:#aaa;display:flex;gap:12px;flex-wrap:wrap}'
         + '.blloc{color:#c98a00;font-weight:700}'
+        + '.blmeta-rate{color:#c98a00;font-weight:700}'
         + '.bempty{background:#fff;border:1px solid #eee;border-radius:12px;padding:38px 20px;text-align:center;color:#777;font-size:14px}'
         + '.bempty a{color:#c98a00;font-weight:700}'
         + '.blfoot{background:#101623;color:#fff;padding:18px 20px;text-align:center;font-size:13px}'

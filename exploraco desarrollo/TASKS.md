@@ -680,6 +680,34 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+## Prioridad SOCIAL - Logros y trofeos (Sprint Actual)
+
+### TSK-055: Sistema de logros/trofeos estilo consola + coleccion por ciudad (Upland)
+- **Prioridad:** ALTA
+- **Responsable:** backend-dev + renderer-dev
+- **Estado:** COMPLETADO en repo (pendiente deploy + migracion, ver TASK-020)
+- **Dependencia:** TSK-015 (voto rapido), misiones XP v4, ADR-012
+- **Detalle técnico:** Catalogo `LOGROS` estatico en `api/interacciones.js` v5: 16 trofeos con `tier` (bronce/plata/oro/platino), `xp`, `requiere` (DAG) y `check(ctx)` server-side -- 6 de voto/opinion (logr_primer_voto, critico_10, critico_25, opinion_blog, votos_blog_5, votos_blog_10), 5 de conteo (coleccionista_10, coleccionista_50, ciudades_5, visitas_5, visitas_20) y 5 generados de `CIUDADES_COLECCION` (Bogota 12 platino/Alcalde, Cartagena 8 oro, Medellin 8 oro, Santa Marta 6 plata, Cali 6 plata). Progreso en nueva columna `usuarios.progreso_logros jsonb` (migracion `db/migrations/005_usuarios_progreso_logros.sql`, ADR-008), merge `||` segun ADR-003. `evaluarLogros()` se ejecuta en los 4 POST de XP (resena, guardado, visita, rating) con agregados memoizados (1 query por grupo, no por trofeo) y anade `logros` a la respuesta (mantiene `misiones`). GET `tipo=logros&usuario_id=` devuelve catalogo + estado/fecha/tier + rareza global % (Steam, via `jsonb_object_keys`). `api/usuarios.js` deriva `total_logros` (conteo de claves). Nombres de ciudad comparados normalizados (TRANSLATE sin tildes + LOWER) porque Neon convive 'Bogota' y 'Bogotá'. `usuario-session.js`: `sumaLogrosXp`/`mostrarLogrosToast` (toast "Trofeo desbloqueado") en las 4 acciones.
+- **Evidencia física de éxito:** `node --check` limpio en interacciones/usuarios/usuario-session; ASCII-safety 0 bytes no-ASCII en los serverless; test local `scripts/test_logros_catalogo.js` 12/12 PASS (16 ids unicos, shape, tiers, DAG a ids validos, todos los check devuelven Promise, TRANSLATE/COALESCE, 5 ciudades, logros de ciudad en catalogo).
+
+### TSK-056: Voto rapido habilitado en blogs + badge de rating en Inspirate/blog.html
+- **Prioridad:** ALTA
+- **Responsable:** renderer-dev
+- **Estado:** COMPLETADO en repo (pendiente deploy, ver TASK-020)
+- **Dependencia:** TSK-055, TASK-017/018 (blog), TSK-015
+- **Detalle técnico:** Se elimina la supresion `esBlogRes ? '' : '<div id="qrwrap">'` en `api/pagina-destino.js`: el widget `#qr-stars` se renderiza en TODAS las categorias incluida blog, con copy condicional ("Califica este artículo" vs "Califica este lugar") y contador "N opiniones" vs "N resenas" (votos +10 XP, dedup 409, ADR-007). Las tarjetas de Inspirate (`inspFeaturedHTML`/`inspHighlightHTML` en index.html) y las cards de blog.html (`api/utilidades.js` blog-lista, SELECT ahora con `rating`/`total_resenas`) muestran el badge `[estrella] X.Y (N)` cuando hay resenas.
+- **Evidencia física de éxito:** Smoke `scripts/smoke_test_blog_voto.js` 14/14 PASS (widget presente en blog y sitio, copy correcto por categoria, contador correcto, sin IDs duplicados, degradacion nRes=0, balance de divs 42/42). `node --check` limpio en pagina-destino.js, utilidades.js e index.html (script inline extraido).
+
+### TASK-020: Aplicar migracion 005 (progreso_logros) + deploy del sistema gaming
+- **Prioridad:** ALTA
+- **Responsable:** backend-dev (con Javier en Neon)
+- **Estado:** PENDIENTE
+- **Dependencia:** TSK-055, TSK-056
+- **Detalle técnico:** Ejecutar en la consola de Neon (ADR-008: SQL versionado, no suelto): `\i db/migrations/005_usuarios_progreso_logros.sql` (ALTER TABLE ADD COLUMN IF NOT EXISTS `progreso_logros jsonb NOT NULL DEFAULT '{}'::jsonb`). Sin esta migracion, GET `tipo=logros` devuelve 500 y los POST degradan (evaluarLogros captura el error y devuelve []). Despues: deploy de Vercel y verificacion en prod (GET logros de un usuario con acciones, voto en un post de blog, badge en Inspirate, toasts de trofeo).
+- **Evidencia física de éxito:** GET `https://exploraco.vercel.app/api/interacciones?tipo=logros&usuario_id=<id>` responde con catalogo de 16 trofeos y rareza %; un voto de 5 estrellas en /monserrate-guia-completa.html dispara el toast "Trofeo desbloqueado" y la tarjeta del post muestra el badge de rating en Inspirate.
+
+---
+
 ## Prioridad MEDIA/BAJA - Infraestructura y Backlog
 
 ### TASK-004: Conectar dominio propio exploraco.co en Vercel

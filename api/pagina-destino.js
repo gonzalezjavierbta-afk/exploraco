@@ -1457,10 +1457,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   // -- Resenas de viajeros ----------------------------------------
   // Blog muestra resenas SIMPLIFICADAS (estrellas 1-5 + comentario +
   // nombre) -- un articulo no se califica por dimensiones como un
-  // hostal o sitio turistico, ni con "viajaste como", ni voto rapido.
-  // Las demas categorias conservan el widget completo (dims, tipo de
-  // viajero, voto rapido). El JS inline (submitRv/addRvOptimista) es
-  // generico: con dims/travellerType vacios funciona igual para blog.
+  // hostal o sitio turistico ni con "viajaste como", pero SI recibe
+  // voto rapido desde TSK-055 (mismo widget #qr-stars de las demas
+  // categorias, con copy de blog). Las demas categorias conservan el
+  // widget completo (dims, tipo de viajero, voto rapido). El JS inline
+  // (submitRv/addRvOptimista/votarDID) es generico: con dims/
+  // travellerType vacios funciona igual para blog.
   var secResenas = '';
   var esBlogRes = cat === 'blog';
   var scoreBars = '';
@@ -1530,13 +1532,17 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '<textarea id="rvt" placeholder="'+placeholderResenas+'" class="wrinp"></textarea>'
     + '<button class="wrsub" onclick="submitRv()">'+btnResenas+'</button>'
     + '<div class="wrok" id="rvok">'+textoRvOk+'</div>'
-    + (esBlogRes ? '' : '<div class="wr" id="qrwrap" style="margin-top:8px">'
-      + '<div class="wrtitle">Califica este lugar</div>'
+    // Voto rapido (1-5 estrellas, +10 XP) para TODAS las categorias
+    // incluidas blog (antes se suprimia en blog con el ternario
+    // esBlogRes; ver TSK-015/TSK-055). El JS inline votarDID ya era
+    // generico y solo requiere la presencia de #qr-stars.
+    + '<div class="wr" id="qrwrap" style="margin-top:8px">'
+      + '<div class="wrtitle">'+(esBlogRes ? 'Califica este art\u00edculo' : 'Califica este lugar')+'</div>'
       + '<div class="sprow" id="qr-stars">'
       + [1,2,3,4,5].map(function(i){ return '<span class="spk" data-v="'+i+'" onclick="votarDID('+i+')">\u2606</span>'; }).join('')
       + '</div>'
       + '<div class="wrok" id="qrok" style="display:none">\u2713 Gracias por tu voto!</div>'
-      + '</div>')
+      + '</div>'
     + '</div>'
     + '</div></section>';
 
@@ -1796,7 +1802,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     + '      var rbavg=document.getElementById("rbavg");var rbcnt=document.getElementById("rbcnt");var rblock=document.getElementById("rblock");var rbstars=document.getElementById("rbstars");\n'
     + '      var na=RV_AVG*RV_COUNT;var nc=RV_COUNT+1;RV_AVG=(na+n)/nc;RV_COUNT=nc;\n'
     + '      if(rbavg)rbavg.textContent=RV_AVG.toFixed(1);\n'
-    + '      if(rbcnt)rbcnt.textContent=RV_COUNT+" resenas";\n'
+    + '      if(rbcnt)rbcnt.textContent=RV_COUNT+"'+(esBlogRes ? ' opiniones' : ' resenas')+'";\n'
     + '      if(rblock)rblock.style.display="";\n'
     + '      if(rbstars)rbstars.innerHTML=[1,2,3,4,5].map(function(i){return \'<span class="rbst\'+(i<=Math.round(RV_AVG)?" on":"")+\'">*</span>\';}).join("");\n'
     + '    }else if(res.ya_votado){if(res.voto_previo&&res.voto_previo.rating){qrVotoActual=res.voto_previo.rating;pintarQR();qrBloquear();}}\n'

@@ -4,7 +4,60 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Fase 7) - Blog: 6 entradas en produccion
+### Sesion actual (Fase 8) - Sistema gaming: logros/trofeos (consola + Upland) + voto en blogs
+
+Se implemento el sistema de logros aprobado por Javier (ADR-012) reutilizando
+el patron MISIONES v4 de `api/interacciones.js` (catalogo estatico server-side,
+DAG via `requiere`, merge `||` de ADR-003) pero con shape de consola:
+`tier` bronce/plata/oro/platino, `xp`, fecha de desbloqueo y rareza global %
+estilo Steam. Pendiente del deploy: ejecutar la migracion en Neon (ver abajo).
+
+Cambios en esta sesion:
+- **`api/interacciones.js` v5:** catalogo `LOGROS` con 16 trofeos (6 de
+  voto/opinion, 5 de conteo coleccion/visitas, 5 de coleccion por ciudad
+  generados desde `CIUDADES_COLECCION`), `evaluarLogros()` ejecutado en los 4
+  POST de XP con agregados memoizados, GET `tipo=logros&usuario_id=` con
+  rareza via `jsonb_object_keys`, respuestas con `logros` (mantiene `misiones`).
+  Comparacion de ciudad normalizada (TRANSLATE sin tildes + LOWER) porque Neon
+  convive 'Bogota' y 'Bogota-con-tilde'.
+- **`db/migrations/005_usuarios_progreso_logros.sql` (nuevo):** ALTER TABLE
+  ADD COLUMN IF NOT EXISTS `progreso_logros jsonb NOT NULL DEFAULT '{}'::jsonb`
+  (ADR-008: SQL versionado).
+- **`api/usuarios.js`:** deriva `total_logros` del conteo de claves.
+- **`usuario-session.js`:** `sumaLogrosXp`/`mostrarLogrosToast` ("Trofeo
+  desbloqueado") en las 4 acciones de XP.
+- **`api/pagina-destino.js`:** voto rapido `#qr-stars` habilitado en blogs
+  (antes suprimido con `esBlogRes ? '' : ...`), copy "Califica este art" y
+  contador "N opiniones" vs "N resenas".
+- **`index.html`:** seccion Trofeos en el perfil (grilla con tier, rareza %,
+  barra X/Y) + badge `[estrella] rating (N)` en tarjetas Inspirate.
+- **`api/utilidades.js`:** blog-lista SELECT con `rating`/`total_resenas` y
+  badge en las cards de blog.html.
+
+Verificacion: `node --check` limpio en los 5 archivos JS + inline de
+index.html; ASCII-safety 0 no-ASCII en los serverless; smoke del renderer
+`scripts/smoke_test_blog_voto.js` 14/14 PASS; catalogo `scripts/test_logros_catalogo.js`
+12/12 PASS. Prod NO se toco (sigue con codigo viejo).
+
+#### Que sigue
+1. **Migracion (BLOQUEANTE antes del deploy):** ejecutar en Neon
+   `db/migrations/005_usuarios_progreso_logros.sql`. Sin ella, GET
+   `tipo=logros` devuelve 500 y los POST degradan (evaluarLogros captura el
+   error y devuelve `logros: []`). TASKS.md TASK-020.
+2. Deploy de Vercel y verificacion en prod: voto en
+   /monserrate-guia-completa.html dispara el toast de trofeo y +10 XP; GET
+   logros responde con el catalogo; badge de rating visible en Inspirate y
+   blog.html.
+3. Commit + push pendiente de esta sesion (Fase 8) -- aun sin commitear.
+
+#### Riesgos activos (Fase 8)
+- La migracion 005 NO esta aplicada en produccion; desplegar antes de
+  migrar rompe el GET de logros (los POST degradan sin 500 gracias al
+  try/catch de evaluarLogros).
+- Los ids de logros quedan como convencion estable; cambiarlos invalida el
+  progreso ya persistido en `progreso_logros`.
+
+### Sesion anterior (Fase 7) - Blog: 6 entradas en produccion
 
 Se continuo la expansion de la seccion Inspirate (blog) con 4 entradas
 nuevas, siguiendo el patron validado en Theatron (Fase 5): seed con

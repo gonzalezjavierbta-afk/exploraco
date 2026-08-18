@@ -1000,6 +1000,22 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .badges-head{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin:2px 0 2px}
 .badges-head span{color:var(--gold)}
 #badges-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
+/* Logros / trofeos (estilo consola + Upland) */
+.logros-progress{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 12px 4px}
+.logros-progress-fill{height:100%;background:linear-gradient(90deg,#E8A020,#FFD700);border-radius:4px;transition:width .4s;width:0%}
+#logros-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
+.trophy-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;text-align:center;transition:all .15s;position:relative}
+.trophy-card.locked{opacity:.4;filter:grayscale(.7)}
+.trophy-card .tier{display:inline-block;font-size:8px;font-weight:900;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:3px;margin-bottom:4px}
+.tier-bronce{background:rgba(205,127,50,.18);color:#D9A066;border:1px solid rgba(205,127,50,.4)}
+.tier-plata{background:rgba(192,192,192,.15);color:#D8D8E0;border:1px solid rgba(192,192,192,.4)}
+.tier-oro{background:rgba(255,215,0,.15);color:#FFE08A;border:1px solid rgba(255,215,0,.4)}
+.tier-platino{background:rgba(229,228,226,.14);color:#F4F3F2;border:1px solid rgba(229,228,226,.5)}
+.trophy-emoji{font-size:22px;margin-bottom:4px;display:block}
+.trophy-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px;line-height:1.25}
+.trophy-desc{font-size:8.5px;color:rgba(255,255,255,.35);line-height:1.4;margin-bottom:4px}
+.trophy-meta{font-size:8px;color:rgba(255,255,255,.45);letter-spacing:.3px}
+.trophy-meta b{color:var(--gold)}
 /* XP bar */
 .xp-bar-wrap{height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin:6px 0;overflow:hidden}
 .xp-bar-fill{height:100%;border-radius:3px;background:var(--gold);transition:width .6s ease}
@@ -2767,6 +2783,8 @@ function inspFeaturedHTML(p) {
   var img   = p.foto ? '<img src="'+inspEsc(p.foto)+'" alt="" loading="lazy">' : '';
   var meta  = inspEsc(p.city || 'ExploraCO');
   if (min) meta += ' · ' + min + ' min lectura';
+  var rn   = parseInt(p.reviews, 10) || 0;
+  if (p.rating && rn > 0) meta += ' · ⭐ ' + parseFloat(p.rating).toFixed(1) + ' (' + rn + ')';
   return '<a class="insp-main" href="'+inspEsc(p.slug)+'.html">'
     + '<div class="insp-main-img" style="background:'+bg+'">'
     +   '<span class="insp-main-badge">Destacado</span>'
@@ -2792,7 +2810,7 @@ function inspHighlightHTML(p) {
     + '<div class="insp-hl-body">'
     +   '<div class="insp-hl-cat">'+emoji+' '+inspEsc(label)+'</div>'
     +   '<div class="insp-hl-title">'+inspEsc(p.name)+'</div>'
-    +   '<div class="insp-hl-meta">'+inspEsc(p.city||'ExploraCO')+(min?' · '+min+' min lectura':'')+'</div>'
+    +   '<div class="insp-hl-meta">'+inspEsc(p.city||'ExploraCO')+(min?' · '+min+' min lectura':'')+(p.rating&&(parseInt(p.reviews,10)||0)>0?' · ⭐ '+parseFloat(p.rating).toFixed(1)+' ('+(parseInt(p.reviews,10)||0)+')':'')+'</div>'
     + '</div></a>';
 }
 
@@ -3954,6 +3972,7 @@ function updatePointsUI() {
 
   renderBadgesGrid(pu, earnedBadges);
   renderOrganizarBtn();
+  cargarLogros();
 
   var mle = document.getElementById('mm-level-emoji');
   var mln = document.getElementById('mm-level-name');
@@ -4031,6 +4050,75 @@ function renderBadgesGrid(pu, earnedBadges) {
       + '<div class="badge-desc">' + b.desc + '</div>'
       + '</div>';
   }).join('');
+}
+
+/* ── LOGROS / TROFEOS (v5, estilo consola + Upland) ─────────────
+   Catalogo completo viene del backend (GET /api/interacciones?tipo=
+   logros&usuario_id=) con estado/fecha/tier y rareza global % tipo
+   Steam. Sin sesion no se llama a la API: se muestra el placeholder
+   honesto. Se re-fetcha cada vez que cambia la sesion o tras una
+   accion (updatePointsUI) porque las acciones de XP podrian haber
+   desbloqueado un trofeo nuevo. */
+var _LOGROS_CACHE = [];
+var _LOGROS_UID = null;
+function tierNombre(t) {
+  return ({ bronce:'Bronce', plata:'Plata', oro:'Oro', platino:'Platino' })[t] || t || '';
+}
+function cargarLogros() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if (!u || !u.id) {
+    _LOGROS_CACHE = [];
+    _LOGROS_UID = null;
+    renderLogrosGrid();
+    return;
+  }
+  _LOGROS_UID = u.id;
+  fetch('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); })
+    .then(function(res) {
+      if (res && res.ok && Array.isArray(res.data)) {
+        _LOGROS_CACHE = res.data;
+        renderLogrosGrid();
+      }
+    })
+    .catch(function() {});
+}
+function renderLogrosGrid() {
+  var grid = document.getElementById('logros-grid');
+  if (!grid) return;
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if (!u) {
+    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px;grid-column:1/-1">Inicia sesión para desbloquear trofeos 🏆</div>';
+    return;
+  }
+  if (!_LOGROS_CACHE.length) {
+    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px;grid-column:1/-1">Califica lugares y artículos, guarda destinos y confirma visitas para desbloquear trofeos 🏆</div>';
+    return;
+  }
+  var done  = 0, total = _LOGROS_CACHE.length;
+  var html  = _LOGROS_CACHE.map(function(l) {
+    var earned = l.estado === 'completada';
+    if (earned) done++;
+    var fecha  = l.en ? new Date(l.en).toLocaleDateString('es-CO', { day:'numeric', month:'short' }) : '';
+    var rareza = (l.rareza_pct != null ? l.rareza_pct : 0);
+    var meta   = earned
+      ? 'Desbloqueado ' + fecha + ' · <b>' + rareza + '%</b> de jugadores'
+      : 'Bloqueado · <b>' + rareza + '%</b> de jugadores';
+    return '<div class="trophy-card' + (earned ? '' : ' locked') + '" title="' + inspEsc(l.desc) + ' · +' + l.xp + ' XP">'
+      + '<span class="tier tier-' + l.tier + '">' + tierNombre(l.tier) + '</span>'
+      + '<span class="trophy-emoji">' + (earned ? l.emoji : '🔒') + '</span>'
+      + '<div class="trophy-name">' + inspEsc(l.nombre) + '</div>'
+      + '<div class="trophy-desc">' + inspEsc(l.desc) + '</div>'
+      + '<div class="trophy-meta">+' + l.xp + ' XP · ' + meta + '</div>'
+      + '</div>';
+  }).join('');
+  var cnt = document.getElementById('pts-logros-count');
+  var tot = document.getElementById('pts-logros-total');
+  var bar = document.getElementById('pts-logros-bar');
+  if (cnt) cnt.textContent = done;
+  if (tot) tot.textContent = total;
+  if (bar) bar.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  grid.innerHTML = html;
 }
 
 /* ── XP HISTORY ──
@@ -4467,6 +4555,9 @@ function submitBlog() {
           </div>
           <div class="badges-head">Insignias · <span id="pts-badges-count">0</span>/7</div>
           <div id="badges-grid"></div>
+          <div class="badges-head" style="margin-top:14px">Trofeos · <span id="pts-logros-count">0</span>/<span id="pts-logros-total">0</span></div>
+          <div class="logros-progress"><div class="logros-progress-fill" id="pts-logros-bar"></div></div>
+          <div id="logros-grid"></div>
           <div id="xp-history"></div>
         </div>
       </div>
