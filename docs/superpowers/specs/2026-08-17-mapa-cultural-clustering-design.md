@@ -45,17 +45,16 @@ targetZoom = max(zoomActual, primerZoomDondeElLugarQuedaAislado)
 - Si el lugar está dentro de un cluster → subir de zoom solo lo necesario hasta que quede aislado (máx. 18), luego centrar y abrir popup.
 - Cálculo de "primer zoom aislado": iterar de `zoomActual` a 18 y, con la grilla de §3, comprobar si la celda del marker contiene solo ese lugar (distancia al vecino > 40px). Primer nivel que cumpla → target.
 
-### 3. Clustering custom por grilla de píxeles
+### 3. Clustering custom por proximidad de píxeles
 
 - Disparo en `zoomend` y `moveend` (debounce 150ms).
-- Proyectar los markers visibles (los que pasan el filtro de categoría) a píxeles con `map.project()`, agrupar en celdas de ~40px.
-- **Celda con 1 marker** → pin individual (divIcon teardrop actual, `index.html` ~2342).
-- **Celda con >1 marker** → cluster:
-  - divIcon circular ~42px, borde dorado `--gold`, fondo oscuro, **conteo** en blanco, emoji del tipo de lugar más común en la celda.
-  - `click` → `flyTo(centroide, zoom+2)` para dividir el cluster (comportamiento Upland).
-- Rebuild del layer group en cada redibujado (clear + re-add). Mantener `mapaMarkers` para compatibilidad con `filterMapaPins`, `setMapaActive`, `toggleMapaSave`.
-- `filterMapaPins(cat)` recalcula el set visible y re-clustera.
-- Rendimiento: trivial con ~106 markers.
+- **Algoritmo greedy por centroides**: cada lugar entra al primer cluster cuyo centroide esté a **≤40px** en píxeles (`map.project`). Esto evita el corte por bordes de grilla fija (puntos vecinos a ~15px que quedaban en celdas distintas). El centroide se actualiza incrementalmente.
+- **Cluster con 1 lugar** → pin individual (divIcon teardrop actual, `index.html` ~2342).
+- **Cluster con >1 lugar** → divIcon circular ~40-54px (según conteo), borde dorado `--gold`, fondo oscuro, **conteo** en blanco, emoji del tipo más común en el cluster.
+  - `click` → `flyTo(centroide, zoom+2)` para dividir (comportamiento Upland).
+- Rebuild del layer group en cada redibujado (clear + re-add). Los markers individuales se crean una vez (`mapaMarkers`) y se añaden/ocultan según el zoom.
+- `filterMapaPins(cat)` recalcula `mapaPlaces` (set visible) y re-clustera.
+- Rendimiento: trivial con ~106 markers (greedy O(n·k)).
 
 ### 4. Lista lateral ordenada por cercanía
 
@@ -77,4 +76,4 @@ targetZoom = max(zoomActual, primerZoomDondeElLugarQuedaAislado)
 - Seleccionar lugar desde lista y desde marker: zoom no baja respecto al actual.
 - Alejar a zoom 6 → clusters con conteos correctos; clic en cluster → zoom-in y división.
 - Filtros de categoría siguen funcionando y re-clusteran.
-- `node --check` sobre el JS extraído no aplica (JS inline); validar con consola del navegador (sin errores).
+- Harness de integración en Node (vm + Leaflet/DOM mockeado): 16 asserts que cubren haversine, init (Bogotá zoom 14), build de markers, clustering a zoom 14/16/18, preservación de zoom en selección, filtros, orden por distancia con km, y click de cluster (zoom+2).
