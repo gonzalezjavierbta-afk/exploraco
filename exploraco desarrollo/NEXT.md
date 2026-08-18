@@ -4,7 +4,36 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Fase 4) - Blog completo: listado + fotos/videos inline + resenas + diseno minimalista
+### Sesion actual (Fase 7) - Blog: 6 entradas en produccion
+
+Se continuo la expansion de la seccion Inspirate (blog) con 4 entradas
+nuevas, siguiendo el patron validado en Theatron (Fase 5): seed con
+`categoria_slug='blog'` + cuerpo ~2.800 palabras en `descripcion` TEXT,
+marcadores `[foto:URL|texto]` inline, loader idempotente DELETE+POST via
+`/api/admin-destinos`, smoke test local de `buildHTML()` antes de
+desplegar.
+
+Posts desplegados en esta sesion (verificados en produccion con 200 OK):
+- **bogota-guia-para-el-viajero** (2.840 palabras, 5 figuras inline,
+  temas tips/cultura, fotos de `seed-bogota.js`). ID: cd09d39c.
+- **bogota-gastronomia-guia** (2.837 palabras, 7 figuras inline,
+  temas gastro/cultura, fotos verificadas via API de Wikimedia Commons).
+  ID: 5d14af37.
+- **la-candelaria-recorrido-por-el-centro** (2.830 palabras, 5 figuras
+  inline, temas cultura/tips, fotos de `seed-lacandelaria.js`). ID:
+  335f25f3.
+- **parques-y-espacios-verdes-de-bogota** (2.758 palabras, 7 figuras
+  inline, temas naturaleza/tips, fotos de `seed-parque-simon-bolivar.js`
+  y otros seeds de parques). ID: db8dc119.
+
+Archivos creados: 8 (4 seeds + 4 loaders) en `scripts/`. Smoke test
+`smoke_4posts.js` (temp) valida titulo, lead, figura count, sin FAQ,
+sin Contacto, sin Destacado final, seccion Opinion, chips multi-tema
+y sin Resenas del articulo. Verificacion final: 4 loaders ejecutados
+contra prod, `/blog.html` muestra 6 entradas (Monserrate + Theatron
++ 4 nuevas).
+
+### Sesion anterior (Fase 6) - Blog completo: listado + fotos/videos inline + resenas + diseno minimalista
 
 La Fase 0 (desbloquear deploy) se completo: la causa era el limite de 12
 Serverless Functions del plan Hobby de Vercel -- cada `.js` en `/api` cuenta
@@ -45,7 +74,7 @@ Fases del blog ya COMMITEADAS y VERIFICADAS EN PROD:
   (`.bhin`/`.bhtitle`/`.bhslead`/`.bchips`), sin grid de 3 thumbs (`.prow`),
   sin botones Contactar/Como llegar/Guardar/Estuve aqui, sin barra dorada de
   rating (`.gstrip` desactivada para blog), sin subnav sticky (`subnav=''`
-  si cat==='blog'). `<body class="blog">` activa columna de lectura ~720px
+  si cat==='blog`). `<body class="blog">` activa columna de lectura ~720px
   (`body.blog .sin{max-width:720px}`), texto 16px/1.8
   (`body.blog .stext{font-size:16px;line-height:1.8}`), oculta la numeracion
   dorada (`body.blog .stnum{display:none}`). Se conservan todas las secciones
@@ -64,6 +93,10 @@ Fases del blog ya COMMITEADAS y VERIFICADAS EN PROD:
   (blog.html 200 con BLDATA/buscador/canonical/robots index,follow/divs 10/10;
   post 200 con BlogPosting/keywords/4 bfig/divs 91/91; sitemap con /blog.html
   y el slug del post).
+- **Fase 7 (cierre documental):** TASKS.md con TASK-046..049, NEXT.md
+  actualizado con 6 posts en blog. QA final en prod OK (blog.html 200,
+  6 entradas, 4 posts con 200 OK, 5/7 figuras inline, sin FAQ, Opinion
+  presente, chips).
 
 ### Sesion anterior (Agosto 2026) - Primera entrada real de blog + multi-tema
 
@@ -286,9 +319,12 @@ Ver BUGS_HISTORICOS.md BUG-022.
 
 ## Que sigue (proxima accion inmediata)
 
-1. **Commit + push del cierre documental (Fase 6):** DECISIONS.md con ADR-011,
-   TASKS.md con TASK-015..019 COMPLETADA y NEXT.md actualizado. (Esta entrega.)
-2. **Pendientes post-blog (sin bloqueo):** aplicar migracion
+1. **Commit + push del cierre documental (Fase 7):** TASKS.md con TASK-046..049,
+   NEXT.md actualizado. (Esta entrega.)
+2. **Candidatos de blog pendientes:** los 2 posts restantes propuestos pero no
+   desarrollados: `suba-ascenso-por-la-ciudad` (naturaleza/aventura) y
+   `bogota-de-noche-con-seguridad` (tips). Mismo patron de seed+loader.
+3. **Pendientes post-blog (sin bloqueo):** aplicar migracion
    `db/migrations/004_usuarios_blog_autor.sql` en Neon (TASK-012) y asignar
    autor al post desde admin.html (TASK-013); corregir URLs de imagenes de
    lacandelaria (BUG-022); cargar tags reales en comida/hostal/evento;

@@ -408,6 +408,64 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   debe devolver el array temas[] y los chips/hero/filtro de Inspirate deben
   mostrar los multiples temas. Ver DECISIONS.md ADR-010.
 
+### TSK-046: Blog -- Bogota para viajeros (tips)
+- **Estado:** COMPLETADA
+- **Detalle:** Segunda entrada real de blog (posts 1-5 usan el patron de
+  Theatron). Slug `bogota-guia-para-el-viajero`, nombre "Bogota para
+  viajeros: clima, altitud, transporte, dinero y seguridad en una sola
+  guia". 2.840 palabras, 36 bloques, 5 fotos inline (reutilizadas de
+  `seed-bogota.js`), temas tips/cultura. Sin FAQs, sin video, sin autor.
+  Archivos: `scripts/seed-bogota-guia-para-el-viajero.js` y
+  `scripts/load-bogota-guia-para-el-viajero-api.js` (loader idempotente
+  DELETE+POST).
+- **Evidencia:** GET /bogota-guia-para-el-viajero.html = 200 (61KB, 5 figuras
+  bfig, Opinion, chips Tips/Cultura, sin FAQ). Smoke test local PASS.
+  ID en prod: cd09d39c-71bb-474e-b3b9-ca2a638481f0.
+
+### TSK-047: Blog -- Bogota gastronomia (gastro)
+- **Estado:** COMPLETADA
+- **Detalle:** Tercera entrada real de blog. Slug `bogota-gastronomia-guia`,
+  nombre "Bogota a la mesa: ajiaco, mercados, dulces callejeros y cafes
+  de especialidad". 2.837 palabras, 37 bloques, 7 fotos inline (verificadas
+  via API de Wikimedia Commons), temas gastro/cultura. Sin FAQs, sin video,
+  sin autor. Archivos: `scripts/seed-bogota-gastronomia-guia.js` y
+  `scripts/load-bogota-gastronomia-guia-api.js`.
+- **Evidencia:** GET /bogota-gastronomia-guia.html = 200 (62KB, 7 figuras,
+  Opinion, chips Gastronomia/Cultura, sin FAQ). Smoke test local PASS.
+  ID en prod: 5d14af37-0253-4908-a34c-dccacbc46509.
+
+### TSK-048: Blog -- La Candelaria recorrido (cultura)
+- **Estado:** COMPLETADA
+- **Detalle:** Cuarta entrada real de blog. Slug
+  `la-candelaria-recorrido-por-el-centro`, nombre "La Candelaria a pie:
+  del Chorro de Quevedo a la Plaza de Bolivar, guia del centro historico
+  de Bogota". 2.830 palabras, 36 bloques, 5 fotos inline (reutilizadas
+  de `seed-lacandelaria.js`), temas cultura/tips. Sin FAQs, sin video,
+  sin autor. Archivos:
+  `scripts/seed-la-candelaria-recorrido-por-el-centro.js` y
+  `scripts/load-la-candelaria-recorrido-por-el-centro-api.js`.
+- **Evidencia:** GET /la-candelaria-recorrido-por-el-centro.html = 200 (61KB,
+  5 figuras, Opinion, chips Cultura/Tips, sin FAQ). Smoke test local PASS.
+  ID en prod: 335f25f3-c320-4727-9bac-294d3f7ebe59.
+
+### TSK-049: Blog -- Parques y espacios verdes (naturaleza)
+- **Estado:** COMPLETADA
+- **Detalle:** Quinta entrada real de blog. Slug
+  `parques-y-espacios-verdes-de-bogota`, nombre "El pulmon de Bogota:
+  Simon Bolivar, Jardin Botanico, El Virrey, El Tunal y los cerros
+  orientales". 2.758 palabras, 35 bloques, 7 fotos inline (reutilizadas
+  de `seed-parque-simon-bolivar.js`, `seed-jardin-botanico.js`,
+  `seed-el-virrey.js`, `seed-el-tunal.js`, `seed-quebrada-la-vieja.js`),
+  temas naturaleza/tips. Sin FAQs, sin video, sin autor. Archivos:
+  `scripts/seed-parques-y-espacios-verdes-de-bogota.js` y
+  `scripts/load-parques-y-espacios-verdes-de-bogota-api.js`.
+- **Evidencia:** GET /parques-y-espacios-verdes-de-bogota.html = 200 (63KB,
+  7 figuras, Opinion, chips Naturaleza/Tips, sin FAQ). Smoke test local PASS.
+  ID en prod: db8dc119-8832-446b-a790-5390c9ed83bd.
+- **Blog en produccion:** 6 entradas visibles en `/blog.html` (Monserrate,
+  Theatron, viajero, gastronomia, La Candelaria, parques). Total destinos
+  en el sitio: 113 (107 destino + 6 blog).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
