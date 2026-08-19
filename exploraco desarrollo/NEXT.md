@@ -4,13 +4,15 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Fase 9) - Motor de eventos: Rock al Parque + Morat + Festival de Verano
+### Sesion actual (Fase 9) - Motor de eventos: Rock al Parque + Morat + Festival de Verano + Jazz al Parque + Salsa al Parque
 
-Se crearon TRES paginas dinamicas con `categoria_slug='evento'` servidas
+Se crearon CINCO paginas dinamicas con `categoria_slug='evento'` servidas
 por el motor, replicando el patron de los lugares (commit 5c43145):
-seed + loader idempotente. El usuario pidio buscar los 3 eventos mas
-importantes de Bogota (Rock al Parque 2026, Morat World Tour, Festival
-de Verano 2026) y se implementaron los tres en orden.
+seed + loader idempotente. El usuario pidio buscar los eventos mas
+importantes de Bogota y eligio, en orden: Rock al Parque 2026, Morat World
+Tour, Festival de Verano 2026 y luego Jazz al Parque + Salsa al Parque
+(los 2 siguientes tras confirmar con el usuario la opcion recomendada:
+completar el circuito Festivales al Parque, familia de Rock al Parque).
 
 Cambios en esta sesion:
 - **`scripts/seed-rock-al-parque.js` (nuevo):** datos de la edicion 30
@@ -54,33 +56,55 @@ Cambios en esta sesion:
 - **`scripts/load-festival-de-verano-bogota-api.js` +
   `scripts/smoke_test_festival_de_verano.js` (nuevos):** loader
   idempotente y smoke 8/8 PASS + balance de divs 184/184.
+- **`scripts/seed-jazz-al-parque.js` (nuevo):** Jazz al Parque 2026 -
+  Edicion 29, 12 y 13 sep 2026, Parque El Country (Av. Calle 127 #11D-90,
+  Usaquen, coords 4.6986, -74.0304). El festival de jazz gratuito mas
+  importante de Colombia y referente latinoamericano. Eje "Donde la
+  memoria latina se convierte en encuentro". Gratis, organiza Idartes.
+  5 fotos verificadas (Unsplash), 5 FAQs.
+- **`scripts/load-jazz-al-parque-api.js` + `scripts/smoke_test_jazz_al_parque.js`
+  (nuevos):** loader idempotente y smoke 8/8 PASS + balance de divs
+  170/170.
+- **`scripts/seed-salsa-al-parque.js` (nuevo):** Salsa al Parque 2026 -
+  Edicion 27, 28 y 29 nov 2026, Parque Metropolitano Simon Bolivar
+  (coords 4.658056, -74.093889). El festival gratuito de salsa mas grande
+  de Colombia, cierre del circuito Festivales al Parque. Eje "La
+  revolucion que nunca deja de sonar". Gratis, organiza Idartes. 5 fotos
+  verificadas (Unsplash), 5 FAQs.
+- **`scripts/load-salsa-al-parque-api.js` + `scripts/smoke_test_salsa_al_parque.js`
+  (nuevos):** loader idempotente y smoke 8/8 PASS + balance de divs
+  170/170.
 
-Verificacion: `node --check` limpio en los 8 scripts; ASCII-safety 0
-bytes no-ASCII en los 8; smokes 8/8 PASS cada uno + balance de divs. En
+Verificacion: `node --check` limpio en los 12 scripts; ASCII-safety 0
+bytes no-ASCII en los 12; smokes 8/8 PASS cada uno + balance de divs. En
 prod (via POST /api/admin-destinos): ids 754d852f-... (rock-al-parque),
-22950e3d-... (morat-bogota) y 340cd60f-... (festival-de-verano-bogota),
-todos status published + destacado. GET /api/pagina-destino?slug=X = 200
-con las 5 secciones de evento en los tres; URLs publicas 200 (divs
-balanceados 213/213 y 233/233); sitemap incluye los 3 slugs; /api/destinos
-los lista con FAQs y fotos. Nota: el renderer lee `tags.edicion`/`tags.sede`
-pero NO `tags.organiza` (campo informativo en el seed, no se muestra).
+22950e3d-... (morat-bogota), 340cd60f-... (festival-de-verano-bogota),
+58d06891-... (jazz-al-parque) y 6b290c4e-... (salsa-al-parque), todos
+status published + destacado. GET /api/pagina-destino?slug=X = 200 con
+las 5 secciones de evento en los cinco; URLs publicas 200 (divs
+balanceados: 213/213, 233/233, 218/218 y 219/219); sitemap incluye los 5
+slugs; /api/destinos los lista con FAQs y fotos. Nota: el renderer lee
+`tags.edicion`/`tags.sede` pero NO `tags.organiza` (campo informativo en
+el seed, no se muestra).
 
 #### Que sigue
 1. **Commit + push (PENDIENTE):** el `git rm` de `rock-al-parque.html`
-   solo surte efecto tras el deploy de Vercel (los 2 eventos nuevos no
+   solo surte efecto tras el deploy de Vercel (los 4 eventos nuevos no
    tenian estatico que ensombreciera el rewrite). Tras el push, verificar
-   GET /rock-al-parque.html, /morat-bogota.html y
-   /festival-de-verano-bogota.html = 200 con las secciones de evento.
+   GET /rock-al-parque.html, /morat-bogota.html,
+   /festival-de-verano-bogota.html, /jazz-al-parque.html y
+   /salsa-al-parque.html = 200 con las secciones de evento.
 2. Si el usuario quiere mas eventos, replicar este patron (seed + loader +
-   TAGS evento) para los 18 existentes con tags vacios (ej. feria-libro-bogota)
-   o nuevos slugs. OJO: cada evento con pagina estatica vieja en la raiz
-   necesita `git rm` antes (mismo conflicto que rock-al-parque).
+   TAGS evento) para los 18 existentes con tags vacios (ej. feria-libro-bogota,
+   hip-hop-al-parque, etc.) o nuevos slugs. OJO: cada evento con pagina
+   estatica vieja en la raiz necesita `git rm` antes (mismo conflicto que
+   rock-al-parque).
 3. Backlog sin commitear de la sesion previa (Fase 8): migracion 005 en
    Neon + deploy del sistema gaming + `scripts/insert-eventos-bogota.js`
    (untracked) y `agenda.html` modificado (no se tocaron en esta sesion).
 
 #### Riesgos activos (Fase 9)
-- El `git rm` de rock-al-parque.html y los 2 eventos nuevos requieren
+- El `git rm` de rock-al-parque.html y los 4 eventos nuevos requieren
   commit+deploy para verse en la URL publica.
 - Los eventos previos en Neon tienen tags vacios: si un slug con pagina
   estatica vieja se carga como dinamico, el estatico gana (Vercel) --

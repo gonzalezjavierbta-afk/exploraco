@@ -610,6 +610,50 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   = 200. Sitemap incluye el slug. Smoke
   `scripts/smoke_test_festival_de_verano.js` 8/8 PASS + balance de divs.
 
+### TSK-060: Pagina dinamica jazz-al-parque.html (Jazz al Parque 2026)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Festival Jazz al Parque 2026 - Edicion 29 como 4to
+  destino `categoria_slug='evento'` del motor. El festival de jazz gratuito
+  mas importante de Colombia y referente de America Latina, el 12 y 13 de
+  septiembre de 2026 en el Parque El Country (Av. Calle 127 #11D-90,
+  Usaquen, coords 4.6986, -74.0304). Organiza Idartes con la Alcaldia Mayor
+  de Bogota; eje conceptual "Donde la memoria latina se convierte en
+  encuentro". TAGS evento completos (TASK-003): `fecha_inicio='2026-09-12'`,
+  `fecha_fin='2026-09-13'`, `edicion='Edicion 29'`, `sede`, `organiza`,
+  `lema`, `lineup` (2), `agenda` (2 dias), `categorias_entrada` (Gratis),
+  `que_llevar` (5), `prohibido` (4). 5 fotos verificadas (Unsplash), 5 FAQs.
+  Archivos: `scripts/seed-jazz-al-parque.js`, `scripts/load-jazz-al-parque-api.js`
+  y `scripts/smoke_test_jazz_al_parque.js`. No habia estatico que
+  ensombreciera el rewrite.
+- **Evidencia:** POST /api/admin-destinos = OK (id 58d06891-...,
+  status published, destacado). GET /api/pagina-destino?slug=jazz-al-parque
+  = 200 con las 5 secciones de evento y divs balanceados (218/218).
+  URL publica https://exploraco.vercel.app/jazz-al-parque.html = 200.
+  Sitemap incluye el slug. Smoke `scripts/smoke_test_jazz_al_parque.js`
+  8/8 PASS + balance de divs.
+
+### TSK-061: Pagina dinamica salsa-al-parque.html (Salsa al Parque 2026)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Festival Salsa al Parque 2026 - Edicion 27 como 5to
+  destino `categoria_slug='evento'` del motor. El festival gratuito de salsa
+  mas grande de Colombia, cierre del circuito Festivales al Parque, el 28 y
+  29 de noviembre de 2026 en el Parque Metropolitano Simon Bolivar
+  (coords 4.658056, -74.093889). Organiza Idartes con la Alcaldia Mayor de
+  Bogota; eje conceptual "La revolucion que nunca deja de sonar". TAGS evento
+  completos (TASK-003): `fecha_inicio='2026-11-28'`,
+  `fecha_fin='2026-11-29'`, `edicion='Edicion 27'`, `sede`, `organiza`,
+  `lema`, `lineup` (2), `agenda` (2 dias), `categorias_entrada` (Gratis),
+  `que_llevar` (5), `prohibido` (4). 5 fotos verificadas (Unsplash), 5 FAQs.
+  Archivos: `scripts/seed-salsa-al-parque.js`, `scripts/load-salsa-al-parque-api.js`
+  y `scripts/smoke_test_salsa_al_parque.js`. No habia estatico que
+  ensombreciera el rewrite.
+- **Evidencia:** POST /api/admin-destinos = OK (id 6b290c4e-...,
+  status published, destacado). GET /api/pagina-destino?slug=salsa-al-parque
+  = 200 con las 5 secciones de evento y divs balanceados (219/219).
+  URL publica https://exploraco.vercel.app/salsa-al-parque.html = 200.
+  Sitemap incluye el slug. Smoke `scripts/smoke_test_salsa_al_parque.js`
+  8/8 PASS + balance de divs.
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
