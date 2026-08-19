@@ -4,13 +4,13 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Fase 9) - Primer evento del motor: Rock al Parque 2026
+### Sesion actual (Fase 9) - Motor de eventos: Rock al Parque + Morat + Festival de Verano
 
-Se creo la pagina dinamica `rock-al-parque.html` como el PRIMER destino con
-`categoria_slug='evento'` servido por el motor, replicando el patron de los
-lugares (commit 5c43145): seed + loader idempotente. El usuario pidio buscar
-los 3 eventos mas importantes de Bogota (Rock al Parque 2026, Morat World
-Tour, Festival de Verano 2026) y eligio Rock al Parque 2026.
+Se crearon TRES paginas dinamicas con `categoria_slug='evento'` servidas
+por el motor, replicando el patron de los lugares (commit 5c43145):
+seed + loader idempotente. El usuario pidio buscar los 3 eventos mas
+importantes de Bogota (Rock al Parque 2026, Morat World Tour, Festival
+de Verano 2026) y se implementaron los tres en orden.
 
 Cambios en esta sesion:
 - **`scripts/seed-rock-al-parque.js` (nuevo):** datos de la edicion 30
@@ -31,30 +31,57 @@ Cambios en esta sesion:
   dinamica.
 - **`scripts/smoke_test_rock_al_parque.js` (nuevo):** 8/8 PASS con los
   datos reales del seed + balance de divs 276/276.
+- **`scripts/seed-morat-bogota.js` (nuevo):** concierto "Morat en Bogota:
+  Ya Es Manana World Tour", 6 funciones 14/15/16/21/22/23 ago 2026 en el
+  Movistar Arena (av. NQS con av. Jose Celestino Mutis, coords 4.6652,
+  -74.0839). Primeras 3 fechas agotadas (Tu Boleta); 24 conciertos sold
+  out en la gira; primer Latin Grammy 2025 por "Ya es manana"; incluye
+  Casa Morat (experiencia inmersiva). Slug `morat-bogota` elegido para NO
+  colisionar con el WIP `scripts/insert-eventos-bogota.js` (slug
+  `morat-bogota-2026` aun sin commitear ni en Neon). 5 fotos verificadas
+  (Unsplash), 5 FAQs.
+- **`scripts/load-morat-bogota-api.js` + `scripts/smoke_test_morat_bogota.js`
+  (nuevos):** loader idempotente y smoke 8/8 PASS + balance de divs
+  213/213.
+- **`scripts/seed-festival-de-verano-bogota.js` (nuevo):** Festival de
+  Verano 2026 - Edicion 29 (IDRD con la Alcaldia Mayor de Bogota), del 31
+  jul al 31 ago 2026, mas de 60 actividades gratuitas en toda la ciudad
+  (ancla: Plaza de Eventos Parque Simon Bolivar 4.658056, -74.093889).
+  Mexico pais invitado; celebracion de los 488 anos de Bogota; incluye el
+  Conciertazo de Verano (1 ago, Plaza de Eventos: Calibre 50, Luister La
+  Voz, Proyecto A, Jhon Onofre) y la Parada del Circuito Sudamericano de
+  Voleibol de Playa (El Salitre). 5 fotos verificadas (Unsplash), 5 FAQs.
+- **`scripts/load-festival-de-verano-bogota-api.js` +
+  `scripts/smoke_test_festival_de_verano.js` (nuevos):** loader
+  idempotente y smoke 8/8 PASS + balance de divs 184/184.
 
-Verificacion: `node --check` limpio en los 2 scripts; ASCII-safety 0 en
-ambos; smoke heredado `scripts/smoke_test_evento.js` 14/14 PASS; smoke del
-evento real 8/8 PASS. En prod (via POST /api/admin-destinos, id
-754d852f-...): GET /api/pagina-destino?slug=rock-al-parque = 200 con las 5
-secciones de evento; sitemap incluye el slug; /api/destinos lo lista.
+Verificacion: `node --check` limpio en los 8 scripts; ASCII-safety 0
+bytes no-ASCII en los 8; smokes 8/8 PASS cada uno + balance de divs. En
+prod (via POST /api/admin-destinos): ids 754d852f-... (rock-al-parque),
+22950e3d-... (morat-bogota) y 340cd60f-... (festival-de-verano-bogota),
+todos status published + destacado. GET /api/pagina-destino?slug=X = 200
+con las 5 secciones de evento en los tres; URLs publicas 200 (divs
+balanceados 213/213 y 233/233); sitemap incluye los 3 slugs; /api/destinos
+los lista con FAQs y fotos. Nota: el renderer lee `tags.edicion`/`tags.sede`
+pero NO `tags.organiza` (campo informativo en el seed, no se muestra).
 
 #### Que sigue
-1. **Commit + push (PENDIENTE):** el `git rm` del estatico solo surte
-   efecto tras el deploy de Vercel. Hasta que se commitee, la URL publica
-   `/rock-al-parque.html` seguira sirviendo el placeholder viejo del ultimo
-   deploy. Tras el push, verificar GET /rock-al-parque.html = 200 con las
-   secciones de evento.
+1. **Commit + push (PENDIENTE):** el `git rm` de `rock-al-parque.html`
+   solo surte efecto tras el deploy de Vercel (los 2 eventos nuevos no
+   tenian estatico que ensombreciera el rewrite). Tras el push, verificar
+   GET /rock-al-parque.html, /morat-bogota.html y
+   /festival-de-verano-bogota.html = 200 con las secciones de evento.
 2. Si el usuario quiere mas eventos, replicar este patron (seed + loader +
-   TAGS evento) para los 18 existentes con tags vacios (ej. morat,
-   feria-libro-bogota) o nuevos slugs. OJO: cada evento con pagina
-   estatica vieja en la raiz necesita `git rm` antes (mismo conflicto que
-   rock-al-parque).
+   TAGS evento) para los 18 existentes con tags vacios (ej. feria-libro-bogota)
+   o nuevos slugs. OJO: cada evento con pagina estatica vieja en la raiz
+   necesita `git rm` antes (mismo conflicto que rock-al-parque).
 3. Backlog sin commitear de la sesion previa (Fase 8): migracion 005 en
    Neon + deploy del sistema gaming + `scripts/insert-eventos-bogota.js`
    (untracked) y `agenda.html` modificado (no se tocaron en esta sesion).
 
 #### Riesgos activos (Fase 9)
-- La URL publica sigue mostrando el placeholder estatico hasta el deploy.
+- El `git rm` de rock-al-parque.html y los 2 eventos nuevos requieren
+  commit+deploy para verse en la URL publica.
 - Los eventos previos en Neon tienen tags vacios: si un slug con pagina
   estatica vieja se carga como dinamico, el estatico gana (Vercel) --
   revisar por evento antes de sembrar.

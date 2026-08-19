@@ -559,6 +559,57 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Pendiente: commit+push para que el `git rm` del estatico surta efecto y
   la URL publica sirva la pagina dinamica.
 
+### TSK-058: Pagina dinamica morat-bogota.html (conciertos Morat en Bogota)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del concierto "Morat en Bogota: Ya Es Manana World
+  Tour" como 2do destino `categoria_slug='evento'` del motor. Seis
+  funciones del 14, 15, 16, 21, 22 y 23 de agosto de 2026 en el Movistar
+  Arena (av. NQS con av. Jose Celestino Mutis, El Campin, coordenadas
+  4.6652, -74.0839). Primeras 3 fechas agotadas (Tu Boleta); la gira suma
+  24 conciertos sold out y su primer Latin Grammy 2025 por "Ya es manana".
+  Incluye Casa Morat (experiencia inmersiva 14-23 ago) y 5 FAQs. TAGS
+  evento completos (TASK-003): `fecha_inicio='2026-08-14'`,
+  `fecha_fin='2026-08-23'`, `edicion='Ya Es Manana World Tour'`,
+  `sede='Movistar Arena, Bogota'`, `lineup` (Morat 9:00 pm), `agenda`
+  (6 conciertos + Casa Morat), `categorias_entrada` (Agotado/Disponible),
+  `que_llevar` (4), `prohibido` (4). Slug elegido `morat-bogota` para NO
+  colisionar con el slug `morat-bogota-2026` del WIP sin commitear
+  `scripts/insert-eventos-bogota.js`. Archivos: `scripts/seed-morat-bogota.js`,
+  `scripts/load-morat-bogota-api.js` y `scripts/smoke_test_morat_bogota.js`.
+  No habia estatico `morat-bogota.html` que ensombreciera el rewrite.
+- **Evidencia:** POST /api/admin-destinos = OK (id 22950e3d-...,
+  status published, destacado). GET /api/pagina-destino?slug=morat-bogota
+  = 200 con las 5 secciones de evento y divs balanceados (213/213).
+  URL publica https://exploraco.vercel.app/morat-bogota.html = 200.
+  Sitemap incluye el slug. Smoke `scripts/smoke_test_morat_bogota.js`
+  8/8 PASS + balance de divs.
+
+### TSK-059: Pagina dinamica festival-de-verano-bogota.html (Festival de Verano 2026)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Festival de Verano 2026 - Edicion 29 (IDRD con
+  la Alcaldia Mayor de Bogota) como 3er destino `categoria_slug='evento'`
+  del motor. Del 31 de julio al 31 de agosto de 2026, mas de 60 actividades
+  gratuitas en parques y escenarios publicos de toda la ciudad (ancla:
+  Plaza de Eventos Parque Simon Bolivar 4.658056, -74.093889). Mexico
+  pais invitado; celebracion de los 488 anos de Bogota. Incluye el
+  Conciertazo de Verano (1 ago, Plaza de Eventos: Calibre 50, Luister La
+  Voz, Proyecto A, Jhon Onofre) y la Parada del Circuito Sudamericano de
+  Voleibol de Playa (El Salitre). TAGS evento completos (TASK-003):
+  `fecha_inicio='2026-07-31'`, `fecha_fin='2026-08-31'`,
+  `edicion='Edicion 29'`, `sede`, `pais_invitado`, `lineup` (Conciertazo
+  + 4 artistas), `agenda` (6 eventos), `categorias_entrada` (Gratis),
+  `que_llevar` (5), `prohibido` (4). Archivos:
+  `scripts/seed-festival-de-verano-bogota.js`,
+  `scripts/load-festival-de-verano-bogota-api.js` y
+  `scripts/smoke_test_festival_de_verano.js`. No habia estatico que
+  ensombreciera el rewrite.
+- **Evidencia:** POST /api/admin-destinos = OK (id 340cd60f-...,
+  status published, destacado). GET /api/pagina-destino?slug=festival-de-verano-bogota
+  = 200 con las 5 secciones de evento y divs balanceados (233/233).
+  URL publica https://exploraco.vercel.app/festival-de-verano-bogota.html
+  = 200. Sitemap incluye el slug. Smoke
+  `scripts/smoke_test_festival_de_verano.js` 8/8 PASS + balance de divs.
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
