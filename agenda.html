@@ -326,6 +326,7 @@ function render() {
       html += '<div class="ev-details">';
       html += '<div class="ev-detail">🕐 '+e.time+'</div>';
       html += '<div class="ev-detail">💰 '+e.price+'</div>';
+      if(e._artists) html += '<div class="ev-detail">🎤 '+e._artists+'</div>';
       html += '</div>';
       if(e.featured) html += '<div class="ev-featured-badge">⭐ Destacado</div>';
       html += '</div>';
@@ -368,9 +369,57 @@ function buildCitySelect() {
   });
 }
 
+/* ── FETCH DINÁMICO DESDE API ── */
+function loadApiEvents() {
+  fetch('/api/destinos?cat=eventos&limit=50&status=published')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (!data.ok || !data.data || !data.data.length) return;
+      var MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      var catMap = {
+        'festival': 'festival', 'música': 'musica', 'musica': 'musica',
+        'gastro': 'gastro', 'gastronomía': 'gastro',
+        'naturaleza': 'naturaleza'
+      };
+      var apiEvents = data.data.map(function(d, i) {
+        var t = d.tags || {};
+        var startDate = t.fecha_inicio ? new Date(t.fecha_inicio + 'T00:00:00') : null;
+        var day = startDate ? startDate.getDate() : 1;
+        var monthIdx = startDate ? startDate.getMonth() : 0;
+        var lineup = Array.isArray(t.lineup) ? t.lineup : [];
+        var artists = lineup.length ? lineup.map(function(l){ return l.nombre; }).slice(0,3).join(', ') : '';
+        var cat = 'festival';
+        if (d.nombre && (d.nombre.toLowerCase().indexOf('música') !== -1 || d.nombre.toLowerCase().indexOf('concierto') !== -1 || d.nombre.toLowerCase().indexOf('morat') !== -1 || d.nombre.toLowerCase().indexOf('afrodiáspora') !== -1 || d.nombre.toLowerCase().indexOf('voces por la vida') !== -1)) cat = 'musica';
+        return {
+          id: 2000 + i,
+          name: d.nombre,
+          cat: cat,
+          city: d.ciudad || 'Bogotá',
+          day: day,
+          month: MONTHS[monthIdx],
+          time: (t.sede || d.horario || 'Variable'),
+          price: d.precio_desde || 'Consulta',
+          loc: (t.sede || d.ciudad || 'Bogotá'),
+          emoji: d.emoji || '🎉',
+          color: '#A855F7',
+          url: (d.slug || '') + '.html',
+          featured: !!d.destacado,
+          _fromApi: true,
+          _artists: artists
+        };
+      });
+      AGENDA_EVENTS = AGENDA_EVENTS.concat(apiEvents);
+      buildMonthStrip();
+      buildCitySelect();
+      render();
+    })
+    .catch(function(err){ console.log('[Agenda] API fallback:', err); });
+}
+
 buildMonthStrip();
 buildCitySelect();
 render();
+loadApiEvents();
 
 /* ── HAMBURGER MENU ── */
 function toggleDrawer(){

@@ -4,7 +4,62 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
-### Sesion actual (Fase 8) - Sistema gaming: logros/trofeos (consola + Upland) + voto en blogs
+### Sesion actual (Fase 9) - Primer evento del motor: Rock al Parque 2026
+
+Se creo la pagina dinamica `rock-al-parque.html` como el PRIMER destino con
+`categoria_slug='evento'` servido por el motor, replicando el patron de los
+lugares (commit 5c43145): seed + loader idempotente. El usuario pidio buscar
+los 3 eventos mas importantes de Bogota (Rock al Parque 2026, Morat World
+Tour, Festival de Verano 2026) y eligio Rock al Parque 2026.
+
+Cambios en esta sesion:
+- **`scripts/seed-rock-al-parque.js` (nuevo):** datos de la edicion 30
+  (30 anos) del festival, 10-12 oct 2026, Parque Simon Bolivar, gratis,
+  26 artistas distritales confirmados por Idartes (bogota.gov.co
+  17-ago-2026). TAGS evento completos segun TASK-003: `fecha_inicio`,
+  `fecha_fin`, `edicion`, `sede`, `lineup[]` (26 con genero), `agenda[]`
+  (3 dias + memoria), `categorias_entrada[]` (gratis), `que_llevar[]` (6),
+  `prohibido[]` (5). 5 fotos verificadas (Wikimedia Commons, incl. foto de
+  Rock al Parque en la plaza), 6 FAQs. ASCII-safe (0 bytes no-ASCII).
+- **`scripts/load-rock-al-parque-api.js` (nuevo):** loader idempotente
+  DELETE+POST via `/api/admin-destinos`, mismo patron de
+  `load-candelario-api.js`.
+- **`rock-al-parque.html` (eliminado con `git rm`):** el placeholder
+  estatico (61 KB, caracteres corruptos) ensombrecia el rewrite
+  `/:slug.html` en Vercel (los estaticos tienen prioridad sobre las
+  rewrites). Con el estatico fuera, la URL publica sirve la pagina
+  dinamica.
+- **`scripts/smoke_test_rock_al_parque.js` (nuevo):** 8/8 PASS con los
+  datos reales del seed + balance de divs 276/276.
+
+Verificacion: `node --check` limpio en los 2 scripts; ASCII-safety 0 en
+ambos; smoke heredado `scripts/smoke_test_evento.js` 14/14 PASS; smoke del
+evento real 8/8 PASS. En prod (via POST /api/admin-destinos, id
+754d852f-...): GET /api/pagina-destino?slug=rock-al-parque = 200 con las 5
+secciones de evento; sitemap incluye el slug; /api/destinos lo lista.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** el `git rm` del estatico solo surte
+   efecto tras el deploy de Vercel. Hasta que se commitee, la URL publica
+   `/rock-al-parque.html` seguira sirviendo el placeholder viejo del ultimo
+   deploy. Tras el push, verificar GET /rock-al-parque.html = 200 con las
+   secciones de evento.
+2. Si el usuario quiere mas eventos, replicar este patron (seed + loader +
+   TAGS evento) para los 18 existentes con tags vacios (ej. morat,
+   feria-libro-bogota) o nuevos slugs. OJO: cada evento con pagina
+   estatica vieja en la raiz necesita `git rm` antes (mismo conflicto que
+   rock-al-parque).
+3. Backlog sin commitear de la sesion previa (Fase 8): migracion 005 en
+   Neon + deploy del sistema gaming + `scripts/insert-eventos-bogota.js`
+   (untracked) y `agenda.html` modificado (no se tocaron en esta sesion).
+
+#### Riesgos activos (Fase 9)
+- La URL publica sigue mostrando el placeholder estatico hasta el deploy.
+- Los eventos previos en Neon tienen tags vacios: si un slug con pagina
+  estatica vieja se carga como dinamico, el estatico gana (Vercel) --
+  revisar por evento antes de sembrar.
+
+### Sesion anterior (Fase 8) - Sistema gaming: logros/trofeos (consola + Upland) + voto en blogs
 
 Se implemento el sistema de logros aprobado por Javier (ADR-012) reutilizando
 el patron MISIONES v4 de `api/interacciones.js` (catalogo estatico server-side,

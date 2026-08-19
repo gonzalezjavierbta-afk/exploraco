@@ -532,6 +532,33 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   quiebracanto, bellagio-bar y cafe-cinema (los 5 con rating 0 hasta
   resenas reales, ADR-009).
 
+### TSK-057: Pagina dinamica rock-al-parque.html (primer evento del motor)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Festival Rock al Parque 2026 - Edicion 30
+  (30 anos) como PRIMER destino con `categoria_slug='evento'` servido por
+  el motor. Lema "30 anos, 30 ediciones, estremeciendo a Bogota", del 10 al
+  12 de octubre de 2026 en la plazoleta de eventos del Parque Simon Bolivar
+  (gratis, 26 artistas distritales confirmados por Idartes el 17-ago-2026).
+  TAGS evento completos (TASK-003): `fecha_inicio='2026-10-10'`,
+  `fecha_fin='2026-10-12'`, `edicion`, `sede`, `lineup` (26 artistas con
+  genero), `agenda` (3 dias + actividades de memoria), `categorias_entrada`
+  (gratis), `que_llevar` (6), `prohibido` (5). 5 fotos, 6 FAQs.
+  Coordenadas del parque 4.658056, -74.093889. Archivos:
+  `scripts/seed-rock-al-parque.js` y `scripts/load-rock-al-parque-api.js`.
+  Se elimino el `rock-al-parque.html` estatico (placeholder viejo con
+  caracteres corruptos) que ensombrecia el rewrite `/:slug.html` en Vercel
+  (los estaticos tienen prioridad sobre las rewrites). Los 18 eventos
+  previos en Neon siguen con tags vacios; este es el primero con las
+  secciones nuevas de evento.
+- **Evidencia:** POST /api/admin-destinos = OK (id 754d852f-...,
+  status published, destacado). GET /api/pagina-destino?slug=rock-al-parque
+  = 200 con las 5 secciones de evento (Fecha y sede, Lineup/Artistas,
+  Agenda, Tipos de entrada, Que llevar). Sitemap incluye el slug.
+  Smoke `scripts/smoke_test_rock_al_parque.js` 8/8 PASS + balance de divs
+  276/276; smoke heredado `scripts/smoke_test_evento.js` 14/14 PASS.
+  Pendiente: commit+push para que el `git rm` del estatico surta efecto y
+  la URL publica sirva la pagina dinamica.
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
