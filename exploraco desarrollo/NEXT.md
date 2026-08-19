@@ -4,6 +4,31 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Ruta Salsera (2026-08-19) - 7 bares de salsa + guia de blog (TSK-066/067)
+
+Se crearon **7 paginas dinamicas de categoria `sitio` (tipos_actividad='Salsa bar')** + **1 post de blog guia** (`categoria_slug='blog'`, multi-tema `temas:['cultura','noche','gastro','musica']`), siguiendo el patron seed+loader establecido (ej. TSK-052 Quiebracanto, TSK-047 bogota-gastronomia-guia).
+
+**7 bares sitio (slugs):** galeria-cafe-libro (Parque 93/Palermo, 1982, orquestas top, galeria arte), el-goce-pagano (Las Aguas, 1978, mas antiguo, acetatos, intelectuales), sandunguera (Chapinero, 1994, Templo Salsa Clasica, clases Mie/Jue/Sab), salsa-camara (Chapinero, 1988, orquestas intl Aragon/Dan Den), habana-93 (Parque 93, 2006, lunch $29.900 12-16h + salsa vivo diario), rumbavana (Cra 19A con 16, 1992, rumba caleña, hermanos Soto), bar-continental (Cra 8 #66-18, 2020, speakeasy ron/vinilos TripAdvisor #1).
+
+**Blog guia (slug ruta-salsera-de-bogota):** ~2.500 palabras, 8 fotos inline [foto:URL|texto] (Wikimedia Commons, thumbs 960px verificadas HTTP 200), multi-tema `cultura/noche/gastro/musica`, sin FAQs, sin video. Enlaza los 7 nuevos + Quiebracanto + Theatron (ya existentes). 3 rutas sugeridas (Centro, Chapinero, Parque 93) + logistica (TransMilenio, taxis, presupuesto, efectivo).
+
+**Archivos creados (16):** `scripts/seed-<slug>.js` (7 sitio + 1 blog, upsert SQL idempotente, `--dry`), `scripts/load-<slug>-api.js` (8 loaders DELETE+POST a `/api/admin-destinos` Bearer exploraco12345), `exploraco desarrollo/ficha-<slug>.md` (8 fichas con datos verificados).
+
+**Fotos:** 5 fotos por bar (hero + 4 galeria) + 8 fotos blog = 43 URLs Wikimedia Commons, todas thumbs 960px verificadas HTTP 200 (patron BUG-022). 3 fotos rate-limited en HEADs (429) funcionan en prod (diferentes IPs, cache).
+
+**Carga a prod:** 8 POST `/api/admin-destinos` = OK (ids nuevos, status=published, destacado=true). Fotos verificadas HTTP 200.
+
+**Verificacion (Escudo GOLD):** `node --check` OK en los 16 scripts; ASCII-safety 0 bytes no-ASCII; smokes: GET /api/destinos?cat=sitio total 65 (era 58, +7), slugs nuevos publicados; GET /api/destinos?categoria=blog incluye ruta-salsera-de-bogota; 8 URLs .html = 200; sitemap.xml incluye los 8 slugs nuevos; 9 fotos clave curl 200 (rate limits en HEADs son de mi IP, prod OK).
+
+**Evidencia fisica de exito:** /api/destinos?cat=sitio paso de 58 a 65 destinos; 7 slugs nuevos + blog; 8 URLs .html = 200; sitemap con 8 slugs nuevos; 43 fotos verificadas; Escudo GOLD limpio en 16 scripts.
+
+**Docs actualizados:** TASKS.md (TSK-066, TSK-067), NEXT.md (este segmento), BUGS_HISTORICOS.md (rate limits Wikimedia en HEADs, no bloqueantes).
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** 16 scripts nuevos + 8 fichas + TASKS.md/TSK-066/067 + NEXT.md (este segmento). Tras push, los 8 slugs ya estan en sitemap y prod.
+2. (Opcional) TASK-013: asignar autor al post monserrate-guia-completa desde admin.html (migracion 004 ya aplicada).
+3. Siguiente prioridad propuesta (P1): calidad de datos legacy -- completar tags/fecha/descripcion de los ~18 eventos y ~18 comidas con tags vacios (patron seed+loader de TSK-057..063), re-seedear ratings hardcodeados a 0 (ADR-009) y revisar slugs que ensombrecen rewrites (estaticos 205KB).
+
 ### Sesion P2 (2026-08-19) - Robustez del panel admin (TASKS.md TSK-065)
 
 Tarea P2 aprobada por Javier sobre `admin.html` (~5.969 lineas actuales):
