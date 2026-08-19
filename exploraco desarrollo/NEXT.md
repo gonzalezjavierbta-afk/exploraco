@@ -4,6 +4,109 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion P2 (2026-08-19) - Robustez del panel admin (TASKS.md TSK-065)
+
+Tarea P2 aprobada por Javier sobre `admin.html` (~5.969 lineas actuales):
+se cerro el desbalance PRE-EXISTENTE de 1 div (el `<div class="app">` de la
+linea 447 nunca se cerraba; 633 vs 632 en git) y se corrigieron 4 bugs
+reales de precarga/coleccion encontrados en la auditoria del flujo
+`loadForm()`/`updateCatUI()`/`clearForm()`:
+
+1. **Cierre del div raiz (Punto A):** un `</div>` insertado antes de
+   `</body>` via Python `str.replace()` con ancla unica
+   (`</script>\r\n</body>\r\n</html>`). Final del archivo ahora:
+   `</script>\r\n</div>\r\n</body>\r\n</html>\r\n`.
+2. **Precarga de tarjetas de secretos (Sitio/Extras):** `#secretos-list-admin`
+   quedaba vacio al editar. `loadForm()` ahora parsea `p.secretos` (array o
+   JSON string) y puebla las tarjetas (`.secreto-icono/.secreto-titulo/
+   .secreto-tag/.secreto-color/.secreto-texto`), vaciando el textarea
+   `f-secretos` (el collector prioriza tarjetas). Texto plano sigue por
+   textarea.
+3. **Correccion post-auditoria (qa-auditor):** la primera version del fix de
+   secretos llamaba `esc()` (solo existia LOCAL en los builders de export
+   L4398/4451/5079/5137, no era global) -> `ReferenceError: esc is not
+   defined` en runtime al editar un sitio con secretos. El qa-auditor lo
+   detecto con reproduccion Node `vm` (patron BUG-020) y se corrigio a
+   `_esc()` (global, L3207/L4807). Leccion: node --check / balance de divs /
+   ASCII NO detectan errores de scope; reproducir SIEMPRE en Node `vm`.
+4. **Contaminacion cruzada en `collectAmenities()`:** el fallback global
+   `.srv-check` (servicios del HOSTAL) corria cuando el contenedor no
+   existia (ej: `#sitio-amenities-check`, que nunca se creo), contagiando
+   sitio/comida con los servicios del hostal al guardar. Ahora el fallback
+   solo corre con `!cid`.
+5. **`clearForm()` incompleto:** faltaban resets de listas dinamicas de
+   sitio (tours/checklist/dificultad-tags/entradas/itinerario/secretos),
+   comida (menu/plataformas/dietas) y blog (tema multi/video/autor) + 12
+   campos escalares que `loadForm()` precarga. "Nuevo lugar" ya no hereda
+   datos del lugar anterior.
+
+Verificacion (Escudo GOLD, BLUEPRINT seccion 8): balance global y
+HTML-puro = 0 (634/634 y 519/519, pila 0); balance por zona de los 5
+paneles `especifico-*` = 0; `node --check` limpio (script inline
+extraido, 4.109 lineas); ASCII-safety 7.291 bytes >127 (baseline exacto,
+0 nuevos); dobles escapes `\\u` = 0; verificacion runtime Node `vm`:
+script completo carga sin ReferenceError, `_esc` global OK, y el bloque de
+secretos crea la tarjeta y vacia `f-secretos` (PASS). Hallazgos menores
+documentados sin tocar: `esc()` x4 (locales a export, una no escapa
+backslashes), `setEditorMeta()` x2 (redundancias por hoisting) y
+`#sitio-amenities-check` codigo muerto (ya inofensivo). Detalle completo
+en TASKS.md TSK-065.
+
+#### Que sigue
+1. Commit + push (PENDIENTE): `admin.html` + TASKS.md/TSK-065 + NEXT.md
+   (esta sesion) + `db/cleanups/001_limpieza_datos_prueba.sql` (P0). Tras
+   el deploy, verificar que editar un sitio con secretos muestra las
+   tarjetas al precargar y que un "Nuevo lugar" no arrastra datos previos.
+2. (Opcional, facil) TASK-013: asignar autor al post monserrate-guia-completa
+   desde admin.html (migracion 004 ya aplicada).
+3. Siguiente prioridad propuesta (P1): calidad de datos legacy -- completar
+   tags/fecha/descripcion de los ~18 eventos y ~18 comidas con tags vacios
+   (patron seed+loader de TSK-057..063), re-seedear ratings hardcodeados a 0
+   (ADR-009) y revisar slugs que ensombrecen rewrites (estaticos 205KB).
+
+### Sesion P0 (2026-08-19) - Limpieza de datos de prueba + cierre TASK-020/012
+
+Se ejecuto la limpieza P0 aprobada por Javier: eliminacion de 425 registros
+basura de la BD de produccion y cierre documental de las migraciones 004/005.
+
+Cambios y verificacion:
+- **`db/cleanups/001_limpieza_datos_prueba.sql` (nuevo):** SQL versionado con
+  la cascada manual (interacciones -> fotos -> detalles -> destinos) y el
+  borrado del usuario de prueba. Ejecutado por Javier en la consola Neon.
+- **Datos eliminados:** 424 destinos `test-hostal-verificacion-bogota-*`
+  (386 draft + 38 archived) de una prueba masiva anterior; el evento
+  `fiesta-r10` (published, descripcion basura, lat/lng 0) que aparecia en
+  listados publicos; y el usuario 'prueba' (`0a865be8-...`, xp=0, sin
+  interacciones).
+- **Resultado en prod:** BD 552 -> 127 registros (todos published; 0 draft,
+  0 archived). /api/destinos?cat=evento 23 -> 22 (sin fiesta-r10); stats
+  destinos 122 -> 121; leaderboard solo `javier` (xp=10). 0 registros
+  `test-hostal-*` restantes.
+
+Hallazgo importante (corrige un falso positivo de sesiones previas):
+- **Las migraciones 004 y 005 YA estaban aplicadas y el gaming ya
+  funcionaba en prod.** El 500 de GET `tipo=logros` reportado antes era
+  causado por probar con `usuario_id=test-check` (no es UUID valido;
+  Postgres rechaza con `invalid input syntax for type uuid`), NO por la
+  columna `progreso_logros` faltante. Verificado con el UUID real de
+  javier (`3b78efad-...`): logros = 200 con catalogo de 16 trofeos y
+  rareza %; /api/usuarios?id=... devuelve `total_logros`, `foto_url` y
+  `ciudad_base`. Leccion: en endpoints que filtran por id, probar siempre
+  con un UUID real de la tabla usuarios.
+- **Cierre documental:** TASKS.md TASK-020 y TASK-012 -> COMPLETADA
+  (evidencia real 2026-08-19), TASK-013 queda desbloqueada (asignar autor
+  al post de Monserrate desde admin.html), nueva TSK-064 registra la
+  limpieza.
+
+#### Que sigue
+1. (Opcional, facil) TASK-013: asignar autor al post monserrate-guia-completa
+   desde admin.html ahora que la migracion 004 esta aplicada -- aparece la
+   seccion "Quien escribe".
+2. Siguiente prioridad propuesta (P1): calidad de datos legacy -- completar
+   tags/fecha/descripcion de los ~18 eventos y ~18 comidas con tags vacios
+   (patron seed+loader de TSK-057..063), re-seedear ratings hardcodeados a 0
+   (ADR-009) y revisar slugs que ensombrecen rewrites (estaticos 205KB).
+
 ### Sesion actual (Fase 9) - Motor de eventos: Rock al Parque + Morat + Festival de Verano + Jazz al Parque + Salsa al Parque
 
 Se crearon CINCO paginas dinamicas con `categoria_slug='evento'` servidas
@@ -188,9 +291,10 @@ index.html; ASCII-safety 0 no-ASCII en los serverless; smoke del renderer
 3. Commit + push pendiente de esta sesion (Fase 8) -- aun sin commitear.
 
 #### Riesgos activos (Fase 8)
-- La migracion 005 NO esta aplicada en produccion; desplegar antes de
-  migrar rompe el GET de logros (los POST degradan sin 500 gracias al
-  try/catch de evaluarLogros).
+- ~~La migracion 005 NO esta aplicada en produccion~~ RESUELTO (2026-08-19):
+  la migracion ya estaba aplicada y el gaming funcionaba; el 500 de logros
+  era un falso positivo por probar con un id no-UUID. Ver segmento "Sesion
+  P0" arriba.
 - Los ids de logros quedan como convencion estable; cambiarlos invalida el
   progreso ya persistido en `progreso_logros`.
 
@@ -521,8 +625,9 @@ Ver BUGS_HISTORICOS.md BUG-022.
    infraestructura TASK-004/005/006.
 3. Los pendientes conocidos de sesiones previas siguen abiertos: TSK-016
    (Widget "Quien va este mes"), desfase de ids en MM_PINS[], renderMyMap()
-   fuera del ciclo de refresco, usuario-session.js sin verificar, admin.html
-   con desbalance pre-existente de 1 div.
+   fuera del ciclo de refresco, usuario-session.js sin verificar. (El
+   desbalance de 1 div en admin.html quedo RESUELTO en la sesion P2 --
+   TSK-065.)
 
 ### Sesion previa (Agosto 2026) - Fix BD BUG-021 + TSK-017 Comparador + TASK-008 Buscar SSR
 
@@ -601,13 +706,11 @@ por "pendiente", "completo" o "sin dependencias externas".
   cambio en el repo queda local hasta desbloquearlo -- incluyendo el
   multi-tema de TSK-044 y pendientes de TASK-008/TSK-017. Es el bloqueador
   #1 del proyecto ahora mismo.
-- **Desbalance pre-existente de 1 div en admin.html (NUEVO, hallazgo de
-  auditoria):** 632 divs abiertos vs 631 cerrados segun git; NO fue
-  introducido por esta sesion (los cambios de admin.html de esta sesion
-  pasaron verificado de balance en el diff). Pendiente de localizar y
-  corregir en una sesion futura; no parece romper el render actual (los
-  navegadores toleran 1 cierre faltante), pero viola el Escudo GOLD y
-  cualquier adicion futura de divs puede empeorar el desbalance.
+- **Desbalance pre-existente de 1 div en admin.html (RESUELTO 2026-08-19,
+  TSK-065):** el `<div class="app">` (linea 447) nunca se cerraba (632
+  abiertos vs 631 cerrados en git). Se inserto el `</div>` faltante antes
+  de `</body>` via Python `str.replace()` exacto; balance global y
+  HTML-puro ahora = 0 (634/634 y 519/519).
 - admin.html es un archivo grande (~7.800 lineas). Toda edicion debe hacerse con Python `str.replace()` exacto, nunca sed/bash sobre HTML complejo (Reglas de Oro ExploraCO v5, punto 2).
 - El presupuesto de funciones serverless de Vercel Hobby esta agotado (8/8). Nuevas necesidades de endpoint deben resolverse extendiendo un archivo existente via query params, no creando uno nuevo.
 - Bugs historicos documentados que no deben repetirse: ver BUGS_HISTORICOS.md (FUNCTION_INVOCATION_FAILED por no-ASCII, doble escape visible, HTML roto por comentarios/divs sin cerrar, sub-tabs que desaparecen, funciones duplicadas, nombres de campo incorrectos, motor generico registrado vacio, campos duplicados sin conectar, categoria 'blog' faltante en Neon, emoji en varchar(10) sin prefijo E).
@@ -629,7 +732,11 @@ Antes de proponer cualquier cambio, la siguiente IA debe:
 
 ## Baseline tecnico actual (referencia rapida)
 
-- **admin.html:** 5.894 lineas (referencial; +86 por el formulario de blog con select multiple de temas, campo video y buscador de autor -- ver TSK-043/TSK-044). Desbalance pre-existente de 1 div en git (632 vs 631), no introducido por esta sesion (ver Riesgos activos).
+- **admin.html:** 5.969 lineas (referencial; tras el cierre del div raiz y
+  los fixes de robustez P2 -- TSK-065). Balance global/HTML-puro = 0
+  (634/634, 519/519). Toda edicion debe hacerse con Python `str.replace()`
+  exacto, nunca sed/bash sobre HTML complejo (Reglas de Oro ExploraCO v5,
+  punto 2).
 - **pagina-destino.js:** v9, ~1.800+ lineas (referencial; +bloque de blog con temasBlog multi-tema, schemaLD keywords y seccion "Quien escribe" condicional por id_autor). Los cambios multi-tema estan en el repo pero NO desplegados (TASK-011).
 - **api/destinos.js:** toPlace() ahora expone `temas` (tags.temas[] o [tags.tema]) y excluye `categoria_slug='blog'` del listado general y del mapa (solo aparece con ?categoria=blog). NO desplegado aun.
 - **admin-destinos.js:** v2.1, sin cambios -- el MERGE JSONB ya cubre tags.temas[]/tags.tema sin tocar el backend (ADR-003).

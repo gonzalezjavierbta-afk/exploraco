@@ -2317,7 +2317,13 @@ function clearForm() {
              /* hostal-specific (TASK-001) */
              'f-tipo-alojamiento','f-edad-minima','f-mascotas','f-cocina-compartida','f-reglas-casa',
              'f-score-atmosfera','f-score-seguridad','f-score-ubicacion',
-             'f-score-limpieza','f-score-personal','f-score-precio'];
+             'f-score-limpieza','f-score-personal','f-score-precio',
+             /* P2: campos que loadForm() precarga pero clearForm() no
+                limpiaba (contaminacion en "Nuevo lugar") */
+             'f-dificultad-desc','f-temporada-nota','f-checklist-tip',
+             'f-tipo-comida','f-cocina','f-precio-promedio','f-ambiente',
+             'f-terraza','f-reservas','f-domicilio','f-blog-video',
+             'f-blog-autor-id'];
   ids.forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.value = '';
@@ -2405,6 +2411,29 @@ function clearForm() {
   if(queLlevarList) queLlevarList.innerHTML = '';
   var prohibidoListEl = document.getElementById('prohibido-list');
   if(prohibidoListEl) prohibidoListEl.innerHTML = '';
+
+  /* -- Reset sitio dynamic lists (P2) -- */
+  ['tour-list-admin','checklist-admin','dificultad-tags-admin',
+   'entradas-list-admin','itinerario-list-admin','secretos-list-admin'
+  ].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.innerHTML = '';
+  });
+  /* -- Reset comida dynamic lists (P2) -- */
+  var menuList = document.getElementById('menu-item-list');
+  if(menuList) menuList.innerHTML = '';
+  var platList = document.getElementById('comida-plataformas-list');
+  if(platList) platList.innerHTML = '';
+  document.querySelectorAll('#comida-dieta-check input[type=checkbox]').forEach(function(cb){
+    cb.checked = false;
+  });
+  /* -- Reset blog (P2) -- */
+  _writeMultiSelect(document.getElementById('f-blog-tema'), []);
+  _writeMultiSelect(document.getElementById('f-temporada'), []);
+  var bas = document.getElementById('blog-autor-seleccionado');
+  if(bas){ bas.style.display = 'none'; bas.innerHTML = ''; }
+  var bar = document.getElementById('blog-autor-resultados');
+  if(bar){ bar.style.display = 'none'; bar.innerHTML = ''; }
 
   /* ── Other resets ── */
   currentTags = [];
@@ -3040,6 +3069,43 @@ function loadForm(p) {
             +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="height:36px">x</button>';
           itiList.appendChild(row);
         });
+      }
+      /* P2: precarga de tarjetas de secretos (Sitio/Extras). Antes
+         applyCategoryTagFields escribia el JSON crudo en #f-secretos
+         y #secretos-list-admin quedaba vacio. Si p.secretos es un
+         array (o JSON string de array), se pueblan las tarjetas y se
+         vacia el textarea (collectSitioSecretos prioriza tarjetas).
+         Si es texto plano, se deja el textarea como unica fuente. */
+      var secList = document.getElementById('secretos-list-admin');
+      var secArr = null;
+      if (Array.isArray(p.secretos)) {
+        secArr = p.secretos;
+      } else if (typeof p.secretos === 'string' && p.secretos.trim().charAt(0) === '[') {
+        try { secArr = JSON.parse(p.secretos); } catch(e) { secArr = null; }
+      }
+      if (secList && Array.isArray(secArr) && secArr.length) {
+        var secValid = secArr.filter(function(s){ return s && s.titulo; });
+        if (secValid.length) {
+          secList.innerHTML = '';
+          secValid.forEach(function(s){
+            var wrap = document.createElement('div');
+            wrap.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px';
+            var colorOpts = ['gold','green','red','blue'];
+            wrap.innerHTML = '<div style="display:grid;grid-template-columns:40px 1fr 100px 80px auto;gap:6px">'
+              +'<input class="form-input secreto-icono" placeholder="Ico" title="Emoji" style="font-size:14px;text-align:center" value="'+_esc(s.icono||'')+'">'
+              +'<input class="form-input secreto-titulo" placeholder="Titulo del tip..." value="'+_esc(s.titulo||'')+'">'
+              +'<input class="form-input secreto-tag" placeholder="Tag (ej: Gold)" value="'+_esc(s.tag||'')+'">'
+              +'<select class="form-input form-select secreto-color" style="font-size:11px">'
+              +colorOpts.map(function(cv){ return '<option value="'+cv+'"'+((s.tag_color||'gold')===cv?' selected':'')+'>'+cv.charAt(0).toUpperCase()+cv.slice(1)+'</option>'; }).join('')
+              +'</select>'
+              +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this.parentElement.parentElement)">x</button>'
+              +'</div>'
+              +'<textarea class="form-input secreto-texto" rows="2" placeholder="Descripcion del tip...">'+_esc(s.texto||'')+'</textarea>';
+            secList.appendChild(wrap);
+          });
+          var secTxt = document.getElementById('f-secretos');
+          if (secTxt) secTxt.value = '';
+        }
       }
     }, 100);
   }
@@ -4814,12 +4880,19 @@ function collectAmenities(cid) {
       var val = cb.value || (cb.parentElement ? cb.parentElement.textContent.trim() : '');
       if(val) items.push(val);
     });
-    if(items.length) return items;
+    return items; /* si el contenedor existe, esa es la unica fuente */
   }
-  /* 2. Fallback: read any visible .srv-check checkbox */
-  document.querySelectorAll('.srv-check input[type=checkbox]:checked').forEach(function(cb){
-    if(cb.value) items.push(cb.value);
-  });
+  /* 2. Fallback SOLO cuando el llamador no indico contenedor: lee
+     cualquier .srv-check marcado (la unica UI de servicios es la de
+     hostal, #servicios-grid). Antes este fallback corria tambien
+     cuando el contenedor solicitado no existia en el DOM (ej:
+     #sitio-amenities-check, que nunca se creo) y contamina sitio y
+     comida con los servicios del hostal (fix P2 robustez del panel). */
+  if(!cid) {
+    document.querySelectorAll('.srv-check input[type=checkbox]:checked').forEach(function(cb){
+      if(cb.value) items.push(cb.value);
+    });
+  }
   return items;
 }
 /* BUG-019 fix (TASK-003): collectLineupItems()/collectAgendaItems()
@@ -5890,5 +5963,6 @@ function escH(s) {
   console.groupEnd();
 })();
 </script>
+</div>
 </body>
 </html>

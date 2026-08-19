@@ -731,6 +731,93 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   comida; URLs publicas .html = 200 (55-57KB); /api/destinos?cat=comida
   paso de 18 a 23; sitemap incluye los 5 slugs.
 
+### TSK-064: Limpieza de datos de prueba en produccion (P0)
+- **Estado:** COMPLETADA (2026-08-19, ejecutada por Javier en consola Neon)
+- **Detalle:** Se eliminaron 425 registros basura de la BD de produccion:
+  (1) 424 destinos `test-hostal-verificacion-bogota-*` (386 draft + 38
+  archived) generados por una prueba masiva de una sesion anterior;
+  (2) el evento `fiesta-r10` (status published, descripcion basura,
+  lat/lng 0) que era visible en listados y agenda publicos; (3) el usuario
+  de prueba 'prueba' (`0a865be8-...`, xp=0, sin interacciones). SQL
+  versionado en `db/cleanups/001_limpieza_datos_prueba.sql` (cascada
+  manual igual al DELETE de api/admin-destinos.js:311).
+- **Evidencia:** BD 552 -> 127 registros (127 published, 0 drafts, 0
+  archived). 0 registros `test-hostal-*`, 0 `fiesta-r10`. Eventos
+  publicos en /api/destinos?cat=evento 23 -> 22; stats destinos 122 ->
+  121. Leaderboard solo muestra `javier` (xp=10). Regresion OK: logros
+  javier sigue 200 con total=16.
+
+### TSK-065: Robustez del panel admin (P2) - cierre de div raiz + precarga de secretos + clearForm completo
+- **Estado:** COMPLETADA (2026-08-19)
+- **Detalle:** Tarea P2 aprobada por Javier sobre `admin.html`. Se corrigio
+  el desbalance PRE-EXISTENTE de 1 div (633 vs 632, hallazgo de
+  auditoria de sesiones previas): el `<div class="app">` (linea 447) nunca
+  se cerraba. Se inserto exactamente un `</div>` antes de `</body>` via
+  Python `str.replace()` (Regla de Oro 2, ancla unica
+  `</script></body></html>`), quedando el archivo con balance global 0 y
+  HTML-puro 0. Ademas se corrigieron 4 bugs reales encontrados en la
+  auditoria del flujo loadForm()/updateCatUI()/clearForm() (2 hallazgos
+  del qa-auditor y 2 del lider de sesion):
+  1. **Precarga de tarjetas de secretos (Sitio/Extras):** `#secretos-list-admin`
+     quedaba vacio al editar (solo el textarea `f-secretos` recibia el JSON
+     crudo via `applyCategoryTagFields`). Ahora `loadForm()` parsea
+     `p.secretos` (array o JSON string) y puebla las tarjetas con
+     `.secreto-icono/.secreto-titulo/.secreto-tag/.secreto-color/
+     .secreto-texto`, vaciando el textarea (el collector
+     `collectSitioSecretos()` prioriza tarjetas). Texto plano sigue
+     funcionando via textarea.
+  2. **Correccion post-auditoria de la precarga de secretos:** la primera
+     version de este fix llamaba `esc()` (inexistente a nivel global; solo
+     existia local dentro de los builders de export L4398/4451/5079/5137).
+     El qa-auditor lo detecto en runtime con Node `vm` (patron de scope de
+     BUG-020): `ReferenceError: esc is not defined` al editar un sitio con
+     secretos, tarjetas vacias, y el error silencioso ante node --check /
+     balance de divs. Corregido reemplazando las 4 llamadas por `_esc()`
+     (global, L3207/L4807). Verificacion runtime: top-level del script sin
+     ReferenceError, `typeof _esc === 'function'`, y simulacion del bloque
+     con DOM controlado -> 1 tarjeta creada, `f-secretos` vaciado, PASS.
+  3. **Contaminacion cruzada en `collectAmenities()`:** el fallback global
+     `.srv-check` (checkboxes de servicios del HOSTAL) corria tambien cuando
+     el contenedor solicitado no existia en el DOM (ej: `#sitio-amenities-check`,
+     que nunca se creo), de modo que al guardar un SITIO o una COMIDA sin
+     amenities marcadas el registro heredaba los servicios del hostal.
+     Ahora el fallback solo corre si el llamador no indico contenedor
+     (`!cid`).
+  4. **`clearForm()` incompleto:** no limpiaba las listas dinamicas de sitio
+     (tours, checklist, dificultad-tags, entradas, itinerario, secretos),
+     comida (menu, plataformas, dietas) ni blog (tema multi, video, autor),
+     ni 12 campos escalares que `loadForm()` precarga (f-dificultad-desc,
+     f-temporada-nota, f-checklist-tip, f-tipo-comida, f-cocina,
+     f-precio-promedio, f-ambiente, f-terraza, f-reservas, f-domicilio,
+     f-blog-video, f-blog-autor-id) -- lo que contaminaba un "Nuevo lugar"
+     con datos del lugar editado anterior. Se anadieron los resets.
+- **Verificacion (Escudo GOLD, BLUEPRINT seccion 8):** balance global
+  `<div>`/`</div>` = 0 (634/634); balance HTML puro (sin script/style) = 0
+  (519/519) con pila 0; balance por zona de los 5 paneles
+  `especifico-hostal/comida/sitio/evento/blog` = 0 cada uno; `node --check`
+  limpio sobre el `<script>` inline extraido (4.109 lineas); ASCII-safety
+  7.291 bytes >127 (baseline exacto, 0 nuevos); dobles escapes `\\u` = 0;
+  IDs del contrato intactos (lineup-list, secretos-list-admin, etc.).
+  Verificacion runtime (Node `vm` con DOM simulado, metodo del qa-auditor):
+  script inline completo carga sin ReferenceError; `_esc` global OK; el
+  bloque de precarga de secretos crea la tarjeta y vacia `f-secretos`.
+  Las 5 ediciones JS fueron 100% dentro de `<script>` (mas la edicion
+  HTML del cierre de div), via Python con ancla unica cada una (1
+  ocurrencia verificada).
+- **Leccion del proceso (qa-auditor):** `node --check`, el balance de divs y
+  el ASCII NO detectan errores de scope (una funcion usada antes de
+  existir a nivel global). El diagnostico inicial de admin-dev de que las 4
+  declaraciones de `esc()` eran "redundancias inofensivas por hoisting" era
+  incorrecto -- eran locales a callbacks de export, no globales. Verificar
+  SIEMPRE con reproduccion en Node `vm` (patron BUG-020).
+- **Hallazgos documentados sin tocar (fuera de alcance):** `esc()` declarada
+  4 veces (L4398/4451/5079/5137, locales a builders de export, una no
+  escapa backslashes); `setEditorMeta()`
+  duplicada (L2232/L3960) -- redundancias inofensivas por hoisting;
+  `#sitio-amenities-check` sigue siendo codigo muerto (loadForm L3042 y
+  savePlace L3483) pero ya no contamina datos; ningun seed de sitio incluye
+  `amenidades` (no hay UI de servicios para sitio en el admin).
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend
@@ -884,7 +971,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### TSK-055: Sistema de logros/trofeos estilo consola + coleccion por ciudad (Upland)
 - **Prioridad:** ALTA
 - **Responsable:** backend-dev + renderer-dev
-- **Estado:** COMPLETADO en repo (pendiente deploy + migracion, ver TASK-020)
+- **Estado:** COMPLETADO y verificado en prod (2026-08-19; deploy y migracion 005 ya activos, ver TASK-020)
 - **Dependencia:** TSK-015 (voto rapido), misiones XP v4, ADR-012
 - **Detalle técnico:** Catalogo `LOGROS` estatico en `api/interacciones.js` v5: 16 trofeos con `tier` (bronce/plata/oro/platino), `xp`, `requiere` (DAG) y `check(ctx)` server-side -- 6 de voto/opinion (logr_primer_voto, critico_10, critico_25, opinion_blog, votos_blog_5, votos_blog_10), 5 de conteo (coleccionista_10, coleccionista_50, ciudades_5, visitas_5, visitas_20) y 5 generados de `CIUDADES_COLECCION` (Bogota 12 platino/Alcalde, Cartagena 8 oro, Medellin 8 oro, Santa Marta 6 plata, Cali 6 plata). Progreso en nueva columna `usuarios.progreso_logros jsonb` (migracion `db/migrations/005_usuarios_progreso_logros.sql`, ADR-008), merge `||` segun ADR-003. `evaluarLogros()` se ejecuta en los 4 POST de XP (resena, guardado, visita, rating) con agregados memoizados (1 query por grupo, no por trofeo) y anade `logros` a la respuesta (mantiene `misiones`). GET `tipo=logros&usuario_id=` devuelve catalogo + estado/fecha/tier + rareza global % (Steam, via `jsonb_object_keys`). `api/usuarios.js` deriva `total_logros` (conteo de claves). Nombres de ciudad comparados normalizados (TRANSLATE sin tildes + LOWER) porque Neon convive 'Bogota' y 'Bogotá'. `usuario-session.js`: `sumaLogrosXp`/`mostrarLogrosToast` (toast "Trofeo desbloqueado") en las 4 acciones.
 - **Evidencia física de éxito:** `node --check` limpio en interacciones/usuarios/usuario-session; ASCII-safety 0 bytes no-ASCII en los serverless; test local `scripts/test_logros_catalogo.js` 12/12 PASS (16 ids unicos, shape, tiers, DAG a ids validos, todos los check devuelven Promise, TRANSLATE/COALESCE, 5 ciudades, logros de ciudad en catalogo).
@@ -892,7 +979,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### TSK-056: Voto rapido habilitado en blogs + badge de rating en Inspirate/blog.html
 - **Prioridad:** ALTA
 - **Responsable:** renderer-dev
-- **Estado:** COMPLETADO en repo (pendiente deploy, ver TASK-020)
+- **Estado:** COMPLETADO y verificado en prod (2026-08-19; deploy activo, ver TASK-020)
 - **Dependencia:** TSK-055, TASK-017/018 (blog), TSK-015
 - **Detalle técnico:** Se elimina la supresion `esBlogRes ? '' : '<div id="qrwrap">'` en `api/pagina-destino.js`: el widget `#qr-stars` se renderiza en TODAS las categorias incluida blog, con copy condicional ("Califica este artículo" vs "Califica este lugar") y contador "N opiniones" vs "N resenas" (votos +10 XP, dedup 409, ADR-007). Las tarjetas de Inspirate (`inspFeaturedHTML`/`inspHighlightHTML` en index.html) y las cards de blog.html (`api/utilidades.js` blog-lista, SELECT ahora con `rating`/`total_resenas`) muestran el badge `[estrella] X.Y (N)` cuando hay resenas.
 - **Evidencia física de éxito:** Smoke `scripts/smoke_test_blog_voto.js` 14/14 PASS (widget presente en blog y sitio, copy correcto por categoria, contador correcto, sin IDs duplicados, degradacion nRes=0, balance de divs 42/42). `node --check` limpio en pagina-destino.js, utilidades.js e index.html (script inline extraido).
@@ -900,10 +987,11 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### TASK-020: Aplicar migracion 005 (progreso_logros) + deploy del sistema gaming
 - **Prioridad:** ALTA
 - **Responsable:** backend-dev (con Javier en Neon)
-- **Estado:** PENDIENTE
+- **Estado:** COMPLETADA (verificada en prod el 2026-08-19)
 - **Dependencia:** TSK-055, TSK-056
+- **Nota de cierre:** la migracion `db/migrations/005_usuarios_progreso_logros.sql` YA estaba aplicada en Neon y el sistema gaming (interacciones.js v5) ya estaba desplegado: GET `tipo=logros` con un `usuario_id` real (UUID valido) responde 200 con el catalogo de 16 trofeos y rareza %. El 500 que se habia registrado en sesiones previas era un falso positivo: se habia probado con `usuario_id=test-check`, que no es UUID valido y Postgres lo rechaza con `invalid input syntax for type uuid` (no es un fallo de la columna faltante). Leccion de proceso: verificar logros SIEMPRE con un UUID real de la tabla usuarios, nunca con un id de prueba.
 - **Detalle técnico:** Ejecutar en la consola de Neon (ADR-008: SQL versionado, no suelto): `\i db/migrations/005_usuarios_progreso_logros.sql` (ALTER TABLE ADD COLUMN IF NOT EXISTS `progreso_logros jsonb NOT NULL DEFAULT '{}'::jsonb`). Sin esta migracion, GET `tipo=logros` devuelve 500 y los POST degradan (evaluarLogros captura el error y devuelve []). Despues: deploy de Vercel y verificacion en prod (GET logros de un usuario con acciones, voto en un post de blog, badge en Inspirate, toasts de trofeo).
-- **Evidencia física de éxito:** GET `https://exploraco.vercel.app/api/interacciones?tipo=logros&usuario_id=<id>` responde con catalogo de 16 trofeos y rareza %; un voto de 5 estrellas en /monserrate-guia-completa.html dispara el toast "Trofeo desbloqueado" y la tarjeta del post muestra el badge de rating en Inspirate.
+- **Evidencia física de éxito:** Verificado el 2026-08-19 con UUID real `3b78efad-e9f6-49a7-bbd1-af836f528348` (usuario javier): GET `https://exploraco.vercel.app/api/interacciones?tipo=logros&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348` = 200 con `total=16`, `desbloqueados=0`, trofeos con `tier`/`rareza_pct`; GET `/api/usuarios?id=...` = 200 con `total_logros=0` y `foto_url`/`ciudad_base` presentes (migracion 004 tambien aplicada).
 
 ---
 
@@ -987,7 +1075,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### TASK-012: Aplicar migracion db/migrations/004_usuarios_blog_autor.sql en Neon
 - **Prioridad:** MEDIA
 - **Responsable:** Lead Developer (con acceso a la URL de Neon)
-- **Estado:** PENDIENTE (por decision del usuario queda pendiente)
+- **Estado:** COMPLETADA (verificada en prod el 2026-08-19: columnas `foto_url` y `ciudad_base` presentes en la respuesta de GET /api/usuarios?id=...)
 - **Dependencia:** Ninguna (el archivo ya existe en el repo, ADR-008 cumplido)
 - **Detalle t\u00e9cnico:** Aplicar en Neon la migracion versionada `db/migrations/004_usuarios_blog_autor.sql` que agrega `usuarios.foto_url` y `usuarios.ciudad_base` (requeridas por la seccion "Quien escribe" del renderer de blog y por el buscador de autor de admin.html). Es idempotente (`ADD COLUMN IF NOT EXISTS`). El post monserrate-guia-completa se creo SIN `id_autor` a proposito hasta que esta migracion se aplique.
 - **Evidencia f\u00edsica de \u00e9xito:** `SELECT column_name FROM information_schema.columns WHERE table_name='usuarios'` muestra `foto_url` y `ciudad_base`; al guardar el post desde admin.html con un autor asignado, la seccion "Quien escribe" aparece en /monserrate-guia-completa.html.
@@ -995,7 +1083,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### TASK-013: Asignar autor al post de blog monserrate-guia-completa desde admin.html
 - **Prioridad:** BAJA
 - **Responsable:** Project Manager (Javier)
-- **Estado:** PENDIENTE (depende de TASK-012)
+- **Estado:** PENDIENTE (dependencia TASK-012 ya COMPLETADA -- el autor ya puede asignarse desde admin.html)
 - **Dependencia:** TASK-012 (migracion 004 aplicada)
 - **Detalle t\u00e9cnico:** Editar el post monserrate-guia-completa desde admin.html usando el buscador de autor (que filtra usuarios ya registrados) y guardar. El renderer de blog omitira la seccion "Quien escribe" mientras el post no tenga `id_autor`.
 - **Evidencia f\u00edsica de \u00e9xito:** /monserrate-guia-completa.html muestra la seccion "Quien escribe" con nombre/foto/ciudad del autor.
