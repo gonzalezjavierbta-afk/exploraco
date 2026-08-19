@@ -14,6 +14,8 @@ const CAT_COLORS = {
 const PIN_COLORS = {
   hostal:'#2196F3', comida:'#FF9800', sitio:'#4CAF50', evento:'#A855F7', blog:'#EC4899',
 };
+// Abreviaturas de mes para AGENDA_EVENTS (formato que usan index.html y agenda.html)
+const MONTHS_ABBR = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 function safeJSON(val) {
   if (!val) return null;
@@ -87,9 +89,19 @@ function toPlace(row) {
     habs:        habitaciones,
     faqs:        faqs,
     // Campos especificos para AGENDA_EVENTS (eventos)
-    day:         row.event_day        || null,
-    month:       row.event_month      || null,
+    // day/month se derivan de tags.fecha_inicio ('YYYY-MM-DD') cuando la
+    // fila no tiene columnas event_day/event_month (los seeds de evento
+    // solo escriben tags.fecha_inicio). Fecha real del evento, no la de hoy.
+    day:         (typeof tags.fecha_inicio === 'string' && tags.fecha_inicio.length >= 10
+                  ? parseInt(tags.fecha_inicio.slice(8,10), 10) || null
+                  : null) || row.event_day || null,
+    month:       (typeof tags.fecha_inicio === 'string' && tags.fecha_inicio.length >= 10
+                  ? (MONTHS_ABBR[parseInt(tags.fecha_inicio.slice(5,7), 10) - 1] || null)
+                  : null) || row.event_month || null,
     time:        row.horario          || 'Consultar',
+    // tags completos: fecha_inicio/fecha_fin/sede/lineup/edicion se leen en
+    // agenda.html (loadApiEvents) e index-api-connector.js (toAgendaEvent)
+    tags:        tags,
   };
 }
 

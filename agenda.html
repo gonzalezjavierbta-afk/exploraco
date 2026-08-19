@@ -371,7 +371,11 @@ function buildCitySelect() {
 
 /* ── FETCH DINÁMICO DESDE API ── */
 function loadApiEvents() {
-  fetch('/api/destinos?cat=eventos&limit=50&status=published')
+  // OJO: el categoria_slug de los eventos en DB es 'evento' (no 'eventos').
+  // Con 'cat=eventos' la API retornaba 0 filas y los eventos nuevos nunca
+  // aparecian en la agenda completa. Ademas AGENDA_EVENTS es const, asi que
+  // se agrega con push (mutacion in-place), nunca con reasignacion.
+  fetch('/api/destinos?cat=evento&limit=50&status=published')
     .then(function(r){ return r.json(); })
     .then(function(data){
       if (!data.ok || !data.data || !data.data.length) return;
@@ -383,7 +387,14 @@ function loadApiEvents() {
       };
       var apiEvents = data.data.map(function(d, i) {
         var t = d.tags || {};
-        var startDate = t.fecha_inicio ? new Date(t.fecha_inicio + 'T00:00:00') : null;
+        var startDate = null;
+        if (t.fecha_inicio && typeof t.fecha_inicio === 'string' && t.fecha_inicio.length >= 10) {
+          startDate = new Date(
+            parseInt(t.fecha_inicio.slice(0, 4), 10),
+            parseInt(t.fecha_inicio.slice(5, 7), 10) - 1,
+            parseInt(t.fecha_inicio.slice(8, 10), 10)
+          );
+        }
         var day = startDate ? startDate.getDate() : 1;
         var monthIdx = startDate ? startDate.getMonth() : 0;
         var lineup = Array.isArray(t.lineup) ? t.lineup : [];
@@ -398,7 +409,7 @@ function loadApiEvents() {
           day: day,
           month: MONTHS[monthIdx],
           time: (t.sede || d.horario || 'Variable'),
-          price: d.precio_desde || 'Consulta',
+          price: d.price || 'Consulta',
           loc: (t.sede || d.ciudad || 'Bogotá'),
           emoji: d.emoji || '🎉',
           color: '#A855F7',
@@ -408,7 +419,12 @@ function loadApiEvents() {
           _artists: artists
         };
       });
-      AGENDA_EVENTS = AGENDA_EVENTS.concat(apiEvents);
+      // Dedupe por nombre: evita dobles (ej. Rock al Parque existe hardcodeado
+      // en AGENDA_EVENTS con url 'index.html', y ahora tambien llega de la API).
+      var nombres = {};
+      AGENDA_EVENTS.forEach(function(e){ nombres[e.name] = true; });
+      apiEvents = apiEvents.filter(function(e){ return !nombres[e.name]; });
+      Array.prototype.push.apply(AGENDA_EVENTS, apiEvents);
       buildMonthStrip();
       buildCitySelect();
       render();

@@ -103,6 +103,20 @@ el seed, no se muestra).
    Neon + deploy del sistema gaming + `scripts/insert-eventos-bogota.js`
    (untracked) y `agenda.html` modificado (no se tocaron en esta sesion).
 
+#### Correccion agenda cultural (TSK-062, esta sesion)
+- El usuario reporto 2 bugs: (1) los 5 eventos del motor se mostraban en la
+  agenda del home con la fecha de HOY en vez de la fecha real; (2) en la
+  agenda completa (agenda.html) los eventos nuevos no aparecian. Se corrigio
+  en esta sesion (TSK-062): `api/destinos.js` ahora deriva `day`/`month`
+  desde `tags.fecha_inicio` y devuelve `tags` en el listado;
+  `index-api-connector.js` parsea `fecha_inicio` con `new Date(y,m,d)`;
+  `agenda.html` usa `?cat=evento`, agrega con push (const) y lee `d.price`.
+- **PENDIENTE de deploy (commit+push):** el fix en api/destinos.js solo
+  surte efecto en prod tras el push. Verificar despues del deploy:
+  GET /api/destinos?cat=evento debe devolver day/month (14 Ago, 12 Sep,
+  28 Nov, 10 Oct, 12 Sep...) y tags.fecha_inicio para los 5 eventos;
+  agenda.html debe listar Jazz/Salsa/Morat/Festival/Rock con su fecha real.
+
 #### Riesgos activos (Fase 9)
 - El `git rm` de rock-al-parque.html y los 4 eventos nuevos requieren
   commit+deploy para verse en la URL publica.

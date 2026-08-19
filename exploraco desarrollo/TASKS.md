@@ -654,6 +654,43 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Sitemap incluye el slug. Smoke `scripts/smoke_test_salsa_al_parque.js`
   8/8 PASS + balance de divs.
 
+### TSK-062: Corregir agenda cultural (fecha de hoy + eventos nuevos ausentes)
+- **Estado:** COMPLETADA
+- **Detalle:** Bug reportado por el usuario: (1) los 5 eventos del motor se
+  mostraban en la agenda del home con la fecha de HOY en vez de la fecha real
+  del evento; (2) al abrir la agenda completa (agenda.html) los eventos
+  nuevos no aparecian. Causa raiz triple:
+  1. `api/destinos.js` devolvia `day`/`month` desde columnas `event_day`/
+     `event_month` que los seeds de evento no pueblan (solo escriben
+     `tags.fecha_inicio`), asi que `toAgendaEvent()` en index-api-connector.js
+     caia al fallback `new Date()` (hoy). Ademas el listado NO devolvia `tags`,
+     por lo que `fecha_inicio`/`sede`/`lineup` eran ilegibles para el front.
+  2. `agenda.html` fetcheaba `?cat=eventos` pero el `categoria_slug` real es
+     `evento` -> 0 filas, los eventos nuevos nunca se agregaban.
+  3. `agenda.html` hacia `AGENDA_EVENTS = AGENDA_EVENTS.concat(...)` pero
+     `AGENDA_EVENTS` es `const` -> `TypeError: Assignment to constant
+     variable`, atrapado por el `.catch` (nada se mostraba). Ademas leia
+     `d.precio_desde` (la API devuelve `price`).
+- **Correccion:** (1) `api/destinos.js` deriva `day`/`month` desde
+  `tags.fecha_inicio` ('YYYY-MM-DD') con fallback a las columnas legadas, y
+  ahora devuelve `tags` completos en el listado. (2) `index-api-connector.js`
+  `toAgendaEvent()` parsea `tags.fecha_inicio` con `new Date(y,m,d)` (sin TZ)
+  antes de caer al fallback. (3) `agenda.html` `loadApiEvents()` usa
+  `?cat=evento`, agrega con `Array.prototype.push.apply` (mutacion in-place,
+  respetando el `const`), lee `d.price`, y deduplica por nombre para evitar el
+  doble Rock al Parque (el hardcodeado tiene url 'index.html').
+- **Evidencia:** `node --check` limpio en api/destinos.js e
+  index-api-connector.js; script inline de agenda.html extraido y `node
+  --check` OK; ASCII-safety: api/destinos.js 0 bytes no-ASCII (los bytes
+  no-ASCII restantes en index-api-connector.js/agenda.html son preexistentes,
+  emojis en comentarios, no en lineas nuevas). Prueba unitaria de la logica
+  toPlace: 2026-08-14 -> 14 Ago, 2026-09-12 -> 12 Sep, 2026-11-28 -> 28 Nov,
+  2026-10-10 -> 10 Oct, sin fecha -> null null. Balance de divs de agenda.html
+  preexistente (62/63, identico a HEAD, no tocado). Antes del deploy:
+  GET /api/destinos?cat=evento confirmo `day`/`month`/`tags` vacios en los 5
+  eventos; tras deploy la API los puebla y agenda.html renderiza con la fecha
+  real de cada evento.
+
 ---
 
 ## Prioridad CRITICA - Fase de Paridad "Ciudad Perdida" y Refactorizacion Backend

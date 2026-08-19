@@ -93,14 +93,25 @@
   // Solo para lugares con cat='evento'
   function toAgendaEvent(item, idx) {
     var d = new Date();
+    var fechaInicio = item.tags && item.tags.fecha_inicio;
+    var startDate = null;
+    if (fechaInicio && typeof fechaInicio === 'string' && fechaInicio.length >= 10) {
+      startDate = new Date(
+        parseInt(fechaInicio.slice(0, 4), 10),
+        parseInt(fechaInicio.slice(5, 7), 10) - 1,
+        parseInt(fechaInicio.slice(8, 10), 10)
+      );
+    }
     return {
       id:       1000 + idx,
       name:     item.name || '',
       cat:      AGENDA_CAT_MAP[item.cat] || 'festival',
       city:     item.city || '',
-      day:      item.day   || d.getDate(),
-      month:    item.month || ['Ene','Feb','Mar','Abr','May','Jun',
-                               'Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()],
+      day:      startDate ? startDate.getDate() : (item.day   || d.getDate()),
+      month:    startDate ? ['Ene','Feb','Mar','Abr','May','Jun',
+                             'Jul','Ago','Sep','Oct','Nov','Dic'][startDate.getMonth()]
+                          : (item.month || ['Ene','Feb','Mar','Abr','May','Jun',
+                             'Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()]),
       time:     item.horario || 'Consultar',
       price:    item.price || 'Consultar',
       loc:      item.barrio
