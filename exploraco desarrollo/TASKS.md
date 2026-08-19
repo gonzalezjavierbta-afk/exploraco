@@ -687,9 +687,49 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   toPlace: 2026-08-14 -> 14 Ago, 2026-09-12 -> 12 Sep, 2026-11-28 -> 28 Nov,
   2026-10-10 -> 10 Oct, sin fecha -> null null. Balance de divs de agenda.html
   preexistente (62/63, identico a HEAD, no tocado). Antes del deploy:
-  GET /api/destinos?cat=evento confirmo `day`/`month`/`tags` vacios en los 5
-  eventos; tras deploy la API los puebla y agenda.html renderiza con la fecha
-  real de cada evento.
+   GET /api/destinos?cat=evento confirmo `day`/`month`/`tags` vacios en los 5
+   eventos; tras deploy la API los puebla y agenda.html renderiza con la fecha
+   real de cada evento.
+
+### TSK-063: 5 paginas dinamicas de comida en La Candelaria (centro de Bogota)
+- **Estado:** COMPLETADA
+- **Detalle:** Primera tanda de la categoria `comida` con el patron completo
+  seed + loader + smoke versionado (los 18 de comida previos en prod no
+  tenian seeds). Set curado de 5 lugares reales del centro historico, todos
+  con `categoria_slug='comida'`, `status='published'`, `destacado=true`:
+  1. `la-puerta-falsa-bogota` - Cafe La Puerta Falsa (Cl. 11 #6-50), desde
+     1816; tamal, chocolate santafere\u00f1o, ajiaco. 7 fotos de Wikimedia
+     reales del local (interior, mostrador, chocolate, ajiaco).
+  2. `el-gato-gris-bogota` - El Gato Gris (Cl. 12b #1A-12), bistro junto al
+     Chorro de Quevedo; tel 3229161227. 7 fotos (barrio + platos).
+  3. `origen-bistro-bogota` - Origen Bistro (Cra 4 #12c-88), cocina de autor
+     colombiana; casa colonial con patio; lunes cerrado. 7 fotos.
+  4. `la-fruteria-candelaria-bogota` - Cafeteria y Fruteria La Candelaria
+     (Cl. 12 #8-85), jugos y desayunos; tel 6013414124; domicilio Si con
+     plataformas. 6 fotos.
+  5. `la-casona-de-la-candelaria-bogota` - La Casona de la Candelaria
+     (Cra 6 #8-39), cocina criolla en casona colonial con patio. 6 fotos.
+  Nota: el candidato original "La Casona de la Abuela" se descarto porque
+  las fuentes lo ubican en Toberin/Usaquen (norte), no en el centro; se
+  reemplazo por La Casona de la Candelaria (centro).
+- **Archivos:** `scripts/seed-<slug>.js` (datos, upsert SQL idempotente,
+  modo `--dry`), `scripts/load-<slug>-api.js` (DELETE+POST a
+  /api/admin-destinos con Bearer), `scripts/smoke_test_<slug>.js`
+  (buildHTML del renderer). TAGS usan los campos comida que lee
+  `api/pagina-destino.js` (TASK-002): `tipo_comida`, `cocina`, `ambiente`,
+  `precio_promedio`, `terraza`, `reservas`, `domicilio`, `menu_destacado[]`
+  (con badge popular), `opciones_dieta[]`, `horario_detallado{}` (7 dias,
+  Origen Bistro con Lunes Cerrado) y `domicilio_plataformas[]`.
+- **Evidencia:** Escudo GOLD: `node --check` OK en los 15 archivos;
+  ASCII-safety 0 bytes no-ASCII en seeds/loaders/smokes; smokes 7/7 PASS por
+  lugar (5/5) con las secciones `perfil-comida`, `menu`, `horarios`,
+  `delivery` presentes y divs balanceados. Carga a prod: POST
+  /api/admin-destinos = OK (ids 024f2ae6-..., c4acaf97-...,
+  f88102ac-..., 9582d05c-..., 705e34b4-..., status published,
+  destacado true). Fotos verificadas HTTP 200 (BUG-022) con User-Agent.
+  GET /api/pagina-destino?slug=<cada slug> = 200 con las 4 secciones de
+  comida; URLs publicas .html = 200 (55-57KB); /api/destinos?cat=comida
+  paso de 18 a 23; sitemap incluye los 5 slugs.
 
 ---
 

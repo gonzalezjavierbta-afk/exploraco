@@ -117,12 +117,29 @@ el seed, no se muestra).
   28 Nov, 10 Oct, 12 Sep...) y tags.fecha_inicio para los 5 eventos;
   agenda.html debe listar Jazz/Salsa/Morat/Festival/Rock con su fecha real.
 
+#### 5 lugares de comida en La Candelaria (TSK-063, esta sesion)
+- Se crearon las primeras 5 paginas dinamicas de categoria `comida` con el
+  patron seed + loader + smoke versionado: la-puerta-falsa-bogota,
+  el-gato-gris-bogota, origen-bistro-bogota, la-fruteria-candelaria-bogota
+  y la-casona-de-la-candelaria-bogota. Todas `published` + `destacado` en
+  prod, TAGS comida completos (menu_destacado, horario_detallado,
+  opciones_dieta, domicilio), smokes 7/7 PASS c/u, divs balanceados,
+  fotos verificadas HTTP 200 (BUG-022).
+- La Casona de la Abuela se descarto (esta en Toberin/Usaquen, norte, no en
+  el centro); se reemplazo por La Casona de la Candelaria (Cra 6 #8-39).
+- **PENDIENTE de commit+push:** 15 archivos nuevos en scripts/ (5 seeds +
+  5 loaders + 5 smokes) + TASKS.md/TSK-063. Tras el deploy los slugs
+  ya estan en sitemap; solo falta el push para versionar el codigo.
+
 #### Riesgos activos (Fase 9)
 - El `git rm` de rock-al-parque.html y los 4 eventos nuevos requieren
   commit+deploy para verse en la URL publica.
 - Los eventos previos en Neon tienen tags vacios: si un slug con pagina
   estatica vieja se carga como dinamico, el estatico gana (Vercel) --
   revisar por evento antes de sembrar.
+- Los 18 lugares de comida previos a TSK-063 siguen sin seeds versionados
+  y con tags vacios en prod (barrio/lead vacios); si el usuario quiere
+  completarlos, replicar el patron de TSK-063 para ellos.
 
 ### Sesion anterior (Fase 8) - Sistema gaming: logros/trofeos (consola + Upland) + voto en blogs
 
