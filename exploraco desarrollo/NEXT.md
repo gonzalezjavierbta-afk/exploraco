@@ -4,6 +4,161 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Hostales top 10 de Bogota (2026-08-24) - 10 paginas dinamicas de hostal (TSK-069)
+
+Se crearon DIEZ paginas dinamicas con `categoria_slug='hostal'` para los
+mejores hostales de Bogota, replicando el patron Fase 9 (seed + loader +
+smoke versionado) y activando las secciones propias de hostal del motor
+(TASK-001/BUG-C): tabla de habitaciones con badges, pills Check-in/
+Check-out/Recepcion, reglas de casa con quick facts, actividades, como
+llegar con barrio_descripcion y eventos del hostal. El usuario aprobo la
+lista final (mix ic\u00f1icos de La Candelaria + top rating de Chapinero);
+todos `status='published'` + destacado editorial.
+
+**Los 10 slugs:** cranky-croc-hostel-bogota (9.7, +4.000 resenas), masaya-
+hostel-bogota (9.0, WhatsApp real 573106092782), botanico-hostel-bogota
+(9.2, jardin+rooftop+yoga), viajero-bogota-hostel-spa (9.5, spa propio),
+arche-noah-boutique-hostel-bogota (gestion alemana, sin booking/hw URL
+verificada -> omitidos), granada-hostel-bogota (8.9, coworking+billar),
+republica-cabin-beds-bogota (cabin beds blackout, adults-only),
+82hostel-bogota (economico con parking), vecinos-by-la-palmera-bogota (9.7,
+agenda semanal real en tags.eventos_hostal[]: Movie Night/Leyendas/
+Boardgames/Tejo/Salsa) y karuss-hostel-bogota (9.9 el mejor calificado,
+WhatsApp real 573057875998, desayuno incluido, pago solo efectivo).
+
+**Cambios (31 archivos nuevos en `scripts/`):**
+- 10 seeds (`seed-<slug>.js`): upsert SQL idempotente (`ON CONFLICT slug`),
+  modo `--dry`, TAGS hostal completos (`tipo_alojamiento`, `checkin`,
+  `checkout`, `recepcion`, `edad_minima`, `mascotas`, `cocina_compartida`,
+  `barrio_descripcion`, `politica_cancelacion`, `reglas_casa`,
+  `habitaciones[]` con badge popular/female/premium, `amenidades[]`,
+  `actividades[]`, `que_incluye[]`, `transporte[]`, `eventos_hostal[]`).
+- **`scripts/_gen_hostales_pipeline.js` (nuevo):** generador que produce los
+  10 loaders + 10 smokes desde plantillas (evita copiar/pegar x20). Si se
+  agregan mas hostales, editar su array HOSTELS y re-ejecutar.
+- 10 loaders (`load-<slug>-api.js`): DELETE previo + POST a
+  `/api/admin-destinos`; extienden el payload Morat enviando TAMBIEN
+  top-level `checkin`, `checkout`, `habitaciones`, `amenidades`,
+  `booking_url`, `hostelworld_url` y `airbnb_url:''` (admin-destinos los
+  escribe en destinos_detalles; el motor los lee de det.*, ver hallazgo).
+- 10 smokes (`smoke_test_<slug>.js`): buildHTML en sandbox vm (fake_neon.js)
+  pasando `det` explicito; checks genericos derivados del seed.
+
+**Hallazgo tecnico nuevo (importante para futuros smokes hostal):** el
+fallback det->tags de `api/pagina-destino.js` (~L1854) vive en el wrapper
+de produccion, NO dentro de buildHTML(). Llamar
+`buildHTML(d, {}, [], [])` deja SIN renderizar la tabla de habitaciones,
+las amenidades y las pills Check-in (se leen de det.*). Los smokes deben
+construir `det = { habitaciones, amenidades, checkin, checkout, ... }`
+desde el seed. En prod no hay riesgo porque admin-destinos persiste esos
+campos top-level en destinos_detalles.
+
+**Fotos:** 5 por hostal (hero + 4 galeria), todas reutilizadas del pool de
+URLs Wikimedia Commons ya validadas en prod; captions honestas de barrio/
+contexto (nunca interiores no verificados del hostel).
+
+**Verificacion (Escudo GOLD):** `node --check` OK en los 31; ASCII-safety
+0 bytes no-ASCII en los 31; smokes PASS x10 (11 checks en Vecinos por
+eventos) con divs balanceados cada uno. Carga a prod: 10 POST
+`/api/admin-destinos` OK (ids d44f0c11-, 0baa3fc5-, 344033a1-, 9891169d-,
+8e4fe851-, bf88a8dc-, 63e850ef-, a9877c17-, 8052f1b9-, 2e1aaf93-) todos
+published. Las 10 URLs `.html` = 200 en prod (59-62KB) con secciones
+`habitaciones` + pill Check-in + `reglas-casa` + `actividades` +
+`como-llegar`; Vecinos renderiza `eventos-hostal`; links wa.me solo en
+Masaya/Karuss; booking/hostelworld donde verificados. Falso negativo
+documentado: 'Heroes' aparece entity-encoded (`H&#233;roes`) por esc().
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** 31 archivos nuevos en `scripts/` +
+   TASKS.md/TSK-069 + NEXT.md (este segmento). Los slugs ya estan vivos en
+   prod y sitemap; el push solo versiona el codigo.
+2. Si se quieren mas hostales (backups investigados: Sue Candelaria 8.6,
+   El Yarumo 10.0, Spotty, Kuyay Ayllu 9.7), agregarlos al array HOSTELS de
+   `_gen_hostales_pipeline.js`, crear el seed a mano y re-ejecutar.
+3. Verificar que las 10 paginas aparecen listadas en /api/destinos?cat=hostal
+   y en la UI (index.html Inspirate filtro Hostales) tras el deploy.
+4. Backlog vigente: completar tags vacios legacy (~18 eventos/comidas y los
+   18 hostales previos sin seeds versionados) y pendientes de sesiones
+   anteriores (commit Ruta Salsera, TSK-068, TASK-013, etc.).
+
+### Sesion Eventos semana 24-30 ago 2026 (2026-08-24) - 5 paginas dinamicas de evento (TSK-068)
+
+Se crearon CINCO paginas dinamicas con `categoria_slug='evento'` para la
+semana del 24 al 30 de agosto de 2026, replicando el patron Fase 9 (seed +
+loader + smoke versionado). El usuario entrego la lista candidata, se
+investigo cada evento (fechas, sedes, coordenadas, precios, horarios,
+lineups, edad minima, ticketeras) y aprobo publicar los 5 tal cual, todos
+`status='published'` + `destacado=true`.
+
+**Los 5 slugs y datos clave:**
+- `maroon-5-bogota`: Maroon 5 Love Is Like Tour, jue 27 ago, Coliseo MedPlus
+  (Calle 80 km 1.5 via Cota), puertas 4 pm / show 9 pm, minima 14 anos,
+  TaquillaLive (organiza Paramo); Etapa 1 $294.000-$671.000 total por
+  localidad (Etapa 2 +$60.000); reprogramado desde 25 abr.
+- `la-vida-es-hoy-bogota`: Camilo Cifuentes + Miguel Buitrago (Media Vida),
+  jue 27 ago 7 pm, Universidad EAN Legacy (Cra 11 #78-47, Chapinero),
+  boletaenlinea.co; reprogramado desde julio.
+- `tardeando-el-centro-bogota`: FUGA ultimo viernes del mes, vie 28 ago
+  1 pm a medianoche, centro historico/La Candelaria, mayoria de actividades
+  gratis; lineup vacio (el renderer omite la seccion).
+- `las-bartenders-el-musical-bogota`: cabaret cocteleria en vivo +
+  acrobacias + musica, 120 min, 18+, Casa E Borrero Sala Arlequin (Park Way),
+  jue-sab 8 pm hasta sab 29 ago (fecha_inicio 27 / fecha_fin 29), desde
+  $86.000 (Dinaticket/Atr\u00e1palo).
+- `juanpis-live-show-bogota`: The Juanpis Live Show benefico AGOTADO por el
+  Choc\u00f3 (terremoto M7.4 del 10 ago, 100% del recaudo a Fundaci\u00f3n PLAN
+  via Tuboleta), sab 29 ago puertas 2 pm / show 4-11 pm, Movistar Arena, 18+,
+  PULEP PQB187; zonas de donacion $130k-$330k con disponibilidad 'Agotado'
+  (badge tip-red); lineup 13 artistas (Feid, Carlos Vives, Kapo, Manuel
+  Turizo, ChocQuibTown, Monsieur Perin\u00e9...).
+
+**Cambios (15 archivos nuevos en `scripts/`):**
+- 5 seeds (`seed-<slug>.js`): upsert SQL idempotente (`ON CONFLICT slug`),
+  modo `--dry`, TAGS evento completos segun TASK-003 (`fecha_inicio`,
+  `fecha_fin`, `edicion`, `sede`, `organiza`, `lema`, `lineup[]`, `agenda[]`,
+  `categorias_entrada[]`, `que_llevar[]`, `prohibido[]`; Juanpis agrega
+  `pulep`). Disponibilidad usa exactamente 'Disponible'/'Pocas'/'Agotado'
+  (lookup exacto en `DISPONIBILIDAD_CLASS_EVENTO` de pagina-destino.js).
+- 5 loaders (`load-<slug>-api.js`): DELETE previo + POST a
+  `/api/admin-destinos` con Bearer exploraco12345 (default URL
+  https://exploraco.vercel.app).
+- 5 smokes (`smoke_test_<slug>.js`): buildHTML en sandbox vm (fake_neon.js),
+  8 checks cada uno + balance de divs.
+
+**Hallazgo tecnico nuevo:** `esc()` de `api/pagina-destino.js` codifica los
+acentos como entidades numericas (`\u00ed` -> `&#237;`), asi que un
+`html.includes('m\u00fasica')` falla aunque el texto este renderizado. Los 5
+smokes traen helper `inc()` que compara tambien la version entity-encoded:
+`html.includes(enc(s)) || html.includes(s)`. Aplica a CUALQUIER smoke futuro
+que verifique strings con tildes.
+
+**Fotos:** 5 por evento (hero + 4 galeria). Se reutilizaron URLs Unsplash ya
+validadas en prod (Morat/Rock/Festivales al Parque) y se agregaron 4 nuevas
+de cocteleria verificadas HEAD 200 antes de sembrar (patron BUG-022).
+
+**Verificacion (Escudo GOLD):** `node --check` OK en los 15; ASCII-safety
+0 bytes no-ASCII en los 15 (conversor temporal reemplaza cada code unit >127
+por `\uXXXX`); smokes PASS x5 con divs balanceados (178/178, 146/146,
+137/137, 133/133, 216/216). Prod: 5 POST `/api/admin-destinos` OK (ids
+54a64de1-, 8276c138-, 3a35f099-, 3481dca9-, d1a918d5-) todos published +
+destacado; las 5 URLs `.html` = 200 (55-60KB) con seccion `evento-fechas`;
+`/api/destinos?cat=evento` paso de 22 a 27 con day/month derivados de
+`tags.fecha_inicio` (27/27/28/27/29 Ago); sitemap.xml incluye los 5 slugs;
+contenido clave verificado (Feid + Agotado + tip-red en Juanpis; $671.000 +
+Coliseo MedPlus en Maroon 5). Ningun slug colisiono con HTML estatico en la
+raiz.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** 15 archivos nuevos en `scripts/` +
+   TASKS.md/TSK-068 + NEXT.md (este segmento). Los slugs ya estan vivos en
+   prod y sitemap; el push solo versiona el codigo.
+2. Si se quieren mas eventos, replicar este patron (los datos investigados
+   de esta semana quedaron documentados en TSK-068). OJO con el riesgo
+   conocido: si un slug tiene pagina estatica vieja en la raiz, el estatico
+   gana sobre el rewrite de Vercel (requiere `git rm` primero).
+3. Backlog vigente: completar tags vacios legacy (~18 eventos/comidas) y
+   pendientes de sesiones anteriores (commit Ruta Salsera, TASK-013, etc.).
+
 ### Sesion Ruta Salsera (2026-08-19) - 7 bares de salsa + guia de blog (TSK-066/067)
 
 Se crearon **7 paginas dinamicas de categoria `sitio` (tipos_actividad='Salsa bar')** + **1 post de blog guia** (`categoria_slug='blog'`, multi-tema `temas:['cultura','noche','gastro','musica']`), siguiendo el patron seed+loader establecido (ej. TSK-052 Quiebracanto, TSK-047 bogota-gastronomia-guia).

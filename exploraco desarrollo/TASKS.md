@@ -1068,6 +1068,153 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Dependencia:** TSK-066
 - **Detalle tecnico:** Actualizacion de TASKS.md (TSK-066, TSK-067), NEXT.md (segmento de sesion Ruta Salsera), DECISIONS.md (si aplica), BUGS_HISTORICOS.md (rate limits Wikimedia en HEADs, no bloqueantes). No nuevos ADRs.
 
+### TSK-068: 5 eventos de la semana 24-30 ago 2026 en produccion
+- **Prioridad:** ALTA
+- **Responsable:** Lead Developer + renderer-dev + qa-auditor
+- **Estado:** COMPLETADA (2026-08-24)
+- **Dependencia:** TASK-003 (tags evento), patron seed+loader+smoke de Fase 9 (TSK-057..061, TSK-063)
+- **Sprint:** Sprint actual (contenido nuevo)
+- **Detalle tecnico:** Se crearon 5 paginas dinamicas con `categoria_slug='evento'`
+  para la semana del 24 al 30 de agosto de 2026. El usuario entrego la lista
+  candidata, se investigo cada evento (fechas, sedes, coordenadas, precios,
+  horarios, lineups, edad minima, ticketeras) y aprobo publicarlos tal cual,
+  todos `status='published'` + `destacado=true`:
+  1. `maroon-5-bogota` - Maroon 5 "Love Is Like Tour", jue 27 ago, Coliseo
+     MedPlus (Calle 80 km 1.5 via Cota, coords 4.7381,-74.1320), puertas 4 pm
+     show 9 pm, edad minima 14, ticketera TaquillaLive, organiza Paramo;
+     precios Etapa 1 $294.000-$671.000 (Etapa 2 suma $60.000 por localidad);
+     fecha reprogramada desde el 25 de abril.
+  2. `la-vida-es-hoy-bogota` - Camilo Cifuentes + Miguel Buitrago (Media Vida),
+     jue 27 ago 7:00 pm, Universidad EAN campus Legacy (Cra 11 #78-47,
+     Chapinero, coords 4.6628,-74.0558), boletaenlinea.co; reprogramado desde
+     julio.
+  3. `tardeando-el-centro-bogota` - jornada cultural "ultimo viernes" de la
+     FUGA con aliados (I Love La Candelaria, AsoSanDiego, Asobares, Visit
+     Centro Internacional), vie 28 ago 1:00 pm a medianoche, centro historico /
+     La Candelaria (ancla Plaza de Bolivar 4.5981,-74.0758), mayoria gratis.
+     Lineup vacio (no aplica); smoke valida que la seccion lineup NO renderice.
+  4. `las-bartenders-el-musical-bogota` - cabaret de cocteleria en vivo +
+     acrobacias + musica, 120 min, solo 18+, Casa E Borrero Sala Arlequin
+     (Cra 24 #41-69, Park Way, coords 4.63287,-74.07520), funciones jue/vie/sab
+     8:00 pm, temporada hasta sab 29 ago (fecha_inicio 27 / fecha_fin 29),
+     desde $86.000 (Dinaticket/Atr\u00e1palo, rating 9.8).
+  5. `juanpis-live-show-bogota` - The Juanpis Live Show "Si Nos Organizamos
+     Cabemos Todos", concierto benefico AGOTADO por el Choc\u00f3 (terremoto
+     M7.4 del 10 de ago, 100% del recaudo a la Fundaci\u00f3n PLAN via
+     Tuboleta), sab 29 ago puertas 2 pm show 4-11 pm, Movistar Arena (coords
+     4.6652,-74.0839), 18+, PULEP PQB187, zonas de donaci\u00f3n Azul/Roja/
+     Plata/Dorada ($130k/$230k/$290k/$330k, todas disponibilidad 'Agotado' ->
+     badge tip-red), lineup 13 artistas (Juanpis Gonz\u00e1lez anfitri\u00f3n +
+     Feid, Carlos Vives, Kapo, Manuel Turizo, Mike Bah\u00eda, Santiago Cruz,
+     Luis Alfonso, Nidia G\u00f3ngora, ChocQuibTown, Piso 21, Manuel Medrano,
+     Monsieur Perin\u00e9); organiza Ria\u00f1o Producciones + BeatHub
+     Entertainment.
+- **Archivos creados (15):** `scripts/seed-<slug>.js` x5 (upsert SQL idempotente
+  ON CONFLICT slug, modo `--dry`, TAGS evento completos segun TASK-003:
+  `fecha_inicio`, `fecha_fin`, `edicion`, `sede`, `organiza`, `lema`,
+  `lineup[]`, `agenda[]`, `categorias_entrada[]`, `que_llevar[]`,
+  `prohibido[]` (+ `pulep` en Juanpis)), `scripts/load-<slug>-api.js` x5
+  (DELETE+POST a `/api/admin-destinos`, Bearer exploraco12345),
+  `scripts/smoke_test_<slug>.js` x5 (buildHTML en sandbox vm con fake_neon.js).
+- **Hallazgo tecnico nuevo:** `esc()` de `api/pagina-destino.js` codifica
+  acentos como entidades numericas (`\u00ed` -> `&#237;`), por lo que los
+  `includes()` de los smokes fallan con strings con tildes. Los 5 smokes
+  incluyen helper `inc()` que compara tambien la version entity-encoded
+  (`html.includes(enc(s)) || html.includes(s)`).
+- **Fotos:** 5 por evento (hero + 4 galeria). Se reutilizaron URLs Unsplash ya
+  validadas en prod (Morat/Rock/Festivales) + 4 nuevas de cocteleria
+  verificadas HEAD 200 antes de sembrar (patron BUG-022).
+- **Verificacion (Escudo GOLD):** `node --check` OK en los 15 archivos;
+  ASCII-safety 0 bytes no-ASCII en los 15; smokes 8 checks PASS cada uno +
+  divs balanceados (178/178, 146/146, 137/137, 133/133, 216/216). Carga a
+  prod: 5 POST `/api/admin-destinos` OK (ids 54a64de1-..., 8276c138-...,
+  3a35f099-..., 3481dca9-..., d1a918d5-...) todos published + destacado.
+- **Evidencia fisica de exito:** las 5 URLs `.html` = 200 en prod (55-60KB)
+  con seccion `evento-fechas`; `/api/destinos?cat=evento` paso de 22 a 27 con
+  day/month correctos derivados de `tags.fecha_inicio` (27/27/28/27/29 Ago);
+  sitemap.xml incluye los 5 slugs; contenido clave verificado en prod
+  (Feid + Agotado + tip-red en Juanpis; $671.000 + Coliseo MedPlus en Maroon 5).
+
+### TSK-069: 10 hostales top de Bogota en produccion
+- **Prioridad:** ALTA
+- **Responsable:** Lead Developer + renderer-dev + qa-auditor
+- **Estado:** COMPLETADA (2026-08-24)
+- **Dependencia:** Patron seed+loader+smoke de Fase 9 (TSK-057..061, TSK-063, TSK-068); secciones hostal del motor (TASK-001, BUG-C)
+- **Sprint:** Sprint actual (contenido nuevo)
+- **Detalle tecnico:** Se crearon 10 paginas dinamicas con `categoria_slug='hostal'`
+  para los mejores hostales de Bogota (mix ic\u00f1icos de La Candelaria + top
+  rating de Chapinero). El usuario aprobo la lista final; todos
+  `status='published'` + destacado editorial:
+  1. `cranky-croc-hostel-bogota` - The Cranky Croc Hostel, La Candelaria,
+     9.7/10 con casi 4.000 resenas en Hostelworld (el mejor valorado en
+     volumen), casa colonial colorida con patio/terraza/restaurante, dorms
+     desde $92.000. Booking + Hostelworld verificados.
+  2. `masaya-hostel-bogota` - Masaya Bogota, Cra 2 #12-48, 9.0/10 (+2.500),
+     casa colonial a 50 m del Chorro de Quevedo, free walking tour, bar y
+     terraza, desayuno incluido, solo adultos 18+, mascotas con costo.
+     WhatsApp real (573106092782) -> botones Reservar por habitacion.
+  3. `botanico-hostel-bogota` - Botanico Hostel, Cra 2 #9-87, 9.2/10
+     (+2.300), jardin tropical + rooftop, yoga diaria, desayuno incluido,
+     recepcion 24h sin toque de queda, dorms desde $35.000.
+  4. `viajero-bogota-hostel-spa` - Viajero Bogota Hostel & Spa, Las Nieves,
+     9.5/10 (+1.300), unico del centro con spa propio (sauna/turco/
+     hidromasaje gratis en privadas), restaurante La Nevera, eventos Linkup.
+  5. `arche-noah-boutique-hostel-bogota` - Arche Noah Boutique Hostel,
+     Cl 12F #2-09, gestion alemana, patio-jardin con cafeteria, desde $38.000;
+     sin URLs de reserva verificadas -> se omiten booking_url/hostelworld_url.
+  6. `granada-hostel-bogota` - Granada Hostel, Cl 11 #2-65/75, 8.9/10
+     (+1.500), casona s. XX con coworking/billar/terraza solarium, agua
+     caliente 24/7 alta presion, lockers gratis, recepcion 24h, minima 16.
+  7. `republica-cabin-beds-bogota` - Republica Bogota Cabin Beds, Quinta
+     Camacho (Chapinero), cabin beds con cortina blackout + luz propia +
+     enchufe, adults-only, karaoke, entre Parque 93 y Zona T.
+  8. `82hostel-bogota` - 82Hostel, Cra 19 #80-14 (Chico), economico con
+     sala de juegos, cocina integrada, aparcamiento propio (raro en Bogota),
+     acepta mascotas y familias.
+  9. `vecinos-by-la-palmera-bogota` - Vecinos by La Palmera, Cl 70 #11a-18,
+     9.7/10 (staff 9.9/limpieza 9.9), desayuno+lockers gratis, coworking y
+     agenda semanal REAL renderizada como `tags.eventos_hostal[]` (Movie
+     Night, Noche de Leyendas, Boardgames Night, Tejo Night, Salsa Class).
+  10. `karuss-hostel-bogota` - Karuss Hostel (ex Bakano), Cl 12F #2-86,
+      9.9/10: el mejor calificado de Bogota; hosts Luis y Leidy, casa nueva
+      con chimenea, desayuno incluido, pago solo efectivo. WhatsApp real
+      (573057875998).
+  Descartados en investigacion: Selina/Socialtel (cadena quebro), La Playa
+  (8.0, Teusaquillo), Fatima (3.8 TripAdvisor).
+- **Archivos creados (31):** `scripts/seed-<slug>.js` x10 (upsert SQL
+  idempotente, modo `--dry`, TAGS hostal completos: `tipo_alojamiento`,
+  `checkin`, `checkout`, `recepcion`, `edad_minima`, `mascotas`,
+  `cocina_compartida`, `barrio_descripcion`, `politica_cancelacion`,
+  `reglas_casa`, `habitaciones[]` con badges popular/female/premium,
+  `amenidades[]`, `actividades[]`, `que_incluye[]`, `transporte[]`,
+  `eventos_hostal[]`), `scripts/load-<slug>-api.js` x10 (DELETE+POST a
+  `/api/admin-destinos` enviando TAMBIEN top-level `checkin`, `checkout`,
+  `habitaciones`, `amenidades`, `booking_url`, `hostelworld_url`,
+  `airbnb_url` porque admin-destinos los escribe en destinos_detalles y el
+  motor los lee de det.*, no de tags), `scripts/smoke_test_<slug>.js` x10
+  (buildHTML en sandbox vm pasando `det` explicito) y
+  `scripts/_gen_hostales_pipeline.js` (generador que produce loaders+smokes
+  desde plantilla para evitar copiar/pegar x20).
+- **Hallazgo tecnico:** el fallback det->tags de pagina-destino.js (~L1854)
+  vive en el wrapper prod, NO dentro de buildHTML(); los smokes deben pasar
+  `det={habitaciones,amenidades,checkin,checkout,...}` como segundo arg o la
+  tabla de habitaciones y las pills Check-in no renderizan. Los precios
+  string tipo '$92.000' pasan por money() que los normaliza.
+- **Fotos:** 5 por hostal (hero + 4 galeria), todas reutilizando URLs de
+  Wikimedia Commons ya validadas en prod (pool de seeds existentes); captions
+  honestas de barrio/contexto (nunca interiores no verificados del hostel).
+- **Verificacion (Escudo GOLD):** `node --check` OK en los 31 archivos;
+  ASCII-safety 0 bytes no-ASCII en los 31 (conversor temporal); smokes PASS
+  x10 (11 checks en Vecinos por eventos) + divs balanceados cada uno. Carga
+  a prod: 10 POST `/api/admin-destinos` OK (ids d44f0c11-, 0baa3fc5-,
+  344033a1-, 9891169d-, 8e4fe851-, bf88a8dc-, 63e850ef-, a9877c17-,
+  8052f1b9-, 2e1aaf93-) todos published.
+- **Evidencia fisica de exito:** las 10 URLs `.html` = 200 en prod
+  (59-62KB) con secciones `habitaciones`, pill Check-in/Check-out,
+  `reglas-casa`, `actividades`, `como-llegar`; Vecinos muestra
+  `eventos-hostal` con su agenda semanal; WhatsApp links presentes en
+  Masaya/Karuss; booking/hostelworld links presentes donde verificados.
+
 ### TASK-009: Integracion de pagos Wompi/PSE para planes destacados
 - **Prioridad:** BAJA
 - **Responsable:** Lead Developer[cite: 1]
