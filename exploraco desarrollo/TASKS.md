@@ -1215,6 +1215,68 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   `eventos-hostal` con su agenda semanal; WhatsApp links presentes en
   Masaya/Karuss; booking/hostelworld links presentes donde verificados.
 
+### TSK-070: Fix Mi Mapa personal - guardados invisibles al iniciar y lista duplicada
+- **Prioridad:** ALTA
+- **Responsable:** Lead Developer
+- **Estado:** COMPLETADA (2026-08-24, codigo verificado localmente; commit pendiente)
+- **Dependencia:** Ninguna (bug de frontend en index.html + index-api-connector.js)
+- **Detalle tecnico:** El usuario reporto dos bugs en la seccion Mi Viaje/
+  Mi mapa personal de index.html:
+  1. *No muestra los sitios guardados al iniciar* - causa raiz triple:
+     (a) el primer `renderMyMap()` corria ANTES de cargar `mm_saved`/
+     `mm_visited` del localStorage (la carga vivia ~30 lineas mas abajo,
+     en LOAD SOCIAL STATE);
+     (b) `index-api-connector.js` poblaba `MAPA_PLACES` de forma asincrona
+     pero su `applyData()` nunca llamaba `renderMyMap()` (riesgo ya anotado
+     en NEXT.md), asi que la seccion quedaba congelada en el estado vacio
+     del primer render hasta que el usuario interactuara;
+     (c) los guardados en Neon nunca se hidrataban al arrancar:
+     `ExploraCO.cargarMiMapa()` existia en usuario-session.js (GET
+     `/api/interacciones?tipo=mapa`, devuelve array de UUIDs activos) y
+     nadie la llamaba nunca.
+  2. *Lista duplicada* - `renderMMList()` solo hacia `cont.innerHTML=''`
+     en el camino vacio; con resultados, cada re-render (filtros, tabs,
+     renderMyMap) acumulaba `appendChild` sobre las filas previas.
+  **Fixes aplicados:**
+  - (A) `cont.innerHTML = ''` SIEMPRE antes del forEach en
+    `renderMMList()` (index.html ~L3650).
+  - (B) Carga de `mm_saved`/`mm_visited` movida al bloque INIT antes del
+    primer `renderMyMap()` (index.html ~L2878) + nueva linea al final de
+    `applyData()` en index-api-connector.js:
+    `if (typeof renderMyMap === 'function') renderMyMap();` - con (A) es
+    idempotente y repinta Mi Mapa cuando `MAPA_PLACES` ya tiene datos.
+  - (C) Nueva `_hidratarGuardadosDB()` en index.html (junto a `_uuidDeId`,
+    ~L4177): si hay sesion y datos cargados, trae los UUID activos via
+    `cargarMiMapa()`, los mapea a ids posicionales buscando `p._uuid` en
+    `MAPA_PLACES`/`PL` (convenio inverso de `_uuidDeId`), une los faltantes
+    a `mmSaved`, persiste en localStorage y re-renderiza. Idempotente via
+    flag `_mmHidratado`; si no hay sesion o `MAPA_PLACES` esta vacio sale
+    SIN marcar el flag (reintento natural en el proximo render). No toca
+    `mmVisited` (el endpoint solo devuelve guardados). Disparadores: el
+    wrapper existente de `renderMyMap` (~L3790, que a su vez ahora lo
+    invoca el conector tras poblar datos) y `window.onExploraCOUpdate`
+    (cubre login sin reload).
+- **Archivos modificados (2):** `index.html` (+75/-4),
+  `index-api-connector.js` (+7).
+- **Verificacion:** `node --check` OK en index-api-connector.js y en el
+  bloque `<script>` inline unico de index.html extraido a temp; smoke de
+  hidratacion con Node vm extrayendo la funcion real del HTML: 4/4 PASS
+  (merge con dedupe por id posicional, sin sesion no marca flag,
+  MAPA_PLACES vacio reintenta, DB vacia marca flag sin persistir ni
+  renderizar); revision integral del diff git.
+- **Evidencia fisica de exito:** guardar un lugar y recargar index.html
+  muestra pin/contador/lista sin requerir interaccion; alternar tabs y
+  filtros de la lista repetidas veces no duplica filas; usuario logueado
+  con guardados en Neon y localStorage vacio ve sus guardados al cargar la
+  pagina.
+- **Riesgo conocido dejado explicito:** `mm_saved` sigue usando ids
+  posicionales (`idx+1`) que dependen del ORDER BY del API entre sesiones
+  (riesgo MM_PINS ya anotado); la hidratacion mapea por UUID en el momento
+  correcto, pero el fix estructural (guardar slugs/UUIDs) queda como
+  backlog. Ademas `clearMyMap()` borra solo local: con sesion activa los
+  guardados de BD reviven al recargar (candidato: llamar `quitarGuardado`
+  por UUID desde clearMyMap).
+
 ### TASK-009: Integracion de pagos Wompi/PSE para planes destacados
 - **Prioridad:** BAJA
 - **Responsable:** Lead Developer[cite: 1]

@@ -289,6 +289,13 @@
     } else if (typeof initMapaSection === 'function') {
       initMapaSection();
     }
+    // Mi Mapa personal: MAPA_PLACES acaba de poblarse/cambiarse, pero
+    // este ciclo nunca lo repintaba -- quedaba congelado en el estado
+    // vacio del primer render (riesgo conocido en NEXT.md, BUG TSK-070:
+    // "al iniciar no muestra los sitios guardados"). renderMMList limpia
+    // su contenedor antes de pintar, asi que repetir la llamada no
+    // duplica items.
+    if (typeof renderMyMap === 'function') renderMyMap();
   }
 
   function loadAndRender() {

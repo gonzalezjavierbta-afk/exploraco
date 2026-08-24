@@ -2875,6 +2875,12 @@ resetTimer();
 renderDest();
 buildCalStrip();
 renderAgenda('all');
+/* BUG TSK-070: mmSaved/mmVisited se cargaban del localStorage MAS ABAJO
+   (bloque LOAD SOCIAL STATE), despues de este primer renderMyMap(), asi
+   que el arranque siempre pintaba "0 guardados" aunque hubiera datos.
+   Cargarlos ANTES del primer render. */
+try { mmSaved   = JSON.parse(localStorage.getItem('mm_saved')   || '[]'); } catch(e){}
+try { mmVisited = JSON.parse(localStorage.getItem('mm_visited') || '[]'); } catch(e){}
 renderMyMap();
 cargarInspirate();
 /* ════════════════════════════════════════════════════
@@ -2902,8 +2908,8 @@ try { socialUser     = JSON.parse(localStorage.getItem('soc_user')      || '{}')
 try { socialFollowing= JSON.parse(localStorage.getItem('soc_following') || '[]'); } catch(e){}
 try { socialPosts    = JSON.parse(localStorage.getItem('soc_posts')     || '[]'); } catch(e){}
 try { socialConnected= JSON.parse(localStorage.getItem('soc_connected') || '[]'); } catch(e){}
-try { mmSaved        = JSON.parse(localStorage.getItem('mm_saved')      || '[]'); } catch(e){}
-try { mmVisited      = JSON.parse(localStorage.getItem('mm_visited')    || '[]'); } catch(e){}
+/* mm_saved / mm_visited se cargan arriba, en el bloque INIT, antes del
+   primer renderMyMap() (BUG TSK-070). */
 
 /* ── MOCK DATA ── */
 var MOCK_USERS = [
@@ -3641,6 +3647,12 @@ function renderMMList() {
   }
   if(empty) empty.style.display = 'none';
 
+  /* BUG TSK-070: antes solo se limpia el contenedor en el camino vacio,
+     asi que cada re-render (filtros, tabs, renderMyMap) volvia a hacer
+     appendChild sobre las filas existentes y la lista crecia con
+     duplicados. Limpiar SIEMPRE antes de pintar. */
+  cont.innerHTML = '';
+
   filtered.forEach(function(p) {
     var isSaved   = mmSaved.indexOf(p.id)   !== -1;
     var isVisited = mmVisited.indexOf(p.id) !== -1;
@@ -3775,13 +3787,19 @@ function updateMMEmptyState() {
   es.classList.toggle('hidden', hasItems);
 }
 
-/* ── Patch renderMyMap to also update empty state ── */
+/* ── Patch renderMyMap to also update empty state ──
+   Tambien dispara _hidratarGuardadosDB() (definida mas abajo, junto a
+   _uuidDeId): como index-api-connector.js ahora llama renderMyMap()
+   cuando MAPA_PLACES ya tiene datos, este wrapper es el punto natural
+   donde la hidratacion desde Neon encuentra todo listo para mapear
+   UUIDs -> ids posicionales. Es idempotente (flag interno). */
 var _origRenderMyMap = renderMyMap;
 renderMyMap = function() {
   _origRenderMyMap();
   updateMMEmptyState();
   var lc = document.querySelector('#mm-tab-lista span');
   if(lc) lc.textContent = mmSaved.length || '';
+  try{ _hidratarGuardadosDB(); }catch(e){}
 };
 
 /* ── Load shared mapa from URL params ── */
@@ -4156,6 +4174,54 @@ function _uuidDeId(id) {
   return null;
 }
 
+var _mmHidratado = false;
+/* ── Hidratar guardados desde Neon (usuarios con sesion) ──
+   Al iniciar, mmSaved solo contiene lo que vive en el localStorage de
+   este navegador. Si el usuario guardo lugares desde otro dispositivo
+   (o limpio su almacenamiento), esos guardados existen en la tabla
+   interacciones pero nunca se muestran: ExploraCO.cargarMiMapa()
+   existia en usuario-session.js y nadie la llamaba. Esta rutina trae
+   los UUID activos, los mapea a ids posicionales via el campo _uuid de
+   MAPA_PLACES/PL (mismo convenio de _uuidDeId, en sentido inverso) y
+   los une a mmSaved. Idempotente via flag; se dispara desde el wrapper
+   de renderMyMap y desde onExploraCOUpdate (login sin reload). No toca
+   mmVisited: el endpoint tipo=mapa solo devuelve guardados. Si no hay
+   sesion o MAPA_PLACES todavia esta vacio, sale sin marcar el flag para
+   reintentar en el proximo render. */
+function _hidratarGuardadosDB() {
+  if(_mmHidratado) return;
+  var usuario = window.ExploraCO && window.ExploraCO.usuario;
+  if(!usuario || !usuario.id) return;
+  if(typeof window.ExploraCO.cargarMiMapa !== 'function') return;
+  var fuentes = [
+    typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : null,
+    typeof PL !== 'undefined' ? PL : null,
+  ].filter(Boolean);
+  var hayDatos = fuentes.some(function(f){ return f.length > 0; });
+  if(!hayDatos) return;
+  _mmHidratado = true;
+  Promise.resolve(window.ExploraCO.cargarMiMapa()).then(function(uuids){
+    if(!uuids || !uuids.length) return;
+    var nuevos = 0;
+    uuids.forEach(function(u){
+      for(var i = 0; i < fuentes.length; i++) {
+        var hit = fuentes[i].find(function(p){ return p._uuid === u; });
+        if(hit && mmSaved.indexOf(hit.id) === -1) {
+          mmSaved.push(hit.id);
+          nuevos++;
+          break;
+        }
+      }
+    });
+    if(nuevos > 0) {
+      try{ localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); }catch(e){}
+      renderMyMap();
+    }
+  }).catch(function(e){
+    console.warn('[mi-mapa] hidratacion DB fallo:', e && e.message);
+  });
+}
+
 var _origToggleDestSave = typeof toggleDestSave !== 'undefined' ? toggleDestSave : null;
 function toggleDestSave(id, btn) {
   var wasNew = mmSaved.indexOf(id) === -1;
@@ -4216,7 +4282,14 @@ if(_origSaveProfile) {
    <script src> al final del body, despues de este bloque: sin el
    hook, updatePointsUI() podria ejecutarse antes de que la sesion
    real termine de cargar. */
-window.onExploraCOUpdate = function(){ try{ updatePointsUI(); }catch(e){} };
+window.onExploraCOUpdate = function(){
+  try{ updatePointsUI(); }catch(e){}
+  /* TSK-070: cubre el caso de login sin reload (y el arranque con
+     sesion ya lista antes de que MAPA_PLACES se llene -- ahi la
+     funcion sale sin marcar su flag y reintenta en el proximo
+     renderMyMap). */
+  try{ _hidratarGuardadosDB(); }catch(e){}
+};
 
 /* ── INIT POINTS ON PAGE LOAD ── */
 (function initPoints() {

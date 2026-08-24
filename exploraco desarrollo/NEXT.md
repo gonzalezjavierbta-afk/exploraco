@@ -4,6 +4,63 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Fix Mi Mapa personal (2026-08-24) - arranque sin guardados + duplicados (TSK-070)
+
+El usuario reporto dos bugs en la seccion "Mi Viaje"/Mi mapa personal de
+index.html: (1) al iniciar no mostraba los sitios guardados y (2) el
+listado mostraba items duplicados. Investigacion read-only (plan mode)
+confirmo las causas raiz y se implemento el fix completo (alcance
+aprobado por usuario: A+B+C).
+
+**Causas raiz:**
+- Bug 1 era una cadena triple: (a) el primer `renderMyMap()` corria antes
+  de cargar `mm_saved`/`mm_visited` del localStorage (la carga estaba ~30
+  lineas mas abajo, en LOAD SOCIAL STATE); (b) `index-api-connector.js`
+  poblaba `MAPA_PLACES` async pero su `applyData()` nunca llamaba
+  `renderMyMap()` -- riesgo ya anotado aqui como "renderMyMap() fuera del
+  ciclo de refresco" -- asi que la seccion quedaba congelada vacia;
+  (c) los guardados en Neon nunca se hidrataban:
+  `ExploraCO.cargarMiMapa()` existia en usuario-session.js y nadie la
+  llamaba.
+- Bug 2: `renderMMList()` solo limpiaba `cont.innerHTML` en el camino
+  vacio; con resultados, cada re-render acumulaba appendChild.
+
+**Fixes (2 archivos):**
+- index.html: `cont.innerHTML=''` siempre antes del forEach en
+  renderMMList (~L3650); carga localStorage movida al bloque INIT antes
+  del primer render (~L2878); nueva `_hidratarGuardadosDB()` junto a
+  `_uuidDeId` (~L4177) que para usuarios con sesion trae UUIDs via
+  tipo=mapa, los mapea a ids posicionales buscando `p._uuid` en
+  MAPA_PLACES/PL, los une a mmSaved, persiste y re-renderiza; disparada
+  desde el wrapper existente de renderMyMap (~L3790) y desde
+  `window.onExploraCOUpdate`. Idempotente via flag `_mmHidratado`; si no
+  hay sesion o MAPA_PLACES esta vacio sale SIN marcar flag (reintenta).
+- index-api-connector.js: al final de `applyData()` se agrego
+  `if (typeof renderMyMap === 'function') renderMyMap();`.
+
+**Verificacion:** node --check OK en el conector y en el bloque script
+inline unico de index.html (extraido a temp); smoke Node vm con la
+funcion real extraida del HTML: 4/4 PASS. Detalle completo en TASKS.md
+TSK-070.
+
+**Riesgos/pendientes dejados explicitos:** (1) mm_saved sigue usando ids
+posicionales dependientes del ORDER BY del API entre sesiones -- fix
+estructural = guardar slugs/UUIDs (refactor que toca varias paginas,
+backlog); (2) `clearMyMap()` borra solo local: con sesion activa los
+guardados de BD reviven al recargar -- candidato: llamar quitarGuardado
+por UUID desde clearMyMap.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** index.html + index-api-connector.js +
+   TASKS.md/TSK-070 + NEXT.md (este segmento). El usuario no pidio commit
+   todavia.
+2. Verificar en prod tras deploy: guardar lugar -> recargar -> aparece;
+   filtros/tabs repetidos sin duplicar; login con guardados en Neon ->
+   aparecen al cargar.
+3. Backlog estructural opcional: migrar mm_saved a slugs/UUIDs.
+4. Backlog vigente de sesiones anteriores (hostales legacy sin seeds,
+   TSK-068 docs, TASK-013, etc.).
+
 ### Sesion Hostales top 10 de Bogota (2026-08-24) - 10 paginas dinamicas de hostal (TSK-069)
 
 Se crearon DIEZ paginas dinamicas con `categoria_slug='hostal'` para los
