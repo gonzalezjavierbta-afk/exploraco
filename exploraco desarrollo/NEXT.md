@@ -4,6 +4,51 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Hostal R10 en directorio (2026-08-25) - seed + loader + smoke + prod (TSK-072)
+
+El usuario pidio agregar el Hostal R10 (La Candelaria, Bogota) al
+directorio. Investigacion: HW 8.8/10 (679 reviews), Booking 8.4
+(1.858 reviews), casona historica remodelada para estudiantes de
+intercambio, 18+ exclusivo, check-in 15:00-24:00, checkout 12:00,
+cancelacion 24h, 4 dorms con literas privadas + 6 privadas, bar,
+terraza con hamacas, city tour gratis, coworking, recepcion 24h.
+
+**Archivos creados:**
+- `scripts/seed-hostal-r10-bogota.js` - seed completo (BASE, TAGS,
+  FAQS, 5 fotos Wikimedia pool, 3 habitaciones, 14 amenidades, 5
+  actividades, 3 transporte, 5 FAQs)
+- `scripts/load-hostal-r10-bogota-api.js` - loader (generado por
+  _gen_hostales_pipeline.js)
+- `scripts/smoke_test_hostal-r10-bogota.js` - smoke (generado)
+
+**Archivos modificados:**
+- `scripts/_gen_hostales_pipeline.js` - entrada R10 en HOSTELS array
+  (ahora 11 hostales, 22 archivos generados)
+
+**Verificacion:** smoke 11/11 PASS, node --check OK, ASCII-safe clean.
+Pagina cargada a prod via loader: /hostal-r10-bogota.html 200 con
+todas las secciones (hero, galeria, habitaciones, reglas, actividades,
+como llegar, reservar, mapa, FAQ, resenas). Precio_desde corregido
+a '$55.000' (fix de concatenacion '$55.000.130.000').
+
+**Nota:** el directorio-hostal.html es HTML estatico con PL embebido
+(no conectado a API). R10 NO aparece en el listado del directorio
+hostal porque el PL es un snapshot estatico. Esto es backlog conocido
+(TSK-072 follow-up).
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** seed + generador + docs.
+2. Agregar R10 al PL embebido en directorio-hostal.html (y
+   directorio.html, directorio-comida.html, directorio-evento.html,
+   directorio-sitio.html) - backlog estatico.
+3. Verificar en prod tras deploy: sidebar Blog con conteo, editar
+   monserrate-guia-completa, preview fiel.
+4. Mejora futura opcional del editor: permitir VACIAR campos en el PUT
+   de api/admin-destinos.js (hoy ignora valores vacios, L236: no se puede
+   quitar un video_url ya guardado).
+5. Backlog vigente de sesiones anteriores (TSK-070 pendiente de verificar
+   en prod, hostales legacy sin seeds, TASK-013, etc.).
+
 ### Sesion Modulo Blog en admin (2026-08-24) - sidebar visible + editor con preview (TSK-071)
 
 El usuario reporto "estoy en admin.html y no veo nada relacionado a

@@ -40,7 +40,10 @@ var HOSTELS = [
     hw: 'https://www.hostelworld.com/p/311331/vecinos-by-la-palmera/' },
   { slug: 'karuss-hostel-bogota',
     booking: '',
-    hw: 'https://www.hostelworld.com/p/69727/karuss-hostel/' }
+    hw: 'https://www.hostelworld.com/p/69727/karuss-hostel/' },
+  { slug: 'hostal-r10-bogota',
+    booking: 'https://www.booking.com/hotel/co/hostal-r10.html',
+    hw: 'https://www.hostelworld.com/p/293853/hostal-r10/' }
 ];
 
 function loaderTemplate(h) {

@@ -1415,5 +1415,24 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-072: Hostal R10 en directorio - seed + loader + smoke
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina dinamica del Hostal R10 (La Candelaria, Bogota),
+  casona historica remodelada para estudiantes de intercambio. Datos de
+  HW 8.8/10 (679 reviews), Booking 8.4 (1.858 reviews). 18+ exclusivo,
+  4 dorms con literas privadas + 6 privadas, bar, terraza hamacas, city
+  tour gratis, coworking, recepcion 24h. Check-in 15:00-24:00, checkout
+  12:00, cancelacion 24h, impuestos 19% no incluidos. Archivos:
+  `scripts/seed-hostal-r10-bogota.js` (3 habitaciones, 14 amenidades, 5
+  actividades, 3 transporte, 5 FAQs), `scripts/load-hostal-r10-bogota-api.js`,
+  `scripts/smoke_test_hostal-r10-bogota.js`. Generador actualizado (11
+  hostales, 22 archivos).
+- **Evidencia:** `/hostal-r10-bogota.html` en produccion 200 con todas
+  las secciones; smoke 11/11 PASS; precio_desde '$55.000' (fix
+  concatenacion). Directorio hostal estatico no incluye R10 (PL embebido,
+  backlog conocido).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
