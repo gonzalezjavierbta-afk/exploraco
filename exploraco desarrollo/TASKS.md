@@ -1277,6 +1277,52 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   guardados de BD reviven al recargar (candidato: llamar `quitarGuardado`
   por UUID desde clearMyMap).
 
+### TSK-071: Modulo Blog visible en admin + editor de escritos con preview fiel al motor
+- **Prioridad:** ALTA
+- **Responsable:** admin-dev + renderer-dev
+- **Estado:** COMPLETADA (2026-08-24, codigo verificado localmente; commit pendiente)
+- **Dependencia:** Ninguna (solo admin.html; el soporte blog del formulario
+  ya existia desde las sesiones Sprint Inspirate pero era invisible)
+- **Detalle tecnico:** El usuario reporto "no veo nada relacionado a blog"
+  en admin.html. Investigacion confirmo que TODO el modulo existia (filtro
+  pill Blog en la tabla, categoria en el form, panel especifico-blog con
+  tabs Historia/Autor, buscador de autor, CRUD PUT/DELETE) PERO no habia
+  entrada en el sidebar: updateNavCounts() calculaba `snav-count-blog` sin
+  encontrar el elemento en el DOM. Se implemento:
+  1. *Entrada sidebar* "Blog" con contador (`showScreenCat('tabla','blog')`,
+     id snav-blog/snav-count-blog) tras Eventos + titulo 'BLOG' agregado al
+     mapa de labels de showScreenCat (antes caia en 'TODOS').
+  2. *Herramientas del cuerpo* (visibles solo cat=blog via
+     updateBlogBodyTools() enganchado a updateCatUI() y newPlace()):
+     boton Ampliar (overlay pantalla completa #blog-desc-overlay con COPIA
+     del valor en #f-desc-big, sincronizado de vuelta al cerrar -- nunca se
+     mueve el #f-desc original), botones Foto/Video que insertan
+     [foto:URL|caption] / [video:URL] en la posicion del cursor como bloque
+     propio (separado por linea vacia, requisito del parser), y contador
+     palabras/min con la formula EXACTA del motor
+     (Math.max(1, Math.round(palabras/200)), pagina-destino.js L562).
+  3. *Preview client-side* (#blog-preview-modal): builder
+     blogBuildCuerpoHtml()/blogVideoEmbedUrl() = puerto literal de
+     parseBlogBody()/videoEmbedUrlBlog() del motor; renderiza titulo,
+     lead, autor seleccionado (_blogAutorNombre stash en
+     blogSeleccionarAutor/blogLimpiarAutor/reset), cuerpo con marcadores y
+     video principal; CSS replica .bfig/.bvid/.stext del motor (L192-196).
+     Cierra con ✕/Esc/click-fuera.
+- **Archivo modificado:** `admin.html` (+~230 lineas).
+- **Verificacion:** node --check OK del bloque script inline unico;
+  smoke de fidelidad con Node vm extrayendo funciones reales de AMBOS
+  archivos (esc del servidor inyectado como _esc para aislar la logica):
+  19/19 PASS -- salidas identicas en parrafos, fotos validas/invalidas/
+  sin caption/malformadas, videos YouTube watch/youtu.be/Vimeo/dominio
+  prohibido/malformados, mixtos y bordes (saltos con espacios, vacio).
+  Hallazgo del harness: en la vm hay que inyectar la global URL (en
+  Vercel/Node existe nativa).
+- **Evidencia fisica de exito:** el sidebar muestra "Blog" con el conteo
+  real de posts; clic filtra la tabla con titulo BLOG; editar un post
+  abre tabs Historia/Autor; con cat=blog aparecen Ampliar/Foto/Video/
+  Preview y el contador; Ampliar edita comodo y sincroniza al salir;
+  Preview muestra el articulo igual que lo renderizara pagina-destino.js.
+
 ### TASK-009: Integracion de pagos Wompi/PSE para planes destacados
 - **Prioridad:** BAJA
 - **Responsable:** Lead Developer[cite: 1]

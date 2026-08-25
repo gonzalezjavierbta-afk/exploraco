@@ -468,6 +468,12 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreenCat('tabla','evento')" id="snav-evento">
     <span class="snav-icon">🎉</span>Eventos<span class="snav-count" id="snav-count-evento">0</span>
   </div>
+  <!-- TSK-071: la categoria blog siempre tuvo panel de edicion y filtro,
+       pero ninguna entrada en el sidebar -- era invisible para el usuario.
+       updateNavCounts() ya calculaba snav-count-blog sin encontrar el DOM. -->
+  <div class="snav-item" onclick="showScreenCat('tabla','blog')" id="snav-blog">
+    <span class="snav-icon">📝</span>Blog<span class="snav-count" id="snav-count-blog">0</span>
+  </div>
   <div class="snav-divider"></div>
   <div class="snav-section">Herramientas</div>
   <div class="snav-item" onclick="showScreen('editor-nuevo')" id="snav-nuevo">
@@ -842,7 +848,17 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
         <div class="form-group">
           <label class="form-label">Descripción completa</label>
-          <textarea class="form-input form-textarea" id="f-desc" rows="5" placeholder="Descripción detallada del lugar. Contexto, historia, qué lo hace único…"></textarea>
+          <!-- TSK-071: herramientas del cuerpo SOLO para categoria blog
+               (visibilidad la controla updateBlogBodyTools desde updateCatUI) -->
+          <div id="blog-body-tools" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center">
+            <button class="btn btn-ghost btn-sm" onclick="blogAmpliarCuerpo(true)">⛶ Ampliar</button>
+            <button class="btn btn-ghost btn-sm" onclick="blogInsertarMarcador('foto')">📷 Foto</button>
+            <button class="btn btn-ghost btn-sm" onclick="blogInsertarMarcador('video')">🎬 Video</button>
+            <button class="btn btn-gold btn-sm" onclick="blogAbrirPreview()">👁 Preview</button>
+            <span class="form-hint" id="blog-body-count" style="margin:0 0 0 auto"></span>
+          </div>
+          <textarea class="form-input form-textarea" id="f-desc" rows="5" placeholder="Descripción detallada del lugar. Contexto, historia, qué lo hace único…" oninput="livePreview();blogBodyCount()"></textarea>
+          <div class="form-hint" id="hint-blog-desc" style="display:none">Modo blog: párrafos separados por una línea vacía. Marcadores inline como bloque propio: [foto:URL|caption] y [video:URL] (YouTube/Vimeo).</div>
         </div>
         <div class="form-group">
           <label class="form-label">Frase destacada (highlight box)</label>
@@ -1848,6 +1864,38 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   </div>
 </div>
 
+<!-- ════ BLOG: CUERPO EN PANTALLA COMPLETA (TSK-071) ════
+     Overlay de edicion comoda para articulos largos. NO mueve el
+     #f-desc original: clona su valor en #f-desc-big, sincroniza de
+     vuelta al cerrar (blogAmpliarCuerpo) y blogDescActivo() decide
+     cual textarea leen insertar/contador/preview. -->
+<div id="blog-desc-overlay" style="display:none;position:fixed;inset:0;background:#14181D;z-index:9500;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:#1B2129;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
+    <b style="color:#fff;font-size:12px">📝 Cuerpo del artículo</b>
+    <span id="bfd-count" style="color:rgba(255,255,255,.45);font-size:11px;margin-right:auto"></span>
+    <button class="btn btn-ghost btn-sm" onclick="blogInsertarMarcador('foto')">📷 Foto</button>
+    <button class="btn btn-ghost btn-sm" onclick="blogInsertarMarcador('video')">🎬 Video</button>
+    <button class="btn btn-gold btn-sm" onclick="blogAbrirPreview()">👁 Preview</button>
+    <button class="btn btn-ghost btn-sm" onclick="blogAmpliarCuerpo(false)">✕ Salir (Esc)</button>
+  </div>
+  <textarea id="f-desc-big" oninput="blogBodyCount()" spellcheck="false"
+    style="flex:1;width:100%;box-sizing:border-box;background:#14181D;color:#E8E6E1;border:0;outline:0;resize:none;padding:28px clamp(20px,8vw,120px);font-size:15px;line-height:1.75;font-family:inherit"></textarea>
+</div>
+
+<!-- ════ BLOG: PREVIEW DEL ARTICULO (TSK-071) ════
+     Render client-side fiel a parseBlogBody()/videoEmbedUrlBlog() de
+     api/pagina-destino.js (puerto literal, ver smoke TSK-071). El CSS
+     de .bfig/.bvid/.stext replica las reglas L192-196 del motor. -->
+<div id="blog-preview-modal" onclick="if(event.target===this)blogCerrarPreview()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9600;align-items:flex-start;justify-content:center;overflow-y:auto">
+  <div style="background:#FDFBF7;width:min(760px,96vw);margin:24px 0;border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.4)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:#1B2129">
+      <span style="color:#fff;font-weight:700;font-size:12px">👁 Preview del artículo</span>
+      <button onclick="blogCerrarPreview()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">✕</button>
+    </div>
+    <div id="blog-preview-body"></div>
+  </div>
+</div>
+
 <!-- ════ HIDDEN INPUTS ════ -->
 <input type="file" id="restore-input" accept=".json" style="display:none" onchange="handleRestoreFile(this)">
 
@@ -2008,7 +2056,7 @@ function showScreenCat(screen, cat) {
   currentCatFilter = cat;
   setTablaFilter(document.querySelector('.fpill[data-cat="'+cat+'"]'), cat);
   showScreen(screen);
-  var labels = {hostal:'HOSPEDAJES',comida:'COMIDA',sitio:'LUGARES',evento:'EVENTOS'};
+  var labels = {hostal:'HOSPEDAJES',comida:'COMIDA',sitio:'LUGARES',evento:'EVENTOS',blog:'BLOG'};
   var el = document.getElementById('tabla-title');
   if(el) el.textContent = labels[cat] || 'TODOS';
 }
@@ -2267,6 +2315,8 @@ function newPlace() {
     var el = document.getElementById('especifico-'+c);
     if(el){ el.style.display='none'; el.classList.remove('on'); }
   });
+  /* TSK-071: f-cat quedo vacio -> ocultar herramientas del cuerpo blog */
+  updateBlogBodyTools();
 }
 async function editPlace(id) {
   var p = places.find(function(x){ return x.id===id; });
@@ -2434,6 +2484,7 @@ function clearForm() {
   if(bas){ bas.style.display = 'none'; bas.innerHTML = ''; }
   var bar = document.getElementById('blog-autor-resultados');
   if(bar){ bar.style.display = 'none'; bar.innerHTML = ''; }
+  _blogAutorNombre = '';
 
   /* ── Other resets ── */
   currentTags = [];
@@ -3869,6 +3920,9 @@ function updateCatUI() {
   if(cat === 'blog') {
     showCatTab('blog-historia');
   }
+  /* TSK-071: herramientas del cuerpo (ampliar/foto/video/preview/
+     contador) solo visibles en categoria blog */
+  updateBlogBodyTools();
   updateTagSuggestions(cat);
 }
 function catLabel(c) {
@@ -3880,6 +3934,191 @@ function catEmoji(c) {
 function catColor(c) {
   return {hostal:'#3B82F6',comida:'#EF4444',sitio:'#22C55E',evento:'#A855F7',blog:'#EC4899'}[c]||'#888';
 }
+
+/* ── BLOG BODY TOOLS + PREVIEW (TSK-071) ──
+   El cuerpo del articulo vive en f-desc (columna descripcion). Para la
+   categoria blog se agregan: edicion en pantalla completa (overlay con
+   COPIA del valor, sincronizado de vuelta al cerrar -- no se mueve el
+   textarea original), insercion de marcadores inline [foto:URL|caption]
+   y [video:URL], contador palabras/min de lectura y un preview
+   client-side cuyo builder es un puerto literal de parseBlogBody()/
+   videoEmbedUrlBlog() de api/pagina-destino.js (verificado con smoke de
+   fidelidad TSK-071). Formula de lectura identica al motor:
+   Math.max(1, Math.round(palabras/200)). */
+var _descOverlayAbierto = false;
+var _blogAutorNombre = '';
+
+function blogDescActivo() {
+  return document.getElementById(_descOverlayAbierto ? 'f-desc-big' : 'f-desc');
+}
+
+function updateBlogBodyTools() {
+  var esBlog = v('f-cat') === 'blog';
+  var t = document.getElementById('blog-body-tools');
+  if(t) t.style.display = esBlog ? 'flex' : 'none';
+  var h = document.getElementById('hint-blog-desc');
+  if(h) h.style.display = esBlog ? '' : 'none';
+  blogBodyCount();
+}
+
+function blogBodyCount() {
+  var src = blogDescActivo();
+  var txt = ((src && src.value) || '').trim();
+  var palabras = txt ? txt.split(/\s+/).filter(Boolean).length : 0;
+  var mins = palabras ? Math.max(1, Math.round(palabras / 200)) : 0;
+  var label = txt ? (palabras + ' palabras \u00b7 ~' + mins + ' min de lectura') : '';
+  setText('blog-body-count', label);
+  setText('bfd-count', label);
+}
+
+function blogAmpliarCuerpo(abrir) {
+  var ov = document.getElementById('blog-desc-overlay');
+  var ta = document.getElementById('f-desc');
+  var big = document.getElementById('f-desc-big');
+  if(!ov || !ta || !big) return;
+  if(abrir && !_descOverlayAbierto) {
+    big.value = ta.value;
+    _descOverlayAbierto = true;
+    ov.style.display = 'flex';
+    blogBodyCount();
+    big.focus();
+  } else if(!abrir && _descOverlayAbierto) {
+    ta.value = big.value;
+    _descOverlayAbierto = false;
+    ov.style.display = 'none';
+    blogBodyCount();
+  }
+}
+
+function blogInsertarMarcador(tipo) {
+  var ta = blogDescActivo();
+  if(!ta) return;
+  var prefix = tipo === 'foto' ? '[foto:' : '[video:';
+  var placeholder = tipo === 'foto' ? 'URL_DE_LA_IMAGEN|caption de la foto]' : 'URL_DEL_VIDEO]';
+  var pre = ta.value.slice(0, ta.selectionStart || 0);
+  var post = ta.value.slice(ta.selectionEnd || 0);
+  /* parseBlogBody divide por bloques separados por linea vacia: el
+     marcador debe quedar como bloque propio para que renderice. */
+  var sep = (!pre || /\n\s*\n$/.test(pre)) ? '' : '\n\n';
+  ta.value = pre + sep + prefix + placeholder + '\n\n' + post;
+  var urlPos = (pre + sep + prefix).length;
+  var urlLen = (tipo === 'foto' ? 'URL_DE_LA_IMAGEN' : 'URL_DEL_VIDEO').length;
+  ta.focus();
+  try { ta.setSelectionRange(urlPos, urlPos + urlLen); } catch(e) {}
+  blogBodyCount();
+}
+
+/* Puerto literal de videoEmbedUrlBlog() (api/pagina-destino.js): solo
+   YouTube/youtu.be/Vimeo; nunca la URL cruda del usuario en el iframe. */
+function blogVideoEmbedUrl(raw) {
+  try {
+    var url = new URL(String(raw));
+    var host = url.hostname.toLowerCase().replace(/^www\./, '');
+    if (host === 'youtu.be') {
+      var id1 = url.pathname.replace(/^\//, '');
+      return id1 ? 'https://www.youtube.com/embed/' + id1 : '';
+    }
+    if (host === 'youtube.com') {
+      var id2 = url.searchParams.get('v');
+      return id2 ? 'https://www.youtube.com/embed/' + id2 : '';
+    }
+    if (host === 'vimeo.com') {
+      var id3 = url.pathname.replace(/^\//, '');
+      return id3 ? 'https://player.vimeo.com/video/' + id3 : '';
+    }
+  } catch (e) {}
+  return '';
+}
+
+/* Puerto literal de parseBlogBody(): bloques por linea(s) vacia;
+   [foto:url|cap] valida http/s -> figure.bfig; [video:url] -> div.bvid
+   via embed validado; resto -> p.stext escapado. Marcadores malformados
+   o URLs invalidas se descartan sin romper el render (igual al motor). */
+function blogBuildCuerpoHtml(texto) {
+  if (!texto) return '';
+  var bloques = String(texto).split(/\n\s*\n/);
+  var out = '';
+  for (var pi = 0; pi < bloques.length; pi++) {
+    var b = bloques[pi].trim();
+    if (!b) continue;
+    var fotoMatch = /^\[foto:(.*?)\|(.*?)\]$/.exec(b);
+    if (fotoMatch) {
+      var fotoUrl = fotoMatch[1].trim();
+      var fotoCap = fotoMatch[2].trim();
+      if (/^https?:\/\//i.test(fotoUrl)) {
+        out += '<figure class="bfig"><img src="'+_esc(fotoUrl)+'" alt="'+_esc(fotoCap||'Foto del articulo')+'" loading="lazy">'
+          + (fotoCap ? '<figcaption>'+_esc(fotoCap)+'</figcaption>' : '')
+          + '</figure>';
+      }
+      continue;
+    }
+    var vidMatch = /^\[video:(.*?)\]$/.exec(b);
+    if (vidMatch) {
+      var vidSrc = blogVideoEmbedUrl(vidMatch[1].trim());
+      if (vidSrc) {
+        out += '<div class="bvid"><iframe src="'+_esc(vidSrc)+'" title="Video del articulo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>';
+      }
+      continue;
+    }
+    out += '<p class="stext">'+_esc(b)+'</p>';
+  }
+  return out;
+}
+
+function blogAbrirPreview() {
+  var modal = document.getElementById('blog-preview-modal');
+  var bodyEl = document.getElementById('blog-preview-body');
+  if(!modal || !bodyEl) return;
+  var nombre = v('f-name') || '(sin titulo)';
+  var lead = v('f-lead') || '';
+  var activo = blogDescActivo();
+  var cuerpoHtml = blogBuildCuerpoHtml((activo && activo.value) || '');
+  var vidEmbed = blogVideoEmbedUrl(v('f-blog-video') || '');
+  /* CSS replica de las reglas del motor para blog (pagina-destino.js
+     L192-196) + tipografia base de columna de lectura (body.blog). */
+  var cssPrev = ''
+    + '<style>'
+    + '.bpw{max-width:720px;margin:0 auto;padding:28px clamp(16px,4vw,32px) 40px}'
+    + '.bpkicker{font-size:10px;font-weight:700;letter-spacing:.12em;color:#EC4899;text-transform:uppercase;margin-bottom:8px}'
+    + '.bptitle{font-size:clamp(24px,5vw,34px);line-height:1.15;font-weight:800;color:#1A1A1A;margin-bottom:10px}'
+    + '.bplead{font-size:14px;line-height:1.6;color:#666;margin-bottom:18px}'
+    + '.bpmeta{font-size:11px;color:#999;border-bottom:1px solid #EDE8E0;padding-bottom:14px;margin-bottom:6px}'
+    + '.stext{font-size:15px;line-height:1.85;color:#2B2B2B;margin:14px 0;white-space:pre-line}'
+    + '.bfig{margin:24px 0}'
+    + '.bfig img{width:100%;max-height:480px;object-fit:cover;border-radius:12px;display:block}'
+    + '.bfig figcaption{text-align:center;font-size:11px;color:#999;margin-top:8px;font-style:italic}'
+    + '.bvid{margin:24px 0;position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden}'
+    + '.bvid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}'
+    + '</style>';
+  bodyEl.innerHTML = cssPrev
+    + '<div class="bpw">'
+    + '<div class="bpkicker">\ud83d\udcdd Blog \u00b7 ExploraCO</div>'
+    + '<div class="bptitle">'+_esc(nombre)+'</div>'
+    + (lead ? '<div class="bplead">'+_esc(lead)+'</div>' : '')
+    + '<div class="bpmeta">'
+      + (_blogAutorNombre ? ('Por '+_esc(_blogAutorNombre)+' \u00b7 ') : '')
+      + 'vista previa local \u00b7 cambios aun no guardados</div>'
+    + cuerpoHtml
+    + (vidEmbed
+        ? '<div class="bvid"><iframe src="'+_esc(vidEmbed)+'" title="Video principal del articulo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>'
+        : '')
+    + '</div>';
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function blogCerrarPreview() {
+  var modal = document.getElementById('blog-preview-modal');
+  if(modal) modal.style.display = 'none';
+  document.body.style.overflow = _descOverlayAbierto ? 'hidden' : '';
+}
+
+document.addEventListener('keydown', function(ev){
+  if(ev.key !== 'Escape') return;
+  var pm = document.getElementById('blog-preview-modal');
+  if(pm && pm.style.display !== 'none') { blogCerrarPreview(); return; }
+  if(_descOverlayAbierto) blogAmpliarCuerpo(false);
+});
 
 /* ── SLUG AUTO-GENERATE ── */
 function autoSlug() {
@@ -5286,6 +5525,7 @@ function blogBuscarAutor(query) {
 function blogSeleccionarAutor(id, nombre, bio, fotoUrl) {
   var idEl = document.getElementById('f-blog-autor-id');
   if (idEl) idEl.value = id;
+  _blogAutorNombre = nombre || '';
   var resultsEl = document.getElementById('blog-autor-resultados');
   if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
   var buscarEl = document.getElementById('f-blog-autor-buscar');
@@ -5302,6 +5542,7 @@ function blogSeleccionarAutor(id, nombre, bio, fotoUrl) {
 function blogLimpiarAutor() {
   var idEl = document.getElementById('f-blog-autor-id');
   if (idEl) idEl.value = '';
+  _blogAutorNombre = '';
   var sel = document.getElementById('blog-autor-seleccionado');
   if (sel) { sel.style.display = 'none'; sel.innerHTML = ''; }
   if (typeof livePreview === 'function') livePreview();

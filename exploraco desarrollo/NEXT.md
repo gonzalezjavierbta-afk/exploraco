@@ -4,6 +4,46 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Modulo Blog en admin (2026-08-24) - sidebar visible + editor con preview (TSK-071)
+
+El usuario reporto "estoy en admin.html y no veo nada relacionado a
+blog". Hallazgo clave: el modulo blog SIEMPRE existio (filtro pill en la
+tabla L618, categoria en el form, panel especifico-blog Historia/Autor,
+buscador de autor, PUT/DELETE) pero NO tenia entrada en el sidebar --
+updateNavCounts() hasta calculaba snav-count-blog sin encontrar el
+elemento. Puro problema de descubribilidad + gaps de edicion.
+
+**Implementado (solo admin.html, sin backend):**
+- Sidebar "Blog" con contador tras Eventos + label 'BLOG' en
+  showScreenCat (antes titulaba TODOS).
+- Herramientas del cuerpo para cat=blog (visibilidad via
+  updateBlogBodyTools enganchado a updateCatUI y newPlace): Ampliar =
+  overlay fullscreen #blog-desc-overlay que CLONA f-desc en #f-desc-big
+  y sincroniza de vuelta al cerrar (nunca mueve el original);
+  Foto/Video insertan [foto:URL|caption] / [video:URL] en el cursor como
+  bloque propio; contador palabras/min con formula EXACTA del motor
+  (Math.max(1, round(palabras/200))).
+- Preview #blog-preview-modal: blogBuildCuerpoHtml/blogVideoEmbedUrl =
+  puerto literal de parseBlogBody/videoEmbedUrlBlog del motor; incluye
+  titulo/lead/autor (_blogAutorNombre stash)/video principal; CSS replica
+  .bfig/.bvid/.stext (motor L192-196). Cierra Esc/click-fuera/boton.
+
+**Verificacion:** node --check inline OK; smoke de fidelidad vm 19/19
+PASS extrayendo funciones reales de ambos archivos (esc del servidor
+inyectado como _esc). Nota harness: inyectar global URL en la vm.
+Detalle completo en TASKS.md TSK-071.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** admin.html + TASKS.md/TSK-071 +
+   NEXT.md. El usuario no pidio commit todavia.
+2. Verificar en prod tras deploy: sidebar Blog con conteo, editar
+   monserrate-guia-completa, preview fiel.
+3. Mejora futura opcional del editor: permitir VACIAR campos en el PUT
+   de api/admin-destinos.js (hoy ignora valores vacios, L236: no se puede
+   quitar un video_url ya guardado).
+4. Backlog vigente de sesiones anteriores (TSK-070 pendiente de verificar
+   en prod, hostales legacy sin seeds, TASK-013, etc.).
+
 ### Sesion Fix Mi Mapa personal (2026-08-24) - arranque sin guardados + duplicados (TSK-070)
 
 El usuario reporto dos bugs en la seccion "Mi Viaje"/Mi mapa personal de
