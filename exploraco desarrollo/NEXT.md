@@ -4,6 +4,70 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion La K-zona en directorio (2026-08-28) - seed + loader + smoke + prod (TSK-073)
+
+El usuario pidio incluir el espacio La K-zona en el directorio de
+ExploraCO. El usuario eligio la categoria `sitio` (mismo patron que
+Espacio Kinder / Theatron / Gate Club). Investigacion desde la fuente
+oficial (lak-zona.org: Raices, Las Zonas, Turismo, Juntes) + IG
+@lakzonaeslazona + Eventario/Yandex para la direccion exacta.
+
+Datos clave de LaK-Zona (Espacio Cultural Artistico Alternativo):
+- Direccion: Calle 15 # 9-64, barrio Veracruz, Centro Historico de
+  Bogota (a pocos metros del Eje Ambiental / Av. Jimenez / Rio Vicacha
+  y del Museo del Oro). Antiguo Hotel Moderno.
+- ONG LaK-Zona // ASOCAMEC, sin animo de lucro, desde 2010 (formalizada
+  2015); colectivo de artivistas/gestores que fomenta Derechos Culturales.
+- Espacios (Las Zonas): studio produccion musical, ensayos (acustico/
+  bateria), danza o circo (20 m2), proyeccion audiovisual/cine (30 m2,
+  aforo 40), K-Fe (70 m2, aforo 80), Auditorio (escenario 265.5 m2,
+  aforo 500), Galerias (45 m), Oficinas/Coworking.
+- Turismo comunitario: Museo Urbano-Ancestral de la Memoria (1000+ m2),
+  residencias artisticas (apartaestudio 30 m2, 6-12 personas), visitas
+  guiadas.
+- Programacion semanal de entrada libre 5pm-11pm: mier Sesiones PIYAA
+  (Hip-Hop), jueves Somos Calle, viernes Junte Salsero, sab K-Fe (rana,
+  karaoke, 2x1).
+
+**Archivos creados:**
+- `scripts/seed-la-k-zona.js` - seed sitio completo (BASE, TAGS, FAQS,
+  5 fotos Wikimedia pool del Centro; 8 zonas, 4 entradas, 2 tours, 4
+  equipamiento, 4 itinerario, 4 secretos, 4 regulaciones, 6 FAQs)
+- `scripts/load-la-k-zona-api.js` - loader a prod via /api/admin-destinos
+- `scripts/smoke_test_la_k_zona.js` - smoke local de buildHTML() sitio
+
+**Verificacion:** node --check OK (los 3), ASCII-safe clean (0 no-ASCII;
+se escondieron los m^2 como \u00b2), smoke 11/11 PASS con balance de
+divs 0. Puesta en produccion via loader: /la-k-zona.html 200 (71KB) con
+todas las secciones del motor sitio (dificultad, entradas, tours,
+checklist, itinerario, fauna, secretos, regulaciones, galeria, mapa,
+FAQ). slug=la-k-zona, id 2daadd88-831c-4584-8193-afdb4bc07d72.
+
+**Nota:** las coordenadas usadas (4.5985, -74.0768) son aproximadas del
+Centro Historico para calle 15 #9-64; conviene revisarlas contra OSM/
+Nominatim en un futuro.
+
+**Directorios estaticos actualizados (misma sesion):** aunque
+`directorio.html` / `directorio-sitio.html` son HTML estatico con PL
+embebido (no conectado a API), se agrego manualmente la tarjeta de
+la-k-zona (id 81, cat sitio, Bogota/Cundinamarca, "Entrada libre", emoji
+musical, hero_bg #7c2d12, foto Wikimedia del Chorro de Quevedo, rating
+4.8/rev 120 coherente con las tours del seed) a `var PLACES` + `var
+FEAT` (destacado) + `var PHOTOS` en AMBOS archivos. La tarjeta enlaza a
+/la-k-zona.html. Verificado: node --check OK en las declaraciones
+extraidas; PLACES de directorio-sitio.html 27->28 y de directorio.html
+80->81.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** seed + loader + smoke + directorios
+   (directorio.html, directorio-sitio.html) + docs (TASKS/TSK-073, NEXT).
+2. Directorios estaticos hostal/comida/evento: R10 y LaK-Zona tampoco
+   aparecen aun en directorio-hostal.html / directorio-comida.html /
+   directorio-evento.html (mismo backlog estatico de R10/TSK-072).
+3. Revisar coordenadas reales de La K-zona en Nominatim/OSM.
+4. Backlog vigente: verificar prod tras deploy, hostales legacy sin seeds,
+   TASK-013, TSK-070, editor admin sin vaciar campos (PUT L236).
+
 ### Sesion Hostal R10 en directorio (2026-08-25) - seed + loader + smoke + prod (TSK-072)
 
 El usuario pidio agregar el Hostal R10 (La Candelaria, Bogota) al

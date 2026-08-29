@@ -1432,6 +1432,32 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   concatenacion). Directorio hostal estatico no incluye R10 (PL embebido,
   backlog conocido).
 
+### TSK-073: La K-zona en directorio - seed + loader + smoke + prod
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina dinamica de LaK-Zona (Espacio Cultural Artistico
+  Alternativo, Calle 15 # 9-64, barrio Veracruz, Centro Historico de
+  Bogota; antigua categoria sitio como Espacio Kinder). Colectivo de
+  artivistas/gestores (ONG LaK-Zona // ASOCAMEC, sin animo de lucro,
+  2010/2015) que fomenta Derechos Culturales. Espacios (Las Zonas):
+  studio produccion musical, ensayos (acustico/bateria), danza o circo
+  (20 m2), proyeccion audiovisual (30 m2, aforo 40), K-Fe (70 m2, aforo
+  80), Auditorio (escenario 265.5 m2, aforo 500), Galerias (45 m),
+  Oficinas/Coworking; turismo comunitario: Museo Urbano-Ancestral de la
+  Memoria (1000+ m2), residencias artisticas (apartaestudio 30 m2),
+  visitas guiadas. Programacion semanal de entrada libre 5pm-11pm
+  (mier Sesiones PIYAA, jueves Somos Calle, viernes Junte Salsero, sab
+  K-Fe). Fuente: lak-zona.org (+ IG @lakzonaeslazona, Eventario/Yandex).
+  Archivos: `scripts/seed-la-k-zona.js` (8 zonas, 4 entradas, 2 tours, 4
+  equipamiento, 4 itinerario, 4 secretos, 4 regulaciones, 6 FAQs),
+  `scripts/load-la-k-zona-api.js`, `scripts/smoke_test_la_k_zona.js`.
+- **Evidencia:** `/la-k-zona.html` en produccion 200 (71KB) con todas
+  las secciones del motor sitio (dificultad, entradas, tours, checklist,
+  itinerario, fauna, secretos, regulaciones, galeria, mapa, FAQ);
+  smoke 11/11 PASS (balance divs 0); node --check y ASCII-safe clean
+  (0 no-ASCII). slug=la-k-zona, id 2daadd88-831c-4584-8193-afdb4bc07d72.
+  Nota: coords aprox. del Centro (calle 15 #9-64). Directorio sitio
+  estatico no incluye la-k-zona (PL embebido, backlog conocido).
+
 ---
 
 ## Regla de actualizacion
