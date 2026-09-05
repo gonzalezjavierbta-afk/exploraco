@@ -15,8 +15,10 @@
 -- One-time migration (CREATE TABLE without IF NOT EXISTS, exactly as
 -- specced): back it up before running. publico defaults to false, so
 -- a map is born private and only its owner can flip it to public.
+-- Idempotent: IF NOT EXISTS so re-running the script (e.g. from the
+-- Neon SQL editor) is a harmless no-op instead of an ugly error.
 
-CREATE TABLE mapas (
+CREATE TABLE IF NOT EXISTS mapas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id uuid NOT NULL REFERENCES usuarios(id),
   nombre varchar(80) NOT NULL,
@@ -27,7 +29,7 @@ CREATE TABLE mapas (
   actualizado_en timestamptz DEFAULT now()
 );
 
-CREATE TABLE mapa_destinos (
+CREATE TABLE IF NOT EXISTS mapa_destinos (
   mapa_id uuid NOT NULL REFERENCES mapas(id) ON DELETE CASCADE,
   destino_id uuid NOT NULL REFERENCES destinos(id),
   orden int NOT NULL DEFAULT 0,
@@ -35,5 +37,5 @@ CREATE TABLE mapa_destinos (
   PRIMARY KEY (mapa_id, destino_id)
 );
 
-CREATE INDEX idx_mapas_usuario ON mapas(usuario_id);
-CREATE INDEX idx_mapas_publico_creado ON mapas(publico, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_mapas_usuario ON mapas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_mapas_publico_creado ON mapas(publico, creado_en DESC);
