@@ -452,26 +452,33 @@ module.exports = async function handler(req, res) {
       }
 
       // Mapa de un usuario: guardados activos + visitas confirmadas.
-      // Devuelve ambos en data.{guardados, visitados} (arrays de UUIDs).
-      // La migracion estructural de Mi Mapa usa slugs en localStorage y
-      // necesita hidratar tambien los visitados (antes solo traia
-      // guardados), para que 'Ya fui' se sincronice entre dispositivos.
+      // Devuelve en data.{guardados, visitados} los destinos COMPLETOS
+      // (JOIN destinos, d.id AS destino_id), no solo UUIDs -- fix del
+      // spec 'mapas publicos/privados' (2026-09-05): mi-perfil.html
+      // espera objetos para _hidratarGuardadosDB/cargarMiMapa. Mismo
+      // patron de columnas que tipo=guardados mas lat/lng para el mapa.
       if (tipo === 'mapa' && usuarioId) {
         var mapaGuardados = await sql(
-          'SELECT DISTINCT i.destino_id FROM interacciones i'
-          + ' WHERE i.usuario_id = $1 AND i.tipo = \'guardado\' AND i.activo = true',
+          'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
+          + ' FROM interacciones i'
+          + ' JOIN destinos d ON d.id = i.destino_id'
+          + ' WHERE i.usuario_id = $1 AND i.tipo = \'guardado\' AND i.activo = true'
+          + '   AND d.status = \'published\'',
           [usuarioId]
         );
         var mapaVisitas = await sql(
-          'SELECT DISTINCT i.destino_id FROM interacciones i'
-          + ' WHERE i.usuario_id = $1 AND i.tipo = \'visita\'',
+          'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
+          + ' FROM interacciones i'
+          + ' JOIN destinos d ON d.id = i.destino_id'
+          + ' WHERE i.usuario_id = $1 AND i.tipo = \'visita\''
+          + '   AND d.status = \'published\'',
           [usuarioId]
         );
         return res.status(200).json({
           ok: true,
           data: {
-            guardados: mapaGuardados.map(function(r){ return r.destino_id; }),
-            visitados: mapaVisitas.map(function(r){ return r.destino_id; })
+            guardados: mapaGuardados,
+            visitados: mapaVisitas
           }
         });
       }
@@ -533,6 +540,76 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // Mapas tematicos del usuario (spec mapas publicos/privados
+      // 2026-09-05): id, nombre, emoji, descripcion, publico, creado_en
+      // y conteo de destinos por mapa (LEFT JOIN + GROUP BY).
+      if (tipo === 'mapas_mios' && usuarioId) {
+        var mapasMios = await sql(
+          'SELECT m.id, m.nombre, m.emoji, m.descripcion, m.publico, m.creado_en,'
+          + ' COALESCE(COUNT(md.destino_id),0)::int AS n_destinos'
+          + ' FROM mapas m'
+          + ' LEFT JOIN mapa_destinos md ON md.mapa_id = m.id'
+          + ' WHERE m.usuario_id = $1'
+          + ' GROUP BY m.id'
+          + ' ORDER BY m.creado_en DESC',
+          [usuarioId]
+        );
+        return res.status(200).json({ ok: true, data: mapasMios });
+      }
+
+      // Catalogo publico: mapas publicos recientes (publico=true,
+      // ORDER BY creado_en DESC, LIMIT 50). Incluye autor
+      // (usuarios.nombre) y conteo de destinos.
+      if (tipo === 'mapas_publicos') {
+        var mapasPublicos = await sql(
+          'SELECT m.id, m.nombre, m.emoji, m.descripcion, m.creado_en,'
+          + ' u.nombre AS autor,'
+          + ' COALESCE(COUNT(md.destino_id),0)::int AS n_destinos'
+          + ' FROM mapas m'
+          + ' JOIN usuarios u ON u.id = m.usuario_id'
+          + ' LEFT JOIN mapa_destinos md ON md.mapa_id = m.id'
+          + ' WHERE m.publico = true'
+          + ' GROUP BY m.id, u.nombre'
+          + ' ORDER BY m.creado_en DESC'
+          + ' LIMIT 50'
+        );
+        return res.status(200).json({ ok: true, data: mapasPublicos });
+      }
+
+      // Detalle de un mapa tematico: mapa + destinos completos (JOIN
+      // destinos con lat/lng para el mapa publico). Si el mapa es
+      // privado solo el dueno (usuario_id) puede verlo; un tercero
+      // recibe 'No autorizado' (equivalente 404, spec 2026-09-05).
+      if (tipo === 'mapa_detalle') {
+        var mapaDetalleId = req.query.id || null;
+        if (!mapaDetalleId)
+          return res.status(400).json({ ok: false, error: 'id requerido' });
+        var mapaDetalleRows = await sql(
+          'SELECT m.id, m.usuario_id, m.nombre, m.emoji, m.descripcion, m.publico, m.creado_en, m.actualizado_en,'
+          + ' u.nombre AS autor'
+          + ' FROM mapas m'
+          + ' JOIN usuarios u ON u.id = m.usuario_id'
+          + ' WHERE m.id = $1 LIMIT 1',
+          [mapaDetalleId]
+        );
+        if (!mapaDetalleRows.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var mapaDetalle = mapaDetalleRows[0];
+        if (!mapaDetalle.publico) {
+          if (!usuarioId || usuarioId !== mapaDetalle.usuario_id)
+            return res.status(403).json({ ok: false, error: 'No autorizado' });
+        }
+        var mapaDestinos = await sql(
+          'SELECT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
+          + ' FROM mapa_destinos md'
+          + ' JOIN destinos d ON d.id = md.destino_id'
+          + ' WHERE md.mapa_id = $1'
+          + ' ORDER BY md.orden, md.creado_en',
+          [mapaDetalleId]
+        );
+        return res.status(200).json({ ok: true, data: { mapa: mapaDetalle, destinos: mapaDestinos } });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -542,6 +619,142 @@ module.exports = async function handler(req, res) {
       var tipo2     = body.tipo;
       var destinoId2= body.destino_id;
       var usuarioId2= body.usuario_id || null;
+
+      // -- Mapas tematicos (spec mapas publicos/privados 2026-09-05) --
+      // Se manejan ANTES del guard generico de destino_id porque
+      // mapa_crear / mapa_editar / mapa_eliminar no reciben destino_id.
+      // Cero Borrado Logico: el DELETE de un mapa borra la fila (CASCADE
+      // limpia mapa_destinos); aqui si es un borrado fisico legitimo (el
+      // mapa es del usuario logueado y no hay XP de por medio).
+      if (tipo2 === 'mapa_crear' || tipo2 === 'mapa_editar'
+          || tipo2 === 'mapa_eliminar'
+          || tipo2 === 'mapa_agregar_destino'
+          || tipo2 === 'mapa_quitar_destino') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+
+        if (tipo2 === 'mapa_crear') {
+          var nombreNuevo = String(body.nombre || '').trim();
+          if (!nombreNuevo)
+            return res.status(400).json({ ok: false, error: 'nombre no puede estar vacio' });
+          if (nombreNuevo.length > 80)
+            return res.status(400).json({ ok: false, error: 'nombre debe tener maximo 80 caracteres' });
+          var emojiNuevo = String(body.emoji || '').trim().slice(0, 8);
+          var descNueva = String(body.descripcion || '').trim().slice(0, 1000);
+          if (emojiNuevo) {
+            var mapaNuevoRows = await sql(
+              'INSERT INTO mapas (usuario_id, nombre, emoji, descripcion) VALUES ($1, $2, $3, $4) RETURNING id, publico',
+              [usuarioId2, nombreNuevo, emojiNuevo, descNueva]
+            );
+          } else {
+            // Sin emoji: se omite la columna para que aplique el DEFAULT
+            // E'\U0001F5FA' de la migracion 006 (bug historico 026: en
+            // ASCII-safe no entra el glifo; el servidor lo inyecta).
+            var mapaNuevoRows = await sql(
+              'INSERT INTO mapas (usuario_id, nombre, descripcion) VALUES ($1, $2, $3) RETURNING id, publico',
+              [usuarioId2, nombreNuevo, descNueva]
+            );
+          }
+          return res.status(200).json({ ok: true, id: mapaNuevoRows[0].id, publico: mapaNuevoRows[0].publico });
+        }
+
+        if (tipo2 === 'mapa_editar') {
+          var mapaEditarId = body.mapa_id || null;
+          if (!mapaEditarId)
+            return res.status(400).json({ ok: false, error: 'mapa_id requerido' });
+          var mapaEditarRows = await sql(
+            'SELECT id FROM mapas WHERE id = $1 AND usuario_id = $2 LIMIT 1',
+            [mapaEditarId, usuarioId2]
+          );
+          if (!mapaEditarRows.length)
+            return res.status(404).json({ ok: false, error: 'No encontrado' });
+          var setsEditar = ['actualizado_en = NOW()'];
+          var valsEditar = [];
+          var piEditar = 1;
+          if (body.nombre !== undefined && body.nombre !== null) {
+            var nombreEditado = String(body.nombre).trim();
+            if (!nombreEditado)
+              return res.status(400).json({ ok: false, error: 'nombre no puede estar vacio' });
+            if (nombreEditado.length > 80)
+              return res.status(400).json({ ok: false, error: 'nombre debe tener maximo 80 caracteres' });
+            setsEditar.push('nombre = $' + piEditar);
+            valsEditar.push(nombreEditado);
+            piEditar++;
+          }
+          if (body.emoji !== undefined && body.emoji !== null) {
+            setsEditar.push('emoji = $' + piEditar);
+            valsEditar.push(String(body.emoji).trim().slice(0, 8));
+            piEditar++;
+          }
+          if (body.descripcion !== undefined && body.descripcion !== null) {
+            setsEditar.push('descripcion = $' + piEditar);
+            valsEditar.push(String(body.descripcion).trim().slice(0, 1000));
+            piEditar++;
+          }
+          if (body.publico !== undefined && body.publico !== null) {
+            setsEditar.push('publico = $' + piEditar);
+            valsEditar.push(body.publico === true || body.publico === 'true' || body.publico === 1 || body.publico === '1');
+            piEditar++;
+          }
+          valsEditar.push(mapaEditarId);
+          var mapaEditadoRows = await sql(
+            'UPDATE mapas SET ' + setsEditar.join(', ') + ' WHERE id = $' + piEditar + ' RETURNING id, nombre, emoji, descripcion, publico',
+            valsEditar
+          );
+          return res.status(200).json({ ok: true, data: mapaEditadoRows[0] });
+        }
+
+        if (tipo2 === 'mapa_eliminar') {
+          var mapaEliminarId = body.mapa_id || null;
+          if (!mapaEliminarId)
+            return res.status(400).json({ ok: false, error: 'mapa_id requerido' });
+          var mapaEliminado = await sql(
+            'DELETE FROM mapas WHERE id = $1 AND usuario_id = $2 RETURNING id',
+            [mapaEliminarId, usuarioId2]
+          );
+          if (!mapaEliminado.length)
+            return res.status(404).json({ ok: false, error: 'No encontrado' });
+          return res.status(200).json({ ok: true });
+        }
+
+        if (tipo2 === 'mapa_agregar_destino') {
+          var mapaAgregarId = body.mapa_id || null;
+          var destinoAgregarId = body.destino_id || null;
+          if (!mapaAgregarId || !destinoAgregarId)
+            return res.status(400).json({ ok: false, error: 'mapa_id y destino_id requeridos' });
+          var mapaDuenoRows = await sql(
+            'SELECT id FROM mapas WHERE id = $1 AND usuario_id = $2 LIMIT 1',
+            [mapaAgregarId, usuarioId2]
+          );
+          if (!mapaDuenoRows.length)
+            return res.status(404).json({ ok: false, error: 'No encontrado' });
+          var destinoInsertRows = await sql(
+            'INSERT INTO mapa_destinos (mapa_id, destino_id, orden)'
+            + ' SELECT $1, $2, COALESCE((SELECT MAX(orden) + 1 FROM mapa_destinos WHERE mapa_id = $1), 0)'
+            + ' ON CONFLICT (mapa_id, destino_id) DO NOTHING RETURNING mapa_id',
+            [mapaAgregarId, destinoAgregarId]
+          );
+          return res.status(200).json({ ok: true, ya_incluido: destinoInsertRows.length === 0 });
+        }
+
+        if (tipo2 === 'mapa_quitar_destino') {
+          var mapaQuitarId = body.mapa_id || null;
+          var destinoQuitarId = body.destino_id || null;
+          if (!mapaQuitarId || !destinoQuitarId)
+            return res.status(400).json({ ok: false, error: 'mapa_id y destino_id requeridos' });
+          var mapaQuitarRows = await sql(
+            'SELECT id FROM mapas WHERE id = $1 AND usuario_id = $2 LIMIT 1',
+            [mapaQuitarId, usuarioId2]
+          );
+          if (!mapaQuitarRows.length)
+            return res.status(404).json({ ok: false, error: 'No encontrado' });
+          await sql(
+            'DELETE FROM mapa_destinos WHERE mapa_id = $1 AND destino_id = $2',
+            [mapaQuitarId, destinoQuitarId]
+          );
+          return res.status(200).json({ ok: true });
+        }
+      }
 
       if (!tipo2 || !destinoId2)
         return res.status(400).json({ ok: false, error: 'tipo y destino_id son requeridos' });

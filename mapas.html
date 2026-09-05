@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mapas públicos de viajeros – ExploraCO</title>
+<meta name="description" content="Descubre los mapas de viaje públicos de la comunidad ExploraCO: rutas y listas temáticas de lugares en Colombia creadas por otros viajeros.">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#E8A020">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--line:rgba(255,255,255,.08)}
+body{font-family:'Outfit',sans-serif;background:var(--black);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+/* ── NAV ── */
+nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px;flex-shrink:0}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
+.nav-label{font-size:11px;color:rgba(255,255,255,.5)}
+.nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s;cursor:pointer}
+.nav-back:hover{border-color:var(--gold);color:var(--gold)}
+/* ── HEAD ── */
+main{flex:1}
+.page-head{padding:40px 4% 8px;text-align:center}
+.ph-eyebrow{display:inline-block;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:10px;font-weight:700;padding:4px 14px;border-radius:20px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px}
+.ph-title{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:900;line-height:1.02;margin-bottom:12px}
+.ph-title em{color:var(--gold);font-style:normal}
+.ph-sub{font-size:14px;color:rgba(255,255,255,.5);line-height:1.7;max-width:520px;margin:0 auto 18px}
+.ph-cta{display:inline-block;padding:11px 22px;background:var(--gold);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1px;border-radius:6px;text-decoration:none;transition:opacity .15s}
+.ph-cta:hover{opacity:.88}
+/* ── GRID ── */
+.vistas{padding:28px 4% 60px}
+.m-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.m-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;text-decoration:none;color:#fff;display:block;transition:all .18s}
+.m-card:hover{transform:translateY(-3px);border-color:rgba(232,160,32,.45);background:rgba(232,160,32,.05)}
+.m-emoji{font-size:34px;margin-bottom:10px}
+.m-name{font-size:15px;font-weight:700;margin-bottom:5px}
+.m-desc{font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:14px;min-height:32px}
+.m-meta{display:flex;gap:14px;font-size:10px;color:rgba(255,255,255,.55);margin-bottom:6px}
+.m-date{font-size:9px;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:.8px}
+.vacio{text-align:center;padding:60px 20px;color:rgba(255,255,255,.5)}
+.vacio .vi-icon{font-size:44px;margin-bottom:12px}
+.vacio .vi-t{font-size:16px;font-weight:700;color:#fff;margin-bottom:6px}
+.vacio .vi-s{font-size:12px;color:rgba(255,255,255,.4);line-height:1.6}
+/* ── DETALLE ── */
+.det-wrap{padding:24px 4% 60px;max-width:860px;margin:0 auto}
+.det-head{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:22px;margin-bottom:16px}
+.det-emoji{font-size:40px;margin-bottom:8px}
+.det-nombre{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;line-height:1.05;margin-bottom:4px}
+.det-nombre em{color:var(--gold);font-style:normal}
+.det-autor{font-size:11px;color:var(--gold);margin-bottom:8px}
+.det-desc{font-size:13px;color:rgba(255,255,255,.55);line-height:1.7;margin-bottom:12px}
+.det-meta{display:inline-block;font-size:10px;color:rgba(255,255,255,.4);border:1px solid var(--line);border-radius:20px;padding:4px 12px;text-transform:uppercase;letter-spacing:.6px}
+#det-map{height:360px;border-radius:12px;border:1px solid var(--line);margin-bottom:16px;background:#101418}
+.det-leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:rgba(255,255,255,.5);margin-bottom:18px}
+.det-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.ley-dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.det-list-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.det-list-title span{color:var(--gold)}
+.det-item{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:10px 14px;text-decoration:none;color:#fff;margin-bottom:8px;transition:all .15s}
+.det-item:hover{border-color:rgba(232,160,32,.4);background:rgba(232,160,32,.04)}
+.det-idx{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:rgba(232,160,32,.7);width:28px;text-align:center;flex-shrink:0}
+.det-thumb{width:46px;height:46px;border-radius:8px;object-fit:cover;background:rgba(255,255,255,.06);border:1px solid var(--line);flex-shrink:0}
+.det-thumb-ph{display:flex;align-items:center;justify-content:center;font-size:20px}
+.det-info{flex:1;min-width:0}
+.det-t{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.det-c{font-size:10px;color:rgba(255,255,255,.4)}
+.det-go{font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.6px;flex-shrink:0}
+.det-empty{text-align:center;padding:30px;color:rgba(255,255,255,.4);font-size:12px}
+/* ── FOOTER ── */
+.footer{border-top:1px solid rgba(255,255,255,.06);padding:26px 4%;text-align:center;font-size:11px;color:rgba(255,255,255,.35);line-height:1.8}
+.footer a{color:var(--gold);text-decoration:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <div class="nav-label" id="nav-label">Mapas de viajeros</div>
+  <a class="nav-back" id="nav-back" onclick="volverGrid()">← Todos</a>
+</nav>
+
+<main>
+
+  <header class="page-head">
+    <div class="ph-eyebrow">ExploraCO · Comunidad</div>
+    <h1 class="ph-title">Mapas de viaje <em>de otros viajeros</em></h1>
+    <p class="ph-sub">Listas temáticas y recorridos que la comunidad creó y compartió: rutas gastronómicas, hospedajes, sitios imperdibles y más.</p>
+    <a class="ph-cta" href="index.html#mymapa-section">＋ Arma tu propio mapa</a>
+  </header>
+
+  <div class="vistas">
+
+    <section id="vista-grid">
+      <div class="m-grid" id="grid">
+        <div class="vacio" style="grid-column:1/-1;padding:60px 0">Cargando mapas públicos...</div>
+      </div>
+    </section>
+
+    <section id="vista-detalle" style="display:none">
+      <div class="det-wrap">
+        <div class="det-head" id="det-head">
+          <div class="det-emoji" id="det-emoji">🗺️</div>
+          <div class="det-nombre" id="det-nombre">Mapa</div>
+          <div class="det-autor" id="det-autor"></div>
+          <div class="det-desc" id="det-desc"></div>
+          <div class="det-meta" id="det-meta"></div>
+        </div>
+        <div id="det-map"></div>
+        <div class="det-leyenda">
+          <span><i class="ley-dot" style="background:#2196F3"></i> Hospedaje</span>
+          <span><i class="ley-dot" style="background:#FF9800"></i> Comida</span>
+          <span><i class="ley-dot" style="background:#4CAF50"></i> Sitio</span>
+          <span><i class="ley-dot" style="background:#A855F7"></i> Evento</span>
+        </div>
+        <div class="det-list-title">Lugares <span>·</span></div>
+        <div id="det-lista"></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <a href="index.html">ExploraCO</a> · El directorio turístico de Colombia<br>
+  <a href="mi-perfil.html">Mi Perfil</a> · <a href="directorio-sitio.html">Sitios</a> · <a href="directorio-hostal.html">Hospedajes</a> · <a href="directorio-comida.html">Gastronomía</a>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Mapas publicos / detalle (spec mapas publicos/privados 2026-09-05) ──
+var BASE='';
+var CAT_COLORS={hostal:'#2196F3',comida:'#FF9800',sitio:'#4CAF50',evento:'#A855F7'};
+var CAT_ICOS={hostal:'🏨',comida:'🍽️',sitio:'🏛️',evento:'🎉'};
+var CAT_LBL={hostal:'Hospedaje',comida:'Comida',sitio:'Sitio',evento:'Evento'};
+var detMap=null;
+
+function _esc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _fmt(s){
+  if(!s) return '';
+  var d=new Date(typeof s==='string' && s.length>10 ? s : String(s));
+  if(isNaN(d.getTime())) return String(s).slice(0,10);
+  return d.toLocaleDateString('es-CO',{day:'numeric',month:'short',year:'numeric'});
+}
+async function _api(q){
+  try{
+    var res=await fetch(BASE+'/api/interacciones?'+q);
+    var d=await res.json();
+    return d||{ok:false};
+  }catch(e){ return {ok:false}; }
+}
+function _markerIcon(cat){
+  return L.divIcon({
+    className:'',
+    html:'<div style="width:20px;height:20px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#E8A020')+';border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)"></div>',
+    iconSize:[20,20],
+    iconAnchor:[10,10]
+  });
+}
+
+function volverGrid(){
+  if(detMap){ detMap.remove(); detMap=null; }
+  history.replaceState(null,'','mapas.html');
+  document.getElementById('vista-detalle').style.display='none';
+  document.getElementById('vista-grid').style.display='block';
+  cargarGrid();
+}
+
+async function cargarGrid(){
+  document.getElementById('nav-label').textContent='Mapas de viajeros';
+  document.getElementById('nav-back').textContent='← Inicio';
+  var g=document.getElementById('grid');
+  var d=await _api('tipo=mapas_publicos');
+  if(!d||!d.ok){
+    g.innerHTML='<div class="vacio"><div class="vi-icon">⚠️</div><div class="vi-t">No se pudieron cargar los mapas</div><div class="vi-s">Vuelve a intentar en unos segundos.</div></div>';
+    return;
+  }
+  var maps=d.data||[];
+  if(!maps.length){
+    g.innerHTML='<div class="vacio"><div class="vi-icon">🗺️</div><div class="vi-t">Aún no hay mapas públicos</div><div class="vi-s">Sé el primero: guarda lugares en ExploraCO y haz un mapa público.</div></div>';
+    return;
+  }
+  g.innerHTML=maps.map(function(m){
+    var n=Number(m.n_destinos||0);
+    return '<a class="m-card" href="?id='+encodeURIComponent(m.id)+'">'
+      +'<div class="m-emoji">'+(m.emoji||'🗺️')+'</div>'
+      +'<div class="m-name">'+_esc(m.nombre)+'</div>'
+      +'<div class="m-desc">'+_esc((m.descripcion||'').slice(0,140))+((m.descripcion||'').length>140?'…':'')+'</div>'
+      +'<div class="m-meta"><span>👤 '+_esc(m.autor||'viajero')+'</span><span>📍 '+n+' lugar'+(n===1?'':'es')+'</span></div>'
+      +'<div class="m-date">'+_fmt(m.creado_en)+'</div>'
+      +'</a>';
+  }).join('');
+}
+
+async function cargarDetalle(id){
+  document.getElementById('nav-label').textContent='Mapa público';
+  document.getElementById('nav-back').textContent='← Todos';
+  document.getElementById('vista-grid').style.display='none';
+  document.getElementById('vista-detalle').style.display='block';
+  var head=document.getElementById('det-head');
+  var d=await _api('tipo=mapa_detalle&id='+encodeURIComponent(id));
+  if(!d||!d.ok){
+    var privado = d && d.error==='No autorizado';
+    head.innerHTML='<div class="vacio" style="padding:30px 0">'
+      +'<div class="vi-icon">🔒</div>'
+      +'<div class="vi-t">'+(privado?'Este mapa es privado':'Mapa no encontrado')+'</div>'
+      +'<div class="vi-s">'+(privado?'Solo su autor puede verlo.':'Es posible que el enlace haya sido eliminado.')+'</div>'
+      +'</div>';
+    return;
+  }
+  var m=d.data.mapa, dest=d.data.destinos||[];
+  head.innerHTML='<div class="det-emoji">'+(m.emoji||'🗺️')+'</div>'
+    +'<div class="det-nombre">'+_esc(m.nombre)+'</div>'
+    +'<div class="det-autor">👤 '+_esc(m.autor||'Un viajero de ExploraCO')+'</div>'
+    +'<div class="det-desc">'+_esc(m.descripcion||'')+'</div>'
+    +'<div class="det-meta">📍 '+dest.length+' lugar'+(dest.length===1?'':'es')+' · '+_fmt(m.creado_en)+'</div>';
+  renderDetLista(dest);
+  initDetMap(dest);
+}
+
+function renderDetLista(dest){
+  var l=document.getElementById('det-lista');
+  if(!dest.length){
+    l.innerHTML='<div class="det-empty">Este mapa aún no tiene lugares guardados.</div>';
+    return;
+  }
+  l.innerHTML=dest.map(function(x,i){
+    var cat=x.categoria_slug;
+    var img=x.foto_hero
+      ? '<img class="det-thumb" src="'+_esc(x.foto_hero)+'" alt="" loading="lazy">'
+      : '<div class="det-thumb det-thumb-ph">'+(CAT_ICOS[cat]||'📍')+'</div>';
+    return '<a class="det-item" href="'+_esc(x.slug)+'.html">'
+      +'<div class="det-idx">'+(i+1)+'</div>'
+      +img
+      +'<div class="det-info">'
+      +'<div class="det-t">'+_esc(x.nombre)+'</div>'
+      +'<div class="det-c">'+_esc(x.ciudad||'')+(x.ciudad?' · ':'')+(CAT_LBL[cat]||'Lugar')+'</div>'
+      +'</div>'
+      +'<div class="det-go">Ver →</div>'
+      +'</a>';
+  }).join('');
+}
+
+function initDetMap(dest){
+  var el=document.getElementById('det-map');
+  if(detMap){ detMap.remove(); detMap=null; }
+  if(!window.L) return;
+  var m=L.map(el,{zoomControl:false,scrollWheelZoom:false});
+  detMap=m;
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    subdomains:'abcd',maxZoom:19,
+    attribution:'© CARTO · © OpenStreetMap'
+  }).addTo(m);
+  var marks=[];
+  dest.forEach(function(x){
+    var lat=Number(x.lat), lng=Number(x.lng);
+    if(!isFinite(lat)||!isFinite(lng)) return;
+    var mk=L.marker([lat,lng],{icon:_markerIcon(x.categoria_slug)});
+    mk.bindPopup('<b>'+_esc(x.nombre)+'</b><br>'+_esc(x.ciudad||''));
+    mk.addTo(m);
+    marks.push(mk);
+  });
+  if(marks.length){
+    var bb=L.latLngBounds(marks.map(function(mk){return mk.getLatLng();}));
+    m.fitBounds(bb,{padding:[36,36]});
+    if(marks.length===1) m.setZoom(13);
+  } else {
+    m.setView([4.5709,-74.2973],5);
+  }
+}
+
+(function init(){
+  var id=new URLSearchParams(location.search).get('id');
+  if(id){ cargarDetalle(id); } else { cargarGrid(); }
+})();
+</script>
+</body>
+</html>

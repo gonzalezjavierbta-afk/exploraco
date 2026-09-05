@@ -920,6 +920,23 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mm-tab:hover{color:rgba(255,255,255,.7)}
 .mm-tab.on{color:var(--gold);border-bottom-color:var(--gold)}
 .mm-tab span{background:rgba(255,255,255,.15);border-radius:10px;padding:1px 5px;font-size:9px;margin-left:3px}
+/* Mis mapas tematicos */
+.mm-mapas-bar{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.25);flex-shrink:0;flex-wrap:wrap}
+.mm-mapas-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.35);white-space:nowrap}
+.mm-mapas-pills{display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0}
+.mm-mapas-empty{font-size:9px;color:rgba(255,255,255,.3);font-style:italic}
+.mm-mapas-pill{display:flex;align-items:center;gap:5px;padding:4px 9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:14px;font-size:9px;font-weight:600;color:rgba(255,255,255,.6);cursor:pointer;white-space:nowrap;transition:all .12s}
+.mm-mapas-pill:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.9)}
+.mm-mapas-pill.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.mm-mapas-pill .pm-count{opacity:.7;font-size:8px}
+.mm-mapas-pill .pm-vis{font-size:8px;opacity:.8}
+.mm-mapas-new{padding:4px 10px;background:transparent;border:1px dashed rgba(232,160,32,.5);border-radius:14px;color:var(--gold);font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s}
+.mm-mapas-new:hover{background:rgba(232,160,32,.12);border-color:var(--gold)}
+/* Editbar del mapa seleccionado */
+.mm-mapas-editbar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(232,160,32,.06);flex-shrink:0;flex-wrap:wrap;font-size:9px;color:rgba(255,255,255,.6)}
+.mm-mapas-editbar .eb-name{font-weight:700;color:var(--gold);white-space:nowrap}
+.mm-mapas-ebtn{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:12px;color:rgba(255,255,255,.55);font-size:9px;font-weight:600;padding:3px 8px;cursor:pointer;white-space:nowrap;transition:all .12s}
+.mm-mapas-ebtn:hover{border-color:var(--gold);color:var(--gold)}
 /* Panels */
 .mm-panel{display:none;flex-direction:column;flex:1;overflow:hidden;position:relative}
 .mm-panel.on{display:flex}
@@ -1448,6 +1465,12 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <button class="mymapa-btn" onclick="document.getElementById('mymapa-section').scrollIntoView({behavior:'smooth'})">Ver mi mapa →</button>
     </div>
     <div class="mymapa-right" id="mymapa-right">
+      <div class="mm-mapas-bar" id="mm-mapas-bar">
+        <div class="mm-mapas-title">Mis mapas</div>
+        <div class="mm-mapas-pills" id="mm-mapas-pills"></div>
+        <button class="mm-mapas-new" onclick="nuevoMapa()">＋ Nuevo</button>
+      </div>
+      <div id="mm-mapas-editbar" style="display:none"></div>
       <div class="mm-tabs">
         <button class="mm-tab on" onclick="switchMMTab('mapa')" id="mm-tab-mapa">🗺️ Mapa</button>
         <button class="mm-tab" onclick="switchMMTab('lista')" id="mm-tab-lista">📋 Lista <span id="mm-list-count"></span></button>
@@ -2059,7 +2082,8 @@ function renderMyMap() {
 
   // Empty state overlay
   var es = document.getElementById('mm-empty-state');
-  if(es) es.style.display = (sv === 0 && vi === 0) ? 'flex' : 'none';
+  var temA = zMapaSel && zMapaDest[zMapaSel] && zMapaDest[zMapaSel].slugs && zMapaDest[zMapaSel].slugs.length;
+  if(es) es.style.display = (sv === 0 && vi === 0 && !temA) ? 'flex' : 'none';
 
   // Initialize or refresh Leaflet map
   initMMLeaflet();
@@ -2110,6 +2134,20 @@ function updateMMMarkers() {
   if(!mmMap || typeof L === 'undefined') return;
   var source = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
 
+  var tb = document.getElementById('mm-topbar-count');
+  if(tb) {
+    if(zMapaSel) {
+      var zm = null;
+      for(var zi = 0; zi < zMapas.length; zi++) { if(zMapas[zi].id === zMapaSel) { zm = zMapas[zi]; break; } }
+      var cache = zMapaDest[zMapaSel];
+      var tn = cache && cache.slugs ? cache.slugs.length : '…';
+      tb.textContent = (zm ? (zm.emoji || '🗺') + ' ' + zm.nombre : 'Mapa') + ' · ' + tn;
+    } else {
+      var svc = mmSaved.length;
+      tb.textContent = svc ? svc + (svc === 1 ? ' guardado' : ' guardados') : '0 guardados';
+    }
+  }
+
   // Remove old markers
   Object.keys(mmMarkers).forEach(function(id) {
     mmMarkers[id].remove();
@@ -2121,7 +2159,11 @@ function updateMMMarkers() {
   source.forEach(function(p) {
     var isSaved   = mmSaved.indexOf(p.slug)   !== -1;
     var isVisited = mmVisited.indexOf(p.slug) !== -1;
-    if(!isSaved && !isVisited) return;
+    if(zMapaSel) {
+      if(!_perteneceMapa(p)) return;
+    } else {
+      if(!isSaved && !isVisited) return;
+    }
 
     var color   = isVisited ? '#22C55E' : '#E8A020';
     var ring    = isVisited ? 'rgba(34,197,94,.25)' : 'rgba(232,160,32,.25)';
@@ -2173,6 +2215,330 @@ function updateMMMarkers() {
     // Default view: Colombia center
     mmMap.setView([4.5, -74.0], 5);
   }
+}
+
+/* ── MIS MAPAS TEMATICOS ───────────────────────────────
+   Mapas con nombre que el viajero crea ademas de su Mi Mapa.
+   Cada mapa puede ser publico (visible en /mapas.html) o
+   privado. Backend: api/interacciones.js ?tipo=mapa_*        */
+var zMapas = [];       // lista del usuario: {id,nombre,emoji,descripcion,publico,n_destinos}
+var zMapaSel = null;   // id del mapa tematico activo (null = Mi Mapa)
+var zMapaDest = {};    // cache por mapa: {uuids:[],slugs:[]}
+var zModoMapa = null;  // 'crear' (null) | id del mapa en edicion
+
+function __mapasApi() {
+  return typeof API !== 'undefined' && API ? API : '';
+}
+function _mapaEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function cargarMisMapas() {
+  var u = window.ExploraCO && window.ExploraCO.usuario ? window.ExploraCO.usuario : null;
+  var pills = document.getElementById('mm-mapas-pills');
+  if(!pills) return;
+  if(!u) {
+    zMapas = [];
+    zMapaSel = null;
+    zMapaDest = {};
+    pills.innerHTML = '<span class="mm-mapas-empty">Inicia sesión para crear mapas</span>';
+    var eb0 = document.getElementById('mm-mapas-editbar');
+    if(eb0) eb0.style.display = 'none';
+    return;
+  }
+  fetch(__mapasApi() + '/api/interacciones?tipo=mapas_mios&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.ok) {
+        zMapas = d.data || [];
+        if(zMapaSel && !zMapas.some(function(m){ return m.id === zMapaSel; })) zMapaSel = null;
+        renderMisMapas();
+        updateMMMarkers();
+        renderMMList();
+      }
+    })
+    .catch(function(){});
+}
+
+function renderMisMapas() {
+  var pills = document.getElementById('mm-mapas-pills');
+  if(!pills) return;
+  if(!zMapas.length) {
+    pills.innerHTML = '<span class="mm-mapas-empty">Crea mapas temáticos y compártelos · Ruta gastronómica, fin de semana…</span>';
+  } else {
+    pills.innerHTML = zMapas.map(function(m){
+      return '<button class="mm-mapas-pill' + (zMapaSel === m.id ? ' on' : '')
+        + '" onclick="selectMapa(\'' + m.id + '\')" title="' + _mapaEsc(m.descripcion || '') + '">'
+        + (m.emoji || '🗺️') + ' ' + _mapaEsc(m.nombre)
+        + ' <span class="pm-count">' + (m.n_destinos != null ? m.n_destinos : 0) + '</span>'
+        + ' <span class="pm-vis">' + (m.publico ? '🌍' : '🔒') + '</span></button>';
+    }).join('');
+  }
+  var editbar = document.getElementById('mm-mapas-editbar');
+  if(!editbar) return;
+  if(!zMapaSel) { editbar.style.display = 'none'; return; }
+  var zm = null;
+  for(var i = 0; i < zMapas.length; i++) { if(zMapas[i].id === zMapaSel) { zm = zMapas[i]; break; } }
+  if(!zm) { editbar.style.display = 'none'; return; }
+  editbar.style.display = 'flex';
+  editbar.innerHTML = '<span class="eb-name">' + (zm.emoji || '🗺️') + ' ' + _mapaEsc(zm.nombre) + ' · ' + (zm.n_destinos != null ? zm.n_destinos : 0) + '</span>'
+    + '<button class="mm-mapas-ebtn" onclick="toggleMapaPubl(\'' + zm.id + '\',' + (zm.publico ? 'false' : 'true') + ')">' + (zm.publico ? '🌍 Público · hacer privado' : '🔒 Privado · hacer público') + '</button>'
+    + '<button class="mm-mapas-ebtn" onclick="abrirModalMapa(\'' + zm.id + '\')">✏️ Editar</button>'
+    + '<button class="mm-mapas-ebtn" onclick="compartirMapa(\'' + zm.id + '\')">🔗 Compartir</button>'
+    + '<button class="mm-mapas-ebtn" onclick="selectMapa(null)">✕ Mi Mapa</button>';
+}
+
+function selectMapa(id) {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) {
+    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesión para organizar mapas');
+    return;
+  }
+  if(zMapaSel === id) { zMapaSel = null; }
+  else { zMapaSel = id; if(id && !zMapaDest[id]) cargarMapaDestinos(id); }
+  renderMisMapas();
+  updateMMMarkers();
+  renderMMList();
+}
+
+function cargarMapaDestinos(id) {
+  fetch(__mapasApi() + '/api/interacciones?tipo=mapa_detalle&id=' + encodeURIComponent(id))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.ok && d.data) {
+        zMapaDest[id] = {
+          uuids: (d.data.destinos || []).map(function(x){ return x.destino_id; }),
+          slugs: (d.data.destinos || []).map(function(x){ return x.slug; }).filter(Boolean)
+        };
+        renderMisMapas();
+        updateMMMarkers();
+        renderMMList();
+      }
+    })
+    .catch(function(){});
+}
+
+function _perteneceMapa(p) {
+  var cache = zMapaDest[zMapaSel];
+  if(!cache) return false;
+  if(p && p._uuid && cache.uuids && cache.uuids.indexOf(p._uuid) !== -1) return true;
+  if(p && p.slug && cache.slugs && cache.slugs.indexOf(p.slug) !== -1) return true;
+  return false;
+}
+
+function toggleMapaPubl(id, pub) {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) return;
+  fetch(__mapasApi() + '/api/interacciones', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tipo:'mapa_editar', usuario_id:u.id, mapa_id:id, publico:pub})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok) {
+      cargarMisMapas();
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast(pub ? '🌍 Mapa público' : '🔒 Mapa privado', '#E8A020');
+    } else if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast((d && d.error) || 'Error', '#ef4444');
+  }).catch(function(){});
+}
+
+function compartirMapa(id) {
+  var zm = null;
+  for(var i = 0; i < zMapas.length; i++) { if(zMapas[i].id === id) { zm = zMapas[i]; break; } }
+  if(!zm) return;
+  if(!zm.publico) {
+    if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Primero haz el mapa público para compartirlo', '#E8A020');
+    return;
+  }
+  var url = (window.location.origin || 'https://exploraco.vercel.app') + '/mapas.html?id=' + encodeURIComponent(id);
+  if(navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function(){
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Link copiado', '#16a34a');
+    });
+  } else {
+    prompt('Copia el link de tu mapa:', url);
+  }
+}
+
+function nuevoMapa() { abrirModalMapa(null); }
+
+function abrirModalMapa(mapaId) {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) {
+    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesión para crear mapas');
+    return;
+  }
+  cerrarPopoverMapas();
+  var ya = document.getElementById('mapa-modal');
+  if(ya) ya.remove();
+  var m = null;
+  for(var i = 0; i < zMapas.length; i++) { if(zMapas[i].id === mapaId) { m = zMapas[i]; break; } }
+  zModoMapa = mapaId || null;
+  var ov = document.createElement('div');
+  ov.id = 'mapa-modal';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75)';
+  var descVal = m ? _mapaEsc(m.descripcion || '') : '';
+  var pubBox = m ? '' : '';
+  if(m) {
+    pubBox = '<label style="display:flex;align-items:center;gap:7px;font-size:11px;color:rgba(255,255,255,.85);margin-bottom:14px;cursor:pointer">'
+      + '<input id="mapa-pub" type="checkbox" ' + (m.publico ? 'checked' : '') + '><span>🌍 Poner este mapa público (visible en /mapas.html)</span></label>';
+  }
+  ov.innerHTML = '<div style="background:#0F172A;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:20px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#E8A020;margin-bottom:14px">' + (m ? 'Editar mapa' : 'Nuevo mapa') + '</div>'
+    + '<label style="display:block;font-size:9px;color:rgba(255,255,255,.5);margin-bottom:4px">NOMBRE *</label>'
+    + '<input id="mapa-nombre" maxlength="80" value="' + (m ? _mapaEsc(m.nombre) : '') + '" placeholder="Ruta gastronómica…" style="width:100%;box-sizing:border-box;padding:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;margin-bottom:10px">'
+    + '<label style="display:block;font-size:9px;color:rgba(255,255,255,.5);margin-bottom:4px">EMOJI (opcional)</label>'
+    + '<input id="mapa-emoji" maxlength="8" value="' + (m ? _mapaEsc(m.emoji || '') : '🗺️') + '" style="width:100%;box-sizing:border-box;padding:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;margin-bottom:10px">'
+    + '<label style="display:block;font-size:9px;color:rgba(255,255,255,.5);margin-bottom:4px">DESCRIPCIÓN (opcional)</label>'
+    + '<textarea id="mapa-desc" maxlength="1000" rows="3" style="width:100%;box-sizing:border-box;padding:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;margin-bottom:12px;resize:none">' + descVal + '</textarea>'
+    + pubBox
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="cerrarModalMapa()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.7);font-size:11px;font-weight:700;cursor:pointer">Cancelar</button>'
+    + '<button onclick="guardarModalMapa()" style="flex:1;padding:9px;background:#E8A020;border:none;border-radius:6px;color:var(--black);font-size:11px;font-weight:800;cursor:pointer">' + (m ? 'Guardar' : 'Crear') + '</button>'
+    + '</div>'
+    + (m ? '<div style="margin-top:10px;text-align:center"><button onclick="eliminarMapa(\'' + m.id + '\')" style="background:transparent;border:none;color:#ef4444;font-size:10px;cursor:pointer">Eliminar este mapa</button></div>' : '')
+    + '</div>';
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  ov.addEventListener('click', function(e){ if(e.target === ov) cerrarModalMapa(); });
+  document.addEventListener('keydown', _mapaKeyEsc);
+  setTimeout(function(){ var n = document.getElementById('mapa-nombre'); if(n) n.focus(); }, 50);
+}
+
+function _mapaKeyEsc(e) {
+  if(e.key === 'Escape') cerrarModalMapa();
+}
+
+function cerrarModalMapa() {
+  var d = document.getElementById('mapa-modal');
+  if(d) d.remove();
+  document.body.style.overflow = '';
+  document.removeEventListener('keydown', _mapaKeyEsc);
+}
+
+function guardarModalMapa() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) return;
+  var nEl = document.getElementById('mapa-nombre');
+  var nombre = nEl ? nEl.value : '';
+  if(!nombre.trim()) {
+    if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Ponle un nombre al mapa', '#ef4444');
+    if(nEl) nEl.focus();
+    return;
+  }
+  var body = { usuario_id: u.id, nombre: nombre.trim().slice(0, 80) };
+  var eEl = document.getElementById('mapa-emoji');
+  var dEl = document.getElementById('mapa-desc');
+  var emoji = eEl ? eEl.value : '';
+  var desc = dEl ? dEl.value : '';
+  if(emoji.trim()) body.emoji = emoji.trim().slice(0, 8);
+  if(desc.trim()) body.descripcion = desc.trim().slice(0, 1000);
+  if(zModoMapa) {
+    body.tipo = 'mapa_editar';
+    body.mapa_id = zModoMapa;
+    var pubEl = document.getElementById('mapa-pub');
+    body.publico = !!(pubEl && pubEl.checked);
+  } else {
+    body.tipo = 'mapa_crear';
+  }
+  fetch(__mapasApi() + '/api/interacciones', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok) {
+      cerrarModalMapa();
+      cargarMisMapas();
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast(zModoMapa ? 'Mapa actualizado' : 'Mapa creado', '#16a34a');
+    } else if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast((d && d.error) || 'Error', '#ef4444');
+  }).catch(function(){});
+}
+
+function eliminarMapa(id) {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) return;
+  if(!confirm('¿Eliminar este mapa? Tus lugares guardados en Mi Mapa NO se borran.')) return;
+  fetch(__mapasApi() + '/api/interacciones', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tipo:'mapa_eliminar', usuario_id:u.id, mapa_id:id})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok) {
+      cerrarModalMapa();
+      if(zMapaSel === id) zMapaSel = null;
+      delete zMapaDest[id];
+      cargarMisMapas();
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Mapa eliminado', '#16a34a');
+    } else if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast((d && d.error) || 'Error', '#ef4444');
+  }).catch(function(){});
+}
+
+/* ── POPOVER: anadir un guardado a mapas tematicos ── */
+function mostrarPopoverMapas(btn, slug) {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u || !zMapas.length) return;
+  cerrarPopoverMapas();
+  var uuid = _uuidDeSlug(slug);
+  var pop = document.createElement('div');
+  pop.id = 'mapa-popover';
+  pop.style.cssText = 'position:fixed;z-index:2000;width:230px;max-height:280px;overflow:auto;background:#0F172A;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);font-family:Outfit,sans-serif';
+  pop.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#E8A020">Añadir a mapa</div>'
+    + '<span style="cursor:pointer;color:rgba(255,255,255,.5);font-size:12px" onclick="cerrarPopoverMapas()">✕</span></div>'
+    + zMapas.map(function(m){
+      var checked = (zMapaDest[m.id] && (zMapaDest[m.id].uuids || []).indexOf(uuid) !== -1) ? ' checked' : '';
+      return '<label style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.85)">'
+        + '<input type="checkbox"' + checked + ' onchange="mapaCheckboxMap(\'' + m.id + '\',\'' + uuid + '\',this.checked)">'
+        + (m.emoji || '🗺️') + ' ' + _mapaEsc(m.nombre) + '</label>';
+    }).join('')
+    + '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08)">'
+    + '<button onclick="nuevoMapa()" style="width:100%;padding:6px;background:transparent;border:1px dashed rgba(232,160,32,.5);border-radius:5px;color:#E8A020;font-size:10px;font-weight:700;cursor:pointer">＋ Nuevo mapa</button></div>';
+  document.body.appendChild(pop);
+  var r = btn ? btn.getBoundingClientRect() : null;
+  if(r) {
+    var x = Math.min(Math.max(8, r.left), window.innerWidth - 238);
+    var y = r.bottom + 8;
+    if(y > window.innerHeight - 290) y = Math.max(8, r.top - 290);
+    pop.style.left = x + 'px';
+    pop.style.top = y + 'px';
+  } else {
+    pop.style.left = '50%';
+    pop.style.top = '40%';
+    pop.style.transform = 'translateX(-50%)';
+  }
+  setTimeout(function(){ document.addEventListener('click', cerrarPopoverMapas, true); }, 0);
+}
+
+function cerrarPopoverMapas() {
+  var p = document.getElementById('mapa-popover');
+  if(p) p.remove();
+  document.removeEventListener('click', cerrarPopoverMapas, true);
+}
+
+function mapaCheckboxMap(mapaId, uuid, checked) {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u) {
+    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesión para organizar mapas');
+    return;
+  }
+  fetch(__mapasApi() + '/api/interacciones', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tipo: checked ? 'mapa_agregar_destino' : 'mapa_quitar_destino',
+      usuario_id: u.id,
+      mapa_id: mapaId,
+      destino_id: uuid
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok) {
+      delete zMapaDest[mapaId];
+      cargarMisMapas();
+      if(zMapaSel === mapaId) { renderMisMapas(); updateMMMarkers(); }
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast(checked ? 'Añadido al mapa' : 'Quitado del mapa', '#16a34a');
+    } else if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast((d && d.error) || 'Error', '#ef4444');
+  }).catch(function(){});
 }
 
 /* ── PUBLICAR LUGAR ── */
@@ -3637,8 +4003,14 @@ function renderMMList() {
   if(!cont) return;
 
   var source = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
+  var tem = zMapaSel && zMapaDest[zMapaSel] ? zMapaDest[zMapaSel] : null;
 
   var filtered = source.filter(function(p) {
+    if(tem) {
+      if((tem.uuids || []).indexOf(p._uuid) === -1 && (tem.slugs || []).indexOf(p.slug) === -1) return false;
+      if(mmCatFilter  !== 'all' && p.cat !== mmCatFilter) return false;
+      return true;
+    }
     var isSaved   = mmSaved.indexOf(p.slug)   !== -1;
     var isVisited = mmVisited.indexOf(p.slug) !== -1;
     if(mmListFilter === 'saved'   && !isSaved)   return false;
@@ -3648,7 +4020,7 @@ function renderMMList() {
     return true;
   });
 
-  if(countEl) countEl.textContent = (mmSaved.length + mmVisited.length) ? (mmSaved.length) : '';
+  if(countEl) countEl.textContent = tem ? (tem.slugs ? tem.slugs.length : '') : ((mmSaved.length + mmVisited.length) ? (mmSaved.length) : '');
 
   if(!filtered.length) {
     cont.innerHTML = '';
@@ -4323,11 +4695,13 @@ function _hidratarGuardadosDB() {
     return null;
   }
 
-  function mezclarEn(arr, key, uuids) {
-    if(!uuids || !uuids.length) return 0;
+  function mezclarEn(arr, key, items) {
+    if(!items || !items.length) return 0;
     var nuevos = 0;
-    uuids.forEach(function(u){
-      var slug = slugDeUuid(u);
+    /* tipo=mapa ahora devuelve objetos completos (fix mapas/spec
+       2026-09-05), asi que el slug ya viene directo en .slug. */
+    items.forEach(function(it){
+      var slug = it && it.slug;
       if(slug && arr.indexOf(slug) === -1) { arr.push(slug); nuevos++; }
     });
     if(nuevos > 0) {
@@ -4368,6 +4742,9 @@ function toggleDestSave(id, btn) {
   if(uuid) {
     var accion = wasNew ? window.ExploraCO.guardarDestino(uuid) : window.ExploraCO.quitarGuardado(uuid);
     Promise.resolve(accion).then(function(){ updatePointsUI(); });
+  }
+  if(wasNew && usuario && zMapas.length) {
+    setTimeout(function(){ mostrarPopoverMapas(btn, slug); }, 500);
   }
 }
 
@@ -4424,6 +4801,7 @@ window.onExploraCOUpdate = function(){
      funcion sale sin marcar su flag y reintenta en el proximo
      renderMyMap). */
   try{ _hidratarGuardadosDB(); }catch(e){}
+  try{ cargarMisMapas(); }catch(e){}
 };
 
 /* ── INIT POINTS ON PAGE LOAD ── */

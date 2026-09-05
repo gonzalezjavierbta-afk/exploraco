@@ -155,10 +155,10 @@
 
   // ── Cargar Mi Mapa desde DB ────────────────────────────────
   // El endpoint /api/interacciones?tipo=mapa responde
-  //   data: { guardados: [uuid...], visitados: [uuid...] }
-  // Tras la migracion estructural de Mi Mapa a slugs, estos metodos
-  // devuelven los UUIDs (no slugs): es el frontend el que los resuelve
-  // a slugs via el campo _uuid de MAPA_PLACES/PL.
+  //   data: { guardados: [ {slug, nombre, lat, lng, ...} ], visitados: [...] }
+  // Tras el fix de la spec "mapas publicos/privados" (2026-09-05) el
+  // endpoint devuelve objetos completos de destino (slug incluido),
+  // no UUIDs; el frontend puede usar slug/lat/lng directamente.
   window.ExploraCO.cargarMiMapa = async function () {
     var usuario = window.ExploraCO.usuario;
     if (!usuario) return [];

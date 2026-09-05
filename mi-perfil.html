@@ -98,6 +98,16 @@ body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);ov
 .guardado-meta{font-size:11px;color:var(--muted)}
 .guardado-empty{grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)}
 
+/* ── MIS MAPAS TEMÁTICOS ── */
+.mis-mapas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+.mis-mapa-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:all .2s}
+.mis-mapa-card:hover{border-color:var(--gold);box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.mis-mapa-emoji{font-size:26px;margin-bottom:6px}
+.mis-mapa-nombre{font-weight:700;font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mis-mapa-meta{font-size:10px;color:var(--muted);margin-bottom:8px}
+.mis-mapa-link{display:inline-block;font-size:10px;font-weight:700;color:var(--gold-dark);text-decoration:none;border:1px solid rgba(200,134,10,.35);border-radius:20px;padding:4px 10px}
+.mis-mapa-link:hover{background:var(--gold-light)}
+
 /* ── RESEÑAS ── */
 .resenas-list{display:flex;flex-direction:column;gap:12px}
 .rv-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px}
@@ -279,6 +289,12 @@ body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);ov
         <div id="mi-mapa-el"></div>
       </div>
 
+      <!-- Mis mapas temáticos -->
+      <div style="font-weight:700;font-size:15px;margin-bottom:14px">🗺️ Mis Mapas Temáticos</div>
+      <div class="mis-mapas-grid" id="mis-mapas-grid">
+        <div class="skeleton" style="height:120px;border-radius:10px"></div>
+      </div>
+
       <!-- Grid de lugares guardados -->
       <div style="font-weight:700;font-size:15px;margin-bottom:14px" id="guardados-count">Lugares guardados</div>
       <div class="guardados-grid" id="guardados-grid">
@@ -429,6 +445,45 @@ function rellenarPerfil(u) {
   document.getElementById('xp-milestones').innerHTML = html;
 }
 
+// ── Mis mapas temáticos ───────────────────────────────
+function _perfilEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+async function cargarMisMapasPerfil() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  var cont = document.getElementById('mis-mapas-grid');
+  if(!cont) return;
+  if(!u) {
+    cont.innerHTML = '<div class="mis-mapa-card" style="color:var(--muted);font-size:12px">Inicia sesión para crear mapas temáticos</div>';
+    return;
+  }
+  try {
+    var res = await fetch(API+'/api/interacciones?tipo=mapas_mios&usuario_id='+u.id);
+    var d = await res.json();
+    if(!d || !d.ok) { cont.innerHTML = ''; return; }
+    var maps = d.data || [];
+    if(!maps.length) {
+      cont.innerHTML = '<div class="mis-mapa-card" style="color:var(--muted);font-size:12px">Aún no tienes mapas temáticos. Créalos desde <a href="index.html#mymapa-section" style="color:var(--gold);font-weight:700">tu Mi Mapa</a>.</div>';
+      return;
+    }
+    cont.innerHTML = maps.map(function(m){
+      var link = m.publico
+        ? '<a href="mapas.html?id='+encodeURIComponent(m.id)+'" class="mis-mapa-link">🌍 Ver público</a>'
+        : '<span class="mis-mapa-link" style="border-color:var(--border);color:var(--muted);cursor:default">🔒 Privado</span>';
+      return '<div class="mis-mapa-card">'
+        + '<div class="mis-mapa-emoji">'+(m.emoji||'🗺️')+'</div>'
+        + '<div class="mis-mapa-nombre" title="'+_perfilEsc(m.descripcion||'')+'">'+_perfilEsc(m.nombre||'')+'</div>'
+        + '<div class="mis-mapa-meta">'+(m.n_destinos||0)+' lugar'+(m.n_destinos===1?'':'es')+'</div>'
+        + link
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    cont.innerHTML = '';
+  }
+}
+
 // ── Cargar datos del usuario desde DB ───────────────────
 async function cargarDatosUsuario() {
   var u = window.ExploraCO && window.ExploraCO.usuario;
@@ -451,6 +506,7 @@ async function cargarDatosUsuario() {
   renderGuardados();
   renderMiniMapaPreview();
   iniciarMapa();
+  cargarMisMapasPerfil();
 }
 
 // ── Renderizar grid de guardados ─────────────────────────
