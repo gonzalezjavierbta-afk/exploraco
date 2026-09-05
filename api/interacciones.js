@@ -451,16 +451,28 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, guardado: check.length > 0 });
       }
 
-      // Mapa de guardados de un usuario
+      // Mapa de un usuario: guardados activos + visitas confirmadas.
+      // Devuelve ambos en data.{guardados, visitados} (arrays de UUIDs).
+      // La migracion estructural de Mi Mapa usa slugs en localStorage y
+      // necesita hidratar tambien los visitados (antes solo traia
+      // guardados), para que 'Ya fui' se sincronice entre dispositivos.
       if (tipo === 'mapa' && usuarioId) {
         var mapaGuardados = await sql(
           'SELECT DISTINCT i.destino_id FROM interacciones i'
           + ' WHERE i.usuario_id = $1 AND i.tipo = \'guardado\' AND i.activo = true',
           [usuarioId]
         );
+        var mapaVisitas = await sql(
+          'SELECT DISTINCT i.destino_id FROM interacciones i'
+          + ' WHERE i.usuario_id = $1 AND i.tipo = \'visita\'',
+          [usuarioId]
+        );
         return res.status(200).json({
           ok: true,
-          data: mapaGuardados.map(function(r){ return r.destino_id; })
+          data: {
+            guardados: mapaGuardados.map(function(r){ return r.destino_id; }),
+            visitados: mapaVisitas.map(function(r){ return r.destino_id; })
+          }
         });
       }
 
@@ -534,8 +546,12 @@ module.exports = async function handler(req, res) {
       if (!tipo2 || !destinoId2)
         return res.status(400).json({ ok: false, error: 'tipo y destino_id son requeridos' });
 
-      // Validar tipo contra constraint real
-      var tiposValidos = ['resena','guardado','visita','foto','rating'];
+      // Validar tipo contra constraint real. Se incluyen los tipos
+      // 'quitar_*' que no insertan filas (hacen UPDATE/DELETE sobre
+      // filas existentes) y por tanto no chocan con el CHECK de la
+      // columna tipo -- antes faltaban y el POST los rechazaba con 400,
+      // dejando 'quitar_guardado' inalcanzable desde el frontend.
+      var tiposValidos = ['resena','guardado','quitar_guardado','visita','quitar_visita','foto','rating'];
       if (!tiposValidos.includes(tipo2))
         return res.status(400).json({ ok: false, error: 'tipo inv\u00e1lido: ' + tipo2 });
 
@@ -764,6 +780,23 @@ module.exports = async function handler(req, res) {
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita, logros: logrosVisita });
+      }
+
+      // -- Quitar visita --
+      // La fila tipo='visita' no tiene columna 'activo' y es deduplicada
+      // por usuario+destino, asi que "desmarcar que ya fui" borra la fila
+      // por completo (no hay ganancia: el XP de la visita ya se otorgo y
+      // no se descuenta). Permite que el boton 'Desmarcar' de Mi Mapa,
+      // y clearMyMap, refelejen en Neon el estado local del usuario.
+      if (tipo2 === 'quitar_visita') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+
+        await sql(
+          'DELETE FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'visita\'',
+          [destinoId2, usuarioId2]
+        );
+        return res.status(200).json({ ok: true });
       }
 
       // -- Solo rating (sin texto) - quick-rating v5 (TSK-015) ---------

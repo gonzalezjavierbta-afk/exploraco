@@ -4,6 +4,97 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Campo web oficial prominente en hero de la ficha (2026-08-31) - TSK-075 / ADR-013 + BUG-028
+
+Auditoria del campo `destinos.web` (pagina web oficial): se confirmo que el
+dato se captura (publicar.html `sitio_web`, admin.html `f-web`), persiste
+y viaja en la API, pero solo se publicaba en UN punto (boton secundario
+"Sitio web" en la seccion Contacto de pagina-destino.js:1554). El home,
+directorios, agenda y schemaLD lo ignoran pese a que los conectores ya lo
+exponen (index-api-connector.js:57, directorio-api-connector.js:51).
+
+**Decidido (usuario):** elevar la web oficial a informacion prominente en
+el hero de la ficha. Cambios en `api/pagina-destino.js`: helper
+`dominioWeb(u)` que extrae hostname legible (sin protocolo ni "www."), chip-
+link `.hqi.hqilink` en la fila HQI que muestra el dominio, y boton CTA
+primario "Sitio web oficial" (`hbtn`) al inicio de `hctar` en el hero. El
+boton de Contacto se conserva (refuerza, no duplica). Blogs excluidos.
+ADR-013 aprobado.
+
+**Verificacion (Escudo GOLD):** `node --check` PASS; ASCII-safety 0 bytes
+>127, 0 backticks; smoke dedicado PASS (31 checks: boton + chip de dominio
+cuando hay `web`, ausencia total sin `web`, divs balanceados 83/78); los 39
+smokes existentes PASS tras el cambio (ulibro 180/180, medejazz 188/188).
+
+**BUG-028 (corregido en la misma sesion):** modal "Subiste de nivel" a
+"Explorador" se mostraba en cada carga de `index.html`. Causa:
+`_ultimoNivelVisto` se contaminaba con `0` en el render pre-sesion
+(`initPoints()` corre antes de `usuario-session.js`), y luego la segunda
+llamada con sesion real comparaba `100 > 0` = true. Fix en
+`index.html:4069-4071`: solo persistir `_ultimoNivelVisto` cuando
+`window.ExploraCO.usuario` existe. Registrado en BUGS_HISTORICOS.md
+BUG-028.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** `api/pagina-destino.js` (cambios) +
+   TASKS.md/TSK-075 + DECISIONS.md/ADR-013 + NEXT.md (este segmento).
+2. Verificar en prod tras deploy: las paginas con `web` (ulibro, medejazz,
+   semana-del-bienestar, etc.) muestran el chip de dominio y el boton CTA
+   en el hero; las sin `web` no muestran ninguno.
+3. **Backlog conocido (no TSK aun):** extender visibilidad de `web` a home
+   (renderDest/renderAgenda), directorios (renderDir + fallback PLACES),
+   agenda (toAgendaEvent) y schemaLD JSON-LD -- decidir cuando prioridad
+   lo justifique.
+
+### Sesion 10 eventos unicos semana 31 ago - 6 sep (2026-08-31) - seed + loader + smoke + prod (TSK-074)
+
+El usuario pidio crear seed + load + smoke para ~8-10 eventos unicos y
+futuros (31 ago al 6 sep 2026) en Colombia y Bogota, para que cada uno
+tenga su pagina dinamica propia. Se filtro a eventos futuros y se
+consolidaron 10 unicos (categoria `evento`). Patron Fase 9 / TSK-068:
+seed (datos) + loader (DELETE+POST a /api/admin-destinos) + smoke
+(buildHTML en sandbox vm) por evento. 30 archivos en `scripts/`.
+
+**Los 10 slugs:** `semana-del-bienestar-bogota` (31 ago-4 sep),
+`libera-2026-bogota`, `festival-teatro-libre-bogota`, `hearth-summit-bogota`,
+`sabor-bogota` (3-6 sep), `vive-mejor-bogota`, `dia-del-arte-urbano-bogota`
+(4-6 sep), `ulibro-bucaramanga` (Feria del Libro UNAB, edicion 24, 28
+ago-6 sep, cierre Claudio Narea/Los Prisioneros), `medejazz-medellin`
+(Festival de Jazz, 30 aniversario, 5-19 sep, Orquesta Aragon y Joseph
+Amado), `travesia-rio-magdalena` (expedicion fluvial brazo de Loba, 2-6
+sep, 20 embarcaciones).
+
+Tags JSONB evento por evento (segun TASK-003): `fecha_inicio`, `fecha_fin`,
+`edicion`, `sede`, `organiza`, `lema`, `pais_invitado`, `lineup[]`,
+`agenda[]`, `categorias_entrada[]`, `que_llevar[]`, `prohibido[]`.
+
+**Verificacion (Escudo GOLD):** `node --check` OK en los 30; ASCII-safety
+0 bytes no-ASCII en los 30; smokes PASS x10 con balance de divs
+(174-188 abiertos = cerrados; spot-check ulibro 180/180, medejazz
+188/188, travesia 184/184). Nota de los smokes: el renderer de evento
+usa los ids `id="tipos-entrada"` y `id="mapa"` y el mapa embebe
+`google.com/maps?q=lat,lng` (no un `.0`); los checks de mapa deben usar
+el query real (`9,-74.3`) no `lat.0`.
+
+**Carga a prod:** 10 loaders ejecutados contra `https://exploraco.vercel.app`
+(Bearer default exploraco12345) -> todos `status=published` con 5 fotos y
+5-6 FAQs. Verificacion HTTP: las 10 URLs `.html` = 200 (56-59KB) con
+contenido correcto y balance de divs 0 (spot-check ulibro 232/232,
+medejazz 237/237). Nota: el custom domain `exploraco.co` NO resuelve desde
+el sandbox (DNS local), se verifico contra el deployment `exploraco.vercel.app`.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** 30 archivos nuevos en `scripts/`
+   (10 seeds + 10 loaders + 10 smokes) + TASKS.md/TSK-074 + NEXT.md
+   (este segmento). Los slugs ya estan vivos en prod y sitemap; el push
+   solo versiona el codigo.
+2. Verificar en prod tras deploy (desde un navegador con DNS a exploraco.co):
+   las 10 URLs `https://exploraco.co/<slug>.html` sirven las paginas
+   dinamicas de evento y aparecen listadas en /api/destinos?cat=evento.
+3. Backlog vigente: completar tags vacios legacy (~18 eventos/comidas) y
+   pendientes de sesiones anteriores (commit Ruta Salsera/TSK-066-067,
+   TSK-070 verificar prod, TASK-013, hostales legacy sin seeds, etc.).
+
 ### Sesion La K-zona en directorio (2026-08-28) - seed + loader + smoke + prod (TSK-073)
 
 El usuario pidio incluir el espacio La K-zona en el directorio de

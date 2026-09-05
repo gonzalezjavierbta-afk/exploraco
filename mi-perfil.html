@@ -441,7 +441,11 @@ async function cargarDatosUsuario() {
   ]);
 
   if(guardadosRes.status==='fulfilled' && guardadosRes.value.ok) {
-    misGuardados = guardadosRes.value.data || [];
+    // tipo=mapa ahora devuelve data:{guardados, visitados}; usamos
+    // guardados. (Nota: la grilla de guardados de esta pagina espera
+    // objetos completos, pero el endpoint devuelve UUIDs; es un bug
+    // pre-existente aparte, aqui solo se mantiene el comportamiento.)
+    misGuardados = (guardadosRes.value.data && guardadosRes.value.data.guardados) || [];
   }
 
   renderGuardados();

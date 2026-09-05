@@ -444,3 +444,39 @@ ON CONFLICT (slug) DO NOTHING;
 
 **Estado:** Resuelto (leccion documentada; el INSERT final uso el emoji correcto). Prevencion: en SQL de Neon, usar SIEMPRE el prefijo E para escapes \uXXXX (`E'\ud83d\udcdd'`) o pegar el emoji real; nunca copiar el escape JS `'\ud83d\udcdd'` de `api/*.js` tal cual. Aplica a cualquier columna varchar corta (como `categorias.emoji`) y a cualquier INSERT/UPDATE manual en la consola de Neon.
 
+## BUG-027: Icono literal `[foto]` en el boton Instagram de la seccion Contacto
+
+**Contexto:** En `api/pagina-destino.js:1555`, el boton "Instagram" de la grilla Contacto renderiza `[foto]` como texto literal en lugar de un icono unicode:
+```
+ctBtns.push('<a class="cbtn blue" href="https://instagram.com/'+esc(...)+'" target="_blank">[foto] Instagram</a>');
+```
+Los otros botones usan iconos unicode reales: WhatsApp `\u2709`, Llamar `\u2706`, Sitio web `\u25CB`, Email `\u0040`. El `[foto]` parece un placeholder que nunca se reemplazo por un glifo real (p.ej. `\uD83D\uDCF7` camera o `\u25CB` circle).
+
+**Sintoma:** en todas las fichas con campo `instagram` (evento, hostal, comida, sitio), el usuario ve `[foto] Instagram` como texto plano con corchetes, no un icono visual. Cosmetico, no funcional.
+
+**Causa raiz:** se desconoce si fue intencional o un placeholder. Todos los demas botones de la grilla Contacto usan unicode escapes, este es el unico que no.
+
+**Fix (pendiente):** reemplazar `[foto]` por un icono unicode consistente con el estilo de los otros botones, o eliminar el prefijo y dejar solo el texto "Instagram". La ruta directa es `\uD83D\uDCF7` (camera emoji) o `\u25CB` (circle, como Sitio web). Requiere cambiar `api/pagina-destino.js` y verificar ASCII-safety (el escape `\uD83D\uDCF7` es surrogate pair y no viola el mandato). Nota: el icono no se renderiza porque `[foto]` es texto literal, no un placeholder del renderer -- es simplemente el label que el usuario ve.
+
+**Estado:** Abierto. Registrado durante la auditoria de TSK-075. Pendiente de fix (cambio menor, 1 linea).
+
+## BUG-028: Modal "Subiste de nivel" a "Explorador" se muestra en cada carga de index.html
+
+**Contexto:** En `index.html`, el sistema de gamificacion tiene un modal `#levelup-modal` ("Subiste de nivel!") que se dispara en `updatePointsUI()` (linea 4066) cuando el nivel actual es mayor que `_ultimoNivelVisto`. La variable `_ultimoNivelVisto` (linea 4007) se declara como `null` y se actualiza al final de cada llamada a `updatePointsUI()` (linea 4069). El problema es que `updatePointsUI()` se ejecuta **dos veces** en cada carga: primero desde `initPoints()` (linea 4428, antes de que `usuario-session.js` cargue) y luego desde `usuario-session.js` -> `init()` -> `cargarSesion()` -> `actualizarUI()` -> `onExploraCOUpdate()`.
+
+**Sintoma:** Cada vez que el usuario carga `index.html`, ve el modal "Subiste de nivel a Explorador" aunque ya lo haya visto antes. El modal nunca se "agota" porque el estado se reinicia en cada recarga.
+
+**Causa raiz:** En la primera llamada (`initPoints()`, linea 4428), `usuario-session.js` aun no ha cargado, asi que `puntosUsuarioActual()` retorna `{ xp: 0 }` (linea 3925-3933). `getLevel(0)` devuelve "Viajero novato" (`min: 0`). El guard `_ultimoNivelVisto !== null` evita el modal (porque `null !== null` es `false`), pero la linea 4069 setea `_ultimoNivelVisto = 0`, contaminando la variable. Cuando `usuario-session.js` carga la sesion real (ej. 120 XP = "Explorador", `min: 100`), la segunda llamada compara `100 > 0` = `true` y muestra el modal. En la proxima recarga, `_ultimoNivelVisto` se reinicia a `null` y el ciclo se repite.
+
+**Fix:** Cambiar la linea 4069 de:
+```js
+_ultimoNivelVisto = lvl.min;
+```
+a:
+```js
+if(window.ExploraCO && window.ExploraCO.usuario) _ultimoNivelVisto = lvl.min;
+```
+Esto evita que el render pre-sesion contamine `_ultimoNivelVisto` con el valor `0` ("novato"). Solo se persiste el nivel cuando hay sesion real, de modo que el modal solo se muestra cuando el nivel **realmente sube** durante la misma sesion de pagina.
+
+**Estado:** Resuelto. Fix aplicado en `index.html:4069-4071`.
+

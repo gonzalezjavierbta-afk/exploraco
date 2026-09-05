@@ -79,37 +79,37 @@
     return null;
   };
 
-  // ── Sincronizar guardados del localStorage → DB ────────────
+  // ── Sincronizar guardados/visitas del localStorage → DB ────
+  // Tras la migracion estructural de Mi Mapa, mm_saved/mm_visited
+  // guardan SLUGS (no ids posicionales). Aqui se cargan los destinos
+  // y se mapea slug → UUID real para persistir en Neon.
   async function sincronizarGuardados() {
     var usuario = window.ExploraCO.usuario;
     if (!usuario) return;
 
-    // mmSaved viene del index.html
+    // mmSaved/mmVisited vienen del index.html (arrays de slugs)
     var localSaved = [];
+    var localVisited = [];
     try {
-      localSaved = JSON.parse(localStorage.getItem('mm_saved') || '[]');
+      localSaved   = JSON.parse(localStorage.getItem('mm_saved')   || '[]');
+      localVisited = JSON.parse(localStorage.getItem('mm_visited') || '[]');
     } catch (e) {}
 
-    if (!localSaved.length) return;
+    if (!localSaved.length && !localVisited.length) return;
 
-    // Cargar los destinos para mapear IDs locales → UUIDs
     try {
       var res = await fetch(API + '/api/destinos?limit=200');
       var data = await res.json();
       if (!data.ok) return;
 
-      // Mapa de posición Y de id local → UUID
-      var uuidMap = {};
-      data.data.forEach(function (d, i) {
-        uuidMap[i + 1] = d.id;        // posición 1-based → UUID
-        if (d.id_local) uuidMap[d.id_local] = d.id;  // id local si existe
-      });
+      // slug → UUID real
+      var uuidBySlug = {};
+      data.data.forEach(function (d) { if (d.slug) uuidBySlug[d.slug] = d.id; });
 
-      // Guardar cada uno en DB
+      // Guardar cada slug de mmSaved en DB
       var synced = 0;
       for (var i = 0; i < localSaved.length; i++) {
-        var localId = localSaved[i];
-        var uuid = uuidMap[localId];
+        var uuid = uuidBySlug[localSaved[i]];
         if (!uuid || typeof uuid !== 'string' || uuid.length < 10) continue;
         if (!usuario.id || usuario.id.length < 10) continue;
         try {
@@ -124,9 +124,29 @@
           });
           if (syncRes.ok) synced++;
         } catch (e) {
-          console.warn('[session] sync error for id', localId, e.message);
+          console.warn('[session] sync error for slug', localSaved[i], e.message);
         }
       }
+
+      // Marcar visitas desde mmVisited (el backend deduplica)
+      var visitSynced = 0;
+      for (var v = 0; v < localVisited.length; v++) {
+        var vUuid = uuidBySlug[localVisited[v]];
+        if (!vUuid || typeof vUuid !== 'string' || vUuid.length < 10) continue;
+        try {
+          var vRes = await fetch(API + '/api/interacciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo:       'visita',
+              usuario_id: usuario.id,
+              destino_id: vUuid,
+            }),
+          });
+          if (vRes.ok) visitSynced++;
+        } catch (e) {}
+      }
+
       if (synced > 0) mostrarToast('✓ ' + synced + ' lugares sincronizados con tu cuenta', '#16a34a');
     } catch (err) {
       console.warn('[session] Sync error:', err.message);
@@ -134,6 +154,11 @@
   }
 
   // ── Cargar Mi Mapa desde DB ────────────────────────────────
+  // El endpoint /api/interacciones?tipo=mapa responde
+  //   data: { guardados: [uuid...], visitados: [uuid...] }
+  // Tras la migracion estructural de Mi Mapa a slugs, estos metodos
+  // devuelven los UUIDs (no slugs): es el frontend el que los resuelve
+  // a slugs via el campo _uuid de MAPA_PLACES/PL.
   window.ExploraCO.cargarMiMapa = async function () {
     var usuario = window.ExploraCO.usuario;
     if (!usuario) return [];
@@ -141,10 +166,24 @@
     try {
       var res = await fetch(API + '/api/interacciones?tipo=mapa&usuario_id=' + usuario.id);
       var data = await res.json();
-      if (data.ok) return data.data;
+      if (data.ok && data.data) return data.data.guardados || [];
     } catch (e) {}
     return [];
   };
+
+  // ── Cargar visitas confirmadas desde DB ─────────────────────
+  window.ExploraCO.cargarVisitas = async function () {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) return [];
+
+    try {
+      var res = await fetch(API + '/api/interacciones?tipo=mapa&usuario_id=' + usuario.id);
+      var data = await res.json();
+      if (data.ok && data.data) return data.data.visitados || [];
+    } catch (e) {}
+    return [];
+  };
+
 
   // ── Guardar destino en DB ──────────────────────────────────
   window.ExploraCO.guardarDestino = async function (destinoUUID) {
@@ -386,6 +425,28 @@
       return !!data.ok;
     } catch (err) {
       console.warn('[session] quitarGuardado error:', err.message);
+      return false;
+    }
+  };
+
+  // ── Quitar visita confirmada en DB (boton 'Desmarcar' / clearMyMap)
+  window.ExploraCO.quitarVisita = async function (destinoUUID) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) return false;
+    try {
+      var res = await fetch(API + '/api/interacciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo:       'quitar_visita',
+          usuario_id: usuario.id,
+          destino_id: destinoUUID,
+        }),
+      });
+      var data = await res.json();
+      return !!data.ok;
+    } catch (err) {
+      console.warn('[session] quitarVisita error:', err.message);
       return false;
     }
   };

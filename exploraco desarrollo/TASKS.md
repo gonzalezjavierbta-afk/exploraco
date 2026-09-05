@@ -1458,6 +1458,65 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Nota: coords aprox. del Centro (calle 15 #9-64). Directorio sitio
   estatico no incluye la-k-zona (PL embebido, backlog conocido).
 
+### TSK-074: 10 eventos unicos semana 31 ago - 6 sep - seed + loader + smoke + prod
+- **Estado:** COMPLETADA
+- **Detalle:** 10 paginas dinamicas (categoria evento) con eventos reales y
+  unicos de la semana 31 ago al 6 sep 2026 en Colombia, cada uno con su
+  triple de archivos (seed + loader + smoke, patron Fase 9 / TSK-068).
+  Eventos: `semana-del-bienestar-bogota` (bienestar holistico, 31 ago-4
+  sep), `libera-2026-bogota` (feria de coleccionismo y cultura alternativa,
+  Plaza de la Hoja), `festival-teatro-libre-bogota` (teatro contemporaneo
+  en 11 sedes), `hearth-summit-bogota` (encuentro/rave sonoro en
+  la Candelaria), `sabor-bogota` (feria gastronomica, 3-6 sep),
+  `vive-mejor-bogota` (expo de vida saludable), `dia-del-arte-urbano-bogota`
+  (festival de muralismo y street art, 4-6 sep), `ulibro-bucaramanga`
+  (Feria del Libro UNAB, edicion 24 "Habitemos lo salvaje", 28 ago-6 sep,
+  cierre Claudio Narea), `medejazz-medellin` (Festival de Jazz, 30
+  aniversario, 5-19 sep, Orquesta Aragon y Joseph Amado), `travesia-rio-magdalena`
+  (expedicion fluvial del brazo de Loba, 2-6 sep, 20 embarcaciones).
+  Tags JSONB por evento: fecha_inicio/fin, edicion, sede, organiza, lema,
+  pais_invitado, lineup[], agenda[], categorias_entrada[], que_llevar[],
+  prohibido[]. Contenido 100% ASCII-safe (escapes \\uXXXX, 0 no-ASCII).
+- **Evidencia:** los 30 scripts con `node --check` PASS, smokes
+  todos PASS (render len>5000, fechas/sede formateadas, edicion, lineup,
+  agenda, tipos de entrada, que_llevar/prohibido, mapa, balance de divs
+  174-188 abiertos=cerrados). Cargados en produccion via loaders
+  (`POST /api/admin-destinos`, Bearer default) -> todos
+  `status=published` con 5 fotos y 5-6 FAQs. Verificacion HTTP:
+  `https://exploraco.vercel.app/<slug>.html` 200 con 56-59KB y contenido
+  correcto (spot-check ulibro/medejazz + balance divs 0 en prod).
+  Nota: dominio `exploraco.co` no resuelve desde el sandbox, se verifico
+  contra el deployment Vercel. Directorio evento estatico no incluye estos
+  slugs (PL embebido, backlog conocido).
+
+---
+
+### TSK-075: Campo web oficial visible y prominente en el hero de la ficha (pagina-destino.js)
+- **Estado:** COMPLETADA
+- **Detalle:** Auditoria (2026-08-31) revelo que la pagina web oficial
+  (`destinos.web`) se capturaba en 2 formularios (publico `sitio_web`,
+  admin `f-web`) y viajaba en la API, pero SOLO se publicaba como un boton
+  secundario "Sitio web" en la seccion Contacto del detalle
+  (`pagina-destino.js:1554`), sin aparecer en home, directorios ni agenda
+  (pese a que los conectores ya exponian `web`). Decidido (usuario):
+  elevarla a informacion oficial prominente en el hero de la ficha.
+  Cambios en `api/pagina-destino.js`: helper `dominioWeb(u)` (extrae
+  hostname legible sin protocolo ni "www."), chip-link `.hqi.hqilink` en la
+  fila HQI que muestra el dominio como dato visible tras el horario, y boton
+  CTA primario "Sitio web oficial" (`hbtn`) al inicio de `hctar` en el hero.
+  El boton secundario de Contacto se conserva (refuerza, no duplica).
+  Blogs excluidos (un articulo no es un lugar con sitio oficial),
+  consistente con la exclusion actual de `secContact`.
+- **Evidencia:** `node --check` PASS; ASCII-safety 0 bytes >127 y 0
+  backticks; smoke dedicado PASS (con `web` -> boton + chip de dominio en
+  hero + boton Contacto conservado; sin `web` -> ausencia total, divs
+  balanceados 83/78); los 39 smokes existentes siguen PASS tras el cambio
+  y los eventos con `web` (ulibro 180/180, medejazz 188/188) intactos.
+- **Backlog (no implementado, auditado):** home `renderDest()/renderAgenda()`,
+  directorios `renderDir()` (y fallback `var PLACES` sin campo `web`),
+  agenda `toAgendaEvent()`, y schemaLD JSON-LD aun no muestran `web`.
+  Pendiente de decidir si se extiende fuera del hero.
+
 ---
 
 ## Regla de actualizacion

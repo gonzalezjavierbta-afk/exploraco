@@ -1980,7 +1980,7 @@ function renderDest() {
     var ct  = CATS[p.cat] || {label:'Lugar',tbg:'#eee',tc:'#333'};
     var ph  = DEST_PHOTOS[p.id] || '';
     var isFeat  = (DEST_FEATURED_IDS.indexOf(p.id) !== -1);
-    var isSaved = (mmSaved.indexOf(p.id) !== -1);
+    var isSaved = (mmSaved.indexOf(p.slug) !== -1);
 
     var imgTag = ph ? '<img src="'+ph+'" alt="'+p.name+'" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">' : '';
     var featBadge = isFeat ? '<div class="dcard-feat-star">⭐ Destacado</div>' : '';
@@ -2023,15 +2023,17 @@ function renderDest() {
 }
 
 function toggleDestSave(id, el) {
+  /* Migracion estructural Mi Mapa: el almacenamiento es de slugs.
+     Los llamadores (tarjetas de Inspirate) pasan id posicional; aqui
+     se normaliza a slug (idempotente si ya es slug). */
+  id = _slugDeId(id);
   var idx = mmSaved.indexOf(id);
   if(idx===-1){
     mmSaved.push(id);
     el.textContent='♥'; el.classList.add('saved');
     // Guardar en DB si hay sesión
     if(window.ExploraCO && window.ExploraCO.usuario) {
-      // Buscar UUID del destino por posición en PL
-      var destino = (typeof PL !== 'undefined') ? PL[id-1] : null;
-      var uuid = destino ? (destino._uuid || null) : null;
+      var uuid = _uuidDeSlug(id);
       if(uuid) window.ExploraCO.guardarDestino(uuid);
       else if(window.ExploraCO) window.ExploraCO.mostrarToast('♥ Guardado localmente', '#E8A020');
     } else if(window.ExploraCO) {
@@ -2117,8 +2119,8 @@ function updateMMMarkers() {
   var bounds = [];
 
   source.forEach(function(p) {
-    var isSaved   = mmSaved.indexOf(p.id)   !== -1;
-    var isVisited = mmVisited.indexOf(p.id) !== -1;
+    var isSaved   = mmSaved.indexOf(p.slug)   !== -1;
+    var isVisited = mmVisited.indexOf(p.slug) !== -1;
     if(!isSaved && !isVisited) return;
 
     var color   = isVisited ? '#22C55E' : '#E8A020';
@@ -2367,7 +2369,7 @@ function refreshMapaMarkers() {
     var lng = parseFloat(p.lng || 0);
     if(!lat || !lng) return;
 
-    var isSaved = mmSaved.indexOf(p.id) !== -1;
+    var isSaved = mmSaved.indexOf(p.slug) !== -1;
     var color   = p.color || '#E8A020';
     var emoji   = p.emoji || '📍';
     var rating  = parseFloat(p.rating || 0);
@@ -2645,6 +2647,7 @@ function filterMapaPins(cat) {
 }
 
 function toggleMapaSave(id, el) {
+  id = _slugDeId(id);
   var idx = mmSaved.indexOf(id);
   if(idx===-1){ mmSaved.push(id); el.textContent='♥ Guardado'; el.classList.add('saved'); }
   else{ mmSaved.splice(idx,1); el.textContent='♡ Guardar en Mi Viaje'; el.classList.remove('saved'); }
@@ -3167,13 +3170,20 @@ function renderProfileMiniMap() {
   if(!map) return;
   var existing = map.querySelectorAll('.pmm-pin');
   existing.forEach(function(e){ e.remove(); });
-  mmSaved.forEach(function(id) {
-    var pos = MM_PIN_POSITIONS[id]; if(!pos) return;
+  mmSaved.forEach(function(slug) {
+    // slug -> lugar (para emoji) y su id posicional (para la posicion
+    // fija del pin demo MM_PIN_POSITIONS). Post-migracion mmSaved son
+    // slugs; antes eran ids posicionales numericos.
+    var p = null;
+    var pl = (typeof PL !== 'undefined') ? PL : (typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : []);
+    if(typeof slug === 'number') p = pl.find(function(x){ return x.id === slug; });
+    else p = pl.find(function(x){ return x.slug === slug; });
+    var posKey = (p && p.id) ? p.id : (typeof slug === 'number' ? slug : null);
+    var pos = MM_PIN_POSITIONS[posKey]; if(!pos) return;
     var div = document.createElement('div');
-    div.className = 'pmm-pin '+(mmVisited.indexOf(id)!==-1?'v':'s');
+    div.className = 'pmm-pin '+(mmVisited.indexOf(slug)!==-1?'v':'s');
     div.style.top  = pos[1]+'%';
     div.style.left = pos[0]+'%';
-    var p = PL.filter(function(x){ return x.id===id; })[0];
     div.innerHTML = '<span>'+(p?p.emoji:'📍')+'</span>';
     map.appendChild(div);
   });
@@ -3629,8 +3639,8 @@ function renderMMList() {
   var source = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
 
   var filtered = source.filter(function(p) {
-    var isSaved   = mmSaved.indexOf(p.id)   !== -1;
-    var isVisited = mmVisited.indexOf(p.id) !== -1;
+    var isSaved   = mmSaved.indexOf(p.slug)   !== -1;
+    var isVisited = mmVisited.indexOf(p.slug) !== -1;
     if(mmListFilter === 'saved'   && !isSaved)   return false;
     if(mmListFilter === 'visited' && !isVisited) return false;
     if(mmListFilter === 'all'     && !isSaved && !isVisited) return false;
@@ -3654,8 +3664,8 @@ function renderMMList() {
   cont.innerHTML = '';
 
   filtered.forEach(function(p) {
-    var isSaved   = mmSaved.indexOf(p.id)   !== -1;
-    var isVisited = mmVisited.indexOf(p.id) !== -1;
+    var isSaved   = mmSaved.indexOf(p.slug)   !== -1;
+    var isVisited = mmVisited.indexOf(p.slug) !== -1;
     var catLabel = {hostal:'Hospedaje',comida:'Comida',sitio:'Lugar',evento:'Evento'}[p.cat] || '';
     var item = document.createElement('div');
     item.className = 'mm-list-item';
@@ -3671,15 +3681,15 @@ function renderMMList() {
       + '<div class="mm-li-actions"></div>';
     item.innerHTML = inner;
     var actionsDiv = item.querySelector('.mm-li-actions');
-    var pid = p.id; var pslug = p.slug;
+    var pslug = p.slug;
     var visBtn = document.createElement('button');
     visBtn.className = 'mm-li-btn vis-btn';
     visBtn.textContent = isVisited ? 'Desmarcar' : 'Ya fui';
-    visBtn.onclick = function(e){ e.stopPropagation(); mmToggleVisited(pid); };
+    visBtn.onclick = function(e){ e.stopPropagation(); mmToggleVisited(pslug); };
     var delBtn = document.createElement('button');
     delBtn.className = 'mm-li-btn del';
     delBtn.textContent = 'Quitar';
-    delBtn.onclick = function(e){ e.stopPropagation(); mmRemove(pid); };
+    delBtn.onclick = function(e){ e.stopPropagation(); mmRemove(pslug); };
     if(actionsDiv){ actionsDiv.appendChild(visBtn); actionsDiv.appendChild(delBtn); }
     item.onclick = function(){ location.href = pslug + '.html'; };
     cont.appendChild(item);
@@ -3691,8 +3701,8 @@ function renderMMStats() {
   var grid = document.getElementById('mm-stats-grid');
   if(!grid) return;
   var source = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
-  var saved   = source.filter(function(p){ return mmSaved.indexOf(p.id)   !== -1; });
-  var visited = source.filter(function(p){ return mmVisited.indexOf(p.id) !== -1; });
+  var saved   = source.filter(function(p){ return mmSaved.indexOf(p.slug)   !== -1; });
+  var visited = source.filter(function(p){ return mmVisited.indexOf(p.slug) !== -1; });
   var cats = {hostal:0, comida:0, sitio:0, evento:0};
   saved.forEach(function(p){ if(cats[p.cat]!==undefined) cats[p.cat]++; });
   var cities = [...new Set(saved.map(function(p){ return p.city; }))];
@@ -3720,6 +3730,7 @@ function renderMMStats() {
 
 /* ── Toggle visited from list ── */
 function mmToggleVisited(id) {
+  id = _slugDeId(id);
   var idx = mmVisited.indexOf(id);
   if(idx === -1) {
     mmVisited.push(id);
@@ -3735,18 +3746,26 @@ function mmToggleVisited(id) {
 
 /* ── Remove from mapa ── */
 function mmRemove(id) {
+  id = _slugDeId(id);
   mmSaved   = mmSaved.filter(function(x){ return x !== id; });
   mmVisited = mmVisited.filter(function(x){ return x !== id; });
   try{ localStorage.setItem('mm_saved',   JSON.stringify(mmSaved));   }catch(e){}
   try{ localStorage.setItem('mm_visited', JSON.stringify(mmVisited)); }catch(e){}
   renderMyMap();
   renderMMList();
+  // Reactive con sesion: quitar tambien de Neon (guardado y visita).
+  var usuario = window.ExploraCO && window.ExploraCO.usuario;
+  var uuid = usuario ? _uuidDeSlug(id) : null;
+  if(uuid) {
+    if(window.ExploraCO.quitarGuardado) window.ExploraCO.quitarGuardado(uuid).then(function(){ updatePointsUI(); });
+    if(window.ExploraCO.quitarVisita)   window.ExploraCO.quitarVisita(uuid).then(function(){ updatePointsUI(); });
+  }
 }
 
 /* ── Share ── */
 function shareMyMap() {
   var source = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
-  var saved = source.filter(function(p){ return mmSaved.indexOf(p.id) !== -1; });
+  var saved = source.filter(function(p){ return mmSaved.indexOf(p.slug) !== -1; });
   if(!saved.length) {
     alert('Guarda algunos lugares primero para compartir tu mapa.');
     return;
@@ -3772,9 +3791,32 @@ function shareMyMap() {
 function clearMyMap() {
   if(!mmSaved.length && !mmVisited.length) return;
   if(!confirm('¿Limpiar todo tu mapa personal? Se eliminarán ' + mmSaved.length + ' lugares guardados.')) return;
+
+  // Snapshot de UUIDs antes de vaciar: usamos las fuentes de datos para
+  // resolver slug → UUID real y asi purgar tambien Neon (clearMyMap
+  // reactivo a la sesion). Sin sesion solo se limpia el localStorage.
+  var usuario = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  var uuids = [];
+  if(usuario) {
+    mmSaved.concat(mmVisited).forEach(function(slug){
+      var u = _uuidDeSlug(slug);
+      if(u && uuids.indexOf(u) === -1) uuids.push(u);
+    });
+  }
+
   mmSaved = []; mmVisited = [];
   try{ localStorage.removeItem('mm_saved'); }catch(e){}
   try{ localStorage.removeItem('mm_visited'); }catch(e){}
+
+  // Purga en Neon (fire & forget, no bloquea la limpieza local)
+  if(usuario && uuids.length) {
+    uuids.forEach(function(u){
+      if(window.ExploraCO.quitarGuardado) window.ExploraCO.quitarGuardado(u);
+      if(window.ExploraCO.quitarVisita)   window.ExploraCO.quitarVisita(u);
+    });
+    if(typeof window.onExploraCOUpdate === 'function') window.onExploraCOUpdate();
+  }
+
   renderMyMap();
   renderMMList();
 }
@@ -3795,6 +3837,10 @@ function updateMMEmptyState() {
    UUIDs -> ids posicionales. Es idempotente (flag interno). */
 var _origRenderMyMap = renderMyMap;
 renderMyMap = function() {
+  /* Migracion estructural Mi Mapa: convertir aqui los ids posicionales
+     legacy de mm_saved/mm_visited a slugs, cuando MAPA_PLACES/PL ya
+     tienen datos para mapear id -> slug (idempotente). */
+  try{ _migrarMM(); }catch(e){}
   _origRenderMyMap();
   updateMMEmptyState();
   var lc = document.querySelector('#mm-tab-lista span');
@@ -3811,7 +3857,7 @@ renderMyMap = function() {
   var source = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
   slugs.forEach(function(slug) {
     var place = source.find(function(p){ return p.slug === slug; });
-    if(place && mmSaved.indexOf(place.id) === -1) mmSaved.push(place.id);
+    if(place && mmSaved.indexOf(place.slug) === -1) mmSaved.push(place.slug);
   });
   try{ localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); }catch(e){}
   renderMyMap();
@@ -4020,7 +4066,9 @@ function updatePointsUI() {
   if(_ultimoNivelVisto !== null && lvl.min > _ultimoNivelVisto) {
     setTimeout(function(){ showLevelUpModal(lvl, pu.xp); }, 800);
   }
-  _ultimoNivelVisto = lvl.min;
+  // BUG-028 fix: solo persistir cuando hay sesion real para que el
+  // render pre-sesión (xp=0) no contamine _ultimoNivelVisto con 0.
+  if(window.ExploraCO && window.ExploraCO.usuario) _ultimoNivelVisto = lvl.min;
 }
 
 /* ── ORGANIZAR ACTIVIDAD (Fase 3: Interfaz Adaptativa / Divulgacion
@@ -4174,6 +4222,70 @@ function _uuidDeId(id) {
   return null;
 }
 
+// ── Helpers de la migracion estructural de Mi Mapa (slugs) ──
+// mm_saved/mm_visited guardan SLUGS estables (no ids posicionales).
+// Estos helpers resuelven en ambos sentidos usando los campos
+// id (posicional), slug y _uuid (UUID real de Neon) de
+// MAPA_PLACES/PL.
+
+// id posicional → slug. Si no se encuentra, devuelve el id tal cual
+// (fallback benigno para ids que aun no aparecen en el catalogo).
+function _slugDeId(id) {
+  var fuentes = [
+    typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : null,
+    typeof PL !== 'undefined' ? PL : null,
+  ];
+  for(var i = 0; i < fuentes.length; i++) {
+    if(!fuentes[i]) continue;
+    var item = fuentes[i].find(function(p){ return p.id === id; });
+    if(item && item.slug) return item.slug;
+  }
+  return id;
+}
+
+// slug → UUID real (para persistir en DB) o null.
+function _uuidDeSlug(slug) {
+  if(!slug) return null;
+  var fuentes = [
+    typeof MAPA_PLACES !== 'undefined' ? MAPA_PLACES : null,
+    typeof PL !== 'undefined' ? PL : null,
+  ];
+  for(var i = 0; i < fuentes.length; i++) {
+    if(!fuentes[i]) continue;
+    var item = fuentes[i].find(function(p){ return p.slug === slug; });
+    if(item && item._uuid && _uuidRe.test(item._uuid)) return item._uuid;
+  }
+  return null;
+}
+
+// Migra el formato LEGACY de mm_saved/mm_visited: antes guardaban ids
+// posicionales (numeros). Tras este cambio guardan slugs. Detecta
+// entradas numericas y las convierte a slug en una unica pasada
+// idempotente (se reescribe el localStorage solo si hubo cambios).
+// Debe correr cuando MAPA_PLACES/PL ya tienen datos para poder
+// mapear id posicional → slug. Se reasignan mmSaved/mmVisited (son
+// `var` y el resto del codigo ya les reasigna []), de modo que la
+// referencia se mantiene coherente.
+function _migrarMM() {
+  var cambiado = false;
+
+  function migrarArr(lista, clave) {
+    var hayNum = lista.some(function(x){ return typeof x === 'number'; });
+    if(!hayNum) return null;
+    var nuevo = lista.map(function(x){
+      return (typeof x === 'number') ? _slugDeId(x) : x;
+    });
+    try{ localStorage.setItem(clave, JSON.stringify(nuevo)); }catch(e){}
+    return nuevo;
+  }
+
+  var s = migrarArr(mmSaved, 'mm_saved');
+  if(s) { mmSaved = s; cambiado = true; }
+  var v = migrarArr(mmVisited, 'mm_visited');
+  if(v) { mmVisited = v; cambiado = true; }
+  return cambiado;
+}
+
 var _mmHidratado = false;
 /* ── Hidratar guardados desde Neon (usuarios con sesion) ──
    Al iniciar, mmSaved solo contiene lo que vive en el localStorage de
@@ -4181,13 +4293,15 @@ var _mmHidratado = false;
    (o limpio su almacenamiento), esos guardados existen en la tabla
    interacciones pero nunca se muestran: ExploraCO.cargarMiMapa()
    existia en usuario-session.js y nadie la llamaba. Esta rutina trae
-   los UUID activos, los mapea a ids posicionales via el campo _uuid de
-   MAPA_PLACES/PL (mismo convenio de _uuidDeId, en sentido inverso) y
-   los une a mmSaved. Idempotente via flag; se dispara desde el wrapper
-   de renderMyMap y desde onExploraCOUpdate (login sin reload). No toca
-   mmVisited: el endpoint tipo=mapa solo devuelve guardados. Si no hay
-   sesion o MAPA_PLACES todavia esta vacio, sale sin marcar el flag para
-   reintentar en el proximo render. */
+   los UUID activos y los mapea a SLUGS via el campo _uuid de
+   MAPA_PLACES/PL (mismo convenio de _uuidDeSlug, en sentido inverso),
+   uniendolos a mmSaved/mmVisited. Tras la migracion estructural, Mi
+   Mapa guarda slugs, asi que aqui persistimos slugs en localStorage.
+   Ambienta guardados (cargarMiMapa) y visitas (cargarVisitas): ambas
+   vienen del mismo endpoint tipo=mapa. Idempotente via flag; se
+   dispara desde el wrapper de renderMyMap y desde onExploraCOUpdate
+   (login sin reload). Si no hay sesion o MAPA_PLACES todavia esta
+   vacio, sale sin marcar el flag para reintentar en el proximo render. */
 function _hidratarGuardadosDB() {
   if(_mmHidratado) return;
   var usuario = window.ExploraCO && window.ExploraCO.usuario;
@@ -4200,23 +4314,37 @@ function _hidratarGuardadosDB() {
   var hayDatos = fuentes.some(function(f){ return f.length > 0; });
   if(!hayDatos) return;
   _mmHidratado = true;
-  Promise.resolve(window.ExploraCO.cargarMiMapa()).then(function(uuids){
-    if(!uuids || !uuids.length) return;
+
+  function slugDeUuid(u) {
+    for(var i = 0; i < fuentes.length; i++) {
+      var hit = fuentes[i].find(function(p){ return p._uuid === u; });
+      if(hit && hit.slug) return hit.slug;
+    }
+    return null;
+  }
+
+  function mezclarEn(arr, key, uuids) {
+    if(!uuids || !uuids.length) return 0;
     var nuevos = 0;
     uuids.forEach(function(u){
-      for(var i = 0; i < fuentes.length; i++) {
-        var hit = fuentes[i].find(function(p){ return p._uuid === u; });
-        if(hit && mmSaved.indexOf(hit.id) === -1) {
-          mmSaved.push(hit.id);
-          nuevos++;
-          break;
-        }
-      }
+      var slug = slugDeUuid(u);
+      if(slug && arr.indexOf(slug) === -1) { arr.push(slug); nuevos++; }
     });
     if(nuevos > 0) {
-      try{ localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); }catch(e){}
-      renderMyMap();
+      try{ localStorage.setItem(key, JSON.stringify(arr)); }catch(e){}
     }
+    return nuevos;
+  }
+
+  Promise.all([
+    Promise.resolve(window.ExploraCO.cargarMiMapa()),
+    typeof window.ExploraCO.cargarVisitas === 'function'
+      ? Promise.resolve(window.ExploraCO.cargarVisitas())
+      : Promise.resolve([]),
+  ]).then(function(rs){
+    var nSaved   = mezclarEn(mmSaved,   'mm_saved',   rs[0]);
+    var nVisited = mezclarEn(mmVisited, 'mm_visited', rs[1]);
+    if(nSaved > 0 || nVisited > 0) renderMyMap();
   }).catch(function(e){
     console.warn('[mi-mapa] hidratacion DB fallo:', e && e.message);
   });
@@ -4224,17 +4352,19 @@ function _hidratarGuardadosDB() {
 
 var _origToggleDestSave = typeof toggleDestSave !== 'undefined' ? toggleDestSave : null;
 function toggleDestSave(id, btn) {
-  var wasNew = mmSaved.indexOf(id) === -1;
-  if(_origToggleDestSave) _origToggleDestSave(id, btn);
+  /* Migracion estructural: el wrapper y el orig normalizan a slug. */
+  var slug = _slugDeId(id);
+  var wasNew = mmSaved.indexOf(slug) === -1;
+  if(_origToggleDestSave) _origToggleDestSave(slug, btn);
   else {
-    var idx = mmSaved.indexOf(id);
-    if(idx===-1){ mmSaved.push(id); if(btn){btn.textContent='♥';btn.classList.add('saved');} }
+    var idx = mmSaved.indexOf(slug);
+    if(idx===-1){ mmSaved.push(slug); if(btn){btn.textContent='♥';btn.classList.add('saved');} }
     else { mmSaved.splice(idx,1); if(btn){btn.textContent='♡';btn.classList.remove('saved');} }
     try{ localStorage.setItem('mm_saved',JSON.stringify(mmSaved)); }catch(e){}
     renderMyMap();
   }
   var usuario = window.ExploraCO && window.ExploraCO.usuario;
-  var uuid = usuario ? _uuidDeId(id) : null;
+  var uuid = usuario ? _uuidDeSlug(slug) : null;
   if(uuid) {
     var accion = wasNew ? window.ExploraCO.guardarDestino(uuid) : window.ExploraCO.quitarGuardado(uuid);
     Promise.resolve(accion).then(function(){ updatePointsUI(); });
@@ -4243,22 +4373,26 @@ function toggleDestSave(id, btn) {
 
 var _origMmToggleVisited = typeof mmToggleVisited !== 'undefined' ? mmToggleVisited : null;
 function mmToggleVisited(id) {
-  var wasNew = mmVisited.indexOf(id) === -1;
-  if(_origMmToggleVisited) _origMmToggleVisited(id);
+  var slug = _slugDeId(id);
+  var wasNew = mmVisited.indexOf(slug) === -1;
+  if(_origMmToggleVisited) _origMmToggleVisited(slug);
   else {
-    var idx = mmVisited.indexOf(id);
-    if(idx===-1){ mmVisited.push(id); if(mmSaved.indexOf(id)===-1) mmSaved.push(id); }
+    var idx = mmVisited.indexOf(slug);
+    if(idx===-1){ mmVisited.push(slug); if(mmSaved.indexOf(slug)===-1) mmSaved.push(slug); }
     else mmVisited.splice(idx,1);
     try{ localStorage.setItem('mm_visited',JSON.stringify(mmVisited)); }catch(e){}
     try{ localStorage.setItem('mm_saved',JSON.stringify(mmSaved)); }catch(e){}
     renderMyMap(); renderMMList();
   }
-  // Solo se marca visita real al pasar de no-visitado a visitado: no
-  // existe (ni tiene sentido) un 'quitar_visita' en el backend.
+  // Reactive con sesion: al marcar visita se persiste en Neon; al
+  // desmarcar ('Desmarcar') se quita la fila de visita via
+  // quitarVisita (backend quitar_visita).
   var usuario = window.ExploraCO && window.ExploraCO.usuario;
-  var uuid = (wasNew && usuario) ? _uuidDeId(id) : null;
+  var uuid = usuario ? _uuidDeSlug(slug) : null;
   if(uuid) {
-    window.ExploraCO.marcarVisitado(uuid).then(function(){ updatePointsUI(); });
+    if(wasNew) window.ExploraCO.marcarVisitado(uuid).then(function(){ updatePointsUI(); });
+    else if(typeof window.ExploraCO.quitarVisita === 'function')
+      window.ExploraCO.quitarVisita(uuid).then(function(){ updatePointsUI(); });
   }
 }
 
@@ -4284,6 +4418,7 @@ if(_origSaveProfile) {
    real termine de cargar. */
 window.onExploraCOUpdate = function(){
   try{ updatePointsUI(); }catch(e){}
+  try{ _migrarMM(); }catch(e){}
   /* TSK-070: cubre el caso de login sin reload (y el arranque con
      sesion ya lista antes de que MAPA_PLACES se llene -- ahi la
      funcion sale sin marcar su flag y reintenta en el proximo

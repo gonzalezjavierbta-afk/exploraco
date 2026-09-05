@@ -81,6 +81,17 @@ function money(n) {
   return '$' + parts.join('');
 }
 
+// Extrae el dominio legible de una URL web (sin protocolo ni "www.")
+// para mostrarlo como informacion oficial visible en el hero (TSK-075).
+function dominioWeb(u) {
+  if (!u) return '';
+  var h = '';
+  try { h = new URL(u).hostname; } catch (e) { h = String(u); }
+  h = h.replace(/^www\./, '');
+  if (!h && u) h = String(u);
+  return h;
+}
+
 function schemaLD(d, cat, autor) {
   var tipos = { hostal:'LodgingBusiness', comida:'FoodEstablishment', sitio:'TouristAttraction', evento:'Event', blog:'BlogPosting' };
   var schema = {
@@ -137,6 +148,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.95;letter-spacing:.5px}"
 +".hsub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.8;max-width:480px}"
 +".hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}"
++".hqi.hqilink{color:var(--gold);text-decoration:none}.hqi.hqilink:hover{text-decoration:underline}"
 +".hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}"
 +".hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}"
 +".hobtn{background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}"
@@ -628,6 +640,8 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
     if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
     if (duracion)      hqi.push('<div class="hqi">\u23F1 '+esc(duracion)+'</div>');
     if (horarioVisita) hqi.push('<div class="hqi">\u23F0 '+esc(horarioVisita)+'</div>');
+    // TSK-075: la pagina web oficial como informacion prominente del hero
+    if (d.web) hqi.push('<a class="hqi hqilink" href="'+esc(d.web)+'" target="_blank">\uD83C\uDF10 '+esc(dominioWeb(d.web))+'</a>');
   }
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
@@ -1664,6 +1678,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
       + (d.lead ? '<p class="hsub">'+esc(d.lead)+'</p>' : '')
       + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
       + '<div class="hctar">'
+      + (d.web ? '<button class="hbtn" onclick="window.open(\''+esc(d.web)+'\',\'_blank\')">\uD83C\uDF10 Sitio web oficial</button>' : '')
       + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
       + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
       + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
