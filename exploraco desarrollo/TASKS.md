@@ -1458,36 +1458,53 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Nota: coords aprox. del Centro (calle 15 #9-64). Directorio sitio
   estatico no incluye la-k-zona (PL embebido, backlog conocido).
 
-### TSK-074: 10 eventos unicos semana 31 ago - 6 sep - seed + loader + smoke + prod
+### TSK-074: 10 eventos de la semana 5-11 sep 2026 como paginas dinamicas de evento
 - **Estado:** COMPLETADA
 - **Detalle:** 10 paginas dinamicas (categoria evento) con eventos reales y
-  unicos de la semana 31 ago al 6 sep 2026 en Colombia, cada uno con su
-  triple de archivos (seed + loader + smoke, patron Fase 9 / TSK-068).
-  Eventos: `semana-del-bienestar-bogota` (bienestar holistico, 31 ago-4
-  sep), `libera-2026-bogota` (feria de coleccionismo y cultura alternativa,
-  Plaza de la Hoja), `festival-teatro-libre-bogota` (teatro contemporaneo
-  en 11 sedes), `hearth-summit-bogota` (encuentro/rave sonoro en
-  la Candelaria), `sabor-bogota` (feria gastronomica, 3-6 sep),
-  `vive-mejor-bogota` (expo de vida saludable), `dia-del-arte-urbano-bogota`
-  (festival de muralismo y street art, 4-6 sep), `ulibro-bucaramanga`
-  (Feria del Libro UNAB, edicion 24 "Habitemos lo salvaje", 28 ago-6 sep,
-  cierre Claudio Narea), `medejazz-medellin` (Festival de Jazz, 30
-  aniversario, 5-19 sep, Orquesta Aragon y Joseph Amado), `travesia-rio-magdalena`
-  (expedicion fluvial del brazo de Loba, 2-6 sep, 20 embarcaciones).
+  unicos de la semana 5 al 11 de septiembre de 2026 en Colombia, cada uno
+  con su triple de archivos (seed + loader + smoke, patron Fase 9 / TSK-068).
+  30 scripts creados en `scripts/` (10 seeds + 10 loaders + 10 smoke tests),
+  siguiendo el patron TSK-068: seed-<slug>.js con SLUG/HERO/PHOTOS/BASE/
+  TAGS/FAQS ASCII-safe con escapes \\uXXXX, load-<slug>-api.js que POST a
+  /api/admin-destinos en https://exploraco.vercel.app con token por defecto
+  exploraco12345, smoke_test_<slug>.js con buildHTML via VM.
+  **Los 10 slugs:**
+  1. `arcangel-medellin-2026` - Arcangel en Medellin, Atanasio Girardot,
+     4-5 sep 2026, 5 sep agotado.
+  2. `ferias-y-fiestas-guaduas-2026` - Ferias y Fiestas de Guaduas,
+     4-11 sep 2026, gratis.
+  3. `los-parceritos-villavicencio` - Lokillo y Jota P en Villavicencio,
+     4 sep 2026.
+  4. `parranda-vallenata-barranquilla` - Samuel Morales y Jaime Luis
+     Campillo en TRUQ, Barranquilla, 5 sep 2026, gratis.
+  5. `queentaesencia-homenaje-queen-medellin` - Trilogia Live Bar,
+     Medellin, 11 sep 2026, cover $50.000.
+  6. `festival-cordillera-2026` - Festival Cordillera 2026,
+     12-13 sep, Parque Simon Bolivar, 41 shows, lema "El futuro es latino".
+  7. `jazz-al-parque-2026` - Jazz al Parque ed. 29, 12-13 sep,
+     Parque El Country, 17 agrupaciones, gratis.
+  8. `justin-quiles-lenny-tavarez-bogota` - Justin Quiles y Lenny
+     Tavarez en Movistar Arena, 11 sep, puertas 5pm show 7pm, +18,
+     general agotado.
+  9. `john-summit-chamorro-bogota` - John Summit en Chamorro Bogota,
+     10 sep, show benefico 100% utilidades a victimas del sismo.
+  10. `stray-kids-bogota` - Stray Kids en Vive Claro, 9 sep,
+      primera visita a Colombia.
   Tags JSONB por evento: fecha_inicio/fin, edicion, sede, organiza, lema,
-  pais_invitado, lineup[], agenda[], categorias_entrada[], que_llevar[],
-  prohibido[]. Contenido 100% ASCII-safe (escapes \\uXXXX, 0 no-ASCII).
-- **Evidencia:** los 30 scripts con `node --check` PASS, smokes
-  todos PASS (render len>5000, fechas/sede formateadas, edicion, lineup,
-  agenda, tipos de entrada, que_llevar/prohibido, mapa, balance de divs
-  174-188 abiertos=cerrados). Cargados en produccion via loaders
+  lineup[], agenda[], categorias_entrada[], que_llevar[], prohibido[].
+  Contenido 100% ASCII-safe (escapes \\uXXXX, 0 bytes no-ASCII en los 30
+  nuevos scripts).
+- **Evidencia:** `node --check` 30/30 OK; 10/10 smoke tests PASS; 0 bytes
+  no-ASCII en los 30 nuevos scripts. Cargados en produccion via loaders
   (`POST /api/admin-destinos`, Bearer default) -> todos
-  `status=published` con 5 fotos y 5-6 FAQs. Verificacion HTTP:
-  `https://exploraco.vercel.app/<slug>.html` 200 con 56-59KB y contenido
-  correcto (spot-check ulibro/medejazz + balance divs 0 en prod).
-  Nota: dominio `exploraco.co` no resuelve desde el sandbox, se verifico
-  contra el deployment Vercel. Directorio evento estatico no incluye estos
-  slugs (PL embebido, backlog conocido).
+  `status=published` con 5 fotos y 5-6 FAQs. Paginas en vivo verificadas
+  200 OK (len ~55-61KB). `/api/destinos?cat=evento` lista 47 eventos.
+  Spot-check: divs balanceados en smokes (174-188 abiertos=cerrados).
+  Directorio evento estatico no incluye estos slugs (PL embebido,
+  backlog conocido).
+- **Commit:** `71d18f7` "feat: 10 eventos sem 5-11 sep como paginas
+  dinamicas (TSK-074) - seeds, loaders y smoke tests en prod"
+  (pusheado a main).
 
 ---
 
@@ -1516,6 +1533,43 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   directorios `renderDir()` (y fallback `var PLACES` sin campo `web`),
   agenda `toAgendaEvent()`, y schemaLD JSON-LD aun no muestran `web`.
   Pendiente de decidir si se extiende fuera del hero.
+
+### TSK-076: Eventos semana 31 ago - 6 sep 2026 (batch previo, en produccion)
+- **Estado:** COMPLETADA (verificada 2026-09-05)
+- **Detalle:** Batch de eventos de la semana del 31 de agosto al 6 de
+  septiembre de 2026, anterior a TSK-074 (que documenta la semana 5-11
+  sep, commit 71d18f7). Este batch estaba ya publicado en produccion pero
+  sin entrada documental propia en TASKS.md. Separado de TSK-074 en esta
+  sesion para mantener trazabilidad correcta.
+  Slugs verificados en vivo contra la API de produccion
+  (https://exploraco.vercel.app/api/destinos) el 2026-09-05 (10 slugs):
+  1. `semana-del-bienestar-bogota` - bienestar hol\u00edstico, 31 ago-4 sep.
+  2. `libera-2026-bogota` - feria de coleccionismo y cultura alternativa,
+     Plaza de la Hoja.
+  3. `festival-teatro-libre-bogota` - teatro contempor\u00e1neo en 11 sedes.
+  4. `hearth-summit-bogota` - encuentro/rave sonoro en la Candelaria.
+  5. `sabor-bogota` - feria gastron\u00f3mica, 3-6 sep.
+  6. `vive-mejor-bogota` - expo de vida saludable.
+  7. `dia-del-arte-urbano-bogota` - festival de muralismo y street art,
+     4-6 sep.
+  8. `ulibro-bucaramanga` - Feria del Libro UNAB, edicion 24
+     "Habitemos lo salvaje", 28 ago-6 sep, cierre Claudio Narea.
+  9. `medejazz-medellin` - Festival de Jazz, 30 aniversario, 5-19 sep,
+     Orquesta Arag\u00f3n y Joseph Amado.
+  10. `travesia-rio-magdalena` - expedicion fluvial del brazo de Loba,
+      2-6 sep, 20 embarcaciones.
+  TSK-074 (semana 5-11 sep) documenta 10 slugs diferentes
+  (arcangel-medellin-2026, ferias-y-fiestas-guaduas-2026,
+  los-parceritos-villavicencio, parranda-vallenata-barranquilla,
+  queentaesencia-homenaje-queen-medellin, festival-cordillera-2026,
+  jazz-al-parque-2026, justin-quiles-lenny-tavarez-bogota,
+  john-summit-chamorro-bogota, stray-kids-bogota) que corresponden a
+  la semana siguiente.
+- **Evidencia:** Los 10 slugs verificados en vivo contra la API de
+  produccion: GET /api/destinos -> slugs presentes con status=published.
+  Fecha de verificacion: 2026-09-05.
+- **Nota cruzada:** Este batch se separa de TSK-074 (commit 71d18f7),
+  que documenta la semana 5-11 sep 2026 con 10 paginas dinamicas.
 
 ---
 

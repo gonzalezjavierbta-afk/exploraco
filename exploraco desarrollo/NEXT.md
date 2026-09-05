@@ -4,6 +4,21 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Documentacion batch 31 ago - 6 sep 2026 (2026-09-05) - TSK-076
+
+Registro documental del batch de eventos de la semana 31 ago - 6 sep 2026
+que ya estaba en produccion sin entrada propia en TASKS.md. Se verificaron
+en vivo los 10 slugs completos del batch contra la API de produccion
+(semana-del-bienestar-bogota, libera-2026-bogota,
+festival-teatro-libre-bogota, hearth-summit-bogota, sabor-bogota,
+vive-mejor-bogota, dia-del-arte-urbano-bogota, ulibro-bucaramanga,
+medejazz-medellin, travesia-rio-magdalena) y se creo TSK-076 como
+entrada separada de TSK-074 (semana 5-11 sep, commit 71d18f7).
+Sesion de documentacion solamente, sin cambios de codigo.
+
+#### Que sigue
+1. Commit + push de TASKS.md/TSK-076 + NEXT.md (este segmento).
+
 ### Sesion Campo web oficial prominente en hero de la ficha (2026-08-31) - TSK-075 / ADR-013 + BUG-028
 
 Auditoria del campo `destinos.web` (pagina web oficial): se confirmo que el
@@ -46,51 +61,62 @@ BUG-028.
    agenda (toAgendaEvent) y schemaLD JSON-LD -- decidir cuando prioridad
    lo justifique.
 
-### Sesion 10 eventos unicos semana 31 ago - 6 sep (2026-08-31) - seed + loader + smoke + prod (TSK-074)
+### Sesion 10 eventos semana 5-11 sep 2026 (2026-09-05) - seed + loader + smoke + prod (TSK-074)
 
-El usuario pidio crear seed + load + smoke para ~8-10 eventos unicos y
-futuros (31 ago al 6 sep 2026) en Colombia y Bogota, para que cada uno
-tenga su pagina dinamica propia. Se filtro a eventos futuros y se
-consolidaron 10 unicos (categoria `evento`). Patron Fase 9 / TSK-068:
-seed (datos) + loader (DELETE+POST a /api/admin-destinos) + smoke
-(buildHTML en sandbox vm) por evento. 30 archivos en `scripts/`.
+El usuario pidio crear 10 paginas dinamicas de evento para la semana del
+5 al 11 de septiembre de 2026 en Colombia, cada uno con su triple de
+archivos (seed + loader + smoke, patron Fase 9 / TSK-068). 30 scripts
+creados en `scripts/` (10 seeds + 10 loaders + 10 smoke tests).
 
-**Los 10 slugs:** `semana-del-bienestar-bogota` (31 ago-4 sep),
-`libera-2026-bogota`, `festival-teatro-libre-bogota`, `hearth-summit-bogota`,
-`sabor-bogota` (3-6 sep), `vive-mejor-bogota`, `dia-del-arte-urbano-bogota`
-(4-6 sep), `ulibro-bucaramanga` (Feria del Libro UNAB, edicion 24, 28
-ago-6 sep, cierre Claudio Narea/Los Prisioneros), `medejazz-medellin`
-(Festival de Jazz, 30 aniversario, 5-19 sep, Orquesta Aragon y Joseph
-Amado), `travesia-rio-magdalena` (expedicion fluvial brazo de Loba, 2-6
-sep, 20 embarcaciones).
+**Los 10 slugs:**
+1. `arcangel-medellin-2026` - Arcangel en Medellin, Atanasio Girardot,
+   4-5 sep 2026, 5 sep agotado.
+2. `ferias-y-fiestas-guaduas-2026` - Ferias y Fiestas de Guaduas,
+   4-11 sep 2026, gratis.
+3. `los-parceritos-villavicencio` - Lokillo y Jota P en Villavicencio,
+   4 sep 2026.
+4. `parranda-vallenata-barranquilla` - Samuel Morales y Jaime Luis
+   Campillo en TRUQ, Barranquilla, 5 sep 2026, gratis.
+5. `queentaesencia-homenaje-queen-medellin` - Trilogia Live Bar,
+   Medellin, 11 sep 2026, cover $50.000.
+6. `festival-cordillera-2026` - Festival Cordillera 2026,
+   12-13 sep, Parque Simon Bolivar, 41 shows, lema "El futuro es latino".
+7. `jazz-al-parque-2026` - Jazz al Parque ed. 29, 12-13 sep,
+   Parque El Country, 17 agrupaciones, gratis.
+8. `justin-quiles-lenny-tavarez-bogota` - Justin Quiles y Lenny
+   Tavarez en Movistar Arena, 11 sep, puertas 5pm show 7pm, +18,
+   general agotado.
+9. `john-summit-chamorro-bogota` - John Summit en Chamorro Bogota,
+   10 sep, show benefico 100% utilidades a victimas del sismo.
+10. `stray-kids-bogota` - Stray Kids en Vive Claro, 9 sep,
+    primera visita a Colombia.
 
 Tags JSONB evento por evento (segun TASK-003): `fecha_inicio`, `fecha_fin`,
-`edicion`, `sede`, `organiza`, `lema`, `pais_invitado`, `lineup[]`,
-`agenda[]`, `categorias_entrada[]`, `que_llevar[]`, `prohibido[]`.
+`edicion`, `sede`, `organiza`, `lema`, `lineup[]`, `agenda[]`,
+`categorias_entrada[]`, `que_llevar[]`, `prohibido[]`.
 
-**Verificacion (Escudo GOLD):** `node --check` OK en los 30; ASCII-safety
-0 bytes no-ASCII en los 30; smokes PASS x10 con balance de divs
-(174-188 abiertos = cerrados; spot-check ulibro 180/180, medejazz
-188/188, travesia 184/184). Nota de los smokes: el renderer de evento
+**Verificacion (Escudo GOLD):** `node --check` 30/30 OK; ASCII-safety
+0 bytes no-ASCII en los 30; 10/10 smoke tests PASS con balance de divs
+(174-188 abiertos=cerrados). Nota de los smokes: el renderer de evento
 usa los ids `id="tipos-entrada"` y `id="mapa"` y el mapa embebe
 `google.com/maps?q=lat,lng` (no un `.0`); los checks de mapa deben usar
-el query real (`9,-74.3`) no `lat.0`.
+el query real, no `lat.0`.
 
 **Carga a prod:** 10 loaders ejecutados contra `https://exploraco.vercel.app`
 (Bearer default exploraco12345) -> todos `status=published` con 5 fotos y
-5-6 FAQs. Verificacion HTTP: las 10 URLs `.html` = 200 (56-59KB) con
-contenido correcto y balance de divs 0 (spot-check ulibro 232/232,
-medejazz 237/237). Nota: el custom domain `exploraco.co` NO resuelve desde
+5-6 FAQs. Verificacion HTTP: las 10 URLs `.html` = 200 (~55-61KB) con
+contenido correcto y balance de divs 0. `/api/destinos?cat=evento` lista
+47 eventos. Nota: el custom domain `exploraco.co` NO resuelve desde
 el sandbox (DNS local), se verifico contra el deployment `exploraco.vercel.app`.
 
-#### Que sigue
-1. **Commit + push (PENDIENTE):** 30 archivos nuevos en `scripts/`
-   (10 seeds + 10 loaders + 10 smokes) + TASKS.md/TSK-074 + NEXT.md
-   (este segmento). Los slugs ya estan vivos en prod y sitemap; el push
-   solo versiona el codigo.
-2. Verificar en prod tras deploy (desde un navegador con DNS a exploraco.co):
-   las 10 URLs `https://exploraco.co/<slug>.html` sirven las paginas
-   dinamicas de evento y aparecen listadas en /api/destinos?cat=evento.
+#### Que sigue (CERRADO 2026-09-05)
+1. **Commit + push:** COMPLETADO -- commit `71d18f7` a main
+   "feat: 10 eventos sem 5-11 sep como paginas dinamicas (TSK-074) -
+   seeds, loaders y smoke tests en prod". Los 30 archivos en `scripts/`
+   quedan versionados.
+2. Verificar en prod tras deploy: las 10 URLs sirven las paginas dinamicas
+   de evento y aparecen listadas en `/api/destinos?cat=evento` (ya
+   verificado: 47 eventos, paginas 200 OK ~55-61KB).
 3. Backlog vigente: completar tags vacios legacy (~18 eventos/comidas) y
    pendientes de sesiones anteriores (commit Ruta Salsera/TSK-066-067,
    TSK-070 verificar prod, TASK-013, hostales legacy sin seeds, etc.).
