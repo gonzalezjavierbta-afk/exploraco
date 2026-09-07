@@ -15,7 +15,7 @@ var STATIC_PAGES = [
   { loc:'/directorio-sitio.html',   priority:'0.9', freq:'daily'   },
   { loc:'/directorio-evento.html',  priority:'0.9', freq:'daily'   },
   { loc:'/publicar.html',           priority:'0.6', freq:'monthly' },
-  { loc:'/viajeros.html',           priority:'0.5', freq:'weekly'  },
+  { loc:'/comunidad.html',          priority:'0.5', freq:'weekly'  },
   { loc:'/blog.html',               priority:'0.8', freq:'weekly'  },
 ];
 var CAT_PRIORITY = { hostal:'0.85', comida:'0.80', sitio:'0.80', evento:'0.75', blog:'0.80' };
