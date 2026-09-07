@@ -4,6 +4,43 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Pagina dinamica Parque Mundo Aventura (2026-09-07) - TSK-079
+
+Nueva pagina dinamica de categoria `sitio` para el Parque Mundo Aventura
+(Bogota, Kennedy - Hipotecho; Carrera 71D # 1-14 Sur), el parque de
+atracciones numero uno de Colombia por visitantes (13 ha, abierto en 1998,
+Gravity 57 m). Patron Fase 9 completo (ficha + seed + loader + smoke) con
+datos verificados 2026 (mundoaventura.com.co, Wikipedia, kennedy.gov.co,
+visitbogota.co/IDT).
+
+**Cambios:**
+- `exploraco desarrollo/ficha-parque-mundo-aventura.md` (nueva): ficha con
+  datos verificados 2026.
+- `scripts/seed-parque-mundo-aventura.js` (nuevo): seed sitio con 21 keys
+  TAGS, 8 fotos, 5 FAQs, destacado=true, rating 0 (ADR-009). Precios 2026:
+  Pasaporte Gold $95.000 / Silver $84.000 / Kids $73.000 / FilaExpress
+  $73.000; ingreso al parque gratuito.
+- `scripts/load-parque-mundo-aventura-api.js` (nuevo): loader idempotente
+  DELETE+POST a /api/admin-destinos (Bearer exploraco12345).
+- `scripts/smoke_test_parque_mundo_aventura.js` (nuevo): smoke test local
+  de buildHTML() sitio.
+
+**Verificacion (Escudo GOLD):** node --check OK en los 3; ASCII-safety
+0 bytes >127 en los 3; smoke 15 checks PASS + balance de divs open=339
+close=339 diff=0. Carga en prod via loader: destino creado id
+47692fc4-1775-47e2-96fd-36eaae5004b4 status=published destacado=True.
+Verificacion en vivo 2026-09-07: /parque-mundo-aventura.html = 200 (15
+secciones del motor sitio, hero con chip de dominio y boton "Sitio web
+oficial", rating 0.0/0 resenas); /api/destinos?categoria=sitio lista el
+slug; sitemap.xml incluye el slug. Nota: coordenadas corregidas a lat
+4.622054, lng -74.134912 (el borrador inicial apuntaba ~4 km al norte).
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** ficha-parque-mundo-aventura.md + 3 scripts
+   en `scripts/` + TASKS.md/TSK-079 + NEXT.md (este segmento).
+2. Backlog vigente de sesiones anteriores (commit TSK-078, referentes-agenda.md,
+   TSK-077 docs, hostales legacy sin seeds, TASK-013, etc.).
+
 ### Sesion Referente agenda + 3 eventos de hoy (2026-09-07) - TSK-078
 
 El usuario pidio (1) registrar en memoria el Instagram

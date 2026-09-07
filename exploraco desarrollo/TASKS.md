@@ -1650,6 +1650,36 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   scrapeable (solo devuelve logo base64); los datos se verificaron en
   fuentes oficiales abiertas.
 
+### TSK-079: Pagina dinamica parque-mundo-aventura.html (parque de atracciones en Kennedy)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Parque Mundo Aventura (cat sitio, slug
+  `parque-mundo-aventura`, `status='published'`, `destacado=true`, rating 0)
+  con datos reales 2026: el parque de atracciones numero uno de Colombia por
+  visitantes (13 ha en Kennedy - Hipotecho, Carrera 71D # 1-14 Sur), abrio
+  el 30-ene-1998 como aporte de la Camara de Comercio de Bogota (Corparques),
+  +40 atracciones en zonas tematicas, Gravity torre de caida libre mas alta
+  de Colombia (57 m, 2023), modelo de acceso unico: ingreso gratuito y solo
+  se paga por usar las atracciones. Precios 2026: Pasaporte Gold $95.000 /
+  Silver $84.000 / Kids $73.000 / FilaExpress $73.000; ingreso al parque
+  gratuito. 8 fotos verificadas, 5 FAQs, 3 tours (rating '0'/review_count 0,
+  ADR-009). Fuentes: mundoaventura.com.co, Wikipedia, kennedy.gov.co,
+  visitbogota.co/IDT. Archivos: `scripts/seed-parque-mundo-aventura.js`
+  (21 keys TAGS sitio), `scripts/load-parque-mundo-aventura-api.js`,
+  `scripts/smoke_test_parque_mundo_aventura.js` y
+  `exploraco desarrollo/ficha-parque-mundo-aventura.md`.
+  Nota: coordenadas corregidas a lat 4.622054, lng -74.134912 (el borrador
+  inicial apuntaba ~4 km al norte).
+- **Evidencia:** Escudo GOLD PASS: node --check OK en los 3 scripts;
+  ASCII-safety 0 bytes >127 en los 3; smoke test 15 checks PASS + balance
+  de divs open=339 close=339 diff=0. Carga en prod via loader (DELETE+POST
+  Bearer exploraco12345): destino creado id 47692fc4-1775-47e2-96fd-36eaae5004b4
+  status=published destacado=True. Verificacion en vivo 2026-09-07:
+  /parque-mundo-aventura.html = 200 con las 15 secciones del motor sitio
+  (hero con chip de dominio y boton "Sitio web oficial", rating 0.0/0
+  resenas); /api/destinos?categoria=sitio lista el slug (name=Parque Mundo
+  Aventura, cat=sitio, id 47692fc4-...); sitemap.xml incluye el slug
+  (lastmod 2026-09-07).
+
 ---
 
 ## Regla de actualizacion
