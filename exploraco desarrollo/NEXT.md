@@ -4,6 +4,43 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Canon del Guejar + Las Gachas en directorio (2026-09-07) - TSK-077
+
+Dos paginas dinamicas de categoria sitio agregadas al directorio (patron
+TSK-073 la-k-zona), creadas por investigacion web de maravillasdelguejar.com
+(canon) y sinitinerario.com (Las Gachas) y aprobadas por el usuario
+("si y si": ambas paginas dinamicas + tarjetas en los directorios; el canon
+representa el DESTINO con el operador Maravillas del Guejar como contacto/web).
+
+- `canon-del-guejar` (id 83, Mesetas/Meta): rafting 17 km cat 3 desde
+  $357.000, 5 Maravillas del Parque Guejar, jacuzzis, charco azul, etc.
+  Web/contacto = operador Maravillas del Guejar.
+- `las-gachas` (id 82, Guadalupe/Santander): pocetas de agua turquesa en
+  piedra roja, 20 min por el Camino Real; sin web oficial (campo web
+  vacio; reserva referencia sinitinerario.com/las-gachas/).
+
+Cada pagina = ficha .md + seed + loader + smoke (6 scripts ASCII-safe),
+cargadas en prod con DELETE+POST Bearer exploraco12345 (las-gachas
+fd216d5c..., canon-del-guejar 9501e3b7...) y verificadas en vivo
+(200, todas las secciones sitio renderizadas, /api/destinos?categoria=sitio
+69, sitemap con ambos). Tarjetas estaticas ids 82/83 agregadas a
+directorio.html y directorio-sitio.html (PLACES inicio + FEAT final +
+PHOTOS). Rating 0 (ADR-009); el badge hero "4.8 - Nuevo" es placeholder
+del motor, no dato guardado.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** fichas x2, 6 scripts, directorio.html,
+   directorio-sitio.html, TASKS.md/TSK-077 y NEXT.md (este segmento).
+2. Backlog conocido (NO TSK aun, en fin): el renderer construye el link de
+   Instagram con la cadena sin '@' (pagina-destino.js:1569); los seeds
+   guardan el handle por tanto sin '@'. Si admin.html llegara a guardar
+   handle con '@' no rompe (paquete replace('@','')); si guardara URL
+   completa 'https://instagram.com/...' si rompe (doble https). Decidir
+   normalizacion en admin.html/seed para futuro ADR.
+3. Resto del backlog: estaticos de directorio.sitio siguen sin incluir
+   nuevos slugs si no se editan (el conector API reemplaza PLACES solo en
+   directorio-<cat>.html, no en directorio.html).
+
 ### Sesion Documentacion batch 31 ago - 6 sep 2026 (2026-09-05) - TSK-076
 
 Registro documental del batch de eventos de la semana 31 ago - 6 sep 2026

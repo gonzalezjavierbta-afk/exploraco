@@ -1571,6 +1571,52 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Nota cruzada:** Este batch se separa de TSK-074 (commit 71d18f7),
   que documenta la semana 5-11 sep 2026 con 10 paginas dinamicas.
 
+### TSK-077: Canon del Guejar y Las Gachas en directorio - fichas + seeds + loaders + smokes + prod
+- **Estado:** COMPLETADA
+- **Detalle:** Dos paginas dinamicas de categoria sitio agregadas al
+  directorio (patron TSK-073 la-k-zona), nuevas por investigacion web de
+  las dos fuentes (maravillasdelguejar.com para el canon y
+  sinitinerario.com para Las Gachas).
+  1. `canon-del-guejar` (id 83): Can\u00f3n del Guejar, Mesetas (Meta).
+     La entrada representa el DESTINO y usa al operador Maravillas del
+     Guejar como contacto/web de referencia (maravillasdelguejar.com,
+     WhatsApp 573144457907, maravillasdelguejar@gmail.com, IG
+     maravillas_del_guejar) segun decision de la sesion. Lat/Lng 3.3840276,
+     -74.0438661 (Mesetas). Rafting 17 km cat 3 desde $357.000, 5
+     Maravillas del Parque Guejar, Charco Azul, Cueva de los Guacharos.
+     5 fotos Commons verificadas (curl 200/206), 6 FAQs.
+  2. `las-gachas` (id 82): Las Gachas, Guadalupe (Santander). Pocetas
+     naturales de aguas turquesas sobre piedra roja a 20 min por el Camino
+     Real; sin web oficial (campo web vac\u00edo; enlaces de reserva a la
+     guia local sinitinerario.com/las-gachas/). Lat/Lng 6.2468, -73.4182.
+     5 fotos Commons verificadas, 6 FAQs.
+  Ambos: `categoria_slug='sitio'`, `status='published'`, `destacado=true`,
+  **rating 0** (ADR-009; el badge hero "★ 4.8 \u00b7 Nuevo" es placeholder
+  del motor pagina-destino.js:634-638 cuando rat=0, no dato guardado).
+  Archivos creados (los 6, ASCII-safe 0 bytes >127): `scripts/
+  seed-canon-del-guejar.js` + `load-canon-del-guejar-api.js` +
+  `smoke_test_canon_del_guejar.js` y `scripts/seed-las-gachas.js` +
+  `load-las-gachas-api.js` + `smoke_test_las_gachas.js`. Leccion de la
+  sesion: el renderer construye el link de Instagram con
+  (d.instagram||'').replace('@','') (pagina-destino.js:1569), por lo que
+  el seed guarda el handle SIN '@'. Tarjetas estaticas agregadas a
+  `directorio.html` y `directorio-sitio.html` (ids 83 y 82 al inicio de
+  PLACES, 82/83 al final de FEAT y entradas 82/83 en PHOTOS).
+- **Evidencia:** Carga en prod v\u00eda loaders (DELETE+POST Bearer
+  exploraco12345): las-gachas id fd216d5c-... y canon-del-guejar id
+  9501e3b7-... status=published. Verificacion en vivo 2026-09-07:
+  /canon-del-guejar.html y /las-gachas.html = 200; API pagina-destino de
+  ambos slugs renderiza todas las secciones sitio (dificultad + matriz de
+  epoca, entradas, tours, checklist, itinerario, fauna, secretos,
+  regulaciones, galeria 5 fotos, mapa, FAQ 6, resenas con RV_AVG=0/
+  RV_COUNT=0, contacto); /api/destinos?categoria=sitio lista ambos
+  (69 sitios, antes 67); sitemap/exploraco.co incluye los dos slugs.
+  Escudo GOLD: node --check 6 scripts PASS; ASCII-safety 0 bytes >127;
+  smokes 11/11 y 10/10 PASS con divs balanceados (373/373 y 316/316);
+  bloques PLACES/FEAT/PHOTOS evaluados por VM en ambos directorios
+  (places=83/30, feat=13, photosKeys=83). Coordenadas aproximadas
+  via Nominatim (Mesetas 3.3840276,-74.0438661; Guadalupe 6.2468,-73.4182).
+
 ---
 
 ## Regla de actualizacion
