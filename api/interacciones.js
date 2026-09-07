@@ -1,4 +1,4 @@
-// api/interacciones.js  v5 - motor de misiones + logros (Fase 3/Gaming)
+// api/interacciones.js  v6 - motor de misiones + logros + Tabla de Destino
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -12,6 +12,12 @@
 //     ADD COLUMN IF NOT EXISTS progreso_misiones jsonb NOT NULL DEFAULT '{}'::jsonb;
 //   ALTER TABLE usuarios
 //     ADD COLUMN IF NOT EXISTS progreso_logros jsonb NOT NULL DEFAULT '{}'::jsonb;
+//   -- v6 (Milestones v2, db/migrations/007_milestones_v2.sql):
+//   ALTER TABLE interacciones
+//     ADD COLUMN IF NOT EXISTS votos_utiles integer NOT NULL DEFAULT 0;
+//   CREATE TABLE IF NOT EXISTS resena_votos (...);
+//   ALTER TABLE usuarios
+//     ADD COLUMN IF NOT EXISTS patrocinios jsonb NOT NULL DEFAULT '{}'::jsonb;
 //
 // v3: cierra 3 vectores de fraude de XP encontrados en v2:
 //  1) 'visita' ahora requiere usuario_id y se deduplica (antes: XP
@@ -113,6 +119,51 @@ var MISIONES = [
         + '   AND (d.tags->\'actividades\' ? $2 OR d.tags->\'que_incluye\' ? $2)',
         [ctx.usuarioId, TAG_COWORKING]
       ).then(function(r){ return !!(r[0] && r[0].n >= 3); });
+    },
+  },
+  {
+    // Milestones v2 (ADR-014): Own the Spot estilo SKATE. Convierte una
+    // resena en Bogota en la mas votada de su spot (votos_utiles maximo
+    // del destino). Recompensa +75 XP (prompt gsming) y deriva el badge
+    // "Gobernador de Monserrate" (ver LOGROS logr_spot_domado).
+    id: 'mis_own_spot_bogota', grupo: 'ciudad',
+    requiere: ['mis_organizador_bogota', 'mis_primera_resena'],
+    nombre: 'Dueno del Spot en Bogota', xp: 75,
+    check: function(ctx) {
+      return esLiderDeCiudad(ctx.sql, ctx.usuarioId, 'Bogota');
+    },
+  },
+  {
+    // Milestones v2 (ADR-014): Gran Arquitecto estilo Albion. Disena un
+    // mapa tematico publico con al menos 5 destinos (spec mapas 2026-09-05).
+    id: 'mis_gran_arquitecto', grupo: 'general', requiere: [],
+    nombre: 'Gran Arquitecto', xp: 50,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM ('
+        + '  SELECT m.id FROM mapas m'
+        + '  JOIN mapa_destinos md ON md.mapa_id = m.id'
+        + '  WHERE m.usuario_id = $1 AND m.publico = true'
+        + '  GROUP BY m.id HAVING COUNT(md.destino_id) >= 5'
+        + ') t',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    // Milestones v2 (ADR-014): itinerario perfeccion (condicion pragm
+    // aprobada por Javier): visitas confirmadas a 4+ destinos cuya ficha
+    // incluya itinerario[] en tags (categoria sitio/naturaleza).
+    id: 'mis_itinerario_perfeccion', grupo: 'categoria', requiere: ['mis_primera_visita'],
+    nombre: 'Itinerario en perfecto orden', xp: 60,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(DISTINCT i.destino_id)::int AS n FROM interacciones i'
+        + ' JOIN destinos d ON d.id = i.destino_id'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'visita\''
+        + '   AND d.tags ? \'itinerario\'',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 4); });
     },
   },
 ];
@@ -226,6 +277,106 @@ CIUDADES_COLECCION.forEach(function(c) {
   });
 });
 
+// Logros Milestones v2 (ADR-014): badges de identidad estilo Steam/
+// SKATE/Albion. IDs estables: una vez desbloqueado, el progreso en
+// usuarios.progreso_logros no se invalida al renombrar el catalogo.
+LOGROS.push(
+  {
+    id: 'logr_spot_domado', grupo: 'general', requiere: ['logr_primer_voto', 'logr_critico_10'],
+    nombre: 'Spot Domado', desc: 'Tu resena es la numero 1 (mas votada) en un destino de dificultad Experto',
+    emoji: '\uD83C\uDFC5', tier: 'oro', xp: 50,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM interacciones i'
+        + ' JOIN destinos d ON d.id = i.destino_id'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'resena\''
+        + '   AND (LOWER(d.tags->>\'dificultad\') IN (\'experto\',\'extremo\')'
+        + '     OR LOWER(COALESCE(d.tags->>\'dificultad\',\'\')) = \'extremo\')'
+        + '   AND i.votos_utiles > 0'
+        + '   AND i.votos_utiles = (SELECT MAX(v.votos_utiles) FROM interacciones v'
+        + '       WHERE v.destino_id = i.destino_id AND v.tipo=\'resena\')',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    id: 'logr_especialista_gastro', grupo: 'general', requiere: ['logr_critico_10'],
+    nombre: 'Especialista en Gastro', desc: 'Alcanza Tier 3 de Critico escribiendo solo resenas de Comida',
+    emoji: '\uD83C\uDF54', tier: 'plata', xp: 40,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n_total,'
+        + ' COUNT(*) FILTER (WHERE d.categoria_slug = \'comida\')::int AS n_comida'
+        + ' FROM interacciones i JOIN destinos d ON d.id = i.destino_id'
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'resena\'',
+        [ctx.usuarioId]
+      ).then(function(r){
+        var row = r[0] || { n_total: 0, n_comida: 0 };
+        return row.n_total >= 5 && row.n_total === row.n_comida;
+      });
+    },
+  },
+  {
+    id: 'logr_cazador_rarezas', grupo: 'general', requiere: ['logr_critico_10', 'logr_coleccionista_10'],
+    nombre: 'Cazador de Rarezas', desc: 'Desbloquea un trofeo cuya rareza global sea menor al 5%',
+    emoji: '\uD83D\uDD0D', tier: 'platino', xp: 100,
+    check: function(ctx) {
+      return ctx.rarezaGlobal().then(function(rareza) {
+        if (!rareza) return false;
+        // Cazador de Rarezas: el usuario ya tiene desbloqueado algun
+        // trofeo cuya rareza global hoy vista menos del 5% de los
+        // viajeros activos (estilo Steam).
+        var desbloqueados = ctx.progresoLogros || {};
+        var tieneRaro = false;
+        Object.keys(desbloqueados).forEach(function(k) {
+          var st = desbloqueados[k];
+          if (st && st.estado === 'completada' && rareza[k] > 0 && rareza[k] < 5) {
+            tieneRaro = true;
+          }
+        });
+        return tieneRaro;
+      });
+    },
+  }
+);
+
+// -- Own the Spot (SKATE, Milestones v2 / ADR-014) ------------------
+// El lider de un spot es el autor de la resena mas votada (votos_utiles
+// maximo) de un destino. La consulta corre BAJO DEMANDA (respuesta del
+// prompt gsming: "bajo demanda") tanto en api/pagina-destino.js (bloque
+// "Lider del Spot" de la seccion de resenas) como aqui, para el
+// multiplicador de XP x1.1 en la ciudad del lider. Requiere la migracion
+// 007 (columna interacciones.votos_utiles); si aun no existe, la query
+// falla y el catch la degrada a false sin romper el POST.
+function esLiderDeCiudad(sql, usuarioId, ciudad) {
+  if (!usuarioId || !ciudad) return Promise.resolve(false);
+  return sql(
+    'SELECT 1 AS uno FROM interacciones i'
+    + ' JOIN destinos d ON d.id = i.destino_id'
+    + ' WHERE i.usuario_id = $1 AND i.tipo = \'resena\''
+    + '   AND i.votos_utiles > 0'
+    + '   AND i.votos_utiles = (SELECT MAX(v.votos_utiles) FROM interacciones v'
+    + '       WHERE v.destino_id = i.destino_id AND v.tipo = \'resena\')'
+    + '   AND ' + CIUDAD_NORM + ' = LOWER($2)'
+    + ' LIMIT 1',
+    [usuarioId, ciudad]
+  ).then(function(r){ return r.length > 0; }).catch(function(){ return false; });
+}
+
+// Aplica el multiplicador x1.1 a la XP base de una accion si el usuario
+// es lider de algun spot en la ciudad del destino (bajo demanda).
+function xpConMultiplicador(sql, usuarioId, destinoId, xpBase) {
+  if (!usuarioId) return Promise.resolve(xpBase);
+  return sql('SELECT ciudad FROM destinos WHERE id=$1 LIMIT 1', [destinoId])
+    .then(function(r){
+      var ciudad = r[0] ? r[0].ciudad : '';
+      if (!ciudad) return xpBase;
+      return esLiderDeCiudad(sql, usuarioId, ciudad).then(function(es){
+        return es ? Math.round(xpBase * 1.1) : xpBase;
+      });
+    }).catch(function(){ return xpBase; });
+}
+
 // Evalua el catalogo completo para un usuario y persiste lo nuevo que se
 // haya completado. Nunca lanza: un fallo aqui no debe tumbar la accion
 // principal (resena/guardado/visita) que ya se registro con exito.
@@ -310,6 +461,7 @@ function evaluarLogros(sql, usuarioId) {
       xpTotal: parseInt(u.xp_total) || 0,
       totalGuardados: parseInt(u.total_guardados) || 0,
       totalVisitas: parseInt(u.total_visitas) || 0,
+      progresoLogros: progreso,
       totalVotos: function() {
         return memo('votos',
           'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'rating\'',
@@ -340,6 +492,29 @@ function evaluarLogros(sql, usuarioId) {
           'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
           + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true AND ' + CIUDAD_NORM + ' = LOWER($2)',
           [usuarioId, ciudad]);
+      },
+      rarezaGlobal: function() {
+        // Rareza estilo Steam: % de usuarios activos que desbloquearon
+        // cada logro. Misma query agregada del GET tipo=logros,
+        // memoizada para correr una sola vez por POST (badge
+        // logr_cazador_rarezas, Milestones v2 / ADR-014).
+        if (cache['rareza']) return cache['rareza'];
+        cache['rareza'] = sql(
+          'SELECT k AS id, COUNT(*)::int AS n FROM usuarios u,'
+          + ' LATERAL jsonb_object_keys(COALESCE(u.progreso_logros,\'{}\'::jsonb)) AS k'
+          + ' WHERE u.activo = true GROUP BY k'
+        ).then(function(raros) {
+          return sql('SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true')
+            .then(function(totales) {
+              var totalUsr = totales[0] ? totales[0].n : 0;
+              var mapa = {};
+              (raros || []).forEach(function(r) {
+                mapa[r.id] = totalUsr ? Math.round((r.n / totalUsr) * 1000) / 10 : 0;
+              });
+              return mapa;
+            });
+        }).catch(function(){ return {}; });
+        return cache['rareza'];
       },
     };
     var completados = {};
@@ -610,6 +785,109 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: { mapa: mapaDetalle, destinos: mapaDestinos } });
       }
 
+      // Tabla de Destino (Albion, Milestones v2 / ADR-014): tres senderos
+      // de especializacion (Explorador, Critico, Organizador) que
+      // progresan en paralelo al XP general. Cada sendero suma "fama"
+      // derivada de las acciones reales (columna xp_ganado de
+      // interacciones, mas los mapas tematicos). Los niveles por sendero
+      // se derivan en cada lectura (FAMA_TIERS), nunca se persisten.
+      // patrocinios llega vacio: la capa SKATE de patrocinios queda
+      // como opcion abierta (ver DECISIONS.md ADR-014).
+      if (tipo === 'tabla_destino' && usuarioId) {
+        var tdUser = await sql(
+          'SELECT id FROM usuarios WHERE id=$1',
+          [usuarioId]
+        );
+        if (!tdUser.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+        var famaExplorador = await sql(
+          'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
+          + ' COUNT(*) FILTER (WHERE i.tipo=\'guardado\' AND i.activo=true)::int AS n_guardados, '
+          + ' COUNT(*) FILTER (WHERE i.tipo=\'visita\')::int AS n_visitas '
+          + ' FROM interacciones i WHERE i.usuario_id=$1 '
+          + '   AND (i.tipo=\'visita\' OR (i.tipo=\'guardado\' AND i.activo=true))',
+          [usuarioId]
+        );
+        var famaCritico = await sql(
+          'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
+          + ' COUNT(*) FILTER (WHERE i.tipo=\'resena\')::int AS n_resenas, '
+          + ' COUNT(*) FILTER (WHERE i.tipo=\'rating\')::int AS n_votos '
+          + ' FROM interacciones i WHERE i.usuario_id=$1 '
+          + '   AND i.tipo IN (\'resena\',\'rating\')',
+          [usuarioId]
+        );
+        var famaOrganizador = await sql(
+          'SELECT COALESCE(COUNT(m.id),0)::int AS n_mapas, '
+          + ' COALESCE(COUNT(*) FILTER (WHERE m.publico=true),0)::int AS n_publicos, '
+          + ' COALESCE(SUM(nm.n_destinos),0)::int AS n_destinos '
+          + ' FROM mapas m '
+          + ' LEFT JOIN (SELECT mapa_id, COUNT(*)::int AS n_destinos FROM mapa_destinos GROUP BY mapa_id) nm '
+          + '   ON nm.mapa_id = m.id '
+          + ' WHERE m.usuario_id=$1',
+          [usuarioId]
+        );
+
+        function nivelSendero(fama, TIERS) {
+          var idx = 0;
+          for (var i = 0; i < TIERS.length; i++) {
+            if (fama >= TIERS[i].min) idx = i;
+          }
+          var cur = TIERS[idx];
+          var next = TIERS[idx + 1] || null;
+          var progreso = next
+            ? Math.min(100, Math.round(((fama - cur.min) / (next.min - cur.min)) * 100))
+            : 100;
+          return {
+            nivel: idx + 1,
+            nombre: cur.nombre,
+            min: cur.min,
+            max: next ? next.min : null,
+            progreso: progreso,
+            total: TIERS.length,
+          };
+        }
+
+        var FAMA_TIERS = [
+          { min: 0,   nombre: 'Semilla' },
+          { min: 100, nombre: 'Aprendiz' },
+          { min: 250, nombre: 'Practicante' },
+          { min: 450, nombre: 'Especialista' },
+          { min: 700, nombre: 'Maestro' },
+        ];
+
+        var fe = famaExplorador[0] || { fama: 0, n_guardados: 0, n_visitas: 0 };
+        var fc = famaCritico[0] || { fama: 0, n_resenas: 0, n_votos: 0 };
+        var fo = famaOrganizador[0] || { n_mapas: 0, n_publicos: 0, n_destinos: 0 };
+        var famaOrg = (fo.n_mapas * 40) + (fo.n_destinos * 5);
+
+        var senderos = [
+          {
+            id: 'explorador', nombre: 'Explorador', emoji: '\uD83E\uDDED',
+            descripcion: 'Guarda destinos (+5) y confirma visitas (+20)',
+            fama: fe.fama, acciones: { guardados: fe.n_guardados, visitas: fe.n_visitas },
+            sendero: nivelSendero(fe.fama, FAMA_TIERS),
+          },
+          {
+            id: 'critico', nombre: 'Cr\u00edtico', emoji: '\u2B50',
+            descripcion: 'Escribe rese\u00f1as (+10/+25) y vota (+10)',
+            fama: fc.fama, acciones: { resenas: fc.n_resenas, votos: fc.n_votos },
+            sendero: nivelSendero(fc.fama, FAMA_TIERS),
+          },
+          {
+            id: 'organizador', nombre: 'Organizador', emoji: '\uD83D\uDDFA',
+            descripcion: 'Crea mapas tem\u00e1ticos y agrega destinos',
+            fama: famaOrg, acciones: { mapas: fo.n_mapas, publicos: fo.n_publicos, destinos: fo.n_destinos },
+            sendero: nivelSendero(famaOrg, FAMA_TIERS),
+          },
+        ];
+
+        return res.status(200).json({
+          ok: true,
+          data: { senderos: senderos, patrocinios: [] },
+        });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -756,6 +1034,66 @@ module.exports = async function handler(req, res) {
         }
       }
 
+      // -- Review_voto (Milestones v2 / ADR-014, SKATE "Own the Spot") --
+      // Voto util sobre una resena existente. Se maneja ANTES del guard
+      // generico de destino_id porque recibe resena_id, no destino_id.
+      // Dedup por usuario+resena (tabla resena_votos, PK compuesta);
+      // incrementa votos_utiles en la fila de la resena. No otorga XP:
+      // es un voto de utilidad, no una accion de viaje. Requiere la
+      // migracion 007 (tabla resena_votos).
+      if (tipo2 === 'review_voto') {
+        var resenaVotoId = body.resena_id || null;
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        if (!resenaVotoId)
+          return res.status(400).json({ ok: false, error: 'resena_id requerido' });
+
+        var resenaVotoTarget = await sql(
+          'SELECT id, usuario_id AS autor_id FROM interacciones WHERE id=$1 AND tipo=\'resena\' LIMIT 1',
+          [resenaVotoId]
+        ).catch(function(){ return []; });
+        if (!resenaVotoTarget.length)
+          return res.status(404).json({ ok: false, error: 'Resena no encontrada' });
+
+        // H-1 (QA Milestones v2): un autor no puede votar su propia
+        // resena como util -- seria un "self-vote" que lo corona lider
+        // del spot (y x1.1 en toda la ciudad) sin merito real.
+        if (resenaVotoTarget[0].autor_id && resenaVotoTarget[0].autor_id === usuarioId2)
+          return res.status(403).json({ ok: false, error: 'No puedes votar tu propia resena' });
+
+        var yaVotoUtil = await sql(
+          'SELECT 1 AS uno FROM resena_votos WHERE usuario_id=$1 AND resena_id=$2 LIMIT 1',
+          [usuarioId2, resenaVotoId]
+        ).catch(function(){ return []; });
+        if (yaVotoUtil.length > 0)
+          return res.status(409).json({
+            ok: false,
+            error: 'Ya votaste esta resena como util',
+            ya_votado: true,
+          });
+
+        // H-2 (QA Milestones v2): la escritura NO se silencia. Si la
+        // migracion 007 (tabla resena_votos / votos_utiles) no corrio,
+        // el POST debe fallar con 503 en vez de responder 200 sin
+        // persistir nada (Regla de Oro: no capturar generico que
+        // silencie fallos de integracion).
+        try {
+          await sql(
+            'INSERT INTO resena_votos (usuario_id, resena_id) VALUES ($1,$2)',
+            [usuarioId2, resenaVotoId]
+          );
+          await sql(
+            'UPDATE interacciones SET votos_utiles = votos_utiles + 1 WHERE id=$1',
+            [resenaVotoId]
+          );
+        } catch (eReviewVoto) {
+          console.error('[interacciones] review_voto fallo (migracion 007 pendiente?): ' + eReviewVoto.message);
+          return res.status(503).json({ ok: false, error: 'Voto util no disponible: migracion pendiente' });
+        }
+
+        return res.status(200).json({ ok: true, votos_utiles: 1 });
+      }
+
       if (!tipo2 || !destinoId2)
         return res.status(400).json({ ok: false, error: 'tipo y destino_id son requeridos' });
 
@@ -849,14 +1187,20 @@ module.exports = async function handler(req, res) {
         // Sumar XP al usuario si esta logueado
         var misionesNuevas = [];
         var logrosNuevas = [];
+        var xpResenaEntregado = xpGanado;
         if (usuarioId2) {
+          // Milestones v2 (ADR-014): el lider del spot gana x1.1 en su
+          // ciudad. Se aplica sobre el XP que recibe el usuario (la fila
+          // de interacciones conserva la xp base para no romper el check
+          // de mis_primera_resena que mira xp_ganado>=25).
+          xpResenaEntregado = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGanado);
           await sql(
             'UPDATE usuarios SET '
             + 'xp_total = xp_total + $1, '
             + 'total_resenas = total_resenas + 1, '
             + 'ultimo_acceso = NOW() '
             + 'WHERE id = $2',
-            [xpGanado, usuarioId2]
+            [xpResenaEntregado, usuarioId2]
           ).catch(function(){});
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
@@ -892,7 +1236,7 @@ module.exports = async function handler(req, res) {
           }
         } catch(_) {}
 
-        return res.status(200).json({ ok: true, id: result[0].id, xp: xpGanado, misiones: misionesNuevas, logros: logrosNuevas });
+        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, misiones: misionesNuevas, logros: logrosNuevas });
       }
 
       // -- Guardado --
@@ -934,14 +1278,15 @@ module.exports = async function handler(req, res) {
         // local en index.html (userPoints.saved via Math.max()). Sirve
         // como base fiable para futuras insignias/misiones ("guardaste
         // 5 lugares alguna vez"), sin depender del estado activo actual.
+        var xpGuardadoFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGuardado);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
-          [xpGuardado, usuarioId2]
+          [xpGuardadoFinal, usuarioId2]
         ).catch(function(){});
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
         var logrosGuardado = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: xpGuardado, misiones: misionesGuardado, logros: logrosGuardado });
+        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, misiones: misionesGuardado, logros: logrosGuardado });
       }
 
       // -- Quitar guardado --
@@ -985,14 +1330,15 @@ module.exports = async function handler(req, res) {
           'INSERT INTO interacciones (destino_id, usuario_id, tipo, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', 20, NOW())',
           [destinoId2, usuarioId2]
         );
+        var xpVisitaFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 20);
         await sql(
-          'UPDATE usuarios SET xp_total=xp_total+20, total_visitas=total_visitas+1 WHERE id=$1',
-          [usuarioId2]
+          'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
+          [xpVisitaFinal, usuarioId2]
         ).catch(function(){});
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: 20, misiones: misionesVisita, logros: logrosVisita });
+        return res.status(200).json({ ok: true, xp: xpVisitaFinal, misiones: misionesVisita, logros: logrosVisita });
       }
 
       // -- Quitar visita --
@@ -1059,14 +1405,15 @@ module.exports = async function handler(req, res) {
         // Sumar XP al usuario logueado y evaluar misiones + logros.
         var misionesRating = [];
         var logrosRating = [];
+        var xpRatingFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 10);
         await sql(
-          'UPDATE usuarios SET xp_total=xp_total+10, ultimo_acceso=NOW() WHERE id=$1',
-          [usuarioId2]
+          'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
+          [xpRatingFinal, usuarioId2]
         ).catch(function(){});
         misionesRating = await evaluarMisiones(sql, usuarioId2);
         logrosRating = await evaluarLogros(sql, usuarioId2);
 
-        return res.status(200).json({ ok: true, xp: 10, misiones: misionesRating, logros: logrosRating });
+        return res.status(200).json({ ok: true, xp: xpRatingFinal, misiones: misionesRating, logros: logrosRating });
       }
 
       return res.status(400).json({ ok: false, error: 'tipo no implementado: ' + tipo2 });

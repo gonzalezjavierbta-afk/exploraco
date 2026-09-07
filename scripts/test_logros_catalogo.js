@@ -31,7 +31,7 @@ function check(label, cond) {
   if (!cond) process.exitCode = 1;
 }
 
-check('LOGROS: 16 trofeos en catalogo (6 general + 5 conteo + 5 ciudad)', LOGROS.length === 16);
+check('LOGROS: 19 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2)', LOGROS.length === 19);
 const ids = LOGROS.map(l => l.id);
 check('LOGROS: ids unicos', new Set(ids).size === LOGROS.length);
 
@@ -50,10 +50,15 @@ check('LOGROS: grupos validos', grupoOk);
 check('LOGROS: requiere apunta a ids existentes', reqOk);
 
 // Metodos de ctx que usan los checks (deben existir en evaluarLogros ctx)
-const ctxMethods = ['totalVotos','blogVotos','blogOpiniones','ciudadesDistintas','guardadosCiudad'];
+const ctxMethods = ['totalVotos','blogVotos','blogOpiniones','ciudadesDistintas','guardadosCiudad','rarezaGlobal'];
 const ctxM = {};
 ctxMethods.forEach(function(m){ ctxM[m] = function(){ return Promise.resolve(0); }; });
 ctxM.totalGuardados = 0; ctxM.totalVisitas = 0; ctxM.xpTotal = 0;
+ctxM.progresoLogros = {};
+// Los checks Milestones v2 (spot_domado, especialista_gastro) corren
+// ctx.sql(...) y ctx.usuarioId; el mock devuelve agregados en 0.
+ctxM.sql = function(){ return Promise.resolve([{ n_total: 0, n_comida: 0, n: 0 }]); };
+ctxM.usuarioId = 'test-uuid';
 const ctxProxy = new Proxy(ctxM, { get: function(t, k) {
   if (!(k in t)) { console.log('FAIL - check usa ctx.' + String(k) + ' que no existe en evaluarLogros'); process.exitCode = 1; }
   return t[k];

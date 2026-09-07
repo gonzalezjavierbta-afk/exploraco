@@ -287,6 +287,16 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
 +".mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}"
 +".rblock{display:flex;gap:24px;align-items:center;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}"
++".spotlider{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:linear-gradient(135deg,#fff7e6,#fdf1d7);border:1px solid #e8c36a;border-radius:8px;margin-bottom:18px;box-shadow:0 2px 8px rgba(232,160,32,.12)}"
++".spotlider-badge{font-size:26px;line-height:1;flex-shrink:0}"
++".spotlider-body{flex:1;min-width:0}"
++".spotlider-title{font-size:10px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:#b8860b;margin-bottom:2px}"
++".spotlider-name{font-size:14px;font-weight:800;color:#4a3410}"
++".spotlider-votes{font-size:11px;font-weight:600;color:#8a6d1f;margin-left:6px}"
++".spotlider-stars{margin:3px 0}"
++".spotlider-stars .rvst.on{color:#f5b301}"
++".spotlider-quote{font-size:12px;font-style:italic;color:#6b5420;line-height:1.5;margin-top:4px}"
++".spotlider-hint{font-size:10px;color:#a8873a;margin-top:6px;letter-spacing:.3px}"
 +".rbavg{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:var(--gold);line-height:1;text-align:center}"
 +".rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}.rbst{font-size:16px;color:#DDD}.rbst.on{color:var(--gold)}"
 +".rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}"
@@ -430,7 +440,7 @@ function topRelacionados(d, candidatos, n) {
   return scored.slice(0, n).map(function(s){ return s.row; });
 }
 
-function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
+function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLider) {
   var cat   = d.categoria_slug || 'sitio';
   var relacionados = relacionados || [];
   var label = CAT_LABEL[cat] || 'Destino';
@@ -1528,11 +1538,36 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg) {
   var promptDims = esBlogRes ? '' : '<label class="wrlbl">Califica por categoria:</label>'
     + '<div class="rv-score-selector">'+dimStarsHtml+'</div>';
 
+  // Lider del Spot (SKATE, Milestones v2 / ADR-014): autor de la resena
+  // mas votada del destino. Solo aplica a categorias de lugar (sitio,
+  // hostal, comida); blog no tiene "spot". Muestra nombre, resena y
+  // conteo de votos utiles. El multiplicador x1.1 de XP se aplica en
+  // api/interacciones.js al accionar en esa ciudad.
+  var spotLiderHtml = '';
+  if (spotLider && !esBlogRes) {
+    var nombreLider = spotLider.usuario_nombre || 'Viajero';
+    var textoLider = spotLider.texto || '';
+    var mLider = textoLider.match(/^\[([^\]]+)\]\s*/);
+    if (mLider) { nombreLider = mLider[1]; textoLider = textoLider.slice(mLider[0].length); }
+    var estrellasLider = [1,2,3,4,5].map(function(i){ return '<span class="rvst'+(i<=Math.round(spotLider.rating||0)?' on':'')+'">*</span>'; }).join('');
+    var nVotos = parseInt(spotLider.votos_utiles,10) || 1;
+    spotLiderHtml = '<div class="spotlider">'
+      + '<div class="spotlider-badge">\uD83D\uDC51</div>'
+      + '<div class="spotlider-body">'
+      + '<div class="spotlider-title">Lider del spot</div>'
+      + '<div class="spotlider-name">'+esc(nombreLider)+' <span class="spotlider-votes">'+nVotos+' voto'+(nVotos===1?'':'s')+' utiles</span></div>'
+      + '<div class="spotlider-stars">'+estrellasLider+'</div>'
+      + (textoLider?'<div class="spotlider-quote">\u201C'+esc(textoLider.slice(0,160))+'\u201D</div>':'')
+      + '<div class="spotlider-hint">Resena mas util del lugar \u00B7 x1.1 XP en esta ciudad</div>'
+      + '</div></div>';
+  }
+
   secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+tituloResenas+'</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+textoRbcnt+'</div></div>'
     + (scoreBars||'')
     + '</div>'
+    + (spotLiderHtml||'')
     + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
     + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">'+textoRvEmpty+'</p>'
     + '<div class="wr"><div class="wrtitle">'+textoWrTitle+'</div>'
@@ -1886,6 +1921,29 @@ module.exports = async function handler(req, res) {
       [d.id]
     );
 
+    // Lider del Spot (SKATE, Milestones v2 / ADR-014): autor de la
+    // resena mas votada (votos_utiles maximo) del destino, calculado
+    // BAJO DEMANDA al cargar la pagina (respuesta del prompt gsming).
+    // Envuelto en try/catch: si la migracion 007 (votos_utiles) aun no
+    // corrio en Neon, la pagina sigue renderizando sin bloque de lider.
+    var spotLider = null;
+    try {
+      var spotLiderRows = await sql(
+        'SELECT i.id AS resena_id, i.rating, i.texto, i.votos_utiles,'
+        + ' u.nombre AS usuario_nombre'
+        + ' FROM interacciones i'
+        + ' LEFT JOIN usuarios u ON i.usuario_id = u.id'
+        + ' WHERE i.destino_id = $1 AND i.tipo = \'resena\''
+        + '   AND i.votos_utiles > 0'
+        + ' ORDER BY i.votos_utiles DESC, i.creado_en ASC'
+        + ' LIMIT 1',
+        [d.id]
+      );
+      if (spotLiderRows.length) spotLider = spotLiderRows[0];
+    } catch (eLider) {
+      console.warn('[pagina-destino] spot_lider fallo (migracion 007 pendiente?): ' + eLider.message);
+    }
+
     // Promedio por dimension (resenas V2) para las barras de puntuacion.
     // Se construye el SELECT con las claves de la categoria para no traer
     // keys irrelevantes ni romper si la migracion 003 no ha corrido.
@@ -1940,7 +1998,7 @@ module.exports = async function handler(req, res) {
       relacionados = topRelacionados(d, relRows, 3);
     }
 
-    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados, dimsAvg);
+    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados, dimsAvg, spotLider);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);

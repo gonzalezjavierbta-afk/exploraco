@@ -3273,13 +3273,24 @@ renderMyMap = function() {
    coincidia con el XP real del leaderboard. Ver nota de entrega.
 ══════════════════════════════════════════════════════ */
 
+// Milestones v2 (ADR-014): 15 rangos en 3 Eras (Mundano/Patrocinado/
+// Organizador). Mismos umbrales que api/usuarios.js NIVELES.
 var XP_LEVELS = [
-  { min: 0,    max: 99,   nombre: 'Viajero novato',     emoji: '🌱', color: '#22C55E' },
-  { min: 100,  max: 299,  nombre: 'Explorador',          emoji: '🧭', color: '#3B82F6' },
-  { min: 300,  max: 599,  nombre: 'Aventurero',          emoji: '🏔️', color: '#8B5CF6' },
-  { min: 600,  max: 999,  nombre: 'Embajador Colombia',  emoji: '🦅', color: '#E8A020' },
-  { min: 1000, max: 1999, nombre: 'Leyenda viajera',     emoji: '🌟', color: '#EF4444' },
-  { min: 2000, max: 99999,nombre: 'Maestro ExploraCO',   emoji: '👑', color: '#E8A020' },
+  { min: 0,     max: 99,    nombre: 'Viajero Novato',         emoji: '🌱', color: '#22C55E' },
+  { min: 100,   max: 249,   nombre: 'Explorador de Barrio',   emoji: '🧭', color: '#3B82F6' },
+  { min: 250,   max: 449,   nombre: 'Mochilero Autónomo',     emoji: '🎒', color: '#22C55E' },
+  { min: 450,   max: 699,   nombre: 'Cazador de Senderos',    emoji: '🥾', color: '#84CC16' },
+  { min: 700,   max: 999,   nombre: 'Local Consagrado',       emoji: '🏡', color: '#22C55E' },
+  { min: 1000,  max: 1399,  nombre: 'Viajero Patrocinado',    emoji: '🤝', color: '#3B82F6' },
+  { min: 1400,  max: 1899,  nombre: 'Crítico de la Calle',    emoji: '⭐', color: '#E8A020' },
+  { min: 1900,  max: 2499,  nombre: 'Cartógrafo de Rutas',    emoji: '🗺️', color: '#8B5CF6' },
+  { min: 2500,  max: 3199,  nombre: 'Embajador de Ciudad',    emoji: '🏛️', color: '#E8A020' },
+  { min: 3200,  max: 3999,  nombre: 'Influenciador Local',    emoji: '📣', color: '#F97316' },
+  { min: 4000,  max: 4999,  nombre: 'Organizador de Eventos', emoji: '🎪', color: '#EF4444' },
+  { min: 5000,  max: 6499,  nombre: 'Protector del Patrimonio', emoji: '🛡️', color: '#22C55E' },
+  { min: 6500,  max: 8499,  nombre: 'Dueño de la Escena',     emoji: '🎤', color: '#A855F7' },
+  { min: 8500,  max: 10999, nombre: 'Leyenda de Territorio',  emoji: '🗿', color: '#E8A020' },
+  { min: 11000, max: 99999, nombre: 'Maestro ExploraCO',      emoji: '👑', color: '#E8A020' },
 ];
 
 // Insignias recortadas frente a v1: se quitaron 'compartido',

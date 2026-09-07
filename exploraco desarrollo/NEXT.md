@@ -4,6 +4,73 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Milestones v2 - Plan Maestro de Gaming (2026-09-07) - TSK-080
+
+Implementacion del Plan Maestro de Gaming (Steam + SKATE + Albion) del
+prompt `prompt gsming.txt`, con las 3 respuestas de calibracion de Javier:
+(1) Own the Spot BAJO DEMANDA (SELECT+COUNT al cargar la pagina), (2)
+Tabla de Destino como mapa de nodos SVG en mi-perfil.html, (3) Patrocinios
+con opcion abierta (solo diseno, sin activacion). Spec versionado en
+`docs/superpowers/specs/2026-09-07-milestones-v2-gaming-design.md` y
+decision arquitectonica en DECISIONS.md ADR-014 (nota: el codigo lo
+referencia como "ADR-013" en comentarios, numero ya ocupado por la web
+oficial del hero -- ver nota en el ADR).
+
+**Cambios:**
+- `api/interacciones.js` (v6): helpers `esLiderDeCiudad`/`xpConMultiplicador`
+  (x1.1 sobre XP base en los 4 POST: resena/guardado/visita/rating);
+  GET `tipo=tabla_destino` (3 senderos Explorador/Critico/Organizador con
+  fama derivada + niveles FAMA_TIERS por lectura, `patrocinios: []`);
+  POST `tipo=review_voto` (dedup PK usuario_id+resena_id -> 409, 403
+  self-vote, 503 si migracion 007 pendiente); 3 misiones nuevas
+  (mis_own_spot_bogota +75, mis_gran_arquitecto +50,
+  mis_itinerario_perfeccion +60) y 3 logros nuevos (logr_spot_domado +50,
+  logr_especialista_gastro +40, logr_cazador_rarezas +100) -> LOGROS 19.
+- `api/usuarios.js`: NIVELES 6 -> 15 (0/100/250/450/700/1000/1400/1900/
+  2500/3200/4000/5000/6500/8500/11000) en 3 Eras (Mundano/Patrocinado/
+  Organizador).
+- `api/pagina-destino.js`: query `spotLider` bajo demanda (try/catch ->
+  null sin migracion 007) + bloque HTML "Lider del spot" en secResenas
+  (solo categorias != blog) + 8vo parametro opcional en `buildHTML`.
+- `index.html`, `mi-perfil.html`, `comunidad.html`: XP_LEVELS 15; XP_BADGES
+  sin los 5 badges muertos (caribe/andino/compartido/plan_maestro/social);
+  mi-perfil anade seccion "Tabla de Destino" con arbol SVG y corrige
+  `rareza_global` -> `rareza_pct` y contador desbloqueados/total (19).
+- `db/migrations/007_milestones_v2.sql` (nuevo): `interacciones.votos_utiles`
+  + indice parcial, tabla `resena_votos` (PK usuario_id+resena_id),
+  `usuarios.patrocinios jsonb`. Idempotente IF NOT EXISTS.
+  PENDIENTE de aplicar en Neon (Javier).
+- `scripts/smoke_test_milestones_v2.js` (nuevo) y
+  `scripts/test_logros_catalogo.js` (actualizado a 19 trofeos).
+
+**Verificacion (Escudo GOLD):** node --check 5/5; ASCII-safety 0 bytes
+>127 en api/*.js (1 doble-escape preexistente confirmado en
+pagina-destino.js:1791, NO de esta tarea); smoke dedicado
+`smoke_test_milestones_v2.js` 28/28 PASS (ejecutado localmente, balance de
+divs 95/95) + `test_logros_catalogo.js` 12/12 PASS; smokes 4/4. QA-auditor:
+veredicto RECOMENDACION con H-1 (self-vote -> 403) y H-2 (escritura
+silenciosa -> 503) YA CORREGIDOS en el codigo, H-3 (contador 16 -> total)
+corregido en mi-perfil.html, H-4 (GUIA_DE_DESARROLLO.md seccion 7.7)
+corregido. Prod NO se toco (codigo viejo hasta el deploy).
+
+#### Que sigue
+1. **Migracion 007 en Neon (BLOQUEANTE, la ejecuta Javier en consola):**
+   `db/migrations/007_milestones_v2.sql`. Sin ella: POST review_voto -> 503,
+   spotLider degrada a null, multiplicador x1.1 inactivo y tabla_destino
+   devuelve `patrocinios: []` normal (la fama de senderos si funciona).
+2. **Commit + push (PENDIENTE):** spec nuevo + cambios en api/interacciones.js,
+   api/usuarios.js, api/pagina-destino.js, index.html, mi-perfil.html,
+   comunidad.html + migracion 007 + 2 scripts + TASKS.md/TSK-080 +
+   DECISIONS.md/ADR-014 + NEXT.md (este segmento). Tras el push, deploy de
+   Vercel.
+3. **Verificacion en vivo tras deploy:** GET
+   `/api/interacciones?tipo=tabla_destino&usuario_id=<uuid real>` con 3
+   senderos y `patrocinios: []`; POST `tipo=review_voto` sobre una resena
+   real (200, 409 al repetir, 403 al auto-votar); bloque "Lider del spot"
+   en una ficha con resenas votadas (x1.1 XP en la ciudad del lider).
+4. Backlog vigente de sesiones anteriores (commit TSK-079, referentes-agenda.md,
+   TSK-077 docs, hostales legacy sin seeds, TASK-013, etc.).
+
 ### Sesion Pagina dinamica Parque Mundo Aventura (2026-09-07) - TSK-079
 
 Nueva pagina dinamica de categoria `sitio` para el Parque Mundo Aventura

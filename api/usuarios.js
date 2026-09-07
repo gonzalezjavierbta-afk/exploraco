@@ -1,19 +1,30 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
 const { neon } = require('@neondatabase/serverless');
 
-// Mismos umbrales que XP_LEVELS en index.html (linea ~3625 del motor de
-// puntos local). nivel/badge_actual existian como columnas en usuarios
-// pero interacciones.js nunca las escribia -- se calculan aqui en cada
+// Mismos umbrales que XP_LEVELS en index.html (~linea 3276 del motor de
+// puntos local) y en mi-perfil/comunidad. Milestones v2 (ADR-014) expandio
+// la escala de 6 a 15 rangos en 3 Eras (Mundano/Patrocinado/Organizador).
+// nivel/badge_actual existian como columnas en usuarios pero
+// interacciones.js nunca las escribia -- se calculan aqui en cada
 // lectura a partir de xp_total en vez de guardarse, para que nunca
 // puedan desincronizarse sin tener que coordinar una escritura extra en
 // cada uno de los 3 lugares de interacciones.js que suman XP.
 const NIVELES = [
-  { min: 0,    nombre: 'Viajero novato' },
-  { min: 100,  nombre: 'Explorador' },
-  { min: 300,  nombre: 'Aventurero' },
-  { min: 600,  nombre: 'Embajador Colombia' },
-  { min: 1000, nombre: 'Leyenda viajera' },
-  { min: 2000, nombre: 'Maestro ExploraCO' },
+  { min: 0,     nombre: 'Viajero Novato' },
+  { min: 100,   nombre: 'Explorador de Barrio' },
+  { min: 250,   nombre: 'Mochilero Aut\u00f3nomo' },
+  { min: 450,   nombre: 'Cazador de Senderos' },
+  { min: 700,   nombre: 'Local Consagrado' },
+  { min: 1000,  nombre: 'Viajero Patrocinado' },
+  { min: 1400,  nombre: 'Cr\u00edtico de la Calle' },
+  { min: 1900,  nombre: 'Cart\u00f3grafo de Rutas' },
+  { min: 2500,  nombre: 'Embajador de Ciudad' },
+  { min: 3200,  nombre: 'Influenciador Local' },
+  { min: 4000,  nombre: 'Organizador de Eventos' },
+  { min: 5000,  nombre: 'Protector del Patrimonio' },
+  { min: 6500,  nombre: 'Due\u00f1o de la Escena' },
+  { min: 8500,  nombre: 'Leyenda de Territorio' },
+  { min: 11000, nombre: 'Maestro ExploraCO' },
 ];
 
 function calcularNivel(xpTotal) {

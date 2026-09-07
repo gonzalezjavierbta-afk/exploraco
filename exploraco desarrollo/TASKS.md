@@ -1680,6 +1680,63 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   Aventura, cat=sitio, id 47692fc4-...); sitemap.xml incluye el slug
   (lastmod 2026-09-07).
 
+### TSK-080: Milestones v2 - Plan Maestro de Gaming (Steam + SKATE + Albion)
+- **Estado:** COMPLETADA (implementado y verificado localmente 2026-09-07;
+  pendiente migracion 007 en Neon + deploy)
+- **Detalle:** Implementacion del Plan Maestro de Gaming del prompt
+  `prompt gsming.txt` con las 3 respuestas de calibracion de Javier
+  (1. Own the Spot BAJO DEMANDA; 2. Tabla de Destino como mapa de nodos
+  SVG; 3. Patrocinios con opcion abierta, solo diseno). Cambios:
+  1. `api/interacciones.js` (v6): helpers `esLiderDeCiudad`/`xpConMultiplicador`
+     (multiplicador x1.1 sobre XP base en la ciudad del lider, aplicado en
+     los 4 POST: resena/guardado/visita/rating; degrada a XP base si la
+     migracion 007 no corrio); GET `tipo=tabla_destino` (3 senderos
+     Explorador/Critico/Organizador con fama derivada de xp_ganado + mapas
+     tematicos, niveles FAMA_TIERS por lectura, `patrocinios: []`); POST
+     `tipo=review_voto` (upvote util, dedup PK usuario_id+resena_id -> 409,
+     403 self-vote, 404 resena inexistente, 503 si migracion 007 pendiente);
+     3 misiones nuevas (`mis_own_spot_bogota` +75, `mis_gran_arquitecto`
+     +50, `mis_itinerario_perfeccion` +60 con condicion pragmatica: >=4
+     visitas a destinos con tags.itinerario) y 3 logros nuevos
+     (`logr_spot_domado` +50, `logr_especialista_gastro` +40,
+     `logr_cazador_rarezas` +100 con rareza global <5%) -> LOGROS 19.
+  2. `api/usuarios.js`: NIVELES 6 -> 15 (umbrales 0/100/250/450/700/1000/
+     1400/1900/2500/3200/4000/5000/6500/8500/11000) en 3 Eras
+     (Mundano/Patrocinado/Organizador).
+  3. `api/pagina-destino.js`: query `spotLider` bajo demanda (try/catch ->
+     null si migracion 007 no corrio) + bloque HTML "Lider del spot" en
+     secResenas (solo categorias != blog) + 8vo parametro opcional
+     `spotLider` en `buildHTML`.
+  4. `index.html`, `mi-perfil.html`, `comunidad.html`: XP_LEVELS 15;
+     XP_BADGES sin los 5 badges muertos (caribe/andino/compartido/
+     plan_maestro/social); mi-perfil anade seccion "Tabla de Destino" con
+     arbol SVG y corrige `rareza_global` -> `rareza_pct` y el contador
+     desbloqueados/total (19).
+  5. `db/migrations/007_milestones_v2.sql` (nuevo): `interacciones.votos_utiles`
+     + indice parcial, tabla `resena_votos` (PK usuario_id+resena_id),
+     `usuarios.patrocinios jsonb`. Idempotente IF NOT EXISTS.
+     PENDIENTE de aplicar en Neon (lo ejecuta Javier en la consola).
+  6. `scripts/smoke_test_milestones_v2.js` (nuevo) y
+     `scripts/test_logros_catalogo.js` (actualizado a 19 trofeos).
+  Spec: `docs/superpowers/specs/2026-09-07-milestones-v2-gaming-design.md`.
+  ADR: DECISIONS.md ADR-014 (el codigo lo referencia como "ADR-013" en
+  comentarios; ver nota de numeracion en el ADR).
+- **Evidencia:** `scripts/smoke_test_milestones_v2.js` 28 checks PASS
+  (ejecutado localmente: NIVELES 15 con umbrales del prompt, tabla_destino
+  con 3 senderos + fama organizador = mapas*40 + destinos*5, patrocinios [],
+  review_voto 400 sin usuario_id, Own the Spot degrada a false sin migracion
+  007, bloque "Lider del spot" presente/con hint x1.1/ausente sin lider/
+  ausente en blog, balance de divs 95/95). `scripts/test_logros_catalogo.js`
+  12/12 PASS (19 trofeos: 6 general + 5 conteo + 5 ciudad + 3 Milestones v2,
+  ids unicos, shape, tiers, DAG, Promise, CIUDAD_NORM, 5 ciudades). Escudo
+  GOLD: node --check 5/5; ASCII-safety 0 bytes >127 en api/*.js (1
+  doble-escape preexistente confirmado en pagina-destino.js:1791 que NO es
+  de esta tarea); smokes 4/4. QA-auditor: veredicto RECOMENDACION con
+  hallazgos H-1 (self-vote) y H-2 (escritura silenciosa) YA CORREGIDOS en
+  el codigo (403 y 503 respectivamente), H-3 (contador 16 -> total)
+  corregido en mi-perfil.html, H-4 (GUIA_DE_DESARROLLO.md seccion 7.7)
+  corregido.
+
 ---
 
 ## Regla de actualizacion

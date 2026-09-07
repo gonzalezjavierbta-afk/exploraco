@@ -1,4 +1,4 @@
-# GUIA_DE_DESARROLLO.md - ExploraCO
+﻿# GUIA_DE_DESARROLLO.md - ExploraCO
 
 Guia maestra de desarrollo de ExploraCO. Documento de onboarding y referencia
 para que CUALQUIER inteligencia artificial (Claude, Gemini, ChatGPT, opencode,
@@ -25,7 +25,7 @@ orden:
 5. `exploraco desarrollo/BLUEPRINT.md` - referencia tecnica principal (arquitectura, motor JSONB, patron de 7 pasos, scripts de verificacion).
 6. `exploraco desarrollo/DECISIONS.md` - registro de decisiones arquitectonicas (ADRs).
 7. `exploraco desarrollo/BUGS_HISTORICOS.md` - fallas ya resueltas que NO deben repetirse.
-8. `exploraco desarrollo/🛡️ Reglas de Oro ExploraCO - v5.md` - las reglas de oro del proyecto.
+8. `exploraco desarrollo/ðŸ›¡ï¸ Reglas de Oro ExploraCO - v5.md` - las reglas de oro del proyecto.
 
 ### 1.2 Regla ADR-006: el archivo real es la verdad
 
@@ -129,7 +129,7 @@ estatico primero (caso real: `rock-al-parque.html`).
 ### 2.5 Reglas de Oro v5 (resumen operativo)
 
 1. **ASCII-Safe (CRITICO en api/*.js):** cero caracteres > 127, cero tildes, cero
-   `ñ` directa, cero emojis directos, cero backticks (`` ` ``). Usar escapes
+   `Ã±` directa, cero emojis directos, cero backticks (`` ` ``). Usar escapes
    Unicode simples `\uXXXX`. El doble escape `\\uXXXX` es un bug (BUG-002).
 2. **Edicion estructural via Python:** los cambios grandes en admin.html
    (~7.800 lineas) deben hacerse con `str.replace()` exacto, verificando balance
@@ -558,7 +558,7 @@ produccion. Para cada slug se crean 3 archivos en `scripts/`:
   smokes de hostal deben construir `det = { habitaciones, amenidades, checkin,
   checkout, ... }` desde el seed o las secciones no se renderizan.
 - **Helper `inc()`:** `esc()` codifica los acentos como entidades numericas
-  (`\u00ed` -> `&#237;`), asi que un `html.includes('música')` falla. Los smokes
+  (`\u00ed` -> `&#237;`), asi que un `html.includes('mÃºsica')` falla. Los smokes
   comparan tambien la version entity-encoded:
   `html.includes(enc(s)) || html.includes(s)`.
 
@@ -710,7 +710,7 @@ guardados/visitas locales (slugs -> UUIDs) a Neon con POST de cada uno.
 - `POST tipo=guardado` (L899-945): requiere `usuario_id`. Dedup por
   `SELECT ... WHERE destino_id AND usuario_id AND tipo='guardado' LIMIT 1`.
   Nuevo -> `xp_ganado=5`, INSERT, `UPDATE usuarios SET xp_total=xp_total+5,
-  total_guardados=total_guardados+1`, evalúa misiones/logros.
+  total_guardados=total_guardados+1`, evalÃºa misiones/logros.
 - `POST tipo=quitar_guardado` (L948-962): **Cero Borrado Logico** - `UPDATE
   interacciones SET activo=false`. Nunca DELETE.
 - `POST tipo=visita` (L965-996): `+20 XP`, requiere `usuario_id` (cierra el
@@ -725,7 +725,7 @@ UUIDs (refactor que toca varias paginas).
 
 ### 6.3 Mapas tematicos publicos/privados (el "guardado de mapas" en si)
 
-Diseño aprobado en `docs/superpowers/specs/2026-09-05-mapas-publicos-privados-
+DiseÃ±o aprobado en `docs/superpowers/specs/2026-09-05-mapas-publicos-privados-
 design.md` (spec pendiente de revision completa, backend y frontend de index
 implementados).
 
@@ -751,7 +751,7 @@ columna slug (detalle por `?id=<uuid>`).
 | Funcion | Rol |
 |---|---|
 | `cargarMisMapas()` | `GET tipo=mapas_mios` -> `renderMisMapas()`. |
-| `renderMisMapas()` | Pills `emoji + nombre + n + 🔒/🌍` + editbar (toggle publico, editar, compartir, "✕ Mi Mapa"). |
+| `renderMisMapas()` | Pills `emoji + nombre + n + ðŸ”’/ðŸŒ` + editbar (toggle publico, editar, compartir, "âœ• Mi Mapa"). |
 | `selectMapa(id)` | Selecciona un mapa tematico (o Mi Mapa con `null`). |
 | `cargarMapaDestinos(id)` | `GET tipo=mapa_detalle`; cachea `uuids`/`slugs`. |
 | `_perteneceMapa(p)` | Determina si un lugar pertenece al mapa seleccionado. |
@@ -759,16 +759,16 @@ columna slug (detalle por `?id=<uuid>`).
 | `compartirMapa(id)` | Link `.../mapas.html?id=<uuid>` (solo si es publico), clipboard. |
 | `nuevoMapa()` / `abrirModalMapa(mapaId)` / `guardarModalMapa()` | Modal crear/editar. |
 | `eliminarMapa(id)` | POST `mapa_eliminar`. |
-| `mostrarPopoverMapas(btn, slug)` | Popover "Anadir a mapa..." con checkboxes + "＋ Nuevo mapa". |
+| `mostrarPopoverMapas(btn, slug)` | Popover "Anadir a mapa..." con checkboxes + "ï¼‹ Nuevo mapa". |
 | `mapaCheckboxMap(mapaId, uuid, checked)` | POST `mapa_agregar_destino` / `mapa_quitar_destino`. |
 
 **mapas.html (catalogo publico + detalle):** pagina estatica que consume solo
 `api/interacciones.js` (cero slots API nuevos):
 
 - `cargarGrid()` -> `GET tipo=mapas_publicos`; renderiza `.m-card` (emoji,
-  nombre, descripcion, autor, nº de destinos, fecha). Estado vacio propio.
+  nombre, descripcion, autor, nÂº de destinos, fecha). Estado vacio propio.
 - `cargarDetalle(id)` -> `GET tipo=mapa_detalle&id=`; si
-  `error==='No autorizado'` muestra "Este mapa es privado" (🔒). Pinta header +
+  `error==='No autorizado'` muestra "Este mapa es privado" (ðŸ”’). Pinta header +
   `renderDetLista` (items con enlace a `slug.html`) + `initDetMap` (Leaflet
   **CARTO dark**, markers `_markerIcon(cat)` circulares de 20px coloreados,
   popup, `fitBounds`, si 1 solo pin `setZoom(13)`, fallback Colombia
@@ -787,7 +787,7 @@ columna slug (detalle por `?id=<uuid>`).
 ## 7. Sistema social
 
 El sistema social se apoya en una sesion ligera (email sin password) y en la
-tabla `interacciones` como columna vertebral. Cubre: reseñas con dimensiones,
+tabla `interacciones` como columna vertebral. Cubre: reseÃ±as con dimensiones,
 rating/voto rapido, guardados, visitas, comunidad, perfiles, ranking y
 notificaciones al admin.
 
@@ -819,18 +819,18 @@ notificaciones al admin.
 - **`window.onExploraCOUpdate`** es el hook global que cada pagina usa para
   refrescar su UI tras login/XP/guardado.
 
-### 7.2 Reseñas (POST/GET tipo=resena)
+### 7.2 ReseÃ±as (POST/GET tipo=resena)
 
 **POST `tipo=resena`** (api/interacciones.js L772-896):
 
 - Acepta `rating || puntuacion` (1-5), `texto`, `dims` (JSONB con 6 dimensiones
-  de la reseña V2, `DIM_BY_CAT` por categoria), `traveller_type`.
+  de la reseÃ±a V2, `DIM_BY_CAT` por categoria), `traveller_type`.
 - **Dedup simetrico (ADR-007):** si el usuario ya califico el destino con
   `tipo IN ('resena','rating')` -> responde **409 `ya_votado`** + `voto_previo`.
 - Guarda `usuario_nombre` como prefijo `[Nombre] ` en el texto (no existe
   columna de nombre en interacciones).
 - **XP:** 10 si el texto (tras quitar el prefijo) tiene <=50 chars; 25 si >50.
-- Tras insertar, **recalcula el destino** (ver 7.4), suma XP al usuario y evalúa
+- Tras insertar, **recalcula el destino** (ver 7.4), suma XP al usuario y evalÃºa
   misiones + logros.
 - Dispara notificacion email al admin (fire-and-forget).
 
@@ -845,7 +845,7 @@ dimension (barras de puntuacion).
   y contador "N opiniones"; para destinos "N resenas").
 - **Requiere sesion** (`400 Se requiere usuario_id` si falta).
 - **Dedup simetrico:** mismo 409 que la resena (quien voto rapido no puede
-  reseñar y viceversa).
+  reseÃ±ar y viceversa).
 - **+10 XP**, recalculo del destino (7.4), misiones + logros.
 - **GET `tipo=mi_rating`:** precarga el voto del usuario en el widget.
 
@@ -888,7 +888,7 @@ fisico (Regla de Oro 5):
   "Entrar sin sesion - modo demo".
 - **User bar:** avatar, nombre, nivel (XP_LEVELS local), barra XP, stats
   XP/Badges/Guardados/Visitados.
-- **Tabs reales: 💬 Chat, 🗺️ Planes, 🏆 Ranking** (NOTA: la spec
+- **Tabs reales: ðŸ’¬ Chat, ðŸ—ºï¸ Planes, ðŸ† Ranking** (NOTA: la spec
   2026-09-07 de comunidad unificada describia otros tabs; el codigo real tiene
   estos 3).
   - **Chat = demo local SIN backend** (`CHAT_ROOMS`, `MOCK_MESSAGES`,
@@ -902,11 +902,15 @@ fisico (Regla de Oro 5):
 
 - **Gate:** con sesion muestra `#profile`; sin sesion pide login.
 - Hero con avatar (iniciales/foto), nombre, email, nivel, barra XP.
-- Stats: XP total, Guardados, Visitados, Reseñas.
+- Stats: XP total, Guardados, Visitados, ReseÃ±as.
 - **Badges:** grilla con `XP_BADGES` local (`renderBadges`).
-- **Trofeos:** `cargarTrofeos()` -> `GET tipo=logros`; muestra conteo "X / 16"
-  y tier. BUG LATENTE: usa `t.rareza_global` (L299) pero el backend devuelve
-  `rareza_pct`.
+- **Trofeos:** `cargarTrofeos()` -> `GET tipo=logros`; muestra conteo
+  "desbloqueados / total" (backend `total`), filtro por `estado='completada'`
+  y tier. RESUELTO (Milestones v2, 2026-09-07): antes leia `t.rareza_global`
+  pero el backend devuelve `rareza_pct` (bug latente corregido).
+- **Tabla de Destino** (Milestones v2 / ADR-014): `cargarTablaDestino()` ->
+  `GET tipo=tabla_destino`; dibuja arbol SVG de 3 senderos (Explorador,
+  Critico, Organizador) x 5 nodos, con `fama` y nivel por sendero.
 - **Mis lugares:** `cargarMisLugares()` -> `GET tipo=mapa` (guardados +
   visitados), fallback a localStorage.
 - **Siguientes pasos:** `renderQuickActions` sugiere acciones con XP.
@@ -915,14 +919,14 @@ fisico (Regla de Oro 5):
 ### 7.8 mi-lugar.html - dashboard del dueno de un lugar
 
 No es social de viajero: es estadisticas de un lugar para su propietario (link
-"← Admin"):
+"â† Admin"):
 
 - Stats: visitas totales, visitas 30d, guardados (heart), rating.
 - Grafica de visitas 30 dias (`renderChart`).
 - **Perfil destacado** (`renderDestacado`): planes pagos Mensual $49.000 /
   Trimestral $120.000 / Anual $390.000, activables por WhatsApp. Backend:
   `api/admin?recurso=destacado` (destacado_hasta en tags).
-- **Reseñas recientes:** `GET /api/admin?recurso=resenas&slug=X&limit=5`.
+- **ReseÃ±as recientes:** `GET /api/admin?recurso=resenas&slug=X&limit=5`.
 - APIs: `api/utilidades?tipo=visitas` y `api/admin?recurso=destacado`.
 
 ### 7.9 api/admin.js - recursos admin relacionados con lo social
@@ -932,12 +936,12 @@ No es social de viajero: es estadisticas de un lugar para su propietario (link
 | `solicitudes` | Lista destinos por status (draft/published/archived) para moderar. | `{id, accion}` con mapeo aprobar->published / rechazar->archived / pendiente->draft. |
 | `resenas` | Lista con stats (total, rating_promedio, positivas >=4, negativas <=2); extrae el nombre del prefijo `[Nombre] `. | DELETE recalcula rating/total_resenas (7.4). |
 | `destacado` | Planes del perfil destacado. | Activar/desactivar con `destacado_hasta`. |
-| `notificaciones` | - | Envia email Resend al admin (`admin@exploraco.co`) por reseña nueva y solicitud. |
+| `notificaciones` | - | Envia email Resend al admin (`admin@exploraco.co`) por reseÃ±a nueva y solicitud. |
 
 ### 7.10 Lo que NO existe (no implementar sin ADR)
 
 - Seguir usuarios / followers / likes: no existe (0 resultados en el codigo).
-- Foro / comentarios: solo "opiniones" en blog = reseñas sobre
+- Foro / comentarios: solo "opiniones" en blog = reseÃ±as sobre
   `categoria_slug='blog'` (terminologia `opinion` vs `resena` en
   pagina-destino.js).
 - Mensajes / chat: solo demo local en comunidad.html.
@@ -1031,7 +1035,7 @@ Shape de consola: `tier` bronce/plata/oro/platino, `xp`, fecha de desbloqueo
 | `logr_alcalde_bogota` | Alcalde de Bogota (12) | platino | 100 |
 | `logr_conquistador_cartagena` | Conquistador de Cartagena (8) | oro | 75 |
 | `logr_conquistador_medellin` | Conquistador de Medellin (8) | oro | 75 |
-| `logr_senor_santa_marta` | Señor de Santa Marta (6) | plata | 40 |
+| `logr_senor_santa_marta` | SeÃ±or de Santa Marta (6) | plata | 40 |
 | `logr_cali_es_colombia` | Cali es Colombia (6) | plata | 40 |
 
 **Mecanica:**
@@ -1144,7 +1148,7 @@ scripts de `scripts/` (seed/loader/smoke).
   leaderboard. Mapas tematicos publicos/privados implementados (backend +
   index + mapas.html).
 - Sesion por email sin password, guardados/visitados en doble via
-  localStorage + Neon, reseñas con dimensiones, rating/voto rapido con dedup.
+  localStorage + Neon, reseÃ±as con dimensiones, rating/voto rapido con dedup.
 
 ### 10.2 Backlog vigente (ver NEXT.md y TASKS.md para el detalle)
 
@@ -1210,7 +1214,7 @@ scripts de `scripts/` (seed/loader/smoke).
 | safeJSON / esc() | Helpers del motor: parseo seguro de tags y escape HTML |
 | replArr / replObj | Mutacion in-place de arrays/objetos `const` (fix BUG-020) |
 | merge JSONB | `tags = COALESCE(tags,'{}') || $new::jsonb` (ADR-003) |
-| dedup simetrico | Un solo voto/reseña por usuario y destino (ADR-007) |
+| dedup simetrico | Un solo voto/reseÃ±a por usuario y destino (ADR-007) |
 
 ## Apendice B. Referencias cruzadas a skills de opencode
 
