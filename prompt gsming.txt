@@ -1,0 +1,112 @@
+Para integrar las filosofías de juego de Steam, SKATE (1, 2 y 3) y Albion Online en la arquitectura de ExploraCO, debemos diseñar un sistema que combine la completitud de logros y rarezas globales de Steam [cite: 356], el progreso de reputación/desbloqueo de spots de SKATE y la especialización por micro-acciones del "Destiny Board" (Tabla de Destino) de Albion Online [cite: 19].
+A continuación, presento el análisis estratégico y la propuesta para el Plan Maestro de Gaming: ExploraCO Milestones v2.
+1. El Modelo de Progresión de Albion Online: La "Tabla de Destino"
+En Albion Online, cada pequeña acción (recolectar piedra, fabricar una espada) otorga fama en un nodo específico, desbloqueando progresivamente tiers superiores [cite: 19].
+Trasladado a ExploraCO, el jugador no solo subirá de nivel general de XP, sino que progresará en tres senderos de especialización simultáneos basados en el comportamiento real del viajero [cite: 532]:
+                     TABLA DE DESTINO (ExploraCO)
+                                  │
+         ┌────────────────────────┼────────────────────────┐
+         ▼                        ▼                        ▼
+     [EXPLORADOR]            [CRÍTICO]               [ORGANIZADOR]
+  (Guardados/Visitas)        (Reseñas/Votos)         (Actividades/QR)
+Ruta del Explorador (Gatherer): Sube de nivel guardando destinos (+5 XP) y registrando visitas físicas (+20 XP) [cite: 353].
+Ruta del Crítico (Crafter): Avanza escribiendo reseñas sustanciales (+25 XP) y votando con estrellas (+10 XP) [cite: 353].
+Ruta del Organizador (Fighter/Leader): Avanza invitando a personas, creando mapas temáticos compartidos y organizando actividades cuando se desbloquee la capacidad [cite: 356, 431, 434].
+2. El Enfoque de SKATE: "Own the Spot" (Adueñarse del Lugar) y Patrocinios
+En la saga SKATE, el juego se basa en descubrir "Spots" (lugares), "adueñarse" de ellos superando retos de puntuación y progresar desde un skater amateur hasta conseguir patrocinios que desbloquean mega-rampas y eventos privados.
+Mecánica "Own the Spot" (Domina el Destino): Cada destino (especialmente los de categoría Sitio y Comida [cite: 409]) tendrá un "Líder del Spot". El usuario cuya reseña tenga más interacciones o votos útiles se convierte en el "Dueño" temporal de ese lugar, ganando un multiplicador de XP x1.1 para todas las acciones realizadas en esa ciudad.
+Desbloqueo de "Patrocinios" (Sponsorships): Al alcanzar ciertos hitos territoriales, marcas ficticias o reales de la plataforma (como un Hostal Premium o un Tour Operador del sistema [cite: 181, 182]) "patrocinan" al viajero, desbloqueando accesos prioritarios en la UI (por ejemplo, el widget "Quién va este mes" [cite: 457] o invitaciones directas).
+3. Ampliación de Niveles (Evolución de 6 a 15 Rangos)
+Para evitar que el progreso se estanque rápidamente, expandimos los niveles de 6 [cite: 353] a 15 rangos de progresión, divididos en tres grandes Eras de juego para soportar la divulgación progresiva de la interfaz [cite: 16]:
+Nivel
+Rango
+Umbral XP
+Capacidad / Opción Desbloqueada
+ERA I
+Mundano (Fase de Aprendizaje)
+1
+Viajero Novato
+0 XP [cite: 353]
+Guardar lugares, calificar con estrellas, ver perfil [cite: 353].
+2
+Explorador de Barrio
+100 XP [cite: 353]
+Desbloquea la pestaña de búsqueda avanzada [cite: 396].
+3
+Mochilero Autónomo
+250 XP
+Habilidad de subir fotos adicionales a la galería pública [cite: 173].
+4
+Cazador de Senderos
+450 XP
+Desbloquea la creación de Mapas Temáticos Privados [cite: 433].
+5
+Local Consagrado
+700 XP
+Desbloquea el foro de discusión en la pestaña Comunidad [cite: 443].
+ERA II
+Patrocinado (Fase de Especialización)
+6
+Viajero Patrocinado
+1,000 XP [cite: 353]
+Primer patrocinio: visualización de ofertas ocultas en Hostales [cite: 174].
+7
+Crítico de la Calle
+1,400 XP
+Habilidad para proponer "Secretos / Tips" de destinos [cite: 409].
+8
+Cartógrafo de Rutas
+1,900 XP
+Desbloquea la publicación de Mapas Temáticos Públicos [cite: 433].
+9
+Embajador de Ciudad
+2,500 XP
+Multiplicador de XP x1.2 en su ciudad base [cite: 407].
+10
+Influenciador Local
+3,200 XP
+Acceso al creador de "Planes de Viaje" grupales [cite: 443].
+ERA III
+Organizador (Fase Autoritativa / Leyenda)
+11
+Organizador de Eventos [cite: 355]
+4,000 XP
+Desbloquea botón "Organizar Actividad" (Creación de retos) [cite: 356].
+12
+Protector del Patrimonio
+5,000 XP
+Moderación básica: reportar reseñas fraudulentas o spam [cite: 446].
+13
+Dueño de la Escena
+6,500 XP
+Habilidad de crear misiones dinámicas en sus propios mapas [cite: 434].
+14
+Leyenda de Territorio
+8,500 XP
+Badge de oro "Espíritu de Colombia" visible en todo el SaaS [cite: 181].
+15
+Maestro ExploraCO
+11,000 XP
+Rango máximo: Inmortalidad en el Leaderboard global [cite: 401].
+4. Nuevas Misiones (Milestones) y Medallas (Badges)
+Aprovechando el motor de base de datos Neon y su campo progreso_misiones JSONB, inyectaremos estas nuevas estructuras sin requerir complejas alteraciones de tablas [cite: 325, 328, 407]:
+Nuevas Misiones (Quests DAG) [cite: 355]
+mis_own_spot_bogota (SKATE-style): Convierte una de tus reseñas en Bogotá en la más votada del spot [cite: 409]. (Recompensa: +75 XP y Badge "Gobernador de Monserrate").
+mis_gran_arquitecto (Albion-style): Diseña un mapa temático público, añádele 5 destinos y compártelo con éxito [cite: 434, 435]. (Recompensa: +50 XP).
+mis_itinerario_perfección: Completa una visita física a todos los puntos de un itinerario sugerido en un destino de Naturaleza [cite: 409]. (Recompensa: +60 XP).
+Nuevos Badges de Identidad [cite: 354]
+🏅 "Spot Domado": Otorgado al lograr la reseña número 1 en un destino con dificultad "Experto" [cite: 409].
+🏅 "Especialista en Gastro" (Albion-style): Alcanzar el Tier 3 de la ruta del Crítico escribiendo exclusivamente reseñas de la categoría Comida [cite: 409].
+🏅 "Cazador de Rarezas" (Steam-style): Desbloquear un trofeo cuya rareza global sea menor al 5% en toda la base de datos de usuarios de Neon [cite: 356, 357].
+5. Arquitectura de Datos y Blindaje Técnico (ADR-012)
+Para persistir este gran salto evolutivo de juego respetando los límites de rendimiento en dispositivos móviles de gama baja y las restricciones serverless de Vercel (presupuesto estricto de 8 endpoints) [cite: 397]:
+Estructura Híbrida en Neon: El catálogo de misiones e hitos se mantiene estático en el backend (api/interacciones.js) para evitar lecturas innecesarias en base de datos [cite: 401, 447]. El progreso dinámico del usuario se almacena mediante el Protocolo de Merge (||) en las columnas JSONB de la tabla usuarios [cite: 337, 400].
+Performance del Cliente: Las animaciones de subida de nivel y desbloqueo de badges utilizarán Lienzos de Retención Intermedia (Buffer Canvases) para no sobrecargar el renderizado gráfico ni introducir retrasos en el hilo principal del navegador [cite: 154].
+🧐 Fase de Indagación Obligatoria (Pre-Code)
+Director, para asegurar que la implementación técnica que Claude desarrolle a continuación sea perfecta y se acople limpiamente con el código actual del proyecto, propongo que analicemos estas tres preguntas de calibración:
+¿El algoritmo para el "Own the Spot" (calcular qué reseña tiene más votos útiles por destino para coronar al líder) se ejecutará bajo demanda mediante un SELECT con COUNT al cargar la página del destino, o prefieres pre-calcularlo en una tarea programada para no afectar la velocidad del renderizado en servidor de pagina-destino.js [cite: 175]?
+¿Cómo visualizamos la "Tabla de Destino" de Albion? ¿Te gustaría una pestaña dedicada en mi-perfil.html con un mapa de nodos visual interactivo (estilo árbol SVG ligero) o prefieres mantener la grilla tradicional pero agrupada por "Especialidades" [cite: 444]?
+Para los "Patrocinios" de SKATE, ¿qué tipo de beneficios virtuales deseas que se activen de forma inmediata? (Ej: descuentos dinámicos generados en las tarjetas de tours, o acceso prioritario a la sección de moderación) [cite: 181, 183]?
+hacer las preguntas necesarias para completar la tarea de la mejor forma posible [cite: 400, 913].
+
+bajo demanda 2. mapa de nodos. 3 dejar abierta la opcion de los patrocinios.
