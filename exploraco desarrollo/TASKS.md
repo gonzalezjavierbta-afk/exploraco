@@ -1615,7 +1615,40 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   smokes 11/11 y 10/10 PASS con divs balanceados (373/373 y 316/316);
   bloques PLACES/FEAT/PHOTOS evaluados por VM en ambos directorios
   (places=83/30, feat=13, photosKeys=83). Coordenadas aproximadas
-  via Nominatim (Mesetas 3.3840276,-74.0438661; Guadalupe 6.2468,-73.4182).
+   via Nominatim (Mesetas 3.3840276,-74.0438661; Guadalupe 6.2468,-73.4182).
+
+### TSK-078: 3 eventos "hoy/en curso" (7 sep 2026) como paginas dinamicas + referente agenda
+- **Estado:** COMPLETADA
+- **Detalle:** A pedido del usuario se (a) creo el archivo de referentes de
+  la agenda (`exploraco desarrollo/referentes-agenda.md`) con el Instagram
+  @quehaypahacerenbogota como inspiracion diaria (NO scrapeable, ver nota) y
+  las fuentes oficiales verificables (bogota.gov.co, idartes.gov.co,
+  culturarecreacionydeporte.gov.co, visitbogota.co, tuboleta.com, idpc.gov.co),
+  y (b) se crearon 3 paginas dinamicas de evento para "hoy/en curso"
+  (lunes 7 sep 2026) con el patron Fase 9 (seed + loader + smoke):
+  1. `jazz-expandido-bogota` (id c9b13826-...): temporada de jazz del Centro
+     Nacional de las Artes (Teatro Colon, Sala Delia Zapata, Sala Fanny Mikey,
+     Plazoleta), 4-27 sep 2026, musicos de 6 paises. Lineup 9 artistas
+     (Davi Fonseca, Luca Ciarla, Michael Varekamp, Rembrandt Trio, Tiken Jah
+     Fakoly, Buika+OSN...). Fuente: La Republica 2026-09-07.
+  2. `mes-del-patrimonio-bogota` (id c18674eb-...): Mes del Patrimonio 2026
+     (IDPC + SDCRD), todo septiembre, 50+ actividades gratis, lema "Memoria
+     que construye futuro", 20 anos del IDPC. Fuente: bogota.gov.co.
+  3. `transitos-fragmentados-bogota` (id e8771df6-...): exposicion
+     fotografica de Isabella Vargas y Mary Barrios en el CEFE Chapinero,
+     3-12 sep 2026, entrada libre. Fuente: bogota.gov.co / Pulzo.
+  Los 3: `categoria_slug='evento'`, `status='published'`, `destacado=true`,
+  rating 0 (ADR-009). Archivos creados (9, ASCII-safe 0 bytes >127):
+  3 seeds + 3 loaders + 3 smokes en `scripts/`. Slugs con sufijo `-bogota`
+  para no colisionar con HTML estatico de la raiz.
+- **Evidencia:** Escudo GOLD: node --check 9/9 PASS; ASCII-safety 0 bytes
+  >127; smokes 3/3 PASS con divs balanceados (190/190, 180/180, 168/168).
+  Carga en prod via loaders (DELETE+POST Bearer exploraco12345): los 3
+  status=published. Verificacion en vivo 2026-09-07: las 3 URLs .html = 200
+  (58-61KB); /api/destinos?cat=evento lista 50 eventos con day/month reales
+  (4/1/3 Sep); sitemap.xml incluye los 3 slugs. Nota: Instagram no es
+  scrapeable (solo devuelve logo base64); los datos se verificaron en
+  fuentes oficiales abiertas.
 
 ---
 

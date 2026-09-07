@@ -4,6 +4,40 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion Referente agenda + 3 eventos de hoy (2026-09-07) - TSK-078
+
+El usuario pidio (1) registrar en memoria el Instagram
+@quehaypahacerenbogota como referente de la agenda y (2) extraer de ahi los
+eventos de hoy (lunes 7 sep 2026). Hallazgo: Instagram NO es scrapeable
+(el fetch solo devuelve el logo base64; el contenido diario vive en Stories
+efimeras). Se documento el referente y se usaron fuentes oficiales abiertas
+para verificar los datos.
+
+**Cambios:**
+- `exploraco desarrollo/referentes-agenda.md` (nuevo): referente principal
+  @quehaypahacerenbogota (inspiracion, no scrapeable) + fuentes oficiales
+  verificables (bogota.gov.co/que-hacer/agenda-cultural, idartes.gov.co/es/agenda,
+  culturarecreacionydeporte.gov.co/es/eventos, visitbogota.co/es/agenda-de-eventos,
+  tuboleta.com, idpc.gov.co) + como usarlas (patron Fase 9).
+- 3 paginas dinamicas de evento (patron Fase 9, 9 archivos ASCII-safe):
+  1. `jazz-expandido-bogota` - temporada de jazz del CNA, 4-27 sep 2026.
+  2. `mes-del-patrimonio-bogota` - Mes del Patrimonio 2026 (IDPC/SDCRD).
+  3. `transitos-fragmentados-bogota` - exposicion fotografica en CEFE Chapinero,
+     3-12 sep 2026.
+
+**Verificacion (Escudo GOLD):** node --check 9/9 PASS; ASCII-safety 0 bytes
+>127; smokes 3/3 PASS con divs balanceados (190/190, 180/180, 168/168).
+Carga a prod via loaders (Bearer exploraco12345): los 3 published (ids
+c9b13826-..., c18674eb-..., e8771df6-...). Las 3 URLs .html = 200 (58-61KB);
+/api/destinos?cat=evento lista 50 eventos con day/month 4/1/3 Sep; sitemap
+incluye los 3 slugs.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** referentes-agenda.md, 9 scripts en
+   `scripts/`, TASKS.md/TSK-078 y NEXT.md (este segmento).
+2. Backlog vigente de sesiones anteriores (commit TSK-077, TSK-076 docs,
+   hostales legacy sin seeds, TASK-013, etc.).
+
 ### Sesion Canon del Guejar + Las Gachas en directorio (2026-09-07) - TSK-077
 
 Dos paginas dinamicas de categoria sitio agregadas al directorio (patron
