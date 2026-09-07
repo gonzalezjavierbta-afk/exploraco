@@ -252,8 +252,15 @@
     if (typeof DEST_FEATURED_IDS !== 'undefined') replArr(DEST_FEATURED_IDS, featIds);
 
     // 5. AGENDA_EVENTS[] — eventos de la DB + los hardcodeados originales
+    //    Orden: mas recientes primero (creado_en DESC) para que los eventos
+    //    recien cargados aparezcan arriba de la agenda del home, sin quedar
+    //    enterrados bajo eventos legacy con rating alto.
     var eventosDB = apiData
       .filter(function (item) { return item.cat === 'evento'; })
+      .sort(function (a, b) {
+        var ca = a.creado_en || '', cb = b.creado_en || '';
+        return ca < cb ? 1 : (ca > cb ? -1 : 0);
+      })
       .map(toAgendaEvent);
 
     if (eventosDB.length > 0 && typeof AGENDA_EVENTS !== 'undefined') {

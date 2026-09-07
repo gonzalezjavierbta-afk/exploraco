@@ -39,6 +39,7 @@ function toPlace(row) {
 
   return {
     id:          row.id,
+    creado_en:   row.creado_en     || null,
     slug:        row.slug          || '',
     name:        row.nombre        || '',
     cat:         cat,
