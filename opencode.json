@@ -1,8 +1,41 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "deepseek/deepseek-v4-pro",
+  "small_model": "deepseek/deepseek-v4-flash",
+  "default_agent": "build",
+  "subagent_depth": 2,
   "permission": {
-    "edit": "allow",
-    "bash": "allow",
-    "webfetch": "allow"
+    "edit": "ask",
+    "bash": "ask"
+  },
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  "watcher": {
+    "ignore": [
+      "node_modules/**",
+      "dist/**",
+      ".git/**",
+      "build/**",
+      "coverage/**",
+      "**/.DS_Store",
+      ".opencode/snapshots/**"
+    ]
+  },
+  "formatter": true,
+  "lsp": true,
+  "agent": {
+    "exp-pickle": {
+      "description": "Agente experimental gratuito MiMo-v2.5 para tareas de bajo riesgo",
+      "model": "opencode/big-pickle",
+      "prompt": "Eres exp-pickle. Realiza tareas rutinarias de desarrollo de software, refactorización menor y linter. Respeta límites de rate limits. Prohibido manipular credenciales, datos de seguridad crítica o lógica de trading.",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
   }
 }
