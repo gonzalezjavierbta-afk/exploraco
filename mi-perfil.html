@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mi Perfil – ExploraCO</title>
+<meta name="description" content="Tu perfil de viajero en ExploraCO. XP, badges, trofeos, lugares guardados y visitados.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E8A020">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
+body{font-family:'Outfit',sans-serif;background:var(--black);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+/* NAV */
+nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px;flex-shrink:0}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
+.nav-label{font-size:11px;color:rgba(255,255,255,.5)}
+.nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
+.nav-back:hover{border-color:var(--gold);color:var(--gold)}
+/* GATE */
+#gate{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--black)}
+.gate-inner{max-width:480px;width:100%;text-align:center}
+.gate-logo{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:6px}
+.gate-logo em{color:var(--gold);font-style:normal}
+.gate-sub{font-size:14px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:28px}
+.gate-btn{width:100%;max-width:320px;padding:14px;background:var(--gold);border:none;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;cursor:pointer;transition:opacity .15s;color:var(--black)}
+.gate-btn:hover{opacity:.88}
+/* PROFILE */
+#profile{flex:1;display:none;flex-direction:column;max-width:720px;width:100%;margin:0 auto;padding:20px 4% 60px}
+.pf-hero{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.pf-av{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;border:3px solid var(--gold);flex-shrink:0;background:#1a3a5c;color:#7eb8f0}
+.pf-info{flex:1;min-width:0}
+.pf-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff}
+.pf-email{font-size:12px;color:rgba(255,255,255,.4);margin-top:2px}
+.pf-level{font-size:13px;color:var(--gold);margin-top:6px}
+.pf-xp-bar{height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:6px;overflow:hidden}
+.pf-xp-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),#FFD700);transition:width .4s}
+.pf-xp-text{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:rgba(255,255,255,.35)}
+/* STATS */
+.pf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:28px}
+.pf-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 10px;text-align:center}
+.pf-stat-n{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff}
+.pf-stat-l{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+/* SECTIONS */
+.pf-section-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.6);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+/* BADGES */
+.badges-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:28px}
+.bg-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
+.bg-card.earned{border-color:rgba(232,160,32,.3);background:rgba(232,160,32,.06)}
+.bg-emoji{font-size:28px;margin-bottom:6px}
+.bg-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
+.bg-desc{font-size:9px;color:rgba(255,255,255,.35);line-height:1.4}
+/* TROFEOS */
+.trofeo-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
+.trofeo-card.earned{border-color:rgba(232,160,32,.3);background:rgba(232,160,32,.06)}
+.trofeo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:28px}
+/* QUICK ACTIONS */
+.qa-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.qa-card:hover{border-color:rgba(232,160,32,.2)}
+/* MIS LUGARES */
+.lugar-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;margin-bottom:6px;text-decoration:none;color:#fff;transition:border-color .15s}
+.lugar-item:hover{border-color:rgba(232,160,32,.3)}
+.lugar-emoji{font-size:20px;flex-shrink:0}
+.lugar-nombre{font-size:12px;font-weight:700;color:#fff}
+.lugar-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px}
+/* ACTION BUTTONS */
+.pf-actions{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+.pf-btn{flex:1;min-width:120px;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.7);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif;text-align:center;transition:all .15s}
+.pf-btn:hover{border-color:var(--gold);color:var(--gold)}
+.pf-btn-gold{background:var(--gold);border-color:var(--gold);color:var(--black);font-weight:700}
+.pf-btn-gold:hover{opacity:.88}
+.pf-btn-danger{border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
+.pf-btn-danger:hover{border-color:#ef4444;color:#ef4444}
+/* TOAST */
+#xp-toast{position:fixed;bottom:20px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(232,160,32,.3)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <span class="nav-label">👤 Mi perfil</span>
+  <a href="comunidad.html" class="nav-back">👥 Comunidad</a>
+</nav>
+
+<!-- GATE -->
+<div id="gate">
+  <div class="gate-inner">
+    <div class="gate-logo">EXPLORA<em>CO</em></div>
+    <p class="gate-sub">Inicia sesión para ver tu perfil de viajero, tus badges, trofeos y tus lugares guardados.</p>
+    <button class="gate-btn" onclick="window.ExploraCO && window.ExploraCO.mostrarLogin ? window.ExploraCO.mostrarLogin() : alert('Inicia sesion para continuar')">🔑 Iniciar sesión</button>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div id="profile">
+
+  <!-- HERO -->
+  <div class="pf-hero">
+    <div class="pf-av" id="pf-av">TÚ</div>
+    <div class="pf-info">
+      <div class="pf-name" id="pf-name">Viajero</div>
+      <div class="pf-email" id="pf-email"></div>
+      <div class="pf-level" id="pf-level">🌱 Viajero novato</div>
+      <div class="pf-xp-bar"><div class="pf-xp-fill" id="pf-xp-fill" style="width:0%"></div></div>
+      <div class="pf-xp-text"><span id="pf-xp-cur">0 XP</span><span id="pf-xp-next">Siguiente: 100 XP</span></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="pf-stats">
+    <div class="pf-stat"><div class="pf-stat-n" id="pf-xp-n">0</div><div class="pf-stat-l">XP total</div></div>
+    <div class="pf-stat"><div class="pf-stat-n" id="pf-saved-n">0</div><div class="pf-stat-l">Guardados</div></div>
+    <div class="pf-stat"><div class="pf-stat-n" id="pf-visited-n">0</div><div class="pf-stat-l">Visitados</div></div>
+    <div class="pf-stat"><div class="pf-stat-n" id="pf-reviews-n">0</div><div class="pf-stat-l">Reseñas</div></div>
+  </div>
+
+  <!-- BADGES -->
+  <div class="pf-section-title">🏅 Badges</div>
+  <div class="badges-grid" id="pf-badges"></div>
+
+  <!-- TROFEOS -->
+  <div class="pf-section-title">🏆 Trofeos desbloqueados</div>
+  <div id="pf-trofeos-count" style="font-size:11px;color:var(--gold);margin-bottom:10px">0 / 16</div>
+  <div class="trofeo-grid" id="pf-trofeos"></div>
+
+  <!-- MIS LUGARES -->
+  <div class="pf-section-title">📍 Mis lugares guardados</div>
+  <div id="pf-guardados"></div>
+  <div class="pf-section-title" style="margin-top:20px">✅ Lugares visitados</div>
+  <div id="pf-visitados"></div>
+
+  <!-- SIGUIENTES PASOS -->
+  <div class="pf-section-title" style="margin-top:28px">🚀 Siguientes pasos</div>
+  <div id="pf-quick-actions" style="display:flex;flex-direction:column;gap:6px;margin-bottom:28px"></div>
+
+  <!-- ACCIONES -->
+  <div class="pf-actions">
+    <button class="pf-btn" onclick="window.location.href='index.html#mymapa-section'">🗺️ Mi Mapa</button>
+    <button class="pf-btn" onclick="window.location.href='directorio.html'">📍 Explorar</button>
+    <button class="pf-btn pf-btn-gold" onclick="editarNombre()">✏️ Editar nombre</button>
+    <button class="pf-btn pf-btn-danger" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
+  </div>
+
+</div>
+
+<div id="xp-toast"></div>
+
+<script>
+/* =============================================================
+   MI PERFIL EXPLORACO — pagina privada del viajero
+   Datos reales: window.ExploraCO.usuario + Neon
+   La sesion la maneja usuario-session.js (window.ExploraCO).
+   ============================================================= */
+
+/* ---- POINTS CONFIG ---- */
+var XP_LEVELS = [
+  {min:0,max:99,nombre:'Viajero novato',emoji:'🌱'},
+  {min:100,max:299,nombre:'Explorador',emoji:'🧭'},
+  {min:300,max:599,nombre:'Aventurero',emoji:'🏔️'},
+  {min:600,max:999,nombre:'Embajador Colombia',emoji:'🦅'},
+  {min:1000,max:1999,nombre:'Leyenda viajera',emoji:'🌟'},
+  {min:2000,max:99999,nombre:'Maestro ExploraCO',emoji:'👑'},
+];
+var XP_BADGES = [
+  {id:'primer_lugar',emoji:'📍',nombre:'Primer destino',desc:'Guardaste tu primer lugar',check:function(u){return u.saved>=1;}},
+  {id:'explorador5',emoji:'🧭',nombre:'Explorador x5',desc:'5 lugares guardados',check:function(u){return u.saved>=5;}},
+  {id:'viajero10',emoji:'✈️',nombre:'Gran viajero',desc:'10 lugares guardados',check:function(u){return u.saved>=10;}},
+  {id:'primer_resena',emoji:'✍️',nombre:'Primera reseña',desc:'Publicaste tu primera reseña',check:function(u){return u.reviews>=1;}},
+  {id:'critico',emoji:'⭐',nombre:'Crítico viajero',desc:'5 reseñas publicadas',check:function(u){return u.reviews>=5;}},
+  {id:'visitado3',emoji:'🏅',nombre:'Ya estuve',desc:'3 lugares visitados',check:function(u){return u.visited>=3;}},
+  {id:'caribe',emoji:'🌊',nombre:'Costa Caribe',desc:'3 destinos del Caribe guardados',check:function(u){return u.caribe>=3;}},
+  {id:'andino',emoji:'⛰️',nombre:'Corazón andino',desc:'3 destinos andinos guardados',check:function(u){return u.andino>=3;}},
+  {id:'compartido',emoji:'📢',nombre:'Difusor',desc:'Compartiste 3 lugares',check:function(u){return u.shares>=3;}},
+  {id:'plan_maestro',emoji:'📋',nombre:'Planificador',desc:'Creaste tu primer plan de viaje',check:function(u){return u.plans>=1;}},
+  {id:'social',emoji:'💬',nombre:'Alma social',desc:'Enviaste 10 mensajes en el chat',check:function(u){return u.chats>=10;}},
+  {id:'colombiano',emoji:'🇨🇴',nombre:'Orgullo colombiano',desc:'Eres viajero local de Colombia',check:function(u){return u.origin&&u.origin.indexOf('Colombia')!==-1;}},
+];
+
+var mmSaved = [], mmVisited = [];
+try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
+try{mmVisited=JSON.parse(localStorage.getItem('mm_visited')||'[]');}catch(e){}
+
+/* ---- SESSION ---- */
+function sesion() { return (window.ExploraCO && window.ExploraCO.usuario) || null; }
+function statsU() {
+  var u = sesion();
+  return {
+    xp:      u ? (parseInt(u.xp_total,10)      || 0) : 0,
+    saved:   u ? (parseInt(u.total_guardados,10) || 0) : Math.max(0, mmSaved.length),
+    visited: u ? (parseInt(u.total_visitas,10)  || 0) : Math.max(0, mmVisited.length),
+    reviews: u ? (parseInt(u.total_resenas,10)  || 0) : 0,
+    origin:  '',
+    caribe:0, andino:0, shares:0, plans:0, chats:0
+  };
+}
+
+function getLevel(xp) { for(var i=XP_LEVELS.length-1;i>=0;i--) if(xp>=XP_LEVELS[i].min) return XP_LEVELS[i]; return XP_LEVELS[0]; }
+function getNextLevel(xp) { var cur=getLevel(xp); for(var i=0;i<XP_LEVELS.length;i++) if(XP_LEVELS[i].min>cur.min) return XP_LEVELS[i]; return cur; }
+function getLevelPct(xp) {
+  var lvl=getLevel(xp); var range=lvl.max-lvl.min;
+  if(range>=99999) return 100;
+  return Math.round((xp-lvl.min)/range*100);
+}
+
+/* ---- HELPERS ---- */
+function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
+function setStyle(id,prop,val){var e=document.getElementById(id);if(e)e.style[prop]=val;}
+
+/* ---- GATE ---- */
+function checkGate() {
+  var gate = document.getElementById('gate');
+  var prof = document.getElementById('profile');
+  if(sesion()) { gate.style.display='none'; prof.style.display='flex'; renderPerfil(); }
+  else { gate.style.display='flex'; prof.style.display='none'; }
+}
+
+/* ---- RENDER ---- */
+function renderPerfil() {
+  var u = sesion();
+  if(!u) return;
+  var st = statsU();
+  var lvl = getLevel(st.xp);
+  var next = getNextLevel(st.xp);
+  var pct = getLevelPct(st.xp);
+  var nombre = u.nombre || 'Viajero';
+  var email = u.email || '';
+  var initials = nombre.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase() || 'TU';
+
+  /* hero */
+  var av = document.getElementById('pf-av');
+  if(av) { av.textContent = initials; av.style.background = '#1a3a5c'; av.style.color = '#7eb8f0'; if(u.avatar_url) av.style.backgroundImage='url('+u.avatar_url+')'; }
+  setText('pf-name', nombre);
+  setText('pf-email', email);
+  setText('pf-level', lvl.emoji + ' ' + lvl.nombre);
+  setStyle('pf-xp-fill','width', pct+'%');
+  setText('pf-xp-cur', st.xp + ' XP');
+  setText('pf-xp-next', 'Siguiente: ' + next.min + ' XP');
+
+  /* stats */
+  setText('pf-xp-n', st.xp);
+  setText('pf-saved-n', st.saved);
+  setText('pf-visited-n', st.visited);
+  setText('pf-reviews-n', st.reviews);
+
+  /* badges */
+  renderBadges(st);
+
+  /* trofeos */
+  cargarTrofeos(u.id);
+
+  /* mis lugares */
+  cargarMisLugares(u.id);
+
+  /* quick actions */
+  renderQuickActions(st);
+}
+
+/* ---- BADGES ---- */
+function renderBadges(st) {
+  var grid = document.getElementById('pf-badges');
+  if(!grid) return;
+  var earned = XP_BADGES.filter(function(b){ return b.check(st); }).map(function(b){ return b.id; });
+  grid.innerHTML = XP_BADGES.map(function(b) {
+    var e = earned.indexOf(b.id) !== -1;
+    return '<div class="bg-card'+(e?' earned':'')+'" title="'+b.desc+'">'
+      +'<div class="bg-emoji">'+(e?b.emoji:'🔒')+'</div>'
+      +'<div class="bg-name">'+b.nombre+'</div>'
+      +'<div class="bg-desc">'+b.desc+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+/* ---- TROFEOS (api/interacciones) ---- */
+function cargarTrofeos(uid) {
+  var grid = document.getElementById('pf-trofeos');
+  var cnt = document.getElementById('pf-trofeos-count');
+  if(!grid || !uid) return;
+  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando trofeos…</div>';
+  fetch('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(uid))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var list = (res && res.data) || [];
+      if(cnt) cnt.textContent = list.length + ' / 16';
+      if(!list.length) {
+        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aun no has desbloqueado trofeos. Guarda lugares, escribe resenas y viaja para ganarlos 🏆</div>';
+        return;
+      }
+      grid.innerHTML = list.map(function(t){
+        var tier = (t.tier||'').charAt(0).toUpperCase() + (t.tier||'').slice(1);
+        return '<div class="trofeo-card earned"><div class="bg-emoji">🏆</div>'
+          +'<div class="bg-name">'+(t.nombre||t.id||'Trofeo')+'</div>'
+          +'<div class="bg-desc">'+(tier?tier+' · ':'')+(t.rareza_global!=null?t.rareza_global+'% de viajeros':'')+'</div>'
+          +'</div>';
+      }).join('');
+    })
+    .catch(function(){
+      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar los trofeos. Intenta de nuevo mas tarde.</div>';
+    });
+}
+
+/* ---- MIS LUGARES (api/interacciones?tipo=mapa) ---- */
+function cargarMisLugares(uid) {
+  if(!uid) return;
+  fetch('/api/interacciones?tipo=mapa&usuario_id=' + encodeURIComponent(uid))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var d = (res && res.data) || {};
+      renderLugares('pf-guardados', d.guardados || [], 'guardado');
+      renderLugares('pf-visitados', d.visitados || [], 'visitado');
+    })
+    .catch(function(){
+      renderLugaresFallback();
+    });
+}
+
+function renderLugares(containerId, list, tipo) {
+  var el = document.getElementById(containerId);
+  if(!el) return;
+  if(!list.length) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:8px 0">'+(tipo==='guardado'?'Aun no guardas lugares. Presiona el corazon en cualquier destino.':'Aun no marcas lugares como visitados.')+'</div>';
+    return;
+  }
+  el.innerHTML = list.map(function(d){
+    var emoji = d.emoji || '📍';
+    var nombre = d.nombre || 'Destino';
+    var sub = d.ciudad ? d.ciudad + (d.region?', '+d.region:'') : '';
+    var href = d.slug ? d.slug+'.html' : '#';
+    return '<a class="lugar-item" href="'+href+'">'
+      +'<div class="lugar-emoji">'+emoji+'</div>'
+      +'<div><div class="lugar-nombre">'+nombre+'</div>'
+      +'<div class="lugar-sub">'+sub+'</div></div></a>';
+  }).join('');
+}
+
+function renderLugaresFallback() {
+  var gc = document.getElementById('pf-guardados');
+  var vc = document.getElementById('pf-visitados');
+  if(gc && mmSaved.length) {
+    gc.innerHTML = mmSaved.map(function(slug){
+      return '<a class="lugar-item" href="'+slug+'.html"><div class="lugar-emoji">📍</div><div><div class="lugar-nombre">'+slug.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})+'</div><div class="lugar-sub">Guardado local</div></div></a>';
+    }).join('');
+  }
+  if(vc && mmVisited.length) {
+    vc.innerHTML = mmVisited.map(function(slug){
+      return '<a class="lugar-item" href="'+slug+'.html"><div class="lugar-emoji">✅</div><div><div class="lugar-nombre">'+slug.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})+'</div><div class="lugar-sub">Visitado</div></div></a>';
+    }).join('');
+  }
+}
+
+/* ---- QUICK ACTIONS ---- */
+function renderQuickActions(st) {
+  var el = document.getElementById('pf-quick-actions');
+  if(!el) return;
+  st = st || statsU();
+  var actions = [];
+  if(st.saved === 0) {
+    actions.push({emoji:'📍', label:'Guarda tu primer lugar', xp:'+5 XP', hint:'Abre cualquier pagina de destino y presiona el corazon', action:function(){ window.location.href='directorio.html'; }});
+  }
+  if(st.reviews === 0) {
+    actions.push({emoji:'✍️', label:'Escribe una resena', xp:'+25 XP', hint:'Abre cualquier lugar y usa la seccion de resenas', action:function(){ window.location.href='directorio.html'; }});
+  }
+  if(st.saved > 0 && st.visited === 0) {
+    actions.push({emoji:'✅', label:'Marca un lugar como visitado', xp:'+10 XP', hint:'En Tu Mapa (ExploraCO) usa el boton "Ya fui"', action:function(){ window.location.href='index.html#mymapa-section'; }});
+  }
+  if(actions.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);padding:8px 0">Vas muy bien! Sigue explorando Colombia 🇨🇴</div>';
+    return;
+  }
+  window._quickActions = actions;
+  el.innerHTML = actions.map(function(a,i){
+    return '<div class="qa-card" onclick="doQuickAction('+i+')">'
+      +'<div style="font-size:20px;flex-shrink:0">'+a.emoji+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#fff">'+a.label+'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px">'+a.hint+'</div></div>'
+      +'<div style="font-size:11px;font-weight:700;color:var(--gold);flex-shrink:0">'+a.xp+'</div>'
+      +'</div>';
+  }).join('');
+}
+function doQuickAction(i){ var a=(window._quickActions||[])[i]; if(a&&a.action) a.action(); }
+
+/* ---- EDITAR NOMBRE ---- */
+function editarNombre() {
+  var u = sesion();
+  if(!u) return;
+  var nuevo = prompt('Tu nombre actual: ' + (u.nombre||'') + '\nEscribe el nuevo nombre:', u.nombre||'');
+  if(!nuevo || !nuevo.trim() || nuevo.trim() === u.nombre) return;
+  fetch('/api/usuarios', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({auth_id:u.auth_id, email:u.email, nombre:nuevo.trim(), avatar_url:u.avatar_url||null, auth_provider:u.auth_provider||'email'})
+  }).then(function(r){return r.json();}).then(function(res){
+    if(res.ok && res.data) {
+      window.ExploraCO.usuario = res.data;
+      try{localStorage.setItem('exploraco_user',JSON.stringify(res.data));}catch(e){}
+      showToast('Nombre actualizado: '+res.data.nombre);
+      renderPerfil();
+    } else {
+      showToast(res.error||'No se pudo actualizar','#ef4444');
+    }
+  }).catch(function(){ showToast('Error de conexion','#ef4444'); });
+}
+
+/* ---- CERRAR SESION ---- */
+function cerrarSesion() {
+  if(window.ExploraCO && window.ExploraCO.cerrarSesion) {
+    window.ExploraCO.cerrarSesion();
+  }
+  checkGate();
+}
+
+/* ---- TOAST ---- */
+function showToast(msg,color){
+  var t=document.getElementById('xp-toast');
+  if(!t)return;
+  t.textContent=msg;
+  t.style.background=color||'#111';
+  t.style.transform='translateY(0)'; t.style.opacity='1';
+  clearTimeout(t._t);
+  t._t=setTimeout(function(){ t.style.transform='translateY(40px)'; t.style.opacity='0'; },2800);
+}
+
+/* ---- INIT ---- */
+window.onExploraCOUpdate = function() { checkGate(); };
+checkGate();
+</script>
+  <script src="usuario-session.js"></script>
+</body>
+</html>

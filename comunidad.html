@@ -111,6 +111,26 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .plan-meta{font-size:10px;color:rgba(255,255,255,.35)}
 .plan-join-btn{width:100%;padding:8px;background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;margin-top:10px;transition:all .15s;font-family:'Outfit',sans-serif}
 .plan-join-btn:hover,.plan-join-btn.joined{background:var(--gold);border-color:var(--gold);color:var(--black)}
+/* Ranking / leaderboard */
+.lb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.lb-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff}
+.lb-title span{color:var(--gold)}
+.lb-sub{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:14px}
+.lb-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.lb-card.top-1{border-color:#FFD700;background:linear-gradient(135deg,rgba(255,215,0,.14),rgba(255,255,255,.04));box-shadow:0 0 0 1px rgba(255,215,0,.15)}
+.lb-card.top-2{border-color:#C0C0C0;background:linear-gradient(135deg,rgba(192,192,192,.12),rgba(255,255,255,.04))}
+.lb-card.top-3{border-color:#CD7F32;background:linear-gradient(135deg,rgba(205,127,50,.12),rgba(255,255,255,.04))}
+.lb-rank{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#fff;width:38px;text-align:center;flex-shrink:0}
+.lb-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;flex-shrink:0}
+.lb-info{flex:1;min-width:0}
+.lb-name{font-size:13px;font-weight:700;color:#fff}
+.lb-level{font-size:10px;color:var(--gold);margin-top:1px}
+.lb-stats{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
+.lb-right{text-align:right;flex-shrink:0}
+.lb-xp{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:#fff}
+.lb-xp small{font-size:9px;color:rgba(255,255,255,.4);font-family:'Outfit',sans-serif;font-weight:500;display:block;margin-top:-2px}
+.lb-progress{margin-top:6px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.lb-progress-fill{height:100%;border-radius:2px;background:var(--gold)}
 /* Badges */
 .badges-grid-comm{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .bgc-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
@@ -159,13 +179,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <!-- User bar -->
   <div class="comm-header">
     <div class="comm-user-bar">
-      <div class="comm-av" id="comm-av" style="background:#1a2e4a;color:#7eb8f0">TÚ</div>
-      <div class="comm-info">
+      <div class="comm-av" id="comm-av" onclick="irMiPerfil()" style="cursor:pointer;background:#1a2e4a;color:#7eb8f0">TÚ</div>
+      <div class="comm-info" onclick="irMiPerfil()" style="cursor:pointer">
         <div class="comm-name" id="comm-name">Viajero</div>
         <div class="comm-level" id="comm-level">🌱 Viajero novato · 0 XP</div>
         <div class="comm-xp-bar"><div class="comm-xp-fill" id="comm-xp-fill" style="width:0%"></div></div>
       </div>
-      <button onclick="editCommProfile()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 12px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='rgba(255,255,255,.6)'">✏️ Editar</button>
+      <button onclick="irMiPerfil()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 12px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='rgba(255,255,255,.6)'">👤 Mi Perfil</button>
     </div>
     <div class="comm-stats">
       <div class="comm-stat"><div class="comm-stat-n" id="comm-xp-n">0</div><div class="comm-stat-l">XP total</div></div>
@@ -175,41 +195,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
     <!-- Tabs -->
         <div class="comm-tabs">
-      <div class="ctab on" onclick="showCommTab('perfil')">👤 Mi Perfil</div>
-      <div class="ctab" onclick="showCommTab('chat')">💬 Chat</div>
+      <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
       <div class="ctab" onclick="showCommTab('planes')">🗺️ Planes</div>
-      <div class="ctab" onclick="showCommTab('logros')">🏅 Logros</div>
-      <div class="ctab" onclick="showCommTab('viajeros')">👤 Viajeros</div>
+      <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
     </div>
     </div>
 
   <!-- Tab panels -->
     <div class="comm-panels">
-
-    <!-- MI PERFIL -->
-    <div class="cpanel on" id="cpanel-perfil">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
-        <div id="perfil-avatar" style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;border:2px solid var(--gold);flex-shrink:0;background:#1a2e4a;color:#7eb8f0">TÚ</div>
-        <div style="flex:1;min-width:0">
-          <div id="perfil-name" style="font-size:16px;font-weight:700;color:#fff">Viajero</div>
-          <div id="perfil-level" style="font-size:12px;color:var(--gold);margin-top:2px">🌱 Viajero novato</div>
-          <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:6px;overflow:hidden"><div id="perfil-xp-fill" style="height:100%;border-radius:3px;background:var(--gold);width:0%;transition:width .4s"></div></div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:18px">
-        <div class="comm-stat"><div class="comm-stat-n" id="perfil-xp">0</div><div class="comm-stat-l">XP total</div></div>
-        <div class="comm-stat"><div class="comm-stat-n" id="perfil-saved">0</div><div class="comm-stat-l">Guardados</div></div>
-        <div class="comm-stat"><div class="comm-stat-n" id="perfil-visited">0</div><div class="comm-stat-l">Visitados</div></div>
-        <div class="comm-stat"><div class="comm-stat-n" id="perfil-reviews">0</div><div class="comm-stat-l">Reseñas</div></div>
-      </div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);margin-bottom:10px">Badges</div>
-      <div class="badges-grid-comm" id="perfil-badges-grid"></div>
-      <div style="margin-top:16px;display:flex;gap:8px">
-        <button onclick="window.location.href='index.html#mymapa-section'" style="flex:1;padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.7);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif">🗺️ Mi Mapa</button>
-        <button onclick="window.location.href='directorio.html'" style="flex:1;padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.7);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif">📍 Explorar</button>
-      </div>
-    </div>
-
 
     <!-- CHAT -->
     <div class="cpanel on" id="cpanel-chat">
@@ -236,22 +229,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="planes-grid" id="planes-grid"></div>
     </div>
 
-        <!-- LOGROS / TROFEOS -->
-    <div class="cpanel" id="cpanel-logros">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="font-size:12px;color:rgba(255,255,255,.4)">Trofeos desbloqueados (Neon)</div>
-        <div id="comm-logros-count" style="font-size:11px;color:var(--gold)">0 / 16</div>
+        <!-- RANKING -->
+    <div class="cpanel" id="cpanel-ranking">
+      <div class="lb-head">
+        <div class="lb-title">🏆 RANKING DE <span>VIAJEROS</span></div>
       </div>
-      <div id="comm-logros-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px"></div>
-      <div id="comm-logros-loading" style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:30px">Cargando trofeos…</div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);margin:18px 0 8px">Siguientes pasos</div>
-      <div id="comm-quick-actions" style="display:flex;flex-direction:column;gap:6px"></div>
-    </div>
-
-<!-- VIAJEROS -->
-    <div class="cpanel" id="cpanel-viajeros">
-      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:14px">Viajeros activos en ExploraCO</div>
-      <div id="viajeros-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px"></div>
+      <div class="lb-sub">Actualizado en tiempo real · Top 20 viajeros más activos</div>
+      <div id="lb-list"></div>
     </div>
 
   </div>
@@ -261,12 +245,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
 <script>
 /* =============================================================
-   COMUNIDAD EXPLORACO — hub unificado
-   1. Mi Perfil (datos reales: window.ExploraCO.usuario + Neon)
-   2. Chat (demo local)
-   3. Planes (demo local)
-   4. Logros / Trofeos (api/interacciones)
-   5. Viajeros (api/usuarios?tipo=leaderboard, con fallback demo)
+   COMUNIDAD EXPLORACO — hub de interaccion social
+   1. Chat (demo local)
+   2. Planes (demo local)
+   3. Ranking de viajeros (api/usuarios?tipo=leaderboard, con fallback demo)
+   El perfil privado vive en mi-perfil.html (badges, trofeos, avance).
    La sesion real la maneja usuario-session.js (window.ExploraCO).
    ============================================================= */
 
@@ -313,7 +296,6 @@ function statsU() {
 }
 
 function getLevel(xp) { for(var i=XP_LEVELS.length-1;i>=0;i--) if(xp>=XP_LEVELS[i].min) return XP_LEVELS[i]; return XP_LEVELS[0]; }
-function getNextLevel(xp) { var cur=getLevel(xp); for(var i=0;i<XP_LEVELS.length;i++) if(XP_LEVELS[i].min>cur.min) return XP_LEVELS[i]; return cur; }
 function getLevelPct(xp) {
   var lvl=getLevel(xp); var range=lvl.max-lvl.min;
   if(range>=99999) return 100;
@@ -341,21 +323,23 @@ function showCommunity() {
   updateCommUI();
   renderChatRooms();
   renderPlanes();
-  renderViajeros();
+  cargarLeaderboard();
 }
 
 /* ---- COMMUNITY UI ---- */
 function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
 function setStyle(id,prop,val){var e=document.getElementById(id);if(e)e.style[prop]=val;}
 
+function irMiPerfil() { window.location.href='mi-perfil.html'; }
+
 function updateCommUI() {
   var st = statsU();
   var lvl = getLevel(st.xp);
   var pct = getLevelPct(st.xp);
-  var next = getNextLevel(st.xp);
   var u = sesion();
   var nombre = u ? (u.nombre||'Viajero') : 'Invitado';
   var initials = u && u.nombre ? u.nombre.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2) : 'TU';
+  var earnedCount = XP_BADGES.filter(function(b){ return b.check(st); }).length;
 
   var av = document.getElementById('comm-av');
   if(av) { av.textContent = initials; av.style.background = '#1a3a5c'; av.style.color = '#7eb8f0'; }
@@ -363,101 +347,10 @@ function updateCommUI() {
   setText('comm-level', lvl.emoji + ' ' + lvl.nombre + ' · ' + st.xp + ' XP');
   setStyle('comm-xp-fill','width', pct+'%');
   setText('comm-xp-n', st.xp);
+  setText('comm-badges-n', earnedCount);
   setText('comm-saved-n', st.saved);
   setText('comm-visited-n', st.visited);
-  setText('perfil-name', nombre);
-  setText('perfil-level', lvl.emoji + ' ' + lvl.nombre);
-  setStyle('perfil-xp-fill','width', pct+'%');
-  setText('perfil-xp', st.xp + ' XP');
-  setText('perfil-saved', st.saved);
-  setText('perfil-visited', st.visited);
-  setText('perfil-reviews', st.reviews);
-
-  renderCommBadges(st);
-  setText('logros-level', lvl.nombre);
-  setText('logros-next', 'Próximo nivel en ' + Math.max(0, next.min - st.xp) + ' XP');
-  var le = document.getElementById('logros-emoji');
-  if(le) le.textContent = lvl.emoji;
-  setStyle('logros-bar','width', pct+'%');
-  cargarTrofeos();
-  renderQuickActions();
 }
-
-function renderCommBadges(st) {
-  st = st || statsU();
-  var grid = document.getElementById('perfil-badges-grid');
-  if(!grid) return;
-  var earned = XP_BADGES.filter(function(b){ return b.check(st); }).map(function(b){ return b.id; });
-  grid.innerHTML = XP_BADGES.map(function(b) {
-    var e = earned.indexOf(b.id) !== -1;
-    return '<div class="bgc-card'+(e?' earned':'')+'" title="'+b.desc+'">'
-      +'<div class="bgc-emoji">'+(e?b.emoji:'🔒')+'</div>'
-      +'<div class="bgc-name">'+b.nombre+'</div>'
-      +'<div class="bgc-desc">'+b.desc+'</div>'
-      +'</div>';
-  }).join('');
-}
-
-/* ---- TROFEOS (api/interacciones) ---- */
-function cargarTrofeos() {
-  var grid = document.getElementById('comm-logros-grid');
-  if(!grid) return;
-  var u = sesion();
-  if(!u || !u.id) {
-    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Inicia sesión para ver tus trofeos y rareza global</div>';
-    return;
-  }
-  fetch('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(u.id))
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      var list = (res && res.data) || [];
-      if(!list.length) {
-        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aún no has desbloqueado trofeos. Guarda lugares, escribe reseñas y viaja para ganarlos 🏆</div>';
-        return;
-      }
-      grid.innerHTML = list.map(function(t){
-        var tier = (t.tier||'').charAt(0).toUpperCase() + (t.tier||'').slice(1);
-        return '<div class="bgc-card earned"><div class="bgc-emoji">🏆</div>'
-          +'<div class="bgc-name">'+(t.nombre||t.id||'Trofeo')+'</div>'
-          +'<div class="bgc-desc">'+(tier?tier+' · ':'')+(t.rareza_global!=null?t.rareza_global+'% de viajeros':'')+'</div>'
-          +'</div>';
-      }).join('');
-    })
-    .catch(function(){
-      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar los trofeos. Intenta de nuevo más tarde.</div>';
-    });
-}
-
-/* ---- QUICK ACTIONS (no registran XP local: es informativo) ---- */
-function renderQuickActions() {
-  var el = document.getElementById('comm-quick-actions');
-  if(!el) return;
-  var st = statsU();
-  var actions = [];
-  if(st.reviews === 0) {
-    actions.push({emoji:'✍️', label:'Escribe una reseña', xp:'+25 XP', hint:'Abre cualquier lugar y usa la sección de reseñas', action:function(){ window.location.href='directorio.html'; }});
-  }
-  if(st.saved === 0) {
-    actions.push({emoji:'📍', label:'Guarda tu primer lugar', xp:'+5 XP', hint:'Abre cualquier página de destino y presiona ♥', action:function(){ window.location.href='directorio.html'; }});
-  }
-  if(st.saved > 0 && st.visited === 0) {
-    actions.push({emoji:'✅', label:'Marca un lugar como visitado', xp:'+10 XP', hint:'En Tu Mapa (ExploraCO) usa el botón "Ya fui"', action:function(){ window.location.href='index.html#mymapa-section'; }});
-  }
-  if(actions.length === 0) {
-    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);padding:8px 0">¡Vas muy bien! Sigue explorando Colombia 🇨🇴</div>';
-    return;
-  }
-  el.innerHTML = actions.map(function(a,i){
-    return '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="doQuickAction('+i+')">'
-      +'<div style="font-size:20px;flex-shrink:0">'+a.emoji+'</div>'
-      +'<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#fff">'+a.label+'</div>'
-      +'<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px">'+a.hint+'</div></div>'
-      +'<div style="font-size:11px;font-weight:700;color:var(--gold);flex-shrink:0">'+a.xp+'</div>'
-      +'</div>';
-  }).join('');
-  window._quickActions = actions;
-}
-function doQuickAction(i){ var a=(window._quickActions||[])[i]; if(a&&a.action) a.action(); }
 
 /* ---- CHAT (demo local, sin backend; no otorga XP) ---- */
 var CHAT_ROOMS = [
@@ -584,55 +477,69 @@ function createPlan() {
   renderPlanes();
 }
 
-/* ---- VIAJEROS (leaderboard real con fallback demo) ---- */
-var MOCK_VIAJEROS = [
-  {init:'CM',bg:'#1a3a5c',tc:'#7eb8f0',name:'Carlos M.',origin:'Bogotá',lvl:'🧭 Explorador'},
-  {init:'SK',bg:'#0a2a1a',tc:'#7ef0b8',name:'Sarah K.',origin:'Alemania',lvl:'🏔️ Aventurero'},
-  {init:'AV',bg:'#3a1a0a',tc:'#f0a87e',name:'Andrea V.',origin:'Medellín',lvl:'🌱 Novato'},
-  {init:'JW',bg:'#1a051a',tc:'#f07ef0',name:'James W.',origin:'Francia',lvl:'🧭 Explorador'},
-  {init:'MR',bg:'#0a1a3a',tc:'#7ea8f0',name:'María R.',origin:'Cartagena',lvl:'🦅 Embajador'},
-  {init:'LP',bg:'#2a1a0a',tc:'#f0c87e',name:'Luis P.',origin:'Cali',lvl:'🌱 Novato'},
+/* ---- RANKING (leaderboard real con podio + fallback demo) ---- */
+var MOCK_LB = [
+  {xp_total:1250,nombre:'Carlos M.',badge_actual:'Leyenda viajera'},
+  {xp_total:980,nombre:'Sarah K.',badge_actual:'Embajador Colombia'},
+  {xp_total:640,nombre:'Andrea V.',badge_actual:'Aventurero'},
+  {xp_total:420,nombre:'James W.',badge_actual:'Explorador'},
+  {xp_total:210,nombre:'María R.',badge_actual:'Explorador'},
+  {xp_total:90,nombre:'Luis P.',badge_actual:'Viajero novato'},
+  {xp_total:45,nombre:'Camila T.',badge_actual:'Viajero novato'},
+  {xp_total:20,nombre:'Diego R.',badge_actual:'Viajero novato'},
 ];
-function paintViajeros(list) {
-  var grid = document.getElementById('viajeros-grid');
-  if(!grid) return;
-  grid.innerHTML='';
-  list.forEach(function(v){
+function lbXpFmt(xp){ return (parseInt(xp,10)||0).toLocaleString('es-CO'); }
+function paintLeaderboard(rows) {
+  var list = document.getElementById('lb-list');
+  if(!list) return;
+  list.innerHTML='';
+  rows.forEach(function(u, idx){
+    var pos = idx + 1;
+    if(pos > 20) return;
+    var xp  = parseInt(u.xp_total,10) || 0;
+    var lvl = getLevel(xp);
+    var pct = getLevelPct(xp);
+    var nombre = u.nombre || 'Viajero';
+    var initials = (nombre+' ').split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase() || 'TU';
+    var medal = pos===1?'🥇':pos===2?'🥈':pos===3?'🥉':String(pos);
+    var cls = pos===1?' top-1':pos===2?' top-2':pos===3?' top-3':'';
     var card=document.createElement('div');
-    card.style.cssText='background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;text-align:center';
+    card.className='lb-card'+cls;
+    var rk=document.createElement('div'); rk.className='lb-rank'; rk.textContent=medal;
     var av=document.createElement('div');
-    av.style.cssText='width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;margin:0 auto 8px';
-    av.style.background=v.bg; av.style.color=v.tc; av.textContent=v.init;
-    var nm=document.createElement('div');
-    nm.style.cssText='font-size:12px;font-weight:700;color:#fff;margin-bottom:2px'; nm.textContent=v.name;
-    var og=document.createElement('div');
-    og.style.cssText='font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px'; og.textContent=v.origin;
-    var lv=document.createElement('div');
-    lv.style.cssText='font-size:10px;color:#E8A020'; lv.textContent=v.lvl;
-    card.appendChild(av); card.appendChild(nm); card.appendChild(og); card.appendChild(lv);
-    grid.appendChild(card);
+    av.className='lb-av';
+    av.style.background=pos===1?'#1a3a5c':pos===2?'#122a45':pos===3?'#2a1a0a':'#1a2a3a';
+    av.style.color=pos===1?'#FFD700':pos===2?'#C0C0C0':pos===3?'#CD7F32':'#7eb8f0';
+    av.textContent=initials;
+    var info=document.createElement('div'); info.className='lb-info';
+    var nm=document.createElement('div'); nm.className='lb-name'; nm.textContent=nombre;
+    var lv=document.createElement('div'); lv.className='lb-level'; lv.textContent=lvl.emoji+' '+lvl.nombre;
+    var st=document.createElement('div'); st.className='lb-stats';
+    st.textContent=(u.badge_actual?u.badge_actual+' · ':'')+(u.total_resenas!=null?(u.total_resenas+' reseñas · '):'')+ 'Nivel '+lvl.nombre;
+    var prog=document.createElement('div'); prog.className='lb-progress';
+    var fill=document.createElement('div'); fill.className='lb-progress-fill'; fill.style.width=pct+'%';
+    prog.appendChild(fill);
+    info.appendChild(nm); info.appendChild(lv); info.appendChild(st); info.appendChild(prog);
+    var right=document.createElement('div'); right.className='lb-right';
+    var xpEl=document.createElement('div'); xpEl.className='lb-xp';
+    xpEl.innerHTML=lbXpFmt(xp)+' <small>XP</small>';
+    right.appendChild(xpEl);
+    card.appendChild(rk); card.appendChild(av); card.appendChild(info); card.appendChild(right);
+    list.appendChild(card);
   });
 }
-function renderViajeros() {
-  var grid = document.getElementById('viajeros-grid');
-  if(!grid) return;
-  grid.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando viajeros…</div>';
-  fetch('/api/usuarios?tipo=leaderboard&limit=8')
+function cargarLeaderboard() {
+  var list = document.getElementById('lb-list');
+  if(!list) return;
+  list.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:30px">Cargando ranking…</div>';
+  fetch('/api/usuarios?tipo=leaderboard&limit=20')
     .then(function(r){ return r.json(); })
     .then(function(res){
       var rows = (res && res.data) || [];
-      if(!rows.length) { paintViajeros(MOCK_VIAJEROS); return; }
-      paintViajeros(rows.map(function(u){
-        var lvl = getLevel(u.xp_total ? parseInt(u.xp_total,10) : 0);
-        return {
-          init:(u.nombre||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2)||'TU',
-          bg:'#1a3a5c', tc:'#7eb8f0',
-          name:u.nombre||'Viajero', origin:u.xp_total+' XP',
-          lvl:lvl.emoji+' '+lvl.nombre
-        };
-      }));
+      if(!rows.length) { paintLeaderboard(MOCK_LB); return; }
+      paintLeaderboard(rows);
     })
-    .catch(function(){ paintViajeros(MOCK_VIAJEROS); });
+    .catch(function(){ paintLeaderboard(MOCK_LB); });
 }
 
 /* ---- TAB SWITCHING ---- */
@@ -645,9 +552,7 @@ function showCommTab(tab) {
   var panel = document.getElementById('cpanel-' + tab);
   if(panel) {
     panel.classList.add('on');
-    if(tab === 'perfil') renderQuickActions();
-    if(tab === 'logros') cargarTrofeos();
-    if(tab === 'viajeros') renderViajeros();
+    if(tab === 'ranking') cargarLeaderboard();
   }
 }
 
