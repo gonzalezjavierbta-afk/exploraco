@@ -1,9 +1,16 @@
-// api/interacciones.js  v6 - motor de misiones + logros + Tabla de Destino
+// api/interacciones.js  v7 - motor de misiones + logros + Tabla de Destino
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
 // rating CHECK: 1-5
 // usuario_nombre NO existe - se guarda en texto como prefijo
+//
+// v7 (fix perfil): los GET tipo=logros/tipo=misiones ejecutan ahora un
+// backfill retroactivo (evaluarLogros/evaluarMisiones) ANTES de leer el
+// progreso persistido, para registrar logros/misiones ya alcanzados que
+// quedaron sin persistir (antes solo se evaluaban en los 4 POST de XP:
+// resena/guardado/visita/rating). Nuevo GET tipo=misiones (catalogo +
+// estado/fecha). La respuesta de ambos comparte entregarCatalogo().
 //
 // REQUIERE MIGRACION ANTES DE DESPLEGAR (acumulativa desde v4):
 //   ALTER TABLE interacciones
@@ -556,6 +563,30 @@ function evaluarLogros(sql, usuarioId) {
   });
 }
 
+// Comparte la respuesta GET de logros/misiones: mapea un catalogo
+// estatico + el progreso jsonb del usuario a filas {id, grupo, nombre,
+// desc, xp, requiere, estado, en} y cuenta las completadas. 'meta'
+// (opcional) anade campos extra por item (tier/emoji/rareza en logros).
+// Evita duplicar el mismo bucle en tipo=logros y tipo=misiones
+// (Regla de No-Duplicidad).
+function entregarCatalogo(catalogo, progreso, meta) {
+  var desbloqueados = 0;
+  var data = catalogo.map(function(item) {
+    var st = progreso[item.id];
+    var done = !!(st && st.estado === 'completada');
+    if (done) desbloqueados++;
+    var fila = {
+      id: item.id, grupo: item.grupo, nombre: item.nombre,
+      desc: item.desc || null, xp: item.xp, requiere: item.requiere,
+      estado: done ? 'completada' : 'pendiente',
+      en: done ? (st.en || null) : null,
+    };
+    if (meta) meta(fila, item);
+    return fila;
+  });
+  return { data: data, desbloqueados: desbloqueados };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -673,6 +704,8 @@ module.exports = async function handler(req, res) {
       // Catalogo de logros del usuario (v5): estado, fecha, tier y
       // rareza global estilo Steam (% de usuarios activos que lo
       // desbloquearon). Una query agregada con jsonb_object_keys.
+      // v7: backfill retroactivo antes de leer el progreso, para
+      // registrar logros ya alcanzados que quedaron sin persistir.
       if (tipo === 'logros' && usuarioId) {
         var usrLogros = await sql(
           'SELECT progreso_logros FROM usuarios WHERE id=$1',
@@ -680,6 +713,14 @@ module.exports = async function handler(req, res) {
         );
         if (!usrLogros.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+        await evaluarLogros(sql, usuarioId);
+
+        var usrLogros2 = await sql(
+          'SELECT progreso_logros FROM usuarios WHERE id=$1',
+          [usuarioId]
+        );
+        var progresoLogros = usrLogros2[0].progreso_logros || {};
 
         var rarezaRows = await sql(
           'SELECT k AS id, COUNT(*)::int AS n FROM usuarios u,'
@@ -693,25 +734,43 @@ module.exports = async function handler(req, res) {
         var rareza = {};
         rarezaRows.forEach(function(r){ rareza[r.id] = totalUsr ? Math.round((r.n / totalUsr) * 1000) / 10 : 0; });
 
-        var progresoLogros = usrLogros[0].progreso_logros || {};
-        var desbloqueados = 0;
-        var dataLogros = LOGROS.map(function(l) {
-          var st = progresoLogros[l.id];
-          var done = !!(st && st.estado === 'completada');
-          if (done) desbloqueados++;
-          return {
-            id: l.id, grupo: l.grupo, nombre: l.nombre, desc: l.desc,
-            emoji: l.emoji, tier: l.tier, xp: l.xp, requiere: l.requiere,
-            estado: done ? 'completada' : 'pendiente',
-            en: done ? (st.en || null) : null,
-            rareza_pct: rareza[l.id] != null ? rareza[l.id] : 0,
-          };
+        var resLogros = entregarCatalogo(LOGROS, progresoLogros, function(fila, l) {
+          fila.tier = l.tier;
+          fila.emoji = l.emoji;
+          fila.rareza_pct = rareza[l.id] != null ? rareza[l.id] : 0;
         });
         return res.status(200).json({
           ok: true,
-          data: dataLogros,
-          desbloqueados: desbloqueados,
+          data: resLogros.data,
+          desbloqueados: resLogros.desbloqueados,
           total: LOGROS.length,
+        });
+      }
+
+      // Catalogo de misiones del usuario (v7): estado y fecha por mision,
+      // con el mismo patron que tipo=logros. Backfill retroactivo via
+      // evaluarMisiones() antes de leer el progreso persistido.
+      if (tipo === 'misiones' && usuarioId) {
+        var usrMis = await sql(
+          'SELECT progreso_misiones FROM usuarios WHERE id=$1',
+          [usuarioId]
+        );
+        if (!usrMis.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+        await evaluarMisiones(sql, usuarioId);
+
+        var usrMis2 = await sql(
+          'SELECT progreso_misiones FROM usuarios WHERE id=$1',
+          [usuarioId]
+        );
+        var progresoMisiones = usrMis2[0].progreso_misiones || {};
+        var resMisiones = entregarCatalogo(MISIONES, progresoMisiones, null);
+        return res.status(200).json({
+          ok: true,
+          data: resMisiones.data,
+          desbloqueadas: resMisiones.desbloqueados,
+          total: MISIONES.length,
         });
       }
 
