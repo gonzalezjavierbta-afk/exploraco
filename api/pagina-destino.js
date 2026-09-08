@@ -338,6 +338,17 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:100%}"
 +".wrsub:disabled{background:#ccc;cursor:not-allowed}"
 +".wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px;margin-top:10px}"
++".fp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:16px}"
++".fp-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}"
++".fp-card img{width:100%;height:150px;object-fit:cover;display:block;background:var(--bg)}"
++".fp-meta{font-size:11px;color:var(--muted);padding:8px 12px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
++".fp-vote{margin:6px 12px 12px;border:1.5px solid var(--border);background:#fff;color:var(--text);border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif}"
++".fp-vote:hover{border-color:var(--gold);color:var(--gold)}"
++".fp-vote.on{background:var(--gold);border-color:var(--gold);color:#fff}"
++".fp-upload{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}"
++".fp-upload .wrinp{flex:1;min-width:220px;margin-bottom:0}"
++".fp-upload .wrsub{width:auto;flex-shrink:0}"
++".fp-info{margin-top:12px}"
 +".cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}"
 +".cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid}"
 +".cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
@@ -1595,6 +1606,21 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '</div>'
     + '</div></section>';
 
+  // -- SECCI??N: Fotos de viajeros (desbloqueable subir_fotos) ---------
+  // Galeria con votos por foto (+5 XP) y subida gateada por la capacidad
+  // subir_fotos (nivel 2). El JS client loadFotos/subirFoto/votarFoto
+  // se inyecta en el bloque de script de la pagina.
+  var secFotos = '<section class="ssec bwhite" id="fotos"><div class="sin">'
+    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Fotos de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
+    + '<div class="fp-info" id="fp-info"></div>'
+    + '<div class="fp-grid" id="fp-grid"><p class="stext">Cargando fotos de la comunidad...</p></div>'
+    + '<div class="fp-upload" id="fp-upload" style="display:none">'
+    + '<input id="fp-url" type="text" placeholder="Pega el URL de tu foto (https://...)" class="wrinp" autocomplete="off">'
+    + '<button class="wrsub" onclick="subirFoto()">Subir foto (+15 XP)</button>'
+    + '</div>'
+    + '<div class="wrok" id="fp-ok">\u2713 Foto publicada</div>'
+    + '</div></section>';
+
   // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
   if (hasLatLng) ctBtns.push('<a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
@@ -1756,6 +1782,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + secMapa + '\n'
     + secFaq + '\n'
     + secResenas + '\n'
+    + secFotos + '\n'
     + secContact + '\n'
     + secRelacionados + '\n\n'
 
@@ -1877,6 +1904,64 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // sin importar el estado visual (ver api/interacciones.js v3).
     + 'if(window.ExploraCO){window.ExploraCO.estaGuardado(DID).then(function(g){if(g){var b=document.getElementById("btn-guardar");if(b)b.classList.add("activo");}});}\n'
     + 'if(document.getElementById("qr-stars")){precargarMiVoto();}\n'
+    // Fotos de viajeros (desbloqueable: capacidad subir_fotos, nivel 2)
+    + 'function fpCaps(){var u=window.ExploraCO&&window.ExploraCO.usuario;return !!(u&&u.capacidades&&u.capacidades.subir_fotos);}\n'
+    + 'function loadFotos(){\n'
+    + '  var grid=document.getElementById("fp-grid");if(!grid)return;\n'
+    + '  var info=document.getElementById("fp-info");\n'
+    + '  fetch("/api/interacciones?tipo=fotos&destino_id="+DID)\n'
+    + '  .then(function(r){return r.json();})\n'
+    + '  .then(function(d){\n'
+    + '    var list=(d&&d.ok&&d.data)||[];\n'
+    + '    if(!list.length){grid.innerHTML="<p class=\\"stext\\">Sin fotos de viajeros todav\u00eda. S\u00e9 el primero: desbloquea Subir fotos en el nivel 2 y comparte tu experiencia.</p>";}\n'
+    + '    else{grid.innerHTML=list.map(function(f){var v=parseInt(f.votos||0);return "<div class=\\"fp-card\\"><img src=\\""+f.url+"\\" alt=\\"Foto de viajero\\" loading=\\"lazy\\"><div class=\\"fp-meta\\">"+(f.autor_nombre||"Viajero")+"</div><button class=\\"fp-vote"+(f.ya_votado?" on":"")+"\\" id=\\"fpv-"+f.id+"\\" onclick=\\"votarFoto(\\\'"+f.id+"\\\',this)\\">"+(f.ya_votado?"&#10003; Votada":"&#11088; Votar")+" <b>"+v+"</b></button></div>";}).join("");}\n'
+    + '    var up=document.getElementById("fp-upload");\n'
+    + '    if(fpCaps()){\n'
+    + '      if(up)up.style.display="flex";\n'
+    + '      if(info)info.innerHTML="<p class=\\"stext\\" style=\\"color:var(--gold)\\">&#128247; Tienes Subir fotos desbloqueado: publica fotos y suma +15 XP.</p>";\n'
+    + '    }else{\n'
+    + '      if(up)up.style.display="none";\n'
+    + '      if(info)info.innerHTML="<p class=\\"stext\\">&#128274; Subir fotos se desbloquea en el nivel 2 (100 XP y tu primera rese\u00f1a).</p>";\n'
+    + '    }\n'
+    + '  }).catch(function(){});\n'
+    + '}\n'
+    + 'function subirFoto(){\n'
+    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
+    + '  if(!u){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para subir fotos");}return;}\n'
+    + '  if(!fpCaps()){alert("Desbloquea Subir fotos (nivel 2) primero.");return;}\n'
+    + '  var inp=document.getElementById("fp-url");if(!inp)return;\n'
+    + '  var url=inp.value.trim();if(!url){alert("Pega el URL de tu foto");return;}\n'
+    + '  var btn=document.querySelector("#fp-upload .wrsub");if(btn){btn.disabled=true;btn.textContent="Subiendo...";}\n'
+    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:"foto",destino_id:DID,usuario_id:u.id,url:url})})\n'
+    + '  .then(function(r){return r.json();})\n'
+    + '  .then(function(d){\n'
+    + '    if(btn){btn.disabled=false;btn.textContent="Subir foto (+15 XP)";}\n'
+    + '    if(d&&d.ok){\n'
+    + '      inp.value="";\n'
+    + '      var ok=document.getElementById("fp-ok");if(ok){ok.style.display="block";setTimeout(function(){ok.style.display="none";},2500);}\n'
+    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=(parseInt(window.ExploraCO.usuario.xp_total)||0)+15;}\n'
+    + '      if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Foto publicada +15 XP","#16a34a");\n'
+    + '      loadFotos();\n'
+    + '    }else{alert((d&&d.error)||"No se pudo subir la foto");}\n'
+    + '  }).catch(function(){if(btn){btn.disabled=false;btn.textContent="Subir foto (+15 XP)";}alert("Error de conexi\u00f3n.");});\n'
+    + '}\n'
+    + 'function votarFoto(fid,btn){\n'
+    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
+    + '  if(!u){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para votar fotos (+5 XP)");}return;}\n'
+    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:"foto_voto",usuario_id:u.id,foto_id:fid})})\n'
+    + '  .then(function(r){return r.json();})\n'
+    + '  .then(function(d){\n'
+    + '    if(d&&d.ok){\n'
+    + '      if(btn){btn.classList.add("on");var b=btn.querySelector("b");btn.innerHTML="&#10003; Votada <b>"+((parseInt(b?b.textContent:"0")||0)+1)+"</b>";}\n'
+    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=(parseInt(window.ExploraCO.usuario.xp_total)||0)+5;}\n'
+    + '      if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Voto en foto +5 XP","#E8A020");\n'
+    + '      loadFotos();\n'
+    + '    }else if(d&&d.ya_votado){\n'
+    + '      if(btn){btn.classList.add("on");var b2=btn.querySelector("b");btn.innerHTML="&#10003; Votada <b>"+(parseInt(b2?b2.textContent:"0")||0)+"</b>";}\n'
+    + '    }else{alert((d&&d.error)||"No se pudo votar");}\n'
+    + '  }).catch(function(){alert("Error de conexi\u00f3n.");});\n'
+    + '}\n'
+    + 'loadFotos();\n'
     + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'
     + '<\/script>\n</body>\n</html>';
 }

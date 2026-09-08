@@ -49,7 +49,13 @@ function conNivel(row) {
 // de la capacidad, no todo el catalogo: este endpoint no necesita
 // evaluar condiciones (check()), solo leer que ya quedo 'completada'
 // en usuarios.progreso_misiones.
-const DESBLOQUEOS = { mis_organizador_bogota: 'organizar_actividad' };
+const DESBLOQUEOS = {
+  mis_organizador_bogota: 'organizar_actividad',
+  mis_fotografo:         'subir_fotos',
+  mis_chat_mensajero:    'chat',
+  mis_chat_moderador:    'moderador_chat',
+  mis_chat_creador:      'crear_chat',
+};
 
 function conMisiones(row) {
   if (!row) return row;

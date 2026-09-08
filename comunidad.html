@@ -99,6 +99,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .chat-inp:focus{border-color:var(--gold)}
 .chat-send{padding:10px 16px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;cursor:pointer;color:var(--black);transition:opacity .15s;flex-shrink:0}
 .chat-send:hover{opacity:.85}
+.msg-mod{display:flex;gap:4px;margin-top:4px}
+.msg-mod button{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:3px;color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;padding:1px 5px;transition:all .12s}
+.msg-mod button:hover{border-color:var(--gold);color:var(--gold)}
+.chat-msg.pinned .msg-bubble{border-left:2px solid var(--gold)}
 /* Planes */
 .planes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .plan-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s}
@@ -193,6 +197,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="comm-stat"><div class="comm-stat-n" id="comm-saved-n">0</div><div class="comm-stat-l">Guardados</div></div>
       <div class="comm-stat"><div class="comm-stat-n" id="comm-visited-n">0</div><div class="comm-stat-l">Visitados</div></div>
     </div>
+    <!-- CTA mapas de la comunidad -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;background:rgba(232,160,32,.07);border:1px solid rgba(232,160,32,.25);border-radius:8px">
+      <div style="font-size:11px;color:rgba(255,255,255,.7)">🗺️ Rutas y listas temáticas de otros viajeros</div>
+      <a href="mapas.html" style="font-size:10px;font-weight:700;color:var(--gold);text-decoration:none;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0">Explorar mapas →</a>
+    </div>
     <!-- Tabs -->
         <div class="comm-tabs">
       <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
@@ -206,11 +215,20 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
     <!-- CHAT -->
     <div class="cpanel on" id="cpanel-chat">
+      <div id="chat-lock" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel 3 (250 XP). A medida que avanzas desbloqueas moderar salas (nivel 4) y crear tus propias salas (nivel 5).</div>
+      </div>
+      <div id="chat-rooms-head" style="display:none;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;color:rgba(255,255,255,.4)">Salas de viajeros</div>
+        <button id="chat-new-room" onclick="crearChatSala()" style="padding:6px 12px;background:var(--gold);border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;color:var(--black);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.6px">+ Nueva sala</button>
+      </div>
       <div class="chat-rooms" id="chat-rooms-list"></div>
       <div id="chat-active-window" style="display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <button onclick="document.getElementById('chat-active-window').style.display='none';document.getElementById('chat-rooms-list').style.display='flex'" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 10px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">← Volver</button>
           <div style="font-size:13px;font-weight:700;color:#fff" id="chat-room-title">Chat</div>
+          <button id="chat-mod-hint" style="display:none;margin-left:auto;background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;padding:3px 8px;color:var(--gold);font-size:9px;cursor:default">🛡️ Moderador</button>
         </div>
         <div class="chat-window" id="chat-window"></div>
         <div class="chat-input-row">
@@ -387,9 +405,23 @@ var activeChatRoom = null;
 function myInitials() { var u=sesion(); return u&&u.nombre?u.nombre.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2):'TU'; }
 function myName() { var u=sesion(); return (u&&u.nombre)||'Invitado'; }
 
+function capC(k) { var u = sesion(); return !!(u && u.capacidades && u.capacidades[k]); }
+
 function renderChatRooms() {
   var list = document.getElementById('chat-rooms-list');
+  var lock = document.getElementById('chat-lock');
+  var head = document.getElementById('chat-rooms-head');
+  var nroom = document.getElementById('chat-new-room');
   if(!list) return;
+  if(!capC('chat')) {
+    list.innerHTML = '';
+    if(lock) lock.style.display = 'block';
+    if(head) head.style.display = 'none';
+    return;
+  }
+  if(lock) lock.style.display = 'none';
+  if(head) head.style.display = 'flex';
+  if(nroom) nroom.style.display = capC('crear_chat') ? '' : 'none';
   list.style.display = 'flex';
   list.innerHTML = '';
   CHAT_ROOMS.forEach(function(r) {
@@ -410,12 +442,15 @@ function renderChatRooms() {
   });
 }
 function openChatRoom(roomId) {
+  if(!capC('chat')) return;
   var room = CHAT_ROOMS.find(function(r){return r.id===roomId;});
   if(!room) return;
   activeChatRoom = roomId;
   document.getElementById('chat-rooms-list').style.display='none';
   document.getElementById('chat-active-window').style.display='block';
   setText('chat-room-title', room.icon+' '+room.name);
+  var modHint = document.getElementById('chat-mod-hint');
+  if(modHint) modHint.style.display = capC('moderador_chat') ? '' : 'none';
   renderChatMessages(roomId);
   var inp = document.getElementById('chat-inp');
   if(inp) inp.focus();
@@ -425,17 +460,41 @@ function renderChatMessages(roomId) {
   if(!win) return;
   var msgs = chatMessages[roomId] || MOCK_MESSAGES[roomId] || [];
   var mi = myInitials();
-  win.innerHTML = msgs.map(function(m) {
+  var mod = capC('moderador_chat');
+  win.innerHTML = msgs.map(function(m, miIdx) {
     var own = (m.init === mi);
-    return '<div class="chat-msg'+(own?' own':'')+'">'
+    var modBtns = mod ? '<div class="msg-mod">'
+      + '<button onclick="modPinMsg('+miIdx+',this)" title="Fijar">📌</button>'
+      + '<button onclick="modDelMsg('+miIdx+')" title="Eliminar">🗑</button></div>' : '';
+    return '<div class="chat-msg'+(own?' own':'')+(m._pinned?' pinned':'')+'">'
       +'<div class="msg-av" style="background:'+m.bg+';color:'+m.tc+'">'+m.init+'</div>'
       +'<div><div class="msg-bubble">'+m.text+'</div>'
-      +'<div class="msg-time">'+m.user+' · '+m.time+'</div></div>'
+      +'<div class="msg-time">'+m.user+' · '+m.time+'</div>'+modBtns+'</div>'
       +'</div>';
   }).join('');
   win.scrollTop = win.scrollHeight;
 }
+function modPinMsg(idx, btn) {
+  var msgs = chatMessages[activeChatRoom] || MOCK_MESSAGES[activeChatRoom] || [];
+  if(!msgs[idx]) return;
+  msgs[idx]._pinned = !msgs[idx]._pinned;
+  renderChatMessages(activeChatRoom);
+}
+function modDelMsg(idx) {
+  var msgs = chatMessages[activeChatRoom];
+  if(msgs && msgs[idx]) { msgs.splice(idx,1); renderChatMessages(activeChatRoom); }
+}
+function crearChatSala() {
+  if(!capC('crear_chat')) return;
+  var nombre = prompt('Nombre de la nueva sala:');
+  if(!nombre || !nombre.trim()) return;
+  var id = 'sala-' + Date.now();
+  CHAT_ROOMS.push({id:id, icon:'💬', name:nombre.trim(), desc:'Sala creada por un viajero', online:1});
+  MOCK_MESSAGES[id] = [{user:myName(), init:myInitials(), bg:'#E8A020', tc:'#000', text:'Sala creada', time:'ahora'}];
+  renderChatRooms();
+}
 function sendChatMsg() {
+  if(!capC('chat')) return;
   var inp = document.getElementById('chat-inp');
   if(!inp) return;
   var text = inp.value.trim();

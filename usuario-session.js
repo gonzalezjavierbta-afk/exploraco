@@ -691,6 +691,27 @@
     }
   }
 
+  // ── Refrescar sesión desde Neon (capacidades, XP, nivel, badges) ──
+  // Al cargar con una sesión guardada en localStorage los datos pueden
+  // quedar viejos (p. ej. nuevas capacidades desbloqueadas en otra
+  // visita). Se re-fetcha el perfil para que los gates (subir_fotos,
+  // chat, moderador_chat, crear_chat, organizar_actividad) reflejen el
+  // estado real.
+  function refrescarSesion() {
+    var u = window.ExploraCO.usuario;
+    if (!u || !u.id) return;
+    fetch(API + '/api/usuarios?id=' + encodeURIComponent(u.id))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.data) {
+          window.ExploraCO.usuario = d.data;
+          try { localStorage.setItem(SESSION_KEY, JSON.stringify(d.data)); } catch (e) {}
+          actualizarUI();
+        }
+      })
+      .catch(function () {});
+  }
+
   // ── Inicializar ────────────────────────────────────────────
   function init() {
     // Solo en Vercel/servidor — no en file://
@@ -698,6 +719,7 @@
 
     cargarSesion();
     actualizarUI();
+    refrescarSesion();
 
     // Exponer función de login al hacer clic en botones con class login-trigger
     document.querySelectorAll('.login-trigger').forEach(function (el) {

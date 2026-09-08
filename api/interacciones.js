@@ -173,6 +173,41 @@ var MISIONES = [
       ).then(function(r){ return !!(r[0] && r[0].n >= 4); });
     },
   },
+  // -- Desbloqueos de capacidades (ADR: gamificacion progresiva) -------
+  // Misiones de nivel que abren funcionalidades de UI:
+  //   subir_fotos     -> Nivel 2 (100 XP) + primera resena
+  //   chat            -> Nivel 3 (250 XP)
+  //   moderador_chat  -> Nivel 4 (450 XP)
+  //   crear_chat      -> Nivel 5 (700 XP)
+  // usuarios.js las traduce a usuario.capacidades via DESBLOQUEOS.
+  {
+    id: 'mis_fotografo', grupo: 'general', requiere: ['mis_primera_resena'],
+    nombre: 'Fot\u00f3grafo de publicaciones', xp: 20, desbloquea: 'subir_fotos',
+    check: function(ctx) {
+      return Promise.resolve(ctx.xpTotal >= 100);
+    },
+  },
+  {
+    id: 'mis_chat_mensajero', grupo: 'general', requiere: ['mis_primera_resena'],
+    nombre: 'Primer mensaje en la comunidad', xp: 25, desbloquea: 'chat',
+    check: function(ctx) {
+      return Promise.resolve(ctx.xpTotal >= 250);
+    },
+  },
+  {
+    id: 'mis_chat_moderador', grupo: 'general', requiere: ['mis_chat_mensajero'],
+    nombre: 'Moderador de chat', xp: 30, desbloquea: 'moderador_chat',
+    check: function(ctx) {
+      return Promise.resolve(ctx.xpTotal >= 450);
+    },
+  },
+  {
+    id: 'mis_chat_creador', grupo: 'general', requiere: ['mis_chat_moderador'],
+    nombre: 'Creador de salas', xp: 40, desbloquea: 'crear_chat',
+    check: function(ctx) {
+      return Promise.resolve(ctx.xpTotal >= 700);
+    },
+  },
 ];
 
 // -- Catalogo de logros (v5, estilo consola + Upland) ---------------
@@ -632,6 +667,34 @@ module.exports = async function handler(req, res) {
           [destinoId]
         );
         return res.status(200).json({ ok: true, data: dimsAvgRows[0] || {} });
+      }
+
+      // Fotos de viajeros de un destino (con conteo de votos y marca
+      // ya_votado para el usuario actual). Las fotos son interacciones
+      // tipo='foto'; cada voto es otra fila tipo='foto' con
+      // dims->>'voto_foto_id' apuntando a la foto votada.
+      if (tipo === 'fotos' && destinoId) {
+        var fotosRows = await sql(
+          'SELECT f.id, f.texto AS url, f.creado_en, u.nombre AS autor_nombre, '
+          + '(SELECT COUNT(*)::int FROM interacciones fv '
+          + '  WHERE fv.tipo=\'foto\' AND fv.activo=true AND fv.dims->>\'voto_foto_id\' = f.id::text) AS votos '
+          + 'FROM interacciones f LEFT JOIN usuarios u ON u.id = f.usuario_id '
+          + 'WHERE f.destino_id=$1 AND f.tipo=\'foto\' AND f.activo=true '
+          + 'AND (f.dims IS NULL OR NOT (f.dims ? \'voto_foto_id\')) '
+          + 'ORDER BY f.creado_en DESC LIMIT 60',
+          [destinoId]
+        );
+        var yaVotoFotos = {};
+        if (usuarioId) {
+          var misVotosFotos = await sql(
+            'SELECT dims->>\'voto_foto_id\' AS foto_id FROM interacciones '
+            + 'WHERE usuario_id=$1 AND tipo=\'foto\' AND activo=true AND dims ? \'voto_foto_id\'',
+            [usuarioId]
+          );
+          misVotosFotos.forEach(function(v){ if (v.foto_id) yaVotoFotos[String(v.foto_id)] = true; });
+        }
+        fotosRows.forEach(function(r){ r.ya_votado = !!yaVotoFotos[String(r.id)]; });
+        return res.status(200).json({ ok: true, data: fotosRows });
       }
 
       // Guardados de un usuario
@@ -1151,6 +1214,75 @@ module.exports = async function handler(req, res) {
         }
 
         return res.status(200).json({ ok: true, votos_utiles: 1 });
+      }
+
+      // -- Foto de viajero (desbloqueable: capacidad subir_fotos) --
+      // Subir foto a un destino: se persiste como interaccion tipo='foto'
+      // con texto=URL. Requiere la mision 'mis_fotografo' completada
+      // (Nivel 2 + primera resena). +15 XP.
+      if (tipo2 === 'foto') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        if (!destinoId2)
+          return res.status(400).json({ ok: false, error: 'destino_id requerido' });
+        var fotoUrl = String(body.url || body.foto_url || '').trim();
+        if (!/^https?:\/\//.test(fotoUrl) || fotoUrl.length > 2000)
+          return res.status(400).json({ ok: false, error: 'URL de foto inv\u00e1lida' });
+        var capFoto = await sql(
+          "SELECT (progreso_misiones->'mis_fotografo'->>'estado') = 'completada' AS ok FROM usuarios WHERE id=$1",
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (!(capFoto[0] && capFoto[0].ok))
+          return res.status(403).json({ ok: false, error: 'Desbloquea Subir fotos (nivel 2) para publicar fotos' });
+
+        var fotoIns = await sql(
+          "INSERT INTO interacciones (destino_id, usuario_id, tipo, texto, xp_ganado, creado_en) "
+          + "VALUES ($1, $2, 'foto', $3, 15, NOW()) RETURNING id",
+          [destinoId2, usuarioId2, fotoUrl]
+        );
+        var misionesFoto = [], logrosFoto = [];
+        await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        misionesFoto = await evaluarMisiones(sql, usuarioId2);
+        logrosFoto = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: 15, misiones: misionesFoto, logros: logrosFoto });
+      }
+
+      // -- Voto en foto (+5 XP al votante) --
+      // Cada voto es una fila interacciones tipo='foto' con
+      // dims->>'voto_foto_id' apuntando a la foto votada. Dedup por
+      // usuario+foto; no se puede votar la propia foto.
+      if (tipo2 === 'foto_voto') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var fotoVotoId = body.foto_id || null;
+        if (!fotoVotoId)
+          return res.status(400).json({ ok: false, error: 'foto_id requerido' });
+        var fotoTarget = await sql(
+          "SELECT id, usuario_id AS autor_id, destino_id FROM interacciones WHERE id=$1 AND tipo='foto' LIMIT 1",
+          [fotoVotoId]
+        ).catch(function(){ return []; });
+        if (!fotoTarget.length)
+          return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+        if (fotoTarget[0].autor_id === usuarioId2)
+          return res.status(403).json({ ok: false, error: 'No puedes votar tu propia foto' });
+        var yaVotoFoto = await sql(
+          "SELECT 1 AS uno FROM interacciones WHERE usuario_id=$1 AND tipo='foto' AND activo=true "
+          + "AND dims->>'voto_foto_id' = $2 LIMIT 1",
+          [usuarioId2, fotoVotoId]
+        ).catch(function(){ return []; });
+        if (yaVotoFoto.length)
+          return res.status(409).json({ ok: false, error: 'Ya votaste esta foto', ya_votado: true });
+
+        await sql(
+          "INSERT INTO interacciones (destino_id, usuario_id, tipo, dims, xp_ganado, creado_en) "
+          + "VALUES ($1, $2, 'foto', jsonb_build_object('voto_foto_id', $3::text), 5, NOW())",
+          [fotoTarget[0].destino_id, usuarioId2, fotoVotoId]
+        );
+        var misionesFotoVoto = [], logrosFotoVoto = [];
+        await sql('UPDATE usuarios SET xp_total=xp_total+5, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        misionesFotoVoto = await evaluarMisiones(sql, usuarioId2);
+        logrosFotoVoto = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: 5, misiones: misionesFotoVoto, logros: logrosFotoVoto });
       }
 
       if (!tipo2 || !destinoId2)

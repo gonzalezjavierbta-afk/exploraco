@@ -763,6 +763,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mm-li-btn:hover{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.8)}
 .mm-li-btn.del:hover{border-color:rgba(239,68,68,.5);color:#f87171}
 .mm-li-btn.vis-btn:hover{border-color:rgba(34,197,94,.5);color:#4ade80}
+.mm-li-btn.map:hover{border-color:rgba(232,160,32,.5);color:var(--gold)}
 /* Stats grid */
 .mm-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;flex:1}
 .mm-stat-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:12px;text-align:center}
@@ -902,6 +903,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <a class="nl" href="#inspirate-section">Inspírate</a>
     <a class="nl" href="#mymapa-section">Mi Viaje</a>
     <a class="nl nl-comunidad" href="comunidad.html">👥 Comunidad</a>
+    <a class="nl nl-mapas" href="mapas.html">🗺️ Mapas</a>
   </div>
   <!-- Login viajero -->
   <button id="btn-login-viajero" class="login-trigger" style="
@@ -941,6 +943,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <a class="md-link" href="#inspirate-section"     onclick="toggleDrawer()"><span class="md-link-icon">✨</span>Inspírate</a>
     <a class="md-link" href="#mymapa-section"        onclick="toggleDrawer()"><span class="md-link-icon">❤️</span>Mi Viaje</a>
     <a class="md-link" href="mi-perfil.html"          onclick="toggleDrawer()"><span class="md-link-icon">👤</span>Mi Perfil</a>
+    <a class="md-link" href="mapas.html"              onclick="toggleDrawer()"><span class="md-link-icon">🗺️</span>Mapas de la comunidad</a>
     <a class="md-link md-link-gold" href="comunidad.html" onclick="toggleDrawer()"><span class="md-link-icon">👥</span>Comunidad</a>
   </div>
 </div>
@@ -2255,7 +2258,15 @@ function eliminarMapa(id) {
 /* ── POPOVER: anadir un guardado a mapas tematicos ── */
 function mostrarPopoverMapas(btn, slug) {
   var u = window.ExploraCO && window.ExploraCO.usuario;
-  if(!u || !zMapas.length) return;
+  if(!u) {
+    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesión para guardar en tus mapas');
+    return;
+  }
+  if(!zMapas.length) {
+    if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Crea tu primer mapa temático', '#E8A020');
+    nuevoMapa();
+    return;
+  }
   cerrarPopoverMapas();
   var uuid = _uuidDeSlug(slug);
   var pop = document.createElement('div');
@@ -2537,6 +2548,7 @@ function refreshMapaMarkers() {
       + '<div class="lp-loc">📍 ' + city + (region ? ', ' + region : '') + '</div>'
       + '<div class="lp-stars">' + starHtml(rating) + ' ' + rating.toFixed(1) + '</div>'
       + '<a class="lp-btn" href="' + slug + '.html">Ver lugar →</a>'
+      + '<button class="lp-btn" onclick="mostrarPopoverMapas(this,\'' + slug + '\')" style="margin-top:6px">🗺️ Guardar en mapa</button>'
       + '<button class="lp-save-btn' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
       + ' onclick="toggleMapaSave(' + p.id + ',this)">'
       + (isSaved ? '♥ Guardado' : '♡ Guardar en Mi Viaje')
@@ -2582,6 +2594,56 @@ function placeById(id) {
   var out = null;
   MAPA_PLACES.forEach(function(p){ if(p.id === id) out = p; });
   return out;
+}
+
+// true si al zoom maximo (18) algun miembro del cluster queda a >45px de
+// los demas (es decir, el zoom SI puede separarlo). Con coords identicas
+// nunca se aislaria, por eso la lista del popup es la salida correcta.
+function clAislable(ids) {
+  if(!mapaMap) return false;
+  var z = 18;
+  for(var i = 0; i < ids.length; i++) {
+    var p = placeById(ids[i]);
+    if(!p) continue;
+    var a = mapaMap.project([p.lat, p.lng], z);
+    var isolated = true;
+    for(var j = 0; j < ids.length; j++) {
+      if(j === i) continue;
+      var q = placeById(ids[j]);
+      if(!q) continue;
+      var b = mapaMap.project([q.lat, q.lng], z);
+      var dx = a.x - b.x, dy = a.y - b.y;
+      if(dx*dx + dy*dy < 45*45) { isolated = false; break; }
+    }
+    if(isolated) return true;
+  }
+  return false;
+}
+
+// Popup de cluster: lista todos los lugares agrupados con link y boton
+// de guardar (misma funcion toggleMapaSave que el popup individual).
+function openClusterPopup(ids, lat, lng) {
+  if(!mapaMap) return;
+  var items = ids.map(function(id){ return placeById(id); }).filter(Boolean);
+  var html = '<div style="min-width:200px;max-width:270px;max-height:280px;overflow:auto;font-family:Outfit,sans-serif">'
+    + '<div class="lp-name">🗂️ ' + items.length + ' lugar' + (items.length !== 1 ? 'es' : '') + ' aquí</div>';
+  items.forEach(function(p){
+    var isSaved = mmSaved.indexOf(p.slug) !== -1;
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(0,0,0,.06)">'
+      + '<span style="font-size:16px">' + (p.emoji || '📍') + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.name + '</div>'
+      + '<div style="font-size:10px;color:#888">' + p.city + '</div></div>'
+      + '<a class="lp-btn" href="' + p.slug + '.html">Ver</a>'
+      + '<button class="lp-btn" onclick="mostrarPopoverMapas(this,\'' + p.slug + '\')">🗺️</button>'
+      + '<button class="lp-save-btn' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
+      + ' onclick="toggleMapaSave(' + p.id + ',this)">' + (isSaved ? '♥' : '♡') + '</button></div>';
+  });
+  html += '</div>';
+  var cm = L.marker([lat, lng], {opacity:0, interactive:false});
+  cm.addTo(mapaClusterLayer);
+  cm.bindPopup(html, {maxWidth:290}).openPopup();
+  cm.on('popupclose', function(){ try { mapaClusterLayer.removeLayer(cm); } catch(_) {} });
 }
 
 function mapaClusterIcon(count, emoji) {
@@ -2643,6 +2705,13 @@ function reclusterMapa() {
     var cm = L.marker([cl.lat, cl.lng], {icon:mapaClusterIcon(cl.ids.length, topEmoji)});
     cm.on('click', function(){
       mapaPendingPopupId = null;
+      // Fix: si el cluster no puede aislarse (miembros en las mismas coords
+      // o zoom ya al maximo) se abre un popup con la lista completa de
+      // lugares, en vez de un zoom infinito que nunca los separa.
+      if(zoom >= 17 || !clAislable(cl.ids)) {
+        openClusterPopup(cl.ids, cl.lat, cl.lng);
+        return;
+      }
       var next = Math.min(zoom + 2, 18);
       mapaMap.flyTo([cl.lat, cl.lng], next, {animate:true});
     });
@@ -3214,6 +3283,14 @@ function renderMMList() {
     delBtn.textContent = 'Quitar';
     delBtn.onclick = function(e){ e.stopPropagation(); mmRemove(pslug); };
     if(actionsDiv){ actionsDiv.appendChild(visBtn); actionsDiv.appendChild(delBtn); }
+    if(zMapas.length) {
+      var mapBtn = document.createElement('button');
+      mapBtn.className = 'mm-li-btn map';
+      mapBtn.textContent = '＋ Mapa';
+      mapBtn.title = 'Guardar en un mapa temático';
+      mapBtn.onclick = function(e){ e.stopPropagation(); mostrarPopoverMapas(this, pslug); };
+      if(actionsDiv) actionsDiv.appendChild(mapBtn);
+    }
     item.onclick = function(){ location.href = pslug + '.html'; };
     cont.appendChild(item);
   });
@@ -4172,6 +4249,7 @@ function submitBlog() {
   <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="directorio-hostal.html">Hospedajes</a><a class="flink" href="directorio-comida.html">Comida</a><a class="flink" href="directorio-sitio.html">Lugares</a><a class="flink" href="directorio-evento.html">Eventos</a><a class="flink" href="directorio.html">Directorio</a></div></div>
   <div><div class="fctl">Destinos</div><div class="flinks"><a class="flink" href="hostal-casa-medina.html">Bogotá</a><a class="flink" href="el-cielo-restaurante.html">Medellín</a><a class="flink" href="ciudad-perdida.html">Sierra Nevada</a><a class="flink" href="feria-de-las-flores.html">Medellín</a><a class="flink" href="hostal-walled-city.html">Cartagena</a></div></div>
   <div><div class="fctl">Plataforma</div><div class="flinks"><a class="flink" href="publicar.html">Publicar lugar</a><a class="flink" href="sobre.html">Acerca de</a><a class="flink" href="contacto.html">Contacto</a><a class="flink" href="#">Términos</a></div></div>
+  <div><div class="fctl">Comunidad</div><div class="flinks"><a class="flink" href="comunidad.html">Comunidad de viajeros</a><a class="flink" href="mapas.html">Mapas de viajeros</a><a class="flink" href="mi-perfil.html">Mi perfil</a><a class="flink" href="agenda.html">Agenda cultural</a></div></div>
 </div>
 <div style="border-top:1px solid rgba(255,255,255,.06);padding:16px 0;margin-bottom:8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
   <span style="font-size:11px;color:rgba(255,255,255,.4)">¿Tienes un hostal, restaurante o sitio turístico?</span>

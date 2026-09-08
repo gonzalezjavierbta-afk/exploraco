@@ -526,7 +526,9 @@ function loadApiEvents() {
           emoji: d.emoji || '🎉',
           color: '#A855F7',
           url: (d.slug || '') + '.html',
-          img: d.foto_hero || '',
+          // /api/destinos devuelve el campo renombrado como 'foto' (destinos.js
+          // toPlace); 'foto_hero' tambien por compatibilidad.
+          img: d.foto || d.foto_hero || '',
           featured: !!d.destacado,
           _fromApi: true,
           _artists: artists,
