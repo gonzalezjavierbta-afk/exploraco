@@ -323,6 +323,9 @@
   function init() {
     loadAndRender();
     setupSearch();
+    // Hook para que el index restaure el PL completo al limpiar la
+    // búsqueda (los clear del hero/directorio no disparan 'input').
+    window.ExploraReloadDestinos = loadAndRender;
   }
 
   if (document.readyState === 'loading') {

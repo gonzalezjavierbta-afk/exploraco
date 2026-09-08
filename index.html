@@ -513,9 +513,14 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .lp-name{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:#F5E6D0;margin-bottom:3px}
 .lp-loc{font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px}
 .lp-stars{color:var(--gold);font-size:11px;margin-bottom:8px}
-.lp-btn{display:block;width:100%;background:var(--gold);color:#fff;border:none;border-radius:3px;padding:7px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;margin-bottom:6px;text-align:center;text-decoration:none}
-.lp-save-btn{display:block;width:100%;background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:6px;font-size:10px;cursor:pointer;text-align:center;font-family:'Outfit',sans-serif;transition:all .15s}
+.lp-btn{display:block;width:100%;background:var(--gold);color:#fff;border:none;border-radius:3px;padding:5px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;margin-bottom:5px;text-align:center;text-decoration:none}
+.lp-save-btn{display:block;width:100%;background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:4px;font-size:9px;cursor:pointer;text-align:center;font-family:'Outfit',sans-serif;transition:all .15s}
 .lp-save-btn:hover,.lp-save-btn.saved{border-color:var(--gold);color:var(--gold)}
+/* Items compactos del popup de cluster (Ver + corazón inline) */
+.lp-li-go{flex-shrink:0;font-size:10px;font-weight:700;color:var(--gold);text-decoration:none;text-transform:uppercase;letter-spacing:.4px}
+.lp-li-go:hover{text-decoration:underline}
+.lp-li-save{flex-shrink:0;background:transparent;border:1px solid rgba(0,0,0,.15);border-radius:4px;width:24px;height:24px;font-size:12px;cursor:pointer;color:#999;transition:all .15s;line-height:1}
+.lp-li-save:hover,.lp-li-save.saved{border-color:var(--gold);color:var(--gold)}
 .mapa-filters .mf-loc{margin-left:auto;border-color:rgba(232,160,32,.45);color:var(--gold);background:rgba(232,160,32,.08)}
 .mapa-filters .mf-loc:hover{border-color:var(--gold);background:rgba(232,160,32,.16)}
 .mapa-cluster{position:relative;border-radius:50%;background:rgba(16,24,40,.97);border:2px solid var(--gold);box-shadow:0 3px 14px rgba(0,0,0,.5),inset 0 0 0 2px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s}
@@ -903,7 +908,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <a class="nl" href="#inspirate-section">Inspírate</a>
     <a class="nl" href="#mymapa-section">Mi Viaje</a>
     <a class="nl nl-comunidad" href="comunidad.html">👥 Comunidad</a>
-    <a class="nl nl-mapas" href="mapas.html">🗺️ Mapas</a>
   </div>
   <!-- Login viajero -->
   <button id="btn-login-viajero" class="login-trigger" style="
@@ -943,7 +947,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <a class="md-link" href="#inspirate-section"     onclick="toggleDrawer()"><span class="md-link-icon">✨</span>Inspírate</a>
     <a class="md-link" href="#mymapa-section"        onclick="toggleDrawer()"><span class="md-link-icon">❤️</span>Mi Viaje</a>
     <a class="md-link" href="mi-perfil.html"          onclick="toggleDrawer()"><span class="md-link-icon">👤</span>Mi Perfil</a>
-    <a class="md-link" href="mapas.html"              onclick="toggleDrawer()"><span class="md-link-icon">🗺️</span>Mapas de la comunidad</a>
     <a class="md-link md-link-gold" href="comunidad.html" onclick="toggleDrawer()"><span class="md-link-icon">👥</span>Comunidad</a>
   </div>
 </div>
@@ -974,7 +977,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="hdd" id="hdd"><div id="hddi"></div></div>
     </div>
     <div class="hcats" id="hcats">
-      <div class="hcat on" data-cat="hostal">🏨 Hospedajes</div>
+      <div class="hcat" data-cat="hostal">🏨 Hospedajes</div>
       <div class="hcat" data-cat="comida">🍽️ Comidanomía</div>
       <div class="hcat" data-cat="sitio">🏔️ Lugares</div>
       <div class="hcat" data-cat="evento">🎉 Eventos</div>
@@ -1402,7 +1405,7 @@ var slideIdx  = 0;
 var slideTimer = null;
 var mmSaved   = [];
 var mmVisited = [];
-var destCat   = 'hostal';
+var destCat   = 'all';
 var destSearch = '';
 var mapaMap   = null;
 var mapaMarkers = {};
@@ -1514,6 +1517,7 @@ if(scl) scl.addEventListener('click', function(){
   scl.classList.remove('vis');
   if(hdd) hdd.classList.remove('open');
   renderDest();
+  if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDestinos();
 });
 document.addEventListener('click', function(e){
   var sw = document.querySelector('.swrap');
@@ -1564,6 +1568,7 @@ if(sinp) sinp.value='';
 if(scl) scl.classList.remove('vis');
 if(hdd) hdd.classList.remove('open');
 renderDest();
+if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDestinos();
 }
 function goBuscar(){
 var q=(sinp&&sinp.value)?sinp.value.trim():'';
@@ -1644,6 +1649,7 @@ function clearDestSearch(){
   if(destClear) destClear.style.display='none';
   if(sinp) sinp.value='';
   renderDest();
+  if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDestinos();
 }
 
 /* ── RENDER DESTACADOS ── */
@@ -1737,10 +1743,10 @@ function destFiltered() {
   return PL.filter(function(p){
     var q = destSearch.toLowerCase();
     var qOk = !q || p.name.toLowerCase().indexOf(q)>-1 || p.city.toLowerCase().indexOf(q)>-1;
-    // Con búsqueda activa se muestran matches de TODAS las categorías; la
-    // categoría solo refina cuando no hay texto (fix: el directorio quedaba
-    // vacío hasta elegir categoría).
-    var catOk = !q || destCat==='all' || p.cat===destCat;
+    // El directorio arranca en 'all' (Todos): la búsqueda del hero muestra
+    // matches de cualquier categoría y los pills de categoría SIEMPRE
+    // refinan (con o sin texto).
+    var catOk = destCat==='all' || p.cat===destCat;
     return catOk && qOk;
   });
 }
@@ -2548,10 +2554,9 @@ function refreshMapaMarkers() {
       + '<div class="lp-loc">📍 ' + city + (region ? ', ' + region : '') + '</div>'
       + '<div class="lp-stars">' + starHtml(rating) + ' ' + rating.toFixed(1) + '</div>'
       + '<a class="lp-btn" href="' + slug + '.html">Ver lugar →</a>'
-      + '<button class="lp-btn" onclick="mostrarPopoverMapas(this,\'' + slug + '\')" style="margin-top:6px">🗺️ Guardar en mapa</button>'
       + '<button class="lp-save-btn' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
       + ' onclick="toggleMapaSave(' + p.id + ',this)">'
-      + (isSaved ? '♥ Guardado' : '♡ Guardar en Mi Viaje')
+      + (isSaved ? '♥ Guardado' : '♡ Guardar')
       + '</button></div>';
 
     try {
@@ -2629,14 +2634,13 @@ function openClusterPopup(ids, lat, lng) {
     + '<div class="lp-name">🗂️ ' + items.length + ' lugar' + (items.length !== 1 ? 'es' : '') + ' aquí</div>';
   items.forEach(function(p){
     var isSaved = mmSaved.indexOf(p.slug) !== -1;
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(0,0,0,.06)">'
-      + '<span style="font-size:16px">' + (p.emoji || '📍') + '</span>'
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(0,0,0,.06)">'
+      + '<span style="font-size:15px;width:18px;text-align:center;flex-shrink:0">' + (p.emoji || '📍') + '</span>'
       + '<div style="flex:1;min-width:0">'
       + '<div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.name + '</div>'
       + '<div style="font-size:10px;color:#888">' + p.city + '</div></div>'
-      + '<a class="lp-btn" href="' + p.slug + '.html">Ver</a>'
-      + '<button class="lp-btn" onclick="mostrarPopoverMapas(this,\'' + p.slug + '\')">🗺️</button>'
-      + '<button class="lp-save-btn' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
+      + '<a class="lp-li-go" href="' + p.slug + '.html">Ver →</a>'
+      + '<button class="lp-li-save' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
       + ' onclick="toggleMapaSave(' + p.id + ',this)">' + (isSaved ? '♥' : '♡') + '</button></div>';
   });
   html += '</div>';
