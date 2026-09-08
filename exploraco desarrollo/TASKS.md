@@ -1941,6 +1941,14 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   desplazan archivo/URL/TOKEN. `validate_eventos.js`/`upload-eventos.js`
   reemplazan `process.exit()` por `process.exitCode` para evitar el crash de
   libuv en Windows tras fetch (exit code anormal -1073740791).
+- **FASE B (fotos):** nuevo `scripts/resolver-fotos-eventos.js` (reutilizable)
+  que resuelve `fotos_sugeridas` a URLs reales de Wikimedia (thumbs 960px +
+  HEAD 200, BUG-022) con fallback por recinto (`tags.sede`). 10/11 eventos con
+  fotos reales; solo `concierto-musica-andina-teatro-colsubsidio-2026` queda
+  sin foto (no existe foto del recinto en Commons). Se corrigio un match
+  incorrecto (jazz/gala apuntaban a un palacio de Madrid) usando las fotos
+  reales del Movistar Arena Bogota. Re-subidos 11/11 (DELETE+POST) y seed
+  `scripts/seed-eventos-2026-09-08.js` regenerado (node --check OK, ASCII 0).
 
 ---
 

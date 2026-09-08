@@ -26,8 +26,17 @@ Primer lote real end-to-end: Gemini investigo 11 eventos de Bogota
 paginas 200; categorias detectadas correctas; multidia correcto (MAMBO 8-13
 Sep, danza 9-10 Sep). seed node --check OK y ASCII 0.
 
-**Pendiente (FASE B):** resolver `fotos_sugeridas` de los 11 eventos via
-Wikimedia (thumbs 960px, HEAD 200) y re-subirlos con foto_hero/fotos_galeria.
+**FASE B completada (fotos, 2026-09-08):** `scripts/resolver-fotos-eventos.js`
+(nuevo, reutilizable) resuelve `fotos_sugeridas` a URLs reales de Wikimedia
+(thumbs 960px + HEAD 200, BUG-022) con fallback por recinto (tags.sede).
+Resultado: 10/11 eventos con `foto_hero`+galeria reales (Teatro Mayor,
+MAMBO, Biblioteca Virgilio Barco, Teatro Gaitan, Movistar Arena Bogota,
+Parque Simon Bolivar, Humedal Tibabuyes, Plaza de los Artesanos); solo
+`concierto-musica-andina-teatro-colsubsidio-2026` queda sin foto (no hay
+foto real del recinto en Commons; hero con gradiente). Se corrigio un match
+incorrecto (Movistar Arena tomaba foto de un palacio de Madrid) usando las
+fotos reales `Movistar arena Bta abr 2018.jpg` y afines. Re-subidos 11/11
+con `--seed` (seed regenerado, ASCII 0, node --check OK).
 
 ### Sesion gemini-eventos-prompt - prompt de investigacion de eventos (2026-09-07) - TSK-086
 
