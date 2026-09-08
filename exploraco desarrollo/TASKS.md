@@ -1760,6 +1760,36 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   las secciones del motor sitio y divs 291/291; /api/destinos lista el slug;
   sitemap.xml incluye el slug (priority 0.80).
 
+### TSK-082: Pagina dinamica centro-cultural-delia-zapata-olivella.html (complejo cultural en La Candelaria)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina del Centro Cultural Delia Zapata Olivella (cat sitio,
+  slug `centro-cultural-delia-zapata-olivella`, `status='published'`,
+  `destacado=true`, rating 0). Complejo estatal de +15.000 m² en La
+  Candelaria (Carrera 6 # 5-22, junto al Teatro Colon), extension del Teatro
+  Colon/Ministerio de las Culturas. 3 salas (Sala Delia Zapata +400 personas,
+  Sala Fanny Mikey caja negra, Ensayadero) + Plaza del Centro. 3 secretos
+  (tributo a Delia Zapata, puente patrimonial con Teatro Colon, acustica de
+  la Sala Fanny Mikey), 2 entradas, 1 tour (rating ''/review_count 0, ADR-009),
+  3 equipamiento, 3 itinerario, 3 dificultad_tags, 5 FAQs. Investigacion de
+  Gemini (ficha JSON) convertida al contrato .md validado con
+  `validate_ficha.js` (PASS). Fotos reales verificadas HEAD 200 (BUG-022): no
+  existe foto del edificio nuevo en Commons, se usaron 5 reales coherentes
+  (fachada Teatro Colon 2024 como HERO, interior Teatro Colon, La Candelaria
+  desde carrera 4, Plaza de Bolivar 2024, Casa de Delia Zapata Olivella).
+  `fauna_flora: ''` (paridad admin). Archivos:
+  `scripts/seed-centro-cultural-delia-zapata-olivella.js`,
+  `scripts/load-centro-cultural-delia-zapata-olivella-api.js`,
+  `scripts/smoke_test_delia_zapata.js` y
+  `exploraco desarrollo/ficha-centro-cultural-delia-zapata-olivella.md`.
+- **Evidencia:** Escudo GOLD PASS: node --check OK en los 3 scripts;
+  ASCII-safety 0 bytes >127 en los 3. Smoke test 13 checks PASS + balance de
+  divs open=258 close=258 diff=0. Carga en prod via loader (DELETE+POST Bearer
+  exploraco12345): destino creado id 49dfe37c-6c55-471d-830c-c062533286a1
+  status=published destacado=True. Verificacion en vivo 2026-09-07:
+  /centro-cultural-delia-zapata-olivella.html = 200 (64KB) con las secciones
+  del motor sitio y divs 292/292; /api/destinos lista el slug (total 175);
+  sitemap.xml incluye el slug.
+
 ---
 
 ## Regla de actualizacion

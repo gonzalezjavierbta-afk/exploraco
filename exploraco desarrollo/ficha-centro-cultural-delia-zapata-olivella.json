@@ -1,0 +1,271 @@
+{
+  "BASE": {
+    "slug": "centro-cultural-delia-zapata-olivella",
+    "nombre": "Centro Cultural Delia Zapata Olivella",
+    "categoria_slug": "sitio",
+    "lead": "El complejo cultural estatal más moderno del centro histórico de Bogotá, dedicado a las artes escénicas y a la diversidad pluricultural de Colombia.",
+    "descripcion": "Inaugurado a finales de 2022 en pleno corazón de La Candelaria, el Centro Cultural Delia Zapata Olivella rinde homenaje a la célebre investigadora, bailarina y gestora cultural afrocolombiana Delia Zapata Olivella. Con más de 15.000 metros cuadrados de infraestructura de vanguardia, es una extensión arquitectónica y programática del histórico Teatro Colón y del Ministerio de las Culturas, las Artes y los Saberes.\n\nEl complejo alberga tres salas principales equipadas con la más alta tecnología acústica y escénica: la Sala Delia Zapata (capacidad para más de 400 personas), la Sala Fanny Mikey (formato caja negra para creación experimental) y un amplio Ensayadero, además de la Plaza del Centro, un espacio al aire libre ideado para encuentros comunitarios y espectáculos de gran formato.\n\nSu programación abarca danza, teatro, música contemporánea y tradicional, así como residencias artísticas y exposiciones. El sitio conecta de manera fluida el patrimonio colonial bogotano con una propuesta arquitectónica contemporánea luminosa, abierta y accesible para todo público.",
+    "highlight": "+15.000 m² de infraestructura cultural · Cerca a la Plaza de Bolívar",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "La Candelaria",
+    "lat": 4.5969,
+    "lng": -74.0734,
+    "whatsapp": "",
+    "telefono": "+57 601 3816380",
+    "email": "info@eneldelia.gov.co",
+    "web": "https://eneldelia.gov.co/",
+    "instagram": "@eneldelia",
+    "precio_desde": "Entrada libre a galerías; eventos desde $20.000 COP",
+    "horario": "Mar-Sáb 10:00-20:00, Dom 10:00-18:00. Lunes cerrado",
+    "emoji": "🎭",
+    "hero_bg": "linear-gradient(135deg, #1f1c2c 0%, #928dab 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Centro Cultural · Artes Escénicas · Arquitectura",
+    "capacidad": "Aforo total +1.500 personas entre sus tres salas y plazas",
+    "como_llegar": "TransMilenio estación Museo del Oro o Las Aguas; caminar por Calle 11 hasta Carrera 6 # 5-22",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Centro Cultural y Artes Escénicas",
+    "dificultad": "Facil",
+    "dificultad_desc": "Accesible para todo tipo de público con infraestructura moderna y adaptada.",
+    "duracion": "1-3 horas",
+    "altitud": "2640",
+    "temporada": [
+      "Todo el año"
+    ],
+    "precio_entrada": "Gratuito para plaza y exposiciones temporales. Obras y conciertos según taquilla.",
+    "distancia": "Centro Histórico de Bogotá",
+    "como_llegar": "TransMilenio hasta Museo del Oro, caminar 5 cuadras al sur hacia La Candelaria.",
+    "permisos": "Libre para áreas comunes; entrada con boleto para espectáculos en salas.",
+    "temporada_nota": "Programación constante durante todo el año, con picos de eventos en festivales de teatro.",
+    "fauna_flora": [],
+    "secretos": [
+      {
+        "icono": "🎭",
+        "titulo": "Tributo a Delia Zapata",
+        "texto": "El nombre honra a la primera gran investigadora afrocolombiana que llevó las danzas tradicionales del Pacífico y Caribe a escenarios internacionales.",
+        "tag": "Historia",
+        "tag_color": "purple"
+      },
+      {
+        "icono": "🏛️",
+        "titulo": "Puente Patrimonial",
+        "texto": "El edificio subterráneo y aéreo conecta de forma interna con el histórico Teatro Colón de 1892.",
+        "tag": "Arquitectura",
+        "tag_color": "gold"
+      },
+      {
+        "icono": "🔊",
+        "titulo": "Acústica Avanzada",
+        "texto": "La Sala Fanny Mikey fue concebida como una caja negra con paneles fonoabsorbentes ajustables para performances experimentales.",
+        "tag": "Tecnología",
+        "tag_color": "blue"
+      }
+    ],
+    "regulaciones": "Prohibido consumir alimentos en salas, uso de flash en funciones y fumar en las instalaciones.",
+    "checklist_tip": "Consulta la web oficial con antelación, varios espectáculos internacionales ofrecen boletería libre con registro digital previo.",
+    "entradas": [
+      {
+        "tipo": "Acceso General Plaza y Galerías",
+        "precio": "Gratis",
+        "incluye": "Ingreso a plazoleta y exposiciones de arte",
+        "link": "https://eneldelia.gov.co/"
+      },
+      {
+        "tipo": "Boletería Obras y Conciertos",
+        "precio": "$20.000 - $80.000 COP",
+        "incluye": "Ubicación numerada en función",
+        "link": "https://www.tuboleta.com/"
+      }
+    ],
+    "tours": [
+      {
+        "nombre": "Visita Guiada Arquitectónica e Histórica",
+        "precio": "0",
+        "precio_sub": "Guiado por mediadores",
+        "duracion": "1 hora",
+        "tipo_tour": "Grupal",
+        "idioma": "Español",
+        "max_personas": "25",
+        "rating": "",
+        "review_count": 0,
+        "descripcion": "Recorrido por las salas del complejo, con explicación de la transición arquitectónica entre el Teatro Colón y la nueva sede.",
+        "incluye": [
+          "Acompañamiento de mediador cultural"
+        ],
+        "no_incluye": [
+          "Boletería a funciones de pago",
+          "Alimentos"
+        ],
+        "link_reserva": "https://eneldelia.gov.co/",
+        "featured": true
+      }
+    ],
+    "equipamiento": [
+      {
+        "item": "Documento de Identidad",
+        "prioridad": "Obligatorio"
+      },
+      {
+        "item": "Ropa cómoda y abrigo ligero",
+        "prioridad": "Recomendado"
+      },
+      {
+        "item": "Calzado para caminata urbana",
+        "prioridad": "Recomendado"
+      }
+    ],
+    "itinerario": [
+      {
+        "dia": "Día 1",
+        "hora": "10:00",
+        "titulo": "Llegada a la Plaza del Centro",
+        "icono": "🏛️",
+        "detalle": "Ingreso por la Calle 11 para apreciar el diseño arquitectónico contemporáneo integrando el entorno colonial.",
+        "tags": [
+          "Arquitectura",
+          "Fotos"
+        ]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "11:00",
+        "titulo": "Recorrido por Exposiciones Temporales",
+        "icono": "🎨",
+        "detalle": "Visita libre a las salas de exhibición de artes plásticas y memoria cultural.",
+        "tags": [
+          "Arte",
+          "Exposición"
+        ]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "15:00",
+        "titulo": "Función Escénica",
+        "icono": "🎭",
+        "detalle": "Disfrute de una presentación de teatro o danza en la Sala Delia Zapata o Sala Fanny Mikey.",
+        "tags": [
+          "Teatro",
+          "Danza"
+        ]
+      }
+    ],
+    "dificultad_tags": [
+      {
+        "texto": "Apto para personas con movilidad reducida",
+        "apto": true
+      },
+      {
+        "texto": "Apto para niños y familias",
+        "apto": true
+      },
+      {
+        "texto": "Requiere esfuerzo físico moderado o alto",
+        "apto": false
+      }
+    ],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "¿Dónde queda el Centro Cultural Delia Zapata Olivella?",
+      "respuesta": "En La Candelaria, Bogotá, en la Carrera 6 # 5-22, junto al Teatro Colón."
+    },
+    {
+      "pregunta": "¿La entrada al centro cultural es gratuita?",
+      "respuesta": "El acceso a la plaza y galerías es libre; espectáculos en sala requieren boletería."
+    },
+    {
+      "pregunta": "¿Quién fue Delia Zapata Olivella?",
+      "respuesta": "Destacada investigadora y bailarina colombiana, icono de las artes y folclor afrocolombiano."
+    },
+    {
+      "pregunta": "¿Cuenta con acceso para personas con movilidad reducida?",
+      "respuesta": "Sí, el edificio dispone de rampas, ascensores y espacios adecuados en salas."
+    },
+    {
+      "pregunta": "¿Tiene parqueadero propio?",
+      "respuesta": "No tiene parqueadero público propio; se recomienda usar parqueaderos privados del sector."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Centro Cultural Delia Zapata Olivella exterior",
+      "caption": "Arquitectura contemporánea del Centro Cultural Delia Zapata Olivella en Bogotá",
+      "nombres_archivo_wikimedia": [
+        "File:Centro_Cultural_Delia_Zapata_Olivella_Bogota.jpg",
+        "File:Teatro_Colon_Bogota_Anexo.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "La Candelaria Bogota patrimonio",
+      "caption": "Entorno patrimonial y calles coloniales de La Candelaria",
+      "nombres_archivo_wikimedia": [
+        "File:La_Candelaria_Bogota_Street.jpg",
+        "File:Calle_de_La_Candelaria_Bogota.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Teatro Colon Bogota fachada",
+      "caption": "Fachada principal del emblemático Teatro Colón",
+      "nombres_archivo_wikimedia": [
+        "File:Teatro_Colon_Bogota.jpg",
+        "File:Fachada_Teatro_Colon_Bogota.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Plaza de Bolivar Bogota",
+      "caption": "Plaza de Bolívar, ubicada a pocas cuadras del centro cultural",
+      "nombres_archivo_wikimedia": [
+        "File:Plaza_de_Bolivar_Bogota_Colombia.jpg",
+        "File:Bogota_Plaza_de_Bolivar.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Artes escenicas Colombia danza",
+      "caption": "Representación de danzas tradicionales colombianas",
+      "nombres_archivo_wikimedia": [
+        "File:Danza_tradicional_colombiana.jpg",
+        "File:Bailarines_colombianos.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://eneldelia.gov.co/",
+      "que_respalda": "Programación, tarifas, misión, horarios y contacto"
+    },
+    {
+      "tipo": "prensa",
+      "url": "https://www.mincultura.gov.co/",
+      "que_respalda": "Infraestructura, áreas en m² y distribución de salas"
+    },
+    {
+      "tipo": "maps",
+      "url": "https://maps.google.com",
+      "que_respalda": "Coordenadas decimales y dirección exactas"
+    }
+  ]
+}

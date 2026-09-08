@@ -4,6 +4,38 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion centro-cultural-delia-zapata-olivella - creada la pagina dinamica del complejo cultural (2026-09-07) - TSK-082
+
+Creacion y carga a produccion de la pagina dinamica del Centro Cultural
+Delia Zapata Olivella (cat sitio, slug `centro-cultural-delia-zapata-olivella`,
+destacado, rating 0). Investigacion de Gemini v2 en
+`exploraco desarrollo/ficha-centro-cultural-delia-zapata-olivella.json`;
+convertida al contrato .md con fotos reales verificadas HEAD 200 (BUG-022) y
+validada con `validate_ficha.js` (PASS).
+
+**Cambios:**
+- `scripts/seed-centro-cultural-delia-zapata-olivella.js` (nuevo): patron
+  seed-el-virrey, ASCII-safe (0 bytes >127, emojis/'·'/'²' en escapes \u),
+  upsert `ON CONFLICT slug` con merge JSONB, FAQS en destinos_detalles y 5
+  fotos (1ª HERO). `fauna_flora: ''` (paridad admin, evita seccion fantasma).
+  Tours con rating ''/review_count 0 (ADR-009).
+- `scripts/load-centro-cultural-delia-zapata-olivella-api.js` (nuevo):
+  loader DELETE+POST a https://exploraco.vercel.app/api/admin-destinos
+  (Bearer exploraco12345).
+- `scripts/smoke_test_delia_zapata.js` (nuevo): 13 checks PASS + balance de
+  divs 258/258.
+- `exploraco desarrollo/ficha-centro-cultural-delia-zapata-olivella.md`:
+  ficha contract validada (fuente de verdad del seed).
+- Fotos (BUG-022): NO existe foto del edificio nuevo en Wikimedia Commons.
+  Se usaron 5 reales y coherentes: HERO fachada Teatro Colon 2024 (el centro
+  es su anexo), interior Teatro Colon, La Candelaria desde la carrera 4,
+  Plaza de Bolivar 2024, Casa de Delia Zapata Olivella. Todas HEAD 200.
+
+**Verificado en produccion (2026-09-07):**
+/centro-cultural-delia-zapata-olivella.html = 200 (64KB) con las secciones
+del motor sitio y divs 292/292; slug presente en /api/destinos (id
+49dfe37c-6c55-471d-830c-c062533286a1, total 175) y en sitemap.xml.
+
 ### Sesion cinemateca-de-bogota - creada la pagina dinamica del centro cultural (2026-09-07) - TSK-081
 
 Creacion y carga a produccion de la pagina dinamica de la Cinemateca de
