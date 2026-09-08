@@ -291,7 +291,8 @@
     // 7. Re-render
     if (typeof renderDest      === 'function') renderDest();
     if (typeof renderAgenda    === 'function') renderAgenda(
-      typeof agendaCat !== 'undefined' ? agendaCat : 'all'
+      typeof agendaCat !== 'undefined' ? agendaCat : 'all',
+      typeof agendaDayFilter !== 'undefined' ? agendaDayFilter : null
     );
     // Mapa: si el Leaflet map YA existe (mapaMap truthy), solo refrescar
     // markers. Si TODAVIA no existe, inicializarlo ahora mismo en vez

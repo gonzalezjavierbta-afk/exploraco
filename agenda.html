@@ -65,6 +65,10 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 .ev-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s,border-color .15s;text-decoration:none;color:inherit}
 .ev-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);border-color:#ddd}
 .ev-card.featured{border-width:2px}
+.ev-cover{position:relative;height:130px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.ev-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ev-cover .ev-cover-emoji{font-size:40px;text-shadow:0 2px 10px rgba(0,0,0,.25)}
+.ev-cover .ev-cover-cat{position:absolute;top:10px;left:10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,.92)}
 .ev-header{padding:12px 14px 0;display:flex;align-items:flex-start;gap:10px}
 .ev-date-box{background:var(--bg);border-radius:8px;padding:6px 10px;text-align:center;flex-shrink:0;border:1px solid var(--border)}
 .ev-day{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;line-height:1;color:#1a1a1a}
@@ -384,6 +388,13 @@ function evCard(e) {
   var range = AU.evRangeText(e);
   var html = '';
   html += '<'+(hasPage?'a href="'+e.url+'"':'div')+' class="ev-card'+(e.featured?' featured':'')+'"'+(e.featured?' style="border-color:'+e.color+'"':'')+' >';
+  if(e.img){
+    html += '<div class="ev-cover"><img src="'+e.img+'" alt="" loading="lazy">'
+      + '<span class="ev-cover-cat" style="background:'+cs.bg+';color:'+cs.color+'">'+(catLabels[e.cat]||e.cat)+'</span></div>';
+  } else {
+    html += '<div class="ev-cover" style="background:'+cs.bg+'"><span class="ev-cover-emoji">'+e.emoji+'</span>'
+      + '<span class="ev-cover-cat" style="background:'+cs.bg+';color:'+cs.color+'">'+(catLabels[e.cat]||e.cat)+'</span></div>';
+  }
   html += '<div class="ev-header">';
   html += '<div class="ev-date-box"><div class="ev-day">'+e.day+'</div><div class="ev-month-lbl">'+e.month+'</div></div>';
   html += '<div class="ev-meta">';
@@ -515,6 +526,7 @@ function loadApiEvents() {
           emoji: d.emoji || '🎉',
           color: '#A855F7',
           url: (d.slug || '') + '.html',
+          img: d.foto_hero || '',
           featured: !!d.destacado,
           _fromApi: true,
           _artists: artists,

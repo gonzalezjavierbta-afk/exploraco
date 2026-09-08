@@ -350,8 +350,8 @@ textarea.wrinp{resize:vertical;min-height:88px}
 
 /* ═══ MI MAPA PERSONAL ═══ */
 .mymapa-section{background:var(--black);border-top:1px solid rgba(255,255,255,.06)}
-.mymapa-inner{display:grid;grid-template-columns:1fr 1.7fr;min-height:420px}
-.mymapa-left{padding:32px 4%;display:flex;flex-direction:column;justify-content:center;gap:16px}
+.mymapa-inner{display:grid;grid-template-columns:minmax(300px,1fr) 1.8fr;min-height:420px}
+.mymapa-left{padding:32px 4%;display:flex;flex-direction:column;justify-content:flex-start;gap:16px;max-height:640px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(232,160,32,.25) transparent}
 .mymapa-eyebrow{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2.5px;color:var(--gold);display:flex;align-items:center;gap:8px}
 .mymapa-title{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:#fff;line-height:.92;letter-spacing:.5px}
 .mymapa-title em{color:var(--gold);font-style:italic;display:block}
@@ -363,6 +363,22 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mms-div{width:1px;background:rgba(255,255,255,.1);align-self:stretch;min-height:24px}
 .mymapa-btn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;align-self:flex-start;transition:background .15s}
 .mymapa-btn:hover{background:var(--gold-dark)}
+.mymapa-btn.ghost{background:transparent;border:1px solid rgba(232,160,32,.5);color:var(--gold);text-decoration:none}
+.mymapa-btn.ghost:hover{background:rgba(232,160,32,.1)}
+.mymapa-actions{display:flex;gap:8px;flex-wrap:wrap}
+/* Perfil de cuenta (resumen izquierdo) */
+.mm-profile{display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px}
+.mm-profile-avatar{width:42px;height:42px;border-radius:50%;background:var(--gold);color:#000;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0}
+.mm-profile-body{flex:1;min-width:0}
+.mm-profile-nombre{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mm-profile-badge{font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mm-profile-btn{flex-shrink:0;background:var(--gold);border:none;border-radius:4px;color:#000;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;padding:8px 12px;cursor:pointer;transition:background .15s}
+.mm-profile-btn:hover{background:var(--gold-dark)}
+.mm-profile-btn.outline{background:transparent;border:1px solid rgba(232,160,32,.5);color:var(--gold)}
+.mm-cuenta-grid{display:grid;grid-template-columns:1fr;gap:6px}
+.mm-cuenta-grid .badges-head{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin:4px 0 2px}
+.mm-cuenta-grid .badges-head span{color:var(--gold)}
+.mm-cuenta-grid #badges-grid,.mm-cuenta-grid #logros-grid{grid-template-columns:repeat(4,1fr);gap:6px;padding:0}
 .mymapa-right{position:relative;overflow:hidden;background:#0a0a0a;min-height:300px;display:flex;flex-direction:column}
 .mm-map-bg{position:absolute;inset:0;background:linear-gradient(135deg,#0a2a1a 0%,#0a1628 50%,#1a0a1a 100%)}
 .mm-grid-lines{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:28px 28px}
@@ -386,7 +402,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mm-leg-dot.v{background:var(--gold)}
 .mm-leg-dot.s{background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4)}
 .mm-count-badge{position:absolute;top:42px;right:12px;z-index:5;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.12);border-radius:3px;padding:4px 10px;font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px}
-@media(max-width:900px){.mymapa-inner{grid-template-columns:1fr}.mymapa-right{min-height:200px}}
+@media(max-width:900px){.mymapa-inner{grid-template-columns:1fr}.mymapa-right{min-height:200px}.mymapa-left{max-height:none;overflow:visible}}
 
 /* ═══ VIDEO 360° ═══ */
 .v360-section{background:var(--bg);border-top:1px solid var(--border)}
@@ -1205,17 +1221,55 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <div class="mymapa-section" id="mymapa-section">
   <div class="mymapa-inner">
     <div class="mymapa-left">
-      <div class="mymapa-eyebrow">🗺️ Tu viaje personal</div>
-      <div class="mymapa-title bc">Mi Mapa<em>personal</em></div>
-      <div class="mymapa-desc">Guarda los lugares que quieres visitar, marca los que ya conociste y genera tu propio mapa de Colombia. Compártelo con otros viajeros y sube de nivel.</div>
+      <div class="mymapa-eyebrow">🗺️ Tu cuenta de viajero</div>
+      <div class="mymapa-title bc">Mi Viaje<em>personal</em></div>
+      <div class="mymapa-desc">Guarda lugares, marca los que visitaste, suma XP, desbloquea insignias y arma tu propio mapa de Colombia.</div>
+
+      <!-- Perfil de la cuenta -->
+      <div class="mm-profile">
+        <div class="mm-profile-avatar" id="mm-profile-avatar">👤</div>
+        <div class="mm-profile-body">
+          <div class="mm-profile-nombre" id="mm-profile-nombre">Viajero anónimo</div>
+          <div class="mm-profile-badge" id="mm-profile-badge">Inicia sesión para guardar tu progreso</div>
+        </div>
+        <button class="mm-profile-btn" id="mm-profile-btn" onclick="mmAccionCuenta()">Iniciar sesión</button>
+      </div>
+
+      <!-- Nivel, XP y progreso -->
+      <div class="mm-xp-mini">
+        <div class="mm-xp-mini-top"><span id="mm-level-emoji">🌱</span><span id="mm-level-name">Viajero Novato</span><span id="mm-xp-total">0 XP</span></div>
+        <div class="mm-xp-mini-bar"><div class="mm-xp-mini-fill" id="mm-xp-fill"></div></div>
+        <div class="mm-xp-mini-badges" id="mm-xp-mini-badges"></div>
+        <a class="mm-xp-mini-link" href="mi-perfil.html">Ver mi perfil →</a>
+      </div>
+
+      <!-- Resumen de actividad -->
       <div class="mymapa-stats">
         <div class="mms"><div class="mms-n" id="mm-saved-count">0</div><div class="mms-l">Guardados</div></div>
         <div class="mms-div"></div>
         <div class="mms"><div class="mms-n" id="mm-visited-count">0</div><div class="mms-l">Visitados</div></div>
         <div class="mms-div"></div>
         <div class="mms"><div class="mms-n" id="mm-pending-count">0</div><div class="mms-l">Pendientes</div></div>
+        <div class="mms-div"></div>
+        <div class="mms"><div class="mms-n" id="soc-resenas-n">0</div><div class="mms-l">Reseñas</div></div>
       </div>
-      <button class="mymapa-btn" onclick="document.getElementById('mymapa-section').scrollIntoView({behavior:'smooth'})">Ver mi mapa →</button>
+
+      <!-- Insignias y logros de la cuenta -->
+      <div class="mm-cuenta-grid">
+        <div>
+          <div class="badges-head">Insignias <span id="pts-badges-count">0</span></div>
+          <div id="badges-grid"></div>
+        </div>
+        <div>
+          <div class="badges-head">Logros <span id="pts-logros-count">0</span>/<span id="pts-logros-total">0</span></div>
+          <div id="logros-grid"></div>
+        </div>
+      </div>
+
+      <div class="mymapa-actions">
+        <a class="mymapa-btn" href="mi-perfil.html">Mi perfil →</a>
+        <a class="mymapa-btn ghost" href="comunidad.html">Comunidad</a>
+      </div>
     </div>
     <div class="mymapa-right" id="mymapa-right">
       <div class="mm-mapas-bar" id="mm-mapas-bar">
@@ -1356,6 +1410,7 @@ var mapaPlaces = [];
 var mapaUserPos = null;
 var mapaPendingPopupId = null;
 var mapaReclusterTimer = null;
+var mapaPendingClearTimer = null;
 var mapaNoteTimer = null;
 var mapaGeoRequested = false;
 var v360Cur   = 0;
@@ -1677,9 +1732,12 @@ var DEST_LIMIT = 8;  /* 2 rows × 4 cols on homepage */
 
 function destFiltered() {
   return PL.filter(function(p){
-    var catOk = (destCat==='all' || p.cat===destCat);
     var q = destSearch.toLowerCase();
     var qOk = !q || p.name.toLowerCase().indexOf(q)>-1 || p.city.toLowerCase().indexOf(q)>-1;
+    // Con búsqueda activa se muestran matches de TODAS las categorías; la
+    // categoría solo refina cuando no hay texto (fix: el directorio quedaba
+    // vacío hasta elegir categoría).
+    var catOk = !q || destCat==='all' || p.cat===destCat;
     return catOk && qOk;
   });
 }
@@ -2508,13 +2566,14 @@ function onMapaMoved() {
   clearTimeout(mapaReclusterTimer);
   mapaReclusterTimer = setTimeout(function(){
     reclusterMapa();
+    // Solo se reabre el popup cuando hubo una seleccion intencional
+    // (mapaPendingPopupId: click en pin, ítem de lista o cluster).
+    // Fix: arrastrar/zoomear el mapa YA NO reabre el popup del ultimo
+    // lugar abierto (antes se reabria via mapaMap._popup en cada moveend).
     if(mapaPendingPopupId) {
       var m = mapaMarkers[mapaPendingPopupId];
       if(m) m.openPopup();
       mapaPendingPopupId = null;
-    } else if(mapaMap._popup) {
-      // clearLayers() cierra el popup abierto: reabrirlo tras re-clusterear
-      try { mapaMap._popup.openOn(mapaMap); } catch(_) {}
     }
   }, 150);
 }
@@ -2711,10 +2770,18 @@ function setMapaActive(id) {
   var targetZ = Math.max(curZ, firstIsolatedZoom(id, curZ));
   if(targetZ === curZ) {
     // Sin cambio de zoom: solo pan centrado. El pin ya es individual.
+    // El popup se abre directo y se reabre tras el moveend via
+    // mapaPendingPopupId (reclusterMapa hace clearLayers y lo cerraria).
+    // Si el pan no se desplaza (ya estaba centrado) no hay moveend: un
+    // timer limpia el pending para que un drag futuro no lo reabra.
     mapaMap.panTo([p.lat, p.lng], {animate:true});
     var m = mapaMarkers[id];
     if(m && mapaClusterLayer.hasLayer(m)) m.openPopup();
-    else mapaPendingPopupId = id;
+    mapaPendingPopupId = id;
+    clearTimeout(mapaPendingClearTimer);
+    mapaPendingClearTimer = setTimeout(function(){
+      if(mapaPendingPopupId === id) mapaPendingPopupId = null;
+    }, 450);
   } else {
     // Estaba dentro de un cluster: subir solo lo necesario para aislarlo.
     mapaPendingPopupId = id;
@@ -2774,9 +2841,9 @@ function shiftAgendaStrip(days) {
 
 function todayAgendaStrip() {
   agendaDayAnchor = new Date();
-  agendaDayFilter = null;
+  agendaDayFilter = new Date();
   buildCalStrip();
-  renderAgenda(agendaCat);
+  renderAgenda(agendaCat, agendaDayFilter);
 }
 
 function pickAgendaDay(date) {
@@ -2835,7 +2902,7 @@ function renderAgenda(cat, fDate) {
   if(moreBtn) moreBtn.textContent = 'Ver los ' + totalCount + ' eventos en agenda completa →';
   evs = evs.slice(0, AGENDA_PREVIEW_COUNT);
   if(!evs.length){
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:13px">Sin eventos para este filtro.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:13px">Sin eventos para este día o filtro. Prueba con otro día del calendario o cambia de categoría.</div>';
     return;
   }
   var today = new Date();
@@ -2872,7 +2939,7 @@ document.querySelectorAll('.af-btn').forEach(function(btn){
 
 function toggleAgendaExpand() {
   agendaExpanded = !agendaExpanded;
-  renderAgenda(agendaCat);
+  renderAgenda(agendaCat, agendaDayFilter);
   if(!agendaExpanded) {
     var sec = document.getElementById('agenda-section');
     if(sec) sec.scrollIntoView({behavior:'smooth'});
@@ -2997,8 +3064,11 @@ document.querySelectorAll('.mchip').forEach(function(c){
 buildSlides();
 resetTimer();
 renderDest();
+/* Agenda del inicio: por defecto muestra SELECCIONADO el dia de hoy
+   (fix: antes arrancaba sin filtro, mostrando todos los eventos). */
+agendaDayFilter = new Date();
 buildCalStrip();
-renderAgenda('all');
+renderAgenda('all', agendaDayFilter);
 /* BUG TSK-070: mmSaved/mmVisited se cargaban del localStorage MAS ABAJO
    (bloque LOAD SOCIAL STATE), despues de este primer renderMyMap(), asi
    que el arranque siempre pintaba "0 guardados" aunque hubiera datos.
@@ -3033,6 +3103,15 @@ document.getElementById('mobile-drawer') && document.getElementById('mobile-draw
 ══════════════════════════════════════════════════ */
 var mmListFilter = 'all';
 var mmCatFilter  = 'all';
+
+/* ── Accion del boton de cuenta (resumen izquierdo de Mi Viaje) ──
+   Con sesion: ir a mi-perfil.html. Sin sesion: abrir el modal de login
+   (usuario-session.js). */
+function mmAccionCuenta() {
+  var usr = window.ExploraCO && window.ExploraCO.usuario;
+  if (usr) { window.location.href = 'mi-perfil.html'; return; }
+  if (window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin();
+}
 
 /* ── Tab switching ── */
 function switchMMTab(tab) {
@@ -3480,6 +3559,22 @@ function updatePointsUI() {
   if(lvlEl) lvlEl.textContent = lvl.emoji + ' ' + lvl.nombre;
   if(barEl) barEl.style.width = pct + '%';
   if(bdgEl) bdgEl.textContent = earnedBadges.length;
+
+  // Resumen de cuenta (columna izquierda de Mi Viaje): perfil y reseñas
+  var resN = document.getElementById('soc-resenas-n');
+  if(resN) resN.textContent = pu.reviews;
+  var pAv  = document.getElementById('mm-profile-avatar');
+  var pNm  = document.getElementById('mm-profile-nombre');
+  var pBd  = document.getElementById('mm-profile-badge');
+  var pBtn = document.getElementById('mm-profile-btn');
+  var usr  = window.ExploraCO && window.ExploraCO.usuario;
+  if(pAv)  pAv.textContent = (usr && usr.nombre) ? usr.nombre.charAt(0).toUpperCase() : '👤';
+  if(pNm)  pNm.textContent = usr ? usr.nombre : 'Viajero anónimo';
+  if(pBd)  pBd.textContent = usr ? (usr.badge_actual || lvl.nombre) : 'Inicia sesión para guardar tu progreso';
+  if(pBtn) {
+    pBtn.textContent = usr ? 'Mi perfil' : 'Iniciar sesión';
+    pBtn.className = 'mm-profile-btn' + (usr ? ' outline' : '');
+  }
 
   var navXP = document.getElementById('nav-xp-badge');
   if(navXP) navXP.textContent = pu.xp + ' XP';
