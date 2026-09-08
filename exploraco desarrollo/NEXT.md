@@ -4,6 +4,36 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion ingest-eventos - ingesta automatizada de eventos a la agenda (2026-09-07) - TSK-085
+
+Herramienta para subir eventos a la agenda cultural en lote via API, sin
+escribir seed+loader+smoke por evento.
+
+**Cambios:**
+- `scripts/validate_eventos.js` (NUEVO): valida un array JSON de eventos
+  (slug, nombre, ciudad, lat/lng, fechas inicio/fin `YYYY-MM-DD`, sede,
+  arrays, tipo_evento, slugs unicos). `--prod` avisa colisiones vs
+  `/api/destinos?cat=evento`.
+- `scripts/upload-eventos.js` (NUEVO): `node scripts/upload-eventos.js
+  <archivo.json> [URL] [TOKEN] [--dry] [--seed]`. DELETE+POST por slug a
+  `/api/admin-destinos` (idempotente). `--dry` valida sin subir; `--seed`
+  genera `scripts/seed-eventos-<fecha>.js` (upsert, faqs/fotos, ASCII-safe).
+- `eventos/eventos.example.json`: plantilla (schema + 2 ejemplos, uno
+  multidia que cruza mes). `eventos/eventos.json`: arranca en `[]`.
+- `.opencode/skills/ingest-eventos/SKILL.md`: wrapper de agente para
+  automatizar el flujo end-to-end (generar JSON -> validar -> subir ->
+  verificar -> docs).
+- `agenda.html`: `?cat=evento&limit=50` -> `limit=200`.
+
+**Verificado:** node --check OK en ambos scripts; ASCII 0/0; validate PASS
+(ejemplo 2, vacio 0) y FAIL (exit 1, 9 errores) en payload invalido;
+upload `--dry --seed` genera seed valido sin tocar produccion; agenda.html
+parse OK; smoke_test_agenda.js 30/30 PASS.
+
+**Pendiente:** llenar `eventos/eventos.json` con eventos reales y ejecutar
+`node scripts/upload-eventos.js eventos/eventos.json --seed` (con --dry
+primero) para poblar la agenda.
+
 ### Sesion agenda-tarjetas-sin-doble-enlace - tarjetas de evento limpias (2026-09-07) - TSK-084
 
 Correccion del diseno de las tarjetas de la agenda: cada tarjeta era un

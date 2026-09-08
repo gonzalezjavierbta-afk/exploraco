@@ -487,7 +487,7 @@ function loadApiEvents() {
   // Con 'cat=eventos' la API retornaba 0 filas y los eventos nuevos nunca
   // aparecian en la agenda completa. Ademas AGENDA_EVENTS es const, asi que
   // se agrega con push (mutacion in-place), nunca con reasignacion.
-  fetch('/api/destinos?cat=evento&limit=50&status=published')
+  fetch('/api/destinos?cat=evento&limit=200&status=published')
     .then(function(r){ return r.json(); })
     .then(function(data){
       if (!data.ok || !data.data || !data.data.length) return;

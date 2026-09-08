@@ -1851,6 +1851,38 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   sin referencias residuales a `.ev-link-btn`/`.ag-ev-action`; smoke
   `scripts/smoke_test_agenda.js` 30/30 PASS (lógica no cambia).
 
+### TSK-085: Ingesta automatizada de eventos a la agenda (CLI + skill)
+- **Estado:** COMPLETADA
+- **Detalle:** Herramienta para subir eventos a la agenda cultural en lote
+  sin escribir seed+loader+smoke por evento. La agenda ya soporta multidia
+  (fecha_inicio -> fecha_fin) y categoria auto-detectada. Componentes:
+  - `scripts/validate_eventos.js`: valida un array JSON de eventos (slug
+    `[a-z0-9-]`, nombre, ciudad, lat/lng != 0,0, fecha_inicio/fecha_fin
+    `YYYY-MM-DD` con fin >= inicio, sede, arrays opcionales, tipo_evento
+    valido, slugs unicos). `--prod` avisa colisiones y total vs la agenda.
+  - `scripts/upload-eventos.js <archivo.json> [URL] [TOKEN] [--dry] [--seed]`:
+    idempotente DELETE+POST por slug a `/api/admin-destinos` (Bearer
+    `exploraco12345`, default `https://exploraco.vercel.app`); defaults
+    `categoria_slug='evento'`, `status='published'`, `destacado=false`
+    (override), `fecha_fin`=inicio si falta; `--dry` valida sin subir;
+    `--seed` genera `scripts/seed-eventos-<fecha>.js` (upsert `ON CONFLICT
+    slug`, faqs en destinos_detalles, fotos en destinos_fotos, ASCII-safe).
+  - `eventos/eventos.example.json`: plantilla con schema completo y 2
+    ejemplos (1 dia y multidia que cruza mes). `eventos/eventos.json` arranca
+    en `[]`.
+  - `.opencode/skills/ingest-eventos/SKILL.md`: wrapper de agente (recibir
+    eventos -> generar eventos.json -> validar -> subir --seed -> verificar
+    en /api/destinos?cat=evento y en la agenda -> docs).
+  - `agenda.html`: `?cat=evento&limit=50` -> `limit=200` para que los lotes
+    aparezcan completos.
+- **Evidencia:** node --check OK en validate_eventos.js y upload-eventos.js;
+  ASCII 0 bytes >127 en ambos. validate PASS en eventos.example.json (2) y
+  eventos.json (0); FAIL (exit 1) contra payload invalido (9 errores: slug,
+  ciudad, 0,0, fechas, tipo_evento, lineup, duplicado). upload `--dry --seed`
+  reporta el lote y genera seed valido (node --check OK, ASCII 0) sin tocar
+  produccion (el seed de prueba con eventos EJEMPLO se eliminó). agenda.html
+  parse OK; smoke_test_agenda.js 30/30 PASS.
+
 ---
 
 ## Regla de actualizacion
