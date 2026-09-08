@@ -4,6 +4,51 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion comunidad-chat-planes-backend - chat y planes reales con gaming (2026-09-08) - TSK-089
+
+Rediseno del apartado social de `comunidad.html` (tabs Chat y Planes)
+conectado al backend real de Neon y con gaming completo (XP, misiones,
+logros). Calibracion con Javier: XP de chat +2 por mensaje con tope diario
+20 XP (anti-farming en `usuarios.progreso_social`); crear plan gateado por
+chat desbloqueado (nivel 3); sin sesion = chat y planes bloqueados con CTA
+de login (se elimino el demo local de ambos tabs; Ranking conserva su
+fallback).
+
+**Cambios:**
+- `db/migrations/008_comunidad_social.sql` (NUEVO): `chat_salas` (+ seed
+  idempotente de 6 salas del sistema con emojis `E'\U...'`, BUG-026),
+  `chat_mensajes` (moderacion fijado/activo), `planes_viaje` +
+  `planes_miembros` (PK compuesta), `usuarios + progreso_social jsonb`.
+  Idempotente (ADR-008), ASCII 0 bytes > 127.
+- `api/interacciones.js`: helpers `misionCompletada`/`chatXpDisponible`/
+  `registrarChatXp`; GET `chat_salas`/`chat_mensajes`/`planes`/`planes_mios`;
+  POST `chat_sala` (gate crear_chat), `chat_msg` (gate chat, +2 XP tope
+  20/dia), `chat_mod` (gate moderador_chat: fijar/eliminar), `plan_crear`
+  (gate chat, valida destino/cupos 1-50), `plan_unirse` (dedup 409, 403
+  plan propio, 409 lleno), `plan_salir`; MISIONES +3 (mis_chat_activo +20,
+  mis_plan_creador +25, mis_plan_unido +15); LOGROS +3 (logr_social_chat
+  +30, logr_social_plan +35, logr_anfitrion +50) -> LOGROS 22. Sin endpoint
+  nuevo (presupuesto 8/8, ADR-010).
+- `comunidad.html`: tabs Chat/Planes consumen la API (polling 5s), envio
+  optimista + XP toast, moderacion condicional, formulario de plan (no
+  `prompt`), fix XSS (`esc()` en todo texto de usuario). Div balance 86/86.
+- `scripts/test_logros_catalogo.js` (19 -> 22) y
+  `scripts/smoke_test_comunidad.js` (NUEVO, 30 checks).
+
+**Verificado:** `node --check api/interacciones.js` OK; ASCII 0 bytes > 127
+y 0 backticks; `test_logros_catalogo.js` 12/12 PASS; `smoke_test_comunidad.js`
+30/30 PASS; divs comunidad 86/86. Espec:
+`docs/superpowers/specs/2026-09-08-comunidad-chat-planes-backend-design.md`;
+ADR-015 en DECISIONS.md; TSK-089 en TASKS.md.
+
+**Pendiente (BLOQUEANTE):** aplicar `db/migrations/008_comunidad_social.sql`
+en Neon (Javier) — **solo en el editor SQL de Neon**; las herramientas que
+exigen result set por sentencia fallan con las sentencias DDL (`result.rows`
+undefined -> error "reading 'map'"). Sin ella: GET/POST de chat y planes
+fallan con error SQL y las misiones/logros nuevos degradan a
+no-completadas. Luego deploy y verificacion en vivo (polling de chat,
+XP toasts, dedup de planes).
+
 ### Sesion hostalterraza-connector - conector automatico a la agenda (2026-09-08) - TSK-088
 
 Conector `scripts/extraer-hostalterraza.js` para traer automaticamente los

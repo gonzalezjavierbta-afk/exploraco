@@ -208,6 +208,44 @@ var MISIONES = [
       return Promise.resolve(ctx.xpTotal >= 700);
     },
   },
+  // -- Comunidad social real (espec 2026-09-08) ---------------------
+  // Misiones accionables del chat y los planes. Sus check() consultan
+  // las tablas de la migracion 008 (chat_mensajes, planes_viaje,
+  // planes_miembros); si la migracion no ha corrido, la consulta falla
+  // y el catch degrada a false sin romper la accion principal.
+  {
+    id: 'mis_chat_activo', grupo: 'general', requiere: ['mis_chat_mensajero'],
+    nombre: 'Conversador activo', xp: 20,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM chat_mensajes WHERE usuario_id=$1 AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 10); })
+       .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_plan_creador', grupo: 'general', requiere: ['mis_chat_mensajero'],
+    nombre: 'Creador de planes', xp: 25,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM planes_viaje WHERE creador_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); })
+       .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_plan_unido', grupo: 'general', requiere: [],
+    nombre: 'Viajero en grupo', xp: 15,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM planes_miembros WHERE usuario_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); })
+       .catch(function(){ return false; });
+    },
+  },
 ];
 
 // -- Catalogo de logros (v5, estilo consola + Upland) ---------------
@@ -382,6 +420,53 @@ LOGROS.push(
   }
 );
 
+// Logros de la comunidad social (espec 2026-09-08): chat y planes
+// colectivos. Mismo patron que los de arriba: codigo estatico, check()
+// server-side que consulta las tablas de la migracion 008.
+LOGROS.push(
+  {
+    id: 'logr_social_chat', grupo: 'general', requiere: ['logr_primer_voto'],
+    nombre: 'Conversador', desc: 'Env\u00eda 50 mensajes en el chat de la comunidad',
+    emoji: '\uD83D\uDCAC', tier: 'plata', xp: 30,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM chat_mensajes WHERE usuario_id=$1 AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 50); })
+       .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'logr_social_plan', grupo: 'general', requiere: ['logr_primer_voto'],
+    nombre: 'Organizador de viajes', desc: 'Crea 3 planes de viaje colectivos',
+    emoji: '\uD83D\uDDFA', tier: 'oro', xp: 35,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM planes_viaje WHERE creador_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 3); })
+       .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'logr_anfitrion', grupo: 'general', requiere: ['logr_primer_voto'],
+    nombre: 'Anfitri\u00f3n de parche', desc: 'Un plan tuyo re\u00fane 5 o m\u00e1s viajeros',
+    emoji: '\uD83E\uDD1D', tier: 'oro', xp: 50,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM ('
+        + ' SELECT p.id FROM planes_viaje p'
+        + ' JOIN planes_miembros pm ON pm.plan_id = p.id'
+        + ' WHERE p.creador_id = $1'
+        + ' GROUP BY p.id HAVING COUNT(pm.usuario_id) >= 5'
+        + ') t',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); })
+       .catch(function(){ return false; });
+    },
+  }
+);
+
 // -- Own the Spot (SKATE, Milestones v2 / ADR-014) ------------------
 // El lider de un spot es el autor de la resena mas votada (votos_utiles
 // maximo) de un destino. La consulta corre BAJO DEMANDA (respuesta del
@@ -417,6 +502,45 @@ function xpConMultiplicador(sql, usuarioId, destinoId, xpBase) {
         return es ? Math.round(xpBase * 1.1) : xpBase;
       });
     }).catch(function(){ return xpBase; });
+}
+
+// Capacidad desbloqueada por mision (patron de la foto en el POST):
+// lee usuarios.progreso_misiones y devuelve true si la mision esta
+// 'completada'. Nunca lanza: un fallo degrada a false.
+function misionCompletada(sql, usuarioId, misionId) {
+  if (!usuarioId || !misionId) return Promise.resolve(false);
+  return sql(
+    "SELECT (progreso_misiones->$1->>'estado') = 'completada' AS ok FROM usuarios WHERE id=$2",
+    [misionId, usuarioId]
+  ).then(function(r){ return !!(r[0] && r[0].ok); })
+   .catch(function(){ return false; });
+}
+
+// Anti-farming del chat (espec 2026-09-08): +2 XP por mensaje con tope
+// diario de 20 XP (10 mensajes/dia). El contador vive en
+// usuarios.progreso_social con la estructura { chat_dia: 'YYYY-MM-DD',
+// chat_n: N }. Nunca lanza: un fallo degrada a sin XP disponible.
+function chatXpDisponible(sql, usuarioId) {
+  if (!usuarioId) return Promise.resolve({ disponible: false, xp: 0, hoy: '', n: 0 });
+  var hoy = new Date();
+  var hoyStr = hoy.getUTCFullYear() + '-'
+    + String(hoy.getUTCMonth() + 1).padStart(2, '0') + '-'
+    + String(hoy.getUTCDate()).padStart(2, '0');
+  return sql('SELECT progreso_social FROM usuarios WHERE id=$1', [usuarioId])
+    .then(function(r){
+      var ps = (r[0] && r[0].progreso_social) || {};
+      var n = (ps.chat_dia === hoyStr) ? (parseInt(ps.chat_n, 10) || 0) : 0;
+      return { disponible: n < 10, xp: n < 10 ? 2 : 0, hoy: hoyStr, n: n };
+    })
+    .catch(function(){ return { disponible: false, xp: 0, hoy: hoyStr, n: 0 }; });
+}
+
+function registrarChatXp(sql, usuarioId, hoy, n) {
+  return sql(
+    "UPDATE usuarios SET progreso_social = COALESCE(progreso_social,'{}'::jsonb)"
+    + " || jsonb_build_object('chat_dia', $1, 'chat_n', $2::int) WHERE id=$3",
+    [hoy, n + 1, usuarioId]
+  ).catch(function(){});
 }
 
 // Evalua el catalogo completo para un usuario y persiste lo nuevo que se
@@ -907,6 +1031,79 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: { mapa: mapaDetalle, destinos: mapaDestinos } });
       }
 
+      // Salas de chat (espec comunidad 2026-09-08): lista de salas activas
+      // con el ultimo mensaje, su autor y el total de mensajes (para el
+      // listado estilo "room"). El contador de "online" es decorativo en
+      // el frontend (sin websockets en Vercel Hobby); aqui solo se sirve
+      // el dato de contenido.
+      if (tipo === 'chat_salas') {
+        var salasRows = await sql(
+          'SELECT s.id, s.nombre, s.icono, s.descripcion, s.tipo, s.creador_id, s.creado_en,'
+          + ' (SELECT m.texto FROM chat_mensajes m'
+          + '   WHERE m.sala_id = s.id AND m.activo = true ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_texto,'
+          + ' (SELECT COALESCE(NULLIF(m.nombre,\'\'), u.nombre, \'Viajero\') FROM chat_mensajes m'
+          + '   LEFT JOIN usuarios u ON u.id = m.usuario_id'
+          + '   WHERE m.sala_id = s.id AND m.activo = true ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_usuario,'
+          + ' (SELECT COUNT(*)::int FROM chat_mensajes m'
+          + '   WHERE m.sala_id = s.id AND m.activo = true) AS total_mensajes'
+          + ' FROM chat_salas s'
+          + ' WHERE s.activo = true'
+          + ' ORDER BY s.orden DESC, s.creado_en ASC',
+          []
+        );
+        return res.status(200).json({ ok: true, data: salasRows });
+      }
+
+      // Mensajes de una sala (espec comunidad 2026-09-08): ultimos 100,
+      // mas recientes primero; el frontend los invierte para mostrar en
+      // orden cronologico.
+      if (tipo === 'chat_mensajes' && req.query.sala_id) {
+        var msgsRows = await sql(
+          'SELECT m.id, m.usuario_id, m.texto, m.fijado, m.creado_en,'
+          + ' COALESCE(NULLIF(m.nombre,\'\'), u.nombre, \'Viajero\') AS nombre,'
+          + ' COALESCE(u.avatar_url, \'\') AS avatar_url'
+          + ' FROM chat_mensajes m'
+          + ' LEFT JOIN usuarios u ON u.id = m.usuario_id'
+          + ' WHERE m.sala_id = $1 AND m.activo = true'
+          + ' ORDER BY m.creado_en DESC'
+          + ' LIMIT 100',
+          [req.query.sala_id]
+        );
+        return res.status(200).json({ ok: true, data: msgsRows });
+      }
+
+      // Planes de viaje colectivos (espec comunidad 2026-09-08): listado
+      // con miembros actuales derivados por COUNT y marca 'unido' para el
+      // usuario que consulta (EXISTS con $1; si no hay usuario_id, false).
+      if (tipo === 'planes') {
+        var planesRows = await sql(
+          'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.creador_id, p.creado_en,'
+          + ' (SELECT COUNT(*)::int FROM planes_miembros pm WHERE pm.plan_id = p.id) AS miembros_actuales,'
+          + ' (SELECT u.nombre FROM usuarios u WHERE u.id = p.creador_id) AS creador_nombre,'
+          + ' EXISTS(SELECT 1 FROM planes_miembros pm WHERE pm.plan_id = p.id AND pm.usuario_id = $1) AS unido'
+          + ' FROM planes_viaje p'
+          + ' WHERE p.activo = true'
+          + ' ORDER BY p.creado_en DESC'
+          + ' LIMIT 50',
+          [usuarioId]
+        );
+        return res.status(200).json({ ok: true, data: planesRows });
+      }
+
+      // Planes creados por el usuario (para gestion y compartir).
+      if (tipo === 'planes_mios' && usuarioId) {
+        var planesMiosRows = await sql(
+          'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.creado_en,'
+          + ' (SELECT COUNT(*)::int FROM planes_miembros pm WHERE pm.plan_id = p.id) AS miembros_actuales'
+          + ' FROM planes_viaje p'
+          + ' WHERE p.creado_id = $1 AND p.activo = true'
+          + ' ORDER BY p.creado_en DESC'
+          + ' LIMIT 50',
+          [usuarioId]
+        );
+        return res.status(200).json({ ok: true, data: planesMiosRows });
+      }
+
       // Tabla de Destino (Albion, Milestones v2 / ADR-014): tres senderos
       // de especializacion (Explorador, Critico, Organizador) que
       // progresan en paralelo al XP general. Cada sendero suma "fama"
@@ -1154,6 +1351,199 @@ module.exports = async function handler(req, res) {
           );
           return res.status(200).json({ ok: true });
         }
+      }
+
+      // -- Chat y Planes reales (espec comunidad 2026-09-08) ---------
+      // Se manejan ANTES del guard generico de destino_id porque operan
+      // sobre salas/planes, no sobre destinos. Todos validan capacidad
+      // server-side via misionCompletada() y, cuando hay XP (chat),
+      // aplican el tope diario anti-farming (chatXpDisponible).
+      // Las capacidades las traduce api/usuarios.js desde
+      // usuarios.progreso_misiones (DESBLOQUEOS).
+
+      // Crear sala de chat (capacidad crear_chat, nivel 5).
+      if (tipo2 === 'chat_sala') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var puedeCrearSala = await misionCompletada(sql, usuarioId2, 'mis_chat_creador');
+        if (!puedeCrearSala)
+          return res.status(403).json({ ok: false, error: 'Desbloquea Creador de salas (nivel 5) para crear salas' });
+        var salaNombre = String(body.nombre || '').trim();
+        if (!salaNombre)
+          return res.status(400).json({ ok: false, error: 'nombre requerido' });
+        if (salaNombre.length > 40)
+          return res.status(400).json({ ok: false, error: 'nombre maximo 40 caracteres' });
+        var salaIcono = String(body.icono || '\uD83D\uDCAC').slice(0, 8);
+        var salaDesc = String(body.descripcion || '').trim().slice(0, 120);
+        var salaIns = await sql(
+          'INSERT INTO chat_salas (nombre, icono, descripcion, tipo, orden, creador_id) '
+          + 'VALUES ($1, $2, $3, \'viajeros\', 0, $4) RETURNING id',
+          [salaNombre, salaIcono, salaDesc, usuarioId2]
+        );
+        return res.status(200).json({ ok: true, id: salaIns[0].id });
+      }
+
+      // Enviar mensaje (capacidad chat, nivel 3). +2 XP con tope diario
+      // de 20 XP; evalua misiones y logros en cada envio.
+      if (tipo2 === 'chat_msg') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var puedeChat = await misionCompletada(sql, usuarioId2, 'mis_chat_mensajero');
+        if (!puedeChat)
+          return res.status(403).json({ ok: false, error: 'Desbloquea el chat (nivel 3, 250 XP) para escribir mensajes' });
+        var msgSala = String(body.sala_id || '');
+        var msgTexto = String(body.texto || '').trim();
+        if (!msgSala)
+          return res.status(400).json({ ok: false, error: 'sala_id requerido' });
+        if (!msgTexto)
+          return res.status(400).json({ ok: false, error: 'mensaje vacio' });
+        if (msgTexto.length > 500)
+          return res.status(400).json({ ok: false, error: 'mensaje maximo 500 caracteres' });
+        var salaValida = await sql(
+          'SELECT id FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+          [msgSala]
+        ).catch(function(){ return []; });
+        if (!salaValida.length)
+          return res.status(404).json({ ok: false, error: 'Sala no encontrada' });
+        var autorMsg = await sql('SELECT nombre FROM usuarios WHERE id=$1 LIMIT 1', [usuarioId2]).catch(function(){ return []; });
+        var nombreMsg = autorMsg[0] && autorMsg[0].nombre ? String(autorMsg[0].nombre).slice(0, 60) : 'Viajero';
+        var msgIns = await sql(
+          'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto) '
+          + 'VALUES ($1, $2, $3, $4) RETURNING id, creado_en',
+          [msgSala, usuarioId2, nombreMsg, msgTexto]
+        );
+        var xpChat = 0, misionesChat = [], logrosChat = [];
+        var dispChat = await chatXpDisponible(sql, usuarioId2);
+        if (dispChat.disponible) {
+          xpChat = dispChat.xp;
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
+            [xpChat, usuarioId2]
+          ).catch(function(){});
+          await registrarChatXp(sql, usuarioId2, dispChat.hoy, dispChat.n);
+        }
+        misionesChat = await evaluarMisiones(sql, usuarioId2);
+        logrosChat = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({
+          ok: true,
+          id: msgIns[0].id,
+          creado_en: msgIns[0].creado_en,
+          xp: xpChat,
+          misiones: misionesChat,
+          logros: logrosChat
+        });
+      }
+
+      // Moderacion de chat (capacidad moderador_chat, nivel 4): fijar
+      // (toggle) o eliminar (soft-delete) un mensaje de una sala.
+      if (tipo2 === 'chat_mod') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var puedeMod = await misionCompletada(sql, usuarioId2, 'mis_chat_moderador');
+        if (!puedeMod)
+          return res.status(403).json({ ok: false, error: 'Desbloquea Moderador de chat (nivel 4) para moderar' });
+        var modSala = String(body.sala_id || '');
+        var modMsgId = String(body.msg_id || '');
+        var modAccion = String(body.accion || '');
+        if (!modSala || !modMsgId)
+          return res.status(400).json({ ok: false, error: 'sala_id y msg_id requeridos' });
+        if (modAccion !== 'fijar' && modAccion !== 'eliminar')
+          return res.status(400).json({ ok: false, error: 'accion debe ser fijar o eliminar' });
+        var modTarget = await sql(
+          'SELECT id FROM chat_mensajes WHERE id=$1 AND sala_id=$2 AND activo=true LIMIT 1',
+          [modMsgId, modSala]
+        ).catch(function(){ return []; });
+        if (!modTarget.length)
+          return res.status(404).json({ ok: false, error: 'Mensaje no encontrado' });
+        if (modAccion === 'fijar') {
+          await sql('UPDATE chat_mensajes SET fijado = NOT fijado WHERE id = $1', [modMsgId]);
+        } else {
+          await sql('UPDATE chat_mensajes SET activo = false WHERE id = $1', [modMsgId]);
+        }
+        return res.status(200).json({ ok: true });
+      }
+
+      // Crear plan de viaje (gate: chat desbloqueado, nivel 3). El XP
+      // llega por la mision mis_plan_creador (25 XP, una vez).
+      if (tipo2 === 'plan_crear') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var puedePlan = await misionCompletada(sql, usuarioId2, 'mis_chat_mensajero');
+        if (!puedePlan)
+          return res.status(403).json({ ok: false, error: 'Desbloquea el chat (nivel 3) para crear planes' });
+        var planDestino = String(body.destino || '').trim();
+        var planFechas = String(body.fechas || '').trim();
+        var planCupos = parseInt(body.cupos, 10);
+        var planDesc = String(body.descripcion || '').trim();
+        if (!planDestino)
+          return res.status(400).json({ ok: false, error: 'destino requerido' });
+        if (planDestino.length > 80)
+          return res.status(400).json({ ok: false, error: 'destino maximo 80 caracteres' });
+        if (isNaN(planCupos) || planCupos < 1 || planCupos > 50)
+          return res.status(400).json({ ok: false, error: 'cupos debe ser entre 1 y 50' });
+        if (planFechas.length > 60)
+          return res.status(400).json({ ok: false, error: 'fechas maximo 60 caracteres' });
+        if (planDesc.length > 300)
+          return res.status(400).json({ ok: false, error: 'descripcion maximo 300 caracteres' });
+        var planIns = await sql(
+          'INSERT INTO planes_viaje (destino, fechas, cupos, descripcion, creador_id) '
+          + 'VALUES ($1, $2, $3, $4, $5) RETURNING id',
+          [planDestino, planFechas, planCupos, planDesc, usuarioId2]
+        );
+        var misionesPlan = await evaluarMisiones(sql, usuarioId2);
+        var logrosPlan = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, id: planIns[0].id, xp: 0, misiones: misionesPlan, logros: logrosPlan });
+      }
+
+      // Unirse a un plan (libre para registrados). Dedup por PK (409),
+      // 403 si es el plan propio, 409 si esta lleno. El XP llega por la
+      // mision mis_plan_unido (15 XP, una vez).
+      if (tipo2 === 'plan_unirse') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var joinPlan = String(body.plan_id || '');
+        if (!joinPlan)
+          return res.status(400).json({ ok: false, error: 'plan_id requerido' });
+        var planRow = await sql(
+          'SELECT id, creador_id, cupos FROM planes_viaje WHERE id=$1 AND activo=true LIMIT 1',
+          [joinPlan]
+        ).catch(function(){ return []; });
+        if (!planRow.length)
+          return res.status(404).json({ ok: false, error: 'Plan no encontrado' });
+        if (planRow[0].creador_id === usuarioId2)
+          return res.status(403).json({ ok: false, error: 'No puedes unirte a tu propio plan' });
+        var miembrosNow = await sql(
+          'SELECT COUNT(*)::int AS n FROM planes_miembros WHERE plan_id=$1',
+          [joinPlan]
+        ).catch(function(){ return []; });
+        var nMiembros = (miembrosNow[0] && parseInt(miembrosNow[0].n, 10)) || 0;
+        if (nMiembros >= (parseInt(planRow[0].cupos, 10) || 0))
+          return res.status(409).json({ ok: false, error: 'Plan lleno' });
+        try {
+          await sql(
+            'INSERT INTO planes_miembros (plan_id, usuario_id) VALUES ($1, $2)',
+            [joinPlan, usuarioId2]
+          );
+        } catch (eJoin) {
+          return res.status(409).json({ ok: false, error: 'Ya estas en este plan' });
+        }
+        var misionesJoin = await evaluarMisiones(sql, usuarioId2);
+        var logrosJoin = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: 0, misiones: misionesJoin, logros: logrosJoin });
+      }
+
+      // Salir de un plan.
+      if (tipo2 === 'plan_salir') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var leavePlan = String(body.plan_id || '');
+        if (!leavePlan)
+          return res.status(400).json({ ok: false, error: 'plan_id requerido' });
+        await sql(
+          'DELETE FROM planes_miembros WHERE plan_id=$1 AND usuario_id=$2',
+          [leavePlan, usuarioId2]
+        );
+        return res.status(200).json({ ok: true });
       }
 
       // -- Review_voto (Milestones v2 / ADR-014, SKATE "Own the Spot") --

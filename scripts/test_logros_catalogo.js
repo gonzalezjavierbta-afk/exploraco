@@ -31,7 +31,7 @@ function check(label, cond) {
   if (!cond) process.exitCode = 1;
 }
 
-check('LOGROS: 19 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2)', LOGROS.length === 19);
+check('LOGROS: 22 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2 + 3 comunidad social)', LOGROS.length === 22);
 const ids = LOGROS.map(l => l.id);
 check('LOGROS: ids unicos', new Set(ids).size === LOGROS.length);
 

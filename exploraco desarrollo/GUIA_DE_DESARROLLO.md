@@ -195,7 +195,7 @@ seed/loader/smoke viven en `scripts/` (nunca en `api/`), por eso son ilimitados.
 | `directorio-sitio.html` / `-hostal.html` / `-comida.html` / `-evento.html` | Directorios por categoria con connector de API. |
 | `blog.html` | SSR desde `api/utilidades?tipo=blog-lista` (rewrite), listado de posts. |
 | `mapas.html` | Catalogo publico de mapas tematicos + detalle con Leaflet. |
-| `comunidad.html` | Hub social: Chat (demo), Planes (demo), Ranking (real). |
+| `comunidad.html` | Hub social: Chat (real, migracion 008), Planes (real, migracion 008), Ranking (real). |
 | `mi-perfil.html` | Perfil del viajero: badges, trofeos, mis lugares, quick actions. |
 | `mi-lugar.html` | Dashboard del dueno de un lugar: visitas, guardados, rating, destacado, resenas. |
 | `publicar.html` | Formulario publico de 4 pasos para publicar un lugar. |
@@ -888,15 +888,24 @@ fisico (Regla de Oro 5):
   "Entrar sin sesion - modo demo".
 - **User bar:** avatar, nombre, nivel (XP_LEVELS local), barra XP, stats
   XP/Badges/Guardados/Visitados.
-- **Tabs reales: ðŸ’¬ Chat, ðŸ—ºï¸ Planes, ðŸ† Ranking** (NOTA: la spec
+- **Tabs reales: 💬 Chat, 🗺️ Planes, 🏆 Ranking** (NOTA: la spec
   2026-09-07 de comunidad unificada describia otros tabs; el codigo real tiene
   estos 3).
-  - **Chat = demo local SIN backend** (`CHAT_ROOMS`, `MOCK_MESSAGES`,
-    `renderChatRooms`, `openChatRoom`, `sendChatMsg`). Sin XP, sin persistencia.
-  - **Planes = demo local** (`PLANES_DATA`, `joinPlanComm`, `createPlan` con
-    prompt). Sin backend.
+  - **Chat = REAL (TSK-089, espec 2026-09-08):** `GET /api/interacciones?
+    tipo=chat_salas` y `tipo=chat_mensajes&sala_id=`; envio `POST tipo=
+    chat_msg` (+2 XP con tope diario 20 XP en `usuarios.progreso_social`);
+    moderacion `POST tipo=chat_mod` (fijar/eliminar, gate moderador_chat);
+    crear sala `POST tipo=chat_sala` (gate crear_chat). Polling 5s (sin
+    websockets en Hobby). Sin sesion -> bloqueado con CTA de login.
+  - **Planes = REAL (TSK-089):** `GET tipo=planes` (miembros_actuales por
+    COUNT, `unido` por EXISTS); crear `POST tipo=plan_crear` (gate chat,
+    nivel 3); unirse `POST tipo=plan_unirse` (dedup 409, 403 plan propio,
+    409 lleno); salir `POST tipo=plan_salir`. Cupos = `cupos - miembros`.
+    Sin sesion -> bloqueado con CTA de login.
   - **Ranking = REAL:** `cargarLeaderboard()` -> `GET /api/usuarios?tipo=
     leaderboard&limit=20`, con fallback a `MOCK_LB`.
+- **Seguridad:** todo texto de usuario se escapa con `esc()` (fix XSS del
+  demo previo). Migracion 008 obligatoria para chat/planes.
 
 ### 7.7 mi-perfil.html - perfil del viajero
 
@@ -944,7 +953,10 @@ No es social de viajero: es estadisticas de un lugar para su propietario (link
 - Foro / comentarios: solo "opiniones" en blog = reseÃ±as sobre
   `categoria_slug='blog'` (terminologia `opinion` vs `resena` en
   pagina-destino.js).
-- Mensajes / chat: solo demo local en comunidad.html.
+- Mensajes / chat: real desde TSK-089 (tablas chat_salas/chat_mensajes,
+  migracion 008). Antes era solo demo local en comunidad.html.
+- Planes colectivos: real desde TSK-089 (planes_viaje/planes_miembros,
+  migracion 008). Antes era solo demo local.
 - Notificaciones in-app para usuarios: solo emails al admin.
 
 ---

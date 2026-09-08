@@ -68,14 +68,14 @@ function invoke(tipo, mockSql) {
   });
 }
 
-check('MISIONES: catalogo con 9 misiones', MISIONES.length === 9);
-check('LOGROS: catalogo con 19 logros', LOGROS.length === 19);
+check('MISIONES: catalogo con 16 misiones', MISIONES.length === 16);
+check('LOGROS: catalogo con 22 logros', LOGROS.length === 22);
 
 invoke('misiones', mockConUsuario()).then(function(res) {
   check('misiones: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('misiones: total=9', res.total === 9);
-  check('misiones: devuelve las 9 con estado/en', list.length === 9
+  check('misiones: total=16', res.total === 16);
+  check('misiones: devuelve las 16 con estado/en', list.length === 16
     && list.every(function(m){ return m.id && m.grupo && m.nombre && m.xp >= 0
       && Array.isArray(m.requiere) && (m.estado === 'completada' || m.estado === 'pendiente'); }));
   var primer = list.filter(function(m){ return m.id === 'mis_primer_guardado'; })[0];
@@ -88,8 +88,8 @@ invoke('misiones', mockConUsuario()).then(function(res) {
 }).then(function(res) {
   check('logros: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('logros: total=19', res.total === 19);
-  check('logros: filas con tier/emoji/rareza_pct', list.length === 19
+  check('logros: total=22', res.total === 22);
+  check('logros: filas con tier/emoji/rareza_pct', list.length === 22
     && list.every(function(l){ return l.id && l.nombre && l.tier && l.emoji
       && typeof l.rareza_pct === 'number' && (l.estado === 'completada' || l.estado === 'pendiente'); }));
   var voto = list.filter(function(l){ return l.id === 'logr_primer_voto'; })[0];

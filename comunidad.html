@@ -219,6 +219,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel 3 (250 XP). A medida que avanzas desbloqueas moderar salas (nivel 4) y crear tus propias salas (nivel 5).</div>
       </div>
+      <div id="chat-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte a las salas de viajeros.</div>
+        <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
+      </div>
       <div id="chat-rooms-head" style="display:none;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:12px;color:rgba(255,255,255,.4)">Salas de viajeros</div>
         <button id="chat-new-room" onclick="crearChatSala()" style="padding:6px 12px;background:var(--gold);border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;color:var(--black);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.6px">+ Nueva sala</button>
@@ -226,7 +231,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="chat-rooms" id="chat-rooms-list"></div>
       <div id="chat-active-window" style="display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <button onclick="document.getElementById('chat-active-window').style.display='none';document.getElementById('chat-rooms-list').style.display='flex'" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 10px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">← Volver</button>
+          <button onclick="closeChatRoom()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 10px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">← Volver</button>
           <div style="font-size:13px;font-weight:700;color:#fff" id="chat-room-title">Chat</div>
           <button id="chat-mod-hint" style="display:none;margin-left:auto;background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;padding:3px 8px;color:var(--gold);font-size:9px;cursor:default">🛡️ Moderador</button>
         </div>
@@ -240,9 +245,25 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
     <!-- PLANES -->
     <div class="cpanel" id="cpanel-planes">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div id="planes-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Planes bloqueados</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para crear y unirte a planes de viaje colectivos.</div>
+        <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
+      </div>
+      <div id="planes-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="font-size:12px;color:rgba(255,255,255,.4)">Planes de viaje colectivos</div>
-        <button onclick="createPlan()" style="padding:7px 14px;background:var(--gold);border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:var(--black);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.8px">+ Crear plan</button>
+        <button id="plan-create-btn" onclick="createPlan()" style="padding:7px 14px;background:var(--gold);border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:var(--black);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.8px">+ Crear plan</button>
+      </div>
+      <div id="plan-form" style="display:none;background:rgba(255,255,255,.04);border:1px solid rgba(232,160,32,.25);border-radius:8px;padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px">Nuevo plan de viaje</div>
+        <input class="chat-inp" id="plan-f-dest" placeholder="Destino (ej: Trek Ciudad Perdida)" style="margin-bottom:8px">
+        <input class="chat-inp" id="plan-f-fechas" placeholder="Fechas (ej: 15–18 Mar 2026)" style="margin-bottom:8px">
+        <input class="chat-inp" id="plan-f-cupos" type="number" min="1" max="50" value="4" placeholder="Cupos" style="margin-bottom:8px">
+        <textarea class="chat-inp" id="plan-f-desc" placeholder="Descripción (opcional)" rows="2" style="margin-bottom:8px;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px">
+          <button class="chat-send" onclick="submitPlanForm()">Crear plan</button>
+          <button style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:10px 16px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer" onclick="togglePlanForm(false)">Cancelar</button>
+        </div>
       </div>
       <div class="planes-grid" id="planes-grid"></div>
     </div>
@@ -377,42 +398,68 @@ function updateCommUI() {
   setText('comm-visited-n', st.visited);
 }
 
-/* ---- CHAT (demo local, sin backend; no otorga XP) ---- */
-var CHAT_ROOMS = [
-  {id:'general',     icon:'🇨🇴', name:'Chat general',      desc:'Todos los viajeros de ExploraCO',   online:12},
-  {id:'bogota',      icon:'🏙️', name:'Bogotá',              desc:'Destinos y tips de la capital',     online:5},
-  {id:'cartagena',   icon:'🏰', name:'Cartagena',           desc:'Ciudad amurallada y playas',         online:8},
-  {id:'medellin',    icon:'🌺', name:'Medellín',             desc:'Ciudad de la eterna primavera',      online:7},
-  {id:'caribe',      icon:'🌊', name:'Costa Caribe',        desc:'Tayrona, Barranquilla, Santa Marta', online:4},
-  {id:'naturaleza',  icon:'🏔️', name:'Naturaleza y trekking',desc:'Ciudad Perdida, Cocora, Cristales', online:6},
-];
-var MOCK_MESSAGES = {
-  general: [
-    {user:'Carlos M.',init:'CM',bg:'#1a3a5c',tc:'#7eb8f0',text:'¿Alguien viaja a Ciudad Perdida en marzo?',time:'10:32'},
-    {user:'Sarah K.',init:'SK',bg:'#0a2a1a',tc:'#7ef0b8',text:'Yo! Tengo el trek del 15 al 18. Se unen?',time:'10:35'},
-    {user:'Andrea V.',init:'AV',bg:'#3a1a0a',tc:'#f0a87e',text:'Qué operadora recomiendan para el trek?',time:'10:41'},
-    {user:'Carlos M.',init:'CM',bg:'#1a3a5c',tc:'#7eb8f0',text:'Wiwa Tour es excelente, los kogui son increíbles como guías',time:'10:44'},
-  ],
-  cartagena: [
-    {user:'María R.',init:'MR',bg:'#0a1a3a',tc:'#7ea8f0',text:'El Hostal Walled City es ideal para salir a pie a la ciudad',time:'09:15'},
-    {user:'James W.',init:'JW',bg:'#1a051a',tc:'#f07ef0',text:'Barú vale la pena? O es mejor Rosario?',time:'09:22'},
-    {user:'María R.',init:'MR',bg:'#0a1a3a',tc:'#7ea8f0',text:'Rosario es más tranquilo. Barú tiene más turistas pero también es bonito',time:'09:28'},
-  ],
-};
-var chatMessages = {};
-var activeChatRoom = null;
+/* ---- CHAT + PLANES (reales, api/interacciones.js, espec 2026-09-08) ---- */
+/* El chat y los planes persisten en Neon (migracion 008). Sin sesion,
+   ambos tabs quedan bloqueados con CTA de login (decision del usuario).
+   Todo texto de usuario se escapa (fix XSS del demo previo). Las
+   capacidades (chat/moderador_chat/crear_chat) las traduce
+   api/usuarios.js desde usuarios.progreso_misiones. */
 
-function myInitials() { var u=sesion(); return u&&u.nombre?u.nombre.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2):'TU'; }
+var AV_COLORS = [
+  ['#1a3a5c','#7eb8f0'],['#0a2a1a','#7ef0b8'],['#3a1a0a','#f0a87e'],
+  ['#1a051a','#f07ef0'],['#0a1a3a','#7ea8f0'],['#2a2a0a','#e0e07e']
+];
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function postComAPI(body) { return fetch('/api/interacciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}); }
+function uid() { var u=sesion(); return u ? u.id : null; }
+function initialsFromName(n) {
+  n = n || 'Viajero';
+  var p = n.trim().split(/\s+/).filter(Boolean);
+  var ini = ((p[0] && p[0][0]) || 'V');
+  if (p.length > 1 && p[1]) ini += p[1][0];
+  return ini.toUpperCase().slice(0,2);
+}
+function colorsFromName(n) {
+  n = n || 'Viajero';
+  var h = 0;
+  for (var i=0;i<n.length;i++) h = (h*31 + n.charCodeAt(i)) | 0;
+  return AV_COLORS[Math.abs(h) % AV_COLORS.length];
+}
+function toastGaming(res) {
+  if (!res) return;
+  var parts = [];
+  if (res.xp > 0) parts.push('💬 +' + res.xp + ' XP');
+  (res.misiones || []).forEach(function(m){ parts.push('🏆 ' + m.nombre + ' +' + m.xp + ' XP'); });
+  (res.logros || []).forEach(function(l){ parts.push('🏅 ' + l.nombre + ' +' + l.xp + ' XP'); });
+  if (parts.length) showXPToastComm(parts.join('  ·  '));
+  if ((res.misiones && res.misiones.length) || (res.logros && res.logros.length)) updateCommUI();
+}
+
+function myInitials() { return initialsFromName(myName()); }
 function myName() { var u=sesion(); return (u&&u.nombre)||'Invitado'; }
 
 function capC(k) { var u = sesion(); return !!(u && u.capacidades && u.capacidades[k]); }
+
+/* ---- CHAT ---- */
+var chatSalasCache = {};
+var chatSalaActiva = null;
+var chatMsgsCache = {};
+var chatPollTimer = null;
 
 function renderChatRooms() {
   var list = document.getElementById('chat-rooms-list');
   var lock = document.getElementById('chat-lock');
   var head = document.getElementById('chat-rooms-head');
-  var nroom = document.getElementById('chat-new-room');
+  var guest = document.getElementById('chat-guest');
   if(!list) return;
+  if(!sesion()) {
+    list.innerHTML = '';
+    if(lock) lock.style.display = 'none';
+    if(head) head.style.display = 'none';
+    if(guest) guest.style.display = 'block';
+    return;
+  }
+  if(guest) guest.style.display = 'none';
   if(!capC('chat')) {
     list.innerHTML = '';
     if(lock) lock.style.display = 'block';
@@ -421,126 +468,311 @@ function renderChatRooms() {
   }
   if(lock) lock.style.display = 'none';
   if(head) head.style.display = 'flex';
+  var nroom = document.getElementById('chat-new-room');
   if(nroom) nroom.style.display = capC('crear_chat') ? '' : 'none';
   list.style.display = 'flex';
-  list.innerHTML = '';
-  CHAT_ROOMS.forEach(function(r) {
-    var msgs = MOCK_MESSAGES[r.id] || chatMessages[r.id] || [];
-    var lastText = msgs.length ? msgs[msgs.length-1].text : 'Sin mensajes aun';
-    var div = document.createElement('div');
-    div.className = 'chat-room';
-    var icon = document.createElement('div'); icon.className='cr-icon'; icon.textContent=r.icon;
-    var info = document.createElement('div'); info.className='cr-info';
-    var nm = document.createElement('div'); nm.className='cr-name'; nm.textContent=r.name;
-    var lt = document.createElement('div'); lt.className='cr-last';
-    lt.textContent = lastText.slice(0,50) + (lastText.length>50?'...':'');
-    info.appendChild(nm); info.appendChild(lt);
-    var dot = document.createElement('div'); dot.className='cr-online';
-    div.appendChild(icon); div.appendChild(info); div.appendChild(dot);
-    div.onclick = (function(rid){ return function(){ openChatRoom(rid); }; })(r.id);
-    list.appendChild(div);
-  });
+  list.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">Cargando salas…</div>';
+  fetch('/api/interacciones?tipo=chat_salas')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var salas = (res && res.data) || [];
+      chatSalasCache = {};
+      salas.forEach(function(s){ chatSalasCache[s.id] = s; });
+      if(!salas.length) {
+        list.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">Sin salas aun</div>';
+        return;
+      }
+      list.innerHTML = '';
+      salas.forEach(function(s){
+        var div = document.createElement('div');
+        div.className = 'chat-room';
+        var lastText = s.ultimo_texto ? (s.ultimo_texto.slice(0,50) + (s.ultimo_texto.length>50?'…':'')) : 'Sin mensajes aun';
+        var lastInfo = s.ultimo_usuario ? (s.ultimo_usuario + ': ' + lastText) : lastText;
+        div.innerHTML = '<div class="cr-icon">' + esc(s.icono) + '</div>'
+          + '<div class="cr-info"><div class="cr-name">' + esc(s.nombre) + '</div>'
+          + '<div class="cr-last">' + esc(lastInfo) + '</div></div>'
+          + '<div class="cr-online"></div>';
+        div.onclick = (function(rid){ return function(){ openChatRoom(rid); }; })(s.id);
+        list.appendChild(div);
+      });
+    })
+    .catch(function(){
+      list.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">No se pudieron cargar las salas</div>';
+    });
 }
+
 function openChatRoom(roomId) {
   if(!capC('chat')) return;
-  var room = CHAT_ROOMS.find(function(r){return r.id===roomId;});
+  var room = chatSalasCache[roomId];
   if(!room) return;
-  activeChatRoom = roomId;
+  chatSalaActiva = roomId;
   document.getElementById('chat-rooms-list').style.display='none';
   document.getElementById('chat-active-window').style.display='block';
-  setText('chat-room-title', room.icon+' '+room.name);
+  setText('chat-room-title', room.icono + ' ' + room.nombre);
   var modHint = document.getElementById('chat-mod-hint');
   if(modHint) modHint.style.display = capC('moderador_chat') ? '' : 'none';
-  renderChatMessages(roomId);
+  loadChatMsgs(roomId);
+  startChatPoll();
   var inp = document.getElementById('chat-inp');
   if(inp) inp.focus();
 }
-function renderChatMessages(roomId) {
+
+function closeChatRoom() {
+  stopChatPoll();
+  chatSalaActiva = null;
+  document.getElementById('chat-active-window').style.display='none';
+  document.getElementById('chat-rooms-list').style.display='flex';
+}
+
+function loadChatMsgs(roomId) {
   var win = document.getElementById('chat-window');
   if(!win) return;
-  var msgs = chatMessages[roomId] || MOCK_MESSAGES[roomId] || [];
-  var mi = myInitials();
+  win.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">Cargando mensajes…</div>';
+  fetch('/api/interacciones?tipo=chat_mensajes&sala_id=' + encodeURIComponent(roomId))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var msgs = (res && res.data) || [];
+      msgs.reverse();
+      chatMsgsCache[roomId] = msgs;
+      renderChatMessages(roomId, msgs);
+    })
+    .catch(function(){
+      win.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">No se pudieron cargar los mensajes</div>';
+    });
+}
+
+function renderChatMessages(roomId, msgs) {
+  var win = document.getElementById('chat-window');
+  if(!win) return;
+  var myId = uid();
   var mod = capC('moderador_chat');
-  win.innerHTML = msgs.map(function(m, miIdx) {
-    var own = (m.init === mi);
+  win.innerHTML = msgs.map(function(m){
+    var own = myId && m.usuario_id && m.usuario_id === myId;
+    var ini = initialsFromName(m.nombre);
+    var col = colorsFromName(m.nombre);
     var modBtns = mod ? '<div class="msg-mod">'
-      + '<button onclick="modPinMsg('+miIdx+',this)" title="Fijar">📌</button>'
-      + '<button onclick="modDelMsg('+miIdx+')" title="Eliminar">🗑</button></div>' : '';
-    return '<div class="chat-msg'+(own?' own':'')+(m._pinned?' pinned':'')+'">'
-      +'<div class="msg-av" style="background:'+m.bg+';color:'+m.tc+'">'+m.init+'</div>'
-      +'<div><div class="msg-bubble">'+m.text+'</div>'
-      +'<div class="msg-time">'+m.user+' · '+m.time+'</div>'+modBtns+'</div>'
-      +'</div>';
+      + '<button onclick="chatModAction(\'' + m.id + '\',\'fijar\')" title="Fijar">📌</button>'
+      + '<button onclick="chatModAction(\'' + m.id + '\',\'eliminar\')" title="Eliminar">🗑</button></div>' : '';
+    return '<div class="chat-msg' + (own?' own':'') + (m.fijado?' pinned':'') + '">'
+      + '<div class="msg-av" style="background:' + col[0] + ';color:' + col[1] + '">' + esc(ini) + '</div>'
+      + '<div><div class="msg-bubble">' + esc(m.texto) + '</div>'
+      + '<div class="msg-time">' + esc(m.nombre) + ' · ' + esc(fmtHora(m.creado_en)) + '</div>' + modBtns + '</div>'
+      + '</div>';
   }).join('');
   win.scrollTop = win.scrollHeight;
 }
-function modPinMsg(idx, btn) {
-  var msgs = chatMessages[activeChatRoom] || MOCK_MESSAGES[activeChatRoom] || [];
-  if(!msgs[idx]) return;
-  msgs[idx]._pinned = !msgs[idx]._pinned;
-  renderChatMessages(activeChatRoom);
+function fmtHora(iso) {
+  if(!iso) return '';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
-function modDelMsg(idx) {
-  var msgs = chatMessages[activeChatRoom];
-  if(msgs && msgs[idx]) { msgs.splice(idx,1); renderChatMessages(activeChatRoom); }
+
+function startChatPoll() {
+  stopChatPoll();
+  chatPollTimer = setInterval(function(){
+    if(!chatSalaActiva) { stopChatPoll(); return; }
+    fetch('/api/interacciones?tipo=chat_mensajes&sala_id=' + encodeURIComponent(chatSalaActiva))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        var msgs = (res && res.data) || [];
+        msgs.reverse();
+        var prev = chatMsgsCache[chatSalaActiva] || [];
+        var changed = msgs.length !== prev.length
+          || (msgs.length && (!prev.length || msgs[msgs.length-1].id !== prev[prev.length-1].id));
+        if(changed) {
+          chatMsgsCache[chatSalaActiva] = msgs;
+          renderChatMessages(chatSalaActiva, msgs);
+        }
+      })
+      .catch(function(){});
+  }, 5000);
 }
+function stopChatPoll() {
+  if(chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+}
+
+function chatModAction(msgId, accion) {
+  if(!capC('moderador_chat')) return;
+  var u = sesion();
+  if(!u || !chatSalaActiva) return;
+  postComAPI({tipo:'chat_mod', usuario_id:u.id, sala_id:chatSalaActiva, msg_id:msgId, accion:accion})
+    .then(function(res){
+      if(res && res.ok) { loadChatMsgs(chatSalaActiva); }
+      else if(res && res.error) showXPToastComm('⚠️ ' + res.error);
+    })
+    .catch(function(){ showXPToastComm('⚠️ No se pudo moderar'); });
+}
+
 function crearChatSala() {
   if(!capC('crear_chat')) return;
+  var u = sesion();
+  if(!u) return;
   var nombre = prompt('Nombre de la nueva sala:');
   if(!nombre || !nombre.trim()) return;
-  var id = 'sala-' + Date.now();
-  CHAT_ROOMS.push({id:id, icon:'💬', name:nombre.trim(), desc:'Sala creada por un viajero', online:1});
-  MOCK_MESSAGES[id] = [{user:myName(), init:myInitials(), bg:'#E8A020', tc:'#000', text:'Sala creada', time:'ahora'}];
-  renderChatRooms();
+  postComAPI({tipo:'chat_sala', usuario_id:u.id, nombre:nombre.trim(), descripcion:'Sala creada por un viajero'})
+    .then(function(res){
+      if(res && res.ok) { renderChatRooms(); showXPToastComm('💬 Sala creada'); }
+      else if(res && res.error) showXPToastComm('⚠️ ' + res.error);
+    })
+    .catch(function(){ showXPToastComm('⚠️ No se pudo crear la sala'); });
 }
+
 function sendChatMsg() {
   if(!capC('chat')) return;
   var inp = document.getElementById('chat-inp');
   if(!inp) return;
   var text = inp.value.trim();
   if(!text) return;
+  var u = sesion();
+  if(!u || !chatSalaActiva) return;
   inp.value='';
-  var now=new Date();
-  var time = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
-  var msg = {user:myName(), init:myInitials(), bg:'#E8A020', tc:'#000', text:text, time:time};
-  if(!chatMessages[activeChatRoom]) chatMessages[activeChatRoom] = (MOCK_MESSAGES[activeChatRoom]||[]).slice();
-  chatMessages[activeChatRoom].push(msg);
-  renderChatMessages(activeChatRoom);
+  var now = new Date();
+  var opt = {id:'opt-' + Date.now(), usuario_id:u.id, nombre:myName(), texto:text, fijado:false, creado_en:now.toISOString()};
+  var cur = chatMsgsCache[chatSalaActiva] || [];
+  cur.push(opt);
+  chatMsgsCache[chatSalaActiva] = cur;
+  renderChatMessages(chatSalaActiva, cur);
+  postComAPI({tipo:'chat_msg', usuario_id:u.id, sala_id:chatSalaActiva, texto:text})
+    .then(function(res){
+      if(res && res.ok) {
+        var arr = chatMsgsCache[chatSalaActiva] || [];
+        arr = arr.filter(function(m){ return !(m.id && String(m.id).indexOf('opt-') === 0); });
+        if(res.id) {
+          arr.push({id:res.id, usuario_id:u.id, nombre:myName(), texto:text, fijado:false, creado_en:res.creado_en || now.toISOString()});
+        }
+        chatMsgsCache[chatSalaActiva] = arr;
+        renderChatMessages(chatSalaActiva, arr);
+        toastGaming(res);
+      } else if(res && res.error) {
+        showXPToastComm('⚠️ ' + res.error);
+        var arr2 = chatMsgsCache[chatSalaActiva] || [];
+        arr2 = arr2.filter(function(m){ return !(m.id && String(m.id).indexOf('opt-') === 0); });
+        chatMsgsCache[chatSalaActiva] = arr2;
+        renderChatMessages(chatSalaActiva, arr2);
+      }
+    })
+    .catch(function(){ showXPToastComm('⚠️ No se pudo enviar el mensaje'); });
 }
 
-/* ---- PLANES (demo local, sin backend; no otorga XP) ---- */
-var PLANES_DATA = [
-  {dest:'Trek Ciudad Perdida',dates:'15–18 Mar 2026',spots:3,members:[{i:'CM',bg:'#1a3a5c',c:'#7eb8f0'},{i:'SK',bg:'#0a2a1a',c:'#7ef0b8'}],desc:'4 días de trek. Cupos disponibles.'},
-  {dest:'Atardecer en Cartagena',dates:'22–24 Mar 2026',spots:4,members:[{i:'MR',bg:'#0a1a3a',c:'#7ea8f0'}],desc:'City tour y playas. Perfecto para parejas o amigos.'},
-  {dest:'Ruta del Café — Eje Cafetero',dates:'5–7 Abr 2026',spots:2,members:[{i:'AV',bg:'#3a1a0a',c:'#f0a87e'},{i:'JW',bg:'#1a051a',c:'#f07ef0'},{i:'CM',bg:'#1a3a5c',c:'#7eb8f0'}],desc:'Salento, Cocora y fincas cafeteras.'},
-  {dest:'Semana Santa en Popayán',dates:'1–5 Abr 2026',spots:5,members:[{i:'SK',bg:'#0a2a1a',c:'#7ef0b8'}],desc:'Procesiones y ciudad colonial. Patrimonio UNESCO.'},
-];
-var joinedPlans = [];
+/* ---- PLANES (reales, api/interacciones.js) ---- */
 function renderPlanes() {
   var grid = document.getElementById('planes-grid');
+  var head = document.getElementById('planes-head');
+  var guest = document.getElementById('planes-guest');
   if(!grid) return;
-  grid.innerHTML = PLANES_DATA.map(function(p,i){
-    var joined = joinedPlans.indexOf(i) !== -1;
-    return '<div class="plan-card"><div class="plan-dest">'+p.dest+'</div>'
-      +'<div class="plan-dates">📅 '+p.dates+' · '+p.spots+' cupos</div>'
-      +'<div class="plan-members">'+p.members.map(function(m){ return '<div class="plan-av" style="background:'+m.bg+';color:'+m.c+'">'+m.i+'</div>'; }).join('')+'</div>'
-      +'<div class="plan-meta">'+p.desc+'</div>'
-      +'<button class="plan-join-btn'+(joined?' joined':'')+'" onclick="joinPlanComm('+i+',this)">'
-      +(joined?'✓ Unido al plan':'+ Unirme al plan')+'</button></div>';
-  }).join('');
+  var u = sesion();
+  if(!u) {
+    if(guest) guest.style.display = 'block';
+    if(head) head.style.display = 'none';
+    grid.innerHTML = '';
+    return;
+  }
+  if(guest) guest.style.display = 'none';
+  if(head) head.style.display = 'flex';
+  var canCreate = capC('chat');
+  var btn = document.getElementById('plan-create-btn');
+  if(btn) btn.style.display = canCreate ? '' : 'none';
+  grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">Cargando planes…</div>';
+  fetch('/api/interacciones?tipo=planes&usuario_id=' + encodeURIComponent(u.id || ''))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var planes = (res && res.data) || [];
+      if(!planes.length) {
+        grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:30px 0;text-align:center">Aun no hay planes. ¡Crea el primero!</div>';
+        return;
+      }
+      grid.innerHTML = '';
+      planes.forEach(function(p){
+        var cuposLibres = (parseInt(p.cupos,10)||0) - (parseInt(p.miembros_actuales,10)||0);
+        var card = document.createElement('div');
+        card.className = 'plan-card';
+        card.innerHTML = '<div class="plan-dest">' + esc(p.destino) + '</div>'
+          + '<div class="plan-dates">📅 ' + (p.fechas ? esc(p.fechas) : 'Por definir') + ' · ' + cuposLibres + ' cupos libres</div>'
+          + '<div class="plan-meta">' + (p.descripcion ? esc(p.descripcion) : '') + '</div>'
+          + '<div class="plan-meta" style="margin-top:6px">👤 Creado por ' + (p.creador_nombre ? esc(p.creador_nombre) : 'Viajero') + ' · ' + (parseInt(p.miembros_actuales,10)||0) + ' viajeros</div>';
+        if(p.unido) {
+          var leaveBtn = document.createElement('button');
+          leaveBtn.className = 'plan-join-btn joined';
+          leaveBtn.textContent = '✓ Estás en este plan · Salir';
+          leaveBtn.onclick = function(){ planSalir(p.id); };
+          card.appendChild(leaveBtn);
+        } else {
+          var joinBtn = document.createElement('button');
+          joinBtn.className = 'plan-join-btn';
+          if(cuposLibres > 0) {
+            joinBtn.textContent = '+ Unirme al plan';
+            joinBtn.onclick = function(){ planUnirse(p.id, joinBtn); };
+          } else {
+            joinBtn.textContent = 'Plan lleno';
+            joinBtn.style.opacity = '.5';
+            joinBtn.style.cursor = 'default';
+          }
+          card.appendChild(joinBtn);
+        }
+        grid.appendChild(card);
+      });
+    })
+    .catch(function(){
+      grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:30px 0;text-align:center">No se pudieron cargar los planes</div>';
+    });
 }
-function joinPlanComm(idx, btn) {
-  if(joinedPlans.indexOf(idx) !== -1) return;
-  joinedPlans.push(idx);
-  btn.textContent='✓ Unido al plan';
-  btn.classList.add('joined');
+
+function togglePlanForm(show) {
+  var f = document.getElementById('plan-form');
+  if(f) f.style.display = show ? 'block' : 'none';
 }
-function createPlan() {
-  var dest = prompt('¿A dónde quieres ir?');
-  if(!dest) return;
-  var dates = prompt('¿Cuándo? (ej: 15–18 Mar 2026)');
-  PLANES_DATA.unshift({dest:dest,dates:dates||'Por definir',spots:5,members:[{i:myInitials(),bg:'#E8A020',c:'#000'}],desc:'Plan creado por '+myName()});
-  renderPlanes();
+function createPlan() { togglePlanForm(true); }
+
+function submitPlanForm() {
+  var u = sesion();
+  if(!u) return;
+  var dest = document.getElementById('plan-f-dest');
+  var fechas = document.getElementById('plan-f-fechas');
+  var cupos = document.getElementById('plan-f-cupos');
+  var desc = document.getElementById('plan-f-desc');
+  if(!dest || !dest.value.trim()) { showXPToastComm('⚠️ Escribe el destino'); return; }
+  postComAPI({
+    tipo:'plan_crear', usuario_id:u.id,
+    destino: dest.value.trim(),
+    fechas: fechas ? fechas.value.trim() : '',
+    cupos: cupos ? (parseInt(cupos.value,10) || 4) : 4,
+    descripcion: desc ? desc.value.trim() : ''
+  })
+    .then(function(res){
+      if(res && res.ok) {
+        togglePlanForm(false);
+        if(dest) dest.value = '';
+        if(fechas) fechas.value = '';
+        if(desc) desc.value = '';
+        renderPlanes();
+        toastGaming(res);
+      } else if(res && res.error) {
+        showXPToastComm('⚠️ ' + res.error);
+      }
+    })
+    .catch(function(){ showXPToastComm('⚠️ No se pudo crear el plan'); });
+}
+
+function planUnirse(planId, btn) {
+  var u = sesion();
+  if(!u) return;
+  btn.disabled = true;
+  postComAPI({tipo:'plan_unirse', usuario_id:u.id, plan_id:planId})
+    .then(function(res){
+      if(res && res.ok) { renderPlanes(); toastGaming(res); }
+      else if(res && res.error) { showXPToastComm('⚠️ ' + res.error); renderPlanes(); }
+      else btn.disabled = false;
+    })
+    .catch(function(){ btn.disabled = false; showXPToastComm('⚠️ No se pudo unir'); });
+}
+
+function planSalir(planId) {
+  var u = sesion();
+  if(!u) return;
+  postComAPI({tipo:'plan_salir', usuario_id:u.id, plan_id:planId})
+    .then(function(res){ if(res && res.ok) renderPlanes(); })
+    .catch(function(){});
 }
 
 /* ---- RANKING (leaderboard real con podio + fallback demo) ---- */
@@ -619,7 +851,10 @@ function showCommTab(tab) {
   if(panel) {
     panel.classList.add('on');
     if(tab === 'ranking') cargarLeaderboard();
+    if(tab === 'chat') renderChatRooms();
+    if(tab === 'planes') renderPlanes();
   }
+  if(tab !== 'chat') stopChatPoll();
 }
 
 /* ---- TOAST ---- */

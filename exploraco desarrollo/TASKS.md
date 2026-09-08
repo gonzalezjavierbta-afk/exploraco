@@ -1976,6 +1976,52 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   ht-afromango-fest-kouj.html y ht-salsa-flow-nt65.html = 200 con foto.
   node --check OK y ASCII 0 en extraer-hostalterraza.js.
 
+### TSK-089: Comunidad social real - chat y planes con gaming completo
+- **Estado:** COMPLETADA (implementado y verificado localmente 2026-09-08;
+  pendiente migracion 008 en Neon + deploy)
+- **Detalle:** Rediseno del apartado social de comunidad.html (tabs Chat y
+  Planes) conectado al backend real de Neon, con gaming completo (XP,
+  misiones, logros). Respuestas de calibracion de Javier: (1) XP de chat
+  +2 por mensaje con tope diario de 20 XP (anti-farming en
+  `usuarios.progreso_social`); (2) crear plan gateado por el chat
+  desbloqueado (nivel 3 / 250 XP), unirse es libre para registrados;
+  (3) sin sesion = chat y planes bloqueados con CTA de login (se elimina
+  el demo local de ambos tabs; Ranking conserva su fallback).
+  Cambios:
+  1. `db/migrations/008_comunidad_social.sql` (nuevo): `chat_salas`
+     (con seed idempotente de 6 salas del sistema, emojis `E'\U...'`),
+     `chat_mensajes` (moderacion por fijado/activo soft-delete),
+     `planes_viaje` + `planes_miembros` (PK compuesta), `usuarios +
+     progreso_social jsonb`. Idempotente (ADR-008), ASCII 0.
+  2. `api/interacciones.js`: helpers `misionCompletada`/`chatXpDisponible`/
+     `registrarChatXp`; GET `chat_salas`, `chat_mensajes`, `planes`,
+     `planes_mios`; POST `chat_sala` (gate crear_chat), `chat_msg` (gate
+     chat, +2 XP tope 20/dia), `chat_mod` (gate moderador_chat: fijar/
+     eliminar), `plan_crear` (gate chat, valida destino/cupos 1-50),
+     `plan_unirse` (dedup 409, 403 plan propio, 409 lleno), `plan_salir`;
+     MISIONES +3 (mis_chat_activo +20, mis_plan_creador +25,
+     mis_plan_unido +15); LOGROS +3 (logr_social_chat +30,
+     logr_social_plan +35, logr_anfitrion +50) -> LOGROS 22. Sin endpoint
+     nuevo (presupuesto 8/8, ADR-010).
+  3. `comunidad.html`: tabs Chat/Planes consumen la API (polling 5s,
+     sin websockets en Hobby), envio optimista + XP toast, moderacion
+     condicional, formulario de plan (no `prompt`), fix XSS (`esc()` en
+     todo texto de usuario). Div balance 86/86.
+  4. `scripts/test_logros_catalogo.js` (19 -> 22) y
+     `scripts/smoke_test_comunidad.js` (nuevo, 30 checks).
+- **Evidencia:** `node --check api/interacciones.js` OK; ASCII 0 bytes
+  >127 y 0 backticks; `test_logros_catalogo.js` 12/12 PASS (LOGROS 22);
+  `smoke_test_comunidad.js` 30/30 PASS (catalogo, 4 GET, 6 POST
+  registrados, gates 403, anti-farming); divs comunidad 86/86.
+  Espec: `docs/superpowers/specs/2026-09-08-comunidad-chat-planes-
+  backend-design.md`; ADR-015 en DECISIONS.md. Pendiente BLOQUEANTE:
+  aplicar la migracion 008 en Neon antes del deploy.
+  APLICACION DE LA MIGRACION: exclusivamente en el **editor SQL de Neon**.
+  Los runners locales que exigen result set por sentencia fallan con las
+  sentencias DDL (`result.rows` undefined -> error "Cannot read properties
+  of undefined (reading 'map')"). Es idempotente; re-ejecutar el archivo
+  completo es seguro tras un fallo parcial.
+
 ---
 
 ## Regla de actualizacion
