@@ -550,9 +550,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .ag-ev-right{padding:12px 14px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:8px;flex-shrink:0}
 .ag-ev-price{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;color:var(--text)}
 .ag-ev-price.free{color:#166534;background:#F0FDF4;padding:3px 10px;border-radius:3px;font-size:12px}
-.ag-ev-action{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap}
-.ag-ev-action.outline{background:var(--white);color:var(--text);border:1.5px solid var(--border);font-family:'Barlow Condensed',sans-serif}
-.ag-ev-action.outline:hover{border-color:var(--gold);color:var(--gold)}
+.ag-ev-cta{display:inline-block;background:var(--gold);color:#fff;border-radius:3px;padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;transition:transform .15s}
+.ag-ev-cta.outline{background:var(--white);color:var(--text);border:1.5px solid var(--border)}
+.ag-ev:hover .ag-ev-cta{transform:translateX(3px)}
 @media(max-width:600px){.ag-ev-right{display:none}}
 
 /* ══ INSPÍRATE ══ */
@@ -2853,7 +2853,7 @@ function renderAgenda(cat, fDate) {
       +'</div>'
       +'<div class="ag-ev-right">'
       +'<div class="ag-ev-price'+(e.price==='Gratis'?' free':'')+'">'+e.price+'</div>'
-      +'<button class="ag-ev-action'+(e.featured?'':' outline')+'" onclick="event.stopPropagation()">'+(e.featured?'Ver evento':'Ver →')+'</button>'
+      +'<span class="ag-ev-cta'+(e.featured?'':' outline')+'">'+(e.featured?'Ver evento →':'Ver →')+'</span>'
       +'</div>'
       +'</a>';
   });

@@ -77,9 +77,9 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 .ev-details{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .ev-detail{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px}
 .ev-featured-badge{display:inline-block;background:var(--gold-l);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.ev-link-btn{display:block;margin:0 14px 12px;background:var(--black);color:#fff;text-align:center;padding:8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s}
-.ev-link-btn:hover{background:#333}
-.ev-link-btn.external{background:var(--bg);color:var(--muted);border:1px solid var(--border)}
+.ev-cta{display:inline-block;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;margin:0 14px 12px;transition:transform .15s}
+.ev-card:hover .ev-cta{transform:translateX(3px)}
+.ev-cta.external{color:var(--muted);font-size:9px;font-weight:700}
 
 /* EMPTY STATE */
 .no-events{text-align:center;padding:60px 20px;color:var(--muted)}
@@ -402,10 +402,10 @@ function evCard(e) {
   else if(e.featured) html += '<div class="ev-featured-badge">⭐ Destacado</div>';
   html += '</div>';
   if(hasPage) {
-    html += '<a href="'+e.url+'" class="ev-link-btn">Ver detalles →</a>';
+    html += '<span class="ev-cta">Ver detalles →</span>';
     html += '</a>';
   } else {
-    html += '<div class="ev-link-btn external">Próximamente</div>';
+    html += '<span class="ev-cta external">Próximamente</span>';
     html += '</div>';
   }
   return html;

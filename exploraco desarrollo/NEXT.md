@@ -4,6 +4,24 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion agenda-tarjetas-sin-doble-enlace - tarjetas de evento limpias (2026-09-07) - TSK-084
+
+Correccion del diseno de las tarjetas de la agenda: cada tarjeta era un
+`<a>` al evento que ademas envolvia OTRO enlace ("Ver detalles →" en
+`agenda.html` y un boton "Ver evento" en `index.html`), HTML anidado invalido
+que el navegador renderizaba como DOS bloques clicables hacia el mismo evento.
+
+**Cambios:**
+- `agenda.html`: `evCard()` deja la tarjeta como unico `<a class="ev-card">`;
+  el CTA pasa a `<span class="ev-cta">Ver detalles →</span>` no interactivo
+  (dorado, translateX al hover); "Próximamente" como `.ev-cta.external`.
+  CSS: se retiro el bloque `.ev-link-btn`.
+- `index.html`: `renderAgenda()` sustituye el `<button class="ag-ev-action">`
+  por `<span class="ag-ev-cta">` (gold/outline) sin interactividad duplicada
+  ni stopPropagation; hover de tarjeta desplaza la flecha.
+
+**Verificado:** parse de scripts inline OK; smoke_test_agenda.js 30/30 PASS.
+
 ### Sesion agenda-cultural-multidia - agenda con eventos multidia, vista por dia y categorias (2026-09-07) - TSK-083
 
 Rework completo de la Agenda Cultural (seccion de `index.html` + `agenda.html`

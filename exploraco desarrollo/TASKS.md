@@ -1831,6 +1831,26 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   scripts inline de index.html y agenda.html OK; ASCII 0 bytes >127 en
   agenda-shared.js.
 
+### TSK-084: Agenda cultural - tarjetas de evento sin doble enlace
+- **Estado:** COMPLETADA
+- **Detalle:** En `agenda.html` cada tarjeta de evento era un `<a>` al evento
+  que ademas contenía OTRO `<a class="ev-link-btn">Ver detalles →</a>` con la
+  misma URL (HTML anidado inválido: el navegador cierra el enlace externo y se
+  renderizaban DOS bloques clicables -> "una tarjeta y otra que dice ver
+  detalles", ambas al mismo evento). En `index.html` ocurría lo mismo con un
+  `<button class="ag-ev-action">` dentro del `<a>`. Cambios:
+  - `agenda.html` `evCard()`: se elimina el `<a>` interno; la tarjeta queda
+    como un único `<a class="ev-card">`. El CTA pasa a `<span class="ev-cta">`
+    no interactivo (affordance dorado + micro-interacción
+    `.ev-card:hover .ev-cta` translateX). "Próximamente" queda como
+    `<span class="ev-cta external">` informativo.
+  - `index.html` `renderAgenda()`: el `<button>` pasa a `<span class="ag-ev-cta">`
+    (variantes gold/outline, sin cursor:pointer, sin stopPropagation);
+    hover de la tarjeta desplaza la flecha.
+- **Evidencia:** parse de scripts inline de index.html y agenda.html OK (vm);
+  sin referencias residuales a `.ev-link-btn`/`.ag-ev-action`; smoke
+  `scripts/smoke_test_agenda.js` 30/30 PASS (lógica no cambia).
+
 ---
 
 ## Regla de actualizacion
