@@ -376,129 +376,127 @@
     }
   },
   {
-    "slug": "muestra-cine-independiente-jorge-eliecer-gaitan-2026",
-    "nombre": "Muestra de Cine Independiente Latinoamericano",
-    "lead": "El emblemático Teatro Jorge Eliécer Gaitán acoge producciones destacadas del cine de autor y cortometrajes regionales.",
-    "descripcion": "La Muestra de Cine Independiente Latinoamericano rinde homenaje a las nuevas narrativas audiovisuales de la región. Durante cuatro días se proyectarán largometrajes, documentales socioambientales y selecciones de cortometrajes galardonados en festivales internacionales.\n\nAdemás de las funciones, los asistentes podrán participar en conversatorios con directores, productores y actores colombianos, fomentando el diálogo cultural y la reflexión sobre el patrimonio audiovisual.\n\nUn espacio ideal para cinéfilos que buscan propuestas alejadas del circuito comercial tradicional.",
+    "slug": "cicla-cita-cine-latinoamericano-2026",
+    "nombre": "CICLA - Cita con el Cine Latinoamericano",
+    "lead": "La Cinemateca de Bogotá acoge la 14.ª edición de CICLA: 16 largometrajes recientes de América Latina para descubrir la memoria, los territorios y las comunidades.",
+    "descripcion": "CICLA - Cita con el Cine Latinoamericano llega a su 14.ª edición en la Cinemateca de Bogotá, del 3 al 13 de septiembre de 2026, con 16 largometrajes recientes de la región. La muestra es organizada por la Cinemateca de Bogotá del Instituto Distrital de las Artes (Idartes) y la Asociación de Agregados Culturales de América Latina y el Caribe.\n\nLa selección de este año se divide en dos secciones. \"El pasado, hoy\" reúne películas que exploran cómo los procesos históricos inciden en las vidas y en los relatos íntimos de sus protagonistas. \"Comunidades en tensión\" retrata a grupos unidos por la familia, el territorio o la creación, y cómo enfrentan las transformaciones sociales y políticas.\n\nLa apertura será el 3 de septiembre a las 7:00 p. m. en la Sala Capital con \"Cobre\", del director mexicano Nicolás Pereda, con entrada libre reclamando boleta en taquilla hasta completar aforo. La función especial de \"Apocalipsur\" (2007), de Javier Mejía, se proyectará en versión restaurada por la Fundación Patrimonio Fílmico Colombiano y contará con conversatorio con el director.\n\nLa programación completa, día a día, se publica en la página web oficial de la Cinemateca de Bogotá y en sus redes sociales. La cita es en la Carrera 3 # 19-10, en el centro histórico de Bogotá.",
     "ciudad": "Bogotá",
     "region": "Cundinamarca",
-    "barrio": "Santa Fe / Centro",
-    "lat": 4.6155,
-    "lng": -74.0683,
-    "web": "https://www.idartes.gov.co",
-    "instagram": "@idartes",
-    "precio_desde": "Desde $15.000",
-    "horario": "3:00 p.m. - 9:00 p.m.",
+    "barrio": "Las Nieves",
+    "lat": 4.6041,
+    "lng": -74.07,
+    "web": "https://www.cinematecadebogota.gov.co",
+    "instagram": "@cinematecabta",
+    "precio_desde": "Gratis (apertura)",
+    "horario": "Apertura 3 sep 7:00 p.m. · funciones en varios horarios",
     "emoji": "🎬",
-    "hero_bg": null,
-    "foto_hero": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Frisos_Teatro_Jorge_Eli%C3%A9cer_Gait%C3%A1n.JPG/960px-Frisos_Teatro_Jorge_Eli%C3%A9cer_Gait%C3%A1n.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "hero_bg": "linear-gradient(135deg,#0f0c1b,#3b2a5a)",
+    "foto_hero": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/2019_Bogot%C3%A1_-_Edificio_de_la_Cinemateca_en_la_Carrera_Tercera.jpg/960px-2019_Bogot%C3%A1_-_Edificio_de_la_Cinemateca_en_la_Carrera_Tercera.jpg",
     "fotos_galeria": [
       {
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/Bogot%C3%A1_TJEG.JPG/960px-Bogot%C3%A1_TJEG.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
-        "caption": "Muestra de Cine Independiente Latinoamericano",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/2019_Bogot%C3%A1_-_Edificio_de_la_Cinemateca_en_la_Carrera_Tercera.jpg/960px-2019_Bogot%C3%A1_-_Edificio_de_la_Cinemateca_en_la_Carrera_Tercera.jpg",
+        "caption": "CICLA - Cita con el Cine Latinoamericano",
         "orden": 0
       },
       {
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Interior_del_Teatro_Jorge_Eli%C3%A9cer_Gait%C3%A1n.jpg/960px-Interior_del_Teatro_Jorge_Eli%C3%A9cer_Gait%C3%A1n.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
-        "caption": "Muestra de Cine Independiente Latinoamericano",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Cinemateca_Distrital_de_Bogot%C3%A1.jpg/960px-Cinemateca_Distrital_de_Bogot%C3%A1.jpg",
+        "caption": "CICLA - Cita con el Cine Latinoamericano",
         "orden": 1
       },
       {
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/88/Bogot%C3%A1_Jorge_Eli%C3%A9cer_Gait%C3%A1n_y_torre_Colpatria.JPG/960px-Bogot%C3%A1_Jorge_Eli%C3%A9cer_Gait%C3%A1n_y_torre_Colpatria.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
-        "caption": "Muestra de Cine Independiente Latinoamericano",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/BECMA_-_Cinemateca_de_Bogot%C3%A1_%282022%29_16.jpg/960px-BECMA_-_Cinemateca_de_Bogot%C3%A1_%282022%29_16.jpg",
+        "caption": "CICLA - Cita con el Cine Latinoamericano",
         "orden": 2
       },
       {
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/NEGRITUDES_TEATRO_JORGE_ELIECER_GAITAN_2015.jpg/960px-NEGRITUDES_TEATRO_JORGE_ELIECER_GAITAN_2015.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
-        "caption": "Muestra de Cine Independiente Latinoamericano",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/BECMA_-_Cinemateca_de_Bogot%C3%A1_%282022%29_03.jpg/960px-BECMA_-_Cinemateca_de_Bogot%C3%A1_%282022%29_03.jpg",
+        "caption": "CICLA - Cita con el Cine Latinoamericano",
         "orden": 3
       }
     ],
     "faqs": [
       {
         "pregunta": "¿Dónde se adquieren las entradas?",
-        "respuesta": "En la taquilla del Teatro Jorge Eliécer Gaitán o a través de la plataforma TuBoleta."
+        "respuesta": "La función de apertura (3 de septiembre, 7:00 p. m.) es gratuita: reclama tu boleta en la taquilla de la Cinemateca hasta completar aforo. La boletería del resto de funciones también se gestiona en la taquilla."
       },
       {
-        "pregunta": "¿Las películas son aptas para niños?",
-        "respuesta": "Cada proyección cuenta con clasificación específica. La franja de la tarde incluye cortometrajes para todo público."
+        "pregunta": "¿Dónde se desarrolla CICLA?",
+        "respuesta": "En la Cinemateca de Bogotá, Carrera 3 # 19-10, en el centro histórico de Bogotá."
+      },
+      {
+        "pregunta": "¿Dónde consulto la programación completa día a día?",
+        "respuesta": "En la web oficial cinematecadebogota.gov.co y en Instagram @cinematecabta."
       },
       {
         "pregunta": "¿Hay estaciones de TransMilenio cercanas?",
-        "respuesta": "Sí, las estaciones San Diego y Calle 22 quedan a pocos metros del teatro."
+        "respuesta": "Sí: las estaciones Las Aguas y Universidades quedan a pocos pasos; se camina por la Carrera 3."
       }
     ],
     "destacado": false,
     "tags": {
-      "fecha_inicio": "2026-09-10",
+      "fecha_inicio": "2026-09-03",
       "fecha_fin": "2026-09-13",
-      "edicion": "Edición 12",
-      "sede": "Teatro Jorge Eliécer Gaitán, Carrera 7 # 22-47",
-      "organiza": "Cinemateca de Bogotá & Idartes",
-      "lema": "Miradas que transforman realidades",
+      "edicion": "Edición 14",
+      "sede": "Cinemateca de Bogotá, Carrera 3 # 19-10",
+      "organiza": "Cinemateca de Bogotá (Idartes) & Asociación de Agregados Culturales de América Latina y el Caribe",
+      "lema": "Memoria, territorios y comunidades en el cine latinoamericano",
       "tipo_evento": "cultura",
       "lineup": [
         {
-          "nombre": "Laura Mora",
-          "rol": "Directora Invitada",
-          "genero": "Cine Ficción"
+          "nombre": "Nicolás Pereda",
+          "escenario": "Sala Capital",
+          "hora": "3 sep 7:00 p.m."
         },
         {
-          "nombre": "Ciro Guerra",
-          "rol": "Ponente",
-          "genero": "Cine de Autor"
-        },
-        {
-          "nombre": "Colectivo Audiovisual Comunitario",
-          "rol": "Expositores Documental",
-          "genero": "Documental"
+          "nombre": "Javier Mejía",
+          "escenario": "Función especial con conversatorio",
+          "hora": "Apocalipsur (2007)"
         }
       ],
       "agenda": [
         {
-          "dia": "2026-09-10",
-          "hora": "3:00 p.m.",
-          "actividad": "Inauguración y proyección documental de apertura"
-        },
-        {
-          "dia": "2026-09-11",
-          "hora": "5:00 p.m.",
-          "actividad": "Franja Selección Oficial Cortometrajes"
-        },
-        {
-          "dia": "2026-09-12",
-          "hora": "6:30 p.m.",
-          "actividad": "Conversatorio con realizadores locales"
-        },
-        {
-          "dia": "2026-09-13",
+          "dia": "2026-09-03",
           "hora": "7:00 p.m.",
-          "actividad": "Función de clausura y premiación"
+          "actividad": "Inauguración: 'Cobre' de Nicolás Pereda en la Sala Capital (entrada libre con boleta en taquilla)"
+        },
+        {
+          "dia": "2026-09-04",
+          "hora": "7:00 p.m.",
+          "actividad": "Función especial: 'Apocalipsur' (2007) de Javier Mejía, versión restaurada, con conversatorio con el director"
+        },
+        {
+          "dia": "03 - 13 de septiembre",
+          "hora": "Programación diaria",
+          "actividad": "16 largometrajes en las secciones \"El pasado, hoy\" y \"Comunidades en tensión\""
         }
       ],
       "categorias_entrada": [
         {
-          "tipo": "General",
-          "precio": "$15.000",
+          "tipo": "Apertura (3 sep)",
+          "precio": "Gratis",
           "disponibilidad": "Disponible"
         },
         {
-          "tipo": "Estudiantes",
-          "precio": "$10.000",
+          "tipo": "Funciones generales",
+          "precio": "Boletería en taquilla",
           "disponibilidad": "Disponible"
         }
       ],
       "que_llevar": [
         "Documento de identidad",
-        "Ganas de aprender sobre cine",
-        "Efectivo o medio de pago digital"
+        "Boleta (impresa o digital)",
+        "Ganas de descubrir el cine latinoamericano"
       ],
       "prohibido": [
         "Grabación de las proyecciones",
-        "Ingreso de alimentos ruidosos",
+        "Uso de flash en sala",
+        "Alimentos ruidosos en el auditorio",
         "Mascotas"
       ]
-    }
+    },
+    "whatsapp": "",
+    "telefono": "+576013795750",
+    "email": "atencion.ciudadano@idartes.gov.co"
   },
   {
     "slug": "encuentro-literatura-poesia-virgilio-barco-2026",
