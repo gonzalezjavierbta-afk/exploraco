@@ -1,1 +1,80 @@
-[]
+[
+  {
+    "slug": "ejemplo-concierto-una-noche",
+    "nombre": "EJEMPLO - Concierto una noche (Bogota)",
+    "lead": "Ejemplo de evento de un solo dia para la plantilla de ingesta de la agenda.",
+    "descripcion": "Evento de ejemplo: muestra el schema minimo para subir un evento de un dia a la agenda cultural. Borra este archivo o reemplaza los eventos reales.",
+    "ciudad": "Bogota",
+    "region": "Cundinamarca",
+    "lat": 4.6389,
+    "lng": -74.0831,
+    "web": "https://tuboleta.com",
+    "instagram": "@ejemplo",
+    "precio_desde": "Desde $80.000",
+    "horario": "9:00 p.m.",
+    "emoji": "🎸",
+    "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)",
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [],
+    "tags": {
+      "fecha_inicio": "2026-10-15",
+      "fecha_fin": "2026-10-15",
+      "edicion": "Edicion ejemplo",
+      "sede": "Movistar Arena, Bogota",
+      "organiza": "Promotora Ejemplo",
+      "lema": "Una noche",
+      "lineup": [
+        { "nombre": "Artista Ejemplo", "rol": "Headliner", "genero": "Rock" }
+      ],
+      "agenda": [
+        { "dia": "15 octubre", "hora": "9:00 p.m.", "actividad": "Concierto" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "$80.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Cedula de ciudadania", "Boleta digital"],
+      "prohibido": ["Comida externa"]
+    }
+  },
+  {
+    "slug": "ejemplo-festival-multidia",
+    "nombre": "EJEMPLO - Festival multidia (cruza mes)",
+    "lead": "Ejemplo de evento de varios dias que cruza de mes: aparece en todos los dias vigentes.",
+    "descripcion": "Evento de ejemplo multidia: tags.fecha_inicio / tags.fecha_fin definen el rango. La agenda lo muestra en cada dia y en cada mes cubierto (Oct y Nov en este caso).",
+    "ciudad": "Bogota",
+    "region": "Cundinamarca",
+    "lat": 4.653,
+    "lng": -74.0667,
+    "web": "https://www.bogota.gov.co",
+    "instagram": "@ejemplofest",
+    "precio_desde": "Gratis",
+    "horario": "10:00 a.m. - 9:00 p.m.",
+    "emoji": "🎶",
+    "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)",
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [],
+    "tags": {
+      "fecha_inicio": "2026-10-28",
+      "fecha_fin": "2026-11-02",
+      "edicion": "Primera edicion",
+      "sede": "Parque El Country, Bogota",
+      "organiza": "Idartes",
+      "lema": "Musica en todos los rincones",
+      "lineup": [
+        { "nombre": "Banda A", "rol": "Headliner (28 oct)", "genero": "Rock" },
+        { "nombre": "Banda B", "rol": "Headliner (02 nov)", "genero": "Fusion" }
+      ],
+      "agenda": [
+        { "dia": "28-30 octubre", "hora": "Variable", "actividad": "Conciertos de apertura" },
+        { "dia": "31 oct - 2 nov", "hora": "Variable", "actividad": "Cierre y clausura" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "Gratis", "disponibilidad": "Abierto al publico" }
+      ],
+      "que_llevar": ["Cedula de ciudadania", "Ropa comoda"],
+      "prohibido": ["Armas de fuego"]
+    }
+  }
+]
