@@ -1,7 +1,7 @@
 ---
 description: Agente especializado en frontend y est\u00e9tica visual de ExploraCO (CSS/HTML/React). \u00dasalo para toda tarea de UI/UX: paletas de color, tipograf\u00edas, layouts responsive, micro-interacciones y consistencia visual en index.html, admin.html, directorios y p\u00e1ginas p\u00fablicas.
 mode: subagent
-model: minimax/m3
+model: opencode-go/minimax-m3
 permission:
   edit: allow
   bash: allow

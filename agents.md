@@ -3,33 +3,43 @@
 Este repositorio utiliza el Desarrollo Dirigido por Subagentes (SDD). Queda prohibida la modificación desordenada de archivos sin un plan de especificación técnica aprobado en la Fase 1.
 
 ## 1. Matriz de Enrutamiento de Agentes (Ruteo por Costo)
-Antes de procesar cualquier código, los agentes principales (build/plan) deben delegar las tareas a los subagentes especializados configurados en la carpeta `.opencode/agent/` según el lenguaje o dominio de la tarea. La tabla es la fuente de verdad (ADR-006); los modelos economicos evitan que todo el consumo caiga sobre el modelo principal `deepseek/deepseek-v4-pro`.
+Antes de procesar cualquier código, los agentes principales (plan/build) deben delegar las tareas a los subagentes especializados configurados en la carpeta `.opencode/agent/` según el lenguaje o dominio de la tarea. La tabla es la fuente de verdad (ADR-006); los modelos economicos evitan que todo el consumo caiga sobre el modelo principal `opencode-go/deepseek-v4-pro`.
 
-### 1.1 Agentes economicos (delegar PRIORITARIAMENTE tareas repetitivas/bajo riesgo)
-
-| Agente | Modelo | Uso |
-|---|---|---|
-| `docs-keeper` | `deepseek/deepseek-v4-flash` | Documentacion: TASKS.md, NEXT.md, DECISIONS.md, ADRs, handoffs |
-| `content-loader` | `deepseek/deepseek-v4-flash` | Creacion repetitiva de paginas dinamicas (seed+loader+smoke) |
-| `research-agent` | `deepseek/deepseek-v4-flash` | Investigacion web de destinos y fichas verificadas |
-| `explore` | `deepseek/deepseek-v4-flash` | Exploracion masiva de codigo (buscquedas, regex, listados) |
-| `exp-pickle` | `opencode/big-pickle` (gratis) | Validaciones de bajo riesgo, linter, smoke tests simples |
-| `qa-auditor` | `opencode/big-pickle` (gratis) | Escudo GOLD y auditoria (solo reporta, no corrige) |
-| `js-silo-dev` | `deepseek/deepseek-v4-flash-free` | Desarrollo JS/TS rutinario y refactor menor |
-| `frontend-tpl` | `minimax/m3` o `qwen/qwen3.7-plus` | Frontend y estetica visual (CSS/React/HTML) |
-
-### 1.2 Agentes criticos (NO bajar de categoria; SQL/RLS/persistencia prohibido delegar a gratuitos)
+### 1.1 Agentes gratis (0 costo — delegar tareas mecanicas y de bajo riesgo)
 
 | Agente | Modelo | Uso |
 |---|---|---|
-| `sql-security` | `deepseek/deepseek-v4-pro` | Seguridad critica, RLS, persistencia SQL, migraciones de esquema |
-| `architect-review` | `kimi/kimi-k3` | Revision de arquitectura y aprobacion de ADRs (segunda opinion) |
-| `backend-dev` | `deepseek/deepseek-v4-pro` (default) | Backend serverless api/*.js |
-| `admin-dev` | `deepseek/deepseek-v4-pro` (default) | Panel de administracion admin.html |
-| `data-migration` | `deepseek/deepseek-v4-pro` (default) | Operaciones de BD, migraciones y seeds masivos |
-| `architect` | `deepseek/deepseek-v4-pro` (default) | Diseno de esquemas JSONB y decisiones de arquitectura |
+| `exp-pickle` | `opencode/big-pickle` | Validaciones de bajo riesgo, linter, smoke tests simples |
+| `qa-auditor` | `opencode/big-pickle` | Escudo GOLD y auditoria (solo reporta, no corrige) |
 
-**Regla de oro:** todo agente sin `model:` explicito en su `.md` hereda el modelo principal (`deepseek/deepseek-v4-pro`). Los agentes de la tabla 1.1 SÍ tienen `model:` asignado en `.opencode/agent/`.
+### 1.2 Agentes economicos (delegar PRIORITARIAMENTE tareas repetitivas/bajo riesgo)
+
+| Agente | Modelo | Uso |
+|---|---|---|
+| `docs-keeper` | `opencode-go/deepseek-v4-flash` | Documentacion: TASKS.md, NEXT.md, DECISIONS.md, ADRs, handoffs |
+| `content-loader` | `opencode-go/deepseek-v4-flash` | Creacion repetitiva de paginas dinamicas (seed+loader+smoke) |
+| `research-agent` | `opencode-go/deepseek-v4-flash` | Investigacion web de destinos y fichas verificadas |
+| `explore` | `opencode-go/deepseek-v4-flash` | Exploracion masiva de codigo (busquedas, regex, listados) |
+| `js-silo-dev` | `opencode-go/deepseek-v4-flash` | Desarrollo JS/TS rutinario y refactor menor |
+| `frontend-tpl` | `opencode-go/minimax-m3` | Frontend y estetica visual (CSS/React/HTML) |
+| `admin-dev` | `opencode-go/minimax-m3` | Panel de administracion admin.html |
+| `renderer-dev` | `opencode-go/minimax-m3` | Motor de renderizado pagina-destino.js |
+| `data-migration` | `opencode-go/minimax-m3` | Operaciones de BD, migraciones y seeds masivos (SQL critico escala a `sql-security`) |
+| `seo-dev` | `opencode-go/qwen3.8-flash` | Sitemap, meta tags, robots.txt, redirects, Search Console |
+| `media-reader` | `opencode-go/mimo-v2.5` | Lectura/analisis de imagen, audio, video y PDF (multimodal) |
+
+### 1.3 Agentes criticos (NO bajar de categoria; SQL/RLS/persistencia prohibido delegar a gratuitos)
+
+| Agente | Modelo | Uso |
+|---|---|---|
+| `sql-security` | `opencode-go/deepseek-v4-pro` | Seguridad critica, RLS, persistencia SQL, migraciones de esquema |
+| `backend-dev` | `opencode-go/deepseek-v4-pro` | Backend serverless api/*.js |
+| `architect` | `opencode-go/deepseek-v4-pro` | Diseno de esquemas JSONB y decisiones de arquitectura |
+| `architect-review` | `opencode-go/kimi-k3` | Revision de arquitectura y aprobacion de ADRs (segunda opinion) |
+
+**Regla de oro:** todo agente DEBE tener `model:` explicito en su `.md` (prohibido heredar el modelo principal). Los IDs usan el prefijo real del proveedor OpenCode Go (`opencode-go/*`) o los modelos gratis (`opencode/*`); cualquier ID fuera de `opencode models` se considera invalido y se corrige.
+
+**Plan = orquestador:** el agente `plan` (`.opencode/agent/plan.md`) NO ejecuta trabajo operativo. Explora mediante `@explore`, investiga via `gemini-research`/`@research-agent`, y deriva toda implementacion al subagente por dominio. Su modelo es `opencode-go/deepseek-v4-flash` para economizar.
 
 **Workflow de investigacion externa:** la investigacion web de NUEVOS items de directorio (hostal, comida, sitio, evento) se ejecuta en Google Gemini (externo, no consume cuota) mediante el skill `gemini-research` (`prompts/GEMINI_MASTER_PROMPT.md`). `research-agent` queda para fichas legacy o validaciones, y toda ingesta se valida con `scripts/validate_ficha.js` antes de pasar a `create-dynamic-page`.
 

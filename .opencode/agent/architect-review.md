@@ -1,7 +1,7 @@
 ---
 description: Agente de revisi\u00f3n de arquitectura y aprobaci\u00f3n de decisiones de ExploraCO. Revisa dise\u00f1os antes de implementar, valida ADRs, audita el impacto de cambios en el motor de renderizado/backend y aprueba planes t\u00e9cnicos. Complementa a architect para la segunda opini\u00f3n.
 mode: subagent
-model: kimi/kimi-k3
+model: opencode-go/kimi-k3
 permission:
   edit: allow
   bash: allow

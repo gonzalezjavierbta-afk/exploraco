@@ -4,6 +4,7 @@ description: >
   de esquema, limpieza de datos y seeds masivos para ExploraCO.
   Maneja Neon PostgreSQL con seguridad y trazabilidad.
 mode: subagent
+model: opencode-go/minimax-m3
 permission:
   edit: allow
   bash: allow
@@ -49,6 +50,7 @@ Lee en orden antes de operar:
 
 - **MERGE JSONB (ADR-003):** `tags = COALESCE(tags,'{}') || $N::jsonb`
 - **SQL versionado (ADR-008):** todo cambio de esquema en archivo .sql
+- **Escalado obligatorio:** migraciones de esquema con RLS, autenticaci\u00f3n o integridad de datos cr\u00edtica se escalan a `sql-security` (modelo pro). Este agente opera en modelo econ\u00f3mico; no decidir sobre seguridad cr\u00edtica.
 - **Idempotencia:** usar IF NOT EXISTS, ON CONFLICT
 - **Trazabilidad:** documentar cada operación en TASKS.md
 - **Confirmación:** nunca ejecutar sin aprobación del usuario

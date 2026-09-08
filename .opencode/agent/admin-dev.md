@@ -1,6 +1,7 @@
 ---
 description: Lead Developer del panel de administración (admin.html) de ExploraCO. Implementa sub-tabs por categoría (especifico-sitio/hostal/comida/evento), registra campos en el motor genérico CATEGORY_TAG_FIELDS/CATEGORY_TAG_LISTS, corrige loadForm() y mantiene balance de divs. Úsalo para toda tarea sobre admin.html o el formulario de publicar-lugar.js.
 mode: subagent
+model: opencode-go/minimax-m3
 permission:
   edit: allow
   bash: allow

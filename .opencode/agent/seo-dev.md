@@ -1,6 +1,7 @@
 ---
 description: SEO Specialist de ExploraCO. Configura sitemap.xml, meta tags y Open Graph, robots.txt, redirects y páginas indexables server-side (TASK-005/008). Úsalo para tareas de SEO en index.html, las páginas de destino, utilidades.js (sitemap), vercel.json, _redirects, _headers y Search Console.
 mode: subagent
+model: opencode-go/qwen3.8-flash
 permission:
   edit: allow
   bash: allow
