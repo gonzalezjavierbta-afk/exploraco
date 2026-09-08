@@ -16,7 +16,17 @@
     "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)",
     "foto_hero": "",
     "fotos_galeria": [],
-    "faqs": [],
+    "faqs": [
+      { "pregunta": "Donde queda la sede?", "respuesta": "Movistar Arena, Av. NQS con Calle 17, Bogota." },
+      { "pregunta": "Hay boleteria en taquilla?", "respuesta": "Si, ademas de la venta en linea." }
+    ],
+    "fotos_sugeridas": [
+      { "tema": "Movistar Arena Bogota exterior", "caption": "Movistar Arena, sede del evento", "nombres_archivo_wikimedia": ["File:Movistar_Arena_Bogota.jpg"], "es_hero": true },
+      { "tema": "Concierto escenario luces", "caption": "Escenario del concierto", "nombres_archivo_wikimedia": ["File:Concierto_Bogota.jpg"], "es_hero": false },
+      { "tema": "Multitud concierto Colombia", "caption": "Publico en el concierto", "nombres_archivo_wikimedia": ["File:Audiencia_concierto.jpg"], "es_hero": false },
+      { "tema": "Calle 17 Bogota NQS", "caption": "Acceso por la Av. NQS", "nombres_archivo_wikimedia": ["File:Calle_17_Bogota.jpg"], "es_hero": false },
+      { "tema": "Boleteria ticketmaster concierto", "caption": "Boleteria oficial", "nombres_archivo_wikimedia": ["File:Boleta_concierto.jpg"], "es_hero": false }
+    ],
     "tags": {
       "fecha_inicio": "2026-10-15",
       "fecha_fin": "2026-10-15",
@@ -54,7 +64,17 @@
     "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)",
     "foto_hero": "",
     "fotos_galeria": [],
-    "faqs": [],
+    "faqs": [
+      { "pregunta": "Es gratis?", "respuesta": "Si, acceso abierto al publico." },
+      { "pregunta": "Que dias se realiza?", "respuesta": "Del 28 de octubre al 2 de noviembre." }
+    ],
+    "fotos_sugeridas": [
+      { "tema": "Parque El Country Bogota", "caption": "Sede del festival en el Parque El Country", "nombres_archivo_wikimedia": ["File:Parque_El_Country_Bogota.jpg"], "es_hero": true },
+      { "tema": "Escenario festival aire libre", "caption": "Escenario principal del festival", "nombres_archivo_wikimedia": ["File:Escenario_festival_Bogota.jpg"], "es_hero": false },
+      { "tema": "Concierto al aire libre noche", "caption": "Concierto nocturno al aire libre", "nombres_archivo_wikimedia": ["File:Concierto_noche_Bogota.jpg"], "es_hero": false },
+      { "tema": "Publico festival musica", "caption": "Publico durante el festival", "nombres_archivo_wikimedia": ["File:Publico_festival.jpg"], "es_hero": false },
+      { "tema": "Zona de comidas festival", "caption": "Zona gastronomica del festival", "nombres_archivo_wikimedia": ["File:Zona_comidas_festival.jpg"], "es_hero": false }
+    ],
     "tags": {
       "fecha_inicio": "2026-10-28",
       "fecha_fin": "2026-11-02",

@@ -80,6 +80,33 @@ function validateEvents(list) {
       var v = ev.tags && ev.tags[k];
       if (v !== undefined && !Array.isArray(v)) fail('tags.' + k + ' debe ser un array');
     });
+
+    // fotos_sugeridas (opcional): sugerencias Wikimedia para la fase de fotos.
+    // El batch la ignora; solo se valida su forma si viene.
+    if (ev.fotos_sugeridas !== undefined) {
+      if (!Array.isArray(ev.fotos_sugeridas)) {
+        fail('fotos_sugeridas debe ser un array');
+      } else {
+        var heroCount = 0;
+        ev.fotos_sugeridas.forEach(function (f, j) {
+          if (!f || typeof f !== 'object') { fail('fotos_sugeridas[' + j + '] no es un objeto'); return; }
+          if (!f.caption || !String(f.caption).trim()) fail('fotos_sugeridas[' + j + '] falta caption');
+          if (!Array.isArray(f.nombres_archivo_wikimedia) || !f.nombres_archivo_wikimedia.length) {
+            fail('fotos_sugeridas[' + j + '] falta nombres_archivo_wikimedia (lista no vacia)');
+          } else {
+            f.nombres_archivo_wikimedia.forEach(function (n) {
+              if (typeof n !== 'string' || n.indexOf('File:') !== 0) {
+                fail('fotos_sugeridas[' + j + '] archivo sin prefijo File: (' + n + ')');
+              }
+            });
+          }
+          if (f.es_hero) heroCount++;
+        });
+        if (ev.fotos_sugeridas.length && heroCount !== 1) {
+          fail('fotos_sugeridas debe tener exactamente 1 es_hero=true (tiene ' + heroCount + ')');
+        }
+      }
+    }
   });
 
   // Slugs unicos en el lote
@@ -122,7 +149,8 @@ async function main() {
 
   if (!file) {
     console.error('Uso: node scripts/validate_eventos.js <archivo.json> [--prod] [URL]');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   var fs = require('fs');
@@ -131,7 +159,8 @@ async function main() {
     list = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) {
     console.error('[FAIL] no se pudo leer/parsear ' + file + ': ' + e.message);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   var res = validateEvents(list);
@@ -149,14 +178,14 @@ async function main() {
 
   if (!res.ok) {
     console.log('\nRESULTADO: FAIL (' + fails + ' evento(s) con errores)');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   console.log('\nRESULTADO: PASS - ' + list.length + ' evento(s) validos');
-  process.exit(0);
 }
 
 module.exports = { validateEvents: validateEvents };
 
 if (require.main === module) {
-  main().catch(function (e) { console.error('[FAIL] ' + e.message); process.exit(1); });
+  main().catch(function (e) { console.error('[FAIL] ' + e.message); process.exitCode = 1; });
 }

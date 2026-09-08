@@ -1,80 +1,1011 @@
 [
   {
-    "slug": "ejemplo-concierto-una-noche",
-    "nombre": "EJEMPLO - Concierto una noche (Bogota)",
-    "lead": "Ejemplo de evento de un solo dia para la plantilla de ingesta de la agenda.",
-    "descripcion": "Evento de ejemplo: muestra el schema minimo para subir un evento de un dia a la agenda cultural. Borra este archivo o reemplaza los eventos reales.",
-    "ciudad": "Bogota",
+    "slug": "feria-gastronomica-sabores-de-bogota-2026",
+    "nombre": "Feria Gastronómica Sabores de Bogotá 2026",
+    "lead": "El encuentro culinario más grande de la capital reúne a los mejores restaurantes, chefs locales y cocinas tradicionales en el Parque Simón Bolívar.",
+    "descripcion": "Sabores de Bogotá es una celebración masiva de la gastronomía capitalina y nacional. Durante tres días, los asistentes pueden disfrutar de una oferta diversa que abarca desde la cocina de autor hasta los platos más representativos de las plazas de mercado de la ciudad.\n\nEl evento cuenta con zonas de pic-nic, pabellones de repostería, mercados campesinos y tarimas en vivo con talleres de cocina impartidos por reconocidos chefs. Además, se habilitarán espacios familiares con música en directo y áreas de recreación para niños.\n\nEs la oportunidad perfecta para descubrir las nuevas tendencias culinarias de la ciudad en un entorno natural al aire libre y accesible para toda la familia.",
+    "ciudad": "Bogotá",
     "region": "Cundinamarca",
-    "lat": 4.6389,
-    "lng": -74.0831,
-    "web": "https://tuboleta.com",
-    "instagram": "@ejemplo",
-    "precio_desde": "Desde $80.000",
-    "horario": "9:00 p.m.",
-    "emoji": "🎸",
-    "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)",
+    "barrio": "Parque Metropolitano Simón Bolívar",
+    "lat": 4.6582,
+    "lng": -74.0937,
+    "web": "https://www.culturarecreacionydeporte.gov.co/es/eventos",
+    "instagram": "@saboresdebogota_oficial",
+    "precio_desde": "Gratis",
+    "horario": "10:00 a.m. - 7:00 p.m.",
+    "emoji": "🍲",
+    "hero_bg": null,
     "foto_hero": "",
     "fotos_galeria": [],
-    "faqs": [],
+    "faqs": [
+      {
+        "pregunta": "¿Tiene costo la entrada?",
+        "respuesta": "La entrada al recinto del parque es totalmente gratuita. Los platos y bebidas se pagan individualmente en cada stand."
+      },
+      {
+        "pregunta": "¿Se permite el ingreso de mascotas?",
+        "respuesta": "Sí, el evento es pet friendly en las zonas al aire libre, siempre y cuando las mascotas vayan con correa."
+      },
+      {
+        "pregunta": "¿Cómo llegar en transporte público?",
+        "respuesta": "Puedes tomar TransMilenio hasta la estación Salitre - El Greco o Movistar Arena y caminar por la Calle 63."
+      }
+    ],
+    "destacado": true,
     "tags": {
-      "fecha_inicio": "2026-10-15",
-      "fecha_fin": "2026-10-15",
-      "edicion": "Edicion ejemplo",
-      "sede": "Movistar Arena, Bogota",
-      "organiza": "Promotora Ejemplo",
-      "lema": "Una noche",
+      "fecha_inicio": "2026-09-11",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Edición 8",
+      "sede": "Parque Metropolitano Simón Bolívar, Av. Calle 53 y Av. Esmeralda",
+      "organiza": "Secretaría de Cultura, Recreación y Deporte (SCRD)",
+      "lema": "Bogotá se degusta en el parque",
+      "tipo_evento": "gastro",
       "lineup": [
-        { "nombre": "Artista Ejemplo", "rol": "Headliner", "genero": "Rock" }
+        { "nombre": "Chef Leonor Espinosa", "rol": "Ponente y Tallerista", "genero": "Cocina Colombiana" },
+        { "nombre": "Chef Harry Sasson", "rol": "Masterclass Culinaria", "genero": "Gastronomía Internacional" },
+        { "nombre": "Colectivo Plazas de Mercado", "rol": "Expositores Gastronómicos", "genero": "Cocina Tradicional" }
       ],
       "agenda": [
-        { "dia": "15 octubre", "hora": "9:00 p.m.", "actividad": "Concierto" }
+        { "dia": "2026-09-11", "hora": "10:00 a.m.", "actividad": "Apertura de puertas y pabellones de comida" },
+        { "dia": "2026-09-11", "hora": "2:00 p.m.", "actividad": "Masterclass inaugural de cocina tradicional" },
+        { "dia": "2026-09-12", "hora": "11:00 a.m.", "actividad": "Showcooking con chefs invitados" },
+        { "dia": "2026-09-13", "hora": "6:00 p.m.", "actividad": "Cierre musical y clausura de la feria" }
       ],
       "categorias_entrada": [
-        { "tipo": "General", "precio": "$80.000", "disponibilidad": "Disponible" }
+        { "tipo": "General", "precio": "Gratis", "disponibilidad": "Disponible" }
       ],
-      "que_llevar": ["Cedula de ciudadania", "Boleta digital"],
-      "prohibido": ["Comida externa"]
-    }
+      "que_llevar": ["Protector solar", "Ropa cómoda", "Sombrilla o impermeable", "Efectivo o tarjetas para compras en stands"],
+      "prohibido": ["Ingreso de bebidas alcohólicas externas", "Armas de cualquier tipo", "Envases de vidrio"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Simon Bolivar Park Bogota",
+        "caption": "Vista general del Parque Simón Bolívar",
+        "nombres_archivo_wikimedia": ["File:Parque_Simón_Bolívar_Bogotá.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Colombian Food Ajiaco",
+        "caption": "Ajiaco santafereño tradicional",
+        "nombres_archivo_wikimedia": ["File:Ajiaco_bogotano_2.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Colombian Gastronomy",
+        "caption": "Gastronomía típica colombiana",
+        "nombres_archivo_wikimedia": ["File:Bandeja_Paisa_Sabores.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Bogota Open Air Event",
+        "caption": "Ambiente de evento al aire libre",
+        "nombres_archivo_wikimedia": ["File:Bogota_Parque_Eventos.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Street Food Festival",
+        "caption": "Stands de comida en feria urbana",
+        "nombres_archivo_wikimedia": ["File:Food_truck_festival.jpg"],
+        "es_hero": false
+      }
+    ]
   },
   {
-    "slug": "ejemplo-festival-multidia",
-    "nombre": "EJEMPLO - Festival multidia (cruza mes)",
-    "lead": "Ejemplo de evento de varios dias que cruza de mes: aparece en todos los dias vigentes.",
-    "descripcion": "Evento de ejemplo multidia: tags.fecha_inicio / tags.fecha_fin definen el rango. La agenda lo muestra en cada dia y en cada mes cubierto (Oct y Nov en este caso).",
-    "ciudad": "Bogota",
+    "slug": "concierto-jazz-fusion-bogota-2026",
+    "nombre": "Concierto Internacional de Jazz Fusión",
+    "lead": "Una velada inolvidable con grandes virtuosos del jazz latino y la música fusión contemporánea.",
+    "descripcion": "El Movistar Arena abre sus puertas para recibir una noche dedicada exclusivamente a la excelencia del jazz contemporáneo y la fusión afrocaribeña. Este concierto reúne a destacados exponentes nacionales e internacionales que exploran ritmos tradicionales combinados con vanguardia armónica.\n\nCon un montaje sonoro y de luces de primer nivel, el espectáculo está diseñado para cautivar tanto a los melómanos experimentados como a los apasionados de las nuevas expresiones musicales.\n\nLas localidades cuentan con aforo numerado y acceso adaptado para personas con movilidad reducida.",
+    "ciudad": "Bogotá",
     "region": "Cundinamarca",
-    "lat": 4.653,
-    "lng": -74.0667,
-    "web": "https://www.bogota.gov.co",
-    "instagram": "@ejemplofest",
-    "precio_desde": "Gratis",
-    "horario": "10:00 a.m. - 9:00 p.m.",
-    "emoji": "🎶",
-    "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)",
+    "barrio": "Teusaquillo / Movistar Arena",
+    "lat": 4.6486,
+    "lng": -74.0778,
+    "web": "https://www.movistararena.co",
+    "instagram": "@movistararenaco",
+    "precio_desde": "Desde $90.000",
+    "horario": "8:00 p.m. - 11:30 p.m.",
+    "emoji": "🎷",
+    "hero_bg": null,
     "foto_hero": "",
     "fotos_galeria": [],
-    "faqs": [],
+    "faqs": [
+      {
+        "pregunta": "¿A qué hora abren las puertas?",
+        "respuesta": "La apertura de puertas se realiza a las 6:00 p.m., dos horas antes del inicio del espectáculo."
+      },
+      {
+        "pregunta": "¿Hay edad mínima de ingreso?",
+        "respuesta": "Evento para mayores de 14 años acompañados por un adulto en localidades autorizadas."
+      },
+      {
+        "pregunta": "¿El lugar cuenta con parqueadero?",
+        "respuesta": "Sí, el Movistar Arena y el Estadio El Campín cuentan con parqueaderos con tarifa fija por evento."
+      }
+    ],
+    "destacado": false,
     "tags": {
-      "fecha_inicio": "2026-10-28",
-      "fecha_fin": "2026-11-02",
-      "edicion": "Primera edicion",
-      "sede": "Parque El Country, Bogota",
-      "organiza": "Idartes",
-      "lema": "Musica en todos los rincones",
+      "fecha_inicio": "2026-09-08",
+      "fecha_fin": "2026-09-08",
+      "edicion": "Gira Bogotá Fusion 2026",
+      "sede": "Movistar Arena, Diagonal 61C # 26-36",
+      "organiza": "Páramo Presenta & TuBoleta",
+      "lema": "El ritmo que transforma la ciudad",
+      "tipo_evento": "musica",
       "lineup": [
-        { "nombre": "Banda A", "rol": "Headliner (28 oct)", "genero": "Rock" },
-        { "nombre": "Banda B", "rol": "Headliner (02 nov)", "genero": "Fusion" }
+        { "nombre": "Antonio Sánchez & Migration", "rol": "Artista Principal", "genero": "Jazz Fusion" },
+        { "nombre": "Puerto Candelaria", "rol": "Invitado Especial", "genero": "Jazz Tropical" },
+        { "nombre": "Camila Meza Trio", "rol": "Apertura", "genero": "Vocal Jazz" }
       ],
       "agenda": [
-        { "dia": "28-30 octubre", "hora": "Variable", "actividad": "Conciertos de apertura" },
-        { "dia": "31 oct - 2 nov", "hora": "Variable", "actividad": "Cierre y clausura" }
+        { "dia": "2026-09-08", "hora": "6:00 p.m.", "actividad": "Apertura de puertas" },
+        { "dia": "2026-09-08", "hora": "8:00 p.m.", "actividad": "Inicio Show Apertura" },
+        { "dia": "2026-09-08", "hora": "9:30 p.m.", "actividad": "Show Principal Antonio Sánchez" },
+        { "dia": "2026-09-08", "hora": "11:30 p.m.", "actividad": "Cierre del evento" }
       ],
       "categorias_entrada": [
-        { "tipo": "General", "precio": "Gratis", "disponibilidad": "Abierto al publico" }
+        { "tipo": "Platea Preferencial", "precio": "$180.000", "disponibilidad": "Disponible" },
+        { "tipo": "Piso 2", "precio": "$120.000", "disponibilidad": "Disponible" },
+        { "tipo": "Piso 3", "precio": "$90.000", "disponibilidad": "Disponible" }
       ],
-      "que_llevar": ["Cedula de ciudadania", "Ropa comoda"],
-      "prohibido": ["Armas de fuego"]
-    }
+      "que_llevar": ["Documento de identidad", "Boleta digital en el celular", "Abrigo adecuado"],
+      "prohibido": ["Cámaras profesionales de fotografía", "Alimentos y bebidas externas", "Sustancias psicoactivas"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Movistar Arena Bogota",
+        "caption": "Fachada del Movistar Arena Bogotá",
+        "nombres_archivo_wikimedia": ["File:Movistar_Arena_Bogota_exterior.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Jazz Concert Performance",
+        "caption": "Músico ejecutando el saxofón en vivo",
+        "nombres_archivo_wikimedia": ["File:Jazz_saxophonist_live.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Jazz Drummer Live",
+        "caption": "Baterista de jazz en escenario",
+        "nombres_archivo_wikimedia": ["File:Jazz_drummer_performance.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Stage Concert Lighting",
+        "caption": "Iluminación de escenario para concierto",
+        "nombres_archivo_wikimedia": ["File:Stage_lights_concert.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Acoustic Bass Jazz",
+        "caption": "Contrabajista en interpretación de jazz",
+        "nombres_archivo_wikimedia": ["File:Contrabass_player_jazz.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "temporada-danza-contemporanea-teatro-mayor-2026",
+    "nombre": "Temporada de Danza Contemporánea: Cuerpos en Movimiento",
+    "lead": "Las compañías más prestigiosas del país e invitadas internacionales presentan obras vanguardistas en el Teatro Mayor.",
+    "descripcion": "La Temporada de Danza Contemporánea 'Cuerpos en Movimiento' llega al Teatro Mayor Julio Mario Santo Domingo para ofrecer una muestra poética y física de alto nivel acrobático y expresivo.\n\nEn esta edición, las piezas indagan sobre la identidad, el impacto tecnológico en la corporalidad y la reconexión con la naturaleza mediante coreografías dinámicas acompañadas de música sinfónica y electrónica ejecutada en directo.\n\nUn imperdible dentro de la agenda de artes escénicas de Bogotá, ideal para los amantes de las expresiones corporales y la cultura contemporánea.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Suba / San José de Bavaria",
+    "lat": 4.7569,
+    "lng": -74.0628,
+    "web": "https://www.teatromayor.org",
+    "instagram": "@teatromayor",
+    "precio_desde": "Desde $40.000",
+    "horario": "8:00 p.m. - 10:00 p.m.",
+    "emoji": "🩰",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Se exige puntualidad?",
+        "respuesta": "Sí, una vez iniciada la función se cerrarán las puertas y no se permitirá el ingreso hasta el intermedio."
+      },
+      {
+        "pregunta": "¿El teatro cuenta con parqueadero?",
+        "respuesta": "Sí, el centro cultural cuenta con parqueadero vigilado para vehículos y bicicletas."
+      },
+      {
+        "pregunta": "¿Hay descuento para estudiantes y adultos mayores?",
+        "respuesta": "Se ofrece un 20% de descuento en taquilla del teatro presentando documento válido."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-09",
+      "fecha_fin": "2026-09-10",
+      "edicion": "Edición 2026",
+      "sede": "Teatro Mayor Julio Mario Santo Domingo, Calle 170 # 67-51",
+      "organiza": "Teatro Mayor & Idartes",
+      "lema": "El arte del movimiento en su máxima expresión",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Compañía Danza Concierto", "rol": "Elenco Principal", "genero": "Danza Contemporánea" },
+        { "nombre": "Ballet Contemporáneo de Cali", "rol": "Compañía Invitada", "genero": "Neoclásico / Contemporáneo" },
+        { "nombre": "L'Explose", "rol": "Colectivo Creador", "genero": "Teatro Físico" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-09", "hora": "7:00 p.m.", "actividad": "Apertura de puertas e ingreso del público" },
+        { "dia": "2026-09-09", "hora": "8:00 p.m.", "actividad": "Inicio de la obra 'Fragmentos de Memoria'" },
+        { "dia": "2026-09-10", "hora": "8:00 p.m.", "actividad": "Segunda función y conversatorio con los coreógrafos" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Platea Delantera", "precio": "$90.000", "disponibilidad": "Disponible" },
+        { "tipo": "Platea Posterior", "precio": "$65.000", "disponibilidad": "Disponible" },
+        { "tipo": "Balcón Mayor", "precio": "$40.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Vestimenta casual o formal", "Boleta impresa o digital", "Abrigo"],
+      "prohibido": ["Fotografía con flash durante la obra", "Uso de teléfonos móviles sonoros en la sala", "Alimentos en el auditorio"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Teatro Mayor Julio Mario Santo Domingo",
+        "caption": "Fachada e instalaciones del Teatro Mayor",
+        "nombres_archivo_wikimedia": ["File:Teatro_Mayor_Julio_Mario_Santo_Domingo.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Contemporary Dance Performance",
+        "caption": "Bailarines ejecutando pieza contemporánea",
+        "nombres_archivo_wikimedia": ["File:Contemporary_dance_dancers.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Modern Dance Stage",
+        "caption": "Iluminación teatral en danza moderna",
+        "nombres_archivo_wikimedia": ["File:Modern_dance_on_stage.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Ballet and Contemporary",
+        "caption": "Expresión corporal y movimiento coreográfico",
+        "nombres_archivo_wikimedia": ["File:Dance_movement_performance.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Theater Stage Interior",
+        "caption": "Sala principal del auditorio",
+        "nombres_archivo_wikimedia": ["File:Auditorium_stage_lights.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "muestra-cine-independiente-jorge-eliecer-gaitan-2026",
+    "nombre": "Muestra de Cine Independiente Latinoamericano",
+    "lead": "El emblemático Teatro Jorge Eliécer Gaitán acoge producciones destacadas del cine de autor y cortometrajes regionales.",
+    "descripcion": "La Muestra de Cine Independiente Latinoamericano rinde homenaje a las nuevas narrativas audiovisuales de la región. Durante cuatro días se proyectarán largometrajes, documentales socioambientales y selecciones de cortometrajes galardonados en festivales internacionales.\n\nAdemás de las funciones, los asistentes podrán participar en conversatorios con directores, productores y actores colombianos, fomentando el diálogo cultural y la reflexión sobre el patrimonio audiovisual.\n\nUn espacio ideal para cinéfilos que buscan propuestas alejadas del circuito comercial tradicional.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Santa Fe / Centro",
+    "lat": 4.6155,
+    "lng": -74.0683,
+    "web": "https://www.idartes.gov.co",
+    "instagram": "@idartes",
+    "precio_desde": "Desde $15.000",
+    "horario": "3:00 p.m. - 9:00 p.m.",
+    "emoji": "🎬",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Dónde se adquieren las entradas?",
+        "respuesta": "En la taquilla del Teatro Jorge Eliécer Gaitán o a través de la plataforma TuBoleta."
+      },
+      {
+        "pregunta": "¿Las películas son aptas para niños?",
+        "respuesta": "Cada proyección cuenta con clasificación específica. La franja de la tarde incluye cortometrajes para todo público."
+      },
+      {
+        "pregunta": "¿Hay estaciones de TransMilenio cercanas?",
+        "respuesta": "Sí, las estaciones San Diego y Calle 22 quedan a pocos metros del teatro."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-10",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Edición 12",
+      "sede": "Teatro Jorge Eliécer Gaitán, Carrera 7 # 22-47",
+      "organiza": "Cinemateca de Bogotá & Idartes",
+      "lema": "Miradas que transforman realidades",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Laura Mora", "rol": "Directora Invitada", "genero": "Cine Ficción" },
+        { "nombre": "Ciro Guerra", "rol": "Ponente", "genero": "Cine de Autor" },
+        { "nombre": "Colectivo Audiovisual Comunitario", "rol": "Expositores Documental", "genero": "Documental" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-10", "hora": "3:00 p.m.", "actividad": "Inauguración y proyección documental de apertura" },
+        { "dia": "2026-09-11", "hora": "5:00 p.m.", "actividad": "Franja Selección Oficial Cortometrajes" },
+        { "dia": "2026-09-12", "hora": "6:30 p.m.", "actividad": "Conversatorio con realizadores locales" },
+        { "dia": "2026-09-13", "hora": "7:00 p.m.", "actividad": "Función de clausura y premiación" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "$15.000", "disponibilidad": "Disponible" },
+        { "tipo": "Estudiantes", "precio": "$10.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Documento de identidad", "Ganas de aprender sobre cine", "Efectivo o medio de pago digital"],
+      "prohibido": ["Grabación de las proyecciones", "Ingreso de alimentos ruidosos", "Mascotas"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Teatro Jorge Eliecer Gaitan Bogota",
+        "caption": "Teatro Jorge Eliécer Gaitán en la Carrera Séptima",
+        "nombres_archivo_wikimedia": ["File:Teatro_Jorge_Eliecer_Gaitan.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Cinema Projector Film",
+        "caption": "Proyector de cine de 35mm",
+        "nombres_archivo_wikimedia": ["File:Cinema_film_projector.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Movie Theater Seats",
+        "caption": "Salas de cine y espacio de proyección",
+        "nombres_archivo_wikimedia": ["File:Movie_theater_red_seats.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Carrera Septima Bogota",
+        "caption": "Paseo peatonal de la Carrera Séptima",
+        "nombres_archivo_wikimedia": ["File:Carrera_7_Bogotá_peatonal.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Film Director Clapperboard",
+        "caption": "Claqueta de cine y producción",
+        "nombres_archivo_wikimedia": ["File:Clapperboard_movie.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "encuentro-literatura-poesia-virgilio-barco-2026",
+    "nombre": "Encuentro de Literatura y Poesía Urbana",
+    "lead": "La Biblioteca Virgilio Barco reúne a escritores, poetas y lectores en un fin de semana lleno de recitativos y talleres de creación.",
+    "descripcion": "El Encuentro de Literatura y Poesía Urbana celebra la diversidad de voces de Bogotá. Durante dos días, la arquitectura emblemática de Rogelio Salmona en la Biblioteca Virgilio Barco servirá de escenario para recitales poéticos, slam de poesía y ferias de editoriales independientes.\n\nLos asistentes podrán asistir a talleres gratuitos de escritura creativa, mesas redondas sobre la literatura contemporánea en Colombia y firmas de libros con autores invitados.\n\nUn evento abierto a la ciudadanía que fomenta la lectura y el diálogo creativo en uno de los parques más hermosos de la capital.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Teusaquillo / Parque Metropolitano",
+    "lat": 4.6575,
+    "lng": -74.0886,
+    "web": "https://www.biblored.gov.co",
+    "instagram": "@bibloredbogota",
+    "precio_desde": "Gratis",
+    "horario": "9:00 a.m. - 5:00 p.m.",
+    "emoji": "📚",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Se requiere inscripción previa?",
+        "respuesta": "La entrada a la biblioteca y los recitales es libre hasta completar aforo. Los talleres requieren registro previo en la web."
+      },
+      {
+        "pregunta": "¿Habrá venta de libros?",
+        "respuesta": "Sí, se dispondrá de una muestra editorial independiente con libros de poesía, narrativa y ensayo."
+      },
+      {
+        "pregunta": "¿Cuenta con acceso para personas con movilidad reducida?",
+        "respuesta": "Sí, la biblioteca cuenta con rampa de acceso, elevadores y senderos adaptados."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-12",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Edición 5",
+      "sede": "Biblioteca Pública Virgilio Barco, Av. Carrera 60 # 57-60",
+      "organiza": "BibloRed & SCRD",
+      "lema": "Palabras que habitan la ciudad",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Piedad Bonnett", "rol": "Poeta Invitada", "genero": "Poesía / Literatura" },
+        { "nombre": "Mario Mendoza", "rol": "Conferencista", "genero": "Narrativa Urbana" },
+        { "nombre": "Colectivo Slam Poético Bogotá", "rol": "Performers", "genero": "Slam Poetry" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-12", "hora": "9:00 a.m.", "actividad": "Apertura de la feria editorial" },
+        { "dia": "2026-09-12", "hora": "11:00 a.m.", "actividad": "Recital poético al aire libre en los espejos de agua" },
+        { "dia": "2026-09-13", "hora": "2:00 p.m.", "actividad": "Taller de escritura poética urbana" },
+        { "dia": "2026-09-13", "hora": "4:30 p.m.", "actividad": "Gran Final del Slam de Poesía Capitalina" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "Gratis", "disponibilidad": "Disponible" },
+        { "tipo": "Talleres (Cupo limitado)", "precio": "Gratis", "disponibilidad": "Registro previo" }
+      ],
+      "que_llevar": ["Libreta de notas y esfero", "Sombrero o gorra para actividades al aire libre", "Botella de agua reutilizable"],
+      "prohibido": ["Fumar dentro de las instalaciones", "Ingreso con mascotas al interior de salas de lectura", "Ruido excesivo en zonas de estudio"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Biblioteca Virgilio Barco Bogota",
+        "caption": "Arquitectura de la Biblioteca Virgilio Barco",
+        "nombres_archivo_wikimedia": ["File:Biblioteca_Virgilio_Barco_Bogotá.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Rogelio Salmona Architecture",
+        "caption": "Detalle de senderos y espejos de agua",
+        "nombres_archivo_wikimedia": ["File:Virgilio_barco_water_mirror.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Poetry Reading Open Air",
+        "caption": "Recital de poesía en espacio público",
+        "nombres_archivo_wikimedia": ["File:Poetry_reading_outdoor.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Books and Literature",
+        "caption": "Exposición de libros y material de lectura",
+        "nombres_archivo_wikimedia": ["File:Open_book_library.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "BibloRed Bogota Park",
+        "caption": "Jardines y parque perimetral de la biblioteca",
+        "nombres_archivo_wikimedia": ["File:Parque_Virgilio_Barco.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "concierto-musica-andina-teatro-colsubsidio-2026",
+    "nombre": "Concierto de Música Andina y Latinoamericana",
+    "lead": "Los instrumentos ancestrales y las armonías folclóricas se toman el Teatro Colsubsidio con grandes intérpretes de la región.",
+    "descripcion": "Una noche mágica llena de quenas, zampoñas, charangos y guitarras en el Teatro Colsubsidio Roberto Arias Pérez. El espectáculo 'Ecos de los Andes' rinde tributo a la riqueza sonora de las cordilleras latinoamericanas.\n\nEl repertorio abarca temas clásicos del folclor andino, así como composiciones contemporáneas que combinan vientos y cuerdas con arreglos orquestales. Una puesta en escena caracterizada por la calidez acústica y la excelencia técnica del recinto.\n\nEl evento está dirigido a toda la familia y amantes de la música folclórica y del patrimonio cultural de América del Sur.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Teusaquillo",
+    "lat": 4.6283,
+    "lng": -74.0722,
+    "web": "https://www.teatrocolsubsidio.com",
+    "instagram": "@teatrocolsubsidio",
+    "precio_desde": "Desde $50.000",
+    "horario": "7:30 p.m. - 9:30 p.m.",
+    "emoji": "🪈",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Hay parqueadero en el teatro?",
+        "respuesta": "Sí, la Manzana Colsubsidio cuenta con amplio parqueadero subterráneo con tarifa preferencial para asistentes."
+      },
+      {
+        "pregunta": "¿Admiten niños en la función?",
+        "respuesta": "Ingreso permitido para niños a partir de los 7 años pagando su entrada correspondiente."
+      },
+      {
+        "pregunta": "¿Cuáles son las estaciones de TransMilenio más cercanas?",
+        "respuesta": "Estación Calle 26 o Calle 34 sobre la Troncal Caracas."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-11",
+      "fecha_fin": "2026-09-11",
+      "edicion": "Serie Folclor 2026",
+      "sede": "Teatro Colsubsidio Roberto Arias Pérez, Calle 26 # 25-40",
+      "organiza": "Teatro Colsubsidio",
+      "lema": "El sonido que une nuestras raíces",
+      "tipo_evento": "musica",
+      "lineup": [
+        { "nombre": "Grupo Putumayo", "rol": "Agrupación Principal", "genero": "Música Andina" },
+        { "nombre": "Ensamble Vientos del Sur", "rol": "Invitados", "genero": "Folclor Instrumental" },
+        { "nombre": "Quintufeutu", "rol": "Apertura", "genero": "Música Latinoamericana" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-11", "hora": "6:30 p.m.", "actividad": "Apertura de puertas" },
+        { "dia": "2026-09-11", "hora": "7:30 p.m.", "actividad": "Inicio del concierto con Ensamble Vientos del Sur" },
+        { "dia": "2026-09-11", "hora": "8:30 p.m.", "actividad": "Presentación del Grupo Putumayo" },
+        { "dia": "2026-09-11", "hora": "9:30 p.m.", "actividad": "Finalización del espectáculo" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Central VIP", "precio": "$85.000", "disponibilidad": "Disponible" },
+        { "tipo": "Platea General", "precio": "$65.000", "disponibilidad": "Disponible" },
+        { "tipo": "Balcón", "precio": "$50.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Boleta física o en celular", "Documento de identidad"],
+      "prohibido": ["Fotografías con equipos profesionales sin acreditación", "Ingreso de comida externa", "Líquidos desprotegidos"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Teatro Colsubsidio Bogota",
+        "caption": "Fachada e ingreso al Teatro Colsubsidio",
+        "nombres_archivo_wikimedia": ["File:Teatro_Colsubsidio_Bogota.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Pan Flute Andean Music",
+        "caption": "Músico ejecutando zampoña andina",
+        "nombres_archivo_wikimedia": ["File:Siku_pan_flute_player.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Charango Andean Instrument",
+        "caption": "Charango tradicional latinoamericano",
+        "nombres_archivo_wikimedia": ["File:Charango_instrument.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Andean Folklore Performance",
+        "caption": "Grupo folclórico en concierto en vivo",
+        "nombres_archivo_wikimedia": ["File:Andean_music_group.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Acoustic Concert Stage",
+        "caption": "Escenario acústico para música instrumental",
+        "nombres_archivo_wikimedia": ["File:Acoustic_stage_performance.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "exposicion-arte-contemporaneo-mambo-2026",
+    "nombre": "Exposición de Arte Contemporáneo Colombiano",
+    "lead": "El MAMBO presenta una retrospectiva colectiva que explora el territorio, la memoria histórica y la ecología urbana.",
+    "descripcion": "El Museo de Arte Moderno de Bogotá (MAMBO) inaugura una ambiciosa exposición temporal que reúne obras de más de 20 artistas colombianos contemporáneos. A través de instalaciones de gran formato, pintura, fotografía y esculturas interactivas, la muestra invita a reflexionar sobre el territorio y la ecología en el siglo XXI.\n\nDurante el recorrido, los visitantes contarán con mediación pedagógica permanente, guías de sala y códigos QR con audios explicativos narrados por los propios artistas.\n\nUna experiencia artística inmersiva situada en pleno corazón cultural del centro histórico de Bogotá.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "La Macarena / Santa Fe",
+    "lat": 4.6106,
+    "lng": -74.0694,
+    "web": "https://www.mambogota.com",
+    "instagram": "@mambogota",
+    "precio_desde": "Desde $12.000",
+    "horario": "10:00 a.m. - 6:00 p.m.",
+    "emoji": "🎨",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Qué días está abierto el museo?",
+        "respuesta": "De martes a domingo de 10:00 a.m. a 6:00 p.m. Los lunes festivos se encuentra cerrado por mantenimiento."
+      },
+      {
+        "pregunta": "¿Hay tarifa reducida para estudiantes?",
+        "respuesta": "Sí, los estudiantes con carné vigente pagan $8.000."
+      },
+      {
+        "pregunta": "¿Se permite tomar fotos en las salas?",
+        "respuesta": "Se permite la toma de fotos con celular sin flash para uso personal."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-08",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Temporada II 2026",
+      "sede": "MAMBO - Museo de Arte Moderno de Bogotá, Calle 24 # 6-00",
+      "organiza": "MAMBO & Ministerio de las Culturas",
+      "lema": "Reimaginar el territorio a través del arte",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Doris Salcedo", "rol": "Artista Expositora", "genero": "Escultura / Instalación" },
+        { "nombre": "Óscar Muñoz", "rol": "Artista Expositor", "genero": "Fotografía / Videoarte" },
+        { "nombre": "Beatriz González", "rol": "Artista Homenajeada", "genero": "Pintura" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-08", "hora": "10:00 a.m.", "actividad": "Apertura diaria de salas" },
+        { "dia": "2026-09-09", "hora": "3:00 p.m.", "actividad": "Visita guiada con el equipo curatorial" },
+        { "dia": "2026-09-12", "hora": "11:00 a.m.", "actividad": "Taller infantil de creación artística" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "$12.000", "disponibilidad": "Disponible" },
+        { "tipo": "Estudiantes y Docentes", "precio": "$8.000", "disponibilidad": "Disponible" },
+        { "tipo": "Niños menores de 5 años y Adultos Mayores", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Documento de identidad o carné estudiantil", "Calzado cómodo para caminata en salas"],
+      "prohibido": ["Tocar las piezas exhibidas", "Uso de trípodes y flashes", "Ingreso de alimentos y bebidas a las salas"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "MAMBO Bogota Museum",
+        "caption": "Fachada exterior del Museo de Arte Moderno de Bogotá",
+        "nombres_archivo_wikimedia": ["File:MAMBO_Museo_de_Arte_Moderno_de_Bogotá.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Contemporary Art Exhibition",
+        "caption": "Sala de exposición de arte contemporáneo",
+        "nombres_archivo_wikimedia": ["File:Art_gallery_exhibition_room.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Modern Art Sculpture Gallery",
+        "caption": "Instalación artística en museo",
+        "nombres_archivo_wikimedia": ["File:Modern_sculpture_gallery.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Bogota Cultural Center",
+        "caption": "Entorno del Parque de la Independencia y MAMBO",
+        "nombres_archivo_wikimedia": ["File:Parque_de_la_Independencia_Bogotá.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Modern Painting Gallery",
+        "caption": "Visitantes apreciando obras pictóricas",
+        "nombres_archivo_wikimedia": ["File:Art_museum_visitors.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "gala-musica-filarmonica-movistar-arena-2026",
+    "nombre": "Gran Gala Sinfónica Filarmónica de Bogotá",
+    "lead": "La Orquesta Filarmónica de Bogotá interpreta majestuosas obras universales y suites colombianas en una noche única.",
+    "descripcion": "La Orquesta Filarmónica de Bogotá presenta su Gala Sinfónica de septiembre en el escenario del Movistar Arena. Dirigida por batutas internacionales y con la participación de solistas invitados, el concierto promete emocionar a miles de espectadores con un repertorio magistral.\n\nEl programa de la noche incluye la Novena Sinfonía de Beethoven junto con arreglos sinfónicos de temas tradicionales del cancionero colombiano, fusionando la técnica clásica con la calidez del folclor nacional.\n\nUn concierto de formato masivo pensado para acercar la gran música orquestal a públicos de todas las edades.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Teusaquillo / Campín",
+    "lat": 4.6486,
+    "lng": -74.0778,
+    "web": "https://www.filarmonicasustentable.gov.co",
+    "instagram": "@filarmonibogota",
+    "precio_desde": "Desde $35.000",
+    "horario": "7:00 p.m. - 9:30 p.m.",
+    "emoji": "🎻",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿A qué hora se abren las puertas?",
+        "respuesta": "Las puertas del recinto se habilitan a partir de las 5:00 p.m."
+      },
+      {
+        "pregunta": "¿Se permite el acceso a niños?",
+        "respuesta": "Sí, está permitido el ingreso de niños mayores de 6 años pagando boleta."
+      },
+      {
+        "pregunta": "¿El evento es totalmente en vivo?",
+        "respuesta": "Sí, con más de 90 músicos y coro profesional en escena interpretando en tiempo real."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-12",
+      "fecha_fin": "2026-09-12",
+      "edicion": "Temporada Oficial 2026",
+      "sede": "Movistar Arena, Diagonal 61C # 26-36",
+      "organiza": "Orquesta Filarmónica de Bogotá & Alcaldía Mayor",
+      "lema": "La música que nos conecta",
+      "tipo_evento": "musica",
+      "lineup": [
+        { "nombre": "Orquesta Filarmónica de Bogotá", "rol": "Orquesta Principal", "genero": "Música Clásica / Sinfónica" },
+        { "nombre": "Joachim Gustafsson", "rol": "Director Titular", "genero": "Dirección Orquestal" },
+        { "nombre": "Coro Filarmónico de Bogotá", "rol": "Ensamble Vocal", "genero": "Canto Coral" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-12", "hora": "5:00 p.m.", "actividad": "Apertura de puertas e ingreso de asistentes" },
+        { "dia": "2026-09-12", "hora": "7:00 p.m.", "actividad": "Primera parte: Beethoven Sinfonía No. 9" },
+        { "dia": "2026-09-12", "hora": "8:15 p.m.", "actividad": "Intermedio" },
+        { "dia": "2026-09-12", "hora": "8:35 p.m.", "actividad": "Segunda parte: Suites y Fantasías Colombianas" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Platea VIP", "precio": "$95.000", "disponibilidad": "Disponible" },
+        { "tipo": "Piso 2", "precio": "$60.000", "disponibilidad": "Disponible" },
+        { "tipo": "Piso 3", "precio": "$35.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Boleta descargada en el teléfono", "Documento de identidad", "Chaqueta o abrigo"],
+      "prohibido": ["Punteros láser", "Bebidas alcohólicas externas", "Armas u objetos punzocortantes"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Symphony Orchestra Performance",
+        "caption": "Orquesta Filarmónica en plena interpretación sinfónica",
+        "nombres_archivo_wikimedia": ["File:Symphony_orchestra_performing.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Violin Player Orchestra",
+        "caption": "Sección de violines en concierto sinfónico",
+        "nombres_archivo_wikimedia": ["File:Violin_section_orchestra.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Orchestra Conductor",
+        "caption": "Director guiando a la orquesta",
+        "nombres_archivo_wikimedia": ["File:Orchestra_conductor_baton.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Movistar Arena Bogota Inside",
+        "caption": "Vista de graderías en el recinto",
+        "nombres_archivo_wikimedia": ["File:Movistar_Arena_interior_event.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Cello Player Classical Music",
+        "caption": "Músico ejecutando el violonchelo",
+        "nombres_archivo_wikimedia": ["File:Cellist_playing_concert.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "jornada-recreativa-naturaleza-cefe-fontanar-2026",
+    "nombre": "Jornada Ambiental y Ecológica Fontanar del Río",
+    "lead": "Talleres de huerta, avistamiento de aves e itinerarios pedagógicos en el parque y Centro Felicidad Suba.",
+    "descripcion": "El CEFE Fontanar del Río abre sus puertas para una jornada comunitaria orientada a la educación ambiental, el deporte al aire libre y la protección de los humedales de Suba.\n\nDurante la jornada, educadores ambientales guiarán recorridos de avistamiento de aves en los senderos colindantes, dictarán talleres prácticos de agricultura urbana y enseñarán sobre la clasificación de residuos e iniciativas sostenibles de la ciudad.\n\nUn plan perfecto de fin de semana para familias, colectivos ambientales y amantes de la naturaleza que deseen reconectar con el entorno natural de la sabana.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Suba / Fontanar del Río",
+    "lat": 4.7628,
+    "lng": -74.0953,
+    "web": "https://www.idrd.gov.co",
+    "instagram": "@idrdbogota",
+    "precio_desde": "Gratis",
+    "horario": "8:00 a.m. - 2:00 p.m.",
+    "emoji": "🌿",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Debo llevar binoculares para el avistamiento?",
+        "respuesta": "Es recomendable, aunque los guías dispondrán de algunos pares para préstamo temporal durante el recorrido."
+      },
+      {
+        "pregunta": "¿El evento es apto para niños pequeños?",
+        "respuesta": "Sí, las caminatas son de bajo impacto y los talleres están adaptados para edades infantiles."
+      },
+      {
+        "pregunta": "¿El centro cuenta con parqueadero para bicicletas?",
+        "respuesta": "Sí, el CEFE Fontanar del Río posee biciparqueaderos gratuitos con vigilancia."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-13",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Jornada Verde 2026",
+      "sede": "CEFE Fontanar del Río, Calle 144 # 141C-04",
+      "organiza": "IDRD & Secretaría de Ambiente",
+      "lema": "Conecta con la biodiversidad urbana",
+      "tipo_evento": "naturaleza",
+      "lineup": [
+        { "nombre": "Colectivo Aves Bogotá", "rol": "Guías de Avistamiento", "genero": "Ornitología" },
+        { "nombre": "Red de Huertas Urbanas Suba", "rol": "Facilitadores de Taller", "genero": "Agroecología" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-13", "hora": "8:00 a.m.", "actividad": "Registro de participantes y caminata de avistamiento de aves" },
+        { "dia": "2026-09-13", "hora": "10:30 a.m.", "actividad": "Taller práctico de siembra en huerta urbana" },
+        { "dia": "2026-09-13", "hora": "12:30 p.m.", "actividad": "Charla sobre conservación de humedales en Bogotá" },
+        { "dia": "2026-09-13", "hora": "2:00 p.m.", "actividad": "Cierre de la jornada" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Ropa cómoda e impermeable", "Calzado de agarre o botas de caminata", "Gorra", "Bloqueador solar", "Termo para agua"],
+      "prohibido": ["Arrojar basura en los senderos", "Mascotas sin correa en zonas de avistamiento", "Extraer plantas o fauna silvestre"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Wetland Birds Colombia",
+        "caption": "Avistamiento de aves en humedales urbanos",
+        "nombres_archivo_wikimedia": ["File:Humdataset_birds_bogota.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Suba Bogota Park",
+        "caption": "Zonas verdes del sector de Suba",
+        "nombres_archivo_wikimedia": ["File:Parque_Fontanar_del_Rio.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Urban Gardening Community",
+        "caption": "Taller de huerta ecológica y siembra",
+        "nombres_archivo_wikimedia": ["File:Urban_community_garden.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Bird Watching Binoculars",
+        "caption": "Observación de fauna nativa sabanera",
+        "nombres_archivo_wikimedia": ["File:Birdwatching_nature.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "CEFE Bogota Architecture",
+        "caption": "Instalaciones del Centro Felicidad",
+        "nombres_archivo_wikimedia": ["File:CEFE_Fontanar_Suba.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "festival-internacional-piano-teatro-mayor-2026",
+    "nombre": "Festival Internacional de Piano de Bogotá",
+    "lead": "Virtuosos pianistas de Europa y América Latina presentan recitativos de música clásica y romántica.",
+    "descripcion": "El Festival Internacional de Piano reúne en la Sala Cantaura del Teatro Mayor a prodigios de las teclas en una serie de conciertos íntimos. Esta entrega especial celebra las grandes obras pianísticas de Chopin, Liszt y los compositores latinoamericanos del siglo XX.\n\nAdemás de la programación de conciertos, el festival incluye clases magistrales públicas impartidas por los maestros invitados para estudiantes de música y pianistas emergentes de los conservatorios del país.\n\nUna oportunidad de disfrutar de la acústica pura del piano de cola en uno de los auditorios mejor dotados del continente.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Suba / San José de Bavaria",
+    "lat": 4.7569,
+    "lng": -74.0628,
+    "web": "https://www.teatromayor.org",
+    "instagram": "@teatromayor",
+    "precio_desde": "Desde $45.000",
+    "horario": "11:00 a.m. - 8:00 p.m.",
+    "emoji": "🎹",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Se venden abonos para todos los recitales?",
+        "respuesta": "Sí, existe un abono especial con el 25% de descuento al comprar boletería para tres o más recitativos."
+      },
+      {
+        "pregunta": "¿Hay parqueadero disponible?",
+        "respuesta": "El Teatro Mayor cuenta con parqueadero privado en sus instalaciones."
+      },
+      {
+        "pregunta": "¿A qué hora inician los talleres pedagógicos?",
+        "respuesta": "Las clases magistrales inician a las 11:00 a.m. previa confirmación de asistencia."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-12",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Edición 15",
+      "sede": "Teatro Mayor Julio Mario Santo Domingo, Calle 170 # 67-51",
+      "organiza": "Teatro Mayor & Fundación Piano de Colombia",
+      "lema": "El teclado que conmueve al mundo",
+      "tipo_evento": "musica",
+      "lineup": [
+        { "nombre": "Blanca Uribe", "rol": "Pianista Invitada", "genero": "Música Clásica" },
+        { "nombre": "Alexander Panizza", "rol": "Solista Internacional", "genero": "Romantiscismo" },
+        { "nombre": "Teresita Gómez", "rol": "Maestra Homenajeada", "genero": "Música Colombiana y Clásica" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-12", "hora": "11:00 a.m.", "actividad": "Clase magistral abierta con Alexander Panizza" },
+        { "dia": "2026-09-12", "hora": "6:00 p.m.", "actividad": "Recital inaugural: Homenaje a Chopin" },
+        { "dia": "2026-09-13", "hora": "5:00 p.m.", "actividad": "Recital de clausura por la maestra Teresita Gómez" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "Platea Preferencial", "precio": "$80.000", "disponibilidad": "Disponible" },
+        { "tipo": "General Balcón", "precio": "$45.000", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Vestimenta formal o semiformal", "Boleta de ingreso"],
+      "prohibido": ["Grabaciones de audio o video durante el recital", "Ingreso de bebidas o snacks a la sala", "Celulares encendidos durante la función"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Grand Piano Performance",
+        "caption": "Piano de cola en escenario de recital",
+        "nombres_archivo_wikimedia": ["File:Grand_piano_concert_stage.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Pianist Hands Keys",
+        "caption": "Detalle de manos en el teclado",
+        "nombres_archivo_wikimedia": ["File:Pianist_playing_keys.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Concert Hall Interior",
+        "caption": "Auditorio y acústica para piano",
+        "nombres_archivo_wikimedia": ["File:Concert_hall_stage_lights.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Sheet Music Classical Piano",
+        "caption": "Partitura de composición clásica",
+        "nombres_archivo_wikimedia": ["File:Piano_sheet_music.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Classical Concert Audience",
+        "caption": "Público en recital de música culta",
+        "nombres_archivo_wikimedia": ["File:Audience_in_classical_concert.jpg"],
+        "es_hero": false
+      }
+    ]
+  },
+  {
+    "slug": "feria-de-emprendimiento-y-diseno-local-2026",
+    "nombre": "Feria de Emprendimiento y Diseño Local 'Bogotá Diseña'",
+    "lead": "Marcas independientes de moda, decoración, ilustración y artesanía se dan cita en la Plaza de los Artesanos.",
+    "descripcion": "Bogotá Diseña reúne a más de 80 creativos y marcas emergentes de la ciudad para impulsar el comercio local y el talento emergente. El evento ofrece una vitrina de productos únicos que van desde la moda sostenible hasta piezas decorativas hechas a mano.\n\nAdemás de los puestos de venta directa, la feria organiza pasarelas urbanas, música en vivo con DJs locales y una oferta gastronómica ligera de café especial y repostería artesanal.\n\nEl espacio idóneo para apoyar la economía creativa independiente y encontrar objetos únicos en la ciudad.",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Barrios Unidos / Plaza de los Artesanos",
+    "lat": 4.6644,
+    "lng": -74.0847,
+    "web": "https://www.desarrolloeconomico.gov.co",
+    "instagram": "@deseconomicobog",
+    "precio_desde": "Gratis",
+    "horario": "10:00 a.m. - 6:30 p.m.",
+    "emoji": "🛍️",
+    "hero_bg": null,
+    "foto_hero": "",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Se puede pagar con tarjetas y transferencias?",
+        "respuesta": "Sí, la mayoría de los emprendedores cuentan con datáfono y canales de pago digital."
+      },
+      {
+        "pregunta": "¿El evento cuenta con zona de comida?",
+        "respuesta": "Sí, hay una franja gastronómica con cafés de origen, postres y comida rápida de autor."
+      },
+      {
+        "pregunta": "¿Se permite el ingreso con mascotas?",
+        "respuesta": "Sí, es un espacio pet-friendly en sus áreas descubiertas y pasillos principales."
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-11",
+      "fecha_fin": "2026-09-13",
+      "edicion": "Edición Primavera 2026",
+      "sede": "Plaza de los Artesanos, Transversal 48 # 63A-52",
+      "organiza": "Secretaría de Desarrollo Económico",
+      "lema": "Compre local, apoya la creatividad bogotana",
+      "tipo_evento": "cultura",
+      "lineup": [
+        { "nombre": "Colectivo Moda Sostenible Bogotá", "rol": "Expositores de Indumentaria", "genero": "Diseño de Moda" },
+        { "nombre": "Red de Ilustradores Capitalinos", "rol": "Expositores de Arte", "genero": "Ilustración / Gráfica" },
+        { "nombre": "DJ Set El Freaky Colectivo", "rol": "Música en Vivo", "genero": "Tropical Bass / Electrónica" }
+      ],
+      "agenda": [
+        { "dia": "2026-09-11", "hora": "10:00 a.m.", "actividad": "Apertura de pabellones de exhibición" },
+        { "dia": "2026-09-12", "hora": "3:00 p.m.", "actividad": "Pasarela de moda urbana independiente" },
+        { "dia": "2026-09-13", "hora": "4:00 p.m.", "actividad": "Presentación musical de cierre con DJ Set" }
+      ],
+      "categorias_entrada": [
+        { "tipo": "General", "precio": "Gratis", "disponibilidad": "Disponible" }
+      ],
+      "que_llevar": ["Bolsa ecológica para compras", "Ropa y calzado cómodo", "Efectivo o aplicaciones de pago en celular"],
+      "prohibido": ["Fumar en áreas cerradas", "Ventas ambulantes no autorizadas dentro del predio"]
+    },
+    "fotos_sugeridas": [
+      {
+        "tema": "Handmade Craft Market",
+        "caption": "Muestra de productos artesanales y diseño local",
+        "nombres_archivo_wikimedia": ["File:Craft_market_stalls.jpg"],
+        "es_hero": true
+      },
+      {
+        "tema": "Plaza de los Artesanos Bogota",
+        "caption": "Plaza de los Artesanos escenario de la feria",
+        "nombres_archivo_wikimedia": ["File:Plaza_Artesanos_Bogota.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Sustainable Fashion Design",
+        "caption": "Prendas de vestir y diseño independiente",
+        "nombres_archivo_wikimedia": ["File:Fashion_design_rack.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Coffee and Bakery Stand",
+        "caption": "Zona de café especial y gastronomía",
+        "nombres_archivo_wikimedia": ["File:Specialty_coffee_barista.jpg"],
+        "es_hero": false
+      },
+      {
+        "tema": "Illustration Art Print",
+        "caption": "Muestra de gráfica e ilustración local",
+        "nombres_archivo_wikimedia": ["File:Art_prints_exhibition.jpg"],
+        "es_hero": false
+      }
+    ]
   }
 ]

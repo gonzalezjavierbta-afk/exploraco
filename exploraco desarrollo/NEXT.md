@@ -4,6 +4,59 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion lote-eventos-gemini - primera ingesta real de 11 eventos (2026-09-08) - TSK-087
+
+Primer lote real end-to-end: Gemini investigo 11 eventos de Bogota
+(septiembre 2026) con el prompt `GEMINI_EVENTOS_PROMPT.md`; el JSON quedo en
+`eventos/eventos.json` y se subio con el pipeline de TSK-085.
+
+**Cambios:**
+- `eventos/eventos.json`: 11 eventos (ver TASKS TSK-087 para la lista con
+  categorias y rangos). Se elimino la clave tipeada `fotos_sugerisedas` del
+  evento de piano.
+- `scripts/upload-eventos.js` (fix): los flags `--dry`/`--seed` ya no se
+  toman como URL/TOKEN posicionales (bug: 'Failed to parse URL from
+  --seed/...').
+- `scripts/validate_eventos.js` y `scripts/upload-eventos.js` (fix):
+  `process.exit()` -> `process.exitCode` para evitar el crash de libuv en
+  Windows tras fetch (exit -1073740791).
+- `scripts/seed-eventos-2026-09-08.js`: seed versionado del lote (nuevo).
+
+**Verificado:** 11/11 subidos (total eventos 61 en /api/destinos?cat=evento);
+paginas 200; categorias detectadas correctas; multidia correcto (MAMBO 8-13
+Sep, danza 9-10 Sep). seed node --check OK y ASCII 0.
+
+**Pendiente (FASE B):** resolver `fotos_sugeridas` de los 11 eventos via
+Wikimedia (thumbs 960px, HEAD 200) y re-subirlos con foto_hero/fotos_galeria.
+
+### Sesion gemini-eventos-prompt - prompt de investigacion de eventos (2026-09-07) - TSK-086
+
+Prompt maestro para que Gemini investigue LOTES de eventos y entregue el JSON
+de `eventos/eventos.json` listo para validar y subir.
+
+**Cambios:**
+- `.opencode/skills/gemini-research/prompts/GEMINI_EVENTOS_PROMPT.md`
+  (NUEVO): plantilla generica por lote (N eventos, ciudad, rango fechas,
+  tipos). Entrega un unico bloque ```json ``` (array) + `## Fuentes` fuera
+  del JSON. `tipo_evento` obligatorio, fechas `YYYY-MM-DD` (fin >= inicio,
+  multidia), coordenadas reales, sin ratings (ADR-009). Fotos como
+  `fotos_sugeridas[]` (File:...), `foto_hero`/`fotos_galeria` vacios en el
+  batch (se resuelven por evento, BUG-022).
+- `ingest-eventos/SKILL.md`: FASE A (Gemini -> eventos.json), FASE B (fotos
+  por evento: resolver fotos_sugeridas via Wikimedia y re-subir), FASE C
+  (validar -> subir --seed -> verificar -> docs).
+- `eventos/eventos.example.json`: bloques `fotos_sugeridas` (1 hero + 4) y
+  faqs de ejemplo en los 2 eventos.
+- `scripts/validate_eventos.js`: validacion opcional de `fotos_sugeridas`.
+
+**Verificado:** validate PASS en el ejemplo (con fotos); FAIL (exit 1, 3
+errores) en fotos mal formadas; upload --dry ignora fotos_sugeridas; smoke
+30/30 PASS.
+
+**Pendiente:** cuando el usuario lo pida, llenar la seccion `## 2. Lote a
+investigar` del prompt, pegar en Gemini, guardar el JSON en
+`eventos/eventos.json` y seguir FASE C.
+
 ### Sesion ingest-eventos - ingesta automatizada de eventos a la agenda (2026-09-07) - TSK-085
 
 Herramienta para subir eventos a la agenda cultural en lote via API, sin

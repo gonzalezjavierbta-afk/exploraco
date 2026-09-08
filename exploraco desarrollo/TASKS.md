@@ -1883,6 +1883,65 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   produccion (el seed de prueba con eventos EJEMPLO se eliminó). agenda.html
   parse OK; smoke_test_agenda.js 30/30 PASS.
 
+### TSK-086: Prompt Gemini para investigacion de eventos (lote -> eventos.json)
+- **Estado:** COMPLETADA
+- **Detalle:** Prompt maestro hermano del de fichas para investigar LOTES de
+  eventos en Google Gemini y obtener directo el JSON de `eventos/eventos.json`.
+  - Nuevo `.opencode/skills/gemini-research/prompts/GEMINI_EVENTOS_PROMPT.md`:
+    plantilla generica por lote (N eventos, ciudad, rango de fechas, tipos).
+    Seccion de fuentes (Portal Bogota, Idartes, SCRD, Visit Bogota,
+    TuBoleta/Ticketmaster, webs oficiales; NO Instagram). Reglas: fechas
+    `YYYY-MM-DD` con fin >= inicio (multidia), sede, `tipo_evento` obligatorio
+    (fuerza festival/musica/gastro/naturaleza/cultura en la agenda),
+    coordenadas reales, sin ratings (ADR-009). Entrega: un unico bloque
+    ```json ``` con el ARRAY copiable a eventos/eventos.json + seccion
+    `## Fuentes` fuera del JSON. Fotos como `fotos_sugeridas[]`
+    (`{tema, caption, nombres_archivo_wikimedia:["File:..."], es_hero}`), 1
+    hero + galeria, con `foto_hero`/`fotos_galeria` VACIOS en el batch (el
+    pipeline resuelve y verifica HEAD 200 por evento, BUG-022).
+  - `ingest-eventos/SKILL.md`: FASE A (pasar el prompt a Gemini, guardar el
+    bloque en eventos/eventos.json), FASE B (fotos por evento opcional:
+    resolver fotos_sugeridas via API Wikimedia y re-subir), FASE C (validar
+    --prod -> subir --seed -> verificar -> docs).
+  - `eventos/eventos.example.json`: se anaden bloques `fotos_sugeridas` de
+    ejemplo a los 2 eventos y faqs de ejemplo.
+  - `scripts/validate_eventos.js`: validacion opcional de `fotos_sugeridas`
+    (array; caption; nombres `File:...`; exactamente 1 `es_hero` cuando hay
+    fotos).
+- **Evidencia:** node --check OK y ASCII 0 en validate_eventos.js; validate
+  PASS en eventos.example.json (2, con fotos_sugeridas 5/1 hero c/u); FAIL
+  (exit 1, 3 errores) contra fotos mal formadas (sin prefijo File: y sin
+  es_hero); upload --dry ignora fotos_sugeridas y reporta el lote;
+  smoke_test_agenda.js 30/30 PASS.
+
+### TSK-087: Lote real de 11 eventos subido a la agenda desde Gemini
+- **Estado:** COMPLETADA
+- **Detalle:** Primera ingesta real end-to-end: el usuario pego el prompt
+  `GEMINI_EVENTOS_PROMPT.md` en Gemini, guardo el JSON en
+  `eventos/eventos.json` y se subio a produccion con el pipeline de TSK-085.
+  Lote: 11 eventos de Bogota para septiembre 2026 (feria gastronomica
+  Sabores de Bogota 11-13 Sep [gastro, destacado], jazz fusion en Movistar
+  Arena 8 Sep [musica], danza contemporanea Teatro Mayor 9-10 Sep [cultura],
+  muestra de cine Teatro Gaitan 10-13 Sep [cultura], poesia BibloRed 12-13
+  Sep [cultura], musica andina Teatro Colsubsidio 11 Sep [musica], MAMBO 8-13
+  Sep [cultura], gala sinfonica Movistar 12 Sep [musica], jornada ambiental
+  CEFE Fontanar 13 Sep [naturaleza], festival de piano Teatro Mayor 12-13 Sep
+  [musica], feria de diseno Plaza de los Artesanos 11-13 Sep [cultura]).
+  Fotos via `fotos_sugeridas` (ignoradas por el batch; FASE B pendiente).
+- **Evidencia:** validate_eventos.js --prod PASS (11 validos, 0 colisiones;
+  total pasa de 50 a 61 < 200). upload-eventos.js --seed -> 11/11 subidos
+  (ids detallados en el log; seed generado `scripts/seed-eventos-2026-09-08.js`,
+  node --check OK, ASCII 0). Verificado en prod: /api/destinos?cat=evento
+  total 61; paginas 200 (feria-gastronomica-sabores-de-bogota-2026.html,
+  muestra-cine-independiente-...html); categorias detectadas correctas
+  (gastro/musica/cultura/naturaleza); multidia correcto (MAMBO activo 8,10 y
+  13 Sep, no el 14; rango '8-13 Sep'; danza activa 9-10 Sep, no el 11).
+- **Fix de pipeline:** `upload-eventos.js` parseaba los flags como posicionales
+  (`--seed` se usaba como URL -> 'Failed to parse URL'); ahora los flags no
+  desplazan archivo/URL/TOKEN. `validate_eventos.js`/`upload-eventos.js`
+  reemplazan `process.exit()` por `process.exitCode` para evitar el crash de
+  libuv en Windows tras fetch (exit code anormal -1073740791).
+
 ---
 
 ## Regla de actualizacion

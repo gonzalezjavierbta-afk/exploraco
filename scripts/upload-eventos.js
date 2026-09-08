@@ -18,10 +18,11 @@ const { validateEvents } = require('./validate_eventos.js');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = process.argv[3] || 'https://exploraco.vercel.app';
-const TOKEN    = process.argv[4] || process.env.ADMIN_SECRET || 'exploraco12345';
 const FLAGS    = process.argv.slice(2);
-const file     = FLAGS[0];
+const positional = FLAGS.filter(function (a) { return a.charAt(0) !== '-'; });
+const file     = positional[0];
+const BASE_URL = positional[1] || 'https://exploraco.vercel.app';
+const TOKEN    = positional[2] || process.env.ADMIN_SECRET || 'exploraco12345';
 const dry      = FLAGS.indexOf('--dry') !== -1;
 const seed     = FLAGS.indexOf('--seed') !== -1;
 
@@ -270,8 +271,8 @@ function genSeed(normalized) {
 
   console.log('\nRESULTADO: ' + okCount + '/' + normalized.length + ' subidos.'
     + (failList.length ? ' Fallos: ' + failList.join(', ') : ''));
-  if (failList.length) process.exit(1);
+  if (failList.length) process.exitCode = 1;
 })().catch(function (err) {
   console.error('ERROR:', err.message);
-  process.exit(1);
+  process.exitCode = 1;
 });
