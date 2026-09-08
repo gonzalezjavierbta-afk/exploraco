@@ -1737,6 +1737,29 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   corregido en mi-perfil.html, H-4 (GUIA_DE_DESARROLLO.md seccion 7.7)
   corregido.
 
+### TSK-081: Pagina dinamica cinemateca-de-bogota.html (centro cultural de las artes audiovisuales)
+- **Estado:** COMPLETADA
+- **Detalle:** Pagina de la Cinemateca de Bogota (cat sitio, slug
+  `cinemateca-de-bogota`, `status='published'`, `destacado=true`, rating 0).
+  Datos investigados por Gemini v2 (ficha JSON) y convertidos al contrato .md
+  validado con `validate_ficha.js` (PASS). 4 salas de proyeccion (Sala Capital
+  272 personas), BECMA, laboratorios Idartes, 3 secretos (MIDBO, consulta
+  gratuita, laboratorios), 3 entradas, 1 tour (rating ''/review_count 0, ADR-009),
+  3 equipamiento, 3 itinerario, 3 dificultad_tags, 5 FAQs, fotos reales
+  verificadas HEAD 200 (BUG-022). `fauna_flora: ''` (paridad admin: el campo no
+  se envia cuando esta vacio; evita seccion fantasma en el renderer). Archivos:
+  `scripts/seed-cinemateca-de-bogota.js`, `scripts/load-cinemateca-de-bogota-api.js`,
+  `scripts/smoke_test_cinemateca.js` y `exploraco desarrollo/ficha-cinemateca-de-bogota.md`.
+- **Evidencia:** Escudo GOLD PASS: node --check OK en los 3 scripts; ASCII-safety
+  0 bytes >127 en los 3. Smoke test 13 checks PASS (incluye seccion FAQ via
+  det.faqs, degradacion sin seccion fauna con lista vacia, instagram como
+  `instagram.com/cinematecabta`) + balance de divs open=258 close=258 diff=0.
+  Carga en prod via loader (DELETE+POST Bearer exploraco12345): destino creado
+  id 62a1099c-3bbf-43c3-9dcc-a892e67a4f64 status=published destacado=True.
+  Verificacion en vivo 2026-09-07: /cinemateca-de-bogota.html = 200 (65KB) con
+  las secciones del motor sitio y divs 291/291; /api/destinos lista el slug;
+  sitemap.xml incluye el slug (priority 0.80).
+
 ---
 
 ## Regla de actualizacion

@@ -1,0 +1,261 @@
+{
+  "BASE": {
+    "slug": "cinemateca-de-bogota",
+    "nombre": "Cinemateca de Bogotá",
+    "categoria_slug": "sitio",
+    "lead": "El centro cultural de las artes audiovisuales en Colombia, ubicado en el corazón del centro histórico de Bogotá. Un espacio emblemático dedicado a la preservación, circulación y creación cinematográfica con salas de proyección de última tecnología.",
+    "descripcion": "La Cinemateca de Bogotá, anteriormente conocida como Cinemateca Distrital, es un centro cultural público dedicado al arte audiovisual colombiano e internacional. Fundada originalmente en 1971 por el Instituto Distrital de Cultura y Turismo, se trasladó en junio de 2019 a una moderna infraestructura cultural de más de 8.500 metros cuadrados ubicada sobre la Calle 19, en el centro histórico de Bogotá.\n\nEl complejo cultural cuenta con cuatro salas de proyección de nivel profesional (incluyendo la Sala Capital con capacidad para 272 personas), múltiples salas de exposición, mediateca con un extenso archivo fílmico y documental, laboratorios de creación digital y sonido, talleres para actividades interactivas, la Biblioteca Especializada en Cine y Medios Audiovisuales (Becma) y áreas de café y librería cultural.\n\nAdemás de su programación regular de cine independiente, retrospectivas, festivales internacionales y muestras nacionales, la Cinemateca de Bogotá actúa como un nodo de formación y fomento a la creación audiovisual a través del Idartes (Instituto Distrital de las Artes). Es un punto de encuentro imprescindible para estudiantes, realizadores y amantes del cine de la ciudad.",
+    "highlight": "4.8/10 · Más de 12.000 reseñas",
+    "ciudad": "Bogotá",
+    "region": "Cundinamarca",
+    "barrio": "Las Nieves",
+    "lat": 4.6041,
+    "lng": -74.0700,
+    "whatsapp": "",
+    "telefono": "+576013795750",
+    "email": "atencion.ciudadano@idartes.gov.co",
+    "web": "https://www.cinematecadebogota.gov.co",
+    "instagram": "@cinematecabta",
+    "precio_desde": "Entrada general $6.000 COP",
+    "horario": "Mar-Dom 9:00 AM - 8:00 PM. Lunes cerrado",
+    "emoji": "🎬",
+    "hero_bg": "linear-gradient(135deg, #1f1c2c 0%, #928dab 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Cine de Arte · Centro Cultural · Mediateca · Archivo Fílmico",
+    "capacidad": "272 personas Sala Capital",
+    "como_llegar": "TransMilenio estación Las Aguas / Universidades, caminar 2 cuadras por Cra 3. Dirección: Carrera 3 # 19-10",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Cine de arte, exposiciones, mediateca y laboratorios creativos",
+    "dificultad": "Facil",
+    "dificultad_desc": "Accesible para todo público con infraestructura adaptada a personas con movilidad reducida.",
+    "duracion": "2-4 horas",
+    "altitud": "2600",
+    "temporada": ["Todo el año"],
+    "precio_entrada": "Entrada general a cine $6.000 COP; estudiantes, docentes y adultos mayores $5.000 COP. Exposiciones y Mediateca gratuitas.",
+    "distancia": "Centro histórico de Bogotá",
+    "como_llegar": "TransMilenio hasta las estaciones Las Aguas o Universidades, o buses SITP por la Carrera 3a o Calle 19.",
+    "permisos": "Boletas en taquilla o tuboleta.com para proyecciones. Acceso libre a galerías y mediateca.",
+    "temporada_nota": "Programación cultural continua durante todo el año.",
+    "fauna_flora": [],
+    "secretos": [
+      {
+        "icono": "🎥",
+        "titulo": "Sede de Festivales de Cine",
+        "texto": "Es la sede principal de festivales cinematográficos de alto impacto como la MIDBO (Muestra Internacional Documental de Bogotá) y Muestras de Cine Internacional.",
+        "tag": "Imperdible",
+        "tag_color": "gold"
+      },
+      {
+        "icono": "🗄️",
+        "titulo": "Consulta Gratuita en BECMA",
+        "texto": "En la Biblioteca Especializada en Cine y Medios Audiovisuales puedes consultar miles de libros y ver películas colombianas de archivo de forma totalmente gratuita.",
+        "tag": "Gratuito",
+        "tag_color": "green"
+      },
+      {
+        "icono": "🎧",
+        "titulo": "Laboratorios de Creación Audiovisual",
+        "texto": "Cuenta con talleres equipados para la producción de contenidos digitales, animación y edición de sonido abiertos mediante convocatorias y talleres de Idartes.",
+        "tag": "Creativo",
+        "tag_color": "purple"
+      }
+    ],
+    "regulaciones": "Prohibido el ingreso de comida pesada a las salas de proyección. Mantener silencio durante las funciones.",
+    "checklist_tip": "Consulta la cartelera mensual en formato digital antes de tu visita para elegir la función de tu preferencia.",
+    "entradas": [
+      {
+        "tipo": "Entrada General Cine",
+        "precio": "$6.000 COP",
+        "incluye": "Acceso a 1 función en sala de proyección",
+        "link": "https://www.cinematecadebogota.gov.co"
+      },
+      {
+        "tipo": "Entrada Preferencial Cine",
+        "precio": "$5.000 COP",
+        "incluye": "Acceso a 1 función para estudiantes, docentes o adultos mayores",
+        "link": "https://www.cinematecadebogota.gov.co"
+      },
+      {
+        "tipo": "Acceso a Mediateca y Exposiciones",
+        "precio": "$0 COP",
+        "incluye": "Ingreso a las salas de exposición de arte y consulta bibliográfica en Becma",
+        "link": "https://www.cinematecadebogota.gov.co"
+      }
+    ],
+    "tours": [
+      {
+        "nombre": "Recorrido por la Infraestructura de la Cinemateca",
+        "precio": "0",
+        "precio_sub": "Entrada libre previa inscripción",
+        "duracion": "1 hora",
+        "tipo_tour": "Grupal",
+        "idioma": "Español",
+        "max_personas": "20 personas",
+        "rating": "",
+        "review_count": 0,
+        "descripcion": "Visita mediada para conocer las 4 salas de proyección, la mediateca, los laboratorios de sonido y la historia de la cinemateca en Bogotá.",
+        "incluye": ["Mediador cultural", "Acceso a laboratorios y salas"],
+        "no_incluye": ["Boleta para función comercial de cine"],
+        "link_reserva": "https://www.cinematecadebogota.gov.co",
+        "featured": true
+      }
+    ],
+    "equipamiento": [
+      {
+        "item": "Documento de Identidad o Carnet Estudiantil",
+        "prioridad": "Obligatorio"
+      },
+      {
+        "item": "Chaqueta o abrigo para salas climatizadas",
+        "prioridad": "Recomendado"
+      },
+      {
+        "item": "Calzado cómodo",
+        "prioridad": "Recomendado"
+      }
+    ],
+    "itinerario": [
+      {
+        "dia": "Día 1",
+        "hora": "10:00 AM",
+        "titulo": "Visita a la Mediateca BECMA",
+        "icono": "📱",
+        "detalle": "Consulta libros de historia del cine y afiches históricos de películas colombianas.",
+        "tags": ["Cultura", "Gratuito"]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "11:30 AM",
+        "titulo": "Recorrido por la Galería de Exposiciones",
+        "icono": "🎨",
+        "detalle": "Disfruta de instalaciones audiovisuales e históricas en el nivel inferior.",
+        "tags": ["Arte", "Exposición"]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "03:00 PM",
+        "titulo": "Proyección Cinematográfica",
+        "icono": "🎟️",
+        "detalle": "Asiste a una función en la Sala Capital con tecnología de proyección y sonido de alta fidelidad.",
+        "tags": ["Cine", "Entretenimiento"]
+      }
+    ],
+    "dificultad_tags": [
+      {
+        "texto": "Apto para personas con movilidad reducida",
+        "apto": true
+      },
+      {
+        "texto": "Apto para familias y niños",
+        "apto": true
+      },
+      {
+        "texto": "Apto para adultos mayores",
+        "apto": true
+      }
+    ],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "¿Dónde queda ubicada la Cinemateca de Bogotá?",
+      "respuesta": "Se encuentra ubicada en la Carrera 3 # 19-10, en el centro histórico de Bogotá."
+    },
+    {
+      "pregunta": "¿Cuánto cuesta la entrada para ver cine?",
+      "respuesta": "La boleta general cuesta $6.000 COP. Estudiantes, docentes y adultos mayores pagan $5.000 COP."
+    },
+    {
+      "pregunta": "¿Cuáles son los horarios de la Cinemateca de Bogotá?",
+      "respuesta": "Abre de martes a domingo de 9:00 AM a 8:00 PM. Los lunes permanece cerrada."
+    },
+    {
+      "pregunta": "¿Tengo que pagar para entrar a las exposiciones?",
+      "respuesta": "No, la entrada a las galerías de arte y a la mediateca es completamente gratuita."
+    },
+    {
+      "pregunta": "¿Cómo compro las boletas para las funciones de cine?",
+      "respuesta": "Puedes adquirirlas directamente en la taquilla o por internet a través de TuBoleta."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Fachada principal de la Cinemateca de Bogotá en el centro",
+      "caption": "Fachada moderna de la Cinemateca de Bogotá sobre la Carrera 3",
+      "nombres_archivo_wikimedia": [
+        "File:Cinemateca_Distrital_de_Bogotá_2019.jpg",
+        "File:Cinemateca_de_Bogotá_2019.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Vista nocturna de la Cinemateca de Bogotá",
+      "caption": "Iluminación exterior nocturna del complejo cultural",
+      "nombres_archivo_wikimedia": [
+        "File:Cinemateca_de_Bogotá_noche.jpg",
+        "File:Cinemateca_Bogota_night.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Plaza pública y entrada a la Cinemateca de Bogotá",
+      "caption": "Plazuela de acceso público en el centro histórico de la ciudad",
+      "nombres_archivo_wikimedia": [
+        "File:Cinemateca_Distrital_Bogotá_fachada.jpg",
+        "File:Plaza_Cinemateca_Bogota.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Interior del edificio de la Cinemateca de Bogotá",
+      "caption": "Espacios interiores y pasillos de circulación de la Cinemateca",
+      "nombres_archivo_wikimedia": [
+        "File:Interior_Cinemateca_de_Bogotá.jpg",
+        "File:Cinemateca_de_Bogotá_interior.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Panorámica de la Calle 19 con la Cinemateca de Bogotá",
+      "caption": "Contexto urbano de la Cinemateca de Bogotá sobre la Calle 19",
+      "nombres_archivo_wikimedia": [
+        "File:Cinemateca_Distrital_2020.jpg",
+        "File:Calle_19_Bogota_Cinemateca.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.cinematecadebogota.gov.co",
+      "que_respalda": "Precios de boletería, horarios de atención, infraestructura de salas y catálogo de servicios."
+    },
+    {
+      "tipo": "maps",
+      "url": "https://maps.google.com/?q=Cinemateca+de+Bogot%C3%A1",
+      "que_respalda": "Coordenadas (4.6041, -74.0700), barrio Las Nieves y dirección exacta Carrera 3 # 19-10."
+    },
+    {
+      "tipo": "prensa",
+      "url": "https://www.idartes.gov.co/es/noticias/cinemateca-de-bogota-un-espacio-para-las-artes-audiovisuales",
+      "que_respalda": "Datos históricos de inauguración en 2019, área de 8.500 m2 y aforo de la Sala Capital (272 personas)."
+    }
+  ]
+}

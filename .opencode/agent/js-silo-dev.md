@@ -1,7 +1,7 @@
 ---
 description: Subagente de bajo coste para desarrollo Javascript/Typescript rutinario de ExploraCO. Tareas mec\u00e1nicas, refactor menor, correcciones de l\u00f3gica simple y ajustes en scripts. NO usar para SQL/RLS/seguridad cr\u00edtica (ver sql-security) ni para decisiones de arquitectura.
 mode: subagent
-model: deepseek/deepseek-v4-flash-free
+model: deepseek-v4-flash-free
 permission:
   edit: allow
   bash: allow

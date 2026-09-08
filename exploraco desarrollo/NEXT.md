@@ -4,6 +4,42 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion cinemateca-de-bogota - creada la pagina dinamica del centro cultural (2026-09-07) - TSK-081
+
+Creacion y carga a produccion de la pagina dinamica de la Cinemateca de
+Bogota (cat sitio, slug `cinemateca-de-bogota`, destacado, rating 0). La
+investigacion de Gemini v2 llego como `exploraco desarrollo/ficha-cinemateca-de-bogota.json`;
+se convirtio al contrato .md con fotos reales de Wikimedia verificadas
+HEAD 200 (BUG-022; las 10 URLs que sugirio Gemini daban `missing`) y se
+valido con `validate_ficha.js` (PASS).
+
+**Cambios:**
+- `scripts/seed-cinemateca-de-bogota.js` (nuevo): patron seed-el-virrey,
+  ASCII-safe (0 bytes >127, emojis y '·' en escapes \u), upsert
+  `ON CONFLICT slug` con merge JSONB, `FAQS` en destinos_detalles y 5
+  fotos (primera HERO). `fauna_flora: ''` por paridad con admin.html (el
+  campo es un textarea que se omite vacio; `'[]'` crearia seccion fantasma).
+  Tours con rating ''/review_count 0 (no hay resenas sembradas, ADR-009).
+- `scripts/load-cinemateca-de-bogota-api.js` (nuevo): loader DELETE+POST a
+  `https://exploraco.vercel.app/api/admin-destinos` (Bearer exploraco12345).
+- `scripts/smoke_test_cinemateca.js` (nuevo): 13 checks PASS + balance de
+  divs 258/258; verifica FAQ via `det.faqs`, ausencia de `id="fauna"` y el
+  formato de instagram que produce el renderer (`instagram.com/cinematecabta`).
+- `exploraco desarrollo/ficha-cinemateca-de-bogota.md`: ficha contract
+  validada (fuente de verdad del seed).
+- Fix de modelos en `.opencode/agent/`: `deepseek/deepseek-v4-flash` no es
+  un ID valido en el runtime (carga de agentes cacheada al inicio de sesion,
+  por eso la delegacion a content-loader/docs-keeper sigue fallando hasta
+  reiniciar). Corregidos a `deepseek-v4-flash` (sin prefijo de proveedor):
+  content-loader, explore, research-agent, docs-keeper; js-silo-dev a
+  `deepseek-v4-flash-free`. AGENTS.md y opencode.json siguen documentando la
+  forma con prefijo.
+
+**Verificado en produccion (2026-09-07):** /cinemateca-de-bogota.html = 200
+(65KB) con las secciones del motor sitio y divs 291/291; slug presente en
+/api/destinos (id 62a1099c-3bbf-43c3-9dcc-a892e67a4f64) y en sitemap.xml
+(priority 0.80).
+
 ### Sesion Milestones v2 - Plan Maestro de Gaming (2026-09-07) - TSK-080
 
 Implementacion del Plan Maestro de Gaming (Steam + SKATE + Albion) del

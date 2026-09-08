@@ -31,6 +31,8 @@ Antes de procesar cualquier código, los agentes principales (build/plan) deben 
 
 **Regla de oro:** todo agente sin `model:` explicito en su `.md` hereda el modelo principal (`deepseek/deepseek-v4-pro`). Los agentes de la tabla 1.1 SÍ tienen `model:` asignado en `.opencode/agent/`.
 
+**Workflow de investigacion externa:** la investigacion web de NUEVOS items de directorio (hostal, comida, sitio, evento) se ejecuta en Google Gemini (externo, no consume cuota) mediante el skill `gemini-research` (`prompts/GEMINI_MASTER_PROMPT.md`). `research-agent` queda para fichas legacy o validaciones, y toda ingesta se valida con `scripts/validate_ficha.js` antes de pasar a `create-dynamic-page`.
+
 ## 2. Reglas del Espacio de Trabajo contra la Deuda Técnica
 Para mitigar la crisis de mantenibilidad, duplicación de código y rotación de commits, el runtime de OpenCode aplicará las siguientes restricciones:
 1. **Regla de No-Duplicidad (Tripwire de 5 líneas)**: Queda prohibido copiar y pegar bloques de código existentes de más de 5 líneas para adaptarlos localmente. Si se requiere una funcionalidad similar en otra sección, se debe refactorizar el código base para crear una abstracción o función reutilizable.
