@@ -24,18 +24,6 @@
       ".opencode/snapshots/**"
     ]
   },
-  "formatter": true,
-  "lsp": true,
-  "agent": {
-    "exp-pickle": {
-      "description": "Agente experimental gratuito MiMo-v2.5 para tareas de bajo riesgo",
-      "model": "opencode/big-pickle",
-      "prompt": "Eres exp-pickle. Realiza tareas rutinarias de desarrollo de software, refactorización menor y linter. Respeta límites de rate limits. Prohibido manipular credenciales, datos de seguridad crítica o lógica de trading.",
-      "tools": {
-        "write": true,
-        "edit": true,
-        "bash": true
-      }
-    }
-  }
+"formatter": true,
+  "lsp": true
 }
