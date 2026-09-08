@@ -93,6 +93,18 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 .ms-btn.has-events{color:#1a1a1a;border-color:#ccc}
 .ms-btn.active{background:var(--black);border-color:var(--black);color:#fff}
 
+/* DAY STRIP (vista por dia) */
+.day-strip{display:flex;gap:4px;flex-wrap:wrap;padding:10px 4%;background:#fff;border-bottom:1px solid var(--border);overflow-x:auto;align-items:center}
+.ds-btn{padding:5px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border);transition:all .12s;white-space:nowrap;background:#fff;color:var(--muted)}
+.ds-btn:hover{border-color:var(--gold);color:#1a1a1a}
+.ds-btn.has-events{color:#1a1a1a;border-color:#ccc}
+.ds-btn.active{background:var(--black);border-color:var(--black);color:#fff}
+.ds-btn.today{background:var(--gold);border-color:var(--gold);color:#fff}
+.ds-nav{border:1.5px solid var(--border);background:#fff;border-radius:3px;width:28px;height:28px;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;flex-shrink:0}
+.ds-nav:hover{border-color:var(--gold);color:var(--gold)}
+.ev-range{font-size:10px;color:var(--gold);font-weight:700}
+.ev-curso{display:inline-block;background:var(--gold-l);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-left:6px}
+
 @media(max-width:600px){.ah-title{font-size:32px}.month-events{grid-template-columns:1fr}.filters-bar{flex-direction:column;align-items:flex-start}.search-wrap{margin-left:0;width:100%}.search-inp{width:100%}}
 
 /* ── MOBILE NAV DETAIL PAGES ── */
@@ -200,6 +212,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
     <div class="fb-btn" data-cat="musica" onclick="setCat(this,'musica')">🎵 Música</div>
     <div class="fb-btn" data-cat="gastro" onclick="setCat(this,'gastro')">🍽️ Comida</div>
     <div class="fb-btn" data-cat="naturaleza" onclick="setCat(this,'naturaleza')">🏔️ Naturaleza</div>
+    <div class="fb-btn" data-cat="cultura" onclick="setCat(this,'cultura')">🎭 Cultura</div>
   </div>
   <div class="fb-sep"></div>
   <div class="fb-group">
@@ -216,17 +229,21 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 
 <div class="count-bar"><span>Mostrando <b id="count-lbl">0</b> eventos</span></div>
 
+<!-- Day strip -->
+<div class="day-strip" id="day-strip"></div>
+
 <div class="calendar-body" id="calendar-body"></div>
 
+<script src="agenda-shared.js"></script>
 <script>
 const AGENDA_EVENTS=[
   /* ── FESTIVALES ── */
-  {id:1, name:'Carnaval de Barranquilla',         cat:'festival',  city:'Barranquilla', day:14, month:'Feb', time:'Todo el día',   price:'Palcos $200.000', loc:'Vía 40, Barranquilla',             emoji:'💃', color:'#A855F7', url:'carnaval-barranquilla.html', featured:true},
-  {id:2, name:'Feria de las Flores',               cat:'festival',  city:'Medellín',     day:1,  month:'Ago', time:'10am–10pm',    price:'Gratis',          loc:'Centro, Medellín',                 emoji:'🌸', color:'#A855F7', url:'feria-de-las-flores.html',    featured:true},
+  {id:1, name:'Carnaval de Barranquilla',         cat:'festival',  city:'Barranquilla', day:14, month:'Feb', dayEnd:17, monthEnd:'Feb', time:'Todo el día',   price:'Palcos $200.000', loc:'Vía 40, Barranquilla',             emoji:'💃', color:'#A855F7', url:'carnaval-barranquilla.html', featured:true},
+  {id:2, name:'Feria de las Flores',               cat:'festival',  city:'Medellín',     day:1,  month:'Ago', dayEnd:10, monthEnd:'Ago', time:'10am–10pm',    price:'Gratis',          loc:'Centro, Medellín',                 emoji:'🌸', color:'#A855F7', url:'feria-de-las-flores.html',    featured:true},
   {id:3, name:'Festival Iberoamericano de Teatro', cat:'festival',  city:'Bogotá',       day:3,  month:'Mar', time:'Varios horarios',price:'Desde $30.000',  loc:'Teatros de Bogotá',                emoji:'🎭', color:'#A855F7', url:'index.html',                  featured:true},
   {id:4, name:'Festival de Jazz de Bogotá',        cat:'musica',    city:'Bogotá',       day:10, month:'Oct', time:'6pm–11pm',     price:'Desde $0',        loc:'Teatro Nacional, Bogotá',          emoji:'🎷', color:'#3B82F6', url:'index.html',                  featured:false},
-  {id:5, name:'Feria de Cali · Salsa y cultura',   cat:'festival',  city:'Cali',         day:25, month:'Dic', time:'Todo el día',  price:'Gratis',          loc:'Centro histórico, Cali',           emoji:'🕺', color:'#A855F7', url:'index.html',                  featured:true},
-  {id:6, name:'Festival Vallenato · Valledupar',   cat:'musica',    city:'Valledupar',   day:27, month:'Abr', time:'Todo el día',  price:'Gratis + palcos', loc:'Parque de la Leyenda, Valledupar', emoji:'🎸', color:'#3B82F6', url:'index.html',                  featured:true},
+  {id:5, name:'Feria de Cali · Salsa y cultura',   cat:'festival',  city:'Cali',         day:25, month:'Dic', dayEnd:30, monthEnd:'Dic', time:'Todo el día',  price:'Gratis',          loc:'Centro histórico, Cali',           emoji:'🕺', color:'#A855F7', url:'index.html',                  featured:true},
+  {id:6, name:'Festival Vallenato · Valledupar',   cat:'musica',    city:'Valledupar',   day:27, month:'Abr', dayEnd:30, monthEnd:'Abr', time:'Todo el día',  price:'Gratis + palcos', loc:'Parque de la Leyenda, Valledupar', emoji:'🎸', color:'#3B82F6', url:'index.html',                  featured:true},
   /* ── MÚSICA ── */
   {id:7, name:'Noche de Gaitas · Ciudad Amurallada',cat:'musica',   city:'Cartagena',    day:20, month:'Mar', time:'7pm–11pm',    price:'$25.000',         loc:'Plaza Trinidad, Cartagena',        emoji:'🎵', color:'#3B82F6', url:'hostal-walled-city.html',     featured:false},
   {id:8, name:'Concierto Sinfónico al Aire Libre',  cat:'musica',   city:'Medellín',     day:12, month:'Sep', time:'5pm–8pm',     price:'Gratis',          loc:'Parque de los Deseos, Medellín',   emoji:'🎼', color:'#3B82F6', url:'index.html',                  featured:false},
@@ -247,6 +264,8 @@ var catFilter = 'all';
 var cityFilter = '';
 var searchFilter = '';
 var monthFilter = '';
+var dayFilter = null;       // vista por dia (Date) o null
+var dayAnchor = new Date(); // ventana del strip por dia
 
 function setCat(btn, cat) {
   document.querySelectorAll('.fb-btn[data-cat]').forEach(function(b){ b.classList.remove('on'); });
@@ -265,11 +284,12 @@ function setMonth(m) {
 }
 
 function filtered() {
+  var AU = window.AgendaUtil;
   return AGENDA_EVENTS.filter(function(e) {
     if(catFilter !== 'all' && e.cat !== catFilter) return false;
     if(cityFilter && e.city !== cityFilter) return false;
     if(searchFilter && e.name.toLowerCase().indexOf(searchFilter) === -1 && e.city.toLowerCase().indexOf(searchFilter) === -1) return false;
-    if(monthFilter && e.month !== monthFilter) return false;
+    if(monthFilter && AU.evActiveMonths(e).indexOf(monthFilter) === -1) return false;
     return true;
   });
 }
@@ -280,73 +300,124 @@ function catStyle(cat) {
     musica:   {bg:'#EFF6FF',color:'#1d4ed8'},
     gastro:   {bg:'#FEF2F2',color:'#b91c1c'},
     naturaleza:{bg:'#F0FDF4',color:'#15803d'},
+    cultura:  {bg:'#FDF2F8',color:'#BE185D'},
   };
   return styles[cat] || {bg:'#F8F7F3',color:'#555'};
 }
 
 function render() {
+  var AU = window.AgendaUtil;
   var evs = filtered();
   document.getElementById('count-lbl').textContent = evs.length;
   document.getElementById('total-stat').textContent = AGENDA_EVENTS.length;
   document.getElementById('featured-stat').textContent = AGENDA_EVENTS.filter(function(e){ return e.featured; }).length;
-  
-  // Group by month
-  var byMonth = {};
-  evs.forEach(function(e) {
-    if(!byMonth[e.month]) byMonth[e.month] = [];
-    byMonth[e.month].push(e);
-  });
   
   var body = document.getElementById('calendar-body');
   if(!evs.length) {
     body.innerHTML = '<div class="no-events"><div class="ne-icon">📭</div><div class="ne-text">Sin eventos con estos filtros. Prueba cambiando la categoría o ciudad.</div></div>';
     return;
   }
+
+  // Dedupe por url/id (mismo evento puede llegar hardcodeado y de la API)
+  var seen = {};
+  evs = evs.filter(function(e){ var k = e.url || ('e'+e.id); if(seen[k]) return false; seen[k]=true; return true; });
+
+  // Vista por dia: eventos activos en la fecha elegida (multidia incluido)
+  if(dayFilter) {
+    body.innerHTML = renderDayView(evs, dayFilter);
+    return;
+  }
+
+  // Agrupar por MESES ACTIVOS: un evento multidia aparece en cada mes que cubre
+  var byMonth = {};
+  evs.forEach(function(e) {
+    AU.evActiveMonths(e).forEach(function(m){
+      if(!byMonth[m]) byMonth[m] = [];
+      byMonth[m].push(e);
+    });
+  });
   
   var html = '';
   MONTH_ORDER.forEach(function(m) {
     if(!byMonth[m]) return;
     var mes = byMonth[m];
+    mes.sort(function(a,b){
+      var ra = AU.normDates(a, new Date());
+      var rb = AU.normDates(b, new Date());
+      return (+ra.start) - (+rb.start);
+    });
     html += '<div class="month-block" id="month-'+m+'">';
     html += '<div class="month-header"><div class="month-name">'+m+'</div><div class="month-count">'+mes.length+' evento'+(mes.length!==1?'s':'')+'</div></div>';
     html += '<div class="month-events">';
-    mes.forEach(function(e) {
-      var cs = catStyle(e.cat);
-      var hasPage = e.url !== 'index.html';
-      var catLabels = {festival:'Festival',musica:'Música',gastro:'Gastro',naturaleza:'Naturaleza'};
-      html += '<'+(hasPage?'a href="'+e.url+'"':'div')+' class="ev-card'+(e.featured?' featured':'')+'"'+(e.featured?' style="border-color:'+e.color+'"':'')+' >';
-      html += '<div class="ev-header">';
-      html += '<div class="ev-date-box"><div class="ev-day">'+e.day+'</div><div class="ev-month-lbl">'+e.month+'</div></div>';
-      html += '<div class="ev-meta">';
-      html += '<div class="ev-cat-pill" style="background:'+cs.bg+';color:'+cs.color+'">'+e.emoji+' '+(catLabels[e.cat]||e.cat)+'</div>';
-      html += '<div class="ev-name">'+e.name+'</div>';
-      html += '<div class="ev-city">📍 '+e.loc+'</div>';
-      html += '</div></div>';
-      html += '<div class="ev-body">';
-      html += '<div class="ev-details">';
-      html += '<div class="ev-detail">🕐 '+e.time+'</div>';
-      html += '<div class="ev-detail">💰 '+e.price+'</div>';
-      if(e._artists) html += '<div class="ev-detail">🎤 '+e._artists+'</div>';
-      html += '</div>';
-      if(e.featured) html += '<div class="ev-featured-badge">⭐ Destacado</div>';
-      html += '</div>';
-      if(hasPage) {
-        html += '<a href="'+e.url+'" class="ev-link-btn">Ver detalles →</a>';
-        html += '</a>';
-      } else {
-        html += '<div class="ev-link-btn external">Próximamente</div>';
-        html += '</div>';
-      }
-    });
+    mes.forEach(function(e) { html += evCard(e); });
     html += '</div></div>';
   });
   body.innerHTML = html;
 }
 
+function renderDayView(evs, date) {
+  var AU = window.AgendaUtil;
+  var list = evs.filter(function(e){ return AU.evActiveOn(e, date); });
+  var today = new Date();
+  var same = date.getFullYear()===today.getFullYear() && date.getMonth()===today.getMonth() && date.getDate()===today.getDate();
+  var label = AU.DOW[date.getDay()] + ' ' + date.getDate() + ' ' + AU.MONTHS[date.getMonth()] + (same ? ' · Hoy' : '');
+  var html = '<div class="month-block">';
+  html += '<div class="month-header"><div class="month-name">'+label+'</div><div class="month-count">'+list.length+' evento'+(list.length!==1?'s':'')+'</div></div>';
+  if(!list.length){
+    html += '<div class="no-events" style="padding:24px 12px"><div class="ne-icon">🗓️</div><div class="ne-text">Sin eventos este día. Prueba otro día del strip.</div></div>';
+  } else {
+    html += '<div class="month-events">';
+    list.forEach(function(e){ html += evCard(e); });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function evCard(e) {
+  var AU = window.AgendaUtil;
+  var cs = catStyle(e.cat);
+  var hasPage = e.url && e.url !== 'index.html';
+  var catLabels = {festival:'Festival',musica:'Música',gastro:'Gastro',naturaleza:'Naturaleza',cultura:'Cultura'};
+  var today = new Date();
+  var enCurso = AU.evActiveOn(e, today);
+  var range = AU.evRangeText(e);
+  var html = '';
+  html += '<'+(hasPage?'a href="'+e.url+'"':'div')+' class="ev-card'+(e.featured?' featured':'')+'"'+(e.featured?' style="border-color:'+e.color+'"':'')+' >';
+  html += '<div class="ev-header">';
+  html += '<div class="ev-date-box"><div class="ev-day">'+e.day+'</div><div class="ev-month-lbl">'+e.month+'</div></div>';
+  html += '<div class="ev-meta">';
+  html += '<div class="ev-cat-pill" style="background:'+cs.bg+';color:'+cs.color+'">'+e.emoji+' '+(catLabels[e.cat]||e.cat)+'</div>';
+  html += '<div class="ev-name">'+e.name+'</div>';
+  html += '<div class="ev-city">📍 '+e.loc+'</div>';
+  html += '</div></div>';
+  html += '<div class="ev-body">';
+  html += '<div class="ev-details">';
+  html += '<div class="ev-detail">📅 '+range+'</div>';
+  html += '<div class="ev-detail">🕐 '+e.time+'</div>';
+  html += '<div class="ev-detail">💰 '+e.price+'</div>';
+  if(e._artists) html += '<div class="ev-detail">🎤 '+e._artists+'</div>';
+  html += '</div>';
+  if(enCurso) html += '<div class="ev-featured-badge">▶ En curso</div>';
+  else if(e.featured) html += '<div class="ev-featured-badge">⭐ Destacado</div>';
+  html += '</div>';
+  if(hasPage) {
+    html += '<a href="'+e.url+'" class="ev-link-btn">Ver detalles →</a>';
+    html += '</a>';
+  } else {
+    html += '<div class="ev-link-btn external">Próximamente</div>';
+    html += '</div>';
+  }
+  return html;
+}
+
 function buildMonthStrip() {
+  var AU = window.AgendaUtil;
   var strip = document.getElementById('month-strip');
   var evsByMonth = {};
-  AGENDA_EVENTS.forEach(function(e){ evsByMonth[e.month] = (evsByMonth[e.month]||0)+1; });
+  AGENDA_EVENTS.forEach(function(e){
+    AU.evActiveMonths(e).forEach(function(m){ evsByMonth[m] = (evsByMonth[m]||0)+1; });
+  });
   strip.innerHTML = '';
   MONTH_ORDER.forEach(function(m) {
     var has = evsByMonth[m] > 0;
@@ -357,6 +428,47 @@ function buildMonthStrip() {
     btn.onclick = (function(mm){ return function(){ setMonth(mm); }; })(m);
     strip.appendChild(btn);
   });
+}
+
+/* ── STRIP POR DIA (multidia) ── */
+function buildDayStrip() {
+  var AU = window.AgendaUtil;
+  var strip = document.getElementById('day-strip');
+  if(!strip) return;
+  var html = '';
+  html += '<button class="ds-nav" onclick="shiftDayStrip(-7)" aria-label="Semana anterior">‹</button>';
+  html += '<button class="ds-btn today" onclick="todayDayFilter()">Hoy</button>';
+  for(var i=-2;i<15;i++){
+    var d = new Date(dayAnchor);
+    d.setDate(dayAnchor.getDate()+i);
+    var has = AGENDA_EVENTS.some(function(e){ return AU.evActiveOn(e, d); });
+    var sel = dayFilter && d.getFullYear()===dayFilter.getFullYear() && d.getMonth()===dayFilter.getMonth() && d.getDate()===dayFilter.getDate();
+    html += '<button class="ds-btn'+(sel?' active':'')+(has?' has-events':'')+'" onclick="setDayFilter(new Date('+d.getFullYear()+','+d.getMonth()+','+d.getDate()+'))">'+d.getDate()+' '+AU.MONTHS[d.getMonth()]+'</button>';
+  }
+  html += '<button class="ds-nav" onclick="shiftDayStrip(7)" aria-label="Semana siguiente">›</button>';
+  strip.innerHTML = html;
+}
+
+function setDayFilter(date) {
+  dayFilter = date;
+  monthFilter = '';
+  document.querySelectorAll('.ms-btn').forEach(function(b){ b.classList.remove('active'); });
+  buildDayStrip();
+  render();
+}
+
+function todayDayFilter() {
+  dayAnchor = new Date();
+  dayFilter = new Date();
+  buildDayStrip();
+  render();
+}
+
+function shiftDayStrip(days) {
+  var d = new Date(dayAnchor);
+  d.setDate(d.getDate() + days);
+  dayAnchor = d;
+  buildDayStrip();
 }
 
 function buildCitySelect() {
@@ -379,44 +491,36 @@ function loadApiEvents() {
     .then(function(r){ return r.json(); })
     .then(function(data){
       if (!data.ok || !data.data || !data.data.length) return;
-      var MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-      var catMap = {
-        'festival': 'festival', 'música': 'musica', 'musica': 'musica',
-        'gastro': 'gastro', 'gastronomía': 'gastro',
-        'naturaleza': 'naturaleza'
-      };
+      var AU = window.AgendaUtil || null;
+      var MONTHS = AU ? AU.MONTHS : ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
       var apiEvents = data.data.map(function(d, i) {
         var t = d.tags || {};
-        var startDate = null;
-        if (t.fecha_inicio && typeof t.fecha_inicio === 'string' && t.fecha_inicio.length >= 10) {
-          startDate = new Date(
-            parseInt(t.fecha_inicio.slice(0, 4), 10),
-            parseInt(t.fecha_inicio.slice(5, 7), 10) - 1,
-            parseInt(t.fecha_inicio.slice(8, 10), 10)
-          );
-        }
+        var startDate = AU ? AU.parseISO(t.fecha_inicio) : null;
+        var endDate = AU && t.fecha_fin ? AU.parseISO(t.fecha_fin) : startDate;
         var day = startDate ? startDate.getDate() : 1;
         var monthIdx = startDate ? startDate.getMonth() : 0;
         var lineup = Array.isArray(t.lineup) ? t.lineup : [];
         var artists = lineup.length ? lineup.map(function(l){ return l.nombre; }).slice(0,3).join(', ') : '';
-        var cat = 'festival';
-        if (d.nombre && (d.nombre.toLowerCase().indexOf('música') !== -1 || d.nombre.toLowerCase().indexOf('concierto') !== -1 || d.nombre.toLowerCase().indexOf('morat') !== -1 || d.nombre.toLowerCase().indexOf('afrodiáspora') !== -1 || d.nombre.toLowerCase().indexOf('voces por la vida') !== -1)) cat = 'musica';
+        var cat = AU ? AU.detectEventCat(d.nombre, t) : 'festival';
         return {
           id: 2000 + i,
-          name: d.nombre,
+          name: d.name || d.nombre || '',
           cat: cat,
-          city: d.ciudad || 'Bogotá',
+          city: d.city || d.ciudad || 'Bogotá',
           day: day,
           month: MONTHS[monthIdx],
-          time: (t.sede || d.horario || 'Variable'),
+          time: d.horario || 'Variable',
           price: d.price || 'Consulta',
-          loc: (t.sede || d.ciudad || 'Bogotá'),
+          loc: t.sede || d.city || d.ciudad || 'Bogotá',
           emoji: d.emoji || '🎉',
           color: '#A855F7',
           url: (d.slug || '') + '.html',
           featured: !!d.destacado,
           _fromApi: true,
-          _artists: artists
+          _artists: artists,
+          start: startDate,
+          end: endDate,
+          tags: t
         };
       });
       // Dedupe por nombre: evita dobles (ej. Rock al Parque existe hardcodeado
@@ -426,6 +530,7 @@ function loadApiEvents() {
       apiEvents = apiEvents.filter(function(e){ return !nombres[e.name]; });
       Array.prototype.push.apply(AGENDA_EVENTS, apiEvents);
       buildMonthStrip();
+      buildDayStrip();
       buildCitySelect();
       render();
     })
@@ -433,6 +538,7 @@ function loadApiEvents() {
 }
 
 buildMonthStrip();
+buildDayStrip();
 buildCitySelect();
 render();
 loadApiEvents();

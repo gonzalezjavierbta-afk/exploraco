@@ -527,6 +527,11 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .cal-day-num:hover{background:var(--gold-light);color:var(--gold)}
 .cal-day-num.today{background:var(--gold);color:#fff}
 .cal-day-num.has-event{color:var(--text);font-weight:900}
+.cal-nav{flex:0 0 auto;border:1.5px solid var(--border);background:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--muted);line-height:1;margin-top:6px}
+.cal-nav:hover{border-color:var(--gold);color:var(--gold)}
+.cal-today{flex:0 0 auto;border:1.5px solid var(--border);border-radius:14px;padding:4px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:#fff;color:var(--muted);cursor:pointer;margin-top:4px}
+.cal-today:hover{border-color:var(--gold);color:var(--gold)}
+.cal-day-num.sel{background:var(--black);color:#fff}
 .cal-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.7;margin:0 auto}
 .cal-dot.hidden{opacity:0}
 .agenda-events{display:flex;flex-direction:column;gap:10px}
@@ -540,6 +545,8 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .ag-ev-cat{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
 .ag-ev-name{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:3px}
 .ag-ev-meta{font-size:10px;color:var(--muted)}
+.ag-ev-range{font-size:10px;color:var(--gold);margin-top:3px;font-weight:600}
+.ag-ev-curso{color:var(--gold);font-weight:700}
 .ag-ev-right{padding:12px 14px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:8px;flex-shrink:0}
 .ag-ev-price{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;color:var(--text)}
 .ag-ev-price.free{color:#166534;background:#F0FDF4;padding:3px 10px;border-radius:3px;font-size:12px}
@@ -867,6 +874,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 
 </style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="agenda-shared.js"></script>
 </head><body>
 
 <nav class="hnav" id="hnav">
@@ -1035,9 +1043,10 @@ textarea.wrinp{resize:vertical;min-height:88px}
           <div class="af-btn" data-af="musica">🎵 Música</div>
           <div class="af-btn" data-af="gastro">🍽️ Comida</div>
           <div class="af-btn" data-af="naturaleza">🏔️ Naturaleza</div>
+          <div class="af-btn" data-af="cultura">🎭 Cultura</div>
         </div>
         <div class="agenda-city-row">
-          <select class="agenda-city-select" id="agenda-city-sel" onchange="agendaCityFilter=this.value;renderAgenda(agendaCat)">
+          <select class="agenda-city-select" id="agenda-city-sel" onchange="agendaCityFilter=this.value;renderAgenda(agendaCat,agendaDayFilter)">
             <option value="">📍 Todas las ciudades</option>
             <option value="Bogotá">Bogotá</option>
             <option value="Medellín">Medellín</option>
@@ -1308,12 +1317,12 @@ const V360_DATA=[
 const MAPA_PLACES=[];
 const AGENDA_EVENTS=[
   /* ── FESTIVALES ── */
-  {id:1, name:'Carnaval de Barranquilla',         cat:'festival',  city:'Barranquilla', day:14, month:'Feb', time:'Todo el día',   price:'Palcos $200.000', loc:'Vía 40, Barranquilla',             emoji:'💃', color:'#A855F7', url:'carnaval-barranquilla.html', featured:true},
-  {id:2, name:'Feria de las Flores',               cat:'festival',  city:'Medellín',     day:1,  month:'Ago', time:'10am–10pm',    price:'Gratis',          loc:'Centro, Medellín',                 emoji:'🌸', color:'#A855F7', url:'feria-de-las-flores.html',    featured:true},
+  {id:1, name:'Carnaval de Barranquilla',         cat:'festival',  city:'Barranquilla', day:14, month:'Feb', dayEnd:17, monthEnd:'Feb', time:'Todo el día',   price:'Palcos $200.000', loc:'Vía 40, Barranquilla',             emoji:'💃', color:'#A855F7', url:'carnaval-barranquilla.html', featured:true},
+  {id:2, name:'Feria de las Flores',               cat:'festival',  city:'Medellín',     day:1,  month:'Ago', dayEnd:10, monthEnd:'Ago', time:'10am–10pm',    price:'Gratis',          loc:'Centro, Medellín',                 emoji:'🌸', color:'#A855F7', url:'feria-de-las-flores.html',    featured:true},
   {id:3, name:'Festival Iberoamericano de Teatro', cat:'festival',  city:'Bogotá',       day:3,  month:'Mar', time:'Varios horarios',price:'Desde $30.000',  loc:'Teatros de Bogotá',                emoji:'🎭', color:'#A855F7', url:'festival-iberoamericano-teatro.html',                  featured:true},
   {id:4, name:'Festival de Jazz de Bogotá',        cat:'musica',    city:'Bogotá',       day:10, month:'Oct', time:'6pm–11pm',     price:'Desde $0',        loc:'Teatro Nacional, Bogotá',          emoji:'🎷', color:'#3B82F6', url:'festival-jazz-bogota.html',                  featured:false},
-  {id:5, name:'Feria de Cali · Salsa y cultura',   cat:'festival',  city:'Cali',         day:25, month:'Dic', time:'Todo el día',  price:'Gratis',          loc:'Centro histórico, Cali',           emoji:'🕺', color:'#A855F7', url:'feria-cali.html',                  featured:true},
-  {id:6, name:'Festival Vallenato · Valledupar',   cat:'musica',    city:'Valledupar',   day:27, month:'Abr', time:'Todo el día',  price:'Gratis + palcos', loc:'Parque de la Leyenda, Valledupar', emoji:'🎸', color:'#3B82F6', url:'festival-vallenato.html',                  featured:true},
+  {id:5, name:'Feria de Cali · Salsa y cultura',   cat:'festival',  city:'Cali',         day:25, month:'Dic', dayEnd:30, monthEnd:'Dic', time:'Todo el día',  price:'Gratis',          loc:'Centro histórico, Cali',           emoji:'🕺', color:'#A855F7', url:'feria-cali.html',                  featured:true},
+  {id:6, name:'Festival Vallenato · Valledupar',   cat:'musica',    city:'Valledupar',   day:27, month:'Abr', dayEnd:30, monthEnd:'Abr', time:'Todo el día',  price:'Gratis + palcos', loc:'Parque de la Leyenda, Valledupar', emoji:'🎸', color:'#3B82F6', url:'festival-vallenato.html',                  featured:true},
   /* ── MÚSICA ── */
   {id:7, name:'Noche de Gaitas · Ciudad Amurallada',cat:'musica',   city:'Cartagena',    day:20, month:'Mar', time:'7pm–11pm',    price:'$25.000',         loc:'Plaza Trinidad, Cartagena',        emoji:'🎵', color:'#3B82F6', url:'hostal-walled-city.html',     featured:false},
   {id:8, name:'Concierto Sinfónico al Aire Libre',  cat:'musica',   city:'Medellín',     day:12, month:'Sep', time:'5pm–8pm',     price:'Gratis',          loc:'Parque de los Deseos, Medellín',   emoji:'🎼', color:'#3B82F6', url:'concierto-sinfonico.html',                  featured:false},
@@ -2753,33 +2762,72 @@ function toggleMapaSave(id, el) {
 var DOW  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 var MONS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+var agendaDayAnchor = new Date();
+var agendaDayFilter = null;
+
+function shiftAgendaStrip(days) {
+  var d = new Date(agendaDayAnchor);
+  d.setDate(d.getDate() + days);
+  agendaDayAnchor = d;
+  buildCalStrip();
+}
+
+function todayAgendaStrip() {
+  agendaDayAnchor = new Date();
+  agendaDayFilter = null;
+  buildCalStrip();
+  renderAgenda(agendaCat);
+}
+
+function pickAgendaDay(date) {
+  agendaDayFilter = date;
+  buildCalStrip();
+  renderAgenda(agendaCat, date);
+}
+
+function agendaHasEventsOn(date) {
+  return AGENDA_EVENTS.some(function(e){ return AgendaUtil.evActiveOn(e, date); });
+}
+
 function buildCalStrip() {
   var strip = document.getElementById('cal-strip');
   if(!strip) return;
   var today = new Date();
   var html = '';
+  html += '<button class="cal-nav" onclick="shiftAgendaStrip(-7)" aria-label="Semana anterior">‹</button>';
+  html += '<button class="cal-today" onclick="todayAgendaStrip()">Hoy</button>';
   for(var i=-2;i<16;i++){
-    var d = new Date(today);
-    d.setDate(today.getDate()+i);
-    var dn=d.getDate(), mn=MONS[d.getMonth()], dw=DOW[d.getDay()], isToday=(i===0);
-    var hasEv = AGENDA_EVENTS.filter(function(e){ return e.day===dn&&e.month===mn; }).length > 0;
-    html += '<div class="cal-day" onclick="filterAgendaByDay('+dn+',\''+mn+'\')">'
+    var d = new Date(agendaDayAnchor);
+    d.setDate(agendaDayAnchor.getDate()+i);
+    var dn=d.getDate(), mn=MONS[d.getMonth()], dw=DOW[d.getDay()];
+    var isToday = d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth() && dn===today.getDate();
+    var isSel = agendaDayFilter && d.getFullYear()===agendaDayFilter.getFullYear() && d.getMonth()===agendaDayFilter.getMonth() && dn===agendaDayFilter.getDate();
+    var hasEv = agendaHasEventsOn(d);
+    html += '<div class="cal-day" onclick="pickAgendaDay(new Date('+d.getFullYear()+','+d.getMonth()+','+dn+'))">'
       +'<div class="cal-day-label">'+dw+'</div>'
-      +'<div class="cal-day-num'+(isToday?' today':hasEv?' has-event':'')+'">'+dn+'</div>'
+      +'<div class="cal-day-num'+(isToday?' today':isSel?' sel':'')+(hasEv?' has-event':'')+'">'+dn+'</div>'
       +'<div class="cal-dot'+(hasEv?'':' hidden')+'"></div>'
       +'</div>';
   }
+  html += '<button class="cal-nav" onclick="shiftAgendaStrip(7)" aria-label="Semana siguiente">›</button>';
   strip.innerHTML = html;
 }
 
-function renderAgenda(cat, fDay, fMon) {
+function renderAgenda(cat, fDate) {
   var el = document.getElementById('agenda-events');
   if(!el) return;
+  var AU = window.AgendaUtil;
   var evs = AGENDA_EVENTS.slice();
   if(cat && cat!=='all') evs = evs.filter(function(e){ return e.cat===cat; });
   if(agendaCityFilter) evs = evs.filter(function(e){ return e.city===agendaCityFilter || e.city.indexOf(agendaCityFilter)>-1; });
-  if(fDay) evs = evs.filter(function(e){ return e.day===fDay && e.month===fMon; });
-  // Show first 4, footer shows count + link to full calendar
+  if(fDate) evs = evs.filter(function(e){ return AU.evActiveOn(e, fDate); });
+  var seen = {};
+  evs = evs.filter(function(e){ var k = e.url || ('e'+e.id); if(seen[k]) return false; seen[k]=true; return true; });
+  evs.sort(function(a,b){
+    var ra = AU.normDates(a, new Date());
+    var rb = AU.normDates(b, new Date());
+    return (+ra.start) - (+rb.start);
+  });
   var footer = document.getElementById('agenda-footer');
   var totalCount = evs.length;
   if(footer) footer.style.display = totalCount > 0 ? 'flex' : 'none';
@@ -2790,14 +2838,18 @@ function renderAgenda(cat, fDay, fMon) {
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:13px">Sin eventos para este filtro.</div>';
     return;
   }
+  var today = new Date();
   var html = '';
   evs.forEach(function(e){
+    var range = AU ? AU.evRangeText(e) : (e.month + ' ' + e.day);
+    var enCurso = AU ? AU.evActiveOn(e, today) : false;
     html += '<a class="ag-ev'+(e.featured?' featured':'')+'" href="'+e.url+'">'
       +'<div class="ag-ev-date"><div class="ag-ev-day">'+e.day+'</div><div class="ag-ev-mon">'+e.month+'</div></div>'
       +'<div class="ag-ev-body">'
       +'<div class="ag-ev-cat" style="color:'+e.color+'">'+e.emoji+' '+e.cat+' · '+e.city+'</div>'
       +'<div class="ag-ev-name">'+e.name+'</div>'
       +'<div class="ag-ev-meta">📍 '+e.loc+' · ⏰ '+e.time+'</div>'
+      +(range ? '<div class="ag-ev-range">📅 '+range+(enCurso ? ' · <span class="ag-ev-curso">▶ En curso</span>' : '')+'</div>' : '')
       +'</div>'
       +'<div class="ag-ev-right">'
       +'<div class="ag-ev-price'+(e.price==='Gratis'?' free':'')+'">'+e.price+'</div>'
@@ -2808,21 +2860,13 @@ function renderAgenda(cat, fDay, fMon) {
   el.innerHTML = html;
 }
 
-function filterAgendaByDay(day, month) {
-  document.querySelectorAll('.af-btn').forEach(function(b){ b.classList.remove('on'); });
-  var all = document.querySelector('.af-btn[data-af="all"]');
-  if(all) all.classList.add('on');
-  agendaCat = 'all';
-  renderAgenda('all', day, month);
-}
-
 document.querySelectorAll('.af-btn').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('.af-btn').forEach(function(b){ b.classList.remove('on'); });
     btn.classList.add('on');
     agendaCat = btn.dataset.af;
     agendaExpanded = false;
-    renderAgenda(agendaCat);
+    renderAgenda(agendaCat, agendaDayFilter);
   });
 });
 

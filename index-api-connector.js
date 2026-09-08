@@ -89,38 +89,47 @@
     };
   }
 
+  // Colores de categoría para la agenda (mismo set que los filtros del home)
+  var AGENDA_CAT_COLOR = {
+    festival:   '#A855F7',
+    musica:     '#3B82F6',
+    gastro:     '#EF4444',
+    naturaleza: '#22C55E',
+    cultura:    '#EC4899',
+  };
+
   // Convierte lugar de DB al formato AGENDA_EVENTS[] que usa renderAgenda()
-  // Solo para lugares con cat='evento'
+  // Solo para lugares con cat='evento'. RANGO [fecha_inicio, fecha_fin]:
+  // el evento queda activo en TODOS los dias vigentes (multidia).
   function toAgendaEvent(item, idx) {
+    var AU = window.AgendaUtil || null;
+    var MONTHS = AU ? AU.MONTHS : ['Ene','Feb','Mar','Abr','May','Jun',
+                                   'Jul','Ago','Sep','Oct','Nov','Dic'];
+    var t = item.tags || {};
     var d = new Date();
-    var fechaInicio = item.tags && item.tags.fecha_inicio;
-    var startDate = null;
-    if (fechaInicio && typeof fechaInicio === 'string' && fechaInicio.length >= 10) {
-      startDate = new Date(
-        parseInt(fechaInicio.slice(0, 4), 10),
-        parseInt(fechaInicio.slice(5, 7), 10) - 1,
-        parseInt(fechaInicio.slice(8, 10), 10)
-      );
-    }
+    var startDate = AU ? AU.parseISO(t.fecha_inicio) : null;
+    var endDate = AU && t.fecha_fin ? AU.parseISO(t.fecha_fin) : startDate;
+    var cat = AU ? AU.detectEventCat(item.name, t) : (AGENDA_CAT_MAP[item.cat] || 'festival');
     return {
       id:       1000 + idx,
       name:     item.name || '',
-      cat:      AGENDA_CAT_MAP[item.cat] || 'festival',
+      cat:      cat,
       city:     item.city || '',
       day:      startDate ? startDate.getDate() : (item.day   || d.getDate()),
-      month:    startDate ? ['Ene','Feb','Mar','Abr','May','Jun',
-                             'Jul','Ago','Sep','Oct','Nov','Dic'][startDate.getMonth()]
-                          : (item.month || ['Ene','Feb','Mar','Abr','May','Jun',
-                             'Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()]),
-      time:     item.horario || 'Consultar',
+      month:    startDate ? MONTHS[startDate.getMonth()]
+                          : (item.month || MONTHS[d.getMonth()]),
+      time:     item.horario || 'Variable',
       price:    item.price || 'Consultar',
-      loc:      item.barrio
-                  ? (item.barrio + ', ' + (item.city || ''))
-                  : (item.city || ''),
-      emoji:    item.emoji   || '🎉',
-      color:    PIN_COLORS.evento,
+      loc:      t.sede
+                  ? t.sede
+                  : (item.barrio ? (item.barrio + ', ' + (item.city || '')) : (item.city || '')),
+      emoji:    item.emoji   || '\ud83c\udf89',
+      color:    AGENDA_CAT_COLOR[cat] || PIN_COLORS.evento,
       url:      item.slug + '.html',
       featured: item.destacado || false,
+      start:    startDate,
+      end:      endDate,
+      tags:     t,
     };
   }
 

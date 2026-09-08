@@ -1790,6 +1790,47 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   del motor sitio y divs 292/292; /api/destinos lista el slug (total 175);
   sitemap.xml incluye el slug.
 
+### TSK-083: Agenda cultural - soporte multidia, vista por dia y categorias claras
+- **Estado:** COMPLETADA
+- **Detalle:** Rework de la agenda cultural (seccion de `index.html` + pagina
+  completa `agenda.html` + conector `index-api-connector.js`) para que un
+  evento que dura varios dias (`tags.fecha_inicio` -> `tags.fecha_fin`,
+  inclusive) aparezca en TODOS los dias y meses en los que esta vigente.
+  Cambios:
+  - Nuevo `agenda-shared.js` (raiz, ASCII-safe, IIFE -> `window.AgendaUtil`):
+    `normDates`, `evActiveOn` (inicio<=dia<=fin), `evActiveMonths` (cruza de
+    mes), `evRangeText` ('12 Sep', '12-13 Sep', '28 Ago - 6 Sep'),
+    `detectEventCat` (keywords priorizadas musica/cultura/gastro/naturaleza/
+    festival con fold sin tildes) y soporte a recurrentes anuales
+    (day/month[/dayEnd/monthEnd]) resueltos al anio consultado.
+  - `index.html`: strip por dia con navegacion semana anterior/siguiente +
+    boton "Hoy"; los puntos marcan TODOS los dias vigentes; clic en dia filtra
+    eventos activos ese dia (dedupe); tarjeta muestra rango + chip "En curso";
+    orden cronologico; filtros categoria/ciudad conservan el dia elegido;
+    nuevo filtro "🎭 Cultura" (exposiciones/patrimonio/teatro/danza).
+  - `agenda.html`: misma logica; el evento aparece en cada mes activo
+    (agrupacion por `evActiveMonths`); strip por dia con "Hoy" y dia<->
+    (`setDayFilter` limpia el filtro de mes); rango en tarjeta + "En curso";
+    nuevo filtro "🎭 Cultura"; `loadApiEvents` usa inicio+fin, hora real
+    (`d.horario` en `time`) y sede en `loc`.
+  - BUG preexistente corregido: `loadApiEvents` usaba `d.nombre`/`d.ciudad`
+    (undefined, la API expone `name`/`city`) -> nombres "undefined" en la
+    agenda completa. Ahora `d.name`/`d.city` con fallback.
+  - Rangos anuales anadidos a festivales hardcodeados: Carnaval (14-17 Feb),
+    Feria de las Flores (1-10 Ago), Feria de Cali (25-30 Dic), Festival
+    Vallenato (27-30 Abr).
+- **Evidencia:** `scripts/smoke_test_agenda.js` 30/30 PASS (multidia antes/
+  inicio/medio/fin/despues, cruce de mes Ago+Sep, textos de rango, recurrentes
+  anuales, deteccion de categoria). Verificado con datos reales de
+  `/api/destinos?cat=evento`: 23/50 eventos activos el 7-sep-2026 (transitos
+  3-12 Sep, patrimonio 1-30 Sep, jazz expandido 4-27 Sep, guaduas 4-11 Sep,
+  medejazz 5-19 Sep, teatro libre 31 Ago - 7 Sep); ulibro aparece en Ago+Sep
+  y NO el 7 sep (termina el 6); categorias detectadas 50 eventos = musica 15,
+  cultura 11, festival 20, naturaleza 2, gastro 2. node --check OK en
+  agenda-shared.js / index-api-connector.js / smoke_test_agenda.js; parse de
+  scripts inline de index.html y agenda.html OK; ASCII 0 bytes >127 en
+  agenda-shared.js.
+
 ---
 
 ## Regla de actualizacion

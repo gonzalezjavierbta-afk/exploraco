@@ -4,6 +4,48 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion agenda-cultural-multidia - agenda con eventos multidia, vista por dia y categorias (2026-09-07) - TSK-083
+
+Rework completo de la Agenda Cultural (seccion de `index.html` + `agenda.html`
++ `index-api-connector.js`) para que un evento que dura varios dias aparezca
+en TODOS los dias/meses vigentes (requisito del usuario) y para que sea mas
+facil de entender.
+
+**Cambios:**
+- `agenda-shared.js` (NUEVO, raiz): helper compartido `window.AgendaUtil`
+  con `normDates`/`evActiveOn`/`evActiveMonths`/`evRangeText`/
+  `detectEventCat`/`fold`. Rango [fecha_inicio, fecha_fin] inclusive;
+  recurrentes anuales (day/month[/dayEnd/monthEnd]) resueltos al anio de la
+  fecha consultada. ASCII-safe (0 bytes >127).
+- `index.html`: strip por dia con "Hoy" + navegacion `‹ ›` (semana); puntos
+  en TODOS los dias vigentes; clic en dia filtra activos ese dia; tarjeta con
+  rango y chip "En curso"; orden cronologico; filtros conservan el dia;
+  boton filtro "🎭 Cultura".
+- `agenda.html`: evento aparece en cada mes activo (`evActiveMonths`);
+  vista por dia (strip + "Hoy" + dia<-|->, `setDayFilter` limpia mes); rango
+  en tarjeta + "En curso"; boton "🎭 Cultura"; `loadApiEvents` con inicio+fin,
+  `time`=hora real, `loc`=sede.
+- `index-api-connector.js`: `toAgendaEvent` con rango, `detectEventCat`,
+  `loc`=sede, `time`=horario, color por categoria, tags/start/end.
+- BUG preexistente: `loadApiEvents` usaba `d.nombre`/`d.ciudad` (undefined,
+  la API expone `name`/`city`) -> ahora `d.name`/`d.city`.
+- Rangos anuales a festivales hardcodeados (Carnaval 14-17 Feb, Feria de las
+  Flores 1-10 Ago, Feria de Cali 25-30 Dic, Vallenato 27-30 Abr).
+
+**Verificado (2026-09-07):** smoke_test_agenda.js 30/30 PASS; con datos
+reales: 23/50 eventos activos el 7-sep-2026 (multidia como patrimonio 1-30
+Sep, jazz expandido 4-27 Sep, teatro libre 31 Ago - 7 Sep); ulibro en Ago+Sep
+y NO activo el 7 sep (termina el 6). Categorias: musica 15 / cultura 11 /
+festival 20 / naturaleza 2 / gastro 2. node --check OK; parse inline scripts
+OK; ASCII 0 en agenda-shared.js.
+
+**Pendientes / notas:**
+- Duplicados de DB (p. ej. `jazz-al-parque-2026` vs `jazz-al-parque`): se
+  deduplican en pantalla por url, pero la limpieza de datos es tarea aparte.
+- La deteccion de categoria es por palabras clave; eventos genericos sin
+  keyword caen a 'festival'. Opcion futura: tag `tipo_evento` en los seeds
+  (ya soportado por `detectEventCat`).
+
 ### Sesion centro-cultural-delia-zapata-olivella - creada la pagina dinamica del complejo cultural (2026-09-07) - TSK-082
 
 Creacion y carga a produccion de la pagina dinamica del Centro Cultural
