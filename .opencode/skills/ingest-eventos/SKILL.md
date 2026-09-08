@@ -57,6 +57,25 @@ todos los dias/meses vigentes) y categoria auto-detectada.
    eventos, schema `eventos/eventos.json`). El usuario guarda el bloque en
    `eventos/eventos.json` (tal cual, sin comentarios).
 
+### FASE A2 — Fuente externa Hostal Terraza (alternativa automatizada)
+
+Para traer los eventos publicados de la cartelera de
+https://hostalterraza.vercel.app (tabla Supabase `eventos`, RLS anon de
+lectura publica) a la agenda:
+
+1. Ejecutar el conector (filtra proximos, sin pruebas/campanas; geocode
+   Nominatim; foto HEAD 200 BUG-022):
+   ```
+   node scripts/extraer-hostalterraza.js --dry   # previsualiza
+   node scripts/extraer-hostalterraza.js         # fusiona ht-* en eventos/eventos.json
+   ```
+2. Continuar en FASE C (validar `--prod`, subir `--seed`, verificar, docs).
+
+Reglas del conector: slugs con prefijo `ht-`; `tipo_evento` mapeado
+(fiesta->musica, cine/cinematografia->cultura, campana->cultura,
+sin categoria->festival); solo eventos proximos (fecha >= hoy); la campaña
+binacional queda excluida (flag `--incluir-campanas` para incluirla).
+
 ### FASE B — Fotos por evento (opcional, tras el batch)
 
 El batch sube sin fotos (`foto_hero`/`fotos_galeria` vacios; hero con

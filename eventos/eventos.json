@@ -1336,5 +1336,198 @@
         "Ventas ambulantes no autorizadas dentro del predio"
       ]
     }
+  },
+  {
+    "slug": "ht-afromango-fest-kouj",
+    "nombre": "Afromango fest",
+    "lead": "Chongotronik presenta una noche en Calle 19 #4-20 La casa del oso",
+    "descripcion": "Playlist oficial: https://open.spotify.com/album/6VtMKNRRFLCvgy5i3KGr6G",
+    "ciudad": "Bogota",
+    "region": "Cundinamarca",
+    "barrio": "",
+    "lat": 4.6044049,
+    "lng": -74.0696414,
+    "web": "https://hostalterraza.vercel.app/evento.html?slug=afromango-fest-kouj",
+    "instagram": "",
+    "precio_desde": "Desde $20.000",
+    "horario": "9:00 p.m.",
+    "emoji": "🎉",
+    "hero_bg": "linear-gradient(135deg,#dcaf09 0%,#0B0A09 100%)",
+    "foto_hero": "https://i.ibb.co/zhHqTVYt/Whats-App-Image-2026-08-31-at-9-29-38-PM.jpg",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Hay parqueadero?",
+        "respuesta": "parqueadero por la calle 19"
+      },
+      {
+        "pregunta": "¿Existe promoción de preventa?",
+        "respuesta": "Sí. Se participa por una botella de Ancestral"
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-11",
+      "fecha_fin": "2026-09-11",
+      "edicion": "",
+      "sede": "Calle 19 #4-20 La casa del oso",
+      "organiza": "Chongotronik",
+      "lema": "",
+      "tipo_evento": "musica",
+      "lineup": [
+        {
+          "nombre": "Chongo de Colombia",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "La Payara",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "El León Pardo",
+          "rol": "DJ",
+          "genero": ""
+        }
+      ],
+      "agenda": [
+        {
+          "dia": "2026-09-11",
+          "hora": "9:00 p.m.",
+          "actividad": "Afromango fest"
+        }
+      ],
+      "categorias_entrada": [
+        {
+          "tipo": "Preventa",
+          "precio": "$20.000",
+          "disponibilidad": "Disponible"
+        },
+        {
+          "tipo": "Taquilla",
+          "precio": "$30.000",
+          "disponibilidad": "Disponible"
+        }
+      ],
+      "que_llevar": [],
+      "prohibido": []
+    }
+  },
+  {
+    "slug": "ht-salsa-flow-nt65",
+    "nombre": "Tropilove",
+    "lead": "Chokoflow presenta una noche en calle 12B #5-07",
+    "descripcion": "Coctel de bienvenida a las primeras 20 personas\n\nPlaylist oficial: https://open.spotify.com/playlist/37i9dQZF1DXan38dNVDdl4",
+    "ciudad": "Bogota",
+    "region": "Cundinamarca",
+    "barrio": "",
+    "lat": 4.5988447,
+    "lng": -74.0727079,
+    "web": "https://hostalterraza.vercel.app/evento.html?slug=salsa-flow-nt65",
+    "instagram": "",
+    "precio_desde": "Desde $25.000",
+    "horario": "2:00 p.m.",
+    "emoji": "🎉",
+    "hero_bg": "linear-gradient(135deg,#b44cc9 0%,#0B0A09 100%)",
+    "foto_hero": "https://i.ibb.co/bjg70fN1/tropilove.jpg",
+    "fotos_galeria": [],
+    "faqs": [
+      {
+        "pregunta": "¿Desde que horas?",
+        "respuesta": "2 p.m"
+      },
+      {
+        "pregunta": "¿Hay parqueadero?",
+        "respuesta": "Parqueaderos a una cuadra del lugar y en r10 se puede parquear bicicletas"
+      },
+      {
+        "pregunta": "Hata que horas es el evento?",
+        "respuesta": "10 p.m"
+      }
+    ],
+    "destacado": false,
+    "tags": {
+      "fecha_inicio": "2026-09-12",
+      "fecha_fin": "2026-09-12",
+      "edicion": "",
+      "sede": "calle 12B #5-07",
+      "organiza": "Chokoflow",
+      "lema": "",
+      "tipo_evento": "musica",
+      "lineup": [
+        {
+          "nombre": "JAGERKILLAH",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "DJ SPERANZA",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "NIK SELECTAH",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "CHOKOFLOW",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "DJ SIZE",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "KAY RIFF",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "NEGRO VALLE",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "CIEMVICI",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "LA NEW FAM",
+          "rol": "DJ",
+          "genero": ""
+        },
+        {
+          "nombre": "MAIWY",
+          "rol": "DJ",
+          "genero": ""
+        }
+      ],
+      "agenda": [
+        {
+          "dia": "2026-09-12",
+          "hora": "2:00 p.m.",
+          "actividad": "Tropilove"
+        }
+      ],
+      "categorias_entrada": [
+        {
+          "tipo": "Preventa",
+          "precio": "$25.000",
+          "disponibilidad": "Disponible"
+        },
+        {
+          "tipo": "Taquilla",
+          "precio": "$40.000",
+          "disponibilidad": "Disponible"
+        }
+      ],
+      "que_llevar": [],
+      "prohibido": []
+    }
   }
 ]

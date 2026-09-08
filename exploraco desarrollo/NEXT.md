@@ -4,6 +4,32 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion hostalterraza-connector - conector automatico a la agenda (2026-09-08) - TSK-088
+
+Conector `scripts/extraer-hostalterraza.js` para traer automaticamente los
+eventos publicados de https://hostalterraza.vercel.app (Supabase `eventos`,
+RLS anon publico) a la agenda de ExploraCO.
+
+**Cambios:**
+- `scripts/extraer-hostalterraza.js` (NUEVO, reutilizable): fetch a Supabase,
+  filtros (proximos, sin pruebas/demos, sin campanas), geocode Nominatim con
+  fragmento de calle + bounding box Bogota (evita Fontibon errado), foto HEAD
+  200 (BUG-022), mapeo a schema eventos.json (slug `ht-*`, tipo_evento
+  fiesta->musica, cine/cinematografia->cultura, campana->cultura, null->
+  festival, lineup/boletos/faq desde config_landing). `--dry` previsualiza;
+  fusiona en `eventos/eventos.json` (reemplaza ht-* previos).
+- `eventos/hostalterraza.json` (lote normalizado, nuevo).
+- `ingest-eventos/SKILL.md`: FASE A2 (fuente externa Hostal Terraza).
+- `eventos/eventos.json`: +2 eventos `ht-*` (Afromango fest 11-sep, Tropilove
+  12-sep). `scripts/seed-eventos-2026-09-08.js` regenerado.
+
+**Verificado:** 13/13 subidos (total eventos prod 63); paginas
+ht-afromango-fest-kouj.html y ht-salsa-flow-nt65.html = 200 con foto;
+categorias/coordenadas correctas; node --check OK y ASCII 0 en el conector.
+
+**Pendiente (opcional):** sincronizacion programada (GitHub Action cron) si
+se quiere que corra solo antes de cada publicacion.
+
 ### Sesion lote-eventos-gemini - primera ingesta real de 11 eventos (2026-09-08) - TSK-087
 
 Primer lote real end-to-end: Gemini investigo 11 eventos de Bogota

@@ -1950,6 +1950,32 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   reales del Movistar Arena Bogota. Re-subidos 11/11 (DELETE+POST) y seed
   `scripts/seed-eventos-2026-09-08.js` regenerado (node --check OK, ASCII 0).
 
+### TSK-088: Conector Hostal Terraza -> agenda (extraccion automatica)
+- **Estado:** COMPLETADA
+- **Detalle:** Nuevo `scripts/extraer-hostalterraza.js` que lee los eventos
+  publicados de https://hostalterraza.vercel.app (tabla Supabase `eventos`,
+  RLS anon de lectura publica, misma key que el sitio) y los fusiona en
+  `eventos/eventos.json` con slug prefijo `ht-`. Filtros: solo proximos
+  (fecha >= hoy), sin pruebas/demos, sin campanas (la binacional no tiene
+  sede local; flag `--incluir-campanas`). Coordenadas via Nominatim (fragmento
+  de calle + bounding box de Bogota para evitar matches errados como Fontibon);
+  foto via `content.poster_url`/`imagen_url` con HEAD 200 (BUG-022). Mapeo:
+  `tipo_evento` fiesta->musica, cine/cinematografia->cultura, campana->cultura,
+  sin categoria->festival; `lineup` de `content.dj_lineup`, `categorias_entrada`
+  de `content.boletos` (Preventa/Taquilla), `faqs` de `content.faq`; `web` al
+  evento original. Salida: `eventos/hostalterraza.json` (lote normalizado) +
+  fusion (reemplaza ht-* previos, conserva el resto). Flags: `--dry`.
+  `ingest-eventos/SKILL.md` actualizado con FASE A2 (fuente externa).
+- **Evidencia:** extraccion real -> 2 eventos `ht-*`:
+  `ht-afromango-fest-kouj` (Afromango fest, 2026-09-11, musica, sede Calle 19
+  #4-20 La casa del oso, lat 4.6044/-74.0696, foto i.ibb.co) y
+  `ht-salsa-flow-nt65` (Tropilove, 2026-09-12, musica, sede calle 12B #5-07
+  R10, lat 4.5988/-74.0727, foto i.ibb.co). validate_eventos.js --prod PASS
+  (13 validos; los 11 previos se re-suben idempotente). upload-eventos.js
+  --seed -> 13/13 subidos (total eventos prod 63). Paginas
+  ht-afromango-fest-kouj.html y ht-salsa-flow-nt65.html = 200 con foto.
+  node --check OK y ASCII 0 en extraer-hostalterraza.js.
+
 ---
 
 ## Regla de actualizacion
