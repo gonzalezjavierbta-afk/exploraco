@@ -1551,7 +1551,7 @@ module.exports = async function handler(req, res) {
     // -- POST ---------------------------------------------------------
     if (req.method === 'POST') {
       var body = req.body || {};
-      var tipo2     = body.tipo;
+      var tipo2     = body.tipo || req.query.tipo;
       var destinoId2= body.destino_id;
       var usuarioId2= body.usuario_id || null;
 
@@ -2047,7 +2047,7 @@ module.exports = async function handler(req, res) {
           return res.status(429).json({ ok: false, error: 'Limite de 5 albumes por mes alcanzado' });
 
         var alDesc = String(body.descripcion || '').trim().slice(0, 1000);
-        var alTipo = ['fotos','videos','audio','mixto'].includes(body.tipo) ? body.tipo : 'fotos';
+        var alTipo = ['fotos','videos','audio','mixto'].includes(body.album_tipo) ? body.album_tipo : 'fotos';
         var alLat = body.lat ? parseFloat(body.lat) : null;
         var alLng = body.lng ? parseFloat(body.lng) : null;
         var alCiudad = String(body.ciudad || '').trim().slice(0, 80) || null;

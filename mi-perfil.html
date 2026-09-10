@@ -725,7 +725,7 @@ function crearAlbum() {
       usuario_id: uid,
       titulo: titulo,
       descripcion: (document.getElementById('album-descripcion').value || '').trim(),
-      tipo: document.getElementById('album-tipo').value || 'fotos',
+      album_tipo: document.getElementById('album-tipo').value || 'fotos',
       ciudad: (document.getElementById('album-ciudad').value || '').trim() || null,
       portada_url: (document.getElementById('album-portada').value || '').trim() || null
     })
