@@ -179,8 +179,66 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando senderos…</div>
   </div>
 
+  <!-- MIS ALBUMES (ADR-017) -->
+  <div class="pf-section-title">&#x1F5BC; Mis Albumes</div>
+  <div id="mis-albumes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
+    <p style="color:rgba(255,255,255,.3);font-size:13px;">Cargando albumes...</p>
+  </div>
+  <button onclick="abrirModalCrearAlbum()" id="btn-crear-album" style="display:none;padding:10px 20px;background:var(--gold);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:Outfit,sans-serif;margin-bottom:28px;">
+    + Crear album
+  </button>
+
+  <!-- Modal Crear Album -->
+  <div id="modal-crear-album" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;">
+      <h3 style="margin:0 0 16px;font-size:18px;color:#fff;">Crear Album</h3>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Titulo *</label>
+        <input type="text" id="album-titulo" maxlength="120" placeholder="Mi album increible" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Descripcion</label>
+        <textarea id="album-descripcion" maxlength="1000" rows="3" placeholder="Describe tu album..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Tipo</label>
+        <select id="album-tipo" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          <option value="fotos">&#x1F4F7; Fotos</option>
+          <option value="videos">&#x25B6; Videos</option>
+          <option value="audio">&#x266B; Audio</option>
+          <option value="mixto">&#x1F3AC; Mixto</option>
+        </select>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Ciudad (opcional)</label>
+        <input type="text" id="album-ciudad" placeholder="Bogota" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">URL de portada (opcional)</label>
+        <input type="url" id="album-portada" placeholder="https://..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="cerrarModalCrearAlbum()" style="padding:8px 16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.7);font-family:Outfit,sans-serif;">Cancelar</button>
+        <button onclick="crearAlbum()" style="padding:8px 16px;background:var(--gold);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:Outfit,sans-serif;">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Detalle Album -->
+  <div id="modal-detalle-album" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 id="album-det-titulo" style="margin:0;font-size:18px;color:#fff;"></h3>
+        <button onclick="cerrarModalDetalleAlbum()" style="background:none;border:none;font-size:20px;cursor:pointer;color:rgba(255,255,255,.5);">&times;</button>
+      </div>
+      <p id="album-det-info" style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:12px;"></p>
+      <div id="album-det-fotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
+      </div>
+    </div>
+  </div>
+
   <!-- MIS LUGARES -->
-  <div class="pf-section-title">📍 Mis lugares guardados</div>
+  <div class="pf-section-title">&#x1F4CD; Mis lugares guardados</div>
   <div id="pf-guardados"></div>
   <div class="pf-section-title" style="margin-top:20px">✅ Lugares visitados</div>
   <div id="pf-visitados"></div>
@@ -271,6 +329,7 @@ function getLevelPct(xp) {
 /* ---- HELPERS ---- */
 function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
 function setStyle(id,prop,val){var e=document.getElementById(id);if(e)e.style[prop]=val;}
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'';}
 
 /* ---- GATE ---- */
 function checkGate() {
@@ -346,6 +405,11 @@ function renderPerfil() {
 
   /* tabla de destino (Milestones v2) */
   cargarTablaDestino(u.id);
+
+  /* mis albumes (ADR-017) */
+  var btnAlbum = document.getElementById('btn-crear-album');
+  if (btnAlbum) btnAlbum.style.display = 'block';
+  cargarMisAlbumes();
 
   /* mis lugares */
   cargarMisLugares(u.id);
@@ -600,6 +664,132 @@ function renderQuickActions(st) {
   }).join('');
 }
 function doQuickAction(i){ var a=(window._quickActions||[])[i]; if(a&&a.action) a.action(); }
+
+/* ---- MIS ALBUMES (ADR-017) ---- */
+function cargarMisAlbumes() {
+  if (!window.ExploraCO || !window.ExploraCO.usuario) return;
+  var uid = window.ExploraCO.usuario.id;
+  var grid = document.getElementById('mis-albumes-grid');
+  if (!grid) return;
+  grid.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px;">Cargando albumes...</p>';
+  fetch('/api/interacciones?tipo=albumes&usuario_id=' + uid)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!grid) return;
+      if (!data.ok || !data.data || !data.data.length) {
+        grid.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Aun no tienes albumes. Crea uno para empezar a coleccionar!</p>';
+        return;
+      }
+      grid.innerHTML = '';
+      data.data.forEach(function(a) {
+        var card = document.createElement('div');
+        card.style.cssText = 'border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:transform .2s;';
+        card.onmouseenter = function(){ card.style.transform = 'translateY(-2px)'; };
+        card.onmouseleave = function(){ card.style.transform = 'none'; };
+        var portada = a.portada_url
+          ? '<img src="' + esc(a.portada_url) + '" style="width:100%;height:140px;object-fit:cover;" loading="lazy" onerror="this.style.background=\'rgba(255,255,255,.06)\';this.style.display=\'none\'">'
+          : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#E8A020,#D4790E);display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F5BC;</div>';
+        card.innerHTML = portada
+          + '<div style="padding:10px;">'
+          + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#fff;">' + esc(a.titulo) + '</div>'
+          + '<div style="font-size:12px;color:rgba(255,255,255,.4);">' + (a.fotos_count || 0) + ' fotos &#x2022; ' + (a.votos_count || 0) + ' &#x2B50;</div>'
+          + '</div>';
+        card.onclick = function(){ verDetalleAlbum(a.id); };
+        grid.appendChild(card);
+      });
+    })
+    .catch(function() {
+      grid.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px;">No se pudieron cargar los albumes.</p>';
+    });
+}
+
+function abrirModalCrearAlbum() {
+  var modal = document.getElementById('modal-crear-album');
+  if (modal) modal.style.display = 'flex';
+}
+
+function cerrarModalCrearAlbum() {
+  var modal = document.getElementById('modal-crear-album');
+  if (modal) modal.style.display = 'none';
+}
+
+function crearAlbum() {
+  if (!window.ExploraCO || !window.ExploraCO.usuario) return;
+  var uid = window.ExploraCO.usuario.id;
+  var titulo = (document.getElementById('album-titulo').value || '').trim();
+  if (!titulo) { alert('El titulo es requerido'); return; }
+  fetch('/api/interacciones?tipo=album_crear', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      usuario_id: uid,
+      titulo: titulo,
+      descripcion: (document.getElementById('album-descripcion').value || '').trim(),
+      tipo: document.getElementById('album-tipo').value || 'fotos',
+      ciudad: (document.getElementById('album-ciudad').value || '').trim() || null,
+      portada_url: (document.getElementById('album-portada').value || '').trim() || null
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      cerrarModalCrearAlbum();
+      document.getElementById('album-titulo').value = '';
+      document.getElementById('album-descripcion').value = '';
+      document.getElementById('album-ciudad').value = '';
+      document.getElementById('album-portada').value = '';
+      cargarMisAlbumes();
+      if (d.misiones && d.misiones.length) {
+        d.misiones.forEach(function(m) {
+          if (typeof showToast === 'function') showToast('Mision completada: ' + m.nombre);
+        });
+      }
+    } else {
+      alert(d.error || 'Error al crear album');
+    }
+  })
+  .catch(function() { alert('Error de conexion'); });
+}
+
+function verDetalleAlbum(albumId) {
+  fetch('/api/interacciones?tipo=album_detalle&album_id=' + albumId)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data.ok) return;
+      var album = data.album;
+      var fotos = data.fotos || [];
+      document.getElementById('album-det-titulo').textContent = album.titulo || '';
+      document.getElementById('album-det-info').textContent =
+        (album.descripcion || 'Sin descripcion') + ' | '
+        + fotos.length + ' fotos | '
+        + (album.ciudad || 'Sin ubicacion');
+      var grid = document.getElementById('album-det-fotos');
+      grid.innerHTML = '';
+      fotos.forEach(function(f) {
+        var card = document.createElement('div');
+        card.style.cssText = 'border-radius:8px;overflow:hidden;background:rgba(255,255,255,.04);position:relative;';
+        if (f.foto_type === 'video') {
+          card.innerHTML = '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);color:#fff;font-size:24px;">&#x25B6;</div>';
+        } else if (f.foto_type === 'audio') {
+          card.innerHTML = '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:rgba(155,89,182,.3);color:#fff;font-size:24px;">&#x266B;</div>';
+        } else {
+          card.innerHTML = '<img src="' + esc(f.foto_url) + '" style="width:100%;height:120px;object-fit:cover;" loading="lazy" onerror="this.style.display=\'none\'">';
+        }
+        card.innerHTML += '<div style="padding:6px;font-size:11px;">'
+          + (f.media_title ? '<div style="font-weight:500;color:rgba(255,255,255,.8);">' + esc(f.media_title) + '</div>' : '')
+          + '<div style="color:rgba(255,255,255,.4);">' + (f.autor_nombre || 'Anonimo') + ' | ' + (f.votos || 0) + ' &#x2B50;</div>'
+          + '</div>';
+        grid.appendChild(card);
+      });
+      document.getElementById('modal-detalle-album').style.display = 'flex';
+    })
+    .catch(function(){});
+}
+
+function cerrarModalDetalleAlbum() {
+  var modal = document.getElementById('modal-detalle-album');
+  if (modal) modal.style.display = 'none';
+}
 
 /* ---- EDITAR NOMBRE ---- */
 function editarNombre() {

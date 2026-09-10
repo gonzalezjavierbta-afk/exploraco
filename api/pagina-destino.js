@@ -1902,6 +1902,25 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<div class="wrok" id="fp-ok">\u2713 Foto publicada</div>'
     + '</div></section>';
 
+  // --- Foto destacada del destino (ADR-017, P11) ---
+  // Solo se muestra si foto_hero existe y no es un gradiente.
+  var secFotoDestacada = '';
+  if (d.foto_hero && typeof d.foto_hero === 'string'
+      && d.foto_hero.indexOf('linear-gradient') === -1
+      && d.foto_hero.indexOf('http') === 0) {
+    secFotoDestacada = '<section class="sec" id="foto-destacada">'
+      + '<div class="stnum" style="background:var(--gold, #E8A020);">&#x2B50;</div>'
+      + '<h2>Foto destacada</h2>'
+      + '<div style="max-width:700px;margin:16px auto;">'
+      + '  <img src="' + esc(d.foto_hero) + '" '
+      + '    alt="' + esc(d.nombre) + '" '
+      + '    style="width:100%;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);" '
+      + '    loading="lazy" '
+      + '    onerror="this.parentElement.style.display=\'none\'">'
+      + '</div>'
+      + '</section>';
+  }
+
   // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
   if (hasLatLng) ctBtns.push('<a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
@@ -2102,6 +2121,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + secFaq + '\n'
     + secResenas + '\n'
     + secFotos + '\n'
+    + secFotoDestacada + '\n'
     + secContact + '\n'
     + secRelacionados + '\n\n'
 

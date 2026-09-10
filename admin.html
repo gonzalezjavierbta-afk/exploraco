@@ -839,6 +839,15 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           </div>
           <div id="photo-grid-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-top:8px"></div>
         </div>
+        <!-- Foto Top del Destino (ADR-017) -->
+        <div id="admin-foto-top-section" style="margin-top:16px;display:none;">
+          <h4 style="color:var(--gold,#E8A020);margin-bottom:8px;">Foto Top del Destino</h4>
+          <p style="font-size:12px;color:#888;margin-bottom:8px;">Selecciona una foto de la galeria como destacada del directorio.</p>
+          <div id="admin-foto-top-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
+            <!-- Se llena dinamicamente con las fotos del destino -->
+          </div>
+          <button onclick="seleccionarFotoTop()" id="btn-seleccionar-foto-top" style="display:none;margin-top:8px;padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Seleccionar como top</button>
+        </div>
       </div><!-- /fpanel-media -->
       <div class="ftab-panel" id="fpanel-contenido">
         <div class="form-group">
@@ -3943,6 +3952,9 @@ function showFormTab(tab) {
   if(t) t.classList.add('on');
   if(p) p.classList.add('on');
   if(tab==='contacto') setTimeout(function(){ updateMiniMap(); },100);
+  /* ADR-017: al abrir el tab FOTOS cargar la seccion Foto Top; solo se
+     muestra si hay un destino con Neon UUID resuelto (regla 6) */
+  if(tab==='media') setTimeout(mostrarFotoTopSection, 50);
 }
 
 /* ── CATEGORY UI ── */
@@ -5824,6 +5836,93 @@ async function _cargarFotosDeNeon(destinoUUID, localId) {
   } catch(e) {
     console.warn('[admin-fotos] cargar error:', e.message);
   }
+}
+
+/* ---- Admin Foto Top del Destino (ADR-017) --------------------------
+   Selecciona una foto de la galeria de Neon como destacada del
+   directorio (foto_hero). POST a /api/interacciones?tipo=admin_foto_top.
+   Adaptado a admin.html: usa _esc()/showAdminToast()/_adminHeaders()
+   (globales reales del archivo, no esc()/showToast() locales de los
+   builders, ver BUG-020/TSK-065); el UUID del destino se resuelve con
+   _localToUUID[currentId] (patron _cargarFotosDeNeon). ------------- */
+var _adminFotoTopSelected = null;
+var _adminFotoTopDestino = null;
+
+function _adminFotoTopUUID() {
+  if (window.localPlace && window.localPlace.id) return window.localPlace.id;
+  if (!currentId) return null;
+  return _localToUUID[currentId] || null;
+}
+
+function seleccionarFotoTop() {
+  var destinoUUID = _adminFotoTopUUID();
+  if (!_adminFotoTopSelected || !destinoUUID) {
+    showAdminToast('Primero selecciona una foto de la galeria', 'error');
+    return;
+  }
+  fetch('/api/interacciones?tipo=admin_foto_top', {
+    method: 'POST',
+    headers: _adminHeaders(),
+    body: JSON.stringify({ destino_id: destinoUUID, foto_url: _adminFotoTopSelected })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.ok) { showAdminToast('Foto top actualizada', 'success'); }
+    else { showAdminToast('Error: ' + (d.error || 'desconocido'), 'error'); }
+  })
+  .catch(function(e) { showAdminToast('Error de conexion', 'error'); });
+}
+
+function mostrarFotoTopSection() {
+  var section = document.getElementById('admin-foto-top-section');
+  if (!section) return;
+  var destinoUUID = _adminFotoTopUUID();
+  if (!destinoUUID) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  var btn = document.getElementById('btn-seleccionar-foto-top');
+  if (btn) btn.style.display = 'none';
+  if (_adminFotoTopDestino !== destinoUUID) {
+    _adminFotoTopDestino = destinoUUID;
+    _adminFotoTopSelected = null;
+  }
+
+  fetch('/api/utilidades?tipo=fotos&destino_id=' + destinoUUID, { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var grid = document.getElementById('admin-foto-top-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      if (!data.ok || !data.data || !data.data.length) return;
+      data.data.forEach(function(f) {
+        var div = document.createElement('div');
+        div.style.cssText = 'border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;position:relative;';
+        div.innerHTML = '<img src="' + _esc(f.url) + '" style="width:100%;height:90px;object-fit:cover;" loading="lazy" onerror="this.parentElement.style.display=\'none\'">'
+          + '<div style="font-size:10px;padding:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _esc(f.caption || '') + '</div>';
+        div.onclick = function() {
+          grid.querySelectorAll('div').forEach(function(d){ d.style.borderColor = 'transparent'; });
+          div.style.borderColor = 'var(--gold,#E8A020)';
+          _adminFotoTopSelected = f.url;
+          if (btn) btn.style.display = 'block';
+        };
+        grid.appendChild(div);
+      });
+    });
+}
+
+/* ---- Admin Moderar Fotos Album (ADR-017) --------------------------- */
+function adminModerarFotoAlbum(fotoId, accion) {
+  fetch('/api/interacciones?tipo=admin_moderar_foto_album', {
+    method: 'POST',
+    headers: _adminHeaders(),
+    body: JSON.stringify({ foto_id: fotoId, accion: accion })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.ok) { showAdminToast('Foto moderada', 'success'); }
+    else { showAdminToast('Error: ' + (d.error || 'desconocido'), 'error'); }
+  })
+  .catch(function(e) { showAdminToast('Error de conexion', 'error'); });
 }
 
 async function _deleteFromNeon(localId) {

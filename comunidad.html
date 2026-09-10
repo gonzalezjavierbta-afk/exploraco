@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#E8A020">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
@@ -149,6 +150,20 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .xph-xp{font-size:13px;font-weight:900;color:var(--gold);flex-shrink:0}
 /* XP toast */
 #xp-toast-comm{position:fixed;bottom:20px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(232,160,32,.3)}
+/* ── MAPA AUDIOVISUAL (ADR-004 scoped) ── */
+#cpanel-mapa .mapa-filtro{padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);transition:all .2s;font-family:'Outfit',sans-serif}
+#cpanel-mapa .mapa-filtro.active{background:var(--gold);color:var(--black);border-color:var(--gold)}
+#cpanel-mapa .mapa-filtro:hover:not(.active){background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
+.av-popup{text-align:center;font-family:'Outfit',sans-serif}
+.av-popup-title{font-weight:600;margin:8px 0 4px;font-size:14px;color:#1a1a1a}
+.av-popup-meta{font-size:12px;color:#666;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.av-popup-type{background:#f0f0f0;padding:2px 8px;border-radius:10px;font-size:11px;text-transform:uppercase}
+.av-popup-link{color:var(--gold);text-decoration:none;font-weight:500}
+/* Fix z-index Leaflet vs nav sticky (z-300): los controles del mapa
+   no deben pintarse sobre la barra de navegacion al hacer scroll */
+#cpanel-mapa .leaflet-pane,
+#cpanel-mapa .leaflet-top,
+#cpanel-mapa .leaflet-bottom{z-index:0}
 </style>
 </head>
 <body>
@@ -206,6 +221,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div class="comm-tabs">
       <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
       <div class="ctab" onclick="showCommTab('planes')">🗺️ Planes</div>
+      <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
     </div>
     </div>
@@ -277,11 +293,26 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div id="lb-list"></div>
     </div>
 
+    <!-- MAPA AUDIOVISUAL -->
+    <div class="cpanel" id="cpanel-mapa">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
+        <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>
+        <button class="mapa-filtro" data-tipo="video" onclick="filtrarMapaAV(this,'video')">&#x25B6; Videos</button>
+        <button class="mapa-filtro" data-tipo="audio" onclick="filtrarMapaAV(this,'audio')">&#x266B; Audio</button>
+      </div>
+      <div id="av-map-container" style="height:500px;width:100%;border-radius:12px;overflow:hidden;background:#2a2a2a"></div>
+      <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:6px;text-align:center">
+        Multimedia compartida por la comunidad en puntos del mapa
+      </p>
+    </div>
+
   </div>
 </div>
 
 <div id="xp-toast-comm"></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* =============================================================
    COMUNIDAD EXPLORACO — hub de interaccion social
@@ -840,6 +871,110 @@ function cargarLeaderboard() {
     .catch(function(){ paintLeaderboard(MOCK_LB); });
 }
 
+/* ---- MAPA AUDIOVISUAL (ADR-017, P9/P10) ---- */
+var _avMap = null;
+var _avMarkers = null;
+var _avData = [];
+var _avTipoActual = 'todos';
+
+function initAudiovisualMap() {
+  if (_avMap) return;
+  if (typeof L === 'undefined') {
+    document.getElementById('av-map-container').innerHTML = '<p style="padding:40px;text-align:center;color:rgba(255,255,255,.3)">Cargando mapa\u2026</p>';
+    return;
+  }
+  _avMap = L.map('av-map-container').setView([4.6, -74.1], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'OSM',
+    maxZoom: 18
+  }).addTo(_avMap);
+  if (typeof L.markerClusterGroup === 'function') {
+    _avMarkers = L.markerClusterGroup();
+    _avMap.addLayer(_avMarkers);
+  } else {
+    _avMarkers = L.layerGroup();
+    _avMap.addLayer(_avMarkers);
+  }
+  loadMultimediaMapa();
+}
+
+function filtrarMapaAV(btn, tipo) {
+  document.querySelectorAll('#cpanel-mapa .mapa-filtro').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  _avTipoActual = tipo;
+  loadMultimediaMapa();
+}
+
+function loadMultimediaMapa() {
+  var params = '/api/interacciones?tipo=multimedia_mapa';
+  if (_avTipoActual && _avTipoActual !== 'todos') params += '&tipo_media=' + _avTipoActual;
+  fetch(params)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data.ok) return;
+      _avData = data.data || [];
+      renderAudiovisualMarkers();
+    })
+    .catch(function(e) { console.error('[mapa-audio]', e); });
+}
+
+function renderAudiovisualMarkers() {
+  if (!_avMarkers) return;
+  _avMarkers.clearLayers();
+  _avData.forEach(function(item) {
+    if (!item.lat || !item.lng) return;
+    var icon = getMediaIcon(item.media_type);
+    var popupHtml = '<div class="av-popup">'
+      + '<img src="' + esc(item.media_url) + '" '
+      + 'style="max-width:200px;max-height:150px;border-radius:8px" '
+      + 'loading="lazy" onerror="this.style.display=\'none\'">'
+      + '<div class="av-popup-title">' + esc(item.media_title || item.album_titulo || '') + '</div>'
+      + '<div class="av-popup-meta">'
+      + '<span class="av-popup-type">' + esc(item.media_type) + '</span>'
+      + (item.autor_nombre ? '<span>por ' + esc(item.autor_nombre) + '</span>' : '')
+      + (item.votos > 0 ? '<span>&#x2B50; ' + item.votos + '</span>' : '')
+      + '</div>';
+    if (item.origen === 'album') {
+      popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="#" onclick="verAlbumFromMap(\'' + esc(item.origen_id) + '\');return false">Ver album &#x2192;</a></div>';
+    } else if (item.origen_id) {
+      popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="/' + esc(item.origen_id) + '.html">Ver destino &#x2192;</a></div>';
+    }
+    popupHtml += '</div>';
+    var marker = L.marker([item.lat, item.lng], { icon: icon });
+    marker.bindPopup(popupHtml, { maxWidth: 250 });
+    _avMarkers.addLayer(marker);
+  });
+}
+
+function getMediaIcon(type) {
+  var colors = { foto: '#E8A020', video: '#e74c3c', audio: '#9b59b6' };
+  var icons = { foto: '\uD83D\uDCF7', video: '\u25B6', audio: '\u266B' };
+  return L.divIcon({
+    className: 'av-marker-icon',
+    html: '<div style="background:' + (colors[type] || colors.foto)
+      + ';color:#fff;border-radius:50%;width:32px;height:32px;'
+      + 'display:flex;align-items:center;justify-content:center;'
+      + 'font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
+      + (icons[type] || icons.foto) + '</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+}
+
+function verAlbumFromMap(albumId) {
+  window.open('/api/interacciones?tipo=album_detalle&album_id=' + albumId, '_blank');
+}
+
+var _avMapInitialized = false;
+function onTabMapaAV() {
+  if (!_avMapInitialized) {
+    _avMapInitialized = true;
+    setTimeout(initAudiovisualMap, 100);
+  } else if (_avMap) {
+    _avMap.invalidateSize();
+  }
+}
+
 /* ---- TAB SWITCHING ---- */
 function showCommTab(tab) {
   document.querySelectorAll('.ctab').forEach(function(t){ t.classList.remove('on'); });
@@ -853,6 +988,7 @@ function showCommTab(tab) {
     if(tab === 'ranking') cargarLeaderboard();
     if(tab === 'chat') renderChatRooms();
     if(tab === 'planes') renderPlanes();
+    if(tab === 'mapa') onTabMapaAV();
   }
   if(tab !== 'chat') stopChatPoll();
 }

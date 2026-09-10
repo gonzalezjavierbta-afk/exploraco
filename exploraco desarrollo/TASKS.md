@@ -2101,5 +2101,50 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-092: Sistema de Albums Fotograficos [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-09; pendiente migracion 009 en Neon + deploy, segun header de api/interacciones.js v8)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-09
+- **ADR:** ADR-017
+- **Archivos modificados:**
+  - db/migrations/009_albumes.sql (NUEVO)
+  - api/interacciones.js v7 -> v8 (+604 lineas)
+  - admin.html (+99 lineas)
+  - comunidad.html (+136 lineas)
+  - mi-perfil.html (+190 lineas)
+  - api/pagina-destino.js (foto destacada ADR-017 P11)
+
+- **Subtareas completadas:**
+  1. Migracion SQL 009_albumes.sql (3 tablas + 1 columna + 6 indices)
+  2. Backend: 5 GET + 8 POST + 6 misiones + 7 logros
+  3. Admin: Foto Top + Moderacion
+  4. Mapa audiovisual en comunidad.html (Leaflet + MarkerCluster)
+  5. Mis Albumes en mi-perfil.html (grid + modales)
+  6. Foto destacada en pagina-destino.js
+  7. Tests actualizados
+  8. Documentacion (ADR-017)
+
+- **Nota de cierre (ADR-006, verificado contra archivo real):** la migracion
+  `db/migrations/009_albumes.sql` existe en el repo; `api/interacciones.js`
+  es v8 (header "Albums ADR-017: +6 misiones, +7 logros, +5 GET (albumes,
+  album_detalle, multimedia_mapa, mi_feed_fotos, fotos_top), +8 POST
+  (album_crear, album_agregar_foto, album_voto, album_quitar_foto,
+  album_editar, album_eliminar, admin_foto_top, admin_moderar_foto_album)")
+  y declara "Requiere migracion 009_albumes.sql antes de desplegar";
+  admin.html tiene la seccion Foto Top del Destino + adminModerarFotoAlbum;
+  comunidad.html tiene el tab Mapa (`#cpanel-mapa`, fix z-index Leaflet,
+  GET `tipo=multimedia_mapa`); mi-perfil.html tiene "Mis Albumes" con
+  modales crear/detalle; api/pagina-destino.js tiene la foto destacada
+  (ADR-017, P11).
+
+- **Pendiente para V2:**
+  - Visibilidad public/unlisted/privado de albumes
+  - Boton "Reportar" para fotos ofensivas
+  - Upload real (Cloudinary/R2)
+  - Busqueda de albumes
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

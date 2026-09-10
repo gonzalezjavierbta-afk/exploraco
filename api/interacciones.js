@@ -1,4 +1,4 @@
-// api/interacciones.js  v7 - motor de misiones + logros + Tabla de Destino
+// api/interacciones.js  v8 - motor de misiones + logros + Tabla de Destino + Albums fotograficos
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -11,6 +11,12 @@
 // quedaron sin persistir (antes solo se evaluaban en los 4 POST de XP:
 // resena/guardado/visita/rating). Nuevo GET tipo=misiones (catalogo +
 // estado/fecha). La respuesta de ambos comparte entregarCatalogo().
+//
+// v8 (Albums ADR-017): +6 misiones, +7 logros, +5 GET (albumes, album_detalle,
+//   multimedia_mapa, mi_feed_fotos, fotos_top), +8 POST (album_crear,
+//   album_agregar_foto, album_voto, album_quitar_foto, album_editar,
+//   album_eliminar, admin_foto_top, admin_moderar_foto_album).
+//   Requiere migracion 009_albumes.sql antes de desplegar.
 //
 // REQUIERE MIGRACION ANTES DE DESPLEGAR (acumulativa desde v4):
 //   ALTER TABLE interacciones
@@ -246,6 +252,93 @@ var MISIONES = [
        .catch(function(){ return false; });
     },
   },
+  // --- Misiones de Albums/Fotos (ADR-017) ---
+  {
+    id: 'mis_primera_foto_social',
+    grupo: 'fotos',
+    requiere: [],
+    nombre: 'Primera foto social',
+    xp: 15,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_fotos WHERE agregador_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    id: 'mis_creador_album',
+    grupo: 'fotos',
+    requiere: ['mis_primera_foto_social'],
+    nombre: 'Creador de albumes',
+    xp: 20,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM albumes WHERE usuario_id=$1 AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    id: 'mis_album_curador',
+    grupo: 'fotos',
+    requiere: ['mis_creador_album'],
+    nombre: 'Curador de albumes',
+    xp: 40,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM albumes WHERE usuario_id=$1 AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 5); });
+    },
+  },
+  {
+    id: 'mis_fotografo_social',
+    grupo: 'fotos',
+    requiere: ['mis_primera_foto_social'],
+    nombre: 'Fotografo social',
+    xp: 30,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_fotos WHERE agregador_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 10); });
+    },
+  },
+  {
+    id: 'mis_cazador_recompensas',
+    grupo: 'fotos',
+    requiere: ['mis_fotografo_social'],
+    nombre: 'Cazador de recompensas',
+    xp: 25,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_votos WHERE usuario_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 20); });
+    },
+  },
+  {
+    id: 'mis_favorito_del_pueblo',
+    grupo: 'fotos',
+    requiere: ['mis_fotografo_social'],
+    nombre: 'Favorito del pueblo',
+    xp: 50,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_votos av '
+        + 'JOIN album_fotos af ON af.id = av.foto_id '
+        + 'WHERE af.autor_original_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 10); });
+    },
+  },
 ];
 
 // -- Catalogo de logros (v5, estilo consola + Upland) ---------------
@@ -344,6 +437,92 @@ var LOGROS = [
     nombre: 'N\u00f3mada', desc: 'Confirma 20 visitas a destinos',
     emoji: '\uD83E\uDDED', tier: 'oro', xp: 50,
     check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 20); },
+  },
+  // --- Logros de Albums/Fotos (ADR-017) ---
+  {
+    id: 'logr_albumero', grupo: 'fotos', requiere: [],
+    nombre: 'Albumero', desc: 'Crea tu primer album fotografico',
+    emoji: '\uD83D\uDDBC', tier: 'bronce', xp: 15,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM albumes WHERE usuario_id=$1 AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    id: 'logr_coleccionista_visual', grupo: 'fotos', requiere: ['logr_albumero'],
+    nombre: 'Coleccionista visual', desc: 'Sube 25 fotos a albumes',
+    emoji: '\uD83C\uDFA8', tier: 'plata', xp: 30,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_fotos WHERE autor_original_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 25); });
+    },
+  },
+  {
+    id: 'logr_maestro_fotografo', grupo: 'fotos', requiere: ['logr_coleccionista_visual'],
+    nombre: 'Maestro fotografico', desc: 'Sube 50 fotos a albumes',
+    emoji: '\uD83C\uDF1F', tier: 'oro', xp: 60,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_fotos WHERE autor_original_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 50); });
+    },
+  },
+  {
+    id: 'logr_favorito_comunidad', grupo: 'fotos', requiere: [],
+    nombre: 'Favorito de la comunidad', desc: 'Tus fotos reciben 10 votos en total',
+    emoji: '\u2B50', tier: 'bronce', xp: 20,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_votos av '
+        + 'JOIN album_fotos af ON af.id = av.foto_id '
+        + 'WHERE af.autor_original_id=$1',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 10); });
+    },
+  },
+  {
+    id: 'logr_estrella_del_mapa', grupo: 'fotos', requiere: ['logr_favorito_comunidad'],
+    nombre: 'Estrella del mapa', desc: 'Una de tus fotos es seleccionada como top por un admin',
+    emoji: '\uD83C\uDF1F', tier: 'oro', xp: 40,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM destinos '
+        + 'WHERE foto_hero IN (SELECT foto_url FROM album_fotos WHERE autor_original_id=$1)',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    id: 'logr_guardian_historias', grupo: 'fotos', requiere: ['logr_albumero'],
+    nombre: 'Guardian de historias', desc: 'Crea 5 albumes con al menos 10 fotos cada uno',
+    emoji: '\uD83D\uDCDA', tier: 'platino', xp: 100,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM ('
+        + '  SELECT af.album_id FROM album_fotos af '
+        + '  JOIN albumes a ON a.id = af.album_id '
+        + '  WHERE a.usuario_id=$1 AND af.activo=true '
+        + '  GROUP BY af.album_id HAVING COUNT(*) >= 10'
+        + ') sub',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 5); });
+    },
+  },
+  {
+    id: 'logr_viajero_multimedia', grupo: 'fotos', requiere: ['logr_albumero'],
+    nombre: 'Viajero multimedia', desc: 'Crea albumes de los 3 tipos: fotos, videos y audio',
+    emoji: '\uD83C\uDFA5', tier: 'plata', xp: 35,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(DISTINCT tipo)::int AS tipos FROM albumes WHERE usuario_id=$1 AND activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].tipos >= 3); });
+    },
   },
 ];
 
@@ -1207,6 +1386,165 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // --- Albums fotograficos (ADR-017) ---
+
+      // Listado de albumes con filtros
+      if (tipo === 'albumes') {
+        var albumUsuarioId = req.query.usuario_id || null;
+        var albumCiudad = req.query.ciudad || null;
+        var albumTipo = req.query.tipo || null;
+        var albumLimit = Math.min(parseInt(req.query.limit || '20'), 50);
+        var albumOffset = parseInt(req.query.offset || '0');
+        var albumOrden = req.query.orden || 'recientes';
+
+        var albumParams = [];
+        var np = 0;
+        var albumWhere = ' WHERE a.activo = true';
+        if (albumUsuarioId) { np++; albumWhere += ' AND a.usuario_id = $' + np; albumParams.push(albumUsuarioId); }
+        if (albumCiudad) { np++; albumWhere += ' AND a.ciudad = $' + np; albumParams.push(albumCiudad); }
+        if (albumTipo) { np++; albumWhere += ' AND a.tipo = $' + np; albumParams.push(albumTipo); }
+        np++; var albumLimitIdx = np; albumParams.push(albumLimit);
+        np++; var albumOffsetIdx = np; albumParams.push(albumOffset);
+        var albumesRows = await sql(
+          'SELECT a.id, a.usuario_id, a.titulo, a.descripcion, a.tipo,'
+          + ' a.lat, a.lng, a.ciudad, a.region, a.portada_url, a.es_top,'
+          + ' a.creado_en, u.nombre AS autor_nombre,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af2'
+          + '  JOIN album_votos av ON av.foto_id = af2.id'
+          + '  WHERE af2.album_id = a.id) AS votos_count'
+          + ' FROM albumes a'
+          + ' LEFT JOIN usuarios u ON u.id = a.usuario_id'
+          + albumWhere
+          + ' ORDER BY '
+          + (albumOrden === 'populares' ? 'votos_count DESC' :
+             albumOrden === 'top' ? 'a.es_top DESC, votos_count DESC' :
+             'a.creado_en DESC')
+          + ' LIMIT $' + albumLimitIdx
+          + ' OFFSET $' + albumOffsetIdx,
+          albumParams
+        );
+        return res.status(200).json({ ok: true, data: albumesRows });
+      }
+
+      // Detalle de un album con sus fotos
+      if (tipo === 'album_detalle' && req.query.album_id) {
+        var albumId = req.query.album_id;
+        var albumDetRows = await sql(
+          'SELECT a.*, u.nombre AS autor_nombre,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count'
+          + ' FROM albumes a LEFT JOIN usuarios u ON u.id = a.usuario_id'
+          + ' WHERE a.id = $1 AND a.activo = true',
+          [albumId]
+        );
+        if (!albumDetRows.length)
+          return res.status(404).json({ ok: false, error: 'Album no encontrado' });
+
+        var fotosDetRows = await sql(
+          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+          + ' af.autor_original_id, af.agregador_id, af.creado_en,'
+          + ' u.nombre AS autor_nombre,'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
+          + ' FROM album_fotos af'
+          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
+          + ' WHERE af.album_id = $1 AND af.activo = true'
+          + ' ORDER BY af.creado_en ASC',
+          [albumId]
+        );
+
+        // Marcar ya_votado para el usuario actual
+        var yaVotoAlbum = {};
+        if (usuarioId) {
+          var misVotosAlbum = await sql(
+            'SELECT foto_id FROM album_votos WHERE usuario_id=$1',
+            [usuarioId]
+          );
+          misVotosAlbum.forEach(function(v){ yaVotoAlbum[String(v.foto_id)] = true; });
+        }
+        fotosDetRows.forEach(function(r){ r.ya_votado = !!yaVotoAlbum[String(r.id)]; });
+
+        return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows });
+      }
+
+      // Mapa audiovisual: UNION de album_fotos (con lat/lng del album) + destinos_fotos.
+      // Nota: en un UNION, $N se comparte entre ambas ramas. Usamos $1/$2 fijos.
+      if (tipo === 'multimedia_mapa') {
+        var mmTipo = req.query.tipo_media || null;
+        var mmCiudad = req.query.ciudad || null;
+        var mmParams = [];
+        var np = 0;
+        if (mmTipo) { np++; mmParams.push(mmTipo); }
+        if (mmCiudad) { np++; mmParams.push(mmCiudad); }
+
+        var multimediaRows = await sql(
+          '('
+          + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
+          + '  af.media_title, af.media_source, a.lat, a.lng, a.ciudad,'
+          + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
+          + '  \'album\' AS origen, a.id AS origen_id,'
+          + '  (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
+          + ' FROM album_fotos af'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
+          + ' WHERE a.lat IS NOT NULL AND a.lng IS NOT NULL AND a.activo=true AND af.activo=true'
+          + (mmTipo ? ' AND af.foto_type = $1' : '')
+          + (mmCiudad ? ' AND a.ciudad = $' + (mmTipo ? '2' : '1') : '')
+          + ') UNION ALL ('
+          + ' SELECT df.url AS media_url, \'foto\' AS media_type,'
+          + '  df.caption AS media_title, \'\' AS media_source, d.lat, d.lng, d.ciudad,'
+          + '  d.nombre AS album_titulo, \'\' AS autor_nombre,'
+          + '  \'destino\' AS origen, d.slug AS origen_id, 0 AS votos'
+          + ' FROM destinos_fotos df'
+          + ' JOIN destinos d ON d.id = df.destino_id'
+          + ' WHERE d.lat IS NOT NULL AND d.lng IS NOT NULL AND d.status = \'published\''
+          + (mmTipo && mmTipo !== 'foto' ? ' AND FALSE' : '')
+          + (mmCiudad ? ' AND d.ciudad = $' + (mmTipo ? '2' : '1') : '')
+          + ') ORDER BY votos DESC LIMIT 200',
+          mmParams
+        );
+        return res.status(200).json({ ok: true, data: multimediaRows });
+      }
+
+      // Feed de fotos recientes de albumes
+      if (tipo === 'mi_feed_fotos') {
+        var feedLimit = Math.min(parseInt(req.query.limit || '20'), 50);
+        var feedOffset = parseInt(req.query.offset || '0');
+        var feedRows = await sql(
+          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+          + ' a.titulo AS album_titulo, a.ciudad, a.id AS album_id,'
+          + ' u.nombre AS autor_nombre,'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
+          + ' af.creado_en'
+          + ' FROM album_fotos af'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
+          + ' WHERE af.activo = true AND a.activo = true'
+          + ' ORDER BY af.creado_en DESC'
+          + ' LIMIT $1 OFFSET $2',
+          [feedLimit, feedOffset]
+        );
+        return res.status(200).json({ ok: true, data: feedRows });
+      }
+
+      // Top fotos para curacion de directorios (por coord match)
+      if (tipo === 'fotos_top' && destinoId) {
+        var ftRows = await sql(
+          'SELECT af.id, af.foto_url, af.foto_type, af.media_title,'
+          + ' u.nombre AS autor_nombre, a.titulo AS album_titulo,'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
+          + ' FROM album_fotos af'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
+          + ' JOIN destinos d ON d.id = $1'
+          + ' WHERE af.activo = true AND a.activo = true'
+          + ' AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
+          + ' AND ABS(a.lat - d.lat) < 0.01 AND ABS(a.lng - d.lng) < 0.01'
+          + ' ORDER BY votos DESC LIMIT 10',
+          [destinoId]
+        );
+        return res.status(200).json({ ok: true, data: ftRows });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -1673,6 +2011,270 @@ module.exports = async function handler(req, res) {
         misionesFotoVoto = await evaluarMisiones(sql, usuarioId2);
         logrosFotoVoto = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({ ok: true, xp: 5, misiones: misionesFotoVoto, logros: logrosFotoVoto });
+      }
+
+      // --- Albums fotograficos POST (ADR-017) ---
+      // Se manejan ANTES del guard generico de destino_id porque
+      // album_crear / album_agregar_foto / etc. no reciben destino_id.
+
+      // Helpers anti-spam para albums
+      function getProgresoAlbum(sql, uid) {
+        return sql('SELECT progreso_album FROM usuarios WHERE id=$1', [uid])
+          .then(function(r){ return (r[0] && r[0].progreso_album) || {}; })
+          .catch(function(){ return {}; });
+      }
+      function updProgresoAlbum(sql, uid, obj) {
+        return sql('UPDATE usuarios SET progreso_album = progreso_album || $1::jsonb WHERE id=$2', [JSON.stringify(obj), uid]).catch(function(){});
+      }
+      function hoy() { return new Date().toISOString().slice(0, 10); }
+
+      // Crear album
+      if (tipo2 === 'album_crear') {
+        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var alTitulo = String(body.titulo || '').trim();
+        if (!alTitulo) return res.status(400).json({ ok: false, error: 'titulo requerido' });
+        if (alTitulo.length > 120) return res.status(400).json({ ok: false, error: 'titulo maximo 120 caracteres' });
+
+        // Check nivel >= 2
+        var nivelCheck = await sql('SELECT xp_total FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
+        var nivelCalc = nivelCheck[0] ? Math.floor(nivelCheck[0].xp_total / 100) + 1 : 1;
+        if (nivelCalc < 2) return res.status(403).json({ ok: false, error: 'Nivel insuficiente (requiere nivel 2)' });
+
+        // Anti-spam: max 5 albumes/mes
+        var pa = await getProgresoAlbum(sql, usuarioId2);
+        var mesActual = hoy().slice(0, 7);
+        if ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual && (pa.albumes_mes || 0) >= 5)
+          return res.status(429).json({ ok: false, error: 'Limite de 5 albumes por mes alcanzado' });
+
+        var alDesc = String(body.descripcion || '').trim().slice(0, 1000);
+        var alTipo = ['fotos','videos','audio','mixto'].includes(body.tipo) ? body.tipo : 'fotos';
+        var alLat = body.lat ? parseFloat(body.lat) : null;
+        var alLng = body.lng ? parseFloat(body.lng) : null;
+        var alCiudad = String(body.ciudad || '').trim().slice(0, 80) || null;
+        var alRegion = String(body.region || '').trim().slice(0, 80) || null;
+        var alPortada = String(body.portada_url || '').trim().slice(0, 2000) || null;
+
+        var albumIns = await sql(
+          'INSERT INTO albumes (usuario_id, titulo, descripcion, tipo, lat, lng, ciudad, region, portada_url) '
+          + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+          [usuarioId2, alTitulo, alDesc, alTipo, alLat, alLng, alCiudad, alRegion, alPortada]
+        );
+
+        // XP +20
+        await sql('UPDATE usuarios SET xp_total=xp_total+20, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+
+        // Actualizar progreso_album
+        var nuevoAlbumesMes = ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual) ? (pa.albumes_mes || 0) + 1 : 1;
+        await updProgresoAlbum(sql, usuarioId2, { albumes_mes: nuevoAlbumesMes, albumes_mes_fecha: hoy() });
+
+        var misionesAlbum = await evaluarMisiones(sql, usuarioId2);
+        var logrosAlbum = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, album: albumIns[0], xp: 20, misiones: misionesAlbum, logros: logrosAlbum });
+      }
+
+      // Agregar foto a album (Pinterest-style)
+      if (tipo2 === 'album_agregar_foto') {
+        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var afAlbumId = body.album_id || null;
+        var afFotoUrl = String(body.foto_url || '').trim();
+        if (!afAlbumId) return res.status(400).json({ ok: false, error: 'album_id requerido' });
+        if (!afFotoUrl || !/^https?:\/\//.test(afFotoUrl) || afFotoUrl.length > 2000)
+          return res.status(400).json({ ok: false, error: 'foto_url invalida' });
+
+        // Check album exists and activo
+        var afAlbumCheck = await sql('SELECT id, usuario_id FROM albumes WHERE id=$1 AND activo=true', [afAlbumId]).catch(function(){ return []; });
+        if (!afAlbumCheck.length) return res.status(404).json({ ok: false, error: 'Album no encontrado' });
+
+        // Check fotos count < 50
+        var afCount = await sql('SELECT COUNT(*)::int AS n FROM album_fotos WHERE album_id=$1 AND activo=true', [afAlbumId]).catch(function(){ return [{n:0}]; });
+        if (afCount[0].n >= 50) return res.status(429).json({ ok: false, error: 'Album lleno (maximo 50 fotos)' });
+
+        // Anti-spam: max 10 fotos/dia
+        var pa2 = await getProgresoAlbum(sql, usuarioId2);
+        if ((pa2.fotos_dia_fecha || '') === hoy() && (pa2.fotos_dia || 0) >= 10)
+          return res.status(429).json({ ok: false, error: 'Limite de 10 fotos por dia alcanzado' });
+
+        var afAutorOriginal = body.autor_original_id || usuarioId2;
+        var afFotoType = ['foto','video','audio'].includes(body.foto_type) ? body.foto_type : 'foto';
+        var afMediaTitle = String(body.media_title || '').trim().slice(0, 200);
+        var afMediaSource = String(body.media_source || '').trim().slice(0, 100);
+
+        // Check dedup
+        var afDedup = await sql(
+          'SELECT 1 AS uno FROM album_fotos WHERE album_id=$1 AND foto_url=$2 AND autor_original_id=$3 LIMIT 1',
+          [afAlbumId, afFotoUrl, afAutorOriginal]
+        ).catch(function(){ return []; });
+        if (afDedup.length) return res.status(409).json({ ok: false, error: 'Foto ya existe en este album' });
+
+        var afIns = await sql(
+          'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, xp_otorgado_autor) '
+          + 'VALUES ($1, $2, $3, $4, $5, $6, $7, 15) RETURNING *',
+          [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource]
+        );
+
+        // XP +15 al agregador
+        await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+
+        // XP +10 al autor original si es foto de otro (tope 10 XP/dia)
+        if (afAutorOriginal !== usuarioId2) {
+          var pa3 = await getProgresoAlbum(sql, afAutorOriginal);
+          if ((pa3.xp_autor_fecha || '') !== hoy() || (pa3.xp_autor_dia || 0) < 10) {
+            await sql('UPDATE usuarios SET xp_total=xp_total+10, ultimo_acceso=NOW() WHERE id=$1', [afAutorOriginal]).catch(function(){});
+            var nuevoXpAutor = ((pa3.xp_autor_fecha || '') === hoy()) ? (pa3.xp_autor_dia || 0) + 10 : 10;
+            await updProgresoAlbum(sql, afAutorOriginal, { xp_autor_dia: nuevoXpAutor, xp_autor_fecha: hoy() });
+          }
+        }
+
+        // Actualizar progreso_album del agregador
+        var nuevoFotosDia = ((pa2.fotos_dia_fecha || '') === hoy()) ? (pa2.fotos_dia || 0) + 1 : 1;
+        await updProgresoAlbum(sql, usuarioId2, { fotos_dia: nuevoFotosDia, fotos_dia_fecha: hoy() });
+
+        var misionesFoto = await evaluarMisiones(sql, usuarioId2);
+        var logrosFoto = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, foto: afIns[0], xp: 15, xp_autor_original: afAutorOriginal !== usuarioId2 ? 10 : 0, misiones: misionesFoto, logros: logrosFoto });
+      }
+
+      // Votar foto de album
+      if (tipo2 === 'album_voto') {
+        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var avFotoId = body.foto_id || null;
+        if (!avFotoId) return res.status(400).json({ ok: false, error: 'foto_id requerido' });
+
+        // Anti-spam: max 20 votos/dia
+        var pa4 = await getProgresoAlbum(sql, usuarioId2);
+        if ((pa4.votos_dia_fecha || '') === hoy() && (pa4.votos_dia || 0) >= 20)
+          return res.status(429).json({ ok: false, error: 'Limite de 20 votos por dia alcanzado' });
+
+        var avTarget = await sql('SELECT id, autor_original_id, album_id FROM album_fotos WHERE id=$1 AND activo=true LIMIT 1', [avFotoId]).catch(function(){ return []; });
+        if (!avTarget.length) return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+        if (avTarget[0].autor_original_id === usuarioId2)
+          return res.status(403).json({ ok: false, error: 'No puedes votar tu propia foto' });
+
+        try {
+          await sql('INSERT INTO album_votos (usuario_id, foto_id, xp_ganado) VALUES ($1, $2, 5)', [usuarioId2, avFotoId]);
+        } catch (e) {
+          if (e.code === '23505') return res.status(409).json({ ok: false, error: 'Ya votaste esta foto', ya_votado: true });
+          return res.status(500).json({ ok: false, error: 'Error al registrar voto' });
+        }
+
+        await sql('UPDATE usuarios SET xp_total=xp_total+5, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        var nuevoVotosDia = ((pa4.votos_dia_fecha || '') === hoy()) ? (pa4.votos_dia || 0) + 1 : 1;
+        await updProgresoAlbum(sql, usuarioId2, { votos_dia: nuevoVotosDia, votos_dia_fecha: hoy() });
+
+        var misionesVoto = await evaluarMisiones(sql, usuarioId2);
+        var logrosVoto = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({ ok: true, xp: 5, misiones: misionesVoto, logros: logrosVoto });
+      }
+
+      // Quitar foto de album (solo agregador o creador del album)
+      if (tipo2 === 'album_quitar_foto') {
+        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var qfFotoId = body.foto_id || null;
+        var qfAlbumId = body.album_id || null;
+        if (!qfFotoId || !qfAlbumId) return res.status(400).json({ ok: false, error: 'foto_id y album_id requeridos' });
+
+        var qfCheck = await sql(
+          'SELECT af.id, af.agregador_id, a.usuario_id AS creador_id'
+          + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
+          + ' WHERE af.id = $1 AND af.album_id = $2',
+          [qfFotoId, qfAlbumId]
+        ).catch(function(){ return []; });
+        if (!qfCheck.length) return res.status(404).json({ ok: false, error: 'Foto no encontrada en album' });
+        if (qfCheck[0].agregador_id !== usuarioId2 && qfCheck[0].creador_id !== usuarioId2)
+          return res.status(403).json({ ok: false, error: 'Sin permisos para quitar esta foto' });
+
+        await sql('UPDATE album_fotos SET activo = false WHERE id = $1', [qfFotoId]);
+        return res.status(200).json({ ok: true });
+      }
+
+      // Editar album (solo creador)
+      if (tipo2 === 'album_editar') {
+        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var aeAlbumId = body.album_id || null;
+        if (!aeAlbumId) return res.status(400).json({ ok: false, error: 'album_id requerido' });
+
+        var aeCheck = await sql('SELECT id, usuario_id FROM albumes WHERE id=$1 AND activo=true', [aeAlbumId]).catch(function(){ return []; });
+        if (!aeCheck.length) return res.status(404).json({ ok: false, error: 'Album no encontrado' });
+        if (aeCheck[0].usuario_id !== usuarioId2) return res.status(403).json({ ok: false, error: 'Sin permisos' });
+
+        var aeTitulo = body.titulo !== undefined ? String(body.titulo).trim().slice(0, 120) : null;
+        var aeDesc = body.descripcion !== undefined ? String(body.descripcion).trim().slice(0, 1000) : null;
+        var aePortada = body.portada_url !== undefined ? String(body.portada_url).trim().slice(0, 2000) : null;
+        var aeLat = body.lat !== undefined ? parseFloat(body.lat) : undefined;
+        var aeLng = body.lng !== undefined ? parseFloat(body.lng) : undefined;
+        var aeCiudad = body.ciudad !== undefined ? String(body.ciudad).trim().slice(0, 80) : undefined;
+        var aeRegion = body.region !== undefined ? String(body.region).trim().slice(0, 80) : undefined;
+
+        var sets = [];
+        var vals = [];
+        var idx = 1;
+        if (aeTitulo !== null) { sets.push('titulo=$' + idx); vals.push(aeTitulo); idx++; }
+        if (aeDesc !== null) { sets.push('descripcion=$' + idx); vals.push(aeDesc); idx++; }
+        if (aePortada !== null) { sets.push('portada_url=$' + idx); vals.push(aePortada); idx++; }
+        if (aeLat !== undefined && !isNaN(aeLat)) { sets.push('lat=$' + idx); vals.push(aeLat); idx++; }
+        if (aeLng !== undefined && !isNaN(aeLng)) { sets.push('lng=$' + idx); vals.push(aeLng); idx++; }
+        if (aeCiudad !== undefined) { sets.push('ciudad=$' + idx); vals.push(aeCiudad || null); idx++; }
+        if (aeRegion !== undefined) { sets.push('region=$' + idx); vals.push(aeRegion || null); idx++; }
+
+        if (!sets.length) return res.status(400).json({ ok: false, error: 'Sin cambios' });
+
+        sets.push('actualizado_en=NOW()');
+        vals.push(aeAlbumId);
+        await sql('UPDATE albumes SET ' + sets.join(', ') + ' WHERE id=$' + idx, vals);
+        return res.status(200).json({ ok: true });
+      }
+
+      // Eliminar album (soft-delete, solo creador)
+      if (tipo2 === 'album_eliminar') {
+        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var elAlbumId = body.album_id || null;
+        if (!elAlbumId) return res.status(400).json({ ok: false, error: 'album_id requerido' });
+
+        var elCheck = await sql('SELECT id, usuario_id FROM albumes WHERE id=$1 AND activo=true', [elAlbumId]).catch(function(){ return []; });
+        if (!elCheck.length) return res.status(404).json({ ok: false, error: 'Album no encontrado' });
+        if (elCheck[0].usuario_id !== usuarioId2) return res.status(403).json({ ok: false, error: 'Sin permisos' });
+
+        await sql('UPDATE albumes SET activo = false, actualizado_en = NOW() WHERE id = $1', [elAlbumId]);
+        return res.status(200).json({ ok: true });
+      }
+
+      // Admin: seleccionar foto top para destino
+      if (tipo2 === 'admin_foto_top') {
+        var aftAdminToken = req.headers.authorization || '';
+        if (aftAdminToken.indexOf('Bearer ') !== 0)
+          return res.status(401).json({ ok: false, error: 'Token requerido' });
+        aftAdminToken = aftAdminToken.slice(7);
+        var adminSecret = process.env.ADMIN_SECRET || 'exploraco12345';
+        if (aftAdminToken !== adminSecret)
+          return res.status(403).json({ ok: false, error: 'Token invalido' });
+
+        var aftDestinoId = body.destino_id || null;
+        var aftFotoUrl = String(body.foto_url || '').trim();
+        if (!aftDestinoId || !aftFotoUrl)
+          return res.status(400).json({ ok: false, error: 'destino_id y foto_url requeridos' });
+
+        await sql('UPDATE destinos SET foto_hero = $1, actualizado_en = NOW() WHERE id = $2', [aftFotoUrl, aftDestinoId]);
+        return res.status(200).json({ ok: true });
+      }
+
+      // Admin: moderar foto de album (soft-delete)
+      if (tipo2 === 'admin_moderar_foto_album') {
+        var amaAdminToken = req.headers.authorization || '';
+        if (amaAdminToken.indexOf('Bearer ') !== 0)
+          return res.status(401).json({ ok: false, error: 'Token requerido' });
+        amaAdminToken = amaAdminToken.slice(7);
+        var adminSecret2 = process.env.ADMIN_SECRET || 'exploraco12345';
+        if (amaAdminToken !== adminSecret2)
+          return res.status(403).json({ ok: false, error: 'Token invalido' });
+
+        var amaFotoId = body.foto_id || null;
+        var amaAccion = body.accion || 'eliminar';
+        if (!amaFotoId) return res.status(400).json({ ok: false, error: 'foto_id requerido' });
+
+        if (amaAccion === 'eliminar') {
+          await sql('UPDATE album_fotos SET activo = false WHERE id = $1', [amaFotoId]);
+        }
+        return res.status(200).json({ ok: true });
       }
 
       if (!tipo2 || !destinoId2)

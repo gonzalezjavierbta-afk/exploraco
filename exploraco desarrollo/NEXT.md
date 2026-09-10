@@ -2,6 +2,9 @@
 
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
+## Completado reciente
+- ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
+
 ## Que se estaba haciendo
 
 ### Sesion ADR-016 - subcategorias en tags sitio/comida/evento (2026-09-10) - TSK-090

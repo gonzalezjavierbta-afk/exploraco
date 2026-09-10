@@ -1,4 +1,4 @@
-// Test local del catalogo LOGROS de api/interacciones.js (v5)
+// Test local del catalogo LOGROS de api/interacciones.js (v8)
 const path = require('path');
 const fs = require('fs');
 const vm = require('vm');
@@ -24,14 +24,14 @@ const LOGROS = sandbox.module.exports.LOGROS;
 const CIUDADES = sandbox.module.exports.CIUDADES_COLECCION;
 const CIUDAD_NORM = sandbox.module.exports.CIUDAD_NORM;
 const TIERS = ['bronce','plata','oro','platino'];
-const GRUPOS = ['general','coleccion','ciudad'];
+const GRUPOS = ['general','coleccion','ciudad','fotos'];
 
 function check(label, cond) {
   console.log((cond ? 'PASS' : 'FAIL') + ' - ' + label);
   if (!cond) process.exitCode = 1;
 }
 
-check('LOGROS: 22 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2 + 3 comunidad social)', LOGROS.length === 22);
+check('LOGROS: 29 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2 + 3 comunidad social + 7 albums/fotos)', LOGROS.length === 29);
 const ids = LOGROS.map(l => l.id);
 check('LOGROS: ids unicos', new Set(ids).size === LOGROS.length);
 
@@ -48,6 +48,25 @@ check('LOGROS: shape completo (id/nombre/desc/emoji/xp/check)', shapeOk);
 check('LOGROS: tiers validos (bronce/plata/oro/platino)', tierOk);
 check('LOGROS: grupos validos', grupoOk);
 check('LOGROS: requiere apunta a ids existentes', reqOk);
+
+// Logros de Albums/Fotos (ADR-017, v8): id, tier, xp y grupo 'fotos'
+var logrosFoto = [
+  { id: 'logr_albumero', tier: 'bronce', xp: 15 },
+  { id: 'logr_coleccionista_visual', tier: 'plata', xp: 30 },
+  { id: 'logr_maestro_fotografo', tier: 'oro', xp: 60 },
+  { id: 'logr_favorito_comunidad', tier: 'bronce', xp: 20 },
+  { id: 'logr_estrella_del_mapa', tier: 'oro', xp: 40 },
+  { id: 'logr_guardian_historias', tier: 'platino', xp: 100 },
+  { id: 'logr_viajero_multimedia', tier: 'plata', xp: 35 },
+];
+var fotoById = {};
+LOGROS.forEach(function(l) { fotoById[l.id] = l; });
+var fotoOk = logrosFoto.every(function(f) {
+  var l = fotoById[f.id];
+  return l && l.grupo === 'fotos' && l.tier === f.tier && l.xp === f.xp
+    && typeof l.check === 'function' && Array.isArray(l.requiere);
+});
+check('LOGROS: 7 logros de albums/fotos con id, grupo=fotos, tier y xp correctos', fotoOk);
 
 // Metodos de ctx que usan los checks (deben existir en evaluarLogros ctx)
 const ctxMethods = ['totalVotos','blogVotos','blogOpiniones','ciudadesDistintas','guardadosCiudad','rarezaGlobal'];

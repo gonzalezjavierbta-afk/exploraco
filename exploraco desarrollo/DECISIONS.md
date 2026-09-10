@@ -338,3 +338,33 @@ Registro de decisiones arquitectonicas (ADR). Este documento NUNCA contiene tare
 **Impacto:** `admin.html` (campo `f-subcategoria` como `<select>` de lista cerrada registrado en `CATEGORY_TAG_FIELDS.<cat>`/`CATEGORY_TAG_LISTS.<cat>` del motor TSK-012, sin tocar `collectPlace()`/`_placeToAPI()`; visibilidad condicional de sub-tabs `especifico-sitio` por subcategoria); `publicar.html` (select de subcategoria); `api/pagina-destino.js` (gateo de secciones de sitio por `tags.subcategoria` + secciones nuevas condicionales + chip de subcategoria en hero con CSS scoped ADR-004 y escapes \uXXXX ADR-002); `scripts/validate_ficha.js` (acepta subcategoria en categorias sitio/comida/evento); `scripts/reclasificar-subcategorias.js` (script idempotente versionado en `scripts/`, log slug→subcategoria para revision de Javier antes de produccion, inferencia tipo_actividad/nombre/lead); BLUEPRINT.md seccion 4 y TASKS.md (post-implementacion con docs-keeper). NO se crean funciones serverless ni migraciones de esquema. Criterios de cierre: Escudo GOLD + smoke test de buildHTML() de las 3 categorias afectadas con y sin subcategoria.
 
 **Estado:** Aprobada - implementacion Fase 1-3 completada en working tree (pendiente commit/deploy y reclasificacion en produccion).
+
+---
+
+## ADR-017: Albums Fotograficos, Gamificacion y Mapa Audiovisual
+
+**ID:** ADR-017
+**Fecha:** 2026-09-09
+**Estado:** Aprobado e implementado (pendiente migracion 009 en Neon + deploy, segun header de api/interacciones.js v8)
+**Autor:** AI-DOS Core
+
+**Problema:** ExploraCO necesita un sistema de albumes fotograficos libres (no vinculados a destinos), gamificacion extendida para fotos/videos/audio, y un mapa audiovisual en comunidad.html.
+
+**Decision:**
+- Albumes libres con ubicacion manual (lat/lng/ciudad), no vinculados a destinos del directorio
+- Modelo Pinterest: fotos de otros usuarios con XP al due\u00f1o original (+10 XP, tope 10/dia)
+- Todo en los 8 endpoints existentes (Vercel Hobby 8/8 agotado)
+- URLs externas con validacion HEAD diferida (sin upload real)
+- Mapa audiovisual via UNION SQL de albumes + destinos_fotos en comunidad.html
+- Gamificacion: +6 misiones (total 18-20) + +7 logros (total 29)
+- Nivel minimo: 2 para albumes y repins
+- Anti-spam: 10 fotos/dia, 5 albumes/mes, 20 votos/dia
+- Contadores derivados por COUNT (sin columnas, sin race condition)
+- Curacion manual: admin selecciona foto top para directorios
+
+**Tablas nuevas:** albumes, album_fotos, album_votos (migracion 009)
+**Extension:** usuarios.progreso_album (jsonb)
+**Endpoint:** api/interacciones.js v8 (+5 GET, +8 POST)
+**Frontend:** comunidad.html (tab Mapa), mi-perfil.html (Mis Albumes), admin.html (Foto Top)
+
+**ADR previos relacionados:** ADR-010 (presupuesto endpoints), ADR-012 (gamificacion), ADR-014 (Milestones v2), ADR-015 (Comunidad social)
