@@ -1392,7 +1392,7 @@ module.exports = async function handler(req, res) {
       if (tipo === 'albumes') {
         var albumUsuarioId = req.query.usuario_id || null;
         var albumCiudad = req.query.ciudad || null;
-        var albumTipo = req.query.tipo || null;
+        var albumTipo = req.query.album_tipo || null;
         var albumLimit = Math.min(parseInt(req.query.limit || '20'), 50);
         var albumOffset = parseInt(req.query.offset || '0');
         var albumOrden = req.query.orden || 'recientes';
