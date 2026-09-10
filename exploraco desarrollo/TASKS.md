@@ -2068,5 +2068,38 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-091: Pagina dinamica bahia-malaga.html (PNN Uramba Bahia Malaga)
+- **Estado:** COMPLETADA (2026-09-09)
+- **Detalle:** Pagina del Parque Nacional Natural Uramba Bahia Malaga (cat
+  sitio, slug `bahia-malaga`, `status='published'`, `destacado=true`,
+  rating 0) con datos del PNN: 47.094 hectareas en Buenaventura (Valle del
+  Cauca), santuario de la ballena jorobada (Megaptera novaeangliae) entre
+  julio y octubre, manglares, esteros y cascada La Sierpe, comunidades
+  afrodescendientes de Juanchaco/Ladrilleros/La Plata/Puerto Chiple.
+  Coordenadas 3.9333, -77.35. TASA muelle $20.000 COP + tours desde
+  $70.000-80.000 COP. Fuente: ficha-bahia-malaga.json (ficha completa,
+  sin re-investigacion). Archivos: `scripts/seed-bahia-malaga.js`
+  (upsert ON CONFLICT slug, modo `--dry`, ASCII-safe 0/0/0),
+  `scripts/load-bahia-malaga-api.js` (DELETE+POST Bearer exploraco12345)
+  y `scripts/smoke_test_bahia_malaga.js` (buildHTML en sandbox vm).
+  Fotos: las 10 URLs de FOTOS_SUGERIDAS de la ficha daban `missing` en
+  Wikimedia Commons -> se resolvieron 5 reales verificadas HEAD 200
+  (BUG-022): HERO "Ballena jorobada y ballenato en Bahia Malaga" (la unica
+  foto georeferenciada del parque en Commons), ballena jorobada yubarta,
+  manglar del Pacifico colombiano, calle de Juanchaco y playa de
+  Juanchaco. FAQS 5. Rating 0 (ADR-009, sin resenas sembradas).
+- **Evidencia (Escudo GOLD):** `node --check` PASS en los 3 archivos;
+  ASCII-safety 0 bytes >127 / 0 dobles escapes / 0 backticks en los 3;
+  smoke `scripts/smoke_test_bahia_malaga.js` 15/15 PASS con balance de
+  divs 361/361. Carga en prod via loader: POST /api/admin-destinos = OK
+  (id 1d233452-9728-4e90-be80-f5b611337129, status published, destacado
+  true). GET /bahia-malaga.html = 200 (79.763 bytes) con las 9 secciones
+  del motor sitio (entradas, tours, fauna, secretos, itinerario,
+  checklist, faq, galeria, mapa); /api/destinos?categoria=sitio lista el
+  slug (name "Parque Nacional Natural Uramba Bahia Malaga", rating 0,
+  total sitio 74); sitemap.xml incluye el slug (HTTP 200).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

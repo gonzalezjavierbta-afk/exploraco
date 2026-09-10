@@ -75,6 +75,54 @@ completada), TSK-090 en TASKS.md, leccion BUG-029 en BUGS_HISTORICOS.md.
   `cover{valor,nota}`: el renderer lee objeto con fallback plano (H1). La
   reclasificacion no toca cover.
 
+### Sesion bahia-malaga - PNN Uramba Bahia Malaga en directorio (2026-09-09) - TSK-091
+
+Pagina dinamica de categoria `sitio` para el Parque Nacional Natural Uramba
+Bahia Malaga (slug `bahia-malaga`, Buenaventura/Valle del Cauca, 3.9333,
+-77.35): santuario de la ballena jorobada entre julio y octubre, manglares,
+esteros, cascada La Sierpe y comunidades afro de Juanchaco/Ladrilleros/La
+Plata. Patron Fase 9 completo (seed + loader + smoke + prod + docs), sin
+re-investigacion: datos de `ficha-bahia-malaga.json` (ficha completa).
+
+**Cambios (3 archivos nuevos en `scripts/`):**
+- `scripts/seed-bahia-malaga.js`: upsert `ON CONFLICT slug`, modo `--dry`
+  (default), ASCII-safe estricto (0 bytes >127; emojis en escapes \u),
+  rating 0 (ADR-009, sin resenas sembradas), destacado=true, 5 fotos
+  (primera HERO), FAQS 5 en destinos_detalles. TAGS sitio completos
+  (entradas[1], tours[2], equipamiento[5], itinerario[5], fauna_flora[4],
+  secretos[3], regulaciones, dificultad_tags[3], temporada_matriz).
+- `scripts/load-bahia-malaga-api.js`: loader DELETE+POST a
+  `https://exploraco.vercel.app/api/admin-destinos` (Bearer exploraco12345).
+- `scripts/smoke_test_bahia_malaga.js`: buildHTML() en sandbox vm
+  (fake_neon.js) con `det` explicito (faqs + entradas/tours/equipamiento) y
+  las 5 fotos como fotosRows (galeria solo renderiza con >1 foto).
+
+**Fotos resueltas (BUG-022):** las 10 URLs de FOTOS_SUGERIDAS de la ficha
+daban `missing` en Wikimedia Commons -> se buscaron reales y se verificaron
+HEAD 200: HERO "Ballena jorobada y ballenato en Bahia Malaga" (unica foto
+georeferenciada del parque en Commons), ballena jorobada yubarta, manglar
+del Pacifico (Bahia Solano, misma ecorregion), calle de Juanchaco y playa
+de Juanchaco.
+
+**Verificado en produccion (2026-09-09):** Escudo GOLD: node --check 3/3
+PASS; ASCII-safety 0/0/0 en los 3; smoke 15/15 PASS con balance de divs
+361/361 (los checks de FAQ y galeria usan `id="faq"` / `id="galeria"` del
+renderer; la galeria requiere fotosRows con >1 foto). Carga en prod via
+loader: POST /api/admin-destinos OK (id 1d233452-9728-4e90-be80-f5b611337129,
+status=published, destacado=True). GET /bahia-malaga.html = 200 (79.763
+bytes) con las 9 secciones del motor sitio renderizadas (entradas, tours,
+fauna, secretos, itinerario, checklist, faq, galeria, mapa); slug presente
+en /api/destinos?categoria=sitio (name "Parque Nacional Natural Uramba
+Bahia Malaga", rating 0, total sitio 74) y en sitemap.xml (HTTP 200).
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** 3 scripts en `scripts/` + TASKS.md/TSK-091
+   (ya escrita) + NEXT.md (este segmento).
+2. Backlog vigente de sesiones anteriores (commit TSK-090 ADR-016 y
+   reclasificacion en produccion, migracion 008 de TSK-089 en Neon,
+   referentes-agenda.md, TSK-077 docs, hostales legacy sin seeds, TASK-013,
+   etc.).
+
 ### Sesion comunidad-chat-planes-backend - chat y planes reales con gaming (2026-09-08) - TSK-089
 
 Rediseno del apartado social de `comunidad.html` (tabs Chat y Planes)
