@@ -1,0 +1,343 @@
+{
+  "BASE": {
+    "slug": "bahia-malaga",
+    "nombre": "Parque Nacional Natural Uramba Bahía Málaga",
+    "categoria_slug": "sitio",
+    "lead": "Descubre el Parque Nacional Natural Uramba Bahía Málaga, una de las zonas de mayor biodiversidad del planeta y el santuario favorito de las ballenas jorobadas en el Pacífico colombiano.",
+    "descripcion": "El Parque Nacional Natural Uramba Bahía Málaga, creado en 2010 y ubicado en el municipio de Buenaventura (Valle del Cauca), abarca cerca de 47.094 hectáreas de ecosistemas continentales, costeros y marinos. Es reconocido mundialmente por ser un área clave para la reproducción, crianza y lactancia de la ballena jorobada (Megaptera novaeangliae), que migra miles de kilómetros desde la Antártida entre julio y octubre.\n\nAdemás del avistamiento de cetáceos, Bahía Málaga se destaca por sus prístinos bosques de manglar, esteros, cascadas de agua dulce que desembocan directamente en el mar e islas de acantilados cubiertos de vegetación selvática. La zona alberga una rica diversidad de aves marinas, reptiles, peces y moluscos, configurando un mosaico ecológico protegido conjuntamente entre Parques Nacionales Naturales de Colombia y las comunidades afrodescendientes ancestrales agrupadas en sus Consejos Comunitarios.\n\nLa experiencia turística en Uramba integra recorridos ecoturísticos guiados por sabedores locales, visitas a caídas de agua emblemáticas como La Sierpe, paseos en kayak o canoa tradicional por los túneles de manglar y exploración de playas vírgenes. El turismo responsable apoya directamente la conservación de la biodiversidad marina y el desarrollo sostenible de las comunidades locales de Juanchaco, Ladrilleros, La Plata y Puerto Chiple.",
+    "highlight": "Parque Nacional Natural · Avistamiento de Ballenas Jorobadas · Eco-destino de alta biodiversidad",
+    "ciudad": "Buenaventura",
+    "region": "Valle del Cauca",
+    "barrio": "Corregimiento de Bahía Málaga",
+    "lat": 3.9333,
+    "lng": -77.35,
+    "whatsapp": "573128834789",
+    "telefono": "576022415100",
+    "email": "uramba@parquesnacionales.gov.co",
+    "web": "https://www.parquesnacionales.gov.co/nuestros-parques/pnn-uramba-bahia-malaga/",
+    "instagram": "@parquescolombia",
+    "precio_desde": "Tasa muelle desde $20.000 COP; Tours desde $70.000 COP",
+    "horario": "Lun-Dom 06:00-17:00 (Sujeto a mares e itinerarios de lancha)",
+    "emoji": "🐋",
+    "hero_bg": "linear-gradient(135deg, #0b3d91 0%, #1e88e5 100%)",
+    "foto_hero": "FOTO 1",
+    "tipo": "Sitio Natural · Parque Nacional Natural · Avistamiento de Fauna",
+    "capacidad": "Capacidad de carga regulada por PNN y Consejos Comunitarios",
+    "como_llegar": "Lancha rápida desde el Muelle Turístico de Buenaventura hasta Juanchaco (1 hora aprox.).",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Avistamiento de fauna, senderismo acuatico, ecoturismo y fotografia",
+    "dificultad": "Facil",
+    "dificultad_desc": "Apto para todo público. Se requiere precaucion basica durante el abordaje de embarcaciones.",
+    "duracion": "1 a 3 dias",
+    "altitud": "0",
+    "temporada": [
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre"
+    ],
+    "precio_entrada": "Entrada gratuita al PNN. Tasa de muelle e ingreso comunitario aprox. $20.000 COP.",
+    "distancia": "A 45 km por mar desde la cabecera municipal de Buenaventura",
+    "como_llegar": "Desde Buenaventura abordar lancha rápida autorizada en el Muelle Turístico hasta el corregimiento de Juanchaco.",
+    "permisos": "Registro obligatorio al desembarcar en el puesto de Parques Nacionales / Consejo Comunitario.",
+    "temporada_nota": "La temporada de ballenas jorobadas se extiende del 15 de julio al 15 de octubre.",
+    "fauna_flora": [
+      {
+        "emoji": "🐋",
+        "nombre": "Ballena Jorobada (Megaptera novaeangliae)",
+        "hecho": "Migra desde la Antartida para parir y alimentar sus crias en aguas calidas."
+      },
+      {
+        "emoji": "🌳",
+        "nombre": "Manglares Rojos y Piñuelos",
+        "hecho": "Bosques acuaticos salacuna de cientos de especies marinas del Pacifico."
+      },
+      {
+        "emoji": "🦅",
+        "nombre": "Aves Marinas y Playeras",
+        "hecho": "Refugio de pelicanos, fragatas y piqueros de patas azules."
+      },
+      {
+        "emoji": "🐬",
+        "nombre": "Delfin Nariz de Botella",
+        "hecho": "Especie residente que suele avistarse cerca de las embarcaciones."
+      }
+    ],
+    "secretos": [
+      {
+        "icono": "🤫",
+        "titulo": "Cascadas que caen al mar",
+        "texto": "La Sierpe es una caida de agua dulce que desemboca directamente en los esteros salobres.",
+        "tag": "Naturaleza",
+        "tag_color": "green"
+      },
+      {
+        "icono": "💡",
+        "titulo": "Navegación tradicional en Chingo",
+        "texto": "Recorridos silenciosos a remo por los esteros para una observacion de aves sin ruido de motor.",
+        "tag": "Cultura",
+        "tag_color": "purple"
+      },
+      {
+        "icono": "🌊",
+        "titulo": "Tuneles naturales de manglar",
+        "texto": "En marea alta se ingresa en embarcaciones pequenas por debajo de las copas de los mangles.",
+        "tag": "Aventura",
+        "tag_color": "blue"
+      }
+    ],
+    "regulaciones": "Mantener distancia minima de 200m con las ballenas. Prohibido el uso de plásticos de un solo uso.",
+    "checklist_tip": "Llevar suficiente dinero en efectivo en billetes de baja denominación; no hay cajeros ni señal estable para datáfonos.",
+    "entradas": [
+      {
+        "tipo": "Tasa de Muelle + Ingreso Comunitario",
+        "precio": "$20.000 COP",
+        "incluye": "Tasa de embarque y aporte de desarrollo ambiental comunitario",
+        "link": "https://www.parquesnacionales.gov.co/nuestros-parques/pnn-uramba-bahia-malaga/"
+      }
+    ],
+    "tours": [
+      {
+        "nombre": "Tour de Avistamiento de Ballenas Jorobadas",
+        "precio": "$80.000 COP",
+        "precio_sub": "por persona",
+        "duracion": "2 horas",
+        "tipo_tour": "Grupal",
+        "idioma": "Español",
+        "max_personas": "20",
+        "rating": "",
+        "review_count": 0,
+        "descripcion": "Navegación autorizada con sabedor ambiental certificado para observar ballenas jorobadas.",
+        "incluye": [
+          "Chaleco salvavidas",
+          "Guía comunitario",
+          "Navegación 2 horas"
+        ],
+        "no_incluye": [
+          "Alimentos",
+          "Tasa de muelle"
+        ],
+        "link_reserva": "https://www.parquesnacionales.gov.co/nuestros-parques/pnn-uramba-bahia-malaga/",
+        "featured": true
+      },
+      {
+        "nombre": "Ruta de Cascadas y Manglares (La Sierpe)",
+        "precio": "$110.000 COP",
+        "precio_sub": "por persona",
+        "duracion": "4 horas",
+        "tipo_tour": "Grupal",
+        "idioma": "Español",
+        "max_personas": "12",
+        "rating": "",
+        "review_count": 0,
+        "descripcion": "Recorrido por esteros hasta las cascadas La Sierpe y Ostional con tiempo para baño recreativo.",
+        "incluye": [
+          "Lancha motorizada",
+          "Guia local",
+          "Acceso a pozos"
+        ],
+        "no_incluye": [
+          "Almuerzo",
+          "Hidratación"
+        ],
+        "link_reserva": "https://www.parquesnacionales.gov.co/nuestros-parques/pnn-uramba-bahia-malaga/",
+        "featured": false
+      }
+    ],
+    "equipamiento": [
+      {
+        "item": "Chaleco salvavidas",
+        "prioridad": "Obligatorio"
+      },
+      {
+        "item": "Chaqueta impermeable / Capota",
+        "prioridad": "Obligatorio"
+      },
+      {
+        "item": "Calzado acuático o sandalias sujetas",
+        "prioridad": "Recomendado"
+      },
+      {
+        "item": "Bolsa seca para celulares y cámaras",
+        "prioridad": "Recomendado"
+      },
+      {
+        "item": "Protector solar biodegradable",
+        "prioridad": "Recomendado"
+      }
+    ],
+    "itinerario": [
+      {
+        "dia": "Día 1",
+        "hora": "08:00",
+        "titulo": "Salida desde Buenaventura",
+        "icono": "🛥️",
+        "detalle": "Embarque en el Muelle Turístico en lancha rápida hacia Juanchaco.",
+        "tags": [
+          "transporte",
+          "mar"
+        ]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "09:15",
+        "titulo": "Registro e inducción ecoturística",
+        "icono": "📋",
+        "detalle": "Llegada a Juanchaco, registro de ingreso y charla sobre conservación.",
+        "tags": [
+          "conservacion",
+          "parques"
+        ]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "10:00",
+        "titulo": "Avistamiento de Ballenas Jorobadas",
+        "icono": "🐋",
+        "detalle": "Recorrido en lancha por la bahía para avistar y escuchar cetáceos.",
+        "tags": [
+          "fauna",
+          "destacado"
+        ]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "13:00",
+        "titulo": "Almuerzo típico del Pacífico",
+        "icono": "🍲",
+        "detalle": "Degustación de cazuela de mariscos o pescado frito en Ladrilleros.",
+        "tags": [
+          "gastronomia"
+        ]
+      },
+      {
+        "dia": "Día 1",
+        "hora": "14:30",
+        "titulo": "Excursión a Cascada La Sierpe",
+        "icono": "🌊",
+        "detalle": "Navegación entre esteros y baño refrescante en caída de agua dulce.",
+        "tags": [
+          "cascadas",
+          "naturaleza"
+        ]
+      }
+    ],
+    "dificultad_tags": [
+      {
+        "texto": "Apto para familias y adultos mayores",
+        "apto": true
+      },
+      {
+        "texto": "Apto para personas con movilidad reducida severa",
+        "apto": false
+      },
+      {
+        "texto": "Requiere caminata exigente en alta montaña",
+        "apto": false
+      }
+    ],
+    "temporada_matriz": {
+      "Ene": "posible",
+      "Feb": "posible",
+      "Mar": "posible",
+      "Abr": "posible",
+      "May": "posible",
+      "Jun": "posible",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "posible",
+      "Dic": "posible"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "¿Cuál es la mejor época para ver ballenas en Bahía Málaga?",
+      "respuesta": "Entre mediados de julio y mediados de octubre, siendo agosto y septiembre los meses con mayor presencia de cetáceos."
+    },
+    {
+      "pregunta": "¿Cómo se llega a Bahía Málaga desde Cali?",
+      "respuesta": "Viajando por tierra de Cali a Buenaventura (3h) y tomando lancha rápida en el Muelle Turístico hasta Juanchaco (1h)."
+    },
+    {
+      "pregunta": "¿Hay que pagar boleta de entrada al PNN Uramba Bahía Málaga?",
+      "respuesta": "No cobra entrada estatal, pero se paga la tasa de muelle y un aporte ecoturístico comunitario ($20.000 COP aprox.)."
+    },
+    {
+      "pregunta": "¿Es seguro realizar el avistamiento de ballenas?",
+      "respuesta": "Sí, utilizando embarcaciones autorizadas con motores ecológicos y guías capacitados por Parques Nacionales."
+    },
+    {
+      "pregunta": "¿Existen cajeros automáticos en Juanchaco o Ladrilleros?",
+      "respuesta": "No existen cajeros automáticos en la zona. Es indispensable llevar dinero en efectivo suficiente desde Buenaventura."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Bahia Malaga paisaje maritimo",
+      "caption": "Vista panorámica del Parque Nacional Natural Uramba Bahía Málaga",
+      "nombres_archivo_wikimedia": [
+        "File:Bahía_Málaga_Valle_del_Cauca.jpg",
+        "File:Bahia_Malaga_Colombia.jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Ballena jorobada en Bahia Malaga",
+      "caption": "Ballena jorobada emergiendo en las aguas cálidas de Bahía Málaga",
+      "nombres_archivo_wikimedia": [
+        "File:Humpback_whale_in_Bahía_Málaga.jpg",
+        "File:Megaptera_novaeangliae_Colombia.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Cascada La Sierpe Bahia Malaga",
+      "caption": "Cascada La Sierpe cayendo hacia los esteros del Pacífico",
+      "nombres_archivo_wikimedia": [
+        "File:Cascada_La_Sierpe_Bahia_Malaga.jpg",
+        "File:Cascadas_de_Juanchaco.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Manglares Pacifico Colombiano",
+      "caption": "Esteros y bosques de manglar en el interior de la bahía",
+      "nombres_archivo_wikimedia": [
+        "File:Manglares_del_Pacifico_Colombiano.jpg",
+        "File:Mangrove_forest_in_Colombia.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Juanchaco muelle embarcadero",
+      "caption": "Poblado costero de Juanchaco, puerta de entrada a Bahía Málaga",
+      "nombres_archivo_wikimedia": [
+        "File:Juanchaco_Buenaventura.jpg",
+        "File:Playa_Juanchaco_Valle.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "oficial",
+      "url": "https://www.parquesnacionales.gov.co/nuestros-parques/pnn-uramba-bahia-malaga/",
+      "que_respalda": "Extension, biodiversidad, limites, recomendaciones y estado del parque nacional"
+    },
+    {
+      "tipo": "prensa",
+      "url": "https://www.valledelcauca.gov.co/",
+      "que_respalda": "Rutas de acceso desde Buenaventura y dinamica ecoturistica regional"
+    },
+    {
+      "tipo": "maps",
+      "url": "https://maps.google.com/?q=3.9333,-77.3500",
+      "que_respalda": "Coordenadas decimales y ubicacion geografica en el municipio de Buenaventura"
+    }
+  ]
+}

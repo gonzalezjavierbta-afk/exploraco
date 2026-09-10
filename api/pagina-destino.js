@@ -14,6 +14,18 @@ var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'line
 // Temas de Blog (sub-categoria dentro de tags.tema, ver publicar-lugar.js BLOG_TEMAS)
 var TEMA_BLOG_LABEL = { aventura:'Aventura', gastro:'Gastronomia', cultura:'Cultura', naturaleza:'Naturaleza', tips:'Tips' };
 var TEMA_BLOG_EMOJI = { aventura:'\ud83c\udfd4\ufe0f', gastro:'\ud83c\udf7d\ufe0f', cultura:'\ud83c\udfad', naturaleza:'\ud83c\udf3f', tips:'\ud83d\udca1' };
+// ADR-016: Labels legibles de subcategoria (slug -> texto visible en el chip del hero).
+// Lista cerrada: sitio [naturaleza..aventura], comida [restaurante..dulces],
+// evento [concierto..fiesta]. Todos ASCII-safe (sin tildes en el JS del serverless).
+var SUBCAT_LABEL = {
+  naturaleza:'Naturaleza', museo:'Museo', cultura:'Cultura', bar:'Bar',
+  parque:'Parque', 'espacio-publico':'Espacio Publico',
+  'sitio-historico':'Sitio Historico', religioso:'Religioso', aventura:'Aventura',
+  restaurante:'Restaurante', cafe:'Cafe', gastrobar:'Gastrobar',
+  'comida-rapida':'Comida Rapida', dulces:'Dulces',
+  concierto:'Concierto', festival:'Festival', teatro:'Teatro',
+  exposicion:'Exposicion', deporte:'Deporte', cine:'Cine', fiesta:'Fiesta'
+};
 // Dimensiones de rese\u00f1as V2 por categoria (clave interna -> etiqueta visible).
 // Se usan en el formulario (selectores de estrellas) y en las barras de puntuacion.
 var DIM_BY_CAT = {
@@ -23,6 +35,21 @@ var DIM_BY_CAT = {
   evento: [ ['desfiles','Desfiles'], ['ambiente','Ambiente'], ['organizacion','Organizacion'], ['valor','Valor / precio'] ]
 };
 var DIM_COLORS = ['#22C55E', '#3B82F6', '#E8A020', '#8B5CF6'];
+
+// ADR-016: gating de secciones por subcategoria de sitio.
+// Clave: subcategoria slug -> lista de ids de secciones habilitadas.
+// Fallback: si tags.subcategoria no existe, se renderiza TODO (regresion cero).
+var SITIO_SECCIONES_POR_SUBCATEGORIA = {
+  naturaleza:      ['descripcion','dificultad','entradas','tours','checklist','itinerario','fauna','secretos','regulaciones','horarios_zona','que_ver'],
+  aventura:        ['descripcion','dificultad','entradas','tours','checklist','itinerario','fauna','secretos','regulaciones','horarios_zona','que_ver'],
+  museo:           ['descripcion','entradas','colecciones','recorridos','horarios_zona','accesibilidad','secretos','programacion'],
+  cultura:         ['descripcion','entradas','colecciones','recorridos','horarios_zona','accesibilidad','secretos','programacion','contexto'],
+  bar:             ['descripcion','entradas','horarios_zona','accesibilidad','musica_vivo','cover','codigo_vestimenta','happy_hour','programacion'],
+  parque:          ['descripcion','entradas','tours','checklist','atracciones','horarios_zona','accesibilidad','actividades_gratis'],
+  'espacio-publico': ['descripcion','entradas','atracciones','horarios_zona','accesibilidad','actividades_gratis','programacion'],
+  'sitio-historico': ['descripcion','entradas','recorridos','horarios_zona','accesibilidad','secretos','contexto'],
+  religioso:       ['descripcion','entradas','recorridos','horarios_zona','accesibilidad','contexto']
+};
 
 function esc(s) {
   if (s === null || s === undefined) return '';
@@ -145,6 +172,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +"@media(max-width:760px){.hi{grid-template-columns:1fr;min-height:auto;padding:8% 5%}}"
 +".hl{display:flex;flex-direction:column;justify-content:center;gap:16px}"
 +".hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}"
++".subcat-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.8);width:fit-content;transition:background .15s,border-color .15s}.subcat-chip:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff}"
 +".htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.95;letter-spacing:.5px}"
 +".hsub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.8;max-width:480px}"
 +".hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}"
@@ -396,7 +424,48 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}.tip-card:hover{border-color:#ccc}.tip-icon{font-size:22px;flex-shrink:0;line-height:1}.tip-body{flex:1;min-width:0}.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.tip-text{font-size:11px;color:var(--muted);line-height:1.6}.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}.fauna-card:hover{border-color:#ccc}.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}.permiso-item.requerido{border-left:3px solid var(--red)}.permiso-item.recomendado{border-left:3px solid var(--gold)}.permiso-item.info{border-left:3px solid var(--blue)}.permiso-icon{font-size:20px;flex-shrink:0}.permiso-body{flex:1;min-width:0}.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}.permiso-link:hover{text-decoration:underline}.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}.blog-video-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;margin:0}.blog-video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.blog-autor-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin:0}.blog-autor-foto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0}.blog-autor-ph{display:flex;align-items:center;justify-content:center;background:var(--gold-light);color:var(--gold-dark);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px}.blog-autor-nombre{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--text)}.blog-autor-bio{font-size:12px;color:#555;line-height:1.6;margin-top:3px}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
 +".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
-+".fcopy a{color:rgba(255,255,255,.45)}";
++".fcopy a{color:rgba(255,255,255,.45)}"
++".ccard{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;transition:border-color .15s}.ccard:hover{border-color:#ccc}"
++".ccard-name{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}"
++".ccard-price{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold-dark)}"
++".ccard-desc{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5}"
++".ccard-cta{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:6px 12px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:var(--gold);color:#fff;text-decoration:none}"
++".acces-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}"
++".acces-row:last-child{border-bottom:none}"
++".acces-icon{font-size:18px;flex-shrink:0;margin-top:2px}"
++".acces-name{font-size:12px;font-weight:700;color:var(--black)}"
++".acces-desc{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5}"
++".prog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:10px}"
++".prog-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px}"
++".prog-dia{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--gold-dark);margin-bottom:4px}"
++".prog-eventos{font-size:11px;color:#444;line-height:1.6}"
++".musica-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-top:10px}"
++".musica-genre{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--text);margin-bottom:4px}"
++".musica-detail{font-size:11px;color:var(--muted);line-height:1.6}"
++".cover-box{display:inline-flex;flex-direction:column;gap:3px;padding:10px 16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-top:10px}"
++".cover-val{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--text)}"
++".cover-note{font-size:10px;color:var(--muted)}"
++".happy-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:14px 16px;margin-top:10px}"
++".happy-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:#92400E;margin-bottom:4px}"
++".happy-detail{font-size:11px;color:#92400E;line-height:1.6}"
++".atraccion-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start}"
++".atraccion-icon{font-size:20px;flex-shrink:0}"
++".atraccion-name{font-size:12px;font-weight:700;color:var(--black)}"
++".atraccion-desc{font-size:10px;color:var(--muted);line-height:1.5;margin-top:2px}"
++".zona-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}"
++".zona-row:last-child{border-bottom:none}"
++".zona-dia{font-size:11px;font-weight:700;color:var(--black);min-width:80px}"
++".zona-horas{font-size:11px;color:#444}"
++".zona-estado{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px}"
++".zona-abierto{background:#F0FDF4;color:#166534}"
++".zona-cerrado{background:#FEF2F2;color:#DC2626}"
++".gratis-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}"
++".gratis-item:last-child{border-bottom:none}"
++".gratis-icon{font-size:16px;flex-shrink:0}"
++".gratis-name{font-size:12px;font-weight:700;color:var(--black)}"
++".gratis-desc{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5}"
++".contexto-box{background:var(--bg);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:14px 16px;margin-top:10px}"
++".contexto-text{font-size:12px;color:#444;line-height:1.7}";
 
 // -- COMPARADOR DE LUGARES SIMILARES (TSK-017) ------------------------
 // Top 3 hermanos de la misma categoria raiz, rankeados por overlap de
@@ -481,6 +550,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var checkout = det.checkout || '';
   // Campos especificos de sitio turistico desde tags JSONB
   var tags = (d.tags && typeof d.tags === 'object') ? d.tags : {};
+  var subcategoria   = tags.subcategoria    || '';
   var tipoActividad  = tags.tipo_actividad  || '';
   var dificultad     = tags.dificultad      || '';
   var dificultadDesc = tags.dificultad_desc || '';
@@ -517,6 +587,31 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var faunaRaw = faunaFlora;
   var secretos       = tags.secretos     || '';
   var regulaciones   = tags.regulaciones || '';
+
+  // ADR-016: campos de subcategoria y nuevas secciones condicionales
+  var colecciones     = safeJSON(tags.colecciones);     if(!Array.isArray(colecciones))     colecciones=[];
+  var recorridos      = safeJSON(tags.recorridos);      if(!Array.isArray(recorridos))      recorridos=[];
+  var accesibilidad   = safeJSON(tags.accesibilidad);   if(!Array.isArray(accesibilidad))   accesibilidad=[];
+  var programacion    = safeJSON(tags.programacion);    if(!Array.isArray(programacion))    programacion=[];
+  var musicaVivo      = (tags.musica_vivo && typeof tags.musica_vivo === 'object' && !Array.isArray(tags.musica_vivo)) ? tags.musica_vivo : null;
+  // ADR-016: cover es objeto {valor, nota} solo para cover condicional nocturno.
+  // Fallback a campos planos legacy (cover_valor/cover_nota) por compatibilidad.
+  var coverObj        = (typeof tags.cover === 'object' && tags.cover) ? tags.cover : {};
+  var coverVal        = coverObj.valor || tags.cover_valor || '';
+  var coverNota       = coverObj.nota  || tags.cover_nota  || '';
+  var codigoVestimenta = tags.codigo_vestimenta || '';
+  var happyHour       = (tags.happy_hour && typeof tags.happy_hour === 'object' && !Array.isArray(tags.happy_hour)) ? tags.happy_hour : null;
+  var atracciones     = safeJSON(tags.atracciones);     if(!Array.isArray(atracciones))     atracciones=[];
+  var horariosZona    = safeJSON(tags.horarios_zona);   if(!Array.isArray(horariosZona))    horariosZona=[];
+  var actividadesGratis = safeJSON(tags.actividades_gratis); if(!Array.isArray(actividadesGratis)) actividadesGratis=[];
+  var queVer          = safeJSON(tags.que_ver);          if(!Array.isArray(queVer))          queVer=[];
+  var contexto        = tags.contexto || '';
+
+  // Resolver set efectivo de secciones habilitadas.
+  // Si no hay subcategoria: fallback = todas las secciones de sitio (regresion cero).
+  var sitioSeccionesActivas = subcategoria
+    ? (SITIO_SECCIONES_POR_SUBCATEGORIA[subcategoria] || ['descripcion'])
+    : null; // null = sin gating, mostrar todo
 
   // Campos especificos de hostal desde tags JSONB (TASK-001)
   var tipoAlojamiento  = tags.tipo_alojamiento    || '';
@@ -790,7 +885,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- descripcion + chips apto/no apto) y epoca ideal (matriz 12 meses
   // -- con leyenda y nota) reunidos en un solo bloque bwarm. ----------
   var secDificultad = '';
-  if (cat === 'sitio' && (dificultad || temporadaMatriz || temporada.length)) {
+  if (cat === 'sitio' && subcatActiva('dificultad') && (dificultad || temporadaMatriz || temporada.length)) {
     var diffBlock = '';
     if (dificultad) {
       var diffScale = [
@@ -883,7 +978,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   }
 
   var secEntradas = ''; 
-  if (cat === 'sitio' && entradas.length) { 
+  if (cat === 'sitio' && subcatActiva('entradas') && entradas.length) { 
       secEntradas = '<section class="ssec bwhite" id="entradas"><div class="sin">' + 
       '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Entradas y precios</h2><div class="stnum">'+nextNum()+'</div></div>' + 
       '<table class="entradas-table"><thead><tr><th>Tipo</th><th>Precio</th><th>Incluye</th><th>Comprar</th></tr></thead><tbody>' + 
@@ -900,7 +995,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- SECCION: Tours disponibles (estilo Monserrate3: .tour-card, --
   // -- badge por tipo, meta, precio, incluye/no_incluye, CTA) -----
   var secTours = '';
-  if (cat === 'sitio' && tours.length) {
+  if (cat === 'sitio' && subcatActiva('tours') && tours.length) {
     var badgeClassMap = { 'Grupal':'tc-badge-grup', 'Privado':'tc-badge-priv', 'Ecoturismo':'tc-badge-eco', 'Personalizado':'tc-badge-pers' };
     function _tourList(arr) {
       if (Array.isArray(arr)) return arr.filter(Boolean);
@@ -967,7 +1062,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- SECCION: Que llevar (estilo Monserrate3: .checklist-grid, --
   // -- .cl-item con icono, texto, sub y badge de prioridad) ------
   var secChecklist = '';
-  if (cat === 'sitio' && equipamiento.length) {
+  if (cat === 'sitio' && subcatActiva('checklist') && equipamiento.length) {
     var prioClass = { 'obligatorio':'req-ob', 'recomendado':'req-re', 'opcional':'req-op', 'prohibido':'req-op' };
     var prioItemClass = { 'obligatorio':'obligatorio', 'recomendado':'recomendado', 'opcional':'opcional', 'prohibido':'opcional' };
     secChecklist = '<section class="ssec bwhite" id="checklist"><div class="sin">'
@@ -998,7 +1093,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- SECCION: Itinerario (estilo Monserrate3: tabs, timeline, --
   // -- .itin-step con dot, hora, titulo, desc y tags) ------------
   var secItinerario = '';
-  if (cat === 'sitio' && itinerario.length) {
+  if (cat === 'sitio' && subcatActiva('itinerario') && itinerario.length) {
     // Agrupar pasos por dia
     var diasMap = {};
     var diasOrder = [];
@@ -1039,7 +1134,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   // -- SECCION: Fauna y flora con cards o chips --
   var secFauna = '';
-  if (cat === 'sitio' && faunaFlora) {
+  if (cat === 'sitio' && subcatActiva('fauna') && faunaFlora) {
     var faunaContent = '';
     // Intentar limpiar fauna_flora si viene malformado
     var faunaClean = faunaFlora;
@@ -1084,7 +1179,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   // -- SECCION: Secretos con tip-cards o lista --
   var secSecretos = '';
-  if (cat === 'sitio' && secretos) {
+  if (cat === 'sitio' && subcatActiva('secretos') && secretos) {
     var tipsContent = '';
     // BUG-024 fix: el valor de tags.secretos llega doble-stringificado desde
     // Neon (admin-destinos.js hace JSONB merge y el string se guarda con
@@ -1135,7 +1230,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   // -- SECCION: Permisos y regulaciones -------------------------
   var secRegulaciones = '';
-  if (cat === 'sitio' && regulaciones) {
+  if (cat === 'sitio' && subcatActiva('regulaciones') && regulaciones) {
     var regContent = '';
     var regArr = null;
     var regClean = regulaciones;
@@ -1181,6 +1276,192 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
         + '<div class="hbtx" style="color:#78350F">'+esc(regulaciones).replace(/\n/g,'<br>')+'</div></div></div>'
         + '</div></section>';
     }
+  }
+
+  // -- ADR-016: SECCIONES CONDICIONALES POR SUBCATEGORIA --
+  // Cada seccion se construye solo si tiene datos reales (sin secciones fantasma).
+  // El gating por subcategoria se aplica al final, en el ensamblaje.
+
+  // -- SECCION: Colecciones --
+  var secColecciones = '';
+  if (cat === 'sitio' && subcatActiva('colecciones') && colecciones.length) {
+    var ccardsHtml = colecciones.map(function(c){
+      return '<div class="ccard">'
+        + '<div class="ccard-name">' + esc(c.nombre || c.name || '') + '</div>'
+        + (c.precio ? '<div class="ccard-price">' + esc(money(c.precio)) + '</div>' : '')
+        + (c.descripcion || c.desc ? '<div class="ccard-desc">' + esc(c.descripcion || c.desc || '') + '</div>' : '')
+        + (c.url || c.link ? '<a class="ccard-cta" href="' + esc(c.url || c.link) + '" target="_blank">\u2197 Ver</a>' : '')
+        + '</div>';
+    }).join('');
+    secColecciones = '<section class="ssec bwarm" id="colecciones"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Colecciones</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="igrid">' + ccardsHtml + '</div></div></section>';
+  }
+
+  // -- SECCION: Recorridos --
+  var secRecorridos = '';
+  if (cat === 'sitio' && subcatActiva('recorridos') && recorridos.length) {
+    var recHtml = recorridos.map(function(r){
+      return '<div class="itin-step">'
+        + '<div class="itin-dot">' + esc(r.icono || r.icon || '\u25B6') + '</div>'
+        + '<div class="itin-body">'
+        + '<div class="itin-title">' + esc(r.nombre || r.name || '') + '</div>'
+        + '<div class="itin-desc">' + esc(r.descripcion || r.desc || '') + '</div>'
+        + (r.duracion ? '<div class="itin-tags"><span class="itin-tag">\u23F1 ' + esc(r.duracion) + '</span></div>' : '')
+        + '</div></div>';
+    }).join('');
+    secRecorridos = '<section class="ssec bwarm" id="recorridos"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Recorridos</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="itin-timeline">' + recHtml + '</div></div></section>';
+  }
+
+  // -- SECCION: Accesibilidad --
+  var secAccesibilidad = '';
+  if (cat === 'sitio' && subcatActiva('accesibilidad') && accesibilidad.length) {
+    var acRows = accesibilidad.map(function(a){
+      return '<div class="acces-row">'
+        + '<div class="acces-icon">' + esc(a.icono || a.icon || '\u2714') + '</div>'
+        + '<div><div class="acces-name">' + esc(a.nombre || a.name || '') + '</div>'
+        + (a.descripcion || a.desc ? '<div class="acces-desc">' + esc(a.descripcion || a.desc || '') + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secAccesibilidad = '<section class="ssec bwhite" id="accesibilidad"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Accesibilidad</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + acRows + '</div></section>';
+  }
+
+  // -- SECCION: Programacion (eventos proximos / agenda semanal) --
+  var secProgramacion = '';
+  if (cat === 'sitio' && subcatActiva('programacion') && programacion.length) {
+    var progHtml = programacion.map(function(p){
+      return '<div class="prog-card">'
+        + '<div class="prog-dia">' + esc(p.dia || p.fecha || '') + '</div>'
+        + '<div class="prog-eventos">' + esc(p.eventos || p.descripcion || p.desc || '') + '</div>'
+        + '</div>';
+    }).join('');
+    secProgramacion = '<section class="ssec bwarm" id="programacion"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Proximos eventos</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="prog-grid">' + progHtml + '</div></div></section>';
+  }
+
+  // -- SECCION: Musica en vivo --
+  var secMusicaVivo = '';
+  if (cat === 'sitio' && subcatActiva('musica_vivo') && musicaVivo) {
+    secMusicaVivo = '<section class="ssec bwarm" id="musica"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Musica en vivo</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="musica-box">'
+      + (musicaVivo.genero ? '<div class="musica-genre">' + esc(musicaVivo.genero) + '</div>' : '')
+      + (musicaVivo.detalle || musicaVivo.descripcion ? '<div class="musica-detail">' + esc(musicaVivo.detalle || musicaVivo.descripcion || '') + '</div>' : '')
+      + (musicaVivo.horario ? '<div class="musica-detail">\u23F0 ' + esc(musicaVivo.horario) + '</div>' : '')
+      + '</div></div></section>';
+  }
+
+  // -- SECCION: Cover --
+  var secCover = '';
+  if (cat === 'sitio' && subcatActiva('cover') && coverVal) {
+    secCover = '<section class="ssec bwhite" id="cover"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Cover</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="cover-box">'
+      + '<div class="cover-val">' + esc(money(coverVal)) + '</div>'
+      + (coverNota ? '<div class="cover-note">' + esc(coverNota) + '</div>' : '')
+      + '</div></div></section>';
+  }
+
+  // -- SECCION: Codigo de vestimenta --
+  var secCodigoVestimenta = '';
+  if (cat === 'sitio' && subcatActiva('codigo_vestimenta') && codigoVestimenta) {
+    secCodigoVestimenta = '<section class="ssec bwhite" id="vestimenta"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Codigo de vestimenta</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<p class="stext">' + esc(codigoVestimenta).replace(/\n/g, '<br>') + '</p>'
+      + '</div></section>';
+  }
+
+  // -- SECCION: Happy Hour --
+  var secHappyHour = '';
+  if (cat === 'sitio' && subcatActiva('happy_hour') && happyHour) {
+    secHappyHour = '<section class="ssec bwarm" id="happy-hour"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Happy Hour</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="happy-box">'
+      + (happyHour.horario ? '<div class="happy-title">\u23F0 ' + esc(happyHour.horario) + '</div>' : '')
+      + (happyHour.detalle || happyHour.descripcion ? '<div class="happy-detail">' + esc(happyHour.detalle || happyHour.descripcion || '') + '</div>' : '')
+      + '</div></div></section>';
+  }
+
+  // -- SECCION: Atracciones --
+  var secAtracciones = '';
+  if (cat === 'sitio' && subcatActiva('atracciones') && atracciones.length) {
+    var atrHtml = atracciones.map(function(at){
+      return '<div class="atraccion-card">'
+        + '<div class="atraccion-icon">' + esc(at.icono || at.icon || '\u2606') + '</div>'
+        + '<div><div class="atraccion-name">' + esc(at.nombre || at.name || '') + '</div>'
+        + (at.descripcion || at.desc ? '<div class="atraccion-desc">' + esc(at.descripcion || at.desc || '') + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secAtracciones = '<section class="ssec bwarm" id="atracciones"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Atracciones</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="igrid">' + atrHtml + '</div></div></section>';
+  }
+
+  // -- SECCION: Horarios por zona --
+  var secHorariosZona = '';
+  if (cat === 'sitio' && subcatActiva('horarios_zona') && horariosZona.length) {
+    var hzRows = horariosZona.map(function(hz){
+      var abierto = (hz.estado || '').toLowerCase() === 'abierto';
+      return '<div class="zona-row">'
+        + '<div class="zona-dia">' + esc(hz.zona || hz.nombre || hz.dia || '') + '</div>'
+        + '<div class="zona-horas">' + esc(hz.horario || hz.horas || '') + '</div>'
+        + (hz.estado ? '<span class="zona-estado ' + (abierto ? 'zona-abierto' : 'zona-cerrado') + '">' + esc(hz.estado) + '</span>' : '')
+        + '</div>';
+    }).join('');
+    secHorariosZona = '<section class="ssec bwhite" id="horarios-zona"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Horarios</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + hzRows + '</div></section>';
+  }
+
+  // -- SECCION: Actividades gratis --
+  var secActividadesGratis = '';
+  if (cat === 'sitio' && subcatActiva('actividades_gratis') && actividadesGratis.length) {
+    var agItems = actividadesGratis.map(function(ag){
+      return '<div class="gratis-item">'
+        + '<div class="gratis-icon">' + esc(ag.icono || ag.icon || '\u2606') + '</div>'
+        + '<div><div class="gratis-name">' + esc(ag.nombre || ag.name || '') + '</div>'
+        + (ag.descripcion || ag.desc ? '<div class="gratis-desc">' + esc(ag.descripcion || ag.desc || '') + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secActividadesGratis = '<section class="ssec bwarm" id="actividades-gratis"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Actividades gratis</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + agItems + '</div></section>';
+  }
+
+  // -- SECCION: Que ver (lista destacada) --
+  var secQueVer = '';
+  if (cat === 'sitio' && subcatActiva('que_ver') && queVer.length) {
+    var qvItems = queVer.map(function(qv){
+      return '<div class="acces-row">'
+        + '<div class="acces-icon">' + esc(qv.icono || qv.icon || '\u2605') + '</div>'
+        + '<div><div class="acces-name">' + esc(qv.nombre || qv.name || '') + '</div>'
+        + (qv.descripcion || qv.desc ? '<div class="acces-desc">' + esc(qv.descripcion || qv.desc || '') + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    secQueVer = '<section class="ssec bwarm" id="que-ver"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Que ver</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + qvItems + '</div></section>';
+  }
+
+  // -- SECCION: Contexto historico / cultural --
+  var secContexto = '';
+  if (cat === 'sitio' && subcatActiva('contexto') && contexto) {
+    secContexto = '<section class="ssec bwarm" id="contexto"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contexto</h2><div class="stnum">' + nextNum() + '</div></div>'
+      + '<div class="contexto-box"><div class="contexto-text">' + esc(contexto).replace(/\n/g, '<br>') + '</div></div>'
+      + '</div></section>';
+  }
+
+  // -- Helper: verificar si una seccion esta activa segun subcategoria --
+  function subcatActiva(sectionId) {
+    // Si no hay gating (sin subcategoria), todo activo -> regresion cero
+    if (!sitioSeccionesActivas) return true;
+    return sitioSeccionesActivas.indexOf(sectionId) !== -1;
   }
 
   var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
@@ -1674,6 +1955,26 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'tours',       label:'Tours',       has:!!secTours},
     {id:'checklist',   label:'Que llevar',  has:!!secChecklist},
     {id:'itinerario',  label:'Itinerario',  has:!!secItinerario},
+    // ADR-016: los items de subcategoria (nuevos + fauna/secretos/regulaciones)
+    // SOLO aparecen en el subnav cuando hay gating activo (tags.subcategoria
+    // presente). Sin subcategoria el subnav queda identico al legado (regresion
+    // cero): el original nunca mostro fauna/secretos/regulaciones en el subnav.
+    {id:'colecciones', label:'Colecciones', has:!!sitioSeccionesActivas && !!secColecciones},
+    {id:'recorridos',  label:'Recorridos',  has:!!sitioSeccionesActivas && !!secRecorridos},
+    {id:'accesibilidad', label:'Accesibilidad', has:!!sitioSeccionesActivas && !!secAccesibilidad},
+    {id:'atracciones', label:'Atracciones', has:!!sitioSeccionesActivas && !!secAtracciones},
+    {id:'horarios-zona', label:'Horarios', has:!!sitioSeccionesActivas && !!secHorariosZona},
+    {id:'actividades-gratis', label:'Gratis', has:!!sitioSeccionesActivas && !!secActividadesGratis},
+    {id:'que-ver',     label:'Que ver',     has:!!sitioSeccionesActivas && !!secQueVer},
+    {id:'contexto',    label:'Contexto',    has:!!sitioSeccionesActivas && !!secContexto},
+    {id:'musica',      label:'Musica',      has:!!sitioSeccionesActivas && !!secMusicaVivo},
+    {id:'cover',       label:'Cover',       has:!!sitioSeccionesActivas && !!secCover},
+    {id:'vestimenta',  label:'Vestimenta',  has:!!sitioSeccionesActivas && !!secCodigoVestimenta},
+    {id:'happy-hour',  label:'Happy Hour',  has:!!sitioSeccionesActivas && !!secHappyHour},
+    {id:'programacion', label:'Eventos',    has:!!sitioSeccionesActivas && !!secProgramacion},
+    {id:'fauna',       label:'Fauna',       has:!!sitioSeccionesActivas && !!secFauna},
+    {id:'secretos',    label:'Secretos',    has:!!sitioSeccionesActivas && !!secSecretos},
+    {id:'regulaciones',label:'Reglas',      has:!!sitioSeccionesActivas && !!secRegulaciones},
     {id:'habitaciones',label:'Habitaciones',has:!!secHabitaciones},
     {id:'reglas-casa', label:'Reglas',      has:!!secReglasCasa},
     {id:'actividades', label:'Actividades', has:!!secActividadesHostal},
@@ -1702,6 +2003,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '</nav>' : '');
 
   // -- ENSAMBLAR ----------------------------------------------------
+  // ADR-016: chip de subcategoria en el hero (no-blog, solo si tags.subcategoria existe)
+  var subcatHTML = (cat !== 'blog' && subcategoria)
+    ? '<span class="subcat-chip">'+esc(SUBCAT_LABEL[subcategoria]||subcategoria)+'</span>'
+    : '';
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
     + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
     + '<title>'+esc(d.nombre)+'  ExploraCO</title>\n'
@@ -1735,6 +2040,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + '</section>\n\n'
       : '<section class="hero"><div class="hi">\n'
       + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
+      + subcatHTML
       + '<h1 class="htitle bc">'+esc(d.nombre)+'</h1>'
       + (d.lead ? '<p class="hsub">'+esc(d.lead)+'</p>' : '')
       + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
@@ -1763,6 +2069,19 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + secFauna + '\n'
     + secSecretos + '\n'
     + secRegulaciones + '\n'
+    + secColecciones + '\n'
+    + secRecorridos + '\n'
+    + secAccesibilidad + '\n'
+    + secAtracciones + '\n'
+    + secHorariosZona + '\n'
+    + secActividadesGratis + '\n'
+    + secQueVer + '\n'
+    + secContexto + '\n'
+    + secMusicaVivo + '\n'
+    + secCover + '\n'
+    + secCodigoVestimenta + '\n'
+    + secHappyHour + '\n'
+    + secProgramacion + '\n'
     + secGaleria + '\n'
     + secHabitaciones + '\n'
     + secReglasCasa + '\n'

@@ -2022,6 +2022,50 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   of undefined (reading 'map')"). Es idempotente; re-ejecutar el archivo
   completo es seguro tras un fallo parcial.
 
+### TSK-090: Subcategorias en tags (ADR-016) - implementacion Fase 1-3 en working tree
+- **Estado:** EN PROGRESO (implementacion Fase 1-3 lista local 2026-09-10,
+  sin commitear; pendiente commit/deploy + ejecutar reclasificacion en
+  produccion con DATABASE_URL y aprobacion de Javier + verificacion pre/post)
+- **Detalle:** Alcance REAL ejecutado del ADR-016 (verificado contra archivo
+  ADR-006):
+  1. `admin.html`: 3 selects `f-subcategoria-*` (sitio L1321 con onchange
+     `applySubcategoriaSitio()`, comida L1182, evento L1496) registrados en
+     `CATEGORY_TAG_FIELDS.<cat>` (L2591/2632/2646); visibilidad condicional de
+     sub-tabs `especifico-sitio` via `SITIO_ALL_TABS` (L4474) +
+     `applySubcategoriaSitio()` (L4475). Balance divs 0 (653/653).
+  2. `api/pagina-destino.js`: `SUBCAT_LABEL` (21 labels, L20-28),
+     `SITIO_SECCIONES_POR_SUBCATEGORIA` (L42-52), chip `.subcat-chip` en el
+     hero (L2007-2008, CSS scoped L175), gating `subcatActiva()` (L1461) sobre
+     8 secciones legacy (dificultad, entradas, tours, checklist, itinerario,
+     fauna, secretos, regulaciones) + 13 secciones nuevas condicionales
+     (colecciones, recorridos, accesibilidad, programacion, musica_vivo, cover,
+     codigo_vestimenta, happy_hour, atracciones, horarios_zona,
+     actividades_gratis, que_ver, contexto). H1: `cover` se lee como objeto
+     `{valor, nota}` con fallback a `cover_valor`/`cover_nota` planos legacy
+     (L599-601). H2: las 13 nuevas usan `subcatActiva()`. Fallback sin
+     subcategoria = render legacy intacto (L611-614, regresion cero).
+  3. `api/publicar-lugar.js`: `SUBCAT_LISTA` (L29-33) valida contra la lista
+     cerrada de la categoria final y solo persiste si matchea (L104-107).
+  4. `publicar.html`: 3 selects (L250/267/280) con show/hide por chip
+     (L829-833), `subcatResumen()` (L963-965), payload `subcategoria` (L1076).
+  5. `.opencode/skills/gemini-research/scripts/validate_ficha.js`:
+     `SUBCATEGORIAS` (L46-58), validacion backward-compatible (ausencia de
+     subcategoria NO es error, L114-122).
+  6. `scripts/reclasificar-subcategorias.js` (NUEVO): idempotente,
+     `--dry-run` (default) / `--apply` / `--local`, merge JSONB (ADR-003),
+     inferencia keyword->subcategoria (tipo_actividad > nombre > lead, orden
+     especifico->generico, NFD + limites de palabra), log en
+     `scripts/logs/reclasificar-subcategorias-2026-09-10.log`.
+- **Evidencia:** dry-run local sobre 84 seeds: 74 inferidos, 10 sin-match
+  (candelario + 9 eventos multiformato), 0 skipped (resumen
+  `total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run`).
+  ADR-016 en DECISIONS.md (Estado actualizado a Fase 1-3 completada).
+  Pendiente: (a) commit + push del working tree; (b) revisar los 10 sin-match
+  con Javier; (c) aplicar reclasificacion en produccion
+  (`DATABASE_URL=... node scripts/reclasificar-subcategorias.js --apply`);
+  (d) Escudo GOLD + smoke de buildHTML() de las 3 categorias con y sin
+  subcategoria antes de cerrar.
+
 ---
 
 ## Regla de actualizacion

@@ -23,6 +23,15 @@ const CAT_MAP = {
 // Cualquier valor de esta lista fuerza categoria_slug='blog'.
 const BLOG_TEMAS = ['aventura', 'gastro', 'cultura', 'naturaleza', 'tips'];
 
+// Subcategorias controladas por categoria (ADR-016). Lista cerrada por
+// categoria final (catSlug); si el slug no pertenece a la lista se
+// descarta (fallback = comportamiento actual sin subcategoria).
+const SUBCAT_LISTA = {
+  sitio: ['naturaleza','museo','cultura','bar','parque','espacio-publico','sitio-historico','religioso','aventura'],
+  comida: ['restaurante','cafe','gastrobar','comida-rapida','dulces'],
+  evento: ['concierto','festival','teatro','exposicion','deporte','cine','fiesta'],
+};
+
 // Dominios permitidos para video_url -- solo se persiste si el host
 // coincide (defensa adicional; el saneo real hacia <iframe> ocurre en
 // pagina-destino.js al momento de renderizar).
@@ -91,6 +100,13 @@ module.exports = async function handler(req, res) {
     if (body.checkin)      tags.checkin      = body.checkin;
     if (body.checkout)     tags.checkout     = body.checkout;
     if (body.contacto_nombre) tags.contacto_nombre = body.contacto_nombre;
+    // Subcategoria (ADR-016) -- lista cerrada por categoria final
+    if (body.subcategoria && SUBCAT_LISTA[catSlug]) {
+      var subcat = String(body.subcategoria).toLowerCase();
+      if (SUBCAT_LISTA[catSlug].indexOf(subcat) !== -1) {
+        tags.subcategoria = subcat;
+      }
+    }
     // Campos especificos de sitio turistico
     if (body.sitio_tipo_actividad) tags.tipo_actividad  = body.sitio_tipo_actividad;
     if (body.sitio_dificultad)     tags.dificultad      = body.sitio_dificultad;

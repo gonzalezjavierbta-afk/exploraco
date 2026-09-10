@@ -42,6 +42,21 @@ var TAGS_REQUIRED = {
   ]
 };
 
+// ADR-016: subcategorias controladas por categoria (lista cerrada de slugs)
+var SUBCATEGORIAS = {
+  sitio: [
+    'naturaleza', 'museo', 'cultura', 'bar', 'parque',
+    'espacio-publico', 'sitio-historico', 'religioso', 'aventura'
+  ],
+  comida: [
+    'restaurante', 'cafe', 'gastrobar', 'comida-rapida', 'dulces'
+  ],
+  evento: [
+    'concierto', 'festival', 'teatro', 'exposicion', 'deporte',
+    'cine', 'fiesta'
+  ]
+};
+
 function fail(msg) {
   console.error('[FAIL] ' + msg);
   return false;
@@ -95,6 +110,20 @@ function validate(fichaPath) {
     var req = TAGS_REQUIRED[cat];
     var missingTags = req.filter(function (k) { return !(k in data.TAGS); });
     if (missingTags.length) allPass = fail('TAGS[' + cat + '] falta: ' + missingTags.join(', '));
+
+    // ADR-016: validar subcategoria si esta presente
+    // Ausencia de subcategoria NO es error (fallback ADR-016)
+    if (SUBCATEGORIAS[cat] && 'subcategoria' in data.TAGS) {
+      var sub = data.TAGS.subcategoria;
+      if (typeof sub !== 'string' || !sub.length) {
+        allPass = fail('TAGS.subcategoria debe ser un string no vacio');
+      } else if (SUBCATEGORIAS[cat].indexOf(sub) === -1) {
+        allPass = fail(
+          'TAGS.subcategoria invalida para ' + cat + ': "' + sub +
+          '" (validas: ' + SUBCATEGORIAS[cat].join(', ') + ')'
+        );
+      }
+    }
   }
 
   if (base.lat === 0 && base.lng === 0) {

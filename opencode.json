@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode-go/deepseek-v4-pro",
-  "small_model": "opencode-go/deepseek-v4-flash",
-  "default_agent": "build",
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/big-pickle",
+  "default_agent": "free-build",
   "subagent_depth": 2,
   "permission": {
     "edit": "ask",

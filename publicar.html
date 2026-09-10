@@ -246,6 +246,51 @@
         </div>
       </div>
 
+      <!-- Subcategoría sitio turístico (ADR-016) -->
+      <div class="field" id="f-subcategoria-sitio" style="display:none">
+        <label>Tipo de sitio</label>
+        <select id="sitio_subcategoria">
+          <option value="">Seleccionar tipo...</option>
+          <option value="naturaleza">🌿 Naturaleza</option>
+          <option value="museo">🏛️ Museo</option>
+          <option value="cultura">🎭 Cultura</option>
+          <option value="bar">🍺 Bar</option>
+          <option value="parque">🌳 Parque</option>
+          <option value="espacio-publico">🏛️ Espacio público</option>
+          <option value="sitio-historico">🏰 Sitio histórico</option>
+          <option value="religioso">⛪ Religioso</option>
+          <option value="aventura">🧗 Aventura</option>
+        </select>
+      </div>
+
+      <!-- Subcategoría comida / restaurante (ADR-016) -->
+      <div class="field" id="f-subcategoria-comida" style="display:none">
+        <label>Tipo de restaurante</label>
+        <select id="comida_subcategoria">
+          <option value="">Seleccionar tipo...</option>
+          <option value="restaurante">🍽️ Restaurante</option>
+          <option value="cafe">☕ Café</option>
+          <option value="gastrobar">🍴 Gastrobar</option>
+          <option value="comida-rapida">🍔 Comida rápida</option>
+          <option value="dulces">🍰 Dulces</option>
+        </select>
+      </div>
+
+      <!-- Subcategoría evento (ADR-016) -->
+      <div class="field" id="f-subcategoria-evento" style="display:none">
+        <label>Tipo de evento</label>
+        <select id="evento_subcategoria">
+          <option value="">Seleccionar tipo...</option>
+          <option value="concierto">🎵 Concierto</option>
+          <option value="festival">🎪 Festival</option>
+          <option value="teatro">🎭 Teatro</option>
+          <option value="exposicion">🖼️ Exposición</option>
+          <option value="deporte">⚽ Deporte</option>
+          <option value="cine">🎬 Cine</option>
+          <option value="fiesta">🎉 Fiesta</option>
+        </select>
+      </div>
+
     </div>
 
     <div class="form-card">
@@ -778,9 +823,14 @@ document.querySelectorAll('.tipo-chip[data-cat]').forEach(function(chip) {
     document.getElementById('f-checkin').style.display = cat === 'hostal' ? 'block' : 'none';
     var cardHab = document.getElementById('card-habitaciones');
     if (cardHab) cardHab.style.display = cat === 'hostal' ? 'block' : 'none';
-    // Sitio: mostrar detalles específicos de sitio turístico
+    // Sitio: mostrar detalles específicos de sitio turístico + subcategoría
     var cardSitio = document.getElementById('card-sitio');
     if (cardSitio) cardSitio.style.display = cat === 'sitio' ? 'block' : 'none';
+    document.getElementById('f-subcategoria-sitio').style.display = cat === 'sitio' ? 'block' : 'none';
+    // Comida/restaurante: subcategoría
+    document.getElementById('f-subcategoria-comida').style.display = cat === 'restaurante' ? 'block' : 'none';
+    // Evento: subcategoría
+    document.getElementById('f-subcategoria-evento').style.display = cat === 'evento' ? 'block' : 'none';
   });
 });
 
@@ -907,6 +957,16 @@ function removeRow(id) {
 // ============================================================
 // RESUMEN
 // ============================================================
+function subcatResumen(catSel) {
+  if (!catSel) return '—';
+  var sel = null;
+  if (catSel.value === 'sitio') sel = document.getElementById('sitio_subcategoria');
+  else if (catSel.value === 'restaurante') sel = document.getElementById('comida_subcategoria');
+  else if (catSel.value === 'evento') sel = document.getElementById('evento_subcategoria');
+  if (!sel || !sel.value) return '—';
+  return sel.options[sel.selectedIndex].text;
+}
+
 function buildResumen() {
   var cat = document.querySelector('input[name="categoria"]:checked');
   var ciudadVal = v('ciudad') === '__otra__' ? v('ciudad-otra') : v('ciudad');
@@ -921,6 +981,7 @@ function buildResumen() {
   var filas = [
     ['Nombre', v('nombre')],
     ['Categoría', cat ? cat.value : '—'],
+    ['Subcategoría', subcatResumen(cat)],
     ['Ciudad', ciudadVal],
     ['Descripción', v('descripcion_corta')],
     ['Precio desde', v('precio_desde') ? '$' + parseInt(v('precio_desde')).toLocaleString('es-CO') : '—'],
@@ -976,6 +1037,14 @@ async function submitForm() {
     };
   }).filter(function(f) { return f.pregunta; });
 
+  // Subcategoría por categoría (ADR-016)
+  var subcatVal = '';
+  if (cat) {
+    if (cat.value === 'sitio')       subcatVal = v('sitio_subcategoria');
+    else if (cat.value === 'restaurante') subcatVal = v('comida_subcategoria');
+    else if (cat.value === 'evento') subcatVal = v('evento_subcategoria');
+  }
+
   var payload = {
     nombre: v('nombre'),
     categoria: cat ? cat.value : '',
@@ -1004,6 +1073,7 @@ async function submitForm() {
     amenidades: amenidades,
     habitaciones: habitaciones,
     faqs: faqs,
+    subcategoria: subcatVal || null,
     // Campos específicos de sitio turístico
     sitio_tipo_actividad: v('sitio_tipo_actividad') || null,
     sitio_dificultad: v('sitio_dificultad') || null,

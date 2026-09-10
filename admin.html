@@ -1177,6 +1177,17 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
 
         <div id="especifico-comida" class="cat-panel">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Subcategoría del lugar</label>
+            <select class="form-input form-select" id="f-subcategoria-comida">
+              <option value="">Sin subcategoría</option>
+              <option value="restaurante">Restaurante</option>
+              <option value="cafe">Café</option>
+              <option value="gastrobar">Gastrobar</option>
+              <option value="comida-rapida">Comida rápida</option>
+              <option value="dulces">Dulces</option>
+            </select>
+          </div>
           <div class="cat-editor-tabs">
             <div class="cetab on" onclick="showCatTab('comida-menu')">🍽️ Carta / Menú</div>
             <div class="cetab" onclick="showCatTab('comida-horarios')">🕐 Horarios</div>
@@ -1305,6 +1316,21 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
 
         <div id="especifico-sitio" class="cat-panel">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Subcategoría del sitio</label>
+            <select class="form-input form-select" id="f-subcategoria-sitio" onchange="applySubcategoriaSitio()">
+              <option value="">Sin subcategoría</option>
+              <option value="naturaleza">Naturaleza</option>
+              <option value="museo">Museo</option>
+              <option value="cultura">Cultura</option>
+              <option value="bar">Bar</option>
+              <option value="parque">Parque</option>
+              <option value="espacio-publico">Espacio público</option>
+              <option value="sitio-historico">Sitio histórico</option>
+              <option value="religioso">Religioso</option>
+              <option value="aventura">Aventura</option>
+            </select>
+          </div>
           <div class="cat-editor-tabs">
             <div class="cetab on" onclick="showCatTab('sitio-tours')">Tours</div>
             <div class="cetab" onclick="showCatTab('sitio-checklist')">Que llevar</div>
@@ -1442,7 +1468,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
           <!-- EXTRAS: fauna, secretos, regulaciones -->
           <div class="cat-panel" id="cat-sitio-extras">
-            <div class="form-group">
+            <div class="form-group" data-sitio-module="fauna">
               <label class="form-label">Fauna y flora</label>
               <p style="font-size:10px;color:var(--muted);margin-bottom:6px">Opcion 1: texto simple separado por comas (Ej: Colibries, orquideas, dantas)<br>Opcion 2 (cards visuales): JSON array [{emoji,nombre,hecho}]<br>Ej: [{"emoji":"🦜","nombre":"Colibrí","hecho":"500 especies en Colombia"}]</p>
               <textarea class="form-input" id="f-fauna-flora" rows="4" placeholder='Colibries, orquideas, monos titi, dantas...'></textarea>
@@ -1465,6 +1491,19 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
 
         <div id="especifico-evento" class="cat-panel">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Subcategoría del evento</label>
+            <select class="form-input form-select" id="f-subcategoria-evento">
+              <option value="">Sin subcategoría</option>
+              <option value="concierto">Concierto</option>
+              <option value="festival">Festival</option>
+              <option value="teatro">Teatro</option>
+              <option value="exposicion">Exposición</option>
+              <option value="deporte">Deporte</option>
+              <option value="cine">Cine</option>
+              <option value="fiesta">Fiesta</option>
+            </select>
+          </div>
           <div class="cat-editor-tabs">
             <div class="cetab on" onclick="showCatTab('evento-info')">📅 Fechas y sede</div>
             <div class="cetab" onclick="showCatTab('evento-lineup')">🎤 Lineup / Artistas</div>
@@ -2548,7 +2587,8 @@ var CATEGORY_TAG_FIELDS = {
     { key:'secretos',       id:'f-secretos',
       collector: function(){ return (typeof collectSitioSecretos==='function') ? collectSitioSecretos() : ''; } },
     { key:'regulaciones',   id:'f-regulaciones' },
-    { key:'checklist_tip',  id:'f-checklist-tip' }
+    { key:'checklist_tip',  id:'f-checklist-tip' },
+    { key:'subcategoria',   id:'f-subcategoria-sitio' }
   ],
   /* TASK-001 (completado). Los primeros 6 son los campos nuevos del
      TODO original. Los ultimos 4 (recepcion, politica_cancelacion,
@@ -2588,7 +2628,8 @@ var CATEGORY_TAG_FIELDS = {
     { key:'domicilio',       id:'f-domicilio' },
     { key:'rappi',           id:'f-rappi' },
     { key:'ifood',           id:'f-ifood' },
-    { key:'domicilio_zona',  id:'f-delivery-zona', localKey:'deliveryZona' }
+    { key:'domicilio_zona',  id:'f-delivery-zona', localKey:'deliveryZona' },
+    { key:'subcategoria',    id:'f-subcategoria-comida' }
   ],
   /* TASK-003 (completado). "capacidad" y "entrada desde" NO se
      registran aqui: existian como f-aforo/f-entrada-desde dentro de
@@ -2601,7 +2642,8 @@ var CATEGORY_TAG_FIELDS = {
     { key:'fecha_inicio', id:'f-fecha-ini', localKey:'fechaIni' },
     { key:'fecha_fin',    id:'f-fecha-fin', localKey:'fechaFin' },
     { key:'edicion',      id:'f-edicion' },
-    { key:'sede',         id:'f-sede' }
+    { key:'sede',         id:'f-sede' },
+    { key:'subcategoria', id:'f-subcategoria-evento' }
   ],
   /* Sprint Inspirate (Blog). cuerpo_historia y tiempo_lectura NO se
      registran aqui: el cuerpo reusa el campo generico f-desc (misma
@@ -3037,6 +3079,7 @@ function loadForm(p) {
       if (p.como_llegar_sitio === undefined) p.como_llegar_sitio = p.como_llegar || '';
       applyCategoryTagFields(p, 'sitio');
       _writeTemporadaMatriz(p.temporadaMatriz);
+      applySubcategoriaSitio();
       // Cargar tours
       var tourList = document.getElementById('tour-list-admin');
       if (tourList && p.tours && p.tours.length) {
@@ -4414,6 +4457,58 @@ function showCatTab(id) {
       t.classList.add('on');
     }
   });
+}
+
+/* ── ADR-016: visibilidad de modulos de sitio por subcategoría ── */
+var SITIO_SUBCAT_MODULES = {
+  'naturaleza':     ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'],
+  'aventura':       ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'],
+  'parque':         ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'],
+  'museo':          ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
+  'cultura':        ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
+  'sitio-historico':['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
+  'religioso':      ['sitio-tours','sitio-checklist','sitio-entradas','sitio-extras'],
+  'espacio-publico':['sitio-tours','sitio-entradas','sitio-extras'],
+  'bar':            ['sitio-entradas','sitio-extras']
+};
+var SITIO_ALL_TABS = ['sitio-tours','sitio-checklist','sitio-dificultad','sitio-entradas','sitio-itinerario','sitio-extras'];
+function applySubcategoriaSitio() {
+  var sel = document.getElementById('f-subcategoria-sitio');
+  var sub = sel ? sel.value : '';
+  var mods = SITIO_SUBCAT_MODULES[sub] || SITIO_ALL_TABS;
+  var panel = document.getElementById('especifico-sitio');
+  if (!panel) return;
+  /* tabs: show/hide cetab buttons */
+  panel.querySelectorAll('.cetab').forEach(function(tab){
+    var oc = tab.getAttribute('onclick') || '';
+    var match = oc.match(/showCatTab\('(sitio-[^']+)'\)/);
+    if (!match) return;
+    var tabId = match[1];
+    var visible = mods.indexOf(tabId) !== -1;
+    tab.style.display = visible ? '' : 'none';
+  });
+  /* panels: show/hide cat- panels */
+  SITIO_ALL_TABS.forEach(function(tid){
+    var p = document.getElementById('cat-' + tid);
+    if (!p) return;
+    var visible = mods.indexOf(tid) !== -1;
+    p.style.display = visible ? '' : 'none';
+    if (!visible) { p.classList.remove('on'); }
+  });
+  /* fauna form-group: hide for bar subcategory */
+  var faunaGrp = panel.querySelector('[data-sitio-module="fauna"]');
+  if (faunaGrp) {
+    faunaGrp.style.display = (sub === 'bar') ? 'none' : '';
+  }
+  /* activate first visible tab */
+  if (mods.length > 0) {
+    var firstPnl = document.getElementById('cat-' + mods[0]);
+    if (firstPnl) { firstPnl.classList.add('on'); firstPnl.style.display = 'block'; }
+    panel.querySelectorAll('.cetab').forEach(function(tab){
+      var oc = tab.getAttribute('onclick') || '';
+      if (oc.indexOf("'"+mods[0]+"'") !== -1) tab.classList.add('on');
+    });
+  }
 }
 // Habitaciones
 function addHabRow() {

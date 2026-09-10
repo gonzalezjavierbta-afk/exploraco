@@ -4,6 +4,77 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ## Que se estaba haciendo
 
+### Sesion ADR-016 - subcategorias en tags sitio/comida/evento (2026-09-10) - TSK-090
+
+Implementacion Fase 1-3 del ADR-016 completada en working tree (SIN commitear
+aun). Las 3 categorias (sitio, comida, evento) reciben `tags.subcategoria`
+(slug ASCII de lista cerrada) que da al renderer una matriz
+modulo-por-subcategoria: admin y publicar.html solo ofrecen los modulos
+funcionales del tipo real de lugar y pagina-destino.js gatea las secciones de
+sitio (fallback sin subcategoria = regresion cero).
+
+**Cambios (verificados contra archivo, ADR-006):**
+- `admin.html`: 3 selects `f-subcategoria-*` en sitio (L1321, onchange
+  `applySubcategoriaSitio()`), comida (L1182) y evento (L1496), registrados en
+  `CATEGORY_TAG_FIELDS.<cat>` (L2591/2632/2646). `applySubcategoriaSitio()`
+  (L4475) muestra solo los sub-tabs de la subcategoria elegida
+  (SITIO_ALL_TABS L4474 como fallback). Balance divs 0 (653/653).
+- `api/pagina-destino.js`: `SUBCAT_LABEL` (21 labels, L20-28),
+  `SITIO_SECCIONES_POR_SUBCATEGORIA` (L42-52), chip `.subcat-chip` en el hero
+  (L2007-2008, CSS scoped L175), gating `subcatActiva()` (L1461) sobre las 8
+  secciones legacy de sitio + 13 secciones nuevas condicionales (colecciones,
+  recorridos, accesibilidad, programacion, musica_vivo, cover,
+  codigo_vestimenta, happy_hour, atracciones, horarios_zona,
+  actividades_gratis, que_ver, contexto). H1 resuelto: `cover` objeto
+  `{valor, nota}` con fallback a `cover_valor`/`cover_nota` planos (L599-601).
+  Fallback sin subcategoria = `sitioSeccionesActivas = null` (L611-614).
+- `api/publicar-lugar.js`: `SUBCAT_LISTA` (L29-33) valida contra la lista
+  cerrada de la categoria final; solo persiste si matchea (L104-107).
+- `publicar.html`: 3 selects (L250/267/280) con show/hide por chip
+  (L829-833), `subcatResumen()` (L963-965), payload `subcategoria` (L1076).
+- `.opencode/skills/gemini-research/scripts/validate_ficha.js`: `SUBCATEGORIAS`
+  (L46-58), validacion backward-compatible (ausencia NO es error, L114-122).
+- `scripts/reclasificar-subcategorias.js` (NUEVO): idempotente, modos
+  `--dry-run` (default)/`--apply`/`--local`, merge JSONB (ADR-003), reglas de
+  inferencia keyword->subcategoria. Dry-run local: 84 seeds -> 74 inferidos,
+  10 sin-match (candelario + 9 eventos multiformato), 0 skipped. Log:
+  `scripts/logs/reclasificar-subcategorias-2026-09-10.log`.
+
+**Verificado:** dry-run local resumen `total=84 asignar=74 aplicado=0 skip=0
+sin_match=10 modo=dry-run` (5 corridas identicas concatenadas en el log);
+balance divs admin 653/653; SUBCAT_LABEL/SITIO_SECCIONES_POR_SUBCATEGORIA/
+SUBCAT_LISTA/SUBCATEGORIAS copian la taxonomia exacta del ADR-016 (9 sitio /
+5 comida / 7 evento). Docs: ADR-016 en DECISIONS.md (Estado -> Fase 1-3
+completada), TSK-090 en TASKS.md, leccion BUG-029 en BUGS_HISTORICOS.md.
+
+#### Que sigue
+1. **Commit + push (PENDIENTE):** admin.html, api/pagina-destino.js,
+   api/publicar-lugar.js, publicar.html, validate_ficha.js,
+   scripts/reclasificar-subcategorias.js + docs (TASKS/TSK-090, NEXT.md,
+   BLUEPRINT seccion 4, DECISIONS/ADR-016, BUGS/BUG-029).
+2. **Reclasificacion en produccion (requiere Javier):** revisar el dry-run y
+   los 10 sin-match, luego
+   `DATABASE_URL=... node scripts/reclasificar-subcategorias.js --apply`
+   (idempotente; los que ya tienen `subcategoria` saltan en estado skipped).
+3. **Verificacion post-deploy:** Escudo GOLD + smoke de buildHTML() de las 3
+   categorias con y sin subcategoria; UI admin pre/post (select cachea en
+   edicion, applySubcategoriaSitio al recargar un sitio con subcategoria).
+4. Backlog previo sin cambios: TSK-089 necesita migracion 008 en Neon
+   (BLOQUEANTE); commit Ruta Salsera y TASK-013 siguen pendientes.
+
+#### Riesgos activos
+- **10 seeds sin-match** (candelario + 9 eventos multiformato: dia-del-arte-
+  urbano-bogota, hearth-summit-bogota, la-vida-es-hoy-bogota,
+  los-parceritos-villavicencio, mes-del-patrimonio-bogota, sabor-bogota,
+  semana-del-bienestar-bogota, travesia-rio-magdalena, vive-mejor-bogota):
+  quedan SIN `subcategoria` hasta revision manual de reglas o decision de
+  Javier (comportamiento legacy intacto mientras tanto).
+- ADR-016 NO tiene migracion de esquema -> el riesgo "deploy sin aplicar
+  migraciones" NO aplica aqui (a diferencia de TSK-089/migracion 008).
+- `cover` legacy plano (`cover_valor`/`cover_nota`) convive con el objeto
+  `cover{valor,nota}`: el renderer lee objeto con fallback plano (H1). La
+  reclasificacion no toca cover.
+
 ### Sesion comunidad-chat-planes-backend - chat y planes reales con gaming (2026-09-08) - TSK-089
 
 Rediseno del apartado social de `comunidad.html` (tabs Chat y Planes)

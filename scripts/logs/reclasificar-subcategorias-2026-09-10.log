@@ -1,0 +1,690 @@
+# reclasificar-subcategorias - 2026-09-10 - MODO LOCAL (seeds, 84 destinos)
+# --apply requiere DATABASE_URL (fuente real = produccion)
+arcangel-medellin-2026|asignar|concierto|tipo|concierto
+bar-continental|asignar|bar|tipo_actividad|salsa
+barichara-pueblo|asignar|sitio-historico|tipo_actividad|patrimonial
+bellagio-bar|asignar|bar|tipo_actividad|bar
+bogota|asignar|cultura|tipo|cultura
+cafe-cinema|asignar|bar|tipo_actividad|bar
+candelario|sin-match|||
+canon-del-guejar|asignar|aventura|tipo_actividad|rafting
+centro-cultural-delia-zapata-olivella|asignar|cultura|tipo_actividad|centro cultural
+cerro-de-guadalupe|asignar|religioso|tipo_actividad|santuario
+cinemateca-de-bogota|asignar|cultura|tipo_actividad|mediateca
+club-octava|asignar|bar|tipo_actividad|club de musica
+dia-del-arte-urbano-bogota|sin-match|||
+el-gato-gris-bogota|asignar|gastrobar|tipo_comida|bistro
+el-goce-pagano|asignar|bar|tipo_actividad|salsa
+el-tunal|asignar|parque|tipo|parque
+el-virrey|asignar|parque|tipo|parque
+espacio-kinder|asignar|bar|tipo_actividad|megaclub
+ferias-y-fiestas-guaduas-2026|asignar|fiesta|tipo|fiestas
+festival-cordillera-2026|asignar|festival|tipo|festival
+festival-de-verano-bogota|asignar|festival|tipo|festival
+festival-teatro-libre-bogota|asignar|festival|tipo|festival
+galeria-cafe-libro|asignar|bar|tipo_actividad|salsa
+gate-club|asignar|bar|tipo_actividad|club de musica
+habana-93|asignar|bar|tipo_actividad|salsa
+hearth-summit-bogota|sin-match|||
+jardin-botanico-bogota|asignar|naturaleza|tipo_actividad|jardin botanico
+jazz-al-parque-2026|asignar|festival|tipo|festival
+jazz-al-parque|asignar|festival|tipo|festival
+jazz-expandido-bogota|asignar|concierto|tipo|conciertos
+john-summit-chamorro-bogota|asignar|concierto|tipo|set electronico
+juanpis-live-show-bogota|asignar|concierto|tipo|concierto
+justin-quiles-lenny-tavarez-bogota|asignar|concierto|tipo|concierto
+klandestino|asignar|bar|tipo_actividad|bar
+la-casa-del-oso|asignar|bar|tipo_actividad|bar
+la-casona-de-la-candelaria-bogota|asignar|restaurante|tipo_comida|restaurante
+la-fruteria-candelaria-bogota|asignar|cafe|tipo_comida|cafeteria
+la-k-zona|asignar|cultura|tipo_actividad|cultural
+la-puerta-falsa-bogota|asignar|cafe|tipo_comida|cafe
+la-vida-es-hoy-bogota|sin-match|||
+lacandelaria|asignar|cultura|tipo|cultural
+las-bartenders-el-musical-bogota|asignar|teatro|tipo|teatro
+las-gachas|asignar|naturaleza|tipo_actividad|senderismo
+libera-2026-bogota|asignar|exposicion|tipo|feria
+los-parceritos-villavicencio|sin-match|||
+mad-radio|asignar|bar|tipo_actividad|club de musica
+maroon-5-bogota|asignar|concierto|tipo|concierto
+medejazz-medellin|asignar|festival|tipo|festival
+mes-del-patrimonio-bogota|sin-match|||
+morat-bogota|asignar|concierto|tipo|concierto
+museo-botero|asignar|museo|tipo_actividad|museo
+museo-de-la-independencia|asignar|museo|tipo_actividad|museo
+museo-del-oro|asignar|museo|tipo_actividad|museo
+museo-nacional|asignar|museo|tipo_actividad|museo
+museo-santa-clara|asignar|museo|tipo_actividad|museo
+origen-bistro-bogota|asignar|gastrobar|tipo_comida|bistro
+parque-la-florida|asignar|parque|tipo|parque
+parque-mundo-aventura|asignar|parque|tipo_actividad|parque
+parque-nacional|asignar|parque|tipo_actividad|paseo urbano
+parque-simon-bolivar|asignar|parque|tipo_actividad|parque
+parranda-vallenata-barranquilla|asignar|concierto|tipo|velada
+plaza-de-bolivar|asignar|espacio-publico|tipo_actividad|plaza
+quebrada-la-vieja|asignar|naturaleza|tipo_actividad|sendero
+queentaesencia-homenaje-queen-medellin|asignar|teatro|tipo|musical
+quiebracanto|asignar|bar|tipo_actividad|salsa
+quinta-de-bolivar|asignar|sitio-historico|tipo_actividad|casa museo
+radio-berlin|asignar|bar|tipo_actividad|club de musica
+radio-estrella|asignar|bar|tipo_actividad|club de musica
+rock-al-parque|asignar|festival|tipo|festival
+rumbavana|asignar|bar|tipo_actividad|salsa
+sabor-bogota|sin-match|||
+salsa-al-parque|asignar|festival|tipo|festival
+salsa-camara|asignar|bar|tipo_actividad|salsa
+sandunguera|asignar|bar|tipo_actividad|salsa
+semana-del-bienestar-bogota|sin-match|||
+sibundoy|asignar|naturaleza|tipo_actividad|naturaleza
+stray-kids-bogota|asignar|concierto|tipo|concierto
+tardeando-el-centro-bogota|asignar|festival|tipo|festival
+theatron|asignar|bar|tipo_actividad|discoteca
+transitos-fragmentados-bogota|asignar|exposicion|tipo|exposicion
+travesia-rio-magdalena|sin-match|||
+ulibro-bucaramanga|asignar|exposicion|tipo|feria
+video-club|asignar|bar|tipo_actividad|club de musica
+vive-mejor-bogota|sin-match|||
+[resumen] total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run
+[sub] aventura=1
+[sub] bar=20
+[sub] cafe=2
+[sub] concierto=9
+[sub] cultura=5
+[sub] espacio-publico=1
+[sub] exposicion=3
+[sub] festival=9
+[sub] fiesta=1
+[sub] gastrobar=2
+[sub] museo=5
+[sub] naturaleza=4
+[sub] parque=6
+[sub] religioso=1
+[sub] restaurante=1
+[sub] sitio-historico=2
+[sub] teatro=2
+[sin-match] destinos sin regla aplicable (revision manual):
+  - candelario (sitio)
+  - dia-del-arte-urbano-bogota (evento)
+  - hearth-summit-bogota (evento)
+  - la-vida-es-hoy-bogota (evento)
+  - los-parceritos-villavicencio (evento)
+  - mes-del-patrimonio-bogota (evento)
+  - sabor-bogota (evento)
+  - semana-del-bienestar-bogota (evento)
+  - travesia-rio-magdalena (evento)
+  - vive-mejor-bogota (evento)
+# reclasificar-subcategorias - 2026-09-10 - MODO LOCAL (seeds, 84 destinos)
+# --apply requiere DATABASE_URL (fuente real = produccion)
+arcangel-medellin-2026|asignar|concierto|tipo|concierto
+bar-continental|asignar|bar|tipo_actividad|salsa
+barichara-pueblo|asignar|sitio-historico|tipo_actividad|patrimonial
+bellagio-bar|asignar|bar|tipo_actividad|bar
+bogota|asignar|cultura|tipo|cultura
+cafe-cinema|asignar|bar|tipo_actividad|bar
+candelario|sin-match|||
+canon-del-guejar|asignar|aventura|tipo_actividad|rafting
+centro-cultural-delia-zapata-olivella|asignar|cultura|tipo_actividad|centro cultural
+cerro-de-guadalupe|asignar|religioso|tipo_actividad|santuario
+cinemateca-de-bogota|asignar|cultura|tipo_actividad|mediateca
+club-octava|asignar|bar|tipo_actividad|club de musica
+dia-del-arte-urbano-bogota|sin-match|||
+el-gato-gris-bogota|asignar|gastrobar|tipo_comida|bistro
+el-goce-pagano|asignar|bar|tipo_actividad|salsa
+el-tunal|asignar|parque|tipo|parque
+el-virrey|asignar|parque|tipo|parque
+espacio-kinder|asignar|bar|tipo_actividad|megaclub
+ferias-y-fiestas-guaduas-2026|asignar|fiesta|tipo|fiestas
+festival-cordillera-2026|asignar|festival|tipo|festival
+festival-de-verano-bogota|asignar|festival|tipo|festival
+festival-teatro-libre-bogota|asignar|festival|tipo|festival
+galeria-cafe-libro|asignar|bar|tipo_actividad|salsa
+gate-club|asignar|bar|tipo_actividad|club de musica
+habana-93|asignar|bar|tipo_actividad|salsa
+hearth-summit-bogota|sin-match|||
+jardin-botanico-bogota|asignar|naturaleza|tipo_actividad|jardin botanico
+jazz-al-parque-2026|asignar|festival|tipo|festival
+jazz-al-parque|asignar|festival|tipo|festival
+jazz-expandido-bogota|asignar|concierto|tipo|conciertos
+john-summit-chamorro-bogota|asignar|concierto|tipo|set electronico
+juanpis-live-show-bogota|asignar|concierto|tipo|concierto
+justin-quiles-lenny-tavarez-bogota|asignar|concierto|tipo|concierto
+klandestino|asignar|bar|tipo_actividad|bar
+la-casa-del-oso|asignar|bar|tipo_actividad|bar
+la-casona-de-la-candelaria-bogota|asignar|restaurante|tipo_comida|restaurante
+la-fruteria-candelaria-bogota|asignar|cafe|tipo_comida|cafeteria
+la-k-zona|asignar|cultura|tipo_actividad|cultural
+la-puerta-falsa-bogota|asignar|cafe|tipo_comida|cafe
+la-vida-es-hoy-bogota|sin-match|||
+lacandelaria|asignar|cultura|tipo|cultural
+las-bartenders-el-musical-bogota|asignar|teatro|tipo|teatro
+las-gachas|asignar|naturaleza|tipo_actividad|senderismo
+libera-2026-bogota|asignar|exposicion|tipo|feria
+los-parceritos-villavicencio|sin-match|||
+mad-radio|asignar|bar|tipo_actividad|club de musica
+maroon-5-bogota|asignar|concierto|tipo|concierto
+medejazz-medellin|asignar|festival|tipo|festival
+mes-del-patrimonio-bogota|sin-match|||
+morat-bogota|asignar|concierto|tipo|concierto
+museo-botero|asignar|museo|tipo_actividad|museo
+museo-de-la-independencia|asignar|museo|tipo_actividad|museo
+museo-del-oro|asignar|museo|tipo_actividad|museo
+museo-nacional|asignar|museo|tipo_actividad|museo
+museo-santa-clara|asignar|museo|tipo_actividad|museo
+origen-bistro-bogota|asignar|gastrobar|tipo_comida|bistro
+parque-la-florida|asignar|parque|tipo|parque
+parque-mundo-aventura|asignar|parque|tipo_actividad|parque
+parque-nacional|asignar|parque|tipo_actividad|paseo urbano
+parque-simon-bolivar|asignar|parque|tipo_actividad|parque
+parranda-vallenata-barranquilla|asignar|concierto|tipo|velada
+plaza-de-bolivar|asignar|espacio-publico|tipo_actividad|plaza
+quebrada-la-vieja|asignar|naturaleza|tipo_actividad|sendero
+queentaesencia-homenaje-queen-medellin|asignar|concierto|tipo|tributo
+quiebracanto|asignar|bar|tipo_actividad|salsa
+quinta-de-bolivar|asignar|sitio-historico|tipo_actividad|casa museo
+radio-berlin|asignar|bar|tipo_actividad|club de musica
+radio-estrella|asignar|bar|tipo_actividad|club de musica
+rock-al-parque|asignar|festival|tipo|festival
+rumbavana|asignar|bar|tipo_actividad|salsa
+sabor-bogota|sin-match|||
+salsa-al-parque|asignar|festival|tipo|festival
+salsa-camara|asignar|bar|tipo_actividad|salsa
+sandunguera|asignar|bar|tipo_actividad|salsa
+semana-del-bienestar-bogota|sin-match|||
+sibundoy|asignar|naturaleza|tipo_actividad|naturaleza
+stray-kids-bogota|asignar|concierto|tipo|concierto
+tardeando-el-centro-bogota|asignar|festival|tipo|festival
+theatron|asignar|bar|tipo_actividad|discoteca
+transitos-fragmentados-bogota|asignar|exposicion|tipo|exposicion
+travesia-rio-magdalena|sin-match|||
+ulibro-bucaramanga|asignar|exposicion|tipo|feria
+video-club|asignar|bar|tipo_actividad|club de musica
+vive-mejor-bogota|sin-match|||
+[resumen] total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run
+[sub] aventura=1
+[sub] bar=20
+[sub] cafe=2
+[sub] concierto=10
+[sub] cultura=5
+[sub] espacio-publico=1
+[sub] exposicion=3
+[sub] festival=9
+[sub] fiesta=1
+[sub] gastrobar=2
+[sub] museo=5
+[sub] naturaleza=4
+[sub] parque=6
+[sub] religioso=1
+[sub] restaurante=1
+[sub] sitio-historico=2
+[sub] teatro=1
+[sin-match] destinos sin regla aplicable (revision manual):
+  - candelario (sitio)
+  - dia-del-arte-urbano-bogota (evento)
+  - hearth-summit-bogota (evento)
+  - la-vida-es-hoy-bogota (evento)
+  - los-parceritos-villavicencio (evento)
+  - mes-del-patrimonio-bogota (evento)
+  - sabor-bogota (evento)
+  - semana-del-bienestar-bogota (evento)
+  - travesia-rio-magdalena (evento)
+  - vive-mejor-bogota (evento)
+# reclasificar-subcategorias - 2026-09-10 - MODO LOCAL (seeds, 84 destinos)
+# --apply requiere DATABASE_URL (fuente real = produccion)
+arcangel-medellin-2026|asignar|concierto|tipo|concierto
+bar-continental|asignar|bar|tipo_actividad|salsa
+barichara-pueblo|asignar|sitio-historico|tipo_actividad|patrimonial
+bellagio-bar|asignar|bar|tipo_actividad|bar
+bogota|asignar|cultura|tipo|cultura
+cafe-cinema|asignar|bar|tipo_actividad|bar
+candelario|sin-match|||
+canon-del-guejar|asignar|aventura|tipo_actividad|rafting
+centro-cultural-delia-zapata-olivella|asignar|cultura|tipo_actividad|centro cultural
+cerro-de-guadalupe|asignar|religioso|tipo_actividad|santuario
+cinemateca-de-bogota|asignar|cultura|tipo_actividad|mediateca
+club-octava|asignar|bar|tipo_actividad|club de musica
+dia-del-arte-urbano-bogota|sin-match|||
+el-gato-gris-bogota|asignar|gastrobar|tipo_comida|bistro
+el-goce-pagano|asignar|bar|tipo_actividad|salsa
+el-tunal|asignar|parque|tipo|parque
+el-virrey|asignar|parque|tipo|parque
+espacio-kinder|asignar|bar|tipo_actividad|megaclub
+ferias-y-fiestas-guaduas-2026|asignar|fiesta|tipo|fiestas
+festival-cordillera-2026|asignar|festival|tipo|festival
+festival-de-verano-bogota|asignar|festival|tipo|festival
+festival-teatro-libre-bogota|asignar|festival|tipo|festival
+galeria-cafe-libro|asignar|bar|tipo_actividad|salsa
+gate-club|asignar|bar|tipo_actividad|club de musica
+habana-93|asignar|bar|tipo_actividad|salsa
+hearth-summit-bogota|sin-match|||
+jardin-botanico-bogota|asignar|naturaleza|tipo_actividad|jardin botanico
+jazz-al-parque-2026|asignar|festival|tipo|festival
+jazz-al-parque|asignar|festival|tipo|festival
+jazz-expandido-bogota|asignar|concierto|tipo|conciertos
+john-summit-chamorro-bogota|asignar|concierto|tipo|set electronico
+juanpis-live-show-bogota|asignar|concierto|tipo|concierto
+justin-quiles-lenny-tavarez-bogota|asignar|concierto|tipo|concierto
+klandestino|asignar|bar|tipo_actividad|bar
+la-casa-del-oso|asignar|bar|tipo_actividad|bar
+la-casona-de-la-candelaria-bogota|asignar|restaurante|tipo_comida|restaurante
+la-fruteria-candelaria-bogota|asignar|cafe|tipo_comida|cafeteria
+la-k-zona|asignar|cultura|tipo_actividad|cultural
+la-puerta-falsa-bogota|asignar|cafe|tipo_comida|cafe
+la-vida-es-hoy-bogota|sin-match|||
+lacandelaria|asignar|cultura|tipo|cultural
+las-bartenders-el-musical-bogota|asignar|teatro|tipo|teatro
+las-gachas|asignar|naturaleza|tipo_actividad|senderismo
+libera-2026-bogota|asignar|exposicion|tipo|feria
+los-parceritos-villavicencio|sin-match|||
+mad-radio|asignar|bar|tipo_actividad|club de musica
+maroon-5-bogota|asignar|concierto|tipo|concierto
+medejazz-medellin|asignar|festival|tipo|festival
+mes-del-patrimonio-bogota|sin-match|||
+morat-bogota|asignar|concierto|tipo|concierto
+museo-botero|asignar|museo|tipo_actividad|museo
+museo-de-la-independencia|asignar|museo|tipo_actividad|museo
+museo-del-oro|asignar|museo|tipo_actividad|museo
+museo-nacional|asignar|museo|tipo_actividad|museo
+museo-santa-clara|asignar|museo|tipo_actividad|museo
+origen-bistro-bogota|asignar|gastrobar|tipo_comida|bistro
+parque-la-florida|asignar|parque|tipo|parque
+parque-mundo-aventura|asignar|parque|tipo_actividad|parque
+parque-nacional|asignar|parque|tipo_actividad|paseo urbano
+parque-simon-bolivar|asignar|parque|tipo_actividad|parque
+parranda-vallenata-barranquilla|asignar|concierto|tipo|velada
+plaza-de-bolivar|asignar|espacio-publico|tipo_actividad|plaza
+quebrada-la-vieja|asignar|naturaleza|tipo_actividad|sendero
+queentaesencia-homenaje-queen-medellin|asignar|concierto|tipo|tributo
+quiebracanto|asignar|bar|tipo_actividad|salsa
+quinta-de-bolivar|asignar|sitio-historico|tipo_actividad|casa museo
+radio-berlin|asignar|bar|tipo_actividad|club de musica
+radio-estrella|asignar|bar|tipo_actividad|club de musica
+rock-al-parque|asignar|festival|tipo|festival
+rumbavana|asignar|bar|tipo_actividad|salsa
+sabor-bogota|sin-match|||
+salsa-al-parque|asignar|festival|tipo|festival
+salsa-camara|asignar|bar|tipo_actividad|salsa
+sandunguera|asignar|bar|tipo_actividad|salsa
+semana-del-bienestar-bogota|sin-match|||
+sibundoy|asignar|naturaleza|tipo_actividad|naturaleza
+stray-kids-bogota|asignar|concierto|tipo|concierto
+tardeando-el-centro-bogota|asignar|festival|tipo|festival
+theatron|asignar|bar|tipo_actividad|discoteca
+transitos-fragmentados-bogota|asignar|exposicion|tipo|exposicion
+travesia-rio-magdalena|sin-match|||
+ulibro-bucaramanga|asignar|exposicion|tipo|feria
+video-club|asignar|bar|tipo_actividad|club de musica
+vive-mejor-bogota|sin-match|||
+[resumen] total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run
+[sub] aventura=1
+[sub] bar=20
+[sub] cafe=2
+[sub] concierto=10
+[sub] cultura=5
+[sub] espacio-publico=1
+[sub] exposicion=3
+[sub] festival=9
+[sub] fiesta=1
+[sub] gastrobar=2
+[sub] museo=5
+[sub] naturaleza=4
+[sub] parque=6
+[sub] religioso=1
+[sub] restaurante=1
+[sub] sitio-historico=2
+[sub] teatro=1
+[sin-match] destinos sin regla aplicable (revision manual):
+  - candelario (sitio)
+  - dia-del-arte-urbano-bogota (evento)
+  - hearth-summit-bogota (evento)
+  - la-vida-es-hoy-bogota (evento)
+  - los-parceritos-villavicencio (evento)
+  - mes-del-patrimonio-bogota (evento)
+  - sabor-bogota (evento)
+  - semana-del-bienestar-bogota (evento)
+  - travesia-rio-magdalena (evento)
+  - vive-mejor-bogota (evento)
+# reclasificar-subcategorias - 2026-09-10 - MODO LOCAL (seeds, 84 destinos)
+# --apply requiere DATABASE_URL (fuente real = produccion)
+arcangel-medellin-2026|asignar|concierto|tipo|concierto
+bar-continental|asignar|bar|tipo_actividad|salsa
+barichara-pueblo|asignar|sitio-historico|tipo_actividad|patrimonial
+bellagio-bar|asignar|bar|tipo_actividad|bar
+bogota|asignar|cultura|tipo|cultura
+cafe-cinema|asignar|bar|tipo_actividad|bar
+candelario|sin-match|||
+canon-del-guejar|asignar|aventura|tipo_actividad|rafting
+centro-cultural-delia-zapata-olivella|asignar|cultura|tipo_actividad|centro cultural
+cerro-de-guadalupe|asignar|religioso|tipo_actividad|santuario
+cinemateca-de-bogota|asignar|cultura|tipo_actividad|mediateca
+club-octava|asignar|bar|tipo_actividad|club de musica
+dia-del-arte-urbano-bogota|sin-match|||
+el-gato-gris-bogota|asignar|gastrobar|tipo_comida|bistro
+el-goce-pagano|asignar|bar|tipo_actividad|salsa
+el-tunal|asignar|parque|tipo|parque
+el-virrey|asignar|parque|tipo|parque
+espacio-kinder|asignar|bar|tipo_actividad|megaclub
+ferias-y-fiestas-guaduas-2026|asignar|fiesta|tipo|fiestas
+festival-cordillera-2026|asignar|festival|tipo|festival
+festival-de-verano-bogota|asignar|festival|tipo|festival
+festival-teatro-libre-bogota|asignar|festival|tipo|festival
+galeria-cafe-libro|asignar|bar|tipo_actividad|salsa
+gate-club|asignar|bar|tipo_actividad|club de musica
+habana-93|asignar|bar|tipo_actividad|salsa
+hearth-summit-bogota|sin-match|||
+jardin-botanico-bogota|asignar|naturaleza|tipo_actividad|jardin botanico
+jazz-al-parque-2026|asignar|festival|tipo|festival
+jazz-al-parque|asignar|festival|tipo|festival
+jazz-expandido-bogota|asignar|concierto|tipo|conciertos
+john-summit-chamorro-bogota|asignar|concierto|tipo|set electronico
+juanpis-live-show-bogota|asignar|concierto|tipo|concierto
+justin-quiles-lenny-tavarez-bogota|asignar|concierto|tipo|concierto
+klandestino|asignar|bar|tipo_actividad|bar
+la-casa-del-oso|asignar|bar|tipo_actividad|bar
+la-casona-de-la-candelaria-bogota|asignar|restaurante|tipo_comida|restaurante
+la-fruteria-candelaria-bogota|asignar|cafe|tipo_comida|cafeteria
+la-k-zona|asignar|cultura|tipo_actividad|cultural
+la-puerta-falsa-bogota|asignar|cafe|tipo_comida|cafe
+la-vida-es-hoy-bogota|sin-match|||
+lacandelaria|asignar|cultura|tipo|cultural
+las-bartenders-el-musical-bogota|asignar|teatro|tipo|teatro
+las-gachas|asignar|naturaleza|tipo_actividad|senderismo
+libera-2026-bogota|asignar|exposicion|tipo|feria
+los-parceritos-villavicencio|sin-match|||
+mad-radio|asignar|bar|tipo_actividad|club de musica
+maroon-5-bogota|asignar|concierto|tipo|concierto
+medejazz-medellin|asignar|festival|tipo|festival
+mes-del-patrimonio-bogota|sin-match|||
+morat-bogota|asignar|concierto|tipo|concierto
+museo-botero|asignar|museo|tipo_actividad|museo
+museo-de-la-independencia|asignar|museo|tipo_actividad|museo
+museo-del-oro|asignar|museo|tipo_actividad|museo
+museo-nacional|asignar|museo|tipo_actividad|museo
+museo-santa-clara|asignar|museo|tipo_actividad|museo
+origen-bistro-bogota|asignar|gastrobar|tipo_comida|bistro
+parque-la-florida|asignar|parque|tipo|parque
+parque-mundo-aventura|asignar|parque|tipo_actividad|parque
+parque-nacional|asignar|parque|tipo_actividad|paseo urbano
+parque-simon-bolivar|asignar|parque|tipo_actividad|parque
+parranda-vallenata-barranquilla|asignar|concierto|tipo|velada
+plaza-de-bolivar|asignar|espacio-publico|tipo_actividad|plaza
+quebrada-la-vieja|asignar|naturaleza|tipo_actividad|sendero
+queentaesencia-homenaje-queen-medellin|asignar|concierto|tipo|tributo
+quiebracanto|asignar|bar|tipo_actividad|salsa
+quinta-de-bolivar|asignar|sitio-historico|tipo_actividad|casa museo
+radio-berlin|asignar|bar|tipo_actividad|club de musica
+radio-estrella|asignar|bar|tipo_actividad|club de musica
+rock-al-parque|asignar|festival|tipo|festival
+rumbavana|asignar|bar|tipo_actividad|salsa
+sabor-bogota|sin-match|||
+salsa-al-parque|asignar|festival|tipo|festival
+salsa-camara|asignar|bar|tipo_actividad|salsa
+sandunguera|asignar|bar|tipo_actividad|salsa
+semana-del-bienestar-bogota|sin-match|||
+sibundoy|asignar|naturaleza|tipo_actividad|naturaleza
+stray-kids-bogota|asignar|concierto|tipo|concierto
+tardeando-el-centro-bogota|asignar|festival|tipo|festival
+theatron|asignar|bar|tipo_actividad|discoteca
+transitos-fragmentados-bogota|asignar|exposicion|tipo|exposicion
+travesia-rio-magdalena|sin-match|||
+ulibro-bucaramanga|asignar|exposicion|tipo|feria
+video-club|asignar|bar|tipo_actividad|club de musica
+vive-mejor-bogota|sin-match|||
+[resumen] total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run
+[sub] aventura=1
+[sub] bar=20
+[sub] cafe=2
+[sub] concierto=10
+[sub] cultura=5
+[sub] espacio-publico=1
+[sub] exposicion=3
+[sub] festival=9
+[sub] fiesta=1
+[sub] gastrobar=2
+[sub] museo=5
+[sub] naturaleza=4
+[sub] parque=6
+[sub] religioso=1
+[sub] restaurante=1
+[sub] sitio-historico=2
+[sub] teatro=1
+[sin-match] destinos sin regla aplicable (revision manual):
+  - candelario (sitio)
+  - dia-del-arte-urbano-bogota (evento)
+  - hearth-summit-bogota (evento)
+  - la-vida-es-hoy-bogota (evento)
+  - los-parceritos-villavicencio (evento)
+  - mes-del-patrimonio-bogota (evento)
+  - sabor-bogota (evento)
+  - semana-del-bienestar-bogota (evento)
+  - travesia-rio-magdalena (evento)
+  - vive-mejor-bogota (evento)
+# reclasificar-subcategorias - 2026-09-10 - MODO LOCAL (seeds, 84 destinos)
+# --apply requiere DATABASE_URL (fuente real = produccion)
+arcangel-medellin-2026|asignar|concierto|tipo|concierto
+bar-continental|asignar|bar|tipo_actividad|salsa
+barichara-pueblo|asignar|sitio-historico|tipo_actividad|patrimonial
+bellagio-bar|asignar|bar|tipo_actividad|bar
+bogota|asignar|cultura|tipo|cultura
+cafe-cinema|asignar|bar|tipo_actividad|bar
+candelario|sin-match|||
+canon-del-guejar|asignar|aventura|tipo_actividad|rafting
+centro-cultural-delia-zapata-olivella|asignar|cultura|tipo_actividad|centro cultural
+cerro-de-guadalupe|asignar|religioso|tipo_actividad|santuario
+cinemateca-de-bogota|asignar|cultura|tipo_actividad|mediateca
+club-octava|asignar|bar|tipo_actividad|club de musica
+dia-del-arte-urbano-bogota|sin-match|||
+el-gato-gris-bogota|asignar|gastrobar|tipo_comida|bistro
+el-goce-pagano|asignar|bar|tipo_actividad|salsa
+el-tunal|asignar|parque|tipo|parque
+el-virrey|asignar|parque|tipo|parque
+espacio-kinder|asignar|bar|tipo_actividad|megaclub
+ferias-y-fiestas-guaduas-2026|asignar|fiesta|tipo|fiestas
+festival-cordillera-2026|asignar|festival|tipo|festival
+festival-de-verano-bogota|asignar|festival|tipo|festival
+festival-teatro-libre-bogota|asignar|festival|tipo|festival
+galeria-cafe-libro|asignar|bar|tipo_actividad|salsa
+gate-club|asignar|bar|tipo_actividad|club de musica
+habana-93|asignar|bar|tipo_actividad|salsa
+hearth-summit-bogota|sin-match|||
+jardin-botanico-bogota|asignar|naturaleza|tipo_actividad|jardin botanico
+jazz-al-parque-2026|asignar|festival|tipo|festival
+jazz-al-parque|asignar|festival|tipo|festival
+jazz-expandido-bogota|asignar|concierto|tipo|conciertos
+john-summit-chamorro-bogota|asignar|concierto|tipo|set electronico
+juanpis-live-show-bogota|asignar|concierto|tipo|concierto
+justin-quiles-lenny-tavarez-bogota|asignar|concierto|tipo|concierto
+klandestino|asignar|bar|tipo_actividad|bar
+la-casa-del-oso|asignar|bar|tipo_actividad|bar
+la-casona-de-la-candelaria-bogota|asignar|restaurante|tipo_comida|restaurante
+la-fruteria-candelaria-bogota|asignar|cafe|tipo_comida|cafeteria
+la-k-zona|asignar|cultura|tipo_actividad|cultural
+la-puerta-falsa-bogota|asignar|cafe|tipo_comida|cafe
+la-vida-es-hoy-bogota|sin-match|||
+lacandelaria|asignar|cultura|tipo|cultural
+las-bartenders-el-musical-bogota|asignar|teatro|tipo|teatro
+las-gachas|asignar|naturaleza|tipo_actividad|senderismo
+libera-2026-bogota|asignar|exposicion|tipo|feria
+los-parceritos-villavicencio|sin-match|||
+mad-radio|asignar|bar|tipo_actividad|club de musica
+maroon-5-bogota|asignar|concierto|tipo|concierto
+medejazz-medellin|asignar|festival|tipo|festival
+mes-del-patrimonio-bogota|sin-match|||
+morat-bogota|asignar|concierto|tipo|concierto
+museo-botero|asignar|museo|tipo_actividad|museo
+museo-de-la-independencia|asignar|museo|tipo_actividad|museo
+museo-del-oro|asignar|museo|tipo_actividad|museo
+museo-nacional|asignar|museo|tipo_actividad|museo
+museo-santa-clara|asignar|museo|tipo_actividad|museo
+origen-bistro-bogota|asignar|gastrobar|tipo_comida|bistro
+parque-la-florida|asignar|parque|tipo|parque
+parque-mundo-aventura|asignar|parque|tipo_actividad|parque
+parque-nacional|asignar|parque|tipo_actividad|paseo urbano
+parque-simon-bolivar|asignar|parque|tipo_actividad|parque
+parranda-vallenata-barranquilla|asignar|concierto|tipo|velada
+plaza-de-bolivar|asignar|espacio-publico|tipo_actividad|plaza
+quebrada-la-vieja|asignar|naturaleza|tipo_actividad|sendero
+queentaesencia-homenaje-queen-medellin|asignar|concierto|tipo|tributo
+quiebracanto|asignar|bar|tipo_actividad|salsa
+quinta-de-bolivar|asignar|sitio-historico|tipo_actividad|casa museo
+radio-berlin|asignar|bar|tipo_actividad|club de musica
+radio-estrella|asignar|bar|tipo_actividad|club de musica
+rock-al-parque|asignar|festival|tipo|festival
+rumbavana|asignar|bar|tipo_actividad|salsa
+sabor-bogota|sin-match|||
+salsa-al-parque|asignar|festival|tipo|festival
+salsa-camara|asignar|bar|tipo_actividad|salsa
+sandunguera|asignar|bar|tipo_actividad|salsa
+semana-del-bienestar-bogota|sin-match|||
+sibundoy|asignar|naturaleza|tipo_actividad|naturaleza
+stray-kids-bogota|asignar|concierto|tipo|concierto
+tardeando-el-centro-bogota|asignar|festival|tipo|festival
+theatron|asignar|bar|tipo_actividad|discoteca
+transitos-fragmentados-bogota|asignar|exposicion|tipo|exposicion
+travesia-rio-magdalena|sin-match|||
+ulibro-bucaramanga|asignar|exposicion|tipo|feria
+video-club|asignar|bar|tipo_actividad|club de musica
+vive-mejor-bogota|sin-match|||
+[resumen] total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run
+[sub] aventura=1
+[sub] bar=20
+[sub] cafe=2
+[sub] concierto=10
+[sub] cultura=5
+[sub] espacio-publico=1
+[sub] exposicion=3
+[sub] festival=9
+[sub] fiesta=1
+[sub] gastrobar=2
+[sub] museo=5
+[sub] naturaleza=4
+[sub] parque=6
+[sub] religioso=1
+[sub] restaurante=1
+[sub] sitio-historico=2
+[sub] teatro=1
+[sin-match] destinos sin regla aplicable (revision manual):
+  - candelario (sitio)
+  - dia-del-arte-urbano-bogota (evento)
+  - hearth-summit-bogota (evento)
+  - la-vida-es-hoy-bogota (evento)
+  - los-parceritos-villavicencio (evento)
+  - mes-del-patrimonio-bogota (evento)
+  - sabor-bogota (evento)
+  - semana-del-bienestar-bogota (evento)
+  - travesia-rio-magdalena (evento)
+  - vive-mejor-bogota (evento)
+# reclasificar-subcategorias - 2026-09-10 - MODO LOCAL (seeds, 84 destinos)
+# --apply requiere DATABASE_URL (fuente real = produccion)
+arcangel-medellin-2026|asignar|concierto|tipo|concierto
+bar-continental|asignar|bar|tipo_actividad|salsa
+barichara-pueblo|asignar|sitio-historico|tipo_actividad|patrimonial
+bellagio-bar|asignar|bar|tipo_actividad|bar
+bogota|asignar|cultura|tipo|cultura
+cafe-cinema|asignar|bar|tipo_actividad|bar
+candelario|sin-match|||
+canon-del-guejar|asignar|aventura|tipo_actividad|rafting
+centro-cultural-delia-zapata-olivella|asignar|cultura|tipo_actividad|centro cultural
+cerro-de-guadalupe|asignar|religioso|tipo_actividad|santuario
+cinemateca-de-bogota|asignar|cultura|tipo_actividad|mediateca
+club-octava|asignar|bar|tipo_actividad|club de musica
+dia-del-arte-urbano-bogota|sin-match|||
+el-gato-gris-bogota|asignar|gastrobar|tipo_comida|bistro
+el-goce-pagano|asignar|bar|tipo_actividad|salsa
+el-tunal|asignar|parque|tipo|parque
+el-virrey|asignar|parque|tipo|parque
+espacio-kinder|asignar|bar|tipo_actividad|megaclub
+ferias-y-fiestas-guaduas-2026|asignar|fiesta|tipo|fiestas
+festival-cordillera-2026|asignar|festival|tipo|festival
+festival-de-verano-bogota|asignar|festival|tipo|festival
+festival-teatro-libre-bogota|asignar|festival|tipo|festival
+galeria-cafe-libro|asignar|bar|tipo_actividad|salsa
+gate-club|asignar|bar|tipo_actividad|club de musica
+habana-93|asignar|bar|tipo_actividad|salsa
+hearth-summit-bogota|sin-match|||
+jardin-botanico-bogota|asignar|naturaleza|tipo_actividad|jardin botanico
+jazz-al-parque-2026|asignar|festival|tipo|festival
+jazz-al-parque|asignar|festival|tipo|festival
+jazz-expandido-bogota|asignar|concierto|tipo|conciertos
+john-summit-chamorro-bogota|asignar|concierto|tipo|set electronico
+juanpis-live-show-bogota|asignar|concierto|tipo|concierto
+justin-quiles-lenny-tavarez-bogota|asignar|concierto|tipo|concierto
+klandestino|asignar|bar|tipo_actividad|bar
+la-casa-del-oso|asignar|bar|tipo_actividad|bar
+la-casona-de-la-candelaria-bogota|asignar|restaurante|tipo_comida|restaurante
+la-fruteria-candelaria-bogota|asignar|cafe|tipo_comida|cafeteria
+la-k-zona|asignar|cultura|tipo_actividad|cultural
+la-puerta-falsa-bogota|asignar|cafe|tipo_comida|cafe
+la-vida-es-hoy-bogota|sin-match|||
+lacandelaria|asignar|cultura|tipo|cultural
+las-bartenders-el-musical-bogota|asignar|teatro|tipo|teatro
+las-gachas|asignar|naturaleza|tipo_actividad|senderismo
+libera-2026-bogota|asignar|exposicion|tipo|feria
+los-parceritos-villavicencio|sin-match|||
+mad-radio|asignar|bar|tipo_actividad|club de musica
+maroon-5-bogota|asignar|concierto|tipo|concierto
+medejazz-medellin|asignar|festival|tipo|festival
+mes-del-patrimonio-bogota|sin-match|||
+morat-bogota|asignar|concierto|tipo|concierto
+museo-botero|asignar|museo|tipo_actividad|museo
+museo-de-la-independencia|asignar|museo|tipo_actividad|museo
+museo-del-oro|asignar|museo|tipo_actividad|museo
+museo-nacional|asignar|museo|tipo_actividad|museo
+museo-santa-clara|asignar|museo|tipo_actividad|museo
+origen-bistro-bogota|asignar|gastrobar|tipo_comida|bistro
+parque-la-florida|asignar|parque|tipo|parque
+parque-mundo-aventura|asignar|parque|tipo_actividad|parque
+parque-nacional|asignar|parque|tipo_actividad|paseo urbano
+parque-simon-bolivar|asignar|parque|tipo_actividad|parque
+parranda-vallenata-barranquilla|asignar|concierto|tipo|velada
+plaza-de-bolivar|asignar|espacio-publico|tipo_actividad|plaza
+quebrada-la-vieja|asignar|naturaleza|tipo_actividad|sendero
+queentaesencia-homenaje-queen-medellin|asignar|concierto|tipo|tributo
+quiebracanto|asignar|bar|tipo_actividad|salsa
+quinta-de-bolivar|asignar|sitio-historico|tipo_actividad|casa museo
+radio-berlin|asignar|bar|tipo_actividad|club de musica
+radio-estrella|asignar|bar|tipo_actividad|club de musica
+rock-al-parque|asignar|festival|tipo|festival
+rumbavana|asignar|bar|tipo_actividad|salsa
+sabor-bogota|sin-match|||
+salsa-al-parque|asignar|festival|tipo|festival
+salsa-camara|asignar|bar|tipo_actividad|salsa
+sandunguera|asignar|bar|tipo_actividad|salsa
+semana-del-bienestar-bogota|sin-match|||
+sibundoy|asignar|naturaleza|tipo_actividad|naturaleza
+stray-kids-bogota|asignar|concierto|tipo|concierto
+tardeando-el-centro-bogota|asignar|festival|tipo|festival
+theatron|asignar|bar|tipo_actividad|discoteca
+transitos-fragmentados-bogota|asignar|exposicion|tipo|exposicion
+travesia-rio-magdalena|sin-match|||
+ulibro-bucaramanga|asignar|exposicion|tipo|feria
+video-club|asignar|bar|tipo_actividad|club de musica
+vive-mejor-bogota|sin-match|||
+[resumen] total=84 asignar=74 aplicado=0 skip=0 sin_match=10 modo=dry-run
+[sub] aventura=1
+[sub] bar=20
+[sub] cafe=2
+[sub] concierto=10
+[sub] cultura=5
+[sub] espacio-publico=1
+[sub] exposicion=3
+[sub] festival=9
+[sub] fiesta=1
+[sub] gastrobar=2
+[sub] museo=5
+[sub] naturaleza=4
+[sub] parque=6
+[sub] religioso=1
+[sub] restaurante=1
+[sub] sitio-historico=2
+[sub] teatro=1
+[sin-match] destinos sin regla aplicable (revision manual):
+  - candelario (sitio)
+  - dia-del-arte-urbano-bogota (evento)
+  - hearth-summit-bogota (evento)
+  - la-vida-es-hoy-bogota (evento)
+  - los-parceritos-villavicencio (evento)
+  - mes-del-patrimonio-bogota (evento)
+  - sabor-bogota (evento)
+  - semana-del-bienestar-bogota (evento)
+  - travesia-rio-magdalena (evento)
+  - vive-mejor-bogota (evento)

@@ -480,3 +480,29 @@ Esto evita que el render pre-sesion contamine `_ultimoNivelVisto` con el valor `
 
 **Estado:** Resuelto. Fix aplicado en `index.html:4069-4071`.
 
+## BUG-029: Leccion ADR-016 -- campo de tags escalar que migra a objeto: `cover` vs `cover_valor`/`cover_nota`
+
+**Contexto:** El ADR-016 define `tags.cover` como objeto `{valor, nota}` (cover
+condicional nocturno de bares). Pero los datos legacy y los seeds previos
+guardaron la misma informacion como campos planos `cover_valor`/`cover_nota`.
+En la implementacion se resolvio el desajuste en el renderer:
+`api/pagina-destino.js:599-601` lee el objeto con fallback:
+`coverObj.valor || tags.cover_valor || ''` (y `coverObj.nota || tags.cover_nota`).
+
+**Sintoma potencial (evitado):** renderizar `[object Object]` o un cover vacio
+si un destino legacy (con `cover_valor` plano) se renderizaba esperando el
+objeto nuevo; o al reves, ignorar el campo nuevo al editar un bar en admin.
+
+**Causa raiz:** dos formas validas conviven para el mismo concepto en datos
+reales (objeto nuevo del ADR-016 vs campos planos legacy). Es el mismo patron
+de BUG-007/012/024: asumir una sola forma de los datos sin verificar el
+archivo real (ADR-006).
+
+**Estado:** Resuelto en codigo (H1 del ADR-016, fallback en L599-601). Leccion:
+cuando un campo de `tags` cambia de escalar a objeto (o a lista cerrada), el
+renderer DEBE leer la forma nueva con fallback a la forma legacy plana;
+la migracion de datos (`scripts/reclasificar-subcategorias.js`) NO debe
+reescribir campos fuera de `subcategoria` (aqui no toca `cover`). Prevencion:
+para cualquier campo nuevo de ADR-016 revisar contra los seeds legacy antes
+de cerrar la tarea.
+
