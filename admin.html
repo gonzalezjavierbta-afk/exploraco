@@ -491,6 +491,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('exportar')" id="snav-exportar">
     <span class="snav-icon">📤</span>Exportar
   </div>
+  <div class="snav-item" onclick="showScreen('consumibles')" id="snav-consumibles">
+    <span class="snav-icon">🧪</span>Consumibles
+  </div>
 </nav>
 
 <!-- ─── WORKSPACE ───────────────────────────────── -->
@@ -1894,6 +1897,87 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="mod-pagination" id="mod-paginacion"></div>
 </div>
 
+<!-- ════ SCREEN: CONSUMIBLES (gamificación v4 / ADR-018) ════ -->
+<div class="ws-screen" id="screen-consumibles">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">CONSUMIBLES</div>
+      <div class="ws-subtitle">Catálogo de la tienda de XP — precios editables desde el panel</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="loadConsumibles()">↺ Actualizar</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+
+    <!-- Nuevo consumible -->
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px">➕ Nuevo consumible</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1 1 200px;min-width:170px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Clave (única)</div>
+          <input class="form-input" id="consumible-clave" placeholder="pluma_inspirada" style="width:100%">
+        </div>
+        <div style="flex:1 1 200px;min-width:170px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nombre</div>
+          <input class="form-input" id="consumible-nombre" placeholder="Pluma Inspirada" style="width:100%">
+        </div>
+        <div style="flex:2 1 280px;min-width:200px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Descripción</div>
+          <input class="form-input" id="consumible-descripcion" placeholder="Qué desbloquea en el servidor..." style="width:100%">
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Precio XP</div>
+          <input class="form-input" id="consumible-precio" type="number" min="1" placeholder="600" style="width:100%">
+        </div>
+        <button class="btn btn-gold" onclick="crearConsumible()" style="white-space:nowrap">＋ Crear</button>
+      </div>
+    </div>
+
+    <!-- Lista -->
+    <div id="consumibles-lista">
+      <div style="text-align:center;padding:48px 0;color:var(--muted)">
+        <div style="font-size:26px;margin-bottom:10px">🧪</div>
+        <div style="font-size:13px;font-weight:600">Cargando consumibles...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL: EDITAR CONSUMIBLE (ADR-018) ════ -->
+<div id="consumible-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;width:min(520px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:14px 18px;background:var(--black);display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:700;font-size:13px">✏️ Editar consumible</div>
+      <button onclick="cerrarConsumibleModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">✕</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Clave (identidad, no editable)</div>
+        <input class="form-input" id="consumible-edit-clave" readonly style="width:100%;background:var(--bg2)">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nombre</div>
+        <input class="form-input" id="consumible-edit-nombre" placeholder="Pluma Inspirada" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Descripción</div>
+        <input class="form-input" id="consumible-edit-descripcion" placeholder="Qué desbloquea..." style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Precio XP</div>
+        <input class="form-input" id="consumible-edit-precio" type="number" min="0" placeholder="600" style="width:100%">
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">💡 Editar el precio no corrompe historial: el ledger compra_consumibles guarda xp_pagado como snapshot de cada compra.</div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
+      <button onclick="cerrarConsumibleModal()" class="btn btn-ghost btn-sm">Cancelar</button>
+      <button onclick="guardarEdicionConsumible()" class="btn btn-gold btn-sm">✓ Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ MAP PICKER MODAL ════ -->
 <div id="map-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;width:min(680px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
@@ -2089,6 +2173,7 @@ function showScreen(name) {
   if(name === 'exportar') generateExportCode();
   if(name === 'reviews') renderReviews();
   if(name === 'moderacion') loadPendientes();
+  if(name === 'consumibles') loadConsumibles();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
     return;
@@ -6359,6 +6444,158 @@ function _copySlug(slug) {
   }).catch(function(){
     showAdminToast('/'+slug+'.html', '');
   });
+}
+
+/* ════════════════════════════════════════════════════════
+   CONSUMIBLES — Catálogo de la tienda de XP (ADR-018)
+   CRUD contra /api/admin?recurso=consumibles&tipo=consumibles_*
+   La clave es identidad y NO se edita; el ledger compra_consumibles
+   guarda xp_pagado como snapshot, así que editar precio_xp no
+   corrompe historial. Cero Borrado Lógico: no hay DELETE, toggle
+   alterna activo = NOT activo.
+════════════════════════════════════════════════════════ */
+
+var _consumiblesCache = [];
+var _consumiblesEditId = null;
+
+async function loadConsumibles() {
+  var lista = document.getElementById('consumibles-lista');
+  if (!lista) return;
+  lista.innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:26px;margin-bottom:10px">⏳</div><div style="font-size:13px;font-weight:600">Cargando consumibles...</div></div>';
+  try {
+    var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_lista', { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _consumiblesCache = data.data || [];
+    renderConsumibles();
+  } catch (e) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">⚠️</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar consumibles</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function renderConsumibles() {
+  var lista = document.getElementById('consumibles-lista');
+  if (!lista) return;
+
+  if (!_consumiblesCache.length) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">🧪</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Aún no hay consumibles</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Crea el primero con el formulario de arriba</div></div>';
+    return;
+  }
+
+  var filas = _consumiblesCache.map(function(c) {
+    var badge = c.activo
+      ? '<span style="background:var(--green-l);color:var(--green);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">● Activo</span>'
+      : '<span style="background:var(--red-l);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">● Inactivo</span>';
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+      + '<div style="flex:0 0 170px;font-family:monospace;font-size:12px;color:var(--text2)">' + escH(c.clave) + '</div>'
+      + '<div style="flex:1 1 220px;min-width:160px">'
+      +   '<div style="font-size:13px;font-weight:800">' + escH(c.nombre) + '</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(c.descripcion) + '</div>'
+      + '</div>'
+      + '<div style="flex:0 0 100px;font-size:14px;font-weight:800;color:var(--gold)">' + parseInt(c.precio_xp||0,10) + ' <span style="font-size:10px;color:var(--muted);font-weight:600">XP</span></div>'
+      + '<div style="flex:0 0 90px">' + badge + '</div>'
+      + '<div style="flex:0 0 auto;display:flex;gap:6px;margin-left:auto">'
+      +   '<button class="btn btn-ghost btn-sm" onclick="abrirEditarConsumible(\'' + c.id + '\')">✏️ Editar</button>'
+      +   (c.activo
+      ?     '<button class="btn btn-danger btn-sm" onclick="toggleConsumible(\'' + c.id + '\')">⏸ Desactivar</button>'
+      :     '<button class="btn btn-gold btn-sm" onclick="toggleConsumible(\'' + c.id + '\')">▶ Activar</button>')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + filas + '</div>';
+}
+
+async function crearConsumible() {
+  var clave = document.getElementById('consumible-clave').value.trim().toLowerCase();
+  var nombre = document.getElementById('consumible-nombre').value.trim();
+  var descripcion = document.getElementById('consumible-descripcion').value.trim();
+  var precio = parseInt(document.getElementById('consumible-precio').value, 10);
+
+  if (!clave || !nombre) { showAdminToast('Clave y nombre son obligatorios', 'error'); return; }
+  if (!/^[a-z0-9_]+$/.test(clave)) { showAdminToast('Clave: solo minúsculas, números y guion bajo', 'error'); return; }
+  if (!Number.isInteger(precio) || precio <= 0) { showAdminToast('Precio debe ser un entero mayor que 0', 'error'); return; }
+
+  try {
+    var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_crear', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ clave: clave, nombre: nombre, descripcion: descripcion, precio_xp: precio })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo crear');
+    document.getElementById('consumible-clave').value = '';
+    document.getElementById('consumible-nombre').value = '';
+    document.getElementById('consumible-descripcion').value = '';
+    document.getElementById('consumible-precio').value = '';
+    showAdminToast('✅ ' + (data.mensaje || 'Consumible creado'), 'success');
+    loadConsumibles();
+  } catch (e) {
+    showAdminToast('❌ ' + e.message, 'error');
+  }
+}
+
+function abrirEditarConsumible(id) {
+  var c = _consumiblesCache.filter(function(x){ return x.id === id; })[0];
+  if (!c) return;
+  _consumiblesEditId = id;
+  document.getElementById('consumible-edit-clave').value = c.clave || '';
+  document.getElementById('consumible-edit-nombre').value = c.nombre || '';
+  document.getElementById('consumible-edit-descripcion').value = c.descripcion || '';
+  document.getElementById('consumible-edit-precio').value = c.precio_xp != null ? c.precio_xp : '';
+  document.getElementById('consumible-modal').style.display = 'flex';
+}
+
+function cerrarConsumibleModal() {
+  var modal = document.getElementById('consumible-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function guardarEdicionConsumible() {
+  if (!_consumiblesEditId) return;
+  var clave = document.getElementById('consumible-edit-clave').value;
+  var nombre = document.getElementById('consumible-edit-nombre').value.trim();
+  var descripcion = document.getElementById('consumible-edit-descripcion').value.trim();
+  var precio = parseInt(document.getElementById('consumible-edit-precio').value, 10);
+
+  if (!nombre) { showAdminToast('El nombre no puede quedar vacío', 'error'); return; }
+  if (!Number.isInteger(precio) || precio < 0) { showAdminToast('Precio debe ser un entero mayor o igual a 0', 'error'); return; }
+
+  try {
+    // La clave NO se envía al backend: es identidad y no se edita (contrato ADR-018).
+    var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_editar', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: _consumiblesEditId, nombre: nombre, descripcion: descripcion, precio_xp: precio })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo actualizar');
+    cerrarConsumibleModal();
+    showAdminToast('✅ ' + (data.mensaje || 'Consumible actualizado'), 'success');
+    loadConsumibles();
+  } catch (e) {
+    showAdminToast('❌ ' + e.message, 'error');
+  }
+}
+
+async function toggleConsumible(id) {
+  try {
+    var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_toggle', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: id })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo alternar');
+    showAdminToast('✅ ' + (data.mensaje || 'Estado actualizado'), 'success');
+    loadConsumibles();
+  } catch (e) {
+    showAdminToast('❌ ' + e.message, 'error');
+  }
 }
 
 function escH(s) {

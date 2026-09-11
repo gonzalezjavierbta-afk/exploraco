@@ -1,4 +1,4 @@
-// api/interacciones.js  v8 - motor de misiones + logros + Tabla de Destino + Albums fotograficos
+// api/interacciones.js  v9 - misiones + logros + Tabla Destino + Albums + Gamificacion v4 (consumibles, cromos, pandillas)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -64,6 +64,32 @@
 // Neon conviven 'Bogota' y 'Bogot\u00e1' segun el seed.
 
 const { neon } = require('@neondatabase/serverless');
+
+// v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
+var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
+
+// Bornes de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
+// la UI sincroniza XP_LEVELS en index/mi-perfil/comunidad). Se usan
+// para calcular nivel y era en GETs locales (inventario) sin depender
+// de api/usuarios.js.
+var NIVELES_LOCAL = [
+  0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200,
+  4000, 5200, 6800, 8500, 10500, 13000, 16000, 19500, 24000, 30000
+];
+function calcularNivelLocal(xpTotal) {
+  var xp = parseInt(xpTotal, 10) || 0;
+  var idx = 0;
+  for (var i = 0; i < NIVELES_LOCAL.length; i++) {
+    if (xp >= NIVELES_LOCAL[i]) idx = i;
+  }
+  return { nivel: idx + 1, badge_actual: '' };
+}
+function calcularEraLocal(nivel) {
+  if (nivel <= 5) return 'Mundana';
+  if (nivel <= 10) return 'Patrocinada';
+  if (nivel <= 15) return 'Organizador';
+  return 'Leyenda';
+}
 
 // -- Catalogo de misiones (Fase 3) ---------------------------------
 // requiere: ids de misiones que deben estar 'completada' antes de que
@@ -693,6 +719,169 @@ function misionCompletada(sql, usuarioId, misionId) {
     [misionId, usuarioId]
   ).then(function(r){ return !!(r[0] && r[0].ok); })
    .catch(function(){ return false; });
+}
+
+// ============================================================
+// v9 Gamificacion v4.0 (ADR-018): helpers de consumibles,
+// cromos y fama de pandilla. Requiere la migracion 010 antes de
+// desplegar; si la tabla no existe, las consultas fallan y se
+// degradan sin romper la accion principal.
+// ============================================================
+
+// Lee capacidades del usuario (inventario JSONB de consumibles).
+function leerCapacidades(sql, usuarioId) {
+  return sql('SELECT capacidades FROM usuarios WHERE id=$1', [usuarioId])
+    .then(function(r){ return (r[0] && r[0].capacidades) || {}; })
+    .catch(function(){ return {}; });
+}
+
+// Aplica el efecto del consumible al capacidades JSONB (MERGE ||).
+// Actualiza solo la clave indicada preservando el resto del inventario.
+function actualizarCapacidad(sql, usuarioId, clave, valor) {
+  return sql(
+    'UPDATE usuarios SET capacidades = COALESCE(capacidades,\'{}\'::jsonb)'
+    + " || jsonb_build_object($1, $2::jsonb) WHERE id=$3",
+    [clave, JSON.stringify(valor), usuarioId]
+  ).catch(function(){});
+}
+
+// Amuleto de Doble XP (clave amuleto_x2): si capacidades->
+// multiplicador_x2_usos > 0, duplica el XP de la accion y decrementa
+// el contador. Nunca lanza: fallo degrada a XP normal.
+function aplicarAmuletoX2(sql, usuarioId, xpBase) {
+  if (!usuarioId) return Promise.resolve({ xp: xpBase, doubled: false });
+  return leerCapacidades(sql, usuarioId).then(function(caps) {
+    var usos = parseInt(caps.multiplicador_x2_usos, 10) || 0;
+    if (usos <= 0) return { xp: xpBase, doubled: false };
+    return actualizarCapacidad(sql, usuarioId, 'multiplicador_x2_usos', usos - 1)
+      .then(function() { return { xp: xpBase * 2, doubled: true }; });
+  });
+}
+
+// Obtencion de cromo (probabilidad 15% base + CROMO_PROBABILIDADES por
+// rareza). Si capacidades->cromo_garantia = 'epico' (consumible
+// imantador_cromos activo), fuerza rareza epica o dorada y consume la
+// garantia. Selecciona un cromo activo del catalogo; si no hay de la
+// rareza exacta, degrada a cualquiera. UPSERT en usuarios_cromos
+// (cantidad + 1). Devuelve el cromo obtenido o null.
+function intentarObtenerCromo(sql, usuarioId, destinoId) {
+  if (!usuarioId) return Promise.resolve(null);
+  if (Math.random() >= 0.15) return Promise.resolve(null);
+  return leerCapacidades(sql, usuarioId).then(function(caps) {
+    var garantia = caps.cromo_garantia || null;
+    var roll = Math.random();
+    var rareza;
+    if (garantia === 'epico') {
+      rareza = (roll < 0.07) ? 'dorado' : 'epico';
+    } else if (roll < 0.07) {
+      rareza = 'dorado';
+    } else if (roll < 0.25) {
+      rareza = 'epico';
+    } else if (roll < 0.55) {
+      rareza = 'raro';
+    } else {
+      rareza = 'comun';
+    }
+    var consumo = garantia === 'epico'
+      ? actualizarCapacidad(sql, usuarioId, 'cromo_garantia', null)
+      : Promise.resolve();
+    return consumo.then(function() {
+      return sql(
+        'SELECT id, nombre, rareza, set_slug, imagen_url FROM cromos_catalogo'
+        + ' WHERE activo=true AND rareza=$1 ORDER BY RANDOM() LIMIT 1',
+        [rareza]
+      ).then(function(rows) {
+        if (!rows.length) {
+          return sql('SELECT id, nombre, rareza, set_slug, imagen_url FROM cromos_catalogo WHERE activo=true ORDER BY RANDOM() LIMIT 1', [])
+            .then(function(fb) { return fb[0] || null; });
+        }
+        return rows[0];
+      });
+    }).then(function(cromo) {
+      if (!cromo) return null;
+      return sql(
+        'INSERT INTO usuarios_cromos (usuario_id, cromo_id, cantidad) VALUES ($1,$2,1)'
+        + ' ON CONFLICT (usuario_id, cromo_id) DO UPDATE SET cantidad = usuarios_cromos.cantidad + 1',
+        [usuarioId, cromo.id]
+      ).then(function() {
+        return { id: cromo.id, nombre: cromo.nombre, rareza: cromo.rareza, set_slug: cromo.set_slug, imagen_url: cromo.imagen_url };
+      });
+    });
+  }).catch(function(){ return null; });
+}
+
+// Aporte de fama a la pandilla activa del usuario: 10% del XP ganado
+// (ROUND), duplicado si capacidades->fama_x2_hasta es futuro (consumible
+// trompeta_fama). Nunca lanza: sin pandilla activa no hace nada.
+function aplicarFamaPandilla(sql, usuarioId, xpGanado) {
+  if (!usuarioId || !xpGanado) return Promise.resolve(false);
+  return sql(
+    'SELECT pm.pandilla_id FROM pandillas_miembros pm'
+    + ' JOIN pandillas p ON p.id = pm.pandilla_id'
+    + ' WHERE pm.usuario_id=$1 AND pm.activo=true AND p.activo=true LIMIT 1',
+    [usuarioId]
+  ).then(function(rows) {
+    if (!rows.length) return false;
+    var pandillaId = rows[0].pandilla_id;
+    var famaBase = Math.round(xpGanado * 0.10);
+    if (famaBase < 1) return false;
+    return leerCapacidades(sql, usuarioId).then(function(caps) {
+      var fama = famaBase;
+      if (caps.fama_x2_hasta && new Date(String(caps.fama_x2_hasta)) > new Date()) {
+        fama = famaBase * 2;
+      }
+      return sql('UPDATE pandillas SET fama_total = fama_total + $1 WHERE id=$2', [fama, pandillaId])
+        .then(function(){ return true; });
+    });
+  }).catch(function(){ return false; });
+}
+
+// Progreso de retos de parche (contrato final punto 8): suma +1 a los
+// retos ACTIVOS (completado=false, fecha_fin futura) de la pandilla del
+// usuario cuyo tipo_reto coincida con el pasado ('resena' para resena,
+// 'guardado' para guardado, 'visita' para visita y rating). Al cruzar
+// meta_valor marca completado=true y reparte xp_bono entre los miembros
+// activos. Devuelve { titulo, xp_bono } del primer reto completado en
+// esta accion, o null si no aplica. Nunca lanza: degrada a null.
+function progresarPandillaRetos(sql, usuarioId, tipoReto) {
+  if (!usuarioId || !tipoReto) return Promise.resolve(null);
+  return sql(
+    'SELECT pm.pandilla_id FROM pandillas_miembros pm'
+    + ' JOIN pandillas p ON p.id = pm.pandilla_id'
+    + ' WHERE pm.usuario_id=$1 AND pm.activo=true AND p.activo=true LIMIT 1',
+    [usuarioId]
+  ).then(function(rows) {
+    if (!rows.length) return null;
+    var prPandillaId = rows[0].pandilla_id;
+    return sql(
+      'UPDATE pandilla_retos SET progreso_actual = progreso_actual + 1,'
+      + ' completado = (progreso_actual + 1 >= meta_valor)'
+      + ' WHERE pandilla_id=$1 AND completado=false AND tipo_reto=$2'
+      + ' AND fecha_fin > NOW()'
+      + ' RETURNING id, titulo, meta_valor, progreso_actual, completado, xp_bono',
+      [prPandillaId, tipoReto]
+    ).then(function(retosUp) {
+      var completados = (retosUp || []).filter(function(r){ return r.completado === true; });
+      if (!completados.length) return null;
+      var primer = completados[0];
+      // Reparte el bono de cada reto completado entre los miembros activos
+      var cadena = Promise.resolve();
+      completados.forEach(function(r) {
+        if (!(parseInt(r.xp_bono, 10) > 0)) return;
+        cadena = cadena.then(function() {
+          return sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1'
+            + ' WHERE id IN (SELECT usuario_id FROM pandillas_miembros'
+            + ' WHERE pandilla_id=$2 AND activo=true)',
+            [r.xp_bono, prPandillaId]
+          );
+        });
+      });
+      return cadena.then(function() {
+        return { titulo: primer.titulo, xp_bono: parseInt(primer.xp_bono, 10) || 0 };
+      });
+    });
+  }).catch(function(){ return null; });
 }
 
 // Anti-farming del chat (espec 2026-09-08): +2 XP por mensaje con tope
@@ -1325,6 +1514,31 @@ module.exports = async function handler(req, res) {
           + ' WHERE m.usuario_id=$1',
           [usuarioId]
         );
+        // v9 (ADR-018) sendero Audiovisual: fotos/votos de viajero
+        // (interacciones tipo='foto') + albumes georeferenciados y videos
+        // (tabla albumes de la migracion 009). Degrada a 0 si la tabla
+        // no existe.
+        var famaAudiovisual = await sql(
+          'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
+          + ' COUNT(*) FILTER (WHERE i.dims->>\'voto_foto_id\' IS NULL)::int AS n_fotos, '
+          + ' COUNT(*) FILTER (WHERE i.dims->>\'voto_foto_id\' IS NOT NULL)::int AS n_votos_foto '
+          + ' FROM interacciones i WHERE i.usuario_id=$1 AND i.tipo=\'foto\' AND i.activo=true',
+          [usuarioId]
+        ).catch(function(){ return []; });
+        var albumAudiovisual = await sql(
+          'SELECT COALESCE(COUNT(*) FILTER (WHERE a.lat IS NOT NULL AND a.lng IS NOT NULL),0)::int AS n_albumes_geo, '
+          + ' COALESCE(COUNT(*) FILTER (WHERE a.tipo=\'videos\'),0)::int AS n_videos '
+          + ' FROM albumes a WHERE a.usuario_id=$1 AND a.activo=true',
+          [usuarioId]
+        ).catch(function(){ return []; });
+        // v9 (ADR-018) sendero Pandilla: fama_total de la pandilla activa
+        // del usuario (pandillas_miembros.activo=true).
+        var famaPandillaRow = await sql(
+          'SELECT p.id AS pandilla_id, p.fama_total, p.nombre FROM pandillas p'
+          + ' JOIN pandillas_miembros pm ON pm.pandilla_id = p.id'
+          + ' WHERE pm.usuario_id=$1 AND pm.activo=true AND p.activo=true LIMIT 1',
+          [usuarioId]
+        ).catch(function(){ return []; });
 
         function nivelSendero(fama, TIERS) {
           var idx = 0;
@@ -1358,6 +1572,11 @@ module.exports = async function handler(req, res) {
         var fc = famaCritico[0] || { fama: 0, n_resenas: 0, n_votos: 0 };
         var fo = famaOrganizador[0] || { n_mapas: 0, n_publicos: 0, n_destinos: 0 };
         var famaOrg = (fo.n_mapas * 40) + (fo.n_destinos * 5);
+        var fav = famaAudiovisual[0] || { fama: 0, n_fotos: 0, n_votos_foto: 0 };
+        var favAlb = albumAudiovisual[0] || { n_albumes_geo: 0, n_videos: 0 };
+        var famaAudiovisualTotal = fav.fama + (favAlb.n_albumes_geo * 30) + (favAlb.n_videos * 35);
+        var pandillaActiva = famaPandillaRow[0] || null;
+        var famaPandillaTotal = pandillaActiva ? (parseInt(pandillaActiva.fama_total, 10) || 0) : 0;
 
         var senderos = [
           {
@@ -1378,11 +1597,30 @@ module.exports = async function handler(req, res) {
             fama: famaOrg, acciones: { mapas: fo.n_mapas, publicos: fo.n_publicos, destinos: fo.n_destinos },
             sendero: nivelSendero(famaOrg, FAMA_TIERS),
           },
+          {
+            id: 'audiovisual', nombre: 'Audiovisual', emoji: '\uD83C\uDFA5',
+            descripcion: 'Sube fotos/videos y georreferencia albumes',
+            fama: famaAudiovisualTotal,
+            acciones: { fotos: fav.n_fotos, votos_foto: fav.n_votos_foto, albumes_geo: favAlb.n_albumes_geo, videos: favAlb.n_videos },
+            sendero: nivelSendero(famaAudiovisualTotal, FAMA_TIERS),
+          },
+          {
+            id: 'pandilla', nombre: 'Pandilla', emoji: '\uD83D\uDC51',
+            descripcion: 'Suma fama colectiva con tu pandilla',
+            fama: famaPandillaTotal,
+            pandilla_nombre: pandillaActiva ? pandillaActiva.nombre : null,
+            acciones: { pandilla_id: pandillaActiva ? famaPandillaRow[0].pandilla_id : null },
+            sendero: pandillaActiva
+              ? nivelSendero(famaPandillaTotal, FAMA_TIERS)
+              : { nivel: 0, nombre: 'Sin Parche', min: 0, max: 100, progreso: 0, total: FAMA_TIERS.length },
+          },
         ];
+
+        var famaTotalGlobal = senderos.reduce(function(s, sn){ return s + (parseInt(sn.fama, 10) || 0); }, 0);
 
         return res.status(200).json({
           ok: true,
-          data: { senderos: senderos, patrocinios: [] },
+          data: { senderos: senderos, fama_total_global: famaTotalGlobal, patrocinios: [] },
         });
       }
 
@@ -1543,6 +1781,157 @@ module.exports = async function handler(req, res) {
           [destinoId]
         );
         return res.status(200).json({ ok: true, data: ftRows });
+      }
+
+      // ==========================================================
+      // v9 Gamificacion v4.0 (ADR-018) - GETs de consumibles, cromos
+      // y pandillas. Requieren la migracion 010; si una tabla no
+      // existe, la consulta falla y el catch degrada a respuesta
+      // vacia o 503 con error claro.
+      // ==========================================================
+
+      // Catalogo activo de consumibles con precios (tabla consumibles).
+      if (tipo === 'consumibles') {
+        var catalogoConsumibles = await sql(
+          'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
+          + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
+          []
+        ).catch(function(){ return []; });
+        return res.status(200).json({ ok: true, data: catalogoConsumibles });
+      }
+
+      // Inventario del usuario: consumibles como objeto clave ->
+      // { cantidad, nombre } + xp_total + nivel calculado + era.
+      // Contrato final: el frontend en paralelo espera consumibles[k]
+      // con shape { cantidad, nombre } (no solo la cantidad cruda).
+      if (tipo === 'inventario' && usuarioId) {
+        var invRows = await sql(
+          'SELECT capacidades, xp_total FROM usuarios WHERE id=$1',
+          [usuarioId]
+        );
+        if (!invRows.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var inv = invRows[0];
+        var capsInv = inv.capacidades || {};
+        var invXp = parseInt(inv.xp_total, 10) || 0;
+        var invNivel = calcularNivelLocal(invXp);
+        var invEra = calcularEraLocal(invNivel.nivel);
+        var invCrudo = capsInv.consumibles || {};
+        // Catalogo para resolver clave -> nombre publico.
+        var invCatalogo = await sql(
+          'SELECT clave, nombre FROM consumibles WHERE activo=true',
+          []
+        ).catch(function(){ return []; });
+        var invNombres = {};
+        invCatalogo.forEach(function(c) { invNombres[c.clave] = c.nombre; });
+        var inventarioCons = {};
+        Object.keys(invCrudo).forEach(function(clave) {
+          inventarioCons[clave] = {
+            cantidad: parseInt(invCrudo[clave], 10) || 0,
+            nombre: invNombres[clave] || clave,
+          };
+        });
+        return res.status(200).json({
+          ok: true,
+          data: {
+            consumibles: inventarioCons,
+            nivel: invNivel.nivel,
+            xp_total: invXp,
+            era: invEra,
+          },
+        });
+      }
+
+      // Coleccion de cromos del usuario (join con catalogo).
+      if (tipo === 'mis_cromos' && usuarioId) {
+        var cromosRows = await sql(
+          'SELECT cc.id AS cromo_id, cc.nombre, cc.rareza, cc.set_slug, cc.imagen_url,'
+          + ' uc.cantidad, uc.obtenido_en'
+          + ' FROM usuarios_cromos uc'
+          + ' JOIN cromos_catalogo cc ON cc.id = uc.cromo_id'
+          + ' WHERE uc.usuario_id = $1'
+          + ' ORDER BY cc.rareza DESC, uc.obtenido_en DESC',
+          [usuarioId]
+        ).catch(function(){ return []; });
+        return res.status(200).json({ ok: true, data: cromosRows });
+      }
+
+      // Detalle de pandilla: pandilla + miembros activos + retos activos.
+      // Contrato final: si el usuario NO tiene pandilla activa, devuelve
+      // pandilla:null y pandillas_disponibles (activas con cupo < 10)
+      // para que el frontend renderice el grid de unirse; si la tiene,
+      // pandillas_disponibles llega vacio.
+      // Acepta pandilla_id o usuario_id (pandilla activa del usuario).
+      if (tipo === 'pandilla_detalle') {
+        var pdPandillaId = req.query.pandilla_id || null;
+        var pdUsuarioId = req.query.usuario_id || null;
+        if (!pdPandillaId && pdUsuarioId) {
+          var pdBusca = await sql(
+            'SELECT pandilla_id FROM pandillas_miembros'
+            + ' WHERE usuario_id=$1 AND activo=true LIMIT 1',
+            [pdUsuarioId]
+          ).catch(function(){ return []; });
+          if (!pdBusca.length) {
+            // Sin pandilla activa: grid de pandillas con cupo disponible.
+            var pdLibres = await sql(
+              'SELECT p.id, p.nombre, p.fundador_id, p.fama_total, p.ciudad_base, p.descripcion, p.creado_en,'
+              + ' (SELECT COUNT(*)::int FROM pandillas_miembros pm'
+              + '   WHERE pm.pandilla_id = p.id AND pm.activo = true) AS miembros_actuales'
+              + ' FROM pandillas p WHERE p.activo = true'
+              + ' AND (SELECT COUNT(*)::int FROM pandillas_miembros pm'
+              + '   WHERE pm.pandilla_id = p.id AND pm.activo = true) < 10'
+              + ' ORDER BY p.fama_total DESC, p.creado_en ASC'
+              + ' LIMIT 30',
+              []
+            ).catch(function(){ return []; });
+            return res.status(200).json({
+              ok: true,
+              data: { pandilla: null, miembros: [], retos: [], pandillas_disponibles: pdLibres },
+            });
+          }
+          pdPandillaId = pdBusca[0].pandilla_id;
+        }
+        if (!pdPandillaId)
+          return res.status(400).json({ ok: false, error: 'pandilla_id o usuario_id requerido' });
+        var pdRows = await sql(
+          'SELECT p.id, p.nombre, p.fundador_id, p.fama_total, p.ciudad_base, p.descripcion, p.creado_en'
+          + ' FROM pandillas p WHERE p.id=$1 AND p.activo=true LIMIT 1',
+          [pdPandillaId]
+        ).catch(function(){ return []; });
+        if (!pdRows.length)
+          return res.status(404).json({ ok: false, error: 'Pandilla no encontrada' });
+        var pdMiembros = await sql(
+          'SELECT pm.usuario_id, pm.rol, pm.fecha_ingreso, u.nombre, u.avatar_url'
+          + ' FROM pandillas_miembros pm'
+          + ' LEFT JOIN usuarios u ON u.id = pm.usuario_id'
+          + ' WHERE pm.pandilla_id=$1 AND pm.activo=true'
+          + ' ORDER BY (pm.rol=\'fundador\') DESC, pm.fecha_ingreso ASC',
+          [pdPandillaId]
+        ).catch(function(){ return []; });
+        var pdRetos = await sql(
+          'SELECT id, titulo, descripcion, tipo_reto, meta_valor, progreso_actual,'
+          + ' fecha_inicio, fecha_fin, completado, xp_bono'
+          + ' FROM pandilla_retos WHERE pandilla_id=$1 AND completado=false'
+          + ' ORDER BY fecha_fin ASC',
+          [pdPandillaId]
+        ).catch(function(){ return []; });
+        return res.status(200).json({
+          ok: true,
+          data: { pandilla: pdRows[0], miembros: pdMiembros, retos: pdRetos, pandillas_disponibles: [] },
+        });
+      }
+
+      // Retos activos de una pandilla (GET para consultar estado).
+      if (tipo === 'pandilla_reto' && req.query.pandilla_id) {
+        var prRows2 = await sql(
+          'SELECT id, titulo, descripcion, tipo_reto, meta_valor, progreso_actual,'
+          + ' fecha_inicio, fecha_fin, completado, xp_bono'
+          + ' FROM pandilla_retos'
+          + ' WHERE pandilla_id=$1 AND completado=false AND fecha_fin > NOW()'
+          + ' ORDER BY fecha_fin ASC',
+          [req.query.pandilla_id]
+        ).catch(function(){ return []; });
+        return res.status(200).json({ ok: true, data: prRows2 });
       }
 
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
@@ -2277,6 +2666,416 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
+      // ==========================================================
+      // v9 Gamificacion v4.0 (ADR-018) - POSTs de consumibles,
+      // cromos y pandillas. Se manejan ANTES del guard generico de
+      // destino_id porque estas operaciones no reciben destino_id.
+      // Requieren la migracion 010 aplicada en Neon.
+      // ==========================================================
+
+      // Comprar consumible pagando xp_total (anti-farming max 5/dia).
+      if (tipo2 === 'comprar_consumible') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var ccClave = String(body.clave || '').trim();
+        if (!ccClave)
+          return res.status(400).json({ ok: false, error: 'clave requerida' });
+        var ccCons = await sql(
+          'SELECT id, clave, precio_xp FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
+          [ccClave]
+        ).catch(function(){ return []; });
+        if (!ccCons.length)
+          return res.status(503).json({ ok: false, error: 'Consumibles no disponibles (migracion 010 pendiente?)' });
+        var ccPrecio = parseInt(ccCons[0].precio_xp, 10) || 0;
+        var ccUsr = await sql('SELECT xp_total, capacidades FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
+        if (!ccUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var ccXp = parseInt(ccUsr[0].xp_total, 10) || 0;
+        if (ccXp < ccPrecio)
+          return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_total: ccXp, precio: ccPrecio });
+        // Anti-farming: max 5 compras por dia por usuario
+        var ccCount = await sql(
+          "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'",
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if ((ccCount[0] && ccCount[0].n) >= 5)
+          return res.status(429).json({ ok: false, error: 'Limite de 5 compras por dia alcanzado' });
+        // amuleto_x2: no apilar multiplicadores activos
+        var ccCaps = ccUsr[0].capacidades || {};
+        if (ccClave === 'amuleto_x2' && (parseInt(ccCaps.multiplicador_x2_usos, 10) || 0) > 0)
+          return res.status(409).json({ ok: false, error: 'Ya tienes un amuleto x2 activo' });
+        var ccNivelAnt = calcularNivelLocal(ccXp).nivel;
+        // Resta atomica + merge del inventario (nunca deja xp negativo:
+        // el WHERE xp_total >= $1 protege la escritura)
+        var ccUpd = await sql(
+          'UPDATE usuarios SET xp_total = xp_total - $1,'
+          + " capacidades = COALESCE(capacidades,'{}'::jsonb)"
+          + " || jsonb_build_object('consumibles', COALESCE(capacidades->'consumibles','{}'::jsonb)"
+          + ' || jsonb_build_object($2, COALESCE((capacidades->\'consumibles\'->>$2)::int, 0) + 1))'
+          + ' WHERE id=$3 AND xp_total >= $1 RETURNING xp_total',
+          [ccPrecio, ccClave, usuarioId2]
+        ).catch(function(){ return []; });
+        if (!ccUpd.length)
+          return res.status(409).json({ ok: false, error: 'XP insuficiente para la compra' });
+        // Ledger append-only
+        await sql(
+          'INSERT INTO compra_consumibles (usuario_id, consumible_id, xp_pagado) VALUES ($1,$2,$3)',
+          [usuarioId2, ccCons[0].id, ccPrecio]
+        ).catch(function(){});
+        var ccXpNuevo = parseInt(ccUpd[0].xp_total, 10) || 0;
+        var ccNivelNuevo = calcularNivelLocal(ccXpNuevo).nivel;
+        return res.status(200).json({
+          ok: true,
+          xp_total_nuevo: ccXpNuevo,
+          nivel_anterior: ccNivelAnt,
+          nivel_nuevo: ccNivelNuevo,
+          bajo_nivel: ccNivelNuevo < ccNivelAnt,
+        });
+      }
+
+      // Usar consumible (descuenta inventario y aplica efecto).
+      if (tipo2 === 'usar_consumible') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var ucClave = String(body.clave || '').trim();
+        if (!ucClave)
+          return res.status(400).json({ ok: false, error: 'clave requerida' });
+        var ucCons = await sql(
+          'SELECT id, clave FROM consumibles WHERE clave=$1 LIMIT 1',
+          [ucClave]
+        ).catch(function(){ return []; });
+        if (!ucCons.length)
+          return res.status(404).json({ ok: false, error: 'Consumible no existe' });
+        var ucCaps = await leerCapacidades(sql, usuarioId2);
+        var ucInv = ucCaps.consumibles || {};
+        var ucQty = parseInt(ucInv[ucClave], 10) || 0;
+        if (ucQty < 1)
+          return res.status(409).json({ ok: false, error: 'No tienes este consumible' });
+        // Validaciones anti-stacking (spec seccion 8)
+        if (ucClave === 'amuleto_x2' && (parseInt(ucCaps.multiplicador_x2_usos, 10) || 0) > 0)
+          return res.status(409).json({ ok: false, error: 'Ya tienes un amuleto x2 activo' });
+        if (ucClave === 'sala_efimera') {
+          var ucSalas = Array.isArray(ucCaps.salas_efimeras) ? ucCaps.salas_efimeras : [];
+          ucSalas = ucSalas.filter(function(s){ return s && s.hasta && new Date(s.hasta).getTime() > Date.now(); });
+          if (ucSalas.length >= 2)
+            return res.status(429).json({ ok: false, error: 'Maximo 2 salas efimeras activas' });
+        }
+        // Descuenta 1 del inventario (borra la clave si llega a 0)
+        if (ucQty === 1) {
+          await sql(
+            "UPDATE usuarios SET capacidades = COALESCE(capacidades,'{}'::jsonb) #- '{consumibles," + ucClave + "}' WHERE id=$1",
+            [usuarioId2]
+          ).catch(function(){});
+        } else {
+          await sql(
+            'UPDATE usuarios SET capacidades = COALESCE(capacidades,\'{}\'::jsonb)'
+            + " || jsonb_build_object('consumibles', COALESCE(capacidades->'consumibles','{}'::jsonb)"
+            + ' || jsonb_build_object($1, $2::int)) WHERE id=$3',
+            [ucClave, ucQty - 1, usuarioId2]
+          ).catch(function(){});
+        }
+        // Aplica el efecto especifico (spec seccion 10)
+        var ucEfecto = {};
+        var ucSieteDias = 7 * 24 * 3600 * 1000;
+        var ucUnDia = 24 * 3600 * 1000;
+        if (ucClave === 'pluma_inspirada') {
+          ucEfecto = { permiso_arte: true };
+          await actualizarCapacidad(sql, usuarioId2, 'permiso_arte', true);
+        } else if (ucClave === 'cuaderno_expedicion') {
+          var ucAlbums = parseInt(ucCaps.albums_extra, 10) || 0;
+          ucEfecto = { albums_extra: ucAlbums + 1 };
+          await actualizarCapacidad(sql, usuarioId2, 'albums_extra', ucAlbums + 1);
+        } else if (ucClave === 'pergamino_mapa') {
+          var ucMapas = parseInt(ucCaps.mapas_extra, 10) || 0;
+          ucEfecto = { mapas_extra: ucMapas + 1 };
+          await actualizarCapacidad(sql, usuarioId2, 'mapas_extra', ucMapas + 1);
+        } else if (ucClave === 'sala_efimera') {
+          // Crea sala comunitaria sin gate de nivel (el esquema real de
+          // chat_salas no tiene expira_en; la expiracion se trackea en
+          // capacidades.salas_efimeras con ventana de 7 dias).
+          var ucNombre = String(body.nombre || 'Sala Efimera').trim().slice(0, 40);
+          var ucIcono = String(body.icono || '\uD83D\uDCAC').slice(0, 8);
+          var ucDescSal = String(body.descripcion || 'Sala comunitaria creada con Sala Efimera').trim().slice(0, 120);
+          var ucSalaRows = await sql(
+            'INSERT INTO chat_salas (nombre, icono, descripcion, tipo, orden, creador_id)'
+            + ' VALUES ($1,$2,$3,\'viajeros\',0,$4) RETURNING id',
+            [ucNombre, ucIcono, ucDescSal, usuarioId2]
+          ).catch(function(){ return []; });
+          if (ucSalaRows.length) {
+            var ucEfimeras = Array.isArray(ucCaps.salas_efimeras) ? ucCaps.salas_efimeras : [];
+            ucEfimeras = ucEfimeras.filter(function(s){ return s && s.hasta && new Date(s.hasta).getTime() > Date.now(); });
+            var ucHasta = new Date(Date.now() + ucSieteDias).toISOString();
+            ucEfimeras.push({ sala_id: ucSalaRows[0].id, hasta: ucHasta });
+            await actualizarCapacidad(sql, usuarioId2, 'salas_efimeras', ucEfimeras);
+            ucEfecto = { sala_id: ucSalaRows[0].id, expira_en: ucHasta };
+          } else {
+            ucEfecto = { error: 'No se pudo crear la sala' };
+          }
+        } else if (ucClave === 'amuleto_x2') {
+          ucEfecto = { multiplicador_x2_usos: 5 };
+          await actualizarCapacidad(sql, usuarioId2, 'multiplicador_x2_usos', 5);
+        } else if (ucClave === 'imantador_cromos') {
+          ucEfecto = { cromo_garantia: 'epico' };
+          await actualizarCapacidad(sql, usuarioId2, 'cromo_garantia', 'epico');
+        } else if (ucClave === 'trompeta_fama') {
+          var ucFamaHasta = new Date(Date.now() + ucUnDia).toISOString();
+          ucEfecto = { fama_x2_hasta: ucFamaHasta };
+          await actualizarCapacidad(sql, usuarioId2, 'fama_x2_hasta', ucFamaHasta);
+        } else if (ucClave === 'vitrina_estelar') {
+          var ucVitrinaHasta = new Date(Date.now() + ucSieteDias).toISOString();
+          ucEfecto = { vitrina_estelar_hasta: ucVitrinaHasta };
+          await actualizarCapacidad(sql, usuarioId2, 'vitrina_estelar_hasta', ucVitrinaHasta);
+        } else if (ucClave === 'pin_cromado') {
+          var ucPinHasta = new Date(Date.now() + ucSieteDias).toISOString();
+          ucEfecto = { pin_mapa_hasta: ucPinHasta };
+          await actualizarCapacidad(sql, usuarioId2, 'pin_mapa_hasta', ucPinHasta);
+        } else if (ucClave === 'pase_vip') {
+          var ucVipHasta = new Date(Date.now() + 30 * ucUnDia).toISOString();
+          ucEfecto = { vip_hasta: ucVipHasta };
+          await actualizarCapacidad(sql, usuarioId2, 'vip_hasta', ucVipHasta);
+        }
+        // Ledger de uso append-only
+        await sql(
+          'INSERT INTO consumo_consumibles (usuario_id, consumible_id, efecto_detalle)'
+          + ' VALUES ($1,$2,$3::jsonb)',
+          [usuarioId2, ucCons[0].id, JSON.stringify(ucEfecto)]
+        ).catch(function(){});
+        return res.status(200).json({ ok: true, efecto: ucEfecto });
+      }
+
+      // Disparo manual de cromo (probabilidad 15% + CROMO_PROBABILIDADES).
+      if (tipo2 === 'cromo_obtener') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var coAccion = String(body.accion || 'resena').slice(0, 20);
+        var coDestino = body.destino_id || null;
+        var coCromo = await intentarObtenerCromo(sql, usuarioId2, coDestino);
+        return res.status(200).json({ ok: true, accion: coAccion, cromo: coCromo });
+      }
+
+      // Intercambio de cromo duplicado entre 2 usuarios.
+      if (tipo2 === 'cromo_intercambio') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido (emisor)' });
+        var ciReceptor = String(body.receptor_id || '');
+        var ciCromoId = String(body.cromo_id || '');
+        if (!ciReceptor || !ciCromoId)
+          return res.status(400).json({ ok: false, error: 'receptor_id y cromo_id requeridos' });
+        if (ciReceptor === usuarioId2)
+          return res.status(409).json({ ok: false, error: 'No puedes intercambiar contigo mismo' });
+        var ciReceptorRow = await sql(
+          'SELECT id FROM usuarios WHERE id=$1 AND activo=true',
+          [ciReceptor]
+        ).catch(function(){ return []; });
+        if (!ciReceptorRow.length)
+          return res.status(404).json({ ok: false, error: 'Receptor no encontrado' });
+        var ciCromoRow = await sql(
+          'SELECT id FROM cromos_catalogo WHERE id=$1 AND activo=true LIMIT 1',
+          [ciCromoId]
+        ).catch(function(){ return []; });
+        if (!ciCromoRow.length)
+          return res.status(404).json({ ok: false, error: 'Cromo no encontrado' });
+        var ciMio = await sql(
+          'SELECT cantidad FROM usuarios_cromos WHERE usuario_id=$1 AND cromo_id=$2 LIMIT 1',
+          [usuarioId2, ciCromoId]
+        ).catch(function(){ return []; });
+        if (!ciMio.length || parseInt(ciMio[0].cantidad, 10) < 2)
+          return res.status(409).json({ ok: false, error: 'Necesitas al menos 2 copias del cromo para intercambiar' });
+        // Anti-farming: max 3 intercambios por dia via la tabla real
+        // cromo_intercambios (migracion 010, idx_cromo_inter_dia). El
+        // ledger es append-only y se inserta una fila por intercambio
+        // tras el credito exitoso (misino try, mismo rollback).
+        var ciInicioDia = hoy() + 'T00:00:00Z';
+        var ciCount = await sql(
+          'SELECT COUNT(*)::int AS n FROM cromo_intercambios'
+          + ' WHERE emisor_id=$1 AND creado_en >= $2',
+          [usuarioId2, ciInicioDia]
+        ).catch(function(){ return []; });
+        if ((ciCount[0] && ciCount[0].n) >= 3)
+          return res.status(429).json({ ok: false, error: 'Limite de 3 intercambios por dia alcanzado' });
+        // Debita emisor (borra fila si llega a 0)
+        var ciNuevaCant = parseInt(ciMio[0].cantidad, 10) - 1;
+        if (ciNuevaCant <= 0) {
+          await sql('DELETE FROM usuarios_cromos WHERE usuario_id=$1 AND cromo_id=$2', [usuarioId2, ciCromoId]);
+        } else {
+          await sql('UPDATE usuarios_cromos SET cantidad=$1 WHERE usuario_id=$2 AND cromo_id=$3', [ciNuevaCant, usuarioId2, ciCromoId]);
+        }
+        // Credita receptor y registra el intercambio en el ledger
+        // append-only (cromo_intercambios). El rollback centralizado
+        // devuelve la copia al emisor si cualquiera de los dos falla.
+        try {
+          await sql(
+            'INSERT INTO usuarios_cromos (usuario_id, cromo_id, cantidad) VALUES ($1,$2,1)'
+            + ' ON CONFLICT (usuario_id, cromo_id) DO UPDATE SET cantidad = usuarios_cromos.cantidad + 1',
+            [ciReceptor, ciCromoId]
+          );
+          await sql(
+            'INSERT INTO cromo_intercambios (emisor_id, receptor_id, cromo_id) VALUES ($1,$2,$3)',
+            [usuarioId2, ciReceptor, ciCromoId]
+          );
+        } catch (eCi) {
+          // Rollback: devuelve la copia al emisor para no perderla
+          if (ciNuevaCant <= 0) {
+            await sql('INSERT INTO usuarios_cromos (usuario_id, cromo_id, cantidad) VALUES ($1,$2,1)', [usuarioId2, ciCromoId]).catch(function(){});
+          } else {
+            await sql('UPDATE usuarios_cromos SET cantidad=$1 WHERE usuario_id=$2 AND cromo_id=$3', [ciNuevaCant + 1, usuarioId2, ciCromoId]).catch(function(){});
+          }
+          return res.status(500).json({ ok: false, error: 'Error al acreditar al receptor' });
+        }
+        return res.status(200).json({ ok: true });
+      }
+
+      // Fundar pandilla (gate: nivel >= 14 = 8500 XP, max 1 activa).
+      if (tipo2 === 'pandilla_crear') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var pcNombre = String(body.nombre || '').trim();
+        if (!pcNombre)
+          return res.status(400).json({ ok: false, error: 'nombre requerido' });
+        if (pcNombre.length > 100)
+          return res.status(400).json({ ok: false, error: 'nombre maximo 100 caracteres' });
+        var pcCiudad = String(body.ciudad_base || '').trim().slice(0, 100) || null;
+        var pcDesc = String(body.descripcion || '').trim().slice(0, 1000);
+        var pcUsr = await sql('SELECT xp_total FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
+        if (!pcUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var pcNivel = calcularNivelLocal(pcUsr[0].xp_total).nivel;
+        if (pcNivel < 14)
+          return res.status(403).json({ ok: false, error: 'Se requiere nivel 14 (8500 XP) para fundar una pandilla' });
+        var pcActiva = await sql(
+          'SELECT 1 AS uno FROM pandillas_miembros WHERE usuario_id=$1 AND activo=true LIMIT 1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (pcActiva.length)
+          return res.status(409).json({ ok: false, error: 'Ya perteneces a una pandilla activa' });
+        var pcNuevo;
+        try {
+          pcNuevo = await sql(
+            'INSERT INTO pandillas (nombre, fundador_id, ciudad_base, descripcion) VALUES ($1,$2,$3,$4) RETURNING *',
+            [pcNombre, usuarioId2, pcCiudad, pcDesc]
+          );
+        } catch (ePc) {
+          if (ePc.code === '23505')
+            return res.status(409).json({ ok: false, error: 'Ya existe una pandilla con ese nombre' });
+          return res.status(500).json({ ok: false, error: 'Error al crear pandilla' });
+        }
+        await sql(
+          'INSERT INTO pandillas_miembros (pandilla_id, usuario_id, rol) VALUES ($1,$2,\'fundador\')',
+          [pcNuevo[0].id, usuarioId2]
+        ).catch(function(){});
+        return res.status(200).json({ ok: true, pandilla: pcNuevo[0] });
+      }
+
+      // Unirse a pandilla (max 1 activa, max 10 miembros, cooldown 14d).
+      if (tipo2 === 'pandilla_unirse') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var puPandilla = String(body.pandilla_id || '');
+        if (!puPandilla)
+          return res.status(400).json({ ok: false, error: 'pandilla_id requerido' });
+        var puActiva = await sql(
+          'SELECT 1 AS uno FROM pandillas_miembros WHERE usuario_id=$1 AND activo=true LIMIT 1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (puActiva.length)
+          return res.status(409).json({ ok: false, error: 'Ya perteneces a una pandilla activa' });
+        // Cooldown 14 dias: ultima membresia inactiva (fecha_ingreso)
+        // o fecha_salida guardada en capacidades al salir.
+        var puUltima = await sql(
+          'SELECT fecha_ingreso FROM pandillas_miembros WHERE usuario_id=$1 AND activo=false ORDER BY fecha_ingreso DESC LIMIT 1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        var puCaps = await leerCapacidades(sql, usuarioId2);
+        var puCooldownOk = true;
+        var puVentana = 14 * 24 * 3600 * 1000;
+        if (puUltima.length) {
+          var puTs = new Date(puUltima[0].fecha_ingreso).getTime();
+          if (!isNaN(puTs) && (Date.now() - puTs) < puVentana) puCooldownOk = false;
+        }
+        if (puCooldownOk && puCaps.fecha_salida_pandilla) {
+          var puTs2 = new Date(String(puCaps.fecha_salida_pandilla)).getTime();
+          if (!isNaN(puTs2) && (Date.now() - puTs2) < puVentana) puCooldownOk = false;
+        }
+        if (!puCooldownOk)
+          return res.status(429).json({ ok: false, error: 'Debes esperar 14 dias para unirte a otra pandilla' });
+        var puPand = await sql(
+          'SELECT id FROM pandillas WHERE id=$1 AND activo=true LIMIT 1',
+          [puPandilla]
+        ).catch(function(){ return []; });
+        if (!puPand.length)
+          return res.status(404).json({ ok: false, error: 'Pandilla no encontrada' });
+        var puMiembros = await sql(
+          'SELECT COUNT(*)::int AS n FROM pandillas_miembros WHERE pandilla_id=$1 AND activo=true',
+          [puPandilla]
+        ).catch(function(){ return []; });
+        if ((puMiembros[0] && puMiembros[0].n) >= 10)
+          return res.status(409).json({ ok: false, error: 'Pandilla llena (maximo 10 miembros)' });
+        try {
+          await sql(
+            'INSERT INTO pandillas_miembros (pandilla_id, usuario_id, rol) VALUES ($1,$2,\'miembro\')',
+            [puPandilla, usuarioId2]
+          );
+        } catch (ePu) {
+          if (ePu.code === '23505')
+            return res.status(409).json({ ok: false, error: 'Ya eres miembro de esta pandilla' });
+          return res.status(500).json({ ok: false, error: 'Error al unirte' });
+        }
+        return res.status(200).json({ ok: true });
+      }
+
+      // Salir de pandilla activa (Cero Borrado Logico + cooldown 14d).
+      if (tipo2 === 'pandilla_salir') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var psUpd = await sql(
+          'UPDATE pandillas_miembros SET activo=false WHERE usuario_id=$1 AND activo=true RETURNING pandilla_id',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (!psUpd.length)
+          return res.status(409).json({ ok: false, error: 'No perteneces a ninguna pandilla activa' });
+        // Guarda la fecha de salida para el cooldown de reingreso
+        await actualizarCapacidad(sql, usuarioId2, 'fecha_salida_pandilla', new Date().toISOString());
+        return res.status(200).json({ ok: true });
+      }
+
+      // Crear reto de parche (rol fundador/oficial, ventana temporal).
+      if (tipo2 === 'pandilla_reto') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var prPandilla = String(body.pandilla_id || '');
+        var prTitulo = String(body.titulo || '').trim();
+        if (!prPandilla || !prTitulo)
+          return res.status(400).json({ ok: false, error: 'pandilla_id y titulo requeridos' });
+        if (prTitulo.length > 150)
+          return res.status(400).json({ ok: false, error: 'titulo maximo 150 caracteres' });
+        var prRol = await sql(
+          'SELECT rol FROM pandillas_miembros WHERE pandilla_id=$1 AND usuario_id=$2 AND activo=true LIMIT 1',
+          [prPandilla, usuarioId2]
+        ).catch(function(){ return []; });
+        if (!prRol.length)
+          return res.status(403).json({ ok: false, error: 'No eres miembro de esta pandilla' });
+        if (prRol[0].rol !== 'fundador' && prRol[0].rol !== 'oficial')
+          return res.status(403).json({ ok: false, error: 'Se requiere rol fundador u oficial para crear retos' });
+        var prMeta = parseInt(body.meta_valor, 10);
+        if (isNaN(prMeta) || prMeta < 1)
+          return res.status(400).json({ ok: false, error: 'meta_valor debe ser entero positivo' });
+        var prFin = body.fecha_fin ? new Date(String(body.fecha_fin)) : null;
+        if (!prFin || isNaN(prFin.getTime()) || prFin.getTime() <= Date.now())
+          return res.status(400).json({ ok: false, error: 'fecha_fin debe ser una fecha futura' });
+        var prDesc = String(body.descripcion || '').trim().slice(0, 1000);
+        var prTipoReto = String(body.tipo_reto || 'general').slice(0, 50);
+        var prXp = parseInt(body.xp_bono, 10);
+        if (isNaN(prXp) || prXp < 0) prXp = 0;
+        var prIns = await sql(
+          'INSERT INTO pandilla_retos (pandilla_id, titulo, descripcion, tipo_reto, meta_valor, fecha_fin, xp_bono)'
+          + ' VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+          [prPandilla, prTitulo, prDesc, prTipoReto, prMeta, prFin.toISOString(), prXp]
+        ).catch(function(){ return []; });
+        if (!prIns.length)
+          return res.status(503).json({ ok: false, error: 'Retos no disponibles (migracion 010 pendiente?)' });
+        return res.status(200).json({ ok: true, reto: prIns[0] });
+      }
+
       if (!tipo2 || !destinoId2)
         return res.status(400).json({ ok: false, error: 'tipo y destino_id son requeridos' });
 
@@ -2371,12 +3170,18 @@ module.exports = async function handler(req, res) {
         var misionesNuevas = [];
         var logrosNuevas = [];
         var xpResenaEntregado = xpGanado;
+        var amuletoResena = { doubled: false };
+        var cromoResena = null;
         if (usuarioId2) {
           // Milestones v2 (ADR-014): el lider del spot gana x1.1 en su
           // ciudad. Se aplica sobre el XP que recibe el usuario (la fila
           // de interacciones conserva la xp base para no romper el check
           // de mis_primera_resena que mira xp_ganado>=25).
           xpResenaEntregado = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGanado);
+          // v9 (ADR-018): amuleto_x2 duplica el XP entregado y decrementa
+          // el contador de usos (nunca modifica la fila de interacciones).
+          amuletoResena = await aplicarAmuletoX2(sql, usuarioId2, xpResenaEntregado);
+          xpResenaEntregado = amuletoResena.xp;
           await sql(
             'UPDATE usuarios SET '
             + 'xp_total = xp_total + $1, '
@@ -2387,6 +3192,14 @@ module.exports = async function handler(req, res) {
           ).catch(function(){});
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
+          // v9 (ADR-018): chance de cromo (15%) y aporte de fama a la
+          // pandilla activa (10% del XP entregado, no bloquean).
+          cromoResena = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
+          await aplicarFamaPandilla(sql, usuarioId2, xpResenaEntregado);
+          // v9 contrato final (punto 8): progreso de retos de parche.
+          var retoResena = await progresarPandillaRetos(sql, usuarioId2, 'resena');
+        } else {
+          var retoResena = null;
         }
 
         // Notificar al admin (no bloquea la respuesta)
@@ -2419,7 +3232,7 @@ module.exports = async function handler(req, res) {
           }
         } catch(_) {}
 
-        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, misiones: misionesNuevas, logros: logrosNuevas });
+        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, misiones: misionesNuevas, logros: logrosNuevas, cromo: cromoResena || undefined, amuleto_x2: amuletoResena.doubled || undefined, reto_completado: retoResena || null });
       }
 
       // -- Guardado --
@@ -2462,6 +3275,9 @@ module.exports = async function handler(req, res) {
         // como base fiable para futuras insignias/misiones ("guardaste
         // 5 lugares alguna vez"), sin depender del estado activo actual.
         var xpGuardadoFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGuardado);
+        // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
+        var amuletoGuardado = await aplicarAmuletoX2(sql, usuarioId2, xpGuardadoFinal);
+        xpGuardadoFinal = amuletoGuardado.xp;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
           [xpGuardadoFinal, usuarioId2]
@@ -2469,7 +3285,12 @@ module.exports = async function handler(req, res) {
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
         var logrosGuardado = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, misiones: misionesGuardado, logros: logrosGuardado });
+        // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
+        var cromoGuardado = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
+        await aplicarFamaPandilla(sql, usuarioId2, xpGuardadoFinal);
+        // v9 contrato final (punto 8): progreso de retos de parche.
+        var retoGuardado = await progresarPandillaRetos(sql, usuarioId2, 'guardado');
+        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null });
       }
 
       // -- Quitar guardado --
@@ -2514,6 +3335,9 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2]
         );
         var xpVisitaFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 20);
+        // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
+        var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpVisitaFinal);
+        xpVisitaFinal = amuletoVisita.xp;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
           [xpVisitaFinal, usuarioId2]
@@ -2521,7 +3345,12 @@ module.exports = async function handler(req, res) {
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: xpVisitaFinal, misiones: misionesVisita, logros: logrosVisita });
+        // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
+        var cromoVisita = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
+        await aplicarFamaPandilla(sql, usuarioId2, xpVisitaFinal);
+        // v9 contrato final (punto 8): progreso de retos de parche.
+        var retoVisita = await progresarPandillaRetos(sql, usuarioId2, 'visita');
+        return res.status(200).json({ ok: true, xp: xpVisitaFinal, misiones: misionesVisita, logros: logrosVisita, cromo: cromoVisita || undefined, amuleto_x2: amuletoVisita.doubled || undefined, reto_completado: retoVisita || null });
       }
 
       // -- Quitar visita --
@@ -2589,14 +3418,23 @@ module.exports = async function handler(req, res) {
         var misionesRating = [];
         var logrosRating = [];
         var xpRatingFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 10);
+        // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
+        var amuletoRating = await aplicarAmuletoX2(sql, usuarioId2, xpRatingFinal);
+        xpRatingFinal = amuletoRating.xp;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
           [xpRatingFinal, usuarioId2]
         ).catch(function(){});
         misionesRating = await evaluarMisiones(sql, usuarioId2);
         logrosRating = await evaluarLogros(sql, usuarioId2);
+        // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
+        var cromoRating = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
+        await aplicarFamaPandilla(sql, usuarioId2, xpRatingFinal);
+        // v9 contrato final (punto 8): rating cuenta como 'visita' en
+        // los retos de parche (regla del contrato).
+        var retoRating = await progresarPandillaRetos(sql, usuarioId2, 'visita');
 
-        return res.status(200).json({ ok: true, xp: xpRatingFinal, misiones: misionesRating, logros: logrosRating });
+        return res.status(200).json({ ok: true, xp: xpRatingFinal, misiones: misionesRating, logros: logrosRating, cromo: cromoRating || undefined, amuleto_x2: amuletoRating.doubled || undefined, reto_completado: retoRating || null });
       }
 
       return res.status(400).json({ ok: false, error: 'tipo no implementado: ' + tipo2 });

@@ -262,9 +262,107 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok:false, error:'tipo debe ser: resena | solicitud' });
   }
 
+  // == CONSUMIBLES (gamificacion v4 / ADR-018) =============================
+  // CRUD sobre la tabla `consumibles` (migracion 010). La clave es la
+  // identidad: nunca se edita. El ledger `compra_consumibles` guarda
+  // `xp_pagado` como snapshot al momento de la compra, asi que cambiar
+  // `precio_xp` aqui solo afecta compras futuras, nunca el historial.
+  // Cero Borrado Logico: no existe DELETE; el estado se controla con
+  // consumibles_toggle (activo = NOT activo).
+  if (recurso === 'consumibles') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+
+    var tipo = req.query.tipo || '';
+
+    // --- Lista: todos (activos e inactivos) ------------------------------
+    if (tipo === 'consumibles_lista') {
+      var filasC = await sql(
+        'SELECT id, clave, nombre, descripcion, precio_xp, activo, creado_en '
+        + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
+      );
+      return res.status(200).json({ ok:true, data: filasC, total: filasC.length });
+    }
+
+    // --- Crear: clave unica, precio entero > 0 ----------------------------
+    if (tipo === 'consumibles_crear') {
+      var claveN = String(body.clave||'').trim().toLowerCase();
+      var nombreN = String(body.nombre||'').trim();
+      var descN  = String(body.descripcion||'').trim();
+      var precioN = parseInt(body.precio_xp, 10);
+      if (!claveN || !nombreN) {
+        return res.status(400).json({ ok:false, error:'clave y nombre son obligatorios' });
+      }
+      if (!Number.isInteger(precioN) || precioN <= 0) {
+        return res.status(400).json({ ok:false, error:'precio_xp debe ser un entero mayor que 0' });
+      }
+      var existC = await sql('SELECT 1 FROM consumibles WHERE clave=$1 LIMIT 1',[claveN]);
+      if (existC.length) {
+        return res.status(409).json({ ok:false, error:'Ya existe un consumible con esa clave' });
+      }
+      var insC = await sql(
+        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp) '
+        + 'VALUES ($1,$2,$3,$4) '
+        + 'RETURNING id, clave, nombre, descripcion, precio_xp, activo, creado_en',
+        [claveN, nombreN, descN, precioN]
+      );
+      return res.status(201).json({ ok:true, data: insC[0], mensaje:'Consumible creado' });
+    }
+
+    // --- Editar: nombre/descripcion/precio_xp (NUNCA la clave) ------------
+    if (tipo === 'consumibles_editar') {
+      if (!body.id) {
+        return res.status(400).json({ ok:false, error:'id requerido' });
+      }
+      var setsC = []; var paramsC = []; var piC = 1;
+      if ('nombre' in body) {
+        var nomE = String(body.nombre||'').trim();
+        if (!nomE) return res.status(400).json({ ok:false, error:'nombre no puede quedar vacio' });
+        setsC.push('nombre=$'+piC++); paramsC.push(nomE);
+      }
+      if ('descripcion' in body) {
+        setsC.push('descripcion=$'+piC++); paramsC.push(String(body.descripcion||'').trim());
+      }
+      if ('precio_xp' in body) {
+        var precioE = parseInt(body.precio_xp, 10);
+        if (!Number.isInteger(precioE) || precioE < 0) {
+          return res.status(400).json({ ok:false, error:'precio_xp debe ser un entero mayor o igual a 0' });
+        }
+        setsC.push('precio_xp=$'+piC++); paramsC.push(precioE);
+      }
+      if (!setsC.length) {
+        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion o precio_xp' });
+      }
+      paramsC.push(body.id);
+      var updC = await sql(
+        'UPDATE consumibles SET '+setsC.join(', ')+' WHERE id=$'+piC
+        + ' RETURNING id, clave, nombre, descripcion, precio_xp, activo',
+        paramsC
+      );
+      if (!updC.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
+      return res.status(200).json({ ok:true, data: updC[0], mensaje:'Consumible actualizado' });
+    }
+
+    // --- Toggle: Cero Borrado Logico (activo = NOT activo) ----------------
+    if (tipo === 'consumibles_toggle') {
+      if (!body.id) return res.status(400).json({ ok:false, error:'id requerido' });
+      var filaT = await sql('SELECT activo FROM consumibles WHERE id=$1 LIMIT 1',[body.id]);
+      if (!filaT.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
+      // Si body.activo viene explicito se respeta (contrato spec); si no se
+      // alterna el estado actual (toggle puro pedido por la tarea).
+      var nuevoT = (typeof body.activo === 'boolean') ? body.activo : !filaT[0].activo;
+      await sql('UPDATE consumibles SET activo=$1 WHERE id=$2',[nuevoT, body.id]);
+      return res.status(200).json({
+        ok:true, activo:nuevoT,
+        mensaje: nuevoT ? 'Consumible activado' : 'Consumible desactivado'
+      });
+    }
+
+    return res.status(400).json({ ok:false, error:'tipo invalido para recurso consumibles' });
+  }
+
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles',
   });
 };

@@ -16,6 +16,44 @@
   window.ExploraCO = window.ExploraCO || {};
   window.ExploraCO.usuario = null;
 
+  // ── Niveles XP (fuente de verdad, 20 niveles) ────────────
+  // XP_LEVELS[i] = xp minimo para alcanzar el nivel (i+1).
+  // Nivel 1 = 0 XP, Nivel 20 = 30000 XP.
+  var XP_LEVELS = [
+    0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200,
+    4000, 5200, 6800, 8500, 10500, 13000, 16000, 19500, 24000, 30000
+  ];
+  var MAX_NIVEL = XP_LEVELS.length; // 20
+
+  // ── Calcular nivel a partir de XP total ───────────────────
+  function calcularNivel(xpTotal) {
+    var xp = parseInt(xpTotal) || 0;
+    if (xp < 0) xp = 0;
+    for (var i = XP_LEVELS.length - 1; i >= 0; i--) {
+      if (xp >= XP_LEVELS[i]) return i + 1;
+    }
+    return 1;
+  }
+
+  window.ExploraCO.calcularNivel = calcularNivel;
+  window.ExploraCO.XP_LEVELS = XP_LEVELS;
+  window.ExploraCO.MAX_NIVEL = MAX_NIVEL;
+
+  // ── Mapa de capacidades por umbral de nivel ───────────────
+  // Clave = nivel minimo, valor = nombre de la capacidad.
+  // Una capacidad esta activa si nivelActual >= umbral.
+  var CAPACIDADES_POR_NIVEL = {
+    6:  'crear_planes',
+    11: 'organizar_actividad',
+    14: 'fundar_pandilla',
+    15: 'moderar_galerias',
+    16: 'cromo_dorado',
+    17: 'mariscal_parche',
+    19: 'inmortal'
+  };
+
+  window.ExploraCO.CAPACIDADES_POR_NIVEL = CAPACIDADES_POR_NIVEL;
+
   // ── Leer sesión del localStorage ──────────────────────────
   function cargarSesion() {
     try {
@@ -651,6 +689,74 @@
       }, i * 1600 + 900);
     });
   }
+
+  // ── Gasto de XP con de-nivel real ─────────────────────────
+  // Descuenta XP del usuario y detecta si baja de nivel.
+  // Devuelve: { ok, xpAnterior, xpNuevo, nivelAnterior, nivelNuevo,
+  //             bajoDeNivel, capacidadesRevocadas[] } o { ok:false, motivo }.
+  //
+  // Mini-test inline (casos esperados):
+  //   Caso A: usuario con 9000 XP gasta 500 -> queda 8500 XP,
+  //     nivel 14 (>= 8500) = nivelAnterior 14 -> no baja, bajoDeNivel=false.
+  //   Caso B: usuario con 8500 XP gasta 800 -> queda 7700 XP,
+  //     nivelAnterior=14 (>= 8500), nivelNuevo=13 (>= 6800, < 8500),
+  //     bajoDeNivel=true, capacidadesRevocadas=['fundar_pandilla'] (nivel 14).
+  function gastarXp(xpGastado) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) {
+      return { ok: false, motivo: 'sin_sesion' };
+    }
+
+    var xpGastar = parseInt(xpGastado) || 0;
+    var xpActual = parseInt(usuario.xp_total) || 0;
+
+    if (xpGastar <= 0) {
+      return { ok: false, motivo: 'xp_invalida' };
+    }
+    if (xpActual < xpGastar) {
+      return { ok: false, motivo: 'xp_insuficiente' };
+    }
+
+    var nivelAnterior = calcularNivel(xpActual);
+    var xpNuevo = xpActual - xpGastar;
+    var nivelNuevo = calcularNivel(xpNuevo);
+    var bajoDeNivel = nivelNuevo < nivelAnterior;
+
+    // Capacidades revocadas: todas las que estaban activas en
+    // nivelAnterior pero dejan de estarlo en nivelNuevo.
+    var capacidadesRevocadas = [];
+    if (bajoDeNivel) {
+      var umbrales = Object.keys(CAPACIDADES_POR_NIVEL)
+        .map(Number)
+        .sort(function (a, b) { return a - b; });
+      for (var i = 0; i < umbrales.length; i++) {
+        if (umbrales[i] > nivelNuevo && umbrales[i] <= nivelAnterior) {
+          capacidadesRevocadas.push(CAPACIDADES_POR_NIVEL[umbrales[i]]);
+        }
+      }
+    }
+
+    // Aplicar cambio
+    usuario.xp_total = xpNuevo;
+    if (bajoDeNivel) {
+      // Marcar flag de capacidades revocadas en la sesion
+      usuario.capacidadesRevocadas = capacidadesRevocadas;
+    }
+    guardarSesion(usuario);
+    actualizarUI();
+
+    return {
+      ok: true,
+      xpAnterior: xpActual,
+      xpNuevo: xpNuevo,
+      nivelAnterior: nivelAnterior,
+      nivelNuevo: nivelNuevo,
+      bajoDeNivel: bajoDeNivel,
+      capacidadesRevocadas: capacidadesRevocadas
+    };
+  }
+
+  window.ExploraCO.gastarXp = gastarXp;
 
   // ── Actualizar UI según estado de sesión ───────────────────
   function actualizarUI() {

@@ -2186,5 +2186,43 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-094: Gamificacion v4.0 -- consumibles, economia de XP, 20 niveles, cromos y pandillas [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-10; pendiente aplicar migracion 010 en Neon + deploy)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-10
+- **ADR:** ADR-018
+- **Spec:** docs/superpowers/specs/2026-09-10-gamificacion-v4-design.md
+- **Prompt origen:** prompt gamming.txt (respuestas de Javier: 10 consumibles, 20 niveles confirmados, de-nivel con revocacion, cromos/pandillas completos, precios editables desde admin)
+
+- **Archivos modificados:**
+  - db/migrations/010_gamificacion_v4.sql (NUEVO, 9 tablas + ALTER + seed)
+  - docs/superpowers/specs/2026-09-10-gamificacion-v4-design.md (NUEVO)
+  - api/interacciones.js (v8 -> v9: +5 GET, +8 POST, tabla_destino 5 senderos, retos de parche)
+  - api/usuarios.js (NIVELES 20 + BUG-1 conMisiones merge + calcularEra)
+  - api/admin.js (+4 endpoints CRUD consumibles)
+  - admin.html (screen Consumibles con precios editables)
+  - mi-perfil.html (vitrina 20 niveles + Tienda/Inventario/Mis Cromos)
+  - comunidad.html (tab Pandillas + retos)
+  - index.html (XP_LEVELS 20)
+  - usuario-session.js (gastarXp + CAPACIDADES_POR_NIVEL + XP_LEVELS 20)
+  - scripts/smoke_test_gamificacion_v4.js (NUEVO)
+  - scripts/smoke_test_perfil_progreso.js, smoke_test_milestones_v2.js, smoke_test_comunidad.js, verify_comunidad_prod.js (conteos stale corregidos)
+
+- **Subtareas completadas:**
+  1. Spec tecnica v4.0 + revision arquitectonica (2 bugs bloqueantes detectados y corregidos)
+  2. Migracion 010 (consumibles, ledgers, cromos, pandillas, retos, cromo_intercambios)
+  3. Backend v9 (economia de XP con de-nivel, cromos probabilisticos, pandillas completas)
+  4. Admin: CRUD de consumibles con precios editables
+  5. Frontend: vitrina 20 niveles, tienda/inventario, cromos, pandillas
+  6. Smokes oficiales (95/95) + correccion de regresiones
+  7. ADR-018 + docs
+
+- **Verificacion:** Escudo GOLD node --check 4/4; ASCII-safety 0 bytes >127 en api/*.js; smoke_test_gamificacion_v4.js 95/95 PASS; smokes de regresion OK.
+
+- **Pendiente (BLOQUEANTE):** aplicar db/migrations/010_gamificacion_v4.sql en Neon (Javier) + commit/deploy y verificacion en vivo.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

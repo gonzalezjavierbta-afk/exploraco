@@ -26,7 +26,7 @@ function check(label, cond) {
   if (!cond) process.exitCode = 1;
 }
 
-// ---- 1) NIVELES 15 en api/usuarios.js -----------------------------
+// ---- 1) NIVELES 20 en api/usuarios.js (Gamificacion v4, ADR-018) ----
 const srcUsu = fs.readFileSync(path.join(__dirname, '..', 'api', 'usuarios.js'), 'utf8');
 const sandboxUsu = { module: { exports: {} }, require, console, process };
 sandboxUsu.exports = sandboxUsu.module.exports;
@@ -34,14 +34,14 @@ vm.createContext(sandboxUsu);
 vm.runInContext(srcUsu + '\nmodule.exports.NIVELES = NIVELES; module.exports.calcularNivel = calcularNivel;', sandboxUsu, { filename: 'api/usuarios.js' });
 const NIVELES = sandboxUsu.module.exports.NIVELES;
 const calcularNivel = sandboxUsu.module.exports.calcularNivel;
-check('NIVELES: 15 rangos (3 Eras)', NIVELES.length === 15);
+check('NIVELES: 20 rangos (4 Eras)', NIVELES.length === 20);
 const umbrales = NIVELES.map(function(n){ return n.min; });
-check('NIVELES: umbrales del prompt (0,100,250,450,700,1000,1400,1900,2500,3200,4000,5000,6500,8500,11000)',
-  JSON.stringify(umbrales) === JSON.stringify([0,100,250,450,700,1000,1400,1900,2500,3200,4000,5000,6500,8500,11000]));
-check('NIVELES: Maestro ExploraCO en 11000', NIVELES[14].nombre.indexOf('Maestro') !== -1);
+check('NIVELES: umbrales del spec v4 (0..30000)',
+  JSON.stringify(umbrales) === JSON.stringify([0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000]));
+check('NIVELES: Gran Maestro ExploraCO en 30000', NIVELES[19].nombre.indexOf('Maestro') !== -1);
 check('NIVELES: calcularNivel(0) -> nivel 1', calcularNivel(0).nivel === 1);
 check('NIVELES: calcularNivel(11000) -> nivel 15', calcularNivel(11000).nivel === 15);
-check('NIVELES: calcularNivel(2000) -> nivel 8 (Cartografo, 1900<=2000<2500)', calcularNivel(2000).nivel === 8);
+check('NIVELES: calcularNivel(2000) -> nivel 8 (Cronista, 1900<=2000<2500)', calcularNivel(2000).nivel === 8);
 
 // ---- 2) GET tabla_destino (3 senderos + patrocinios) ---------------
 // Se evalua la logica de forma directa: el GET vive en el handler; aqui
@@ -90,13 +90,14 @@ function invokeTablaDestino() {
 const sqlFallback = function(){ return Promise.reject(new Error('columna inexistente')); };
 return invokeTablaDestino().then(function(td) {
   check('tabla_destino: ok=true', td.ok === true);
-  check('tabla_destino: 3 senderos', td.data && td.data.senderos.length === 3);
+  check('tabla_destino: 5 senderos (v4: audiovisual/pandilla)', td.data && td.data.senderos.length === 5);
   var ids = (td.data.senderos || []).map(function(s){ return s.id; });
-  check('tabla_destino: senderos explorador/critico/organizador',
-    JSON.stringify(ids) === JSON.stringify(['explorador','critico','organizador']));
+  check('tabla_destino: senderos explorador/critico/organizador/audiovisual/pandilla',
+    JSON.stringify(ids) === JSON.stringify(['explorador','critico','organizador','audiovisual','pandilla']));
   var org = td.data.senderos[2];
   check('tabla_destino: fama organizador = mapas*40 + destinos*5', org.fama === (2*40 + 9*5));
   check('tabla_destino: sendero expone nivel y total', typeof org.sendero.nivel === 'number' && org.sendero.total === 5);
+  check('tabla_destino: sendero pandilla nace en Sin Parche sin membersia', td.data.senderos[4].sendero.nivel === 0);
   check('tabla_destino: patrocinios llega vacio (opcion abierta)',
     Array.isArray(td.data.patrocinios) && td.data.patrocinios.length === 0);
 

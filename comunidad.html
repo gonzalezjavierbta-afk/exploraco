@@ -164,6 +164,28 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #cpanel-mapa .leaflet-pane,
 #cpanel-mapa .leaflet-top,
 #cpanel-mapa .leaflet-bottom{z-index:0}
+/* PANDILLAS (Gamificacion v4) */
+.pand-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;margin-bottom:12px}
+.pand-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:#fff;margin-bottom:4px}
+.pand-meta{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px}
+.pand-fama{display:inline-flex;align-items:center;gap:4px;background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.2);border-radius:4px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px}
+.pand-miembro{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.pand-rol{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:2px 6px;border-radius:3px}
+.pand-rol.fundador{background:rgba(232,160,32,.15);color:var(--gold)}
+.pand-rol.oficial{background:rgba(59,130,246,.15);color:#3B82F6}
+.pand-rol.miembro{background:rgba(255,255,255,.06);color:rgba(255,255,255,.5)}
+.pand-reto{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;margin-bottom:8px}
+.pand-reto-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:4px}
+.pand-reto-meta{font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px}
+.pand-reto-bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.pand-reto-fill{height:100%;border-radius:3px;background:var(--gold);transition:width .4s}
+.pand-reto-done{font-size:10px;font-weight:700;color:#22C55E}
+.pand-btn{padding:8px 16px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black);transition:opacity .15s}
+.pand-btn:hover{opacity:.88}
+.pand-btn-outline{background:transparent;border:1px solid rgba(232,160,32,.3);color:var(--gold)}
+.pand-btn-outline:hover{background:var(--gold);color:var(--black)}
+.pand-btn-danger{background:transparent;border:1px solid rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
+.pand-btn-danger:hover{border-color:#ef4444;color:#ef4444}
 </style>
 </head>
 <body>
@@ -223,6 +245,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="ctab" onclick="showCommTab('planes')">🗺️ Planes</div>
       <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
+      <div class="ctab" onclick="showCommTab('pandillas')">👥 Pandillas</div>
     </div>
     </div>
 
@@ -307,6 +330,19 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       </p>
     </div>
 
+    <!-- PANDILLAS (Gamificacion v4) -->
+    <div class="cpanel" id="cpanel-pandillas">
+      <div id="pandillas-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Pandillas bloqueadas</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte o fundar una pandilla.</div>
+        <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
+      </div>
+      <div id="pandilla-mi-pandilla"></div>
+      <div id="pandilla-fundar"></div>
+      <div id="pandillas-unirse"></div>
+      <div id="pandilla-retos"></div>
+    </div>
+
   </div>
 </div>
 
@@ -323,24 +359,31 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
    La sesion real la maneja usuario-session.js (window.ExploraCO).
    ============================================================= */
 
-/* ---- POINTS CONFIG (Milestones v2: 15 rangos / 3 Eras) ---- */
+/* ---- POINTS CONFIG (20 rangos / 4 Eras) ---- */
 var XP_LEVELS = [
-  {min:0,max:99,nombre:'Viajero Novato',emoji:'🌱'},
-  {min:100,max:249,nombre:'Explorador de Barrio',emoji:'🧭'},
-  {min:250,max:449,nombre:'Mochilero Autónomo',emoji:'🎒'},
-  {min:450,max:699,nombre:'Cazador de Senderos',emoji:'🥾'},
-  {min:700,max:999,nombre:'Local Consagrado',emoji:'🏡'},
-  {min:1000,max:1399,nombre:'Viajero Patrocinado',emoji:'🤝'},
-  {min:1400,max:1899,nombre:'Crítico de la Calle',emoji:'⭐'},
-  {min:1900,max:2499,nombre:'Cartógrafo de Rutas',emoji:'🗺️'},
-  {min:2500,max:3199,nombre:'Embajador de Ciudad',emoji:'🏛️'},
-  {min:3200,max:3999,nombre:'Influenciador Local',emoji:'📣'},
-  {min:4000,max:4999,nombre:'Organizador de Eventos',emoji:'🎪'},
-  {min:5000,max:6499,nombre:'Protector del Patrimonio',emoji:'🛡️'},
-  {min:6500,max:8499,nombre:'Dueño de la Escena',emoji:'🎤'},
-  {min:8500,max:10999,nombre:'Leyenda de Territorio',emoji:'🗿'},
-  {min:11000,max:99999,nombre:'Maestro ExploraCO',emoji:'👑'},
+  {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31'},
+  {min:100,nombre:'Rastreador Local',emoji:'\uD83E\uDDED'},
+  {min:250,nombre:'Explorador Urbano',emoji:'\uD83E\uDDED'},
+  {min:450,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E'},
+  {min:700,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F'},
+  {min:1000,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F'},
+  {min:1400,nombre:'Fotografo de Ruta',emoji:'\u2B50'},
+  {min:1900,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6'},
+  {min:2500,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0'},
+  {min:3200,nombre:'Guia de Fronteras',emoji:'\uD83E\uDDED'},
+  {min:4000,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF'},
+  {min:5200,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC'},
+  {min:6800,nombre:'Senor del Spot',emoji:'\uD83D\uDC51'},
+  {min:8500,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05'},
+  {min:10500,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F'},
+  {min:13000,nombre:'Curador de Colombia',emoji:'\uD83E\uD489'},
+  {min:16000,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5'},
+  {min:19500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5'},
+  {min:24000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25'},
+  {min:30000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51'},
 ];
+for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
+XP_LEVELS[XP_LEVELS.length-1].max=99999;
 /* Badges locales calculables con datos reales (igual que index.html);
    removidos caribe/andino/compartido/plan_maestro/social (bloqueados).
    Los de Milestones v2 son LOGROS server-side en api/interacciones.js. */
@@ -375,7 +418,7 @@ function statsU() {
 function getLevel(xp) { for(var i=XP_LEVELS.length-1;i>=0;i--) if(xp>=XP_LEVELS[i].min) return XP_LEVELS[i]; return XP_LEVELS[0]; }
 function getLevelPct(xp) {
   var lvl=getLevel(xp); var range=lvl.max-lvl.min;
-  if(range>=99999) return 100;
+  if(lvl.max>=99999) return 100;
   return Math.round((xp-lvl.min)/range*100);
 }
 
@@ -462,8 +505,10 @@ function toastGaming(res) {
   if (res.xp > 0) parts.push('💬 +' + res.xp + ' XP');
   (res.misiones || []).forEach(function(m){ parts.push('🏆 ' + m.nombre + ' +' + m.xp + ' XP'); });
   (res.logros || []).forEach(function(l){ parts.push('🏅 ' + l.nombre + ' +' + l.xp + ' XP'); });
+  if (res.reto_completado) parts.push('⚔️ Reto completado: ' + res.reto_completado.titulo + ' +' + (res.reto_completado.xp_bono || 0) + ' XP');
+  if (res.cromo) parts.push('🎴 Cromo obtenido: ' + (res.cromo.nombre || '') + ' (' + (res.cromo.rareza || '') + ')');
   if (parts.length) showXPToastComm(parts.join('  ·  '));
-  if ((res.misiones && res.misiones.length) || (res.logros && res.logros.length)) updateCommUI();
+  if ((res.misiones && res.misiones.length) || (res.logros && res.logros.length) || res.reto_completado) updateCommUI();
 }
 
 function myInitials() { return initialsFromName(myName()); }
@@ -806,6 +851,273 @@ function planSalir(planId) {
     .catch(function(){});
 }
 
+/* ---- PANDILLAS (Gamificacion v4) ---- */
+function renderPandillas() {
+  var guest = document.getElementById('pandillas-guest');
+  if(!sesion()) {
+    if(guest) guest.style.display = 'block';
+    clearPandillaRegions();
+    return;
+  }
+  if(guest) guest.style.display = 'none';
+  cargarPandillaDetalle();
+}
+
+function clearPandillaRegions() {
+  ['pandilla-mi-pandilla','pandilla-fundar','pandillas-unirse','pandilla-retos'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.innerHTML = '';
+  });
+}
+
+function cargarPandillaDetalle() {
+  var u = sesion();
+  var miPandilla = document.getElementById('pandilla-mi-pandilla');
+  var fundar = document.getElementById('pandilla-fundar');
+  var retos = document.getElementById('pandilla-retos');
+  if(!u || !miPandilla) return;
+  miPandilla.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando pandilla\u2026</div>';
+  if(fundar) fundar.innerHTML = '';
+  if(document.getElementById('pandillas-unirse')) document.getElementById('pandillas-unirse').innerHTML = '';
+  if(retos) retos.innerHTML = '';
+  fetch('/api/interacciones?tipo=pandilla_detalle&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var data = (res && res.data) || {};
+      var pandilla = data.pandilla || null;
+      if(!pandilla) {
+        miPandilla.innerHTML = '';
+        renderPandillaCTA();
+        renderPandillasUnirse(data.pandillas_disponibles || []);
+        return;
+      }
+      var miembros = data.miembros || [];
+      var html = '<div class="pand-card">'
+        + '<div class="pand-title">👥 ' + esc(pandilla.nombre) + '</div>'
+        + '<div class="pand-meta">' + esc(pandilla.ciudad_base || 'Sin ciudad base')
+        + (pandilla.descripcion ? ' · ' + esc(pandilla.descripcion) : '') + '</div>'
+        + '<div class="pand-fama">⭐ ' + (pandilla.fama_total || 0) + ' Fama</div>'
+        + '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:6px">Miembros (' + miembros.length + ')</div>';
+      miembros.forEach(function(m){
+        var rolCls = m.rol || 'miembro';
+        html += '<div class="pand-miembro">'
+          + '<div style="flex:1;font-size:11px;color:#fff">' + esc(m.nombre || 'Viajero') + '</div>'
+          + '<span class="pand-rol ' + rolCls + '">' + rolCls + '</span>'
+          + '</div>';
+      });
+      html += '<button class="pand-btn pand-btn-danger" style="margin-top:10px" onclick="pandillaSalir()">Salir de la pandilla</button>';
+      html += '</div>';
+      miPandilla.innerHTML = html;
+      renderPandillaRetos(data.retos || [], retos, esLiderPandilla(pandilla, miembros), pandilla);
+    })
+    .catch(function(){
+      miPandilla.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar la pandilla.</div>';
+    });
+}
+
+function esLiderPandilla(pandilla, miembros) {
+  var u = sesion();
+  if(!u || !pandilla) return false;
+  if(pandilla.mi_rol === 'fundador' || pandilla.mi_rol === 'oficial') return true;
+  var m = (miembros || []).filter(function(x){
+    return x.usuario_id && String(x.usuario_id) === String(u.id);
+  })[0];
+  return m && (m.rol === 'fundador' || m.rol === 'oficial');
+}
+
+function renderPandillaCTA() {
+  var fundar = document.getElementById('pandilla-fundar');
+  var retos = document.getElementById('pandilla-retos');
+  if(!fundar) return;
+  var lvl = getLevel(statsU().xp);
+  var lvlIdx = XP_LEVELS.indexOf(lvl);
+  if(lvlIdx >= 13) {
+    fundar.innerHTML = '<div class="pand-card" style="text-align:center">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">Crea tu propia pandilla</div>'
+      + '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Nivel 14+ · Los fundadores ganan fama con cada miembro</div>'
+      + '<input class="chat-inp" id="pand-nombre" maxlength="100" placeholder="Nombre de la pandilla" style="margin-bottom:8px">'
+      + '<input class="chat-inp" id="pand-ciudad" maxlength="100" placeholder="Ciudad base (opcional)" style="margin-bottom:8px">'
+      + '<button class="pand-btn" onclick="pandillaCrear()">Fundar Pandilla</button>'
+      + '</div>';
+  } else {
+    fundar.innerHTML = '<div class="pand-card" style="text-align:center">'
+      + '<div style="font-size:11px;color:rgba(255,255,255,.4)">Necesitas Nivel 14 (Cartografo de Cine) para fundar una pandilla.</div>'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">Tu nivel actual: ' + (lvlIdx + 1) + ' · ' + lvl.nombre + '</div>'
+      + '</div>';
+  }
+  if(retos) retos.innerHTML = '';
+}
+
+function renderPandillasUnirse(list) {
+  var el = document.getElementById('pandillas-unirse');
+  if(!el) return;
+  if(!list || !list.length) { el.innerHTML = ''; return; }
+  var html = '<div class="pand-card">'
+    + '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Pandillas abiertas a membresia</div>';
+  list.forEach(function(p){
+    var cantTxt = p.miembros_count != null ? ' · ' + p.miembros_count + ' miembros'
+      : (p.cantidad_miembros != null ? ' · ' + p.cantidad_miembros + ' miembros' : '');
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:8px">'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;font-weight:700;color:#fff">' + esc(p.nombre) + '</div>'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' + esc(p.ciudad_base || 'Sin ciudad base') + cantTxt + '</div>'
+      + '<div class="pand-fama" style="margin:4px 0 0">⭐ ' + (p.fama_total || 0) + ' Fama</div>'
+      + '</div>'
+      + '<button class="pand-btn pand-btn-outline" onclick="pandillaUnirse(\'' + esc(p.id) + '\',this)">Unirme</button>'
+      + '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function pandillaUnirse(pandillaId, btn) {
+  var u = sesion();
+  if(!u) return;
+  if(btn) { btn.disabled = true; btn.textContent = 'Uniendo\u2026'; }
+  postComAPI({ tipo: 'pandilla_unirse', usuario_id: u.id, pandilla_id: pandillaId })
+    .then(function(res){
+      if(res && res.ok) {
+        showXPToastComm('👥 Te uniste a la pandilla');
+        cargarPandillaDetalle();
+      } else {
+        showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo unir'));
+        if(btn) { btn.disabled = false; btn.textContent = 'Unirme'; }
+      }
+    })
+    .catch(function(){
+      showXPToastComm('⚠️ Error de conexion');
+      if(btn) { btn.disabled = false; btn.textContent = 'Unirme'; }
+    });
+}
+
+function renderPandillaRetos(retoList, container, esLider, pandilla) {
+  container = container || document.getElementById('pandilla-retos');
+  if(!container) return;
+  var html = '';
+  if(esLider && pandilla) html += retoFormHtml(pandilla);
+  var list = retoList || [];
+  if(list.length) {
+    html += '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">Retos de Parche</div>';
+    html += list.map(retoCardHtml).join('');
+  }
+  if(!html) html = '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:10px 0;text-align:center">No hay retos de parche activos.</div>';
+  container.innerHTML = html;
+}
+
+function retoCardHtml(r) {
+  var meta = parseInt(r.meta_valor,10) || 0;
+  var prog = parseInt(r.progreso_actual,10) || 0;
+  var pct = meta > 0 ? Math.min(100, Math.round(prog / meta * 100)) : 0;
+  var fechaFin = r.fecha_fin ? esc(String(r.fecha_fin).split('T')[0]) : '';
+  return '<div class="pand-reto">'
+    + '<div class="pand-reto-title">' + esc(r.titulo) + '</div>'
+    + '<div class="pand-reto-meta">' + prog + ' / ' + meta + (fechaFin ? ' · Hasta ' + fechaFin : '') + '</div>'
+    + '<div class="pand-reto-bar"><div class="pand-reto-fill" style="width:' + pct + '%"></div></div>'
+    + (r.completado ? '<div class="pand-reto-done">\u2713 Completado</div>' : '')
+    + '</div>';
+}
+
+function retoFormHtml(pandilla) {
+  return '<div class="pand-card" style="border-color:rgba(232,160,32,.25)">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px">⚔️ Crear reto de parche</div>'
+    + '<input class="chat-inp" id="reto-titulo" maxlength="150" placeholder="Titulo del reto" style="margin-bottom:8px">'
+    + '<select class="chat-inp" id="reto-tipo" style="margin-bottom:8px">'
+      + '<option value="visitas">Visitas</option>'
+      + '<option value="resenas">Resenas</option>'
+      + '<option value="guardados">Guardados</option>'
+    + '</select>'
+    + '<input class="chat-inp" id="reto-meta" type="number" min="1" step="1" placeholder="Meta (acciones)" style="margin-bottom:8px">'
+    + '<input class="chat-inp" id="reto-xp" type="number" min="0" step="1" placeholder="XP bono" style="margin-bottom:8px">'
+    + '<input class="chat-inp" id="reto-fecha" type="date" style="margin-bottom:8px">'
+    + '<button class="pand-btn" onclick="pandillaCrearReto(\'' + esc(pandilla.id) + '\')">Crear reto</button>'
+    + '</div>';
+}
+
+function pandillaCrearReto(pandillaId) {
+  var u = sesion();
+  if(!u) return;
+  var titulo = (document.getElementById('reto-titulo') || {}).value || '';
+  var tipo = (document.getElementById('reto-tipo') || {}).value || 'visitas';
+  var meta = parseInt((document.getElementById('reto-meta') || {}).value, 10) || 0;
+  var xpBono = parseInt((document.getElementById('reto-xp') || {}).value, 10) || 0;
+  var fechaFin = (document.getElementById('reto-fecha') || {}).value || '';
+  titulo = titulo.trim();
+  if(!titulo) { showXPToastComm('⚠️ Escribe un titulo para el reto'); return; }
+  if(meta < 1) { showXPToastComm('⚠️ Define una meta mayor a 0'); return; }
+  if(!fechaFin) { showXPToastComm('⚠️ Elige la fecha de cierre'); return; }
+  var btn = document.querySelector('#pandilla-retos .pand-btn');
+  if(btn) { btn.disabled = true; btn.textContent = 'Creando\u2026'; }
+  postComAPI({
+    tipo: 'pandilla_reto',
+    usuario_id: u.id,
+    pandilla_id: pandillaId,
+    titulo: titulo,
+    tipo_reto: tipo,
+    meta_valor: meta,
+    xp_bono: xpBono,
+    fecha_fin: fechaFin
+  })
+    .then(function(res){
+      if(res && res.ok) {
+        showXPToastComm('⚔️ Reto creado!');
+        cargarPandillaDetalle();
+      } else {
+        showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo crear el reto'));
+        if(btn) { btn.disabled = false; btn.textContent = 'Crear reto'; }
+      }
+    })
+    .catch(function(){
+      showXPToastComm('⚠️ Error de conexion');
+      if(btn) { btn.disabled = false; btn.textContent = 'Crear reto'; }
+    });
+}
+
+function pandillaCrear() {
+  var u = sesion();
+  if(!u) return;
+  var nombreEl = document.getElementById('pand-nombre');
+  var ciudadEl = document.getElementById('pand-ciudad');
+  var nombre = nombreEl ? nombreEl.value.trim() : '';
+  if(!nombre) { showXPToastComm('⚠️ Escribe un nombre para la pandilla'); return; }
+  var btn = document.getElementById('pandilla-fundar').querySelector('.pand-btn');
+  if(btn) { btn.disabled = true; btn.textContent = 'Creando\u2026'; }
+  postComAPI({
+    tipo: 'pandilla_crear',
+    usuario_id: u.id,
+    nombre: nombre,
+    ciudad_base: ciudadEl ? ciudadEl.value.trim() : ''
+  })
+    .then(function(res){
+      if(res && res.ok) {
+        showXPToastComm('👥 Pandilla "' + nombre + '" creada!');
+        renderPandillas();
+      } else {
+        showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo crear la pandilla'));
+        if(btn) { btn.disabled = false; btn.textContent = 'Fundar Pandilla'; }
+      }
+    })
+    .catch(function(){
+      showXPToastComm('⚠️ Error de conexion');
+      if(btn) { btn.disabled = false; btn.textContent = 'Fundar Pandilla'; }
+    });
+}
+
+function pandillaSalir() {
+  var u = sesion();
+  if(!u) return;
+  if(!window.confirm('¿Seguro que quieres salir de tu pandilla?')) return;
+  postComAPI({ tipo: 'pandilla_salir', usuario_id: u.id })
+    .then(function(res){
+      if(res && res.ok) {
+        showXPToastComm('👋 Saliste de la pandilla');
+        renderPandillas();
+      } else {
+        showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo salir'));
+      }
+    })
+    .catch(function(){ showXPToastComm('⚠️ Error de conexion'); });
+}
+
 /* ---- RANKING (leaderboard real con podio + fallback demo) ---- */
 var MOCK_LB = [
 {xp_total:1250,nombre:'Carlos M.',badge_actual:'Viajero Patrocinado'},
@@ -989,6 +1301,7 @@ function showCommTab(tab) {
     if(tab === 'chat') renderChatRooms();
     if(tab === 'planes') renderPlanes();
     if(tab === 'mapa') onTabMapaAV();
+    if(tab === 'pandillas') renderPandillas();
   }
   if(tab !== 'chat') stopChatPoll();
 }

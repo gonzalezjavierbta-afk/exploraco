@@ -3,10 +3,44 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- ADR-018 / Gamificacion v4.0 (2026-09-10) - Consumibles con economia de XP y de-nivel, vitrina de 20 niveles, cromos probabilisticos y pandillas completas + migracion 010 + smoke 95/95
 - TSK-093: Capa multimedia + drawer del mapa cultural (2026-09-10) - pines multimedia por tipo, drawer de destino con tabs Fotos/Videos/Audios + fix UNION BUG-030
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion ADR-018 - Gamificacion v4.0 (2026-09-10)
+
+Implementacion completada en working tree (SIN commitear). Requiere aplicar
+`db/migrations/010_gamificacion_v4.sql` en Neon (BLOQUEANTE, lo ejecuta Javier)
+y deploy de `api/interacciones.js` (v9) + `api/admin.js`.
+
+**Cambios:**
+- `db/migrations/010_gamificacion_v4.sql` (NUEVO): `consumibles`,
+  `compra_consumibles`, `consumo_consumibles`, `cromos_catalogo`,
+  `usuarios_cromos`, `pandillas`, `pandillas_miembros`, `pandilla_retos`,
+  `cromo_intercambios`, ALTER `usuarios.capacidades` + seed de 10 consumibles.
+- `api/interacciones.js` (v9): +5 GET (`consumibles`, `inventario`,
+  `mis_cromos`, `pandilla_detalle`, `pandilla_reto`) +8 POST
+  (`comprar_consumible`, `usar_consumible`, `cromo_obtener`,
+  `cromo_intercambio`, `pandilla_crear`, `pandilla_unirse`, `pandilla_salir`,
+  `pandilla_reto`) + `tabla_destino` con 5 senderos + retos de parche que
+  consumen las 4 acciones XP.
+- `api/usuarios.js`: NIVELES 20, `conMisiones()` con MERGE (BUG-1) +
+  `calcularEra()`.
+- `api/admin.js` + `admin.html`: CRUD de consumibles (precios editables).
+- `mi-perfil.html`: vitrina 20 niveles + Tienda/Inventario/Mis Cromos.
+- `comunidad.html`: tab Pandillas (detalle, unirse, fundar, retos).
+- `index.html`: XP_LEVELS 20.
+- `usuario-session.js`: `gastarXp()` + `CAPACIDADES_POR_NIVEL` + XP_LEVELS 20.
+- `scripts/smoke_test_gamificacion_v4.js` (NUEVO): 95/95 PASS.
+
+**Pendiente (BLOQUEANTE):**
+1. Aplicar `db/migrations/010_gamificacion_v4.sql` en Neon (Javier).
+   Nota: 007, 008 y 009 siguen pendientes de aplicar en Neon.
+2. Commit + push + deploy de Vercel.
+3. Verificacion en vivo: comprar/usar consumible, obtener cromo, fundar
+   pandilla, y la vitrina de 20 niveles.
 
 ### Sesion TSK-093 - capa multimedia + drawer del mapa cultural (2026-09-10)
 

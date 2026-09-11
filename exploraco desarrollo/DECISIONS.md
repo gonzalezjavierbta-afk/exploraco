@@ -368,3 +368,39 @@ Registro de decisiones arquitectonicas (ADR). Este documento NUNCA contiene tare
 **Frontend:** comunidad.html (tab Mapa), mi-perfil.html (Mis Albumes), admin.html (Foto Top)
 
 **ADR previos relacionados:** ADR-010 (presupuesto endpoints), ADR-012 (gamificacion), ADR-014 (Milestones v2), ADR-015 (Comunidad social)
+
+---
+
+## ADR-018: Gamificacion v4.0 -- Consumibles, Economia de XP, 20 Niveles, Cromos y Pandillas
+
+**ID:** ADR-018
+**Fecha:** 2026-09-10
+**Estado:** Aprobado e implementado en working tree (pendiente aplicar migracion 010 en Neon + deploy)
+**Autor:** AI-DOS Core
+**Spec:** `docs/superpowers/specs/2026-09-10-gamificacion-v4-design.md`
+
+**Problema:** El motor gaming (ADR-012, ADR-014, ADR-017) llegaba a 15 niveles y no tenia economia de consumo: todo el XP era acumulativo e irreversible. El producto pedia una capa de gasto (consumibles de un solo uso) que introdujera riesgo real, una vitrina de perfil completa de 20 niveles con desbloqueos visibles, y las mecanicas de cromos (Steam) y pandillas (clanes) que hasta hoy eran solo conceptuales.
+
+**Decision:**
+- **Economia de XP con de-nivel real:** los consumibles se pagan con `usuarios.xp_total`. Como el nivel se calcula DINAMICAMENTE desde `xp_total`, gastar XP puede bajar de nivel y revocar en runtime las capacidades del nivel superior perdido (revocacion dura, ya soportada por `gastarXp()` en `usuario-session.js`).
+- **10 consumibles** orientados a la experiencia (albumes de fotos, escritos/publicaciones y salas de chat), con catalogo en tabla `consumibles` y **precios editables desde admin.html**.
+- **20 niveles** con 4 Eras (Mundana 1-5, Patrocinada 6-10, Organizador 11-15, Leyenda 16-20) y umbrales 0..30000; nivel/era/badge nunca se persisten (se derivan de `xp_total`).
+- **Inventario en JSONB** (`usuarios.capacidades`) escrito SIEMPRE con `COALESCE ||` (ADR-003, Protocolo Merge). Los ledgers de compra/uso son append-only.
+- **Cromos** con probabilidad comun 0.45 / raro 0.30 / epico 0.18 / dorado 0.07, sets por ciudad, y ledger de intercambios en tabla dedicada `cromo_intercambios`.
+- **Pandillas:** funda Nivel 14+, max 10 miembros, max 1 activa por usuario, cooldown de reingreso 14 dias, fama colectiva (10% de la XP individual) y retos de parche con ventana temporal que reparten `xp_bono` al completarse.
+- **Cero archivos nuevos en /api** (Vercel Hobby 8/8): todas las operaciones entran como `tipo=` en `interacciones.js` (5 GET + 8 POST nuevos) o `admin.js` (CRUD consumibles).
+
+**Tablas nuevas (migracion 010):** `consumibles`, `compra_consumibles`, `consumo_consumibles`, `cromos_catalogo`, `usuarios_cromos`, `pandillas`, `pandillas_miembros`, `pandilla_retos`, `cromo_intercambios`.
+**Extension:** `usuarios.capacidades jsonb` (inventario de consumibles).
+**Backend:** `api/interacciones.js` v9 (+5 GET, +8 POST, tabla_destino con 5 senderos: explorador/critico/organizador/audiovisual/pandilla) + `api/admin.js` (CRUD consumibles).
+**Frontend:** `mi-perfil.html` (vitrina de 20 niveles + Tienda/Inventario/Mis Cromos), `comunidad.html` (tab Pandillas: detalle, unirse, fundar, retos), `index.html` (XP_LEVELS 20).
+
+**Bugs bloqueantes detectados en la revision arquitectonica y corregidos:**
+- BUG-1: `conMisiones()` en `api/usuarios.js` sobrescribia `capacidades` con un objeto nuevo en cada lectura; se corrigio a MERGE con `Object.assign({}, dbCap, misiones)` para no destruir el inventario.
+- BUG-2: la spec referenciaba una columna inexistente para contar intercambios; se creo la tabla dedicada `cromo_intercambios` (ledger append-only + indices anti-farming).
+
+**Verificacion:** `node --check` 4/4; ASCII-safety 0 bytes >127 en api/*.js; `smoke_test_gamificacion_v4.js` 95/95 PASS; smokes de regresion (milestones_v2, catalogo de logros, perfil_progreso) OK.
+
+**Pendiente:** aplicar `db/migrations/010_gamificacion_v4.sql` en Neon (lo ejecuta Javier) + commit/deploy y verificacion en vivo.
+
+**ADR previos relacionados:** ADR-003 (merge JSONB), ADR-010 (presupuesto endpoints), ADR-012 (gamificacion), ADR-014 (Milestones v2), ADR-015 (Comunidad social), ADR-017 (Albums/multimedia)

@@ -1,30 +1,35 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
 const { neon } = require('@neondatabase/serverless');
 
-// Mismos umbrales que XP_LEVELS en index.html (~linea 3276 del motor de
-// puntos local) y en mi-perfil/comunidad. Milestones v2 (ADR-014) expandio
-// la escala de 6 a 15 rangos en 3 Eras (Mundano/Patrocinado/Organizador).
+// Mismos umbrales que XP_LEVELS en index.html (~linea 3959 del motor de
+// puntos local) y en mi-perfil/comunidad. 20 niveles en 4 Eras
+// (Mundana/Patrocinada/Leyenda/Gran Maestro).
 // nivel/badge_actual existian como columnas en usuarios pero
 // interacciones.js nunca las escribia -- se calculan aqui en cada
 // lectura a partir de xp_total en vez de guardarse, para que nunca
 // puedan desincronizarse sin tener que coordinar una escritura extra en
 // cada uno de los 3 lugares de interacciones.js que suman XP.
 const NIVELES = [
-  { min: 0,     nombre: 'Viajero Novato' },
-  { min: 100,   nombre: 'Explorador de Barrio' },
-  { min: 250,   nombre: 'Mochilero Aut\u00f3nomo' },
-  { min: 450,   nombre: 'Cazador de Senderos' },
-  { min: 700,   nombre: 'Local Consagrado' },
-  { min: 1000,  nombre: 'Viajero Patrocinado' },
-  { min: 1400,  nombre: 'Cr\u00edtico de la Calle' },
-  { min: 1900,  nombre: 'Cart\u00f3grafo de Rutas' },
-  { min: 2500,  nombre: 'Embajador de Ciudad' },
-  { min: 3200,  nombre: 'Influenciador Local' },
-  { min: 4000,  nombre: 'Organizador de Eventos' },
-  { min: 5000,  nombre: 'Protector del Patrimonio' },
-  { min: 6500,  nombre: 'Due\u00f1o de la Escena' },
-  { min: 8500,  nombre: 'Leyenda de Territorio' },
-  { min: 11000, nombre: 'Maestro ExploraCO' },
+  { min: 0,     nombre: 'Caminante Novato' },
+  { min: 100,   nombre: 'Rastreador Local' },
+  { min: 250,   nombre: 'Explorador Urbano' },
+  { min: 450,   nombre: 'Aventurero Regional' },
+  { min: 700,   nombre: 'Vanguardia Territorial' },
+  { min: 1000,  nombre: 'Embajador de Zona' },
+  { min: 1400,  nombre: 'Fot\u00f3grafo de Ruta' },
+  { min: 1900,  nombre: 'Cronista de Historias' },
+  { min: 2500,  nombre: 'Buscador de Leyendas' },
+  { min: 3200,  nombre: 'Gu\u00eda de Fronteras' },
+  { min: 4000,  nombre: 'Estrat\u00e9ga Comunitario' },
+  { min: 5200,  nombre: 'Documentalista Visual' },
+  { min: 6800,  nombre: 'Se\u00f1or del Spot' },
+  { min: 8500,  nombre: 'Cart\u00f3grafo de Cine' },
+  { min: 10500, nombre: 'Protector del Patrimonio' },
+  { min: 13000, nombre: 'Curador de Colombia' },
+  { min: 16000, nombre: 'Mariscal de Parche' },
+  { min: 19500, nombre: 'Cineasta de Territorio' },
+  { min: 24000, nombre: 'Inmortal del Mapa' },
+  { min: 30000, nombre: 'Gran Maestro ExploraCO' },
 ];
 
 function calcularNivel(xpTotal) {
@@ -36,11 +41,19 @@ function calcularNivel(xpTotal) {
   return { nivel: nivelIdx + 1, badge_actual: NIVELES[nivelIdx].nombre };
 }
 
+function calcularEra(nivel) {
+  if (nivel <= 5) return 'Mundana';
+  if (nivel <= 10) return 'Patrocinada';
+  if (nivel <= 15) return 'Organizador';
+  return 'Leyenda';
+}
+
 function conNivel(row) {
   if (!row) return row;
   const calc = calcularNivel(row.xp_total);
   row.nivel = calc.nivel;
   row.badge_actual = calc.badge_actual;
+  row.era = calcularEra(calc.nivel);
   return row;
 }
 
@@ -57,16 +70,21 @@ const DESBLOQUEOS = {
   mis_chat_creador:      'crear_chat',
 };
 
+// v9 (Gamificacion v4.0): conMisiones ahora MERGE con capacidades del
+// DB en vez de sobrescribirlas. La migracion 010 agrega
+// usuarios.capacidades con inventario de consumibles; cada GET a
+// /api/usuarios destruiria el inventario si se sobreescribia.
 function conMisiones(row) {
   if (!row) return row;
   const progreso = row.progreso_misiones || {};
-  const capacidades = {};
+  const dbCap = row.capacidades || {};
+  const misiones = {};
   Object.keys(DESBLOQUEOS).forEach((misionId) => {
     if (progreso[misionId] && progreso[misionId].estado === 'completada') {
-      capacidades[DESBLOQUEOS[misionId]] = true;
+      misiones[DESBLOQUEOS[misionId]] = true;
     }
   });
-  row.capacidades = capacidades;
+  row.capacidades = Object.assign({}, dbCap, misiones);
   return row;
 }
 

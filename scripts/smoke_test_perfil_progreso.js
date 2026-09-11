@@ -1,4 +1,4 @@
-// Smoke test de perfil (v7): GET tipo=misiones y GET tipo=logros con
+// Smoke test de perfil (v8): GET tipo=misiones y GET tipo=logros con
 // backfill retroactivo. Reutiliza el patron de smoke_test_milestones_v2.js:
 // carga api/interacciones.js en un VM con Neon fake (global.__MOCKSQL__)
 // e invoca el handler real con consultas mockeadas por contenido.
@@ -68,14 +68,14 @@ function invoke(tipo, mockSql) {
   });
 }
 
-check('MISIONES: catalogo con 16 misiones', MISIONES.length === 16);
-check('LOGROS: catalogo con 22 logros', LOGROS.length === 22);
+check('MISIONES: catalogo con 22 misiones', MISIONES.length === 22);
+check('LOGROS: catalogo con 29 logros', LOGROS.length === 29);
 
 invoke('misiones', mockConUsuario()).then(function(res) {
   check('misiones: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('misiones: total=16', res.total === 16);
-  check('misiones: devuelve las 16 con estado/en', list.length === 16
+  check('misiones: total=22', res.total === 22);
+  check('misiones: devuelve las 22 con estado/en', list.length === 22
     && list.every(function(m){ return m.id && m.grupo && m.nombre && m.xp >= 0
       && Array.isArray(m.requiere) && (m.estado === 'completada' || m.estado === 'pendiente'); }));
   var primer = list.filter(function(m){ return m.id === 'mis_primer_guardado'; })[0];
@@ -88,8 +88,8 @@ invoke('misiones', mockConUsuario()).then(function(res) {
 }).then(function(res) {
   check('logros: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('logros: total=22', res.total === 22);
-  check('logros: filas con tier/emoji/rareza_pct', list.length === 22
+  check('logros: total=29', res.total === 29);
+  check('logros: filas con tier/emoji/rareza_pct', list.length === 29
     && list.every(function(l){ return l.id && l.nombre && l.tier && l.emoji
       && typeof l.rareza_pct === 'number' && (l.estado === 'completada' || l.estado === 'pendiente'); }));
   var voto = list.filter(function(l){ return l.id === 'logr_primer_voto'; })[0];
