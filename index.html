@@ -531,6 +531,92 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mapa-note.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:860px){.mapa-body-grid{grid-template-columns:1fr;height:auto}.mapa-list-panel{height:180px}.mapa-map-container{height:280px}}
 
+/* -- MAPA | MEDIA (pines multimedia) -- */
+.mf-sep{width:1px;height:20px;background:rgba(255,255,255,.16);margin:0 3px;flex-shrink:0}
+.mpa-media-pin{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(0,0,0,.45);border:2.5px solid #fff;cursor:pointer;transition:transform .14s}
+.mpa-media-pin:hover{transform:scale(1.15);z-index:1000}
+
+/* -- MAPA | DRAWER LATERAL -- */
+.mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}
+.mapa-drawer.open{visibility:visible;pointer-events:auto}
+.md-backdrop{position:absolute;inset:0;background:rgba(8,12,24,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .25s}
+.mapa-drawer.open .md-backdrop{opacity:1}
+.md-panel{position:absolute;top:0;right:0;height:100%;width:410px;max-width:100vw;background:#0D1520;box-shadow:-18px 0 50px rgba(0,0,0,.55);transform:translateX(105%);transition:transform .32s cubic-bezier(.22,.8,.24,1);display:flex;flex-direction:column;overflow:hidden;color:#fff}
+.mapa-drawer.open .md-panel{transform:translateX(0)}
+.md-close{position:absolute;top:14px;right:14px;z-index:6;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.md-close:hover{background:var(--gold);border-color:var(--gold);color:#111;transform:rotate(90deg)}
+.md-content{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.md-content::-webkit-scrollbar{width:5px}
+.md-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+.md-hero{position:relative;height:210px;overflow:hidden}
+.md-hero img{width:100%;height:100%;object-fit:cover;display:block}
+.md-hero-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:58px}
+.md-head{padding:16px 18px 8px}
+.md-badge{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 9px;border-radius:3px;margin-bottom:8px}
+.md-cat-hostal{background:#2196F322;color:#7cc0ff;border:1px solid #2196F355}
+.md-cat-comida{background:#FF980020;color:#ffb85c;border:1px solid #FF980055}
+.md-cat-sitio{background:#4CAF5020;color:#7de08d;border:1px solid #4CAF5055}
+.md-cat-evento{background:#A855F720;color:#c99bff;border:1px solid #A855F755}
+.md-title{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#F5E6D0;line-height:1.05;margin-bottom:4px}
+.md-meta{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px;line-height:1.5}
+.md-stars{color:var(--gold);font-size:13px;letter-spacing:1px;margin-bottom:8px}
+.md-price{display:inline-block;background:rgba(232,160,32,.14);border:1px solid rgba(232,160,32,.5);color:var(--gold);font-size:11px;font-weight:800;padding:3px 10px;border-radius:3px;margin-bottom:10px}
+.md-lead{font-size:12px;color:rgba(255,255,255,.6);line-height:1.7;margin-bottom:12px}
+.md-link{display:block;background:var(--gold);color:#111;text-align:center;padding:10px 14px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.md-link:hover{background:var(--gold-dark);color:#fff}
+.md-media{padding:16px 18px 20px;border-top:1px solid rgba(255,255,255,.08);margin-top:6px}
+.md-media h4{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#F5E6D0;margin-bottom:12px}
+.md-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.md-tab{padding:6px 14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;cursor:pointer;border-radius:3px;transition:all .15s}
+.md-tab:hover,.md-tab.on{border-color:var(--gold);color:var(--gold);background:rgba(232,160,32,.1)}
+.md-pane{display:none}
+.md-pane.on{display:block}
+.md-thumbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.md-thumb{position:relative;aspect-ratio:4/3;border-radius:6px;overflow:hidden;cursor:pointer;background:#0A101C}
+.md-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.md-thumb:hover img{transform:scale(1.06)}
+.md-thumb .md-thb-ico{position:absolute;bottom:5px;right:6px;font-size:11px;background:rgba(0,0,0,.5);border-radius:3px;padding:1px 5px}
+.md-mcard{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:6px;background:rgba(255,255,255,.03);margin-bottom:8px;cursor:pointer;transition:all .15s}
+.md-mcard:hover{border-color:var(--gold);background:rgba(232,160,32,.07)}
+.md-mcard-ico{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:#fff}
+.md-mcard-foto{background:#E8A020}
+.md-mcard-video{background:#e74c3c}
+.md-mcard-audio{background:#9b59b6}
+.md-mcard-body{flex:1;min-width:0}
+.md-mcard-t{font-size:12px;font-weight:800;color:#F5E6D0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.md-mcard-a{font-size:10px;color:rgba(255,255,255,.45)}
+.md-mcard-v{font-size:10px;color:var(--gold);margin-top:2px}
+.md-mcard-type{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff;padding:2px 6px;border-radius:3px;flex-shrink:0}
+.md-mcard-type.foto{background:#E8A020}
+.md-mcard-type.video{background:#e74c3c}
+.md-mcard-type.audio{background:#9b59b6}
+.md-audio-row{padding:11px 12px;border:1px solid rgba(255,255,255,.1);border-radius:6px;background:rgba(255,255,255,.03);margin-bottom:8px}
+.md-audio-t{font-size:12px;font-weight:800;color:#F5E6D0;margin-bottom:2px}
+.md-audio-a{font-size:10px;color:rgba(255,255,255,.45);margin-bottom:8px}
+.md-audio-row audio{width:100%;height:34px}
+.md-no-media{text-align:center;padding:22px 14px;border:1px dashed rgba(255,255,255,.18);border-radius:8px}
+.md-no-media .md-nm-ico{font-size:30px;margin-bottom:8px}
+.md-no-media .md-nm-t{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;color:#F5E6D0;text-transform:uppercase;letter-spacing:1px}
+.md-no-media .md-nm-s{font-size:11px;color:rgba(255,255,255,.45);margin-top:4px}
+.md-feat{background:#0A101C;min-height:200px;display:flex;align-items:center;justify-content:center}
+.md-feat img{max-width:100%;max-height:300px;object-fit:contain}
+.md-feat video,.md-feat audio,.md-feat iframe{width:100%;max-width:100%}
+/* Lightbox de media */
+.md-lbox{position:fixed;inset:0;z-index:1300;background:rgba(4,8,16,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:4%;visibility:hidden;opacity:0;transition:opacity .2s;pointer-events:none}
+.md-lbox.open{visibility:visible;opacity:1;pointer-events:auto}
+.md-lb-close{position:absolute;top:16px;right:18px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.md-lb-close:hover{background:var(--gold);color:#111;transform:rotate(90deg)}
+.md-lb-media{max-width:92vw;max-height:78vh;border-radius:8px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+.md-lb-wrap{display:flex;align-items:center;justify-content:center;width:100%}
+.md-lb-wrap iframe,.md-lb-wrap video{width:100%;max-width:92vw}
+.md-lb-cap{font-size:12px;color:rgba(255,255,255,.6);max-width:80%;text-align:center;line-height:1.5}
+
+@media(max-width:768px){
+  .md-panel{width:100%;height:100%;box-shadow:none;transform:translateY(105%)}
+  .mapa-drawer.open .md-panel{transform:translateY(0)}
+  .md-hero{height:190px}
+}
+
 /* ══ AGENDA CULTURAL ══ */
 .agenda-section{background:var(--warm);border-top:1px solid var(--border)}
 .agenda-inner{padding:36px 4%}
@@ -1109,11 +1195,23 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="mf-btn" data-cat="evento">🎉 Eventos</div>
       <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)">📍 Cerca de mí</div>
       <div class="mf-btn" onclick="resetMapaColombia()">🗺️ Colombia</div>
+      <span class="mf-sep"></span>
+      <div class="mf-btn" data-media="all" onclick="toggleMapaMedia(this)">📸 Media</div>
+      <div class="mf-btn" data-media="foto" onclick="filterMapaMedia(this,'foto')">Fotos</div>
+      <div class="mf-btn" data-media="video" onclick="filterMapaMedia(this,'video')">Videos</div>
+      <div class="mf-btn" data-media="audio" onclick="filterMapaMedia(this,'audio')">Audios</div>
     </div>
   </div>
   <div class="mapa-body-grid">
     <div class="mapa-list-panel"><div class="mapa-list-inner" id="mapa-list-inner"></div></div>
     <div class="mapa-map-container"><div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div></div>
+  </div>
+  <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
+    <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
+    <aside class="md-panel" role="dialog" aria-label="Detalle del lugar">
+      <button class="md-close" onclick="closeMapaDrawer()" aria-label="Cerrar">&times;</button>
+      <div class="md-content" id="md-content"><!-- render dinamico --></div>
+    </aside>
   </div>
 </div>
 
@@ -1413,6 +1511,9 @@ var mapaActiveCat = 'all';
 var mapaActiveId  = null;
 var mapaClusterLayer = null;
 var mapaPlaces = [];
+var MAPA_MEDIA = [];
+var mapaMediaLayer = null;
+var MAPA_MEDIA_TIPO = 'all';
 var mapaUserPos = null;
 var mapaPendingPopupId = null;
 var mapaReclusterTimer = null;
@@ -2487,6 +2588,7 @@ function initMapaSection() {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
       {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19}).addTo(mapaMap);
     mapaClusterLayer = L.layerGroup().addTo(mapaMap);
+    mapaMediaLayer = L.layerGroup().addTo(mapaMap);
     mapaMap.on('moveend', onMapaMoved);
   } catch(e) {
     console.warn('[mapa] init error:', e.message);
@@ -2498,11 +2600,21 @@ function initMapaSection() {
   document.querySelectorAll('.mf-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
       if(!btn.dataset.cat) return; // botones de control (Cerca de mí / Colombia)
-      document.querySelectorAll('.mf-btn').forEach(function(b){ b.classList.remove('on'); });
+      document.querySelectorAll('.mf-btn[data-cat]').forEach(function(b){ b.classList.remove('on'); });
       btn.classList.add('on');
       mapaActiveCat = btn.dataset.cat;
       renderMapaList(mapaActiveCat);
       filterMapaPins(mapaActiveCat);
+      // H1 QA: el filtro "Todo" tambien activa la capa multimedia:
+      // los pines media se muestran junto a los de destino.
+      if(mapaActiveCat === 'all') {
+        if(!mapaMediaOn && mapaMap && mapaMediaLayer) {
+          mapaMediaOn = true;
+          if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
+        }
+        syncMapaMediaBtns();
+        renderMapaMedia();
+      }
     });
   });
 }
@@ -2521,6 +2633,9 @@ function refreshMapaMarkers() {
   var places = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
   if(!places.length) {
     console.warn('[mapa] MAPA_PLACES vacío o no cargado aún');
+    // Re-sync de la capa multimedia: MAPA_MEDIA puede estar poblada
+    // aunque los destinos aun no hayan llegado del connector.
+    renderMapaMedia();
     return;
   }
 
@@ -2573,6 +2688,7 @@ function refreshMapaMarkers() {
   mapaPlaces = places.slice();
   filterMapaPins(mapaActiveCat || 'all');
   renderMapaList(mapaActiveCat || 'all');
+  renderMapaMedia();
   console.log('[mapa] ' + added + ' markers de ' + places.length + ' lugares');
 }
 
@@ -2880,6 +2996,367 @@ function toggleMapaSave(id, el) {
   try{ localStorage.setItem('mm_saved',JSON.stringify(mmSaved)); }catch(e){}
   renderMyMap();
 }
+
+/* -- MAPA | CAPA MULTIMEDIA (Modelo A) -- */
+var mapaMediaOn = false;
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function normaliza(s) {
+  var out = String(s == null ? '' : s).toLowerCase();
+  out = out.replace(/\u00e1/g,'a').replace(/\u00e9/g,'e').replace(/\u00ed/g,'i')
+           .replace(/\u00f3/g,'o').replace(/\u00fa/g,'u').replace(/\u00fc/g,'u')
+           .replace(/\u00f1/g,'n');
+  return out;
+}
+
+function mismaCiudad(a, b) {
+  var na = normaliza(a);
+  var nb = normaliza(b);
+  return na !== '' && nb !== '' && na === nb;
+}
+
+function dentroRadio(lat1, lng1, lat2, lng2, km) {
+  if(!km) km = 10;
+  return haversineKm(lat1, lng1, lat2, lng2) <= km;
+}
+
+function mapaMediaIcon(item) {
+  var tipo = item.media_type || 'foto';
+  var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : '#E8A020');
+  var ico = (tipo === 'video') ? '▶' : ((tipo === 'audio') ? '♫' : '📸');
+  return L.divIcon({
+    html: '<div class="mpa-media-pin" style="background:' + color + '">' + ico + '</div>',
+    iconSize:[34,34], iconAnchor:[17,17], className:''
+  });
+}
+
+function renderMapaMedia() {
+  if(!mapaMap || typeof L === 'undefined' || !mapaMediaLayer) return;
+  mapaMediaLayer.clearLayers();
+  if(!mapaMediaOn) return;
+  var items = (typeof MAPA_MEDIA !== 'undefined') ? MAPA_MEDIA : [];
+  if(!items.length) return;
+  var bounds = mapaMap.getBounds();
+  var n = 0;
+  items.forEach(function(item){
+    var lat = parseFloat(item.lat);
+    var lng = parseFloat(item.lng);
+    if(!lat || !lng) return;
+    if(MAPA_MEDIA_TIPO !== 'all' && item.media_type !== MAPA_MEDIA_TIPO) return;
+    if(!bounds.contains([lat, lng])) return;
+    try {
+      var marker = L.marker([lat, lng], { icon: mapaMediaIcon(item) });
+      marker.on('click', function(){ openMapaMediaDrawer(item); });
+      marker.addTo(mapaMediaLayer);
+      n++;
+    } catch(e) {
+      console.warn('[mapa] media marker error:', e.message);
+    }
+  });
+}
+
+function syncMapaMediaBtns() {
+  var btnAll = document.querySelector('[data-media="all"]');
+  var btns = document.querySelectorAll('.mf-btn[data-media]');
+  if(btnAll && mapaMediaOn) btnAll.classList.add('on');
+  else if(btnAll) btnAll.classList.remove('on');
+  for(var i = 0; i < btns.length; i++) {
+    var b = btns[i];
+    if(b.getAttribute('data-media') === 'all') continue;
+    var ok = mapaMediaOn && MAPA_MEDIA_TIPO === b.getAttribute('data-media');
+    if(ok) b.classList.add('on');
+    else b.classList.remove('on');
+  }
+}
+
+function toggleMapaMedia(btn) {
+  if(!mapaMap || !mapaMediaLayer) return;
+  if(mapaMediaOn) {
+    mapaMediaOn = false;
+    btn.classList.remove('on');
+    if(mapaMap.hasLayer(mapaMediaLayer)) mapaMap.removeLayer(mapaMediaLayer);
+  } else {
+    mapaMediaOn = true;
+    btn.classList.add('on');
+    if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
+    renderMapaMedia();
+  }
+  syncMapaMediaBtns();
+}
+
+function filterMapaMedia(btn, tipo) {
+  MAPA_MEDIA_TIPO = tipo;
+  if(!mapaMediaOn && mapaMap && mapaMediaLayer) {
+    mapaMediaOn = true;
+    if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
+  }
+  syncMapaMediaBtns();
+  renderMapaMedia();
+}
+
+/* -- MAPA | DRAWER LATERAL (Modelo C) -- */
+function mdCatLabel(cat) {
+  if(cat === 'hostal') return 'Hospedaje';
+  if(cat === 'comida') return 'Comida';
+  if(cat === 'sitio') return 'Naturaleza';
+  if(cat === 'evento') return 'Eventos';
+  return 'Sitio';
+}
+
+function mdMediaBadge(tipo) {
+  if(tipo === 'video') return 'Video';
+  if(tipo === 'audio') return 'Audio';
+  return 'Foto';
+}
+
+function mdCapMedia(titulo, autor, votos) {
+  var c = titulo || '';
+  if(autor) c += ' \u00b7 ' + autor;
+  if(votos && votos > 0) c += ' \u2b50 ' + votos;
+  return c;
+}
+
+// M2 QA: valida hero_bg antes de inyectarlo en el estilo del hero del
+// drawer. Solo acepta un gradiente CSS plano sin comillas ni apóstrofes,
+// de modo que no pueda cerrar el atributo style ni inyectar HTML.
+function mdHeroBgSafe(bg, fallback) {
+  if(typeof bg === 'string' && /^linear-gradient\([^"']{1,200}\)$/.test(bg)) return bg;
+  return fallback;
+}
+
+function mdMediasCercanas(place) {
+  if(typeof MAPA_MEDIA === 'undefined') return [];
+  var out = [];
+  var pl = place || {};
+  MAPA_MEDIA.forEach(function(it){
+    if(!it.lat || !it.lng) return;
+    var ok = mismaCiudad(pl.city, it.ciudad);
+    if(!ok) ok = dentroRadio(parseFloat(pl.lat), parseFloat(pl.lng), parseFloat(it.lat), parseFloat(it.lng), 10);
+    if(ok && out.length < 40) out.push(it);
+  });
+  return out;
+}
+
+function mdVideoEmbed(url) {
+  if(!url) return '';
+  var yt = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/.exec(url);
+  if(yt && yt[1]) {
+    return '<iframe class="md-lb-media" src="https://www.youtube.com/embed/' + yt[1]
+      + '" frameborder="0" allowfullscreen></iframe>';
+  }
+  var vm = /vimeo\.com\/(\d+)/.exec(url);
+  if(vm && vm[1]) {
+    return '<iframe class="md-lb-media" src="https://player.vimeo.com/video/' + vm[1]
+      + '" frameborder="0" allowfullscreen></iframe>';
+  }
+  return '<video class="md-lb-media" controls src="' + esc(url) + '"></video>';
+}
+
+function mdEnsureLightbox() {
+  var lb = document.getElementById('md-lbox');
+  if(lb) return lb;
+  lb = document.createElement('div');
+  lb.id = 'md-lbox';
+  lb.className = 'md-lbox';
+  lb.onclick = function(e){ if(e && e.target === lb) mdCloseLightbox(); };
+  document.body.appendChild(lb);
+  return lb;
+}
+
+function mdOpenLightbox(html, cap) {
+  var lb = mdEnsureLightbox();
+  lb.innerHTML = '<button class="md-lb-close" onclick="mdCloseLightbox()" aria-label="Cerrar">&times;</button>'
+    + '<div class="md-lb-wrap">' + html + '</div>'
+    + (cap ? '<div class="md-lb-cap">' + esc(cap) + '</div>' : '');
+  lb.classList.add('open');
+}
+
+function mdCloseLightbox() {
+  var lb = document.getElementById('md-lbox');
+  if(!lb) return;
+  lb.classList.remove('open');
+  lb.innerHTML = '';
+}
+
+function mdFotoLightbox(url, cap) {
+  mdOpenLightbox('<img class="md-lb-media" src="' + esc(url) + '" alt="' + esc(cap || '') + '">', cap);
+}
+
+function mdVideoLightbox(url, cap, autor, votos) {
+  mdOpenLightbox(mdVideoEmbed(url), mdCapMedia(cap, autor, votos));
+}
+
+function mdSwitchTab(btn, tab) {
+  var scope = btn.parentNode.parentNode;
+  var tabs = scope.querySelectorAll('.md-tab');
+  for(var i = 0; i < tabs.length; i++) tabs[i].classList.remove('on');
+  btn.classList.add('on');
+  var panes = scope.querySelectorAll('.md-pane');
+  for(var j = 0; j < panes.length; j++) {
+    panes[j].classList.toggle('on', panes[j].getAttribute('data-mdpane') === tab);
+  }
+}
+
+function mdTabHtml(place) {
+  var cercanas = mdMediasCercanas(place);
+  var videos = [];
+  var audios = [];
+  var fotosMedia = [];
+  cercanas.forEach(function(it){
+    if(it.media_type === 'video') videos.push(it);
+    else if(it.media_type === 'audio') audios.push(it);
+    else fotosMedia.push(it);
+  });
+  var fotosArr = [];
+  if(place.photos && place.photos.length) {
+    place.photos.forEach(function(ph){
+      var u = (typeof ph === 'string') ? ph : (ph.url || '');
+      if(u && fotosArr.indexOf(u) === -1) fotosArr.push(u);
+    });
+  }
+  if(place.foto && fotosArr.indexOf(place.foto) === -1) fotosArr.push(place.foto);
+  var hasFotos = fotosArr.length > 0 || fotosMedia.length > 0;
+  var hasVideos = videos.length > 0;
+  var hasAudios = audios.length > 0;
+  var html = '<div class="md-media"><h4>📸 Multimedia</h4>';
+  if(!hasFotos && !hasVideos && !hasAudios) {
+    html += '<div class="md-no-media"><div class="md-nm-ico">📸</div>'
+      + '<div class="md-nm-t">Sin multimedia cercana aún</div>'
+      + '<div class="md-nm-s">¡Sé el primero en subir fotos y videos de este lugar!</div></div>';
+    html += '</div>';
+    return html;
+  }
+  html += '<div class="md-tabs">';
+  if(hasFotos) html += '<button class="md-tab on" data-mdtab="fotos" onclick="mdSwitchTab(this,\'fotos\')">Fotos</button>';
+  if(hasVideos) html += '<button class="md-tab' + (hasFotos ? '' : ' on') + '" data-mdtab="videos" onclick="mdSwitchTab(this,\'videos\')">Videos</button>';
+  if(hasAudios) html += '<button class="md-tab' + ((hasFotos || hasVideos) ? '' : ' on') + '" data-mdtab="audios" onclick="mdSwitchTab(this,\'audios\')">Audios</button>';
+  html += '</div>';
+
+  html += '<div class="md-pane' + (hasFotos ? ' on' : '') + '" data-mdpane="fotos"><div class="md-thumbs">';
+  if(hasFotos) {
+    fotosArr.forEach(function(u){
+      html += '<div class="md-thumb" data-url="' + esc(u) + '" data-cap="' + esc(place.name || 'Foto') + '"'
+        + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
+        + '<img src="' + esc(u) + '" alt="' + esc(place.name || '') + '" loading="lazy">'
+        + '<span class="md-thb-ico">📸</span></div>';
+    });
+    fotosMedia.forEach(function(it){
+      html += '<div class="md-thumb" data-url="' + esc(it.media_url) + '"'
+        + ' data-cap="' + esc(mdCapMedia(it.media_title, it.autor_nombre, it.votos)) + '"'
+        + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
+        + '<img src="' + esc(it.media_url) + '" alt="' + esc(it.media_title || '') + '" loading="lazy">'
+        + '<span class="md-thb-ico">📸</span></div>';
+    });
+  }
+  html += '</div></div>';
+
+  if(hasVideos) {
+    html += '<div class="md-pane' + (hasFotos ? '' : ' on') + '" data-mdpane="videos">';
+    videos.forEach(function(it){
+      html += '<div class="md-mcard" data-url="' + esc(it.media_url) + '" data-cap="' + esc(it.media_title || 'Video') + '"'
+        + ' data-autor="' + esc(it.autor_nombre || '') + '" data-votos="' + (parseInt(it.votos, 10) || 0) + '"'
+        + ' onclick="mdVideoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;),this.getAttribute(&quot;data-autor&quot;),parseInt(this.getAttribute(&quot;data-votos&quot;)||0,10))">'
+        + '<span class="md-mcard-ico md-mcard-video">▶</span>'
+        + '<div class="md-mcard-body"><div class="md-mcard-t">' + esc(it.media_title || 'Video') + '</div>'
+        + (it.autor_nombre ? '<div class="md-mcard-a">' + esc(it.autor_nombre) + '</div>' : '')
+        + (it.votos > 0 ? '<div class="md-mcard-v">⭐ ' + it.votos + '</div>' : '')
+        + '</div><span class="md-mcard-type video">Video</span></div>';
+    });
+    html += '</div>';
+  }
+
+  if(hasAudios) {
+    html += '<div class="md-pane' + ((hasFotos || hasVideos) ? '' : ' on') + '" data-mdpane="audios">';
+    audios.forEach(function(it){
+      html += '<div class="md-audio-row"><div class="md-audio-t">' + esc(it.media_title || 'Audio') + '</div>'
+        + (it.autor_nombre ? '<div class="md-audio-a">' + esc(it.autor_nombre) + '</div>' : '')
+        + '<audio controls preload="metadata" src="' + esc(it.media_url) + '"></audio></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function openMapaDrawer(place) {
+  var drawer = document.getElementById('mapa-drawer');
+  var cont = document.getElementById('md-content');
+  if(!drawer || !cont || !place) return;
+  var heroBg = mdHeroBgSafe(place.hero_bg, 'linear-gradient(135deg,#1a3a5c,#2a4a7c)');
+  var foto = place.foto || '';
+  var rating = parseFloat(place.rating) || 0;
+  var html = '<div class="md-hero" style="background:' + heroBg + '">';
+  if(foto) {
+    html += '<img src="' + esc(foto) + '" alt="' + esc(place.name || '') + '" loading="lazy"'
+      + ' onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.md-hero-ph\').style.display=\'flex\';">';
+  }
+  html += '<div class="md-hero-ph"' + (foto ? ' style="display:none"' : '') + '>' + (place.emoji || '📸') + '</div></div>';
+  html += '<div class="md-head">';
+  html += '<span class="md-badge md-cat-' + esc(place.cat || 'sitio') + '">' + mdCatLabel(place.cat) + '</span>';
+  html += '<div class="md-title">' + esc(place.name || '') + '</div>';
+  html += '<div class="md-meta">📍 ' + esc(place.city || '') + (place.region ? ' · ' + esc(place.region) : '') + '</div>';
+  html += '<div class="md-stars">' + starHtml(rating) + ' ' + rating.toFixed(1) + '</div>';
+  if(place.price) html += '<div class="md-price">' + esc(place.price) + '</div>';
+  if(place.lead) html += '<div class="md-lead">' + esc(place.lead) + '</div>';
+  if(place.slug) html += '<a class="md-link" href="' + esc(place.slug) + '.html">Ver lugar completo →</a>';
+  html += '</div>';
+  html += mdTabHtml(place);
+  cont.innerHTML = html;
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+}
+
+function openMapaMediaDrawer(item) {
+  var drawer = document.getElementById('mapa-drawer');
+  var cont = document.getElementById('md-content');
+  if(!drawer || !cont || !item) return;
+  if(item.origen === 'destino' && item.origen_id) {
+    var found = null;
+    if(typeof MAPA_PLACES !== 'undefined') {
+      MAPA_PLACES.forEach(function(p){ if(p.slug === item.origen_id) found = p; });
+    }
+    if(found) { openMapaDrawer(found); return; }
+  }
+  var html = '<div class="md-feat">';
+  if(item.media_type === 'video') html += mdVideoEmbed(item.media_url);
+  else if(item.media_type === 'audio') html += '<audio controls preload="metadata" src="' + esc(item.media_url) + '"></audio>';
+  else html += '<img src="' + esc(item.media_url) + '" alt="' + esc(item.media_title || '') + '" loading="lazy" onerror="this.parentNode.innerHTML=\'📸\';">';
+  html += '</div>';
+  html += '<div class="md-head">';
+  html += '<span class="md-badge md-cat-' + ((item.media_type === 'video') ? 'evento' : ((item.media_type === 'audio') ? 'comida' : 'sitio')) + '">' + mdMediaBadge(item.media_type) + '</span>';
+  html += '<div class="md-title">' + esc(item.media_title || 'Multimedia') + '</div>';
+  if(item.album_titulo) html += '<div class="md-meta">' + esc(item.album_titulo) + '</div>';
+  if(item.autor_nombre) html += '<div class="md-meta">Por ' + esc(item.autor_nombre) + '</div>';
+  if(item.votos > 0) html += '<div class="md-stars">⭐ ' + item.votos + ' votos</div>';
+  if(item.ciudad) html += '<div class="md-meta">📍 ' + esc(item.ciudad) + '</div>';
+  if(item.ciudad && item.lat && item.lng) {
+    html += '<button class="md-link" onclick="mapaMap.setView([' + parseFloat(item.lat) + ',' + parseFloat(item.lng) + '],13);closeMapaDrawer();">📍 Ver en el mapa</button>';
+  }
+  html += '</div>';
+  cont.innerHTML = html;
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+}
+
+function closeMapaDrawer() {
+  var drawer = document.getElementById('mapa-drawer');
+  var cont = document.getElementById('md-content');
+  if(cont) cont.innerHTML = '';
+  if(drawer) {
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+  mdCloseLightbox();
+}
+
+document.addEventListener('keydown', function(e){
+  if(e && e.key === 'Escape') closeMapaDrawer();
+});
 
 // Init mapa lazily + geolocalización en el primer viewport
 (function(){

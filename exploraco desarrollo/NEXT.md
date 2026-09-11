@@ -3,9 +3,43 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-093: Capa multimedia + drawer del mapa cultural (2026-09-10) - pines multimedia por tipo, drawer de destino con tabs Fotos/Videos/Audios + fix UNION BUG-030
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-093 - capa multimedia + drawer del mapa cultural (2026-09-10)
+
+Implementacion completada en working tree (SIN commitear aun). Requiere
+deploy de api/interacciones.js con el fix de UNION types para dejarla
+operativa en produccion (BUG-030).
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `index.html`: capa multimedia en el mapa Leaflet -- array `MAPA_MEDIA`
+  (L1514), filtro `MAPA_MEDIA_TIPO` (L1516), re-sync de la capa (L2636);
+  drawer lateral fijo con datos del destino (foto hero, rating, precio,
+  lead, link) y tabs Fotos/Videos/Audios con lightbox, embed de
+  YouTube/Vimeo y player de audio. Spec:
+  `docs/superpowers/specs/2026-09-10-multimedia-mapa-cultural-drawer.md`.
+- `index-api-connector.js`: `toMapPlace()` (L72) propaga `foto` (L88,
+  `item.foto_hero || item.foto`) y `photos[]` (L92, slice 8); bloque 3b
+  (L256-276) consume el endpoint publico
+  `GET /api/interacciones?tipo=multimedia_mapa` y puebla `MAPA_MEDIA[]`
+  via `replArr` (L271).
+- `api/interacciones.js`: fix UNION types del handler `multimedia_mapa`
+  (500 uuid vs varchar) -- cast `a.id::text AS origen_id` (L1484). Detalle
+  en BUG-030.
+
+**Pendiente:** deploy de api/interacciones.js (fix UNION) y verificacion
+en produccion.
+
+#### Que sigue
+1. **Deploy + verificacion en produccion (requiere Javier):**
+   "Verificar en produccion la capa multimedia del mapa cultural (requiere
+   deploy de api/interacciones.js con fix UNION types) -- activar capa
+   Media, abrir drawer de destino y de pin multimedia".
+2. **Commit + push (PENDIENTE):** index.html, index-api-connector.js,
+   api/interacciones.js + docs (TASKS/TSK-093, NEXT.md, BUGS/BUG-030).
 
 ### Sesion ADR-016 - subcategorias en tags sitio/comida/evento (2026-09-10) - TSK-090
 

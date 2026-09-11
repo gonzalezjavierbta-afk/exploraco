@@ -2146,5 +2146,45 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-093: Capa multimedia + drawer del mapa cultural [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-10; requiere deploy de api/interacciones.js con fix UNION, ver BUG-030)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-10
+- **Spec:** docs/superpowers/specs/2026-09-10-multimedia-mapa-cultural-drawer.md
+- **Archivos modificados:**
+  - index.html (capa multimedia Leaflet + drawer lateral fijo)
+  - index-api-connector.js (toMapPlace foto/photos + bloque MAPA_MEDIA)
+  - api/interacciones.js (fix UNION types de multimedia_mapa, BUG-030)
+
+- **Subtareas completadas:**
+  1. Capa de pines multimedia en el mapa Leaflet de index.html
+     (foto/video/audio con divIcon de colores y toggle por tipo)
+  2. Drawer lateral fijo con datos del destino (foto hero, rating, precio,
+     lead, link) + tabs Fotos/Videos/Audios con lightbox, embed de
+     YouTube/Vimeo y player de audio
+  3. index-api-connector.js propaga `foto` y `photos[]` en `toMapPlace()`
+     y puebla `MAPA_MEDIA[]` desde el endpoint publico
+     GET /api/interacciones?tipo=multimedia_mapa
+  4. Fix UNION types en api/interacciones.js (BUG-030): `a.id::text AS
+     origen_id` en la rama de albumes
+
+- **Nota de cierre (ADR-006, verificado contra archivo real):** index.html
+  tiene `MAPA_MEDIA` (L1514) y el filtro `MAPA_MEDIA_TIPO` (L1516) con
+  re-sync de la capa multimedia (L2636); index-api-connector.js
+  `toMapPlace()` (L72) emite `foto` (L88, `item.foto_hero || item.foto`)
+  y `photos[]` (L92, slice 8), y el bloque 3b (L256-276) consume el
+  endpoint publico y puebla `MAPA_MEDIA` via `replArr` (L271);
+  api/interacciones.js en el UNION ALL de `multimedia_mapa` castea
+  `a.id::text AS origen_id` (L1484) frente a `d.slug AS origen_id`
+  (L1496); la spec del drawer existe en
+  docs/superpowers/specs/2026-09-10-multimedia-mapa-cultural-drawer.md.
+
+- **Pendiente:**
+  - Deploy de api/interacciones.js (fix UNION) y verificacion en
+    produccion de la capa multimedia y el drawer
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

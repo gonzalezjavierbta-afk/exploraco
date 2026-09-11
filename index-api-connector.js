@@ -85,6 +85,11 @@
       lead:    item.lead    || '',
       price:   item.price   || '',
       hero_bg: item.hero_bg || CAT_COLORS[item.cat] || CAT_COLORS.sitio,
+      foto:    item.foto_hero || item.foto || '',
+      // Galeria completa del destino (max 8) para el drawer del mapa.
+      // Shape normalizado {url,cap}; index.html puede consumir place.photos
+      // sin sorpresas (spec: galeria completa, no solo la hero).
+      photos:   (item.photos && item.photos.length) ? item.photos.slice(0, 8).map(function (p) { return { url: p.url || '', cap: p.cap || '' }; }) : [],
       color:   PIN_COLORS[item.cat] || '#666666', // ← campo requerido por initMapaSection()
     };
   }
@@ -247,6 +252,30 @@
         return toMapPlace(item, idx);
       });
     if (typeof MAPA_PLACES !== 'undefined') replArr(MAPA_PLACES, nuevoMapa);
+
+    // 3b. MAPA_MEDIA[] - multimedia del mapa cultural del endpoint
+    //     publico GET /api/interacciones?tipo=multimedia_mapa
+    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa&_t=' + Date.now();
+    fetch(mediaUrl)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok || !d.data) {
+          console.warn('[index-api] Sin multimedia de mapa:', d.error || 'vacio');
+          return;
+        }
+        var nuevoMedia = d.data.filter(function (m) {
+          return m.media_url
+            && m.lat != null && m.lat !== 0
+            && m.lng != null && m.lng !== 0;
+        });
+        if (typeof MAPA_MEDIA !== 'undefined') replArr(MAPA_MEDIA, nuevoMedia);
+        // Re-render de la capa media: sin esto, si el usuario abre el mapa
+        // antes de que llegue la respuesta, la capa queda vacia hasta la
+        // siguiente interaccion (auditoria QA -> hallazgo M1).
+        if (typeof refreshMapaMarkers === 'function') { try { refreshMapaMarkers(); } catch (e) { console.warn('[index-api] refresh tras multimedia:', e.message); } }
+        console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length);
+      })
+      .catch(function (e) { console.warn('[index-api] Error multimedia mapa:', e.message); });
 
     // 4. DEST_FEATURED_IDS[]
     var featIds = nuevoPL

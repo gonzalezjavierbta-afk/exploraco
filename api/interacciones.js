@@ -1481,7 +1481,7 @@ module.exports = async function handler(req, res) {
           + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
           + '  af.media_title, af.media_source, a.lat, a.lng, a.ciudad,'
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
-          + '  \'album\' AS origen, a.id AS origen_id,'
+          + '  \'album\' AS origen, a.id::text AS origen_id,'
           + '  (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'

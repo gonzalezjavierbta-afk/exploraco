@@ -506,3 +506,39 @@ reescribir campos fuera de `subcategoria` (aqui no toca `cover`). Prevencion:
 para cualquier campo nuevo de ADR-016 revisar contra los seeds legacy antes
 de cerrar la tarea.
 
+## BUG-030: api/interacciones.js handler multimedia_mapa devolvia 500 "UNION types uuid and character varying cannot be matched"
+
+**Contexto:** el handler `tipo=multimedia_mapa` (GET /api/interacciones)
+ejecuta un UNION ALL de 2 ramas: (1) albumes, que emite `a.id AS
+origen_id` (tipo uuid), y (2) destinos, que emite `d.slug AS origen_id`
+(tipo character varying). PostgreSQL exige tipos compatibles entre ramas
+de un UNION; al unir uuid con varchar el query reventaba con error 500.
+
+**Sintoma:** el endpoint del mapa audiovisual / capa multimedia del mapa
+cultural (usado por index.html y comunidad.html) devolvia 500, por lo que
+los pines multimedia y el drawer no cargaban datos.
+
+**Causa raiz:** en el UNION ALL del handler multimedia_mapa, las dos
+ramas emitian la columna `origen_id` con tipos distintos sin castear
+(uuid en la rama de albumes, character varying en la rama de destinos).
+
+**Fix:** castear la columna heterogenea de la rama de albumes a texto:
+`a.id::text AS origen_id` (api/interacciones.js L1484). La rama de
+destinos ya emitia `d.slug` (varchar), de modo que `origen_id` queda como
+text en ambas ramas del UNION.
+
+**Evidencia (ADR-006):** verificado contra el archivo real
+api/interacciones.js: L1471 `if (tipo === 'multimedia_mapa')`; en el
+UNION ALL la rama de albumes emite `'album' AS origen, a.id::text AS
+origen_id` (L1484) y la rama de destinos emite `'destino' AS origen,
+d.slug AS origen_id, 0 AS votos` (L1496).
+
+**Estado:** Corregido en codigo (working tree). REQUIERE DEPLOY de
+api/interacciones.js para que produccion quede sana.
+
+**Leccion:** en cualquier UNION/UNION ALL, si las columnas homonimas de
+las ramas tienen tipos distintos (uuid vs text, int vs text, etc.),
+castear SIEMPRE de forma explicita (`::text`) a un tipo comun antes de
+unir; nunca asumir que los tipos son compatibles solo porque los nombres
+coinciden.
+
