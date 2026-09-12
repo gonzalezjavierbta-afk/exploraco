@@ -621,10 +621,10 @@
   // ── Toast de notificación ──────────────────────────────────
   function mostrarToast(msg, color) {
     // Reusar el toast del admin si existe, o crear uno nuevo
-    var toast = document.getElementById('exploracо-toast');
+    var toast = document.getElementById('exploraco-toast');
     if (!toast) {
       toast = document.createElement('div');
-      toast.id = 'exploracо-toast';
+      toast.id = 'exploraco-toast';
       toast.style.cssText = [
         'position:fixed;bottom:24px;right:24px;',
         'padding:10px 18px;border-radius:8px;color:#fff;',

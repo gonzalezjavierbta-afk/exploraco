@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-098 / Epic multimedia de usuarios (2026-09-12, working tree SIN commitear) - fix 500 albumes/mapa (COALESCE foto/avatar + catch 42P01/42703 -> 503 `SCHEMA_NOT_MIGRATED`), filtro multimedia multi-seleccion (tipo_media CSV + 400 estricto + `tipos_aplicados`), galeria ampliada (`galeria.html` global y `?destino=<slug>`, STATIC_PAGES + boton en ficha), modulo audiovisual en comunidad.html, comentarios tipo Facebook (ADR-023: migracion 013 NUEVA + 6 `tipo=` sin endpoint nuevo) y moderacion en admin; PENDIENTE BLOQUEANTE aplicar migracion 013 en Neon; hallazgo BUG-033 (canonicals cirilicos, NO bloqueante); ADR-023
 - TSK-097 / Fixes multimedia + constraint unica de interacciones (2026-09-12, working tree SIN commitear) - migracion 012 (dedup resena/rating por indice parcial, fotos libres), catch 23505 -> 409 tipado, `DEST_PHOTOS` vacio + `photoPlaceholderHTML`, UI completa de albumes en mi-perfil, trazabilidad de autor/album, BUG-027 resuelto (icono Instagram), smoke_auditoria 42/42; PENDIENTE BLOQUEANTE aplicar migracion 012 en Neon; ADR-022
 - TSK-096 / Capa audiovisual estricta + paridad de drawer en el mapa cultural (2026-09-12, working tree SIN commitear) - deseleccion de "Todo" oculta los pines del directorio; `MAPA_MEDIA` solo albumes de usuarios (backend `?origen=album` + filtro frontend); pines del directorio/Mi Mapa abren el drawer (sin popup) y `mapas.html` estrena drawer propio; ADR-021
 - BUG-031 / hotfix JS inline del popover (2026-09-11, working tree SIN commitear) - SyntaxError en el JS inline de buildHTML() (onchange de mapas tematicos L2288-2290 con comilla escapada mal formada) dejaba TODAS las paginas dinamicas sin funciones de cliente; fix con entidad HTML `&#39;` (1 linea) + guard permanente `scripts/check_buildHTML_inline.js` (vm.Script, 8 funciones + JSON-LD + divs); TSK-095 ya desplegada CON el bug -> produccion rota hasta commit+push+redeploy (ver "Que sigue", item 1)
@@ -13,6 +14,102 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion epic multimedia de usuarios (2026-09-12) - TSK-098
+
+Epic completo de multimedia de usuarios implementado en working tree (SIN
+commitear): fix de los 500 en albumes/mapa, filtro multimedia
+multi-seleccion, galeria ampliada, modulo audiovisual y comentarios tipo
+Facebook. 10 archivos (8 modificados + 2 nuevos + 1 migracion nueva),
+Escudo GOLD limpio. Docs: TASKS/TSK-098, DECISIONS/ADR-023 (ya agregado por
+el architect), BUGS/BUG-033 (hallazgo, NO bloqueante).
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/interacciones.js`: (a) `COALESCE(u.foto_url, u.avatar_url, '')` en
+  `album_detalle`/`multimedia_mapa`; (b) catch global `42P01`/`42703` ->
+  503 tipado `SCHEMA_NOT_MIGRATED` (L3920-3921); (c) `multimedia_mapa`
+  soporta `tipo_media=foto,video,audio` (CSV, `ANY($1::text[])`, 400
+  estricto ante tokens invalidos con `tipos_invalidos` y respuesta
+  `tipos_aplicados`, L1807-1866); (d) `mi_feed_fotos?orden=top|recientes`
+  (L1873); (e) contador `comentarios` (subquery derivada) en
+  `album_detalle` y `mi_feed_fotos`; (f) 6 ramas `tipo=` nuevas SIN
+  endpoint nuevo (presupuesto 8/8, ADR-010): GET `comentarios_foto`
+  (arbol con `likes`/`ya_like`/`es_mio`/`nivel`/`respuestas[]`, L1917),
+  GET `galeria_destino` (L1713), GET `comentarios_recientes` (L1775),
+  POST `comentario_foto` (201, rate-limit 30/dia, +2 XP tope 20/dia,
+  L2908), POST `comentario_eliminar` (soft-delete autor/admin + `cascada`
+  opcional, L3023), POST `comentario_voto` (toggle `like`/`unlike`
+  idempotente, 403 self-like, sin XP, L3094).
+- `db/migrations/013_album_comentarios.sql` (NUEVO, ADR-023): tabla
+  `album_comentarios` (parent_id self-FK, anidacion ilimitada, soft-delete
+  `activo`, CHECK texto 1..1000) + `album_comentario_votos` (likes, PK
+  compuesta) + 4 indices (hilo, arbol, rate-limit diario, likes).
+  Idempotente IF NOT EXISTS (ADR-008), ASCII-safe (ADR-002). **PENDIENTE
+  de aplicar manualmente en Neon por Javier.**
+- `index.html` y `comunidad.html`: filtro multimedia multi-seleccion
+  (foto+video+audio simultaneos) y montaje de comentarios en los modales
+  de album (`AlbumComments.toggle`, index L3392 / comunidad L1448).
+  `comunidad.html` ademas estrena el tab "Audiovisual" (L293,
+  `initAudiovisual` L1614): grid de albumes + feed con orden
+  recientes/populares/top y "cargar mas".
+- `mi-perfil.html`: inputs lat/lng para georreferenciar albumes (para que
+  aparezcan en el mapa) + comentarios en el modal de detalle (L1188).
+- `admin.html`: panel de moderacion de comentarios (`adminCargarComentarios`
+  -> GET `comentarios_recientes` + POST `comentario_eliminar` con cascada
+  admin, L6139-6152).
+- `galeria.html` (NUEVO): subpagina de galeria ampliada, modo global (fotos
+  mas votadas + albumes populares) y modo `?destino=<slug>` (fotos del
+  destino + fotos de usuarios por votos), integra comentarios
+  (`window.AlbumComments.mount`, L341-385). Canonical correcto
+  (`https://exploraco.co/galeria.html`, sin homografo).
+- `album-comments.js` (NUEVO): componente compartido
+  `window.AlbumComments.mount/toggle` (arbol anidado, indentacion visual
+  clamp a 3 niveles, like/unlike, borrar, responder). ASCII 0 bytes >127.
+- `api/pagina-destino.js`: boton "Ver galeria ampliada" (L1488) ahora
+  navega a `/galeria.html?destino=<slug>` (fallback al lightbox in-page si
+  no hay slug).
+- `api/utilidades.js`: `/galeria.html` agregada a STATIC_PAGES del sitemap
+  (L20, priority 0.7, weekly).
+
+**Decisiones de producto (confirmadas):**
+1. Ingreso de media por URL externa por ahora; la SUBIDA REAL DE ARCHIVOS
+   queda como TODO futuro (requiere storage externo tipo Vercel
+   Blob/Supabase/Cloudinary porque Vercel Hobby no persiste archivos).
+2. Los links que sube un usuario quedan en su galeria y referenciados en el
+   mapa (por eso lat/lng en albumes).
+3. Comentarios con likes y respuestas anidadas ILIMITADAS en datos
+   (indentacion visual limitada a 3 niveles, ADR-023).
+4. Migraciones 004-012 ya aplicadas por Javier en Neon; la 013 la aplica
+   manualmente el.
+
+**Verificacion (Escudo GOLD, 2026-09-12):** `node --check` PASS en
+api/interacciones.js, api/pagina-destino.js, api/utilidades.js y
+album-comments.js (re-verificado en esta sesion documental); ASCII-safety
+0 bytes >127 en api/interacciones.js, album-comments.js y la migracion 013.
+Hallazgo de QA de la sesion: los canonicals de 8 HTML usan el homografo
+cirilico `\u043E` (`explorac\u043E.co`, dominio inexistente) -> BUGS/BUG-033
+(NO bloqueante, fuera del alcance del epic).
+
+#### Que sigue
+1. **Aplicar `db/migrations/013_album_comentarios.sql` en Neon (PENDIENTE
+   BLOQUEANTE, lo ejecuta Javier en el editor SQL de Neon; idempotente, no
+   requiere nada mas; requiere migracion 009 previa).** Sin la migracion:
+   los `tipo=` de comentarios (comentarios_foto, comentario_foto,
+   comentario_eliminar, comentario_voto) y el contador `comentarios`
+   degradan a 503 `SCHEMA_NOT_MIGRATED` (el catch 42P01 de este epic solo
+   tipifica el error; la tabla no existe en prod). Nota: la 012 tambien
+   sigue pendiente de aplicar en Neon.
+2. **Commit + push + deploy manual** del working tree completo (los
+   archivos de esta sesion + los de TSK-095/096/097 que siguen sin
+   commitear + los cambios de modelos de agentes de `.opencode/agent/`).
+3. **Verificacion post-deploy:** mapa con fotos de usuarios (albumes con
+   lat/lng visibles), abrir album sin 500, filtros multi-seleccion
+   foto+video+audio simultaneos, galeria ampliada (modo global y
+   `?destino=<slug>`), comentarios end-to-end (crear, responder anidado,
+   like/unlike, borrar autor, moderar en admin con cascada).
+4. **TODO futuro: subida real de archivos** (storage externo tipo Vercel
+   Blob/Supabase/Cloudinary; hoy el ingreso es por URL externa y Vercel
+   Hobby no persiste archivos subidos).
 
 ### Sesion fixes multimedia + constraint unica de interacciones (2026-09-12) - TSK-097
 

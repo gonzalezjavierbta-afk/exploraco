@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Galeria de la comunidad - ExploraCO</title>
+<meta name="description" content="Explora las fotos mas votadas y los albumes populares de la comunidad de viajeros de ExploraCO. Fotos, videos y audio de Colombia con comentarios y votos.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://exploraco.co/galeria.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ExploraCO">
+<meta property="og:title" content="Galeria de la comunidad - ExploraCO">
+<meta property="og:description" content="Explora las fotos mas votadas y los albumes populares de la comunidad de viajeros de ExploraCO. Fotos, videos y audio de Colombia con comentarios y votos.">
+<meta property="og:url" content="https://exploraco.co/galeria.html">
+<meta property="og:image" content="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E8A020">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
+body{font-family:'Outfit',sans-serif;background:var(--black);color:#fff;min-height:100vh;display:flex;flex-direction:column}
+/* NAV (coherente con comunidad.html) */
+nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px;flex-shrink:0}
+.tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
+.tl em{color:var(--gold);font-style:normal}
+.tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
+.nav-label{font-size:11px;color:rgba(255,255,255,.5)}
+.nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
+.nav-back:hover{border-color:var(--gold);color:var(--gold)}
+/* LAYOUT */
+.g-wrap{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:28px 4% 64px}
+.g-head{margin-bottom:26px}
+.g-eyebrow{display:inline-block;background:rgba(232,160,32,.14);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;padding:4px 12px;border-radius:20px;margin-bottom:10px}
+.g-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:.95;color:#fff;letter-spacing:.5px}
+.g-title em{color:var(--gold);font-style:normal}
+.g-sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.7;max-width:640px;margin-top:8px}
+.g-sec{margin-bottom:40px}
+.g-sec-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.g-sec-line{width:30px;height:3px;background:var(--gold);border-radius:2px;flex-shrink:0}
+.g-sec-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#fff}
+.g-sec-count{font-size:11px;color:rgba(255,255,255,.35);margin-left:auto}
+/* MASONRY */
+.g-masonry{column-count:4;column-gap:14px}
+.g-masonry .g-card{break-inside:avoid;margin-bottom:14px;display:inline-block;width:100%}
+.g-loading,.g-empty,.g-error{column-span:all}
+@media (max-width:980px){.g-masonry{column-count:3}}
+@media (max-width:680px){.g-masonry{column-count:2}}
+@media (max-width:420px){.g-masonry{column-count:1}}
+/* CARDS */
+.g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s,background .15s}
+.g-card:hover{border-color:rgba(232,160,32,.4);background:rgba(232,160,32,.05);transform:translateY(-2px)}
+.g-media{width:100%;min-height:60px;background:#181818;display:block;overflow:hidden}
+.g-media img{width:100%;height:auto;display:block}
+.g-media video{width:100%;display:block;background:#000}
+.g-media audio{width:100%;display:block;padding:10px}
+.g-media-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.3);font-size:11px;text-align:center}
+.g-card-body{padding:10px 12px 12px}
+.g-card-title{font-size:12px;font-weight:600;color:#fff;line-height:1.35;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.g-card-meta{font-size:10px;color:rgba(255,255,255,.42);line-height:1.5}
+.g-card-stats{display:flex;align-items:center;gap:12px;margin-top:7px;font-size:10px;font-weight:700;color:var(--gold);flex-wrap:wrap}
+.g-stat{display:inline-flex;align-items:center;gap:4px}
+/* ALBUMS */
+.g-albums{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.g-album{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
+.g-album:hover{border-color:rgba(232,160,32,.4);background:rgba(232,160,32,.05)}
+.g-album-img{width:100%;aspect-ratio:16/10;object-fit:cover;background:#181818;display:block}
+.g-album-ph{width:100%;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.3);font-size:11px;background:#181818}
+.g-album-body{padding:11px 13px;display:flex;flex-direction:column;gap:4px;flex:1}
+.g-album-title{font-size:13px;font-weight:700;color:#fff;line-height:1.3}
+.g-album-meta{font-size:10px;color:rgba(255,255,255,.45)}
+.g-album-stats{font-size:10px;color:var(--gold);font-weight:700;margin-top:auto}
+/* BOTON CARGAR MAS */
+.g-more{display:block;margin:20px auto 0;padding:11px 26px;background:transparent;border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s}
+.g-more:hover{background:var(--gold);color:var(--black)}
+.g-more:disabled{opacity:.5;cursor:default}
+/* ESTADOS */
+.g-loading{padding:40px 20px;text-align:center;color:rgba(255,255,255,.4);font-size:12px}
+.g-empty,.g-error{padding:32px 18px;text-align:center;font-size:12px;border-radius:12px}
+.g-empty{color:rgba(255,255,255,.4);border:1px dashed rgba(255,255,255,.12)}
+.g-error{color:#fca5a5;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25)}
+/* MODAL */
+.g-modal{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:400;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto}
+.g-modal.on{display:flex}
+.g-modal-box{background:var(--black);border:1px solid rgba(232,160,32,.28);border-radius:16px;width:100%;max-width:760px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden;margin:auto}
+.g-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);position:sticky;top:0;z-index:2}
+.g-modal-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.2px;color:var(--gold)}
+.g-modal-close{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:6px;width:32px;height:32px;color:rgba(255,255,255,.7);font-size:18px;line-height:1;cursor:pointer;transition:all .15s;font-family:inherit}
+.g-modal-close:hover{border-color:var(--gold);color:var(--gold)}
+.g-modal-body{padding:18px}
+.g-detail-media{width:100%;border-radius:10px;overflow:hidden;background:#141414;margin-bottom:12px}
+.g-detail-media img,.g-detail-media video{width:100%;display:block}
+.g-detail-media audio{width:100%;display:block;padding:14px}
+.g-detail-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1.15;margin-bottom:4px}
+.g-detail-meta{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:14px}
+.g-detail-stats{font-size:11px;color:var(--gold);font-weight:700;margin-bottom:14px}
+.g-comments{margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:16px}
+.g-album-photos{display:flex;flex-direction:column;gap:20px}
+.g-album-photo{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden}
+.g-album-photo .g-media{min-height:0}
+.g-album-photo-body{padding:12px 14px}
+@media (max-width:600px){.g-modal{padding:8px}.g-modal-body{padding:12px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <div class="tsep"></div>
+  <span class="nav-label">Galeria de la comunidad</span>
+  <a href="comunidad.html" class="nav-back">Volver</a>
+</nav>
+
+<main class="g-wrap">
+  <div class="g-head" id="g-head-global">
+    <div class="g-eyebrow">ExploraCO</div>
+    <h1 class="g-title">Galeria de la <em>comunidad</em></h1>
+    <p class="g-sub">Fotos, videos y audio compartidos por viajeros. Vota tus favoritas y comenta en cada publicacion.</p>
+  </div>
+
+  <div class="g-head" id="g-head-destino" style="display:none">
+    <div class="g-eyebrow">Destino</div>
+    <h1 class="g-title" id="g-dest-title">Destino</h1>
+    <p class="g-sub" id="g-dest-sub"></p>
+  </div>
+
+  <div id="g-global">
+    <section class="g-sec">
+      <div class="g-sec-head">
+        <div class="g-sec-line"></div>
+        <div class="g-sec-title">Fotos mas votadas</div>
+        <span class="g-sec-count" id="g-feed-count"></span>
+      </div>
+      <div id="g-feed" class="g-masonry"></div>
+      <button id="g-more" class="g-more" style="display:none" type="button">Cargar mas</button>
+    </section>
+
+    <section class="g-sec">
+      <div class="g-sec-head">
+        <div class="g-sec-line"></div>
+        <div class="g-sec-title">Albumes populares</div>
+        <span class="g-sec-count" id="g-albums-count"></span>
+      </div>
+      <div id="g-albums" class="g-albums"></div>
+    </section>
+  </div>
+
+  <div id="g-destino" style="display:none">
+    <section class="g-sec">
+      <div class="g-sec-head">
+        <div class="g-sec-line"></div>
+        <div class="g-sec-title">Fotos del destino</div>
+      </div>
+      <div id="g-dest-fotos" class="g-masonry"></div>
+    </section>
+
+    <section class="g-sec">
+      <div class="g-sec-head">
+        <div class="g-sec-line"></div>
+        <div class="g-sec-title">Fotos de la comunidad</div>
+        <span class="g-sec-count" id="g-dest-count"></span>
+      </div>
+      <div id="g-dest-usuarios" class="g-masonry"></div>
+    </section>
+  </div>
+</main>
+
+<div class="g-modal" id="g-modal">
+  <div class="g-modal-box">
+    <div class="g-modal-bar">
+      <div class="g-modal-title" id="g-modal-title">Publicacion</div>
+      <button class="g-modal-close" id="g-modal-close" type="button" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="g-modal-body" id="g-modal-body"></div>
+  </div>
+</div>
+
+<script src="usuario-session.js"></script>
+<script src="album-comments.js"></script>
+<script>
+/* ExploraCO - galeria.html (subpagina de galeria ampliada) */
+/* Modo global: feed top + albumes populares. Modo destino: ?destino=<slug>. */
+(function () {
+  'use strict';
+
+  var G = { usuarioId: null, feedOffset: 0, feedLoading: false };
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function gUsuarioId() {
+    var u = window.ExploraCO && window.ExploraCO.usuario;
+    return (u && u.id) ? String(u.id) : null;
+  }
+
+  function gParams() {
+    var q = window.location.search.replace(/^\?/, '');
+    var out = {};
+    q.split('&').forEach(function (pair) {
+      if (!pair) { return; }
+      var i = pair.indexOf('=');
+      var k = i === -1 ? pair : pair.slice(0, i);
+      var v = i === -1 ? '' : pair.slice(i + 1);
+      out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' '));
+    });
+    return out;
+  }
+
+  function gFetchJson(url) {
+    return fetch(url).then(function (r) {
+      return r.json().catch(function () {
+        return { ok: false, error: 'Respuesta invalida del servidor' };
+      }).then(function (j) {
+        j = j || {};
+        j.__status = r.status;
+        return j;
+      });
+    });
+  }
+
+  function gErrMsg(res) {
+    if (!res) { return 'No se pudo completar la solicitud'; }
+    if (res.__status === 503 || res.code === 'SCHEMA_NOT_MIGRATED') {
+      return 'La galeria de la comunidad no esta disponible todavia';
+    }
+    return res.error || 'No se pudo completar la solicitud';
+  }
+
+  function gLoadingHTML(msg) {
+    return '<div class="g-loading">' + esc(msg || 'Cargando...') + '</div>';
+  }
+
+  function gEmptyHTML(msg) {
+    return '<div class="g-empty">' + esc(msg || 'Sin resultados') + '</div>';
+  }
+
+  function gErrorHTML(msg) {
+    return '<div class="g-error">' + esc(msg || 'Ocurrio un error') + '</div>';
+  }
+
+  function gEmbedUrl(url) {
+    if (!url) { return null; }
+    var m = url.match(/youtube\.com\/watch\?v=([\w-]{6,})/);
+    if (m) { return 'https://www.youtube.com/embed/' + m[1]; }
+    m = url.match(/youtu\.be\/([\w-]{6,})/);
+    if (m) { return 'https://www.youtube.com/embed/' + m[1]; }
+    m = url.match(/vimeo\.com\/(\d+)/);
+    if (m) { return 'https://player.vimeo.com/video/' + m[1]; }
+    return null;
+  }
+
+  function gMediaHTML(item) {
+    var url = esc(item.media_url || '');
+    var type = item.media_type;
+    if (type === 'foto' || !type) {
+      return '<img src="' + url + '" alt="' + esc(item.media_title || '') + '" loading="lazy" onerror="this.style.display=\'none\'">';
+    }
+    if (type === 'video') {
+      var embed = gEmbedUrl(item.media_url);
+      if (embed) {
+        return '<div style="position:relative;width:100%;padding-top:56.25%;background:#000">'
+          + '<iframe src="' + esc(embed) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen loading="lazy"></iframe></div>';
+      }
+      return '<video controls src="' + url + '" preload="metadata"></video>';
+    }
+    if (type === 'audio') {
+      return '<audio controls src="' + url + '" preload="none">Tu navegador no soporta audio.</audio>';
+    }
+    return '<div class="g-media-ph">Tipo no soportado</div>';
+  }
+
+  function gUserCard(f) {
+    var card = document.createElement('div');
+    card.className = 'g-card';
+    card.innerHTML = '<div class="g-media">' + gMediaHTML({ media_url: f.foto_url, media_type: f.foto_type }) + '</div>'
+      + '<div class="g-card-body">'
+      + (f.media_title ? '<div class="g-card-title">' + esc(f.media_title) + '</div>' : '')
+      + '<div class="g-card-meta">' + esc(f.autor_nombre || 'Viajero')
+      + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '')
+      + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '') + '</div>'
+      + '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(f.votos, 10) || 0) + '</span>'
+      + '<span class="g-stat">' + (parseInt(f.comentarios, 10) || 0) + ' comentarios</span></div>'
+      + '</div>';
+    card.addEventListener('click', function () { gOpenMedia(f.id, f); });
+    return card;
+  }
+
+  function gSeedCard(f) {
+    var card = document.createElement('div');
+    card.className = 'g-card';
+    card.innerHTML = '<div class="g-media"><img src="' + esc(f.url) + '" alt="' + esc(f.caption || '') + '" loading="lazy" onerror="this.style.display=\'none\'"></div>'
+      + (f.caption ? '<div class="g-card-body"><div class="g-card-title">' + esc(f.caption) + '</div></div>' : '');
+    return card;
+  }
+
+  function gAlbumCover(a) {
+    var url = a.portada_url || '';
+    if (url) {
+      return '<img class="g-album-img" src="' + esc(url) + '" alt="' + esc(a.titulo || 'Album') + '" loading="lazy" onerror="this.style.display=\'none\'">';
+    }
+    return '<div class="g-album-ph">Album sin portada</div>';
+  }
+
+  function gAlbumCard(a) {
+    var card = document.createElement('div');
+    card.className = 'g-album';
+    card.innerHTML = gAlbumCover(a)
+      + '<div class="g-album-body">'
+      + '<div class="g-album-title">' + esc(a.titulo || 'Album') + '</div>'
+      + '<div class="g-album-meta">' + esc(a.autor_nombre || 'Viajero') + (a.ciudad ? ' \u00b7 ' + esc(a.ciudad) : '') + '</div>'
+      + '<div class="g-album-stats">\u2B50 ' + (parseInt(a.votos_count, 10) || 0) + ' votos \u00b7 ' + (parseInt(a.fotos_count, 10) || 0) + ' fotos</div>'
+      + '</div>';
+    card.addEventListener('click', function () { gOpenAlbum(a.id); });
+    return card;
+  }
+
+  function gOpenMedia(fotoId, f) {
+    var modal = document.getElementById('g-modal');
+    var box = document.getElementById('g-modal-body');
+    if (!modal || !box) { return; }
+    modal.classList.add('on');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('g-modal-title').textContent = 'Publicacion';
+    box.innerHTML = '<div class="g-detail-media">' + gMediaHTML({ media_url: f.foto_url, media_type: f.foto_type }) + '</div>'
+      + (f.media_title ? '<div class="g-detail-title">' + esc(f.media_title) + '</div>' : '')
+      + '<div class="g-detail-meta">' + esc(f.autor_nombre || 'Viajero')
+      + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '')
+      + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '') + '</div>'
+      + '<div class="g-detail-stats">\u2B50 ' + (parseInt(f.votos, 10) || 0) + ' votos</div>'
+      + '<div class="g-comments" id="g-modal-comments"></div>';
+    if (window.AlbumComments && window.AlbumComments.mount) {
+      window.AlbumComments.mount('#g-modal-comments', fotoId, { usuarioId: G.usuarioId });
+    }
+  }
+
+  function gOpenAlbum(albumId) {
+    var modal = document.getElementById('g-modal');
+    var box = document.getElementById('g-modal-body');
+    if (!modal || !box) { return; }
+    modal.classList.add('on');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('g-modal-title').textContent = 'Album';
+    box.innerHTML = gLoadingHTML('Cargando album...');
+    gFetchJson('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId))
+      .then(function (res) {
+        if (!res.ok || !res.album) {
+          box.innerHTML = gErrorHTML(gErrMsg(res));
+          return;
+        }
+        var album = res.album;
+        var fotos = res.fotos || [];
+        var html = '<div class="g-detail-title">' + esc(album.titulo || 'Album') + '</div>'
+          + '<div class="g-detail-meta">' + esc(album.autor_nombre || 'Viajero')
+          + (album.ciudad ? ' \u00b7 ' + esc(album.ciudad) : '')
+          + ' \u00b7 ' + fotos.length + ' fotos</div>';
+        if (!fotos.length) {
+          html += gEmptyHTML('Este album todavia no tiene fotos.');
+        } else {
+          html += '<div class="g-album-photos">';
+          fotos.forEach(function (f) {
+            html += '<div class="g-album-photo"><div class="g-media">' + gMediaHTML({ media_url: f.foto_url, media_type: f.foto_type }) + '</div>'
+              + '<div class="g-album-photo-body">'
+              + (f.media_title ? '<div class="g-card-title">' + esc(f.media_title) + '</div>' : '')
+              + '<div class="g-card-meta">' + esc(f.autor_nombre || 'Viajero') + '</div>'
+              + '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(f.votos, 10) || 0) + '</span>'
+              + '<span class="g-stat">' + (parseInt(f.comentarios, 10) || 0) + ' comentarios</span></div>'
+              + '<div class="g-comments" id="g-ac-' + esc(f.id) + '"></div>'
+              + '</div></div>';
+          });
+          html += '</div>';
+        }
+        box.innerHTML = html;
+        if (window.AlbumComments && window.AlbumComments.mount) {
+          fotos.forEach(function (f) {
+            window.AlbumComments.mount('#g-ac-' + f.id, f.id, { usuarioId: G.usuarioId });
+          });
+        }
+      })
+      .catch(function () {
+        box.innerHTML = gErrorHTML('Error de red al cargar el album');
+      });
+  }
+
+  function gCloseModal() {
+    var modal = document.getElementById('g-modal');
+    if (!modal) { return; }
+    modal.classList.remove('on');
+    document.body.style.overflow = '';
+    document.getElementById('g-modal-body').innerHTML = '';
+  }
+
+  function gLoadFeed(reset) {
+    if (G.feedLoading) { return; }
+    G.feedLoading = true;
+    var box = document.getElementById('g-feed');
+    var more = document.getElementById('g-more');
+    var count = document.getElementById('g-feed-count');
+    if (reset) {
+      G.feedOffset = 0;
+      box.innerHTML = gLoadingHTML('Cargando fotos...');
+      more.style.display = 'none';
+      if (count) { count.textContent = ''; }
+    }
+    more.disabled = true;
+    var url = '/api/interacciones?tipo=mi_feed_fotos&orden=top&limit=24&offset=' + G.feedOffset;
+    gFetchJson(url).then(function (res) {
+      G.feedLoading = false;
+      more.disabled = false;
+      if (!res.ok) {
+        if (reset) { box.innerHTML = gErrorHTML(gErrMsg(res)); }
+        return;
+      }
+      var data = res.data || [];
+      if (reset) { box.innerHTML = ''; }
+      if (!data.length) {
+        if (reset) { box.innerHTML = gEmptyHTML('Todavia no hay fotos en la comunidad.'); }
+        more.style.display = 'none';
+        return;
+      }
+      data.forEach(function (f) { box.appendChild(gUserCard(f)); });
+      G.feedOffset += data.length;
+      if (count) { count.textContent = G.feedOffset + ' fotos'; }
+      more.style.display = data.length >= 24 ? 'block' : 'none';
+    }).catch(function () {
+      G.feedLoading = false;
+      more.disabled = false;
+      if (reset) { box.innerHTML = gErrorHTML('No se pudieron cargar las fotos'); }
+    });
+  }
+
+  function gLoadAlbums() {
+    var box = document.getElementById('g-albums');
+    box.innerHTML = gLoadingHTML('Cargando albumes...');
+    gFetchJson('/api/interacciones?tipo=albumes&orden=populares&limit=12').then(function (res) {
+      if (!res.ok) {
+        box.innerHTML = gErrorHTML(gErrMsg(res));
+        return;
+      }
+      var data = res.data || [];
+      if (!data.length) {
+        box.innerHTML = gEmptyHTML('Todavia no hay albumes populares.');
+        return;
+      }
+      box.innerHTML = '';
+      document.getElementById('g-albums-count').textContent = data.length + ' albumes';
+      data.forEach(function (a) { box.appendChild(gAlbumCard(a)); });
+    }).catch(function () {
+      box.innerHTML = gErrorHTML('No se pudieron cargar los albumes');
+    });
+  }
+
+  function gLoadDestino(slug) {
+    var boxFotos = document.getElementById('g-dest-fotos');
+    var boxUsr = document.getElementById('g-dest-usuarios');
+    boxFotos.innerHTML = gLoadingHTML('Cargando fotos del destino...');
+    boxUsr.innerHTML = gLoadingHTML('Cargando fotos de la comunidad...');
+    gFetchJson('/api/interacciones?tipo=galeria_destino&slug=' + encodeURIComponent(slug))
+      .then(function (res) {
+        document.getElementById('g-head-destino').style.display = 'block';
+        if (!res.ok) {
+          document.getElementById('g-dest-title').textContent = 'Destino no encontrado';
+          document.getElementById('g-dest-sub').textContent = '';
+          boxFotos.innerHTML = gErrorHTML(gErrMsg(res));
+          boxUsr.innerHTML = '';
+          return;
+        }
+        var d = res.destino || {};
+        document.getElementById('g-dest-title').textContent = d.nombre || 'Destino';
+        document.getElementById('g-dest-sub').textContent = (d.ciudad ? d.ciudad + ' \u00b7 ' : '') + 'Fotos curadas y aportes de la comunidad.';
+        var fotos = res.fotos || [];
+        var usuarios = res.usuarios || [];
+        if (!fotos.length) {
+          boxFotos.innerHTML = gEmptyHTML('Este destino todavia no tiene fotos curadas.');
+        } else {
+          boxFotos.innerHTML = '';
+          fotos.forEach(function (f) { boxFotos.appendChild(gSeedCard(f)); });
+        }
+        if (!usuarios.length) {
+          boxUsr.innerHTML = gEmptyHTML('La comunidad todavia no ha compartido fotos de este destino.');
+          document.getElementById('g-dest-count').textContent = '0 fotos';
+        } else {
+          boxUsr.innerHTML = '';
+          usuarios.forEach(function (f) { boxUsr.appendChild(gUserCard(f)); });
+          document.getElementById('g-dest-count').textContent = usuarios.length + ' fotos';
+        }
+      })
+      .catch(function () {
+        document.getElementById('g-head-destino').style.display = 'block';
+        document.getElementById('g-dest-title').textContent = 'Destino no encontrado';
+        document.getElementById('g-dest-sub').textContent = '';
+        boxFotos.innerHTML = gErrorHTML('No se pudo cargar la galeria del destino');
+        boxUsr.innerHTML = '';
+      });
+  }
+
+  function gInit() {
+    G.usuarioId = gUsuarioId();
+    var params = gParams();
+    var destino = params.destino;
+    if (destino) {
+      document.getElementById('g-global').style.display = 'none';
+      document.getElementById('g-head-global').style.display = 'none';
+      document.getElementById('g-destino').style.display = 'block';
+      gLoadDestino(destino);
+    } else {
+      gLoadFeed(true);
+      gLoadAlbums();
+    }
+  }
+
+  window.onExploraCOUpdate = function () { G.usuarioId = gUsuarioId(); };
+
+  var btnClose = document.getElementById('g-modal-close');
+  if (btnClose) { btnClose.addEventListener('click', gCloseModal); }
+  var modal = document.getElementById('g-modal');
+  if (modal) {
+    modal.addEventListener('click', function (e) { if (e.target === this) { gCloseModal(); } });
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { gCloseModal(); } });
+  var btnMore = document.getElementById('g-more');
+  if (btnMore) { btnMore.addEventListener('click', function () { gLoadFeed(false); }); }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', gInit);
+  } else {
+    gInit();
+  }
+})();
+</script>
+</body>
+</html>

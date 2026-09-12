@@ -34,7 +34,7 @@ El sistema permite alternar dinámicamente entre **3 esquemas de operación** se
 
 ### A. Esquema Standard / Pro (Máxima Precisión Técnica)
 * **Agente Principal por defecto**: `build` / `plan`
-* **Modelos Utilizados**: Comercial Pro (`opencode-go/deepseek-v4-pro`, `opencode-go/minimax-m3`, `opencode-go/deepseek-v4-flash`).
+* **Modelos Utilizados**: Comercial Pro (`opencode-go/deepseek-v4-flash` por el momento, es necesario revisar modelos mas economicos para incluir en el sistema).
 * **Propósito**: Tareas complejas de refactorización backend, reescrituras estructurales de HTML/CSS de más de 7,000 líneas (`admin.html`) y migraciones críticas de esquemas SQL en Neon PostgreSQL.
 * **Comportamiento de Delegación**: Invoca exclusivamente subagentes Pro (`backend-dev`, `admin-dev`, `data-migration`, etc.).
 
@@ -63,8 +63,8 @@ Los agentes principales son los puntos de entrada interactivos en una sesión de
 
 | Agente | Esquema | Modelo Asignado | Descripción y Rol en el Sistema |
 | :--- | :--- | :--- | :--- |
-| **`build`** | Standard / Pro | `opencode-go/deepseek-v4-pro` | Agente principal de desarrollo de alta capacidad. Orquesta subagentes Pro para ejecución de código. |
-| **`plan`** | Standard / Pro | `opencode-go/deepseek-v4-pro` | Agente principal de arquitectura y diseño. Crea planes detallados en `TASKS.md` antes de editar código. |
+| **`build`** | Standard / Pro | `opencode-go/deepseek-v4-flash` | Agente principal de desarrollo de alta capacidad. Orquesta subagentes Pro para ejecución de código. |
+| **`plan`** | Standard / Pro | `opencode-go/deepseek-v4-flash` | Agente principal de arquitectura y diseño. Crea planes detallados en `TASKS.md` antes de editar código. |
 | **`free-build`** | Free | `opencode/big-pickle` | Agente principal interactivo por defecto en `opencode.json`. Ejecuta tareas usando la matriz de subagentes gratuitos. |
 | **`free-plan`** | Free | `opencode/big-pickle` | Planificador ligero de costo cero. Diseña la secuencia de trabajo sin consumir APIs comerciales. |
 | **`hybrid-build`** | Hybrid | `opencode-go/deepseek-v4-flash` | Orquestador ejecutor inteligente. Evalúa el riesgo del archivo antes de invocar subagentes Pro o Free. |
@@ -79,7 +79,7 @@ Cada subagente opera en aislamiento mediante un archivo `.md` en `.opencode/agen
 ### 1. Panel Admin (`admin-dev` / `admin-dev-free`)
 * **Propósito**: Lead Developer exclusivo de `admin.html` (~7.800 líneas) y el formulario público `publicar-lugar.js`.
 * **Territorio de Archivos**: `admin.html`, `publicar-lugar.js`.
-* **Modelo Pro**: `opencode-go/minimax-m3` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 * **Permisos**: `edit: allow`, `bash: allow`
 * **Protocolos Obligatorios**:
   * Edición de `admin.html` **únicamente vía scripts Python con `str.replace()` exacto** (Regla de Oro 2).
@@ -90,7 +90,7 @@ Cada subagente opera en aislamiento mediante un archivo `.md` en `.opencode/agen
 ### 2. Backend Serverless (`backend-dev` / `backend-dev-free`)
 * **Propósito**: Lead Developer de los 8 endpoints serverless en Vercel Hobby y del script frontend del conector.
 * **Territorio de Archivos**: `api/*.js` (8 funciones fijas), `index-api-connector.js`.
-* **Modelo Pro**: `opencode-go/deepseek-v4-pro` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 * **Permisos**: `edit: allow`, `bash: allow`
 * **Protocolos Obligatorios**:
   * **ASCII-Safety Estricto**: 0 caracteres > 127, 0 tildes, 0 "ñ", 0 emojis directos, 0 backticks (escapes Unicode `\uXXXX` únicamente).
@@ -113,7 +113,7 @@ Cada subagente opera en aislamiento mediante un archivo `.md` en `.opencode/agen
 ### 4. Gestor de Base de Datos (`data-migration` / `data-migration-free`)
 * **Propósito**: Especialista en migraciones de esquema SQL, limpiezas de datos y seeds masivos en Neon PostgreSQL.
 * **Territorio de Archivos**: `db/migrations/*.sql`, `db/cleanups/*.sql`, `scripts/_gen_*.js`.
-* **Modelo Pro**: `opencode-go/minimax-m3` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 * **Permisos**: `edit: allow`, `bash: allow`
 * **Protocolos Obligatorios**:
   * Trazabilidad SQL versionada (`db/migrations/NNN_descripcion.sql`).
@@ -144,42 +144,47 @@ Cada subagente opera en aislamiento mediante un archivo `.md` en `.opencode/agen
 ### 7. Arquitecto del Sistema (`architect` / `architect-free`)
 * **Propósito**: Chief Architect de ExploraCO. Diseña la estructura global, toma decisiones de ADR y aprueba cambios de infraestructura.
 * **Territorio de Archivos**: `exploraco desarrollo/BLUEPRINT.md`, `exploraco desarrollo/DECISIONS.md`.
-* **Modelo Pro**: `opencode-go/deepseek-v4-pro` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 * **Permisos**: `edit: allow`, `bash: allow`
 
 ### 8. Revisor de Arquitectura (`architect-review` / `architect-review-free`)
 * **Propósito**: Auditor senior que revisa planes y refactorizaciones propuestas por otros agentes antes de la implementación.
-* **Modelo Pro**: `opencode-go/deepseek-v4-pro` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 9. Auditor de Calidad (`qa-auditor`)
 * **Propósito**: Auditor de rendimiento, accesibilidad, seguridad y estándares de la Web Vitals.
-* **Modelo Pro**: `opencode-go/deepseek-v4-pro`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 * **Permisos**: `edit: deny`, `bash: allow` (Ejecuta tests de verificación pero no edita código directamente).
 
 ### 10. Seguridad SQL y RLS (`sql-security` / `sql-security-free`)
 * **Propósito**: Especialista de alto nivel para políticas de seguridad RLS, índices pesados y encriptación de claves Bearer.
-* **Modelo Pro**: `opencode-go/deepseek-v4-pro` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 11. Motor de Renderizado HTML (`renderer-dev` / `renderer-dev-free`)
 * **Propósito**: Lead Developer de `pagina-destino.js` v9 (motor de concatenación de strings Vanilla JS).
 * **Territorio de Archivos**: `api/pagina-destino.js`.
-* **Modelo Pro**: `opencode-go/deepseek-v4-pro` | **Modelo Free**: `opencode/big-pickle`
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 12. Desarrollo de UI y Componentes (`frontend-tpl` / `frontend-tpl-free`)
 * **Propósito**: Diseñador y desarrollador de layouts HTML/CSS aislados para las 4 categorías (sitio, hostal, comida, evento).
 * **Territorio de Archivos**: `public/*.html`, `css/*.css`.
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 13. Aislamiento CSS / JS (`js-silo-dev` / `js-silo-dev-free`)
 * **Propósito**: Mantenimiento de la regla de aislación atómica CSS/JS bajo selectores únicos por categoría (`.tpl-pX`, `.cat-sitio`).
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 14. Investigación y Benchmarking (`research-agent` / `research-agent-free`)
 * **Propósito**: Investigación de datos geográficos, scraping web y recolección de información para nuevos destinos.
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 15. Optimización SEO (`seo-dev` / `seo-dev-free`)
 * **Propósito**: Generación de metas dinámicas, OpenGraph, Schema.org JSON-LD y sitemaps.
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ### 16. Lector de Multimedia (`media-reader` / `media-reader-free`)
 * **Propósito**: Procesamiento de assets visuales, compresión de imágenes y validación de metadatos.
+* **Modelo Pro**: `opencode-go/deepseek-v4-flash` | **Modelo Free**: `opencode/big-pickle`
 
 ---
 

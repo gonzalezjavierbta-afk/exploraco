@@ -17,6 +17,7 @@ var STATIC_PAGES = [
   { loc:'/publicar.html',           priority:'0.6', freq:'monthly' },
   { loc:'/comunidad.html',          priority:'0.5', freq:'weekly'  },
   { loc:'/blog.html',               priority:'0.8', freq:'weekly'  },
+  { loc:'/galeria.html',            priority:'0.7', freq:'weekly'  },
 ];
 var CAT_PRIORITY = { hostal:'0.85', comida:'0.80', sitio:'0.80', evento:'0.75', blog:'0.80' };
 

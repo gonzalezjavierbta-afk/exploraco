@@ -7,7 +7,7 @@
   <!-- SEO + Open Graph -->
   <meta name="description" content="El directorio turístico más completo de Colombia. Hostales, gastronomía, lugares naturales y eventos en una sola plataforma.">
   <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://exploracо.co/index.html">
+  <link rel="canonical" href="https://exploraco.co/index.html">
   <!-- Open Graph -->
   <meta property="og:type"        content="website">
   <meta property="og:site_name"   content="ExploraCO">
@@ -16,7 +16,7 @@
   <meta property="og:image"       content="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80">
   <meta property="og:image:width"  content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:url"         content="https://exploracо.co/">
+  <meta property="og:url"         content="https://exploraco.co/">
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary_large_image">
   <meta name="twitter:title"       content="ExploraCO — Directorio turístico de Colombia">
@@ -743,9 +743,13 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .md-album-t{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
 .md-album-loc{font-size:11px;color:rgba(255,255,255,.5)}
 .md-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.md-album-cell{display:flex;flex-direction:column;gap:6px}
 .md-album-photo{cursor:pointer;aspect-ratio:1/1;border-radius:6px;overflow:hidden;background:#0A101C;transition:transform .15s}
 .md-album-photo:hover{transform:scale(1.02)}
 .md-album-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.md-album-com-btn{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center}
+.md-album-com-btn:hover{background:rgba(232,160,32,.18)}
+.md-album-comments{width:100%}
 .md-album-loading,.md-album-empty{padding:40px 20px;text-align:center;font-size:12px;color:rgba(255,255,255,.5)}
 .dcard-badge{position:absolute;top:9px;left:9px;z-index:2;padding:3px 8px;border-radius:4px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .dcard-feat-star{position:absolute;top:9px;right:9px;z-index:2;background:rgba(232,160,32,.9);color:#fff;font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px}
@@ -1531,7 +1535,6 @@ var mapaClusterLayer = null;
 var mapaPlaces = [];
 var MAPA_MEDIA = [];
 var mapaMediaLayer = null;
-var MAPA_MEDIA_TIPO = 'all';
 var mapaUserPos = null;
 var mapaPendingPopupId = null;
 var mapaReclusterTimer = null;
@@ -2909,6 +2912,20 @@ function toggleMapaSave(id, el) {
 /* -- MAPA | CAPA MULTIMEDIA (Modelo A) -- */
 var mapaMediaOn = false;
 
+// Filtro multimedia MULTI-TIPO: cada tipo (foto/video/audio) es un
+// toggle independiente y varios pueden estar activos a la vez.
+// "Media" es el interruptor maestro de la capa completa.
+var MAPA_MEDIA_TIPOS = { foto: false, video: false, audio: false };
+
+// Cuenta cuantos tipos de media estan activos en el filtro multi-tipo.
+function mapaMediaTiposActivos() {
+  var n = 0;
+  if(MAPA_MEDIA_TIPOS.foto) n++;
+  if(MAPA_MEDIA_TIPOS.video) n++;
+  if(MAPA_MEDIA_TIPOS.audio) n++;
+  return n;
+}
+
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -2975,7 +2992,7 @@ function renderMapaMedia() {
     var lng = parseFloat(item.lng);
     if(!lat || !lng) return;
     if(item.origen === 'destino') return; // R2: solo albumes de usuarios
-    if(MAPA_MEDIA_TIPO !== 'all' && item.media_type !== MAPA_MEDIA_TIPO) return;
+    if(!MAPA_MEDIA_TIPOS[item.media_type]) return; // multi-tipo: solo tipos activos
     if(!bounds.contains([lat, lng])) return;
     try {
       var marker = L.marker([lat, lng], { icon: mapaMediaIcon(item) });
@@ -2991,13 +3008,15 @@ function renderMapaMedia() {
 function syncMapaMediaBtns() {
   var btnAll = document.querySelector('[data-media="all"]');
   var btns = document.querySelectorAll('.mf-btn[data-media]');
-  if(btnAll && mapaMediaOn) btnAll.classList.add('on');
-  else if(btnAll) btnAll.classList.remove('on');
+  if(btnAll) {
+    if(mapaMediaOn) btnAll.classList.add('on');
+    else btnAll.classList.remove('on');
+  }
   for(var i = 0; i < btns.length; i++) {
     var b = btns[i];
-    if(b.getAttribute('data-media') === 'all') continue;
-    var ok = mapaMediaOn && MAPA_MEDIA_TIPO === b.getAttribute('data-media');
-    if(ok) b.classList.add('on');
+    var t = b.getAttribute('data-media');
+    if(t === 'all') continue;
+    if(MAPA_MEDIA_TIPOS[t] === true) b.classList.add('on');
     else b.classList.remove('on');
   }
 }
@@ -3006,11 +3025,15 @@ function toggleMapaMedia(btn) {
   if(!mapaMap || !mapaMediaLayer) return;
   if(mapaMediaOn) {
     mapaMediaOn = false;
-    btn.classList.remove('on');
     if(mapaMap.hasLayer(mapaMediaLayer)) mapaMap.removeLayer(mapaMediaLayer);
   } else {
+    // Encender la capa completa: si ningun tipo esta activo, se activan los 3.
+    if(mapaMediaTiposActivos() === 0) {
+      MAPA_MEDIA_TIPOS.foto = true;
+      MAPA_MEDIA_TIPOS.video = true;
+      MAPA_MEDIA_TIPOS.audio = true;
+    }
     mapaMediaOn = true;
-    btn.classList.add('on');
     if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
     renderMapaMedia();
   }
@@ -3018,8 +3041,16 @@ function toggleMapaMedia(btn) {
 }
 
 function filterMapaMedia(btn, tipo) {
-  MAPA_MEDIA_TIPO = tipo;
-  if(!mapaMediaOn && mapaMap && mapaMediaLayer) {
+  if(!mapaMap || !mapaMediaLayer) return;
+  if(!MAPA_MEDIA_TIPOS.hasOwnProperty(tipo)) return;
+  var antesActivo = MAPA_MEDIA_TIPOS[tipo];
+  MAPA_MEDIA_TIPOS[tipo] = !antesActivo;
+  if(mapaMediaTiposActivos() === 0) {
+    // Se deselecciono el ultimo tipo activo: se apaga la capa completa.
+    mapaMediaOn = false;
+    if(mapaMap.hasLayer(mapaMediaLayer)) mapaMap.removeLayer(mapaMediaLayer);
+  } else if(!antesActivo && !mapaMediaOn) {
+    // Se selecciono un tipo con la capa apagada: se enciende la capa.
     mapaMediaOn = true;
     if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
   }
@@ -3351,10 +3382,19 @@ function openAlbumModal(albumId) {
           if(!url) continue;
           // Atributo escapado: usamos entidad &#39; en onclick para
           // evitar comilla escapada rota (mismo patron que BUG-031 fix).
-          html += '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
+          html += '<div class="md-album-cell">'
+            + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
             + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
             +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
             + '</div>';
+          if(typeof f !== 'string' && f.id) {
+            html += '<button type="button" class="md-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
+              + ' onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios'
+              + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '')
+              + '</button>'
+              + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>';
+          }
+          html += '</div>';
         }
         html += '</div>';
       }
@@ -4937,5 +4977,6 @@ function submitBlog() {
 
   <script src="index-api-connector.js"></script>
   <script src="usuario-session.js"></script>
+  <script src="album-comments.js"></script>
 </body>
 </html>

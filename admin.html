@@ -870,6 +870,16 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           </div>
           <div id="admin-fotos-album-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:10px"></div>
         </div>
+        <!-- Moderacion de comentarios de album (ADR-023) -->
+        <div id="admin-comentarios-section" style="margin-top:16px">
+          <h4 style="color:var(--gold,#E8A020);margin-bottom:8px;">Moderacion de comentarios</h4>
+          <p style="font-size:12px;color:#888;margin-bottom:8px;">Carga los comentarios recientes sobre media de albumes y oculta los que no cumplan las normas. "Ocultar con respuestas" desactiva el subarbol completo (cascada, solo admin).</p>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button onclick="adminCargarComentarios()" id="btn-cargar-comentarios" style="padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Cargar comentarios</button>
+            <span id="admin-comentarios-status" style="font-size:12px;color:#888"></span>
+          </div>
+          <div id="admin-comentarios-grid" style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px"></div>
+        </div>
       </div><!-- /fpanel-media -->
       <div class="ftab-panel" id="fpanel-contenido">
         <div class="form-group">
@@ -4970,7 +4980,7 @@ function downloadCSVTemplate() {
   var example = '"Hostal Ejemplo","hostal","Bogotá","Cundinamarca","La Candelaria","Desde $45.000","Un hostal boutique en el corazón de Bogotá","Descripción larga…","4.5981","-74.0759","573102345678","+57 310 234 5678","hola@hostal.com","https://hostal.com","@hostal_ejemplo","4.8","42"\n';
   var blob = new Blob([header+example],{type:'text/csv;charset=utf-8;'});
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href=url; a.download='plantilla_exploracо.csv'; a.click();
+  var a = document.createElement('a'); a.href=url; a.download='plantilla_exploraco.csv'; a.click();
 }
 
 function handleCSVDrop(event) {
@@ -5076,7 +5086,7 @@ function downloadBackup() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   var date = new Date().toISOString().slice(0,10);
-  a.href=url; a.download='exploracо_backup_'+date+'.json'; a.click();
+  a.href=url; a.download='exploraco_backup_'+date+'.json'; a.click();
   showAdminToast('✓ Backup descargado', 'success');
 }
 
@@ -6123,6 +6133,125 @@ function adminRetirarFotoAlbum(fotoId, btn) {
     function() { adminCargarFeedFotos(); },
     function() { if (btn) { btn.disabled = false; btn.textContent = 'Retirar'; } }
   );
+}
+
+/* ---- Admin Moderar Comentarios Album (ADR-023) --------------------- */
+// GET /api/interacciones?tipo=comentarios_recientes&limit=50 (Bearer admin).
+// Schema por fila: {id, foto_id, texto, creado_en, activo, autor_nombre,
+//                   autor_id, foto_url, foto_type, album_id, album_titulo}.
+// Acciones: ocultar (soft-delete) o cascada:true (desactiva subarbol).
+function adminCargarComentarios() {
+  var grid = document.getElementById('admin-comentarios-grid');
+  var status = document.getElementById('admin-comentarios-status');
+  var btn = document.getElementById('btn-cargar-comentarios');
+  if (!grid || !status) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
+  status.textContent = '';
+  grid.innerHTML = '';
+
+  fetch('/api/interacciones?tipo=comentarios_recientes&limit=50', { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data || !data.ok) {
+        status.textContent = 'Error al cargar comentarios: ' + ((data && data.error) || 'respuesta invalida');
+        if (btn) { btn.disabled = false; btn.textContent = 'Cargar comentarios'; }
+        return;
+      }
+      var rows = data.data || [];
+      if (!rows.length) {
+        status.textContent = 'No hay comentarios en este momento.';
+      } else {
+        status.textContent = rows.length + ' comentario(s) cargados.';
+        rows.forEach(function(c) { grid.appendChild(_adminComentarioCard(c)); });
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Recargar comentarios'; }
+    })
+    .catch(function(err) {
+      status.textContent = 'Error de conexion al cargar comentarios.';
+      if (btn) { btn.disabled = false; btn.textContent = 'Cargar comentarios'; }
+    });
+}
+
+function _adminComentarioCard(c) {
+  var card = document.createElement('div');
+  card.style.cssText = 'border:1px solid var(--border);border-radius:8px;background:var(--card,#fff);padding:10px;display:flex;gap:10px;align-items:flex-start;';
+  var fotoUrl = _esc(c.foto_url || '');
+  var autor = _esc(c.autor_nombre || 'Anonimo');
+  var texto = _esc(c.texto || '');
+  var album = _esc(c.album_titulo || '');
+  var tipo = _esc(String(c.foto_type || 'foto').toUpperCase());
+  var activo = c.activo === true || c.activo === 'true';
+  var cid = _esc(String(c.id));
+  var creado = _esc(c.creado_en ? String(c.creado_en).slice(0, 19).replace('T', ' ') : '');
+  var colorEstado = activo ? '#16a34a' : '#b91c1c';
+  var lblEstado = activo ? 'ACTIVO' : 'OCULTO';
+  var html =
+    '<img src="' + fotoUrl + '" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#222" loading="lazy" onerror="this.style.display=\'none\'">'
+    + '<div style="flex:1;min-width:0">'
+    + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+    + '<strong style="font-size:13px">' + autor + '</strong>'
+    + '<span style="font-size:10px;background:' + colorEstado + ';color:#fff;padding:2px 6px;border-radius:4px">' + lblEstado + '</span>'
+    + '<span style="font-size:10px;background:#444;color:#fff;padding:2px 6px;border-radius:4px">' + tipo + '</span>'
+    + '<span style="font-size:11px;color:#888">' + creado + '</span>'
+    + '</div>'
+    + '<div style="font-size:13px;color:#222;word-break:break-word;white-space:pre-wrap;margin-bottom:4px">' + texto + '</div>'
+    + '<div style="font-size:11px;color:#888;margin-bottom:6px">Album: ' + album + '</div>';
+  if (activo) {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button data-cid="' + cid + '" data-cascada="0" '
+      + 'style="padding:4px 10px;background:#b45309;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px">Ocultar</button>'
+      + '<button data-cid="' + cid + '" data-cascada="1" '
+      + 'style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px">Ocultar con respuestas</button>'
+      + '</div>';
+  }
+  html += '</div>';
+  card.innerHTML = html;
+  var btns = card.querySelectorAll('button[data-cid]');
+  btns.forEach(function(b) {
+    b.onclick = function() {
+      var cascada = b.getAttribute('data-cascada') === '1';
+      var msg = cascada
+        ? 'Ocultar este comentario y TODAS sus respuestas?'
+        : 'Ocultar este comentario? (las respuestas se conservan como tombstones)';
+      if (!confirm(msg)) return;
+      adminEliminarComentario(c.id, cascada, b);
+    };
+  });
+  return card;
+}
+
+/* Wrapper POST comentario_eliminar (Bearer admin permite cualquier comentario
+   y cascada:true para el subarbol). Refresca la lista en exito; re-habilita
+   el boton en error para reintento sin recargar la lista completa. */
+function adminEliminarComentario(comentarioId, cascada, btn) {
+  var labelOriginal = btn ? (btn.getAttribute('data-cascada') === '1' ? 'Ocultar con respuestas' : 'Ocultar') : '';
+  if (btn) { btn.disabled = true; btn.textContent = cascada ? 'Ocultando con respuestas...' : 'Ocultando...'; }
+  fetch('/api/interacciones?tipo=comentario_eliminar', {
+    method: 'POST',
+    headers: _adminHeaders(),
+    body: JSON.stringify({
+      usuario_id: null,
+      comentario_id: comentarioId,
+      cascada: cascada === true
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      var extra = (d.cascada && typeof d.comentarios_desactivados === 'number')
+        ? ' (' + d.comentarios_desactivados + ' desactivado(s))'
+        : '';
+      showAdminToast('Comentario ocultado' + extra, 'success');
+      adminCargarComentarios();
+    } else {
+      showAdminToast('Error: ' + (d.error || 'desconocido'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = labelOriginal; }
+    }
+  })
+  .catch(function(e) {
+    showAdminToast('Error de conexion', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = labelOriginal; }
+  });
 }
 
 async function _deleteFromNeon(localId) {

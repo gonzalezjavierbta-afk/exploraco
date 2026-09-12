@@ -684,3 +684,56 @@ indice unico PARCIAL acotado a los tipos que requieren unicidad; (2) los errores
 para que la UI pueda distinguir "duplicado" de "fallo"; (3) toda alteracion de
 constraint vive en el repo como `.sql` versionado (ADR-008), nunca SQL suelto en Neon.
 
+## BUG-033: Canonicals con homografo cirilico `\u043E` (U+043E) apuntando a un dominio inexistente `explorac\u043E.co`
+
+**Contexto:** detectado en la sesion documental de TSK-098 (2026-09-12) al verificar
+los canonicals de los HTML estaticos. El canonical `<link rel="canonical">` de 8
+archivos raiz usa el homografo cirilico "o" (U+043E, CIRILLIC SMALL LETTER O) en vez
+de la "o" latina (U+006F) dentro de la URL del dominio: `https://explorac\u043E.co/...`
+en lugar de `https://exploraco.co/...`.
+
+**Archivos afectados (verificado contra archivo real, ADR-006):**
+1. `index.html` (L10)
+2. `directorio.html` (L11)
+3. `contacto.html` (L8)
+4. `sobre.html` (L8)
+5. `directorio-hostal.html` (L11)
+6. `directorio-comida.html` (L11)
+7. `directorio-sitio.html` (L11)
+8. `directorio-evento.html` (L11)
+
+**Sintoma:** el tag canonical declara como URL canonica un dominio que NO existe
+(`explorac\u043E.co` no es exploraco.co: el dominio propio real esta pendiente de
+conectar, TASK-004, y el canonical correcto deberia ser `exploraco.co` o
+`exploraco.vercel.app`). Impacto SEO: los buscadores podrian ignorar el canonical
+o indexar la pagina sin senal canonica; los paginas dinamicas del motor
+(`api/pagina-destino.js`, `api/utilidades.js`) SI emiten el canonical correcto,
+por lo que la inconsistencia afecta solo a los estaticos listados.
+
+**Causa:** un caracter homografo introducido en las URLs de los estaticos (copia con
+teclado/configuracion no-latina o autocompletado de un texto previo con el mismo
+caracter). Es invisible a simple vista (la "o" cirilica y la "o" latina son
+indistinguibles visualmente en mayoria de fuentes) y no rompe el parseo HTML, por lo
+que pasa desapercibido en el Escudo GOLD (balance de divs, node --check y
+ASCII-safety no lo detectan: U+043E es un byte >127, pero estos archivos HTML ya
+tienen contenido no-ASCII legitimo y el check se aplica a los api/*.js).
+
+**Fix sugerido (NO aplicado, fuera del alcance del epic TSK-098):** reemplazar 1
+caracter por archivo (U+043E -> U+006F) en las 8 URLs canonicas:
+`https://explorac\u043E.co/` -> `https://exploraco.co/`. Fix de 1 caracter por
+archivo, sin cambios de comportamiento; puede hacerse con un script de reemplazo
+puntual o a mano. Candidato natural: tarea SEO futura junto con TASK-004 (conectar
+el dominio propio) y TASK-005 (Search Console), cuando el dominio propio este activo.
+
+**Estado:** Detectado (2026-09-12, sesion TSK-098). **NO bloqueante y fuera del
+alcance del epic** (los canonicals no afectan la funcionalidad: los estaticos
+siguen sirviendose por `exploraco.vercel.app` y los dinamicos emiten canonical
+correcto). No se corrige en esta sesion para no ampliar el alcance; queda
+registrado como hallazgo de QA.
+
+**Leccion / prevencion:** (1) verificar SIEMPRE la composicion Unicode de las URLs
+de dominio (canonicals, og:url, links absolutos) con un check de code points (buscar
+U+043E y otros homografos cirilicos/griegos en strings `https://exploraco.co`),
+porque el homografo no se detecta por inspeccion visual; (2) candidato a incluir en
+el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
+

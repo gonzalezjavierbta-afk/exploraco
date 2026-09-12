@@ -1479,11 +1479,19 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     return sitioSeccionesActivas.indexOf(sectionId) !== -1;
   }
 
+  // Btn "Ver galeria ampliada": navega a la subpagina dedicada
+  // /galeria.html?destino=<slug>. Fallback seguro al lightbox in-page si
+  // el destino no tiene slug (no romper miniaturas existentes). Apostrofes
+  // del onclick van como entidad HTML &#39; para no romper el JS inline
+  // del HTML generado (patron BUG-031).
+  var btnGaleriaAmpliada = d.slug
+    ? '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html?destino=&#39;+encodeURIComponent(&#39;'+esc(d.slug)+'&#39;)">Ver galeria ampliada</button>'
+    : '<button class="glbtn" onclick="abrirLightbox(0)">Ver galeria ampliada</button>';
   var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="gal-main" style="background-image:url(\''+esc(galAll[0])+'\')" onclick="abrirLightbox(0)"></div>'
     + '<div class="gal-thumbs">'+galAll.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+i+')"></div>'; }).join('')+'</div>'
-    + '<button class="glbtn" onclick="abrirLightbox(0)">Ver galeria ampliada</button>'
+    + btnGaleriaAmpliada
     + '</div></section>' : '';
 
   // -- LIGHTBOX (galeria ampliada) --------------------------------

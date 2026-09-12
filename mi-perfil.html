@@ -148,6 +148,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .cromo-name{font-size:11px;font-weight:700;color:#fff;margin-bottom:2px}
 .cromo-set{font-size:9px;color:rgba(255,255,255,.35);margin-bottom:4px}
 .cromo-qty{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--gold)}
+.mp-album-com-btn{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center;width:100%}
+.mp-album-com-btn:hover{background:rgba(232,160,32,.18)}
+.mp-album-comments{width:100%}
 </style>
 </head>
 <body>
@@ -265,6 +268,19 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <input type="text" id="album-ciudad" placeholder="Bogota" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
       </div>
       <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Ubicacion en el mapa (opcional)</label>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <div style="flex:1;">
+            <input type="number" step="0.000001" min="0" max="13" id="album-lat" placeholder="Latitud (opcional)" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          </div>
+          <div style="flex:1;">
+            <input type="number" step="0.000001" min="-79" max="-66" id="album-lng" placeholder="Longitud (opcional)" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          </div>
+        </div>
+        <button onclick="usarMiUbicacionAlbum('album-lat','album-lng',this)" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x1F4CD; Usar mi ubicacion</button>
+        <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Sin latitud/longitud el album no aparecera en el mapa cultural.</p>
+      </div>
+      <div style="margin-bottom:12px;">
         <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">URL de portada (opcional)</label>
         <input type="url" id="album-portada" placeholder="https://..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
       </div>
@@ -342,6 +358,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Longitud</label>
           <input type="number" step="any" id="edit-album-lng" placeholder="-75.6" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
         </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <button onclick="usarMiUbicacionAlbum('edit-album-lat','edit-album-lng',this)" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x1F4CD; Usar mi ubicacion</button>
+        <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Sin latitud/longitud el album no aparecera en el mapa cultural.</p>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
         <button onclick="cerrarModalEditarAlbum()" style="padding:8px 16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.7);font-family:Outfit,sans-serif;">Cancelar</button>
@@ -1032,6 +1052,11 @@ function crearAlbum() {
   var uid = window.ExploraCO.usuario.id;
   var titulo = (document.getElementById('album-titulo').value || '').trim();
   if (!titulo) { alert('El titulo es requerido'); return; }
+  var latRaw = (document.getElementById('album-lat').value || '').trim();
+  var lngRaw = (document.getElementById('album-lng').value || '').trim();
+  var latNum = parseFloat(latRaw);
+  var lngNum = parseFloat(lngRaw);
+  var tieneCoords = isFinite(latNum) && isFinite(lngNum);
   fetch('/api/interacciones?tipo=album_crear', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1041,7 +1066,9 @@ function crearAlbum() {
       descripcion: (document.getElementById('album-descripcion').value || '').trim(),
       album_tipo: document.getElementById('album-tipo').value || 'fotos',
       ciudad: (document.getElementById('album-ciudad').value || '').trim() || null,
-      portada_url: (document.getElementById('album-portada').value || '').trim() || null
+      portada_url: (document.getElementById('album-portada').value || '').trim() || null,
+      lat: tieneCoords ? latNum : null,
+      lng: tieneCoords ? lngNum : null
     })
   })
   .then(function(r){ return r.json(); })
@@ -1052,6 +1079,8 @@ function crearAlbum() {
       document.getElementById('album-descripcion').value = '';
       document.getElementById('album-ciudad').value = '';
       document.getElementById('album-portada').value = '';
+      document.getElementById('album-lat').value = '';
+      document.getElementById('album-lng').value = '';
       cargarMisAlbumes();
       if (d.misiones && d.misiones.length) {
         d.misiones.forEach(function(m) {
@@ -1063,6 +1092,27 @@ function crearAlbum() {
     }
   })
   .catch(function() { alert('Error de conexion'); });
+}
+
+/* Llena los inputs lat/lng de un modal de album con la posicion actual
+   del navegador, para que el album quede georreferenciado en el mapa
+   cultural (ADR-017). Reutilizada por los modales crear y editar. */
+function usarMiUbicacionAlbum(idLat, idLng, btn) {
+  if (!navigator.geolocation) { toastError('Tu navegador no soporta geolocalizacion'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Obteniendo\u2026'; }
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var latEl = document.getElementById(idLat);
+    var lngEl = document.getElementById(idLng);
+    if (latEl) latEl.value = pos.coords.latitude.toFixed(6);
+    if (lngEl) lngEl.value = pos.coords.longitude.toFixed(6);
+    if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDCCD Usar mi ubicacion'; }
+    if (typeof showToast === 'function') showToast('Ubicacion detectada');
+  }, function(err) {
+    if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDCCD Usar mi ubicacion'; }
+    var msg = (err && err.message) ? err.message : 'No se pudo obtener la ubicacion';
+    if (err && err.code === 1) msg = 'Permiso de ubicacion denegado';
+    toastError(msg);
+  });
 }
 
 /* Estado global del album actualmente abierto en el modal de detalle.
@@ -1107,6 +1157,8 @@ function verDetalleAlbum(albumId) {
       var grid = document.getElementById('album-det-fotos');
       grid.innerHTML = '';
       fotos.forEach(function(f) {
+        var cell = document.createElement('div');
+        cell.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
         var card = document.createElement('div');
         card.style.cssText = 'border-radius:8px;overflow:hidden;background:rgba(255,255,255,.04);position:relative;';
         if (f.foto_type === 'video') {
@@ -1125,7 +1177,23 @@ function verDetalleAlbum(albumId) {
           + (f.media_title ? '<div style="font-weight:500;color:rgba(255,255,255,.8);">' + esc(f.media_title) + '</div>' : '')
           + '<div style="color:rgba(255,255,255,.4);">' + (f.autor_nombre || 'Anonimo') + ' | ' + (f.votos || 0) + ' &#x2B50;</div>'
           + '</div>';
-        grid.appendChild(card);
+        cell.appendChild(card);
+        if (f.id) {
+          var comBtn = document.createElement('button');
+          comBtn.type = 'button';
+          comBtn.className = 'mp-album-com-btn';
+          comBtn.setAttribute('data-comments-for', String(f.id));
+          comBtn.innerHTML = '\uD83D\uDCAC Comentarios'
+            + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '');
+          comBtn.addEventListener('click', function(){ AlbumComments.toggle(comBtn); });
+          var comBox = document.createElement('div');
+          comBox.className = 'mp-album-comments';
+          comBox.setAttribute('data-comments-for', String(f.id));
+          comBox.style.display = 'none';
+          cell.appendChild(comBtn);
+          cell.appendChild(comBox);
+        }
+        grid.appendChild(cell);
       });
       document.getElementById('modal-detalle-album').style.display = 'flex';
     })
@@ -1371,5 +1439,6 @@ window.onExploraCOUpdate = function() { checkGate(); };
 checkGate();
 </script>
   <script src="usuario-session.js"></script>
+  <script src="album-comments.js"></script>
 </body>
 </html>

@@ -2374,5 +2374,52 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-098: Epic multimedia de usuarios: fix 500 albumes/mapa, filtro multi-seleccion, galeria ampliada, modulo audiovisual y comentarios tipo Facebook [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-12, working tree SIN commitear)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-12
+- **Prompt origen:** epic multimedia de usuarios (fix 500 en albumes/mapa, filtro multi-seleccion, galeria ampliada, modulo audiovisual y comentarios tipo Facebook)
+- **Archivos modificados/nuevos (Escudo GOLD limpio, working tree SIN commitear):**
+  - `api/interacciones.js` (COALESCE foto/avatar, catch 42P01/42703 -> 503 `SCHEMA_NOT_MIGRATED`, `multimedia_mapa` con `tipo_media` CSV, `mi_feed_fotos?orden=`, contador `comentarios`, 6 ramas `tipo=` nuevas de comentarios/galeria; SIN endpoints nuevos, presupuesto 8/8 ADR-010)
+  - `db/migrations/013_album_comentarios.sql` (NUEVO, ADR-023)
+  - `index.html`, `comunidad.html` (filtro multimedia multi-seleccion + comentarios en modales de album; comunidad estrena tab "Audiovisual")
+  - `mi-perfil.html` (inputs lat/lng para georreferenciar albumes + comentarios en el modal de detalle)
+  - `admin.html` (panel de moderacion de comentarios)
+  - `galeria.html` (NUEVO)
+  - `album-comments.js` (NUEVO)
+  - `api/pagina-destino.js` (boton "Ver galeria ampliada" -> `/galeria.html?destino=<slug>`)
+  - `api/utilidades.js` (`/galeria.html` en STATIC_PAGES del sitemap)
+
+- **Cambios completados (verificados contra archivo real, ADR-006):**
+  1. **Fix 500 en albumes/mapa:** `COALESCE(u.foto_url, u.avatar_url, '')` en `album_detalle`/`multimedia_mapa` (avatar null ya no rompe); catch global `err.code === '42P01' || err.code === '42703'` -> 503 tipado `SCHEMA_NOT_MIGRATED` (L3920-3921) en vez de 500 generico.
+  2. **Filtro multimedia multi-seleccion:** `multimedia_mapa` acepta `tipo_media=foto,video,audio` (CSV), consulta con `ANY($1::text[])` (L1807-1828), 400 estricto ante tokens invalidos (`tipos_invalidos`) en vez del fallback silencioso, y respuesta con `tipos_aplicados` (L1866).
+  3. **Feed de fotos con orden:** `mi_feed_fotos?orden=top|recientes` (`feedOrden`, L1873; default recientes).
+  4. **Contador de comentarios:** subquery derivada `comentarios` (COUNT activos) en `album_detalle` y `mi_feed_fotos` (patron ADR-023: contador derivado, sin columna persistida).
+  5. **Comentarios tipo Facebook (ADR-023):** 6 ramas `tipo=` nuevas en `api/interacciones.js` SIN endpoint nuevo: GET `comentarios_foto` (arbol con `likes`/`ya_like`/`es_mio`/`nivel`/`respuestas[]`, L1917-1933), GET `galeria_destino` (L1713), GET `comentarios_recientes` (L1775), POST `comentario_foto` (201, rate-limit diario 30, +2 XP tope 20/dia, L2908), POST `comentario_eliminar` (soft-delete autor/admin + `cascada` opcional, L3023), POST `comentario_voto` (toggle `like`/`unlike` idempotente, 403 self-like, sin XP, L3094-3129).
+  6. **Galeria ampliada:** `galeria.html` (NUEVO) con modo global (fotos mas votadas + albumes populares) y modo `?destino=<slug>` (fotos del destino + fotos de usuarios por votos), integra comentarios (`window.AlbumComments.mount`, L341-385); `api/pagina-destino.js` L1488: boton "Ver galeria ampliada" navega a `/galeria.html?destino=<slug>` con fallback al lightbox in-page si no hay slug; `api/utilidades.js` L20 agrega `/galeria.html` (priority 0.7, weekly) a STATIC_PAGES del sitemap.
+  7. **Modulo audiovisual:** `comunidad.html` tab "Audiovisual" (L293, `initAudiovisual` L1614): grid de albumes + feed con orden recientes/populares/top y "cargar mas".
+  8. **Georreferenciacion:** `mi-perfil.html` inputs lat/lng en albumes para que aparezcan en el mapa (`multimedia_mapa`).
+  9. **Moderacion admin:** `admin.html` panel de comentarios (`adminCargarComentarios` -> GET `comentarios_recientes` + POST `comentario_eliminar` con cascada admin, L6139-6152).
+  10. **Componente compartido:** `album-comments.js` (NUEVO) expone `window.AlbumComments.mount/toggle` (arbol anidado, indentacion visual clamp a 3 niveles, like/unlike, borrar, responder), consumido por index.html (L3392), comunidad.html (L1448), mi-perfil.html (L1188) y galeria.html.
+
+- **Decisiones de producto (confirmadas por el usuario):**
+  1. Ingreso de media por URL externa por ahora; SUBIDA REAL DE ARCHIVOS queda como TODO futuro (requiere storage externo tipo Vercel Blob/Supabase/Cloudinary porque Vercel Hobby no persiste archivos).
+  2. Los links que sube un usuario quedan en su galeria y referenciados en el mapa (por eso lat/lng en albumes).
+  3. Comentarios con likes y respuestas anidadas ILIMITADAS en datos (indentacion visual limitada a 3 niveles, ADR-023).
+  4. Migraciones 004-012 ya aplicadas por Javier en Neon; la 013 la aplica manualmente el (bloqueante para los `tipo=` de comentarios; sin ella devuelven 503 `SCHEMA_NOT_MIGRATED`).
+
+- **Verificacion (Escudo GOLD, 2026-09-12):** `node --check` PASS en api/interacciones.js, api/pagina-destino.js, api/utilidades.js y album-comments.js (re-verificado en esta sesion documental); ASCII-safety 0 bytes >127 en api/interacciones.js, album-comments.js y db/migrations/013_album_comentarios.sql. Hallazgo de QA de la sesion: canonicals con homografo cirilico `\u043E` en 8 HTML -> BUGS_HISTORICOS.md BUG-033 (NO bloqueante, fuera del alcance del epic).
+
+- **PENDIENTES (bloqueantes):**
+  1. **APLICAR `db/migrations/013_album_comentarios.sql` EN NEON (lo ejecuta Javier en el editor SQL; idempotente IF NOT EXISTS, ASCII-safe, requiere migracion 009 previa).** Sin la tabla, los `tipo=` de comentarios y el contador `comentarios` degradan a 503 `SCHEMA_NOT_MIGRATED` (catch 42P01 de este epic).
+  2. **Commit + push + deploy manual** del working tree completo (incluye los pendientes de TSK-095/096/097 y los cambios de modelos de agentes de `.opencode/agent/`).
+  3. **Verificacion post-deploy:** mapa con fotos de usuarios (albumes con lat/lng), abrir album sin 500, filtros multi-seleccion foto+video+audio, galeria ampliada (modo global y `?destino=`), comentarios end-to-end (crear/responder/like/unlike/borrar/moderar en admin).
+  4. **TODO futuro: subida real de archivos** (storage externo tipo Vercel Blob/Supabase/Cloudinary; hoy el ingreso es por URL externa).
+
+- **Fuera de alcance / backlog:** BUG-033 (canonicals cirilicos, NO bloqueante, fix de 1 caracter por archivo); subida real de archivos (TODO, requiere storage externo); nota ADR-023: `multimedia_mapa` y `fotos_top` pueden sumar el contador `comentarios` despues.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

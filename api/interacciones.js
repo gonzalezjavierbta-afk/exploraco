@@ -1670,7 +1670,7 @@ module.exports = async function handler(req, res) {
         var albumId = req.query.album_id;
         var albumDetRows = await sql(
           'SELECT a.*, u.nombre AS autor_nombre,'
-          + ' u.nombre AS usuario_nombre, u.foto_url AS usuario_avatar,'
+          + ' u.nombre AS usuario_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS usuario_avatar,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count'
           + ' FROM albumes a LEFT JOIN usuarios u ON u.id = a.usuario_id'
           + ' WHERE a.id = $1 AND a.activo = true',
@@ -1682,8 +1682,9 @@ module.exports = async function handler(req, res) {
         var fotosDetRows = await sql(
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' af.autor_original_id, af.agregador_id, af.creado_en,'
-          + ' u.nombre AS autor_nombre, u.foto_url AS autor_avatar, u.id AS usuario_id,'
-          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
+          + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar, u.id AS usuario_id,'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
+          + ' (SELECT COUNT(*)::int FROM album_comentarios ac WHERE ac.foto_id = af.id AND ac.activo = true) AS comentarios'
           + ' FROM album_fotos af'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE af.album_id = $1 AND af.activo = true'
@@ -1705,15 +1706,133 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows });
       }
 
+      // Galeria de un destino (ficha publica): fotos curadas de
+      // destinos_fotos + fotos de albumes de usuario geolocalizadas
+      // cerca del destino (mismo criterio de cercania que fotos_top).
+      // Params: slug (o destino_id). Sin endpoints nuevos (ADR-010).
+      if (tipo === 'galeria_destino') {
+        var gdSlug = req.query.slug || null;
+        var gdDestinoId = req.query.destino_id || null;
+        if (!gdSlug && !gdDestinoId)
+          return res.status(400).json({ ok: false, error: 'slug o destino_id requerido' });
+
+        var gdDestinoRows = await sql(
+          'SELECT id, nombre, slug, ciudad, lat, lng'
+          + ' FROM destinos'
+          + ' WHERE (slug = $1 OR id = $2) AND status = \'published\''
+          + ' LIMIT 1',
+          [gdSlug, gdDestinoId]
+        );
+        if (!gdDestinoRows.length)
+          return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        var gdDestino = gdDestinoRows[0];
+
+        var gdFotos = await sql(
+          'SELECT url, caption, orden FROM destinos_fotos'
+          + ' WHERE destino_id = $1'
+          + ' ORDER BY orden ASC',
+          [gdDestino.id]
+        );
+
+        // NOTA (ADR-023): album_comentarios se crea en la migracion 013.
+        // Mientras no este aplicada, la subquery de comentarios lanza
+        // 42P01 y este GET responde 503 (SCHEMA_NOT_MIGRATED). Se deja
+        // asi a proposito; cuando la 013 se aplique, funciona sin cambios.
+        var gdUsuarios = await sql(
+          'SELECT af.id, af.foto_url, af.foto_type, af.media_title,'
+          + ' a.id AS album_id, a.titulo AS album_titulo, a.ciudad,'
+          + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
+          + ' (SELECT COUNT(*)::int FROM album_comentarios ac WHERE ac.foto_id = af.id AND ac.activo = true) AS comentarios'
+          + ' FROM album_fotos af'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
+          + ' WHERE af.activo = true AND a.activo = true'
+          + ' AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
+          + ' AND ABS(a.lat - $1) < 0.01 AND ABS(a.lng - $2) < 0.01'
+          + ' ORDER BY votos DESC LIMIT 100',
+          [gdDestino.lat, gdDestino.lng]
+        );
+
+        return res.status(200).json({
+          ok: true,
+          destino: {
+            id: gdDestino.id,
+            nombre: gdDestino.nombre,
+            slug: gdDestino.slug,
+            ciudad: gdDestino.ciudad,
+            lat: gdDestino.lat,
+            lng: gdDestino.lng,
+          },
+          fotos: gdFotos,
+          usuarios: gdUsuarios,
+        });
+      }
+
+      // Moderacion admin: comentarios recientes de albumes (ADR-023).
+      // Requiere Authorization: Bearer <ADMIN_SECRET>. Mismo patron que
+      // admin_moderar_foto_album / admin_foto_top.
+      if (tipo === 'comentarios_recientes') {
+        var crToken = req.headers.authorization || '';
+        if (crToken.indexOf('Bearer ') !== 0)
+          return res.status(401).json({ ok: false, error: 'Token requerido' });
+        crToken = crToken.slice(7);
+        var crSecret = process.env.ADMIN_SECRET || 'exploraco12345';
+        if (crToken !== crSecret)
+          return res.status(403).json({ ok: false, error: 'Token invalido' });
+
+        var crLimit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 100);
+        var crOffset = Math.max(parseInt(req.query.offset || '0', 10) || 0, 0);
+
+        var crRows = await sql(
+          'SELECT ac.id, ac.foto_id, ac.texto, ac.creado_en, ac.activo,'
+          + ' u.nombre AS autor_nombre, u.id AS autor_id,'
+          + ' af.foto_url, af.foto_type,'
+          + ' a.id AS album_id, a.titulo AS album_titulo'
+          + ' FROM album_comentarios ac'
+          + ' JOIN album_fotos af ON af.id = ac.foto_id'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = ac.usuario_id'
+          + ' ORDER BY ac.creado_en DESC'
+          + ' LIMIT $1 OFFSET $2',
+          [crLimit, crOffset]
+        );
+        return res.status(200).json({ ok: true, data: crRows });
+      }
+
       // Mapa audiovisual: UNION de album_fotos (con lat/lng del album) + destinos_fotos.
       // Nota: en un UNION, $N se comparte entre ambas ramas. Usamos $1/$2 fijos.
       if (tipo === 'multimedia_mapa') {
-        var mmTipo = req.query.tipo_media || null;
+        // v10 (ADR-023): multi-seleccion endurecida. Los tokens se
+        // normalizan a minusculas antes de la whitelist; si tipo_media
+        // viene con contenido no vacio pero trae tokens invalidos (o
+        // ningun token valido) se responde 400, nunca se degrada en
+        // silencio a "todos los tipos". Ausente o vacio = sin filtro.
+        var mmTipos = null;
+        var mmTiposAplicados = [];
+        var mmTiposRaw = req.query.tipo_media;
+        if (mmTiposRaw !== undefined && mmTiposRaw !== null && String(mmTiposRaw).trim() !== '') {
+          var mmWhitelist = ['foto', 'video', 'audio'];
+          var mmInvalidos = [];
+          var mmVistos = {};
+          String(mmTiposRaw).split(',').forEach(function(t){
+            var tok = String(t).trim().toLowerCase();
+            if (!tok) return;
+            if (mmWhitelist.indexOf(tok) === -1) {
+              if (mmInvalidos.indexOf(tok) === -1) mmInvalidos.push(tok);
+              return;
+            }
+            if (!mmVistos[tok]) { mmVistos[tok] = true; mmTiposAplicados.push(tok); }
+          });
+          if (mmInvalidos.length || !mmTiposAplicados.length)
+            return res.status(400).json({ ok: false, error: 'tipo_media no contiene tipos validos', tipos_invalidos: mmInvalidos });
+          mmTipos = mmTiposAplicados;
+        }
         var mmCiudad = req.query.ciudad || null;
         var mmOrigen = req.query.origen || null;
         var mmParams = [];
         var np = 0;
-        if (mmTipo) { np++; mmParams.push(mmTipo); }
+        if (mmTipos) { np++; mmParams.push(mmTipos); }
         if (mmCiudad) { np++; mmParams.push(mmCiudad); }
 
         var multimediaRows = await sql(
@@ -1721,7 +1840,7 @@ module.exports = async function handler(req, res) {
           + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
           + '  af.media_title, af.media_source, a.lat, a.lng, a.ciudad,'
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
-          + '  u.nombre AS usuario_nombre, u.foto_url AS usuario_avatar,'
+          + '  u.nombre AS usuario_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS usuario_avatar,'
           + '  af.autor_original_id::text AS usuario_id, a.id::text AS album_id,'
           + '  \'album\' AS origen, a.id::text AS origen_id,'
           + '  (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
@@ -1729,39 +1848,42 @@ module.exports = async function handler(req, res) {
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE a.lat IS NOT NULL AND a.lng IS NOT NULL AND a.activo=true AND af.activo=true'
-          + (mmTipo ? ' AND af.foto_type = $1' : '')
-          + (mmCiudad ? ' AND a.ciudad = $' + (mmTipo ? '2' : '1') : '')
+          + (mmTipos ? ' AND af.foto_type = ANY($1::text[])' : '')
+          + (mmCiudad ? ' AND a.ciudad = $' + (mmTipos ? '2' : '1') : '')
           + ') UNION ALL ('
           + ' SELECT df.url AS media_url, \'foto\' AS media_type,'
           + '  df.caption AS media_title, \'\' AS media_source, d.lat, d.lng, d.ciudad,'
           + '  d.nombre AS album_titulo, \'\' AS autor_nombre,'
+          + '  \'\' AS usuario_nombre, \'\' AS usuario_avatar, NULL::text AS usuario_id, NULL::text AS album_id,'
           + '  \'destino\' AS origen, d.slug AS origen_id, 0 AS votos'
           + ' FROM destinos_fotos df'
           + ' JOIN destinos d ON d.id = df.destino_id'
           + ' WHERE d.lat IS NOT NULL AND d.lng IS NOT NULL AND d.status = \'published\''
-          + ((mmTipo && mmTipo !== 'foto') || mmOrigen === 'album' ? ' AND FALSE' : '')
-          + (mmCiudad ? ' AND d.ciudad = $' + (mmTipo ? '2' : '1') : '')
+          + ((mmTipos && mmTipos.indexOf('foto') === -1) || mmOrigen === 'album' ? ' AND FALSE' : '')
+          + (mmCiudad ? ' AND d.ciudad = $' + (mmTipos ? '2' : '1') : '')
           + ') ORDER BY votos DESC LIMIT 200',
           mmParams
         );
-        return res.status(200).json({ ok: true, data: multimediaRows });
+        return res.status(200).json({ ok: true, data: multimediaRows, tipos_aplicados: mmTiposAplicados });
       }
 
       // Feed de fotos recientes de albumes
       if (tipo === 'mi_feed_fotos') {
         var feedLimit = Math.min(parseInt(req.query.limit || '20'), 50);
         var feedOffset = parseInt(req.query.offset || '0');
+        var feedOrden = req.query.orden === 'top' ? 'top' : 'recientes';
         var feedRows = await sql(
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' a.titulo AS album_titulo, a.ciudad, a.id AS album_id,'
           + ' u.nombre AS autor_nombre,'
           + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
+          + ' (SELECT COUNT(*)::int FROM album_comentarios ac WHERE ac.foto_id = af.id AND ac.activo = true) AS comentarios,'
           + ' af.creado_en'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE af.activo = true AND a.activo = true'
-          + ' ORDER BY af.creado_en DESC'
+          + (feedOrden === 'top' ? ' ORDER BY votos DESC, af.creado_en DESC' : ' ORDER BY af.creado_en DESC')
           + ' LIMIT $1 OFFSET $2',
           [feedLimit, feedOffset]
         );
@@ -1785,6 +1907,116 @@ module.exports = async function handler(req, res) {
           [destinoId]
         );
         return res.status(200).json({ ok: true, data: ftRows });
+      }
+
+      // Comentarios de una media de album (ADR-023): 1 GET. Consulta
+      // PLANA de todos los comentarios del foto_id (incluye inactivos
+      // para poder reparentar) y arma el arbol SERVER-SIDE. Un inactivo
+      // sin descendencia activa se descarta; uno con hijos se devuelve
+      // como tombstone (texto/autor nulos, conserva respuestas[]).
+      // nivel es 0-based; el cliente limita la indentacion visual a 3.
+      if (tipo === 'comentarios_foto') {
+        var cfFotoId = req.query.foto_id || null;
+        if (!cfFotoId)
+          return res.status(400).json({ ok: false, error: 'foto_id requerido' });
+
+        var cfMediaRows = await sql(
+          'SELECT id FROM album_fotos WHERE id=$1 AND activo=true LIMIT 1',
+          [cfFotoId]
+        ).catch(function(){ return []; });
+        if (!cfMediaRows.length)
+          return res.status(404).json({ ok: false, error: 'Media no encontrada' });
+
+        var cfRows = await sql(
+          'SELECT ac.id, ac.foto_id, ac.parent_id, ac.usuario_id, ac.texto, ac.activo, ac.creado_en,'
+          + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+          + ' (SELECT COUNT(*)::int FROM album_comentario_votos av WHERE av.comentario_id = ac.id) AS likes,'
+          + ' EXISTS(SELECT 1 FROM album_comentario_votos av2 WHERE av2.comentario_id = ac.id AND av2.usuario_id = $2) AS ya_like'
+          + ' FROM album_comentarios ac'
+          + ' LEFT JOIN usuarios u ON u.id = ac.usuario_id'
+          + ' WHERE ac.foto_id = $1'
+          + ' ORDER BY ac.creado_en ASC, ac.id ASC',
+          [cfFotoId, usuarioId]
+        );
+
+        var cfById = {};
+        var cfHijos = {};
+        cfRows.forEach(function(r) {
+          cfById[String(r.id)] = r;
+          cfHijos[String(r.id)] = [];
+        });
+        cfRows.forEach(function(r) {
+          var pid = r.parent_id ? String(r.parent_id) : null;
+          if (pid && cfHijos[pid]) cfHijos[pid].push(String(r.id));
+        });
+
+        // Un nodo se conserva si esta activo o si algun descendiente
+        // esta activo (si no, se descarta junto con su rama inactiva).
+        var cfMemo = {};
+        var cfConserva = function(id) {
+          if (cfMemo[id] !== undefined) return cfMemo[id];
+          var self = cfById[id];
+          if (self && self.activo) { cfMemo[id] = true; return true; }
+          cfMemo[id] = false;
+          var hijos = cfHijos[id] || [];
+          for (var i = 0; i < hijos.length; i++) {
+            if (cfConserva(hijos[i])) { cfMemo[id] = true; break; }
+          }
+          return cfMemo[id];
+        };
+
+        var cfTotal = 0;
+        cfRows.forEach(function(r) { if (r.activo) cfTotal++; });
+
+        var cfFlat = [];
+        var cfArmar = function(id, nivel, padreVisibleId) {
+          var r = cfById[id];
+          var eliminado = !r.activo;
+          var nodo = {
+            id: r.id,
+            foto_id: r.foto_id,
+            parent_id: r.parent_id,
+            padre_visible_id: padreVisibleId,
+            nivel: nivel,
+            texto: eliminado ? null : r.texto,
+            eliminado: eliminado,
+            creado_en: r.creado_en,
+            autor: eliminado ? null : {
+              id: r.usuario_id,
+              nombre: r.autor_nombre || null,
+              avatar: r.autor_avatar || '',
+            },
+            es_mio: !eliminado && !!usuarioId && String(r.usuario_id) === String(usuarioId),
+            likes: eliminado ? 0 : (parseInt(r.likes, 10) || 0),
+            ya_like: eliminado ? false : !!r.ya_like,
+            respuestas: [],
+          };
+          cfFlat.push({
+            id: nodo.id, parent_id: nodo.parent_id,
+            padre_visible_id: nodo.padre_visible_id, nivel: nodo.nivel,
+          });
+          (cfHijos[id] || []).forEach(function(hijoId) {
+            if (cfConserva(hijoId)) nodo.respuestas.push(cfArmar(hijoId, nivel + 1, r.id));
+          });
+          return nodo;
+        };
+
+        var cfArboles = [];
+        cfRows.forEach(function(r) {
+          var id = String(r.id);
+          if (!cfConserva(id)) return;
+          var pid = r.parent_id ? String(r.parent_id) : null;
+          var esRaiz = !pid || !cfById[pid] || !cfConserva(pid);
+          if (esRaiz) cfArboles.push(cfArmar(id, 0, null));
+        });
+
+        return res.status(200).json({
+          ok: true,
+          foto_id: cfFotoId,
+          total: cfTotal,
+          data: cfArboles,
+          flat: cfFlat,
+        });
       }
 
       // ==========================================================
@@ -2670,6 +2902,242 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
+      // -- Comentarios de media (ADR-023) ----------------------------
+      // Publicar comentario o respuesta. Rate-limit 30/dia por usuario y
+      // XP +2 con tope 20/dia (10 comentarios) en progreso_album (merge
+      // ||, patron del chat). Sin endpoint nuevo (8/8, ADR-010).
+      if (tipo2 === 'comentario_foto') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var cfcUsr = await sql(
+          'SELECT id, nombre, COALESCE(foto_url, avatar_url, \'\') AS avatar FROM usuarios WHERE id=$1 LIMIT 1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (!cfcUsr.length)
+          return res.status(403).json({ ok: false, error: 'Usuario no registrado' });
+
+        var cfcFotoId = body.foto_id || null;
+        if (!cfcFotoId)
+          return res.status(400).json({ ok: false, error: 'foto_id requerido' });
+        var cfcMedia = await sql(
+          'SELECT id FROM album_fotos WHERE id=$1 AND activo=true LIMIT 1',
+          [cfcFotoId]
+        ).catch(function(){ return []; });
+        if (!cfcMedia.length)
+          return res.status(404).json({ ok: false, error: 'Media no encontrada' });
+
+        var cfcTexto = String(body.texto || '').trim();
+        if (!cfcTexto)
+          return res.status(400).json({ ok: false, error: 'texto vacio' });
+        if (cfcTexto.length > 1000)
+          return res.status(400).json({ ok: false, error: 'texto maximo 1000 caracteres' });
+
+        var cfcParent = body.parent_id || null;
+        if (cfcParent) {
+          var cfcParentRow = await sql(
+            'SELECT id, foto_id, activo FROM album_comentarios WHERE id=$1 LIMIT 1',
+            [cfcParent]
+          ).catch(function(){ return []; });
+          if (!cfcParentRow.length || !cfcParentRow[0].activo)
+            return res.status(404).json({ ok: false, error: 'Comentario padre no encontrado' });
+          if (String(cfcParentRow[0].foto_id) !== String(cfcFotoId))
+            return res.status(400).json({ ok: false, error: 'parent_id no pertenece a esta media' });
+        }
+
+        // Rate-limit: 30 comentarios/dia (incluye respuestas).
+        var cfcCount = await sql(
+          "SELECT COUNT(*)::int AS n FROM album_comentarios WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'",
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        var cfcN = (cfcCount[0] && parseInt(cfcCount[0].n, 10)) || 0;
+        if (cfcN >= 30)
+          return res.status(429).json({ ok: false, error: 'Limite de 30 comentarios por dia alcanzado' });
+
+        var cfcIns = await sql(
+          'INSERT INTO album_comentarios (foto_id, usuario_id, parent_id, texto)'
+          + ' VALUES ($1, $2, $3, $4)'
+          + ' RETURNING id, foto_id, parent_id, texto, activo, creado_en',
+          [cfcFotoId, usuarioId2, cfcParent, cfcTexto]
+        );
+        var cfcRow = cfcIns[0];
+
+        // Nivel 0-based: profundidad del padre + 1.
+        var cfcNivel = 0;
+        if (cfcParent) {
+          var cfcDepth = await sql(
+            'WITH RECURSIVE anc AS ('
+            + ' SELECT id, parent_id, 0 AS depth FROM album_comentarios WHERE id=$1'
+            + ' UNION ALL'
+            + ' SELECT a.id, a.parent_id, anc.depth + 1 FROM album_comentarios a JOIN anc ON a.id = anc.parent_id'
+            + ') SELECT COALESCE(MAX(depth),0)::int AS d FROM anc',
+            [cfcParent]
+          ).catch(function(){ return []; });
+          cfcNivel = ((cfcDepth[0] && parseInt(cfcDepth[0].d, 10)) || 0) + 1;
+        }
+
+        // XP +2 con tope 20/dia (10 comentarios) via progreso_album.
+        var cfcPa = await getProgresoAlbum(sql, usuarioId2);
+        var cfcHoy = hoy();
+        var cfcDia = (cfcPa.comentarios_dia_fecha === cfcHoy)
+          ? (parseInt(cfcPa.comentarios_dia, 10) || 0) : 0;
+        var cfcXp = cfcDia < 10 ? 2 : 0;
+        if (cfcXp > 0) {
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+            [cfcXp, usuarioId2]
+          ).catch(function(){});
+          await updProgresoAlbum(sql, usuarioId2, {
+            comentarios_dia: cfcDia + 1, comentarios_dia_fecha: cfcHoy,
+          });
+        }
+
+        var cfcMisiones = await evaluarMisiones(sql, usuarioId2);
+        var cfcLogros = await evaluarLogros(sql, usuarioId2);
+        return res.status(201).json({
+          ok: true,
+          comentario: {
+            id: cfcRow.id,
+            foto_id: cfcRow.foto_id,
+            parent_id: cfcRow.parent_id,
+            padre_visible_id: cfcParent || null,
+            nivel: cfcNivel,
+            texto: cfcRow.texto,
+            eliminado: false,
+            creado_en: cfcRow.creado_en,
+            autor: { id: usuarioId2, nombre: cfcUsr[0].nombre || null, avatar: cfcUsr[0].avatar || '' },
+            es_mio: true,
+            likes: 0,
+            ya_like: false,
+            respuestas: [],
+          },
+          xp: cfcXp,
+          misiones: cfcMisiones,
+          logros: cfcLogros,
+        });
+      }
+
+      // Soft-delete de un comentario (ADR-023). Pueden borrar el autor,
+      // el admin (Bearer ADMIN_SECRET) o el dueno del album. Por defecto
+      // NO cascada: el nodo queda como tombstone y conserva respuestas.
+      // Con cascada:true (solo admin) un CTE recursivo desactiva todo el
+      // subarbol. Idempotente; no descuenta XP.
+      if (tipo2 === 'comentario_eliminar') {
+        var cfeComentarioId = body.comentario_id || null;
+        if (!cfeComentarioId)
+          return res.status(400).json({ ok: false, error: 'comentario_id requerido' });
+
+        var cfeAdmin = false;
+        var cfeToken = req.headers.authorization || '';
+        if (cfeToken.indexOf('Bearer ') === 0) {
+          var cfeSecret = process.env.ADMIN_SECRET || 'exploraco12345';
+          if (cfeToken.slice(7) === cfeSecret) cfeAdmin = true;
+        }
+        if (!usuarioId2 && !cfeAdmin)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+
+        var cfeCascada = body.cascada === true || body.cascada === 'true'
+          || body.cascada === 1 || body.cascada === '1';
+
+        var cfeRow = await sql(
+          'SELECT ac.id, ac.usuario_id AS autor_id, ac.activo, a.usuario_id AS album_dueno_id'
+          + ' FROM album_comentarios ac'
+          + ' JOIN album_fotos af ON af.id = ac.foto_id'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' WHERE ac.id=$1 LIMIT 1',
+          [cfeComentarioId]
+        ).catch(function(){ return []; });
+        if (!cfeRow.length)
+          return res.status(404).json({ ok: false, error: 'Comentario no encontrado' });
+
+        var cfeAutorizado = cfeAdmin
+          || String(cfeRow[0].autor_id) === String(usuarioId2)
+          || String(cfeRow[0].album_dueno_id) === String(usuarioId2);
+        if (!cfeAutorizado)
+          return res.status(403).json({ ok: false, error: 'Sin permisos para eliminar este comentario' });
+        if (cfeCascada && !cfeAdmin)
+          return res.status(403).json({ ok: false, error: 'Solo el admin puede eliminar en cascada' });
+
+        if (!cfeRow[0].activo)
+          return res.status(200).json({
+            ok: true, eliminado: true, ya_eliminado: true,
+            cascada: false, comentarios_desactivados: 0,
+          });
+
+        var cfeDesactivados = 0;
+        if (cfeCascada) {
+          var cfeUpd = await sql(
+            'WITH RECURSIVE sub AS ('
+            + ' SELECT id FROM album_comentarios WHERE id=$1'
+            + ' UNION ALL'
+            + ' SELECT ac.id FROM album_comentarios ac JOIN sub ON ac.parent_id = sub.id'
+            + ') UPDATE album_comentarios SET activo=false'
+            + ' WHERE id IN (SELECT id FROM sub) AND activo=true RETURNING id',
+            [cfeComentarioId]
+          );
+          cfeDesactivados = cfeUpd.length;
+        } else {
+          await sql('UPDATE album_comentarios SET activo=false WHERE id=$1 AND activo=true', [cfeComentarioId]);
+          cfeDesactivados = 1;
+        }
+        return res.status(200).json({
+          ok: true,
+          eliminado: true,
+          ya_eliminado: false,
+          cascada: cfeCascada,
+          comentarios_desactivados: cfeDesactivados,
+        });
+      }
+
+      // Toggle de me gusta sobre un comentario (ADR-023). No otorga XP.
+      // like -> INSERT ... ON CONFLICT DO NOTHING (idempotente, nunca
+      // 409); unlike -> DELETE. Sin self-like (403). No se puede votar
+      // un tombstone (404).
+      if (tipo2 === 'comentario_voto') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var cvComentarioId = body.comentario_id || null;
+        if (!cvComentarioId)
+          return res.status(400).json({ ok: false, error: 'comentario_id requerido' });
+        var cvAccion = String(body.accion || '');
+        if (cvAccion !== 'like' && cvAccion !== 'unlike')
+          return res.status(400).json({ ok: false, error: 'accion debe ser like o unlike' });
+
+        var cvRow = await sql(
+          'SELECT id, usuario_id AS autor_id FROM album_comentarios WHERE id=$1 AND activo=true LIMIT 1',
+          [cvComentarioId]
+        ).catch(function(){ return []; });
+        if (!cvRow.length)
+          return res.status(404).json({ ok: false, error: 'Comentario no encontrado' });
+        if (String(cvRow[0].autor_id) === String(usuarioId2))
+          return res.status(403).json({ ok: false, error: 'No puedes dar me gusta a tu propio comentario' });
+
+        var cvNuevo = false;
+        if (cvAccion === 'like') {
+          var cvIns = await sql(
+            'INSERT INTO album_comentario_votos (usuario_id, comentario_id) VALUES ($1, $2)'
+            + ' ON CONFLICT (usuario_id, comentario_id) DO NOTHING RETURNING usuario_id',
+            [usuarioId2, cvComentarioId]
+          );
+          cvNuevo = cvIns.length > 0;
+        } else {
+          var cvDel = await sql(
+            'DELETE FROM album_comentario_votos WHERE usuario_id=$1 AND comentario_id=$2 RETURNING usuario_id',
+            [usuarioId2, cvComentarioId]
+          );
+          cvNuevo = cvDel.length > 0;
+        }
+        var cvLikes = await sql(
+          'SELECT COUNT(*)::int AS n FROM album_comentario_votos WHERE comentario_id=$1',
+          [cvComentarioId]
+        ).catch(function(){ return []; });
+        return res.status(200).json({
+          ok: true,
+          ya_like: cvAccion === 'like',
+          likes: (cvLikes[0] && parseInt(cvLikes[0].n, 10)) || 0,
+          nuevo: cvNuevo,
+        });
+      }
+
       // ==========================================================
       // v9 Gamificacion v4.0 (ADR-018) - POSTs de consumibles,
       // cromos y pandillas. Se manejan ANTES del guard generico de
@@ -3450,6 +3918,8 @@ module.exports = async function handler(req, res) {
     console.error('[interacciones]', err.message);
     if (err && err.code === '23505')
       return res.status(409).json({ ok: false, error: 'Registro duplicado', duplicado: true });
+    if (err && (err.code === '42P01' || err.code === '42703'))
+      return res.status(503).json({ ok: false, error: 'Esquema de base de datos pendiente de migracion', code: 'SCHEMA_NOT_MIGRATED' });
     return res.status(500).json({ ok: false, error: err.message });
   }
 };

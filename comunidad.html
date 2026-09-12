@@ -151,9 +151,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* XP toast */
 #xp-toast-comm{position:fixed;bottom:20px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(232,160,32,.3)}
 /* ── MAPA AUDIOVISUAL (ADR-004 scoped) ── */
-#cpanel-mapa .mapa-filtro{padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);transition:all .2s;font-family:'Outfit',sans-serif}
-#cpanel-mapa .mapa-filtro.active{background:var(--gold);color:var(--black);border-color:var(--gold)}
-#cpanel-mapa .mapa-filtro:hover:not(.active){background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
+/* Chip base compartido: filtros del mapa y chips de orden del tab AV
+   (un solo bloque, sin duplicar estilos) */
+#cpanel-mapa .mapa-filtro,
+#cpanel-av .av-chip{padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);transition:all .2s;font-family:'Outfit',sans-serif}
+#cpanel-mapa .mapa-filtro.active,
+#cpanel-av .av-chip.on{background:var(--gold);color:var(--black);border-color:var(--gold)}
+#cpanel-mapa .mapa-filtro:hover:not(.active),
+#cpanel-av .av-chip:hover:not(.on){background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
 .av-popup{text-align:center;font-family:'Outfit',sans-serif}
 .av-popup-title{font-weight:600;margin:8px 0 4px;font-size:14px;color:#1a1a1a}
 .av-popup-meta{font-size:12px;color:#666;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
@@ -183,7 +188,26 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .av-album-photo-title{font-size:11px;font-weight:700;color:#fff;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .av-album-photo-author{font-size:10px;color:rgba(255,255,255,.45)}
 .av-album-photo-votos{font-size:10px;color:var(--gold);font-weight:700;margin-top:2px}
+.av-album-com-btn{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center}
+.av-album-com-btn:hover{background:rgba(232,160,32,.18)}
+.av-album-comments{width:100%}
 @media (max-width:540px){.av-album-modal{padding:8px}.av-album-grid{grid-template-columns:repeat(2,1fr);gap:8px}}
+/* TAB AUDIOVISUAL (albumes + feed de media, ADR-017) */
+.av-sec-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 10px}
+.av-album-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;overflow:hidden;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
+.av-album-card:hover{border-color:rgba(232,160,32,.35);background:rgba(232,160,32,.04)}
+.av-album-card img{width:100%;aspect-ratio:16/10;object-fit:cover;background:#222;display:block}
+.av-album-card-body{padding:10px 12px;display:flex;flex-direction:column;gap:4px;flex:1}
+.av-album-card-title{font-size:12px;font-weight:700;color:#fff;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.av-album-card-meta{font-size:10px;color:rgba(255,255,255,.45)}
+.av-album-card-stats{font-size:10px;color:var(--gold);font-weight:700;margin-top:2px}
+.av-feed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.av-feed-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.av-feed-card img,.av-feed-card video,.av-feed-card audio{max-width:100%}
+.av-feed-title{font-size:11px;font-weight:700;color:#fff;text-align:center;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.av-feed-meta{font-size:10px;color:rgba(255,255,255,.45);text-align:center}
+.av-feed-votos{font-size:10px;color:var(--gold);font-weight:700}
+@media (max-width:540px){.av-feed-grid{grid-template-columns:repeat(2,1fr);gap:8px}}
 /* PANDILLAS (Gamificacion v4) */
 .pand-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;margin-bottom:12px}
 .pand-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:#fff;margin-bottom:4px}
@@ -266,6 +290,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
       <div class="ctab" onclick="showCommTab('pandillas')">👥 Pandillas</div>
+      <div class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
     </div>
     </div>
 
@@ -361,6 +386,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div id="pandilla-fundar"></div>
       <div id="pandillas-unirse"></div>
       <div id="pandilla-retos"></div>
+    </div>
+
+    <!-- AUDIOVISUAL (albumes + feed de media, ADR-017) -->
+    <div class="cpanel" id="cpanel-av">
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-right:4px">Orden</span>
+        <button class="av-chip on" data-av-orden="recientes" onclick="setAVOrden('recientes')">Recientes</button>
+        <button class="av-chip" data-av-orden="populares" onclick="setAVOrden('populares')">Populares</button>
+        <button class="av-chip" data-av-orden="top" onclick="setAVOrden('top')">Top</button>
+        <a class="pand-btn pand-btn-outline" href="galeria.html" style="text-decoration:none;display:inline-block;margin-left:auto">Ver galer&iacute;a completa</a>
+      </div>
+      <div class="av-sec-title">📸 Álbumes de la comunidad</div>
+      <div id="av-albumes-grid" class="av-album-grid"></div>
+      <div class="av-sec-title" style="margin-top:22px">🎞️ Media reciente</div>
+      <div id="av-feed" class="av-feed-grid"></div>
+      <div style="text-align:center;margin-top:16px">
+        <button class="pand-btn pand-btn-outline" id="av-more-btn" style="display:none" onclick="avCargarMas()">Cargar más álbumes</button>
+      </div>
     </div>
 
   </div>
@@ -1218,7 +1261,10 @@ function cargarLeaderboard() {
 var _avMap = null;
 var _avMarkers = null;
 var _avData = [];
-var _avTipoActual = 'todos';
+/* Multi-seleccion de tipos de media: cada tipo hace toggle independiente
+   y el CSV se arma al llamar loadMultimediaMapa (tipo_media=foto,video).
+   'todos' es un estado derivado: los 3 tipos activos. */
+var _avTiposActivos = { foto: true, video: true, audio: true };
 
 function initAudiovisualMap() {
   if (_avMap) return;
@@ -1242,15 +1288,44 @@ function initAudiovisualMap() {
 }
 
 function filtrarMapaAV(btn, tipo) {
-  document.querySelectorAll('#cpanel-mapa .mapa-filtro').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  _avTipoActual = tipo;
+  if (tipo === 'todos') {
+    // Toggle global: si los 3 estan activos los apaga; si alguno esta
+    // apagado, los enciende todos.
+    if (_avTiposActivos.foto && _avTiposActivos.video && _avTiposActivos.audio) {
+      _avTiposActivos.foto = _avTiposActivos.video = _avTiposActivos.audio = false;
+    } else {
+      _avTiposActivos.foto = _avTiposActivos.video = _avTiposActivos.audio = true;
+    }
+  } else {
+    _avTiposActivos[tipo] = !_avTiposActivos[tipo];
+  }
+  syncMapaFiltrosUI();
   loadMultimediaMapa();
 }
 
+function syncMapaFiltrosUI() {
+  document.querySelectorAll('#cpanel-mapa .mapa-filtro').forEach(function(b){
+    var t = b.getAttribute('data-tipo');
+    if (t === 'todos') {
+      b.classList.toggle('active', _avTiposActivos.foto && _avTiposActivos.video && _avTiposActivos.audio);
+    } else {
+      b.classList.toggle('active', !!_avTiposActivos[t]);
+    }
+  });
+}
+
 function loadMultimediaMapa() {
+  // Sin tipos activos: no se dispara fetch con lista vacia; se deja la
+  // capa visible y sin pines (mismo estado visual que un filtro sin
+  // resultados del backend -- comportamiento heredado respetado).
+  if (!_avTiposActivos.foto && !_avTiposActivos.video && !_avTiposActivos.audio) {
+    _avData = [];
+    if (_avMarkers) _avMarkers.clearLayers();
+    return;
+  }
+  var csv = ['foto','video','audio'].filter(function(t){ return _avTiposActivos[t]; }).join(',');
   var params = '/api/interacciones?tipo=multimedia_mapa';
-  if (_avTipoActual && _avTipoActual !== 'todos') params += '&tipo_media=' + _avTipoActual;
+  if (csv) params += '&tipo_media=' + csv;
   fetch(params)
     .then(function(r){ return r.json(); })
     .then(function(data) {
@@ -1280,13 +1355,13 @@ function avMediaHTML(item) {
   if (type === 'video') {
     var embed = avEmbedUrl(item.media_url);
     if (embed) {
-      return '<div style="position:relative;width:200px;height:113px;border-radius:8px;overflow:hidden;background:#000">'
+      return '<div style="position:relative;width:100%;max-width:200px;height:113px;border-radius:8px;overflow:hidden;background:#000">'
         + '<iframe src="' + esc(embed) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media" allowfullscreen></iframe></div>';
     }
     return '<video controls src="' + url + '" style="max-width:200px;max-height:150px;border-radius:8px;background:#000;display:block" preload="metadata"></video>';
   }
   if (type === 'audio') {
-    return '<audio controls src="' + url + '" style="width:200px;display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
+    return '<audio controls src="' + url + '" style="width:100%;max-width:200px;display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
   }
   return '<div style="font-size:10px;color:#999;padding:6px">Tipo no soportado</div>';
 }
@@ -1367,7 +1442,15 @@ function abrirAlbumModal(albumId) {
           + (f.media_title ? '<div class="av-album-photo-title">' + esc(f.media_title) + '</div>' : '')
           + (f.autor_nombre ? '<div class="av-album-photo-author">' + esc(f.autor_nombre) + '</div>' : '')
           + '<div class="av-album-photo-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>'
-          + '</div></div>';
+          + '</div>';
+        if(f.id) {
+          grid += '<button type="button" class="av-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
+            + ' onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios'
+            + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '')
+            + '</button>'
+            + '<div class="av-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>';
+        }
+        grid += '</div>';
       });
       grid += '</div>';
       body.innerHTML = head + grid;
@@ -1391,6 +1474,129 @@ function onTabMapaAV() {
   }
 }
 
+/* ---- TAB AUDIOVISUAL (albumes + feed de media, ADR-017) ---- */
+var AV_ALBUM_LIMIT = 9;
+var _avAlbumesOffset = 0;
+var _avOrdenActual = 'recientes';
+var _avTabInicializado = false;
+
+/* Init perezoso del tab: la primera visita carga el estado completo;
+   las visitas siguientes solo refrescan datos (flag para no duplicar). */
+function initAudiovisual() {
+  if (_avTabInicializado) {
+    cargarAudiovisual(true);
+    return;
+  }
+  _avTabInicializado = true;
+  cargarAudiovisual(true);
+}
+
+function setAVOrden(orden) {
+  if (orden === _avOrdenActual) return;
+  _avOrdenActual = orden;
+  document.querySelectorAll('#cpanel-av .av-chip').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-av-orden') === orden);
+  });
+  cargarAudiovisual(true);
+}
+
+function cargarAudiovisual(reset) {
+  if (reset) _avAlbumesOffset = 0;
+  cargarAlbumesAV(reset);
+  if (reset) cargarFeedAV();
+}
+
+function avCargarMas() {
+  cargarAlbumesAV(true);
+}
+
+function cargarAlbumesAV(append) {
+  var grid = document.getElementById('av-albumes-grid');
+  if (!grid) return;
+  if (!append) grid.innerHTML = '<div style="grid-column:1/-1;padding:30px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">Cargando \u00e1lbumes\u2026</div>';
+  fetch('/api/interacciones?tipo=albumes&orden=' + encodeURIComponent(_avOrdenActual)
+    + '&limit=' + AV_ALBUM_LIMIT + '&offset=' + _avAlbumesOffset)
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var albumes = (res && res.data) || [];
+      if (!albumes.length) {
+        if (!append) {
+          grid.innerHTML = '<div style="grid-column:1/-1;padding:30px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">Sin \u00e1lbumes de la comunidad a\u00fan.</div>';
+        }
+      } else {
+        if (!append) grid.innerHTML = '';
+        albumes.forEach(function(a){ grid.appendChild(albumCardAV(a)); });
+        _avAlbumesOffset += albumes.length;
+      }
+      var more = document.getElementById('av-more-btn');
+      if (more) more.style.display = albumes.length >= AV_ALBUM_LIMIT ? '' : 'none';
+    })
+    .catch(function(){
+      if (!append) {
+        grid.innerHTML = '<div style="grid-column:1/-1;padding:30px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">No se pudieron cargar los \u00e1lbumes</div>';
+      }
+    });
+}
+
+function albumCardAV(a) {
+  var card = document.createElement('div');
+  card.className = 'av-album-card';
+  card.onclick = function(){ abrirAlbumModal(String(a.id)); };
+  var portada = a.portada_url || '';
+  var fotos = parseInt(a.fotos_count,10) || 0;
+  var votos = parseInt(a.votos_count,10) || 0;
+  card.innerHTML = (portada
+      ? '<img src="' + esc(portada) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<div style="aspect-ratio:16/10;background:#222;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:22px">\uD83D\uDCF7</div>')
+    + '<div class="av-album-card-body">'
+    + '<div class="av-album-card-title">' + esc(a.titulo || '\u00c1lbum') + '</div>'
+    + '<div class="av-album-card-meta">' + esc(a.autor_nombre || 'Viajero')
+    + (a.ciudad ? ' \u00b7 ' + esc(a.ciudad) : '') + '</div>'
+    + '<div class="av-album-card-stats">\uD83D\uDCF7 ' + fotos + ' \u00b7 \u2B50 ' + votos + '</div>'
+    + '</div>';
+  return card;
+}
+
+/* Feed de media: mi_feed_fotos devuelve foto_url/foto_type; se normaliza
+   al shape media_url/media_type que consume avMediaHTML (reuso sin duplicar).
+   'populares' se mapea a 'top' porque el feed solo acepta recientes|top. */
+function avFeedOrden() {
+  return _avOrdenActual === 'populares' ? 'top' : _avOrdenActual;
+}
+
+function cargarFeedAV() {
+  var cont = document.getElementById('av-feed');
+  if (!cont) return;
+  cont.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">Cargando media\u2026</div>';
+  fetch('/api/interacciones?tipo=mi_feed_fotos&orden=' + avFeedOrden() + '&limit=12&offset=0')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var items = (res && res.data) || [];
+      if (!items.length) {
+        cont.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">Sin media de la comunidad a\u00fan.</div>';
+        return;
+      }
+      cont.innerHTML = '';
+      items.forEach(function(f){ cont.appendChild(feedCardAV(f)); });
+    })
+    .catch(function(){
+      cont.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">No se pudo cargar la media</div>';
+    });
+}
+
+function feedCardAV(f) {
+  var card = document.createElement('div');
+  card.className = 'av-feed-card';
+  var item = { media_url: f.foto_url, media_type: f.foto_type, media_title: f.media_title };
+  card.innerHTML = avMediaHTML(item)
+    + (f.media_title ? '<div class="av-feed-title">' + esc(f.media_title) + '</div>' : '')
+    + '<div class="av-feed-meta">' + esc(f.autor_nombre || 'Viajero')
+    + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '')
+    + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '') + '</div>'
+    + '<div class="av-feed-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>';
+  return card;
+}
+
 /* ---- TAB SWITCHING ---- */
 function showCommTab(tab) {
   document.querySelectorAll('.ctab').forEach(function(t){ t.classList.remove('on'); });
@@ -1405,6 +1611,7 @@ function showCommTab(tab) {
     if(tab === 'chat') renderChatRooms();
     if(tab === 'planes') renderPlanes();
     if(tab === 'mapa') onTabMapaAV();
+    if(tab === 'av') initAudiovisual();
     if(tab === 'pandillas') renderPandillas();
   }
   if(tab !== 'chat') stopChatPoll();
@@ -1425,5 +1632,6 @@ window.onExploraCOUpdate = function() { checkGate(); };
 checkGate();
 </script>
   <script src="usuario-session.js"></script>
+  <script src="album-comments.js"></script>
 </body>
 </html>

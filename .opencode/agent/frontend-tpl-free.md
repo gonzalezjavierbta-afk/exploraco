@@ -35,4 +35,18 @@ Lee en orden antes de tocar nada:
 3. Implementa respetando las guías de frontend-design y web-design-guidelines.
 4. Verifica balance de divs y sintaxis.
 
+# Directivas de Eficiencia para Frontend & Maquetación
+
+1. EDICIÓN QUIRÚRGICA:
+   - Jamás reescribas un archivo HTML o JS completo.
+   - Aplica cambios mediante scripts de reemplazo de texto exacto (Python str.replace con ancla única).
+
+2. DELIMITACIÓN DE CONTEXTO:
+   - Lee únicamente la sección/función relevante que vas a modificar.
+   - No cargues en el contexto arreglos de datos embebidos ni componentes ajenos a la tarea.
+
+3. CICLO DE VERIFICACIÓN LOCAL:
+   - Tras realizar un cambio, ejecuta la validación de sintaxis o balance de etiquetas localmente.
+   - Si la validación falla, corrige únicamente el token o carácter que produjo el error. No regeneres el bloque completo.
+
 Responde siempre en español. Cierra con: **hacer las preguntas necesarias para completar la tarea de la mejor forma posible**.
