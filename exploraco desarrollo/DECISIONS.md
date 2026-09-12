@@ -404,3 +404,48 @@ Registro de decisiones arquitectonicas (ADR). Este documento NUNCA contiene tare
 **Pendiente:** aplicar `db/migrations/010_gamificacion_v4.sql` en Neon (lo ejecuta Javier) + commit/deploy y verificacion en vivo.
 
 **ADR previos relacionados:** ADR-003 (merge JSONB), ADR-010 (presupuesto endpoints), ADR-012 (gamificacion), ADR-014 (Milestones v2), ADR-015 (Comunidad social), ADR-017 (Albums/multimedia)
+
+## ADR-019: Campo `verificado` como columna gestionada de destinos (control interno admin, sin insignia publica)
+
+**ID:** ADR-019
+**Fecha:** 2026-09-11
+**Estado:** Aprobado e implementado en working tree (pendiente commit/deploy; sin migracion, la columna ya existia en Neon)
+**Autor:** AI-DOS Core (prompt cambios.txt: "Verificado y Gestion Admin")
+
+**Problema:** El prompt de refactor UI/UX pedia un estado "Verificado" para destinos, editable SOLO desde admin.html como checkbox de revision manual, y explicitamente SIN ninguna insignia publica en la ficha para cuentas de usuario general. Habia que decidir donde vive el dato: `tags` JSONB (camino generico TSK-012) o columna nueva/ya existente en `destinos`.
+
+**Opciones consideradas:**
+1. **Tag JSONB `tags.verificado` (rechazada):** un estado de confianza editorial no es contenido de la ficha; vivirlo en `tags` lo mezcla con el contenido curado y dificulta el gating futuro (ej. filtrar "solo verificados" en listados sin leer JSONB).
+2. **Columna `destinos.verificado` (elegida):** replica el patron exacto de `destacado` (columna booleana gestionada por admin-destinos.js), ya usada por publicar-lugar.js (escribe) y destinos.js (lee en listado). No requiere migracion (la columna ya existia en Neon) ni endpoint nuevo (presupuesto 8/8 intacto).
+
+**Decision tomada:** `verificado` es COLUMNA booleana de `destinos`, gestionada por `api/admin-destinos.js` con el patron de `destacado`: GET listado la incluye (L63); INSERT con `Boolean(b.verificado||false)` (L109/157); UPDATE con guard `b.verificado !== undefined` (L256-258) que permite persistir `false` y asi DESTILDAR un verificado ya guardado (el patron `||` de otros campos no permitiria desmarcar). En admin.html vive como checkbox `f-verificado` ("Verificacion manual admin", pestana General L795-797) con wiring completo en clearForm/loadForm/savePlace/_placeToAPI (_placeToAPI emite `verificado: p.verificado === true`)/_mergeNeonRowIntoLocal (guard `!== undefined && !== null`). El renderer pagina-destino.js NO renderiza ninguna insignia publica del campo (0 ocurrencias): el verificado es control interno, usable en el futuro para curacion editorial/filtros de admin sin exponerlo al publico.
+
+**Justificacion:** El campo es meta-dato de curacion, no contenido de la ficha: no debe viajar en `tags` (ADR-003 merge lo preservaria contaminando fichas curadas con flags internos) ni ocupar endpoint nuevo. La columna ya existia en produccion, asi que el cambio es solo de gestion (admin + backend), con riesgo cero de regresion para los seeds (ninguno envia el campo y el guard `!== undefined` en UPDATE lo ignora). El patron identico a `destacado` da consistencia operativa: mismo flujo, misma semantica, mismo default false.
+
+**Impacto:** `api/admin-destinos.js` (+`verificado` en GET/INSERT/UPDATE); `admin.html` (checkbox `f-verificado` + wiring, divs 716/716); `api/pagina-destino.js` SIN cambios para verificado (no se renderiza); docs TASKS/TSK-095, NEXT.md, BLUEPRINT seccion 3. Sin migracion SQL (columna preexistente). Pendiente: commit/deploy; backlog abierto: persistir `address` (mismo patron de gestion de columnas) y decidir si en el futuro se expone insignia publica condicionada a rol admin.
+
+**ADR previos relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline de verdad), ADR-009 (rating/destacado editorial), ADR-013 (campo `web` prominente)
+
+---
+
+## ADR-020: La seccion "Reservar" de la ficha solo se renderiza con enlace real de Booking.com o Hostelworld
+
+**ID:** ADR-020
+**Fecha:** 2026-09-11
+**Estado:** Aprobado e implementado en working tree (pendiente commit manual del usuario; sin migracion ni endpoint nuevo)
+**Autor:** AI-DOS Core (decision de producto confirmada por Javier, sesion TSK-095)
+
+**Problema:** Tras el refactor UI/UX (TSK-095) se elimino el boton "Reservar" de la franja `gstrip` (L781-782), pero la seccion `secReservar` del renderer se ensamblaba con cualquier boton de reserva disponible, de modo que los destinos de categoria `sitio` con solo WhatsApp mostraban una seccion "Reservar" sobrante: la accion prometia una reserva y entregaba un chat, no un canal de reserva real.
+
+**Opciones evaluadas:**
+1. **Gate por categoria (`cat !== 'sitio'`):** rechazada -- la categoria no es el criterio correcto; un hostal o comida sin enlace real de reserva tambien generaria la seccion sobrante.
+2. **Gate por enlace real de reserva (`bookingUrl || hwUrl`) (elegida):** la seccion solo aparece cuando el destino tiene un canal real en Booking.com o Hostelworld, los dos OTAs que el motor ya resuelve (`det.booking_url || d.booking` y `det.hostelworld_url || d.hostelworld`, L722-723).
+3. **Incluir Airbnb en el gate (`|| airbnbUrl`):** valorada y descartada en el alcance actual -- el tradeoff aceptado es que un destino con SOLO `airbnb_url` tampoco dispara la seccion en esta version.
+
+**Decision tomada:** `secReservar` se ensambla unicamente cuando `(bookingUrl || hwUrl)` (api/pagina-destino.js L1747). El WhatsApp solo ya no dispara la seccion; el Airbnb solo tampoco la dispara (tradeoff aceptado: Airbnb huerfano en esta version; el gate es aditivo, se puede ampliar en un futuro sprint sin romper nada). El WhatsApp y el contacto siguen vivos via el hero y la seccion `secContact`, que no se modifican.
+
+**Justificacion:** El criterio correcto para mostrar "Reservar" es la existencia de un enlace real de reserva en un OTA reconocido, no la categoria ni la presencia de cualquier boton en el bloque. Renderizar la seccion con solo un WhatsApp confundia al viajero y dejaba una seccion fantasma en los sitios; el gate por enlace real la limita a los casos con valor de conversion real. El tradeoff de Airbnb es aceptado porque casi no hay destinos con `airbnb` cargado en Neon y la condicion es extensible (suma aditiva) sin cambios de schema ni de backend.
+
+**Impacto:** `api/pagina-destino.js` L1747 (gate de `secReservar`). Sin cambios en admin.html, schema ni endpoints (presupuesto 8/8 intacto). Cierra el riesgo R-2 de NEXT.md (secReservar en sitios). El subnav de la ficha refleja la ausencia (`has:!!secReservar`, L2027). Pendiente: commit manual del usuario con el resto de la sesion TSK-095.
+
+**ADR previos relacionados:** ADR-004 (scoped CSS), ADR-013 (web oficial prominente en hero), ADR-019 (verificado como control interno admin)

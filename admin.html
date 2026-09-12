@@ -790,6 +790,15 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <input type="color" id="f-color-picker" style="width:36px;height:36px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;padding:2px" oninput="document.getElementById('f-color').value=this.value">
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Verificacion manual admin</label>
+            <label class="srv-check" style="font-size:12px">
+              <input type="checkbox" id="f-verificado">
+              <span>Marcar como VERIFICADO por el equipo de ExploraCO</span>
+            </label>
+          </div>
+        </div>
       </div>
 
       <!-- TAB: MEDIA (FOTOS) -->
@@ -2535,6 +2544,9 @@ function clearForm() {
   document.querySelectorAll('.srv-check input[type=checkbox]').forEach(function(cb){
     cb.checked = false;
   });
+  /* -- Reset verificacion manual admin (columna Neon, no tag) -- */
+  var cbVer=document.getElementById('f-verificado');
+  if(cbVer) cbVer.checked = false;
 
   /* ── Reset transport-list to 2 placeholder rows ── */
   var tList = document.getElementById('transport-list');
@@ -2973,6 +2985,8 @@ function loadForm(p) {
     var el=document.getElementById(id);
     if(el && map[id]!==undefined && map[id]!==null) el.value=map[id];
   });
+  var cbVer=document.getElementById('f-verificado');
+  if(cbVer) cbVer.checked = !!(p.verificado);
   currentTags=(p.tags||[]).slice(); renderTagPills();
   renderPhotoList(p.photos||[]);
   setStatus(p.status||'published');
@@ -3612,6 +3626,8 @@ function savePlace() {
     hero_bg: v('f-hero-bg'), tags: currentTags.slice(), photos: photos,
     updatedAt: new Date().toISOString()
   };
+  var cbVer=document.getElementById('f-verificado');
+  p.verificado = !!(cbVer && cbVer.checked);
 
   /* ── HOSTAL SPECIFIC ── */
   if(cat === 'hostal') {
@@ -5788,6 +5804,7 @@ function _placeToAPI(p) {
     ciudad:         p.city||'',
     region:         p.region||'',
     barrio:         p.barrio||'',
+    address:        p.address||'',
     lat:            p.lat||null,
     lng:            p.lng||null,
     whatsapp:       p.whatsapp||'',
@@ -5809,6 +5826,7 @@ function _placeToAPI(p) {
     como_llegar:    p.como_llegar_sitio || p.como_llegar || '',
     status:         p.status||'published',
     destacado:      p.destacado||false,
+    verificado:     p.verificado === true,
     tags:           tagsObj,
     // Detalles (destinos_detalles)
     habitaciones:   p.habs||[],
@@ -6125,6 +6143,7 @@ function _mergeNeonRowIntoLocal(local, d) {
   local.categoria_slug = d.categoria_slug || local.cat;
   local.cat = d.categoria_slug || local.cat;
   if (d.destacado !== undefined && d.destacado !== null) local.destacado = d.destacado;
+  if (d.verificado !== undefined && d.verificado !== null) local.verificado = d.verificado;
 
   // Desanidar tags JSONB -- TSK-012: motor generico (ver
   // CATEGORY_TAG_FIELDS / _applyTagsToLocal), cubre cualquier

@@ -60,7 +60,7 @@ module.exports = async function handler(req, res) {
         'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region, '
         + 'd.lead, d.descripcion, d.highlight, d.foto_hero, d.hero_bg, '
         + 'd.lat, d.lng, d.whatsapp, d.telefono, d.email, d.web, d.instagram, '
-        + 'd.precio_desde, d.horario, d.emoji, d.status, d.destacado, '
+        + 'd.precio_desde, d.horario, d.emoji, d.status, d.destacado, d.verificado, '
         + 'd.booking, d.hostelworld, d.airbnb, d.tipo, d.capacidad, '
         + 'd.como_llegar, d.tags, d.rating, d.total_resenas, '
         + 'd.creado_en, d.actualizado_en, '
@@ -100,24 +100,24 @@ module.exports = async function handler(req, res) {
         'INSERT INTO destinos ( '
         + 'slug, nombre, categoria_slug, '
         + 'lead, descripcion, highlight, '
-        + 'ciudad, region, barrio, '
+        + 'ciudad, region, barrio, address, '
         + 'lat, lng, '
         + 'whatsapp, telefono, email, web, instagram, '
         + 'precio_desde, horario, emoji, hero_bg, foto_hero, '
         + 'booking, hostelworld, airbnb, '
         + 'tipo, capacidad, como_llegar, '
-        + 'status, destacado, tags, '
+        + 'status, destacado, verificado, tags, '
         + 'creado_en, actualizado_en '
         + ') VALUES ( '
         + '$1, $2, $3, '
         + '$4, $5, $6, '
-        + '$7, $8, $9, '
-        + '$10, $11, '
-        + '$12, $13, $14, $15, $16, '
-        + '$17, $18, $19, $20, $21, '
-        + '$22, $23, $24, '
-        + '$25, $26, $27, '
-        + '$28, $29, $30, '
+        + '$7, $8, $9, $10, '
+        + '$11, $12, '
+        + '$13, $14, $15, $16, $17, '
+        + '$18, $19, $20, $21, $22, '
+        + '$23, $24, $25, '
+        + '$26, $27, $28, '
+        + '$29, $30, $31, $32, '
         + 'NOW(), NOW() '
         + ') '
         + 'ON CONFLICT (slug) DO UPDATE SET '
@@ -134,6 +134,7 @@ module.exports = async function handler(req, res) {
           String(b.ciudad||b.city||'').trim(),
           String(b.region||'').trim(),
           String(b.barrio||'').trim(),
+          String(b.address||'').trim(),
           b.lat ? parseFloat(b.lat) : null,
           b.lng ? parseFloat(b.lng) : null,
           String(b.whatsapp||'').trim(),
@@ -154,6 +155,7 @@ module.exports = async function handler(req, res) {
           String(b.como_llegar||'').trim(),
           String(b.status||'draft').trim(),
           Boolean(b.destacado||false),
+          Boolean(b.verificado||false),
           JSON.stringify(tags),
         ]
       );
@@ -215,6 +217,7 @@ module.exports = async function handler(req, res) {
         ciudad:         b.ciudad || b.city,
         region:         b.region,
         barrio:         b.barrio,
+        address:        b.address,
         whatsapp:       b.whatsapp,
         telefono:       b.telefono || b.tel,
         email:          b.email,
@@ -251,6 +254,10 @@ module.exports = async function handler(req, res) {
       if (b.destacado !== undefined) {
         sets.push('destacado = $' + pi2++);
         vals.push(Boolean(b.destacado));
+      }
+      if (b.verificado !== undefined) {
+        sets.push('verificado = $' + pi2++);
+        vals.push(Boolean(b.verificado));
       }
 
       // Tags JSONB -- merge con los existentes

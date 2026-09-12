@@ -8,13 +8,24 @@
 //   node scripts/informe-cuota.js --dia           dia natural de hoy (local)
 //   node scripts/informe-cuota.js --desde=2026-09-01   desde una fecha
 //   node scripts/informe-cuota.js --hist5h=3      ultimos 3 bloques de 5h (fijos UTC)
+//   node scripts/informe-cuota.js --schema        inspecciona el esquema de la
+//                                                  base (tablas, columnas y las
+//                                                  claves JSON reales dentro de
+//                                                  message.data). No genera
+//                                                  informe; es una utilidad de
+//                                                  diagnostico para ajustar la
+//                                                  extraccion de tareas.
 //   Opcionales:
 //     --db=...            ruta a opencode.db (default: ~/.local/share/opencode)
 //     --dir=...           filtro de directorio (default: contiene 'exploraco')
 //     --out=...           carpeta de salida (default: exploraco desarrollo/informes-cuota)
+//     --topn=N            cuantos mensajes de alto consumo listar en el
+//                          desglose de tareas (default: 10)
 //
 // Salida: imprime cada informe en consola y lo guarda en <out>/cuota-*.md
-// Incluye secciones por sesion (session) y por subagente x modelo (message).
+// Incluye secciones por sesion (session), por subagente x modelo (message),
+// un desglose detallado de tareas/prompts de alto consumo y una deteccion
+// de tareas repetitivas (agrupadas por patron de titulo de sesion).
 // ASCII-safe (no emite tildes).
 
 'use strict';
@@ -41,8 +52,78 @@ var DB_PATH = argValue('--db=') ||
 var DIR_FILTER = argValue('--dir=') || 'exploraco';
 var OUT_DIR = argValue('--out=') ||
   path.join(process.cwd(), 'exploraco desarrollo', 'informes-cuota');
+var TOP_N = parseInt(argValue('--topn='), 10) || 10;
 
 var now = Date.now();
+
+if (!fs.existsSync(DB_PATH)) {
+  console.error('ERROR: no se encontro la base opencode.db en: ' + DB_PATH);
+  process.exitCode = 1;
+  return;
+}
+
+var db = new DatabaseSync('file:' + DB_PATH.replace(/\\/g, '/') + '?mode=ro', { readOnly: true });
+
+function query(sql) {
+  var params = Array.prototype.slice.call(arguments, 1);
+  var stmt = db.prepare(sql);
+  return stmt.all.apply(stmt, params);
+}
+
+// ---------------------------------------------------------------------------
+// Modo diagnostico: --schema
+// Lista las tablas y columnas reales de la base y muestrea las claves de
+// nivel superior presentes en message.data, para saber con certeza donde
+// vive la descripcion/intencion de cada tarea (esto varia entre versiones
+// de opencode y no debe asumirse a ciegas).
+// ---------------------------------------------------------------------------
+function runSchemaInspection() {
+  console.log('=== Tablas encontradas en ' + DB_PATH + ' ===');
+  var tables = query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+  tables.forEach(function (t) {
+    console.log('\n-- ' + t.name + ' --');
+    var cols = query('PRAGMA table_info(' + t.name + ')');
+    cols.forEach(function (c) { console.log('  ' + c.name + ' (' + c.type + ')'); });
+  });
+
+  try {
+    var sample = query('SELECT data FROM message ORDER BY time_created DESC LIMIT 300');
+    var keySet = {};
+    var nestedTokenKeys = {};
+    sample.forEach(function (r) {
+      var d;
+      try { d = JSON.parse(r.data); } catch (e) { return; }
+      Object.keys(d).forEach(function (k) {
+        keySet[k] = (keySet[k] || 0) + 1;
+        if (k === 'tokens' && d.tokens && typeof d.tokens === 'object') {
+          Object.keys(d.tokens).forEach(function (tk) {
+            nestedTokenKeys[tk] = (nestedTokenKeys[tk] || 0) + 1;
+          });
+        }
+      });
+    });
+    console.log('\n=== Claves de nivel superior en message.data (muestra de ' + sample.length + ' filas) ===');
+    Object.keys(keySet).sort(function (a, b) { return keySet[b] - keySet[a]; }).forEach(function (k) {
+      console.log('  ' + k + ': presente en ' + keySet[k] + ' filas');
+    });
+    if (Object.keys(nestedTokenKeys).length) {
+      console.log('\n=== Subclaves dentro de message.data.tokens ===');
+      Object.keys(nestedTokenKeys).forEach(function (k) {
+        console.log('  tokens.' + k + ': presente en ' + nestedTokenKeys[k] + ' filas');
+      });
+    }
+    console.log('\nSugerencia: si ves aqui una clave como "summary", "title", "parts" o');
+    console.log('"content" que contenga texto de la tarea/prompt, usa --db normal y');
+    console.log('ajusta extractTaskDescription() en este script para leerla primero.');
+  } catch (e) {
+    console.log('\n(no se pudo inspeccionar message.data: ' + e.message + ')');
+  }
+}
+
+if (hasFlag('--schema')) {
+  runSchemaInspection();
+  return;
+}
 
 // Construye la lista de ventanas [{from, to, label, fname}]
 function buildWindows() {
@@ -90,19 +171,9 @@ function modelLabel(raw) {
   } catch (e) { return raw; }
 }
 function esc(s) { return String(s || '').replace(/[|\n]/g, ' '); }
-
-if (!fs.existsSync(DB_PATH)) {
-  console.error('ERROR: no se encontro la base opencode.db en: ' + DB_PATH);
-  process.exitCode = 1;
-  return;
-}
-
-var db = new DatabaseSync('file:' + DB_PATH.replace(/\\/g, '/') + '?mode=ro', { readOnly: true });
-
-function query(sql) {
-  var params = Array.prototype.slice.call(arguments, 1);
-  var stmt = db.prepare(sql);
-  return stmt.all.apply(stmt, params);
+function truncate(s, n) {
+  s = String(s || '');
+  return s.length > n ? s.slice(0, n - 3) + '...' : s;
 }
 
 function tableRows(obj, sortKey) {
@@ -111,11 +182,50 @@ function tableRows(obj, sortKey) {
   }).sort(function (a, b) { return (b[sortKey] || 0) - (a[sortKey] || 0); });
 }
 
+// ---------------------------------------------------------------------------
+// Extraccion de la descripcion/intencion de una tarea a partir de
+// message.data. La estructura interna de opencode puede variar segun
+// version, asi que se intentan varias claves conocidas en orden y se cae
+// a null si ninguna aplica (usar --schema para descubrir el nombre real
+// de campo en una base concreta y ampliar esta lista si hace falta).
+// ---------------------------------------------------------------------------
+function extractTaskDescription(d) {
+  if (!d || typeof d !== 'object') return null;
+  var directKeys = ['summary', 'title', 'task', 'description', 'intent', 'prompt'];
+  for (var i = 0; i < directKeys.length; i++) {
+    var v = d[directKeys[i]];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  var arr = d.parts || d.content || null;
+  if (Array.isArray(arr)) {
+    for (var j = 0; j < arr.length; j++) {
+      var p = arr[j];
+      if (!p) continue;
+      if (typeof p === 'string' && p.trim()) return p.trim();
+      if (typeof p.text === 'string' && p.text.trim()) return p.text.trim();
+      if ((p.type === 'tool' || p.type === 'tool_use') && (p.tool || p.name)) {
+        return '[tool] ' + (p.tool || p.name);
+      }
+    }
+  }
+  return null;
+}
+
+// Normaliza un titulo de sesion para agrupar tareas repetitivas: minusculas,
+// espacios colapsados y secuencias numericas unificadas como '#' (para que
+// "Fix bug 123" y "Fix bug 456" se cuenten como el mismo patron de tarea).
+function normalizeTitle(t) {
+  var s = (t || '(sin titulo)').toString().trim().toLowerCase();
+  s = s.replace(/[0-9]+/g, '#');
+  s = s.replace(/\s+/g, ' ');
+  return s || '(sin titulo)';
+}
+
 // Informe para una ventana
 function buildReport(w) {
   // Sesiones del proyecto en la ventana
   var rows = query(
-    "SELECT title, directory, model, agent, cost, tokens_input, tokens_output, " +
+    "SELECT id, title, directory, model, agent, cost, tokens_input, tokens_output, " +
     "tokens_reasoning, tokens_cache_read, tokens_cache_write, time_created, time_updated " +
     "FROM session WHERE directory LIKE ? AND time_updated >= ? AND time_updated < ? ORDER BY cost DESC",
     '%' + DIR_FILTER + '%', w.from, w.to
@@ -138,15 +248,37 @@ function buildReport(w) {
     byAgent[a].n++; byAgent[a].cost += r.cost || 0; byAgent[a].in += r.tokens_input || 0; byAgent[a].out += r.tokens_output || 0;
   });
 
-  // Mensajes del proyecto en la ventana (subagente x modelo)
+  // Tareas repetitivas: agrupar las sesiones de la ventana por patron de
+  // titulo normalizado, para ver que tipo de tarea se repite mas y cuanto
+  // cuesta en conjunto (permite decidir donde optimizar primero).
+  var byPattern = {};
+  rows.forEach(function (r) {
+    var pat = normalizeTitle(r.title);
+    if (!byPattern[pat]) byPattern[pat] = { n: 0, cost: 0, in: 0, out: 0, sample: r.title };
+    byPattern[pat].n++;
+    byPattern[pat].cost += r.cost || 0;
+    byPattern[pat].in += r.tokens_input || 0;
+    byPattern[pat].out += r.tokens_output || 0;
+  });
+  var patternRows = Object.keys(byPattern).map(function (k) {
+    var g = byPattern[k];
+    return { pattern: k, sample: g.sample, n: g.n, cost: g.cost, in: g.in, out: g.out };
+  }).sort(function (a, b) { return b.cost - a.cost; });
+
+  // Mensajes del proyecto en la ventana (subagente x modelo), con el titulo
+  // de la sesion a la que pertenecen para poder listar los prompts de mayor
+  // consumo con su contexto.
   var msgs = query(
-    "SELECT m.data FROM message m JOIN session s ON s.id = m.session_id " +
+    "SELECT m.data, s.title as session_title, s.id as session_id FROM message m " +
+    "JOIN session s ON s.id = m.session_id " +
     "WHERE s.directory LIKE ? AND m.time_created >= ? AND m.time_created < ?",
     '%' + DIR_FILTER + '%', w.from, w.to
   );
 
   var sa = {};        // por agente
   var saModel = {};   // agente -> {modelo -> agg}
+  var highCost = [];  // mensajes individuales, para el desglose de tareas
+  var anyDescriptionFound = false;
   msgs.forEach(function (r) {
     var d;
     try { d = JSON.parse(r.data); } catch (e) { return; }
@@ -163,7 +295,20 @@ function buildReport(w) {
     sa[agent].n++; sa[agent].cost += cost; sa[agent].in += tin; sa[agent].out += tout;
     saModel[agent][model].n++; saModel[agent][model].cost += cost;
     saModel[agent][model].in += tin; saModel[agent][model].out += tout;
+
+    var desc = extractTaskDescription(d);
+    if (desc) anyDescriptionFound = true;
+    highCost.push({
+      sessionTitle: r.session_title || '(sin titulo)',
+      agent: agent,
+      model: model,
+      desc: desc,
+      cost: cost,
+      tin: tin,
+      tout: tout
+    });
   });
+  highCost.sort(function (a, b) { return b.cost - a.cost; });
 
   var md = '';
   md += '# Informe de consumo de cuota - ExploraCO\n\n';
@@ -212,6 +357,42 @@ function buildReport(w) {
   md += '|---|---|---:|---:|---:|\n';
   rows.slice(0, 5).forEach(function (r) {
     md += '| ' + esc(r.title).slice(0, 50) + ' | ' + esc(r.agent) + ' | ' + fmtUSD(r.cost) + ' | ' + fmtTok(r.tokens_input) + ' | ' + fmtTok(r.tokens_output) + ' |\n';
+  });
+
+  md += '\n## Tareas Repetitivas (patron de titulo de sesion)\n\n';
+  md += 'Agrupa las sesiones de esta ventana por un patron de titulo normalizado ';
+  md += '(minusculas, numeros unificados como #) para detectar que tipo de tarea se ';
+  md += 'repite mas y cuanto cuesta en conjunto. Es el primer lugar donde mirar para ';
+  md += 'decidir que optimizar (por ejemplo: mover un patron muy repetido a un modelo ';
+  md += 'mas barato, o revisar por que un mismo tipo de tarea necesita reintentos).\n\n';
+  if (patternRows.length === 0) {
+    md += '(sin sesiones en esta ventana)\n';
+  } else {
+    md += '| Patron de titulo (ejemplo real) | Repeticiones | Costo total | Costo promedio | Tokens in | Tokens out |\n';
+    md += '|---|---:|---:|---:|---:|---:|\n';
+    patternRows.slice(0, 15).forEach(function (r) {
+      md += '| ' + esc(truncate(r.sample, 60)) + ' | ' + r.n + ' | ' + fmtUSD(r.cost) + ' | ' + fmtUSD(r.cost / r.n) + ' | ' + fmtTok(r.in) + ' | ' + fmtTok(r.out) + ' |\n';
+    });
+  }
+
+  md += '\n## Desglose Detallado de Tareas y Prompts de Alto Consumo\n\n';
+  md += 'Top ' + TOP_N + ' mensajes individuales por costo en esta ventana, con su sesion, ';
+  md += 'subagente/modelo y (si la base lo expone) una descripcion de la tarea o prompt ';
+  md += 'ejecutado. Util para responder "en que prompt o loop especifico se gasto mas".\n\n';
+  if (!anyDescriptionFound) {
+    md += '**Nota:** no se encontro ningun campo de descripcion reconocible en message.data ';
+    md += 'para esta base (se probaron: summary, title, task, description, intent, prompt, ';
+    md += 'parts, content). Ejecuta `node scripts/informe-cuota.js --schema` para ver las ';
+    md += 'claves reales disponibles y, si corresponde, amplia extractTaskDescription() en ';
+    md += 'el script con el nombre de campo correcto. Mientras tanto se muestra el resto del ';
+    md += 'contexto disponible (sesion, agente, modelo, costo, tokens).\n\n';
+  }
+  md += '| Sesion / Tarea | Descripcion de la tarea | Subagente / Modelo | Costo | Tokens |\n';
+  md += '|---|---|---|---:|---:|\n';
+  highCost.slice(0, TOP_N).forEach(function (r) {
+    var descCol = r.desc ? esc(truncate(r.desc, 90)) : '(no disponible)';
+    md += '| ' + esc(truncate(r.sessionTitle, 45)) + ' | ' + descCol + ' | ' + esc(r.agent) + ' / ' + esc(r.model) +
+      ' | ' + fmtUSD(r.cost) + ' | in ' + fmtTok(r.tin) + ' / out ' + fmtTok(r.tout) + ' |\n';
   });
 
   return md;

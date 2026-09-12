@@ -3,11 +3,120 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-095 / Refactor UI/UX ficha de destino (2026-09-11) - verificado como columna admin (sin insignia publica), hero HQI con chip de direccion, popover de Guardar con mapas tematicos, galeria con lightbox; Escudo GOLD limpio (divs 716/716, smoke 28/28, flujo verificado 6/6)
+- TSK-095 extension (2026-09-11) - verificacion exp-pickle 14/14 PASS: `address` PERSISTIDA en admin (INSERT/UPDATE + migracion 011 PENDIENTE de aplicar en Neon), gate secReservar = solo `bookingUrl||hwUrl` implementado (ADR-020), badge publico confirmado NO (ADR-019)
 - ADR-018 / Gamificacion v4.0 (2026-09-10) - Consumibles con economia de XP y de-nivel, vitrina de 20 niveles, cromos probabilisticos y pandillas completas + migracion 010 + smoke 95/95
 - TSK-093: Capa multimedia + drawer del mapa cultural (2026-09-10) - pines multimedia por tipo, drawer de destino con tabs Fotos/Videos/Audios + fix UNION BUG-030
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion refactor UI/UX ficha de destino (2026-09-11) - TSK-095
+
+Refactor completo de la ficha dinamica ejecutado desde `prompt cambios.txt`
+(requerimientos UI/UX + sistema de verificado manual admin). Implementacion
+completada en working tree (SIN commitear). 3 archivos modificados con
+Escudo GOLD limpio.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/pagina-destino.js` (motor):
+  - Hero HQI: eliminados chips de resenas, precio "desde", duracion y link
+    web; agregado chip de direccion fisica con fallback `d.address || d.barrio`
+    (L764); se conservan ciudad/region y horario.
+  - "Sobre este lugar": eliminado el `slead` (lead solo en hero); nuevo
+    subtitulo estilizado `.sintro` con apertura de la descripcion (150 chars,
+    fallback highlight, solo no-blog) (CSS L231, render L801).
+  - Botonera hero: solo Sitio Web y Contactar prominentes (`hbtn`); Como
+    llegar, Ver galeria, Guardar y Estuve aqui secundarios (`hobtn`).
+  - Boton Guardar -> popover `abrirPopoverGuardar()` (L2257): "Tu Mapa"
+    (`toggleGuardado`) + checkboxes de mapas tematicos (`mapas_mios` +
+    `mapa_detalle`) + crear nuevo mapa (`mapa_crear` + `mapa_agregar_destino`,
+    L2301). Reutiliza /api/interacciones (sin endpoints nuevos).
+  - gstrip (franja naranja): conserva resenas y precio desde; ELIMINADO boton
+    "Reservar" (L781-782); agregado boton "Ver galeria" con scroll a `#galeria`
+    (L783, condicion `galAll.length > 1`).
+  - Galeria: foto principal `.gal-main` + miniaturas `.gal-thumbs` + boton
+    "Ver galeria ampliada" + Lightbox `#lb` (L1493) con prev/next, teclado
+    (Esc/flechas) y cierre por fondo; click en la foto principal abre el
+    lightbox.
+  - secMapa: SOLO boton Google Maps (eliminados WhatsApp y Telefono de ese
+    bloque, L1755-1756).
+  - Limpieza: eliminado modulo inferior "Foto destacada" (`secFotoDestacada`,
+    era ADR-017/P11, L1936) y eliminado el boton Google Maps de secContact
+    (centralizado en secMapa, L1941-1942).
+  - NO se renderiza ninguna insignia publica del campo `verificado`
+    (0 ocurrencias en el archivo; requisito: solo control interno del admin).
+- `admin.html`: checkbox `f-verificado` "Verificacion manual admin" en la
+  pestana General (L795-797) + wiring completo: clearForm (L2548-2549),
+  loadForm (L2988-2989), savePlace (L3629-3630), `_placeToAPI`
+  (`verificado: p.verificado === true`, L5828) y `_mergeNeonRowIntoLocal`
+  (L6145, guard `!== undefined && !== null`). Divs balanceados 716/716
+  (delta 0).
+- `api/admin-destinos.js`: `verificado` como COLUMNA gestionada con el patron
+  identico a `destacado`: GET listado (L63), INSERT (L109/157 con
+  `Boolean(b.verificado||false)`), UPDATE con guard `b.verificado !==
+  undefined` que permite persistir `false` y DESTILDAR (L256-258). La columna
+  ya existia en Neon (usada por publicar-lugar.js y leida por destinos.js).
+
+**Verificacion (Escudo GOLD):** `node --check` limpio en los 2 serverless;
+ASCII-safety 0 caracteres no-ASCII nuevos; balance de divs admin 716/716
+(delta 0); smoke del renderer 28/28 PASS; flujo de verificado 6/6 PASS
+(checkbox -> INSERT/UPDATE -> GET listado -> merge, incluido desmarcar).
+Extension 2026-09-11: verificacion exp-pickle 14/14 PASS de la persistencia
+de `address` (L5807 admin, INSERT L103/$10/L137 + fieldMap L220 de
+admin-destinos.js) y del gate de secReservar (L1747, ADR-020).
+Docs: ADR-019 en DECISIONS.md, TSK-095 en TASKS.md.
+
+#### Que sigue
+1. **Aplicar `db/migrations/011_ficha_direccion_destinos.sql` en Neon
+   (PENDIENTE, unico paso manual restante de la persistencia de `address`;
+   lo ejecuta Javier en el editor SQL de Neon, es idempotente y no requiere
+   nada mas).** Sin la columna, el INSERT/UPDATE de admin-destinos.js (que
+   ya envia `address`, L103/$10/L137/L220) fallaria al persistir un destino
+   con direccion.
+2. **Commit + push (MANUAL, lo ejecuta el usuario, no la IA):**
+   api/pagina-destino.js, admin.html, api/admin-destinos.js,
+   db/migrations/011_ficha_direccion_destinos.sql + docs (TASKS/TSK-095,
+   NEXT.md, DECISIONS/ADR-019 + ADR-020).
+3. **Verificacion en prod tras deploy:** hero de una ficha con `barrio`
+   muestra el chip de direccion; tras aplicar la migracion 011, un destino
+   con `address` cargada en admin muestra la direccion exacta en el chip
+   (prevalece sobre `barrio`); el popover de Guardar abre con los mapas
+   tematicos; galeria abre el lightbox; la franja no muestra "Reservar" pero
+   si "Ver galeria"; la seccion "Reservar" SOLO aparece en destinos con
+   booking/hostelworld reales; secMapa solo tiene Google Maps; admin
+   guarda/desmarca `verificado` sin romper ningun destino existente (el
+   guard `!== undefined` preserva los registros que no envian el campo).
+
+#### Riesgos activos / backlog (hallazgos del QA, NO bloqueantes)
+1. **[CERRADO 2026-09-11] `address` NO se persistia en Neon:** implementado
+   y verificado 14/14 (exp-pickle): `admin.html` `_placeToAPI` envia
+   `address` en POST y PUT (L5807); INSERT de admin-destinos.js persiste la
+   columna (L103 columnas, `$10` en L114, L137 valores) y el fieldMap del
+   UPDATE la incluye (L220). Unico pendiente manual: APLICAR la migracion
+   `db/migrations/011_ficha_direccion_destinos.sql` en el editor SQL de Neon
+   (idempotente, `ADD COLUMN IF NOT EXISTS address TEXT`, patron ADR-008),
+   NO implementar nada mas. El chip del hero sigue leyendo
+   `d.address || d.barrio` (L764, sin cambios): con la migracion aplicada y
+   un destino con `address`, el chip muestra la direccion exacta en vez de
+   `barrio`.
+2. **[CERRADO 2026-09-11 - ADR-020] R-2 secReservar en sitios:** decidido e
+   implementado: la seccion "Reservar" de la ficha SOLO se renderiza con
+   enlace real de Booking.com o Hostelworld (`bookingUrl || hwUrl`, L1747).
+   El WhatsApp solo y el Airbnb solo ya no disparan la seccion (sin
+   "Reservar" sobrante en sitios); WhatsApp y contacto siguen vivos via el
+   hero y secContact.
+3. **Doble escape preexistente** en api/pagina-destino.js ~L2174
+   (`\\u2605` en addRvOptimista): funcionalmente correcto (el cliente recibe
+   el escape simple al renderizar), pero mantener como pendiente menor de
+   higiene (Escudo GOLD lo cuenta como 1 preexistente; BUG-002 lo prohibe
+   como patron).
+4. **BUG-027 sigue abierto** (preexistente): el boton Instagram en secContact
+   muestra "[foto] Instagram" -- oportunidad de cerrar en un futuro sprint.
+5. **[DECIDIDO, sin cambio] Insignia publica de verificado:** confirmado que
+   NO se renderiza ninguna insignia publica por ahora (ADR-019: solo control
+   interno del admin + columna). Si el equipo la quiere en el futuro, habria
+   que renderizarla en pagina-destino.js condicionada a rol admin/`verificado`.
 
 ### Sesion ADR-018 - Gamificacion v4.0 (2026-09-10)
 

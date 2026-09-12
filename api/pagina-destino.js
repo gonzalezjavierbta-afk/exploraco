@@ -228,6 +228,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".stitle{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:900;text-transform:uppercase;letter-spacing:2.5px;color:var(--text)}"
 +".stnum{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:900;color:rgba(0,0,0,.05);line-height:1;margin-left:auto}"
 +".slead{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}"
++".sintro{font-size:15px;line-height:1.7;font-style:italic;color:var(--muted);border-left:3px solid var(--gold);padding-left:14px;margin:-4px 0 16px}"
 +".stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px;white-space:pre-line}"
 +".bfig{margin:24px 0}"
 +".bfig img{width:100%;max-height:480px;object-fit:cover;border-radius:12px;display:block}"
@@ -302,8 +303,21 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".ilbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted)}"
 +".ival{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--text);line-height:1.2}"
 +".gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}"
-+".gal-i{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center}"
++".gal-i{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;cursor:pointer}"
 +".gal-i img{width:100%;height:100%;object-fit:cover}"
++".gal-main{aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;cursor:pointer;transition:transform .15s}"
++".gal-main:hover{transform:scale(1.005)}"
++".gal-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px}"
++".glbtn{display:inline-block;margin-top:16px;background:transparent;border:1.5px solid var(--gold);color:var(--gold-dark);border-radius:4px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}"
++".glbtn:hover{background:var(--gold);color:#fff}"
++"#lb{position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;padding:4%}"
++"#lb-bg{position:absolute;inset:0;background:rgba(0,0,0,.92)}"
++"#lb-img{position:relative;max-width:92vw;max-height:76vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.6);object-fit:contain}"
++"#lb-cap{position:relative;color:rgba(255,255,255,.7);font-size:12px;font-family:'Outfit',sans-serif;margin-top:4px}"
++"#lb-close{position:fixed;top:18px;right:22px;z-index:3001;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;line-height:1}"
++".lb-nav{position:fixed;top:50%;transform:translateY(-50%);z-index:3001;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;width:44px;height:44px;border-radius:50%;font-size:22px;cursor:pointer;line-height:1;transition:background .15s}"
++".lb-nav:hover{background:var(--gold);border-color:var(--gold);color:#fff}"
++"#lb-prev{left:18px}#lb-next{right:18px}"
 +".entradas-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--border)}"
 +".entradas-table th{background:var(--black);color:#fff;padding:10px 14px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px}"
 +".entradas-table td{padding:12px 14px;border-bottom:1px solid var(--border)}"
@@ -746,30 +760,27 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (autor && autor.nombre) hqi.push('<div class="hqi">\u270D\ufe0f '+esc(autor.nombre)+'</div>');
   } else {
     if (d.ciudad) hqi.push('<div class="hqi">\u29BF '+esc(d.ciudad)+(d.region?', '+esc(d.region):'')+'</div>');
-    if (nRes>0) {
-      hqi.push('<div class="hqi">\u2605 '+rat.toFixed(1)+' \u00b7 '+nRes+' rese\u00f1as</div>');
-    } else {
-      // Fallback pedido en Sprint 2: evitar que un lugar recien
-      // publicado se vea "vacio" sin ninguna senal de confianza.
-      hqi.push('<div class="hqi">\u2605 4.8 \u00b7 Nuevo</div>');
-    }
-    if (d.precio_desde) hqi.push('<div class="hqi">\u0024 Desde '+esc(money(d.precio_desde))+'</div>');
-    if (duracion)      hqi.push('<div class="hqi">\u23F1 '+esc(duracion)+'</div>');
+    // TSK-076 HQI: chip de direccion exacta (d.address) cuando el admin la cargo
+    if (d.address || d.barrio) hqi.push('<div class="hqi">\uD83D\uDCCD '+esc(d.address || d.barrio)+'</div>');
     if (horarioVisita) hqi.push('<div class="hqi">\u23F0 '+esc(horarioVisita)+'</div>');
-    // TSK-075: la pagina web oficial como informacion prominente del hero
-    if (d.web) hqi.push('<a class="hqi hqilink" href="'+esc(d.web)+'" target="_blank">\uD83C\uDF10 '+esc(dominioWeb(d.web))+'</a>');
+    // TSK-076 HQI: se removieron los chips de resenas, precio "desde",
+    // duracion y pagina web del hero (TSK-075). Esa informacion vive ahora
+    // en la franja gstrip (resenas y precio) y en la botonera (Sitio web).
+    // rat y nRes siguen en uso por gstrip y secResenas; no se eliminan.
   }
 
   // -- GSTRIP (rating sticky bar) ---------------------------------
   var gstrip = '';
-  if (cat !== 'blog' && (nRes > 0 || d.precio_desde)) {
+  if (cat !== 'blog' && (nRes > 0 || d.precio_desde || galAll.length > 1)) {
     var starsHtml = [1,2,3,4,5].map(function(i){
       return '<span class="gstar'+(i<=Math.round(rat)?' on':'')+'">*</span>';
     }).join('');
     gstrip = '<div class="gstrip">'
       + (nRes>0 ? '<div><div class="gsavg">'+rat.toFixed(1)+'</div><div class="gstars">'+starsHtml+'</div><div class="gsrv">'+nRes+' resenas</div></div><div class="gsdiv"></div>' : '')
       + (d.precio_desde ? '<div class="gsprice"><div class="gspl">Desde</div><div class="gspv">'+esc(money(d.precio_desde))+'</div></div>' : '')
-      + (d.whatsapp ? '<button class="gscta" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">Reservar -></button>' : '')
+      // TSK-076: el boton "Reservar" salio de la franja; la reserva vive
+      // en secReservar y en la botonera. En su lugar, CTA a la galeria.
+      + (galAll.length > 1 ? '<button class="gscta" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria</button>' : '')
       + '</div>';
   }
 
@@ -781,9 +792,13 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var cuerpoHTML = cat === 'blog'
     ? parseBlogBody(d.descripcion || '')
     : (d.descripcion ? '<p class="stext">'+esc(d.descripcion)+'</p>' : '');
+  // TSK-076: el lead (d.lead) se elimino como parrafo suelto; en su lugar
+  // sobreIntro abre el texto con un subtitulo estilizado (primeras 150
+  // letras de la descripcion, o highlight como fallback). Solo no-blog.
+  var sobreIntro = (cat !== 'blog') ? (d.descripcion ? d.descripcion.replace(/\s+/g,' ').substring(0,150).replace(/\s\S*$/,'') : (d.highlight||'')) : '';
   var secDescripcion = '<section class="ssec bwarm" id="descripcion"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+descTitleGeneric+'</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + (d.lead ? '<p class="slead bc">'+esc(d.lead)+'</p>' : '')
+    + (sobreIntro ? '<p class="sintro">'+esc(sobreIntro)+'</p>' : '')
     + cuerpoHTML
     // En blog el recuadro "Destacado" no se muestra al final del
     // articulo: el cuerpo del post ya termina en el cierre editorial.
@@ -1466,8 +1481,23 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="gal">'+galAll.map(function(u){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"></div>'; }).join('')+'</div>'
+    + '<div class="gal-main" style="background-image:url(\''+esc(galAll[0])+'\')" onclick="abrirLightbox(0)"></div>'
+    + '<div class="gal-thumbs">'+galAll.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+i+')"></div>'; }).join('')+'</div>'
+    + '<button class="glbtn" onclick="abrirLightbox(0)">Ver galeria ampliada</button>'
     + '</div></section>' : '';
+
+  // -- LIGHTBOX (galeria ampliada) --------------------------------
+  // Overlay oculto montado al final del body, antes del script inline.
+  // Solo se monta si hay mas de 1 foto (degradacion condicional).
+  // Lo controla el JS inline: abrirLightbox/LB_I, lbNav, lbClose.
+  var lbHTML = galAll.length > 1 ? '<div id="lb" style="display:none">'
+    + '<div id="lb-bg"></div>'
+    + '<button id="lb-close" onclick="lbClose()">\u2715</button>'
+    + '<button id="lb-prev" class="lb-nav" onclick="lbNav(-1)">\u2039</button>'
+    + '<img id="lb-img" src="" alt="Foto">'
+    + '<button id="lb-next" class="lb-nav" onclick="lbNav(1)">\u203A</button>'
+    + '<div id="lb-cap"></div>'
+    + '</div>' : '';
 
   // -- SECCION: Habitaciones / precios (solo hostal) ----------------
   var HAB_BADGE = {popular:'\u2605 Mas popular', female:'Solo mujeres', quiet:'Tranquila', premium:'Premium'};
@@ -1714,7 +1744,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   if (hwUrl)      rbtns.push('<a class="cbtn dark" href="'+esc(hwUrl)+'" target="_blank"> Hostelworld</a>');
   if (airbnbUrl)  rbtns.push('<a class="cbtn gold" href="'+esc(airbnbUrl)+'" target="_blank">[casa2] Airbnb</a>');
 
-  var secReservar = rbtns.length ? '<section class="ssec bwarm" id="reservar"><div class="sin">'
+  var secReservar = (bookingUrl || hwUrl) ? '<section class="ssec bwarm" id="reservar"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reservar</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+rbtns.join('')+'</div></div></section>' : '';
 
@@ -1722,14 +1752,14 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var secMapa = '';
   if (hasLatLng) {
     var mapBtns = [];
+    // TSK-076: WhatsApp y Telefono se removieron de secMapa; el contacto
+    // directo vive en secContact (cgrid). Aqui solo Google Maps.
     mapBtns.push('<a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
-    if (d.whatsapp) mapBtns.push('<a class="mabtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
-    if (d.telefono) mapBtns.push('<a class="mabtn outline" href="tel:'+esc(d.telefono)+'">\u2706 '+esc(d.telefono)+'</a>');
     secMapa = '<section class="ssec bwhite" id="mapa"><div class="sin">'
       + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicacion y como llegar</h2><div class="stnum">'+nextNum()+'</div></div>'
       + '<div id="mapel"><iframe loading="lazy" src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe></div>'
       + (comoLlegar ? '<p class="stext" style="margin-top:14px">'+esc(comoLlegar)+'</p>' : '')
-      + '<div class="mapacts">'+mapBtns.join('')+'</div>'
+      + (mapBtns.length ? '<div class="mapacts">'+mapBtns.join('')+'</div>' : '')
       + '</div></section>';
   }
 
@@ -1902,28 +1932,14 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<div class="wrok" id="fp-ok">\u2713 Foto publicada</div>'
     + '</div></section>';
 
-  // --- Foto destacada del destino (ADR-017, P11) ---
-  // Solo se muestra si foto_hero existe y no es un gradiente.
-  var secFotoDestacada = '';
-  if (d.foto_hero && typeof d.foto_hero === 'string'
-      && d.foto_hero.indexOf('linear-gradient') === -1
-      && d.foto_hero.indexOf('http') === 0) {
-    secFotoDestacada = '<section class="sec" id="foto-destacada">'
-      + '<div class="stnum" style="background:var(--gold, #E8A020);">&#x2B50;</div>'
-      + '<h2>Foto destacada</h2>'
-      + '<div style="max-width:700px;margin:16px auto;">'
-      + '  <img src="' + esc(d.foto_hero) + '" '
-      + '    alt="' + esc(d.nombre) + '" '
-      + '    style="width:100%;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);" '
-      + '    loading="lazy" '
-      + '    onerror="this.parentElement.style.display=\'none\'">'
-      + '</div>'
-      + '</section>';
-  }
+  // ADR-017 P11 (removido por refactor de UI, TSK-076): la seccion
+  // secFotoDestacada se elimino; la galeria con lightbox ya cubre la
+  // foto destacada y evita duplicar la misma imagen en dos secciones.
 
   // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
-  if (hasLatLng) ctBtns.push('<a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
+  // TSK-076: Google Maps se removio de secContact; queda centralizado
+  // en secMapa (boton unico "Google Maps" bajo el mapa embed).
   if (d.whatsapp) ctBtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
   if (d.telefono) ctBtns.push('<a class="cbtn dark" href="tel:'+esc(d.telefono)+'">\u2706 Llamar</a>');
   if (d.web)       ctBtns.push('<a class="cbtn blue" href="'+esc(d.web)+'" target="_blank">\u25CB Sitio web</a>');
@@ -2068,7 +2084,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
       + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
       + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
-      + '<button class="hobtn" id="btn-guardar" onclick="toggleGuardar(this)">\u2661 Guardar</button>'
+      + '<button class="hobtn" id="btn-guardar" onclick="abrirPopoverGuardar()">\u2661 Guardar</button>'
       + '<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>'
       + '</div>'
       + '</div>\n'
@@ -2121,13 +2137,14 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + secFaq + '\n'
     + secResenas + '\n'
     + secFotos + '\n'
-    + secFotoDestacada + '\n'
     + secContact + '\n'
     + secRelacionados + '\n\n'
 
     + '<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>'
     + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
     + '<div class="fcopy"><a href="/index.html">Inicio</a> &middot; <a href="/'+esc(dir)+'">'+esc(label)+'</a></div></footer>\n\n'
+
+    + lbHTML + '\n'
 
     + '<script src="/usuario-session.js"><\/script>\n'
     + '<script>\n'
@@ -2232,6 +2249,71 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  if(!window.ExploraCO){return;}\n'
     + '  window.ExploraCO.toggleGuardado(DID,btn);\n'
     + '}\n'
+    // Popover de guardar (TSK-076): Tu Mapa + mapas tematicos del usuario.
+    // El boton del hero (btn-guardar) abre el popover en vez de alternar
+    // directo. Si no hay sesion, se invita a iniciar sesion primero.
+    + 'var popAbierto=false;\n'
+    + 'function cerrarPopoverGuardar(){var p=document.getElementById(\'guardar-pop\');if(p)p.remove();popAbierto=false;document.removeEventListener(\'click\',cerrarPopoverGuardar,true);}\n'
+    + 'function abrirPopoverGuardar(){\n'
+    + '  if(popAbierto){cerrarPopoverGuardar();return;}\n'
+    + '  if(!window.ExploraCO||!window.ExploraCO.usuario){if(window.ExploraCO&&window.ExploraCO.mostrarLogin)window.ExploraCO.mostrarLogin(\'Inicia sesion para guardar en tus mapas\');return;}\n'
+    + '  var u=window.ExploraCO.usuario;\n'
+    + '  popAbierto=true;\n'
+    + '  var btn=document.getElementById(\'btn-guardar\');\n'
+    + '  if(!btn)return;\n'
+    + '  var pop=document.createElement(\'div\');\n'
+    + '  pop.id=\'guardar-pop\';\n'
+    + '  pop.style.cssText=\'position:fixed;z-index:2500;width:240px;max-height:300px;overflow:auto;background:#0F172A;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);font-family:Outfit,sans-serif\';\n'
+    + '  var r=btn.getBoundingClientRect();\n'
+    + '  pop.style.top=Math.min(window.innerHeight-320,Math.max(8,r.bottom+6))+\'px\';\n'
+    + '  pop.style.left=Math.max(8,r.right-240)+\'px\';\n'
+    + '  pop.innerHTML=\'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#E8A020;margin-bottom:6px;display:flex;justify-content:space-between">Guardar en<span style="cursor:pointer;color:rgba(255,255,255,.5)" onclick="cerrarPopoverGuardar()">\u2715</span></div>\';\n'
+    + '  var cuerpo=document.createElement(\'div\');\n'
+    + '  pop.appendChild(cuerpo);\n'
+    + '  document.body.appendChild(pop);\n'
+    + '  var opTu=document.createElement(\'label\');\n'
+    + '  opTu.style.cssText=\'display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.85)\';\n'
+    + '  opTu.innerHTML=\'<input type="checkbox" id="gp-tu" onchange="toggleTuMapa(this)"> Tu Mapa\';\n'
+    + '  cuerpo.appendChild(opTu);\n'
+    + '  window.ExploraCO.estaGuardado(DID).then(function(g){var c=document.getElementById(\'gp-tu\');if(c)c.checked=!!g;});\n'
+    + '  var sep=document.createElement(\'div\');\n'
+    + '  sep.style.cssText=\'height:1px;background:rgba(255,255,255,.1);margin:6px 0\';\n'
+    + '  cuerpo.appendChild(sep);\n'
+    + '  fetch(\'/api/interacciones?tipo=mapas_mios&usuario_id=\'+encodeURIComponent(u.id)).then(function(r){return r.json();}).then(function(dd){\n'
+    + '    var mapas=(dd&&dd.ok&&dd.data)||[];\n'
+    + '    if(!mapas.length){var av=document.createElement(\'div\');av.style.cssText=\'padding:6px 4px;font-size:11px;color:rgba(255,255,255,.5)\';av.textContent=\'Sin mapas tematicos\';cuerpo.appendChild(av);}\n'
+    + '    mapas.forEach(function(m){\n'
+    + '      var lb=document.createElement(\'label\');\n'
+    + '      lb.style.cssText=\'display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.85)\';\n'
+    + '      lb.innerHTML=\'<input type="checkbox" onchange="toggleMapaDest(\\\''
+    + '+m.id+'
+    + '\',this.checked)"> \'+(m.emoji||\'\uD83D\uDDFA\')+\' <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>\';\n'
+    + '      lb.querySelector(\'span\').textContent=m.nombre;\n'
+    + '      cuerpo.appendChild(lb);\n'
+    + '      fetch(\'/api/interacciones?tipo=mapa_detalle&id=\'+encodeURIComponent(m.id)).then(function(r){return r.json();}).then(function(dd2){\n'
+    + '        var en=(dd2&&dd2.ok&&dd2.data&&dd2.data.destinos||[]).some(function(x){return String(x.destino_id)===String(DID);});\n'
+    + '        lb.querySelector(\'input\').checked=en;\n'
+    + '      }).catch(function(){});\n'
+    + '    });\n'
+    + '    var nb=document.createElement(\'button\');\n'
+    + '    nb.style.cssText=\'width:100%;padding:6px;margin-top:6px;background:transparent;border:1px dashed rgba(232,160,32,.5);border-radius:5px;color:#E8A020;font-size:10px;font-weight:700;cursor:pointer\';\n'
+    + '    nb.textContent=\'+ Nuevo mapa\';\n'
+    + '    nb.onclick=function(){var nombre=window.prompt(\'Nombre del nuevo mapa\');if(!nombre||!nombre.trim())return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_crear\',usuario_id:u.id,nombre:nombre.trim()})}).then(function(r){return r.json();}).then(function(dc){if(dc&&dc.ok){var nid=dc.id||dc.mapa_id||(dc.data&&dc.data.id)||null;if(nid)return fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_agregar_destino\',usuario_id:u.id,mapa_id:nid,destino_id:DID})});}}).then(function(r){if(r)return r.json();}).then(function(dx){cerrarPopoverGuardar();if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(dx&&dx.ok?\'Guardado en el mapa\':\'Mapa creado\',\'#16a34a\');}).catch(function(){cerrarPopoverGuardar();});};\n'
+    + '    cuerpo.appendChild(nb);\n'
+    + '  });\n'
+    + '  setTimeout(function(){document.addEventListener(\'click\',cerrarPopoverGuardar,true);},0);\n'
+    + '}\n'
+    + 'function toggleTuMapa(cb){var btn=document.getElementById(\'btn-guardar\');if(window.ExploraCO)window.ExploraCO.toggleGuardado(DID,btn);setTimeout(function(){window.ExploraCO.estaGuardado(DID).then(function(g){cb.checked=!!g;});},400);}\n'
+    + 'function toggleMapaDest(mapaId,checked){var u=window.ExploraCO&&window.ExploraCO.usuario;if(!u)return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:checked?\'mapa_agregar_destino\':\'mapa_quitar_destino\',usuario_id:u.id,mapa_id:mapaId,destino_id:DID})}).then(function(r){return r.json();}).then(function(){if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(checked?\'Anadido al mapa\':\'Quitado del mapa\',\'#16a34a\');}).catch(function(){});}\n'
+    // Lightbox de galeria (TSK-076): GAL_ALL se genera en runtime del
+    // servidor (igual que DIM_LABELS mas arriba) a partir de galAll.
+    + 'var GAL_ALL='+JSON.stringify(galAll)+';\n'
+    + 'var LB_I=0;\n'
+    + 'function abrirLightbox(i){if(!GAL_ALL.length)return;LB_I=(i+GAL_ALL.length)%GAL_ALL.length;var im=document.getElementById(\'lb-img\');if(im){im.src=GAL_ALL[LB_I];var bg=document.getElementById(\'lb\');if(bg)bg.style.display=\'flex\';}var cap=document.getElementById(\'lb-cap\');if(cap)cap.textContent=(LB_I+1)+\' / \'+GAL_ALL.length;}\n'
+    + 'function lbNav(d){abrirLightbox(LB_I+d);}\n'
+    + 'function lbClose(){var lb=document.getElementById(\'lb\');if(lb)lb.style.display=\'none\';}\n'
+    + 'var lbEl=document.getElementById(\'lb\');if(lbEl&&document.getElementById(\'lb-bg\')){document.getElementById(\'lb-bg\').addEventListener(\'click\',lbClose);}\n'
+    + 'document.addEventListener(\'keydown\',function(e){var lb=document.getElementById(\'lb\');if(!lb||lb.style.display===\'none\')return;if(e.key===\'Escape\')lbClose();if(e.key===\'ArrowLeft\')lbNav(-1);if(e.key===\'ArrowRight\')lbNav(1);});\n'
     + 'function marcarVisitadoBtn(btn){\n'
     + '  if(!window.ExploraCO){return;}\n'
     + '  btn.disabled=true;\n'

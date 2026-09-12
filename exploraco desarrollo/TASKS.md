@@ -2224,5 +2224,41 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-095: Refactor UI/UX ficha de destino (prompt cambios.txt) -- verificado admin, hero HQI, popover Guardar y galeria con lightbox [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-11)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-11
+- **Prompt origen:** `prompt cambios.txt` (requerimientos UI/UX de la ficha dinamica + sistema de verificado manual admin)
+- **Archivos modificados (3, Escudo GOLD LIMPIO):**
+  - api/pagina-destino.js (motor de render de la ficha)
+  - admin.html (checkbox `f-verificado` + wiring completo, divs 716/716)
+  - api/admin-destinos.js (columna `verificado` gestionada, patron de `destacado`)
+
+- **Subtareas completadas:**
+  1. **Hero HQI (remueve TSK-075):** se eliminan los chips de resenas, precio "desde", duracion y del link web (este se centraliza en la botonera); se agrega chip de direccion fisica con fallback `d.address || d.barrio` (L764); se conservan ciudad/region y horario.
+  2. **Seccion "Sobre este lugar":** se elimina el `slead` (el lead se mantiene solo en el hero); nuevo subtitulo estilizado `.sintro` (CSS L231, borde dorado + italica) con apertura de la descripcion (150 chars, fallback a highlight, solo no-blog) (L801).
+  3. **Botonera hero:** Sitio Web y Contactar como unicos prominentes (`hbtn`); Como llegar, Ver galeria, Guardar y Estuve aqui en secundario (`hobtn`).
+  4. **Boton Guardar -> popover `abrirPopoverGuardar()`** (L2257): seleccion "Tu Mapa" (`toggleGuardado`), checkboxes de mapas tematicos del usuario (`mapas_mios` + `mapa_detalle`) y crear nuevo mapa (`mapa_crear` + `mapa_agregar_destino`, L2301). Reutiliza la API existente de /api/interacciones (sin endpoints nuevos).
+  5. **Franja naranja (gstrip):** conserva resenas y precio desde; ELIMINADO el boton "Reservar" (comentario L781-782; la reserva vive en secReservar); agregado boton "Ver galeria" con scroll directo a `#galeria` (L783, condicion `galAll.length > 1`).
+  6. **Galeria:** foto principal grande `.gal-main` (L1484, click abre lightbox) + miniaturas `.gal-thumbs` (L1485) + boton "Ver galeria ampliada" (L1486) + **Lightbox** `#lb` (L1493) con navegacion prev/next, teclado (Esc/flechas) y cierre por fondo.
+  7. **secMapa:** SOLO boton Google Maps (se eliminan WhatsApp y Telefono de ese bloque, comentario L1755-1756).
+  8. **Limpieza de modulos:** eliminado el modulo inferior "Foto destacada" (`secFotoDestacada`, era ADR-017/P11; comentario L1936) y eliminado el boton Google Maps del bloque secContact (queda centralizado en secMapa, comentario L1941-1942).
+  9. **Sin insignia publica de verificado:** por decision, el renderer NO emite ninguna insignia publica del campo `verificado` (0 ocurrencias de `verificado` en api/pagina-destino.js); es control interno del admin. Ver DECISIONS.md ADR-019.
+  10. **admin.html:** nuevo checkbox `f-verificado` "Verificacion manual admin" en pestana General (L795-797) + wiring completo: clearForm (L2548-2549 `cbVer.checked=false`), loadForm (L2988-2989 `cbVer.checked = !!(p.verificado)`), savePlace (L3629-3630 `p.verificado = !!(cbVer && cbVer.checked)`), `_placeToAPI` (`verificado: p.verificado === true`, L5828) y `_mergeNeonRowIntoLocal` (L6145 con guard `!== undefined && !== null`).
+  11. **api/admin-destinos.js:** `verificado` como COLUMNA gestionada con el patron identico a `destacado`: GET listado la incluye (L63), INSERT (L109/157 con `Boolean(b.verificado||false)`) y UPDATE con guard `b.verificado !== undefined` que permite persistir `false` y DESTILDAR (L256-258). La columna ya existia en Neon (la usan publicar-lugar.js y destinos.js).
+  12. **ADR-019** en DECISIONS.md + NEXT.md con el backlog de hallazgos del QA.
+
+- **Verificacion (Escudo GOLD):** `node --check` limpio en api/pagina-destino.js y api/admin-destinos.js; ASCII-safety 0 caracteres no-ASCII nuevos en los 3 (1 doble escape preexistente confirmado ~L2174 de addRvOptimista, NO de esta tarea; ver backlog en NEXT.md); balance de divs de admin.html 716/716 (delta 0, re-verificado contra archivo real ADR-006); smoke del renderer 28/28 PASS; flujo de verificado 6/6 PASS (checkbox admin -> INSERT/UPDATE de admin-destinos.js -> GET listado -> merge _mergeNeonRowIntoLocal, incluyendo desmarcar con UPDATE `false`).
+
+- **Cierre de backlog (2026-09-11, verificacion exp-pickle 14/14 PASS):**
+  - **`address` PERSISTIDA (cierra el riesgo activo 1 de NEXT.md):** `admin.html` `_placeToAPI` envia `address` en POST y PUT (L5807); `api/admin-destinos.js` INSERT persiste la columna (L103 columnas, `$10` en L114, L137 valores) y el fieldMap del UPDATE la incluye (L220); `api/pagina-destino.js` L764 sigue leyendo `d.address || d.barrio` (sin cambios). Columna lista via migracion `db/migrations/011_ficha_direccion_destinos.sql` (`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS address TEXT;`, idempotente, patron ADR-008) -- PENDIENTE de APLICARSE en el editor SQL de Neon manualmente (NO pendiente de implementarse).
+  - **Gate de la seccion "Reservar" DECIDIDO e implementado (ADR-020):** `secReservar` SOLO se renderiza cuando el destino tiene enlace real de Booking.com o Hostelworld (`bookingUrl || hwUrl`, api/pagina-destino.js L1747). El WhatsApp solo y el Airbnb solo ya no disparan la seccion (los sitios ya no muestran "Reservar" sobrante); WhatsApp y contacto siguen vivos via hero y secContact.
+  - **Insignia publica de verificado: NO** (decidido; coherente con ADR-019 -- solo control interno del admin + columna, sin render publico).
+  - **Estado final de la TSK-095:** implementada; unico paso manual pendiente = aplicar la migracion 011 en Neon + commit/push manual del usuario.
+  - **Sigue abierto (higiene menor, NO bloqueante):** doble escape preexistente ~L2174 en `addRvOptimista` (ver backlog en NEXT.md, punto 3) y BUG-027 (boton Instagram en secContact).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

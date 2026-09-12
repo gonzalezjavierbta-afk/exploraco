@@ -227,11 +227,20 @@ seed/loader/smoke viven en `scripts/` (nunca en `api/`), por eso son ilimitados.
 **`destinos`** (principal)
 Campos fijos comunes a las 4-5 categorias: `id`, `slug`, `nombre`,
 `categoria_slug`, `lead`, `descripcion`, `highlight`, `ciudad`, `region`,
-`barrio`, `lat`, `lng`, `whatsapp`, `telefono`, `email`, `web`, `instagram`,
-`precio_desde`, `horario`, `emoji`, `hero_bg`, `foto_hero`, `rating`,
-`total_resenas`, `status`, `destacado`, `booking`, `hostelworld`, `airbnb`,
-`tipo`, `capacidad`, `como_llegar`, `tags` (jsonb), `creado_en`,
-`actualizado_en`.
+`barrio`, `address`, `lat`, `lng`, `whatsapp`, `telefono`, `email`, `web`,
+`instagram`, `precio_desde`, `horario`, `emoji`, `hero_bg`, `foto_hero`,
+`rating`, `total_resenas`, `status`, `destacado`, `verificado`, `booking`,
+`hostelworld`, `airbnb`, `tipo`, `capacidad`, `como_llegar`, `tags` (jsonb),
+`creado_en`, `actualizado_en`.
+NOTA (coherencia TSK-095, ver BLUEPRINT.md seccion 3 y DECISIONS.md ADR-019/ADR-020):
+`address` (direccion fisica exacta) se persiste desde el codigo (admin.html
+`_placeToAPI` L5807; INSERT de admin-destinos.js L103 columnas/`$10`/L137
+valores; fieldMap del UPDATE L220) y el renderer la lee con fallback
+`d.address || d.barrio` (api/pagina-destino.js L764). Unico paso manual
+pendiente: APLICAR la migracion `db/migrations/011_ficha_direccion_destinos.sql`
+en el editor SQL de Neon (`ADD COLUMN IF NOT EXISTS address TEXT`, idempotente,
+ADR-008). `verificado` (booleano) es columna gestionada con el patron de
+`destacado`, control interno del admin, sin insignia publica.
 
 **`destinos_fotos`** - galeria: `id`, `destino_id` (FK), `url`, `caption`,
 `orden`, `es_hero`, `creado_en`.
