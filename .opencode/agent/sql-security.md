@@ -1,7 +1,7 @@
 ---
 description: Agente exclusivo para seguridad cr\u00edtica, RLS y persistencia SQL de ExploraCO. \u00dasalo SOLO para tareas que toquen Neon PostgreSQL, RLS, autenticaci\u00f3n, claves, migraciones de esquema o integridad de datos. Prohibido delegar estas tareas a agentes experimentales gratuitos.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

@@ -1,7 +1,7 @@
 ---
 description: QA Specialist / Auditor de ExploraCO. Ejecuta el Escudo GOLD (node --check, ASCII-safety, balance de divs), smoke tests de buildHTML(), verificación de integración con Node vm y valida contra BUGS_HISTORICOS.md. Solo audita y reporta; no corrige código. Úsalo antes de desplegar cualquier cambio en api/*.js, admin.html, pagina-destino.js o index.html.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: allow

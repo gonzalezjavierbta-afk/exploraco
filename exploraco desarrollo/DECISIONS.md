@@ -478,3 +478,34 @@ Registro de decisiones arquitectonicas (ADR). Este documento NUNCA contiene tare
 **Impacto:** `api/interacciones.js` (2 lineas, handler `multimedia_mapa`); `index-api-connector.js` (URL del fetch); `index.html` (listener de filtros, `filterMapaPins`, `renderMapaList`, `setMapaActive`, `renderMapaMedia`, `mdMediasCercanas`, `refreshMapaMarkers`, `onMapaMoved`, `updateMMMarkers`); `mapas.html` (nuevo drawer + `abrirDrawerDetalle`). Sin migracion SQL ni endpoints nuevos. `mapaPendingPopupId`/`mapaPendingClearTimer` quedan declaradas sin uso (limpieza pendiente, no bloqueante). Fuera de alcance: la capa multimedia de `comunidad.html` sigue mostrando ambas ramas (no se le agrego el parametro); candidata a unificar en una tarea futura.
 
 **ADR previos relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline de verdad), ADR-017 (mapa audiovisual), ADR-020 (gate de reserva con criterio real)
+
+---
+
+## ADR-022: Reemplazo de la constraint unica compuesta `(usuario_id, destino_id, tipo)` por un indice unico parcial solo para `resena`/`rating` (fotos libres)
+
+**ID:** ADR-022
+**Fecha:** 2026-09-12
+**Estado:** Aprobado e implementado en working tree (migracion `db/migrations/012` PENDIENTE de aplicar en Neon)
+**Autor:** AI-DOS Core (prompt cambios.txt: fixes multimedia; sesion TSK-097)
+
+**Problema:** la tabla `interacciones` tenia la constraint unica compuesta heredada `interacciones_usuario_id_destino_id_tipo_key` sobre `(usuario_id, destino_id, tipo)`, disenada para deduplicar resenas/rating (ADR-007). Pero el modelo de fotos (ADR-017) define las fotos como registros LIBRES: los handlers `tipo='foto'` (upload de foto de lugar) y `tipo='foto_voto'` insertan filas `tipo='foto'` para el mismo `(usuario_id, destino_id)`. La constraint compuesta chocaba con la segunda foto (y con el segundo voto de foto) del mismo usuario al mismo destino: `duplicate key value violates unique constraint` -> 500 generico. Ademas, la constraint vieja PERMITIA que un usuario tuviera a la vez una `resena` y un `rating` del mismo destino (el `tipo` los diferenciaba), lo que contradice el dedup simetrico "una calificacion por usuario y destino" del ADR-007.
+
+**Opciones evaluadas:**
+1. **Mantener la constraint compuesta y usar `ON CONFLICT DO UPDATE`/upsert en los handlers de foto:** rechazada -- convertiria la segunda foto en una sobrescritura de la primera (el usuario no podria subir varias fotos al mismo lugar) y el voto de foto repetido no debe mutar la fila previa; viola el espiritu de fotos libres del ADR-017.
+2. **DROP de la constraint vieja sin reemplazo + dedup en codigo:** rechazada -- elimina la garantia a nivel de BD del dedup de resena/rating (ADR-007) y deja la integridad dependiendo solo del backend (carrera de condiciones entre POSTs simultaneos).
+3. **Indice unico PARCIAL solo para `resena`/`rating` (elegida):** DROP de la constraint compuesta vieja + `CREATE UNIQUE INDEX ... ON interacciones (usuario_id, destino_id) WHERE tipo IN ('resena','rating')`. Las fotos (y cualquier tipo de registro libre futuro) quedan sin restriccion de unicidad; el dedup de calificaciones queda garantizado por la BD exactamente sobre los tipos que lo requieren. Se complementa con una limpieza defensiva de duplicados preexistentes (una `resena` + un `rating` del mismo usuario-destino: se conserva la resena con texto y, a igualdad de tipo, la fila mas reciente; se excluye `usuario_id` NULL) y con el recalculo de `destinos.rating`/`total_resenas` solo para los destinos afectados (patron identico al de `api/admin.js` y `api/interacciones.js`, ADR-007).
+4. **Separar fotos en tabla propia:** descartada -- ADR-017 ya las vive en `interacciones` (contadores por COUNT, sin columnas) y migrar a tabla aparte amplia el alcance sin beneficio inmediato.
+
+**Decision tomada:** se adopta la opcion 3. La migracion `db/migrations/012_interacciones_dedup_resena_rating.sql` (nueva, idempotente ADR-008, ASCII-safe ADR-002):
+- Paso 1: `DROP CONSTRAINT IF EXISTS interacciones_usuario_id_destino_id_tipo_key`.
+- Paso 2: limpieza defensiva de duplicados `resena`/`rating` por `(usuario_id, destino_id)` (conserva la resena con texto, luego la mas reciente; excluye `usuario_id` NULL) con captura previa de los destinos afectados en tabla temporal.
+- Paso 3: `CREATE UNIQUE INDEX IF NOT EXISTS idx_interacciones_dedup_resena_rating ON interacciones (usuario_id, destino_id) WHERE tipo IN ('resena','rating')`.
+- Paso 4: recalculo de `destinos.rating` (AVG redondeado a 2 decimales) y `destinos.total_resenas` (COUNT) sobre `resena`+`rating` solo para los destinos con duplicados eliminados.
+
+Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 409 tipado (`{ok:false, error:'Registro duplicado', duplicado:true}`) en vez de 500 generico: un conflicto de unicidad real (resena/rating duplicado, `foto_voto` repetido) se distingue de un fallo de servidor.
+
+**Justificacion:** el indice parcial expresa en el esquema la regla de negocio exacta: unicidad SOLO donde la hay (una calificacion por usuario y destino, ADR-007), libertad donde la hay (fotos multiples por usuario y destino, ADR-017). Es la solucion de menor riesgo: no cambia el contrato del endpoint, no crea endpoints nuevos (presupuesto 8/8 intacto), no mueve datos de tabla, y el DROP+CREATE idempotente hace la migracion re-aplicable. La limpieza defensiva realinea los datos historicos que la constraint vieja permitia (resena + rating simultaneos) sin intervencion manual. El 409 tipificado da una semantica HTTP correcta al conflicto de unicidad y es coherente con los 409 existentes del sistema (`ya_votado`, dedup de planes ADR-015).
+
+**Impacto:** `db/migrations/012_interacciones_dedup_resena_rating.sql` (NUEVO, versionado ADR-008); `api/interacciones.js` (catch final L3451-3452 -> 409 en 23505). Sin cambios de contrato ni de frontend. **PENDIENTE BLOQUEANTE:** aplicar la migracion 012 en el editor SQL de Neon (lo ejecuta Javier; sin ella produccion sigue con la constraint vieja y la segunda foto del mismo usuario-destino sigue devolviendo 500; el catch 23505 -> 409 solo tipifica el error). Verificacion: Escudo GOLD limpio (node --check, ASCII 0 bytes >127, divs 4/4 HTML en 0), smokes OK. Detalle operativo: TASKS.md TSK-097; falla corregida: BUGS_HISTORICOS.md BUG-032.
+
+**ADR previos relacionados:** ADR-002 (ASCII-safe), ADR-003 (merge JSONB), ADR-007 (dedup simetrico resena/rating), ADR-008 (SQL versionado), ADR-017 (albumes y fotos libres), ADR-021 (capa audiovisual estricta)

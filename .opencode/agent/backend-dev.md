@@ -1,7 +1,7 @@
 ---
 description: Lead Developer del backend serverless (api/*.js) de ExploraCO. Escribe y mantiene funciones Node.js CommonJS para Vercel Hobby con Neon PostgreSQL, merge JSONB y ASCII-safety estricto. Úsalo para toda tarea sobre los 8 endpoints (destinos, usuarios, interacciones, admin-destinos, publicar-lugar, pagina-destino, admin, utilidades) o sobre index-api-connector.js.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

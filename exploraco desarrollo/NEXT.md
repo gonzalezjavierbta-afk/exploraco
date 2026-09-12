@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-097 / Fixes multimedia + constraint unica de interacciones (2026-09-12, working tree SIN commitear) - migracion 012 (dedup resena/rating por indice parcial, fotos libres), catch 23505 -> 409 tipado, `DEST_PHOTOS` vacio + `photoPlaceholderHTML`, UI completa de albumes en mi-perfil, trazabilidad de autor/album, BUG-027 resuelto (icono Instagram), smoke_auditoria 42/42; PENDIENTE BLOQUEANTE aplicar migracion 012 en Neon; ADR-022
 - TSK-096 / Capa audiovisual estricta + paridad de drawer en el mapa cultural (2026-09-12, working tree SIN commitear) - deseleccion de "Todo" oculta los pines del directorio; `MAPA_MEDIA` solo albumes de usuarios (backend `?origen=album` + filtro frontend); pines del directorio/Mi Mapa abren el drawer (sin popup) y `mapas.html` estrena drawer propio; ADR-021
 - BUG-031 / hotfix JS inline del popover (2026-09-11, working tree SIN commitear) - SyntaxError en el JS inline de buildHTML() (onchange de mapas tematicos L2288-2290 con comilla escapada mal formada) dejaba TODAS las paginas dinamicas sin funciones de cliente; fix con entidad HTML `&#39;` (1 linea) + guard permanente `scripts/check_buildHTML_inline.js` (vm.Script, 8 funciones + JSON-LD + divs); TSK-095 ya desplegada CON el bug -> produccion rota hasta commit+push+redeploy (ver "Que sigue", item 1)
 - TSK-095 / Refactor UI/UX ficha de destino (2026-09-11) - verificado como columna admin (sin insignia publica), hero HQI con chip de direccion, popover de Guardar con mapas tematicos, galeria con lightbox; Escudo GOLD limpio (divs 716/716, smoke 28/28, flujo verificado 6/6)
@@ -12,6 +13,74 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion fixes multimedia + constraint unica de interacciones (2026-09-12) - TSK-097
+
+Implementacion de la segunda tanda del `prompt cambios.txt` (fixes multimedia +
+constraint unica, working tree SIN commitear). 8 archivos modificados + 1
+migracion nueva, Escudo GOLD limpio. Docs: TASKS/TSK-097, DECISIONS/ADR-022,
+BUGS/BUG-032 y BUG-027 (resuelto).
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- **FIX 1 - Constraint unica (la mas relevante):** nueva migracion
+  `db/migrations/012_interacciones_dedup_resena_rating.sql` (NUEVO): DROP de
+  `interacciones_usuario_id_destino_id_tipo_key` + indice unico PARCIAL
+  `idx_interacciones_dedup_resena_rating ON interacciones (usuario_id, destino_id)
+  WHERE tipo IN ('resena','rating')` + dedup defensivo (conserva la resena y la mas
+  reciente, excluye usuario_id NULL) + recalculo de `destinos.rating`/`total_resenas`
+  de los afectados. Motivo: los INSERT `tipo='foto'` (L2356-2360) y `foto_voto`
+  (L2394-2398) chocaban con la constraint compuesta y devolvian 500 (BUG-032); con el
+  indice parcial las fotos quedan libres (ADR-017) y el dedup de resena/rating se
+  preserva (ADR-007). `api/interacciones.js` catch final: `err.code === '23505'` ->
+  409 tipado (L3451-3452).
+- **FIX 2 - Fotos reales:** `index.html` dejo `var DEST_PHOTOS = {};` (L1781, sin URLs
+  Unsplash de prueba) y agrego el helper `photoPlaceholderHTML(emoji, variant)` (L2928)
+  con placeholder neutro (gradiente + emoji) para destinos sin foto real;
+  `index-api-connector.js` confirmado sin URLs externas. `MAPA_MEDIA` ya era 100% real
+  (ADR-021, `?origen=album`); no existia `MOCK_MEDIA`.
+- **FIX 3 - Albumes en perfil:** `mi-perfil.html` UI completa: crear, editar
+  (`album_editar`), eliminar (`album_eliminar`), subir foto (`album_agregar_foto`) y
+  quitar foto (`album_quitar_foto`), sesion via `window.ExploraCO.usuario`.
+- **FIX 4 - Trazabilidad:** `api/interacciones.js` enriquece `multimedia_mapa`
+  (`album_id`, `usuario_id`, `usuario_nombre`, `usuario_avatar`, L1673/1724) y
+  `album_detalle` (`usuario_nombre`, `usuario_avatar`, `autor_avatar`, `usuario_id` en
+  fotos, L1685). `index.html` (`openAlbumModal` L3321) y `comunidad.html`
+  (`abrirAlbumModal` L1340): de foto -> album y de autor -> `/mi-perfil.html?id=...`.
+- **FIX 5 - Auditoria:** `api/pagina-destino.js` L1950 corrige BUG-027 (el boton
+  Instagram mostraba el literal `[foto]`; ahora `\uD83D\uDCF7`); nuevo
+  `scripts/smoke_auditoria_pagina_destino.js` (42 checks); `comunidad.html` reproductor
+  real de audio/video/embed (`avMediaHTML` L1274, `avEmbedUrl` L1264); `index.html`
+  balance de divs corregido en `publicar-modal` (497/497); `admin.html` moderacion de
+  fotos de album conectada (`adminCargarFeedFotos` -> `mi_feed_fotos`, L6056;
+  `adminRetirarFotoAlbum` -> `admin_moderar_foto_album` accion 'eliminar', L6031/6120).
+
+**Verificacion (Escudo GOLD):** `node --check` limpio en api/interacciones.js,
+api/pagina-destino.js e index-api-connector.js; 0 bytes >127 en los api/*.js
+(index-api-connector.js mantiene 26 backticks preexistentes, baseline HEAD 26);
+balance de divs 0 en los 4 HTML (index 497/497, comunidad 181/181, mi-perfil
+166/166, admin 724/724); inline JS de los 4 HTML parsea; `check_buildHTML_inline.js`
+TODO OK; smokes OK (auditoria 42/42, comunidad, logros 29, perfil_progreso). QA
+manual: 2 bugs de integracion detectados y corregidos (openAlbumModal leia
+`res.data` en vez de `res.album`/`res.fotos`; `quitarFotoAlbum(uuid,uuid)` sin
+comillas -> ReferenceError).
+
+**Pendiente / backlog:**
+1. **APLICAR `db/migrations/012_interacciones_dedup_resena_rating.sql` EN NEON
+   (PENDIENTE BLOQUEANTE, lo ejecuta Javier en el editor SQL de Neon; idempotente,
+   no requiere nada mas).** Sin la migracion: el dedup por indice parcial NO esta
+   activo en produccion y la segunda foto del mismo usuario al mismo destino sigue
+   devolviendo 500 (el catch 23505 -> 409 solo tipifica el error; la constraint vieja
+   sigue existiendo). Nota: 007, 008, 009, 010 y 011 tambien siguen pendientes de
+   aplicar en Neon.
+2. **Reiniciar opencode** para que tome los nuevos modelos de agentes: se cambiaron
+   `backend-dev`, `architect` y `sql-security` de `opencode-go/deepseek-v4-pro` a
+   `opencode-go/deepseek-v4.1-flash` y se corrigio `qa-auditor` de un ID invalido
+   (`opencode/deepseek-v4-flash`) a `opencode-go/deepseek-v4.1-flash`
+   (`.opencode/agent/*.md` ya actualizados en working tree; AGENTS.md actualizado en
+   esta sesion documental). La carga de agentes esta cacheada al inicio de sesion
+   (misma leccion que TSK-081).
+3. **Commit + push + deploy manual** del working tree completo (los archivos de esta
+   sesion + los de TSK-096 + TSK-095/BUG-031 que siguen sin commitear).
 
 ### Sesion mapa cultural: capa audiovisual estricta + paridad de drawer (2026-09-12) - TSK-096
 

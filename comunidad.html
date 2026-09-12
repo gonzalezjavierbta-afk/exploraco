@@ -164,6 +164,26 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #cpanel-mapa .leaflet-pane,
 #cpanel-mapa .leaflet-top,
 #cpanel-mapa .leaflet-bottom{z-index:0}
+/* MODAL ÁLBUM MAPA AV (FIX 4, ADR-004 scoped) */
+.av-album-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
+.av-album-modal.on{display:flex}
+.av-album-box{background:var(--black);border:1px solid rgba(232,160,32,.3);border-radius:14px;width:100%;max-width:780px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.av-album-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);flex-shrink:0}
+.av-album-bar-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
+.av-album-close{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;width:32px;height:32px;color:rgba(255,255,255,.7);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit;line-height:1}
+.av-album-close:hover{border-color:var(--gold);color:var(--gold)}
+.av-album-body{overflow-y:auto;padding:18px;flex:1;-webkit-overflow-scrolling:touch}
+.av-album-head{margin-bottom:14px}
+.av-album-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1.15}
+.av-album-meta{font-size:11px;color:var(--gold);margin-top:3px;text-transform:uppercase;letter-spacing:.6px}
+.av-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.av-album-photo{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.av-album-photo img{width:100%;aspect-ratio:4/3;object-fit:cover;background:#222;display:block}
+.av-album-photo-foot{padding:8px 10px;display:flex;flex-direction:column;gap:3px}
+.av-album-photo-title{font-size:11px;font-weight:700;color:#fff;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.av-album-photo-author{font-size:10px;color:rgba(255,255,255,.45)}
+.av-album-photo-votos{font-size:10px;color:var(--gold);font-weight:700;margin-top:2px}
+@media (max-width:540px){.av-album-modal{padding:8px}.av-album-grid{grid-template-columns:repeat(2,1fr);gap:8px}}
 /* PANDILLAS (Gamificacion v4) */
 .pand-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;margin-bottom:12px}
 .pand-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:#fff;margin-bottom:4px}
@@ -347,6 +367,17 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 </div>
 
 <div id="xp-toast-comm"></div>
+
+<!-- MODAL ÁLBUM MAPA AV (FIX 4: trazabilidad + vista real de álbum) -->
+<div id="av-album-modal" class="av-album-modal" role="dialog" aria-label="Álbum de la comunidad">
+  <div class="av-album-box" onclick="event.stopPropagation()">
+    <div class="av-album-bar">
+      <div class="av-album-bar-title">Álbum de la comunidad</div>
+      <button class="av-album-close" onclick="cerrarAlbumModal()" aria-label="Cerrar">&times;</button>
+    </div>
+    <div id="av-album-body" class="av-album-body"></div>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -1230,24 +1261,57 @@ function loadMultimediaMapa() {
     .catch(function(e) { console.error('[mapa-audio]', e); });
 }
 
+function avEmbedUrl(url) {
+  if (!url) return null;
+  var m = url.match(/youtube\.com\/watch\?v=([\w-]{6,})/);
+  if (m) return 'https://www.youtube.com/embed/' + m[1];
+  m = url.match(/youtu\.be\/([\w-]{6,})/);
+  if (m) return 'https://www.youtube.com/embed/' + m[1];
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return 'https://player.vimeo.com/video/' + m[1];
+  return null;
+}
+function avMediaHTML(item) {
+  var url = esc(item.media_url || '');
+  var type = item.media_type;
+  if (type === 'foto') {
+    return '<img src="' + url + '" style="max-width:200px;max-height:150px;border-radius:8px" loading="lazy" onerror="this.style.display=\'none\'">';
+  }
+  if (type === 'video') {
+    var embed = avEmbedUrl(item.media_url);
+    if (embed) {
+      return '<div style="position:relative;width:200px;height:113px;border-radius:8px;overflow:hidden;background:#000">'
+        + '<iframe src="' + esc(embed) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media" allowfullscreen></iframe></div>';
+    }
+    return '<video controls src="' + url + '" style="max-width:200px;max-height:150px;border-radius:8px;background:#000;display:block" preload="metadata"></video>';
+  }
+  if (type === 'audio') {
+    return '<audio controls src="' + url + '" style="width:200px;display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
+  }
+  return '<div style="font-size:10px;color:#999;padding:6px">Tipo no soportado</div>';
+}
 function renderAudiovisualMarkers() {
   if (!_avMarkers) return;
   _avMarkers.clearLayers();
   _avData.forEach(function(item) {
     if (!item.lat || !item.lng) return;
     var icon = getMediaIcon(item.media_type);
+    var autorNom = item.usuario_nombre || item.autor_nombre || '';
+    var autorHTML = autorNom
+      ? (item.usuario_id
+          ? '<a class="av-popup-link" href="/mi-perfil.html?id=' + esc(item.usuario_id) + '" title="Ver perfil">' + esc(autorNom) + '</a>'
+          : esc(autorNom))
+      : '';
     var popupHtml = '<div class="av-popup">'
-      + '<img src="' + esc(item.media_url) + '" '
-      + 'style="max-width:200px;max-height:150px;border-radius:8px" '
-      + 'loading="lazy" onerror="this.style.display=\'none\'">'
+      + avMediaHTML(item)
       + '<div class="av-popup-title">' + esc(item.media_title || item.album_titulo || '') + '</div>'
       + '<div class="av-popup-meta">'
       + '<span class="av-popup-type">' + esc(item.media_type) + '</span>'
-      + (item.autor_nombre ? '<span>por ' + esc(item.autor_nombre) + '</span>' : '')
+      + (autorHTML ? '<span>por ' + autorHTML + '</span>' : '')
       + (item.votos > 0 ? '<span>&#x2B50; ' + item.votos + '</span>' : '')
       + '</div>';
     if (item.origen === 'album') {
-      popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="#" onclick="verAlbumFromMap(\'' + esc(item.origen_id) + '\');return false">Ver album &#x2192;</a></div>';
+      popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="#" onclick="abrirAlbumModal(\'' + esc(item.origen_id) + '\');return false">Ver album &#x2192;</a></div>';
     } else if (item.origen_id) {
       popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="/' + esc(item.origen_id) + '.html">Ver destino &#x2192;</a></div>';
     }
@@ -1273,8 +1337,48 @@ function getMediaIcon(type) {
   });
 }
 
-function verAlbumFromMap(albumId) {
-  window.open('/api/interacciones?tipo=album_detalle&album_id=' + albumId, '_blank');
+function abrirAlbumModal(albumId) {
+  var modal = document.getElementById('av-album-modal');
+  var body = document.getElementById('av-album-body');
+  if (!modal || !body) return;
+  modal.classList.add('on');
+  body.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,.4);font-size:12px">Cargando \u00e1lbum\u2026</div>';
+  fetch('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (!res || !res.ok || !res.album) {
+        body.innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;font-size:12px">No se pudo cargar el \u00e1lbum</div>';
+        return;
+      }
+      var album = res.album;
+      var fotos = res.fotos || [];
+      var head = '<div class="av-album-head">'
+        + '<div class="av-album-title">' + esc(album.titulo || '\u00c1lbum') + '</div>'
+        + (album.ciudad ? '<div class="av-album-meta">' + esc(album.ciudad) + '</div>' : '')
+        + '</div>';
+      var grid = '<div class="av-album-grid">';
+      if (!fotos.length) {
+        grid += '<div style="grid-column:1/-1;padding:24px;text-align:center;color:rgba(255,255,255,.4);font-size:12px">Este \u00e1lbum a\u00fan no tiene fotos.</div>';
+      }
+      fotos.forEach(function(f){
+        grid += '<div class="av-album-photo">'
+          + '<img src="' + esc(f.foto_url) + '" loading="lazy" alt="" onerror="this.style.opacity=.2">'
+          + '<div class="av-album-photo-foot">'
+          + (f.media_title ? '<div class="av-album-photo-title">' + esc(f.media_title) + '</div>' : '')
+          + (f.autor_nombre ? '<div class="av-album-photo-author">' + esc(f.autor_nombre) + '</div>' : '')
+          + '<div class="av-album-photo-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>'
+          + '</div></div>';
+      });
+      grid += '</div>';
+      body.innerHTML = head + grid;
+    })
+    .catch(function(){
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;font-size:12px">Error de red al cargar el \u00e1lbum</div>';
+    });
+}
+function cerrarAlbumModal() {
+  var modal = document.getElementById('av-album-modal');
+  if (modal) modal.classList.remove('on');
 }
 
 var _avMapInitialized = false;

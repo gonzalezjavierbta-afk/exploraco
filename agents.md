@@ -65,9 +65,9 @@ Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `o
 | `data-migration` | `opencode-go/minimax-m3` | Operaciones de BD, migraciones y seeds masivos (SQL critico escala a `sql-security`) |
 | `seo-dev` | `opencode-go/qwen3.8-flash` | Sitemap, meta tags, robots.txt, redirects, Search Console |
 | `media-reader` | `opencode-go/mimo-v2.5` | Lectura/analisis de imagen, audio, video y PDF (multimodal) |
-| `sql-security` | `opencode-go/deepseek-v4-pro` | Seguridad critica, RLS, persistencia SQL, migraciones de esquema |
-| `backend-dev` | `opencode-go/deepseek-v4-pro` | Backend serverless api/*.js |
-| `architect` | `opencode-go/deepseek-v4-pro` | Diseno de esquemas JSONB y decisiones de arquitectura |
+| `sql-security` | `opencode-go/deepseek-v4.1-flash` | Seguridad critica, RLS, persistencia SQL, migraciones de esquema |
+| `backend-dev` | `opencode-go/deepseek-v4.1-flash` | Backend serverless api/*.js |
+| `architect` | `opencode-go/deepseek-v4.1-flash` | Diseno de esquemas JSONB y decisiones de arquitectura |
 | `architect-review` | `opencode-go/kimi-k3` | Revision de arquitectura y aprobacion de ADRs (segunda opinion) |
 
 **Regla de oro:** todo agente DEBE tener `model:` explicito en su `.md` (prohibido heredar el modelo principal). Los IDS usan el prefijo real del proveedor OpenCode Go (`opencode-go/*`) o los modelos gratis (`opencode/*`); cualquier ID fuera de `opencode models` se considera invalido y se corrige.

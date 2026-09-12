@@ -1670,6 +1670,7 @@ module.exports = async function handler(req, res) {
         var albumId = req.query.album_id;
         var albumDetRows = await sql(
           'SELECT a.*, u.nombre AS autor_nombre,'
+          + ' u.nombre AS usuario_nombre, u.foto_url AS usuario_avatar,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count'
           + ' FROM albumes a LEFT JOIN usuarios u ON u.id = a.usuario_id'
           + ' WHERE a.id = $1 AND a.activo = true',
@@ -1681,7 +1682,7 @@ module.exports = async function handler(req, res) {
         var fotosDetRows = await sql(
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' af.autor_original_id, af.agregador_id, af.creado_en,'
-          + ' u.nombre AS autor_nombre,'
+          + ' u.nombre AS autor_nombre, u.foto_url AS autor_avatar, u.id AS usuario_id,'
           + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
@@ -1720,6 +1721,8 @@ module.exports = async function handler(req, res) {
           + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
           + '  af.media_title, af.media_source, a.lat, a.lng, a.ciudad,'
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
+          + '  u.nombre AS usuario_nombre, u.foto_url AS usuario_avatar,'
+          + '  af.autor_original_id::text AS usuario_id, a.id::text AS album_id,'
           + '  \'album\' AS origen, a.id::text AS origen_id,'
           + '  (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
@@ -3445,6 +3448,8 @@ module.exports = async function handler(req, res) {
 
   } catch(err) {
     console.error('[interacciones]', err.message);
+    if (err && err.code === '23505')
+      return res.status(409).json({ ok: false, error: 'Registro duplicado', duplicado: true });
     return res.status(500).json({ ok: false, error: err.message });
   }
 };

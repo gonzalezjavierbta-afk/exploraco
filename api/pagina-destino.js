@@ -1943,7 +1943,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   if (d.whatsapp) ctBtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
   if (d.telefono) ctBtns.push('<a class="cbtn dark" href="tel:'+esc(d.telefono)+'">\u2706 Llamar</a>');
   if (d.web)       ctBtns.push('<a class="cbtn blue" href="'+esc(d.web)+'" target="_blank">\u25CB Sitio web</a>');
-  if (d.instagram) ctBtns.push('<a class="cbtn blue" href="https://instagram.com/'+esc((d.instagram||'').replace('@',''))+'" target="_blank">[foto] Instagram</a>');
+  // BUG-027 fix: "[foto]" era un placeholder literal que nunca se reemplazo por un
+  // icono unicode (los demas botones de esta misma grilla usan escapes: \u2709 WhatsApp,
+  // \u2706 Llamar, \u25CB Sitio web, \u0040 Email). Surrogate pair de camara, patron
+  // ya en uso en el archivo (ver L1877 \uD83D\uDC51 Lider del spot).
+  if (d.instagram) ctBtns.push('<a class="cbtn blue" href="https://instagram.com/'+esc((d.instagram||'').replace('@',''))+'" target="_blank">\uD83D\uDCF7 Instagram</a>');
   if (d.email)     ctBtns.push('<a class="cbtn dark" href="mailto:'+esc(d.email)+'">\u0040 Email</a>');
 
   // En blog el modulo de contacto no se muestra: un articulo no es un

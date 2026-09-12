@@ -1,7 +1,7 @@
 ---
 description: Chief Architect de ExploraCO. Diseña esquemas de tags JSONB por categoría, valida decisiones (ADRs), revisa el patrón de 7 pasos y aprueba el diseño antes de implementar. Úsalo cuando una tarea requiera definir el modelo de datos, elegir entre opciones de arquitectura, evaluar el impacto de un cambio en el motor de renderizado/backend, o documentar una decisión en DECISIONS.md.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

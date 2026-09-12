@@ -1,6 +1,6 @@
-// index-api-connector.js  v8 — completo y definitivo
+// index-api-connector.js  v8 \u2014 completo y definitivo
 // Actualiza: PL[], DEST_PHOTOS{}, MAPA_PLACES[], DEST_FEATURED_IDS[],
-//            AGENDA_EVENTS[] (sección eventos), stats reales, búsqueda en tiempo real
+//            AGENDA_EVENTS[] (secci\u00f3n eventos), stats reales, b\u00fasqueda en tiempo real
 
 (function () {
   'use strict';
@@ -12,7 +12,7 @@
     evento: 'linear-gradient(135deg,#1a051a,#3a1a3a)',
   };
 
-  // Color del pin del mapa por categoría — MAPA_PLACES necesita p.color
+  // Color del pin del mapa por categor\u00eda \u2014 MAPA_PLACES necesita p.color
   var PIN_COLORS = {
     hostal: '#2196F3',
     comida: '#FF9800',
@@ -20,7 +20,7 @@
     evento: '#A855F7',
   };
 
-  // Mapeo cat DB → cat de agenda (para AGENDA_EVENTS)
+  // Mapeo cat DB \u2192 cat de agenda (para AGENDA_EVENTS)
   var AGENDA_CAT_MAP = {
     hostal:  'alojamiento',
     comida:  'gastro',
@@ -28,7 +28,12 @@
     evento:  'festival',
   };
 
-  // Formato exacto de PL[] confirmado del index.html real
+  // Formato exacto de PL[] confirmado del index.html real.
+  // FIX 2: foto por defecto es '' (cadena vac\u00eda). NUNCA se inyecta una URL
+  // externa (Unsplash, placeholder, etc.). Si item.foto / item.photos[0].url
+  // falta o viene vac\u00eda, se devuelve '' y el render del index muestra el
+  // placeholder NEUTRO (photoPlaceholderHTML del index.html). Mantener esto
+  // ASCII-safe: ning\u00fan caracter >127 ni backticks.
   function toPlace(item, idx) {
     var foto = item.foto
       || (item.photos && item.photos[0] ? item.photos[0].url : '')
@@ -47,7 +52,7 @@
       desc:      item.desc       || item.lead || '',
       highlight: item.highlight  || '',
       price:     item.price      || '',
-      emoji:     item.emoji      || '📍',
+      emoji:     item.emoji      || '\uD83D\uDCCD',
       hero_bg:   item.hero_bg    || CAT_COLORS[item.cat] || CAT_COLORS.sitio,
       rating:    item.rating     || 0,
       rev:       item.reviews    || 0,
@@ -68,7 +73,10 @@
     };
   }
 
-  // Formato MAPA_PLACES[] — necesita p.color para los pins de Leaflet
+  // Formato MAPA_PLACES[] \u2014 necesita p.color para los pins de Leaflet.
+  // FIX 2: igual que toPlace, NUNCA se inyecta una URL externa de fallback.
+  // Si el destino no tiene foto real, place.foto queda '' y el placeholder
+  // neutro del index.html se muestra via photoPlaceholderHTML(emoji, 'hero').
   function toMapPlace(item, idx) {
     return {
       id:      idx + 1,
@@ -79,7 +87,7 @@
       city:    item.city    || '',
       region:  item.region  || '',
       rating:  item.rating  || 0,
-      emoji:   item.emoji   || '📍',
+      emoji:   item.emoji   || '\uD83D\uDCCD',
       lat:     parseFloat(item.lat) || 0,
       lng:     parseFloat(item.lng) || 0,
       lead:    item.lead    || '',
@@ -90,11 +98,11 @@
       // Shape normalizado {url,cap}; index.html puede consumir place.photos
       // sin sorpresas (spec: galeria completa, no solo la hero).
       photos:   (item.photos && item.photos.length) ? item.photos.slice(0, 8).map(function (p) { return { url: p.url || '', cap: p.cap || '' }; }) : [],
-      color:   PIN_COLORS[item.cat] || '#666666', // ← campo requerido por initMapaSection()
+      color:   PIN_COLORS[item.cat] || '#666666', // \u2190 campo requerido por initMapaSection()
     };
   }
 
-  // Colores de categoría para la agenda (mismo set que los filtros del home)
+  // Colores de categor\u00eda para la agenda (mismo set que los filtros del home)
   var AGENDA_CAT_COLOR = {
     festival:   '#A855F7',
     musica:     '#3B82F6',
@@ -128,7 +136,7 @@
       loc:      t.sede
                   ? t.sede
                   : (item.barrio ? (item.barrio + ', ' + (item.city || '')) : (item.city || '')),
-      emoji:    item.emoji   || '\ud83c\udf89',
+      emoji:    item.emoji   || '\uD83C\uDF89',
       color:    AGENDA_CAT_COLOR[cat] || PIN_COLORS.evento,
       url:      item.slug + '.html',
       featured: item.destacado || false,
@@ -138,7 +146,7 @@
     };
   }
 
-  // Actualizar stats con IDs añadidos al HTML
+  // Actualizar stats con IDs a\u00f1adidos al HTML
   function updateStats(stats) {
     var get = function (id) { return document.getElementById(id); };
     // Antes usaba "&& stats.X" (truthiness), asi que un valor real de 0
@@ -154,7 +162,7 @@
         : stats.resenas;
     }
     if (get('stat-rating') && stats.rating != null) {
-      get('stat-rating').textContent = stats.rating + '★';
+      get('stat-rating').textContent = stats.rating + '\u2605';
     }
   }
 
@@ -188,7 +196,7 @@
     Object.keys(newObj).forEach(function (k) { targetObj[k] = newObj[k]; });
   }
 
-  // ── BÚSQUEDA EN TIEMPO REAL ────────────────────────────────────
+  // \u2500\u2500 B\u00daSQUEDA EN TIEMPO REAL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   // Conectar el input del hero (#sinp) y el input de destinos (#dest-input)
   // a la API con debounce 300ms
   var searchTimer = null;
@@ -204,7 +212,7 @@
         var q = e.target.value.trim();
         clearTimeout(searchTimer);
         if (q.length === 0) {
-          // Sin búsqueda — restaurar PL completo
+          // Sin b\u00fasqueda \u2014 restaurar PL completo
           loadAndRender();
           return;
         }
@@ -216,7 +224,7 @@
     });
   }
 
-  // ── FETCH Y ACTUALIZAR ─────────────────────────────────────────
+  // \u2500\u2500 FETCH Y ACTUALIZAR \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   function fetchAndUpdate(q) {
     var url = '/api/destinos?limit=500&_t=' + Date.now() + (q ? '&q=' + encodeURIComponent(q) : '');
     fetch(url)
@@ -227,7 +235,7 @@
 
   function applyData(d, q) {
     if (!d.ok || !d.data) {
-      console.warn('[index-api] Sin datos:', d.error || 'vacío');
+      console.warn('[index-api] Sin datos:', d.error || 'vac\u00edo');
       return;
     }
 
@@ -237,14 +245,17 @@
     var nuevoPL = apiData.map(toPlace);
     if (typeof PL !== 'undefined') replArr(PL, nuevoPL);
 
-    // 2. DEST_PHOTOS{}
+    // 2. DEST_PHOTOS{} -- FIX 2: ahora poblado desde la API con fotos
+    //    REALES por destino (index.html ya no hardcodea URLs externas).
+    //    Si un destino no tiene foto, queda '' y se muestra el
+    //    placeholder neutro (photoPlaceholderHTML).
     var nuevosPhotos = {};
     nuevoPL.forEach(function (p) {
       if (p.photos && p.photos[0]) nuevosPhotos[p.id] = p.photos[0].url;
     });
     if (typeof DEST_PHOTOS !== 'undefined') replObj(DEST_PHOTOS, nuevosPhotos);
 
-    // 3. MAPA_PLACES[] — solo con coords + campo color
+    // 3. MAPA_PLACES[] \u2014 solo con coords + campo color
     var nuevoMapa = apiData
       .filter(function (item) { return item.lat && item.lng && item.lat !== 0 && item.lng !== 0; })
       .map(function (item) {
@@ -289,7 +300,7 @@
     }
     if (typeof DEST_FEATURED_IDS !== 'undefined') replArr(DEST_FEATURED_IDS, featIds);
 
-    // 5. AGENDA_EVENTS[] — eventos de la DB + los hardcodeados originales
+    // 5. AGENDA_EVENTS[] \u2014 eventos de la DB + los hardcodeados originales
     //    Orden: mas recientes primero (creado_en DESC) para que los eventos
     //    recien cargados aparezcan arriba de la agenda del home, sin quedar
     //    enterrados bajo eventos legacy con rating alto.
@@ -302,7 +313,7 @@
       .map(toAgendaEvent);
 
     if (eventosDB.length > 0 && typeof AGENDA_EVENTS !== 'undefined') {
-      // Mantener eventos hardcodeados, añadir los de DB al principio si no son duplicados
+      // Mantener eventos hardcodeados, a\u00f1adir los de DB al principio si no son duplicados
       var slugsDB = eventosDB.map(function (e) { return e.url; });
       var eventosOriginalesFiltrados = AGENDA_EVENTS.filter(function (e) {
         return !slugsDB.includes(e.url);
@@ -310,12 +321,12 @@
       replArr(AGENDA_EVENTS, eventosDB.concat(eventosOriginalesFiltrados));
     }
 
-    // 6. Stats reales (solo en carga inicial, no en búsquedas)
+    // 6. Stats reales (solo en carga inicial, no en b\u00fasquedas)
     if (!q && d.stats) updateStats(d.stats);
 
-    console.log('[index-api] ✓ PL:' + nuevoPL.length
+    console.log('[index-api] \u2713 PL:' + nuevoPL.length
       + ' | mapa:' + nuevoMapa.length
-      + (q ? ' | búsqueda:"' + q + '"' : ''));
+      + (q ? ' | b\u00fasqueda:"' + q + '"' : ''));
 
     // 7. Re-render
     if (typeof renderDest      === 'function') renderDest();
@@ -348,12 +359,12 @@
     fetchAndUpdate('');
   }
 
-  // ── INIT ───────────────────────────────────────────────────────
+  // \u2500\u2500 INIT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   function init() {
     loadAndRender();
     setupSearch();
     // Hook para que el index restaure el PL completo al limpiar la
-    // búsqueda (los clear del hero/directorio no disparan 'input').
+    // b\u00fasqueda (los clear del hero/directorio no disparan 'input').
     window.ExploraReloadDestinos = loadAndRender;
   }
 

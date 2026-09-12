@@ -860,6 +860,16 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           </div>
           <button onclick="seleccionarFotoTop()" id="btn-seleccionar-foto-top" style="display:none;margin-top:8px;padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Seleccionar como top</button>
         </div>
+        <!-- Moderacion de fotos de album (ADR-017) -->
+        <div id="admin-fotos-album-section" style="margin-top:16px">
+          <h4 style="color:var(--gold,#E8A020);margin-bottom:8px;">Moderacion de fotos de album</h4>
+          <p style="font-size:12px;color:#888;margin-bottom:8px;">Carga el feed reciente de fotos de albumes y retira las que no cumplan las normas. La accion ejecuta un soft-delete (activo=false) y refresca la lista.</p>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button onclick="adminCargarFeedFotos()" id="btn-cargar-feed-fotos" style="padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Cargar fotos de album</button>
+            <span id="admin-fotos-album-status" style="font-size:12px;color:#888"></span>
+          </div>
+          <div id="admin-fotos-album-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:10px"></div>
+        </div>
       </div><!-- /fpanel-media -->
       <div class="ftab-panel" id="fpanel-contenido">
         <div class="form-group">
@@ -6014,7 +6024,10 @@ function mostrarFotoTopSection() {
 }
 
 /* ---- Admin Moderar Fotos Album (ADR-017) --------------------------- */
-function adminModerarFotoAlbum(fotoId, accion) {
+function adminModerarFotoAlbum(fotoId, accion, onSuccess, onError) {
+  // accion soportada por el backend (api/interacciones.js L2664-2669):
+  // unicamente 'eliminar' ejecuta UPDATE album_fotos SET activo=false.
+  // Cualquier otro valor solo devuelve 200 sin tocar la BD.
   fetch('/api/interacciones?tipo=admin_moderar_foto_album', {
     method: 'POST',
     headers: _adminHeaders(),
@@ -6022,10 +6035,94 @@ function adminModerarFotoAlbum(fotoId, accion) {
   })
   .then(function(r){ return r.json(); })
   .then(function(d) {
-    if (d.ok) { showAdminToast('Foto moderada', 'success'); }
-    else { showAdminToast('Error: ' + (d.error || 'desconocido'), 'error'); }
+    if (d.ok) {
+      showAdminToast('Foto moderada', 'success');
+      if (typeof onSuccess === 'function') onSuccess();
+    } else {
+      var msg = 'Error: ' + (d.error || 'desconocido');
+      showAdminToast(msg, 'error');
+      if (typeof onError === 'function') onError(new Error(msg));
+    }
   })
-  .catch(function(e) { showAdminToast('Error de conexion', 'error'); });
+  .catch(function(e) {
+    showAdminToast('Error de conexion', 'error');
+    if (typeof onError === 'function') onError(e);
+  });
+}
+
+/* UI: cargar feed reciente y permitir retirar una por una.
+   GET mi_feed_fotos (api/interacciones.js L1751-1769) limita el resultado
+   a 50 filas ya filtradas por activo=true en album y foto. */
+function adminCargarFeedFotos() {
+  var grid = document.getElementById('admin-fotos-album-grid');
+  var status = document.getElementById('admin-fotos-album-status');
+  var btn = document.getElementById('btn-cargar-feed-fotos');
+  if (!grid || !status) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
+  status.textContent = '';
+  grid.innerHTML = '';
+
+  fetch('/api/interacciones?tipo=mi_feed_fotos&limit=50', { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data || !data.ok) {
+        status.textContent = 'Error al cargar el feed: ' + ((data && data.error) || 'respuesta invalida');
+        if (btn) { btn.disabled = false; btn.textContent = 'Cargar fotos de album'; }
+        return;
+      }
+      var rows = data.data || [];
+      if (!rows.length) {
+        status.textContent = 'No hay fotos de album activas en este momento.';
+      } else {
+        status.textContent = rows.length + ' foto(s) activa(s) en el feed.';
+        rows.forEach(function(f) { grid.appendChild(_adminFotoAlbumCard(f)); });
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Recargar fotos'; }
+    })
+    .catch(function(err) {
+      status.textContent = 'Error de conexion al cargar el feed.';
+      if (btn) { btn.disabled = false; btn.textContent = 'Cargar fotos de album'; }
+    });
+}
+
+function _adminFotoAlbumCard(f) {
+  var card = document.createElement('div');
+  card.style.cssText = 'border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card,#fff);display:flex;flex-direction:column;';
+  var fotoUrl = _esc(f.foto_url || '');
+  var autor = _esc(f.autor_nombre || 'Anonimo');
+  var album = _esc(f.album_titulo || '');
+  var ciudad = _esc(f.ciudad || '');
+  var votos = parseInt(f.votos, 10) || 0;
+  var tipo = _esc((f.foto_type || 'foto').toUpperCase());
+  var fid = _esc(String(f.id));
+  card.innerHTML =
+    '<div style="position:relative">'
+    + '<img src="' + fotoUrl + '" alt="" style="width:100%;height:140px;object-fit:cover;display:block;background:#222" loading="lazy" onerror="this.style.display=\'none\'">'
+    + '<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;">' + tipo + '</span>'
+    + '</div>'
+    + '<div style="padding:8px;font-size:12px;line-height:1.4">'
+    + '<div style="font-weight:600;margin-bottom:2px;word-break:break-word">' + album + '</div>'
+    + '<div style="color:#888;font-size:11px;margin-bottom:4px">' + autor + (ciudad ? ' \u00b7 ' + ciudad : '') + '</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px">'
+    + '<span style="font-size:11px;color:#888">' + votos + ' voto(s)</span>'
+    + '<button data-foto-id="' + fid + '" '
+    + 'style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px">Retirar</button>'
+    + '</div>'
+    + '</div>';
+  var btn = card.querySelector('button[data-foto-id]');
+  if (btn) btn.onclick = function() { adminRetirarFotoAlbum(f.id, btn); };
+  return card;
+}
+
+/* Wrapper que reusa adminModerarFotoAlbum (soft-delete) y refresca el grid
+   automaticamente en exito; re-habilita el boton en error para permitir
+   reintento sin recargar el feed completo. */
+function adminRetirarFotoAlbum(fotoId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Retirando...'; }
+  adminModerarFotoAlbum(fotoId, 'eliminar',
+    function() { adminCargarFeedFotos(); },
+    function() { if (btn) { btn.disabled = false; btn.textContent = 'Retirar'; } }
+  );
 }
 
 async function _deleteFromNeon(localId) {

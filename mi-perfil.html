@@ -283,7 +283,69 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <button onclick="cerrarModalDetalleAlbum()" style="background:none;border:none;font-size:20px;cursor:pointer;color:rgba(255,255,255,.5);">&times;</button>
       </div>
       <p id="album-det-info" style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:12px;"></p>
+      <div id="album-det-acciones" style="display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button id="album-det-btn-editar" onclick="abrirModalEditarAlbum()" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">&#x270F;&#xFE0F; Editar &aacute;lbum</button>
+        <button id="album-det-btn-eliminar" onclick="confirmarEliminarAlbum()" style="padding:6px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:6px;color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">&#x1F5D1;&#xFE0F; Eliminar &aacute;lbum</button>
+      </div>
+      <div id="album-det-add-foto" style="display:none;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px;">+ Agregar foto al &aacute;lbum</div>
+        <input type="url" id="album-nueva-foto-url" maxlength="2000" placeholder="URL de la foto (https://...)" style="width:100%;padding:7px 10px;margin-bottom:6px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <select id="album-nueva-foto-tipo" style="flex:1;min-width:90px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+            <option value="foto">&#x1F4F7; Foto</option>
+            <option value="video">&#x25B6; Video</option>
+            <option value="audio">&#x266B; Audio</option>
+          </select>
+          <input type="text" id="album-nueva-foto-titulo" maxlength="200" placeholder="T&iacute;tulo (opcional)" style="flex:1;min-width:120px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          <input type="text" id="album-nueva-foto-fuente" maxlength="100" placeholder="Fuente (opcional)" style="flex:1;min-width:110px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        </div>
+        <button id="album-nueva-foto-btn" onclick="agregarFotoAlbum()" style="margin-top:8px;padding:7px 14px;background:var(--gold);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">+ Agregar foto</button>
+      </div>
       <div id="album-det-fotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Album -->
+  <div id="modal-editar-album" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1100;justify-content:center;align-items:center;">
+    <div style="background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;max-width:480px;width:90%;max-height:85vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:18px;color:#fff;">Editar &aacute;lbum</h3>
+        <button onclick="cerrarModalEditarAlbum()" style="background:none;border:none;font-size:20px;cursor:pointer;color:rgba(255,255,255,.5);">&times;</button>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">T&iacute;tulo *</label>
+        <input type="text" id="edit-album-titulo" maxlength="120" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Descripci&oacute;n</label>
+        <textarea id="edit-album-descripcion" maxlength="1000" rows="3" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">URL de portada (opcional)</label>
+        <input type="url" id="edit-album-portada" maxlength="2000" placeholder="https://..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Ciudad</label>
+        <input type="text" id="edit-album-ciudad" maxlength="80" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Regi&oacute;n</label>
+        <input type="text" id="edit-album-region" maxlength="80" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Latitud</label>
+          <input type="number" step="any" id="edit-album-lat" placeholder="-6.2" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        </div>
+        <div style="flex:1;">
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Longitud</label>
+          <input type="number" step="any" id="edit-album-lng" placeholder="-75.6" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="cerrarModalEditarAlbum()" style="padding:8px 16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.7);font-family:Outfit,sans-serif;">Cancelar</button>
+        <button onclick="editarAlbum()" style="padding:8px 16px;background:var(--gold);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:Outfit,sans-serif;">Guardar</button>
       </div>
     </div>
   </div>
@@ -1003,18 +1065,45 @@ function crearAlbum() {
   .catch(function() { alert('Error de conexion'); });
 }
 
+/* Estado global del album actualmente abierto en el modal de detalle.
+   Permite que las funciones de editar / agregar foto / quitar foto lean
+   el id sin re-pedirlo. Re-render tras cada accion. */
+window._albumDetalleActual = null;
+
 function verDetalleAlbum(albumId) {
-  fetch('/api/interacciones?tipo=album_detalle&album_id=' + albumId)
+  var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  var uid = ses ? ses.id : null;
+  var qs = '/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId);
+  if (uid) qs += '&usuario_id=' + encodeURIComponent(uid);
+  fetch(qs)
     .then(function(r){ return r.json(); })
     .then(function(data) {
-      if (!data.ok) return;
+      if (!data || !data.ok) {
+        toastError((data && data.error) ? data.error : 'No se pudo cargar el album');
+        return;
+      }
       var album = data.album;
       var fotos = data.fotos || [];
+      window._albumDetalleActual = album;
+      var esCreador = uid && String(album.usuario_id) === String(uid);
       document.getElementById('album-det-titulo').textContent = album.titulo || '';
       document.getElementById('album-det-info').textContent =
         (album.descripcion || 'Sin descripcion') + ' | '
         + fotos.length + ' fotos | '
         + (album.ciudad || 'Sin ubicacion');
+      var acciones = document.getElementById('album-det-acciones');
+      var btnEdit = document.getElementById('album-det-btn-editar');
+      var btnDel = document.getElementById('album-det-btn-eliminar');
+      var addFoto = document.getElementById('album-det-add-foto');
+      if (esCreador) {
+        if (acciones) acciones.style.display = 'flex';
+        if (btnEdit) btnEdit.style.display = 'inline-block';
+        if (btnDel) btnDel.style.display = 'inline-block';
+        if (addFoto) addFoto.style.display = 'block';
+      } else {
+        if (acciones) acciones.style.display = 'none';
+        if (addFoto) addFoto.style.display = 'none';
+      }
       var grid = document.getElementById('album-det-fotos');
       grid.innerHTML = '';
       fotos.forEach(function(f) {
@@ -1027,7 +1116,12 @@ function verDetalleAlbum(albumId) {
         } else {
           card.innerHTML = '<img src="' + esc(f.foto_url) + '" style="width:100%;height:120px;object-fit:cover;" loading="lazy" onerror="this.style.display=\'none\'">';
         }
-        card.innerHTML += '<div style="padding:6px;font-size:11px;">'
+        var puedeQuitar = esCreador || (uid && String(f.agregador_id) === String(uid));
+        var btnQuitar = puedeQuitar
+          ? '<button onclick="quitarFotoAlbum(\'' + album.id + '\',\'' + f.id + '\')" title="Quitar foto" style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:13px;cursor:pointer;line-height:1;">&times;</button>'
+          : '';
+        card.innerHTML += btnQuitar
+          + '<div style="padding:6px;font-size:11px;">'
           + (f.media_title ? '<div style="font-weight:500;color:rgba(255,255,255,.8);">' + esc(f.media_title) + '</div>' : '')
           + '<div style="color:rgba(255,255,255,.4);">' + (f.autor_nombre || 'Anonimo') + ' | ' + (f.votos || 0) + ' &#x2B50;</div>'
           + '</div>';
@@ -1035,7 +1129,195 @@ function verDetalleAlbum(albumId) {
       });
       document.getElementById('modal-detalle-album').style.display = 'flex';
     })
-    .catch(function(){});
+    .catch(function(err){
+      toastError('Error al cargar el album: ' + (err && err.message ? err.message : 'conexion'));
+    });
+}
+
+/* Helper para mostrar errores de la API via toast rojo. */
+function toastError(msg) {
+  if (typeof showToast === 'function') showToast(msg || 'Error', '#ef4444');
+  else alert(msg || 'Error');
+}
+
+/* ---- EDITAR ALBUM (POST album_editar, solo creador) ---- */
+function abrirModalEditarAlbum() {
+  var album = window._albumDetalleActual;
+  if (!album) { toastError('No hay album cargado'); return; }
+  var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  if (!ses || String(album.usuario_id) !== String(ses.id)) {
+    toastError('Solo el creador puede editar el album');
+    return;
+  }
+  document.getElementById('edit-album-titulo').value = album.titulo || '';
+  document.getElementById('edit-album-descripcion').value = album.descripcion || '';
+  document.getElementById('edit-album-portada').value = album.portada_url || '';
+  document.getElementById('edit-album-ciudad').value = album.ciudad || '';
+  document.getElementById('edit-album-region').value = album.region || '';
+  document.getElementById('edit-album-lat').value = (album.lat != null) ? album.lat : '';
+  document.getElementById('edit-album-lng').value = (album.lng != null) ? album.lng : '';
+  document.getElementById('modal-editar-album').style.display = 'flex';
+}
+
+function cerrarModalEditarAlbum() {
+  var modal = document.getElementById('modal-editar-album');
+  if (modal) modal.style.display = 'none';
+}
+
+function editarAlbum() {
+  var album = window._albumDetalleActual;
+  var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  if (!album || !ses) { toastError('Sesion expirada'); return; }
+  if (String(album.usuario_id) !== String(ses.id)) {
+    toastError('Solo el creador puede editar el album');
+    return;
+  }
+  var titulo = (document.getElementById('edit-album-titulo').value || '').trim();
+  if (!titulo) { toastError('El titulo es requerido'); return; }
+  var body = {
+    usuario_id: ses.id,
+    album_id: album.id,
+    titulo: titulo,
+    descripcion: (document.getElementById('edit-album-descripcion').value || '').trim(),
+    portada_url: (document.getElementById('edit-album-portada').value || '').trim() || null,
+    ciudad: (document.getElementById('edit-album-ciudad').value || '').trim() || null,
+    region: (document.getElementById('edit-album-region').value || '').trim() || null
+  };
+  var latStr = (document.getElementById('edit-album-lat').value || '').trim();
+  var lngStr = (document.getElementById('edit-album-lng').value || '').trim();
+  if (latStr) body.lat = parseFloat(latStr);
+  if (lngStr) body.lng = parseFloat(lngStr);
+  fetch('/api/interacciones?tipo=album_editar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (res && res.ok) {
+      cerrarModalEditarAlbum();
+      showToast('Album actualizado');
+      cargarMisAlbumes();
+      verDetalleAlbum(album.id);
+    } else {
+      toastError((res && res.error) ? res.error : 'Error al editar album');
+    }
+  })
+  .catch(function(err){
+    toastError('Error de conexion: ' + (err && err.message ? err.message : ''));
+  });
+}
+
+/* ---- ELIMINAR ALBUM (POST album_eliminar, solo creador) ---- */
+function confirmarEliminarAlbum() {
+  var album = window._albumDetalleActual;
+  if (!album) { toastError('No hay album cargado'); return; }
+  var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  if (!ses || String(album.usuario_id) !== String(ses.id)) {
+    toastError('Solo el creador puede eliminar el album');
+    return;
+  }
+  if (!confirm('Eliminar el album "' + album.titulo + '"? Esta accion no se puede deshacer.')) return;
+  fetch('/api/interacciones?tipo=album_eliminar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario_id: ses.id, album_id: album.id })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (res && res.ok) {
+      cerrarModalDetalleAlbum();
+      showToast('Album eliminado');
+      cargarMisAlbumes();
+    } else {
+      toastError((res && res.error) ? res.error : 'Error al eliminar album');
+    }
+  })
+  .catch(function(err){
+    toastError('Error de conexion: ' + (err && err.message ? err.message : ''));
+  });
+}
+
+/* ---- AGREGAR FOTO AL ALBUM (POST album_agregar_foto) ---- */
+function agregarFotoAlbum() {
+  var album = window._albumDetalleActual;
+  var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  if (!album || !ses) { toastError('Sesion expirada'); return; }
+  if (String(album.usuario_id) !== String(ses.id)) {
+    toastError('Solo el creador puede agregar fotos');
+    return;
+  }
+  var fotoUrl = (document.getElementById('album-nueva-foto-url').value || '').trim();
+  if (!fotoUrl) { toastError('La URL de la foto es requerida'); return; }
+  if (!/^https?:\/\//.test(fotoUrl) || fotoUrl.length > 2000) {
+    toastError('URL invalida (debe empezar con http(s) y max 2000 chars)');
+    return;
+  }
+  var btn = document.getElementById('album-nueva-foto-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Agregando\u2026'; }
+  var body = {
+    usuario_id: ses.id,
+    album_id: album.id,
+    foto_url: fotoUrl,
+    foto_type: document.getElementById('album-nueva-foto-tipo').value || 'foto',
+    media_title: (document.getElementById('album-nueva-foto-titulo').value || '').trim(),
+    media_source: (document.getElementById('album-nueva-foto-fuente').value || '').trim()
+  };
+  fetch('/api/interacciones?tipo=album_agregar_foto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (res && res.ok) {
+      document.getElementById('album-nueva-foto-url').value = '';
+      document.getElementById('album-nueva-foto-titulo').value = '';
+      document.getElementById('album-nueva-foto-fuente').value = '';
+      showToast('Foto agregada (+' + (res.xp || 15) + ' XP)');
+      if (res.misiones && res.misiones.length) {
+        res.misiones.forEach(function(m){ showToast('Mision completada: ' + m.nombre); });
+      }
+      if (res.logros && res.logros.length) {
+        res.logros.forEach(function(l){ showToast('\uD83C\uDFC6 Logro: ' + (l.nombre || l.id)); });
+      }
+      cargarMisAlbumes();
+      verDetalleAlbum(album.id);
+    } else {
+      toastError((res && res.error) ? res.error : 'Error al agregar foto');
+    }
+  })
+  .catch(function(err){
+    toastError('Error de conexion: ' + (err && err.message ? err.message : ''));
+  })
+  .finally(function(){
+    if (btn) { btn.disabled = false; btn.textContent = '+ Agregar foto'; }
+  });
+}
+
+/* ---- QUITAR FOTO DEL ALBUM (POST album_quitar_foto) ---- */
+function quitarFotoAlbum(albumId, fotoId) {
+  var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  if (!ses) { toastError('Sesion expirada'); return; }
+  if (!confirm('Quitar esta foto del album?')) return;
+  fetch('/api/interacciones?tipo=album_quitar_foto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario_id: ses.id, album_id: albumId, foto_id: fotoId })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (res && res.ok) {
+      showToast('Foto quitada');
+      cargarMisAlbumes();
+      verDetalleAlbum(albumId);
+    } else {
+      toastError((res && res.error) ? res.error : 'Error al quitar foto');
+    }
+  })
+  .catch(function(err){
+    toastError('Error de conexion: ' + (err && err.message ? err.message : ''));
+  });
 }
 
 function cerrarModalDetalleAlbum() {

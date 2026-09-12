@@ -2296,5 +2296,83 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-097: Fixes multimedia + constraint unica de interacciones (prompt cambios.txt) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-12)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-12
+- **Prompt origen:** `prompt cambios.txt` (fixes multimedia + constraint unica de interacciones)
+- **Archivos modificados (Escudo GOLD limpio, working tree SIN commitear):**
+  - `db/migrations/012_interacciones_dedup_resena_rating.sql` (NUEVO)
+  - `api/interacciones.js` (catch 23505 + trazabilidad multimedia_mapa/album_detalle)
+  - `api/pagina-destino.js` (BUG-027: icono Instagram)
+  - `index.html` (DEST_PHOTOS vacio + `photoPlaceholderHTML` + `openAlbumModal` + balance de divs 497/497)
+  - `index-api-connector.js` (confirmado sin URLs externas)
+  - `mi-perfil.html` (UI completa de albumes + fix comillas de `quitarFotoAlbum`)
+  - `comunidad.html` (reproductor real de audio/video/embed + `abrirAlbumModal`)
+  - `admin.html` (moderacion de fotos de album, divs 724/724)
+  - `scripts/smoke_auditoria_pagina_destino.js` (NUEVO, 42 checks)
+
+- **Fixes completados:**
+  1. **FIX 1 - Constraint unica de interacciones (solo resena/rating):** nueva migracion
+     `db/migrations/012_interacciones_dedup_resena_rating.sql` que hace DROP de la constraint
+     heredada `interacciones_usuario_id_destino_id_tipo_key` y crea el indice unico PARCIAL
+     `idx_interacciones_dedup_resena_rating ON interacciones (usuario_id, destino_id)
+     WHERE tipo IN ('resena','rating')`, con dedup defensivo (conserva la resena con texto y,
+     a igualdad de tipo, la mas reciente; excluye usuario_id NULL) y recalculo de
+     `destinos.rating`/`total_resenas` solo para los destinos afectados (patron ADR-007/008,
+     idempotente, ASCII-safe). Motivo: los INSERT `tipo='foto'` (upload de foto de lugar) y
+     `tipo='foto_voto'` chocaban con la constraint compuesta y devolvian 500; con el indice
+     parcial las fotos quedan libres (ADR-017) y el dedup de resena/rating se preserva
+     (ADR-007). En `api/interacciones.js` el catch final ahora mapea `err.code === '23505'`
+     a 409 tipado (`{ok:false, error:'Registro duplicado', duplicado:true}`, L3451-3452) en
+     vez de 500 generico.
+  2. **FIX 2 - Fotos reales en index (sin URLs de prueba):** `index.html` dejo
+     `var DEST_PHOTOS = {};` (L1781; antes tenia URLs Unsplash de prueba) y agrego el helper
+     reutilizable `photoPlaceholderHTML(emoji, variant)` (L2928) con placeholder neutro
+     (gradiente + emoji) para destinos sin foto real. `index-api-connector.js` confirmado sin
+     URLs externas (solo refiere el placeholder del index). La capa `MAPA_MEDIA` ya era 100%
+     real desde ADR-021 (`?tipo=multimedia_mapa&origen=album`). No existia `MOCK_MEDIA`.
+  3. **FIX 3 - Albumes en perfil:** `mi-perfil.html` ahora tiene UI completa para crear,
+     editar (`album_editar`), eliminar (`album_eliminar`), subir foto (`album_agregar_foto`)
+     y quitar foto (`album_quitar_foto`), reutilizando `window.ExploraCO.usuario` como sesion.
+  4. **FIX 4 - Trazabilidad de autor/album:** `api/interacciones.js` enriquece
+     `multimedia_mapa` (agrega `album_id`, `usuario_id`, `usuario_nombre`, `usuario_avatar`,
+     L1673/1724) y `album_detalle` (agrega `usuario_nombre`, `usuario_avatar`, `autor_avatar`,
+     `usuario_id` en fotos, L1685). `index.html` (`openAlbumModal` L3321 + drawer) y
+     `comunidad.html` (`abrirAlbumModal` L1340) permiten ir de foto -> album y de autor ->
+     `/mi-perfil.html?id=...`.
+  5. **FIX 5 - Auditoria multimedia:** `api/pagina-destino.js` corrigio BUG-027 (el boton
+     Instagram mostraba el literal `[foto]`; ahora `\uD83D\uDCF7`, L1950). Se creo
+     `scripts/smoke_auditoria_pagina_destino.js` (42 checks). `comunidad.html` agrego
+     reproductor real de audio/video/embed (`avMediaHTML` L1274, `avEmbedUrl` L1264).
+     `index.html` corrigio el desbalance de divs (un `</div>` sobrante y uno faltante en
+     `publicar-modal`; balance 497/497). `admin.html` conecto la UI de moderacion de fotos
+     de album (`adminCargarFeedFotos` -> `mi_feed_fotos` L6056, `adminRetirarFotoAlbum` ->
+     `admin_moderar_foto_album` con accion 'eliminar' L6031/6120).
+
+- **Verificacion (Escudo GOLD):** `node --check` limpio en api/interacciones.js y
+  api/pagina-destino.js; `node --check index-api-connector.js` limpio; 0 bytes >127 en los
+  api/*.js (index-api-connector.js mantiene sus 26 backticks preexistentes, baseline HEAD 26);
+  balance de divs 0 en index.html (497/497), comunidad.html (181/181), mi-perfil.html
+  (166/166) y admin.html (724/724); JS inline de los 4 HTML parsea con `node --check`;
+  `scripts/check_buildHTML_inline.js` -> TODO OK; smokes OK: `smoke_auditoria_pagina_destino.js`
+  (42/42), `smoke_test_comunidad.js`, `test_logros_catalogo.js` (29) y
+  `smoke_test_perfil_progreso.js`. QA manual detecto y se corrigieron 2 bugs de integracion
+  nuevos: (a) `openAlbumModal` en index.html leia `res.data` en vez de `res.album`/`res.fotos`;
+  (b) `mi-perfil.html` generaba `onclick="quitarFotoAlbum(uuid,uuid)"` sin comillas
+  (ReferenceError); ambos corregidos (L3333-3338 y L1121).
+
+- **PENDIENTE BLOQUEANTE:** aplicar `db/migrations/012_interacciones_dedup_resena_rating.sql`
+  en el editor SQL de Neon (no hay credenciales en el repo; lo ejecuta Javier manualmente,
+  es idempotente y no requiere nada mas). Sin la migracion: el dedup de resena/rating NO esta
+  activo en produccion y la segunda foto del mismo usuario al mismo destino sigue devolviendo
+  500 (el mapeo a 409 del catch solo tipifica el error, no elimina la constraint vieja).
+  Pendiente tambien: commit + push + deploy manual del working tree completo (incluye los
+  cambios de modelos de agentes, ver NEXT.md) y reiniciar opencode para que tome los modelos
+  nuevos de `.opencode/agent/`.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

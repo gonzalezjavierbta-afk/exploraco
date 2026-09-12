@@ -727,6 +727,26 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .dcard-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .4s}
 .dcard:hover .dcard-img img{transform:scale(1.06)}
 .dcard-emoji{position:relative;z-index:1;font-size:36px}
+/* FIX 2: placeholder neutro cuando no hay foto real. Reutilizable
+   entre cards (.dcard-img) y drawer (.md-hero). El fondo lo pone el
+   contenedor padre (hero_bg o gradiente del drawer); aqui solo va el
+   contenido neutro (emoji grande + leve dim). */
+.photo-ph{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:42px;line-height:1;color:rgba(255,255,255,.55);filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+/* FIX 4: trazabilidad foto -> album -> usuario en drawer multimedia */
+.md-author{display:inline-flex;align-items:center;gap:8px;margin:6px 0;padding:4px 0;text-decoration:none;color:rgba(255,255,255,.8);font-size:11px;transition:color .15s}
+.md-author:hover{color:var(--gold)}
+.md-author-av{width:24px;height:24px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.08);flex-shrink:0}
+.md-author-av-fb{width:24px;height:24px;border-radius:50%;background:rgba(232,160,32,.15);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;color:var(--gold);flex-shrink:0}
+.md-author-name{font-weight:600}
+.md-album-wrap{padding:24px;max-width:min(960px,92vw);max-height:90vh;overflow:auto;color:#fff;background:#0D1520;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.md-album-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.md-album-t{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
+.md-album-loc{font-size:11px;color:rgba(255,255,255,.5)}
+.md-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.md-album-photo{cursor:pointer;aspect-ratio:1/1;border-radius:6px;overflow:hidden;background:#0A101C;transition:transform .15s}
+.md-album-photo:hover{transform:scale(1.02)}
+.md-album-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.md-album-loading,.md-album-empty{padding:40px 20px;text-align:center;font-size:12px;color:rgba(255,255,255,.5)}
 .dcard-badge{position:absolute;top:9px;left:9px;z-index:2;padding:3px 8px;border-radius:4px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .dcard-feat-star{position:absolute;top:9px;right:9px;z-index:2;background:rgba(232,160,32,.9);color:#fff;font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px}
 .dcard-media{position:absolute;bottom:7px;right:7px;z-index:2;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:10px;display:flex;align-items:center;gap:3px}
@@ -1221,8 +1241,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <div class="ctab">
   <div><div class="ctatitle bc">¿Tienes un hostal, restaurante o sitio turístico?</div><div class="ctasub">Publica gratis y llega a miles de viajeros cada mes.</div></div>
   <button class="ctabtn" onclick="window.location.href='publicar.html'">Publicar mi lugar →</button>
-</div>
-
 </div>
 
 <!-- ════ INSPÍRATE ════ -->
@@ -1754,89 +1772,13 @@ function clearDestSearch(){
 }
 
 /* ── RENDER DESTACADOS ── */
-var DEST_PHOTOS = {
-  1:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=75',
-  2:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=75',
-  3:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75',
-  4:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75',
-  5:'https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=600&q=75',
-  6:'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=75',
-  7:'https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=600&q=75',
-  8:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75',
-  9:'https://images.unsplash.com/photo-1535530992830-e25d07cfa780?w=600&q=75',
-  10:'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=75',
-  11:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=75',
-  12:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75',
-  13:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75',
-  14:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=75',
-  15:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=75',
-  16:'https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=75',
-  17:'https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=75',
-  18:'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=75',
-  19:'https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=600&q=75',
-  20:'https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=75',
-  21:'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&q=80',
-  22:'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
-  23:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
-  24:'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
-  25:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
-  26:'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80',
-  27:'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&q=80',
-  28:'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
-  29:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
-  30:'https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=80',
-  31:'https://images.unsplash.com/photo-1523592591869-4b8d678c7e66?w=600&q=80',
-  32:'https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=80',
-  33:'https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=80',
-  34:'https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=80',
-  35:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
-  36:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  37:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  38:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  39:'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80',
-  40:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  41:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  42:'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80',
-  43:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  44:'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=600&q=80',
-  45:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  46:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  47:'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80',
-  48:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  49:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  50:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-  51:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80',
-  52:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
-  53:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
-  54:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80',
-  55:'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&q=80',
-  56:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
-  57:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
-  58:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80',
-  59:'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&q=80',
-  60:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80',
-  61:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
-  62:'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80',
-  63:'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600&q=80',
-  64:'https://images.unsplash.com/photo-1542401886-65d6c61db217?w=600&q=80',
-  65:'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80',
-  66:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
-  67:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
-  68:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-  69:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
-  70:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-  71:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
-  72:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-  73:'https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=600&q=80',
-  74:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-  75:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
-  76:'https://images.unsplash.com/photo-1548919360-3ca6dbb7bbb9?w=600&q=80',
-  77:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-  78:'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80',
-  79:'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80',
-  80:'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=600&q=80'
-
-};
+// FIX 2: DEST_PHOTOS ya NO contiene URLs externas hardcodeadas (antes
+// apuntaba a Unsplash como placeholder generico). Ahora se repuebla
+// en tiempo real desde la API con fotos reales por destino (ver
+// index-api-connector.js -> replObj(DEST_PHOTOS, ...)). Si un destino
+// no tiene foto real, se muestra el placeholder neutro (emoji + gradiente)
+// generado por photoPlaceholderHTML(); NUNCA una URL externa.
+var DEST_PHOTOS = {};
 var DEST_FEATURED_IDS = [3,7,9,8,2,4,11,15,16,18];
 var DEST_LIMIT = 8;  /* 2 rows × 4 cols on homepage */
 
@@ -1893,13 +1835,18 @@ function renderDest() {
     var isFeat  = (DEST_FEATURED_IDS.indexOf(p.id) !== -1);
     var isSaved = (mmSaved.indexOf(p.slug) !== -1);
 
-    var imgTag = ph ? '<img src="'+ph+'" alt="'+p.name+'" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">' : '';
+    // FIX 2: cuando NO hay foto real (DEST_PHOTOS se llena desde la API,
+    // ver index-api-connector.js), se inyecta el placeholder neutro
+    // (helper photoPlaceholderHTML -> gradiente del dcard-img + emoji
+    // de la categoria). Nunca una URL externa de fallback.
+    var imgTag = ph
+      ? '<img src="'+esc(ph)+'" alt="'+esc(p.name)+'" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'">'
+      : photoPlaceholderHTML(p.emoji, 'card');
     var featBadge = isFeat ? '<div class="dcard-feat-star">⭐ Destacado</div>' : '';
     var stars = starHtml(p.rating, 'dst');
 
     html += '<a class="dcard'+(isFeat?' is-featured':'')+(isSaved?' is-saved':'')+'" href="'+p.slug+'.html">'
       +'<div class="dcard-img" style="background:'+p.hero_bg+'">'+imgTag
-      +'<span class="dcard-emoji">'+p.emoji+'</span>'
       +'<div class="dcard-badge" style="background:'+ct.tbg+';color:'+ct.tc+'">'+ct.label+'</div>'
       +featBadge
       +'<div class="dcard-save'+(isSaved?' saved':'')+'" onclick="event.preventDefault();toggleDestSave('+p.id+',this)">'+(isSaved?'♥':'♡')+'</div>'
@@ -2968,6 +2915,24 @@ function esc(s) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// FIX 2: placeholder NEUTRO reutilizable. Solo se inyecta cuando la
+// foto es cadena vacia o falla la carga -- NUNCA una URL externa (ver
+// BUGS_HISTORICOS.md BUG-022 sobre hash/tamano invalido de Wikimedia,
+// mismo principio anti-placeholder). Variants:
+//   'card' -> <span> pequeno dentro del .dcard-img (home)
+//   'hero' -> <div> grande dentro del .md-hero (drawer multimedia)
+// En ambos casos el fondo neutro lo pone el contenedor padre
+// (hero_bg en cards, mdHeroBgSafe en drawer); aqui solo va el emoji
+// grande de la categoria sobre un leve dim. Esto centraliza el patron
+// para que un cambio de estilo o de fallback se haga en 1 sola linea.
+function photoPlaceholderHTML(emoji, variant) {
+  var e = emoji || '\uD83D\uDCCD'; // pin por defecto
+  if(variant === 'hero') {
+    return '<div class="md-hero-ph">' + e + '</div>';
+  }
+  return '<span class="photo-ph">' + e + '</span>';
+}
+
 function normaliza(s) {
   var out = String(s == null ? '' : s).toLowerCase();
   out = out.replace(/\u00e1/g,'a').replace(/\u00e9/g,'e').replace(/\u00ed/g,'i')
@@ -3254,12 +3219,18 @@ function openMapaDrawer(place) {
   var heroBg = mdHeroBgSafe(place.hero_bg, 'linear-gradient(135deg,#1a3a5c,#2a4a7c)');
   var foto = place.foto || '';
   var rating = parseFloat(place.rating) || 0;
+  // FIX 2: helper reutilizable. Si hay foto, la inyectamos con onerror
+  // que muestra el .md-hero-ph subyacente. Si NO hay foto, el placeholder
+  // neutro (emoji + gradiente del .md-hero) se inyecta directo.
   var html = '<div class="md-hero" style="background:' + heroBg + '">';
   if(foto) {
     html += '<img src="' + esc(foto) + '" alt="' + esc(place.name || '') + '" loading="lazy"'
       + ' onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.md-hero-ph\').style.display=\'flex\';">';
+    html += photoPlaceholderHTML(place.emoji || '\uD83D\uDCF7', 'hero').replace('class="md-hero-ph"', 'class="md-hero-ph" style="display:none"');
+  } else {
+    html += photoPlaceholderHTML(place.emoji || '\uD83D\uDCF7', 'hero');
   }
-  html += '<div class="md-hero-ph"' + (foto ? ' style="display:none"' : '') + '>' + (place.emoji || '📸') + '</div></div>';
+  html += '</div>';
   html += '<div class="md-head">';
   html += '<span class="md-badge md-cat-' + esc(place.cat || 'sitio') + '">' + mdCatLabel(place.cat) + '</span>';
   html += '<div class="md-title">' + esc(place.name || '') + '</div>';
@@ -3287,24 +3258,112 @@ function openMapaMediaDrawer(item) {
     if(found) { openMapaDrawer(found); return; }
   }
   var html = '<div class="md-feat">';
+  // FIX 2: el onerror de antes destruia el contenedor con
+  // `this.parentNode.innerHTML='X'`. Ahora usa el helper neutro para
+  // que el drawer mantenga su estructura (badge/titulo/acciones).
   if(item.media_type === 'video') html += mdVideoEmbed(item.media_url);
   else if(item.media_type === 'audio') html += '<audio controls preload="metadata" src="' + esc(item.media_url) + '"></audio>';
-  else html += '<img src="' + esc(item.media_url) + '" alt="' + esc(item.media_title || '') + '" loading="lazy" onerror="this.parentNode.innerHTML=\'📸\';">';
+  else html += '<img src="' + esc(item.media_url) + '" alt="' + esc(item.media_title || '') + '" loading="lazy"'
+    + ' onerror="this.parentNode.innerHTML=\'' + photoPlaceholderHTML('\uD83D\uDCF7', 'hero') + '\';">';
   html += '</div>';
   html += '<div class="md-head">';
   html += '<span class="md-badge md-cat-' + ((item.media_type === 'video') ? 'evento' : ((item.media_type === 'audio') ? 'comida' : 'sitio')) + '">' + mdMediaBadge(item.media_type) + '</span>';
   html += '<div class="md-title">' + esc(item.media_title || 'Multimedia') + '</div>';
   if(item.album_titulo) html += '<div class="md-meta">' + esc(item.album_titulo) + '</div>';
-  if(item.autor_nombre) html += '<div class="md-meta">Por ' + esc(item.autor_nombre) + '</div>';
-  if(item.votos > 0) html += '<div class="md-stars">⭐ ' + item.votos + ' votos</div>';
-  if(item.ciudad) html += '<div class="md-meta">📍 ' + esc(item.ciudad) + '</div>';
+
+  // FIX 4: trazabilidad autor -> /mi-perfil.html?id=<usuario_id>.
+  // Si NO hay usuario_id pero si autor_nombre (caso legacy, datos
+  // viejos sin JOIN de usuarios), caemos al texto plano como antes.
+  if(item.usuario_id) {
+    var nombreAut = item.usuario_nombre || item.autor_nombre || '';
+    var inicial = (nombreAut || '?').charAt(0).toUpperCase();
+    var avHtml;
+    if(item.usuario_avatar) {
+      avHtml = '<img class="md-author-av" src="' + esc(item.usuario_avatar) + '" alt="' + esc(nombreAut) + '"'
+        + ' onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\';">'
+        + '<span class="md-author-av-fb" style="display:none">' + esc(inicial) + '</span>';
+    } else {
+      avHtml = '<span class="md-author-av-fb">' + esc(inicial) + '</span>';
+    }
+    html += '<a class="md-author" href="/mi-perfil.html?id=' + encodeURIComponent(item.usuario_id) + '">'
+         +   avHtml
+         +   '<span class="md-author-name">' + esc(nombreAut) + '</span>'
+         + '</a>';
+  } else if(item.autor_nombre) {
+    html += '<div class="md-meta">Por ' + esc(item.autor_nombre) + '</div>';
+  }
+
+  if(item.votos > 0) html += '<div class="md-stars">\u2B50 ' + item.votos + ' votos</div>';
+  if(item.ciudad) html += '<div class="md-meta">\uD83D\uDCCD ' + esc(item.ciudad) + '</div>';
+
+  // FIX 4: trazabilidad album -> modal de fotos del album (no JSON crudo)
+  if(item.album_id) {
+    // El album_id puede ser uuid/numero: lo escapamos para atributos HTML
+    // y lo inyectamos como string JS entre comillas simples.
+    html += '<button class="md-link" onclick="openAlbumModal(\'' + esc(String(item.album_id)) + '\')">\uD83D\uDCDA Ver \u00e1lbum</button>';
+  }
+  // FIX 4 (bonus): centrar mapa en la foto si tiene coordenadas
   if(item.ciudad && item.lat && item.lng) {
-    html += '<button class="md-link" onclick="mapaMap.setView([' + parseFloat(item.lat) + ',' + parseFloat(item.lng) + '],13);closeMapaDrawer();">📍 Ver en el mapa</button>';
+    html += '<button class="md-link" onclick="mapaMap.setView([' + parseFloat(item.lat) + ',' + parseFloat(item.lng) + '],13);closeMapaDrawer();">\uD83D\uDCCD Ver en el mapa</button>';
   }
   html += '</div>';
   cont.innerHTML = html;
   drawer.classList.add('open');
   drawer.setAttribute('aria-hidden', 'false');
+}
+
+// FIX 4: modal de album. Reutiliza el overlay de md-lbox (mismo patron
+// que el lightbox de medios) pero con un grid de fotos del album.
+// Endpoint: GET /api/interacciones?tipo=album_detalle&album_id=<id>
+// (mismo prefijo que multimedia_mapa -- ADR-017, sin nuevos endpoints).
+// NO abre el JSON crudo: renderiza un grid de miniaturas y cada foto
+// se puede abrir en el lightbox mdFotoLightbox ya existente.
+function openAlbumModal(albumId) {
+  if(!albumId) return;
+  var lb = mdEnsureLightbox();
+  lb.innerHTML = '<button class="md-lb-close" onclick="mdCloseLightbox()" aria-label="Cerrar">&times;</button>'
+    + '<div class="md-album-wrap"><div class="md-album-loading">Cargando \u00e1lbum\u2026</div></div>';
+  lb.classList.add('open');
+  fetch('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var wrap = lb.querySelector('.md-album-wrap');
+      if(!wrap) return;
+      // El handler album_detalle responde { ok, album, fotos } (sin data).
+      if(!res || !res.ok || !res.album) {
+        wrap.innerHTML = '<div class="md-album-empty">No se pudo cargar el \u00e1lbum.</div>';
+        return;
+      }
+      var al = res.album;
+      var fotos = res.fotos || [];
+      var html = '<div class="md-album-head">'
+        + '<div class="md-album-t">' + esc(al.titulo || al.nombre || '\u00c1lbum') + '</div>'
+        + (al.ciudad ? '<div class="md-album-loc">\uD83D\uDCCD ' + esc(al.ciudad) + '</div>' : '')
+        + '</div>';
+      if(!fotos.length) {
+        html += '<div class="md-album-empty">Este \u00e1lbum a\u00fan no tiene fotos.</div>';
+      } else {
+        html += '<div class="md-album-grid">';
+        for(var i = 0; i < fotos.length; i++) {
+          var f = fotos[i];
+          var url = (typeof f === 'string') ? f : (f.foto_url || f.url || f.media_url || '');
+          var cap = (typeof f === 'string') ? (al.titulo || '') : (f.cap || f.media_title || al.titulo || '');
+          if(!url) continue;
+          // Atributo escapado: usamos entidad &#39; en onclick para
+          // evitar comilla escapada rota (mismo patron que BUG-031 fix).
+          html += '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
+            + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
+            +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
+            + '</div>';
+        }
+        html += '</div>';
+      }
+      wrap.innerHTML = html;
+    })
+    .catch(function(){
+      var wrap = lb.querySelector('.md-album-wrap');
+      if(wrap) wrap.innerHTML = '<div class="md-album-empty">Error de conexi\u00f3n.</div>';
+    });
 }
 
 function closeMapaDrawer() {
@@ -4871,6 +4930,7 @@ function submitBlog() {
       </div>
     </div>
   </div>
+</div>
 
 <button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
   style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:2px solid var(--gold);color:var(--gold);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.4)">↑</button>

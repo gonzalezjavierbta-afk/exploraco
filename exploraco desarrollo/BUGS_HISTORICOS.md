@@ -456,9 +456,18 @@ Los otros botones usan iconos unicode reales: WhatsApp `\u2709`, Llamar `\u2706`
 
 **Causa raiz:** se desconoce si fue intencional o un placeholder. Todos los demas botones de la grilla Contacto usan unicode escapes, este es el unico que no.
 
-**Fix (pendiente):** reemplazar `[foto]` por un icono unicode consistente con el estilo de los otros botones, o eliminar el prefijo y dejar solo el texto "Instagram". La ruta directa es `\uD83D\uDCF7` (camera emoji) o `\u25CB` (circle, como Sitio web). Requiere cambiar `api/pagina-destino.js` y verificar ASCII-safety (el escape `\uD83D\uDCF7` es surrogate pair y no viola el mandato). Nota: el icono no se renderiza porque `[foto]` es texto literal, no un placeholder del renderer -- es simplemente el label que el usuario ve.
+**Fix (aplicado, TSK-097 2026-09-12):** reemplazado `[foto]` por el icono unicode
+`\uD83D\uDCF7` (camera emoji) en `api/pagina-destino.js` L1950, consistente con los
+otros botones de la grilla (surrogate pair valido, no viola el mandato ASCII-safe,
+ADR-002). Verificado contra archivo real (ADR-006): la linea del boton ahora emite
+`\uD83D\uDCF7 Instagram`. La ruta alternativa `\u25CB` (circle) quedo descartada por
+decision de implementacion.
 
-**Estado:** Abierto. Registrado durante la auditoria de TSK-075. Pendiente de fix (cambio menor, 1 linea).
+**Estado:** Resuelto (2026-09-12, TSK-097, working tree SIN commitear). Deteccion
+original durante la auditoria de TSK-075; el fix vive en el working tree pendiente de
+commit + push + deploy. Prevencion: ningun boton de la grilla Contacto debe emitir
+texto literal entre corchetes como label de icono; todo icono debe ser un escape
+unicode real (`\uXXXX`, incluyendo surrogate pairs).
 
 ## BUG-028: Modal "Subiste de nivel" a "Explorador" se muestra en cada carga de index.html
 
@@ -620,4 +629,58 @@ comillas escapadas dentro de strings single-quoted del servidor -- usar
 entidades HTML (`&#39;`) y colapsar el string en una sola linea; (3) todo
 JS inline que buildHTML() emita debe validarse con un parser real
 (`new vm.Script()`) antes de desplegar.
+
+## BUG-032: Violacion de constraint unica al subir la segunda foto del mismo usuario al mismo destino (500)
+
+**Contexto:** la tabla `interacciones` tenia una constraint unica compuesta heredada
+`interacciones_usuario_id_destino_id_tipo_key` sobre `(usuario_id, destino_id, tipo)`.
+Esa constraint fue disenada para deduplicar resenas/rating (ADR-007), pero los handlers
+`tipo='foto'` (upload de foto de lugar, api/interacciones.js L2356-2360) y
+`tipo='foto_voto'` (L2394-2398) insertan filas `tipo='foto'` para el mismo
+`(usuario_id, destino_id)` -- y ADR-017 define las fotos como registros LIBRES
+(una persona puede subir varias fotos al mismo lugar).
+
+**Sintoma:** al subir una SEGUNDA foto al mismo destino (o votar una foto ya votada),
+el INSERT lanzaba `duplicate key value violates unique constraint
+"interacciones_usuario_id_destino_id_tipo_key"` (SQLSTATE 23505) y el catch generico
+de `api/interacciones.js` (L3446-3449, anterior a esta sesion) lo devolvia como 500,
+sin distincion del tipo de conflicto. Detectado en el flujo FIX 3/FIX 5 de la TSK-097
+(albumes y fotos de lugar).
+
+**Causa raiz:** la constraint unica compuesta aplicaba a TODOS los `tipo` de
+interaccion, no solo a `resena`/`rating`. La dedup semantica (una calificacion por
+usuario y destino, ADR-007) no necesita cubrir fotos: exigir unicidad de
+`(usuario_id, destino_id, tipo)` para `tipo='foto'` rompe el modelo de fotos libres
+del ADR-017. Ademas, la constraint vieja permitia que un usuario tuviera a la vez una
+`resena` y un `rating` del mismo destino (porque el `tipo` diferencia), lo que el dedup
+simetrico del ADR-007 deberia impedir.
+
+**Fix aplicado (TSK-097, 2026-09-12):**
+1. **Migracion `db/migrations/012_interacciones_dedup_resena_rating.sql` (NUEVO):**
+   DROP de la constraint compuesta vieja + indice unico PARCIAL
+   `idx_interacciones_dedup_resena_rating ON interacciones (usuario_id, destino_id)
+   WHERE tipo IN ('resena','rating')` (una calificacion por usuario-destino entre
+   resena y rating, ADR-007) + dedup defensivo de duplicados (conserva la resena con
+   texto y la fila mas reciente; excluye `usuario_id` NULL) + recalculo de
+   `destinos.rating`/`total_resenas` solo para los destinos afectados. Las fotos quedan
+   libres de restriccion. Idempotente (ADR-008), ASCII-safe (ADR-002).
+2. **Catch tipificado en `api/interacciones.js` L3451-3452:** el catch final ahora
+   mapea `err.code === '23505'` a 409 tipado (`{ok:false, error:'Registro duplicado',
+   duplicado:true}`) en vez de 500 generico -- el cliente puede distinguir un conflicto
+   real de dedup (resena/rating duplicado, foto_voto repetido) de un fallo de servidor.
+
+**Estado:** Corregido en codigo y migracion versionada (working tree SIN commitear).
+**REQUIERE aplicar `db/migrations/012_interacciones_dedup_resena_rating.sql` en Neon**
+(BLOQUEANTE, lo ejecuta Javier en el editor SQL; no hay credenciales en el repo). Sin
+la migracion, produccion sigue con la constraint vieja y la segunda foto devuelve 500;
+el catch 23505 -> 409 solo tipifica el error, no elimina la restriccion. Luego commit +
+push + deploy.
+
+**Leccion / prevencion:** (1) una constraint unica compuesta sobre `(usuario_id,
+destino_id, tipo)` es demasiado amplia cuando existen tipos de registro LIBRES (fotos,
+ADR-017) y tipos DEDUP (resena/rating, ADR-007) en la misma tabla -- usar SIEMPRE un
+indice unico PARCIAL acotado a los tipos que requieren unicidad; (2) los errores
+23505 (violacion de unicidad) no deben caer en el catch 500 generico: mapearlos a 409
+para que la UI pueda distinguir "duplicado" de "fallo"; (3) toda alteracion de
+constraint vive en el repo como `.sql` versionado (ADR-008), nunca SQL suelto en Neon.
 
