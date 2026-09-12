@@ -542,3 +542,82 @@ castear SIEMPRE de forma explicita (`::text`) a un tipo comun antes de
 unir; nunca asumir que los tipos son compatibles solo porque los nombres
 coinciden.
 
+## BUG-031: JS inline de buildHTML() roto (SyntaxError) -- onchange de mapas tematicos con comilla escapada mal formada; TODAS las paginas dinamicas sin funciones de cliente
+
+**Contexto (TSK-095 / refactor UI/UX, deploy 2026-09-11):** el popover de
+Guardar de la ficha dinamica renderiza checkboxes de mapas tematicos del
+usuario con `onchange="toggleMapaDest(...)"`. Ese onchange se ensamblaba en
+el servidor en 3 lineas (`api/pagina-destino.js` L2288-2290) con una comilla
+escapada mal formada: `toggleMapaDest(\\\'` + `+m.id+` + `\',this.checked)`
+-- el `\'` dentro de un string single-quoted del servidor no cerraba el
+string JS generado, el string engullia `+m.id+` y dejaba `,this.checked)`
+como codigo suelto -> `SyntaxError: Unexpected token` en la linea 126 del
+JS inline generado.
+
+**Sintoma (reporte de usuario):** en
+https://exploraco.vercel.app/parque-mundo-aventura.html, al hacer clic en
+"Guardar" aparecia `Uncaught ReferenceError: abrirPopoverGuardar is not
+defined` y el boton "Estuve aqui" no funcionaba.
+
+**Causa raiz:** el onchange del checkbox de mapas tematicos se ensamblaba
+con comilla escapada mal formada (`\\\'` dentro de string single-quoted).
+El HTML generado quedaba con un string JS sin cerrar; el parseo del script
+inline completo fallaba con SyntaxError.
+
+**Impacto (general, NO especifico de parque-mundo-aventura):** el
+SyntaxError mataba el parseo de TODO el script inline que emite
+buildHTML(), asi que TODAS las paginas dinamicas quedaban sin las funciones
+de cliente: Guardar (`abrirPopoverGuardar`), Estuve aqui
+(`marcarVisitadoBtn`), rese\u00f1as (`submitRv`), voto rapido (`votarDID`),
+lightbox (`abrirLightbox`), `toggleTuMapa`, `toggleMapaDest` y
+`cerrarPopoverGuardar`. Se confirmo local (5 categorias) y en produccion
+(4 paginas).
+
+**Como se detecto:** reporte de usuario en consola
+(`Uncaught ReferenceError: abrirPopoverGuardar is not defined` + "Estuve
+aqui" inerte). El guard permanente nuevo (`scripts/check_buildHTML_inline.js`)
+reproduce el fallo automaticamente y lo convierte en check de regresion.
+
+**Brecha de cobertura del Escudo GOLD:** el Escudo GOLD (node --check,
+ASCII-safety, balance de divs) y los smoke tests NO parseaban el JS inline
+del HTML generado: `node --check` valida archivos .js, pero el script
+inline solo existe como STRING dentro de buildHTML() y no existe como
+archivo -- un SyntaxError dentro de ese string es invisible para
+node --check. Por eso el blob roto paso como "PASS" pese a estar roto en
+produccion.
+
+**Fix aplicado (working tree, SIN commitear):** lineas 2288-2290 colapsadas
+en 1 sola usando la entidad HTML `&#39;` en el onchange -> en el cliente
+queda `toggleMapaDest('ID',this.checked)`. La entidad `&#39;` viaja tal
+cual en el HTML y el navegador la interpreta como comilla simple; no hay
+concatenacion de comillas en el servidor. Verificado contra archivo real
+(ADR-006): `git diff api/pagina-destino.js` muestra solo ese cambio.
+
+**Guard permanente creado:** `scripts/check_buildHTML_inline.js` (NUEVO,
+generico: seed por argumento, default parque-mundo-aventura). Parsea con
+`new vm.Script()` TODO `<script>` inline que emite buildHTML() (sin src) y
+verifica: parse V8 de cada inline (detecta SyntaxError), ejecucion en
+sandbox con stubs de document/window/fetch, 8 funciones criticas definidas
+(abrirPopoverGuardar, marcarVisitadoBtn, toggleTuMapa, toggleMapaDest,
+cerrarPopoverGuardar, submitRv, votarDID, abrirLightbox), JSON.parse de los
+JSON-LD y balance de divs del HTML generado. Exit 0 OK / 1 roto / 2 seed
+inexistente. Correr con `node scripts/check_buildHTML_inline.js`.
+
+**Verificaciones (post-fix):** `node --check` PASS; ASCII-safety 0/0/0;
+smoke parque 14/14 PASS; check inline en 3 categorias PASS (8/8 funciones);
+divs identicos (364/364).
+
+**Estado:** Corregido en codigo (working tree, SIN commitear). REQUIERE
+commit + push + re-deploy MANUAL de Vercel: TSK-095 (incluido el bug) YA
+esta desplegado en produccion; el fix NO. Hasta el deploy, TODAS las
+paginas dinamicas siguen sin las funciones de cliente.
+
+**Leccion / prevencion:** (1) el Escudo GOLD DEBE incluir
+`node scripts/check_buildHTML_inline.js` en el ciclo de verificacion antes
+de cada deploy (cerrar la brecha: parsear el JS inline generado, no solo
+los archivos .js); (2) nunca ensamblar atributos onchange/onclick con
+comillas escapadas dentro de strings single-quoted del servidor -- usar
+entidades HTML (`&#39;`) y colapsar el string en una sola linea; (3) todo
+JS inline que buildHTML() emita debe validarse con un parser real
+(`new vm.Script()`) antes de desplegar.
+

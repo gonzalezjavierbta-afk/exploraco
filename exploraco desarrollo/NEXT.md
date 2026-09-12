@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- BUG-031 / hotfix JS inline del popover (2026-09-11, working tree SIN commitear) - SyntaxError en el JS inline de buildHTML() (onchange de mapas tematicos L2288-2290 con comilla escapada mal formada) dejaba TODAS las paginas dinamicas sin funciones de cliente; fix con entidad HTML `&#39;` (1 linea) + guard permanente `scripts/check_buildHTML_inline.js` (vm.Script, 8 funciones + JSON-LD + divs); TSK-095 ya desplegada CON el bug -> produccion rota hasta commit+push+redeploy (ver "Que sigue", item 1)
 - TSK-095 / Refactor UI/UX ficha de destino (2026-09-11) - verificado como columna admin (sin insignia publica), hero HQI con chip de direccion, popover de Guardar con mapas tematicos, galeria con lightbox; Escudo GOLD limpio (divs 716/716, smoke 28/28, flujo verificado 6/6)
 - TSK-095 extension (2026-09-11) - verificacion exp-pickle 14/14 PASS: `address` PERSISTIDA en admin (INSERT/UPDATE + migracion 011 PENDIENTE de aplicar en Neon), gate secReservar = solo `bookingUrl||hwUrl` implementado (ADR-020), badge publico confirmado NO (ADR-019)
 - ADR-018 / Gamificacion v4.0 (2026-09-10) - Consumibles con economia de XP y de-nivel, vitrina de 20 niveles, cromos probabilisticos y pandillas completas + migracion 010 + smoke 95/95
@@ -68,25 +69,48 @@ admin-destinos.js) y del gate de secReservar (L1747, ADR-020).
 Docs: ADR-019 en DECISIONS.md, TSK-095 en TASKS.md.
 
 #### Que sigue
-1. **Aplicar `db/migrations/011_ficha_direccion_destinos.sql` en Neon
+1. **HOTFIX BUG-031 -- commit + push + redeploy (PRIMERA PRIORIDAD,
+   PRODUCCION ROTA HOY, lo ejecuta Javier manualmente):** TSK-095 ya esta
+   desplegada en Vercel CON el bug: el JS inline que emite buildHTML()
+   tiene un SyntaxError (onchange de mapas tematicos del popover de
+   Guardar, L2288-2290, comilla escapada mal formada) que deja TODAS las
+   paginas dinamicas sin funciones de cliente (`abrirPopoverGuardar is not
+   defined` en parque-mundo-aventura.html, Estuve aqui, submitRv, votarDID,
+   lightbox). El fix YA esta en el working tree SIN commitear:
+   `api/pagina-destino.js` (L2288-2290 colapsadas a 1 linea con entidad
+   HTML `&#39;`) + `scripts/check_buildHTML_inline.js` (guard permanente:
+   parsea con `new vm.Script()` todo inline de buildHTML, 8 funciones +
+   JSON-LD + divs; exit 0/1/2) + docs (BUGS/BUG-031, TASKS/TSK-095,
+   NEXT.md). Detalle: BUGS_HISTORICOS.md BUG-031.
+2. **Aplicar `db/migrations/011_ficha_direccion_destinos.sql` en Neon
    (PENDIENTE, unico paso manual restante de la persistencia de `address`;
    lo ejecuta Javier en el editor SQL de Neon, es idempotente y no requiere
    nada mas).** Sin la columna, el INSERT/UPDATE de admin-destinos.js (que
    ya envia `address`, L103/$10/L137/L220) fallaria al persistir un destino
    con direccion.
-2. **Commit + push (MANUAL, lo ejecuta el usuario, no la IA):**
-   api/pagina-destino.js, admin.html, api/admin-destinos.js,
-   db/migrations/011_ficha_direccion_destinos.sql + docs (TASKS/TSK-095,
-   NEXT.md, DECISIONS/ADR-019 + ADR-020).
-3. **Verificacion en prod tras deploy:** hero de una ficha con `barrio`
+3. **Commit del HOTFIX (cubre TODO lo pendiente de la TSK-095):** el unico
+   archivo de la TSK-095 sin commitear es `api/pagina-destino.js` (fix
+   BUG-031; admin.html, api/admin-destinos.js y la migracion 011 ya
+   quedaron commiteados en `2f939e0` "arreglos"). El commit del item 1
+   debe incluir: api/pagina-destino.js + scripts/check_buildHTML_inline.js
+   + docs (BUGS/BUG-031, TASKS/TSK-095, NEXT.md). Tras el push, Vercel
+   redeploya solo (auto-deploy desde GitHub).
+4. **Verificacion en prod tras deploy:** hero de una ficha con `barrio`
    muestra el chip de direccion; tras aplicar la migracion 011, un destino
    con `address` cargada en admin muestra la direccion exacta en el chip
    (prevalece sobre `barrio`); el popover de Guardar abre con los mapas
-   tematicos; galeria abre el lightbox; la franja no muestra "Reservar" pero
+   tematicos (con el HOTFIX BUG-031 aplicado, ya sin el SyntaxError);
+   galeria abre el lightbox; la franja no muestra "Reservar" pero
    si "Ver galeria"; la seccion "Reservar" SOLO aparece en destinos con
    booking/hostelworld reales; secMapa solo tiene Google Maps; admin
    guarda/desmarca `verificado` sin romper ningun destino existente (el
    guard `!== undefined` preserva los registros que no envian el campo).
+5. **Escudo GOLD (cambio permanente, brecha de cobertura BUG-031):**
+   incorporar `node scripts/check_buildHTML_inline.js` al ciclo de
+   verificacion previo a cada deploy -- el Escudo GOLD + smoke tests NO
+   parseaban el JS inline del HTML generado y el blob roto paso como "PASS";
+   el guard cierra esa brecha (SDD Gating: verificar asincrono obligatorio
+   antes de dar una tarea por completada).
 
 #### Riesgos activos / backlog (hallazgos del QA, NO bloqueantes)
 1. **[CERRADO 2026-09-11] `address` NO se persistia en Neon:** implementado
