@@ -4,7 +4,7 @@ description: >
   de esquema, limpieza de datos y seeds masivos para ExploraCO.
   Maneja Neon PostgreSQL con seguridad y trazabilidad.
 mode: subagent
-model: opencode-go/minimax-m3
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

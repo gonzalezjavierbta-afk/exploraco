@@ -1,7 +1,7 @@
 ---
 description: Agente multimodal de ExploraCO que lee y analiza imagenes, audio, video y PDFs. Usalo cuando una tarea requiera interpretar contenido visual o multimedia: fotos de destinos, capturas de UI, planos, escaneos, material audiovisual o documentos con imagenes. Modelo economico multimodal: no requiere el modelo principal.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: allow

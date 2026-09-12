@@ -6,7 +6,7 @@ description: >
   Úsalo para crear cualquier página dinámica de destino (sitio,
   hostal, comida, evento, blog).
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

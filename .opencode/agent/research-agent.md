@@ -5,7 +5,7 @@ description: >
   oficiales, TripAdvisor, Booking, Google Maps y Wikimedia Commons.
   Genera fichas .md estructuradas con datos verificables.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

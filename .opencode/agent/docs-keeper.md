@@ -1,7 +1,7 @@
 ---
 description: Documentation Specialist del AI-DOS Core de ExploraCO. Mantiene PROJECT.md, NEXT.md, TASKS.md, BLUEPRINT.md, DECISIONS.md y BUGS_HISTORICOS.md; cierra tareas, redacta handoffs y registra bugs y ADRs. Úsalo al completar una tarea, al detectar un bug, al tomar una decisión de arquitectura o al preparar el relevo para la siguiente sesión.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow
