@@ -55,7 +55,7 @@ check('MISIONES: mis_plan_unido +15 XP (1 join)', mj && mj.xp === 15);
 check('LOGROS: incluye logr_social_chat', logrIds.indexOf('logr_social_chat') !== -1);
 check('LOGROS: incluye logr_social_plan', logrIds.indexOf('logr_social_plan') !== -1);
 check('LOGROS: incluye logr_anfitrion', logrIds.indexOf('logr_anfitrion') !== -1);
-check('LOGROS: total 29 trofeos', LOGROS.length === 29);
+check('LOGROS: total 30 trofeos', LOGROS.length === 30);
 
 // ---- Invocacion del handler con sql mock ----------------------------
 function invoke(req) {

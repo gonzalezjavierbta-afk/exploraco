@@ -64,7 +64,9 @@ Galeria de imagenes por destino: id, destino_id (FK), url, caption, orden, es_he
 Detalles estructurados (principalmente hostal, pero reutilizable): destino_id (PK/FK), checkin, checkout, habitaciones (jsonb), amenidades (jsonb), faqs (jsonb), booking_url, hostelworld_url, airbnb_url, scores (jsonb).
 
 ### Tabla `interacciones`
-Rese\u00f1as, guardados y visitas: id, usuario_id (FK, nullable = anonimo), destino_id (FK), tipo (resena/guardado/visita), rating (1-5), texto, xp_ganado, creado_en.
+Rese\u00f1as, guardados y visitas: id, usuario_id (FK, nullable = anonimo), destino_id (FK), tipo (resena/guardado/visita/foto/rating), rating (1-5), texto, xp_ganado, `activo` (boolean, default true; soft-delete de guardado/visita), `dims` (JSONB, evidencia por interaccion: dims de resena y `dims.geo` de la visita), `traveller_type`, creado_en.
+
+Nota ADR-024 (Presencia Fisica + Espacial v4.0, 2026-09-12): el POST `tipo=visita` de `api/interacciones.js` (v11) aplica una geocerca Haversine server-side contra `destinos.lat/lng` (sin endpoint nuevo, 8/8) con radios adaptativos (default/urbano 100 m; `naturaleza`/`aventura`/keyword rural 250 m; `parque` 150 m; evento 150 m; `festival`/`deporte` 200 m; blog rechazado), anti-spoofing (accuracy <=150 m, cooldown 90 s, velocidad <=69.4 m/s, tope 30 en ventana movil de 24 h, rechazo de `0,0`), dedup-first + indice unico parcial `idx_interacciones_visita_unica` (23505 -> 200 `ya_visitado`), reactivacion con xp 0 y `quitar_visita` como soft-delete (`activo=false`). `zona`/`zona_motivo` (`subcategoria`/`keyword`/`densidad`/`urbano`; `sin_geocerca` sin coords). Bono rural plano +20 XP y logro `logr_pionero`. Evidencia en `interacciones.dims.geo` (sin migracion de columnas). El conteo GET de `api/utilidades.js?tipo=visitas` filtra `activo=true`. La migracion `db/migrations/014_reset_visitas_presencia_fisica.sql` hace la purga fisica unica de las visitas gamificadas con respaldo de auditoria. Detalle: DECISIONS.md ADR-024 y `docs/superpowers/specs/2026-09-12-presencia-fisica-gamificacion-v4-design.md`.
 
 ### Tabla `usuarios`
 Perfil y gamificacion: id, email (unique), nombre, xp_total, nivel, badge_actual, total_resenas, creado_en.
@@ -84,6 +86,8 @@ El campo `destinos.tags` es el mecanismo que permite escalar a nuevas categorias
 - **evento** -> [concierto, festival, teatro, exposicion, deporte, cine, fiesta]
 
 El renderer gatea las secciones de sitio por subcategoria via `subcatActiva()` (matriz modulo-por-subcategoria en `SITIO_SECCIONES_POR_SUBCATEGORIA`); si `tags.subcategoria` esta ausente el fallback renderiza todo el bloque legacy de sitio (regresion cero). La migracion de datos legacy se hace con `scripts/reclasificar-subcategorias.js` (idempotente, dry-run/apply, merge JSONB ADR-003). Detalle completo: DECISIONS.md ADR-016 y TASKS.md TSK-090.
+
+**Motor de interacciones y presencia fisica (ADR-024, 2026-09-12):** ademas del motor de tags, `api/interacciones.js` resuelve la geocerca de `tipo=visita` con `haversineMetros` y `resolverRadioM`, que leen `destinos.tags.subcategoria`/`tipo_actividad`/`nombre` y `destinos.lat/lng`. La evidencia viaja en `interacciones.dims.geo` (JSONB). El esquema y el detalle completo viven en la seccion 3 (tabla `interacciones`) y en DECISIONS.md ADR-024.
 
 ### Protocolo de persistencia: MERGE obligatorio (ver DECISIONS.md ADR-003)
 

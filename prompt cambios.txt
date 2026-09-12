@@ -1,58 +1,70 @@
-Actúa como Senior Full-Stack Developer para ExploraCO. Necesitamos resolver de manera definitiva los bugs reportados en el uso de fotos, álbumes, audio y video, y corregir una violación de restricción única en la base de datos PostgreSQL/Neon.
+# PROMPT: Evaluación y Propuesta de Rediseño de Gamificación v4.0 (Presencia Física + Presencia Espacial) para ExploraCO
 
-Revisa los archivos relevantes del proyecto (`api/interacciones.js`, `api/destinos.js`, `api/pagina-destino.js`, `index-api-connector.js`, `comunidad.html`, `mi-perfil.html`, `admin.html` y migraciones SQL) para implementar los siguientes fixes:
+## 1. Contexto y Estado del Proyecto
+ExploraCO es una plataforma serverless (desplegada en Vercel Hobby con presupuesto estricto de 8 endpoints serverless en `/api`) y base de datos PostgreSQL en Neon. Toda la capa de datos de gamificación (XP, niveles, misiones, trofeos/logros, tabla de destino/senderos, consumibles, cromos y pandillas) opera bajo el principio de Merge JSONB (ADR-003), ASCII-safety en serverless (ADR-002) y gobernanza de base de datos con migraciones SQL versionadas (ADR-008).
 
----
-
-### 1. FIX: Error 500 / Violación de Restricción Única al Subir Segunda Foto en Perfil
-- **Síntoma:** `duplicate key value violates unique constraint "interacciones_usuario_id_destino_id_tipo_key"`.
-- **Causa Raíz:** En `api/interacciones.js` (o en las migraciones SQL), las interacciones de tipo foto/álbum están intentando reutilizar la restricción de deduplicación única compuesta `(usuario_id, destino_id, tipo)` que se diseñó para reseñas/votos de destinos (ADR-007). Al subir una segunda foto o interacción del mismo tipo sin un `destino_id` explícito (o hacia el mismo destino/perfil), la llave única colisiona.
-- **Solución requerida:**
-  1. Revisar la lógica de `UPSERT` / `INSERT` en `api/interacciones.js` para fotos de álbumes, repins o imágenes de perfil. Las subidas de fotos y elementos multimedia deben ser registros libres (no deduplicados bajo esa constraint) o incluir una llave única propia (por ejemplo, `album_id` / `foto_id` en sus respectivas tablas `albumes` / `album_fotos` según ADR-017).
-  2. Asegurar que las consultas de inserción para multimedia no fuercen la restricción `interacciones_usuario_id_destino_id_tipo_key`. Si se registra en la tabla `interacciones` para XP, omitir el conflicto o usar `ON CONFLICT DO NOTHING` / manejar IDs independientes.
+Actualmente, el motor gaming se rige bajo las decisiones documentadas en:
+- `DECISIONS.md`: ADR-012, ADR-014, ADR-015, ADR-017 y ADR-018.
+- `PROJECT.md`, `BLUEPRINT.md`, `TASKS.md` y `NEXT.md`.
+- El archivo de especificación previa de gamificación o módulo gaming.
 
 ---
 
-### 2. FIX: Visualización de Fotos Reales en el Mapa Cultural y Limpieza de Fotos de Prueba
-- **Síntoma:** El mapa cultural sigue mostrando fotos de prueba hardcodeadas y no muestra las fotos subidas por los usuarios desde sus cuentas.
-- **Solución requerida:**
-  1. En `index-api-connector.js` y `api/interacciones.js` (handler `multimedia_mapa` / ADR-021), asegurar que el mapa cultural consuma **únicamente** la capa de contenido real subido por usuarios (`?tipo=multimedia_mapa&origen=album`).
-  2. Eliminar o purgar de la respuesta del mapa cualquier array estático o fallback de prueba (`MOCK_MEDIA`, fotos placeholder o semillas estáticas de test) para que la grilla y los pines del mapa reflejen 100% datos reales persistidos en Neon.
+## 2. Problemática Actual
+1. **Marcado Remoto de "Estuve Aquí" (Falta de Presencia Física):**
+   Actualmente, el marcado de presencia en los puntos ("Estuve aquí" / visitas / check-in) o la interacción con nodos no exige la presencia física real del usuario en las coordenadas geográficas del lugar. Esto distorsiona la métrica social, permite la acumulación pasiva o remota de XP/Fama y le resta valor territorial a las dinámicas de exploración.
+
+2. **Rigidez y Puntos Ciegos del Modelo Tradicional de Pokémon GO:**
+   - **Brecha Urbano/Rural:** Las reglas estrictas de cuadrículas de celdas S2 (Nivel 17) favorecen únicamente a metrópolis con alta densidad de monumentos, dejando zonas rurales, senderos eco-turísticos y pueblos pequeños vacíos de contenido interactivo.
+   - **Nodos Estáticos y Pasivos:** Girar un punto genera mecánicas repetitivas sin valor cultural, histórico ni comercial real.
+   - **Fraude y Spoofing:** Alteraciones de GPS y falta de verificación de proximidad en el servidor.
 
 ---
 
-### 3. FIX: Habilitar Gestión de Álbumes en Perfil de Usuario (Crear, Editar, Borrar y Subir Fotos)
-- **Síntoma:** En el perfil de usuario (`mi-perfil.html`), no existe la opción para añadir fotos a álbumes, ni controles para editar o borrar álbumes existentes.
-- **Solución requerida:**
-  1. Implementar/activar los controles UI en `mi-perfil.html` (sección Mis Álbumes / ADR-017) para:
-     - Crear nuevo álbum (Nombre, descripción, ubicación lat/lng/ciudad).
-     - Subir/añadir fotos a un álbum existente.
-     - Editar metadatos del álbum.
-     - Eliminar álbumes o fotos individuales.
-  2. Conectar estos controles con los endpoints de backend correspondientes en `api/interacciones.js` (`POST` `tipo=album_crear`, `album_foto_agregar`, `album_editar`, `album_eliminar`).
+## 3. Propuesta Base de Solución (A Evaluar y Refinar por OpenCode)
+
+La propuesta busca fusionar la tridimensionalidad pervasiva y el crowdsourcing de Pokémon GO con la economía de exploración cultural de ExploraCO v4.0:
+
+### A. Validación Estricta de Presencia Física ("Estuve Aquí" v2.0)
+- **Geofencing / Haversine Server-Side:** Para marcar "Estuve aquí", reclamar un cromo de territorio o votar/interactuar en un nodo, el cliente debe enviar su ubicación actual (`lat`, `lng`) obtenida mediante la API de Geolocalización del navegador.
+- **Verificación en Backend:** El servidor (`api/interacciones.js`) debe calcular la distancia (fórmula de Haversine o `ST_DWithin` en PostGIS/Neon) entre las coordenadas del usuario y las coordenadas reales del destino (`destinos.lat`, `destinos.lng`). La interacción solo se valida si la distancia es menor o igual al umbral tolerado (ej. $\le 100\text{ metros}$).
+- **Reset de Puntos Previos:** Para garantizar la integridad del nuevo esquema de juego con presencia física obligatoria, se deberán purgar/resetear los puntos o marcas de visita ("Estuve aquí") de los usuarios actuales en la base de datos para iniciar el esquema desde cero.
+
+### B. "Own the Spot" y Territorio de Pandillas (Evolución de Gimnasios)
+- Disputa de liderazgo basada en aportes comunitarios verificados. El usuario cuya reseña reciba más `votos_utiles` y visitas confirmadas se corona "Líder del Spot", otorgando multiplicadores de XP (ej. x1.1) en la zona. Las Pandillas (Parches) colaboran para desplazar banderas de zona en destinos clave.
+
+### C. Celdas Culturales Flexibles (Solución a la Brecha Rural)
+- Algoritmo de celdas adaptativo donde nodos en zonas rurales o de naturaleza (senderos, miradores, fincas cafeteras) reciban bonificaciones de Fama de Explorador (+20 XP) e hitos de "Pionero", haciendo que descubrir un lugar apartado otorgue más valor que guardar un sitio concurrido en la capital.
+
+### D. Crowdsourcing Cultural con Recompensas Reales (El "Wayfarer" Turístico)
+- El envío de nuevos lugares o fotos georreferenciadas suma puntos en el Sendero Audiovisual y el Sendero Crítico, desbloqueando rangos de Cartógrafo y publicación en el Hero del destino.
+
+### E. Integración Comercial con Comercios y Patrocinadores (Sponsors)
+- Tienda de Canje de consumibles e incentivos donde los puntos de exploración se convierten en beneficios en comercios, hostales y restaurantes afiliados.
+
+### F. Álbum de Cromos y Coleccionables Locales
+- Sets de Cromos Digitales por Ciudad (ej. Set Cartagena: 8 cromos digitales) obtenidos únicamente mediante visitas presenciales confirmadas, permitiendo "fabricar" Insignias Legendarias de Ciudad.
 
 ---
 
-### 4. FIX: Navegación y Trazabilidad (Explorador de Álbumes: Foto -> Colección -> Usuario)
-- **Síntoma:** No hay forma fluida de explorar álbumes ni de navegar desde una foto individual hacia su colección/álbum y hacia el perfil de su creador.
-- **Solución requerida:**
-  1. En el drawer/modal multimedia (en `comunidad.html`, `index.html` y lightbox de `pagina-destino.js`), agregar enlaces de trazabilidad en el footer/header de la tarjeta de foto:
-     - Clic en la foto o título -> abre la vista/modal de la Colección/Álbum completo.
-     - Clic en el nombre/avatar del autor -> redirige o abre el Perfil del usuario (`/mi-perfil.html?id=...` o modal de perfil).
-  2. Asegurar que el handler `multimedia_mapa` y los endpoints de álbumes devuelvan los metadatos necesarios en el JSON (`album_id`, `album_titulo`, `usuario_id`, `usuario_nombre`, `usuario_avatar`).
+## 4. Instrucciones para OpenCode (Paso a Paso)
 
----
+### Paso 1: Auditoría del Proyecto
+Revisa los archivos reales del repositorio:
+- `PROJECT.md`, `BLUEPRINT.md`, `DECISIONS.md` (especialmente ADR-002, ADR-003, ADR-008, ADR-012, ADR-014, ADR-018), `TASKS.md` y `NEXT.md`.
+- `api/interacciones.js` (handlers de visita, rating, resena, comprobación de límites y endpoints serverless).
+- Scripts de migración en `db/migrations/` (especialmente `007_milestones_v2.sql`, `008_comunidad_social.sql`, `010_gamificacion_v4.sql` y `012_interacciones_dedup_resena_rating.sql`).
+- Documentos de especificación de gamificación existentes en el repositorio.
 
-### 5. AUDITORÍA GENERAL: Revisión Extrema del Uso de Fotos, Audio y Video en Toda la Plataforma
-- **Revisión integral:**
-  - **Fotos:** Verificar lightbox (`#lb`), miniaturas en el hero (`.gal-thumbs`), soporte para escapes y parsing de `[foto:URL|caption]` en artículos de blog (`parseBlogBody`).
-  - **Audio:** Validar la reproducción de reproductores audio/podcast en el drawer de `comunidad.html` y en las secciones específicas de destinos.
-  - **Video:** Verificar la conversión limpia de URLs de YouTube/Vimeo a embeds responsivos (`videoEmbedUrlBlog` / `.bvid`) sin romper la concatenación HTML.
-  - **ASCII-Safety & Integrity:** Garantizar que ningún archivo backend (`api/*.js`) contenga caracteres no-ASCII (>127), backticks o comillas escapadas que rompan el V8 parser (cumplir Escudo GOLD y ejecutar `node --check` + `node scripts/check_buildHTML_inline.js`).
+### Paso 2: Contrapropuesta Técnica y Arquitectónica
+Plantea una **Contrapropuesta de Solución** evaluando:
+1. **Rendimiento y Presupuesto Serverless:** Cómo integrar la verificación de proximidad física Haversine en `api/interacciones.js` sin crear endpoints nuevos (presupuesto 8/8 de Vercel Hobby).
+2. **Estrategia de Migración / Reset:** Diseña la migración SQL (`db/migrations/014_reset_visitas_presencia_fisica.sql`) que elimine de forma limpia las marcas de visita/interacciones no presenciales anteriores sin violar la integridad referencial ni corromper `usuarios.xp_total`.
+3. **Mecanismo Anti-Spoofing:** Evaluación de mitigación de fraude GPS en cliente/servidor dentro de las limitaciones de una PWA / JS Vanilla.
+4. **Viabilidad de Celdas Flexibles:** Cómo mapear o aproximar la lógica de celdas S2 o regiones flexibles dentro de PostgreSQL en Neon.
 
----
-
-### ENTREGABLES REQUERIDOS:
-1. Código corregido e integrado en los archivos correspondientes.
-2. Si se requieren cambios estructurales en PostgreSQL, incluir el script SQL acumulativo idempotente (`IF NOT EXISTS`) bajo `db/migrations/`.
-3. Confirmación de paso del **Escudo GOLD** (`node --check` en archivos de `/api`, 0 bytes >127, balance de divs HTML 0).
+### Paso 3: Actualización de la Documentación de Gaming
+Una vez definida la solución consensuada:
+1. Actualiza el documento principal de gamificación/gaming de la plataforma (ej. `docs/superpowers/specs/...` o el spec gaming activo) incorporando el nuevo requisito de **Presencia Física Obligatoria**.
+2. Registra el nuevo ADR en `DECISIONS.md` (ej. `ADR-024: Presencia Física Obligatoria para Marcar Visitas y Mecánicas Espaciales v4.0`).
+3. Actualiza `TASKS.md` y `NEXT.md` reflejando los pendientes técnicos, la migración SQL de reset de visitas y los cambios en el motor de interacciones.

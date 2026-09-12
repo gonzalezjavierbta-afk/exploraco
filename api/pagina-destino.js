@@ -2326,8 +2326,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + 'document.addEventListener(\'keydown\',function(e){var lb=document.getElementById(\'lb\');if(!lb||lb.style.display===\'none\')return;if(e.key===\'Escape\')lbClose();if(e.key===\'ArrowLeft\')lbNav(-1);if(e.key===\'ArrowRight\')lbNav(1);});\n'
     + 'function marcarVisitadoBtn(btn){\n'
     + '  if(!window.ExploraCO){return;}\n'
+    + '  if(btn.disabled)return;\n'
     + '  btn.disabled=true;\n'
-    + '  window.ExploraCO.marcarVisitado(DID).then(function(ok){btn.disabled=false;if(ok)btn.classList.add("activo");});\n'
+    + '  var txt=btn.textContent;\n'
+    + '  btn.textContent="Verificando...";\n'
+    + '  window.ExploraCO.marcarVisitado(DID).then(function(ok){\n'
+    + '    btn.disabled=false;\n'
+    + '    btn.textContent=txt;\n'
+    + '    if(ok)btn.classList.add("activo");\n'
+    + '  }).catch(function(err){console.warn("[visitado]",err&&err.message);btn.disabled=false;btn.textContent=txt;});\n'
     + '}\n'
     // Estado inicial del boton de guardar (si el visitante ya tiene
     // sesion y ya habia guardado este destino antes). El boton de

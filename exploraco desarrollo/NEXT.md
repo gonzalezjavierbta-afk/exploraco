@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-099 / ADR-024 Presencia Fisica + Espacial v4.0 (2026-09-12, IMPLEMENTADO EN WORKING TREE) - geocerca Haversine server-side en `POST tipo=visita` (sin endpoint nuevo, 8/8), dedup-first + indice unico parcial (cierra race `23505`), `quitar_visita` -> soft-delete (`activo=false`), radios adaptativos 100/150/200/250 m, bono rural +20 XP y logro `logr_pionero` (LOGROS = 30), evidencia `interacciones.dims.geo`, conteo de visitas de `api/utilidades.js` filtra `activo=true`; tests de logros 30/30 PASS; migracion 014 NUEVA (reset de visitas gamificadas con respaldo + indice unico); UNICO BLOQUEANTE: aplicar migraciones 011/012/013/014 en Neon + deploy; ADR-024 + spec
 - TSK-098 / Epic multimedia de usuarios (2026-09-12, working tree SIN commitear) - fix 500 albumes/mapa (COALESCE foto/avatar + catch 42P01/42703 -> 503 `SCHEMA_NOT_MIGRATED`), filtro multimedia multi-seleccion (tipo_media CSV + 400 estricto + `tipos_aplicados`), galeria ampliada (`galeria.html` global y `?destino=<slug>`, STATIC_PAGES + boton en ficha), modulo audiovisual en comunidad.html, comentarios tipo Facebook (ADR-023: migracion 013 NUEVA + 6 `tipo=` sin endpoint nuevo) y moderacion en admin; PENDIENTE BLOQUEANTE aplicar migracion 013 en Neon; hallazgo BUG-033 (canonicals cirilicos, NO bloqueante); ADR-023
 - TSK-097 / Fixes multimedia + constraint unica de interacciones (2026-09-12, working tree SIN commitear) - migracion 012 (dedup resena/rating por indice parcial, fotos libres), catch 23505 -> 409 tipado, `DEST_PHOTOS` vacio + `photoPlaceholderHTML`, UI completa de albumes en mi-perfil, trazabilidad de autor/album, BUG-027 resuelto (icono Instagram), smoke_auditoria 42/42; PENDIENTE BLOQUEANTE aplicar migracion 012 en Neon; ADR-022
 - TSK-096 / Capa audiovisual estricta + paridad de drawer en el mapa cultural (2026-09-12, working tree SIN commitear) - deseleccion de "Todo" oculta los pines del directorio; `MAPA_MEDIA` solo albumes de usuarios (backend `?origen=album` + filtro frontend); pines del directorio/Mi Mapa abren el drawer (sin popup) y `mapas.html` estrena drawer propio; ADR-021
@@ -14,6 +15,94 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion presencia fisica v4.0 - geocerca de visitas (2026-09-12) - TSK-099 / ADR-024
+
+Diseno aprobado (architect + architect-review) e IMPLEMENTADO en working tree para
+exigir presencia fisica real al marcar "Estuve aqui". El diseno completo vive en el spec
+`docs/superpowers/specs/2026-09-12-presencia-fisica-gamificacion-v4-design.md`; la decision en
+`DECISIONS.md` ADR-024; la tarea en `TASKS.md` TSK-099.
+
+**Problema:** `POST tipo=visita` otorgaba +20 XP sin validar ubicacion; `quitar_visita` hacia
+`DELETE` fisico sin descontar XP (farming visita/quitar_visita/visita); el dedup `SELECT`+`INSERT`
+no era atomico (sin indice unico); un radio fijo de 100 m castigaba la exploracion rural.
+
+**Cambios (verificados contra archivo real, ADR-006 - el repo se edito en paralelo durante la
+sesion documental; estado al 2026-09-12):**
+- `usuario-session.js` (commit HEAD `fcd6060`): `obtenerUbicacion()` con
+  `navigator.geolocation.getCurrentPosition` (`enableHighAccuracy`, timeout 10 s, `maximumAge 0`);
+  `marcarVisitado()` envia `{tipo:'visita', usuario_id, destino_id, lat, lng, accuracy, ts}` y
+  maneja `data.code`/`data.dist_m`/`data.zona`; `mensajeErrorVisita()` traduce
+  `FUERA_DE_RANGO`, `PRECISION_INSUFICIENTE`, `ACCURACY_INVALIDA`, `COORDENADAS_*`, `RATE_LIMIT`,
+  `LIMITE_DIARIO`. `quitarVisita()` sigue enviando `quitar_visita`.
+- `api/pagina-destino.js`: boton `marcarVisitadoBtn` (L2327) llama
+  `window.ExploraCO.marcarVisitado(DID)`; blogs excluidos.
+- `api/interacciones.js` v11 (header ADR-024): helpers `haversineMetros`, `resolverRadioM` y
+  constantes de geocerca L74-119 (`TIERRA_RADIO_M=6371008.8`, `RADIO_DEFAULT_M=100`,
+  `RADIO_POR_CATEGORIA`, `RADIO_POR_SUBCATEGORIA`, `RURAL_KEYWORDS`, `ACCURACY_MAX_M=150`,
+  `COOLDOWN_MIN_SEG=90`, `MAX_VELOCIDAD_MPS=69.4`, `VISITAS_DIA_MAX=30`, `VECINOS_RURAL_MAX=3`,
+  `VECINOS_BBOX_DEG=0.02`, `VISITA_BONO_RURAL=20`). **Handler `tipo2==='visita'` YA reescrito y
+  verificado (L3866-4056):** dedup-first (cualquier fila activa o no -> `ya_visitado`/`reactivado`
+  xp 0), 404 destino, 400 blog, coords (`COORDENADAS_REQUERIDAS`/`COORDENADAS_INVALIDAS` con
+  rechazo de `0,0`), `accuracy` (`ACCURACY_INVALIDA`/`PRECISION_INSUFICIENTE`), geocerca
+  (`FUERA_DE_RANGO`), anti-farming (`RATE_LIMIT` 90 s, `VELOCIDAD_IMPOSIBLE` 69.4 m/s,
+  `LIMITE_DIARIO` >=30 en ventana movil de 24 h), `dims.geo`, bono rural y `modo='sin_geocerca'`;
+  `quitar_visita` -> `UPDATE activo=false` (L4062-4071); catch `23505` -> 200 `ya_visitado`.
+- `api/utilidades.js` (L116/L131): el conteo GET de `?tipo=visitas` filtra `activo=true`.
+- `usuario-session.js` (L124-175): `sincronizarGuardados()` solo sincroniza guardados; ya no
+  migra visitas desde el cache local (comentario ADR-024), porque exigen `lat/lng` presencial.
+- Logro `logr_pionero` en el catalogo (L523-529): cuenta visitas activas con
+  `dims->'geo'->>'zona'='rural'`; LOGROS = 30 y tests actualizados (`test_logros_catalogo.js`,
+  `smoke_test_perfil_progreso.js`, `smoke_test_comunidad.js`, `verify_comunidad_prod.js`) PASS.
+- `db/migrations/014_reset_visitas_presencia_fisica.sql` (NUEVA en working tree, 344 lineas):
+  purga fisica UNICA de visitas gamificadas (`tipo='visita' AND usuario_id IS NOT NULL`) con
+  respaldo `interacciones_visitas_reset_backup`; recomputa `xp_total` (resta `SUM(xp_ganado)` +
+  bonos de misiones/logros de visitas), `total_visitas`, `pandillas.fama_total` y
+  `pandilla_retos`; resetea flags JSONB `mis_primera_visita`, `mis_itinerario_perfeccion`,
+  `logr_visitas_5`, `logr_visitas_20`; conserva analitica anonima (`usuario_id IS NULL`) y
+  cromos; crea `idx_interacciones_visita_unica` (indice unico parcial que cierra la race). Drift
+  residual de XP por multiplicadores/amuletos documentado (no hay ledger).
+
+**Decisiones de producto (aprobadas):** radios por keyword -> subcategoria -> categoria ->
+default: default/urbano 100 m, `naturaleza`/`aventura`/keyword rural 250 m, `parque` 150 m,
+categoria `evento` 150 m, `festival`/`deporte` 200 m, blog rechazado; bono rural plano +20 XP
+solo en INSERT fresco (sin multiplicador/amuleto/fama); `logr_pionero` tier plata 40 XP;
+destino sin coordenadas -> `modo='sin_geocerca'` (permite, sin bono); spoofing residual
+(`lat/lng/accuracy` client-supplied) -> ADR-025 candidato (sesion firmada/atestacion).
+
+**Docs de esta sesion documental:** ADR-024 en DECISIONS.md; spec
+`2026-09-12-presencia-fisica-gamificacion-v4-design.md`; TSK-099 en TASKS.md; este segmento.
+
+#### Que sigue
+1. **[HECHO] Backend + tests:** handler `tipo2==='visita'` reescrito y verificado contra archivo
+   real; `quitar_visita` soft-delete; logro `logr_pionero` en catalogo; `node --check` PASS;
+   ASCII 0 bytes >127; tests de logros 30/30 PASS (`test_logros_catalogo.js`,
+   `smoke_test_perfil_progreso.js`, `smoke_test_comunidad.js`, `verify_comunidad_prod.js`).
+2. **[HECHO] `scripts/smoke_visita_geocerca.js` 15/15 PASS (ejecutado 2026-09-12):** validaciones
+   tempranas, dedup activa/inactiva, cooldown, tope diario y caminos felices urbano (xp 20) y
+   rural (xp 40).
+3. **APLICAR `db/migrations/014_reset_visitas_presencia_fisica.sql` EN NEON (BLOQUEANTE, lo
+   ejecuta Javier en el editor SQL de Neon; idempotente, transaccional; requiere migracion 012
+   previa).** Verificar post-aplicacion: 0 visitas con `usuario_id IS NOT NULL`, anonimas
+   preservadas, `interacciones_visitas_reset_backup` con las filas purgadas e
+   `idx_interacciones_visita_unica` presente. Recordar que 011/012/013 tambien siguen pendientes
+   de aplicar en Neon.
+4. **Commit + push + deploy manual** del working tree (incluye la implementacion de esta tarea +
+   los pendientes de TSK-095/096/097/098). Verificar en vivo que marcar "Estuve aqui" exige
+   ubicacion y que fuera de rango responde 422 `FUERA_DE_RANGO`.
+5. **ADR-025 candidato (backlog):** sesion firmada / atestacion de dispositivo para que
+   `lat/lng/accuracy` dejen de ser datos no confiables.
+
+#### Riesgos activos
+- **Spoofing de GPS (residual):** coordenadas client-supplied sin sesion firmada; mitigado
+  parcialmente por accuracy/velocidad/cooldown/tope diario. Escalar a ADR-025.
+- **Drift de XP del reset:** `xp_ganado` guarda el XP base (20); multiplicadores x1.1 y
+  amuleto_x2 se suman aparte y no quedan en la fila -> el recomputo puede dejar remanente
+  positivo (nunca negativo por `GREATEST(0,...)`).
+- **Contador publico de visitas a la baja:** `api/utilidades.js?tipo=visitas` incluye las filas
+  gamificadas purgadas; el numero bajara tras el reset (efecto esperado).
+- **Bbox rural `0.02` grados:** aproximado (~2.2 km lat; `2.2*cos(lat)` km lng); ajustar la
+  constante si el QA detecta falsos negativos en zonas densas.
 
 ### Sesion epic multimedia de usuarios (2026-09-12) - TSK-098
 

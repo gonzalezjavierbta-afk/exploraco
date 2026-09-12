@@ -113,7 +113,7 @@ module.exports = async function handler(req, res) {
         `SELECT COUNT(*) AS total,
                 COUNT(CASE WHEN creado_en>=$2 THEN 1 END) AS v30,
                 COUNT(CASE WHEN creado_en>=$3 THEN 1 END) AS v7
-         FROM interacciones WHERE destino_id=$1 AND tipo='visita'`,
+         FROM interacciones WHERE destino_id=$1 AND tipo='visita' AND activo=true`,
         [d.id, h30, h7]
       );
       var g  = await sql(
@@ -128,7 +128,7 @@ module.exports = async function handler(req, res) {
       var hist = await sql(
         `SELECT DATE(creado_en AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS n
          FROM interacciones
-         WHERE destino_id=$1 AND tipo='visita' AND creado_en>=$2
+         WHERE destino_id=$1 AND tipo='visita' AND activo=true AND creado_en>=$2
          GROUP BY dia ORDER BY dia ASC`,
         [d.id, h30]
       );

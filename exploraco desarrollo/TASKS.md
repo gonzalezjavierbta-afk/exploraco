@@ -2421,5 +2421,35 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-099: Presencia Fisica + Espacial v4.0 (geocerca server-side en visita)
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE; PENDIENTE APLICAR MIGRACION 014 EN NEON + DEPLOY (backend + frontend verificados 2026-09-12: `node --check` PASS, ASCII 0 bytes >127, tests de logros 30/30)
+- **Prioridad:** ALTA
+- **Fecha:** 2026-09-12
+- **Responsable:** backend-dev + renderer-dev + data-migration/sql-security + qa-auditor + docs-keeper
+- **Dependencia:** ADR-024; migracion 012 (indice parcial resena/rating, PENDIENTE en Neon); migracion 013
+- **ADR:** ADR-024
+- **Spec:** `docs/superpowers/specs/2026-09-12-presencia-fisica-gamificacion-v4-design.md`
+- **Prompt origen:** `prompt cambios.txt` (Presencia Fisica + Presencia Espacial)
+
+- **Problema:** el POST `tipo=visita` otorgaba +20 XP sin presencia fisica; `quitar_visita` hacia `DELETE` fisico y permitia el ciclo visita/quitar_visita/visita (farming); el dedup `SELECT`+`INSERT` no era atomico; un radio fijo de 100 m castigaba la exploracion rural.
+
+- **Subtareas:**
+  1. **[A - Backend Haversine] HECHO:** `api/interacciones.js` v11. Helpers `haversineMetros` + `resolverRadioM` + constantes (`RADIO_DEFAULT_M=100`, `RADIO_POR_CATEGORIA`, `RADIO_POR_SUBCATEGORIA`, `RURAL_KEYWORDS`, `ACCURACY_MAX_M=150`, `COOLDOWN_MIN_SEG=90`, `MAX_VELOCIDAD_MPS=69.4`, `VISITAS_DIA_MAX=30`, `VECINOS_RURAL_MAX=3`, `VECINOS_BBOX_DEG=0.02`, `VISITA_BONO_RURAL=20`). Handler `tipo=visita` reescrito con el contrato 400/404/422/429/200 idempotente, dedup-first, evidencia `dims.geo`, bono rural, `zona_motivo` `subcategoria`/`keyword`/`densidad`/`urbano` y `modo='sin_geocerca'`; rechazo de `0,0`; tope diario en ventana movil de 24 h; `quitar_visita` -> `UPDATE activo=false` (soft-delete, sin descontar XP); catch `23505` -> 200 `ya_visitado`. Codigo real del error de velocidad: `VELOCIDAD_IMPOSIBLE`.
+  2. **[B - Frontend geolocation] HECHO en working tree/HEAD `fcd6060`:** `usuario-session.js` `obtenerUbicacion()` (`navigator.geolocation.getCurrentPosition`, `enableHighAccuracy`, timeout 10 s) + `marcarVisitado()` enviando `lat/lng/accuracy/ts` + `mensajeErrorVisita()`; `sincronizarGuardados()` ya NO migra visitas (solo guardados, comentario ADR-024); `api/pagina-destino.js` boton `marcarVisitadoBtn` con estado de carga que llama `window.ExploraCO.marcarVisitado(DID)`.
+  3. **[C - Migracion 014] CREADA, PENDIENTE DE APLICAR:** `db/migrations/014_reset_visitas_presencia_fisica.sql` (10 pasos sin tablas temporales para compatibilidad con el editor SQL de Neon, idempotente, transaccional, ASCII-safe): respaldo `interacciones_visitas_reset_backup`; recomputo de `usuarios.xp_total` (resta `SUM(xp_ganado)` + bonos `mis_primera_visita` 15 / `mis_itinerario_perfeccion` 60 / `logr_visitas_5` 15 / `logr_visitas_20` 50), `total_visitas`, `pandillas.fama_total` y `pandilla_retos`; reset dirigido de flags JSONB; purga fisica de visitas gamificadas; `CREATE UNIQUE INDEX idx_interacciones_visita_unica (usuario_id,destino_id) WHERE tipo='visita' AND usuario_id IS NOT NULL`. Conserva analitica anonima (`usuario_id IS NULL`) y cromos.
+  4. **[D - ADR-024] HECHO (esta sesion documental):** ADR-024 en `DECISIONS.md` + spec en `docs/superpowers/specs/2026-09-12-presencia-fisica-gamificacion-v4-design.md`.
+  5. **[E - QA] HECHO (salvo smoke dedicado):** tests de Haversine/radios/zona rural/anti-spoofing/idempotencia/soft-delete/`sin_geocerca` cubiertos; Escudo GOLD (`node --check` PASS, ASCII 0 bytes >127); tests de logros actualizados a 30 en `scripts/test_logros_catalogo.js`, `scripts/smoke_test_perfil_progreso.js`, `scripts/smoke_test_comunidad.js` y `scripts/verify_comunidad_prod.js` (todos PASS). `scripts/smoke_visita_geocerca.js` (smoke dedicado del contrato) 15/15 PASS (ejecutado 2026-09-12).
+
+- **Decisiones de producto (aprobadas):** radios adaptativos 100/150/200/250 m (keyword -> subcategoria -> categoria -> default); bono rural plano +20 XP solo en INSERT fresco (sin multiplicador/amuleto/fama); `logr_pionero` tier plata 40 XP; `sin_geocerca` para destinos sin coordenadas; reset unico autorizado con respaldo; spoofing residual -> ADR-025 candidato.
+
+- **Impacto:** `api/interacciones.js`, `usuario-session.js`, `api/pagina-destino.js`, `db/migrations/014_reset_visitas_presencia_fisica.sql`, `scripts/test_logros_catalogo.js` (+ smokes de logros), docs. **Sin endpoints nuevos** (8/8, ADR-010). **Trade-off:** el contador publico de visitas de `api/utilidades.js` puede bajar tras el reset. **Drift residual de XP** por multiplicadores/amuleto (sin ledger) documentado en el spec.
+
+- **Evidencia:** `node --check api/interacciones.js` PASS; ASCII 0 bytes >127 en `api/interacciones.js`; handler `tipo=visita` con Haversine/geocerca/anti-farming/`dims.geo`/bono rural y `quitar_visita` soft-delete verificados contra archivo real; logro `logr_pionero` presente en el catalogo (LOGROS 30); tests de logros 30/30 PASS en los 4 scripts; `node scripts/smoke_visita_geocerca.js` 15/15 PASS (validaciones tempranas, dedup activa/inactiva, cooldown, tope diario, caminos felices urbano xp 20 y rural xp 40). Falta: la verificacion en vivo tras aplicar la migracion 014 y desplegar.
+
+- **Pendiente BLOQUEANTE:** aplicar migracion 014 en el editor SQL de Neon (Javier) + deploy; recordar que 011/012/013 tambien siguen pendientes de aplicar.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

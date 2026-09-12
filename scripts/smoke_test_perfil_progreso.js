@@ -69,7 +69,7 @@ function invoke(tipo, mockSql) {
 }
 
 check('MISIONES: catalogo con 22 misiones', MISIONES.length === 22);
-check('LOGROS: catalogo con 29 logros', LOGROS.length === 29);
+check('LOGROS: catalogo con 30 logros', LOGROS.length === 30);
 
 invoke('misiones', mockConUsuario()).then(function(res) {
   check('misiones: ok=true (backfill no rompe)', res.ok === true);
@@ -88,8 +88,8 @@ invoke('misiones', mockConUsuario()).then(function(res) {
 }).then(function(res) {
   check('logros: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('logros: total=29', res.total === 29);
-  check('logros: filas con tier/emoji/rareza_pct', list.length === 29
+  check('logros: total=30', res.total === 30);
+  check('logros: filas con tier/emoji/rareza_pct', list.length === 30
     && list.every(function(l){ return l.id && l.nombre && l.tier && l.emoji
       && typeof l.rareza_pct === 'number' && (l.estado === 'completada' || l.estado === 'pendiente'); }));
   var voto = list.filter(function(l){ return l.id === 'logr_primer_voto'; })[0];

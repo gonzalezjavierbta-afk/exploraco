@@ -63,7 +63,7 @@ async function post(body) {
     check('misiones: total 22 (catalogo nuevo desplegado)', mi.json && mi.json.total === 22,
       'total=' + ((mi.json && mi.json.total) || 'n/a'));
     const lg = await get('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(uid));
-    check('logros: total 29 (catalogo nuevo desplegado)', lg.json && lg.json.total === 29,
+    check('logros: total 30 (catalogo nuevo desplegado)', lg.json && lg.json.total === 30,
       'total=' + ((lg.json && lg.json.total) || 'n/a'));
   }
 

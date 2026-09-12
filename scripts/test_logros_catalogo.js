@@ -31,7 +31,7 @@ function check(label, cond) {
   if (!cond) process.exitCode = 1;
 }
 
-check('LOGROS: 29 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2 + 3 comunidad social + 7 albums/fotos)', LOGROS.length === 29);
+check('LOGROS: 30 trofeos en catalogo (6 general + 5 conteo + 5 ciudad + 3 Milestones v2 + 3 comunidad social + 7 albums/fotos + 1 Pionero)', LOGROS.length === 30);
 const ids = LOGROS.map(l => l.id);
 check('LOGROS: ids unicos', new Set(ids).size === LOGROS.length);
 
@@ -69,7 +69,7 @@ var fotoOk = logrosFoto.every(function(f) {
 check('LOGROS: 7 logros de albums/fotos con id, grupo=fotos, tier y xp correctos', fotoOk);
 
 // Metodos de ctx que usan los checks (deben existir en evaluarLogros ctx)
-const ctxMethods = ['totalVotos','blogVotos','blogOpiniones','ciudadesDistintas','guardadosCiudad','rarezaGlobal'];
+const ctxMethods = ['totalVotos','blogVotos','blogOpiniones','ciudadesDistintas','guardadosCiudad','rarezaGlobal','visitasActivas'];
 const ctxM = {};
 ctxMethods.forEach(function(m){ ctxM[m] = function(){ return Promise.resolve(0); }; });
 ctxM.totalGuardados = 0; ctxM.totalVisitas = 0; ctxM.xpTotal = 0;

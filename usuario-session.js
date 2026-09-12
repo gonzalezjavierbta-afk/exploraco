@@ -127,13 +127,11 @@
 
     // mmSaved/mmVisited vienen del index.html (arrays de slugs)
     var localSaved = [];
-    var localVisited = [];
     try {
-      localSaved   = JSON.parse(localStorage.getItem('mm_saved')   || '[]');
-      localVisited = JSON.parse(localStorage.getItem('mm_visited') || '[]');
+      localSaved = JSON.parse(localStorage.getItem('mm_saved') || '[]');
     } catch (e) {}
 
-    if (!localSaved.length && !localVisited.length) return;
+    if (!localSaved.length) return;
 
     try {
       var res = await fetch(API + '/api/destinos?limit=200');
@@ -166,24 +164,9 @@
         }
       }
 
-      // Marcar visitas desde mmVisited (el backend deduplica)
-      var visitSynced = 0;
-      for (var v = 0; v < localVisited.length; v++) {
-        var vUuid = uuidBySlug[localVisited[v]];
-        if (!vUuid || typeof vUuid !== 'string' || vUuid.length < 10) continue;
-        try {
-          var vRes = await fetch(API + '/api/interacciones', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tipo:       'visita',
-              usuario_id: usuario.id,
-              destino_id: vUuid,
-            }),
-          });
-          if (vRes.ok) visitSynced++;
-        } catch (e) {}
-      }
+      // ADR-024: las visitas exigen presencia fisica (lat/lng) y ya no se
+      // pueden migrar desde el cache local (mmVisited) sin coordenadas.
+      // Solo se sincronizan guardados; las visitas se confirman en destino.
 
       if (synced > 0) mostrarToast('✓ ' + synced + ' lugares sincronizados con tu cuenta', '#16a34a');
     } catch (err) {
@@ -399,14 +382,81 @@
     }
   };
 
+  // ── Obtener la ubicacion actual del navegador (ADR-024) ────
+  // Resuelve {lat, lng, accuracy, ts} o null si el usuario
+  // deniega el permiso o el navegador no soporta geolocalizacion.
+  function obtenerUbicacion() {
+    return new Promise(function (resolve) {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        mostrarToast('Tu navegador no soporta ubicación', '#ef4444');
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        resolve({
+          lat:      pos.coords.latitude,
+          lng:      pos.coords.longitude,
+          accuracy: Math.round(pos.coords.accuracy),
+          ts:       Date.now(),
+        });
+      }, function (err) {
+        var negado = !!(err && err.code === 1);
+        mostrarToast(
+          negado
+            ? "Activa tu ubicación para marcar 'Estuve aquí'"
+            : 'No pudimos obtener tu ubicación. Intenta de nuevo.',
+          '#ef4444'
+        );
+        resolve(null);
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    });
+  }
+
+  window.ExploraCO.obtenerUbicacion = obtenerUbicacion;
+
+  // ── Traducir los codigos de error del backend de visitas ────
+  function mensajeErrorVisita(data) {
+    var d = data || {};
+    var code = d.code || '';
+    if (code === 'FUERA_DE_RANGO') {
+      return 'Estas a ' + (d.dist_m != null ? d.dist_m : '?') + ' m del lugar (max '
+        + (d.radio_m != null ? d.radio_m : '?') + ' m). Acercate para confirmar.';
+    }
+    if (code === 'PRECISION_INSUFICIENTE' || code === 'ACCURACY_INVALIDA') {
+      return 'Senal GPS imprecisa. Intenta al aire libre.';
+    }
+    if (code === 'COORDENADAS_REQUERIDAS' || code === 'COORDENADAS_INVALIDAS') {
+      return 'No pudimos validar tu ubicación. Activa el GPS e intenta de nuevo.';
+    }
+    if (code === 'RATE_LIMIT') {
+      return 'Espera un momento antes de marcar otra visita.';
+    }
+    if (code === 'LIMITE_DIARIO') {
+      return 'Alcanzaste el límite de visitas de hoy.';
+    }
+    if (code === 'VELOCIDAD_IMPOSIBLE') {
+      return 'Detectamos un desplazamiento imposible. Espera e intenta desde el lugar.';
+    }
+    if (code === 'VISITA_NO_PERMITIDA' || code === 'DESTINO_NO_ENCONTRADO') {
+      return 'Este lugar no permite confirmar visitas.';
+    }
+    return d.error || 'No se pudo registrar la visita';
+  }
+
   // ── Marcar destino como visitado (accion deliberada del usuario, ──
   // ── no el contador automatico de vistas de pagina) ─────────────
+  // ADR-024: exige presencia fisica; el backend valida el geofence
+  // con lat/lng obligatorios.
   window.ExploraCO.marcarVisitado = async function (destinoUUID) {
     var usuario = window.ExploraCO.usuario;
     if (!usuario) {
       mostrarModalLogin('Inicia sesión para marcar que estuviste aquí');
       return false;
     }
+
+    var pos = await obtenerUbicacion();
+    if (!pos) return false;
+
     try {
       var res = await fetch(API + '/api/interacciones', {
         method: 'POST',
@@ -415,15 +465,22 @@
           tipo:       'visita',
           usuario_id: usuario.id,
           destino_id: destinoUUID,
+          lat:        pos.lat,
+          lng:        pos.lng,
+          accuracy:   pos.accuracy,
+          ts:         pos.ts,
         }),
       });
       var data = await res.json();
-      if (!data.ok) {
-        mostrarToast(data.error || 'No se pudo registrar la visita', '#ef4444');
+      if (!data.ok || data.code) {
+        mostrarToast(mensajeErrorVisita(data), '#ef4444');
         return false;
       }
       if (data.xp > 0) {
-        mostrarToast('✓ Visita registrada · +' + data.xp + ' XP', '#16a34a');
+        var extra = (data.dist_m != null)
+          ? ' a ' + data.dist_m + ' m' + (data.zona ? ', zona ' + data.zona : '')
+          : '';
+        mostrarToast('Visita confirmada' + extra + ' · +' + data.xp + ' XP', '#16a34a');
         var misionesXp = sumaMisionesXp(data.misiones);
           aplicarDesbloqueos(data.misiones);
         var logrosXp = sumaLogrosXp(data.logros);
@@ -434,6 +491,8 @@
         mostrarLogrosToast(data.logros);
       } else if (data.ya_visitado) {
         mostrarToast('Ya habías marcado que estuviste aquí', '#888');
+      } else {
+        mostrarToast('Visita confirmada', '#16a34a');
       }
       return true;
     } catch (err) {

@@ -68,6 +68,61 @@ const { neon } = require('@neondatabase/serverless');
 // v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
 var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
 
+// v11 (ADR-024) Presencia Fisica v4.0: geocerca Haversine server-side
+// para el POST tipo='visita', cierre del farming de XP (reactivar no
+// repaga) y bono rural plano. Helpers puros, sin dependencias.
+var TIERRA_RADIO_M = 6371008.8;
+var RADIO_DEFAULT_M = 100;
+var RADIO_POR_CATEGORIA = { sitio: 100, hostal: 100, comida: 100, evento: 150 };
+var RADIO_POR_SUBCATEGORIA = {
+  naturaleza: 250, aventura: 250, parque: 150,
+  'espacio-publico': 100, 'sitio-historico': 100, museo: 100, cultura: 100,
+  religioso: 100, bar: 100, restaurante: 100, cafe: 100, gastrobar: 100,
+  'comida-rapida': 100, dulces: 100, concierto: 150, festival: 200,
+  teatro: 100, exposicion: 100, deporte: 200, cine: 100, fiesta: 100
+};
+var RURAL_KEYWORDS = ['sendero', 'mirador', 'finca', 'cabana', 'glamping',
+  'rural', 'ecotur', 'natural', 'playa', 'montana', 'refugio', 'cascada',
+  'reserva', 'parque nacional', 'rio'];
+var ACCURACY_MAX_M = 150;
+var COOLDOWN_MIN_SEG = 90;
+var MAX_VELOCIDAD_MPS = 69.4;
+var VISITAS_DIA_MAX = 30;
+var VECINOS_RURAL_MAX = 3;
+var VECINOS_BBOX_DEG = 0.02;
+var VISITA_BONO_RURAL = 20;
+
+function haversineMetros(lat1, lng1, lat2, lng2) {
+  var rad = Math.PI / 180;
+  var dLat = (lat2 - lat1) * rad;
+  var dLng = (lng2 - lng1) * rad;
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return TIERRA_RADIO_M * c;
+}
+
+function resolverRadioM(categoria, tags, nombre) {
+  var t = tags || {};
+  var blob = [t.tipo_actividad, t.tipo_alojamiento, t.tipo_comida, nombre]
+    .filter(function(x) { return x !== undefined && x !== null; })
+    .join(' ').toLowerCase();
+  for (var i = 0; i < RURAL_KEYWORDS.length; i++) {
+    if (blob.indexOf(RURAL_KEYWORDS[i]) !== -1) return 250;
+  }
+  var sub = t.subcategoria ? String(t.subcategoria).toLowerCase() : '';
+  if (sub && Object.prototype.hasOwnProperty.call(RADIO_POR_SUBCATEGORIA, sub))
+    return RADIO_POR_SUBCATEGORIA[sub];
+  if (categoria && Object.prototype.hasOwnProperty.call(RADIO_POR_CATEGORIA, categoria))
+    return RADIO_POR_CATEGORIA[categoria];
+  return RADIO_DEFAULT_M;
+}
+
+function tieneCoordsValidas(lat, lng) {
+  return typeof lat === 'number' && typeof lng === 'number'
+    && isFinite(lat) && isFinite(lng) && lat !== 0 && lng !== 0;
+}
+
 // Bornes de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
 // la UI sincroniza XP_LEVELS en index/mi-perfil/comunidad). Se usan
 // para calcular nivel y era en GETs locales (inventario) sin depender
@@ -119,7 +174,7 @@ var MISIONES = [
   {
     id: 'mis_primera_visita', grupo: 'general', requiere: [],
     nombre: 'Primera visita confirmada', xp: 15,
-    check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 1); },
+    check: function(ctx) { return ctx.visitasActivas.then(function(n){ return n >= 1; }); },
   },
   {
     id: 'mis_explorador_bogota', grupo: 'ciudad', requiere: ['mis_primer_guardado'],
@@ -199,7 +254,7 @@ var MISIONES = [
       return ctx.sql(
         'SELECT COUNT(DISTINCT i.destino_id)::int AS n FROM interacciones i'
         + ' JOIN destinos d ON d.id = i.destino_id'
-        + ' WHERE i.usuario_id=$1 AND i.tipo=\'visita\''
+        + ' WHERE i.usuario_id=$1 AND i.tipo=\'visita\' AND i.activo=true'
         + '   AND d.tags ? \'itinerario\'',
         [ctx.usuarioId]
       ).then(function(r){ return !!(r[0] && r[0].n >= 4); });
@@ -456,13 +511,24 @@ var LOGROS = [
     id: 'logr_visitas_5', grupo: 'coleccion', requiere: [],
     nombre: 'Senderista', desc: 'Confirma 5 visitas a destinos',
     emoji: '\uD83E\uDDBC', tier: 'bronce', xp: 15,
-    check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 5); },
+    check: function(ctx) { return ctx.visitasActivas().then(function(n){ return n >= 5; }); },
   },
   {
     id: 'logr_visitas_20', grupo: 'coleccion', requiere: ['logr_visitas_5'],
     nombre: 'N\u00f3mada', desc: 'Confirma 20 visitas a destinos',
     emoji: '\uD83E\uDDED', tier: 'oro', xp: 50,
-    check: function(ctx) { return Promise.resolve(ctx.totalVisitas >= 20); },
+    check: function(ctx) { return ctx.visitasActivas().then(function(n){ return n >= 20; }); },
+  },
+  {
+    id: 'logr_pionero', grupo: 'coleccion', requiere: [],
+    nombre: 'Pionero', desc: 'Confirma una visita en zona rural o remota',
+    emoji: '\uD83E\uDDED', tier: 'plata', xp: 40,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true AND dims->\'geo\'->>\'zona\'=\'rural\'',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
   },
   // --- Logros de Albums/Fotos (ADR-017) ---
   {
@@ -922,12 +988,18 @@ function evaluarMisiones(sql, usuarioId) {
     if (!rows.length) return [];
     var u = rows[0];
     var progreso = u.progreso_misiones || {};
+    var visitasActivasM = sql(
+      'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true',
+      [usuarioId]
+    ).then(function(r){ return r[0] ? (parseInt(r[0].n, 10) || 0) : 0; })
+     .catch(function(){ return 0; });
     var ctx = {
       sql: sql,
       usuarioId: usuarioId,
       xpTotal: parseInt(u.xp_total) || 0,
       totalGuardados: parseInt(u.total_guardados) || 0,
       totalVisitas: parseInt(u.total_visitas) || 0,
+      visitasActivas: visitasActivasM,
     };
     var completadas = {};
     Object.keys(progreso).forEach(function(k) {
@@ -1018,6 +1090,11 @@ function evaluarLogros(sql, usuarioId) {
           'SELECT COUNT(DISTINCT ' + CIUDAD_NORM + ')::int AS n FROM interacciones i'
           + ' JOIN destinos d ON d.id=i.destino_id'
           + ' WHERE i.usuario_id=$1 AND i.tipo=\'guardado\' AND i.activo=true AND ' + CIUDAD_NORM + ' <> \'\'',
+          [usuarioId]);
+      },
+      visitasActivas: function() {
+        return memo('visitas_activas',
+          'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true',
           [usuarioId]);
       },
       guardadosCiudad: function(ciudad) {
@@ -1231,7 +1308,7 @@ module.exports = async function handler(req, res) {
           'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
           + ' FROM interacciones i'
           + ' JOIN destinos d ON d.id = i.destino_id'
-          + ' WHERE i.usuario_id = $1 AND i.tipo = \'visita\''
+          + ' WHERE i.usuario_id = $1 AND i.tipo = \'visita\' AND i.activo = true'
           + '   AND d.status = \'published\'',
           [usuarioId]
         );
@@ -1491,7 +1568,7 @@ module.exports = async function handler(req, res) {
         var famaExplorador = await sql(
           'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
           + ' COUNT(*) FILTER (WHERE i.tipo=\'guardado\' AND i.activo=true)::int AS n_guardados, '
-          + ' COUNT(*) FILTER (WHERE i.tipo=\'visita\')::int AS n_visitas '
+          + ' COUNT(*) FILTER (WHERE i.tipo=\'visita\' AND i.activo=true)::int AS n_visitas '
           + ' FROM interacciones i WHERE i.usuario_id=$1 '
           + '   AND (i.tipo=\'visita\' OR (i.tipo=\'guardado\' AND i.activo=true))',
           [usuarioId]
@@ -3782,37 +3859,170 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
-      // -- Visita --
+      // -- Visita (Presencia Fisica v4.0, ADR-024) --
+      // Exige presencia fisica server-side: Haversine contra el destino,
+      // precision GPS, anti-farming (cooldown, velocidad y tope diario),
+      // dedup idempotente y bono rural plano (no multiplicable).
       if (tipo2 === 'visita') {
-        // Antes se podia llamar sin usuario_id y sin limite: cada POST
-        // sencillo otorgaba +20 XP de forma infinita. Ahora requiere
-        // usuario_id (igual que 'guardado') y se deduplica por
-        // usuario+destino. Nota: hoy ningun caller real en produccion usa
-        // este tipo (pagina-destino.js registra visitas de pagina via
-        // /api/utilidades?tipo=visitas, un contador distinto y no
-        // gamificado); este fix queda listo para cuando exista un boton
-        // real de "marcar como visitado" conectado a la sesion.
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido para marcar visita' });
 
+        // 3) Dedup primero: detecta CUALQUIER fila, activa o no.
         var yaVisitado = await sql(
-          'SELECT id FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'visita\' LIMIT 1',
+          'SELECT id, activo FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'visita\' LIMIT 1',
           [destinoId2, usuarioId2]
         );
-        if (yaVisitado.length > 0)
+        if (yaVisitado.length > 0 && yaVisitado[0].activo)
           return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
+        if (yaVisitado.length > 0 && !yaVisitado[0].activo) {
+          await sql('UPDATE interacciones SET activo=true WHERE id=$1', [yaVisitado[0].id]);
+          return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [] });
+        }
 
-        await sql(
-          'INSERT INTO interacciones (destino_id, usuario_id, tipo, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', 20, NOW())',
-          [destinoId2, usuarioId2]
+        // 4) Destino real.
+        var destVisita = await sql(
+          'SELECT id, lat, lng, categoria_slug, tags, nombre FROM destinos WHERE id=$1',
+          [destinoId2]
         );
+        if (!destVisita.length)
+          return res.status(404).json({ ok: false, error: 'Destino no encontrado', code: 'DESTINO_NO_ENCONTRADO' });
+        destVisita = destVisita[0];
+
+        // 5) El blog no admite presencia fisica.
+        if (destVisita.categoria_slug === 'blog')
+          return res.status(400).json({ ok: false, error: 'No se puede confirmar presencia fisica en el blog', code: 'VISITA_NO_PERMITIDA' });
+
+        // 6) Coordenadas del usuario.
+        if (body.lat === undefined || body.lat === null || body.lng === undefined || body.lng === null)
+          return res.status(400).json({ ok: false, error: 'lat y lng son requeridos', code: 'COORDENADAS_REQUERIDAS' });
+        var uLatV = parseFloat(body.lat);
+        var uLngV = parseFloat(body.lng);
+        if (!isFinite(uLatV) || !isFinite(uLngV) || uLatV < -90 || uLatV > 90 || uLngV < -180 || uLngV > 180 || (uLatV === 0 && uLngV === 0))
+          return res.status(400).json({ ok: false, error: 'lat o lng invalidos', code: 'COORDENADAS_INVALIDAS' });
+
+        // 7) Precision GPS.
+        var uAccV = null;
+        if (body.accuracy !== undefined && body.accuracy !== null && body.accuracy !== '') {
+          uAccV = parseFloat(body.accuracy);
+          if (!isFinite(uAccV) || uAccV <= 0)
+            return res.status(400).json({ ok: false, error: 'accuracy invalido', code: 'ACCURACY_INVALIDA' });
+          if (uAccV > ACCURACY_MAX_M)
+            return res.status(422).json({ ok: false, error: 'Precision GPS insuficiente', code: 'PRECISION_INSUFICIENTE' });
+        }
+
+        // 8) Geocerca server-side.
+        var dLatV = typeof destVisita.lat === 'number' ? destVisita.lat : parseFloat(destVisita.lat);
+        var dLngV = typeof destVisita.lng === 'number' ? destVisita.lng : parseFloat(destVisita.lng);
+        var destConCoords = tieneCoordsValidas(dLatV, dLngV);
+        var radioVisita = null;
+        var distVisita = null;
+        var modoVisita = destConCoords ? 'geocerca' : 'sin_geocerca';
+        if (destConCoords) {
+          radioVisita = resolverRadioM(destVisita.categoria_slug, destVisita.tags, destVisita.nombre);
+          distVisita = haversineMetros(uLatV, uLngV, dLatV, dLngV);
+          if (distVisita > radioVisita + (uAccV || 0))
+            return res.status(422).json({
+              ok: false,
+              error: 'Estas fuera del radio permitido para confirmar la visita',
+              code: 'FUERA_DE_RANGO',
+              dist_m: Math.round(distVisita),
+              radio_m: radioVisita
+            });
+        }
+
+        // 9) Anti-farming: cooldown, velocidad imposible y tope diario.
+        var prevVisita = await sql(
+          'SELECT creado_en, dims FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' ORDER BY creado_en DESC LIMIT 1',
+          [usuarioId2]
+        );
+        var prevGeo = prevVisita.length && prevVisita[0].dims ? prevVisita[0].dims.geo : null;
+        var prevLatV = prevGeo ? parseFloat(prevGeo.lat) : NaN;
+        var prevLngV = prevGeo ? parseFloat(prevGeo.lng) : NaN;
+        var vMpsVisita = null;
+        if (isFinite(prevLatV) && isFinite(prevLngV)) {
+          var dtVisita = prevVisita[0].creado_en
+            ? (Date.now() - Date.parse(prevVisita[0].creado_en)) / 1000
+            : null;
+          if (dtVisita !== null && !isNaN(dtVisita)) {
+            if (dtVisita < COOLDOWN_MIN_SEG)
+              return res.status(429).json({ ok: false, error: 'Debes esperar antes de confirmar otra visita', code: 'RATE_LIMIT' });
+            if (dtVisita > 0) {
+              vMpsVisita = haversineMetros(uLatV, uLngV, prevLatV, prevLngV) / dtVisita;
+              if (vMpsVisita > MAX_VELOCIDAD_MPS)
+                return res.status(422).json({ ok: false, error: 'Velocidad de desplazamiento imposible', code: 'VELOCIDAD_IMPOSIBLE' });
+            }
+          }
+        }
+        var visitasHoy = await sql(
+          'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND creado_en > NOW() - INTERVAL \'24 hours\'',
+          [usuarioId2]
+        );
+        if ((visitasHoy[0] && visitasHoy[0].n) >= VISITAS_DIA_MAX)
+          return res.status(429).json({ ok: false, error: 'Limite diario de visitas alcanzado', code: 'LIMITE_DIARIO' });
+
+        // 10) Zona rural / urbana (subcategoria, keyword y densidad).
+        var zonaVisita = 'sin_geocerca';
+        var zonaMotivoVisita = 'sin_geocerca';
+        var vecinosVisita = null;
+        if (destConCoords) {
+          var subcatVisita = destVisita.tags && destVisita.tags.subcategoria
+            ? String(destVisita.tags.subcategoria).toLowerCase() : '';
+          var blobVisita = [
+            destVisita.tags ? destVisita.tags.tipo_actividad : null,
+            destVisita.tags ? destVisita.tags.tipo_alojamiento : null,
+            destVisita.tags ? destVisita.tags.tipo_comida : null,
+            destVisita.nombre
+          ].filter(function(x) { return x !== undefined && x !== null; }).join(' ').toLowerCase();
+          var subcatRural = subcatVisita === 'naturaleza' || subcatVisita === 'aventura' || subcatVisita === 'parque';
+          var keywordRural = RURAL_KEYWORDS.some(function(k) { return blobVisita.indexOf(k) !== -1; });
+          var vecinosRows = await sql(
+            'SELECT COUNT(*)::int AS n FROM destinos WHERE status=\'published\''
+            + ' AND lat IS NOT NULL AND lng IS NOT NULL AND lat<>0 AND lng<>0'
+            + ' AND ABS(lat-$1)<$3 AND ABS(lng-$2)<$3',
+            [dLatV, dLngV, VECINOS_BBOX_DEG]
+          );
+          vecinosVisita = vecinosRows[0] ? (parseInt(vecinosRows[0].n, 10) || 0) : 0;
+          if (subcatRural) { zonaVisita = 'rural'; zonaMotivoVisita = 'subcategoria'; }
+          else if (keywordRural) { zonaVisita = 'rural'; zonaMotivoVisita = 'keyword'; }
+          else if (vecinosVisita <= VECINOS_RURAL_MAX) { zonaVisita = 'rural'; zonaMotivoVisita = 'densidad'; }
+          else { zonaVisita = 'urbana'; zonaMotivoVisita = 'urbano'; }
+        }
+        var bonoRuralVisita = zonaVisita === 'rural' ? VISITA_BONO_RURAL : 0;
+
+        // 11) Insert con dims.geo (auditoria de la presencia fisica).
+        var dimsVisitaGeo = {
+          lat: uLatV,
+          lng: uLngV,
+          accuracy: uAccV,
+          dist_m: distVisita === null ? null : Math.round(distVisita),
+          radio_m: radioVisita,
+          zona: zonaVisita,
+          zona_motivo: zonaMotivoVisita,
+          modo: modoVisita,
+          v_mps: vMpsVisita,
+          ts_cliente: body.ts !== undefined && body.ts !== null ? body.ts : null
+        };
+        try {
+          await sql(
+            'INSERT INTO interacciones (destino_id, usuario_id, tipo, dims, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', $3::jsonb, 20, NOW())',
+            [destinoId2, usuarioId2, JSON.stringify({ geo: dimsVisitaGeo })]
+          );
+        } catch (eVisitaIns) {
+          if (eVisitaIns && eVisitaIns.code === '23505')
+            return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
+          throw eVisitaIns;
+        }
         var xpVisitaFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 20);
+        var multiplicadorVisita = xpVisitaFinal !== 20 ? 1.1 : 1;
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpVisitaFinal);
         xpVisitaFinal = amuletoVisita.xp;
+        // El bono rural es plano: se suma al XP total sin multiplicador
+        // ni amuleto y NO aporta fama a la pandilla.
+        var xpTotalVisita = xpVisitaFinal + bonoRuralVisita;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
-          [xpVisitaFinal, usuarioId2]
+          [xpTotalVisita, usuarioId2]
         ).catch(function(){});
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
@@ -3822,21 +4032,39 @@ module.exports = async function handler(req, res) {
         await aplicarFamaPandilla(sql, usuarioId2, xpVisitaFinal);
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoVisita = await progresarPandillaRetos(sql, usuarioId2, 'visita');
-        return res.status(200).json({ ok: true, xp: xpVisitaFinal, misiones: misionesVisita, logros: logrosVisita, cromo: cromoVisita || undefined, amuleto_x2: amuletoVisita.doubled || undefined, reto_completado: retoVisita || null });
+        return res.status(200).json({
+          ok: true,
+          xp: xpTotalVisita,
+          xp_detalle: {
+            base: 20,
+            multiplicador: multiplicadorVisita,
+            amuleto: amuletoVisita.doubled ? 2 : 1,
+            bono_rural: bonoRuralVisita,
+            total: xpTotalVisita
+          },
+          dist_m: distVisita === null ? null : Math.round(distVisita),
+          radio_m: radioVisita,
+          zona: zonaVisita,
+          zona_motivo: zonaMotivoVisita,
+          modo: modoVisita,
+          misiones: misionesVisita,
+          logros: logrosVisita,
+          cromo: cromoVisita || undefined,
+          amuleto_x2: amuletoVisita.doubled || undefined,
+          reto_completado: retoVisita || null
+        });
       }
 
-      // -- Quitar visita --
-      // La fila tipo='visita' no tiene columna 'activo' y es deduplicada
-      // por usuario+destino, asi que "desmarcar que ya fui" borra la fila
-      // por completo (no hay ganancia: el XP de la visita ya se otorgo y
-      // no se descuenta). Permite que el boton 'Desmarcar' de Mi Mapa,
-      // y clearMyMap, refelejen en Neon el estado local del usuario.
+      // -- Quitar visita (Cero Borrado Logico, R-1 / ADR-024) --
+      // Antes era DELETE fisico y permitia farming (quitar/reactivar sin
+      // limite). Ahora desactiva la fila; el XP y total_visitas ya
+      // otorgados NO se descuentan. Reactivar se maneja en 'visita'.
       if (tipo2 === 'quitar_visita') {
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
 
         await sql(
-          'DELETE FROM interacciones WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'visita\'',
+          'UPDATE interacciones SET activo=false WHERE destino_id=$1 AND usuario_id=$2 AND tipo=\'visita\' AND activo=true',
           [destinoId2, usuarioId2]
         );
         return res.status(200).json({ ok: true });
