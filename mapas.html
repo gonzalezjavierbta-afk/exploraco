@@ -72,6 +72,33 @@ main{flex:1}
 /* ── FOOTER ── */
 .footer{border-top:1px solid rgba(255,255,255,.06);padding:26px 4%;text-align:center;font-size:11px;color:rgba(255,255,255,.35);line-height:1.8}
 .footer a{color:var(--gold);text-decoration:none}
+/* -- DRAWER DETALLE MAPA (paridad de UX con el pin de index.html, estetica mapas.html) -- */
+.dd-wrap{position:fixed;inset:0;z-index:900;visibility:hidden;pointer-events:none}
+.dd-wrap.abierto{visibility:visible;pointer-events:auto}
+.dd-back{position:absolute;inset:0;background:rgba(5,8,12,.66);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .22s}
+.dd-wrap.abierto .dd-back{opacity:1}
+.dd-panel{position:absolute;top:0;right:0;height:100%;width:390px;max-width:100vw;background:#15181c;border-left:1px solid rgba(232,160,32,.35);box-shadow:-16px 0 44px rgba(0,0,0,.5);transform:translateX(105%);transition:transform .3s cubic-bezier(.22,.8,.24,1);display:flex;flex-direction:column;overflow:hidden;color:#fff}
+.dd-wrap.abierto .dd-panel{transform:translateX(0)}
+.dd-close{position:absolute;top:12px;right:12px;z-index:6;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.85);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.dd-close:hover{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.dd-close:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.dd-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.dd-scroll::-webkit-scrollbar{width:5px}
+.dd-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+.dd-hero{position:relative;height:200px;background:#101418;overflow:hidden}
+.dd-img{width:100%;height:100%;object-fit:cover;display:block}
+.dd-fb{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:56px}
+.dd-body{padding:16px 18px 22px}
+.dd-badge{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;padding:3px 10px;border-radius:3px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--gold);margin-bottom:9px}
+.dd-titulo{font-family:'Barlow Condensed',sans-serif;font-size:25px;font-weight:900;line-height:1.05;margin-bottom:5px}
+.dd-ciudad{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:15px;line-height:1.5}
+.dd-cta{display:block;background:var(--gold);color:var(--black);text-align:center;padding:11px 14px;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:all .15s}
+.dd-cta:hover{background:var(--gold-d);color:#fff}
+@media(max-width:640px){
+  .dd-panel{width:100%;box-shadow:none;transform:translateY(105%);border-left:none;border-top:1px solid rgba(232,160,32,.35)}
+  .dd-wrap.abierto .dd-panel{transform:translateY(0)}
+  .dd-hero{height:180px}
+}
 </style>
 </head>
 <body>
@@ -128,6 +155,15 @@ main{flex:1}
   <a href="index.html">ExploraCO</a> · El directorio turístico de Colombia<br>
   <a href="comunidad.html">Comunidad</a> · <a href="directorio-sitio.html">Sitios</a> · <a href="directorio-hostal.html">Hospedajes</a> · <a href="directorio-comida.html">Gastronomía</a>
 </footer>
+
+<!-- Drawer lateral de detalle: paridad de UX con el pin del mapa de index.html -->
+<div class="dd-wrap" id="dd-wrap" aria-hidden="true">
+  <div class="dd-back" id="dd-back" onclick="cerrarDrawerDetalle()" aria-hidden="true"></div>
+  <aside class="dd-panel" role="dialog" aria-label="Detalle del lugar">
+    <button class="dd-close" id="dd-close" onclick="cerrarDrawerDetalle()" aria-label="Cerrar">&#x2715;</button>
+    <div class="dd-scroll" id="dd-content"></div>
+  </aside>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -262,7 +298,7 @@ function initDetMap(dest){
     var lat=Number(x.lat), lng=Number(x.lng);
     if(!isFinite(lat)||!isFinite(lng)) return;
     var mk=L.marker([lat,lng],{icon:_markerIcon(x.categoria_slug)});
-    mk.bindPopup('<b>'+_esc(x.nombre)+'</b><br>'+_esc(x.ciudad||''));
+    mk.on('click',function(){ abrirDrawerDetalle(x); });
     mk.addTo(m);
     marks.push(mk);
   });
@@ -274,6 +310,57 @@ function initDetMap(dest){
     m.setView([4.5709,-74.2973],5);
   }
 }
+
+function _fotoSrc(u){
+  if(!u) return '';
+  u=String(u).trim();
+  if(!u) return '';
+  if(u.indexOf('http://')===0||u.indexOf('https://')===0) return u;
+  if(u.indexOf('//')===0) return '';
+  if(u.indexOf('/')===0) return u;
+  if(u.indexOf('./')===0||u.indexOf('../')===0) return u;
+  if(u.indexOf(':')<0) return u; /* ruta relativa simple sin esquema */
+  return ''; /* esquema raro (javascript:, data:, ...) -> fallback */
+}
+
+function abrirDrawerDetalle(x){
+  var wrap=document.getElementById('dd-wrap');
+  if(!wrap||!x) return;
+  var cont=document.getElementById('dd-content');
+  var src=_fotoSrc(x.foto_hero);
+  var cat=x.categoria_slug;
+  var ico=CAT_ICOS[cat]||'\uD83D\uDCCD';
+  var html='<div class="dd-hero">';
+  if(src){
+    html+='<img class="dd-img" src="'+_esc(src)+'" alt="'+_esc(x.nombre)+'" loading="lazy"'
+      +' onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.dd-fb\').style.display=\'flex\';">'
+      +'<div class="dd-fb" style="display:none">'+ico+'</div>';
+  } else {
+    html+='<div class="dd-fb">'+ico+'</div>';
+  }
+  html+='</div><div class="dd-body">'
+    +'<div class="dd-badge">'+_esc(CAT_LBL[cat]||'Lugar')+'</div>'
+    +'<div class="dd-titulo">'+_esc(x.nombre)+'</div>'
+    +'<div class="dd-ciudad">'+_esc(x.ciudad||'')+'</div>'
+    +'<a class="dd-cta" href="'+_esc(x.slug)+'.html">Ver lugar completo \u2192</a>'
+    +'</div>';
+  cont.innerHTML=html;
+  wrap.classList.add('abierto');
+  wrap.setAttribute('aria-hidden','false');
+  var c=document.getElementById('dd-close');
+  if(c) c.focus();
+}
+
+function cerrarDrawerDetalle(){
+  var wrap=document.getElementById('dd-wrap');
+  if(!wrap) return;
+  wrap.classList.remove('abierto');
+  wrap.setAttribute('aria-hidden','true');
+}
+
+document.addEventListener('keydown',function(e){
+  if(e&&e.key==='Escape') cerrarDrawerDetalle();
+});
 
 (function init(){
   var id=new URLSearchParams(location.search).get('id');

@@ -2068,24 +2068,12 @@ function updateMMMarkers() {
       html: iconHtml,
       className: '',
       iconSize: [36, 36],
-      iconAnchor: [18, 18],
-      popupAnchor: [0, -20]
+      iconAnchor: [18, 18]
     });
 
     var marker = L.marker([p.lat, p.lng], {icon: icon});
 
-    marker.bindPopup(
-      '<div style="font-family:Outfit,sans-serif;min-width:140px">'
-      + '<div style="font-size:13px;font-weight:700;color:#111;margin-bottom:2px">' + p.name + '</div>'
-      + '<div style="font-size:11px;color:#777;margin-bottom:8px">📍 ' + p.city + '</div>'
-      + '<div style="display:flex;gap:6px">'
-      + '<a href="' + p.slug + '.html" style="flex:1;padding:6px;background:#111;color:#fff;border-radius:4px;font-size:10px;font-weight:700;text-align:center;text-decoration:none;text-transform:uppercase;letter-spacing:.5px">Ver →</a>'
-      + (isVisited
-          ? '<span style="padding:6px 8px;background:#dcfce7;color:#166534;border-radius:4px;font-size:10px;font-weight:700">✓ Visitado</span>'
-          : '<span style="padding:6px 8px;background:#fef9ec;color:#92400e;border-radius:4px;font-size:10px;font-weight:700">💾 Guardado</span>')
-      + '</div></div>',
-      { maxWidth: 200 }
-    );
+    marker.on('click', function(){ openMapaDrawer(p); });
 
     marker.addTo(mmMap);
     mmMarkers[p.id] = marker;
@@ -2600,7 +2588,15 @@ function initMapaSection() {
   document.querySelectorAll('.mf-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
       if(!btn.dataset.cat) return; // botones de control (Cerca de mí / Colombia)
+      var yaActivo = btn.classList.contains('on');
       document.querySelectorAll('.mf-btn[data-cat]').forEach(function(b){ b.classList.remove('on'); });
+      if(yaActivo) {
+        // R1: deseleccion -> ninguna categoria activa, capa directorio off.
+        mapaActiveCat = 'off';
+        renderMapaList('off');
+        filterMapaPins('off');
+        return;
+      }
       btn.classList.add('on');
       mapaActiveCat = btn.dataset.cat;
       renderMapaList(mapaActiveCat);
@@ -2645,14 +2641,9 @@ function refreshMapaMarkers() {
     var lng = parseFloat(p.lng || 0);
     if(!lat || !lng) return;
 
-    var isSaved = mmSaved.indexOf(p.slug) !== -1;
     var color   = p.color || '#E8A020';
     var emoji   = p.emoji || '📍';
-    var rating  = parseFloat(p.rating || 0);
     var name    = p.name  || '';
-    var slug    = p.slug  || '';
-    var city    = p.city  || '';
-    var region  = p.region|| '';
 
     var ico = L.divIcon({
       html: '<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;'
@@ -2661,22 +2652,11 @@ function refreshMapaMarkers() {
           + 'box-shadow:0 3px 10px rgba(0,0,0,.35);border:2.5px solid #fff">'
           + '<span style="transform:rotate(45deg);font-size:12px;display:block">' + emoji + '</span>'
           + '</div>',
-      iconSize:[30,30], iconAnchor:[15,30], popupAnchor:[0,-32], className:''
+      iconSize:[30,30], iconAnchor:[15,30], className:''
     });
 
-    var popup = '<div style="min-width:160px;font-family:Outfit,sans-serif">'
-      + '<div class="lp-name">' + emoji + ' ' + name + '</div>'
-      + '<div class="lp-loc">📍 ' + city + (region ? ', ' + region : '') + '</div>'
-      + '<div class="lp-stars">' + starHtml(rating) + ' ' + rating.toFixed(1) + '</div>'
-      + '<a class="lp-btn" href="' + slug + '.html">Ver lugar →</a>'
-      + '<button class="lp-save-btn' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
-      + ' onclick="toggleMapaSave(' + p.id + ',this)">'
-      + (isSaved ? '♥ Guardado' : '♡ Guardar')
-      + '</button></div>';
-
     try {
-      var marker = L.marker([lat, lng], {icon:ico})
-        .bindPopup(popup, {maxWidth:210});
+      var marker = L.marker([lat, lng], {icon:ico});
       marker.on('click', function(){ setMapaActive(p.id); });
       mapaMarkers[p.id] = marker;
       added++;
@@ -2699,15 +2679,6 @@ function onMapaMoved() {
   clearTimeout(mapaReclusterTimer);
   mapaReclusterTimer = setTimeout(function(){
     reclusterMapa();
-    // Solo se reabre el popup cuando hubo una seleccion intencional
-    // (mapaPendingPopupId: click en pin, ítem de lista o cluster).
-    // Fix: arrastrar/zoomear el mapa YA NO reabre el popup del ultimo
-    // lugar abierto (antes se reabria via mapaMap._popup en cada moveend).
-    if(mapaPendingPopupId) {
-      var m = mapaMarkers[mapaPendingPopupId];
-      if(m) m.openPopup();
-      mapaPendingPopupId = null;
-    }
   }, 150);
 }
 
@@ -2824,7 +2795,6 @@ function reclusterMapa() {
     });
     var cm = L.marker([cl.lat, cl.lng], {icon:mapaClusterIcon(cl.ids.length, topEmoji)});
     cm.on('click', function(){
-      mapaPendingPopupId = null;
       // Fix: si el cluster no puede aislarse (miembros en las mismas coords
       // o zoom ya al maximo) se abre un popup con la lista completa de
       // lugares, en vez de un zoom infinito que nunca los separa.
@@ -2907,7 +2877,6 @@ function geolocateMapa(btnEl) {
       mapaUserPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       recomputeDists();
       renderMapaList(mapaActiveCat);
-      mapaPendingPopupId = null;
       showMapaNote(null);
       mapaMap.flyTo([mapaUserPos.lat, mapaUserPos.lng], 16, {animate:true});
       finish();
@@ -2925,13 +2894,16 @@ function geolocateMapa(btnEl) {
 
 function resetMapaColombia() {
   if(!mapaMap) return;
-  mapaPendingPopupId = null;
   mapaMap.flyTo([5.5, -74.5], 6, {animate:true});
 }
 
 function renderMapaList(cat) {
   var el = document.getElementById('mapa-list-inner');
   if(!el) return;
+  if(cat === 'off') {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:16px">Sin categoria seleccionada - activa una para ver destinos</div>';
+    return;
+  }
   var arr = (cat==='all') ? MAPA_PLACES.slice() : MAPA_PLACES.filter(function(p){ return p.cat===cat; });
   if(mapaUserPos) {
     arr.sort(function(a,b){
@@ -2959,30 +2931,20 @@ function setMapaActive(id) {
   var targetZ = Math.max(curZ, firstIsolatedZoom(id, curZ));
   if(targetZ === curZ) {
     // Sin cambio de zoom: solo pan centrado. El pin ya es individual.
-    // El popup se abre directo y se reabre tras el moveend via
-    // mapaPendingPopupId (reclusterMapa hace clearLayers y lo cerraria).
-    // Si el pan no se desplaza (ya estaba centrado) no hay moveend: un
-    // timer limpia el pending para que un drag futuro no lo reabra.
     mapaMap.panTo([p.lat, p.lng], {animate:true});
-    var m = mapaMarkers[id];
-    if(m && mapaClusterLayer.hasLayer(m)) m.openPopup();
-    mapaPendingPopupId = id;
-    clearTimeout(mapaPendingClearTimer);
-    mapaPendingClearTimer = setTimeout(function(){
-      if(mapaPendingPopupId === id) mapaPendingPopupId = null;
-    }, 450);
   } else {
     // Estaba dentro de un cluster: subir solo lo necesario para aislarlo.
-    mapaPendingPopupId = id;
     mapaMap.flyTo([p.lat, p.lng], targetZ, {animate:true});
   }
+  openMapaDrawer(p);
   renderMapaList(mapaActiveCat);
 }
 
 function filterMapaPins(cat) {
   mapaActiveCat = cat;
   if(!mapaMap) return;
-  if(cat === 'all') mapaPlaces = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES.slice() : [];
+  if(cat === 'off') mapaPlaces = [];
+  else if(cat === 'all') mapaPlaces = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES.slice() : [];
   else mapaPlaces = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES.filter(function(p){ return p.cat === cat; }) : [];
   reclusterMapa();
   renderMapaList(cat);
@@ -3047,6 +3009,7 @@ function renderMapaMedia() {
     var lat = parseFloat(item.lat);
     var lng = parseFloat(item.lng);
     if(!lat || !lng) return;
+    if(item.origen === 'destino') return; // R2: solo albumes de usuarios
     if(MAPA_MEDIA_TIPO !== 'all' && item.media_type !== MAPA_MEDIA_TIPO) return;
     if(!bounds.contains([lat, lng])) return;
     try {
@@ -3134,6 +3097,7 @@ function mdMediasCercanas(place) {
   var out = [];
   var pl = place || {};
   MAPA_MEDIA.forEach(function(it){
+    if(it.origen === 'destino') return; // R2: solo albumes de usuarios
     if(!it.lat || !it.lng) return;
     var ok = mismaCiudad(pl.city, it.ciudad);
     if(!ok) ok = dentroRadio(parseFloat(pl.lat), parseFloat(pl.lng), parseFloat(it.lat), parseFloat(it.lng), 10);

@@ -449,3 +449,32 @@ Registro de decisiones arquitectonicas (ADR). Este documento NUNCA contiene tare
 **Impacto:** `api/pagina-destino.js` L1747 (gate de `secReservar`). Sin cambios en admin.html, schema ni endpoints (presupuesto 8/8 intacto). Cierra el riesgo R-2 de NEXT.md (secReservar en sitios). El subnav de la ficha refleja la ausencia (`has:!!secReservar`, L2027). Pendiente: commit manual del usuario con el resto de la sesion TSK-095.
 
 **ADR previos relacionados:** ADR-004 (scoped CSS), ADR-013 (web oficial prominente en hero), ADR-019 (verificado como control interno admin)
+
+---
+
+## ADR-021: Capa audiovisual estricta (solo contenido de usuarios) y paridad de drawer en los mapas
+
+**ID:** ADR-021
+**Fecha:** 2026-09-12
+**Estado:** Aprobado e implementado en working tree (pendiente commit/deploy; sin migracion de schema ni endpoint nuevo)
+**Autor:** AI-DOS Core (prompt cambios.txt: "Capa audiovisual y filtros en mapa cultural")
+
+**Problema:** El mapa cultural de index.html mezclaba en `MAPA_MEDIA[]` dos origenes de contenido: material dinamico de usuarios (albumes, `origen='album'`) y la galeria estatica seed de destinos publicados (`destinos_fotos`, `origen='destino'`), ambas unidas por el handler `tipo=multimedia_mapa`. Ademas, los pines del directorio abrian el popup compacto de Leaflet en vez del drawer lateral que ya usaba la capa audiovisual, y el filtro "Todo" no podia deseleccionarse (siempre activo), por lo que no habia forma de ocultar los pines del directorio y ver exclusivamente la capa audiovisual.
+
+**Opciones evaluadas:**
+1. **Cambiar el contrato del endpoint (backend only):** rechazada -- `comunidad.html` (L1221) consume `tipo=multimedia_mapa` sin parametros y espera ambas ramas; alterar el default habria roto esa vista.
+2. **Filtrar solo en frontend:** suficiente para index.html, pero deja viajar hasta 200 filas estaticas que el mapa descarta.
+3. **Query param opcional `origen` en backend + filtro defensivo en frontend (elegida):** el endpoint acepta `origen=album` (anula la rama estatica con `AND FALSE`, sin parametros SQL nuevos ni migracion); el connector de index lo solicita; y el frontend descarta igualmente `origen==='destino'` como defensa. Retrocompatible.
+4. **Toggle on/off separado para la capa directorio:** descartada por decision de producto -- "deseleccionar Todo" ya oculta todos los pines del directorio sin sumar un control extra.
+5. **Mantener el popup de los pines:** rechazada -- paridad estricta: el clic abre el drawer lateral.
+
+**Decision tomada:**
+- **Capa audiovisual estricta:** `GET /api/interacciones?tipo=multimedia_mapa&origen=album` anula la rama estatica reutilizando el patron `AND FALSE` existente; sin el parametro la respuesta es identica a la anterior (retrocompatible con comunidad.html). `index-api-connector.js` pide `&origen=album`; `renderMapaMedia()` y `mdMediasCercanas()` de index.html excluyen `origen === 'destino'` como red de seguridad.
+- **Filtro de categoria deseleccionable:** el boton de categoria activo (incluido "Todo") se puede deseleccionar; `mapaActiveCat = 'off'` deja `mapaPlaces = []` (recluster vacia la capa y oculta todos los pines del directorio) y la lista lateral muestra un estado vacio. Sin toggle on/off adicional.
+- **Paridad de drawer:** se elimina el `bindPopup` de los pines individuales del directorio y de "Mi Mapa personal" (index.html); el clic llama `setMapaActive()` -> `openMapaDrawer(place)` (hero, rating, precio/lead y CTA a `/{slug}.html`, estructura ya existente). Los clusters conservan su zoom y su popup de lista (no son pines individuales). `mapas.html` recibe un drawer propio (`.dd-wrap`, estilos acordes a esa pagina) que abre al clic en los markers del mapa de detalle.
+
+**Justificacion:** El parametro `origen` es la solucion de menor riesgo y costo: no toca el schema, no consume endpoints nuevos (presupuesto 8/8 intacto) y respeta al consumidor legacy (comunidad.html) porque es opcional. El filtro frontend duplicado convierte la regla "solo contenido de usuarios" en invariante del render, no en una dependencia de que el llamador use el parametro. La deseleccion de "Todo" resuelve el caso de uso (ver solo la capa audiovisual) sin agregar UI; eliminar el popup y reutilizar `openMapaDrawer` no duplica codigo (reutiliza el drawer existente) y unifica la UX entre capa de directorio y capa audiovisual.
+
+**Impacto:** `api/interacciones.js` (2 lineas, handler `multimedia_mapa`); `index-api-connector.js` (URL del fetch); `index.html` (listener de filtros, `filterMapaPins`, `renderMapaList`, `setMapaActive`, `renderMapaMedia`, `mdMediasCercanas`, `refreshMapaMarkers`, `onMapaMoved`, `updateMMMarkers`); `mapas.html` (nuevo drawer + `abrirDrawerDetalle`). Sin migracion SQL ni endpoints nuevos. `mapaPendingPopupId`/`mapaPendingClearTimer` quedan declaradas sin uso (limpieza pendiente, no bloqueante). Fuera de alcance: la capa multimedia de `comunidad.html` sigue mostrando ambas ramas (no se le agrego el parametro); candidata a unificar en una tarea futura.
+
+**ADR previos relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline de verdad), ADR-017 (mapa audiovisual), ADR-020 (gate de reserva con criterio real)

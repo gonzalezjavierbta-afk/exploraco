@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-096 / Capa audiovisual estricta + paridad de drawer en el mapa cultural (2026-09-12, working tree SIN commitear) - deseleccion de "Todo" oculta los pines del directorio; `MAPA_MEDIA` solo albumes de usuarios (backend `?origen=album` + filtro frontend); pines del directorio/Mi Mapa abren el drawer (sin popup) y `mapas.html` estrena drawer propio; ADR-021
 - BUG-031 / hotfix JS inline del popover (2026-09-11, working tree SIN commitear) - SyntaxError en el JS inline de buildHTML() (onchange de mapas tematicos L2288-2290 con comilla escapada mal formada) dejaba TODAS las paginas dinamicas sin funciones de cliente; fix con entidad HTML `&#39;` (1 linea) + guard permanente `scripts/check_buildHTML_inline.js` (vm.Script, 8 funciones + JSON-LD + divs); TSK-095 ya desplegada CON el bug -> produccion rota hasta commit+push+redeploy (ver "Que sigue", item 1)
 - TSK-095 / Refactor UI/UX ficha de destino (2026-09-11) - verificado como columna admin (sin insignia publica), hero HQI con chip de direccion, popover de Guardar con mapas tematicos, galeria con lightbox; Escudo GOLD limpio (divs 716/716, smoke 28/28, flujo verificado 6/6)
 - TSK-095 extension (2026-09-11) - verificacion exp-pickle 14/14 PASS: `address` PERSISTIDA en admin (INSERT/UPDATE + migracion 011 PENDIENTE de aplicar en Neon), gate secReservar = solo `bookingUrl||hwUrl` implementado (ADR-020), badge publico confirmado NO (ADR-019)
@@ -11,6 +12,53 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion mapa cultural: capa audiovisual estricta + paridad de drawer (2026-09-12) - TSK-096
+
+Implementacion del `prompt cambios.txt` sobre el mapa cultural (working tree,
+SIN commitear). 4 archivos, Escudo GOLD limpio.
+
+**Decisiones de producto (confirmadas por el usuario):**
+1. Capa audiovisual estricta: backend con param opcional `origen` + filtro
+   defensivo en frontend (mejor opcion; sin migracion ni endpoint nuevo).
+2. Sin toggle on/off de la capa directorio: la deseleccion de "Todo" oculta
+   todos los pines del directorio.
+3. Se elimina el popup de los pines individuales y todo clic abre el drawer.
+4. Alcance "a los 2": paridad tambien en "Mi Mapa personal" y `mapas.html`.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/interacciones.js`: `var mmOrigen = req.query.origen || null;` (L1712)
+  y la rama estatica `destinos_fotos` se anula con
+  `((mmTipo && mmTipo !== 'foto') || mmOrigen === 'album' ? ' AND FALSE' : '')`
+  (L1739). Sin `origen`, respuesta identica a la anterior (comunidad.html L1221
+  sigue recibiendo ambas ramas).
+- `index-api-connector.js`: fetch `?tipo=multimedia_mapa&origen=album` (L258).
+- `index.html`:
+  - Listener `.mf-btn[data-cat]` (L2588): si el boton ya esta `on`, deselecciona
+    (`mapaActiveCat='off'`); `filterMapaPins('off')` deja `mapaPlaces=[]` y
+    `reclusterMapa()` oculta los pines; `renderMapaList('off')` muestra estado
+    vacio. "Todo" activa la capa media solo al re-seleccionarse.
+  - `renderMapaMedia` (L3009) y `mdMediasCercanas` (L3097) descartan
+    `origen === 'destino'` (solo albumes de usuarios).
+  - `refreshMapaMarkers` (L2658) y `updateMMMarkers` (L2075): sin `bindPopup`;
+    clic -> `setMapaActive()` -> `openMapaDrawer(place)`. `setMapaActive`
+    (L2926) y `onMapaMoved` (L2678) sin manejo de popup individual. Clusters
+    intactos.
+- `mapas.html`: drawer lateral propio (`.dd-wrap`/`.dd-panel`, CSS L75-99) +
+  `abrirDrawerDetalle` (L314) con `_fotoSrc` (valida esquema), `CAT_LBL`,
+  titulo, ciudad y CTA `/{slug}.html`; cierre por backdrop/boton/Escape; datos con
+  `_esc`. Divs 0 de balance (HEAD 0).
+
+**Verificacion (Escudo GOLD):** `node --check` de api/interacciones.js e
+index-api-connector.js PASS; inline JS de index.html y mapas.html extraido con
+`node _verify.js` + `node --check` PASS; ASCII nuevas lineas 0; divs index -1
+(preexistente en HEAD) y mapas 0. Auditoria contra BUGS_HISTORICOS: BUG-001,
+BUG-030, BUG-020, BUG-031 sin reaparicion.
+
+**Pendiente / backlog:** (1) commit + push + deploy manual de los 4 archivos;
+(2) la capa multimedia de `comunidad.html` sigue con la rama estatica (no se le
+agrego `origen=album`) -- candidata a unificar; (3) `mapaPendingPopupId` y
+`mapaPendingClearTimer` quedan declaradas sin uso en index.html (higiene menor).
 
 ### Sesion refactor UI/UX ficha de destino (2026-09-11) - TSK-095
 

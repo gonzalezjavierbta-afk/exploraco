@@ -1,57 +1,23 @@
-# PROMPT DE EJECUCIÓN PARA OPENCODE: REFACTORIZACIÓN UI/UX FICHA DE DESTINO
+# PROMPT MAESTRO DE IMPLEMENTACIÓN: CAPA AUDIOVISUAL Y FILTROS EN MAPA CULTURAL (ExploraCO)
 
-## 1. Contexto y Restricciones Obligatorias
-- Archivos a modificar: `api/pagina-destino.js` y `admin.html`.
-- Lenguaje: Vanilla JS (Concatenación de strings pura). 
-- Restricciones Backend/Frontend: 0 frameworks, 0 backticks (`), 0 caracteres no-ASCII (>127). Utilizar exclusivamente escapes Unicode (\uXXXX) para caracteres especiales o emojis.
-- Regla de Oro: Mantener el balance exacto de DIVs en `admin.html` y asegurar que `node --check api/pagina-destino.js` pase limpio.
+## CONTEXTO Y ESPECIFICACIÓN TÉCNICA
 
-## 2. Requerimientos de UI/UX (Ficha Dinámica - `api/pagina-destino.js`)
-
-### A. Sistema de Verificado y Gestión Admin
-1. Agregar campo `verificado` (booleano) dentro del objeto JSONB `tags` o en la estructura del destino.
-2. Este estado de "Verificado" SOLO debe ser accesible, visible y editable desde la vista del Administrador General (`admin.html`) como un toggle/checkbox de revisión manual.
-3. En la vista pública de la ficha, NO debe renderizarse ninguna insignia de verificado si la cuenta es de usuario general.
-
-### B. Modificaciones en el Hero y Sección "Sobre este lugar"
-1. Hero: Mantener únicamente el `lead` original.
-2. Hero (Datos de Resumen / HQI): 
-   - QUITAR: Reseñas, Precio "desde" y Duración.
-   - QUITAR: Enlace/Boton a Página Web (se centraliza en los botones inferiores).
-   - AGREGAR: Dirección exacta física en este espacio de datos de resumen.
-3. Sección "Sobre este lugar": 
-   - QUITAR el `lead` del inicio de esta sección.
-   - REEMPLAZAR por un Subtítulo estilizado que dé apertura al texto o escrito de presentación.
-
-### C. Botonera Principal de Acciones (Hero / CTA)
-1. Resaltar visualmente (clase prominente/estilo destacado) únicamente:
-   - Botón **Sitio Web** (abrir en ventana nueva).
-   - Botón **Contactar**.
-2. Dejar en estilo secundario:
-   - Botón **Cómo llegar**.
-   - Botón **Guardar**: Al hacer clic en "Guardar", debe desplegar/activar una opción para seleccionar o guardar en un mapa/lista en particular del usuario.
-
-### D. Franja Naranja de Resumen (`gstrip`)
-1. MANTENER: Información de reseñas (promedio y conteo) y Precio "desde".
-2. QUITAR: Botón de "Reservar".
-3. AGREGAR: Botón "Ver galería" (acción con scroll directo a la sección `#galeria`).
-
-### E. Galería de Fotos y Videos (`secGaleria`)
-1. Layout Grid: Renderizar 1 foto/video grande destacada (la principal/más votada o index 0).
-2. Renderizar el resto de fotografías en miniatura al costado/abajo.
-3. Agregar botón/opción funcional de "Ver galería ampliada" (Lightbox/Modal de pantalla completa).
-
-### F. Ubicación y Cómo Llegar (`secMapa`)
-1. QUITAR: Botones directos de WhatsApp y Teléfono de este bloque específico.
-2. CONSERVAR únicamente el botón hacia **Google Maps**.
-
-### G. Limpieza de Módulos Generales
-1. Módulo inferior: QUITAR la sección/módulo de "Foto destacada" de la parte inferior.
-2. Módulo de Contacto (`secContact`): QUITAR la integración/botón de **Google Maps** en este bloque (queda centralizado en la sección de Ubicación).
+Debes implementar una actualización en la interfaz y lógica del mapa cultural de ExploraCO (`index.html` y sus scripts conectores) para cumplir con el desacoplamiento de capas entre los pines del directorio tradicional y la nueva capa multimedia (fotos, videos, audios), manteniendo la paridad estética, el aislamiento atómico de estilos y las normas del sistema (JS Vanilla estricto, 0 frameworks, ASCII-safe).
 
 ---
 
-## 3. Entregables Esperados
-1. Modificación limpia de `api/pagina-destino.js` con soporte condicional.
-2. Controles de formulario en `admin.html` para la casilla "Verificación Manual Admin".
-3. Pasar validación `node --check` y script ASCII-safe.
+## REQUERIMIENTOS FUNCIONALES
+
+1. **Control del Toggle de Capa Directorio (Pines Tradicionales):**
+   - El mapa debe permitir desactivar la capa de pines del directorio de destinos mediante un control UI (switch/toggle en la barra de filtros del mapa).
+   - Al desmarcar esta opción, se ocultan/remueven del mapa todos los marcadores estándar de destinos, permitiendo visualizar **exclusivamente** la capa audiovisual. (TAMBIEN PUEDE QUE AL NO TENER NINGUNA OPCION SELECCIONADAS DEL DIRECTORIO, QUE SE PUEDA DESELECCIONAR "TODOS",  NO MUESTRE ESOS ITEMS)
+
+2. **Capa Audiovisual Estricta (Solo Contenido Dinámico):**
+   - La capa audiovisual (`MAPA_MEDIA[]`) solo debe consumir y renderizar material dinámico que haya sido subido o compartido por los usuarios (fotos, videos, audios de la comunidad o álbumes), excluyendo recursos estáticos de fallback del servidor.
+
+3. **Paridad de Comportamiento en Popups/Drawers (Directorio vs Audiovisual):**
+   - Al hacer clic en cualquier pin del directorio tradicional, se debe abrir exactamente la misma estructura de vista previa/drawer lateral que utiliza la capa audiovisual:
+     - Mostrar un pequeño resumen dinámico (foto hero, calificación, precio o lead/categoría).
+     - Incluir un botón CTA principal directo hacia la página dinámica del destino (`/{slug}.html`).
+
+---

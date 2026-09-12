@@ -255,7 +255,7 @@
 
     // 3b. MAPA_MEDIA[] - multimedia del mapa cultural del endpoint
     //     publico GET /api/interacciones?tipo=multimedia_mapa
-    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa&_t=' + Date.now();
+    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa&origen=album&_t=' + Date.now();
     fetch(mediaUrl)
       .then(function (r) { return r.json(); })
       .then(function (d) {

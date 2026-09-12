@@ -1709,6 +1709,7 @@ module.exports = async function handler(req, res) {
       if (tipo === 'multimedia_mapa') {
         var mmTipo = req.query.tipo_media || null;
         var mmCiudad = req.query.ciudad || null;
+        var mmOrigen = req.query.origen || null;
         var mmParams = [];
         var np = 0;
         if (mmTipo) { np++; mmParams.push(mmTipo); }
@@ -1735,7 +1736,7 @@ module.exports = async function handler(req, res) {
           + ' FROM destinos_fotos df'
           + ' JOIN destinos d ON d.id = df.destino_id'
           + ' WHERE d.lat IS NOT NULL AND d.lng IS NOT NULL AND d.status = \'published\''
-          + (mmTipo && mmTipo !== 'foto' ? ' AND FALSE' : '')
+          + ((mmTipo && mmTipo !== 'foto') || mmOrigen === 'album' ? ' AND FALSE' : '')
           + (mmCiudad ? ' AND d.ciudad = $' + (mmTipo ? '2' : '1') : '')
           + ') ORDER BY votos DESC LIMIT 200',
           mmParams

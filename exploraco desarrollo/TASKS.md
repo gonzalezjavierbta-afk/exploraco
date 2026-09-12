@@ -2261,5 +2261,40 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-096: Capa audiovisual estricta y paridad de drawer en el mapa cultural (prompt cambios.txt) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-12)
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-12
+- **Prompt origen:** `prompt cambios.txt` (requerimientos de capa audiovisual, filtros del mapa y paridad de popups/drawers)
+- **Archivos modificados (4, Escudo GOLD limpio):**
+  - api/interacciones.js (query param `origen` en el handler `multimedia_mapa`)
+  - index-api-connector.js (fetch con `&origen=album`)
+  - index.html (filtros deseleccionables, capa estricta y paridad de drawer)
+  - mapas.html (drawer lateral propio en el mapa de detalle)
+
+- **Decisiones de producto (respuestas del usuario):**
+  1. Capa audiovisual estricta: mejor opcion = filtro en backend (param opcional) + filtro defensivo frontend.
+  2. Sin toggle on/off: la deseleccion de "Todo" oculta todos los pines del directorio.
+  3. Se elimina el popup de los pines individuales y se deja el drawer.
+  4. Alcance "a los 2": ademas del mapa cultural, aplicar la paridad a "Mi Mapa personal" y a `mapas.html`.
+
+- **Subtareas completadas:**
+  1. **Backend (api/interacciones.js):** nuevo `var mmOrigen = req.query.origen || null;` (L1712); la rama estatica se anula con `((mmTipo && mmTipo !== 'foto') || mmOrigen === 'album' ? ' AND FALSE' : '')` (L1739). Sin `origen` la respuesta es identica a la anterior (retrocompatible con comunidad.html L1221). Sin parametros SQL nuevos ni migracion.
+  2. **Connector (index-api-connector.js):** el fetch de multimedia_mapa pide `&origen=album` (L258).
+  3. **Capa estricta (index.html):** `renderMapaMedia()` y `mdMediasCercanas()` descartan `origen === 'destino'`; la capa solo pinta albumes de usuarios. El branch defensivo `origen==='destino'` de `openMapaMediaDrawer` se conserva.
+  4. **Filtro deseleccionable (index.html):** el listener de `.mf-btn[data-cat]` detecta `yaActivo` y deselecciona (`mapaActiveCat='off'`); `filterMapaPins('off')` deja `mapaPlaces=[]` (recluster vacia la capa) y `renderMapaList('off')` muestra estado vacio. "Todo" activa la capa media solo al re-seleccionarse, no al deseleccionar.
+  5. **Paridad de drawer (index.html):** eliminado el `bindPopup` de los pines del directorio (`refreshMapaMarkers`) y de "Mi Mapa personal" (`updateMMMarkers`); el clic usa `setMapaActive()` -> `openMapaDrawer(place)`. Se limpio el manejo de popup (`openPopup`, `mapaPendingPopupId`) de `setMapaActive` y `onMapaMoved`. Clusters intactos (zoom + popup de lista).
+  6. **mapas.html:** drawer lateral propio (`.dd-wrap`/`.dd-panel`, CSS nuevo acorde a la pagina) + `abrirDrawerDetalle(x)` con hero (`_fotoSrc` valida esquema), badge de categoria (`CAT_LBL`), titulo, ciudad y CTA `/{slug}.html`; cierre por backdrop, boton y Escape; datos escapados con `_esc`.
+  7. **ADR-021** en DECISIONS.md + NEXT.md actualizado.
+
+- **Verificacion (Escudo GOLD):** `node --check api/interacciones.js` e `index-api-connector.js` PASS; JS inline extraido de index.html y mapas.html con `node _verify.js` + `node --check` PASS; ASCII-safety: 0 caracteres no-ASCII en lineas nuevas (un comentario CSS se normalizo a ASCII); balance de divs index.html -1 (preexistente en HEAD, sin regresion) y mapas.html 0 (HEAD 0).
+
+- **Auditoria (BUGS_HISTORICOS):** BUG-001 (no-ASCII en api/*.js) no aplica (cambio ASCII); BUG-030 (UNION types uuid/varchar) sin reaparicion (`a.id::text AS origen_id` intacto); BUG-020 (replArr const/window) sin impacto; BUG-031 (JS inline) cubierto por `node --check` del inline extraido. XSS: los drawers escapan datos con `esc()`/`_esc()`.
+
+- **Fuera de alcance / backlog:** la capa multimedia de `comunidad.html` sigue mostrando la rama estatica (no se le agrego `origen=album`); `mapaPendingPopupId`/`mapaPendingClearTimer` quedan declaradas sin uso; pendiente commit/deploy manual.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
