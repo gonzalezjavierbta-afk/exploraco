@@ -118,6 +118,50 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-btn-gold:hover{opacity:.88}
 .pf-btn-danger{border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
 .pf-btn-danger:hover{border-color:#ef4444;color:#ef4444}
+/* GALERIA DE MEJORAS DE PERFIL (frontend v6) */
+.pf-section-sub{font-size:11px;color:rgba(255,255,255,.35);margin:-8px 0 14px}
+.adorno-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:12px}
+.custom-store{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px;background:rgba(255,255,255,.03);height:100%;display:flex;flex-direction:column}
+.custom-store.activa{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06)}
+.custom-emoji{font-size:26px;margin-bottom:8px}
+.custom-name{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
+.custom-desc{font-size:10px;color:rgba(255,255,255,.4);line-height:1.4;margin-bottom:8px;flex:1}
+.custom-price{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--gold);margin-bottom:8px}
+.custom-actions{display:flex;flex-direction:column;gap:6px}
+/* VOCACIONES DE ARTISTA */
+.voc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:12px}
+.voc-card{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;background:rgba(255,255,255,.03);position:relative}
+.voc-card.activa{border-color:rgba(232,160,32,.45);background:rgba(232,160,32,.07)}
+.voc-card.locked{opacity:.45;filter:grayscale(.4)}
+.voc-emoji{font-size:30px;margin-bottom:8px}
+.voc-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
+.voc-nivel{font-size:10px;color:var(--gold);font-weight:600;margin-bottom:8px}
+.voc-habs{font-size:10px;color:rgba(255,255,255,.4);line-height:1.5;margin-bottom:10px}
+.voc-state{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.voc-state.on{color:#22C55E}
+.voc-state.lock{color:rgba(255,255,255,.3)}
+.voc-btn{width:100%;padding:7px 0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:5px;color:rgba(255,255,255,.6);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:all .15s}
+.voc-btn:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+.voc-btn:disabled{cursor:not-allowed;opacity:.5}
+.voc-btn.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+/* MUSEO: LINEA RESUMEN + VITRINA reforzada */
+.pf-museo-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:rgba(255,255,255,.55);font-family:'Outfit',sans-serif}
+.pf-museo-line .museo-dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.25)}
+.pf-museo-line b{color:var(--gold);font-weight:700}
+.trofeo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:28px}
+.trofeo-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 10px;text-align:center;position:relative;transition:transform .18s,box-shadow .18s,border-color .18s}
+.trofeo-card.earned{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border-color:rgba(232,160,32,.35);box-shadow:0 6px 18px rgba(232,160,32,.08)}
+.trofeo-card.earned:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(232,160,32,.16);border-color:rgba(232,160,32,.6)}
+.trofeo-card.locked{opacity:.45;filter:grayscale(.5)}
+.trofeo-card.locked:hover{transform:none;box-shadow:none}
+.trofeo-card.locked .bg-emoji{position:relative;color:rgba(255,255,255,.4)}
+.trofeo-card .pedestal{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:46px;height:5px;border-radius:2px 2px 0 0;background:rgba(255,255,255,.06)}
+.trofeo-card.earned .pedestal{background:linear-gradient(180deg,rgba(232,160,32,.5),rgba(232,160,32,.15))}
+/* Mejoras aplicadas en vivo sobre #profile */
+#profile.profile-marco-dorado .pf-hero{border:2px solid var(--gold);box-shadow:0 0 24px rgba(232,160,32,.25);border-radius:14px}
+#profile.profile-tema-oscuro .pf-hero{background:linear-gradient(180deg,rgba(0,0,0,.68),var(--black))}
+#profile.profile-banda-artista .pf-av::after{content:'';position:absolute;left:-8px;right:-8px;bottom:-6px;height:6px;border-radius:3px;background:linear-gradient(90deg,#E8A020,#22C55E,#3B82F6);opacity:.9}
+#pf-av{position:relative}
 /* TOAST */
 #xp-toast{position:fixed;bottom:20px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(232,160,32,.3)}
 /* TIENDA / INVENTARIO / CROMOS */
@@ -182,6 +226,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="pf-email" id="pf-email"></div>
       <div class="pf-level" id="pf-level">🌱 Viajero Novato</div>
       <div class="pf-level-num" id="pf-level-num">Nivel 1 de 20</div>
+      <div class="pf-museo-line" id="pf-museo-line"><span>&#x1F396; 0 trofeos</span><span class="museo-dot">&#x00B7;</span><span>&#x1F4F8; 0 fotos</span><span class="museo-dot">&#x00B7;</span><span>&#x1F5FA; 0 destinos</span></div>
       <div class="pf-xp-bar"><div class="pf-xp-fill" id="pf-xp-fill" style="width:0%"></div></div>
       <div class="pf-xp-text"><span id="pf-xp-cur">0 XP</span><span id="pf-xp-next">Siguiente: 100 XP</span></div>
     </div>
@@ -232,6 +277,16 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:20px">&#x1F3AB; Mis Cromos</div>
   <div class="pf-counter" id="pf-cromos-count">0 cromos</div>
   <div class="cromo-grid" id="pf-cromos"></div>
+
+  <!-- GALERIA DE MEJORAS DE PERFIL -->
+  <div class="pf-section-title">&#x1F3A8; Galeria de Mejoras de Perfil</div>
+  <div class="pf-counter" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Mejora como se ve tu perfil ante la comunidad (se aplica en vivo).</div>
+  <div class="adorno-grid" id="pf-mejoras-grid"></div>
+
+  <!-- VOCACIONES DE ARTISTA -->
+  <div class="pf-section-title" style="margin-top:22px;">&#x1F3A4; Vocaciones de Artista</div>
+  <div class="pf-counter" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Desbloquea tu lado creativo: activa una vocacion para presumirla en tu vitrina (puedes tener varias activas).</div>
+  <div class="voc-grid" id="pf-vocaciones-grid"></div>
 
   <!-- MIS ALBUMES (ADR-017) -->
   <div class="pf-section-title">&#x1F5BC; Mis Albumes</div>
@@ -543,13 +598,27 @@ function renderPerfil() {
   /* trofeos/logros */
   cargarTrofeos(u.id);
 
+  /* museo-line (hero): sync de conteos con backfill real */
+  syncMuseoLine(u.id, true);
+
   /* tabla de destino (Milestones v2) */
   cargarTablaDestino(u.id);
+
+  /* museo-line: barra de museo en el hero (sync con backfill) */
+  syncMuseoLine(u.id, true);
+
+  /* galeria de mejoras de perfil + vocaciones (ADR-015/ADR-018) */
+  cargarGaleriaMejoras(u.id);
+  cargarVocaciones(u.id);
 
   /* tienda/inventario/cromos (Gamificacion v4) */
   cargarTienda(u.id);
   cargarInventario(u.id);
   cargarCromos(u.id);
+
+  /* galeria de mejoras + vocaciones (perfil-artista v1 / ADR-015) */
+  cargarGaleriaMejoras(u.id);
+  cargarVocaciones(u.id);
 
   /* mis albumes (ADR-017) */
   var btnAlbum = document.getElementById('btn-crear-album');
@@ -832,6 +901,151 @@ function formatearEfecto(efecto, clave) {
   if(typeof efecto === 'string') return efecto;
   try { return JSON.stringify(efecto); } catch(e) { return nombreConsumible(clave); }
 }
+/* ---- MUSEO-LINE DEL HERO (ADR-015, synced) ---- */
+function syncMuseoLine(uid, fuerza) {
+  var el = document.getElementById('pf-museo-line');
+  if (!el || !uid) return;
+  if (el.getAttribute('data-synced') === '1' && !fuerza) return;
+  el.setAttribute('data-synced', '1');
+  Promise.all([
+    fetch('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(uid)).then(function(r){ return r.json(); }),
+    fetch('/api/interacciones?tipo=albumes&usuario_id=' + encodeURIComponent(uid)).then(function(r){ return r.json(); })
+  ]).then(function(re){
+    var trofeos = 0;
+    var logList = (re[0] && (re[0].data || re[0].logros)) || [];
+    for (var i = 0; i < logList.length; i++) {
+      if (logList[i] && logList[i].estado === 'completada') trofeos++;
+    }
+    if (re[0] && re[0].desbloqueados != null) trofeos = re[0].desbloqueados;
+    var fotos = 0;
+    var albList = (re[1] && re[1].data) || [];
+    for (var j = 0; j < albList.length; j++) {
+      fotos += (albList[j] && parseInt(albList[j].fotos_count, 10)) || 0;
+    }
+    var dest = 0;
+    var st = statsU();
+    if (st) dest = (st.saved || 0);
+    el.innerHTML = '<span>&#x1F396; ' + trofeos + ' trofeos</span><span class="museo-dot">&#x00B7;</span><span>&#x1F4F8; ' + fotos + ' fotos</span><span class="museo-dot">&#x00B7;</span><span>&#x1F5FA; ' + dest + ' destinos</span>';
+  }).catch(function(){
+    /* silencioso: muestra el estado por defecto si no se pudo sync */
+    var st2 = statsU();
+    var dest2 = (st2 && st2.saved) || 0;
+    el.innerHTML = '<span>&#x1F396; 0 trofeos</span><span class="museo-dot">&#x00B7;</span><span>&#x1F4F8; 0 fotos</span><span class="museo-dot">&#x00B7;</span><span>&#x1F5FA; ' + dest2 + ' destinos</span>';
+  });
+}
+
+/* ---- GALERIA DE MEJORAS DE PERFIL (ADR-015) ---- */
+var PF_MEJORAS_META = {};
+function cargarGaleriaMejoras(uid) {
+  var grid = document.getElementById('pf-mejoras-grid');
+  if (!grid || !uid) return;
+  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando mejoras\u2026</div>';
+  Promise.all([
+    fetch('/api/interacciones?tipo=consumibles').then(function(r){ return r.json(); }),
+    fetch('/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(uid)).then(function(r){ return r.json(); })
+  ]).then(function(re){
+    var cat = (re[0] && (re[0].data || re[0].data)) || [];
+    var inv = (re[1] && re[1].data) || {};
+    var cons = (inv.consumibles) || {};
+    var u0 = sesion();
+    var caps = (u0 && u0.capacidades) || {};
+    var list = cat.filter(function(c){ return c && c.clave && String(c.clave).indexOf('perfil_') === 0; });
+    if (!list.length) {
+      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aun no hay mejoras de perfil disponibles.</div>';
+      return;
+    }
+    grid.innerHTML = list.map(function(c){
+      var activa = !!caps[c.clave];
+      var posee = (parseInt(cons[c.clave], 10) || 0) > 0;
+      var cuerpoBt;
+      if (activa) {
+        cuerpoBt = '<button disabled style="background:rgba(34,197,94,.18);color:#22C55E;border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:default;">&#x2713; Activa en tu perfil</button>';
+      } else if (posee) {
+        cuerpoBt = '<button onclick="usarConsumible(\'' + esc(c.clave) + '\',this)" style="background:var(--gold);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">Aplicar</button>';
+      } else {
+        var noAlc = statsU() && (c.precio_xp > statsU().xp);
+        cuerpoBt = '<button onclick="comprarConsumible(\'' + esc(c.clave) + '\',this)"' + (noAlc ? ' disabled' : '') + ' style="' + (noAlc ? 'opacity:.35;' : '') + 'border:1px solid var(--gold);color:var(--gold);background:transparent;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">Comprar ' + (parseInt(c.precio_xp, 10) || 0) + ' XP</button>';
+      }
+      return '<div class="adorno-card">'
+        + '<div class="adorno-emoji" style="height:88px;display:flex;align-items:center;justify-content:center;font-size:30px;background:linear-gradient(160deg,rgba(232,160,32,.14),rgba(255,255,255,.03));border-radius:8px;margin-bottom:8px;">' + (c.emoji || '\uD83C\uDFA8') + '</div>'
+        + '<div class="adorno-nombre" style="font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;">' + esc(c.nombre || c.clave) + '</div>'
+        + '<div class="adorno-desc" style="font-size:10px;color:rgba(255,255,255,.45);line-height:1.4;margin-bottom:10px;min-height:26px;">' + esc(c.descripcion || '') + '</div>'
+        + cuerpoBt
+        + '</div>';
+    }).join('');
+    grid._reload = function(){ cargarGaleriaMejoras(uid); };
+  }).catch(function(){
+    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar la galeria de mejoras.</div>';
+  });
+}
+
+/* ---- VOCACIONES DE ARTISTA (ADR-018) ---- */
+function cargarVocaciones(uid) {
+  var grid = document.getElementById('pf-vocaciones-grid');
+  if (!grid || !uid) return;
+  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando vocaciones\u2026</div>';
+  fetch('/api/interacciones?tipo=vocaciones_usuario&usuario_id=' + encodeURIComponent(uid))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (!res || !res.ok || !res.data) {
+        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar las vocaciones.</div>';
+        return;
+      }
+      var activas = (res.data.activadas) || [];
+      var cat = (res.data.catalogo) || [];
+      if (!cat.length) {
+        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No hay vocaciones disponibles aun.</div>';
+        return;
+      }
+      var mapaAct = {};
+      for (var a = 0; a < activas.length; a++) mapaAct[activas[a]] = true;
+      grid.innerHTML = cat.map(function(v){
+        var on = !!mapaAct[v.id];
+        var skills = (v.habilidades || []).map(function(h){ return '<span class="voc-skill">' + esc(h) + '</span>'; }).join('');
+        return '<div class="voc-card' + (on ? ' activa' : '') + '" data-voc="' + esc(v.id) + '">'
+          + '<div class="voc-emoji" style="font-size:30px;height:64px;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,rgba(168,85,247,.16),rgba(255,255,255,.03));border-radius:8px;margin-bottom:8px;">' + (v.emoji || '\uD83C\uDFA4') + '</div>'
+          + '<div class="voc-nombre" style="font-size:13px;font-weight:700;color:#fff;">' + esc(v.nombre) + '</div>'
+          + '<div class="voc-nivel" style="font-size:10px;color:rgba(255,255,255,.4);margin:2px 0 8px;">Requiere nivel ' + (v.nivel || 1) + '</div>'
+          + '<div class="voc-skills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">' + skills + '</div>'
+          + '<button onclick="activarVocacion(\'' + esc(v.id) + '\',this)"'
+          + (on ? ' style="background:rgba(34,197,94,.18);color:#22C55E;border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">&#x2713; Activa</button>'
+              : ' style="border:1px solid rgba(168,85,247,.4);color:#C084FC;background:transparent;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">Activar</button>')
+          + '</div>';
+      }).join('');
+    })
+    .catch(function(){
+      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar las vocaciones.</div>';
+    });
+}
+function activarVocacion(vocId, btn) {
+  var u0 = sesion();
+  if (!u0) return;
+  btn.disabled = true;
+  var origTxt = btn.textContent;
+  btn.textContent = 'Guardando\u2026';
+  fetch('/api/interacciones?tipo=vocacion_activar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ usuario_id: u0.id, vocacion_id: vocId })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res && res.ok) {
+        showToast('Vocacion actualizada');
+        refrescarSesion();
+      } else {
+        btn.disabled = false;
+        btn.textContent = origTxt;
+        showToast((res && res.error) || 'No se pudo activar la vocacion', '#ef4444');
+      }
+    })
+    .catch(function(){
+      btn.disabled = false;
+      btn.textContent = origTxt;
+      showToast('Error de conexion', '#ef4444');
+    });
+}
+
 function cargarTienda(uid) {
   var grid = document.getElementById('pf-tienda');
   var balance = document.getElementById('pf-xp-balance');
@@ -1024,6 +1238,7 @@ function cargarMisAlbumes() {
           ? '<img src="' + esc(a.portada_url) + '" style="width:100%;height:140px;object-fit:cover;" loading="lazy" onerror="this.style.background=\'rgba(255,255,255,.06)\';this.style.display=\'none\'">'
           : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#E8A020,#D4790E);display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F5BC;</div>';
         card.innerHTML = portada
+          + (a.lat && a.lng ? '' : '<div style="margin:8px 8px 0;display:inline-block;padding:5px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px dashed rgba(245,158,11,.35);color:#F59E0B;font-size:10px;font-weight:600;">&#x26A0; Sin mapa</div>')
           + '<div style="padding:10px;">'
           + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#fff;">' + esc(a.titulo) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.4);">' + (a.fotos_count || 0) + ' fotos &#x2022; ' + (a.votos_count || 0) + ' &#x2B50;</div>'
@@ -1140,7 +1355,8 @@ function verDetalleAlbum(albumId) {
       document.getElementById('album-det-info').textContent =
         (album.descripcion || 'Sin descripcion') + ' | '
         + fotos.length + ' fotos | '
-        + (album.ciudad || 'Sin ubicacion');
+        + (album.ciudad || 'Sin ubicacion')
+        + (album.lat && album.lng ? '' : ' | &#x26A0; Sin mapa');
       var acciones = document.getElementById('album-det-acciones');
       var btnEdit = document.getElementById('album-det-btn-editar');
       var btnDel = document.getElementById('album-det-btn-eliminar');

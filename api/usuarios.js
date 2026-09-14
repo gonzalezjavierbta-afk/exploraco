@@ -1,4 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v8 (Epic prompt 2026-09-13): GET ?buscar= para admin y linkeo de vocaciones (columna migracion 015).
 const { neon } = require('@neondatabase/serverless');
 
 // Mismos umbrales que XP_LEVELS en index.html (~linea 3959 del motor de
@@ -122,7 +123,24 @@ module.exports = async (req, res) => {
         );
         return res.json({ ok: true, data: rows.map(conNivel) });
       }
+      if (tipo === 'buscar' || req.query.buscar) {
+        const palabra = String(req.query.buscar || '').trim();
+        if (palabra.length < 2) return res.status(400).json({ ok: false, error: 'Minimo 2 caracteres' });
+        const rows = await sql(
+          'SELECT id, nombre, email, avatar_url, xp_total, total_resenas, total_guardados '
+          + 'FROM usuarios WHERE activo = true AND (nombre ILIKE $1 OR email ILIKE $1) '
+          + 'ORDER BY xp_total DESC LIMIT $2',
+          ['%' + palabra + '%', 20]
+        );
+        const data = rows.map(function (r) {
+          return conLogros(conMisiones(conNivel(r)));
+        });
+        return res.json({ ok: true, data });
+      }
       if (id) {
+        // vocaciones (jsonb) la agrega la migracion 015 a la columna y llega
+        // via SELECT * ya como objeto; conNivel/conMisiones/conLogros no la
+        // tocan, asi que pasa tal cual al cliente (era viene de conNivel).
         const rows = await sql('SELECT * FROM usuarios WHERE id = $1', [id]);
         if (!rows.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
         return res.json({ ok: true, data: conLogros(conMisiones(conNivel(rows[0]))) });

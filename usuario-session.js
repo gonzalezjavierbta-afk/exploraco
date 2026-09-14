@@ -44,6 +44,8 @@
   // Una capacidad esta activa si nivelActual >= umbral.
   var CAPACIDADES_POR_NIVEL = {
     6:  'crear_planes',
+    7:  'emojis_premium',
+    10: 'sello_sala',
     11: 'organizar_actividad',
     14: 'fundar_pandilla',
     15: 'moderar_galerias',
@@ -53,6 +55,36 @@
   };
 
   window.ExploraCO.CAPACIDADES_POR_NIVEL = CAPACIDADES_POR_NIVEL;
+
+  // ---- Catalogo global de vocaciones (backend usuario-session) ----
+  // Mismo catalogo que expone el backend para que los frontends lo
+  // lean sin fetch. Acentos y emojis SOLO como escapes \uXXXX
+  // (ADR-002: ASCII puro en este archivo).
+  var VOCACIONES = [
+    {
+      id: 'musico',
+      nombre: 'Musico',
+      emoji: '\uD83C\uDFB5',
+      nivel: 5,
+      habilidades: ['Vitrina musical', 'Setlist destacado', 'Sello de interprete']
+    },
+    {
+      id: 'cine',
+      nombre: 'Cine',
+      emoji: '\uD83C\uDFAC',
+      nivel: 8,
+      habilidades: ['Reel de cine', 'Cartelera propia', 'Sello de cineasta']
+    },
+    {
+      id: 'artista_grafico',
+      nombre: 'Artista Grafico',
+      emoji: '\uD83C\uDFA8',
+      nivel: 11,
+      habilidades: ['Galeria de obra', 'Paleta de marca', 'Sello de autor']
+    }
+  ];
+
+  window.ExploraCO.vocaciones = VOCACIONES;
 
   // ── Leer sesión del localStorage ──────────────────────────
   function cargarSesion() {

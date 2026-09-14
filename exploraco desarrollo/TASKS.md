@@ -992,6 +992,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Nota de cierre:** la migracion `db/migrations/005_usuarios_progreso_logros.sql` YA estaba aplicada en Neon y el sistema gaming (interacciones.js v5) ya estaba desplegado: GET `tipo=logros` con un `usuario_id` real (UUID valido) responde 200 con el catalogo de 16 trofeos y rareza %. El 500 que se habia registrado en sesiones previas era un falso positivo: se habia probado con `usuario_id=test-check`, que no es UUID valido y Postgres lo rechaza con `invalid input syntax for type uuid` (no es un fallo de la columna faltante). Leccion de proceso: verificar logros SIEMPRE con un UUID real de la tabla usuarios, nunca con un id de prueba.
 - **Detalle técnico:** Ejecutar en la consola de Neon (ADR-008: SQL versionado, no suelto): `\i db/migrations/005_usuarios_progreso_logros.sql` (ALTER TABLE ADD COLUMN IF NOT EXISTS `progreso_logros jsonb NOT NULL DEFAULT '{}'::jsonb`). Sin esta migracion, GET `tipo=logros` devuelve 500 y los POST degradan (evaluarLogros captura el error y devuelve []). Despues: deploy de Vercel y verificacion en prod (GET logros de un usuario con acciones, voto en un post de blog, badge en Inspirate, toasts de trofeo).
 - **Evidencia física de éxito:** Verificado el 2026-08-19 con UUID real `3b78efad-e9f6-49a7-bbd1-af836f528348` (usuario javier): GET `https://exploraco.vercel.app/api/interacciones?tipo=logros&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348` = 200 con `total=16`, `desbloqueados=0`, trofeos con `tier`/`rareza_pct`; GET `/api/usuarios?id=...` = 200 con `total_logros=0` y `foto_url`/`ciudad_base` presentes (migracion 004 tambien aplicada).
+- **Ampliacion 2026-09-13 (epic prompt.txt, TSK-100/ADR-026):** el perfil como "museo de trofeos" quedo COMPLETO en su version v1 dentro del epic prompt.txt: `mi-perfil.html` estrena museo-line en el hero (trofeos·fotos·destinos con backfill real), galeria de mejoras de perfil (3 consumibles `perfil_*`) y seccion Vocaciones de artista. La vitrina extendida y el sello de verificado quedan como futuro cercano (decision de Javier).
 
 ---
 
@@ -2363,11 +2364,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   (b) `mi-perfil.html` generaba `onclick="quitarFotoAlbum(uuid,uuid)"` sin comillas
   (ReferenceError); ambos corregidos (L3333-3338 y L1121).
 
-- **PENDIENTE BLOQUEANTE:** aplicar `db/migrations/012_interacciones_dedup_resena_rating.sql`
-  en el editor SQL de Neon (no hay credenciales en el repo; lo ejecuta Javier manualmente,
-  es idempotente y no requiere nada mas). Sin la migracion: el dedup de resena/rating NO esta
-  activo en produccion y la segunda foto del mismo usuario al mismo destino sigue devolviendo
-  500 (el mapeo a 409 del catch solo tipifica el error, no elimina la constraint vieja).
+- **PENDIENTE BLOQUEANTE (ACTUALIZADO 2026-09-13):** la migracion `db/migrations/012_interacciones_dedup_resena_rating.sql` YA fue aplicada por Javier en Neon (migraciones 011-014 aplicadas el 2026-09-13).
   Pendiente tambien: commit + push + deploy manual del working tree completo (incluye los
   cambios de modelos de agentes, ver NEXT.md) y reiniciar opencode para que tome los modelos
   nuevos de `.opencode/agent/`.
@@ -2407,12 +2404,12 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   1. Ingreso de media por URL externa por ahora; SUBIDA REAL DE ARCHIVOS queda como TODO futuro (requiere storage externo tipo Vercel Blob/Supabase/Cloudinary porque Vercel Hobby no persiste archivos).
   2. Los links que sube un usuario quedan en su galeria y referenciados en el mapa (por eso lat/lng en albumes).
   3. Comentarios con likes y respuestas anidadas ILIMITADAS en datos (indentacion visual limitada a 3 niveles, ADR-023).
-  4. Migraciones 004-012 ya aplicadas por Javier en Neon; la 013 la aplica manualmente el (bloqueante para los `tipo=` de comentarios; sin ella devuelven 503 `SCHEMA_NOT_MIGRATED`).
+  4. Migraciones 004-012 ya aplicadas por Javier en Neon; la 013 la aplica manualmente el (bloqueante para los `tipo=` de comentarios; sin ella devuelven 503 `SCHEMA_NOT_MIGRATED`). ACTUALIZADO 2026-09-13: la 013 ya fue aplicada por Javier en Neon PRODUCCION (migraciones 011-014 aplicadas); queda la 015 del epic prompt.txt (TSK-100).
 
 - **Verificacion (Escudo GOLD, 2026-09-12):** `node --check` PASS en api/interacciones.js, api/pagina-destino.js, api/utilidades.js y album-comments.js (re-verificado en esta sesion documental); ASCII-safety 0 bytes >127 en api/interacciones.js, album-comments.js y db/migrations/013_album_comentarios.sql. Hallazgo de QA de la sesion: canonicals con homografo cirilico `\u043E` en 8 HTML -> BUGS_HISTORICOS.md BUG-033 (NO bloqueante, fuera del alcance del epic).
 
 - **PENDIENTES (bloqueantes):**
-  1. **APLICAR `db/migrations/013_album_comentarios.sql` EN NEON (lo ejecuta Javier en el editor SQL; idempotente IF NOT EXISTS, ASCII-safe, requiere migracion 009 previa).** Sin la tabla, los `tipo=` de comentarios y el contador `comentarios` degradan a 503 `SCHEMA_NOT_MIGRATED` (catch 42P01 de este epic).
+  1. **APLICAR `db/migrations/013_album_comentarios.sql` EN NEON -- [HECHO 2026-09-13] (lo ejecuto Javier en el editor SQL; idempotente IF NOT EXISTS, ASCII-safe, requiere migracion 009 previa; aplicada junto con 011/012/014 el 2026-09-13).** Sin la tabla, los `tipo=` de comentarios y el contador `comentarios` degradan a 503 `SCHEMA_NOT_MIGRATED` (catch 42P01 de este epic).
   2. **Commit + push + deploy manual** del working tree completo (incluye los pendientes de TSK-095/096/097 y los cambios de modelos de agentes de `.opencode/agent/`).
   3. **Verificacion post-deploy:** mapa con fotos de usuarios (albumes con lat/lng), abrir album sin 500, filtros multi-seleccion foto+video+audio, galeria ampliada (modo global y `?destino=`), comentarios end-to-end (crear/responder/like/unlike/borrar/moderar en admin).
   4. **TODO futuro: subida real de archivos** (storage externo tipo Vercel Blob/Supabase/Cloudinary; hoy el ingreso es por URL externa).
@@ -2447,7 +2444,45 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 - **Evidencia:** `node --check api/interacciones.js` PASS; ASCII 0 bytes >127 en `api/interacciones.js`; handler `tipo=visita` con Haversine/geocerca/anti-farming/`dims.geo`/bono rural y `quitar_visita` soft-delete verificados contra archivo real; logro `logr_pionero` presente en el catalogo (LOGROS 30); tests de logros 30/30 PASS en los 4 scripts; `node scripts/smoke_visita_geocerca.js` 15/15 PASS (validaciones tempranas, dedup activa/inactiva, cooldown, tope diario, caminos felices urbano xp 20 y rural xp 40). Falta: la verificacion en vivo tras aplicar la migracion 014 y desplegar.
 
-- **Pendiente BLOQUEANTE:** aplicar migracion 014 en el editor SQL de Neon (Javier) + deploy; recordar que 011/012/013 tambien siguen pendientes de aplicar.
+- **Pendiente BLOQUEANTE (ACTUALIZADO 2026-09-13):** la migracion 014 YA fue aplicada por Javier en Neon (junto con 011/012/013, mismas fechas). Queda: aplicar la migracion 015 del epic prompt.txt (TSK-100) tras el commit + commit/push/deploy manual + verificacion en vivo de la geocerca (marcar "Estuve aqui" exige ubicacion, fuera de rango -> 422 FUERA_DE_RANGO).
+
+---
+
+### TSK-100: Epic prompt.txt -- perfil museo v1, vocaciones acumulables, chat por plan privado, XP admin y fixes multimedia (BUG A/B) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-13, implementada en working tree; Escudo GOLD verde; pendiente aplicar migracion 015 en Neon + commit/push/deploy)
+- **Prioridad:** ALTA
+- **Fecha:** 2026-09-13
+- **Prompt origen:** `prompt.txt` (museo de trofeos en mi-perfil, vocaciones de artista estilo Diablo/PoE/Albion, limpieza de salas de la comunidad, chat propio por plan, XP admin para testear niveles, BUG A 503 de album_detalle, BUG B mapa cultural sin fotos de usuarios)
+- **Spec:** `docs/superpowers/specs/2026-09-13-epic-prompt-vocaciones-chat-perfil-design.md`
+- **ADR:** ADR-026 (DECISIONS.md)
+- **Responsable:** free-build (orquestador) + free-tpl/frontend/admin/renderer/backend/js-silo/qa + docs-keeper
+
+- **Nota de migraciones (registro):** las migraciones **011-014 YA fueron aplicadas por Javier en Neon PRODUCCION el 2026-09-13** (011 direccion, 012 dedup resena/rating, 013 comentarios, 014 reset de visitas presencia fisica). La **015 `db/migrations/015_epic_prompt.sql` queda PENDIENTE de aplicar por Javier tras el commit** (idempotente IF NOT EXISTS + ON CONFLICT, ASCII-safe, 4 bloques).
+
+- **Subtareas (del Alcance de la spec; las 7 + 2 bugs):**
+  1. **[Perfil museo v1] HECHO:** `mi-perfil.html` (1.575 lineas) estrena museo-line en el hero (`#pf-museo-line`: trofeos·fotos·destinos con backfill real, L906), galeria de mejoras de perfil (`#pf-mejoras-grid`: 3 consumibles `perfil_*`), seccion Vocaciones de artista (`#pf-vocaciones-grid` con toggle, candado por nivel y manejo de 403) y chip "Sin mapa" en albumes sin lat/lng (`\u26A0 Sin mapa`, L1241/1359). CSS vitrina de trofeos. Divs 195/195. Vitrina extendida y sello verificado quedan como futuro cercano (decision de Javier).
+  2. **[Vocaciones acumulables] HECHO:** catalogo `VOCACIONES` en codigo (`api/interacciones.js` L181-188: musico@5, cine@8, artista_grafico@11, cada una con habilidades[]); columna `usuarios.vocaciones jsonb NOT NULL DEFAULT '{}'` (migracion 015, merge ADR-003); GET `vocaciones_catalogo` (publico), GET `vocaciones_usuario` y POST `vocacion_activar` (toggle, gate de nivel server-side 403). ACUMULABLES: el usuario puede tener todas las que desbloquee.
+  3. **[Comunidad: limpieza de salas] HECHO:** migracion 015 borra `chat_salas WHERE creador_id IS NULL AND nombre NOT IN ('Chat general','Bogota')` (idempotente, acumulativa sobre el seed de 008; CASCADE limpia los mensajes). `comunidad.html` agrega filtro defensivo `tipo !== 'plan'` en el listado, bloque "Niveles de chat" (5 perks: chat@3, crear_chat@3, emojis_premium@7, sello_sala@10, moderador_chat@12) y refactor compartido chatMsgsHTML/chatPollTick/enviarMensajeOpt. Divs 223/223.
+  4. **[Chat por plan privado] HECHO:** `planes_viaje.sala_id uuid REFERENCES chat_salas(id)` (FK nullable, sin CASCADE, migracion 015); `plan_crear` crea `chat_salas` tipo='plan' y liga la sala (L2736-2748); GET `plan_chat` (sala + mensajes + miembros, gate miembro/creador 403, L1641-1678) y POST `plan_chat_msg` (gate miembro, +2 XP tope 20/dia reusando chatXpDisponible/registrarChatXp, L2811-2850); defensa: `chat_msg` POST rechaza salas de plan y `chat_mensajes` GET las excluye (L1595); GET `planes`/`planes_mios` exponen `p.sala_id`; `comunidad.html` modal privado "Chat del plan" (abrirPlanChat/enviarPlanChat/polling 5 s, L1058-1154) e indicador "chat activo" (L987-988).
+  5. **[Admin XP] HECHO:** POST `admin_xp` (L3274-3336, Bearer `ADMIN_SECRET` con fallback 'exploraco12345'): `{usuario_id, delta_xp}` (Math.max(0,...)) o `{usuario_id, nivel}` 1-20 (Math.max con el umbral, NO degrada); recalcula con calcularNivelLocal/calcularEraLocal/BADGES_LOCAL; `UPDATE usuarios SET xp_total=$1, ultimo_acceso=NOW()` (se uso `ultimo_acceso`, no `actualizado_en`, porque esa columna no existe en usuarios). `admin.html` tab "Jugadores" (snav-jugadores + showScreen('jugadores'), L1980-2039): buscador por nombre/email, tarjeta de jugador (nivel, XP, era, logros, vocaciones activas), sumar/restar XP y subir a nivel exacto 1-20; refactor `_adminBuscarUsuarios` compartido con blogBuscarAutor (L6933). Divs 786/786.
+  6. **[BUG A -- 503 album_detalle] HECHO:** helper `contarComentarioSafe(sql, fotoId)` (L1025) degrada a 0 comentarios si la tabla `album_comentarios` (migracion 013) no existe (catch 42P01/42703), aplicado en `album_detalle`, `galeria_detalle` y `mi_feed_fotos`. `comentarios_recientes` (admin) sigue exigiendola (503 tipificado, no degrada silenciosamente).
+  7. **[BUG B -- mapa cultural sin fotos de usuarios] HECHO:** `multimedia_mapa` ya no exige coords en el album: helper `coordsFallbackAutor(sql, usuarioId)` (L1045) hereda lat/lng/ciudad de la primera visita/guardado del autor hacia un destino georreferenciado; descarta los que quedan sin coords; flag `coords_heredadas`. Resuelve el caso reportado (hostal r10).
+  8. **[Backend api/usuarios.js] HECHO:** v8 (180 lineas): GET `?buscar=` (2+ chars, ILIKE sobre nombre/email, limit 20, pasa por conLogros/conMisiones/conNivel, L126-141) y columna `vocaciones` incluida en SELECT * (perfil).
+  9. **[user-session] HECHO:** `emojis_premium@7` y `sello_sala@10` en CAPACIDADES_POR_NIVEL (L47-48) + catalogo `window.ExploraCO.vocaciones` (L59-87). `subirNivelTest(n)` NO se creo (no hay helpers de test previos en el proyecto; decision de no inventar infraestructura).
+
+- **Decisiones de producto (Javier, 2026-09-13):** vocaciones acumulables (no exclusivas); mejoras de perfil v1 = SOLO marco dorado (700 XP), tema galeria oscura (500 XP) y banda de artista (900 XP) como consumibles permanentes (ON CONFLICT clave) activados por `usar_consumible`; chat de plan PRIVADO solo miembros; admin XP = "subir a nivel X exacto" + delta manual, sin degradar; migraciones 011-014 YA aplicadas en Neon; la 015 la aplica Javier tras el commit.
+
+- **Verificacion (Escudo GOLD, 2026-09-13):** `node --check` PASS en api/interacciones.js (v12, 4.547 lineas) y api/usuarios.js (v8); ASCII 0 bytes >127 en los api/*.js y en la migracion 015; balance de divs mi-perfil 195/195, comunidad 223/223 y admin 786/786; header de interacciones.js v12 con el bloque del epic en L75-83. SMOKE DEDICADO DEL EPIC ENTREGADO: `scripts/smoke_test_epic_prompt.js` 50/50 PASS (ejecutado 2026-09-13, salida "SMOKE EPIC PROMPT: OK"), cubre vocaciones, admin_xp, plan_chat/plan_chat_msg, contarComentarioSafe, coordsFallbackAutor, queries capturadas sala_id/tipo!=plan, divs de los 3 HTML y la migracion 015.
+
+- **PENDIENTES (bloqueantes):**
+  1. **APLICAR `db/migrations/015_epic_prompt.sql` EN NEON (lo ejecuta Javier en el editor SQL de Neon tras el commit; idempotente IF NOT EXISTS + ON CONFLICT, requiere la 008 para chat_salas/planes_viaje y la 010 para consumibles).** Sin la columna `usuarios.vocaciones` y `planes_viaje.sala_id`, `vocacion_activar`/`vocaciones_*` responden 500/503 y `plan_crear` falla al ligar la sala.
+  2. **Commit + push + deploy manual** del working tree completo (incluye los pendientes de TSK-095/096/097/098/099 y la migracion 015).
+  3. **Verificacion post-deploy en vivo:** vocaciones end-to-end (toggle + candado 403), admin_xp niveles 1-20 sin degradacion, plan_chat con miembro vs no-miembro (403), mapa cultural con fotos de usuarios (caso hostal r10), contadores de comentarios sin 503, y un plan nuevo con chat ligado.
+
+- **Pendientes pequenos / backlog:** backfill opcional de `sala_id` para planes EXISTENTES (la migracion los deja NULL; solo los planes creados tras el deploy obtienen sala via `plan_crear`); vitrina extendida de perfil y sello verificado (futuro cercano, decision de Javier); `comunidad.html` capa multimedia con `origen=album` (candidata a unificar, backlog TSK-096); BUG-033 canonicals cirilicos (NO bloqueante). NOTA de cierre QA: el smoke dedicado del epic SI se entrego en `scripts/smoke_test_epic_prompt.js` (50/50 PASS, ver Verificacion arriba).
+
+- **Fuera de alcance:** subida real de archivos (requiere storage externo, TODO vigente de TSK-098); ADR-025 (sesion firmada/atestacion, candidato); cambios de codigo posteriores al registro documental.
 
 ---
 

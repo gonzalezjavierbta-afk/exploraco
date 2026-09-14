@@ -1,4 +1,4 @@
-// api/interacciones.js  v9 - misiones + logros + Tabla Destino + Albums + Gamificacion v4 (consumibles, cromos, pandillas)
+// api/interacciones.js  v12 - misiones + logros + Tabla Destino + Albums + Gamificacion v4 (consumibles, cromos, pandillas) + epic 2026-09-13 (vocaciones, chat por plan, admin_xp, fixes multimedia)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -71,6 +71,16 @@ var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 
 // v11 (ADR-024) Presencia Fisica v4.0: geocerca Haversine server-side
 // para el POST tipo='visita', cierre del farming de XP (reactivar no
 // repaga) y bono rural plano. Helpers puros, sin dependencias.
+//
+// v12 (epic prompt.txt 2026-09-13): vocaciones de artista (3 rutas
+// acumulables, catalogo en codigo), chat privado por plan (GET plan_chat,
+// POST plan_chat_msg y sala ligada en plan_crear), admin_xp (Bearer,
+// delta_xp o nivel exacto) y dos fixes: BUG-A (contadores de comentarios
+// degradables cuando la migracion 013 no esta aplicada) y BUG-B
+// (multimedia_mapa hereda coords del album desde la primera visita o
+// guardado del autor hacia un destino georreferenciado). Requiere la
+// migracion 015 antes de desplegar (usuarios.vocaciones y
+// planes_viaje.sala_id).
 var TIERRA_RADIO_M = 6371008.8;
 var RADIO_DEFAULT_M = 100;
 var RADIO_POR_CATEGORIA = { sitio: 100, hostal: 100, comida: 100, evento: 150 };
@@ -145,6 +155,37 @@ function calcularEraLocal(nivel) {
   if (nivel <= 15) return 'Organizador';
   return 'Leyenda';
 }
+
+// Nombres de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
+// ASCII-safe: las tildes van como escapes \u00xx, nunca bytes > 127).
+var BADGES_LOCAL = [
+  'Caminante Novato', 'Rastreador Local', 'Explorador Urbano',
+  'Aventurero Regional', 'Vanguardia Territorial', 'Embajador de Zona',
+  'Fot\u00f3grafo de Ruta', 'Cronista de Historias', 'Buscador de Leyendas',
+  'Gu\u00eda de Fronteras', 'Estrat\u00e9ga Comunitario', 'Documentalista Visual',
+  'Se\u00f1or del Spot', 'Cart\u00f3grafo de Cine', 'Protector del Patrimonio',
+  'Curador de Colombia', 'Mariscal de Parche', 'Cineasta de Territorio',
+  'Inmortal del Mapa', 'Gran Maestro ExploraCO'
+];
+
+// Alias para el epic v12 (admin_xp y vocaciones): NO se duplica la lista,
+// se reusa NIVELES_LOCAL (mismos 20 minimos que api/usuarios.js NIVELES)
+// para que no existan dos catalogos que puedan desincronizarse.
+var NIVELES_ADMIN = NIVELES_LOCAL;
+
+// -- Catalogo de vocaciones de artista (epic 2026-09-13) -------------
+// 3 rutas acumulables (Musico, Cine, Artista grafico) desbloqueables por
+// nivel (NIVELES_ADMIN). El catalogo vive en codigo (patron de LOGROS);
+// usuarios.vocaciones solo guarda las claves activadas por el usuario.
+// ASCII-safe (ADR-002): los emojis van como escapes \uXXXX, nunca bytes.
+var VOCACIONES = [
+  { id: 'musico', nombre: 'Musico', emoji: '\uD83C\uDFB5', nivel: 5,
+    habilidades: ['Vitrina musical', 'Setlist destacado', 'Sello de interprete'] },
+  { id: 'cine', nombre: 'Cine', emoji: '\uD83C\uDFAC', nivel: 8,
+    habilidades: ['Reel de cine', 'Cartelera propia', 'Sello de cineasta'] },
+  { id: 'artista_grafico', nombre: 'Artista Grafico', emoji: '\uD83C\uDFA8', nivel: 11,
+    habilidades: ['Galeria de obra', 'Paleta de marca', 'Sello de autor'] }
+];
 
 // -- Catalogo de misiones (Fase 3) ---------------------------------
 // requiere: ids de misiones que deben estar 'completada' antes de que
@@ -977,6 +1018,52 @@ function registrarChatXp(sql, usuarioId, hoy, n) {
   ).catch(function(){});
 }
 
+// BUG-A (v12): contador de comentarios degradable. album_comentarios se
+// crea en la migracion 013; si no esta aplicada (42P01/42703) devuelve 0
+// en silencio (con warn limitado) para que album_detalle, galeria_destino
+// y mi_feed_fotos degraden con gracia. Cualquier otro error se re-lanza.
+function contarComentarioSafe(sqlFn, fotoId) {
+  if (!fotoId) return Promise.resolve(0);
+  return sqlFn(
+    'SELECT COUNT(*)::int AS n FROM album_comentarios ac'
+    + ' WHERE ac.foto_id = $1 AND ac.activo = true',
+    [fotoId]
+  ).then(function(r) {
+    return (r[0] && parseInt(r[0].n, 10)) || 0;
+  }).catch(function(e) {
+    if (e && (e.code === '42P01' || e.code === '42703')) {
+      console.warn('TRACE: album_comentarios ausente (migracion 013), contador degradado a 0');
+      return 0;
+    }
+    throw e;
+  });
+}
+
+// Coordenadas de respaldo para albumes sin geolocalizacion (BUG-B):
+// hereda lat/lng/ciudad de la primera interaccion (visita/guardado) del
+// autor con un destino georreferenciado. Devuelve null si no hay una.
+function coordsFallbackAutor(sqlFn, usuarioId) {
+  if (!usuarioId) return Promise.resolve(null);
+  return sqlFn(
+    'SELECT d.lat AS lat, d.lng AS lng, d.ciudad AS ciudad'
+    + ' FROM interacciones i'
+    + ' JOIN destinos d ON d.id = i.destino_id'
+    + ' WHERE i.usuario_id = $1'
+    + '   AND i.tipo IN (\'visita\', \'guardado\')'
+    + '   AND d.lat IS NOT NULL AND d.lng IS NOT NULL'
+    + ' ORDER BY i.creado_en DESC'
+    + ' LIMIT 1',
+    [usuarioId]
+  ).then(function(r) { return r && r.length ? r[0] : null; })
+   .catch(function(e) {
+     if (e && (e.code === '42P01' || e.code === '42703')) {
+       console.warn('TRACE: esquema incompleto en coordsFallbackAutor, coords heredadas degradadas a null');
+       return null;
+     }
+     throw e;
+   });
+}
+
 // Evalua el catalogo completo para un usuario y persiste lo nuevo que se
 // haya completado. Nunca lanza: un fallo aqui no debe tumbar la accion
 // principal (resena/guardado/visita) que ya se registro con exito.
@@ -1492,7 +1579,7 @@ module.exports = async function handler(req, res) {
           + ' (SELECT COUNT(*)::int FROM chat_mensajes m'
           + '   WHERE m.sala_id = s.id AND m.activo = true) AS total_mensajes'
           + ' FROM chat_salas s'
-          + ' WHERE s.activo = true'
+          + ' WHERE s.activo = true AND (s.tipo IS NULL OR s.tipo != \'plan\')'
           + ' ORDER BY s.orden DESC, s.creado_en ASC',
           []
         );
@@ -1510,6 +1597,8 @@ module.exports = async function handler(req, res) {
           + ' FROM chat_mensajes m'
           + ' LEFT JOIN usuarios u ON u.id = m.usuario_id'
           + ' WHERE m.sala_id = $1 AND m.activo = true'
+          + '   AND NOT EXISTS (SELECT 1 FROM chat_salas cs'
+          + '     WHERE cs.id = m.sala_id AND cs.tipo = \'plan\')'
           + ' ORDER BY m.creado_en DESC'
           + ' LIMIT 100',
           [req.query.sala_id]
@@ -1522,7 +1611,7 @@ module.exports = async function handler(req, res) {
       // usuario que consulta (EXISTS con $1; si no hay usuario_id, false).
       if (tipo === 'planes') {
         var planesRows = await sql(
-          'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.creador_id, p.creado_en,'
+          'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.sala_id, p.creador_id, p.creado_en,'
           + ' (SELECT COUNT(*)::int FROM planes_miembros pm WHERE pm.plan_id = p.id) AS miembros_actuales,'
           + ' (SELECT u.nombre FROM usuarios u WHERE u.id = p.creador_id) AS creador_nombre,'
           + ' EXISTS(SELECT 1 FROM planes_miembros pm WHERE pm.plan_id = p.id AND pm.usuario_id = $1) AS unido'
@@ -1538,15 +1627,94 @@ module.exports = async function handler(req, res) {
       // Planes creados por el usuario (para gestion y compartir).
       if (tipo === 'planes_mios' && usuarioId) {
         var planesMiosRows = await sql(
-          'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.creado_en,'
+          'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.sala_id, p.creado_en,'
           + ' (SELECT COUNT(*)::int FROM planes_miembros pm WHERE pm.plan_id = p.id) AS miembros_actuales'
           + ' FROM planes_viaje p'
-          + ' WHERE p.creado_id = $1 AND p.activo = true'
+          + ' WHERE p.creador_id = $1 AND p.activo = true'
           + ' ORDER BY p.creado_en DESC'
           + ' LIMIT 50',
           [usuarioId]
         );
         return res.status(200).json({ ok: true, data: planesMiosRows });
+      }
+
+      // Chat privado del plan (epic 2026-09-13): sala ligada a
+      // planes_viaje.sala_id (migracion 015) + ultimos 100 mensajes en
+      // orden cronologico + nombres de miembros (incluye al creador).
+      // Gate de membresia: miembro de planes_miembros o creador del plan.
+      // Si el plan aun no tiene sala, responde 200 con error sin romper
+      // el contrato del cliente.
+      if (tipo === 'plan_chat' && req.query.plan_id) {
+        var plcPlanId = String(req.query.plan_id || '');
+        var plcUserId = String(req.query.usuario_id || '');
+        if (!plcUserId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var plcPlanRow = await sql(
+          'SELECT id, creador_id, sala_id FROM planes_viaje WHERE id=$1 AND activo=true LIMIT 1',
+          [plcPlanId]
+        ).catch(function(){ return []; });
+        if (!plcPlanRow.length)
+          return res.status(404).json({ ok: false, error: 'Plan no encontrado' });
+        if (String(plcPlanRow[0].creador_id) !== plcUserId) {
+          var plcMemb = await sql(
+            'SELECT 1 FROM planes_miembros WHERE plan_id=$1 AND usuario_id=$2 LIMIT 1',
+            [plcPlanId, plcUserId]
+          ).catch(function(){ return []; });
+          if (!plcMemb.length)
+            return res.status(403).json({ ok: false, error: 'Solo miembros del plan' });
+        }
+        if (!plcPlanRow[0].sala_id)
+          return res.status(200).json({ ok: false, error: 'Este plan aun no tiene chat' });
+        var plcSalaRow = await sql(
+          'SELECT s.id, s.nombre, s.icono, s.descripcion, s.tipo, s.creador_id, s.creado_en'
+          + ' FROM chat_salas s WHERE s.id=$1 AND s.activo=true LIMIT 1',
+          [plcPlanRow[0].sala_id]
+        ).catch(function(){ return []; });
+        if (!plcSalaRow.length)
+          return res.status(200).json({ ok: false, error: 'Este plan aun no tiene chat' });
+        var plcMsgs = await sql(
+          'SELECT m.id, m.usuario_id, m.texto, m.fijado, m.creado_en,'
+          + ' COALESCE(NULLIF(m.nombre,\'\'), u.nombre, \'Viajero\') AS nombre,'
+          + ' COALESCE(u.avatar_url, \'\') AS avatar_url'
+          + ' FROM chat_mensajes m'
+          + ' LEFT JOIN usuarios u ON u.id = m.usuario_id'
+          + ' WHERE m.sala_id = $1 AND m.activo = true'
+          + ' ORDER BY m.creado_en ASC'
+          + ' LIMIT 100',
+          [plcPlanRow[0].sala_id]
+        );
+        var plcMiembros = await sql(
+          'SELECT DISTINCT u.nombre AS nombre FROM planes_miembros pm'
+          + ' LEFT JOIN usuarios u ON u.id = pm.usuario_id'
+          + ' WHERE pm.plan_id = $1 AND u.nombre IS NOT NULL'
+          + ' UNION'
+          + ' SELECT DISTINCT u2.nombre AS nombre FROM usuarios u2'
+          + ' WHERE u2.id = $2 AND u2.nombre IS NOT NULL',
+          [plcPlanId, plcPlanRow[0].creador_id]
+        );
+        var plcNombres = [];
+        plcMiembros.forEach(function(r) { if (r.nombre) plcNombres.push(r.nombre); });
+        return res.status(200).json({ ok: true, sala: plcSalaRow[0], mensajes: plcMsgs, miembros: plcNombres });
+      }
+
+      // Catalogo de vocaciones de artista (epic 2026-09-13): publico.
+      // El catalogo vive en codigo (VOCACIONES); la columna
+      // usuarios.vocaciones solo guarda las claves activadas por usuario.
+      if (tipo === 'vocaciones_catalogo') {
+        return res.status(200).json({ ok: true, data: VOCACIONES });
+      }
+
+      // Vocaciones activadas de un usuario + catalogo completo.
+      if (tipo === 'vocaciones_usuario' && req.query.usuario_id) {
+        var vocUsrId = String(req.query.usuario_id || '');
+        var vocUsrRow = await sql(
+          'SELECT vocaciones FROM usuarios WHERE id=$1',
+          [vocUsrId]
+        ).catch(function(){ return []; });
+        if (!vocUsrRow.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var vocAct = (vocUsrRow[0] && vocUsrRow[0].vocaciones) || {};
+        return res.status(200).json({ ok: true, data: { activadas: Object.keys(vocAct), catalogo: VOCACIONES } });
       }
 
       // Tabla de Destino (Albion, Milestones v2 / ADR-014): tres senderos
@@ -1760,14 +1928,20 @@ module.exports = async function handler(req, res) {
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' af.autor_original_id, af.agregador_id, af.creado_en,'
           + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar, u.id AS usuario_id,'
-          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
-          + ' (SELECT COUNT(*)::int FROM album_comentarios ac WHERE ac.foto_id = af.id AND ac.activo = true) AS comentarios'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE af.album_id = $1 AND af.activo = true'
           + ' ORDER BY af.creado_en ASC',
           [albumId]
         );
+
+        // BUG-A (v12): el contador de comentarios corre post-query con
+        // degradacion: si la migracion 013 (album_comentarios) no esta
+        // aplicada, 42P01 se atrapa y devuelve 0 en vez de 503.
+        await Promise.all(fotosDetRows.map(function(f) {
+          return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
+        }));
 
         // Marcar ya_votado para el usuario actual
         var yaVotoAlbum = {};
@@ -1811,16 +1985,14 @@ module.exports = async function handler(req, res) {
           [gdDestino.id]
         );
 
-        // NOTA (ADR-023): album_comentarios se crea en la migracion 013.
-        // Mientras no este aplicada, la subquery de comentarios lanza
-        // 42P01 y este GET responde 503 (SCHEMA_NOT_MIGRATED). Se deja
-        // asi a proposito; cuando la 013 se aplique, funciona sin cambios.
+        // BUG-A (v12): el contador de comentarios se calcula post-query
+        // con contarComentarioSafe, que degrada a 0 si la migracion 013
+        // (album_comentarios) no esta aplicada, en vez de tumbar el GET.
         var gdUsuarios = await sql(
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title,'
           + ' a.id AS album_id, a.titulo AS album_titulo, a.ciudad,'
           + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
-          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
-          + ' (SELECT COUNT(*)::int FROM album_comentarios ac WHERE ac.foto_id = af.id AND ac.activo = true) AS comentarios'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
@@ -1830,6 +2002,9 @@ module.exports = async function handler(req, res) {
           + ' ORDER BY votos DESC LIMIT 100',
           [gdDestino.lat, gdDestino.lng]
         );
+        await Promise.all(gdUsuarios.map(function(f) {
+          return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
+        }));
 
         return res.status(200).json({
           ok: true,
@@ -1924,7 +2099,7 @@ module.exports = async function handler(req, res) {
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
-          + ' WHERE a.lat IS NOT NULL AND a.lng IS NOT NULL AND a.activo=true AND af.activo=true'
+          + ' WHERE a.activo=true AND af.activo=true'
           + (mmTipos ? ' AND af.foto_type = ANY($1::text[])' : '')
           + (mmCiudad ? ' AND a.ciudad = $' + (mmTipos ? '2' : '1') : '')
           + ') UNION ALL ('
@@ -1941,6 +2116,29 @@ module.exports = async function handler(req, res) {
           + ') ORDER BY votos DESC LIMIT 200',
           mmParams
         );
+
+        // BUG-B (v12): los albumes sin lat/lng heredan coords de la
+        // primera interaccion (visita/guardado) del autor hacia un
+        // destino georreferenciado; los que se quedan sin coords se
+        // descartan antes de responder. El shape se mantiene
+        // ({ok, data, tipos_aplicados}) y el orden/limite original.
+        var mmSinCoords = multimediaRows.filter(function(r) {
+          return !tieneCoordsValidas(r.lat, r.lng);
+        });
+        if (mmSinCoords.length) {
+          await Promise.all(mmSinCoords.map(function(r) {
+            return coordsFallbackAutor(sql, r.usuario_id).then(function(fb) {
+              if (!fb) return;
+              r.lat = fb.lat;
+              r.lng = fb.lng;
+              if (!r.ciudad && fb.ciudad) r.ciudad = fb.ciudad;
+              r.coords_heredadas = true;
+            });
+          }));
+          multimediaRows = multimediaRows.filter(function(r) {
+            return tieneCoordsValidas(r.lat, r.lng);
+          });
+        }
         return res.status(200).json({ ok: true, data: multimediaRows, tipos_aplicados: mmTiposAplicados });
       }
 
@@ -1954,7 +2152,6 @@ module.exports = async function handler(req, res) {
           + ' a.titulo AS album_titulo, a.ciudad, a.id AS album_id,'
           + ' u.nombre AS autor_nombre,'
           + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
-          + ' (SELECT COUNT(*)::int FROM album_comentarios ac WHERE ac.foto_id = af.id AND ac.activo = true) AS comentarios,'
           + ' af.creado_en'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
@@ -1964,6 +2161,10 @@ module.exports = async function handler(req, res) {
           + ' LIMIT $1 OFFSET $2',
           [feedLimit, feedOffset]
         );
+        // BUG-A (v12): contador de comentarios post-query degradable.
+        await Promise.all(feedRows.map(function(f) {
+          return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
+        }));
         return res.status(200).json({ ok: true, data: feedRows });
       }
 
@@ -2440,11 +2641,16 @@ module.exports = async function handler(req, res) {
         if (msgTexto.length > 500)
           return res.status(400).json({ ok: false, error: 'mensaje maximo 500 caracteres' });
         var salaValida = await sql(
-          'SELECT id FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+          'SELECT id, tipo FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
           [msgSala]
         ).catch(function(){ return []; });
         if (!salaValida.length)
           return res.status(404).json({ ok: false, error: 'Sala no encontrada' });
+        // v12 (chat privado por plan): las salas tipo='plan' solo se
+        // escriben via plan_chat_msg (gate de membresia del plan); el
+        // chat general no puede saltarse la privacidad del plan.
+        if (salaValida[0].tipo === 'plan')
+          return res.status(403).json({ ok: false, error: 'Esta sala es privada del plan' });
         var autorMsg = await sql('SELECT nombre FROM usuarios WHERE id=$1 LIMIT 1', [usuarioId2]).catch(function(){ return []; });
         var nombreMsg = autorMsg[0] && autorMsg[0].nombre ? String(autorMsg[0].nombre).slice(0, 60) : 'Viajero';
         var msgIns = await sql(
@@ -2530,6 +2736,23 @@ module.exports = async function handler(req, res) {
           + 'VALUES ($1, $2, $3, $4, $5) RETURNING id',
           [planDestino, planFechas, planCupos, planDesc, usuarioId2]
         );
+
+        // v12 (epic 2026-09-13, migracion 015): el plan nace con su sala
+        // de chat privada (tipo='plan', icono calendario) y se liga via
+        // planes_viaje.sala_id. Alta secuencial sin transaccion explicita
+        // (patron del archivo); si falla la sala, el plan sigue valido.
+        var planSalaIns = await sql(
+          'INSERT INTO chat_salas (nombre, icono, descripcion, tipo, orden, creador_id) '
+          + 'VALUES ($1, $2, $3, \'plan\', 0, $4) RETURNING id',
+          ['Plan: ' + planDestino, '\uD83D\uDCC5', planFechas || 'Chat privado del plan', usuarioId2]
+        ).catch(function(){ return []; });
+        if (planSalaIns.length) {
+          await sql(
+            'UPDATE planes_viaje SET sala_id = $1 WHERE id = $2',
+            [planSalaIns[0].id, planIns[0].id]
+          ).catch(function(){});
+          planIns[0].sala_id = planSalaIns[0].id;
+        }
         var misionesPlan = await evaluarMisiones(sql, usuarioId2);
         var logrosPlan = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({ ok: true, id: planIns[0].id, xp: 0, misiones: misionesPlan, logros: logrosPlan });
@@ -2584,6 +2807,75 @@ module.exports = async function handler(req, res) {
           [leavePlan, usuarioId2]
         );
         return res.status(200).json({ ok: true });
+      }
+
+      // Mensaje en el chat privado de un plan (epic 2026-09-13): gates
+      // de membresia (miembro o creador) y de capacidad de chat (misma
+      // mision que chat_msg); +2 XP con tope diario de 20 via
+      // registrarChatXp (helper reutilizado, no duplicado). Mismo shape
+      // que chat_msg + plan_id.
+      if (tipo2 === 'plan_chat_msg') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var puedePlanChat = await misionCompletada(sql, usuarioId2, 'mis_chat_mensajero');
+        if (!puedePlanChat)
+          return res.status(403).json({ ok: false, error: 'Desbloquea el chat (nivel 3, 250 XP) para escribir mensajes' });
+        var pcmPlanId = String(body.plan_id || '');
+        var pcmTexto = String(body.texto || '').trim();
+        if (!pcmPlanId)
+          return res.status(400).json({ ok: false, error: 'plan_id requerido' });
+        if (!pcmTexto)
+          return res.status(400).json({ ok: false, error: 'mensaje vacio' });
+        if (pcmTexto.length > 500)
+          return res.status(400).json({ ok: false, error: 'mensaje maximo 500 caracteres' });
+        var pcmPlan = await sql(
+          'SELECT id, creador_id, sala_id FROM planes_viaje WHERE id=$1 AND activo=true LIMIT 1',
+          [pcmPlanId]
+        ).catch(function(){ return []; });
+        if (!pcmPlan.length)
+          return res.status(404).json({ ok: false, error: 'Plan no encontrado' });
+        var pcmEsCreador = String(pcmPlan[0].creador_id) === String(usuarioId2);
+        if (!pcmEsCreador) {
+          var pcmMemb = await sql(
+            'SELECT 1 FROM planes_miembros WHERE plan_id=$1 AND usuario_id=$2 LIMIT 1',
+            [pcmPlanId, usuarioId2]
+          ).catch(function(){ return []; });
+          if (!pcmMemb.length)
+            return res.status(403).json({ ok: false, error: 'Solo miembros del plan' });
+        }
+        if (!pcmPlan[0].sala_id)
+          return res.status(400).json({ ok: false, error: 'Este plan aun no tiene chat' });
+        var autorPcm = await sql(
+          'SELECT nombre FROM usuarios WHERE id=$1 LIMIT 1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        var nombrePcm = autorPcm[0] && autorPcm[0].nombre ? String(autorPcm[0].nombre).slice(0, 60) : 'Viajero';
+        var pcmIns = await sql(
+          'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto) '
+          + 'VALUES ($1, $2, $3, $4) RETURNING id, creado_en',
+          [pcmPlan[0].sala_id, usuarioId2, nombrePcm, pcmTexto]
+        );
+        var xpPcm = 0, misionesPcm = [], logrosPcm = [];
+        var dispPcm = await chatXpDisponible(sql, usuarioId2);
+        if (dispPcm.disponible) {
+          xpPcm = dispPcm.xp;
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
+            [xpPcm, usuarioId2]
+          ).catch(function(){});
+          await registrarChatXp(sql, usuarioId2, dispPcm.hoy, dispPcm.n);
+        }
+        misionesPcm = await evaluarMisiones(sql, usuarioId2);
+        logrosPcm = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({
+          ok: true,
+          id: pcmIns[0].id,
+          creado_en: pcmIns[0].creado_en,
+          plan_id: pcmPlanId,
+          xp: xpPcm,
+          misiones: misionesPcm,
+          logros: logrosPcm
+        });
       }
 
       // -- Review_voto (Milestones v2 / ADR-014, SKATE "Own the Spot") --
@@ -2977,6 +3269,114 @@ module.exports = async function handler(req, res) {
           await sql('UPDATE album_fotos SET activo = false WHERE id = $1', [amaFotoId]);
         }
         return res.status(200).json({ ok: true });
+      }
+
+      // Admin: ajuste de XP / subir a nivel exacto (epic 2026-09-13).
+      // Bearer identico a comentarios_recientes / admin_foto_top. Body:
+      // {usuario_id, delta_xp} para sumar/restar, o {usuario_id, nivel}
+      // para subir a un nivel exacto (xp_total = minimo del umbral). El
+      // nivel/badge se recalcula desde NIVELES_ADMIN/BADGES_LOCAL: nunca
+      // se confia en la columna persistida, que puede desincronizarse.
+      if (tipo2 === 'admin_xp') {
+        var axToken = req.headers.authorization || '';
+        if (axToken.indexOf('Bearer ') !== 0)
+          return res.status(401).json({ ok: false, error: 'Token requerido' });
+        axToken = axToken.slice(7);
+        var axSecret = process.env.ADMIN_SECRET || 'exploraco12345';
+        if (axToken !== axSecret)
+          return res.status(403).json({ ok: false, error: 'Token invalido' });
+        var axUserId = String(body.usuario_id || '');
+        if (!axUserId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var axTieneNivel = body.nivel !== undefined && body.nivel !== null && body.nivel !== '';
+        var axTieneDelta = body.delta_xp !== undefined && body.delta_xp !== null && body.delta_xp !== '';
+        var axNivel = axTieneNivel ? parseInt(body.nivel, 10) : null;
+        var axDelta = axTieneDelta ? parseInt(body.delta_xp, 10) : null;
+        if (!axTieneNivel && !axTieneDelta)
+          return res.status(400).json({ ok: false, error: 'nivel o delta_xp requerido' });
+        if (axTieneNivel && axTieneDelta)
+          return res.status(400).json({ ok: false, error: 'envia solo uno de nivel o delta_xp' });
+        if (axTieneNivel && (isNaN(axNivel) || axNivel < 1 || axNivel > 20))
+          return res.status(400).json({ ok: false, error: 'nivel debe estar entre 1 y 20' });
+        if (axTieneDelta && (isNaN(axDelta) || axDelta === 0))
+          return res.status(400).json({ ok: false, error: 'delta_xp invalido' });
+        var axUsr = await sql(
+          'SELECT * FROM usuarios WHERE id=$1',
+          [axUserId]
+        ).catch(function(){ return []; });
+        if (!axUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var axXpActual = parseInt(axUsr[0].xp_total, 10) || 0;
+        var axNuevoXp;
+        if (axTieneNivel) {
+          // Decision: subir a nivel X = minimo del umbral del nivel, pero
+          // Math.max NO degrada a un usuario que ya supero ese nivel (no
+          // se quita XP ganado legitimamente con una seleccion menor).
+          axNuevoXp = Math.max(NIVELES_ADMIN[axNivel - 1], axXpActual);
+        } else {
+          axNuevoXp = Math.max(0, axXpActual + axDelta);
+        }
+        var axUpd = await sql(
+          'UPDATE usuarios SET xp_total=$1, ultimo_acceso=NOW() WHERE id=$2 RETURNING *',
+          [axNuevoXp, axUserId]
+        );
+        var axFila = axUpd && axUpd.length ? axUpd[0] : axUsr[0];
+        var axCalc = calcularNivelLocal(axNuevoXp);
+        var axEra = calcularEraLocal(axCalc.nivel);
+        return res.status(200).json({
+          ok: true,
+          data: {
+            usuario: {
+              id: axFila.id,
+              nombre: axFila.nombre,
+              email: axFila.email,
+              xp_total: axNuevoXp,
+              nivel: axCalc.nivel,
+              badge_actual: BADGES_LOCAL[axCalc.nivel - 1] || axFila.badge_actual || '',
+              era: axEra,
+            },
+            delta_aplicado: axTieneNivel ? (axNuevoXp - axXpActual) : axDelta,
+            mensaje: 'XP actualizado'
+          }
+        });
+      }
+
+      // Activar/desactivar vocacion de artista (epic 2026-09-13): toggle
+      // sobre usuarios.vocaciones (jsonb). Gate por nivel derivado de
+      // xp_total (NIVELES_ADMIN), nunca del cliente. Toggle con
+      // Object.assign/delete en JS porque hay que borrar claves; el
+      // UPDATE solo reemplaza el objeto de vocaciones del usuario.
+      if (tipo2 === 'vocacion_activar') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'Se requiere usuario_id' });
+        var vocId = String(body.vocacion_id || '');
+        var vocItem = null;
+        for (var vi = 0; vi < VOCACIONES.length; vi++) {
+          if (VOCACIONES[vi].id === vocId) { vocItem = VOCACIONES[vi]; break; }
+        }
+        if (!vocItem)
+          return res.status(400).json({ ok: false, error: 'vocacion_id no valido' });
+        var vocUsrRow2 = await sql(
+          'SELECT vocaciones, xp_total FROM usuarios WHERE id=$1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (!vocUsrRow2.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var vocNivel = calcularNivelLocal(parseInt(vocUsrRow2[0].xp_total, 10) || 0).nivel;
+        if (vocNivel < vocItem.nivel)
+          return res.status(403).json({ ok: false, error: 'Sube a nivel ' + vocItem.nivel + ' para desbloquear esta vocacion' });
+        var vocActual = (vocUsrRow2[0].vocaciones) || {};
+        var vocNuevo = Object.assign({}, vocActual);
+        if (Object.prototype.hasOwnProperty.call(vocNuevo, vocId)) {
+          delete vocNuevo[vocId];
+        } else {
+          vocNuevo[vocId] = true;
+        }
+        await sql(
+          'UPDATE usuarios SET vocaciones = $1::jsonb WHERE id=$2',
+          [JSON.stringify(vocNuevo), usuarioId2]
+        );
+        return res.status(200).json({ ok: true, data: { activadas: Object.keys(vocNuevo) } });
       }
 
       // -- Comentarios de media (ADR-023) ----------------------------

@@ -3,7 +3,8 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
-- TSK-099 / ADR-024 Presencia Fisica + Espacial v4.0 (2026-09-12, IMPLEMENTADO EN WORKING TREE) - geocerca Haversine server-side en `POST tipo=visita` (sin endpoint nuevo, 8/8), dedup-first + indice unico parcial (cierra race `23505`), `quitar_visita` -> soft-delete (`activo=false`), radios adaptativos 100/150/200/250 m, bono rural +20 XP y logro `logr_pionero` (LOGROS = 30), evidencia `interacciones.dims.geo`, conteo de visitas de `api/utilidades.js` filtra `activo=true`; tests de logros 30/30 PASS; migracion 014 NUEVA (reset de visitas gamificadas con respaldo + indice unico); UNICO BLOQUEANTE: aplicar migraciones 011/012/013/014 en Neon + deploy; ADR-024 + spec
+- TSK-100 / ADR-026 Epic prompt.txt (2026-09-13, IMPLEMENTADO EN WORKING TREE, sin commitear) - perfil museo v1 en mi-perfil.html (museo-line trofeos·fotos·destinos, galeria de 3 mejoras perfil_*, vocaciones con toggle/candado/403, chip "Sin mapa"), vocaciones acumulables (catalogo en codigo musico@5/cine@8/artista_grafico@11 + `usuarios.vocaciones` jsonb), chat por plan PRIVADO (chat_salas tipo='plan' + `planes_viaje.sala_id`, GET plan_chat / POST plan_chat_msg con +2 XP tope 20/dia, defensas en chat_msg/chat_mensajes), limpieza de salas del sistema (solo Chat general + Bogota), XP admin (POST admin_xp Bearer: delta o nivel 1-20 sin degradar via Math.max), BUG-A contarComentarioSafe (degradacion a 0 sin migracion 013), BUG-B coordsFallbackAutor (multimedia_mapa hereda coords de la visita/guardado del autor); api/usuarios.js v8 con `?buscar=`; divs 195/195, 223/223, 786/786; MIGRACION 015 NUEVA (usuarios.vocaciones, planes_viaje.sala_id, DELETE salas sistema, 3 consumibles); migraciones 011-014 YA APLICADAS por Javier en Neon (2026-09-13); UNICO BLOQUEANTE: aplicar 015 en Neon + commit/push/deploy; ADR-026 + spec
+- TSK-099 / ADR-024 Presencia Fisica + Espacial v4.0 (2026-09-12, IMPLEMENTADO EN WORKING TREE) - geocerca Haversine server-side en `POST tipo=visita` (sin endpoint nuevo, 8/8), dedup-first + indice unico parcial (cierra race `23505`), `quitar_visita` -> soft-delete (`activo=false`), radios adaptativos 100/150/200/250 m, bono rural +20 XP y logro `logr_pionero` (LOGROS = 30), evidencia `interacciones.dims.geo`, conteo de visitas de `api/utilidades.js` filtra `activo=true`; tests de logros 30/30 PASS; migracion 014 NUEVA (reset de visitas gamificadas con respaldo + indice unico); migraciones 011/012/013/014 YA APLICADAS por Javier en Neon (2026-09-13, ver TSK-100); pendiente aplicar 015 + deploy; ADR-024 + spec
 - TSK-098 / Epic multimedia de usuarios (2026-09-12, working tree SIN commitear) - fix 500 albumes/mapa (COALESCE foto/avatar + catch 42P01/42703 -> 503 `SCHEMA_NOT_MIGRATED`), filtro multimedia multi-seleccion (tipo_media CSV + 400 estricto + `tipos_aplicados`), galeria ampliada (`galeria.html` global y `?destino=<slug>`, STATIC_PAGES + boton en ficha), modulo audiovisual en comunidad.html, comentarios tipo Facebook (ADR-023: migracion 013 NUEVA + 6 `tipo=` sin endpoint nuevo) y moderacion en admin; PENDIENTE BLOQUEANTE aplicar migracion 013 en Neon; hallazgo BUG-033 (canonicals cirilicos, NO bloqueante); ADR-023
 - TSK-097 / Fixes multimedia + constraint unica de interacciones (2026-09-12, working tree SIN commitear) - migracion 012 (dedup resena/rating por indice parcial, fotos libres), catch 23505 -> 409 tipado, `DEST_PHOTOS` vacio + `photoPlaceholderHTML`, UI completa de albumes en mi-perfil, trazabilidad de autor/album, BUG-027 resuelto (icono Instagram), smoke_auditoria 42/42; PENDIENTE BLOQUEANTE aplicar migracion 012 en Neon; ADR-022
 - TSK-096 / Capa audiovisual estricta + paridad de drawer en el mapa cultural (2026-09-12, working tree SIN commitear) - deseleccion de "Todo" oculta los pines del directorio; `MAPA_MEDIA` solo albumes de usuarios (backend `?origen=album` + filtro frontend); pines del directorio/Mi Mapa abren el drawer (sin popup) y `mapas.html` estrena drawer propio; ADR-021
@@ -15,6 +16,108 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion epic prompt.txt - perfil museo, vocaciones, chat por plan y XP admin (2026-09-13) - TSK-100 / ADR-026
+
+Epic completo de 7 features + 2 bugs implementado en working tree (SIN commitear),
+Escudo GOLD verde en todos los archivos. La spec vive en
+`docs/superpowers/specs/2026-09-13-epic-prompt-vocaciones-chat-perfil-design.md`; la decision en
+`DECISIONS.md` ADR-026; la tarea en `TASKS.md` TSK-100.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/interacciones.js` v12 (4.547 lineas, header del epic en L75-83): BUG-A
+  `contarComentarioSafe` (L1025) -- `album_detalle`, `galeria_detalle`, `mi_feed_fotos`
+  degradan a 0 comentarios si la migracion 013 no existe; `comentarios_recientes` (admin)
+  sigue exigiendola. BUG-B `coordsFallbackAutor` (L1045) -- `multimedia_mapa` hereda
+  lat/lng/ciudad de la primera visita/guardado del autor con destino georreferenciado y
+  descarta los que quedan sin coords (flag `coords_heredadas`). Chat por plan: GET
+  `plan_chat` (sala+mensajes+miembros, gate miembro/creador 403, L1641-1678), POST
+  `plan_chat_msg` (gate membresia + +2 XP tope 20/dia reusando chatXpDisponible/
+  registrarChatXp, L2811-2850), `plan_crear` crea `chat_salas` tipo='plan' y liga
+  `planes_viaje.sala_id` (L2736-2748); defensa: `chat_msg` POST rechaza salas de plan y
+  `chat_mensajes` GET las excluye (L1595). POST `admin_xp` Bearer `ADMIN_SECRET`
+  (L3274-3336): `{usuario_id, delta_xp}` o `{usuario_id, nivel}` 1-20 con Math.max
+  (NO degrada), recalcula con `NIVELES_ADMIN = NIVELES_LOCAL`/`calcularNivelLocal`/
+  `calcularEraLocal`/`BADGES_LOCAL`, `UPDATE ... ultimo_acceso=NOW()` (se corrigio
+  `actualizado_en` -> `ultimo_acceso`, columna inexistente). Vocaciones: `VOCACIONES`
+  (L181-188: musico@5/cine@8/artista_grafico@11 con habilidades[]), GET
+  `vocaciones_catalogo`/`vocaciones_usuario`, POST `vocacion_activar` (toggle en
+  `usuarios.vocaciones` jsonb, gate de nivel 403, L3343-3374). GET `planes`/`planes_mios`
+  exponen `p.sala_id`.
+- `api/usuarios.js` v8 (180 lineas): GET `?buscar=` (2+ chars, ILIKE, limit 20, pasa por
+  conLogros/conMisiones/conNivel, L126-141) + columna `vocaciones` en SELECT *.
+- `db/migrations/015_epic_prompt.sql` (NUEVA, 103 lineas, idempotente ADR-008, ASCII 0
+  bytes >127): `usuarios.vocaciones jsonb NOT NULL DEFAULT '{}'`; `planes_viaje.sala_id
+  uuid REFERENCES chat_salas(id)` (FK nullable sin CASCADE); `DELETE FROM chat_salas WHERE
+  creador_id IS NULL AND nombre NOT IN ('Chat general','Bogota')` (solo quedan las 2 de
+  sistema + las creadas por usuarios; CASCADE limpia sus mensajes); 3 consumibles nuevos
+  con ON CONFLICT (clave): perfil_marco_dorado (700), perfil_tema_oscuro (500),
+  perfil_banda_artista (900). PENDIENTE DE APLICAR por Javier tras el commit.
+- `mi-perfil.html` (1.575 lineas): museo-line en hero (`#pf-museo-line`: trofeos·fotos·
+  destinos con backfill), galeria de mejoras de perfil (3 consumibles `perfil_*`),
+  seccion Vocaciones de artista (toggle/candado/403), chip "Sin mapa" en albumes sin
+  lat/lng, CSS vitrina de trofeos. Divs 195/195.
+- `comunidad.html` (1.850+ lineas): filtro defensivo de salas plan, modal privado "Chat
+  del plan" (abrirPlanChat/enviarPlanChat/polling 5 s, L1058-1154), bloque "Niveles de
+  chat" con 5 perks (chat@3, crear_chat@3, emojis_premium@7, sello_sala@10,
+  moderador_chat@12), indicador "chat activo" con p.sala_id (L987-988), refactor
+  compartido chatMsgsHTML/chatPollTick/enviarMensajeOpt. Divs 223/223.
+- `admin.html` (7.183 lineas): tab "Jugadores" (snav-jugadores + showScreen('jugadores'),
+  L1980-2039): buscador por nombre/email, tarjeta de jugador (nivel, XP, era, logros,
+  vocaciones activas), sumar/restar XP y subir a nivel exacto 1-20 via POST admin_xp
+  Bearer; refactor `_adminBuscarUsuarios` compartido con blogBuscarAutor. Divs 786/786.
+- `usuario-session.js`: `emojis_premium@7`, `sello_sala@10` en CAPACIDADES_POR_NIVEL
+  (L47-48) + catalogo `window.ExploraCO.vocaciones` (L59-87). `subirNivelTest` NO se creo
+  (no hay helpers de test previos en el proyecto).
+
+**Decisiones de producto (Javier, 2026-09-13):** vocaciones ACUMULABLES (no exclusivas);
+mejoras de perfil v1 SOLO marco dorado/tema oscuro/banda de artista (vitrina extendida y
+sello verificado a futuro); chat de plan PRIVADO solo miembros; admin XP = nivel exacto +
+delta manual sin degradar; migraciones 011-014 YA aplicadas en Neon PRODUCCION
+(2026-09-13) -- la 015 la aplica Javier tras el commit.
+
+**Verificacion (Escudo GOLD, 2026-09-13):** `node --check` PASS en api/interacciones.js v12
+y api/usuarios.js v8; ASCII 0 bytes >127; divs mi-perfil 195/195, comunidad 223/223,
+admin 786/786. QA: smoke dedicado del epic ENTREGADO en `scripts/smoke_test_epic_prompt.js`
+-- 50/50 PASS (ejecutado 2026-09-13, "SMOKE EPIC PROMPT: OK"), cubre vocaciones, admin_xp,
+plan_chat/plan_chat_msg, contarComentarioSafe, coordsFallbackAutor, queries capturadas
+sala_id/tipo!=plan, divs de los 3 HTML y la migracion 015.
+
+#### Que sigue
+1. **APLICAR `db/migrations/015_epic_prompt.sql` EN NEON (BLOQUEANTE, lo ejecuta Javier en
+   el editor SQL de Neon tras el commit; idempotente, acumulativa; requiere haber aplicado
+   la 008 y la 010).** Sin la 015: `vocacion_activar`/`vocaciones_*` fallan (columna
+   `usuarios.vocaciones` inexistente), `plan_crear` falla al ligar la sala (`planes_viaje.
+   sala_id` inexistente) y las salas extra del sistema siguen en produccion.
+2. **Commit + push + deploy manual** del working tree completo (incluye los pendientes de
+   TSK-095/096/097/098/099 y la migracion 015).
+3. **Verificacion post-deploy en vivo:** vocaciones end-to-end (toggle + 403 por nivel),
+   admin_xp niveles 1-20 sin degradacion, plan_chat con miembro vs no-miembro (403),
+   mapa cultural con fotos de usuarios (caso hostal r10), contadores de comentarios sin
+   503, y un plan nuevo con chat ligado. La geocerca de TSK-099 tambien debe verificarse
+   en vivo (marcar Estuve aqui exige ubicacion).
+4. **Pendientes pequenos:** backfill OPCIONAL de `sala_id` para planes EXISTENTES (la
+   migracion 015 los deja NULL; solo los planes creados tras el deploy obtienen sala);
+   vitrina extendida de perfil y sello verificado (futuro cercano); BUG-033 canonicals
+   cirilicos (NO bloqueante); subida real de archivos (TODO de TSK-098, storage externo).
+   COMPLETADO en esta iteracion: el smoke dedicado del epic (`scripts/smoke_test_epic_prompt.js`,
+   50/50 PASS -- vocaciones, admin_xp, plan_chat/plan_chat_msg, contarComentarioSafe,
+   coordsFallbackAutor, queries capturadas sala_id/tipo!=plan, divs de los 3 HTML, migracion 015).
+
+#### Riesgos activos
+- **Migracion 015 pending** (BLOQUEANTE): sin ella, vocaciones, sala de plan y limpieza
+  de salas no operan en produccion; el codigo ya desplegado degrada con 500/503 hasta
+  aplicarla (los helpers de BUG-A/BUG-B SI degradan bien sin migraciones).
+- **Planes existentes sin chat:** `planes_viaje.sala_id` queda NULL para los planes
+  creados antes del deploy; sin backfill manual, esos planes no tendran "Chat del plan".
+- **ADMIN_SECRET en fallback 'exploraco12345'** en el codigo (patron historico del
+  proyecto): el Bearer de admin_xp es la misma secret que admin-destinos; riesgo aceptado,
+  candidato a variable de entorno dedicada.
+- **Smoke del epic en su lugar:** `scripts/smoke_test_epic_prompt.js` (50/50 PASS,
+  2026-09-13) guarda el contrato nuevo (vocaciones/admin_xp/plan_chat/plan_chat_msg/
+  contarComentarioSafe/coordsFallbackAutor, queries capturadas sala_id/tipo!=plan, divs de
+  los 3 HTML, migracion 015). Riesgo residual: verifica se ejecute tras aplicar la migracion
+  015 en Neon y tras cada cambio futuro en interacciones.js/usuarios.js.
 
 ### Sesion presencia fisica v4.0 - geocerca de visitas (2026-09-12) - TSK-099 / ADR-024
 
@@ -81,12 +184,9 @@ destino sin coordenadas -> `modo='sin_geocerca'` (permite, sin bono); spoofing r
 2. **[HECHO] `scripts/smoke_visita_geocerca.js` 15/15 PASS (ejecutado 2026-09-12):** validaciones
    tempranas, dedup activa/inactiva, cooldown, tope diario y caminos felices urbano (xp 20) y
    rural (xp 40).
-3. **APLICAR `db/migrations/014_reset_visitas_presencia_fisica.sql` EN NEON (BLOQUEANTE, lo
-   ejecuta Javier en el editor SQL de Neon; idempotente, transaccional; requiere migracion 012
-   previa).** Verificar post-aplicacion: 0 visitas con `usuario_id IS NOT NULL`, anonimas
+3. **[HECHO 2026-09-13] APLICAR `db/migrations/014_reset_visitas_presencia_fisica.sql` EN NEON** -- ya aplicada por Javier (editor SQL de Neon; idempotente, transaccional; requeria migracion 012 previa -- la 011/012/013 tambien quedaron aplicadas el mismo dia). Verificar post-deploy en vivo: 0 visitas con `usuario_id IS NOT NULL`, anonimas
    preservadas, `interacciones_visitas_reset_backup` con las filas purgadas e
-   `idx_interacciones_visita_unica` presente. Recordar que 011/012/013 tambien siguen pendientes
-   de aplicar en Neon.
+   `idx_interacciones_visita_unica` presente. Recordar que la 015 (epic prompt.txt, TSK-100) sigue pendiente de aplicar.
 4. **Commit + push + deploy manual** del working tree (incluye la implementacion de esta tarea +
    los pendientes de TSK-095/096/097/098). Verificar en vivo que marcar "Estuve aqui" exige
    ubicacion y que fuera de rango responde 422 `FUERA_DE_RANGO`.
@@ -180,17 +280,13 @@ cirilico `\u043E` (`explorac\u043E.co`, dominio inexistente) -> BUGS/BUG-033
 (NO bloqueante, fuera del alcance del epic).
 
 #### Que sigue
-1. **Aplicar `db/migrations/013_album_comentarios.sql` en Neon (PENDIENTE
-   BLOQUEANTE, lo ejecuta Javier en el editor SQL de Neon; idempotente, no
-   requiere nada mas; requiere migracion 009 previa).** Sin la migracion:
-   los `tipo=` de comentarios (comentarios_foto, comentario_foto,
+1. **[HECHO 2026-09-13] Aplicar `db/migrations/013_album_comentarios.sql` en Neon** -- ya aplicada por Javier (editor SQL de Neon; idempotente, no requeria nada mas; requeria migracion 009 previa, ya aplicada). La 012 tambien quedo aplicada el mismo dia. Queda la 015 (epic prompt.txt, TSK-100). Sin la 013 aplicada, los `tipo=` de comentarios (comentarios_foto, comentario_foto,
    comentario_eliminar, comentario_voto) y el contador `comentarios`
-   degradan a 503 `SCHEMA_NOT_MIGRATED` (el catch 42P01 de este epic solo
-   tipifica el error; la tabla no existe en prod). Nota: la 012 tambien
-   sigue pendiente de aplicar en Neon.
+   degradaban a 503 `SCHEMA_NOT_MIGRATED` (el catch 42P01 de este epic solo
+   tipifica el error; la tabla no existia en prod).
 2. **Commit + push + deploy manual** del working tree completo (los
    archivos de esta sesion + los de TSK-095/096/097 que siguen sin
-   commitear + los cambios de modelos de agentes de `.opencode/agent/`).
+   commitear + los cambios de modelos de agentes de `.opencode/agent/` + el epic prompt.txt TSK-100).
 3. **Verificacion post-deploy:** mapa con fotos de usuarios (albumes con
    lat/lng visibles), abrir album sin 500, filtros multi-seleccion
    foto+video+audio simultaneos, galeria ampliada (modo global y
@@ -251,13 +347,11 @@ manual: 2 bugs de integracion detectados y corregidos (openAlbumModal leia
 comillas -> ReferenceError).
 
 **Pendiente / backlog:**
-1. **APLICAR `db/migrations/012_interacciones_dedup_resena_rating.sql` EN NEON
-   (PENDIENTE BLOQUEANTE, lo ejecuta Javier en el editor SQL de Neon; idempotente,
-   no requiere nada mas).** Sin la migracion: el dedup por indice parcial NO esta
-   activo en produccion y la segunda foto del mismo usuario al mismo destino sigue
+1. **[HECHO 2026-09-13] APLICAR `db/migrations/012_interacciones_dedup_resena_rating.sql` EN NEON** -- ya aplicada por Javier (editor SQL de Neon; idempotente,
+   no requeria nada mas). Las 007, 008, 009, 010 y 011 tambien quedaron aplicadas (migraciones 011-014 completas el 2026-09-13). Queda la 015 (epic prompt.txt, TSK-100). Sin la 012 el dedup por indice parcial NO estaba
+   activo en produccion y la segunda foto del mismo usuario al mismo destino seguia
    devolviendo 500 (el catch 23505 -> 409 solo tipifica el error; la constraint vieja
-   sigue existiendo). Nota: 007, 008, 009, 010 y 011 tambien siguen pendientes de
-   aplicar en Neon.
+   seguia existiendo).
 2. **Reiniciar opencode** para que tome los nuevos modelos de agentes: se cambiaron
    `backend-dev`, `architect` y `sql-security` de `opencode-go/deepseek-v4-pro` a
    `opencode-go/deepseek-v4.1-flash` y se corrigio `qa-auditor` de un ID invalido

@@ -301,7 +301,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <div class="cpanel on" id="cpanel-chat">
       <div id="chat-lock" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel 3 (250 XP). A medida que avanzas desbloqueas moderar salas (nivel 4) y crear tus propias salas (nivel 5).</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel <b id="chat-lock-nivel" style="color:var(--gold)">3</b> (<span id="chat-lock-xp">250</span> XP). A medida que avanzas desbloqueas crear salas y moderar el chat.</div>
+      </div>
+      <div id="chat-perks" style="display:none;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Niveles de chat</div>
+        <div id="chat-perks-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px"></div>
       </div>
       <div id="chat-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
@@ -422,6 +426,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   </div>
 </div>
 
+<!-- MODAL CHAT PRIVADO DEL PLAN (epic 2026-09-13; reusa estilos del modal de album) -->
+<div id="plan-chat-modal" class="av-album-modal" role="dialog" aria-label="Chat del plan">
+  <div class="av-album-box">
+    <div class="av-album-bar">
+      <div class="av-album-bar-title" id="plan-chat-title">Chat del plan</div>
+      <button class="av-album-close" onclick="cerrarPlanChatModal()" aria-label="Cerrar">&times;</button>
+    </div>
+    <div id="plan-chat-body" class="av-album-body">
+      <div id="plan-chat-members"></div>
+      <div id="plan-chat-window" class="chat-window"></div>
+      <div class="chat-input-row">
+        <input class="chat-inp" id="plan-chat-inp" type="text" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')enviarPlanChat()">
+        <button class="chat-send" onclick="enviarPlanChat()">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* =============================================================
@@ -501,7 +523,7 @@ function checkGate() {
   var gate = document.getElementById('gate');
   var comm = document.getElementById('community');
   if(sesion()) { gate.style.display='none'; comm.style.display='flex'; showCommunity(); }
-  else { gate.style.display='flex'; comm.style.display='none'; updateCommUI(); }
+  else { gate.style.display='flex'; comm.style.display='none'; planChatStopPoll(); updateCommUI(); }
 }
 function loginGate() {
   if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin();
@@ -590,6 +612,56 @@ function myName() { var u=sesion(); return (u&&u.nombre)||'Invitado'; }
 
 function capC(k) { var u = sesion(); return !!(u && u.capacidades && u.capacidades[k]); }
 
+/* ---- MEJORAS DE CHAT POR NIVEL (epic 2026-09-13) ----
+   Niveles informativos de cada perk de chat. El unlock real lo
+   decide u.capacidades (fuente de verdad); CAPACIDADES_POR_NIVEL de
+   usuario-session.js puede sobreescribir el nivel mostrado. Todo
+   texto nuevo es ASCII-safe (emojis como \uXXXX). */
+var CHAT_PERKS = [
+  {k:'chat',           nombre:'Unirse a salas',  nivel:3,  icono:'\uD83D\uDCAC'},
+  {k:'crear_chat',     nombre:'Crear sala',      nivel:3,  icono:'\uD83D\uDCE5'},
+  {k:'emojis_premium', nombre:'Emojis premium',  nivel:7,  icono:'\u2728'},
+  {k:'sello_sala',     nombre:'Sello de sala',   nivel:10, icono:'\uD83D\uDC8C'},
+  {k:'moderador_chat', nombre:'Moderar chat',    nivel:12, icono:'\uD83D\uDEE1\uFE0F'}
+];
+
+function chatPerkNivel(k, def) {
+  var mapa = (window.ExploraCO && window.ExploraCO.CAPACIDADES_POR_NIVEL) || {};
+  for (var n in mapa) {
+    if (Object.prototype.hasOwnProperty.call(mapa, n) && mapa[n] === k) return parseInt(n, 10) || def;
+  }
+  return def;
+}
+
+function setChatLockNivel() {
+  var n = chatPerkNivel('chat', 3);
+  var lvlEl = document.getElementById('chat-lock-nivel');
+  if(lvlEl) lvlEl.textContent = String(n);
+  var xpEl = document.getElementById('chat-lock-xp');
+  if(xpEl && XP_LEVELS[n-1]) xpEl.textContent = String(XP_LEVELS[n-1].min);
+}
+
+function renderChatPerks() {
+  var wrap = document.getElementById('chat-perks');
+  var grid = document.getElementById('chat-perks-grid');
+  if(!wrap || !grid) return;
+  if(!sesion()) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  var nivelActual = XP_LEVELS.indexOf(getLevel(statsU().xp)) + 1;
+  grid.innerHTML = CHAT_PERKS.map(function(p){
+    var nivelReq = chatPerkNivel(p.k, p.nivel);
+    var abierto = capC(p.k);
+    var th = XP_LEVELS[nivelReq-1] ? XP_LEVELS[nivelReq-1].min : 0;
+    return '<div style="background:rgba(255,255,255,' + (abierto ? '.06' : '.03') + ');border:1px solid ' + (abierto ? 'rgba(232,160,32,.35)' : 'rgba(255,255,255,.08)') + ';border-radius:8px;padding:10px;text-align:center" title="' + (abierto ? p.nombre + ' \u2713' : 'Requiere nivel ' + nivelReq + ' \u00b7 tu nivel: ' + nivelActual) + '">'
+      + '<div style="font-size:20px;margin-bottom:4px">' + p.icono + '</div>'
+      + '<div style="font-size:10px;font-weight:700;color:' + (abierto ? '#fff' : 'rgba(255,255,255,.5)') + '">' + p.nombre + '</div>'
+      + '<div style="font-size:9px;margin-top:5px;color:' + (abierto ? '#22C55E' : 'rgba(255,255,255,.4)') + '">'
+      + (abierto ? '\u2713 Disponible' : '\uD83D\uDD12 Nivel ' + nivelReq + ' \u00b7 ' + th + ' XP')
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
 /* ---- CHAT ---- */
 var chatSalasCache = {};
 var chatSalaActiva = null;
@@ -602,6 +674,7 @@ function renderChatRooms() {
   var head = document.getElementById('chat-rooms-head');
   var guest = document.getElementById('chat-guest');
   if(!list) return;
+  renderChatPerks();
   if(!sesion()) {
     list.innerHTML = '';
     if(lock) lock.style.display = 'none';
@@ -613,6 +686,7 @@ function renderChatRooms() {
   if(!capC('chat')) {
     list.innerHTML = '';
     if(lock) lock.style.display = 'block';
+    setChatLockNivel();
     if(head) head.style.display = 'none';
     return;
   }
@@ -625,7 +699,7 @@ function renderChatRooms() {
   fetch('/api/interacciones?tipo=chat_salas')
     .then(function(r){ return r.json(); })
     .then(function(res){
-      var salas = (res && res.data) || [];
+      var salas = ((res && res.data) || []).filter(function(s){ return s.tipo !== 'plan'; });
       chatSalasCache = {};
       salas.forEach(function(s){ chatSalasCache[s.id] = s; });
       if(!salas.length) {
@@ -691,24 +765,38 @@ function loadChatMsgs(roomId) {
     });
 }
 
-function renderChatMessages(roomId, msgs) {
-  var win = document.getElementById('chat-window');
-  if(!win) return;
+/* Builder compartido de mensajes (reuso: chat de salas y chat de plan).
+   Todo texto de usuario se escapa con esc() (fix XSS). ASCII-safe:
+   emojis y puntuacion como escapes \uXXXX. */
+function chatMsgsHTML(msgs, withMod) {
   var myId = uid();
-  var mod = capC('moderador_chat');
-  win.innerHTML = msgs.map(function(m){
+  var mod = withMod && capC('moderador_chat');
+  return msgs.map(function(m){
     var own = myId && m.usuario_id && m.usuario_id === myId;
     var ini = initialsFromName(m.nombre);
     var col = colorsFromName(m.nombre);
     var modBtns = mod ? '<div class="msg-mod">'
-      + '<button onclick="chatModAction(\'' + m.id + '\',\'fijar\')" title="Fijar">📌</button>'
-      + '<button onclick="chatModAction(\'' + m.id + '\',\'eliminar\')" title="Eliminar">🗑</button></div>' : '';
+      + '<button onclick="chatModAction(\'' + m.id + '\',\'fijar\')" title="Fijar">\uD83D\uDCCC</button>'
+      + '<button onclick="chatModAction(\'' + m.id + '\',\'eliminar\')" title="Eliminar">\uD83D\uDDD1</button></div>' : '';
     return '<div class="chat-msg' + (own?' own':'') + (m.fijado?' pinned':'') + '">'
       + '<div class="msg-av" style="background:' + col[0] + ';color:' + col[1] + '">' + esc(ini) + '</div>'
       + '<div><div class="msg-bubble">' + esc(m.texto) + '</div>'
-      + '<div class="msg-time">' + esc(m.nombre) + ' · ' + esc(fmtHora(m.creado_en)) + '</div>' + modBtns + '</div>'
+      + '<div class="msg-time">' + esc(m.nombre) + ' \u00b7 ' + esc(fmtHora(m.creado_en)) + '</div>' + modBtns + '</div>'
       + '</div>';
   }).join('');
+}
+
+function renderChatMessages(roomId, msgs) {
+  var win = document.getElementById('chat-window');
+  if(!win) return;
+  win.innerHTML = chatMsgsHTML(msgs, true);
+  win.scrollTop = win.scrollHeight;
+}
+
+function renderPlanChatMessages() {
+  var win = document.getElementById('plan-chat-window');
+  if(!win) return;
+  win.innerHTML = chatMsgsHTML(planChatMsgs || [], false);
   win.scrollTop = win.scrollHeight;
 }
 function fmtHora(iso) {
@@ -718,24 +806,33 @@ function fmtHora(iso) {
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 
+/* Tick de polling compartido (reuso: salas y plan). urlFn/extractFn/
+   cacheGet/cacheSet/render parametrizan la diferencia entre ambos. */
+function chatPollTick(urlFn, extractFn, cacheGet, cacheSet, render) {
+  fetch(urlFn())
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var msgs = extractFn(res) || [];
+      msgs.reverse();
+      var prev = cacheGet() || [];
+      var changed = msgs.length !== prev.length
+        || (msgs.length && (!prev.length || msgs[msgs.length-1].id !== prev[prev.length-1].id));
+      if(changed) { cacheSet(msgs); render(); }
+    })
+    .catch(function(){});
+}
+
 function startChatPoll() {
   stopChatPoll();
   chatPollTimer = setInterval(function(){
     if(!chatSalaActiva) { stopChatPoll(); return; }
-    fetch('/api/interacciones?tipo=chat_mensajes&sala_id=' + encodeURIComponent(chatSalaActiva))
-      .then(function(r){ return r.json(); })
-      .then(function(res){
-        var msgs = (res && res.data) || [];
-        msgs.reverse();
-        var prev = chatMsgsCache[chatSalaActiva] || [];
-        var changed = msgs.length !== prev.length
-          || (msgs.length && (!prev.length || msgs[msgs.length-1].id !== prev[prev.length-1].id));
-        if(changed) {
-          chatMsgsCache[chatSalaActiva] = msgs;
-          renderChatMessages(chatSalaActiva, msgs);
-        }
-      })
-      .catch(function(){});
+    chatPollTick(
+      function(){ return '/api/interacciones?tipo=chat_mensajes&sala_id=' + encodeURIComponent(chatSalaActiva); },
+      function(res){ return res && res.data; },
+      function(){ return chatMsgsCache[chatSalaActiva]; },
+      function(a){ chatMsgsCache[chatSalaActiva] = a; },
+      function(){ renderChatMessages(chatSalaActiva, chatMsgsCache[chatSalaActiva] || []); }
+    );
   }, 5000);
 }
 function stopChatPoll() {
@@ -768,6 +865,42 @@ function crearChatSala() {
     .catch(function(){ showXPToastComm('⚠️ No se pudo crear la sala'); });
 }
 
+/* Envio optimista compartido (reuso: chat de salas y chat de plan).
+   Contrato: body ya armado; opts = {texto, usuarioId, nombre,
+   cacheGet, cacheSet, render}. Coloca el mensaje optimista, lo
+   reemplaza por el real al responder y notifica XP (toastGaming). */
+function enviarMensajeOpt(body, opts) {
+  var myId = opts.usuarioId;
+  var miNombre = opts.nombre;
+  var texto = opts.texto;
+  var now = new Date();
+  var opt = {id:'opt-' + Date.now(), usuario_id:myId, nombre:miNombre, texto:texto, fijado:false, creado_en:now.toISOString()};
+  var cur = (opts.cacheGet && opts.cacheGet()) || [];
+  cur.push(opt);
+  if(opts.cacheSet) opts.cacheSet(cur);
+  opts.render();
+  postComAPI(body)
+    .then(function(res){
+      if(res && res.ok) {
+        var arr = (opts.cacheGet && opts.cacheGet()) || [];
+        arr = arr.filter(function(m){ return !(m.id && String(m.id).indexOf('opt-') === 0); });
+        if(res.id) {
+          arr.push({id:res.id, usuario_id:myId, nombre:miNombre, texto:texto, fijado:false, creado_en:res.creado_en || now.toISOString()});
+        }
+        if(opts.cacheSet) opts.cacheSet(arr);
+        opts.render();
+        toastGaming(res);
+      } else if(res && res.error) {
+        showXPToastComm('\u26A0\uFE0F ' + res.error);
+        var arr2 = (opts.cacheGet && opts.cacheGet()) || [];
+        arr2 = arr2.filter(function(m){ return !(m.id && String(m.id).indexOf('opt-') === 0); });
+        if(opts.cacheSet) opts.cacheSet(arr2);
+        opts.render();
+      }
+    })
+    .catch(function(){ showXPToastComm('\u26A0\uFE0F No se pudo enviar el mensaje'); });
+}
+
 function sendChatMsg() {
   if(!capC('chat')) return;
   var inp = document.getElementById('chat-inp');
@@ -776,33 +909,16 @@ function sendChatMsg() {
   if(!text) return;
   var u = sesion();
   if(!u || !chatSalaActiva) return;
-  inp.value='';
-  var now = new Date();
-  var opt = {id:'opt-' + Date.now(), usuario_id:u.id, nombre:myName(), texto:text, fijado:false, creado_en:now.toISOString()};
-  var cur = chatMsgsCache[chatSalaActiva] || [];
-  cur.push(opt);
-  chatMsgsCache[chatSalaActiva] = cur;
-  renderChatMessages(chatSalaActiva, cur);
-  postComAPI({tipo:'chat_msg', usuario_id:u.id, sala_id:chatSalaActiva, texto:text})
-    .then(function(res){
-      if(res && res.ok) {
-        var arr = chatMsgsCache[chatSalaActiva] || [];
-        arr = arr.filter(function(m){ return !(m.id && String(m.id).indexOf('opt-') === 0); });
-        if(res.id) {
-          arr.push({id:res.id, usuario_id:u.id, nombre:myName(), texto:text, fijado:false, creado_en:res.creado_en || now.toISOString()});
-        }
-        chatMsgsCache[chatSalaActiva] = arr;
-        renderChatMessages(chatSalaActiva, arr);
-        toastGaming(res);
-      } else if(res && res.error) {
-        showXPToastComm('⚠️ ' + res.error);
-        var arr2 = chatMsgsCache[chatSalaActiva] || [];
-        arr2 = arr2.filter(function(m){ return !(m.id && String(m.id).indexOf('opt-') === 0); });
-        chatMsgsCache[chatSalaActiva] = arr2;
-        renderChatMessages(chatSalaActiva, arr2);
-      }
-    })
-    .catch(function(){ showXPToastComm('⚠️ No se pudo enviar el mensaje'); });
+  inp.value = '';
+  enviarMensajeOpt(
+    {tipo:'chat_msg', usuario_id:u.id, sala_id:chatSalaActiva, texto:text},
+    {
+      texto:text, usuarioId:u.id, nombre:myName(),
+      cacheGet: function(){ return chatMsgsCache[chatSalaActiva]; },
+      cacheSet: function(a){ chatMsgsCache[chatSalaActiva] = a; },
+      render: function(){ renderChatMessages(chatSalaActiva, chatMsgsCache[chatSalaActiva] || []); }
+    }
+  );
 }
 
 /* ---- PLANES (reales, api/interacciones.js) ---- */
@@ -859,6 +975,18 @@ function renderPlanes() {
             joinBtn.style.cursor = 'default';
           }
           card.appendChild(joinBtn);
+        }
+        /* Chat privado del plan (epic 2026-09-13): disponible para el
+           creador y los miembros; la sala puede no existir aun (el
+           modal muestra el error del backend si es el caso). */
+        if(p.unido || (u && p.creador_id && String(p.creador_id) === String(u.id))) {
+          var chatPlanBtn = document.createElement('button');
+          chatPlanBtn.className = 'plan-join-btn';
+          chatPlanBtn.style.marginTop = '6px';
+          chatPlanBtn.innerHTML = '\uD83D\uDCAC Chat del plan'
+            + (p.sala_id ? ' \u00b7 <span style="color:#22C55E">chat activo</span>' : '');
+          chatPlanBtn.onclick = function(){ abrirPlanChat(p.id, p.destino); };
+          card.appendChild(chatPlanBtn);
         }
         grid.appendChild(card);
       });
@@ -923,6 +1051,118 @@ function planSalir(planId) {
   postComAPI({tipo:'plan_salir', usuario_id:u.id, plan_id:planId})
     .then(function(res){ if(res && res.ok) renderPlanes(); })
     .catch(function(){});
+}
+
+/* ---- CHAT PRIVADO DE PLANES (epic 2026-09-13) ----
+   Modal con sala ligada al plan (solo miembros). Fuente: GET
+   tipo=plan_chat / POST tipo=plan_chat_msg. Reusa chatMsgsHTML,
+   chatPollTick y enviarMensajeOpt (sin duplicar logica). */
+var planChatPlanId = null;
+var planChatSalaId = null;
+var planChatMsgs = [];
+var planChatPollTimer = null;
+
+function abrirPlanChat(planId, planNombre) {
+  var u = sesion();
+  if(!u) { loginGate(); return; }
+  planChatPlanId = planId;
+  planChatSalaId = null;
+  planChatMsgs = [];
+  var modal = document.getElementById('plan-chat-modal');
+  if(!modal) return;
+  modal.classList.add('on');
+  var title = document.getElementById('plan-chat-title');
+  if(title) title.textContent = '\uD83D\uDCAC ' + (planNombre || 'Chat del plan');
+  var members = document.getElementById('plan-chat-members');
+  var win = document.getElementById('plan-chat-window');
+  var inp = document.getElementById('plan-chat-inp');
+  if(members) members.innerHTML = '';
+  if(win) win.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:20px 0;text-align:center">Cargando chat\u2026</div>';
+  if(inp) inp.value = '';
+  fetch('/api/interacciones?tipo=plan_chat&plan_id=' + encodeURIComponent(planId) + '&usuario_id=' + encodeURIComponent(u.id || ''))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if(!res || !res.ok) {
+        var errText = (res && res.error) || 'No se pudo cargar el chat del plan';
+        if(win) win.innerHTML = '<div style="color:rgba(255,255,255,.5);font-size:11px;padding:30px 0;text-align:center">' + esc(errText) + '</div>';
+        if(members) members.innerHTML = '';
+        planChatPlanId = null;
+        planChatStopPoll();
+        return;
+      }
+      var sala = res.sala || {};
+      planChatSalaId = sala.id || null;
+      if(members) {
+        var lista = res.miembros || [];
+        members.innerHTML = '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Miembros (' + lista.length + ')</div>'
+          + lista.map(function(n){
+            var ini = initialsFromName(n);
+            var col = colorsFromName(n);
+            return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:3px 10px;font-size:10px;color:rgba(255,255,255,.75);margin:0 4px 6px 0">'
+              + '<span style="width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;background:' + col[0] + ';color:' + col[1] + '">' + esc(ini) + '</span>'
+              + esc(n) + '</span>';
+          }).join('');
+      }
+      var msgs = res.mensajes || [];
+      msgs.reverse();
+      planChatMsgs = msgs;
+      renderPlanChatMessages();
+      planChatStartPoll();
+      if(inp) inp.focus();
+    })
+    .catch(function(){
+      if(win) win.innerHTML = '<div style="color:rgba(255,255,255,.5);font-size:11px;padding:30px 0;text-align:center">No se pudo cargar el chat del plan</div>';
+      planChatPlanId = null;
+      planChatStopPoll();
+    });
+}
+
+function cerrarPlanChatModal() {
+  planChatStopPoll();
+  planChatPlanId = null;
+  planChatSalaId = null;
+  planChatMsgs = [];
+  var modal = document.getElementById('plan-chat-modal');
+  if(modal) modal.classList.remove('on');
+}
+
+function enviarPlanChat() {
+  var u = sesion();
+  if(!u) { loginGate(); return; }
+  var inp = document.getElementById('plan-chat-inp');
+  if(!inp || !planChatPlanId) return;
+  var text = inp.value.trim();
+  if(!text) return;
+  inp.value = '';
+  enviarMensajeOpt(
+    {tipo:'plan_chat_msg', plan_id:planChatPlanId, usuario_id:u.id, texto:text},
+    {
+      texto:text, usuarioId:u.id, nombre:myName(),
+      cacheGet: function(){ return planChatMsgs; },
+      cacheSet: function(a){ planChatMsgs = a; },
+      render: renderPlanChatMessages
+    }
+  );
+}
+
+function planChatStartPoll() {
+  planChatStopPoll();
+  planChatPollTimer = setInterval(function(){
+    if(!planChatPlanId) { planChatStopPoll(); return; }
+    var u = sesion();
+    if(!u) return;
+    var urlPlan = '/api/interacciones?tipo=plan_chat&plan_id=' + encodeURIComponent(planChatPlanId) + '&usuario_id=' + encodeURIComponent(u.id || '');
+    chatPollTick(
+      function(){ return urlPlan; },
+      function(res){ return res && res.mensajes; },
+      function(){ return planChatMsgs; },
+      function(a){ planChatMsgs = a; },
+      renderPlanChatMessages
+    );
+  }, 5000);
+}
+function planChatStopPoll() {
+  if(planChatPollTimer) { clearInterval(planChatPollTimer); planChatPollTimer = null; }
 }
 
 /* ---- PANDILLAS (Gamificacion v4) ---- */

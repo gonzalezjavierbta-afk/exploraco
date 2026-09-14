@@ -494,6 +494,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('consumibles')" id="snav-consumibles">
     <span class="snav-icon">🧪</span>Consumibles
   </div>
+  <div class="snav-item" onclick="showScreen('jugadores')" id="snav-jugadores">
+    <span class="snav-icon">&#127918;</span>Jugadores
+  </div>
 </nav>
 
 <!-- ─── WORKSPACE ───────────────────────────────── -->
@@ -1973,6 +1976,67 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
     </div>
   </div>
 </div>
+
+<div class="ws-screen" id="screen-jugadores">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">JUGADORES</div>
+      <div class="ws-subtitle">Busca un jugador y administra su XP y nivel</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="limpiarPanelJugadores()">&#8634; Limpiar</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+    <style>
+      #screen-jugadores .jug-opt:hover{background:var(--bg2,#F3EFE7)}
+    </style>
+
+    <!-- Buscador -->
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px">&#128269; Buscar jugador</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1 1 320px;min-width:220px">
+          <input class="form-input" id="jug-buscar" placeholder="Buscar por nombre o email..." onkeydown="if(event.key==='Enter'){buscarJugadores();}" autocomplete="off" style="width:100%">
+        </div>
+        <button class="btn btn-gold" onclick="buscarJugadores()">&#128269; Buscar</button>
+      </div>
+      <div id="jug-resultados" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg)"></div>
+    </div>
+
+    <!-- Tarjeta del jugador -->
+    <div id="jug-tarjeta-wrap"></div>
+
+    <!-- Acciones XP -->
+    <div id="jug-acciones" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px">&#9889; Acciones XP</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+
+        <div style="flex:1 1 280px;min-width:240px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Sumar / Restar XP</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="form-input" id="jug-delta" type="number" min="0" step="1" placeholder="Ej: 50" style="width:110px">
+            <button class="btn btn-gold btn-sm" onclick="aplicarDeltaXP(1)">+ XP</button>
+            <button class="btn btn-danger btn-sm" onclick="aplicarDeltaXP(-1)">- XP</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px">El valor se suma o resta al XP actual. El backend no deja bajar de 0.</div>
+        </div>
+
+        <div style="flex:1 1 280px;min-width:240px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Subir a nivel</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="form-input" id="jug-nivel" style="width:150px"></select>
+            <button class="btn btn-gold btn-sm" id="jug-nivel-btn" onclick="jugSubirNivel()">Subir a nivel</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px">Lleva la XP al minimo del nivel EXACTO elegido; nunca degrada.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /screen-jugadores -->
 
 <!-- ════ MODAL: EDITAR CONSUMIBLE (ADR-018) ════ -->
 <div id="consumible-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
@@ -5725,10 +5789,8 @@ function blogBuscarAutor(query) {
     return;
   }
   _blogAutorBuscarTimer = setTimeout(function() {
-    fetch('/api/usuarios?buscar=' + encodeURIComponent(query.trim()) + '&limit=8', { headers: _adminHeaders() })
-      .then(function(r){ return r.json(); })
-      .then(function(res){
-        var items = (res && res.data) ? res.data : [];
+    _adminBuscarUsuarios(query, 8)
+      .then(function(items){
         if (!resultsEl) return;
         if (!items.length) {
           resultsEl.style.display = 'block';
@@ -6846,6 +6908,258 @@ async function toggleConsumible(id) {
 function escH(s) {
   if(!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ===== JUGADORES: busqueda + XP =====
+   Contratos (api/ ya implementado, no tocar):
+   GET  /api/usuarios?buscar=TEXT&limit=N
+        -> { data:[{id,nombre,email,xp_total,nivel,badge_actual,era,total_logros,vocaciones}] }
+   POST /api/interacciones?tipo=admin_xp
+        body {usuario_id, delta_xp} o {usuario_id, nivel}
+        -> { ok:true, data:{ usuario:{id,nombre,email,xp_total,nivel,badge_actual,era}, delta_aplicado, mensaje } }
+   GET  /api/interacciones?tipo=vocaciones_usuario&usuario_id=ID
+        -> { ok:true, data:{ activadas:[slugs], catalogo:[{slug,nombre,min_nivel}] } }
+   Errores tipificados 400/401/403/404 -> { error: '...' } */
+var _jugNiveles = [0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000];
+var _jugActivo = null;
+var _jugActivoData = null;
+var _jugActivoVocaciones = null;
+var _jugResultados = [];
+var _jugVocacionesCatalogo = [];
+var _jugVocacionesActivas = [];
+var _jugMensajeProcesando = false;
+
+/* Buscador generico reutilizable (compartido con blogBuscarAutor). */
+function _adminBuscarUsuarios(query, limit) {
+  return fetch('/api/usuarios?buscar=' + encodeURIComponent(query.trim()) + '&limit=' + (limit || 8), { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(res){ return (res && res.data) ? res.data : []; });
+}
+
+function buscarJugadores() {
+  var qEl = document.getElementById('jug-buscar');
+  if (!qEl) return;
+  var q = (qEl.value || '').trim();
+  if (q.length < 2) {
+    showAdminToast('Escribe al menos 2 caracteres para buscar', 'error');
+    return;
+  }
+  _adminBuscarUsuarios(q, 10).then(function(items){
+    _jugResultados = items || [];
+    jugRenderLista();
+  }).catch(function(){
+    showAdminToast('No se pudo buscar. Verifica /api/usuarios', 'error');
+  });
+}
+
+function jugRenderLista() {
+  var resultsEl = document.getElementById('jug-resultados');
+  if (!resultsEl) return;
+  if (!_jugResultados.length) {
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted,#888)">Sin resultados. Verifica el nombre o email.</div>';
+    return;
+  }
+  resultsEl.style.display = 'block';
+  resultsEl.innerHTML = _jugResultados.map(function(u){
+    var nl = Number(u.nivel) || 0;
+    var cls = (u.id === _jugActivo) ? 'background:var(--gold-light,#F5E9D0);' : '';
+    return '<div class="jug-opt" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--border,#EDE8E0);' + cls + '" onclick="jugSeleccionar(\'' + _esc(u.id) + '\')">'
+      + '<div style="display:flex;align-items:center;gap:10px">'
+      + '<div style="width:32px;height:32px;border-radius:50%;background:var(--gold-dark,#B98A2F);color:var(--white,#fff);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">' + _esc((u.nombre || '?').charAt(0).toUpperCase()) + '</div>'
+      + '<div style="min-width:0">'
+      + '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(u.nombre || '(sin nombre)') + '</div>'
+      + '<div style="font-size:11px;color:var(--muted,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(u.email || '') + '</div>'
+      + '</div>'
+      + '<div style="margin-left:auto;text-align:right;flex:none">'
+      + '<div style="font-size:12px;font-weight:700">Nv ' + nl + '</div>'
+      + '<div style="font-size:10px;color:var(--muted,#888)">' + (u.xp_total || 0) + ' XP</div>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function jugSeleccionar(id) {
+  var u = null;
+  for (var i = 0; i < _jugResultados.length; i++) {
+    if (_jugResultados[i].id === id) { u = _jugResultados[i]; break; }
+  }
+  if (!u) { showAdminToast('Jugador no encontrado en los resultados', 'error'); return; }
+  _jugActivo = id;
+  jugRenderLista();
+  jugRender(u, true);
+}
+
+function jugActualizarDatos(u) {
+  if (!u) return;
+  if (!_jugActivoData) { _jugActivoData = u; return; }
+  for (var key in u) { if (u.hasOwnProperty(key)) { _jugActivoData[key] = u[key]; } }
+}
+
+function jugRender(u, conVocaciones) {
+  if (!u || !u.id) { showAdminToast('Datos del jugador invalidos', 'error'); return; }
+  jugActualizarDatos(u);
+  var p = _jugActivoData;
+  _jugActivo = p.id;
+  var wrap = document.getElementById('jug-tarjeta-wrap');
+  if (!wrap) return;
+  var acciones = document.getElementById('jug-acciones');
+  var xpActual = Number(p.xp_total) || 0;
+  var lvl = Number(p.nivel) || 1;
+  var xpMin = _jugNiveles[lvl] || 0;
+  var xpMax = (lvl < 20) ? (_jugNiveles[lvl + 1] || 999999) : 999999;
+  var pct = Math.max(0, Math.min(100, Math.round(((xpActual - xpMin) / Math.max(1, xpMax - xpMin)) * 100)));
+  var html = '';
+  html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">';
+  html += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
+  html += '<div style="width:54px;height:54px;border-radius:50%;background:var(--gold-dark,#B98A2F);color:var(--white,#fff);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex:none">' + _esc((p.nombre || '?').charAt(0).toUpperCase()) + '</div>';
+  html += '<div style="min-width:0;flex:1 1 200px">';
+  html += '<div style="font-size:16px;font-weight:800">' + _esc(p.nombre || '(sin nombre)') + '</div>';
+  html += '<div style="font-size:12px;color:var(--muted,#888)">' + _esc(p.email || '') + '</div>';
+  if (p.era) { html += '<div style="font-size:11px;color:var(--gold-dark,#B98A2F);font-weight:700;margin-top:2px">' + _esc(p.era) + '</div>'; }
+  html += '</div>';
+  html += '<div style="text-align:right;flex:none">';
+  html += '<div style="font-size:12px;color:var(--muted,#888)">NIVEL</div>';
+  html += '<div style="font-size:26px;font-weight:800;line-height:1">' + lvl + '</div>';
+  html += '<div style="font-size:12px;color:var(--muted,#888);margin-top:2px">' + xpActual + ' XP</div>';
+  html += '</div>';
+  html += '</div>';
+  html += '<div style="height:6px;border-radius:3px;background:var(--bg,#F3EFE7);margin-top:14px;overflow:hidden">';
+  html += '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,var(--gold-light,#EACB7F),var(--gold-dark,#B98A2F))"></div>';
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted,#888);margin-top:4px">';
+  html += '<span>Minimo nivel ' + lvl + ': ' + xpMin + ' XP</span>';
+  html += (lvl >= 20) ? '<span>Nivel maximo alcanzado</span>' : '<span>Nivel ' + (lvl + 1) + ': desde ' + xpMax + ' XP</span>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">';
+  html += '<div style="background:var(--bg,#F3EFE7);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600">&#127942; Logros: ' + (p.total_logros || 0) + '</div>';
+  html += jugRenderVocacionesHtml();
+  html += '</div>';
+  html += '</div>';
+  wrap.innerHTML = html;
+  if (acciones) { acciones.style.display = 'block'; }
+  jugPoblarNiveles(lvl);
+  if (conVocaciones) { jugCargarVocaciones(p.id); }
+}
+
+function jugRenderVocacionesHtml() {
+  var html = '';
+  var mapa = {};
+  for (var i = 0; i < _jugVocacionesCatalogo.length; i++) {
+    mapa[_jugVocacionesCatalogo[i].id] = _jugVocacionesCatalogo[i].nombre || _jugVocacionesCatalogo[i].id;
+  }
+  if (_jugActivoVocaciones === _jugActivo && _jugVocacionesActivas.length) {
+    for (var j = 0; j < _jugVocacionesActivas.length; j++) {
+      var slug = _jugVocacionesActivas[j];
+      html += '<div style="background:var(--bg,#F3EFE7);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600">&#127891; ' + _esc(mapa[slug] || slug) + '</div>';
+    }
+  } else if (_jugActivoVocaciones === _jugActivo && !_jugVocacionesActivas.length) {
+    html += '<div style="background:var(--bg,#F3EFE7);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--muted,#888)">Sin vocaciones activas</div>';
+  }
+  return html;
+}
+
+function jugCargarVocaciones(id) {
+  fetch('/api/interacciones?tipo=vocaciones_usuario&usuario_id=' + encodeURIComponent(id), { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (!res || !res.ok || !res.data) { showAdminToast('No se pudo cargar las vocaciones', 'error'); return; }
+      _jugVocacionesCatalogo = (res.data.catalogo || []).slice();
+      _jugVocacionesActivas = res.data.activadas || [];
+      _jugActivoVocaciones = id;
+      if (_jugActivoData) { jugRender(_jugActivoData, false); }
+    })
+    .catch(function(){
+      showAdminToast('No se pudo cargar las vocaciones', 'error');
+    });
+}
+
+function jugPoblarNiveles(actual) {
+  var sel = document.getElementById('jug-nivel');
+  if (!sel) return;
+  var previo = Number(sel.value) || 0;
+  var html = '';
+  for (var i = 1; i <= _jugNiveles.length; i++) {
+    html += '<option value="' + i + '">Nivel ' + i + ' (desde ' + (_jugNiveles[i - 1] || 0) + ' XP)</option>';
+  }
+  sel.innerHTML = html;
+  var objetivo = (previo >= 1 && previo <= _jugNiveles.length) ? previo : (Number(actual) || 1);
+  if (objetivo >= 1 && objetivo <= _jugNiveles.length) { sel.value = String(objetivo); }
+}
+
+function aplicarDeltaXP(signo) {
+  var inp = document.getElementById('jug-delta');
+  if (!inp) return;
+  var val = parseInt(inp.value, 10);
+  if (!val || val <= 0) { showAdminToast('Ingresa un valor mayor que 0', 'error'); return; }
+  if (!_jugActivo) { showAdminToast('Selecciona un jugador primero', 'error'); return; }
+  var etiqueta = (signo > 0) ? 'sumar' : 'restar';
+  jugAplicarXP({ usuario_id: _jugActivo, delta_xp: signo * val }, 'XP ' + etiqueta + ' ' + val);
+}
+
+function jugSubirNivel() {
+  var sel = document.getElementById('jug-nivel');
+  if (!sel) return;
+  var nivel = parseInt(sel.value, 10);
+  if (!nivel || nivel < 1 || nivel > 20) { showAdminToast('Nivel invalido', 'error'); return; }
+  if (!_jugActivo) { showAdminToast('Selecciona un jugador primero', 'error'); return; }
+  jugAplicarXP({ usuario_id: _jugActivo, nivel: nivel }, 'nivel ' + nivel);
+}
+
+function jugAplicarXP(payload, etiqueta) {
+  if (_jugMensajeProcesando) return;
+  _jugMensajeProcesando = true;
+  var btn = document.getElementById('jug-nivel-btn');
+  if (btn) { btn.disabled = true; }
+  fetch('/api/interacciones?tipo=admin_xp', {
+    method: 'POST',
+    headers: _adminHeaders(),
+    body: JSON.stringify(payload)
+  })
+    .then(function(r){ return r.json().then(function(res){ return { status: r.status, res: res }; }); })
+    .then(function(br){
+      if (br.status >= 400 || !br.res || !br.res.ok) {
+        var err = (br.res && br.res.error) ? br.res.error : ('HTTP ' + br.status);
+        showAdminToast('Error: ' + err, 'error');
+        return;
+      }
+      var d = br.res.data || {};
+      var u = d.usuario || {};
+      if (u.id) {
+        _jugActivo = u.id;
+        jugRender(u, false);
+      }
+      showAdminToast(d.mensaje || ('OK: ' + etiqueta + ' aplicado'), 'success');
+    })
+    .catch(function(){
+      showAdminToast('Error de red al aplicar la accion', 'error');
+    })
+    .then(function(){
+      _jugMensajeProcesando = false;
+      if (btn) { btn.disabled = false; }
+    });
+}
+
+function limpiarPanelJugadores() {
+  _jugActivo = null;
+  _jugActivoData = null;
+  _jugActivoVocaciones = null;
+  _jugResultados = [];
+  _jugVocacionesCatalogo = [];
+  _jugVocacionesActivas = [];
+  var qEl = document.getElementById('jug-buscar');
+  var rEl = document.getElementById('jug-resultados');
+  var tEl = document.getElementById('jug-tarjeta-wrap');
+  var aEl = document.getElementById('jug-acciones');
+  var sEl = document.getElementById('jug-nivel');
+  var dEl = document.getElementById('jug-delta');
+  if (qEl) { qEl.value = ''; }
+  if (rEl) { rEl.style.display = 'none'; rEl.innerHTML = ''; }
+  if (tEl) { tEl.innerHTML = ''; }
+  if (aEl) { aEl.style.display = 'none'; }
+  if (sEl) { sEl.innerHTML = ''; }
+  if (dEl) { dEl.value = ''; }
 }
 
 
