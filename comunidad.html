@@ -230,6 +230,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pand-btn-outline:hover{background:var(--gold);color:var(--black)}
 .pand-btn-danger{background:transparent;border:1px solid rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
 .pand-btn-danger:hover{border-color:#ef4444;color:#ef4444}
+/* ACTIVO OCULTO (Wayfarer, Entrega 016) */
+.ao-podium{display:flex;gap:8px;justify-content:center;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap}
+.ao-pod-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;text-align:center;min-width:110px;flex:1;max-width:180px}
+.ao-pod-item.first{border-color:rgba(232,160,32,.4);background:linear-gradient(135deg,rgba(232,160,32,.1),rgba(255,255,255,.04))}
+.ao-voto{background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 10px;transition:all .15s;font-family:'Outfit',sans-serif}
+.ao-voto:hover{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.ao-voto.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.ao-voto-contra{background:transparent;border:1px solid rgba(239,68,68,.3);border-radius:4px;color:#ef4444;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 10px;transition:all .15s;font-family:'Outfit',sans-serif}
+.ao-voto-contra:hover{background:#ef4444;border-color:#ef4444;color:#fff}
 </style>
 </head>
 <body>
@@ -289,7 +298,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="ctab" onclick="showCommTab('planes')">🗺️ Planes</div>
       <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
-      <div class="ctab" onclick="showCommTab('pandillas')">👥 Pandillas</div>
+      <div class="ctab" onclick="showCommTab('pandillas')">👥 Parches</div>
+      <div class="ctab" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
       <div class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
     </div>
     </div>
@@ -382,8 +392,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <!-- PANDILLAS (Gamificacion v4) -->
     <div class="cpanel" id="cpanel-pandillas">
       <div id="pandillas-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
-        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Pandillas bloqueadas</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte o fundar una pandilla.</div>
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Parches bloqueados</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte o fundar un parche.</div>
         <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
       </div>
       <div id="pandilla-mi-pandilla"></div>
@@ -408,6 +418,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div style="text-align:center;margin-top:16px">
         <button class="pand-btn pand-btn-outline" id="av-more-btn" style="display:none" onclick="avCargarMas()">Cargar más álbumes</button>
       </div>
+    </div>
+
+    <!-- ACTIVO OCULTO (Wayfarer, Entrega 016) -->
+    <div class="cpanel" id="cpanel-wayfarer">
+      <div id="ao-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+        <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🕵️ Activo Oculto bloqueado</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para proponer, votar y descubrir puntos secretos.</div>
+        <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
+      </div>
+      <div id="ao-email-banner" style="display:none;margin-bottom:14px">
+        <div style="padding:10px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;display:flex;align-items:center;gap:10px">
+          <div style="font-size:18px;flex-shrink:0">📧</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);flex:1">Verifica tu correo primero para proponer y votar activos ocultos.</div>
+        </div>
+      </div>
+      <div id="ao-proponer"></div>
+      <div id="ao-facciones"></div>
+      <div id="ao-pendientes"></div>
     </div>
 
   </div>
@@ -1190,7 +1218,7 @@ function cargarPandillaDetalle() {
   var fundar = document.getElementById('pandilla-fundar');
   var retos = document.getElementById('pandilla-retos');
   if(!u || !miPandilla) return;
-  miPandilla.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando pandilla\u2026</div>';
+  miPandilla.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando parche\u2026</div>';
   if(fundar) fundar.innerHTML = '';
   if(document.getElementById('pandillas-unirse')) document.getElementById('pandillas-unirse').innerHTML = '';
   if(retos) retos.innerHTML = '';
@@ -1219,13 +1247,13 @@ function cargarPandillaDetalle() {
           + '<span class="pand-rol ' + rolCls + '">' + rolCls + '</span>'
           + '</div>';
       });
-      html += '<button class="pand-btn pand-btn-danger" style="margin-top:10px" onclick="pandillaSalir()">Salir de la pandilla</button>';
+      html += '<button class="pand-btn pand-btn-danger" style="margin-top:10px" onclick="pandillaSalir()">Salir del parche</button>';
       html += '</div>';
       miPandilla.innerHTML = html;
       renderPandillaRetos(data.retos || [], retos, esLiderPandilla(pandilla, miembros), pandilla);
     })
     .catch(function(){
-      miPandilla.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar la pandilla.</div>';
+      miPandilla.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar el parche.</div>';
     });
 }
 
@@ -1247,15 +1275,15 @@ function renderPandillaCTA() {
   var lvlIdx = XP_LEVELS.indexOf(lvl);
   if(lvlIdx >= 13) {
     fundar.innerHTML = '<div class="pand-card" style="text-align:center">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">Crea tu propia pandilla</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">Crea tu propio parche</div>'
       + '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Nivel 14+ · Los fundadores ganan fama con cada miembro</div>'
-      + '<input class="chat-inp" id="pand-nombre" maxlength="100" placeholder="Nombre de la pandilla" style="margin-bottom:8px">'
+      + '<input class="chat-inp" id="pand-nombre" maxlength="100" placeholder="Nombre del parche" style="margin-bottom:8px">'
       + '<input class="chat-inp" id="pand-ciudad" maxlength="100" placeholder="Ciudad base (opcional)" style="margin-bottom:8px">'
-      + '<button class="pand-btn" onclick="pandillaCrear()">Fundar Pandilla</button>'
+      + '<button class="pand-btn" onclick="pandillaCrear()">Fundar Parche</button>'
       + '</div>';
   } else {
     fundar.innerHTML = '<div class="pand-card" style="text-align:center">'
-      + '<div style="font-size:11px;color:rgba(255,255,255,.4)">Necesitas Nivel 14 (Cartografo de Cine) para fundar una pandilla.</div>'
+      + '<div style="font-size:11px;color:rgba(255,255,255,.4)">Necesitas Nivel 14 (Cartografo de Cine) para fundar un parche.</div>'
       + '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">Tu nivel actual: ' + (lvlIdx + 1) + ' · ' + lvl.nombre + '</div>'
       + '</div>';
   }
@@ -1267,7 +1295,7 @@ function renderPandillasUnirse(list) {
   if(!el) return;
   if(!list || !list.length) { el.innerHTML = ''; return; }
   var html = '<div class="pand-card">'
-    + '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Pandillas abiertas a membresia</div>';
+    + '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Parches abiertos a membresia</div>';
   list.forEach(function(p){
     var cantTxt = p.miembros_count != null ? ' · ' + p.miembros_count + ' miembros'
       : (p.cantidad_miembros != null ? ' · ' + p.cantidad_miembros + ' miembros' : '');
@@ -1291,7 +1319,7 @@ function pandillaUnirse(pandillaId, btn) {
   postComAPI({ tipo: 'pandilla_unirse', usuario_id: u.id, pandilla_id: pandillaId })
     .then(function(res){
       if(res && res.ok) {
-        showXPToastComm('👥 Te uniste a la pandilla');
+        showXPToastComm('\uD83D\uDC65 Te uniste al parche');
         cargarPandillaDetalle();
       } else {
         showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo unir'));
@@ -1392,7 +1420,7 @@ function pandillaCrear() {
   var nombreEl = document.getElementById('pand-nombre');
   var ciudadEl = document.getElementById('pand-ciudad');
   var nombre = nombreEl ? nombreEl.value.trim() : '';
-  if(!nombre) { showXPToastComm('⚠️ Escribe un nombre para la pandilla'); return; }
+  if(!nombre) { showXPToastComm('\u26A0\uFE0F Escribe un nombre para el parche'); return; }
   var btn = document.getElementById('pandilla-fundar').querySelector('.pand-btn');
   if(btn) { btn.disabled = true; btn.textContent = 'Creando\u2026'; }
   postComAPI({
@@ -1403,27 +1431,27 @@ function pandillaCrear() {
   })
     .then(function(res){
       if(res && res.ok) {
-        showXPToastComm('👥 Pandilla "' + nombre + '" creada!');
+        showXPToastComm('\uD83D\uDC65 Parche "' + nombre + '" creado!');
         renderPandillas();
       } else {
-        showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo crear la pandilla'));
-        if(btn) { btn.disabled = false; btn.textContent = 'Fundar Pandilla'; }
+        showXPToastComm('\u26A0\uFE0F ' + (res && res.error ? res.error : 'No se pudo crear el parche'));
+        if(btn) { btn.disabled = false; btn.textContent = 'Fundar Parche'; }
       }
     })
     .catch(function(){
       showXPToastComm('⚠️ Error de conexion');
-      if(btn) { btn.disabled = false; btn.textContent = 'Fundar Pandilla'; }
+      if(btn) { btn.disabled = false; btn.textContent = 'Fundar Parche'; }
     });
 }
 
 function pandillaSalir() {
   var u = sesion();
   if(!u) return;
-  if(!window.confirm('¿Seguro que quieres salir de tu pandilla?')) return;
+  if(!window.confirm('\u00BFSeguro que quieres salir de tu parche?')) return;
   postComAPI({ tipo: 'pandilla_salir', usuario_id: u.id })
     .then(function(res){
       if(res && res.ok) {
-        showXPToastComm('👋 Saliste de la pandilla');
+        showXPToastComm('\uD83D\uDC4B Saliste del parche');
         renderPandillas();
       } else {
         showXPToastComm('⚠️ ' + (res && res.error ? res.error : 'No se pudo salir'));
@@ -1837,6 +1865,341 @@ function feedCardAV(f) {
   return card;
 }
 
+/* ---- ACTIVO OCULTO (Wayfarer, Entrega 016) ----
+   Segmento gamificado: los viajeros proponen puntos secretos con
+   geolocalizacion, votan las propuestas pendientes (quorum +/-3) y
+   las facciones compiten por el control territorial. Las llamadas
+   de voto llevan la sesion firmada JWT (ADR-025) como Bearer; si el
+   backend responde 401 SESION_REQUERIDA se renueva el token con un
+   re-POST upsert silencioso a /api/usuarios. ASCII-safe: emojis y
+   tildes como escapes \uXXXX (misma convencion que el resto del JS). */
+var _aoInicializado = false;
+var _aoCategorias = ['parque','sendero','mirador','cueva','cascada','ruina','monumento','plaza','playa','finca','gastronomico','otro'];
+var _aoFacciones = {
+  exploradores: { nombre: 'Exploradores', icono: '\uD83E\uDDED' },
+  curadores:    { nombre: 'Curadores',    icono: '\uD83D\uDEE1\uFE0F' },
+  creadores:    { nombre: 'Creadores',    icono: '\uD83C\uDFA8' },
+  artistas:     { nombre: 'Artistas',     icono: '\uD83C\uDFAD' }
+};
+
+function obtenerJwtExploraco() {
+  if (window.ExploraCO && typeof window.ExploraCO.obtenerJwt === 'function') {
+    try { return window.ExploraCO.obtenerJwt(); } catch (e) {}
+  }
+  if (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.jwt) {
+    return window.ExploraCO.usuario.jwt;
+  }
+  return '';
+}
+
+function refrescarJwtExploraco() {
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if (!u) return Promise.resolve('');
+  var body = {
+    auth_id: u.auth_id || ('email:' + String(u.email || '').toLowerCase()),
+    email: u.email || '',
+    nombre: u.nombre || 'Viajero',
+    auth_provider: u.auth_provider || 'email'
+  };
+  if (u.avatar_url) body.avatar_url = u.avatar_url;
+  return fetch('/api/usuarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res && res.ok && res.data && res.data.jwt) {
+        if (window.ExploraCO) window.ExploraCO.usuario = res.data;
+        try { localStorage.setItem('exploraco_user', JSON.stringify(res.data)); } catch (e) {}
+        return res.data.jwt;
+      }
+      return '';
+    })
+    .catch(function(){ return ''; });
+}
+
+/* POST a /api/interacciones con Bearer JWT (ADR-025). Si el backend
+   responde 401 SESION_REQUERIDA, refresca el token en silencio y
+   reintenta el mismo body una sola vez. Devuelve el JSON final (ya
+   reintentado o el error original si el refresh no produce JWT). */
+function postComAPIJWT(body) {
+  var jwt = obtenerJwtExploraco();
+  var headers = { 'Content-Type': 'application/json' };
+  if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+  return fetch('/api/interacciones', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  })
+    .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }); })
+    .then(function(res){
+      if (res.status === 401 && res.body && res.body.error === 'SESION_REQUERIDA') {
+        return refrescarJwtExploraco().then(function(nuevoJwt){
+          if (!nuevoJwt) return res.body;
+          var h2 = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + nuevoJwt };
+          return fetch('/api/interacciones', {
+            method: 'POST',
+            headers: h2,
+            body: JSON.stringify(body)
+          }).then(function(r2){ return r2.json(); });
+        });
+      }
+      return res.body;
+    });
+}
+
+function aoEmailVerificado() {
+  var u = sesion();
+  return !!(u && u.email_verificado === true);
+}
+
+function initActivoOculto() {
+  var u = sesion();
+  var guest = document.getElementById('ao-guest');
+  var banner = document.getElementById('ao-email-banner');
+  if (!u) {
+    if (guest) guest.style.display = 'block';
+    if (banner) banner.style.display = 'none';
+    aoVacio('ao-proponer');
+    aoVacio('ao-facciones');
+    aoVacio('ao-pendientes');
+    return;
+  }
+  if (guest) guest.style.display = 'none';
+  if (banner) banner.style.display = aoEmailVerificado() ? 'none' : 'block';
+  renderAoProponer();
+  cargarFaccionesAo();
+  cargarAoPendientes();
+}
+
+function aoVacio(id) {
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = '';
+}
+
+function renderAoProponer() {
+  var el = document.getElementById('ao-proponer');
+  if (!el) return;
+  var verif = aoEmailVerificado();
+  el.innerHTML = '<div class="pand-card">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">\uD83D\uDD75\uFE0F Proponer punto aqu\u00ed</div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Descubre un lugar secreto y prop\u00f3nlo a la comunidad. Si alcanza quorum, se publica y ganas +50 XP.</div>'
+    + (verif
+      ? '<input class="chat-inp" id="ao-nombre" maxlength="120" placeholder="Nombre del punto (ej: Mirador del silencio)" style="margin-bottom:8px">'
+        + '<input class="chat-inp" id="ao-desc" maxlength="500" placeholder="Descripci\u00f3n breve (opcional)" style="margin-bottom:8px">'
+        + '<div style="display:flex;gap:8px;margin-bottom:8px">'
+        + '<select class="chat-inp" id="ao-categoria" style="margin-bottom:0;flex:1">'
+        + '<option value="">Categor\u00eda</option>'
+        + _aoCategorias.map(function(c){ return '<option value="' + esc(c) + '">' + esc(c.charAt(0).toUpperCase() + c.slice(1)) + '</option>'; }).join('')
+        + '</select>'
+        + '<input class="chat-inp" id="ao-ciudad" maxlength="80" placeholder="Ciudad" style="margin-bottom:0;flex:1">'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;margin-bottom:8px">'
+        + '<input class="chat-inp" id="ao-lat" type="number" step="any" placeholder="Latitud" style="margin-bottom:0;flex:1">'
+        + '<input class="chat-inp" id="ao-lng" type="number" step="any" placeholder="Longitud" style="margin-bottom:0;flex:1">'
+        + '</div>'
+        + '<div id="ao-geo-status" style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:8px">\uD83D\uDCCD Coordenadas: usa el bot\u00f3n o escr\u00edbelas</div>'
+        + '<button class="pand-btn" onclick="aoObtenerUbicacion()">\uD83D\uDCCD Detectar mi ubicaci\u00f3n</button>'
+        + '<button class="pand-btn" style="margin-top:8px;width:100%" onclick="aoEnviarPropuesta()">Enviar propuesta</button>'
+      : '<div style="font-size:11px;color:rgba(255,255,255,.4);padding:8px 0;text-align:center" title="Verifica tu correo primero">Verifica tu correo primero para proponer un punto.</div>')
+    + '</div>';
+}
+
+function aoObtenerUbicacion() {
+  var statusEl = document.getElementById('ao-geo-status');
+  var latEl = document.getElementById('ao-lat');
+  var lngEl = document.getElementById('ao-lng');
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = '\u26A0\uFE0F Geolocalizaci\u00f3n no soportada: escribe las coordenadas';
+    return;
+  }
+  if (statusEl) statusEl.textContent = '\uD83D\uDCCD Buscando tu posici\u00f3n\u2026';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat = pos.coords.latitude;
+    var lng = pos.coords.longitude;
+    if (latEl) latEl.value = String(lat.toFixed(6));
+    if (lngEl) lngEl.value = String(lng.toFixed(6));
+    if (statusEl) statusEl.textContent = '\uD83D\uDCCD Posici\u00f3n capturada: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+  }, function(){
+    if (statusEl) statusEl.textContent = '\u26A0\uFE0F No se pudo obtener tu posici\u00f3n: escribe las coordenadas';
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+}
+
+function aoEnviarPropuesta() {
+  var u = sesion();
+  if (!u) { loginGate(); return; }
+  if (!aoEmailVerificado()) {
+    showXPToastComm('\uD83D\uDCE7 Verifica tu correo primero');
+    return;
+  }
+  var nombre = ((document.getElementById('ao-nombre') || {}).value || '').trim();
+  var desc = ((document.getElementById('ao-desc') || {}).value || '').trim();
+  var ciudad = ((document.getElementById('ao-ciudad') || {}).value || '').trim();
+  var categoria = ((document.getElementById('ao-categoria') || {}).value || '').trim();
+  var lat = parseFloat((document.getElementById('ao-lat') || {}).value);
+  var lng = parseFloat((document.getElementById('ao-lng') || {}).value);
+  if (!nombre) { showXPToastComm('\u26A0\uFE0F Escribe el nombre del punto'); return; }
+  if (!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) {
+    showXPToastComm('\u26A0\uFE0F Coordenadas inv\u00e1lidas: usa tu ubicaci\u00f3n o escr\u00edbelas');
+    return;
+  }
+  var btn = document.querySelector('#ao-proponer .pand-btn[onclick="aoEnviarPropuesta()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando\u2026'; }
+  postComAPI({
+    tipo: 'activo_oculto_proponer',
+    usuario_id: u.id,
+    nombre: nombre,
+    descripcion: desc,
+    lat: lat,
+    lng: lng,
+    categoria: categoria || null,
+    ciudad: ciudad || null
+  })
+    .then(function(res){
+      if (res && res.ok) {
+        showXPToastComm('\uD83D\uDD75\uFE0F Propuesta enviada: pendiente de aprobaci\u00f3n');
+        cargarAoPendientes();
+      } else {
+        var err = (res && res.error) || 'No se pudo enviar la propuesta';
+        if (err === 'EMAIL_SIN_VERIFICAR') err = '\uD83D\uDCE7 Verifica tu correo primero';
+        if (err === 'COORDENADAS_INVALIDAS') err = '\u26A0\uFE0F Coordenadas inv\u00e1lidas';
+        showXPToastComm(err);
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar propuesta'; }
+    })
+    .catch(function(){
+      showXPToastComm('\u26A0\uFE0F Error de conexion');
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar propuesta'; }
+    });
+}
+
+function cargarAoPendientes() {
+  var el = document.getElementById('ao-pendientes');
+  if (!el) return;
+  var u = sesion();
+  if (!u) { el.innerHTML = ''; return; }
+  renderAoPendientesHead(el);
+  fetch('/api/interacciones?tipo=activos_ocultos_pendientes&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var list = (res && res.data) || [];
+      if (!list.length) {
+        el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83D\uDDF3\uFE0F Propuestas pendientes de voto</div>'
+          + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">Sin propuestas pendientes. S\u00e9 el primero en proponer un punto.</div>';
+        return;
+      }
+      el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83D\uDDF3\uFE0F Propuestas pendientes de voto</div>';
+      list.forEach(function(a){ el.appendChild(aoCardPendiente(a)); });
+    })
+    .catch(function(){
+      el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83D\uDDF3\uFE0F Propuestas pendientes de voto</div>'
+        + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">No se pudieron cargar las propuestas.</div>';
+    });
+}
+
+function renderAoPendientesHead(el) {
+  el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83D\uDDF3\uFE0F Propuestas pendientes de voto</div>'
+    + '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando propuestas\u2026</div>';
+}
+
+function aoCardPendiente(a) {
+  var card = document.createElement('div');
+  card.className = 'pand-card';
+  var cat = a.categoria || '';
+  var latF = (a.lat != null && isFinite(parseFloat(a.lat))) ? parseFloat(a.lat).toFixed(4) : '?';
+  var lngF = (a.lng != null && isFinite(parseFloat(a.lng))) ? parseFloat(a.lng).toFixed(4) : '?';
+  var loc = (a.ciudad || 'Sin ciudad') + ' \u00b7 ' + latF + ', ' + lngF;
+  card.innerHTML = '<div class="pand-title">\uD83D\uDD75\uFE0F ' + esc(a.nombre || 'Punto sin nombre') + '</div>'
+    + '<div class="pand-meta">' + esc(loc) + (cat ? ' \u00b7 ' + esc(cat) : '') + '</div>'
+    + (a.descripcion ? '<div style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.5;margin-bottom:10px">' + esc(a.descripcion) + '</div>' : '')
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    + '<span style="font-size:11px;color:#22C55E;font-weight:700">\uD83D\uDC4D ' + (parseInt(a.votos_favor,10)||0) + '</span>'
+    + '<span style="font-size:11px;color:#ef4444;font-weight:700">\uD83D\uDC4E ' + (parseInt(a.votos_contra,10)||0) + '</span>'
+    + '<span style="font-size:10px;color:rgba(255,255,255,.35);flex:1;text-align:right">Quorum \u00b13 votos</span>'
+    + '</div>'
+    + '<button class="ao-voto" onclick="aoVotar(\'' + esc(String(a.id)) + '\',\'favor\',this)">A favor</button>'
+    + ' <button class="ao-voto-contra" onclick="aoVotar(\'' + esc(String(a.id)) + '\',\'contra\',this)">En contra</button>';
+  return card;
+}
+
+function aoVotar(activoId, voto, btn) {
+  var u = sesion();
+  if (!u) { loginGate(); return; }
+  if (!aoEmailVerificado()) { showXPToastComm('\uD83D\uDCE7 Verifica tu correo primero'); return; }
+  if (btn) { btn.disabled = true; }
+  postComAPIJWT({ tipo: 'activo_oculto_votar', usuario_id: u.id, activo_id: activoId, voto: voto })
+    .then(function(res){
+      if (res && res.ok) {
+        if (res.ya_votado) showXPToastComm('\u2713 Ya hab\u00edas votado esta propuesta');
+        else showXPToastComm('\uD83D\uDDF3\uFE0F Voto registrado \u00b7 +5 XP');
+        cargarAoPendientes();
+      } else {
+        var err = (res && res.error) || 'No se pudo registrar el voto';
+        if (err === 'EMAIL_SIN_VERIFICAR') err = '\uD83D\uDCE7 Verifica tu correo primero';
+        if (err === 'NIVEL_INSUFICIENTE') err = '\u26D4 Nivel insuficiente: necesitas nivel 5 para votar';
+        if (err === 'VOTO_PROPIO') err = '\u26A0\uFE0F No puedes votar tu propia propuesta';
+        if (err === 'ACTIVO_NO_ENCONTRADO') err = '\u26A0\uFE0F La propuesta ya no est\u00e1 disponible';
+        showXPToastComm(err);
+        if (btn) btn.disabled = false;
+      }
+    })
+    .catch(function(){
+      showXPToastComm('\u26A0\uFE0F Error de conexion');
+      if (btn) btn.disabled = false;
+    });
+}
+
+function cargarFaccionesAo() {
+  var el = document.getElementById('ao-facciones');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+    + '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:16px">Cargando facciones\u2026</div>';
+  fetch('/api/usuarios?tipo=faccion_ranking')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var data = (res && res.data) || {};
+      var facciones = data.facciones || [];
+      if (!facciones.length) {
+        el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+          + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">A\u00fan no hay facciones en el ranking.</div>';
+        return;
+      }
+      var html = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+        + '<div class="ao-podium">';
+      facciones.forEach(function(f, idx){
+        var info = _aoFacciones[f.faccion] || { nombre: f.faccion, icono: '\uD83C\uDFF4' };
+        html += '<div class="ao-pod-item' + (idx === 0 ? ' first' : '') + '" title="Control territorial">'
+          + '<div class="ao-pod-icon" style="font-size:26px;margin-bottom:4px">' + info.icono + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:#fff;text-transform:capitalize">' + esc(info.nombre) + '</div>'
+          + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' + (parseInt(f.miembros,10)||0) + ' miembros</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:900;color:var(--gold)">' + lbXpFmt(f.xp_total) + ' XP</div>'
+          + '</div>';
+      });
+      html += '</div>'
+        + '<div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">\u00b7 L\u00edderes de cada facci\u00f3n (top 3):</div>';
+      var top = data.top || [];
+      if (top.length) {
+        html += '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px">';
+        top.slice(0, 8).forEach(function(t){
+          var ti = _aoFacciones[t.faccion] || {};
+          html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+            + '<span style="font-size:13px">' + (ti.icono || '\uD83C\uDFF4') + '</span>'
+            + '<span style="flex:1;font-size:11px;color:#fff">' + esc(t.nombre || 'Viajero') + '</span>'
+            + '<span style="font-size:10px;color:rgba(255,255,255,.4);text-transform:capitalize">' + esc(t.faccion || '') + '</span>'
+            + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:var(--gold)">' + lbXpFmt(t.xp_total) + ' XP</span>'
+            + '</div>';
+        });
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    })
+    .catch(function(){
+      el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+        + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">No se pudo cargar el ranking de facciones.</div>';
+    });
+}
+
 /* ---- TAB SWITCHING ---- */
 function showCommTab(tab) {
   document.querySelectorAll('.ctab').forEach(function(t){ t.classList.remove('on'); });
@@ -1853,6 +2216,7 @@ function showCommTab(tab) {
     if(tab === 'mapa') onTabMapaAV();
     if(tab === 'av') initAudiovisual();
     if(tab === 'pandillas') renderPandillas();
+    if(tab === 'wayfarer') initActivoOculto();
   }
   if(tab !== 'chat') stopChatPoll();
 }

@@ -1913,10 +1913,25 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
     </div>
   </div>
 
-  <div style="padding:14px 28px;background:var(--white);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
-    <button class="mod-filter-btn active" data-mod-status="draft" onclick="setModFilter('draft',this)">⏳ Borradores</button>
-    <button class="mod-filter-btn" data-mod-status="published" onclick="setModFilter('published',this)">✅ Aprobados</button>
-    <button class="mod-filter-btn" data-mod-status="archived" onclick="setModFilter('archived',this)">🗄️ Archivados</button>
+  <!-- Sub-tabs de moderacion -->
+  <div style="display:flex;gap:0;border-bottom:2px solid var(--border);background:var(--white);flex-shrink:0">
+    <div class="mod-subtab active" data-mod-tab="solicitudes" onclick="showModSubTab('solicitudes')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">&#128203; Solicitudes</div>
+    <div class="mod-subtab" data-mod-tab="activos-ocultos" onclick="showModSubTab('activos-ocultos')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">&#127917; Activos Ocultos</div>
+  </div>
+
+  <div style="padding:14px 28px;background:var(--white);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0" id="mod-solicitudes-filters">
+    <button class="mod-filter-btn active" data-mod-status="draft" onclick="setModFilter('draft',this)">&#9203; Borradores</button>
+    <button class="mod-filter-btn" data-mod-status="published" onclick="setModFilter('published',this)">&#9989; Aprobados</button>
+    <button class="mod-filter-btn" data-mod-status="archived" onclick="setModFilter('archived',this)">&#128451;&#65039; Archivados</button>
+  </div>
+
+  <!-- Panel: Activos Ocultos pendientes -->
+  <div id="mod-activos-ocultos-panel" style="display:none;flex:1;overflow-y:auto;padding:20px 28px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn btn-gold btn-sm" onclick="adminCargarActivosOcultos()">&#128260; Cargar pendientes</button>
+      <span id="ao-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="ao-lista" style="display:flex;flex-direction:column;gap:12px"></div>
   </div>
 
   <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:10px" id="mod-lista">
@@ -2265,7 +2280,12 @@ function showScreen(name) {
   if(name === 'tabla') renderTabla();
   if(name === 'exportar') generateExportCode();
   if(name === 'reviews') renderReviews();
-  if(name === 'moderacion') loadPendientes();
+  if(name === 'moderacion') {
+    var activeTab = document.querySelector('.mod-subtab.active');
+    var tab = activeTab ? activeTab.getAttribute('data-mod-tab') : 'solicitudes';
+    if(tab === 'activos-ocultos') { adminCargarActivosOcultos(); }
+    else { loadPendientes(); }
+  }
   if(name === 'consumibles') loadConsumibles();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
@@ -6742,6 +6762,163 @@ async function _checkPendingBadge() {
     var data = await resp.json();
     if(data.ok) _updatePendingBadge(data.total);
   } catch(e) {}
+}
+
+/* ------------------------------------------------------------------
+   MODERACION - Activos Ocultos (Gaming v5.0 / Entrega 016)
+   GET /api/interacciones?tipo=activos_ocultos_pendientes
+   POST /api/admin?recurso=activos_ocultos tipo=activo_oculto_moderar
+   ------------------------------------------------------------------ */
+
+function showModSubTab(tab) {
+  document.querySelectorAll('.mod-subtab').forEach(function(t) {
+    t.classList.remove('active');
+    t.style.color = '';
+    t.style.borderBottomColor = 'transparent';
+  });
+  var active = document.querySelector('.mod-subtab[data-mod-tab="'+tab+'"]');
+  if (active) {
+    active.classList.add('active');
+    active.style.color = 'var(--black)';
+    active.style.borderBottomColor = 'var(--black)';
+  }
+
+  var solicitudesPanel = document.getElementById('mod-solicitudes-filters');
+  var ocultosPanel = document.getElementById('mod-activos-ocultos-panel');
+  var modLista = document.getElementById('mod-lista');
+  var modPag = document.getElementById('mod-paginacion');
+
+  if (tab === 'activos-ocultos') {
+    if (solicitudesPanel) solicitudesPanel.style.display = 'none';
+    if (ocultosPanel) ocultosPanel.style.display = '';
+    if (modLista) modLista.style.display = 'none';
+    if (modPag) modPag.style.display = 'none';
+    adminCargarActivosOcultos();
+  } else {
+    if (solicitudesPanel) solicitudesPanel.style.display = '';
+    if (ocultosPanel) ocultosPanel.style.display = 'none';
+    if (modLista) modLista.style.display = '';
+    if (modPag) modPag.style.display = '';
+    loadPendientes();
+  }
+}
+
+async function adminCargarActivosOcultos() {
+  var lista = document.getElementById('ao-lista');
+  var status = document.getElementById('ao-status');
+  if (!lista) return;
+  if (status) status.textContent = 'Cargando...';
+  lista.innerHTML = '';
+
+  try {
+    var resp = await fetch('/api/interacciones?tipo=activos_ocultos_pendientes', {
+      headers: _adminHeaders()
+    });
+    var data = await resp.json();
+
+    if (data.ok && data.data && data.data.length) {
+      if (status) status.textContent = data.data.length + ' activo(s) oculto(s) pendiente(s).';
+      data.data.forEach(function(a) {
+        lista.appendChild(_adminActivoOcultoCard(a));
+      });
+    } else if (data.error === 'SCHEMA_NOT_MIGRATED') {
+      if (status) status.textContent = 'La migracion de activos ocultos no ha sido aplicada aun.';
+    } else {
+      if (status) status.textContent = 'No hay activos ocultos pendientes de revision.';
+    }
+  } catch (err) {
+    if (status) status.textContent = 'Error al cargar: ' + err.message;
+  }
+}
+
+function _adminActivoOcultoCard(a) {
+  var card = document.createElement('div');
+  card.style.cssText = 'border:1px solid var(--border);border-radius:10px;background:var(--white);overflow:hidden;';
+
+  var nombre = _esc(a.nombre || '');
+  var desc = _esc(a.descripcion || 'Sin descripcion');
+  var cat = _esc(a.categoria || '');
+  var ciudad = _esc(a.ciudad || '');
+  var lat = a.lat;
+  var lng = a.lng;
+  var votosFavor = parseInt(a.votos_favor, 10) || 0;
+  var votosContra = parseInt(a.votos_contra, 10) || 0;
+  var propuestoPor = _esc(a.propuesto_por_nombre || '');
+  var estado = _esc(a.estado || 'pendiente');
+  var fecha = a.creado_en ? new Date(a.creado_en).toLocaleDateString('es-CO', {day:'2-digit', month:'short', year:'numeric'}) : '';
+  var fotoUrl = _esc(a.foto_url || '');
+  var activoId = _esc(String(a.id));
+
+  var catIcons = {hostal:'\uD83C\uDFE8',comida:'\uD83C\uDF7D\uFE0F',sitio:'\u26F0\uFE0F',evento:'\uD83C\uDF89',blog:'\uD83D\uDCDD'};
+  var catIcon = catIcons[cat] || '\uD83D\uDCCD';
+
+  var fotoHtml = fotoUrl
+    ? '<img src="' + fotoUrl + '" style="width:100%;height:160px;object-fit:cover;display:block;background:#222" loading="lazy" onerror="this.style.display=\'none\'">'
+    : '<div style="width:100%;height:160px;background:linear-gradient(135deg,var(--bg),var(--border));display:flex;align-items:center;justify-content:center;font-size:48px">' + catIcon + '</div>';
+
+  var votosHtml = '';
+  if (votosFavor > 0 || votosContra > 0) {
+    votosHtml = '<div style="display:flex;gap:10px;margin-top:6px">';
+    if (votosFavor > 0) votosHtml += '<span style="font-size:11px;color:var(--green);font-weight:600">\u2705 ' + votosFavor + ' a favor</span>';
+    if (votosContra > 0) votosHtml += '<span style="font-size:11px;color:var(--red);font-weight:600">\u274C ' + votosContra + ' en contra</span>';
+    votosHtml += '</div>';
+  }
+
+  var estadoColor = '#EAB308';
+  var estadoLabel = 'Pendiente';
+  if (estado === 'rechazado') { estadoColor = '#EF4444'; estadoLabel = 'Rechazado (30 dias)'; }
+  else if (estado === 'aprobado') { estadoColor = '#22C55E'; estadoLabel = 'Aprobado'; }
+
+  card.innerHTML =
+    '<div style="position:relative">' + fotoHtml + '</div>'
+    + '<div style="padding:14px 16px">'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+        + '<strong style="font-size:14px">' + nombre + '</strong>'
+        + '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + estadoColor + ';color:#fff;font-weight:700">' + estadoLabel + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.4">' + desc + '</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">'
+        + '<span style="font-size:10px;padding:3px 8px;border-radius:12px;background:var(--bg);color:var(--text2)">' + catIcon + ' ' + cat + '</span>'
+        + '<span style="font-size:10px;padding:3px 8px;border-radius:12px;background:var(--bg);color:var(--text2)">\uD83D\uDCCD ' + ciudad + '</span>'
+        + (lat ? '<span style="font-size:10px;padding:3px 8px;border-radius:12px;background:var(--bg);color:var(--text2)">\uD83D\uDCCD ' + lat + ', ' + lng + '</span>' : '')
+      + '</div>'
+      + votosHtml
+      + (propuestoPor ? '<div style="font-size:11px;color:var(--muted);margin-top:6px">Propuesto por: <strong>' + propuestoPor + '</strong></div>' : '')
+      + (fecha ? '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + fecha + '</div>' : '')
+      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+        + '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;cursor:pointer" onclick="adminModerarActivoOculto(\'' + activoId + '\',\'aprobar\',this)">\u2705 Aprobar</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="adminModerarActivoOculto(\'' + activoId + '\',\'rechazar\',this)">\u274C Rechazar</button>'
+      + '</div>'
+    + '</div>';
+
+  return card;
+}
+
+async function adminModerarActivoOculto(activoId, accion, btn) {
+  var msgs = {aprobar:'\u2705 Activo aprobado y publicado',rechazar:'\u274C Activo rechazado (30 dias)'};
+  if (!confirm('Seguro que deseas ' + accion + ' este activo oculto?')) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = accion === 'aprobar' ? 'Aprobando...' : 'Rechazando...'; }
+
+  try {
+    var resp = await fetch('/api/admin?recurso=activos_ocultos', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ activo_id: activoId, accion: accion })
+    });
+    var data = await resp.json();
+
+    if (data.ok) {
+      showAdminToast(msgs[accion] || 'Accion ejecutada', 'success');
+      adminCargarActivosOcultos();
+    } else {
+      showAdminToast('Error: ' + (data.error || 'desconocido'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = accion === 'aprobar' ? '\u2705 Aprobar' : '\u274C Rechazar'; }
+    }
+  } catch (err) {
+    showAdminToast('Error de conexion: ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = accion === 'aprobar' ? '\u2705 Aprobar' : '\u274C Rechazar'; }
+  }
 }
 
 function _copySlug(slug) {

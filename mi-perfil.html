@@ -195,6 +195,37 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mp-album-com-btn{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center;width:100%}
 .mp-album-com-btn:hover{background:rgba(232,160,32,.18)}
 .mp-album-comments{width:100%}
+/* ---- GAMING V5.0 (Entrega 016): Mi Red, Facciones, Verificacion ---- */
+.verify-banner{background:linear-gradient(135deg,rgba(232,160,32,.14),rgba(239,68,68,.08));border:1px solid rgba(232,160,32,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.verify-banner-txt{flex:1;min-width:200px;font-size:12px;color:rgba(255,255,255,.75);font-family:Outfit,sans-serif}
+.verify-banner-btn{background:var(--gold);color:var(--black);border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.verify-banner-btn:hover{opacity:.85}
+.verify-banner-btn.ghost{background:transparent;color:var(--gold);border:1px solid var(--gold)}
+.ref-code-box{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:10px}
+.ref-code{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;letter-spacing:3px;color:var(--gold);user-select:all;-webkit-user-select:all}
+.ref-copy-btn{background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.35);color:var(--gold);border-radius:6px;padding:7px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.ref-copy-btn:hover{background:rgba(232,160,32,.2)}
+.ref-qr{width:96px;height:96px;border-radius:8px;background:#fff;padding:4px}
+.ref-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.ref-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;text-align:center}
+.ref-stat-n{font-size:20px;font-weight:900;color:var(--gold);font-family:'Barlow Condensed',sans-serif;line-height:1.1}
+.ref-stat-l{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.45);margin-top:3px;font-family:Outfit,sans-serif}
+.ref-net-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.ref-net-level{text-align:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:8px 4px}
+.ref-net-num{font-size:16px;font-weight:900;color:#fff;font-family:'Barlow Condensed',sans-serif}
+.ref-net-label{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);margin-top:2px;font-family:Outfit,sans-serif}
+.ref-net-xp{font-size:10px;color:var(--gold);margin-top:2px;font-weight:700}
+.facc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}
+.facc-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:14px;text-align:center;transition:border-color .15s,background .15s}
+.facc-card:hover{border-color:rgba(255,255,255,.22)}
+.facc-card.actual{border-color:var(--gold);background:rgba(232,160,32,.06)}
+.facc-emoji{font-size:26px;min-height:52px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.04);border-radius:8px;margin-bottom:8px}
+.facc-name{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.8px}
+.facc-desc{font-size:10px;color:rgba(255,255,255,.45);line-height:1.4;margin:6px 0 10px;font-family:Outfit,sans-serif;min-height:28px}
+.facc-btn{width:100%;background:transparent;border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:6px 0;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.facc-btn:hover{background:rgba(232,160,32,.12)}
+.facc-btn:disabled{opacity:.35;cursor:not-allowed}
+.facc-current{display:inline-flex;align-items:center;gap:6px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.35);border-radius:999px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--gold);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.6px}
 </style>
 </head>
 <body>
@@ -287,6 +318,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:22px;">&#x1F3A4; Vocaciones de Artista</div>
   <div class="pf-counter" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Desbloquea tu lado creativo: activa una vocacion para presumirla en tu vitrina (puedes tener varias activas).</div>
   <div class="voc-grid" id="pf-vocaciones-grid"></div>
+  <!-- Caminos de artista (Gaming v5.0 / ADR-026) -->
+  <div id="pf-voc-misiones"></div>
 
   <!-- MIS ALBUMES (ADR-017) -->
   <div class="pf-section-title">&#x1F5BC; Mis Albumes</div>
@@ -430,6 +463,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div id="pf-guardados"></div>
   <div class="pf-section-title" style="margin-top:20px">✅ Lugares visitados</div>
   <div id="pf-visitados"></div>
+
+  <!-- GAMING V5.0: MI RED DE REFERIDOS -->
+  <div class="pf-section-title" style="margin-top:28px">&#x1F517; Mi Red de Referidos</div>
+  <div style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Invita viajeros con tu codigo y gana XP por cada nivel de tu red (10/5/3/2/1%).</div>
+  <div id="pf-referidos"></div>
+
+  <!-- GAMING V5.0: TU FACCION -->
+  <div class="pf-section-title" style="margin-top:28px">&#x1F3C6; Tu Faccion</div>
+  <div id="pf-facciones"></div>
 
   <!-- SIGUIENTES PASOS -->
   <div class="pf-section-title" style="margin-top:28px">🚀 Siguientes pasos</div>
@@ -627,6 +669,11 @@ function renderPerfil() {
 
   /* mis lugares */
   cargarMisLugares(u.id);
+
+  /* Gaming v5.0: red de referidos, faccion y caminos de artista */
+  cargarMiRed(u.id);
+  cargarFacciones(u.id);
+  cargarMisionesArtista(u.id);
 
   /* quick actions */
   renderQuickActions(st);
@@ -979,10 +1026,18 @@ function cargarGaleriaMejoras(uid) {
   });
 }
 
-/* ---- VOCACIONES DE ARTISTA (ADR-018) ---- */
+/* ---- VOCACIONES DE ARTISTA (ADR-018 / ADR-026) ---- */
 function cargarVocaciones(uid) {
   var grid = document.getElementById('pf-vocaciones-grid');
   if (!grid || !uid) return;
+  var lvl = getLevel(statsU().xp);
+  var bloqueado = !lvl || lvl.min < 700;
+  if (bloqueado) {
+    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:22px;border:1px dashed rgba(168,85,247,.3);border-radius:10px;">'
+      + '\uD83D\uDD12 Las vocaciones de artista se desbloquean en el nivel 5 (Vanguardia Territorial, 700 XP). '
+      + 'Sigue explorando para cerrar tu camino creativo.</div>';
+    return;
+  }
   grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando vocaciones\u2026</div>';
   fetch('/api/interacciones?tipo=vocaciones_usuario&usuario_id=' + encodeURIComponent(uid))
     .then(function(r){ return r.json(); })
@@ -1607,6 +1662,311 @@ function quitarFotoAlbum(albumId, fotoId) {
 function cerrarModalDetalleAlbum() {
   var modal = document.getElementById('modal-detalle-album');
   if (modal) modal.style.display = 'none';
+}
+
+/* ---- GAMING V5.0 (Entrega 016): red, facciones, email, artes ---- */
+var FACCION_META = [
+  {id:'exploradores', nombre:'Exploradores', emoji:'\uD83E\uDDED', color:'#22C55E', desc:'Descubren rutas nuevas y abren camino a toda la comunidad.'},
+  {id:'curadores', nombre:'Curadores', emoji:'\uD83D\uDC8E', color:'#3B82F6', desc:'Elevan los mejores destinos con curaduria fina y rese\u00F1as.'},
+  {id:'creadores', nombre:'Creadores', emoji:'\u2692\uFE0F', color:'#E8A020', desc:'Construyen mapas, contenido y experiencias inolvidables.'},
+  {id:'artistas', nombre:'Artistas', emoji:'\uD83C\uDFA8', color:'#A855F7', desc:'Pintan el mapa con musica, cine, arte grafico y letras.'}
+];
+var REF_URL_BASE = 'https://exploraco.vercel.app';
+
+/* fetch con JWT (ADR-025): si el backend responde 401 SESION_REQUERIDA,
+   renueva la sesion por el upsert y reintenta una sola vez. */
+function obtenerJwtLocal() {
+  try { return (window.ExploraCO && typeof window.ExploraCO.obtenerJwt === 'function') ? window.ExploraCO.obtenerJwt() : ''; }
+  catch (e) { return ''; }
+}
+function renovarJwt() {
+  var u = sesion();
+  if (!u) return Promise.resolve(false);
+  return fetch('/api/usuarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auth_id: u.auth_id, email: u.email || '', nombre: u.nombre || '',
+      avatar_url: u.avatar_url || null, auth_provider: u.auth_provider || 'email'
+    })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (res && res.ok && res.data && res.data.jwt) {
+      window.ExploraCO.usuario = res.data;
+      try { localStorage.setItem('exploraco_user', JSON.stringify(res.data)); } catch (e) {}
+      return true;
+    }
+    return false;
+  }).catch(function(){ return false; });
+}
+function fetchConJwt(url, opts, reintento) {
+  opts = opts || {};
+  var jwt = obtenerJwtLocal();
+  var hdrs = { 'Content-Type': 'application/json' };
+  if (jwt) hdrs['Authorization'] = 'Bearer ' + jwt;
+  var copia = {};
+  for (var k in opts) if (opts.hasOwnProperty(k)) copia[k] = opts[k];
+  copia.headers = hdrs;
+  return fetch(url, copia).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(body){
+      if (r.status === 401 && !reintento) {
+        var err = (body && body.error) || '';
+        if (err === 'SESION_REQUERIDA' || err === 'SESION_EXPIRADA' || err === 'SESION_INVALIDA') {
+          return renovarJwt().then(function(listo){
+            if (!listo) return body;
+            return fetchConJwt(url, opts, true);
+          });
+        }
+      }
+      return body;
+    });
+  }).catch(function(){ return {}; });
+}
+
+/* ---- Verificacion de email (banner no bloqueante) ---- */
+function bannerVerificacionHtml() {
+  var u = sesion();
+  if (u && u.email_verificado === true) return '';
+  return '<div class="verify-banner">'
+    + '<div class="verify-banner-txt">\uD83D\uDD11 Verifica tu email para desbloquear la piramide de referidos y las facciones.</div>'
+    + '<button class="verify-banner-btn" onclick="enviarVerificacionEmail(this)">Enviar codigo</button>'
+    + '<button class="verify-banner-btn ghost" onclick="confirmarVerificacionEmail(this)">Ya tengo codigo</button>'
+    + '</div>';
+}
+function enviarVerificacionEmail(btn) {
+  var u = sesion();
+  if (!u || !u.email) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando\u2026'; }
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'email_verificar_solicitar', usuario_id: String(u.id), email: String(u.email) })
+  }).then(function(res){
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar codigo'; }
+    if (res && res.ok) { showToast('Codigo de verificacion enviado a ' + u.email); return; }
+    if (res && res.error === 'EMAIL_NO_CONFIGURADO') {
+      if (res.debug_token) {
+        window._pfDemoToken = res.debug_token;
+        showToast('Modo demo: tu codigo es ' + res.debug_token);
+      } else {
+        showToast('El envio de correos no esta configurado aun', '#ef4444');
+      }
+      return;
+    }
+    showToast((res && res.error) || 'No se pudo enviar el codigo', '#ef4444');
+  }).catch(function(){
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar codigo'; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+function confirmarVerificacionEmail(btn) {
+  var u = sesion();
+  if (!u) return;
+  var demo = window._pfDemoToken || '';
+  var token = prompt('Pega aqui el codigo de verificacion que recibiste por correo:', demo || '');
+  if (!token || !token.trim()) return;
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'email_verificar_confirmar', usuario_id: String(u.id), token: token.trim() })
+  }).then(function(res){
+    if (res && res.ok && res.data && res.data.email_verificado) {
+      if (window.ExploraCO && window.ExploraCO.usuario) {
+        window.ExploraCO.usuario.email_verificado = true;
+        try { localStorage.setItem('exploraco_user', JSON.stringify(window.ExploraCO.usuario)); } catch (e) {}
+      }
+      showToast('Email verificado: tu red y tus facciones estan desbloqueadas');
+      refrescarSesion();
+    } else {
+      showToast((res && res.error) || 'Codigo invalido o expirado', '#ef4444');
+    }
+  }).catch(function(){ showToast('Error de conexion', '#ef4444'); });
+}
+
+/* ---- Mi Red de Referidos (piramide 10/5/3/2/1%) ---- */
+function copiarCodigoRef(codigo, btn) {
+  if (!codigo) return;
+  if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(codigo).catch(function(){});
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = codigo;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  if (btn) { btn.textContent = 'Copiado'; setTimeout(function(){ btn.textContent = 'Copiar codigo'; }, 1500); }
+}
+function pintarMiRed(c, red) {
+  var codigo = c.codigo_referido || '';
+  var url = REF_URL_BASE + '/registro.html?ref=' + encodeURIComponent(codigo);
+  var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(url);
+  var html = '<div class="ref-code-box">'
+    + '<div class="ref-code">' + esc(codigo) + '</div>'
+    + '<button class="ref-copy-btn" onclick="copiarCodigoRef(\'' + esc(codigo) + '\',this)">Copiar codigo</button>'
+    + '</div>'
+    + '<img class="ref-qr" src="' + qr + '" alt="QR de invitacion">'
+    + '<div class="ref-stats">'
+    + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.referidos_directos_contados, 10) || 0) + '</div><div class="ref-stat-l">Directos</div></div>'
+    + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.xp_ref_total, 10) || 0) + '</div><div class="ref-stat-l">XP por red</div></div>'
+    + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.referidos_dia_actual, 10) || 0) + '</div><div class="ref-stat-l">Hoy</div></div>'
+    + '</div>';
+  var niveles = (red && red.niveles) || [];
+  if (niveles.length) {
+    html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);margin:10px 0 6px;">Piramide de tu red</div>'
+      + '<div class="ref-net-grid">';
+    for (var i = 0; i < niveles.length; i++) {
+      var nv = niveles[i];
+      html += '<div class="ref-net-level">'
+        + '<div class="ref-net-num">' + (parseInt(nv.cantidad, 10) || 0) + '</div>'
+        + '<div class="ref-net-label">Nivel ' + nv.nivel + '</div>'
+        + '<div class="ref-net-xp">+' + (parseInt(nv.xp_ref, 10) || 0) + '</div>'
+        + '</div>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:10px;">Aun no tienes referidos. Comparte tu codigo para empezar a sumar XP.</div>';
+  }
+  return html;
+}
+function cargarMiRed(uid) {
+  var con = document.getElementById('pf-referidos');
+  if (!con || !uid) return;
+  var u = sesion();
+  if (!u || u.email_verificado !== true) {
+    con.innerHTML = bannerVerificacionHtml()
+      + '<div style="text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:18px;border:1px dashed rgba(232,160,32,.35);border-radius:10px;">'
+      + '\uD83D\uDD11 Verifica tu email para desbloquear tu red de referidos, tu codigo de invitacion y la piramide de XP.</div>';
+    return;
+  }
+  con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:18px">Cargando tu red\u2026</div>';
+  Promise.all([
+    fetchConJwt('/api/usuarios?tipo=referido_codigo&usuario_id=' + encodeURIComponent(uid), { method: 'GET' }),
+    fetchConJwt('/api/usuarios?tipo=referido_red&usuario_id=' + encodeURIComponent(uid), { method: 'GET' })
+  ]).then(function(dats){
+    var rc = dats[0] || {};
+    var rr = dats[1] || {};
+    if (!rc.ok || !rc.data) {
+      con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.4);font-size:12px;padding:16px">No se pudo cargar tu red de referidos.</div>';
+      return;
+    }
+    con.innerHTML = pintarMiRed(rc.data, rr.data || null);
+  }).catch(function(){
+    con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.4);font-size:12px;padding:16px">No se pudo cargar tu red de referidos.</div>';
+  });
+}
+
+/* ---- Tu Faccion (primera gratis, cambios 500 XP / 15 dias) ---- */
+function faccionDiasRestantes(u) {
+  if (!u || !u.faccion || !u.faccion_elegida_en) return 0;
+  var t = Date.parse(u.faccion_elegida_en);
+  if (isNaN(t)) return 0;
+  var restante = 15 - Math.floor((Date.now() - t) / 86400000);
+  return restante > 0 ? restante : 0;
+}
+function cargarFacciones(uid) {
+  var con = document.getElementById('pf-facciones');
+  if (!con || !uid) return;
+  var u = sesion();
+  if (!u || u.email_verificado !== true) {
+    con.innerHTML = bannerVerificacionHtml()
+      + '<div style="text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:18px;border:1px dashed rgba(232,160,32,.35);border-radius:10px;">'
+      + '\uD83D\uDD11 Verifica tu email para elegir tu faccion y competir en el ranking comunitario.</div>';
+    return;
+  }
+  var actual = u.faccion || '';
+  var dias = faccionDiasRestantes(u);
+  var html = '';
+  if (actual) {
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
+      + '<span class="facc-current">Tu faccion: ' + esc(actual) + '</span>'
+      + '<span style="font-size:11px;color:rgba(255,255,255,.5);">'
+      + (dias > 0 ? 'Cambio disponible en ' + dias + ' d\u00EDas (500 XP)' : 'Puedes cambiar de faccion (500 XP)')
+      + '</span>'
+      + '</div>';
+  } else {
+    html += '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px;">Primera eleccion gratis. Cambios posteriores: 500 XP con 15 dias de espera.</div>';
+  }
+  html += '<div class="facc-grid">';
+  for (var i = 0; i < FACCION_META.length; i++) {
+    var f = FACCION_META[i];
+    var es = f.id === actual;
+    var accion = es
+      ? '<div style="font-size:11px;font-weight:700;color:#22C55E;padding:6px 0;">\u2713 Actual</div>'
+      : '<button class="facc-btn" onclick="elegirFaccion(\'' + f.id + '\',this)">' + (actual ? 'Cambiar' : 'Elegir') + '</button>';
+    html += '<div class="facc-card' + (es ? ' actual' : '') + '" style="border-top:3px solid ' + f.color + ';">'
+      + '<div class="facc-emoji">' + f.emoji + '</div>'
+      + '<div class="facc-name">' + f.nombre + '</div>'
+      + '<div class="facc-desc">' + f.desc + '</div>'
+      + accion
+      + '</div>';
+  }
+  html += '</div>';
+  con.innerHTML = html;
+}
+function elegirFaccion(faccion, btn) {
+  var u = sesion();
+  if (!u) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando\u2026'; }
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'faccion_elegir', usuario_id: String(u.id), faccion: faccion })
+  }).then(function(res){
+    if (res && res.ok && res.data) {
+      showToast('Faccion elegida: ' + faccion);
+      refrescarSesion();
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Elegir'; }
+    var err = (res && res.error) || 'No se pudo actualizar la faccion';
+    var msg = err;
+    if (err === 'EMAIL_SIN_VERIFICAR') msg = 'Verifica tu email antes de elegir faccion';
+    else if (err === 'FACCION_YA_ELEGIDA') msg = 'Ya elegiste faccion en esta cuenta';
+    else if (err === 'COOLDOWN_FACCION') msg = 'Debes esperar 15 dias desde tu ultimo cambio de faccion';
+    else if (err === 'PUNTOS_INSUFICIENTES') msg = 'Necesitas 500 XP para cambiar de faccion';
+    else if (err === 'FACCION_INVALIDA') msg = 'Faccion invalida';
+    showToast(msg, '#ef4444');
+  }).catch(function(){
+    if (btn) { btn.disabled = false; btn.textContent = 'Elegir'; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+
+/* ---- Caminos de artista (misiones grupo 'artista') ---- */
+function cargarMisionesArtista(uid) {
+  var con = document.getElementById('pf-voc-misiones');
+  if (!con || !uid) return;
+  con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:14px">Cargando caminos de artista\u2026</div>';
+  fetch('/api/interacciones?tipo=misiones&usuario_id=' + encodeURIComponent(uid))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var list = ((res && res.data) || []).filter(function(m){ return (m.grupo || '') === 'artista'; });
+      if (!list.length) {
+        con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.4);font-size:11px;padding:14px">Los caminos de artista apareceran al desbloquear tus vocaciones (nivel 5).</div>';
+        return;
+      }
+      var doneIds = {};
+      list.forEach(function(m){ if (m.estado === 'completada') doneIds[m.id] = true; });
+      var html = '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);margin:8px 0 6px;">Caminos de artista</div>';
+      html += list.map(function(m){
+        var done = m.estado === 'completada';
+        var reqsPend = (m.requiere || []).filter(function(r){ return !doneIds[r]; });
+        var bloqueada = !done && reqsPend.length > 0;
+        var icono = done ? '\u2705' : (bloqueada ? '\uD83D\uDD12' : '\u23F3');
+        var estadoTxt = done ? 'Completada' : (bloqueada ? 'Bloqueada' : 'Disponible');
+        var reqsTxt = reqsPend.length ? ' · Requiere: ' + reqsPend.join(', ') : '';
+        return '<div class="mis-card' + (done ? ' done' : '') + '">'
+          + '<div class="mis-emoji">' + icono + '</div>'
+          + '<div class="mis-body">'
+          + '<div class="mis-nombre">' + esc(m.nombre || m.id) + '</div>'
+          + '<div class="mis-meta">Artista · ' + estadoTxt + reqsTxt + '</div>'
+          + '</div>'
+          + '<div class="mis-xp">+' + (m.xp || 0) + ' XP</div>'
+          + '</div>';
+      }).join('');
+      con.innerHTML = html;
+    })
+    .catch(function(){
+      con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.4);font-size:11px;padding:14px">No se pudieron cargar los caminos de artista.</div>';
+    });
 }
 
 /* ---- EDITAR NOMBRE ---- */

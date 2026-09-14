@@ -1,4 +1,4 @@
-// api/interacciones.js  v12 - misiones + logros + Tabla Destino + Albums + Gamificacion v4 (consumibles, cromos, pandillas) + epic 2026-09-13 (vocaciones, chat por plan, admin_xp, fixes multimedia)
+// api/interacciones.js  v13 (Entrega 016: piramide referidos con reparto, Wayfarer Activo Oculto, nonce anti-replay, vocaciones en bloque nivel 5)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -64,6 +64,7 @@
 // Neon conviven 'Bogota' y 'Bogot\u00e1' segun el seed.
 
 const { neon } = require('@neondatabase/serverless');
+var crypto = require('crypto');
 
 // v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
 var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
@@ -81,6 +82,16 @@ var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 
 // guardado del autor hacia un destino georreferenciado). Requiere la
 // migracion 015 antes de desplegar (usuarios.vocaciones y
 // planes_viaje.sala_id).
+//
+// v13 (Entrega 016, 2026-09-14): piramide de referidos con reparto
+// multinivel (10/5/3/2/1 % via xp_ref_total), Wayfarer Activo Oculto
+// (proponer / votar con quorum / checkin geolocalizado), nonce
+// anti-replay de geolocalizacion (ADR-025, tabla geo_nonces), vocaciones
+// de artista unificadas a nivel 5 (4 rutas: musico/cine/arte/escritor) y
+// sesion firmada JWT (validarSesion, misma firma que api/usuarios.js
+// v9). Requiere la migracion 016 antes de desplegar (tablas
+// activos_ocultos*, activos_ocultos_votos, activos_ocultos_checkins y
+// geo_nonces).
 var TIERRA_RADIO_M = 6371008.8;
 var RADIO_DEFAULT_M = 100;
 var RADIO_POR_CATEGORIA = { sitio: 100, hostal: 100, comida: 100, evento: 150 };
@@ -178,13 +189,17 @@ var NIVELES_ADMIN = NIVELES_LOCAL;
 // nivel (NIVELES_ADMIN). El catalogo vive en codigo (patron de LOGROS);
 // usuarios.vocaciones solo guarda las claves activadas por el usuario.
 // ASCII-safe (ADR-002): los emojis van como escapes \uXXXX, nunca bytes.
+// v13 (Entrega 016): las 4 vocaciones artisticas se desbloquean juntas
+// en el bloque de nivel 5 (decision aprobada, ADR-026).
 var VOCACIONES = [
   { id: 'musico', nombre: 'Musico', emoji: '\uD83C\uDFB5', nivel: 5,
     habilidades: ['Vitrina musical', 'Setlist destacado', 'Sello de interprete'] },
-  { id: 'cine', nombre: 'Cine', emoji: '\uD83C\uDFAC', nivel: 8,
+  { id: 'cine', nombre: 'Cine', emoji: '\uD83C\uDFAC', nivel: 5,
     habilidades: ['Reel de cine', 'Cartelera propia', 'Sello de cineasta'] },
-  { id: 'artista_grafico', nombre: 'Artista Grafico', emoji: '\uD83C\uDFA8', nivel: 11,
-    habilidades: ['Galeria de obra', 'Paleta de marca', 'Sello de autor'] }
+  { id: 'artista_grafico', nombre: 'Artista Grafico', emoji: '\uD83C\uDFA8', nivel: 5,
+    habilidades: ['Galeria de obra', 'Paleta de marca', 'Sello de autor'] },
+  { id: 'escritor', nombre: 'Escritor', emoji: '\u270D\uFE0F', nivel: 5,
+    habilidades: ['Pluma de relatos', 'Bitacora de ruta', 'Sello de cronista'] }
 ];
 
 // -- Catalogo de misiones (Fase 3) ---------------------------------
@@ -459,6 +474,75 @@ var MISIONES = [
         + 'WHERE af.autor_original_id=$1',
         [ctx.usuarioId]
       ).then(function(r){ return !!(r[0] && r[0].n >= 10); });
+    },
+  },
+  // -- Vocaciones artisticas (Entrega 016 / ADR-026): el bloque de nivel
+  // 5 abre 4 caminos acumulables (musico/cine/arte/escritor). El ctx de
+  // evaluarMisiones no trae vocaciones, asi que cada check lee
+  // usuarios.vocaciones (jsonb de claves activadas por vocacion_activar).
+  {
+    id: 'mis_primera_vocacion_artista', grupo: 'artista', requiere: [],
+    nombre: 'Primera vocacion artistica', xp: 25,
+    check: function(ctx) {
+      return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
+        .then(function(r) {
+          var v = (r[0] && r[0].vocaciones) || {};
+          return !!(v.musico || v.cine || v.artista_grafico || v.escritor);
+        })
+        .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_camino_musica', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
+    nombre: 'Camino de la musica', xp: 40,
+    check: function(ctx) {
+      return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
+        .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).musico; })
+        .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_camino_cine', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
+    nombre: 'Camino del cine', xp: 40,
+    check: function(ctx) {
+      return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
+        .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).cine; })
+        .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_camino_arte', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
+    nombre: 'Camino del arte', xp: 40,
+    check: function(ctx) {
+      return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
+        .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).artista_grafico; })
+        .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_camino_escritor', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
+    nombre: 'Camino del escritor', xp: 40,
+    check: function(ctx) {
+      return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
+        .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).escritor; })
+        .catch(function(){ return false; });
+    },
+  },
+  {
+    id: 'mis_poliglota_artista', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
+    nombre: 'Poliglota del arte', xp: 60,
+    check: function(ctx) {
+      return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
+        .then(function(r) {
+          var v = (r[0] && r[0].vocaciones) || {};
+          var n = 0;
+          if (v.musico) n++;
+          if (v.cine) n++;
+          if (v.artista_grafico) n++;
+          if (v.escritor) n++;
+          return n >= 2;
+        })
+        .catch(function(){ return false; });
     },
   },
 ];
@@ -991,6 +1075,85 @@ function progresarPandillaRetos(sql, usuarioId, tipoReto) {
   }).catch(function(){ return null; });
 }
 
+// =====================================================================
+// ENTREGA 016 (Gaming v5.0): helpers de sesion, reparto y nonce
+// =====================================================================
+
+// Validador JWT (ADR-025): misma firma que api/usuarios.js v9
+// (HMAC-SHA256 sobre payload base64url con SESSION_JWT_SECRET). El token
+// viaja como Authorization: Bearer <b64.sig>. Devuelve {ok:true} o
+// {ok:false, razon}; el sub del payload debe ser String(usuarioIdEsperado).
+function validarSesion(req, usuarioIdEsperado) {
+  var encabezado = req.headers['authorization'] || '';
+  if (encabezado.indexOf('Bearer ') !== 0) return { ok: false, razon: 'SESION_REQUERIDA' };
+  var token = encabezado.slice(7).trim();
+  var punto = token.indexOf('.');
+  if (punto <= 0 || punto === token.length - 1) return { ok: false, razon: 'SESION_INVALIDA' };
+  var payloadB64 = token.slice(0, punto);
+  var firma = token.slice(punto + 1);
+  var secreto = process.env.SESSION_JWT_SECRET || 'dev_secret';
+  var firmaEsperada = crypto
+    .createHmac('sha256', secreto)
+    .update(payloadB64)
+    .digest('base64url');
+  var fa = Buffer.from(firma, 'utf8');
+  var fb = Buffer.from(firmaEsperada, 'utf8');
+  if (fa.length !== fb.length) return { ok: false, razon: 'SESION_INVALIDA' };
+  if (!crypto.timingSafeEqual(fa, fb)) return { ok: false, razon: 'SESION_INVALIDA' };
+  var payload = null;
+  try {
+    payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+  } catch (e) { return { ok: false, razon: 'SESION_INVALIDA' }; }
+  if (!payload || !payload.exp || !payload.sub) return { ok: false, razon: 'SESION_INVALIDA' };
+  if (payload.exp <= Math.floor(Date.now() / 1000)) return { ok: false, razon: 'SESION_EXPIRADA' };
+  if (payload.sub !== String(usuarioIdEsperado)) return { ok: false, razon: 'SESION_INVALIDA' };
+  return { ok: true };
+}
+
+// Respuesta 401 unica para fallos de sesion (contrato de la Entrega 016).
+function responderSesion(res, razon) {
+  return res.status(401).json({ ok: false, error: razon });
+}
+
+// Consumo atomico de nonce anti-replay (ADR-025): un solo uso, expira
+// en 2 minutos y esta atado al usuario. Devuelve Promise<boolean>. Si
+// geo_nonces no existe (migracion 016 pendiente) el 42P01 sube limpio y
+// el catch global lo tipifica como 503.
+function consumirNonce(sql, nonce, usuarioId) {
+  return sql(
+    'UPDATE geo_nonces SET usado=true '
+    + 'WHERE nonce=$1 AND usado=false AND expira_en>NOW() AND usuario_id=$2 RETURNING id',
+    [nonce, usuarioId]
+  ).then(function(r) { return r.length > 0; });
+}
+
+// Reparto multinivel de la piramide de referidos (Entrega 016): del XP
+// ganado por el usuario, sus ancestros hasta 5 niveles reciben 10/5/3/2/1
+// % (FLOOR) sobre xp_ref_total, solo si el ancestro no supero el tope de
+// 500 referidos directos. REGLA Postgres (0A000): el UPDATE es la
+// sentencia PRINCIPAL con FROM cadena - jamas un UPDATE dentro del WITH
+// RECURSIVE. Nunca lanza: degrada a false.
+function repartirXpReferidos(sql, usuarioId, xpGanado) {
+  if (!usuarioId || !(parseInt(xpGanado, 10) > 0)) return Promise.resolve(false);
+  return sql(
+    'WITH RECURSIVE cadena AS ('
+    + 'SELECT u.referido_por AS ancestro_id, 1 AS nivel FROM usuarios u '
+    + 'WHERE u.id=$1 AND u.referido_por IS NOT NULL '
+    + 'UNION ALL '
+    + 'SELECT u2.referido_por, cadena.nivel + 1 FROM usuarios u2 '
+    + 'JOIN cadena ON u2.id = cadena.ancestro_id '
+    + 'WHERE cadena.nivel < 5 AND u2.referido_por IS NOT NULL'
+    + ') '
+    + 'UPDATE usuarios a '
+    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + FLOOR($2 * ('
+    + 'CASE c.nivel WHEN 1 THEN 0.10 WHEN 2 THEN 0.05 '
+    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END)) '
+    + 'FROM cadena c WHERE a.id = c.ancestro_id '
+    + 'AND a.referidos_directos_contados < 500',
+    [usuarioId, parseInt(xpGanado, 10)]
+  ).then(function(){ return true; }).catch(function(){ return false; });
+}
+
 // Anti-farming del chat (espec 2026-09-08): +2 XP por mensaje con tope
 // diario de 20 XP (10 mensajes/dia). El contador vive en
 // usuarios.progreso_social con la estructura { chat_dia: 'YYYY-MM-DD',
@@ -1292,6 +1455,54 @@ module.exports = async function handler(req, res) {
       var tipo     = req.query.tipo       || null;
       var destinoId= req.query.destino_id || null;
       var usuarioId= req.query.usuario_id || null;
+
+      // Entrega 016 (Wayfarer): nonce anti-replay para checkins
+      // geolocalizados (ADR-025). GET segun la matriz del contrato; el
+      // nonce es de un solo uso y expira en 2 minutos.
+      if (tipo === 'geo_nonce_solicitar') {
+        if (!usuarioId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var gnNonce = crypto.randomBytes(32).toString('hex');
+        var gnFilas = await sql(
+          'INSERT INTO geo_nonces (usuario_id, proposito, nonce, expira_en) '
+          + 'VALUES ($1, \'checkin\', $2, NOW() + INTERVAL \'2 minutes\') RETURNING nonce, expira_en',
+          [usuarioId, gnNonce]
+        );
+        return res.json({ ok: true, data: { nonce: gnFilas[0].nonce, expira_en: gnFilas[0].expira_en } });
+      }
+
+      // Entrega 016 (Wayfarer): cola de propuestas pendientes para
+      // votar, excluyendo las del propio usuario. El estado leido se
+      // deriva: el quorum (+/-3) manda sobre la columna estado real; si
+      // no hay quorum y pasaron 30 dias (sin actividad de votos o sin
+      // propuesta nueva) la propuesta se lee como rechazada.
+      if (tipo === 'activos_ocultos_pendientes') {
+        var esAdminAo = (req.headers.authorization || '').slice(7)
+          === (process.env.ADMIN_SECRET || 'exploraco12345');
+        if (!usuarioId && !esAdminAo)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var aoPend = await sql(
+          'SELECT a.id, a.nombre, a.descripcion, a.lat, a.lng, a.foto_url, '
+          + 'a.categoria, a.ciudad, a.creado_en, a.votos_favor, a.votos_contra, '
+          + 'a.propuesto_por, u.nombre AS propuesto_por_nombre, '
+          + 'CASE WHEN (SELECT MAX(v.creado_en) FROM activos_ocultos_votos v '
+          + '   WHERE v.activo_id = a.id) IS NOT NULL '
+          + '  AND (SELECT MAX(v.creado_en) FROM activos_ocultos_votos v '
+          + '   WHERE v.activo_id = a.id) < NOW() - INTERVAL \'30 days\' THEN \'rechazado\' '
+          + 'WHEN (SELECT MAX(v.creado_en) FROM activos_ocultos_votos v '
+          + '   WHERE v.activo_id = a.id) IS NULL '
+          + '  AND a.creado_en < NOW() - INTERVAL \'30 days\' THEN \'rechazado\' '
+          + 'ELSE \'pendiente\' END AS estado_leido '
+          + 'FROM activos_ocultos a '
+          + 'LEFT JOIN usuarios u ON a.propuesto_por = u.id '
+          + 'WHERE a.estado = \'pendiente\' AND a.activo = true '
+          + 'AND ($1::uuid IS NULL OR a.propuesto_por <> $1) '
+          + 'ORDER BY a.creado_en ASC LIMIT 50',
+          [usuarioId || null]
+        );
+        aoPend.forEach(function(x) { x.estado = x.estado_leido; });
+        return res.json({ ok: true, data: aoPend });
+      }
 
       // Resenas de un destino
       if (tipo === 'resenas' && destinoId) {
@@ -2458,6 +2669,231 @@ module.exports = async function handler(req, res) {
       var destinoId2= body.destino_id;
       var usuarioId2= body.usuario_id || null;
 
+      // ============ ENTREGA 016: WAYFARER ACTIVO OCULTO ============
+      // Crowdsourcing geoespacial (migracion 016): cualquier usuario con
+      // correo verificado propone sin gate de nivel (decision aprobada);
+      // el filtro de calidad lo da la votacion de la comunidad.
+
+      // Proponer un Activo Oculto. El +50 XP se otorga SOLO al aprobar
+      // (via quorum de votos), no por proponer.
+      if (tipo2 === 'activo_oculto_proponer') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var aoUsr = await sql(
+          'SELECT email_verificado FROM usuarios WHERE id=$1',
+          [usuarioId2]
+        );
+        if (!aoUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        if (!(aoUsr[0].email_verificado === true))
+          return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
+        var aoNombre = String(body.nombre || '').trim();
+        var aoDesc = String(body.descripcion || '').trim();
+        var aoLat = parseFloat(body.lat);
+        var aoLng = parseFloat(body.lng);
+        var aoCiudad = String(body.ciudad || '').trim().slice(0, 100) || null;
+        var aoFoto = String(body.foto_url || '').trim().slice(0, 2000) || null;
+        var aoCategoria = String(body.categoria || '').trim().slice(0, 50) || null;
+        if (!aoNombre)
+          return res.status(400).json({ ok: false, error: 'nombre requerido' });
+        if (!isFinite(aoLat) || !isFinite(aoLng))
+          return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+        if (aoLat === 0 && aoLng === 0)
+          return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+        if (aoLat < -90 || aoLat > 90 || aoLng < -180 || aoLng > 180)
+          return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+        var aoIns = await sql(
+          'INSERT INTO activos_ocultos (propuesto_por, nombre, descripcion, lat, lng, foto_url, categoria, ciudad) '
+          + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, estado',
+          [usuarioId2, aoNombre, aoDesc, aoLat, aoLng, aoFoto, aoCategoria, aoCiudad]
+        );
+        return res.json({ ok: true, data: { activo_id: aoIns[0].id, estado: aoIns[0].estado } });
+      }
+
+      // Votar una propuesta (quorum +/-3 para aprobar/rechazar en una
+      // sola sentencia). Gates en orden: sesion firmada -> correo
+      // verificado -> nivel 5 -> no votar la propuesta propia -> voto
+      // valido. La PK compuesta deduplica; el segundo voto no paga XP.
+      if (tipo2 === 'activo_oculto_votar') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var svVoto = validarSesion(req, usuarioId2);
+        if (!svVoto.ok) return responderSesion(res, svVoto.razon);
+        var aoVUsr = await sql(
+          'SELECT email_verificado, xp_total FROM usuarios WHERE id=$1',
+          [usuarioId2]
+        );
+        if (!aoVUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        if (!(aoVUsr[0].email_verificado === true))
+          return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
+        if (calcularNivelLocal(parseInt(aoVUsr[0].xp_total, 10) || 0).nivel < 5)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE' });
+        var aoActivoId = String(body.activo_id || '');
+        if (!aoActivoId)
+          return res.status(400).json({ ok: false, error: 'activo_id requerido' });
+        var aoTarget = await sql(
+          'SELECT propuesto_por FROM activos_ocultos WHERE id=$1',
+          [aoActivoId]
+        ).catch(function(){ return []; });
+        if (!aoTarget.length)
+          return res.status(404).json({ ok: false, error: 'ACTIVO_NO_ENCONTRADO' });
+        if (String(aoTarget[0].propuesto_por) === String(usuarioId2))
+          return res.status(409).json({ ok: false, error: 'VOTO_PROPIO' });
+        var aoVoto = String(body.voto || '');
+        if (aoVoto !== 'favor' && aoVoto !== 'contra')
+          return res.status(400).json({ ok: false, error: 'VOTO_INVALIDO' });
+        var aoVotoIns = await sql(
+          'INSERT INTO activos_ocultos_votos (activo_id, usuario_id, voto) VALUES ($1, $2, $3) '
+          + 'ON CONFLICT (activo_id, usuario_id) DO NOTHING RETURNING id',
+          [aoActivoId, usuarioId2, aoVoto]
+        );
+        if (!aoVotoIns.length)
+          return res.status(200).json({ ok: true, ya_votado: true, xp_otorgado: false });
+        // Contadores + quorum + resuelto_en en UNA sentencia (misma
+        // transaccion logica que el INSERT del voto, sin ventana entre
+        // el conteo y el UPDATE).
+        await sql(
+          'UPDATE activos_ocultos SET '
+          + 'votos_favor = votos_favor + CASE WHEN $3 = \'favor\' THEN 1 ELSE 0 END, '
+          + 'votos_contra = votos_contra + CASE WHEN $3 = \'contra\' THEN 1 ELSE 0 END, '
+          + 'estado = CASE WHEN (votos_favor + CASE WHEN $3 = \'favor\' THEN 1 ELSE 0 END) '
+          + '  - (votos_contra + CASE WHEN $3 = \'contra\' THEN 1 ELSE 0 END) >= 3 THEN \'aprobado\' '
+          + 'WHEN (votos_favor + CASE WHEN $3 = \'favor\' THEN 1 ELSE 0 END) '
+          + '  - (votos_contra + CASE WHEN $3 = \'contra\' THEN 1 ELSE 0 END) <= -3 THEN \'rechazado\' '
+          + 'ELSE estado END, '
+          + 'resuelto_en = CASE WHEN (votos_favor + CASE WHEN $3 = \'favor\' THEN 1 ELSE 0 END) '
+          + '  - (votos_contra + CASE WHEN $3 = \'contra\' THEN 1 ELSE 0 END) >= 3 THEN NOW() '
+          + 'WHEN (votos_favor + CASE WHEN $3 = \'favor\' THEN 1 ELSE 0 END) '
+          + '  - (votos_contra + CASE WHEN $3 = \'contra\' THEN 1 ELSE 0 END) <= -3 THEN NOW() '
+          + 'ELSE resuelto_en END '
+          + 'WHERE id=$2',
+          [usuarioId2, aoActivoId, aoVoto]
+        );
+        // +5 XP por voto con tope diario (patron chatXpDisponible): max
+        // 30 XP al dia = 6 votos con recompensa; el resto sigue votando
+        // pero sin XP. El COUNT corre despues del INSERT, asi el voto
+        // actual ya cuenta para su propio tope.
+        var aoVotosHoy = await sql(
+          'SELECT COUNT(*)::int AS n FROM activos_ocultos_votos '
+          + 'WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL \'1 day\'',
+          [usuarioId2]
+        );
+        var aoVotosN = (aoVotosHoy[0] && parseInt(aoVotosHoy[0].n, 10)) || 0;
+        if (aoVotosN <= 6) {
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + 5, ultimo_acceso = NOW() WHERE id=$1',
+            [usuarioId2]
+          ).catch(function(e){ console.warn('gaming016 xp_voto no acreditado', e && e.code); });
+          await repartirXpReferidos(sql, usuarioId2, 5);
+        } else {
+          return res.status(200).json({ ok: true, ya_votado: false, xp_otorgado: false });
+        }
+        var aoVMisiones = await evaluarMisiones(sql, usuarioId2);
+        var aoVLogros = await evaluarLogros(sql, usuarioId2);
+        return res.json({
+          ok: true,
+          data: { ya_votado: false, xp_otorgado: true, xp: 5, misiones: aoVMisiones, logros: aoVLogros }
+        });
+      }
+
+      // Checkin geolocalizado sobre un Activo Oculto aprobado: nonce
+      // anti-replay + device_hash registrado + geocerca Haversine +
+      // cooldown 90s + tope diario 30 (mismas constantes de la visita,
+      // ADR-024). Dedup por el UNIQUE parcial (activo, usuario) activo.
+      if (tipo2 === 'activo_oculto_checkin') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var svCheckin = validarSesion(req, usuarioId2);
+        if (!svCheckin.ok) return responderSesion(res, svCheckin.razon);
+        var aoCheckId = String(body.activo_id || '');
+        var aoCheckNonce = String(body.nonce || '');
+        var aoCheckLat = parseFloat(body.lat);
+        var aoCheckLng = parseFloat(body.lng);
+        var aoCheckAcc = (body.accuracy !== undefined && body.accuracy !== null && body.accuracy !== '')
+          ? parseFloat(body.accuracy) : null;
+        var aoCheckDevice = String(body.device_hash || '');
+        if (!aoCheckId || !aoCheckNonce)
+          return res.status(400).json({ ok: false, error: 'activo_id y nonce requeridos' });
+        if (!isFinite(aoCheckLat) || !isFinite(aoCheckLng) || (aoCheckLat === 0 && aoCheckLng === 0))
+          return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+        var nonceCheckinOk = await consumirNonce(sql, aoCheckNonce, usuarioId2);
+        if (!nonceCheckinOk)
+          return res.status(400).json({ ok: false, error: 'NONCE_INVALIDO' });
+        if (!aoCheckDevice)
+          return res.status(403).json({ ok: false, error: 'DEVICE_NO_REGISTRADO' });
+        var devOk = await sql(
+          'SELECT 1 AS uno FROM usuarios WHERE id=$1 AND device_hashes @> $2::jsonb',
+          [usuarioId2, JSON.stringify([aoCheckDevice])]
+        ).catch(function(){ return []; });
+        if (!devOk.length)
+          return res.status(403).json({ ok: false, error: 'DEVICE_NO_REGISTRADO' });
+        var aoCheckAct = await sql(
+          'SELECT id, lat, lng, categoria, nombre FROM activos_ocultos '
+          + 'WHERE id=$1 AND estado=\'aprobado\' AND activo=true',
+          [aoCheckId]
+        ).catch(function(){ return []; });
+        if (!aoCheckAct.length)
+          return res.status(404).json({ ok: false, error: 'ACTIVO_NO_ENCONTRADO' });
+        // Geocerca: radios 100/150/200/250 segun categoria con fallback
+        // 150 (el 250 rural sale de las keywords del nombre).
+        var acCat = String(aoCheckAct[0].categoria || '').toLowerCase();
+        var acNombre = String(aoCheckAct[0].nombre || '').toLowerCase();
+        var radioCheckin = 150;
+        if (Object.prototype.hasOwnProperty.call(RADIO_POR_CATEGORIA, acCat))
+          radioCheckin = RADIO_POR_CATEGORIA[acCat];
+        for (var acRk = 0; acRk < RURAL_KEYWORDS.length; acRk++) {
+          if (acNombre.indexOf(RURAL_KEYWORDS[acRk]) !== -1) { radioCheckin = 250; break; }
+        }
+        var acLatDest = typeof aoCheckAct[0].lat === 'number' ? aoCheckAct[0].lat : parseFloat(aoCheckAct[0].lat);
+        var acLngDest = typeof aoCheckAct[0].lng === 'number' ? aoCheckAct[0].lng : parseFloat(aoCheckAct[0].lng);
+        var acDist = haversineMetros(aoCheckLat, aoCheckLng, acLatDest, acLngDest);
+        if (aoCheckAcc !== null && (!isFinite(aoCheckAcc) || aoCheckAcc <= 0))
+          return res.status(400).json({ ok: false, error: 'ACCURACY_INVALIDA' });
+        if (aoCheckAcc !== null && aoCheckAcc > ACCURACY_MAX_M)
+          return res.status(422).json({ ok: false, error: 'ACCURACY_INSUFICIENTE' });
+        if (acDist > radioCheckin + (aoCheckAcc || 0))
+          return res.status(422).json({
+            ok: false,
+            error: 'FUERA_DE_RANGO',
+            dist_m: Math.round(acDist),
+            radio_m: radioCheckin
+          });
+        // Cooldown 90s y tope diario 30 (mismas constantes de visita).
+        var acUltimo = await sql(
+          'SELECT MAX(creado_en) AS ultimo FROM activos_ocultos_checkins WHERE usuario_id=$1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (acUltimo.length && acUltimo[0].ultimo) {
+          var acDt = (Date.now() - Date.parse(acUltimo[0].ultimo)) / 1000;
+          if (acDt < COOLDOWN_MIN_SEG)
+            return res.status(429).json({ ok: false, error: 'CHECKIN_RATE_LIMIT' });
+        }
+        var acHoy = await sql(
+          'SELECT COUNT(*)::int AS n FROM activos_ocultos_checkins '
+          + 'WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL \'1 day\'',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (((acHoy[0] && parseInt(acHoy[0].n, 10)) || 0) >= VISITAS_DIA_MAX)
+          return res.status(429).json({ ok: false, error: 'LIMITE_DIARIO' });
+        var acIns = await sql(
+          'INSERT INTO activos_ocultos_checkins (activo_id, usuario_id, lat, lng, accuracy) '
+          + 'VALUES ($1, $2, $3, $4, $5) '
+          + 'ON CONFLICT (activo_id, usuario_id) WHERE activo = true DO NOTHING RETURNING id',
+          [aoCheckId, usuarioId2, aoCheckLat, aoCheckLng, aoCheckAcc]
+        ).catch(function(e) { if (e && e.code === '23505') return []; throw e; });
+        if (!acIns.length)
+          return res.status(200).json({ ok: true, ya_checkin: true, xp: 0 });
+        await sql(
+          'UPDATE usuarios SET xp_total = xp_total + 15, ultimo_acceso = NOW() WHERE id=$1',
+          [usuarioId2]
+        ).catch(function(e){ console.warn('gaming016 xp_checkin no acreditado', e && e.code); });
+        await repartirXpReferidos(sql, usuarioId2, 15);
+        var acMis = await evaluarMisiones(sql, usuarioId2);
+        var acLog = await evaluarLogros(sql, usuarioId2);
+        return res.json({ ok: true, data: { checkin_id: acIns[0].id, xp: 15, misiones: acMis, logros: acLog } });
+      }
+
       // -- Mapas tematicos (spec mapas publicos/privados 2026-09-05) --
       // Se manejan ANTES del guard generico de destino_id porque
       // mapa_crear / mapa_editar / mapa_eliminar no reciben destino_id.
@@ -2667,6 +3103,9 @@ module.exports = async function handler(req, res) {
             [xpChat, usuarioId2]
           ).catch(function(){});
           await registrarChatXp(sql, usuarioId2, dispChat.hoy, dispChat.n);
+          // v13: reparto multinivel del XP ganado (piramide de
+          // referidos, no bloquea).
+          await repartirXpReferidos(sql, usuarioId2, xpChat);
         }
         misionesChat = await evaluarMisiones(sql, usuarioId2);
         logrosChat = await evaluarLogros(sql, usuarioId2);
@@ -2864,6 +3303,8 @@ module.exports = async function handler(req, res) {
             [xpPcm, usuarioId2]
           ).catch(function(){});
           await registrarChatXp(sql, usuarioId2, dispPcm.hoy, dispPcm.n);
+          // v13: reparto multinivel del XP ganado (no bloquea).
+          await repartirXpReferidos(sql, usuarioId2, xpPcm);
         }
         misionesPcm = await evaluarMisiones(sql, usuarioId2);
         logrosPcm = await evaluarLogros(sql, usuarioId2);
@@ -2964,6 +3405,8 @@ module.exports = async function handler(req, res) {
         );
         var misionesFoto = [], logrosFoto = [];
         await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        // v13: reparto multinivel del XP ganado (no bloquea).
+        await repartirXpReferidos(sql, usuarioId2, 15);
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
         logrosFoto = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: 15, misiones: misionesFoto, logros: logrosFoto });
@@ -3002,6 +3445,8 @@ module.exports = async function handler(req, res) {
         );
         var misionesFotoVoto = [], logrosFotoVoto = [];
         await sql('UPDATE usuarios SET xp_total=xp_total+5, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        // v13: reparto multinivel sobre el XP REAL entregado (+5).
+        await repartirXpReferidos(sql, usuarioId2, 5);
         misionesFotoVoto = await evaluarMisiones(sql, usuarioId2);
         logrosFotoVoto = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({ ok: true, xp: 5, misiones: misionesFotoVoto, logros: logrosFotoVoto });
@@ -3056,6 +3501,8 @@ module.exports = async function handler(req, res) {
 
         // XP +20
         await sql('UPDATE usuarios SET xp_total=xp_total+20, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        // v13: reparto multinivel sobre el XP REAL entregado (+20).
+        await repartirXpReferidos(sql, usuarioId2, 20);
 
         // Actualizar progreso_album
         var nuevoAlbumesMes = ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual) ? (pa.albumes_mes || 0) + 1 : 1;
@@ -3108,12 +3555,18 @@ module.exports = async function handler(req, res) {
 
         // XP +15 al agregador
         await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        // v13: reparto multinivel del XP ganado por el agregador (no
+        // bloquea).
+        await repartirXpReferidos(sql, usuarioId2, 15);
 
         // XP +10 al autor original si es foto de otro (tope 10 XP/dia)
         if (afAutorOriginal !== usuarioId2) {
           var pa3 = await getProgresoAlbum(sql, afAutorOriginal);
           if ((pa3.xp_autor_fecha || '') !== hoy() || (pa3.xp_autor_dia || 0) < 10) {
             await sql('UPDATE usuarios SET xp_total=xp_total+10, ultimo_acceso=NOW() WHERE id=$1', [afAutorOriginal]).catch(function(){});
+            // v13: reparto multinivel para el autor original (no
+            // bloquea).
+            await repartirXpReferidos(sql, afAutorOriginal, 10);
             var nuevoXpAutor = ((pa3.xp_autor_fecha || '') === hoy()) ? (pa3.xp_autor_dia || 0) + 10 : 10;
             await updProgresoAlbum(sql, afAutorOriginal, { xp_autor_dia: nuevoXpAutor, xp_autor_fecha: hoy() });
           }
@@ -3463,6 +3916,8 @@ module.exports = async function handler(req, res) {
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
             [cfcXp, usuarioId2]
           ).catch(function(){});
+          // v13: reparto multinivel del XP ganado (no bloquea).
+          await repartirXpReferidos(sql, usuarioId2, cfcXp);
           await updProgresoAlbum(sql, usuarioId2, {
             comentarios_dia: cfcDia + 1, comentarios_dia_fecha: cfcHoy,
           });
@@ -4145,6 +4600,8 @@ module.exports = async function handler(req, res) {
           // pandilla activa (10% del XP entregado, no bloquean).
           cromoResena = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
           await aplicarFamaPandilla(sql, usuarioId2, xpResenaEntregado);
+          // v13: reparto multinivel del XP ganado (no bloquea).
+          await repartirXpReferidos(sql, usuarioId2, xpResenaEntregado);
           // v9 contrato final (punto 8): progreso de retos de parche.
           var retoResena = await progresarPandillaRetos(sql, usuarioId2, 'resena');
         } else {
@@ -4237,6 +4694,8 @@ module.exports = async function handler(req, res) {
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
         var cromoGuardado = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
         await aplicarFamaPandilla(sql, usuarioId2, xpGuardadoFinal);
+        // v13: reparto multinivel del XP ganado (no bloquea).
+        await repartirXpReferidos(sql, usuarioId2, xpGuardadoFinal);
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoGuardado = await progresarPandillaRetos(sql, usuarioId2, 'guardado');
         return res.status(200).json({ ok: true, xp: xpGuardadoFinal, misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null });
@@ -4266,6 +4725,20 @@ module.exports = async function handler(req, res) {
       if (tipo2 === 'visita') {
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido para marcar visita' });
+
+        // v13 (Entrega 016 / ADR-025): la geolocalizacion exige sesion
+        // firmada (JWT) y nonce de un solo uso emitido por
+        // geo_nonce_solicitar. El nonce se consume ANTES del dedup y de
+        // la geocerca; si la migracion 016 falta, el 42P01 sube al catch
+        // tipificado (503).
+        var svVisita = validarSesion(req, usuarioId2);
+        if (!svVisita.ok) return responderSesion(res, svVisita.razon);
+        var nonceVisita = String(body.nonce || '');
+        if (!nonceVisita)
+          return res.status(400).json({ ok: false, error: 'NONCE_REQUERIDO' });
+        var nonceVisitaOk = await consumirNonce(sql, nonceVisita, usuarioId2);
+        if (!nonceVisitaOk)
+          return res.status(400).json({ ok: false, error: 'NONCE_INVALIDO' });
 
         // 3) Dedup primero: detecta CUALQUIER fila, activa o no.
         var yaVisitado = await sql(
@@ -4430,6 +4903,9 @@ module.exports = async function handler(req, res) {
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
         var cromoVisita = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
         await aplicarFamaPandilla(sql, usuarioId2, xpVisitaFinal);
+        // v13: reparto multinivel del XP TOTAL ganado en la visita
+        // (incluye bono rural, no bloquea).
+        await repartirXpReferidos(sql, usuarioId2, xpTotalVisita);
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoVisita = await progresarPandillaRetos(sql, usuarioId2, 'visita');
         return res.status(200).json({
@@ -4530,6 +5006,8 @@ module.exports = async function handler(req, res) {
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
         var cromoRating = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
         await aplicarFamaPandilla(sql, usuarioId2, xpRatingFinal);
+        // v13: reparto multinivel del XP ganado (no bloquea).
+        await repartirXpReferidos(sql, usuarioId2, xpRatingFinal);
         // v9 contrato final (punto 8): rating cuenta como 'visita' en
         // los retos de parche (regla del contrato).
         var retoRating = await progresarPandillaRetos(sql, usuarioId2, 'visita');

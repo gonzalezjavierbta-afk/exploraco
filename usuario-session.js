@@ -72,15 +72,22 @@
       id: 'cine',
       nombre: 'Cine',
       emoji: '\uD83C\uDFAC',
-      nivel: 8,
+      nivel: 5,
       habilidades: ['Reel de cine', 'Cartelera propia', 'Sello de cineasta']
     },
     {
       id: 'artista_grafico',
       nombre: 'Artista Grafico',
       emoji: '\uD83C\uDFA8',
-      nivel: 11,
+      nivel: 5,
       habilidades: ['Galeria de obra', 'Paleta de marca', 'Sello de autor']
+    },
+    {
+      id: 'escritor',
+      nombre: 'Escritor',
+      emoji: '\u270D\uFE0F',
+      nivel: 5,
+      habilidades: ['Pluma de relatos', 'Bitacora de ruta', 'Sello de cronista']
     }
   ];
 
@@ -104,6 +111,99 @@
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(usuario));
     } catch (e) {}
+  }
+
+  // --- Fingerprint de dispositivo (Entrega 016 - Gaming v5.0) ---
+  // ID persistente por navegador. Se envia como device_hash en el
+  // upsert de /api/usuarios; el backend lo acumula en device_hashes
+  // (JSONB). No necesita ser un hash criptografico: basta un
+  // identificador consistente construido con userAgent + id local.
+  var DEVICE_KEY = 'exploraco_device_id';
+
+  function obtenerDeviceId() {
+    var id = null;
+    try { id = localStorage.getItem(DEVICE_KEY); } catch (e) { id = null; }
+    if (id) return id;
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      id = window.crypto.randomUUID();
+    } else {
+      id = 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+    }
+    try { localStorage.setItem(DEVICE_KEY, id); } catch (e) { console.warn('exploraco: device id no persistido', e && e.name); }
+    return id;
+  }
+
+  function obtenerDeviceHash() {
+    var ua = (typeof navigator !== 'undefined' && navigator.userAgent)
+      ? navigator.userAgent
+      : 'unknown';
+    return ua + '|' + obtenerDeviceId();
+  }
+
+  window.ExploraCO.obtenerDeviceId = obtenerDeviceId;
+  window.ExploraCO.obtenerDeviceHash = obtenerDeviceHash;
+
+  // --- Soporte JWT (Entrega 016 - Gaming v5.0) -----------------
+  // usuarios.js v9 devuelve jwt y jwt_expira_en en el upsert.
+  // Quedan guardados dentro de la misma sesion (exploraco_user) y
+  // se exponen aqui para que las paginas autentiquen sus llamadas
+  // con el header Authorization: Bearer.
+  window.ExploraCO.obtenerJwt = function () {
+    var u = window.ExploraCO.usuario;
+    if (u && u.jwt) return u.jwt;
+    try {
+      var raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        var sesion = JSON.parse(raw);
+        if (sesion && sesion.jwt) return sesion.jwt;
+      }
+    } catch (e) {}
+    return null;
+  };
+
+  window.ExploraCO.authHeaders = function () {
+    var jwt = window.ExploraCO.obtenerJwt();
+    return jwt ? { Authorization: 'Bearer ' + jwt } : {};
+  };
+
+  // Refresh silencioso: re-upsert de la sesion para obtener un JWT
+  // nuevo. Las paginas lo llaman al recibir 401 SESION_REQUERIDA.
+  // Si el backend no responde ok, se limpia la sesion local.
+  window.ExploraCO.refreshJwt = async function () {
+    var u = window.ExploraCO.usuario;
+    if (!u || !u.auth_id || !u.email) return null;
+    try {
+      var res = await fetch(API + '/api/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_id:       u.auth_id,
+          email:         u.email,
+          nombre:        u.nombre,
+          auth_provider: u.auth_provider || 'email',
+          device_hash:   obtenerDeviceHash(),
+        }),
+      });
+      var data = await res.json();
+      if (!data.ok || !data.data) return limpiarSesionParaJwt();
+      var perfil = data.data;
+      if (data.jwt && !perfil.jwt) perfil.jwt = data.jwt;
+      if (data.jwt_expira_en && !perfil.jwt_expira_en) perfil.jwt_expira_en = data.jwt_expira_en;
+      if (!perfil.jwt) return limpiarSesionParaJwt();
+      guardarSesion(perfil);
+      actualizarUI();
+      return perfil.jwt;
+    } catch (err) {
+      console.warn('[session] refreshJwt error:', err.message);
+      return limpiarSesionParaJwt();
+    }
+  };
+
+  function limpiarSesionParaJwt() {
+    window.ExploraCO.usuario = null;
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    actualizarUI();
+    return null;
   }
 
   // ── Cerrar sesión ──────────────────────────────────────────
@@ -131,16 +231,21 @@
           email:          email.toLowerCase().trim(),
           nombre:         nombre || email.split('@')[0],
           auth_provider: 'email',
+          device_hash:    obtenerDeviceHash(),
         }),
       });
       var data = await res.json();
       if (data.ok) {
-        guardarSesion(data.data);
+        var perfil = data.data || {};
+        // JWT puede venir en la raiz o dentro de data.data
+        if (data.jwt && !perfil.jwt) perfil.jwt = data.jwt;
+        if (data.jwt_expira_en && !perfil.jwt_expira_en) perfil.jwt_expira_en = data.jwt_expira_en;
+        guardarSesion(perfil);
         actualizarUI();
-        mostrarToast('¡Bienvenido, ' + data.data.nombre + '! +XP por explorar', '#16a34a');
+        mostrarToast('¡Bienvenido, ' + perfil.nombre + '! +XP por explorar', '#16a34a');
         // Sincronizar guardados locales con DB
         sincronizarGuardados();
-        return data.data;
+        return perfil;
       }
     } catch (err) {
       console.warn('[session] Login error:', err.message);
@@ -914,6 +1019,7 @@
     // Solo en Vercel/servidor — no en file://
     if (window.location.protocol === 'file:') return;
 
+    obtenerDeviceId();
     cargarSesion();
     actualizarUI();
     refrescarSesion();

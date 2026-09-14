@@ -2486,5 +2486,40 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-101: Entrega 016 "ExploraCO Gaming v5.0" -- piramide de referidos, crowdsourcing Wayfarer (Activo Oculto), 4 facciones y mundo artistas [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-14, implementada y verificada en working tree; pendiente aplicar la migracion 016 en Neon + configurar `RESEND_API_KEY`/`SESSION_JWT_SECRET` en Vercel + commit/push/deploy)
+- **Prioridad:** ALTA
+- **Fecha:** 2026-09-14
+- **Prompt origen:** `promptgamming.md` (Entrega 016 "ExploraCO Gaming v5.0", aprobada por arquitectura y verificada contra el repo real)
+- **ADR:** ADR-027 (piramide + crowdsourcing + facciones + mundo artistas) y ADR-025 (sesion firmada / anti-Sybil, consume el candidato reservado desde ADR-024)
+- **Checklist de despliegue:** `docs/DEPLOY_016.md`
+- **Responsable:** build (orquestador) + backend/architect/sql-security/admin/frontend/qa + docs-keeper
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006):**
+  1. **[Esquema] `db/migrations/016_multinivel_crowdsourcing.sql` (NUEVA, 209 lineas, idempotente ADR-008, ASCII-safe ADR-002):** 10 columnas en `usuarios` (`referido_por`, `codigo_referido`, `xp_ref_total`, `referidos_directos_contados`, `faccion` con CHECK de 4 facciones, `faccion_elegida_en`, `email_verificado`, `email_token`, `email_token_expira`, `device_hashes`) + 4 tablas (`activos_ocultos`, `activos_ocultos_votos`, `activos_ocultos_checkins`, `geo_nonces`) + 8 indices. Idempotencia DDL verificada 13/13.
+  2. **[Backend `api/usuarios.js` v8 -> v9]:** piramide de referidos (codigo, red CTE de 5 niveles, `?ref=` en registro con topes 500/20, reparto 10/5/3/2/1 FLOOR en `xp_ref_total`), 4 facciones (primera gratis, cambio 500 `xp_total` + cooldown 15 dias), verificacion de email (Resend), JWT HMAC (`firmarSesion`, `SESSION_JWT_SECRET`) y `device_hashes`.
+  3. **[Backend `api/interacciones.js` v12 -> v13]:** helper `repartirXpReferidos` (CTE recursiva) inyectado en 14 puntos de XP real (excluye `admin_xp` y `comprar_consumible`); Wayfarer Activo Oculto completo (proponer sin nivel pero con email verificado, votar nivel 5, quorum +/-3, 30 dias derivado, +50/+5/+15 XP, checkin reusa geocerca ADR-024 + nonce); `validarSesion` (JWT con `timingSafeEqual`) en visita/votar/checkin; nonce en visita y checkin; vocaciones en bloque nivel 5 (musico/cine/artista_grafico/escritor); 6 misiones de artista.
+  4. **[Backend `api/admin.js`]:** rama `activo_oculto_moderar` (Bearer admin): aprobar +50 XP al proponente con reparto piramidal, rechazar sin XP y borrado logico (`activo=false`).
+  5. **[Frontend]:** `mi-perfil.html` (Mi Red + QR + selector de facciones + panel de vocaciones + banner de verificacion), `comunidad.html` (relabel visual Pandilla->Parche solo en el texto visible + seccion Activo Oculto + ranking de facciones), `admin.html` (panel de moderacion de Activos Ocultos), `usuario-session.js` (catalogo de vocaciones nivel 5, fingerprint de dispositivo, JWT + refresh silencioso).
+  6. **[Governanza/config]:** `.gitignore` corregido (filtra `.env`, `.env.local`, `.env.*.local`; conserva `!.env.example`), `.env.example` creado (NUEVO, plantilla con `DATABASE_URL`, `ADMIN_SECRET`, `SESSION_JWT_SECRET`, `RESEND_API_KEY`, `ADMIN_EMAIL`, `SITE_URL`, `DEV_EMAIL_ECHO`), `docs/DEPLOY_016.md` (NUEVO, checklist de 5 pasos).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (verificado con `git status`: cero archivos nuevos en `api/`; todo entro como ramas `tipo=` y helpers dentro de los endpoints existentes, ADR-010).
+
+- **Evidencia (Escudo GOLD, 2026-09-14):**
+  - Smoke dedicado `scripts/smoke_016_multinivel_crowdsourcing.js`: **39/39 PASS** (ejecutado en esta sesion documental, salida "SMOKE 016 MULTINIVEL: OK").
+  - `node --check` PASS x3 (`api/usuarios.js`, `api/interacciones.js`, `api/admin.js`); ASCII-safety **0 bytes >127** y **0 backticks**; balance de divs **0**; idempotencia DDL **13/13**.
+  - Arquitectura: 8 archivos en `api/` (sin altas); headers reales confirmados `api/usuarios.js` v9 y `api/interacciones.js` v13.
+
+- **PENDIENTE OPERATIVO (bloqueante para produccion, lo ejecuta Javier):**
+  1. **Aplicar `db/migrations/016_multinivel_crowdsourcing.sql` en Neon antes del deploy** (editor SQL, archivo COMPLETO en una corrida; idempotente). Prerrequisito declarado en `docs/DEPLOY_016.md`: migraciones **010 a 015** ya aplicadas (verificar 015 -- ADR-006).
+  2. **Configurar variables en Vercel:** `SESSION_JWT_SECRET` (generar aleatorio fuerte; el fallback `dev_secret` es inseguro) y `RESEND_API_KEY`; `SITE_URL` (`https://exploraco.co` si el dominio propio esta activo, `https://exploraco.vercel.app` si no). Confirmar `DATABASE_URL`/`ADMIN_SECRET` reales. NO configurar `DEV_EMAIL_ECHO` en produccion.
+  3. **Deploy en UN SOLO release:** `api/usuarios.js` v9 + `api/interacciones.js` v13 + `api/admin.js` deben viajar juntos y compartir el MISMO `SESSION_JWT_SECRET` (si una funcion usa otro secreto, los usuarios reciben 401).
+  4. **Verificacion en vivo:** registro con `?ref=`, verificacion de correo, eleccion/cambio de faccion, proponer/votar/checkin de Activo Oculto, moderacion admin (+50 XP al aprobar), y sesion JWT (token alterado -> 401).
+
+- **Fuera de alcance:** subida real de archivos (storage externo, TODO de TSK-098); atestacion nativa de dispositivo (Play Integrity/App Attest, evolucion futura de ADR-025); correccion del drift documental de `scripts/validate_ficha.js` (ver BUGS_HISTORICOS.md BUG-034).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

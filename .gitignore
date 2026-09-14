@@ -2,3 +2,11 @@
 api/fake_neon.js
 scripts/fake_neon.js
 node_modules/
+
+# Entorno y secretos (NO commitear valores reales) - Entrega 016
+.env
+.env.local
+.env.*.local
+
+# La plantilla SI se versiona (no debe quedar ignorada)
+!.env.example

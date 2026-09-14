@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-101 / ADR-027 + ADR-025 Entrega 016 "ExploraCO Gaming v5.0" (2026-09-14, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - piramide de referidos de 5 niveles con `xp_ref_total` separado y CTE recursiva (0.10/0.05/0.03/0.02/0.01 FLOOR, topes 500/20, `?ref=` en registro), crowdsourcing Wayfarer "Activo Oculto" (proponer con email verificado, votar nivel 5, quorum +/-3, 30 dias derivado, +50/+5/+15 XP, checkin reusa geocerca ADR-024 + nonce), 4 facciones con CHECK (exploradores/curadores/creadores/artistas; primera gratis, cambio 500 xp_total + cooldown 15 dias), vocaciones de artista en bloque nivel 5 y 6 misiones de artista; backend `api/usuarios.js` v8->v9 (JWT HMAC `firmarSesion`, verificacion de email, device_hashes), `api/interacciones.js` v12->v13 (`repartirXpReferidos` en 14 puntos de XP, `validarSesion` con timingSafeEqual en visita/votar/checkin, geo_nonces), `api/admin.js` (`activo_oculto_moderar`), frontend mi-perfil/comunidad/admin/usuario-session; `.env.example` + `.gitignore` corregido; MIGRACION 016 NUEVA (209 lineas, idempotente); smoke `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; Escudo GOLD verde (node --check x3, ASCII 0 bytes >127, 0 backticks, divs 0, idempotencia 13/13); presupuesto 8/8 INTACTO; PENDIENTE OPERATIVO: aplicar migracion 016 en Neon + configurar `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + commit/push/deploy (ver `docs/DEPLOY_016.md`); ADR-027 + ADR-025
 - TSK-100 / ADR-026 Epic prompt.txt (2026-09-13, IMPLEMENTADO EN WORKING TREE, sin commitear) - perfil museo v1 en mi-perfil.html (museo-line trofeos·fotos·destinos, galeria de 3 mejoras perfil_*, vocaciones con toggle/candado/403, chip "Sin mapa"), vocaciones acumulables (catalogo en codigo musico@5/cine@8/artista_grafico@11 + `usuarios.vocaciones` jsonb), chat por plan PRIVADO (chat_salas tipo='plan' + `planes_viaje.sala_id`, GET plan_chat / POST plan_chat_msg con +2 XP tope 20/dia, defensas en chat_msg/chat_mensajes), limpieza de salas del sistema (solo Chat general + Bogota), XP admin (POST admin_xp Bearer: delta o nivel 1-20 sin degradar via Math.max), BUG-A contarComentarioSafe (degradacion a 0 sin migracion 013), BUG-B coordsFallbackAutor (multimedia_mapa hereda coords de la visita/guardado del autor); api/usuarios.js v8 con `?buscar=`; divs 195/195, 223/223, 786/786; MIGRACION 015 NUEVA (usuarios.vocaciones, planes_viaje.sala_id, DELETE salas sistema, 3 consumibles); migraciones 011-014 YA APLICADAS por Javier en Neon (2026-09-13); UNICO BLOQUEANTE: aplicar 015 en Neon + commit/push/deploy; ADR-026 + spec
 - TSK-099 / ADR-024 Presencia Fisica + Espacial v4.0 (2026-09-12, IMPLEMENTADO EN WORKING TREE) - geocerca Haversine server-side en `POST tipo=visita` (sin endpoint nuevo, 8/8), dedup-first + indice unico parcial (cierra race `23505`), `quitar_visita` -> soft-delete (`activo=false`), radios adaptativos 100/150/200/250 m, bono rural +20 XP y logro `logr_pionero` (LOGROS = 30), evidencia `interacciones.dims.geo`, conteo de visitas de `api/utilidades.js` filtra `activo=true`; tests de logros 30/30 PASS; migracion 014 NUEVA (reset de visitas gamificadas con respaldo + indice unico); migraciones 011/012/013/014 YA APLICADAS por Javier en Neon (2026-09-13, ver TSK-100); pendiente aplicar 015 + deploy; ADR-024 + spec
 - TSK-098 / Epic multimedia de usuarios (2026-09-12, working tree SIN commitear) - fix 500 albumes/mapa (COALESCE foto/avatar + catch 42P01/42703 -> 503 `SCHEMA_NOT_MIGRATED`), filtro multimedia multi-seleccion (tipo_media CSV + 400 estricto + `tipos_aplicados`), galeria ampliada (`galeria.html` global y `?destino=<slug>`, STATIC_PAGES + boton en ficha), modulo audiovisual en comunidad.html, comentarios tipo Facebook (ADR-023: migracion 013 NUEVA + 6 `tipo=` sin endpoint nuevo) y moderacion en admin; PENDIENTE BLOQUEANTE aplicar migracion 013 en Neon; hallazgo BUG-033 (canonicals cirilicos, NO bloqueante); ADR-023
@@ -16,6 +17,113 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion Entrega 016 "ExploraCO Gaming v5.0" - piramide, Wayfarer, facciones y mundo artistas (2026-09-14) - TSK-101 / ADR-027 + ADR-025
+
+Entrega 016 implementada y verificada en working tree (SIN commitear). El
+checklist de despliegue vive en `docs/DEPLOY_016.md`; las decisiones en
+`DECISIONS.md` ADR-027 (piramide + crowdsourcing + facciones + mundo
+artistas) y ADR-025 (sesion firmada / anti-Sybil, que consume el candidato
+reservado desde ADR-024); la tarea en `TASKS.md` TSK-101.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `db/migrations/016_multinivel_crowdsourcing.sql` (NUEVA, 209 lineas,
+  idempotente ADR-008, ASCII-safe): 10 columnas en `usuarios`
+  (`referido_por`, `codigo_referido`, `xp_ref_total`,
+  `referidos_directos_contados`, `faccion` con CHECK de 4 facciones,
+  `faccion_elegida_en`, `email_verificado`, `email_token`,
+  `email_token_expira`, `device_hashes`), 4 tablas (`activos_ocultos`,
+  `activos_ocultos_votos`, `activos_ocultos_checkins`, `geo_nonces`) y 8
+  indices. Idempotencia DDL 13/13.
+- `api/usuarios.js` (v9): piramide de referidos (codigo, red CTE 5
+  niveles, `?ref=` con topes 500/20, reparto 10/5/3/2/1 FLOOR en
+  `xp_ref_total`), 4 facciones (primera gratis, cambio 500 `xp_total` +
+  cooldown 15 dias), verificacion de email (Resend), JWT HMAC
+  (`firmarSesion`, `SESSION_JWT_SECRET`) y `device_hashes`.
+- `api/interacciones.js` (v13): helper `repartirXpReferidos` (CTE
+  recursiva) en 14 puntos de XP real (excluye `admin_xp` y
+  `comprar_consumible`); Wayfarer Activo Oculto completo (proponer sin
+  nivel pero con email verificado, votar nivel 5, quorum +/-3, 30 dias
+  derivado, +50/+5/+15 XP, checkin reusa geocerca ADR-024 + nonce);
+  `validarSesion` (JWT `timingSafeEqual`) en visita/votar/checkin; nonce
+  en visita y checkin; vocaciones en bloque nivel 5
+  (musico/cine/artista_grafico/escritor) y 6 misiones de artista.
+- `api/admin.js`: rama `activo_oculto_moderar` (Bearer admin) -- aprobar
+  +50 XP al proponente con reparto piramidal, rechazar sin XP, borrado
+  logico (`activo=false`).
+- Frontend: `mi-perfil.html` (Mi Red + QR + selector de facciones + panel
+  de vocaciones + banner de verificacion), `comunidad.html` (relabel
+  visible Pandilla->Parche solo en texto + seccion Activo Oculto + ranking
+  de facciones), `admin.html` (panel de moderacion de Activos Ocultos),
+  `usuario-session.js` (catalogo de vocaciones nivel 5, fingerprint de
+  dispositivo, JWT + refresh silencioso).
+- Config/gobernanza: `.gitignore` corregido (filtra `.env`, `.env.local`,
+  `.env.*.local`; conserva `!.env.example`), `.env.example` (NUEVO,
+  plantilla), `docs/DEPLOY_016.md` (NUEVO, checklist de 5 pasos).
+
+**Verificacion (Escudo GOLD, 2026-09-14):** smoke dedicado
+`scripts/smoke_016_multinivel_crowdsourcing.js` **39/39 PASS** (ejecutado en
+esta sesion documental, salida "SMOKE 016 MULTINIVEL: OK"); `node --check`
+PASS x3; ASCII 0 bytes >127 y 0 backticks; balance de divs 0; idempotencia
+DDL 13/13. Presupuesto de endpoints **8/8 INTACTO** (8 archivos en `api/`,
+cero altas; todo como ramas `tipo=` y helpers, ADR-010).
+
+#### Checklist de deploy (`docs/DEPLOY_016.md`, en orden)
+1. **Aplicar la migracion 016 en Neon** (editor SQL, archivo COMPLETO en una
+   corrida; idempotente). Verificar 10 columnas, 4 tablas y 8 indices con el
+   bloque de diagnostico del propio `.sql`.
+2. **Configurar variables en Vercel:** `SESSION_JWT_SECRET` (generar
+   aleatorio fuerte distinto de cualquier otro; el fallback `dev_secret` es
+   inseguro), `RESEND_API_KEY` y `SITE_URL`; confirmar `DATABASE_URL` y
+   `ADMIN_SECRET` reales; NO configurar `DEV_EMAIL_ECHO` en produccion.
+3. **Desplegar en UN SOLO release:** `api/usuarios.js` v9 +
+   `api/interacciones.js` v13 + `api/admin.js` juntos y con el MISMO
+   `SESSION_JWT_SECRET` (si difiere, las llamadas de sesion devuelven 401).
+4. **Verificacion en vivo:** registro con `?ref=`, verificacion de correo,
+   eleccion/cambio de faccion, proponer/votar/checkin de Activo Oculto,
+   moderacion admin (+50 XP al aprobar) y sesion JWT (token alterado 401).
+5. **Rollback:** revertir variables y redeploy. La migracion 016 es ADITIVA
+   (no requiere downgrade); el codigo viejo ignora las columnas nuevas.
+
+#### Que sigue
+1. **APLICAR `db/migrations/016_multinivel_crowdsourcing.sql` EN NEON
+   (BLOQUEANTE, lo ejecuta Javier antes del deploy).** Prerrequisito
+   declarado en `docs/DEPLOY_016.md`: migraciones 010-015 ya aplicadas.
+   **Verificar el estado de la 015** (`db/migrations/015_epic_prompt.sql`):
+   este documento la seguia listando como pendiente en la sesion TSK-100;
+   ADR-006 exige confirmar contra Neon antes de asumir el prerrequisito.
+2. **Configurar `SESSION_JWT_SECRET` y `RESEND_API_KEY` en Vercel** (y
+   `SITE_URL`); un secreto distinto por funcion rompe el contrato de sesion.
+3. **Commit + push + deploy manual** en un solo release (esta entrega +
+   los pendientes previos sin commitear: TSK-095/096/097/098/099/100 y las
+   migraciones 015/016; ver `git status`).
+4. **Verificacion post-deploy en vivo** segun el Paso 4 del checklist.
+5. **Drift documental registrado:** `scripts/validate_ficha.js` no existe en
+   esa ruta (el real es
+   `.opencode/skills/gemini-research/scripts/validate_ficha.js`);
+   documentado en BUGS_HISTORICOS.md BUG-034, sin crear el script.
+
+#### Riesgos activos
+- **Migracion 016 pending (BLOQUEANTE):** sin ella, referidos, facciones,
+  Activo Oculto y `geo_nonces` fallan (columnas/tablas inexistentes); el
+  checkin de Activo Oculto y la sesion firmada degradan con error.
+- **Prerrequisito 015 no verificado:** `docs/DEPLOY_016.md` asume 010-015
+  aplicadas, pero NEXT.md/TSK-100 listaban la 015 como pendiente. Confirmar
+  en Neon antes de correr la 016 (ADR-006).
+- **`SESSION_JWT_SECRET` en fallback `dev_secret`:** si no se configura (o
+  difiere entre funciones), los tokens de sesion son falsificables o las
+  validaciones devuelven 401. Variable OBLIGATORIA antes de anunciar el
+  release.
+- **`RESEND_API_KEY` pendiente desde TASK-006:** sin ella, la verificacion
+  de email devuelve 503 `EMAIL_NO_CONFIGURADO` y el gating por
+  `email_verificado` (referidos, proponer/votar Activos, fundar Parche) no
+  puede completarse.
+- **Coherencia de relabel Pandilla->Parche:** es solo texto visible; la API
+  y el esquema siguen usando `pandillas*`. No confundir en futuras busquedas.
+- **Drift `validate_ficha.js` (BUG-034, NO bloqueante):** BLUEPRINT.md,
+  ADR-016 y 2 skills citan `scripts/validate_ficha.js`, que no existe en esa
+  ruta; el archivo real es
+  `.opencode/skills/gemini-research/scripts/validate_ficha.js`.
 
 ### Sesion epic prompt.txt - perfil museo, vocaciones, chat por plan y XP admin (2026-09-13) - TSK-100 / ADR-026
 

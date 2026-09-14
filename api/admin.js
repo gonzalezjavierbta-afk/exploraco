@@ -4,6 +4,10 @@
 //   resenas      -> resenas-admin (listar/eliminar resenas)
 //   destacado    -> destacar (activar/desactivar perfiles)
 //   notificaciones -> envio de emails
+//   consumibles  -> CRUD consumibles (gamificacion v4, ADR-018)
+//   activos_ocultos -> moderar propuestas Wayfarer (tipo=activo_oculto_moderar,
+//     Entrega 016 / migracion 016: aprobar otorga +50 XP al proponente con
+//     reparto piramidal; rechazar no paga nada. Cero borrado fisico)
 // Auth: Bearer exploraco12345 en todos los casos
 
 const { neon } = require('@neondatabase/serverless');
@@ -25,6 +29,37 @@ function auth(req) {
 function authInternal(req) {
   return (req.headers['x-internal-secret']||'').trim()
     === (process.env.ADMIN_SECRET || 'exploraco12345');
+}
+
+// == REPARTO PIRAMIDAL (Entrega 016) ======================================
+// EXCEPCION CONTROLADA al tripwire de no-duplicidad (GSD 2.1): los
+// archivadores api/*.js se despliegan como funciones serverless
+// independientes (sin require cruzado entre ellas), asi que cada una es
+// autosuficiente. Esta copia identica viene de api/interacciones.js v13
+// (FUENTE DE VERDAD; si cambia alla, actualizar aqui). Constante API:
+// con WITH RECURSIVE cadena de 5 niveles + UPDATE como SENTENCIA
+// PRINCIPAL con FROM cadena (regla Postgres 0A000: un UPDATE dentro del
+// WITH es ilegal), FLOOR 10/5/3/2/1 % sobre xp_ref_total y tope
+// referidos_directos_contados < 500. Nunca lanza: degrada a false.
+function repartirXpReferidos(sql, usuarioId, xp) {
+  if (!usuarioId || !(parseInt(xp, 10) > 0)) return Promise.resolve(false);
+  return sql(
+    'WITH RECURSIVE cadena AS ('
+    + 'SELECT u.referido_por AS ancestro_id, 1 AS nivel FROM usuarios u '
+    + 'WHERE u.id=$1 AND u.referido_por IS NOT NULL '
+    + 'UNION ALL '
+    + 'SELECT u2.referido_por, cadena.nivel + 1 FROM usuarios u2 '
+    + 'JOIN cadena ON u2.id = cadena.ancestro_id '
+    + 'WHERE cadena.nivel < 5 AND u2.referido_por IS NOT NULL'
+    + ') '
+    + 'UPDATE usuarios a '
+    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + FLOOR($2 * ('
+    + 'CASE c.nivel WHEN 1 THEN 0.10 WHEN 2 THEN 0.05 '
+    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END)) '
+    + 'FROM cadena c WHERE a.id = c.ancestro_id '
+    + 'AND a.referidos_directos_contados < 500',
+    [usuarioId, parseInt(xp, 10)]
+  ).then(function(){ return true; }).catch(function(){ return false; });
 }
 
 // -- EMAIL ----------------------------------------------------------
@@ -263,10 +298,10 @@ module.exports = async function handler(req, res) {
   }
 
   // == CONSUMIBLES (gamificacion v4 / ADR-018) =============================
-  // CRUD sobre la tabla `consumibles` (migracion 010). La clave es la
-  // identidad: nunca se edita. El ledger `compra_consumibles` guarda
-  // `xp_pagado` como snapshot al momento de la compra, asi que cambiar
-  // `precio_xp` aqui solo afecta compras futuras, nunca el historial.
+  // CRUD sobre la tabla consumibles (migracion 010). La clave es la
+  // identidad: nunca se edita. El ledger compra_consumibles guarda
+  // xp_pagado como snapshot al momento de la compra, asi que cambiar
+  // precio_xp aqui solo afecta compras futuras, nunca el historial.
   // Cero Borrado Logico: no existe DELETE; el estado se controla con
   // consumibles_toggle (activo = NOT activo).
   if (recurso === 'consumibles') {
@@ -360,9 +395,83 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok:false, error:'tipo invalido para recurso consumibles' });
   }
 
+  // == ACTIVOS OCULTOS (Wayfarer, moderacion admin - Entrega 016) ==========
+  // Moderacion manual sobre las propuestas de la comunidad (migracion 016).
+  // El quorum de votos (+/-3) ya resuelve el caso normal en
+  // api/interacciones.js v13; esta rama es la via directa del admin.
+  // Cero borrado fisico: se cambia estado/resuelto_en, nunca DELETE.
+  if (recurso === 'activos_ocultos') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (req.method !== 'POST') return res.status(405).end();
+    var tipoAO = body.tipo || req.query.tipo || '';
+
+    // Moderar una propuesta: 'aprobar' (+50 XP al proponente + reparto
+    // piramidal) o 'rechazar' (sin XP, decision aprobada). Al aprobar una
+    // propuesta YA aprobada se responde sin_cambios:true sin pagar XP de
+    // nuevo (anti-farm de re-aprobacion).
+    if (tipoAO === 'activo_oculto_moderar') {
+      try {
+        var aoAccion = body.accion;
+        var aoId = body.activo_id;
+        if (!aoId) return res.status(400).json({ ok:false, error:'activo_id requerido' });
+        if (aoAccion !== 'aprobar' && aoAccion !== 'rechazar')
+          return res.status(400).json({ ok:false, error:'ACCION_INVALIDA' });
+
+        var aoRow = await sql(
+          'SELECT propuesto_por, estado FROM activos_ocultos '
+          + 'WHERE id=$1 AND activo=true',
+          [aoId]
+        );
+        if (!aoRow.length)
+          return res.status(404).json({ ok:false, error:'ACTIVO_NO_ENCONTRADO' });
+        var aoPropuesta = aoRow[0].propuesto_por;
+        var aoEstado = aoRow[0].estado;
+
+        if (aoAccion === 'aprobar') {
+          if (aoEstado === 'aprobado')
+            return res.status(200).json({ ok:true, data:{ sin_cambios:true, estado:'aprobado', xp_proponente:0 } });
+          await sql(
+            'UPDATE activos_ocultos SET estado=\'aprobado\', resuelto_en=NOW() '
+            + 'WHERE id=$1 AND activo=true',
+            [aoId]
+          );
+          // +50 XP al autor de la propuesta (no se otorga al proponer,
+          // solo al aprobar) y reparto piramidal silencioso. si el
+          // proponente ya no existe (FK optional), el UPDATE no afecta
+          // filas y el reparto degrada a false: inofensivo.
+          await sql(
+            'UPDATE usuarios SET xp_total=xp_total+50, ultimo_acceso=NOW() WHERE id=$1',
+            [aoPropuesta]
+          ).catch(function(e){ console.warn('gaming016 xp_propuesta no acreditado', e && e.code); });
+          await repartirXpReferidos(sql, aoPropuesta, 50);
+          return res.status(200).json({ ok:true, data:{ estado:'aprobado', xp_proponente:50 } });
+        }
+
+        // accion = rechazar (sin XP, decision aprobada)
+        await sql(
+          'UPDATE activos_ocultos SET estado=\'rechazado\', resuelto_en=NOW() '
+          + 'WHERE id=$1 AND activo=true',
+          [aoId]
+        );
+        return res.status(200).json({ ok:true, data:{ estado:'rechazado', xp_proponente:0 } });
+      } catch (e) {
+        // Errores tipificados (mismo patron que api/interacciones.js):
+        // tabla/columna ausente = migracion pendiente; violacion de PK =
+        // conflicto; cualquier otra cosa = 500 explicito (no silenciado).
+        if (e && (e.code === '42P01' || e.code === '42703'))
+          return res.status(503).json({ ok:false, error:'SCHEMA_NOT_MIGRATED' });
+        if (e && e.code === '23505')
+          return res.status(409).json({ ok:false, error:'CONFLICTO' });
+        return res.status(500).json({ ok:false, error:'Error interno' });
+      }
+    }
+
+    return res.status(400).json({ ok:false, error:'tipo invalido para recurso activos_ocultos' });
+  }
+
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos',
   });
 };

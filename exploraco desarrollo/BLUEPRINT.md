@@ -30,8 +30,8 @@ ADMIN (admin.html)
 | Endpoint | Metodo(s) | Responsabilidad |
 |---|---|---|
 | destinos.js | GET | Listado publico, filtros, modo=mapa, stats (Cache s-maxage=10) |
-| usuarios.js | GET/POST | Perfil, leaderboard, upsert de usuario |
-| interacciones.js | GET/POST | Rese\u00f1as, guardados, visitas, calculo de XP |
+| usuarios.js | GET/POST | Perfil, leaderboard, upsert de usuario; v9 (Entrega 016): registro con `?ref=`, piramide de referidos, 4 facciones, verificacion de email y sesion firmada JWT (`firmarSesion`) |
+| interacciones.js | GET/POST | Rese\u00f1as, guardados, visitas, calculo de XP; v13 (Entrega 016): `repartirXpReferidos` en 14 puntos de XP, Activo Oculto Wayfarer (proponer/votar/checkin + moderacion), `validarSesion` JWT (timingSafeEqual) y nonce geoespacial |
 | admin-destinos.js | GET/POST/PUT/DELETE | CRUD completo con auth Bearer (v2 reescrito) |
 | publicar-lugar.js | POST | Formulario publico, crea destino en status=draft |
 | pagina-destino.js | GET | HTML dinamico premium por slug (v9, motor principal) |
@@ -40,7 +40,7 @@ ADMIN (admin.html)
 
 Nota critica: el limite de 8 funciones esta en su maximo. Cualquier endpoint nuevo requiere fusionar responsabilidades dentro de un archivo existente via query params (patron ya usado en admin.js y utilidades.js), no crear un archivo nuevo.
 
-Autenticacion: header `Authorization: Bearer exploraco12345`. Variables de entorno en Vercel: `DATABASE_URL`, `ADMIN_SECRET`, `RESEND_API_KEY` (pendiente de configurar, ver TASKS.md).
+Autenticacion: header `Authorization: Bearer exploraco12345`. Variables de entorno en Vercel: `DATABASE_URL`, `ADMIN_SECRET`, `RESEND_API_KEY` (pendiente de configurar desde TASK-006), `SESSION_JWT_SECRET` (NUEVA en la Entrega 016: firma/valida el JWT de sesion HMAC SHA-256; debe ser el MISMO valor en `usuarios.js` e `interacciones.js`; el fallback `dev_secret` es inseguro en produccion), `SITE_URL` (base del enlace de verificacion de correo) y `DEV_EMAIL_ECHO` (solo desarrollo; ausente en produccion). Plantilla versionada: `.env.example`. Checklist de despliegue: `docs/DEPLOY_016.md`.
 
 `vercel.json` rewrites clave:
 ```
@@ -70,6 +70,16 @@ Nota ADR-024 (Presencia Fisica + Espacial v4.0, 2026-09-12): el POST `tipo=visit
 
 ### Tabla `usuarios`
 Perfil y gamificacion: id, email (unique), nombre, xp_total, nivel, badge_actual, total_resenas, creado_en.
+
+Nota ADR-027 (Entrega 016, migracion `db/migrations/016_multinivel_crowdsourcing.sql`): 10 columnas nuevas -- `referido_por` (uuid self-FK nullable), `codigo_referido` (varchar(20), indice unico parcial), `xp_ref_total` (int, campo de apoyo del reparto piramidal), `referidos_directos_contados` (int), `faccion` (varchar(20) con CHECK `exploradores/curadores/creadores/artistas`), `faccion_elegida_en` (timestamptz), `email_verificado` (boolean), `email_token` + `email_token_expira` (verificacion por Resend), y `device_hashes` (jsonb NOT NULL DEFAULT `'[]'`, tope 5). El nivel/era/badge siguen derivandose de `xp_total` (nunca persistidos). La afinidad de Parche a faccion y el control territorial se calculan en consulta (no persistidos).
+
+### Tablas de crowdsourcing y anti-replay (ADR-027 / ADR-025, migracion 016)
+- **`activos_ocultos`:** propuestas Wayfarer (`propuesto_por`, `nombre`, `descripcion`, `lat`/`lng` numericos, `foto_url`, `categoria`, `ciudad`, `estado` con CHECK `pendiente/aprobado/rechazado`, `votos_favor`/`votos_contra` con CHECK `>= 0`, `activo` para soft-delete, `creado_en`, `resuelto_en`).
+- **`activos_ocultos_votos`:** un voto por usuario y propuesta (PK compuesta `activo_id + usuario_id`; CHECK `favor/contra`).
+- **`activos_ocultos_checkins`:** presencia fisica sobre activos aprobados (`lat`/`lng`/`accuracy`, `activo`); indice unico parcial `idx_activo_checkin_unico (activo_id, usuario_id) WHERE activo = true`. Reutiliza la geocerca Haversine de ADR-024.
+- **`geo_nonces`:** nonce de un solo uso para geolocalizacion firmada (ADR-025), `expira_en DEFAULT now() + interval '2 minutes'`, indice unico `idx_geo_nonce_unico`.
+
+Nota de gobernanza: la migracion 016 es **aditiva e idempotente** (ADR-008: `IF NOT EXISTS` + constraints con nombre). Su aplicacion es un paso manual en Neon (lo ejecuta Javier) antes del deploy; los 8 endpoints siguen 8/8 (sin archivos nuevos en `api/`).
 
 ## 4. Motor de tags JSONB (modulo central)
 

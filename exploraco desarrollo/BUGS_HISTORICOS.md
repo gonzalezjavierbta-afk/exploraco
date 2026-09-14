@@ -737,3 +737,22 @@ U+043E y otros homografos cirilicos/griegos en strings `https://exploraco.co`),
 porque el homografo no se detecta por inspeccion visual; (2) candidato a incluir en
 el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 
+## BUG-034: Drift documental -- `scripts/validate_ficha.js` no existe en esa ruta aunque la documentacion y los skills lo citan
+
+**Contexto:** detectado por exploracion durante la sesion documental de la Entrega 016 (2026-09-14, ADR-006: baseline = archivo real). La documentacion de gobernanza cita el validador de fichas como `scripts/validate_ficha.js`, pero ese archivo NO existe en la carpeta `scripts/` de la raiz. El archivo real vive en `.opencode/skills/gemini-research/scripts/validate_ficha.js` (su propio header lo titula `// scripts/validate_ficha.js`), es decir, dentro del skill de investigacion de Gemini.
+
+**Evidencia (verificado contra el repo real, ADR-006):**
+- `scripts/validate_ficha.js` -> **NO existe** (`Test-Path` = False).
+- `.opencode/skills/gemini-research/scripts/validate_ficha.js` -> **SI existe**.
+- Citas con la ruta incorrecta o incompleta: `BLUEPRINT.md` seccion 4 lo menciona como `validate_ficha.js` (sin ruta); `DECISIONS.md` ADR-016 (linea de Impacto) cita `scripts/validate_ficha.js`; `.opencode/skills/create-dynamic-page/SKILL.md` cita `scripts/validate_ficha.js`; `.opencode/skills/gemini-research/SKILL.md` usa la ruta correcta en un punto (`.opencode/skills/gemini-research/scripts/validate_ficha.js`) y la incompleta en otro (`scripts/validate_ficha.js`).
+
+**Sintoma/impacto:** un humano o una IA que siga las instrucciones al pie de la letra ejecutara `node scripts/validate_ficha.js ...` y recibira un error "Cannot find module" (ruta inexistente), bloqueando la validacion de una ficha antes de su ingesta. No afecta a la produccion (no es codigo de runtime), pero rompe el pipeline de creacion de paginas dinamicas descrito en los skills.
+
+**Causa:** el archivo nacio dentro del skill (`.opencode/skills/gemini-research/scripts/`) y se movio/renombro de facto sin actualizar todas las referencias; los documentos del AI-DOS Core conservaron el nombre corto `scripts/validate_ficha.js` de una version anterior (drift documental, el mismo riesgo que ADR-006 advierte: nunca tratar una ruta citada como hecho sin verificar).
+
+**Fix sugerido (NO aplicado):** decidir la ubicacion canonica del validador y alinear todas las referencias. Opcion A (minima): corregir las citas a la ruta real `.opencode/skills/gemini-research/scripts/validate_ficha.js` (BLUEPRINT.md seccion 4, DECISIONS.md ADR-016, los 2 SKILL.md). Opcion B: crear un wrapper/alias en `scripts/validate_ficha.js`. El wrapper agregaria un archivo duplicado (violaria la Regla de No-Duplicidad); la opcion A es la recomendada. En ningun caso se crea el script en esta sesion: la tarea pide solo documentar el drift.
+
+**Estado:** Detectado (2026-09-14, sesion documental Entrega 016). **NO bloqueante** y fuera del alcance de la Entrega 016; queda registrado como hallazgo/observacion documental para una tarea de higiene futura.
+
+**Leccion / prevencion:** (1) toda ruta de archivo citada en los documentos de gobernanza debe verificarse con `Test-Path`/exploracion antes de darla por valida (ADR-006); (2) cuando un script vive dentro de un skill, citar SIEMPRE la ruta completa desde la raiz; (3) auditoria futura: revisar periodicamente las rutas citadas en BLUEPRINT.md/DECISIONS.md/skills contra el arbol real del repo.
+
