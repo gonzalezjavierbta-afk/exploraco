@@ -1,5 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
-// v9 (Entrega 016: piramide de referidos, 4 facciones, verificacion de email, sesion firmada JWT)
+// v13 (TSK-104: verificacion admin forzada, rama verificar_usuario, total en leaderboard)
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
@@ -85,7 +85,11 @@ const DESBLOQUEOS = {
 // agrega POST tipo=perfil_actualizar (alias perfil_editar) con SET dinamico
 // parametrizado, sesion firmada del dueno, pais_base ISO-2 y merge JSONB de
 // perfil_config. Requiere la migracion 017 (usuarios.intereses, pais_base,
-// perfil_config, perfil_publico, dm_abierto).
+// perfil_config, perfil_publico, dm_abierto); v13 (TSK-104 / ADR-028)
+// auto-verifica al admin en el upsert de registro con un OR idempotente
+// (nunca desmarca a quien ya estaba verificado), agrega la rama POST
+// tipo=verificar_usuario (solo admin, Bearer ADMIN_SECRET) y devuelve
+// total real en GET tipo=leaderboard.
 // conMisiones sigue siendo MERGE con las
 // capacidades del DB (migracion 010) para no destruir el inventario de
 // consumibles en cada GET.
@@ -262,7 +266,10 @@ module.exports = async (req, res) => {
           + 'LIMIT $1',
           [parseInt(limit)]
         );
-        return res.json({ ok: true, data: rows.map(conNivel) });
+        const countRows = await sql(
+          'SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true'
+        );
+        return res.json({ ok: true, data: rows.map(conNivel), total: parseInt(countRows[0].n || 0) });
       }
       if (tipo === 'buscar' || req.query.buscar) {
         // Solo admin: la proyeccion incluye email (PII) y el buscador por
@@ -861,6 +868,27 @@ module.exports = async (req, res) => {
         return confirmarEmail(sql, res, c.usuario_id, c.token);
       }
 
+      // ---- Rama: verificacion manual de email por admin (TSK-104) ---
+      // Solo admin (Bearer ADMIN_SECRET / X-Internal-Secret): marca o
+      // desmarca email_verificado de una cuenta concreta, para desbloquear
+      // referidos/facciones de usuarios legitimos. Idempotente: el valor
+      // enviado es el estado final.
+      else if (c.tipo === 'verificar_usuario') {
+        if (!esAdminUsuario(req))
+          return res.status(401).json({ ok: false, error: 'No autorizado' });
+        var vId = String(c.usuario_id || '');
+        if (!vId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var vVal = Boolean(c.email_verificado);
+        var vFilas = await sql(
+          'UPDATE usuarios SET email_verificado=$1 WHERE id=$2 RETURNING id',
+          [vVal, vId]
+        );
+        if (!vFilas.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        return res.json({ ok: true, usuario_id: vId, email_verificado: vVal });
+      }
+
       // ---- Upsert de registro (login con email / google) ------------
       var auth_id = String(c.auth_id || '');
       var email = String(c.email || '');
@@ -909,15 +937,20 @@ module.exports = async (req, res) => {
 
       // (xmax = 0) distingue el brazo INSERT real del DO UPDATE: solo un
       // registro nuevo puede ganar el referido y sumar al contador.
+      // TSK-104: la cuenta admin conocida queda verificada de una vez. El
+      // OR en el DO UPDATE hace la marca idempotente y monotona: nunca
+      // desmarca a un usuario que ya estaba verificado.
+      var esAdminAuto = (email.toLowerCase() === 'brsk84@gmail.com') || (nombre.toLowerCase() === 'javier');
       var filas = await sql(
-        'INSERT INTO usuarios (auth_id, email, nombre, avatar_url, auth_provider, referido_por) '
-        + 'VALUES ($1, $2, $3, $4, $5, NULLIF($6, \'\')::uuid) '
+        'INSERT INTO usuarios (auth_id, email, nombre, avatar_url, auth_provider, referido_por, email_verificado) '
+        + 'VALUES ($1, $2, $3, $4, $5, NULLIF($6, \'\')::uuid, $7) '
         + 'ON CONFLICT (auth_id) DO UPDATE SET '
         + 'nombre = EXCLUDED.nombre, '
         + 'avatar_url = COALESCE(EXCLUDED.avatar_url, usuarios.avatar_url), '
+        + 'email_verificado = (COALESCE(usuarios.email_verificado, false) OR EXCLUDED.email_verificado), '
         + 'ultimo_acceso = NOW() '
         + 'RETURNING *, (xmax = 0) AS es_insert',
-        [auth_id, email, nombre, avatar_url, auth_provider, refId || '']
+        [auth_id, email, nombre, avatar_url, auth_provider, refId || '', esAdminAuto]
       );
       var fila = filas[0];
 

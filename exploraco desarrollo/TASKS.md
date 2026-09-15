@@ -2602,5 +2602,61 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-104: Verificacion admin forzada en el upsert + rama `verificar_usuario` + dashboard con datos reales (5 tarjetas) y filtro de verificados [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-15, implementada y verificada en working tree, Escudo GOLD PASS). **PENDIENTE OPERATIVO: aplicar `db/migrations/017_perfil_publico_arbol_casas.sql` y `db/migrations/018_consumibles_categorias.sql` en Neon (016/015 ya aplicadas) + commit/push/deploy.**
+- **Prioridad:** MEDIA
+- **Fecha:** 2026-09-15
+- **Prompt origen:** `prompt_exploraco_tsk104.md` (verificacion admin + diferenciacion visual de verificados + dashboard con datos reales)
+- **ADR:** ADR-029 (DECISIONS.md); consume precedentes ADR-019 (`destinos.verificado`) y ADR-028 (`email_verificado` / `verificar_usuario`)
+- **Responsable:** build (orquestador) + backend/admin/qa + docs-keeper
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006):**
+
+  **Tarea A [`api/usuarios.js`, +45/-6 en el working tree] COMPLETADO:**
+  1. **[A1 - auto-verificacion del admin en el upsert]** El INSERT de `usuarios` agrega la columna `email_verificado` (`$7`) y el `ON CONFLICT (auth_id) DO UPDATE` agrega `email_verificado = (COALESCE(usuarios.email_verificado, false) OR EXCLUDED.email_verificado)`. La condicion es `email.toLowerCase() === 'brsk84@gmail.com' || nombre.toLowerCase() === 'javier'`. El `OR` hace la marca idempotente y monotona: nunca desmarca a quien ya estaba verificado.
+  2. **[A2 - rama POST `tipo=verificar_usuario`, admin-only]** Guard `esAdminUsuario(req)` -> 401 `'No autorizado'`; 400 si falta `usuario_id`; `UPDATE usuarios SET email_verificado=$1 WHERE id=$2 RETURNING id`; 404 si no hay filas; responde `{ ok, usuario_id, email_verificado }`. El valor enviado es el estado final (idempotente: permite marcar y desmarcar).
+  3. **[C1 - `total` en GET `?tipo=leaderboard`]** Se agrega `SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true` y el campo aditivo `total` a la respuesta `{ ok, data, total }` (no altera `data`).
+
+  **Tarea B [`admin.html`, +42/-8 en el working tree] COMPLETADO:**
+  4. **[B - diferenciacion de verificados en `renderTabla()`]** Fila con fondo `#f0fdf4` y borde izquierdo `#22c55e` cuando `p.verificado`; badge `VERIF` tras el nombre. **[B3 - filtro]** Pills `data-verified` + variable `currentVerifiedFilter` + `setVerifiedFilter()` + condicion `if(currentVerifiedFilter === true && !p.verificado) return false` dentro de `filtered`.
+
+  **Tarea C [`admin.html` y `api/utilidades.js`] COMPLETADO:**
+  5. **[C1 - tarjeta Usuarios]** `ds-usuarios` deja de usar `st.destinos`; ahora lee el `total` real del leaderboard.
+  6. **[C2 - tarjeta Visitas + rama nueva]** `api/utilidades.js` (+24/-0) agrega la rama admin-only GET `?tipo=visitas_global` -> `{ ok, total, v30, v7 }` sobre `interacciones tipo='visita' AND activo=true` (usa `auth(req)`/Bearer). No existia endpoint de visitas globales y NO se creo archivo nuevo (8/8 intacto, ADR-010). `admin.html` consume esa rama para `ds-visitas`.
+  7. **[C3 - quinta tarjeta]** Tarjeta `ds-verificados` derivada del array local `places` (`p.verificado === true`). **[C4 - CSS]** `.stats-grid` pasa a `repeat(5,1fr)`.
+  8. **[Fix post-sync]** `syncFromNeon()` re-renderiza el dashboard si la pantalla esta activa, para que las tarjetas no queden en 0 en un navegador limpio.
+
+- **Decisiones aprobadas por Javier (2026-09-15):**
+  1. La migracion 016 ya estaba aplicada (confirmado segun NEXT.md/ADR-028/`docs/DEPLOY_017.md`); el prompt de tarea la declaraba "pendiente" por error (ADR-006: se confirma contra las fuentes del repo).
+  2. C2 se resolvio creando la rama `visitas_global` (no existia endpoint de visitas globales).
+  3. Dashboard con 5 tarjetas.
+  4. Filtro "Verificados" + badge en la tabla.
+  5. A2 usa `esAdminUsuario` + 401 (consistencia con el patron del archivo); el prompt sugeria 403.
+  6. El conteo de viajeros entra como campo aditivo `total` en el leaderboard (no se toca `stats` de `api/destinos.js`).
+
+- **Hallazgos QA residuales (no bloqueantes; ver observaciones en BUGS_HISTORICOS.md):**
+  - **H4 (riesgo aceptado):** cualquier usuario que se registre con nombre `javier` queda auto-verificado (es el requisito textual del prompt). Riesgo de integridad a revisar.
+  - **H6:** `GET ?tipo=leaderboard` es publico y ahora expone `total` (conteo de usuarios) sin Bearer.
+  - **H7:** `verificar_usuario` con `usuario_id` no-UUID devuelve 500 (capturado por el try externo) en vez de 400.
+  - **H8 (preexistente, fuera de TSK-104):** `api/utilidades.js` tiene un `.catch(function(){})` vacio en la rama `visitas` POST, baseline preexistente no-ASCII (680 bytes >127) y 24 backticks; NINGUNO atribuible a TSK-104 (las lineas nuevas del diff estan limpias).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-010). Cero archivos nuevos en `api/`; todo entra como ramas `tipo=` y ajustes puntuales.
+
+- **Evidencia (ADR-006, contra archivo real):**
+  - Header real `api/usuarios.js` v13 ("verificacion admin forzada, rama verificar_usuario, total en leaderboard"); nota: el header habia quedado en v9 pese a que el changelog ya documentaba v10-v12 (TSK-103), por eso el salto v9 -> v13.
+  - `api/utilidades.js` v2 con la rama `visitas_global`; `git diff --stat` = 3 archivos, +105/-14 (`api/usuarios.js` 45, `api/utilidades.js` 24, `admin.html` 50).
+  - `esAdminUsuario` existe en `api/usuarios.js` (L180) y A2 lo usa.
+  - QA reporta Escudo GOLD PASS (sintaxis, ASCII-safety de lo nuevo, balance de divs). Las lineas agregadas a `api/utilidades.js` no aportan no-ASCII ni backticks.
+
+- **PENDIENTE OPERATIVO (bloqueante para produccion, lo ejecuta Javier):**
+  1. **Aplicar `db/migrations/017_perfil_publico_arbol_casas.sql` en Neon** y despues **`018_consumibles_categorias.sql`** (el orden importa: la 018 presupone la 017).
+  2. **Commit + push + deploy en un solo release** (incluye los pendientes previos sin commitear de TSK-095..TSK-103 + las migraciones 015/016/017/018).
+  3. **Verificacion post-deploy:** A1 (la cuenta admin aparece con `email_verificado=true`), A2 (Bearer valido marca/desmarca; sin Bearer 401; UUID inexistente 404), C1/C2/C3/C4 (las 5 tarjetas con datos reales y sin quedar en 0 en navegador limpio).
+
+- **Fuera de alcance:** correccion de los hallazgos H4/H6/H7/H8 (se documentan, no se corrigen); aplicacion de las migraciones 017/018 (la ejecuta Javier); cambios de codigo posteriores al cierre documental.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

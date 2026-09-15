@@ -79,7 +79,7 @@
 .btn-icon{width:28px;height:28px;padding:0;justify-content:center;font-size:13px}
 
 /* ── DASHBOARD STATS ── */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px 28px 0}
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;padding:20px 28px 0}
 .stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:4px}
 .stat-num{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--black);line-height:1}
 .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
@@ -538,6 +538,12 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div class="stat-sub" id="ds-usuarios-sub">en la plataforma</div>
       <div class="stat-bar"><div class="stat-bar-fill" id="ds-usr-bar" style="width:60%;background:#8b5cf6"></div></div>
     </div>
+    <div class="stat-card">
+      <div class="stat-num" id="ds-verificados">&#8212;</div>
+      <div class="stat-label">&#205;tems verificados</div>
+      <div class="stat-sub" id="ds-verificados-sub">de <span id="ds-verificados-total">0</span> destinos</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="ds-ver-bar" style="width:0%;background:#22c55e"></div></div>
+    </div>
   </div>
 
   <!-- Quick actions -->
@@ -633,6 +639,8 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div class="fpill on" data-status="all" onclick="setStatusFilter(this,'all')">Todos estados</div>
       <div class="fpill" data-status="published" onclick="setStatusFilter(this,'published')">✅ Publicados</div>
       <div class="fpill" data-status="draft" onclick="setStatusFilter(this,'draft')">📝 Borradores</div>
+      <div class="fpill" data-verified="1" onclick="setVerifiedFilter(this,true)">&#10003; Verificados</div>
+      <div class="fpill on" data-verified="0" onclick="setVerifiedFilter(this,'all')">Todos</div>
     </div>
   </div>
   <div class="table-wrap">
@@ -2190,6 +2198,7 @@ var places = [];
 var currentId = null;
 var currentCatFilter = 'all';
 var currentStatusFilter = 'all';
+var currentVerifiedFilter = 'all';
 var sortKey = 'name';
 var sortAsc = true;
 var pickerMap = null, pickerMarker = null, pickerLatLng = null;
@@ -2334,9 +2343,13 @@ async function renderDashboard() {
   var dft   = places.filter(function(p){return p.status==='draft';}).length;
   var total = places.length;
   var pct   = total ? Math.round(pub/total*100) : 0;
+  var verificados = places.filter(function(p){ return p.verificado === true; }).length;
   setText('ds-total',   total);
   setText('ds-pub-sub', pub+' publicados \xb7 '+dft+' borradores');
   setStyle('ds-pub-bar','width',pct+'%');
+  setText('ds-verificados', verificados);
+  setText('ds-verificados-total', total);
+  setStyle('ds-ver-bar', 'width', (total ? Math.round(verificados / total * 100) : 0) + '%');
   updateNavCounts();
 
   // Categorías locales
@@ -2366,13 +2379,25 @@ async function renderDashboard() {
       setText('ds-resenas',    (st.resenas||0).toLocaleString('es-CO'));
       setText('ds-rating-sub', 'rating promedio: '+(st.rating||0)+'\u2b50');
       setStyle('ds-rat-bar','width',Math.min(100,(st.rating||0)*20)+'%');
-      setText('ds-usuarios',     st.destinos||total);
-      setText('ds-usuarios-sub', 'publicados en el sitio');
     }
 
-    // Visitas — mostrar placeholder (ver mi-lugar.html?slug=X para stats por lugar)
-    setText('ds-visitas',     '📊');
-    setText('ds-visitas-sub', 'ver mi-lugar.html?slug=X');
+    // Usuarios registrados (leaderboard global)
+    var rU = await fetch('/api/usuarios?tipo=leaderboard&limit=1', { headers: _adminHeaders() });
+    var dU = await rU.json();
+    if (dU.ok && typeof dU.total === 'number') {
+      setText('ds-usuarios', dU.total.toLocaleString('es-CO'));
+      setText('ds-usuarios-sub', 'viajeros registrados en la plataforma');
+      setStyle('ds-usr-bar', 'width', Math.min(100, Math.round(dU.total / 500 * 100)) + '%');
+    }
+
+    // Visitas globales
+    var rV = await fetch('/api/utilidades?tipo=visitas_global', { headers: _adminHeaders() });
+    var dV = await rV.json();
+    if (dV.ok && typeof dV.total === 'number') {
+      setText('ds-visitas', dV.total.toLocaleString('es-CO'));
+      setText('ds-visitas-sub', (dV.v30||0).toLocaleString('es-CO') + ' en los ultimos 30 dias');
+      setStyle('ds-vis-bar', 'width', Math.min(100, Math.round(dV.total / 1000 * 100)) + '%');
+    }
 
     // Top lugares por reseñas
     var r4 = await fetch('/api/destinos?limit=200', { headers: _adminHeaders() });
@@ -2471,6 +2496,7 @@ function renderTabla() {
   var filtered = places.filter(function(p){
     if(currentCatFilter !== 'all' && p.cat !== currentCatFilter) return false;
     if(currentStatusFilter !== 'all' && p.status !== currentStatusFilter) return false;
+    if(currentVerifiedFilter === true && !p.verificado) return false;
     if(sl && !p.name.toLowerCase().includes(sl) && !(p.city||'').toLowerCase().includes(sl)
           && !(p.slug||'').toLowerCase().includes(sl)) return false;
     return true;
@@ -2499,9 +2525,9 @@ function renderTabla() {
       : p.status==='archived'
       ? '<span class="status-pill sp-arch">📦 Archivado</span>'
       : '<span class="status-pill sp-dft">📝 Borrador</span>';
-    return '<tr id="tr-'+p.id+'">'
+    return '<tr id="tr-'+p.id+'"'+(p.verificado?' style="background:#f0fdf4;border-left:3px solid #22c55e"':'')+'>'
       +'<td><input type="checkbox" class="row-cb" data-id="'+p.id+'"></td>'
-      +'<td><div class="dt-name">'+(p.emoji||catEmoji(p.cat))+' '+p.name+'</div>'
+      +'<td><div class="dt-name">'+(p.emoji||catEmoji(p.cat))+' '+p.name+(p.verificado ? ' <span style="display:inline-block;background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;vertical-align:middle;letter-spacing:.3px">VERIF</span>' : '')+'</div>'
       +'<div class="dt-slug">'+( p.slug||'—')+'</div></td>'
       +'<td><span class="dp-cat cat-'+p.cat+'">'+catLabel(p.cat)+'</span></td>'
       +'<td>'+( p.city||'—')+'</td>'
@@ -2529,6 +2555,12 @@ function setStatusFilter(el, status) {
   document.querySelectorAll('.fpill[data-status]').forEach(function(b){ b.classList.remove('on'); });
   el.classList.add('on');
   currentStatusFilter = status;
+  renderTabla();
+}
+function setVerifiedFilter(el, v) {
+  document.querySelectorAll('.fpill[data-verified]').forEach(function(b){ b.classList.remove('on'); });
+  if (el) el.classList.add('on');
+  currentVerifiedFilter = v;
   renderTabla();
 }
 function sortTabla(key) {
@@ -6578,6 +6610,8 @@ async function syncFromNeon() {
 
     var synced = Object.keys(_localToUUID).length;
     _showDBStatus('● DB · '+data.total+' lugares', '#16a34a');
+    var _dashScreen = document.getElementById('screen-dashboard');
+    if (_dashScreen && _dashScreen.classList.contains('active')) renderDashboard();
     console.log('[admin-online] Sincronizado: '+synced+' UUIDs mapeados'+
       (nuevos ? ' ('+nuevos+' nuevos importados desde Neon)' : ''));
   } catch(err) {

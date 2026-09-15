@@ -927,3 +927,34 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `api/usuarios.js` (v12) rama `casa_ranking` (L445) y `api/interacciones.js` (v15) calculo de Activos Ocultos; ambos archivos modificados en el working tree de TSK-103.
 **Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
 
+---
+
+## Observaciones residuales de TSK-104 (2026-09-15) -- NO son bugs confirmados
+
+**Nota:** estos hallazgos provienen del QA de TSK-104 y se registran como OBSERVACIONES de riesgo/consistencia (no como bugs confirmados), a pedido del cierre documental. Se conservan por Regla de Oro 3 (Cero Borrado Logico). La decision que los origina vive en DECISIONS.md ADR-029; el cierre de la tarea en TASKS.md TSK-104.
+
+### H4 (TSK-104): auto-verificacion amplia al nombre `javier` -- riesgo de integridad aceptado
+- **Severidad:** MEDIA (riesgo de integridad; aceptado por decision de producto).
+- **Contexto:** A1 de TSK-104 (ADR-029) verifica automaticamente en el upsert a quien cumpla `email.toLowerCase() === 'brsk84@gmail.com' || nombre.toLowerCase() === 'javier'`.
+- **Observacion:** cualquier usuario nuevo que se registre con el nombre `javier` queda `email_verificado=true` sin control adicional, lo que desbloquea referidos/facciones/proponer Activos.
+- **Estado:** OBSERVACION (no bloqueante, riesgo aceptado 2026-09-15). A revisar: restringir por email y/o verificar propiedad del nombre.
+
+### H6 (TSK-104): `GET ?tipo=leaderboard` publico expone `total` de usuarios
+- **Severidad:** BAJA (dato agregado; cambio de superficie publica).
+- **Contexto:** C1 de TSK-104 agrega `total` (`COUNT(*)`) a la respuesta del leaderboard.
+- **Observacion:** el endpoint no exige Bearer, por lo que el conteo de usuarios registrados queda publico.
+- **Estado:** OBSERVACION (no bloqueante 2026-09-15). Decidir si el `total` se mantiene publico o se mueve tras auth.
+
+### H7 (TSK-104): `verificar_usuario` con `usuario_id` no-UUID responde 500
+- **Severidad:** BAJA-MEDIA (validacion de entrada; diagnostico).
+- **Contexto:** A2 de TSK-104 ejecuta `UPDATE ... WHERE id=$2` con el valor recibido.
+- **Observacion:** un `usuario_id` que no sea UUID valido dispara `22P02` (invalid input syntax for type uuid), capturado por el try externo -> 500, en vez del 400 esperado.
+- **Estado:** OBSERVACION (no bloqueante 2026-09-15). Fix sugerido: validar el formato UUID antes del UPDATE y responder 400.
+
+### H8 (TSK-104): deuda preexistente en `api/utilidades.js` (catch vacio + baseline no-ASCII/backticks)
+- **Severidad:** BAJA (deuda tecnica preexistente; NO atribuible a TSK-104).
+- **Contexto:** verificacion ADR-006 de `api/utilidades.js` durante el cierre de TSK-104.
+- **Observacion:** (a) `.catch(function(){})` vacio en la rama `visitas` POST (silencia fallos, prohibido por AGENTS.md seccion 2.2); (b) baseline no-ASCII de 680 bytes >127 y 24 backticks, preexistentes en HEAD (Regla de Oro 1 exige cero en `api/*.js`).
+- **Evidencia (ADR-006):** conteo sobre el archivo real: 680 bytes >127 y 24 backticks; el diff de TSK-104 (`+24` lineas) aporta 0 backticks y 0 no-ASCII.
+- **Estado:** OBSERVACION (deuda preexistente 2026-09-15, no bloqueante). Candidata a una tarea de higiene ASCII del backend; no se corrige aqui.
+

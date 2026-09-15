@@ -151,6 +151,30 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // == VISITAS GLOBAL (admin) ======================================
+  // GET ?tipo=visitas_global -> conteo global de visitas activas (solo admin)
+  if (tipo === 'visitas_global') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    try {
+      var rg = await sql(
+        "SELECT COUNT(*)::int AS total, "
+        + "COUNT(CASE WHEN creado_en >= NOW() - INTERVAL '30 days' THEN 1 END)::int AS v30, "
+        + "COUNT(CASE WHEN creado_en >= NOW() - INTERVAL '7 days' THEN 1 END)::int AS v7 "
+        + "FROM interacciones WHERE tipo='visita' AND activo=true"
+      );
+      var gv = rg[0] || {};
+      return res.status(200).json({
+        ok:true,
+        total:parseInt(gv.total||0),
+        v30:parseInt(gv.v30||0),
+        v7:parseInt(gv.v7||0)
+      });
+    } catch (e) {
+      console.error('visitas_global error:', e && e.message || e);
+      return res.status(500).json({ ok:false, error:'Error al contar visitas globales' });
+    }
+  }
+
   // ══ FOTOS (Paso 17) ═══════════════════════════════════════════════
   // GET ?tipo=fotos&destino_id=UUID  → listar fotos (sin auth)
   // GET ?tipo=fotos&slug=X           → listar fotos por slug (sin auth)

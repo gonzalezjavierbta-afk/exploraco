@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-104 / ADR-029 Verificacion admin forzada + rama `verificar_usuario` + dashboard real (5 tarjetas) y filtro de verificados (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, Escudo GOLD PASS, sin commitear) - `api/usuarios.js` v13 (+45/-6: A1 auto-verificacion del admin en el upsert con `email_verificado` y `ON CONFLICT ... COALESCE(usuarios.email_verificado,false) OR EXCLUDED.email_verificado`, condicion `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`; A2 rama POST `tipo=verificar_usuario` admin-only via `esAdminUsuario` con 401/400/404 y `UPDATE ... RETURNING`; C1 campo aditivo `total` (`COUNT(*) WHERE activo=true`) en GET `?tipo=leaderboard`), `api/utilidades.js` v2 (+24/-0: rama admin-only GET `?tipo=visitas_global` -> `{ok,total,v30,v7}` sobre `interacciones tipo='visita' AND activo=true`), `admin.html` (+42/-8: fila verde + badge `VERIF` para `p.verificado`, filtro `data-verified`/`currentVerifiedFilter`/`setVerifiedFilter`, `ds-usuarios` real desde leaderboard, `ds-visitas` real desde `visitas_global`, 5a tarjeta `ds-verificados`, CSS `.stats-grid` a `repeat(5,1fr)`, re-render del dashboard en `syncFromNeon()` si la pantalla esta activa); presupuesto 8/8 INTACTO; sin migraciones nuevas; **PENDIENTE OPERATIVO: aplicar 017/018 en Neon (016/015 ya aplicadas) + commit/push/deploy**; hallazgos residuales H4/H6/H7/H8 registrados como observaciones en BUGS_HISTORICOS.md
 - TSK-103 / ADR-028 Perfil publico museo + DM + Arbol de Clases de 16 ramas + Casas + categorias de consumibles (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - `perfil.html` (NUEVO, museo publico `?id=`), `registro.html` (NUEVO, alta con `?ref=`), `docs/DEPLOY_017.md` (NUEVO), `scripts/verify_017_precheck.js` (NUEVO, read-only); migraciones NUEVAS 017 (columnas de perfil/casa/`progreso_arbol`/`perfil_config`/`perfil_publico`/`dm_abierto`; `consumibles.categoria`; `chat_salas.clave_dm` + CHECK `chk_chat_salas_tipo`; tabla `usuario_bloqueos`) y 018 (categoriza 17 consumibles: perfil 7 / impulso 3 / social 4 / coleccion 2 / general 1); backend como ramas `tipo=` sin archivos nuevos (8/8) - `api/usuarios.js` v12 (`perfil_publico` ligero, blindaje PII owner-aware en `?id=`/`?buscar=`/`referido_codigo`, `casa_elegir`/`casa_ranking`, `perfil_actualizar`), `api/interacciones.js` v15 (`museo_publico`, DM `dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`, `arbol_catalogo`/`arbol_usuario`/`rama_activar`, `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS [0,100,250,450,700]`, Origen derivado con bono x1.2 dentro de `D_R`, 8 misiones `perfil`), `api/admin.js` (`categoria` en consumibles) y `api/utilidades.js` (`/registro.html` y `/perfil.html` en `STATIC_PAGES`); frontend mi-perfil.html (Mi Red + DM + Arbol SVG + 7 pestanas + selector de Casa + tienda por chips), comunidad.html (R-4), index.html (R-5) y usuario-session.js (`?ref=` con TTL 30d + `codigo_referido` + JWT en refresco); fixes R-1..R-5 (registro.html faltante, `?ref=` no capturado, `mi-perfil?id=` ignorado, etiqueta "Control Territorial" enganosa, relabel Pandilla->Parche) y 4 fixes adicionales (fuga de PII preexistente, carrera del cobro del DM, `museo_publico` 404 en vez de 503, filtros `activo=true` en casa_ranking/exp_ocultos); DEUDA detectada (patron BUG-021): `interacciones.activo`, `usuarios.bio`/`usuarios.activo` no versionadas. **PENDIENTE OPERATIVO: aplicar 017 y 018 en Neon (016/015 ya aplicadas) + commit/push/deploy + verificacion en vivo. El smoke de cierre `scripts/smoke_017_perfil_arbol_casas.js` esta ENTREGADO y en verde (`node scripts/smoke_017_perfil_arbol_casas.js` -> 73/73 PASS, 2026-09-15).** ADR-028
 - TSK-102 / Consolidacion documental v5 (2026-09-14, working tree, sin cambios de codigo) - creados/consolidados los dos documentos maestros vigentes en `exploraco desarrollo/ampliacion desarrollo/`: `ExploraCO_Gamificacion_v5_Plan_Maestro.md` (Plan Maestro tecnico + hoja de ruta del gaming v4 + Entrega 016, con estados reales y citas `archivo:linea`) y `ExploraCO_Sistema_Social_v5.md` (mapa del apartado social con 7 tabs, Parches, chat/planes, albumes/comentarios, referidos, facciones, Wayfarer, notificaciones; gaps G-01..G-23 y discrepancias D-01..D-15). Enlaces cruzados verificados entre ambos (Plan v5 -> Sistema Social v5 y viceversa). Spec de la Entrega 016 `docs/superpowers/specs/2026-09-14-gaming-v5-referidos-wayfarer-facciones-design.md` + indice `docs/superpowers/specs/README.md`. 9 hallazgos reales registrados en BUGS_HISTORICOS.md BUG-035..BUG-043 (referidos inalcanzables, visita rota en frontend, notificacion de resena a endpoint inexistente, conteo de miembros de Parche, relabel residual Pandilla, etiquetas de chat desfasadas, gate de voto de utilidad ausente, formula de `album_crear`, tabs de GUIA). PENDIENTE OPERATIVO intacto (ver TSK-101 y "Que sigue"): aplicar migracion 016 en Neon + `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + deploy.
 - TSK-101 / ADR-027 + ADR-025 Entrega 016 "ExploraCO Gaming v5.0" (2026-09-14, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - piramide de referidos de 5 niveles con `xp_ref_total` separado y CTE recursiva (0.10/0.05/0.03/0.02/0.01 FLOOR, topes 500/20, `?ref=` en registro), crowdsourcing Wayfarer "Activo Oculto" (proponer con email verificado, votar nivel 5, quorum +/-3, 30 dias derivado, +50/+5/+15 XP, checkin reusa geocerca ADR-024 + nonce), 4 facciones con CHECK (exploradores/curadores/creadores/artistas; primera gratis, cambio 500 xp_total + cooldown 15 dias), vocaciones de artista en bloque nivel 5 y 6 misiones de artista; backend `api/usuarios.js` v8->v9 (JWT HMAC `firmarSesion`, verificacion de email, device_hashes), `api/interacciones.js` v12->v13 (`repartirXpReferidos` en 14 puntos de XP, `validarSesion` con timingSafeEqual en visita/votar/checkin, geo_nonces), `api/admin.js` (`activo_oculto_moderar`), frontend mi-perfil/comunidad/admin/usuario-session; `.env.example` + `.gitignore` corregido; MIGRACION 016 NUEVA (209 lineas, idempotente); smoke `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; Escudo GOLD verde (node --check x3, ASCII 0 bytes >127, 0 backticks, divs 0, idempotencia 13/13); presupuesto 8/8 INTACTO; PENDIENTE OPERATIVO: aplicar migracion 016 en Neon + configurar `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + commit/push/deploy (ver `docs/DEPLOY_016.md`); ADR-027 + ADR-025
@@ -19,6 +20,70 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-104 "Verificacion admin forzada + dashboard real (5 tarjetas) + filtro de verificados" (2026-09-15) - ADR-029
+
+Tarea TSK-104 implementada y verificada en working tree (SIN commitear), Escudo
+GOLD PASS. La decision vive en `DECISIONS.md` ADR-029; la tarea en
+`TASKS.md` TSK-104. NO hay migraciones nuevas ni archivos nuevos en `api/`
+(8/8 intacto, ADR-010). El prompt de origen declaraba la migracion 016 como
+"pendiente" por error: 016/015 ya estaban aplicadas (confirmado contra
+NEXT.md/ADR-028/`docs/DEPLOY_017.md`, ADR-006).
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/usuarios.js` v9 -> v13 (+45/-6): A1 auto-verificacion del admin en el
+  upsert (columna `email_verificado` en el INSERT y `ON CONFLICT ... COALESCE(
+  usuarios.email_verificado,false) OR EXCLUDED.email_verificado`; condicion
+  `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`);
+  A2 rama POST `tipo=verificar_usuario` admin-only via `esAdminUsuario`
+  (401/400/404, `UPDATE ... RETURNING`); C1 `total` aditivo en GET
+  `?tipo=leaderboard`. Nota: el header habia quedado en v9 pese a que el
+  changelog ya documentaba v10-v12 de TSK-103.
+- `api/utilidades.js` v2 (+24/-0): rama admin-only GET `?tipo=visitas_global`
+  -> `{ ok, total, v30, v7 }` sobre `interacciones tipo='visita' AND activo=true`.
+- `admin.html` (+42/-8): fila verde + badge `VERIF` para `p.verificado`; filtro
+  "Verificados" (`data-verified`, `currentVerifiedFilter`, `setVerifiedFilter()`
+  y condicion en `filtered`); `ds-usuarios` real desde leaderboard `total`;
+  `ds-visitas` real desde `visitas_global`; 5a tarjeta `ds-verificados`; CSS
+  `.stats-grid` a `repeat(5,1fr)`; fix post-sync: `syncFromNeon()` re-renderiza
+  el dashboard si la pantalla esta activa (evita tarjetas en 0 en navegador
+  limpio).
+
+**Decisiones de producto (Javier, 2026-09-15):** migracion 016 ya aplicada (el
+prompt la declaraba pendiente por error); C2 resuelto con la rama
+`visitas_global`; dashboard de 5 tarjetas; filtro "Verificados" + badge; A2 usa
+`esAdminUsuario` + 401 (el prompt sugeria 403); conteo de viajeros como campo
+aditivo `total` en el leaderboard.
+
+**Verificacion:** Escudo GOLD PASS (sintaxis, ASCII-safety de lo nuevo, balance
+de divs); `git diff --stat` = 3 archivos, +105/-14. Las lineas nuevas de
+`api/utilidades.js` aportan 0 no-ASCII y 0 backticks (baseline preexistente
+aparte, H8).
+
+#### Que sigue
+1. **APLICAR `db/migrations/017_perfil_publico_arbol_casas.sql` EN NEON
+   (BLOQUEANTE, lo ejecuta Javier).** Prerrequisito: 016/015 ya aplicadas.
+2. **Aplicar DESPUES `db/migrations/018_consumibles_categorias.sql`** (la 017
+   agrega `consumibles.categoria`; la 018 solo la reparte).
+3. **Commit + push + deploy en un solo release** (incluye los pendientes
+   previos sin commitear de TSK-095..TSK-103 y las migraciones 015/016/017/018).
+4. **Verificacion post-deploy:** A1 (cuenta admin `email_verificado=true`),
+   A2 (Bearer marca/desmarca; sin Bearer 401; UUID inexistente 404), C1/C2/C3/C4
+   (5 tarjetas con datos reales y sin quedar en 0 en navegador limpio), B/B3
+   (fila verde + badge + filtro "Verificados").
+
+#### Riesgos activos
+- **Migraciones 017/018 pendientes (BLOQUEANTE, heredado de TSK-103):** sin la
+  017, Arbol, Casas, DM y `consumibles.categoria` fallan por esquema
+  inexistente; sin la 018, la tienda queda con los 17 consumibles en `general`.
+- **H4 (riesgo aceptado):** cualquier usuario registrado con nombre `javier`
+  queda auto-verificado; vector de integridad a revisar.
+- **H6:** el leaderboard es publico y ahora expone `total` (conteo de usuarios)
+  sin Bearer.
+- **H7:** `verificar_usuario` con `usuario_id` no-UUID devuelve 500 en vez de
+  400.
+- **H8 (preexistente):** deuda de `api/utilidades.js` (catch vacio + baseline
+  no-ASCII 680 bytes + 24 backticks); no atribuible a TSK-104.
 
 ### Sesion TSK-103 "Perfil publico museo + DM + Arbol de 16 ramas + Casas + categorias de consumibles" (2026-09-15) - ADR-028
 
@@ -77,7 +142,7 @@ PASS)**; evidencia: `node scripts/smoke_017_perfil_arbol_casas.js` ->
    scripts/smoke_017_perfil_arbol_casas.js` -> `73/73 PASS`, 2026-09-15); no
    es pendiente.
 4. **Commit + push + deploy en un solo release** (esta entrega + los
-   pendientes previos sin commitear: TSK-095 a TSK-102 y las migraciones
+     pendientes previos sin commitear: TSK-095 a TSK-104 y las migraciones
    015/016/017/018; ver `git status`).
 5. **Verificacion post-deploy en vivo:** perfil publico sin PII, DM (hilo
    nuevo con cobro 20 XP, bloqueo 403), Arbol (activar nodo nivel 5, bono de
