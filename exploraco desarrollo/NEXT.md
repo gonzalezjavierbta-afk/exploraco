@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- Bugfix de sesion / regresion colateral de BUG-049 (2026-09-15, working tree, SIN commitear) - `refrescarSesion()` de `usuario-session.js` y `mi-perfil.html` REEMPLAZABA `window.ExploraCO.usuario` con la proyeccion publica de `GET /api/usuarios?id=` (SIN `jwt`/`auth_id`/`email`/`email_verificado`), dejando el banner "Verifica tu email" y bloqueando referidos/facciones/casa/DM de la cuenta `brsk84@gmail.com` pese a `email_verificado=TRUE` en Neon (causa: la proyeccion publica la introdujo el fix de PII de BUG-049 / ADR-028, `api/usuarios.js` L500-529); fix: FUSION (`Object.assign({}, actual, d.data)`) + conservar `jwt`/`jwt_expira_en` + detectar la proyeccion publica (respuesta sin `email`) y llamar `refreshJwt()`/`renovarJwt()` sin pisar la sesion (`usuario-session.js` +21/-4, `mi-perfil.html` +19/-4); QA: `node --check` OK, delta ASCII 0 en lo nuevo, divs 0, `smoke_017` 73/73 PASS, `smoke_016` 39/39 PASS, sin recursion; registrado como BUGS_HISTORICOS.md BUG-053; **PENDIENTE OPERATIVO: commit/push/deploy + re-login del usuario afectado si su localStorage ya perdio `auth_id`/`email`.**
 - TSK-104 / ADR-029 Verificacion admin forzada + rama `verificar_usuario` + dashboard real (5 tarjetas) y filtro de verificados (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, Escudo GOLD PASS, sin commitear) - `api/usuarios.js` v13 (+45/-6: A1 auto-verificacion del admin en el upsert con `email_verificado` y `ON CONFLICT ... COALESCE(usuarios.email_verificado,false) OR EXCLUDED.email_verificado`, condicion `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`; A2 rama POST `tipo=verificar_usuario` admin-only via `esAdminUsuario` con 401/400/404 y `UPDATE ... RETURNING`; C1 campo aditivo `total` (`COUNT(*) WHERE activo=true`) en GET `?tipo=leaderboard`), `api/utilidades.js` v2 (+24/-0: rama admin-only GET `?tipo=visitas_global` -> `{ok,total,v30,v7}` sobre `interacciones tipo='visita' AND activo=true`), `admin.html` (+42/-8: fila verde + badge `VERIF` para `p.verificado`, filtro `data-verified`/`currentVerifiedFilter`/`setVerifiedFilter`, `ds-usuarios` real desde leaderboard, `ds-visitas` real desde `visitas_global`, 5a tarjeta `ds-verificados`, CSS `.stats-grid` a `repeat(5,1fr)`, re-render del dashboard en `syncFromNeon()` si la pantalla esta activa); presupuesto 8/8 INTACTO; sin migraciones nuevas; **PENDIENTE OPERATIVO: aplicar 017/018 en Neon (016/015 ya aplicadas) + commit/push/deploy**; hallazgos residuales H4/H6/H7/H8 registrados como observaciones en BUGS_HISTORICOS.md
 - TSK-103 / ADR-028 Perfil publico museo + DM + Arbol de Clases de 16 ramas + Casas + categorias de consumibles (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - `perfil.html` (NUEVO, museo publico `?id=`), `registro.html` (NUEVO, alta con `?ref=`), `docs/DEPLOY_017.md` (NUEVO), `scripts/verify_017_precheck.js` (NUEVO, read-only); migraciones NUEVAS 017 (columnas de perfil/casa/`progreso_arbol`/`perfil_config`/`perfil_publico`/`dm_abierto`; `consumibles.categoria`; `chat_salas.clave_dm` + CHECK `chk_chat_salas_tipo`; tabla `usuario_bloqueos`) y 018 (categoriza 17 consumibles: perfil 7 / impulso 3 / social 4 / coleccion 2 / general 1); backend como ramas `tipo=` sin archivos nuevos (8/8) - `api/usuarios.js` v12 (`perfil_publico` ligero, blindaje PII owner-aware en `?id=`/`?buscar=`/`referido_codigo`, `casa_elegir`/`casa_ranking`, `perfil_actualizar`), `api/interacciones.js` v15 (`museo_publico`, DM `dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`, `arbol_catalogo`/`arbol_usuario`/`rama_activar`, `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS [0,100,250,450,700]`, Origen derivado con bono x1.2 dentro de `D_R`, 8 misiones `perfil`), `api/admin.js` (`categoria` en consumibles) y `api/utilidades.js` (`/registro.html` y `/perfil.html` en `STATIC_PAGES`); frontend mi-perfil.html (Mi Red + DM + Arbol SVG + 7 pestanas + selector de Casa + tienda por chips), comunidad.html (R-4), index.html (R-5) y usuario-session.js (`?ref=` con TTL 30d + `codigo_referido` + JWT en refresco); fixes R-1..R-5 (registro.html faltante, `?ref=` no capturado, `mi-perfil?id=` ignorado, etiqueta "Control Territorial" enganosa, relabel Pandilla->Parche) y 4 fixes adicionales (fuga de PII preexistente, carrera del cobro del DM, `museo_publico` 404 en vez de 503, filtros `activo=true` en casa_ranking/exp_ocultos); DEUDA detectada (patron BUG-021): `interacciones.activo`, `usuarios.bio`/`usuarios.activo` no versionadas. **PENDIENTE OPERATIVO: aplicar 017 y 018 en Neon (016/015 ya aplicadas) + commit/push/deploy + verificacion en vivo. El smoke de cierre `scripts/smoke_017_perfil_arbol_casas.js` esta ENTREGADO y en verde (`node scripts/smoke_017_perfil_arbol_casas.js` -> 73/73 PASS, 2026-09-15).** ADR-028
 - TSK-102 / Consolidacion documental v5 (2026-09-14, working tree, sin cambios de codigo) - creados/consolidados los dos documentos maestros vigentes en `exploraco desarrollo/ampliacion desarrollo/`: `ExploraCO_Gamificacion_v5_Plan_Maestro.md` (Plan Maestro tecnico + hoja de ruta del gaming v4 + Entrega 016, con estados reales y citas `archivo:linea`) y `ExploraCO_Sistema_Social_v5.md` (mapa del apartado social con 7 tabs, Parches, chat/planes, albumes/comentarios, referidos, facciones, Wayfarer, notificaciones; gaps G-01..G-23 y discrepancias D-01..D-15). Enlaces cruzados verificados entre ambos (Plan v5 -> Sistema Social v5 y viceversa). Spec de la Entrega 016 `docs/superpowers/specs/2026-09-14-gaming-v5-referidos-wayfarer-facciones-design.md` + indice `docs/superpowers/specs/README.md`. 9 hallazgos reales registrados en BUGS_HISTORICOS.md BUG-035..BUG-043 (referidos inalcanzables, visita rota en frontend, notificacion de resena a endpoint inexistente, conteo de miembros de Parche, relabel residual Pandilla, etiquetas de chat desfasadas, gate de voto de utilidad ausente, formula de `album_crear`, tabs de GUIA). PENDIENTE OPERATIVO intacto (ver TSK-101 y "Que sigue"): aplicar migracion 016 en Neon + `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + deploy.
@@ -20,6 +21,58 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Bugfix de sesion "refrescarSesion() pisaba la sesion con la proyeccion publica" (2026-09-15) - regresion colateral de BUG-049 (TSK-103 / ADR-028)
+
+Bugfix implementado y verificado en working tree (SIN commitear). El detalle
+del bug vive en `BUGS_HISTORICOS.md` BUG-053; la nota de cierre en
+`TASKS.md` TSK-104 (seccion "Bugfix posterior"). No hay migraciones nuevas ni
+archivos nuevos; presupuesto 8/8 intacto (ADR-010).
+
+**Sintoma reportado por Javier:** la cuenta `brsk84@gmail.com` tenia
+`email_verificado = TRUE` en Neon, pero `mi-perfil.html` seguia mostrando el
+banner "Verifica tu email" y bloqueaba referidos, facciones, casa y DM.
+
+**Causa raiz (confirmada por QA):** `GET /api/usuarios?id=UUID` nunca devuelve
+`jwt` y, con JWT faltante/expirado, responde la proyeccion publica SIN
+`email`/`auth_id`/`jwt`/`email_verificado` (`api/usuarios.js`, L500-529;
+introducido por el fix de PII de BUG-049 / ADR-028). Las dos
+`refrescarSesion()` REEMPLAZABAN `window.ExploraCO.usuario`
+(`usuario-session.js`, L1092 y `mi-perfil.html`, L854), descartando
+`jwt`/`auth_id`/`email`/`email_verificado`.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `usuario-session.js` (+21/-4): `refrescarSesion()` fusiona
+  (`Object.assign({}, actual, d.data)`) en vez de reemplazar, conserva
+  `jwt`/`jwt_expira_en` y, ante la proyeccion publica (respuesta sin `email`),
+  no pisa la sesion y dispara `window.ExploraCO.refreshJwt()`.
+- `mi-perfil.html` (+19/-4): mismo patron; ante la proyeccion publica llama
+  `renovarJwt()` y re-renderiza. `git diff --stat` = 2 archivos, +32/-8.
+
+**Verificacion:** `node --check` OK en ambos; delta ASCII 0 en el bloque
+nuevo; balance de divs de `mi-perfil.html` 0; `smoke_017_perfil_arbol_casas.js`
+73/73 PASS; `smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; sin recursion.
+
+#### Que sigue
+1. **Commit + push + deploy** del bugfix junto con los pendientes previos
+   (TSK-095..TSK-104) en un solo release.
+2. **Verificacion post-deploy:** la cuenta `brsk84@gmail.com` deja de mostrar
+   el banner y quedan habilitados referidos/facciones/casa/DM.
+3. **Re-login del usuario afectado** si su `localStorage` ya perdio
+   `auth_id`/`email` (la sesion publica cacheada no permite reconstruir el JWT
+   sin re-autenticar).
+4. **Deuda QA no bloqueante** (preexistente, NO de este fix):
+   `scripts/smoke_test_perfil_progreso.js` espera 22 misiones vs 36 reales;
+   `scripts/smoke_test_epic_prompt.js` espera VOCACIONES 3 vs 4 y
+   `chat_salas` plan vs plan+dm. Ver observacion al final de BUGS_HISTORICOS.md.
+
+#### Riesgos activos
+- **Deploy pendiente:** el fix no esta en produccion hasta el commit/push;
+  en produccion el banner sigue apareciendo para cuentas verificadas.
+- **localStorage del usuario afectado:** si perdio `auth_id`/`email`, el
+  auto-recupero (`refreshJwt`/`renovarJwt`) no puede operar; requiere re-login.
+- **Deuda QA de smokes preexistentes:** no bloqueante; los smokes citados
+  fallan por expectativas desactualizadas, no por el codigo.
 
 ### Sesion TSK-104 "Verificacion admin forzada + dashboard real (5 tarjetas) + filtro de verificados" (2026-09-15) - ADR-029
 

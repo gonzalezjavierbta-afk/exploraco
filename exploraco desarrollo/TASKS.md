@@ -2656,6 +2656,14 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 - **Fuera de alcance:** correccion de los hallazgos H4/H6/H7/H8 (se documentan, no se corrigen); aplicacion de las migraciones 017/018 (la ejecuta Javier); cambios de codigo posteriores al cierre documental.
 
+- **Bugfix posterior (2026-09-15): regresion colateral de BUG-049 en `refrescarSesion()` -- no previsto en el alcance original de TSK-104.** Detalle completo en `BUGS_HISTORICOS.md` BUG-053.
+  - **Sintoma reportado por Javier:** la cuenta `brsk84@gmail.com` (auto-verificada por A1 de esta tarea) tenia `email_verificado = TRUE` en Neon, pero `mi-perfil.html` seguia mostrando el banner "Verifica tu email" y bloqueaba referidos/facciones/casa/DM.
+  - **Causa raiz (QA):** `GET /api/usuarios?id=UUID` nunca devuelve `jwt` y, con JWT faltante/expirado, responde la proyeccion publica SIN `email`/`auth_id`/`jwt`/`email_verificado` (`api/usuarios.js`, L500-529; fuga cerrada por BUG-049 / ADR-028). Las dos `refrescarSesion()` REEMPLAZABAN `window.ExploraCO.usuario` (`usuario-session.js`, L1092; `mi-perfil.html`, L854).
+  - **Fix (working tree, SIN commitear):** `usuario-session.js` (+21/-4) y `mi-perfil.html` (+19/-4) fusionan la respuesta (`Object.assign({}, actual, d.data)`), conservan `jwt`/`jwt_expira_en` y, ante la proyeccion publica (respuesta sin `email`), no pisan la sesion y llaman `refreshJwt()`/`renovarJwt()`. No quedan asignaciones de sesion alimentadas por GET.
+  - **Evidencia (ADR-006):** `git diff --stat` = 2 archivos, +32/-8; `node --check` OK en ambos; delta ASCII 0 en el bloque nuevo; balance de divs de `mi-perfil.html` 0; `scripts/smoke_017_perfil_arbol_casas.js` 73/73 PASS; `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; sin recursion.
+  - **Estado:** RESUELTO en working tree (2026-09-15); **PENDIENTE commit/push/deploy** y re-login del usuario afectado si su `localStorage` ya perdio `auth_id`/`email`. Repara la regresion colateral de BUG-049 (BUG-049 permanece RESUELTO y sin cambios).
+  - **Deuda QA no bloqueante (preexistente, NO de este fix):** `scripts/smoke_test_perfil_progreso.js` espera 22 misiones vs 36 reales; `scripts/smoke_test_epic_prompt.js` espera VOCACIONES 3 vs 4 y `chat_salas` plan vs plan+dm. Ver DQ-1/DQ-2 al final de BUGS_HISTORICOS.md; los smokes NO se actualizan en este cierre.
+
 ---
 
 ## Regla de actualizacion

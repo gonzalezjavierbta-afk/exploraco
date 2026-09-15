@@ -1088,11 +1088,24 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.ok && d.data) {
-          window.ExploraCO.usuario = d.data;
-          try { localStorage.setItem(SESSION_KEY, JSON.stringify(d.data)); } catch (e) {}
-          actualizarUI();
+        if (!d || !d.ok || !d.data) return;
+        // La respuesta privada trae email; la publica NO. Nunca pisar la
+        // sesion con la publica: se perderian email/auth_id/jwt/email_verificado.
+        if (!d.data.email) {
+          var pub = window.ExploraCO.usuario;
+          if (pub && pub.auth_id && pub.email && typeof window.ExploraCO.refreshJwt === 'function') {
+            window.ExploraCO.refreshJwt();
+          }
+          return;
         }
+        var actual = window.ExploraCO.usuario || {};
+        var merged = Object.assign({}, actual, d.data);
+        // GET ?id= nunca devuelve jwt: conservar el vigente.
+        if (!merged.jwt && actual.jwt) merged.jwt = actual.jwt;
+        if (!merged.jwt_expira_en && actual.jwt_expira_en) merged.jwt_expira_en = actual.jwt_expira_en;
+        window.ExploraCO.usuario = merged;
+        try { localStorage.setItem(SESSION_KEY, JSON.stringify(merged)); } catch (e) {}
+        actualizarUI();
       })
       .catch(function () {});
   }

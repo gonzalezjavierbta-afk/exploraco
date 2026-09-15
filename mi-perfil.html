@@ -850,11 +850,22 @@ function refrescarSesion() {
   if(!u || !u.id) return;
   fetchConJwt('/api/usuarios?id=' + encodeURIComponent(u.id))
     .then(function(res){
-      if(res.ok && res.data) {
-        window.ExploraCO.usuario = res.data;
-        try{localStorage.setItem('exploraco_user',JSON.stringify(res.data));}catch(e){}
-        renderPerfil();
+      if(!(res && res.ok && res.data)) return;
+      // Proyeccion publica (sin email): nunca pisar la sesion local; re-upsertar.
+      if(!res.data.email) {
+        var pub = sesion();
+        if(pub && pub.auth_id && pub.email && typeof renovarJwt === 'function') {
+          renovarJwt().then(function(ok){ if(ok) renderPerfil(); });
+        }
+        return;
       }
+      var actual = sesion() || {};
+      var merged = Object.assign({}, actual, res.data);
+      if(!merged.jwt && actual.jwt) merged.jwt = actual.jwt;
+      if(!merged.jwt_expira_en && actual.jwt_expira_en) merged.jwt_expira_en = actual.jwt_expira_en;
+      window.ExploraCO.usuario = merged;
+      try{localStorage.setItem('exploraco_user',JSON.stringify(merged));}catch(e){}
+      renderPerfil();
     })
     .catch(function(){});
 }

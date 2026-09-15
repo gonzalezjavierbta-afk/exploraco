@@ -927,6 +927,16 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `api/usuarios.js` (v12) rama `casa_ranking` (L445) y `api/interacciones.js` (v15) calculo de Activos Ocultos; ambos archivos modificados en el working tree de TSK-103.
 **Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
 
+## BUG-053: `refrescarSesion()` reemplazaba la sesion con la proyeccion publica -- banner "Verifica tu email" persistente pese a `email_verificado=TRUE`
+
+**Severidad:** ALTA (bloquea referidos/facciones/casa/DM de cuentas verificadas).
+**Contexto:** regresion colateral del fix de PII de BUG-049 (Entrega TSK-103 / ADR-028) en `api/usuarios.js`; reportada por Javier el 2026-09-15 sobre la cuenta `brsk84@gmail.com`.
+**Sintoma reportado:** la cuenta `brsk84@gmail.com` tenia `email_verificado = TRUE` en Neon, pero `mi-perfil.html` seguia mostrando el banner "Verifica tu email" y bloqueaba referidos, facciones, casa y DM.
+**Causa raiz (confirmada por QA):** (1) `GET /api/usuarios?id=UUID` nunca devuelve `jwt` (no es columna; se firma en cada login) y, cuando falta/expira el JWT, responde con una proyeccion publica SIN `email`, `auth_id`, `jwt` ni `email_verificado` (`api/usuarios.js`, L500-529; introducido por el fix de PII de BUG-049 / ADR-028). (2) Las dos funciones `refrescarSesion()` REEMPLAZABAN `window.ExploraCO.usuario` con esa respuesta (`usuario-session.js`, L1092 y `mi-perfil.html`, L854), descartando `jwt`/`auth_id`/`email`/`email_verificado`. Al quedar sin JWT, el siguiente fetch pedia la proyeccion publica y los gates `email_verificado !== true` mostraban el banner aunque Neon tuviera TRUE.
+**Resolucion aplicada:** `refrescarSesion()` ahora FUSIONA (`Object.assign({}, actual, d.data)`) en vez de reemplazar; conserva `jwt`/`jwt_expira_en` cuando la respuesta no los trae; y si detecta la proyeccion publica (respuesta sin `email`), NO pisa la sesion y dispara `refreshJwt()` (`usuario-session.js`) / `renovarJwt()` (`mi-perfil.html`) para recuperar una sesion privada con JWT nuevo. No quedan asignaciones de sesion alimentadas por GET.
+**Evidencia (ADR-006):** `usuario-session.js` (+21/-4) y `mi-perfil.html` (+19/-4) en el working tree (2026-09-15). QA: `node --check` OK en ambos; delta ASCII 0 en el bloque nuevo; balance de divs de `mi-perfil.html` 0; `scripts/smoke_017_perfil_arbol_casas.js` 73/73 PASS; `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; sin recursion.
+**Estado:** RESUELTO (working tree, 2026-09-15; PENDIENTE commit/push/deploy). Repara la regresion colateral de BUG-049; BUG-049 permanece RESUELTO y sin cambios.
+
 ---
 
 ## Observaciones residuales de TSK-104 (2026-09-15) -- NO son bugs confirmados
@@ -957,4 +967,20 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 - **Observacion:** (a) `.catch(function(){})` vacio en la rama `visitas` POST (silencia fallos, prohibido por AGENTS.md seccion 2.2); (b) baseline no-ASCII de 680 bytes >127 y 24 backticks, preexistentes en HEAD (Regla de Oro 1 exige cero en `api/*.js`).
 - **Evidencia (ADR-006):** conteo sobre el archivo real: 680 bytes >127 y 24 backticks; el diff de TSK-104 (`+24` lineas) aporta 0 backticks y 0 no-ASCII.
 - **Estado:** OBSERVACION (deuda preexistente 2026-09-15, no bloqueante). Candidata a una tarea de higiene ASCII del backend; no se corrige aqui.
+
+---
+
+## Deuda QA preexistente en smokes (2026-09-15) -- NO bloqueante, NO atribuible al bugfix de sesion (BUG-053)
+
+**Nota:** hallazgos de QA detectados durante el cierre del bugfix de sesion (BUG-053); son PREEXISTENTES y no bloqueantes. NO se corrigen aqui porque el bugfix no toca smokes ni el catalogo (Regla de Oro 3: se documentan, no se borran).
+
+### DQ-1: `scripts/smoke_test_perfil_progreso.js` espera 22 misiones (catalogo real: 36)
+- **Severidad:** BAJA (smoke desactualizado; falso negativo).
+- **Observacion:** el smoke fija 22 misiones esperadas, pero el catalogo server-side tiene 36. Candidato: actualizar el numero esperado o derivarlo del backend.
+- **Estado:** DEUDA QA (preexistente, no bloqueante, 2026-09-15).
+
+### DQ-2: `scripts/smoke_test_epic_prompt.js` con expectativas desactualizadas (VOCACIONES y `chat_salas`)
+- **Severidad:** BAJA (smoke desactualizado; falso negativo).
+- **Observacion:** espera `VOCACIONES` 3 vs 4 reales, y `chat_salas` `plan` vs `plan+dm` reales (tras TSK-103: 4 vocaciones y DM `tipo='dm'`). Candidato: actualizar las expectativas.
+- **Estado:** DEUDA QA (preexistente, no bloqueante, 2026-09-15).
 
