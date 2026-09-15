@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Museo de viajero · ExploraCO</title>
+<meta name="description" content="Museo publico de un viajero de ExploraCO: trofeos, cromos, mapas y albumes en una sola sala.">
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#111111">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600;700&family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+/* ============================================================
+   perfil.html - Museo publico de viajero (ADR-028, WP-3)
+   Aislamiento atomico ADR-004: TODO el CSS vive bajo .pf-museo.
+   El tema oscuro se aplica con .pf-museo--oscuro en el contenedor
+   raiz (nunca sobre body).
+   ============================================================ */
+html,body{margin:0;padding:0}
+body{background:#FBF8F2}
+
+.pf-museo *{box-sizing:border-box;margin:0;padding:0}
+.pf-museo{
+  --m-bg:#FBF8F2;--m-panel:#FFFFFF;--m-panel2:#F5F0E6;--m-line:#E7E0D3;
+  --m-ink:#111111;--m-muted:#6E6559;--m-gold:#E8A020;--m-gold-d:#C8860A;
+  --m-shadow:0 1px 2px rgba(17,17,17,.04),0 10px 34px rgba(17,17,17,.07);
+  background:var(--m-bg);color:var(--m-ink);
+  font-family:'Outfit',sans-serif;font-size:15px;line-height:1.5;
+  min-height:100vh;display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+}
+.pf-museo.pf-museo--oscuro{
+  --m-bg:#0E0E0E;--m-panel:#171717;--m-panel2:#201E1A;--m-line:#2C2B27;
+  --m-ink:#FBF8F2;--m-muted:#A79E90;
+  --m-shadow:0 1px 2px rgba(0,0,0,.5),0 12px 40px rgba(0,0,0,.55);
+}
+.pf-museo h1,.pf-museo h2,.pf-museo h3{font-family:'Barlow Condensed',sans-serif;font-weight:900;line-height:1;letter-spacing:.3px}
+.pf-museo a{color:inherit}
+.pf-num{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.pf-museo :focus-visible{outline:2px solid var(--m-gold);outline-offset:2px}
+
+/* ---- Nav (silo propio dentro del museo) ---- */
+.pf-nav{position:sticky;top:0;z-index:60;background:#111;border-bottom:3px solid var(--m-gold);height:52px;display:flex;align-items:center;gap:14px;padding:0 4%;flex-shrink:0}
+.pf-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
+.pf-logo em{color:var(--m-gold);font-style:normal}
+.pf-nav-tag{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.42)}
+.pf-navlink{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.7);text-decoration:none;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:6px 12px;transition:color .15s,border-color .15s}
+.pf-navlink:hover{color:var(--m-gold);border-color:var(--m-gold)}
+
+.pf-wrap{width:100%;max-width:1060px;margin:0 auto;padding:26px 4% 96px;flex:1}
+
+/* ---- Estados ---- */
+.pf-loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:90px 0;color:var(--m-muted);font-size:14px}
+.pf-spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--m-line);border-top-color:var(--m-gold);animation:pfspin .8s linear infinite}
+@keyframes pfspin{to{transform:rotate(360deg)}}
+
+.pf-priv{max-width:560px;margin:46px auto;text-align:center;background:var(--m-panel);border:1px solid var(--m-line);border-radius:16px;padding:42px 28px;box-shadow:var(--m-shadow)}
+.pf-priv-ico{width:64px;height:64px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(232,160,32,.12);color:var(--m-gold)}
+.pf-priv-ico svg{width:30px;height:30px}
+.pf-priv .pf-name{font-size:clamp(30px,5vw,44px)}
+.pf-priv-msg{color:var(--m-muted);font-size:14px;margin:12px auto 0;max-width:40ch}
+
+/* ---- Hall de entrada ---- */
+.pf-flag{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2.6px;text-transform:uppercase;color:var(--m-muted)}
+.pf-hall{display:flex;gap:26px;align-items:flex-start;padding-bottom:24px;border-bottom:1px solid var(--m-line)}
+.pf-avwrap{position:relative;flex-shrink:0}
+.pf-av{position:relative;width:108px;height:108px;border-radius:50%;background:var(--m-panel2);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pf-av-ini{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;color:var(--m-gold);line-height:1}
+.pf-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pf-frame--oro{border:4px solid var(--m-gold);box-shadow:0 0 0 5px rgba(232,160,32,.14),0 12px 32px rgba(232,160,32,.22)}
+.pf-frame--plata{border:4px solid #A6AFB8;box-shadow:0 0 0 5px rgba(166,175,184,.16),0 12px 32px rgba(166,175,184,.22)}
+.pf-frame--base{border:4px solid var(--m-line)}
+.pf-lvl{position:absolute;right:-4px;bottom:-4px;min-width:34px;height:34px;padding:0 7px;border-radius:999px;background:#111;color:#fff;border:2px solid var(--m-gold);display:inline-flex;align-items:center;justify-content:center;gap:3px;font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:14px}
+.pf-lvl svg{width:13px;height:13px;color:var(--m-gold)}
+.pf-hall-main{min-width:0;flex:1;display:flex;flex-direction:column;gap:9px}
+.pf-name{font-size:clamp(32px,5.2vw,50px);line-height:.94}
+.pf-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.35);color:var(--m-gold-d);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
+.pf-museo--oscuro .pf-badge{color:var(--m-gold)}
+.pf-badge svg{width:14px;height:14px}
+.pf-chips{display:flex;flex-wrap:wrap;gap:7px}
+.pf-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;border:1px solid var(--m-line);background:var(--m-panel);font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--m-ink)}
+.pf-chip svg{width:13px;height:13px;color:var(--m-muted)}
+.pf-chip--exploradores{border-color:rgba(34,197,94,.4);color:#16a34a}
+.pf-chip--curadores{border-color:rgba(59,130,246,.4);color:#2563eb}
+.pf-chip--creadores{border-color:rgba(168,85,247,.4);color:#9333ea}
+.pf-chip--artistas{border-color:rgba(232,160,32,.5);color:var(--m-gold-d)}
+.pf-museo--oscuro .pf-chip--exploradores{color:#4ade80}
+.pf-museo--oscuro .pf-chip--curadores{color:#60a5fa}
+.pf-museo--oscuro .pf-chip--creadores{color:#c084fc}
+.pf-banda{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;padding:8px 14px;border-left:3px solid var(--m-gold);background:var(--m-panel2);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.pf-banda svg{width:15px;height:15px;color:var(--m-gold)}
+.pf-banda-lbl{color:var(--m-muted);font-size:10px;letter-spacing:2px}
+.pf-bio{color:var(--m-muted);font-size:14px;line-height:1.65;max-width:62ch}
+.pf-meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--m-muted)}
+.pf-meta span{display:inline-flex;align-items:center;gap:6px}
+.pf-meta svg{width:14px;height:14px;color:var(--m-gold)}
+.pf-meta b{color:var(--m-ink);font-size:14px}
+
+/* ---- Placa de estadisticas ---- */
+.pf-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--m-line);border:1px solid var(--m-line);border-radius:12px;overflow:hidden;margin:26px 0 4px;box-shadow:var(--m-shadow)}
+.pf-stat{background:var(--m-panel);padding:15px 8px;text-align:center}
+.pf-stat .pf-num{display:block;font-size:27px;line-height:1}
+.pf-stat > span:last-child{display:block;margin-top:4px;font-size:9.5px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--m-muted)}
+
+/* ---- Salas ---- */
+.pf-sala{margin-top:38px}
+.pf-sala-head{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--m-ink);padding-bottom:9px;margin-bottom:18px}
+.pf-sala-num{font-family:'Barlow Condensed',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:2.6px;text-transform:uppercase;color:var(--m-gold);border:1px solid var(--m-gold);border-radius:3px;padding:3px 8px;white-space:nowrap}
+.pf-sala-title{font-size:clamp(22px,3vw,28px);text-transform:uppercase;letter-spacing:1.2px}
+.pf-sala-count{margin-left:auto;font-size:20px;color:var(--m-muted)}
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:12px}
+.pf-grid--album{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+
+.pf-empty{border:1px dashed var(--m-line);border-radius:12px;padding:30px 20px;text-align:center;background:var(--m-panel);color:var(--m-muted);font-size:13px}
+.pf-empty b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--m-ink);margin-bottom:6px}
+
+/* Trofeos */
+.pf-trofeo{position:relative;background:var(--m-panel);border:1px solid var(--m-line);border-radius:11px;padding:15px 14px 13px;display:flex;flex-direction:column;gap:7px;overflow:hidden;box-shadow:var(--m-shadow)}
+.pf-tier--bronce{--tier:#B87333}
+.pf-tier--plata{--tier:#9AA3AD}
+.pf-tier--oro{--tier:#E8A020}
+.pf-tier--platino{--tier:#5FD3D0}
+.pf-trofeo::before{content:"";position:absolute;top:0;bottom:0;left:0;width:4px;background:var(--tier,#B87333)}
+.pf-trofeo-ico{color:var(--tier,#B87333)}
+.pf-trofeo-ico svg{width:26px;height:26px}
+.pf-trofeo-name{font-size:16px;text-transform:uppercase;line-height:1.05}
+.pf-trofeo-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:auto}
+.pf-trofeo-tier{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:var(--tier,#B87333)}
+.pf-rareza{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--m-muted)}
+.pf-rareza svg{width:12px;height:12px}
+.pf-rareza b{color:var(--m-ink);font-size:12px}
+.pf-trofeo-date{font-size:10.5px;color:var(--m-muted)}
+
+/* Cromos */
+.pf-cromo{display:flex;align-items:center;gap:11px;background:var(--m-panel);border:1px solid var(--m-line);border-radius:11px;padding:12px;box-shadow:var(--m-shadow)}
+.pf-cromo-thumb{width:42px;height:52px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(150deg,var(--cue,#8B8B8B),#111);border:1px solid rgba(0,0,0,.15)}
+.pf-cromo-thumb svg{width:20px;height:20px}
+.pf-cromo-r-comun{--cue:#8B8B8B}
+.pf-cromo-r-rara{--cue:#2563EB}
+.pf-cromo-r-epica{--cue:#9333EA}
+.pf-cromo-r-legendaria{--cue:#E8A020}
+.pf-cromo-info{min-width:0}
+.pf-cromo-name{font-size:15px;text-transform:uppercase;line-height:1.05}
+.pf-cromo-meta{display:flex;align-items:center;gap:9px;margin-top:4px;font-size:11px;color:var(--m-muted)}
+.pf-cromo-meta .pf-num{color:var(--m-ink);font-size:13px}
+
+/* Mapa */
+.pf-mapwrap{display:flex;flex-direction:column;gap:10px}
+.pf-map{height:390px;width:100%;border-radius:12px;border:1px solid var(--m-line);overflow:hidden;background:var(--m-panel2)}
+.pf-map-meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:var(--m-muted)}
+.pf-map-meta span{display:inline-flex;align-items:center;gap:6px}
+.pf-map-meta svg{width:14px;height:14px;color:var(--m-gold)}
+.pf-map-meta b{color:var(--m-ink);font-size:15px}
+.pf-pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--m-gold);border:2px solid #111;box-shadow:0 3px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
+.pf-pin span{transform:rotate(45deg);display:flex;color:#111}
+.pf-pin svg{width:14px;height:14px}
+.pf-museo .leaflet-popup-content-wrapper{border-radius:10px}
+.pf-museo .leaflet-popup-content{margin:11px 13px;font-family:'Outfit',sans-serif;font-size:13px}
+.pf-museo .leaflet-popup-content a{color:var(--m-gold-d);font-weight:600}
+
+/* Albumes */
+.pf-album{display:block;text-decoration:none;background:var(--m-panel);border:1px solid var(--m-line);border-radius:12px;overflow:hidden;box-shadow:var(--m-shadow);transition:transform .16s,box-shadow .16s}
+.pf-album:hover{transform:translateY(-3px);box-shadow:0 14px 38px rgba(17,17,17,.14)}
+.pf-album-cover{position:relative;aspect-ratio:4/3;background:var(--m-panel2);display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--m-line)}
+.pf-album-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pf-album-ph{color:var(--m-muted)}
+.pf-album-ph svg{width:30px;height:30px}
+.pf-album-body{padding:12px 13px}
+.pf-album-title{font-size:16px;text-transform:uppercase;line-height:1.05}
+.pf-album-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;margin-top:6px;font-size:11px;color:var(--m-muted)}
+.pf-album-meta span{display:inline-flex;align-items:center;gap:4px}
+.pf-album-meta svg{width:12px;height:12px}
+.pf-album-meta .pf-num{color:var(--m-ink);font-size:13px}
+
+/* Clases */
+.pf-clases{display:flex;flex-direction:column;gap:12px}
+.pf-clases-fac{font-size:12px;color:var(--m-muted);letter-spacing:.6px;text-transform:uppercase}
+.pf-clases-fac b{color:var(--m-gold-d)}
+.pf-museo--oscuro .pf-clases-fac b{color:var(--m-gold)}
+.pf-rama{background:var(--m-panel);border:1px solid var(--m-line);border-radius:11px;padding:14px;box-shadow:var(--m-shadow)}
+.pf-rama-top{display:flex;align-items:baseline;gap:10px}
+.pf-rama-name{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:.8px}
+.pf-rama-pts{margin-left:auto;font-size:19px;color:var(--m-gold-d)}
+.pf-museo--oscuro .pf-rama-pts{color:var(--m-gold)}
+.pf-rama-bar{height:7px;border-radius:999px;background:var(--m-panel2);margin:10px 0 9px;overflow:hidden}
+.pf-rama-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--m-gold-d),var(--m-gold));border-radius:999px;transition:width .5s}
+.pf-rama-meta{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--m-muted)}
+.pf-chip--sm{padding:2px 9px;font-size:10px}
+/* Arbol de clases en solo lectura (ADR-028 / WP-4) */
+.pf-clases-grupo{margin-bottom:18px}
+.pf-clases-grupo:last-child{margin-bottom:0}
+.pf-clases-ramas{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.pf-clases-svg{width:100%;height:auto;display:block;margin:6px 0 2px}
+.pf-clases-linea{stroke:var(--m-line);stroke-width:2.5}
+.pf-clases-linea.on{stroke:var(--m-gold)}
+.pf-clases-nodo{fill:var(--m-panel2);stroke:var(--m-line);stroke-width:1.6}
+.pf-clases-nodo.disp{fill:rgba(232,160,32,.12);stroke:var(--m-gold);stroke-width:2.5}
+.pf-clases-nodo.on{fill:var(--m-gold);stroke:var(--m-gold)}
+.pf-clases-halo{fill:none;stroke:var(--m-gold);stroke-width:2;animation:pfclasepulso 1.7s ease-in-out infinite}
+.pf-clases-lock{fill:none;stroke:var(--m-muted);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.pf-clases-check{fill:none;stroke:#111;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.pf-clases-prog{font-size:11px;color:var(--m-muted);text-align:center;letter-spacing:-.3px}
+@keyframes pfclasepulso{0%,100%{opacity:.22}50%{opacity:.85}}
+@media (max-width:720px){.pf-clases-ramas{grid-template-columns:repeat(2,1fr)}}
+
+/* Acciones */
+.pf-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.pf-actions--center{justify-content:center}
+.pf-btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:6px;border:1px solid var(--m-line);background:var(--m-panel);color:var(--m-ink);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.9px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:background .15s,border-color .15s,color .15s}
+.pf-btn:hover{border-color:var(--m-gold);color:var(--m-gold-d)}
+.pf-btn--gold{background:var(--m-gold);border-color:var(--m-gold);color:#111}
+.pf-btn--gold:hover{background:var(--m-gold-d);border-color:var(--m-gold-d);color:#111}
+.pf-btn--ghost{background:transparent}
+.pf-btn:disabled{opacity:.45;cursor:not-allowed}
+.pf-foot{margin-top:46px;padding-top:16px;border-top:1px solid var(--m-line);font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--m-muted);font-family:'Barlow Condensed',sans-serif;font-weight:700}
+
+/* ---- Boton flotante de mensaje ---- */
+.pf-dm-fab{position:fixed;right:22px;bottom:22px;z-index:200;display:inline-flex;align-items:center;gap:9px;padding:13px 21px;border-radius:999px;border:none;background:var(--m-gold);color:#111;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;box-shadow:0 8px 26px rgba(232,160,32,.42);transition:transform .15s,opacity .15s}
+.pf-dm-fab:hover{transform:translateY(-2px)}
+.pf-dm-fab svg{width:17px;height:17px}
+.pf-dm-fab--off{background:var(--m-panel);color:var(--m-muted);border:1px solid var(--m-line);box-shadow:none;cursor:not-allowed}
+.pf-dm-fab--off:hover{transform:none}
+
+/* ---- Modal DM ---- */
+.pf-modal{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.58);display:none;align-items:center;justify-content:center;padding:20px}
+.pf-modal.on{display:flex}
+.pf-modal-box{width:100%;max-width:440px;background:var(--m-panel);border:1px solid var(--m-line);border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4);max-height:92vh;overflow:auto}
+.pf-modal-head{display:flex;align-items:center;gap:10px}
+.pf-modal-title{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:1px}
+.pf-modal-x{margin-left:auto;width:32px;height:32px;border-radius:50%;border:1px solid var(--m-line);background:transparent;color:var(--m-muted);font-size:20px;line-height:1;cursor:pointer}
+.pf-modal-sub{font-size:12.5px;color:var(--m-muted);margin:6px 0 14px}
+.pf-ta{width:100%;min-height:116px;resize:vertical;border:1px solid var(--m-line);border-radius:10px;background:var(--m-bg);color:var(--m-ink);font-family:'Outfit',sans-serif;font-size:14px;line-height:1.55;padding:12px 13px;outline:none}
+.pf-ta:focus{border-color:var(--m-gold)}
+.pf-ta-foot{display:flex;justify-content:flex-end;margin:5px 0 12px;font-size:11px;color:var(--m-muted)}
+.pf-cost{background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.38);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55}
+.pf-cost b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:var(--m-gold-d)}
+.pf-museo--oscuro .pf-cost b{color:var(--m-gold)}
+.pf-cost span{display:block;margin-top:3px;color:var(--m-muted)}
+.pf-ok{display:flex;align-items:flex-start;gap:9px;margin:14px 0 12px;font-size:12.5px;line-height:1.45;cursor:pointer}
+.pf-ok input{margin-top:2px;accent-color:var(--m-gold);width:16px;height:16px;flex-shrink:0}
+.pf-dm-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:#dc2626;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.45;margin-bottom:12px}
+.pf-museo--oscuro .pf-dm-err{color:#f87171}
+.pf-modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
+@media (max-width:720px){
+  .pf-hall{flex-direction:column;align-items:center;text-align:center}
+  .pf-hall-main{align-items:center}
+  .pf-chips,.pf-meta{justify-content:center}
+  .pf-bio{text-align:center}
+  .pf-stats{grid-template-columns:repeat(2,1fr)}
+  .pf-stat:last-child{grid-column:1/-1}
+  .pf-map{height:320px}
+  .pf-dm-fab{right:14px;bottom:14px;padding:12px 16px;font-size:13px}
+  .pf-dm-fab span{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .pf-museo *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<main id="pf-museo" class="pf-museo">
+
+  <nav class="pf-nav">
+    <a class="pf-logo" href="/index.html">EXPLORA<em>CO</em></a>
+    <span class="pf-nav-tag">Museo de viajero</span>
+    <a class="pf-navlink" href="/directorio.html">Directorio</a>
+  </nav>
+
+  <div class="pf-wrap">
+    <div class="pf-loading" id="pf-loading">
+      <div class="pf-spin"></div>
+      <p>Abriendo el museo...</p>
+    </div>
+    <div id="pf-content" style="display:none"></div>
+  </div>
+
+  <button type="button" class="pf-dm-fab" id="pf-dm-fab" style="display:none" title="Enviar mensaje" aria-label="Enviar mensaje">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 01-9 8.4 9.3 9.3 0 01-3.9-.8L3 21l1.9-4.3A8.4 8.4 0 013 11.5 8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z"/></svg>
+    <span>Enviar mensaje</span>
+  </button>
+
+  <div class="pf-modal" id="pf-dm-modal" role="dialog" aria-modal="true" aria-labelledby="pf-dm-title">
+    <div class="pf-modal-box">
+      <div class="pf-modal-head">
+        <h2 class="pf-modal-title" id="pf-dm-title">Enviar mensaje</h2>
+        <button type="button" class="pf-modal-x" id="pf-dm-x" aria-label="Cerrar">&times;</button>
+      </div>
+      <p class="pf-modal-sub" id="pf-dm-sub">Escribe tu mensaje a este viajero.</p>
+      <textarea id="pf-dm-text" class="pf-ta" maxlength="500" placeholder="Hola, me interesa tu museo..."></textarea>
+      <div class="pf-ta-foot"><span id="pf-dm-count" class="pf-num">0 / 500</span></div>
+      <div class="pf-cost">
+        <b>Abrir una conversacion nueva cuesta 20 XP</b>
+        <span>Si ya existe un hilo previo, este mensaje no tiene costo. Solo lo sabras al enviarlo.</span>
+      </div>
+      <label class="pf-ok"><input type="checkbox" id="pf-dm-ok"> Entiendo el costo de 20 XP y quiero enviar este mensaje.</label>
+      <div class="pf-dm-err" id="pf-dm-err" style="display:none"></div>
+      <div class="pf-modal-actions">
+        <button type="button" class="pf-btn pf-btn--ghost" id="pf-dm-cancel">Cancelar</button>
+        <button type="button" class="pf-btn pf-btn--gold" id="pf-dm-send" disabled>Enviar mensaje</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<noscript><p style="text-align:center;padding:40px;font-family:sans-serif">Este museo necesita JavaScript para abrir sus salas.</p></noscript>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="usuario-session.js"></script>
+<script>
+/* ============================================================
+   perfil.html - Museo publico de viajero (ADR-028, WP-3)
+   Consume: GET /api/interacciones?tipo=museo_publico&id=<uuid>
+   - 403 PERFIL_PRIVADO -> pantalla privada elegante.
+   - data.arbol = arbol de clases (solo lectura) viaja en museo_publico.
+   - DM: POST /api/interacciones {tipo:'dm_enviar', ...} con JWT.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  function pfI(p) { return SVG + p + '</svg>'; }
+  var PF_ICONS = {
+    share: pfI('<path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/>'),
+    msg: pfI('<path d="M21 11.5a8.4 8.4 0 01-9 8.4 9.3 9.3 0 01-3.9-.8L3 21l1.9-4.3A8.4 8.4 0 013 11.5 8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z"/>'),
+    trophy: pfI('<path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 5H5a2 2 0 000 4h1"/><path d="M16 5h3a2 2 0 010 4h-1"/><path d="M12 13v4"/><path d="M10 17h4l.5 3h-5z"/>'),
+    star: pfI('<path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z"/>'),
+    pin: pfI('<path d="M12 22s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/>'),
+    camera: pfI('<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.4"/>'),
+    music: pfI('<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>'),
+    card: pfI('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>'),
+    lock: pfI('<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/>'),
+    shield: pfI('<path d="M12 3l7 3v6c0 4.4-3 8.2-7 9-4-.8-7-4.6-7-9V6z"/>'),
+    clock: pfI('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+    xp: pfI('<path d="M13 2L4.5 13H11l-1 9 8.5-11H12z"/>'),
+    chart: pfI('<path d="M4 20V11"/><path d="M10 20V4"/><path d="M16 20v-6"/><path d="M22 20H2"/>'),
+    city: pfI('<path d="M3 21h18"/><path d="M6 21V8l4-2v15"/><path d="M10 21V6l5-2v17"/><path d="M15 21V10l4 2v9"/>'),
+    faccion: pfI('<path d="M5 3v18"/><path d="M5 4h12l-2 3 2 3H5"/>'),
+    casa: pfI('<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/>'),
+    origen: pfI('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5a13 13 0 010 17 13 13 0 010-17z"/>'),
+    compass: pfI('<circle cx="12" cy="12" r="8.5"/><path d="M15 9l-2 5-4 1 2-5z"/>')
+  };
+  function pfIcon(n) { return PF_ICONS[n] || ''; }
+
+  var ROOT = document.getElementById('pf-museo');
+  var perfil = null;
+  var pfMap = null;
+
+  /* ---- Utilidades ---- */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function pfNum(n) { return (parseInt(n, 10) || 0).toLocaleString('es-CO'); }
+  function pfCap(s) { s = String(s == null ? '' : s); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function pfSlug(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  function pfToast(msg, color) {
+    if (window.ExploraCO && typeof window.ExploraCO.mostrarToast === 'function') window.ExploraCO.mostrarToast(msg, color);
+  }
+  function pfShow(id) { var e = document.getElementById(id); if (e) e.style.display = ''; }
+  function pfHide(id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; }
+  function pfEmpty(title, msg) {
+    return '<div class="pf-empty"><b>' + esc(title) + '</b><span>' + esc(msg) + '</span></div>';
+  }
+  var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function pfFecha(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return MESES[d.getMonth()] + ' de ' + d.getFullYear();
+  }
+
+  /* ---- Hall de entrada ---- */
+  function pfMarcoClass(marco) {
+    var m = String(marco || '').toLowerCase();
+    if (m === 'dorado' || m === 'oro') return 'pf-frame--oro';
+    if (m === 'plata') return 'pf-frame--plata';
+    return 'pf-frame--base';
+  }
+  function pfAvatarHtml(u) {
+    var url = u.avatar_url || u.foto_url || '';
+    var inicial = (String(u.nombre || '?').trim().charAt(0) || '?').toUpperCase();
+    return '<span class="pf-av-ini">' + esc(inicial) + '</span>'
+      + (url ? '<img src="' + esc(url) + '" alt="' + esc(u.nombre || 'Avatar') + '" loading="lazy" onerror="this.remove()">' : '');
+  }
+  function pfOrigen(u) {
+    var pais = String(u.pais_base || '').trim();
+    var ciudad = String(u.ciudad_base || '').trim();
+    if (!pais && !ciudad) return '';
+    if (pais && pais.toUpperCase() !== 'CO') return 'Extranjero \u00B7 ' + pais;
+    if (ciudad) return 'Local \u00B7 ' + ciudad;
+    return 'Nacional';
+  }
+  function pfChips(u) {
+    var out = [];
+    if (u.faccion) out.push('<span class="pf-chip pf-chip--' + pfSlug(u.faccion) + '">' + pfIcon('faccion') + esc(pfCap(u.faccion)) + '</span>');
+    if (u.casa) out.push('<span class="pf-chip">' + pfIcon('casa') + esc(u.casa) + '</span>');
+    var origen = pfOrigen(u);
+    if (origen) out.push('<span class="pf-chip">' + pfIcon('origen') + esc(origen) + '</span>');
+    return out.length ? '<div class="pf-chips">' + out.join('') + '</div>' : '';
+  }
+  function pfBandaHtml(v) {
+    if (!v || !v.banda) return '';
+    return '<div class="pf-banda">' + pfIcon('music')
+      + '<span class="pf-banda-lbl">Banda</span><span>' + esc(v.banda) + '</span></div>';
+  }
+  function pfHall(d) {
+    var u = d.usuario || {}, v = d.vitrina || {};
+    var h = '<section class="pf-hall">';
+    h += '<div class="pf-avwrap"><div class="pf-av ' + pfMarcoClass(v.marco) + '">' + pfAvatarHtml(u) + '</div>';
+    h += '<span class="pf-lvl" title="Nivel">' + pfIcon('star') + pfNum(u.nivel || 1) + '</span></div>';
+    h += '<div class="pf-hall-main">';
+    h += '<div class="pf-flag">' + esc(u.era || 'Museo personal') + '</div>';
+    h += '<h1 class="pf-name">' + esc(u.nombre || 'Viajero') + '</h1>';
+    h += '<div class="pf-badge">' + pfIcon('shield') + esc(u.badge_actual || ('Nivel ' + (u.nivel || 1))) + '</div>';
+    h += pfChips(u);
+    h += pfBandaHtml(v);
+    if (u.bio) h += '<p class="pf-bio">' + esc(u.bio) + '</p>';
+    var metas = [];
+    if (u.ciudad_base || u.pais_base) {
+      metas.push('<span>' + pfIcon('pin') + esc([u.ciudad_base, u.pais_base].filter(Boolean).join(', ')) + '</span>');
+    }
+    var f = pfFecha(u.creado_en);
+    if (f) metas.push('<span>' + pfIcon('clock') + 'Ingreso: ' + esc(f) + '</span>');
+    metas.push('<span>' + pfIcon('xp') + '<b class="pf-num">' + pfNum(u.xp_total) + '</b> XP</span>');
+    h += '<div class="pf-meta">' + metas.join('') + '</div>';
+    h += '</div></section>';
+    return h;
+  }
+  function pfStats(s) {
+    s = s || {};
+    var items = [
+      ['Visitas', s.visitas], ['Resenas', s.resenas], ['Fotos', s.fotos],
+      ['Albumes', s.albumes], ['Referidos', s.referidos_directos]
+    ];
+    var h = '<div class="pf-stats">';
+    items.forEach(function (it) {
+      h += '<div class="pf-stat"><span class="pf-num">' + pfNum(it[1]) + '</span><span>' + esc(it[0]) + '</span></div>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  /* ---- Contenedor de sala (la numeracion Roman es la senal del museo) ---- */
+  function pfSala(num, title, count, body) {
+    return '<section class="pf-sala">'
+      + '<header class="pf-sala-head">'
+      +   '<span class="pf-sala-num">Sala ' + esc(num) + '</span>'
+      +   '<h2 class="pf-sala-title">' + esc(title) + '</h2>'
+      +   (count != null ? '<span class="pf-sala-count pf-num">' + pfNum(count) + '</span>' : '')
+      + '</header>'
+      + body + '</section>';
+  }
+
+  /* ---- Sala I: Trofeos ---- */
+  function pfTrofeos(d) {
+    var logros = Array.isArray(d.logros) ? d.logros : [];
+    var body;
+    if (!logros.length) {
+      body = pfEmpty('Vitrina esperando su primer trofeo', 'Los logros desbloqueados de este viajero apareceran aqui.');
+    } else {
+      body = '<div class="pf-grid">';
+      logros.forEach(function (l) {
+        var tier = String(l.tier || '').toLowerCase() || 'bronce';
+        body += '<article class="pf-trofeo pf-tier--' + esc(tier) + '">'
+          + '<div class="pf-trofeo-ico">' + pfIcon('trophy') + '</div>'
+          + '<h3 class="pf-trofeo-name">' + esc(l.nombre || 'Logro') + '</h3>'
+          + '<div class="pf-trofeo-meta">'
+          +   '<span class="pf-trofeo-tier">' + esc(pfCap(tier)) + '</span>'
+          +   (l.rareza_pct != null ? '<span class="pf-rareza">' + pfIcon('chart') + '<b class="pf-num">' + esc(l.rareza_pct) + '%</b> global</span>' : '')
+          + '</div>'
+          + (l.desbloqueado_en ? '<div class="pf-trofeo-date">' + esc(pfFecha(l.desbloqueado_en)) + '</div>' : '')
+          + '</article>';
+      });
+      body += '</div>';
+    }
+    return pfSala('I', 'Trofeos', logros.length, body);
+  }
+
+  /* ---- Sala II: Cromos ---- */
+  function pfCromos(d) {
+    var cromos = Array.isArray(d.cromos) ? d.cromos : [];
+    var body;
+    if (!cromos.length) {
+      body = pfEmpty('Sin cromos en el album', 'Los cromos se ganan explorando; aun no hay ninguno.');
+    } else {
+      body = '<div class="pf-grid">';
+      cromos.forEach(function (c) {
+        var rareza = String(c.rareza || 'comun').toLowerCase();
+        body += '<div class="pf-cromo">'
+          + '<div class="pf-cromo-thumb pf-cromo-r-' + esc(rareza) + '">' + pfIcon('card') + '</div>'
+          + '<div class="pf-cromo-info">'
+          +   '<h3 class="pf-cromo-name">' + esc(c.nombre || 'Cromo') + '</h3>'
+          +   '<div class="pf-cromo-meta"><span>' + esc(pfCap(rareza)) + '</span><span class="pf-num">x' + pfNum(c.cantidad) + '</span></div>'
+          + '</div></div>';
+      });
+      body += '</div>';
+    }
+    return pfSala('II', 'Cromos', cromos.length, body);
+  }
+
+  /* ---- Sala III: Mapas ---- */
+  function pfMapas(d) {
+    var mapa = Array.isArray(d.mapa) ? d.mapa : [];
+    if (!mapa.length) {
+      return pfSala('III', 'Mapas', 0,
+        pfEmpty('Aun no ha marcado destinos', 'Cuando este viajero marque lugares visitados, apareceran en este mapa.'));
+    }
+    var ciudades = {};
+    mapa.forEach(function (p) { if (p.ciudad) ciudades[String(p.ciudad).toLowerCase()] = true; });
+    var nCiudades = Object.keys(ciudades).length;
+    var body = '<div class="pf-mapwrap">'
+      + '<div id="pf-map" class="pf-map"></div>'
+      + '<div class="pf-map-meta">'
+      +   '<span>' + pfIcon('pin') + '<b class="pf-num">' + pfNum(mapa.length) + '</b> destinos visitados</span>'
+      +   (nCiudades ? '<span>' + pfIcon('city') + '<b class="pf-num">' + pfNum(nCiudades) + '</b> ciudades</span>' : '')
+      + '</div></div>';
+    return pfSala('III', 'Mapas', mapa.length, body);
+  }
+  function pfInitMap(puntos) {
+    var el = document.getElementById('pf-map');
+    if (!el || typeof L === 'undefined' || !puntos || !puntos.length) return;
+    try {
+      pfMap = L.map(el, { scrollWheelZoom: false, attributionControl: true });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '\u00A9 OpenStreetMap \u00A9 CARTO', maxZoom: 19
+      }).addTo(pfMap);
+      var bounds = [];
+      puntos.forEach(function (p) {
+        var lat = parseFloat(p.lat), lng = parseFloat(p.lng);
+        if (isNaN(lat) || isNaN(lng)) return;
+        var icon = L.divIcon({
+          html: '<div class="pf-pin"><span>' + pfIcon('pin') + '</span></div>',
+          className: '', iconSize: [30, 30], iconAnchor: [15, 30]
+        });
+        var popup = '<b>' + esc(p.nombre || 'Destino') + '</b>'
+          + (p.ciudad ? '<br>' + esc(p.ciudad) : '')
+          + (p.slug ? '<br><a href="/' + encodeURIComponent(p.slug) + '.html">Ver destino</a>' : '');
+        L.marker([lat, lng], { icon: icon }).addTo(pfMap).bindPopup(popup);
+        bounds.push([lat, lng]);
+      });
+      if (bounds.length === 1) pfMap.setView(bounds[0], 10);
+      else if (bounds.length > 1) pfMap.fitBounds(bounds, { padding: [34, 34], maxZoom: 11 });
+      else pfMap.setView([4.6, -74.1], 5);
+      setTimeout(function () { if (pfMap) pfMap.invalidateSize(); }, 150);
+    } catch (e) {
+      console.warn('[perfil] mapa no disponible:', e && e.message);
+    }
+  }
+
+  /* ---- Sala IV: Audiovisual ---- */
+  function pfAlbumes(d) {
+    var albumes = Array.isArray(d.albumes) ? d.albumes : [];
+    var body;
+    if (!albumes.length) {
+      body = pfEmpty('Sin salas audiovisuales', 'Este viajero aun no ha publicado albumes.');
+    } else {
+      body = '<div class="pf-grid pf-grid--album">';
+      albumes.forEach(function (a) {
+        body += '<a class="pf-album" href="/galeria.html" title="' + esc(a.titulo || 'Album') + '">'
+          + '<div class="pf-album-cover">'
+          +   (a.portada_url
+                ? '<img src="' + esc(a.portada_url) + '" alt="' + esc(a.titulo || 'Album') + '" loading="lazy" onerror="this.remove()">'
+                : '<span class="pf-album-ph">' + pfIcon('camera') + '</span>')
+          + '</div>'
+          + '<div class="pf-album-body">'
+          +   '<h3 class="pf-album-title">' + esc(a.titulo || 'Album') + '</h3>'
+          +   '<div class="pf-album-meta">'
+          +     '<span>' + esc(a.tipo || 'Album') + '</span>'
+          +     '<span>' + pfIcon('camera') + '<b class="pf-num">' + pfNum(a.total_fotos) + '</b></span>'
+          +     '<span>' + pfIcon('star') + '<b class="pf-num">' + pfNum(a.votos) + '</b></span>'
+          +   '</div>'
+          + '</div></a>';
+      });
+      body += '</div>';
+    }
+    return pfSala('IV', 'Audiovisual', albumes.length, body);
+  }
+
+  /* ---- Sala V: Clases (arbol de clases en solo lectura, ADR-028 / WP-4) ----
+     Consume data.arbol = {faccion, ramas:[{rama_id|id, faccion, nombre, puntos,
+     tier|nivel_nodo, nodos_desbloqueados}]}. Normaliza rama_id/id y tier/nivel_nodo.
+     Umbrales por nodo [0,100,250,450,700]. Sin acciones ni POST: solo lectura. */
+  var PF_ARBOL_UMBRALES = [0, 100, 250, 450, 700];
+  var PF_ARBOL_FACCIONES = ['exploradores', 'curadores', 'creadores', 'artistas'];
+  function pfRamaId(r) { return String((r && (r.rama_id || r.id)) || ''); }
+  function pfRamaPuntos(r) { return parseInt(r && r.puntos, 10) || 0; }
+  function pfRamaTier(r) {
+    var t = (r && r.tier) || '';
+    if (!t && r && r.nivel_nodo != null) t = 'Nivel ' + r.nivel_nodo;
+    return String(t || '');
+  }
+  function pfArbolNodosOn(r) {
+    var p = pfRamaPuntos(r), n = 0, i;
+    for (i = 0; i < PF_ARBOL_UMBRALES.length; i++) if (p >= PF_ARBOL_UMBRALES[i]) n = i + 1;
+    var nd = r && r.nodos_desbloqueados;
+    var d = Array.isArray(nd) ? nd.length : parseInt(nd, 10);
+    if (!isNaN(d)) n = Math.max(n, Math.min(PF_ARBOL_UMBRALES.length, d));
+    return n;
+  }
+  function pfArbolColumna(r) {
+    var nombre = (r && (r.nombre || pfRamaId(r))) || 'Rama';
+    var puntos = pfRamaPuntos(r);
+    var on = pfArbolNodosOn(r);
+    var tier = pfRamaTier(r);
+    var W = 92, H = 266, cx = 46, y0 = 26, dy = 54, rad = 16, i;
+    var s = '<svg class="pf-clases-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="'
+      + esc(nombre) + ': ' + on + ' de ' + PF_ARBOL_UMBRALES.length + ' nodos">';
+    for (i = 0; i < PF_ARBOL_UMBRALES.length - 1; i++) {
+      s += '<line class="pf-clases-linea' + ((i + 1 < on) ? ' on' : '') + '" x1="' + cx + '" y1="' + (y0 + i * dy + rad) + '" x2="' + cx + '" y2="' + (y0 + (i + 1) * dy - rad) + '"/>';
+    }
+    for (i = 0; i < PF_ARBOL_UMBRALES.length; i++) {
+      var y = y0 + i * dy;
+      var desbloqueado = i < on;
+      var disponible = (i === on);
+      if (disponible) s += '<circle class="pf-clases-halo" cx="' + cx + '" cy="' + y + '" r="' + (rad + 6) + '"/>';
+      s += '<circle class="pf-clases-nodo' + (desbloqueado ? ' on' : (disponible ? ' disp' : '')) + '" cx="' + cx + '" cy="' + y + '" r="' + rad + '"><title>'
+        + esc('Nodo ' + (i + 1) + ' \u00B7 ' + PF_ARBOL_UMBRALES[i] + ' pts') + '</title></circle>';
+      if (desbloqueado) {
+        s += '<path class="pf-clases-check" d="M' + (cx - 6) + ' ' + y + 'l4 4 8-8"/>';
+      } else if (!disponible) {
+        s += '<g class="pf-clases-lock" transform="translate(' + (cx - 6) + ',' + (y - 6) + ') scale(0.5)"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></g>';
+      }
+    }
+    s += '</svg>';
+    var pct = 100, siguiente = null;
+    if (on < PF_ARBOL_UMBRALES.length) {
+      siguiente = PF_ARBOL_UMBRALES[on];
+      var previo = on > 0 ? PF_ARBOL_UMBRALES[on - 1] : 0;
+      var rango = siguiente - previo;
+      pct = rango > 0 ? Math.max(0, Math.min(100, Math.round(((puntos - previo) / rango) * 100))) : 0;
+    }
+    var meta = '';
+    if (tier) meta += '<span class="pf-chip pf-chip--sm">' + esc(tier) + '</span>';
+    meta += '<span>' + pfNum(on) + ' / ' + PF_ARBOL_UMBRALES.length + ' nodos</span>';
+    return '<div class="pf-rama">'
+      + '<div class="pf-rama-top"><span class="pf-rama-name">' + esc(nombre) + '</span>'
+      + '<span class="pf-rama-pts pf-num">' + pfNum(puntos) + '</span></div>'
+      + s
+      + '<div class="pf-rama-bar"><i style="width:' + pct + '%"></i></div>'
+      + '<div class="pf-clases-prog pf-num">' + pfNum(puntos) + ' / ' + (siguiente == null ? 'MAX' : pfNum(siguiente)) + '</div>'
+      + '<div class="pf-rama-meta">' + meta + '</div>'
+      + '</div>';
+  }
+  function pfMuseoRenderClases(arbol) {
+    var host = document.getElementById('pf-clases-body');
+    if (!host) return;
+    var vacio = pfEmpty('Sala en preparacion', 'La tabla de clases de este viajero se revelara proximamente.');
+    var ramas = (arbol && Array.isArray(arbol.ramas)) ? arbol.ramas.filter(function (r) { return r && pfRamaId(r); }) : [];
+    if (!ramas.length) { host.innerHTML = vacio; return; }
+    var principal = String(arbol.faccion || '').toLowerCase();
+    var orden = [], grupos = {};
+    function grupoDe(f) {
+      if (!grupos[f]) { grupos[f] = []; orden.push(f); }
+      return grupos[f];
+    }
+    PF_ARBOL_FACCIONES.forEach(function (f) { grupoDe(f); });
+    ramas.forEach(function (r) {
+      grupoDe(String(r.faccion || principal || 'otras').toLowerCase()).push(r);
+    });
+    var h = '<div class="pf-clases">', impresos = 0;
+    orden.forEach(function (f) {
+      var lista = grupos[f];
+      if (!lista || !lista.length) return;
+      impresos++;
+      h += '<div class="pf-clases-grupo">'
+        + '<div class="pf-clases-fac">' + esc(pfCap(f)) + (f === principal ? ' \u00B7 Tu faccion' : '') + '</div>'
+        + '<div class="pf-clases-ramas">' + lista.map(pfArbolColumna).join('') + '</div>'
+        + '</div>';
+    });
+    h += '</div>';
+    host.innerHTML = impresos ? h : vacio;
+  }
+  window.pfMuseoRenderClases = pfMuseoRenderClases;
+  /* ---- Pintado y acciones ---- */
+  function pfSetTheme(vitrina) {
+    var oscuro = vitrina && String(vitrina.tema || '').toLowerCase() === 'oscuro';
+    if (ROOT) ROOT.classList.toggle('pf-museo--oscuro', !!oscuro);
+  }
+  function pfPaint(inner) {
+    var host = document.getElementById('pf-content');
+    if (host) host.innerHTML = inner;
+    pfShow('pf-content');
+    pfHide('pf-loading');
+  }
+  function pfActions(d) {
+    var u = d.usuario || {};
+    var ses = window.ExploraCO && window.ExploraCO.usuario;
+    var h = '<div class="pf-actions">';
+    h += '<button type="button" class="pf-btn" id="pf-share">' + pfIcon('share') + 'Compartir perfil</button>';
+    if (ses && String(ses.id) === String(u.id)) h += '<a class="pf-btn pf-btn--ghost" href="/mi-perfil.html">Editar mi perfil</a>';
+    else h += '<a class="pf-btn pf-btn--ghost" href="/directorio.html">Explorar destinos</a>';
+    h += '</div>';
+    return h;
+  }
+  function pfRender(d) {
+    perfil = d;
+    pfSetTheme(d.vitrina);
+    var u = d.usuario || {};
+    pfPaint(
+      pfHall(d) + pfStats(d.stats || {})
+      + pfTrofeos(d) + pfCromos(d) + pfMapas(d) + pfAlbumes(d)
+      + pfSala('V', 'Clases', null, '<div id="pf-clases-body"></div>')
+      + pfActions(d)
+      + '<div class="pf-foot">Museo de ' + esc(u.nombre || 'un viajero') + ' \u00B7 ExploraCO</div>'
+    );
+    pfInitMap(d.mapa);
+    pfMuseoRenderClases(d.arbol);
+    document.title = (u.nombre || 'Perfil') + ' \u00B7 ExploraCO';
+    pfSyncDM(d);
+  }
+
+  /* ---- Estado privado y errores ---- */
+  function pfPrivado(data) {
+    data = data || {};
+    if (ROOT) ROOT.classList.remove('pf-museo--oscuro');
+    pfPaint(
+      '<div class="pf-priv">'
+      + '<div class="pf-priv-ico">' + pfIcon('lock') + '</div>'
+      + '<div class="pf-flag">Museo privado</div>'
+      + '<h1 class="pf-name">' + esc(data.nombre || 'Viajero') + '</h1>'
+      + (data.nivel != null ? '<div class="pf-badge" style="margin-top:14px">' + pfIcon('star') + 'Nivel ' + esc(data.nivel) + '</div>' : '')
+      + '<p class="pf-priv-msg">Este viajero mantiene su museo privado.</p>'
+      + '<div class="pf-actions pf-actions--center"><a class="pf-btn" href="/directorio.html">Explorar destinos</a></div>'
+      + '</div>'
+    );
+  }
+  function pfError(title, msg) {
+    if (ROOT) ROOT.classList.remove('pf-museo--oscuro');
+    pfPaint(
+      '<div class="pf-priv">'
+      + '<div class="pf-priv-ico">' + pfIcon('compass') + '</div>'
+      + '<h1 class="pf-name">' + esc(title) + '</h1>'
+      + '<p class="pf-priv-msg">' + esc(msg) + '</p>'
+      + '<div class="pf-actions pf-actions--center"><a class="pf-btn" href="/directorio.html">Explorar destinos</a></div>'
+      + '</div>'
+    );
+  }
+
+  /* ---- Compartir ---- */
+  function pfCompartir() {
+    var url = window.location.href;
+    function hecho() { pfToast('Enlace copiado', '#16a34a'); }
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = url;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) hecho(); else pfToast('Copia manualmente: ' + url, '#E8A020');
+      } catch (e) {
+        pfToast('Copia manualmente: ' + url, '#E8A020');
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(hecho).catch(fallback);
+    } else fallback();
+  }
+
+  /* ---- Mensaje directo ---- */
+  function pfSetErr(id, msg) {
+    var e = document.getElementById(id);
+    if (!e) return;
+    if (msg) { e.textContent = msg; e.style.display = ''; } else { e.textContent = ''; e.style.display = 'none'; }
+  }
+  function pfSyncDM(d) {
+    var fab = document.getElementById('pf-dm-fab');
+    if (!fab || !d) return;
+    var u = d.usuario || {};
+    var ses = window.ExploraCO && window.ExploraCO.usuario;
+    if (ses && String(ses.id) === String(u.id)) { fab.style.display = 'none'; return; }
+    var abierto = !(u.dm_abierto === false);
+    fab.style.display = 'inline-flex';
+    fab.classList.toggle('pf-dm-fab--off', !abierto);
+    fab.setAttribute('aria-disabled', abierto ? 'false' : 'true');
+    fab.title = abierto ? 'Enviar mensaje' : 'Este viajero no acepta mensajes directos';
+  }
+  function pfDMValido() {
+    var ta = document.getElementById('pf-dm-text');
+    var ok = document.getElementById('pf-dm-ok');
+    return !!(ta && ok && ta.value.trim().length > 0 && ok.checked);
+  }
+  function pfSyncSend() {
+    var b = document.getElementById('pf-dm-send');
+    if (b) b.disabled = !pfDMValido();
+  }
+  function pfOpenDM() {
+    pfSetErr('pf-dm-err', '');
+    var ta = document.getElementById('pf-dm-text');
+    if (ta) ta.value = '';
+    var ok = document.getElementById('pf-dm-ok');
+    if (ok) ok.checked = false;
+    var c = document.getElementById('pf-dm-count');
+    if (c) c.textContent = '0 / 500';
+    pfSyncSend();
+    var m = document.getElementById('pf-dm-modal');
+    if (m) m.classList.add('on');
+    if (ta) setTimeout(function () { ta.focus(); }, 60);
+  }
+  function pfCloseDM() {
+    var m = document.getElementById('pf-dm-modal');
+    if (m) m.classList.remove('on');
+  }
+  function pfDmMensaje(error, status) {
+    var e = String(error || '').toUpperCase();
+    if (status === 401 || e === 'SESION_REQUERIDA' || e === 'SESION_INVALIDA') return 'Tu sesion expiro. Vuelve a iniciar sesion para enviar el mensaje.';
+    if (status === 402 || e === 'PUNTOS_INSUFICIENTES') return 'No tienes XP suficiente: abrir una conversacion nueva cuesta 20 XP.';
+    if (e === 'DM_BLOQUEADO') return 'Este viajero no acepta mensajes de tu parte.';
+    if (e === 'DM_CERRADO') return 'Este viajero tiene los mensajes cerrados.';
+    if (status === 429 || e === 'LIMITE_HILOS_DIA') return 'Alcanzaste el limite de conversaciones nuevas por hoy. Intenta manana.';
+    return 'No se pudo enviar el mensaje' + (e ? ' (' + e + ').' : '.');
+  }
+  function pfSendDM() {
+    var ta = document.getElementById('pf-dm-text');
+    var txt = ta ? ta.value.trim() : '';
+    if (!txt) { pfSetErr('pf-dm-err', 'Escribe un mensaje antes de enviar.'); return; }
+    if (txt.length > 500) txt = txt.slice(0, 500);
+    var ses = window.ExploraCO && window.ExploraCO.usuario;
+    if (!ses) {
+      pfCloseDM();
+      if (window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesion para enviar un mensaje');
+      return;
+    }
+    var receptor = perfil && perfil.usuario ? perfil.usuario.id : null;
+    if (!receptor) { pfSetErr('pf-dm-err', 'No se pudo identificar al destinatario.'); return; }
+    var btn = document.getElementById('pf-dm-send');
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+    pfSetErr('pf-dm-err', '');
+    var headers = { 'Content-Type': 'application/json' };
+    var auth = (typeof window.ExploraCO.authHeaders === 'function') ? window.ExploraCO.authHeaders() : {};
+    for (var k in auth) { if (Object.prototype.hasOwnProperty.call(auth, k)) headers[k] = auth[k]; }
+    fetch('/api/interacciones', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ tipo: 'dm_enviar', usuario_id: ses.id, receptor_id: receptor, texto: txt })
+    })
+      .then(function (r) {
+        return r.json().catch(function () { return { ok: false }; }).then(function (j) {
+          j = j || {}; j.__status = r.status; return j;
+        });
+      })
+      .then(function (res) {
+        if (res && res.ok) {
+          var bajo = res.bajo_nivel === true || (res.data && res.data.bajo_nivel === true);
+          pfCloseDM();
+          pfToast('Mensaje enviado' + (bajo ? ' \u00B7 El costo te bajo de nivel' : ''), bajo ? '#E8A020' : '#16a34a');
+          return;
+        }
+        pfSetErr('pf-dm-err', pfDmMensaje(res && res.error, res && res.__status));
+      })
+      .catch(function () { pfSetErr('pf-dm-err', 'No se pudo enviar el mensaje. Revisa tu conexion e intenta de nuevo.'); })
+      .then(function () { if (btn) { btn.disabled = !pfDMValido(); btn.textContent = 'Enviar mensaje'; } });
+  }
+
+  /* ---- Bindings e init ---- */
+  function pfBind() {
+    var fab = document.getElementById('pf-dm-fab');
+    if (fab) fab.addEventListener('click', function () {
+      var ses = window.ExploraCO && window.ExploraCO.usuario;
+      if (!ses) {
+        if (window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesion para enviar un mensaje');
+        else pfToast('Inicia sesion para enviar un mensaje', '#E8A020');
+        return;
+      }
+      var u = perfil && perfil.usuario ? perfil.usuario : {};
+      if (u.dm_abierto === false) { pfToast('Este viajero no acepta mensajes directos', '#ef4444'); return; }
+      pfOpenDM();
+    });
+    var x = document.getElementById('pf-dm-x'); if (x) x.addEventListener('click', pfCloseDM);
+    var c = document.getElementById('pf-dm-cancel'); if (c) c.addEventListener('click', pfCloseDM);
+    var modal = document.getElementById('pf-dm-modal');
+    if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) pfCloseDM(); });
+    var ta = document.getElementById('pf-dm-text');
+    if (ta) ta.addEventListener('input', function () {
+      var n = document.getElementById('pf-dm-count');
+      if (n) n.textContent = ta.value.length + ' / 500';
+      pfSyncSend();
+    });
+    var ok = document.getElementById('pf-dm-ok'); if (ok) ok.addEventListener('change', pfSyncSend);
+    var send = document.getElementById('pf-dm-send'); if (send) send.addEventListener('click', pfSendDM);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') pfCloseDM(); });
+    var content = document.getElementById('pf-content');
+    if (content) content.addEventListener('click', function (e) {
+      var t = e.target;
+      while (t && t !== content) {
+        if (t.id === 'pf-share') { pfCompartir(); return; }
+        t = t.parentNode;
+      }
+    });
+  }
+  function pfInit() {
+    pfBind();
+    var uid = '';
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      uid = (params.get('id') || '').trim();
+    } catch (e) { uid = ''; }
+    if (!uid) {
+      pfError('Perfil no encontrado', 'Falta el identificador del viajero en la URL (perfil.html?id=<uuid>).');
+      return;
+    }
+    fetch('/api/interacciones?tipo=museo_publico&id=' + encodeURIComponent(uid))
+      .then(function (r) {
+        return r.json().catch(function () { return { ok: false, error: 'RESPUESTA_INVALIDA' }; }).then(function (j) {
+          j = j || {}; j.__status = r.status; return j;
+        });
+      })
+      .then(function (res) {
+        if (res && res.ok && res.data) { pfRender(res.data); return; }
+        if (res && res.error === 'PERFIL_PRIVADO') { pfPrivado(res.data); return; }
+        if (res && res.__status === 404) { pfError('Perfil no encontrado', 'No existe un viajero con ese identificador.'); return; }
+        pfError('No se pudo abrir el museo', 'El servidor no respondio como se esperaba' + (res && res.error ? ' (' + res.error + ').' : '.'));
+      })
+      .catch(function () { pfError('Sin conexion', 'No se pudo contactar al servidor. Intenta de nuevo.'); });
+  }
+
+  window.onExploraCOUpdate = function () { if (perfil) pfSyncDM(perfil); };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pfInit);
+  else pfInit();
+})();
+</script>
+</body>
+</html>

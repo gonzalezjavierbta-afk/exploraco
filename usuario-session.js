@@ -143,6 +143,66 @@
   window.ExploraCO.obtenerDeviceId = obtenerDeviceId;
   window.ExploraCO.obtenerDeviceHash = obtenerDeviceHash;
 
+  // ── Captura global de referidos (?ref=) ────────────────────
+  // El backend (api/usuarios.js) acepta codigo_referido en el body del
+  // alta y lo aplica SOLO en el INSERT real: el ON CONFLICT DO UPDATE
+  // no toca referido_por, así un relogin con un código ajeno no
+  // corrompe el árbol. Aquí se preservan 30 días el último ?ref= visto
+  // para que el alta, aunque ocurra en otra navegación, lo propague.
+  var REF_KEY = 'exploraco_ref';
+  var REF_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+
+  // Devuelve el código vigente o null. Si el TTL venció, borra la
+  // clave y lo trata como ausente.
+  function obtenerRefPendiente() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem(REF_KEY);
+    } catch (e) {
+      console.warn('exploraco: ref no legible', e && e.name);
+      return null;
+    }
+    if (!raw) return null;
+    var ref = null;
+    try {
+      ref = JSON.parse(raw);
+    } catch (e) {
+      // Valor corrupto: se descarta para no bloquear futuras capturas.
+      limpiarRefPendiente();
+      return null;
+    }
+    if (!ref || !ref.codigo || !ref.exp || ref.exp <= Date.now()) {
+      limpiarRefPendiente();
+      return null;
+    }
+    return ref.codigo;
+  }
+
+  // Solo escribe cuando la URL trae un ?ref= nuevo (último clic manda).
+  // Sin ?ref= en la URL, el ref vigente se conserva hasta su TTL.
+  function capturarRefUrl() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var ref = (params.get('ref') || '').trim();
+      if (!ref) return;
+      localStorage.setItem(REF_KEY, JSON.stringify({
+        codigo: ref,
+        exp: Date.now() + REF_TTL_MS,
+      }));
+    } catch (e) {
+      // URLSearchParams/localStorage no disponibles (p. ej. modo
+      // privado): nunca romper init() por el referido.
+      console.warn('exploraco: ref no capturado', e && e.name);
+    }
+  }
+
+  function limpiarRefPendiente() {
+    try { localStorage.removeItem(REF_KEY); } catch (e) {}
+  }
+
+  window.ExploraCO.obtenerRefPendiente = obtenerRefPendiente;
+  window.ExploraCO.limpiarRefPendiente = limpiarRefPendiente;
+
   // --- Soporte JWT (Entrega 016 - Gaming v5.0) -----------------
   // usuarios.js v9 devuelve jwt y jwt_expira_en en el upsert.
   // Quedan guardados dentro de la misma sesion (exploraco_user) y
@@ -216,11 +276,18 @@
   };
 
   // ── Registrar / Login por email ────────────────────────────
-  window.ExploraCO.loginConEmail = async function (email, nombre) {
+  // codigoRef (opcional): código de referido explícito. Si no llega se
+  // usa el ?ref= pendiente guardado por capturarRefUrl(). Las llamadas
+  // históricas loginConEmail(email, nombre) siguen funcionando igual.
+  window.ExploraCO.loginConEmail = async function (email, nombre, codigoRef) {
     if (!email || !email.includes('@')) {
       mostrarToast('Email inválido', '#ef4444');
       return null;
     }
+
+    // Preferencia: argumento explícito > ref pendiente en localStorage.
+    // Sin ref, refAplicado queda vacío y la clave se omite del body.
+    var refAplicado = codigoRef || obtenerRefPendiente() || '';
 
     try {
       var res = await fetch(API + '/api/usuarios', {
@@ -232,6 +299,7 @@
           nombre:         nombre || email.split('@')[0],
           auth_provider: 'email',
           device_hash:    obtenerDeviceHash(),
+          codigo_referido: refAplicado || undefined,
         }),
       });
       var data = await res.json();
@@ -240,6 +308,15 @@
         // JWT puede venir en la raiz o dentro de data.data
         if (data.jwt && !perfil.jwt) perfil.jwt = data.jwt;
         if (data.jwt_expira_en && !perfil.jwt_expira_en) perfil.jwt_expira_en = data.jwt_expira_en;
+        // Consumo del referido: el backend devuelve es_insert (columna
+        // (xmax = 0) del RETURNING) y referido_por. Solo se limpia el
+        // ref local si es un alta NUEVA y el código quedó realmente
+        // aplicado; si esos campos no vienen (backend viejo) o es un
+        // relogin, NO se limpia: se deja vencer el TTL para no perder
+        // un referido válido.
+        if (refAplicado && perfil.es_insert === true && perfil.referido_por) {
+          limpiarRefPendiente();
+        }
         guardarSesion(perfil);
         actualizarUI();
         mostrarToast('¡Bienvenido, ' + perfil.nombre + '! +XP por explorar', '#16a34a');
@@ -1002,7 +1079,13 @@
   function refrescarSesion() {
     var u = window.ExploraCO.usuario;
     if (!u || !u.id) return;
-    fetch(API + '/api/usuarios?id=' + encodeURIComponent(u.id))
+    // WP-3 (TSK-103 / ADR-028): el backend devuelve un subconjunto PUBLICO
+    // a quien no se autentique como el dueno. Como este refresco es del
+    // PROPIO usuario, enviamos su JWT para recibir todos los campos.
+    // authHeaders() devuelve {} si no hay JWT (respuesta publica aceptable).
+    fetch(API + '/api/usuarios?id=' + encodeURIComponent(u.id), {
+      headers: window.ExploraCO.authHeaders(),
+    })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.ok && d.data) {
@@ -1020,6 +1103,7 @@
     if (window.location.protocol === 'file:') return;
 
     obtenerDeviceId();
+    capturarRefUrl();
     cargarSesion();
     actualizarUI();
     refrescarSesion();

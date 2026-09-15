@@ -16,6 +16,8 @@ var STATIC_PAGES = [
   { loc:'/directorio-evento.html',  priority:'0.9', freq:'daily'   },
   { loc:'/publicar.html',           priority:'0.6', freq:'monthly' },
   { loc:'/comunidad.html',          priority:'0.5', freq:'weekly'  },
+  { loc:'/registro.html',           priority:'0.5', freq:'monthly' },
+  { loc:'/perfil.html',             priority:'0.4', freq:'monthly' },
   { loc:'/blog.html',               priority:'0.8', freq:'weekly'  },
   { loc:'/galeria.html',            priority:'0.7', freq:'weekly'  },
 ];

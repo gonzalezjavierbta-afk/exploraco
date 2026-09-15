@@ -1,0 +1,135 @@
+1- [{
+  "column_name": "bio",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "def": ""
+}, {
+  "column_name": "ciudad_base",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "def": ""
+}, {
+  "column_name": "codigo_referido",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "def": ""
+}, {
+  "column_name": "device_hashes",
+  "data_type": "jsonb",
+  "is_nullable": "NO",
+  "def": "'[]'::jsonb"
+}, {
+  "column_name": "email_verificado",
+  "data_type": "boolean",
+  "is_nullable": "YES",
+  "def": "false"
+}, {
+  "column_name": "faccion",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "def": ""
+}, {
+  "column_name": "referido_por",
+  "data_type": "uuid",
+  "is_nullable": "YES",
+  "def": ""
+}, {
+  "column_name": "vocaciones",
+  "data_type": "jsonb",
+  "is_nullable": "NO",
+  "def": "'{}'::jsonb"
+}]
+
+2.
+
+[{
+  "tipo": "ciudad"
+}, {
+  "tipo": "viajeros"
+}]
+
+3.
+
+[{
+  "conname": "chat_salas_creador_id_fkey",
+  "def": "FOREIGN KEY (creador_id) REFERENCES usuarios(id)"
+}, {
+  "conname": "chat_salas_pkey",
+  "def
+
+4.
+
+[{
+  "indexname": "chat_mensajes_pkey",
+  "indexdef": "CREATE UNIQUE INDEX chat_mensajes_pkey ON public.chat_mensajes USING btree (id)"
+}, {
+  "indexname": "idx_chat_mensajes_sala",
+  "indexdef": "CREATE INDEX idx_chat_mensajes_sala ON public.chat_mensajes USING btree (sala_id, creado_en DESC)"
+}, {
+  "indexname": "chat_salas_pkey",
+  "indexdef": "CREATE UNIQUE INDEX chat_salas_pkey ON public.chat_salas USING btree (id)"
+}, {
+  "indexname": "idx_chat_salas_orden",
+  "indexdef": "CREATE INDEX idx_chat_salas_orden ON public.chat_salas USING btree (orden DESC, creado_en)"
+}]
+": "PRIMARY KEY (id)"
+}]
+
+5.
+
+[{
+  "column_name": "id",
+  "data_type": "uuid",
+  "is_nullable": "NO",
+  "def": "gen_random_uuid()"
+}, {
+  "column_name": "clave",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "def": ""
+}, {
+  "column_name": "nombre",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "def": ""
+}, {
+  "column_name": "descripcion",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "def": "''::text"
+}, {
+  "column_name": "precio_xp",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "def": "0"
+}, {
+  "column_name": "activo",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "def": "true"
+}, {
+  "column_name": "creado_en",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "def": "now()"
+}]
+
+
+6. 
+
+[{
+  "usuarios": 4
+}]
+
+
+7. 
+
+[{
+  "total": 4,
+  "no_null": 0,
+  "no_vacio": 0
+}]
+
+
+
+

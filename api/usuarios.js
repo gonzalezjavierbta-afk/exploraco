@@ -75,7 +75,18 @@ const DESBLOQUEOS = {
 // Historial de versiones: v8 (2026-09-13) sumo GET ?buscar= para admin y
 // vocaciones (migracion 015); v9 (Entrega 016, 2026-09-14) agrega
 // piramide de referidos, facciones, verificacion de email y sesion
-// firmada JWT (ADR-025). conMisiones sigue siendo MERGE con las
+// firmada JWT (ADR-025); v10 (WP-3, TSK-103 / ADR-028) cierra la fuga de
+// PII en GET ?id= con whitelist owner-aware (admin o dueno), exige admin
+// en ?buscar= y exige sesion firmada en ?tipo=referido_codigo; v11 (WP-5,
+// TSK-103 / ADR-028) agrega las Casas (POST tipo=casa_elegir, espejo de
+// faccion_elegir pero con sesion firmada y nivel 2; GET tipo=casa_ranking
+// normalizado por numero de miembros). Requiere la migracion 017
+// (usuarios.casa, usuarios.casa_elegida_en); v12 (WP-5, TSK-103 / ADR-028)
+// agrega POST tipo=perfil_actualizar (alias perfil_editar) con SET dinamico
+// parametrizado, sesion firmada del dueno, pais_base ISO-2 y merge JSONB de
+// perfil_config. Requiere la migracion 017 (usuarios.intereses, pais_base,
+// perfil_config, perfil_publico, dm_abierto).
+// conMisiones sigue siendo MERGE con las
 // capacidades del DB (migracion 010) para no destruir el inventario de
 // consumibles en cada GET.
 function conMisiones(row) {
@@ -124,6 +135,51 @@ function firmarSesion(usuarioId) {
   return payloadB64 + '.' + firma;
 }
 
+// Validador del MISMO contrato de sesion firmada (ADR-025) que
+// api/interacciones.js validarSesion. Cada endpoint serverless es
+// autosuficiente (no hay imports entre funciones en este repo, misma
+// excepcion documentada que sendEmail en admin.js/usuarios.js), asi que
+// el verificador vive aqui para permitir que el dueno vea su propio
+// perfil privado. Devuelve {ok:true} o {ok:false, razon}.
+function validarSesionUsuario(req, usuarioIdEsperado) {
+  var encabezado = req.headers['authorization'] || '';
+  if (encabezado.indexOf('Bearer ') !== 0) return { ok: false, razon: 'SESION_REQUERIDA' };
+  var token = encabezado.slice(7).trim();
+  var punto = token.indexOf('.');
+  if (punto <= 0 || punto === token.length - 1) return { ok: false, razon: 'SESION_INVALIDA' };
+  var payloadB64 = token.slice(0, punto);
+  var firma = token.slice(punto + 1);
+  var secreto = process.env.SESSION_JWT_SECRET || 'dev_secret';
+  var firmaEsperada = crypto
+    .createHmac('sha256', secreto)
+    .update(payloadB64)
+    .digest('base64url');
+  var fa = Buffer.from(firma, 'utf8');
+  var fb = Buffer.from(firmaEsperada, 'utf8');
+  if (fa.length !== fb.length) return { ok: false, razon: 'SESION_INVALIDA' };
+  if (!crypto.timingSafeEqual(fa, fb)) return { ok: false, razon: 'SESION_INVALIDA' };
+  var payload = null;
+  try {
+    payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+  } catch (e) { return { ok: false, razon: 'SESION_INVALIDA' }; }
+  if (!payload || !payload.exp || !payload.sub) return { ok: false, razon: 'SESION_INVALIDA' };
+  if (payload.exp <= Math.floor(Date.now() / 1000)) return { ok: false, razon: 'SESION_EXPIRADA' };
+  if (payload.sub !== String(usuarioIdEsperado)) return { ok: false, razon: 'SESION_INVALIDA' };
+  return { ok: true };
+}
+
+// Verificacion del secreto de admin para las lecturas que devuelven PII
+// (WP-3, TSK-103 / ADR-028). Reutiliza el MISMO mecanismo ya instalado en
+// el repo (api/admin.js acepta X-Internal-Secret; api/utilidades.js acepta
+// Authorization: Bearer): no inventa un canal nuevo. admin.html envia
+// Authorization: Bearer ADMIN_SECRET (ver _adminHeaders, linea ~5791).
+function esAdminUsuario(req) {
+  var secreto = process.env.ADMIN_SECRET || 'exploraco12345';
+  var bearer = String(req.headers['authorization'] || '').replace('Bearer ', '').trim();
+  var interno = String(req.headers['x-internal-secret'] || '').trim();
+  return bearer === secreto || interno === secreto;
+}
+
 // Alfabeto de codigos de referido sin caracteres ambiguos (sin 0/O y sin
 // 1/l/I) para que el codigo sea legible y copiable entre usuarios.
 var ALFABETO_REFERIDO = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -138,6 +194,12 @@ function generarCodigoReferido() {
 // Facciones validas del CHECK de la migracion 016. 'artistas' cubre el
 // bloque de vocaciones de artista (ADR-026) dentro de la competencia.
 var FACCIONES_VALIDAS = ['exploradores', 'curadores', 'creadores', 'artistas'];
+
+// Casas validas del CHECK chk_usuarios_casa de la migracion 017 (WP-5,
+// TSK-103 / ADR-028). Son equipos tematicos elegibles; el Origen
+// (local/nacional/extranjero) es un atributo DERIVADO que no se persiste
+// como identidad y no se valida aqui.
+var CASAS_VALIDAS = ['condor', 'jaguar', 'delfin'];
 
 // Envio de email con Resend. EXCEPCION controlada al tripwire de
 // no-duplicidad (5 lineas): admin.js y usuarios.js son endpoints
@@ -182,7 +244,7 @@ async function confirmarEmail(sql, res, usuarioId, token) {
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -203,6 +265,11 @@ module.exports = async (req, res) => {
         return res.json({ ok: true, data: rows.map(conNivel) });
       }
       if (tipo === 'buscar' || req.query.buscar) {
+        // Solo admin: la proyeccion incluye email (PII) y el buscador por
+        // email no debe ser enumerable por cualquiera. admin.html ya envia
+        // _adminHeaders() (Authorization: Bearer ADMIN_SECRET).
+        if (!esAdminUsuario(req))
+          return res.status(401).json({ ok: false, error: 'No autorizado' });
         const palabra = String(req.query.buscar || '').trim();
         if (palabra.length < 2) return res.status(400).json({ ok: false, error: 'Minimo 2 caracteres' });
         const rows = await sql(
@@ -217,6 +284,47 @@ module.exports = async (req, res) => {
         return res.json({ ok: true, data });
       }
 
+      // Version ligera del perfil publico (TSK-103 / ADR-028, WP-3) para
+      // tarjetas y hover: nombre, foto, nivel, faccion y casa. Si el
+      // perfil es privado responde 403 con el minimo (nombre + nivel),
+      // salvo el dueno con sesion firmada (ADR-025).
+      if (tipo === 'perfil_publico' && (id || req.query.usuario_id)) {
+        var ppTarget = String(id || req.query.usuario_id || '');
+        var ppRows = await sql(
+          'SELECT id, nombre, avatar_url, foto_url, xp_total, faccion, casa, perfil_publico'
+          + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+          [ppTarget]
+        );
+        if (!ppRows.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var ppU = ppRows[0];
+        var ppNivel = calcularNivel(ppU.xp_total).nivel;
+        var ppPublico = (ppU.perfil_publico !== false);
+        if (!ppPublico) {
+          var ppSes = validarSesionUsuario(req, String(ppU.id));
+          if (!ppSes.ok) {
+            return res.status(403).json({
+              ok: false,
+              error: 'PERFIL_PRIVADO',
+              data: { nombre: ppU.nombre, nivel: ppNivel },
+            });
+          }
+        }
+        return res.json({
+          ok: true,
+          data: {
+            id: ppU.id,
+            nombre: ppU.nombre,
+            avatar_url: ppU.avatar_url || null,
+            foto_url: ppU.foto_url || null,
+            nivel: ppNivel,
+            faccion: ppU.faccion || null,
+            casa: ppU.casa || null,
+            perfil_publico: ppPublico,
+          },
+        });
+      }
+
       // Obtener (o generar) el codigo de referido del usuario. Solo para
       // correos verificados; al primer pedido se genera y persiste un
       // codigo de 6 chars (colision revisada, hasta 6 reintentos).
@@ -224,6 +332,11 @@ module.exports = async (req, res) => {
         var rcId = String(req.query.usuario_id || '');
         if (!rcId)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        // El codigo de referido es dato del propio usuario: se exige su
+        // sesion firmada (ADR-025), no solo el email verificado.
+        var rcSes = validarSesionUsuario(req, rcId);
+        if (!rcSes.ok)
+          return res.status(401).json({ ok: false, error: rcSes.razon });
         var rcRows = await sql(
           'SELECT id, codigo_referido, referidos_directos_contados, xp_ref_total, email_verificado '
           + 'FROM usuarios WHERE id=$1',
@@ -323,6 +436,42 @@ module.exports = async (req, res) => {
         return res.json({ ok: true, data: { facciones: frFacciones, top: frTop } });
       }
 
+      // Ranking de Casas (WP-5, TSK-103 / ADR-028): agregado por Casa +
+      // top 5 por Casa. Se NORMALIZA por numero de miembros: el orden es
+      // por xp_promedio (no por la suma), para que la Casa mas poblada no
+      // gane siempre. La division usa GREATEST(COUNT(*),1) como guarda de
+      // division por cero (no aplica dentro de un GROUP BY con miembros,
+      // pero se deja explicita). Espejo de faccion_ranking.
+      if (tipo === 'casa_ranking') {
+        var crCasas = await sql(
+          'SELECT u.casa,'
+          + ' COUNT(*)::int AS miembros,'
+          + ' COALESCE(SUM(u.xp_total), 0)::int AS xp_total,'
+          + ' COALESCE(ROUND(SUM(u.xp_total)::numeric / GREATEST(COUNT(*), 1)), 0)::int AS xp_promedio,'
+          // FIX O1 (WP-6): el conteo de aprobados exige ao.activo=true
+          // ademas del quorum (+3), para no contar propuestas
+          // soft-deleted en el ranking de Casas.
+          + ' (SELECT COUNT(*)::int FROM activos_ocultos ao'
+          + '   WHERE (ao.votos_favor - ao.votos_contra) >= 3'
+          + '   AND ao.activo = true'
+          + '   AND ao.propuesto_por IN (SELECT id FROM usuarios WHERE casa=u.casa)) AS activos_ocultos_aprobados,'
+          + ' (SELECT COUNT(*)::int FROM activos_ocultos_checkins aoc'
+          + '   JOIN usuarios u2 ON u2.id = aoc.usuario_id'
+          + '   WHERE u2.casa = u.casa AND aoc.activo = true'
+          + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d'
+          + ' FROM usuarios u WHERE u.casa IS NOT NULL'
+          + ' GROUP BY u.casa ORDER BY xp_promedio DESC'
+        );
+        var crTop = await sql(
+          'SELECT id, nombre, avatar_url, casa, xp_total FROM ('
+          + 'SELECT id, nombre, avatar_url, casa, xp_total, '
+          + 'ROW_NUMBER() OVER (PARTITION BY casa ORDER BY xp_total DESC) AS pos '
+          + 'FROM usuarios WHERE casa IS NOT NULL'
+          + ') t WHERE t.pos <= 5 ORDER BY t.casa, t.xp_total DESC'
+        );
+        return res.json({ ok: true, data: { casas: crCasas, top: crTop } });
+      }
+
       // El enlace del correo aterriza aqui en navegador (GET). La logica
       // es compartida con la rama POST para no duplicar el UPDATE.
       if (tipo === 'email_verificar_confirmar') {
@@ -335,7 +484,42 @@ module.exports = async (req, res) => {
         // tocan, asi que pasa tal cual al cliente (era viene de conNivel).
         const rows = await sql('SELECT * FROM usuarios WHERE id = $1', [id]);
         if (!rows.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
-        return res.json({ ok: true, data: conLogros(conMisiones(conNivel(rows[0]))) });
+        // WP-3 (TSK-103 / ADR-028): la fila completa contiene PII (email,
+        // email_token, email_token_expira, device_hashes, codigo_referido,
+        // referido_por, auth_id, auth_provider, ultimo_acceso). Solo la
+        // reciben el dueno (sesion firmada, ADR-025) o el admin (Bearer
+        // ADMIN_SECRET / X-Internal-Secret). Los demas reciben un
+        // subconjunto publico que nunca incluye esos campos.
+        var esAutorizado = esAdminUsuario(req) || validarSesionUsuario(req, String(rows[0].id)).ok;
+        if (esAutorizado) {
+          return res.json({ ok: true, data: conLogros(conMisiones(conNivel(rows[0]))) });
+        }
+        // Perfil privado (migracion 017): 403 con el minimo.
+        if (rows[0].perfil_publico === false) {
+          return res.status(403).json({
+            ok: false,
+            error: 'PERFIL_PRIVADO',
+            data: { nombre: rows[0].nombre },
+          });
+        }
+        var pub = rows[0];
+        return res.json({
+          ok: true,
+          data: {
+            id: pub.id,
+            nombre: pub.nombre,
+            avatar_url: pub.avatar_url || null,
+            foto_url: pub.foto_url || null,
+            bio: pub.bio || null,
+            ciudad_base: pub.ciudad_base || null,
+            pais_base: pub.pais_base || null,
+            creado_en: pub.creado_en,
+            xp_total: parseInt(pub.xp_total, 10) || 0,
+            faccion: pub.faccion || null,
+            casa: pub.casa || null,
+            perfil_publico: pub.perfil_publico !== false,
+          },
+        });
       }
       return res.status(400).json({ ok: false, error: 'Falta id o tipo' });
     }
@@ -394,6 +578,239 @@ module.exports = async (req, res) => {
           return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
         }
         return res.json({ ok: true, data: { faccion: feCambio[0].faccion, faccion_elegida_en: feCambio[0].faccion_elegida_en } });
+      }
+
+      // ---- Rama: elegir o cambiar Casa (WP-5, TSK-103 / ADR-028) ----
+      // ESPEJO EXACTO de faccion_elegir (mismo contrato de errores y
+      // mismos UPDATE condicionales para resolver carreras), con dos
+      // diferencias deliberadas: (1) exige sesion firmada del propio
+      // usuario (ADR-025), porque casa_elegida_en es dato de su cuenta;
+      // (2) la primera eleccion exige nivel >= 2. Primera eleccion:
+      // gratis (WHERE casa IS NULL). Cambio: cuesta 300 xp_total (debito
+      // atomico con WHERE xp_total >= 300, patron de comprar_consumible)
+      // y tiene cooldown de 30 dias via casa_elegida_en. La moneda del
+      // juego es xp_total (ADR-018). Devuelve nivel_anterior/nivel_nuevo/
+      // bajo_nivel para que la UI avise si el debito baja de nivel.
+      if (c.tipo === 'casa_elegir') {
+        var ceId = String(c.usuario_id || '');
+        var ceCasa = String(c.casa || '');
+        if (!ceId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var ceSes = validarSesionUsuario(req, ceId);
+        if (!ceSes.ok)
+          return res.status(401).json({ ok: false, error: ceSes.razon });
+        if (CASAS_VALIDAS.indexOf(ceCasa) === -1)
+          return res.status(400).json({ ok: false, error: 'CASA_INVALIDA' });
+        var ceFila = await sql(
+          'SELECT id, casa, casa_elegida_en, xp_total, email_verificado FROM usuarios WHERE id=$1',
+          [ceId]
+        );
+        if (!ceFila.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        if (!(ceFila[0].email_verificado === true))
+          return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
+        var ceXp = parseInt(ceFila[0].xp_total, 10) || 0;
+        var ceNivelAnt = calcularNivel(ceXp).nivel;
+        if (ceNivelAnt < 2)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: ceNivelAnt, nivel_requerido: 2 });
+        if (!ceFila[0].casa) {
+          // Primera eleccion: el WHERE casa IS NULL protege la carrera y
+          // el 409 si otro request gano la eleccion primero.
+          var cePrim = await sql(
+            'UPDATE usuarios SET casa=$2, casa_elegida_en=NOW() '
+            + 'WHERE id=$1 AND casa IS NULL RETURNING casa, casa_elegida_en, xp_total',
+            [ceId, ceCasa]
+          );
+          if (!cePrim.length)
+            return res.status(409).json({ ok: false, error: 'CASA_YA_ELEGIDA' });
+          var ceXpPrim = parseInt(cePrim[0].xp_total, 10) || 0;
+          var ceNivelPrim = calcularNivel(ceXpPrim).nivel;
+          return res.json({ ok: true, data: {
+            casa: cePrim[0].casa,
+            casa_elegida_en: cePrim[0].casa_elegida_en,
+            xp_total_nuevo: ceXpPrim,
+            nivel_anterior: ceNivelAnt,
+            nivel_nuevo: ceNivelPrim,
+            bajo_nivel: ceNivelPrim < ceNivelAnt,
+          } });
+        }
+        // Cambio de Casa: pago 300 xp, cooldown de 30 dias. El UPDATE
+        // condicional es la fuente de verdad; si no afecta filas se
+        // distingue el motivo con los datos ya leidos.
+        var ceCambio = await sql(
+          'UPDATE usuarios SET xp_total = xp_total - 300, casa=$2, casa_elegida_en=NOW() '
+          + 'WHERE id=$1 AND xp_total >= 300 '
+          + 'AND (casa_elegida_en IS NULL OR casa_elegida_en <= NOW() - INTERVAL \'30 days\') '
+          + 'RETURNING casa, casa_elegida_en, xp_total',
+          [ceId, ceCasa]
+        );
+        if (!ceCambio.length) {
+          var ceElegidaEn = ceFila[0].casa_elegida_en;
+          var ceEnCooldown = ceElegidaEn
+            && (Date.parse(ceElegidaEn) > Date.now() - 30 * 24 * 3600 * 1000);
+          if (ceEnCooldown)
+            return res.status(429).json({ ok: false, error: 'COOLDOWN_CASA' });
+          return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
+        }
+        var ceXpNuevo = parseInt(ceCambio[0].xp_total, 10) || 0;
+        var ceNivelNuevo = calcularNivel(ceXpNuevo).nivel;
+        return res.json({ ok: true, data: {
+          casa: ceCambio[0].casa,
+          casa_elegida_en: ceCambio[0].casa_elegida_en,
+          xp_total_nuevo: ceXpNuevo,
+          nivel_anterior: ceNivelAnt,
+          nivel_nuevo: ceNivelNuevo,
+          bajo_nivel: ceNivelNuevo < ceNivelAnt,
+        } });
+      }
+
+      // ---- Rama: actualizar perfil (WP-5, TSK-103 / ADR-028) --------
+      // Edicion del propio perfil desde mi-perfil.html (pestana PERFIL y
+      // CUENTA). Exige sesion firmada del DUENO (ADR-025) porque escribe
+      // datos de su cuenta. Acepta el nombre canonico 'perfil_actualizar'
+      // que ya envia el frontend y el alias 'perfil_editar' por
+      // compatibilidad con clientes previos.
+      //
+      // El SET es dinamico y 100% parametrizado (cero interpolacion de
+      // valores en el SQL): solo se toca lo que venga definido. Las listas
+      // de columnas se arman con emparejamiento nombre=placeholder.
+      // Campos PROHIBIDOS por esta rama (no se leen del body): email,
+      // xp_total, faccion, casa, codigo_referido, referido_por.
+      //
+      // ADR-003 (cero borrado / cero reemplazo):
+      //   - perfil_config es MERGE a nivel raiz:
+      //     COALESCE(perfil_config,'{}'::jsonb) || $n::jsonb.
+      //   - intereses es REEMPLAZO deliberado (lista de un solo escritor,
+      //     mismo precedente que device_hashes): el cliente envia la lista
+      //     completa y el servidor la sella entera.
+      //
+      // perfil_config NO valida capacidades en esta rama (los consumibles
+      // perfil_* aun no tienen efecto); solo guarda. WP-6 lo hara.
+      if (c.tipo === 'perfil_actualizar' || c.tipo === 'perfil_editar') {
+        var puId = String(c.usuario_id || '');
+        if (!puId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var puSes = validarSesionUsuario(req, puId);
+        if (!puSes.ok)
+          return res.status(401).json({ ok: false, error: puSes.razon });
+
+        var puParams = [];
+        var puSets = [];
+        var puPh = function (valor) {
+          puParams.push(valor);
+          return '$' + puParams.length;
+        };
+
+        // nombre (opcional, 1..60 chars)
+        if (c.nombre !== undefined) {
+          var puNombre = (typeof c.nombre === 'string') ? c.nombre.trim() : '';
+          if (!puNombre || puNombre.length > 60)
+            return res.status(400).json({ ok: false, error: 'NOMBRE_INVALIDO' });
+          puSets.push('nombre = ' + puPh(puNombre));
+        }
+
+        // foto_url (URL http/https o null para limpiarla)
+        if (c.foto_url !== undefined) {
+          if (c.foto_url === null || c.foto_url === '') {
+            puSets.push('foto_url = ' + puPh(null));
+          } else {
+            var puFoto = (typeof c.foto_url === 'string') ? c.foto_url.trim() : '';
+            if (!/^https?:\/\/\S+$/i.test(puFoto) || puFoto.length > 600)
+              return res.status(400).json({ ok: false, error: 'FOTO_URL_INVALIDA' });
+            puSets.push('foto_url = ' + puPh(puFoto));
+          }
+        }
+
+        // bio (opcional, max 280 chars; la columna ya existe, text nullable)
+        if (c.bio !== undefined) {
+          var puBio = (typeof c.bio === 'string') ? c.bio.trim() : '';
+          if (puBio.length > 280)
+            return res.status(400).json({ ok: false, error: 'BIO_LARGA' });
+          puSets.push('bio = ' + puPh(puBio || null));
+        }
+
+        // ciudad_base (opcional, 1..80 chars o null para limpiarla)
+        if (c.ciudad_base !== undefined) {
+          if (c.ciudad_base === null || c.ciudad_base === '') {
+            puSets.push('ciudad_base = ' + puPh(null));
+          } else {
+            var puCiudad = (typeof c.ciudad_base === 'string') ? c.ciudad_base.trim() : '';
+            if (!puCiudad || puCiudad.length > 80)
+              return res.status(400).json({ ok: false, error: 'CIUDAD_INVALIDA' });
+            puSets.push('ciudad_base = ' + puPh(puCiudad));
+          }
+        }
+
+        // pais_base (ISO-3166-1 alfa-2: exactamente 2 letras, a MAYUSCULAS)
+        if (c.pais_base !== undefined) {
+          if (c.pais_base === null || c.pais_base === '') {
+            puSets.push('pais_base = ' + puPh(null));
+          } else {
+            var puPais = String(c.pais_base).trim().toUpperCase();
+            if (!/^[A-Za-z]{2}$/.test(puPais))
+              return res.status(400).json({ ok: false, error: 'PAIS_INVALIDO' });
+            puSets.push('pais_base = ' + puPh(puPais));
+          }
+        }
+
+        // intereses (array de slugs ASCII, max 10; REEMPLAZO deliberado)
+        if (c.intereses !== undefined) {
+          if (!Array.isArray(c.intereses) || c.intereses.length > 10)
+            return res.status(400).json({ ok: false, error: 'INTERESES_INVALIDOS' });
+          var puIntereses = [];
+          for (var puI = 0; puI < c.intereses.length; puI++) {
+            var puSlug = c.intereses[puI];
+            if (typeof puSlug !== 'string' || !/^[a-z0-9_]{1,40}$/.test(puSlug))
+              return res.status(400).json({ ok: false, error: 'INTERESES_INVALIDOS' });
+            puIntereses.push(puSlug);
+          }
+          puSets.push('intereses = ' + puPh(JSON.stringify(puIntereses)) + '::jsonb');
+        }
+
+        // perfil_publico / dm_abierto (booleanos)
+        if (c.perfil_publico !== undefined) {
+          if (typeof c.perfil_publico !== 'boolean')
+            return res.status(400).json({ ok: false, error: 'PERFIL_PUBLICO_INVALIDO' });
+          puSets.push('perfil_publico = ' + puPh(c.perfil_publico));
+        }
+        if (c.dm_abierto !== undefined) {
+          if (typeof c.dm_abierto !== 'boolean')
+            return res.status(400).json({ ok: false, error: 'DM_ABIERTO_INVALIDO' });
+          puSets.push('dm_abierto = ' + puPh(c.dm_abierto));
+        }
+
+        // perfil_config (objeto; MERGE JSONB a nivel raiz, nunca reemplazo)
+        if (c.perfil_config !== undefined) {
+          var puConf = c.perfil_config;
+          if (!puConf || typeof puConf !== 'object' || Array.isArray(puConf))
+            return res.status(400).json({ ok: false, error: 'PERFIL_CONFIG_INVALIDO' });
+          puSets.push('perfil_config = COALESCE(perfil_config, \'{}\'::jsonb) || '
+            + puPh(JSON.stringify(puConf)) + '::jsonb');
+        }
+
+        if (!puSets.length)
+          return res.status(400).json({ ok: false, error: 'NADA_QUE_ACTUALIZAR' });
+
+        puParams.push(puId);
+        var puUpd = await sql(
+          'UPDATE usuarios SET ' + puSets.join(', ')
+          + ' WHERE id=$' + puParams.length + ' RETURNING *',
+          puParams
+        );
+        if (!puUpd.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+
+        // Misma hidratacion que el upsert de registro. Se retiran del
+        // payload los campos secretos que trae el RETURNING *: nunca se
+        // exponen email_token, email_token_expira ni device_hashes.
+        var puData = conLogros(conMisiones(conNivel(puUpd[0])));
+        delete puData.email_token;
+        delete puData.email_token_expira;
+        delete puData.device_hashes;
+        // Esta rama nunca debita xp_total: el aviso de de-nivel de la UI
+        // (mi-perfil.html pfGuardarPerfil) queda siempre en falso.
+        puData.bajo_nivel = false;
+        return res.json({ ok: true, data: puData });
       }
 
       // ---- Rama: solicitar verificacion de email (Gaming v5.0) ------

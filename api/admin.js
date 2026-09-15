@@ -31,6 +31,19 @@ function authInternal(req) {
     === (process.env.ADMIN_SECRET || 'exploraco12345');
 }
 
+// == CATEGORIA DE CONSUMIBLE (WP-6, TSK-103 / ADR-028) ====================
+// Categorias conocidas del catalogo (migracion 018): perfil | impulso |
+// social | coleccion | general. La columna consumibles.categoria NO lleva
+// CHECK a proposito (catalogo administrable), asi que se acepta cualquier
+// slug ASCII de hasta 30 caracteres. Vacio, tipo invalido o mayor a 30
+// devuelve null y el caller responde 400 CATEGORIA_INVALIDA.
+function normalizarCategoriaConsumible(valor) {
+  var s = String(valor == null ? '' : valor).trim().toLowerCase();
+  if (!s || s.length > 30) return null;
+  if (!/^[a-z0-9_-]+$/.test(s)) return null;
+  return s;
+}
+
 // == REPARTO PIRAMIDAL (Entrega 016) ======================================
 // EXCEPCION CONTROLADA al tripwire de no-duplicidad (GSD 2.1): los
 // archivadores api/*.js se despliegan como funciones serverless
@@ -312,7 +325,7 @@ module.exports = async function handler(req, res) {
     // --- Lista: todos (activos e inactivos) ------------------------------
     if (tipo === 'consumibles_lista') {
       var filasC = await sql(
-        'SELECT id, clave, nombre, descripcion, precio_xp, activo, creado_en '
+        'SELECT id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en '
         + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
       );
       return res.status(200).json({ ok:true, data: filasC, total: filasC.length });
@@ -330,15 +343,22 @@ module.exports = async function handler(req, res) {
       if (!Number.isInteger(precioN) || precioN <= 0) {
         return res.status(400).json({ ok:false, error:'precio_xp debe ser un entero mayor que 0' });
       }
+      // WP-6 (TSK-103 / ADR-028): categoria opcional; default 'general'
+      // (mismo default de la columna). Si viene, se normaliza y valida.
+      var catN = 'general';
+      if (body.categoria !== undefined && String(body.categoria).trim() !== '') {
+        catN = normalizarCategoriaConsumible(body.categoria);
+        if (!catN) return res.status(400).json({ ok:false, error:'CATEGORIA_INVALIDA' });
+      }
       var existC = await sql('SELECT 1 FROM consumibles WHERE clave=$1 LIMIT 1',[claveN]);
       if (existC.length) {
         return res.status(409).json({ ok:false, error:'Ya existe un consumible con esa clave' });
       }
       var insC = await sql(
-        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp) '
-        + 'VALUES ($1,$2,$3,$4) '
-        + 'RETURNING id, clave, nombre, descripcion, precio_xp, activo, creado_en',
-        [claveN, nombreN, descN, precioN]
+        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, categoria) '
+        + 'VALUES ($1,$2,$3,$4,$5) '
+        + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en',
+        [claveN, nombreN, descN, precioN, catN]
       );
       return res.status(201).json({ ok:true, data: insC[0], mensaje:'Consumible creado' });
     }
@@ -364,13 +384,20 @@ module.exports = async function handler(req, res) {
         }
         setsC.push('precio_xp=$'+piC++); paramsC.push(precioE);
       }
+      // WP-6 (TSK-103 / ADR-028): categoria editable (default de columna
+      // 'general'; la lista conocida vive en normalizarCategoriaConsumible).
+      if ('categoria' in body) {
+        var catE = normalizarCategoriaConsumible(body.categoria);
+        if (!catE) return res.status(400).json({ ok:false, error:'CATEGORIA_INVALIDA' });
+        setsC.push('categoria=$'+piC++); paramsC.push(catE);
+      }
       if (!setsC.length) {
-        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion o precio_xp' });
+        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp o categoria' });
       }
       paramsC.push(body.id);
       var updC = await sql(
         'UPDATE consumibles SET '+setsC.join(', ')+' WHERE id=$'+piC
-        + ' RETURNING id, clave, nombre, descripcion, precio_xp, activo',
+        + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, activo',
         paramsC
       );
       if (!updC.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });

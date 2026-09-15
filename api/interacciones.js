@@ -1,4 +1,4 @@
-// api/interacciones.js  v13 (Entrega 016: piramide referidos con reparto, Wayfarer Activo Oculto, nonce anti-replay, vocaciones en bloque nivel 5)
+// api/interacciones.js  v14 (WP-4 TSK-103/ADR-028: Arbol de Clases 16 ramas x 5 nodos; base v13 Entrega 016)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -92,6 +92,28 @@ var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 
 // v9). Requiere la migracion 016 antes de desplegar (tablas
 // activos_ocultos*, activos_ocultos_votos, activos_ocultos_checkins y
 // geo_nonces).
+//
+// v14 (WP-4, TSK-103 / ADR-028, 2026-09-15): Arbol de Clases estilo
+// Albion (16 ramas = 4 facciones x 4 ramas, 5 nodos cada una, umbrales
+// 0/100/250/450/700). Catalogo en codigo RAMAS (junto a VOCACIONES),
+// puntos derivados D_R recalculados en cada lectura + bonos SOLO de
+// misiones completadas (rama + puntos_rama en el catalogo MISIONES).
+// Ramas tipo=: GET arbol_catalogo (publico), GET arbol_usuario (progreso
+// + persistencia write-once de fechas de nodo para el dueno con sesion),
+// POST rama_activar (gate nivel 5, sin coincidencia de faccion; art_*
+// delega en usuarios.vocaciones), POST arbol_usuario accion=bono_mision
+// (+25 unico e idempotente de mis_perfil_completo). museo_publico expone
+// el arbol en solo lectura. comprar_consumible aplica el descuento del
+// nodo 5 si la categoria del consumible coincide. Requiere la migracion
+// 017 (usuarios.progreso_arbol, consumibles.categoria).
+//
+// v15 (WP-5, TSK-103 / ADR-028, 2026-09-15): Origen derivado + bono x1.2
+// dentro de D_R (nunca sobre xp_total ni sobre interacciones.xp_ganado) y
+// 8 misiones de perfil (grupo 'perfil', ids mis_perfil_*). El Origen
+// ('local'/'nacional'/'extranjero') se deriva por FILA de accion
+// comparando usuarios.pais_base/ciudad_base con la ciudad del destino
+// (ciudades normalizadas con TRANSLATE para tolerar tildes, patron
+// ADR-012). Sin columnas nuevas: usa pais_base (017) y ciudad_base.
 var TIERRA_RADIO_M = 6371008.8;
 var RADIO_DEFAULT_M = 100;
 var RADIO_POR_CATEGORIA = { sitio: 100, hostal: 100, comida: 100, evento: 150 };
@@ -202,6 +224,718 @@ var VOCACIONES = [
     habilidades: ['Pluma de relatos', 'Bitacora de ruta', 'Sello de cronista'] }
 ];
 
+// -- Catalogo del Arbol de Clases (WP-4, TSK-103 / ADR-028) ----------
+// 16 ramas = 4 facciones x 4 ramas, 5 nodos por rama. Los umbrales son
+// los mismos tiers de tabla_destino (0/100/250/450/700) para no crear una
+// segunda escala de progreso (Regla de No-Duplicidad). El arbol NO es un
+// cuarto sistema de progresion: cuelga de usuarios.faccion y ESPEJA las 4
+// vocaciones de artista de usuarios.vocaciones en las ramas art_*
+// (fuente unica, ADR-026).
+//
+// DECISION DEL DUENO (WP-4): se progresa en TODAS las ramas de cualquier
+// faccion; rama_activar NO exige coincidencia de faccion, solo nivel 5.
+//
+// PUNTOS DERIVADOS (D_R): se recalculan en CADA lectura desde las
+// acciones reales del usuario; JAMAS se leen de usuarios.progreso_arbol.
+//   P_R = COALESCE((progreso_arbol->'bonos'->>R)::int, 0) + D_R
+// Los 'bonos' provienen SOLO de misiones completadas (campos rama y
+// puntos_rama del catalogo MISIONES) o del bono unico de mis_perfil_completo.
+// Formulas D_R (ver calcularDerivadosArbol):
+//   exp_rutas:      SUM(xp_ganado) de interacciones tipo IN ('guardado','visita') activo=true
+//   exp_ocultos:    aprobados*60 + pendientes*10 + checkins*25 (016)
+//   exp_ciudades:   COUNT(DISTINCT ciudad) de destinos visitados activos * 40
+//   exp_naturaleza: SUM(xp_ganado de visitas) + n_visitas_rural*20
+//   cur_critico:    SUM(xp_ganado) de resena/rating + SUM(votos_utiles)*10
+//   cur_colecciones:n_cromos*15 + n_dorados*50 (usuarios_cromos/cromos_catalogo)
+//   cur_datos:      n_votos_activo*8 + n_review_voto*5 + n_comentarios*5 (016/007/013)
+//   cur_guia:       n_mapas_publicos*40 + n_mapa_destinos*5 + n_planes_unidos*15
+//   cre_planes:     n_planes_creados_activos*25 + n_miembros_planes*10
+//   cre_parche:     es_fundador*100 + n_miembros_activos*15 + n_retos_completados*30
+//   cre_eventos:    SUM(xp_ganado) de acciones a destinos.categoria_slug='evento'
+//   cre_embajador:  n_directos*40 + n_red_nivel2_5*10 (usuarios.referido_por)
+//   art_musica:     (vocacion musico)*50 + n_media_audio*15 (album_fotos.foto_type='audio')
+//   art_cine:       (vocacion cine)*50 + n_media_video*15
+//   art_grafica:    (vocacion artista_grafico)*50 + n_votos_recibidos*10
+//   art_literatura: (vocacion escritor)*50 + n_resenas_largas*15 (LENGTH(texto)>500)
+//
+// BONO DE ORIGEN x1.2 (WP-5, ADR-028), SOLO dentro de D_R (jamas toca
+// usuarios.xp_total ni interacciones.xp_ganado). El Origen se deriva por
+// fila comparando pais_base/ciudad_base del usuario con la ciudad del
+// destino de la accion (TRANSLATE tolera tildes):
+//   local      -> cur_critico, cur_colecciones, cur_datos, cur_guia, exp_ocultos
+//   nacional   -> exp_rutas, exp_ciudades
+//   extranjero -> cur_critico, art_literatura
+// El redondeo del bono es FLOOR(valor * 1.2) por fila/unidad (mismo
+// criterio que la piramide de referidos, FLOOR). En ramas sin ciudad de
+// destino (cur_colecciones, y el componente sin mapa de cur_guia, y
+// art_literatura) se aplica el ORIGEN PROPIO del usuario, documentado
+// como simplificacion.
+// Ninguna consulta D_R menciona progreso_arbol ni perfil_config (invariante
+// anti-doble-conteo). Cada consulta degrada a 0 en catch (tabla/columna
+// ausente por migracion pendiente) sin romper la lectura.
+//
+// EFECTOS PERMITIDOS (duro): nodos 1-4 con efecto null (solo titulo e
+// insignia cosmeticos); el nodo 5 puede ser un TITULO visible o un
+// DESCUENTO del 10% en consumibles de una categoria (perfil/mapas/galeria/
+// chat). PROHIBIDO conceder capacidades funcionales o de privilegio y
+// PROHIBIDO crear multiplicadores de XP.
+var RAMA_TIERS = [0, 100, 250, 450, 700];
+var RAMA_TIERS_NOMBRES = ['Iniciado', 'Aprendiz', 'Veterano', 'Maestro', 'Leyenda'];
+
+var RAMAS = [
+  {
+    id: 'exp_rutas', faccion: 'exploradores', nombre: 'Rutas',
+    emoji: '\uD83E\uDDED',
+    desc: 'Recorre y guarda destinos para dominar las rutas de Colombia.',
+    fuente: 'xp de guardados y visitas activas',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Caminante', insignia: 'ruta-paso', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Trazador', insignia: 'ruta-huella', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Cartografo', insignia: 'ruta-mapa', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Guia de Rutas', insignia: 'ruta-guia', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Maestro de Rutas', insignia: 'ruta-maestro',
+        efecto: { tipo: 'titulo', valor: 'Maestro de Rutas' } }
+    ]
+  },
+  {
+    id: 'exp_ocultos', faccion: 'exploradores', nombre: 'Ocultos',
+    emoji: '\uD83D\uDD0D',
+    desc: 'Propone, vota y verifica Activos Ocultos en el terreno.',
+    fuente: 'propuestas aprobadas, pendientes y checkins de Activo Oculto',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Curioso', insignia: 'oculto-curioso', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Rastreador', insignia: 'oculto-rastreador', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Descubridor', insignia: 'oculto-descubridor', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Explorador de Sombras', insignia: 'oculto-sombras', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Leyenda Oculta', insignia: 'oculto-leyenda',
+        efecto: { tipo: 'titulo', valor: 'Leyenda Oculta' } }
+    ]
+  },
+  {
+    id: 'exp_ciudades', faccion: 'exploradores', nombre: 'Ciudades',
+    emoji: '\uD83C\uDFD9',
+    desc: 'Suma ciudades distintas a tu mapa de viajero.',
+    fuente: 'ciudades distintas con visitas activas',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Visitante', insignia: 'ciudad-visitante', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Transeunte', insignia: 'ciudad-transeunte', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Viajero de Ciudades', insignia: 'ciudad-viajero', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Conquistador Urbano', insignia: 'ciudad-conquistador', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Nomada Urbano', insignia: 'ciudad-nomada',
+        efecto: { tipo: 'descuento', categoria: 'mapas', pct: 10 } }
+    ]
+  },
+  {
+    id: 'exp_naturaleza', faccion: 'exploradores', nombre: 'Naturaleza',
+    emoji: '\uD83C\uDF3F',
+    desc: 'Confirma visitas a senderos, parques y destinos rurales.',
+    fuente: 'xp de visitas y salidas rurales o de naturaleza',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Sendero', insignia: 'natura-sendero', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Baqueano', insignia: 'natura-baqueano', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Guardian Verde', insignia: 'natura-guardian', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Espiritu del Bosque', insignia: 'natura-espiritu', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Voz de la Montana', insignia: 'natura-montana',
+        efecto: { tipo: 'titulo', valor: 'Voz de la Montana' } }
+    ]
+  },
+  {
+    id: 'cur_critico', faccion: 'curadores', nombre: 'Critico',
+    emoji: '\u2B50',
+    desc: 'Escribe resenas y califica lugares con criterio.',
+    fuente: 'xp de resenas y ratings mas votos utiles recibidos',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Opinador', insignia: 'critico-opinador', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Resenador', insignia: 'critico-resenador', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Critico Local', insignia: 'critico-local', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Critico Experto', insignia: 'critico-experto', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Pluma de Autoridad', insignia: 'critico-autoridad',
+        efecto: { tipo: 'titulo', valor: 'Pluma de Autoridad' } }
+    ]
+  },
+  {
+    id: 'cur_colecciones', faccion: 'curadores', nombre: 'Colecciones',
+    emoji: '\uD83D\uDCE6',
+    desc: 'Completa tu vitrina de cromos y persigue los dorados.',
+    fuente: 'cromos coleccionados y cromos dorados',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Aprendiz de Vitrina', insignia: 'colec-aprendiz', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Coleccionista', insignia: 'colec-coleccionista', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Curador de Cromos', insignia: 'colec-curador', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Maestro de Vitrina', insignia: 'colec-maestro', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Archivista Dorado', insignia: 'colec-archivista',
+        efecto: { tipo: 'descuento', categoria: 'perfil', pct: 10 } }
+    ]
+  },
+  {
+    id: 'cur_datos', faccion: 'curadores', nombre: 'Datos',
+    emoji: '\uD83D\uDCCA',
+    desc: 'Vota propuestas, resenas y comentarios de la comunidad.',
+    fuente: 'votos en Activos Ocultos, votos de resenas y comentarios',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Observador', insignia: 'datos-observador', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Analista', insignia: 'datos-analista', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Verificador', insignia: 'datos-verificador', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Faro de Datos', insignia: 'datos-faro', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Oraculo de Datos', insignia: 'datos-oraculo',
+        efecto: { tipo: 'descuento', categoria: 'galeria', pct: 10 } }
+    ]
+  },
+  {
+    id: 'cur_guia', faccion: 'curadores', nombre: 'Guia',
+    emoji: '\uD83D\uDDFA',
+    desc: 'Publica mapas tematicos y guia planes de viaje.',
+    fuente: 'mapas publicos, destinos mapeados y planes unidos',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Aprendiz de Mapa', insignia: 'guia-aprendiz', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Trazador de Mapas', insignia: 'guia-trazador', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Guia Practico', insignia: 'guia-practico', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Cartografo Mayor', insignia: 'guia-cartografo', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Gran Guia', insignia: 'guia-gran',
+        efecto: { tipo: 'descuento', categoria: 'mapas', pct: 10 } }
+    ]
+  },
+  {
+    id: 'cre_planes', faccion: 'creadores', nombre: 'Planes',
+    emoji: '\uD83E\uDD1D',
+    desc: 'Convoca planes de viaje y suma viajeros a tu grupo.',
+    fuente: 'planes creados activos y miembros sumados',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Anfitrion Novato', insignia: 'plan-anfitrion', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Organizador', insignia: 'plan-organizador', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Lider de Planes', insignia: 'plan-lider', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Arquitecto de Viajes', insignia: 'plan-arquitecto', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Maestro de Planes', insignia: 'plan-maestro',
+        efecto: { tipo: 'descuento', categoria: 'chat', pct: 10 } }
+    ]
+  },
+  {
+    id: 'cre_parche', faccion: 'creadores', nombre: 'Parche',
+    emoji: '\uD83D\uDC51',
+    desc: 'Funda o impulsa tu Parche y completa sus retos.',
+    fuente: 'fundacion, miembros activos y retos completados',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Recluta', insignia: 'parche-recluta', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Miembro Activo', insignia: 'parche-miembro', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Oficial de Parche', insignia: 'parche-oficial', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Referente del Parche', insignia: 'parche-referente', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Fundador Legendario', insignia: 'parche-fundador',
+        efecto: { tipo: 'titulo', valor: 'Fundador Legendario' } }
+    ]
+  },
+  {
+    id: 'cre_eventos', faccion: 'creadores', nombre: 'Eventos',
+    emoji: '\uD83C\uDF89',
+    desc: 'Participa y dinamiza la agenda de eventos del pais.',
+    fuente: 'xp de acciones en destinos de categoria evento',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Asistente', insignia: 'evento-asistente', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Convocante', insignia: 'evento-convocante', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Promotor', insignia: 'evento-promotor', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Gestor de Eventos', insignia: 'evento-gestor', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Maestro de Eventos', insignia: 'evento-maestro',
+        efecto: { tipo: 'titulo', valor: 'Maestro de Eventos' } }
+    ]
+  },
+  {
+    id: 'cre_embajador', faccion: 'creadores', nombre: 'Embajador',
+    emoji: '\uD83C\uDF96',
+    desc: 'Invita viajeros y haz crecer tu red de referidos.',
+    fuente: 'referidos directos y red de niveles 2 a 5',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Invitado', insignia: 'embajador-invitado', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Referente', insignia: 'embajador-referente', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Embajador Local', insignia: 'embajador-local', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Embajador Regional', insignia: 'embajador-regional', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Embajador de Leyenda', insignia: 'embajador-leyenda',
+        efecto: { tipo: 'descuento', categoria: 'perfil', pct: 10 } }
+    ]
+  },
+  {
+    id: 'art_musica', faccion: 'artistas', nombre: 'Musica',
+    emoji: '\uD83C\uDFB5',
+    desc: 'Desarrolla tu vocacion musical y publica audio.',
+    fuente: 'vocacion de musico y media de audio subida',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Aficionado', insignia: 'musica-aficionado', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Interprete', insignia: 'musica-interprete', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Compositor', insignia: 'musica-compositor', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Productor', insignia: 'musica-productor', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Leyenda Musical', insignia: 'musica-leyenda',
+        efecto: { tipo: 'descuento', categoria: 'galeria', pct: 10 } }
+    ]
+  },
+  {
+    id: 'art_cine', faccion: 'artistas', nombre: 'Cine',
+    emoji: '\uD83C\uDFAC',
+    desc: 'Desarrolla tu vocacion audiovisual y publica video.',
+    fuente: 'vocacion de cine y media de video subido',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Espectador', insignia: 'cine-espectador', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Realizador', insignia: 'cine-realizador', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Director', insignia: 'cine-director', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Cineasta', insignia: 'cine-cineasta', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Leyenda del Cine', insignia: 'cine-leyenda',
+        efecto: { tipo: 'descuento', categoria: 'galeria', pct: 10 } }
+    ]
+  },
+  {
+    id: 'art_grafica', faccion: 'artistas', nombre: 'Grafica',
+    emoji: '\uD83C\uDFA8',
+    desc: 'Publica tu obra visual y recibe votos de la comunidad.',
+    fuente: 'vocacion de artista grafico y votos recibidos en tus fotos',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Trazos', insignia: 'grafica-trazos', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Ilustrador', insignia: 'grafica-ilustrador', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Disenador', insignia: 'grafica-disenador', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Artista Visual', insignia: 'grafica-visual', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Leyenda Grafica', insignia: 'grafica-leyenda',
+        efecto: { tipo: 'descuento', categoria: 'perfil', pct: 10 } }
+    ]
+  },
+  {
+    id: 'art_literatura', faccion: 'artistas', nombre: 'Literatura',
+    emoji: '\u270D\uFE0F',
+    desc: 'Escribe relatos y resenas extensas de tus viajes.',
+    fuente: 'vocacion de escritor y resenas extensas',
+    nodos: [
+      { id: 'n1', puntos: 0, nombre: 'Lector', insignia: 'letras-lector', efecto: null },
+      { id: 'n2', puntos: 100, nombre: 'Cronista', insignia: 'letras-cronista', efecto: null },
+      { id: 'n3', puntos: 250, nombre: 'Narrador', insignia: 'letras-narrador', efecto: null },
+      { id: 'n4', puntos: 450, nombre: 'Escritor de Viajes', insignia: 'letras-viajes', efecto: null },
+      { id: 'n5', puntos: 700, nombre: 'Leyenda Literaria', insignia: 'letras-leyenda',
+        efecto: { tipo: 'titulo', valor: 'Leyenda Literaria' } }
+    ]
+  }
+];
+
+// Indice id -> rama (lista blanca para validar rama_id del cliente).
+var RAMA_POR_ID = {};
+RAMAS.forEach(function(r) { RAMA_POR_ID[r.id] = r; });
+
+// Mapeo art_* <-> vocacion: las 4 ramas de artista ESPEJAN
+// usuarios.vocaciones (fuente unica, ADR-026). No se escribe ramas_activas
+// para art_*.
+var VOCACION_POR_RAMA_ART = {
+  art_musica: 'musico', art_cine: 'cine',
+  art_grafica: 'artista_grafico', art_literatura: 'escritor'
+};
+
+// Literal SQL de comilla simple con escape (ids de rama/nodo provienen de
+// esta lista blanca o de JSON.stringify; ninguno lleva comilla simple).
+function sqlLiteralArbol(s) {
+  return "'" + String(s).replace(/'/g, "''") + "'";
+}
+
+// Nivel de nodo alcanzado (1..5): mayor i con P_R >= RAMA_TIERS[i].
+function nivelNodoArbol(puntos) {
+  var p = parseInt(puntos, 10) || 0;
+  var idx = 0;
+  for (var i = 0; i < RAMA_TIERS.length; i++) {
+    if (p >= RAMA_TIERS[i]) idx = i;
+  }
+  return idx + 1;
+}
+
+// Nodos alcanzados con P_R (array de objetos del catalogo).
+function nodosDesbloqueadosArbol(rama, puntos) {
+  var p = parseInt(puntos, 10) || 0;
+  return rama.nodos.filter(function(n) { return p >= n.puntos; });
+}
+
+// Bono pendiente del bono unico de +25: 25 solo si mis_perfil_completo
+// esta completada y aun no se eligio rama (tolerante: mis_perfil_completo
+// llega en WP-5, hoy da 0).
+function bonoPendienteArbol(progresoMisiones, progresoArbol) {
+  var pm = progresoMisiones || {};
+  var pa = progresoArbol || {};
+  var completo = pm.mis_perfil_completo;
+  if (!completo || completo.estado !== 'completada') return 0;
+  if (pa.rama_bono_elegida) return 0;
+  return 25;
+}
+
+// Descuento de nodo 5 aplicable a una categoria de consumible (0 si
+// ninguna rama con nodo 5 alcanzado descuenta esa categoria).
+function descuentoArbolParaCategoria(ramas, categoria) {
+  if (!categoria) return 0;
+  var pct = 0;
+  (ramas || []).forEach(function(r) {
+    var ef = r.efecto;
+    if (ef && ef.tipo === 'descuento' && ef.categoria === categoria) {
+      var p = parseInt(ef.pct, 10) || 0;
+      if (p > pct) pct = p;
+    }
+  });
+  return pct;
+}
+
+// -- Origen derivado + bono x1.2 (WP-5, TSK-103 / ADR-028) ------------
+// El Origen no se persiste como identidad: se recalcula por request desde
+// usuarios.pais_base/ciudad_base y se compara, fila a fila, con la ciudad
+// del destino. Se pasa al SQL como $2 (ciudad_base cruda, '' si NULL) y
+// $3 (boolean extranjero) para que cada consulta decida el bono por FILA.
+// La normalizacion replica TRANSLATE_CIUDAD de los logros (tildes ->
+// vocal simple) para tolerar 'Bogota' y 'Bogot\u00e1' (ADR-012 / BUGS:63).
+// ASCII-safe: la lista de tildes va como escapes \u00xx, nunca como bytes.
+function sqlNormCiudad(expr) {
+  return "LOWER(TRANSLATE(COALESCE(" + expr + ",''),'"
+    + '\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc' + "','aeiouu'))";
+}
+// local = misma ciudad que el destino y no extranjero.
+function sqlOrigenLocal(exprCiudad) {
+  var nc = sqlNormCiudad(exprCiudad);
+  var nb = sqlNormCiudad('$2');
+  return "(NOT $3::boolean AND " + nb + " <> '' AND "
+    + nc + " <> '' AND " + nc + " = " + nb + ")";
+}
+// nacional = no extranjero y ciudad distinta a la del destino (incluye
+// pais_base NULL o ciudad_base NULL, siempre que el destino tenga ciudad).
+function sqlOrigenNacional(exprCiudad) {
+  var nc = sqlNormCiudad(exprCiudad);
+  var nb = sqlNormCiudad('$2');
+  return "(NOT $3::boolean AND " + nc + " <> '' AND ("
+    + nb + " = '' OR " + nc + " <> " + nb + "))";
+}
+// Origen propio del usuario para ramas sin ciudad de destino: local =
+// residente con ciudad_base declarada y no extranjero.
+function sqlOrigenLocalPropio() {
+  return "(NOT $3::boolean AND " + sqlNormCiudad('$2') + " <> '')";
+}
+// Multiplicador x1.2 con FLOOR por fila/unidad (mismo redondeo que la
+// piramide de referidos). exprPuntos es un literal o una expresion SQL.
+var BONO_ORIGEN = 1.2;
+function sqlBonoFila(exprPuntos, cond) {
+  return "CASE WHEN " + cond + " THEN FLOOR((" + exprPuntos + ") * "
+    + BONO_ORIGEN + ") ELSE (" + exprPuntos + ") END";
+}
+
+// Calcula los puntos DERIVADOS (D_R) de las 16 ramas. NUNCA lee
+// progreso_arbol. Cada consulta degrada a 0 en catch (tabla/columna
+// ausente por migracion pendiente). Agrupa las agregaciones en pocas
+// round-trips por dominio.
+function calcularDerivadosArbol(sql, usuarioId, vocaciones) {
+  var v = vocaciones || {};
+  var out = {};
+  RAMAS.forEach(function(r) { out[r.id] = 0; });
+  function ent(x) { return parseInt(x, 10) || 0; }
+
+  // Contexto de Origen (WP-5, ADR-028): UNA sola lectura de
+  // pais_base/ciudad_base; nunca se persiste y nunca menciona
+  // progreso_arbol (invariante anti-doble-conteo). Degrada a
+  // {ciudad:'', extranjero:false} si la migracion 017 no esta aplicada.
+  return sql(
+    'SELECT pais_base, ciudad_base FROM usuarios WHERE id=$1',
+    [usuarioId]
+  ).catch(function() { return []; }).then(function(rows) {
+    var u = rows[0] || {};
+    var orgPais = (u.pais_base == null) ? '' : String(u.pais_base);
+    var org = {
+      ciudad: (u.ciudad_base == null) ? '' : String(u.ciudad_base),
+      extranjero: (orgPais !== '' && orgPais.toUpperCase() !== 'CO'),
+    };
+    return derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org);
+  });
+}
+
+// Cuerpo de D_R con el contexto de Origen ya resuelto. Solo lo llama
+// calcularDerivadosArbol. $2 = ciudad_base cruda del usuario y $3 =
+// boolean extranjero (ver sqlOrigenLocal/sqlOrigenNacional).
+function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
+  var orgCiudad = org.ciudad;
+  var orgExtranjero = org.extranjero;
+  // Origen propio del usuario (ramas sin ciudad de destino): local =
+  // residente con ciudad_base declarada y no extranjero.
+  var localPropio = (!orgExtranjero && orgCiudad !== '');
+  var pOrg = [usuarioId, orgCiudad, orgExtranjero];
+
+  // Exploradores: rutas, ciudades y naturaleza (interacciones/destinos).
+  var qExp = sql(
+    "SELECT"
+    + " COALESCE(SUM(" + sqlBonoFila('i.xp_ganado', sqlOrigenNacional('d.ciudad'))
+    + ") FILTER (WHERE i.tipo IN ('guardado','visita') AND i.activo=true),0)::int AS exp_rutas,"
+    + " COALESCE(SUM(i.xp_ganado) FILTER (WHERE i.tipo='visita' AND i.activo=true),0)::int AS natura_xp,"
+    + " (SELECT COUNT(*)::int FROM interacciones i2 JOIN destinos d2 ON d2.id=i2.destino_id"
+    + "   WHERE i2.usuario_id=$1 AND i2.tipo='visita' AND i2.activo=true"
+    + "   AND (i2.dims->'geo'->>'zona'='rural' OR d2.tags->>'subcategoria' IN ('naturaleza','aventura','parque'))) AS natura_rural,"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('40', sqlOrigenNacional('dc.ciudad')) + "),0)::int FROM ("
+    + "   SELECT DISTINCT d3.ciudad FROM interacciones i3 JOIN destinos d3 ON d3.id=i3.destino_id"
+    + "   WHERE i3.usuario_id=$1 AND i3.tipo='visita' AND i3.activo=true AND COALESCE(d3.ciudad,'') <> '') dc) AS exp_ciudades"
+    + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
+    pOrg
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.exp_rutas = ent(q.exp_rutas);
+    out.exp_ciudades = ent(q.exp_ciudades);
+    out.exp_naturaleza = ent(q.natura_xp) + ent(q.natura_rural) * 20;
+  }).catch(function(){});
+
+  // Exploradores: Activo Oculto (migracion 016). Bono de Origen local
+  // por PROPUESTA de la ciudad del usuario (ao.ciudad); los checkins de
+  // presencia no llevan bono de origen (no son propuestas).
+  // FIX O1 (WP-6): aprobados y pendientes exigen ao.activo=true, para no
+  // contar propuestas soft-deleted al derivar exp_ocultos.
+  var qOcultos = sql(
+    "SELECT"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('60', sqlOrigenLocal('ao.ciudad')) + "),0)::int"
+    + "   FROM activos_ocultos ao WHERE ao.propuesto_por=$1 AND ao.activo=true"
+    + "   AND (ao.votos_favor - ao.votos_contra) >= 3) AS aprobados,"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('10', sqlOrigenLocal('ao2.ciudad')) + "),0)::int"
+    + "   FROM activos_ocultos ao2 WHERE ao2.propuesto_por=$1 AND ao2.activo=true AND ao2.estado='pendiente'"
+    + "   AND (ao2.votos_favor - ao2.votos_contra) < 3 AND (ao2.votos_favor - ao2.votos_contra) > -3) AS pendientes,"
+    + " (SELECT COUNT(*)::int FROM activos_ocultos_checkins WHERE usuario_id=$1 AND activo=true) AS checkins",
+    pOrg
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.exp_ocultos = ent(q.aprobados) + ent(q.pendientes) + ent(q.checkins) * 25;
+  }).catch(function(){});
+
+  // Curadores: critico (resenas/ratings + votos utiles). Bono de Origen
+  // local O extranjero por FILA (xp + votos_utiles*10 de esa resena). Si
+  // votos_utiles no existe (migracion 007 pendiente), reintenta solo con
+  // el XP de la fila.
+  var qCritico = sql(
+    "SELECT COALESCE(SUM(" + sqlBonoFila('i.xp_ganado + COALESCE(i.votos_utiles,0)*10',
+      '(' + sqlOrigenLocal('d.ciudad') + ' OR $3::boolean)')
+    + ") FILTER (WHERE i.tipo IN ('resena','rating')),0)::int AS xp"
+    + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
+    pOrg
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.cur_critico = ent(q.xp);
+  }).catch(function() {
+    return sql(
+      "SELECT COALESCE(SUM(" + sqlBonoFila('i.xp_ganado',
+        '(' + sqlOrigenLocal('d.ciudad') + ' OR $3::boolean)')
+      + ") FILTER (WHERE i.tipo IN ('resena','rating')),0)::int AS xp"
+      + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
+      pOrg
+    ).then(function(rows) { out.cur_critico = ent((rows[0] || {}).xp); }).catch(function(){});
+  });
+
+  // Curadores: colecciones de cromos (migracion 010). Los cromos no
+  // guardan ciudad: SIMPLIFICACION documentada -> bono local con el
+  // origen PROPIO del usuario (no hay destino con el que comparar).
+  var qColec = sql(
+    "SELECT COALESCE(SUM(uc.cantidad),0)::int AS n_cromos,"
+    + " COALESCE(SUM(uc.cantidad) FILTER (WHERE cc.rareza='dorado'),0)::int AS n_dorados"
+    + " FROM usuarios_cromos uc JOIN cromos_catalogo cc ON cc.id = uc.cromo_id"
+    + " WHERE uc.usuario_id=$1",
+    [usuarioId]
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    var uCromo = localPropio ? Math.floor(15 * BONO_ORIGEN) : 15;
+    var uDorado = localPropio ? Math.floor(50 * BONO_ORIGEN) : 50;
+    out.cur_colecciones = ent(q.n_cromos) * uCromo + ent(q.n_dorados) * uDorado;
+  }).catch(function(){});
+
+  // Curadores: datos (votos de Activo Oculto 016, votos de resena 007,
+  // comentarios de media 013). Bono de Origen local por UNIDAD: la ciudad
+  // sale de la propuesta votada / del destino de la resena votada / del
+  // album del comentario. Degrada completo si falta cualquiera.
+  var qDatos = sql(
+    "SELECT"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('8', sqlOrigenLocal('ao.ciudad')) + "),0)::int"
+    + "   FROM activos_ocultos_votos av JOIN activos_ocultos ao ON ao.id=av.activo_id"
+    + "   WHERE av.usuario_id=$1) AS n_votos_activo,"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "),0)::int"
+    + "   FROM resena_votos rv JOIN interacciones i ON i.id=rv.resena_id"
+    + "   LEFT JOIN destinos d ON d.id=i.destino_id"
+    + "   WHERE rv.usuario_id=$1) AS n_review_voto,"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('5', sqlOrigenLocal('alb.ciudad')) + "),0)::int"
+    + "   FROM album_comentarios ac JOIN album_fotos af ON af.id=ac.foto_id"
+    + "   JOIN albumes alb ON alb.id=af.album_id"
+    + "   WHERE ac.usuario_id=$1 AND ac.activo=true) AS n_comentarios",
+    pOrg
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.cur_datos = ent(q.n_votos_activo) + ent(q.n_review_voto) + ent(q.n_comentarios);
+  }).catch(function(){});
+
+  // Curadores: guia (mapas 006 + planes unidos 008). Bono de Origen local
+  // por UNIDAD: los destinos mapeados traen su ciudad; los mapas y planes
+  // no tienen ciudad -> origen PROPIO del usuario (simplificacion
+  // documentada). $3 no se usa en las dos primeras subconsultas, pero
+  // sqlOrigenLocalPropio lo referencia, asi que pOrg se mantiene.
+  var qGuia = sql(
+    "SELECT"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('40', sqlOrigenLocalPropio()) + "),0)::int"
+    + "   FROM mapas WHERE usuario_id=$1 AND publico=true) AS n_mapas_publicos,"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "),0)::int FROM mapa_destinos md"
+    + "   JOIN mapas m ON m.id=md.mapa_id LEFT JOIN destinos d ON d.id=md.destino_id"
+    + "   WHERE m.usuario_id=$1) AS n_mapa_destinos,"
+    + " (SELECT COALESCE(SUM(" + sqlBonoFila('15', sqlOrigenLocalPropio()) + "),0)::int"
+    + "   FROM planes_miembros WHERE usuario_id=$1) AS n_planes",
+    pOrg
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.cur_guia = ent(q.n_mapas_publicos) + ent(q.n_mapa_destinos) + ent(q.n_planes);
+  }).catch(function(){});
+
+  // Creadores: planes (creados activos + miembros sumados).
+  var qPlanes = sql(
+    "SELECT"
+    + " (SELECT COUNT(*)::int FROM planes_viaje WHERE creador_id=$1 AND activo=true) AS n_planes,"
+    + " (SELECT COUNT(*)::int FROM planes_miembros pm JOIN planes_viaje p ON p.id=pm.plan_id"
+    + "   WHERE p.creador_id=$1 AND p.activo=true) AS n_miembros",
+    [usuarioId]
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.cre_planes = ent(q.n_planes) * 25 + ent(q.n_miembros) * 10;
+  }).catch(function(){});
+
+  // Creadores: parche (fundacion, miembros activos, retos completados).
+  var qParche = sql(
+    "SELECT"
+    + " (SELECT COUNT(*)::int FROM pandillas WHERE fundador_id=$1 AND activo=true) AS n_fundadas,"
+    + " (SELECT COUNT(*)::int FROM pandillas_miembros pm2 WHERE pm2.activo=true AND pm2.pandilla_id IN"
+    + "   (SELECT pandilla_id FROM pandillas_miembros WHERE usuario_id=$1 AND activo=true)) AS n_miembros,"
+    + " (SELECT COUNT(*)::int FROM pandilla_retos pr JOIN pandillas_miembros pm3 ON pm3.pandilla_id=pr.pandilla_id"
+    + "   WHERE pm3.usuario_id=$1 AND pm3.activo=true AND pr.completado=true) AS n_retos",
+    [usuarioId]
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.cre_parche = (ent(q.n_fundadas) > 0 ? 100 : 0) + ent(q.n_miembros) * 15 + ent(q.n_retos) * 30;
+  }).catch(function(){});
+
+  // Creadores: eventos (acciones sobre destinos de categoria evento).
+  var qEventos = sql(
+    "SELECT COALESCE(SUM(i.xp_ganado),0)::int AS xp FROM interacciones i"
+    + " JOIN destinos d ON d.id=i.destino_id"
+    + " WHERE i.usuario_id=$1 AND d.categoria_slug='evento'",
+    [usuarioId]
+  ).then(function(rows) {
+    out.cre_eventos = ent((rows[0] || {}).xp);
+  }).catch(function(){});
+
+  // Creadores: embajador (referidos directos + red de niveles 2 a 5).
+  var qEmbajador = sql(
+    "WITH RECURSIVE red AS ("
+    + "SELECT u.id, 1 AS nivel FROM usuarios u WHERE u.referido_por=$1"
+    + " UNION ALL"
+    + " SELECT u2.id, red.nivel + 1 FROM usuarios u2 JOIN red ON u2.referido_por = red.id WHERE red.nivel < 5"
+    + ") SELECT"
+    + " (SELECT COUNT(*)::int FROM usuarios WHERE referido_por=$1) AS directos,"
+    + " (SELECT COUNT(*)::int FROM red WHERE nivel > 1) AS red2_5",
+    [usuarioId]
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.cre_embajador = ent(q.directos) * 40 + ent(q.red2_5) * 10;
+  }).catch(function(){});
+
+  // Artistas: vocaciones (fuente unica) + media/votos/resenas (009/013).
+  var qArt = sql(
+    "SELECT"
+    + " (SELECT COUNT(*)::int FROM album_fotos WHERE agregador_id=$1 AND foto_type='audio' AND activo=true) AS n_audio,"
+    + " (SELECT COUNT(*)::int FROM album_fotos WHERE agregador_id=$1 AND foto_type='video' AND activo=true) AS n_video,"
+    + " (SELECT COUNT(*)::int FROM album_votos av JOIN album_fotos af ON af.id=av.foto_id"
+    + "   WHERE af.autor_original_id=$1) AS n_votos,"
+    + " (SELECT COUNT(*)::int FROM interacciones WHERE usuario_id=$1 AND tipo='resena'"
+    + "   AND LENGTH(COALESCE(texto,'')) > 500) AS n_largas",
+    [usuarioId]
+  ).then(function(rows) {
+    var q = rows[0] || {};
+    out.art_musica = (v.musico ? 50 : 0) + ent(q.n_audio) * 15;
+    out.art_cine = (v.cine ? 50 : 0) + ent(q.n_video) * 15;
+    out.art_grafica = (v.artista_grafico ? 50 : 0) + ent(q.n_votos) * 10;
+    // Bono de Origen extranjero por resena larga (art_literatura). La
+    // vocacion escritor*50 es un desbloqueo, no una fila de accion: solo
+    // se bonifica la contribucion de las resenas largas. SIMPLIFICACION:
+    // art_literatura no tiene destino, se usa el origen propio del usuario.
+    out.art_literatura = (v.escritor ? 50 : 0)
+      + ent(q.n_largas) * (orgExtranjero ? Math.floor(15 * BONO_ORIGEN) : 15);
+  }).catch(function(){});
+
+  return Promise.all([qExp, qOcultos, qCritico, qColec, qDatos, qGuia,
+    qPlanes, qParche, qEventos, qEmbajador, qArt]).then(function() { return out; });
+}
+
+// Lee el estado COMPLETO del arbol de un usuario (faccion, vocaciones,
+// ramas activas y las 16 ramas con bono + derivado + nivel + nodos).
+// Funcion UNICA compartida por GET arbol_usuario y por museo_publico
+// (Regla de No-Duplicidad). Nunca lee puntos de progreso_arbol: solo los
+// 'bonos' persistidos y el recalculo D_R.
+function calcularArbolUsuario(sql, usuarioId) {
+  var base = {
+    usuarioId: String(usuarioId || ''),
+    faccion: null, vocaciones: {}, ramasActivas: {}, progresoArbol: {},
+    rama_bono_elegida: null, bono_pendiente: 0, ramas: [],
+  };
+  if (!base.usuarioId) return Promise.resolve(base);
+  return sql(
+    'SELECT faccion, vocaciones, progreso_arbol, progreso_misiones'
+    + ' FROM usuarios WHERE id=$1 LIMIT 1',
+    [base.usuarioId]
+  ).catch(function(){ return []; }).then(function(rows) {
+    if (!rows.length) return base;
+    var u = rows[0];
+    base.faccion = u.faccion || null;
+    base.vocaciones = u.vocaciones || {};
+    base.progresoArbol = u.progreso_arbol || {};
+    base.ramasActivas = base.progresoArbol.ramas_activas || {};
+    base.rama_bono_elegida = base.progresoArbol.rama_bono_elegida || null;
+    base.bono_pendiente = bonoPendienteArbol(u.progreso_misiones || {}, base.progresoArbol);
+    return calcularDerivadosArbol(sql, base.usuarioId, base.vocaciones)
+      .then(function(deriv) {
+        var bonos = base.progresoArbol.bonos || {};
+        base.ramas = RAMAS.map(function(r) {
+          var bono = parseInt(bonos[r.id], 10) || 0;
+          var derivado = parseInt(deriv[r.id], 10) || 0;
+          var puntos = bono + derivado;
+          var nivel = nivelNodoArbol(puntos);
+          var vocKey = VOCACION_POR_RAMA_ART[r.id];
+          var activa = vocKey
+            ? !!base.vocaciones[vocKey]
+            : base.ramasActivas[r.id] === true;
+          return {
+            id: r.id, faccion: r.faccion, nombre: r.nombre, emoji: r.emoji,
+            desc: r.desc, fuente: r.fuente,
+            puntos: puntos, bono: bono, derivado: derivado,
+            nivel_nodo: nivel, nodos_desbloqueados: nodosDesbloqueadosArbol(r, puntos),
+            efecto: nivel >= RAMA_TIERS.length ? r.nodos[r.nodos.length - 1].efecto : null,
+            activa: activa,
+          };
+        });
+        return base;
+      });
+  });
+}
+
+// Persiste write-once la fecha ISO de cada nodo alcanzado en
+// progreso_arbol.ramas.<rama>.nodos.<nodo> (merge ANIDADO, nunca
+// reemplaza el objeto ramas ni los nodos ya fechados). Solo se invoca
+// para el dueno con sesion firmada; si falla, degrada a false.
+function persistirNodosArbol(sql, usuarioId, progresoArbol, ramas) {
+  var pa = progresoArbol || {};
+  var ramasPa = pa.ramas || {};
+  var hoy = new Date().toISOString();
+  var parches = {};
+  (ramas || []).forEach(function(r) {
+    var ya = (ramasPa[r.id] && ramasPa[r.id].nodos) || {};
+    var nuevos = {};
+    (r.nodos_desbloqueados || []).forEach(function(n) {
+      if (!ya[n.id]) nuevos[n.id] = hoy;
+    });
+    if (Object.keys(nuevos).length) parches[r.id] = nuevos;
+  });
+  var ids = Object.keys(parches);
+  if (!ids.length) return Promise.resolve(false);
+  var sqlRamas = '';
+  ids.forEach(function(rid) {
+    var lit = sqlLiteralArbol(rid);
+    sqlRamas += ' || jsonb_build_object(' + lit
+      + ", COALESCE(progreso_arbol->'ramas'->" + lit + ",'{}'::jsonb)"
+      + " || jsonb_build_object('nodos', COALESCE(progreso_arbol->'ramas'->" + lit
+      + "->'nodos','{}'::jsonb) || " + sqlLiteralArbol(JSON.stringify(parches[rid])) + "::jsonb))";
+  });
+  return sql(
+    "UPDATE usuarios SET progreso_arbol = COALESCE(progreso_arbol,'{}'::jsonb)"
+    + " || jsonb_build_object('ramas', COALESCE(progreso_arbol->'ramas','{}'::jsonb)" + sqlRamas + ')'
+    + ' WHERE id=$1',
+    [usuarioId]
+  ).then(function() { return true; }).catch(function() { return false; });
+}
+
 // -- Catalogo de misiones (Fase 3) ---------------------------------
 // requiere: ids de misiones que deben estar 'completada' antes de que
 // esta se evalue siquiera (evita gastar consultas de mas). check()
@@ -211,10 +945,24 @@ var TAG_COWORKING  = 'coworking'; // enum cerrado v1: unico valor soportado hoy;
                                    // pendiente extenderlo cuando el admin
                                    // deje de aceptar texto libre en tags
 
+// Chequeo reutilizable de las misiones de perfil (WP-5): recibe una
+// EXPRESION SQL de LISTA BLANCA escrita en el propio catalogo (nunca
+// texto del cliente) y devuelve Promise<boolean>. Degrada a false si la
+// columna no existe todavia (migracion 017 pendiente), igual que el
+// resto de checks del catalogo.
+function misionPerfilFlag(ctx, expr) {
+  return ctx.sql(
+    'SELECT (' + expr + ') AS ok FROM usuarios WHERE id=$1',
+    [ctx.usuarioId]
+  ).then(function(r) { return !!(r[0] && r[0].ok === true); })
+   .catch(function(){ return false; });
+}
+
 var MISIONES = [
   {
     id: 'mis_primer_guardado', grupo: 'general', requiere: [],
     nombre: 'Primer lugar guardado', xp: 15,
+    rama: 'exp_rutas', puntos_rama: 20,
     check: function(ctx) { return Promise.resolve(ctx.totalGuardados >= 1); },
   },
   {
@@ -230,11 +978,13 @@ var MISIONES = [
   {
     id: 'mis_primera_visita', grupo: 'general', requiere: [],
     nombre: 'Primera visita confirmada', xp: 15,
+    rama: 'exp_rutas', puntos_rama: 25,
     check: function(ctx) { return ctx.visitasActivas.then(function(n){ return n >= 1; }); },
   },
   {
     id: 'mis_explorador_bogota', grupo: 'ciudad', requiere: ['mis_primer_guardado'],
     nombre: 'Explorador de Bogota', xp: 40,
+    rama: 'exp_ciudades', puntos_rama: 30,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
@@ -261,6 +1011,7 @@ var MISIONES = [
   {
     id: 'mis_nomada_digital', grupo: 'categoria', requiere: ['mis_primer_guardado'],
     nombre: 'N\u00f3mada digital', xp: 30,
+    rama: 'exp_rutas', puntos_rama: 20,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
@@ -279,6 +1030,7 @@ var MISIONES = [
     id: 'mis_own_spot_bogota', grupo: 'ciudad',
     requiere: ['mis_organizador_bogota', 'mis_primera_resena'],
     nombre: 'Dueno del Spot en Bogota', xp: 75,
+    rama: 'cur_critico', puntos_rama: 50,
     check: function(ctx) {
       return esLiderDeCiudad(ctx.sql, ctx.usuarioId, 'Bogota');
     },
@@ -288,6 +1040,7 @@ var MISIONES = [
     // mapa tematico publico con al menos 5 destinos (spec mapas 2026-09-05).
     id: 'mis_gran_arquitecto', grupo: 'general', requiere: [],
     nombre: 'Gran Arquitecto', xp: 50,
+    rama: 'cur_guia', puntos_rama: 50,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM ('
@@ -306,6 +1059,7 @@ var MISIONES = [
     // incluya itinerario[] en tags (categoria sitio/naturaleza).
     id: 'mis_itinerario_perfeccion', grupo: 'categoria', requiere: ['mis_primera_visita'],
     nombre: 'Itinerario en perfecto orden', xp: 60,
+    rama: 'exp_naturaleza', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(DISTINCT i.destino_id)::int AS n FROM interacciones i'
@@ -359,6 +1113,7 @@ var MISIONES = [
   {
     id: 'mis_chat_activo', grupo: 'general', requiere: ['mis_chat_mensajero'],
     nombre: 'Conversador activo', xp: 20,
+    rama: 'cur_datos', puntos_rama: 20,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM chat_mensajes WHERE usuario_id=$1 AND activo=true',
@@ -370,6 +1125,7 @@ var MISIONES = [
   {
     id: 'mis_plan_creador', grupo: 'general', requiere: ['mis_chat_mensajero'],
     nombre: 'Creador de planes', xp: 25,
+    rama: 'cre_planes', puntos_rama: 25,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM planes_viaje WHERE creador_id=$1',
@@ -424,6 +1180,7 @@ var MISIONES = [
     requiere: ['mis_creador_album'],
     nombre: 'Curador de albumes',
     xp: 40,
+    rama: 'cur_colecciones', puntos_rama: 40,
     gate_nivel: 2,
     check: function(ctx) {
       return ctx.sql(
@@ -466,6 +1223,7 @@ var MISIONES = [
     requiere: ['mis_fotografo_social'],
     nombre: 'Favorito del pueblo',
     xp: 50,
+    rama: 'art_grafica', puntos_rama: 50,
     gate_nivel: 2,
     check: function(ctx) {
       return ctx.sql(
@@ -495,6 +1253,7 @@ var MISIONES = [
   {
     id: 'mis_camino_musica', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino de la musica', xp: 40,
+    rama: 'art_musica', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
         .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).musico; })
@@ -504,6 +1263,7 @@ var MISIONES = [
   {
     id: 'mis_camino_cine', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino del cine', xp: 40,
+    rama: 'art_cine', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
         .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).cine; })
@@ -513,6 +1273,7 @@ var MISIONES = [
   {
     id: 'mis_camino_arte', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino del arte', xp: 40,
+    rama: 'art_grafica', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
         .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).artista_grafico; })
@@ -522,6 +1283,7 @@ var MISIONES = [
   {
     id: 'mis_camino_escritor', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino del escritor', xp: 40,
+    rama: 'art_literatura', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
         .then(function(r) { return !!((r[0] && r[0].vocaciones) || {}).escritor; })
@@ -544,6 +1306,69 @@ var MISIONES = [
         })
         .catch(function(){ return false; });
     },
+  },
+  // -- Misiones de perfil (WP-5, TSK-103 / ADR-028) --------------------
+  // Onboarding del perfil completo, sin 'requiere' entre ellas salvo la
+  // ultima (que se resuelve por el DAG). Alimentan la barra de
+  // completitud de mi-perfil.html. Los checks consultan usuarios.* porque
+  // el ctx de evaluarMisiones no trae estos campos.
+  {
+    id: 'mis_perfil_foto', grupo: 'perfil', requiere: [],
+    nombre: 'Ponle cara al viajero', xp: 10,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "COALESCE(foto_url,'') <> '' OR COALESCE(avatar_url,'') <> ''");
+    },
+  },
+  {
+    id: 'mis_perfil_bio', grupo: 'perfil', requiere: [],
+    nombre: 'Cuenta tu historia', xp: 15,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "LENGTH(COALESCE(bio,'')) >= 40");
+    },
+  },
+  {
+    id: 'mis_perfil_ciudad', grupo: 'perfil', requiere: [],
+    nombre: 'Tu punto de partida', xp: 10,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "ciudad_base IS NOT NULL AND pais_base IS NOT NULL");
+    },
+  },
+  {
+    id: 'mis_perfil_intereses', grupo: 'perfil', requiere: [],
+    nombre: 'Que te mueve', xp: 15,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "jsonb_array_length(COALESCE(intereses,'[]'::jsonb)) >= 3");
+    },
+  },
+  {
+    id: 'mis_perfil_email', grupo: 'perfil', requiere: [],
+    nombre: 'Viajero verificado', xp: 30,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "email_verificado = true");
+    },
+  },
+  {
+    id: 'mis_perfil_casa', grupo: 'perfil', requiere: [],
+    nombre: 'Jura tu Casa', xp: 20,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "casa IS NOT NULL");
+    },
+  },
+  {
+    id: 'mis_perfil_faccion', grupo: 'perfil', requiere: [],
+    nombre: 'Elige tu oficio', xp: 20,
+    check: function(ctx) {
+      return misionPerfilFlag(ctx, "faccion IS NOT NULL");
+    },
+  },
+  {
+    // Cierra el DAG: si las 7 anteriores estan completadas, se completa.
+    id: 'mis_perfil_completo', grupo: 'perfil',
+    requiere: ['mis_perfil_foto', 'mis_perfil_bio', 'mis_perfil_ciudad',
+               'mis_perfil_intereses', 'mis_perfil_email', 'mis_perfil_casa',
+               'mis_perfil_faccion'],
+    nombre: 'Pasaporte sellado', xp: 30,
+    check: function(ctx) { return Promise.resolve(true); },
   },
 ];
 
@@ -1154,6 +1979,79 @@ function repartirXpReferidos(sql, usuarioId, xpGanado) {
   ).then(function(){ return true; }).catch(function(){ return false; });
 }
 
+// Clave unica de un hilo de Mensajeria Directa (migracion 017): los dos
+// uuid participantes ordenados alfabeticamente unidos por '_' (36+1+36 =
+// 73 chars). El indice unico parcial idx_chat_salas_dm_unica garantiza un
+// solo hilo por par de usuarios.
+function claveDm(a, b) {
+  var x = String(a || '');
+  var y = String(b || '');
+  return x < y ? x + '_' + y : y + '_' + x;
+}
+
+// Mejora de perfil activa (vitrina del museo publico): el catalogo de
+// consumibles perfil_* se guarda en usuarios.capacidades, tanto como flag
+// directo (capacidades.<clave> = true) como cantidad en el inventario
+// (capacidades.consumibles.<clave>). Lee ambas formas sin reescribir.
+function perfilPosee(caps, clave) {
+  var c = caps || {};
+  if (c[clave] === true) return true;
+  var inv = c.consumibles || {};
+  return (parseInt(inv[clave], 10) || 0) > 0;
+}
+
+// Fondo por defecto del museo cuando perfil_fondo_paisaje se consume sin
+// body.fondo (o con un valor invalido). Clave ASCII que el frontend
+// resuelve a su paisaje base; nunca una URL externa (ADR-002).
+var FONDO_PERFIL_DEFAULT = 'default';
+
+// Titulo de viajero (perfil_titulo_custom, WP-6 / TSK-103 / ADR-028):
+// normaliza a ASCII imprimible y recorta a 24 caracteres. NFKD + borrado
+// de las marcas combinantes convierte tildes y enes a ASCII, de modo que
+// el titulo viaja siempre como texto seguro (ADR-002). Devuelve '' si
+// queda vacio (el caller responde 400 TITULO_REQUERIDO).
+function tituloPerfilSafe(valor) {
+  var s = String(valor == null ? '' : valor);
+  s = s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  return s.replace(/[^\x20-\x7e]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24);
+}
+
+// Mejora de perfil persistida (WP-6, ADR-003): escribe usuarios.perfil_config
+// con MERGE JSONB a nivel raiz (COALESCE(perfil_config,'{}'::jsonb) || $1),
+// NUNCA reemplazo. Mismo contrato que la rama perfil_actualizar de
+// api/usuarios.js. Nunca lanza: si la migracion 017 no esta aplicada
+// degrada a false sin romper el uso del consumible.
+function mergePerfilConfig(sqlFn, usuarioId, parche) {
+  if (!usuarioId || !parche) return Promise.resolve(false);
+  return sqlFn(
+    'UPDATE usuarios SET perfil_config = COALESCE(perfil_config, \'{}\'::jsonb)'
+    + ' || $1::jsonb WHERE id=$2',
+    [JSON.stringify(parche), usuarioId]
+  ).then(function() { return true; }).catch(function() { return false; });
+}
+
+// Rareza global estilo Steam de los logros: mapa id -> % de usuarios
+// activos que lo desbloquearon. Helper compartido por el GET tipo=logros,
+// el GET tipo=museo_publico y el contexto de evaluarLogros (Regla de
+// No-Duplicidad). Nunca lanza: degrada a {}.
+function rarezaLogrosGlobal(sqlFn) {
+  return sqlFn(
+    'SELECT k AS id, COUNT(*)::int AS n FROM usuarios u,'
+    + ' LATERAL jsonb_object_keys(COALESCE(u.progreso_logros,\'{}\'::jsonb)) AS k'
+    + ' WHERE u.activo = true GROUP BY k'
+  ).then(function(raros) {
+    return sqlFn('SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true')
+      .then(function(totales) {
+        var totalUsr = totales[0] ? totales[0].n : 0;
+        var mapa = {};
+        (raros || []).forEach(function(r) {
+          mapa[r.id] = totalUsr ? Math.round((r.n / totalUsr) * 1000) / 10 : 0;
+        });
+        return mapa;
+      });
+  }).catch(function(){ return {}; });
+}
+
 // Anti-farming del chat (espec 2026-09-08): +2 XP por mensaje con tope
 // diario de 20 XP (10 mensajes/dia). El contador vive en
 // usuarios.progreso_social con la estructura { chat_dia: 'YYYY-MM-DD',
@@ -1282,7 +2180,37 @@ function evaluarMisiones(sql, usuarioId) {
         + '   xp_total = xp_total + $2'
         + ' WHERE id = $3',
         [JSON.stringify(progreso), xpBonus, usuarioId]
-      ).then(function() { return nuevas; });
+      ).then(function() {
+        // Arbol de Clases (WP-4): suma los puntos_rama SOLO en la primera
+        // transicion a completada (nuevas ya excluye lo completado). El
+        // merge es ANIDADO por rama: nunca reemplaza el objeto bonos
+        // completo. Corre en su propia sentencia para que, si la
+        // migracion 017 no esta aplicada, el progreso de misiones no se
+        // pierda (degrada con warn).
+        var bonos = {};
+        nuevas.forEach(function(m) {
+          if (!m.rama || !m.puntos_rama) return;
+          if (!RAMA_POR_ID[m.rama]) return;
+          var pts = parseInt(m.puntos_rama, 10) || 0;
+          if (pts <= 0) return;
+          bonos[m.rama] = (bonos[m.rama] || 0) + pts;
+        });
+        var ramasBonus = Object.keys(bonos);
+        if (!ramasBonus.length) return;
+        var sumaSql = ramasBonus.map(function(r) {
+          var lit = sqlLiteralArbol(r);
+          return ' || jsonb_build_object(' + lit
+            + ", COALESCE((progreso_arbol->'bonos'->>" + lit + ')::int,0) + ' + bonos[r] + ')';
+        }).join('');
+        return sql(
+          "UPDATE usuarios SET progreso_arbol = COALESCE(progreso_arbol,'{}'::jsonb)"
+          + " || jsonb_build_object('bonos', COALESCE(progreso_arbol->'bonos','{}'::jsonb)"
+          + sumaSql + ') WHERE id = $1',
+          [usuarioId]
+        ).catch(function(e) {
+          console.warn('TRACE: bonos de arbol no persistidos (migracion 017 pendiente?): ' + (e && e.message));
+        });
+      }).then(function() { return nuevas; });
     });
   }).catch(function(err) {
     console.error('[misiones]', err.message);
@@ -1356,25 +2284,11 @@ function evaluarLogros(sql, usuarioId) {
       },
       rarezaGlobal: function() {
         // Rareza estilo Steam: % de usuarios activos que desbloquearon
-        // cada logro. Misma query agregada del GET tipo=logros,
-        // memoizada para correr una sola vez por POST (badge
-        // logr_cazador_rarezas, Milestones v2 / ADR-014).
+        // cada logro. Delega en rarezaLogrosGlobal (misma query del GET
+        // tipo=logros, helper compartido) memoizada para correr una sola
+        // vez por POST (badge logr_cazador_rarezas, ADR-014).
         if (cache['rareza']) return cache['rareza'];
-        cache['rareza'] = sql(
-          'SELECT k AS id, COUNT(*)::int AS n FROM usuarios u,'
-          + ' LATERAL jsonb_object_keys(COALESCE(u.progreso_logros,\'{}\'::jsonb)) AS k'
-          + ' WHERE u.activo = true GROUP BY k'
-        ).then(function(raros) {
-          return sql('SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true')
-            .then(function(totales) {
-              var totalUsr = totales[0] ? totales[0].n : 0;
-              var mapa = {};
-              (raros || []).forEach(function(r) {
-                mapa[r.id] = totalUsr ? Math.round((r.n / totalUsr) * 1000) / 10 : 0;
-              });
-              return mapa;
-            });
-        }).catch(function(){ return {}; });
+        cache['rareza'] = rarezaLogrosGlobal(sql);
         return cache['rareza'];
       },
     };
@@ -1652,17 +2566,7 @@ module.exports = async function handler(req, res) {
         );
         var progresoLogros = usrLogros2[0].progreso_logros || {};
 
-        var rarezaRows = await sql(
-          'SELECT k AS id, COUNT(*)::int AS n FROM usuarios u,'
-          + ' LATERAL jsonb_object_keys(COALESCE(u.progreso_logros,\'{}\'::jsonb)) AS k'
-          + ' WHERE u.activo = true GROUP BY k'
-        ).catch(function(){ return []; });
-        var totalUsuarios = await sql(
-          'SELECT COUNT(*)::int AS n FROM usuarios WHERE activo = true'
-        );
-        var totalUsr = totalUsuarios[0] ? totalUsuarios[0].n : 0;
-        var rareza = {};
-        rarezaRows.forEach(function(r){ rareza[r.id] = totalUsr ? Math.round((r.n / totalUsr) * 1000) / 10 : 0; });
+        var rareza = await rarezaLogrosGlobal(sql);
 
         var resLogros = entregarCatalogo(LOGROS, progresoLogros, function(fila, l) {
           fila.tier = l.tier;
@@ -1790,7 +2694,7 @@ module.exports = async function handler(req, res) {
           + ' (SELECT COUNT(*)::int FROM chat_mensajes m'
           + '   WHERE m.sala_id = s.id AND m.activo = true) AS total_mensajes'
           + ' FROM chat_salas s'
-          + ' WHERE s.activo = true AND (s.tipo IS NULL OR s.tipo != \'plan\')'
+          + ' WHERE s.activo = true AND (s.tipo IS NULL OR s.tipo NOT IN (\'plan\',\'dm\'))'
           + ' ORDER BY s.orden DESC, s.creado_en ASC',
           []
         );
@@ -1809,12 +2713,281 @@ module.exports = async function handler(req, res) {
           + ' LEFT JOIN usuarios u ON u.id = m.usuario_id'
           + ' WHERE m.sala_id = $1 AND m.activo = true'
           + '   AND NOT EXISTS (SELECT 1 FROM chat_salas cs'
-          + '     WHERE cs.id = m.sala_id AND cs.tipo = \'plan\')'
+          + '     WHERE cs.id = m.sala_id AND cs.tipo IN (\'plan\',\'dm\'))'
           + ' ORDER BY m.creado_en DESC'
           + ' LIMIT 100',
           [req.query.sala_id]
         );
         return res.status(200).json({ ok: true, data: msgsRows });
+      }
+
+      // Perfil publico "Museo" (TSK-103 / ADR-028, WP-3): UN solo GET con
+      // todo el perfil (usuario + vitrina + logros + cromos + albumes +
+      // mapa + parche + stats + arbol) para evitar 5 round-trips. Respeta
+      // perfil_publico (migracion 017): si es privado y quien pide no es
+      // el dueno (sesion JWT, ADR-025) responde 403 PERFIL_PRIVADO con el
+      // minimo. Nunca expone email, email_token, device_hashes,
+      // codigo_referido ni referido_por. El arbol entra como arbol (WP-4,
+      // solo lectura). NO otorga XP ni reparte referidos.
+      if (tipo === 'museo_publico' && (req.query.usuario_id || req.query.id)) {
+        var mpId = String(req.query.usuario_id || req.query.id || '');
+        var mpRows = await sql(
+          'SELECT id, nombre, foto_url, avatar_url, bio, ciudad_base, pais_base, creado_en,'
+          + ' xp_total, faccion, casa, capacidades, progreso_logros, perfil_publico, dm_abierto,'
+          + ' perfil_config'
+          + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+          [mpId]
+        );
+        if (!mpRows.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var mpU = mpRows[0];
+        var mpCalc = calcularNivelLocal(mpU.xp_total);
+        var mpNivel = mpCalc.nivel;
+        var mpEsPublico = (mpU.perfil_publico !== false);
+        if (!mpEsPublico) {
+          // Dueno: unico autorizado a leer un museo privado. Se exige la
+          // sesion firmada de ese mismo usuario, no un parametro de query.
+          var mpSes = validarSesion(req, mpId);
+          if (!mpSes.ok) {
+            return res.status(403).json({
+              ok: false,
+              error: 'PERFIL_PRIVADO',
+              data: { nombre: mpU.nombre, nivel: mpNivel },
+            });
+          }
+        }
+        var mpCaps = mpU.capacidades || {};
+        // Valores DESCRIPTIVOS (WP-3, TSK-103 / ADR-028): perfil.html pinta
+        // el museo segun el string, no segun un booleano. null = sin mejora.
+        // WP-6 (TSK-103 / ADR-028): la vitrina se EXTIENDE en solo lectura
+        // con lo persistido en usuarios.perfil_config (titulo/fondo/
+        // destacados). Degrada a null/[] si la migracion 017 no esta
+        // aplicada o el campo falta; no expone ninguna otra clave.
+        var mpPerfil = mpU.perfil_config || {};
+        var mpVitrina = {
+          marco: perfilPosee(mpCaps, 'perfil_marco_dorado') ? 'dorado' : (perfilPosee(mpCaps, 'perfil_marco_plata') ? 'plata' : null),
+          tema: perfilPosee(mpCaps, 'perfil_tema_oscuro') ? 'oscuro' : null,
+          banda: perfilPosee(mpCaps, 'perfil_banda_artista') ? 'Artista' : null,
+          titulo: (typeof mpPerfil.titulo === 'string') ? mpPerfil.titulo : null,
+          fondo: (typeof mpPerfil.fondo === 'string') ? mpPerfil.fondo : null,
+          destacados: Array.isArray(mpPerfil.destacados) ? mpPerfil.destacados : [],
+        };
+        var mpRareza = await rarezaLogrosGlobal(sql);
+        var mpProgreso = mpU.progreso_logros || {};
+        var mpLogros = [];
+        LOGROS.forEach(function(l) {
+          var st = mpProgreso[l.id];
+          if (st && st.estado === 'completada') {
+            mpLogros.push({
+              id: l.id, nombre: l.nombre, tier: l.tier,
+              rareza_pct: mpRareza[l.id] != null ? mpRareza[l.id] : 0,
+              desbloqueado_en: st.en || null,
+            });
+          }
+        });
+        var mpCromos = await sql(
+          'SELECT cc.id AS clave, cc.nombre, cc.rareza, uc.cantidad'
+          + ' FROM usuarios_cromos uc JOIN cromos_catalogo cc ON cc.id = uc.cromo_id'
+          + ' WHERE uc.usuario_id=$1 ORDER BY cc.rareza DESC, uc.obtenido_en DESC LIMIT 200',
+          [mpId]
+        ).catch(function(){ return []; });
+        var mpAlbumes = await sql(
+          'SELECT a.id, a.titulo, a.tipo, a.portada_url,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id=a.id AND af.activo=true) AS total_fotos,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af2 JOIN album_votos av ON av.foto_id=af2.id'
+          + '   WHERE af2.album_id=a.id) AS votos'
+          + ' FROM albumes a WHERE a.usuario_id=$1 AND a.activo=true'
+          + ' ORDER BY a.creado_en DESC LIMIT 12',
+          [mpId]
+        ).catch(function(){ return []; });
+        var mpMapa = await sql(
+          'SELECT i.destino_id, d.slug, d.nombre, d.ciudad, d.lat, d.lng'
+          + ' FROM interacciones i JOIN destinos d ON d.id=i.destino_id'
+          + ' WHERE i.usuario_id=$1 AND i.tipo=\'visita\' AND i.activo=true'
+          + ' ORDER BY i.creado_en DESC LIMIT 200',
+          [mpId]
+        ).catch(function(){ return []; });
+        var mpParcheRows = await sql(
+          'SELECT p.id, p.nombre, p.fama_total FROM pandillas p'
+          + ' JOIN pandillas_miembros pm ON pm.pandilla_id=p.id'
+          + ' WHERE pm.usuario_id=$1 AND pm.activo=true AND p.activo=true LIMIT 1',
+          [mpId]
+        ).catch(function(){ return []; });
+        var mpStatsRows = await sql(
+          'SELECT'
+          + ' (SELECT COUNT(*)::int FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true) AS visitas,'
+          + ' (SELECT COUNT(*)::int FROM interacciones WHERE usuario_id=$1 AND tipo=\'resena\' AND activo=true) AS resenas,'
+          + ' (SELECT COUNT(*)::int FROM interacciones WHERE usuario_id=$1 AND tipo=\'foto\' AND activo=true) AS fotos,'
+          + ' (SELECT COUNT(*)::int FROM albumes WHERE usuario_id=$1 AND activo=true) AS albumes,'
+          + ' (SELECT COUNT(*)::int FROM usuarios WHERE referido_por=$1) AS referidos_directos',
+          [mpId]
+        ).catch(function(){ return []; });
+        var mpStats = mpStatsRows[0] || { visitas: 0, resenas: 0, fotos: 0, albumes: 0, referidos_directos: 0 };
+        // Sala de Clases (WP-4): arbol en SOLO LECTURA. No persiste fechas
+        // (quien mira no es necesariamente el dueno) y reusa la MISMA
+        // funcion de calculo del GET arbol_usuario (No-Duplicidad). Si el
+        // calculo falla, degrada a la faccion sin ramas.
+        var mpArbol = { faccion: mpU.faccion || null, ramas: [] };
+        try {
+          var mpArbolCalc = await calcularArbolUsuario(sql, mpId);
+          mpArbol = {
+            faccion: mpArbolCalc.faccion,
+            ramas: mpArbolCalc.ramas.map(function(r) {
+              var lvl = Math.max(1, Math.min(RAMA_TIERS_NOMBRES.length, parseInt(r.nivel_nodo, 10) || 1));
+              return {
+                rama_id: r.id, faccion: r.faccion, nombre: r.nombre,
+                puntos: r.puntos, tier: RAMA_TIERS_NOMBRES[lvl - 1],
+                nodos_desbloqueados: (r.nodos_desbloqueados || []).length,
+              };
+            }),
+          };
+        } catch (eArbol) {
+          console.warn('TRACE: museo_publico sin arbol: ' + (eArbol && eArbol.message));
+        }
+        // Cache publico solo para museos publicos (nunca se cachea el 403).
+        if (mpEsPublico)
+          res.setHeader('Cache-Control', 'public, s-maxage=60');
+        return res.status(200).json({
+          ok: true,
+          data: {
+            usuario: {
+              id: mpU.id,
+              nombre: mpU.nombre,
+              foto_url: mpU.foto_url || null,
+              avatar_url: mpU.avatar_url || null,
+              bio: mpU.bio || null,
+              ciudad_base: mpU.ciudad_base || null,
+              pais_base: mpU.pais_base || null,
+              creado_en: mpU.creado_en,
+              nivel: mpNivel,
+              badge_actual: BADGES_LOCAL[mpNivel - 1] || mpCalc.badge_actual,
+              era: calcularEraLocal(mpNivel),
+              faccion: mpU.faccion || null,
+              casa: mpU.casa || null,
+              xp_total: parseInt(mpU.xp_total, 10) || 0,
+              perfil_publico: mpEsPublico,
+              dm_abierto: mpU.dm_abierto !== false,
+            },
+            vitrina: mpVitrina,
+            logros: mpLogros,
+            cromos: mpCromos,
+            albumes: mpAlbumes,
+            mapa: mpMapa,
+            arbol: mpArbol,
+            parche: mpParcheRows.length
+              ? { id: mpParcheRows[0].id, nombre: mpParcheRows[0].nombre, fama_total: parseInt(mpParcheRows[0].fama_total, 10) || 0 }
+              : null,
+            stats: {
+              visitas: parseInt(mpStats.visitas, 10) || 0,
+              resenas: parseInt(mpStats.resenas, 10) || 0,
+              fotos: parseInt(mpStats.fotos, 10) || 0,
+              albumes: parseInt(mpStats.albumes, 10) || 0,
+              referidos_directos: parseInt(mpStats.referidos_directos, 10) || 0,
+            },
+          },
+        });
+      }
+
+      // Mensajeria Directa - bandeja de hilos (TSK-103 / ADR-028, WP-3):
+      // hilos donde el usuario es participante (clave_dm = dos uuid
+      // ordenados unidos por '_'), con ultimo mensaje y no leidos
+      // derivados (mensajes del otro posteriores a mi ultimo mensaje; no
+      // existe tabla de leidos). Solo con sesion firmada (ADR-025).
+      if (tipo === 'dm_hilos' && req.query.usuario_id) {
+        var dhId = String(req.query.usuario_id || '');
+        var dhSes = validarSesion(req, dhId);
+        if (!dhSes.ok) return responderSesion(res, dhSes.razon);
+        var dhHilos = await sql(
+          'SELECT s.id, s.clave_dm, s.creado_en,'
+          + ' CASE WHEN split_part(s.clave_dm,\'_\',1)=$1 THEN split_part(s.clave_dm,\'_\',2)'
+          + '      ELSE split_part(s.clave_dm,\'_\',1) END AS otro_id,'
+          + ' (SELECT m.texto FROM chat_mensajes m WHERE m.sala_id=s.id AND m.activo=true'
+          + '   ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_texto,'
+          + ' (SELECT m.creado_en FROM chat_mensajes m WHERE m.sala_id=s.id AND m.activo=true'
+          + '   ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_en,'
+          + ' (SELECT COUNT(*)::int FROM chat_mensajes m WHERE m.sala_id=s.id AND m.activo=true'
+          + '   AND m.usuario_id<>$1 AND m.creado_en > COALESCE('
+          + '     (SELECT MAX(m2.creado_en) FROM chat_mensajes m2 WHERE m2.sala_id=s.id'
+          + '       AND m2.usuario_id=$1 AND m2.activo=true), \'epoch\'::timestamptz)) AS no_leidos'
+          + ' FROM chat_salas s'
+          + ' WHERE s.activo=true AND s.tipo=\'dm\''
+          + ' AND (split_part(s.clave_dm,\'_\',1)=$1 OR split_part(s.clave_dm,\'_\',2)=$1)'
+          + ' ORDER BY ultimo_en DESC NULLS LAST',
+          [dhId]
+        );
+        var dhOtros = [];
+        var dhVistos = {};
+        dhHilos.forEach(function(h){ if (h.otro_id && !dhVistos[String(h.otro_id)]) { dhVistos[String(h.otro_id)] = true; dhOtros.push(h.otro_id); } });
+        var dhUsuarios = dhOtros.length ? await sql(
+          'SELECT id, nombre, COALESCE(foto_url, avatar_url, \'\') AS avatar_url FROM usuarios WHERE id = ANY($1::uuid[])',
+          [dhOtros]
+        ).catch(function(){ return []; }) : [];
+        var dhPorId = {};
+        dhUsuarios.forEach(function(u){ dhPorId[String(u.id)] = u; });
+        // Bloqueo vigente por contraparte (WP-3, TSK-103 / ADR-028): el
+        // frontend pinta Bloquear/Desbloquear tras recargar. Una sola query
+        // para todo el inbox; si la migracion 017 no esta aplicada, degrada
+        // a [] y todos los hilos quedan bloqueado:false sin romper la
+        // respuesta.
+        var dhBloqueos = await sql(
+          'SELECT CASE WHEN bloqueador_id=$1 THEN bloqueado_id ELSE bloqueador_id END AS otro'
+          + ' FROM usuario_bloqueos WHERE bloqueador_id=$1 OR bloqueado_id=$1',
+          [dhId]
+        ).catch(function(){ return []; });
+        var dhBloqSet = {};
+        (dhBloqueos || []).forEach(function(b){ if (b && b.otro) dhBloqSet[String(b.otro)] = true; });
+        dhHilos.forEach(function(h){
+          var o = dhPorId[String(h.otro_id)] || {};
+          h.otro_nombre = o.nombre || 'Viajero';
+          h.otro_avatar = o.avatar_url || '';
+          h.no_leidos = parseInt(h.no_leidos, 10) || 0;
+          h.bloqueado = (dhBloqSet[String(h.otro_id)] === true);
+        });
+        return res.status(200).json({ ok: true, data: dhHilos });
+      }
+
+      // Mensajeria Directa - mensajes de un hilo: ultimos 100 en orden
+      // cronologico ASC. SOLO si el solicitante es uno de los dos
+      // participantes (validado contra clave_dm, nunca un parametro
+      // libre), con sesion firmada y sin bloqueo entre ambos. Un DM
+      // jamas se lee por el GET publico chat_mensajes.
+      if (tipo === 'dm_mensajes' && req.query.usuario_id && req.query.sala_id) {
+        var dmsgId = String(req.query.usuario_id || '');
+        var dmsgSala = String(req.query.sala_id || '');
+        var dmsgSes = validarSesion(req, dmsgId);
+        if (!dmsgSes.ok) return responderSesion(res, dmsgSes.razon);
+        var dmsgSalaRow = await sql(
+          'SELECT id, tipo, clave_dm FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+          [dmsgSala]
+        ).catch(function(){ return []; });
+        if (!dmsgSalaRow.length || dmsgSalaRow[0].tipo !== 'dm' || !dmsgSalaRow[0].clave_dm)
+          return res.status(404).json({ ok: false, error: 'Hilo no encontrado' });
+        var dmsgClave = String(dmsgSalaRow[0].clave_dm);
+        var dmsgA = dmsgClave.slice(0, 36);
+        var dmsgB = dmsgClave.slice(37);
+        if (dmsgA !== dmsgId && dmsgB !== dmsgId)
+          return res.status(403).json({ ok: false, error: 'No autorizado' });
+        var dmsgOtro = dmsgA === dmsgId ? dmsgB : dmsgA;
+        var dmsgBloqueo = await sql(
+          'SELECT 1 AS uno FROM usuario_bloqueos'
+          + ' WHERE (bloqueador_id=$1 AND bloqueado_id=$2)'
+          + '    OR (bloqueador_id=$2 AND bloqueado_id=$1) LIMIT 1',
+          [dmsgId, dmsgOtro]
+        ).catch(function(){ return []; });
+        if (dmsgBloqueo.length)
+          return res.status(403).json({ ok: false, error: 'DM_BLOQUEADO' });
+        var dmsgRows = await sql(
+          'SELECT * FROM ('
+          + ' SELECT m.id, m.usuario_id, m.texto, m.fijado, m.creado_en,'
+          + ' COALESCE(NULLIF(m.nombre,\'\'), u.nombre, \'Viajero\') AS nombre,'
+          + ' COALESCE(u.avatar_url, \'\') AS avatar_url'
+          + ' FROM chat_mensajes m LEFT JOIN usuarios u ON u.id = m.usuario_id'
+          + ' WHERE m.sala_id=$1 AND m.activo=true'
+          + ' ORDER BY m.creado_en DESC LIMIT 100'
+          + ') t ORDER BY t.creado_en ASC',
+          [dmsgSala]
+        );
+        return res.status(200).json({ ok: true, data: dmsgRows, otro_id: dmsgOtro });
       }
 
       // Planes de viaje colectivos (espec comunidad 2026-09-08): listado
@@ -1926,6 +3099,57 @@ module.exports = async function handler(req, res) {
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         var vocAct = (vocUsrRow[0] && vocUsrRow[0].vocaciones) || {};
         return res.status(200).json({ ok: true, data: { activadas: Object.keys(vocAct), catalogo: VOCACIONES } });
+      }
+
+      // Arbol de Clases: catalogo publico (WP-4, TSK-103 / ADR-028).
+      // 16 ramas con sus 5 nodos. Sin usuario: cacheable.
+      if (tipo === 'arbol_catalogo') {
+        res.setHeader('Cache-Control', 'public, s-maxage=300');
+        return res.status(200).json({
+          ok: true,
+          data: {
+            tiers: RAMA_TIERS,
+            ramas: RAMAS.map(function(r) {
+              return {
+                id: r.id, faccion: r.faccion, nombre: r.nombre, emoji: r.emoji,
+                desc: r.desc, fuente: r.fuente,
+                nodos: r.nodos.map(function(n) {
+                  return { id: n.id, puntos: n.puntos, nombre: n.nombre, insignia: n.insignia, efecto: n.efecto };
+                }),
+              };
+            }),
+          },
+        });
+      }
+
+      // Arbol de Clases: progreso de un usuario. Recalcula D_R en cada
+      // lectura (nunca lee puntos de progreso_arbol) y persiste write-once
+      // la fecha ISO de cada nodo alcanzado SOLO si el solicitante es el
+      // dueno con sesion firmada (ADR-025); en caso contrario es lectura.
+      if (tipo === 'arbol_usuario' && req.query.usuario_id) {
+        var arbId = String(req.query.usuario_id || '');
+        var arbData = await calcularArbolUsuario(sql, arbId);
+        if (!arbData.ramas.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        if (validarSesion(req, arbId).ok) {
+          await persistirNodosArbol(sql, arbId, arbData.progresoArbol, arbData.ramas);
+        }
+        return res.status(200).json({
+          ok: true,
+          data: {
+            faccion: arbData.faccion,
+            ramas: arbData.ramas.map(function(r) {
+              return {
+                id: r.id, faccion: r.faccion, nombre: r.nombre, emoji: r.emoji,
+                desc: r.desc, fuente: r.fuente,
+                puntos: r.puntos, bono: r.bono, derivado: r.derivado,
+                nivel_nodo: r.nivel_nodo, nodos_desbloqueados: r.nodos_desbloqueados,
+                efecto: r.efecto, activa: r.activa,
+              };
+            }),
+            bono_pendiente: arbData.bono_pendiente,
+          },
+        });
       }
 
       // Tabla de Destino (Albion, Milestones v2 / ADR-014): tres senderos
@@ -2516,12 +3740,29 @@ module.exports = async function handler(req, res) {
       // ==========================================================
 
       // Catalogo activo de consumibles con precios (tabla consumibles).
+      // WP-6 (TSK-103 / ADR-028): acepta &categoria= opcional para que la
+      // tienda agrupe/filtre por categoria sin endpoint nuevo (8/8). El
+      // filtro es 100% parametrizado ($1::text IS NULL = todas) y cada item
+      // devuelve su categoria. Si la columna aun no existe (migracion 018
+      // pendiente) degrada al catalogo completo sin filtro (cero rotura).
       if (tipo === 'consumibles') {
-        var catalogoConsumibles = await sql(
-          'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
-          + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
-          []
-        ).catch(function(){ return []; });
+        var catCons = String(req.query.categoria || '').trim().toLowerCase().slice(0, 30);
+        var catalogoConsumibles = [];
+        try {
+          catalogoConsumibles = await sql(
+            'SELECT clave, nombre, descripcion, precio_xp, categoria FROM consumibles'
+            + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
+            + ' ORDER BY precio_xp ASC, clave ASC',
+            [catCons || null]
+          );
+        } catch (eCatCons) {
+          console.warn('TRACE: GET consumibles sin categoria: ' + (eCatCons && eCatCons.message));
+          catalogoConsumibles = await sql(
+            'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
+            + ' WHERE activo = true ORDER BY precio_xp ASC, clave ASC',
+            []
+          ).catch(function(){ return []; });
+        }
         return res.status(200).json({ ok: true, data: catalogoConsumibles });
       }
 
@@ -3082,11 +4323,13 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         if (!salaValida.length)
           return res.status(404).json({ ok: false, error: 'Sala no encontrada' });
-        // v12 (chat privado por plan): las salas tipo='plan' solo se
-        // escriben via plan_chat_msg (gate de membresia del plan); el
-        // chat general no puede saltarse la privacidad del plan.
+        // v12 (chat privado por plan) + WP-3 (DM): las salas tipo='plan'
+        // solo se escriben via plan_chat_msg y las tipo='dm' solo via
+        // dm_enviar; el chat general no puede saltarse su privacidad.
         if (salaValida[0].tipo === 'plan')
           return res.status(403).json({ ok: false, error: 'Esta sala es privada del plan' });
+        if (salaValida[0].tipo === 'dm')
+          return res.status(403).json({ ok: false, error: 'SALA_PRIVADA' });
         var autorMsg = await sql('SELECT nombre FROM usuarios WHERE id=$1 LIMIT 1', [usuarioId2]).catch(function(){ return []; });
         var nombreMsg = autorMsg[0] && autorMsg[0].nombre ? String(autorMsg[0].nombre).slice(0, 60) : 'Viajero';
         var msgIns = await sql(
@@ -3134,6 +4377,14 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'sala_id y msg_id requeridos' });
         if (modAccion !== 'fijar' && modAccion !== 'eliminar')
           return res.status(400).json({ ok: false, error: 'accion debe ser fijar o eliminar' });
+        // WP-3 (privacidad): los moderadores no pueden tocar salas
+        // privadas (plan o DM); chat_mod solo opera sobre salas publicas.
+        var modSalaRow = await sql(
+          'SELECT tipo FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+          [modSala]
+        ).catch(function(){ return []; });
+        if (modSalaRow.length && (modSalaRow[0].tipo === 'plan' || modSalaRow[0].tipo === 'dm'))
+          return res.status(403).json({ ok: false, error: 'SALA_PRIVADA' });
         var modTarget = await sql(
           'SELECT id FROM chat_mensajes WHERE id=$1 AND sala_id=$2 AND activo=true LIMIT 1',
           [modMsgId, modSala]
@@ -3317,6 +4568,168 @@ module.exports = async function handler(req, res) {
           misiones: misionesPcm,
           logros: logrosPcm
         });
+      }
+
+      // -- Mensajeria Directa (TSK-103 / ADR-028, WP-3) --------------
+      // Enviar un DM. Gate P-4: remitente nivel >= 3, email verificado,
+      // receptor distinto, texto 1..500. Bloqueo en CUALQUIER direccion
+      // (usuario_bloqueos) -> 403. Hilo nuevo: cobra 20 XP al emisor con
+      // el patron atomico de comprar_consumible (WHERE xp_total >= 20) y
+      // devuelve nivel_anterior/nivel_nuevo/bajo_nivel; si el receptor
+      // tiene dm_abierto=false y NO hay hilo previo -> 403 DM_CERRADO.
+      // Tope 5 hilos nuevos/dia. Responder en un hilo abierto es gratis.
+      // El DM NO otorga XP a nadie ni reparte referidos.
+      if (tipo2 === 'dm_enviar') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var dmSes = validarSesion(req, usuarioId2);
+        if (!dmSes.ok) return responderSesion(res, dmSes.razon);
+        var dmReceptor = String(body.receptor_id || '');
+        var dmTexto = String(body.texto || '').trim();
+        if (!dmReceptor)
+          return res.status(400).json({ ok: false, error: 'receptor_id requerido' });
+        if (dmReceptor === String(usuarioId2))
+          return res.status(409).json({ ok: false, error: 'DM_A_MI_MISMO' });
+        if (!dmTexto)
+          return res.status(400).json({ ok: false, error: 'mensaje vacio' });
+        if (dmTexto.length > 500)
+          return res.status(400).json({ ok: false, error: 'mensaje maximo 500 caracteres' });
+        var dmEmisorRow = await sql(
+          'SELECT id, nombre, xp_total, email_verificado FROM usuarios WHERE id=$1 LIMIT 1',
+          [usuarioId2]
+        );
+        if (!dmEmisorRow.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var dmEmisor = dmEmisorRow[0];
+        var dmNivel = calcularNivelLocal(dmEmisor.xp_total).nivel;
+        if (dmNivel < 3)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: dmNivel });
+        if (!(dmEmisor.email_verificado === true))
+          return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
+        var dmReceptorRow = await sql(
+          'SELECT id, nombre, dm_abierto FROM usuarios WHERE id=$1 LIMIT 1',
+          [dmReceptor]
+        );
+        if (!dmReceptorRow.length)
+          return res.status(404).json({ ok: false, error: 'Receptor no encontrado' });
+        var dmBloqueo = await sql(
+          'SELECT 1 AS uno FROM usuario_bloqueos'
+          + ' WHERE (bloqueador_id=$1 AND bloqueado_id=$2)'
+          + '    OR (bloqueador_id=$2 AND bloqueado_id=$1) LIMIT 1',
+          [usuarioId2, dmReceptor]
+        );
+        if (dmBloqueo.length)
+          return res.status(403).json({ ok: false, error: 'DM_BLOQUEADO' });
+        var dmClave = claveDm(usuarioId2, dmReceptor);
+        var dmSalaPrev = await sql(
+          'SELECT id FROM chat_salas WHERE clave_dm=$1 AND tipo=\'dm\' AND activo=true LIMIT 1',
+          [dmClave]
+        );
+        var dmSalaId = dmSalaPrev.length ? dmSalaPrev[0].id : null;
+        var dmXpCobrado = 0;
+        var dmXpAntes = parseInt(dmEmisor.xp_total, 10) || 0;
+        var dmNivelAnt = dmNivel;
+        var dmXpNuevo = dmXpAntes;
+        if (!dmSalaId) {
+          if (dmReceptorRow[0].dm_abierto === false)
+            return res.status(403).json({ ok: false, error: 'DM_CERRADO' });
+          var dmNuevosHoy = await sql(
+            'SELECT COUNT(*)::int AS n FROM chat_salas'
+            + ' WHERE creador_id=$1 AND tipo=\'dm\' AND creado_en > NOW() - INTERVAL \'1 day\'',
+            [usuarioId2]
+          );
+          if ((dmNuevosHoy[0] && dmNuevosHoy[0].n) >= 5)
+            return res.status(429).json({ ok: false, error: 'DM_LIMITE_DIARIO' });
+          var dmNombre = 'DM ' + String(dmEmisor.nombre || 'Viajero').slice(0, 30);
+          // Alta + cobro atomicos (patron comprar_consumible): el INSERT
+          // solo ocurre si xp_total >= 20 (CTE puede); el UPDATE de cobro
+          // REPITE el guard xp_total >= 20 (cierra la carrera de dos hilos
+          // nuevos concurrentes con 20-39 XP: el segundo UPDATE relee la
+          // fila ya descontada y no deja xp negativo), solo si el INSERT
+          // creo fila (CTE cobro con EXISTS nueva) y devuelve el xp_total
+          // real para no recalcularlo en JS (dmXpAntes - 20).
+          var dmNueva = await sql(
+            'WITH puede AS (SELECT id FROM usuarios WHERE id=$4 AND xp_total >= 20),'
+            + ' nueva AS (INSERT INTO chat_salas (nombre, icono, descripcion, tipo, orden, creador_id, clave_dm)'
+            + '   SELECT $1,$2,$3,\'dm\',0,$4,$5 FROM puede'
+            + '   ON CONFLICT (clave_dm) WHERE tipo=\'dm\' AND clave_dm IS NOT NULL DO NOTHING'
+            + '   RETURNING id),'
+            + ' cobro AS (UPDATE usuarios SET xp_total = xp_total - 20'
+            + '   WHERE id=$4 AND xp_total >= 20 AND EXISTS (SELECT 1 FROM nueva) RETURNING xp_total)'
+            + ' SELECT (SELECT id FROM nueva) AS sala_id, (SELECT xp_total FROM cobro) AS xp_total',
+            [dmNombre, '\uD83D\uDCAC', 'Mensajeria directa', usuarioId2, dmClave]
+          );
+          var dmCobro = dmNueva.length ? dmNueva[0] : {};
+          if (dmCobro.xp_total !== null && dmCobro.xp_total !== undefined) {
+            // Cobro confirmado por la BD: sala nueva + xp_total_nuevo real.
+            dmSalaId = dmCobro.sala_id;
+            dmXpCobrado = 20;
+            dmXpNuevo = parseInt(dmCobro.xp_total, 10) || 0;
+          } else {
+            // Sin fila de cobro: o xp < 20 (402) o carrera perdida contra
+            // otro request que creo el hilo (se reusa, xp_cobrado 0).
+            var dmReChequeo = await sql(
+              'SELECT id FROM chat_salas WHERE clave_dm=$1 AND tipo=\'dm\' AND activo=true LIMIT 1',
+              [dmClave]
+            );
+            if (dmReChequeo.length) {
+              dmSalaId = dmReChequeo[0].id;
+            } else {
+              return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
+            }
+          }
+        }
+        var dmIns = await sql(
+          'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto)'
+          + ' VALUES ($1,$2,$3,$4) RETURNING id, creado_en',
+          [dmSalaId, usuarioId2, String(dmEmisor.nombre || 'Viajero').slice(0, 60), dmTexto]
+        );
+        var dmNivelNuevo = calcularNivelLocal(dmXpNuevo).nivel;
+        return res.status(200).json({
+          ok: true,
+          sala_id: dmSalaId,
+          clave_dm: dmClave,
+          id: dmIns[0].id,
+          creado_en: dmIns[0].creado_en,
+          xp_cobrado: dmXpCobrado,
+          xp_total_nuevo: dmXpNuevo,
+          nivel_anterior: dmNivelAnt,
+          nivel_nuevo: dmNivelNuevo,
+          bajo_nivel: dmNivelNuevo < dmNivelAnt,
+        });
+      }
+
+      // Bloquear / desbloquear a un usuario (DM). INSERT ... ON CONFLICT
+      // DO NOTHING (PK compuesta bloqueador+bloqueado) o DELETE fisico de
+      // la relacion (excepcion acotada de la migracion 017: un bloqueo
+      // debe cesar de inmediato). Con sesion firmada.
+      if (tipo2 === 'dm_bloquear') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var dbSes = validarSesion(req, usuarioId2);
+        if (!dbSes.ok) return responderSesion(res, dbSes.razon);
+        var dbBloqueado = String(body.bloqueado_id || '');
+        var dbAccion = String(body.accion || '');
+        if (!dbBloqueado)
+          return res.status(400).json({ ok: false, error: 'bloqueado_id requerido' });
+        if (dbBloqueado === String(usuarioId2))
+          return res.status(409).json({ ok: false, error: 'BLOQUEO_A_MI_MISMO' });
+        if (dbAccion === 'bloquear') {
+          await sql(
+            'INSERT INTO usuario_bloqueos (bloqueador_id, bloqueado_id) VALUES ($1,$2)'
+            + ' ON CONFLICT (bloqueador_id, bloqueado_id) DO NOTHING',
+            [usuarioId2, dbBloqueado]
+          );
+          return res.status(200).json({ ok: true, bloqueado: true });
+        }
+        if (dbAccion === 'desbloquear') {
+          await sql(
+            'DELETE FROM usuario_bloqueos WHERE bloqueador_id=$1 AND bloqueado_id=$2',
+            [usuarioId2, dbBloqueado]
+          );
+          return res.status(200).json({ ok: true, bloqueado: false });
+        }
+        return res.status(400).json({ ok: false, error: 'accion debe ser bloquear o desbloquear' });
       }
 
       // -- Review_voto (Milestones v2 / ADR-014, SKATE "Own the Spot") --
@@ -3832,6 +5245,100 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: { activadas: Object.keys(vocNuevo) } });
       }
 
+      // Arbol de Clases: activar una rama (WP-4, TSK-103 / ADR-028).
+      // Gate: sesion firmada del dueno (ADR-025) + nivel >= 5 derivado de
+      // xp_total (calcularNivelLocal). DECISION DEL DUENO: NO se exige
+      // coincidencia de faccion; se progresa en ramas de cualquier
+      // faccion (estilo Albion). Las ramas art_* DELEGAN en la semantica
+      // de vocacion_activar: escriben usuarios.vocaciones (fuente unica)
+      // y NUNCA ramas_activas.
+      if (tipo2 === 'rama_activar') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var ramActSes = validarSesion(req, usuarioId2);
+        if (!ramActSes.ok) return responderSesion(res, ramActSes.razon);
+        var ramActId = String(body.rama_id || '');
+        if (!RAMA_POR_ID[ramActId])
+          return res.status(400).json({ ok: false, error: 'rama_id no valido' });
+        var ramActUsr = await sql(
+          'SELECT xp_total, vocaciones, progreso_arbol FROM usuarios WHERE id=$1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (!ramActUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var ramActNivel = calcularNivelLocal(parseInt(ramActUsr[0].xp_total, 10) || 0).nivel;
+        if (ramActNivel < 5)
+          return res.status(403).json({ ok: false, error: 'Sube a nivel 5 para desbloquear el arbol de clases' });
+        var ramActVoc = Object.assign({}, (ramActUsr[0].vocaciones) || {});
+        var ramActProg = (ramActUsr[0].progreso_arbol) || {};
+        var ramActVocKey = VOCACION_POR_RAMA_ART[ramActId];
+        if (ramActVocKey) {
+          // Misma semantica que vocacion_activar: toggle sobre
+          // usuarios.vocaciones (fuente unica), sin tocar ramas_activas.
+          if (Object.prototype.hasOwnProperty.call(ramActVoc, ramActVocKey)) {
+            delete ramActVoc[ramActVocKey];
+          } else {
+            ramActVoc[ramActVocKey] = true;
+          }
+          await sql(
+            'UPDATE usuarios SET vocaciones = $1::jsonb WHERE id=$2',
+            [JSON.stringify(ramActVoc), usuarioId2]
+          );
+        } else {
+          await sql(
+            "UPDATE usuarios SET progreso_arbol = COALESCE(progreso_arbol,'{}'::jsonb)"
+            + " || jsonb_build_object('ramas_activas', COALESCE(progreso_arbol->'ramas_activas','{}'::jsonb)"
+            + ' || jsonb_build_object($1::text, true)) WHERE id=$2',
+            [ramActId, usuarioId2]
+          );
+        }
+        var ramActActivas = Object.keys(Object.assign({}, ramActProg.ramas_activas || {}));
+        if (!ramActVocKey && ramActActivas.indexOf(ramActId) === -1) ramActActivas.push(ramActId);
+        return res.status(200).json({
+          ok: true,
+          data: { ramas_activas: ramActActivas, vocaciones: ramActVoc },
+        });
+      }
+
+      // Arbol de Clases: materializar el bono unico de +25 de la mision
+      // mis_perfil_completo (WP-4). Idempotente por write-once: solo si
+      // bono_pendiente (mision completada y sin eleccion previa) y aun no
+      // se eligio rama. Merge ANIDADO de bonos[rama] + rama_bono_elegida.
+      if (tipo2 === 'arbol_usuario') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var bonoSes = validarSesion(req, usuarioId2);
+        if (!bonoSes.ok) return responderSesion(res, bonoSes.razon);
+        if (String(body.accion || '') !== 'bono_mision')
+          return res.status(400).json({ ok: false, error: 'accion no valida' });
+        var bonoRamaId = String(body.rama_id || '');
+        if (!RAMA_POR_ID[bonoRamaId])
+          return res.status(400).json({ ok: false, error: 'rama_id no valido' });
+        var bonoUsr = await sql(
+          'SELECT progreso_misiones, progreso_arbol FROM usuarios WHERE id=$1',
+          [usuarioId2]
+        ).catch(function(){ return []; });
+        if (!bonoUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var bonoPa = (bonoUsr[0].progreso_arbol) || {};
+        if (!bonoPendienteArbol(bonoUsr[0].progreso_misiones || {}, bonoPa))
+          return res.status(409).json({ ok: false, error: 'BONO_NO_DISPONIBLE' });
+        await sql(
+          "UPDATE usuarios SET progreso_arbol = COALESCE(progreso_arbol,'{}'::jsonb)"
+          + " || jsonb_build_object('bonos', COALESCE(progreso_arbol->'bonos','{}'::jsonb)"
+          + "   || jsonb_build_object($1::text, COALESCE((progreso_arbol->'bonos'->>$1)::int,0) + 25),"
+          + "   'rama_bono_elegida', $1::text)"
+          + ' WHERE id=$2',
+          [bonoRamaId, usuarioId2]
+        ).catch(function(e) {
+          console.warn('TRACE: bono de mision no persistido: ' + (e && e.message));
+        });
+        return res.status(200).json({
+          ok: true,
+          data: { bono_pendiente: 0, rama_bono_elegida: bonoRamaId },
+        });
+      }
+
       // -- Comentarios de media (ADR-023) ----------------------------
       // Publicar comentario o respuesta. Rate-limit 30/dia por usuario y
       // XP +2 con tope 20/dia (10 comentarios) en progreso_album (merge
@@ -4085,12 +5592,38 @@ module.exports = async function handler(req, res) {
         if (!ccClave)
           return res.status(400).json({ ok: false, error: 'clave requerida' });
         var ccCons = await sql(
-          'SELECT id, clave, precio_xp FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
+          'SELECT id, clave, precio_xp, categoria FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
           [ccClave]
         ).catch(function(){ return []; });
+        if (!ccCons.length) {
+          // Degradacion si consumibles.categoria no existe todavia
+          // (migracion 017 / WP-6 pendiente): la compra sigue sin
+          // descuento en vez de romper.
+          ccCons = await sql(
+            'SELECT id, clave, precio_xp FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
+            [ccClave]
+          ).catch(function(){ return []; });
+        }
         if (!ccCons.length)
           return res.status(503).json({ ok: false, error: 'Consumibles no disponibles (migracion 010 pendiente?)' });
-        var ccPrecio = parseInt(ccCons[0].precio_xp, 10) || 0;
+        // Descuento del nodo 5 del Arbol de Clases (WP-4): 10% si el
+        // usuario alcanzo el nodo 5 de una rama cuyo efecto descuenta la
+        // categoria del consumible. Si el calculo degrada, no hay
+        // descuento (nunca rompe la compra).
+        var ccPrecioBase = parseInt(ccCons[0].precio_xp, 10) || 0;
+        var ccCategoria = ccCons[0].categoria || null;
+        var ccDescPct = 0;
+        if (ccCategoria) {
+          try {
+            var ccArbol = await calcularArbolUsuario(sql, usuarioId2);
+            ccDescPct = descuentoArbolParaCategoria(ccArbol.ramas, ccCategoria);
+          } catch (eDesc) {
+            ccDescPct = 0;
+          }
+        }
+        var ccPrecio = ccDescPct > 0
+          ? Math.floor(ccPrecioBase * (100 - ccDescPct) / 100)
+          : ccPrecioBase;
         var ccUsr = await sql('SELECT xp_total, capacidades FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
         if (!ccUsr.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -4130,6 +5663,9 @@ module.exports = async function handler(req, res) {
         var ccNivelNuevo = calcularNivelLocal(ccXpNuevo).nivel;
         return res.status(200).json({
           ok: true,
+          precio_base: ccPrecioBase,
+          precio_final: ccPrecio,
+          descuento_pct: ccDescPct,
           xp_total_nuevo: ccXpNuevo,
           nivel_anterior: ccNivelAnt,
           nivel_nuevo: ccNivelNuevo,
@@ -4163,6 +5699,28 @@ module.exports = async function handler(req, res) {
           ucSalas = ucSalas.filter(function(s){ return s && s.hasta && new Date(s.hasta).getTime() > Date.now(); });
           if (ucSalas.length >= 2)
             return res.status(429).json({ ok: false, error: 'Maximo 2 salas efimeras activas' });
+        }
+        // WP-6 (TSK-103 / ADR-028): validacion de los efectos perfil_*
+        // ANTES de descontar inventario. Un payload invalido responde 400
+        // sin consumir la mejora (el descuento y el ledger ocurren despues).
+        var ucTitulo = '';
+        if (ucClave === 'perfil_titulo_custom') {
+          ucTitulo = tituloPerfilSafe(body.titulo);
+          if (!ucTitulo)
+            return res.status(400).json({ ok: false, error: 'TITULO_REQUERIDO' });
+        }
+        var ucDestacados = null;
+        if (ucClave === 'perfil_vitrina_destacada') {
+          // WP-6: acepta el nombre historico body.destacados y el alias
+          // que envia mi-perfil.html, body.albumes (mismo array <=3 ids).
+          var ucDestInput = body.destacados || body.albumes;
+          if (!Array.isArray(ucDestInput) || ucDestInput.length > 3)
+            return res.status(400).json({ ok: false, error: 'DESTACADOS_INVALIDOS' });
+          ucDestacados = [];
+          for (var ucD = 0; ucD < ucDestInput.length; ucD++) {
+            var ucDestId = String(ucDestInput[ucD] == null ? '' : ucDestInput[ucD]).trim().slice(0, 64);
+            if (ucDestId) ucDestacados.push(ucDestId);
+          }
         }
         // Descuenta 1 del inventario (borra la clave si llega a 0)
         if (ucQty === 1) {
@@ -4237,6 +5795,53 @@ module.exports = async function handler(req, res) {
           var ucVipHasta = new Date(Date.now() + 30 * ucUnDia).toISOString();
           ucEfecto = { vip_hasta: ucVipHasta };
           await actualizarCapacidad(sql, usuarioId2, 'vip_hasta', ucVipHasta);
+        } else if (ucClave === 'perfil_marco_dorado') {
+          // WP-6 (TSK-103 / ADR-028): marco permanente de la vitrina del
+          // museo. Capacidad-flag (leida por museo_publico via perfilPosee)
+          // + merge de perfil_config a nivel raiz (ADR-003, nunca reemplazo).
+          ucEfecto = { marco: 'dorado' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_marco_dorado', true);
+          await mergePerfilConfig(sql, usuarioId2, { marco: 'dorado' });
+        } else if (ucClave === 'perfil_marco_plata') {
+          // Marco alternativo de entrada (WP-6): mismo contrato que el
+          // dorado; el ultimo marco consumido gana en perfil_config.
+          ucEfecto = { marco: 'plata' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_marco_plata', true);
+          await mergePerfilConfig(sql, usuarioId2, { marco: 'plata' });
+        } else if (ucClave === 'perfil_tema_oscuro') {
+          // Tema oscuro permanente del museo (WP-6).
+          ucEfecto = { tema: 'oscuro' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_tema_oscuro', true);
+          await mergePerfilConfig(sql, usuarioId2, { tema: 'oscuro' });
+        } else if (ucClave === 'perfil_banda_artista') {
+          // Banda de artista bajo el nombre en la comunidad (WP-6).
+          ucEfecto = { banda: 'Artista' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_banda_artista', true);
+          await mergePerfilConfig(sql, usuarioId2, { banda: 'Artista' });
+        } else if (ucClave === 'perfil_titulo_custom') {
+          // Titulo de viajero ya saneado a ASCII (max 24) en la fase de
+          // validacion previa al descuento de inventario.
+          ucEfecto = { titulo: ucTitulo };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_titulo_custom', true);
+          await mergePerfilConfig(sql, usuarioId2, { titulo: ucTitulo });
+        } else if (ucClave === 'perfil_fondo_paisaje') {
+          // Cabecera del museo: URL http(s) o clave ASCII, max 300. Acepta
+          // body.fondo (nombre historico) y el alias body.fondo_url que
+          // envia mi-perfil.html. Si no viene o no es valido, cae al valor
+          // por defecto documentado (FONDO_PERFIL_DEFAULT); nunca rompe.
+          var ucFondo = String(body.fondo || body.fondo_url || '').trim();
+          var ucFondoOk = ucFondo.length <= 300
+            && (/^https?:\/\/\S+$/i.test(ucFondo) || /^[a-z0-9_-]{1,40}$/i.test(ucFondo));
+          if (!ucFondoOk) ucFondo = FONDO_PERFIL_DEFAULT;
+          ucEfecto = { fondo: ucFondo };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_fondo_paisaje', true);
+          await mergePerfilConfig(sql, usuarioId2, { fondo: ucFondo });
+        } else if (ucClave === 'perfil_vitrina_destacada') {
+          // Hasta 3 ids de album elegidos (ya validados <=3 antes del
+          // descuento). El array completo se sella en perfil_config (merge).
+          ucEfecto = { destacados: ucDestacados };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_vitrina_destacada', true);
+          await mergePerfilConfig(sql, usuarioId2, { destacados: ucDestacados });
         }
         // Ledger de uso append-only
         await sql(

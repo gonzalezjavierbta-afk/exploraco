@@ -12,6 +12,11 @@ relevo; no reemplaza a NEXT.md sino que lo complementa como hoja de ruta.
 - Agenda cultural con ingesta automatizada (Gemini + conector Hostal Terraza).
 - Panel admin (admin.html) con blog, mapas, gaming (logros/trofeos), planes.
 - Sistema de ruteo por costo de subagentes (ADR-006).
+- Gaming v5.0 (20 niveles/4 eras, 28 misiones, 30 logros, 13 consumibles, cromos,
+  referidos, Wayfarer, facciones, vocaciones) y apartado social de 7 tabs.
+  Migracion 016 pendiente en Neon. Detalle en los documentos maestros v5
+  (`ampliacion desarrollo/ExploraCO_Gamificacion_v5_Plan_Maestro.md` y
+  `ampliacion desarrollo/ExploraCO_Sistema_Social_v5.md`).
 
 ## P0 - Higiene y deuda pendiente (desbloquea todo lo demas)
 
@@ -19,10 +24,15 @@ relevo; no reemplaza a NEXT.md sino que lo complementa como hoja de ruta.
    acumuladas: TSK-071 (blog admin), TSK-072/073 (hostales/directorios), TSK-074
    (eventos), TSK-075/ADR-013 (campo web), TSK-077/078/079/080 (directorios y
    Milestones v2). Revisar `git status`/`git log`, commitear por sesion.
-2. **Migraciones Neon pendientes (bloqueadas en Javier).**
-   - Migracion 007 (Milestones v2, `api/interacciones.js`) - PENDIENTE de aplicar.
-   - Migracion 005 - PENDIENTE de deploy (fix en `api/destinos.js`).
-   - Migracion 004 (blog multi-tema/autor) - opcional.
+2. **Migracion Neon pendiente (bloqueada en Javier).**
+   - Migracion **016** (`db/migrations/016_multinivel_crowdsourcing.sql`) -
+     **PENDIENTE de aplicar en Neon (BLOQUEANTE)**: sin ella fallan referidos,
+     facciones, Activo Oculto y `geo_nonces`. Checklist: `docs/DEPLOY_016.md`.
+   - Variables de entorno de la Entrega 016: `SESSION_JWT_SECRET` (nueva,
+     obligatoria) y `RESEND_API_KEY` (pendiente desde TASK-006), mas `SITE_URL`.
+   - Migraciones 004/005/007/011/012/013/014: **YA APLICADAS** en Neon (NEXT.md,
+     sesiones TSK-097..100). La 015 es prerrequisito declarado de la 016:
+     confirmarla en Neon antes de aplicar la 016 (ADR-006).
 3. **`scores` de Hostal sin persistir** (BUG-016): viaja en el payload pero
    `admin-destinos.js` nunca lo escribe. Decidir si se implementa o se cierra.
 
@@ -38,6 +48,14 @@ relevo; no reemplaza a NEXT.md sino que lo complementa como hoja de ruta.
 
 7. TSK-015/016/017: "Quien va este mes", comparador, y secciones bespoke de
    ciudad-perdida.html. TSK-016 (widget "Quien va este mes") es el mas corto.
+   - **Detalle v5:** el estado real y los gaps del apartado social estan
+     documentados en `ampliacion desarrollo/ExploraCO_Sistema_Social_v5.md`
+     (secciones 9, 10 y 15): referidos sin frontend (`registro.html` inexistente,
+     D-09/G-12), checkin de Activo Oculto sin UI (D-13), afinidad de Parche y
+     control territorial solo documentados (G-10/G-11), `album_voto` sin UI
+     (G-07), perfil publico `?id=` no soportado (G-14) y notificacion de resena a
+     `/api/notificaciones` inexistente (G-15). El gaming completo, en
+     `ampliacion desarrollo/ExploraCO_Gamificacion_v5_Plan_Maestro.md`.
 
 ## P3 - Fix estructurales
 

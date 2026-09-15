@@ -756,3 +756,174 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 
 **Leccion / prevencion:** (1) toda ruta de archivo citada en los documentos de gobernanza debe verificarse con `Test-Path`/exploracion antes de darla por valida (ADR-006); (2) cuando un script vive dentro de un skill, citar SIEMPRE la ruta completa desde la raiz; (3) auditoria futura: revisar periodicamente las rutas citadas en BLUEPRINT.md/DECISIONS.md/skills contra el arbol real del repo.
 
+## BUG-035: Referidos inalcanzables por web -- QR/enlace apunta a `registro.html` inexistente y ningun frontend captura `?ref=`
+
+**Severidad:** ALTA (la piramide de referidos es inutilizable desde la UI; el backend esta sano).
+**Sintoma:** el usuario comparte su codigo/QR de invitacion (`.../registro.html?ref=<codigo>`), pero la pagina NO existe (404) y, aunque existiera, el formulario real de registro nunca envia el codigo: la red de referidos queda inalcanzable desde la web.
+**Causa:** `mi-perfil.html:1800` compone `REF_URL_BASE + '/registro.html?ref=' + codigo`; `registro.html` NO existe en el repositorio. El alta/login real (`usuario-session.js:219-255`, `loginConEmail`) envia `auth_id/email/nombre/auth_provider/device_hash` pero NUNCA `codigo_referido`. El backend SI lo soporta: `api/usuarios.js:461` lee `body.codigo_referido || req.query.ref`.
+**Evidencia (ADR-006):** `mi-perfil.html:1800`; `usuario-session.js:219-255`; `api/usuarios.js:461`; `Test-Path registro.html` = False; grep de `codigo_referido`/`?ref=` en `*.html`/`*.js` solo devuelve `mi-perfil.html:1799-1800`.
+**Fix sugerido (NO aplicado):** crear `registro.html` (o landing de registro) que lea `?ref=` y lo envie como `codigo_referido` en el POST de `/api/usuarios`; o redirigir a un registro existente con captura del parametro.
+**Estado:** ROTO (working tree, 2026-09-14). Registrado durante la consolidacion documental v5; no se corrige en esta sesion. Mapa completo: `ExploraCO_Sistema_Social_v5.md` seccion 9.4 (G-12/G-13, D-09).
+
+## BUG-036: Visita rota en el frontend -- `marcarVisitado` no envia `Authorization: Bearer` ni `nonce` (401/400)
+
+**Severidad:** ALTA (el flujo de usuario "Estuve aqui" falla aunque el backend y la geocerca esten listos).
+**Sintoma:** al pulsar "Estuve aqui", el POST `tipo=visita` responde 401 (sesion) o 400 `NONCE_REQUERIDO`/`NONCE_INVALIDO`; el usuario ve un error y no gana XP.
+**Causa:** `usuario-session.js:598-609` (`marcarVisitado`) envia `tipo/usuario_id/destino_id/lat/lng/accuracy/ts` pero NO adjunta el JWT (`Authorization: Bearer`) ni el `nonce`. El backend v13 los exige desde ADR-025: `api/interacciones.js:4734-4741` (`validarSesion` + `consumirNonce`).
+**Evidencia (ADR-006):** `usuario-session.js:598-609`; `api/interacciones.js:4734-4741`.
+**Fix sugerido (NO aplicado):** solicitar `GET ?tipo=geo_nonce_solicitar`, adjuntar `nonce` y el header `Authorization: Bearer <jwt>` en el POST de visita.
+**Estado:** ROTO (working tree, 2026-09-14). Registrado durante la consolidacion documental v5; no se corrige en esta sesion. Mapa completo: `ExploraCO_Sistema_Social_v5.md` y `ExploraCO_Gamificacion_v5_Plan_Maestro.md` seccion 8.6.
+
+## BUG-037: Notificacion de resena a endpoint inexistente (`/api/notificaciones`)
+
+**Severidad:** MEDIA (la resena nueva no notifica al admin; fallo silencioso fire-and-forget).
+**Sintoma:** el POST `tipo=resena` intenta notificar al admin, pero el fetch cae en 404 sin log visible para el usuario; el admin no recibe el correo.
+**Causa:** `api/interacciones.js:4618-4637` hace `fetch('/api/notificaciones')`; ese endpoint NO existe. El real es `POST /api/admin?recurso=notificaciones` (protegido con Bearer admin o `X-Internal-Secret`), en `api/admin.js:281-298`. La notificacion de solicitudes si funciona porque usa el endpoint correcto (`api/publicar-lugar.js:212`).
+**Evidencia (ADR-006):** `api/interacciones.js:4618-4637` (linea 4620 con la URL); `api/admin.js:281-298`; no hay `api/notificaciones.js`.
+**Fix sugerido (NO aplicado):** apuntar el fetch a `/api/admin?recurso=notificaciones` con el header interno/Bearer correspondiente.
+**Estado:** ROTO (working tree, 2026-09-14). Registrado durante la consolidacion documental v5; no se corrige en esta sesion. Mapa completo: `ExploraCO_Sistema_Social_v5.md` seccion 12.2 (G-15, D-08).
+
+## BUG-038: Conteo de miembros de Parche no se muestra (mismatch `miembros_actuales` vs `miembros_count`)
+
+**Severidad:** BAJA (cosmetico; el dato llega pero el frontend no lo lee).
+**Sintoma:** las tarjetas de "Parches abiertos a membresia" nunca muestran el numero de miembros actuales.
+**Causa:** el backend devuelve el alias `miembros_actuales` (`api/interacciones.js:2602-2604`), pero el frontend lee `p.miembros_count` / `p.cantidad_miembros` (`comunidad.html:1300-1301`).
+**Evidencia (ADR-006):** `api/interacciones.js:2602-2604` (`... AS miembros_actuales`); `comunidad.html:1300-1301`.
+**Fix sugerido (NO aplicado):** leer `p.miembros_actuales` en el frontend (o exponer ambos alias).
+**Estado:** ROTO (cosmetico, working tree 2026-09-14). Mapa completo: `ExploraCO_Sistema_Social_v5.md` seccion 3.6 (G-02).
+
+## BUG-039: Relabel residual Pandilla -- textos visibles sin actualizar
+
+**Severidad:** BAJA (cosmetico; solo texto de UI).
+**Sintoma:** pese al relabel visible Pandilla -> Parche, tres textos conservan el termino viejo en los catalogos de niveles.
+**Causa:** el relabel se aplico solo a una parte de los textos; quedaron sin actualizar `mi-perfil.html:514` ("FUNDAR PANDILLA"), `mi-perfil.html:517` ("x1.2 XP de Pandilla grupal") e `index.html:4037` ("FUNDAR PANDILLA").
+**Evidencia (ADR-006):** `mi-perfil.html:514`; `mi-perfil.html:517`; `index.html:4037`. La API y el esquema siguen usando `pandilla*` a proposito (NEXT.md).
+**Fix sugerido (NO aplicado):** reemplazar por "FUNDAR PARCHE" / "XP de Parche grupal" en los tres textos.
+**Estado:** ROTO (cosmetico, working tree 2026-09-14). Mapa completo: `ExploraCO_Sistema_Social_v5.md` seccion 3.5 (G-03).
+
+## BUG-040: Etiquetas de chat desfasadas -- UI dice crear sala nivel 3 / moderar nivel 12, el backend exige 5 / 4
+
+**Severidad:** BAJA (etiqueta informativa desactualizada; el gate real es del backend).
+**Sintoma:** el aviso "Niveles de chat" informa crear sala en nivel 3 y moderar en nivel 12, pero el backend rechaza con 403 hasta los niveles 5 y 4 respectivamente.
+**Causa:** `CHAT_PERKS` (`comunidad.html:648-654`) declara `crear_chat` nivel 3 y `moderador_chat` nivel 12; el backend exige `mis_chat_creador` (nivel 5, 700 XP) y `mis_chat_moderador` (nivel 4, 450 XP) en `api/interacciones.js:334-353`.
+**Evidencia (ADR-006):** `comunidad.html:648-654`; `api/interacciones.js:334-353`.
+**Fix sugerido (NO aplicado):** alinear `CHAT_PERKS` con los umbrales de las misiones (`crear_chat` @5, `moderador_chat` @4).
+**Estado:** ROTO (etiqueta desactualizada, working tree 2026-09-14). Mapa completo: `ExploraCO_Sistema_Social_v5.md` (G-17/G-18, D-06).
+
+## BUG-041: Gate de voto de utilidad ausente -- `review_voto` no valida nivel
+
+**Severidad:** MEDIA (consistencia de diseno: la capacidad se anuncia como nivel 5 pero no se aplica).
+**Sintoma:** cualquier usuario con sesion puede votar utilidad (Own the Spot), sin importar su nivel, aunque la UI presente la capacidad como desbloqueo de nivel 5.
+**Causa:** el catalogo de niveles lista la capacidad como texto (`index.html:4028`; `mi-perfil.html:505`, "votos de utilidad (Own the Spot)"), pero `review_voto` solo valida `usuario_id`, que no sea la propia resena y el dedup: NO valida nivel (`api/interacciones.js:3329-3380`).
+**Evidencia (ADR-006):** `index.html:4028`; `api/interacciones.js:3329-3380`.
+**Fix sugerido (NO aplicado):** agregar gate de nivel 5 (700 XP) en `review_voto` o retirar la capacidad del texto si no se desea gatear.
+**Estado:** ROTO (gate ausente, working tree 2026-09-14). Mapa completo: `ExploraCO_Sistema_Social_v5.md` seccion 6.3 (G-06, D-10).
+
+## BUG-042: `album_crear` calcula el nivel con `floor(xp/100)+1` en vez de la tabla oficial de 20 niveles
+
+**Severidad:** BAJA (inconsistencia de calculo; el gate de nivel 2 no coincide con el umbral real de 100 XP).
+**Sintoma:** el gate "nivel >= 2" para crear albumes se evalua con una formula distinta a la tabla oficial, por lo que el desbloqueo no coincide con el nivel que ve el usuario.
+**Causa:** `api/interacciones.js:3479` calcula `Math.floor(xp_total / 100) + 1`; la fuente de verdad de niveles es la tabla `NIVELES` de `api/usuarios.js:14-35` (nivel 2 = 100 XP).
+**Evidencia (ADR-006):** `api/interacciones.js:3479`; `api/usuarios.js:14-35`.
+**Fix sugerido (NO aplicado):** reutilizar el calculo oficial de nivel (helper compartido) en lugar de la formula `floor(xp/100)+1`.
+**Estado:** ROTO (consistencia, working tree 2026-09-14). Mapa completo: `ExploraCO_Sistema_Social_v5.md` (G-19, D-15).
+
+## BUG-043: Tabs de comunidad desactualizados en GUIA_DE_DESARROLLO.md (doc-drift: 3 vs 7 reales)
+
+**Severidad:** BAJA (doc-drift documental; no afecta runtime).
+**Sintoma:** la guia de desarrollo afirma que `comunidad.html` tiene 3 tabs reales (Chat, Planes, Ranking), cuando el hub real tiene 7.
+**Causa:** drift documental: la guia de desarrollo no se actualizo cuando el hub crecio de 3 a 7 tabs; el codigo real (`comunidad.html:296-304`) tiene Chat, Planes, Mapa, Ranking, Parches, Activo Oculto y Audiovisual. El drift quedo registrado como discrepancia D-01 del Sistema Social v5 (que citaba `GUIA_DE_DESARROLLO.md:900-903`).
+**Evidencia (ADR-006):** contraste original en `ExploraCO_Sistema_Social_v5.md` (D-01, `:860`) contra `comunidad.html:296-304`; al 2026-09-14 la GUIA ya fue corregida por la tarea paralela y `GUIA_DE_DESARROLLO.md:900` ya declara los 7 tabs reales.
+**Fix sugerido (NO aplicado aqui):** mantener la GUIA alineada con `comunidad.html:296-304` (corregida por otra tarea) y conservar el contraste historico en el Sistema Social v5.
+**Estado:** Detectado y en correccion por la tarea paralela de docs core (2026-09-14, GUIA ya en 7 tabs). Se registra igualmente por Regla de Oro 3 (Cero Borrado Logico).
+
+## BUG-044 (fix R-1): `registro.html` inexistente -- alta de usuarios con `?ref=` inalcanzable (cierra BUG-035)
+
+**Severidad:** ALTA (bloqueaba la piramide de referidos desde la web).
+**Contexto:** regresion corregida en la Entrega TSK-103 / ADR-028 (WP-7).
+**Sintoma:** el QR/enlace de referidos apuntaba a `/registro.html?ref=<codigo>`, pero la pagina no existia (404).
+**Causa (original, BUG-035):** `mi-perfil.html` componia la URL, pero nunca se creo la pagina de alta.
+**Resolucion aplicada:** `registro.html` (NUEVO, 13.991 bytes) -- pagina de alta que lee `?ref=` y lo envia como `codigo_referido` en el POST a `/api/usuarios`. `api/utilidades.js` la agrega a `STATIC_PAGES` (`/registro.html`).
+**Evidencia (ADR-006):** `Test-Path registro.html` = True; `api/utilidades.js` contiene `{ loc:'/registro.html', priority:'0.5', freq:'monthly' }`.
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028). Cierra el sintoma reportado en BUG-035 (queda pendiente el deploy).
+
+## BUG-045 (fix R-2): ningun frontend capturaba `?ref=` -- el codigo de referido nunca llegaba al backend
+
+**Severidad:** ALTA (la piramide de referidos era inutilizable aunque el backend la soportara).
+**Contexto:** regresion corregida en la Entrega TSK-103 / ADR-028 (WP-7).
+**Sintoma:** al registrarse desde un enlace de invitacion, `codigo_referido` nunca se enviaba; la red quedaba sin construir.
+**Causa (original, BUG-035):** `usuario-session.js` (`loginConEmail`) enviaba `auth_id/email/nombre/auth_provider/device_hash` pero NUNCA `codigo_referido`, y no se leia el parametro `?ref=` de la URL.
+**Resolucion aplicada:** `usuario-session.js` captura `?ref=` con TTL de 30 dias y lo adjunta como `codigo_referido` en `loginConEmail`; ademas refresca el JWT de sesion.
+**Evidencia (ADR-006):** `registro.html` (NUEVO) consume el parametro y `usuario-session.js` lo propaga; el backend ya leia `body.codigo_referido || req.query.ref` (`api/usuarios.js`).
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028). Cierra el segundo sintoma de BUG-035.
+
+## BUG-046 (fix R-3): `mi-perfil.html?id=` ignoraba el parametro -- no se podia visitar el perfil de otro usuario
+
+**Severidad:** MEDIA (funcionalidad del perfil publico inaccesible).
+**Contexto:** regresion corregida en la Entrega TSK-103 / ADR-028 (WP-7).
+**Sintoma:** abrir `mi-perfil.html?id=<uuid>` mostraba SIEMPRE el perfil propio del usuario en sesion, ignorando el `id` solicitado.
+**Causa:** `mi-perfil.html` no leia el parametro `id` de la URL; el perfil publico de un tercero no tenia superficie.
+**Resolucion aplicada:** la vista publica se movio a `perfil.html` (NUEVO, consume UNA llamada `museo_publico`); `mi-perfil.html` redirige a `perfil.html?id=` cuando recibe el parametro `id`.
+**Evidencia (ADR-006):** `perfil.html` (NUEVO, 53.205 bytes) procesa `?id=`; `api/usuarios.js` `GET tipo=perfil_publico` responde con la version ligera.
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
+
+## BUG-047 (fix R-4): etiqueta "Control Territorial" enganosa en la comunidad
+
+**Severidad:** BAJA (cosmetico / informacion enganosa).
+**Contexto:** regresion corregida en la Entrega TSK-103 / ADR-028 (WP-7).
+**Sintoma:** `comunidad.html` presentaba una seccion rotulada "Control Territorial" que sugeria un control persistente y exclusivo por faccion, cuando el calculo es derivado en consulta y no otorga dominio.
+**Causa:** el rotulo se redacto antes de fijar que la afinidad de Parche y el territorio se calculan en lectura (ADR-027), nunca se persiste un "dueno".
+**Resolucion aplicada:** se corrigio la etiqueta de la seccion en `comunidad.html`.
+**Evidencia (ADR-006):** `comunidad.html` (archivo modificado en el working tree de TSK-103); ADR-027 documenta el calculo derivado.
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
+
+## BUG-048 (fix R-5): relabel residual Pandilla -> Parche en la UI (cierra BUG-039)
+
+**Severidad:** BAJA (cosmetico; solo texto visible).
+**Contexto:** regresion cerrada en la Entrega TSK-103 / ADR-028 (WP-7); es la continuacion de BUG-039.
+**Sintoma:** pese al relabel visible, quedaban textos con "PANDILLA" en los catalogos de niveles (`mi-perfil.html` e `index.html`).
+**Causa:** el relabel se aplico por partes y dejo textos sin actualizar (BUG-039).
+**Resolucion aplicada:** se corrigio el texto visible en `mi-perfil.html` e `index.html`. La API y el esquema conservan `pandilla*` a proposito (relabel SOLO de UI, ver BLUEPRINT.md seccion 5-ter).
+**Evidencia (ADR-006):** `index.html` y `mi-perfil.html` modificados en el working tree de TSK-103.
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028). Cierra BUG-039.
+
+## BUG-049: fuga de PII preexistente en `api/usuarios.js` (`?id=`, `?buscar=`, `?tipo=referido_codigo`)
+
+**Severidad:** ALTA (exposicion de datos personales; seguridad).
+**Contexto:** detectado y corregido en la Entrega TSK-103 / ADR-028 (WP-3, `api/usuarios.js` v10).
+**Sintoma:** `GET /api/usuarios?tipo=perfil_publico&id=<uuid>` devolvia el perfil completo (incluyendo email, tokens de verificacion, `device_hashes` y `codigo_referido`) a cualquiera que conociera el `id`; `?buscar=` permitia enumerar por email y `referido_codigo` era enumerable.
+**Causa:** la proyeccion del perfil se construia con `SELECT *` y sin control de acceso por rol/propietario (el patron historico de identidad solo por `usuario_id`).
+**Resolucion aplicada:** proyeccion owner-aware (subconjunto publico SIN email/tokens/`device_hashes`/`codigo_referido`; el detalle completo solo para admin o el dueno), `?buscar=` exige admin y `?tipo=referido_codigo` exige sesion firmada JWT (ADR-025).
+**Evidencia (ADR-006):** `api/usuarios.js` v12, historial de versiones L75-88 (v10 WP-3 cierra la fuga de PII con whitelist owner-aware; v11/v12 extienden).
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
+
+## BUG-050: carrera del cobro del DM -- doble cobro / doble sala al enviar el primer mensaje
+
+**Severidad:** MEDIA (integridad de XP y de salas).
+**Contexto:** detectado y corregido en la Entrega TSK-103 / ADR-028 (WP-6).
+**Sintoma:** dos envios concurrentes del primer mensaje podian crear dos salas DM para el mismo par de usuarios y/o cobrar 20 XP dos veces.
+**Causa:** el INSERT de la sala DM no era idempotente ante concurrencia (falta de constraint/`ON CONFLICT` sobre la clave del par).
+**Resolucion aplicada:** `clave_dm` (par de uuid ordenado) con indice unico parcial `idx_chat_salas_dm_unica` y `INSERT ... ON CONFLICT (clave_dm) WHERE tipo='dm' DO NOTHING`; la sala se resuelve despues con un SELECT y el cobro ocurre una sola vez.
+**Evidencia (ADR-006):** `api/interacciones.js` (v15) ramas `dm_enviar`/`dm_hilos` usan `split_part(clave_dm,'_',...)` y `ON CONFLICT (clave_dm) WHERE tipo='dm'`; `db/migrations/017_perfil_publico_arbol_casas.sql` crea el indice unico parcial.
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
+
+## BUG-051: `museo_publico` tragaba el error de esquema -- devolvia 404 en vez de 503
+
+**Severidad:** MEDIA (diagnostico enganoso; la pagina parecia "no encontrada" cuando faltaba la migracion).
+**Contexto:** detectado y corregido en la Entrega TSK-103 / ADR-028 (WP-3).
+**Sintoma:** al pedir un perfil publico sin la migracion 017 aplicada, el endpoint respondia 404 (usuario inexistente), ocultando la causa real (columnas/tablas ausentes).
+**Causa:** el catch generico del handler `museo_publico` no distinguia el error de esquema (42P01/42703) del caso legitimo "sin filas".
+**Resolucion aplicada:** error tipificado 503 `SCHEMA_NOT_MIGRATED` cuando falta el esquema, en linea con el patron ya usado por otros handlers (no silenciar el fallo, Reglas de Oro).
+**Evidencia (ADR-006):** `api/interacciones.js` (v15) rama `tipo=museo_publico` (L2732).
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
+
+## BUG-052: `casa_ranking` / `exp_ocultos` contaban Activos Ocultos sin filtrar `activo=true`
+
+**Severidad:** MEDIA (conteos inflados que desvirtuaban el ranking y la experiencia).
+**Contexto:** detectado y corregido en la Entrega TSK-103 / ADR-028 (WP-5).
+**Sintoma:** el ranking de Casas y el calculo de `exp_ocultos` sumaban Activos Ocultos borrados logicamente (`activo=false`), inflando los resultados.
+**Causa:** las consultas derivadas agregaban sobre `activos_ocultos` sin el filtro de soft-delete que usa el resto del sistema (Regla de Oro 3 / ADR-003: borrado logico, no fisico).
+**Resolucion aplicada:** se agrego `activo = true` a las consultas de `casa_ranking` y del calculo `exp_ocultos`.
+**Evidencia (ADR-006):** `api/usuarios.js` (v12) rama `casa_ranking` (L445) y `api/interacciones.js` (v15) calculo de Activos Ocultos; ambos archivos modificados en el working tree de TSK-103.
+**Estado:** RESUELTO (working tree, 2026-09-15, TSK-103 / ADR-028).
+

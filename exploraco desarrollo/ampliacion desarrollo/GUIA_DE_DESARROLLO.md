@@ -60,8 +60,15 @@ Sistemas principales (los 4 nucleos que documenta esta guia):
 |---|---|---|
 | Registro en directorios | publicar.html, admin.html, admin-destinos.js, publicar-lugar.js | 4 vias para crear destinos (form publico, admin, seeds editoriales, tarjetas estaticas) |
 | Guardado de mapas | index.html, mapas.html, usuario-session.js, interacciones.js | Mapa cultural, "Mi Mapa" personal y mapas tematicos publicos/privados |
-| Social | interacciones.js, comunidad.html, mi-perfil.html, mi-lugar.html | Resenas, rating, guardados, visitas, sesion por email, comunidad y ranking |
-| Gaming | interacciones.js, usuarios.js, usuario-session.js, index.html | XP, niveles, badges, misiones, trofeos/logros con rareza estilo Steam |
+| Social | interacciones.js, comunidad.html, mi-perfil.html, mi-lugar.html | Resenas, rating, guardados, visitas, sesion por email, hub de 7 tabs (chat/planes reales, albumes, Parches, facciones) y ranking |
+| Gaming | interacciones.js, usuarios.js, usuario-session.js, index.html | XP, 20 niveles/4 eras, badges, 28 misiones, 30 logros con rareza estilo Steam, 13 consumibles, cromos, Parches y capa v5.0 (referidos, Wayfarer, facciones, vocaciones) |
+
+> **Documentacion maestra (v5):** el detalle tecnico del gaming esta en
+> `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Gamificacion_v5_Plan_Maestro.md`
+> (602 lineas) y el del apartado social en
+> `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Sistema_Social_v5.md`
+> (878 lineas). El v4 (`..._v4_Plan_Maestro.md`) queda como referencia historica
+> (solo lectura). Checklist operativo de la Entrega 016: `docs/DEPLOY_016.md`.
 
 ### 2.2 Stack tecnologico
 
@@ -168,7 +175,7 @@ seed/loader/smoke viven en `scripts/` (nunca en `api/`), por eso son ilimitados.
 |---|---|
 | `api/destinos.js` | Listado publico + `modo=mapa` + stats. `toPlace()` normaliza filas Neon -> objeto cliente. Blog excluido salvo `?categoria=blog`. |
 | `api/usuarios.js` | Upsert de usuario (login por email sin password), leaderboard, nivel/badge/total_logros derivados en cada lectura. |
-| `api/interacciones.js` | Motor social/gaming: resena/rating/visita/guardado + quitar_*, XP, MISIONES (6), LOGROS (16), mapas tematicos (CRUD), GETs (resenas, dims_avg, guardados, is_guardado, mapa, mi_rating, logros, mapas_mios, mapas_publicos, mapa_detalle). |
+| `api/interacciones.js` | Motor social/gaming (v13): resena/rating/visita/guardado + quitar_*, XP, **MISIONES (28)**, **LOGROS (30)**, consumibles, cromos, Parches, Wayfarer (Activo Oculto), vocaciones, mapas tematicos (CRUD), chat/planes, albumes y comentarios. GETs: resenas, dims_avg, guardados, is_guardado, mapa, mi_rating, logros, misiones, mapas_mios, mapas_publicos, mapa_detalle, chat_salas, chat_mensajes, planes, plan_chat, vocaciones_*, tabla_destino, albumes, album_detalle, multimedia_mapa, consumibles, inventario, mis_cromos, pandilla_detalle, activos_ocultos_pendientes. |
 | `api/admin-destinos.js` | CRUD de destinos con auth Bearer. POST con `ON CONFLICT (slug) DO UPDATE`. PUT con merge JSONB. DELETE en cascada. |
 | `api/publicar-lugar.js` | Formulario publico: INSERT draft, slug aleatorio, tags JSONB, notificacion email al admin. |
 | `api/pagina-destino.js` | Motor de renderizado v9: SELECT multi-tabla + `buildHTML()` (secciones condicionales por categoria) + JS inline con `onclick` fisico. |
@@ -211,9 +218,9 @@ seed/loader/smoke viven en `scripts/` (nunca en `api/`), por eso son ilimitados.
 | Carpeta | Contenido |
 |---|---|
 | `scripts/` | ~100+ seeds (`seed-*.js`), ~120+ loaders (`load-*-api.js`), ~100+ smoke tests (`smoke_test_*.js`), generadores (`_gen_hostales_pipeline.js`), `fake_neon.js`, utilidades. Patron Fase 9. |
-| `db/migrations/` | Migraciones versionadas (ADR-008): 001-006 aprox. (dims/traveller, blog autor, progreso_logros, mapas, etc.). |
+| `db/migrations/` | Migraciones versionadas (ADR-008): **003 a 016** (dims/traveller, blog autor, progreso_logros, mapas, milestones v2, comunidad social, albumes, gamificacion v4, direccion, dedup resena/rating, comentarios de album, reset de visitas, epic prompt/vocaciones y multinivel/crowdsourcing). La **016 esta PENDIENTE** de aplicar en Neon (ver `docs/DEPLOY_016.md`); 011-014 ya aplicadas (NEXT.md). |
 | `db/cleanups/` | SQL de limpieza de datos de prueba versionado. |
-| `docs/superpowers/specs/` | Design specs por feature (mapas publicos/privados, comunidad unificada, logros/trofeos/voto blog, clustering del mapa, ruta salsera). |
+| `docs/superpowers/specs/` | Design specs por feature (**13 + README**): mapa-cultural-clustering, logros-trofeos-voto-blog, ruta-salsera-bogota, mapas-publicos-privados, comunidad-unificada, milestones-v2-gaming, comunidad-chat-planes-backend, albumes-fotograficos, gamificacion-v4, multimedia-mapa-cultural-drawer, presencia-fisica-gamificacion-v4, epic-prompt-vocaciones-chat-perfil y **2026-09-14-gaming-v5-referidos-wayfarer-facciones** (Entrega 016). El prompt de producto original es `promptgamming.md` (ver `docs/DEPLOY_016.md:7`). |
 | `exploraco desarrollo/` | AI-DOS Core: PROJECT, BLUEPRINT, DECISIONS, TASKS, NEXT, BUGS_HISTORICOS, Reglas de Oro, fichas de destinos (ficha-*.md), referentes-agenda. |
 | `.opencode/skills/` | Skills de opencode: create-dynamic-page, gold-shield, batch-create, research-destination, etc. |
 | `.agents/skills/`, `.superpowers/` | Otros skills/plugins. |
@@ -897,9 +904,7 @@ fisico (Regla de Oro 5):
   "Entrar sin sesion - modo demo".
 - **User bar:** avatar, nombre, nivel (XP_LEVELS local), barra XP, stats
   XP/Badges/Guardados/Visitados.
-- **Tabs reales: 💬 Chat, 🗺️ Planes, 🏆 Ranking** (NOTA: la spec
-  2026-09-07 de comunidad unificada describia otros tabs; el codigo real tiene
-  estos 3).
+- **Tabs reales (7, `comunidad.html:296-304`): 💬 Chat, 🗺️ Planes, 🗺️ Mapa, 🏆 Ranking, 👥 Parches, 🕵️ Activo Oculto, 🎬 Audiovisual.** El conmutador es `showCommTab()` (`comunidad.html:2204-2222`); al salir de Chat se detiene el polling. El mapa de cada tab a sus endpoints sociales y los gaps conocidos estan en `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Sistema_Social_v5.md` (secciones 2 y 15). (La spec 2026-09-07 de comunidad unificada describia solo 3.)
   - **Chat = REAL (TSK-089, espec 2026-09-08):** `GET /api/interacciones?
     tipo=chat_salas` y `tipo=chat_mensajes&sala_id=`; envio `POST tipo=
     chat_msg` (+2 XP con tope diario 20 XP en `usuarios.progreso_social`);
@@ -992,53 +997,91 @@ nunca se guardan.
 Cabecera de `api/interacciones.js` documenta los 3 fixes de fraude de XP de la
 v3 (visita/guardado/resena).
 
-### 8.2 Niveles (6) - api/usuarios.js
+### 8.2 Niveles (20 en 4 eras) - api/usuarios.js
 
-| Nivel | Umbral XP |
-|---|---|
-| Viajero novato | 0 |
-| Explorador | 100 |
-| Aventurero | 300 |
-| Embajador Colombia | 600 |
-| Leyenda viajera | 1000 |
-| Maestro ExploraCO | 2000 |
+`NIVELES` (`api/usuarios.js:14-35`) define 20 umbrales; `calcularEra()`
+(`api/usuarios.js:46-51`) agrupa las eras. La tabla es la misma en
+`XP_LEVELS` de index.html y en mi-perfil/comunidad (mantener sincronizadas).
 
-- `calcularNivel(xp)` y `conNivel(row)` derivan `nivel` y `badge_actual` en cada
-  lectura (NUNCA se guardan, evita desincronizacion).
-- Los mismos umbrales existen en `XP_LEVELS` de index.html (mantener sincronizados).
+| Nivel | Umbral XP | Nombre | Era |
+|---|---|---|---|
+| 1 | 0 | Caminante Novato | Mundana |
+| 2 | 100 | Rastreador Local | Mundana |
+| 3 | 250 | Explorador Urbano | Mundana |
+| 4 | 450 | Aventurero Regional | Mundana |
+| 5 | 700 | Vanguardia Territorial | Mundana |
+| 6 | 1000 | Embajador de Zona | Patrocinada |
+| 7 | 1400 | Fotógrafo de Ruta | Patrocinada |
+| 8 | 1900 | Cronista de Historias | Patrocinada |
+| 9 | 2500 | Buscador de Leyendas | Patrocinada |
+| 10 | 3200 | Guía de Fronteras | Patrocinada |
+| 11 | 4000 | Estratéga Comunitario | Organizador |
+| 12 | 5200 | Documentalista Visual | Organizador |
+| 13 | 6800 | Señor del Spot | Organizador |
+| 14 | 8500 | Cartógrafo de Cine | Organizador |
+| 15 | 10500 | Protector del Patrimonio | Organizador |
+| 16 | 13000 | Curador de Colombia | Leyenda |
+| 17 | 16000 | Mariscal de Parche | Leyenda |
+| 18 | 19500 | Cineasta de Territorio | Leyenda |
+| 19 | 24000 | Inmortal del Mapa | Leyenda |
+| 20 | 30000 | Gran Maestro ExploraCO | Leyenda |
+
+- `calcularNivel(xp)` y `conNivel(row)` derivan `nivel`, `badge_actual` y `era`
+  en cada lectura (NUNCA se guardan, evita desincronizacion).
+- Nivel 5 (700 XP) desbloquea en bloque las **4 vocaciones de artista**
+  (`musico`, `cine`, `artista_grafico`, `escritor`); nivel 14 (8500 XP) permite
+  **fundar Parche**.
 
 ### 8.3 Badges (7) - XP_BADGES en index.html
 
 `primer_lugar`, `explorador5`, `viajero10`, `primer_resena`, `critico`,
-`visitado3`, `colombiano`. Se renderizan con null-guards (el modulo social
+`visitado3`, `colombiano`. Conteo verificado contra el archivo real en
+`index.html:4055-4063` (**sigue siendo 7**: son insignias de perfil, un sistema
+aparte de los 20 niveles/eras). Se renderizan con null-guards (el modulo social
 embebido fue removido con la comunidad unificada; los contenedores `#pts-xp`,
 `#badges-grid`, `#logros-grid`, etc. ya NO existen en el HTML).
 
-### 8.4 MISIONES (6) - api/interacciones.js
+### 8.4 MISIONES (28) - api/interacciones.js
 
 DAG via `requiere`, evaluadas por `evaluarMisiones()` tras cada POST con XP
-(progreso_misiones con merge `||`, bonus XP sumado a `xp_total`):
+(progreso_misiones con merge `||`, bonus XP sumado a `xp_total`). Catalogo
+completo en el bloque `var MISIONES` de `api/interacciones.js` (L214-556); el
+detalle mision por mision esta en
+`ExploraCO_Gamificacion_v5_Plan_Maestro.md` (seccion 5).
 
-| ID | Grupo | Requiere | XP | Condicion |
-|---|---|---|---|---|
-| `mis_primer_guardado` | general | - | 15 | 1 guardado |
-| `mis_primera_resena` | general | - | 20 | 1 resena con `xp_ganado>=25` |
-| `mis_primera_visita` | general | - | 15 | 1 visita |
-| `mis_explorador_bogota` | ciudad | primer_guardado | 40 | 5 guardados en Bogota |
-| `mis_organizador_bogota` | ciudad | explorador + primera_resena | 100 | 8 guardados Bogota + xp_total>=300; **desbloquea `organizar_actividad`** |
-| `mis_nomada_digital` | categoria | primer_guardado | 30 | 3 hostales con tag coworking |
+| Grupo | Misiones | Foco |
+|---|---|---|
+| `general` | 11 | Primer guardado/resena/visita, hitos de XP, chat, planes, perfil |
+| `ciudad` | 3 | Coleccion por ciudad (Bogota y otras) |
+| `categoria` | 2 | Categorias/tags (p. ej. hostales con tag coworking) |
+| `fotos` | 6 | Albumes/feed de fotos sociales (`mis_primera_foto_social`, `mis_creador_album`, `mis_album_curador`, ...) |
+| `artista` | 6 | Vocaciones nivel 5 (`mis_primera_vocacion_artista`, `mis_camino_musica`, `mis_camino_cine`, `mis_camino_arte`, `mis_camino_escritor`, `mis_poliglota_artista`) |
 
-**DESBLOQUEOS** (api/usuarios.js L41): `mis_organizador_bogota ->
-organizar_actividad`. `conMisiones()` expone `row.capacidades`. En index.html,
+Ejemplos de misiones que abren capacidades de UI:
+
+| ID | Grupo | XP | Condicion |
+|---|---|---|---|
+| `mis_primer_guardado` | general | 15 | 1 guardado |
+| `mis_primera_resena` | general | 20 | 1 resena con `xp_ganado>=25` |
+| `mis_organizador_bogota` | ciudad | 100 | 8 guardados Bogota + xp_total>=300; **desbloquea `organizar_actividad`** |
+| `mis_chat_mensajero` | general | - | habilita `chat` (nivel 3 / 250 XP) |
+
+**DESBLOQUEOS** (`api/usuarios.js:67-73`): `mis_organizador_bogota ->
+organizar_actividad`, `mis_fotografo -> subir_fotos`, `mis_chat_mensajero ->
+chat`, `mis_chat_moderador -> moderador_chat`, `mis_chat_creador ->
+crear_chat`. `conMisiones()` expone `row.capacidades`. En index.html,
 `renderOrganizarBtn` mantiene el boton `#btn-organizar` bloqueado hasta
 completar `mis_organizador_bogota`.
 
-### 8.5 LOGROS / Trofeos (16) - api/interacciones.js (ADR-012)
+### 8.5 LOGROS / Trofeos (30) - api/interacciones.js (ADR-012, ampliado por ADR-024)
 
 Shape de consola: `tier` bronce/plata/oro/platino, `xp`, fecha de desbloqueo
-(`en`), `requiere`, y **rareza global % estilo Steam** en el GET.
+(`en`), `requiere`, y **rareza global % estilo Steam** en el GET. Catalogo real
+de **30**: 25 fijos + 5 por ciudad; tiers 6 bronce / 8 plata / 9 oro / 2 platino
+(+ los 5 de ciudad). Bloque `var LOGROS` en `api/interacciones.js`; detalle en
+`ExploraCO_Gamificacion_v5_Plan_Maestro.md` (seccion 6).
 
-**11 generales + 5 por ciudad** (generados desde `CIUDADES_COLECCION`):
+**25 del catalogo fijo + 5 por ciudad** (generados desde `CIUDADES_COLECCION`):
 
 | ID | Nombre | Tier | XP |
 |---|---|---|---|
@@ -1058,6 +1101,15 @@ Shape de consola: `tier` bronce/plata/oro/platino, `xp`, fecha de desbloqueo
 | `logr_conquistador_medellin` | Conquistador de Medellin (8) | oro | 75 |
 | `logr_senor_santa_marta` | SeÃ±or de Santa Marta (6) | plata | 40 |
 | `logr_cali_es_colombia` | Cali es Colombia (6) | plata | 40 |
+
+**Logros anadidos despues de ADR-012 (hasta llegar a 30):** `logr_pionero`
+(visita rural, ADR-024); los 7 de albumes/media (`logr_albumero`,
+`logr_coleccionista_visual`, `logr_maestro_fotografo`, `logr_favorito_comunidad`,
+`logr_estrella_del_mapa`, `logr_guardian_historias`, `logr_viajero_multimedia`);
+los 3 sociales (`logr_social_chat`, `logr_social_plan`, `logr_anfitrion`); y los
+3 de Milestones v2 (`logr_spot_domado`, `logr_especialista_gastro`,
+`logr_cazador_rarezas`). Los IDs de logros son convencion estable: cambiarlos
+invalida el progreso persistido en `progreso_logros`.
 
 **Mecanica:**
 
@@ -1086,13 +1138,79 @@ invalida el progreso ya persistido en `progreso_logros`.
 |---|---|
 | index.html | `updatePointsUI()` (XP/nivel/barra/badges con null-guards), `showLevelUpModal` (`#levelup-modal`), `renderOrganizarBtn`, `cargarLogros`/`renderLogrosGrid` (tier + rareza, barra X/Y), `initPoints`. Hook `window.onExploraCOUpdate`. |
 | comunidad.html | User bar con XP/badges y Ranking real. |
-| mi-perfil.html | Stats, badges, trofeos ("X / 16" + tier), quick actions. |
+| mi-perfil.html | Stats, badges, trofeos ("X / 30" + tier), quick actions, Tienda/Inventario/Mis Cromos, Museo-line, Mi Red y vocaciones. |
 | api/utilidades.js | blog-lista con badge `[estrella] rating (N)` en blog.html. |
 | api/pagina-destino.js | Widget `#qr-stars` en todas las categorias (incl. blog) con contador de opiniones. |
 
 **Nota de estado:** BUG-028 (modal "Subiste de nivel" fantasma) fue corregido en
 index.html: solo persistir `_ultimoNivelVisto` cuando `window.ExploraCO.usuario`
 existe (el render pre-sesion no debe contaminar la comparacion).
+
+### 8.7 Economia de XP y consumibles (ADR-018)
+
+- **13 consumibles** en la tabla `consumibles` (10 de la migracion 010 + 3 de
+  mejoras de perfil de la migracion 015), comprables (`comprar_consumible`,
+  gasta `xp_total` con de-nivel real) y usables (`usar_consumible`).
+- Ledger `consumo_consumibles`; inventario/capacidades en `usuarios.capacidades`
+  + `usuarios.progreso_*` (merge `||`, ADR-003).
+- GET `tipo=consumibles` / `tipo=inventario`; UI en `mi-perfil.html`
+  (Tienda/Inventario). Detalle: `ExploraCO_Gamificacion_v5_Plan_Maestro.md`
+  seccion 4.
+
+### 8.8 Cromos y Parches (ADR-018)
+
+- **Cromos:** drop probabilistico (15% por accion de XP), rareza por roll
+  (`cromos_catalogo`, `usuarios_cromos`); el consumible `imantador_cromos`
+  garantiza epico o mejor. Intercambio `cromo_intercambio` (hoy SOLO BACKEND,
+  sin UI). Vitrina en `mi-perfil.html`.
+- **Parches (ex Pandillas):** `pandillas`, `pandillas_miembros`, `pandilla_retos`;
+  fundar requiere nivel 14 (8500 XP) y max 1 activo; fama = 10% del XP de sus
+  miembros (`pandillas.fama_total`); retos con ventana reparten `xp_bono`.
+  La UI usa "Parche" y la API/esquema conservan `pandilla*` (relabel solo de
+  texto visible).
+
+### 8.9 Referidos multinivel (Entrega 016 / ADR-027)
+
+`usuarios.referido_por` (self-FK), `codigo_referido`, `xp_ref_total` y
+`referidos_directos_contados`. Reparto FLOOR 10/5/3/2/1% sobre `xp_ref_total`
+via CTE recursiva de 5 niveles (`api/interacciones.js:1136-1155`), topes 500
+directos y 20/dia. Registro con `?ref=` y GET `referido_codigo`/`referido_red`
+en `api/usuarios.js` (v9). UI "Mi Red" con QR en `mi-perfil.html`; **el frontend
+no captura `?ref=` y `registro.html` no existe** (gap D-09/G-12 del doc social).
+
+### 8.10 Wayfarer "Activo Oculto" (Entrega 016 / ADR-027)
+
+Crowdsourcing geoespacial peer-to-peer: `activos_ocultos`,
+`activos_ocultos_votos` (PK compuesta) y `activos_ocultos_checkins`. Estados
+`pendiente/aprobado/rechazado`; quorum +/-3 votos netos; checkin geolocalizado
+que reutiliza la geocerca de ADR-024 + `geo_nonces` de un solo uso (2 min).
+XP: +5 por votar (tope 30/dia), +15 por checkin y +50 al proponente al aprobar
+(moderacion `activo_oculto_moderar` en `api/admin.js`). UI proponer/votar en
+`comunidad.html` (tab Activo Oculto); **el checkin es SOLO BACKEND** (sin UI).
+
+### 8.11 Facciones y vocaciones (Entrega 016 / ADR-027, ADR-026)
+
+- **4 facciones** (`exploradores`, `curadores`, `creadores`, `artistas`) con
+  CHECK en `usuarios.faccion`; primera eleccion gratis, cambio 500 `xp_total`
+  + cooldown 15 dias (requiere `email_verificado`). Ranking GET
+  `faccion_ranking` (agregado + top 3 por faccion). La "afinidad de Parche"
+  (x1.3/x1.15/x1.0) y el "control territorial" por ciudad estan SOLO
+  DOCUMENTADOS (la UI los rotula pero consulta el ranking global).
+- **Vocaciones:** 4 rutas acumulables (`musico`, `cine`, `artista_grafico`,
+  `escritor`) desbloqueadas juntas a nivel 5 (el codigo unifica el ADR-026
+  original de niveles 5/8/11). Toggle `vocacion_activar`; catalogo en
+  `api/interacciones.js:187-203`.
+
+### 8.12 Presencia fisica y anti-Sybil (ADR-024, ADR-025)
+
+- **Presencia fisica (ADR-024):** geocerca Haversine server-side en
+  `POST tipo=visita` (radios adaptativos 100/150/200/250 m, accuracy <=150 m,
+  cooldown, tope diario, rechazo de `0,0`), dedup-first + indice unico parcial,
+  `quitar_visita` como soft-delete; evidencia en `interacciones.dims.geo`.
+- **Anti-Sybil (ADR-025):** sesion firmada JWT HMAC SHA-256
+  (`SESSION_JWT_SECRET`), JWT `timingSafeEqual` en visita/votar/checkin, nonce
+  geoespacial de un solo uso (`geo_nonces`), `device_hashes` y exigencia de
+  `email_verificado` para referidos, proponer/votar Activos y fundar Parche.
 
 ---
 
@@ -1165,9 +1283,13 @@ scripts de `scripts/` (seed/loader/smoke).
 - Mas de 100 paginas dinamicas en produccion (sitios, hostales, comidas,
   eventos, blogs) creadas con el patron Fase 9. Total destinos ~130+ (ver
   TASKS.md para el conteo vigente).
-- Gaming completo: 6 misiones, 16 logros/trofeos, XP, niveles, badges,
-  leaderboard. Mapas tematicos publicos/privados implementados (backend +
-  index + mapas.html).
+- Gaming completo: **28 misiones, 30 logros/trofeos**, XP, **20 niveles en 4
+  eras**, 7 badges, **13 consumibles**, cromos, Parches, leaderboard y la capa
+  social v5.0 (referidos, Wayfarer, facciones, vocaciones). Mapas tematicos
+  publicos/privados implementados (backend + index + mapas.html).
+- Apartado social: `comunidad.html` con **7 tabs** (Chat, Planes, Mapa, Ranking,
+  Parches, Activo Oculto, Audiovisual); migracion **016 PENDIENTE** de aplicar en
+  Neon (bloquea referidos, facciones, Activo Oculto y `geo_nonces`).
 - Sesion por email sin password, guardados/visitados en doble via
   localStorage + Neon, reseÃ±as con dimensiones, rating/voto rapido con dedup.
 
@@ -1186,7 +1308,14 @@ scripts de `scripts/` (seed/loader/smoke).
 - Completar tags vacios legacy (~18 eventos y ~18 comidas) con el patron
   seed+loader.
 - Infraestructura: dominio exploraco.co, Search Console, RESEND_API_KEY.
-- TSK-016 (widget "Quien va este mes") en backlog social.
+- Migracion **016** pendiente en Neon + `SESSION_JWT_SECRET` en Vercel (ver
+  `docs/DEPLOY_016.md`).
+- TSK-016 (widget "Quien va este mes") en backlog social. Gaps del apartado
+  social (referidos sin frontend, checkin de Activo Oculto sin UI, afinidad y
+  control territorial solo documentados) en `ExploraCO_Sistema_Social_v5.md`
+  (secciones 9, 10 y 15).
+- Detalle maestro del gaming completo en
+  `ExploraCO_Gamificacion_v5_Plan_Maestro.md`.
 
 ### 10.3 Bugs historicos que NO deben repetirse (resumen de BUGS_HISTORICOS.md)
 

@@ -30,17 +30,19 @@ ADMIN (admin.html)
 | Endpoint | Metodo(s) | Responsabilidad |
 |---|---|---|
 | destinos.js | GET | Listado publico, filtros, modo=mapa, stats (Cache s-maxage=10) |
-| usuarios.js | GET/POST | Perfil, leaderboard, upsert de usuario; v9 (Entrega 016): registro con `?ref=`, piramide de referidos, 4 facciones, verificacion de email y sesion firmada JWT (`firmarSesion`) |
-| interacciones.js | GET/POST | Rese\u00f1as, guardados, visitas, calculo de XP; v13 (Entrega 016): `repartirXpReferidos` en 14 puntos de XP, Activo Oculto Wayfarer (proponer/votar/checkin + moderacion), `validarSesion` JWT (timingSafeEqual) y nonce geoespacial |
+| usuarios.js | GET/POST | Perfil, leaderboard, upsert de usuario; v9 (Entrega 016): registro con `?ref=`, piramide de referidos, 4 facciones, verificacion de email y sesion firmada JWT (`firmarSesion`); v12 (TSK-103 / ADR-028): GET `perfil_publico` (ligero), GET `casa_ranking`, POST `casa_elegir`, POST `perfil_actualizar` (alias `perfil_editar`) y blindaje PII owner-aware en `?id=`/`?buscar=`/`referido_codigo` |
+| interacciones.js | GET/POST | Rese\u00f1as, guardados, visitas, calculo de XP; v13 (Entrega 016): `repartirXpReferidos` en 14 puntos de XP, Activo Oculto Wayfarer (proponer/votar/checkin + moderacion), `validarSesion` JWT (timingSafeEqual) y nonce geoespacial; v15 (TSK-103 / ADR-028): GET `museo_publico`, DM (`dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`), GET `arbol_catalogo`/`arbol_usuario`, POST `rama_activar`, GET `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS`, Origen derivado con bono x1.2 en `D_R` y 8 misiones `perfil` |
 | admin-destinos.js | GET/POST/PUT/DELETE | CRUD completo con auth Bearer (v2 reescrito) |
 | publicar-lugar.js | POST | Formulario publico, crea destino en status=draft |
 | pagina-destino.js | GET | HTML dinamico premium por slug (v9, motor principal) |
-| admin.js | GET/POST | Recursos admin: solicitudes, rese\u00f1as, destacado, notificaciones |
-| utilidades.js | GET | sitemap, visitas, fotos, diagnostico |
+| admin.js | GET/POST | Recursos admin: solicitudes, rese\u00f1as, destacado, notificaciones; v2 (TSK-103 / ADR-028): `categoria` en `consumibles_lista`/`consumibles_crear`/`consumibles_editar` (400 `CATEGORIA_INVALIDA`) |
+| utilidades.js | GET | sitemap, visitas, fotos, diagnostico; v2 (TSK-103 / ADR-028): `STATIC_PAGES` incluye `/registro.html` y `/perfil.html` |
 
 Nota critica: el limite de 8 funciones esta en su maximo. Cualquier endpoint nuevo requiere fusionar responsabilidades dentro de un archivo existente via query params (patron ya usado en admin.js y utilidades.js), no crear un archivo nuevo.
 
 Autenticacion: header `Authorization: Bearer exploraco12345`. Variables de entorno en Vercel: `DATABASE_URL`, `ADMIN_SECRET`, `RESEND_API_KEY` (pendiente de configurar desde TASK-006), `SESSION_JWT_SECRET` (NUEVA en la Entrega 016: firma/valida el JWT de sesion HMAC SHA-256; debe ser el MISMO valor en `usuarios.js` e `interacciones.js`; el fallback `dev_secret` es inseguro en produccion), `SITE_URL` (base del enlace de verificacion de correo) y `DEV_EMAIL_ECHO` (solo desarrollo; ausente en produccion). Plantilla versionada: `.env.example`. Checklist de despliegue: `docs/DEPLOY_016.md`.
+
+Documentacion maestra del sistema social/gaming (detalle completo; BLUEPRINT resume la arquitectura): `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Gamificacion_v5_Plan_Maestro.md` (602 lineas) y `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Sistema_Social_v5.md` (878 lineas). El `ExploraCO_Gamificacion_v4_Plan_Maestro.md` queda como referencia HISTORICA (solo lectura).
 
 `vercel.json` rewrites clave:
 ```
@@ -80,6 +82,17 @@ Nota ADR-027 (Entrega 016, migracion `db/migrations/016_multinivel_crowdsourcing
 - **`geo_nonces`:** nonce de un solo uso para geolocalizacion firmada (ADR-025), `expira_en DEFAULT now() + interval '2 minutes'`, indice unico `idx_geo_nonce_unico`.
 
 Nota de gobernanza: la migracion 016 es **aditiva e idempotente** (ADR-008: `IF NOT EXISTS` + constraints con nombre). Su aplicacion es un paso manual en Neon (lo ejecuta Javier) antes del deploy; los 8 endpoints siguen 8/8 (sin archivos nuevos en `api/`).
+
+### Nota ADR-028 (Entrega TSK-103, migraciones 017 y 018) -- columnas, tablas y constraints nuevos
+
+La Entrega TSK-103 agrega superficie de datos aditiva e idempotente (ADR-008) SIN columnas/tablas nuevas en `api/` (8/8 intacto, ADR-010):
+- **`usuarios` (migracion 017):** `intereses` (jsonb NOT NULL DEFAULT `'[]'`), `pais_base` (varchar(2)), `casa` (varchar(20), CHECK `chk_usuarios_casa`), `casa_elegida_en` (timestamptz), `progreso_arbol` (jsonb NOT NULL DEFAULT `'{}'`), `perfil_config` (jsonb NOT NULL DEFAULT `'{}'`), `perfil_publico` (boolean NOT NULL DEFAULT true), `dm_abierto` (boolean NOT NULL DEFAULT true). Indices `idx_usuarios_casa` e `idx_usuarios_pais_base`. `progreso_arbol`/`perfil_config` se actualizan por merge JSONB (ADR-003).
+- **`consumibles.categoria` (migracion 017 la agrega; migracion 018 la reparte):** varchar(30) NOT NULL DEFAULT `'general'`. La 018 categoriza los 17 consumibles: `perfil` 7, `impulso` 3, `social` 4, `coleccion` 2, `general` 1. Agregar categorias nuevas no exige migracion (catalogo administrable). Se evita `LIKE 'perfil_%'` por el comodin `_`.
+- **`chat_salas.clave_dm` (migracion 017):** varchar(80) con el par de uuid ordenado de la conversacion DM (`split_part(clave_dm,'_',1/2)`); CHECK `chk_chat_salas_tipo` (se elimina antes `chat_salas_tipo_check` legacy para no duplicar) e indice unico parcial `idx_chat_salas_dm_unica` + `idx_chat_salas_dm_a`/`idx_chat_salas_dm_b`. El INSERT del hilo usa `ON CONFLICT (clave_dm) WHERE tipo='dm'`.
+- **Tabla `usuario_bloqueos` (migracion 017):** relacion de bloqueo entre dos usuarios, PK compuesta (`bloqueador_id` + `bloqueado_id`), CHECK `chk_usuario_bloqueos_distintos` e indice `idx_usuario_bloqueos_bloqueado`. Guarda relaciones, no contenido.
+- **Indice `idx_interacciones_usuario_tipo_activo` (migracion 017):** soporte de las consultas de acciones del usuario para el Arbol de Clases.
+
+Deuda detectada (patron BUG-021): `interacciones.activo` y `usuarios.bio`/`usuarios.activo` existen en Neon sin estar declaradas en ninguna migracion versionada; no se declaran en 017 para no chocar con la realidad. Su aplicacion (017 y luego 018) es manual en Neon antes del deploy: `docs/DEPLOY_017.md`.
 
 ## 4. Motor de tags JSONB (modulo central)
 
@@ -155,6 +168,33 @@ Hasta TASK-007 este archivo ya existia y estaba en produccion, pero no figuraba 
 4. Actualiza los contadores de stats (`#stat-destinos`, `#stat-ciudades`, `#stat-resenas`, `#stat-rating`) solo en la carga inicial, no en cada busqueda.
 
 **Que NO hace (ver NEXT.md, Riesgos activos, Sprint 6):** no re-invoca `renderMyMap()` (seccion personal "Mi Mapa") tras el fetch inicial -- esa funcion solo se refresca ante interaccion directa del usuario. Tampoco actualiza `MM_PINS[]` (pines decorativos, hardcodeados con ids de la version estatica original de `PL`), por lo que puede haber desfase de ids entre esos pines y los lugares reales tras el fetch.
+
+## 5-ter. Mapa del apartado social (comunidad.html, 7 tabs)
+
+`comunidad.html` es el hub social y concentra 7 tabs (declarados en `comunidad.html:296-304` y conmutados por `showCommTab()`): Chat, Planes, Mapa, Ranking, Parches, Activo Oculto y Audiovisual. Toda su logica vive en ramas `?tipo=` de `api/interacciones.js` v13 y `api/usuarios.js` v9 (presupuesto 8/8 intacto, ADR-010); el detalle completo (componentes, formulas y gaps) esta en `ExploraCO_Sistema_Social_v5.md` seccion 2.
+
+| Tab | id | Endpoints principales |
+|---|---|---|
+| Chat | `chat` | GET `chat_salas`, GET `chat_mensajes`, POST `chat_msg`, POST `chat_sala`, POST `chat_mod` |
+| Planes | `planes` | GET `planes`/`planes_mios`, POST `plan_crear`/`plan_unirse`/`plan_salir`, GET `plan_chat` / POST `plan_chat_msg` |
+| Mapa | `mapa` | GET `multimedia_mapa` (capa audiovisual + `tipo_media` CSV), GET `album_detalle` |
+| Ranking | `ranking` | GET `/api/usuarios?tipo=leaderboard` |
+| Parches | `pandillas` | GET `pandilla_detalle`, POST `pandilla_crear`/`pandilla_unirse`/`pandilla_salir`/`pandilla_reto` |
+| Activo Oculto | `wayfarer` | POST `activo_oculto_proponer`/`activo_oculto_votar`, GET `activos_ocultos_pendientes`, GET `/api/usuarios?tipo=faccion_ranking` |
+| Audiovisual | `av` | GET `albumes`, GET `mi_feed_fotos`; asset externo `album-comments.js` |
+
+Nota de nomenclatura: la API y el esquema conservan el termino historico `pandilla*` (`pandillas`, `pandillas_miembros`, `pandilla_retos`, `pandilla_crear`, ...); "Parche" es un relabel SOLO de texto visible en la UI. No confundir en busquedas futuras (`ExploraCO_Sistema_Social_v5.md` seccion 3.5).
+
+## 5-quater. Paginas publicas de perfil (TSK-103 / ADR-028)
+
+Dos paginas estaticas nuevas completan el ciclo social del perfil. Ambas son assets frontend (no funciones serverless; no cuentan contra el presupuesto 8/8, ADR-010) y estan registradas en `STATIC_PAGES` de `api/utilidades.js` (sitemap):
+
+| Pagina | Proposito | Datos |
+|---|---|---|
+| `perfil.html` | Perfil publico tipo "museo" de un usuario (`?id=<uuid>`); expone trofeos, fotos, destinos y el Arbol de Clases en solo lectura | UNA llamada a `GET /api/interacciones?tipo=museo_publico` (ensambla perfil + trofeos + fotos + destinos) + `GET /api/usuarios?tipo=perfil_publico` (version ligera) |
+| `registro.html` | Alta de usuario con captura de `?ref=<codigo>` (cierra BUG-035/BUG-044/BUG-045) | `POST /api/usuarios` con `codigo_referido`; `usuario-session.js` captura `?ref=` con TTL de 30 dias |
+
+`mi-perfil.html` (perfil propio) redirige a `perfil.html?id=<uuid>` cuando recibe el parametro `id` (fix R-3). El perfil publico NUNCA expone PII: `api/usuarios.js` v12 proyecta un subconjunto publico (sin email/tokens/`device_hashes`/`codigo_referido`) y reserva el detalle completo al admin o al dueno.
 
 ## 6. admin.html - sistema de formularios (baseline referencial ~7.800 lineas)
 

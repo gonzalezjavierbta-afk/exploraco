@@ -1868,7 +1868,7 @@ function feedCardAV(f) {
 /* ---- ACTIVO OCULTO (Wayfarer, Entrega 016) ----
    Segmento gamificado: los viajeros proponen puntos secretos con
    geolocalizacion, votan las propuestas pendientes (quorum +/-3) y
-   las facciones compiten por el control territorial. Las llamadas
+   el ranking de facciones se ordena por la suma de XP de sus miembros. Las llamadas
    de voto llevan la sesion firmada JWT (ADR-025) como Bearer; si el
    backend responde 401 SESION_REQUERIDA se renueva el token con un
    re-POST upsert silencioso a /api/usuarios. ASCII-safe: emojis y
@@ -2153,7 +2153,7 @@ function aoVotar(activoId, voto, btn) {
 function cargarFaccionesAo() {
   var el = document.getElementById('ao-facciones');
   if (!el) return;
-  el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+  el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
     + '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:16px">Cargando facciones\u2026</div>';
   fetch('/api/usuarios?tipo=faccion_ranking')
     .then(function(r){ return r.json(); })
@@ -2161,15 +2161,15 @@ function cargarFaccionesAo() {
       var data = (res && res.data) || {};
       var facciones = data.facciones || [];
       if (!facciones.length) {
-        el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+        el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
           + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">A\u00fan no hay facciones en el ranking.</div>';
         return;
       }
-      var html = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+      var html = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
         + '<div class="ao-podium">';
       facciones.forEach(function(f, idx){
         var info = _aoFacciones[f.faccion] || { nombre: f.faccion, icono: '\uD83C\uDFF4' };
-        html += '<div class="ao-pod-item' + (idx === 0 ? ' first' : '') + '" title="Control territorial">'
+        html += '<div class="ao-pod-item' + (idx === 0 ? ' first' : '') + '" title="Ranking de facciones por XP">'
           + '<div class="ao-pod-icon" style="font-size:26px;margin-bottom:4px">' + info.icono + '</div>'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:#fff;text-transform:capitalize">' + esc(info.nombre) + '</div>'
           + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' + (parseInt(f.miembros,10)||0) + ' miembros</div>'
@@ -2195,7 +2195,7 @@ function cargarFaccionesAo() {
       el.innerHTML = html;
     })
     .catch(function(){
-      el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Control Territorial por Facci\u00f3n</div>'
+      el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
         + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">No se pudo cargar el ranking de facciones.</div>';
     });
 }

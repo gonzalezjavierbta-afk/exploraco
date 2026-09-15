@@ -3,6 +3,8 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-103 / ADR-028 Perfil publico museo + DM + Arbol de Clases de 16 ramas + Casas + categorias de consumibles (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - `perfil.html` (NUEVO, museo publico `?id=`), `registro.html` (NUEVO, alta con `?ref=`), `docs/DEPLOY_017.md` (NUEVO), `scripts/verify_017_precheck.js` (NUEVO, read-only); migraciones NUEVAS 017 (columnas de perfil/casa/`progreso_arbol`/`perfil_config`/`perfil_publico`/`dm_abierto`; `consumibles.categoria`; `chat_salas.clave_dm` + CHECK `chk_chat_salas_tipo`; tabla `usuario_bloqueos`) y 018 (categoriza 17 consumibles: perfil 7 / impulso 3 / social 4 / coleccion 2 / general 1); backend como ramas `tipo=` sin archivos nuevos (8/8) - `api/usuarios.js` v12 (`perfil_publico` ligero, blindaje PII owner-aware en `?id=`/`?buscar=`/`referido_codigo`, `casa_elegir`/`casa_ranking`, `perfil_actualizar`), `api/interacciones.js` v15 (`museo_publico`, DM `dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`, `arbol_catalogo`/`arbol_usuario`/`rama_activar`, `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS [0,100,250,450,700]`, Origen derivado con bono x1.2 dentro de `D_R`, 8 misiones `perfil`), `api/admin.js` (`categoria` en consumibles) y `api/utilidades.js` (`/registro.html` y `/perfil.html` en `STATIC_PAGES`); frontend mi-perfil.html (Mi Red + DM + Arbol SVG + 7 pestanas + selector de Casa + tienda por chips), comunidad.html (R-4), index.html (R-5) y usuario-session.js (`?ref=` con TTL 30d + `codigo_referido` + JWT en refresco); fixes R-1..R-5 (registro.html faltante, `?ref=` no capturado, `mi-perfil?id=` ignorado, etiqueta "Control Territorial" enganosa, relabel Pandilla->Parche) y 4 fixes adicionales (fuga de PII preexistente, carrera del cobro del DM, `museo_publico` 404 en vez de 503, filtros `activo=true` en casa_ranking/exp_ocultos); DEUDA detectada (patron BUG-021): `interacciones.activo`, `usuarios.bio`/`usuarios.activo` no versionadas. **PENDIENTE OPERATIVO: aplicar 017 y 018 en Neon (016/015 ya aplicadas) + commit/push/deploy + verificacion en vivo. El smoke de cierre `scripts/smoke_017_perfil_arbol_casas.js` esta ENTREGADO y en verde (`node scripts/smoke_017_perfil_arbol_casas.js` -> 73/73 PASS, 2026-09-15).** ADR-028
+- TSK-102 / Consolidacion documental v5 (2026-09-14, working tree, sin cambios de codigo) - creados/consolidados los dos documentos maestros vigentes en `exploraco desarrollo/ampliacion desarrollo/`: `ExploraCO_Gamificacion_v5_Plan_Maestro.md` (Plan Maestro tecnico + hoja de ruta del gaming v4 + Entrega 016, con estados reales y citas `archivo:linea`) y `ExploraCO_Sistema_Social_v5.md` (mapa del apartado social con 7 tabs, Parches, chat/planes, albumes/comentarios, referidos, facciones, Wayfarer, notificaciones; gaps G-01..G-23 y discrepancias D-01..D-15). Enlaces cruzados verificados entre ambos (Plan v5 -> Sistema Social v5 y viceversa). Spec de la Entrega 016 `docs/superpowers/specs/2026-09-14-gaming-v5-referidos-wayfarer-facciones-design.md` + indice `docs/superpowers/specs/README.md`. 9 hallazgos reales registrados en BUGS_HISTORICOS.md BUG-035..BUG-043 (referidos inalcanzables, visita rota en frontend, notificacion de resena a endpoint inexistente, conteo de miembros de Parche, relabel residual Pandilla, etiquetas de chat desfasadas, gate de voto de utilidad ausente, formula de `album_crear`, tabs de GUIA). PENDIENTE OPERATIVO intacto (ver TSK-101 y "Que sigue"): aplicar migracion 016 en Neon + `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + deploy.
 - TSK-101 / ADR-027 + ADR-025 Entrega 016 "ExploraCO Gaming v5.0" (2026-09-14, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - piramide de referidos de 5 niveles con `xp_ref_total` separado y CTE recursiva (0.10/0.05/0.03/0.02/0.01 FLOOR, topes 500/20, `?ref=` en registro), crowdsourcing Wayfarer "Activo Oculto" (proponer con email verificado, votar nivel 5, quorum +/-3, 30 dias derivado, +50/+5/+15 XP, checkin reusa geocerca ADR-024 + nonce), 4 facciones con CHECK (exploradores/curadores/creadores/artistas; primera gratis, cambio 500 xp_total + cooldown 15 dias), vocaciones de artista en bloque nivel 5 y 6 misiones de artista; backend `api/usuarios.js` v8->v9 (JWT HMAC `firmarSesion`, verificacion de email, device_hashes), `api/interacciones.js` v12->v13 (`repartirXpReferidos` en 14 puntos de XP, `validarSesion` con timingSafeEqual en visita/votar/checkin, geo_nonces), `api/admin.js` (`activo_oculto_moderar`), frontend mi-perfil/comunidad/admin/usuario-session; `.env.example` + `.gitignore` corregido; MIGRACION 016 NUEVA (209 lineas, idempotente); smoke `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; Escudo GOLD verde (node --check x3, ASCII 0 bytes >127, 0 backticks, divs 0, idempotencia 13/13); presupuesto 8/8 INTACTO; PENDIENTE OPERATIVO: aplicar migracion 016 en Neon + configurar `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + commit/push/deploy (ver `docs/DEPLOY_016.md`); ADR-027 + ADR-025
 - TSK-100 / ADR-026 Epic prompt.txt (2026-09-13, IMPLEMENTADO EN WORKING TREE, sin commitear) - perfil museo v1 en mi-perfil.html (museo-line trofeos·fotos·destinos, galeria de 3 mejoras perfil_*, vocaciones con toggle/candado/403, chip "Sin mapa"), vocaciones acumulables (catalogo en codigo musico@5/cine@8/artista_grafico@11 + `usuarios.vocaciones` jsonb), chat por plan PRIVADO (chat_salas tipo='plan' + `planes_viaje.sala_id`, GET plan_chat / POST plan_chat_msg con +2 XP tope 20/dia, defensas en chat_msg/chat_mensajes), limpieza de salas del sistema (solo Chat general + Bogota), XP admin (POST admin_xp Bearer: delta o nivel 1-20 sin degradar via Math.max), BUG-A contarComentarioSafe (degradacion a 0 sin migracion 013), BUG-B coordsFallbackAutor (multimedia_mapa hereda coords de la visita/guardado del autor); api/usuarios.js v8 con `?buscar=`; divs 195/195, 223/223, 786/786; MIGRACION 015 NUEVA (usuarios.vocaciones, planes_viaje.sala_id, DELETE salas sistema, 3 consumibles); migraciones 011-014 YA APLICADAS por Javier en Neon (2026-09-13); UNICO BLOQUEANTE: aplicar 015 en Neon + commit/push/deploy; ADR-026 + spec
 - TSK-099 / ADR-024 Presencia Fisica + Espacial v4.0 (2026-09-12, IMPLEMENTADO EN WORKING TREE) - geocerca Haversine server-side en `POST tipo=visita` (sin endpoint nuevo, 8/8), dedup-first + indice unico parcial (cierra race `23505`), `quitar_visita` -> soft-delete (`activo=false`), radios adaptativos 100/150/200/250 m, bono rural +20 XP y logro `logr_pionero` (LOGROS = 30), evidencia `interacciones.dims.geo`, conteo de visitas de `api/utilidades.js` filtra `activo=true`; tests de logros 30/30 PASS; migracion 014 NUEVA (reset de visitas gamificadas con respaldo + indice unico); migraciones 011/012/013/014 YA APLICADAS por Javier en Neon (2026-09-13, ver TSK-100); pendiente aplicar 015 + deploy; ADR-024 + spec
@@ -17,6 +19,88 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-103 "Perfil publico museo + DM + Arbol de 16 ramas + Casas + categorias de consumibles" (2026-09-15) - ADR-028
+
+Entrega TSK-103 implementada y verificada en working tree (SIN commitear). El
+checklist de despliegue vive en `docs/DEPLOY_017.md`; la decision en
+`DECISIONS.md` ADR-028; la tarea en `TASKS.md` TSK-103. Cinco features de
+producto + 5 regresiones (R-1..R-5) + 4 fixes adicionales, todo SIN archivos
+nuevos en `api/` (8/8 intacto, ADR-010).
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `db/migrations/017_perfil_publico_arbol_casas.sql` (NUEVA, 12.013 bytes,
+  aditiva e idempotente ADR-008): columnas `usuarios.intereses`, `pais_base`,
+  `casa`, `casa_elegida_en`, `progreso_arbol`, `perfil_config`,
+  `perfil_publico`, `dm_abierto`; `consumibles.categoria`;
+  `chat_salas.clave_dm`; CHECK `chk_usuarios_casa` y `chk_chat_salas_tipo`
+  (elimina antes `chat_salas_tipo_check` legacy); indices DM y de usuario;
+  tabla NUEVA `usuario_bloqueos`.
+- `db/migrations/018_consumibles_categorias.sql` (NUEVA, 5.281 bytes):
+  categoriza 17 consumibles (perfil 7 / impulso 3 / social 4 / coleccion 2 /
+  general 1). Presupone la 017 aplicada.
+- `api/usuarios.js` v12: `GET perfil_publico` ligero, blindaje PII owner-aware
+  en `GET ?id=` (sin email/tokens/`device_hashes`/`codigo_referido`),
+  `?buscar=` admin-only, `referido_codigo` con JWT; `casa_elegir` +
+  `casa_ranking`; `perfil_actualizar` (alias `perfil_editar`).
+- `api/interacciones.js` v15: `museo_publico`; DM completo; `arbol_catalogo` /
+  `arbol_usuario` / `rama_activar` (RAMAS 16x5, `RAMA_TIERS [0,100,250,450,700]`);
+  `consumibles?categoria=`; Origen derivado (local/nacional/extranjero con
+  bono x1.2 dentro de `D_R`); 8 misiones `perfil`.
+- `api/admin.js`: `categoria` en `consumibles_lista`/`crear`/`editar`.
+- `api/utilidades.js`: `/registro.html` y `/perfil.html` en `STATIC_PAGES`.
+- Frontend: `perfil.html` y `registro.html` (NUEVOS), `mi-perfil.html`
+  (Mi Red con QR/codigo/enlace, bandeja DM, Arbol SVG, 7 pestanas, "Completa
+  tu perfil", selector de Casa, tienda por chips), `comunidad.html` (R-4),
+  `index.html` (R-5), `usuario-session.js` (captura `?ref=` con TTL 30d +
+  `loginConEmail` con `codigo_referido` + JWT en refresco).
+- Fixes: R-1 (`registro.html`), R-2 (`?ref=`), R-3 (`mi-perfil?id=`),
+  R-4 ("Control Territorial"), R-5 (relabel Pandilla->Parche); adicionales:
+  fuga de PII preexistente, carrera del cobro del DM, `museo_publico`
+  404->503 tipificado, `casa_ranking`/`exp_ocultos` sin filtrar `activo=true`.
+
+**Verificacion (ADR-006):** existen 017, 018, `perfil.html`, `registro.html`,
+`docs/DEPLOY_017.md` y `scripts/verify_017_precheck.js`; headers reales
+`api/usuarios.js` v12 e `api/interacciones.js` v15; `api/utilidades.js` con
+las 2 paginas en `STATIC_PAGES`; `api/admin.js` con `categoria`. El smoke
+`scripts/smoke_017_perfil_arbol_casas.js` **esta ENTREGADO y en verde (73/73
+PASS)**; evidencia: `node scripts/smoke_017_perfil_arbol_casas.js` ->
+`73/73 PASS` (verificado 2026-09-15). Ya no hay smoke de cierre pendiente.
+
+#### Que sigue
+1. **APLICAR `db/migrations/017_perfil_publico_arbol_casas.sql` EN NEON
+   (BLOQUEANTE, lo ejecuta Javier antes del deploy).** Prerrequisito: 016/015
+   ya aplicadas.
+2. **Aplicar DESPUES `db/migrations/018_consumibles_categorias.sql`** (la 017
+   agrega `consumibles.categoria`; la 018 solo la reparte).
+3. **Smoke de cierre ENTREGADO y en verde** (`node
+   scripts/smoke_017_perfil_arbol_casas.js` -> `73/73 PASS`, 2026-09-15); no
+   es pendiente.
+4. **Commit + push + deploy en un solo release** (esta entrega + los
+   pendientes previos sin commitear: TSK-095 a TSK-102 y las migraciones
+   015/016/017/018; ver `git status`).
+5. **Verificacion post-deploy en vivo:** perfil publico sin PII, DM (hilo
+   nuevo con cobro 20 XP, bloqueo 403), Arbol (activar nodo nivel 5, bono de
+   mision), Casas (elegir + ranking), tienda por categorias y `?ref=`
+   capturado en `registro.html`.
+6. **Deuda registrada (patron BUG-021):** columnas no versionadas
+   `interacciones.activo`, `usuarios.bio` y `usuarios.activo`; solo se
+   documentan, no se corrigen aqui.
+
+#### Riesgos activos
+- **Migraciones 017/018 pendientes (BLOQUEANTE):** sin la 017, el Arbol, las
+  Casas, el DM y `consumibles.categoria` fallan por esquema inexistente; sin
+  la 018, la tienda queda con los 17 consumibles en `general`.
+- **Orden de migraciones:** la 018 presupone `consumibles.categoria` creada
+  por la 017; invertirlas deja el reparto sin efecto.
+- **Smoke de cierre (RESUELTO):** `scripts/smoke_017_perfil_arbol_casas.js`
+  paso de "en elaboracion" a ENTREGADO y en verde 73/73 PASS (2026-09-15);
+  ya no es un riesgo activo.
+- **Deuda de columnas no versionadas (patron BUG-021):** `interacciones.activo`
+  y `usuarios.bio`/`usuarios.activo` existen en Neon fuera de toda migracion;
+  cualquier `DROP`/recreacion de esquema debe considerarlas.
+- **Drift de XP por el bono x1.2 / `D_R` derivado:** mismo riesgo residual ya
+  documentado en ADR-024/ADR-027 (sin ledger).
 
 ### Sesion Entrega 016 "ExploraCO Gaming v5.0" - piramide, Wayfarer, facciones y mundo artistas (2026-09-14) - TSK-101 / ADR-027 + ADR-025
 
@@ -102,6 +186,15 @@ cero altas; todo como ramas `tipo=` y helpers, ADR-010).
    esa ruta (el real es
    `.opencode/skills/gemini-research/scripts/validate_ficha.js`);
    documentado en BUGS_HISTORICOS.md BUG-034, sin crear el script.
+6. **Flujos ROTO del frontend (documentados en esta consolidacion, requieren
+   codigo):** (a) **BUG-035** -- el QR/enlace de referidos apunta a
+   `/registro.html?ref=<codigo>` (`mi-perfil.html:1800`), pero `registro.html`
+   NO existe y ningun frontend captura `?ref=` (`usuario-session.js:219-255`);
+   el backend si lo soporta (`api/usuarios.js:461`). (b) **BUG-036** --
+   `marcarVisitado` (`usuario-session.js:598-609`) no envia
+   `Authorization: Bearer` ni `nonce`, que el backend v13 exige
+   (`api/interacciones.js:4734-4741`) -> 401/400. Ademas BUG-037..BUG-043
+   (severidad media/baja) quedan registrados como backlog de consistencia.
 
 #### Riesgos activos
 - **Migracion 016 pending (BLOQUEANTE):** sin ella, referidos, facciones,
@@ -124,6 +217,11 @@ cero altas; todo como ramas `tipo=` y helpers, ADR-010).
   ADR-016 y 2 skills citan `scripts/validate_ficha.js`, que no existe en esa
   ruta; el archivo real es
   `.opencode/skills/gemini-research/scripts/validate_ficha.js`.
+- **Frontend ROTO ya implementado en produccion logica (BUG-035/BUG-036):** los
+  dos flujos de mayor impacto de la Entrega 016 (referidos y visita
+  presencial) no son usables desde la UI pese a que el backend esta completo;
+  sin el fix de codigo, el release de la 016 no habilita esas features a los
+  usuarios. Resto de hallazgos (BUG-037..BUG-043) son consistencia/cosmetico.
 
 ### Sesion epic prompt.txt - perfil museo, vocaciones, chat por plan y XP admin (2026-09-13) - TSK-100 / ADR-026
 

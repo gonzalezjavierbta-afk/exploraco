@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Crear mi cuenta · ExploraCO</title>
+<meta name="description" content="Crea tu cuenta de explorador en ExploraCO y empieza a sumar XP por Colombia. Sin contraseña: tu email es tu llave.">
+<meta name="theme-color" content="#E8A020">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ---- SILO registro.html (ADR-004): todo el CSS vive bajo .reg-silo ---- */
+body{background:#FBF8F2}
+.reg-silo *{box-sizing:border-box;margin:0;padding:0}
+.reg-silo{min-height:100vh;background:#FBF8F2;color:#111;font-family:'Outfit',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;padding:22px 16px 40px}
+.reg-silo .reg-top{width:100%;max-width:460px;margin:0 auto 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.reg-silo .reg-wordmark{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:3.5px;color:#111;text-decoration:none}
+.reg-silo .reg-wordmark em{font-style:normal;color:#E8A020}
+.reg-silo .reg-flag{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#8a8072;border:1px solid #E5E0D4;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.reg-silo .reg-wrap{flex:1;width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;justify-content:center}
+.reg-silo .reg-card{position:relative;background:#fff;border:1px solid #ECE7DC;border-radius:16px;padding:30px 22px 24px;box-shadow:0 20px 44px -30px rgba(17,17,17,.45);overflow:hidden}
+.reg-silo .reg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:repeating-linear-gradient(90deg,#E8A020 0 16px,transparent 16px 28px)}
+.reg-silo .reg-eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2.4px;text-transform:uppercase;color:#C8860A;margin-bottom:8px}
+.reg-silo .reg-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(30px,7vw,42px);font-weight:900;line-height:.98;letter-spacing:.2px;text-transform:uppercase;margin-bottom:10px}
+.reg-silo .reg-sub{font-size:13.5px;line-height:1.55;color:#6b6257;margin-bottom:18px;max-width:34ch}
+.reg-silo .reg-chip{display:flex;align-items:center;gap:10px;background:#111;border-radius:12px;padding:11px 14px;margin-bottom:18px;animation:reg-in .35s ease both}
+.reg-silo .reg-chip[hidden]{display:none}
+.reg-silo .reg-chip-ico{width:18px;height:18px;flex:0 0 18px;color:#E8A020}
+.reg-silo .reg-chip-txt{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.reg-silo .reg-chip-code{margin-left:auto;font-family:'Geist','Outfit',sans-serif;font-weight:900;font-size:15px;letter-spacing:2px;color:#E8A020;word-break:break-all;user-select:all;-webkit-user-select:all}
+.reg-silo .reg-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #EF4444;border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:#991B1B}
+.reg-silo .reg-alert[hidden]{display:none}
+.reg-silo .reg-alert-btn{background:#111;color:#fff;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
+.reg-silo .reg-alert-btn[hidden]{display:none}
+.reg-silo .reg-alert-btn:hover{background:#C8860A}
+.reg-silo .reg-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#6b6257;margin-bottom:6px}
+.reg-silo .reg-input{width:100%;font-family:inherit;font-size:16px;color:#111;background:#FBF8F2;border:1px solid #E5E0D4;border-radius:10px;padding:13px 14px;margin-bottom:16px;transition:border-color .15s,box-shadow .15s}
+.reg-silo .reg-input::placeholder{color:#A9A190}
+.reg-silo .reg-input:focus{outline:none;border-color:#E8A020;box-shadow:0 0 0 3px rgba(232,160,32,.18)}
+.reg-silo .reg-submit{width:100%;border:none;border-radius:10px;background:#E8A020;color:#111;cursor:pointer;padding:15px 18px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;transition:background .15s,transform .1s}
+.reg-silo .reg-submit:hover{background:#F0AD35}
+.reg-silo .reg-submit:active{transform:translateY(1px)}
+.reg-silo .reg-submit:disabled{opacity:.6;cursor:progress}
+.reg-silo .reg-note{font-size:11.5px;line-height:1.5;color:#8a8072;margin-top:14px;text-align:center}
+.reg-silo .reg-back{display:inline-flex;align-items:center;gap:7px;margin:18px auto 0;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#8a8072;text-decoration:none;transition:color .15s}
+.reg-silo .reg-back:hover{color:#111}
+.reg-silo .reg-back-ico{width:14px;height:14px}
+.reg-silo :focus-visible{outline:2px solid #C8860A;outline-offset:2px}
+@keyframes reg-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (min-width:560px){.reg-silo .reg-card{padding:36px 30px 28px}}
+@media (prefers-reduced-motion:reduce){.reg-silo .reg-chip{animation:none}.reg-silo .reg-submit:active{transform:none}}
+</style>
+</head>
+<body>
+<div class="reg-silo">
+
+  <header class="reg-top">
+    <a class="reg-wordmark" href="/index.html">EXPLORA<em>CO</em></a>
+    <span class="reg-flag">Colombia por descubrir</span>
+  </header>
+
+  <main class="reg-wrap">
+    <section class="reg-card" aria-labelledby="reg-title">
+      <p class="reg-eyebrow">Credencial de explorador</p>
+      <h1 class="reg-title" id="reg-title">Tu próximo destino empieza aquí</h1>
+      <p class="reg-sub">Sin contraseña: tu email es tu llave. Guarda lugares, gana XP y arma tu red de viajeros.</p>
+
+      <div class="reg-chip" id="reg-ref-chip" hidden>
+        <svg class="reg-chip-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M15.5 8.5l-2 5.5-5.5 2 2-5.5z"></path>
+        </svg>
+        <span class="reg-chip-txt">Te invito</span>
+        <span class="reg-chip-code" id="reg-ref-code"></span>
+      </div>
+
+      <div class="reg-alert" id="reg-error" role="alert" aria-live="polite" hidden>
+        <span id="reg-error-msg"></span>
+        <button type="button" class="reg-alert-btn" id="reg-skip-ref" hidden>Continuar sin invitación</button>
+      </div>
+
+      <form id="reg-form" novalidate>
+        <label class="reg-lbl" for="reg-nombre">Nombre</label>
+        <input class="reg-input" id="reg-nombre" name="nombre" type="text" autocomplete="name" placeholder="¿Cómo te llamamos?" required>
+
+        <label class="reg-lbl" for="reg-email">Email</label>
+        <input class="reg-input" id="reg-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="tu@correo.com" required>
+
+        <button class="reg-submit" id="reg-submit" type="submit">Crear mi cuenta / Entrar</button>
+      </form>
+
+      <p class="reg-note">Si ya te registraste con este email, entras directo a tu perfil y conservas tu XP.</p>
+    </section>
+
+    <a class="reg-back" href="/index.html">
+      <svg class="reg-back-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 18l-6-6 6-6"></path>
+      </svg>
+      Volver al inicio
+    </a>
+  </main>
+
+</div>
+
+<script src="usuario-session.js"></script>
+<script>
+/* registro.html — alta/entrada minima con captura de ?ref= (BUG-035).
+   Depende de usuario-session.js (window.ExploraCO.loginConEmail / mostrarToast).
+   No toca api/*.js: el backend ya acepta codigo_referido (api/usuarios.js). */
+(function () {
+  'use strict';
+
+  var form = document.getElementById('reg-form');
+  var nombreEl = document.getElementById('reg-nombre');
+  var emailEl = document.getElementById('reg-email');
+  var submitEl = document.getElementById('reg-submit');
+  var errBox = document.getElementById('reg-error');
+  var errMsg = document.getElementById('reg-error-msg');
+  var skipBtn = document.getElementById('reg-skip-ref');
+  var chip = document.getElementById('reg-ref-chip');
+  var chipCode = document.getElementById('reg-ref-code');
+
+  /* Codigo de invitacion de la URL (?ref=). Vacio = alta normal. */
+  var REF_CODE = '';
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    REF_CODE = (params.get('ref') || '').trim();
+  } catch (e) {
+    console.warn('registro: no se pudo leer ?ref=', e && e.message);
+  }
+  if (REF_CODE) {
+    chipCode.textContent = REF_CODE;
+    chip.hidden = false;
+  }
+
+  var BTN_TXT = 'Crear mi cuenta / Entrar';
+
+  function mostrarError(msg, permiteContinuar) {
+    errMsg.textContent = msg;
+    errBox.hidden = false;
+    skipBtn.hidden = !permiteContinuar;
+  }
+  function limpiarError() {
+    errBox.hidden = true;
+    errMsg.textContent = '';
+    skipBtn.hidden = true;
+  }
+  function emailValido(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+  }
+  function toast(msg, color) {
+    if (window.ExploraCO && typeof window.ExploraCO.mostrarToast === 'function') {
+      window.ExploraCO.mostrarToast(msg, color);
+    }
+  }
+  function mensajeDeError(codigo, ref) {
+    if (codigo === 'REFERIDO_INVALIDO') {
+      return 'El código de invitación "' + ref + '" no existe o expiró. Revísalo, o continúa sin invitación.';
+    }
+    if (codigo === 'AUTO_REFERIDO') {
+      return 'Ese código es tuyo: no puedes invitarte a ti mismo. Continúa sin invitación para entrar a tu cuenta.';
+    }
+    return 'No pudimos crear tu cuenta. Revisa tu conexión e inténtalo otra vez.';
+  }
+
+  /* loginConEmail() (usuario-session.js) devuelve null sin exponer el
+     codigo de error del backend. Para distinguir REFERIDO_INVALIDO de
+     AUTO_REFERIDO se observa el .json() de la respuesta de /api/usuarios
+     solo durante esta llamada, sin modificar el archivo compartido. */
+  function loginConDetalle(email, nombre, ref) {
+    var fetchOriginal = window.fetch;
+    var errorApi = '';
+    window.fetch = function (input) {
+      var url = (typeof input === 'string') ? input : ((input && input.url) || '');
+      var promesa = fetchOriginal.apply(window, arguments);
+      if (url.indexOf('/api/usuarios') === -1) return promesa;
+      return promesa.then(function (res) {
+        var jsonOriginal = res.json.bind(res);
+        var cache = null;
+        try {
+          res.json = function () {
+            if (!cache) {
+              cache = jsonOriginal().then(function (data) {
+                if (data && data.ok === false && data.error) errorApi = String(data.error);
+                return data;
+              });
+            }
+            return cache;
+          };
+        } catch (e) {
+          console.warn('registro: no se pudo observar el error del backend', e && e.message);
+        }
+        return res;
+      });
+    };
+    return window.ExploraCO.loginConEmail(email, nombre, ref)
+      .then(function (perfil) { return { perfil: perfil, error: errorApi }; })
+      .catch(function (e) {
+        console.warn('registro: login fallo', e && e.message);
+        return { perfil: null, error: errorApi || 'ERROR_RED' };
+      })
+      .then(function (r) {
+        window.fetch = fetchOriginal;
+        return r;
+      });
+  }
+
+  async function enviar(ref) {
+    var nombre = (nombreEl.value || '').trim();
+    var email = (emailEl.value || '').trim();
+    limpiarError();
+
+    if (!window.ExploraCO || typeof window.ExploraCO.loginConEmail !== 'function') {
+      mostrarError('No pudimos cargar el sistema de cuentas. Recarga la página e inténtalo de nuevo.', false);
+      return;
+    }
+    if (nombre.length < 2) {
+      mostrarError('Escribe tu nombre (mínimo 2 letras).', false);
+      nombreEl.focus();
+      return;
+    }
+    if (!emailValido(email)) {
+      mostrarError('Ese email no parece válido. Ejemplo: nombre@correo.com', false);
+      emailEl.focus();
+      return;
+    }
+
+    submitEl.disabled = true;
+    submitEl.textContent = 'Creando tu cuenta…';
+    var r;
+    try {
+      r = await loginConDetalle(email, nombre, ref);
+    } catch (e) {
+      console.warn('registro: alta interrumpida', e && e.message);
+      r = { perfil: null, error: 'ERROR_RED' };
+    }
+    submitEl.disabled = false;
+    submitEl.textContent = BTN_TXT;
+
+    if (r.perfil) {
+      toast('Bienvenido, ' + (r.perfil.nombre || nombre), '#16a34a');
+      window.location.href = ref ? '/mi-perfil.html' : '/index.html';
+      return;
+    }
+
+    var fallaPorRef = (r.error === 'REFERIDO_INVALIDO' || r.error === 'AUTO_REFERIDO');
+    mostrarError(mensajeDeError(r.error, ref), fallaPorRef);
+    toast('No pudimos crear tu cuenta', '#ef4444');
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    enviar(REF_CODE || undefined);
+  });
+
+  skipBtn.addEventListener('click', function () {
+    /* El ?ref= invalido tambien quedo guardado en localStorage por
+       usuario-session.js: se limpia para que el reintento NO lo reenvie. */
+    if (window.ExploraCO && typeof window.ExploraCO.limpiarRefPendiente === 'function') {
+      window.ExploraCO.limpiarRefPendiente();
+    }
+    REF_CODE = '';
+    chip.hidden = true;
+    enviar(undefined);
+  });
+})();
+</script>
+</body>
+</html>

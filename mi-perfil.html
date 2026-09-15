@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#E8A020">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
@@ -118,16 +119,31 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-btn-gold:hover{opacity:.88}
 .pf-btn-danger{border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
 .pf-btn-danger:hover{border-color:#ef4444;color:#ef4444}
-/* GALERIA DE MEJORAS DE PERFIL (frontend v6) */
-.pf-section-sub{font-size:11px;color:rgba(255,255,255,.35);margin:-8px 0 14px}
-.adorno-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:12px}
-.custom-store{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px;background:rgba(255,255,255,.03);height:100%;display:flex;flex-direction:column}
-.custom-store.activa{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06)}
-.custom-emoji{font-size:26px;margin-bottom:8px}
-.custom-name{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
-.custom-desc{font-size:10px;color:rgba(255,255,255,.4);line-height:1.4;margin-bottom:8px;flex:1}
-.custom-price{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--gold);margin-bottom:8px}
-.custom-actions{display:flex;flex-direction:column;gap:6px}
+/* TIENDA DE CONSUMIBLES: CHIPS DE CATEGORIA (WP-6 / ADR-028) */
+.tienda-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tienda-chips .tienda-chip{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 14px;cursor:pointer;transition:all .15s}
+.tienda-chips .tienda-chip:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
+.tienda-chips .tienda-chip.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.tienda-chips .tienda-chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* MODAL DE DATOS DE CONSUMIBLES perfil_* (WP-6 / ADR-028) */
+.pf-uso-ov{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.72);z-index:1200;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
+.pf-uso-box{width:100%;max-width:440px;background:#141414;border:1px solid rgba(232,160,32,.28);border-radius:14px;padding:18px}
+.pf-uso-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#fff;margin-bottom:6px}
+.pf-uso-help{font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:12px}
+.pf-uso-input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:10px 12px;color:#fff;font-family:'Outfit',sans-serif;font-size:13px;outline:none}
+.pf-uso-input:focus{border-color:var(--gold)}
+.pf-uso-list{max-height:210px;overflow-y:auto;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px;margin-bottom:4px}
+.pf-uso-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:12px;color:#fff;cursor:pointer}
+.pf-uso-item:hover{background:rgba(255,255,255,.05)}
+.pf-uso-item.on{background:rgba(232,160,32,.12)}
+.pf-uso-item input{accent-color:#E8A020}
+.pf-uso-item .pf-uso-item-n{margin-left:auto;font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:10px;color:rgba(255,255,255,.4)}
+.pf-uso-vacio{font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:14px}
+.pf-uso-cont{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:10px;color:var(--gold);text-align:right;margin-bottom:10px}
+.pf-uso-actions{display:flex;gap:8px;justify-content:flex-end}
+.pf-uso-btn{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--gold);background:var(--gold);color:var(--black)}
+.pf-uso-btn.ghost{background:transparent;color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.18)}
+.pf-uso-btn:disabled{opacity:.45;cursor:not-allowed}
 /* VOCACIONES DE ARTISTA */
 .voc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:12px}
 .voc-card{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;background:rgba(255,255,255,.03);position:relative}
@@ -215,6 +231,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .ref-net-num{font-size:16px;font-weight:900;color:#fff;font-family:'Barlow Condensed',sans-serif}
 .ref-net-label{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);margin-top:2px;font-family:Outfit,sans-serif}
 .ref-net-xp{font-size:10px;color:var(--gold);margin-top:2px;font-weight:700}
+.ref-net-pct{font-size:9px;color:rgba(255,255,255,.5);margin-top:3px;font-weight:700}
+.ref-insumo{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:8px}
+.ref-insumo-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1.2px;color:rgba(255,255,255,.5);margin-bottom:8px}
+.ref-row{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.ref-input{flex:1;min-width:170px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:9px 11px;color:#fff;font-family:Outfit,sans-serif;font-size:12px}
+.ref-input:focus{outline:none;border-color:rgba(232,160,32,.55)}
+.ref-qr-wrap{display:flex;flex-direction:column;align-items:center;gap:9px}
+.ref-qr-wrap a.ref-copy-btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.ref-qr-fallback{display:none;font-size:11px;line-height:1.5;color:rgba(255,255,255,.6);text-align:center;word-break:break-all}
+.ref-qr-fallback a{color:var(--gold)}
+.ref-net-title{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);margin:10px 0 6px}
+.ref-empty{font-size:11px;color:rgba(255,255,255,.4);margin-top:10px;line-height:1.5}
 .facc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}
 .facc-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:14px;text-align:center;transition:border-color .15s,background .15s}
 .facc-card:hover{border-color:rgba(255,255,255,.22)}
@@ -226,6 +254,181 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .facc-btn:hover{background:rgba(232,160,32,.12)}
 .facc-btn:disabled{opacity:.35;cursor:not-allowed}
 .facc-current{display:inline-flex;align-items:center;gap:6px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.35);border-radius:999px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--gold);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.6px}
+/* ---- GAMING v5.0 / ADR-028: MENSAJES DIRECTOS (DM) ----
+   Silo atomico: todo estilo nuevo cuelga de .dm-bandeja (Regla de Oro 4). */
+.dm-bandeja{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;margin-bottom:28px;color:#fff;font-family:'Outfit',sans-serif;font-size:13px;line-height:1.45}
+.dm-bandeja,.dm-bandeja *{box-sizing:border-box}
+.dm-bandeja .dm-hint{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px}
+.dm-bandeja .dm-cargando{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:18px}
+.dm-bandeja .dm-vacio{text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:26px 16px;border:1px dashed rgba(232,160,32,.3);border-radius:10px;line-height:1.6}
+.dm-bandeja .dm-vacio-ico{font-size:30px;display:block;margin-bottom:8px;opacity:.75}
+/* Lista de hilos */
+.dm-bandeja .dm-hilo{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;margin-bottom:6px;transition:border-color .15s,background .15s}
+.dm-bandeja .dm-hilo:hover{border-color:rgba(232,160,32,.35);background:rgba(232,160,32,.05)}
+.dm-bandeja .dm-hilo.abierto{border-color:var(--gold)}
+.dm-bandeja .dm-hilo-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:none;border:none;padding:0;text-align:left;cursor:pointer;color:inherit;font-family:inherit}
+.dm-bandeja .dm-avatar{width:40px;height:40px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:#111;background:#E8A020;background-size:cover;background-position:center;border:2px solid rgba(232,160,32,.5);overflow:hidden}
+.dm-bandeja .dm-hilo-body{flex:1;min-width:0;display:block}
+.dm-bandeja .dm-hilo-nombre{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;letter-spacing:.4px;color:#fff;text-transform:uppercase;line-height:1.25}
+.dm-bandeja .dm-hilo-ultimo{display:block;font-size:11px;color:rgba(255,255,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dm-bandeja .dm-hilo-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.dm-bandeja .dm-hilo-fecha{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:10px;color:rgba(255,255,255,.35);white-space:nowrap}
+.dm-bandeja .dm-no-leidos{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:10px;background:var(--gold);color:#111;border-radius:999px;padding:2px 7px}
+.dm-bandeja .dm-bloq-btn{background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:6px;color:rgba(255,255,255,.55);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 9px;cursor:pointer;flex-shrink:0}
+.dm-bandeja .dm-bloq-btn:hover{border-color:#ef4444;color:#ef4444}
+.dm-bandeja .dm-bloq-btn.on{border-color:rgba(34,197,94,.45);color:#22C55E}
+/* Hilo abierto */
+.dm-bandeja .dm-chat{border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden;background:rgba(0,0,0,.25)}
+.dm-bandeja .dm-chat-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03)}
+.dm-bandeja .dm-volver{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.7);font-size:11px;padding:5px 10px;cursor:pointer;font-family:'Outfit',sans-serif}
+.dm-bandeja .dm-volver:hover{border-color:var(--gold);color:var(--gold)}
+.dm-bandeja .dm-chat-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;text-transform:uppercase;letter-spacing:.6px;color:#fff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dm-bandeja .dm-msgs{display:flex;flex-direction:column;gap:8px;padding:12px;max-height:380px;overflow-y:auto}
+.dm-bandeja .dm-burbuja{max-width:78%;padding:8px 11px;border-radius:12px;font-size:12.5px;line-height:1.45;word-wrap:break-word;white-space:pre-wrap}
+.dm-bandeja .dm-burbuja.dm-otro{align-self:flex-start;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.9);border-bottom-left-radius:3px}
+.dm-bandeja .dm-burbuja.dm-yo{align-self:flex-end;background:var(--gold);color:#111;border-bottom-right-radius:3px;font-weight:500}
+.dm-bandeja .dm-msg-fecha{font-family:'Geist','Barlow Condensed',sans-serif;font-size:9px;font-weight:900;opacity:.55;margin-top:4px;display:block}
+.dm-bandeja .dm-composer{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02)}
+.dm-bandeja .dm-texto{width:100%;min-height:62px;max-height:140px;resize:vertical;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:9px 11px;color:#fff;font-family:'Outfit',sans-serif;font-size:13px}
+.dm-bandeja .dm-texto:focus{outline:none;border-color:rgba(232,160,32,.55)}
+.dm-bandeja .dm-composer-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dm-bandeja .dm-contador{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:10px;color:rgba(255,255,255,.35)}
+.dm-bandeja .dm-enviar{background:var(--gold);border:none;border-radius:6px;color:#111;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;padding:8px 16px;cursor:pointer}
+.dm-bandeja .dm-enviar:hover{opacity:.88}
+.dm-bandeja .dm-enviar:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);cursor:not-allowed}
+.dm-bandeja .dm-aviso{font-size:10px;color:rgba(255,255,255,.4);padding:0 12px 10px}
+/* ---- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES ----
+   Silo atomico: todo estilo nuevo cuelga de .arbol-clases (ADR-004). */
+.arbol-clases{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px;color:#fff;font-family:'Outfit',sans-serif}
+.arbol-clases,.arbol-clases *{box-sizing:border-box}
+.arbol-clases .arbol-cargando{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:18px}
+.arbol-clases .arbol-nota{font-size:10px;color:rgba(255,255,255,.45);line-height:1.5;text-align:center;margin:0 0 10px}
+.arbol-clases .arbol-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.arbol-clases .arbol-tab{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;color:rgba(255,255,255,.65);font-family:'Outfit',sans-serif;transition:background .15s,border-color .15s,color .15s}
+.arbol-clases .arbol-tab:hover{border-color:rgba(232,160,32,.35);color:#fff}
+.arbol-clases .arbol-tab.on{background:rgba(232,160,32,.1);border-color:rgba(232,160,32,.45);color:#fff}
+.arbol-clases .arbol-tab-emoji{font-size:17px;line-height:1}
+.arbol-clases .arbol-tab-nombre{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}
+.arbol-clases .arbol-tab-mio{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:8px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px}
+.arbol-clases .arbol-bono{background:linear-gradient(135deg,rgba(232,160,32,.14),rgba(232,160,32,.04));border:1px solid rgba(232,160,32,.4);border-radius:10px;padding:11px 12px;margin-bottom:12px}
+.arbol-clases .arbol-bono-txt{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.85);margin-bottom:8px}
+.arbol-clases .arbol-num{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;color:var(--gold)}
+.arbol-clases .arbol-bono-row{display:flex;gap:8px;flex-wrap:wrap}
+.arbol-clases .arbol-bono-sel{flex:1;min-width:170px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:9px 11px;color:#fff;font-family:'Outfit',sans-serif;font-size:12px}
+.arbol-clases .arbol-bono-sel:focus{outline:none;border-color:rgba(232,160,32,.55)}
+.arbol-clases .arbol-btn{background:transparent;border:1px solid rgba(232,160,32,.45);color:var(--gold);border-radius:6px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}
+.arbol-clases .arbol-btn:hover:not(:disabled){background:rgba(232,160,32,.14)}
+.arbol-clases .arbol-btn:disabled{opacity:.4;cursor:not-allowed}
+.arbol-clases .arbol-btn--gold{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.arbol-clases .arbol-ramas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.arbol-clases .arbol-rama{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 8px;display:flex;flex-direction:column;gap:6px;text-align:center}
+.arbol-clases .arbol-rama.activa{border-color:rgba(232,160,32,.45);background:rgba(232,160,32,.06)}
+.arbol-clases .arbol-rama-nombre{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;line-height:1.15;min-height:32px;display:flex;align-items:center;justify-content:center;gap:5px}
+.arbol-clases .arbol-rama-emoji{font-size:15px}
+.arbol-clases .arbol-svg{width:100%;height:auto;display:block}
+.arbol-clases .arbol-linea{stroke:rgba(255,255,255,.14);stroke-width:2.5}
+.arbol-clases .arbol-linea.on{stroke:var(--gold)}
+.arbol-clases .arbol-nodo{fill:rgba(255,255,255,.05);stroke:rgba(255,255,255,.16);stroke-width:1.6}
+.arbol-clases .arbol-nodo.disp{fill:rgba(232,160,32,.12);stroke:var(--gold);stroke-width:2.5}
+.arbol-clases .arbol-nodo.on{fill:var(--gold);stroke:var(--gold)}
+.arbol-clases .arbol-halo{fill:none;stroke:var(--gold);stroke-width:2;animation:arbolPulso 1.7s ease-in-out infinite}
+.arbol-clases .arbol-lock{fill:none;stroke:rgba(255,255,255,.5);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.arbol-clases .arbol-insignia{fill:none;stroke:var(--gold);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.arbol-clases .arbol-check{fill:none;stroke:#111;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.arbol-clases .arbol-hit{fill:transparent;cursor:pointer}
+.arbol-clases .arbol-hit:focus{outline:none;stroke:rgba(232,160,32,.7);stroke-width:1.5}
+.arbol-clases .arbol-prog-bar{height:6px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+.arbol-clases .arbol-prog-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold-d),var(--gold));transition:width .5s}
+.arbol-clases .arbol-prog-txt{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.72);letter-spacing:-.3px;margin-top:4px}
+.arbol-clases .arbol-rama-meta{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px}
+.arbol-clases .arbol-estado{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;border-top:1px solid rgba(255,255,255,.07);padding-top:6px}
+.arbol-clases .arbol-estado.on{color:#22C55E}
+.arbol-clases .arbol-tip{position:fixed;left:0;top:0;z-index:900;max-width:250px;background:#0d0d0d;border:1px solid rgba(232,160,32,.45);border-radius:10px;padding:11px 13px;box-shadow:0 16px 40px rgba(0,0,0,.55);display:none;color:#fff}
+.arbol-clases .arbol-tip.on{display:block}
+.arbol-clases .arbol-tip-t{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:var(--gold)}
+.arbol-clases .arbol-tip-ef{font-size:11px;line-height:1.5;color:rgba(255,255,255,.75);margin-top:5px}
+.arbol-clases .arbol-tip-req{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:10px;color:rgba(255,255,255,.5);margin-top:6px}
+@keyframes arbolPulso{0%,100%{opacity:.22}50%{opacity:.85}}
+@media (max-width:600px){.arbol-clases .arbol-ramas{grid-template-columns:repeat(2,1fr)}.arbol-clases .arbol-tabs{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){.arbol-clases .arbol-halo{animation:none}}
+/* ---- WP-5 (TSK-103 / ADR-028): ADMINISTRADOR DE PERFIL POR PESTANAS ----
+   Silos atomicos: .pf-tabs, .pf-datos, .pf-completa, .pf-casa,
+   .pf-museo-preview y .pf-cuenta (Regla de Oro 4 / ADR-004). */
+.pf-tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:52px;background:var(--black);z-index:120;height:auto;align-items:center;-webkit-overflow-scrolling:touch}
+.pf-tabs::-webkit-scrollbar{height:0}
+.pf-tab{flex:0 0 auto;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:999px;color:rgba(255,255,255,.6);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.9px;padding:8px 14px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.pf-tab:hover{border-color:rgba(232,160,32,.4);color:#fff}
+.pf-tab.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.pf-tab:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* Mis datos (PERFIL) */
+.pf-datos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:28px}
+.pf-datos .pf-dato{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.pf-datos .pf-dato.vacio{border-style:dashed;border-color:rgba(232,160,32,.3)}
+.pf-datos .pf-dato-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.45)}
+.pf-datos .pf-dato-val{font-size:12px;color:#fff;line-height:1.45;word-break:break-word;flex:1}
+.pf-datos .pf-dato.vacio .pf-dato-val{color:rgba(255,255,255,.35);font-style:italic}
+.pf-datos .pf-dato-btn{align-self:flex-start;margin-top:6px;background:transparent;border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}
+.pf-datos .pf-dato-btn:hover{background:rgba(232,160,32,.12)}
+/* Completa tu perfil (PERFIL) */
+.pf-completa{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
+.pf-completa .pf-comp-cargando,.pf-completa .pf-comp-vacio{text-align:center;color:rgba(255,255,255,.35);font-size:11px;padding:14px}
+.pf-completa .pf-comp-head{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.pf-completa .pf-comp-pct{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:40px;line-height:1;color:var(--gold);letter-spacing:-1px}
+.pf-completa .pf-comp-titulo{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#fff}
+.pf-completa .pf-comp-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:3px}
+.pf-completa .pf-comp-bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:14px}
+.pf-completa .pf-comp-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold-d),var(--gold));transition:width .5s}
+.pf-completa .pf-comp-list{display:flex;flex-direction:column;gap:5px}
+.pf-completa .pf-comp-item{display:flex;align-items:center;gap:9px;padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px}
+.pf-completa .pf-comp-item.done{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.06)}
+.pf-completa .pf-comp-tick{font-size:14px;width:18px;text-align:center;color:#22C55E;flex-shrink:0}
+.pf-completa .pf-comp-item:not(.done) .pf-comp-tick{color:rgba(255,255,255,.3)}
+.pf-completa .pf-comp-nombre{flex:1;min-width:0;font-size:12px;font-weight:700;color:#fff}
+.pf-completa .pf-comp-xp{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;color:var(--gold);flex-shrink:0}
+.pf-completa .pf-comp-ok{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#22C55E;flex-shrink:0}
+.pf-completa .pf-comp-btn{background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:5px 11px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0}
+.pf-completa .pf-comp-btn:hover{background:var(--gold);color:var(--black)}
+.pf-completa .pf-comp-feliz{margin-top:12px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#22C55E}
+/* Mi Casa (CLASE) */
+.pf-casa{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px}
+.pf-casa .pf-casa-cabeza{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.pf-casa .pf-casa-meta{font-size:11px;color:rgba(255,255,255,.5)}
+.pf-casa .pf-casa-nota{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px;line-height:1.5}
+.pf-casa .pf-casa-actual{font-size:11px;font-weight:700;color:#22C55E;padding:6px 0}
+/* Mi Museo publico: vista previa (MUSEO) */
+.pf-museo-preview{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
+.pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado{text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:16px;line-height:1.6}
+.pf-museo-preview .pf-mp-hall{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.pf-museo-preview .pf-mp-av{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:var(--black);background:var(--gold);background-size:cover;background-position:center;border:3px solid var(--gold)}
+.pf-museo-preview .pf-mp-id{flex:1;min-width:0}
+.pf-museo-preview .pf-mp-nombre{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:#fff}
+.pf-museo-preview .pf-mp-badge{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;color:var(--gold);margin-top:2px}
+.pf-museo-preview .pf-mp-bio{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;margin-top:6px}
+.pf-museo-preview .pf-mp-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pf-museo-preview .pf-mp-chip{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;color:var(--gold);border:1px solid rgba(232,160,32,.4);border-radius:999px;padding:3px 10px}
+.pf-museo-preview .pf-mp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.pf-museo-preview .pf-mp-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 6px;text-align:center}
+.pf-museo-preview .pf-mp-stat-n{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:#fff;line-height:1.1}
+.pf-museo-preview .pf-mp-stat-l{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.45);margin-top:3px}
+.pf-museo-preview .pf-mp-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px;color:rgba(255,255,255,.45)}
+.pf-museo-preview .pf-mp-btn{background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;padding:9px 16px;cursor:pointer}
+.pf-museo-preview .pf-mp-btn:hover{opacity:.88}
+/* Mi Cuenta (CUENTA) */
+.pf-cuenta{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px}
+.pf-cuenta .pf-cta-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap}
+.pf-cuenta .pf-cta-row:last-child{border-bottom:none}
+.pf-cuenta .pf-cta-lbl{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.55);min-width:130px}
+.pf-cuenta .pf-cta-val{flex:1;min-width:150px;font-size:12px;color:#fff}
+.pf-cuenta .pf-cta-badge{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;border-radius:999px;padding:4px 10px}
+.pf-cuenta .pf-cta-badge.ok{color:#22C55E;border:1px solid rgba(34,197,94,.4)}
+.pf-cuenta .pf-cta-badge.pend{color:#E8A020;border:1px solid rgba(232,160,32,.4)}
+.pf-cuenta .pf-switch{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 12px 5px 6px;cursor:pointer;color:rgba(255,255,255,.6);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px}
+.pf-cuenta .pf-switch i{width:26px;height:15px;border-radius:999px;background:rgba(255,255,255,.2);position:relative;display:inline-block;transition:background .15s}
+.pf-cuenta .pf-switch i::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:left .15s}
+.pf-cuenta .pf-switch.on{border-color:rgba(34,197,94,.45);color:#22C55E}
+.pf-cuenta .pf-switch.on i{background:#22C55E}
+.pf-cuenta .pf-switch.on i::after{left:13px}
+@media (max-width:600px){.pf-tabs{top:0}.pf-museo-preview .pf-mp-stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -249,8 +452,20 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <!-- PROFILE -->
 <div id="profile">
 
+  <!-- WP-5 (TSK-103 / ADR-028): barra de pestanas. Los bloques existentes
+       NO se movieron: cada uno lleva data-tab y se muestra/oculta. -->
+  <nav class="pf-tabs" id="pf-tabs" role="tablist" aria-label="Secciones de mi perfil">
+    <button type="button" class="pf-tab on" role="tab" data-tab="perfil" aria-selected="true" onclick="pfTab('perfil')">&#x1F464; Perfil</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="clase" aria-selected="false" onclick="pfTab('clase')">&#x2694;&#xFE0F; Clase</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="red" aria-selected="false" onclick="pfTab('red')">&#x1F517; Mi Red</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="museo" aria-selected="false" onclick="pfTab('museo')">&#x1F3DB;&#xFE0F; Museo</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Inventario</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="mensajes" aria-selected="false" onclick="pfTab('mensajes')">&#x1F4E8; Mensajes</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="cuenta" aria-selected="false" onclick="pfTab('cuenta')">&#x2699;&#xFE0F; Cuenta</button>
+  </nav>
+
   <!-- HERO -->
-  <div class="pf-hero">
+  <div class="pf-hero" data-tab="perfil">
     <div class="pf-av" id="pf-av">Tú</div>
     <div class="pf-info">
       <div class="pf-name" id="pf-name">Viajero</div>
@@ -264,69 +479,72 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   </div>
 
   <!-- STATS -->
-  <div class="pf-stats">
+  <div class="pf-stats" data-tab="perfil">
     <div class="pf-stat"><div class="pf-stat-n" id="pf-xp-n">0</div><div class="pf-stat-l">XP total</div></div>
     <div class="pf-stat"><div class="pf-stat-n" id="pf-saved-n">0</div><div class="pf-stat-l">Guardados</div></div>
     <div class="pf-stat"><div class="pf-stat-n" id="pf-visited-n">0</div><div class="pf-stat-l">Visitados</div></div>
     <div class="pf-stat"><div class="pf-stat-n" id="pf-reviews-n">0</div><div class="pf-stat-l">Reseñas</div></div>
   </div>
 
+  <!-- WP-5 (TSK-103 / ADR-028): datos personales + completitud del perfil -->
+  <div class="pf-section-title" data-tab="perfil">&#x1F9F3; Mis datos</div>
+  <div class="pf-datos" id="pf-datos" data-tab="perfil"></div>
+
+  <div class="pf-section-title" data-tab="perfil">&#x1F4CB; Completa tu perfil</div>
+  <div class="pf-completa" id="pf-completa" data-tab="perfil"></div>
+
   <!-- NIVELES -->
-  <div class="pf-section-title">🏅 Niveles</div>
-  <div id="pf-niveles"></div>
+  <div class="pf-section-title" data-tab="perfil">🏅 Niveles</div>
+  <div id="pf-niveles" data-tab="perfil"></div>
 
   <!-- BADGES -->
-  <div class="pf-section-title">🎖️ Badges</div>
-  <div class="badges-grid" id="pf-badges"></div>
+  <div class="pf-section-title" data-tab="perfil">🎖️ Badges</div>
+  <div class="badges-grid" id="pf-badges" data-tab="perfil"></div>
 
   <!-- MISIONES -->
-  <div class="pf-section-title">🎯 Misiones</div>
-  <div class="pf-counter" id="pf-misiones-count">0 / 10</div>
-  <div id="pf-misiones"></div>
+  <div class="pf-section-title" data-tab="perfil">🎯 Misiones</div>
+  <div class="pf-counter" id="pf-misiones-count" data-tab="perfil">0 / 10</div>
+  <div id="pf-misiones" data-tab="perfil"></div>
 
   <!-- TROFEOS / LOGROS -->
-  <div class="pf-section-title">🏆 Logros y trofeos</div>
-  <div class="pf-counter" id="pf-trofeos-count">0 / 19</div>
-  <div class="trofeo-grid" id="pf-trofeos"></div>
+  <div class="pf-section-title" data-tab="museo">🏆 Logros y trofeos</div>
+  <div class="pf-counter" id="pf-trofeos-count" data-tab="museo">0 / 19</div>
+  <div class="trofeo-grid" id="pf-trofeos" data-tab="museo"></div>
 
   <!-- TABLA DE DESTINO (Milestones v2: Albion) -->
-  <div class="pf-section-title">🕸️ Tabla de Destino</div>
-  <div class="td-wrap" id="pf-tabla">
+  <div class="pf-section-title" data-tab="clase">🕸️ Tabla de Destino</div>
+  <div class="td-wrap" id="pf-tabla" data-tab="clase">
     <div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando senderos…</div>
   </div>
 
   <!-- TIENDA DE CONSUMIBLES (Gamificacion v4) -->
-  <div class="pf-section-title">&#x1F6D2; Tienda de Consumibles</div>
-  <div class="pf-counter" id="pf-xp-balance">0 XP disponibles</div>
-  <div class="store-grid" id="pf-tienda"></div>
+  <div class="pf-section-title" data-tab="inventario">&#x1F6D2; Tienda de Consumibles</div>
+  <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP disponibles</div>
+  <div class="tienda-chips" id="pf-tienda-chips" data-tab="inventario"></div>
+  <div class="store-grid" id="pf-tienda" data-tab="inventario"></div>
 
   <!-- MI INVENTARIO (Gamificacion v4) -->
-  <div class="pf-section-title" style="margin-top:20px">&#x1F392; Mi Inventario</div>
-  <div id="pf-inventario"></div>
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F392; Mi Inventario</div>
+  <div id="pf-inventario" data-tab="inventario"></div>
 
   <!-- MIS CROMOS (Gamificacion v4) -->
-  <div class="pf-section-title" style="margin-top:20px">&#x1F3AB; Mis Cromos</div>
-  <div class="pf-counter" id="pf-cromos-count">0 cromos</div>
-  <div class="cromo-grid" id="pf-cromos"></div>
-
-  <!-- GALERIA DE MEJORAS DE PERFIL -->
-  <div class="pf-section-title">&#x1F3A8; Galeria de Mejoras de Perfil</div>
-  <div class="pf-counter" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Mejora como se ve tu perfil ante la comunidad (se aplica en vivo).</div>
-  <div class="adorno-grid" id="pf-mejoras-grid"></div>
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F3AB; Mis Cromos</div>
+  <div class="pf-counter" id="pf-cromos-count" data-tab="inventario">0 cromos</div>
+  <div class="cromo-grid" id="pf-cromos" data-tab="inventario"></div>
 
   <!-- VOCACIONES DE ARTISTA -->
-  <div class="pf-section-title" style="margin-top:22px;">&#x1F3A4; Vocaciones de Artista</div>
-  <div class="pf-counter" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Desbloquea tu lado creativo: activa una vocacion para presumirla en tu vitrina (puedes tener varias activas).</div>
-  <div class="voc-grid" id="pf-vocaciones-grid"></div>
+  <div class="pf-section-title" style="margin-top:22px;" data-tab="clase">&#x1F3A4; Vocaciones de Artista</div>
+  <div class="pf-counter" data-tab="clase" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Desbloquea tu lado creativo: activa una vocacion para presumirla en tu vitrina (puedes tener varias activas).</div>
+  <div class="voc-grid" id="pf-vocaciones-grid" data-tab="clase"></div>
   <!-- Caminos de artista (Gaming v5.0 / ADR-026) -->
-  <div id="pf-voc-misiones"></div>
+  <div id="pf-voc-misiones" data-tab="clase"></div>
 
   <!-- MIS ALBUMES (ADR-017) -->
-  <div class="pf-section-title">&#x1F5BC; Mis Albumes</div>
-  <div id="mis-albumes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
+  <div class="pf-section-title" data-tab="museo">&#x1F5BC; Mis Albumes</div>
+  <div id="mis-albumes-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
     <p style="color:rgba(255,255,255,.3);font-size:13px;">Cargando albumes...</p>
   </div>
-  <button onclick="abrirModalCrearAlbum()" id="btn-crear-album" style="display:none;padding:10px 20px;background:var(--gold);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:Outfit,sans-serif;margin-bottom:28px;">
+  <button onclick="abrirModalCrearAlbum()" id="btn-crear-album" data-tab="museo" style="display:none;padding:10px 20px;background:var(--gold);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:Outfit,sans-serif;margin-bottom:28px;">
     + Crear album
   </button>
 
@@ -458,27 +676,50 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
+  <!-- WP-5: vista previa de lo que ven otros en tu perfil publico -->
+  <div class="pf-section-title" data-tab="museo">&#x1F3DB;&#xFE0F; Mi Museo publico</div>
+  <div class="pf-museo-preview" id="pf-museo-preview" data-tab="museo"></div>
+
   <!-- MIS LUGARES -->
-  <div class="pf-section-title">&#x1F4CD; Mis lugares guardados</div>
-  <div id="pf-guardados"></div>
-  <div class="pf-section-title" style="margin-top:20px">✅ Lugares visitados</div>
-  <div id="pf-visitados"></div>
+  <div class="pf-section-title" data-tab="museo">&#x1F4CD; Mis lugares guardados</div>
+  <div id="pf-guardados" data-tab="museo"></div>
+  <div class="pf-section-title" style="margin-top:20px" data-tab="museo">✅ Lugares visitados</div>
+  <div id="pf-visitados" data-tab="museo"></div>
 
   <!-- GAMING V5.0: MI RED DE REFERIDOS -->
-  <div class="pf-section-title" style="margin-top:28px">&#x1F517; Mi Red de Referidos</div>
-  <div style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Invita viajeros con tu codigo y gana XP por cada nivel de tu red (10/5/3/2/1%).</div>
-  <div id="pf-referidos"></div>
+  <div class="pf-section-title" style="margin-top:28px" data-tab="red">&#x1F517; Mi Red de Referidos</div>
+  <div data-tab="red" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Comparte tu QR, tu codigo o tu enlace completo. Ganas XP por cada nivel de tu red: 10 / 5 / 3 / 2 / 1%.</div>
+  <div id="pf-referidos" data-tab="red"></div>
 
   <!-- GAMING V5.0: TU FACCION -->
-  <div class="pf-section-title" style="margin-top:28px">&#x1F3C6; Tu Faccion</div>
-  <div id="pf-facciones"></div>
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3C6; Tu Faccion</div>
+  <div id="pf-facciones" data-tab="clase"></div>
+  <!-- WP-5: Casa (identidad de equipo: Condor / Jaguar / Delfin) -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3E0; Mi Casa</div>
+  <div class="pf-casa" id="pf-casa" data-tab="clase"></div>
+
+  <!-- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x2694;&#xFE0F; Arbol de Clases</div>
+  <div class="arbol-clases" id="arbol-clases" data-tab="clase">
+    <div class="arbol-cargando">Abriendo tu Arbol de Clases&#8230;</div>
+  </div>
+  <!-- GAMING v5.0 / ADR-028: MENSAJES DIRECTOS (DM) -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="mensajes">&#x1F4E8; Mensajes</div>
+  <div data-tab="mensajes" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Conversaciones privadas: abrir un hilo nuevo cuesta 20 XP; responder dentro de un hilo abierto es gratis.</div>
+  <div class="dm-bandeja" id="dm-bandeja" data-tab="mensajes">
+    <div class="dm-cargando">Cargando tus conversaciones&#8230;</div>
+  </div>
 
   <!-- SIGUIENTES PASOS -->
-  <div class="pf-section-title" style="margin-top:28px">🚀 Siguientes pasos</div>
-  <div id="pf-quick-actions" style="display:flex;flex-direction:column;gap:6px;margin-bottom:28px"></div>
+  <div class="pf-section-title" style="margin-top:28px" data-tab="perfil">🚀 Siguientes pasos</div>
+  <div id="pf-quick-actions" data-tab="perfil" style="display:flex;flex-direction:column;gap:6px;margin-bottom:28px"></div>
+
+  <!-- WP-5: cuenta, verificacion de email y privacidad -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="cuenta">&#x2699;&#xFE0F; Mi Cuenta</div>
+  <div class="pf-cuenta" id="pf-cuenta" data-tab="cuenta"></div>
 
   <!-- ACCIONES -->
-  <div class="pf-actions">
+  <div class="pf-actions" data-tab="cuenta">
     <button class="pf-btn" onclick="window.location.href='index.html#mymapa-section'">🗺️ Mi Mapa</button>
     <button class="pf-btn" onclick="window.location.href='directorio.html'">📍 Explorar</button>
     <button class="pf-btn pf-btn-gold" onclick="editarNombre()">✏️ Editar nombre</button>
@@ -495,6 +736,29 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
    Datos reales: window.ExploraCO.usuario + Neon
    La sesion la maneja usuario-session.js (window.ExploraCO).
    ============================================================= */
+/* ---- R-3: perfil publico ajeno (ADR-028 / P-1) ----
+   comunidad.html enlaza a /mi-perfil.html?id=<uuid>: si el id no es el de la
+   sesion (o no hay sesion) se redirige a perfil.html?id=<uuid>, antes de
+   pintar el perfil propio. Se re-evalua en checkGate() por si la sesion
+   (usuario-session.js) termina de cargar despues de este punto. */
+function redirigirPerfilPublico() {
+  var idParam = '';
+  try { idParam = new URLSearchParams(window.location.search || '').get('id') || ''; }
+  catch (e) { return; }
+  if (!idParam) return;
+  var propio = '';
+  try {
+    var raw = localStorage.getItem('exploraco_user');
+    if (raw) propio = (JSON.parse(raw) || {}).id || '';
+  } catch (e) { propio = ''; }
+  if (!propio) {
+    var enMemoria = sesion();
+    if (enMemoria && enMemoria.id) propio = String(enMemoria.id);
+  }
+  if (String(propio) === String(idParam)) return;
+  window.location.replace('perfil.html?id=' + encodeURIComponent(idParam));
+}
+redirigirPerfilPublico();
 
 /* ---- POINTS CONFIG (20 rangos / 4 Eras) ---- */
 var XP_LEVELS = [
@@ -511,10 +775,10 @@ var XP_LEVELS = [
   {min:4000,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF',era:'Era 3',capacidades:'organizar_actividad; presidir salas regionales'},
   {min:5200,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC',era:'Era 3',capacidades:'Video-Reels en fichas; galeria destacada en Blog'},
   {min:6800,nombre:'Senor del Spot',emoji:'\uD83D\uDC51',era:'Era 3',capacidades:'Disputa avanzada Own the Spot; x1.1 XP en esa ciudad'},
-  {min:8500,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05',era:'Era 3',capacidades:'Mapas de Cine; FUNDAR PANDILLA'},
+  {min:8500,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05',era:'Era 3',capacidades:'Mapas de Cine; FUNDAR PARCHE'},
   {min:10500,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F',era:'Era 3',capacidades:'Moderacion galerias/resenas; badge Plata Neon'},
   {min:13000,nombre:'Curador de Colombia',emoji:'\uD83E\uD489',era:'Era 4 Leyenda',capacidades:'Cromos dorados; insignias legendarias (+100 XP)'},
-  {min:16000,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Era 4',capacidades:'x1.2 XP de Pandilla grupal; pases VIP'},
+  {min:16000,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Era 4',capacidades:'x1.2 XP de Parche grupal; pases VIP'},
   {min:19500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5',era:'Era 4',capacidades:'Videos en Hero; destacado permanente'},
   {min:24000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25',era:'Era 4',capacidades:'Marco avatar Neon Fuego; acceso beta'},
   {min:30000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51',era:'Era 4',capacidades:'Maximo prestigio; A2A Agent Card'},
@@ -570,6 +834,7 @@ function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 /* ---- GATE ---- */
 function checkGate() {
+  redirigirPerfilPublico();
   var gate = document.getElementById('gate');
   var prof = document.getElementById('profile');
   if(sesion()) { gate.style.display='none'; prof.style.display='flex'; renderPerfil(); refrescarSesion(); }
@@ -583,8 +848,7 @@ function checkGate() {
 function refrescarSesion() {
   var u = sesion();
   if(!u || !u.id) return;
-  fetch('/api/usuarios?id=' + encodeURIComponent(u.id))
-    .then(function(r){ return r.json(); })
+  fetchConJwt('/api/usuarios?id=' + encodeURIComponent(u.id))
     .then(function(res){
       if(res.ok && res.data) {
         window.ExploraCO.usuario = res.data;
@@ -649,17 +913,12 @@ function renderPerfil() {
   /* museo-line: barra de museo en el hero (sync con backfill) */
   syncMuseoLine(u.id, true);
 
-  /* galeria de mejoras de perfil + vocaciones (ADR-015/ADR-018) */
-  cargarGaleriaMejoras(u.id);
-  cargarVocaciones(u.id);
-
   /* tienda/inventario/cromos (Gamificacion v4) */
   cargarTienda(u.id);
   cargarInventario(u.id);
   cargarCromos(u.id);
 
-  /* galeria de mejoras + vocaciones (perfil-artista v1 / ADR-015) */
-  cargarGaleriaMejoras(u.id);
+  /* vocaciones de artista (perfil-artista v1 / ADR-015) */
   cargarVocaciones(u.id);
 
   /* mis albumes (ADR-017) */
@@ -670,13 +929,23 @@ function renderPerfil() {
   /* mis lugares */
   cargarMisLugares(u.id);
 
-  /* Gaming v5.0: red de referidos, faccion y caminos de artista */
+  /* Gaming v5.0: red de referidos, faccion, caminos de artista y DM */
   cargarMiRed(u.id);
   cargarFacciones(u.id);
+  cargarArbolClases(u.id);
   cargarMisionesArtista(u.id);
+  cargarMensajes(u.id);
 
   /* quick actions */
   renderQuickActions(st);
+
+  /* WP-5 (TSK-103 / ADR-028): pestanas, completitud, Casa y museo publico */
+  pfAplicarTab();
+  renderDatosPerfil();
+  renderCuentaPanel();
+  cargarCompletitudPerfil(u.id);
+  cargarCasas(u.id);
+  cargarMuseoPreview(u.id);
 }
 
 /* ---- NIVELES ---- */
@@ -981,51 +1250,6 @@ function syncMuseoLine(uid, fuerza) {
   });
 }
 
-/* ---- GALERIA DE MEJORAS DE PERFIL (ADR-015) ---- */
-var PF_MEJORAS_META = {};
-function cargarGaleriaMejoras(uid) {
-  var grid = document.getElementById('pf-mejoras-grid');
-  if (!grid || !uid) return;
-  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando mejoras\u2026</div>';
-  Promise.all([
-    fetch('/api/interacciones?tipo=consumibles').then(function(r){ return r.json(); }),
-    fetch('/api/interacciones?tipo=inventario&usuario_id=' + encodeURIComponent(uid)).then(function(r){ return r.json(); })
-  ]).then(function(re){
-    var cat = (re[0] && (re[0].data || re[0].data)) || [];
-    var inv = (re[1] && re[1].data) || {};
-    var cons = (inv.consumibles) || {};
-    var u0 = sesion();
-    var caps = (u0 && u0.capacidades) || {};
-    var list = cat.filter(function(c){ return c && c.clave && String(c.clave).indexOf('perfil_') === 0; });
-    if (!list.length) {
-      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aun no hay mejoras de perfil disponibles.</div>';
-      return;
-    }
-    grid.innerHTML = list.map(function(c){
-      var activa = !!caps[c.clave];
-      var posee = (parseInt(cons[c.clave], 10) || 0) > 0;
-      var cuerpoBt;
-      if (activa) {
-        cuerpoBt = '<button disabled style="background:rgba(34,197,94,.18);color:#22C55E;border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:default;">&#x2713; Activa en tu perfil</button>';
-      } else if (posee) {
-        cuerpoBt = '<button onclick="usarConsumible(\'' + esc(c.clave) + '\',this)" style="background:var(--gold);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">Aplicar</button>';
-      } else {
-        var noAlc = statsU() && (c.precio_xp > statsU().xp);
-        cuerpoBt = '<button onclick="comprarConsumible(\'' + esc(c.clave) + '\',this)"' + (noAlc ? ' disabled' : '') + ' style="' + (noAlc ? 'opacity:.35;' : '') + 'border:1px solid var(--gold);color:var(--gold);background:transparent;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">Comprar ' + (parseInt(c.precio_xp, 10) || 0) + ' XP</button>';
-      }
-      return '<div class="adorno-card">'
-        + '<div class="adorno-emoji" style="height:88px;display:flex;align-items:center;justify-content:center;font-size:30px;background:linear-gradient(160deg,rgba(232,160,32,.14),rgba(255,255,255,.03));border-radius:8px;margin-bottom:8px;">' + (c.emoji || '\uD83C\uDFA8') + '</div>'
-        + '<div class="adorno-nombre" style="font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;">' + esc(c.nombre || c.clave) + '</div>'
-        + '<div class="adorno-desc" style="font-size:10px;color:rgba(255,255,255,.45);line-height:1.4;margin-bottom:10px;min-height:26px;">' + esc(c.descripcion || '') + '</div>'
-        + cuerpoBt
-        + '</div>';
-    }).join('');
-    grid._reload = function(){ cargarGaleriaMejoras(uid); };
-  }).catch(function(){
-    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar la galeria de mejoras.</div>';
-  });
-}
-
 /* ---- VOCACIONES DE ARTISTA (ADR-018 / ADR-026) ---- */
 function cargarVocaciones(uid) {
   var grid = document.getElementById('pf-vocaciones-grid');
@@ -1101,19 +1325,67 @@ function activarVocacion(vocId, btn) {
     });
 }
 
+/* Categorias de la tienda (WP-6 / ADR-028, migracion 018). El valor del
+   servidor (item.categoria) tiene prioridad; el mapa local es el respaldo
+   para que los chips funcionen aunque el endpoint aun no devuelva la columna. */
+var PF_TIENDA_CATS = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'perfil', label: 'Perfil' },
+  { id: 'impulso', label: 'Impulso' },
+  { id: 'social', label: 'Social' },
+  { id: 'coleccion', label: 'Coleccion' },
+  { id: 'general', label: 'General' }
+];
+var PF_TIENDA_CAT = 'todos';
+var PF_CAT_CONSUMIBLE = {
+  perfil_marco_dorado: 'perfil', perfil_tema_oscuro: 'perfil', perfil_banda_artista: 'perfil',
+  perfil_marco_plata: 'perfil', perfil_vitrina_destacada: 'perfil',
+  perfil_titulo_custom: 'perfil', perfil_fondo_paisaje: 'perfil',
+  amuleto_x2: 'impulso', trompeta_fama: 'impulso', imantador_cromos: 'impulso',
+  sala_efimera: 'social', vitrina_estelar: 'social', pin_cromado: 'social', pase_vip: 'social',
+  cuaderno_expedicion: 'coleccion', pergamino_mapa: 'coleccion',
+  pluma_inspirada: 'general'
+};
+function categoriaConsumible(c) {
+  if (c && c.categoria) return String(c.categoria).toLowerCase();
+  var clave = String((c && c.clave) || '');
+  if (PF_CAT_CONSUMIBLE[clave]) return PF_CAT_CONSUMIBLE[clave];
+  return clave.indexOf('perfil_') === 0 ? 'perfil' : 'general';
+}
+function renderTiendaChips() {
+  var box = document.getElementById('pf-tienda-chips');
+  if (!box) return;
+  box.innerHTML = PF_TIENDA_CATS.map(function(cat){
+    var on = (cat.id === PF_TIENDA_CAT);
+    return '<button type="button" class="tienda-chip' + (on ? ' on' : '') + '"'
+      + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
+      + ' onclick="setTiendaFiltro(\'' + cat.id + '\')">' + cat.label + '</button>';
+  }).join('');
+}
+function setTiendaFiltro(cat) {
+  PF_TIENDA_CAT = cat || 'todos';
+  renderTiendaChips();
+  var u = sesion();
+  if (u) cargarTienda(u.id);
+}
 function cargarTienda(uid) {
   var grid = document.getElementById('pf-tienda');
   var balance = document.getElementById('pf-xp-balance');
   if(!grid) return;
+  renderTiendaChips();
   var st = statsU();
   if(balance) balance.textContent = st.xp + ' XP disponibles';
   grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando tienda\u2026</div>';
-  fetch('/api/interacciones?tipo=consumibles')
-    .then(function(r){ return r.json(); })
+  var url = '/api/interacciones?tipo=consumibles';
+  if (PF_TIENDA_CAT !== 'todos') url += '&categoria=' + encodeURIComponent(PF_TIENDA_CAT);
+  fetchConJwt(url)
     .then(function(res){
       var list = (res && res.data) || [];
+      if (PF_TIENDA_CAT !== 'todos') {
+        list = list.filter(function(c){ return categoriaConsumible(c) === PF_TIENDA_CAT; });
+      }
       if(!list.length) {
-        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No hay consumibles disponibles aun.</div>';
+        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No hay consumibles en esta categoria.</div>';
         return;
       }
       st = statsU();
@@ -1207,16 +1479,140 @@ function cargarInventario(uid) {
     });
 }
 
+/* ---- DATOS REQUERIDOS AL USAR consumibles perfil_* (WP-6 / ADR-028) ----
+   perfil_titulo_custom -> titulo (24 chars); perfil_fondo_paisaje ->
+   fondo_url; perfil_vitrina_destacada -> albumes (hasta 3 ids). Se envian
+   en el body de usar_consumible junto a usuario_id y clave. Los demas
+   consumibles conservan el flujo generico. */
+var PF_DATO_CONSUMIBLE = {
+  perfil_titulo_custom: {
+    tipo: 'texto', max: 24,
+    titulo: 'Titulo de Viajero',
+    ayuda: 'Escribe el titulo (maximo 24 caracteres) que vera la comunidad bajo tu nombre.',
+    placeholder: 'Ej: Cazador de Atardeceres',
+    accion: 'Guardar titulo'
+  },
+  perfil_fondo_paisaje: {
+    tipo: 'url', max: 300,
+    titulo: 'Fondo de Paisaje',
+    ayuda: 'Pega la URL publica (https) de la foto que quieres como cabecera de tu museo.',
+    placeholder: 'https://...',
+    accion: 'Usar fondo'
+  },
+  perfil_vitrina_destacada: {
+    tipo: 'albumes', max: 3,
+    titulo: 'Vitrina Destacada',
+    ayuda: 'Elige hasta 3 albumes para fijarlos arriba de tu museo.',
+    accion: 'Fijar vitrina'
+  }
+};
+function pfPedirDatoConsumible(clave) {
+  var conf = PF_DATO_CONSUMIBLE[clave];
+  if (!conf) return Promise.resolve({});
+  var u = sesion();
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.className = 'pf-uso-ov';
+    var cuerpo = conf.tipo === 'albumes'
+      ? '<div class="pf-uso-list" id="pf-uso-list"><div class="pf-uso-vacio">Cargando albumes\u2026</div></div><div class="pf-uso-cont" id="pf-uso-cont">0 / ' + conf.max + ' elegidos</div>'
+      : '<input class="pf-uso-input" id="pf-uso-input" type="' + (conf.tipo === 'url' ? 'url' : 'text') + '" maxlength="' + conf.max + '" placeholder="' + esc(conf.placeholder) + '">';
+    ov.innerHTML = '<div class="pf-uso-box">'
+      + '<div class="pf-uso-title">' + esc(conf.titulo) + '</div>'
+      + '<div class="pf-uso-help">' + esc(conf.ayuda) + '</div>'
+      + cuerpo
+      + '<div class="pf-uso-actions">'
+      + '<button type="button" class="pf-uso-btn ghost" id="pf-uso-cancel">Cancelar</button>'
+      + '<button type="button" class="pf-uso-btn" id="pf-uso-ok">' + esc(conf.accion) + '</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+    var okBtn = document.getElementById('pf-uso-ok');
+    var elegidos = [];
+    function cerrar(res){
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+      resolve(res);
+    }
+    document.getElementById('pf-uso-cancel').onclick = function(){ cerrar(null); };
+    ov.onclick = function(e){ if (e.target === ov) cerrar(null); };
+    okBtn.onclick = function(){
+      if (conf.tipo === 'albumes') {
+        if (!elegidos.length) { showToast('Elige al menos un album', '#ef4444'); return; }
+        cerrar({ albumes: elegidos.slice() });
+        return;
+      }
+      var inp = document.getElementById('pf-uso-input');
+      var val = inp ? inp.value.trim() : '';
+      if (conf.tipo === 'url') {
+        if (!/^https?:\/\/.+/i.test(val)) { showToast('Pega una URL valida (http o https)', '#ef4444'); return; }
+        cerrar({ fondo_url: val });
+      } else {
+        if (val.length < 3) { showToast('El titulo necesita al menos 3 caracteres', '#ef4444'); return; }
+        cerrar({ titulo: val.slice(0, conf.max) });
+      }
+    };
+    if (conf.tipo === 'albumes') {
+      if (!u) { cerrar(null); return; }
+      fetch('/api/interacciones?tipo=albumes&usuario_id=' + encodeURIComponent(u.id))
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          var list = document.getElementById('pf-uso-list');
+          if (!list) return;
+          var alb = (data && data.data) || [];
+          if (!alb.length) {
+            list.innerHTML = '<div class="pf-uso-vacio">Aun no tienes albumes. Crea uno para fijarlo en tu vitrina.</div>';
+            okBtn.disabled = true;
+            return;
+          }
+          list.innerHTML = alb.map(function(a){
+            return '<label class="pf-uso-item" data-id="' + esc(a.id) + '">'
+              + '<input type="checkbox" value="' + esc(a.id) + '">'
+              + '<span>' + esc(a.titulo) + '</span>'
+              + '<span class="pf-uso-item-n">' + ((parseInt(a.fotos_count, 10) || 0) + ' fotos') + '</span>'
+              + '</label>';
+          }).join('');
+          var cont = document.getElementById('pf-uso-cont');
+          Array.prototype.slice.call(list.querySelectorAll('input')).forEach(function(chk){
+            chk.onchange = function(){
+              elegidos = Array.prototype.slice.call(list.querySelectorAll('input:checked')).map(function(x){ return x.value; });
+              if (elegidos.length > conf.max) {
+                chk.checked = false;
+                elegidos = Array.prototype.slice.call(list.querySelectorAll('input:checked')).map(function(x){ return x.value; });
+                showToast('Maximo ' + conf.max + ' albumes en la vitrina', '#ef4444');
+              }
+              Array.prototype.slice.call(list.querySelectorAll('.pf-uso-item')).forEach(function(it){
+                it.className = 'pf-uso-item' + (it.querySelector('input').checked ? ' on' : '');
+              });
+              if (cont) cont.textContent = elegidos.length + ' / ' + conf.max + ' elegidos';
+            };
+          });
+        })
+        .catch(function(){
+          var list = document.getElementById('pf-uso-list');
+          if (list) list.innerHTML = '<div class="pf-uso-vacio">No se pudieron cargar los albumes.</div>';
+        });
+    } else {
+      var inp2 = document.getElementById('pf-uso-input');
+      if (inp2) { inp2.focus(); inp2.onkeydown = function(e){ if (e.key === 'Enter') okBtn.click(); }; }
+    }
+  });
+}
 function usarConsumible(clave, btn) {
+  pfPedirDatoConsumible(clave).then(function(extra){
+    if (extra === null) return;
+    pfEnviarUsarConsumible(clave, btn, extra);
+  });
+}
+function pfEnviarUsarConsumible(clave, btn, extra) {
   var u = sesion();
   if(!u) return;
   btn.disabled = true;
   var origTxt = btn.textContent;
   btn.textContent = 'Usando\u2026';
+  var body = { usuario_id: u.id, clave: clave };
+  Object.keys(extra || {}).forEach(function(k){ body[k] = extra[k]; });
   fetch('/api/interacciones?tipo=usar_consumible', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({usuario_id: u.id, clave: clave})
+    body: JSON.stringify(body)
   })
     .then(function(r){ return r.json(); })
     .then(function(res){
@@ -1781,49 +2177,140 @@ function confirmarVerificacionEmail(btn) {
 }
 
 /* ---- Mi Red de Referidos (piramide 10/5/3/2/1%) ---- */
-function copiarCodigoRef(codigo, btn) {
-  if (!codigo) return;
-  if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(codigo).catch(function(){});
-  } else {
+var REF_PCT_POR_NIVEL = {1:'10%',2:'5%',3:'3%',4:'2%',5:'1%'};
+
+/* Copia generica: portapapeles moderno con fallback a execCommand.
+   Deja la etiqueta del boton en "Copiado" 2 segundos. */
+function copiarTextoRef(texto, btn, etiqueta) {
+  if (!texto) return;
+  var confirmar = function () {
+    if (window.ExploraCO && typeof window.ExploraCO.mostrarToast === 'function') window.ExploraCO.mostrarToast('Copiado', '#16a34a');
+    else showToast('Copiado', '#16a34a');
+    if (btn) {
+      btn.textContent = 'Copiado';
+      if (btn._refT) clearTimeout(btn._refT);
+      btn._refT = setTimeout(function(){ btn.textContent = etiqueta; }, 2000);
+    }
+  };
+  var conTextarea = function () {
     var ta = document.createElement('textarea');
-    ta.value = codigo;
+    ta.value = texto;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); }
+    catch (e) { console.warn('referidos: fallback de copia fallo', e && e.message); }
     document.body.removeChild(ta);
+    if (ok) confirmar();
+    else showToast('No se pudo copiar: selecciona el texto y copialo a mano', '#ef4444');
+  };
+  if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(confirmar).catch(function(e){
+      console.warn('referidos: clipboard no disponible, uso fallback', e && e.message);
+      conTextarea();
+    });
+    return;
   }
-  if (btn) { btn.textContent = 'Copiado'; setTimeout(function(){ btn.textContent = 'Copiar codigo'; }, 1500); }
+  conTextarea();
 }
+
+/* Compatibilidad con la firma previa (mismo nombre y parametros). */
+function copiarCodigoRef(codigo, btn) {
+  copiarTextoRef(codigo, btn, 'Copiar codigo');
+}
+function copiarRefDesdeBoton(btn) {
+  copiarTextoRef(btn.getAttribute('data-ref-copy'), btn, btn.getAttribute('data-ref-label') || 'Copiar');
+}
+
+/* Web Share API si existe; si no (o si el dispositivo la bloquea), copia. */
+function compartirEnlaceRef(url, btn) {
+  if (navigator && typeof navigator.share === 'function' && url) {
+    try {
+      if (typeof navigator.canShare === 'function' && !navigator.canShare({ url: url })) {
+        copiarTextoRef(url, btn, 'Compartir');
+        return;
+      }
+      navigator.share({ title: 'ExploraCO', text: 'Unete a ExploraCO con mi invitacion', url: url })
+        .then(function(){ if (btn) btn.textContent = 'Compartido'; })
+        .catch(function(e){
+          if (e && e.name === 'AbortError') return;
+          console.warn('referidos: share fallo, copio el enlace', e && e.message);
+          copiarTextoRef(url, btn, 'Compartir');
+        });
+      return;
+    } catch (e) {
+      console.warn('referidos: share no disponible', e && e.message);
+    }
+  }
+  copiarTextoRef(url, btn, 'Compartir');
+}
+function compartirRefDesdeBoton(btn) {
+  compartirEnlaceRef(btn.getAttribute('data-ref-url'), btn);
+}
+
+/* Tres insumos explicitos (P-9/WP-2): QR, codigo y enlace completo. */
 function pintarMiRed(c, red) {
   var codigo = c.codigo_referido || '';
   var url = REF_URL_BASE + '/registro.html?ref=' + encodeURIComponent(codigo);
-  var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(url);
-  var html = '<div class="ref-code-box">'
-    + '<div class="ref-code">' + esc(codigo) + '</div>'
-    + '<button class="ref-copy-btn" onclick="copiarCodigoRef(\'' + esc(codigo) + '\',this)">Copiar codigo</button>'
+  var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
+  var cod = esc(codigo);
+  var enlace = esc(url);
+  var qrAttr = esc(qr);
+
+  var html = '<div class="ref-insumo">'
+    + '<div class="ref-insumo-lbl">1 \u00b7 Tu QR de invitacion</div>'
+    + '<div class="ref-qr-wrap">'
+    + '<img class="ref-qr" src="' + qrAttr + '" width="140" height="140" alt="QR de invitacion de ExploraCO" loading="lazy"'
+    + ' onerror="this.style.display=\'none\';var f=this.parentNode.querySelector(\'.ref-qr-fallback\');if(f)f.style.display=\'block\';">'
+    + '<div class="ref-qr-fallback">No se pudo cargar el QR. Comparte este enlace: <a href="' + enlace + '" target="_blank" rel="noopener">' + enlace + '</a></div>'
+    + '<a class="ref-copy-btn" href="' + qrAttr + '" download="exploraco-qr-invitacion.png" target="_blank" rel="noopener">Descargar QR</a>'
     + '</div>'
-    + '<img class="ref-qr" src="' + qr + '" alt="QR de invitacion">'
-    + '<div class="ref-stats">'
+    + '</div>';
+
+  html += '<div class="ref-insumo">'
+    + '<div class="ref-insumo-lbl">2 \u00b7 Tu codigo</div>'
+    + '<div class="ref-row">'
+    + '<input class="ref-input" type="text" readonly value="' + cod + '" aria-label="Tu codigo de referido">'
+    + '<button class="ref-copy-btn" type="button" data-ref-copy="' + cod + '" data-ref-label="Copiar codigo" onclick="copiarRefDesdeBoton(this)">Copiar codigo</button>'
+    + '</div>'
+    + '</div>';
+
+  html += '<div class="ref-insumo">'
+    + '<div class="ref-insumo-lbl">3 \u00b7 Tu enlace completo</div>'
+    + '<div class="ref-row">'
+    + '<input class="ref-input" type="text" readonly value="' + enlace + '" aria-label="Tu enlace de invitacion">'
+    + '<button class="ref-copy-btn" type="button" data-ref-copy="' + enlace + '" data-ref-label="Copiar enlace" onclick="copiarRefDesdeBoton(this)">Copiar enlace</button>'
+    + '<button class="ref-copy-btn" type="button" data-ref-url="' + enlace + '" onclick="compartirRefDesdeBoton(this)">Compartir</button>'
+    + '</div>'
+    + '</div>';
+
+  html += '<div class="ref-stats">'
     + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.referidos_directos_contados, 10) || 0) + '</div><div class="ref-stat-l">Directos</div></div>'
     + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.xp_ref_total, 10) || 0) + '</div><div class="ref-stat-l">XP por red</div></div>'
     + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.referidos_dia_actual, 10) || 0) + '</div><div class="ref-stat-l">Hoy</div></div>'
     + '</div>';
+
   var niveles = (red && red.niveles) || [];
   if (niveles.length) {
-    html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);margin:10px 0 6px;">Piramide de tu red</div>'
+    html += '<div class="ref-net-title">Piramide de tu red</div>'
       + '<div class="ref-net-grid">';
     for (var i = 0; i < niveles.length; i++) {
       var nv = niveles[i];
+      var nivel = parseInt(nv.nivel, 10) || (i + 1);
+      var pct = REF_PCT_POR_NIVEL[nivel] || '';
       html += '<div class="ref-net-level">'
         + '<div class="ref-net-num">' + (parseInt(nv.cantidad, 10) || 0) + '</div>'
-        + '<div class="ref-net-label">Nivel ' + nv.nivel + '</div>'
-        + '<div class="ref-net-xp">+' + (parseInt(nv.xp_ref, 10) || 0) + '</div>'
+        + '<div class="ref-net-label">Nivel ' + nivel + '</div>'
+        + (pct ? '<div class="ref-net-pct">' + pct + '</div>' : '')
+        + '<div class="ref-net-xp">+' + (parseInt(nv.xp_ref, 10) || 0) + ' XP</div>'
         + '</div>';
     }
     html += '</div>';
   } else {
-    html += '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:10px;">Aun no tienes referidos. Comparte tu codigo para empezar a sumar XP.</div>';
+    html += '<div class="ref-empty">Aun no tienes referidos. Comparte tu QR, tu codigo o tu enlace: cada nivel de tu red te devuelve XP (10/5/3/2/1%).</div>';
   }
   return html;
 }
@@ -1969,6 +2456,633 @@ function cargarMisionesArtista(uid) {
     });
 }
 
+/* ---- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES ----
+   Contrato real de las ramas tipo= de api/interacciones.js (v14):
+     GET  ?tipo=arbol_catalogo            -> {ok,data:{ramas:[16]{id,faccion,nombre,emoji,desc,fuente,
+                                             nodos[5]{id,puntos,nombre,insignia,efecto}}}}
+     GET  ?tipo=arbol_usuario&usuario_id= -> {ok,data:{faccion,vocaciones,ramasActivas,bono_pendiente,
+                                             ramas[16]{id,faccion,nombre,emoji,desc,fuente,puntos,bono,derivado,
+                                             nivel_nodo,nodos_desbloqueados[],efecto{},activa}}}
+     POST {tipo:'rama_activar', usuario_id, rama_id}                        (gate nivel>=5)
+     POST {tipo:'arbol_usuario', accion:'bono_mision', rama_id, usuario_id} (gasta el bono de 25)
+   Silo atomico: todo el CSS nuevo cuelga de .arbol-clases (ADR-004). */
+var ARBOL_UMBRALES = [0, 100, 250, 450, 700];
+var ARBOL_FACCIONES = ['exploradores', 'curadores', 'creadores', 'artistas'];
+var ARBOL_BONO_PTS = 25;
+var ARBOL_ICONO_DEF = 'estrella';
+/* Insignias del catalogo (ruta-paso, oculto-curioso, ...): se mapean por prefijo.
+   Iconos como path SVG inline, sin dependencias externas. */
+var ARBOL_ICONOS = {
+  ruta: '<path d="M6 4v5a3 3 0 003 3h6a3 3 0 013 3v5"/><circle cx="6" cy="4" r="2"/><circle cx="18" cy="20" r="2"/>',
+  oculto: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.6-4.6"/>',
+  ciudad: '<path d="M3 21h18"/><path d="M6 21V8l4-2v15"/><path d="M10 21V6l5-2v17"/><path d="M15 21V10l4 2v9"/>',
+  natura: '<path d="M12 21v-9"/><path d="M12 12c0-4 3-8 8-8 0 5-3 9-8 9z"/><path d="M12 16c0-3-2-6-6-6 0 4 2 6 6 6z"/>',
+  critico: '<path d="M4 20l4-1L19 8l-3-3L5 16z"/><path d="M15 6l3 3"/>',
+  colec: '<rect x="3" y="6" width="12" height="15" rx="2"/><path d="M8 3h9a2 2 0 012 2v13"/><path d="M7 12h4"/>',
+  datos: '<path d="M4 20V11"/><path d="M10 20V4"/><path d="M16 20v-6"/><path d="M22 20H2"/>',
+  guia: '<circle cx="12" cy="12" r="8.5"/><path d="M15 9l-2 5-4 1 2-5z"/>',
+  plan: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/>',
+  parche: '<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 5.5a3 3 0 010 5.6"/><path d="M17.6 20a6.6 6.6 0 00-2.3-5"/>',
+  evento: '<path d="M3 9a2 2 0 012-2h14a2 2 0 012 2 2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4z"/><path d="M12 7v10"/>',
+  embajador: '<path d="M5 3v18"/><path d="M5 4h12l-2 3 2 3H5"/>',
+  musica: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+  cine: '<path d="M3 8l18-3"/><rect x="3" y="8" width="18" height="11" rx="2"/><path d="M7 7l1 4"/><path d="M12 6l1 4"/>',
+  grafica: '<path d="M4 20c3 0 5-1.6 5-4 0-1.6-1.4-2.6-3-2.6C4.6 13.4 4 15 4 16.7z"/><path d="M10.7 13.3L19 5"/>',
+  letras: '<path d="M4 5h7a3 3 0 013 3v11a3 3 0 00-3-3H4z"/><path d="M20 5h-7a3 3 0 00-3 3v11a3 3 0 013-3h7z"/>',
+  estrella: '<path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z"/>'
+};
+/* art_* espeja usuarios.vocaciones (fuente unica, ADR-026). Mapa exacto del
+   backend; el fuzzy queda solo como red de seguridad. */
+var ARBOL_VOCACION_POR_RAMA = { art_musica:'musico', art_cine:'cine', art_grafica:'artista_grafico', art_literatura:'escritor' };
+var ARBOL_ESTADO = { uid:'', faccion:'', tab:'', catalogo:null, catPromesa:null, ramas:{}, activas:{}, bono:0, tip:{}, tipOpen:'' };
+
+function arbolNum(n) { return (parseInt(n, 10) || 0).toLocaleString('es-CO'); }
+function arbolInsigniaKey(insignia) {
+  var k = String(insignia || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (ARBOL_ICONOS[k]) return k;
+  var pre = k.split('-')[0];
+  return ARBOL_ICONOS[pre] ? pre : ARBOL_ICONO_DEF;
+}
+function arbolEfectoTexto(ef) {
+  if (!ef) return '';
+  if (typeof ef === 'string') return ef;
+  if (typeof ef !== 'object') return '';
+  var t = String(ef.tipo || '').toLowerCase();
+  var pct = parseInt(ef.pct, 10) || 10;
+  if (t === 'titulo') return 'Titulo visible: ' + (ef.valor || '');
+  if (t === 'descuento') return '-' + pct + '% en consumibles de ' + (ef.categoria || 'perfil');
+  return (ef.tipo || 'Efecto') + (ef.valor ? ': ' + ef.valor : '');
+}
+function arbolFacMeta(id) {
+  var k = String(id || '').toLowerCase();
+  for (var i = 0; i < FACCION_META.length; i++) if (FACCION_META[i].id === k) return FACCION_META[i];
+  return { id:k, nombre:(k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Faccion'), emoji:'\u2694\uFE0F', color:'#E8A020', desc:'' };
+}
+function arbolEsRamaArtista(ramaId) { return String(ramaId || '').indexOf('art_') === 0; }
+function arbolNivel5() { var l = getLevel(statsU().xp); return !!l && l.min >= 700; }
+function arbolVocacionesSet() {
+  var v = (sesion() || {}).vocaciones, out = {};
+  if (Array.isArray(v)) { for (var i = 0; i < v.length; i++) out[String(v[i])] = true; }
+  else if (v && typeof v === 'object') { for (var k in v) if (Object.prototype.hasOwnProperty.call(v, k) && v[k]) out[k] = true; }
+  else if (typeof v === 'string' && v) { var p = v.split(','); for (var j = 0; j < p.length; j++) { var t = p[j].trim(); if (t) out[t] = true; } }
+  return out;
+}
+function arbolVocacionDe(ramaId) {
+  var id = String(ramaId || '').toLowerCase();
+  if (ARBOL_VOCACION_POR_RAMA[id]) return ARBOL_VOCACION_POR_RAMA[id];
+  var cat = (window.ExploraCO && window.ExploraCO.vocaciones) || [];
+  for (var i = 0; i < cat.length; i++) {
+    var vid = String((cat[i] && cat[i].id) || '').toLowerCase();
+    if (vid && (id === vid || id === 'art_' + vid)) return vid;
+  }
+  return '';
+}
+function arbolUmbrales(nodosCat) {
+  var out = [];
+  (nodosCat || []).forEach(function (nd, i) {
+    var p = parseInt(nd && nd.puntos, 10);
+    out.push(isNaN(p) ? (ARBOL_UMBRALES[i] != null ? ARBOL_UMBRALES[i] : 0) : p);
+  });
+  return out.length ? out : ARBOL_UMBRALES.slice(0);
+}
+function arbolNodosOn(puntos, nodosCat) {
+  var um = arbolUmbrales(nodosCat), n = 0;
+  for (var i = 0; i < um.length; i++) if (puntos >= um[i]) n = i + 1;
+  return n;
+}
+/* El backend devuelve nodos_desbloqueados como array de nodos; si no viene,
+   se deriva de los puntos contra los umbrales. */
+function arbolDesbloq(puntos, nodosCat, ur) {
+  var n = arbolNodosOn(puntos, nodosCat);
+  if (ur && Array.isArray(ur.nodos_desbloqueados)) n = Math.max(n, ur.nodos_desbloqueados.length);
+  else { var d = parseInt(ur && ur.nodos_desbloqueados, 10); if (!isNaN(d)) n = Math.max(n, d); }
+  var total = arbolUmbrales(nodosCat).length;
+  return Math.max(0, Math.min(total, n));
+}
+function arbolErrorMsg(err) {
+  var e = String(err || '').toUpperCase();
+  if (e === 'NIVEL_INSUFICIENTE') return 'Necesitas nivel 5 (700 XP) para activar ramas';
+  if (e === 'SIN_BONO') return 'Ya no tienes puntos de clase pendientes';
+  if (e === 'RAMA_INVALIDA') return 'Esa rama no existe';
+  if (e === 'SESION_REQUERIDA' || e === 'SESION_INVALIDA' || e === 'SESION_EXPIRADA') return 'Tu sesion expiro: vuelve a iniciar sesion';
+  if (e === 'ARBOL_NO_DISPONIBLE' || e === 'ARBOL_CATALOGO_VACIO') return 'El Arbol de Clases aun no esta disponible';
+  return 'No se pudo completar la accion' + (e ? ' (' + e + ')' : '');
+}
+function arbolMarcarActivas(ra) {
+  if (!ra) return;
+  if (Array.isArray(ra)) { for (var i = 0; i < ra.length; i++) ARBOL_ESTADO.activas[String(ra[i])] = true; return; }
+  if (typeof ra === 'object') { for (var k in ra) if (Object.prototype.hasOwnProperty.call(ra, k) && ra[k]) ARBOL_ESTADO.activas[k] = true; }
+}
+function arbolRamaActiva(id, ur) {
+  if (ARBOL_ESTADO.activas[id]) return true;
+  if (ur && (ur.activa === true || ur.activada === true)) return true;
+  var vid = arbolVocacionDe(id);
+  return vid ? !!arbolVocacionesSet()[vid] : false;
+}
+function arbolCatalogoGet() {
+  if (ARBOL_ESTADO.catalogo) return Promise.resolve(ARBOL_ESTADO.catalogo);
+  if (ARBOL_ESTADO.catPromesa) return ARBOL_ESTADO.catPromesa;
+  ARBOL_ESTADO.catPromesa = fetch('/api/interacciones?tipo=arbol_catalogo')
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      var ramas = (res && res.ok && res.data && Array.isArray(res.data.ramas)) ? res.data.ramas : [];
+      if (!ramas.length) return null;
+      ARBOL_ESTADO.catalogo = ramas;
+      return ramas;
+    })
+    .catch(function () { return null; })
+    .then(function (v) { if (!v) ARBOL_ESTADO.catPromesa = null; return v; });
+  return ARBOL_ESTADO.catPromesa;
+}
+function arbolFaccionesDisponibles() {
+  var cat = ARBOL_ESTADO.catalogo || [], out = [];
+  function tiene(f) { return cat.some(function (r) { return String(r.faccion || '').toLowerCase() === f; }); }
+  ARBOL_FACCIONES.forEach(function (f) { if (tiene(f)) out.push(f); });
+  cat.forEach(function (r) { var f = String(r.faccion || '').toLowerCase(); if (f && out.indexOf(f) < 0) out.push(f); });
+  return out;
+}
+function arbolRamasDeFaccion(f) {
+  return (ARBOL_ESTADO.catalogo || []).filter(function (r) { return String(r.faccion || '').toLowerCase() === f; });
+}
+function arbolColumnaSVG(ramaId, nodosCat, puntos, desbloq, fuente) {
+  var W = 92, H = 266, cx = 46, y0 = 26, dy = 54, r = 16, i;
+  var nodos = [], um = arbolUmbrales(nodosCat);
+  for (i = 0; i < um.length; i++) {
+    var nd = nodosCat[i] || {};
+    nodos.push({ i:i, y:y0 + i * dy, umbral:um[i], nombre:nd.nombre || ('Nodo ' + (i + 1)),
+      insignia:nd.insignia || '', efecto:arbolEfectoTexto(nd.efecto), on:(puntos >= um[i]), disp:false });
+  }
+  for (i = 0; i < nodos.length; i++) nodos[i].disp = (!nodos[i].on && i === desbloq);
+  var s = '<svg class="arbol-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rama de clases: ' + esc(ramaId) + '">';
+  for (i = 0; i < nodos.length - 1; i++) {
+    s += '<line class="arbol-linea' + ((nodos[i].on && nodos[i + 1].on) ? ' on' : '') + '" x1="' + cx + '" y1="' + (nodos[i].y + r) + '" x2="' + cx + '" y2="' + (nodos[i + 1].y - r) + '"/>';
+  }
+  nodos.forEach(function (n) {
+    ARBOL_ESTADO.tip[ramaId + '|' + n.i] = { nombre:n.nombre, efecto:n.efecto, fuente:fuente || '', umbral:n.umbral,
+      estado:(n.on ? 'Desbloqueado' : (n.disp ? 'Disponible' : 'Bloqueado')) };
+    if (n.disp) s += '<circle class="arbol-halo" cx="' + cx + '" cy="' + n.y + '" r="' + (r + 6) + '"/>';
+    s += '<circle class="arbol-nodo' + (n.on ? ' on' : (n.disp ? ' disp' : '')) + '" cx="' + cx + '" cy="' + n.y + '" r="' + r + '"/>';
+    if (n.on) s += '<path class="arbol-check" d="M' + (cx - 6) + ' ' + n.y + 'l4 4 8-8"/>';
+    else if (n.disp) s += '<g class="arbol-insignia" transform="translate(' + (cx - 8) + ',' + (n.y - 8) + ') scale(0.66)">' + ARBOL_ICONOS[arbolInsigniaKey(n.insignia)] + '</g>';
+    else s += '<g class="arbol-lock" transform="translate(' + (cx - 6) + ',' + (n.y - 6) + ') scale(0.5)"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></g>';
+    s += '<circle class="arbol-hit" cx="' + cx + '" cy="' + n.y + '" r="' + (r + 7) + '" fill="transparent" data-r="' + esc(ramaId) + '" data-n="' + n.i + '" role="button" tabindex="0" onclick="arbolNodoTip(this,event)" onkeydown="arbolNodoTecla(event,this)"/>';
+  });
+  return s + '</svg>';
+}
+function arbolNodoTecla(ev, el) {
+  if (!ev) return;
+  if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') { ev.preventDefault(); arbolNodoTip(el, ev); }
+}
+function arbolTipCerrar() {
+  var box = document.getElementById('arbol-tip');
+  if (box) box.classList.remove('on');
+  ARBOL_ESTADO.tipOpen = '';
+}
+function arbolNodoTip(el, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  var box = document.getElementById('arbol-tip');
+  if (!box) return;
+  var k = (el.getAttribute('data-r') || '') + '|' + (el.getAttribute('data-n') || '');
+  var d = ARBOL_ESTADO.tip[k];
+  if (!d) return;
+  if (ARBOL_ESTADO.tipOpen === k) { arbolTipCerrar(); return; }
+  box.innerHTML = '<div class="arbol-tip-t">' + esc(d.nombre) + '</div>'
+    + (d.efecto ? '<div class="arbol-tip-ef">' + esc(d.efecto) + '</div>' : '')
+    + (d.fuente ? '<div class="arbol-tip-ef">Se gana con: ' + esc(d.fuente) + '</div>' : '')
+    + '<div class="arbol-tip-req">' + esc(d.estado) + ' \u00B7 ' + arbolNum(d.umbral) + ' pts</div>';
+  box.classList.add('on');
+  ARBOL_ESTADO.tipOpen = k;
+  var w = box.offsetWidth || 240, hh = box.offsetHeight || 92;
+  var vw = window.innerWidth || 360, vh = window.innerHeight || 640;
+  var px = 12, py = 12;
+  if (ev && ev.clientX) { px = ev.clientX + 12; py = ev.clientY + 12; }
+  else if (el.getBoundingClientRect) { var rc = el.getBoundingClientRect(); px = rc.left + rc.width / 2 - w / 2; py = rc.bottom + 8; }
+  if (px + w > vw - 8) px = vw - w - 8;
+  if (px < 8) px = 8;
+  if (py + hh > vh - 8) py = py - hh - 18;
+  if (py < 8) py = 8;
+  box.style.left = px + 'px';
+  box.style.top = py + 'px';
+}
+function arbolInit() {
+  document.addEventListener('click', function (e) {
+    if (!ARBOL_ESTADO.tipOpen) return;
+    var box = document.getElementById('arbol-tip');
+    if (box && (e.target === box || (box.contains && box.contains(e.target)))) return;
+    var t = e.target;
+    while (t && t.getAttribute) { if (t.getAttribute('data-n') != null) return; t = t.parentNode; }
+    arbolTipCerrar();
+  });
+}
+function arbolTabsHtml(facciones) {
+  var h = '<div class="arbol-tabs" role="tablist">';
+  facciones.forEach(function (f) {
+    var m = arbolFacMeta(f), on = (f === ARBOL_ESTADO.tab);
+    h += '<button type="button" class="arbol-tab' + (on ? ' on' : '') + '" role="tab" aria-selected="' + (on ? 'true' : 'false') + '"'
+      + ' style="border-top:3px solid ' + esc(m.color) + '" onclick="arbolTab(\'' + esc(f) + '\')">'
+      + '<span class="arbol-tab-emoji">' + m.emoji + '</span>'
+      + '<span class="arbol-tab-nombre">' + esc(m.nombre) + '</span>'
+      + (f === ARBOL_ESTADO.faccion ? '<span class="arbol-tab-mio">Tu faccion</span>' : '')
+      + '</button>';
+  });
+  return h + '</div>';
+}
+function arbolTab(f) { ARBOL_ESTADO.tab = String(f || ''); arbolPintar(); }
+function arbolBonoHtml() {
+  if (ARBOL_ESTADO.bono <= 0) return '';
+  var opts = '';
+  (ARBOL_ESTADO.catalogo || []).forEach(function (r) {
+    opts += '<option value="' + esc(r.id) + '">' + esc(arbolFacMeta(r.faccion).nombre + ' \u00B7 ' + (r.nombre || r.id)) + '</option>';
+  });
+  return '<div class="arbol-bono">'
+    + '<div class="arbol-bono-txt">Tienes <b class="arbol-num">' + ARBOL_ESTADO.bono + '</b> puntos de clase por asignar</div>'
+    + '<div class="arbol-bono-row">'
+    + '<select class="arbol-bono-sel" id="arbol-bono-sel" aria-label="Rama que recibe los puntos">' + opts + '</select>'
+    + '<button type="button" class="arbol-btn arbol-btn--gold" onclick="arbolBonoAsignar(this)">Asignar ' + ARBOL_BONO_PTS + ' pts</button>'
+    + '</div></div>';
+}
+function arbolProgHtml(puntos, nodosCat, desbloq) {
+  var um = arbolUmbrales(nodosCat), next = null, i;
+  for (i = 0; i < um.length; i++) if (puntos < um[i]) { next = um[i]; break; }
+  var pct = 100;
+  if (next != null) {
+    var prev = desbloq > 0 ? um[desbloq - 1] : 0, rango = next - prev;
+    pct = rango > 0 ? Math.max(0, Math.min(100, Math.round(((puntos - prev) / rango) * 100))) : 0;
+  }
+  return '<div class="arbol-prog">'
+    + '<div class="arbol-prog-bar"><i style="width:' + pct + '%"></i></div>'
+    + '<div class="arbol-prog-txt">' + arbolNum(puntos) + ' / ' + (next == null ? 'MAX' : arbolNum(next)) + '</div>'
+    + '</div>';
+}
+function arbolRamaAccionHtml(id, activa) {
+  if (activa) return '<div class="arbol-estado on">\u2713 Rama activa</div>';
+  if (arbolEsRamaArtista(id)) return '<div class="arbol-estado">Se activa con tu vocacion de artista</div>';
+  if (!arbolNivel5()) return '<div class="arbol-estado">Nivel 5 para activar</div>';
+  return '<button type="button" class="arbol-btn" onclick="arbolActivarRama(\'' + esc(id) + '\',this)">Activar rama</button>';
+}
+function arbolRamaHtml(catRama) {
+  var id = String(catRama.id || '');
+  var ur = ARBOL_ESTADO.ramas[id] || {};
+  var nodosCat = Array.isArray(catRama.nodos) ? catRama.nodos : [];
+  var puntos = parseInt(ur.puntos, 10) || 0;
+  var desbloq = arbolDesbloq(puntos, nodosCat, ur);
+  var activa = arbolRamaActiva(id, ur);
+  var meta = desbloq + ' / ' + (arbolUmbrales(nodosCat).length) + ' nodos';
+  if (parseInt(ur.bono, 10) > 0) meta += ' \u00B7 bono +' + arbolNum(ur.bono);
+  var h = '<div class="arbol-rama' + (activa ? ' activa' : '') + '">';
+  h += '<div class="arbol-rama-nombre">' + (catRama.emoji ? '<span class="arbol-rama-emoji">' + catRama.emoji + '</span>' : '') + esc(catRama.nombre || id) + '</div>';
+  h += arbolColumnaSVG(id, nodosCat, puntos, desbloq, catRama.fuente);
+  h += arbolProgHtml(puntos, nodosCat, desbloq);
+  h += '<div class="arbol-rama-meta">' + esc(meta) + '</div>';
+  h += arbolRamaAccionHtml(id, activa);
+  return h + '</div>';
+}
+function arbolPanelHtml(faccion) {
+  var ramas = arbolRamasDeFaccion(faccion), m = arbolFacMeta(faccion);
+  if (!ramas.length) return '<div class="arbol-nota">Esta faccion aun no publica sus ramas.</div>';
+  var h = m.desc ? '<div class="arbol-nota">' + esc(m.desc) + '</div>' : '';
+  h += '<div class="arbol-ramas">';
+  ramas.forEach(function (r) { h += arbolRamaHtml(r); });
+  return h + '</div>';
+}
+function arbolVacioHtml() {
+  return '<div class="arbol-nota" style="border:1px dashed rgba(232,160,32,.3);border-radius:10px;padding:22px;">'
+    + '\u2694\uFE0F El Arbol de Clases se abrira al conectar con el servidor. Sigue explorando mientras tanto.</div>';
+}
+function arbolPintar() {
+  var host = document.getElementById('arbol-clases');
+  if (!host) return;
+  var facciones = arbolFaccionesDisponibles();
+  ARBOL_ESTADO.tip = {};
+  ARBOL_ESTADO.tipOpen = '';
+  if (!facciones.length) { host.innerHTML = arbolVacioHtml(); return; }
+  if (facciones.indexOf(ARBOL_ESTADO.tab) < 0) {
+    ARBOL_ESTADO.tab = (ARBOL_ESTADO.faccion && facciones.indexOf(ARBOL_ESTADO.faccion) >= 0) ? ARBOL_ESTADO.faccion : facciones[0];
+  }
+  host.innerHTML = arbolTabsHtml(facciones) + arbolBonoHtml() + arbolPanelHtml(ARBOL_ESTADO.tab)
+    + '<div class="arbol-tip" id="arbol-tip" role="status" aria-live="polite"></div>';
+}
+function cargarArbolClases(uid) {
+  var host = document.getElementById('arbol-clases');
+  if (!host || !uid) return;
+  if (ARBOL_ESTADO.uid !== String(uid)) {
+    ARBOL_ESTADO.uid = String(uid);
+    ARBOL_ESTADO.ramas = {};
+    ARBOL_ESTADO.activas = {};
+    ARBOL_ESTADO.bono = 0;
+    ARBOL_ESTADO.tab = '';
+  }
+  Promise.all([
+    arbolCatalogoGet(),
+    fetchConJwt('/api/interacciones?tipo=arbol_usuario&usuario_id=' + encodeURIComponent(uid), { method:'GET' })
+  ]).then(function (par) {
+    var cat = par[0], res = par[1] || {}, d = (res && res.data) || null;
+    if (!ARBOL_ESTADO.catalogo && cat) ARBOL_ESTADO.catalogo = cat;
+    ARBOL_ESTADO.faccion = String((d && d.faccion) || (sesion() || {}).faccion || '').toLowerCase();
+    ARBOL_ESTADO.bono = parseInt(d && d.bono_pendiente, 10) || 0;
+    ARBOL_ESTADO.ramas = {};
+    ((d && d.ramas) || []).forEach(function (r) { if (r && r.id) ARBOL_ESTADO.ramas[String(r.id)] = r; });
+    arbolMarcarActivas(d && d.ramasActivas);
+    arbolPintar();
+  }).catch(function () { arbolPintar(); });
+}
+function arbolActivarRama(ramaId, btn) {
+  var u = sesion();
+  if (!u) { showToast('Inicia sesion para activar ramas', '#ef4444'); return; }
+  if (!arbolNivel5()) { showToast('Necesitas nivel 5 (700 XP) para activar ramas', '#ef4444'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Activando\u2026'; }
+  fetchConJwt('/api/interacciones', {
+    method:'POST',
+    body: JSON.stringify({ tipo:'rama_activar', usuario_id:String(u.id), rama_id:ramaId })
+  }).then(function (res) {
+    if (res && res.ok) {
+      var d = (res.data || {});
+      arbolMarcarActivas(d.ramas_activas);
+      if (!d.ramas_activas && !arbolEsRamaArtista(ramaId)) ARBOL_ESTADO.activas[ramaId] = true;
+      arbolPintar();
+      showToast('Rama activada');
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Activar rama'; }
+    showToast(arbolErrorMsg(res && res.error), '#ef4444');
+  }).catch(function () {
+    if (btn) { btn.disabled = false; btn.textContent = 'Activar rama'; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+function arbolBonoAsignar(btn) {
+  var u = sesion();
+  var sel = document.getElementById('arbol-bono-sel');
+  if (!u || !sel || !sel.value) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Asignando\u2026'; }
+  fetchConJwt('/api/interacciones', {
+    method:'POST',
+    body: JSON.stringify({ tipo:'arbol_usuario', accion:'bono_mision', rama_id:sel.value, usuario_id:String(u.id) })
+  }).then(function (res) {
+    if (res && res.ok) { showToast('Puntos asignados a tu rama'); cargarArbolClases(u.id); return; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Asignar ' + ARBOL_BONO_PTS + ' pts'; }
+    showToast(arbolErrorMsg(res && res.error), '#ef4444');
+  }).catch(function () {
+    if (btn) { btn.disabled = false; btn.textContent = 'Asignar ' + ARBOL_BONO_PTS + ' pts'; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+arbolInit();
+
+/* ---- GAMING v5.0 / ADR-028: MENSAJES DIRECTOS (DM) ----
+   Contrato de las ramas tipo= de api/interacciones.js:
+     GET  ?tipo=dm_hilos&usuario_id=            -> hilos: partner{id,nombre,avatar_url} + ultimo mensaje
+     GET  ?tipo=dm_mensajes&usuario_id=&sala_id= -> ultimos 100 (emisor/receptor)
+     POST {tipo:'dm_enviar', usuario_id, receptor_id, texto}      (-20 XP al abrir hilo)
+     POST {tipo:'dm_bloquear', usuario_id, bloqueado_id, accion:'bloquear'|'desbloquear'} */
+var DM_ESTADO = { uid:'', partnerId:'', partnerNombre:'', salaId:'', hilos:[], mensajes:[], bloqueos:{}, abierto:false };
+
+/* Solo ids/uuid: se inyectan en onclick inline (Regla de Oro 5). */
+function dmIdSeguro(v) { return String(v == null ? '' : v).replace(/[^a-zA-Z0-9_-]/g, ''); }
+
+function dmIniciales(nombre) {
+  var p = String(nombre || '?').trim().split(/\s+/);
+  return (((p[0] || '?')[0] || '?') + (p[1] ? (p[1][0] || '') : '')).toUpperCase();
+}
+
+function dmFecha(iso) {
+  if (!iso) return '';
+  var t = Date.parse(iso);
+  if (isNaN(t)) return '';
+  var dif = Date.now() - t;
+  if (dif < 60000) return 'ahora';
+  if (dif < 3600000) return Math.floor(dif / 60000) + ' min';
+  if (dif < 86400000) return Math.floor(dif / 3600000) + ' h';
+  if (dif < 604800000) return Math.floor(dif / 86400000) + ' d';
+  var d = new Date(t);
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + String(d.getFullYear()).slice(-2);
+}
+
+/* Acepta data:[...] o data:{hilos|mensajes|items:[...]} sin romper si el
+   backend anida la lista con otro nombre. */
+function dmLista(res, clave) {
+  var d = (res && res.data) || res || [];
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d[clave])) return d[clave];
+  if (Array.isArray(d.items)) return d.items;
+  return [];
+}
+
+function dmTraducirError(err) {
+  switch (String(err || '')) {
+    case 'PUNTOS_INSUFICIENTES': return 'Necesitas 20 XP para abrir una conversacion nueva';
+    case 'DM_BLOQUEADO': return 'No puedes escribirle: hay un bloqueo entre ustedes';
+    case 'DM_CERRADO': return 'Este viajero no acepta mensajes directos';
+    case 'DM_LIMITE_DIARIO': case 'LIMITE_HILOS_DIA': return 'Alcanzaste el limite de 5 conversaciones nuevas por dia';
+    case 'NIVEL_INSUFICIENTE': return 'Necesitas nivel 3 para enviar mensajes directos';
+    case 'EMAIL_SIN_VERIFICAR': return 'Verifica tu email para enviar mensajes directos';
+    case 'DM_A_MI_MISMO': case 'BLOQUEO_A_MI_MISMO': return 'No puedes hacer eso contigo mismo';
+    case 'mensaje vacio': case 'TEXTO_VACIO': return 'Escribe un mensaje antes de enviar';
+    case 'mensaje maximo 500 caracteres': case 'TEXTO_LARGO': return 'El mensaje supera los 500 caracteres';
+    case 'Hilo no encontrado': return 'Ese hilo ya no existe';
+    case 'No autorizado': return 'No tienes acceso a esa conversacion';
+    case 'Receptor no encontrado': case 'Usuario no encontrado': return 'Ese viajero ya no existe';
+    case 'SESION_REQUERIDA': return 'Tu sesion expiro: vuelve a entrar';
+    default: return err ? ('No se pudo completar: ' + err) : 'No se pudo completar la accion';
+  }
+}
+function dmAvisoBajoNivel(res) {
+  if (res && res.bajo_nivel === true) showToast('Ojo: con este envio bajaste de nivel', '#ef4444');
+}
+function dmVacioHtml(msg) {
+  return '<div class="dm-vacio"><span class="dm-vacio-ico">&#x1F4EA;</span>' + esc(msg || 'Sin conversaciones') + '</div>';
+}
+function dmHintHtml() {
+  return '<div class="dm-hint">Abrir una conversacion nueva cuesta 20 XP. Responder dentro de un hilo abierto no cuesta nada.</div>';
+}
+
+function cargarMensajes(uid) {
+  var con = document.getElementById('dm-bandeja');
+  if (!con || !uid) return;
+  var u = sesion();
+  if (!u || u.email_verificado !== true) {
+    DM_ESTADO.abierto = false;
+    con.innerHTML = bannerVerificacionHtml()
+      + '<div class="dm-vacio"><span class="dm-vacio-ico">&#x1F4E8;</span>Verifica tu email para enviar y recibir mensajes directos.</div>';
+    return;
+  }
+  DM_ESTADO.uid = String(uid);
+  con.innerHTML = '<div class="dm-cargando">Cargando tus conversaciones\u2026</div>';
+  fetchConJwt('/api/interacciones?tipo=dm_hilos&usuario_id=' + encodeURIComponent(uid), { method: 'GET' })
+    .then(function(res){
+      if (!res || !res.ok) { con.innerHTML = dmVacioHtml(dmTraducirError(res && res.error)); return; }
+      DM_ESTADO.hilos = dmLista(res, 'hilos');
+      if (DM_ESTADO.abierto && DM_ESTADO.partnerId) { dmAbrirHilo(DM_ESTADO.partnerId); return; }
+      con.innerHTML = dmHintHtml() + dmPintarHilos();
+    })
+    .catch(function(){ con.innerHTML = dmVacioHtml('No se pudieron cargar tus conversaciones'); });
+}
+
+/* ---- Contrato real de api/interacciones.js (verificado) ----
+   dm_hilos    -> data:[{ id (sala), otro_id, otro_nombre, otro_avatar, ultimo_texto, ultimo_en, no_leidos }]
+   dm_mensajes -> data:[{ id, usuario_id, texto, fijado, creado_en }] + otro_id
+   dm_enviar   -> { sala_id, xp_cobrado, bajo_nivel, nivel_anterior, nivel_nuevo }
+   dm_bloquear -> { bloqueado } */
+function dmPartner(h) {
+  var p = (h && (h.partner || h.contraparte)) || {};
+  return {
+    id: dmIdSeguro((h && h.otro_id) || p.id),
+    nombre: (h && h.otro_nombre) || p.nombre || p.name || 'Viajero',
+    avatar: (h && h.otro_avatar) || p.avatar_url || ''
+  };
+}
+function dmSalaDe(h) { return dmIdSeguro((h && (h.sala_id || h.id)) || ''); }
+function dmEsMio(m, mio) { return String((m && (m.usuario_id || m.emisor_id)) || '') === mio; }
+/* dm_hilos no expone el bloqueo: se recuerda lo que respondio dm_bloquear. */
+function dmBloqueado(pid, h) {
+  if (h && typeof h.bloqueado === 'boolean') return h.bloqueado;
+  return DM_ESTADO.bloqueos[pid] === true;
+}
+
+function dmPintarHilos() {
+  if (!DM_ESTADO.hilos.length) {
+    return '<div class="dm-vacio"><span class="dm-vacio-ico">&#x1F4EC;</span>Aun no tienes conversaciones.<br>Escribele a alguien desde su perfil publico y el hilo aparecera aqui.</div>';
+  }
+  return DM_ESTADO.hilos.map(function(h){
+    var p = dmPartner(h);
+    var av = p.avatar ? ' style="background-image:url(' + esc(p.avatar) + ');color:transparent;"' : '';
+    var ultimo = h.ultimo_texto || '';
+    var fecha = dmFecha(h.ultimo_en || h.creado_en);
+    var noLeidos = parseInt(h.no_leidos, 10) || 0;
+    var bloq = dmBloqueado(p.id, h);
+    return '<div class="dm-hilo' + (DM_ESTADO.abierto && DM_ESTADO.partnerId === p.id ? ' abierto' : '') + '">'
+      + '<button type="button" class="dm-hilo-main" onclick="dmAbrirHilo(\'' + p.id + '\')">'
+      + '<span class="dm-avatar"' + av + '>' + esc(dmIniciales(p.nombre)) + '</span>'
+      + '<span class="dm-hilo-body">'
+      + '<span class="dm-hilo-nombre">' + esc(p.nombre) + '</span>'
+      + '<span class="dm-hilo-ultimo">' + (ultimo ? esc(ultimo) : 'Sin mensajes aun') + '</span>'
+      + '</span>'
+      + '</button>'
+      + '<span class="dm-hilo-meta">'
+      + (noLeidos ? '<span class="dm-no-leidos">' + noLeidos + '</span>' : '')
+      + '<span class="dm-hilo-fecha">' + esc(fecha) + '</span>'
+      + '</span>'
+      + '<button type="button" class="dm-bloq-btn' + (bloq ? ' on' : '') + '" onclick="dmBloquear(\'' + p.id + '\',\'' + (bloq ? 'desbloquear' : 'bloquear') + '\',this)">' + (bloq ? 'Desbloquear' : 'Bloquear') + '</button>'
+      + '</div>';
+  }).join('');
+}
+
+function dmAbrirHilo(partnerId, salaId) {
+  var pid = dmIdSeguro(partnerId);
+  if (!pid || !DM_ESTADO.uid) return;
+  var hilo = null;
+  for (var i = 0; i < DM_ESTADO.hilos.length; i++) {
+    if (dmPartner(DM_ESTADO.hilos[i]).id === pid) hilo = DM_ESTADO.hilos[i];
+  }
+  if (hilo) DM_ESTADO.partnerNombre = dmPartner(hilo).nombre;
+  if (!DM_ESTADO.partnerNombre) DM_ESTADO.partnerNombre = 'Viajero';
+  var sala = dmIdSeguro(salaId || (hilo ? dmSalaDe(hilo) : '') || DM_ESTADO.salaId);
+  if (!sala) { showToast('No se pudo identificar el hilo', '#ef4444'); return; }
+  DM_ESTADO.abierto = true;
+  DM_ESTADO.partnerId = pid;
+  DM_ESTADO.salaId = sala;
+  var con = document.getElementById('dm-bandeja');
+  if (con) con.innerHTML = '<div class="dm-chat" id="dm-chat"><div class="dm-cargando">Abriendo conversacion\u2026</div></div>';
+  fetchConJwt('/api/interacciones?tipo=dm_mensajes&usuario_id=' + encodeURIComponent(DM_ESTADO.uid) + '&sala_id=' + encodeURIComponent(sala), { method: 'GET' })
+    .then(function(res){
+      if (!res || !res.ok) { dmPintarChat(dmTraducirError(res && res.error), []); return; }
+      dmPintarChat('', dmLista(res, 'mensajes'));
+    })
+    .catch(function(){ dmPintarChat('No se pudo abrir la conversacion', []); });
+}
+
+function dmPintarChat(error, mensajes) {
+  DM_ESTADO.mensajes = mensajes || [];
+  var con = document.getElementById('dm-chat');
+  if (!con) return;
+  var u = sesion();
+  var mio = u && u.id ? String(u.id) : DM_ESTADO.uid;
+  var burbujas = DM_ESTADO.mensajes.map(function(m){
+    var txt = m.texto != null ? m.texto : (m.contenido || '');
+    return '<div class="dm-burbuja ' + (dmEsMio(m, mio) ? 'dm-yo' : 'dm-otro') + '">' + esc(txt)
+      + '<span class="dm-msg-fecha">' + esc(dmFecha(m.creado_en || m.enviado_en)) + '</span></div>';
+  }).join('');
+  if (!burbujas) burbujas = '<div class="dm-vacio">Sin mensajes todavia. Escribe el primero.</div>';
+  con.innerHTML = '<div class="dm-chat-head">'
+    + '<button type="button" class="dm-volver" onclick="dmCerrarHilo()">&#x2190; Volver</button>'
+    + '<span class="dm-avatar">' + esc(dmIniciales(DM_ESTADO.partnerNombre)) + '</span>'
+    + '<span class="dm-chat-titulo">' + esc(DM_ESTADO.partnerNombre) + '</span>'
+    + '</div>'
+    + '<div class="dm-msgs" id="dm-msgs">' + burbujas + '</div>'
+    + (error ? '<div class="dm-aviso" style="color:#ef4444">' + esc(error) + '</div>' : '')
+    + '<div class="dm-composer">'
+    + '<textarea class="dm-texto" id="dm-texto" maxlength="500" placeholder="Escribe tu mensaje (max. 500 caracteres)" oninput="dmContarTexto()"></textarea>'
+    + '<div class="dm-composer-row">'
+    + '<span class="dm-contador" id="dm-contador">0 / 500</span>'
+    + '<button type="button" class="dm-enviar" id="dm-enviar" onclick="dmEnviar(this)">Enviar</button>'
+    + '</div>'
+    + '</div>';
+  var caja = document.getElementById('dm-msgs');
+  if (caja) caja.scrollTop = caja.scrollHeight;
+}
+
+function dmCerrarHilo() {
+  DM_ESTADO.abierto = false;
+  DM_ESTADO.partnerId = '';
+  DM_ESTADO.partnerNombre = '';
+  DM_ESTADO.salaId = '';
+  DM_ESTADO.mensajes = [];
+  var con = document.getElementById('dm-bandeja');
+  if (con) con.innerHTML = dmHintHtml() + dmPintarHilos();
+}
+
+function dmContarTexto() {
+  var ta = document.getElementById('dm-texto');
+  var cnt = document.getElementById('dm-contador');
+  if (cnt) cnt.textContent = (ta ? String(ta.value || '').length : 0) + ' / 500';
+}
+
+function dmEnviar(btn) {
+  if (!DM_ESTADO.uid || !DM_ESTADO.partnerId) return;
+  var ta = document.getElementById('dm-texto');
+  var texto = ta ? String(ta.value || '').trim() : '';
+  if (!texto) { showToast('Escribe un mensaje antes de enviar', '#ef4444'); return; }
+  if (texto.length > 500) { showToast('El mensaje supera los 500 caracteres', '#ef4444'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando\u2026'; }
+  fetchConJwt('/api/interacciones', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'dm_enviar', usuario_id: String(DM_ESTADO.uid), receptor_id: String(DM_ESTADO.partnerId), texto: texto })
+  }).then(function(res){
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
+    if (!res || !res.ok) { showToast(dmTraducirError(res && res.error), '#ef4444'); return; }
+    dmAvisoBajoNivel(res);
+    if (res.xp_cobrado === 20) showToast('Conversacion abierta (-20 XP)');
+    DM_ESTADO.salaId = dmIdSeguro(res.sala_id || DM_ESTADO.salaId);
+    refrescarSesion();
+    cargarMensajes(DM_ESTADO.uid);
+  }).catch(function(){
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+
+function dmBloquear(partnerId, accion, btn) {
+  if (!DM_ESTADO.uid) return;
+  var pid = dmIdSeguro(partnerId);
+  if (!pid) return;
+  var etiqueta = (accion === 'bloquear') ? 'Bloquear' : 'Desbloquear';
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando\u2026'; }
+  fetchConJwt('/api/interacciones', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'dm_bloquear', usuario_id: String(DM_ESTADO.uid), bloqueado_id: pid, accion: accion })
+  }).then(function(res){
+    if (btn) { btn.disabled = false; btn.textContent = etiqueta; }
+    if (!res || !res.ok) { showToast(dmTraducirError(res && res.error), '#ef4444'); return; }
+    DM_ESTADO.bloqueos[pid] = (typeof res.bloqueado === 'boolean') ? res.bloqueado : (accion === 'bloquear');
+    showToast(DM_ESTADO.bloqueos[pid] ? 'Viajero bloqueado' : 'Viajero desbloqueado');
+    if (DM_ESTADO.bloqueos[pid] && DM_ESTADO.abierto && DM_ESTADO.partnerId === pid) dmCerrarHilo();
+    cargarMensajes(DM_ESTADO.uid);
+  }).catch(function(){
+    if (btn) { btn.disabled = false; btn.textContent = etiqueta; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+
 /* ---- EDITAR NOMBRE ---- */
 function editarNombre() {
   var u = sesion();
@@ -2010,9 +3124,417 @@ function showToast(msg,color){
   t._t=setTimeout(function(){ t.style.transform='translateY(40px)'; t.style.opacity='0'; },2800);
 }
 
+/* ==== WP-5 (TSK-103 / ADR-028): ADMINISTRADOR DE PERFIL ================
+   Pestanas: las secciones existentes no se movieron, solo llevan data-tab;
+   pfAplicarTab recuerda el display original de cada bloque y lo alterna.
+   La pestana activa vive en el hash (#clase, #museo...) y por defecto
+   es PERFIL. */
+var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','cuenta'];
+var PF_TAB_ACTIVO = 'perfil';
+function pfTabDesdeHash() {
+  var h = '';
+  try { h = String(window.location.hash || '').replace('#','').toLowerCase(); } catch (e) { h = ''; }
+  return PF_TABS.indexOf(h) !== -1 ? h : 'perfil';
+}
+function pfAplicarTab() {
+  var tab = PF_TAB_ACTIVO;
+  PF_TABS.forEach(function(t){
+    var on = (t === tab);
+    var nodos = document.querySelectorAll('#profile > [data-tab="' + t + '"]');
+    for (var i = 0; i < nodos.length; i++) {
+      var el = nodos[i];
+      if (typeof el._pfDisp === 'undefined') el._pfDisp = el.style.display || '';
+      el.style.display = on ? el._pfDisp : 'none';
+    }
+    var btn = document.querySelector('#pf-tabs .pf-tab[data-tab="' + t + '"]');
+    if (btn) { btn.classList.toggle('on', on); btn.setAttribute('aria-selected', on ? 'true' : 'false'); }
+  });
+}
+function pfTab(tab) {
+  tab = PF_TABS.indexOf(tab) !== -1 ? tab : 'perfil';
+  PF_TAB_ACTIVO = tab;
+  pfAplicarTab();
+  var u = sesion();
+  if (tab === 'perfil' && u && u.id) renderDatosPerfil();
+  if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
+  if (tab === 'clase' && u && u.id) { cargarFacciones(u.id); cargarCasas(u.id); cargarArbolClases(u.id); cargarVocaciones(u.id); }
+  if (tab === 'red' && u && u.id) cargarMiRed(u.id);
+  if (tab === 'museo' && u && u.id) cargarMuseoPreview(u.id);
+  if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); }
+  if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
+  if (tab === 'cuenta' && u) renderCuentaPanel();
+  try { if (('#' + tab) !== window.location.hash) history.replaceState(null, '', '#' + tab); }
+  catch (e) { window.location.hash = tab; }
+}
+function pfIr(tab, targetId) {
+  pfTab(tab);
+  var el = targetId ? document.getElementById(targetId) : null;
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---- Completitud del perfil (misiones grupo 'perfil') ----
+   Lee GET tipo=misiones con fetchConJwt y filtra grupo==='perfil'; no
+   hardcodea estados: el 100% se alcanza cuando las 8 misiones quedan
+   'completada' en el servidor. Cada pendiente enlaza al campo que falta. */
+var PF_MISION_DESTINO = {
+  mis_perfil_foto:      { tab:'perfil', target:'pf-datos',     cta:'Poner foto' },
+  mis_perfil_bio:       { tab:'perfil', target:'pf-datos',     cta:'Escribir bio' },
+  mis_perfil_ciudad:    { tab:'perfil', target:'pf-datos',     cta:'Definir ciudad' },
+  mis_perfil_intereses: { tab:'perfil', target:'pf-datos',     cta:'Elegir intereses' },
+  mis_perfil_email:     { tab:'cuenta', target:'pf-cuenta',    cta:'Verificar email' },
+  mis_perfil_casa:      { tab:'clase',  target:'pf-casa',      cta:'Elegir Casa' },
+  mis_perfil_faccion:   { tab:'clase',  target:'pf-facciones', cta:'Elegir faccion' },
+  mis_perfil_completo:  { tab:'perfil', target:'pf-datos',     cta:'Completar todo' }
+};
+var PF_MISION_ORDEN = ['mis_perfil_foto','mis_perfil_bio','mis_perfil_ciudad',
+  'mis_perfil_intereses','mis_perfil_email','mis_perfil_casa',
+  'mis_perfil_faccion','mis_perfil_completo'];
+function cargarCompletitudPerfil(uid) {
+  var box = document.getElementById('pf-completa');
+  if (!box || !uid) return;
+  box.innerHTML = '<div class="pf-comp-cargando">Calculando tu avance\u2026</div>';
+  fetchConJwt('/api/interacciones?tipo=misiones&usuario_id=' + encodeURIComponent(uid))
+    .then(function(res){
+      var todas = (res && res.data) || [];
+      var perfil = todas.filter(function(m){ return (m.grupo || '') === 'perfil'; });
+      if (!perfil.length) {
+        box.innerHTML = '<div class="pf-comp-vacio">Aun no hay misiones de perfil disponibles.</div>';
+        return;
+      }
+      var porId = {};
+      perfil.forEach(function(m){ porId[m.id] = m; });
+      var orden = PF_MISION_ORDEN.filter(function(id){ return porId[id]; });
+      var total = orden.length;
+      var hechas = orden.filter(function(id){ return porId[id].estado === 'completada'; }).length;
+      var pct = total ? Math.round(hechas * 100 / total) : 0;
+      var html = '<div class="pf-comp-head">'
+        + '<div class="pf-comp-pct">' + pct + '%</div>'
+        + '<div><div class="pf-comp-titulo">Tu pasaporte de viajero</div>'
+        + '<div class="pf-comp-sub">' + hechas + ' de ' + total + ' misiones de perfil completadas</div></div>'
+        + '</div>'
+        + '<div class="pf-comp-bar"><i style="width:' + pct + '%"></i></div>'
+        + '<div class="pf-comp-list">';
+      orden.forEach(function(id){
+        var m = porId[id] || {};
+        var done = m.estado === 'completada';
+        var dest = PF_MISION_DESTINO[id] || { tab:'perfil', target:'pf-datos', cta:'Ir' };
+        html += '<div class="pf-comp-item' + (done ? ' done' : '') + '">'
+          + '<span class="pf-comp-tick">' + (done ? '\u2713' : '\u25CB') + '</span>'
+          + '<span class="pf-comp-nombre">' + esc(m.nombre || id) + '</span>'
+          + '<span class="pf-comp-xp">+' + (m.xp || 0) + ' XP</span>'
+          + (done
+              ? '<span class="pf-comp-ok">Listo</span>'
+              : '<button type="button" class="pf-comp-btn" onclick="pfIr(\'' + dest.tab + '\',\'' + dest.target + '\')">' + dest.cta + '</button>')
+          + '</div>';
+      });
+      html += '</div>';
+      if (pct === 100) html += '<div class="pf-comp-feliz">\uD83C\uDF89 Pasaporte sellado: completaste tu perfil al 100%.</div>';
+      box.innerHTML = html;
+    })
+    .catch(function(){ box.innerHTML = '<div class="pf-comp-vacio">No se pudo cargar tu avance. Intenta de nuevo.</div>'; });
+}
+
+/* ---- Mis datos (PERFIL) ----
+   Los campos viven en usuarios.* (migracion 017). El guardado usa la rama
+   POST tipo=perfil_actualizar con JWT; si aun no existe, la UI avisa sin
+   fingir exito. */
+var PF_INTERESES_CATALOGO = [
+  { slug:'naturaleza', label:'Naturaleza' }, { slug:'aventura', label:'Aventura' },
+  { slug:'cultura', label:'Cultura' }, { slug:'gastronomia', label:'Gastronomia' },
+  { slug:'musica', label:'Musica' }, { slug:'historia', label:'Historia' },
+  { slug:'playa', label:'Playa' }, { slug:'fotografia', label:'Fotografia' },
+  { slug:'vida-nocturna', label:'Vida nocturna' }, { slug:'familiar', label:'Plan familiar' }
+];
+function pfInteresesLista(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') { try { var p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch (e) { return []; } }
+  return [];
+}
+function pfInteresesTexto(list) {
+  return pfInteresesLista(list).map(function(s){
+    var f = null;
+    for (var i = 0; i < PF_INTERESES_CATALOGO.length; i++) if (PF_INTERESES_CATALOGO[i].slug === s) f = PF_INTERESES_CATALOGO[i];
+    return f ? f.label : s;
+  }).join(', ');
+}
+function pfDato(label, valor, campo) {
+  var tiene = valor !== null && valor !== undefined && String(valor).trim() !== '';
+  return '<div class="pf-dato' + (tiene ? '' : ' vacio') + '">'
+    + '<div class="pf-dato-lbl">' + label + '</div>'
+    + '<div class="pf-dato-val">' + (tiene ? esc(valor) : 'Sin configurar') + '</div>'
+    + '<button type="button" class="pf-dato-btn" onclick="pfEditarCampo(\'' + campo + '\')">' + (tiene ? 'Editar' : 'Agregar') + '</button>'
+    + '</div>';
+}
+function renderDatosPerfil() {
+  var box = document.getElementById('pf-datos');
+  var u = sesion();
+  if (!box || !u) return;
+  var lugar = (u.ciudad_base || '') + (u.pais_base ? ((u.ciudad_base ? ' (' : '') + u.pais_base + (u.ciudad_base ? ')' : '')) : '');
+  box.innerHTML =
+      pfDato('Foto de perfil', u.foto_url || u.avatar_url || '', 'foto_url')
+    + pfDato('Nombre', u.nombre || '', 'nombre')
+    + pfDato('Bio', u.bio || '', 'bio')
+    + pfDato('Ciudad y pais', lugar, 'ciudad')
+    + pfDato('Intereses', pfInteresesTexto(u.intereses), 'intereses');
+}
+function pfEditarCampo(campo) {
+  var u = sesion();
+  if (!u) return;
+  if (campo === 'nombre') { editarNombre(); return; }
+  var cambios = null;
+  if (campo === 'bio') {
+    var bio = prompt('Cuenta tu historia (minimo 40 caracteres):', u.bio || '');
+    if (bio === null) return;
+    bio = bio.trim();
+    if (bio.length < 40) { showToast('La bio necesita al menos 40 caracteres', '#ef4444'); return; }
+    cambios = { bio: bio };
+  } else if (campo === 'foto_url') {
+    var foto = prompt('URL de tu foto (https://...):', u.foto_url || u.avatar_url || '');
+    if (foto === null) return;
+    cambios = { foto_url: foto.trim() };
+  } else if (campo === 'ciudad') {
+    var ciudad = prompt('Tu ciudad base:', u.ciudad_base || '');
+    if (ciudad === null) return;
+    var pais = prompt('Pais (ISO de 2 letras, CO para Colombia):', u.pais_base || 'CO');
+    if (pais === null) return;
+    cambios = { ciudad_base: ciudad.trim(), pais_base: pais.trim().toUpperCase().slice(0, 2) };
+  } else if (campo === 'intereses') {
+    var opciones = PF_INTERESES_CATALOGO.map(function(x){ return x.slug; }).join(', ');
+    var actual = pfInteresesLista(u.intereses).join(', ');
+    var resp = prompt('Elige al menos 3 intereses separados por coma.\nOpciones: ' + opciones, actual);
+    if (resp === null) return;
+    var validos = resp.split(',').map(function(s){ return s.trim().toLowerCase(); })
+      .filter(function(s){ return PF_INTERESES_CATALOGO.some(function(x){ return x.slug === s; }); });
+    if (validos.length < 3) { showToast('Elige al menos 3 intereses de la lista', '#ef4444'); return; }
+    cambios = { intereses: validos };
+  }
+  if (cambios) pfGuardarPerfil(cambios);
+}
+function pfErrorPerfil(err) {
+  if (err === 'BIO_CORTA') return 'La bio necesita al menos 40 caracteres';
+  if (err === 'PAIS_INVALIDO') return 'Pais invalido: usa el codigo ISO de 2 letras';
+  if (err === 'INTERESES_INVALIDOS') return 'Elige al menos 3 intereses validos';
+  if (err === 'SESION_REQUERIDA' || err === 'SESION_INVALIDA' || err === 'SESION_EXPIRADA') return 'Inicia sesion de nuevo para guardar';
+  return err ? ('No se pudo guardar: ' + err) : 'No se pudo guardar';
+}
+function pfGuardarPerfil(cambios) {
+  var u = sesion();
+  if (!u || !cambios) return;
+  var body = { tipo: 'perfil_actualizar', usuario_id: String(u.id) };
+  for (var k in cambios) if (cambios.hasOwnProperty(k)) body[k] = cambios[k];
+  fetchConJwt('/api/usuarios', { method: 'POST', body: JSON.stringify(body) }).then(function(res){
+    if (res && res.ok) {
+      for (var k2 in cambios) if (cambios.hasOwnProperty(k2)) u[k2] = cambios[k2];
+      try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
+      pfRefrescarPerfilPaneles();
+      showToast('Perfil actualizado');
+      if (res.data && res.data.bajo_nivel) showToast('Ojo: bajaste de nivel', '#ef4444');
+      return;
+    }
+    showToast(pfErrorPerfil(res && res.error), '#ef4444');
+  }).catch(function(){ showToast('Error de conexion', '#ef4444'); });
+}
+function pfRefrescarPerfilPaneles() {
+  renderDatosPerfil();
+  renderCuentaPanel();
+  var u = sesion();
+  if (u && u.id) cargarCompletitudPerfil(u.id);
+}
+
+/* ---- Mi Cuenta (CUENTA): email, verificacion y privacidad ---- */
+function pfSwitch(campo, on) {
+  return '<button type="button" class="pf-switch' + (on ? ' on' : '') + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" onclick="pfTogglePrivacidad(\'' + campo + '\',' + (on ? 'false' : 'true') + ')">'
+    + '<i></i><span>' + (on ? 'Activado' : 'Desactivado') + '</span></button>';
+}
+function pfTogglePrivacidad(campo, valor) {
+  if (campo === 'perfil_publico') pfGuardarPerfil({ perfil_publico: valor });
+  else if (campo === 'dm_abierto') pfGuardarPerfil({ dm_abierto: valor });
+}
+function renderCuentaPanel() {
+  var box = document.getElementById('pf-cuenta');
+  var u = sesion();
+  if (!box || !u) return;
+  var verificado = u.email_verificado === true;
+  var publico = u.perfil_publico !== false;
+  var dm = u.dm_abierto !== false;
+  box.innerHTML =
+      '<div class="pf-cta-row"><div class="pf-cta-lbl">Email</div>'
+    + '<div class="pf-cta-val">' + esc(u.email || 'Sin email') + '</div>'
+    + '<span class="pf-cta-badge' + (verificado ? ' ok' : ' pend') + '">' + (verificado ? 'Verificado' : 'Sin verificar') + '</span></div>'
+    + (verificado ? '' : bannerVerificacionHtml())
+    + '<div class="pf-cta-row"><div class="pf-cta-lbl">Perfil publico</div>'
+    + '<div class="pf-cta-val">' + (publico ? 'Cualquiera puede ver tu museo' : 'Solo tu puedes ver tu museo') + '</div>'
+    + pfSwitch('perfil_publico', publico) + '</div>'
+    + '<div class="pf-cta-row"><div class="pf-cta-lbl">Mensajes directos</div>'
+    + '<div class="pf-cta-val">' + (dm ? 'Aceptas mensajes de la comunidad' : 'Solo hilos ya abiertos') + '</div>'
+    + pfSwitch('dm_abierto', dm) + '</div>';
+}
+
+/* ---- Mi Casa (identidad de equipo) ----
+   Primera eleccion gratis desde nivel 2; cambio: 300 XP + cooldown 30 dias.
+   Sesion firmada JWT obligatoria. La confirmacion del costo y del posible
+   de-nivel es explicita antes de enviar. */
+var CASAS_META = [
+  { id:'condor', nombre:'Casa Condor', emoji:'\uD83E\uDD85', color:'#3B82F6', desc:'Andes y altura: montana, caminatas, miradores y patrimonio andino.' },
+  { id:'jaguar', nombre:'Casa Jaguar', emoji:'\uD83D\uDC06', color:'#22C55E', desc:'Selva y Pacifico: biodiversidad, rutas remotas y naturaleza densa.' },
+  { id:'delfin', nombre:'Casa Delfin', emoji:'\uD83D\uDC2C', color:'#E8A020', desc:'Caribe y rios: agua, costa, fiesta y gastronomia costera.' }
+];
+function pfCasaNombre(id) {
+  for (var i = 0; i < CASAS_META.length; i++) if (CASAS_META[i].id === id) return CASAS_META[i].nombre;
+  return id || '';
+}
+function casaDiasRestantes(u) {
+  if (!u || !u.casa || !u.casa_elegida_en) return 0;
+  var t = Date.parse(u.casa_elegida_en);
+  if (isNaN(t)) return 0;
+  var d = 30 - Math.floor((Date.now() - t) / 86400000);
+  return d > 0 ? d : 0;
+}
+function cargarCasas(uid) {
+  var con = document.getElementById('pf-casa');
+  if (!con || !uid) return;
+  var u = sesion();
+  if (!u) return;
+  if (u.email_verificado !== true) {
+    con.innerHTML = bannerVerificacionHtml()
+      + '<div class="pf-casa-nota">\uD83D\uDD11 Verifica tu email para jurar tu Casa.</div>';
+    return;
+  }
+  var actual = u.casa || '';
+  var nivel = XP_LEVELS.indexOf(getLevel(statsU().xp)) + 1;
+  var dias = casaDiasRestantes(u);
+  var html = '';
+  if (actual) {
+    html += '<div class="pf-casa-cabeza"><span class="facc-current">Tu Casa: ' + esc(pfCasaNombre(actual)) + '</span>'
+      + '<span class="pf-casa-meta">' + (dias > 0 ? 'Cambio disponible en ' + dias + ' dias (300 XP)' : 'Puedes cambiar de Casa (300 XP)') + '</span></div>';
+  } else {
+    html += '<div class="pf-casa-nota">Primera eleccion gratis (nivel 2 en adelante). Cambiarla cuesta 300 XP y 30 dias de espera.</div>';
+  }
+  if (!actual && nivel < 2) html += '<div class="pf-casa-nota">Necesitas nivel 2 para elegir tu Casa.</div>';
+  html += '<div class="facc-grid">';
+  CASAS_META.forEach(function(casa){
+    var es = casa.id === actual;
+    var bloqueada = (!actual && nivel < 2);
+    var accion = es
+      ? '<div class="pf-casa-actual">\u2713 Actual</div>'
+      : '<button type="button" class="facc-btn"' + (bloqueada ? ' disabled' : '') + ' onclick="elegirCasa(\'' + casa.id + '\',this)">' + (actual ? 'Cambiar' : 'Elegir') + '</button>';
+    html += '<div class="facc-card' + (es ? ' actual' : '') + '" style="border-top:3px solid ' + casa.color + ';">'
+      + '<div class="facc-emoji">' + casa.emoji + '</div>'
+      + '<div class="facc-name">' + casa.nombre + '</div>'
+      + '<div class="facc-desc">' + casa.desc + '</div>'
+      + accion + '</div>';
+  });
+  html += '</div>';
+  con.innerHTML = html;
+}
+function casaErrorMsg(err, u) {
+  if (err === 'PUNTOS_INSUFICIENTES') return 'Necesitas 300 XP para cambiar de Casa';
+  if (err === 'COOLDOWN_CASA') {
+    var d = casaDiasRestantes(u);
+    return d > 0 ? ('Debes esperar ' + d + ' dias para cambiar de Casa') : 'Tu Casa sigue en periodo de espera';
+  }
+  if (err === 'NIVEL_INSUFICIENTE') return 'Necesitas nivel 2 para elegir tu Casa';
+  if (err === 'EMAIL_SIN_VERIFICAR') return 'Verifica tu email antes de elegir tu Casa';
+  if (err === 'CASA_YA_ELEGIDA') return 'Tu Casa ya fue elegida desde otra pestana';
+  if (err === 'CASA_INVALIDA') return 'Casa invalida';
+  if (err === 'SESION_REQUERIDA' || err === 'SESION_INVALIDA' || err === 'SESION_EXPIRADA') return 'Inicia sesion de nuevo para elegir tu Casa';
+  return err || 'No se pudo actualizar tu Casa';
+}
+function elegirCasa(casa, btn) {
+  var u = sesion();
+  if (!u) return;
+  var nombre = pfCasaNombre(casa);
+  if (u.casa) {
+    if (!window.confirm('Este cambio cuesta 300 XP y puede bajarte de nivel. Tampoco podras volver a cambiar tu Casa en 30 dias. Deseas cambiar a ' + nombre + '?')) return;
+  } else {
+    if (!window.confirm('Tu primera Casa es gratis. Despues, cambiarla cuesta 300 XP y tiene 30 dias de espera. Deseas jurar por ' + nombre + '?')) return;
+  }
+  var etiqueta = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando\u2026'; }
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'casa_elegir', usuario_id: String(u.id), casa: casa })
+  }).then(function(res){
+    if (res && res.ok && res.data) {
+      u.casa = res.data.casa || casa;
+      u.casa_elegida_en = res.data.casa_elegida_en || u.casa_elegida_en;
+      if (res.data.xp_total_nuevo != null) u.xp_total = res.data.xp_total_nuevo;
+      try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
+      showToast('Casa elegida: ' + pfCasaNombre(u.casa));
+      if (res.data.bajo_nivel) showToast('Ojo: con este cambio bajaste de nivel', '#ef4444');
+      refrescarSesion();
+      cargarCasas(u.id);
+      cargarCompletitudPerfil(u.id);
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = etiqueta || 'Elegir'; }
+    showToast(casaErrorMsg(res && res.error, u), '#ef4444');
+  }).catch(function(){
+    if (btn) { btn.disabled = false; btn.textContent = etiqueta || 'Elegir'; }
+    showToast('Error de conexion', '#ef4444');
+  });
+}
+
+/* ---- Vista previa del museo publico (MUSEO) ----
+   Un solo GET tipo=museo_publico (WP-3). Boton a perfil.html?id=<uid>. */
+function pfMpStat(n, label) {
+  return '<div class="pf-mp-stat"><div class="pf-mp-stat-n">' + (parseInt(n, 10) || 0) + '</div>'
+    + '<div class="pf-mp-stat-l">' + label + '</div></div>';
+}
+function pfVerPerfilPublico() {
+  var u = sesion();
+  if (!u || !u.id) return;
+  window.location.href = 'perfil.html?id=' + encodeURIComponent(u.id);
+}
+function cargarMuseoPreview(uid) {
+  var box = document.getElementById('pf-museo-preview');
+  if (!box || !uid) return;
+  box.innerHTML = '<div class="pf-mp-cargando">Abriendo tu museo\u2026</div>';
+  fetchConJwt('/api/interacciones?tipo=museo_publico&usuario_id=' + encodeURIComponent(uid))
+    .then(function(res){
+      if (!res || !res.ok || !res.data) {
+        box.innerHTML = (res && res.error === 'PERFIL_PRIVADO')
+          ? '<div class="pf-mp-privado">\uD83D\uDD12 Tu museo es privado. Activa "Perfil publico" en la pestana CUENTA para que otros puedan visitarlo.</div>'
+          : '<div class="pf-mp-vacio">No se pudo abrir la vista previa de tu museo.</div>';
+        return;
+      }
+      var d = res.data;
+      var us = d.usuario || {};
+      var vit = d.vitrina || {};
+      var stats = d.stats || {};
+      var chips = [];
+      if (us.faccion) chips.push('<span class="pf-mp-chip">' + esc(us.faccion) + '</span>');
+      if (us.casa) chips.push('<span class="pf-mp-chip">' + esc(pfCasaNombre(us.casa)) + '</span>');
+      if (vit.marco) chips.push('<span class="pf-mp-chip">Marco ' + esc(vit.marco) + '</span>');
+      if (vit.banda) chips.push('<span class="pf-mp-chip">Banda ' + esc(vit.banda) + '</span>');
+      var ini = String(us.nombre || 'Viajero').split(' ').slice(0, 2).map(function(w){ return w[0]; }).join('').toUpperCase() || '?';
+      var top = d.parche ? ('Parche: ' + esc(d.parche.nombre)) : 'Sin parche';
+      box.innerHTML = '<div class="pf-mp-hall">'
+        + '<div class="pf-mp-av"' + (us.foto_url ? (' style="background-image:url(' + esc(us.foto_url) + ')"') : '') + '>' + (us.foto_url ? '' : esc(ini)) + '</div>'
+        + '<div class="pf-mp-id">'
+        + '<div class="pf-mp-nombre">' + esc(us.nombre || 'Viajero') + '</div>'
+        + '<div class="pf-mp-badge">Nivel ' + (parseInt(us.nivel, 10) || 1) + ' \u00b7 ' + esc(us.badge_actual || '') + '</div>'
+        + '<div class="pf-mp-bio">' + (us.bio ? esc(us.bio) : 'Aun sin bio.') + '</div>'
+        + '<div class="pf-mp-chips">' + chips.join('') + '</div>'
+        + '</div></div>'
+        + '<div class="pf-mp-stats">'
+        + pfMpStat((d.logros || []).length, 'Trofeos')
+        + pfMpStat((d.cromos || []).length, 'Cromos')
+        + pfMpStat((d.albumes || []).length, 'Albumes')
+        + pfMpStat(stats.visitas || 0, 'Destinos')
+        + '</div>'
+        + '<div class="pf-mp-pie"><span>' + top + '</span>'
+        + '<button type="button" class="pf-mp-btn" onclick="pfVerPerfilPublico()">Ver mi perfil publico</button></div>';
+    })
+    .catch(function(){ box.innerHTML = '<div class="pf-mp-vacio">No se pudo abrir la vista previa de tu museo.</div>'; });
+}
+
 /* ---- INIT ---- */
 window.onExploraCOUpdate = function() { checkGate(); };
+PF_TAB_ACTIVO = pfTabDesdeHash();
 checkGate();
+window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
   <script src="album-comments.js"></script>
