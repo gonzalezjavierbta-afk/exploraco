@@ -2644,7 +2644,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-010). Cero archivos nuevos en `api/`; todo entra como ramas `tipo=` y ajustes puntuales.
 
 - **Evidencia (ADR-006, contra archivo real):**
-  - Header real `api/usuarios.js` v13 ("verificacion admin forzada, rama verificar_usuario, total en leaderboard"); nota: el header habia quedado en v9 pese a que el changelog ya documentaba v10-v12 (TSK-103), por eso el salto v9 -> v13.
+  - Header real `api/usuarios.js` v13 al cierre de TSK-104 ("verificacion admin forzada, rama verificar_usuario, total en leaderboard"); nota: el header habia quedado en v9 pese a que el changelog ya documentaba v10-v12 (TSK-103), por eso el salto v9 -> v13. **Nota de version (ADR-006, 2026-09-15): el header real HOY es v14** por el hotfix de login BUG-054 (SQL invalido del merge de `device_hashes`), documentado mas abajo en "Hotfix posterior".
   - `api/utilidades.js` v2 con la rama `visitas_global`; `git diff --stat` = 3 archivos, +105/-14 (`api/usuarios.js` 45, `api/utilidades.js` 24, `admin.html` 50).
   - `esAdminUsuario` existe en `api/usuarios.js` (L180) y A2 lo usa.
   - QA reporta Escudo GOLD PASS (sintaxis, ASCII-safety de lo nuevo, balance de divs). Las lineas agregadas a `api/utilidades.js` no aportan no-ASCII ni backticks.
@@ -2663,6 +2663,13 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   - **Evidencia (ADR-006):** `git diff --stat` = 2 archivos, +32/-8; `node --check` OK en ambos; delta ASCII 0 en el bloque nuevo; balance de divs de `mi-perfil.html` 0; `scripts/smoke_017_perfil_arbol_casas.js` 73/73 PASS; `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; sin recursion.
   - **Estado:** RESUELTO en working tree (2026-09-15); **PENDIENTE commit/push/deploy** y re-login del usuario afectado si su `localStorage` ya perdio `auth_id`/`email`. Repara la regresion colateral de BUG-049 (BUG-049 permanece RESUELTO y sin cambios).
   - **Deuda QA no bloqueante (preexistente, NO de este fix):** `scripts/smoke_test_perfil_progreso.js` espera 22 misiones vs 36 reales; `scripts/smoke_test_epic_prompt.js` espera VOCACIONES 3 vs 4 y `chat_salas` plan vs plan+dm. Ver DQ-1/DQ-2 al final de BUGS_HISTORICOS.md; los smokes NO se actualizan en este cierre.
+
+- **Hotfix posterior (2026-09-15): login 500 por SQL invalido en el merge de `device_hashes` -- no previsto en el alcance original de TSK-104.** Detalle completo en `BUGS_HISTORICOS.md` BUG-054.
+  - **Sintoma reportado por Javier:** `POST /api/usuarios` (upsert de login/registro) devolvia 500 para TODOS los logins; error real de Postgres/Neon: `column "t.ord" must appear in the GROUP BY clause or be used in an aggregate function` (SQLSTATE 42803).
+  - **Causa raiz:** commit origen `7cc28fe` ("sistema de puntos", 2026-09-14), PREVIO a TSK-104; lo expuso el re-upsert forzado por el fix de sesion (BUG-053), porque `usuario-session.js` envia siempre `device_hash`.
+  - **Fix (working tree, SIN commitear):** `api/usuarios.js` (+30/-14; header `v13` -> `v14`) con `jsonb_agg(h ORDER BY ord)` (ORDER BY DENTRO del agregado) y `try/catch` best-effort que loguea con `console.error` y NO re-lanza (el fingerprint nunca bloquea el login).
+  - **Evidencia (ADR-006):** header real L2 `v14`; bloque del hotfix L981-1006; `node --check` OK; ASCII/backticks/doble-escape 0/0/0; simulacion runtime con mock `sql`/`neon` 15/15 PASS (200 con `device_hash`; 200 incluso si el UPDATE del fingerprint falla); sin regresion en A1/`verificar_usuario`/`total`; el patron invalido ya no aparece en `api/*.js`.
+  - **Estado:** RESUELTO en working tree (2026-09-15); **PENDIENTE OPERATIVO: commit/push/deploy** (login roto en produccion). Ver el pendiente y la verificacion post-deploy en NEXT.md.
 
 ---
 

@@ -3,8 +3,9 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
-- Bugfix de sesion / regresion colateral de BUG-049 (2026-09-15, working tree, SIN commitear) - `refrescarSesion()` de `usuario-session.js` y `mi-perfil.html` REEMPLAZABA `window.ExploraCO.usuario` con la proyeccion publica de `GET /api/usuarios?id=` (SIN `jwt`/`auth_id`/`email`/`email_verificado`), dejando el banner "Verifica tu email" y bloqueando referidos/facciones/casa/DM de la cuenta `brsk84@gmail.com` pese a `email_verificado=TRUE` en Neon (causa: la proyeccion publica la introdujo el fix de PII de BUG-049 / ADR-028, `api/usuarios.js` L500-529); fix: FUSION (`Object.assign({}, actual, d.data)`) + conservar `jwt`/`jwt_expira_en` + detectar la proyeccion publica (respuesta sin `email`) y llamar `refreshJwt()`/`renovarJwt()` sin pisar la sesion (`usuario-session.js` +21/-4, `mi-perfil.html` +19/-4); QA: `node --check` OK, delta ASCII 0 en lo nuevo, divs 0, `smoke_017` 73/73 PASS, `smoke_016` 39/39 PASS, sin recursion; registrado como BUGS_HISTORICOS.md BUG-053; **PENDIENTE OPERATIVO: commit/push/deploy + re-login del usuario afectado si su localStorage ya perdio `auth_id`/`email`.**
-- TSK-104 / ADR-029 Verificacion admin forzada + rama `verificar_usuario` + dashboard real (5 tarjetas) y filtro de verificados (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, Escudo GOLD PASS, sin commitear) - `api/usuarios.js` v13 (+45/-6: A1 auto-verificacion del admin en el upsert con `email_verificado` y `ON CONFLICT ... COALESCE(usuarios.email_verificado,false) OR EXCLUDED.email_verificado`, condicion `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`; A2 rama POST `tipo=verificar_usuario` admin-only via `esAdminUsuario` con 401/400/404 y `UPDATE ... RETURNING`; C1 campo aditivo `total` (`COUNT(*) WHERE activo=true`) en GET `?tipo=leaderboard`), `api/utilidades.js` v2 (+24/-0: rama admin-only GET `?tipo=visitas_global` -> `{ok,total,v30,v7}` sobre `interacciones tipo='visita' AND activo=true`), `admin.html` (+42/-8: fila verde + badge `VERIF` para `p.verificado`, filtro `data-verified`/`currentVerifiedFilter`/`setVerifiedFilter`, `ds-usuarios` real desde leaderboard, `ds-visitas` real desde `visitas_global`, 5a tarjeta `ds-verificados`, CSS `.stats-grid` a `repeat(5,1fr)`, re-render del dashboard en `syncFromNeon()` si la pantalla esta activa); presupuesto 8/8 INTACTO; sin migraciones nuevas; **PENDIENTE OPERATIVO: aplicar 017/018 en Neon (016/015 ya aplicadas) + commit/push/deploy**; hallazgos residuales H4/H6/H7/H8 registrados como observaciones en BUGS_HISTORICOS.md
+- HOTFIX login 500 / BUG-054 (2026-09-15, working tree, SIN commitear) - `POST /api/usuarios` (upsert de login/registro) devolvia 500 para TODOS los logins con `device_hash`; error real de Postgres/Neon: `column "t.ord" must appear in the GROUP BY clause or be used in an aggregate function` (SQLSTATE 42803). Causa raiz: el merge de `device_hashes` en `api/usuarios.js` usaba `SELECT COALESCE(jsonb_agg(t.h), '[]'::jsonb) FROM (...) t ORDER BY t.ord LIMIT 5` (ORDER BY externo junto al agregado SIN GROUP BY = invalido en Postgres); introducido en el commit `7cc28fe` ("sistema de puntos", 2026-09-14), PREVIO a TSK-104, y expuesto al forzar el re-upsert (fix de sesion BUG-053). Fix: `api/usuarios.js` (+30/-14; header `v13` -> `v14`) con `jsonb_agg(h ORDER BY ord)` (ORDER BY dentro del agregado + subquery interna `u ORDER BY u.ord LIMIT 5`) y `try/catch` best-effort que loguea con `console.error` y NO re-lanza (el fingerprint nunca bloquea el login); QA: `node --check` OK, ASCII/backticks/doble-escape 0/0/0, simulacion runtime con mock `sql`/`neon` 15/15 PASS (200 con `device_hash`; 200 incluso si el UPDATE falla), sin regresion en A1/`verificar_usuario`/`total`, el patron invalido ya no aparece en `api/*.js`; registrado como BUGS_HISTORICOS.md BUG-054; **PENDIENTE OPERATIVO: commit/push/deploy (login roto en produccion) + login real post-deploy que envie `device_hash`.**
+- Bugfix de sesion / regresion colateral de BUG-049 (2026-09-15, working tree, SIN commitear) - `refrescarSesion()` de `usuario-session.js` y `mi-perfil.html` REEMPLAZABA `window.ExploraCO.usuario` con la proyeccion publica de `GET /api/usuarios?id=` (SIN `jwt`/`auth_id`/`email`/`email_verificado`), dejando el banner "Verifica tu email" y bloqueando referidos/facciones/casa/DM de la cuenta `brsk84@gmail.com` pese a `email_verificado=TRUE` en Neon (causa: la proyeccion publica la introdujo el fix de PII de BUG-049 / ADR-028, `api/usuarios.js` L500-529); fix: FUSION (`Object.assign({}, actual, d.data)`) + conservar `jwt`/`jwt_expira_en` + detectar la proyeccion publica (respuesta sin `email`) y llamar `refreshJwt()`/`renovarJwt()` sin pisar la sesion (`usuario-session.js` +21/-4, `mi-perfil.html` +19/-4); QA: `node --check` OK, delta ASCII 0 en lo nuevo, divs 0, `smoke_017` 73/73 PASS, `smoke_016` 39/39 PASS, sin recursion; registrado como BUGS_HISTORICOS.md BUG-053; **PENDIENTE OPERATIVO: commit/push/deploy + re-login del usuario afectado si su localStorage ya perdio `auth_id`/`email`.** Nota de version (ADR-006): tras el hotfix de login BUG-054 el header real de `api/usuarios.js` es v14 (v13 al cierre de TSK-104).
+- TSK-104 / ADR-029 Verificacion admin forzada + rama `verificar_usuario` + dashboard real (5 tarjetas) y filtro de verificados (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, Escudo GOLD PASS, sin commitear) - `api/usuarios.js` v13 en su cierre (header real HOY v14 tras el hotfix BUG-054) (+45/-6: A1 auto-verificacion del admin en el upsert con `email_verificado` y `ON CONFLICT ... COALESCE(usuarios.email_verificado,false) OR EXCLUDED.email_verificado`, condicion `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`; A2 rama POST `tipo=verificar_usuario` admin-only via `esAdminUsuario` con 401/400/404 y `UPDATE ... RETURNING`; C1 campo aditivo `total` (`COUNT(*) WHERE activo=true`) en GET `?tipo=leaderboard`), `api/utilidades.js` v2 (+24/-0: rama admin-only GET `?tipo=visitas_global` -> `{ok,total,v30,v7}` sobre `interacciones tipo='visita' AND activo=true`), `admin.html` (+42/-8: fila verde + badge `VERIF` para `p.verificado`, filtro `data-verified`/`currentVerifiedFilter`/`setVerifiedFilter`, `ds-usuarios` real desde leaderboard, `ds-visitas` real desde `visitas_global`, 5a tarjeta `ds-verificados`, CSS `.stats-grid` a `repeat(5,1fr)`, re-render del dashboard en `syncFromNeon()` si la pantalla esta activa); presupuesto 8/8 INTACTO; sin migraciones nuevas; **PENDIENTE OPERATIVO: aplicar 017/018 en Neon (016/015 ya aplicadas) + commit/push/deploy**; hallazgos residuales H4/H6/H7/H8 registrados como observaciones en BUGS_HISTORICOS.md
 - TSK-103 / ADR-028 Perfil publico museo + DM + Arbol de Clases de 16 ramas + Casas + categorias de consumibles (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - `perfil.html` (NUEVO, museo publico `?id=`), `registro.html` (NUEVO, alta con `?ref=`), `docs/DEPLOY_017.md` (NUEVO), `scripts/verify_017_precheck.js` (NUEVO, read-only); migraciones NUEVAS 017 (columnas de perfil/casa/`progreso_arbol`/`perfil_config`/`perfil_publico`/`dm_abierto`; `consumibles.categoria`; `chat_salas.clave_dm` + CHECK `chk_chat_salas_tipo`; tabla `usuario_bloqueos`) y 018 (categoriza 17 consumibles: perfil 7 / impulso 3 / social 4 / coleccion 2 / general 1); backend como ramas `tipo=` sin archivos nuevos (8/8) - `api/usuarios.js` v12 (`perfil_publico` ligero, blindaje PII owner-aware en `?id=`/`?buscar=`/`referido_codigo`, `casa_elegir`/`casa_ranking`, `perfil_actualizar`), `api/interacciones.js` v15 (`museo_publico`, DM `dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`, `arbol_catalogo`/`arbol_usuario`/`rama_activar`, `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS [0,100,250,450,700]`, Origen derivado con bono x1.2 dentro de `D_R`, 8 misiones `perfil`), `api/admin.js` (`categoria` en consumibles) y `api/utilidades.js` (`/registro.html` y `/perfil.html` en `STATIC_PAGES`); frontend mi-perfil.html (Mi Red + DM + Arbol SVG + 7 pestanas + selector de Casa + tienda por chips), comunidad.html (R-4), index.html (R-5) y usuario-session.js (`?ref=` con TTL 30d + `codigo_referido` + JWT en refresco); fixes R-1..R-5 (registro.html faltante, `?ref=` no capturado, `mi-perfil?id=` ignorado, etiqueta "Control Territorial" enganosa, relabel Pandilla->Parche) y 4 fixes adicionales (fuga de PII preexistente, carrera del cobro del DM, `museo_publico` 404 en vez de 503, filtros `activo=true` en casa_ranking/exp_ocultos); DEUDA detectada (patron BUG-021): `interacciones.activo`, `usuarios.bio`/`usuarios.activo` no versionadas. **PENDIENTE OPERATIVO: aplicar 017 y 018 en Neon (016/015 ya aplicadas) + commit/push/deploy + verificacion en vivo. El smoke de cierre `scripts/smoke_017_perfil_arbol_casas.js` esta ENTREGADO y en verde (`node scripts/smoke_017_perfil_arbol_casas.js` -> 73/73 PASS, 2026-09-15).** ADR-028
 - TSK-102 / Consolidacion documental v5 (2026-09-14, working tree, sin cambios de codigo) - creados/consolidados los dos documentos maestros vigentes en `exploraco desarrollo/ampliacion desarrollo/`: `ExploraCO_Gamificacion_v5_Plan_Maestro.md` (Plan Maestro tecnico + hoja de ruta del gaming v4 + Entrega 016, con estados reales y citas `archivo:linea`) y `ExploraCO_Sistema_Social_v5.md` (mapa del apartado social con 7 tabs, Parches, chat/planes, albumes/comentarios, referidos, facciones, Wayfarer, notificaciones; gaps G-01..G-23 y discrepancias D-01..D-15). Enlaces cruzados verificados entre ambos (Plan v5 -> Sistema Social v5 y viceversa). Spec de la Entrega 016 `docs/superpowers/specs/2026-09-14-gaming-v5-referidos-wayfarer-facciones-design.md` + indice `docs/superpowers/specs/README.md`. 9 hallazgos reales registrados en BUGS_HISTORICOS.md BUG-035..BUG-043 (referidos inalcanzables, visita rota en frontend, notificacion de resena a endpoint inexistente, conteo de miembros de Parche, relabel residual Pandilla, etiquetas de chat desfasadas, gate de voto de utilidad ausente, formula de `album_crear`, tabs de GUIA). PENDIENTE OPERATIVO intacto (ver TSK-101 y "Que sigue"): aplicar migracion 016 en Neon + `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + deploy.
 - TSK-101 / ADR-027 + ADR-025 Entrega 016 "ExploraCO Gaming v5.0" (2026-09-14, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, sin commitear) - piramide de referidos de 5 niveles con `xp_ref_total` separado y CTE recursiva (0.10/0.05/0.03/0.02/0.01 FLOOR, topes 500/20, `?ref=` en registro), crowdsourcing Wayfarer "Activo Oculto" (proponer con email verificado, votar nivel 5, quorum +/-3, 30 dias derivado, +50/+5/+15 XP, checkin reusa geocerca ADR-024 + nonce), 4 facciones con CHECK (exploradores/curadores/creadores/artistas; primera gratis, cambio 500 xp_total + cooldown 15 dias), vocaciones de artista en bloque nivel 5 y 6 misiones de artista; backend `api/usuarios.js` v8->v9 (JWT HMAC `firmarSesion`, verificacion de email, device_hashes), `api/interacciones.js` v12->v13 (`repartirXpReferidos` en 14 puntos de XP, `validarSesion` con timingSafeEqual en visita/votar/checkin, geo_nonces), `api/admin.js` (`activo_oculto_moderar`), frontend mi-perfil/comunidad/admin/usuario-session; `.env.example` + `.gitignore` corregido; MIGRACION 016 NUEVA (209 lineas, idempotente); smoke `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; Escudo GOLD verde (node --check x3, ASCII 0 bytes >127, 0 backticks, divs 0, idempotencia 13/13); presupuesto 8/8 INTACTO; PENDIENTE OPERATIVO: aplicar migracion 016 en Neon + configurar `SESSION_JWT_SECRET`/`RESEND_API_KEY` en Vercel + commit/push/deploy (ver `docs/DEPLOY_016.md`); ADR-027 + ADR-025
@@ -21,6 +22,58 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Hotfix "login 500 por SQL invalido en el merge de `device_hashes`" (2026-09-15) - BUG-054
+
+Hotfix implementado y verificado en working tree (SIN commitear). El detalle
+del bug vive en `BUGS_HISTORICOS.md` BUG-054; la nota de cierre en
+`TASKS.md` TSK-104 (seccion "Hotfix posterior"). No hay migraciones nuevas,
+archivos nuevos en `api/` ni cambios de version en otros endpoints;
+presupuesto 8/8 intacto (ADR-010).
+
+**Sintoma reportado por Javier:** `POST /api/usuarios` (upsert de
+login/registro) devolvia 500 para TODOS los logins. Error real reproducido
+en produccion (Postgres/Neon): `column "t.ord" must appear in the GROUP BY
+clause or be used in an aggregate function` (SQLSTATE 42803).
+
+**Causa raiz:** el merge de `device_hashes` en `api/usuarios.js` (bloque del
+upsert) usaba `SELECT COALESCE(jsonb_agg(t.h), '[]'::jsonb) FROM (...) t
+ORDER BY t.ord LIMIT 5`: un `ORDER BY` externo junto al agregado `jsonb_agg`
+SIN `GROUP BY` es invalido en Postgres. Introducido en el commit `7cc28fe`
+("sistema de puntos", 2026-09-14), PREVIO a TSK-104; lo expuso el re-upsert
+forzado por el fix de sesion (BUG-053), porque `usuario-session.js` envia
+SIEMPRE `device_hash`.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/usuarios.js` (+30/-14; header `v13` -> `v14`, L2): la consulta pasa a
+  `jsonb_agg(h ORDER BY ord)` con el `ORDER BY` DENTRO del agregado y la
+  subconsulta interna `u ORDER BY u.ord LIMIT 5` (L987-1000); el UPDATE queda
+  en un `try/catch` (L986/L1001-1005) que loguea con `console.error` y NO
+  re-lanza: el fingerprint es best-effort (anti-Sybil) y NUNCA debe bloquear
+  el login/registro.
+
+**Verificacion:** `node --check` OK; ASCII/backticks/doble-escape 0/0/0;
+simulacion runtime con mock `sql`/`neon` 15/15 PASS (200 con `device_hash`, y
+200 incluso si el UPDATE del fingerprint falla); sin regresion en
+A1/`verificar_usuario`/`total`; el patron invalido ya no aparece en
+`api/*.js`.
+
+#### Que sigue
+1. **PENDIENTE OPERATIVO (BLOQUEANTE, login roto en produccion): commit +
+   push + deploy del hotfix en un solo release** con los pendientes previos
+   (TSK-095..TSK-104 y las migraciones 015/016/017/018). Mientras no se
+   despliegue, TODO login/registro que envie `device_hash` sigue en 500.
+2. **Verificacion post-deploy:** un login real que envie `device_hash`
+   responde 200; confirmar que `POST /api/usuarios` no devuelve 500 y que el
+   error 42803 no aparece en los logs de la funcion.
+3. **Deuda futura (menor, no bloqueante):** el merge solo excluye el hash
+   entrante `$1` y no deduplica duplicados heredados de `device_hashes`.
+
+#### Riesgos activos
+- **Deploy pendiente (CRITICO):** en produccion el login sigue roto (500)
+  hasta el commit/push/deploy.
+- **Deuda de dedup de `device_hashes`:** solo se excluye el hash entrante;
+  los duplicados heredados no se limpian (menor, no afecta el login).
 
 ### Bugfix de sesion "refrescarSesion() pisaba la sesion con la proyeccion publica" (2026-09-15) - regresion colateral de BUG-049 (TSK-103 / ADR-028)
 
@@ -55,7 +108,7 @@ nuevo; balance de divs de `mi-perfil.html` 0; `smoke_017_perfil_arbol_casas.js`
 
 #### Que sigue
 1. **Commit + push + deploy** del bugfix junto con los pendientes previos
-   (TSK-095..TSK-104) en un solo release.
+   (TSK-095..TSK-104) y el hotfix de login BUG-054 en un solo release.
 2. **Verificacion post-deploy:** la cuenta `brsk84@gmail.com` deja de mostrar
    el banner y quedan habilitados referidos/facciones/casa/DM.
 3. **Re-login del usuario afectado** si su `localStorage` ya perdio
@@ -84,7 +137,8 @@ GOLD PASS. La decision vive en `DECISIONS.md` ADR-029; la tarea en
 NEXT.md/ADR-028/`docs/DEPLOY_017.md`, ADR-006).
 
 **Cambios (verificados contra archivo real, ADR-006):**
-- `api/usuarios.js` v9 -> v13 (+45/-6): A1 auto-verificacion del admin en el
+- `api/usuarios.js` v9 -> v13 (+45/-6; header real HOY v14 por el hotfix
+  BUG-054, ver seccion "Hotfix login 500"): A1 auto-verificacion del admin en el
   upsert (columna `email_verificado` en el INSERT y `ON CONFLICT ... COALESCE(
   usuarios.email_verificado,false) OR EXCLUDED.email_verificado`; condicion
   `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`);

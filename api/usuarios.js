@@ -1,5 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
-// v13 (TSK-104: verificacion admin forzada, rama verificar_usuario, total en leaderboard)
+// v14 (HOTFIX: SQL de device_hashes, login 500)
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
@@ -89,7 +89,12 @@ const DESBLOQUEOS = {
 // auto-verifica al admin en el upsert de registro con un OR idempotente
 // (nunca desmarca a quien ya estaba verificado), agrega la rama POST
 // tipo=verificar_usuario (solo admin, Bearer ADMIN_SECRET) y devuelve
-// total real en GET tipo=leaderboard.
+// total real en GET tipo=leaderboard; v14 (HOTFIX, 2026-09-15) corrige el
+// SQL del merge de device_hashes: el ORDER BY externo junto al agregado
+// sin GROUP BY era invalido en Postgres (42803) y respondia 500 en TODO
+// login/registro con device_hash. Ahora el ORDER BY va dentro de
+// jsonb_agg(h ORDER BY ord) y el fingerprint es best-effort (un fallo no
+// bloquea el login).
 // conMisiones sigue siendo MERGE con las
 // capacidades del DB (migracion 010) para no destruir el inventario de
 // consumibles en cada GET.
@@ -973,20 +978,31 @@ module.exports = async (req, res) => {
       // resto en orden previo, sin duplicados) usando COALESCE (ADR-003:
       // cero reemplazo total). Clientes legacy sin device_hash no se
       // bloquean.
+      // HOTFIX (2026-09-15): el ORDER BY debe ir DENTRO del jsonb_agg.
+      // Un ORDER BY externo junto a un agregado sin GROUP BY es invalido
+      // en Postgres (error 42803) y rompia TODO el login con device_hash.
       if (c.device_hash) {
         var dhHash = String(c.device_hash);
-        await sql(
-          'UPDATE usuarios SET device_hashes = ('
-          + 'SELECT COALESCE(jsonb_agg(t.h), \'[]\'::jsonb) FROM ('
-          + 'SELECT $1::text AS h, -1 AS ord '
-          + 'UNION ALL '
-          + 'SELECT x.h, x.ord FROM jsonb_array_elements_text('
-          + 'COALESCE(device_hashes, \'[]\'::jsonb)'
-          + ') WITH ORDINALITY AS x(h, ord) WHERE x.h <> $1'
-          + ') t ORDER BY t.ord LIMIT 5'
-          + ') WHERE id=$2',
-          [dhHash, fila.id]
-        );
+        try {
+          await sql(
+            'UPDATE usuarios SET device_hashes = ('
+            + 'SELECT COALESCE(jsonb_agg(h ORDER BY ord), \'[]\'::jsonb) FROM ('
+            + 'SELECT h, ord FROM ('
+            + 'SELECT $1::text AS h, -1 AS ord '
+            + 'UNION ALL '
+            + 'SELECT x.h, x.ord FROM jsonb_array_elements_text('
+            + 'COALESCE(device_hashes, \'[]\'::jsonb)'
+            + ') WITH ORDINALITY AS x(h, ord) WHERE x.h <> $1'
+            + ') u ORDER BY u.ord LIMIT 5'
+            + ') t'
+            + ') WHERE id=$2',
+            [dhHash, fila.id]
+          );
+        } catch (dhErr) {
+          // El fingerprint es opcional (anti-Sybil best-effort): un fallo
+          // aqui NUNCA debe bloquear el login/registro.
+          console.error('[usuarios] device_hashes no actualizado:', dhErr && dhErr.message);
+        }
       }
 
       var usuarioResp = conLogros(conMisiones(conNivel(fila)));

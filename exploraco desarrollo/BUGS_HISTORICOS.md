@@ -937,6 +937,17 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `usuario-session.js` (+21/-4) y `mi-perfil.html` (+19/-4) en el working tree (2026-09-15). QA: `node --check` OK en ambos; delta ASCII 0 en el bloque nuevo; balance de divs de `mi-perfil.html` 0; `scripts/smoke_017_perfil_arbol_casas.js` 73/73 PASS; `scripts/smoke_016_multinivel_crowdsourcing.js` 39/39 PASS; sin recursion.
 **Estado:** RESUELTO (working tree, 2026-09-15; PENDIENTE commit/push/deploy). Repara la regresion colateral de BUG-049; BUG-049 permanece RESUELTO y sin cambios.
 
+## BUG-054: `POST /api/usuarios` respondia 500 en TODO login/registro con `device_hash` -- SQL invalido en el merge de `device_hashes` (SQLSTATE 42803)
+
+**Severidad:** ALTA (produccion: ningun login ni registro con fingerprint completaba; 500 en todos los casos).
+**Contexto:** introducido en el commit `7cc28fe` ("sistema de puntos", 2026-09-14), PREVIO a TSK-104; expuesto por el re-upsert forzado del fix de sesion (BUG-053), porque `usuario-session.js` envia SIEMPRE `device_hash`.
+**Sintoma reportado por Javier:** todo `POST /api/usuarios` (upsert de login/registro) devolvia 500. Error real reproducido en produccion (Postgres/Neon): `column "t.ord" must appear in the GROUP BY clause or be used in an aggregate function` -- SQLSTATE 42803.
+**Causa raiz:** el merge de `device_hashes` en `api/usuarios.js` (bloque del upsert) construia `SELECT COALESCE(jsonb_agg(t.h), '[]'::jsonb) FROM (...) t ORDER BY t.ord LIMIT 5`: un `ORDER BY` EXTERNO sobre la subconsulta `t` conviviendo con la funcion de agregado `jsonb_agg` SIN `GROUP BY` es invalido en PostgreSQL (42803). Al ejecutarse en cada login con `device_hash`, reventaba TODO el upsert.
+**Resolucion aplicada:** `api/usuarios.js` (+30/-14; header `v13` -> `v14`) reescribio la consulta a `jsonb_agg(h ORDER BY ord)` (el `ORDER BY` va DENTRO del agregado) con la subconsulta interna `u ORDER BY u.ord LIMIT 5`, y envolvio el UPDATE en `try/catch` que loguea con `console.error('[usuarios] device_hashes no actualizado:', ...)` y NO re-lanza: el fingerprint es best-effort (anti-Sybil) y NUNCA debe bloquear el login/registro.
+**Evidencia QA (ADR-006, contra archivo real):** header real `api/usuarios.js` L2 = `// v14 (HOTFIX: SQL de device_hashes, login 500)`; changelog L92-96; bloque del hotfix L981-1006 (`try` L986, consulta nueva L987-1000, `catch` + `console.error` L1001-1005); `node --check` OK; ASCII/backticks/doble-escape 0/0/0; simulacion runtime con mock `sql`/`neon` 15/15 PASS (200 con `device_hash`, y 200 incluso cuando el UPDATE del fingerprint falla); sin regresion en A1/`verificar_usuario`/`total`; el patron invalido (`ORDER BY t.ord` externo al agregado) ya no aparece en `api/*.js`; `git diff --stat` = 1 archivo, +30/-14.
+**Deuda futura (menor, no bloqueante):** el merge solo excluye el hash entrante `$1`; no deduplica duplicados heredados que ya estuvieran en `device_hashes` (JSONB puede conservar repetidos de escrituras previas). No afecta el login; candidato a limpieza futura.
+**Estado:** RESUELTO en working tree (2026-09-15); **PENDIENTE commit/push/deploy**. Es la causa inmediata del 500 de login reportado por Javier; el fix de sesion (BUG-053) lo expuso al provocar el re-upsert. No modifica BUG-053 (permanece RESUELTO y sin cambios).
+
 ---
 
 ## Observaciones residuales de TSK-104 (2026-09-15) -- NO son bugs confirmados
