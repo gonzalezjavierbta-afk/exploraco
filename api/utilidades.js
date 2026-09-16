@@ -1,8 +1,8 @@
-// api/utilidades.js  v2 — sitemap + visitas + diagnostico + fotos (Paso 17)
-// ?tipo=sitemap     → genera sitemap.xml dinámico (sin auth)
-// ?tipo=visitas     → tracking visitas (POST sin auth, GET con auth)
-// ?tipo=diagnostico → info sistema (auth)
-// ?tipo=fotos       → CRUD galería destinos_fotos (GET sin auth, resto con auth)
+// api/utilidades.js  v2 - sitemap + visitas + diagnostico + fotos (Paso 17)
+// ?tipo=sitemap     -> genera sitemap.xml dinamico (sin auth)
+// ?tipo=visitas     -> tracking visitas (POST sin auth, GET con auth)
+// ?tipo=diagnostico -> info sistema (auth)
+// ?tipo=fotos       -> CRUD galeria destinos_fotos (GET sin auth, resto con auth)
 // ?tipo=buscar      -> pagina SSR de resultados indexable (GET sin auth, TASK-008)
 
 const { neon } = require('@neondatabase/serverless');
@@ -40,7 +40,7 @@ module.exports = async function handler(req, res) {
   var tipo = req.query.tipo || '';
   var sql  = neon(process.env.DATABASE_URL);
 
-  // ══ SITEMAP ══════════════════════════════════════════════════════
+  // == SITEMAP ======================================================
   if (tipo === 'sitemap' || !tipo) {
     try {
       var rows = await sql(
@@ -80,7 +80,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ══ VISITAS ═══════════════════════════════════════════════════════
+  // == VISITAS =======================================================
   if (tipo === 'visitas') {
     if (req.method === 'POST') {
       var body   = req.body || {};
@@ -175,12 +175,12 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ══ FOTOS (Paso 17) ═══════════════════════════════════════════════
-  // GET ?tipo=fotos&destino_id=UUID  → listar fotos (sin auth)
-  // GET ?tipo=fotos&slug=X           → listar fotos por slug (sin auth)
-  // POST ?tipo=fotos                 → agregar fotos (auth)
-  // PUT  ?tipo=fotos&id=N            → actualizar foto (auth)
-  // DELETE ?tipo=fotos&id=N          → eliminar foto (auth)
+  // == FOTOS (Paso 17) ===============================================
+  // GET ?tipo=fotos&destino_id=UUID  -> listar fotos (sin auth)
+  // GET ?tipo=fotos&slug=X           -> listar fotos por slug (sin auth)
+  // POST ?tipo=fotos                 -> agregar fotos (auth)
+  // PUT  ?tipo=fotos&id=N            -> actualizar foto (auth)
+  // DELETE ?tipo=fotos&id=N          -> eliminar foto (auth)
   if (tipo === 'fotos') {
 
     if (req.method === 'GET') {
@@ -210,24 +210,39 @@ module.exports = async function handler(req, res) {
                 : b2.url ? [{ url:b2.url, caption:b2.caption||'', orden:b2.orden||0, es_hero:b2.es_hero||false }]
                 : [];
       if (!lista.length) return res.status(400).json({ ok:false, error:'Falta url o fotos[]' });
-      var insertadas = [];
+      var vistasF = {};
+      var limpia  = [];
       for (var i = 0; i < lista.length; i++) {
         var f = lista[i];
-        if (!f.url) continue;
+        if (!f || !f.url) continue;
+        var urlF = String(f.url).trim();
+        if (!urlF || vistasF[urlF]) continue;
+        vistasF[urlF] = true;
+        limpia.push({ url:urlF, caption:f.caption||'',
+          orden:(typeof f.orden==='number'?f.orden:limpia.length), es_hero:f.es_hero||false });
+      }
+      // Auditoria QA: sin url valida en NINGUN item, NO se borra la galeria existente
+      // (el DELETE previo a un bucle vacio dejaba el destino sin fotos).
+      if (!limpia.length) {
+        return res.status(400).json({ ok:false, error:'Ninguna foto con url valida' });
+      }
+      await sql('DELETE FROM destinos_fotos WHERE destino_id=$1',[destId3]);
+      var insertadas = [];
+      for (var i2 = 0; i2 < limpia.length; i2++) {
+        var f2 = limpia[i2];
         var r2 = await sql(
           `INSERT INTO destinos_fotos (destino_id,url,caption,orden,es_hero,creado_en)
            VALUES ($1,$2,$3,$4,$5,NOW()) ON CONFLICT DO NOTHING
            RETURNING id,url,caption,orden,es_hero`,
-          [destId3, f.url.trim(), f.caption||'',
-           typeof f.orden==='number'?f.orden:i, f.es_hero||false]
+          [destId3, f2.url, f2.caption, f2.orden, f2.es_hero]
         );
         if (r2.length) insertadas.push(r2[0]);
       }
-      // Hero: primera foto si destino no tiene foto_hero aún
-      var heroF = lista.find(function(f){ return f.es_hero&&f.url; });
-      if (!heroF && lista[0]&&lista[0].url) {
+      // Hero: primera foto si destino no tiene foto_hero aun
+      var heroF = limpia.find(function(f){ return f.es_hero&&f.url; });
+      if (!heroF && limpia[0]&&limpia[0].url) {
         var ex = await sql('SELECT foto_hero FROM destinos WHERE id=$1 LIMIT 1',[destId3]);
-        if (ex.length && !ex[0].foto_hero) heroF = lista[0];
+        if (ex.length && !ex[0].foto_hero) heroF = limpia[0];
       }
       if (heroF) {
         await sql(
@@ -291,7 +306,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ══ DIAGNÓSTICO ══════════════════════════════════════════════════
+  // == DIAGNOSTICO ==================================================
   // == BUSCAR (TASK-008) =============================================
   if (tipo === 'buscar') {
     try {

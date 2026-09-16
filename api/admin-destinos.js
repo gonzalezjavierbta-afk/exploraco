@@ -19,6 +19,47 @@ function safeJSON(v) {
   try { return JSON.parse(v); } catch(_) { return null; }
 }
 
+// Normaliza la galeria: descarta items sin url valida, deduplica por url (trim),
+// conserva el orden de entrada y el flag es_hero (unico lugar de la regla).
+function normFotosGaleria(lista) {
+  var vistas  = {};
+  var limpias = [];
+  for (var i = 0; i < lista.length; i++) {
+    var f = lista[i];
+    if (!f || !f.url) continue;
+    var url = String(f.url).trim();
+    if (!url || vistas[url]) continue;
+    vistas[url] = true;
+    limpias.push({
+      url:     url,
+      caption: f.caption || '',
+      orden:   (typeof f.orden === 'number' ? f.orden : limpias.length),
+      es_hero: f.es_hero === true,
+    });
+  }
+  return limpias;
+}
+
+// Replace seguro de destinos_fotos: NUNCA borra si la lista normalizada queda vacia
+// (auditoria QA: el DELETE previo a un bucle sin inserciones dejaba el destino sin fotos).
+// Devuelve {ok:false} sin tocar la base en ese caso; el caller responde 400.
+async function reemplazarFotosGaleria(sql, destinoId, lista) {
+  var limpias = normFotosGaleria(lista);
+  if (!limpias.length) return { ok: false, total: 0 };
+  await sql('DELETE FROM destinos_fotos WHERE destino_id = $1', [destinoId]);
+  for (var i = 0; i < limpias.length; i++) {
+    var f = limpias[i];
+    await sql(
+      'INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en) '
+      + 'VALUES ($1,$2,$3,$4,$5,NOW()) ON CONFLICT DO NOTHING',
+      [destinoId, f.url, f.caption, f.orden, f.es_hero]
+    ).catch(function(e){
+      console.error('[admin-destinos] insert foto galeria:', e && e.message);
+    });
+  }
+  return { ok: true, total: limpias.length };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -180,16 +221,13 @@ module.exports = async function handler(req, res) {
         ).catch(function(){});
       }
 
-      // Guardar fotos de galeria
+      // Guardar fotos de galeria. El INSERT de arriba es un UPSERT por slug
+      // (ON CONFLICT (slug) DO UPDATE RETURNING id), asi que newId puede apuntar a un
+      // destino preexistente: se aplica el mismo replace seguro del PUT.
       if (b.fotos_galeria && b.fotos_galeria.length) {
-        for (var i = 0; i < b.fotos_galeria.length; i++) {
-          var fg = b.fotos_galeria[i];
-          if (!fg.url) continue;
-          await sql(
-            'INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en) '
-            + 'VALUES ($1,$2,$3,$4,false,NOW()) ON CONFLICT DO NOTHING',
-            [newId, fg.url, fg.caption||'', fg.orden||i]
-          ).catch(function(){});
+        var repN = await reemplazarFotosGaleria(sql, newId, b.fotos_galeria);
+        if (!repN.ok) {
+          return res.status(400).json({ ok: false, error: 'Ninguna foto con url valida' });
         }
       }
 
@@ -299,16 +337,13 @@ module.exports = async function handler(req, res) {
         ).catch(function(){});
       }
 
-      // Guardar fotos de galeria
+      // Galeria: semantica replace (DELETE + reinsert deduplicado por url).
+      // Auditoria QA: si el payload trae items pero NINGUNO pasa el filtro (sin url
+      // valida), la lista limpia queda vacia -> NO se borra nada y se responde 400.
       if (b.fotos_galeria && b.fotos_galeria.length) {
-        for (var j = 0; j < b.fotos_galeria.length; j++) {
-          var fg2 = b.fotos_galeria[j];
-          if (!fg2.url) continue;
-          await sql(
-            'INSERT INTO destinos_fotos (destino_id, url, caption, orden, es_hero, creado_en) '
-            + 'VALUES ($1,$2,$3,$4,false,NOW()) ON CONFLICT DO NOTHING',
-            [id, fg2.url, fg2.caption||'', fg2.orden||j]
-          ).catch(function(){});
+        var repP = await reemplazarFotosGaleria(sql, id, b.fotos_galeria);
+        if (!repP.ok) {
+          return res.status(400).json({ ok: false, error: 'Ninguna foto con url valida' });
         }
       }
 

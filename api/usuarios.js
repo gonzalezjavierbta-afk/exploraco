@@ -302,11 +302,28 @@ module.exports = async (req, res) => {
       // salvo el dueno con sesion firmada (ADR-025).
       if (tipo === 'perfil_publico' && (id || req.query.usuario_id)) {
         var ppTarget = String(id || req.query.usuario_id || '');
-        var ppRows = await sql(
-          'SELECT id, nombre, avatar_url, foto_url, xp_total, faccion, casa, perfil_publico'
-          + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
-          [ppTarget]
-        );
+        // Migracion 004 pendiente: si usuarios.foto_url aun no existe en
+        // Neon (42703), se reintenta la MISMA consulta sin la columna y el
+        // perfil publico responde 200 con foto_url=null (el mapeo
+        // ppU.foto_url || null ya lo resuelve) en vez de escalar al 503
+        // global (SCHEMA_NOT_MIGRATED). Cualquier otro codigo se re-lanza
+        // al catch global del handler.
+        var ppRows;
+        try {
+          ppRows = await sql(
+            'SELECT id, nombre, avatar_url, foto_url, xp_total, faccion, casa, perfil_publico'
+            + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+            [ppTarget]
+          );
+        } catch (eFoto) {
+          if (!eFoto || eFoto.code !== '42703') throw eFoto;
+          console.error('[usuarios] perfil_publico degradado 42703: ' + eFoto.message);
+          ppRows = await sql(
+            'SELECT id, nombre, avatar_url, xp_total, faccion, casa, perfil_publico'
+            + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+            [ppTarget]
+          );
+        }
         if (!ppRows.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         var ppU = ppRows[0];

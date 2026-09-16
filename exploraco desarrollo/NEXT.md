@@ -3,6 +3,16 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-105 / ADR-030 Lote "promptarreglos" - DM 500, galeria duplicada, popover Guardar, "Estuve aqui", unificacion Como llegar/Ubicacion, galeria unificada de destino, seguridad de album y degradacion 503 (2026-09-16, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+649/-167) + 2 scripts nuevos sin versionar:
+  - `api/interacciones.js` (271 lineas cambiadas): casts `::text` en `dm_hilos` (`m.usuario_id::text<>$1`, `m2.usuario_id::text=$1`, `bloqueador_id::text=$1 OR bloqueado_id::text=$1`, L2937-2939/L2962) por el 42P08 (BUG-055); helper `queryConAvatarFallback` (L2114) que degrada `42703` (`usuarios.foto_url` ausente) a `avatar_url` en `museo_publico`/`album_detalle`/`galeria_destino` (BUG-060); `items[]` aditivo solo con `incluir`; 403 `ALBUM_AJENO`/400 `AUTOR_ORIGINAL_INVALIDO` en `album_agregar_foto` (BUG-059); `repartirXpReferidos` en `album_voto` (gap ADR-027).
+  - `api/pagina-destino.js` (197 lineas cambiadas): `#galeria` unificada (curadas + viajeros + `#fp-upload`, ancla legacy `#fotos`), `secComoLlegar` (fusion de `secTransporteHostal` + `secMapa`, id="como-llegar", ancla legacy `#mapa`), UI "Guardar en album", helper `galEsc()` (cierra XSS del inline), fix de `cerrarPopoverGuardar` (BUG-057).
+  - `api/admin-destinos.js` (71 lineas cambiadas) + `api/utilidades.js` (59): semantica REPLACE (dedupe por url + DELETE + reinsert) con guard anti-perdida (lista vacia -> 400 y NO borra) (BUG-056); `admin.html` (8 lineas) elimina la doble escritura de la galeria.
+  - `api/usuarios.js` (27 lineas cambiadas): fallback de avatar en `perfil_publico` (BUG-060).
+  - `usuario-session.js` (127 lineas cambiadas): "Estuve aqui" con `GET ?tipo=geo_nonce_solicitar` + `Authorization: Bearer` + `nonce`, reintento con nonce nuevo tras 401 y `obtenerUbicacion` con reintento de baja precision (cierra BUG-036).
+  - `scripts/smoke_auditoria_pagina_destino.js` (56 lineas cambiadas): 54 checks (el modulo unificado se muestra SIEMPRE en la ficha).
+  - NO hay migraciones nuevas ni archivos nuevos en `api/` (8/8 INTACTO, ADR-001); bugs registrados BUG-055..BUG-060; decision en ADR-030.
+  - **PENDIENTE OPERATIVO (BLOQUEANTE): `node scripts/apply_004_foto_url.js` (aplica migracion 004) + `node scripts/dedupe_destinos_fotos.js --apply` (dedupe + `CREATE UNIQUE INDEX idx_destinos_fotos_destino_url`) en Neon + commit/push/deploy.** Requieren `DATABASE_URL` (no hay credenciales locales). Sin el segundo, BUG-056 no queda cerrado al 100%; sin el primero, BUG-060 queda solo mitigado.
+  - **Nota de version (ADR-006):** los comentarios nuevos de `api/interacciones.js` se rotulan `v16` pero el header real sigue en `v14` (no se agrego el bloque de changelog `v16`).
 - HOTFIX login 500 / BUG-054 (2026-09-15, working tree, SIN commitear) - `POST /api/usuarios` (upsert de login/registro) devolvia 500 para TODOS los logins con `device_hash`; error real de Postgres/Neon: `column "t.ord" must appear in the GROUP BY clause or be used in an aggregate function` (SQLSTATE 42803). Causa raiz: el merge de `device_hashes` en `api/usuarios.js` usaba `SELECT COALESCE(jsonb_agg(t.h), '[]'::jsonb) FROM (...) t ORDER BY t.ord LIMIT 5` (ORDER BY externo junto al agregado SIN GROUP BY = invalido en Postgres); introducido en el commit `7cc28fe` ("sistema de puntos", 2026-09-14), PREVIO a TSK-104, y expuesto al forzar el re-upsert (fix de sesion BUG-053). Fix: `api/usuarios.js` (+30/-14; header `v13` -> `v14`) con `jsonb_agg(h ORDER BY ord)` (ORDER BY dentro del agregado + subquery interna `u ORDER BY u.ord LIMIT 5`) y `try/catch` best-effort que loguea con `console.error` y NO re-lanza (el fingerprint nunca bloquea el login); QA: `node --check` OK, ASCII/backticks/doble-escape 0/0/0, simulacion runtime con mock `sql`/`neon` 15/15 PASS (200 con `device_hash`; 200 incluso si el UPDATE falla), sin regresion en A1/`verificar_usuario`/`total`, el patron invalido ya no aparece en `api/*.js`; registrado como BUGS_HISTORICOS.md BUG-054; **PENDIENTE OPERATIVO: commit/push/deploy (login roto en produccion) + login real post-deploy que envie `device_hash`.**
 - Bugfix de sesion / regresion colateral de BUG-049 (2026-09-15, working tree, SIN commitear) - `refrescarSesion()` de `usuario-session.js` y `mi-perfil.html` REEMPLAZABA `window.ExploraCO.usuario` con la proyeccion publica de `GET /api/usuarios?id=` (SIN `jwt`/`auth_id`/`email`/`email_verificado`), dejando el banner "Verifica tu email" y bloqueando referidos/facciones/casa/DM de la cuenta `brsk84@gmail.com` pese a `email_verificado=TRUE` en Neon (causa: la proyeccion publica la introdujo el fix de PII de BUG-049 / ADR-028, `api/usuarios.js` L500-529); fix: FUSION (`Object.assign({}, actual, d.data)`) + conservar `jwt`/`jwt_expira_en` + detectar la proyeccion publica (respuesta sin `email`) y llamar `refreshJwt()`/`renovarJwt()` sin pisar la sesion (`usuario-session.js` +21/-4, `mi-perfil.html` +19/-4); QA: `node --check` OK, delta ASCII 0 en lo nuevo, divs 0, `smoke_017` 73/73 PASS, `smoke_016` 39/39 PASS, sin recursion; registrado como BUGS_HISTORICOS.md BUG-053; **PENDIENTE OPERATIVO: commit/push/deploy + re-login del usuario afectado si su localStorage ya perdio `auth_id`/`email`.** Nota de version (ADR-006): tras el hotfix de login BUG-054 el header real de `api/usuarios.js` es v14 (v13 al cierre de TSK-104).
 - TSK-104 / ADR-029 Verificacion admin forzada + rama `verificar_usuario` + dashboard real (5 tarjetas) y filtro de verificados (2026-09-15, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, Escudo GOLD PASS, sin commitear) - `api/usuarios.js` v13 en su cierre (header real HOY v14 tras el hotfix BUG-054) (+45/-6: A1 auto-verificacion del admin en el upsert con `email_verificado` y `ON CONFLICT ... COALESCE(usuarios.email_verificado,false) OR EXCLUDED.email_verificado`, condicion `email.toLowerCase()==='brsk84@gmail.com' || nombre.toLowerCase()==='javier'`; A2 rama POST `tipo=verificar_usuario` admin-only via `esAdminUsuario` con 401/400/404 y `UPDATE ... RETURNING`; C1 campo aditivo `total` (`COUNT(*) WHERE activo=true`) en GET `?tipo=leaderboard`), `api/utilidades.js` v2 (+24/-0: rama admin-only GET `?tipo=visitas_global` -> `{ok,total,v30,v7}` sobre `interacciones tipo='visita' AND activo=true`), `admin.html` (+42/-8: fila verde + badge `VERIF` para `p.verificado`, filtro `data-verified`/`currentVerifiedFilter`/`setVerifiedFilter`, `ds-usuarios` real desde leaderboard, `ds-visitas` real desde `visitas_global`, 5a tarjeta `ds-verificados`, CSS `.stats-grid` a `repeat(5,1fr)`, re-render del dashboard en `syncFromNeon()` si la pantalla esta activa); presupuesto 8/8 INTACTO; sin migraciones nuevas; **PENDIENTE OPERATIVO: aplicar 017/018 en Neon (016/015 ya aplicadas) + commit/push/deploy**; hallazgos residuales H4/H6/H7/H8 registrados como observaciones en BUGS_HISTORICOS.md
@@ -12,7 +22,7 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - TSK-100 / ADR-026 Epic prompt.txt (2026-09-13, IMPLEMENTADO EN WORKING TREE, sin commitear) - perfil museo v1 en mi-perfil.html (museo-line trofeos·fotos·destinos, galeria de 3 mejoras perfil_*, vocaciones con toggle/candado/403, chip "Sin mapa"), vocaciones acumulables (catalogo en codigo musico@5/cine@8/artista_grafico@11 + `usuarios.vocaciones` jsonb), chat por plan PRIVADO (chat_salas tipo='plan' + `planes_viaje.sala_id`, GET plan_chat / POST plan_chat_msg con +2 XP tope 20/dia, defensas en chat_msg/chat_mensajes), limpieza de salas del sistema (solo Chat general + Bogota), XP admin (POST admin_xp Bearer: delta o nivel 1-20 sin degradar via Math.max), BUG-A contarComentarioSafe (degradacion a 0 sin migracion 013), BUG-B coordsFallbackAutor (multimedia_mapa hereda coords de la visita/guardado del autor); api/usuarios.js v8 con `?buscar=`; divs 195/195, 223/223, 786/786; MIGRACION 015 NUEVA (usuarios.vocaciones, planes_viaje.sala_id, DELETE salas sistema, 3 consumibles); migraciones 011-014 YA APLICADAS por Javier en Neon (2026-09-13); UNICO BLOQUEANTE: aplicar 015 en Neon + commit/push/deploy; ADR-026 + spec
 - TSK-099 / ADR-024 Presencia Fisica + Espacial v4.0 (2026-09-12, IMPLEMENTADO EN WORKING TREE) - geocerca Haversine server-side en `POST tipo=visita` (sin endpoint nuevo, 8/8), dedup-first + indice unico parcial (cierra race `23505`), `quitar_visita` -> soft-delete (`activo=false`), radios adaptativos 100/150/200/250 m, bono rural +20 XP y logro `logr_pionero` (LOGROS = 30), evidencia `interacciones.dims.geo`, conteo de visitas de `api/utilidades.js` filtra `activo=true`; tests de logros 30/30 PASS; migracion 014 NUEVA (reset de visitas gamificadas con respaldo + indice unico); migraciones 011/012/013/014 YA APLICADAS por Javier en Neon (2026-09-13, ver TSK-100); pendiente aplicar 015 + deploy; ADR-024 + spec
 - TSK-098 / Epic multimedia de usuarios (2026-09-12, working tree SIN commitear) - fix 500 albumes/mapa (COALESCE foto/avatar + catch 42P01/42703 -> 503 `SCHEMA_NOT_MIGRATED`), filtro multimedia multi-seleccion (tipo_media CSV + 400 estricto + `tipos_aplicados`), galeria ampliada (`galeria.html` global y `?destino=<slug>`, STATIC_PAGES + boton en ficha), modulo audiovisual en comunidad.html, comentarios tipo Facebook (ADR-023: migracion 013 NUEVA + 6 `tipo=` sin endpoint nuevo) y moderacion en admin; PENDIENTE BLOQUEANTE aplicar migracion 013 en Neon; hallazgo BUG-033 (canonicals cirilicos, NO bloqueante); ADR-023
-- TSK-097 / Fixes multimedia + constraint unica de interacciones (2026-09-12, working tree SIN commitear) - migracion 012 (dedup resena/rating por indice parcial, fotos libres), catch 23505 -> 409 tipado, `DEST_PHOTOS` vacio + `photoPlaceholderHTML`, UI completa de albumes en mi-perfil, trazabilidad de autor/album, BUG-027 resuelto (icono Instagram), smoke_auditoria 42/42; PENDIENTE BLOQUEANTE aplicar migracion 012 en Neon; ADR-022
+- TSK-097 / Fixes multimedia + constraint unica de interacciones (2026-09-12, working tree SIN commitear) - migracion 012 (dedup resena/rating por indice parcial, fotos libres), catch 23505 -> 409 tipado, `DEST_PHOTOS` vacio + `photoPlaceholderHTML`, UI completa de albumes en mi-perfil, trazabilidad de autor/album, BUG-027 resuelto (icono Instagram), smoke_auditoria 42/42 al cierre (54/54 HOY tras TSK-105 / ADR-030, 2026-09-16); PENDIENTE BLOQUEANTE aplicar migracion 012 en Neon; ADR-022
 - TSK-096 / Capa audiovisual estricta + paridad de drawer en el mapa cultural (2026-09-12, working tree SIN commitear) - deseleccion de "Todo" oculta los pines del directorio; `MAPA_MEDIA` solo albumes de usuarios (backend `?origen=album` + filtro frontend); pines del directorio/Mi Mapa abren el drawer (sin popup) y `mapas.html` estrena drawer propio; ADR-021
 - BUG-031 / hotfix JS inline del popover (2026-09-11, working tree SIN commitear) - SyntaxError en el JS inline de buildHTML() (onchange de mapas tematicos L2288-2290 con comilla escapada mal formada) dejaba TODAS las paginas dinamicas sin funciones de cliente; fix con entidad HTML `&#39;` (1 linea) + guard permanente `scripts/check_buildHTML_inline.js` (vm.Script, 8 funciones + JSON-LD + divs); TSK-095 ya desplegada CON el bug -> produccion rota hasta commit+push+redeploy (ver "Que sigue", item 1)
 - TSK-095 / Refactor UI/UX ficha de destino (2026-09-11) - verificado como columna admin (sin insignia publica), hero HQI con chip de direccion, popover de Guardar con mapas tematicos, galeria con lightbox; Escudo GOLD limpio (divs 716/716, smoke 28/28, flujo verificado 6/6)
@@ -22,6 +32,102 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-105 "Lote promptarreglos" - galeria unificada de destino + arreglos de DM, galeria, popover, visita y album (2026-09-16) - ADR-030
+
+Tarea TSK-105 implementada y verificada en working tree (SIN commitear), Escudo
+GOLD limpio. La decision vive en `DECISIONS.md` ADR-030; la tarea en
+`TASKS.md` TSK-105; los bugs en `BUGS_HISTORICOS.md` BUG-055..BUG-060. NO hay
+migraciones NUEVAS ni archivos nuevos en `api/` (8/8 intacto, ADR-001). El spec
+de origen vive en `docs/superpowers/specs/2026-09-15-galeria-unificada-destino-design.md`.
+
+**Cambios (verificados contra archivo real, ADR-006):**
+- `api/interacciones.js` (271 lineas cambiadas; header real sigue **v14**, los
+  comentarios nuevos se rotulan `v16` sin bloque de changelog -> deuda menor):
+  - **BUG-055:** `dm_hilos` castea `m.usuario_id::text<>$1`,
+    `m2.usuario_id::text=$1` y `bloqueador_id::text=$1 OR bloqueado_id::text=$1`
+    (L2937-2939, L2962) para resolver `SQLSTATE 42P08` (el parametro `$1` se
+    comparaba contra `split_part()` text y columnas uuid a la vez).
+  - **BUG-060:** helper `queryConAvatarFallback` (L2114) que ante `42703`
+    (`usuarios.foto_url` ausente) reintenta con `COALESCE(u.avatar_url,'')` en
+    `museo_publico` (L2760), `album_detalle` (L3382/L3394) y `galeria_destino`
+    (`gdUsuarios`/`gdViajeros`, L3499/L3542). Nunca silencia: re-lanza cualquier
+    otro codigo.
+  - **ADR-030:** `tipo=galeria_destino` gana `incluir`/`usuario_id` e `items[]`
+    aditivo (solo se emite con `incluir`); 403 `ALBUM_AJENO` (L5143) y 400
+    `AUTOR_ORIGINAL_INVALIDO` (L5181) en `album_agregar_foto`; `album_voto` llama
+    `repartirXpReferidos` (L5237).
+- `api/pagina-destino.js` (197 lineas cambiadas): UNA sola `#galeria`
+  (miniaturas curadas + "Fotos de viajeros" `#fp-grid` + `#fp-upload`, ancla
+  legacy invisible `<span id="fotos">`); `secComoLlegar` (L1810) fusiona
+  `secTransporteHostal` + `secMapa` (id="como-llegar", una sola entrada de
+  subnav, ancla legacy `#mapa`); UI "Guardar en album" (`abrirAlbumPopover`);
+  helper `galEsc()` (L2379) que escapa HTML (cierra un XSS preexistente del
+  inline); fix de `cerrarPopoverGuardar` (L2298) y `toggleMapaDest` (L2347)
+  (BUG-057).
+- `api/admin-destinos.js` (71 lineas cambiadas) y `api/utilidades.js` (59):
+  semantica REPLACE de `destinos_fotos` (dedupe por url + DELETE + reinsert,
+  helper `normFotosGaleria` L43-60) con guard anti-perdida (lista vacia -> 400 y
+  NO borra; BUG-056); `admin.html` (8 lineas) elimina la doble escritura de la
+  galeria.
+- `api/usuarios.js` (27 lineas cambiadas): fallback de avatar en
+  `perfil_publico` (BUG-060).
+- `usuario-session.js` (127 lineas cambiadas): "Estuve aqui" solicita
+  `GET ?tipo=geo_nonce_solicitar` (L649-665), envia `Authorization: Bearer` +
+  `nonce`, maneja 401 con `refreshJwt` y reintenta UNA vez con nonce nuevo
+  (L698-767); `obtenerUbicacion` (L602-647) distingue codigos 1/2/3 y reintenta
+  con baja precision ante 2/3. **Cierra BUG-036.**
+- `scripts/smoke_auditoria_pagina_destino.js` (56 lineas cambiadas): pasa a
+  **54 checks** (modulo unificado siempre visible).
+- NUEVOS sin versionar: `scripts/apply_004_foto_url.js` (aplica la migracion
+  004; causa raiz del 503) y `scripts/dedupe_destinos_fotos.js` (backup + borra
+  duplicados + `CREATE UNIQUE INDEX idx_destinos_fotos_destino_url`).
+
+**Decisiones de producto (revisadas por architect-review):** NO se votan fotos
+curadas en este MVP (no se creo `foto_curada_voto`; `tipo_voto=null` para
+curadas) porque `destinos_fotos.id` NO es estable (el REPLACE lo re-crea); se
+vota solo viajeros (`foto_voto`) y album (`album_voto`). `origen='album'`
+(album_fotos por cercania) queda APAGADO por defecto (solo con
+`incluir=albumes`). `items[]` solo se emite si el cliente envia `incluir`
+(protege a `galeria.html`). El modulo unificado se muestra SIEMPRE. El
+`autor_original_id` null lo normaliza `album_agregar_foto` con `|| usuarioId2` y
+el dedup se hace por SELECT.
+
+**Verificacion:** `node scripts/smoke_auditoria_pagina_destino.js` ->
+`TODOS LOS SMOKE TESTS PASARON (54 checks)`; `node --check` OK en los `api/*.js`
+tocados; helper `galEsc` cierra el XSS del inline; `git diff --stat` = 8
+archivos, +649/-167.
+
+#### Que sigue
+1. **APLICAR la migracion 004 en Neon (BLOQUEANTE, lo ejecuta Javier; requiere
+   `DATABASE_URL`):** `node scripts/apply_004_foto_url.js` (`usuarios.foto_url` +
+   `ciudad_base`; idempotente). Cierra de raiz el BUG-060.
+2. **Ejecutar el dedupe + indice unico (BLOQUEANTE):** `node
+   scripts/dedupe_destinos_fotos.js --apply` (backup + borra duplicados +
+   `CREATE UNIQUE INDEX idx_destinos_fotos_destino_url`). Cierra al 100% el
+   BUG-056.
+3. **Commit + push + deploy en un solo release** (esta entrega + los pendientes
+   previos sin commitear de TSK-095..TSK-104 y las migraciones 015/016/017/018).
+   Incluir el bump del header `v14` -> `v16` de `api/interacciones.js` si se
+   decide mantener el rotulo.
+4. **Verificacion post-deploy en vivo:** `dm_hilos` 200; "Estuve aqui" completa
+   con nonce + Bearer; el popover Guardar conserva los checkboxes; la galeria no
+   repite fotos; voto viajeros/album y "Guardar en album" (403 `ALBUM_AJENO` con
+   album ajeno); sin 503 en museo/galeria/albumes/perfil publico; "Como llegar"
+   con transporte + mapa en una sola seccion.
+
+#### Riesgos activos
+- **Migracion 004 pendiente (BLOQUEANTE):** sin aplicarla, `usuarios.foto_url`
+  no existe; la degradacion mantiene las rutas en 200 pero el avatar cae siempre
+  a `avatar_url` y `ciudad_base`/autor de blog quedan inutilizables (BUG-060).
+- **Datos duplicados de galeria pendientes (BLOQUEANTE para el cierre):** el
+  codigo ya no duplica, pero las filas historicas de `destinos_fotos` siguen
+  repetidas y el indice unico no existe hasta correr el script (BUG-056).
+- **Header de version desalineado:** `api/interacciones.js` sigue en `v14`
+  mientras los comentarios nuevos dicen `v16`; deuda documental a resolver en el
+  commit (ADR-006).
+- **Voto de fotos curadas fuera del MVP:** recorte explicito; requiere un ancla
+  estable futura (no `destinos_fotos.id`).
 
 ### Hotfix "login 500 por SQL invalido en el merge de `device_hashes`" (2026-09-15) - BUG-054
 
@@ -708,7 +814,8 @@ BUGS/BUG-032 y BUG-027 (resuelto).
   (`abrirAlbumModal` L1340): de foto -> album y de autor -> `/mi-perfil.html?id=...`.
 - **FIX 5 - Auditoria:** `api/pagina-destino.js` L1950 corrige BUG-027 (el boton
   Instagram mostraba el literal `[foto]`; ahora `\uD83D\uDCF7`); nuevo
-  `scripts/smoke_auditoria_pagina_destino.js` (42 checks); `comunidad.html` reproductor
+  `scripts/smoke_auditoria_pagina_destino.js` (42 checks al cierre de TSK-097; 54
+  checks HOY tras TSK-105 / ADR-030, 2026-09-16); `comunidad.html` reproductor
   real de audio/video/embed (`avMediaHTML` L1274, `avEmbedUrl` L1264); `index.html`
   balance de divs corregido en `publicar-modal` (497/497); `admin.html` moderacion de
   fotos de album conectada (`adminCargarFeedFotos` -> `mi_feed_fotos`, L6056;
@@ -719,7 +826,8 @@ api/pagina-destino.js e index-api-connector.js; 0 bytes >127 en los api/*.js
 (index-api-connector.js mantiene 26 backticks preexistentes, baseline HEAD 26);
 balance de divs 0 en los 4 HTML (index 497/497, comunidad 181/181, mi-perfil
 166/166, admin 724/724); inline JS de los 4 HTML parsea; `check_buildHTML_inline.js`
-TODO OK; smokes OK (auditoria 42/42, comunidad, logros 29, perfil_progreso). QA
+TODO OK; smokes OK (auditoria 42/42 al cierre de TSK-097; 54/54 HOY tras TSK-105 /
+ADR-030, 2026-09-16; comunidad, logros 29, perfil_progreso). QA
 manual: 2 bugs de integracion detectados y corregidos (openAlbumModal leia
 `res.data` en vez de `res.album`/`res.fotos`; `quitarFotoAlbum(uuid,uuid)` sin
 comillas -> ReferenceError).
@@ -816,10 +924,15 @@ Escudo GOLD limpio.
     (Esc/flechas) y cierre por fondo; click en la foto principal abre el
     lightbox.
   - secMapa: SOLO boton Google Maps (eliminados WhatsApp y Telefono de ese
-    bloque, L1755-1756).
+    bloque, L1755-1756). **Nota posterior (TSK-105 / ADR-030, 2026-09-16):
+    `secMapa` quedo OBSOLETO -- se fusiono con `secTransporteHostal` en
+    `secComoLlegar` (id="como-llegar", transporte arriba + mapa abajo), con una
+    sola entrada de subnav `como-llegar` y un ancla legacy invisible `#mapa`. El
+    texto historico se conserva por Cero Borrado Logico (Regla de Oro 3).**
   - Limpieza: eliminado modulo inferior "Foto destacada" (`secFotoDestacada`,
     era ADR-017/P11, L1936) y eliminado el boton Google Maps de secContact
-    (centralizado en secMapa, L1941-1942).
+    (centralizado en secMapa, L1941-1942; HOY `secComoLlegar`, ver la nota
+    anterior).
   - NO se renderiza ninguna insignia publica del campo `verificado`
     (0 ocurrencias en el archivo; requisito: solo control interno del admin).
 - `admin.html`: checkbox `f-verificado` "Verificacion manual admin" en la
@@ -877,7 +990,8 @@ Docs: ADR-019 en DECISIONS.md, TSK-095 en TASKS.md.
    tematicos (con el HOTFIX BUG-031 aplicado, ya sin el SyntaxError);
    galeria abre el lightbox; la franja no muestra "Reservar" pero
    si "Ver galeria"; la seccion "Reservar" SOLO aparece en destinos con
-   booking/hostelworld reales; secMapa solo tiene Google Maps; admin
+   booking/hostelworld reales; secMapa solo tiene Google Maps (HOY
+   `secComoLlegar`, que fusiona transporte + mapa, ver TSK-105 / ADR-030); admin
    guarda/desmarca `verificado` sin romper ningun destino existente (el
    guard `!== undefined` preserva los registros que no envian el campo).
 5. **Escudo GOLD (cambio permanente, brecha de cobertura BUG-031):**

@@ -948,6 +948,77 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Deuda futura (menor, no bloqueante):** el merge solo excluye el hash entrante `$1`; no deduplica duplicados heredados que ya estuvieran en `device_hashes` (JSONB puede conservar repetidos de escrituras previas). No afecta el login; candidato a limpieza futura.
 **Estado:** RESUELTO en working tree (2026-09-15); **PENDIENTE commit/push/deploy**. Es la causa inmediata del 500 de login reportado por Javier; el fix de sesion (BUG-053) lo expuso al provocar el re-upsert. No modifica BUG-053 (permanece RESUELTO y sin cambios).
 
+## BUG-055: `GET ?tipo=dm_hilos` devolvia 500 (SQLSTATE 42P08) -- conflicto de deduccion de tipo del parametro `$1` en la bandeja de DM
+
+**Severidad:** ALTA (la bandeja de Mensajeria Directa no cargaba: 500 en cada apertura).
+**Contexto:** detectado y corregido en el lote de arreglos ("promptarreglos", 2026-09-16) dentro de `api/interacciones.js`.
+**Sintoma:** `GET /api/interacciones?tipo=dm_hilos&usuario_id=<uuid>` respondia 500 con conflicto de deduccion de tipo del parametro (SQLSTATE 42P08); el hilo de DM quedaba inutilizable.
+**Causa raiz:** la misma consulta comparaba `$1` contra `split_part(m.clave_dm,'_',1)` (text) y ademas contra `m.usuario_id` (uuid). PostgreSQL infiere UN solo tipo para `$1` y no puede satisfacer ambos usos -> 42P08. El mismo patron aparecia al filtrar `usuario_bloqueos` por `bloqueador_id`/`bloqueado_id` (uuid).
+**Resolucion aplicada:** cast explicito a texto en los usos uuid: `m.usuario_id::text<>$1`, `m2.usuario_id::text=$1` y `bloqueador_id::text=$1 OR bloqueado_id::text=$1`. El parametro queda tipado como text sin ambiguedad.
+**Evidencia (ADR-006):** `api/interacciones.js` L2937-2939 (rama `dm_hilos`) y L2962 (`usuario_bloqueos`); `node --check` OK.
+**Estado:** RESUELTO (working tree, 2026-09-16; PENDIENTE commit/push/deploy).
+
+## BUG-056: fotos repetidas en la galeria de la ficha (caso hostal-r10) -- `destinos_fotos` acumulaba filas sin `UNIQUE(destino_id,url)`
+
+**Severidad:** ALTA (contenido visible corrupto: la misma imagen repetida N veces; deuda de integridad en la tabla).
+**Contexto:** detectado y corregido en el lote "promptarreglos" (2026-09-16); afecta `api/admin-destinos.js`, `api/utilidades.js`, `admin.html` y `api/pagina-destino.js`.
+**Sintoma:** la galeria de `hostal-r10` (y de cualquier destino editado varias veces) mostraba la misma foto repetida; el conteo de fotos del destino crecia con cada guardado.
+**Causa raiz (multiple):** (1) `destinos_fotos` NO declara `UNIQUE(destino_id, url)` y la tabla no se crea en NINGUNA migracion del repo (patron BUG-021: objeto vivo fuera del versionamiento); (2) `api/admin-destinos.js` PUT re-insertaba la galeria SIN borrar la previa; (3) `api/utilidades.js` POST `?tipo=fotos` tambien insertaba acumulando; (4) `admin.html` hacia DOBLE escritura (PUT `admin-destinos` + POST `utilidades`) por la misma accion.
+**Resolucion aplicada:** semantica REPLACE (dedupe por url + DELETE + reinsert) en `api/admin-destinos.js` PUT y POST (upsert por slug) y en `api/utilidades.js` POST, con guard anti-perdida (si la lista normalizada queda vacia -> 400 y NO se borra nada; helper `normFotosGaleria`); `admin.html` ya no ejecuta la segunda escritura; `galAll` aplica dedupe defensivo en el render de la ficha.
+**Evidencia (ADR-006):** `api/admin-destinos.js` L43-60 (`normFotosGaleria`), L230 y L340-346 (guards 400); `api/utilidades.js` L225-234; `api/pagina-destino.js` L727-733 (`galAll` dedupe); `node --check` OK en los 3.
+**Pendiente operativo (BLOQUEANTE para cerrar el bug al 100%):** el codigo ya no vuelve a duplicar, pero los datos YA duplicados en Neon no se limpian solos. Debe ejecutarse `scripts/dedupe_destinos_fotos.js --apply` (backup + borra duplicados + `CREATE UNIQUE INDEX idx_destinos_fotos_destino_url`); requiere `DATABASE_URL` (no hay credenciales locales). `--dry` solo reporta.
+**Estado:** RESUELTO en codigo (working tree, 2026-09-16); **PENDIENTE ejecutar dedupe + indice unico en Neon** -> NO cerrado al 100% hasta aplicarlo.
+
+## BUG-057: el popover "Guardar" se cerraba con CUALQUIER click y desmontaba los checkboxes
+
+**Severidad:** MEDIA (bloqueaba el guardado en mapas tematicos desde la ficha).
+**Contexto:** detectado y corregido en el lote "promptarreglos" (2026-09-16) en `api/pagina-destino.js`.
+**Sintoma:** al abrir el popover "Guardar" (`#guardar-pop`) y marcar un checkbox de mapa tematico, el popover se cerraba solo y el estado del checkbox se perdia.
+**Causa raiz:** `cerrarPopoverGuardar` estaba registrado en `document` en fase de CAPTURA y cerraba ante CUALQUIER click (incluidos los del propio popover y los de los checkboxes), destruyendo el nodo antes de que el `onchange` pudiera completarse.
+**Resolucion aplicada:** el handler solo cierra si el click es FUERA del popover (`p.contains(ev.target)`) o sobre `#btn-guardar` (guard); `toggleMapaDest` muestra error si `!data.ok` y sus `catch` usan `console.warn` (nada silenciado).
+**Evidencia (ADR-006):** `api/pagina-destino.js` L2298 (`cerrarPopoverGuardar`), L2344 (registro del listener en fase de captura) y L2347 (`toggleMapaDest`); `node --check` OK.
+**Estado:** RESUELTO (working tree, 2026-09-16; PENDIENTE commit/push/deploy).
+
+## BUG-058: "Estuve aqui" nunca completaba -- el frontend no enviaba `nonce` ni JWT (cierra BUG-036)
+
+**Severidad:** ALTA (el flujo de visita presencial, nucleo de ADR-024, era inusable desde la UI).
+**Contexto:** BUG-036 (registrado al cierre de la Entrega 016) documentaba el flujo ROTO; se corrige en el lote "promptarreglos" (2026-09-16) en `usuario-session.js`.
+**Sintoma:** pulsar "Estuve aqui" devolvia 401 (`SESION_*`) o 400 (`NONCE_*`) porque `marcarVisitado` no adjuntaba `Authorization: Bearer` ni `nonce`, exigidos por el backend v13 (`api/interacciones.js`).
+**Causa raiz:** el contrato del backend (ADR-025: sesion firmada + nonce geoespacial de un solo uso) avanzo, pero el cliente no se adapto; relacionado con el cierre parcial de BUG-035/BUG-036.
+**Resolucion aplicada:** `usuario-session.js` solicita `GET ?tipo=geo_nonce_solicitar`, envia `Authorization: Bearer` + `nonce`, ante 401 llama `refreshJwt` y reintenta UNA vez con nonce NUEVO, y traduce `NONCE_*`/`SESION_*` a mensajes claros; `obtenerUbicacion` distingue los codigos 1/2/3 y reintenta con baja precision (`enableHighAccuracy:false`, `maximumAge:60000`) ante 2/3.
+**Evidencia (ADR-006):** `usuario-session.js` L602-647 (`obtenerUbicacion`), L649-665 (`solicitarNonceVisita`), L698-767 (Bearer + nonce + reintento); `node --check` OK.
+**Estado:** RESUELTO (working tree, 2026-09-16; PENDIENTE commit/push/deploy + verificacion en vivo). Cierra BUG-036; el backend de la Entrega 016 ya estaba completo.
+
+## BUG-059: IDOR de escritura en albumes -- `album_agregar_foto` no validaba la propiedad del album; `album_voto` no repartia referidos
+
+**Severidad:** ALTA (seguridad: un usuario podia escribir en el album de OTRO usuario).
+**Contexto:** detectado y corregido en el lote "promptarreglos" (2026-09-16) en `api/interacciones.js`.
+**Sintoma:** `POST tipo=album_agregar_foto` aceptaba cualquier `album_id` sin comprobar que el album perteneciera al `usuario_id` que lo invocaba (escritura cruzada); un `autor_original_id` inexistente escalaba a 500 generico. En paralelo, `album_voto` otorgaba XP sin llamar a `repartirXpReferidos` (gap de la piramide de ADR-027).
+**Causa raiz:** la rama confiaba en el `album_id` recibido y no filtraba por dueno; el error de clave foranea (`23503`) no estaba tipificado; `album_voto` se implemento (ADR-017) ANTES de la piramide multinivel (ADR-027) y no se retrofiteo.
+**Resolucion aplicada:** `album_agregar_foto` valida la propiedad del album (403 `ALBUM_AJENO`) y tipifica `23503` -> 400 `AUTOR_ORIGINAL_INVALIDO`; `album_voto` invoca `repartirXpReferidos(sql, usuarioId, 5)` para consistencia de la piramide (delta real de `album_voto` = solo este reparto).
+**Evidencia (ADR-006):** `api/interacciones.js` L5143-5181 (403 `ALBUM_AJENO`, 400 `AUTOR_ORIGINAL_INVALIDO`) y L5237 (reparto de referidos en `album_voto`); `node --check` OK.
+**Estado:** RESUELTO (working tree, 2026-09-16; PENDIENTE commit/push/deploy).
+
+## BUG-060: 503 `SCHEMA_NOT_MIGRATED` en museo/galeria/albumes/perfil publico -- la migracion 004 nunca se aplico en Neon (patron BUG-021)
+
+**Severidad:** ALTA (degradaba a 503 `museo_publico`, `galeria_destino`, `album_detalle`, `albumes`, `mi_feed_fotos`, `fotos_top` y `perfil_publico`).
+**Contexto:** causa raiz confirmada en el lote "promptarreglos" (2026-09-16). Es el MISMO patron de BUG-021 (estado de Neon no reproducible desde el repo) y de la familia de BUG-051 (`museo_publico` degradaba mal el error de esquema, 404 en vez de 503).
+**Sintoma:** las superficies de museo/galeria/albumes/perfil publico respondian 503 `SCHEMA_NOT_MIGRATED` aunque el codigo estuviera desplegado.
+**Causa raiz:** `db/migrations/004_usuarios_blog_autor.sql` (`usuarios.foto_url` + `ciudad_base`) existe en el repo desde la era del blog, pero NUNCA se aplico en la base de produccion. La consulta que proyecta `u.foto_url` disparaba `42703` (undefined column) y el catch global lo convertia en 503. El script sin versionar `scripts/apply_004_foto_url.js` (idempotente, READ-ONLY tras aplicar) confirma la causa.
+**Resolucion aplicada (defensiva):** helper `queryConAvatarFallback` en `api/interacciones.js`: si la consulta falla con `42703`, reintenta la MISMA plantilla reemplazando `COALESCE(u.foto_url, u.avatar_url, '')` por `COALESCE(u.avatar_url, '')` y loguea con `console.error` (nunca silencia: cualquier otro codigo se re-lanza). Se aplica a `museo_publico`, `album_detalle` (2 queries), `galeria_destino` (`gdUsuarios`/`gdViajeros`) y `perfil_publico` en `api/usuarios.js`. Antes de la 004, esas rutas devolvian 503; ahora responden 200 con `avatar_url`.
+**Evidencia (ADR-006):** `api/interacciones.js` L2114 (`queryConAvatarFallback`), L2760, L3382, L3394, L3499, L3542; `api/usuarios.js` (`perfil_publico`); `db/migrations/004_usuarios_blog_autor.sql`; `scripts/apply_004_foto_url.js`; `node --check` OK.
+**Pendiente operativo (BLOQUEANTE, cierre definitivo):** ejecutar `scripts/apply_004_foto_url.js` con `DATABASE_URL` para aplicar la migracion 004 en Neon. Sin ella la degradacion mantiene las rutas en 200, pero `usuarios.foto_url` sigue sin existir (el avatar cae siempre a `avatar_url`) y `ciudad_base`/el autor del blog quedan inutilizables.
+**Estado:** MITIGADO en codigo (working tree, 2026-09-16); **PENDIENTE aplicar la migracion 004 en Neon**.
+
+---
+
+## Pendientes operativos del lote "promptarreglos" (2026-09-16) -- requieren `DATABASE_URL` / Neon
+
+**Nota:** consolidado de los pendientes de ejecucion del lote; ambos requieren credenciales de Neon que NO existen en el entorno local, por lo que los ejecuta Javier. Se listan aqui para que ninguna IA los asuma resueltos (ADR-006).
+
+- **P1 -- `scripts/apply_004_foto_url.js`** (aplica `db/migrations/004_usuarios_blog_autor.sql`: `usuarios.foto_url` + `ciudad_base`). Causa raiz de los 503 `SCHEMA_NOT_MIGRATED` de museo/galeria/albumes/perfil publico (BUG-060). Idempotente.
+- **P2 -- `scripts/dedupe_destinos_fotos.js --apply`** (backup + borra duplicados de `destinos_fotos` + `CREATE UNIQUE INDEX idx_destinos_fotos_destino_url`). Sin este paso, el BUG-056 NO queda cerrado al 100% (el codigo ya no duplica, pero los datos historicos siguen repetidos).
+
 ---
 
 ## Observaciones residuales de TSK-104 (2026-09-15) -- NO son bugs confirmados

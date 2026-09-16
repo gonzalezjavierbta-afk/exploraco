@@ -2100,6 +2100,28 @@ function contarComentarioSafe(sqlFn, fotoId) {
   });
 }
 
+// Helper generico reutilizable (v16): ejecuta una plantilla SQL que
+// proyecta una foto/avatar de usuario (columna usuarios.foto_url,
+// migracion 004, pendiente de aplicar en Neon). Si esa columna aun no
+// existe, el 42703 se degrada reintentando la MISMA consulta con un
+// reemplazo alterno por query en vez de escalar al 503 global
+// (SCHEMA_NOT_MIGRATED). La plantilla lleva la marca __FOTO_URL__ (una o
+// varias veces); el par de reemplazos [conFotoUrl, sinFotoUrl] es opcional
+// y por defecto asume el JOIN con usuarios u (COALESCE con avatar_url).
+// Nunca silencia: solo el 42703 activa el reintento (logueado con
+// console.error); cualquier otro codigo se re-lanza y, si el reintento
+// falla, su error se propaga.
+function queryConAvatarFallback(sqlFn, plantilla, params, reemplazos) {
+  var par = reemplazos || ['COALESCE(u.foto_url, u.avatar_url, \'\')', 'COALESCE(u.avatar_url, \'\')'];
+  var conFoto = plantilla.split('__FOTO_URL__').join(par[0]);
+  var sinFoto = plantilla.split('__FOTO_URL__').join(par[1]);
+  return sqlFn(conFoto, params).catch(function(e) {
+    if (!e || e.code !== '42703') throw e;
+    console.error('[interacciones] query degradada 42703: ' + e.message);
+    return sqlFn(sinFoto, params);
+  });
+}
+
 // Coordenadas de respaldo para albumes sin geolocalizacion (BUG-B):
 // hereda lat/lng/ciudad de la primera interaccion (visita/guardado) del
 // autor con un destino georreferenciado. Devuelve null si no hay una.
@@ -2731,12 +2753,18 @@ module.exports = async function handler(req, res) {
       // solo lectura). NO otorga XP ni reparte referidos.
       if (tipo === 'museo_publico' && (req.query.usuario_id || req.query.id)) {
         var mpId = String(req.query.usuario_id || req.query.id || '');
-        var mpRows = await sql(
-          'SELECT id, nombre, foto_url, avatar_url, bio, ciudad_base, pais_base, creado_en,'
+        // Migracion 004 pendiente: si usuarios.foto_url aun no existe en
+        // Neon (42703), el museo publico reintenta por query con
+        // avatar_url AS foto_url y responde 200 en vez del 503 global.
+        // El resto de la rama (incluido el 403 PERFIL_PRIVADO) no cambia.
+        var mpRows = await queryConAvatarFallback(
+          sql,
+          'SELECT id, nombre, __FOTO_URL__ AS foto_url, avatar_url, bio, ciudad_base, pais_base, creado_en,'
           + ' xp_total, faccion, casa, capacidades, progreso_logros, perfil_publico, dm_abierto,'
           + ' perfil_config'
           + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
-          [mpId]
+          [mpId],
+          ['foto_url', 'avatar_url AS foto_url']
         );
         if (!mpRows.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
@@ -2906,9 +2934,9 @@ module.exports = async function handler(req, res) {
           + ' (SELECT m.creado_en FROM chat_mensajes m WHERE m.sala_id=s.id AND m.activo=true'
           + '   ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_en,'
           + ' (SELECT COUNT(*)::int FROM chat_mensajes m WHERE m.sala_id=s.id AND m.activo=true'
-          + '   AND m.usuario_id<>$1 AND m.creado_en > COALESCE('
+          + '   AND m.usuario_id::text<>$1 AND m.creado_en > COALESCE('
           + '     (SELECT MAX(m2.creado_en) FROM chat_mensajes m2 WHERE m2.sala_id=s.id'
-          + '       AND m2.usuario_id=$1 AND m2.activo=true), \'epoch\'::timestamptz)) AS no_leidos'
+          + '       AND m2.usuario_id::text=$1 AND m2.activo=true), \'epoch\'::timestamptz)) AS no_leidos'
           + ' FROM chat_salas s'
           + ' WHERE s.activo=true AND s.tipo=\'dm\''
           + ' AND (split_part(s.clave_dm,\'_\',1)=$1 OR split_part(s.clave_dm,\'_\',2)=$1)'
@@ -2930,8 +2958,8 @@ module.exports = async function handler(req, res) {
         // a [] y todos los hilos quedan bloqueado:false sin romper la
         // respuesta.
         var dhBloqueos = await sql(
-          'SELECT CASE WHEN bloqueador_id=$1 THEN bloqueado_id ELSE bloqueador_id END AS otro'
-          + ' FROM usuario_bloqueos WHERE bloqueador_id=$1 OR bloqueado_id=$1',
+          'SELECT CASE WHEN bloqueador_id::text=$1 THEN bloqueado_id ELSE bloqueador_id END AS otro'
+          + ' FROM usuario_bloqueos WHERE bloqueador_id::text=$1 OR bloqueado_id::text=$1',
           [dhId]
         ).catch(function(){ return []; });
         var dhBloqSet = {};
@@ -3348,9 +3376,13 @@ module.exports = async function handler(req, res) {
       // Detalle de un album con sus fotos
       if (tipo === 'album_detalle' && req.query.album_id) {
         var albumId = req.query.album_id;
-        var albumDetRows = await sql(
+        // Migracion 004 pendiente: si usuarios.foto_url aun no existe en
+        // Neon (42703), el detalle de album degrada por query con
+        // COALESCE(u.avatar_url, '') en vez del 503 global.
+        var albumDetRows = await queryConAvatarFallback(
+          sql,
           'SELECT a.*, u.nombre AS autor_nombre,'
-          + ' u.nombre AS usuario_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS usuario_avatar,'
+          + ' u.nombre AS usuario_nombre, __FOTO_URL__ AS usuario_avatar,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count'
           + ' FROM albumes a LEFT JOIN usuarios u ON u.id = a.usuario_id'
           + ' WHERE a.id = $1 AND a.activo = true',
@@ -3359,10 +3391,11 @@ module.exports = async function handler(req, res) {
         if (!albumDetRows.length)
           return res.status(404).json({ ok: false, error: 'Album no encontrado' });
 
-        var fotosDetRows = await sql(
+        var fotosDetRows = await queryConAvatarFallback(
+          sql,
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' af.autor_original_id, af.agregador_id, af.creado_en,'
-          + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar, u.id AS usuario_id,'
+          + ' u.nombre AS autor_nombre, __FOTO_URL__ AS autor_avatar, u.id AS usuario_id,'
           + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
@@ -3393,14 +3426,48 @@ module.exports = async function handler(req, res) {
       }
 
       // Galeria de un destino (ficha publica): fotos curadas de
-      // destinos_fotos + fotos de albumes de usuario geolocalizadas
-      // cerca del destino (mismo criterio de cercania que fotos_top).
-      // Params: slug (o destino_id). Sin endpoints nuevos (ADR-010).
+      // destinos_fotos + fotos de viajeros (interacciones tipo='foto') +
+      // fotos de albumes de usuario geolocalizadas cerca del destino
+      // (mismo criterio de cercania que fotos_top).
+      // Params: slug (o destino_id), incluir (CSV viajeros/albumes) y
+      // usuario_id (opcional). Sin endpoints nuevos (ADR-010).
+      // v16: incluir activa items[] (grilla unificada de la ficha); sin el,
+      // la respuesta es la misma que consume galeria.html y no se ejecuta
+      // ninguna query extra.
       if (tipo === 'galeria_destino') {
         var gdSlug = req.query.slug || null;
         var gdDestinoId = req.query.destino_id || null;
         if (!gdSlug && !gdDestinoId)
           return res.status(400).json({ ok: false, error: 'slug o destino_id requerido' });
+
+        // incluir es un CSV estricto (mismo patron que tipo_media en
+        // multimedia_mapa): un token invalido responde 400, nunca se
+        // degrada en silencio a "todos los origenes".
+        var gdIncluirRaw = req.query.incluir;
+        var gdIncluirPresente = (gdIncluirRaw !== undefined && gdIncluirRaw !== null);
+        var gdViajerosOn = false;
+        var gdAlbumesOn = false;
+        if (gdIncluirPresente) {
+          var gdWhitelist = ['viajeros', 'albumes'];
+          var gdInvalidos = [];
+          var gdVistos = {};
+          String(gdIncluirRaw).split(',').forEach(function(t){
+            var tok = String(t).trim().toLowerCase();
+            if (!tok) return;
+            if (gdWhitelist.indexOf(tok) === -1) {
+              if (gdInvalidos.indexOf(tok) === -1) gdInvalidos.push(tok);
+              return;
+            }
+            gdVistos[tok] = true;
+          });
+          if (gdInvalidos.length
+              || (String(gdIncluirRaw).trim() !== ''
+                  && !gdVistos.viajeros && !gdVistos.albumes))
+            return res.status(400).json({ ok: false, error: 'incluir invalido' });
+          gdViajerosOn = !!gdVistos.viajeros;
+          gdAlbumesOn = !!gdVistos.albumes;
+        }
+        var gdUsuarioId = req.query.usuario_id || null;
 
         var gdDestinoRows = await sql(
           'SELECT id, nombre, slug, ciudad, lat, lng'
@@ -3413,20 +3480,29 @@ module.exports = async function handler(req, res) {
           return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
         var gdDestino = gdDestinoRows[0];
 
+        // Curadas: id y creado_en son aditivos al SELECT legacy. votos y
+        // ya_votado quedan fijos (0/false) porque el voto de fotos curadas
+        // NO se habilita en esta entrega: no hay tipo nuevo de interaccion.
         var gdFotos = await sql(
-          'SELECT url, caption, orden FROM destinos_fotos'
+          'SELECT id, url, caption, orden, creado_en FROM destinos_fotos'
           + ' WHERE destino_id = $1'
           + ' ORDER BY orden ASC',
           [gdDestino.id]
         );
+        gdFotos.forEach(function(f){ f.votos = 0; f.ya_votado = false; });
 
         // BUG-A (v12): el contador de comentarios se calcula post-query
         // con contarComentarioSafe, que degrada a 0 si la migracion 013
         // (album_comentarios) no esta aplicada, en vez de tumbar el GET.
-        var gdUsuarios = await sql(
-          'SELECT af.id, af.foto_url, af.foto_type, af.media_title,'
+        // v16: el 42703 de usuarios.foto_url (migracion 004) degrada por
+        // query con queryConAvatarFallback en vez del 503 global.
+        var gdUsuarios = await queryConAvatarFallback(
+          sql,
+          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+          + ' af.creado_en, af.autor_original_id,'
           + ' a.id AS album_id, a.titulo AS album_titulo, a.ciudad,'
-          + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+          + ' u.nombre AS autor_nombre, u.id AS autor_id,'
+          + ' __FOTO_URL__ AS autor_avatar,'
           + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
@@ -3441,7 +3517,7 @@ module.exports = async function handler(req, res) {
           return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
         }));
 
-        return res.status(200).json({
+        var gdRespuesta = {
           ok: true,
           destino: {
             id: gdDestino.id,
@@ -3453,7 +3529,133 @@ module.exports = async function handler(req, res) {
           },
           fotos: gdFotos,
           usuarios: gdUsuarios,
-        });
+        };
+
+        // items[] unificado (clave SOLO presente si el cliente pide
+        // incluir): normaliza curadas + viajeros + albumes al mismo shape.
+        if (gdIncluirPresente) {
+          var gdViajeros = [];
+          var gdYaVotoFotos = {};
+          if (gdViajerosOn) {
+            // Misma base que el branch tipo=fotos (2457-2478): las filas
+            // de voto (dims.voto_foto_id) no son fotos y se excluyen.
+            gdViajeros = await queryConAvatarFallback(
+              sql,
+              'SELECT f.id, f.texto AS url, f.usuario_id AS autor_id, f.creado_en,'
+              + ' u.nombre AS autor_nombre, __FOTO_URL__ AS autor_avatar,'
+              + ' (SELECT COUNT(*)::int FROM interacciones fv'
+              + '  WHERE fv.tipo=\'foto\' AND fv.activo=true'
+              + '  AND fv.dims->>\'voto_foto_id\' = f.id::text) AS votos'
+              + ' FROM interacciones f LEFT JOIN usuarios u ON u.id = f.usuario_id'
+              + ' WHERE f.destino_id=$1 AND f.tipo=\'foto\' AND f.activo=true'
+              + ' AND (f.dims IS NULL OR NOT (f.dims ? \'voto_foto_id\'))'
+              + ' ORDER BY f.creado_en DESC LIMIT 60',
+              [gdDestino.id]
+            );
+            if (gdUsuarioId) {
+              var gdMisVotosFotos = await sql(
+                'SELECT dims->>\'voto_foto_id\' AS foto_id FROM interacciones'
+                + ' WHERE usuario_id=$1 AND tipo=\'foto\' AND activo=true AND dims ? \'voto_foto_id\'',
+                [gdUsuarioId]
+              );
+              gdMisVotosFotos.forEach(function(v){ if (v.foto_id) gdYaVotoFotos[String(v.foto_id)] = true; });
+            }
+          }
+
+          var gdYaVotoAlbum = {};
+          if (gdAlbumesOn && gdUsuarioId) {
+            var gdMisVotosAlbum = await sql(
+              'SELECT foto_id FROM album_votos WHERE usuario_id=$1',
+              [gdUsuarioId]
+            );
+            gdMisVotosAlbum.forEach(function(v){ gdYaVotoAlbum[String(v.foto_id)] = true; });
+          }
+
+          // Orden determinista: curadas (orden ASC) -> viajeros (creado_en
+          // DESC) -> album (votos DESC). Dedupe por URL con trim y
+          // precedencia curada > viajero > album: como se agrega en ese
+          // mismo orden, la primera aparicion gana (Cero Borrado Logico:
+          // la fila descartada sigue viva en su tabla de origen).
+          var gdItems = [];
+          var gdUrlsVistas = {};
+          var gdAgregarItem = function(it) {
+            var clave = String(it.url || '').trim();
+            if (clave) {
+              if (gdUrlsVistas[clave]) return;
+              gdUrlsVistas[clave] = true;
+            }
+            gdItems.push(it);
+          };
+
+          gdFotos.slice(0, 12).forEach(function(f){
+            gdAgregarItem({
+              origen: 'curada',
+              id_origen: f.id,
+              tipo_voto: null,
+              url: f.url,
+              caption: f.caption || '',
+              votos: 0,
+              ya_votado: false,
+              es_propia: false,
+              autor_id: null,
+              autor_nombre: null,
+              autor_avatar: null,
+              album_id: null,
+              album_titulo: null,
+              foto_type: 'foto',
+              media_source: null,
+              creado_en: f.creado_en || null,
+            });
+          });
+
+          gdViajeros.forEach(function(f){
+            gdAgregarItem({
+              origen: 'viajero',
+              id_origen: f.id,
+              tipo_voto: 'foto',
+              url: f.url,
+              caption: '',
+              votos: parseInt(f.votos, 10) || 0,
+              ya_votado: !!gdYaVotoFotos[String(f.id)],
+              es_propia: !!(gdUsuarioId && String(f.autor_id) === String(gdUsuarioId)),
+              autor_id: f.autor_id || null,
+              autor_nombre: f.autor_nombre || null,
+              autor_avatar: f.autor_avatar || '',
+              album_id: null,
+              album_titulo: null,
+              foto_type: 'foto',
+              media_source: null,
+              creado_en: f.creado_en || null,
+            });
+          });
+
+          if (gdAlbumesOn) {
+            gdUsuarios.slice(0, 100).forEach(function(f){
+              gdAgregarItem({
+                origen: 'album',
+                id_origen: f.id,
+                tipo_voto: 'album',
+                url: f.foto_url,
+                caption: f.media_title || '',
+                votos: parseInt(f.votos, 10) || 0,
+                ya_votado: !!gdYaVotoAlbum[String(f.id)],
+                es_propia: !!(gdUsuarioId && String(f.autor_original_id) === String(gdUsuarioId)),
+                autor_id: f.autor_original_id || null,
+                autor_nombre: f.autor_nombre || null,
+                autor_avatar: f.autor_avatar || '',
+                album_id: f.album_id || null,
+                album_titulo: f.album_titulo || null,
+                foto_type: f.foto_type || 'foto',
+                media_source: f.media_source || null,
+                creado_en: f.creado_en || null,
+              });
+            });
+          }
+
+          gdRespuesta.items = gdItems;
+        }
+
+        return res.status(200).json(gdRespuesta);
       }
 
       // Moderacion admin: comentarios recientes de albumes (ADR-023).
@@ -4938,6 +5140,10 @@ module.exports = async function handler(req, res) {
         // Check album exists and activo
         var afAlbumCheck = await sql('SELECT id, usuario_id FROM albumes WHERE id=$1 AND activo=true', [afAlbumId]).catch(function(){ return []; });
         if (!afAlbumCheck.length) return res.status(404).json({ ok: false, error: 'Album no encontrado' });
+        // v16 (fix IDOR de escritura): solo el dueno del album puede
+        // agregarle fotos. El album existe pero es ajeno -> 403 explicito.
+        if (String(afAlbumCheck[0].usuario_id) !== String(usuarioId2))
+          return res.status(403).json({ ok: false, error: 'ALBUM_AJENO' });
 
         // Check fotos count < 50
         var afCount = await sql('SELECT COUNT(*)::int AS n FROM album_fotos WHERE album_id=$1 AND activo=true', [afAlbumId]).catch(function(){ return [{n:0}]; });
@@ -4960,11 +5166,21 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         if (afDedup.length) return res.status(409).json({ ok: false, error: 'Foto ya existe en este album' });
 
-        var afIns = await sql(
-          'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, xp_otorgado_autor) '
-          + 'VALUES ($1, $2, $3, $4, $5, $6, $7, 15) RETURNING *',
-          [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource]
-        );
+        var afIns;
+        try {
+          afIns = await sql(
+            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, xp_otorgado_autor) '
+            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, 15) RETURNING *',
+            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource]
+          );
+        } catch (afInsErr) {
+          // La FK autor_original_id -> usuarios.id (009) convierte un id
+          // inexistente en 23503: se tipifica como 400 en vez del 500
+          // generico del catch global. Cualquier otro error se re-lanza.
+          if (afInsErr && afInsErr.code === '23503')
+            return res.status(400).json({ ok: false, error: 'AUTOR_ORIGINAL_INVALIDO' });
+          throw afInsErr;
+        }
 
         // XP +15 al agregador
         await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
@@ -5018,6 +5234,9 @@ module.exports = async function handler(req, res) {
         }
 
         await sql('UPDATE usuarios SET xp_total=xp_total+5, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        // v16 (ADR-027): cierre del gap de referidos de album_voto; mismo
+        // patron que foto_voto/resena. No bloquea (la funcion nunca lanza).
+        await repartirXpReferidos(sql, usuarioId2, 5);
         var nuevoVotosDia = ((pa4.votos_dia_fecha || '') === hoy()) ? (pa4.votos_dia || 0) + 1 : 1;
         await updProgresoAlbum(sql, usuarioId2, { votos_dia: nuevoVotosDia, votos_dia_fecha: hoy() });
 
@@ -6626,7 +6845,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
   } catch(err) {
-    console.error('[interacciones]', err.message);
+    console.error('[interacciones]', (err && err.code ? err.code + ' ' : '') + err.message);
     if (err && err.code === '23505')
       return res.status(409).json({ ok: false, error: 'Registro duplicado', duplicado: true });
     if (err && (err.code === '42P01' || err.code === '42703'))

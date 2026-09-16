@@ -3,7 +3,8 @@
 // Carga el motor en sandbox, llama buildHTML() con datos minimos y valida:
 //   1) videoEmbedUrlBlog: hosts conocidos -> embed correcto, desconocidos -> ''.
 //   2) parseBlogBody: defensa XSS (javascript:, data:, ftp:, hosts sin http).
-//   3) secGaleria + lbHTML: degradacion condicional segun # de fotos.
+//   3) Seccion unificada #galeria (curadas + viajeros) + lbHTML: degradacion
+//      condicional segun # de fotos curadas (diseno galeria unificada).
 //   4) BUG-027: boton Instagram NO contiene literal [foto], SI contiene camara unicode.
 //   5) secBlogVideo: solo se renderiza si videoEmbedUrlBlog retorna embed valido.
 //   6) secContact: gating cat !== 'blog'.
@@ -34,7 +35,9 @@ vm.runInContext(src + "\nmodule.exports.buildHTML = buildHTML;", sandbox, { file
 var buildHTML = sandbox.module.exports.buildHTML;
 
 var fails = 0;
+var total = 0;
 function check(label, cond, detail) {
+  total++;
   console.log((cond ? "PASS" : "FAIL") + " - " + label + (detail ? " | " + detail : ""));
   if (!cond) fails++;
 }
@@ -105,18 +108,53 @@ casosBody.forEach(function (c) {
   }
 });
 
-console.log("\n=== AUDIT 3: secGaleria + lbHTML (degradacion condicional) ===");
+console.log("\n=== AUDIT 3: seccion unificada #galeria + lbHTML (degradacion condicional) ===");
+// Diseno nuevo aprobado (galeria unificada): UNA sola <section id="galeria">
+// que SIEMPRE se emite (hereda el gate historico de secFotos, que no tenia
+// condicion) y que contiene el bloque curado (solo si galAll.length > 1), el
+// ancla invisible <span id="fotos">, la grilla de viajeros #fp-grid y la caja
+// de subida #fp-upload. El lightbox #lb conserva el gate historico
+// galAll.length > 1. Ya NO existe <section id="fotos">.
+//
+// Ojo: "gal-main"/"gal-thumbs" tambien aparecen en el CSS scoped (.gal-main,
+// .gal-thumbs), por lo que las aserciones negativas usan el atributo de clase
+// del elemento (class="gal-main" / class="gal-thumbs").
+function seccionGaleria(html) {
+  var i = html.indexOf('<section class="ssec bwarm" id="galeria">');
+  if (i < 0) return "";
+  var j = html.indexOf("</section>", i);
+  return j < 0 ? html.slice(i) : html.slice(i, j);
+}
+function cuenta(html, re) {
+  return (html.match(re) || []).length;
+}
+function auditarGaleriaUnificada(label, html, hayCurada) {
+  var sec = seccionGaleria(html);
+  var nGal = cuenta(html, /id="galeria"/g);
+  check("id=galeria presente y unico (" + label + ")", nGal === 1, "ocurrencias=" + nGal);
+  check("cero <section id=fotos> (" + label + ")", cuenta(html, /<section[^>]*id="fotos"/g) === 0);
+  check("ancla <span id=fotos> presente (" + label + ")", html.indexOf('<span id="fotos"') >= 0);
+  check("fp-grid dentro de #galeria (" + label + ")", sec.indexOf('id="fp-grid"') >= 0);
+  check("fp-upload dentro de #galeria (" + label + ")", sec.indexOf('id="fp-upload"') >= 0);
+  check("bloque curado " + (hayCurada ? "VISIBLE" : "OCULTO") + " (" + label + ")",
+    hayCurada
+      ? (sec.indexOf('class="gal-main"') >= 0 && sec.indexOf('class="gal-thumbs"') >= 0)
+      : (sec.indexOf('class="gal-main"') < 0 && sec.indexOf('class="gal-thumbs"') < 0));
+  check("lbHTML " + (hayCurada ? "VISIBLE" : "OCULTO") + " (" + label + ")",
+    hayCurada ? html.indexOf('id="lb"') >= 0 : html.indexOf('id="lb"') < 0);
+  var abre = cuenta(html, /<div/g);
+  var cierra = cuenta(html, /<\/div>/g);
+  check("balance de divs (" + label + ")", abre === cierra, "open=" + abre + " close=" + cierra + " diff=" + (abre - cierra));
+}
+
 var sinFotos = buildHTML(base({}), {}, [], [], null, []);
-check("secGaleria OCULTA con 0 fotos", sinFotos.indexOf('id="galeria"') < 0);
-check("lbHTML OCULTO con 0 fotos", sinFotos.indexOf('id="lb"') < 0);
+auditarGaleriaUnificada("0 fotos", sinFotos, false);
 
 var unaFoto = buildHTML(base({ foto_hero: "https://e.com/h.jpg" }), {}, [{ url: "https://e.com/h.jpg" }], [], null, []);
-check("secGaleria OCULTA con 1 sola foto (=hero)", unaFoto.indexOf('id="galeria"') < 0, "regla: galAll.length > 1");
+auditarGaleriaUnificada("1 sola foto (=hero)", unaFoto, false);
 
 var dosFotos = buildHTML(base({ foto_hero: "https://e.com/h.jpg" }), {}, [{ url: "https://e.com/h.jpg" }, { url: "https://e.com/g.jpg" }], [], null, []);
-check("secGaleria VISIBLE con 2+ fotos", dosFotos.indexOf('id="galeria"') >= 0);
-check("lbHTML VISIBLE con 2+ fotos", dosFotos.indexOf('id="lb"') >= 0);
-check("gal-thumbs presente", dosFotos.indexOf("gal-thumbs") >= 0);
+auditarGaleriaUnificada("2+ fotos", dosFotos, true);
 check("gal-thumbs tiene onclick abrirLightbox", dosFotos.indexOf('onclick="abrirLightbox(') >= 0);
 check("lb-bg presente", dosFotos.indexOf('id="lb-bg"') >= 0);
 check("lb-close presente", dosFotos.indexOf('id="lb-close"') >= 0);
@@ -150,5 +188,5 @@ var sitioSinContacto = buildHTML(base({ categoria_slug: "sitio" }), {}, [], [], 
 check("secContact OCULTA si no hay datos de contacto", sitioSinContacto.indexOf('id="contact"') < 0);
 
 console.log("\n=== RESUMEN ===");
-console.log(fails === 0 ? "TODOS LOS SMOKE TESTS PASARON (" + (42) + " checks)" : fails + " smoke test(s) FALLARON");
+console.log(fails === 0 ? "TODOS LOS SMOKE TESTS PASARON (" + total + " checks)" : fails + " smoke test(s) FALLARON de " + total);
 process.exit(fails > 0 ? 1 : 0);

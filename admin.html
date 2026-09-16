@@ -6023,14 +6023,6 @@ async function _syncToNeon(p) {
       }
     }
 
-    // ── Sincronizar galería a destinos_fotos ──────────────────────
-    // Solo si hay uuid y hay fotos de galería (fotos 2 en adelante)
-    if (uuid && payload.fotos_galeria && payload.fotos_galeria.length > 0) {
-      _syncFotosGaleria(uuid, payload.fotos_galeria).catch(function(e){
-        console.warn('[admin-fotos] sync galería error:', e.message);
-      });
-    }
-
     return data || await res.json();
   } catch(err) {
     console.warn('[admin-online] syncToNeon error:', err.message);

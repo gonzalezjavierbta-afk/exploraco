@@ -129,7 +129,9 @@ Genera HTML 100% en servidor mediante concatenacion de strings (operador `+`), s
 Dise\u00f1o visual: tipografia Barlow Condensed (titulos) + Outfit (cuerpo), paleta dorado `#E8A020` / negro `#111` / fondo warm `#FBF8F2`. Componentes CSS reutilizables: `gstrip` (barra dorada sticky), `icard` (tarjeta icono), `hbox` (highlight box), `tpill` (chip/tag), `stnum` (numero de seccion grande).
 
 ### Secciones comunes a las 4 categorias (se renderizan siempre que existan datos)
-secDescripcion, secInfo, secGaleria, secHabitaciones (solo hostal), secReservar, secMapa, secFaq, secResenas, secContact.
+secDescripcion, secInfo, secGaleria (galeria unificada: curadas + viajeros + albumes, ADR-030), secHabitaciones (solo hostal), secReservar, secComoLlegar (fusion de transporte + mapa en una sola seccion, id="como-llegar"; ancla legacy invisible `#mapa`; reemplaza al historico `secMapa`, ADR-030), secFaq, secResenas, secContact.
+
+**Nota (TSK-105 / ADR-030, 2026-09-16):** `secMapa` (id="mapa") y `secTransporteHostal` se fusionaron en `secComoLlegar` (id="como-llegar", transporte arriba + mapa abajo), con UNA sola entrada de subnav `como-llegar`. `secGaleria` y la antigua seccion `#fotos` ("Fotos de viajeros") se fusionaron en una sola `#galeria` (con ancla legacy invisible `#fotos`). No hay archivos ni endpoints nuevos (8/8, ADR-001); `api/interacciones.js` extiende `tipo=galeria_destino` de forma aditiva (`incluir`/`usuario_id`/`items[]`) y conserva `fotos[]`/`usuarios[]` para `galeria.html`.
 
 ### Secciones especificas de "Sitio" (implementadas - 8 secciones adicionales)
 secSitio, secEntradas, secTours, secChecklist, secItinerario (con tabs por dia via `switchItin()`), secFauna, secSecretos, secRegulaciones.

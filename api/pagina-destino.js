@@ -391,6 +391,10 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".fp-upload .wrinp{flex:1;min-width:220px;margin-bottom:0}"
 +".fp-upload .wrsub{width:auto;flex-shrink:0}"
 +".fp-info{margin-top:12px}"
++".fp-save{margin-top:0}"
++".glsub{display:flex;align-items:center;gap:10px;margin:22px 0 4px}"
++".glsub-t{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text)}"
++".glsub-l{flex:1;height:1px;background:var(--border)}"
 +".cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}"
 +".cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:2px solid}"
 +".cbtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.cbtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
@@ -723,7 +727,14 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var hwUrl      = det.hostelworld_url || d.hostelworld || '';
   var airbnbUrl  = det.airbnb_url      || d.airbnb      || '';
 
-  var galAll = (fotos||[]).map(function(f){ return f.url || f; }).filter(Boolean);
+  var galAll = [];
+  (fotos||[]).forEach(function(f){
+    var u = (f && f.url) ? f.url : f;
+    if (!u) return;
+    u = String(u).trim();
+    if (!u || galAll.indexOf(u) !== -1) return;
+    galAll.push(u);
+  });
   if (hero && galAll.indexOf(hero) === -1) galAll.unshift(hero);
   // Si no hay galeria, usar el hero como unica foto
   if (!galAll.length && hero) galAll = [hero];
@@ -1487,18 +1498,50 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var btnGaleriaAmpliada = d.slug
     ? '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html?destino=&#39;+encodeURIComponent(&#39;'+esc(d.slug)+'&#39;)">Ver galeria ampliada</button>'
     : '<button class="glbtn" onclick="abrirLightbox(0)">Ver galeria ampliada</button>';
-  var secGaleria = galAll.length > 1 ? '<section class="ssec bwarm" id="galeria"><div class="sin">'
+  // -- SECCION: Galeria unificada (curadas + fotos de viajeros) --------
+  // Antes existian DOS modulos separados: #galeria (fotos curadas de
+  // destinos_fotos, gate galAll.length > 1) y #fotos ("Fotos de viajeros",
+  // SIEMPRE emitida, sin gate). Se fusionan en UN solo
+  // <section id="galeria">: el bloque curado conserva su gate historico y
+  // la grilla de viajeros (#fp-grid) + la caja de subida (#fp-upload) se
+  // hidratan por cliente DENTRO de la misma seccion, tras las miniaturas.
+  // Semantica de emision = galAll.length > 0 || <secFotos: sin condicion> =
+  // siempre: no rompe blogs ni destinos sin fotos curadas.
+  //
+  // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash en
+  // buildHTML), por lo que "galAll.length > 0" es trivialmente verdadero. El
+  // bloque curado y el lightbox usan > 1 (gate historico), que cumple
+  // "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0 curadas.
+  var hayGaleriaCurada = galAll.length > 1;
+  var galCuradaHTML = hayGaleriaCurada
+    ? '<div class="gal-main" style="background-image:url(\''+esc(galAll[0])+'\')" onclick="abrirLightbox(0)"></div>'
+      + '<div class="gal-thumbs">'+galAll.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+i+')"></div>'; }).join('')+'</div>'
+      + btnGaleriaAmpliada
+    : '';
+  var secGaleria = '<section class="ssec bwarm" id="galeria">'
+    // Ancla legacy invisible #fotos (defensa barata): hoy no hay deep-links
+    // reales, pero evita romper cualquier enlace historico al modulo de
+    // viajeros ahora que vive dentro de #galeria.
+    + '<span id="fotos" style="position:absolute;left:-9999px"></span>'
+    + '<div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="gal-main" style="background-image:url(\''+esc(galAll[0])+'\')" onclick="abrirLightbox(0)"></div>'
-    + '<div class="gal-thumbs">'+galAll.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+i+')"></div>'; }).join('')+'</div>'
-    + btnGaleriaAmpliada
-    + '</div></section>' : '';
+    + galCuradaHTML
+    + '<div class="glsub"><span class="glsub-t">Fotos de viajeros</span><span class="glsub-l"></span></div>'
+    + '<div class="fp-info" id="fp-info"></div>'
+    + '<div class="fp-grid" id="fp-grid"><p class="stext">Cargando fotos de la comunidad...</p></div>'
+    + '<div class="fp-upload" id="fp-upload" style="display:none">'
+    + '<input id="fp-url" type="text" placeholder="Pega el URL de tu foto (https://...)" class="wrinp" autocomplete="off">'
+    + '<button class="wrsub" onclick="subirFoto()">Subir foto (+15 XP)</button>'
+    + '</div>'
+    + '<div class="wrok" id="fp-ok">\u2713 Foto publicada</div>'
+    + '</div></section>';
 
   // -- LIGHTBOX (galeria ampliada) --------------------------------
   // Overlay oculto montado al final del body, antes del script inline.
-  // Solo se monta si hay mas de 1 foto (degradacion condicional).
-  // Lo controla el JS inline: abrirLightbox/LB_I, lbNav, lbClose.
-  var lbHTML = galAll.length > 1 ? '<div id="lb" style="display:none">'
+  // Solo se monta si hay galeria curada navegable (gate historico > 1; ver
+  // nota en secGaleria: galAll nunca esta vacio). Lo controla el JS inline:
+  // abrirLightbox/LB_I, lbNav, lbClose.
+  var lbHTML = hayGaleriaCurada ? '<div id="lb" style="display:none">'
     + '<div id="lb-bg"></div>'
     + '<button id="lb-close" onclick="lbClose()">\u2715</button>'
     + '<button id="lb-prev" class="lb-nav" onclick="lbNav(-1)">\u2039</button>'
@@ -1567,18 +1610,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
         + '<div class="tagrow">'+queIncluye.map(function(qi){
             return '<span class="tpill">\u2713 '+esc(typeof qi==='string'?qi:(qi.texto||''))+'</span>';
           }).join('')+'</div></div>' : '')
-    + '</div></section>' : '';
-
-  // -- SECCION: Como llegar / Transporte (TASK-001, BUG-C) -----------
-  var secTransporteHostal = transporteHostal.length ?
-    '<section class="ssec bwarm" id="como-llegar"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Como llegar</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + (barrioDescripcion ? '<p style="margin-bottom:16px;color:var(--muted)">'+esc(barrioDescripcion)+'</p>' : '')
-    + '<div class="igrid">'+transporteHostal.map(function(t){
-        return '<div class="icard"><div class="iico">'+esc(t.icon||'\uD83D\uDE8C')+'</div><div class="ilbl">'+esc(t.title||'')+'</div>'
-          + (t.detail ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(t.detail)+'</div>' : '')
-          + '</div>';
-      }).join('')+'</div>'
     + '</div></section>' : '';
 
   // -- SECCION: Eventos del hostal (TASK-001, BUG-C) -----------------
@@ -1756,18 +1787,29 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reservar</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="cgrid">'+rbtns.join('')+'</div></div></section>' : '';
 
-  // -- SECCI??N: Mapa ----------------------------------------------
-  var secMapa = '';
-  if (hasLatLng) {
-    var mapBtns = [];
-    // TSK-076: WhatsApp y Telefono se removieron de secMapa; el contacto
-    // directo vive en secContact (cgrid). Aqui solo Google Maps.
-    mapBtns.push('<a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a>');
-    secMapa = '<section class="ssec bwhite" id="mapa"><div class="sin">'
-      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Ubicacion y como llegar</h2><div class="stnum">'+nextNum()+'</div></div>'
-      + '<div id="mapel"><iframe loading="lazy" src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe></div>'
+  // -- SECCION UNIFICADA: Como llegar + Ubicacion (transporte + mapa) --
+  var secComoLlegar = '';
+  if (transporteHostal.length || hasLatLng) {
+    var bloqueTransporte = transporteHostal.length ?
+      (barrioDescripcion ? '<p style="margin-bottom:16px;color:var(--muted)">'+esc(barrioDescripcion)+'</p>' : '')
+      + '<div class="igrid">'+transporteHostal.map(function(t){
+          return '<div class="icard"><div class="iico">'+esc(t.icon||'\uD83D\uDE8C')+'</div><div class="ilbl">'+esc(t.title||'')+'</div>'
+            + (t.detail ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(t.detail)+'</div>' : '')
+            + '</div>';
+        }).join('')+'</div>'
+      : '';
+    var bloqueMapa = hasLatLng ?
+      '<div id="mapel"'+(transporteHostal.length?' style="margin-top:20px"':'')+'><iframe loading="lazy" src="https://www.google.com/maps?q='+esc(d.lat)+','+esc(d.lng)+'&z=15&output=embed"></iframe></div>'
       + (comoLlegar ? '<p class="stext" style="margin-top:14px">'+esc(comoLlegar)+'</p>' : '')
-      + (mapBtns.length ? '<div class="mapacts">'+mapBtns.join('')+'</div>' : '')
+      + '<div class="mapacts"><a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'" target="_blank">\u2316 Google Maps</a></div>'
+      : '';
+    // Ancla legacy invisible #mapa (defensa barata): el modulo de mapa se
+    // unifico dentro de #como-llegar; conserva el id antiguo solo cuando hay
+    // coordenadas, igual que hacia el bloque mapa original.
+    var anclaMapa = hasLatLng ? '<span id="mapa" style="position:absolute;left:-9999px"></span>' : '';
+    secComoLlegar = '<section class="ssec bwhite" id="como-llegar"><div class="sin">'
+      + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+(hasLatLng?'Ubicacion y como llegar':'Como llegar')+'</h2><div class="stnum">'+nextNum()+'</div></div>'
+      + bloqueTransporte + anclaMapa + bloqueMapa
       + '</div></section>';
   }
 
@@ -1925,20 +1967,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '</div>'
     + '</div></section>';
 
-  // -- SECCI??N: Fotos de viajeros (desbloqueable subir_fotos) ---------
-  // Galeria con votos por foto (+5 XP) y subida gateada por la capacidad
-  // subir_fotos (nivel 2). El JS client loadFotos/subirFoto/votarFoto
-  // se inyecta en el bloque de script de la pagina.
-  var secFotos = '<section class="ssec bwhite" id="fotos"><div class="sin">'
-    + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Fotos de viajeros</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + '<div class="fp-info" id="fp-info"></div>'
-    + '<div class="fp-grid" id="fp-grid"><p class="stext">Cargando fotos de la comunidad...</p></div>'
-    + '<div class="fp-upload" id="fp-upload" style="display:none">'
-    + '<input id="fp-url" type="text" placeholder="Pega el URL de tu foto (https://...)" class="wrinp" autocomplete="off">'
-    + '<button class="wrsub" onclick="subirFoto()">Subir foto (+15 XP)</button>'
-    + '</div>'
-    + '<div class="wrok" id="fp-ok">\u2713 Foto publicada</div>'
-    + '</div></section>';
+  // -- Fotos de viajeros: UNIFICADO en secGaleria ---------------------
+  // El shell #fotos (fp-info/fp-grid/fp-upload) se movio DENTRO de la
+  // seccion #galeria (mas arriba). El JS client loadFotos/subirFoto/
+  // votarFoto se inyecta en el bloque de script de la pagina. Se conserva
+  // el ancla invisible <span id="fotos"> dentro de #galeria.
 
   // ADR-017 P11 (removido por refactor de UI, TSK-076): la seccion
   // secFotoDestacada se elimino; la galeria con lightbox ya cubre la
@@ -1947,7 +1980,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- SECCI??N: Contacto --------------------------------------------
   var ctBtns = [];
   // TSK-076: Google Maps se removio de secContact; queda centralizado
-  // en secMapa (boton unico "Google Maps" bajo el mapa embed).
+  // en secComoLlegar (boton unico "Google Maps" bajo el mapa embed).
   if (d.whatsapp) ctBtns.push('<a class="cbtn green" href="https://wa.me/'+esc(d.whatsapp)+'" target="_blank">\u2709 WhatsApp</a>');
   if (d.telefono) ctBtns.push('<a class="cbtn dark" href="tel:'+esc(d.telefono)+'">\u2706 Llamar</a>');
   if (d.web)       ctBtns.push('<a class="cbtn blue" href="'+esc(d.web)+'" target="_blank">\u25CB Sitio web</a>');
@@ -2025,7 +2058,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'habitaciones',label:'Habitaciones',has:!!secHabitaciones},
     {id:'reglas-casa', label:'Reglas',      has:!!secReglasCasa},
     {id:'actividades', label:'Actividades', has:!!secActividadesHostal},
-    {id:'como-llegar', label:'Como llegar', has:!!secTransporteHostal},
     {id:'eventos-hostal', label:'Eventos',  has:!!secEventosHostal},
     {id:'perfil-comida', label:'Cocina',    has:!!secPerfilComida},
     {id:'menu',        label:'Menu',        has:!!secMenuDestacado},
@@ -2037,7 +2069,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'tipos-entrada', label:'Entradas',  has:!!secEntradasEvento},
     {id:'que-llevar',  label:'Que llevar',  has:!!secPrepEvento},
     {id:'reservar',    label:'Reservar',    has:!!secReservar},
-    {id:'mapa',        label:'Mapa',        has:!!secMapa},
+    {id:'como-llegar', label:'Como llegar', has:!!secComoLlegar},
     {id:'faq',         label:'FAQ',         has:!!secFaq},
     {id:'resenas',     label:'Resenas',     has:!!secResenas},
     {id:'autor',       label:'Autor',       has:!!secBlogAutor},
@@ -2133,7 +2165,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + secHabitaciones + '\n'
     + secReglasCasa + '\n'
     + secActividadesHostal + '\n'
-    + secTransporteHostal + '\n'
     + secEventosHostal + '\n'
     + secPerfilComida + '\n'
     + secMenuDestacado + '\n'
@@ -2145,10 +2176,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + secEntradasEvento + '\n'
     + secPrepEvento + '\n'
     + secReservar + '\n'
-    + secMapa + '\n'
+    + secComoLlegar + '\n'
     + secFaq + '\n'
     + secResenas + '\n'
-    + secFotos + '\n'
     + secContact + '\n'
     + secRelacionados + '\n\n'
 
@@ -2265,7 +2295,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // El boton del hero (btn-guardar) abre el popover en vez de alternar
     // directo. Si no hay sesion, se invita a iniciar sesion primero.
     + 'var popAbierto=false;\n'
-    + 'function cerrarPopoverGuardar(){var p=document.getElementById(\'guardar-pop\');if(p)p.remove();popAbierto=false;document.removeEventListener(\'click\',cerrarPopoverGuardar,true);}\n'
+    + 'function cerrarPopoverGuardar(ev){var p=document.getElementById(\'guardar-pop\');if(!p)return;if(ev&&ev.target&&p.contains(ev.target))return;if(ev&&ev.target&&ev.target.closest&&ev.target.closest(\'#btn-guardar\'))return;p.remove();popAbierto=false;document.removeEventListener(\'click\',cerrarPopoverGuardar,true);}\n'
     + 'function abrirPopoverGuardar(){\n'
     + '  if(popAbierto){cerrarPopoverGuardar();return;}\n'
     + '  if(!window.ExploraCO||!window.ExploraCO.usuario){if(window.ExploraCO&&window.ExploraCO.mostrarLogin)window.ExploraCO.mostrarLogin(\'Inicia sesion para guardar en tus mapas\');return;}\n'
@@ -2303,7 +2333,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '      fetch(\'/api/interacciones?tipo=mapa_detalle&id=\'+encodeURIComponent(m.id)).then(function(r){return r.json();}).then(function(dd2){\n'
     + '        var en=(dd2&&dd2.ok&&dd2.data&&dd2.data.destinos||[]).some(function(x){return String(x.destino_id)===String(DID);});\n'
     + '        lb.querySelector(\'input\').checked=en;\n'
-    + '      }).catch(function(){});\n'
+    + '      }).catch(function(e){console.warn(\'[mapa] detalle\',e);});\n'
     + '    });\n'
     + '    var nb=document.createElement(\'button\');\n'
     + '    nb.style.cssText=\'width:100%;padding:6px;margin-top:6px;background:transparent;border:1px dashed rgba(232,160,32,.5);border-radius:5px;color:#E8A020;font-size:10px;font-weight:700;cursor:pointer\';\n'
@@ -2311,10 +2341,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '    nb.onclick=function(){var nombre=window.prompt(\'Nombre del nuevo mapa\');if(!nombre||!nombre.trim())return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_crear\',usuario_id:u.id,nombre:nombre.trim()})}).then(function(r){return r.json();}).then(function(dc){if(dc&&dc.ok){var nid=dc.id||dc.mapa_id||(dc.data&&dc.data.id)||null;if(nid)return fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_agregar_destino\',usuario_id:u.id,mapa_id:nid,destino_id:DID})});}}).then(function(r){if(r)return r.json();}).then(function(dx){cerrarPopoverGuardar();if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(dx&&dx.ok?\'Guardado en el mapa\':\'Mapa creado\',\'#16a34a\');}).catch(function(){cerrarPopoverGuardar();});};\n'
     + '    cuerpo.appendChild(nb);\n'
     + '  });\n'
-    + '  setTimeout(function(){document.addEventListener(\'click\',cerrarPopoverGuardar,true);},0);\n'
+    + '  setTimeout(function(){if(document.getElementById(\'guardar-pop\'))document.addEventListener(\'click\',cerrarPopoverGuardar,true);},0);\n'
     + '}\n'
     + 'function toggleTuMapa(cb){var btn=document.getElementById(\'btn-guardar\');if(window.ExploraCO)window.ExploraCO.toggleGuardado(DID,btn);setTimeout(function(){window.ExploraCO.estaGuardado(DID).then(function(g){cb.checked=!!g;});},400);}\n'
-    + 'function toggleMapaDest(mapaId,checked){var u=window.ExploraCO&&window.ExploraCO.usuario;if(!u)return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:checked?\'mapa_agregar_destino\':\'mapa_quitar_destino\',usuario_id:u.id,mapa_id:mapaId,destino_id:DID})}).then(function(r){return r.json();}).then(function(){if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(checked?\'Anadido al mapa\':\'Quitado del mapa\',\'#16a34a\');}).catch(function(){});}\n'
+    + 'function toggleMapaDest(mapaId,checked){var u=window.ExploraCO&&window.ExploraCO.usuario;if(!u)return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:checked?\'mapa_agregar_destino\':\'mapa_quitar_destino\',usuario_id:u.id,mapa_id:mapaId,destino_id:DID})}).then(function(r){return r.json();}).then(function(data){if(window.ExploraCO&&window.ExploraCO.mostrarToast){if(data&&data.ok)window.ExploraCO.mostrarToast(checked?\'Anadido al mapa\':\'Quitado del mapa\',\'#16a34a\');else window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');}}).catch(function(e){console.warn(\'[mapa] toggle\',e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');});}\n'
     // Lightbox de galeria (TSK-076): GAL_ALL se genera en runtime del
     // servidor (igual que DIM_LABELS mas arriba) a partir de galAll.
     + 'var GAL_ALL='+JSON.stringify(galAll)+';\n'
@@ -2342,7 +2372,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // sin importar el estado visual (ver api/interacciones.js v3).
     + 'if(window.ExploraCO){window.ExploraCO.estaGuardado(DID).then(function(g){if(g){var b=document.getElementById("btn-guardar");if(b)b.classList.add("activo");}});}\n'
     + 'if(document.getElementById("qr-stars")){precargarMiVoto();}\n'
-    // Fotos de viajeros (desbloqueable: capacidad subir_fotos, nivel 2)
+    // Galeria unificada: fotos curadas + fotos de viajeros en #galeria.
+    // Desbloqueable subir_fotos (nivel 2). FP_URLS mapea id->url para que el
+    // popover de albumes no incruste datos de usuario en el onclick (XSS);
+    // galEsc es el UNICO helper de escape de datos de usuario/foto.
+    + 'function galEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}\n'
+    + 'var FP_URLS={};\n'
     + 'function fpCaps(){var u=window.ExploraCO&&window.ExploraCO.usuario;return !!(u&&u.capacidades&&u.capacidades.subir_fotos);}\n'
     + 'function loadFotos(){\n'
     + '  var grid=document.getElementById("fp-grid");if(!grid)return;\n'
@@ -2351,8 +2386,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  .then(function(r){return r.json();})\n'
     + '  .then(function(d){\n'
     + '    var list=(d&&d.ok&&d.data)||[];\n'
+    + '    FP_URLS={};\n'
     + '    if(!list.length){grid.innerHTML="<p class=\\"stext\\">Sin fotos de viajeros todav\u00eda. S\u00e9 el primero: desbloquea Subir fotos en el nivel 2 y comparte tu experiencia.</p>";}\n'
-    + '    else{grid.innerHTML=list.map(function(f){var v=parseInt(f.votos||0);return "<div class=\\"fp-card\\"><img src=\\""+f.url+"\\" alt=\\"Foto de viajero\\" loading=\\"lazy\\"><div class=\\"fp-meta\\">"+(f.autor_nombre||"Viajero")+"</div><button class=\\"fp-vote"+(f.ya_votado?" on":"")+"\\" id=\\"fpv-"+f.id+"\\" onclick=\\"votarFoto(\\\'"+f.id+"\\\',this)\\">"+(f.ya_votado?"&#10003; Votada":"&#11088; Votar")+" <b>"+v+"</b></button></div>";}).join("");}\n'
+    + '    else{grid.innerHTML=list.map(function(f){var v=parseInt(f.votos||0);FP_URLS[f.id]=f.url;return "<div class=\\"fp-card\\"><img src=\\""+galEsc(f.url)+"\\" alt=\\"Foto de viajero\\" loading=\\"lazy\\"><div class=\\"fp-meta\\">"+galEsc(f.autor_nombre||"Viajero")+"</div><button class=\\"fp-vote"+(f.ya_votado?" on":"")+"\\" id=\\"fpv-"+f.id+"\\" onclick=\\"votarFoto(\\\'"+f.id+"\\\',this)\\">"+(f.ya_votado?"&#10003; Votada":"&#11088; Votar")+" <b>"+v+"</b></button><button class=\\"fp-vote fp-save\\" onclick=\\"abrirAlbumPopover(\\\'"+f.id+"\\\',this)\\">Guardar en album</button></div>";}).join("");}\n'
     + '    var up=document.getElementById("fp-upload");\n'
     + '    if(fpCaps()){\n'
     + '      if(up)up.style.display="flex";\n'
@@ -2398,6 +2434,51 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '      if(btn){btn.classList.add("on");var b2=btn.querySelector("b");btn.innerHTML="&#10003; Votada <b>"+(parseInt(b2?b2.textContent:"0")||0)+"</b>";}\n'
     + '    }else{alert((d&&d.error)||"No se pudo votar");}\n'
     + '  }).catch(function(){alert("Error de conexi\u00f3n.");});\n'
+    + '}\n'
+    // Guardar en album: mini-popover con los albumes PROPIOS del usuario
+    // (GET tipo=albumes). El POST omite autor_original_id a proposito: asi el
+    // dedup del indice (album_id,foto_url,autor_original_id) usa al guardador
+    // y no se acredita XP a un tercero. El listener de cierre va en document
+    // en fase de captura y sigue el patron de cerrarPopoverGuardar: SIEMPRE
+    // comprueba que el click sea fuera del popover (p.contains(ev.target)) y
+    // que no venga del propio boton (.fp-save); sin ese chequeo el boton se
+    // autodestruye (era el bug del boton Guardar).
+    + 'function cerrarAlbumPopover(ev){\n'
+    + '  var p=document.getElementById("gal-albpop");if(!p)return;\n'
+    + '  if(ev&&ev.target&&p.contains(ev.target))return;\n'
+    + '  if(ev&&ev.target&&ev.target.closest&&ev.target.closest(".fp-save"))return;\n'
+    + '  p.remove();\n'
+    + '  document.removeEventListener("click",cerrarAlbumPopover,true);\n'
+    + '}\n'
+    + 'function abrirAlbumPopover(fid,btn){\n'
+    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
+    + '  if(!u||!u.id){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para guardar en tus albumes");}return;}\n'
+    + '  var url=FP_URLS[fid]||"";\n'
+    + '  if(!url){console.warn("[galeria] url de foto no encontrada",fid);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("No se pudo identificar la foto","#ef4444");return;}\n'
+    + '  var prev=document.getElementById("gal-albpop");if(prev)prev.remove();\n'
+    + '  var pop=document.createElement("div");\n'
+    + '  pop.id="gal-albpop";\n'
+    + '  pop.style.cssText="position:fixed;z-index:2500;width:230px;max-height:300px;overflow:auto;background:#0F172A;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);font-family:Outfit,sans-serif";\n'
+    + '  var r=btn.getBoundingClientRect();\n'
+    + '  pop.style.top=Math.min(window.innerHeight-320,Math.max(8,r.bottom+6))+"px";\n'
+    + '  pop.style.left=Math.max(8,r.right-230)+"px";\n'
+    + '  pop.innerHTML="<div style=\\"font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#E8A020;margin-bottom:6px;display:flex;justify-content:space-between\\">Guardar en album<span style=\\"cursor:pointer;color:rgba(255,255,255,.5)\\" onclick=\\"cerrarAlbumPopover()\\">\u2715</span></div>";\n'
+    + '  var cuerpo=document.createElement("div");pop.appendChild(cuerpo);document.body.appendChild(pop);\n'
+    + '  fetch("/api/interacciones?tipo=albumes&usuario_id="+encodeURIComponent(u.id)+"&limit=50").then(function(r){return r.json();}).then(function(dd){\n'
+    + '    var albumes=(dd&&dd.ok&&dd.data)||[];\n'
+    + '    if(!albumes.length){var av=document.createElement("div");av.style.cssText="padding:6px 4px;font-size:11px;color:rgba(255,255,255,.5)";av.textContent="Aun no tienes albumes. Crea uno en Mi Perfil.";cuerpo.appendChild(av);return;}\n'
+    + '    albumes.forEach(function(a){var b=document.createElement("button");b.style.cssText="display:block;width:100%;text-align:left;padding:7px 8px;margin-bottom:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;color:rgba(255,255,255,.9);font-size:11px;font-weight:600;cursor:pointer";b.textContent=a.titulo||"Sin titulo";b.onclick=function(){guardarEnAlbum(a.id,url);};cuerpo.appendChild(b);});\n'
+    + '  }).catch(function(e){console.warn("[galeria] albumes",e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("No se pudieron cargar tus albumes","#ef4444");});\n'
+    + '  setTimeout(function(){if(document.getElementById("gal-albpop"))document.addEventListener("click",cerrarAlbumPopover,true);},0);\n'
+    + '}\n'
+    + 'function guardarEnAlbum(albumId,fotoUrl){\n'
+    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
+    + '  if(!u||!u.id){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para guardar en tus albumes");}return;}\n'
+    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:"album_agregar_foto",usuario_id:u.id,album_id:albumId,foto_url:fotoUrl,foto_type:"foto",media_title:""})}).then(function(r){return r.json();}).then(function(d){\n'
+    + '    cerrarAlbumPopover();\n'
+    + '    if(d&&d.ok){if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Guardada en tu album +15 XP","#16a34a");}\n'
+    + '    else{var msg=(d&&d.error)||"No se pudo guardar en el album";if(msg==="ALBUM_AJENO")msg="Ese album no es tuyo";console.warn("[galeria] album_agregar_foto",msg);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(msg,"#ef4444");}\n'
+    + '  }).catch(function(e){console.warn("[galeria] album_agregar_foto",e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Error de conexi\u00f3n","#ef4444");});\n'
     + '}\n'
     + 'loadFotos();\n'
     + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'

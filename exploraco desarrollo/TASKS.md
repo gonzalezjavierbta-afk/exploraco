@@ -2259,6 +2259,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   - **Estado final de la TSK-095:** implementada; pasos manuales pendientes = (1) HOTFIX BUG-031 en produccion (commit+push+redeploy del fix del JS inline del popover, ver bullet abajo -- TSK-095 YA desplegada CON el bug, produccion rota), (2) aplicar la migracion 011 en Neon + commit/push manual del usuario.
   - **BUG-031 (detectado post-deploy, corregido en codigo, PENDIENTE deploy manual):** el popover de Guardar de la TSK-095 (subtarea 4) llego a produccion con el JS inline de buildHTML() roto: el onchange de los checkboxes de mapas tematicos se ensamblaba en 3 lineas (L2288-2290) con comilla escapada mal formada (`\\\'` dentro de string single-quoted) -> `SyntaxError: Unexpected token` en la linea 126 del JS inline generado -> TODAS las paginas dinamicas sin funciones de cliente (`abrirPopoverGuardar is not defined`, Estuve aqui, submitRv, votarDID, lightbox; confirmado local 5 categorias y prod 4 paginas). Reportado por usuario en /parque-mundo-aventura.html. FIX en working tree SIN commitear: L2288-2290 colapsadas en 1 sola con entidad HTML `&#39;` (cliente queda `toggleMapaDest('ID',this.checked)`) + guard permanente `scripts/check_buildHTML_inline.js` (parsea con vm.Script todo inline de buildHTML: 8 funciones criticas + JSON-LD + divs; exit 0/1/2). Verificado: node --check PASS, ASCII 0/0/0, smoke parque 14/14, check inline 3 categorias 8/8, divs 364/364. Detalle completo: BUGS_HISTORICOS.md BUG-031; Escudo GOLD debe incluir `node scripts/check_buildHTML_inline.js`.
   - **Sigue abierto (higiene menor, NO bloqueante):** doble escape preexistente ~L2174 en `addRvOptimista` (ver backlog en NEXT.md, punto 3) y BUG-027 (boton Instagram en secContact).
+  - **Nota posterior (TSK-105 / ADR-030, 2026-09-16):** las menciones a `secMapa` de las subtareas 7 y 8 quedaron OBSOLETAS: `secMapa` (id="mapa") se FUSIONO con `secTransporteHostal` en `secComoLlegar` (id="como-llegar", transporte arriba + mapa abajo), con una sola entrada de subnav `como-llegar` y un ancla legacy invisible `#mapa`. El texto historico se conserva por Cero Borrado Logico (Regla de Oro 3); el estado vigente esta en TSK-105 y BLUEPRINT.md seccion 5.
 
 ---
 
@@ -2312,7 +2313,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   - `mi-perfil.html` (UI completa de albumes + fix comillas de `quitarFotoAlbum`)
   - `comunidad.html` (reproductor real de audio/video/embed + `abrirAlbumModal`)
   - `admin.html` (moderacion de fotos de album, divs 724/724)
-  - `scripts/smoke_auditoria_pagina_destino.js` (NUEVO, 42 checks)
+  - `scripts/smoke_auditoria_pagina_destino.js` (NUEVO; 42 checks al cierre de TSK-097, 54 checks HOY tras TSK-105 / ADR-030, 2026-09-16)
 
 - **Fixes completados:**
   1. **FIX 1 - Constraint unica de interacciones (solo resena/rating):** nueva migracion
@@ -2344,8 +2345,9 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
      `comunidad.html` (`abrirAlbumModal` L1340) permiten ir de foto -> album y de autor ->
      `/mi-perfil.html?id=...`.
   5. **FIX 5 - Auditoria multimedia:** `api/pagina-destino.js` corrigio BUG-027 (el boton
-     Instagram mostraba el literal `[foto]`; ahora `\uD83D\uDCF7`, L1950). Se creo
-     `scripts/smoke_auditoria_pagina_destino.js` (42 checks). `comunidad.html` agrego
+      Instagram mostraba el literal `[foto]`; ahora `\uD83D\uDCF7`, L1950). Se creo
+      `scripts/smoke_auditoria_pagina_destino.js` (42 checks al cierre de TSK-097;
+      54 checks HOY tras TSK-105 / ADR-030, 2026-09-16). `comunidad.html` agrego
      reproductor real de audio/video/embed (`avMediaHTML` L1274, `avEmbedUrl` L1264).
      `index.html` corrigio el desbalance de divs (un `</div>` sobrante y uno faltante en
      `publicar-modal`; balance 497/497). `admin.html` conecto la UI de moderacion de fotos
@@ -2358,7 +2360,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   balance de divs 0 en index.html (497/497), comunidad.html (181/181), mi-perfil.html
   (166/166) y admin.html (724/724); JS inline de los 4 HTML parsea con `node --check`;
   `scripts/check_buildHTML_inline.js` -> TODO OK; smokes OK: `smoke_auditoria_pagina_destino.js`
-  (42/42), `smoke_test_comunidad.js`, `test_logros_catalogo.js` (29) y
+  (42/42 al cierre de TSK-097; 54/54 HOY tras TSK-105 / ADR-030, 2026-09-16),
+  `smoke_test_comunidad.js`, `test_logros_catalogo.js` (29) y
   `smoke_test_perfil_progreso.js`. QA manual detecto y se corrigieron 2 bugs de integracion
   nuevos: (a) `openAlbumModal` en index.html leia `res.data` en vez de `res.album`/`res.fotos`;
   (b) `mi-perfil.html` generaba `onclick="quitarFotoAlbum(uuid,uuid)"` sin comillas
@@ -2670,6 +2673,61 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   - **Fix (working tree, SIN commitear):** `api/usuarios.js` (+30/-14; header `v13` -> `v14`) con `jsonb_agg(h ORDER BY ord)` (ORDER BY DENTRO del agregado) y `try/catch` best-effort que loguea con `console.error` y NO re-lanza (el fingerprint nunca bloquea el login).
   - **Evidencia (ADR-006):** header real L2 `v14`; bloque del hotfix L981-1006; `node --check` OK; ASCII/backticks/doble-escape 0/0/0; simulacion runtime con mock `sql`/`neon` 15/15 PASS (200 con `device_hash`; 200 incluso si el UPDATE del fingerprint falla); sin regresion en A1/`verificar_usuario`/`total`; el patron invalido ya no aparece en `api/*.js`.
   - **Estado:** RESUELTO en working tree (2026-09-15); **PENDIENTE OPERATIVO: commit/push/deploy** (login roto en produccion). Ver el pendiente y la verificacion post-deploy en NEXT.md.
+
+---
+
+### TSK-105: Lote "promptarreglos" -- DM 500, galeria duplicada, popover Guardar, "Estuve aqui", unificacion Como llegar/Ubicacion, galeria unificada de destino, seguridad de album y degradacion 503 [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-16, implementada y verificada en working tree). **PENDIENTE OPERATIVO (BLOQUEANTE para cerrar al 100%): aplicar la migracion 004 (`scripts/apply_004_foto_url.js`) + ejecutar `scripts/dedupe_destinos_fotos.js --apply` (dedupe + indice unico) en Neon + commit/push/deploy.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-16
+- **Prompt origen:** `promptarreglos.txt`
+- **ADR:** ADR-030 (DECISIONS.md); cierra BUG-036 y consume los precedentes ADR-024 (geocerca), ADR-025 (sesion firmada + nonce), ADR-027 (piramide de referidos) y ADR-028 (blindaje PII)
+- **Responsable:** build (orquestador) + architect-review + qa + docs-keeper
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006):**
+
+  1. **BUG-055 - `dm_hilos` 500 (SQLSTATE 42P08).** `api/interacciones.js` L2937-2939 y L2962 castean a texto los usos uuid del parametro ambiguo: `m.usuario_id::text<>$1`, `m2.usuario_id::text=$1` y `bloqueador_id::text=$1 OR bloqueado_id::text=$1`. Causa: `$1` se comparaba contra `split_part(...)` (text) y contra columnas uuid a la vez.
+  2. **BUG-056 - foto repetida en la galeria (hostal-r10).** Causa raiz multiple: `destinos_fotos` sin `UNIQUE(destino_id,url)` y sin migracion que la cree, `api/admin-destinos.js` PUT re-insertaba sin borrar, `api/utilidades.js` POST `?tipo=fotos` acumulaba y `admin.html` hacia DOBLE escritura. Fix: semantica REPLACE (dedupe por url + DELETE + reinsert) en `api/admin-destinos.js` PUT/POST (upsert por slug, helper `normFotosGaleria` L43-60, guards 400 en L230/L340-346) y en `api/utilidades.js` POST (L225-234), con guard anti-perdida (lista vacia -> 400 y NO borra); `admin.html` elimina la segunda escritura; `galAll` dedupe defensivo en el render (`api/pagina-destino.js` L727-733).
+  3. **BUG-057 - popover "Guardar" cerraba con CUALQUIER click.** `cerrarPopoverGuardar` (`api/pagina-destino.js` L2298) solo cierra si el click es FUERA (`p.contains(ev.target)`) o sobre `#btn-guardar`; `toggleMapaDest` (L2347) muestra error si `!data.ok` y sus `catch` usan `console.warn`.
+  4. **BUG-058 - "Estuve aqui" nunca completaba (cierra BUG-036).** `usuario-session.js` solicita `GET ?tipo=geo_nonce_solicitar` (L649-665), envia `Authorization: Bearer` + `nonce`, maneja 401 con `refreshJwt` y reintenta UNA vez con nonce nuevo (L698-767), y traduce `NONCE_*`/`SESION_*`; `obtenerUbicacion` (L602-647) distingue los codigos 1/2/3 y reintenta con baja precision ante 2/3.
+  5. **Unificacion "Como llegar" + "Ubicacion".** `api/pagina-destino.js` funde `secTransporteHostal` (id original "como-llegar") y `secMapa` (id original "mapa") en `secComoLlegar` (id="como-llegar", transporte arriba + mapa abajo), con UNA sola entrada de subnav (`{id:'como-llegar', label:'Como llegar'}`) y anclas legacy invisibles `#fotos` y `#mapa`.
+  6. **Galeria unificada de destino (ADR-030).** `#galeria` y `#fotos` se fusionan en UNA seccion `id="galeria"` (miniaturas curadas + "Fotos de viajeros" `#fp-grid` + caja `#fp-upload`), con ancla legacy invisible `<span id="fotos">`; nueva UI "Guardar en album" en fotos de viajeros (GET `tipo=albumes` + POST `album_agregar_foto`); helper cliente `galEsc()` (L2379) que escapa HTML y cierra un XSS preexistente del inline. El modulo unificado se muestra SIEMPRE en la ficha.
+  7. **BUG-059 - seguridad de album + consistencia de XP.** `album_agregar_foto` valida la propiedad del album (403 `ALBUM_AJENO`, L5143) y tipifica `23503` -> 400 `AUTOR_ORIGINAL_INVALIDO` (L5181); `album_voto` llama `repartirXpReferidos` (L5237), cerrando el gap de la piramide de ADR-027.
+  8. **BUG-060 - degradacion del 503 por migracion 004 no aplicada.** Helper `queryConAvatarFallback` (`api/interacciones.js` L2114) degrada `42703` (`usuarios.foto_url` ausente) reintentando con `avatar_url` en `museo_publico` (L2760), `album_detalle` (L3382/L3394) y `galeria_destino` (`gdUsuarios`/`gdViajeros`, L3499/L3542); `api/usuarios.js` hace lo equivalente en `perfil_publico`. Antes eran 503. Mismo patron que BUG-051; causa raiz: migracion 004 nunca aplicada (patron BUG-021).
+
+- **Decisiones de producto (revisadas por architect-review):**
+  1. **NO se permite votar fotos curadas en esta entrega:** no se creo el tipo `foto_curada_voto`; `tipo_voto=null` para curadas. Se vota SOLO viajeros (`foto_voto`) y album (`album_voto`). Razon: `destinos_fotos.id` NO es estable (el REPLACE lo re-crea).
+  2. **`origen='album'` APAGADO por defecto:** las album_fotos por cercania solo aparecen con `incluir=albumes` en `GET tipo=galeria_destino`.
+  3. **`items[]` SOLO se emite si el cliente envia `incluir`** (protege a `galeria.html`, que no lo envia).
+  4. **El modulo unificado se muestra SIEMPRE en la ficha** (`scripts/smoke_auditoria_pagina_destino.js` actualizado a 54 checks).
+  5. **`autor_original_id` null:** `album_agregar_foto` lo normaliza con `|| usuarioId2` y el dedup se hace por SELECT (no se depende del indice unico, que con NULL no deduplica).
+
+- **Archivos modificados en el working tree (SIN commitear; `git diff --stat` = 8 archivos, +649/-167):**
+  - `api/interacciones.js` (271 lineas cambiadas): casts `::text` de DM, `queryConAvatarFallback`, `items[]`/`incluir`, 403/400 de album, `repartirXpReferidos` en `album_voto`.
+  - `api/pagina-destino.js` (197 lineas cambiadas): `secComoLlegar`, `#galeria` unificada, UI "Guardar en album" (`abrirAlbumPopover`), `galEsc`, fix del popover.
+  - `api/admin-destinos.js` (71 lineas cambiadas): `normFotosGaleria` + REPLACE + guards.
+  - `api/utilidades.js` (59 lineas cambiadas): REPLACE en POST `?tipo=fotos`.
+  - `api/usuarios.js` (27 lineas cambiadas): fallback de avatar en `perfil_publico`.
+  - `usuario-session.js` (127 lineas cambiadas): nonce + Bearer + reintento + geolocation.
+  - `admin.html` (8 lineas cambiadas): elimina la doble escritura de la galeria.
+  - `scripts/smoke_auditoria_pagina_destino.js` (56 lineas cambiadas): 54 checks.
+  - NUEVOS sin versionar: `scripts/apply_004_foto_url.js`, `scripts/dedupe_destinos_fotos.js`.
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001). Cero archivos nuevos en `api/`; todo entra como ramas `tipo=` y helpers.
+
+- **Evidencia (ADR-006, contra archivo real):**
+  - Smoke: `node scripts/smoke_auditoria_pagina_destino.js` -> `TODOS LOS SMOKE TESTS PASARON (54 checks)`.
+  - `api/interacciones.js` L2114, L2937-2939, L2962, L3382, L3394, L3499, L3542, L5143-5181, L5237; `api/pagina-destino.js` L1521/L1525 (`#galeria` + ancla `#fotos`), L1810 (`secComoLlegar`), L2298, L2347, L2379; `api/admin-destinos.js` L43-60/L230/L340-346.
+  - **Nota de version (ADR-006):** los comentarios nuevos de `api/interacciones.js` se rotulan `v16`, pero el header real sigue en `v14` y no se agrego el bloque de changelog `v16`; inconsistencia de version a corregir en el commit.
+
+- **PENDIENTE OPERATIVO (bloqueante para produccion, lo ejecuta Javier; requiere `DATABASE_URL`):**
+  1. **`node scripts/apply_004_foto_url.js`** -> aplica `db/migrations/004_usuarios_blog_autor.sql` (`usuarios.foto_url` + `ciudad_base`); cierra de raiz el BUG-060.
+  2. **`node scripts/dedupe_destinos_fotos.js --apply`** -> backup + borra duplicados de `destinos_fotos` + `CREATE UNIQUE INDEX idx_destinos_fotos_destino_url`; cierra al 100% el BUG-056.
+  3. **Commit + push + deploy en un solo release** (incluye los pendientes previos sin commitear de TSK-095..TSK-104 y las migraciones 015/016/017/018).
+  4. **Verificacion post-deploy:** `dm_hilos` 200; "Estuve aqui" completa con nonce+Bearer; popover Guardar conserva checkboxes; galeria sin repetidas; voto de viajeros/album y "Guardar en album" (403 `ALBUM_AJENO` con album ajeno); sin 503 en museo/galeria/albumes/perfil publico; "Como llegar" con transporte + mapa en una sola seccion.
+
+- **Fuera de alcance:** voto de fotos curadas (recorte del MVP, ver decisiones); subida real de archivos; correccion de la doble fila de galeria historica (la hace el script); bump del header `v14` -> `v16` (se corrige en el commit).
 
 ---
 

@@ -1,0 +1,77 @@
+Quiero revisar todo el apartado de fotos. Teniendo como ejemplo hsotal r10 https://exploraco.vercel.app/hostal-r10-bogota.html una de las fotografias subidas se repite en toda la galeria. La galeria debe mostrar  las fotos subidas y las fotos  subidas por los usuariosEsa galeria se puede juntar con fotos de viajeros, para dejarlo en un solo modulo. Las fotos subidas por viajeros, no hay forma de guardar en un album o de votar por ellas. mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=dm_hilos&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 500 (Internal Server Error)
+fetchConJwt @ mi-perfil.html:2116
+cargarMensajes @ mi-perfil.html:2922
+renderPerfil @ mi-perfil.html:948
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+init @ usuario-session.js:1121
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=museo_publico&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 503 (Service Unavailable)
+fetchConJwt @ mi-perfil.html:2116
+cargarMuseoPreview @ mi-perfil.html:3505
+renderPerfil @ mi-perfil.html:959
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+init @ usuario-session.js:1121
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=museo_publico&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 503 (Service Unavailable)
+fetchConJwt @ mi-perfil.html:2116
+cargarMuseoPreview @ mi-perfil.html:3505
+renderPerfil @ mi-perfil.html:959
+(anonymous) @ mi-perfil.html:868
+Promise.then
+refrescarSesion @ mi-perfil.html:852
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+init @ usuario-session.js:1121
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=dm_hilos&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 500 (Internal Server Error)
+fetchConJwt @ mi-perfil.html:2116
+cargarMensajes @ mi-perfil.html:2922
+renderPerfil @ mi-perfil.html:948
+(anonymous) @ mi-perfil.html:868
+Promise.then
+refrescarSesion @ mi-perfil.html:852
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+init @ usuario-session.js:1121
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=museo_publico&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 503 (Service Unavailable)
+fetchConJwt @ mi-perfil.html:2116
+cargarMuseoPreview @ mi-perfil.html:3505
+renderPerfil @ mi-perfil.html:959
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+(anonymous) @ usuario-session.js:1108
+Promise.then
+refrescarSesion @ usuario-session.js:1090
+init @ usuario-session.js:1122
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=dm_hilos&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 500 (Internal Server Error)
+fetchConJwt @ mi-perfil.html:2116
+cargarMensajes @ mi-perfil.html:2922
+renderPerfil @ mi-perfil.html:948
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+(anonymous) @ usuario-session.js:1108
+Promise.then
+refrescarSesion @ usuario-session.js:1090
+init @ usuario-session.js:1122
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=museo_publico&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 503 (Service Unavailable)
+fetchConJwt @ mi-perfil.html:2116
+cargarMuseoPreview @ mi-perfil.html:3505
+renderPerfil @ mi-perfil.html:959
+(anonymous) @ mi-perfil.html:868
+Promise.then
+refrescarSesion @ mi-perfil.html:852
+checkGate @ mi-perfil.html:840
+window.onExploraCOUpdate @ mi-perfil.html:3545
+actualizarUI @ usuario-session.js:1069
+(anonymous) @ usuario-session.js:1108
+Promise.then
+refrescarSesion @ usuario-session.js:1090
+init @ usuario-session.js:1122
+mi-perfil.html:2116  GET https://exploraco.vercel.app/api/interacciones?tipo=dm_hilos&usuario_id=3b78efad-e9f6-49a7-bbd1-af836f528348 500 (Internal Server Error)
+
+Todos estos son errores que muestra en mi perfil. No deja cargar los albumes de fotos. En las publicaciones el modulo de "colo llegar" lo vamos a poner arriba de  ubicacion y como llegar y los vamos a unificar. El boton de guardar no esta dejando guardar los lugares. y el esuve aqui, me pide ubicacion activa de mi celular... pero ya esta activa y no la reconoce

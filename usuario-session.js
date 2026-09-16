@@ -606,32 +606,73 @@
         resolve(null);
         return;
       }
-      navigator.geolocation.getCurrentPosition(function (pos) {
-        resolve({
-          lat:      pos.coords.latitude,
-          lng:      pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-          ts:       Date.now(),
-        });
-      }, function (err) {
-        var negado = !!(err && err.code === 1);
-        mostrarToast(
-          negado
-            ? "Activa tu ubicación para marcar 'Estuve aquí'"
-            : 'No pudimos obtener tu ubicación. Intenta de nuevo.',
-          '#ef4444'
-        );
-        resolve(null);
-      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+      // Mensajes por codigo de GeolocationPositionError:
+      // 1 = permiso denegado por el sitio, 2 = posicion no disponible,
+      // 3 = tiempo agotado.
+      var msgGeo = {
+        1: 'Bloqueaste la ubicaci\u00f3n para este sitio; act\u00edvala en el navegador',
+        2: 'Tu ubicaci\u00f3n no est\u00e1 disponible en este momento. Intenta de nuevo.',
+        3: 'No pudimos obtener tu ubicaci\u00f3n a tiempo, sal al aire libre e intenta de nuevo',
+      };
+
+      function intentar(opciones, esReintento) {
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          resolve({
+            lat:      pos.coords.latitude,
+            lng:      pos.coords.longitude,
+            accuracy: Math.round(pos.coords.accuracy),
+            ts:       Date.now(),
+          });
+        }, function (err) {
+          var code = err && err.code;
+          // Codigos 2/3: el GPS no fijo dentro del timeout. Un unico
+          // reintento de baja precision con cache reciente suele resolverlo.
+          if (!esReintento && (code === 2 || code === 3)) {
+            console.warn('[session] geolocation codigo ' + code + ', reintentando baja precision');
+            intentar({ enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }, true);
+            return;
+          }
+          mostrarToast(
+            msgGeo[code] || 'No pudimos obtener tu ubicaci\u00f3n. Intenta de nuevo.',
+            '#ef4444'
+          );
+          resolve(null);
+        }, opciones);
+      }
+
+      intentar({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }, false);
     });
   }
 
   window.ExploraCO.obtenerUbicacion = obtenerUbicacion;
 
+  // Solicita un nonce anti-replay (ADR-025) de un solo uso para el
+  // checkin geolocalizado. Devuelve el string nonce o null si falla.
+  async function solicitarNonceVisita(usuarioId) {
+    try {
+      var res = await fetch(
+        API + '/api/interacciones?tipo=geo_nonce_solicitar&usuario_id='
+          + encodeURIComponent(usuarioId),
+        { headers: window.ExploraCO.authHeaders() }
+      );
+      var data = await res.json();
+      if (!data.ok || !data.data || !data.data.nonce) {
+        console.warn('[session] nonce de visita no disponible:', data && data.error);
+        return null;
+      }
+      return data.data.nonce;
+    } catch (err) {
+      console.warn('[session] solicitarNonceVisita error:', err.message);
+      return null;
+    }
+  }
+
   // ── Traducir los codigos de error del backend de visitas ────
   function mensajeErrorVisita(data) {
     var d = data || {};
-    var code = d.code || '';
+    // El backend de sesion responde los fallos 401 como {ok:false, error:'SESION_*'}
+    // (sin campo code), por eso se normaliza aqui.
+    var code = d.code || d.error || '';
     if (code === 'FUERA_DE_RANGO') {
       return 'Estas a ' + (d.dist_m != null ? d.dist_m : '?') + ' m del lugar (max '
         + (d.radio_m != null ? d.radio_m : '?') + ' m). Acercate para confirmar.';
@@ -654,6 +695,12 @@
     if (code === 'VISITA_NO_PERMITIDA' || code === 'DESTINO_NO_ENCONTRADO') {
       return 'Este lugar no permite confirmar visitas.';
     }
+    if (code === 'NONCE_REQUERIDO' || code === 'NONCE_INVALIDO') {
+      return 'No pudimos validar tu ubicaci\u00f3n, intenta de nuevo';
+    }
+    if (code === 'SESION_REQUERIDA' || code === 'SESION_INVALIDA' || code === 'SESION_EXPIRADA') {
+      return 'Tu sesi\u00f3n expir\u00f3, vuelve a iniciar sesi\u00f3n';
+    }
     return d.error || 'No se pudo registrar la visita';
   }
 
@@ -671,10 +718,20 @@
     var pos = await obtenerUbicacion();
     if (!pos) return false;
 
-    try {
+    var nonce = await solicitarNonceVisita(usuario.id);
+    if (!nonce) {
+      mostrarToast(mensajeErrorVisita({ error: 'NONCE_REQUERIDO' }), '#ef4444');
+      return false;
+    }
+
+    // POST de visita reutilizable: el reintento tras refreshJwt necesita
+    // un nonce nuevo (el primero pudo consumirse antes del 401).
+    var ejecutarVisita = async function (nonceActual) {
+      var headers = window.ExploraCO.authHeaders();
+      headers['Content-Type'] = 'application/json';
       var res = await fetch(API + '/api/interacciones', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({
           tipo:       'visita',
           usuario_id: usuario.id,
@@ -683,9 +740,37 @@
           lng:        pos.lng,
           accuracy:   pos.accuracy,
           ts:         pos.ts,
+          nonce:      nonceActual,
         }),
       });
-      var data = await res.json();
+      return { status: res.status, data: await res.json() };
+    };
+
+    try {
+      var r = await ejecutarVisita(nonce);
+
+      // 401 (SESION_*): un refresh silencioso y un unico reintento con
+      // nonce nuevo. Si vuelve a fallar, se degrada sin silenciar.
+      if (r.status === 401) {
+        var jwtNuevo = await window.ExploraCO.refreshJwt();
+        if (!jwtNuevo) {
+          mostrarToast(mensajeErrorVisita(r.data), '#ef4444');
+          return false;
+        }
+        var nonceNuevo = await solicitarNonceVisita(usuario.id);
+        if (!nonceNuevo) {
+          mostrarToast(mensajeErrorVisita({ error: 'NONCE_REQUERIDO' }), '#ef4444');
+          return false;
+        }
+        r = await ejecutarVisita(nonceNuevo);
+        if (r.status === 401) {
+          console.warn('[session] visita rechazada tras refreshJwt:', r.data && r.data.error);
+          mostrarToast(mensajeErrorVisita(r.data), '#ef4444');
+          return false;
+        }
+      }
+
+      var data = r.data;
       if (!data.ok || data.code) {
         mostrarToast(mensajeErrorVisita(data), '#ef4444');
         return false;

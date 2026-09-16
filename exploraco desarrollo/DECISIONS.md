@@ -206,6 +206,8 @@ Registro de decisiones arquitectonicas (ADR). Este documento NUNCA contiene tare
 
 **Estado:** Aprobada y vigente.
 
+**Nota de correccion de citas (ADR-006, 2026-09-16):** varias entradas de este documento (y de los demas documentos del AI-DOS Core) citan el presupuesto de endpoints como `ADR-010 (presupuesto 8/8)`. Esa cita es ERRONEA: el limite de 8 funciones serverless de Vercel Hobby se origina en **ADR-001** ("Prohibicion de frameworks frontend"), que lo invoca expresamente como justificacion; este ADR-010 es la decision de **multi-tema en tags JSONB** (`tags.temas[]` + `tags.tema`) y solo menciona el presupuesto agotado (8/8) de forma incidental en su opcion 3. Las citas historicas se conservan por Cero Borrado Logico (Regla de Oro 3), pero toda cita NUEVA debe referir el presupuesto 8/8 a **ADR-001** y reservar `ADR-010` para el multi-tema de tags JSONB.
+
 ## ADR-011: Variante de diseno propia para el post de blog -- moderno minimalista, distinto del render de destinos
 
 **ID:** ADR-011
@@ -784,3 +786,55 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 - Persisten como bloqueantes las migraciones 017/018 en Neon (heredado de TSK-103), ajenas al alcance de esta decision.
 
 **ADR previos relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8), ADR-019 (`destinos.verificado` como control interno admin, sin insignia publica), ADR-025 (sesion firmada / email verificado), ADR-028 (blindaje PII y patron `esAdminUsuario`; `verificar_usuario` extiende la verificacion de email)
+
+---
+
+## ADR-030: Galeria unificada de la ficha de destino (curadas + viajeros + albumes) con MVP de voto, guardar en album y blindaje de escritura del album
+
+**ID:** ADR-030
+**Fecha:** 2026-09-16
+**Estado:** Aprobado e IMPLEMENTADO (MVP) en working tree; **PENDIENTE aplicar la migracion 004 (`scripts/apply_004_foto_url.js`) y ejecutar `scripts/dedupe_destinos_fotos.js --apply` (dedupe + indice unico) en Neon + commit/push/deploy.**
+**Autor:** architect (AI-DOS) con decision de producto del Chief Architect; implementado en el lote "promptarreglos" y revisado por `architect-review`
+**Nota de numeracion:** el 030 es el consecutivo real tras ADR-029 (mayor registrado en este documento); el numero estaba RESERVADO por la spec `docs/superpowers/specs/2026-09-15-galeria-unificada-destino-design.md`.
+
+**Problema:** la ficha de destino (`api/pagina-destino.js`) tenia dos modulos de fotos desconectados: `#galeria` (fotos curadas de `destinos_fotos`, sin interaccion) y `#fotos` ("Fotos de viajeros", `interacciones.tipo='foto'`, votables via `foto_voto`), lo que producia dos grillas sin unidad editorial. Un tercer origen disponible (`album_fotos` geolocalizadas, ya servido por `tipo=galeria_destino`) solo lo consumia `galeria.html`; `album_voto` existia en backend sin ningun frontend (brecha G-07/D-12); y no habia UI para guardar una foto en un album aunque `album_agregar_foto` ya existia. En paralelo, esa rama de escritura no validaba la propiedad del album (IDOR: se podia escribir en el album de otro usuario) y `album_voto` no repartia referidos (gap de ADR-027). A esto se sumo la causa raiz de los 503 `SCHEMA_NOT_MIGRATED` de museo/galeria/albumes/perfil publico: la migracion 004 (`usuarios.foto_url`) NUNCA se aplico en Neon (mismo patron que BUG-021). El presupuesto de endpoints de Vercel Hobby esta agotado (8/8; ver ADR-001), por lo que la unificacion debia lograrse extendiendo endpoints existentes y sin romper `galeria.html`.
+
+**Opciones consideradas:**
+1. **Modulo nuevo con endpoint nuevo:** descartada -- viola el limite de 8 funciones serverless de Vercel Hobby (ADR-001).
+2. **Tabla unica de votos / unificar persistencia:** descartada -- exigiria migracion de datos y cambio de esquema (ADR-008) sin beneficio; `album_votos` (PK) y el mecanismo `interacciones.dims` ya funcionan y estan desplegados.
+3. **Extender `tipo=galeria_destino` con `items[]` aditivo + `incluir`/`usuario_id`, y unificar la UI en `#galeria` (elegida):** cero endpoints nuevos, cero cambios a `galeria.html`, un unico modulo con boton de voto (viajeros/album) y "Guardar en album", y blindaje de la escritura del album.
+4. **Reemplazar `#fotos` por `#galeria` borrando el modulo viejo:** descartada por Cero Borrado Logico -- se conserva el ancla invisible `#fotos` y los identificadores historicos (`loadFotos`/`subirFoto`/`votarFoto`).
+5. **Votar las fotos curadas en esta entrega (tipo `foto_curada_voto`):** descartada (ver Decision tomada): el acoplamiento con `destinos_fotos` no es estable bajo la nueva semantica REPLACE.
+
+**Decision tomada:**
+- **Una sola seccion `#galeria`:** `secGaleria` y `secFotos` se fusionan en una unica seccion con miniaturas curadas + "Fotos de viajeros" (`#fp-grid`) + caja de subida (`#fp-upload`). Se conserva un ancla invisible `<span id="fotos">` (Cero Borrado Logico de deep-links). El modulo unificado se muestra SIEMPRE en la ficha (el smoke `scripts/smoke_auditoria_pagina_destino.js` pasa a 54 checks).
+- **Contrato aditivo `tipo=galeria_destino`:** se conservan `destino[]`/`fotos[]`/`usuarios[]` para `galeria.html` (extension aditiva, regresion cero) y se agrega la clave NUEVA `items[]` normalizada (`{ origen, id_origen, tipo_voto, url, caption, votos, ya_votado, es_propia, autor_id, autor_nombre, autor_avatar, album_id, album_titulo, foto_type, media_source, creado_en }`), con dedup por URL y precedencia `curada > viajero > album`.
+- **`items[]` SOLO se emite si el cliente envia `incluir`** (CSV `viajeros,albumes`). Esto protege a `galeria.html`, que sigue llamando sin `incluir` ni `usuario_id` y recibe exactamente el contrato previo mas la clave nueva; sin `incluir`, `items[]` queda vacio/no se emite.
+- **`origen='album'` APAGADO por defecto:** las fotos de albumes por cercania solo aparecen cuando el cliente pide `incluir=albumes`. La ficha lo hace; `galeria.html` no.
+- **MVP de voto (alcance recortado):** NO se permite votar fotos curadas en esta entrega. No se creo el tipo `foto_curada_voto`; para las tarjetas curadas `tipo_voto=null`. Se vota SOLO viajeros (`POST tipo=foto_voto`) y album (`POST tipo=album_voto`). Razon: `destinos_fotos.id` NO es un ancla estable.
+- **`destinos_fotos.id` NO es estable:** la nueva semantica REPLACE de la galeria (`DELETE` + reinsert deduplicado, ver abajo y BUG-056) re-crea las filas en cada guardado, por lo que un voto persistido contra ese `id` quedaria huerfano. Consecuencia: no sirve como ancla de voto -> refuerza el recorte del MVP.
+- **Guardar en album (UI nueva):** las fotos de viajeros estrenan "Guardar en album" alimentado por `GET ?tipo=albumes` + `POST tipo=album_agregar_foto`. La UI escapa todo con el helper cliente `galEsc()` (cierra un XSS preexistente en el inline de la ficha).
+- **`autor_original_id` null:** `album_agregar_foto` lo normaliza con `body.autor_original_id || usuarioId2` y el dedup se hace por SELECT; no se depende del indice unico (en Postgres los NULL son distintos y desactivarian el dedup).
+- **Blindaje de escritura del album (seguridad):** `album_agregar_foto` valida la PROPIEDAD del album (403 `ALBUM_AJENO`) y tipifica `23503` -> 400 `AUTOR_ORIGINAL_INVALIDO`. `album_voto` ahora llama `repartirXpReferidos` (delta real de `album_voto` = solo ese reparto; cierre del gap de ADR-027).
+- **Unificacion "Como llegar" + "Ubicacion":** `secTransporteHostal` (id="como-llegar") y `secMapa` (id="mapa") se fusionan en `secComoLlegar` (id="como-llegar", transporte arriba + mapa abajo), con UNA sola entrada de subnav `como-llegar` y anclas legacy invisibles `#fotos` y `#mapa`.
+- **Degradacion (nunca 503 por columna faltante):** helper `queryConAvatarFallback` en `api/interacciones.js` degrada `42703` (`usuarios.foto_url` ausente, migracion 004) reintentando con `avatar_url` en `museo_publico`, `album_detalle`, `galeria_destino` y `perfil_publico`. Es la mitigacion del BUG-060 (patron defensivo iniciado en BUG-051), no un sustituto de aplicar la migracion.
+- **Semantica REPLACE de `destinos_fotos`:** PUT/POST de `api/admin-destinos.js` y POST de `api/utilidades.js` deduplican por url + DELETE + reinsert, con guard anti-perdida (lista vacia -> 400 y NO borra). `admin.html` deja de hacer la doble escritura. Detalle en BUG-056.
+
+**Justificacion:** `items[]` aditivo da a la ficha un contrato unico sin tocar `galeria.html` ni borrar modulos previos, y mantiene el dedup por URL que la ficha ya aplicaba en `galAll`. Reutilizar `album_voto` y `album_agregar_foto` cierra la brecha G-07/D-12 y activa XP ya implementado sin endpoints nuevos (ADR-001). No persistir contadores y apoyar el voto en `interacciones`/`album_votos` respeta el patron del proyecto (nada derivable se guarda). No votar curadas en el MVP evita comprometer el contrato de voto con un `id` que la semantica REPLACE vuelve inestable; se documenta como recorte explicito, no como omision. Validar la propiedad del album y repartir referidos en `album_voto` cierra dos fallos reales de seguridad/consistencia que la nueva UI habria hecho visibles. La degradacion por query blinda las superficies contra el estado real de Neon (004 pendiente), siguiendo la leccion de BUG-021/BUG-051/BUG-060.
+
+**Impacto:** `api/interacciones.js` (extender `tipo=galeria_destino` con `incluir`/`usuario_id`/`items[]`/dedup; helper `queryConAvatarFallback`; 403 `ALBUM_AJENO` / 400 `AUTOR_ORIGINAL_INVALIDO` en `album_agregar_foto`; `repartirXpReferidos` en `album_voto`; casts `::text` en `dm_hilos` para el 42P08 de BUG-055); `api/pagina-destino.js` (una sola `#galeria` que fusiona `secGaleria` + `secFotos` con ancla legacy `#fotos`; `secComoLlegar` que fusiona transporte + mapa con ancla legacy `#mapa`; UI "Guardar en album"; helper `galEsc()`; fix de `cerrarPopoverGuardar`); `api/admin-destinos.js` (semantica REPLACE + `normFotosGaleria` + guards 400); `api/utilidades.js` (REPLACE en POST `?tipo=fotos`); `api/usuarios.js` (fallback de avatar en `perfil_publico`); `admin.html` (elimina la doble escritura de la galeria); `usuario-session.js` (nonce + Bearer en "Estuve aqui", cierra BUG-036); `scripts/smoke_auditoria_pagina_destino.js` (54 checks); `scripts/apply_004_foto_url.js` y `scripts/dedupe_destinos_fotos.js` (NUEVOS, sin versionar hasta el commit). NO se crean funciones serverless (8/8 de ADR-001 intacto); NO se modifica `galeria.html`; NO hay migracion de esquema nueva (se requiere APLICAR la 004 y crear el indice unico via script). Nota de version (ADR-006): los comentarios nuevos de `api/interacciones.js` se rotulan `v16`, pero el header real del archivo sigue en `v14` y no se agrego el bloque de changelog `v16`; inconsistencia de version a corregir en el commit.
+
+**Consecuencias positivas:**
+- Una sola galeria en la ficha con unidad visual y editorial, sin romper `galeria.html` (extension aditiva) ni las anclas historicas (`#fotos`).
+- Se activa `album_voto` y se estrena "Guardar en album" desde la ficha (cierra G-07/D-12) y se cierra un XSS preexistente del inline con `galEsc()`.
+- Se cierran dos fallos reales: IDOR de escritura en albumes (BUG-059) y el 42P08 de `dm_hilos` (BUG-055); `album_voto` entra en la piramide de referidos (ADR-027).
+- Las superficies de museo/galeria/albumes/perfil publico dejan de devolver 503 cuando falta `usuarios.foto_url` (BUG-060), y la galeria deja de acumular filas (BUG-056).
+
+**Consecuencias negativas / riesgos residuales:**
+- **No se puede votar fotos curadas en el MVP:** recorte explicito; candidato a una entrega futura con un ancla estable (no `destinos_fotos.id`).
+- **BUG-056 NO cerrado al 100% hasta ejecutar `scripts/dedupe_destinos_fotos.js --apply`:** los datos historicos duplicados siguen en Neon y el indice unico aun no existe.
+- **BUG-060 solo MITIGADO hasta aplicar la 004:** `usuarios.foto_url` sigue ausente en Neon; el avatar cae siempre a `avatar_url`.
+- **Header de version de `api/interacciones.js` desalineado** (`v14` real vs `v16` en los comentarios nuevos); deuda documental menor a corregir en el commit.
+- Persisten como bloqueantes heredados las migraciones 017/018 (TSK-103) y el commit/push/deploy de todo el working tree.
+
+**ADR previos relacionados:** ADR-001 (limite de las 8 funciones serverless de Vercel Hobby / presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / merge JSONB), ADR-004 (CSS scoped), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-017 (albumes y media), ADR-022 (constraints e indices de interacciones), ADR-023 (lectura de media), ADR-025 (sesion firmada / nonce, consumido por "Estuve aqui"), ADR-027 (piramide de referidos), ADR-028 (blindaje PII y patron `esAdminUsuario`). **Nota (ADR-006):** el presupuesto 8/8 se cita a ADR-001, NO a ADR-010 (multi-tema en tags JSONB); ver la nota de correccion de citas en la entrada ADR-010.
