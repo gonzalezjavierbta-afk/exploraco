@@ -19,6 +19,15 @@ function safeJSON(v) {
   try { return JSON.parse(v); } catch(_) { return null; }
 }
 
+// Normaliza el resumen corto (sintro): colapsa saltos/tabs y espacios
+// multiples a un espacio, recorta a 200 caracteres y devuelve null si
+// queda vacio (permite limpiar el campo desde el admin, ADR-034).
+function normSintro(v) {
+  if (v === undefined || v === null) return null;
+  var s = String(v).replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return s ? s.slice(0, 200) : null;
+}
+
 // Normaliza la galeria: descarta items sin url valida, deduplica por url (trim),
 // conserva el orden de entrada y el flag es_hero (unico lugar de la regla).
 function normFotosGaleria(lista) {
@@ -99,7 +108,7 @@ module.exports = async function handler(req, res) {
 
       var rows2 = await sql(
         'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region, '
-        + 'd.lead, d.descripcion, d.highlight, d.foto_hero, d.hero_bg, '
+        + 'd.lead, d.descripcion, d.highlight, d.sintro, d.foto_hero, d.hero_bg, '
         + 'd.lat, d.lng, d.radio_m, d.whatsapp, d.telefono, d.email, d.web, d.instagram, '
         + 'd.precio_desde, d.horario, d.emoji, d.status, d.destacado, d.verificado, '
         + 'd.booking, d.hostelworld, d.airbnb, d.tipo, d.capacidad, '
@@ -147,7 +156,7 @@ module.exports = async function handler(req, res) {
         + 'precio_desde, horario, emoji, hero_bg, foto_hero, '
         + 'booking, hostelworld, airbnb, '
         + 'tipo, capacidad, como_llegar, '
-        + 'status, destacado, verificado, tags, radio_m, '
+        + 'status, destacado, verificado, tags, radio_m, sintro, '
         + 'creado_en, actualizado_en '
         + ') VALUES ( '
         + '$1, $2, $3, '
@@ -158,7 +167,7 @@ module.exports = async function handler(req, res) {
         + '$18, $19, $20, $21, $22, '
         + '$23, $24, $25, '
         + '$26, $27, $28, '
-        + '$29, $30, $31, $32, $33, '
+        + '$29, $30, $31, $32, $33, $34, '
         + 'NOW(), NOW() '
         + ') '
         + 'ON CONFLICT (slug) DO UPDATE SET '
@@ -203,6 +212,7 @@ module.exports = async function handler(req, res) {
             return (b.radio_m !== undefined && b.radio_m !== null && b.radio_m !== ''
               && isFinite(rm) && rm >= 25 && rm <= 100000) ? rm : null;
           })(),
+          normSintro(b.sintro),
         ]
       );
 
@@ -301,6 +311,12 @@ module.exports = async function handler(req, res) {
         sets.push('radio_m = $' + pi2++);
         vals.push((b.radio_m !== null && b.radio_m !== '' && isFinite(rmUpd)
           && rmUpd >= 25 && rmUpd <= 100000) ? rmUpd : null);
+      }
+      // ADR-034: resumen corto (sintro). Se persiste normalizado y permite
+      // limpiar el campo (vacio -> null) sin romper el fieldMap generico.
+      if (b.sintro !== undefined) {
+        sets.push('sintro = $' + pi2++);
+        vals.push(normSintro(b.sintro));
       }
       if (b.destacado !== undefined) {
         sets.push('destacado = $' + pi2++);

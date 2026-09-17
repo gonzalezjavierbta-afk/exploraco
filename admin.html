@@ -913,6 +913,11 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div class="form-hint" id="hint-blog-desc" style="display:none">Modo blog: párrafos separados por una línea vacía. Marcadores inline como bloque propio: [foto:URL|caption] y [video:URL] (YouTube/Vimeo).</div>
         </div>
         <div class="form-group">
+          <label class="form-label">Sintesis (resumen corto, max 200)</label>
+          <input class="form-input" id="f-sintro" type="text" maxlength="200" placeholder="Lo mejor del lugar en una frase (abre la seccion Sobre este lugar)">
+          <div class="form-hint">Es "lo mejor del lugar": el resumen corto que abre la ficha. Max 200 caracteres.</div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Frase destacada (highlight box)</label>
           <input class="form-input" id="f-highlight" type="text" placeholder="Playa virgen · UNESCO · Guía kogui incluido">
           <div class="form-hint">3 puntos clave separados por · aparecen en un box dorado</div>
@@ -1217,14 +1222,23 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="form-section-divider" style="margin-top:16px">Actividades disponibles</div>
             <div class="form-hint">Actividades fijas que ofrece el hostal (no recurrentes por dia, ver tab Eventos para eso). Ej: gimnasio, tour propio, clases.</div>
             <div id="hostal-actividades-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-              <div class="hostal-actividad-row" style="display:grid;grid-template-columns:50px 1fr 2fr auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)">
+              <div class="hostal-actividad-row" style="display:grid;grid-template-columns:50px 1fr 2fr auto auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)">
                 <input class="form-input" value="🧘" placeholder="🧘" style="text-align:center;font-size:18px">
                 <input class="form-input" value="Yoga en la terraza" placeholder="Nombre de la actividad">
                 <input class="form-input" placeholder="Descripción breve">
+                <span style="display:flex;gap:4px;align-items:center">
+                  <button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalActividad(this,-1)" title="Subir" aria-label="Subir actividad">&#9650;</button>
+                  <button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalActividad(this,1)" title="Bajar" aria-label="Bajar actividad">&#9660;</button>
+                </span>
                 <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>
               </div>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="addHostalActividad()">+ Añadir actividad</button>
+
+            <div class="form-section-divider" style="margin-top:16px">Orden de los modulos</div>
+            <div class="form-hint">Cambia con las flechas el orden en que aparecen las secciones en la pagina publica del hostal. El orden se guarda con el lugar.</div>
+            <div id="hostal-modulos-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="resetHostalModulos()">Restablecer orden</button>
           </div>
         </div>
 
@@ -2665,7 +2679,7 @@ async function editPlace(id) {
 function clearForm() {
   /* ── Basic field IDs ── */
   var ids = ['f-name','f-slug','f-cat','f-city','f-region','f-barrio','f-address',
-             'f-price','f-emoji','f-color','f-lead','f-desc','f-highlight',
+             'f-price','f-emoji','f-color','f-lead','f-desc','f-sintro','f-highlight',
              'f-horario','f-tipo','f-capacidad','f-duracion','f-comotransporte',
              'f-whatsapp','f-tel','f-email','f-web','f-instagram','f-booking',
              'f-rating','f-reviews','f-lat','f-lng','f-radio-m','f-photo-hero','f-hero-bg',
@@ -2746,6 +2760,9 @@ function clearForm() {
   if(actList) actList.innerHTML = '';
   var qiList = document.getElementById('que-incluye-list');
   if(qiList) qiList.innerHTML = '';
+
+  /* -- Reset orden de modulos del hostal (ADR-034) -- */
+  if (typeof _renderHostalModulos === 'function') _renderHostalModulos(HOSTAL_MODULOS_ORDEN_DEFAULT.slice());
 
   /* ── Reset FAQ list ── */
   var faqList = document.getElementById('faq-builder-list');
@@ -3099,6 +3116,16 @@ function _buildTagsObj(p) {
     tagsObj.horario_detallado = p.horarioDetallado;
   }
 
+  /* orden_modulos (hostal, ADR-034): arreglo con el orden de las secciones
+     de la pagina publica. Es un arreglo de strings, no de objetos: no encaja
+     en CATEGORY_TAG_LISTS (que asume filas con collector). Se emite SIEMPRE
+     completo (los 12 ids). Mismo patron que temporada_matriz / horario_detallado. */
+  if (p.cat === 'hostal') {
+    var _ordenMod = (typeof collectHostalModulos === 'function') ? collectHostalModulos() : [];
+    if (!_ordenMod.length) _ordenMod = HOSTAL_MODULOS_ORDEN_DEFAULT.slice();
+    tagsObj.orden_modulos = _ordenMod;
+  }
+
   return tagsObj;
 }
 
@@ -3132,6 +3159,13 @@ function _applyTagsToLocal(local, tags, cat) {
   if (cat === 'comida' && tags.horario_detallado && typeof tags.horario_detallado === 'object') {
     local.horarioDetallado = tags.horario_detallado;
   }
+  /* orden_modulos (hostal, ADR-034): arreglo de ids. Si viene, reconstruye
+     el DOM de #hostal-modulos-list en ese orden; si no, usa el default. */
+  if (cat === 'hostal') {
+    var _ordenMod = Array.isArray(tags.orden_modulos) ? tags.orden_modulos : HOSTAL_MODULOS_ORDEN_DEFAULT.slice();
+    local.ordenModulos = _ordenMod;
+    if (typeof _renderHostalModulos === 'function') _renderHostalModulos(_ordenMod);
+  }
   /* Blog multi-tema: el grid lee tags.tema (unico). Al editar un post
      creado antes del multi-tema, tags.temas[] no existe -- se envuelve
      el valor unico en un array para que el select multiple lo muestre. */
@@ -3140,11 +3174,102 @@ function _applyTagsToLocal(local, tags, cat) {
   }
 }
 
+/* ---- ORDEN DE LOS MODULOS DEL HOSTAL (ADR-034) -------------
+   Lista canonica en su orden por defecto. El admin la reordena con
+   flechas; el orden efectivo vive en tags.orden_modulos[] y se emite
+   siempre completo desde _buildTagsObj(). No usa CATEGORY_TAG_LISTS
+   porque es un arreglo de STRINGS, no de objetos (mismo patron que
+   temporada_matriz / horario_detallado). */
+var HOSTAL_MODULOS_ORDEN_DEFAULT = ['descripcion','galeria','habitaciones','reservar','reglas-casa','actividades','eventos-hostal','como-llegar','contacto','faq','resenas','relacionados'];
+var HOSTAL_MODULOS_LABELS = {
+  'descripcion':'Descripcion',
+  'galeria':'Galeria',
+  'habitaciones':'Habitaciones',
+  'reservar':'Reservar',
+  'reglas-casa':'Reglas de casa',
+  'actividades':'Actividades',
+  'eventos-hostal':'Eventos del hostal',
+  'como-llegar':'Como llegar',
+  'contacto':'Contacto',
+  'faq':'FAQ',
+  'resenas':'Resenas',
+  'relacionados':'Relacionados'
+};
+
+/* Reconstruye #hostal-modulos-list en el orden recibido. Normaliza:
+   descarta ids desconocidos/duplicados y agrega al final los que falten,
+   asi que la lista SIEMPRE queda con los 12 modulos. */
+function _renderHostalModulos(orden) {
+  var list = document.getElementById('hostal-modulos-list');
+  if (!list) return;
+  var finales = [];
+  var vistos = {};
+  (Array.isArray(orden) ? orden : []).forEach(function(id){
+    if (HOSTAL_MODULOS_LABELS[id] && !vistos[id]) { vistos[id] = true; finales.push(id); }
+  });
+  HOSTAL_MODULOS_ORDEN_DEFAULT.forEach(function(id){
+    if (!vistos[id]) { vistos[id] = true; finales.push(id); }
+  });
+  var html = '';
+  finales.forEach(function(id){
+    html += '<div class="hostal-modulo-row" data-modulo="'+id+'" style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)">'
+      + '<span class="hostal-modulo-label" style="font-size:13px">'+HOSTAL_MODULOS_LABELS[id]+'</span>'
+      + '<span style="display:flex;gap:4px;align-items:center">'
+      + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalModulo(this,-1)" title="Subir" aria-label="Subir modulo">&#9650;</button>'
+      + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalModulo(this,1)" title="Bajar" aria-label="Bajar modulo">&#9660;</button>'
+      + '</span>'
+      + '</div>';
+  });
+  list.innerHTML = html;
+}
+
+/* Lee #hostal-modulos-list y devuelve los ids en el orden del DOM. */
+function collectHostalModulos() {
+  var out = [];
+  document.querySelectorAll('#hostal-modulos-list .hostal-modulo-row').forEach(function(row){
+    var id = row.getAttribute('data-modulo');
+    if (id) out.push(id);
+  });
+  return out;
+}
+
+/* Sube/baja una fila de la lista de modulos (intercambio con el hermano
+   anterior/siguiente). Prefijo hostal/modulo contra colisiones
+   (BUG-006/018/019). */
+function moveHostalModulo(btn, dir) {
+  if (!btn || !dir) return;
+  var row = btn.closest ? btn.closest('.hostal-modulo-row') : null;
+  if (!row || !row.parentNode) return;
+  var her = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+  if (!her || !her.classList || !her.classList.contains('hostal-modulo-row')) return;
+  if (dir < 0) row.parentNode.insertBefore(row, her);
+  else row.parentNode.insertBefore(her, row);
+}
+
+/* Restablece el orden por defecto de los modulos. */
+function resetHostalModulos() {
+  _renderHostalModulos(HOSTAL_MODULOS_ORDEN_DEFAULT.slice());
+}
+
+/* Sube/baja una fila de la lista de Actividades del hostal (ADR-034).
+   El orden del DOM ES el orden del arreglo: collectHostalActividades()
+   ya devuelve las filas en orden, asi que no se toca. Prefijo hostal
+   contra colisiones (BUG-006/018/019). */
+function moveHostalActividad(btn, dir) {
+  if (!btn || !dir) return;
+  var row = btn.closest ? btn.closest('.hostal-actividad-row') : null;
+  if (!row || !row.parentNode) return;
+  var her = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+  if (!her || !her.classList || !her.classList.contains('hostal-actividad-row')) return;
+  if (dir < 0) row.parentNode.insertBefore(row, her);
+  else row.parentNode.insertBefore(her, row);
+}
+
 function loadForm(p) {
   var map = {
     'f-name':p.name,'f-slug':p.slug,'f-cat':p.cat,'f-city':p.city,'f-region':p.region,
     'f-barrio':p.barrio,'f-address':p.address,'f-price':p.price,'f-emoji':p.emoji,
-    'f-color':p.color,'f-lead':p.lead,'f-desc':p.desc,'f-highlight':p.highlight,
+    'f-color':p.color,'f-lead':p.lead,'f-desc':p.desc,'f-sintro':p.sintro,'f-highlight':p.highlight,
     'f-horario':p.horario,'f-tipo':p.tipo,'f-capacidad':p.capacidad,
     'f-comotransporte':p.comotransporte,'f-whatsapp':p.whatsapp,'f-tel':p.tel,
     'f-email':p.email,'f-web':p.web,'f-instagram':p.instagram,'f-booking':p.booking,
@@ -3173,6 +3298,11 @@ function loadForm(p) {
 
   if(p.cat==='hostal') {
     setTimeout(function(){
+      /* orden de los modulos (ADR-034): reconstruye la lista con el orden
+         guardado en tags.orden_modulos (p.ordenModulos) o con el default. */
+      if (typeof _renderHostalModulos === 'function') {
+        _renderHostalModulos((p.ordenModulos && p.ordenModulos.length) ? p.ordenModulos : HOSTAL_MODULOS_ORDEN_DEFAULT.slice());
+      }
       /* habitaciones */
       var habList=document.getElementById('hab-list');
       if(habList&&p.habs&&p.habs.length){
@@ -3240,10 +3370,14 @@ function loadForm(p) {
         p.actividades.forEach(function(a){
           var row=document.createElement('div');
           row.className='hostal-actividad-row';
-          row.style.cssText='display:grid;grid-template-columns:50px 1fr 2fr auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+          row.style.cssText='display:grid;grid-template-columns:50px 1fr 2fr auto auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
           row.innerHTML='<input class="form-input" value="'+_esc(a.icono||'')+'" placeholder="🧘" style="text-align:center;font-size:18px">'
             +'<input class="form-input" value="'+_esc(a.nombre||'')+'" placeholder="Nombre de la actividad">'
             +'<input class="form-input" value="'+_esc(a.descripcion||'')+'" placeholder="Descripción breve">'
+            +'<span style="display:flex;gap:4px;align-items:center">'
+            +'<button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalActividad(this,-1)" title="Subir" aria-label="Subir actividad">&#9650;</button>'
+            +'<button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalActividad(this,1)" title="Bajar" aria-label="Bajar actividad">&#9660;</button>'
+            +'</span>'
             +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
           actList.appendChild(row);
         });
@@ -3813,6 +3947,7 @@ function savePlace() {
     city: v('f-city'), region: v('f-region'), barrio: v('f-barrio'),
     address: v('f-address'), price: v('f-price'), emoji: v('f-emoji'),
     color: v('f-color'), lead: v('f-lead'), desc: v('f-desc'),
+    sintro: v('f-sintro'),
     highlight: v('f-highlight'), horario: v('f-horario'), tipo: v('f-tipo'),
     capacidad: v('f-capacidad'), comotransporte: v('f-comotransporte'),
     whatsapp: v('f-whatsapp'), tel: v('f-tel'), email: v('f-email'),
@@ -3845,6 +3980,10 @@ function savePlace() {
        aqui mismo, pero 5 nunca llegaban a _placeToAPI() (BUG-B) y 2
        llegaban pero el backend las descartaba (BUG-C). */
     collectCategoryTagFields(p, 'hostal');
+    /* ADR-034: orden de los modulos del hostal (tags.orden_modulos).
+       Se lee del DOM de #hostal-modulos-list; _buildTagsObj() lo emite
+       siempre completo (12 ids). */
+    p.ordenModulos = (typeof collectHostalModulos === 'function') ? collectHostalModulos() : [];
     p.scores = {
       atmosfera: parseFloat(v('f-score-atmosfera'))||0,
       seguridad: parseFloat(v('f-score-seguridad'))||0,
@@ -5584,10 +5723,14 @@ function addHostalActividad() {
   if(!list) return;
   var row = document.createElement('div');
   row.className = 'hostal-actividad-row';
-  row.style.cssText = 'display:grid;grid-template-columns:50px 1fr 2fr auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
+  row.style.cssText = 'display:grid;grid-template-columns:50px 1fr 2fr auto auto;gap:6px;align-items:start;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border)';
   row.innerHTML = '<input class="form-input" placeholder="🧘" style="text-align:center;font-size:18px">'
     +'<input class="form-input" placeholder="Nombre de la actividad">'
     +'<input class="form-input" placeholder="Descripción breve">'
+    +'<span style="display:flex;gap:4px;align-items:center">'
+    +'<button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalActividad(this,-1)" title="Subir" aria-label="Subir actividad">&#9650;</button>'
+    +'<button class="btn btn-ghost btn-icon btn-sm" onclick="moveHostalActividad(this,1)" title="Bajar" aria-label="Bajar actividad">&#9660;</button>'
+    +'</span>'
     +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
   list.appendChild(row);
 }
@@ -5996,6 +6139,7 @@ function _placeToAPI(p) {
     lead:           p.lead||'',
     descripcion:    p.desc||'',
     highlight:      p.highlight||'',
+    sintro:         p.sintro||'',
     ciudad:         p.city||'',
     region:         p.region||'',
     barrio:         p.barrio||'',
@@ -6517,6 +6661,7 @@ function _mergeNeonRowIntoLocal(local, d) {
   local.price   = d.precio_desde  || local.price;
   local.tel     = d.telefono      || local.tel;
   local.desc    = d.descripcion   || local.desc;
+  local.sintro  = d.sintro        || local.sintro;
   local.rating  = d.rating        ? parseFloat(d.rating)      : local.rating;
   local.rev     = d.total_resenas ? parseInt(d.total_resenas)  : local.rev;
   local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;

@@ -848,6 +848,14 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 
 **ADR relacionados de esta actualizacion:** ADR-021 (capa audiovisual estricta / paridad de drawer), ADR-025 (sesion firmada: base de la recomendacion de BUG-061), ADR-028 (blindaje de identidad/PII).
 
+**Actualizacion (ADR-034, 2026-09-17) -- ajusta el hero de la ficha, no la decision de galeria unificada:**
+- **Hero de 12 a 4 fotos:** el hero de la ficha pasa de 12 miniaturas (`HERO_THUMBS_MAX=12`, TSK-106) a **4 fotos** (1 grande `foto_hero` + `HERO_THUMBS_MAX=3`: 2a curada por orden, viajero mas votado y album mas votado). La galeria unificada `#galeria` de esta ADR NO cambia: sigue con su composicion 1 grande + 12 miniaturas (6 curadas + 6 comunidad, `GAL_THUMBS_MAX=12`). Detalle completo en ADR-034.
+- **CTA "Ver galeria" retirado SOLO del hero:** se elimina el boton "Ver galeria" de la botonera del hero; el CTA homonimo de la franja `gstrip` (`.gscta`) SE CONSERVA. El boton "Ver galeria ampliada" de la seccion `#galeria` tambien se conserva.
+- **Botonera del hero resultante:** `Sitio web -> Contactar (WhatsApp o mailto) -> Como llegar -> Guardar -> Estuve aqui` (sin "Ver galeria").
+- **`items[]` / `incluir`:** el contrato aditivo de esta ADR se mantiene; `galeria.html` ahora lo consume con `incluir=viajeros,albumes` y suma la rama `mapas_de_destino` (ADR-034).
+
+**ADR relacionados de esta actualizacion:** ADR-030 (esta misma), ADR-034 (hero de 4 fotos y CTA retirado).
+
 ---
 
 ## ADR-031: Capa de media del mapa cultural -- album de destino agregado y visibilidad publica por defecto
@@ -966,3 +974,60 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 - El checkin de Activos Ocultos (`activos_ocultos_checkin`) NO usa `radio_m`: sigue con su heuristica propia (150/250). Alcance explicitamente fuera de esta ADR.
 
 **ADR previos relacionados:** ADR-001 (presupuesto 8/8), ADR-006 (baseline = archivo real / nota de version), ADR-008 (SQL versionado / idempotencia), ADR-012 (escalado de XP), ADR-018 (economia de XP), ADR-024 (presencia fisica, radios heuristicos y bono rural -- esta ADR agrega el radio configurable y el factor por amplitud), ADR-027 (reparto de XP), ADR-032 (misma migracion 019)
+
+---
+
+## ADR-034: Ficha de destino -- hero de 4 fotos con votos existentes, `destinos.sintro` curada, galeria 1+12 y orden de modulos por lugar (solo hostal)
+
+**ID:** ADR-034
+**Fecha:** 2026-09-17
+**Estado:** Aprobado e implementado en working tree (SIN commitear). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar `db/migrations/020_destinos_sintro.sql` en Neon (archivo COMPLETO en una corrida del editor SQL, patron BUG-021) ANTES del deploy**; despues, commit/push/deploy de los 6 archivos en un solo release.
+**Autor:** architect (AI-DOS) con decision de producto del Chief Architect; implementado y verificado en working tree (2026-09-17).
+**Nota de numeracion:** el 034 es el consecutivo real tras ADR-033 (mayor registrado en este documento).
+
+**Problema:** la ficha de destino tenia cuatro frentes abiertos. (1) Tras TSK-106/ADR-030 el hero mostraba 12 miniaturas: una parrilla pesada que competia con la botonera y el titulo, con un CTA "Ver galeria" que duplicaba el de la franja `gstrip`. (2) El subtitulo estilizado `.sintro` de la seccion "Sobre este lugar" se derivaba en el render (primeras 150 letras de `descripcion`, fallback `highlight`) y el admin no podia curarlo. (3) La galeria de la ficha no tenia una regla editorial de composicion (curadas vs comunidad) y `galeria.html` en modo destino mostraba una sola grilla indiferenciada, sin exponer albumes ni los mapas donde el destino esta guardado. (4) El orden de los modulos de la ficha era fijo y no servia a todos los hostales (p. ej. "Reservar" quedaba lejos de "Habitaciones/Precios" y "Contacto" lejos de "Como llegar"). Todo debia lograrse sin crear funciones serverless (presupuesto 8/8 agotado, ADR-001) y sin introducir un sistema de votacion NUEVO para las fotos curadas.
+
+**Opciones evaluadas:**
+1. **Crear votacion de fotos curadas / tabla nueva de votos:** descartada -- viola el presupuesto 8/8 (ADR-001) y `destinos_fotos.id` no es un ancla estable bajo la semantica REPLACE (recorte ya documentado en ADR-030).
+2. **Mantener el hero de 12 miniaturas (statu quo TSK-106):** descartada por decision de producto -- el hero quedaba saturado y la botonera perdia protagonismo; se prefirio una composicion curada de 4 fotos.
+3. **Subtitulo calculado en render vs columna persistida:** elegida la columna `destinos.sintro` (TEXT nullable) con fallback al calculo historico, para que el admin cure el texto sin perder el comportamiento previo en los destinos existentes.
+4. **Orden de modulos en columna relacional nueva vs en `tags` JSONB:** elegida `tags.orden_modulos` (array de ids) -- no toca el esquema relacional, viaja por el merge JSONB (ADR-003) y queda acotada a hostal.
+5. **`galeria.html` con una grilla unica vs secciones separadas:** elegidas 4 secciones (curadas / comunidad / albumes / mapas) + bloque de subida, para dar unidad editorial y exponer datos ya servidos por el backend.
+
+**Decision tomada:**
+- **Hero de 4 fotos (1 grande + 3 miniaturas).** `HERO_THUMBS_MAX=3`: imagen principal `foto_hero` y tres miniaturas compuestas por (1) la 2a foto curada por orden (sin repetir el hero), (2) la foto de viajero mas votada y (3) la foto de album mas votada; los faltantes se rellenan con las curadas restantes y, si aun faltan, con el resto de la comunidad, siempre con dedup por URL.
+- **Botonera del hero:** `Sitio web -> Contactar (WhatsApp o mailto) -> Como llegar -> Guardar -> Estuve aqui`. Se ELIMINA el CTA "Ver galeria" del hero; el CTA de la franja `gstrip` se CONSERVA.
+- **Sin votacion nueva:** los votos se leen de los mecanismos YA existentes (`interacciones.dims->>'voto_foto_id'` para la foto de viajero; `album_votos` para la foto de album). No se crean tablas, endpoints ni tipos de voto.
+- **`destinos.sintro` (migracion 020):** columna `TEXT` nullable, editable en el admin (tab GENERAL, `#f-sintro`, max 200); el render la usa con fallback a los 150 caracteres de `descripcion` o a `highlight`. Solo no-blog.
+- **Galeria de la ficha (1 grande + 12 miniaturas):** 1 foto grande aparte + 12 miniaturas = 6 curadas + 6 comunidad (merge de viajeros + albumes por votos DESC, dedup por URL); 4 columnas en escritorio, 2 en tablet y 1 en movil; si faltan de comunidad se completan con curadas. Nunca se repite la grande.
+- **`galeria.html` modo destino:** 4 secciones separadas (fotos curadas / comunidad / albumes del destino / mapas donde el destino esta guardado) + bloque de subida; consume `tipo=galeria_destino&incluir=viajeros,albumes` y el nuevo endpoint-logico `mapas_de_destino`.
+- **`api/interacciones.js`:** nueva rama GET `tipo=mapas_de_destino&destino_id=` (o `slug=`), con visibilidad `m.publico = true OR m.usuario_id = viewer`; el `viewer` se deriva de `validarSesion` (ADR-025) y es `null` sin sesion valida. Sin archivos nuevos en `api/` (8/8, ADR-001).
+- **Orden de modulos SOLO hostal:** `tags.orden_modulos` (array de ids `descripcion, galeria, habitaciones, reservar, reglas-casa, actividades, eventos-hostal, como-llegar, contacto, faq, resenas, relacionados`); default nuevo: "Reservar" tras "Habitaciones/Precios" y "Contacto" tras "Como llegar". El admin reordena con flechas los modulos del hostal (`HOSTAL_MODULOS_ORDEN_DEFAULT`, `_renderHostalModulos`) y la lista de Actividades (el orden del array `tags.actividades` ES el orden). Un array ausente, vacio o invalido deja el orden por defecto (cero regresion); los ids no listados se agregan al final.
+- **Persistencia de `sintro`:** `api/admin-destinos.js` la incluye en SELECT/INSERT/UPDATE (normalizada por `normSintro`) y `api/publicar-lugar.js` la acepta en el INSERT publico (status=draft).
+
+**Justificacion:** reutilizar los votos existentes (`voto_foto_id`, `album_votos`) da al hero y a la galeria una senal de calidad sin crear un subsistema de votacion ni tocar el esquema (ADR-001/ADR-030). Persistir `sintro` en una columna nullable mantiene el fallback historico y no reescribe datos existentes (Regla de Oro 3: Cero Borrado Logico). El orden de modulos en `tags.orden_modulos` es configuracion editorial, no esquema: viaja por el merge JSONB (ADR-003), no exige migracion y queda acotado a hostal sin afectar a las demas categorias. Separar `galeria.html` en 4 secciones expone albumes y mapas ya servidos por `interacciones.js` (incluida la nueva rama `mapas_de_destino`) sin endpoints nuevos y con visibilidad derivada de la sesion validada (ADR-025). Componer el hero con 4 fotos curadas mejora la jerarquia visual y deja mas peso a la botonera.
+
+**Impacto:**
+- `api/pagina-destino.js` (+283/-65): `HERO_THUMBS_MAX=3` y composicion del hero (L776-805); botonera (L2269-2277); `sobreIntro` con `d.sintro` + fallback (L860-868); orden de modulos de hostal (`SEC_HOSTAL_DEFAULT`, L2173-2214); galeria 1+12 (`GAL_THUMBS_MAX=12`, `GAL_CURADAS_MAX=6`, `GAL_COMUNIDAD_MAX=6`, L1573-1608) con CSS `.gal-thumbs` responsivo 4/2/1 (L311-313).
+- `api/interacciones.js` (+46/-0): rama GET `mapas_de_destino` (L2731-2767), con `destino_id`/`slug`, validacion de formato, `validarSesion` para el `viewer` y visibilidad `m.publico=true OR m.usuario_id=viewer`.
+- `api/admin-destinos.js` (+19/-3): `normSintro` (L22), `sintro` en el SELECT (L111), en el INSERT (L159/L215) y en el UPDATE (L315-319).
+- `api/publicar-lugar.js` (+12/-2): `normSintro` + `sintro` en el INSERT publico (status=draft).
+- `admin.html` (+150/-5): campo `#f-sintro` en el tab GENERAL (L917); `HOSTAL_MODULOS_ORDEN_DEFAULT` (L3183) y reorden por flechas de los modulos hostal + la lista de Actividades (`_renderHostalModulos`, L3177-3260); lectura/escritura de `tags.orden_modulos` en el collect/apply (L3119-3165); `sintro` en `_placeToAPI`/loadForm (L3950, L6142, L2721/L3304). **La galeria `galeria.html` ahora tiene 4 secciones + bloque de subida** y el admin reordena los modulos via `tags.orden_modulos` (este es el ajuste central de impacto del panel).
+- `galeria.html` (+153/-20): 4 secciones `.g-sec` ("Fotos del destino", "Fotos de la comunidad", "Albumes del destino", "Mapas con este destino", L150-205) + bloque de subida `#g-share`; consumo de `incluir=viajeros,albumes` (L627) y del nuevo `tipo=mapas_de_destino` (L676).
+- `db/migrations/020_destinos_sintro.sql` (NUEVA, 16 lineas, sin versionar): `ALTER TABLE destinos ADD COLUMN IF NOT EXISTS sintro TEXT;` (nullable, sin default; idempotente ADR-008, ASCII-safe ADR-002).
+- **Presupuesto de endpoints 8/8 INTACTO** (ADR-001): cero archivos nuevos en `api/`; `mapas_de_destino` es una rama `tipo=` de `api/interacciones.js`.
+- **Bug derivado:** BUGS_HISTORICOS.md BUG-062 (`addPhotoFieldWithUrl` genera `photo-url-input` y `getPhotos()` recolecta `.photo-url-inp`).
+
+**Consecuencias positivas:**
+- Hero mas limpio (4 fotos) con jerarquia clara y botonera protagonista; el CTA de galeria queda solo en el `gstrip` (sin duplicar).
+- El admin puede curar el texto de apertura (`sintro`) y el orden de los modulos del hostal sin tocar codigo ni esquema relacional.
+- `galeria.html` gana 4 secciones con albumes y mapas del destino, y una rama `mapas_de_destino` que respeta la privacidad (`publico` o dueno con sesion validada).
+- La galeria de la ficha mezcla curadas y comunidad con una regla explicita (6+6) y nunca repite la foto grande.
+
+**Consecuencias negativas / riesgos residuales:**
+- **Migracion 020 pendiente (BLOQUEANTE):** el INSERT/UPDATE de `admin-destinos.js` y `publicar-lugar.js` incluye `sintro`; hasta aplicar la 020 en Neon, persistir un destino falla por columna inexistente (patron BUG-021). El render degrada (si `d.sintro` no viene, usa el fallback), pero la escritura no.
+- **Las fotos de comunidad del hero/galeria no se pueden votar desde la ficha si no existe interaccion previa:** solo reflejan votos existentes; sin votos, el orden es el de llegada.
+- **BUG-062 (admin, MEDIA):** las fotos agregadas por Unsplash no se recolectan con `getPhotos()` (clase distinta); queda detectado, pendiente de correccion.
+- **Nota de version (ADR-006):** `api/interacciones.js` mantiene header `v14` mientras los comentarios nuevos se rotulan `v17`; deuda documental a resolver en el commit.
+
+**ADRs relacionados:** ADR-001 (presupuesto 8/8 de Vercel Hobby), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-016 (subcategorias y orden condicional), ADR-021 (capa publica de media), ADR-025 (sesion firmada / `validarSesion` para el `viewer`), ADR-030 (galeria unificada y `items[]`; esta ADR ajusta su hero de 12 a 4 fotos y retira el CTA del hero), ADR-031 (visibilidad publica del mapa), ADR-033 (radio; misma familia de configuracion por lugar).

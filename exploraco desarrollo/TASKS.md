@@ -2831,5 +2831,58 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-108: Ficha de destino -- hero de 4 fotos, `destinos.sintro` curada, galeria 1+12 y `galeria.html` con 4 secciones + orden de modulos por hostal [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-17, implementada en working tree, SIN commitear). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar `db/migrations/020_destinos_sintro.sql` en Neon (editor SQL, archivo COMPLETO, patron BUG-021) ANTES del deploy; despues, commit/push/deploy de los 6 archivos.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-17
+- **ADR:** DECISIONS.md ADR-034 (nuevo); ADR-030 queda actualizado (hero de 12 a 4 fotos y CTA "Ver galeria" retirado solo del hero).
+- **Responsable:** build (implementacion) + docs-keeper (cierre documental).
+- **Bug derivado:** BUGS_HISTORICOS.md BUG-062 (`addPhotoFieldWithUrl` usa `photo-url-input` y `getPhotos()` recolecta `.photo-url-inp`): DETECTADO, PENDIENTE, no corregido aqui.
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006; `git diff --numstat` = 6 archivos, +663/-95, mas 1 migracion nueva sin versionar):**
+
+  1. **Hero de 4 fotos.** `HERO_THUMBS_MAX=3` (1 grande `foto_hero` + 3 miniaturas): 2a foto curada por orden, viajero mas votado y album mas votado; faltantes rellenados con curadas restantes y luego comunidad, con dedup por URL (`api/pagina-destino.js` L776-805). Se ELIMINA el CTA "Ver galeria" del hero; el del `gstrip` se CONSERVA. Botonera: `Sitio web -> Contactar (WhatsApp o mailto) -> Como llegar -> Guardar -> Estuve aqui` (L2269-2277). Sin votacion nueva: se leen `interacciones.dims->>'voto_foto_id'` (viajero) y `album_votos` (album).
+  2. **`destinos.sintro`.** Migracion 020 agrega la columna TEXT nullable (16 lineas, idempotente ADR-008, ASCII-safe ADR-002). Persistida normalizada por `normSintro` en `api/admin-destinos.js` (SELECT/INSERT/UPDATE) y aceptada por `api/publicar-lugar.js`; editable en `admin.html` (`#f-sintro`, max 200, tab GENERAL). Render con fallback a los 150 chars de `descripcion` o `highlight` (L860-868).
+  3. **Galeria de la ficha 1+12.** 1 grande aparte + 12 miniaturas (6 curadas + 6 comunidad por votos DESC, dedup URL); si faltan de comunidad se completan con curadas; 4/2/1 columnas (escritorio/tablet/movil). `GAL_THUMBS_MAX=12`, `GAL_CURADAS_MAX=6`, `GAL_COMUNIDAD_MAX=6` (L1573-1608; CSS L311-313).
+  4. **`galeria.html` modo destino con 4 secciones + subida.** "Fotos del destino" (curadas), "Fotos de la comunidad", "Albumes del destino" y "Mapas con este destino" (`.g-sec`, L150-205), mas el bloque `#g-share`; consume `tipo=galeria_destino&incluir=viajeros,albumes` (L627) y la rama nueva `tipo=mapas_de_destino` (L676).
+  5. **Rama `mapas_de_destino`.** `GET /api/interacciones?tipo=mapas_de_destino&destino_id=<uuid>` (o `&slug=`): validacion de formato (400) y existencia (404); visibilidad `m.publico=true OR m.usuario_id=viewer`, con `viewer` derivado de `validarSesion` (ADR-025) y `null` sin sesion valida (L2731-2767). Cero endpoints nuevos (8/8, ADR-001).
+  6. **Orden de modulos SOLO hostal.** `tags.orden_modulos` (array de ids); default nuevo: Reservar tras Habitaciones/Precios y Contacto tras Como llegar (`SEC_HOSTAL_DEFAULT` L2179; `HOSTAL_MODULOS_ORDEN_DEFAULT` admin L3183). Admin reordena con flechas los modulos del hostal y la lista de Actividades (`_renderHostalModulos`; el orden del array `tags.actividades` ES el orden). Array ausente/vacio/invalido deja el default; ids no listados se agregan al final (cero regresion).
+
+- **Archivos en el working tree (SIN commitear; verificados con `git diff --numstat`):**
+  - `api/pagina-destino.js` (+283/-65): hero 4 fotos, `sintro`, galeria 1+12, orden de modulos de hostal.
+  - `api/interacciones.js` (+46/-0): rama GET `mapas_de_destino`.
+  - `api/admin-destinos.js` (+19/-3): `sintro` en SELECT/INSERT/UPDATE + `normSintro`.
+  - `api/publicar-lugar.js` (+12/-2): `sintro` en el INSERT publico (draft).
+  - `admin.html` (+150/-5): `#f-sintro`, `HOSTAL_MODULOS_ORDEN_DEFAULT`, reorden por flechas, `tags.orden_modulos`.
+  - `galeria.html` (+153/-20): 4 secciones + bloque de subida + `mapas_de_destino`.
+  - NUEVO sin versionar: `db/migrations/020_destinos_sintro.sql` (16 lineas, idempotente ADR-008, ASCII-safe ADR-002).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001). Cero archivos nuevos en `api/`.
+
+- **Evidencia (ADR-006, verificacion documental contra archivo real, 2026-09-17):**
+  - `db/migrations/020_destinos_sintro.sql` existe (untracked) y contiene `ALTER TABLE destinos ADD COLUMN IF NOT EXISTS sintro TEXT;`.
+  - `api/pagina-destino.js`: `HERO_THUMBS_MAX=3` L776, `sobreIntro` con `d.sintro` L865, `SEC_HOSTAL_DEFAULT` L2179, `GAL_THUMBS_MAX=12` L1577, `.gal-thumbs` 4/2/1 L311-313, botonera sin "Ver galeria" L2269-2277, "Ver galeria" solo en gstrip L848.
+  - `api/interacciones.js`: rama `mapas_de_destino` L2731; `validarSesion` en L2752.
+  - `api/admin-destinos.js`: `normSintro` L22, `sintro` L111/L159/L215/L315-319. `api/publicar-lugar.js`: `normSintro` L56, `sintro` L157/L198.
+  - `admin.html`: `#f-sintro` L917, `HOSTAL_MODULOS_ORDEN_DEFAULT` L3183, `photo-url-inp` L4644/L4656/L4675 vs `photo-url-input` L4149/L4159 (BUG-062).
+  - `galeria.html`: 4 secciones `.g-sec` L150-205, `incluir=viajeros,albumes` L627, `mapas_de_destino` L676.
+  - **NO se ejecutaron smokes ni `node --check` en esta sesion documental** (no se reportan resultados de pruebas no corridas). La QA funcional queda pendiente de la verificacion en vivo post-deploy.
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. **Aplicar `db/migrations/020_destinos_sintro.sql` en Neon** (editor SQL, archivo COMPLETO en una corrida; idempotente). Verificar que `destinos.sintro` existe antes de desplegar: sin ella, guardar un destino desde el admin o `publicar-lugar` falla por columna inexistente (patron BUG-021).
+  2. **Commit + push + deploy de los 6 archivos** (`api/pagina-destino.js`, `api/interacciones.js`, `api/admin-destinos.js`, `api/publicar-lugar.js`, `admin.html`, `galeria.html`) en un solo release junto con los pendientes previos sin commitear (TSK-095..TSK-107 + migraciones 015/016/017/018/019 + scripts de la 004). NO mezclar los 3 archivos borrados ajenos.
+  3. **Verificacion en vivo:** hero con 4 fotos y sin CTA "Ver galeria" en la ficha (y con el CTA conservado en el gstrip); `sintro` curado visible en "Sobre este lugar"; galeria 1+12 con curadas + comunidad; `galeria.html?destino=<slug>` con las 4 secciones (incluida "Mapas con este destino"); orden de modulos hostal reordenado por flechas en admin.
+
+- **Hallazgos / pendientes derivados:**
+  - **BUG-062 DETECTADO:** fotos agregadas por Unsplash no se recolectan con `getPhotos()` en `admin.html` (clase `photo-url-input` vs `.photo-url-inp`); no corregido en esta entrega.
+  - **Migracion 020 pendiente (BLOQUEANTE):** el render degrada con fallback, pero la escritura de `sintro` falla hasta aplicar la columna.
+  - **Nota de version (ADR-006):** `api/interacciones.js` mantiene header `v14` mientras los comentarios citan `v17`; deuda documental a resolver en el commit.
+  - **Sin UI de alta de bookmark (`guardar_media`):** siguen los pendientes de TSK-107 (no relacionados con esta tarea).
+
+- **Fuera de alcance:** BUG-062 (solo registrado); BUG-061 (escalado a `sql-security`); UI de alta de bookmark (`guardar_media`); verificacion en vivo (post-deploy).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

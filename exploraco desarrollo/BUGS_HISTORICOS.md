@@ -1021,6 +1021,21 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `api/interacciones.js` L4136 (`var usuarioId2= body.usuario_id || null;`), L1911 (`function validarSesion`), L5024-5035 (rama `tipo='foto'`); `galeria.html` `gShareFoto()` (cliente nuevo que expone el flujo).
 **Estado:** ABIERTO (working tree, 2026-09-16); NO corregido en TSK-106 por decision H-2. Escalar a `sql-security`.
 
+## BUG-062: fotos agregadas por Unsplash no se recolectan en `admin.html` -- `addPhotoFieldWithUrl` usa la clase `photo-url-input` y `getPhotos()` busca `.photo-url-inp`
+
+**Severidad:** MEDIA (perdida silenciosa de datos: fotos elegidas por el buscador de Unsplash se ven en la grilla pero no se guardan).
+**Contexto:** detectado durante la sesion ADR-034 (2026-09-17), revisando el flujo de fotos del admin. Es PREEXISTENTE (no lo introdujo ADR-034) y se registra como "detectado, pendiente" (no corregido en esta entrega).
+**Sintoma:** al agregar una foto con el buscador de Unsplash, la fila aparece en `#photo-list` y en la grilla de vista previa, pero al guardar el destino esa foto NO se persiste: `getPhotos()` la ignora.
+**Causa raiz:** inconsistencia de nombre de clase CSS entre los generadores de filas y el recolector:
+  - `renderPhotoList()` (L4644) y `addPhotoField()` (L4656) generan `<input class="form-input photo-url-inp" ...>`.
+  - `addPhotoFieldWithUrl()` (L4149, ruta de Unsplash) genera `<input class="form-input photo-url-input" ...>` (con `-input`, sin la abreviatura).
+  - `getPhotos()` (L4673-4679) recolecta con `document.querySelectorAll('#photo-list .photo-url-inp')`, por lo que solo lee las filas con la clase historica.
+  - Como efecto colateral, `showPhotoGrid()` (L4156-4164) busca `.photo-url-input`, asi que la vista previa SI muestra la foto de Unsplash (lo que oculta el fallo: la foto se ve pero no se guarda).
+**Impacto:** perdida silenciosa de fotos de galeria curadas por el buscador de Unsplash; no hay error visible en el admin. Afecta solo a `admin.html` (no a la API ni al render publico).
+**Recomendacion (pendiente):** unificar la clase en una sola (`.photo-url-inp`) para `addPhotoFieldWithUrl()` y `showPhotoGrid()`, o exponer un selector/clase compartida; agregar un smoke que verifique que `getPhotos()` incluye una fila creada por todas las rutas de alta. Prevencion: mismo principio de BUG-006/007/012 (una sola fuente para el nombre del contrato, aplicado aqui a una clase de recoleccion).
+**Evidencia (ADR-006):** `admin.html` L4149 (`addPhotoFieldWithUrl` -> `photo-url-input`), L4159 (`showPhotoGrid` -> `.photo-url-input`), L4644/L4656 (`renderPhotoList`/`addPhotoField` -> `photo-url-inp`), L4673-4675 (`getPhotos` -> `.photo-url-inp`).
+**Estado:** DETECTADO, PENDIENTE (working tree, 2026-09-17). NO corregido en la entrega ADR-034; no bloqueante para el deploy pero si para la integridad de las galerias cargadas por Unsplash.
+
 ---
 
 ## Pendientes operativos del lote "promptarreglos" (2026-09-16) -- requieren `DATABASE_URL` / Neon

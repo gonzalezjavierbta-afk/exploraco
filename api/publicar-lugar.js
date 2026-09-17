@@ -53,6 +53,15 @@ function slug(nombre, ciudad) {
     + '-' + Math.random().toString(36).slice(2,6);
 }
 
+// Normaliza el resumen corto (sintro): colapsa saltos/tabs y espacios
+// multiples a un espacio, recorta a 200 caracteres y devuelve null si
+// queda vacio (ADR-034). Misma practica que api/admin-destinos.js.
+function normSintro(v) {
+  if (v === undefined || v === null) return null;
+  var s = String(v).replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return s ? s.slice(0, 200) : null;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -145,7 +154,7 @@ module.exports = async function handler(req, res) {
       + 'precio_desde, horario, '
       + 'foto_hero, '
       + 'booking, hostelworld, airbnb, '
-      + 'tipo, tags, '
+      + 'tipo, tags, sintro, '
       + 'status, destacado, verificado, '
       + 'creado_en, actualizado_en '
       + ') VALUES ( '
@@ -157,7 +166,7 @@ module.exports = async function handler(req, res) {
       + '$17,$18, '
       + '$19, '
       + '$20,$21,$22, '
-      + '$23,$24, '
+      + '$23,$24, $25, '
       + "'draft',false,false, "
       + 'NOW(),NOW() '
       + ') RETURNING id, slug',
@@ -186,6 +195,7 @@ module.exports = async function handler(req, res) {
         body.airbnb_url         || null,                 // airbnb
         body.tipo_alojamiento   || null,                 // tipo
         JSON.stringify(tags),
+        normSintro(body.sintro),
       ]
     );
 

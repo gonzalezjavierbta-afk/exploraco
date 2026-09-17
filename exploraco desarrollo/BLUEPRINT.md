@@ -53,7 +53,9 @@ Documentacion maestra del sistema social/gaming (detalle completo; BLUEPRINT res
 ## 3. Modelo de datos (Neon PostgreSQL)
 
 ### Tabla `destinos` (principal)
-Campos fijos comunes a las 4 categorias: id, slug, nombre, categoria_slug, lead, descripcion, highlight, ciudad, region, barrio, address, lat, lng, whatsapp, telefono, email, web, instagram, precio_desde, horario, emoji, hero_bg, foto_hero, rating, total_resenas, status, destacado, verificado, booking, hostelworld, airbnb, tipo, capacidad, como_llegar, tags (jsonb), creado_en, actualizado_en.
+Campos fijos comunes a las 4 categorias: id, slug, nombre, categoria_slug, lead, descripcion, highlight, sintro, ciudad, region, barrio, address, lat, lng, whatsapp, telefono, email, web, instagram, precio_desde, horario, emoji, hero_bg, foto_hero, rating, total_resenas, status, destacado, verificado, booking, hostelworld, airbnb, tipo, capacidad, como_llegar, tags (jsonb), creado_en, actualizado_en.
+
+Nota ADR-034 (ficha de destino): `sintro` es una columna TEXT nullable (max 200, editable en el admin tab GENERAL, `#f-sintro`) con el subtitulo de apertura de la seccion "Sobre este lugar". El render la usa con fallback a los 150 caracteres de `descripcion` o a `highlight` (`api/pagina-destino.js`, variable `sobreIntro`). Se persiste normalizada por `normSintro` en `api/admin-destinos.js` (SELECT/INSERT/UPDATE) y `api/publicar-lugar.js`. Requiere aplicar `db/migrations/020_destinos_sintro.sql` en Neon (patron BUG-021) antes del deploy: hasta entonces el INSERT/UPDATE con `sintro` falla por columna inexistente.
 
 Nota TSK-095: `verificado` (booleano) es COLUMNA gestionada por admin-destinos.js con el patron identico a `destacado` (guard `!== undefined` en UPDATE permite desmarcar/DESTILDAR). Es control INTERNO del admin (checkbox `f-verificado` en admin.html); pagina-destino.js NO renderiza ninguna insignia publica del campo. Ver DECISIONS.md ADR-019. La columna `address` (campo `f-address` del admin, codigo) YA se persiste en Neon: `admin.html` `_placeToAPI` la envia en POST y PUT (L5807); `api/admin-destinos.js` INSERT la persiste (L103 columnas, `$10`, L137 valores) y el fieldMap del UPDATE la incluye (L220); `api/pagina-destino.js` lee `d.address || d.barrio` (L764, el chip del hero muestra la direccion exacta cuando existe y cae a `barrio` si no). Unica accion manual pendiente: APLICAR la migracion `db/migrations/011_ficha_direccion_destinos.sql` en el editor SQL de Neon (`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS address TEXT;`, idempotente, patron ADR-008) -- hasta aplicarla, el INSERT/UPDATE de admin-destinos.js fallaria al persistir un destino con `address` porque la columna no existiria aun.
 
@@ -99,7 +101,7 @@ Deuda detectada (patron BUG-021): `interacciones.activo` y `usuarios.bio`/`usuar
 El campo `destinos.tags` es el mecanismo que permite escalar a nuevas categorias sin alterar el esquema relacional. Cada categoria define su propia forma de tags:
 
 - **Sitio** (implementado): tipo_actividad, dificultad, dificultad_desc, dificultad_tags[] (Sprint 2: {texto, apto:boolean}), duracion, altitud, horario_visita, precio_entrada, distancia, como_llegar, temporada (legado, rangos de texto), temporada_matriz (Sprint 2: objeto {Ene..Dic: ideal|posible|evitar}), permisos, tours[] (Sprint 2: + tipo_tour, idioma, max_personas), equipamiento[], entradas[], itinerario[], fauna_flora, secretos, regulaciones. **ADR-016:** `subcategoria` (slug ASCII de lista cerrada) + claves nuevas condicionales: colecciones[], recorridos[], accesibilidad[], programacion[], musica_vivo{}, cover{} (objeto {valor, nota} solo para cover condicional nocturno; fallback legacy `cover_valor`/`cover_nota`), codigo_vestimenta, happy_hour{}, atracciones[], horarios_zona[], actividades_gratis[], que_ver[], contexto.
-- **Hostal** (implementado, Sprint 3 / TASK-001): tipo_alojamiento, politica_cancelacion, edad_minima, mascotas, cocina_compartida, actividades[], reglas_casa, que_incluye[].
+- **Hostal** (implementado, Sprint 3 / TASK-001): tipo_alojamiento, politica_cancelacion, edad_minima, mascotas, cocina_compartida, actividades[], reglas_casa, que_incluye[]. **ADR-034:** `orden_modulos[]` (array de ids con el orden de las secciones de la ficha hostal; ver seccion 5).
 - **Comida** (implementado, Sprint 4 / TASK-002): tipo_comida, cocina, precio_promedio, reservas, menu_destacado[], horario_detallado{}, opciones_dieta[], ambiente, terraza, domicilio, domicilio_plataformas[]. **ADR-016:** `subcategoria` (slug ASCII de lista cerrada).
 - **Evento** (implementado, Sprint 5 / TASK-003): fecha_inicio, fecha_fin, edicion, sede, lineup[], agenda[], categorias_entrada[], que_llevar[], prohibido[]. **ADR-016:** `subcategoria` (slug ASCII de lista cerrada). Nota: "capacidad" y "entrada desde" se evaluaron para esta categoria pero NO se agregaron como campos de `tags` -- el admin ya tenia inputs propios (`f-aforo`/`f-entrada-desde`) duplicando 1 a 1 los campos genericos ya existentes y compartidos por las 4 categorias (`f-capacidad` -> columna `destinos.capacidad`; `f-price` -> columna `destinos.precio_desde`). Se eliminaron los duplicados y Evento reusa esos 2 campos genericos (ver BUGS_HISTORICOS.md BUG-019, punto 6).
 
@@ -140,6 +142,8 @@ Nota Sprint 2 (Paridad Visual): secDificultad, secSitio (bloque Temporada) y sec
 
 ### Secciones especificas de "Hostal" (implementadas, Sprint 3 / TASK-001)
 secHostalActividades (Actividades disponibles), secHostalReglas (Reglas de la casa).
+
+**Orden de modulos (hostal, ADR-034):** SOLO para `cat==='hostal'`, las secciones se ensamblan desde un array `{id, html}` para permitir el override del admin via `tags.orden_modulos` (array de ids). Los ids validos son `descripcion, galeria, habitaciones, reservar, reglas-casa, actividades, eventos-hostal, como-llegar, contacto, faq, resenas, relacionados`. Default nuevo (`SEC_HOSTAL_DEFAULT` en `api/pagina-destino.js` y `HOSTAL_MODULOS_ORDEN_DEFAULT` en `admin.html`): **Reservar justo tras Habitaciones/Precios y Contacto justo tras Como llegar**. Un `tags.orden_modulos` ausente, vacio o con ids invalidos deja el orden por defecto; los ids validos del admin mandan y los no listados se agregan al final (cero regresion). El admin (`_renderHostalModulos`) reordena con flechas los modulos del hostal y la lista de Actividades (el orden del array `tags.actividades` ES el orden). Las demas categorias conservan su concatenacion fija. Detalle: DECISIONS.md ADR-034.
 
 ### Secciones especificas de "Comida" (implementadas, Sprint 4 / TASK-002)
 secPerfilComida (perfil: tipo_comida/cocina/precio_promedio/ambiente), secMenuDestacado, secHorariosComida, secDeliveryComida (opciones dieteticas + domicilio).
@@ -197,6 +201,19 @@ Dos paginas estaticas nuevas completan el ciclo social del perfil. Ambas son ass
 | `registro.html` | Alta de usuario con captura de `?ref=<codigo>` (cierra BUG-035/BUG-044/BUG-045) | `POST /api/usuarios` con `codigo_referido`; `usuario-session.js` captura `?ref=` con TTL de 30 dias |
 
 `mi-perfil.html` (perfil propio) redirige a `perfil.html?id=<uuid>` cuando recibe el parametro `id` (fix R-3). El perfil publico NUNCA expone PII: `api/usuarios.js` v12 proyecta un subconjunto publico (sin email/tokens/`device_hashes`/`codigo_referido`) y reserva el detalle completo al admin o al dueno.
+
+## 5-quinquies. galeria.html - modo destino (4 secciones + subida, ADR-034)
+
+`galeria.html` (asset frontend, no funcion serverless) tiene un modo destino (`?destino=<slug>`) que desde ADR-034 separa el contenido en 4 secciones `.g-sec` + un bloque de subida:
+
+| Seccion | id | Fuente |
+|---|---|---|
+| Fotos del destino (curadas) | `g-sec-dest` | `tipo=galeria_destino` (`items[]` con `origen='curada'`) |
+| Fotos de la comunidad | `g-sec-com` | `tipo=galeria_destino&incluir=viajeros,albumes` (`origen='viajero'` + `origen='album'`, orden por votos DESC) |
+| Albumes del destino | `g-sec-albumes` | mismo `items[]` agrupado por album (`gAlbumesDeItems`) |
+| Mapas con este destino | `g-sec-mapas` | RAMA NUEVA `GET /api/interacciones?tipo=mapas_de_destino&destino_id=<uuid>` (o `&slug=`) |
+
+El bloque de subida (`#g-share`) permite compartir una foto al destino (`POST tipo=foto`; requiere sesion y nivel 2, ver BUG-061). La rama `mapas_de_destino` devuelve los mapas tematicos que guardan el destino con visibilidad `m.publico = true OR m.usuario_id = viewer`, donde el `viewer` se deriva de `validarSesion` (ADR-025) y es `null` sin sesion valida. Las secciones se ocultan si no tienen contenido (`gSecVis`). Detalle: DECISIONS.md ADR-034.
 
 ## 6. admin.html - sistema de formularios (baseline referencial ~7.800 lineas)
 

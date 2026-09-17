@@ -308,7 +308,9 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".gal-i img{width:100%;height:100%;object-fit:cover}"
 +".gal-main{aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;cursor:pointer;transition:transform .15s}"
 +".gal-main:hover{transform:scale(1.005)}"
-+".gal-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px}"
++".gal-thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}"
++"@media(max-width:900px){.gal-thumbs{grid-template-columns:repeat(2,1fr)}}"
++"@media(max-width:520px){.gal-thumbs{grid-template-columns:repeat(1,1fr)}}"
 +".glbtn{display:inline-block;margin-top:16px;background:transparent;border:1.5px solid var(--gold);color:var(--gold-dark);border-radius:4px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}"
 +".glbtn:hover{background:var(--gold);color:#fff}"
 +"#lb{position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;padding:4%}"
@@ -539,9 +541,14 @@ function topRelacionados(d, candidatos, n) {
   return scored.slice(0, n).map(function(s){ return s.row; });
 }
 
-function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLider) {
+function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLider, fotosViajeros, fotosAlbum) {
   var cat   = d.categoria_slug || 'sitio';
   var relacionados = relacionados || [];
+  // ADR-034: fotos de comunidad (viajeros + albumes) para el hero y la
+  // galeria. Son opcionales al final de la firma para no romper llamadas
+  // existentes (smokes/loaders) y degradan a [] si no llegan.
+  var comunidadViajeros = Array.isArray(fotosViajeros) ? fotosViajeros : [];
+  var comunidadAlbum    = Array.isArray(fotosAlbum) ? fotosAlbum : [];
   var label = CAT_LABEL[cat] || 'Destino';
   var dir   = CAT_DIR[cat]   || 'index.html';
   var grad  = d.hero_bg || CAT_GRAD[cat] || CAT_GRAD.sitio;
@@ -742,18 +749,60 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   var hasLatLng = d.lat && d.lng && parseFloat(d.lat)!==0 && parseFloat(d.lng)!==0;
 
-  // -- HERO: imagen principal + grid de hasta 12 mas -------------
-  // TSK-106 (PROBLEMA 4): el hero mostraba solo 3 miniaturas
-  // (slice(1,4)) aunque galAll trae hasta 12 fotos. El limite se
-  // define con constante para evitar el numero magico.
-  var HERO_THUMBS_MAX = 12;
-  var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
-  var heroThumbs = '';
-  if (galAll.length > 1) {
-    heroThumbs = galAll.slice(1, HERO_THUMBS_MAX + 1).map(function(u){
-      return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"></div>';
-    }).join('');
+  // -- COMUNIDAD (ADR-034): merge viajeros + albumes por votos DESC ----
+  // Se normaliza cada item a {url, votos} y se deduplica por URL. Sirve
+  // tanto al hero (top por fuente) como a la galeria (merge global).
+  function comUrl(x) { return (x && x.url) ? String(x.url).trim() : ''; }
+  function comVotos(x) { var v = parseInt(x && x.votos, 10); return isNaN(v) ? 0 : v; }
+  function ordenaComunidad(arr) {
+    return (arr || []).map(function(x){ return { url: comUrl(x), votos: comVotos(x) }; })
+      .filter(function(x){ return !!x.url; })
+      .sort(function(a, b){ return b.votos - a.votos; });
   }
+  var viajerosOrden = ordenaComunidad(comunidadViajeros);
+  var albumOrden    = ordenaComunidad(comunidadAlbum);
+  var comunidadMerge = viajerosOrden.concat(albumOrden);
+  comunidadMerge.sort(function(a, b){ return b.votos - a.votos; });
+  var comunidadUrls = [];
+  comunidadMerge.forEach(function(x){
+    if (comunidadUrls.indexOf(x.url) === -1) comunidadUrls.push(x.url);
+  });
+
+  // -- HERO: imagen principal + 3 miniaturas (ADR-034) -----------------
+  // Composicion: (1) 2a foto curada por orden (sin repetir el hero),
+  // (2) foto de viajero mas votada, (3) foto de album mas votada. Los
+  // faltantes se rellenan con curadas restantes y, si aun faltan, con el
+  // resto de la comunidad; siempre sin duplicar URL.
+  var HERO_THUMBS_MAX = 3;
+  var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
+  var curadasTodas = [];
+  (fotos || []).forEach(function(f){
+    var u = (f && f.url) ? String(f.url).trim() : (typeof f === 'string' ? String(f).trim() : '');
+    if (!u) return;
+    if (curadasTodas.indexOf(u) !== -1) return;
+    curadasTodas.push(u);
+  });
+  var curadasOrden = curadasTodas.filter(function(u){ return u !== hero; });
+  var segundaCurada = '';
+  if (curadasTodas.length > 1 && curadasTodas[1] !== hero) segundaCurada = curadasTodas[1];
+  if (!segundaCurada && curadasOrden.length) segundaCurada = curadasOrden[0];
+  var heroThumbsList = [];
+  function addHeroThumb(u) {
+    if (!u) return;
+    u = String(u).trim();
+    if (!u || u === hero) return;
+    if (heroThumbsList.indexOf(u) !== -1) return;
+    if (heroThumbsList.length >= HERO_THUMBS_MAX) return;
+    heroThumbsList.push(u);
+  }
+  addHeroThumb(segundaCurada);
+  addHeroThumb(viajerosOrden.length ? viajerosOrden[0].url : '');
+  addHeroThumb(albumOrden.length ? albumOrden[0].url : '');
+  curadasOrden.forEach(addHeroThumb);
+  comunidadUrls.forEach(addHeroThumb);
+  var heroThumbs = heroThumbsList.map(function(u){
+    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"></div>';
+  }).join('');
 
   // -- HQI: chips de informacion rapida bajo el titulo (TSK-013 Hero) --
   // BUG-011 fix (ver BUGS_HISTORICOS.md): antes existia una SEGUNDA
@@ -809,9 +858,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     ? parseBlogBody(d.descripcion || '')
     : (d.descripcion ? '<p class="stext">'+esc(d.descripcion)+'</p>' : '');
   // TSK-076: el lead (d.lead) se elimino como parrafo suelto; en su lugar
-  // sobreIntro abre el texto con un subtitulo estilizado (primeras 150
-  // letras de la descripcion, o highlight como fallback). Solo no-blog.
-  var sobreIntro = (cat !== 'blog') ? (d.descripcion ? d.descripcion.replace(/\s+/g,' ').substring(0,150).replace(/\s\S*$/,'') : (d.highlight||'')) : '';
+  // sobreIntro abre el texto con un subtitulo estilizado. ADR-034: si el
+  // admin cargo d.sintro (columna destinos.sintro, migracion 020) ese valor
+  // manda; si no, se conserva el calculo historico (primeras 150 letras de
+  // la descripcion, o highlight como fallback). Solo no-blog.
+  var sobreIntro = (cat !== 'blog') ? (d.sintro ? String(d.sintro).replace(/\s+/g,' ').trim() : (d.descripcion ? d.descripcion.replace(/\s+/g,' ').substring(0,150).replace(/\s\S*$/,'') : (d.highlight||''))) : '';
   var secDescripcion = '<section class="ssec bwarm" id="descripcion"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+descTitleGeneric+'</h2><div class="stnum">'+nextNum()+'</div></div>'
     + (sobreIntro ? '<p class="sintro">'+esc(sobreIntro)+'</p>' : '')
@@ -1518,9 +1569,42 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // bloque curado y el lightbox usan > 1 (gate historico), que cumple
   // "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0 curadas.
   var hayGaleriaCurada = galAll.length > 1;
+  // ADR-034: set explicito de la galeria. La grande (curada #1 / hero) se
+  // mantiene aparte y se arman hasta 12 miniaturas: 6 curadas (en orden,
+  // excluyendo la grande) + 6 de comunidad (merge viajeros+albumes por
+  // votos DESC, dedup URL). Si hay menos de 6 de comunidad se completan con
+  // curadas restantes; nunca se repite la grande.
+  var GAL_THUMBS_MAX = 12;
+  var GAL_CURADAS_MAX = 6;
+  var GAL_COMUNIDAD_MAX = 6;
+  var galBig = galAll[0];
+  var galCuradasThumbs = [];
+  for (var gci = 1; gci < galAll.length && galCuradasThumbs.length < GAL_CURADAS_MAX; gci++) {
+    if (galAll[gci] !== galBig && galCuradasThumbs.indexOf(galAll[gci]) === -1) galCuradasThumbs.push(galAll[gci]);
+  }
+  var galComunidadThumbs = [];
+  for (var gcj = 0; gcj < comunidadUrls.length && galComunidadThumbs.length < GAL_COMUNIDAD_MAX; gcj++) {
+    var gcu = comunidadUrls[gcj];
+    if (gcu === galBig) continue;
+    if (galCuradasThumbs.indexOf(gcu) !== -1) continue;
+    if (galComunidadThumbs.indexOf(gcu) !== -1) continue;
+    galComunidadThumbs.push(gcu);
+  }
+  var galThumbsList = galCuradasThumbs.concat(galComunidadThumbs);
+  if (galThumbsList.length < GAL_THUMBS_MAX) {
+    for (var gk = 1; gk < galAll.length && galThumbsList.length < GAL_THUMBS_MAX; gk++) {
+      var gku = galAll[gk];
+      if (gku === galBig || galThumbsList.indexOf(gku) !== -1) continue;
+      galThumbsList.push(gku);
+    }
+  }
+  if (galThumbsList.length > GAL_THUMBS_MAX) galThumbsList = galThumbsList.slice(0, GAL_THUMBS_MAX);
+  // GAL_ALL para el lightbox: la grande + las miniaturas en el MISMO orden
+  // que la grilla, para que los indices de abrirLightbox() sigan alineados.
+  var galLightbox = [galBig].concat(galThumbsList);
   var galCuradaHTML = hayGaleriaCurada
-    ? '<div class="gal-main" style="background-image:url(\''+esc(galAll[0])+'\')" onclick="abrirLightbox(0)"></div>'
-      + '<div class="gal-thumbs">'+galAll.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+i+')"></div>'; }).join('')+'</div>'
+    ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')" onclick="abrirLightbox(0)"></div>'
+      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+(i+1)+')"></div>'; }).join('')+'</div>'
       + btnGaleriaAmpliada
     : '';
   var secGaleria = '<section class="ssec bwarm" id="galeria">'
@@ -2031,6 +2115,56 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + '<div class="rcscroll">'+rcCards+'</div></div></section>';
   }
 
+  // -- ORDEN DE MODULOS: hostal (ADR-034) ---------------------------
+  // Solo para cat==='hostal'. Las secciones se ensamblan desde un array
+  // {id, html} para permitir el orden por defecto nuevo (Reservar justo
+  // tras Habitaciones; Contacto justo tras Como llegar) y el override del
+  // admin via tags.orden_modulos. Las demas categorias conservan su
+  // concatenacion fija de siempre.
+  // Normaliza tags.orden_modulos: descarta ids que no son string, ids
+  // desconocidos y duplicados. Helper local compartido por el ensamblado
+  // de secciones (secHostalOrden) y por el subnav sticky, para que ambos
+  // reflejen exactamente el mismo orden.
+  function normalizarOrdenModulosHostal(raw, mapa) {
+    var out = [];
+    if (!Array.isArray(raw)) return out;
+    raw.forEach(function(id){
+      if (typeof id !== 'string') return;
+      if (!Object.prototype.hasOwnProperty.call(mapa, id)) return;
+      if (out.indexOf(id) !== -1) return;
+      out.push(id);
+    });
+    return out;
+  }
+  var SEC_HOSTAL_DEFAULT = ['descripcion','galeria','habitaciones','reservar','reglas-casa','actividades','eventos-hostal','como-llegar','contacto','faq','resenas','relacionados'];
+  var secHostalMapa = {
+    'descripcion': secDescripcion,
+    'galeria': secGaleria,
+    'habitaciones': secHabitaciones,
+    'reservar': secReservar,
+    'reglas-casa': secReglasCasa,
+    'actividades': secActividadesHostal,
+    'eventos-hostal': secEventosHostal,
+    'como-llegar': secComoLlegar,
+    'contacto': secContact,
+    'faq': secFaq,
+    'resenas': secResenas,
+    'relacionados': secRelacionados
+  };
+  var ordenAdminHostal = normalizarOrdenModulosHostal(tags ? tags.orden_modulos : null, secHostalMapa);
+  var secHostalOrden = SEC_HOSTAL_DEFAULT.slice();
+  if (ordenAdminHostal.length) {
+    // Los ids del admin mandan; los no listados se agregan al final
+    // conservando el orden por defecto (cero regresion: un array
+    // invalido/vacio/ausente deja el orden por defecto).
+    var ordenHostalFinal = [];
+    ordenAdminHostal.forEach(function(id){ ordenHostalFinal.push(id); });
+    SEC_HOSTAL_DEFAULT.forEach(function(id){
+      if (ordenAdminHostal.indexOf(id) === -1) ordenHostalFinal.push(id);
+    });
+    secHostalOrden = ordenHostalFinal;
+  }
+
   // -- SUBNAV STICKY: anclas solo a secciones que van a existir ------
   var subnavItems = [
     {id:'descripcion', label:'Sobre',       has:!!secDescripcion},
@@ -2080,11 +2214,47 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     {id:'autor',       label:'Autor',       has:!!secBlogAutor},
     {id:'video',       label:'Video',       has:!!secBlogVideo}
   ].filter(function(it){ return it.has; });
+
+  // ADR-034: el subnav sticky del hostal SIEMPRE refleja el orden efectivo
+  // de secciones (secHostalOrden), haya o no override del admin: sin
+  // tags.orden_modulos usa SEC_HOSTAL_DEFAULT (Reservar tras Habitaciones,
+  // Contacto tras Como llegar). Solo se reordenan los items cuyo id es un
+  // modulo de hostal; los demas conservan su posicion relativa. Cada item
+  // conserva su id, por lo que su ancla (#id de su seccion) no cambia. Las
+  // demas categorias no se tocan.
+  if (cat === 'hostal') {
+    var hostalRank = {};
+    secHostalOrden.forEach(function(id, i){ hostalRank[id] = i; });
+    var hostalPos = [];
+    var hostalItems = [];
+    subnavItems.forEach(function(it, i){
+      if (!Object.prototype.hasOwnProperty.call(hostalRank, it.id)) return;
+      hostalPos.push(i);
+      hostalItems.push(it);
+    });
+    hostalItems.sort(function(a, b){ return hostalRank[a.id] - hostalRank[b.id]; });
+    hostalPos.forEach(function(pos, k){ subnavItems[pos] = hostalItems[k]; });
+  }
+
   var subnav = (cat === 'blog') ? '' : (subnavItems.length > 1 ? '<nav class="subnav">'
     + subnavItems.map(function(it, i){
         return '<a class="snlink'+(i===0?' on':'')+'" href="#'+it.id+'" onclick="document.querySelectorAll(\'.snlink\').forEach(function(l){l.classList.remove(\'on\')});this.classList.add(\'on\')">'+esc(it.label)+'</a>';
       }).join('')
     + '</nav>' : '');
+
+  var secHostalHTML = '';
+  if (cat === 'hostal') {
+    var secHostalNum = 0;
+    secHostalOrden.forEach(function(id){
+      var h = secHostalMapa[id] || '';
+      if (!h) return;
+      secHostalNum++;
+      // Renumerar el stnum en el nuevo orden para que el contador visual
+      // siga siendo secuencial (cada seccion tiene exactamente un stnum).
+      h = h.replace(/(<div class="stnum">)\d+(<\/div>)/, '$1' + secHostalNum + '$2');
+      secHostalHTML += h + '\n';
+    });
+  }
 
   // -- ENSAMBLAR ----------------------------------------------------
   // ADR-016: chip de subcategoria en el hero (no-blog, solo si tags.subcategoria existe)
@@ -2130,9 +2300,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
       + '<div class="hctar">'
       + (d.web ? '<button class="hbtn" onclick="window.open(\''+esc(d.web)+'\',\'_blank\')">\uD83C\uDF10 Sitio web oficial</button>' : '')
-      + (d.whatsapp ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>' : '')
+      + (d.whatsapp
+          ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>'
+          : (d.email ? '<button class="hbtn" onclick="window.open(\'mailto:'+esc(d.email)+'\')">\u2709 Contactar</button>' : ''))
       + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
-      + (galAll.length>1 ? '<button class="hobtn" onclick="document.getElementById(\'galeria\').scrollIntoView({behavior:\'smooth\'})">Ver galeria -></button>' : '')
       + '<button class="hobtn" id="btn-guardar" onclick="abrirPopoverGuardar()">\u2661 Guardar</button>'
       + '<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>'
       + '</div>'
@@ -2142,50 +2313,53 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + '</div>\n</div></section>\n\n')
 
     + gstrip + '\n\n'
-    + secDescripcion + '\n'
-    + secBlogVideo + '\n'
-    + secBlogAutor + '\n'
-    + secDificultad + '\n'
-    + secEntradas + '\n'
-    + secTours + '\n'
-    + secChecklist + '\n'
-    + secItinerario + '\n'
-    + secFauna + '\n'
-    + secSecretos + '\n'
-    + secRegulaciones + '\n'
-    + secColecciones + '\n'
-    + secRecorridos + '\n'
-    + secAccesibilidad + '\n'
-    + secAtracciones + '\n'
-    + secHorariosZona + '\n'
-    + secActividadesGratis + '\n'
-    + secQueVer + '\n'
-    + secContexto + '\n'
-    + secMusicaVivo + '\n'
-    + secCover + '\n'
-    + secCodigoVestimenta + '\n'
-    + secHappyHour + '\n'
-    + secProgramacion + '\n'
-    + secGaleria + '\n'
-    + secHabitaciones + '\n'
-    + secReglasCasa + '\n'
-    + secActividadesHostal + '\n'
-    + secEventosHostal + '\n'
-    + secPerfilComida + '\n'
-    + secMenuDestacado + '\n'
-    + secHorariosComida + '\n'
-    + secDeliveryComida + '\n'
-    + secEventoInfo + '\n'
-    + secLineupEvento + '\n'
-    + secAgendaEvento + '\n'
-    + secEntradasEvento + '\n'
-    + secPrepEvento + '\n'
-    + secReservar + '\n'
-    + secComoLlegar + '\n'
-    + secFaq + '\n'
-    + secResenas + '\n'
-    + secContact + '\n'
-    + secRelacionados + '\n\n'
+    + (cat === 'hostal'
+      ? secHostalHTML
+      : secDescripcion + '\n'
+        + secBlogVideo + '\n'
+        + secBlogAutor + '\n'
+        + secDificultad + '\n'
+        + secEntradas + '\n'
+        + secTours + '\n'
+        + secChecklist + '\n'
+        + secItinerario + '\n'
+        + secFauna + '\n'
+        + secSecretos + '\n'
+        + secRegulaciones + '\n'
+        + secColecciones + '\n'
+        + secRecorridos + '\n'
+        + secAccesibilidad + '\n'
+        + secAtracciones + '\n'
+        + secHorariosZona + '\n'
+        + secActividadesGratis + '\n'
+        + secQueVer + '\n'
+        + secContexto + '\n'
+        + secMusicaVivo + '\n'
+        + secCover + '\n'
+        + secCodigoVestimenta + '\n'
+        + secHappyHour + '\n'
+        + secProgramacion + '\n'
+        + secGaleria + '\n'
+        + secHabitaciones + '\n'
+        + secReglasCasa + '\n'
+        + secActividadesHostal + '\n'
+        + secEventosHostal + '\n'
+        + secPerfilComida + '\n'
+        + secMenuDestacado + '\n'
+        + secHorariosComida + '\n'
+        + secDeliveryComida + '\n'
+        + secEventoInfo + '\n'
+        + secLineupEvento + '\n'
+        + secAgendaEvento + '\n'
+        + secEntradasEvento + '\n'
+        + secPrepEvento + '\n'
+        + secReservar + '\n'
+        + secComoLlegar + '\n'
+        + secFaq + '\n'
+        + secResenas + '\n'
+        + secContact + '\n'
+        + secRelacionados + '\n')
+    + '\n'
 
     + '<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>'
     + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
@@ -2352,7 +2526,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + 'function toggleMapaDest(mapaId,checked){var u=window.ExploraCO&&window.ExploraCO.usuario;if(!u)return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:checked?\'mapa_agregar_destino\':\'mapa_quitar_destino\',usuario_id:u.id,mapa_id:mapaId,destino_id:DID})}).then(function(r){return r.json();}).then(function(data){if(window.ExploraCO&&window.ExploraCO.mostrarToast){if(data&&data.ok)window.ExploraCO.mostrarToast(checked?\'Anadido al mapa\':\'Quitado del mapa\',\'#16a34a\');else window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');}}).catch(function(e){console.warn(\'[mapa] toggle\',e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');});}\n'
     // Lightbox de galeria (TSK-076): GAL_ALL se genera en runtime del
     // servidor (igual que DIM_LABELS mas arriba) a partir de galAll.
-    + 'var GAL_ALL='+JSON.stringify(galAll)+';\n'
+    + 'var GAL_ALL='+JSON.stringify(galLightbox)+';\n'
     + 'var LB_I=0;\n'
     + 'function abrirLightbox(i){if(!GAL_ALL.length)return;LB_I=(i+GAL_ALL.length)%GAL_ALL.length;var im=document.getElementById(\'lb-img\');if(im){im.src=GAL_ALL[LB_I];var bg=document.getElementById(\'lb\');if(bg)bg.style.display=\'flex\';}var cap=document.getElementById(\'lb-cap\');if(cap)cap.textContent=(LB_I+1)+\' / \'+GAL_ALL.length;}\n'
     + 'function lbNav(d){abrirLightbox(LB_I+d);}\n'
@@ -2527,6 +2701,51 @@ module.exports = async function handler(req, res) {
       'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 24',
       [d.id]
     );
+
+    // ADR-034: fotos de comunidad para el hero (3 miniaturas) y la galeria
+    // (6 miniaturas). Cada consulta lleva su PROPIO try/catch: si falla
+    // (p.ej. migracion pendiente), la ficha renderiza sin fotos de
+    // comunidad en vez de devolver 500. NO se selecciona usuarios.foto_url
+    // (migracion 004 pendiente); solo u.nombre.
+    var fotosViajeros = [];
+    try {
+      fotosViajeros = await sql(
+        'SELECT i.id, i.texto AS url, i.usuario_id AS autor_id, i.creado_en,'
+        + ' u.nombre AS autor_nombre,'
+        + ' (SELECT COUNT(*)::int FROM interacciones v'
+        + '   WHERE v.tipo=\'foto\' AND v.activo=true'
+        + '     AND v.dims->>\'voto_foto_id\' = i.id::text) AS votos'
+        + ' FROM interacciones i LEFT JOIN usuarios u ON u.id = i.usuario_id'
+        + ' WHERE i.destino_id=$1 AND i.tipo=\'foto\' AND i.activo=true'
+        + '   AND (i.dims IS NULL OR NOT (i.dims ? \'voto_foto_id\'))'
+        + ' ORDER BY votos DESC, i.creado_en DESC LIMIT 12',
+        [d.id]
+      );
+    } catch (eViajeros) {
+      console.warn('[pagina-destino] fotos viajeros fallo: ' + eViajeros.message);
+    }
+
+    var fotosAlbum = [];
+    if (d.lat && d.lng && parseFloat(d.lat) !== 0 && parseFloat(d.lng) !== 0) {
+      try {
+        fotosAlbum = await sql(
+          'SELECT af.id, af.foto_url AS url, af.foto_type, af.media_title, af.creado_en,'
+          + ' a.id AS album_id, a.titulo AS album_titulo,'
+          + ' COALESCE(af.autor_original_id, af.agregador_id) AS autor_id,'
+          + ' u.nombre AS autor_nombre,'
+          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
+          + ' FROM album_fotos af'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = COALESCE(af.autor_original_id, af.agregador_id)'
+          + ' WHERE af.activo=true AND a.activo=true AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
+          + '   AND ABS(a.lat-$1) < 0.01 AND ABS(a.lng-$2) < 0.01'
+          + ' ORDER BY votos DESC, af.creado_en DESC LIMIT 12',
+          [d.lat, d.lng]
+        );
+      } catch (eAlbum) {
+        console.warn('[pagina-destino] fotos album fallo: ' + eAlbum.message);
+      }
+    }
     var resenasRows = await sql(
       'SELECT i.rating, i.texto, i.dims, i.traveller_type, u.nombre AS usuario_nombre FROM interacciones i LEFT JOIN usuarios u ON i.usuario_id=u.id WHERE i.destino_id=$1 AND i.tipo=\'resena\' ORDER BY i.creado_en DESC LIMIT 10',
       [d.id]
@@ -2609,7 +2828,7 @@ module.exports = async function handler(req, res) {
       relacionados = topRelacionados(d, relRows, 3);
     }
 
-    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados, dimsAvg, spotLider);
+    var html = buildHTML(d, det, fotosRows, resenasRows, autor, relacionados, dimsAvg, spotLider, fotosViajeros, fotosAlbum);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).send(html);

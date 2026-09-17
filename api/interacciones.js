@@ -2720,6 +2720,52 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: { mapa: mapaDetalle, destinos: mapaDestinos } });
       }
 
+      // Reverse lookup de mapas (ADR-034): dado un destino (destino_id
+      // uuid o slug), devuelve los mapas tematicos que lo incluyen. La
+      // visibilidad se filtra SQL-side: los publicos para cualquiera y
+      // los privados solo para su dueno. El viewer ($2) NUNCA sale de un
+      // query param crudo: el candidato es req.query.usuario_id y solo se
+      // acepta si validarSesion() confirma la firma JWT (patron
+      // dm_hilos/museo_publico, ADR-025). Sin sesion valida viewer=null
+      // (m.usuario_id = NULL nunca es true) y solo se devuelven publicos.
+      if (tipo === 'mapas_de_destino') {
+        var mdSlug = req.query.slug ? String(req.query.slug) : null;
+        var mdDestinoId = destinoId ? String(destinoId) : null;
+        if (!mdDestinoId && !mdSlug)
+          return res.status(400).json({ ok: false, error: 'destino_id o slug requerido' });
+        if (mdDestinoId
+          && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mdDestinoId))
+          return res.status(400).json({ ok: false, error: 'destino_id invalido' });
+        if (!mdDestinoId && !/^[a-z0-9-]{3,}$/.test(mdSlug))
+          return res.status(400).json({ ok: false, error: 'slug invalido' });
+
+        var mdDestRes = mdDestinoId
+          ? await sql('SELECT id FROM destinos WHERE id = $1::uuid LIMIT 1', [mdDestinoId])
+          : await sql('SELECT id FROM destinos WHERE slug = $1 LIMIT 1', [mdSlug]);
+        if (!mdDestRes.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var mdDestino = mdDestRes[0].id;
+
+        var mdViewer = null;
+        if (usuarioId) {
+          var mdViewerCand = String(usuarioId);
+          if (validarSesion(req, mdViewerCand).ok) mdViewer = mdViewerCand;
+        }
+
+        var mdMapas = await sql(
+          'SELECT m.id, m.nombre, m.emoji, m.descripcion, m.publico,'
+          + ' (m.usuario_id = $2::uuid) AS es_mio,'
+          + ' (SELECT COUNT(*)::int FROM mapa_destinos md2 WHERE md2.mapa_id = m.id) AS n_destinos'
+          + ' FROM mapas m'
+          + ' JOIN mapa_destinos md ON md.mapa_id = m.id'
+          + ' WHERE md.destino_id = $1'
+          + '   AND (m.publico = true OR m.usuario_id = $2::uuid)'
+          + ' ORDER BY m.publico DESC, m.creado_en DESC',
+          [mdDestino, mdViewer]
+        );
+        return res.status(200).json({ ok: true, data: mdMapas });
+      }
+
       // Salas de chat (espec comunidad 2026-09-08): lista de salas activas
       // con el ultimo mensaje, su autor y el total de mensajes (para el
       // listado estilo "room"). El contador de "online" es decorativo en
