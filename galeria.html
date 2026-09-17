@@ -78,6 +78,20 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .g-more{display:block;margin:20px auto 0;padding:11px 26px;background:transparent;border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s}
 .g-more:hover{background:var(--gold);color:var(--black)}
 .g-more:disabled{opacity:.5;cursor:default}
+/* COMPARTIR FOTO (modo destino) */
+.g-share{background:rgba(255,255,255,.04);border:1px solid rgba(232,160,32,.25);border-radius:12px;padding:16px 18px;margin-bottom:22px}
+.g-share-text{font-size:13px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:12px}
+.g-share-row{display:flex;gap:10px;flex-wrap:wrap}
+.g-share-input{flex:1;min-width:220px;padding:11px 13px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:8px;color:#fff;font-family:inherit;font-size:13px}
+.g-share-input::placeholder{color:rgba(255,255,255,.3)}
+.g-share-input:focus{outline:none;border-color:var(--gold)}
+.g-share-btn{padding:11px 22px;background:var(--gold);color:var(--black);border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:background .15s}
+.g-share-btn:hover{background:var(--gold-d)}
+.g-share-btn:disabled{opacity:.5;cursor:default}
+.g-share-msg{font-size:12px;margin-top:10px;line-height:1.5;display:none}
+.g-share-msg.on{display:block}
+.g-share-msg.err{color:#fca5a5}
+.g-share-msg.ok{color:#86efac}
 /* ESTADOS */
 .g-loading{padding:40px 20px;text-align:center;color:rgba(255,255,255,.4);font-size:12px}
 .g-empty,.g-error{padding:32px 18px;text-align:center;font-size:12px;border-radius:12px}
@@ -154,17 +168,19 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="g-sec-head">
         <div class="g-sec-line"></div>
         <div class="g-sec-title">Fotos del destino</div>
-      </div>
-      <div id="g-dest-fotos" class="g-masonry"></div>
-    </section>
-
-    <section class="g-sec">
-      <div class="g-sec-head">
-        <div class="g-sec-line"></div>
-        <div class="g-sec-title">Fotos de la comunidad</div>
         <span class="g-sec-count" id="g-dest-count"></span>
       </div>
-      <div id="g-dest-usuarios" class="g-masonry"></div>
+
+      <div class="g-share" id="g-share">
+        <div class="g-share-text" id="g-share-aviso">¿Tienes fotografías de tu viaje? Comparte el enlace de tu imagen para sumarla a la comunidad.</div>
+        <div class="g-share-row">
+          <input type="url" id="g-share-url" class="g-share-input" placeholder="https://..." autocomplete="off">
+          <button type="button" id="g-share-btn" class="g-share-btn">Compartir foto</button>
+        </div>
+        <div class="g-share-msg" id="g-share-msg" role="status" aria-live="polite"></div>
+      </div>
+
+      <div id="g-dest-fotos" class="g-masonry"></div>
     </section>
   </div>
 </main>
@@ -187,7 +203,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 (function () {
   'use strict';
 
-  var G = { usuarioId: null, feedOffset: 0, feedLoading: false };
+  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -216,8 +232,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     return out;
   }
 
-  function gFetchJson(url) {
-    return fetch(url).then(function (r) {
+  function gFetchJson(url, opts) {
+    return fetch(url, opts).then(function (r) {
       return r.json().catch(function () {
         return { ok: false, error: 'Respuesta invalida del servidor' };
       }).then(function (j) {
@@ -295,12 +311,60 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     return card;
   }
 
-  function gSeedCard(f) {
+  function gItemToFoto(it) {
+    return {
+      foto_url: it.url,
+      foto_type: it.foto_type || 'foto',
+      media_title: it.caption || '',
+      autor_nombre: it.autor_nombre || '',
+      album_titulo: it.album_titulo || '',
+      ciudad: '',
+      votos: it.votos
+    };
+  }
+
+  function gItemCard(it) {
     var card = document.createElement('div');
     card.className = 'g-card';
-    card.innerHTML = '<div class="g-media"><img src="' + esc(f.url) + '" alt="' + esc(f.caption || '') + '" loading="lazy" onerror="this.style.display=\'none\'"></div>'
-      + (f.caption ? '<div class="g-card-body"><div class="g-card-title">' + esc(f.caption) + '</div></div>' : '');
+    var titulo = it.caption || '';
+    var meta = it.autor_nombre || (it.origen === 'curada' ? 'Selecci\u00f3n ExploraCO' : 'Viajero');
+    var html = '<div class="g-media">' + gMediaHTML({ media_url: it.url, media_type: it.foto_type || 'foto', media_title: titulo }) + '</div>'
+      + '<div class="g-card-body">'
+      + (titulo ? '<div class="g-card-title">' + esc(titulo) + '</div>' : '')
+      + '<div class="g-card-meta">' + esc(meta) + '</div>';
+    if (it.tipo_voto) {
+      html += '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(it.votos, 10) || 0) + '</span>'
+        + (it.es_propia ? '<span class="g-stat">Tu foto</span>' : '') + '</div>';
+    }
+    html += '</div>';
+    card.innerHTML = html;
+    if (it.tipo_voto) {
+      card.addEventListener('click', function () { gOpenMedia(it.id_origen, gItemToFoto(it)); });
+    } else {
+      card.style.cursor = 'default';
+    }
     return card;
+  }
+
+  function gDestinoItems(res) {
+    if (res.items && res.items.length) { return res.items; }
+    var out = [];
+    (res.fotos || []).forEach(function (f) {
+      out.push({
+        origen: 'curada', id_origen: f.id, tipo_voto: null, url: f.url,
+        caption: f.caption || '', votos: 0, es_propia: false,
+        autor_nombre: null, album_titulo: null, foto_type: 'foto'
+      });
+    });
+    (res.usuarios || []).forEach(function (f) {
+      out.push({
+        origen: 'album', id_origen: f.id, tipo_voto: 'album', url: f.foto_url,
+        caption: f.media_title || '', votos: parseInt(f.votos, 10) || 0, es_propia: false,
+        autor_nombre: f.autor_nombre || null, album_titulo: f.album_titulo || null,
+        foto_type: f.foto_type || 'foto'
+      });
+    });
+    return out;
   }
 
   function gAlbumCover(a) {
@@ -460,47 +524,98 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   }
 
   function gLoadDestino(slug) {
-    var boxFotos = document.getElementById('g-dest-fotos');
-    var boxUsr = document.getElementById('g-dest-usuarios');
-    boxFotos.innerHTML = gLoadingHTML('Cargando fotos del destino...');
-    boxUsr.innerHTML = gLoadingHTML('Cargando fotos de la comunidad...');
-    gFetchJson('/api/interacciones?tipo=galeria_destino&slug=' + encodeURIComponent(slug))
+    var box = document.getElementById('g-dest-fotos');
+    var count = document.getElementById('g-dest-count');
+    G.destinoSlug = slug;
+    G.destinoId = null;
+    box.innerHTML = gLoadingHTML('Cargando fotos del destino...');
+    if (count) { count.textContent = ''; }
+    var url = '/api/interacciones?tipo=galeria_destino&slug=' + encodeURIComponent(slug) + '&incluir=viajeros';
+    if (G.usuarioId) { url += '&usuario_id=' + encodeURIComponent(G.usuarioId); }
+    gFetchJson(url)
       .then(function (res) {
         document.getElementById('g-head-destino').style.display = 'block';
         if (!res.ok) {
           document.getElementById('g-dest-title').textContent = 'Destino no encontrado';
           document.getElementById('g-dest-sub').textContent = '';
-          boxFotos.innerHTML = gErrorHTML(gErrMsg(res));
-          boxUsr.innerHTML = '';
+          box.innerHTML = gErrorHTML(gErrMsg(res));
           return;
         }
         var d = res.destino || {};
+        G.destinoId = d.id || null;
         document.getElementById('g-dest-title').textContent = d.nombre || 'Destino';
         document.getElementById('g-dest-sub').textContent = (d.ciudad ? d.ciudad + ' \u00b7 ' : '') + 'Fotos curadas y aportes de la comunidad.';
-        var fotos = res.fotos || [];
-        var usuarios = res.usuarios || [];
-        if (!fotos.length) {
-          boxFotos.innerHTML = gEmptyHTML('Este destino todavia no tiene fotos curadas.');
-        } else {
-          boxFotos.innerHTML = '';
-          fotos.forEach(function (f) { boxFotos.appendChild(gSeedCard(f)); });
+        var items = gDestinoItems(res);
+        if (!items.length) {
+          box.innerHTML = gEmptyHTML('Este destino todavia no tiene fotos.');
+          if (count) { count.textContent = '0 fotos'; }
+          return;
         }
-        if (!usuarios.length) {
-          boxUsr.innerHTML = gEmptyHTML('La comunidad todavia no ha compartido fotos de este destino.');
-          document.getElementById('g-dest-count').textContent = '0 fotos';
-        } else {
-          boxUsr.innerHTML = '';
-          usuarios.forEach(function (f) { boxUsr.appendChild(gUserCard(f)); });
-          document.getElementById('g-dest-count').textContent = usuarios.length + ' fotos';
-        }
+        box.innerHTML = '';
+        items.forEach(function (it) { box.appendChild(gItemCard(it)); });
+        if (count) { count.textContent = items.length + ' fotos'; }
       })
       .catch(function () {
         document.getElementById('g-head-destino').style.display = 'block';
         document.getElementById('g-dest-title').textContent = 'Destino no encontrado';
         document.getElementById('g-dest-sub').textContent = '';
-        boxFotos.innerHTML = gErrorHTML('No se pudo cargar la galeria del destino');
-        boxUsr.innerHTML = '';
+        box.innerHTML = gErrorHTML('No se pudo cargar la galeria del destino');
       });
+  }
+
+  function gShareMsg(texto, esError) {
+    var msg = document.getElementById('g-share-msg');
+    if (!msg) { return; }
+    msg.textContent = texto || '';
+    msg.className = 'g-share-msg' + (texto ? ' on' : '') + (esError ? ' err' : ' ok');
+  }
+
+  function gShareFoto() {
+    var input = document.getElementById('g-share-url');
+    var btn = document.getElementById('g-share-btn');
+    if (!input || !btn) { return; }
+    var uid = gUsuarioId() || G.usuarioId;
+    if (!uid) {
+      gShareMsg('Inicia sesion para compartir tu foto con la comunidad.', true);
+      return;
+    }
+    if (!G.destinoId) {
+      gShareMsg('No se pudo identificar el destino. Recarga la pagina.', true);
+      return;
+    }
+    var url = String(input.value || '').trim();
+    if (!/^https?:\/\//i.test(url)) {
+      gShareMsg('Escribe un enlace valido que empiece por http:// o https://', true);
+      return;
+    }
+    btn.disabled = true;
+    gShareMsg('Publicando tu foto...', false);
+    gFetchJson('/api/interacciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'foto', usuario_id: uid, destino_id: G.destinoId, url: url })
+    }).then(function (res) {
+      btn.disabled = false;
+      if (res.ok) {
+        input.value = '';
+        gShareMsg('Foto compartida. Gracias por aportar a la comunidad.', false);
+        if (window.ExploraCO && window.ExploraCO.mostrarToast) {
+          window.ExploraCO.mostrarToast('Foto compartida \u00b7 +' + (res.xp || 0) + ' XP', '#16a34a');
+        }
+        gLoadDestino(G.destinoSlug);
+        return;
+      }
+      if (res.__status === 401) {
+        gShareMsg('Tu sesion expiro, vuelve a iniciar sesion.', true);
+      } else if (res.__status === 403) {
+        gShareMsg(res.error || 'Desbloquea Subir fotos (nivel 2) para publicar.', true);
+      } else {
+        gShareMsg(res.error || 'No se pudo compartir tu foto.', true);
+      }
+    }).catch(function () {
+      btn.disabled = false;
+      gShareMsg('Error de red al compartir tu foto.', true);
+    });
   }
 
   function gInit() {
@@ -529,6 +644,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { gCloseModal(); } });
   var btnMore = document.getElementById('g-more');
   if (btnMore) { btnMore.addEventListener('click', function () { gLoadFeed(false); }); }
+  var btnShare = document.getElementById('g-share-btn');
+  if (btnShare) { btnShare.addEventListener('click', gShareFoto); }
+  var shareInput = document.getElementById('g-share-url');
+  if (shareInput) {
+    shareInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); gShareFoto(); }
+    });
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', gInit);

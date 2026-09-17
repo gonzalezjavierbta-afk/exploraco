@@ -535,6 +535,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mf-sep{width:1px;height:20px;background:rgba(255,255,255,.16);margin:0 3px;flex-shrink:0}
 .mpa-media-pin{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(0,0,0,.45);border:2.5px solid #fff;cursor:pointer;transition:transform .14s}
 .mpa-media-pin:hover{transform:scale(1.15);z-index:1000}
+/* TSK-106: los pines de fotos curadas del destino (origen='destino') usan
+   borde punteado para distinguirse de los albumes subidos por usuarios. */
+.mpa-media-pin-dest{border-style:dashed;border-color:#f2d9a0}
 
 /* -- MAPA | DRAWER LATERAL -- */
 .mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}
@@ -2971,10 +2974,14 @@ function dentroRadio(lat1, lng1, lat2, lng2, km) {
 
 function mapaMediaIcon(item) {
   var tipo = item.media_type || 'foto';
-  var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : '#E8A020');
+  // TSK-106: color por ORIGEN. Album de usuario: ambar/rojo/violeta segun
+  // el tipo de medio. Destino: verde azulado, para que el material curado
+  // del destino se distinga de las subidas de la comunidad.
+  var esDestino = (item.origen === 'destino');
+  var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : (esDestino ? '#1f8a70' : '#E8A020'));
   var ico = (tipo === 'video') ? '▶' : ((tipo === 'audio') ? '♫' : '📸');
   return L.divIcon({
-    html: '<div class="mpa-media-pin" style="background:' + color + '">' + ico + '</div>',
+    html: '<div class="mpa-media-pin' + (esDestino ? ' mpa-media-pin-dest' : '') + '" style="background:' + color + '">' + ico + '</div>',
     iconSize:[34,34], iconAnchor:[17,17], className:''
   });
 }
@@ -2987,13 +2994,22 @@ function renderMapaMedia() {
   if(!items.length) return;
   var bounds = mapaMap.getBounds();
   var n = 0;
+  // TSK-106: la capa ahora trae tambien items origen='destino'. Para no
+  // saturar el mapa: (a) dedupe por origen_id -- un solo pin por destino
+  // aunque tenga varias fotos -- y (b) tope duro de markers visibles.
+  var TOPE_MEDIA_PINS = 300;
+  var destinosVistos = {};
   items.forEach(function(item){
     var lat = parseFloat(item.lat);
     var lng = parseFloat(item.lng);
     if(!lat || !lng) return;
-    if(item.origen === 'destino') return; // R2: solo albumes de usuarios
     if(!MAPA_MEDIA_TIPOS[item.media_type]) return; // multi-tipo: solo tipos activos
     if(!bounds.contains([lat, lng])) return;
+    if(n >= TOPE_MEDIA_PINS) return;
+    if(item.origen === 'destino' && item.origen_id) {
+      if(destinosVistos[item.origen_id]) return;
+      destinosVistos[item.origen_id] = true;
+    }
     try {
       var marker = L.marker([lat, lng], { icon: mapaMediaIcon(item) });
       marker.on('click', function(){ openMapaMediaDrawer(item); });
@@ -3093,7 +3109,8 @@ function mdMediasCercanas(place) {
   var out = [];
   var pl = place || {};
   MAPA_MEDIA.forEach(function(it){
-    if(it.origen === 'destino') return; // R2: solo albumes de usuarios
+    // TSK-106: los items origen='destino' (fotos curadas del destino por
+    // el backend) tambien alimentan el drawer, no solo los albumes.
     if(!it.lat || !it.lng) return;
     var ok = mismaCiudad(pl.city, it.ciudad);
     if(!ok) ok = dentroRadio(parseFloat(pl.lat), parseFloat(pl.lng), parseFloat(it.lat), parseFloat(it.lng), 10);
@@ -3299,8 +3316,15 @@ function openMapaMediaDrawer(item) {
   html += '</div>';
   html += '<div class="md-head">';
   html += '<span class="md-badge md-cat-' + ((item.media_type === 'video') ? 'evento' : ((item.media_type === 'audio') ? 'comida' : 'sitio')) + '">' + mdMediaBadge(item.media_type) + '</span>';
-  html += '<div class="md-title">' + esc(item.media_title || 'Multimedia') + '</div>';
-  if(item.album_titulo) html += '<div class="md-meta">' + esc(item.album_titulo) + '</div>';
+  // TSK-106: los items origen='destino' pueden traer media_title vacio y el
+  // nombre del destino en album_titulo (el backend lo llena con d.nombre).
+  // Se usa ese nombre como titulo y se evita repetirlo dos veces.
+  var esDestMedia = (item.origen === 'destino');
+  var tituloMedia = item.media_title || item.album_titulo || 'Multimedia';
+  var subMedia = (item.album_titulo && item.album_titulo !== tituloMedia) ? item.album_titulo : '';
+  html += '<div class="md-title">' + esc(tituloMedia) + '</div>';
+  if(subMedia) html += '<div class="md-meta">' + esc(subMedia) + '</div>';
+  if(esDestMedia) html += '<div class="md-meta">📸 Foto del destino</div>';
 
   // FIX 4: trazabilidad autor -> /mi-perfil.html?id=<usuario_id>.
   // Si NO hay usuario_id pero si autor_nombre (caso legacy, datos

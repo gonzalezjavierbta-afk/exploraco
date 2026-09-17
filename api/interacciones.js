@@ -3719,10 +3719,31 @@ module.exports = async function handler(req, res) {
         }
         var mmCiudad = req.query.ciudad || null;
         var mmOrigen = req.query.origen || null;
+        // TSK-106 (Problema 1): filtro opcional por usuario. Sin el query
+        // param usuario_id la consulta publica es IDENTICA a la anterior.
+        // El valor se valida como uuid ANTES de tocar el SQL: si no lo es,
+        // el filtro se ignora (nunca se manda texto no-uuid a un cast
+        // ::uuid, que reventaria con 22P02).
+        var mmUsuarioId = null;
+        var mmUsuarioRaw = req.query.usuario_id;
+        if (mmUsuarioRaw !== undefined && mmUsuarioRaw !== null) {
+          var mmUsuarioStr = String(mmUsuarioRaw).trim();
+          if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mmUsuarioStr))
+            mmUsuarioId = mmUsuarioStr;
+        }
+        // En un UNION ALL los $N son COMPARTIDOS entre ambas ramas. El
+        // indice real de cada parametro se captura al apilarlo
+        // (mmIdxTipos/mmIdxCiudad/mmIdxUsuario) y se reutiliza en las 2
+        // ramas; si un opcional no viene, su indice es null y la clausula
+        // no se emite. asi el orden de $N siempre respeta mmParams.
         var mmParams = [];
         var np = 0;
-        if (mmTipos) { np++; mmParams.push(mmTipos); }
-        if (mmCiudad) { np++; mmParams.push(mmCiudad); }
+        var mmIdxTipos = null;
+        var mmIdxCiudad = null;
+        var mmIdxUsuario = null;
+        if (mmTipos) { np++; mmIdxTipos = np; mmParams.push(mmTipos); }
+        if (mmCiudad) { np++; mmIdxCiudad = np; mmParams.push(mmCiudad); }
+        if (mmUsuarioId) { np++; mmIdxUsuario = np; mmParams.push(mmUsuarioId); }
 
         var multimediaRows = await sql(
           '('
@@ -3737,8 +3758,9 @@ module.exports = async function handler(req, res) {
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE a.activo=true AND af.activo=true'
-          + (mmTipos ? ' AND af.foto_type = ANY($1::text[])' : '')
-          + (mmCiudad ? ' AND a.ciudad = $' + (mmTipos ? '2' : '1') : '')
+          + (mmIdxTipos ? ' AND af.foto_type = ANY($' + mmIdxTipos + '::text[])' : '')
+          + (mmIdxCiudad ? ' AND a.ciudad = $' + mmIdxCiudad : '')
+          + (mmIdxUsuario ? ' AND a.usuario_id = $' + mmIdxUsuario + '::uuid' : '')
           + ') UNION ALL ('
           + ' SELECT df.url AS media_url, \'foto\' AS media_type,'
           + '  df.caption AS media_title, \'\' AS media_source, d.lat, d.lng, d.ciudad,'
@@ -3749,7 +3771,8 @@ module.exports = async function handler(req, res) {
           + ' JOIN destinos d ON d.id = df.destino_id'
           + ' WHERE d.lat IS NOT NULL AND d.lng IS NOT NULL AND d.status = \'published\''
           + ((mmTipos && mmTipos.indexOf('foto') === -1) || mmOrigen === 'album' ? ' AND FALSE' : '')
-          + (mmCiudad ? ' AND d.ciudad = $' + (mmTipos ? '2' : '1') : '')
+          + (mmIdxCiudad ? ' AND d.ciudad = $' + mmIdxCiudad : '')
+          + (mmIdxUsuario ? ' AND d.id IN (SELECT i.destino_id FROM interacciones i WHERE i.usuario_id = $' + mmIdxUsuario + '::uuid AND i.tipo IN (\'guardado\',\'voto\',\'rating\') AND i.activo = true)' : '')
           + ') ORDER BY votos DESC LIMIT 200',
           mmParams
         );

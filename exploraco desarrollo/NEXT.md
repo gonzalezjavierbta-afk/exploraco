@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-106 / ADR-030 (actualizado) Capa multimedia, galeria comunidad y galeria hospedajes (2026-09-16, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, SIN commitear) - 5 archivos modificados (+243/-56): filtro opcional `usuario_id` en `GET ?tipo=multimedia_mapa` (RESTRICTIVO, validado por regex uuid) e indices capturados del UNION ALL (`api/interacciones.js` +28/-5); `index-api-connector.js` (+12/-2) sin `origen=album` + `usuario_id` si hay sesion; `index.html` (+30/-6) pines de destino (`#1f8a70` + borde punteado, dedupe por `origen_id`, tope 300); `api/pagina-destino.js` (+12/-5) hero de 12 miniaturas (`HERO_THUMBS_MAX=12`, `slice(1,13)`, `LIMIT` de `destinos_fotos` 12->24, `.prow` grid responsivo 6/4 col); `galeria.html` (+161/-38) grid unico "Fotos del destino" + aviso/input/boton de compartir (se eliminan `gSeedCard` y `#g-dest-usuarios`). P2 OMITIDO; P3 re-alcanzado a `galeria.html` (no `comunidad.html`); H-2 registrado como BUGS_HISTORICOS.md BUG-061 (spoofing de `tipo='foto'`, escalado a `sql-security`); H-3 (`smoke_auditoria_pagina_destino.js` ignora el slug). Presupuesto 8/8 INTACTO. **PENDIENTE: commit/push/deploy (sin mezclar los 3 archivos borrados ajenos a TSK-106).**
 - TSK-105 / ADR-030 Lote "promptarreglos" - DM 500, galeria duplicada, popover Guardar, "Estuve aqui", unificacion Como llegar/Ubicacion, galeria unificada de destino, seguridad de album y degradacion 503 (2026-09-16, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+649/-167) + 2 scripts nuevos sin versionar:
   - `api/interacciones.js` (271 lineas cambiadas): casts `::text` en `dm_hilos` (`m.usuario_id::text<>$1`, `m2.usuario_id::text=$1`, `bloqueador_id::text=$1 OR bloqueado_id::text=$1`, L2937-2939/L2962) por el 42P08 (BUG-055); helper `queryConAvatarFallback` (L2114) que degrada `42703` (`usuarios.foto_url` ausente) a `avatar_url` en `museo_publico`/`album_detalle`/`galeria_destino` (BUG-060); `items[]` aditivo solo con `incluir`; 403 `ALBUM_AJENO`/400 `AUTOR_ORIGINAL_INVALIDO` en `album_agregar_foto` (BUG-059); `repartirXpReferidos` en `album_voto` (gap ADR-027).
   - `api/pagina-destino.js` (197 lineas cambiadas): `#galeria` unificada (curadas + viajeros + `#fp-upload`, ancla legacy `#fotos`), `secComoLlegar` (fusion de `secTransporteHostal` + `secMapa`, id="como-llegar", ancla legacy `#mapa`), UI "Guardar en album", helper `galEsc()` (cierra XSS del inline), fix de `cerrarPopoverGuardar` (BUG-057).
@@ -32,6 +33,88 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-106 "Capa multimedia, galeria comunidad y galeria hospedajes" (2026-09-16) - ADR-030 actualizado
+
+Tarea TSK-106 implementada y verificada en working tree (SIN commitear). El prompt
+de origen es `PROMPT_MULTIMEDIA_GALERIA.md` (sin versionar). La decision vive en
+`DECISIONS.md` ADR-030 (actualizado, no reemplazado); la tarea en `TASKS.md`
+TSK-106; el bug derivado en `BUGS_HISTORICOS.md` BUG-061. NO hay migraciones
+nuevas ni archivos nuevos en `api/` (8/8 intacto, ADR-001).
+
+**Cambios (verificados contra archivo real, ADR-006; `git diff --numstat` = 5
+archivos, +243/-56):**
+- `api/interacciones.js` (+28/-5): `GET ?tipo=multimedia_mapa` acepta
+  `usuario_id` opcional validado por regex uuid (si es invalido el filtro se
+  IGNORA; nunca llega texto no-uuid a `::uuid` -> sin 22P02). Con `usuario_id`:
+  rama albumes -> `a.usuario_id=$N::uuid`; rama destinos -> `d.id IN (SELECT
+  i.destino_id FROM interacciones i WHERE i.usuario_id=$N::uuid AND i.tipo IN
+  ('guardado','voto','rating') AND i.activo=true)`. SIN `usuario_id` el SQL
+  publico es byte-identico al anterior (regresion cero). Se sustituyo el calculo
+  fragil `(mmTipos?'2':'1')` por indices capturados (`mmIdxTipos`/`mmIdxCiudad`/
+  `mmIdxUsuario`), con `null` cuando el opcional no viene.
+- `index-api-connector.js` (+12/-2): la capa multimedia llama
+  `tipo=multimedia_mapa` SIN `origen=album` y con `&usuario_id=<id>` cuando hay
+  sesion (`window.ExploraCO.usuario.id`). **Decision H-1: el filtro es
+  RESTRICTIVO** (el logueado ve solo lo suyo), no aditivo.
+- `index.html` (+30/-6): `renderMapaMedia` y `mdMediasCercanas` ya NO descartan
+  `origen==='destino'`; pins de destino con color `#1f8a70` + borde punteado
+  (`.mpa-media-pin-dest`) y dedupe por `origen_id` (slug) con tope de 300
+  markers; el drawer titula para ambos origenes.
+- `api/pagina-destino.js` (+12/-5): PROBLEMA 4 - el hero pasa de 3 a 12
+  miniaturas (`HERO_THUMBS_MAX=12`, `slice(1, HERO_THUMBS_MAX + 1)`), la query
+  de `destinos_fotos` sube `LIMIT 12 -> 24` y el CSS `.prow` pasa de `flex` a
+  `grid` responsivo (6 col desktop, 4 col `<=760px`), `.pth` sin `flex:1`.
+- `galeria.html` (+161/-38): PROBLEMA 3 RE-ALCANZADO a este archivo (no a
+  `comunidad.html`, que no tenia la seccion). Modo destino unificado: aviso
+  "Tienes fotografias de tu viaje?...", `<input type="url">` + boton que hace
+  `POST /api/interacciones {tipo:'foto', usuario_id, destino_id, url}`, grid
+  unico "Fotos del destino" usando `incluir=viajeros` (`items[]` del endpoint,
+  con fallback a `fotos[]`+`usuarios[]`). Se elimino `gSeedCard` y la seccion
+  `#g-dest-usuarios`.
+
+**Decisiones de producto (usuario, 2026-09-16):** P2 (tab audiovisual de "Mi
+Viaje Personal") OMITIDO; P3 aplicado en `galeria.html`, no en `comunidad.html`;
+H-1 RESTRICTIVO confirmado; H-2 registrado como BUG-061 (no corregido aqui).
+
+**Verificacion:** `node --check` OK en `api/interacciones.js`,
+`api/pagina-destino.js` e `index-api-connector.js`; ASCII-safety 0 bytes >127 en
+los 3; `node scripts/smoke_auditoria_pagina_destino.js` ->
+`TODOS LOS SMOKE TESTS PASARON (54 checks)`.
+
+#### Que sigue
+1. **Commit + push + deploy en un solo release** de TSK-106 junto con los
+   pendientes previos sin commitear (TSK-095..TSK-105 + migraciones 015/016/017/018).
+2. **NO mezclar en ese commit los 3 archivos borrados ajenos a TSK-106:**
+   `PROMPT.md`, `prompt_exploraco_tsk104.md` y `promptarreglos.txt`.
+3. **Corregir H-2 (BUG-061):** `POST /api/interacciones` `tipo='foto'` debe
+   validar sesion (`validarSesion`/JWT) en vez de confiar en `body.usuario_id`.
+   Escalado a `sql-security`.
+4. **Verificacion post-deploy:** pins de album + destino en el mapa cultural
+   (con y sin sesion), drawer con el material propio del usuario, galeria del
+   destino con 12 miniaturas en el hero (slug con mas de 12 fotos, ej.
+   hostal-r10) y compartir foto desde `galeria.html`.
+5. **Posible auto-recarga de `galeria.html` al iniciar sesion:** hoy
+   `G.usuarioId` se resuelve en `gInit()`; si el usuario inicia sesion despues
+   de cargar la pagina, el aviso puede no habilitarse hasta recargar.
+6. **Confirmar el breakpoint movil del grid del hero (`.prow`):** el corte es
+   `<=760px` (6 -> 4 columnas); validar en pantallas intermedias.
+7. **H-3 (no bloqueante):** `scripts/smoke_auditoria_pagina_destino.js` IGNORA
+   el slug de `process.argv` (el prompt proponia correrlo con `hostal-r10`);
+   candidato a aceptar el slug y validar la ficha real.
+
+#### Riesgos activos
+- **Deploy pendiente:** la capa multimedia por usuario, los 12 thumbs del hero
+  y la galeria unificada de `galeria.html` no estan en produccion hasta el
+  commit/push/deploy.
+- **BUG-061 (seguridad, MEDIA):** `tipo='foto'` es suplantable mientras no se
+  valide la sesion; la UI nueva de `galeria.html` lo expone. Escalado a
+  `sql-security`.
+- **H-3:** el smoke de la ficha no prueba el slug real pasado por argumento;
+  cobertura efectiva menor a la que sugiere el comando del prompt.
+- **P2 omitido:** el tab audiovisual de "Mi Viaje Personal" queda como deuda de
+  producto (no existe); la capa multimedia por usuario se valida solo en el
+  mapa cultural.
 
 ### Sesion TSK-105 "Lote promptarreglos" - galeria unificada de destino + arreglos de DM, galeria, popover, visita y album (2026-09-16) - ADR-030
 

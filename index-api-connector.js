@@ -265,8 +265,18 @@
     if (typeof MAPA_PLACES !== 'undefined') replArr(MAPA_PLACES, nuevoMapa);
 
     // 3b. MAPA_MEDIA[] - multimedia del mapa cultural del endpoint
-    //     publico GET /api/interacciones?tipo=multimedia_mapa
-    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa&origen=album&_t=' + Date.now();
+    //     GET /api/interacciones?tipo=multimedia_mapa
+    //     Sin sesion: capa publica (albumes + destinos con fotos).
+    //     Con sesion: el backend RESTRINGE la capa a los albumes del
+    //     usuario y a las fotos de los destinos que guardo o voto
+    //     (decision H-1 TSK-106: filtro restrictivo, no aditivo). NO se
+    //     envia el parametro origen=album para que los destinos con fotos
+    //     lleguen tambien al mapa (TSK-106).
+    var uid = (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
+      ? String(window.ExploraCO.usuario.id) : null;
+    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa'
+      + (uid ? '&usuario_id=' + encodeURIComponent(uid) : '')
+      + '&_t=' + Date.now();
     fetch(mediaUrl)
       .then(function (r) { return r.json(); })
       .then(function (d) {

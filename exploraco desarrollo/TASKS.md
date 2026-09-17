@@ -2731,5 +2731,54 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-106: Capa multimedia del mapa (filtro por usuario), galeria unificada en `galeria.html` y 12 miniaturas en el hero de la ficha [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-16, implementada y verificada en working tree). **PENDIENTE OPERATIVO: commit/push/deploy** (junto con los pendientes previos de TSK-095..TSK-105).
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-16
+- **Prompt origen:** `PROMPT_MULTIMEDIA_GALERIA.md` (sin versionar en el working tree al cierre).
+- **ADR:** DECISIONS.md ADR-030 (actualizado con la decision H-1 y el re-alcance de P3); consume ADR-021 (capa audiovisual estricta), ADR-025 (sesion firmada / nonce) y ADR-028 (blindaje PII). Bug derivado: BUGS_HISTORICOS.md BUG-061 (H-2, no corregido aqui).
+- **Responsable:** build (orquestador) + qa + docs-keeper
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006; `git diff --numstat` = 5 archivos, +243/-56):**
+
+  1. **PROBLEMA 1 - capa multimedia del mapa (`api/interacciones.js` + `index-api-connector.js`).** `GET ?tipo=multimedia_mapa` acepta el filtro opcional `usuario_id` (validado por regex uuid; si el valor es invalido el filtro se IGNORA, nunca se manda texto no-uuid a un cast `::uuid` -> sin 22P02). Con `usuario_id`: rama albumes -> `a.usuario_id=$N::uuid`; rama destinos -> `d.id IN (SELECT i.destino_id FROM interacciones i WHERE i.usuario_id=$N::uuid AND i.tipo IN ('guardado','voto','rating') AND i.activo=true)`. Sin `usuario_id` el SQL publico es byte-identico al anterior (regresion cero). Se reemplazo el calculo fragil de indices del UNION ALL (`(mmTipos?'2':'1')`) por indices capturados al apilar cada parametro (`mmIdxTipos`/`mmIdxCiudad`/`mmIdxUsuario`); si un opcional no viene su indice es null y la clausula no se emite. `index-api-connector.js` deja de enviar `origen=album` y agrega `&usuario_id=<id>` cuando hay sesion (`window.ExploraCO.usuario.id`).
+  2. **PROBLEMA 2 - tab audiovisual de "Mi Viaje Personal" (index.html): OMITIDO.** No existe ese tab y NO se construye en TSK-106 (decision explicita del usuario).
+  3. **PROBLEMA 3 - galeria unificada: RE-ALCANZADO a `galeria.html`, NO a `comunidad.html`.** `comunidad.html` no tenia la seccion descrita (la galeria unificada real ya vive en `api/pagina-destino.js` `#galeria`). En `galeria.html` (modo destino) queda: aviso "Tienes fotografias de tu viaje?..." + `<input type="url">` + boton que hace `POST /api/interacciones {tipo:'foto', usuario_id, destino_id, url}` + grid unico "Fotos del destino" alimentado con `incluir=viajeros` (se consumen `items[]` del endpoint, con fallback a `fotos[]`+`usuarios[]`). Se elimino `gSeedCard` y la seccion `#g-dest-usuarios`.
+  4. **PROBLEMA 4 - hero de la ficha con solo 3 miniaturas (`api/pagina-destino.js`).** El hero pasa de 3 a 12 miniaturas (`HERO_THUMBS_MAX=12`, `galAll.slice(1, HERO_THUMBS_MAX + 1)`); la query de `destinos_fotos` sube `LIMIT 12 -> 24` (material suficiente para `galAll`); el CSS `.prow` pasa de `flex` a `grid` responsivo (6 columnas en desktop, 4 en `<=760px`) y `.pth` pierde el `flex:1`.
+
+- **Decisiones tomadas por el usuario (registradas):**
+  1. **P2 OMITIDO:** el tab audiovisual de "Mi Viaje Personal" no existe y no se construye en TSK-106.
+  2. **P3 RE-ALCANZADO a `galeria.html`:** aplicado ahi, NO a `comunidad.html`.
+  3. **H-1 RESTRICTIVO (confirmado):** con sesion, `usuario_id` RESTRINGE la capa multimedia a lo propio (albumes del usuario + destinos que guardo/voto/califico); no es aditivo. Registrado en ADR-030.
+  4. **H-2 -> BUG-061:** `POST tipo='foto'` confia en `body.usuario_id` sin `validarSesion` (spoofable); se registra como bug independiente y NO se corrige en TSK-106 (escalado a `sql-security`).
+
+- **Archivos modificados en el working tree (SIN commitear):**
+  - `api/interacciones.js` (+28/-5): filtro opcional `usuario_id` en `multimedia_mapa` + indices capturados del UNION ALL.
+  - `index-api-connector.js` (+12/-2): la capa multimedia llama sin `origen=album` y con `usuario_id` si hay sesion.
+  - `index.html` (+30/-6): `renderMapaMedia`/`mdMediasCercanas` ya NO descartan `origen==='destino'`; pins de destino en `#1f8a70` con borde punteado (`.mpa-media-pin-dest`), dedupe por `origen_id` (slug) y tope de 300 markers; el drawer titula ambos origenes.
+  - `api/pagina-destino.js` (+12/-5): `HERO_THUMBS_MAX=12` + `slice(1,13)`, `LIMIT` de `destinos_fotos` 12 -> 24, `.prow` grid responsivo.
+  - `galeria.html` (+161/-38): grid unico "Fotos del destino" + aviso/input/boton de compartir + `gItemCard`/`gDestinoItems`/`gShareFoto`; se eliminan `gSeedCard` y `#g-dest-usuarios`.
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001 / ADR-010). Cero archivos nuevos en `api/`.
+
+- **Evidencia (ADR-006, contra archivo real):**
+  - `node --check` OK en `api/interacciones.js`, `api/pagina-destino.js` e `index-api-connector.js`.
+  - ASCII-safety: 0 bytes >127 en los 3 archivos JS tocados (`index-api-connector.js` no es `api/*`, pero tambien quedo en 0).
+  - Smoke: `node scripts/smoke_auditoria_pagina_destino.js` -> `TODOS LOS SMOKE TESTS PASARON (54 checks)`.
+  - `api/interacciones.js` L3719-3745 (validacion uuid + `mmIdx*`) y L3758-3775 (clausulas del UNION ALL); `api/pagina-destino.js` L745 (`HERO_THUMBS_MAX`) y L2524 (`LIMIT 24`); `index.html` `mapaMediaIcon`/`renderMapaMedia`/`mdMediasCercanas`/`openMapaMediaDrawer`; `galeria.html` `gDestinoItems`/`gItemCard`/`gShareFoto`.
+
+- **Pendiente operativo:** **commit + push + deploy** de los 5 archivos en un solo release con los pendientes previos (TSK-095..TSK-105 + migraciones 015/016/017/018 y los scripts de la 004). Verificacion funcional post-deploy segun `PROMPT_MULTIMEDIA_GALERIA.md` seccion 5.
+
+- **Hallazgo derivado (H-2 -> BUG-061):** `POST /api/interacciones` `tipo='foto'` (`api/interacciones.js` ~L5024-5035) usa `body.usuario_id` (`var usuarioId2= body.usuario_id || null;`, L4136) sin `validarSesion` (definida en L1911) -> suplantacion de autor. Preexistente; expuesto por la UI nueva de `galeria.html`. Severidad MEDIA; escalado a `sql-security`.
+
+- **Hallazgo H-3 (no corregido):** `scripts/smoke_auditoria_pagina_destino.js` IGNORA el slug que se le pasa por `process.argv` (el prompt sugeria `node scripts/smoke_auditoria_pagina_destino.js hostal-r10`); el script no lee `process.argv` y valida solo datos minimos embebidos.
+
+- **Higiene de working tree:** hay 3 archivos BORRADOS en el working tree ajenos a TSK-106 (`PROMPT.md`, `prompt_exploraco_tsk104.md`, `promptarreglos.txt`) que NO deben colarse en el commit de TSK-106.
+
+- **Fuera de alcance:** tab audiovisual de "Mi Viaje Personal" (P2, omitido); correccion de H-2/BUG-061 (escalada a `sql-security`); correccion del smoke H-3; `comunidad.html` (no se toca).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

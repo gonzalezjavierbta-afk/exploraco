@@ -200,8 +200,9 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".psm{height:200px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
 +".psm img{width:100%;height:100%;object-fit:cover}"
 +".pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}"
-+".prow{display:flex;gap:8px;height:88px}"
-+".pth{flex:1;border-radius:6px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
++".prow{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:44px;gap:4px;height:auto}"
++"@media(max-width:760px){.prow{grid-template-columns:repeat(4,1fr)}}"
++".pth{border-radius:6px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
 +".pth img{width:100%;height:100%;object-fit:cover}"
 +".subnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:260;display:flex;gap:4px;overflow-x:auto;padding:0 4%;-ms-overflow-style:none;scrollbar-width:none}"
 +".subnav::-webkit-scrollbar{display:none}"
@@ -741,11 +742,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
 
   var hasLatLng = d.lat && d.lng && parseFloat(d.lat)!==0 && parseFloat(d.lng)!==0;
 
-  // -- HERO: imagen principal + grid de hasta 3 mas --------------
+  // -- HERO: imagen principal + grid de hasta 12 mas -------------
+  // TSK-106 (PROBLEMA 4): el hero mostraba solo 3 miniaturas
+  // (slice(1,4)) aunque galAll trae hasta 12 fotos. El limite se
+  // define con constante para evitar el numero magico.
+  var HERO_THUMBS_MAX = 12;
   var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
   var heroThumbs = '';
   if (galAll.length > 1) {
-    heroThumbs = galAll.slice(1,4).map(function(u){
+    heroThumbs = galAll.slice(1, HERO_THUMBS_MAX + 1).map(function(u){
       return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"></div>';
     }).join('');
   }
@@ -2516,8 +2521,10 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // TSK-106 (PROBLEMA 4): LIMIT ampliado de 12 a 24 para que galAll
+    // tenga material suficiente y el hero muestre 12 miniaturas reales.
     var fotosRows = await sql(
-      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 12',
+      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 24',
       [d.id]
     );
     var resenasRows = await sql(

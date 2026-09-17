@@ -1010,6 +1010,17 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Pendiente operativo (BLOQUEANTE, cierre definitivo):** ejecutar `scripts/apply_004_foto_url.js` con `DATABASE_URL` para aplicar la migracion 004 en Neon. Sin ella la degradacion mantiene las rutas en 200, pero `usuarios.foto_url` sigue sin existir (el avatar cae siempre a `avatar_url`) y `ciudad_base`/el autor del blog quedan inutilizables.
 **Estado:** MITIGADO en codigo (working tree, 2026-09-16); **PENDIENTE aplicar la migracion 004 en Neon**.
 
+## BUG-061: `POST /api/interacciones` `tipo='foto'` confia en `body.usuario_id` sin validar sesion -- suplantacion de autor (spoofing)
+
+**Severidad:** MEDIA (seguridad: un usuario puede publicar fotos a nombre de OTRO usuario).
+**Contexto:** detectado durante TSK-106 / `PROMPT_MULTIMEDIA_GALERIA.md` (2026-09-16) al construir la UI de compartir foto de `galeria.html`. El handler es PREEXISTENTE (rama de "foto de viajero") y la UI nueva lo hace visible. Decision H-2 del usuario: se registra como bug independiente y NO se corrige en TSK-106 (escalado a `sql-security`).
+**Sintoma:** `POST /api/interacciones` con `{ tipo:'foto', usuario_id:<otro uuid>, destino_id, url }` persiste la interaccion `tipo='foto'` a nombre del `usuario_id` recibido, sin comprobar que quien invoca sea ese usuario.
+**Causa raiz:** la rama `tipo2 === 'foto'` (`api/interacciones.js` ~L5024-5035) usa la variable del handler `var usuarioId2= body.usuario_id || null;` (L4136) y NO llama a `validarSesion(req, usuarioId2)` (definida en L1911), a diferencia de las rutas de visita/votar/checkin que SI la exigen (ADR-025). El unico gate que existe es de capacidad (`mis_fotografo` completada), no de identidad.
+**Impacto:** un atacante autenticado (o anonimo, si la rama no exige sesion) puede atribuir una foto a cualquier `usuario_id`; contamina el feed/galeria del destino y el conteo de XP/misiones del usuario suplantado. No permite leer datos de terceros ni modificar su cuenta.
+**Recomendacion (escalada a `sql-security`):** exigir `Authorization: Bearer` y validar la identidad con `validarSesion(req, usuarioId2)` (JWT HMAC, ADR-025), tomando el `usuario_id` del token y NO del body; responder 401 `SESION_*` cuando no coincida. Revisar en la misma pasada las demas ramas POST que usan `usuarioId2` sin `validarSesion`.
+**Evidencia (ADR-006):** `api/interacciones.js` L4136 (`var usuarioId2= body.usuario_id || null;`), L1911 (`function validarSesion`), L5024-5035 (rama `tipo='foto'`); `galeria.html` `gShareFoto()` (cliente nuevo que expone el flujo).
+**Estado:** ABIERTO (working tree, 2026-09-16); NO corregido en TSK-106 por decision H-2. Escalar a `sql-security`.
+
 ---
 
 ## Pendientes operativos del lote "promptarreglos" (2026-09-16) -- requieren `DATABASE_URL` / Neon
