@@ -116,6 +116,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .g-detail-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;line-height:1.15;margin-bottom:4px}
 .g-detail-meta{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:14px}
 .g-detail-stats{font-size:11px;color:var(--gold);font-weight:700;margin-bottom:14px}
+.g-detail-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 14px}
+.g-act{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.82);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s}
+.g-act:hover{border-color:var(--gold);color:var(--gold)}
+.g-act.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.g-act:disabled{opacity:.5;cursor:default}
 .g-comments{margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:16px}
 .g-album-photos{display:flex;flex-direction:column;gap:20px}
 .g-album-photo{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden}
@@ -171,10 +176,19 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <section class="g-sec" id="g-sec-dest">
       <div class="g-sec-head">
         <div class="g-sec-line"></div>
-        <div class="g-sec-title">Fotos del destino</div>
+        <div class="g-sec-title">Fotos de este lugar</div>
         <span class="g-sec-count" id="g-dest-count"></span>
       </div>
       <div id="g-dest-fotos" class="g-masonry"></div>
+    </section>
+
+    <section class="g-sec" id="g-sec-albumes" style="display:none">
+      <div class="g-sec-head">
+        <div class="g-sec-line"></div>
+        <div class="g-sec-title">Albumes de este espacio</div>
+        <span class="g-sec-count" id="g-dest-alb-count"></span>
+      </div>
+      <div id="g-dest-albumes" class="g-albums"></div>
     </section>
 
     <section class="g-sec" id="g-sec-com" style="display:none">
@@ -186,32 +200,29 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div id="g-dest-com" class="g-masonry"></div>
     </section>
 
-    <section class="g-sec" id="g-sec-albumes" style="display:none">
-      <div class="g-sec-head">
-        <div class="g-sec-line"></div>
-        <div class="g-sec-title">Albumes del destino</div>
-        <span class="g-sec-count" id="g-dest-alb-count"></span>
-      </div>
-      <div id="g-dest-albumes" class="g-albums"></div>
-    </section>
-
     <section class="g-sec" id="g-sec-mapas" style="display:none">
       <div class="g-sec-head">
         <div class="g-sec-line"></div>
-        <div class="g-sec-title">Mapas con este destino</div>
+        <div class="g-sec-title">Mapa y audiovisual</div>
         <span class="g-sec-count" id="g-dest-mapas-count"></span>
       </div>
       <div id="g-dest-mapas" class="g-albums"></div>
     </section>
 
-    <div class="g-share" id="g-share" style="display:none">
-      <div class="g-share-text" id="g-share-aviso">&iquest;Tienes fotograf&iacute;as de tu viaje? Comparte el enlace de tu imagen para sumarla a la comunidad.</div>
-      <div class="g-share-row">
-        <input type="url" id="g-share-url" class="g-share-input" placeholder="https://..." autocomplete="off">
-        <button type="button" id="g-share-btn" class="g-share-btn">Compartir foto</button>
+    <section class="g-sec" id="g-sec-share" style="display:none">
+      <div class="g-sec-head">
+        <div class="g-sec-line"></div>
+        <div class="g-sec-title">Comparte tu foto</div>
       </div>
-      <div class="g-share-msg" id="g-share-msg" role="status" aria-live="polite"></div>
-    </div>
+      <div class="g-share" id="g-share">
+        <div class="g-share-text" id="g-share-aviso">&iquest;Tienes fotograf&iacute;as de tu viaje? Comparte el enlace de tu imagen para sumarla a la comunidad.</div>
+        <div class="g-share-row">
+          <input type="url" id="g-share-url" class="g-share-input" placeholder="https://..." autocomplete="off">
+          <button type="button" id="g-share-btn" class="g-share-btn">Compartir foto</button>
+        </div>
+        <div class="g-share-msg" id="g-share-msg" role="status" aria-live="polite"></div>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -226,14 +237,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 </div>
 
 <script src="usuario-session.js"></script>
-<script src="album-comments.js"></script>
+<script src="/compartir.js"></script>
+<script src="album-comments.js?v=2"></script>
 <script>
 /* ExploraCO - galeria.html (subpagina de galeria ampliada) */
 /* Modo global: feed top + albumes populares. Modo destino: ?destino=<slug>. */
 (function () {
   'use strict';
 
-  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false, ultimoUidCarga: null };
+  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false, ultimoUidCarga: null, media: null };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -286,6 +298,33 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       return 'La galeria de la comunidad no esta disponible todavia';
     }
     return res.error || 'No se pudo completar la solicitud';
+  }
+
+  function gPostJson(body) {
+    var headers = { 'Content-Type': 'application/json' };
+    var auth = gAuthHeaders();
+    for (var k in auth) {
+      if (Object.prototype.hasOwnProperty.call(auth, k)) { headers[k] = auth[k]; }
+    }
+    return gFetchJson('/api/interacciones', { method: 'POST', headers: headers, body: JSON.stringify(body) });
+  }
+
+  function gToast(msg, color) {
+    if (window.ExploraCO && typeof window.ExploraCO.mostrarToast === 'function') {
+      window.ExploraCO.mostrarToast(msg, color);
+    }
+  }
+
+  function gPedirLogin(msg) {
+    gToast(msg, '#E8A020');
+    if (window.ExploraCO && typeof window.ExploraCO.mostrarLogin === 'function') {
+      window.ExploraCO.mostrarLogin();
+    }
+  }
+
+  function gItemUrl(itemId) {
+    var base = window.location.origin + window.location.pathname + window.location.search;
+    return base + '#g-media-' + encodeURIComponent(String(itemId || ''));
   }
 
   function gLoadingHTML(msg) {
@@ -369,7 +408,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       autor_nombre: it.autor_nombre || '',
       album_titulo: it.album_titulo || '',
       ciudad: '',
-      votos: it.votos
+      votos: it.votos,
+      comentarios: it.comentarios,
+      fuente: it.fuente || (it.origen === 'curada' ? 'curada' : 'album_foto'),
+      id_origen: it.id_origen,
+      ya_votado: it.ya_votado,
+      ya_guardado: it.ya_guardado,
+      es_propia: it.es_propia
     };
   }
 
@@ -378,17 +423,19 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     card.className = 'g-card';
     var titulo = it.caption || '';
     var meta = it.autor_nombre || (it.origen === 'curada' ? 'Selecci\u00f3n ExploraCO' : 'Viajero');
+    var votable = (it.tipo_voto === 'media' || !!it.fuente);
     var html = '<div class="g-media">' + gMediaHTML({ media_url: it.url, media_type: it.foto_type || 'foto', media_title: titulo }) + '</div>'
       + '<div class="g-card-body">'
       + (titulo ? '<div class="g-card-title">' + esc(titulo) + '</div>' : '')
-      + '<div class="g-card-meta">' + esc(meta) + '</div>';
-    if (it.tipo_voto) {
+      + '<div class="g-card-meta">' + esc(meta) + (it.album_titulo ? ' \u00b7 ' + esc(it.album_titulo) : '') + '</div>';
+    if (votable) {
       html += '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(it.votos, 10) || 0) + '</span>'
+        + '<span class="g-stat">' + (parseInt(it.comentarios, 10) || 0) + ' comentarios</span>'
         + (it.es_propia ? '<span class="g-stat">Tu foto</span>' : '') + '</div>';
     }
     html += '</div>';
     card.innerHTML = html;
-    if (it.tipo_voto) {
+    if (votable) {
       card.addEventListener('click', function () { gOpenMedia(it.id_origen, gItemToFoto(it)); });
     } else {
       card.style.cursor = 'default';
@@ -401,16 +448,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     var out = [];
     (res.fotos || []).forEach(function (f) {
       out.push({
-        origen: 'curada', id_origen: f.id, tipo_voto: null, url: f.url,
-        caption: f.caption || '', votos: 0, es_propia: false,
+        origen: 'curada', id_origen: f.id, fuente: 'curada', tipo_voto: 'media', url: f.url,
+        caption: f.caption || '', votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
+        ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: false,
         autor_id: null, autor_nombre: null, album_id: null, album_titulo: null,
         foto_type: 'foto'
       });
     });
     (res.usuarios || []).forEach(function (f) {
       out.push({
-        origen: 'album', id_origen: f.id, tipo_voto: 'album', url: f.foto_url,
-        caption: f.media_title || '', votos: parseInt(f.votos, 10) || 0, es_propia: false,
+        origen: 'album', id_origen: f.id, fuente: 'album_foto', tipo_voto: 'media', url: f.foto_url,
+        caption: f.media_title || '', votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
+        ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: !!f.es_propia,
         autor_id: f.autor_id || null, autor_nombre: f.autor_nombre || null,
         album_id: f.album_id || null, album_titulo: f.album_titulo || null,
         foto_type: f.foto_type || 'foto'
@@ -482,10 +531,129 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     return card;
   }
 
+  function gAccionesHTML() {
+    var st = G.media || {};
+    var h = '<div class="g-detail-actions">';
+    if (st.votoItem) {
+      h += '<button type="button" class="g-act' + (st.ya_votado ? ' on' : '') + '" id="g-act-vote"'
+        + (st.es_propia ? ' disabled' : '') + '>\u2B50 <span id="g-act-vote-n">' + (parseInt(st.votos, 10) || 0) + '</span></button>';
+    }
+    h += '<button type="button" class="g-act' + (st.ya_guardado ? ' on' : '') + '" id="g-act-save">'
+      + (st.ya_guardado ? 'Guardado' : 'Guardar') + '</button>'
+      + '<button type="button" class="g-act" id="g-modal-share">Compartir</button>'
+      + '</div>';
+    return h;
+  }
+
+  function gBindAcciones() {
+    var btnVote = document.getElementById('g-act-vote');
+    if (btnVote) { btnVote.addEventListener('click', gMediaVoto); }
+    var btnSave = document.getElementById('g-act-save');
+    if (btnSave) { btnSave.addEventListener('click', gMediaGuardar); }
+    var btnShare = document.getElementById('g-modal-share');
+    if (!btnShare) { return; }
+    if (window.ExploraCompartir && typeof window.ExploraCompartir.init === 'function') {
+      window.ExploraCompartir.init(btnShare, {
+        usuarioId: G.usuarioId,
+        fuente: (G.media && G.media.shareFuente) || 'curada',
+        itemId: (G.media && G.media.shareItem) || '',
+        destinoId: G.destinoId || '',
+        url: gItemUrl((G.media && G.media.shareItem) || ''),
+        titulo: (G.media && G.media.caption) || 'Galeria ExploraCO',
+        texto: 'Mira esta publicacion en ExploraCO'
+      });
+    } else {
+      btnShare.style.display = 'none';
+    }
+  }
+
+  function gPintarVoto() {
+    var btn = document.getElementById('g-act-vote');
+    var n = document.getElementById('g-act-vote-n');
+    if (n && G.media) { n.textContent = parseInt(G.media.votos, 10) || 0; }
+    if (btn && G.media) {
+      if (G.media.ya_votado) { btn.classList.add('on'); } else { btn.classList.remove('on'); }
+    }
+  }
+
+  function gMediaVoto() {
+    var st = G.media;
+    var btn = document.getElementById('g-act-vote');
+    if (!st || !st.votoItem || !btn) { return; }
+    var uid = gUsuarioId() || G.usuarioId;
+    if (!uid) { gPedirLogin('Inicia sesion para votar esta foto.'); return; }
+    if (st.es_propia) { gToast('No puedes votar tu propia foto.', '#E8A020'); return; }
+    var accion = st.ya_votado ? 'unlike' : 'like';
+    btn.disabled = true;
+    gPostJson({ tipo: 'media_voto', usuario_id: uid, fuente: st.votoFuente, item_id: st.votoItem, accion: accion })
+      .then(function (res) {
+        btn.disabled = false;
+        if (res.ok) {
+          st.ya_votado = !!res.ya_votado;
+          st.votos = parseInt(res.votos, 10) || 0;
+          gPintarVoto();
+          if (res.xp > 0) { gToast('+' + res.xp + ' XP', '#16a34a'); }
+          return;
+        }
+        if (res.__status === 409) { st.ya_votado = true; gPintarVoto(); return; }
+        if (res.__status === 400 || res.__status === 401) { gPedirLogin('Inicia sesion para votar esta foto.'); return; }
+        if (res.__status === 429) { gToast(res.error || 'Limite de votos por dia alcanzado', '#E8A020'); return; }
+        gToast(res.error || 'No se pudo registrar tu voto', '#ef4444');
+      })
+      .catch(function () { btn.disabled = false; gToast('Error de red al votar', '#ef4444'); });
+  }
+
+  function gMediaGuardar() {
+    var st = G.media;
+    var btn = document.getElementById('g-act-save');
+    if (!st || !st.saveItem || !btn) { return; }
+    var uid = gUsuarioId() || G.usuarioId;
+    if (!uid) { gPedirLogin('Inicia sesion para guardar esta foto.'); return; }
+    var tipo = st.ya_guardado ? 'quitar_guardado_media' : 'guardar_media';
+    btn.disabled = true;
+    gPostJson({ tipo: tipo, usuario_id: uid, fuente: st.saveFuente, item_id: st.saveItem })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) {
+          if (res.__status === 503) { gToast('Los guardados no estan disponibles todavia', '#E8A020'); return; }
+          if (res.__status === 400 || res.__status === 401) { gPedirLogin('Inicia sesion para guardar esta foto.'); return; }
+          gToast(res.error || 'No se pudo guardar', '#ef4444');
+          return;
+        }
+        st.ya_guardado = (res.guardado === undefined) ? !st.ya_guardado : !!res.guardado;
+        btn.textContent = st.ya_guardado ? 'Guardado' : 'Guardar';
+        if (st.ya_guardado) { btn.classList.add('on'); } else { btn.classList.remove('on'); }
+        gToast(st.ya_guardado ? 'Guardado en Tu Mapa' : 'Quitado de tus guardados', st.ya_guardado ? '#E8A020' : '#888');
+      })
+      .catch(function () { btn.disabled = false; gToast('Error de red al guardar', '#ef4444'); });
+  }
+
+  function gAlbumPortada(album, fotos) {
+    if (!fotos || !fotos.length) { return null; }
+    var url = (album && album.portada_url) ? String(album.portada_url) : '';
+    if (url) {
+      for (var i = 0; i < fotos.length; i++) {
+        if (String(fotos[i].foto_url || '') === url) { return fotos[i]; }
+      }
+    }
+    return fotos[0];
+  }
+
   function gOpenMedia(fotoId, f) {
     var modal = document.getElementById('g-modal');
     var box = document.getElementById('g-modal-body');
     if (!modal || !box) { return; }
+    var fuente = f.fuente || 'album_foto';
+    var itemId = String(f.id_origen != null ? f.id_origen : fotoId);
+    G.media = {
+      votoFuente: fuente, votoItem: itemId,
+      saveFuente: fuente, saveItem: itemId,
+      shareFuente: fuente, shareItem: itemId,
+      votos: parseInt(f.votos, 10) || 0,
+      ya_votado: !!f.ya_votado, ya_guardado: !!f.ya_guardado,
+      es_propia: !!f.es_propia,
+      caption: f.media_title || ''
+    };
     modal.classList.add('on');
     document.body.style.overflow = 'hidden';
     document.getElementById('g-modal-title').textContent = 'Publicacion';
@@ -494,10 +662,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       + '<div class="g-detail-meta">' + esc(f.autor_nombre || 'Viajero')
       + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '')
       + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '') + '</div>'
-      + '<div class="g-detail-stats">\u2B50 ' + (parseInt(f.votos, 10) || 0) + ' votos</div>'
+      + gAccionesHTML()
       + '<div class="g-comments" id="g-modal-comments"></div>';
+    gBindAcciones();
     if (window.AlbumComments && window.AlbumComments.mount) {
-      window.AlbumComments.mount('#g-modal-comments', fotoId, { usuarioId: G.usuarioId });
+      window.AlbumComments.mount('#g-modal-comments', { fuente: fuente, itemId: itemId }, { usuarioId: G.usuarioId });
     }
   }
 
@@ -517,10 +686,25 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         }
         var album = res.album;
         var fotos = res.fotos || [];
+        var portada = gAlbumPortada(album, fotos);
+        G.media = {
+          votoFuente: 'album_foto',
+          votoItem: portada ? String(portada.id) : null,
+          saveFuente: 'album', saveItem: String(albumId),
+          shareFuente: 'album_foto', shareItem: portada ? String(portada.id) : '',
+          votos: portada ? (parseInt(portada.votos, 10) || 0) : 0,
+          ya_votado: portada ? !!portada.ya_votado : false,
+          ya_guardado: false, es_propia: false,
+          caption: album.titulo || 'Album'
+        };
         var html = '<div class="g-detail-title">' + esc(album.titulo || 'Album') + '</div>'
           + '<div class="g-detail-meta">' + esc(album.autor_nombre || 'Viajero')
           + (album.ciudad ? ' \u00b7 ' + esc(album.ciudad) : '')
-          + ' \u00b7 ' + fotos.length + ' fotos</div>';
+          + ' \u00b7 ' + fotos.length + ' fotos</div>'
+          + gAccionesHTML();
+        if (portada) {
+          html += '<div class="g-comments" id="g-album-comments"></div>';
+        }
         if (!fotos.length) {
           html += gEmptyHTML('Este album todavia no tiene fotos.');
         } else {
@@ -538,9 +722,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           html += '</div>';
         }
         box.innerHTML = html;
+        gBindAcciones();
         if (window.AlbumComments && window.AlbumComments.mount) {
+          if (portada) {
+            window.AlbumComments.mount('#g-album-comments', { fuente: 'album_foto', itemId: String(portada.id) }, { usuarioId: G.usuarioId });
+          }
           fotos.forEach(function (f) {
-            window.AlbumComments.mount('#g-ac-' + f.id, f.id, { usuarioId: G.usuarioId });
+            window.AlbumComments.mount('#g-ac-' + f.id, { fuente: 'album_foto', itemId: String(f.id) }, { usuarioId: G.usuarioId });
           });
         }
       })
@@ -552,6 +740,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   function gCloseModal() {
     var modal = document.getElementById('g-modal');
     if (!modal) { return; }
+    G.media = null;
     modal.classList.remove('on');
     document.body.style.overflow = '';
     document.getElementById('g-modal-body').innerHTML = '';
@@ -694,8 +883,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   }
 
   function gToggleShare() {
+    gSecVis('g-sec-share', !!gUsuarioId());
     var box = document.getElementById('g-share');
-    if (box) { box.style.display = gUsuarioId() ? 'block' : 'none'; }
+    if (box) { box.style.display = 'block'; }
   }
 
   function gShareMsg(texto, esError) {

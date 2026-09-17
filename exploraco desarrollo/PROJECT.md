@@ -1,7 +1,7 @@
 # PROJECT.md - ExploraCO
 
 ## Estado del documento
-- Version: v1.1 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0, 2026-09-14)
+- Version: v1.2 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17)
 - Fecha: Julio 2026 (actualizado Septiembre 2026)
 - Fuente: EXPLORACO_CONTEXT_V4.md + Reglas de Oro ExploraCO v5 + documentos maestros v5
 - Documento obligatorio del AI-DOS Core (Cap. 9.4). Es el primer documento que debe leer cualquier IA.
@@ -15,7 +15,7 @@ ExploraCO es una plataforma web multi-categoria de descubrimiento y promocion de
 - Categoria "Sitio" turistico: completamente implementada (formulario admin con 6 sub-tabs, pagina publica con 17 secciones dinamicas).
 - Categorias "Hostal", "Comida" y "Evento": completamente implementadas (Sprint 3/4/5 -- TASK-001/002/003), siguiendo el mismo patron ya validado con "Sitio".
 - Categoria "Blog" (seccion Inspirate): formulario admin con multi-tema (select multiple de temas), video (oEmbed) y buscador de autor; pagina publica con cuerpo por parrafos (white-space:pre-line), video embed, chip de tema y seccion "Quien escribe" condicional por id_autor. Primera entrada real en produccion: TSK-043 (monserrate-guia-completa).
-- Sistema de interacciones (rese\u00f1as, guardados, visitas, XP) y perfiles de usuario con gamificacion completa: 20 niveles en 4 eras, 28 misiones, 30 logros/trofeos con rareza estilo Steam, economia de XP con 13 consumibles, cromos coleccionables, Parches (clanes) con fama y retos, y una capa social v5.0 (referidos multinivel, crowdsourcing Wayfarer "Activo Oculto", 4 facciones, vocaciones de artista y presencia fisica verificada).
+- Sistema de interacciones (rese\u00f1as, guardados, visitas, XP) y perfiles de usuario con gamificacion completa: 20 niveles en 4 eras, 39 misiones, 33 logros/trofeos con rareza estilo Steam, economia de XP con 13 consumibles, cromos coleccionables, Parches (clanes) con fama y retos, compartir social con XP (ADR-036) y una capa social v5.0 (referidos multinivel, crowdsourcing Wayfarer "Activo Oculto", 4 facciones, vocaciones de artista y presencia fisica verificada). La media de usuarios (curadas, fotos de viajero y fotos de album) esta unificada en tablas `media_*` (votos/comentarios/guardados) desde ADR-036.
 - Motor de paginas dinamicas por slug (pagina-destino.js).
 - Panel administrativo unico (admin.html) para las 5 categorias (Sitio, Hostal, Comida, Evento, Blog).
 
@@ -69,13 +69,13 @@ Desde TASK-007 (Sprint 6), index.html ya no incluye datos locales de respaldo (`
 
 ### Arquitectura y presupuesto de endpoints
 
-La plataforma corre sobre 8 funciones serverless en `api/` (presupuesto 8/8 consumido, Vercel Hobby; ADR-010), con Neon PostgreSQL como unica fuente de verdad y renderizado server-side por concatenacion de strings (Vanilla JS, ADR-001/ADR-002). El motor social/gaming se concentra en dos endpoints y crece por ramas `?tipo=` sin crear archivos nuevos: `api/usuarios.js` v9 como baseline de esa Entrega (header real HOY v14 tras el hotfix BUG-054, 2026-09-15: SQL del merge de `device_hashes`; ver BLUEPRINT.md seccion 3; perfil, leaderboard, upsert, referidos, facciones, verificacion de email y sesion firmada JWT) y `api/interacciones.js` v13 (rese\u00f1as/guardados/visitas/ratings, misiones, logros, albumes, cromos, Parches, Wayfarer y geocerca de presencia fisica). `api/admin.js` expone la moderacion, incluida la rama `activo_oculto_moderar`. El esquema vive en `db/migrations/` (003 a 016). Detalle tecnico vigente en BLUEPRINT.md secciones 2 y 3.
+La plataforma corre sobre 8 funciones serverless en `api/` (presupuesto 8/8 consumido, Vercel Hobby; ADR-010), con Neon PostgreSQL como unica fuente de verdad y renderizado server-side por concatenacion de strings (Vanilla JS, ADR-001/ADR-002). El motor social/gaming se concentra en dos endpoints y crece por ramas `?tipo=` sin crear archivos nuevos: `api/usuarios.js` v9 como baseline de esa Entrega (header real HOY v15 tras ADR-035; el hotfix BUG-054 lo dejo en v14 con el SQL del merge de `device_hashes`; ver BLUEPRINT.md seccion 3; perfil, leaderboard, upsert, referidos, facciones, verificacion de email y sesion firmada JWT) y `api/interacciones.js` v19 (rese\u00f1as/guardados/visitas/ratings, misiones, logros, albumes, cromos, Parches, Wayfarer, geocerca de presencia fisica y, desde ADR-036, compartir social con XP y media unificada `media_*`). `api/admin.js` expone la moderacion, incluida la rama `activo_oculto_moderar`. El esquema vive en `db/migrations/` (003 a 023). Detalle tecnico vigente en BLUEPRINT.md secciones 2 y 3.
 
 ### Sistema de gamificacion completo (estado real, working tree)
 
 - **Progresion:** 20 niveles en 4 eras (Mundana 1-5, Patrocinada 6-10, Organizador 11-15, Leyenda 16-20), derivados de `usuarios.xp_total` en cada lectura (`api/usuarios.js` NIVELES); nunca persistidos.
-- **Misiones:** 28 misiones server-side (DAG via `requiere`) evaluadas tras cada accion de XP (`api/interacciones.js`): 11 general, 3 de ciudad, 2 de categoria, 6 de fotos/albumes y 6 de artista.
-- **Logros/trofeos:** 30 logros con tier (6 bronce, 8 plata, 9 oro, 2 platino + 5 de coleccion por ciudad), rareza global estilo Steam y fecha de desbloqueo; `logr_pionero` (ADR-024) elevo el catalogo a 30.
+- **Misiones:** 39 misiones server-side (DAG via `requiere`) evaluadas tras cada accion de XP (`api/interacciones.js`): 28 del catalogo base + 8 de perfil (ADR-028) + 3 de compartir (ADR-036: `mis_primer_compartido`, `mis_voz_comunidad`, `mis_embajador_destinos`).
+- **Logros/trofeos:** 33 logros con tier (rareza global estilo Steam y fecha de desbloqueo): 30 hasta ADR-035 + 3 de compartir (ADR-036: `logr_primer_compartido` bronce, `logr_compartidor_25` plata, `logr_viral_100` oro); `logr_pionero` (ADR-024) habia elevado el catalogo a 30.
 - **Economia de XP:** 13 consumibles comprables/usables (10 de la migracion 010 + 3 de mejoras de perfil de la 015) con de-nivel real (ADR-018).
 - **Cromos y Parches:** drops probabilisticos de cromos (garantia con iman) y Parches (clanes, ex Pandillas) con fundacion a nivel 14, fama (10% del XP de sus miembros) y retos con ventana.
 - **Presencia fisica:** geocerca Haversine server-side en `POST tipo=visita` (radios adaptativos y anti-spoofing) y logro `logr_pionero` (ADR-024).
@@ -94,6 +94,16 @@ La sesion firmada JWT (HMAC SHA-256) con `SESSION_JWT_SECRET` (validada solo en 
 
 Sobre el sistema social v5.0 se implemento la Entrega TSK-103, verificada en working tree y pendiente de aplicar las migraciones 017/018 en Neon + deploy. Agrega el perfil publico tipo "museo" (`perfil.html?id=`, sin filtrar PII) y la Mensajeria Directa (`chat_salas.tipo='dm'` + `clave_dm`, tabla `usuario_bloqueos`), el Arbol de Clases de 16 ramas (4 facciones x 4 ramas x 5 nodos, catalogo en codigo `RAMAS` + `RAMA_TIERS [0,100,250,450,700]`, solo backend/UI en mi-perfil.html), las Casas (`casa_elegir`/`casa_ranking`, gate nivel 2) y las categorias de consumibles (`consumibles.categoria`: perfil/impulso/social/coleccion/general, migracion 018 categoriza 17). Tambien cierra 5 regresiones (R-1..R-5: `registro.html` faltante, `?ref=` no capturado, `mi-perfil?id=` ignorado, etiqueta "Control Territorial", relabel Pandilla->Parche) y 4 fixes de seguridad/consistencia (fuga de PII preexistente en `api/usuarios.js`, carrera del cobro del DM, `museo_publico` 404->503 y filtros `activo=true`). Todo entra como ramas `tipo=` sin archivos nuevos en `api/` (8/8, ADR-010): `api/usuarios.js` v12, `api/interacciones.js` v15, `api/admin.js` y `api/utilidades.js`. Checklist operativo en `docs/DEPLOY_017.md`; smoke de cierre `scripts/smoke_017_perfil_arbol_casas.js` entregado y en verde (73/73 PASS, 2026-09-15).
 
+### Compartir social con XP + interacciones de media unificadas (Entrega TSK-110 / ADR-036, 2026-09-17)
+
+Sobre el XP decimal de ADR-035 se implemento la Entrega TSK-110, verificada en working tree y pendiente de aplicar las migraciones 022/023 en Neon + deploy. Agrega dos capacidades sin crear funciones serverless (8/8, ADR-001):
+
+- **Compartir con XP (`media_compartidos`, migracion 022):** ledger propio de comparticiones con indice unico parcial `es_primero`. `POST /api/interacciones?tipo=compartir` paga 25 XP la primera vez que un usuario comparte un `(fuente,item_id)` y 5 XP las posteriores, con tope de 10 eventos y 50 XP por ventana rodante de 24h y `validarSesion` obligatoria (ADR-025). **No toca el CHECK de `interacciones.tipo`** (`'compartir'` no entra a `interacciones`). Suma 3 misiones y 3 logros (catalogo real 39 misiones / 33 logros).
+- **Media unificada (`media_votos`/`media_comentarios`/`media_comentario_likes` + `media_guardados` extendida, migracion 023):** contrato polimorfico `fuente` (`curada|viajero_foto|album_foto`) + `item_id text`, con votos, comentarios anidados y likes para las 3 fuentes. `media_guardados.item_id` pasa de uuid a text y su CHECK admite `'curada'`. Backfill idempotente desde `album_votos`/`album_comentarios`/`album_comentario_votos`; las tablas legacy se conservan (cero borrado) y los alias legacy del backend siguen vivos.
+- **Frontend:** nueva `compartir.js` (`window.ExploraCompartir`: Web Share API + WhatsApp + Copiar link, toasts reusando `window.ExploraCO`), hero en mosaico 1+3 y boton Compartir en el `.subnav` de la ficha (`api/pagina-destino.js` v10), `galeria.html` con 5 secciones + modal VOTAR/GUARDAR/COMPARTIR, `album-comments.js` v2.0.0 (firma `mount(target,{fuente,itemId},opts)` retrocompatible), helper `aplicarResultadoXp` en `usuario-session.js` e insignia `compartido` reincorporada en `index.html` (derivada del catalogo real de logros). Cache-bust `album-comments.js?v=2` en `index.html`, `comunidad.html`, `mi-perfil.html` y `galeria.html`.
+- **Verificacion:** Escudo GOLD (`node --check` 7/7 OK; ASCII-safe 0 bytes >127 y 0 backticks en `api/*.js`, `compartir.js` y migraciones) y smokes `scripts/smoke_036_compartir.js` 55/55 PASS + `scripts/smoke_036_media_unificada.js` 71/71 PASS (con mock: no validan Neon).
+- **PENDIENTE OPERATIVO (BLOQUEANTE):** aplicar `db/migrations/022_media_compartidos.sql` y `db/migrations/023_interacciones_media_unificadas.sql` en Neon **antes** del deploy del backend v19 (el backend consulta tablas que deben existir). Relevo corto en `docs/HANDOFF_036.md`.
+
 ### Documentacion maestra
 
 El detalle tecnico consolidado del sistema de gamificacion y del apartado social vive en dos documentos maestros (referencia de detalle; este PROJECT.md solo resume):
@@ -101,6 +111,7 @@ El detalle tecnico consolidado del sistema de gamificacion y del apartado social
 - `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Gamificacion_v5_Plan_Maestro.md` (602 lineas) -- documento maestro tecnico de la gamificacion completo: 20 niveles/4 eras, 28 misiones, 30 logros, economia de XP, cromos, referidos, Wayfarer, facciones, vocaciones, presencia fisica, anti-Sybil y hoja de ruta.
 - `exploraco desarrollo/ampliacion desarrollo/ExploraCO_Sistema_Social_v5.md` (878 lineas) -- documento unico del apartado social: comunidad.html y sus 7 tabs, Parches, chat/planes, albumes, rese\u00f1as/votos, Activo Oculto, facciones, referidos y perfiles, con sus gaps documentados.
 - `docs/DEPLOY_016.md` -- checklist operativo de la Entrega 016: aplicar la migracion 016 en Neon, configurar `SESSION_JWT_SECRET`/`RESEND_API_KEY`/`SITE_URL` en Vercel y desplegar en un solo release.
+- `docs/HANDOFF_036.md` -- relevo corto de la Entrega TSK-110 / ADR-036: que se hizo, que quedo pendiente (aplicar 022/023 en Neon) y como verificar.
 
 El documento `ExploraCO_Gamificacion_v4_Plan_Maestro.md` queda como referencia HISTORICA (solo lectura); el v5 lo supersede.
 

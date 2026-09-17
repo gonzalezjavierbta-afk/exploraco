@@ -68,14 +68,20 @@ function invoke(tipo, mockSql) {
   });
 }
 
-check('MISIONES: catalogo con 22 misiones', MISIONES.length === 22);
-check('LOGROS: catalogo con 30 logros', LOGROS.length === 30);
+// ADR-036: los totales se derivan del catalogo cargado en el VM (el backend
+// expone total: MISIONES.length / LOGROS.length), no de constantes fijas.
+const misIdsUnicos = Object.keys(MISIONES.reduce(function(a, m){ a[String(m.id)] = 1; return a; }, {}));
+const logrIdsUnicos = Object.keys(LOGROS.reduce(function(a, l){ a[String(l.id)] = 1; return a; }, {}));
+check('MISIONES: catalogo coherente sin ids duplicados (n=' + MISIONES.length + ')',
+  MISIONES.length > 0 && misIdsUnicos.length === MISIONES.length);
+check('LOGROS: catalogo coherente sin ids duplicados (n=' + LOGROS.length + ')',
+  LOGROS.length > 0 && logrIdsUnicos.length === LOGROS.length);
 
 invoke('misiones', mockConUsuario()).then(function(res) {
   check('misiones: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('misiones: total=22', res.total === 22);
-  check('misiones: devuelve las 22 con estado/en', list.length === 22
+  check('misiones: total coincide con el catalogo (n=' + MISIONES.length + ')', res.total === MISIONES.length);
+  check('misiones: devuelve todas con estado/en', list.length === MISIONES.length
     && list.every(function(m){ return m.id && m.grupo && m.nombre && m.xp >= 0
       && Array.isArray(m.requiere) && (m.estado === 'completada' || m.estado === 'pendiente'); }));
   var primer = list.filter(function(m){ return m.id === 'mis_primer_guardado'; })[0];
@@ -88,8 +94,8 @@ invoke('misiones', mockConUsuario()).then(function(res) {
 }).then(function(res) {
   check('logros: ok=true (backfill no rompe)', res.ok === true);
   var list = (res.data) || [];
-  check('logros: total=30', res.total === 30);
-  check('logros: filas con tier/emoji/rareza_pct', list.length === 30
+  check('logros: total coincide con el catalogo (n=' + LOGROS.length + ')', res.total === LOGROS.length);
+  check('logros: filas con tier/emoji/rareza_pct', list.length === LOGROS.length
     && list.every(function(l){ return l.id && l.nombre && l.tier && l.emoji
       && typeof l.rareza_pct === 'number' && (l.estado === 'completada' || l.estado === 'pendiente'); }));
   var voto = list.filter(function(l){ return l.id === 'logr_primer_voto'; })[0];

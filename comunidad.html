@@ -521,8 +521,11 @@ var XP_LEVELS = [
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;
 /* Badges locales calculables con datos reales (igual que index.html);
-   removidos caribe/andino/compartido/plan_maestro/social (bloqueados).
-   Los de Milestones v2 son LOGROS server-side en api/interacciones.js. */
+   se mantienen fuera caribe/andino/plan_maestro/social (sin contador
+   propio; sus logros llegan por el catalogo). 'compartido' volvio con
+   ADR-036: su check usa 'shares', derivado de GET ?tipo=logros
+   (logr_primer_compartido..logr_viral_100). Los de Milestones v2 son
+   LOGROS server-side en api/interacciones.js. */
 var XP_BADGES = [
   {id:'primer_lugar',emoji:'📍',nombre:'Primer destino',desc:'Guardaste tu primer lugar',check:function(u){return u.saved>=1;}},
   {id:'explorador5',emoji:'🧭',nombre:'Explorador x5',desc:'5 lugares guardados',check:function(u){return u.saved>=5;}},
@@ -531,7 +534,12 @@ var XP_BADGES = [
   {id:'critico',emoji:'⭐',nombre:'Crítico viajero',desc:'5 reseñas publicadas',check:function(u){return u.reviews>=5;}},
   {id:'visitado3',emoji:'🏅',nombre:'Ya estuve',desc:'3 lugares visitados',check:function(u){return u.visited>=3;}},
   {id:'colombiano',emoji:'🇨🇴',nombre:'Orgullo colombiano',desc:'Eres viajero local de Colombia',check:function(u){return u.origin&&u.origin.indexOf('Colombia')!==-1;}},
+  {id:'compartido',emoji:'🔗',nombre:'Compartidor',desc:'Compartiste un destino o una foto',check:function(u){return u.shares>=1;}},
 ];
+
+/* Contador de compartidos derivado del catalogo de logros (ADR-036).
+   Sin campo en el perfil: lo actualiza cargarCompartidosBadge(). */
+var _sharedCount = 0;
 
 var mmSaved = [], mmVisited = [];
 try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
@@ -547,7 +555,7 @@ function statsU() {
     visited: u ? (parseInt(u.total_visitas,10)  || 0) : Math.max(0, mmVisited.length),
     reviews: u ? (parseInt(u.total_resenas,10)  || 0) : 0,
     origin:  '',
-    caribe:0, andino:0, shares:0, plans:0, chats:0
+    caribe:0, andino:0, shares:(u ? _sharedCount : 0), plans:0, chats:0
   };
 }
 
@@ -577,6 +585,7 @@ function enterWithoutRegister() {
 
 function showCommunity() {
   updateCommUI();
+  cargarCompartidosBadge();
   renderChatRooms();
   renderPlanes();
   cargarLeaderboard();
@@ -606,6 +615,24 @@ function updateCommUI() {
   setText('comm-badges-n', earnedCount);
   setText('comm-saved-n', st.saved);
   setText('comm-visited-n', st.visited);
+}
+
+/* Insignia 'compartido' (ADR-036): sin contador en el perfil, se deriva
+   del catalogo real de logros via window.ExploraCO.compartidosDeLogros
+   (helper compartido en usuario-session.js; aqui no se duplica). */
+function cargarCompartidosBadge() {
+  var u = sesion();
+  if (!u || !u.id) { _sharedCount = 0; return; }
+  fetch('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res && res.ok && Array.isArray(res.data)) {
+        var f = window.ExploraCO && window.ExploraCO.compartidosDeLogros;
+        _sharedCount = f ? f(res.data) : 0;
+        updateCommUI();
+      }
+    })
+    .catch(function(){});
 }
 
 /* ---- CHAT + PLANES (reales, api/interacciones.js, espec 2026-09-08) ---- */
@@ -2388,6 +2415,6 @@ window.onExploraCOUpdate = function() { checkGate(); };
 checkGate();
 </script>
   <script src="usuario-session.js"></script>
-  <script src="album-comments.js"></script>
+  <script src="album-comments.js?v=2"></script>
 </body>
 </html>

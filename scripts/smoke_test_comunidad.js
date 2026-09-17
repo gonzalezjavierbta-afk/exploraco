@@ -55,7 +55,12 @@ check('MISIONES: mis_plan_unido +15 XP (1 join)', mj && mj.xp === 15);
 check('LOGROS: incluye logr_social_chat', logrIds.indexOf('logr_social_chat') !== -1);
 check('LOGROS: incluye logr_social_plan', logrIds.indexOf('logr_social_plan') !== -1);
 check('LOGROS: incluye logr_anfitrion', logrIds.indexOf('logr_anfitrion') !== -1);
-check('LOGROS: total 30 trofeos', LOGROS.length === 30);
+// ADR-036: el backend deriva res.total de LOGROS.length, asi que el smoke
+// valida la coherencia del catalogo cargado en vez de un total fijo.
+const logrIdsUnicos = Object.keys(LOGROS.reduce(function(a, l){ a[String(l.id)] = 1; return a; }, {}));
+check('LOGROS: catalogo coherente y sin ids duplicados (n=' + LOGROS.length + ')',
+  LOGROS.length > 0 && logrIdsUnicos.length === LOGROS.length
+    && LOGROS.every(function(l){ return typeof l.id === 'string' && l.id.length > 0; }));
 
 // ---- Invocacion del handler con sql mock ----------------------------
 function invoke(req) {

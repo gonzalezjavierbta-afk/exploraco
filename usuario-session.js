@@ -1068,6 +1068,45 @@
     });
   }
 
+  // Aplica el resultado de una accion de XP que un caller externo
+  // ejecuto por su cuenta (ej. compartir.js, que hace su propio POST a
+  // tipo=compartir): suma la XP de la accion + los bonos de misiones y
+  // logros al perfil local, persiste la sesion, refresca la UI y dispara
+  // los toasts correspondientes. Un unico punto para no duplicar el
+  // patron de acreditacion (Regla de No-Duplicidad); los toasts de
+  // misiones/logros reusan las funciones ya existentes.
+  function aplicarResultadoXp(data) {
+    if (!data || !data.ok) return 0;
+    var misionesXp = sumaMisionesXp(data.misiones);
+    var logrosXp = sumaLogrosXp(data.logros);
+    var total = redondearXp((Number(data.xp) || 0) + misionesXp + logrosXp);
+    if (window.ExploraCO.usuario) {
+      aplicarDesbloqueos(data.misiones);
+      window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + total);
+      guardarSesion(window.ExploraCO.usuario);
+      actualizarUI();
+    }
+    mostrarMisionesToast(data.misiones);
+    mostrarLogrosToast(data.logros);
+    return total;
+  }
+  window.ExploraCO.aplicarResultadoXp = aplicarResultadoXp;
+
+  // Deriva el contador de compartidos del catalogo de logros
+  // (GET ?tipo=logros). Los tres logros de ADR-036 son acumulativos y
+  // estan encadenados por 'requiere': manda el de mayor umbral visible.
+  // Helper compartido por index.html / comunidad.html / mi-perfil.html
+  // para evaluar la insignia 'compartido' sin duplicar el mapeo.
+  function compartidosDeLogros(logros) {
+    var done = {};
+    (logros || []).forEach(function (l) { if (l.estado === 'completada') done[l.id] = true; });
+    if (done['logr_viral_100']) return 100;
+    if (done['logr_compartidor_25']) return 25;
+    if (done['logr_primer_compartido']) return 1;
+    return 0;
+  }
+  window.ExploraCO.compartidosDeLogros = compartidosDeLogros;
+
   // ── Gasto de XP con de-nivel real ─────────────────────────
   // Descuenta XP del usuario y detecta si baja de nivel.
   // Devuelve: { ok, xpAnterior, xpNuevo, nivelAnterior, nivelNuevo,

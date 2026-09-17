@@ -2939,5 +2939,68 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-110: Compartir social con XP por primer share + interacciones de media unificadas (votos/comentarios/guardados) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-17, implementada en working tree, SIN commitear). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar `db/migrations/022_media_compartidos.sql` y `db/migrations/023_interacciones_media_unificadas.sql` en Neon (las aplica Javier; archivo COMPLETO en una corrida) ANTES del deploy del backend v19; despues, commit/push/deploy de los 8 archivos modificados + 5 nuevos en un solo release.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-17
+- **ADR:** DECISIONS.md ADR-036 (redactado por architect con la decision de producto; esta tarea documenta su implementacion; NO se duplica la decision aqui).
+- **Responsable:** build (implementacion) + docs-keeper (cierre documental).
+- **Precedencia:** continua a TSK-109 / ADR-035 (XP decimal `numeric(12,2)`); `media_votos.xp_ganado` nace `numeric(12,2)`.
+- **Relacion con bugs:** no cierra BUG-061 (la rama nueva `compartir` SI exige `validarSesion`; `tipo='foto'` sigue ABIERTO y escalado a `sql-security`). Abre la deuda de esquema base registrada en BUGS_HISTORICOS.md (seccion "Deuda ADR-036").
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006; `git diff --numstat` = 8 archivos de codigo, +1379/-536, mas 5 archivos nuevos sin versionar):**
+
+  1. **Migracion 022 - `db/migrations/022_media_compartidos.sql` (131 lineas, idempotente ADR-008, ASCII-safe ADR-002).** Tabla `media_compartidos` (ledger de comparticiones) con CHECK de `fuente` (`destino|curada|viajero_foto|album_foto`), CHECK de `canal` (`web_share|whatsapp|copiar|otro`), `item_id text` 1..64, `xp_ganado numeric(12,2)` y **indice unico PARCIAL `media_compartidos_primero_uq (usuario_id,fuente,item_id) WHERE es_primero = true`** (habilita el `ON CONFLICT ... WHERE es_primero = true DO NOTHING` del backend). **NO toca el CHECK de `interacciones.tipo`** (`'compartir'` no entra a `interacciones`). Incluye preflight read-only (confirmar el CHECK legacy, el indice parcial y una prueba del `ON CONFLICT` en transaccion con ROLLBACK) y un PLAN B documentado (tabla `media_compartidos_unicos`) por si esa version de Postgres no infiere el indice parcial.
+  2. **Migracion 023 - `db/migrations/023_interacciones_media_unificadas.sql` (408 lineas, idempotente ADR-008, ASCII-safe ADR-002).** Tablas `media_votos` (PK compuesta `usuario_id,fuente,item_id`, soft-delete `activo`, `xp_ganado numeric(12,2)`), `media_comentarios` (lista de adyacencia `parent_id`, tombstone `activo`, texto 1..1000) y `media_comentario_likes` (PK compuesta, sin XP); `ALTER media_guardados.item_id uuid -> text` (`USING item_id::text`, valores preservados) + CHECK de `fuente` ampliado con `'curada'` (busca/dropea/recrea la constraint real por definicion, sin asumir el nombre); backfill idempotente desde `album_votos` (5.1), `interacciones tipo='foto'` con `dims.voto_foto_id` (5.2, regex de id seguro), `album_comentarios` por niveles con tope 50 (5.4) y `album_comentario_votos` (5.3), todo `ON CONFLICT DO NOTHING`. **Cero DROP/DELETE/TRUNCATE de las tablas legacy.** Preflight 6.1-6.5 (tipo real de `destinos_fotos.id`, conteos legacy vs unificados, idempotencia, tipos de `item_id`, CHECK de `media_guardados`).
+  3. **Backend `api/interacciones.js` (header `v18` -> `v19`, +949/-425).**
+     - **Rama POST `compartir`:** exige `validarSesion` (ADR-025), valida fuente/canal/item y existencia real (404); **25 XP el primer share por `(usuario,fuente,item_id)` y 5 XP los posteriores**, con **tope de 10 eventos y 50 XP por ventana rodante de 24h** (los eventos sin remanente se registran con `xp_ganado=0`); el XP pasa por `xpConMultiplicador`/`aplicarAmuletoX2`/`aplicarFamaPandilla`/`repartirXpReferidos` y el ledger se actualiza con el XP final. **No escribe en `interacciones`** (CHECK intacto).
+     - **3 misiones nuevas** (`mis_primer_compartido` 15 XP, `mis_voz_comunidad` 40 XP, `mis_embajador_destinos` 75 XP) y **3 logros nuevos** (`logr_primer_compartido` bronce, `logr_compartidor_25` plata, `logr_viral_100` oro); catalogo real HOY: **39 misiones y 33 logros**.
+     - **Media unificada:** POST `media_voto` y `media_comentar`; GET `media_interacciones` y `media_comentarios`; alias legacy conservados (`album_voto`, `foto_voto`, `comentario_foto`, `comentario_voto`, `comentario_eliminar`, `guardar_media`, `comentarios_foto`).
+     - **TODOS los lectores legacy migrados a `media_*`:** `album_detalle`, `fotos_top`, `mi_feed_fotos`, `multimedia_mapa`, `comentarios_recientes`, checks de misiones/logros, `museo_publico`, `arbol`, `mis_fotos` y sendero audiovisual. Helpers `conDegradacionMedia`/`contarComentarioSafe`/`contarCompartidosUsuario` degradan con `warn` si falta la tabla (patron BUG-051/BUG-060).
+     - **`galeria_destino` items[] v2** con `fuente`, `votos`, `comentarios`, `ya_votado`, `ya_guardado` y `tipo_voto:'media'`; metricas en lote sin N+1.
+  4. **`api/pagina-destino.js` (header v10, +40/-27).** Hero en mosaico (grid `1.9fr` + columna, fila 360px: 1 principal + 3 secundarias) y boton **Compartir** al final de la barra sticky `.subnav` (atributos `data-share*`; no aparece en blog), con carga de `/compartir.js` junto a `usuario-session.js`. La galeria principal llega a 12 miniaturas (comunidad max 6 + relleno con curadas).
+  5. **Nuevo asset `compartir.js` (295 lineas).** `window.ExploraCompartir = { VERSION, init, compartir }`: Web Share API + WhatsApp + Copiar link, popover propio, POST `tipo=compartir` y toasts reusando `window.ExploraCO.mostrarToast`; la acreditacion local de XP/misiones/logros delega en `usuario-session.js`.
+  6. **`galeria.html` (+222/-32).** Modo destino con 5 secciones ("Fotos de este lugar", "Albumes de este espacio", "Fotos de la comunidad", "Mapa y audiovisual", "Comparte tu foto") y modal de foto/album con VOTAR, GUARDAR, COMPARTIR y comentarios para las 3 fuentes; carga `/compartir.js`.
+  7. **`album-comments.js` v2.0.0 (+92/-33).** Firma `mount(target, {fuente,itemId}, opts)` retrocompatible con la de string legacy (string -> `fuente='album_foto'`); GET `comentarios_foto` para album y `media_comentarios` para las otras fuentes.
+  8. **`usuario-session.js` (+24/-0).** Helper `window.ExploraCO.aplicarResultadoXp(data)`: unico punto de acreditacion de acciones de XP de un caller externo (compartir.js), reusando `sumaMisionesXp`/`sumaLogrosXp`/`aplicarDesbloqueos` y los toasts existentes.
+  9. **`index.html` (+50/-17) / `comunidad.html` (+1/-1) / `mi-perfil.html` (+1/-1).** `index.html`: insignia `compartido` reincorporada (derivada del catalogo real de logros via `_compartidosDeLogros` -> `_sharedCount`). Los 3 y `galeria.html` reciben cache-bust `album-comments.js?v=2`.
+
+- **Archivos en el working tree (SIN commitear; `git diff --numstat`):**
+  - `api/interacciones.js` (+949/-425; header v19).
+  - `galeria.html` (+222/-32).
+  - `album-comments.js` (+92/-33; v2.0.0).
+  - `index.html` (+50/-17).
+  - `api/pagina-destino.js` (+40/-27; header v10).
+  - `usuario-session.js` (+24/-0).
+  - `comunidad.html` (+1/-1) y `mi-perfil.html` (+1/-1): SOLO cache-bust.
+  - NUEVOS sin versionar: `compartir.js` (295 lineas), `db/migrations/022_media_compartidos.sql` (131), `db/migrations/023_interacciones_media_unificadas.sql` (408), `scripts/smoke_036_compartir.js` (290) y `scripts/smoke_036_media_unificada.js` (361).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001). Cero archivos nuevos en `api/`; `compartir` y toda la media entran como ramas `?tipo=` de `api/interacciones.js`.
+
+- **Evidencia (ADR-006, verificada en esta sesion documental el 2026-09-17):**
+  - Existen los 5 archivos nuevos (untracked) y sus line counts coinciden (295/131/408/290/361).
+  - Headers reales: `api/interacciones.js` v19, `api/pagina-destino.js` v10.
+  - Anclas reales: `api/interacciones.js` L1421/L1429/L1439 (3 misiones), L1774/L1782/L1790 (3 logros), L7070+ (rama `compartir`), L2610 (`INSERT media_votos`), L2800 (`INSERT media_comentarios`), L4584 (`media_interacciones`), L4618 (`media_comentarios`), L4143-4231 (`items[]` v2); `api/pagina-destino.js` L201-204 (CSS hero mosaico) y L2246-2253 (boton Compartir en `.subnav`); `compartir.js` L285-287 (`window.ExploraCompartir`); `album-comments.js` L610 (`version: '2.0.0'`); `index.html` L4208 (insignia `compartido`).
+  - `node --check` **7/7 OK**: `api/interacciones.js`, `api/pagina-destino.js`, `compartir.js`, `album-comments.js`, `usuario-session.js` y los 2 smokes.
+  - ASCII-safe verificado por buffer: 0 bytes >127 y 0 backticks en `api/interacciones.js`, `api/pagina-destino.js`, `compartir.js`, las 2 migraciones y los 2 smokes. `usuario-session.js` mantiene su baseline no-ASCII preexistente (2386 bytes >127) con delta 0 en lo nuevo.
+  - Smokes re-ejecutados en esta sesion: `scripts/smoke_036_compartir.js` **55/55 PASS** y `scripts/smoke_036_media_unificada.js` **71/71 PASS**. **Ambos usan mock: NO validan el esquema de Neon.**
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. **Aplicar `db/migrations/022_media_compartidos.sql` y `db/migrations/023_interacciones_media_unificadas.sql` en Neon** (cada archivo COMPLETO en una corrida; idempotentes). Correr los preflights read-only de cada archivo (022: CHECK legacy sin `compartir`, indice parcial, prueba del `ON CONFLICT`; 023: 6.1-6.5) y, si el `ON CONFLICT` parcial falla por inferencia, aplicar el PLAN B de la 022.
+  2. **Verificar** que `media_compartidos`, `media_votos`, `media_comentarios` y `media_comentario_likes` existen, que `media_guardados.item_id` es `text` y que su CHECK admite `'curada'`, y que los conteos unificados igualan o superan a los legacy (preflight 6.2).
+  3. **Deploy del backend v19** solo despues de la 022/023; luego frontend (`compartir.js`, `galeria.html`, `album-comments.js`, `index.html`, `comunidad.html`, `mi-perfil.html`, `usuario-session.js`).
+  4. **Verificacion en vivo:** compartir una foto curada (25 XP, ledger en `media_compartidos`), repetir (5 XP), votar/comentar/guardar una curada y una de viajero, y ver la insignia `compartido`.
+  5. **Rollback (solo emergencia):** `DROP TABLE media_comentario_likes/media_comentarios/media_votos` y revertir `media_guardados.item_id` a uuid (LOSSY si hay item_id no-uuid); las tablas legacy NO se tocan. Scripts de bajada fuera del flujo normal.
+
+- **Hallazgos / pendientes derivados:**
+  - **Deuda de esquema base no versionado:** CHECK de `interacciones.tipo` y tablas `usuarios`/`interacciones`/`destinos_fotos` fuera de `db/migrations/` (patron BUG-021); tipo real de `destinos_fotos.id` por verificar (preflight 6.1); tablas legacy `album_votos`/`album_comentarios`/`album_comentario_votos` retiradas del backend pero no dropeadas. Registrado en BUGS_HISTORICOS.md, seccion "Deuda ADR-036".
+  - **Nota ADR-006 (discrepancia con el reporte de sesion):** la insignia `compartido` volvio SOLO en `index.html`; `comunidad.html` y `mi-perfil.html` solo recibieron el cache-bust `?v=2` (su comentario de `XP_BADGES` aun lista `compartido` como removido). Consistencia de UI pendiente, no bloqueante.
+  - **BUG-061 sigue ABIERTO:** `POST tipo='foto'` sin `validarSesion` (escalado a `sql-security`); la rama nueva `compartir` no lo repite.
+
+- **Fuera de alcance:** DROP de tablas legacy; versar el esquema base; arreglar BUG-061/BUG-062; pen-test en vivo; indices de apoyo adicionales.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

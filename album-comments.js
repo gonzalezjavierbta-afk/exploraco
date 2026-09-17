@@ -1,19 +1,26 @@
 /**
  * ExploraCO - album-comments.js
- * Componente compartido de comentarios sobre la media de albumes (ADR-023).
+ * Componente compartido de comentarios sobre media (ADR-023, ADR-036).
  *
- * Contrato:
- *   window.AlbumComments.mount(target, fotoId, opts)
- *     target   selector CSS o elemento DOM (se limpia y se renderiza)
- *     fotoId   id de album_fotos (la media comentada)
- *     opts     { usuarioId: string|null, compact: bool, maxIndent: 3,
- *                admin: bool, onCountChange: function(total) }
+ * Contrato (retrocompatible):
+ *   window.AlbumComments.mount(target, itemIdOrOpts, opts)
+ *     target       selector CSS o elemento DOM (se limpia y se renderiza)
+ *     itemIdOrOpts '<uuid>'              -> legacy: fuente='album_foto'
+ *                  {fuente,itemId}       -> unificado: fuente in
+ *                    ('curada','viajero_foto','album_foto')
+ *     opts         { usuarioId: string|null, compact: bool, maxIndent: 3,
+ *                    admin: bool, onCountChange: function(total) }
  *
  * Backend (api/interacciones.js, sin endpoints nuevos):
- *   GET  ?tipo=comentarios_foto&foto_id=<id>[&usuario_id=<id>]
- *   POST  tipo=comentario_foto    {usuario_id,foto_id,texto,parent_id}
- *   POST  tipo=comentario_voto    {usuario_id,comentario_id,accion}
- *   POST  tipo=comentario_eliminar{usuario_id,comentario_id}
+ *   GET  album_foto:       ?tipo=comentarios_foto&foto_id=<itemId>[&usuario_id=]
+ *   GET  otras fuentes:    ?tipo=media_comentarios&fuente=<f>&item_id=<itemId>[&usuario_id=]
+ *   POST ?tipo=media_comentar     {usuario_id,fuente,item_id,texto,parent_id}
+ *   POST ?tipo=comentario_voto    {usuario_id,comentario_id,accion}
+ *   POST ?tipo=comentario_eliminar{usuario_id,comentario_id}
+ *
+ * Sesion: los fetch adjuntan window.ExploraCO.authHeaders() (Bearer JWT)
+ * via acHeaders(); sin sesion o sin window.ExploraCO se degrada a los
+ * headers base para no romper la lectura publica de comentarios.
  *
  * ASCII-safe, ES5, sin backticks y sin console.log. El CSS propio usa
  * prefijo .ac- (scoped, ADR-004) y se inyecta una sola vez.
@@ -27,6 +34,8 @@
   var AC_DEFAULT_MAX_INDENT = 3;
   var AC_INDENT_PX = 16;
   var AC_MAX_LEN = 1000;
+  var AC_FUENTE_DEFAULT = 'album_foto';
+  var AC_FUENTES = ['curada', 'viajero_foto', 'album_foto'];
   var AC_PALETTE = [
     ['#1a2e4a', '#7eb8f0'],
     ['#0a2a1a', '#7ef0b8'],
@@ -177,11 +186,68 @@
     return null;
   }
 
-  function acPost(body) {
-    return fetch('/api/interacciones', {
+  function acQs(params) {
+    var parts = [];
+    var keys = Object.keys(params || {});
+    for (var i = 0; i < keys.length; i++) {
+      var v = params[keys[i]];
+      if (v == null || v === '') { continue; }
+      parts.push(encodeURIComponent(keys[i]) + '=' + encodeURIComponent(String(v)));
+    }
+    return parts.join('&');
+  }
+
+  function acNormFuente(f) {
+    var v = String(f == null ? '' : f).toLowerCase();
+    return AC_FUENTES.indexOf(v) === -1 ? AC_FUENTE_DEFAULT : v;
+  }
+
+  // Acepta el contrato legacy (itemId string) o el unificado ({fuente,itemId}).
+  function acParseTarget(itemIdOrOpts) {
+    if (itemIdOrOpts && typeof itemIdOrOpts === 'object') {
+      return {
+        fuente: acNormFuente(itemIdOrOpts.fuente),
+        itemId: itemIdOrOpts.itemId == null ? null : String(itemIdOrOpts.itemId)
+      };
+    }
+    return {
+      fuente: AC_FUENTE_DEFAULT,
+      itemId: itemIdOrOpts == null ? null : String(itemIdOrOpts)
+    };
+  }
+
+  // Fusiona headers base con los de sesion (Bearer) si hay JWT. Sin sesion
+  // o sin window.ExploraCO devuelve solo los base y la peticion sigue (el
+  // GET es publico y la carga de comentarios no se rompe).
+  function acHeaders(base) {
+    var headers = {};
+    var k;
+    if (base) {
+      for (k in base) {
+        if (Object.prototype.hasOwnProperty.call(base, k)) { headers[k] = base[k]; }
+      }
+    }
+    if (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function') {
+      try {
+        var auth = window.ExploraCO.authHeaders() || {};
+        for (k in auth) {
+          if (Object.prototype.hasOwnProperty.call(auth, k)) { headers[k] = auth[k]; }
+        }
+      } catch (e) {
+        if (window.console && window.console.warn) {
+          window.console.warn('[album-comments] authHeaders', e);
+        }
+      }
+    }
+    return headers;
+  }
+
+  // El tipo viaja en el query string; el body queda id-agnostico (ADR-036).
+  function acPost(tipo, body) {
+    return fetch('/api/interacciones?' + acQs({ tipo: tipo }), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      headers: acHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body || {})
     }).then(function (r) {
       return r.json().catch(function () {
         return { ok: false, error: 'Respuesta invalida del servidor' };
@@ -205,6 +271,17 @@
       return res.error || 'No tienes permisos para esta accion';
     }
     return res.error || 'No se pudo completar la accion';
+  }
+
+  // Crear comentario (fuente/itemId viven en el estado interno, ADR-036).
+  function acPostComentario(state, texto, parentId) {
+    return acPost('media_comentar', {
+      usuario_id: state.usuarioId,
+      fuente: state.fuente,
+      item_id: state.itemId,
+      texto: texto,
+      parent_id: parentId
+    });
   }
 
   // ---- Render ------------------------------------------------------------
@@ -315,9 +392,16 @@
     state.loading = true;
     state.error = null;
     acRender(state);
-    var url = '/api/interacciones?tipo=comentarios_foto&foto_id=' + encodeURIComponent(state.fotoId);
-    if (state.usuarioId) { url += '&usuario_id=' + encodeURIComponent(state.usuarioId); }
-    fetch(url).then(function (r) {
+    var params;
+    if (state.fuente === AC_FUENTE_DEFAULT) {
+      params = { tipo: 'comentarios_foto', foto_id: state.itemId, usuario_id: state.usuarioId };
+    } else {
+      params = {
+        tipo: 'media_comentarios', fuente: state.fuente,
+        item_id: state.itemId, usuario_id: state.usuarioId
+      };
+    }
+    fetch('/api/interacciones?' + acQs(params), { headers: acHeaders() }).then(function (r) {
       return r.json().catch(function () {
         return { ok: false, error: 'Respuesta invalida del servidor' };
       }).then(function (j) {
@@ -350,7 +434,7 @@
     if (!texto) { acNotify(state, 'Escribe un comentario'); return; }
     if (texto.length > AC_MAX_LEN) { acNotify(state, 'El comentario supera los 1000 caracteres'); return; }
     ta.disabled = true;
-    acPost({ tipo: 'comentario_foto', usuario_id: state.usuarioId, foto_id: state.fotoId, texto: texto, parent_id: null })
+    acPostComentario(state, texto, null)
       .then(function (res) {
         if (!res.ok) { ta.disabled = false; acNotify(state, acErrMsg(res)); return; }
         if (res.xp > 0 && window.ExploraCO && typeof window.ExploraCO.mostrarToast === 'function') {
@@ -392,7 +476,7 @@
     if (!texto) { acNotify(state, 'Escribe una respuesta'); return; }
     if (texto.length > AC_MAX_LEN) { acNotify(state, 'La respuesta supera los 1000 caracteres'); return; }
     if (ta) { ta.disabled = true; }
-    acPost({ tipo: 'comentario_foto', usuario_id: state.usuarioId, foto_id: state.fotoId, texto: texto, parent_id: id })
+    acPostComentario(state, texto, id)
       .then(function (res) {
         if (!res.ok) { if (ta) { ta.disabled = false; } acNotify(state, acErrMsg(res)); return; }
         if (res.xp > 0 && window.ExploraCO && typeof window.ExploraCO.mostrarToast === 'function') {
@@ -417,7 +501,7 @@
     if (!state.usuarioId) { acNotify(state, 'Inicia sesion para dar me gusta'); return; }
     var accion = btn.classList.contains('ac-on') ? 'unlike' : 'like';
     btn.disabled = true;
-    acPost({ tipo: 'comentario_voto', usuario_id: state.usuarioId, comentario_id: id, accion: accion })
+    acPost('comentario_voto', { usuario_id: state.usuarioId, comentario_id: id, accion: accion })
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) { acNotify(state, acErrMsg(res)); return; }
@@ -435,7 +519,7 @@
 
   function acDelete(state, id) {
     if (!window.confirm('Eliminar este comentario?')) { return; }
-    acPost({ tipo: 'comentario_eliminar', usuario_id: state.usuarioId, comentario_id: id })
+    acPost('comentario_eliminar', { usuario_id: state.usuarioId, comentario_id: id })
       .then(function (res) {
         if (!res.ok) { acNotify(state, acErrMsg(res)); return; }
         acLoad(state);
@@ -477,21 +561,24 @@
     span.textContent = n > 0 ? ' (' + n + ')' : '';
   }
 
-  // Contrato: el boton tiene data-comments-for="<fotoId>" y el contenedor
-  // oculto es el hermano siguiente (div con data-comments-for). Al primer
-  // click se monta el componente (flag data-mounted); los siguientes solo
-  // alternan la visibilidad del contenedor.
+  // Contrato: el boton tiene data-comments-for="<itemId>" (y opcionalmente
+  // data-comments-fuente="<fuente>"; sin ella = album_foto legacy) y el
+  // contenedor oculto es el hermano siguiente (div con data-comments-for).
+  // Al primer click se monta el componente (flag data-mounted); los
+  // siguientes solo alternan la visibilidad del contenedor.
   function toggle(btn) {
     if (!btn) { return; }
-    var fotoId = btn.getAttribute('data-comments-for');
-    if (!fotoId) { return; }
+    var itemId = btn.getAttribute('data-comments-for');
+    if (!itemId) { return; }
     var box = btn.nextElementSibling;
-    if (!box || box.getAttribute('data-comments-for') !== fotoId) { return; }
+    if (!box || box.getAttribute('data-comments-for') !== itemId) { return; }
     if (box.style.display === 'none') {
       box.style.display = 'block';
       if (box.getAttribute('data-mounted') !== '1') {
         box.setAttribute('data-mounted', '1');
-        mount(box, fotoId, {
+        var fuente = btn.getAttribute('data-comments-fuente')
+          || box.getAttribute('data-comments-fuente') || null;
+        mount(box, { fuente: fuente, itemId: itemId }, {
           usuarioId: acGetUid(),
           compact: true,
           onCountChange: function (total) { acUpdateBtnCount(btn, total); }
@@ -504,18 +591,20 @@
 
   // ---- API publica -------------------------------------------------------
 
-  function mount(target, fotoId, opts) {
+  function mount(target, itemIdOrOpts, opts) {
     opts = opts || {};
     var el = acResolveTarget(target);
     if (!el) { return null; }
     acEnsureStyle();
-    if (!fotoId) {
+    var ref = acParseTarget(itemIdOrOpts);
+    if (!ref.itemId) {
       el.innerHTML = '<div class="ac-error">No se pudo identificar la publicacion.</div>';
       return null;
     }
     var state = {
       el: el,
-      fotoId: String(fotoId),
+      fuente: ref.fuente,
+      itemId: ref.itemId,
       usuarioId: (opts.usuarioId == null || opts.usuarioId === '') ? null : String(opts.usuarioId),
       compact: !!opts.compact,
       admin: !!opts.admin,
@@ -548,6 +637,6 @@
     mount: mount,
     toggle: toggle,
     escape: acEsc,
-    version: '1.1.0'
+    version: '2.0.0'
   };
 })();

@@ -1117,3 +1117,29 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 - **Observacion:** espera `VOCACIONES` 3 vs 4 reales, y `chat_salas` `plan` vs `plan+dm` reales (tras TSK-103: 4 vocaciones y DM `tipo='dm'`). Candidato: actualizar las expectativas.
 - **Estado:** DEUDA QA (preexistente, no bloqueante, 2026-09-15).
 
+---
+
+## Deuda ADR-036: esquema base no versionado, tipo de `destinos_fotos.id` y tablas legacy de media (patron BUG-021)
+
+**Nota:** estos hallazgos NO son bugs confirmados de la Entrega TSK-110 / ADR-036 (2026-09-17); son DEUDA TECNICA de esquema detectada al versionar las migraciones 022/023. Se registran aqui para que ninguna IA las asuma resueltas (ADR-006). La entrega las mitiga con guards (`to_regclass`/`information_schema`) y degradacion con `warn`, pero NO las cierra. Se conservan por Regla de Oro 3 (Cero Borrado Logico).
+
+### D-1: CHECK de `interacciones.tipo` y esquema base (`usuarios`/`interacciones`/`destinos_fotos`) NO versionados
+- **Severidad:** MEDIA (gobernanza de BD; la realidad de Neon no es reproducible desde el repo, mismo patron que BUG-021/BUG-060).
+- **Contexto:** la Entrega ADR-036 necesitaba registrar comparticiones y votos/comentarios/guardados de media. Por eso NO se agrego `'compartir'` al CHECK de `interacciones.tipo`: la tabla `interacciones` y su CHECK viven SOLO en Neon (fuera de `db/migrations/`), de modo que un `ALTER` sobre ellas seria SQL suelto contra ADR-008 y podria divergir de la realidad. Se resolvio con tabla propia `media_compartidos` (022) y tablas `media_*` (023); el CHECK legacy queda intacto (confirmado por el preflight 1 de la 022).
+- **Deuda:** siguen SIN declaracion versionada el CHECK de `interacciones.tipo` (`resena|guardado|visita|foto|rating`), la tabla base `interacciones` (incluidas `dims` y `xp_ganado`), la tabla `usuarios` (incluidas `activo`/`ultimo_acceso`, ya anotadas en la deuda de ADR-035) y `destinos_fotos`.
+- **Mitigacion implementada (no cierra la deuda):** la 022/023 validan en tiempo de ejecucion la existencia de tablas/columnas con `to_regclass`/`information_schema` antes de tocarlas; `api/interacciones.js` v19 usa `conDegradacionMedia`/`contarComentarioSafe`/`contarCompartidosUsuario` para degradar a 0/false con `console.warn` si falta una tabla (nunca catch vacio, AGENTS.md 2.2).
+- **Recomendacion:** versar el esquema base en migraciones idempotentes (ADR-008) antes de cualquier `DROP`/recreacion de esquema; una migracion futura debe declarar el CHECK real de `interacciones.tipo` y las columnas no versionadas en vez de asumirlas.
+- **Evidencia (ADR-006):** `db/migrations/022_media_compartidos.sql` (encabezado "NO TOCA EL CHECK DE interacciones.tipo" y preflight 1, lineas 18-21 y 77-85), `db/migrations/023_interacciones_media_unificadas.sql` (encabezado "DEFENSIVO", lineas 29-34), `api/interacciones.js` v19 L2199/L2512/L2862.
+
+### D-2: tipo real de `destinos_fotos.id` por verificar
+- **Severidad:** BAJA (por ahora el diseno no depende de ese tipo, pero la verificacion es obligatoria antes de asumir cualquier cast/FK).
+- **Contexto:** la 023 migra los votos de foto curada con `fuente='curada'` e `item_id text`, y `galeria_destino` los arma con `String(f.id)`. La entrega NO asume si `destinos_fotos.id` es `uuid` o `text`: el preflight 6.1 de la 023 lo consulta en vivo (`information_schema.columns`). Si en el futuro se quisiera una FK real de `media_votos.item_id` a `destinos_fotos.id`, primero hay que confirmar el tipo.
+- **Estado:** DEUDA DOCUMENTADA (ADR-036 / TSK-110, 2026-09-17). El preflight 6.1 es el paso de verificacion; no bloqueante.
+
+### D-3: tablas legacy `album_votos`/`album_comentarios`/`album_comentario_votos` retiradas del backend pero NO dropeadas
+- **Severidad:** BAJA (deuda de limpieza; convivencia deliberada).
+- **Contexto:** desde ADR-036 v19 TODOS los lectores del backend migraron a `media_*` (votos, comentarios, likes y guardados), pero las tablas legacy se CONSERVAN intactas: la 023 hace backfill idempotente (solo COPIA con `ON CONFLICT DO NOTHING`) y su encabezado prohibe explicitamente `DROP`/`DELETE`/`TRUNCATE` (Cero Borrado Logico, Regla de Oro 3). Ademas, eliminarlas con clientes viejos aun activos romperia el rollback.
+- **Recomendacion:** una tarea de datos explicita y separada (con respaldo y ventana de observacion post-deploy) cuando se confirme que ningun cliente viejo las lee; no ejecutar en caliente junto con el deploy de ADR-036.
+- **Evidencia (ADR-006):** `db/migrations/023_interacciones_media_unificadas.sql` encabezado "NO BORRA TABLAS LEGACY" (lineas 24-27) y backfills 5.1/5.4/5.3; `api/interacciones.js` v19 (lectores sobre `media_votos`/`media_comentarios`/`media_comentario_likes`).
+- **Estado:** DEUDA DOCUMENTADA (ADR-036 / TSK-110, 2026-09-17). No bloqueante; el rollback la mantiene como red de seguridad.
+

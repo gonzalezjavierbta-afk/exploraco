@@ -198,18 +198,26 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +"body.blog .ssec{padding:44px 5%}"
 +"body.blog .bfig img{border-radius:14px}"
 +"body.blog .bvid{border-radius:14px}"
-+".hr{display:flex;flex-direction:column;gap:8px;justify-content:center}"
-+".psm{height:200px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
+// Hero en mosaico: la principal ocupa ~66% del ancho y toda la altura
+// (360px desktop) y las 3 secundarias se apilan en la columna derecha.
+// Con una sola foto (sin heroThumbs) la principal abarca todo el ancho.
++".hr{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);grid-template-rows:360px;gap:8px}"
++".hr>.psm:only-child{grid-column:1/-1}"
++".psm{height:100%;min-height:0;border-radius:10px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
 +".psm img{width:100%;height:100%;object-fit:cover}"
 +".pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}"
-+".prow{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:44px;gap:4px;height:auto}"
-+"@media(max-width:760px){.prow{grid-template-columns:repeat(4,1fr)}}"
-+".pth{border-radius:6px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
++".prow{display:grid;grid-template-columns:1fr;grid-auto-rows:minmax(0,1fr);gap:8px;height:100%;min-width:0}"
++".pth{border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
 +".pth img{width:100%;height:100%;object-fit:cover}"
++"@media(max-width:760px){.hr{grid-template-columns:1fr;grid-template-rows:auto}.psm{height:230px}.prow{grid-template-columns:repeat(3,1fr);grid-auto-rows:auto;height:auto}.pth{height:86px}}"
 +".subnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:260;display:flex;gap:4px;overflow-x:auto;padding:0 4%;-ms-overflow-style:none;scrollbar-width:none}"
 +".subnav::-webkit-scrollbar{display:none}"
 +".snlink{flex-shrink:0;padding:14px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}"
 +".snlink.on{color:var(--gold-dark);border-color:var(--gold)}"
+// Boton Compartir del subnav (compartir.js): reusa la estetica .snlink y se
+// empuja a la derecha con margin-left:auto. Sin fondo ni bordes de boton.
++".snshare{margin-left:auto;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--gold-dark);flex-shrink:0}"
++".snshare:hover{color:var(--gold)}"
   // BUG-014 fix (ver BUGS_HISTORICOS.md): este bloque definia una
   // segunda regla ".snlink" (para un ".secnav" que nunca se usa en
   // ningun render, ver grep) que pisaba en cascada CSS a la regla
@@ -310,9 +318,11 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".gal-i img{width:100%;height:100%;object-fit:cover}"
 +".gal-main{aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;cursor:pointer;transition:transform .15s}"
 +".gal-main:hover{transform:scale(1.005)}"
-+".gal-thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}"
-+"@media(max-width:900px){.gal-thumbs{grid-template-columns:repeat(2,1fr)}}"
-+"@media(max-width:520px){.gal-thumbs{grid-template-columns:repeat(1,1fr)}}"
+// 12 miniaturas con mas presencia: 6x2 en desktop, 3 columnas en tablet
+// y 2 columnas en movil (antes 4/2/1).
++".gal-thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:10px}"
++"@media(max-width:900px){.gal-thumbs{grid-template-columns:repeat(3,1fr)}}"
++"@media(max-width:520px){.gal-thumbs{grid-template-columns:repeat(2,1fr)}}"
 +".glbtn{display:inline-block;margin-top:16px;background:transparent;border:1.5px solid var(--gold);color:var(--gold-dark);border-radius:4px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}"
 +".glbtn:hover{background:var(--gold);color:#fff}"
 +"#lb{position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;padding:4%}"
@@ -1571,34 +1581,29 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // bloque curado y el lightbox usan > 1 (gate historico), que cumple
   // "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0 curadas.
   var hayGaleriaCurada = galAll.length > 1;
-  // ADR-034: set explicito de la galeria. La grande (curada #1 / hero) se
-  // mantiene aparte y se arman hasta 12 miniaturas: 6 curadas (en orden,
-  // excluyendo la grande) + 6 de comunidad (merge viajeros+albumes por
-  // votos DESC, dedup URL). Si hay menos de 6 de comunidad se completan con
-  // curadas restantes; nunca se repite la grande.
+  // ADR-034 (ajuste): set explicito de la galeria. La grande (curada #1 /
+  // hero) se mantiene aparte y se arman hasta 12 miniaturas con orden
+  // comunidad -> curadas: primero hasta 6 fotos de comunidad (merge
+  // viajeros+albumes por votos DESC, dedup URL); luego las curadas en orden
+  // (excluyendo la grande) hasta completar 12. Si no hay comunidad, se
+  // listan hasta 12 curadas. Nunca se repite la grande ni una URL.
   var GAL_THUMBS_MAX = 12;
-  var GAL_CURADAS_MAX = 6;
   var GAL_COMUNIDAD_MAX = 6;
   var galBig = galAll[0];
-  var galCuradasThumbs = [];
-  for (var gci = 1; gci < galAll.length && galCuradasThumbs.length < GAL_CURADAS_MAX; gci++) {
-    if (galAll[gci] !== galBig && galCuradasThumbs.indexOf(galAll[gci]) === -1) galCuradasThumbs.push(galAll[gci]);
-  }
+  // 1) Comunidad primero (tope 6, votos DESC, dedup por URL).
   var galComunidadThumbs = [];
   for (var gcj = 0; gcj < comunidadUrls.length && galComunidadThumbs.length < GAL_COMUNIDAD_MAX; gcj++) {
     var gcu = comunidadUrls[gcj];
     if (gcu === galBig) continue;
-    if (galCuradasThumbs.indexOf(gcu) !== -1) continue;
     if (galComunidadThumbs.indexOf(gcu) !== -1) continue;
     galComunidadThumbs.push(gcu);
   }
-  var galThumbsList = galCuradasThumbs.concat(galComunidadThumbs);
-  if (galThumbsList.length < GAL_THUMBS_MAX) {
-    for (var gk = 1; gk < galAll.length && galThumbsList.length < GAL_THUMBS_MAX; gk++) {
-      var gku = galAll[gk];
-      if (gku === galBig || galThumbsList.indexOf(gku) !== -1) continue;
-      galThumbsList.push(gku);
-    }
+  var galThumbsList = galComunidadThumbs.slice();
+  // 2) Curadas restantes hasta completar 12 (sin repetir grande ni comunidad).
+  for (var gci = 1; gci < galAll.length && galThumbsList.length < GAL_THUMBS_MAX; gci++) {
+    var gku = galAll[gci];
+    if (gku === galBig || galThumbsList.indexOf(gku) !== -1) continue;
+    galThumbsList.push(gku);
   }
   if (galThumbsList.length > GAL_THUMBS_MAX) galThumbsList = galThumbsList.slice(0, GAL_THUMBS_MAX);
   // GAL_ALL para el lightbox: la grande + las miniaturas en el MISMO orden
@@ -2238,10 +2243,17 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     hostalPos.forEach(function(pos, k){ subnavItems[pos] = hostalItems[k]; });
   }
 
-  var subnav = (cat === 'blog') ? '' : (subnavItems.length > 1 ? '<nav class="subnav">'
+  // El boton Compartir viaja al final del subnav y alimenta el contrato de
+  // compartir.js (data-share*). Se mantiene visible aunque el destino tenga
+  // una sola seccion (o ninguna): gate (length>1 || no-blog); blog no lo usa.
+  var snshare = '<button type="button" class="snlink snshare" data-share data-share-fuente="destino"'
+    + ' data-share-item="'+esc(String(d.id || d.slug || ''))+'" data-share-slug="'+esc(d.slug || '')+'"'
+    + ' data-share-title="'+esc(d.nombre || '')+'">Compartir</button>';
+  var subnav = (cat === 'blog') ? '' : ((subnavItems.length > 1 || cat !== 'blog') ? '<nav class="subnav">'
     + subnavItems.map(function(it, i){
         return '<a class="snlink'+(i===0?' on':'')+'" href="#'+it.id+'" onclick="document.querySelectorAll(\'.snlink\').forEach(function(l){l.classList.remove(\'on\')});this.classList.add(\'on\')">'+esc(it.label)+'</a>';
       }).join('')
+    + snshare
     + '</nav>' : '');
 
   var secHostalHTML = '';
@@ -2370,6 +2382,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + lbHTML + '\n'
 
     + '<script src="/usuario-session.js"><\/script>\n'
+    + '<script src="/compartir.js"><\/script>\n'
     + '<script>\n'
     + 'var DID="'+esc(String(d.id))+'";\n'
     + 'var RV_AVG='+rat+';\n'
@@ -2735,7 +2748,9 @@ module.exports = async function handler(req, res) {
           + ' a.id AS album_id, a.titulo AS album_titulo,'
           + ' COALESCE(af.autor_original_id, af.agregador_id) AS autor_id,'
           + ' u.nombre AS autor_nombre,'
-          + ' (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
+          + ' (SELECT COUNT(*)::int FROM media_votos mv'
+          + '   WHERE mv.fuente=\'album_foto\' AND mv.activo=true'
+          + '     AND mv.item_id = af.id::text) AS votos'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = COALESCE(af.autor_original_id, af.agregador_id)'

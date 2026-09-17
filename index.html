@@ -4188,13 +4188,15 @@ var XP_LEVELS = [
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;
 
-// Insignias recortadas frente a v1: se quitaron 'compartido',
-// 'plan_maestro' y 'social' (compartir/plan/chat nunca tuvieron un
-// endpoint real detras -- habrian quedado bloqueadas para siempre) y
-// las de region 'caribe'/'andino' (total_guardados en Neon no
-// distingue region por destino todavia). Quedan solo las que se
-// pueden calcular con datos reales: total_guardados, total_resenas,
-// total_visitas, y el origen auto-declarado en el onboarding.
+// Insignias frente a v1: se mantienen fuera 'plan_maestro' y 'social'
+// (plan/chat no exponen un contador propio; sus logros llegan por el
+// catalogo de trofeos, no como insignia) y las de region
+// 'caribe'/'andino' (total_guardados en Neon no distingue region por
+// destino todavia). 'compartido' volvio con ADR-036: su check usa
+// _sharedCount, derivado del catalogo real de logros
+// (logr_primer_compartido..logr_viral_100), no de un contador local
+// decorativo. Las demas se calculan con total_guardados, total_resenas,
+// total_visitas y el origen auto-declarado en el onboarding.
 var XP_BADGES = [
   { id: 'primer_lugar',  emoji: '📍', nombre: 'Primer destino',      desc: 'Guardaste tu primer lugar',       check: function(u){ return u.saved >= 1; } },
   { id: 'explorador5',   emoji: '🧭', nombre: 'Explorador x5',       desc: '5 lugares guardados',              check: function(u){ return u.saved >= 5; } },
@@ -4203,6 +4205,7 @@ var XP_BADGES = [
   { id: 'critico',       emoji: '⭐', nombre: 'Crítico viajero',     desc: '5 reseñas publicadas',             check: function(u){ return u.reviews >= 5; } },
   { id: 'visitado3',     emoji: '🏅', nombre: 'Ya estuve',           desc: '3 lugares visitados',              check: function(u){ return u.visited >= 3; } },
   { id: 'colombiano',    emoji: '🇨🇴', nombre: 'Orgullo colombiano', desc: 'Eres viajero local de Colombia',   check: function(u){ return u.origin && u.origin.indexOf('Colombia') !== -1; } },
+  { id: 'compartido',    emoji: '🔗', nombre: 'Compartidor',         desc: 'Compartiste un destino o una foto', check: function(u){ return u.shared >= 1; } },
 ];
 
 /* ── LEVEL LOGIC (se conserva igual, ahora opera sobre xp real) ── */
@@ -4237,7 +4240,11 @@ function fmtXp(n) {
 }
 
 /* ── Snapshot para calcular insignias: viene de window.ExploraCO
-   (sesion real), no de un contador local. Sin sesion, todo en 0. ── */
+   (sesion real), no de un contador local. Sin sesion, todo en 0.
+   'shared' no existe como campo del perfil: se deriva del catalogo de
+   logros (GET ?tipo=logros) via _compartidosDeLogros, que cargarLogros
+   actualiza en _sharedCount. ── */
+var _sharedCount = 0;
 function puntosUsuarioActual() {
   var u = (window.ExploraCO && window.ExploraCO.usuario) || null;
   return {
@@ -4246,6 +4253,7 @@ function puntosUsuarioActual() {
     reviews: u ? (parseInt(u.total_resenas)   || 0) : 0,
     visited: u ? (parseInt(u.total_visitas)   || 0) : 0,
     origin:  '',
+    shared:  u ? _sharedCount : 0,
   };
 }
 
@@ -4320,6 +4328,17 @@ function _marcarBadgeVisto(id) {
   _badgesVistos[id] = true;
   try { localStorage.setItem('badges_vistos', JSON.stringify(_badgesVistos)); } catch(e) {}
 }
+// Unico punto que dispara el toast de insignia nueva. Se usa desde
+// updatePointsUI y, tras resolver el fetch de logros, desde cargarLogros
+// (necesario para 'compartido', cuyo check depende de _sharedCount).
+function _toastBadgesNuevos(earnedBadges) {
+  (earnedBadges || []).forEach(function(b) {
+    if(!_badgesVistos[b.id]) {
+      _marcarBadgeVisto(b.id);
+      setTimeout(function(){ showBadgeToast(b); }, 400);
+    }
+  });
+}
 var _ultimoNivelVisto = null;
 
 /* ── UPDATE POINTS UI ──
@@ -4336,11 +4355,9 @@ function updatePointsUI() {
   var xpEl  = document.getElementById('pts-xp');
   var lvlEl = document.getElementById('pts-level');
   var barEl = document.getElementById('pts-bar');
-  var bdgEl = document.getElementById('pts-badges-count');
   if(xpEl)  xpEl.textContent  = fmtXp(pu.xp) + ' XP';
   if(lvlEl) lvlEl.textContent = lvl.emoji + ' ' + lvl.nombre;
   if(barEl) barEl.style.width = pct + '%';
-  if(bdgEl) bdgEl.textContent = earnedBadges.length;
 
   // Resumen de cuenta (columna izquierda de Mi Viaje): perfil y reseñas
   var resN = document.getElementById('soc-resenas-n');
@@ -4385,12 +4402,7 @@ function updatePointsUI() {
 
   // Toast por cada insignia nueva que no se haya mostrado antes en
   // este dispositivo.
-  earnedBadges.forEach(function(b) {
-    if(!_badgesVistos[b.id]) {
-      _marcarBadgeVisto(b.id);
-      setTimeout(function(){ showBadgeToast(b); }, 400);
-    }
-  });
+  _toastBadgesNuevos(earnedBadges);
 
   // Modal de subida de nivel, comparando contra el ultimo nivel visto
   // en esta sesion de pagina (no persiste entre recargas a proposito:
@@ -4439,6 +4451,8 @@ function renderBadgesGrid(pu, earnedBadges) {
   if(!grid) return;
   pu = pu || puntosUsuarioActual();
   earnedBadges = earnedBadges || XP_BADGES.filter(function(b){ return b.check(pu); });
+  var bdgEl = document.getElementById('pts-badges-count');
+  if(bdgEl) bdgEl.textContent = earnedBadges.length;
   var earnedIds = earnedBadges.map(function(b){ return b.id; });
   grid.innerHTML = XP_BADGES.map(function(b) {
     var earned = earnedIds.indexOf(b.id) !== -1;
@@ -4448,6 +4462,7 @@ function renderBadgesGrid(pu, earnedBadges) {
       + '<div class="badge-desc">' + b.desc + '</div>'
       + '</div>';
   }).join('');
+  return earnedBadges;
 }
 
 /* ── LOGROS / TROFEOS (v5, estilo consola + Upland) ─────────────
@@ -4462,11 +4477,20 @@ var _LOGROS_UID = null;
 function tierNombre(t) {
   return ({ bronce:'Bronce', plata:'Plata', oro:'Oro', platino:'Platino' })[t] || t || '';
 }
+// Deriva el contador de compartidos del catalogo de logros
+// (GET ?tipo=logros). El mapeo real vive en usuario-session.js
+// (window.ExploraCO.compartidosDeLogros), compartido con comunidad.html
+// y mi-perfil.html; aqui solo se delega para no duplicarlo.
+function _compartidosDeLogros(logros) {
+  var f = window.ExploraCO && window.ExploraCO.compartidosDeLogros;
+  return f ? f(logros) : 0;
+}
 function cargarLogros() {
   var u = window.ExploraCO && window.ExploraCO.usuario;
   if (!u || !u.id) {
     _LOGROS_CACHE = [];
     _LOGROS_UID = null;
+    _sharedCount = 0;
     renderLogrosGrid();
     return;
   }
@@ -4476,7 +4500,12 @@ function cargarLogros() {
     .then(function(res) {
       if (res && res.ok && Array.isArray(res.data)) {
         _LOGROS_CACHE = res.data;
+        _sharedCount = _compartidosDeLogros(res.data);
         renderLogrosGrid();
+        // Re-render de insignias tras resolver logros: la insignia
+        // 'compartido' depende de _sharedCount (no de un campo del perfil).
+        var earned = renderBadgesGrid();
+        if (earned) _toastBadgesNuevos(earned);
       }
     })
     .catch(function() {});
@@ -5130,6 +5159,6 @@ function submitBlog() {
 
   <script src="index-api-connector.js"></script>
   <script src="usuario-session.js"></script>
-  <script src="album-comments.js"></script>
+  <script src="album-comments.js?v=2"></script>
 </body>
 </html>

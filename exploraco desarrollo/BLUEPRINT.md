@@ -31,7 +31,7 @@ ADMIN (admin.html)
 |---|---|---|
 | destinos.js | GET | Listado publico, filtros, modo=mapa, stats (Cache s-maxage=10) |
 | usuarios.js | GET/POST | Perfil, leaderboard, upsert de usuario; v9 (Entrega 016): registro con `?ref=`, piramide de referidos, 4 facciones, verificacion de email y sesion firmada JWT (`firmarSesion`); v12 (TSK-103 / ADR-028): GET `perfil_publico` (ligero), GET `casa_ranking`, POST `casa_elegir`, POST `perfil_actualizar` (alias `perfil_editar`) y blindaje PII owner-aware en `?id=`/`?buscar=`/`referido_codigo`; **header real HOY v15** (ADR-035, 2026-09-17: XP `numeric(12,2)`, `casa_ranking` con `miembros_activos` y orden por `xp_total DESC`; el v14 fue el hotfix BUG-054 del SQL del merge de `device_hashes`, ver BUGS_HISTORICOS.md BUG-054) |
-| interacciones.js | GET/POST | Rese\u00f1as, guardados, visitas, calculo de XP; v13 (Entrega 016): `repartirXpReferidos` en 14 puntos de XP, Activo Oculto Wayfarer (proponer/votar/checkin + moderacion), `validarSesion` JWT (timingSafeEqual) y nonce geoespacial; v15 (TSK-103 / ADR-028): GET `museo_publico`, DM (`dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`), GET `arbol_catalogo`/`arbol_usuario`, POST `rama_activar`, GET `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS`, Origen derivado con bono x1.2 en `D_R` y 8 misiones `perfil`; **v18 (ADR-035, 2026-09-17)**: XP `numeric(12,2)` con redondeo half-up a 2 decimales (helper `red2`), sin `::int` en las sumas de XP y NUEVA rama GET `tipo=pandilla_ranking` (ranking global de Parches por `fama_total DESC` con `miembros_activos`) |
+| interacciones.js | GET/POST | Rese\u00f1as, guardados, visitas, calculo de XP; v13 (Entrega 016): `repartirXpReferidos` en 14 puntos de XP, Activo Oculto Wayfarer (proponer/votar/checkin + moderacion), `validarSesion` JWT (timingSafeEqual) y nonce geoespacial; v15 (TSK-103 / ADR-028): GET `museo_publico`, DM (`dm_enviar`/`dm_hilos`/`dm_mensajes`/`dm_bloquear`), GET `arbol_catalogo`/`arbol_usuario`, POST `rama_activar`, GET `consumibles?categoria=`, catalogo RAMAS 16x5 + `RAMA_TIERS`, Origen derivado con bono x1.2 en `D_R` y 8 misiones `perfil`; **v18 (ADR-035, 2026-09-17)**: XP `numeric(12,2)` con redondeo half-up a 2 decimales (helper `red2`), sin `::int` en las sumas de XP y NUEVA rama GET `tipo=pandilla_ranking` (ranking global de Parches por `fama_total DESC` con `miembros_activos`); **v19 (ADR-036, 2026-09-17)**: POST `tipo=compartir` (25 XP primer share / 5 XP posteriores, tope 10 eventos y 50 XP/24h, `validarSesion` obligatoria, ledger en `media_compartidos` sin tocar el CHECK de `interacciones.tipo`), 3 misiones + 3 logros nuevos, POST `media_voto`/`media_comentar`, GET `media_interacciones`/`media_comentarios`, alias legacy conservados y TODOS los lectores migrados a `media_*` |
 | admin-destinos.js | GET/POST/PUT/DELETE | CRUD completo con auth Bearer (v2 reescrito) |
 | publicar-lugar.js | POST | Formulario publico, crea destino en status=draft |
 | pagina-destino.js | GET | HTML dinamico premium por slug (v9, motor principal) |
@@ -106,6 +106,17 @@ El XP se almacena en `numeric(12,2)` (migracion `db/migrations/021_xp_decimal.sq
 - **"Miembro activo vigente":** `usuarios.activo = true` AND `usuarios.ultimo_acceso > NOW() - INTERVAL '30 days'`. `usuarios.activo`, `usuarios.ultimo_acceso` e `interacciones.xp_ganado` siguen NO versionadas (patron BUG-021, ver `BUGS_HISTORICOS.md`); si la consulta falla con `42703` se reintenta la MISMA consulta sin la condicion de actividad y se responde `miembros_activos = 0` con `console.warn` (nunca catch vacio).
 - **Paso manual obligatorio:** aplicar la 021 en Neon ANTES del deploy del backend decimal (si no, Postgres redondea por cast de asignacion en silencio); checklist en `docs/DEPLOY_021.md`. Rollback `numeric(12,2) -> integer USING ROUND(col)`: exacto mientras no haya decimales acumulados y LOSSY despues.
 - **Sin `tags` JSONB nuevo:** el motor `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` de la seccion 6 no aplica a esta entrega.
+
+### Nota ADR-036 (Entrega TSK-110, migraciones 022 y 023) -- comparticiones, media unificada y guardados polimorficos
+
+La Entrega TSK-110 agrega dos migraciones aditivas e idempotentes (ADR-008) y NO crea archivos en `api/` (8/8 intacto, ADR-001): todo entra como ramas `?tipo=` de `api/interacciones.js` v19.
+
+- **Tabla `media_compartidos` (migracion 022):** ledger de comparticiones (`id`, `usuario_id` FK, `destino_id` FK, `fuente` CHECK `destino|curada|viajero_foto|album_foto`, `item_id text` 1..64, `canal` CHECK `web_share|whatsapp|copiar|otro`, `es_primero`, `xp_ganado numeric(12,2)`, `creado_en`). Indice unico PARCIAL `media_compartidos_primero_uq (usuario_id,fuente,item_id) WHERE es_primero = true` (deteccion atomica del primer share via `ON CONFLICT ... WHERE es_primero = true DO NOTHING`; PLAN B documentado con `media_compartidos_unicos` si el planner no infiere el indice parcial) + `idx_media_compartidos_usuario_dia` e `idx_media_compartidos_item`. **`'compartir'` NO se agrega al CHECK de `interacciones.tipo`** (tabla base no versionada).
+- **Tablas `media_votos` / `media_comentarios` / `media_comentario_likes` (migracion 023):** contrato polimorfico con `fuente` (`curada|viajero_foto|album_foto`) e `item_id text` 1..64. `media_votos` con PK compuesta `usuario_id,fuente,item_id` y soft-delete `activo`; `media_comentarios` con lista de adyacencia `parent_id` (tombstone `activo`, texto 1..1000); `media_comentario_likes` con PK compuesta y sin XP. `xp_ganado` es `numeric(12,2)` (coherente con ADR-035).
+- **`media_guardados` (019) extendida por la 023:** `item_id uuid -> text` (`USING item_id::text`, valores preservados) y CHECK de `fuente` ampliado con `'curada'` (`album|album_foto|viajero_foto|curada`). Backfill idempotente desde `album_votos`, `interacciones tipo='foto'` (`dims.voto_foto_id`), `album_comentarios` (por niveles, tope 50) y `album_comentario_votos`, todo `ON CONFLICT DO NOTHING`. **Las tablas legacy NO se dropean** (solo se copian; Cero Borrado Logico).
+- **Fuentes canonicas de media:** `curada` -> `destinos_fotos.id`; `viajero_foto` -> `interacciones.id` `tipo='foto'`; `album_foto` -> `album_fotos.id`. `galeria_destino` devuelve `items[]` v2 (`fuente`, `votos`, `comentarios`, `ya_votado`, `ya_guardado`, `tipo_voto:'media'`) con metricas en lote sin N+1.
+- **Paso manual obligatorio:** aplicar 022 y 023 en Neon ANTES del deploy del backend v19 (el backend consulta tablas que deben existir; los smokes de la entrega usan mock y NO validan Neon). Preflight 6.1 de la 023: confirmar el tipo real de `destinos_fotos.id` (tabla base NO versionada). Deuda de las 3 tablas legacy no dropeadas y del esquema base no versionado: `BUGS_HISTORICOS.md`, seccion "Deuda ADR-036".
+- **Gamificacion:** +3 misiones y +3 logros por compartir -> catalogo real 39 misiones / 33 logros (ADR-006: los totales anteriores de 28/30 estaban desactualizados).
 
 ## 4. Motor de tags JSONB (modulo central)
 
@@ -213,18 +224,23 @@ Dos paginas estaticas nuevas completan el ciclo social del perfil. Ambas son ass
 
 `mi-perfil.html` (perfil propio) redirige a `perfil.html?id=<uuid>` cuando recibe el parametro `id` (fix R-3). El perfil publico NUNCA expone PII: `api/usuarios.js` v12 proyecta un subconjunto publico (sin email/tokens/`device_hashes`/`codigo_referido`) y reserva el detalle completo al admin o al dueno.
 
-## 5-quinquies. galeria.html - modo destino (4 secciones + subida, ADR-034)
+## 5-quinquies. galeria.html - modo destino (5 secciones + subida, ADR-034 + ADR-036)
 
-`galeria.html` (asset frontend, no funcion serverless) tiene un modo destino (`?destino=<slug>`) que desde ADR-034 separa el contenido en 4 secciones `.g-sec` + un bloque de subida:
+`galeria.html` (asset frontend, no funcion serverless) tiene un modo destino (`?destino=<slug>`) que separa el contenido en 5 secciones `.g-sec` + un bloque de subida. ADR-034 definio las 4 primeras; ADR-036 agrego "Comparte tu foto", el modal con VOTAR/GUARDAR/COMPARTIR y comentarios para las 3 fuentes de media, y el cache-bust `album-comments.js?v=2`:
 
 | Seccion | id | Fuente |
 |---|---|---|
-| Fotos del destino (curadas) | `g-sec-dest` | `tipo=galeria_destino` (`items[]` con `origen='curada'`) |
-| Fotos de la comunidad | `g-sec-com` | `tipo=galeria_destino&incluir=viajeros,albumes` (`origen='viajero'` + `origen='album'`, orden por votos DESC) |
-| Albumes del destino | `g-sec-albumes` | mismo `items[]` agrupado por album (`gAlbumesDeItems`) |
-| Mapas con este destino | `g-sec-mapas` | RAMA NUEVA `GET /api/interacciones?tipo=mapas_de_destino&destino_id=<uuid>` (o `&slug=`) |
+| Fotos de este lugar (curadas) | `g-sec-dest` | `tipo=galeria_destino` (`items[]` con `fuente='curada'`) |
+| Albumes de este espacio | `g-sec-albumes` | mismo `items[]` agrupado por album (`gAlbumesDeItems`) |
+| Fotos de la comunidad | `g-sec-com` | `tipo=galeria_destino&incluir=viajeros,albumes` (`fuente='viajero_foto'` + `fuente='album_foto'`, orden por votos DESC) |
+| Mapa y audiovisual | `g-sec-mapas` | RAMA `GET /api/interacciones?tipo=mapas_de_destino&destino_id=<uuid>` (o `&slug=`) |
+| Comparte tu foto | `#g-share` | `POST tipo=foto` (requiere sesion y nivel 2, ver BUG-061) |
 
-El bloque de subida (`#g-share`) permite compartir una foto al destino (`POST tipo=foto`; requiere sesion y nivel 2, ver BUG-061). La rama `mapas_de_destino` devuelve los mapas tematicos que guardan el destino con visibilidad `m.publico = true OR m.usuario_id = viewer`, donde el `viewer` se deriva de `validarSesion` (ADR-025) y es `null` sin sesion valida. Las secciones se ocultan si no tienen contenido (`gSecVis`). Detalle: DECISIONS.md ADR-034.
+El modal de foto y el de album usan VOTAR / GUARDAR / COMPARTIR y comentarios por las 3 fuentes (curada/viajero/album) via `media_voto`, `guardar_media`, `compartir` y `album-comments.js` v2.0.0 (`mount(target,{fuente,itemId},opts)`). La rama `mapas_de_destino` devuelve los mapas tematicos que guardan el destino con visibilidad `m.publico = true OR m.usuario_id = viewer`, donde el `viewer` se deriva de `validarSesion` (ADR-025) y es `null` sin sesion valida. Las secciones se ocultan si no tienen contenido (`gSecVis`). Detalle: DECISIONS.md ADR-034 y ADR-036.
+
+**Hero y Compartir en la ficha (ADR-036):** `api/pagina-destino.js` v10 renderiza el hero en mosaico (1 principal `1.9fr` + 3 secundarias en columna, fila 360px desktop) y anade un boton **Compartir** al final del `.subnav` sticky (atributos `data-share*`, no en blog), cargando el asset `compartir.js` (`window.ExploraCompartir`: Web Share API + WhatsApp + Copiar link + POST `tipo=compartir`). La galeria principal llega a 12 miniaturas (comunidad max 6 + relleno con curadas).
+
+**Nota de recalibracion (ADR-006):** el reporte de sesion listaba la insignia `compartido` reincorporada en `index.html`, `comunidad.html` y `mi-perfil.html`; contra archivo real, volvio SOLO en `index.html` (L4208), derivada del catalogo de logros (`_sharedCount`). `comunidad.html` y `mi-perfil.html` solo recibieron el cache-bust; su comentario de `XP_BADGES` aun lista `compartido` como removido.
 
 ## 6. admin.html - sistema de formularios (baseline referencial ~7.800 lineas)
 

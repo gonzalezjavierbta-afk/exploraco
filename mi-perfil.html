@@ -786,11 +786,13 @@ var XP_LEVELS = [
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;
 /* Badges locales calculables con datos reales de la sesion (igual que
-   index.html). Se removieron caribe/andino/compartido/plan_maestro/social
-   (nunca tuvieron endpoint detras: quedaban bloqueados para siempre).
-   Los badges de Milestones v2 (Spot Domado, Especialista en Gastro,
-   Cazador de Rarezas) son LOGROS server-side en api/interacciones.js y
-   se muestran en la seccion Logros y trofeos. */
+   index.html). Se mantienen fuera caribe/andino/plan_maestro/social (sin
+   contador propio; sus logros llegan por el catalogo). 'compartido'
+   volvio con ADR-036: su check usa 'shares', derivado de GET
+   ?tipo=logros (logr_primer_compartido..logr_viral_100). Los badges de
+   Milestones v2 (Spot Domado, Especialista en Gastro, Cazador de
+   Rarezas) son LOGROS server-side en api/interacciones.js y se muestran
+   en la seccion Logros y trofeos. */
 var XP_BADGES = [
   {id:'primer_lugar',emoji:'📍',nombre:'Primer destino',desc:'Guardaste tu primer lugar',check:function(u){return u.saved>=1;}},
   {id:'explorador5',emoji:'🧭',nombre:'Explorador x5',desc:'5 lugares guardados',check:function(u){return u.saved>=5;}},
@@ -799,7 +801,12 @@ var XP_BADGES = [
   {id:'critico',emoji:'⭐',nombre:'Crítico viajero',desc:'5 reseñas publicadas',check:function(u){return u.reviews>=5;}},
   {id:'visitado3',emoji:'🏅',nombre:'Ya estuve',desc:'3 lugares visitados',check:function(u){return u.visited>=3;}},
   {id:'colombiano',emoji:'🇨🇴',nombre:'Orgullo colombiano',desc:'Eres viajero local de Colombia',check:function(u){return u.origin&&u.origin.indexOf('Colombia')!==-1;}},
+  {id:'compartido',emoji:'🔗',nombre:'Compartidor',desc:'Compartiste un destino o una foto',check:function(u){return u.shares>=1;}},
 ];
+
+/* Contador de compartidos derivado del catalogo de logros (ADR-036).
+   Sin campo en el perfil: lo actualiza cargarTrofeos(). */
+var _sharedCount = 0;
 
 var mmSaved = [], mmVisited = [];
 try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
@@ -815,7 +822,7 @@ function statsU() {
     visited: u ? (parseInt(u.total_visitas,10)  || 0) : Math.max(0, mmVisited.length),
     reviews: u ? (parseInt(u.total_resenas,10)  || 0) : 0,
     origin:  '',
-    caribe:0, andino:0, shares:0, plans:0, chats:0
+    caribe:0, andino:0, shares:(u ? _sharedCount : 0), plans:0, chats:0
   };
 }
 
@@ -1003,6 +1010,7 @@ function renderNiveles(st) {
 function renderBadges(st) {
   var grid = document.getElementById('pf-badges');
   if(!grid) return;
+  st = st || statsU();
   var earned = XP_BADGES.filter(function(b){ return b.check(st); }).map(function(b){ return b.id; });
   grid.innerHTML = XP_BADGES.map(function(b) {
     var e = earned.indexOf(b.id) !== -1;
@@ -1070,6 +1078,12 @@ function cargarTrofeos(uid) {
     .then(function(r){ return r.json(); })
     .then(function(res){
       var list = (res && res.data) || [];
+      // Insignia 'compartido' (ADR-036): deriva shares del catalogo de
+      // logros (helper compartido en usuario-session.js) y re-renderiza
+      // los badges, que se pintaron antes de resolver este fetch.
+      var f = window.ExploraCO && window.ExploraCO.compartidosDeLogros;
+      _sharedCount = f ? f(list) : 0;
+      renderBadges();
       var total = (res && res.total) || list.length;
       var desbloqueados = (res && res.desbloqueados != null) ? res.desbloqueados : list.filter(function(t){ return t.estado === 'completada'; }).length;
       if(cnt) cnt.textContent = desbloqueados + ' / ' + total;
@@ -3699,6 +3713,6 @@ checkGate();
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>
-  <script src="album-comments.js"></script>
+  <script src="album-comments.js?v=2"></script>
 </body>
 </html>
