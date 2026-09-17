@@ -100,7 +100,7 @@ module.exports = async function handler(req, res) {
       var rows2 = await sql(
         'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region, '
         + 'd.lead, d.descripcion, d.highlight, d.foto_hero, d.hero_bg, '
-        + 'd.lat, d.lng, d.whatsapp, d.telefono, d.email, d.web, d.instagram, '
+        + 'd.lat, d.lng, d.radio_m, d.whatsapp, d.telefono, d.email, d.web, d.instagram, '
         + 'd.precio_desde, d.horario, d.emoji, d.status, d.destacado, d.verificado, '
         + 'd.booking, d.hostelworld, d.airbnb, d.tipo, d.capacidad, '
         + 'd.como_llegar, d.tags, d.rating, d.total_resenas, '
@@ -147,7 +147,7 @@ module.exports = async function handler(req, res) {
         + 'precio_desde, horario, emoji, hero_bg, foto_hero, '
         + 'booking, hostelworld, airbnb, '
         + 'tipo, capacidad, como_llegar, '
-        + 'status, destacado, verificado, tags, '
+        + 'status, destacado, verificado, tags, radio_m, '
         + 'creado_en, actualizado_en '
         + ') VALUES ( '
         + '$1, $2, $3, '
@@ -158,7 +158,7 @@ module.exports = async function handler(req, res) {
         + '$18, $19, $20, $21, $22, '
         + '$23, $24, $25, '
         + '$26, $27, $28, '
-        + '$29, $30, $31, $32, '
+        + '$29, $30, $31, $32, $33, '
         + 'NOW(), NOW() '
         + ') '
         + 'ON CONFLICT (slug) DO UPDATE SET '
@@ -198,6 +198,11 @@ module.exports = async function handler(req, res) {
           Boolean(b.destacado||false),
           Boolean(b.verificado||false),
           JSON.stringify(tags),
+          (function(){
+            var rm = parseInt(b.radio_m, 10);
+            return (b.radio_m !== undefined && b.radio_m !== null && b.radio_m !== ''
+              && isFinite(rm) && rm >= 25 && rm <= 100000) ? rm : null;
+          })(),
         ]
       );
 
@@ -288,6 +293,14 @@ module.exports = async function handler(req, res) {
       if (b.lng !== undefined && b.lng !== null) {
         sets.push('lng = $' + pi2++);
         vals.push(parseFloat(b.lng) || null);
+      }
+      // ADR-033: radio de verificacion de "Estuve aqui" (metros). Permite
+      // vaciar el radio (null = heuristica adaptativa).
+      if (b.radio_m !== undefined) {
+        var rmUpd = parseInt(b.radio_m, 10);
+        sets.push('radio_m = $' + pi2++);
+        vals.push((b.radio_m !== null && b.radio_m !== '' && isFinite(rmUpd)
+          && rmUpd >= 25 && rmUpd <= 100000) ? rmUpd : null);
       }
       if (b.destacado !== undefined) {
         sets.push('destacado = $' + pi2++);

@@ -1707,6 +1707,20 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
                 placeholder="-74.0759" oninput="updateMiniMap()">
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Radio de verificación (metros)</label>
+              <input class="form-input" id="f-radio-m" type="number" min="25" max="100000" step="5" placeholder="100" oninput="_syncRadioPresetChips()">
+              <div id="radio-m-presets" class="status-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                <button class="status-pill" data-m="100" onclick="setRadioPreset(100)">Punto 100m</button>
+                <button class="status-pill" data-m="300" onclick="setRadioPreset(300)">Manzana 300m</button>
+                <button class="status-pill" data-m="1000" onclick="setRadioPreset(1000)">Barrio 1km</button>
+                <button class="status-pill" data-m="3000" onclick="setRadioPreset(3000)">Zona 3km</button>
+                <button class="status-pill" data-m="10000" onclick="setRadioPreset(10000)">Ciudad 10km</button>
+              </div>
+              <div class="form-hint">Vacío = radio automático según categoría. Áreas grandes otorgan menos XP.</div>
+            </div>
+          </div>
           <div id="esb-mini-map" style="height:160px;border-radius:var(--r);border:1px solid var(--border);margin-top:10px;background:var(--bg)"></div>
           <div class="form-hint" style="margin-top:6px">
             Bogotá: 4.5981, -74.0759 &nbsp;·&nbsp; Medellín: 6.2087, -75.5665
@@ -2654,7 +2668,7 @@ function clearForm() {
              'f-price','f-emoji','f-color','f-lead','f-desc','f-highlight',
              'f-horario','f-tipo','f-capacidad','f-duracion','f-comotransporte',
              'f-whatsapp','f-tel','f-email','f-web','f-instagram','f-booking',
-             'f-rating','f-reviews','f-lat','f-lng','f-photo-hero','f-hero-bg',
+             'f-rating','f-reviews','f-lat','f-lng','f-radio-m','f-photo-hero','f-hero-bg',
              'f-rappi','f-ifood','f-delivery-zona','f-dificultad','f-altitud','f-temporada',
              'f-tipo-actividad','f-entrada-precio','f-distancia-sitio','f-como-llegar-sitio','f-permisos-sitio','f-fauna-flora','f-secretos','f-regulaciones',
              'f-fecha-ini','f-fecha-fin','f-edicion','f-sede',
@@ -2676,6 +2690,7 @@ function clearForm() {
     var el = document.getElementById(id);
     if(el) el.value = '';
   });
+  if (typeof _syncRadioPresetChips === 'function') _syncRadioPresetChips();
 
   /* ── Reset hab table to one blank row ── */
   var habList = document.getElementById('hab-list');
@@ -3141,6 +3156,12 @@ function loadForm(p) {
     var el=document.getElementById(id);
     if(el && map[id]!==undefined && map[id]!==null) el.value=map[id];
   });
+  /* ADR-033: radio de "Estuve aqui" (columna escalar destinos.radio_m).
+     Va aparte del map porque null debe LIMPIAR el input -- el map solo
+     escribe valores presentes y dejaria el radio del lugar anterior. */
+  var radioEl = document.getElementById('f-radio-m');
+  if (radioEl) radioEl.value = (p.radio_m !== undefined && p.radio_m !== null && p.radio_m !== '') ? p.radio_m : '';
+  if (typeof _syncRadioPresetChips === 'function') _syncRadioPresetChips();
   var cbVer=document.getElementById('f-verificado');
   if(cbVer) cbVer.checked = !!(p.verificado);
   currentTags=(p.tags||[]).slice(); renderTagPills();
@@ -3760,6 +3781,25 @@ function collectFaqs() {
   return faqs;
 }
 
+/* ADR-033: radio de verificacion del boton "Estuve aqui" (columna
+   escalar destinos.radio_m, en metros). Los presets solo rellenan
+   f-radio-m; el valor viaja a Neon via _placeToAPI(). Vacio = null =
+   heuristica adaptativa del backend segun categoria/subcategoria. */
+function setRadioPreset(m) {
+  var el = document.getElementById('f-radio-m');
+  if (el) el.value = m;
+  _syncRadioPresetChips();
+}
+function _syncRadioPresetChips() {
+  var el = document.getElementById('f-radio-m');
+  var val = el ? parseInt(el.value, 10) : NaN;
+  var chips = document.querySelectorAll('#radio-m-presets .status-pill');
+  for (var i = 0; i < chips.length; i++) {
+    var m = parseInt(chips[i].getAttribute('data-m'), 10);
+    chips[i].classList.toggle('on', isFinite(val) && m === val);
+  }
+}
+
 function savePlace() {
   if(!validateForm()) return;
   var idx = places.findIndex(function(p){ return p.id===currentId; });
@@ -3779,6 +3819,7 @@ function savePlace() {
     web: v('f-web'), instagram: v('f-instagram'), booking: v('f-booking'),
     rating: parseFloat(v('f-rating'))||0, reviews: parseInt(v('f-reviews'))||0,
     lat: parseFloat(v('f-lat'))||0, lng: parseFloat(v('f-lng'))||0,
+    radio_m: v('f-radio-m'),
     hero_bg: v('f-hero-bg'), tags: currentTags.slice(), photos: photos,
     updatedAt: new Date().toISOString()
   };
@@ -5961,6 +6002,11 @@ function _placeToAPI(p) {
     address:        p.address||'',
     lat:            p.lat||null,
     lng:            p.lng||null,
+    /* ADR-033: radio de verificacion de "Estuve aqui" (columna escalar
+       destinos.radio_m, en metros). NO va dentro de tags. null = el
+       backend aplica su heuristica adaptativa por categoria. */
+    radio_m:        (p.radio_m !== undefined && p.radio_m !== null && p.radio_m !== '')
+                      ? (parseInt(p.radio_m, 10) || null) : null,
     whatsapp:       p.whatsapp||'',
     telefono:       p.tel||'',
     email:          p.email||'',
@@ -6475,6 +6521,10 @@ function _mergeNeonRowIntoLocal(local, d) {
   local.rev     = d.total_resenas ? parseInt(d.total_resenas)  : local.rev;
   local.lat     = d.lat           ? parseFloat(d.lat)         : local.lat;
   local.lng     = d.lng           ? parseFloat(d.lng)         : local.lng;
+  /* ADR-033: radio_m es columna escalar (null = heuristica auto).
+     A diferencia de destacado/verificado, null DEBE propagarse para
+     limpiar el valor local al re-sincronizar desde Neon. */
+  local.radio_m = (d.radio_m === undefined || d.radio_m === null) ? null : parseInt(d.radio_m, 10);
 
   local.highlight    = d.highlight    || local.highlight;
   local.barrio       = d.barrio       || local.barrio;

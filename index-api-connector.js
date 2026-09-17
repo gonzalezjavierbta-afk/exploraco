@@ -266,37 +266,13 @@
 
     // 3b. MAPA_MEDIA[] - multimedia del mapa cultural del endpoint
     //     GET /api/interacciones?tipo=multimedia_mapa
-    //     Sin sesion: capa publica (albumes + destinos con fotos).
-    //     Con sesion: el backend RESTRINGE la capa a los albumes del
-    //     usuario y a las fotos de los destinos que guardo o voto
-    //     (decision H-1 TSK-106: filtro restrictivo, no aditivo). NO se
-    //     envia el parametro origen=album para que los destinos con fotos
-    //     lleguen tambien al mapa (TSK-106).
-    var uid = (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
-      ? String(window.ExploraCO.usuario.id) : null;
-    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa'
-      + (uid ? '&usuario_id=' + encodeURIComponent(uid) : '')
-      + '&_t=' + Date.now();
-    fetch(mediaUrl)
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (!d.ok || !d.data) {
-          console.warn('[index-api] Sin multimedia de mapa:', d.error || 'vacio');
-          return;
-        }
-        var nuevoMedia = d.data.filter(function (m) {
-          return m.media_url
-            && m.lat != null && m.lat !== 0
-            && m.lng != null && m.lng !== 0;
-        });
-        if (typeof MAPA_MEDIA !== 'undefined') replArr(MAPA_MEDIA, nuevoMedia);
-        // Re-render de la capa media: sin esto, si el usuario abre el mapa
-        // antes de que llegue la respuesta, la capa queda vacia hasta la
-        // siguiente interaccion (auditoria QA -> hallazgo M1).
-        if (typeof refreshMapaMarkers === 'function') { try { refreshMapaMarkers(); } catch (e) { console.warn('[index-api] refresh tras multimedia:', e.message); } }
-        console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length);
-      })
-      .catch(function (e) { console.warn('[index-api] Error multimedia mapa:', e.message); });
+    //     Por defecto la capa es PUBLICA: se llama SIN usuario_id (trae
+    //     albumes + destinos con fotos + albumes curados de destino
+    //     origen='destino_album'). Solo cuando el toggle "Solo mio" esta
+    //     activo (window.MAPA_MEDIA_SOLO_MIO === true) se envia
+    //     scope=mio&usuario_id=<id> para restringir la capa al contenido
+    //     propio (albumes propios + destinos con interaccion).
+    cargarMapaMedia();
 
     // 4. DEST_FEATURED_IDS[]
     var featIds = nuevoPL
@@ -364,6 +340,56 @@
     // duplica items.
     if (typeof renderMyMap === 'function') renderMyMap();
   }
+
+  // -- MAPA_MEDIA: capa de multimedia del mapa cultural -----------------
+  // Estado del toggle "Solo mio". Default: capa publica (false).
+  if (typeof window.MAPA_MEDIA_SOLO_MIO === 'undefined') {
+    window.MAPA_MEDIA_SOLO_MIO = false;
+  }
+
+  function cargarMapaMedia() {
+    var soloMio = (window.MAPA_MEDIA_SOLO_MIO === true);
+    var uid = (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
+      ? String(window.ExploraCO.usuario.id) : null;
+    var mediaUrl = '/api/interacciones?tipo=multimedia_mapa';
+    // Solo con el toggle activo Y sesion se restringe el scope.
+    if (soloMio && uid) {
+      mediaUrl += '&scope=mio&usuario_id=' + encodeURIComponent(uid);
+    }
+    mediaUrl += '&_t=' + Date.now();
+    fetch(mediaUrl)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok || !d.data) {
+          console.warn('[index-api] Sin multimedia de mapa:', d.error || 'vacio');
+          return;
+        }
+        var nuevoMedia = d.data.filter(function (m) {
+          return m.media_url
+            && m.lat != null && m.lat !== 0
+            && m.lng != null && m.lng !== 0;
+        });
+        if (typeof MAPA_MEDIA !== 'undefined') replArr(MAPA_MEDIA, nuevoMedia);
+        // Re-render de la capa media: sin esto, si el usuario abre el mapa
+        // antes de que llegue la respuesta, la capa queda vacia hasta la
+        // siguiente interaccion (auditoria QA -> hallazgo M1).
+        if (typeof refreshMapaMarkers === 'function') { try { refreshMapaMarkers(); } catch (e) { console.warn('[index-api] refresh tras multimedia:', e.message); } }
+        console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length + (soloMio ? ' (solo mio)' : ' (publico)'));
+      })
+      .catch(function (e) { console.warn('[index-api] Error multimedia mapa:', e.message); });
+  }
+
+  // Toggle "Solo mio": actualiza el flag global y recarga la capa.
+  window.setMapaMediaSoloMio = function (valor) {
+    window.MAPA_MEDIA_SOLO_MIO = (valor === true || valor === 'true');
+    cargarMapaMedia();
+    return window.MAPA_MEDIA_SOLO_MIO;
+  };
+
+  // Recarga manual de la capa con el scope actual.
+  window.refreshMapaMedia = function () {
+    cargarMapaMedia();
+  };
 
   function loadAndRender() {
     fetchAndUpdate('');

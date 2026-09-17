@@ -548,6 +548,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     + Crear album
   </button>
 
+  <!-- FOTOS SUBIDAS (ADR-032) -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F4F8; Fotos subidas</div>
+  <div id="mis-fotos-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
+    <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando fotos...</p>
+  </div>
+
+  <!-- GUARDADOS DE MEDIA (ADR-032) -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F516; Guardados (fotos y albumes)</div>
+  <div id="mis-guardados-media-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:28px;">
+    <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando guardados...</p>
+  </div>
+
   <!-- Modal Crear Album -->
   <div id="modal-crear-album" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center;">
     <div style="background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;">
@@ -936,6 +948,10 @@ function renderPerfil() {
   var btnAlbum = document.getElementById('btn-crear-album');
   if (btnAlbum) btnAlbum.style.display = 'block';
   cargarMisAlbumes();
+
+  /* mis fotos y guardados de media (ADR-032) */
+  cargarMisFotos();
+  cargarMisGuardadosMedia();
 
   /* mis lugares */
   cargarMisLugares(u.id);
@@ -1711,6 +1727,90 @@ function cargarMisAlbumes() {
     })
     .catch(function() {
       grid.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px;">No se pudieron cargar los albumes.</p>';
+    });
+}
+
+/* ---- MIS FOTOS Y GUARDADOS DE MEDIA (ADR-032) ----
+   Dos GET del museo propio (mis_fotos / mis_guardados_media) y un POST
+   de baja de bookmark (quitar_guardado_media). Las tarjetas comparten el
+   helper mediaCardHTML() para no duplicar el markup de miniatura. Los
+   guardados son privados por decision de producto: solo se pintan aqui. */
+function mediaCardHTML(m, opts) {
+  opts = opts || {};
+  var url = m.media_url || m.foto_url || '';
+  var titulo = m.media_title || m.titulo || 'Sin titulo';
+  var sub = m.album_titulo || m.ciudad || (m.fuente === 'viajero_foto' ? 'Foto de viajero' : '');
+  var thumb = url
+    ? '<img src="' + esc(url) + '" alt="' + esc(titulo) + '" style="width:100%;height:140px;object-fit:cover;display:block;" loading="lazy" onerror="this.style.display=\'none\'">'
+    : '<div style="width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F4F7;</div>';
+  var btn = opts.quitar
+    ? '<button onclick="quitarGuardadoMedia(\'' + esc(m.fuente) + '\',\'' + esc(m.item_id) + '\')" style="margin-top:8px;width:100%;padding:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:6px;color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">Quitar</button>'
+    : '';
+  return '<div style="border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);">'
+    + '<div style="height:140px;overflow:hidden;">' + thumb + '</div>'
+    + '<div style="padding:10px;">'
+    + '<div style="font-size:14px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(titulo) + '</div>'
+    + (sub ? '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px;">' + esc(sub) + '</div>' : '')
+    + btn
+    + '</div></div>';
+}
+
+function cargarMisFotos() {
+  cargarMediaGrid({ gridId: 'mis-fotos-grid', tipo: 'mis_fotos', quitar: false,
+    cargando: 'Cargando fotos...',
+    vacio: 'Aun no has subido fotos. Agrega fotos a tus albumes o marca una en cualquier ficha.',
+    error: 'No se pudieron cargar tus fotos.' });
+}
+
+function cargarMisGuardadosMedia() {
+  cargarMediaGrid({ gridId: 'mis-guardados-media-grid', tipo: 'mis_guardados_media', quitar: true,
+    cargando: 'Cargando guardados...',
+    vacio: 'Aun no guardas fotos ni albumes. Usa el marcador en la galeria o en las fichas.',
+    error: 'No se pudieron cargar tus guardados.' });
+}
+
+/* Loader generico de rejillas de media: un solo camino de fetch/estado
+   para mis_fotos y mis_guardados_media (Regla de No-Duplicidad). */
+function cargarMediaGrid(cfg) {
+  if (!window.ExploraCO || !window.ExploraCO.usuario) return;
+  var grid = document.getElementById(cfg.gridId);
+  if (!grid) return;
+  var estilo = 'color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;';
+  function mensaje(txt) { if (grid) grid.innerHTML = '<p style="' + estilo + '">' + txt + '</p>'; }
+  mensaje(cfg.cargando);
+  fetch('/api/interacciones?tipo=' + cfg.tipo + '&usuario_id=' + encodeURIComponent(window.ExploraCO.usuario.id))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!grid) return;
+      if (!data.ok || !data.data || !data.data.length) { mensaje(cfg.vacio); return; }
+      grid.innerHTML = data.data.map(function(m){ return mediaCardHTML(m, cfg); }).join('');
+    })
+    .catch(function(){ mensaje(cfg.error); });
+}
+
+function quitarGuardadoMedia(fuente, itemId) {
+  if (!window.ExploraCO || !window.ExploraCO.usuario) return;
+  fetch('/api/interacciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tipo: 'quitar_guardado_media',
+      usuario_id: window.ExploraCO.usuario.id,
+      fuente: fuente,
+      item_id: itemId
+    })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d && d.ok) {
+        if (typeof showToast === 'function') showToast('Guardado eliminado');
+        cargarMisGuardadosMedia();
+      } else if (typeof toastError === 'function') {
+        toastError((d && d.error) || 'No se pudo quitar el guardado');
+      }
+    })
+    .catch(function() {
+      if (typeof toastError === 'function') toastError('Error de conexion');
     });
 }
 

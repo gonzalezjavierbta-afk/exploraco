@@ -847,3 +847,122 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 - **H-2 derivado a BUG-061 (no corregido aqui):** `POST /api/interacciones` `tipo='foto'` confia en `body.usuario_id` sin `validarSesion` (spoofing de autor); se registra en `BUGS_HISTORICOS.md` BUG-061 y se escala a `sql-security`.
 
 **ADR relacionados de esta actualizacion:** ADR-021 (capa audiovisual estricta / paridad de drawer), ADR-025 (sesion firmada: base de la recomendacion de BUG-061), ADR-028 (blindaje de identidad/PII).
+
+---
+
+## ADR-031: Capa de media del mapa cultural -- album de destino agregado y visibilidad publica por defecto
+
+**ID:** ADR-031
+**Fecha:** 2026-09-17
+**Estado:** Aprobado e IMPLEMENTADO en working tree (SIN commitear). No agrega esquema propio. **PENDIENTE: commit/push/deploy y verificacion en vivo del caso `hostal-r10-bogota` (slug, coords 4.598835,-74.072662, status published).**
+**Autor:** AI-DOS Core (fix del 503 de la capa de media y agrupacion del album de destino, 2026-09-17)
+**Nota de numeracion:** el 031 es el consecutivo real tras ADR-030 (mayor registrado en este documento).
+
+**Problema:** `GET ?tipo=multimedia_mapa` (`api/interacciones.js`) proyectaba el avatar con `COALESCE(u.foto_url, u.avatar_url, '')` SIN el helper `queryConAvatarFallback` que ADR-030/BUG-060 introdujo para degradar `42703`. Como la migracion 004 (`usuarios.foto_url`) sigue pendiente en Neon, el `42703` escalaba al catch global y la capa entera respondia 503 `SCHEMA_NOT_MIGRATED`; sintoma reportado por Javier: "el hostal r10 no aparece en el mapa". Ademas, la capa solo emitia las fotos individuales de la ficha (`origen='destino'`) y NO agrupaba la galeria de la ficha como album del destino, por lo que un destino con varias fotos se veia como multiples pines sueltos sin portada ni conteo. En paralelo, la decision H-1 de TSK-106/ADR-030 dejaba la capa RESTRICTIVA por sesion (con `usuario_id`, el logueado solo veia lo suyo), lo que contradice una capa cultural de proposito publico (ADR-021 estricta).
+
+**Opciones consideradas:**
+1. **Aplicar la migracion 004 y no tocar el SQL:** descartada como solucion unica -- la 004 sigue pendiente de ejecucion en Neon y la capa no puede depender de un paso operativo para no devolver 503 (patron BUG-021/BUG-060).
+2. **Fila agregada `origen='destino_album'` por destino con galeria (elegida):** una fila por destino (`portada` + `fotos_count`) ADEMAS de las fotos individuales `origen='destino'`.
+3. **Relajar el filtro restrictivo H-1 via `scope=mio` (elegida):** la capa publica por defecto; el filtro solo cuando el cliente pide explicitamente el scope propio.
+
+**Decision tomada:**
+- **Blindaje del 503:** la consulta de `multimedia_mapa` se envuelve en `queryConAvatarFallback(sql, ...)` (`api/interacciones.js` L3775), que ante `42703` reintenta con `avatar_url` y nunca silencia otros codigos. Es la misma mitigacion de ADR-030 aplicada ahora a la capa del mapa.
+- **Album de destino agregado:** se emite UNA fila por destino con galeria (`origen='destino_album'`, `origen_id=slug`, `media_url`=portada con `ARRAY_AGG(... ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST)[1]`, `fotos_count`), ademas de las fotos individuales de la ficha (`origen='destino'`). Se activa cuando `origen!='album'`, no se excluye el tipo `foto` y NO es scope propio (L3835-3865).
+- **Filtro restrictivo solo con `scope=mio`:** `mmScopeMio = (req.query.scope === 'mio')`; si NO viene `scope=mio`, `mmUsuarioId` se fuerza a `null` (L3745-3756) y el SQL publico queda sin restriccion. Con `scope=mio` + `usuario_id` (uuid validado por regex) se restringe a los albumes propios y a los destinos con `interacciones.activo=true` (guardado/voto/rating).
+- **Frontend con toggle "Solo mio":** `index.html` (`#mm-solo-mio` -> `setMapaMediaSoloMio()`, L1234) y `index-api-connector.js` (`cargarMapaMedia()` agrega `&scope=mio&usuario_id=<id>` SOLO con el toggle activo y sesion; sin toggle, capa publica sin `usuario_id`, L350-387).
+
+**Justificacion:** Envolver la consulta en `queryConAvatarFallback` elimina el 503 sin depender del estado de Neon (misma leccion de BUG-021/BUG-051/BUG-060). Una fila agregada por destino convierte la galeria de la ficha en un album de mapa (portada + conteo) sin duplicar datos: se deriva por consulta, no se persiste. Relajar H-1 a `scope=mio` devuelve a la capa su proposito cultural publico y mantiene el caso "ver solo lo mio" como opt-in explicito; el costo es que el default ya no filtra por sesion, coherente con ADR-021 (capa publica de usuarios).
+
+**Impacto:** `api/interacciones.js` (+212/-14 en el working tree, compartido con ADR-032/ADR-033: `queryConAvatarFallback` en `multimedia_mapa`, fila `destino_album`, `scope=mio`); `index.html` (+89/-3: toggle "Solo mio"); `index-api-connector.js` (+57/-31: revela el wiring `scope=mio`/toggle sin `origen=album`). Sin endpoints nuevos (8/8, ADR-001); sin migracion propia. Nota de verificacion (ADR-006): el header de `api/interacciones.js` sigue en `v14` mientras los comentarios nuevos se rotulan `v17` (deuda documental de version a corregir en el commit).
+
+**Consecuencias positivas:**
+- La capa de media del mapa deja de responder 503 por `usuarios.foto_url` ausente y vuelve a mostrar destinos con galeria (incluido el caso hostal r10).
+- La galeria de la ficha de un destino aparece como un album agrupado (portada + conteo) en el mapa, ademas de sus fotos individuales.
+- La capa publica vuelve a ser el default; "Solo mio" queda como filtro opt-in.
+
+**Consecuencias negativas / riesgos residuales:**
+- La representacion del avatar sigue dependiendo de aplicar la migracion 004 en Neon: sin ella el avatar cae siempre a `avatar_url` (mitigado, no resuelto).
+- Si el cliente no actualiza `index-api-connector.js` en el mismo release, no habra toggle y la capa quedara publica (comportamiento por defecto, sin regresion funcional).
+- Verificacion en vivo pendiente (`hostal-r10-bogota`): agrupacion `destino_album`, portada y conteo.
+
+**ADR previos relacionados:** ADR-001 (presupuesto 8/8 de Vercel Hobby), ADR-006 (baseline = archivo real / nota de version), ADR-017 (albumes y media), ADR-021 (capa audiovisual estricta -- esta ADR la relaja a `scope=mio`), ADR-023 (lectura de media), ADR-024 (geocerca/radios), ADR-030 (helper `queryConAvatarFallback` y contrato de `items[]`; H-1 restrictivo que esta ADR convierte en opt-in)
+
+---
+
+## ADR-032: Guardados (bookmarks) de media + area museo del perfil -- visibilidad publica vs privada
+
+**ID:** ADR-032
+**Fecha:** 2026-09-17
+**Estado:** Aprobado e IMPLEMENTADO en working tree (SIN commitear). **PENDIENTE: aplicar `db/migrations/019_media_guardados_radio.sql` en Neon + commit/push/deploy.**
+**Autor:** AI-DOS Core (guardados de media y area "mis fotos/mis guardados" del museo, 2026-09-17)
+**Nota de numeracion:** el 032 es el consecutivo real tras ADR-031.
+
+**Problema:** No existia forma de guardar (bookmark) fotos o albumes de terceros desde el mapa/galeria/ficha, ni un area del perfil museo para revisar "mis fotos" y "mis guardados". El presupuesto de funciones serverless de Vercel Hobby esta agotado (8/8, ADR-001), por lo que no cabia un endpoint nuevo. Ademas habia que distinguir tres conceptos que se confunden facilmente: un VOTO (`album_votos`), una COPIA ("Guardar en album", ADR-030) y una REFERENCIA personal del usuario a un item existente (bookmark).
+
+**Opciones consideradas:**
+1. **Endpoint nuevo `/api/guardados.js`:** descartada -- viola el presupuesto 8/8 (ADR-001).
+2. **Tabla con FK polimorfica al item guardado:** descartada -- Postgres no admite FK polimorficas; habria que crear una tabla por tipo o un CHECK fragil.
+3. **Ramas GET/POST en `api/interacciones.js` + tabla `media_guardados` con PK compuesta y sin FK polimorfica (elegida):** la integridad referencial se valida en el backend al insertar (el item debe existir y estar activo).
+
+**Decision tomada:**
+- **Tabla `media_guardados`** (migracion 019): `usuario_id uuid NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE`, `fuente varchar(20) CHECK (fuente IN ('album','album_foto','viajero_foto'))`, `item_id uuid NOT NULL`, `activo boolean NOT NULL DEFAULT true`, `creado_en timestamptz`, `PRIMARY KEY (usuario_id, fuente, item_id)`. Sin FK polimorfica: `item_id` referencia `albumes.id` (fuente `album`), `album_fotos.id` (fuente `album_foto`) o `interacciones.id` tipo `foto` (fuente `viajero_foto`), validado por SELECT en el backend.
+- **Ramas nuevas en `api/interacciones.js`:** GET `mis_fotos` (fotos agregadas a albumes propios + fotos de viajero subidas por el usuario), GET `mis_guardados_media` (bookmarks activos resueltos por fuente), POST `guardar_media` / `quitar_guardado_media`. `guardar_media` valida `fuente` contra la whitelist, `item_id` por regex uuid, la EXISTENCIA del item segun la fuente (404 si no existe) y hace `INSERT ... ON CONFLICT (usuario_id,fuente,item_id) DO UPDATE SET activo=true` (soft delete/reactivacion, Cero Borrado Logico). Si la migracion 019 falta, responde 503 `SCHEMA_NOT_MIGRATED` (nunca escritura silenciosa).
+- **Visibilidad (decision de producto):** las fotos subidas y los albumes creados son PUBLICOS (aparecen en el museo publico `perfil.html` via `mis_fotos`); los guardados son PRIVADOS y solo se pintan en el perfil propio (`mi-perfil.html`).
+- **Sin endpoints nuevos** (8/8, ADR-001).
+
+**Justificacion:** `media_guardados` modela una referencia personal sin duplicar el item ni pasar por el sistema de votos, y la PK compuesta mas `ON CONFLICT` hace el bookmark idempotente y reversible. Validar la existencia en el backend sustituye a la FK polimorfica inexistente en Postgres sin migrar datos. Separar publico (fotos/albumes) de privado (guardados) respeta la expectativa del usuario sobre su actividad reciente sin exponerla en el museo publico. Todo entra como ramas `tipo=`, sin tocar el contrato de otros endpoints.
+
+**Impacto:** `db/migrations/019_media_guardados_radio.sql` (NUEVA, 65 lineas, aditiva e idempotente ADR-008, ASCII-safe ADR-002: columna `destinos.radio_m` + CHECK + tabla `media_guardados` + 2 indices); `api/interacciones.js` (GET `mis_fotos` L3899, GET `mis_guardados_media` L3929, POST `guardar_media`/`quitar_guardado_media` L5476-5533); `mi-perfil.html` (+109/-0: `#mis-fotos-grid` L553, `#mis-guardados-media-grid` L559, helper `mediaCardHTML()`, `cargarMisFotos()`, `cargarMisGuardadosMedia()`, `quitarGuardadoMedia()` L1733-1824); `perfil.html` (+60/-3: nueva "Sala V: Fotos" publica de solo lectura que consume `mis_fotos` del dueno del museo; los guardados NO se muestran ahi por ser privados); `admin.html` y `api/admin-destinos.js` (radio_m, ver ADR-033). Sin endpoints nuevos (8/8). Nota de verificacion (ADR-006): en el working tree NO se encontro NINGUN consumidor de `guardar_media` (el boton/marcador que crea el bookmark no existe aun); solo se consume `quitar_guardado_media`. Los guardados solo pueden crearse hoy por llamada directa a la API.
+
+**Consecuencias positivas:**
+- Existe un modelo de bookmark persistente, idempotente y reversible, sin endpoint nuevo ni FK polimorfica.
+- El perfil propio gana "Mis fotos" y "Mis guardados"; el museo publico expone solo la sala de fotos (publica), nunca los guardados (privados).
+- `mis_fotos` alimenta tanto el museo propio como el publico.
+
+**Consecuencias negativas / riesgos residuales:**
+- **Sin UI de alta de bookmark:** no se verifica un control que invoque `guardar_media`; el area de guardados del perfil solo se puede poblar por API directa hasta que se agregue el marcador (en `galeria.html`/ficha). El texto de estado vacio de `mi-perfil.html` promete "Usa el marcador en la galeria o en las fichas", que aun no existe.
+- Los GET `mis_fotos`/`mis_guardados_media` validan `usuario_id` por formato uuid pero no exigen JWT (mismo patron preexistente); cualquiera con un uuid valido puede consultar las fotos publicas de ese usuario (por diseno) y la lista de guardados (a revisar con `sql-security`).
+- `mis_guardados_media` degrada a lista vacia si falta la 019 (`.catch(function(){ return []; })`), por lo que un fallo de esquema se manifiesta como "sin guardados" y no como error visible.
+- Migracion 019 pendiente de aplicar en Neon: sin ella, `guardar_media`/`quitar_guardado_media` responden 503 y los GET degradan.
+
+**ADR previos relacionados:** ADR-001 (presupuesto 8/8), ADR-003 (Cero Borrado Logico / merge), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-017 (albumes y media), ADR-025 (sesion firmada), ADR-028 (blindaje de identidad/PII), ADR-030 (distincion voto vs guardar-en-album vs bookmark)
+
+---
+
+## ADR-033: Radio de verificacion por lugar y escalado de XP por amplitud para "Estuve aqui"
+
+**ID:** ADR-033
+**Fecha:** 2026-09-17
+**Estado:** Aprobado e IMPLEMENTADO en working tree (SIN commitear). **PENDIENTE: aplicar `db/migrations/019_media_guardados_radio.sql` en Neon + commit/push/deploy + verificacion en vivo.**
+**Autor:** AI-DOS Core (radio configurable por lugar y XP proporcional al area, 2026-09-17)
+**Nota de numeracion:** el 033 es el consecutivo real tras ADR-032.
+
+**Problema:** ADR-024 verificaba la presencia fisica con una geocerca de radios heuristicos (100/150/200/250 m segun categoria, subcategoria y keywords) sin posibilidad de ajuste por lugar. Un bar necesita exigir un punto exacto (~100 m) y una ciudad o un parque metropolitano extenso necesitan cubrir un area amplia, pero la heuristica no permitia representar esa diferencia. Ademas, la visita otorgaba XP PLANO (20 base) sin importar la amplitud del area verificada, por lo que confirmar presencia en un lugar de radio enorme rendia lo mismo que en un local puntual.
+
+**Opciones consideradas:**
+1. **Mantener solo la heuristica de ADR-024:** descartada -- no permite que un lugar puntual exija precision ni que un area extensa sea practicable.
+2. **Columna escalar `destinos.radio_m` (elegida):** `NULL` = heuristica historica; un valor explicito tiene prioridad absoluta. Se agrego un CHECK de rango `25..100000` m.
+3. **Escalado de XP por amplitud (elegida):** la XP base de la visita se multiplica por un factor segun el radio efectivo, en vez de ser plana.
+
+**Decision tomada:**
+- **Columna `destinos.radio_m integer`** (migracion 019): `NULL` = heuristica adaptativa de ADR-024 (100/150/200/250 m); valor explicito = radio fijado por el admin. CHECK `destinos_radio_m_check` (`radio_m IS NULL OR (radio_m >= 25 AND radio_m <= 100000)`).
+- **`resolverRadioM(categoria, tags, nombre, radioExplicito)`** (`api/interacciones.js` L164): si el radio explicito es valido (25..100000) lo devuelve; si no, cae a la heuristica (keywords rurales -> subcategoria -> categoria -> default). Prioridad absoluta del valor explicito.
+- **Escalado de XP por amplitud:** `factorXpPorRadio(radio)` (`L143`) devuelve `1` (radio <= 1000 m o `null`), `0.5` (radio > 1000 m) o `0` (radio > 5000 m); constantes `RADIO_XP_MEDIO_M=1000` y `RADIO_XP_CERO_M=5000` (`L141-142`). En el flujo de visita, `xpBaseVisita = Math.round(20 * factorAreaVisita)` (`L6847-6848`); el factor solo aplica en modo `geocerca` (sin coords no hay area que abusar). **La visita SIEMPRE se registra y marca el mapa; solo cambia el XP.** El response expone `factor_area` en `xp_detalle`.
+- **Solo el admin define el radio:** `api/admin-destinos.js` acepta `radio_m` en POST (INSERT/upsert) y PUT (UPDATE), validando `25..100000`; `null`/vacio lo limpia a `NULL` (vuelve a la heuristica). En el panel, `admin.html` expone el campo `#f-radio-m` (number, min 25, max 100000, step 5) con presets y lo incluye en `_placeToAPI()`/`applyCategoryTagFields`/`loadForm`.
+
+**Justificacion:** `radio_m` es una columna escalar (no un tag JSONB) porque es un parametro de verificacion territorial, no contenido editorial, y su CHECK garantiza rangos sanos. `resolverRadioM` centraliza la prioridad en un unico punto, de modo que la heuristica historica sigue vigente para los destinos sin radio. Escalar la XP por amplitud desincentiva el abuso de "confirmar" presencia en areas enormes (ciudades, parques) sin eliminar el registro de la visita: la presencia fisica se mantiene honesta y la recompensa refleja el esfuerzo real. El tope de 100 km evita valores absurdos.
+
+**Impacto:** `db/migrations/019_media_guardados_radio.sql` (columna `destinos.radio_m` + CHECK; compartida con ADR-032); `api/interacciones.js` (+212/-14 en el working tree, compartido con las otras dos ADR: `RADIO_XP_MEDIO_M`/`RADIO_XP_CERO_M`/`factorXpPorRadio` L137-148, `resolverRadioM` L160-182, uso en `POST tipo=visita` L6795-6848, auditoria `dims.geo.radio_m` y response `radio_m` L6915/L6967); `api/admin-destinos.js` (+16/-3: `radio_m` en SELECT/INSERT/UPDATE con validacion de rango); `admin.html` (+51/-1: campo `#f-radio-m` L1713, carga/guardado L3159-3163/L3785-3822/L6006-6009/L6524-6527). Sin endpoints nuevos (8/8, ADR-001). La XP de visita incluye ademas el bono rural plano de ADR-024 (fuera de este factor). Nota de version (ADR-006): header de `api/interacciones.js` aun `v14` pese a las referencias `v17`.
+
+**Consecuencias positivas:**
+- El admin puede fijar el area de verificacion por lugar (bar puntual vs parque/ciudad extensa) sin tocar codigo.
+- La XP de presencia fisica deja de ser plana y penaliza areas excesivamente amplias (50% > 1 km, 0 > 5 km) sin dejar de registrar la visita.
+- La heuristica de ADR-024 sigue vigente como fallback (`radio_m = NULL`), sin regresion para los destinos existentes.
+
+**Consecuencias negativas / riesgos residuales:**
+- La visita con radio > 5 km otorga `xp_base = 0`, pero el bono rural (+20, ADR-024) es plano e independiente del factor: un destino rural con radio enorme podria aun sumar ese bono. Es un residuo a revisar.
+- `radio_m` mal fijado por el admin (demasiado amplio o estrecho) altera la verificacion en vivo sin otra validacion que el rango 25..100000; no hay auditoria de cambios de radio.
+- Migracion 019 pendiente en Neon: sin ella, el SELECT de visita (`radio_m` en la lista de columnas) falla y `resolverRadioM` recibe `undefined` (cae a heuristica) solo si el SQL no revienta; riesgo de 503 hasta aplicar la migracion.
+- El checkin de Activos Ocultos (`activos_ocultos_checkin`) NO usa `radio_m`: sigue con su heuristica propia (150/250). Alcance explicitamente fuera de esta ADR.
+
+**ADR previos relacionados:** ADR-001 (presupuesto 8/8), ADR-006 (baseline = archivo real / nota de version), ADR-008 (SQL versionado / idempotencia), ADR-012 (escalado de XP), ADR-018 (economia de XP), ADR-024 (presencia fisica, radios heuristicos y bono rural -- esta ADR agrega el radio configurable y el factor por amplitud), ADR-027 (reparto de XP), ADR-032 (misma migracion 019)

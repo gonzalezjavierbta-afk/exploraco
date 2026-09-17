@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-107 / ADR-031 + ADR-032 + ADR-033 Capa de media del mapa (album de destino + visibilidad publica), guardados de media + area museo del perfil, y radio de verificacion por lugar para "Estuve aqui" (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+591/-53) + 1 migracion nueva: `api/interacciones.js` (+212/-14: fix 503 con `queryConAvatarFallback` en `multimedia_mapa`, fila `origen='destino_album'`, `scope=mio`, GET `mis_fotos`/`mis_guardados_media`, POST `guardar_media`/`quitar_guardado_media`, `factorXpPorRadio`/`resolverRadioM`); `index.html` (+89/-3: toggle "Solo mio"); `index-api-connector.js` (+57/-31: wiring `scope=mio`); `mi-perfil.html` (+109/-0: "Mis fotos" + "Mis guardados"); `perfil.html` (+60/-3: "Sala V: Fotos" publica, sin guardados); `admin.html` (+51/-1: campo `#f-radio-m`); `api/admin-destinos.js` (+16/-3: `radio_m` en POST/PUT); NUEVA `db/migrations/019_media_guardados_radio.sql` (65 lineas: `destinos.radio_m` + CHECK 25..100000 + tabla `media_guardados`). Presupuesto 8/8 INTACTO (ADR-001). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar migracion 019 en Neon + commit/push/deploy + verificacion en vivo de `hostal-r10-bogota`.** BUG-061 sigue ABIERTO.
 - TSK-106 / ADR-030 (actualizado) Capa multimedia, galeria comunidad y galeria hospedajes (2026-09-16, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, SIN commitear) - 5 archivos modificados (+243/-56): filtro opcional `usuario_id` en `GET ?tipo=multimedia_mapa` (RESTRICTIVO, validado por regex uuid) e indices capturados del UNION ALL (`api/interacciones.js` +28/-5); `index-api-connector.js` (+12/-2) sin `origen=album` + `usuario_id` si hay sesion; `index.html` (+30/-6) pines de destino (`#1f8a70` + borde punteado, dedupe por `origen_id`, tope 300); `api/pagina-destino.js` (+12/-5) hero de 12 miniaturas (`HERO_THUMBS_MAX=12`, `slice(1,13)`, `LIMIT` de `destinos_fotos` 12->24, `.prow` grid responsivo 6/4 col); `galeria.html` (+161/-38) grid unico "Fotos del destino" + aviso/input/boton de compartir (se eliminan `gSeedCard` y `#g-dest-usuarios`). P2 OMITIDO; P3 re-alcanzado a `galeria.html` (no `comunidad.html`); H-2 registrado como BUGS_HISTORICOS.md BUG-061 (spoofing de `tipo='foto'`, escalado a `sql-security`); H-3 (`smoke_auditoria_pagina_destino.js` ignora el slug). Presupuesto 8/8 INTACTO. **PENDIENTE: commit/push/deploy (sin mezclar los 3 archivos borrados ajenos a TSK-106).**
 - TSK-105 / ADR-030 Lote "promptarreglos" - DM 500, galeria duplicada, popover Guardar, "Estuve aqui", unificacion Como llegar/Ubicacion, galeria unificada de destino, seguridad de album y degradacion 503 (2026-09-16, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+649/-167) + 2 scripts nuevos sin versionar:
   - `api/interacciones.js` (271 lineas cambiadas): casts `::text` en `dm_hilos` (`m.usuario_id::text<>$1`, `m2.usuario_id::text=$1`, `bloqueador_id::text=$1 OR bloqueado_id::text=$1`, L2937-2939/L2962) por el 42P08 (BUG-055); helper `queryConAvatarFallback` (L2114) que degrada `42703` (`usuarios.foto_url` ausente) a `avatar_url` en `museo_publico`/`album_detalle`/`galeria_destino` (BUG-060); `items[]` aditivo solo con `incluir`; 403 `ALBUM_AJENO`/400 `AUTOR_ORIGINAL_INVALIDO` en `album_agregar_foto` (BUG-059); `repartirXpReferidos` en `album_voto` (gap ADR-027).
@@ -33,6 +34,88 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-107 "Media del mapa, guardados de media y radio por lugar" (2026-09-17) - ADR-031 + ADR-032 + ADR-033
+
+Tarea TSK-107 implementada en working tree (SIN commitear). Las decisiones viven
+en `DECISIONS.md` ADR-031/ADR-032/ADR-033; la tarea en `TASKS.md` TSK-107; el
+bug abierto relacionado en `BUGS_HISTORICOS.md` BUG-061. NO hay archivos nuevos
+en `api/` (8/8 intacto, ADR-001); SI hay una migracion nueva
+(`db/migrations/019_media_guardados_radio.sql`, sin versionar aun).
+
+**Cambios (verificados contra archivo real, ADR-006; `git diff --stat` = 7
+archivos, +591/-53 + 1 migracion nueva):**
+- `api/interacciones.js` (+212/-14): **ADR-031** -- `multimedia_mapa` envuelto en
+  `queryConAvatarFallback` (fix del 503 por `usuarios.foto_url` ausente), fila
+  agregada `origen='destino_album'` (portada + `fotos_count`) ademas de
+  `origen='destino'`, y filtro restrictivo solo con `scope=mio` (`mmUsuarioId`
+  null por defecto). **ADR-032** -- GET `mis_fotos`, GET `mis_guardados_media`,
+  POST `guardar_media`/`quitar_guardado_media` (503 explicito si falta la 019).
+  **ADR-033** -- `factorXpPorRadio`/`RADIO_XP_MEDIO_M`/`RADIO_XP_CERO_M`,
+  `resolverRadioM` priorizando `destinos.radio_m` en `POST tipo=visita`.
+- `index.html` (+89/-3): toggle "Solo mio" (`#mm-solo-mio`).
+- `index-api-connector.js` (+57/-31): `cargarMapaMedia()` agrega
+  `&scope=mio&usuario_id=` solo con toggle activo y sesion; sin toggle, capa
+  publica.
+- `mi-perfil.html` (+109/-0): "Mis fotos" (`#mis-fotos-grid`) y "Mis guardados"
+  (`#mis-guardados-media-grid`) con `mediaCardHTML` y `quitarGuardadoMedia()`.
+- `perfil.html` (+60/-3): "Sala V: Fotos" publica de solo lectura (consume
+  `mis_fotos` del dueno del museo; NO muestra guardados, que son privados).
+- `admin.html` (+51/-1): campo `#f-radio-m` (min 25, max 100000) + presets +
+  carga/guardado.
+- `api/admin-destinos.js` (+16/-3): `radio_m` en SELECT/INSERT/UPDATE con
+  validacion de rango.
+- `db/migrations/019_media_guardados_radio.sql` (NUEVA, 65 lineas, idempotente
+  ADR-008, ASCII-safe ADR-002): `destinos.radio_m` + `destinos_radio_m_check`
+  (25..100000) + tabla `media_guardados` + 2 indices.
+
+**Decisiones de producto:** visibilidad publica para fotos subidas y albumes
+creados, privada para guardados (ADR-032); la capa de media del mapa es publica
+por defecto y "Solo mio" es opt-in (ADR-031); la visita se registra siempre y
+solo cambia la XP segun la amplitud del radio (ADR-033).
+
+**Nota de verificacion (ADR-006):** en el working tree NO se encontro consumidor
+de `guardar_media` (solo de `quitar_guardado_media`), por lo que hoy no hay UI
+que cree un bookmark. El header de `api/interacciones.js` sigue en `v14` pese a
+que los comentarios nuevos y la migracion citan `v17`.
+
+**Verificacion:** documental contra archivo real (existencia de la migracion,
+anclas de linea en los 7 archivos). NO se ejecutaron `node --check` ni smokes en
+esta sesion documental; no se reportan resultados de pruebas no corridas.
+
+#### Que sigue
+1. **APLICAR `db/migrations/019_media_guardados_radio.sql` EN NEON (BLOQUEANTE,
+   lo ejecuta Javier).** Sin ella: `guardar_media`/`quitar_guardado_media`
+   responden 503, los GET degradan, y el SELECT de visita que lee `radio_m`
+   puede fallar.
+2. **Commit + push + deploy en un solo release** con los pendientes previos sin
+   commitear (TSK-095..TSK-106 + migraciones 015/016/017/018 + scripts de la
+   004). NO mezclar los 3 archivos borrados ajenos (`PROMPT.md`,
+   `prompt_exploraco_tsk104.md`, `promptarreglos.txt`).
+3. **Verificacion en vivo:** `hostal-r10-bogota` aparece con pin de album
+   (`destino_album`); capa publica por defecto y "Solo mio" con sesion;
+   `mis_fotos`/`mis_guardados_media` en perfil; radio explicito de "Estuve aqui"
+   (XP 50% > 1 km y 0 > 5 km).
+4. **UI de alta de bookmark (`guardar_media`):** agregar el marcador en
+   `galeria.html`/ficha para poblar "Mis guardados"; hoy el area existe pero no
+   se puede alimentar desde la UI.
+5. **Bump de version:** alinear el header de `api/interacciones.js` (`v14` ->
+   `v17`) con los comentarios y la migracion en el commit (ADR-006).
+6. **BUG-061 sigue ABIERTO:** `POST tipo='foto'` sin `validarSesion`; escalado a
+   `sql-security`.
+
+#### Riesgos activos
+- **Migracion 019 pendiente (BLOQUEANTE):** sin ella, los guardados responden
+  503, `mis_guardados_media` degrada a vacio y el `radio_m` de la visita no
+  esta disponible.
+- **Sin UI para crear bookmarks:** el area "Mis guardados" no se puede poblar
+  desde la interfaz; solo por API directa.
+- **Header de version desalineado (`v14` vs `v17`):** deuda documental a
+  resolver en el commit (ADR-006).
+- **Bono rural vs radio grande:** con `radio_m > 5000` la XP base es 0, pero el
+  bono rural plano (+20, ADR-024) sigue sumando; residuo a revisar.
+- **BUG-061 (seguridad, MEDIA):** `tipo='foto'` es suplantable; los flujos
+  nuevos de media conviven con el.
 
 ### Sesion TSK-106 "Capa multimedia, galeria comunidad y galeria hospedajes" (2026-09-16) - ADR-030 actualizado
 

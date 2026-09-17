@@ -538,6 +538,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* TSK-106: los pines de fotos curadas del destino (origen='destino') usan
    borde punteado para distinguirse de los albumes subidos por usuarios. */
 .mpa-media-pin-dest{border-style:dashed;border-color:#f2d9a0}
+/* Album curado del destino (origen='destino_album'): borde solido claro y
+   ligero realce ambar para diferenciarlo de las fotos individuales. */
+.mpa-media-pin-album{border-style:solid;border-color:#fff3d6;box-shadow:0 3px 10px rgba(217,119,6,.55)}
 
 /* -- MAPA | DRAWER LATERAL -- */
 .mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}
@@ -754,6 +757,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .md-album-com-btn:hover{background:rgba(232,160,32,.18)}
 .md-album-comments{width:100%}
 .md-album-loading,.md-album-empty{padding:40px 20px;text-align:center;font-size:12px;color:rgba(255,255,255,.5)}
+.md-album-actions{margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end}
 .dcard-badge{position:absolute;top:9px;left:9px;z-index:2;padding:3px 8px;border-radius:4px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .dcard-feat-star{position:absolute;top:9px;right:9px;z-index:2;background:rgba(232,160,32,.9);color:#fff;font-size:8px;font-weight:800;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px}
 .dcard-media{position:absolute;bottom:7px;right:7px;z-index:2;background:rgba(0,0,0,.55);color:#fff;font-size:8px;padding:2px 7px;border-radius:10px;display:flex;align-items:center;gap:3px}
@@ -1227,6 +1231,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="mf-btn" data-media="foto" onclick="filterMapaMedia(this,'foto')">Fotos</div>
       <div class="mf-btn" data-media="video" onclick="filterMapaMedia(this,'video')">Videos</div>
       <div class="mf-btn" data-media="audio" onclick="filterMapaMedia(this,'audio')">Audios</div>
+      <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))">Solo mío</div>
     </div>
   </div>
   <div class="mapa-body-grid">
@@ -2978,10 +2983,15 @@ function mapaMediaIcon(item) {
   // el tipo de medio. Destino: verde azulado, para que el material curado
   // del destino se distinga de las subidas de la comunidad.
   var esDestino = (item.origen === 'destino');
+  // Album curado del destino (origen='destino_album', media_type='album'):
+  // pin ambar con icono de album. No es un medio individual, agrupa la
+  // galeria completa de la ficha.
+  var esAlbumDestino = (item.origen === 'destino_album');
   var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : (esDestino ? '#1f8a70' : '#E8A020'));
-  var ico = (tipo === 'video') ? '▶' : ((tipo === 'audio') ? '♫' : '📸');
+  if(esAlbumDestino) color = '#d97706';
+  var ico = esAlbumDestino ? '📚' : ((tipo === 'video') ? '▶' : ((tipo === 'audio') ? '♫' : '📸'));
   return L.divIcon({
-    html: '<div class="mpa-media-pin' + (esDestino ? ' mpa-media-pin-dest' : '') + '" style="background:' + color + '">' + ico + '</div>',
+    html: '<div class="mpa-media-pin' + (esDestino ? ' mpa-media-pin-dest' : '') + (esAlbumDestino ? ' mpa-media-pin-album' : '') + '" style="background:' + color + '">' + ico + '</div>',
     iconSize:[34,34], iconAnchor:[17,17], className:''
   });
 }
@@ -2999,20 +3009,32 @@ function renderMapaMedia() {
   // aunque tenga varias fotos -- y (b) tope duro de markers visibles.
   var TOPE_MEDIA_PINS = 300;
   var destinosVistos = {};
+  var albumesVistos = {};
   items.forEach(function(item){
     var lat = parseFloat(item.lat);
     var lng = parseFloat(item.lng);
     if(!lat || !lng) return;
-    if(!MAPA_MEDIA_TIPOS[item.media_type]) return; // multi-tipo: solo tipos activos
+    // Album curado del destino: no pertenece a los tipos foto/video/audio
+    // del filtro, por eso se muestra siempre que la capa este encendida.
+    var esAlbumDestino = (item.origen === 'destino_album');
+    if(!esAlbumDestino && !MAPA_MEDIA_TIPOS[item.media_type]) return; // multi-tipo: solo tipos activos
     if(!bounds.contains([lat, lng])) return;
     if(n >= TOPE_MEDIA_PINS) return;
     if(item.origen === 'destino' && item.origen_id) {
       if(destinosVistos[item.origen_id]) return;
       destinosVistos[item.origen_id] = true;
     }
+    if(esAlbumDestino && item.origen_id) {
+      if(albumesVistos[item.origen_id]) return;
+      albumesVistos[item.origen_id] = true;
+    }
     try {
       var marker = L.marker([lat, lng], { icon: mapaMediaIcon(item) });
       marker.on('click', function(){ openMapaMediaDrawer(item); });
+      if(esAlbumDestino) {
+        // Tooltip: nombre del destino + numero de fotos del album.
+        marker.bindTooltip((item.album_titulo || 'Álbum del destino') + ' · ' + (parseInt(item.fotos_count,10) || 0) + ' fotos');
+      }
       marker.addTo(mapaMediaLayer);
       n++;
     } catch(e) {
@@ -3298,6 +3320,12 @@ function openMapaMediaDrawer(item) {
   var drawer = document.getElementById('mapa-drawer');
   var cont = document.getElementById('md-content');
   if(!drawer || !cont || !item) return;
+  // Album curado del destino: no es un medio individual, abre el visor
+  // con la galeria completa de la ficha (mismo patron del album).
+  if(item.origen === 'destino_album' && item.origen_id) {
+    openMapaAlbumDestino(item);
+    return;
+  }
   if(item.origen === 'destino' && item.origen_id) {
     var found = null;
     if(typeof MAPA_PLACES !== 'undefined') {
@@ -3367,12 +3395,97 @@ function openMapaMediaDrawer(item) {
   drawer.setAttribute('aria-hidden', 'false');
 }
 
+// Album curado de un destino (item.origen='destino_album'): abre un visor
+// con la galeria completa de la ficha. Endpoint:
+// GET /api/interacciones?tipo=galeria_destino&slug=<slug> -> {ok, items}
+// Reutiliza el overlay y el estilo del modal de album (md-lbox + md-album-*).
+function openMapaAlbumDestino(item) {
+  if(!item || !item.origen_id) return;
+  var slug = String(item.origen_id);
+  var lb = mdEnsureLightbox();
+  lb.innerHTML = '<button class="md-lb-close" onclick="mdCloseLightbox()" aria-label="Cerrar">&times;</button>'
+    + '<div class="md-album-wrap"><div class="md-album-loading">Cargando galería…</div></div>';
+  lb.classList.add('open');
+  fetch('/api/interacciones?tipo=galeria_destino&slug=' + encodeURIComponent(slug))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var wrap = lb.querySelector('.md-album-wrap');
+      if(!wrap) return;
+      var fotos = (res && res.ok && res.items) ? res.items : [];
+      var titulo = item.album_titulo || 'Galería del destino';
+      var html = '<div class="md-album-head">'
+        + '<div class="md-album-t">' + esc(titulo) + '</div>'
+        + '<div class="md-album-loc">\uD83D\uDCF7 ' + fotos.length + ' fotos</div>'
+        + '</div>';
+      if(!fotos.length) {
+        html += '<div class="md-album-empty">Este destino aún no tiene fotos.</div>';
+      } else {
+        html += '<div class="md-album-grid">';
+        for(var i = 0; i < fotos.length; i++) {
+          var f = fotos[i] || {};
+          var url = f.url || f.foto_url || f.media_url || '';
+          if(!url) continue;
+          var cap = f.caption || f.media_title || titulo;
+          html += '<div class="md-album-cell">'
+            + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
+            + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
+            +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
+            + '</div>'
+            + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '<div class="md-album-actions">'
+        + '<button type="button" class="md-link" onclick="mdAlbumDestinoFicha(\'' + esc(slug) + '\')">Ver ficha</button>'
+        + '</div>';
+      wrap.innerHTML = html;
+    })
+    .catch(function(){
+      var wrap = lb.querySelector('.md-album-wrap');
+      if(wrap) wrap.innerHTML = '<div class="md-album-empty">Error de conexión.</div>';
+    });
+}
+
+// Cierra el visor del album de destino y abre el drawer del lugar en el
+// mapa, buscando el place por slug en MAPA_PLACES. Si no existe, no hace nada.
+function mdAlbumDestinoFicha(slug) {
+  mdCloseLightbox();
+  var found = null;
+  if(typeof MAPA_PLACES !== 'undefined') {
+    MAPA_PLACES.forEach(function(p){ if(p.slug === slug) found = p; });
+  }
+  if(found && typeof openMapaDrawer === 'function') openMapaDrawer(found);
+}
+
 // FIX 4: modal de album. Reutiliza el overlay de md-lbox (mismo patron
 // que el lightbox de medios) pero con un grid de fotos del album.
 // Endpoint: GET /api/interacciones?tipo=album_detalle&album_id=<id>
 // (mismo prefijo que multimedia_mapa -- ADR-017, sin nuevos endpoints).
 // NO abre el JSON crudo: renderiza un grid de miniaturas y cada foto
 // se puede abrir en el lightbox mdFotoLightbox ya existente.
+// ADR-032: guardar (bookmark) una foto o album en "Mis guardados" del
+// museo. fuente: 'album' | 'album_foto' | 'viajero_foto'. Requiere sesion.
+function guardarMedia(fuente, itemId, btn){
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u || !u.id){
+    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesi\u00f3n para guardar');
+    return;
+  }
+  if(!itemId) return;
+  if(btn) btn.disabled = true;
+  fetch('/api/interacciones',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tipo:'guardar_media',usuario_id:u.id,fuente:fuente,item_id:itemId})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(btn){ btn.disabled=false; if(d&&d.ok){ btn.classList.add('on'); btn.textContent='\u2713 Guardado'; } }
+    if(window.ExploraCO && window.ExploraCO.mostrarToast)
+      window.ExploraCO.mostrarToast((d&&d.ok)?'Guardado en tu museo':'No se pudo guardar', (d&&d.ok)?'#16a34a':'#ef4444');
+  })
+  .catch(function(){ if(btn) btn.disabled=false; });
+}
+
 function openAlbumModal(albumId) {
   if(!albumId) return;
   var lb = mdEnsureLightbox();
@@ -3416,11 +3529,17 @@ function openAlbumModal(albumId) {
               + ' onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios'
               + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '')
               + '</button>'
-              + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>';
+              + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>'
+              + '<button type="button" class="md-album-com-btn" onclick="guardarMedia(\'album_foto\',\'' + esc(String(f.id)) + '\',this)">\uD83D\uDD16 Guardar</button>';
           }
           html += '</div>';
         }
         html += '</div>';
+      }
+      if(fotos.length) {
+        html += '<div class="md-album-actions">'
+          + '<button type="button" class="md-album-com-btn" onclick="guardarMedia(\'album\',\'' + esc(String(albumId)) + '\',this)">\uD83D\uDD16 Guardar \u00e1lbum</button>'
+          + '</div>';
       }
       wrap.innerHTML = html;
     })

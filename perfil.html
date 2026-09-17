@@ -174,6 +174,17 @@ body{background:#FBF8F2}
 .pf-album-meta svg{width:12px;height:12px}
 .pf-album-meta .pf-num{color:var(--m-ink);font-size:13px}
 
+/* Fotos (ADR-032) */
+.pf-grid--foto{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
+.pf-foto{position:relative;display:block;aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:var(--m-panel2);border:1px solid var(--m-line);box-shadow:var(--m-shadow);text-decoration:none}
+.pf-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .22s}
+.pf-foto:hover img{transform:scale(1.05)}
+.pf-foto-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--m-muted)}
+.pf-foto-ph svg{width:30px;height:30px}
+.pf-foto-tag{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;background:linear-gradient(transparent,rgba(0,0,0,.74));color:#fff;line-height:1.25}
+.pf-foto-tag b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;letter-spacing:.3px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-foto-tag span{color:rgba(255,255,255,.75);font-size:10.5px}
+
 /* Clases */
 .pf-clases{display:flex;flex-direction:column;gap:12px}
 .pf-clases-fac{font-size:12px;color:var(--m-muted);letter-spacing:.6px;text-transform:uppercase}
@@ -584,7 +595,52 @@ body{background:#FBF8F2}
     return pfSala('IV', 'Audiovisual', albumes.length, body);
   }
 
-  /* ---- Sala V: Clases (arbol de clases en solo lectura, ADR-028 / WP-4) ----
+  /* ---- Sala V: Fotos (ADR-032) ----
+     Solo lectura y solo contenido publico: GET tipo=mis_fotos del dueno
+     del museo. Los guardados de media NO se muestran aqui (privados por
+     decision de producto). Se pinta async sobre el contenedor de la sala. */
+  function pfFotos() {
+    return pfSala('V', 'Fotos', null, '<div id="pf-fotos-body">'
+      + pfEmpty('Abriendo la sala de fotos', 'Las fotos publicas de este viajero cargaran en un momento.')
+      + '</div>');
+  }
+  function pfCargarFotos(uid) {
+    var host = document.getElementById('pf-fotos-body');
+    if (!host || !uid) return;
+    fetch('/api/interacciones?tipo=mis_fotos&usuario_id=' + encodeURIComponent(uid))
+      .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
+      .then(function (res) {
+        if (!host) return;
+        var fotos = (res && res.ok && Array.isArray(res.data)) ? res.data : [];
+        if (!fotos.length) {
+          host.innerHTML = pfEmpty('Sin fotos en las paredes', 'Este viajero aun no ha subido fotos a su museo.');
+          return;
+        }
+        var h = '<div class="pf-grid pf-grid--foto">';
+        fotos.forEach(function (f) {
+          var url = f.foto_url || '';
+          var titulo = f.media_title || f.album_titulo || f.destino_nombre || 'Foto';
+          var sub = f.destino_nombre || f.album_titulo || f.ciudad || '';
+          var href = f.destino_slug ? '/' + encodeURIComponent(f.destino_slug) + '.html' : '';
+          var inner = (url
+                ? '<img src="' + esc(url) + '" alt="' + esc(titulo) + '" loading="lazy" onerror="this.remove()">'
+                : '')
+            + '<span class="pf-foto-ph">' + pfIcon('camera') + '</span>'
+            + '<span class="pf-foto-tag"><b>' + esc(titulo) + '</b>'
+            + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</span>';
+          h += href
+            ? '<a class="pf-foto" href="' + esc(href) + '" title="' + esc(titulo) + '">' + inner + '</a>'
+            : '<div class="pf-foto">' + inner + '</div>';
+        });
+        h += '</div>';
+        host.innerHTML = h;
+      })
+      .catch(function () {
+        if (host) host.innerHTML = pfEmpty('Sin conexion', 'No se pudieron cargar las fotos de este museo.');
+      });
+  }
+
+  /* ---- Sala VI: Clases (arbol de clases en solo lectura, ADR-028 / WP-4) ----
      Consume data.arbol = {faccion, ramas:[{rama_id|id, faccion, nombre, puntos,
      tier|nivel_nodo, nodos_desbloqueados}]}. Normaliza rama_id/id y tier/nivel_nodo.
      Umbrales por nodo [0,100,250,450,700]. Sin acciones ni POST: solo lectura. */
@@ -706,13 +762,14 @@ body{background:#FBF8F2}
     var u = d.usuario || {};
     pfPaint(
       pfHall(d) + pfStats(d.stats || {})
-      + pfTrofeos(d) + pfCromos(d) + pfMapas(d) + pfAlbumes(d)
-      + pfSala('V', 'Clases', null, '<div id="pf-clases-body"></div>')
+      + pfTrofeos(d) + pfCromos(d) + pfMapas(d) + pfAlbumes(d) + pfFotos(d)
+      + pfSala('VI', 'Clases', null, '<div id="pf-clases-body"></div>')
       + pfActions(d)
       + '<div class="pf-foot">Museo de ' + esc(u.nombre || 'un viajero') + ' \u00B7 ExploraCO</div>'
     );
     pfInitMap(d.mapa);
     pfMuseoRenderClases(d.arbol);
+    pfCargarFotos(u.id);
     document.title = (u.nombre || 'Perfil') + ' \u00B7 ExploraCO';
     pfSyncDM(d);
   }

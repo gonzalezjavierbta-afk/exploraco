@@ -134,6 +134,18 @@ var VISITAS_DIA_MAX = 30;
 var VECINOS_RURAL_MAX = 3;
 var VECINOS_BBOX_DEG = 0.02;
 var VISITA_BONO_RURAL = 20;
+// ADR-033 (v17): escalado de XP segun la amplitud del area de verificacion
+// del lugar. Areas extensas (ciudades, parques metropolitanos) debilitan la
+// presencia fisica, asi que rinden menos XP. La visita SIEMPRE se registra
+// (marca el mapa); solo cambia el XP otorgado.
+var RADIO_XP_MEDIO_M = 1000;
+var RADIO_XP_CERO_M = 5000;
+function factorXpPorRadio(radio) {
+  if (radio === null || radio === undefined) return 1;
+  if (radio > RADIO_XP_CERO_M) return 0;
+  if (radio > RADIO_XP_MEDIO_M) return 0.5;
+  return 1;
+}
 
 function haversineMetros(lat1, lng1, lat2, lng2) {
   var rad = Math.PI / 180;
@@ -145,7 +157,15 @@ function haversineMetros(lat1, lng1, lat2, lng2) {
   return TIERRA_RADIO_M * c;
 }
 
-function resolverRadioM(categoria, tags, nombre) {
+// ADR-033 (v17): el admin puede fijar un radio explicito en metros por
+// lugar (destinos.radio_m). Tiene prioridad absoluta sobre la heuristica
+// adaptativa: un bar puede exigir un punto exacto (~100 m) y una ciudad o
+// parque extenso cubrir un area amplia. NULL/invalido = heuristica.
+function resolverRadioM(categoria, tags, nombre, radioExplicito) {
+  if (radioExplicito !== undefined && radioExplicito !== null && radioExplicito !== '') {
+    var re = parseInt(radioExplicito, 10);
+    if (isFinite(re) && re >= 25 && re <= 100000) return re;
+  }
   var t = tags || {};
   var blob = [t.tipo_actividad, t.tipo_alojamiento, t.tipo_comida, nombre]
     .filter(function(x) { return x !== undefined && x !== null; })
@@ -3719,10 +3739,12 @@ module.exports = async function handler(req, res) {
         }
         var mmCiudad = req.query.ciudad || null;
         var mmOrigen = req.query.origen || null;
-        // TSK-106 (Problema 1): filtro opcional por usuario. Sin el query
-        // param usuario_id la consulta publica es IDENTICA a la anterior.
-        // El valor se valida como uuid ANTES de tocar el SQL: si no lo es,
-        // el filtro se ignora (nunca se manda texto no-uuid a un cast
+        // v17 (ADR-031): la capa publica ya NO se restringe por sesion. El
+        // filtro restrictivo H-1/ADR-021 solo se aplica con scope=mio
+        // (toggle "Solo mio" del mapa). Default = contenido publico.
+        var mmScopeMio = String(req.query.scope || '').toLowerCase() === 'mio';
+        // El usuario_id se valida como uuid ANTES de tocar el SQL: si no lo
+        // es, el filtro se ignora (nunca se manda texto no-uuid a un cast
         // ::uuid, que reventaria con 22P02).
         var mmUsuarioId = null;
         var mmUsuarioRaw = req.query.usuario_id;
@@ -3731,6 +3753,7 @@ module.exports = async function handler(req, res) {
           if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mmUsuarioStr))
             mmUsuarioId = mmUsuarioStr;
         }
+        if (!mmScopeMio) mmUsuarioId = null;
         // En un UNION ALL los $N son COMPARTIDOS entre ambas ramas. El
         // indice real de cada parametro se captura al apilarlo
         // (mmIdxTipos/mmIdxCiudad/mmIdxUsuario) y se reutiliza en las 2
@@ -3745,12 +3768,16 @@ module.exports = async function handler(req, res) {
         if (mmCiudad) { np++; mmIdxCiudad = np; mmParams.push(mmCiudad); }
         if (mmUsuarioId) { np++; mmIdxUsuario = np; mmParams.push(mmUsuarioId); }
 
-        var multimediaRows = await sql(
+        // FIX capa media 503 (SCHEMA_NOT_MIGRATED): la proyeccion del
+        // avatar usa queryConAvatarFallback para degradar 42703 cuando
+        // usuarios.foto_url (migracion 004) aun no existe en Neon. Sin
+        // este wrapper la capa audiovisual entera caia al 503 global.
+        var multimediaRows = await queryConAvatarFallback(sql,
           '('
           + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
           + '  af.media_title, af.media_source, a.lat, a.lng, a.ciudad,'
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
-          + '  u.nombre AS usuario_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS usuario_avatar,'
+          + '  u.nombre AS usuario_nombre, __FOTO_URL__ AS usuario_avatar,'
           + '  af.autor_original_id::text AS usuario_id, a.id::text AS album_id,'
           + '  \'album\' AS origen, a.id::text AS origen_id,'
           + '  (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos'
@@ -3799,6 +3826,43 @@ module.exports = async function handler(req, res) {
             return tieneCoordsValidas(r.lat, r.lng);
           });
         }
+
+        // v17 (ADR-031): representacion "album de destino". Ademas de las
+        // fotos individuales de la ficha (origen='destino'), se emite UNA
+        // fila agregada por destino (origen='destino_album') con portada y
+        // conteo. Asi el mapa muestra el album de la ficha de hostal r10
+        // como un pin agrupado que abre su galeria, y no solo fotos sueltas.
+        var mmDestinoAlbumOn = mmOrigen !== 'album'
+          && (!mmTipos || mmTipos.indexOf('foto') !== -1);
+        if (mmDestinoAlbumOn && !mmScopeMio) {
+          var mmAlbumRows = await sql(
+            'SELECT d.slug AS origen_id, d.nombre AS album_titulo, d.lat, d.lng, d.ciudad,'
+            + ' COUNT(df.id)::int AS fotos_count,'
+            + ' (ARRAY_AGG(df.url ORDER BY df.es_hero DESC NULLS LAST, df.orden ASC NULLS LAST))[1] AS media_url'
+            + ' FROM destinos d JOIN destinos_fotos df ON df.destino_id = d.id'
+            + ' WHERE d.lat IS NOT NULL AND d.lng IS NOT NULL'
+            + '   AND d.lat <> 0 AND d.lng <> 0 AND d.status = \'published\''
+            + (mmIdxCiudad ? ' AND d.ciudad = $' + mmIdxCiudad : '')
+            + ' GROUP BY d.id, d.slug, d.nombre, d.lat, d.lng, d.ciudad'
+            + ' ORDER BY fotos_count DESC LIMIT 200',
+            mmParams
+          ).catch(function(){ return []; });
+          mmAlbumRows.forEach(function(a) {
+            if (!tieneCoordsValidas(a.lat, a.lng)) return;
+            multimediaRows.push({
+              media_url: a.media_url,
+              media_type: 'album',
+              media_title: a.album_titulo,
+              media_source: '',
+              lat: a.lat, lng: a.lng, ciudad: a.ciudad,
+              album_titulo: a.album_titulo,
+              autor_nombre: '', usuario_nombre: '', usuario_avatar: '',
+              usuario_id: null, album_id: null,
+              origen: 'destino_album', origen_id: a.origen_id,
+              votos: 0, fotos_count: a.fotos_count
+            });
+          });
+        }
         return res.status(200).json({ ok: true, data: multimediaRows, tipos_aplicados: mmTiposAplicados });
       }
 
@@ -3826,6 +3890,71 @@ module.exports = async function handler(req, res) {
           return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
         }));
         return res.status(200).json({ ok: true, data: feedRows });
+      }
+
+      // ADR-032 (v17): "Mis fotos" del museo. Une las fotos agregadas a
+      // albumes propios (album_fotos.agregador_id) con las fotos de viajero
+      // subidas en fichas (interacciones.tipo='foto', excluyendo las filas
+      // de voto que reutilizan dims->>'voto_foto_id'). Requiere usuario_id.
+      if (tipo === 'mis_fotos') {
+        var mfUsuario = usuarioId ? String(usuarioId).trim() : '';
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mfUsuario))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var mfRows = await sql(
+          'SELECT sub.* FROM ('
+          + ' SELECT af.id::text AS id, af.foto_url, af.foto_type, af.media_title,'
+          + '  a.id::text AS album_id, a.titulo AS album_titulo, a.ciudad AS ciudad,'
+          + '  \'album_foto\' AS fuente, NULL::text AS destino_slug, NULL::text AS destino_nombre,'
+          + '  (SELECT COUNT(*)::int FROM album_votos av WHERE av.foto_id = af.id) AS votos,'
+          + '  af.creado_en'
+          + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
+          + ' WHERE af.agregador_id = $1::uuid AND af.activo = true AND a.activo = true'
+          + ' UNION ALL'
+          + ' SELECT i.id::text, i.texto, \'foto\' AS foto_type, \'\' AS media_title,'
+          + '  NULL::text, NULL::text, d.ciudad,'
+          + '  \'viajero_foto\', d.slug, d.nombre,'
+          + '  0 AS votos, i.creado_en'
+          + ' FROM interacciones i JOIN destinos d ON d.id = i.destino_id'
+          + ' WHERE i.usuario_id = $1::uuid AND i.tipo = \'foto\' AND i.activo = true'
+          + '   AND (i.dims IS NULL OR NOT (i.dims ? \'voto_foto_id\'))'
+          + ' ) sub ORDER BY sub.creado_en DESC LIMIT 200',
+          [mfUsuario]
+        );
+        return res.status(200).json({ ok: true, data: mfRows });
+      }
+
+      // ADR-032 (v17): "Mis guardados" de media del museo (bookmarks de
+      // fotos y albumes de terceros). Si la migracion 019 (media_guardados)
+      // aun no esta aplicada, degrada a lista vacia en vez del 503 global.
+      if (tipo === 'mis_guardados_media') {
+        var mgUsuario = usuarioId ? String(usuarioId).trim() : '';
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mgUsuario))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var mgRows = await sql(
+          'SELECT sub.* FROM ('
+          + ' SELECT \'album\' AS fuente, mg.item_id::text AS item_id, mg.creado_en,'
+          + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, \'album\' AS media_type,'
+          + '  a.ciudad AS ciudad, a.id::text AS album_id, NULL::text AS destino_slug'
+          + ' FROM media_guardados mg JOIN albumes a ON a.id = mg.item_id'
+          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true AND a.activo = true'
+          + ' UNION ALL'
+          + ' SELECT \'album_foto\', mg.item_id::text, mg.creado_en,'
+          + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, af.foto_type,'
+          + '  a.ciudad, a.id::text, NULL::text'
+          + ' FROM media_guardados mg JOIN album_fotos af ON af.id = mg.item_id'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true AND af.activo = true'
+          + ' UNION ALL'
+          + ' SELECT \'viajero_foto\', mg.item_id::text, mg.creado_en,'
+          + '  d.nombre AS titulo, i.texto AS media_url, \'foto\' AS media_type,'
+          + '  d.ciudad, NULL::text, d.slug'
+          + ' FROM media_guardados mg JOIN interacciones i ON i.id = mg.item_id'
+          + ' JOIN destinos d ON d.id = i.destino_id'
+          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
+          + ' ) sub ORDER BY sub.creado_en DESC LIMIT 200',
+          [mgUsuario]
+        ).catch(function(){ return []; });
+        return res.status(200).json({ ok: true, data: mgRows });
       }
 
       // Top fotos para curacion de directorios (por coord match)
@@ -3865,9 +3994,11 @@ module.exports = async function handler(req, res) {
         if (!cfMediaRows.length)
           return res.status(404).json({ ok: false, error: 'Media no encontrada' });
 
-        var cfRows = await sql(
+        // Igual que multimedia_mapa: degrada 42703 si usuarios.foto_url
+        // (migracion 004) no existe en Neon, en vez del 503 global.
+        var cfRows = await queryConAvatarFallback(sql,
           'SELECT ac.id, ac.foto_id, ac.parent_id, ac.usuario_id, ac.texto, ac.activo, ac.creado_en,'
-          + ' u.nombre AS autor_nombre, COALESCE(u.foto_url, u.avatar_url, \'\') AS autor_avatar,'
+          + ' u.nombre AS autor_nombre, __FOTO_URL__ AS autor_avatar,'
           + ' (SELECT COUNT(*)::int FROM album_comentario_votos av WHERE av.comentario_id = ac.id) AS likes,'
           + ' EXISTS(SELECT 1 FROM album_comentario_votos av2 WHERE av2.comentario_id = ac.id AND av2.usuario_id = $2) AS ya_like'
           + ' FROM album_comentarios ac'
@@ -5340,6 +5471,69 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
+      // ADR-032 (v17): guardado (bookmark) de media. fuente valida el tipo
+      // de item: album -> albumes.id, album_foto -> album_fotos.id,
+      // viajero_foto -> interacciones.id (tipo='foto'). No es voto ni copia.
+      // Requiere migracion 019; si falta, responde 503 explicito.
+      if (tipo2 === 'guardar_media' || tipo2 === 'quitar_guardado_media') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var gmFuente = String(body.fuente || '').toLowerCase();
+        if (['album', 'album_foto', 'viajero_foto'].indexOf(gmFuente) === -1)
+          return res.status(400).json({ ok: false, error: 'fuente invalida (album|album_foto|viajero_foto)' });
+        var gmItem = String(body.item_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(gmItem))
+          return res.status(400).json({ ok: false, error: 'item_id invalido' });
+
+        try {
+          if (tipo2 === 'quitar_guardado_media') {
+            await sql(
+              'UPDATE media_guardados SET activo = false'
+              + ' WHERE usuario_id = $1 AND fuente = $2 AND item_id = $3::uuid',
+              [usuarioId2, gmFuente, gmItem]
+            );
+            return res.status(200).json({ ok: true, guardado: false });
+          }
+
+          var gmExiste = false;
+          if (gmFuente === 'album') {
+            var gmAl = await sql('SELECT id FROM albumes WHERE id=$1::uuid AND activo=true', [gmItem]).catch(function(){ return []; });
+            gmExiste = gmAl.length > 0;
+          } else if (gmFuente === 'album_foto') {
+            var gmAf = await sql(
+              'SELECT af.id FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
+              + ' WHERE af.id=$1::uuid AND af.activo=true AND a.activo=true',
+              [gmItem]
+            ).catch(function(){ return []; });
+            gmExiste = gmAf.length > 0;
+          } else {
+            var gmVf = await sql(
+              'SELECT id FROM interacciones WHERE id=$1::uuid AND tipo=\'foto\' AND activo=true'
+              + ' AND (dims IS NULL OR NOT (dims ? \'voto_foto_id\'))',
+              [gmItem]
+            ).catch(function(){ return []; });
+            gmExiste = gmVf.length > 0;
+          }
+          if (!gmExiste)
+            return res.status(404).json({ ok: false, error: 'Media no encontrada' });
+
+          await sql(
+            'INSERT INTO media_guardados (usuario_id, fuente, item_id, activo, creado_en)'
+            + ' VALUES ($1, $2, $3::uuid, true, NOW())'
+            + ' ON CONFLICT (usuario_id, fuente, item_id)'
+            + ' DO UPDATE SET activo = true, creado_en = NOW()',
+            [usuarioId2, gmFuente, gmItem]
+          );
+          return res.status(200).json({ ok: true, guardado: true });
+        } catch (eGuardarMedia) {
+          if (eGuardarMedia && (eGuardarMedia.code === '42P01' || eGuardarMedia.code === '42703')) {
+            console.error('[interacciones] guardar_media sin migracion 019: ' + eGuardarMedia.message);
+            return res.status(503).json({ ok: false, error: 'Guardados de media no disponibles (migracion 019 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
+          }
+          throw eGuardarMedia;
+        }
+      }
+
       // Admin: seleccionar foto top para destino
       if (tipo2 === 'admin_foto_top') {
         var aftAdminToken = req.headers.authorization || '';
@@ -5588,9 +5782,13 @@ module.exports = async function handler(req, res) {
       if (tipo2 === 'comentario_foto') {
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
-        var cfcUsr = await sql(
-          'SELECT id, nombre, COALESCE(foto_url, avatar_url, \'\') AS avatar FROM usuarios WHERE id=$1 LIMIT 1',
-          [usuarioId2]
+        // Con queryConAvatarFallback para no devolver [] (que se
+        // interpretaba como 403 "Usuario no registrado") cuando falta
+        // usuarios.foto_url (migracion 004).
+        var cfcUsr = await queryConAvatarFallback(sql,
+          'SELECT id, nombre, __FOTO_URL__ AS avatar FROM usuarios WHERE id=$1 LIMIT 1',
+          [usuarioId2],
+          ['COALESCE(foto_url, avatar_url, \'\')', 'COALESCE(avatar_url, \'\')']
         ).catch(function(){ return []; });
         if (!cfcUsr.length)
           return res.status(403).json({ ok: false, error: 'Usuario no registrado' });
@@ -6601,7 +6799,7 @@ module.exports = async function handler(req, res) {
 
         // 4) Destino real.
         var destVisita = await sql(
-          'SELECT id, lat, lng, categoria_slug, tags, nombre FROM destinos WHERE id=$1',
+          'SELECT id, lat, lng, categoria_slug, tags, nombre, radio_m FROM destinos WHERE id=$1',
           [destinoId2]
         );
         if (!destVisita.length)
@@ -6638,7 +6836,7 @@ module.exports = async function handler(req, res) {
         var distVisita = null;
         var modoVisita = destConCoords ? 'geocerca' : 'sin_geocerca';
         if (destConCoords) {
-          radioVisita = resolverRadioM(destVisita.categoria_slug, destVisita.tags, destVisita.nombre);
+          radioVisita = resolverRadioM(destVisita.categoria_slug, destVisita.tags, destVisita.nombre, destVisita.radio_m);
           distVisita = haversineMetros(uLatV, uLngV, dLatV, dLngV);
           if (distVisita > radioVisita + (uAccV || 0))
             return res.status(422).json({
@@ -6649,6 +6847,11 @@ module.exports = async function handler(req, res) {
               radio_m: radioVisita
             });
         }
+        // ADR-033: XP escalado segun la amplitud del area efectiva. Con
+        // geocerca se usa el radio resuelto; sin coords (sin_geocerca) no
+        // hay penalizacion porque no hay area que abusar.
+        var factorAreaVisita = modoVisita === 'geocerca' ? factorXpPorRadio(radioVisita) : 1;
+        var xpBaseVisita = Math.round(20 * factorAreaVisita);
 
         // 9) Anti-farming: cooldown, velocidad imposible y tope diario.
         var prevVisita = await sql(
@@ -6724,16 +6927,16 @@ module.exports = async function handler(req, res) {
         };
         try {
           await sql(
-            'INSERT INTO interacciones (destino_id, usuario_id, tipo, dims, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', $3::jsonb, 20, NOW())',
-            [destinoId2, usuarioId2, JSON.stringify({ geo: dimsVisitaGeo })]
+            'INSERT INTO interacciones (destino_id, usuario_id, tipo, dims, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', $3::jsonb, $4, NOW())',
+            [destinoId2, usuarioId2, JSON.stringify({ geo: dimsVisitaGeo }), xpBaseVisita]
           );
         } catch (eVisitaIns) {
           if (eVisitaIns && eVisitaIns.code === '23505')
             return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
           throw eVisitaIns;
         }
-        var xpVisitaFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 20);
-        var multiplicadorVisita = xpVisitaFinal !== 20 ? 1.1 : 1;
+        var xpVisitaFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpBaseVisita);
+        var multiplicadorVisita = xpVisitaFinal > xpBaseVisita ? 1.1 : 1;
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpVisitaFinal);
         xpVisitaFinal = amuletoVisita.xp;
@@ -6759,7 +6962,8 @@ module.exports = async function handler(req, res) {
           ok: true,
           xp: xpTotalVisita,
           xp_detalle: {
-            base: 20,
+            base: xpBaseVisita,
+            factor_area: factorAreaVisita,
             multiplicador: multiplicadorVisita,
             amuleto: amuletoVisita.doubled ? 2 : 1,
             bono_rural: bonoRuralVisita,
