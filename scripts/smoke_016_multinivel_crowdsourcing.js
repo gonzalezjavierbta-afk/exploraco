@@ -189,7 +189,7 @@ async function run() {
   check('A3f: el UPDATE es la sentencia principal (posterior al cierre del CTE)',
     updateIdx !== -1 && !!cte && updateIdx > cte.close);
 
-  check('A4a: la cadena contiene FLOOR', queryRef.indexOf('FLOOR') !== -1);
+  check('A4a: la cadena contiene ROUND half-up (ADR-035)', queryRef.indexOf('ROUND') !== -1);
   check('A4b: porcentajes 10/5/3/2/1 (0.10/0.05/0.03/0.02/0.01)',
     queryRef.indexOf('0.10') !== -1 && queryRef.indexOf('0.05') !== -1
     && queryRef.indexOf('0.03') !== -1 && queryRef.indexOf('0.02') !== -1

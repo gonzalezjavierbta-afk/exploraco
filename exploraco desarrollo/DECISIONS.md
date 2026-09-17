@@ -1031,3 +1031,251 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 - **Nota de version (ADR-006):** `api/interacciones.js` mantiene header `v14` mientras los comentarios nuevos se rotulan `v17`; deuda documental a resolver en el commit.
 
 **ADRs relacionados:** ADR-001 (presupuesto 8/8 de Vercel Hobby), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-016 (subcategorias y orden condicional), ADR-021 (capa publica de media), ADR-025 (sesion firmada / `validarSesion` para el `viewer`), ADR-030 (galeria unificada y `items[]`; esta ADR ajusta su hero de 12 a 4 fotos y retira el CTA del hero), ADR-031 (visibilidad publica del mapa), ADR-033 (radio; misma familia de configuracion por lugar).
+
+---
+
+## ADR-035: XP decimal con `numeric(12,2)` y rankings de comunidad (Casas por XP total, Parches global, sub-vistas de Ranking)
+
+**ID:** ADR-035
+**Fecha:** 2026-09-17
+**Estado:** Implementado en working tree (TSK-109): migracion `021_xp_decimal.sql` + preflight creados; backend `api/usuarios.js` v15, `api/interacciones.js` v18, `api/admin.js`, `api/pagina-destino.js` v10; frontend `usuario-session.js`/`index.html`/`admin.html`/`perfil.html`/`mi-perfil.html`/`comunidad.html`. Migracion 021 PENDIENTE de aplicar en Neon antes del deploy (ver `docs/DEPLOY_021.md`). Escudo GOLD PASS y smoke `scripts/smoke_021_xp_decimal_rankings.js` 45/45. Presupuesto 8/8 intacto (ADR-001): cero archivos nuevos en `api/`; todo entra como ramas `tipo=` y campos aditivos.
+**Autor:** architect (AI-DOS). Decisiones de producto 1-5 aprobadas por el dueno del repositorio (2026-09-17).
+**Nota de numeracion:** el 035 es el consecutivo real tras ADR-034 (mayor registrado en este documento, verificado con `Select-String '^## ADR-'` sobre el archivo real, ADR-006). El numero no estaba reservado en ninguna spec.
+**Spec operativa:** `docs/superpowers/specs/2026-09-17-xp-decimal-rankings-comunidad-design.md`.
+
+### Problema
+
+El motor de gamificacion almacena el XP en columnas `integer`. La economia ya producia fracciones reales y las estaba perdiendo por redondeo/truncamiento silencioso en varios puntos:
+
+1. **Piramide de referidos (ADR-027):** `FLOOR($2 * (0.10|0.05|0.03|0.02|0.01))` sobre `xp_ref_total`, mas un `parseInt(xpGanado, 10)` PREVIO al calculo que trunca el XP ganado (ej. 12.5 -> 12, y luego 10% = 1 en vez de 1.25). Doble perdida.
+2. **Fama de Parche (ADR-018):** `Math.round(xpGanado * 0.10)` con guarda `if (famaBase < 1) return false;` que descarta aportes legitimamente menores a 1 XP.
+3. **Own the Spot (ADR-014):** `Math.round(xpBase * 1.1)`.
+4. **Presencia fisica (ADR-033):** `Math.round(20 * factorAreaVisita)`, donde `factorAreaVisita` vale `0.5`, `1` o `0` (el `0` desactiva el XP por zona).
+5. **Arbol de Clases (ADR-028):** `ent(x) = parseInt(x, 10) || 0` trunca TODOS los derivados `D_R` que suman `xp_ganado` con bono de Origen `x1.2` aplicado por `FLOOR(...)` (`sqlBonoFila`); el descuento de nodo 5 usa `Math.floor(precio * (100 - pct) / 100)`.
+6. **Tienda:** al bajar el precio de un consumible a fraccionario, la validacion de `admin.js` lo rechaza (`parseInt`, "debe ser un entero").
+7. **Producto:** el usuario pidio que el XP se muestre SIEMPRE con 2 decimales (`es-CO`, ej. "125,50 XP"), con redondeo half-up a 2 decimales en cada acreditacion, para que la economia sea auditable y los bonos porcentuales no se desvanezcan.
+
+En paralelo, la capa de rankings de `comunidad.html` estaba incompleta y desordenada: `casa_ranking` (ADR-028) existe en backend pero SIN UI y ordena por `xp_promedio`; no existe ranking global de Parches; y el ranking de Facciones vive en el tab "Activo Oculto" en lugar del tab "Ranking". El producto aprobo: Casas por **XP total** (mostrando total, promedio por miembro y **miembros activos vigentes**), Parches global por `fama_total` (mostrando **miembros activos**), y sub-vistas de Ranking: Viajeros | Casas | Facciones | Parches.
+
+### Opciones evaluadas (almacenamiento)
+
+1. **Centi-XP escalado (guardar `xp * 100` como `integer`).** Ventaja: cero cambios de tipo. Desventajas decisivas: (a) obliga a DIVIDIR por 100 en cada uno de los ~30 puntos de lectura/escritura (mismo esfuerzo de inventario que `numeric`), y cualquier punto olvidado muestra "12550 XP"; (b) deja una unidad fantasma que se filtra a JSON, HTML, correos, URLs y al JSON-LD; (c) NO resuelve el redondeo: sigue siendo aritmetica entera con `FLOOR`/`Math.round` que hay que reescribir igual; (d) `xp_total * 100` puede desbordar `int4` en teoricos 21.4M XP (no hoy, pero el techo baja 100x); (e) rompe la legibilidad de la BD (soporte y admin leen "12550"). **Descartada.**
+2. **`numeric(12,2)` (DECISION DE PRODUCTO APROBADA).** Exacto en base 10 (a diferencia de `float8`), rango 0..9999999999.99 holgado, redondeo explicito con `ROUND(expr, 2)` (half-away-from-zero, que es el half-up pedido para positivos), y la conversion `integer -> numeric(12,2)` es **exacta y sin perdida**. **Elegida.**
+3. **`float8` / `double precision`.** Descartada: no es exacta; en una economia donde `xp_total` es a la vez moneda (compras, DM de 20 XP, faccion 500 XP) el error binario acumulado hace que `xp_total >= precio` sea no determinista en el limite.
+4. **Segunda moneda / ledger decimal separado.** Descartada por ADR-018 (moneda unica `xp_total`) y por presupuesto de endpoints (ADR-001).
+
+### Opciones evaluadas (rankings)
+
+1. **Crear endpoint nuevo `/api/rankings.js`.** Descartada: 8/8 agotado (ADR-001).
+2. **Reusar `casa_ranking` (modificarlo) + nueva rama `pandilla_ranking` en `interacciones.js` (elegida).** Cero endpoints nuevos; `casa_ranking` ya vive en `usuarios.js` y `pandilla_ranking` comparte el patron de `pandilla_detalle` en `interacciones.js`. **Elegida.**
+3. **Persistir `miembros_activos`/`xp_total` de Casa como columnas.** Descartada: viola el principio del proyecto de no persistir lo derivable (ADR-018/028); los contadores se calculan en consulta.
+
+### Decision tomada
+
+**(D1) Almacenamiento `numeric(12,2)`.** Se convierten las 9 columnas XP listadas en la seccion "Plan de migracion". Se conservan como `integer` los contadores (`total_resenas`, `total_guardados`, `total_visitas`, `votos_favor/contra`, `progreso_actual`, `meta_valor`, `cantidad`, `miembros`, etc.) y los puntos internos de rama (`progreso_arbol.bonos`, `RAMA_TIERS`, `FAMA_TIERS`), que no son `xp_total`.
+
+**(D2) Redondeo half-up a 2 decimales en CADA acreditacion.** Se define UN helper por lenguaje (Regla de No-Duplicidad):
+- Server JS: `redondearXp(n) = Math.round((Number(n) + Number.EPSILON) * 100) / 100` (domina valores positivos; `0` si `!isFinite`).
+- SQL: `ROUND(expr::numeric, 2)` (half-away-from-zero en `numeric`).
+Se aplica en: XP entregado por accion (`xpConMultiplicador`, `aplicarAmuletoX2`, `xpBaseVisita`, bonos de mision/logro ya enteros), reparto de referidos, fama de Parche, descuento de nodo 5, precio de consumible, `admin_xp` con `delta_xp`, y `xp_bono` de retos.
+UI: **2 decimales SIEMPRE visibles**, formato `es-CO` via un unico helper cliente `window.ExploraCO.fmtXp(n)` (`Number(n).toLocaleString('es-CO', {minimumFractionDigits:2, maximumFractionDigits:2})`), con sufijo " XP" en las superficies que hoy lo muestran. Prohibido formatear XP inline en cada pantalla.
+
+**(D3) Pestana "Clase" consolidada.** Todo el Arbol de Clases (faccion, vocaciones y la Tabla de Destino como sub-vista "Senderos") vive dentro del componente Arbol de Clases; "Mi Casa" queda como bloque compacto dentro de Clase. Es refactor de frontend (`mi-perfil.html`/`comunidad.html`); no toca esquema ni endpoints.
+
+**(D4) Rankings.**
+- **Casas:** `GET /api/usuarios?tipo=casa_ranking` ordena por `xp_total` DESC (ya no por `xp_promedio`) y agrega `miembros_activos`; expone `miembros`, `miembros_activos`, `xp_total`, `xp_promedio` (todos `numeric` redondeados a 2) y los contadores existentes (`activos_ocultos_aprobados`, `checkins_30d`). El `top` por Casa no cambia.
+- **Parches:** NUEVA rama `GET /api/interacciones?tipo=pandilla_ranking` global, ordenada por `fama_total` DESC (desempate `creado_en ASC`), limit 50, con `miembros` y `miembros_activos` por Parche. Sin sesion (lectura publica, coherente con la capa publica de ADR-031).
+- **Facciones:** el ranking se mueve del tab "Activo Oculto" al tab "Ranking" de `comunidad.html`.
+- **Sub-vistas del tab Ranking:** Viajeros | Casas | Facciones | Parches (conmutadas en cliente, sin endpoint nuevo salvo `pandilla_ranking`).
+
+**(D5) Sin `::int` ni `parseInt` sobre columnas XP.** Todo `::int` que hoy envuelve `SUM(xp_...)` se elimina (o pasa a `::numeric(12,2)` con `ROUND(...,2)`), y todo `parseInt(columna_xp)` pasa a `parseFloat`/`Number`. Critico: Neon/@neondatabase/serverless devuelve `numeric` como **string** en el JSON del driver; por eso (a) no debe hacerse aritmetica directa sobre el valor crudo y (b) todo row que se devuelva al cliente debe normalizar la columna a `Number` redondeado (si no, `GET ?tipo=leaderboard` empezaria a emitir `"xp_total":"125.50"` como string).
+
+### Justificacion
+
+`numeric(12,2)` es la unica opcion que elimina la perdida de precision sin inventar una unidad artificial, sin duplicar la economia y sin crear endpoints (ADR-001). El centi-XP obliga al mismo barrido de codigo pero ademas contamina todas las superficies con una unidad escalada; su unica ventaja (no migrar tipos) se anula porque de todos modos hay que tocar cada punto de redondeo. La conversion `integer -> numeric(12,2)` es exacta (todo `int4` cabe en `numeric(12,2)`), por lo que la migracion es de bajo riesgo y no requiere backfill de valores; solo `pandillas.fama_total` merece analisis aparte (ver abajo) y la conclusion es NO recomputarlo. Definir un unico helper de redondeo por lenguaje evita el escenario mas probable de bug (30 puntos con criterios distintos); el mandato ASCII-safe (ADR-002) sigue vigente en `api/*.js` y en este documento.
+
+Sobre `pandillas.fama_total`: **NO se recomputa, solo se cambia el tipo.** Razon: `fama_total` es un acumulador historico construido con `ROUND(10% del XP entregado)`, **duplicado** por el consumible `trompeta_fama` (x2) y alimentado tambien por XP de misiones/logros que nunca queda en `interacciones.xp_ganado` (drift ya documentado en ADR-024/ADR-028). Un recomputo `SUM(xp_ganado)*0.10` (a) borraria el efecto del consumible, (b) ignoraria el drift de misiones/logros, (c) reescribiria datos historicos (contra Cero Borrado Logico / Regla de Oro 3) y (d) la migracion 014 ya hizo un recomputo unico autorizado. La conversion de tipo preserva el valor tal cual (125 -> 125.00), que es exactamente lo que se necesita. Si en el futuro se quiere realinear la fama, sera una tarea de datos explicita y separada, con respaldo.
+
+### Plan de migracion 021 (`db/migrations/021_xp_decimal.sql`)
+
+**Principio:** idempotente (ADR-008) y defensiva (patron BUG-021): cada `ALTER` corre solo si la columna EXISTE y su `data_type` actual es entero (`integer`/`smallint`/`bigint`); tras la conversion el `data_type` es `numeric` y el bloque se vuelve no-op. Se implementa con un unico `DO $$` que itera una lista `(tabla, columna)` y ejecuta `ALTER TABLE ... ALTER COLUMN ... TYPE numeric(12,2) USING col::numeric(12,2)` con `format('%I')` (identificadores seguros). No se hace `ADD COLUMN` de nada no versionado.
+
+Columnas a convertir (fuente de verdad = DDL real, ADR-006):
+
+| Tabla | Columna | DDL versionado | Nullable | Default |
+|---|---|---|---|---|
+| `usuarios` | `xp_total` | `010_gamificacion_v4.sql:183` | NOT NULL | 0 |
+| `usuarios` | `xp_ref_total` | `016_multinivel_crowdsourcing.sql:56` | SI (nullable) | 0 |
+| `interacciones` | `xp_ganado` | **NO versionada** (guard `IF EXISTS`) | (de Neon) | (de Neon) |
+| `album_votos` | `xp_ganado` | `009_albumes.sql:67` | NOT NULL | 5 |
+| `album_fotos` | `xp_otorgado_autor` | `009_albumes.sql:56` | NOT NULL | 0 |
+| `compra_consumibles` | `xp_pagado` | `010_gamificacion_v4.sql:34` | NOT NULL | (sin default) |
+| `pandilla_retos` | `xp_bono` | `010_gamificacion_v4.sql:140` | NOT NULL | 0 |
+| `consumibles` | `precio_xp` | `010_gamificacion_v4.sql:21` | NOT NULL | 0 |
+| `pandillas` | `fama_total` | `010_gamificacion_v4.sql:97` | NOT NULL | 0 |
+
+**Nota de no-perdida:** `int4` maximo = 2147483647; `numeric(12,2)` maximo = 9999999999.99. Toda fila entera existente cabe de forma exacta (`125 -> 125.00`); no hay redondeo, truncamiento ni saturacion. La conversion preserva `NULL` (en `usuarios.xp_ref_total`) y los `DEFAULT` (Postgres recastea la expresion del default por cast de asignacion).
+
+**No se agregan indices en 021.** `casa_ranking`/`pandilla_ranking` son agregados con `LIMIT` sobre tablas pequenas (cientos de filas) y el filtro de 30 dias usa `usuarios.ultimo_acceso`, que es una columna **no versionada**; crear un indice sobre ella aumentaria el riesgo de la migracion sin ganancia medible. Si el volumen crece, sera una migracion aparte que primero versione esas columnas.
+
+**Paso manual obligatorio:** la 021 la aplica el dueno del repositorio en el editor SQL de Neon ANTES del deploy (ADR-008; mismo flujo que 016/017/018). Si el backend decimal se despliega sin la 021, los `UPDATE` sobre columnas `integer` reciben numeros fraccionarios: Postgres los redondea por cast de asignacion (no falla), por lo que el sintoma es silencioso (se sigue redondeando a entero). La verificacion de cierre debe comprobar `data_type='numeric'` en las 9 columnas.
+
+### Plan de rollback
+
+- El rollback es `numeric(12,2) -> integer` con `USING ROUND(col)::integer`. Es **LOSSY** (se pierden los decimales) y solo se ejecuta ante una emergencia de produccion; debe acompanarse del revert del backend a la version entera (el codigo decimal sobre columnas `integer` sigue funcionando pero trunca). Se documenta como `db/migrations/021_xp_decimal_down.sql` NO ejecutable en el flujo normal.
+- Rollback parcial nulo-riesgo: para reproducir el comportamiento entero SIN tocar tipos, basta `SET xp_total = ROUND(xp_total)` (los decimales se pierden). No se recomienda.
+- Mitigacion previa: la 021 puede acompanarse de un respaldo logico de las 9 columnas (`CREATE TABLE xp_backup_021 AS SELECT ...`) si el operador quiere un rollback exacto; opcional, dado que la conversion es de ida y vuelta sin perdida mientras NO se hayan acreditado fracciones.
+
+### Definicion: "miembro activo vigente (30 dias)"
+
+Un miembro de una Casa o de un Parche es **activo vigente** si y solo si se cumplen las TRES condiciones:
+
+1. **Pertenencia activa:** `pandillas_miembros.activo = true` (Parches) o `usuarios.casa IS NOT NULL` (Casas). El soft-leave pone `activo=false`, nunca borra (Cero Borrado Logico).
+2. **Cuenta habilitada:** `usuarios.activo = true`.
+3. **Actividad reciente:** `usuarios.ultimo_acceso > NOW() - INTERVAL '30 days'`.
+
+`ultimo_acceso` es el proxy de actividad del proyecto: se escribe `NOW()` en cada acreditacion de XP (resena, guardado, visita, rating, chat, planes, albumes, DM, `admin_xp`, etc.). Se descarta contar acciones por tipo (costoso y sesgado): la ventana de 30 dias sobre `ultimo_acceso` es determinista, barata y ya usada por ADR-029/ADR-028.
+
+**Deuda asociada:** `usuarios.activo` y `usuarios.ultimo_acceso` siguen siendo columnas NO versionadas (patron BUG-021, registrado en ADR-028). La implementacion DEBE degradar con gracia: si la consulta falla con `42703` (columna ausente), reintentar la misma consulta SIN la condicion de actividad (`activo`/`ultimo_acceso`) y devolver `miembros_activos = 0` mas un `warn`; nunca silenciar el error con un catch vacio (Regla de Oro / GSD 2.2). Se recomienda versar ambas columnas en una migracion futura.
+
+### Inventario backend de redondeo/parseo (archivo:linea, verificado 2026-09-17 sobre el working tree real)
+
+Regla: **todo `parseInt(columna_xp)` -> `parseFloat`/`Number`; todo `FLOOR`/`Math.round`/`Math.floor` que produzca XP -> half-up a 2 decimales; todo `::int` sobre `SUM(xp_...)` -> `ROUND(...,2)`/`::numeric(12,2)`.**
+
+**`api/usuarios.js` (header real v14)**
+- L38 `parseInt(xpTotal)` en `calcularNivel` -> `parseFloat` (display/derivados; ver seccion de validacion).
+- L53-55 `conNivel(row)`: normalizar `row.xp_total = Number(row.xp_total)` (numeric llega string; `leaderboard` L267-277 y `?id=` L314-330 devuelven la fila cruda).
+- L415 `parseInt(rcRows[0].xp_ref_total, 10) || 0` -> `Number` + redondeo 2.
+- L435 `COALESCE(SUM(xp_ref_total), 0)::int AS xp_ref` -> quitar `::int`, `ROUND(SUM(...),2)`.
+- L455 `COALESCE(SUM(xp_total), 0)::int AS xp_total` (faccion_ranking) -> quitar `::int`.
+- L459-463 `frTop` devuelve `xp_total` crudo -> normalizar a `Number` en el map de respuesta.
+- L478 `COALESCE(SUM(u.xp_total), 0)::int AS xp_total` (casa_ranking) -> quitar `::int`; **anadir `miembros_activos`** (ver arriba).
+- L479 `COALESCE(ROUND(SUM(u.xp_total)::numeric / GREATEST(COUNT(*), 1)), 0)::int AS xp_promedio` -> `ROUND(..., 2)` sin `::int`.
+- L492 `ORDER BY xp_promedio DESC` -> `ORDER BY xp_total DESC`.
+- L495-499 `crTop` devuelve `xp_total` crudo -> normalizar a `Number`.
+- L546 `xp_total: parseInt(pub.xp_total, 10) || 0` (perfil publico) -> `Number` + 2 decimales.
+- L572-596 `faccion_elegir`: el `WHERE xp_total >= 500` SQL es correcto; el `xp_total` del RETURNING debe normalizarse a `Number`.
+- L634/641/650/655/670/684 `casa_elegir`: `parseInt(ceFila[0].xp_total, 10)` (L641, L655, L684) -> `Number` + redondeo 2.
+
+**`api/interacciones.js` (header real v14; comentarios nuevos v17)**
+- L193-204 `calcularNivelLocal`: L198 `parseInt(xpTotal, 10)` -> `parseFloat`.
+- L544-564 `nivelNodoArbol`/`nodosDesbloqueadosArbol`: L552/L562 `parseInt(puntos, 10)` -> `parseFloat` (los `P_R` ahora son `numeric`); `RAMA_TIERS` sigue entero (comparacion `>=` correcta).
+- L586 `parseInt(ef.pct, 10)` -> mantener entero (es porcentaje de descuento, no XP).
+- **L628-630 `sqlBonoFila`:** `FLOOR((expr) * 1.2)` -> `ROUND((expr) * 1.2, 2)`.
+- **L641 `ent(x) = parseInt(x, 10) || 0`** -> `parseFloat`/`Number` + redondeo 2 (trunca TODO `D_R`).
+- L675-677, L681 `::int` sobre `SUM(... xp_ganado ...)` en `D_R` -> `ROUND(...,2)`.
+- L700/703/758/761/765/782/784/787 `::int` sobre sumas de puntos derivados (no columnas XP, pero reciben `sqlBonoFila`) -> `ROUND(...,2)` (consistencia).
+- L718-720 / L728-730 `SUM(... xp_ganado ...) FILTER (...)::int` -> `ROUND(...,2)`.
+- L747-748 `Math.floor(15 * BONO_ORIGEN)` / `Math.floor(50 * BONO_ORIGEN)` -> `ROUND(...,2)` SQL-equivalente (o `Math.round(x*100)/100`).
+- L823 `COALESCE(SUM(i.xp_ganado),0)::int AS xp` (cre_eventos) -> `ROUND(...,2)`.
+- L866 `ent(q.n_largas) * (orgExtranjero ? Math.floor(15 * BONO_ORIGEN) : 15)` -> half-up 2.
+- **L1743 `xpConMultiplicador`: `Math.round(xpBase * 1.1)` -> `redondearXp(xpBase * 1.1)`.**
+- **L1862-1863 `aplicarFamaPandilla`: `Math.round(xpGanado * 0.10)` -> `redondearXp(...)`; guarda `if (famaBase < 1) return false;` -> `if (famaBase <= 0) return false;`** (si no, los aportes < 1 XP se descartan y `fama_total` queda subcontada). L1867 `fama = famaBase * 2` -> redondear.
+- L1906/1917 `parseInt(r.xp_bono, 10)` (retos) -> `Number` + 2 decimales; L1912 el `UPDATE ... xp_total = xp_total + $1` queda correcto con numeric.
+- **L1982/1998 `repartirXpReferidos`: `parseInt(xpGanado, 10)` -> `parseFloat`/`Number`** (hoy trunca ANTES de calcular porcentajes).
+- **L1993 `FLOOR($2 * (CASE ...))` -> `ROUND($2 * (CASE ...), 2)`.**
+- L2189/2190/2191 `evaluarMisiones` ctx (`parseInt(u.xp_total)` etc.) -> `Number`/`parseFloat`.
+- L2287/2288/2289 `evaluarLogros` ctx -> `Number`/`parseFloat`.
+- L2361-2367 `xpBonus` de logros (enteros): el `UPDATE` queda correcto; no requiere cambio.
+- L2961 `xp_total: parseInt(mpU.xp_total, 10) || 0` (museo_publico) -> `Number` + 2.
+- L2972 `fama_total: parseInt(..., 10) || 0` -> `Number` + 2.
+- L3266 / L3274 / L3296 `COALESCE(SUM(xp_ganado),0)::int AS fama` (tabla_destino) -> `ROUND(...,2)`.
+- L3353 `parseInt(pandillaActiva.fama_total, 10) || 0` -> `Number` + 2.
+- L3393 `parseInt(sn.fama, 10) || 0` -> `Number`/`parseFloat`.
+- L4184 `parseInt(inv.xp_total, 10) || 0` (inventario) -> `Number` + 2.
+- L4373 `parseInt(aoVUsr[0].xp_total, 10) || 0` (gate nivel 5 Wayfarer) -> `parseFloat`.
+- L5032 `parseInt(dmEmisor.xp_total, 10) || 0` -> `Number`.
+- L5069 `parseInt(dmCobro.xp_total, 10) || 0` -> `Number`.
+- **L5294 `Math.floor(nivelCheck[0].xp_total / 100) + 1` (gate de `album_crear`) -> `calcularNivelLocal(nivelCheck[0].xp_total).nivel`** (formula oculta, ver validacion).
+- L5641/5642 `admin_xp`: `parseInt(body.nivel)` es correcto (nivel entero); `parseInt(body.delta_xp, 10)` -> `parseFloat` + `redondearXp`. L5657 `parseInt(axUsr[0].xp_total, 10) || 0` -> `Number`. L5668 `UPDATE ... xp_total=$1` -> redondear antes.
+- L5713 / L5751 `parseInt(...xp_total...)` (vocaciones / rama_activar) -> `parseFloat`.
+- **L6099 `parseInt(ccCons[0].precio_xp, 10) || 0` -> `Number` + 2.**
+- **L6111 `Math.floor(ccPrecioBase * (100 - ccDescPct) / 100)` -> `redondearXp(...)`.**
+- L6116 `parseInt(ccUsr[0].xp_total, 10)` -> `Number`; L6148 `parseInt(ccUpd[0].xp_total, 10)` -> `Number`.
+- L6554 `parseInt(body.meta_valor, 10)` -> mantener entero (meta del reto). **L6562 `parseInt(body.xp_bono, 10)` -> `parseFloat` + `redondearXp`.**
+- L6667-6695 resena: `xpResenaEntregado` debe pasar por `redondearXp` tras `xpConMultiplicador` y `aplicarAmuletoX2` antes del `UPDATE` L6682.
+- L6779 / L6993 / L7098 `UPDATE usuarios SET xp_total = xp_total + $1` (guardado / visita / rating) -> enviar `$1` ya redondeado.
+- **L6900 `Math.round(20 * factorAreaVisita)` -> `redondearXp(20 * factorAreaVisita)`** (ADR-033).
+- L5217/5257/6976/7072/5430/5372 `INSERT INTO interacciones (..., xp_ganado)` con constantes enteras (foto 15/5, visita base, rating): la columna numeric las acepta; se conserva la base entera en la fila (misma razon de ADR-014: el check `xp_ganado >= 25` de `mis_primera_resena`, L993).
+
+**`api/admin.js`**
+- L58/74 `repartirXpReferidos` (copia sincronizada de interacciones.js): `parseInt(xp, 10)` -> `parseFloat`; **L69 `FLOOR($2 * (...))` -> `ROUND(...,2)`**.
+- L189/214 `i.xp_ganado` / `xp: r.xp_ganado||0` (listado de resenas) -> `Number` + 2 decimales.
+- L328-329 `SELECT ... precio_xp ... ORDER BY precio_xp ASC` -> correcto con numeric; normalizar a `Number` en la respuesta.
+- **L339-344 `parseInt(body.precio_xp, 10)` + mensaje "debe ser un entero mayor que 0" -> `parseFloat` + `redondearXp` + mensaje "mayor que 0"** (permite precio fraccionario, requerido por D2 y por la tienda).
+- L380-385 `editar`: `parseInt(body.precio_xp, 10)` -> `parseFloat` + `redondearXp`.
+- L470 `UPDATE usuarios SET xp_total=xp_total+50` -> correcto (constante entera).
+
+**`api/pagina-destino.js`**
+- L2595 `window.ExploraCO.usuario.xp_total=(parseInt(...)||0)+15` -> `parseFloat` + `redondearXp` (espejo cliente).
+- L2609 idem con `+5`.
+- L101 `money()` es formateo de precio de destino (no XP): sin cambios.
+
+**`usuario-session.js` (fuente de verdad del cliente)**
+- L30 `parseInt(xpTotal) || 0` en `calcularNivel` -> `parseFloat`.
+- **Nuevo helper compartido** `window.ExploraCO.fmtXp(n)` y, si aplica, `window.ExploraCO.redondearXp(n)`; TODAS las superficies deben consumirlo (prohibido `parseInt(u.xp_total)` inline).
+
+**Frontend (formato/parseo de display)**
+- `index.html` L4166/4209-4227 (XP_LEVELS/getLevel/getLevelPct) y `statsU` (parseInt de `xp_total`); `mi-perfil.html` L776/825/834-840; `comunidad.html` L487/533/542-547; `admin.html` L7351 (`_jugNiveles`), L7438-7439 (`xpMin/xpMax`), tab Jugadores. Todos: `parseFloat` + `fmtXp`.
+
+### Formato de presentacion
+
+- `fmtXp(125.5)` -> `"125,50"` (es-CO, 2 decimales, separador de miles `.`).
+- Superficies con sufijo: mostrar `"125,50 XP"` (mantener el literal "XP" donde ya existe).
+- Progreso de nivel (`getLevelPct`): usar el XP real (`parseFloat`); el `Math.round(...*100)` del porcentaje final se conserva (es un porcentaje entero, no XP).
+- El input del admin de `precio_xp` acepta decimales con punto o coma; el backend normaliza.
+
+### Validacion: umbrales de nivel con decimales
+
+1. **Las 20 comparaciones de umbral siguen siendo correctas con decimales.** Los umbrales son enteros `[0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200, 4000, 5200, 6800, 8500, 10500, 13000, 16000, 19500, 24000, 30000]` y para todo `x >= 0` y entero `T` se cumple `floor(x) >= T  <=>  x >= T`. Por tanto, incluso un `parseInt` olvidado NO cambia el nivel asignado (trunca valores como `99.99 -> 99` o `100.50 -> 100`, ambos con el mismo nivel que con el valor completo). La conversion a `parseFloat` es obligatoria por DISPLAY y por AGREGADOS (bonos, fama, `ent()`, reparto), no por el nivel; sirve ademas como blindaje si un umbral futuro deja de ser entero.
+2. **Se confirmo UN unico catalogo de umbrales, replicado identico en 7 lugares** (todos verificados por lectura): `api/usuarios.js:14-35`, `api/interacciones.js:193-196`, `usuario-session.js:22-25`, `index.html:4166-4187`, `mi-perfil.html:776-797`, `comunidad.html:487-508`, `admin.html:7351`. No hay discrepancias de valores.
+3. **FORMULA OCULTA ENCONTRADA (bug preexistente): `api/interacciones.js:5294`** usa `Math.floor(xp_total / 100) + 1` como gate del nivel 2 para `album_crear`. Es una segunda formula de nivel que solo coincide con la tabla real en los umbrales bajos: en 450 XP devuelve 5 (real 4), en 1400 devuelve 15 (real 7), en 30000 devuelve 301 (real 20). Hoy el unico uso es `nivelCalc < 2` (a 100 XP ambas coinciden), por lo que el bug esta latente; **debe corregirse en esta entrega** a `calcularNivelLocal(xpDB).nivel` para no dejar una formula divergente en la misma funcion que migra el XP. Debe registrarse en BUGS_HISTORICOS.md.
+4. **No hay ninguna otra formula de nivel oculta:** `RAMA_TIERS [0,100,250,450,700]`, `FAMA_TIERS` y `_jugNiveles` no son niveles de XP global (son progresiones internas de rama/sendero y el selector del admin) y se conservan enteros, coherentes con la tabla global.
+
+### Riesgos y mitigaciones
+
+| # | Riesgo | Impacto | Mitigacion |
+|---|---|---|---|
+| R1 | `numeric` llega como **string** desde Neon al JSON (driver `pg`) | API emite `"xp_total":"125.50"`; front hace `+` de concatenacion | D5: normalizar en el borde (`conNivel`, maps de `frTop`/`crTop`, `leaderboard`, `?id=`, `perfil_publico`, `museo_publico`, inventario) + helper `fmtXp` en cliente |
+| R2 | Deploy del backend decimal SIN la migracion 021 | Cast integer trunca las fracciones **en silencio** (no hay 500) | Aplicar 021 antes del deploy; verificacion de cierre con `information_schema` (`data_type='numeric'` en las 9) |
+| R3 | `parseInt` olvidado sobre columna XP | Trunca, recomputa porcentajes sobre valores incompletos; no cambia nivel (ver validacion) pero si `D_R`, fama, referidos | Inventario de esta ADR como checklist de cierre + grep de verificacion (`parseInt` + columnas XP) en el Escudo GOLD |
+| R4 | `::int` olvidado en un `SUM(xp_...)` | Redondeo silencioso de sumas (rankings/fama/`D_R`) | Checklist L435/455/478-479/676-677/720/730/823/1993/3266/3274/3296 (+ admin.js L69) |
+| R5 | Redondeo inconsistente entre puntos (JS vs SQL) | Deriva de centavos entre `xp_total` y `xp_ref_total`/fama | Un helper por lenguaje (D2) + regla "redondear en la acreditacion, no en la lectura" |
+| R6 | `usuarios.activo`/`ultimo_acceso` no versionadas (patron BUG-021) | `casa_ranking`/`pandilla_ranking` con 42703 | Reintento sin la condicion de actividad + `warn` + `miembros_activos: 0`; nunca catch vacio; versar columnas en migracion futura |
+| R7 | Guarda `famaBase < 1` recortaba aportes | Parches subcontados | Cambiar a `<= 0` (ver L1863) |
+| R8 | Codigo viejo durante el deploy (mix entero/decimal) | Ventana de minutos con respuestas mixtas | Desplegar backend y frontend juntos; el codigo entero sigue operando (degradado) contra columnas numeric |
+| R9 | Rollback pierde decimales | Datos historicos redondeados | Respaldo opcional de las 9 columnas antes de la 021; rollback solo emergencia |
+| R10 | `xp_ref_total` nullable | `SUM` con NULL | Ya manejado con `COALESCE`; la conversion preserva NULL |
+| R11 | Ranking de Casas pasa de promedio a total: Casas grandes suben | Cambio de expectativa editorial | Decision D4 aprobada; la UI muestra tambien `xp_promedio` para transparencia |
+
+### Impacto
+
+- `db/migrations/021_xp_decimal.sql` (NUEVA, idempotente ADR-008, ASCII-safe ADR-002; 9 columnas -> `numeric(12,2)`; sin indices).
+- `api/usuarios.js` (v14 -> v15: `calcularNivel` parseFloat, `conNivel` normaliza `Number`, `referido_red` sin `::int`, `faccion_ranking` sin `::int` + normalizacion, **`casa_ranking` con `miembros_activos` y `ORDER BY xp_total DESC`**, `perfil_publico` y `casa_elegir` normalizados).
+- `api/interacciones.js` (v14/v17 -> v18: helpers `redondearXp`, `ent` con `parseFloat`, `sqlBonoFila` con `ROUND(...,2)`, `repartirXpReferidos` con `ROUND(...,2)` y `parseFloat`, `xpConMultiplicador` y `aplicarFamaPandilla` con half-up, `xpBaseVisita` half-up, `admin_xp` delta decimal, `comprar_consumible`/`pandilla_reto` decimales, gate `album_crear` con `calcularNivelLocal`, **NUEVA rama `GET tipo=pandilla_ranking`**).
+- `api/admin.js` (`precio_xp` decimal, `repartirXpReferidos` decimal, listado de resenas normalizado).
+- `api/pagina-destino.js` (espejo cliente de XP en foto/voto con decimales).
+- `usuario-session.js` (`calcularNivel` parseFloat + helper `fmtXp`).
+- Frontend: `index.html`, `mi-perfil.html` (pestana "Clase" consolidada: Arbol + vocaciones + Tabla de Destino como "Senderos"; "Mi Casa" compacto), `comunidad.html` (tab Ranking con sub-vistas Viajeros|Casas|Facciones|Parches; Facciones sale de "Activo Oculto"; consumo de `pandilla_ranking`), `admin.html` (input de precio decimal, display XP).
+- `exploraco desarrollo/BUGS_HISTORICOS.md`: registrar la formula de nivel de L5294 y (si aplica) la guarda `famaBase < 1`.
+- **Sin endpoints nuevos** (8/8, ADR-001); sin `tags` JSONB nuevo (no aplica el motor `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` de BLUEPRINT seccion 6, que es para campos de ficha de destino).
+- Verificacion esperada: Escudo GOLD (`node --check` en los 4 `api/*.js` + `usuario-session.js`, ASCII 0 bytes >127, divs balanceados), smoke dedicado (migracion 021 idempotente, `casa_ranking`/`pandilla_ranking`, redondeo half-up, ranking ordenado, `fmtXp`) y prueba en Neon de la conversion (idempotencia: correr la 021 dos veces y confirmar que la segunda es no-op).
+
+### Consecuencias positivas
+
+- La economia deja de perder fracciones: referidos, fama, multiplicadores y descuentos son auditables al centavo.
+- Un unico criterio de redondeo (helper por lenguaje) elimina la causa raiz de la deriva de centavos.
+- Se activa el ranking de Casas (antes sin UI) y nace el ranking global de Parches sin gastar endpoints.
+- Se elimina una formula de nivel divergente (L5294) y se deja el XP con formato consistente en todo el sitio.
+
+### Consecuencias negativas / riesgos residuales
+
+- **Migracion 021 pendiente (BLOQUEANTE):** sin ella el sistema sigue redondeando en silencio; la verificacion de tipo es obligatoria.
+- La conversion reescribe las 9 tablas (`ACCESS EXCLUSIVE` momentaneo por tabla). Con el volumen actual es instantanea; el operador debe aplicarla fuera de pico.
+- `usuario-session.js` es cacheado por el navegador: si el frontend no se despliega junto con el backend, un cliente con `calcularNivel` viejo (`parseInt`) mantiene el nivel correcto (ver validacion) pero muestra XP truncado.
+- Persiste la deuda de columnas no versionadas (`usuarios.activo`, `usuarios.ultimo_acceso`, `interacciones.xp_ganado`), que la 021 mitiga con guards pero no cierra.
+- El rollback es lossy.
+
+**Estado:** Aprobado (diseno). Implementacion pendiente: migracion 021 + backend + frontend, con verificacion en Neon y Escudo GOLD.
+
+**ADRs previos relacionados:** ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-012 (logros en codigo), ADR-014 (x1.1; precedente de numeracion), ADR-018 (moneda unica `xp_total`, consumibles, 20 niveles), ADR-024 (drift de XP sin ledger), ADR-025 (sesion firmada), ADR-027 (piramide de referidos, `fama_total`, topes), ADR-028 (Casas, Arbol, `casa_ranking`, deuda de columnas no versionadas), ADR-029 (conteos reales del admin con `usuarios.activo`), ADR-031 (capa publica), ADR-033 (factor de area por radio), ADR-034 (consecutivo anterior).

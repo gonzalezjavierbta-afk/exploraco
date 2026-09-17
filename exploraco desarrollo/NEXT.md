@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-109 / ADR-035 XP decimal `numeric(12,2)` + pestana "Clase" consolidada + rankings de comunidad (Casas/Facciones/Parches) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 10 archivos de codigo modificados (+700/-282) + 1 migracion nueva + 1 preflight nuevos sin versionar (mas `DECISIONS.md` +249/-1 agregado por architect): `db/migrations/021_xp_decimal.sql` (NUEVA, 121 lineas, idempotente ADR-008, ASCII-safe ADR-002; 9 columnas XP -> `numeric(12,2)` con guard `information_schema`, sin indices) + `scripts/verify_021_precheck.js` (NUEVO, read-only, `MIN/MAX/COUNT`); `api/interacciones.js` (+185/-98; header v18: `red2`/half-up, `parseFloat`/`Number`, rama GET `pandilla_ranking` L4257-4284, gate de `album_crear` con `calcularNivelLocal` L5379, guarda de fama `<= 0` L1880-1881); `api/usuarios.js` (+102/-40; header v15: `casa_ranking` con `miembros_activos` y `ORDER BY xp_total DESC` L510-557, rankings sin `::int`); `comunidad.html` (+195/-43; tab Ranking con 4 sub-vistas Viajeros|Casas|Facciones|Parches L372-386, `setRankingVista` L1661, facciones fuera de "Activo Oculto"); `mi-perfil.html` (+101/-50; tab `clase` con arbol + sub-vista `senderos` + vocaciones inline + Mi Casa compacto); `usuario-session.js` (+39/-19; helper `window.ExploraCO.fmtXp`/`redondearXp` L46-60); `api/admin.js` (+29/-14); `admin.html` (+20/-9); `index.html` (+15/-5); `perfil.html` (+9/-1); `api/pagina-destino.js` (+5/-3; header v10). Presupuesto 8/8 INTACTO (ADR-001). BUG-042 pasa a CORREGIDO y se registra BUG-063 (guarda de fama de Parche); deuda de columnas no versionadas (`usuarios.activo`/`ultimo_acceso`/`interacciones.xp_ganado`) anotada con fallback 42703. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar la migracion 021 en Neon ANTES del deploy del backend; desplegar en 2 releases (backend + 021 primero, frontend despues). Checklist en `docs/DEPLOY_021.md`.**
 - TSK-108 / ADR-034 Ficha de destino: hero de 4 fotos, `destinos.sintro` curada, galeria 1+12 y `galeria.html` con 4 secciones + orden de modulos por hostal (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 6 archivos modificados (+663/-95) + 1 migracion nueva: `api/pagina-destino.js` (+283/-65: hero `HERO_THUMBS_MAX=3`, botonera sin "Ver galeria", `sintro` con fallback, galeria 1+12 con `GAL_THUMBS_MAX=12`/6+6 y `.gal-thumbs` 4/2/1, orden de modulos hostal por `tags.orden_modulos`); `api/interacciones.js` (+46/-0: GET `mapas_de_destino` con `validarSesion` para el viewer); `api/admin-destinos.js` (+19/-3: `sintro` en SELECT/INSERT/UPDATE + `normSintro`); `api/publicar-lugar.js` (+12/-2: `sintro` en el INSERT draft); `admin.html` (+150/-5: `#f-sintro`, `HOSTAL_MODULOS_ORDEN_DEFAULT`, reorden por flechas de modulos hostal + Actividades); `galeria.html` (+153/-20: 4 secciones + bloque de subida + `mapas_de_destino`); NUEVA `db/migrations/020_destinos_sintro.sql` (16 lineas, `ADD COLUMN IF NOT EXISTS sintro TEXT`, idempotente ADR-008, ASCII-safe ADR-002). Presupuesto 8/8 INTACTO (ADR-001). ADR-030 actualizado (hero 12->4, CTA "Ver galeria" retirado solo del hero). BUG-062 DETECTADO/PENDIENTE (fotos Unsplash no recolectadas por `getPhotos()`). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar migracion 020 en Neon + commit/push/deploy de los 6 archivos.**
 - TSK-107 / ADR-031 + ADR-032 + ADR-033 Capa de media del mapa (album de destino + visibilidad publica), guardados de media + area museo del perfil, y radio de verificacion por lugar para "Estuve aqui" (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+591/-53) + 1 migracion nueva: `api/interacciones.js` (+212/-14: fix 503 con `queryConAvatarFallback` en `multimedia_mapa`, fila `origen='destino_album'`, `scope=mio`, GET `mis_fotos`/`mis_guardados_media`, POST `guardar_media`/`quitar_guardado_media`, `factorXpPorRadio`/`resolverRadioM`); `index.html` (+89/-3: toggle "Solo mio"); `index-api-connector.js` (+57/-31: wiring `scope=mio`); `mi-perfil.html` (+109/-0: "Mis fotos" + "Mis guardados"); `perfil.html` (+60/-3: "Sala V: Fotos" publica, sin guardados); `admin.html` (+51/-1: campo `#f-radio-m`); `api/admin-destinos.js` (+16/-3: `radio_m` en POST/PUT); NUEVA `db/migrations/019_media_guardados_radio.sql` (65 lineas: `destinos.radio_m` + CHECK 25..100000 + tabla `media_guardados`). Presupuesto 8/8 INTACTO (ADR-001). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar migracion 019 en Neon + commit/push/deploy + verificacion en vivo de `hostal-r10-bogota`.** BUG-061 sigue ABIERTO.
 - TSK-106 / ADR-030 (actualizado) Capa multimedia, galeria comunidad y galeria hospedajes (2026-09-16, IMPLEMENTADO Y VERIFICADO EN WORKING TREE, SIN commitear) - 5 archivos modificados (+243/-56): filtro opcional `usuario_id` en `GET ?tipo=multimedia_mapa` (RESTRICTIVO, validado por regex uuid) e indices capturados del UNION ALL (`api/interacciones.js` +28/-5); `index-api-connector.js` (+12/-2) sin `origen=album` + `usuario_id` si hay sesion; `index.html` (+30/-6) pines de destino (`#1f8a70` + borde punteado, dedupe por `origen_id`, tope 300); `api/pagina-destino.js` (+12/-5) hero de 12 miniaturas (`HERO_THUMBS_MAX=12`, `slice(1,13)`, `LIMIT` de `destinos_fotos` 12->24, `.prow` grid responsivo 6/4 col); `galeria.html` (+161/-38) grid unico "Fotos del destino" + aviso/input/boton de compartir (se eliminan `gSeedCard` y `#g-dest-usuarios`). P2 OMITIDO; P3 re-alcanzado a `galeria.html` (no `comunidad.html`); H-2 registrado como BUGS_HISTORICOS.md BUG-061 (spoofing de `tipo='foto'`, escalado a `sql-security`); H-3 (`smoke_auditoria_pagina_destino.js` ignora el slug). Presupuesto 8/8 INTACTO. **PENDIENTE: commit/push/deploy (sin mezclar los 3 archivos borrados ajenos a TSK-106).**
@@ -35,6 +36,128 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-109 "XP decimal, pestana Clase y rankings de comunidad" (2026-09-17) - ADR-035
+
+Tarea TSK-109 implementada en working tree (SIN commitear). La decision vive en
+`DECISIONS.md` ADR-035 (redactada por architect como contrato de diseno y NO
+duplicada aqui); la tarea en `TASKS.md` TSK-109; los bugs en
+`BUGS_HISTORICOS.md` BUG-042 (CORREGIDO) y BUG-063 (NUEVO, CORREGIDO). NO hay
+archivos nuevos en `api/` (8/8 intacto, ADR-001); SI hay una migracion nueva
+(`db/migrations/021_xp_decimal.sql`, sin versionar), un preflight
+(`scripts/verify_021_precheck.js`, sin versionar) y un checklist de despliegue
+nuevo (`docs/DEPLOY_021.md`).
+
+**Cambios (verificados contra archivo real, ADR-006; `git diff --numstat` = 10
+archivos de codigo, +700/-282; `DECISIONS.md` +249/-1 lo agrego architect):**
+- `api/interacciones.js` (+185/-98; header `v18`): helper de redondeo half-up a
+  2 decimales, `parseFloat`/`Number` sobre columnas XP (sin `::int` en las
+  sumas), NUEVA rama `GET tipo=pandilla_ranking` global por `fama_total DESC`
+  con `miembros`/`miembros_activos` y fallback `42703` (L4257-4284); gate de
+  `album_crear` con `calcularNivelLocal(...).nivel` (L5379; cierra BUG-042);
+  guarda de fama `famaBase <= 0` (L1880-1881; cierra BUG-063).
+- `api/usuarios.js` (+102/-40; header `v15`): `calcularNivel`/`conNivel`
+  normalizan a `Number` redondeado; `casa_ranking` agrega `miembros_activos`
+  (activo=true AND `ultimo_acceso > NOW() - 30 days`) y pasa a
+  `ORDER BY xp_total DESC` (L510-557), con el mismo fallback `42703`; rankings
+  sin `::int`.
+- `comunidad.html` (+195/-43): tab Ranking con 4 sub-vistas (Viajeros | Casas |
+  Facciones | Parches; `rk-chip` L372-386 y `setRankingVista` L1661); consume
+  `casa_ranking` (L1579) y `pandilla_ranking` (L1613); el ranking de Facciones
+  sale de "Activo Oculto" (`verRankingFacciones` L2144-2146 deja un CTA).
+- `mi-perfil.html` (+101/-50): pestana "Clase" consolidada -- el Arbol de
+  Clases es el componente unico (tab `clase` L463); "Tabla de Destino" pasa a
+  sub-vista `senderos` (L2621-2622, L2707-2708); "Tu Faccion" pasa a cabecera
+  del arbol; "Vocaciones de Artista" se integra en la sub-vista de la faccion
+  `artistas` con boton inline "Activar vocacion" (L2859); "Mi Casa" queda como
+  bloque compacto (L698-699). IDs/funciones conservados para no romper smokes.
+- `usuario-session.js` (+39/-19): helper canonico
+  `window.ExploraCO.fmtXp`/`redondearXp` (L46-60; `es-CO`, 2 decimales,
+  `Number.EPSILON`) y acreditaciones en cliente normalizadas.
+- `api/admin.js` (+29/-14): `precio_xp` acepta decimales (`parseFloat` +
+  redondeo; ya no exige entero); listado de resenas normalizado;
+  `repartirXpReferidos` sincronizado con el de `interacciones.js`.
+- `admin.html` (+20/-9): display de XP con `fmtXp` y precio decimal en la
+  tienda.
+- `index.html` (+15/-5): `getLevel`/`statsU` con `parseFloat` + `fmtXp`
+  (fallback local L4233-4234).
+- `perfil.html` (+9/-1): XP del museo publico normalizado.
+- `api/pagina-destino.js` (+5/-3; header `v10`): el espejo cliente de
+  `xp_total` al publicar/votar foto usa `Number` (no `parseInt`).
+- NUEVOS sin versionar: `db/migrations/021_xp_decimal.sql` (121 lineas,
+  idempotente ADR-008, ASCII-safe ADR-002; 9 columnas XP -> `numeric(12,2)`
+  con guard `information_schema`, sin indices) y
+  `scripts/verify_021_precheck.js` (149 lineas, read-only).
+
+**Decisiones de producto:** ADR-035 fija el almacenamiento `numeric(12,2)`
+(no centi-XP ni `float8`), un unico helper de redondeo half-up por lenguaje,
+la pestana "Clase" consolidada, los 4 rankings de comunidad y la prohibicion
+de `::int`/`parseInt` sobre columnas XP. La conversion es exacta
+(`int4 -> numeric(12,2)`), por lo que no hay backfill; `pandillas.fama_total`
+NO se recomputa (solo cambia de tipo).
+
+**Verificacion (ADR-006, ejecutada en esta sesion documental el 2026-09-17):**
+`node --check` 6/6 OK (`api/usuarios.js`, `api/interacciones.js`,
+`api/admin.js`, `api/pagina-destino.js`, `usuario-session.js`,
+`scripts/verify_021_precheck.js`); ASCII-safe 0 bytes >127 y 0 backticks en
+los 4 `api/*.js`, la migracion 021 y el preflight; `smoke_test_gamificacion_v4.js`
+95/95 PASS; `smoke_test_comunidad.js`, `smoke_test_perfil_progreso.js`,
+`smoke_test_milestones_v2.js` OK; `scripts/check_buildHTML_inline.js` TODO OK
+(divs 361/361). `smoke_test_epic_prompt.js` mantiene 4 FAIL PRE-EXISTENTES
+(53 checks, 49 PASS; VOCACIONES 3 vs 4 y `chat_salas` tipo plan) ajenos a esta
+entrega.
+
+#### Que sigue
+1. **APLICAR `db/migrations/021_xp_decimal.sql` EN NEON (BLOQUEANTE, lo ejecuta
+   Javier, ANTES del deploy del backend).** Preflight opcional read-only:
+   `$env:DATABASE_URL="postgresql://..."; node scripts/verify_021_precheck.js`
+   (falla si falta una columna obligatoria; `interacciones.xp_ganado` es
+   opcional). Correr el archivo COMPLETO en el editor SQL de Neon y verificar
+   `data_type='numeric'`, `numeric_precision=12` y `numeric_scale=2` en las 9
+   columnas (bloque comentado al final del `.sql`), incluyendo `MIN`/`MAX` por
+   columna para confirmar que los valores historicos se conservaron.
+2. **Deploy en 2 releases, en este orden (ver `docs/DEPLOY_021.md`):**
+   (a) aplicar la 021 en Neon; (b) deploy del BACKEND
+   (`api/usuarios.js` v15, `api/interacciones.js` v18, `api/admin.js`,
+   `api/pagina-destino.js` v10) con `usuario-session.js`; (c) smoke en vivo
+   contra la API real; (d) deploy del FRONTEND (`index.html`, `admin.html`,
+   `perfil.html`, `mi-perfil.html`, `comunidad.html`). Si el backend decimal
+   se despliega SIN la 021, Postgres redondea por cast de asignacion en
+   silencio (no hay 500): el sintoma es que el XP sigue entero.
+3. **Verificacion en vivo sugerida:** elegir faccion y Casa desde
+   `mi-perfil.html`; abrir el tab Ranking de `comunidad.html` y comprobar las
+   4 sub-vistas (Casas con XP total, activos y promedio; Parches con
+   `fama_total` y miembros activos; Facciones ya no vive en "Activo Oculto");
+   provocar un XP con decimales (ej. un bono con multiplicador) y ver que se
+   muestre "125,50 XP" y no "125,5" ni 125 truncado.
+4. **Backlog:** indices de apoyo para los rankings; normalizar
+   `api/pagina-destino.js` si quedara algun espejo de XP; fusionar
+   `repartirXpReferidos` duplicado (`api/interacciones.js` y `api/admin.js`) si
+   se decide; resolver el drift de `smoke_test_epic_prompt.js`; versar las
+   columnas no versionadas (`usuarios.activo`, `usuarios.ultimo_acceso`,
+   `interacciones.xp_ganado`).
+5. **Commit + push:** los 10 archivos de codigo + `DECISIONS.md` + la migracion
+   021 + el preflight + el spec
+   (`docs/superpowers/specs/2026-09-17-xp-decimal-rankings-comunidad-design.md`)
+   en un release coherente. NO mezclar los 3 archivos borrados ajenos
+   (`PROMPT.md`, `prompt_exploraco_tsk104.md`, `promptarreglos.txt`).
+
+#### Riesgos activos
+- **Migracion 021 pendiente (BLOQUEANTE):** sin ella el backend decimal
+  redondea en silencio contra columnas `integer`; no hay error visible.
+- **Orden de deploy invertido:** desplegar el frontend antes que el backend deja
+  una ventana con formatos mixtos; el ADR exige backend+021 primero.
+- **Rollback LOSSY:** `numeric(12,2) -> integer USING ROUND(col)` es exacto
+  mientras no haya decimales acumulados y pierde las centesimas despues;
+  respaldo opcional de las 9 columnas antes de la 021.
+- **Deuda de columnas no versionadas (patron BUG-021):** los rankings dependen
+  de `usuarios.activo`/`usuarios.ultimo_acceso`; la 021 los cubre con guard y el
+  fallback `42703` responde `miembros_activos=0` con `warn` (nunca catch vacio).
+- **Drift de `smoke_test_epic_prompt.js` (4 FAIL pre-existentes):** deuda QA no
+  atribuible a esta entrega.
+- **ADR-035 declara "NO implementado aun" en su Estado:** drift documental (el
+  ADR se redacto como contrato antes de implementar); HOY el estado real es
+  implementado en working tree.
 
 ### Sesion TSK-108 "Ficha de destino: hero, sintro, galeria y orden de modulos" (2026-09-17) - ADR-034
 

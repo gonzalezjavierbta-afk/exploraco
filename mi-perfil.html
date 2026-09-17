@@ -351,6 +351,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 @keyframes arbolPulso{0%,100%{opacity:.22}50%{opacity:.85}}
 @media (max-width:600px){.arbol-clases .arbol-ramas{grid-template-columns:repeat(2,1fr)}.arbol-clases .arbol-tabs{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:reduce){.arbol-clases .arbol-halo{animation:none}}
+.arbol-clases .arbol-fac{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.arbol-clases .arbol-fac-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
+.arbol-clases .arbol-facc-panel{margin-bottom:12px}
+.arbol-clases .arbol-voc{margin-top:14px;border-top:1px solid rgba(255,255,255,.07);padding-top:12px}
 /* ---- WP-5 (TSK-103 / ADR-028): ADMINISTRADOR DE PERFIL POR PESTANAS ----
    Silos atomicos: .pf-tabs, .pf-datos, .pf-completa, .pf-casa,
    .pf-museo-preview y .pf-cuenta (Regla de Oro 4 / ADR-004). */
@@ -511,12 +515,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-counter" id="pf-trofeos-count" data-tab="museo">0 / 19</div>
   <div class="trofeo-grid" id="pf-trofeos" data-tab="museo"></div>
 
-  <!-- TABLA DE DESTINO (Milestones v2: Albion) -->
-  <div class="pf-section-title" data-tab="clase">🕸️ Tabla de Destino</div>
-  <div class="td-wrap" id="pf-tabla" data-tab="clase">
-    <div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando senderos…</div>
-  </div>
-
   <!-- TIENDA DE CONSUMIBLES (Gamificacion v4) -->
   <div class="pf-section-title" data-tab="inventario">&#x1F6D2; Tienda de Consumibles</div>
   <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP disponibles</div>
@@ -531,13 +529,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F3AB; Mis Cromos</div>
   <div class="pf-counter" id="pf-cromos-count" data-tab="inventario">0 cromos</div>
   <div class="cromo-grid" id="pf-cromos" data-tab="inventario"></div>
-
-  <!-- VOCACIONES DE ARTISTA -->
-  <div class="pf-section-title" style="margin-top:22px;" data-tab="clase">&#x1F3A4; Vocaciones de Artista</div>
-  <div class="pf-counter" data-tab="clase" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Desbloquea tu lado creativo: activa una vocacion para presumirla en tu vitrina (puedes tener varias activas).</div>
-  <div class="voc-grid" id="pf-vocaciones-grid" data-tab="clase"></div>
-  <!-- Caminos de artista (Gaming v5.0 / ADR-026) -->
-  <div id="pf-voc-misiones" data-tab="clase"></div>
 
   <!-- MIS ALBUMES (ADR-017) -->
   <div class="pf-section-title" data-tab="museo">&#x1F5BC; Mis Albumes</div>
@@ -703,9 +694,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div data-tab="red" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Comparte tu QR, tu codigo o tu enlace completo. Ganas XP por cada nivel de tu red: 10 / 5 / 3 / 2 / 1%.</div>
   <div id="pf-referidos" data-tab="red"></div>
 
-  <!-- GAMING V5.0: TU FACCION -->
-  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3C6; Tu Faccion</div>
-  <div id="pf-facciones" data-tab="clase"></div>
   <!-- WP-5: Casa (identidad de equipo: Condor / Jaguar / Delfin) -->
   <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3E0; Mi Casa</div>
   <div class="pf-casa" id="pf-casa" data-tab="clase"></div>
@@ -822,7 +810,7 @@ function sesion() { return (window.ExploraCO && window.ExploraCO.usuario) || nul
 function statsU() {
   var u = sesion();
   return {
-    xp:      u ? (parseInt(u.xp_total,10)      || 0) : 0,
+    xp:      u ? (Number(u.xp_total)           || 0) : 0,
     saved:   u ? (parseInt(u.total_guardados,10) || 0) : Math.max(0, mmSaved.length),
     visited: u ? (parseInt(u.total_visitas,10)  || 0) : Math.max(0, mmVisited.length),
     reviews: u ? (parseInt(u.total_resenas,10)  || 0) : 0,
@@ -843,6 +831,10 @@ function getLevelPct(xp) {
 function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
 function setStyle(id,prop,val){var e=document.getElementById(id);if(e)e.style[prop]=val;}
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'';}
+/* XP decimal (numeric(12,2)): un solo formateador de 2 decimales.
+   Usa window.ExploraCO.fmtXp (usuario-session.js) y cae a un fallback
+   local minimo si el orden de carga aun no lo expone. */
+function fmtXp(n){ var f=(window.ExploraCO && window.ExploraCO.fmtXp); return f ? f(n) : (isFinite(Number(n)) ? Number(n) : 0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
 /* ---- GATE ---- */
 function checkGate() {
@@ -906,11 +898,11 @@ function renderPerfil() {
   setText('pf-email', email);
   setText('pf-level', lvl.emoji + ' ' + lvl.nombre);
   setStyle('pf-xp-fill','width', pct+'%');
-  setText('pf-xp-cur', st.xp + ' XP');
-  setText('pf-xp-next', 'Siguiente: ' + next.min + ' XP');
+  setText('pf-xp-cur', fmtXp(st.xp) + ' XP');
+  setText('pf-xp-next', 'Siguiente: ' + fmtXp(next.min) + ' XP');
 
   /* stats */
-  setText('pf-xp-n', st.xp);
+  setText('pf-xp-n', fmtXp(st.xp));
   setText('pf-saved-n', st.saved);
   setText('pf-visited-n', st.visited);
   setText('pf-reviews-n', st.reviews);
@@ -992,14 +984,14 @@ function renderNiveles(st) {
     if(actual) badgeHtml = '<span class="nivel-badge">NIVEL ACTUAL</span>';
     else if(desbloqueado) badgeHtml = '<span class="nivel-badge unlocked">\u2713</span>';
     else badgeHtml = '<span class="nivel-badge locked">\uD83D\uDD12</span>';
-    var rangeMax = l.max >= 99999 ? '\u221E' : l.max;
+    var rangeMax = l.max >= 99999 ? '\u221E' : fmtXp(l.max);
     return '<div class="nivel-item' + cls + '">'
       + '<span class="nivel-num">' + (idx + 1) + '</span>'
       + '<span class="nivel-emoji">' + l.emoji + '</span>'
       + '<div class="nivel-body">'
         + '<div class="nivel-nombre">' + l.nombre + '</div>'
         + '<div class="nivel-era">' + (l.era || '') + '</div>'
-        + '<div class="nivel-meta">Umbral: ' + l.min + ' \u2013 ' + rangeMax + ' XP</div>'
+        + '<div class="nivel-meta">Umbral: ' + fmtXp(l.min) + ' \u2013 ' + rangeMax + ' XP</div>'
         + (l.capacidades ? '<div class="nivel-cap">' + l.capacidades + '</div>' : '')
       + '</div>'
       + badgeHtml
@@ -1056,7 +1048,7 @@ function cargarMisiones(uid) {
           +'<div class="mis-nombre">'+m.nombre+'</div>'
           +'<div class="mis-meta">'+grupoNombre(m.grupo)+' · '+estadoTxt+(reqsTxt?' · '+reqsTxt:'')+'</div>'
           +'</div>'
-          +'<div class="mis-xp">+'+(m.xp||0)+' XP</div>'
+          +'<div class="mis-xp">+'+fmtXp(m.xp)+' XP</div>'
           +'</div>';
       }).join('');
     })
@@ -1136,7 +1128,7 @@ function renderTablaSVG(wrap, senderos) {
     var lvl = (s.sendero && s.sendero.nivel) || 1;
     svg += '<line x1="' + cx + '" y1="' + (top + rowH - nodeR) + '" x2="' + cx + '" y2="' + (top + 4 * rowH + nodeR) + '" stroke="rgba(255,255,255,.12)" stroke-width="2"/>';
     svg += '<text class="td-path-label" x="' + cx + '" y="' + (top - 18) + '" text-anchor="middle" font-size="15">' + s.emoji + ' ' + s.nombre + '</text>';
-    svg += '<text class="td-path-sub" x="' + cx + '" y="' + (top - 4) + '" text-anchor="middle">' + s.fama + ' fama</text>';
+    svg += '<text class="td-path-sub" x="' + cx + '" y="' + (top - 4) + '" text-anchor="middle">' + fmtXp(s.fama) + ' fama</text>';
     for (var t = 0; t < 5; t++) {
       var y = top + t * rowH;
       var on = (t + 1) <= lvl;
@@ -1149,7 +1141,7 @@ function renderTablaSVG(wrap, senderos) {
   svg += '</svg>';
   var legend = '<div class="td-legend">'
     + senderos.map(function(s, c){
-        return '<span><span style="width:9px;height:9px;border-radius:50%;background:' + TD_COLORS[c % TD_COLORS.length] + '"></span>' + s.nombre + ': ' + s.fama + ' fama · Nivel ' + ((s.sendero && s.sendero.nivel) || 1) + '</span>';
+        return '<span><span style="width:9px;height:9px;border-radius:50%;background:' + TD_COLORS[c % TD_COLORS.length] + '"></span>' + s.nombre + ': ' + fmtXp(s.fama) + ' fama · Nivel ' + ((s.sendero && s.sendero.nivel) || 1) + '</span>';
       }).join('')
     + '</div>';
   wrap.innerHTML = svg + legend;
@@ -1401,7 +1393,7 @@ function cargarTienda(uid) {
   if(!grid) return;
   renderTiendaChips();
   var st = statsU();
-  if(balance) balance.textContent = st.xp + ' XP disponibles';
+  if(balance) balance.textContent = fmtXp(st.xp) + ' XP disponibles';
   grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando tienda\u2026</div>';
   var url = '/api/interacciones?tipo=consumibles';
   if (PF_TIENDA_CAT !== 'todos') url += '&categoria=' + encodeURIComponent(PF_TIENDA_CAT);
@@ -1419,11 +1411,11 @@ function cargarTienda(uid) {
       grid.innerHTML = list.map(function(c){
         var canBuy = st.xp >= c.precio_xp;
         var faltan = canBuy ? 0 : (c.precio_xp - st.xp);
-        var tipAttr = canBuy ? '' : ' title="Te faltan ' + faltan + ' XP"';
+        var tipAttr = canBuy ? '' : ' title="Te faltan ' + fmtXp(faltan) + ' XP"';
         return '<div class="store-card">'
           + '<div class="store-name">' + esc(c.nombre) + '</div>'
           + '<div class="store-desc">' + esc(c.descripcion) + '</div>'
-          + '<div class="store-price">' + c.precio_xp + ' XP</div>'
+          + '<div class="store-price">' + fmtXp(c.precio_xp) + ' XP</div>'
           + '<button class="store-buy"' + (canBuy ? '' : ' disabled') + tipAttr + ' onclick="comprarConsumible(\'' + esc(c.clave) + '\',this)">Comprar</button>'
           + '</div>';
       }).join('');
@@ -1480,7 +1472,7 @@ function cargarInventario(uid) {
     .then(function(r){ return r.json(); })
     .then(function(res){
       var data = (res && res.data) || {};
-      if(data.xp_total != null && balance) balance.textContent = data.xp_total + ' XP disponibles';
+      if(data.xp_total != null && balance) balance.textContent = fmtXp(data.xp_total) + ' XP disponibles';
       var consumibles = data.consumibles || {};
       var claves = Object.keys(consumibles).filter(function(k){
         var item = consumibles[k] || {};
@@ -2120,7 +2112,7 @@ function agregarFotoAlbum() {
       document.getElementById('album-nueva-foto-url').value = '';
       document.getElementById('album-nueva-foto-titulo').value = '';
       document.getElementById('album-nueva-foto-fuente').value = '';
-      showToast('Foto agregada (+' + (res.xp || 15) + ' XP)');
+      showToast('Foto agregada (+' + fmtXp(res.xp || 15) + ' XP)');
       if (res.misiones && res.misiones.length) {
         res.misiones.forEach(function(m){ showToast('Mision completada: ' + m.nombre); });
       }
@@ -2400,7 +2392,7 @@ function pintarMiRed(c, red) {
 
   html += '<div class="ref-stats">'
     + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.referidos_directos_contados, 10) || 0) + '</div><div class="ref-stat-l">Directos</div></div>'
-    + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.xp_ref_total, 10) || 0) + '</div><div class="ref-stat-l">XP por red</div></div>'
+    + '<div class="ref-stat"><div class="ref-stat-n">' + fmtXp(c.xp_ref_total) + '</div><div class="ref-stat-l">XP por red</div></div>'
     + '<div class="ref-stat"><div class="ref-stat-n">' + (parseInt(c.referidos_dia_actual, 10) || 0) + '</div><div class="ref-stat-l">Hoy</div></div>'
     + '</div>';
 
@@ -2416,7 +2408,7 @@ function pintarMiRed(c, red) {
         + '<div class="ref-net-num">' + (parseInt(nv.cantidad, 10) || 0) + '</div>'
         + '<div class="ref-net-label">Nivel ' + nivel + '</div>'
         + (pct ? '<div class="ref-net-pct">' + pct + '</div>' : '')
-        + '<div class="ref-net-xp">+' + (parseInt(nv.xp_ref, 10) || 0) + ' XP</div>'
+        + '<div class="ref-net-xp">+' + fmtXp(nv.xp_ref) + ' XP</div>'
         + '</div>';
     }
     html += '</div>';
@@ -2557,7 +2549,7 @@ function cargarMisionesArtista(uid) {
           + '<div class="mis-nombre">' + esc(m.nombre || m.id) + '</div>'
           + '<div class="mis-meta">Artista · ' + estadoTxt + reqsTxt + '</div>'
           + '</div>'
-          + '<div class="mis-xp">+' + (m.xp || 0) + ' XP</div>'
+          + '<div class="mis-xp">+' + fmtXp(m.xp) + ' XP</div>'
           + '</div>';
       }).join('');
       con.innerHTML = html;
@@ -2605,9 +2597,9 @@ var ARBOL_ICONOS = {
 /* art_* espeja usuarios.vocaciones (fuente unica, ADR-026). Mapa exacto del
    backend; el fuzzy queda solo como red de seguridad. */
 var ARBOL_VOCACION_POR_RAMA = { art_musica:'musico', art_cine:'cine', art_grafica:'artista_grafico', art_literatura:'escritor' };
-var ARBOL_ESTADO = { uid:'', faccion:'', tab:'', catalogo:null, catPromesa:null, ramas:{}, activas:{}, bono:0, tip:{}, tipOpen:'' };
+var ARBOL_ESTADO = { uid:'', faccion:'', tab:'', catalogo:null, catPromesa:null, ramas:{}, activas:{}, bono:0, tip:{}, tipOpen:'', faccOpen:false };
 
-function arbolNum(n) { return (parseInt(n, 10) || 0).toLocaleString('es-CO'); }
+function arbolNum(n) { return fmtXp(n); }
 function arbolInsigniaKey(insignia) {
   var k = String(insignia || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (ARBOL_ICONOS[k]) return k;
@@ -2626,6 +2618,8 @@ function arbolEfectoTexto(ef) {
 }
 function arbolFacMeta(id) {
   var k = String(id || '').toLowerCase();
+  /* Pseudo-tab interno del componente: la Tabla de Destino (senderos). */
+  if (k === 'senderos') return { id:'senderos', nombre:'Tabla de Destino', emoji:'\uD83D\uDD78\uFE0F', color:'#A855F7', desc:'' };
   for (var i = 0; i < FACCION_META.length; i++) if (FACCION_META[i].id === k) return FACCION_META[i];
   return { id:k, nombre:(k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Faccion'), emoji:'\u2694\uFE0F', color:'#E8A020', desc:'' };
 }
@@ -2651,7 +2645,7 @@ function arbolVocacionDe(ramaId) {
 function arbolUmbrales(nodosCat) {
   var out = [];
   (nodosCat || []).forEach(function (nd, i) {
-    var p = parseInt(nd && nd.puntos, 10);
+    var p = parseFloat(nd && nd.puntos);
     out.push(isNaN(p) ? (ARBOL_UMBRALES[i] != null ? ARBOL_UMBRALES[i] : 0) : p);
   });
   return out.length ? out : ARBOL_UMBRALES.slice(0);
@@ -2710,6 +2704,8 @@ function arbolFaccionesDisponibles() {
   function tiene(f) { return cat.some(function (r) { return String(r.faccion || '').toLowerCase() === f; }); }
   ARBOL_FACCIONES.forEach(function (f) { if (tiene(f)) out.push(f); });
   cat.forEach(function (r) { var f = String(r.faccion || '').toLowerCase(); if (f && out.indexOf(f) < 0) out.push(f); });
+  /* Sub-vista "senderos" (Tabla de Destino): ultimo pseudo-tab del arbol. */
+  if (out.indexOf('senderos') < 0) out.push('senderos');
   return out;
 }
 function arbolRamasDeFaccion(f) {
@@ -2785,6 +2781,34 @@ function arbolInit() {
     arbolTipCerrar();
   });
 }
+/* Cabecera del arbol: chip de la faccion actual + panel colapsable que
+   reutiliza cargarFacciones/elegirFaccion (sin duplicar el render). */
+function arbolFaccionHeaderHtml() {
+  var m = ARBOL_ESTADO.faccion ? arbolFacMeta(ARBOL_ESTADO.faccion) : null;
+  var chip = m
+    ? '<span class="arbol-fac-chip" style="border-color:' + esc(m.color) + '">' + m.emoji + ' ' + esc(m.nombre) + '</span>'
+    : '<span class="arbol-fac-chip" style="opacity:.65">Sin faccion</span>';
+  return '<div class="arbol-fac">' + chip
+    + '<button type="button" class="arbol-btn" onclick="arbolFaccionToggle()">' + (m ? 'Cambiar faccion' : 'Elegir faccion') + '</button>'
+    + '</div>'
+    + '<div class="arbol-facc-panel" id="arbol-facc-panel" style="display:' + (ARBOL_ESTADO.faccOpen ? 'block' : 'none') + '">'
+    + '<div id="pf-facciones"></div></div>';
+}
+function arbolFaccionCargar() {
+  if (ARBOL_ESTADO.uid) cargarFacciones(ARBOL_ESTADO.uid);
+}
+function arbolFaccionToggle() {
+  ARBOL_ESTADO.faccOpen = !ARBOL_ESTADO.faccOpen;
+  var p = document.getElementById('arbol-facc-panel');
+  if (p) p.style.display = ARBOL_ESTADO.faccOpen ? 'block' : 'none';
+  if (ARBOL_ESTADO.faccOpen) arbolFaccionCargar();
+}
+function arbolFaccionAbrir() {
+  ARBOL_ESTADO.faccOpen = true;
+  var p = document.getElementById('arbol-facc-panel');
+  if (p) p.style.display = 'block';
+  arbolFaccionCargar();
+}
 function arbolTabsHtml(facciones) {
   var h = '<div class="arbol-tabs" role="tablist">';
   facciones.forEach(function (f) {
@@ -2827,7 +2851,15 @@ function arbolProgHtml(puntos, nodosCat, desbloq) {
 }
 function arbolRamaAccionHtml(id, activa) {
   if (activa) return '<div class="arbol-estado on">\u2713 Rama activa</div>';
-  if (arbolEsRamaArtista(id)) return '<div class="arbol-estado">Se activa con tu vocacion de artista</div>';
+  if (arbolEsRamaArtista(id)) {
+    /* El backend marca el vinculo rama<-vocacion (ADR-026). Si existe y el
+       nivel alcanza, se ofrece activarla reutilizando activarVocacion. */
+    var vid = arbolVocacionDe(id);
+    if (vid && arbolNivel5()) {
+      return '<button type="button" class="arbol-btn" onclick="activarVocacion(\'' + esc(vid) + '\',this)">Activar vocacion</button>';
+    }
+    return '<div class="arbol-estado">Se activa con tu vocacion de artista</div>';
+  }
   if (!arbolNivel5()) return '<div class="arbol-estado">Nivel 5 para activar</div>';
   return '<button type="button" class="arbol-btn" onclick="arbolActivarRama(\'' + esc(id) + '\',this)">Activar rama</button>';
 }
@@ -2835,11 +2867,11 @@ function arbolRamaHtml(catRama) {
   var id = String(catRama.id || '');
   var ur = ARBOL_ESTADO.ramas[id] || {};
   var nodosCat = Array.isArray(catRama.nodos) ? catRama.nodos : [];
-  var puntos = parseInt(ur.puntos, 10) || 0;
+  var puntos = parseFloat(ur.puntos) || 0;
   var desbloq = arbolDesbloq(puntos, nodosCat, ur);
   var activa = arbolRamaActiva(id, ur);
   var meta = desbloq + ' / ' + (arbolUmbrales(nodosCat).length) + ' nodos';
-  if (parseInt(ur.bono, 10) > 0) meta += ' \u00B7 bono +' + arbolNum(ur.bono);
+  if (parseFloat(ur.bono) > 0) meta += ' \u00B7 bono +' + arbolNum(ur.bono);
   var h = '<div class="arbol-rama' + (activa ? ' activa' : '') + '">';
   h += '<div class="arbol-rama-nombre">' + (catRama.emoji ? '<span class="arbol-rama-emoji">' + catRama.emoji + '</span>' : '') + esc(catRama.nombre || id) + '</div>';
   h += arbolColumnaSVG(id, nodosCat, puntos, desbloq, catRama.fuente);
@@ -2848,17 +2880,31 @@ function arbolRamaHtml(catRama) {
   h += arbolRamaAccionHtml(id, activa);
   return h + '</div>';
 }
-function arbolPanelHtml(faccion) {
-  var ramas = arbolRamasDeFaccion(faccion), m = arbolFacMeta(faccion);
-  if (!ramas.length) return '<div class="arbol-nota">Esta faccion aun no publica sus ramas.</div>';
-  var h = m.desc ? '<div class="arbol-nota">' + esc(m.desc) + '</div>' : '';
-  h += '<div class="arbol-ramas">';
-  ramas.forEach(function (r) { h += arbolRamaHtml(r); });
-  return h + '</div>';
+function arbolVocacionesHtml() {
+  return '<div class="arbol-voc">'
+    + '<div class="arbol-bono-txt">\uD83C\uDFA4 Vocaciones de artista</div>'
+    + '<div class="voc-grid" id="pf-vocaciones-grid"></div>'
+    + '<div id="pf-voc-misiones"></div>'
+    + '</div>';
 }
-function arbolVacioHtml() {
-  return '<div class="arbol-nota" style="border:1px dashed rgba(232,160,32,.3);border-radius:10px;padding:22px;">'
-    + '\u2694\uFE0F El Arbol de Clases se abrira al conectar con el servidor. Sigue explorando mientras tanto.</div>';
+function arbolPanelHtml(faccion) {
+  /* Sub-vista senderos: la Tabla de Destino vive dentro del componente. */
+  if (faccion === 'senderos') {
+    return '<div class="arbol-nota">Tus senderos de especializacion: guarda, visita y resena para subir cada camino.</div>'
+      + '<div id="pf-tabla" class="td-wrap"></div>';
+  }
+  var ramas = arbolRamasDeFaccion(faccion), m = arbolFacMeta(faccion);
+  var h = m.desc ? '<div class="arbol-nota">' + esc(m.desc) + '</div>' : '';
+  if (!ramas.length) {
+    h += '<div class="arbol-nota">Esta faccion aun no publica sus ramas.</div>';
+  } else {
+    h += '<div class="arbol-ramas">';
+    ramas.forEach(function (r) { h += arbolRamaHtml(r); });
+    h += '</div>';
+  }
+  /* La faccion artistas integra ademas vocaciones y caminos de artista. */
+  if (faccion === 'artistas') h += arbolVocacionesHtml();
+  return h;
 }
 function arbolPintar() {
   var host = document.getElementById('arbol-clases');
@@ -2866,12 +2912,15 @@ function arbolPintar() {
   var facciones = arbolFaccionesDisponibles();
   ARBOL_ESTADO.tip = {};
   ARBOL_ESTADO.tipOpen = '';
-  if (!facciones.length) { host.innerHTML = arbolVacioHtml(); return; }
   if (facciones.indexOf(ARBOL_ESTADO.tab) < 0) {
     ARBOL_ESTADO.tab = (ARBOL_ESTADO.faccion && facciones.indexOf(ARBOL_ESTADO.faccion) >= 0) ? ARBOL_ESTADO.faccion : facciones[0];
   }
-  host.innerHTML = arbolTabsHtml(facciones) + arbolBonoHtml() + arbolPanelHtml(ARBOL_ESTADO.tab)
+  host.innerHTML = arbolFaccionHeaderHtml() + arbolTabsHtml(facciones) + arbolBonoHtml() + arbolPanelHtml(ARBOL_ESTADO.tab)
     + '<div class="arbol-tip" id="arbol-tip" role="status" aria-live="polite"></div>';
+  /* Las sub-vistas pintan contenedores que se recargan aqui mismo. */
+  if (ARBOL_ESTADO.faccOpen) arbolFaccionCargar();
+  if (ARBOL_ESTADO.tab === 'senderos') cargarTablaDestino(ARBOL_ESTADO.uid);
+  if (ARBOL_ESTADO.tab === 'artistas') { cargarVocaciones(ARBOL_ESTADO.uid); cargarMisionesArtista(ARBOL_ESTADO.uid); }
 }
 function cargarArbolClases(uid) {
   var host = document.getElementById('arbol-clases');
@@ -3279,6 +3328,8 @@ function pfTab(tab) {
 }
 function pfIr(tab, targetId) {
   pfTab(tab);
+  /* La faccion vive ahora dentro del arbol: abre su panel antes de saltar. */
+  if (targetId === 'pf-facciones' && typeof arbolFaccionAbrir === 'function') arbolFaccionAbrir();
   var el = targetId ? document.getElementById(targetId) : null;
   if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -3332,7 +3383,7 @@ function cargarCompletitudPerfil(uid) {
         html += '<div class="pf-comp-item' + (done ? ' done' : '') + '">'
           + '<span class="pf-comp-tick">' + (done ? '\u2713' : '\u25CB') + '</span>'
           + '<span class="pf-comp-nombre">' + esc(m.nombre || id) + '</span>'
-          + '<span class="pf-comp-xp">+' + (m.xp || 0) + ' XP</span>'
+          + '<span class="pf-comp-xp">+' + fmtXp(m.xp) + ' XP</span>'
           + (done
               ? '<span class="pf-comp-ok">Listo</span>'
               : '<button type="button" class="pf-comp-btn" onclick="pfIr(\'' + dest.tab + '\',\'' + dest.target + '\')">' + dest.cta + '</button>')

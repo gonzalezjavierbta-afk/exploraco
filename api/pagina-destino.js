@@ -1,5 +1,7 @@
-// api/pagina-destino.js -- v9.20260702
+// api/pagina-destino.js -- v10.20260917
 // CAMBIOS: diseno premium Barlow Condensed, seccion sitio turistico, tags JSONB, sin backticks
+// v10 (ADR-035): el espejo cliente de xp_total al publicar/votar foto usa
+// Number (no parseInt) para no truncar los decimales del XP.
 
 // Sistema de diseno: Barlow Condensed + Outfit, paleta dorada/negra editorial
 // 100% basado en datos reales del formulario publicar.html y schema Neon
@@ -2592,7 +2594,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '    if(d&&d.ok){\n'
     + '      inp.value="";\n'
     + '      var ok=document.getElementById("fp-ok");if(ok){ok.style.display="block";setTimeout(function(){ok.style.display="none";},2500);}\n'
-    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=(parseInt(window.ExploraCO.usuario.xp_total)||0)+15;}\n'
+    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=Math.round(((Number(window.ExploraCO.usuario.xp_total)||0)+15)*100)/100;}\n'
     + '      if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Foto publicada +15 XP","#16a34a");\n'
     + '      loadFotos();\n'
     + '    }else{alert((d&&d.error)||"No se pudo subir la foto");}\n'
@@ -2606,7 +2608,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  .then(function(d){\n'
     + '    if(d&&d.ok){\n'
     + '      if(btn){btn.classList.add("on");var b=btn.querySelector("b");btn.innerHTML="&#10003; Votada <b>"+((parseInt(b?b.textContent:"0")||0)+1)+"</b>";}\n'
-    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=(parseInt(window.ExploraCO.usuario.xp_total)||0)+5;}\n'
+    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=Math.round(((Number(window.ExploraCO.usuario.xp_total)||0)+5)*100)/100;}\n'
     + '      if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Voto en foto +5 XP","#E8A020");\n'
     + '      loadFotos();\n'
     + '    }else if(d&&d.ya_votado){\n'

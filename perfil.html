@@ -367,6 +367,14 @@ body{background:#FBF8F2}
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function pfNum(n) { return (parseInt(n, 10) || 0).toLocaleString('es-CO'); }
+  /* XP decimal (ADR-035): 2 decimales fijos. Delega en el helper canonico
+     de usuario-session.js; si no estuviera cargado, replica el formato.
+     pfNum sigue siendo el formateador entero (fotos, guardados, etc.). */
+  function pfXp(n) {
+    if (window.ExploraCO && typeof window.ExploraCO.fmtXp === 'function') return window.ExploraCO.fmtXp(n);
+    var v = Number(n); if (!isFinite(v)) v = 0;
+    return v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
   function pfCap(s) { s = String(s == null ? '' : s); return s.charAt(0).toUpperCase() + s.slice(1); }
   function pfSlug(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -440,7 +448,7 @@ body{background:#FBF8F2}
     }
     var f = pfFecha(u.creado_en);
     if (f) metas.push('<span>' + pfIcon('clock') + 'Ingreso: ' + esc(f) + '</span>');
-    metas.push('<span>' + pfIcon('xp') + '<b class="pf-num">' + pfNum(u.xp_total) + '</b> XP</span>');
+    metas.push('<span>' + pfIcon('xp') + '<b class="pf-num">' + pfXp(u.xp_total) + '</b> XP</span>');
     h += '<div class="pf-meta">' + metas.join('') + '</div>';
     h += '</div></section>';
     return h;

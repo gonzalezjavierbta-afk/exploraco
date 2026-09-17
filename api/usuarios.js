@@ -1,5 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
-// v14 (HOTFIX: SQL de device_hashes, login 500)
+// v15 (ADR-035: XP numeric(12,2), rankings de comunidad)
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
@@ -34,8 +34,14 @@ const NIVELES = [
   { min: 30000, nombre: 'Gran Maestro ExploraCO' },
 ];
 
+// XP decimal (ADR-035): las columnas XP son numeric(12,2). Neon entrega
+// numeric como STRING, asi que todo valor XP se normaliza a Number en el
+// borde y se redondea half-up a 2 decimales con un unico helper.
+function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
 function calcularNivel(xpTotal) {
-  const xp = parseInt(xpTotal) || 0;
+  const xp = Number(xpTotal) || 0;
   let nivelIdx = 0;
   for (let i = 0; i < NIVELES.length; i++) {
     if (xp >= NIVELES[i].min) nivelIdx = i;
@@ -52,6 +58,7 @@ function calcularEra(nivel) {
 
 function conNivel(row) {
   if (!row) return row;
+  row.xp_total = red2(numXp(row.xp_total));
   const calc = calcularNivel(row.xp_total);
   row.nivel = calc.nivel;
   row.badge_actual = calc.badge_actual;
@@ -94,7 +101,11 @@ const DESBLOQUEOS = {
 // sin GROUP BY era invalido en Postgres (42803) y respondia 500 en TODO
 // login/registro con device_hash. Ahora el ORDER BY va dentro de
 // jsonb_agg(h ORDER BY ord) y el fingerprint es best-effort (un fallo no
-// bloquea el login).
+// bloquea el login). v15 (ADR-035, 2026-09-17) adapta el XP a
+// numeric(12,2): calcularNivel/conNivel normalizan a Number redondeado a 2
+// decimales, referido_red/codigo y casa_elegir sin parseInt/::int, y
+// faccion_ranking/casa_ranking con miembros_activos (fallback 42703) y
+// orden de Casas por xp_total DESC.
 // conMisiones sigue siendo MERGE con las
 // capacidades del DB (migracion 010) para no destruir el inventario de
 // consumibles en cada GET.
@@ -412,7 +423,7 @@ module.exports = async (req, res) => {
           data: {
             codigo_referido: rcCodigo,
             referidos_directos_contados: parseInt(rcRows[0].referidos_directos_contados, 10) || 0,
-            xp_ref_total: parseInt(rcRows[0].xp_ref_total, 10) || 0,
+            xp_ref_total: red2(numXp(rcRows[0].xp_ref_total)),
             referidos_dia_actual: rcHoy.length ? rcHoy[0].n : 0,
           }
         });
@@ -432,7 +443,7 @@ module.exports = async (req, res) => {
           + 'SELECT u2.id, u2.nombre, u2.avatar_url, u2.xp_total, u2.xp_ref_total, u2.referido_por, red.nivel + 1 '
           + 'FROM usuarios u2 JOIN red ON u2.referido_por = red.id '
           + 'WHERE red.nivel < 5'
-          + ') SELECT nivel, COUNT(*)::int AS cantidad, COALESCE(SUM(xp_ref_total), 0)::int AS xp_ref '
+          + ') SELECT nivel, COUNT(*)::int AS cantidad, COALESCE(ROUND(SUM(xp_ref_total), 2), 0) AS xp_ref '
           + 'FROM red GROUP BY nivel ORDER BY nivel',
           [rrId]
         );
@@ -440,21 +451,47 @@ module.exports = async (req, res) => {
           'SELECT COUNT(*)::int AS n FROM usuarios WHERE referido_por=$1',
           [rrId]
         );
+        var rrNivelesNum = rrNiveles.map(function (r) {
+          r.xp_ref = red2(numXp(r.xp_ref));
+          return r;
+        });
         return res.json({
           ok: true,
           data: {
-            niveles: rrNiveles,
+            niveles: rrNivelesNum,
             total_directos: rrDirectos.length ? rrDirectos[0].n : 0,
           }
         });
       }
 
       // Ranking de facciones: agregado por faccion + top 3 por faccion.
+      // miembros_activos = miembros vigentes (ADR-035). Si usuarios.activo
+      // o ultimo_acceso no existen (42703, columnas no versionadas), se
+      // reintenta la MISMA consulta sin el FILTER y se devuelve 0.
       if (tipo === 'faccion_ranking') {
-        var frFacciones = await sql(
-          'SELECT faccion, COUNT(*)::int AS miembros, COALESCE(SUM(xp_total), 0)::int AS xp_total '
-          + 'FROM usuarios WHERE faccion IS NOT NULL GROUP BY faccion ORDER BY xp_total DESC'
-        );
+        var frActividad = 'activo = true AND ultimo_acceso > NOW() - INTERVAL \'30 days\'';
+        var frSql = function (filtroAct) {
+          return 'SELECT faccion, COUNT(*)::int AS miembros, '
+            + 'COALESCE(ROUND(SUM(xp_total), 2), 0) AS xp_total, '
+            + (filtroAct
+                ? 'COUNT(*) FILTER (WHERE ' + filtroAct + ')::int AS miembros_activos '
+                : '0::int AS miembros_activos ')
+            + 'FROM usuarios WHERE faccion IS NOT NULL GROUP BY faccion '
+            + 'ORDER BY COALESCE(ROUND(SUM(xp_total), 2), 0) DESC';
+        };
+        var frFacciones;
+        try {
+          frFacciones = await sql(frSql(frActividad));
+        } catch (frErr) {
+          if (!frErr || frErr.code !== '42703') throw frErr;
+          console.warn('[usuarios] faccion_ranking degradado 42703: ' + frErr.message);
+          frFacciones = await sql(frSql(null));
+        }
+        frFacciones = frFacciones.map(function (f) {
+          f.xp_total = red2(numXp(f.xp_total));
+          f.miembros_activos = Number(f.miembros_activos) || 0;
+          return f;
+        });
         var frTop = await sql(
           'SELECT id, nombre, avatar_url, faccion, xp_total FROM ('
           + 'SELECT id, nombre, avatar_url, faccion, xp_total, '
@@ -462,35 +499,56 @@ module.exports = async (req, res) => {
           + 'FROM usuarios WHERE faccion IS NOT NULL'
           + ') t WHERE t.pos <= 3 ORDER BY t.faccion, t.xp_total DESC'
         );
+        frTop = frTop.map(function (f) {
+          f.xp_total = red2(numXp(f.xp_total));
+          return f;
+        });
         return res.json({ ok: true, data: { facciones: frFacciones, top: frTop } });
       }
 
       // Ranking de Casas (WP-5, TSK-103 / ADR-028): agregado por Casa +
-      // top 5 por Casa. Se NORMALIZA por numero de miembros: el orden es
-      // por xp_promedio (no por la suma), para que la Casa mas poblada no
-      // gane siempre. La division usa GREATEST(COUNT(*),1) como guarda de
-      // division por cero (no aplica dentro de un GROUP BY con miembros,
-      // pero se deja explicita). Espejo de faccion_ranking.
+      // top 5 por Casa. ADR-035: el orden pasa a xp_total DESC (ya no
+      // xp_promedio) y se agrega miembros_activos vigentes (30 dias). La
+      // division usa GREATEST(COUNT(*),1) como guarda de division por
+      // cero. Espejo de faccion_ranking, con el mismo fallback 42703.
       if (tipo === 'casa_ranking') {
-        var crCasas = await sql(
-          'SELECT u.casa,'
-          + ' COUNT(*)::int AS miembros,'
-          + ' COALESCE(SUM(u.xp_total), 0)::int AS xp_total,'
-          + ' COALESCE(ROUND(SUM(u.xp_total)::numeric / GREATEST(COUNT(*), 1)), 0)::int AS xp_promedio,'
-          // FIX O1 (WP-6): el conteo de aprobados exige ao.activo=true
-          // ademas del quorum (+3), para no contar propuestas
-          // soft-deleted en el ranking de Casas.
-          + ' (SELECT COUNT(*)::int FROM activos_ocultos ao'
-          + '   WHERE (ao.votos_favor - ao.votos_contra) >= 3'
-          + '   AND ao.activo = true'
-          + '   AND ao.propuesto_por IN (SELECT id FROM usuarios WHERE casa=u.casa)) AS activos_ocultos_aprobados,'
-          + ' (SELECT COUNT(*)::int FROM activos_ocultos_checkins aoc'
-          + '   JOIN usuarios u2 ON u2.id = aoc.usuario_id'
-          + '   WHERE u2.casa = u.casa AND aoc.activo = true'
-          + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d'
-          + ' FROM usuarios u WHERE u.casa IS NOT NULL'
-          + ' GROUP BY u.casa ORDER BY xp_promedio DESC'
-        );
+        var crActividad = 'u.activo = true AND u.ultimo_acceso > NOW() - INTERVAL \'30 days\'';
+        var crSql = function (filtroAct) {
+          return 'SELECT u.casa,'
+            + ' COUNT(*)::int AS miembros,'
+            + (filtroAct
+                ? ' COUNT(*) FILTER (WHERE ' + filtroAct + ')::int AS miembros_activos,'
+                : ' 0::int AS miembros_activos,')
+            + ' COALESCE(ROUND(SUM(u.xp_total), 2), 0) AS xp_total,'
+            + ' COALESCE(ROUND(SUM(u.xp_total) / GREATEST(COUNT(*), 1), 2), 0) AS xp_promedio,'
+            // FIX O1 (WP-6): el conteo de aprobados exige ao.activo=true
+            // ademas del quorum (+3), para no contar propuestas
+            // soft-deleted en el ranking de Casas.
+            + ' (SELECT COUNT(*)::int FROM activos_ocultos ao'
+            + '   WHERE (ao.votos_favor - ao.votos_contra) >= 3'
+            + '   AND ao.activo = true'
+            + '   AND ao.propuesto_por IN (SELECT id FROM usuarios WHERE casa=u.casa)) AS activos_ocultos_aprobados,'
+            + ' (SELECT COUNT(*)::int FROM activos_ocultos_checkins aoc'
+            + '   JOIN usuarios u2 ON u2.id = aoc.usuario_id'
+            + '   WHERE u2.casa = u.casa AND aoc.activo = true'
+            + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d'
+            + ' FROM usuarios u WHERE u.casa IS NOT NULL'
+            + ' GROUP BY u.casa ORDER BY COALESCE(ROUND(SUM(u.xp_total), 2), 0) DESC';
+        };
+        var crCasas;
+        try {
+          crCasas = await sql(crSql(crActividad));
+        } catch (crErr) {
+          if (!crErr || crErr.code !== '42703') throw crErr;
+          console.warn('[usuarios] casa_ranking degradado 42703: ' + crErr.message);
+          crCasas = await sql(crSql(null));
+        }
+        crCasas = crCasas.map(function (c) {
+          c.xp_total = red2(numXp(c.xp_total));
+          c.xp_promedio = red2(numXp(c.xp_promedio));
+          c.miembros_activos = Number(c.miembros_activos) || 0;
+          return c;
+        });
         var crTop = await sql(
           'SELECT id, nombre, avatar_url, casa, xp_total FROM ('
           + 'SELECT id, nombre, avatar_url, casa, xp_total, '
@@ -498,6 +556,10 @@ module.exports = async (req, res) => {
           + 'FROM usuarios WHERE casa IS NOT NULL'
           + ') t WHERE t.pos <= 5 ORDER BY t.casa, t.xp_total DESC'
         );
+        crTop = crTop.map(function (c) {
+          c.xp_total = red2(numXp(c.xp_total));
+          return c;
+        });
         return res.json({ ok: true, data: { casas: crCasas, top: crTop } });
       }
 
@@ -543,7 +605,7 @@ module.exports = async (req, res) => {
             ciudad_base: pub.ciudad_base || null,
             pais_base: pub.pais_base || null,
             creado_en: pub.creado_en,
-            xp_total: parseInt(pub.xp_total, 10) || 0,
+            xp_total: red2(numXp(pub.xp_total)),
             faccion: pub.faccion || null,
             casa: pub.casa || null,
             perfil_publico: pub.perfil_publico !== false,
@@ -638,7 +700,7 @@ module.exports = async (req, res) => {
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         if (!(ceFila[0].email_verificado === true))
           return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
-        var ceXp = parseInt(ceFila[0].xp_total, 10) || 0;
+        var ceXp = numXp(ceFila[0].xp_total);
         var ceNivelAnt = calcularNivel(ceXp).nivel;
         if (ceNivelAnt < 2)
           return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: ceNivelAnt, nivel_requerido: 2 });
@@ -652,12 +714,12 @@ module.exports = async (req, res) => {
           );
           if (!cePrim.length)
             return res.status(409).json({ ok: false, error: 'CASA_YA_ELEGIDA' });
-          var ceXpPrim = parseInt(cePrim[0].xp_total, 10) || 0;
+          var ceXpPrim = numXp(cePrim[0].xp_total);
           var ceNivelPrim = calcularNivel(ceXpPrim).nivel;
           return res.json({ ok: true, data: {
             casa: cePrim[0].casa,
             casa_elegida_en: cePrim[0].casa_elegida_en,
-            xp_total_nuevo: ceXpPrim,
+            xp_total_nuevo: red2(ceXpPrim),
             nivel_anterior: ceNivelAnt,
             nivel_nuevo: ceNivelPrim,
             bajo_nivel: ceNivelPrim < ceNivelAnt,
@@ -681,12 +743,12 @@ module.exports = async (req, res) => {
             return res.status(429).json({ ok: false, error: 'COOLDOWN_CASA' });
           return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
         }
-        var ceXpNuevo = parseInt(ceCambio[0].xp_total, 10) || 0;
+        var ceXpNuevo = numXp(ceCambio[0].xp_total);
         var ceNivelNuevo = calcularNivel(ceXpNuevo).nivel;
         return res.json({ ok: true, data: {
           casa: ceCambio[0].casa,
           casa_elegida_en: ceCambio[0].casa_elegida_en,
-          xp_total_nuevo: ceXpNuevo,
+          xp_total_nuevo: red2(ceXpNuevo),
           nivel_anterior: ceNivelAnt,
           nivel_nuevo: ceNivelNuevo,
           bajo_nivel: ceNivelNuevo < ceNivelAnt,

@@ -2884,5 +2884,60 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-109: XP decimal (`numeric(12,2)`), pestana "Clase" consolidada y rankings de comunidad (Casas/Facciones/Parches) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-17, implementada en working tree, SIN commitear). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar `db/migrations/021_xp_decimal.sql` en Neon (la aplica Javier) ANTES del deploy del backend; despues, commit/push/deploy en 2 releases (backend + 021 primero, frontend despues). Checklist: `docs/DEPLOY_021.md`.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-17
+- **ADR:** DECISIONS.md ADR-035 (redactado por architect como contrato de diseno; esta tarea lo implementa; NO se duplica aqui).
+- **Responsable:** build (implementacion) + docs-keeper (cierre documental).
+- **Bugs relacionados:** BUGS_HISTORICOS.md BUG-042 (formula de nivel oculta en `album_crear`) pasa a **CORREGIDO**; BUG-063 (NUEVO, guarda de fama `famaBase < 1` que subcontaba los Parches) queda **CORREGIDO**.
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006; `git diff --numstat` = 10 archivos de codigo, +700/-282, mas 1 migracion nueva y 1 script de preflight sin versionar; `DECISIONS.md` +249/-1 lo agrego architect):**
+
+  1. **Objetivo 1 - XP decimal (`numeric(12,2)`).** Migracion nueva `db/migrations/021_xp_decimal.sql` (121 lineas, idempotente ADR-008, ASCII-safe ADR-002): un solo bloque `DO $$` con guard `information_schema` que convierte 9 columnas de XP de entero a `numeric(12,2)` usando `format('%I')`; sin `ADD COLUMN` de nada no versionado y **sin indices** (los rankings son agregados sobre tablas pequenas). Preflight read-only `scripts/verify_021_precheck.js` (149 lineas; solo `information_schema` + `MIN/MAX/COUNT`; falla si falta una columna obligatoria; `interacciones.xp_ganado` es opcional). Backend: `api/usuarios.js` (header `v15`), `api/interacciones.js` (header `v18`), `api/admin.js` y `api/pagina-destino.js` (header `v10`) normalizan `numeric`->`Number` en el borde de lectura, redondean half-up a 2 decimales (helper `red2`/`redondearXp`) y ya NO castean `::int` las sumas de XP. Frontend: helper canonico `window.ExploraCO.fmtXp`/`redondearXp` en `usuario-session.js` (formato `es-CO` a 2 decimales con `Number.EPSILON`), aplicado en `index.html`, `admin.html`, `perfil.html`, `mi-perfil.html` y `comunidad.html`.
+  2. **Bug latente corregido (BUG-042).** `api/interacciones.js` usaba `Math.floor(xp_total / 100) + 1` como gate de nivel en `album_crear`; ahora usa `calcularNivelLocal(...).nivel` (L5379). La formula oculta se habia registrado como BUG-042 el 2026-09-14 y queda cerrada aqui.
+  3. **Bug de subconteo corregido (BUG-063, NUEVO).** La guarda de fama de Parche `if (famaBase < 1) return false;` descartaba aportes legitimamente menores a 1 XP; pasa a `if (famaBase <= 0) return false;` (`api/interacciones.js` L1880-1881) para acreditar micro-fama decimal.
+  4. **Objetivo 2 - pestana "Clase" consolidada** (`mi-perfil.html`): el Arbol de Clases es el componente unico. "Tabla de Destino" pasa a sub-vista `senderos` (pseudo-tab interno del arbol, L2621-2622 y L2707-2708); "Tu Faccion" pasa a cabecera del arbol (panel colapsable); "Vocaciones de Artista" se integra en la sub-vista de la faccion `artistas` con boton inline "Activar vocacion" (L2859); "Mi Casa" queda como bloque compacto dentro de `data-tab="clase"` (L698-699). IDs/funciones conservados para no romper smokes.
+  5. **Objetivo 3 - rankings de comunidad** (`comunidad.html`, tab Ranking con 4 sub-vistas Viajeros | Casas | Facciones | Parches, L372-386 y `setRankingVista` L1661): `GET /api/usuarios?tipo=casa_ranking` existia SIN UI, ahora agrega `miembros_activos` (activo=true AND `ultimo_acceso > NOW() - 30 days`) y ordena por `xp_total DESC` (total de la casa, ya no promedio); la UI muestra XP total, activos y promedio (`api/usuarios.js` L510-557). Nueva rama `GET /api/interacciones?tipo=pandilla_ranking` (NUEVO, sin archivo nuevo: presupuesto 8/8 intacto) con parches globales ordenados por `fama_total DESC` mas miembros/miembros activos (`api/interacciones.js` L4257-4284). El ranking de facciones se movio del tab "Activo Oculto" al tab Ranking (sub-vista Facciones, `verRankingFacciones` L2144-2146); en Wayfarer queda un CTA que redirige. Definicion "miembro activo vigente" = `usuarios.activo=true` AND `ultimo_acceso` en los ultimos 30 dias, con fallback `42703` si las columnas no existen (patron BUG-021).
+
+- **Archivos en el working tree (SIN commitear; `git diff --numstat`):**
+  - `api/interacciones.js` (+185/-98): redondeo half-up, `parseFloat`/`Number` en columnas XP, rama `pandilla_ranking`, fix del gate de `album_crear` y de la guarda de fama.
+  - `api/usuarios.js` (+102/-40): `calcularNivel`/`conNivel` normalizados, `casa_ranking` con `miembros_activos` y orden por `xp_total DESC`, rankings sin `::int`.
+  - `comunidad.html` (+195/-43): tab Ranking con 4 sub-vistas (Viajeros/Casas/Facciones/Parches), consumo de `casa_ranking`/`pandilla_ranking`, facciones fuera de "Activo Oculto".
+  - `mi-perfil.html` (+101/-50): pestana "Clase" consolidada (arbol + senderos + vocaciones inline + Mi Casa compacto).
+  - `usuario-session.js` (+39/-19): helper `window.ExploraCO.fmtXp`/`redondearXp` (L46-60) y acreditaciones en cliente normalizadas.
+  - `api/admin.js` (+29/-14): `precio_xp` acepta decimales (`parseFloat` + redondeo), listado de resenas normalizado y `repartirXpReferidos` sincronizado.
+  - `admin.html` (+20/-9): display de XP con `fmtXp` y precio decimal en la tienda.
+  - `index.html` (+15/-5): `getLevel`/`statsU` con `parseFloat` + `fmtXp` (fallback local L4233-4234).
+  - `perfil.html` (+9/-1): XP del museo publico normalizado.
+  - `api/pagina-destino.js` (+5/-3): espejo cliente de `xp_total` al publicar/votar foto usa `Number` (header `v10`).
+  - NUEVOS sin versionar: `db/migrations/021_xp_decimal.sql` (121 lineas, idempotente ADR-008, ASCII-safe ADR-002) y `scripts/verify_021_precheck.js` (preflight read-only).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001). Cero archivos nuevos en `api/`; `pandilla_ranking` entra como rama `?tipo=` y `casa_ranking` ya existia.
+
+- **Evidencia (ADR-006, verificada en esta sesion documental el 2026-09-17):**
+  - Existen `db/migrations/021_xp_decimal.sql` y `scripts/verify_021_precheck.js` (ambos untracked); `docs/DEPLOY_021.md` fue creado por este cierre documental.
+  - Headers reales: `api/usuarios.js` v15, `api/interacciones.js` v18, `api/pagina-destino.js` v10.
+  - Anclas reales: `api/interacciones.js` L1880-1881 (`famaBase <= 0`), L5379 (`calcularNivelLocal(...).nivel` en `album_crear`), L4257-4284 (rama `pandilla_ranking` + fallback `42703`); `api/usuarios.js` L468-549 (`miembros_activos` y orden en `casa_ranking`, fallback `42703`); `usuario-session.js` L46-60 (`redondearXp`/`fmtXp`); `comunidad.html` L372-386 (`rk-chip` de las 4 sub-vistas) y L1661 (`setRankingVista`); `mi-perfil.html` L463 (tab `clase`), L698-699 (Mi Casa), L2621-2622/L2707-2708 (sub-vista `senderos`), L2859 ("Activar vocacion" inline).
+  - `node --check` **6/6 OK**: `api/usuarios.js`, `api/interacciones.js`, `api/admin.js`, `api/pagina-destino.js`, `usuario-session.js` y `scripts/verify_021_precheck.js`.
+  - ASCII-safe verificado por buffer: 0 bytes >127 y 0 backticks en `api/usuarios.js`, `api/interacciones.js`, `api/admin.js`, `api/pagina-destino.js`, `db/migrations/021_xp_decimal.sql` y `scripts/verify_021_precheck.js`.
+  - Smokes re-ejecutados en esta sesion: `smoke_test_gamificacion_v4.js` 95/95 PASS; `smoke_test_comunidad.js` OK; `smoke_test_perfil_progreso.js` OK; `smoke_test_milestones_v2.js` OK; `scripts/check_buildHTML_inline.js` TODO OK (divs 361/361). `smoke_test_epic_prompt.js` mantiene **4 FAIL PRE-EXISTENTES** (53 checks, 49 PASS; vocaciones 3 vs 4 y `chat_salas` tipo plan) ajenos a esta entrega.
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. **Aplicar `db/migrations/021_xp_decimal.sql` en Neon** (archivo COMPLETO en una corrida; idempotente). Preflight opcional read-only: `$env:DATABASE_URL="postgresql://..."; node scripts/verify_021_precheck.js`. Verificar `data_type='numeric'`, `numeric_precision=12` y `numeric_scale=2` en las 9 columnas (bloque comentado al final del .sql).
+  2. **Deploy en 2 releases:** backend + 021 primero, frontend despues. Si el backend decimal se despliega SIN la 021, Postgres redondea por cast de asignacion en silencio (sin 500).
+  3. **Verificacion en vivo:** elegir faccion/casa; ranking de Casas con activos; ranking de Parches; un XP con decimales mostrado como "125,50 XP".
+  4. **Rollback (solo emergencia):** `TYPE integer USING ROUND(col)::integer` es EXACTO mientras no haya decimales acumulados y LOSSY despues; se documenta como `021_xp_decimal_down.sql`, fuera del flujo normal.
+
+- **Hallazgos / pendientes derivados:**
+  - **Deuda de columnas no versionadas (patron BUG-021):** `usuarios.ultimo_acceso`, `usuarios.activo` e `interacciones.xp_ganado` siguen sin migracion versionada; los rankings dependen de las dos primeras y la 021 las cubre con guard `IF EXISTS`; el fallback `42703` esta implementado (reintento sin la condicion + `console.warn`, nunca catch vacio).
+  - **Backlog:** indices de apoyo para los rankings; normalizar `api/pagina-destino.js` si quedara algun espejo de XP; fusionar `repartirXpReferidos` duplicado (`api/interacciones.js` y `api/admin.js`) si se decide; resolver el drift de `smoke_test_epic_prompt.js`.
+  - **Nota documental (ADR-006):** ADR-035 declara en su campo Estado "NO implementado aun" (se redacto como contrato antes de la implementacion); el estado real HOY es implementado en working tree. Queda como deuda de actualizacion del ADR, fuera del alcance de este cierre (DECISIONS.md no se toca aqui, por instruccion explicita).
+
+- **Fuera de alcance:** indices de ranking; fusion de `repartirXpReferidos`; `smoke_test_epic_prompt.js` (deuda QA preexistente); BUG-061 (`POST tipo='foto'` sin `validarSesion`, escalado a `sql-security`); BUG-062 (fotos Unsplash en `admin.html`); verificacion en vivo (post-deploy).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

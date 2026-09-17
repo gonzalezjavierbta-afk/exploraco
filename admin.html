@@ -2012,7 +2012,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
         <div style="flex:0 0 120px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Precio XP</div>
-          <input class="form-input" id="consumible-precio" type="number" min="1" placeholder="600" style="width:100%">
+          <input class="form-input" id="consumible-precio" type="number" min="0.01" step="0.01" placeholder="600" style="width:100%">
         </div>
         <div style="flex:0 0 150px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Categoría</div>
@@ -2121,7 +2121,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       </div>
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Precio XP</div>
-        <input class="form-input" id="consumible-edit-precio" type="number" min="0" placeholder="600" style="width:100%">
+        <input class="form-input" id="consumible-edit-precio" type="number" min="0" step="0.01" placeholder="600" style="width:100%">
       </div>
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Categoría</div>
@@ -7226,7 +7226,7 @@ function renderConsumibles() {
       +   '<div style="font-size:13px;font-weight:800">' + escH(c.nombre) + '</div>'
       +   '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(c.descripcion) + '</div>'
       + '</div>'
-      + '<div style="flex:0 0 100px;font-size:14px;font-weight:800;color:var(--gold)">' + parseInt(c.precio_xp||0,10) + ' <span style="font-size:10px;color:var(--muted);font-weight:600">XP</span></div>'
+      + '<div style="flex:0 0 100px;font-size:14px;font-weight:800;color:var(--gold)">' + fmtXp(c.precio_xp) + ' <span style="font-size:10px;color:var(--muted);font-weight:600">XP</span></div>'
       + '<div style="flex:0 0 110px"><span style="background:var(--bg2);color:var(--text2);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;text-transform:capitalize">' + escH(c.categoria || 'general') + '</span></div>'
       + '<div style="flex:0 0 90px">' + badge + '</div>'
       + '<div style="flex:0 0 auto;display:flex;gap:6px;margin-left:auto">'
@@ -7245,12 +7245,14 @@ async function crearConsumible() {
   var clave = document.getElementById('consumible-clave').value.trim().toLowerCase();
   var nombre = document.getElementById('consumible-nombre').value.trim();
   var descripcion = document.getElementById('consumible-descripcion').value.trim();
-  var precio = parseInt(document.getElementById('consumible-precio').value, 10);
+  // ADR-035: precio_xp es numeric(12,2); se acepta coma o punto y se
+  // envia el decimal tal cual (el backend redondea a 2 decimales).
+  var precio = parseFloat(String(document.getElementById('consumible-precio').value || '').replace(',', '.'));
   var categoria = (document.getElementById('consumible-categoria') || {}).value || 'general';
 
   if (!clave || !nombre) { showAdminToast('Clave y nombre son obligatorios', 'error'); return; }
   if (!/^[a-z0-9_]+$/.test(clave)) { showAdminToast('Clave: solo minúsculas, números y guion bajo', 'error'); return; }
-  if (!Number.isInteger(precio) || precio <= 0) { showAdminToast('Precio debe ser un entero mayor que 0', 'error'); return; }
+  if (!isFinite(precio) || precio <= 0) { showAdminToast('Precio debe ser un número mayor que 0', 'error'); return; }
 
   try {
     var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_crear', {
@@ -7294,11 +7296,11 @@ async function guardarEdicionConsumible() {
   var clave = document.getElementById('consumible-edit-clave').value;
   var nombre = document.getElementById('consumible-edit-nombre').value.trim();
   var descripcion = document.getElementById('consumible-edit-descripcion').value.trim();
-  var precio = parseInt(document.getElementById('consumible-edit-precio').value, 10);
+  var precio = parseFloat(String(document.getElementById('consumible-edit-precio').value || '').replace(',', '.'));
   var categoria = (document.getElementById('consumible-edit-categoria') || {}).value || 'general';
 
   if (!nombre) { showAdminToast('El nombre no puede quedar vacío', 'error'); return; }
-  if (!Number.isInteger(precio) || precio < 0) { showAdminToast('Precio debe ser un entero mayor o igual a 0', 'error'); return; }
+  if (!isFinite(precio) || precio < 0) { showAdminToast('Precio debe ser un número mayor o igual a 0', 'error'); return; }
 
   try {
     // La clave NO se envía al backend: es identidad y no se edita (contrato ADR-018).
@@ -7336,6 +7338,15 @@ async function toggleConsumible(id) {
 function escH(s) {
   if(!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* Formato canonico de XP (ADR-035): 2 decimales fijos en es-CO.
+   admin.html no carga usuario-session.js, asi que el helper vive aqui
+   y es el unico punto de formato de XP del panel. */
+function fmtXp(n) {
+  var v = Number(n);
+  if (!isFinite(v)) v = 0;
+  return v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /* ===== JUGADORES: busqueda + XP =====
@@ -7401,7 +7412,7 @@ function jugRenderLista() {
       + '</div>'
       + '<div style="margin-left:auto;text-align:right;flex:none">'
       + '<div style="font-size:12px;font-weight:700">Nv ' + nl + '</div>'
-      + '<div style="font-size:10px;color:var(--muted,#888)">' + (u.xp_total || 0) + ' XP</div>'
+      + '<div style="font-size:10px;color:var(--muted,#888)">' + fmtXp(u.xp_total) + ' XP</div>'
       + '</div>'
       + '</div>'
       + '</div>';
@@ -7450,7 +7461,7 @@ function jugRender(u, conVocaciones) {
   html += '<div style="text-align:right;flex:none">';
   html += '<div style="font-size:12px;color:var(--muted,#888)">NIVEL</div>';
   html += '<div style="font-size:26px;font-weight:800;line-height:1">' + lvl + '</div>';
-  html += '<div style="font-size:12px;color:var(--muted,#888);margin-top:2px">' + xpActual + ' XP</div>';
+  html += '<div style="font-size:12px;color:var(--muted,#888);margin-top:2px">' + fmtXp(xpActual) + ' XP</div>';
   html += '</div>';
   html += '</div>';
   html += '<div style="height:6px;border-radius:3px;background:var(--bg,#F3EFE7);margin-top:14px;overflow:hidden">';

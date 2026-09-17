@@ -4226,12 +4226,22 @@ function getNextLevel(xp) {
   return cur;
 }
 
+/* Formato canonico de XP (ADR-035). Delega en usuario-session.js cuando
+   ya esta cargado (lo normal: se carga al final del body y este bloque
+   corre al parsear); si no, aplica el mismo helper de 2 decimales es-CO.
+   Unico punto de formato: no duplicar toLocaleString en cada pantalla. */
+function fmtXp(n) {
+  if(window.ExploraCO && typeof window.ExploraCO.fmtXp === 'function') return window.ExploraCO.fmtXp(n);
+  var v = Number(n); if(!isFinite(v)) v = 0;
+  return v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /* ── Snapshot para calcular insignias: viene de window.ExploraCO
    (sesion real), no de un contador local. Sin sesion, todo en 0. ── */
 function puntosUsuarioActual() {
   var u = (window.ExploraCO && window.ExploraCO.usuario) || null;
   return {
-    xp:      u ? (parseInt(u.xp_total)        || 0) : 0,
+    xp:      u ? (Number(u.xp_total)          || 0) : 0,
     saved:   u ? (parseInt(u.total_guardados) || 0) : 0,
     reviews: u ? (parseInt(u.total_resenas)   || 0) : 0,
     visited: u ? (parseInt(u.total_visitas)   || 0) : 0,
@@ -4289,7 +4299,7 @@ function showLevelUpModal(level, xpActual) {
   var xm = m.querySelector('.lu-xp');
   if(em) em.textContent = level.emoji;
   if(nm) nm.textContent = level.nombre;
-  if(xm) xm.textContent = xpActual + ' XP';
+  if(xm) xm.textContent = fmtXp(xpActual) + ' XP';
   m.style.display = 'flex';
   setTimeout(function() { m.style.opacity = '1'; }, 10);
 }
@@ -4327,7 +4337,7 @@ function updatePointsUI() {
   var lvlEl = document.getElementById('pts-level');
   var barEl = document.getElementById('pts-bar');
   var bdgEl = document.getElementById('pts-badges-count');
-  if(xpEl)  xpEl.textContent  = pu.xp + ' XP';
+  if(xpEl)  xpEl.textContent  = fmtXp(pu.xp) + ' XP';
   if(lvlEl) lvlEl.textContent = lvl.emoji + ' ' + lvl.nombre;
   if(barEl) barEl.style.width = pct + '%';
   if(bdgEl) bdgEl.textContent = earnedBadges.length;
@@ -4349,7 +4359,7 @@ function updatePointsUI() {
   }
 
   var navXP = document.getElementById('nav-xp-badge');
-  if(navXP) navXP.textContent = pu.xp + ' XP';
+  if(navXP) navXP.textContent = fmtXp(pu.xp) + ' XP';
 
   var savedN   = document.getElementById('soc-saved-n');
   var visitedN = document.getElementById('soc-visited-n');
@@ -4367,7 +4377,7 @@ function updatePointsUI() {
   var mxb = document.getElementById('mm-xp-mini-badges');
   if(mle) mle.textContent = lvl.emoji;
   if(mln) mln.textContent = lvl.nombre;
-  if(mxt) mxt.textContent = pu.xp + ' XP';
+  if(mxt) mxt.textContent = fmtXp(pu.xp) + ' XP';
   if(mxf) mxf.style.width = pct + '%';
   if(mxb) mxb.innerHTML = earnedBadges.slice(0,6).map(function(b) {
     return '<span title="'+b.nombre+'">'+b.emoji+'</span>';

@@ -154,11 +154,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* Chip base compartido: filtros del mapa y chips de orden del tab AV
    (un solo bloque, sin duplicar estilos) */
 #cpanel-mapa .mapa-filtro,
-#cpanel-av .av-chip{padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);transition:all .2s;font-family:'Outfit',sans-serif}
+#cpanel-av .av-chip,
+#cpanel-ranking .rk-chip{padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);transition:all .2s;font-family:'Outfit',sans-serif}
 #cpanel-mapa .mapa-filtro.active,
-#cpanel-av .av-chip.on{background:var(--gold);color:var(--black);border-color:var(--gold)}
+#cpanel-av .av-chip.on,
+#cpanel-ranking .rk-chip.on{background:var(--gold);color:var(--black);border-color:var(--gold)}
 #cpanel-mapa .mapa-filtro:hover:not(.active),
-#cpanel-av .av-chip:hover:not(.on){background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
+#cpanel-av .av-chip:hover:not(.on),
+#cpanel-ranking .rk-chip:hover:not(.on){background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
 .av-popup{text-align:center;font-family:'Outfit',sans-serif}
 .av-popup-title{font-weight:600;margin:8px 0 4px;font-size:14px;color:#1a1a1a}
 .av-popup-meta{font-size:12px;color:#666;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
@@ -366,12 +369,21 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="planes-grid" id="planes-grid"></div>
     </div>
 
-        <!-- RANKING -->
+        <!-- RANKING (4 sub-vistas: viajeros, casas, facciones, parches) -->
     <div class="cpanel" id="cpanel-ranking">
       <div class="lb-head">
-        <div class="lb-title">🏆 RANKING DE <span>VIAJEROS</span></div>
+        <div class="lb-title">&#x1F3C6; RANKING DE <span id="rk-foco">VIAJEROS</span></div>
       </div>
-      <div class="lb-sub">Actualizado en tiempo real · Top 20 viajeros más activos</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button type="button" class="rk-chip on" data-rk="viajeros" onclick="setRankingVista('viajeros')">&#x1F464; Viajeros</button>
+        <button type="button" class="rk-chip" data-rk="casas" onclick="setRankingVista('casas')">&#x1F3E0; Casas</button>
+        <button type="button" class="rk-chip" data-rk="facciones" onclick="setRankingVista('facciones')">&#x2694;&#xFE0F; Facciones</button>
+        <button type="button" class="rk-chip" data-rk="parches" onclick="setRankingVista('parches')">&#x1F465; Parches</button>
+      </div>
+      <div class="lb-sub" id="rk-sub">Actualizado en tiempo real · Top 20 viajeros más activos</div>
+      <div id="rk-casas" style="display:none"></div>
+      <div id="rk-facciones" style="display:none"></div>
+      <div id="rk-parches" style="display:none"></div>
       <div id="lb-list"></div>
     </div>
 
@@ -530,7 +542,7 @@ function sesion() { return (window.ExploraCO && window.ExploraCO.usuario) || nul
 function statsU() {
   var u = sesion();
   return {
-    xp:      u ? (parseInt(u.xp_total,10)      || 0) : 0,
+    xp:      u ? (Number(u.xp_total)           || 0) : 0,
     saved:   u ? (parseInt(u.total_guardados,10) || 0) : Math.max(0, mmSaved.length),
     visited: u ? (parseInt(u.total_visitas,10)  || 0) : Math.max(0, mmVisited.length),
     reviews: u ? (parseInt(u.total_resenas,10)  || 0) : 0,
@@ -588,9 +600,9 @@ function updateCommUI() {
   var av = document.getElementById('comm-av');
   if(av) { av.textContent = initials; av.style.background = '#1a3a5c'; av.style.color = '#7eb8f0'; }
   setText('comm-name', nombre);
-  setText('comm-level', lvl.emoji + ' ' + lvl.nombre + ' · ' + st.xp + ' XP');
+  setText('comm-level', lvl.emoji + ' ' + lvl.nombre + ' · ' + fmtXp(st.xp) + ' XP');
   setStyle('comm-xp-fill','width', pct+'%');
-  setText('comm-xp-n', st.xp);
+  setText('comm-xp-n', fmtXp(st.xp));
   setText('comm-badges-n', earnedCount);
   setText('comm-saved-n', st.saved);
   setText('comm-visited-n', st.visited);
@@ -608,6 +620,10 @@ var AV_COLORS = [
   ['#1a051a','#f07ef0'],['#0a1a3a','#7ea8f0'],['#2a2a0a','#e0e07e']
 ];
 function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* XP decimal (numeric(12,2)): un solo formateador de 2 decimales.
+   Usa window.ExploraCO.fmtXp (usuario-session.js) y cae a un fallback
+   local si el orden de carga aun no lo expone. */
+function fmtXp(n){ var f=(window.ExploraCO && window.ExploraCO.fmtXp); return f ? f(n) : (isFinite(Number(n)) ? Number(n) : 0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function postComAPI(body) { return fetch('/api/interacciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}); }
 function uid() { var u=sesion(); return u ? u.id : null; }
 function initialsFromName(n) {
@@ -1369,7 +1385,7 @@ function retoFormHtml(pandilla) {
       + '<option value="guardados">Guardados</option>'
     + '</select>'
     + '<input class="chat-inp" id="reto-meta" type="number" min="1" step="1" placeholder="Meta (acciones)" style="margin-bottom:8px">'
-    + '<input class="chat-inp" id="reto-xp" type="number" min="0" step="1" placeholder="XP bono" style="margin-bottom:8px">'
+    + '<input class="chat-inp" id="reto-xp" type="number" min="0" step="0.01" placeholder="XP bono" style="margin-bottom:8px">'
     + '<input class="chat-inp" id="reto-fecha" type="date" style="margin-bottom:8px">'
     + '<button class="pand-btn" onclick="pandillaCrearReto(\'' + esc(pandilla.id) + '\')">Crear reto</button>'
     + '</div>';
@@ -1381,7 +1397,7 @@ function pandillaCrearReto(pandillaId) {
   var titulo = (document.getElementById('reto-titulo') || {}).value || '';
   var tipo = (document.getElementById('reto-tipo') || {}).value || 'visitas';
   var meta = parseInt((document.getElementById('reto-meta') || {}).value, 10) || 0;
-  var xpBono = parseInt((document.getElementById('reto-xp') || {}).value, 10) || 0;
+  var xpBono = parseFloat(String((document.getElementById('reto-xp') || {}).value || '').replace(',', '.')) || 0;
   var fechaFin = (document.getElementById('reto-fecha') || {}).value || '';
   titulo = titulo.trim();
   if(!titulo) { showXPToastComm('⚠️ Escribe un titulo para el reto'); return; }
@@ -1471,7 +1487,6 @@ var MOCK_LB = [
   {xp_total:45,nombre:'Camila T.',badge_actual:'Viajero Novato'},
   {xp_total:20,nombre:'Diego R.',badge_actual:'Viajero Novato'},
 ];
-function lbXpFmt(xp){ return (parseInt(xp,10)||0).toLocaleString('es-CO'); }
 function paintLeaderboard(rows) {
   var list = document.getElementById('lb-list');
   if(!list) return;
@@ -1479,7 +1494,7 @@ function paintLeaderboard(rows) {
   rows.forEach(function(u, idx){
     var pos = idx + 1;
     if(pos > 20) return;
-    var xp  = parseInt(u.xp_total,10) || 0;
+    var xp  = Number(u.xp_total) || 0;
     var lvl = getLevel(xp);
     var pct = getLevelPct(xp);
     var nombre = u.nombre || 'Viajero';
@@ -1505,7 +1520,7 @@ function paintLeaderboard(rows) {
     info.appendChild(nm); info.appendChild(lv); info.appendChild(st); info.appendChild(prog);
     var right=document.createElement('div'); right.className='lb-right';
     var xpEl=document.createElement('div'); xpEl.className='lb-xp';
-    xpEl.innerHTML=lbXpFmt(xp)+' <small>XP</small>';
+    xpEl.innerHTML=fmtXp(xp)+' <small>XP</small>';
     right.appendChild(xpEl);
     card.appendChild(rk); card.appendChild(av); card.appendChild(info); card.appendChild(right);
     list.appendChild(card);
@@ -1523,6 +1538,144 @@ function cargarLeaderboard() {
       paintLeaderboard(rows);
     })
     .catch(function(){ paintLeaderboard(MOCK_LB); });
+}
+
+/* ---- SUB-VISTAS DEL RANKING (Casas, Facciones, Parches) ----
+   Segmentado dentro del tab Ranking; cada sub-vista consume su rama del
+   backend y muestra "No se pudo cargar" en error (nunca "Cargando...").
+   rkTopHtml es el render compartido de lideres (casas + facciones). */
+function rkTopHtml(top, metaMap, iconDef) {
+  if (!top || !top.length) return '';
+  var html = '<div style="font-size:10px;color:rgba(255,255,255,.35);margin:10px 0 4px">\u00b7 L\u00edderes (top ' + Math.min(top.length, 8) + ')</div>'
+    + '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px">';
+  top.slice(0, 8).forEach(function(t){
+    var k = String((t && (t.casa || t.faccion)) || '');
+    var ti = metaMap[k] || {};
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+      + '<span style="font-size:13px">' + (ti.icono || ti.emoji || iconDef) + '</span>'
+      + '<span style="flex:1;font-size:11px;color:#fff">' + esc(t.nombre || 'Viajero') + '</span>'
+      + '<span style="font-size:10px;color:rgba(255,255,255,.4);text-transform:capitalize">' + esc(ti.nombre || k) + '</span>'
+      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:var(--gold)">' + fmtXp(t.xp_total) + ' XP</span>'
+      + '</div>';
+  });
+  return html + '</div>';
+}
+/* Espejo local de CASAS_META de mi-perfil.html (emoji/color por Casa). */
+var RANGO_CASAS_META = {
+  condor: { nombre:'Casa Condor', emoji:'\uD83E\uDD85', color:'#3B82F6' },
+  jaguar: { nombre:'Casa Jaguar', emoji:'\uD83D\uDC06', color:'#22C55E' },
+  delfin: { nombre:'Casa Delfin', emoji:'\uD83D\uDC2C', color:'#E8A020' }
+};
+function rkCasaMeta(id) {
+  return RANGO_CASAS_META[String(id || '').toLowerCase()] || { nombre:(id || 'Casa'), emoji:'\uD83C\uDFE0', color:'#E8A020' };
+}
+/* Casas: GET /api/usuarios?tipo=casa_ranking
+   data.casas[] {casa,miembros,miembros_activos,xp_total,xp_promedio,...}
+   ordenado por xp_total DESC; data.top[] lideres. */
+function cargarCasasRanking() {
+  var el = document.getElementById('rk-casas');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:24px">Cargando Casas\u2026</div>';
+  fetch('/api/usuarios?tipo=casa_ranking')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var casas = (res && res.data && res.data.casas) || [];
+      if (!casas.length) {
+        el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aun no hay Casas en el ranking.</div>';
+        return;
+      }
+      var html = '<div class="ao-podium">';
+      casas.slice(0, 3).forEach(function(c, idx){
+        var m = rkCasaMeta(c.casa);
+        html += '<div class="ao-pod-item' + (idx === 0 ? ' first' : '') + '" style="border-top:3px solid ' + esc(m.color) + '">'
+          + '<div class="ao-pod-icon" style="font-size:26px;margin-bottom:4px">' + m.emoji + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:#fff;text-transform:uppercase">' + esc(m.nombre) + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:900;color:var(--gold);margin-top:2px">' + fmtXp(c.xp_total) + ' XP</div>'
+          + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px">' + (parseInt(c.miembros_activos,10)||0) + ' activos vigentes</div>'
+          + '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + fmtXp(c.xp_promedio) + ' prom./miembro</div>'
+          + '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + (parseInt(c.miembros,10)||0) + ' miembros totales</div>'
+          + '</div>';
+      });
+      html += '</div>' + rkTopHtml((res && res.data && res.data.top) || [], RANGO_CASAS_META, '\uD83C\uDFE0');
+      el.innerHTML = html;
+    })
+    .catch(function(){
+      el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar el ranking de Casas.</div>';
+    });
+}
+/* Parches: GET /api/interacciones?tipo=pandilla_ranking
+   data.parches[] {id,nombre,ciudad_base,fama_total,miembros,miembros_activos}
+   ordenado por fama_total DESC; podio top 3 + lista. */
+function cargarParchesRanking() {
+  var el = document.getElementById('rk-parches');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:24px">Cargando Parches\u2026</div>';
+  fetch('/api/interacciones?tipo=pandilla_ranking')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      var parches = (res && res.data && res.data.parches) || [];
+      if (!parches.length) {
+        el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aun no hay Parches en el ranking.</div>';
+        return;
+      }
+      var medals = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
+      var html = '<div class="ao-podium">';
+      parches.slice(0, 3).forEach(function(p, idx){
+        html += '<div class="ao-pod-item' + (idx === 0 ? ' first' : '') + '">'
+          + '<div class="ao-pod-icon" style="font-size:26px;margin-bottom:4px">' + medals[idx] + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:#fff">' + esc(p.nombre || 'Parche') + '</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:900;color:var(--gold)">' + fmtXp(p.fama_total) + ' fama</div>'
+          + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' + (parseInt(p.miembros_activos,10)||0) + ' activos</div>'
+          + (p.ciudad_base ? '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + esc(p.ciudad_base) + '</div>' : '')
+          + '</div>';
+      });
+      html += '</div>';
+      var resto = parches.slice(3, 12);
+      if (resto.length) {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        resto.forEach(function(p, i){
+          html += '<div class="pand-card" style="margin-bottom:0;display:flex;align-items:center;gap:10px">'
+            + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:900;color:rgba(255,255,255,.5);width:28px;text-align:center">' + (i + 4) + '</div>'
+            + '<div style="flex:1;min-width:0">'
+            + '<div class="pand-title" style="font-size:14px;margin-bottom:2px">' + esc(p.nombre || 'Parche') + '</div>'
+            + '<div class="pand-meta" style="margin-bottom:0">' + esc(p.ciudad_base || 'Sin ciudad') + ' \u00b7 ' + (parseInt(p.miembros,10)||0) + ' miembros \u00b7 ' + (parseInt(p.miembros_activos,10)||0) + ' activos</div>'
+            + '</div>'
+            + '<div class="pand-fama" style="margin-bottom:0">' + fmtXp(p.fama_total) + ' fama</div>'
+            + '</div>';
+        });
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    })
+    .catch(function(){
+      el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar el ranking de Parches.</div>';
+    });
+}
+var RK_VISTA = 'viajeros';
+var RK_SUB = {
+  viajeros: 'Actualizado en tiempo real · Top 20 viajeros más activos',
+  casas: 'Casas con mas XP total, miembros activos vigentes (30 dias) y promedio por miembro',
+  facciones: 'Suma de XP de sus miembros por faccion',
+  parches: 'Parches ordenados por fama total'
+};
+function setRankingVista(v) {
+  v = ['viajeros','casas','facciones','parches'].indexOf(v) !== -1 ? v : 'viajeros';
+  RK_VISTA = v;
+  document.querySelectorAll('#cpanel-ranking .rk-chip').forEach(function(c){
+    c.classList.toggle('on', c.getAttribute('data-rk') === v);
+  });
+  var foco = document.getElementById('rk-foco');
+  if (foco) foco.textContent = v.toUpperCase();
+  var sub = document.getElementById('rk-sub');
+  if (sub) sub.textContent = RK_SUB[v];
+  ['viajeros','casas','facciones','parches'].forEach(function(k){
+    var el = document.getElementById(k === 'viajeros' ? 'lb-list' : 'rk-' + k);
+    if (el) el.style.display = (k === v) ? '' : 'none';
+  });
+  if (v === 'viajeros') cargarLeaderboard();
+  else if (v === 'casas') cargarCasasRanking();
+  else if (v === 'facciones') cargarFaccionesAo();
+  else cargarParchesRanking();
 }
 
 /* ---- MAPA AUDIOVISUAL (ADR-017, P9/P10) ---- */
@@ -1962,20 +2115,35 @@ function initActivoOculto() {
     if (guest) guest.style.display = 'block';
     if (banner) banner.style.display = 'none';
     aoVacio('ao-proponer');
-    aoVacio('ao-facciones');
+    aoFaccionesCta();
     aoVacio('ao-pendientes');
     return;
   }
   if (guest) guest.style.display = 'none';
   if (banner) banner.style.display = aoEmailVerificado() ? 'none' : 'block';
   renderAoProponer();
-  cargarFaccionesAo();
+  aoFaccionesCta();
   cargarAoPendientes();
 }
 
 function aoVacio(id) {
   var el = document.getElementById(id);
   if (el) el.innerHTML = '';
+}
+
+/* El ranking de facciones vive ahora en el tab Ranking: en Wayfarer solo
+   queda el CTA que salta a la sub-vista (sin duplicar el render). */
+function aoFaccionesCta() {
+  var el = document.getElementById('ao-facciones');
+  if (!el) return;
+  el.innerHTML = '<div class="pand-card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    + '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.65)">\uD83C\uDFF0 Ranking de Facciones</div>'
+    + '<button class="pand-btn pand-btn-outline" onclick="verRankingFacciones()">Ver ranking de facciones</button>'
+    + '</div>';
+}
+function verRankingFacciones() {
+  showCommTab('ranking');
+  setRankingVista('facciones');
 }
 
 function renderAoProponer() {
@@ -2150,53 +2318,37 @@ function aoVotar(activoId, voto, btn) {
     });
 }
 
+/* Ranking de Facciones: sub-vista del tab Ranking. En Wayfarer queda solo
+   el CTA (aoFaccionesCta) que salta aqui, sin duplicar el render. */
 function cargarFaccionesAo() {
-  var el = document.getElementById('ao-facciones');
+  var el = document.getElementById('rk-facciones');
   if (!el) return;
-  el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
-    + '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:16px">Cargando facciones\u2026</div>';
+  var head = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:0 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>';
+  el.innerHTML = head + '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:16px">Cargando facciones\u2026</div>';
   fetch('/api/usuarios?tipo=faccion_ranking')
     .then(function(r){ return r.json(); })
     .then(function(res){
       var data = (res && res.data) || {};
       var facciones = data.facciones || [];
       if (!facciones.length) {
-        el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
-          + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">A\u00fan no hay facciones en el ranking.</div>';
+        el.innerHTML = head + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">A\u00fan no hay facciones en el ranking.</div>';
         return;
       }
-      var html = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
-        + '<div class="ao-podium">';
+      var html = head + '<div class="ao-podium">';
       facciones.forEach(function(f, idx){
         var info = _aoFacciones[f.faccion] || { nombre: f.faccion, icono: '\uD83C\uDFF4' };
         html += '<div class="ao-pod-item' + (idx === 0 ? ' first' : '') + '" title="Ranking de facciones por XP">'
           + '<div class="ao-pod-icon" style="font-size:26px;margin-bottom:4px">' + info.icono + '</div>'
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:#fff;text-transform:capitalize">' + esc(info.nombre) + '</div>'
           + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' + (parseInt(f.miembros,10)||0) + ' miembros</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:900;color:var(--gold)">' + lbXpFmt(f.xp_total) + ' XP</div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:900;color:var(--gold)">' + fmtXp(f.xp_total) + ' XP</div>'
           + '</div>';
       });
-      html += '</div>'
-        + '<div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">\u00b7 L\u00edderes de cada facci\u00f3n (top 3):</div>';
-      var top = data.top || [];
-      if (top.length) {
-        html += '<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px">';
-        top.slice(0, 8).forEach(function(t){
-          var ti = _aoFacciones[t.faccion] || {};
-          html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
-            + '<span style="font-size:13px">' + (ti.icono || '\uD83C\uDFF4') + '</span>'
-            + '<span style="flex:1;font-size:11px;color:#fff">' + esc(t.nombre || 'Viajero') + '</span>'
-            + '<span style="font-size:10px;color:rgba(255,255,255,.4);text-transform:capitalize">' + esc(t.faccion || '') + '</span>'
-            + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;color:var(--gold)">' + lbXpFmt(t.xp_total) + ' XP</span>'
-            + '</div>';
-        });
-        html += '</div>';
-      }
+      html += '</div>' + rkTopHtml(data.top, _aoFacciones, '\uD83C\uDFF4');
       el.innerHTML = html;
     })
     .catch(function(){
-      el.innerHTML = '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin:14px 0 8px">\uD83C\uDFF0 Ranking de Facciones (por XP)<div style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-top:2px">Suma de XP de sus miembros</div></div>'
-        + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">No se pudo cargar el ranking de facciones.</div>';
+      el.innerHTML = head + '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:14px 0;text-align:center">No se pudo cargar el ranking de facciones.</div>';
     });
 }
 
@@ -2210,7 +2362,7 @@ function showCommTab(tab) {
   var panel = document.getElementById('cpanel-' + tab);
   if(panel) {
     panel.classList.add('on');
-    if(tab === 'ranking') cargarLeaderboard();
+    if(tab === 'ranking') setRankingVista(RK_VISTA);
     if(tab === 'chat') renderChatRooms();
     if(tab === 'planes') renderPlanes();
     if(tab === 'mapa') onTabMapaAV();

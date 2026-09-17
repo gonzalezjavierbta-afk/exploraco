@@ -9,6 +9,9 @@
 //     Entrega 016 / migracion 016: aprobar otorga +50 XP al proponente con
 //     reparto piramidal; rechazar no paga nada. Cero borrado fisico)
 // Auth: Bearer exploraco12345 en todos los casos
+// v2 (ADR-035, 2026-09-17): precio_xp acepta decimal (punto o coma) y el
+// reparto de referidos usa ROUND(...,2) con Number; las respuestas de
+// resenas/consumibles normalizan las columnas XP (numeric llega string).
 
 const { neon } = require('@neondatabase/serverless');
 
@@ -31,6 +34,11 @@ function authInternal(req) {
     === (process.env.ADMIN_SECRET || 'exploraco12345');
 }
 
+// XP decimal (ADR-035): las columnas XP son numeric(12,2) y Neon las
+// entrega como STRING. red2 = half-up a 2 decimales; numXp = a Number.
+function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
 // == CATEGORIA DE CONSUMIBLE (WP-6, TSK-103 / ADR-028) ====================
 // Categorias conocidas del catalogo (migracion 018): perfil | impulso |
 // social | coleccion | general. La columna consumibles.categoria NO lleva
@@ -52,10 +60,12 @@ function normalizarCategoriaConsumible(valor) {
 // (FUENTE DE VERDAD; si cambia alla, actualizar aqui). Constante API:
 // con WITH RECURSIVE cadena de 5 niveles + UPDATE como SENTENCIA
 // PRINCIPAL con FROM cadena (regla Postgres 0A000: un UPDATE dentro del
-// WITH es ilegal), FLOOR 10/5/3/2/1 % sobre xp_ref_total y tope
-// referidos_directos_contados < 500. Nunca lanza: degrada a false.
+// WITH es ilegal), ROUND half-up a 2 decimales de 10/5/3/2/1 % sobre
+// xp_ref_total (ADR-035) y tope referidos_directos_contados < 500.
+// Nunca lanza: degrada a false.
 function repartirXpReferidos(sql, usuarioId, xp) {
-  if (!usuarioId || !(parseInt(xp, 10) > 0)) return Promise.resolve(false);
+  var xpGan = Number(xp) || 0;
+  if (!usuarioId || !(xpGan > 0)) return Promise.resolve(false);
   return sql(
     'WITH RECURSIVE cadena AS ('
     + 'SELECT u.referido_por AS ancestro_id, 1 AS nivel FROM usuarios u '
@@ -66,12 +76,12 @@ function repartirXpReferidos(sql, usuarioId, xp) {
     + 'WHERE cadena.nivel < 5 AND u2.referido_por IS NOT NULL'
     + ') '
     + 'UPDATE usuarios a '
-    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + FLOOR($2 * ('
+    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + ROUND($2 * ('
     + 'CASE c.nivel WHEN 1 THEN 0.10 WHEN 2 THEN 0.05 '
-    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END)) '
+    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END), 2) '
     + 'FROM cadena c WHERE a.id = c.ancestro_id '
     + 'AND a.referidos_directos_contados < 500',
-    [usuarioId, parseInt(xp, 10)]
+    [usuarioId, xpGan]
   ).then(function(){ return true; }).catch(function(){ return false; });
 }
 
@@ -211,7 +221,7 @@ module.exports = async function handler(req, res) {
         data: rows2.map(function(r){
           var txt=r.texto||''; var m=txt.match(/^\[([^\]]+)\]\s*/);
           return { id:r.id, rating: r.rating?parseFloat(r.rating):0, texto: m?txt.slice(m[0].length):txt,
-            fecha:r.creado_en, xp:r.xp_ganado||0,
+            fecha:r.creado_en, xp:red2(numXp(r.xp_ganado)),
             usuario:{ nombre:r.usuario_nombre||(m?m[1]:'An\u00f3nimo'), email:r.usuario_email||null },
             destino:{ id:r.destino_id, slug:r.destino_slug||'', nombre:r.destino_nombre||'', ciudad:r.destino_ciudad||'' }};
         }),
@@ -328,6 +338,7 @@ module.exports = async function handler(req, res) {
         'SELECT id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en '
         + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
       );
+      filasC = filasC.map(function(c){ c.precio_xp = red2(numXp(c.precio_xp)); return c; });
       return res.status(200).json({ ok:true, data: filasC, total: filasC.length });
     }
 
@@ -336,13 +347,15 @@ module.exports = async function handler(req, res) {
       var claveN = String(body.clave||'').trim().toLowerCase();
       var nombreN = String(body.nombre||'').trim();
       var descN  = String(body.descripcion||'').trim();
-      var precioN = parseInt(body.precio_xp, 10);
+      // ADR-035: precio_xp es numeric(12,2); acepta decimal con punto o coma.
+      var precioN = parseFloat(String(body.precio_xp == null ? '' : body.precio_xp).replace(',', '.'));
       if (!claveN || !nombreN) {
         return res.status(400).json({ ok:false, error:'clave y nombre son obligatorios' });
       }
-      if (!Number.isInteger(precioN) || precioN <= 0) {
-        return res.status(400).json({ ok:false, error:'precio_xp debe ser un entero mayor que 0' });
+      if (!isFinite(precioN) || precioN <= 0) {
+        return res.status(400).json({ ok:false, error:'precio_xp debe ser un numero mayor que 0' });
       }
+      precioN = red2(precioN);
       // WP-6 (TSK-103 / ADR-028): categoria opcional; default 'general'
       // (mismo default de la columna). Si viene, se normaliza y valida.
       var catN = 'general';
@@ -360,6 +373,7 @@ module.exports = async function handler(req, res) {
         + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en',
         [claveN, nombreN, descN, precioN, catN]
       );
+      insC[0].precio_xp = red2(numXp(insC[0].precio_xp));
       return res.status(201).json({ ok:true, data: insC[0], mensaje:'Consumible creado' });
     }
 
@@ -378,11 +392,11 @@ module.exports = async function handler(req, res) {
         setsC.push('descripcion=$'+piC++); paramsC.push(String(body.descripcion||'').trim());
       }
       if ('precio_xp' in body) {
-        var precioE = parseInt(body.precio_xp, 10);
-        if (!Number.isInteger(precioE) || precioE < 0) {
-          return res.status(400).json({ ok:false, error:'precio_xp debe ser un entero mayor o igual a 0' });
+        var precioE = parseFloat(String(body.precio_xp == null ? '' : body.precio_xp).replace(',', '.'));
+        if (!isFinite(precioE) || precioE < 0) {
+          return res.status(400).json({ ok:false, error:'precio_xp debe ser un numero mayor o igual a 0' });
         }
-        setsC.push('precio_xp=$'+piC++); paramsC.push(precioE);
+        setsC.push('precio_xp=$'+piC++); paramsC.push(red2(precioE));
       }
       // WP-6 (TSK-103 / ADR-028): categoria editable (default de columna
       // 'general'; la lista conocida vive en normalizarCategoriaConsumible).
@@ -401,6 +415,7 @@ module.exports = async function handler(req, res) {
         paramsC
       );
       if (!updC.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
+      updC[0].precio_xp = red2(numXp(updC[0].precio_xp));
       return res.status(200).json({ ok:true, data: updC[0], mensaje:'Consumible actualizado' });
     }
 

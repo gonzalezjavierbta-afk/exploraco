@@ -1,4 +1,4 @@
-// api/interacciones.js  v14 (WP-4 TSK-103/ADR-028: Arbol de Clases 16 ramas x 5 nodos; base v13 Entrega 016)
+// api/interacciones.js  v18 (ADR-035: XP numeric(12,2), redondeo half-up 2 decimales y ranking de Parches; base v14 WP-4 TSK-103/ADR-028)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // interacciones columnas: rating (no puntuacion), creado_en (no created_at)
 // tipo CHECK: resena, guardado, visita, foto, rating
@@ -114,6 +114,15 @@ var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 
 // comparando usuarios.pais_base/ciudad_base con la ciudad del destino
 // (ciudades normalizadas con TRANSLATE para tolerar tildes, patron
 // ADR-012). Sin columnas nuevas: usa pais_base (017) y ciudad_base.
+//
+// v18 (ADR-035, 2026-09-17): el XP pasa a numeric(12,2). Helpers red2
+// (half-up a 2 decimales) y numXp (normaliza el string de Neon a Number).
+// calcularNivelLocal/ent/D_R, sqlBonoFila, reparto de referidos, fama de
+// Parche, amuletos, visitas, compra de consumibles, admin_xp y xp_bono de
+// retos pasan a half-up 2. La guarda de fama (famaBase < 1) pasa a <= 0.
+// El gate de album_crear usa calcularNivelLocal (antes Math.floor/100+1).
+// NUEVA rama GET tipo=pandilla_ranking (global por fama_total DESC, con
+// miembros_activos y fallback 42703). Cero endpoints nuevos (8/8).
 var TIERRA_RADIO_M = 6371008.8;
 var RADIO_DEFAULT_M = 100;
 var RADIO_POR_CATEGORIA = { sitio: 100, hostal: 100, comida: 100, evento: 150 };
@@ -186,6 +195,12 @@ function tieneCoordsValidas(lat, lng) {
     && isFinite(lat) && isFinite(lng) && lat !== 0 && lng !== 0;
 }
 
+// XP decimal (ADR-035): las columnas XP son numeric(12,2). Neon entrega
+// numeric como STRING, asi que todo valor XP se normaliza a Number y se
+// redondea half-up a 2 decimales con helpers unicos.
+function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
 // Bornes de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
 // la UI sincroniza XP_LEVELS en index/mi-perfil/comunidad). Se usan
 // para calcular nivel y era en GETs locales (inventario) sin depender
@@ -195,7 +210,7 @@ var NIVELES_LOCAL = [
   4000, 5200, 6800, 8500, 10500, 13000, 16000, 19500, 24000, 30000
 ];
 function calcularNivelLocal(xpTotal) {
-  var xp = parseInt(xpTotal, 10) || 0;
+  var xp = Number(xpTotal) || 0;
   var idx = 0;
   for (var i = 0; i < NIVELES_LOCAL.length; i++) {
     if (xp >= NIVELES_LOCAL[i]) idx = i;
@@ -257,7 +272,7 @@ var VOCACIONES = [
 //
 // PUNTOS DERIVADOS (D_R): se recalculan en CADA lectura desde las
 // acciones reales del usuario; JAMAS se leen de usuarios.progreso_arbol.
-//   P_R = COALESCE((progreso_arbol->'bonos'->>R)::int, 0) + D_R
+//   P_R = COALESCE((progreso_arbol->'bonos'->>R)::numeric, 0) + D_R
 // Los 'bonos' provienen SOLO de misiones completadas (campos rama y
 // puntos_rama del catalogo MISIONES) o del bono unico de mis_perfil_completo.
 // Formulas D_R (ver calcularDerivadosArbol):
@@ -285,8 +300,8 @@ var VOCACIONES = [
 //   local      -> cur_critico, cur_colecciones, cur_datos, cur_guia, exp_ocultos
 //   nacional   -> exp_rutas, exp_ciudades
 //   extranjero -> cur_critico, art_literatura
-// El redondeo del bono es FLOOR(valor * 1.2) por fila/unidad (mismo
-// criterio que la piramide de referidos, FLOOR). En ramas sin ciudad de
+// El redondeo del bono es ROUND(valor * 1.2, 2) por fila/unidad (mismo
+// criterio que la piramide de referidos, ADR-035). En ramas sin ciudad de
 // destino (cur_colecciones, y el componente sin mapa de cur_guia, y
 // art_literatura) se aplica el ORIGEN PROPIO del usuario, documentado
 // como simplificacion.
@@ -549,7 +564,7 @@ function sqlLiteralArbol(s) {
 
 // Nivel de nodo alcanzado (1..5): mayor i con P_R >= RAMA_TIERS[i].
 function nivelNodoArbol(puntos) {
-  var p = parseInt(puntos, 10) || 0;
+  var p = Number(puntos) || 0;
   var idx = 0;
   for (var i = 0; i < RAMA_TIERS.length; i++) {
     if (p >= RAMA_TIERS[i]) idx = i;
@@ -559,7 +574,7 @@ function nivelNodoArbol(puntos) {
 
 // Nodos alcanzados con P_R (array de objetos del catalogo).
 function nodosDesbloqueadosArbol(rama, puntos) {
-  var p = parseInt(puntos, 10) || 0;
+  var p = Number(puntos) || 0;
   return rama.nodos.filter(function(n) { return p >= n.puntos; });
 }
 
@@ -622,12 +637,13 @@ function sqlOrigenNacional(exprCiudad) {
 function sqlOrigenLocalPropio() {
   return "(NOT $3::boolean AND " + sqlNormCiudad('$2') + " <> '')";
 }
-// Multiplicador x1.2 con FLOOR por fila/unidad (mismo redondeo que la
-// piramide de referidos). exprPuntos es un literal o una expresion SQL.
+// Multiplicador x1.2 con ROUND half-up a 2 decimales por fila/unidad
+// (mismo criterio que la piramide de referidos, ADR-035). exprPuntos es
+// un literal o una expresion SQL.
 var BONO_ORIGEN = 1.2;
 function sqlBonoFila(exprPuntos, cond) {
-  return "CASE WHEN " + cond + " THEN FLOOR((" + exprPuntos + ") * "
-    + BONO_ORIGEN + ") ELSE (" + exprPuntos + ") END";
+  return "CASE WHEN " + cond + " THEN ROUND((" + exprPuntos + ") * "
+    + BONO_ORIGEN + ", 2) ELSE (" + exprPuntos + ") END";
 }
 
 // Calcula los puntos DERIVADOS (D_R) de las 16 ramas. NUNCA lee
@@ -638,7 +654,7 @@ function calcularDerivadosArbol(sql, usuarioId, vocaciones) {
   var v = vocaciones || {};
   var out = {};
   RAMAS.forEach(function(r) { out[r.id] = 0; });
-  function ent(x) { return parseInt(x, 10) || 0; }
+  function ent(x) { return red2(parseFloat(x) || 0); }
 
   // Contexto de Origen (WP-5, ADR-028): UNA sola lectura de
   // pais_base/ciudad_base; nunca se persiste y nunca menciona
@@ -672,13 +688,13 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
   // Exploradores: rutas, ciudades y naturaleza (interacciones/destinos).
   var qExp = sql(
     "SELECT"
-    + " COALESCE(SUM(" + sqlBonoFila('i.xp_ganado', sqlOrigenNacional('d.ciudad'))
-    + ") FILTER (WHERE i.tipo IN ('guardado','visita') AND i.activo=true),0)::int AS exp_rutas,"
-    + " COALESCE(SUM(i.xp_ganado) FILTER (WHERE i.tipo='visita' AND i.activo=true),0)::int AS natura_xp,"
+    + " COALESCE(ROUND(SUM(" + sqlBonoFila('i.xp_ganado', sqlOrigenNacional('d.ciudad'))
+    + ") FILTER (WHERE i.tipo IN ('guardado','visita') AND i.activo=true), 2), 0) AS exp_rutas,"
+    + " COALESCE(ROUND(SUM(i.xp_ganado) FILTER (WHERE i.tipo='visita' AND i.activo=true), 2), 0) AS natura_xp,"
     + " (SELECT COUNT(*)::int FROM interacciones i2 JOIN destinos d2 ON d2.id=i2.destino_id"
     + "   WHERE i2.usuario_id=$1 AND i2.tipo='visita' AND i2.activo=true"
     + "   AND (i2.dims->'geo'->>'zona'='rural' OR d2.tags->>'subcategoria' IN ('naturaleza','aventura','parque'))) AS natura_rural,"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('40', sqlOrigenNacional('dc.ciudad')) + "),0)::int FROM ("
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('40', sqlOrigenNacional('dc.ciudad')) + "), 2), 0) FROM ("
     + "   SELECT DISTINCT d3.ciudad FROM interacciones i3 JOIN destinos d3 ON d3.id=i3.destino_id"
     + "   WHERE i3.usuario_id=$1 AND i3.tipo='visita' AND i3.activo=true AND COALESCE(d3.ciudad,'') <> '') dc) AS exp_ciudades"
     + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
@@ -697,10 +713,10 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
   // contar propuestas soft-deleted al derivar exp_ocultos.
   var qOcultos = sql(
     "SELECT"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('60', sqlOrigenLocal('ao.ciudad')) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('60', sqlOrigenLocal('ao.ciudad')) + "), 2), 0)"
     + "   FROM activos_ocultos ao WHERE ao.propuesto_por=$1 AND ao.activo=true"
     + "   AND (ao.votos_favor - ao.votos_contra) >= 3) AS aprobados,"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('10', sqlOrigenLocal('ao2.ciudad')) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('10', sqlOrigenLocal('ao2.ciudad')) + "), 2), 0)"
     + "   FROM activos_ocultos ao2 WHERE ao2.propuesto_por=$1 AND ao2.activo=true AND ao2.estado='pendiente'"
     + "   AND (ao2.votos_favor - ao2.votos_contra) < 3 AND (ao2.votos_favor - ao2.votos_contra) > -3) AS pendientes,"
     + " (SELECT COUNT(*)::int FROM activos_ocultos_checkins WHERE usuario_id=$1 AND activo=true) AS checkins",
@@ -715,9 +731,9 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
   // votos_utiles no existe (migracion 007 pendiente), reintenta solo con
   // el XP de la fila.
   var qCritico = sql(
-    "SELECT COALESCE(SUM(" + sqlBonoFila('i.xp_ganado + COALESCE(i.votos_utiles,0)*10',
+    "SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('i.xp_ganado + COALESCE(i.votos_utiles,0)*10',
       '(' + sqlOrigenLocal('d.ciudad') + ' OR $3::boolean)')
-    + ") FILTER (WHERE i.tipo IN ('resena','rating')),0)::int AS xp"
+    + ") FILTER (WHERE i.tipo IN ('resena','rating')), 2), 0) AS xp"
     + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
     pOrg
   ).then(function(rows) {
@@ -725,9 +741,9 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
     out.cur_critico = ent(q.xp);
   }).catch(function() {
     return sql(
-      "SELECT COALESCE(SUM(" + sqlBonoFila('i.xp_ganado',
+      "SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('i.xp_ganado',
         '(' + sqlOrigenLocal('d.ciudad') + ' OR $3::boolean)')
-      + ") FILTER (WHERE i.tipo IN ('resena','rating')),0)::int AS xp"
+      + ") FILTER (WHERE i.tipo IN ('resena','rating')), 2), 0) AS xp"
       + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
       pOrg
     ).then(function(rows) { out.cur_critico = ent((rows[0] || {}).xp); }).catch(function(){});
@@ -744,8 +760,8 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
     [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
-    var uCromo = localPropio ? Math.floor(15 * BONO_ORIGEN) : 15;
-    var uDorado = localPropio ? Math.floor(50 * BONO_ORIGEN) : 50;
+    var uCromo = localPropio ? red2(15 * BONO_ORIGEN) : 15;
+    var uDorado = localPropio ? red2(50 * BONO_ORIGEN) : 50;
     out.cur_colecciones = ent(q.n_cromos) * uCromo + ent(q.n_dorados) * uDorado;
   }).catch(function(){});
 
@@ -755,14 +771,14 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
   // album del comentario. Degrada completo si falta cualquiera.
   var qDatos = sql(
     "SELECT"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('8', sqlOrigenLocal('ao.ciudad')) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('8', sqlOrigenLocal('ao.ciudad')) + "), 2), 0)"
     + "   FROM activos_ocultos_votos av JOIN activos_ocultos ao ON ao.id=av.activo_id"
     + "   WHERE av.usuario_id=$1) AS n_votos_activo,"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "), 2), 0)"
     + "   FROM resena_votos rv JOIN interacciones i ON i.id=rv.resena_id"
     + "   LEFT JOIN destinos d ON d.id=i.destino_id"
     + "   WHERE rv.usuario_id=$1) AS n_review_voto,"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('5', sqlOrigenLocal('alb.ciudad')) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('5', sqlOrigenLocal('alb.ciudad')) + "), 2), 0)"
     + "   FROM album_comentarios ac JOIN album_fotos af ON af.id=ac.foto_id"
     + "   JOIN albumes alb ON alb.id=af.album_id"
     + "   WHERE ac.usuario_id=$1 AND ac.activo=true) AS n_comentarios",
@@ -779,12 +795,12 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
   // sqlOrigenLocalPropio lo referencia, asi que pOrg se mantiene.
   var qGuia = sql(
     "SELECT"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('40', sqlOrigenLocalPropio()) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('40', sqlOrigenLocalPropio()) + "), 2), 0)"
     + "   FROM mapas WHERE usuario_id=$1 AND publico=true) AS n_mapas_publicos,"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "),0)::int FROM mapa_destinos md"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "), 2), 0) FROM mapa_destinos md"
     + "   JOIN mapas m ON m.id=md.mapa_id LEFT JOIN destinos d ON d.id=md.destino_id"
     + "   WHERE m.usuario_id=$1) AS n_mapa_destinos,"
-    + " (SELECT COALESCE(SUM(" + sqlBonoFila('15', sqlOrigenLocalPropio()) + "),0)::int"
+    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('15', sqlOrigenLocalPropio()) + "), 2), 0)"
     + "   FROM planes_miembros WHERE usuario_id=$1) AS n_planes",
     pOrg
   ).then(function(rows) {
@@ -820,7 +836,7 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
 
   // Creadores: eventos (acciones sobre destinos de categoria evento).
   var qEventos = sql(
-    "SELECT COALESCE(SUM(i.xp_ganado),0)::int AS xp FROM interacciones i"
+    "SELECT COALESCE(ROUND(SUM(i.xp_ganado), 2), 0) AS xp FROM interacciones i"
     + " JOIN destinos d ON d.id=i.destino_id"
     + " WHERE i.usuario_id=$1 AND d.categoria_slug='evento'",
     [usuarioId]
@@ -863,7 +879,7 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
     // se bonifica la contribucion de las resenas largas. SIMPLIFICACION:
     // art_literatura no tiene destino, se usa el origen propio del usuario.
     out.art_literatura = (v.escritor ? 50 : 0)
-      + ent(q.n_largas) * (orgExtranjero ? Math.floor(15 * BONO_ORIGEN) : 15);
+      + ent(q.n_largas) * (orgExtranjero ? red2(15 * BONO_ORIGEN) : 15);
   }).catch(function(){});
 
   return Promise.all([qExp, qOcultos, qCritico, qColec, qDatos, qGuia,
@@ -899,9 +915,9 @@ function calcularArbolUsuario(sql, usuarioId) {
       .then(function(deriv) {
         var bonos = base.progresoArbol.bonos || {};
         base.ramas = RAMAS.map(function(r) {
-          var bono = parseInt(bonos[r.id], 10) || 0;
-          var derivado = parseInt(deriv[r.id], 10) || 0;
-          var puntos = bono + derivado;
+          var bono = red2(numXp(bonos[r.id]));
+          var derivado = red2(numXp(deriv[r.id]));
+          var puntos = red2(bono + derivado);
           var nivel = nivelNodoArbol(puntos);
           var vocKey = VOCACION_POR_RAMA_ART[r.id];
           var activa = vocKey
@@ -1740,7 +1756,7 @@ function xpConMultiplicador(sql, usuarioId, destinoId, xpBase) {
       var ciudad = r[0] ? r[0].ciudad : '';
       if (!ciudad) return xpBase;
       return esLiderDeCiudad(sql, usuarioId, ciudad).then(function(es){
-        return es ? Math.round(xpBase * 1.1) : xpBase;
+        return es ? red2(xpBase * 1.1) : red2(xpBase);
       });
     }).catch(function(){ return xpBase; });
 }
@@ -1785,12 +1801,13 @@ function actualizarCapacidad(sql, usuarioId, clave, valor) {
 // multiplicador_x2_usos > 0, duplica el XP de la accion y decrementa
 // el contador. Nunca lanza: fallo degrada a XP normal.
 function aplicarAmuletoX2(sql, usuarioId, xpBase) {
+  xpBase = red2(xpBase);
   if (!usuarioId) return Promise.resolve({ xp: xpBase, doubled: false });
   return leerCapacidades(sql, usuarioId).then(function(caps) {
     var usos = parseInt(caps.multiplicador_x2_usos, 10) || 0;
     if (usos <= 0) return { xp: xpBase, doubled: false };
     return actualizarCapacidad(sql, usuarioId, 'multiplicador_x2_usos', usos - 1)
-      .then(function() { return { xp: xpBase * 2, doubled: true }; });
+      .then(function() { return { xp: red2(xpBase * 2), doubled: true }; });
   });
 }
 
@@ -1850,7 +1867,8 @@ function intentarObtenerCromo(sql, usuarioId, destinoId) {
 // (ROUND), duplicado si capacidades->fama_x2_hasta es futuro (consumible
 // trompeta_fama). Nunca lanza: sin pandilla activa no hace nada.
 function aplicarFamaPandilla(sql, usuarioId, xpGanado) {
-  if (!usuarioId || !xpGanado) return Promise.resolve(false);
+  xpGanado = numXp(xpGanado);
+  if (!usuarioId || xpGanado <= 0) return Promise.resolve(false);
   return sql(
     'SELECT pm.pandilla_id FROM pandillas_miembros pm'
     + ' JOIN pandillas p ON p.id = pm.pandilla_id'
@@ -1859,12 +1877,12 @@ function aplicarFamaPandilla(sql, usuarioId, xpGanado) {
   ).then(function(rows) {
     if (!rows.length) return false;
     var pandillaId = rows[0].pandilla_id;
-    var famaBase = Math.round(xpGanado * 0.10);
-    if (famaBase < 1) return false;
+    var famaBase = red2(xpGanado * 0.10);
+    if (famaBase <= 0) return false;
     return leerCapacidades(sql, usuarioId).then(function(caps) {
       var fama = famaBase;
       if (caps.fama_x2_hasta && new Date(String(caps.fama_x2_hasta)) > new Date()) {
-        fama = famaBase * 2;
+        fama = red2(famaBase * 2);
       }
       return sql('UPDATE pandillas SET fama_total = fama_total + $1 WHERE id=$2', [fama, pandillaId])
         .then(function(){ return true; });
@@ -1903,18 +1921,18 @@ function progresarPandillaRetos(sql, usuarioId, tipoReto) {
       // Reparte el bono de cada reto completado entre los miembros activos
       var cadena = Promise.resolve();
       completados.forEach(function(r) {
-        if (!(parseInt(r.xp_bono, 10) > 0)) return;
+        if (!(numXp(r.xp_bono) > 0)) return;
         cadena = cadena.then(function() {
           return sql(
             'UPDATE usuarios SET xp_total = xp_total + $1'
             + ' WHERE id IN (SELECT usuario_id FROM pandillas_miembros'
             + ' WHERE pandilla_id=$2 AND activo=true)',
-            [r.xp_bono, prPandillaId]
+            [red2(numXp(r.xp_bono)), prPandillaId]
           );
         });
       });
       return cadena.then(function() {
-        return { titulo: primer.titulo, xp_bono: parseInt(primer.xp_bono, 10) || 0 };
+        return { titulo: primer.titulo, xp_bono: red2(numXp(primer.xp_bono)) };
       });
     });
   }).catch(function(){ return null; });
@@ -1974,12 +1992,13 @@ function consumirNonce(sql, nonce, usuarioId) {
 
 // Reparto multinivel de la piramide de referidos (Entrega 016): del XP
 // ganado por el usuario, sus ancestros hasta 5 niveles reciben 10/5/3/2/1
-// % (FLOOR) sobre xp_ref_total, solo si el ancestro no supero el tope de
-// 500 referidos directos. REGLA Postgres (0A000): el UPDATE es la
-// sentencia PRINCIPAL con FROM cadena - jamas un UPDATE dentro del WITH
-// RECURSIVE. Nunca lanza: degrada a false.
+// % (ROUND half-up a 2 decimales, ADR-035) sobre xp_ref_total, solo si el
+// ancestro no supero el tope de 500 referidos directos. REGLA Postgres
+// (0A000): el UPDATE es la sentencia PRINCIPAL con FROM cadena - jamas un
+// UPDATE dentro del WITH RECURSIVE. Nunca lanza: degrada a false.
 function repartirXpReferidos(sql, usuarioId, xpGanado) {
-  if (!usuarioId || !(parseInt(xpGanado, 10) > 0)) return Promise.resolve(false);
+  var xpGan = Number(xpGanado) || 0;
+  if (!usuarioId || !(xpGan > 0)) return Promise.resolve(false);
   return sql(
     'WITH RECURSIVE cadena AS ('
     + 'SELECT u.referido_por AS ancestro_id, 1 AS nivel FROM usuarios u '
@@ -1990,12 +2009,12 @@ function repartirXpReferidos(sql, usuarioId, xpGanado) {
     + 'WHERE cadena.nivel < 5 AND u2.referido_por IS NOT NULL'
     + ') '
     + 'UPDATE usuarios a '
-    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + FLOOR($2 * ('
+    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + ROUND($2 * ('
     + 'CASE c.nivel WHEN 1 THEN 0.10 WHEN 2 THEN 0.05 '
-    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END)) '
+    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END), 2) '
     + 'FROM cadena c WHERE a.id = c.ancestro_id '
     + 'AND a.referidos_directos_contados < 500',
-    [usuarioId, parseInt(xpGanado, 10)]
+    [usuarioId, xpGan]
   ).then(function(){ return true; }).catch(function(){ return false; });
 }
 
@@ -2186,7 +2205,7 @@ function evaluarMisiones(sql, usuarioId) {
     var ctx = {
       sql: sql,
       usuarioId: usuarioId,
-      xpTotal: parseInt(u.xp_total) || 0,
+      xpTotal: numXp(u.xp_total),
       totalGuardados: parseInt(u.total_guardados) || 0,
       totalVisitas: parseInt(u.total_visitas) || 0,
       visitasActivas: visitasActivasM,
@@ -2215,7 +2234,7 @@ function evaluarMisiones(sql, usuarioId) {
 
     return cadena.then(function() {
       if (!nuevas.length) return [];
-      var xpBonus = nuevas.reduce(function(s, m){ return s + m.xp; }, 0);
+      var xpBonus = red2(nuevas.reduce(function(s, m){ return s + (Number(m.xp) || 0); }, 0));
       return sql(
         'UPDATE usuarios SET'
         + '   progreso_misiones = COALESCE(progreso_misiones,\'{}\'::jsonb) || $1::jsonb,'
@@ -2233,7 +2252,7 @@ function evaluarMisiones(sql, usuarioId) {
         nuevas.forEach(function(m) {
           if (!m.rama || !m.puntos_rama) return;
           if (!RAMA_POR_ID[m.rama]) return;
-          var pts = parseInt(m.puntos_rama, 10) || 0;
+          var pts = red2(numXp(m.puntos_rama));
           if (pts <= 0) return;
           bonos[m.rama] = (bonos[m.rama] || 0) + pts;
         });
@@ -2242,7 +2261,7 @@ function evaluarMisiones(sql, usuarioId) {
         var sumaSql = ramasBonus.map(function(r) {
           var lit = sqlLiteralArbol(r);
           return ' || jsonb_build_object(' + lit
-            + ", COALESCE((progreso_arbol->'bonos'->>" + lit + ')::int,0) + ' + bonos[r] + ')';
+            + ", COALESCE((progreso_arbol->'bonos'->>" + lit + ')::numeric,0) + ' + bonos[r] + ')';
         }).join('');
         return sql(
           "UPDATE usuarios SET progreso_arbol = COALESCE(progreso_arbol,'{}'::jsonb)"
@@ -2284,7 +2303,7 @@ function evaluarLogros(sql, usuarioId) {
     var ctx = {
       sql: sql,
       usuarioId: usuarioId,
-      xpTotal: parseInt(u.xp_total) || 0,
+      xpTotal: numXp(u.xp_total),
       totalGuardados: parseInt(u.total_guardados) || 0,
       totalVisitas: parseInt(u.total_visitas) || 0,
       progresoLogros: progreso,
@@ -2358,7 +2377,7 @@ function evaluarLogros(sql, usuarioId) {
 
     return cadena.then(function() {
       if (!nuevos.length) return [];
-      var xpBonus = nuevos.reduce(function(s, l){ return s + l.xp; }, 0);
+      var xpBonus = red2(nuevos.reduce(function(s, l){ return s + (Number(l.xp) || 0); }, 0));
       return sql(
         'UPDATE usuarios SET'
         + '   progreso_logros = COALESCE(progreso_logros,\'{}\'::jsonb) || $1::jsonb,'
@@ -2835,7 +2854,7 @@ module.exports = async function handler(req, res) {
         if (!mpRows.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         var mpU = mpRows[0];
-        var mpCalc = calcularNivelLocal(mpU.xp_total);
+        var mpCalc = calcularNivelLocal(numXp(mpU.xp_total));
         var mpNivel = mpCalc.nivel;
         var mpEsPublico = (mpU.perfil_publico !== false);
         if (!mpEsPublico) {
@@ -2958,7 +2977,7 @@ module.exports = async function handler(req, res) {
               era: calcularEraLocal(mpNivel),
               faccion: mpU.faccion || null,
               casa: mpU.casa || null,
-              xp_total: parseInt(mpU.xp_total, 10) || 0,
+              xp_total: red2(numXp(mpU.xp_total)),
               perfil_publico: mpEsPublico,
               dm_abierto: mpU.dm_abierto !== false,
             },
@@ -2969,7 +2988,7 @@ module.exports = async function handler(req, res) {
             mapa: mpMapa,
             arbol: mpArbol,
             parche: mpParcheRows.length
-              ? { id: mpParcheRows[0].id, nombre: mpParcheRows[0].nombre, fama_total: parseInt(mpParcheRows[0].fama_total, 10) || 0 }
+              ? { id: mpParcheRows[0].id, nombre: mpParcheRows[0].nombre, fama_total: red2(numXp(mpParcheRows[0].fama_total)) }
               : null,
             stats: {
               visitas: parseInt(mpStats.visitas, 10) || 0,
@@ -3263,7 +3282,7 @@ module.exports = async function handler(req, res) {
           return res.status(404).json({ ok: false, error: 'No encontrado' });
 
         var famaExplorador = await sql(
-          'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
+          'SELECT COALESCE(ROUND(SUM(xp_ganado), 2),0) AS fama, '
           + ' COUNT(*) FILTER (WHERE i.tipo=\'guardado\' AND i.activo=true)::int AS n_guardados, '
           + ' COUNT(*) FILTER (WHERE i.tipo=\'visita\' AND i.activo=true)::int AS n_visitas '
           + ' FROM interacciones i WHERE i.usuario_id=$1 '
@@ -3271,7 +3290,7 @@ module.exports = async function handler(req, res) {
           [usuarioId]
         );
         var famaCritico = await sql(
-          'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
+          'SELECT COALESCE(ROUND(SUM(xp_ganado), 2),0) AS fama, '
           + ' COUNT(*) FILTER (WHERE i.tipo=\'resena\')::int AS n_resenas, '
           + ' COUNT(*) FILTER (WHERE i.tipo=\'rating\')::int AS n_votos '
           + ' FROM interacciones i WHERE i.usuario_id=$1 '
@@ -3293,7 +3312,7 @@ module.exports = async function handler(req, res) {
         // (tabla albumes de la migracion 009). Degrada a 0 si la tabla
         // no existe.
         var famaAudiovisual = await sql(
-          'SELECT COALESCE(SUM(xp_ganado),0)::int AS fama, '
+          'SELECT COALESCE(ROUND(SUM(xp_ganado), 2),0) AS fama, '
           + ' COUNT(*) FILTER (WHERE i.dims->>\'voto_foto_id\' IS NULL)::int AS n_fotos, '
           + ' COUNT(*) FILTER (WHERE i.dims->>\'voto_foto_id\' IS NOT NULL)::int AS n_votos_foto '
           + ' FROM interacciones i WHERE i.usuario_id=$1 AND i.tipo=\'foto\' AND i.activo=true',
@@ -3343,14 +3362,17 @@ module.exports = async function handler(req, res) {
         ];
 
         var fe = famaExplorador[0] || { fama: 0, n_guardados: 0, n_visitas: 0 };
+        fe.fama = red2(numXp(fe.fama));
         var fc = famaCritico[0] || { fama: 0, n_resenas: 0, n_votos: 0 };
+        fc.fama = red2(numXp(fc.fama));
         var fo = famaOrganizador[0] || { n_mapas: 0, n_publicos: 0, n_destinos: 0 };
-        var famaOrg = (fo.n_mapas * 40) + (fo.n_destinos * 5);
+        var famaOrg = red2((fo.n_mapas * 40) + (fo.n_destinos * 5));
         var fav = famaAudiovisual[0] || { fama: 0, n_fotos: 0, n_votos_foto: 0 };
+        fav.fama = red2(numXp(fav.fama));
         var favAlb = albumAudiovisual[0] || { n_albumes_geo: 0, n_videos: 0 };
-        var famaAudiovisualTotal = fav.fama + (favAlb.n_albumes_geo * 30) + (favAlb.n_videos * 35);
+        var famaAudiovisualTotal = red2(fav.fama + (favAlb.n_albumes_geo * 30) + (favAlb.n_videos * 35));
         var pandillaActiva = famaPandillaRow[0] || null;
-        var famaPandillaTotal = pandillaActiva ? (parseInt(pandillaActiva.fama_total, 10) || 0) : 0;
+        var famaPandillaTotal = pandillaActiva ? red2(numXp(pandillaActiva.fama_total)) : 0;
 
         var senderos = [
           {
@@ -3390,7 +3412,7 @@ module.exports = async function handler(req, res) {
           },
         ];
 
-        var famaTotalGlobal = senderos.reduce(function(s, sn){ return s + (parseInt(sn.fama, 10) || 0); }, 0);
+        var famaTotalGlobal = red2(senderos.reduce(function(s, sn){ return s + numXp(sn.fama); }, 0));
 
         return res.status(200).json({
           ok: true,
@@ -4165,6 +4187,11 @@ module.exports = async function handler(req, res) {
             []
           ).catch(function(){ return []; });
         }
+        // numeric(12,2) llega como string: normalizar el precio (ADR-035).
+        catalogoConsumibles = catalogoConsumibles.map(function(c) {
+          c.precio_xp = red2(numXp(c.precio_xp));
+          return c;
+        });
         return res.status(200).json({ ok: true, data: catalogoConsumibles });
       }
 
@@ -4181,7 +4208,7 @@ module.exports = async function handler(req, res) {
           return res.status(404).json({ ok: false, error: 'No encontrado' });
         var inv = invRows[0];
         var capsInv = inv.capacidades || {};
-        var invXp = parseInt(inv.xp_total, 10) || 0;
+        var invXp = red2(numXp(inv.xp_total));
         var invNivel = calcularNivelLocal(invXp);
         var invEra = calcularEraLocal(invNivel.nivel);
         var invCrudo = capsInv.consumibles || {};
@@ -4224,6 +4251,51 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: cromosRows });
       }
 
+      // Ranking global de Parches por fama acumulada (ADR-035, lectura
+      // publica sin sesion). miembros_activos = miembros vigentes (30
+      // dias): pm.activo=true + u.activo=true + ultimo_acceso reciente.
+      // Si usuarios.activo/ultimo_acceso no existen (42703), se
+      // reintenta la MISMA consulta sin la condicion de actividad y se
+      // devuelve miembros_activos=0 (nunca catch vacio).
+      if (tipo === 'pandilla_ranking') {
+        var prkLimit = parseInt(req.query.limit, 10);
+        if (!isFinite(prkLimit) || prkLimit <= 0) prkLimit = 50;
+        prkLimit = Math.min(prkLimit, 200);
+        // La condicion de actividad se interpola como literal SQL (no hay
+        // params libres: $1 es el LIMIT); el unico texto interpolado son
+        // nombres de columna controlados, ninguno viene del cliente.
+        var prkCond = 'pm.activo = true AND u.activo = true'
+          + ' AND u.ultimo_acceso > NOW() - INTERVAL \'30 days\'';
+        var prkSql = function (condAct) {
+          return 'SELECT p.id, p.nombre, p.ciudad_base, p.descripcion, p.fama_total,'
+            + ' (SELECT COUNT(*)::int FROM pandillas_miembros pm'
+            + '   WHERE pm.pandilla_id = p.id AND pm.activo = true) AS miembros,'
+            + ' (SELECT COUNT(*)::int FROM pandillas_miembros pm'
+            + '   JOIN usuarios u ON u.id = pm.usuario_id'
+            + '   WHERE pm.pandilla_id = p.id AND ' + condAct + ') AS miembros_activos'
+            + ' FROM pandillas p WHERE p.activo = true'
+            + ' ORDER BY p.fama_total DESC NULLS LAST, p.creado_en ASC LIMIT $1';
+        };
+        var prkParches;
+        try {
+          prkParches = await sql(prkSql(prkCond), [prkLimit]);
+        } catch (prkErr) {
+          if (!prkErr || prkErr.code !== '42703') throw prkErr;
+          console.warn('[interacciones] pandilla_ranking degradado 42703: ' + prkErr.message);
+          prkParches = await sql(prkSql('pm.activo = true'), [prkLimit]);
+        }
+        prkParches = prkParches.map(function (p) {
+          p.fama_total = red2(numXp(p.fama_total));
+          p.miembros = Number(p.miembros) || 0;
+          p.miembros_activos = Number(p.miembros_activos) || 0;
+          return p;
+        });
+        return res.status(200).json({
+          ok: true,
+          data: { parches: prkParches, total: prkParches.length },
+        });
+      }
+
       // Detalle de pandilla: pandilla + miembros activos + retos activos.
       // Contrato final: si el usuario NO tiene pandilla activa, devuelve
       // pandilla:null y pandillas_disponibles (activas con cupo < 10)
@@ -4252,6 +4324,10 @@ module.exports = async function handler(req, res) {
               + ' LIMIT 30',
               []
             ).catch(function(){ return []; });
+            pdLibres = pdLibres.map(function(p) {
+              p.fama_total = red2(numXp(p.fama_total));
+              return p;
+            });
             return res.status(200).json({
               ok: true,
               data: { pandilla: null, miembros: [], retos: [], pandillas_disponibles: pdLibres },
@@ -4283,6 +4359,11 @@ module.exports = async function handler(req, res) {
           + ' ORDER BY fecha_fin ASC',
           [pdPandillaId]
         ).catch(function(){ return []; });
+        pdRows[0].fama_total = red2(numXp(pdRows[0].fama_total));
+        pdRetos = pdRetos.map(function(r) {
+          r.xp_bono = red2(numXp(r.xp_bono));
+          return r;
+        });
         return res.status(200).json({
           ok: true,
           data: { pandilla: pdRows[0], miembros: pdMiembros, retos: pdRetos, pandillas_disponibles: [] },
@@ -4299,6 +4380,10 @@ module.exports = async function handler(req, res) {
           + ' ORDER BY fecha_fin ASC',
           [req.query.pandilla_id]
         ).catch(function(){ return []; });
+        prRows2 = prRows2.map(function(r) {
+          r.xp_bono = red2(numXp(r.xp_bono));
+          return r;
+        });
         return res.status(200).json({ ok: true, data: prRows2 });
       }
 
@@ -4370,7 +4455,7 @@ module.exports = async function handler(req, res) {
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         if (!(aoVUsr[0].email_verificado === true))
           return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
-        if (calcularNivelLocal(parseInt(aoVUsr[0].xp_total, 10) || 0).nivel < 5)
+        if (calcularNivelLocal(numXp(aoVUsr[0].xp_total)).nivel < 5)
           return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE' });
         var aoActivoId = String(body.activo_id || '');
         if (!aoActivoId)
@@ -5003,7 +5088,7 @@ module.exports = async function handler(req, res) {
         if (!dmEmisorRow.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         var dmEmisor = dmEmisorRow[0];
-        var dmNivel = calcularNivelLocal(dmEmisor.xp_total).nivel;
+        var dmNivel = calcularNivelLocal(numXp(dmEmisor.xp_total)).nivel;
         if (dmNivel < 3)
           return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: dmNivel });
         if (!(dmEmisor.email_verificado === true))
@@ -5029,7 +5114,7 @@ module.exports = async function handler(req, res) {
         );
         var dmSalaId = dmSalaPrev.length ? dmSalaPrev[0].id : null;
         var dmXpCobrado = 0;
-        var dmXpAntes = parseInt(dmEmisor.xp_total, 10) || 0;
+        var dmXpAntes = numXp(dmEmisor.xp_total);
         var dmNivelAnt = dmNivel;
         var dmXpNuevo = dmXpAntes;
         if (!dmSalaId) {
@@ -5066,7 +5151,7 @@ module.exports = async function handler(req, res) {
             // Cobro confirmado por la BD: sala nueva + xp_total_nuevo real.
             dmSalaId = dmCobro.sala_id;
             dmXpCobrado = 20;
-            dmXpNuevo = parseInt(dmCobro.xp_total, 10) || 0;
+            dmXpNuevo = numXp(dmCobro.xp_total);
           } else {
             // Sin fila de cobro: o xp < 20 (402) o carrera perdida contra
             // otro request que creo el hilo (se reusa, xp_cobrado 0).
@@ -5094,7 +5179,7 @@ module.exports = async function handler(req, res) {
           id: dmIns[0].id,
           creado_en: dmIns[0].creado_en,
           xp_cobrado: dmXpCobrado,
-          xp_total_nuevo: dmXpNuevo,
+          xp_total_nuevo: red2(dmXpNuevo),
           nivel_anterior: dmNivelAnt,
           nivel_nuevo: dmNivelNuevo,
           bajo_nivel: dmNivelNuevo < dmNivelAnt,
@@ -5291,7 +5376,7 @@ module.exports = async function handler(req, res) {
 
         // Check nivel >= 2
         var nivelCheck = await sql('SELECT xp_total FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
-        var nivelCalc = nivelCheck[0] ? Math.floor(nivelCheck[0].xp_total / 100) + 1 : 1;
+        var nivelCalc = nivelCheck[0] ? calcularNivelLocal(nivelCheck[0].xp_total).nivel : 1;
         if (nivelCalc < 2) return res.status(403).json({ ok: false, error: 'Nivel insuficiente (requiere nivel 2)' });
 
         // Anti-spam: max 5 albumes/mes
@@ -5639,7 +5724,7 @@ module.exports = async function handler(req, res) {
         var axTieneNivel = body.nivel !== undefined && body.nivel !== null && body.nivel !== '';
         var axTieneDelta = body.delta_xp !== undefined && body.delta_xp !== null && body.delta_xp !== '';
         var axNivel = axTieneNivel ? parseInt(body.nivel, 10) : null;
-        var axDelta = axTieneDelta ? parseInt(body.delta_xp, 10) : null;
+        var axDelta = axTieneDelta ? red2(parseFloat(body.delta_xp)) : null;
         if (!axTieneNivel && !axTieneDelta)
           return res.status(400).json({ ok: false, error: 'nivel o delta_xp requerido' });
         if (axTieneNivel && axTieneDelta)
@@ -5654,15 +5739,15 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         if (!axUsr.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
-        var axXpActual = parseInt(axUsr[0].xp_total, 10) || 0;
+        var axXpActual = numXp(axUsr[0].xp_total);
         var axNuevoXp;
         if (axTieneNivel) {
           // Decision: subir a nivel X = minimo del umbral del nivel, pero
           // Math.max NO degrada a un usuario que ya supero ese nivel (no
           // se quita XP ganado legitimamente con una seleccion menor).
-          axNuevoXp = Math.max(NIVELES_ADMIN[axNivel - 1], axXpActual);
+          axNuevoXp = red2(Math.max(NIVELES_ADMIN[axNivel - 1], axXpActual));
         } else {
-          axNuevoXp = Math.max(0, axXpActual + axDelta);
+          axNuevoXp = red2(Math.max(0, axXpActual + axDelta));
         }
         var axUpd = await sql(
           'UPDATE usuarios SET xp_total=$1, ultimo_acceso=NOW() WHERE id=$2 RETURNING *',
@@ -5678,12 +5763,12 @@ module.exports = async function handler(req, res) {
               id: axFila.id,
               nombre: axFila.nombre,
               email: axFila.email,
-              xp_total: axNuevoXp,
+              xp_total: red2(axNuevoXp),
               nivel: axCalc.nivel,
               badge_actual: BADGES_LOCAL[axCalc.nivel - 1] || axFila.badge_actual || '',
               era: axEra,
             },
-            delta_aplicado: axTieneNivel ? (axNuevoXp - axXpActual) : axDelta,
+            delta_aplicado: red2(axTieneNivel ? (axNuevoXp - axXpActual) : axDelta),
             mensaje: 'XP actualizado'
           }
         });
@@ -5710,7 +5795,7 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         if (!vocUsrRow2.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
-        var vocNivel = calcularNivelLocal(parseInt(vocUsrRow2[0].xp_total, 10) || 0).nivel;
+        var vocNivel = calcularNivelLocal(numXp(vocUsrRow2[0].xp_total)).nivel;
         if (vocNivel < vocItem.nivel)
           return res.status(403).json({ ok: false, error: 'Sube a nivel ' + vocItem.nivel + ' para desbloquear esta vocacion' });
         var vocActual = (vocUsrRow2[0].vocaciones) || {};
@@ -5748,7 +5833,7 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         if (!ramActUsr.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
-        var ramActNivel = calcularNivelLocal(parseInt(ramActUsr[0].xp_total, 10) || 0).nivel;
+        var ramActNivel = calcularNivelLocal(numXp(ramActUsr[0].xp_total)).nivel;
         if (ramActNivel < 5)
           return res.status(403).json({ ok: false, error: 'Sube a nivel 5 para desbloquear el arbol de clases' });
         var ramActVoc = Object.assign({}, (ramActUsr[0].vocaciones) || {});
@@ -5808,7 +5893,7 @@ module.exports = async function handler(req, res) {
         await sql(
           "UPDATE usuarios SET progreso_arbol = COALESCE(progreso_arbol,'{}'::jsonb)"
           + " || jsonb_build_object('bonos', COALESCE(progreso_arbol->'bonos','{}'::jsonb)"
-          + "   || jsonb_build_object($1::text, COALESCE((progreso_arbol->'bonos'->>$1)::int,0) + 25),"
+          + "   || jsonb_build_object($1::text, COALESCE((progreso_arbol->'bonos'->>$1)::numeric,0) + 25),"
           + "   'rama_bono_elegida', $1::text)"
           + ' WHERE id=$2',
           [bonoRamaId, usuarioId2]
@@ -6096,7 +6181,7 @@ module.exports = async function handler(req, res) {
         // usuario alcanzo el nodo 5 de una rama cuyo efecto descuenta la
         // categoria del consumible. Si el calculo degrada, no hay
         // descuento (nunca rompe la compra).
-        var ccPrecioBase = parseInt(ccCons[0].precio_xp, 10) || 0;
+        var ccPrecioBase = red2(numXp(ccCons[0].precio_xp));
         var ccCategoria = ccCons[0].categoria || null;
         var ccDescPct = 0;
         if (ccCategoria) {
@@ -6108,14 +6193,14 @@ module.exports = async function handler(req, res) {
           }
         }
         var ccPrecio = ccDescPct > 0
-          ? Math.floor(ccPrecioBase * (100 - ccDescPct) / 100)
+          ? red2(ccPrecioBase * (100 - ccDescPct) / 100)
           : ccPrecioBase;
         var ccUsr = await sql('SELECT xp_total, capacidades FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
         if (!ccUsr.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
-        var ccXp = parseInt(ccUsr[0].xp_total, 10) || 0;
+        var ccXp = numXp(ccUsr[0].xp_total);
         if (ccXp < ccPrecio)
-          return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_total: ccXp, precio: ccPrecio });
+          return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_total: red2(ccXp), precio: ccPrecio });
         // Anti-farming: max 5 compras por dia por usuario
         var ccCount = await sql(
           "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'",
@@ -6145,14 +6230,14 @@ module.exports = async function handler(req, res) {
           'INSERT INTO compra_consumibles (usuario_id, consumible_id, xp_pagado) VALUES ($1,$2,$3)',
           [usuarioId2, ccCons[0].id, ccPrecio]
         ).catch(function(){});
-        var ccXpNuevo = parseInt(ccUpd[0].xp_total, 10) || 0;
+        var ccXpNuevo = numXp(ccUpd[0].xp_total);
         var ccNivelNuevo = calcularNivelLocal(ccXpNuevo).nivel;
         return res.status(200).json({
           ok: true,
           precio_base: ccPrecioBase,
           precio_final: ccPrecio,
           descuento_pct: ccDescPct,
-          xp_total_nuevo: ccXpNuevo,
+          xp_total_nuevo: red2(ccXpNuevo),
           nivel_anterior: ccNivelAnt,
           nivel_nuevo: ccNivelNuevo,
           bajo_nivel: ccNivelNuevo < ccNivelAnt,
@@ -6434,7 +6519,7 @@ module.exports = async function handler(req, res) {
         var pcUsr = await sql('SELECT xp_total FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
         if (!pcUsr.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
-        var pcNivel = calcularNivelLocal(pcUsr[0].xp_total).nivel;
+        var pcNivel = calcularNivelLocal(numXp(pcUsr[0].xp_total)).nivel;
         if (pcNivel < 14)
           return res.status(403).json({ ok: false, error: 'Se requiere nivel 14 (8500 XP) para fundar una pandilla' });
         var pcActiva = await sql(
@@ -6559,8 +6644,9 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'fecha_fin debe ser una fecha futura' });
         var prDesc = String(body.descripcion || '').trim().slice(0, 1000);
         var prTipoReto = String(body.tipo_reto || 'general').slice(0, 50);
-        var prXp = parseInt(body.xp_bono, 10);
+        var prXp = parseFloat(body.xp_bono);
         if (isNaN(prXp) || prXp < 0) prXp = 0;
+        else prXp = red2(prXp);
         var prIns = await sql(
           'INSERT INTO pandilla_retos (pandilla_id, titulo, descripcion, tipo_reto, meta_valor, fecha_fin, xp_bono)'
           + ' VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
@@ -6568,6 +6654,7 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         if (!prIns.length)
           return res.status(503).json({ ok: false, error: 'Retos no disponibles (migracion 010 pendiente?)' });
+        prIns[0].xp_bono = red2(numXp(prIns[0].xp_bono));
         return res.status(200).json({ ok: true, reto: prIns[0] });
       }
 
@@ -6676,7 +6763,7 @@ module.exports = async function handler(req, res) {
           // v9 (ADR-018): amuleto_x2 duplica el XP entregado y decrementa
           // el contador de usos (nunca modifica la fila de interacciones).
           amuletoResena = await aplicarAmuletoX2(sql, usuarioId2, xpResenaEntregado);
-          xpResenaEntregado = amuletoResena.xp;
+          xpResenaEntregado = red2(amuletoResena.xp);
           await sql(
             'UPDATE usuarios SET '
             + 'xp_total = xp_total + $1, '
@@ -6774,7 +6861,7 @@ module.exports = async function handler(req, res) {
         var xpGuardadoFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGuardado);
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoGuardado = await aplicarAmuletoX2(sql, usuarioId2, xpGuardadoFinal);
-        xpGuardadoFinal = amuletoGuardado.xp;
+        xpGuardadoFinal = red2(amuletoGuardado.xp);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
           [xpGuardadoFinal, usuarioId2]
@@ -6897,7 +6984,7 @@ module.exports = async function handler(req, res) {
         // geocerca se usa el radio resuelto; sin coords (sin_geocerca) no
         // hay penalizacion porque no hay area que abusar.
         var factorAreaVisita = modoVisita === 'geocerca' ? factorXpPorRadio(radioVisita) : 1;
-        var xpBaseVisita = Math.round(20 * factorAreaVisita);
+        var xpBaseVisita = red2(20 * factorAreaVisita);
 
         // 9) Anti-farming: cooldown, velocidad imposible y tope diario.
         var prevVisita = await sql(
@@ -6985,10 +7072,10 @@ module.exports = async function handler(req, res) {
         var multiplicadorVisita = xpVisitaFinal > xpBaseVisita ? 1.1 : 1;
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpVisitaFinal);
-        xpVisitaFinal = amuletoVisita.xp;
+        xpVisitaFinal = red2(amuletoVisita.xp);
         // El bono rural es plano: se suma al XP total sin multiplicador
         // ni amuleto y NO aporta fama a la pandilla.
-        var xpTotalVisita = xpVisitaFinal + bonoRuralVisita;
+        var xpTotalVisita = red2(xpVisitaFinal + bonoRuralVisita);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
           [xpTotalVisita, usuarioId2]
@@ -7093,7 +7180,7 @@ module.exports = async function handler(req, res) {
         var xpRatingFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 10);
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoRating = await aplicarAmuletoX2(sql, usuarioId2, xpRatingFinal);
-        xpRatingFinal = amuletoRating.xp;
+        xpRatingFinal = red2(amuletoRating.xp);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
           [xpRatingFinal, usuarioId2]

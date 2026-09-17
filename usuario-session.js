@@ -27,7 +27,7 @@
 
   // ── Calcular nivel a partir de XP total ───────────────────
   function calcularNivel(xpTotal) {
-    var xp = parseInt(xpTotal) || 0;
+    var xp = Number(xpTotal) || 0;
     if (xp < 0) xp = 0;
     for (var i = XP_LEVELS.length - 1; i >= 0; i--) {
       if (xp >= XP_LEVELS[i]) return i + 1;
@@ -38,6 +38,26 @@
   window.ExploraCO.calcularNivel = calcularNivel;
   window.ExploraCO.XP_LEVELS = XP_LEVELS;
   window.ExploraCO.MAX_NIVEL = MAX_NIVEL;
+
+  // ---- Helpers canonicos de XP (ADR-035: numeric(12,2)) ----
+  // Fuente unica del cliente. redondearXp se usa en la ACREDITACION
+  // (nunca al leer) y fmtXp en TODA superficie que muestre XP, con 2
+  // decimales fijos en formato es-CO.
+  function redondearXp(n) {
+    var v = Number(n);
+    if (!isFinite(v)) v = 0;
+    return Math.round((v + Number.EPSILON) * 100) / 100;
+  }
+
+  function fmtXp(n) {
+    return redondearXp(n).toLocaleString('es-CO', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  window.ExploraCO.redondearXp = redondearXp;
+  window.ExploraCO.fmtXp = fmtXp;
 
   // ── Mapa de capacidades por umbral de nivel ───────────────
   // Clave = nivel minimo, valor = nombre de la capacidad.
@@ -443,13 +463,13 @@
         // Antes decia data.xp_ganado, pero interacciones.js siempre
         // devuelve el campo como 'xp' -- este toast nunca disparaba con
         // el XP real (quedaba en silencio, ok seguia siendo true).
-        mostrarToast('♥ Guardado · +' + data.xp + ' XP', '#E8A020');
+        mostrarToast('♥ Guardado · +' + fmtXp(data.xp) + ' XP', '#E8A020');
         // Actualizar perfil local con nuevo XP (accion + bonus de misiones)
         if (window.ExploraCO.usuario) {
           var misionesXp = sumaMisionesXp(data.misiones);
           var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp + misionesXp + logrosXp;
+          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp);
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
@@ -498,12 +518,12 @@
       if (data.ok) {
         // Mismo bug de nombre de campo que guardarDestino: era
         // data.xp_ganado, interacciones.js devuelve 'xp'.
-        mostrarToast('⭐ Reseña publicada · +' + (data.xp || 0) + ' XP', '#16a34a');
+        mostrarToast('⭐ Reseña publicada · +' + fmtXp(data.xp || 0) + ' XP', '#16a34a');
         if (window.ExploraCO.usuario) {
           var misionesXp = sumaMisionesXp(data.misiones);
           var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp + logrosXp;
+          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + (data.xp || 0) + misionesXp + logrosXp);
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
@@ -555,11 +575,11 @@
 
       if (ahoraGuardado) {
         if (data.xp > 0) {
-          mostrarToast('♥ Guardado · +' + data.xp + ' XP', '#E8A020');
+          mostrarToast('♥ Guardado · +' + fmtXp(data.xp) + ' XP', '#E8A020');
           var misionesXp = sumaMisionesXp(data.misiones);
           var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp;
+          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp);
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
           mostrarMisionesToast(data.misiones);
@@ -779,11 +799,11 @@
         var extra = (data.dist_m != null)
           ? ' a ' + data.dist_m + ' m' + (data.zona ? ', zona ' + data.zona : '')
           : '';
-        mostrarToast('Visita confirmada' + extra + ' · +' + data.xp + ' XP', '#16a34a');
+        mostrarToast('Visita confirmada' + extra + ' · +' + fmtXp(data.xp) + ' XP', '#16a34a');
         var misionesXp = sumaMisionesXp(data.misiones);
           aplicarDesbloqueos(data.misiones);
         var logrosXp = sumaLogrosXp(data.logros);
-        window.ExploraCO.usuario.xp_total = (parseInt(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp;
+        window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp);
         guardarSesion(window.ExploraCO.usuario);
         actualizarUI();
         mostrarMisionesToast(data.misiones);
@@ -871,12 +891,12 @@
       });
       var data = await res.json();
       if (data.ok) {
-        mostrarToast('⭐ Voto guardado · +' + (data.xp || 0) + ' XP', '#16a34a');
+        mostrarToast('⭐ Voto guardado · +' + fmtXp(data.xp || 0) + ' XP', '#16a34a');
         if (window.ExploraCO.usuario) {
           var misionesXp = sumaMisionesXp(data.misiones);
           var logrosXp = sumaLogrosXp(data.logros);
           aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + (data.xp || 0) + misionesXp + logrosXp;
+          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + (data.xp || 0) + misionesXp + logrosXp);
           guardarSesion(window.ExploraCO.usuario);
           actualizarUI();
         }
@@ -1011,7 +1031,7 @@
   // esta sumado en Neon; aqui solo se refleja localmente y se avisa.
   function sumaMisionesXp(misiones) {
     if (!misiones || !misiones.length) return 0;
-    return misiones.reduce(function (s, m) { return s + (parseInt(m.xp) || 0); }, 0);
+    return misiones.reduce(function (s, m) { return s + (Number(m.xp) || 0); }, 0);
   }
   function aplicarDesbloqueos(misiones) {
     if (!misiones || !misiones.length || !window.ExploraCO.usuario) return;
@@ -1024,7 +1044,7 @@
     if (!misiones || !misiones.length) return;
     misiones.forEach(function (m, i) {
       setTimeout(function () {
-        mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + m.xp + ' XP', '#E8A020');
+        mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + fmtXp(m.xp) + ' XP', '#E8A020');
       }, i * 1600);
     });
   }
@@ -1037,13 +1057,13 @@
   // pequeno desfase para que no pise los toasts de misiones.
   function sumaLogrosXp(logros) {
     if (!logros || !logros.length) return 0;
-    return logros.reduce(function (s, l) { return s + (parseInt(l.xp) || 0); }, 0);
+    return logros.reduce(function (s, l) { return s + (Number(l.xp) || 0); }, 0);
   }
   function mostrarLogrosToast(logros) {
     if (!logros || !logros.length) return;
     logros.forEach(function (l, i) {
       setTimeout(function () {
-        mostrarToast((l.emoji || '🏆') + ' Trofeo desbloqueado: ' + l.nombre + ' · +' + l.xp + ' XP', '#E8A020');
+        mostrarToast((l.emoji || '🏆') + ' Trofeo desbloqueado: ' + l.nombre + ' · +' + fmtXp(l.xp) + ' XP', '#E8A020');
       }, i * 1600 + 900);
     });
   }
@@ -1065,8 +1085,8 @@
       return { ok: false, motivo: 'sin_sesion' };
     }
 
-    var xpGastar = parseInt(xpGastado) || 0;
-    var xpActual = parseInt(usuario.xp_total) || 0;
+    var xpGastar = redondearXp(xpGastado);
+    var xpActual = redondearXp(usuario.xp_total);
 
     if (xpGastar <= 0) {
       return { ok: false, motivo: 'xp_invalida' };
@@ -1076,7 +1096,7 @@
     }
 
     var nivelAnterior = calcularNivel(xpActual);
-    var xpNuevo = xpActual - xpGastar;
+    var xpNuevo = redondearXp(xpActual - xpGastar);
     var nivelNuevo = calcularNivel(xpNuevo);
     var bajoDeNivel = nivelNuevo < nivelAnterior;
 
@@ -1132,7 +1152,7 @@
         var xpEl   = document.getElementById('perfil-xp');
         var badge  = document.getElementById('perfil-badge');
         if (nameEl) nameEl.textContent = usuario.nombre;
-        if (xpEl)   xpEl.textContent   = (parseInt(usuario.xp_total) || 0) + ' XP';
+        if (xpEl)   xpEl.textContent   = fmtXp(usuario.xp_total) + ' XP';
         if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
       }
     } else {

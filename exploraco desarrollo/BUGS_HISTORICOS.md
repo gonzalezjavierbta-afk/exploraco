@@ -824,9 +824,10 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Severidad:** BAJA (inconsistencia de calculo; el gate de nivel 2 no coincide con el umbral real de 100 XP).
 **Sintoma:** el gate "nivel >= 2" para crear albumes se evalua con una formula distinta a la tabla oficial, por lo que el desbloqueo no coincide con el nivel que ve el usuario.
 **Causa:** `api/interacciones.js:3479` calcula `Math.floor(xp_total / 100) + 1`; la fuente de verdad de niveles es la tabla `NIVELES` de `api/usuarios.js:14-35` (nivel 2 = 100 XP).
-**Evidencia (ADR-006):** `api/interacciones.js:3479`; `api/usuarios.js:14-35`.
-**Fix sugerido (NO aplicado):** reutilizar el calculo oficial de nivel (helper compartido) en lugar de la formula `floor(xp/100)+1`.
-**Estado:** ROTO (consistencia, working tree 2026-09-14). Mapa completo: `ExploraCO_Sistema_Social_v5.md` (G-19, D-15).
+**Evidencia (ADR-006, al 2026-09-14):** `api/interacciones.js:3479`; `api/usuarios.js:14-35`.
+**Fix sugerido (NO aplicado en 2026-09-14):** reutilizar el calculo oficial de nivel (helper compartido) en lugar de la formula `floor(xp/100)+1`.
+**Fix aplicado (ADR-035 / TSK-109, 2026-09-17):** el gate de `album_crear` usa ahora `calcularNivelLocal(nivelCheck[0].xp_total).nivel`, el helper oficial de `api/interacciones.js` (misma tabla de 20 niveles que `api/usuarios.js`). Ubicacion real HOY: `api/interacciones.js` L5379 (la L3479 del reporte original quedo obsoleta por el crecimiento del archivo). Cierra la formula divergente que habia quedado latente y que ADR-035 seccion "Validacion" exigio corregir al migrar el XP.
+**Estado:** CORREGIDO (ADR-035 / TSK-109, working tree 2026-09-17). Se conserva el registro historico del hallazgo (Regla de Oro 3). Mapa completo: `ExploraCO_Sistema_Social_v5.md` (G-19, D-15).
 
 ## BUG-043: Tabs de comunidad desactualizados en GUIA_DE_DESARROLLO.md (doc-drift: 3 vs 7 reales)
 
@@ -1035,6 +1036,30 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Recomendacion (pendiente):** unificar la clase en una sola (`.photo-url-inp`) para `addPhotoFieldWithUrl()` y `showPhotoGrid()`, o exponer un selector/clase compartida; agregar un smoke que verifique que `getPhotos()` incluye una fila creada por todas las rutas de alta. Prevencion: mismo principio de BUG-006/007/012 (una sola fuente para el nombre del contrato, aplicado aqui a una clase de recoleccion).
 **Evidencia (ADR-006):** `admin.html` L4149 (`addPhotoFieldWithUrl` -> `photo-url-input`), L4159 (`showPhotoGrid` -> `.photo-url-input`), L4644/L4656 (`renderPhotoList`/`addPhotoField` -> `photo-url-inp`), L4673-4675 (`getPhotos` -> `.photo-url-inp`).
 **Estado:** DETECTADO, PENDIENTE (working tree, 2026-09-17). NO corregido en la entrega ADR-034; no bloqueante para el deploy pero si para la integridad de las galerias cargadas por Unsplash.
+
+## BUG-063: la guarda `famaBase < 1` de `aplicarFamaPandilla` descartaba aportes de fama menores a 1 XP -- Parches subcontados
+
+**Severidad:** MEDIA (integridad economica: la fama acumulada de los Parches quedaba por debajo de la real).
+**Contexto:** detectado y corregido durante la Entrega TSK-109 / ADR-035 (2026-09-17). Es PREEXISTENTE (introducido con la fama de Parche de ADR-018); forma parte del inventario de puntos de redondeo que ADR-035 obligo a corregir al pasar el XP a `numeric(12,2)`.
+**Sintoma:** un aporte de fama legitimamente menor a 1 XP (ej. 0.5, proveniente del 10% de una acreditacion fraccionaria) era descartado por completo en lugar de acumularse; el `fama_total` del Parche quedaba subcontado.
+**Causa raiz:** `aplicarFamaPandilla` calculaba `var famaBase = Math.round(xpGanado * 0.10);` y luego `if (famaBase < 1) return false;`. Con la economia entera previa el `< 1` equivalia a "0 o negativo", pero con XP decimal descarta aportes validos entre 0 y 1. Ademas `Math.round` no aplicaba el half-up a 2 decimales que ADR-035 define como criterio unico.
+**Resolucion aplicada:** helper de redondeo half-up a 2 decimales (`red2`) y guarda `<= 0`:
+  - `api/interacciones.js` L1880: `var famaBase = red2(xpGanado * 0.10);`
+  - `api/interacciones.js` L1881: `if (famaBase <= 0) return false;`
+  - L1885: el duplicado por el consumible `trompeta_fama` pasa a `red2(famaBase * 2)`.
+**Impacto del fix:** solo cambia el calculo hacia adelante (no hay recomputo historico; ver ADR-035: `pandillas.fama_total` NO se recomputa, solo cambia de tipo). Ya NO se descartan micro-fama.
+**Evidencia (ADR-006):** `api/interacciones.js` L1880-1885 (verificado en esta sesion documental el 2026-09-17).
+**Estado:** CORREGIDO (ADR-035 / TSK-109, working tree 2026-09-17).
+
+## Deuda ADR-035: columnas no versionadas de las que dependen los rankings (patron BUG-021)
+
+**Nota:** los rankings de la Entrega TSK-109 dependen de tres columnas que siguen SIN migracion versionada, igual que BUG-021: `usuarios.activo` y `usuarios.ultimo_acceso` (definicion de "miembro activo vigente" a 30 dias en `casa_ranking` y `pandilla_ranking`) e `interacciones.xp_ganado` (columna de XP, no versionada; la migracion 021 la cubre con guard `IF EXISTS` y el preflight la marca como opcional).
+
+**Mitigacion implementada (no cierra la deuda):** fallback `42703` en `api/usuarios.js` (L468-549) y `api/interacciones.js` (L4257-4284): si la columna no existe, se reintenta la MISMA consulta sin la condicion de actividad y se responde `miembros_activos = 0` con `console.warn` (nunca catch vacio, AGENTS.md 2.2). La 021 no puede versionar estas columnas porque no las crea: solo convierte tipos de columnas que ya existen.
+
+**Recomendacion:** versar `usuarios.activo`, `usuarios.ultimo_acceso` e `interacciones.xp_ganado` en una migracion futura (idempotente ADR-008) antes de crear los indices de apoyo de los rankings; sin la definicion versionada, cualquier `DROP`/recreacion de esquema las pierde.
+
+**Estado:** DEUDA DOCUMENTADA (ADR-035 / TSK-109, 2026-09-17). No bloqueante; el fallback mantiene las rutas en 200 con contadores en 0.
 
 ---
 
