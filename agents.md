@@ -47,8 +47,8 @@ Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `o
 
 | Agente | Modelo | Uso |
 |---|---|---|
-| `plan` | `opencode-go/deepseek-v4-flash` | Orquestador de pago (mode primary, edit/bash deny) |
-| `build` (default legacy) | `opencode-go/deepseek-v4-pro` | Build de pago |
+| `plan` | `opencode-go/deepseek-v4.1-flash` | Orquestador de pago (mode primary, edit/bash deny) |
+| `build` (default legacy) | `opencode-go/deepseek-v4.1-flash` | Build de pago |
 
 **Subagentes de pago:**
 

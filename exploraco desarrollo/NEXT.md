@@ -3,7 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
-- TSK-111 / ADR-037 Geocerca con radio urbano 50 m + `album_oficial` en el mapa cultural + limpieza de modulos del admin + refactor de hero/galeria de la ficha (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+335/-298) + 1 archivo nuevo sin versionar (`PROMPT_OPENCODE_TSK111.md`): `admin.html` (+49/-82; "Que incluye el precio" retirado del admin/render, UI "Orden de modulos" eliminada con `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`, seccion "Operacion" eliminada con `f-capacidad` movido a General, `f-comotransporte` eliminado end-to-end, `moverFila`/`moveFaqRow`); `api/interacciones.js` (+44/-8; header v19 -> v20: `RADIO_DEFAULT_M`/`RADIO_POR_CATEGORIA` 100 -> 50 y subcategorias urbanas a 50, rural 250/parque-concierto 150/festival-deporte 200 intactos, `ACCURACY_MAX_M=150` y bloqueo 422 intactos, `album_oficial` en `multimedia_mapa`); `api/pagina-destino.js` (+121/-194; header v11: guard `edad_minima` con trim, hero botonera en 2 filas `.hctar-row` + grid 1+3 + `abrirLightboxHero`, "Fotos de viajeros" retirado, CTA "Ver todas las fotos"); `index-api-connector.js` (+32/-0; `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`); `index.html` (+51/-1; `mdMapaAlbumOficial`, solo rama `origen='destino'`); `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10) actualizados. Presupuesto 8/8 INTACTO (ADR-001); TSK-111 NO genera migraciones. Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES: `node --check` 8/8 api, ASCII 0/0/0 en `api/interacciones.js`, balance DIVs admin hostal/comida/sitio/evento = 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS (`smoke_test_epic_prompt` 4 FAIL PREEXISTENTES ajenos, DQ-2). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar las migraciones 019, 020, 021, 022 y 023 en Neon (las aplica Javier) ANTES del deploy; despues, commit/push/deploy de los 7 archivos + este cierre documental en un solo release.**
+- TSK-111 / ADR-037 Geocerca con radio urbano 50 m + `album_oficial` en el mapa cultural + limpieza de modulos del admin + refactor de hero/galeria de la ficha (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+335/-298) + 1 archivo nuevo sin versionar (`PROMPT_OPENCODE_TSK111.md`): `admin.html` (+49/-82; "Que incluye el precio" retirado del admin/render, UI "Orden de modulos" eliminada con `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`, seccion "Operacion" eliminada con `f-capacidad` movido a General, `f-comotransporte` eliminado end-to-end, `moverFila`/`moveFaqRow`); `api/interacciones.js` (+44/-8; header v19 -> v20: `RADIO_DEFAULT_M`/`RADIO_POR_CATEGORIA` 100 -> 50 y subcategorias urbanas a 50, rural 250/parque-concierto 150/festival-deporte 200 intactos, `ACCURACY_MAX_M=150` y bloqueo 422 intactos, `album_oficial` en `multimedia_mapa`); `api/pagina-destino.js` (+121/-194; header v11: guard `edad_minima` con trim, hero botonera en 2 filas `.hctar-row` + grid 1+3 + `abrirLightboxHero`, "Fotos de viajeros" retirado, CTA "Ver todas las fotos"); `index-api-connector.js` (+32/-0; `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`); `index.html` (+51/-1; `mdMapaAlbumOficial`, solo rama `origen='destino'`); `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10) actualizados. Presupuesto 8/8 INTACTO (ADR-001); TSK-111 NO genera migraciones. Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES: `node --check` 8/8 api, ASCII 0/0/0 en `api/interacciones.js`, balance DIVs admin hostal/comida/sitio/evento = 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS (`smoke_test_epic_prompt` 4 FAIL PREEXISTENTES ajenos, DQ-2). **PENDIENTE OPERATIVO: migraciones 019-023 YA APLICADAS en Neon (confirmado por Javier el 2026-09-17; ver sesion TSK-112); solo queda commit/push/deploy de los 7 archivos + este cierre documental en un solo release.**
 - TSK-110 / ADR-036 Compartir social con XP (primer share 25 / posteriores 5, tope 10 eventos y 50 XP por 24h) + interacciones de media unificadas (votos/comentarios/guardados en `media_*`) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+1379/-536) + 5 archivos nuevos sin versionar: `api/interacciones.js` (+949/-425; header `v18` -> `v19`: rama POST `compartir` con `validarSesion` y ledger en `media_compartidos`, 3 misiones + 3 logros nuevos, `media_voto`/`media_comentar`/GET `media_interacciones`/`media_comentarios`, alias legacy conservados, TODOS los lectores migrados a `media_*`, `galeria_destino` `items[]` v2 con `fuente`/`votos`/`comentarios`/`ya_votado`/`ya_guardado`/`tipo_voto:'media'`); `galeria.html` (+222/-32; 5 secciones en modo destino + modales VOTAR/GUARDAR/COMPARTIR + comentarios por 3 fuentes); `album-comments.js` (+92/-33; v2.0.0, `mount(target,{fuente,itemId},opts)` retrocompatible); `index.html` (+50/-17; insignia `compartido` derivada del catalogo real de logros); `api/pagina-destino.js` (+40/-27; hero mosaico 1+3 y boton Compartir en `.subnav`); `usuario-session.js` (+24/-0; `aplicarResultadoXp`); `comunidad.html` y `mi-perfil.html` (+1/-1 cada uno: solo cache-bust `album-comments.js?v=2`). NUEVOS: `compartir.js` (295 lineas, `window.ExploraCompartir`), `db/migrations/022_media_compartidos.sql` (131), `db/migrations/023_interacciones_media_unificadas.sql` (408), `scripts/smoke_036_compartir.js` (290) y `scripts/smoke_036_media_unificada.js` (361). Presupuesto 8/8 INTACTO (ADR-001); catalogo real HOY 39 misiones / 33 logros. Verificacion: `node --check` 7/7 OK, ASCII-safe 0 >127 / 0 backticks en `api/*.js`, `compartir.js` y migraciones, smokes 55/55 y 71/71 PASS (mock). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 022 y 023 en Neon ANTES del deploy del backend v19; los smokes NO validan Neon.**
 - TSK-109 / ADR-035 XP decimal `numeric(12,2)` + pestana "Clase" consolidada + rankings de comunidad (Casas/Facciones/Parches) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 10 archivos de codigo modificados (+700/-282) + 1 migracion nueva + 1 preflight nuevos sin versionar (mas `DECISIONS.md` +249/-1 agregado por architect): `db/migrations/021_xp_decimal.sql` (NUEVA, 121 lineas, idempotente ADR-008, ASCII-safe ADR-002; 9 columnas XP -> `numeric(12,2)` con guard `information_schema`, sin indices) + `scripts/verify_021_precheck.js` (NUEVO, read-only, `MIN/MAX/COUNT`); `api/interacciones.js` (+185/-98; header v18: `red2`/half-up, `parseFloat`/`Number`, rama GET `pandilla_ranking` L4257-4284, gate de `album_crear` con `calcularNivelLocal` L5379, guarda de fama `<= 0` L1880-1881); `api/usuarios.js` (+102/-40; header v15: `casa_ranking` con `miembros_activos` y `ORDER BY xp_total DESC` L510-557, rankings sin `::int`); `comunidad.html` (+195/-43; tab Ranking con 4 sub-vistas Viajeros|Casas|Facciones|Parches L372-386, `setRankingVista` L1661, facciones fuera de "Activo Oculto"); `mi-perfil.html` (+101/-50; tab `clase` con arbol + sub-vista `senderos` + vocaciones inline + Mi Casa compacto); `usuario-session.js` (+39/-19; helper `window.ExploraCO.fmtXp`/`redondearXp` L46-60); `api/admin.js` (+29/-14); `admin.html` (+20/-9); `index.html` (+15/-5); `perfil.html` (+9/-1); `api/pagina-destino.js` (+5/-3; header v10). Presupuesto 8/8 INTACTO (ADR-001). BUG-042 pasa a CORREGIDO y se registra BUG-063 (guarda de fama de Parche); deuda de columnas no versionadas (`usuarios.activo`/`ultimo_acceso`/`interacciones.xp_ganado`) anotada con fallback 42703. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar la migracion 021 en Neon ANTES del deploy del backend; desplegar en 2 releases (backend + 021 primero, frontend despues). Checklist en `docs/DEPLOY_021.md`.**
 - TSK-108 / ADR-034 Ficha de destino: hero de 4 fotos, `destinos.sintro` curada, galeria 1+12 y `galeria.html` con 4 secciones + orden de modulos por hostal (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 6 archivos modificados (+663/-95) + 1 migracion nueva: `api/pagina-destino.js` (+283/-65: hero `HERO_THUMBS_MAX=3`, botonera sin "Ver galeria", `sintro` con fallback, galeria 1+12 con `GAL_THUMBS_MAX=12`/6+6 y `.gal-thumbs` 4/2/1, orden de modulos hostal por `tags.orden_modulos`); `api/interacciones.js` (+46/-0: GET `mapas_de_destino` con `validarSesion` para el viewer); `api/admin-destinos.js` (+19/-3: `sintro` en SELECT/INSERT/UPDATE + `normSintro`); `api/publicar-lugar.js` (+12/-2: `sintro` en el INSERT draft); `admin.html` (+150/-5: `#f-sintro`, `HOSTAL_MODULOS_ORDEN_DEFAULT`, reorden por flechas de modulos hostal + Actividades); `galeria.html` (+153/-20: 4 secciones + bloque de subida + `mapas_de_destino`); NUEVA `db/migrations/020_destinos_sintro.sql` (16 lineas, `ADD COLUMN IF NOT EXISTS sintro TEXT`, idempotente ADR-008, ASCII-safe ADR-002). Presupuesto 8/8 INTACTO (ADR-001). ADR-030 actualizado (hero 12->4, CTA "Ver galeria" retirado solo del hero). BUG-062 DETECTADO/PENDIENTE (fotos Unsplash no recolectadas por `getPhotos()`). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar migracion 020 en Neon + commit/push/deploy de los 6 archivos.**
@@ -38,6 +38,128 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-112 "Sistema de Casas (cofre + nivelacion) y Clases Rising Star" (2026-09-18) - ADR-038
+
+Tarea TSK-112 **IMPLEMENTADA EN WORKING TREE** (SIN commitear; verificado contra
+archivo real, ADR-006, el 2026-09-18). La decision consolidada vive en `DECISIONS.md`
+**ADR-038 + ENMIENDA 1 (L1639-1677)**; la ENMIENDA 1 formaliza y aprueba el contrato
+realmente implementado y prevalece sobre el diseno previo (manda el spec de producto
+`PROMPT_OPENCODE_TSK112.md`). La tarea vive en `TASKS.md` TSK-112. NO hay archivos
+nuevos en `api/` (8/8 intacto, ADR-001) y la migracion
+`db/migrations/024_casas_cofre_y_clases.sql` **EXISTE** (232 lineas, idempotente,
+ASCII-safe) y es la **UNICA migracion pendiente de aplicar en Neon**.
+
+**Estado real del working tree (verificado, ADR-006, 2026-09-18):**
+- `db/migrations/024_casas_cofre_y_clases.sql`: **EXISTE** (232 lineas). Agrega a
+  `usuarios` `clase_id`/`nivel_clase`/`xp_clase`/`clase_elegida_en` + CHECK
+  `chk_usuarios_clase`, crea `casas_cofre` (PK casa + `xp_cofre_total` +
+  `poblacion_activa` + `factor_conversion` + `actualizado_en`) con seed idempotente
+  e indice parcial `idx_usuarios_clase_id`. NO crea `casa_id`, NO `casas_votaciones`,
+  NO FK.
+- Headers reales: `api/usuarios.js` **v16** y `api/interacciones.js` **v21** (ambos
+  `node --check` OK; ASCII 0/0/0). Helpers reales: `contextoXpE`, `calcularXpFinal`,
+  `calcularNivelClase`, `calcularTagCasa` y `acreditarClaseYCofre`, con `BONUS_CLASE`
+  y `XP_NIVEL_CLASE`; rama POST `clase_elegir` presente. **NO existe** el
+  monotilitico `entregarXpUsuario`, **NO hay gate de nivel** y **NO hay afinidad por
+  accion** (asi lo aprueba la ENMIENDA 1).
+- Frontend: `mi-perfil.html` con `#pf-clase` + `#modal-clase` + `cargarClase`/
+  `elegirClase` (divs 390/390) y `comunidad.html` con tag/mult/cofre en las cards del
+  ranking (divs 304/304).
+- `git status` (2026-09-18): `M api/usuarios.js`, `M api/interacciones.js`,
+  `M mi-perfil.html`, `M comunidad.html`, `M exploraco desarrollo/DECISIONS.md`,
+  `M TASKS.md`, `M NEXT.md`, y sin versionar
+  `?? db/migrations/024_casas_cofre_y_clases.sql`,
+  `?? scripts/smoke_038_casas_clases.js` y `?? PROMPT_OPENCODE_TSK112.md` (prompt de
+  la tarea, no artefacto de producto).
+- **La implementacion, la migracion y el QA de TSK-112 YA estan ejecutados** (Escudo
+  GOLD con `smoke_038` 76/76 PASS; ver abajo).
+
+**Contrato implementado (ENMIENDA 1 del ADR-038, prevalece sobre el diseno previo):**
+- **Se REUSA `usuarios.casa`** (`condor|jaguar|delfin`, `varchar(20)`, CHECK
+  `chk_usuarios_casa` e indice parcial `idx_usuarios_casa` de la migracion 017 /
+  ADR-028); se RECHAZA la propuesta original de `casa_id` con valores
+  `alta|media|baja` + tabla `casas_tributacion`.
+- **`casas_cofre`:** cofre por Casa con seed idempotente y sin FK en v1.
+  `poblacion_activa`/`factor_conversion` son **cache NO autoritativa**. La
+  **tributacion del 10% del `xp_final`** es un literal `0.10` dentro de
+  `acreditarClaseYCofre`, best-effort, **sin endpoint HTTP `casa_tributar`**.
+- **Factor de nivelacion runtime (calcularTagCasa):** `dominante` (>45%, x0.85),
+  `equilibrada` (25%-45%, x1.00) y `rezagada` (<25%, x1.30), aplicado UNA sola vez en
+  `calcularXpFinal`. `arancel_inter_casa`/`fee_mercado_interno` se exponen pero NO se
+  cobran en v1.
+- **Clases Rising Star:** coexisten con el Arbol de 16 ramas (`progreso_arbol`,
+  ADR-028; NO lo reemplazan). `BONUS_CLASE` = cartografo 0.08 / cronista 0.10 /
+  explorador 0.07; `XP_NIVEL_CLASE` = 11 umbrales
+  `[0,100,250,500,900,1400,2100,3000,4200,5700,7500]`; `xp_clase` incrementa el
+  **50% del `xp_final`**. `clase_elegir`: primera eleccion gratis, recambio con
+  **300 XP + cooldown de 30 dias**, errores `CLASE_INVALIDA`/`CLASE_YA_ELEGIDA`/
+  `COOLDOWN_CLASE`/`PUNTOS_INSUFICIENTES`/`EMAIL_SIN_VERIFICAR`.
+- **Whitelist de 14 acciones** con la triada de helpers (los `UPDATE usuarios SET
+  xp_total` siguen inline para preservar contadores); **EXCLUIDOS** cobros
+  (`dm_enviar`, `comprar_consumible`) y bonos/terceros (`evaluarMisiones`,
+  `evaluarLogros`, `progresarPandillaRetos`, `repartirXpReferidos`).
+- **Versionado ejecutado:** `api/usuarios.js` v15 -> **v16** y `api/interacciones.js`
+  v20 -> **v21**. **`casas_votaciones` se DIFIERE a v2.**
+
+**Ambiguedades resueltas/ajustadas por la ENMIENDA 1 (2026-09-18):** el gate de
+nivel >= 2 y el mapeo de afinidad de las 14 acciones quedan **RESUELTOS como NO
+existentes**; la curva real es `XP_NIVEL_CLASE` de 11 umbrales y `xp_clase = 50% del
+xp_final`. Sigue vigente revisar los **umbrales de tag 45%/25% y los multiplicadores
+0.85/1.00/1.30 tras la primera semana de datos**. Detalle en ADR-038, ENMIENDA 1
+(DECISIONS.md L1639-1677).
+
+**Verificacion (Escudo GOLD, 2026-09-18):** `node --check` OK; ASCII 0/0/0 en API,
+migracion y smoke; balance de divs 0; smokes `017` (73/73), `021` (45/45),
+`036_media_unificada` (85/85), `gamificacion_v4` (95/95) y `smoke_038_casas_clases`
+**76/76 PASS**. El QA inicial dio "GOLD FAIL" SOLO por desincronizacion ADR<->codigo;
+se resolvio con la ENMIENDA 1 (no hubo fallo de sintaxis, ASCII ni balance). Deuda
+PREEXISTENTE (no de TSK-112): los `.catch(function(){})` best-effort de
+`api/interacciones.js` (37 ocurrencias).
+
+**Agentes:** architect/architect-review (diseno + Enmienda 1), sql-security
+(migracion 024 y cofre), backend-dev x2 (`api/usuarios.js` v16,
+`api/interacciones.js` v21), frontend-tpl (UI de Casas/Clases), qa-auditor (Escudo
+GOLD), docs-keeper (cierre documental).
+
+#### Que sigue
+1. **Aplicar `db/migrations/024_casas_cofre_y_clases.sql` en Neon** (archivo
+   COMPLETO en una corrida; idempotente). Es la **UNICA migracion pendiente de
+   aplicar**: las **019-023 YA estan aplicadas en Neon** (confirmado por Javier el
+   2026-09-17; se conserva su registro historico como pendientes, Regla de Oro 3).
+   Correr despues el preflight del ADR contra `information_schema` (columnas
+   `clase_id`/`nivel_clase`/`xp_clase`/`clase_elegida_en`, tabla `casas_cofre` e
+   igualdad de las listas CHECK `usuarios.casa` vs `casas_cofre.casa`).
+2. **Deploy del backend** (`api/usuarios.js` v16 + `api/interacciones.js` v21)
+   despues de aplicar la 024.
+3. **Deploy del frontend** de Casas/Clases (`mi-perfil.html`, `comunidad.html`).
+4. **Verificacion en vivo:** elegir Clase y ver el multiplicador/`tag` de Casa en el
+   ranking; confirmar el tributo del 10% en `casas_cofre.xp_cofre_total`; probar el
+   recambio de Clase (300 XP + cooldown de 30 dias).
+5. **Commit + push del release:** incluye los pendientes de TSK-107..TSK-111 y este
+   cierre documental; NO mezclar los archivos ajenos/borrados.
+
+#### Riesgos activos
+- **Migracion 024 CREADA pero aun no aplicada en Neon:** el backend v16/v21 no puede
+  desplegarse antes de aplicarla; si se desplegara, consultaria columnas y la tabla
+  `casas_cofre` inexistentes (mismo flujo que 017/021, ADR-008).
+- **Coexistencia de dos capas de progresion:** el Arbol de 16 ramas
+  (`progreso_arbol`, ADR-028) sigue vigente en paralelo a las Clases; toda lectura
+  o UI debe distinguir ambas para no mostrar ni perder progreso real.
+- **Tributacion best-effort:** un fallo del cofre NO debe bloquear la entrega de XP
+  del usuario (degradar con `warn`; los `.catch(function(){})` preexistentes son
+  deuda a limpiar, AGENTS.md seccion 2.2).
+- **Cache no autoritativa:** `casas_cofre.poblacion_activa`/`factor_conversion`
+  pueden quedar desactualizadas si el refresh best-effort falla; la fuente de
+  verdad es el calculo runtime (no leerlas como autoritativas).
+- **Gaming de poblacion activa:** el factor por participacion puede incentivar
+  migraciones coordinadas entre Casas; en v1 solo hay monitoreo (tributacion sobre
+  `xp_final`), sin defensa fuerte. Revisar umbrales 45%/25% y 0.85/1.00/1.30 tras la
+  primera semana de datos.
+- **Deuda `usuarios.activo`/`ultimo_acceso` (patron BUG-021):** el calculo de
+  poblacion activa depende de columnas no versionadas; debe degradar con `warn` y
+  nunca romper la entrega de XP.
+- **BUG-061 y BUG-062 siguen ABIERTOS** (no relacionados con TSK-112).
 
 ### Sesion TSK-111 "Geocerca 50 m, album_oficial en el mapa, limpieza del admin y refactor de hero/galeria" (2026-09-17) - ADR-037
 
@@ -93,14 +215,15 @@ preexistente (no de TSK-111): `api/pagina-destino.js:2431` (1 doble-escape, BUG-
 y `api/utilidades.js` (H8).
 
 #### Que sigue
-1. **APLICAR EN NEON las migraciones pendientes 019, 020, 021, 022 y 023
-   (BLOQUEANTE, lo ejecuta Javier, ANTES del deploy).** Correr cada archivo COMPLETO
-   en el editor SQL de Neon (idempotentes ADR-008) y sus preflights read-only.
-   **TSK-111 NO agrega migraciones**; este bloque es el mismo arrastre de
-   TSK-107..TSK-110.
-2. **Deploy en orden:** 019-023 en Neon -> backend (`api/interacciones.js` v20,
-   `api/pagina-destino.js` v10) -> frontend (`admin.html`, `index-api-connector.js`,
-   `index.html`) -> smokes.
+1. **[RESUELTO - 2026-09-17] APLICAR EN NEON las migraciones 019, 020, 021, 022 y
+   023 (lo ejecuto Javier).** **Javier confirmo (2026-09-17) que YA ESTAN
+   APLICADAS en Neon**; el bloqueo de arrastre de TSK-107..TSK-111 queda CERRADO y
+   su registro historico se conserva (Regla de Oro 3). **TSK-111 NO agrega
+   migraciones**; la unica migracion pendiente de APLICAR es la 024 (TSK-112), ya
+   creada (232 lineas; ver la sesion TSK-112).
+2. **Deploy en orden (migraciones 019-023 ya aplicadas):** backend
+   (`api/interacciones.js` v20, `api/pagina-destino.js` v10/v11) -> frontend
+   (`admin.html`, `index-api-connector.js`, `index.html`) -> smokes.
 3. **Commit + push en un solo release:** los 7 archivos modificados + los pendientes
    de TSK-107..TSK-110 sin commitear + este cierre documental (`TASKS.md`, `NEXT.md`,
    `DECISIONS.md`). NO mezclar los 3 archivos borrados ajenos (`PROMPT.md`,
@@ -115,9 +238,12 @@ y `api/utilidades.js` (H8).
    dato); eliminar de verdad `f-comotransporte` si algun dia reaparece en un merge.
 
 #### Riesgos activos
-- **Migraciones 019-023 pendientes (BLOQUEANTE):** sin ellas el backend de TSK-110
-  (v19/v20) y las rutas de media/compartir degradan o fallan; TSK-111 no las empeora
-  pero tampoco puede desplegarse de forma aislada.
+- **Migraciones 019-023 (RESUELTO el 2026-09-17):** Javier confirmo que ya estan
+  APLICADAS en Neon. Se conserva el registro del riesgo (Regla de Oro 3): mientras
+  estuvieron pendientes, el backend de TSK-110 (v19/v20) y las rutas de
+  media/compartir degradaban o fallaban y TSK-111 no podia desplegarse aislada. El
+  unico bloqueo de migraciones que queda es la **024** (TSK-112), ya creada pero
+  pendiente de aplicar en Neon.
 - **Radio urbano de 50 m mas estricto:** el GPS en interiores/canonadas puede quedar
   fuera; el frontend ya envia `accuracy` y el 422 `PRECISION_INSUFICIENTE` sigue
   vigente, pero la friccion de "Estuve aqui" sube en destinos urbanos.

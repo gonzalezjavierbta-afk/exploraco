@@ -224,6 +224,19 @@ Capacidades de misión (se traducen a `usuario.capacidades`): `organizar_activid
 
 ---
 
+## 4-bis. Casas (cofre + nivelacion) y Clases Rising Star (TSK-112 / ADR-038)
+
+Capa de progresion posterior al v5.0, implementada en working tree (2026-09-18) y documentada en ADR-038 + ENMIENDA 1. No crea endpoints (8/8) ni reemplaza el Arbol de 16 ramas (ADR-028): las Clases y el cofre de Casa son capas nuevas.
+
+- **Casas (reuso, sin `casa_id`):** se reusa `usuarios.casa` (`condor|jaguar|delfin`); la migracion 024 crea `casas_cofre` (cofre por Casa: `xp_cofre_total`, `poblacion_activa`, `factor_conversion`, `actualizado_en`) con seed idempotente y sin FK en v1.
+- **Factor de nivelacion por poblacion dominante (runtime):** tag `dominante` (>45% -> x0.85), `equilibrada` (25%-45% -> x1.00) o `rezagada` (<25% -> x1.30). Se aplica UNA vez en `calcularXpFinal`; `arancel_inter_casa`/`fee_mercado_interno` se exponen pero no se cobran en v1.
+- **Tributacion del 10% al cofre:** sobre el `xp_final` post-factor, best-effort via `acreditarClaseYCofre` (literal `0.10`, sin endpoint `casa_tributar`).
+- **Helper unico de XP:** triada `contextoXpE` / `calcularXpFinal` / `calcularNivelClase` + `acreditarClaseYCofre` en `api/interacciones.js` v21, sobre 14 acciones de la whitelist (excluidos cobros y bonos a terceros); los `UPDATE usuarios SET xp_total` siguen inline para preservar contadores.
+- **Clases Rising Star (curva `XP_NIVEL_CLASE`):** `BONUS_CLASE` = cartografo 0.08 / cronista 0.10 / explorador 0.07; `XP_NIVEL_CLASE` = 11 umbrales `[0,100,250,500,900,1400,2100,3000,4200,5700,7500]`; `xp_clase` incrementa el **50% del `xp_final`**. `clase_elegir` (`api/usuarios.js` v16): primera eleccion gratis y recambio con 300 XP + cooldown de 30 dias, sin gate de nivel (ENMIENDA 1).
+- **Estado:** verificado con Escudo GOLD y `smoke_038_casas_clases` 76/76 PASS; pendiente aplicar la migracion 024 en Neon + deploy. Detalle en `TASKS.md` TSK-112, `NEXT.md` y ADR-038.
+
+---
+
 ## 5. Misiones (28) y Logros (30)
 
 ### 5.1 Misiones — catálogo en código, DAG server-side

@@ -1,5 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
-// v15 (ADR-035: XP numeric(12,2), rankings de comunidad)
+// v16 (TSK-112 / ADR-038: casas_cofre + factor de nivelacion; clase_elegir y clases Rising Star)
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
@@ -105,7 +105,14 @@ const DESBLOQUEOS = {
 // numeric(12,2): calcularNivel/conNivel normalizan a Number redondeado a 2
 // decimales, referido_red/codigo y casa_elegir sin parseInt/::int, y
 // faccion_ranking/casa_ranking con miembros_activos (fallback 42703) y
-// orden de Casas por xp_total DESC.
+// orden de Casas por xp_total DESC; v16 (TSK-112 / ADR-038, 2026-09-17)
+// agrega CLASES_VALIDAS y la rama POST clase_elegir (primera eleccion
+// gratis, recambio de 300 XP + cooldown de 30 dias via clase_elegida_en;
+// nivel_clase/xp_clase vuelven a 1/0) y enriquece casa_ranking con el
+// cofre (LEFT JOIN casas_cofre) y el factor de nivelacion runtime
+// (pct/tag/multiplicador_xp/arancel_inter_casa/fee_mercado_interno).
+// casa_ranking degrada 42P01 si la migracion 024 aun no existe. NO toca
+// progreso_arbol, RAMAS ni casas_votaciones (coexisten, ADR-038).
 // conMisiones sigue siendo MERGE con las
 // capacidades del DB (migracion 010) para no destruir el inventario de
 // consumibles en cada GET.
@@ -220,6 +227,11 @@ var FACCIONES_VALIDAS = ['exploradores', 'curadores', 'creadores', 'artistas'];
 // (local/nacional/extranjero) es un atributo DERIVADO que no se persiste
 // como identidad y no se valida aqui.
 var CASAS_VALIDAS = ['condor', 'jaguar', 'delfin'];
+
+// Clases Rising Star validas del CHECK chk_usuarios_clase de la migracion
+// 024 (TSK-112 / ADR-038). COEXISTEN con el Arbol de Clases de 16 ramas
+// (usuarios.progreso_arbol): son una capa nueva, no un reemplazo.
+var CLASES_VALIDAS = ['cartografo', 'cronista', 'explorador'];
 
 // Envio de email con Resend. EXCEPCION controlada al tripwire de
 // no-duplicidad (5 lineas): admin.js y usuarios.js son endpoints
@@ -513,7 +525,11 @@ module.exports = async (req, res) => {
       // cero. Espejo de faccion_ranking, con el mismo fallback 42703.
       if (tipo === 'casa_ranking') {
         var crActividad = 'u.activo = true AND u.ultimo_acceso > NOW() - INTERVAL \'30 days\'';
-        var crSql = function (filtroAct) {
+        // TSK-112 / ADR-038: el cofre (casas_cofre) entra por LEFT JOIN;
+        // sus campos son cache NO autoritativa. conCofre=false es la
+        // degradacion 42P01 (migracion 024 aun no aplicada): responde el
+        // cofre en cero y factor neutro sin romper el contrato.
+        var crSql = function (filtroAct, conCofre) {
           return 'SELECT u.casa,'
             + ' COUNT(*)::int AS miembros,'
             + (filtroAct
@@ -531,23 +547,59 @@ module.exports = async (req, res) => {
             + ' (SELECT COUNT(*)::int FROM activos_ocultos_checkins aoc'
             + '   JOIN usuarios u2 ON u2.id = aoc.usuario_id'
             + '   WHERE u2.casa = u.casa AND aoc.activo = true'
-            + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d'
-            + ' FROM usuarios u WHERE u.casa IS NOT NULL'
-            + ' GROUP BY u.casa ORDER BY COALESCE(ROUND(SUM(u.xp_total), 2), 0) DESC';
+            + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d,'
+            + (conCofre
+                ? ' COALESCE(ct.xp_cofre_total, 0) AS xp_cofre_total,'
+                  + ' COALESCE(ct.factor_conversion, 1) AS factor_conversion'
+                : ' 0 AS xp_cofre_total, 1 AS factor_conversion')
+            + ' FROM usuarios u'
+            + (conCofre ? ' LEFT JOIN casas_cofre ct ON ct.casa = u.casa' : '')
+            + ' WHERE u.casa IS NOT NULL'
+            + ' GROUP BY u.casa'
+            + (conCofre ? ', ct.xp_cofre_total, ct.factor_conversion' : '')
+            + ' ORDER BY COALESCE(ROUND(SUM(u.xp_total), 2), 0) DESC';
+        };
+        // Reintenta quitando el JOIN si casas_cofre no existe (42P01),
+        // registrando siempre el motivo (nunca catch vacio).
+        var crConsultar = async function (filtroAct, conCofre) {
+          try {
+            return await sql(crSql(filtroAct, conCofre));
+          } catch (crErr42P01) {
+            if (!conCofre || !crErr42P01 || crErr42P01.code !== '42P01') throw crErr42P01;
+            console.warn('[usuarios] casa_ranking sin casas_cofre 42P01: ' + crErr42P01.message);
+            return await crConsultar(filtroAct, false);
+          }
         };
         var crCasas;
         try {
-          crCasas = await sql(crSql(crActividad));
+          crCasas = await crConsultar(crActividad, true);
         } catch (crErr) {
           if (!crErr || crErr.code !== '42703') throw crErr;
           console.warn('[usuarios] casa_ranking degradado 42703: ' + crErr.message);
-          crCasas = await sql(crSql(null));
+          crCasas = await crConsultar(null, true);
         }
         crCasas = crCasas.map(function (c) {
           c.xp_total = red2(numXp(c.xp_total));
           c.xp_promedio = red2(numXp(c.xp_promedio));
           c.miembros_activos = Number(c.miembros_activos) || 0;
+          c.xp_cofre_total = red2(parseFloat(c.xp_cofre_total) || 0);
+          c.factor_conversion = parseFloat(c.factor_conversion) || 1;
           return c;
+        });
+        // Factor de nivelacion runtime (ADR-038 seccion D): el tag de cada
+        // Casa sale de su cuota de poblacion activa; los multiplicadores
+        // son constantes de producto. Fuente de verdad = este calculo.
+        var crTotalActivos = 0;
+        crCasas.forEach(function (c) { crTotalActivos += c.miembros_activos; });
+        crCasas.forEach(function (c) {
+          var crPct = crTotalActivos > 0 ? (c.miembros_activos / crTotalActivos) : 0;
+          c.pct = crPct;
+          var crTag = (crTotalActivos > 0 && crPct > 0.45) ? 'dominante'
+            : ((crTotalActivos > 0 && crPct < 0.25) ? 'rezagada' : 'equilibrada');
+          c.tag = crTag;
+          c.multiplicador_xp = crTag === 'rezagada' ? 1.30 : (crTag === 'dominante' ? 0.85 : 1.00);
+          c.arancel_inter_casa = crTag === 'rezagada' ? 0.05 : (crTag === 'dominante' ? 0.25 : 0.10);
+          c.fee_mercado_interno = crTag === 'rezagada' ? 0.00 : (crTag === 'dominante' ? 0.02 : 0.05);
         });
         var crTop = await sql(
           'SELECT id, nombre, avatar_url, casa, xp_total FROM ('
@@ -714,6 +766,19 @@ module.exports = async (req, res) => {
           );
           if (!cePrim.length)
             return res.status(409).json({ ok: false, error: 'CASA_YA_ELEGIDA' });
+          // ADR-038: poblacion_activa es cache NO autoritativa del cofre.
+          // Refresco best-effort: si la migracion 024 aun no existe, NUNCA
+          // bloquea la respuesta de eleccion.
+          try {
+            await sql(
+              'UPDATE casas_cofre SET poblacion_activa = '
+              + '(SELECT COUNT(*)::int FROM usuarios WHERE casa=$1), actualizado_en=NOW() '
+              + 'WHERE casa=$1',
+              [ceCasa]
+            );
+          } catch (ceErr) {
+            console.warn('[usuarios] poblacion_activa no actualizada: ' + (ceErr && ceErr.message));
+          }
           var ceXpPrim = numXp(cePrim[0].xp_total);
           var ceNivelPrim = calcularNivel(ceXpPrim).nivel;
           return res.json({ ok: true, data: {
@@ -743,6 +808,17 @@ module.exports = async (req, res) => {
             return res.status(429).json({ ok: false, error: 'COOLDOWN_CASA' });
           return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
         }
+        // ADR-038: mismo refresco best-effort del cofre tras el recambio.
+        try {
+          await sql(
+            'UPDATE casas_cofre SET poblacion_activa = '
+            + '(SELECT COUNT(*)::int FROM usuarios WHERE casa=$1), actualizado_en=NOW() '
+            + 'WHERE casa=$1',
+            [ceCasa]
+          );
+        } catch (ceErr) {
+          console.warn('[usuarios] poblacion_activa no actualizada: ' + (ceErr && ceErr.message));
+        }
         var ceXpNuevo = numXp(ceCambio[0].xp_total);
         var ceNivelNuevo = calcularNivel(ceXpNuevo).nivel;
         return res.json({ ok: true, data: {
@@ -752,6 +828,80 @@ module.exports = async (req, res) => {
           nivel_anterior: ceNivelAnt,
           nivel_nuevo: ceNivelNuevo,
           bajo_nivel: ceNivelNuevo < ceNivelAnt,
+        } });
+      }
+
+      // ---- Rama: elegir o cambiar Clase Rising Star (TSK-112 / ADR-038) --
+      // Espejo de casa_elegir (sesion firmada ADR-025, email verificado,
+      // primera eleccion gratis y recambio con coste de 300 XP + cooldown
+      // de 30 dias via clase_elegida_en), SIN gate de nivel. NO toca el
+      // Arbol de Clases de 16 ramas (usuarios.progreso_arbol): la Clase es
+      // una capa nueva que COEXISTE con el arbol (ADR-038). Al recambiar,
+      // nivel_clase vuelve a 1 y xp_clase a 0: la nueva profesion empieza
+      // de cero.
+      if (c.tipo === 'clase_elegir') {
+        var clId = String(c.usuario_id || '');
+        if (!clId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var clSes = validarSesionUsuario(req, clId);
+        if (!clSes.ok)
+          return res.status(401).json({ ok: false, error: clSes.razon });
+        var clClase = String(c.clase_id || c.clase || '').toLowerCase();
+        if (CLASES_VALIDAS.indexOf(clClase) === -1)
+          return res.status(400).json({ ok: false, error: 'CLASE_INVALIDA' });
+        var clFila = await sql(
+          'SELECT id, clase_id, clase_elegida_en, xp_total, email_verificado FROM usuarios WHERE id=$1',
+          [clId]
+        );
+        if (!clFila.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        if (!(clFila[0].email_verificado === true))
+          return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
+        var clXp = numXp(clFila[0].xp_total);
+        var clNivelAnt = calcularNivel(clXp).nivel;
+        if (!clFila[0].clase_id) {
+          // Primera eleccion: el WHERE clase_id IS NULL protege la carrera
+          // y el 409 si otro request gano la eleccion primero.
+          var clPrim = await sql(
+            'UPDATE usuarios SET clase_id=$2, nivel_clase=1, xp_clase=0, clase_elegida_en=NOW() '
+            + 'WHERE id=$1 AND clase_id IS NULL RETURNING clase_id, clase_elegida_en',
+            [clId, clClase]
+          );
+          if (!clPrim.length)
+            return res.status(409).json({ ok: false, error: 'CLASE_YA_ELEGIDA' });
+          return res.json({ ok: true, data: {
+            clase_id: clPrim[0].clase_id,
+            clase_elegida_en: clPrim[0].clase_elegida_en,
+          } });
+        }
+        // Recambio de Clase: pago 300 XP, cooldown de 30 dias. El UPDATE
+        // condicional es la fuente de verdad; si no afecta filas se
+        // distingue el motivo con los datos ya leidos.
+        var clCambio = await sql(
+          'UPDATE usuarios SET xp_total = xp_total - 300, clase_id=$2, nivel_clase=1, xp_clase=0, '
+          + 'clase_elegida_en=NOW() '
+          + 'WHERE id=$1 AND xp_total >= 300 '
+          + 'AND (clase_elegida_en IS NULL OR clase_elegida_en <= NOW() - INTERVAL \'30 days\') '
+          + 'RETURNING clase_id, clase_elegida_en, xp_total',
+          [clId, clClase]
+        );
+        if (!clCambio.length) {
+          var clElegidaEn = clFila[0].clase_elegida_en;
+          var clEnCooldown = clElegidaEn
+            && (Date.parse(clElegidaEn) > Date.now() - 30 * 24 * 3600 * 1000);
+          if (clEnCooldown)
+            return res.status(429).json({ ok: false, error: 'COOLDOWN_CLASE' });
+          return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
+        }
+        var clXpNuevo = numXp(clCambio[0].xp_total);
+        var clNivelNuevo = calcularNivel(clXpNuevo).nivel;
+        return res.json({ ok: true, data: {
+          clase_id: clCambio[0].clase_id,
+          clase_elegida_en: clCambio[0].clase_elegida_en,
+          xp_total_nuevo: red2(clXpNuevo),
+          nivel_anterior: clNivelAnt,
+          nivel_nuevo: clNivelNuevo,
+          bajo_nivel: clNivelNuevo < clNivelAnt,
         } });
       }
 

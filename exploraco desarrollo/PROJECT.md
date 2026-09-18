@@ -1,7 +1,7 @@
 # PROJECT.md - ExploraCO
 
 ## Estado del documento
-- Version: v1.2 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17)
+- Version: v1.3 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17 + ADR-038 TSK-112, 2026-09-18)
 - Fecha: Julio 2026 (actualizado Septiembre 2026)
 - Fuente: EXPLORACO_CONTEXT_V4.md + Reglas de Oro ExploraCO v5 + documentos maestros v5
 - Documento obligatorio del AI-DOS Core (Cap. 9.4). Es el primer documento que debe leer cualquier IA.
@@ -69,7 +69,7 @@ Desde TASK-007 (Sprint 6), index.html ya no incluye datos locales de respaldo (`
 
 ### Arquitectura y presupuesto de endpoints
 
-La plataforma corre sobre 8 funciones serverless en `api/` (presupuesto 8/8 consumido, Vercel Hobby; ADR-010), con Neon PostgreSQL como unica fuente de verdad y renderizado server-side por concatenacion de strings (Vanilla JS, ADR-001/ADR-002). El motor social/gaming se concentra en dos endpoints y crece por ramas `?tipo=` sin crear archivos nuevos: `api/usuarios.js` v9 como baseline de esa Entrega (header real HOY v15 tras ADR-035; el hotfix BUG-054 lo dejo en v14 con el SQL del merge de `device_hashes`; ver BLUEPRINT.md seccion 3; perfil, leaderboard, upsert, referidos, facciones, verificacion de email y sesion firmada JWT) y `api/interacciones.js` v19 (rese\u00f1as/guardados/visitas/ratings, misiones, logros, albumes, cromos, Parches, Wayfarer, geocerca de presencia fisica y, desde ADR-036, compartir social con XP y media unificada `media_*`). `api/admin.js` expone la moderacion, incluida la rama `activo_oculto_moderar`. El esquema vive en `db/migrations/` (003 a 023). Detalle tecnico vigente en BLUEPRINT.md secciones 2 y 3.
+La plataforma corre sobre 8 funciones serverless en `api/` (presupuesto 8/8 consumido, Vercel Hobby; ADR-010), con Neon PostgreSQL como unica fuente de verdad y renderizado server-side por concatenacion de strings (Vanilla JS, ADR-001/ADR-002). El motor social/gaming se concentra en dos endpoints y crece por ramas `?tipo=` sin crear archivos nuevos: `api/usuarios.js` v9 como baseline de esa Entrega (header real HOY v16 tras ADR-038; v15 tras ADR-035 y v14 con el hotfix BUG-054 y el SQL del merge de `device_hashes`; ver BLUEPRINT.md seccion 3; perfil, leaderboard, upsert, referidos, facciones, verificacion de email, sesion firmada JWT y, desde TSK-112/ADR-038, `casa_ranking` con cofre y `clase_elegir`) y `api/interacciones.js` v21 (rese\u00f1as/guardados/visitas/ratings, misiones, logros, albumes, cromos, Parches, Wayfarer, geocerca de presencia fisica, desde ADR-036 compartir social con XP y media unificada `media_*` y, desde TSK-112/ADR-038, factor de nivelacion de Casa/tributo al cofre y Clases). `api/admin.js` expone la moderacion, incluida la rama `activo_oculto_moderar`. El esquema vive en `db/migrations/` (003 a 024). Detalle tecnico vigente en BLUEPRINT.md secciones 2 y 3.
 
 ### Sistema de gamificacion completo (estado real, working tree)
 
@@ -103,6 +103,18 @@ Sobre el XP decimal de ADR-035 se implemento la Entrega TSK-110, verificada en w
 - **Frontend:** nueva `compartir.js` (`window.ExploraCompartir`: Web Share API + WhatsApp + Copiar link, toasts reusando `window.ExploraCO`), hero en mosaico 1+3 y boton Compartir en el `.subnav` de la ficha (`api/pagina-destino.js` v10), `galeria.html` con 5 secciones + modal VOTAR/GUARDAR/COMPARTIR, `album-comments.js` v2.0.0 (firma `mount(target,{fuente,itemId},opts)` retrocompatible), helper `aplicarResultadoXp` en `usuario-session.js` e insignia `compartido` reincorporada en `index.html` (derivada del catalogo real de logros). Cache-bust `album-comments.js?v=2` en `index.html`, `comunidad.html`, `mi-perfil.html` y `galeria.html`.
 - **Verificacion:** Escudo GOLD (`node --check` 7/7 OK; ASCII-safe 0 bytes >127 y 0 backticks en `api/*.js`, `compartir.js` y migraciones) y smokes `scripts/smoke_036_compartir.js` 55/55 PASS + `scripts/smoke_036_media_unificada.js` 71/71 PASS (con mock: no validan Neon).
 - **PENDIENTE OPERATIVO (BLOQUEANTE):** aplicar `db/migrations/022_media_compartidos.sql` y `db/migrations/023_interacciones_media_unificadas.sql` en Neon **antes** del deploy del backend v19 (el backend consulta tablas que deben existir). Relevo corto en `docs/HANDOFF_036.md`.
+
+### Casas con cofre, factor de nivelacion y Clases Rising Star (Entrega TSK-112 / ADR-038, 2026-09-18)
+
+Sobre el modelo de Casas de ADR-028 y el XP decimal de ADR-035 se implemento la Entrega TSK-112, verificada en working tree y pendiente de aplicar la migracion 024 en Neon + deploy. Agrega una capa de progresion colectiva (cofre de Casa) y una capa de profesion (Clases Rising Star) sin crear funciones serverless (8/8, ADR-001/ADR-010):
+
+- **Reuso de Casas (sin `casa_id`):** se reusa `usuarios.casa` (`condor|jaguar|delfin`, ADR-028) y se RECHAZA la propuesta original de `casa_id` + `casas_tributacion`. La migracion 024 crea `casas_cofre` (cofre por Casa: `xp_cofre_total`, `poblacion_activa`, `factor_conversion`, `actualizado_en`) con seed idempotente y sin FK en v1; `poblacion_activa`/`factor_conversion` son cache NO autoritativa.
+- **Tributacion y factor de nivelacion (runtime):** el 10% del `xp_final` se acredita best-effort al cofre de la Casa (`acreditarClaseYCofre`, literal `0.10`; sin endpoint `casa_tributar`). `calcularTagCasa` aplica `dominante` (>45%, x0.85), `equilibrada` (25%-45%, x1.00) y `rezagada` (<25%, x1.30) UNA sola vez en `calcularXpFinal`; `arancel_inter_casa`/`fee_mercado_interno` se exponen pero NO se cobran en v1.
+- **Clases Rising Star (capa nueva, coexiste con el Arbol de 16 ramas):** `usuarios.clase_id` (`cartografo|cronista|explorador`), `nivel_clase`, `xp_clase numeric(12,2)` y `clase_elegida_en` (migracion 024). `BONUS_CLASE` = cartografo 0.08 / cronista 0.10 / explorador 0.07; `XP_NIVEL_CLASE` = 11 umbrales `[0,100,250,500,900,1400,2100,3000,4200,5700,7500]`; `xp_clase` incrementa el 50% del `xp_final`. Rama POST `clase_elegir` en `api/usuarios.js` v16: primera eleccion gratis, recambio con 300 XP + cooldown de 30 dias y sin gate de nivel (ENMIENDA 1 del ADR-038).
+- **Helper unico (anti-duplicidad):** triada `contextoXpE` / `calcularXpFinal` / `calcularNivelClase` + `acreditarClaseYCofre` en `api/interacciones.js` v21, aplicada a 14 acciones de la whitelist; EXCLUIDOS cobros (`dm_enviar`, `comprar_consumible`) y bonos/terceros (misiones, logros, retos de Parche, referidos). Los `UPDATE usuarios SET xp_total` siguen inline para preservar contadores.
+- **Frontend:** `mi-perfil.html` "Mi Clase" (`#pf-clase` + `#modal-clase`, `cargarClase`/`elegirClase`) y `#pf-casa` con tag/multiplicador/cofre; `comunidad.html` con tag/mult/cofre en las cards del ranking.
+- **Verificacion:** Escudo GOLD (`node --check` OK; ASCII 0/0/0; divs 0) y smokes `017` 73/73, `021` 45/45, `036_media_unificada` 85/85, `gamificacion_v4` 95/95 y `smoke_038_casas_clases` 76/76 PASS (mock, no valida Neon). El QA inicial dio "GOLD FAIL" SOLO por desincronizacion ADR<->codigo; se resolvio con la ENMIENDA 1 del ADR-038.
+- **PENDIENTE OPERATIVO (BLOQUEANTE):** aplicar `db/migrations/024_casas_cofre_y_clases.sql` en Neon (UNICA migracion pendiente; 019-023 ya aplicadas, confirmado por Javier el 2026-09-17) ANTES del deploy del backend v16/v21 y del frontend.
 
 ### Documentacion maestra
 

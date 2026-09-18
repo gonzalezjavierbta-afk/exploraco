@@ -1,7 +1,7 @@
 ---
 description: Agente de implementacion GRATUITO de ExploraCO. Modelo open-source (big-pickle). NO usa agentes de pago: delega a subagentes gratuitos (*-free). Maneja el flujo completo de build: modifica archivos del proyecto y coordina subagentes gratuitos por dominio.
 mode: primary
-model: opencode/deepseek-v4.1-flash
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

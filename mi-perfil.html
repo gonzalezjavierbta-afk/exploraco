@@ -399,6 +399,36 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-casa .pf-casa-meta{font-size:11px;color:rgba(255,255,255,.5)}
 .pf-casa .pf-casa-nota{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px;line-height:1.5}
 .pf-casa .pf-casa-actual{font-size:11px;font-weight:700;color:#22C55E;padding:6px 0}
+.pf-casa .pf-casa-tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;margin-top:8px}
+.pf-casa .pf-casa-dato{font-size:10px;color:rgba(255,255,255,.45);margin-top:4px}
+/* TSK-112 / ADR-038: Mi Clase (profesion Rising Star; coexiste con el arbol) */
+.pf-clase{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px}
+.pf-clase .pf-clase-cabeza{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.pf-clase .pf-clase-nombre{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#fff}
+.pf-clase .pf-clase-nivel{font-family:'Geist','Barlow Condensed',sans-serif;font-size:11px;font-weight:900;color:var(--gold)}
+.pf-clase .pf-clase-bonus{font-size:11px;color:rgba(255,255,255,.55);margin-bottom:8px}
+.pf-clase .pf-clase-barra{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:6px}
+.pf-clase .pf-clase-barra-in{height:100%;border-radius:999px;background:linear-gradient(90deg,#E8A020,#F5C46B)}
+.pf-clase .pf-clase-xp{font-family:'Geist','Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,.45)}
+.pf-clase .pf-clase-nota{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px;line-height:1.5}
+.pf-clase .pf-clase-btn{background:transparent;border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:7px 16px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.pf-clase .pf-clase-btn:hover{background:rgba(232,160,32,.12)}
+.pf-clase .pf-clase-btn:disabled{opacity:.35;cursor:not-allowed}
+.pf-clase .pf-clase-cargando{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:14px}
+.pf-clase-modal-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:6px}
+.pf-clase-modal-nota{font-size:11px;color:rgba(255,255,255,.5);line-height:1.5;margin-bottom:12px}
+.pf-clase-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.pf-clase-op{display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;cursor:pointer;text-align:left;color:#fff;transition:border-color .15s,background .15s}
+.pf-clase-op:hover{border-color:rgba(232,160,32,.45);background:rgba(232,160,32,.06)}
+.pf-clase-op:disabled{opacity:.4;cursor:not-allowed}
+.pf-clase-op-ico{font-family:'Geist','Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold)}
+.pf-clase-op-nombre{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px}
+.pf-clase-op-bonus{font-size:10px;color:#22C55E;font-weight:700}
+.pf-clase-op-desc{font-size:10px;color:rgba(255,255,255,.45);line-height:1.4}
+.pf-clase-msg{font-size:11px;color:#ef4444;min-height:14px;margin-top:10px;line-height:1.5}
+.pf-clase-msg.ok{color:#22C55E}
+.pf-clase-cerrar{width:100%;margin-top:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:12px;padding:8px;cursor:pointer}
+.pf-clase-cerrar:hover{border-color:rgba(255,255,255,.3)}
 /* Mi Museo publico: vista previa (MUSEO) */
 .pf-museo-preview{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
 .pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado{text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:16px;line-height:1.6}
@@ -697,6 +727,38 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <!-- WP-5: Casa (identidad de equipo: Condor / Jaguar / Delfin) -->
   <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3E0; Mi Casa</div>
   <div class="pf-casa" id="pf-casa" data-tab="clase"></div>
+
+  <!-- TSK-112 / ADR-038: MI CLASE (profesion Rising Star; coexiste con el arbol de 16 ramas) -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">Mi Clase</div>
+  <div class="pf-clase" id="pf-clase" data-tab="clase"></div>
+  <div id="modal-clase" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1200;justify-content:center;align-items:center;padding:16px;" onclick="if(event.target===this)cerrarModalClase()">
+    <div style="background:#111;border:1px solid rgba(232,160,32,.35);border-radius:12px;padding:20px;width:min(460px,100%);font-family:Outfit,sans-serif;">
+      <div class="pf-clase-modal-title">Elegir / Cambiar Clase</div>
+      <div class="pf-clase-modal-nota">Primera eleccion gratis. Recambio: 300 XP y 30 dias de espera. Nivel maximo 10.</div>
+      <div class="pf-clase-grid">
+        <button type="button" class="pf-clase-op" data-clase="cartografo" onclick="elegirClase('cartografo',this)">
+          <span class="pf-clase-op-ico">//</span>
+          <span class="pf-clase-op-nombre">Cartografo</span>
+          <span class="pf-clase-op-bonus">+8% XP por nivel</span>
+          <span class="pf-clase-op-desc">Cartografia, rutas y territorio.</span>
+        </button>
+        <button type="button" class="pf-clase-op" data-clase="cronista" onclick="elegirClase('cronista',this)">
+          <span class="pf-clase-op-ico">[]</span>
+          <span class="pf-clase-op-nombre">Cronista</span>
+          <span class="pf-clase-op-bonus">+10% XP por nivel</span>
+          <span class="pf-clase-op-desc">Relatos, resenas e historias.</span>
+        </button>
+        <button type="button" class="pf-clase-op" data-clase="explorador" onclick="elegirClase('explorador',this)">
+          <span class="pf-clase-op-ico">&gt;&gt;</span>
+          <span class="pf-clase-op-nombre">Explorador</span>
+          <span class="pf-clase-op-bonus">+7% XP por nivel</span>
+          <span class="pf-clase-op-desc">Salidas, check-ins y hallazgos.</span>
+        </button>
+      </div>
+      <div id="pf-clase-msg" class="pf-clase-msg"></div>
+      <button type="button" class="pf-clase-cerrar" onclick="cerrarModalClase()">Cerrar</button>
+    </div>
+  </div>
 
   <!-- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES -->
   <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x2694;&#xFE0F; Arbol de Clases</div>
@@ -3331,7 +3393,7 @@ function pfTab(tab) {
   var u = sesion();
   if (tab === 'perfil' && u && u.id) renderDatosPerfil();
   if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
-  if (tab === 'clase' && u && u.id) { cargarFacciones(u.id); cargarCasas(u.id); cargarArbolClases(u.id); cargarVocaciones(u.id); }
+  if (tab === 'clase' && u && u.id) { cargarFacciones(u.id); cargarCasas(u.id); cargarClase(u.id); cargarArbolClases(u.id); cargarVocaciones(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) cargarMuseoPreview(u.id);
   if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); }
@@ -3603,6 +3665,27 @@ function cargarCasas(uid) {
   });
   html += '</div>';
   con.innerHTML = html;
+  /* TSK-112 / ADR-038: enriquece el card de tu Casa con tag/multiplicador/
+     cofre desde casa_ranking. Best-effort: si falla o no trae los campos
+     nuevos, el render base queda intacto (degradacion silenciosa). */
+  if (actual) {
+    fetch('/api/usuarios?tipo=casa_ranking')
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        var arr = (res && res.data && res.data.casas) || [];
+        var fila = null;
+        for (var i = 0; i < arr.length; i++) {
+          if (String(arr[i].casa || '').toLowerCase() === String(actual).toLowerCase()) fila = arr[i];
+        }
+        if (!fila) return;
+        var extra = pfCasaExtraHtml(fila);
+        if (!extra) return;
+        var cont = document.getElementById('pf-casa');
+        var card = cont ? cont.querySelector('.facc-card.actual') : null;
+        if (card) card.insertAdjacentHTML('beforeend', extra);
+      })
+      .catch(function(){});
+  }
 }
 function casaErrorMsg(err, u) {
   if (err === 'PUNTOS_INSUFICIENTES') return 'Necesitas 300 XP para cambiar de Casa';
@@ -3649,6 +3732,138 @@ function elegirCasa(casa, btn) {
   }).catch(function(){
     if (btn) { btn.disabled = false; btn.textContent = etiqueta || 'Elegir'; }
     showToast('Error de conexion', '#ef4444');
+  });
+}
+
+/* ---- TSK-112 / ADR-038: CLASE (profesion Rising Star) ----
+   Coexiste con el arbol de 16 ramas. El GET del usuario propio (SELECT *)
+   trae clase_id/nivel_clase/xp_clase; POST clase_elegir elige/recambia. */
+var CLASES_META = {
+  cartografo: { nombre:'Cartografo', bonus:0.08, icono:'//', desc:'Cartografia, rutas y territorio.' },
+  cronista:   { nombre:'Cronista',   bonus:0.10, icono:'[]', desc:'Relatos, resenas e historias.' },
+  explorador: { nombre:'Explorador', bonus:0.07, icono:'>>', desc:'Salidas, check-ins y hallazgos.' }
+};
+/* Espejo front de XP_NIVEL_CLASE del backend (nivel 1..10). */
+var XP_NIVEL_CLASE = [0,100,250,500,900,1400,2100,3000,4200,5700,7500];
+/* Tag de nivelacion runtime de la Casa (ADR-038 seccion D). */
+var CASA_TAGS = {
+  dominante:   { label:'Dominante',   color:'#ef4444' },
+  equilibrada: { label:'Equilibrada', color:'#818CF8' },
+  rezagada:    { label:'Rezagada',    color:'#22C55E' }
+};
+function pfXpFmt(v) { var n = Number(v) || 0; return Math.round(n * 100) / 100; }
+function pfClaseMeta(id) { return CLASES_META[String(id || '').toLowerCase()] || null; }
+function claseNivelDatos(nivel, xpClase) {
+  var n = Math.min(Math.max(parseInt(nivel, 10) || 1, 1), 10);
+  var xp = Number(xpClase) || 0;
+  var base = XP_NIVEL_CLASE[n - 1];
+  var sig = n < 10 ? XP_NIVEL_CLASE[n] : XP_NIVEL_CLASE[10];
+  var pct = (n >= 10 || sig <= base) ? 100 : Math.max(0, Math.min(100, Math.round((xp - base) / (sig - base) * 100)));
+  return { nivel:n, base:base, sig:sig, pct:pct };
+}
+/* HTML extra (degradable) del card de tu Casa con los campos de casa_ranking. */
+function pfCasaExtraHtml(fila) {
+  if (!fila) return '';
+  var html = '';
+  var tag = CASA_TAGS[String(fila.tag || '').toLowerCase()];
+  if (tag) html += '<div class="pf-casa-tag" style="border-color:' + tag.color + ';color:' + tag.color + '">' + tag.label + '</div>';
+  if (fila.multiplicador_xp != null) html += '<div class="pf-casa-dato">Multiplicador XP x' + Number(fila.multiplicador_xp).toFixed(2) + '</div>';
+  if (fila.xp_cofre_total != null) html += '<div class="pf-casa-dato">Cofre: ' + pfXpFmt(fila.xp_cofre_total) + ' XP</div>';
+  return html;
+}
+function cargarClase(uid) {
+  var con = document.getElementById('pf-clase');
+  if (!con || !uid) return;
+  con.innerHTML = '<div class="pf-clase-cargando">Cargando tu Clase\u2026</div>';
+  fetchConJwt('/api/usuarios?id=' + encodeURIComponent(uid))
+    .then(function(res){
+      if (!(res && res.ok && res.data)) { con.innerHTML = '<div class="pf-clase-nota">No se pudo cargar tu Clase.</div>'; return; }
+      renderClase(res.data);
+    })
+    .catch(function(){ con.innerHTML = '<div class="pf-clase-nota">No se pudo cargar tu Clase.</div>'; });
+}
+function renderClase(data) {
+  var con = document.getElementById('pf-clase');
+  if (!con) return;
+  var meta = pfClaseMeta(data && data.clase_id);
+  if (!meta) {
+    con.innerHTML = '<div class="pf-clase-cabeza"><span class="pf-clase-nombre">Sin Clase</span></div>'
+      + '<div class="pf-clase-nota">Elige una profesion: tu Clase sube de nivel y multiplica tu XP. Coexiste con el Arbol de Clases.</div>'
+      + '<button type="button" class="pf-clase-btn" id="btn-elegir-clase" onclick="abrirModalClase()">Elegir Clase</button>';
+    return;
+  }
+  var d = claseNivelDatos(data.nivel_clase, data.xp_clase);
+  var bonusTxt = '+' + Math.round(meta.bonus * 100) + '% XP por nivel';
+  var xpTxt = d.nivel >= 10
+    ? ('Nivel maximo \u00b7 ' + d.sig + ' XP de clase')
+    : (pfXpFmt(data.xp_clase) + ' / ' + d.sig + ' XP de clase');
+  con.innerHTML = '<div class="pf-clase-cabeza">'
+    + '<span class="pf-clase-nombre">' + meta.icono + ' ' + meta.nombre + '</span>'
+    + '<span class="pf-clase-nivel">Nivel ' + d.nivel + '</span></div>'
+    + '<div class="pf-clase-bonus">' + bonusTxt + '</div>'
+    + '<div class="pf-clase-barra"><div class="pf-clase-barra-in" style="width:' + d.pct + '%"></div></div>'
+    + '<div class="pf-clase-xp">' + xpTxt + '</div>'
+    + '<div class="pf-clase-nota" style="margin-top:10px">Cambiar de Clase cuesta 300 XP y 30 dias de espera.</div>'
+    + '<button type="button" class="pf-clase-btn" id="btn-elegir-clase" onclick="abrirModalClase()">Elegir / Cambiar Clase</button>';
+}
+function abrirModalClase() {
+  var u = sesion();
+  var actual = u ? String(u.clase_id || '') : '';
+  var botones = document.querySelectorAll('#modal-clase .pf-clase-op');
+  for (var i = 0; i < botones.length; i++) {
+    var es = botones[i].getAttribute('data-clase') === actual;
+    botones[i].disabled = es;
+    botones[i].style.opacity = es ? '0.5' : '';
+  }
+  var msg = document.getElementById('pf-clase-msg');
+  if (msg) { msg.textContent = ''; msg.className = 'pf-clase-msg'; }
+  var m = document.getElementById('modal-clase');
+  if (m) m.style.display = 'flex';
+}
+function cerrarModalClase() {
+  var m = document.getElementById('modal-clase');
+  if (m) m.style.display = 'none';
+}
+function claseErrorMsg(err) {
+  if (err === 'CLASE_YA_ELEGIDA') return 'Ya tienes una Clase. Usa el recambio (300 XP + 30 dias).';
+  if (err === 'COOLDOWN_CLASE') return 'Debes esperar 30 dias desde tu ultima eleccion de Clase.';
+  if (err === 'PUNTOS_INSUFICIENTES') return 'Necesitas 300 XP para cambiar de Clase.';
+  if (err === 'EMAIL_SIN_VERIFICAR') return 'Verifica tu email antes de elegir tu Clase.';
+  if (err === 'CLASE_INVALIDA') return 'Clase invalida.';
+  if (err === 'SESION_REQUERIDA' || err === 'SESION_EXPIRADA' || err === 'SESION_INVALIDA') return 'Inicia sesion de nuevo para elegir tu Clase.';
+  return err || 'No se pudo actualizar tu Clase.';
+}
+function elegirClase(claseId, btn) {
+  var u = sesion();
+  if (!u || !u.id) return;
+  var meta = pfClaseMeta(claseId);
+  if (!meta) return;
+  var msg = document.getElementById('pf-clase-msg');
+  if (u.clase_id && !window.confirm('El recambio cuesta 300 XP y no podras volver a cambiar en 30 dias. Deseas cambiar a ' + meta.nombre + '?')) return;
+  if (btn) btn.disabled = true;
+  if (msg) { msg.textContent = 'Guardando\u2026'; msg.className = 'pf-clase-msg ok'; }
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'clase_elegir', usuario_id: String(u.id), clase_id: claseId })
+  }).then(function(res){
+    if (res && res.ok && res.data) {
+      u.clase_id = res.data.clase_id || claseId;
+      u.clase_elegida_en = res.data.clase_elegida_en || u.clase_elegida_en;
+      if (res.data.xp_total_nuevo != null) u.xp_total = res.data.xp_total_nuevo;
+      if (res.data.nivel_nuevo != null) u.nivel_clase = res.data.nivel_nuevo;
+      try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
+      showToast('Clase elegida: ' + meta.nombre);
+      if (res.data.bajo_nivel) showToast('Ojo: con este cambio bajaste de nivel', '#ef4444');
+      cerrarModalClase();
+      cargarClase(u.id);
+      if (typeof refrescarSesion === 'function') refrescarSesion();
+      return;
+    }
+    if (btn) btn.disabled = false;
+    if (msg) { msg.textContent = claseErrorMsg(res && res.error); msg.className = 'pf-clase-msg'; }
+  }).catch(function(){
+    if (btn) btn.disabled = false;
+    if (msg) { msg.textContent = 'Error de conexion.'; msg.className = 'pf-clase-msg'; }
   });
 }
 

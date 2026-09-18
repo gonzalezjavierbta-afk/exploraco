@@ -1454,3 +1454,224 @@ El radio urbano se endurece porque 100 m permitia marcar la visita sin presencia
 **Estado final:** Aprobado e implementado en working tree (SIN commitear), 2026-09-17.
 
 **ADRs relacionados:** ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-010 (presupuesto de endpoints), ADR-024 (radios, enmendado), ADR-030 (galeria unificada), ADR-033 (radio explicito por lugar), ADR-034 (hero/galeria/orden de modulos, enmendado), ADR-036 (precedente inmediato), BUG-002/BUG-061/BUG-062 (deuda preexistente).
+
+---
+
+## ADR-038: Casas con cofre (tributacion del 10%), Clases (profesion) y entrega unica de XP con factor de nivelacion por poblacion activa
+
+**ID:** ADR-038
+**Fecha:** 2026-09-17
+**Estado:** Aprobado e IMPLEMENTADO con Enmienda 1 (2026-09-18). Verificado contra el archivo real (ADR-006): existen db/migrations/024_casas_cofre_y_clases.sql, los helpers contextoXpE / calcularXpFinal / calcularNivelClase / acreditarClaseYCofre y la rama POST clase_elegir. **Enmienda 1:** el diseno original de este ADR queda SUPERSEDIDO en los puntos listados en la seccion ENMIENDA 1 (al final), que formaliza y aprueba el contrato realmente implementado en TSK-112 (prevalece el spec de producto PROMPT_OPENCODE_TSK112.md). Si un punto de las secciones A-E contradice la ENMIENDA 1, PREVALECE la ENMIENDA 1. Los valores RECHAZADOS 'alta'/'media'/'baja' y la tabla casas_tributacion jamas se implementaron; el cofre real vive en casas_cofre.
+**Autor:** architect (AI-DOS) con decisiones del propietario del producto (Javier, 2026-09-17).
+**Nota de numeracion:** el 038 es el consecutivo real tras ADR-037 (mayor registrado, verificado con `^## ADR-` sobre el archivo real, ADR-006). No estaba reservado en ninguna spec.
+**Alcance de esquema:** esta ADR NO toca `destinos.tags` JSONB ni ninguna categoria del directorio. Opera sobre `usuarios` (columnas nuevas) y una tabla nueva `casas_cofre`. No hay merge JSONB porque no hay tags involucrados.
+
+### Contexto
+
+El proyecto YA tiene un sistema de Casas completo (TSK-103 / ADR-028) y un Arbol de Clases de 16 ramas:
+
+1. **Casas reales (ADR-028).** `usuarios.casa varchar(20)` con `chk_usuarios_casa CHECK (casa IS NULL OR casa IN ('condor','jaguar','delfin'))` (`db/migrations/017_perfil_publico_arbol_casas.sql`, L70-85). En `api/usuarios.js` (header real v15): `CASAS_VALIDAS = ['condor','jaguar','delfin']` (L222), rama POST `casa_elegir` (L685-756) con sesion firmada `validarSesionUsuario` (L164), email verificado, nivel >= 2, primera eleccion gratis (`UPDATE ... WHERE casa IS NULL`), cambio con coste de 300 XP y cooldown de 30 dias via `casa_elegida_en` (L731-745); y rama GET `casa_ranking` (L514-564) que devuelve `{ok:true, data:{casas, top}}` con `miembros`, `miembros_activos` (ventana de 30 dias, ADR-035), `xp_total`, `xp_promedio`, `activos_ocultos_aprobados`, `checkins_30d` y fallback `42703`.
+2. **Arbol de Clases de 16 ramas (ADR-028).** `RAMAS`/`RAMA_TIERS = [0,100,250,450,700]` en `api/interacciones.js` (L274-332) y `usuarios.progreso_arbol jsonb` (migracion 017). El arbol es un skill-tree: los puntos `D_R` se DERIVAN en cada lectura y solo se persisten fechas write-once de nodo (merge JSONB, ADR-003).
+3. **Entrega de XP dispersa.** `api/interacciones.js` (header real v20, 7791 lineas) tiene **18 ocurrencias de `UPDATE usuarios SET xp_total...`** (verificado 2026-09-17 sobre el archivo real) y helpers aislados `red2` (L213) y `numXp` (L214); **NO existe** un helper unico de entrega de XP, ni `XP_BASE`, ni `entregarXpUsuario`.
+4. **El problema de producto:** se quiere (a) dar a cada Casa un **cofre compartido** alimentado por la actividad de sus miembros, (b) una **Clase / profesion ("Rising Star")** que coexista con el Arbol de 16 ramas, y (c) **balancear las Casas por poblacion activa** en runtime (la Casa dominante gana con penalizacion y la rezagada con bonificacion).
+
+Ademas rige el **presupuesto 8/8 de funciones serverless** (ADR-001): nada de endpoints nuevos; todo entra como ramas `tipo=` y como escrituras internas de los endpoints existentes.
+
+**Propuesta original RECHAZADA (registro obligatorio):** el mandato original describia un `casa_id` con valores `'alta'|'media'|'baja'`. Se RECHAZA de forma explicita porque **duplicaria el sistema de Casas ya existente de ADR-028** (`usuarios.casa` con `condor/jaguar/delfin`): crearia una SEGUNDA fuente de verdad para la identidad de Casa, romperia el contrato de `casa_elegir`/`casa_ranking` y resucitaria el anti-patron de "segunda escala de progreso" ya rechazado en ADR-028/ADR-035. **Se reusa `usuarios.casa` como unica base. Queda prohibido crear `casa_id` o los valores `'alta'|'media'|'baja'`.**
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Crear `casa_id` con `'alta'|'media'|'baja'` (RECHAZADA).** Duplica ADR-028: dos columnas de identidad de Casa, dos catalogos y dos caminos de eleccion que pueden divergir; ademas `'alta/media/baja'` no son Casas sino NIVELES de Casa, lo que obliga a mapear 3x3 y a migrar datos existentes. **Rechazada por decision del dueno y por ADR-006/ADR-028.**
+2. **Reusar `usuarios.casa` como base de nivelacion + cofre (ELEGIDA).** Cero cambio de identidad, cero migracion de datos de Casa, `casa_elegir`/`casa_ranking` intactos.
+3. **Tabla `casas_tributacion` (RECHAZADA) vs `casas_cofre` (ELEGIDA).** `tributacion` nombra el ACTO, no el objeto persistido; el objeto que acumula es el COFRE compartido. `casas_cofre` es el nombre aprobado por producto.
+4. **`casas_votaciones` en v1 (DIFERIDA a v2).** No es necesaria para el lazo nivelacion/tributacion y agranda la superficie; se difiere explicitamente.
+5. **Clase como rama 17 del Arbol o reemplazo de `progreso_arbol` (RECHAZADA).** Mezclaria dos escalas (skill-tree derivado vs progresion acumulada) y romperia la invariante de ADR-028 de no persistir derivados del arbol. Se elige **COEXISTENCIA**: `clase_id`/`nivel_clase`/`xp_clase` sin tocar `progreso_arbol`.
+6. **Clase sin recambio (eleccion libre permanente) vs con recambio (ELEGIDA).** Se reusa el patron de `faccion_elegir`/`casa_elegir`: primera eleccion gratis; **cambio 300 XP + cooldown 30 dias** via `clase_elegida_en`.
+7. **Endpoint HTTP `casa_tributar` (RECHAZADA).** Viola el 8/8 (ADR-001) y expondria un sumidero de XP disparable por el cliente. La tributacion es un helper INTERNO best-effort.
+8. **Parchear cada uno de los 18 `UPDATE ... xp_total` (RECHAZADA) vs un helper unico (ELEGIDA).** Parchear a mano duplica la matematica de clase + Casa + tributacion en 18 puntos (viola la Regla de No-Duplicidad, AGENTS.md 2.1) y garantiza drift de redondeo. Se elige **un unico `entregarXpUsuario`**.
+9. **Factor de nivelacion por XP absoluto / ranking (RECHAZADA) vs por poblacion activa (ELEGIDA).** El XP absoluto consolida al ganador (snowball); la PARTICIPACION de poblacion activa es la palanca de catch-up correcta y es barata de calcular.
+10. **Tributar sobre el XP base (RECHAZADA) vs sobre el `xp_final` (ELEGIDA).** Sobre el base ignoraria el factor de Casa y premiaria igual a la Casa dominante; sobre `xp_final` (post-factor) el 10% se calcula sobre lo realmente acreditado.
+
+### Decision tomada
+
+**(A) Casas: reuso + cofre (migracion 024).**
+- `usuarios.casa` sigue siendo la UNICA fuente de identidad de Casa. No se agrega `casa_id` ni los valores `'alta'|'media'|'baja'`.
+- Tabla NUEVA `casas_cofre`:
+  - `casa varchar(20) PRIMARY KEY`
+  - `xp_cofre_total numeric(12,2) NOT NULL DEFAULT 0`
+  - `poblacion_activa int NOT NULL DEFAULT 0` (CACHE de `miembros_activos`)
+  - `factor_conversion numeric(5,4) NOT NULL DEFAULT 1.0` (CACHE del `multiplicador_xp`; 0.8500 / 1.0000 / 1.3000)
+  - `actualizado_en timestamptz NOT NULL DEFAULT now()`
+  - `CONSTRAINT chk_casas_cofre_casa CHECK (casa IN ('condor','jaguar','delfin'))`
+- Seed idempotente con las 3 Casas reales: `INSERT ... ON CONFLICT (casa) DO NOTHING`.
+- **NO se crea `casas_votaciones`** (v2). **NO se agrega FK** `usuarios.casa -> casas_cofre.casa` en v1 (riesgo de validacion sobre filas historicas); la consistencia la garantizan las dos listas CHECK espejo + el seed, con un preflight que las compara.
+- `poblacion_activa` y `factor_conversion` son **cache NO autoritativa**: la fuente de verdad es la consulta runtime. `contextoXpE` la refresca best-effort (escribe solo si cambio; nunca rompe la entrega de XP).
+
+**(B) Clases: coexistencia con el Arbol (migracion 024).**
+- Columnas NUEVAS en `usuarios` (sin tocar `progreso_arbol`, `RAMAS` ni `RAMA_TIERS`):
+  - `clase_id varchar(20)`
+  - `nivel_clase int NOT NULL DEFAULT 1`
+  - `xp_clase numeric(12,2) NOT NULL DEFAULT 0`
+  - `clase_elegida_en timestamptz`
+  - `CONSTRAINT chk_usuarios_clase CHECK (clase_id IS NULL OR clase_id IN ('cartografo','cronista','explorador'))`
+- Catalogo en codigo `CLASES` (`api/interacciones.js`), con afinidad a la whitelist: **(CORREGIDO POR ENMIENDA 1, 2026-09-18: NO existe afinidad por tipo de accion; BONUS_CLASE se aplica a TODAS las acciones de la whitelist y el catalogo CLASES con mapa de afinidad NO se implemento.)**
+  - `explorador` -> `visita`, `guardado`, `foto`, `activo_oculto_checkin`
+  - `cronista` -> `resena`, `rating`, `media_comentar`, `chat_msg`, `plan_chat_msg`
+  - `cartografo` -> `compartir`, `media_voto`, `activo_oculto_votar`, `album_crear`, `album_agregar_foto`
+- `XP_NIVEL_CLASE = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5700, 7500]` (VALORES DEL SPEC ORIGINAL, aprobados por producto) y `calcularNivelClase(xp)` como UNICO catalogo de umbrales de clase, con TOPE DURO de nivel 10 (los 11 umbrales cubren 10 niveles; el umbral 7500 queda comprendido dentro del nivel 10 por el tope). `BONUS_CLASE = { cartografo: 0.08, cronista: 0.10, explorador: 0.07 }` (VALORES DEL SPEC ORIGINAL): el bono es POR CLASE, no un `CLASE_POR_NIVEL` unico. Ambos son constantes de producto ajustables por `api/interacciones.js` sin migracion.
+- **Rama POST `clase_elegir`** en `api/usuarios.js` (espejo de `casa_elegir`): `CLASES_VALIDAS = ['cartografo','cronista','explorador']`; exige `validarSesionUsuario`, email verificado y nivel >= 2; primera eleccion gratis (`UPDATE ... WHERE clase_id IS NULL`); cambio con coste de **300 XP** y **cooldown de 30 dias** via `clase_elegida_en`; errores `CLASE_INVALIDA`, `CLASE_YA_ELEGIDA`, `COOLDOWN_CLASE`, `PUNTOS_INSUFICIENTES`, `NIVEL_INSUFICIENTE`, `SESION_REQUERIDA`/`SESION_INVALIDA`; respuesta `{clase_id, nivel_clase, xp_clase, xp_total_nuevo, nivel_anterior, nivel_nuevo, bajo_nivel}`. **(CORREGIDO POR ENMIENDA 1, 2026-09-18: NO existe gate de nivel ni el error NIVEL_INSUFICIENTE; primera eleccion responde {ok:true,data:{clase_id, clase_elegida_en}} y el recambio {ok:true,data:{clase_id, clase_elegida_en, xp_total_nuevo, nivel_anterior, nivel_nuevo, bajo_nivel}}. Ver ENMIENDA 1.)**
+- **Lectura aditiva:** `clase_id`/`nivel_clase`/`xp_clase` se exponen en `GET ?id=` y `perfil_publico` (que ya proyectan columnas de `usuarios`); el catalogo de clases viaja como campo aditivo `clases` en la rama existente `GET ?tipo=arbol_catalogo` (cero endpoints nuevos). **(CORREGIDO POR ENMIENDA 1, 2026-09-18: esto NO se implemento; arbol_catalogo NO expone clases. El frontend usa catalogos locales espejo CLASES_META y XP_NIVEL_CLASE, verificados en mi-perfil.html. El campo clases queda DIFERIDO a v2.)**
+
+**(C) Helper unico de entrega de XP (`api/interacciones.js` v21).** **(SUPERSEDIDO POR ENMIENDA 1, 2026-09-18: NO se implemento un helper unico ni la afinidad; el contrato vigente es la triada contextoXpE / calcularXpFinal / acreditarClaseYCofre con UPDATE inline por contadores. Ver ENMIENDA 1 al final.)**
+- Helpers (unica implementacion; Regla de No-Duplicidad):
+  - `contextoXpE(sql, usuarioId, tipoAccion)` -> lee `casa`, `clase_id`, `nivel_clase`; calcula el tag de Casa por poblacion activa (seccion D) y la afinidad de clase; devuelve `{casa, casa_tag, multiplicador_xp, arancel_inter_casa, fee_mercado_interno, nivel_clase, clase_id_afin}`. Ejemplo de contexto (derivado, NO persistido):
+    `{ "casa": "jaguar", "casa_tag": "equilibrada", "multiplicador_xp": 1.0, "arancel_inter_casa": 0.10, "fee_mercado_interno": 0.05, "nivel_clase": 3, "clase_id_afin": "cartografo" }`
+  - `calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag)` -> pura, sin BD: `factor_casa = MULT_CASA[casa_tag]`; `factor_clase = clase_id ? (1 + nivel_clase * BONUS_CLASE[clase_id]) : 1` (formula del spec original: `xp_clase_nuevo = xp_base * (1 + nivel_clase * bonus_clase)`); devuelve `{xp_final, factor_casa, factor_clase, xp_clase_inc}` con `xp_final = red2(red2(xp_base * factor_casa) * factor_clase)` y `xp_clase_inc = clase_id ? red2(xp_base * factor_clase) : 0`. **(CORREGIDO POR ENMIENDA 1, 2026-09-18: la formula implementada es xp_clase_inc = red2(xp_final * 0.50), es decir el 50 por ciento del XP FINAL que YA incluye el factor de Casa; se acredita en acreditarClaseYCofre y SOLO si existe clase_id. La lectura previa que excluia el factor de Casa del incremento de clase quedo sin efecto.)** `clase_id` es la clase YA RESUELTA por afinidad (NULO si la accion no es afin), de modo que la funcion no necesita el tipo de accion; `nivel_clase` es el nivel ANTES de esta entrega. **Lectura literal del spec (a confirmar por producto):** el incremento de `xp_clase` NO lleva `factor_casa`; el factor de Casa modula SOLO `xp_total`.
+  - `calcularNivelClase(xp)` -> usa `XP_NIVEL_CLASE`.
+  - `entregarXpUsuario(sql, usuarioId, xpBase, tipoAccion)` -> orquesta: **(SUPERSEDIDO POR ENMIENDA 1, 2026-09-18: esta funcion NO existe en el archivo real; ver la triada contextoXpE / calcularXpFinal / acreditarClaseYCofre y los UPDATE inline por contadores en la ENMIENDA 1.)** (1) `contextoXpE`; (2) `calcularXpFinal`; (3) `UPDATE usuarios SET xp_total = xp_total + $1, xp_clase = xp_clase + $3, ultimo_acceso = NOW() [, total_resenas = total_resenas + 1] [, total_guardados = total_guardados + 1] [, total_visitas = total_visitas + 1] WHERE id = $2 RETURNING xp_clase, clase_id` (los fragmentos de contador se agregan SOLO para `resena`/`guardado`/`visita`, preservando el comportamiento actual; `$1 = xp_final`, `$3 = xp_clase_inc`); (4) `nivel_clase = calcularNivelClase(xp_clase devuelto)` (segundo UPDATE solo si cambio); (5) tributacion best-effort; (6) devuelve `{xp_base, xp_final, factor_casa, factor_clase, clase_id_afin, casa, nivel_clase_antes, nivel_clase_despues, cofre_ok}`.
+  - **Desviacion ACEPTADA:** el mandato enuncia `entregarXpUsuario(sql, usuarioId, xpBase)` con 3 argumentos. El dueno del producto ACEPTA (2026-09-17) el 4o argumento `tipoAccion` como desviacion justificada de la firma inicial, porque la afinidad de clase no es derivable de `xpBase`; `contextoXpE` y `calcularXpFinal` conservan la firma exacta del mandato. **(SUPERSEDIDO POR ENMIENDA 1, 2026-09-18: entregarXpUsuario no existe y la afinidad tampoco; calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag) NO necesita tipoAccion.)**
+- **Whitelist (SOLO acciones propias):** `resena`, `foto`, `visita`, `guardado`, `rating`, `compartir`, `media_voto`, `media_comentar`, `chat_msg`, `plan_chat_msg`, `album_crear`, `album_agregar_foto`, `activo_oculto_checkin`, `activo_oculto_votar` (14 claves). Cada punto de entrega reemplaza su `UPDATE ... xp_total` inline por una llamada a `entregarXpUsuario`. **(SUPERSEDIDO POR ENMIENDA 1, 2026-09-18: los UPDATE usuarios SET xp_total PERMANECEN inline para preservar en el mismo UPDATE los contadores total_resenas / total_guardados / total_visitas; cada rama llama a calcularXpFinal y luego a acreditarClaseYCofre. El valor de XP usado es siempre el xp_final de calcularXpFinal.)**
+- **EXCLUIDOS (no pasan por el helper):**
+  - **Cobros** (`dm_enviar`, `comprar_consumible`): RESTAN XP; no hay entrega, ni XP de clase, ni tributacion.
+  - **Bonos / terceros** (`evaluarMisiones`, `evaluarLogros`, `progresarPandillaRetos`, `repartirXpReferidos`): conservan su matematica propia para evitar recursion, doble tributacion y drift.
+- **Orden de modificadores (invariante):** el `xpBase` que recibe el helper es el valor DESPUES de los modificadores existentes (`xpConMultiplicador` x1.1 Own the Spot, `aplicarAmuletoX2` x2, factor de area de `visita` de ADR-033, YA verificado en `interacciones.js` L7338-7342 resena, L7647-7651 visita, L7210-7214 compartir). `entregarXpUsuario` NO re-aplica esos modificadores: solo agrega clase + Casa + tributacion. El factor de clase/Casa se aplica UNA sola vez y NUNCA dentro de `xpConMultiplicador`, `aplicarAmuletoX2`, `aplicarFamaPandilla`, `repartirXpReferidos`, `evaluarMisiones` ni `evaluarLogros`. La fama de Parche (10%) y los referidos siguen ejecutandose en sus llamadas actuales, sobre el `xp_final`.
+  - **`visita` y bono rural (correccion de coherencia, ADR-024/ADR-033):** el helper se llama con `xpVisitaFinal` (ya multiplicado y amuletado, SIN bono rural) y el `bonoRuralVisita` (`VISITA_BONO_RURAL=20`, `interacciones.js` L157/L7622) se sigue sumando PLANO despues del factor: `xp_total += red2(xp_final + bonoRuralVisita)`, sin factor de clase/Casa y sin amuleto. `aplicarFamaPandilla` recibe `xp_final` (sin bono rural, preserva "el bono rural NO aporta fama"); `repartirXpReferidos` recibe `xp_final + bonoRuralVisita` (preserva el comportamiento actual L7664/L7667). **El helper NO debe recibir `xpTotalVisita`**, porque escalaria el bono plano por clase/Casa.
+  - **Contadores por accion (correccion):** el helper preserva en el MISMO UPDATE los contadores que hoy incrementan los updates inline: `total_resenas` (resena, L7346), `total_guardados` (guardado, L7442) y `total_visitas` (visita, L7656). Reemplazar el UPDATE inline sin preservarlos romperia `perfil_progreso`/misiones/logros que leen esos contadores.
+  - **Terceros excluidos aunque compartan rama (correccion):** en `album_agregar_foto` (XP +15 al agregador, L5966; +10 al autor original, L5975) y en las ramas `media_*`, SOLO el XP del ACTOR pasa por el helper; el XP a un tercero (`afAutorOriginal`) conserva su UPDATE y su tope diario propios, sin factor de clase/Casa ni tributacion.
+- **Interaccion con ADR-036:** el XP de `compartir` (25 primer share / 5 posteriores, tope 10 eventos y 50 XP / 24h) entra a la whitelist; el ledger `media_compartidos.xp_ganado` registra el `xp_final` (post-factor) y el tope diario cuenta sobre ese valor final.
+
+**(D) Factor de nivelacion por poblacion activa.** **(PARCIALMENTE SUPERSEDIDO POR ENMIENDA 1, 2026-09-18: en el archivo real contextoXpE cuenta PERTENENCIA (COUNT sobre usuarios.casa y COUNT sobre usuarios.casa IS NOT NULL), SIN filtro de ventana de 30 dias ni de usuarios.activo. Ver ENMIENDA 1, resolucion 5.)**
+- `contextoXpE` calcula, en runtime, la poblacion activa por Casa real con la MISMA definicion de "miembro activo vigente" de ADR-035: `usuarios.casa IS NOT NULL AND usuarios.activo = true AND usuarios.ultimo_acceso > NOW() - INTERVAL '30 days'`; si la consulta falla con `42703` (columnas no versionadas, patron BUG-021), reintenta SIN la condicion de actividad y degrada con `warn` (NUNCA catch vacio).
+- `pct_casa = miembros_activos_casa / GREATEST(total_activos, 1)`, con `total_activos = SUM` sobre las 3 Casas reales.
+- Tag y factores (constantes de producto `CASAS_NIVELACION`):
+
+| tag | pct de poblacion activa | multiplicador_xp | arancel_inter_casa | fee_mercado_interno |
+|---|---|---|---|---|
+| dominante | > 45% | 0.85 | 0.25 | 0.02 |
+| equilibrada | 25% a 45% | 1.00 | 0.10 | 0.05 |
+| rezagada | < 25% | 1.30 | 0.05 | 0.00 |
+
+- Umbrales ESTRICTOS: exactamente 0.25 o 0.45 => `equilibrada`. `total_activos = 0` => `equilibrada`. Una sola Casa con miembros => esa Casa es `dominante` (se auto-penaliza, efecto buscado).
+- **En v1 SOLO se consume `multiplicador_xp`** (dentro de `calcularXpFinal`). `arancel_inter_casa` y `fee_mercado_interno` quedan DEFINIDOS y expuestos en el contexto (lectura) para el futuro mercado inter-Casa; NO se cobran en ninguna ruta de v1.
+- `casas_cofre.factor_conversion` espeja SOLO `multiplicador_xp` como CACHE (`0.8500` / `1.0000` / `1.3000`); la fuente de verdad es el calculo runtime. **APROBADO por producto (2026-09-17):** `arancel_inter_casa` y `fee_mercado_interno` quedan como CONSTANTES RUNTIME no persistidas hasta que exista el mercado inter-Casa (v2).
+
+**(E) Tributacion (10% al cofre de la Casa).** **(CORREGIDO POR ENMIENDA 1, 2026-09-18: NO existe la constante TRIBUTO_CASA_PCT; el 10 por ciento es un literal 0.10 dentro de acreditarClaseYCofre. NO existe endpoint casa_tributar; el cofre solo lo alimenta acreditarClaseYCofre.)**
+- `TRIBUTO_CASA_PCT = 0.10`. Sobre el `xp_final` (post-factor), `tributo = red2(xp_final * 0.10)`.
+- Si `usuarios.casa IS NULL` => no hay tributacion (ninguna fila de cofre se toca).
+- Escritura interna: `UPDATE casas_cofre SET xp_cofre_total = ROUND(COALESCE(xp_cofre_total,0) + $1, 2), actualizado_en = NOW() WHERE casa = $2` (`$1 = tributo`, `$2` = Casa del usuario).
+- **Best-effort:** corre DESPUES del `UPDATE` de XP del usuario y va envuelto en un `try/catch` que registra `console.warn('[interacciones] tributacion degradada: ' + err.message)` y devuelve `cofre_ok=false`; **jamas bloquea ni revierte la entrega de XP** y **nunca** es un catch vacio (AGENTS.md 2.2).
+- **NO existe endpoint HTTP `casa_tributar`** (ADR-001 8/8). El cofre NO es escribible por el cliente; solo `entregarXpUsuario` lo alimenta.
+- Las acciones EXCLUIDAS (cobros, misiones, logros, retos, referidos) NO alimentan el cofre: evita tributacion recursiva, doble conteo y drift.
+
+### Justificacion
+
+Reusar `usuarios.casa` es la unica opcion que no crea una segunda identidad de Casa: la propuesta `casa_id` con `'alta'|'media'|'baja'` habria dejado dos columnas, dos catalogos y dos flujos de eleccion capaces de divergir, ademas de exigir migrar datos historicos; se RECHAZA por ADR-006 (la realidad del repo manda) y por ADR-028 (la Casa ya existe). La COEXISTENCIA de la Clase con el Arbol de 16 ramas respeta la separacion de escalas: el Arbol es un skill-tree de puntos DERIVADOS con nodos write-once y la Clase es una profesion con XP propio acumulado; tocar `progreso_arbol` habria roto la invariante anti-doble-conteo de ADR-028.
+
+Concentrar la entrega en `entregarXpUsuario` honra la Regla de No-Duplicidad (AGENTS.md 2.1) y ataca el riesgo real medido: 18 sitios de `UPDATE usuarios SET xp_total` que, de otro modo, tendrian que recibir cada uno la matematica de clase + Casa + tributacion y el redondeo half-up de ADR-035 (`red2`). El helper unico es tambien el unico punto donde se puede garantizar que el factor se aplica UNA vez y nunca dentro de los bonos de terceros. **(SUPERSEDIDO POR ENMIENDA 1, 2026-09-18: la centralizacion se logra con la triada contextoXpE / calcularXpFinal / acreditarClaseYCofre; los UPDATE usuarios SET xp_total siguen inline para preservar contadores en el mismo UPDATE. Ver ENMIENDA 1.)**
+
+El factor por poblacion activa es determinista, barato (un agregado sobre tablas pequenas) y evita el snowball del XP absoluto: penaliza a la Casa dominante (x0.85) y bonifica a la rezagada (x1.30) con la MISMA ventana de 30 dias que ya usa `casa_ranking` (ADR-035). La tributacion sobre `xp_final` y en modo best-effort mantiene la entrega atomica y no acopla la experiencia del usuario a un fallo del cofre. Todo es aditivo: migracion idempotente (ADR-008), sin DROP (ADR-003), sin endpoints nuevos (ADR-001) y ASCII-safe (ADR-002).
+
+### Impacto
+
+- **Migracion NUEVA** `db/migrations/024_casas_cofre_y_clases.sql` (idempotente ADR-008, ASCII-safe ADR-002):
+  - `ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS clase_id varchar(20), nivel_clase int NOT NULL DEFAULT 1, xp_clase numeric(12,2) NOT NULL DEFAULT 0, clase_elegida_en timestamptz;`
+  - `ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS chk_usuarios_clase;` + `ADD CONSTRAINT chk_usuarios_clase CHECK (clase_id IS NULL OR clase_id IN ('cartografo','cronista','explorador'));`
+  - `CREATE TABLE IF NOT EXISTS casas_cofre (...)` + `DROP CONSTRAINT IF EXISTS chk_casas_cofre_casa` + `ADD CONSTRAINT chk_casas_cofre_casa CHECK (casa IN ('condor','jaguar','delfin'));`
+  - `INSERT INTO casas_cofre (casa) VALUES ('condor'),('jaguar'),('delfin') ON CONFLICT (casa) DO NOTHING;`
+  - `CREATE INDEX IF NOT EXISTS idx_usuarios_clase ON usuarios (clase_id) WHERE clase_id IS NOT NULL;`
+- **`api/usuarios.js` v15 -> v16:** `CLASES_VALIDAS`; rama POST `clase_elegir` (espejo de `casa_elegir`); exposicion aditiva de `clase_id`/`nivel_clase`/`xp_clase` en `?id=` y `perfil_publico`. Sin endpoints nuevos.
+- **`api/interacciones.js` v20 -> v21:** helpers `contextoXpE`/`calcularXpFinal`/`calcularNivelClase`/`entregarXpUsuario`; catalogos `CLASES`, `BONUS_CLASE`, `XP_NIVEL_CLASE`, `CASAS_NIVELACION`, `TRIBUTO_CASA_PCT`, `MULT_CASA`; reemplazo de los 14 puntos de entrega de la whitelist (preservando contadores por accion y el bono rural plano de `visita`); `clases` como campo aditivo de `arbol_catalogo`. **(CORREGIDO POR ENMIENDA 1, 2026-09-18: los helpers reales son contextoXpE / calcularXpFinal / calcularNivelClase / acreditarClaseYCofre; las constantes reales son BONUS_CLASE, XP_NIVEL_CLASE y calcularTagCasa; NO existen CLASES (catalogo), CASAS_NIVELACION, MULT_CASA ni TRIBUTO_CASA_PCT; arbol_catalogo NO expone clases.)**
+- **Frontend (render):** `mi-perfil.html` (selector de Clase y medidor `nivel_clase`/`xp_clase` en la pestana Clase; cofre y tag de Casa en el bloque "Mi Casa"); `comunidad.html` (sub-vista Casas puede mostrar `xp_cofre_total`/tag). Consumo de los campos aditivos ya expuestos; sin endpoint nuevo.
+- **Presupuesto 8/8 INTACTO** (ADR-001): cero archivos nuevos en `api/`. **Sin tags JSONB tocados.**
+- **Verificacion exigible al cierre:** Escudo GOLD (`node --check`, ASCII-safe 0 bytes >127 y 0 backticks en `api/*.js` y en la migracion, balance de divs en el HTML); smoke dedicado con mock (`scripts/smoke_038_*.js`) que verifique el orden clase/Casa/tributacion, la PRESERVACION de `total_resenas`/`total_guardados`/`total_visitas`, que `visita` mantiene el bono rural PLANO sin factor, que los terceros (`afAutorOriginal`) NO pasan por el helper y la exclusion de cobros/bonos; preflight contra `information_schema` que confirme las columnas `clase_id`/`nivel_clase`/`xp_clase`/`clase_elegida_en`, la tabla `casas_cofre` y la igualdad de las listas CHECK (`usuarios.casa` vs `casas_cofre.casa`).
+
+### Consecuencias positivas
+
+- Una sola fuente de identidad de Casa: el cofre y la nivelacion cuelgan de `usuarios.casa`, sin `casa_id` ni migracion de datos de Casa.
+- El cofre da a cada Casa un sumidero de recompensa compartido, alimentado SOLO por las 14 acciones propias de la whitelist (auditable y acotado).
+- La Clase ("Rising Star") convive con el Arbol de 16 ramas sin romper `progreso_arbol` ni `RAMA_TIERS`.
+- Un unico helper de entrega de XP elimina la duplicacion de la matematica nueva en 18 puntos y centraliza el redondeo (`red2`, ADR-035).
+- Balance por poblacion activa, determinista y barato, con la misma ventana de 30 dias de ADR-035 (sin segunda definicion de "activo").
+- Todo aditivo/idempotente: cero DROP, cero endpoints nuevos, ASCII-safe.
+
+### Consecuencias negativas / riesgos residuales
+
+- **Migracion 024 pendiente (BLOQUEANTE):** sin aplicarla en Neon, `clase_elegir`, la entrega con factor y la tributacion fallan por esquema inexistente; aplicar ANTES del deploy de v16/v21 (mismo flujo que 017/021, ADR-008).
+- **Cache no autoritativa:** `casas_cofre.poblacion_activa` y `factor_conversion` pueden quedar desactualizadas si el refresh best-effort falla; la fuente de verdad es el calculo runtime. Debe quedar documentado y no leerse como autoritativo.
+- **Gaming de poblacion:** el factor por participacion puede incentivar migraciones coordinadas entre Casas (funnel) para forzar `rezagada`. Mitigacion: ventana de 30 dias + tributacion sobre `xp_final` + monitoreo; no hay defensa fuerte en v1.
+- **Carrera de `nivel_clase`:** dos entregas concurrentes podrian calcular el nivel desde un `xp_clase` desactualizado. Mitigacion: derivar `nivel_clase` del valor devuelto por `RETURNING xp_clase` (atomico para el incremento).
+- **`xp_clase` condicionado a tener Clase (RESUELTO):** `xp_clase` acumula SOLO si `clase_id IS NOT NULL` (la Clase es un compromiso). **APROBADO por producto (2026-09-17, resolucion 4).**
+- **Sin FK `usuarios.casa -> casas_cofre.casa` (ACEPTADO):** las dos listas CHECK podrian divergir en el futuro. **APROBADO por producto (2026-09-17, resolucion 5):** en v1 basta el preflight defensivo + las constantes espejo; no se agrega FK (evita validar filas historicas).
+- **Desviacion de firma (ACEPTADA):** `entregarXpUsuario` con 4 argumentos (`tipoAccion`); el mandato lo enuncio con 3. **ACEPTADA por producto (2026-09-17, resolucion 2).** **(SUPERSEDIDO POR ENMIENDA 1: entregarXpUsuario no existe en el archivo real.)**
+- **Interpretacion de la formula de clase (NUEVO):** se tomo la lectura literal del spec (`xp_clase_inc = xp_base * (1 + nivel_clase * BONUS_CLASE[clase])`, sin `factor_casa`). Si producto queria que `xp_clase` tambien absorbiera el factor de Casa, cambia una linea en `calcularXpFinal`. Confirmar antes de cerrar. **(SUPERSEDIDO POR ENMIENDA 1: la implementacion usa xp_clase_inc = red2(xp_final * 0.50), con el factor de Casa YA incluido, acreditado en acreditarClaseYCofre.)**
+- **Contadores de accion (NUEVO, critico para el implementador):** reemplazar los UPDATE inline sin preservar `total_resenas`/`total_guardados`/`total_visitas` rompe misiones/logros. El helper DEBE incluirlos (ver seccion C).
+- **Bono rural plano (NUEVO):** alimentar el helper con `xpTotalVisita` escalaria el bono rural (ADR-024/033); debe llamarse con `xpVisitaFinal` y sumar el bono aparte. Ver seccion C.
+- **Terceros en la misma rama (NUEVO):** el XP a `afAutorOriginal` (album_agregar_foto/media) NO pasa por el helper; el implementador no debe sustituir ambos UPDATEs.
+- **Interaccion con topes de ADR-036:** el tope de 50 XP/24h de `compartir` se evalua sobre el `xp_final`; un miembro de Casa dominante obtiene menos XP por share (25 x 0.85 = 21.25) y consume tope mas lento. Efecto esperado del balance; vigilar que no abra farming relativo.
+- **Deuda de columnas no versionadas (`usuarios.activo`/`ultimo_acceso`, patron BUG-021):** el calculo de poblacion activa depende de ellas; debe degradar con `warn` y NO romper la entrega.
+
+### Resoluciones del dueno (Javier, 2026-09-17)
+
+**SUPERSEDIDO POR ENMIENDA 1 (2026-09-18):** estas resoluciones describen el diseno previo a la implementacion y quedan como registro historico. El contrato vigente (triada de helpers, sin afinidad, sin gate de nivel, xp_clase = 50 por ciento del xp_final, constantes BONUS_CLASE / XP_NIVEL_CLASE / calcularTagCasa) es el de la ENMIENDA 1. Conservan vigencia: la resolucion 1 (factor_conversion espeja multiplicador_xp; aranceles como constantes runtime), la resolucion 4 (xp_clase solo con clase_id) y la resolucion 5 (sin FK).
+
+1. `factor_conversion` en `casas_cofre` espeja SOLO `multiplicador_xp`; `arancel_inter_casa` y `fee_mercado_interno` quedan como constantes runtime NO persistidas. **APROBADO.**
+2. Se ACEPTA el 4o argumento `tipoAccion` en `entregarXpUsuario(sql, usuarioId, xpBase, tipoAccion)` (desviacion justificada de la firma inicial de 3 args). **APROBADO.**
+3. Se usan los VALORES DEL SPEC ORIGINAL (no los propuestos por el architect): `BONUS_CLASE = { cartografo: 0.08, cronista: 0.10, explorador: 0.07 }`; `XP_NIVEL_CLASE = [0,100,250,500,900,1400,2100,3000,4200,5700,7500]`; `calcularNivelClase()` con maximo 10; formula `xp_clase_nuevo = xp_base * (1 + nivel_clase * bonus_clase)` y `factor_casa` (rezagada 1.30 / dominante 0.85 / equilibrada 1.00). **APROBADO.**
+4. `xp_clase` acumula SOLO si el usuario tiene `clase_id` (sin clase elegida no hay XP de clase). **APROBADO.**
+5. SIN FK `usuarios.casa -> casas_cofre.casa` en v1 (el CHECK de 017 ya restringe a las mismas 3 casas); el preflight defensivo basta. **APROBADO.**
+6. Estado del ADR: "Aprobado en diseno; implementacion en curso (2026-09-17)". **APLICADO.**
+
+### Ambiguedades que siguen abiertas (no bloquean el contrato central)
+
+**SUPERSEDIDO POR ENMIENDA 1 (2026-09-18):** las ambiguedades 1 (gate de nivel) y 2 (afinidad) quedan RESUELTAS por el contrato implementado: NO hay gate de nivel y NO existe afinidad de clase. Se leen solo como registro historico del diseno. Sigue vigente la recomendacion de revisar los umbrales de tag 45/25 y los valores 0.85/1.00/1.30 tras la primera semana de datos.
+
+1. **Gate de nivel para la primera eleccion de Clase:** se propone nivel >= 2 (consistente con `casa_elegir`). `faccion_elegir` no tiene gate. Confirmar el gate (o eliminarlo). Implementador: usar >= 2 salvo indicacion contraria.
+2. **Afinidad de clase propuesta** (reparto de las 14 acciones en 3 clases): es una propuesta del arquitecto, no una especificacion cerrada de producto. Confirmar el mapeo. **Nota:** la afinidad se resuelve en runtime (NO persistida); cambiarla no requiere migracion.
+3. **Umbrales de tag (45% / 25%) y valores (0.85/1.00/1.30 y aranceles):** fijados por el mandato/resolucion 3, pero su efecto depende del tamano real de cada Casa; revisar tras la primera semana de datos.
+4. **Interpretacion de `xp_clase_inc` sin `factor_casa`:** ver riesgos residuales; confirmar la lectura literal del spec.
+
+**Estado final:** Aprobado e IMPLEMENTADO con Enmienda 1 (2026-09-18). El contrato vigente es el de la ENMIENDA 1 al final de este ADR; las secciones A-E, la justificacion, las Resoluciones del dueno y las Ambiguedades previas quedan como registro historico del diseno. Migracion 024 + api/usuarios.js v16 + api/interacciones.js v21 implementados en working tree (verificado contra el archivo real, ADR-006). El gate de nivel y la afinidad quedan resueltos como NO existentes. No commitear ni desplegar sin aplicar 024 en Neon.
+
+**ADRs relacionados:** ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-010 (presupuesto de endpoints), ADR-018 (moneda unica `xp_total`), ADR-024 (presencia fisica / factor de area), ADR-028 (Casas `usuarios.casa`, Arbol de 16 ramas, `casa_elegir`, `casa_ranking`), ADR-033 (factor de area por radio en `visita`), ADR-035 (`numeric(12,2)`, `red2`, `miembros_activos` de 30 dias), ADR-036 (compartir y media unificada), BUG-021 (deuda de columnas no versionadas).
+
+---
+
+**ENMIENDA 1 (2026-09-18)**
+
+**Motivo.** El QA detecto que el diseno de ADR-038 (2026-09-17) no coincidia con la implementacion real de TSK-112. El spec de producto (PROMPT_OPENCODE_TSK112.md) prevalece sobre el diseno del architect en los puntos que la implementacion resolvio de otra forma. Esta enmienda NO cambia codigo: documenta y aprueba el contrato REALMENTE implementado, verificado contra el archivo real (ADR-006: api/interacciones.js v21, api/usuarios.js v16 y db/migrations/024_casas_cofre_y_clases.sql). Donde haya contradiccion, PREVALECE esta enmienda sobre las secciones A-E, la justificacion, las Resoluciones del dueno y las Ambiguedades previas. El helper monolitico entregarXpUsuario NO existe: se sustituye por la triada contextoXpE / calcularXpFinal / acreditarClaseYCofre, manteniendo los UPDATE usuarios SET xp_total inline en cada rama para PRESERVAR los contadores en el mismo UPDATE y evitar regresiones.
+
+**Resoluciones del contrato implementado (13).**
+
+1. Sin helper monolitico. La centralizacion anti-duplicidad (AGENTS.md 2.1) se logra con 3 helpers en api/interacciones.js: contextoXpE(sql, usuarioId), con un SELECT unico de clase/casa + conteo de miembros + tag; calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag), con bonus de clase + factor de Casa y un solo red2 final; y acreditarClaseYCofre(sql, usuarioId, ctx, xp_final), con side-effects best-effort (50 por ciento a xp_clase y 10 por ciento al cofre). Los UPDATE usuarios SET xp_total permanecen INLINE en cada rama para preservar en el mismo UPDATE los contadores total_resenas, total_guardados y total_visitas; el XP usado en esos UPDATE es siempre el xp_final devuelto por calcularXpFinal.
+
+2. xp_clase_inc = red2(xp_final * 0.50), es decir el 50 por ciento del XP FINAL, que YA incluye el factor de Casa. Se acredita SOLO si el usuario tiene clase_id; nivel_clase se recalcula con calcularNivelClase sobre el xp_clase acumulado mas el incremento. Queda sin efecto la lectura previa que excluia el factor de Casa del incremento de clase.
+
+3. Formula de clase. El bonus depende SOLO de la clase elegida: BONUS_CLASE = { cartografo: 0.08, cronista: 0.10, explorador: 0.07 }, y se aplica a TODAS las acciones de la whitelist. NO hay afinidad por tipo de accion; la afinidad del diseno original NO se implemento.
+
+4. Curva de clase. XP_NIVEL_CLASE = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5700, 7500]; calcularNivelClase con tope duro de nivel 10. Son los valores del spec de producto.
+
+5. Factores de Casa. rezagada 1.30, dominante 0.85, equilibrada 1.00. El tag es dominante si pct > 0.45, rezagada si pct < 0.25, y equilibrada en el resto; ademas, si el total es 0 se devuelve equilibrada (guard). En la implementacion, contextoXpE obtiene los conteos de PERTENENCIA a la Casa (COUNT sobre usuarios.casa y COUNT sobre usuarios.casa IS NOT NULL), SIN filtro de ventana de 30 dias ni de usuarios.activo; el nombre miembros_activos del spec NO se materializo como filtro de actividad en v1.
+
+6. clase_elegir (POST en api/usuarios.js). SIN gate de nivel: solo exige sesion firmada (validarSesionUsuario) y email verificado. Primera eleccion gratis (WHERE clase_id IS NULL); el recambio cuesta 300 XP y tiene cooldown de 30 dias via clase_elegida_en; al recambiar se reinician nivel_clase = 1 y xp_clase = 0. Respuestas: primera eleccion {ok:true,data:{clase_id, clase_elegida_en}}; recambio {ok:true,data:{clase_id, clase_elegida_en, xp_total_nuevo, nivel_anterior, nivel_nuevo, bajo_nivel}}. Errores: 400 usuario_id, 401 razon de sesion, 400 CLASE_INVALIDA, 404 usuario no encontrado, 403 EMAIL_SIN_VERIFICAR, 409 CLASE_YA_ELEGIDA, 429 COOLDOWN_CLASE, 402 PUNTOS_INSUFICIENTES. El error NIVEL_INSUFICIENTE NO existe en la rama `clase_elegir` de TSK-112 (si existe en ramas ajenas: `casa_elegir` en api/usuarios.js, y `activo_oculto_votar`/`dm_enviar` en api/interacciones.js).
+
+7. visita. calcularXpFinal se aplica a xpVisitaFinal (ya multiplicado y amuletado, sin bono rural). El bono rural (VISITA_BONO_RURAL = 20) es PLANO y se SUMA despues: xpTotalVisita = red2(xpVisitaEscalado + bonoRural). La clase (50 por ciento) y el cofre (10 por ciento) se acreditan sobre ese xpTotalVisita TOTAL, es decir SI incluyen la base del bono rural en el porcentaje, aunque el bono no se multiplica por clase/Casa. aplicarFamaPandilla usa el XP SIN bono; repartirXpReferidos usa el XP CON bono.
+
+8. album_agregar_foto. SOLO el actor pasa por los helpers; el +10 al autor original conserva su UPDATE separado y su tope de 10 por dia.
+
+9. compartir. El tope de 50 por 24h y el ledger media_compartidos.xp_ganado cuentan sobre el xp_final (post-factor).
+
+10. arbol_catalogo NO se modifica: NO expone clases. El frontend usa catalogos locales espejo (CLASES_META y XP_NIVEL_CLASE, verificados en mi-perfil.html). El campo aditivo clases del diseno original queda DIFERIDO a v2.
+
+11. Nombres reales de constantes: BONUS_CLASE, XP_NIVEL_CLASE y calcularTagCasa. NO existen las constantes CLASES (catalogo), CASAS_NIVELACION, MULT_CASA ni TRIBUTO_CASA_PCT; el 10 por ciento del cofre es un literal 0.10 dentro de acreditarClaseYCofre.
+
+12. casas_cofre se crea SIN FK hacia usuarios.casa; poblacion_activa se refresca best-effort solo en casa_elegir. casas_votaciones queda diferida a v2. NO existe endpoint casa_tributar.
+
+13. Deuda PREEXISTENTE, no introducida por TSK-112: multiples .catch(function(){}) best-effort en api/interacciones.js. Se reconoce como deuda pendiente conforme a AGENTS.md 2.2 (prohibicion de capturas que silencien fallos) y NO se computa como incumplimiento de TSK-112.
+
+**Impacto en el contrato.**
+- Prevalece esta enmienda sobre las secciones A-E y sobre las Resoluciones del dueno / Ambiguedades previas donde se contradigan.
+- Se elimina del contrato vigente: entregarXpUsuario (helper monolitico), la afinidad de clase, el gate de nivel >= 2, el error NIVEL_INSUFICIENTE, la formula xp_clase_inc = xp_base * (1 + nivel_clase * BONUS_CLASE) sin factor de Casa, el campo clases en arbol_catalogo y las constantes CLASES / CASAS_NIVELACION / MULT_CASA / TRIBUTO_CASA_PCT.
+- Se mantiene vigente: el reuso de usuarios.casa como unica identidad de Casa, la tabla real casas_cofre (no casas_tributacion) con CHECK de las 3 Casas y sin FK, BONUS_CLASE y XP_NIVEL_CLASE del spec, el tope de nivel 10, la tributacion best-effort del 10 por ciento y el presupuesto 8/8 de endpoints.
+- Verificacion contra el archivo real (ADR-006): api/interacciones.js v21 (helpers y llamadas en las 14 acciones de la whitelist), api/usuarios.js v16 (rama clase_elegir, sin gate de nivel) y db/migrations/024_casas_cofre_y_clases.sql (sin FK, sin casas_votaciones).
+
+**Estado de la enmienda:** Aprobada e implementada (2026-09-18).

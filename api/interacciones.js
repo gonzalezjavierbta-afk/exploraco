@@ -1,4 +1,5 @@
-// api/interacciones.js  v20 (ADR-036: compartir con XP por primer share + media unificada votos/comentarios/guardados; base v18 ADR-035 XP numeric(12,2))
+// api/interacciones.js  v21 (TSK-112 / ADR-038: calcularXpFinal clase+Casa, tributacion al cofre, xp_clase/nivel_clase)
+// v20 (ADR-036: compartir con XP por primer share + media unificada votos/comentarios/guardados; base v18 ADR-035 XP numeric(12,2))
 // TSK-111 (v20): radio urbano 50m (CAMBIO 4) + album_oficial en multimedia_mapa (CAMBIO 8)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // v19 requiere migraciones 022_media_compartidos.sql y
@@ -212,6 +213,121 @@ function tieneCoordsValidas(lat, lng) {
 // redondea half-up a 2 decimales con helpers unicos.
 function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
 function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
+// TSK-112 (v21, ADR-038): Clases Rising Star + factor de nivelacion por
+// Casa. UNICO catalogo de bonus/umbrales y UNICO calculo de XP final.
+// Regla de No-Duplicidad (AGENTS.md 2.1): las 14 acciones propias de la
+// whitelist llaman a calcularXpFinal + acreditarClaseYCofre; nunca
+// copian esta matematica.
+var BONUS_CLASE = { cartografo: 0.08, cronista: 0.10, explorador: 0.07 };
+var XP_NIVEL_CLASE = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5700, 7500];
+
+function calcularNivelClase(xpClaseTotal) {
+  var xp = numXp(xpClaseTotal);
+  var nivel = 1;
+  for (var i = 1; i < XP_NIVEL_CLASE.length; i++) {
+    if (xp >= XP_NIVEL_CLASE[i]) nivel = i + 1;
+    else break;
+  }
+  return Math.min(nivel, 10);
+}
+
+function calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag) {
+  var bonus = BONUS_CLASE[clase_id] || 0;
+  var nivel = parseInt(nivel_clase, 10);
+  if (!isFinite(nivel) || nivel < 1) nivel = 1;
+  var xp_clase_calc = (Number(xp_base) || 0) * (1 + (nivel * bonus));
+  var factor_casa = (casa_tag === 'rezagada') ? 1.30
+    : (casa_tag === 'dominante') ? 0.85 : 1.0;
+  return red2(xp_clase_calc * factor_casa);
+}
+
+function calcularTagCasa(miembros_casa, total_miembros) {
+  var total = parseInt(total_miembros, 10);
+  if (!isFinite(total) || total <= 0) return 'equilibrada';
+  var miembros = parseInt(miembros_casa, 10);
+  if (!isFinite(miembros) || miembros < 0) miembros = 0;
+  var pct = miembros / total;
+  if (pct > 0.45) return 'dominante';
+  if (pct < 0.25) return 'rezagada';
+  return 'equilibrada';
+}
+
+// Contexto de entrega (1 SELECT): clase del usuario + tag de su Casa por
+// poblacion relativa. DEGRADACION (patron BUG-021): si el esquema 024 aun
+// no esta migrado, reintenta el SELECT minimo y, si tambien falla,
+// devuelve defaults seguros. NUNCA lanza y NUNCA captura en silencio.
+async function contextoXpE(sql, usuarioId) {
+  var out = { clase_id: null, nivel_clase: 1, xp_clase: 0, casa: null, tag: 'equilibrada' };
+  if (!usuarioId) return out;
+  function armarCtx(row) {
+    var r = row || {};
+    var nivel = parseInt(r.nivel_clase, 10);
+    if (!isFinite(nivel) || nivel < 1) nivel = 1;
+    var miembros = parseInt(r.miembros_casa, 10);
+    var total = parseInt(r.total_miembros, 10);
+    return {
+      clase_id: r.clase_id || null,
+      nivel_clase: nivel,
+      xp_clase: numXp(r.xp_clase),
+      casa: r.casa || null,
+      tag: calcularTagCasa(isFinite(miembros) ? miembros : 0, isFinite(total) ? total : 0)
+    };
+  }
+  try {
+    var rows = await sql(
+      'SELECT u.clase_id, u.nivel_clase, u.xp_clase, u.casa, u.xp_total, '
+      + '(SELECT COUNT(*)::int FROM usuarios WHERE casa = u.casa) AS miembros_casa, '
+      + '(SELECT COUNT(*)::int FROM usuarios WHERE casa IS NOT NULL) AS total_miembros '
+      + 'FROM usuarios u WHERE u.id = $1::uuid',
+      [usuarioId]
+    );
+    return armarCtx(rows && rows[0]);
+  } catch (errCtx) {
+    console.warn('[xp] contexto degradado: ' + (errCtx && errCtx.message));
+  }
+  try {
+    var minRows = await sql(
+      'SELECT clase_id, nivel_clase, xp_clase, casa FROM usuarios WHERE id = $1::uuid',
+      [usuarioId]
+    );
+    return armarCtx(minRows && minRows[0]);
+  } catch (errMin) {
+    console.warn('[xp] contexto minimo degradado: ' + (errMin && errMin.message));
+    return out;
+  }
+}
+
+// Efectos posteriores a la entrega de XP (best-effort, no bloquean):
+// (a) 50% del XP final al xp_clase/nivel_clase del usuario con Clase;
+// (b) 10% del XP final al cofre de su Casa. Cada efecto se aisla con su
+// propio try/catch que registra el error (AGENTS.md 2.2); jamas lanza ni
+// revierte el XP del usuario. NO existe endpoint HTTP casa_tributar.
+async function acreditarClaseYCofre(sql, usuarioId, ctx, xp_final) {
+  var c = ctx || {};
+  if (c.clase_id) {
+    try {
+      var xp_inc = red2(xp_final * 0.5);
+      await sql(
+        'UPDATE usuarios SET xp_clase = xp_clase + $1, nivel_clase = $2 WHERE id=$3::uuid',
+        [xp_inc, calcularNivelClase(parseFloat(c.xp_clase || 0) + xp_inc), usuarioId]
+      );
+    } catch (errClase) {
+      console.error('[entregarXp] clase/cofre best-effort: ' + (errClase && errClase.message));
+    }
+  }
+  if (c.casa) {
+    try {
+      var tributo = red2(xp_final * 0.10);
+      await sql(
+        'UPDATE casas_cofre SET xp_cofre_total = xp_cofre_total + $1, actualizado_en = NOW() WHERE casa = $2',
+        [tributo, c.casa]
+      );
+    } catch (errCofre) {
+      console.error('[entregarXp] clase/cofre best-effort: ' + (errCofre && errCofre.message));
+    }
+  }
+}
 
 // Bornes de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
 // la UI sincroniza XP_LEVELS en index/mi-perfil/comunidad). Se usan
@@ -2614,10 +2730,13 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion) {
           .then(function(){ return base({ reactivado: true }); });
       }
       return sqlFn('INSERT INTO media_votos (usuario_id, fuente, item_id, xp_ganado, activo) VALUES ($1,$2,$3,$4,true)', [usuarioId, f, id, 5])
-        .then(function() {
-          return sqlFn('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [5, usuarioId]).catch(function(){});
-        })
-        .then(function(){ return base({ nuevo: true, xp: 5 }); });
+        .then(async function() {
+          var ctxVoto = await contextoXpE(sqlFn, usuarioId);
+          var xpVotoFinal = calcularXpFinal(5, ctxVoto.nivel_clase, ctxVoto.clase_id, ctxVoto.tag);
+          await sqlFn('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpVotoFinal, usuarioId]).catch(function(){});
+          await acreditarClaseYCofre(sqlFn, usuarioId, ctxVoto, xpVotoFinal);
+          return base({ nuevo: true, xp: xpVotoFinal });
+        });
     });
   });
 }
@@ -2825,10 +2944,15 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId)
               var h = hoy();
               var dia = (prog.comentarios_dia_fecha === h) ? (parseInt(prog.comentarios_dia, 10) || 0) : 0;
               var xp = dia < 10 ? 2 : 0;
+              var xpComentarioEntregado = 0;
               var aplicar = xp > 0
-                ? sqlFn('UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2', [xp, usuarioId]).catch(function(){})
-                    .then(function(){ return repartirXpReferidos(sqlFn, usuarioId, xp); })
-                    .then(function(){ return updProgresoAlbum(sqlFn, usuarioId, { comentarios_dia: dia + 1, comentarios_dia_fecha: h }); })
+                ? contextoXpE(sqlFn, usuarioId).then(function(ctxComentario) {
+                    xpComentarioEntregado = calcularXpFinal(xp, ctxComentario.nivel_clase, ctxComentario.clase_id, ctxComentario.tag);
+                    return sqlFn('UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2', [xpComentarioEntregado, usuarioId]).catch(function(){})
+                      .then(function(){ return acreditarClaseYCofre(sqlFn, usuarioId, ctxComentario, xpComentarioEntregado); })
+                      .then(function(){ return repartirXpReferidos(sqlFn, usuarioId, xpComentarioEntregado); })
+                      .then(function(){ return updProgresoAlbum(sqlFn, usuarioId, { comentarios_dia: dia + 1, comentarios_dia_fecha: h }); });
+                  })
                 : Promise.resolve();
               return aplicar.then(function() {
                 return Promise.all([evaluarMisiones(sqlFn, usuarioId), evaluarLogros(sqlFn, usuarioId)]);
@@ -2850,7 +2974,7 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId)
                     ya_like: false,
                     respuestas: [],
                   },
-                  xp: xp,
+                  xp: xpComentarioEntregado,
                   misiones: ml[0],
                   logros: ml[1],
                 };
@@ -5033,11 +5157,14 @@ module.exports = async function handler(req, res) {
         );
         var aoVotosN = (aoVotosHoy[0] && parseInt(aoVotosHoy[0].n, 10)) || 0;
         if (aoVotosN <= 6) {
+          var ctxAoVoto = await contextoXpE(sql, usuarioId2);
+          var xpAoVotoFinal = calcularXpFinal(5, ctxAoVoto.nivel_clase, ctxAoVoto.clase_id, ctxAoVoto.tag);
           await sql(
-            'UPDATE usuarios SET xp_total = xp_total + 5, ultimo_acceso = NOW() WHERE id=$1',
-            [usuarioId2]
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+            [xpAoVotoFinal, usuarioId2]
           ).catch(function(e){ console.warn('gaming016 xp_voto no acreditado', e && e.code); });
-          await repartirXpReferidos(sql, usuarioId2, 5);
+          await acreditarClaseYCofre(sql, usuarioId2, ctxAoVoto, xpAoVotoFinal);
+          await repartirXpReferidos(sql, usuarioId2, xpAoVotoFinal);
         } else {
           return res.status(200).json({ ok: true, ya_votado: false, xp_otorgado: false });
         }
@@ -5045,7 +5172,7 @@ module.exports = async function handler(req, res) {
         var aoVLogros = await evaluarLogros(sql, usuarioId2);
         return res.json({
           ok: true,
-          data: { ya_votado: false, xp_otorgado: true, xp: 5, misiones: aoVMisiones, logros: aoVLogros }
+          data: { ya_votado: false, xp_otorgado: true, xp: xpAoVotoFinal, misiones: aoVMisiones, logros: aoVLogros }
         });
       }
 
@@ -5136,14 +5263,17 @@ module.exports = async function handler(req, res) {
         ).catch(function(e) { if (e && e.code === '23505') return []; throw e; });
         if (!acIns.length)
           return res.status(200).json({ ok: true, ya_checkin: true, xp: 0 });
+        var ctxCheckin = await contextoXpE(sql, usuarioId2);
+        var xpCheckinFinal = calcularXpFinal(15, ctxCheckin.nivel_clase, ctxCheckin.clase_id, ctxCheckin.tag);
         await sql(
-          'UPDATE usuarios SET xp_total = xp_total + 15, ultimo_acceso = NOW() WHERE id=$1',
-          [usuarioId2]
+          'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+          [xpCheckinFinal, usuarioId2]
         ).catch(function(e){ console.warn('gaming016 xp_checkin no acreditado', e && e.code); });
-        await repartirXpReferidos(sql, usuarioId2, 15);
+        await acreditarClaseYCofre(sql, usuarioId2, ctxCheckin, xpCheckinFinal);
+        await repartirXpReferidos(sql, usuarioId2, xpCheckinFinal);
         var acMis = await evaluarMisiones(sql, usuarioId2);
         var acLog = await evaluarLogros(sql, usuarioId2);
-        return res.json({ ok: true, data: { checkin_id: acIns[0].id, xp: 15, misiones: acMis, logros: acLog } });
+        return res.json({ ok: true, data: { checkin_id: acIns[0].id, xp: xpCheckinFinal, misiones: acMis, logros: acLog } });
       }
 
       // -- Mapas tematicos (spec mapas publicos/privados 2026-09-05) --
@@ -5352,14 +5482,18 @@ module.exports = async function handler(req, res) {
         var dispChat = await chatXpDisponible(sql, usuarioId2);
         if (dispChat.disponible) {
           xpChat = dispChat.xp;
+          var ctxChat = await contextoXpE(sql, usuarioId2);
+          var xpChatFinal = calcularXpFinal(xpChat, ctxChat.nivel_clase, ctxChat.clase_id, ctxChat.tag);
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
-            [xpChat, usuarioId2]
+            [xpChatFinal, usuarioId2]
           ).catch(function(){});
+          await acreditarClaseYCofre(sql, usuarioId2, ctxChat, xpChatFinal);
           await registrarChatXp(sql, usuarioId2, dispChat.hoy, dispChat.n);
           // v13: reparto multinivel del XP ganado (piramide de
           // referidos, no bloquea).
-          await repartirXpReferidos(sql, usuarioId2, xpChat);
+          await repartirXpReferidos(sql, usuarioId2, xpChatFinal);
+          xpChat = xpChatFinal;
         }
         misionesChat = await evaluarMisiones(sql, usuarioId2);
         logrosChat = await evaluarLogros(sql, usuarioId2);
@@ -5560,13 +5694,17 @@ module.exports = async function handler(req, res) {
         var dispPcm = await chatXpDisponible(sql, usuarioId2);
         if (dispPcm.disponible) {
           xpPcm = dispPcm.xp;
+          var ctxPcm = await contextoXpE(sql, usuarioId2);
+          var xpPcmFinal = calcularXpFinal(xpPcm, ctxPcm.nivel_clase, ctxPcm.clase_id, ctxPcm.tag);
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
-            [xpPcm, usuarioId2]
+            [xpPcmFinal, usuarioId2]
           ).catch(function(){});
+          await acreditarClaseYCofre(sql, usuarioId2, ctxPcm, xpPcmFinal);
           await registrarChatXp(sql, usuarioId2, dispPcm.hoy, dispPcm.n);
           // v13: reparto multinivel del XP ganado (no bloquea).
-          await repartirXpReferidos(sql, usuarioId2, xpPcm);
+          await repartirXpReferidos(sql, usuarioId2, xpPcmFinal);
+          xpPcm = xpPcmFinal;
         }
         misionesPcm = await evaluarMisiones(sql, usuarioId2);
         logrosPcm = await evaluarLogros(sql, usuarioId2);
@@ -5828,12 +5966,15 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2, fotoUrl]
         );
         var misionesFoto = [], logrosFoto = [];
-        await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        var ctxFoto = await contextoXpE(sql, usuarioId2);
+        var xpFotoFinal = calcularXpFinal(15, ctxFoto.nivel_clase, ctxFoto.clase_id, ctxFoto.tag);
+        await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpFotoFinal, usuarioId2]).catch(function(){});
+        await acreditarClaseYCofre(sql, usuarioId2, ctxFoto, xpFotoFinal);
         // v13: reparto multinivel del XP ganado (no bloquea).
-        await repartirXpReferidos(sql, usuarioId2, 15);
+        await repartirXpReferidos(sql, usuarioId2, xpFotoFinal);
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
         logrosFoto = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: 15, misiones: misionesFoto, logros: logrosFoto });
+        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, misiones: misionesFoto, logros: logrosFoto });
       }
 
       // -- Voto en foto (+5 XP al votante) --
@@ -5895,9 +6036,12 @@ module.exports = async function handler(req, res) {
         );
 
         // XP +20
-        await sql('UPDATE usuarios SET xp_total=xp_total+20, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        var ctxAlbum = await contextoXpE(sql, usuarioId2);
+        var xpAlbumFinal = calcularXpFinal(20, ctxAlbum.nivel_clase, ctxAlbum.clase_id, ctxAlbum.tag);
+        await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFinal, usuarioId2]).catch(function(){});
+        await acreditarClaseYCofre(sql, usuarioId2, ctxAlbum, xpAlbumFinal);
         // v13: reparto multinivel sobre el XP REAL entregado (+20).
-        await repartirXpReferidos(sql, usuarioId2, 20);
+        await repartirXpReferidos(sql, usuarioId2, xpAlbumFinal);
 
         // Actualizar progreso_album
         var nuevoAlbumesMes = ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual) ? (pa.albumes_mes || 0) + 1 : 1;
@@ -5905,7 +6049,7 @@ module.exports = async function handler(req, res) {
 
         var misionesAlbum = await evaluarMisiones(sql, usuarioId2);
         var logrosAlbum = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, album: albumIns[0], xp: 20, misiones: misionesAlbum, logros: logrosAlbum });
+        return res.status(200).json({ ok: true, album: albumIns[0], xp: xpAlbumFinal, misiones: misionesAlbum, logros: logrosAlbum });
       }
 
       // Agregar foto a album (Pinterest-style)
@@ -5963,10 +6107,13 @@ module.exports = async function handler(req, res) {
         }
 
         // XP +15 al agregador
-        await sql('UPDATE usuarios SET xp_total=xp_total+15, ultimo_acceso=NOW() WHERE id=$1', [usuarioId2]).catch(function(){});
+        var ctxAlbumFoto = await contextoXpE(sql, usuarioId2);
+        var xpAlbumFotoFinal = calcularXpFinal(15, ctxAlbumFoto.nivel_clase, ctxAlbumFoto.clase_id, ctxAlbumFoto.tag);
+        await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFotoFinal, usuarioId2]).catch(function(){});
+        await acreditarClaseYCofre(sql, usuarioId2, ctxAlbumFoto, xpAlbumFotoFinal);
         // v13: reparto multinivel del XP ganado por el agregador (no
         // bloquea).
-        await repartirXpReferidos(sql, usuarioId2, 15);
+        await repartirXpReferidos(sql, usuarioId2, xpAlbumFotoFinal);
 
         // XP +10 al autor original si es foto de otro (tope 10 XP/dia)
         if (afAutorOriginal !== usuarioId2) {
@@ -5987,7 +6134,7 @@ module.exports = async function handler(req, res) {
 
         var misionesFoto = await evaluarMisiones(sql, usuarioId2);
         var logrosFoto = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, foto: afIns[0], xp: 15, xp_autor_original: afAutorOriginal !== usuarioId2 ? 10 : 0, misiones: misionesFoto, logros: logrosFoto });
+        return res.status(200).json({ ok: true, foto: afIns[0], xp: xpAlbumFotoFinal, xp_autor_original: afAutorOriginal !== usuarioId2 ? 10 : 0, misiones: misionesFoto, logros: logrosFoto });
       }
 
       // Votar foto de album (alias legacy de media_voto, ADR-036 v19):
@@ -7207,13 +7354,21 @@ module.exports = async function handler(req, res) {
         var cpBase = cpPrimero ? 25 : 5;
         var cpRemanente = Math.max(0, red2(50 - cpDiaPrevio));
         var cpBaseCap = Math.min(cpBase, cpRemanente);
-        var cpXpFinal = cpBaseCap > 0 ? red2(await xpConMultiplicador(sql, usuarioId2, cpDestinoId, cpBaseCap)) : 0;
+        var cpPreClase = cpBaseCap > 0 ? red2(await xpConMultiplicador(sql, usuarioId2, cpDestinoId, cpBaseCap)) : 0;
         var cpAmuleto = { doubled: false };
-        if (cpXpFinal > 0) {
-          cpAmuleto = await aplicarAmuletoX2(sql, usuarioId2, cpXpFinal);
-          cpXpFinal = red2(cpAmuleto.xp);
+        var cpXpFinal = 0;
+        if (cpPreClase > 0) {
+          cpAmuleto = await aplicarAmuletoX2(sql, usuarioId2, cpPreClase);
+          cpPreClase = red2(cpAmuleto.xp);
+          // ADR-038/ADR-036: el ledger media_compartidos.xp_ganado y el
+          // tope rodante de 50 XP/24h cuentan sobre el xp_final
+          // (post clase + Casa); el cap post-factor evita que el factor
+          // > 1 desborde el remanente de la ventana.
+          var ctxCompartir = await contextoXpE(sql, usuarioId2);
+          cpXpFinal = red2(Math.min(calcularXpFinal(cpPreClase, ctxCompartir.nivel_clase, ctxCompartir.clase_id, ctxCompartir.tag), cpRemanente));
           await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [cpXpFinal, usuarioId2]).catch(function(){});
           await sql('UPDATE media_compartidos SET xp_ganado=$1 WHERE id=$2', [cpXpFinal, cpFilaId]).catch(function(){});
+          await acreditarClaseYCofre(sql, usuarioId2, ctxCompartir, cpXpFinal);
           await aplicarFamaPandilla(sql, usuarioId2, cpXpFinal);
           await repartirXpReferidos(sql, usuarioId2, cpXpFinal);
         }
@@ -7340,6 +7495,10 @@ module.exports = async function handler(req, res) {
           // el contador de usos (nunca modifica la fila de interacciones).
           amuletoResena = await aplicarAmuletoX2(sql, usuarioId2, xpResenaEntregado);
           xpResenaEntregado = red2(amuletoResena.xp);
+          // v21 (ADR-038): clase + Casa en UNA sola aplicacion; el UPDATE
+          // conserva el contador total_resenas.
+          var ctxResena = await contextoXpE(sql, usuarioId2);
+          xpResenaEntregado = calcularXpFinal(xpResenaEntregado, ctxResena.nivel_clase, ctxResena.clase_id, ctxResena.tag);
           await sql(
             'UPDATE usuarios SET '
             + 'xp_total = xp_total + $1, '
@@ -7348,6 +7507,7 @@ module.exports = async function handler(req, res) {
             + 'WHERE id = $2',
             [xpResenaEntregado, usuarioId2]
           ).catch(function(){});
+          await acreditarClaseYCofre(sql, usuarioId2, ctxResena, xpResenaEntregado);
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
           // v9 (ADR-018): chance de cromo (15%) y aporte de fama a la
@@ -7438,10 +7598,13 @@ module.exports = async function handler(req, res) {
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoGuardado = await aplicarAmuletoX2(sql, usuarioId2, xpGuardadoFinal);
         xpGuardadoFinal = red2(amuletoGuardado.xp);
+        var ctxGuardado = await contextoXpE(sql, usuarioId2);
+        xpGuardadoFinal = calcularXpFinal(xpGuardadoFinal, ctxGuardado.nivel_clase, ctxGuardado.clase_id, ctxGuardado.tag);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
           [xpGuardadoFinal, usuarioId2]
         ).catch(function(){});
+        await acreditarClaseYCofre(sql, usuarioId2, ctxGuardado, xpGuardadoFinal);
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
         var logrosGuardado = await evaluarLogros(sql, usuarioId2);
@@ -7649,19 +7812,23 @@ module.exports = async function handler(req, res) {
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpVisitaFinal);
         xpVisitaFinal = red2(amuletoVisita.xp);
-        // El bono rural es plano: se suma al XP total sin multiplicador
-        // ni amuleto y NO aporta fama a la pandilla.
-        var xpTotalVisita = red2(xpVisitaFinal + bonoRuralVisita);
+        // v21 (ADR-038): clase + Casa se aplican SOLO al XP de visita (ya
+        // multiplicado y amuletado). El bono rural sigue siendo PLANO: se
+        // suma despues, sin factor ni amuleto, y NO aporta fama.
+        var ctxVisita = await contextoXpE(sql, usuarioId2);
+        var xpVisitaEscalado = calcularXpFinal(xpVisitaFinal, ctxVisita.nivel_clase, ctxVisita.clase_id, ctxVisita.tag);
+        var xpTotalVisita = red2(xpVisitaEscalado + bonoRuralVisita);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
           [xpTotalVisita, usuarioId2]
         ).catch(function(){});
+        await acreditarClaseYCofre(sql, usuarioId2, ctxVisita, xpTotalVisita);
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
         var cromoVisita = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
-        await aplicarFamaPandilla(sql, usuarioId2, xpVisitaFinal);
+        await aplicarFamaPandilla(sql, usuarioId2, xpVisitaEscalado);
         // v13: reparto multinivel del XP TOTAL ganado en la visita
         // (incluye bono rural, no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpTotalVisita);
@@ -7757,10 +7924,13 @@ module.exports = async function handler(req, res) {
         // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
         var amuletoRating = await aplicarAmuletoX2(sql, usuarioId2, xpRatingFinal);
         xpRatingFinal = red2(amuletoRating.xp);
+        var ctxRating = await contextoXpE(sql, usuarioId2);
+        xpRatingFinal = calcularXpFinal(xpRatingFinal, ctxRating.nivel_clase, ctxRating.clase_id, ctxRating.tag);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
           [xpRatingFinal, usuarioId2]
         ).catch(function(){});
+        await acreditarClaseYCofre(sql, usuarioId2, ctxRating, xpRatingFinal);
         misionesRating = await evaluarMisiones(sql, usuarioId2);
         logrosRating = await evaluarLogros(sql, usuarioId2);
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.

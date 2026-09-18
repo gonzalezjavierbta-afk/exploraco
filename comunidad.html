@@ -1596,6 +1596,24 @@ var RANGO_CASAS_META = {
 function rkCasaMeta(id) {
   return RANGO_CASAS_META[String(id || '').toLowerCase()] || { nombre:(id || 'Casa'), emoji:'\uD83C\uDFE0', color:'#E8A020' };
 }
+/* TSK-112 / ADR-038: tag de nivelacion runtime por Casa (dominante rojo,
+   equilibrada indigo, rezagada verde). No altera los ids de las Casas. */
+var RANGO_CASA_TAGS = {
+  dominante:   { label:'Dominante',   color:'#ef4444' },
+  equilibrada: { label:'Equilibrada', color:'#818CF8' },
+  rezagada:    { label:'Rezagada',    color:'#22C55E' }
+};
+/* HTML extra (degradable) de una Casa: tag + cofre + multiplicador de XP.
+   Si el backend no manda los campos nuevos, devuelve '' y el podio no cambia. */
+function rkCasaExtraHtml(c) {
+  if (!c) return '';
+  var html = '';
+  var tag = RANGO_CASA_TAGS[String(c.tag || '').toLowerCase()];
+  if (tag) html += '<div style="display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid ' + esc(tag.color) + ';color:' + esc(tag.color) + ';border-radius:999px;padding:2px 8px;margin-top:6px">' + tag.label + '</div>';
+  if (c.multiplicador_xp != null) html += '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px">Mult. XP x' + Number(c.multiplicador_xp).toFixed(2) + '</div>';
+  if (c.xp_cofre_total != null) html += '<div style="font-size:10px;color:rgba(255,255,255,.4)">Cofre: ' + fmtXp(c.xp_cofre_total) + ' XP</div>';
+  return html;
+}
 /* Casas: GET /api/usuarios?tipo=casa_ranking
    data.casas[] {casa,miembros,miembros_activos,xp_total,xp_promedio,...}
    ordenado por xp_total DESC; data.top[] lideres. */
@@ -1621,6 +1639,7 @@ function cargarCasasRanking() {
           + '<div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px">' + (parseInt(c.miembros_activos,10)||0) + ' activos vigentes</div>'
           + '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + fmtXp(c.xp_promedio) + ' prom./miembro</div>'
           + '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + (parseInt(c.miembros,10)||0) + ' miembros totales</div>'
+          + rkCasaExtraHtml(c)
           + '</div>';
       });
       html += '</div>' + rkTopHtml((res && res.data && res.data.top) || [], RANGO_CASAS_META, '\uD83C\uDFE0');
