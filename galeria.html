@@ -245,7 +245,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 (function () {
   'use strict';
 
-  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false, ultimoUidCarga: null, media: null };
+  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false, ultimoUidCarga: null, media: null, galPagina: 1, galPorPagina: 12, galItems: [] };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -453,6 +453,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: false,
         autor_id: null, autor_nombre: null, album_id: null, album_titulo: null,
         foto_type: 'foto'
+      });
+    });
+    (res.viajeros || []).forEach(function (f) {
+      out.push({
+        origen: 'viajero', id_origen: f.id, fuente: 'viajero_foto', tipo_voto: 'media',
+        url: f.foto_url || f.url,
+        caption: f.media_title || f.caption || '',
+        votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
+        ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: !!f.es_propia,
+        autor_id: f.autor_id || null, autor_nombre: f.autor_nombre || null,
+        album_id: null, album_titulo: null,
+        foto_type: f.foto_type || 'foto'
       });
     });
     (res.usuarios || []).forEach(function (f) {
@@ -809,15 +821,21 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   function gLoadDestino(slug) {
     var box = document.getElementById('g-dest-fotos');
     var count = document.getElementById('g-dest-count');
+    var more = document.getElementById('g-more');
+    var destSec = document.getElementById('g-sec-dest');
     G.destinoSlug = slug;
     G.destinoId = null;
     G.ultimoUidCarga = gUsuarioId();
+    if (more && destSec && more.parentNode !== destSec) { destSec.appendChild(more); }
+    G.galPagina = 1;
+    G.galItems = [];
     gSecVis('g-sec-dest', true);
     gSecVis('g-sec-com', false);
     gSecVis('g-sec-albumes', false);
     gSecVis('g-sec-mapas', false);
     box.innerHTML = gLoadingHTML('Cargando fotos del destino...');
     if (count) { count.textContent = ''; }
+    if (more) { more.style.display = 'none'; }
     var uid = G.ultimoUidCarga;
     var url = '/api/interacciones?tipo=galeria_destino&slug=' + encodeURIComponent(slug) + '&incluir=viajeros,albumes';
     if (uid) { url += '&usuario_id=' + encodeURIComponent(uid); }
@@ -835,18 +853,17 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         document.getElementById('g-dest-title').textContent = d.nombre || 'Destino';
         document.getElementById('g-dest-sub').textContent = (d.ciudad ? d.ciudad + ' \u00b7 ' : '') + 'Fotos curadas y aportes de la comunidad.';
         var items = gDestinoItems(res);
-        var curadas = items.filter(function (it) { return it.origen === 'curada'; });
-        var comunidad = items.filter(function (it) { return it.origen === 'viajero' || it.origen === 'album'; });
-        comunidad.sort(function (a, b) { return (parseInt(b.votos, 10) || 0) - (parseInt(a.votos, 10) || 0); });
         var albumes = gAlbumesDeItems(items);
-        if (!curadas.length && !comunidad.length && !albumes.length) {
+        G.galItems = items;
+        G.galPagina = 1;
+        if (!items.length && !albumes.length) {
           box.innerHTML = gEmptyHTML('Este destino todavia no tiene fotos.');
           if (count) { count.textContent = '0 fotos'; }
+          if (more) { more.style.display = 'none'; }
         } else {
-          gSecVis('g-sec-dest', curadas.length > 0);
-          if (curadas.length) { gFillGrid('g-dest-fotos', 'g-dest-count', curadas, gItemCard, 'foto', 'fotos'); }
-          gSecVis('g-sec-com', comunidad.length > 0);
-          if (comunidad.length) { gFillGrid('g-dest-com', 'g-dest-com-count', comunidad, gItemCard, 'foto', 'fotos'); }
+          gSecVis('g-sec-dest', items.length > 0);
+          if (items.length) { gGalRenderPage(); }
+          gSecVis('g-sec-com', false);
           gSecVis('g-sec-albumes', albumes.length > 0);
           if (albumes.length) { gFillGrid('g-dest-albumes', 'g-dest-alb-count', albumes, gAlbumCard, 'album', 'albumes'); }
         }
@@ -860,6 +877,35 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         gSecVis('g-sec-dest', true);
         box.innerHTML = gErrorHTML('No se pudo cargar la galeria del destino');
       });
+  }
+
+  function gGalRenderPage() {
+    var box = document.getElementById('g-dest-fotos');
+    var count = document.getElementById('g-dest-count');
+    var more = document.getElementById('g-more');
+    var items = G.galItems;
+    var to = G.galPagina * G.galPorPagina;
+    if (to > items.length) { to = items.length; }
+    box.innerHTML = '';
+    for (var i = 0; i < to; i++) {
+      box.appendChild(gItemCard(items[i]));
+    }
+    if (count) { count.textContent = items.length + ' fotos'; }
+    if (more) { more.style.display = to < items.length ? 'block' : 'none'; }
+  }
+
+  function gGalLoadMore() {
+    var box = document.getElementById('g-dest-fotos');
+    var more = document.getElementById('g-more');
+    var items = G.galItems;
+    G.galPagina++;
+    var from = (G.galPagina - 1) * G.galPorPagina;
+    var to = G.galPagina * G.galPorPagina;
+    if (to > items.length) { to = items.length; }
+    for (var i = from; i < to; i++) {
+      box.appendChild(gItemCard(items[i]));
+    }
+    if (more) { more.style.display = to < items.length ? 'block' : 'none'; }
   }
 
   function gLoadMapas(destinoId, slug) {
@@ -974,7 +1020,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   }
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { gCloseModal(); } });
   var btnMore = document.getElementById('g-more');
-  if (btnMore) { btnMore.addEventListener('click', function () { gLoadFeed(false); }); }
+  if (btnMore) { btnMore.addEventListener('click', function () {
+    if (G.destinoSlug && G.galItems.length) { gGalLoadMore(); } else { gLoadFeed(false); }
+  }); }
   var btnShare = document.getElementById('g-share-btn');
   if (btnShare) { btnShare.addEventListener('click', gShareFoto); }
   var shareInput = document.getElementById('g-share-url');

@@ -3118,5 +3118,48 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-113: Sprint Multimedia / Perfil / Galeria / Mapa [COMPLETADA]
+
+- **Estado:** **COMPLETADA** (2026-09-18, implementada en working tree, SIN commitear). Cierra el ciclo documental del Sprint Multimedia (referencia al prompt `PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md`, untracked). **BUG-057 CERRADO** con el fix reforzado `v12.20260917` de `api/pagina-destino.js`. **PENDIENTE OPERATIVO (BLOQUEANTE): commit/push/deploy de los 4 archivos del sprint + este cierre documental en un solo release; NO mezclar los archivos ajenos del working tree (ver nota O3).** No genera migraciones ni archivos nuevos en `api/` (presupuesto 8/8 INTACTO, ADR-001/ADR-010).
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-18
+- **ADR:** no requiere ADR nuevo (extiende las UI y defensas de ADR-030/ADR-034/ADR-035/ADR-036 sin cambio de contrato); la desviacion de alcance O2 se documenta en esta entrada.
+- **Responsable:** free-build + renderer-dev-free/frontend-tpl-free/js-silo-dev-free (implementacion en el sprint) + qa-auditor (Escudo GOLD #92) + docs-keeper-free (este cierre documental).
+- **Precedencia:** continua a TSK-112 / ADR-038. `api/pagina-destino.js` pasa a **v12.20260917** (header real L1-2: changelog del fix de BUG-057 y defensas en listener capture).
+- **Relacion con bugs:** BUG-057 **CERRADO** (fix reforzado, ver BUGS_HISTORICOS.md). BUG-002 (doble escape) **CONFIRMADO ABIERTO** en `api/pagina-destino.js` L2431 (1 ocurrencia real verificada ADR-006 el 2026-09-18, identica a HEAD; deuda preexistente, NO introducida por este sprint). BUG-061 y BUG-062 siguen **ABIERTOS** y son ajenos.
+
+- **Alcance ejecutado (verificado contra archivo real con anclas ADR-006 el 2026-09-18):**
+  1. **`api/pagina-destino.js` v12.20260917 -- fix reforzado de BUG-057 (CERRADO).** `cerrarPopoverGuardar` no cierra ante `ev.target.id==='btn-guardar'` (L2513); checkboxes Tu Mapa (L2533) y mapas tematicos (L2545) y boton "Nuevo mapa" (L2556) usan `event.stopPropagation()`; listener en fase de captura. `node --check` PASS; ASCII 0 bytes >127 / 0 backticks; `smoke_auditoria_pagina_destino` 54/54 PASS.
+  2. **`mi-perfil.html` -- Grupo 1 (perfil multimedia); divs 394/394, script tags 3/3.** 1-A fotos propias con `mediaCardHTML` (L1832, unifica `foto_url||texto||media_url`, grid de 140px, votos, empty state "Aun no tienes fotos..." L1876). 1-B guardados ramificados por fuente (`album`/`album_foto`/`viajero_foto` con placeholder + enlace al destino e iconos por `media_type`). 1-C geolocalizacion en `agregarFotoAlbum` (`#album-nueva-foto-lat/lng` L658-660, boton `usarMiUbicacionAlbum` L660/L1992, validacion de rango Colombia, `body.lat/lng` solo si validos). 1-D logros (`renderTrofeoCard` L1140, desbloqueados primero, boton colapsable "+N bloqueados" L1155-1192 via `toggleTrofeosBloqueados`).
+  3. **`galeria.html` -- paginacion 12/pagina; divs 84/84.** `G.galPagina/galPorPagina/galItems` (L248), consolidacion curadas -> viajeros -> albumes, `gGalRenderPage` (L882) y `gGalLoadMore` (L897); el boton `#g-more` se **REUTILIZA** en modo destino (no se crea `btn-gal-mas`).
+  4. **`index.html` -- Grupo 3 + 4; divs 523/523.** 3-A header del drawer del mapa `#md-mapa-destino-titulo` (L1245) + `mdSetDestinoTitulo` (L3301-3302), invocado en pin de destino (L3310) y album del destino (L3454). 3-B `votarMediaMapa` (L3566) con manejo de sesion (muestra `mostrarLogin` L3569 y trata el 401 L3584). 4-A `renderLogrosGrid` (L4630) solo con `estado==='completada'` (L4648) y `tierOrder` platino>oro>plata>bronce (L4645), sin candados.
+
+- **Desviacion de alcance O2 (documentada):** el spec 3-A del prompt apuntaba a `index-api-connector.js`; se resolvio **SIN modificar ese archivo** (verificado por `git status`: NO figura como modificado). Justificacion: el endpoint `multimedia_mapa` de `api/interacciones.js` filtra solo por `destino_id` (regex uuid inline; nunca lee el slug) y `cargarAlbumOficialDestino` ya envia `destino_id`; el componente visible (titulo del drawer) se resolvio en `index.html`. El backend no requirio cambios.
+
+- **Archivos en el working tree (SIN commitear; `git diff --numstat` verificado el 2026-09-18):**
+  - `api/pagina-destino.js` (+6/-6; header **v12.20260917** con changelog L1-2).
+  - `galeria.html` (+58/-10; paginacion 12/pagina).
+  - `index.html` (+103/-13; Grupo 3 + 4).
+  - `mi-perfil.html` (+82/-27; Grupo 1 + comentario `Rev 2026-09-18b` insertado por O1 del Escudo GOLD #92).
+  - Sin migraciones nuevas; sin archivos nuevos en `api/`.
+
+- **Escudo GOLD #92 (qa-auditor): APROBADO CON OBSERVACIONES.** `node --check` PASS en `api/pagina-destino.js`; ASCII **0 bytes >127 y 0 backticks**; balance de divs **0/0/0** (mi-perfil 394/394, galeria 84/84, index 523/523; re-verificado en esta sesion documental); `smoke_auditoria_pagina_destino` 54/54 PASS; script tags balanceados (mi-perfil 3/3). Observaciones: **O1** (comentario `Rev 2026-09-18b` en `mi-perfil.html`) CERRADA en esta sesion; **O2** (desviacion 3-A connector) documentada arriba; **O3** (higiene de working tree) en pendientes.
+
+- **PENDIENTE OPERATIVO (lo ejecuta Javier):**
+  1. **Commit + push + deploy** de los 4 archivos del sprint + este cierre documental (`TASKS.md`, `NEXT.md`, `BUGS_HISTORICOS.md`, `docs/HANDOFF_037.md`) en un solo release.
+  2. **NO mezclar archivos ajenos (O3):** `opencode.json` y `.opencode/agent/free-plan.md`/`media-reader-free.md`/`qa-auditor-free.md` modificados; 4 archivos borrados (`PROMPT_OPENCODE_TSK111.md`, `PROMPT_OPENCODE_TSK112.md`, `PROMPT_MULTIMEDIA_GALERIA.md`, `opencode - copia.json`); `PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md` untracked (prompt de la tarea, no artefacto de producto).
+  3. **Verificacion en vivo post-deploy:** drawer del mapa cultural con titulo del destino y voto de media en `index.html`; paginacion de `galeria.html`; fotos/guardados/geo/logros en `mi-perfil.html`; popover Guardar estable en la ficha.
+  4. **Limpiar BUG-002** (doble escape) en `api/pagina-destino.js` L2431 (deuda preexistente, `'\\u2605'` en `addRvOptimista`).
+
+- **Hallazgos / pendientes derivados:**
+  - **BUG-002 confirmado ABIERTO** en `api/pagina-destino.js` L2431 (verificacion ADR-006: 1 doble-escape real, identico a HEAD).
+  - **BUG-061** (POST `tipo='foto'` sin `validarSesion`, escalado a `sql-security`) y **BUG-062** (fotos Unsplash en `admin.html`) siguen **ABIERTOS**, ajenos.
+  - El boton `#g-more` de `galeria.html` queda compartido por el feed y el modo destino (documentado para evitar regresiones).
+  - `index-api-connector.js` no participo del sprint (O2); el wiring de `mdSetDestinoTitulo`/`votarMediaMapa` vive en `index.html`.
+
+- **Fuera de alcance:** migraciones nuevas; archivos nuevos en `api/`; BUG-061/BUG-062; verificacion en vivo (post-deploy); refactor de `index-api-connector.js` (O2); limpieza de archivos ajenos del working tree (O3, decision de release de Javier).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

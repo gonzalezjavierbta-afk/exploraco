@@ -3,7 +3,7 @@ description: Agente multimodal GRATUITO de ExploraCO que lee y analiza imagenes,
 mode: subagent
 model: opencode/mimo-v2.5-free
 permission:
-  edit: deny
+  edit: ask
   bash: allow
   webfetch: allow
 ---

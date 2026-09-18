@@ -3,8 +3,8 @@ description: Planificador GRATUITO de ExploraCO (esquema Free/Open-Source). Prod
 mode: primary
 model: opencode/big-pickle
 permission:
-  edit: deny
-  bash: deny
+  edit: ask
+  bash: ask
   task: allow
   webfetch: allow
   websearch: allow

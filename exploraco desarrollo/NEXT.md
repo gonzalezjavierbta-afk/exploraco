@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-113 / Sprint Multimedia-Pefil-Galeria-Mapa (2026-09-18, COMPLETADA en working tree, SIN commitear) - 4 archivos modificados (+249/-56; `git diff --numstat` verificado): `api/pagina-destino.js` (+6/-6; header **v12.20260917** con changelog L1-2: fix REFORZADO de BUG-057 en listener capture -- `cerrarPopoverGuardar` ignora `ev.target.id==='btn-guardar'` L2513, checkboxes Tu Mapa L2533 / mapas tematicos L2545 / boton "Nuevo mapa" L2556 con `event.stopPropagation()`; BUG-057 pasa a **CERRADO**, ver BUGS_HISTORICOS.md); `mi-perfil.html` (+82/-27; Grupo 1: `mediaCardHTML` L1832 unifica `foto_url||texto||media_url` en grid 140px con votos y empty state "Aun no tienes fotos..." L1876, guardados por fuente `album`/`album_foto`/`viajero_foto` con placeholder + enlace al destino, geo en `agregarFotoAlbum` con `#album-nueva-foto-lat/lng` L658-660 + `usarMiUbicacionAlbum` L1992 y validacion de rango Colombia, logros con `renderTrofeoCard` L1140 desbloqueados primero y boton colapsable "+N bloqueados" L1155-1192; divs 394/394, script 3/3; comentario `Rev 2026-09-18b` insertado por O1 del Escudo GOLD #92); `galeria.html` (+58/-10; paginacion 12/pagina con `G.galPagina/galPorPagina/galItems` L248, `gGalRenderPage` L882 y `gGalLoadMore` L897, consolidacion curadas->viajeros->albumes, boton `#g-more` REUTILIZADO; divs 84/84); `index.html` (+103/-13; Grupo 3+4: `#md-mapa-destino-titulo` L1245 + `mdSetDestinoTitulo` L3301-3302 en pin L3310 y album L3454, `votarMediaMapa` L3566 con `mostrarLogin` L3569 y 401 L3584, `renderLogrosGrid` L4630 solo `estado==='completada'` L4648 con `tierOrder` L4645; divs 523/523). **Desviacion de alcance O2:** `index-api-connector.js` NO se modifico (el endpoint `multimedia_mapa` filtra solo por `destino_id` y `cargarAlbumOficialDestino` ya envia `destino_id`; el titulo del drawer se resolvio en `index.html`). Escudo GOLD #92 APROBADO CON OBSERVACIONES: `node --check` PASS, ASCII 0/0/0, divs 0/0/0, `smoke_auditoria_pagina_destino` 54/54 PASS. Presupuesto 8/8 INTACTO; sin migraciones; prompt de la tarea `PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md` (untracked). **PENDIENTE OPERATIVO: commit/push/deploy de los 4 archivos + cierre documental en un solo release; NO mezclar archivos ajenos (O3): `opencode.json` + 3 `.opencode/agent/*` modificados + 4 borrados (`PROMPT_OPENCODE_TSK111.md`, `PROMPT_OPENCODE_TSK112.md`, `PROMPT_MULTIMEDIA_GALERIA.md`, `opencode - copia.json`).** Deuda confirmada: BUG-002 sigue ABIERTO en `api/pagina-destino.js` L2431. Detalle en TASKS.md TSK-113 y docs/HANDOFF_037.md.
 - TSK-111 / ADR-037 Geocerca con radio urbano 50 m + `album_oficial` en el mapa cultural + limpieza de modulos del admin + refactor de hero/galeria de la ficha (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+335/-298) + 1 archivo nuevo sin versionar (`PROMPT_OPENCODE_TSK111.md`): `admin.html` (+49/-82; "Que incluye el precio" retirado del admin/render, UI "Orden de modulos" eliminada con `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`, seccion "Operacion" eliminada con `f-capacidad` movido a General, `f-comotransporte` eliminado end-to-end, `moverFila`/`moveFaqRow`); `api/interacciones.js` (+44/-8; header v19 -> v20: `RADIO_DEFAULT_M`/`RADIO_POR_CATEGORIA` 100 -> 50 y subcategorias urbanas a 50, rural 250/parque-concierto 150/festival-deporte 200 intactos, `ACCURACY_MAX_M=150` y bloqueo 422 intactos, `album_oficial` en `multimedia_mapa`); `api/pagina-destino.js` (+121/-194; header v11: guard `edad_minima` con trim, hero botonera en 2 filas `.hctar-row` + grid 1+3 + `abrirLightboxHero`, "Fotos de viajeros" retirado, CTA "Ver todas las fotos"); `index-api-connector.js` (+32/-0; `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`); `index.html` (+51/-1; `mdMapaAlbumOficial`, solo rama `origen='destino'`); `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10) actualizados. Presupuesto 8/8 INTACTO (ADR-001); TSK-111 NO genera migraciones. Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES: `node --check` 8/8 api, ASCII 0/0/0 en `api/interacciones.js`, balance DIVs admin hostal/comida/sitio/evento = 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS (`smoke_test_epic_prompt` 4 FAIL PREEXISTENTES ajenos, DQ-2). **PENDIENTE OPERATIVO: migraciones 019-023 YA APLICADAS en Neon (confirmado por Javier el 2026-09-17; ver sesion TSK-112); solo queda commit/push/deploy de los 7 archivos + este cierre documental en un solo release.**
 - TSK-110 / ADR-036 Compartir social con XP (primer share 25 / posteriores 5, tope 10 eventos y 50 XP por 24h) + interacciones de media unificadas (votos/comentarios/guardados en `media_*`) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+1379/-536) + 5 archivos nuevos sin versionar: `api/interacciones.js` (+949/-425; header `v18` -> `v19`: rama POST `compartir` con `validarSesion` y ledger en `media_compartidos`, 3 misiones + 3 logros nuevos, `media_voto`/`media_comentar`/GET `media_interacciones`/`media_comentarios`, alias legacy conservados, TODOS los lectores migrados a `media_*`, `galeria_destino` `items[]` v2 con `fuente`/`votos`/`comentarios`/`ya_votado`/`ya_guardado`/`tipo_voto:'media'`); `galeria.html` (+222/-32; 5 secciones en modo destino + modales VOTAR/GUARDAR/COMPARTIR + comentarios por 3 fuentes); `album-comments.js` (+92/-33; v2.0.0, `mount(target,{fuente,itemId},opts)` retrocompatible); `index.html` (+50/-17; insignia `compartido` derivada del catalogo real de logros); `api/pagina-destino.js` (+40/-27; hero mosaico 1+3 y boton Compartir en `.subnav`); `usuario-session.js` (+24/-0; `aplicarResultadoXp`); `comunidad.html` y `mi-perfil.html` (+1/-1 cada uno: solo cache-bust `album-comments.js?v=2`). NUEVOS: `compartir.js` (295 lineas, `window.ExploraCompartir`), `db/migrations/022_media_compartidos.sql` (131), `db/migrations/023_interacciones_media_unificadas.sql` (408), `scripts/smoke_036_compartir.js` (290) y `scripts/smoke_036_media_unificada.js` (361). Presupuesto 8/8 INTACTO (ADR-001); catalogo real HOY 39 misiones / 33 logros. Verificacion: `node --check` 7/7 OK, ASCII-safe 0 >127 / 0 backticks en `api/*.js`, `compartir.js` y migraciones, smokes 55/55 y 71/71 PASS (mock). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 022 y 023 en Neon ANTES del deploy del backend v19; los smokes NO validan Neon.**
 - TSK-109 / ADR-035 XP decimal `numeric(12,2)` + pestana "Clase" consolidada + rankings de comunidad (Casas/Facciones/Parches) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 10 archivos de codigo modificados (+700/-282) + 1 migracion nueva + 1 preflight nuevos sin versionar (mas `DECISIONS.md` +249/-1 agregado por architect): `db/migrations/021_xp_decimal.sql` (NUEVA, 121 lineas, idempotente ADR-008, ASCII-safe ADR-002; 9 columnas XP -> `numeric(12,2)` con guard `information_schema`, sin indices) + `scripts/verify_021_precheck.js` (NUEVO, read-only, `MIN/MAX/COUNT`); `api/interacciones.js` (+185/-98; header v18: `red2`/half-up, `parseFloat`/`Number`, rama GET `pandilla_ranking` L4257-4284, gate de `album_crear` con `calcularNivelLocal` L5379, guarda de fama `<= 0` L1880-1881); `api/usuarios.js` (+102/-40; header v15: `casa_ranking` con `miembros_activos` y `ORDER BY xp_total DESC` L510-557, rankings sin `::int`); `comunidad.html` (+195/-43; tab Ranking con 4 sub-vistas Viajeros|Casas|Facciones|Parches L372-386, `setRankingVista` L1661, facciones fuera de "Activo Oculto"); `mi-perfil.html` (+101/-50; tab `clase` con arbol + sub-vista `senderos` + vocaciones inline + Mi Casa compacto); `usuario-session.js` (+39/-19; helper `window.ExploraCO.fmtXp`/`redondearXp` L46-60); `api/admin.js` (+29/-14); `admin.html` (+20/-9); `index.html` (+15/-5); `perfil.html` (+9/-1); `api/pagina-destino.js` (+5/-3; header v10). Presupuesto 8/8 INTACTO (ADR-001). BUG-042 pasa a CORREGIDO y se registra BUG-063 (guarda de fama de Parche); deuda de columnas no versionadas (`usuarios.activo`/`ultimo_acceso`/`interacciones.xp_ganado`) anotada con fallback 42703. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar la migracion 021 en Neon ANTES del deploy del backend; desplegar en 2 releases (backend + 021 primero, frontend despues). Checklist en `docs/DEPLOY_021.md`.**
@@ -38,6 +39,58 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-113 "Sprint Multimedia / Perfil / Galeria / Mapa" (2026-09-18) - cierre documental
+
+Tarea TSK-113 **COMPLETADA EN WORKING TREE** (SIN commitear; verificado contra
+archivo real, ADR-006, el 2026-09-18). Guiado por el prompt
+`PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md` (untracked). La tarea vive en
+`TASKS.md` TSK-113. NO hay archivos nuevos en `api/` (8/8 intacto, ADR-001) y **NO
+genera migraciones**. `api/pagina-destino.js` queda en **v12.20260917** (header real
+L1-2). **BUG-057 CERRADO** con el refuerzo v12.20260917 (ver BUGS_HISTORICOS.md).
+
+**Que se hizo (resumen, ver TASKS.md TSK-113 para anclas ADR-006):**
+- `api/pagina-destino.js` (v12.20260917, +6/-6): defensas reforzadas del popover
+  Guardar en listener capture (L2513/L2533/L2545/L2556).
+- `mi-perfil.html` (+82/-27; divs 394/394, script 3/3): fotos propias con
+  `mediaCardHTML`, guardados por fuente, geo en `agregarFotoAlbum`, logros
+  colapsables ("+N bloqueados"); comentario `Rev 2026-09-18b` insertado (O1 del
+  Escudo GOLD #92).
+- `galeria.html` (+58/-10; divs 84/84): paginacion 12/pagina (`gGalRenderPage`/
+  `gGalLoadMore`), boton `#g-more` reutilizado.
+- `index.html` (+103/-13; divs 523/523): titulo del drawer del mapa cultural
+  (`mdSetDestinoTitulo`), `votarMediaMapa` (sin sesion y 401), `renderLogrosGrid`
+  (solo `completada`, tierOrder platino>oro>plata>bronce).
+- **O2 (desviacion de alcance):** `index-api-connector.js` NO se modifico; el
+  endpoint filtra solo por `destino_id` y `cargarAlbumOficialDestino` ya envia
+  `destino_id`; el titulo del drawer se resolvio en `index.html`.
+- Escudo GOLD #92: `node --check` PASS, ASCII 0/0/0, divs 0/0/0,
+  `smoke_auditoria_pagina_destino` 54/54 PASS. **APROBADO CON OBSERVACIONES.**
+
+**PENDIENTE OPERATIVO de TSK-113 (lo ejecuta Javier):**
+1. **Commit + push + deploy** de los 4 archivos del sprint + el cierre documental
+   (`TASKS.md`, `NEXT.md`, `BUGS_HISTORICOS.md`, `docs/HANDOFF_037.md`) en un solo
+   release.
+2. **NO mezclar archivos ajenos (O3):** `opencode.json` y 3 `.opencode/agent/*`
+   modificados; 4 borrados (`PROMPT_OPENCODE_TSK111.md`,
+   `PROMPT_OPENCODE_TSK112.md`, `PROMPT_MULTIMEDIA_GALERIA.md`,
+   `opencode - copia.json`); `PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md`
+   untracked.
+3. **Verificacion en vivo post-deploy:** (a) drawer del mapa cultural con titulo del
+   destino y voto de media (click en pin -> titulo + recursos filtrados);
+   (b) paginacion de `galeria.html`; (c) fotos/guardados/geo/logros de
+   `mi-perfil.html`; (d) popover Guardar estable en la ficha.
+4. **Limpiar BUG-002** en `api/pagina-destino.js` L2431 (deuda preexistente
+   confirmada: 1 doble-escape `'\\u2605'` en `addRvOptimista`, identico a HEAD).
+
+**Riesgos activos de TSK-113:**
+- **BUG-002 ABIERTO** (doble escape en `api/pagina-destino.js` L2431): deuda
+  preexistente, NO introducida por el sprint; limpiar en una tarea de mantenimiento.
+- **BUG-061 y BUG-062 siguen ABIERTOS** (ajenos a TSK-113).
+- **Higiene de working tree (O3):** el release de TSK-113 NO debe mezclar los
+  archivos ajenos modificados/borrados (config y prompts).
+- El boton `#g-more` de `galeria.html` queda compartido por feed y modo destino;
+  cualquier cambio futuro debe conservar esa reutilizacion.
 
 ### Sesion TSK-112 "Sistema de Casas (cofre + nivelacion) y Clases Rising Star" (2026-09-18) - ADR-038
 

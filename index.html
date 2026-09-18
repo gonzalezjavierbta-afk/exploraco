@@ -1242,6 +1242,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
     <aside class="md-panel" role="dialog" aria-label="Detalle del lugar">
       <button class="md-close" onclick="closeMapaDrawer()" aria-label="Cerrar">&times;</button>
+      <div id="md-mapa-destino-titulo" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)"></div>
       <div class="md-content" id="md-content"><!-- render dinamico --></div>
     </aside>
   </div>
@@ -3245,11 +3246,23 @@ function mdTabHtml(place) {
         + '<span class="md-thb-ico">📸</span></div>';
     });
     fotosMedia.forEach(function(it){
+      var itVotos = parseInt(it.votos, 10) || 0;
+      // 3-B: voto interactivo solo si el item trae id+fuente (album_foto /
+      // viajero_foto / curada). Los items de MAPA_MEDIA no emiten id por
+      // foto (solo album_id/origen_id), asi que sin id se muestra un badge
+      // estatico de votos: ver nota 3-B en el reporte.
+      var votoCtrl = '';
+      if(it.id && it.fuente) {
+        votoCtrl = '<button type="button" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:var(--gold);border:1px solid rgba(232,160,32,.35);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer;line-height:1.4"'
+          + ' onclick="event.stopPropagation();votarMediaMapa(\'' + esc(String(it.id)) + '\',\'' + esc(String(it.fuente)) + '\',this)">\u2B50 ' + itVotos + '</button>';
+      } else {
+        votoCtrl = '<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.7);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.4">\u2B50 ' + itVotos + '</span>';
+      }
       html += '<div class="md-thumb" data-url="' + esc(it.media_url) + '"'
         + ' data-cap="' + esc(mdCapMedia(it.media_title, it.autor_nombre, it.votos)) + '"'
         + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
         + '<img src="' + esc(it.media_url) + '" alt="' + esc(it.media_title || '') + '" loading="lazy">'
-        + '<span class="md-thb-ico">📸</span></div>';
+        + '<span class="md-thb-ico">📸</span>' + votoCtrl + '</div>';
     });
   }
   html += '</div></div>';
@@ -3282,10 +3295,19 @@ function mdTabHtml(place) {
   return html;
 }
 
+// 3-A: header del drawer con el nombre del destino que se esta viendo.
+// Fue añadido al markup (#md-mapa-destino-titulo) y se rellena en cada
+// apertura; se limpia al cerrar el drawer.
+function mdSetDestinoTitulo(txt) {
+  var el = document.getElementById('md-mapa-destino-titulo');
+  if(el) el.textContent = txt || '';
+}
+
 function openMapaDrawer(place) {
   var drawer = document.getElementById('mapa-drawer');
   var cont = document.getElementById('md-content');
   if(!drawer || !cont || !place) return;
+  mdSetDestinoTitulo(place.name || '');
   var heroBg = mdHeroBgSafe(place.hero_bg, 'linear-gradient(135deg,#1a3a5c,#2a4a7c)');
   var foto = place.foto || '';
   var rating = parseFloat(place.rating) || 0;
@@ -3429,6 +3451,8 @@ function openMapaMediaDrawer(item) {
   if(item.votos > 0) html += '<div class="md-stars">\u2B50 ' + item.votos + ' votos</div>';
   if(item.ciudad) html += '<div class="md-meta">\uD83D\uDCCD ' + esc(item.ciudad) + '</div>';
 
+  mdSetDestinoTitulo(item.album_titulo || tituloMedia);
+
   // FIX 4: trazabilidad album -> modal de fotos del album (no JSON crudo)
   if(item.album_id) {
     // El album_id puede ser uuid/numero: lo escapamos para atributos HTML
@@ -3536,6 +3560,45 @@ function guardarMedia(fuente, itemId, btn){
   .catch(function(){ if(btn) btn.disabled=false; });
 }
 
+// 3-B: like (voto) en media unificada desde el drawer del mapa.
+// Requiere sesion (Authorization Bearer via authHeaders de usuario-session.js).
+// POST /api/interacciones?tipo=media_voto — patron galeria.html gMediaVoto.
+function votarMediaMapa(itemId, fuente, btn){
+  var u = window.ExploraCO && window.ExploraCO.usuario;
+  if(!u || !u.id){
+    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesi\u00f3n para votar');
+    return;
+  }
+  if(!itemId || !fuente) return;
+  if(btn) btn.disabled = true;
+  var headers = { 'Content-Type': 'application/json' };
+  var auth = (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function') ? window.ExploraCO.authHeaders() : {};
+  for(var k in auth){ if(Object.prototype.hasOwnProperty.call(auth,k)) headers[k] = auth[k]; }
+  fetch('/api/interacciones?tipo=media_voto',{
+    method:'POST', headers:headers,
+    body:JSON.stringify({tipo:'media_voto',usuario_id:String(u.id),fuente:fuente,item_id:String(itemId)})
+  })
+  .then(function(r){
+    if(r.status === 401){
+      if(btn) btn.disabled=false;
+      if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Sesi\u00f3n expirada \u2014 vuelve a iniciar');
+      return null;
+    }
+    return r.json();
+  })
+  .then(function(d){
+    if(!d) return;
+    if(btn) btn.disabled=false;
+    if(d && d.ok){
+      if(btn) btn.textContent = '\u2B50 ' + (d.votos != null ? d.votos : '');
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Voto registrado', '#16a34a');
+    } else if(d && d.error){
+      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast(d.error, '#E8A020');
+    }
+  })
+  .catch(function(){ if(btn) btn.disabled=false; });
+}
+
 function openAlbumModal(albumId) {
   if(!albumId) return;
   var lb = mdEnsureLightbox();
@@ -3580,7 +3643,10 @@ function openAlbumModal(albumId) {
               + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '')
               + '</button>'
               + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>'
-              + '<button type="button" class="md-album-com-btn" onclick="guardarMedia(\'album_foto\',\'' + esc(String(f.id)) + '\',this)">\uD83D\uDD16 Guardar</button>';
+              + '<button type="button" class="md-album-com-btn" onclick="guardarMedia(\'album_foto\',\'' + esc(String(f.id)) + '\',this)">\uD83D\uDD16 Guardar</button>'
+              + '<button type="button" class="md-album-com-btn" onclick="votarMediaMapa(\'' + esc(String(f.id)) + '\',\'album_foto\',this)">\u2B50 '
+              + (f.ya_votado ? 'Votado' : ((typeof f.votos === 'number' && f.votos > 0) ? 'Votar · ' + f.votos : 'Votar'))
+              + '</button>';
           }
           html += '</div>';
         }
@@ -3602,6 +3668,7 @@ function openAlbumModal(albumId) {
 function closeMapaDrawer() {
   var drawer = document.getElementById('mapa-drawer');
   var cont = document.getElementById('md-content');
+  mdSetDestinoTitulo('');
   if(cont) cont.innerHTML = '';
   if(drawer) {
     drawer.classList.remove('open');
@@ -4572,23 +4639,46 @@ function renderLogrosGrid() {
     grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px;grid-column:1/-1">Califica lugares y artículos, guarda destinos y confirma visitas para desbloquear trofeos 🏆</div>';
     return;
   }
-  var done  = 0, total = _LOGROS_CACHE.length;
-  var html  = _LOGROS_CACHE.map(function(l) {
-    var earned = l.estado === 'completada';
-    if (earned) done++;
-    var fecha  = l.en ? new Date(l.en).toLocaleDateString('es-CO', { day:'numeric', month:'short' }) : '';
+  // 4-A: el panel "Mi viaje" solo muestra logros desbloqueados, ordenados
+  // por tier (platino > oro > plata > bronce). Los bloqueados quedan fuera
+  // (sin candados): ver nota 4-A en el reporte del js-silo-dev-free.
+  var tierOrder = { platino:0, oro:1, plata:2, bronce:3 };
+  var done = 0, total = _LOGROS_CACHE.length;
+  var earned = _LOGROS_CACHE.filter(function(l){
+    var ok = l.estado === 'completada';
+    if(ok) done++;
+    return ok;
+  }).sort(function(a,b){
+    var ta = (tierOrder[a.tier] != null) ? tierOrder[a.tier] : 99;
+    var tb = (tierOrder[b.tier] != null) ? tierOrder[b.tier] : 99;
+    return ta - tb;
+  });
+  if (!earned.length) {
+    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px;grid-column:1/-1">Aun no has desbloqueado logros. Explora, guarda y resena para ganar trofeos.</div>';
+    var cnt0 = document.getElementById('pts-logros-count');
+    var tot0 = document.getElementById('pts-logros-total');
+    var bar0 = document.getElementById('pts-logros-bar');
+    if (cnt0) cnt0.textContent = 0;
+    if (tot0) tot0.textContent = total;
+    if (bar0) bar0.style.width = '0%';
+    return;
+  }
+  var html = earned.slice(0, 3).map(function(l) {
+    var fecha = l.en ? new Date(l.en).toLocaleDateString('es-CO', { day:'numeric', month:'short' }) : '';
     var rareza = (l.rareza_pct != null ? l.rareza_pct : 0);
-    var meta   = earned
-      ? 'Desbloqueado ' + fecha + ' · <b>' + rareza + '%</b> de jugadores'
-      : 'Bloqueado · <b>' + rareza + '%</b> de jugadores';
-    return '<div class="trophy-card' + (earned ? '' : ' locked') + '" title="' + inspEsc(l.desc) + ' · +' + l.xp + ' XP">'
+    // Sin candados: solo hay cards de trofeos ya desbloqueados aqui.
+    return '<div class="trophy-card" title="' + inspEsc(l.desc) + ' · +' + l.xp + ' XP">'
       + '<span class="tier tier-' + l.tier + '">' + tierNombre(l.tier) + '</span>'
-      + '<span class="trophy-emoji">' + (earned ? l.emoji : '🔒') + '</span>'
+      + '<span class="trophy-emoji">' + l.emoji + '</span>'
       + '<div class="trophy-name">' + inspEsc(l.nombre) + '</div>'
       + '<div class="trophy-desc">' + inspEsc(l.desc) + '</div>'
-      + '<div class="trophy-meta">+' + l.xp + ' XP · ' + meta + '</div>'
+      + '<div class="trophy-meta">+' + l.xp + ' XP · ' + (l.en ? 'Desbloqueado ' + fecha : '') + ' · <b>' + rareza + '%</b> de jugadores</div>'
       + '</div>';
   }).join('');
+  var sobrantes = earned.length - 3;
+  if (sobrantes > 0) {
+    html += '<div class="trophy-more" style="grid-column:1/-1;text-align:center;padding:10px;font-size:11px;font-weight:700;color:var(--gold);border:1px dashed rgba(232,160,32,.35);border-radius:8px;background:rgba(232,160,32,.06)">+ ' + sobrantes + ' m\u00e1s</div>';
+  }
   var cnt = document.getElementById('pts-logros-count');
   var tot = document.getElementById('pts-logros-total');
   var bar = document.getElementById('pts-logros-bar');

@@ -1,5 +1,5 @@
-// api/pagina-destino.js -- v11.20260917
-// CAMBIOS: diseno premium Barlow Condensed, seccion sitio turistico, tags JSONB, sin backticks
+// api/pagina-destino.js -- v12.20260917
+// v12: fix cerrarPopoverGuardar BUG-057 - defensas reforzadas en listener capture
 // v10 (ADR-035): el espejo cliente de xp_total al publicar/votar foto usa
 // Number (no parseInt) para no truncar los decimales del XP.
 // v11 (TSK-111): botonera del hero en 2 filas (CAMBIO 5); grid del hero
@@ -2510,7 +2510,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // El boton del hero (btn-guardar) abre el popover en vez de alternar
     // directo. Si no hay sesion, se invita a iniciar sesion primero.
     + 'var popAbierto=false;\n'
-    + 'function cerrarPopoverGuardar(ev){var p=document.getElementById(\'guardar-pop\');if(!p)return;if(ev&&ev.target&&p.contains(ev.target))return;if(ev&&ev.target&&ev.target.closest&&ev.target.closest(\'#btn-guardar\'))return;p.remove();popAbierto=false;document.removeEventListener(\'click\',cerrarPopoverGuardar,true);}\n'
+    + 'function cerrarPopoverGuardar(ev){var p=document.getElementById(\'guardar-pop\');if(!p)return;if(ev&&ev.target&&ev.target.id===\'btn-guardar\')return;if(ev&&ev.target&&p.contains(ev.target))return;if(ev&&ev.target&&ev.target.closest&&ev.target.closest(\'#btn-guardar\'))return;p.remove();popAbierto=false;document.removeEventListener(\'click\',cerrarPopoverGuardar,true);}\n'
     + 'function abrirPopoverGuardar(){\n'
     + '  if(popAbierto){cerrarPopoverGuardar();return;}\n'
     + '  if(!window.ExploraCO||!window.ExploraCO.usuario){if(window.ExploraCO&&window.ExploraCO.mostrarLogin)window.ExploraCO.mostrarLogin(\'Inicia sesion para guardar en tus mapas\');return;}\n'
@@ -2530,7 +2530,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  document.body.appendChild(pop);\n'
     + '  var opTu=document.createElement(\'label\');\n'
     + '  opTu.style.cssText=\'display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.85)\';\n'
-    + '  opTu.innerHTML=\'<input type="checkbox" id="gp-tu" onchange="toggleTuMapa(this)"> Tu Mapa\';\n'
+    + '  opTu.innerHTML=\'<input type="checkbox" id="gp-tu" onchange="toggleTuMapa(this)" onclick="event.stopPropagation()"> Tu Mapa\';\n'
     + '  cuerpo.appendChild(opTu);\n'
     + '  window.ExploraCO.estaGuardado(DID).then(function(g){var c=document.getElementById(\'gp-tu\');if(c)c.checked=!!g;});\n'
     + '  var sep=document.createElement(\'div\');\n'
@@ -2542,7 +2542,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '    mapas.forEach(function(m){\n'
     + '      var lb=document.createElement(\'label\');\n'
     + '      lb.style.cssText=\'display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;color:rgba(255,255,255,.85)\';\n'
-    + '      lb.innerHTML=\'<input type="checkbox" onchange="toggleMapaDest(&#39;\'+m.id+\'&#39;,this.checked)"> \'+(m.emoji||\'\uD83D\uDDFA\')+\' <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>\';\n'
+    + '      lb.innerHTML=\'<input type="checkbox" onchange="toggleMapaDest(&#39;\'+m.id+\'&#39;,this.checked)" onclick="event.stopPropagation()"> \'+(m.emoji||\'\uD83D\uDDFA\')+\' <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>\';\n'
     + '      lb.querySelector(\'span\').textContent=m.nombre;\n'
     + '      cuerpo.appendChild(lb);\n'
     + '      fetch(\'/api/interacciones?tipo=mapa_detalle&id=\'+encodeURIComponent(m.id)).then(function(r){return r.json();}).then(function(dd2){\n'
@@ -2553,7 +2553,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '    var nb=document.createElement(\'button\');\n'
     + '    nb.style.cssText=\'width:100%;padding:6px;margin-top:6px;background:transparent;border:1px dashed rgba(232,160,32,.5);border-radius:5px;color:#E8A020;font-size:10px;font-weight:700;cursor:pointer\';\n'
     + '    nb.textContent=\'+ Nuevo mapa\';\n'
-    + '    nb.onclick=function(){var nombre=window.prompt(\'Nombre del nuevo mapa\');if(!nombre||!nombre.trim())return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_crear\',usuario_id:u.id,nombre:nombre.trim()})}).then(function(r){return r.json();}).then(function(dc){if(dc&&dc.ok){var nid=dc.id||dc.mapa_id||(dc.data&&dc.data.id)||null;if(nid)return fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_agregar_destino\',usuario_id:u.id,mapa_id:nid,destino_id:DID})});}}).then(function(r){if(r)return r.json();}).then(function(dx){cerrarPopoverGuardar();if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(dx&&dx.ok?\'Guardado en el mapa\':\'Mapa creado\',\'#16a34a\');}).catch(function(){cerrarPopoverGuardar();});};\n'
+    + '    nb.onclick=function(ev){if(ev&&ev.stopPropagation)ev.stopPropagation();var nombre=window.prompt(\'Nombre del nuevo mapa\');if(!nombre||!nombre.trim())return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_crear\',usuario_id:u.id,nombre:nombre.trim()})}).then(function(r){return r.json();}).then(function(dc){if(dc&&dc.ok){var nid=dc.id||dc.mapa_id||(dc.data&&dc.data.id)||null;if(nid)return fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:\'mapa_agregar_destino\',usuario_id:u.id,mapa_id:nid,destino_id:DID})});}}).then(function(r){if(r)return r.json();}).then(function(dx){cerrarPopoverGuardar();if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(dx&&dx.ok?\'Guardado en el mapa\':\'Mapa creado\',\'#16a34a\');}).catch(function(){cerrarPopoverGuardar();});};\n'
     + '    cuerpo.appendChild(nb);\n'
     + '  });\n'
     + '  setTimeout(function(){if(document.getElementById(\'guardar-pop\'))document.addEventListener(\'click\',cerrarPopoverGuardar,true);},0);\n'

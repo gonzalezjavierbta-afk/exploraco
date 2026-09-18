@@ -571,13 +571,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
   <!-- FOTOS SUBIDAS (ADR-032) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F4F8; Fotos subidas</div>
-  <div id="mis-fotos-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px;">
+  <div id="mis-fotos-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:12px;">
     <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando fotos...</p>
   </div>
 
   <!-- GUARDADOS DE MEDIA (ADR-032) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F516; Guardados (fotos y albumes)</div>
-  <div id="mis-guardados-media-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:28px;">
+  <div id="mis-guardados-media-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:28px;">
     <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando guardados...</p>
   </div>
 
@@ -654,6 +654,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <input type="text" id="album-nueva-foto-titulo" maxlength="200" placeholder="T&iacute;tulo (opcional)" style="flex:1;min-width:120px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
           <input type="text" id="album-nueva-foto-fuente" maxlength="100" placeholder="Fuente (opcional)" style="flex:1;min-width:110px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
         </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+          <input type="number" step="any" id="album-nueva-foto-lat" placeholder="-4.7" style="flex:1;min-width:80px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          <input type="number" step="any" id="album-nueva-foto-lng" placeholder="-74.1" style="flex:1;min-width:80px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          <button onclick="usarMiUbicacionAlbum('album-nueva-foto-lat','album-nueva-foto-lng',this)" type="button" style="flex:0 0 auto;padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x1F4CD; Usar mi ubicacion</button>
+        </div>
+        <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Con coordenadas, la foto aparece en el mapa cultural.</p>
         <button id="album-nueva-foto-btn" onclick="agregarFotoAlbum()" style="margin-top:8px;padding:7px 14px;background:var(--gold);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">+ Agregar foto</button>
       </div>
       <div id="album-det-fotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
@@ -793,6 +799,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <div id="xp-toast"></div>
 
 <script>
+/* mi-perfil.html -- Rev 2026-09-18b: logros colapsados, geo en album_foto */
 /* =============================================================
    MI PERFIL EXPLORACO — pagina privada del viajero
    Datos reales: window.ExploraCO.usuario + Neon
@@ -1131,11 +1138,35 @@ function cargarMisiones(uid) {
    Muestra el catalogo completo: desbloqueados a color con tier/ emoji del
    servidor; pendientes en gris con candado. */
 var TIER_NOMBRE = {bronce:'Bronce',plata:'Plata',oro:'Oro',platino:'Platino'};
+function renderTrofeoCard(t) {
+  var done = t.estado === 'completada';
+  var tier = t.tier || '';
+  var tierLbl = TIER_NOMBRE[tier] || tier;
+  var emoji = done ? (t.emoji || '\uD83C\uDFC6') : '\uD83D\uDD12';
+  var rarezaTxt = t.rareza_pct != null ? t.rareza_pct+'% de viajeros' : '';
+  var desc = t.desc || '';
+  var info = (done ? (tierLbl ? tierLbl + ' \u00B7 ' : '') + desc : (rarezaTxt ? rarezaTxt + ' \u00B7 ' : '') + desc);
+  return '<div class="trofeo-card'+(done?' earned':' locked')+' tier-'+tier+'">'
+    +'<div class="bg-emoji">'+emoji+'</div>'
+    +'<div class="bg-name">'+(t.nombre||t.id||'Logro')+'</div>'
+    +'<div class="bg-desc">'+info+'</div>'
+    +'</div>';
+}
+function toggleTrofeosBloqueados() {
+  var el = document.getElementById('trofeos-bloqueados-wrap');
+  var btn = document.getElementById('trofeos-toggle-bloqueados');
+  if(!el || !btn) return;
+  var visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'grid';
+  btn.textContent = visible
+    ? 'Ver todos los logros (+'+ el.getAttribute('data-count') +' bloqueados)'
+    : 'Ocultar logros bloqueados';
+}
 function cargarTrofeos(uid) {
   var grid = document.getElementById('pf-trofeos');
   var cnt = document.getElementById('pf-trofeos-count');
   if(!grid || !uid) return;
-  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando logros…</div>';
+  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando logros\u2026</div>';
   fetch('/api/interacciones?tipo=logros&usuario_id=' + encodeURIComponent(uid))
     .then(function(r){ return r.json(); })
     .then(function(res){
@@ -1150,26 +1181,22 @@ function cargarTrofeos(uid) {
       var desbloqueados = (res && res.desbloqueados != null) ? res.desbloqueados : list.filter(function(t){ return t.estado === 'completada'; }).length;
       if(cnt) cnt.textContent = desbloqueados + ' / ' + total;
       if(!list.length) {
-        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aún no hay logros disponibles.</div>';
+        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aun no hay logros disponibles.</div>';
         return;
       }
-      grid.innerHTML = list.map(function(t){
-        var done = t.estado === 'completada';
-        var tier = t.tier || '';
-        var tierLbl = TIER_NOMBRE[tier] || tier;
-        var emoji = done ? (t.emoji || '🏆') : '🔒';
-        var rarezaTxt = t.rareza_pct != null ? t.rareza_pct+'% de viajeros' : '';
-        var desc = t.desc || '';
-        var info = (done ? (tierLbl ? tierLbl + ' · ' : '') + desc : (rarezaTxt ? rarezaTxt + ' · ' : '') + desc);
-        return '<div class="trofeo-card'+(done?' earned':' locked')+' tier-'+tier+'">'
-          +'<div class="bg-emoji">'+emoji+'</div>'
-          +'<div class="bg-name">'+(t.nombre||t.id||'Logro')+'</div>'
-          +'<div class="bg-desc">'+info+'</div>'
+      var desbloq = list.filter(function(t){ return t.estado === 'completada'; });
+      var bloqueados = list.filter(function(t){ return t.estado !== 'completada'; });
+      var html = desbloq.map(function(t){ return renderTrofeoCard(t); }).join('');
+      if(bloqueados.length) {
+        html += '<button id="trofeos-toggle-bloqueados" onclick="toggleTrofeosBloqueados()" style="grid-column:1/-1;margin-top:10px;padding:8px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.55);font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">Ver todos los logros (+'+bloqueados.length+' bloqueados)</button>';
+        html += '<div id="trofeos-bloqueados-wrap" data-count="'+bloqueados.length+'" style="display:none;grid-column:1/-1;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px;">'
+          +bloqueados.map(function(t){ return renderTrofeoCard(t); }).join('')
           +'</div>';
-      }).join('');
+      }
+      grid.innerHTML = html;
     })
     .catch(function(){
-      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar los logros. Intenta de nuevo más tarde.</div>';
+      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar los logros. Intenta de nuevo mas tarde.</div>';
     });
 }
 
@@ -1805,35 +1832,56 @@ function cargarMisAlbumes() {
    guardados son privados por decision de producto: solo se pintan aqui. */
 function mediaCardHTML(m, opts) {
   opts = opts || {};
-  var url = m.media_url || m.foto_url || '';
+  var esViajeroFoto = m.fuente === 'viajero_foto';
+  var url = esViajeroFoto ? '' : (m.foto_url || m.texto || m.media_url || '');
   var titulo = m.media_title || m.titulo || 'Sin titulo';
-  var sub = m.album_titulo || m.ciudad || (m.fuente === 'viajero_foto' ? 'Foto de viajero' : '');
-  var thumb = url
-    ? '<img src="' + esc(url) + '" alt="' + esc(titulo) + '" style="width:100%;height:140px;object-fit:cover;display:block;" loading="lazy" onerror="this.style.display=\'none\'">'
-    : '<div style="width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F4F7;</div>';
+  var sub = m.album_titulo || m.ciudad || '';
+  if (esViajeroFoto) sub = m.destino_nombre || m.destino_slug || 'Foto de viajero';
+  var votos = m.votos || 0;
+  var tipoMedia = m.media_type || m.foto_type || '';
+  var tipoIcon = '';
+  if (tipoMedia === 'video') {
+    tipoIcon = '<span style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);border-radius:4px;padding:2px 5px;font-size:10px;">&#x25B6;</span>';
+  } else if (tipoMedia === 'audio') {
+    tipoIcon = '<span style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);border-radius:4px;padding:2px 5px;font-size:10px;">&#x266B;</span>';
+  }
+  var thumb;
+  if (esViajeroFoto) {
+    thumb = '<div style="width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:28px;">&#x1F5FA;</div>';
+  } else if (url) {
+    thumb = '<img src="' + esc(url) + '" alt="' + esc(titulo) + '" style="width:100%;height:140px;object-fit:cover;display:block;" loading="lazy" onerror="this.style.display=\'none\'">';
+  } else {
+    thumb = '<div style="width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F4F7;</div>';
+  }
   var btn = opts.quitar
     ? '<button onclick="quitarGuardadoMedia(\'' + esc(m.fuente) + '\',\'' + esc(m.item_id) + '\')" style="margin-top:8px;width:100%;padding:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:6px;color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">Quitar</button>'
     : '';
+  var linkDestino = esViajeroFoto && m.destino_slug
+    ? '<a href="' + esc(m.destino_slug) + '.html" style="font-size:11px;color:var(--gold);text-decoration:none;display:inline-block;margin-top:4px;">Ver destino &#x2192;</a>'
+    : '';
+  var votosHtml = votos > 0
+    ? '<div style="font-size:11px;color:var(--gold);margin-top:4px;">&#x2764; ' + votos + ' votos</div>'
+    : '';
   return '<div style="border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);">'
-    + '<div style="height:140px;overflow:hidden;">' + thumb + '</div>'
+    + '<div style="height:140px;overflow:hidden;position:relative;">' + thumb + tipoIcon + '</div>'
     + '<div style="padding:10px;">'
     + '<div style="font-size:14px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(titulo) + '</div>'
     + (sub ? '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px;">' + esc(sub) + '</div>' : '')
-    + btn
+    + votosHtml + linkDestino + btn
     + '</div></div>';
 }
 
 function cargarMisFotos() {
   cargarMediaGrid({ gridId: 'mis-fotos-grid', tipo: 'mis_fotos', quitar: false,
     cargando: 'Cargando fotos...',
-    vacio: 'Aun no has subido fotos. Agrega fotos a tus albumes o marca una en cualquier ficha.',
+    vacio: 'Aun no tienes fotos. Agrega una desde un Album. <a href="mi-perfil.html#mis-albumes-grid" style="color:var(--gold);text-decoration:none;">Ir a Albumes &#x2192;</a>',
     error: 'No se pudieron cargar tus fotos.' });
 }
 
 function cargarMisGuardadosMedia() {
   cargarMediaGrid({ gridId: 'mis-guardados-media-grid', tipo: 'mis_guardados_media', quitar: true,
     cargando: 'Cargando guardados...',
-    vacio: 'Aun no guardas fotos ni albumes. Usa el marcador en la galeria o en las fichas.',
+    vacio: 'Aun no has guardado fotos de la comunidad.',
     error: 'No se pudieron cargar tus guardados.' });
 }
 
@@ -2177,6 +2225,14 @@ function agregarFotoAlbum() {
     media_title: (document.getElementById('album-nueva-foto-titulo').value || '').trim(),
     media_source: (document.getElementById('album-nueva-foto-fuente').value || '').trim()
   };
+  var fLat = parseFloat((document.getElementById('album-nueva-foto-lat').value || '').trim());
+  var fLng = parseFloat((document.getElementById('album-nueva-foto-lng').value || '').trim());
+  if (isFinite(fLat) && isFinite(fLng)
+      && fLat >= -4.5 && fLat <= 13.5
+      && fLng >= -79.5 && fLng <= -65.5) {
+    body.lat = fLat;
+    body.lng = fLng;
+  }
   fetch('/api/interacciones?tipo=album_agregar_foto', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

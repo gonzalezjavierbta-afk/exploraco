@@ -15,6 +15,7 @@ Documento bajo demanda del AI-DOS Core (Cap. 9.4 / 9.5). Registra fallas ya iden
 - **Causa:** doble escape en el string JS, es decir `\\u00f1` (doble barra invertida) en vez de `\u00f1` (barra simple).
 - **Fix:** usar exclusivamente escapes Unicode simples. El doble escape queda documentado como bug conocido y prohibido, no como solucion valida.
 - **Estado:** Resuelto. Prevencion: script de verificacion cuenta ocurrencias de doble escape (`\\u`), debe dar 0.
+- **Nota ADR-006 (2026-09-18):** la deuda persiste en el codigo. Verificado contra archivo real: `api/pagina-destino.js` **L2431** mantiene 1 doble-escape real (`'\\u2605'` en `addRvOptimista`, idéntico a HEAD). El script de prevencion sigue activo (0 ocurrencias en el resto de `api/*.js`) pero BUG-002 queda **ABIERTO** hasta limpiar esa linea (tarea de limpieza pendiente, registrada en TASKS.md TSK-113).
 
 ## BUG-003: Codigo HTML visible en pantalla (comentarios o divs rotos)
 
@@ -976,9 +977,9 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Contexto:** detectado y corregido en el lote "promptarreglos" (2026-09-16) en `api/pagina-destino.js`.
 **Sintoma:** al abrir el popover "Guardar" (`#guardar-pop`) y marcar un checkbox de mapa tematico, el popover se cerraba solo y el estado del checkbox se perdia.
 **Causa raiz:** `cerrarPopoverGuardar` estaba registrado en `document` en fase de CAPTURA y cerraba ante CUALQUIER click (incluidos los del propio popover y los de los checkboxes), destruyendo el nodo antes de que el `onchange` pudiera completarse.
-**Resolucion aplicada:** el handler solo cierra si el click es FUERA del popover (`p.contains(ev.target)`) o sobre `#btn-guardar` (guard); `toggleMapaDest` muestra error si `!data.ok` y sus `catch` usan `console.warn` (nada silenciado).
-**Evidencia (ADR-006):** `api/pagina-destino.js` L2298 (`cerrarPopoverGuardar`), L2344 (registro del listener en fase de captura) y L2347 (`toggleMapaDest`); `node --check` OK.
-**Estado:** RESUELTO (working tree, 2026-09-16; PENDIENTE commit/push/deploy).
+**Resolucion aplicada:** el handler solo cierra si el click es FUERA del popover (`p.contains(ev.target)`) o sobre `#btn-guardar` (guard); `toggleMapaDest` muestra error si `!data.ok` y sus `catch` usan `console.warn` (nada silenciado). **Refuerzo v12.20260917 (TSK-113, 2026-09-18):** defensas en listener capture -- `cerrarPopoverGuardar` no cierra ante `ev.target.id==='btn-guardar'` (L2513) y los checkboxes Tu Mapa (L2533), mapas tematicos (L2545) y el boton "Nuevo mapa" (L2556) usan `event.stopPropagation()` para que el `onchange` siempre se complete.
+**Evidencia (ADR-006):** `api/pagina-destino.js` L2298 (`cerrarPopoverGuardar`), L2344 (registro del listener en fase de captura) y L2347 (`toggleMapaDest`); refuerzo v12.20260917 en L2513/L2533/L2545/L2556 (header v12.20260917 L1-2); `node --check` OK, ASCII 0/0/0; `smoke_auditoria_pagina_destino` 54/54 PASS.
+**Estado:** **CERRADO** (2026-09-18, fix reforzado `v12.20260917` aplicado en working tree; PENDIENTE commit/push/deploy de TSK-113).
 
 ## BUG-058: "Estuve aqui" nunca completaba -- el frontend no enviaba `nonce` ni JWT (cierra BUG-036)
 
