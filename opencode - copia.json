@@ -1,20 +1,18 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/big-pickle",
+  "model": "opencode-go/deepseek-v4.1-flash",
   "small_model": "opencode/big-pickle",
+  "default_agent": "free-plan",
   "subagent_depth": 2,
-
   "permission": {
     "edit": "ask",
     "bash": "ask"
   },
-
   "compaction": {
     "auto": true,
     "prune": true,
     "reserved": 10000
   },
-
   "watcher": {
     "ignore": [
       "node_modules/**",
@@ -26,7 +24,6 @@
       ".opencode/snapshots/**"
     ]
   },
-
   "formatter": true,
   "lsp": true
 }
