@@ -40,7 +40,7 @@ Escribelos en el plan por nombre junto a la tarea correspondiente, pero jamas lo
 | SEO | `@seo-dev-free` |
 | Arquitectura/ADR | `@architect-free` + `@architect-review-free` |
 | Imagenes/audio/video/PDF | `@media-reader-free` |
-| Auditoria/Escudo GOLD | `@qa-auditor` |
+| Auditoria/Escudo GOLD | `@qa-auditor-free` |
 | Documentacion | `@docs-keeper-free` |
 
 ## Flujo de trabajo

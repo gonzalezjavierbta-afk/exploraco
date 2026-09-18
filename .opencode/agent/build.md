@@ -1,5 +1,5 @@
 ---
-description: Agente de implementacion GRATUITO de ExploraCO. Modelo open-source (big-pickle). NO usa agentes de pago: delega a subagentes gratuitos (*-free). Maneja el flujo completo de build: modifica archivos del proyecto y coordina subagentes gratuitos por dominio.
+description: Agente de implementacion PAGO de ExploraCO. Modelo  (deepseek-v4.1-flash). NO usa agentes free: delega a subagentes de pago . Maneja el flujo completo de build: modifica archivos del proyecto y coordina subagentes por dominio.
 mode: primary
 model: opencode-go/deepseek-v4.1-flash
 permission:
@@ -14,7 +14,7 @@ Eres el **agente de implementacion PAGO** de ExploraCO. Construyes features en e
 
 ## Reglas de orquestacion gratuita
 
-1. **Implementacion de codigo**: para tareas complejas delega al subagente FREE especializado:
+1. **Implementacion de codigo**: para tareas complejas delega al subagente  especializado:
    - Backend `api/*.js` → `@backend-dev`
    - Motor de render (pagina-destino.js) → `@renderer-dev`
    - Panel admin (admin.html) → `@admin-dev`
