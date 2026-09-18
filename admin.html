@@ -810,6 +810,12 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             </label>
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Capacidad / Aforo</label>
+            <input class="form-input" id="f-capacidad" placeholder="40 personas, 20 camas">
+          </div>
+        </div>
       </div>
 
       <!-- TAB: MEDIA (FOTOS) -->
@@ -1209,16 +1215,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               </div>
             </div>
 
-            <div class="form-section-divider" style="margin-top:16px">Que incluye el precio</div>
-            <div class="form-hint">Cada fila = un item de la lista "Que incluye" en la pagina publica.</div>
-            <div id="que-incluye-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-              <div class="que-incluye-row" style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center">
-                <input class="form-input" placeholder="Ej: Toallas y sabanas incluidas">
-                <button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>
-              </div>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="addHostalQueIncluye()">+ Añadir item</button>
-
             <div class="form-section-divider" style="margin-top:16px">Actividades disponibles</div>
             <div class="form-hint">Actividades fijas que ofrece el hostal (no recurrentes por dia, ver tab Eventos para eso). Ej: gimnasio, tour propio, clases.</div>
             <div id="hostal-actividades-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
@@ -1235,10 +1231,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             </div>
             <button class="btn btn-ghost btn-sm" onclick="addHostalActividad()">+ Añadir actividad</button>
 
-            <div class="form-section-divider" style="margin-top:16px">Orden de los modulos</div>
-            <div class="form-hint">Cambia con las flechas el orden en que aparecen las secciones en la pagina publica del hostal. El orden se guarda con el lugar.</div>
-            <div id="hostal-modulos-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
-            <button class="btn btn-ghost btn-sm" onclick="resetHostalModulos()">Restablecer orden</button>
+            <div id="hostal-modulos-list" style="display:none" aria-hidden="true"></div>
           </div>
         </div>
 
@@ -1773,20 +1766,6 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <div class="form-group">
               <label class="form-label">Booking.com URL</label>
               <input class="form-input" id="f-booking" type="url" placeholder="https://booking.com/hotel/co/...">
-            </div>
-          </div>
-        </div>
-
-        <div class="card-section" style="margin-top:16px">
-          <div class="card-section-title">⚙️ Operación</div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Capacidad / Aforo</label>
-              <input class="form-input" id="f-capacidad" placeholder="40 personas, 20 camas">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Cómo llegar (resumen)</label>
-              <input class="form-input" id="f-comotransporte" placeholder="A 5 min del Transmilenio Av. Jiménez">
             </div>
           </div>
         </div>
@@ -2680,7 +2659,7 @@ function clearForm() {
   /* ── Basic field IDs ── */
   var ids = ['f-name','f-slug','f-cat','f-city','f-region','f-barrio','f-address',
              'f-price','f-emoji','f-color','f-lead','f-desc','f-sintro','f-highlight',
-             'f-horario','f-tipo','f-capacidad','f-duracion','f-comotransporte',
+             'f-horario','f-tipo','f-capacidad','f-duracion',
              'f-whatsapp','f-tel','f-email','f-web','f-instagram','f-booking',
              'f-rating','f-reviews','f-lat','f-lng','f-radio-m','f-photo-hero','f-hero-bg',
              'f-rappi','f-ifood','f-delivery-zona','f-dificultad','f-altitud','f-temporada',
@@ -2758,8 +2737,6 @@ function clearForm() {
   /* ── Reset hostal actividades / que incluye (TASK-001) ── */
   var actList = document.getElementById('hostal-actividades-list');
   if(actList) actList.innerHTML = '';
-  var qiList = document.getElementById('que-incluye-list');
-  if(qiList) qiList.innerHTML = '';
 
   /* -- Reset orden de modulos del hostal (ADR-034) -- */
   if (typeof _renderHostalModulos === 'function') _renderHostalModulos(HOSTAL_MODULOS_ORDEN_DEFAULT.slice());
@@ -2778,6 +2755,7 @@ function clearForm() {
       row.style.cssText = 'background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)';
       row.innerHTML = '<input class="form-input faq-q-inp" value="'+faq[0]+'" placeholder="Pregunta" style="margin-bottom:4px">'
         +'<textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta">'+faq[1]+'</textarea>'
+        +_faqMoveBtns()
         +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>';
       faqList.appendChild(row);
     });
@@ -2975,8 +2953,6 @@ var CATEGORY_TAG_LISTS = {
   hostal: [
     { key:'actividades',  localKey:'actividades',
       collector: function(){ return (typeof collectHostalActividades==='function') ? collectHostalActividades() : []; } },
-    { key:'que_incluye',  localKey:'queIncluye',
-      collector: function(){ return (typeof collectHostalQueIncluye==='function') ? collectHostalQueIncluye() : []; } },
     /* BUG-C fix: transporte y eventos_hostal viajaban en el payload de
        _placeToAPI() pero admin-destinos.js nunca los escribia en Neon
        (no hay columna transporte/eventos_hostal en destinos_detalles).
@@ -3251,18 +3227,41 @@ function resetHostalModulos() {
   _renderHostalModulos(HOSTAL_MODULOS_ORDEN_DEFAULT.slice());
 }
 
-/* Sube/baja una fila de la lista de Actividades del hostal (ADR-034).
-   El orden del DOM ES el orden del arreglo: collectHostalActividades()
-   ya devuelve las filas en orden, asi que no se toca. Prefijo hostal
-   contra colisiones (BUG-006/018/019). */
-function moveHostalActividad(btn, dir) {
-  if (!btn || !dir) return;
-  var row = btn.closest ? btn.closest('.hostal-actividad-row') : null;
+/* Generico: sube/baja una fila dentro de su contenedor intercambiandola
+   con el hermano anterior/siguiente que tenga la misma clase. Compartido
+   por Actividades del hostal (ADR-034) y FAQ (TSK-111) para no duplicar
+   la logica (Regla de No-Duplicidad). */
+function moverFila(btn, dir, selector) {
+  if (!btn || !dir || !selector) return;
+  var row = btn.closest ? btn.closest(selector) : null;
   if (!row || !row.parentNode) return;
   var her = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
-  if (!her || !her.classList || !her.classList.contains('hostal-actividad-row')) return;
+  if (!her || !her.classList || !her.classList.contains(selector.replace(/^\./,''))) return;
   if (dir < 0) row.parentNode.insertBefore(row, her);
   else row.parentNode.insertBefore(her, row);
+}
+
+/* Sube/baja una fila de Actividades del hostal. El orden del DOM ES el
+   orden del arreglo: collectHostalActividades() ya devuelve las filas
+   en orden, asi que no se toca. */
+function moveHostalActividad(btn, dir) {
+  moverFila(btn, dir, '.hostal-actividad-row');
+}
+
+/* Sube/baja una fila de FAQ (TSK-111). Mismo patron que Actividades: el
+   orden del DOM ES el orden del arreglo recogido por collectFaqs(). */
+function moveFaqRow(btn, dir) {
+  moverFila(btn, dir, '.faq-builder-row');
+}
+
+/* HTML compartido de los botones Subir/Bajar de una fila FAQ: se usa en
+   addFaqRow(), en el reset de clearForm() y en el render de loadForm(),
+   para no repetir el <span> en 3 sitios (Regla de No-Duplicidad). */
+function _faqMoveBtns() {
+  return '<span style="display:flex;gap:4px;align-items:center;margin-top:4px">'
+    +'<button class="btn btn-ghost btn-icon btn-sm" type="button" onclick="moveFaqRow(this,-1)" title="Subir" aria-label="Subir pregunta">&#9650;</button>'
+    +'<button class="btn btn-ghost btn-icon btn-sm" type="button" onclick="moveFaqRow(this,1)" title="Bajar" aria-label="Bajar pregunta">&#9660;</button>'
+    +'</span>';
 }
 
 function loadForm(p) {
@@ -3271,7 +3270,7 @@ function loadForm(p) {
     'f-barrio':p.barrio,'f-address':p.address,'f-price':p.price,'f-emoji':p.emoji,
     'f-color':p.color,'f-lead':p.lead,'f-desc':p.desc,'f-sintro':p.sintro,'f-highlight':p.highlight,
     'f-horario':p.horario,'f-tipo':p.tipo,'f-capacidad':p.capacidad,
-    'f-comotransporte':p.comotransporte,'f-whatsapp':p.whatsapp,'f-tel':p.tel,
+    'f-whatsapp':p.whatsapp,'f-tel':p.tel,
     'f-email':p.email,'f-web':p.web,'f-instagram':p.instagram,'f-booking':p.booking,
     'f-rating':p.rating,'f-reviews':p.reviews,'f-lat':p.lat,'f-lng':p.lng,
     'f-photo-hero':(p.photos&&p.photos[0]&&(p.photos[0].url||p.photos[0]))||'',
@@ -3382,19 +3381,6 @@ function loadForm(p) {
           actList.appendChild(row);
         });
       }
-      /* que incluye (TASK-001) */
-      var qiList=document.getElementById('que-incluye-list');
-      if(qiList&&p.queIncluye&&p.queIncluye.length){
-        qiList.innerHTML='';
-        p.queIncluye.forEach(function(qi){
-          var row=document.createElement('div');
-          row.className='que-incluye-row';
-          row.style.cssText='display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
-          row.innerHTML='<input class="form-input" value="'+_esc(typeof qi==='string'?qi:(qi.texto||''))+'" placeholder="Ej: Toallas y sábanas incluidas">'
-            +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
-          qiList.appendChild(row);
-        });
-      }
       /* events */
       var evList=document.getElementById('hostal-events-list');
       if(evList&&p.hostalEvents&&p.hostalEvents.length){
@@ -3422,6 +3408,7 @@ function loadForm(p) {
           row.style.cssText='background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)';
           row.innerHTML='<input class="form-input faq-q-inp" value="'+_esc(f.q||'')+'" placeholder="Pregunta" style="margin-bottom:4px">'
             +'<textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta">'+_esc(f.a||'')+'</textarea>'
+            +_faqMoveBtns()
             +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕</button>';
           faqList.appendChild(row);
         });
@@ -3949,7 +3936,7 @@ function savePlace() {
     color: v('f-color'), lead: v('f-lead'), desc: v('f-desc'),
     sintro: v('f-sintro'),
     highlight: v('f-highlight'), horario: v('f-horario'), tipo: v('f-tipo'),
-    capacidad: v('f-capacidad'), comotransporte: v('f-comotransporte'),
+    capacidad: v('f-capacidad'),
     whatsapp: v('f-whatsapp'), tel: v('f-tel'), email: v('f-email'),
     web: v('f-web'), instagram: v('f-instagram'), booking: v('f-booking'),
     rating: parseFloat(v('f-rating'))||0, reviews: parseInt(v('f-reviews'))||0,
@@ -3975,7 +3962,7 @@ function savePlace() {
        y CATEGORY_TAG_LISTS mas arriba). Llena tipo_alojamiento,
        reglas_casa, edad_minima, mascotas, cocina_compartida,
        politica_cancelacion (via p.cancelacion), recepcion,
-       precioBooking, bookingMsg, barrioDesc, actividades, queIncluye,
+       precioBooking, bookingMsg, barrioDesc, actividades,
        transport y hostalEvents. Antes estas ultimas 7 se leian a mano
        aqui mismo, pero 5 nunca llegaban a _placeToAPI() (BUG-B) y 2
        llegaban pero el backend las descartaba (BUG-C). */
@@ -5138,8 +5125,8 @@ function addEntradaItem() {
   list.appendChild(item);
 }
 
-// Que llevar / Prohibido -- mismo patron simple que
-// addHostalQueIncluye() (1 input + boton quitar)
+// Que llevar / Prohibido -- mismo patron simple de lista
+// (1 input + boton quitar)
 function addQueLlevarRow() {
   var list = document.getElementById('que-llevar-list');
   if(!list) return;
@@ -5751,29 +5738,8 @@ function collectHostalActividades() {
   return items;
 }
 
-/* ── ADD QUE INCLUYE ROW (TASK-001) ── */
-function addHostalQueIncluye() {
-  var list = document.getElementById('que-incluye-list');
-  if(!list) return;
-  var row = document.createElement('div');
-  row.className = 'que-incluye-row';
-  row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center';
-  row.innerHTML = '<input class="form-input" placeholder="Ej: Toallas y sábanas incluidas">'
-    +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)">✕</button>';
-  list.appendChild(row);
-}
-
-/* ── COLLECT QUE INCLUYE (TASK-001) ── */
-function collectHostalQueIncluye() {
-  var items = [];
-  document.querySelectorAll('#que-incluye-list .que-incluye-row input').forEach(function(inp) {
-    if(inp.value.trim()) items.push(inp.value.trim());
-  });
-  return items;
-}
-
-/* ── OTRAS PLATAFORMAS DE DOMICILIO (TASK-002, mismo patron que
-   que_incluye de Hostal) ── */
+/* ── OTRAS PLATAFORMAS DE DOMICILIO (TASK-002, mismo patron de
+   lista simple que las demas) ── */
 function addComidaPlataforma() {
   var list = document.getElementById('comida-plataformas-list');
   if(!list) return;
@@ -5800,6 +5766,7 @@ function addFaqRow() {
   row.className = 'faq-builder-row';
   row.innerHTML = '<input class="form-input faq-q-inp" placeholder="Pregunta" style="margin-bottom:4px">'
     +'<textarea class="form-input faq-a-inp" rows="2" placeholder="Respuesta"></textarea>'
+    +_faqMoveBtns()
     +'<button class="btn btn-danger btn-icon btn-sm" onclick="removeRow(this)" style="margin-top:4px">✕ Eliminar</button>';
   list.appendChild(row);
 }

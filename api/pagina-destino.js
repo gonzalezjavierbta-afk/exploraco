@@ -1,7 +1,13 @@
-// api/pagina-destino.js -- v10.20260917
+// api/pagina-destino.js -- v11.20260917
 // CAMBIOS: diseno premium Barlow Condensed, seccion sitio turistico, tags JSONB, sin backticks
 // v10 (ADR-035): el espejo cliente de xp_total al publicar/votar foto usa
 // Number (no parseInt) para no truncar los decimales del XP.
+// v11 (TSK-111): botonera del hero en 2 filas (CAMBIO 5); grid del hero
+// 1+3 y lightbox ampliado con abrirLightboxHero (CAMBIO 6A/6B); se elimina
+// "Que incluye el precio" del render de hostal (CAMBIO 3A) y el modulo
+// "Fotos de viajeros" de la ficha + su JS/CSS (CAMBIO 7A); guard de
+// edad_minima con trim (CAMBIO 2); CTA renombrado a "Ver todas las fotos"
+// (CAMBIO 7B).
 
 // Sistema de diseno: Barlow Condensed + Outfit, paleta dorada/negra editorial
 // 100% basado en datos reales del formulario publicar.html y schema Neon
@@ -179,7 +185,8 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".hsub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.8;max-width:480px}"
 +".hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}"
 +".hqi.hqilink{color:var(--gold);text-decoration:none}.hqi.hqilink:hover{text-decoration:underline}"
-+".hctar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}"
++".hctar{display:flex;flex-direction:column;gap:10px;align-items:flex-start}"
++".hctar-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}"
 +".hbtn{background:var(--gold);color:#fff;border:none;border-radius:3px;padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer}"
 +".hobtn{background:transparent;color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;cursor:pointer}"
 +".hobtn.activo{background:rgba(232,160,32,.15);color:var(--gold);border-color:var(--gold)}"
@@ -198,18 +205,19 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +"body.blog .ssec{padding:44px 5%}"
 +"body.blog .bfig img{border-radius:14px}"
 +"body.blog .bvid{border-radius:14px}"
-// Hero en mosaico: la principal ocupa ~66% del ancho y toda la altura
-// (360px desktop) y las 3 secundarias se apilan en la columna derecha.
-// Con una sola foto (sin heroThumbs) la principal abarca todo el ancho.
-+".hr{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);grid-template-rows:360px;gap:8px}"
-+".hr>.psm:only-child{grid-column:1/-1}"
-+".psm{height:100%;min-height:0;border-radius:10px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
+// Hero 1+3 (TSK-111 / CAMBIO 6A): la foto principal ocupa la fila completa
+// (3 columnas) y hasta 3 secundarias van abajo, una por columna (1/3 cada
+// una). Con menos de 3 secundarias, flex:1 reparte el ancho disponible.
+// Todas las imagenes del hero abren el lightbox (abrirLightboxHero).
++".hr{display:grid;grid-template-columns:1fr 1fr 1fr;grid-auto-rows:auto;gap:8px}"
++".hr .psm{grid-column:1/-1}"
++".psm{height:360px;min-height:0;border-radius:10px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
 +".psm img{width:100%;height:100%;object-fit:cover}"
 +".pbadge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;padding:3px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}"
-+".prow{display:grid;grid-template-columns:1fr;grid-auto-rows:minmax(0,1fr);gap:8px;height:100%;min-width:0}"
-+".pth{border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
++".prow{grid-column:1/-1;display:flex;gap:8px;min-width:0}"
++".pth{flex:1 1 0;min-width:0;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer}"
 +".pth img{width:100%;height:100%;object-fit:cover}"
-+"@media(max-width:760px){.hr{grid-template-columns:1fr;grid-template-rows:auto}.psm{height:230px}.prow{grid-template-columns:repeat(3,1fr);grid-auto-rows:auto;height:auto}.pth{height:86px}}"
++"@media(max-width:760px){.hr{grid-template-columns:1fr}.psm{height:230px}.prow{flex-wrap:wrap}.pth{flex:1 1 calc(33.333% - 6px)}}"
 +".subnav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:260;display:flex;gap:4px;overflow-x:auto;padding:0 4%;-ms-overflow-style:none;scrollbar-width:none}"
 +".subnav::-webkit-scrollbar{display:none}"
 +".snlink{flex-shrink:0;padding:14px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}"
@@ -333,6 +341,12 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".lb-nav{position:fixed;top:50%;transform:translateY(-50%);z-index:3001;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;width:44px;height:44px;border-radius:50%;font-size:22px;cursor:pointer;line-height:1;transition:background .15s}"
 +".lb-nav:hover{background:var(--gold);border-color:var(--gold);color:#fff}"
 +"#lb-prev{left:18px}#lb-next{right:18px}"
+// TSK-111 (CAMBIO 6B): el lightbox muestra la foto + conteo de votos
+// (si hay dato) + contenedor de comentarios + 2 CTAs a la galeria ampliada.
++"#lb-stage{position:relative;display:flex;flex-direction:column;align-items:center;max-height:88vh;overflow:auto;z-index:1}"
++"#lb-votes{position:relative;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-top:8px}"
++"#lb-comments{position:relative;color:rgba(255,255,255,.6);font-size:12px;font-family:'Outfit',sans-serif;margin-top:10px;text-align:center}"
++"#lb-actions{position:relative;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:12px}"
 +".entradas-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--border)}"
 +".entradas-table th{background:var(--black);color:#fff;padding:10px 14px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px}"
 +".entradas-table td{padding:12px 14px;border-bottom:1px solid var(--border)}"
@@ -395,18 +409,6 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:100%}"
 +".wrsub:disabled{background:#ccc;cursor:not-allowed}"
 +".wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px;margin-top:10px}"
-+".fp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:16px}"
-+".fp-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}"
-+".fp-card img{width:100%;height:150px;object-fit:cover;display:block;background:var(--bg)}"
-+".fp-meta{font-size:11px;color:var(--muted);padding:8px 12px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
-+".fp-vote{margin:6px 12px 12px;border:1.5px solid var(--border);background:#fff;color:var(--text);border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif}"
-+".fp-vote:hover{border-color:var(--gold);color:var(--gold)}"
-+".fp-vote.on{background:var(--gold);border-color:var(--gold);color:#fff}"
-+".fp-upload{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}"
-+".fp-upload .wrinp{flex:1;min-width:220px;margin-bottom:0}"
-+".fp-upload .wrsub{width:auto;flex-shrink:0}"
-+".fp-info{margin-top:12px}"
-+".fp-save{margin-top:0}"
 +".glsub{display:flex;align-items:center;gap:10px;margin:22px 0 4px}"
 +".glsub-t{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text)}"
 +".glsub-l{flex:1;height:1px;background:var(--border)}"
@@ -661,7 +663,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var recepcionInfo    = tags.recepcion           || '';
   var barrioDescripcion= tags.barrio_descripcion  || '';
   var actividadesHostal = safeJSON(tags.actividades);    if(!Array.isArray(actividadesHostal)) actividadesHostal=[];
-  var queIncluye        = safeJSON(tags.que_incluye);    if(!Array.isArray(queIncluye))        queIncluye=[];
   var transporteHostal  = safeJSON(tags.transporte);     if(!Array.isArray(transporteHostal))  transporteHostal=[];
   var eventosHostal     = safeJSON(tags.eventos_hostal); if(!Array.isArray(eventosHostal))     eventosHostal=[];
 
@@ -812,8 +813,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   addHeroThumb(albumOrden.length ? albumOrden[0].url : '');
   curadasOrden.forEach(addHeroThumb);
   comunidadUrls.forEach(addHeroThumb);
-  var heroThumbs = heroThumbsList.map(function(u){
-    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"></div>';
+  // TSK-111 (CAMBIO 6B): cada miniatura del hero abre el lightbox
+  // compartido. Se pasa HERO_ALL[k] (array emitido en el script de la
+  // pagina) en vez de la URL cruda, para no inyectar datos en el onclick.
+  var heroThumbs = heroThumbsList.map(function(u, i){
+    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightboxHero(HERO_ALL['+(i+1)+'])"></div>';
   }).join('');
 
   // -- HQI: chips de informacion rapida bajo el titulo (TSK-013 Hero) --
@@ -1558,23 +1562,20 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     return sitioSeccionesActivas.indexOf(sectionId) !== -1;
   }
 
-  // Btn "Ver galeria ampliada": navega a la subpagina dedicada
-  // /galeria.html?destino=<slug>. Fallback seguro al lightbox in-page si
-  // el destino no tiene slug (no romper miniaturas existentes). Apostrofes
-  // del onclick van como entidad HTML &#39; para no romper el JS inline
-  // del HTML generado (patron BUG-031).
+  // Btn "Ver todas las fotos" (TSK-111 / CAMBIO 7B): navega a la subpagina
+  // dedicada /galeria.html?destino=<slug>. Fallback seguro al lightbox
+  // in-page si el destino no tiene slug (no romper miniaturas existentes).
+  // Apostrofes del onclick van como entidad HTML &#39; para no romper el JS
+  // inline del HTML generado (patron BUG-031).
   var btnGaleriaAmpliada = d.slug
-    ? '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html?destino=&#39;+encodeURIComponent(&#39;'+esc(d.slug)+'&#39;)">Ver galeria ampliada</button>'
-    : '<button class="glbtn" onclick="abrirLightbox(0)">Ver galeria ampliada</button>';
-  // -- SECCION: Galeria unificada (curadas + fotos de viajeros) --------
-  // Antes existian DOS modulos separados: #galeria (fotos curadas de
-  // destinos_fotos, gate galAll.length > 1) y #fotos ("Fotos de viajeros",
-  // SIEMPRE emitida, sin gate). Se fusionan en UN solo
-  // <section id="galeria">: el bloque curado conserva su gate historico y
-  // la grilla de viajeros (#fp-grid) + la caja de subida (#fp-upload) se
-  // hidratan por cliente DENTRO de la misma seccion, tras las miniaturas.
-  // Semantica de emision = galAll.length > 0 || <secFotos: sin condicion> =
-  // siempre: no rompe blogs ni destinos sin fotos curadas.
+    ? '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html?destino=&#39;+encodeURIComponent(&#39;'+esc(d.slug)+'&#39;)">Ver todas las fotos</button>'
+    : '<button class="glbtn" onclick="abrirLightbox(0)">Ver todas las fotos</button>';
+  // -- SECCION: Galeria curada (TSK-111 / CAMBIO 7A) -------------------
+  // La seccion conserva la galeria curada (1 grande + hasta 12 miniaturas)
+  // y su CTA a galeria.html. El modulo "Fotos de viajeros" (#fp-grid,
+  // #fp-info, #fp-upload) y su JS cliente (loadFotos/subirFoto/votarFoto)
+  // se retiraron de la ficha; el ancla invisible #fotos se conserva por
+  // compatibilidad de enlaces. La seccion sigue emitiendose siempre.
   //
   // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash en
   // buildHTML), por lo que "galAll.length > 0" es trivialmente verdadero. El
@@ -1609,6 +1610,16 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // GAL_ALL para el lightbox: la grande + las miniaturas en el MISMO orden
   // que la grilla, para que los indices de abrirLightbox() sigan alineados.
   var galLightbox = [galBig].concat(galThumbsList);
+  // TSK-111 (CAMBIO 6B): votos por URL de comunidad para el lightbox. Si una
+  // URL no tiene dato de votos (curada), su entrada queda null -> el lightbox
+  // OMITE el conteo en vez de mostrar 0. Nunca rompe si no hay datos.
+  var galVotosMap = {};
+  comunidadMerge.forEach(function(x){ if (galVotosMap[x.url] === undefined) galVotosMap[x.url] = x.votos; });
+  var galLightboxVotos = galLightbox.map(function(u){ return (galVotosMap[u] !== undefined) ? galVotosMap[u] : null; });
+  // URL de los CTAs "Guardar en album"/"Agregar a album" del lightbox.
+  var galeriaUrl = d.slug ? '/galeria.html?destino=' + encodeURIComponent(d.slug) : '/galeria.html';
+  // El lightbox se monta si hay galeria curada navegable o miniaturas de hero.
+  var hayLightbox = hayGaleriaCurada || (heroThumbsList && heroThumbsList.length > 0);
   var galCuradaHTML = hayGaleriaCurada
     ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')" onclick="abrirLightbox(0)"></div>'
       + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+(i+1)+')"></div>'; }).join('')+'</div>'
@@ -1617,33 +1628,34 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var secGaleria = '<section class="ssec bwarm" id="galeria">'
     // Ancla legacy invisible #fotos (defensa barata): hoy no hay deep-links
     // reales, pero evita romper cualquier enlace historico al modulo de
-    // viajeros ahora que vive dentro de #galeria.
+    // viajeros retirado por TSK-111 / CAMBIO 7A.
     + '<span id="fotos" style="position:absolute;left:-9999px"></span>'
     + '<div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria de fotos</h2><div class="stnum">'+nextNum()+'</div></div>'
     + galCuradaHTML
-    + '<div class="glsub"><span class="glsub-t">Fotos de viajeros</span><span class="glsub-l"></span></div>'
-    + '<div class="fp-info" id="fp-info"></div>'
-    + '<div class="fp-grid" id="fp-grid"><p class="stext">Cargando fotos de la comunidad...</p></div>'
-    + '<div class="fp-upload" id="fp-upload" style="display:none">'
-    + '<input id="fp-url" type="text" placeholder="Pega el URL de tu foto (https://...)" class="wrinp" autocomplete="off">'
-    + '<button class="wrsub" onclick="subirFoto()">Subir foto (+15 XP)</button>'
-    + '</div>'
-    + '<div class="wrok" id="fp-ok">\u2713 Foto publicada</div>'
     + '</div></section>';
 
-  // -- LIGHTBOX (galeria ampliada) --------------------------------
+  // -- LIGHTBOX (galeria ampliada + hero, TSK-111 / CAMBIO 6B) -------
   // Overlay oculto montado al final del body, antes del script inline.
-  // Solo se monta si hay galeria curada navegable (gate historico > 1; ver
-  // nota en secGaleria: galAll nunca esta vacio). Lo controla el JS inline:
-  // abrirLightbox/LB_I, lbNav, lbClose.
-  var lbHTML = hayGaleriaCurada ? '<div id="lb" style="display:none">'
+  // Se monta si hay galeria curada navegable o miniaturas de hero
+  // (hayLightbox). Lo controla el JS inline: abrirLightbox (curada),
+  // abrirLightboxHero (hero), lbNav y lbClose. Ambos modos comparten el
+  // overlay/CSS/cierre (lbClose, Escape y click en #lb-bg).
+  var lbHTML = hayLightbox ? '<div id="lb" style="display:none">'
     + '<div id="lb-bg"></div>'
     + '<button id="lb-close" onclick="lbClose()">\u2715</button>'
-    + '<button id="lb-prev" class="lb-nav" onclick="lbNav(-1)">\u2039</button>'
+    + '<div id="lb-stage">'
     + '<img id="lb-img" src="" alt="Foto">'
-    + '<button id="lb-next" class="lb-nav" onclick="lbNav(1)">\u203A</button>'
     + '<div id="lb-cap"></div>'
+    + '<div id="lb-votes" style="display:none"></div>'
+    + '<div id="lb-comments">Comentarios disponibles en la galeria ampliada</div>'
+    + '<div id="lb-actions">'
+    + '<button class="cbtn gold" onclick="lbIrGaleria()">Guardar en album</button>'
+    + '<button class="cbtn dark" onclick="lbIrGaleria()">Agregar a album</button>'
+    + '</div>'
+    + '</div>'
+    + '<button id="lb-prev" class="lb-nav" onclick="lbNav(-1)">\u2039</button>'
+    + '<button id="lb-next" class="lb-nav" onclick="lbNav(1)">\u203A</button>'
     + '</div>' : '';
 
   // -- SECCION: Habitaciones / precios (solo hostal) ----------------
@@ -1675,7 +1687,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // -- SECCION: Reglas de la casa (TASK-001, solo hostal) -----------
   var reglasQuickFacts = [];
   if (tipoAlojamiento)  reglasQuickFacts.push({ico:'\uD83C\uDFE0', lbl:'Tipo',    val:tipoAlojamiento});
-  if (edadMinima)       reglasQuickFacts.push({ico:'\uD83D\uDD1E', lbl:'Edad minima', val:String(edadMinima)+' anios'});
+  // TSK-111 (CAMBIO 2): edad_minima solo se pinta si no es cadena vacia
+  // ni solo espacios (algunos seeds/admin guardaron ' ').
+  if (edadMinima && String(edadMinima).trim() !== '') reglasQuickFacts.push({ico:'\uD83D\uDD1E', lbl:'Edad minima', val:String(edadMinima)+' anios'});
   if (mascotas)         reglasQuickFacts.push({ico:'\uD83D\uDC3E', lbl:'Mascotas', val:mascotas});
   if (cocinaCompartida) reglasQuickFacts.push({ico:'\uD83C\uDF73', lbl:'Cocina compartida', val:cocinaCompartida});
 
@@ -1693,19 +1707,18 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + (politicaCancel ? '<div class="hbox"><strong>Politica de cancelacion:</strong> '+esc(politicaCancel)+'</div>' : '')
     + '</div></section>' : '';
 
-  // -- SECCION: Actividades disponibles + Que incluye (TASK-001) ----
-  var secActividadesHostal = (actividadesHostal.length || queIncluye.length) ?
+  // -- SECCION: Actividades disponibles (TASK-001) -----------------
+  // TSK-111 (CAMBIO 3A): se elimino el bloque "Que incluye el precio"
+  // (queIncluye) de esta seccion, junto con su declaracion y lectura de
+  // tags.que_incluye. La seccion ahora solo se emite con actividades reales.
+  var secActividadesHostal = actividadesHostal.length ?
     '<section class="ssec bwhite" id="actividades"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">Actividades disponibles</h2><div class="stnum">'+nextNum()+'</div></div>'
-    + (actividadesHostal.length ? '<div class="igrid">'+actividadesHostal.map(function(a){
+    + '<div class="igrid">'+actividadesHostal.map(function(a){
         return '<div class="icard"><div class="iico">'+esc(a.icono||'\u2728')+'</div><div class="ilbl">'+esc(a.nombre||'')+'</div>'
           + (a.descripcion ? '<div class="ival" style="font-size:12px;font-weight:400">'+esc(a.descripcion)+'</div>' : '')
           + '</div>';
-      }).join('')+'</div>' : '')
-    + (queIncluye.length ? '<div style="margin-top:'+(actividadesHostal.length?'22px':'0')+'">'
-        + '<div class="tagrow">'+queIncluye.map(function(qi){
-            return '<span class="tpill">\u2713 '+esc(typeof qi==='string'?qi:(qi.texto||''))+'</span>';
-          }).join('')+'</div></div>' : '')
+      }).join('')+'</div>'
     + '</div></section>' : '';
 
   // -- SECCION: Eventos del hostal (TASK-001, BUG-C) -----------------
@@ -2063,11 +2076,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '</div>'
     + '</div></section>';
 
-  // -- Fotos de viajeros: UNIFICADO en secGaleria ---------------------
-  // El shell #fotos (fp-info/fp-grid/fp-upload) se movio DENTRO de la
-  // seccion #galeria (mas arriba). El JS client loadFotos/subirFoto/
-  // votarFoto se inyecta en el bloque de script de la pagina. Se conserva
-  // el ancla invisible <span id="fotos"> dentro de #galeria.
+  // -- Fotos de viajeros: modulo RETIRADO de la ficha (CAMBIO 7A) -----
+  // El shell #fotos (fp-info/fp-grid/fp-upload) y su JS cliente
+  // (loadFotos/subirFoto/votarFoto) se eliminaron. Se conserva el ancla
+  // invisible <span id="fotos"> dentro de #galeria por compatibilidad.
 
   // ADR-017 P11 (removido por refactor de UI, TSK-076): la seccion
   // secFotoDestacada se elimino; la galeria con lightbox ya cubre la
@@ -2275,6 +2287,20 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var subcatHTML = (cat !== 'blog' && subcategoria)
     ? '<span class="subcat-chip">'+esc(SUBCAT_LABEL[subcategoria]||subcategoria)+'</span>'
     : '';
+  // TSK-111 (CAMBIO 5): botonera del hero en 2 filas logicas. Fila 1:
+  // Sitio web oficial + Contacto (WhatsApp o mailto). Fila 2: Como llegar +
+  // Guardar + Estuve aqui. Si una fila queda vacia, no se emite.
+  var hctarRow1 = [];
+  var hctarRow2 = [];
+  if (d.web) hctarRow1.push('<button class="hbtn" onclick="window.open(\''+esc(d.web)+'\',\'_blank\')">\uD83C\uDF10 Sitio web oficial</button>');
+  if (d.whatsapp) {
+    hctarRow1.push('<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>');
+  } else if (d.email) {
+    hctarRow1.push('<button class="hbtn" onclick="window.open(\'mailto:'+esc(d.email)+'\')">\u2709 Contactar</button>');
+  }
+  if (d.lat && d.lng) hctarRow2.push('<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>');
+  hctarRow2.push('<button class="hobtn" id="btn-guardar" onclick="abrirPopoverGuardar()">\u2661 Guardar</button>');
+  hctarRow2.push('<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>');
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
     + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
     + '<title>'+esc(d.nombre)+'  ExploraCO</title>\n'
@@ -2313,16 +2339,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (d.lead ? '<p class="hsub">'+esc(d.lead)+'</p>' : '')
       + (hqi.length ? '<div class="hqi-row">'+hqi.join('')+'</div>' : '')
       + '<div class="hctar">'
-      + (d.web ? '<button class="hbtn" onclick="window.open(\''+esc(d.web)+'\',\'_blank\')">\uD83C\uDF10 Sitio web oficial</button>' : '')
-      + (d.whatsapp
-          ? '<button class="hbtn" onclick="window.open(\'https://wa.me/'+esc(d.whatsapp)+'\',\'_blank\')">\u2709 Contactar</button>'
-          : (d.email ? '<button class="hbtn" onclick="window.open(\'mailto:'+esc(d.email)+'\')">\u2709 Contactar</button>' : ''))
-      + (d.lat && d.lng ? '<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>' : '')
-      + '<button class="hobtn" id="btn-guardar" onclick="abrirPopoverGuardar()">\u2661 Guardar</button>'
-      + '<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>'
+      + (hctarRow1.length ? '<div class="hctar-row">'+hctarRow1.join('')+'</div>' : '')
+      + (hctarRow2.length ? '<div class="hctar-row">'+hctarRow2.join('')+'</div>' : '')
       + '</div>'
       + '</div>\n'
-      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
+      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'" onclick="abrirLightboxHero(HERO_ALL[0])">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
       + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
       + '</div>\n</div></section>\n\n')
 
@@ -2539,15 +2560,25 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '}\n'
     + 'function toggleTuMapa(cb){var btn=document.getElementById(\'btn-guardar\');if(window.ExploraCO)window.ExploraCO.toggleGuardado(DID,btn);setTimeout(function(){window.ExploraCO.estaGuardado(DID).then(function(g){cb.checked=!!g;});},400);}\n'
     + 'function toggleMapaDest(mapaId,checked){var u=window.ExploraCO&&window.ExploraCO.usuario;if(!u)return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:checked?\'mapa_agregar_destino\':\'mapa_quitar_destino\',usuario_id:u.id,mapa_id:mapaId,destino_id:DID})}).then(function(r){return r.json();}).then(function(data){if(window.ExploraCO&&window.ExploraCO.mostrarToast){if(data&&data.ok)window.ExploraCO.mostrarToast(checked?\'Anadido al mapa\':\'Quitado del mapa\',\'#16a34a\');else window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');}}).catch(function(e){console.warn(\'[mapa] toggle\',e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');});}\n'
-    // Lightbox de galeria (TSK-076): GAL_ALL se genera en runtime del
-    // servidor (igual que DIM_LABELS mas arriba) a partir de galAll.
+    // Lightbox compartido (galeria curada + hero, TSK-111 / CAMBIO 6B).
+    // GAL_ALL: fotos curadas navegables. HERO_ALL: [hero + miniaturas del
+    // hero]. LB_VOTOS: votos por indice de GAL_ALL (null si no hay dato).
+    // abrirLightbox(i) navega la curada; abrirLightboxHero(url) muestra una
+    // foto del hero sin duplicar overlay/CSS/cierre.
     + 'var GAL_ALL='+JSON.stringify(galLightbox)+';\n'
+    + 'var HERO_ALL='+JSON.stringify([hero].concat(heroThumbsList))+';\n'
+    + 'var LB_VOTOS='+JSON.stringify(galLightboxVotos)+';\n'
+    + 'var LB_GAL_URL='+JSON.stringify(galeriaUrl)+';\n'
+    + 'var LB_MODE="curated";\n'
     + 'var LB_I=0;\n'
-    + 'function abrirLightbox(i){if(!GAL_ALL.length)return;LB_I=(i+GAL_ALL.length)%GAL_ALL.length;var im=document.getElementById(\'lb-img\');if(im){im.src=GAL_ALL[LB_I];var bg=document.getElementById(\'lb\');if(bg)bg.style.display=\'flex\';}var cap=document.getElementById(\'lb-cap\');if(cap)cap.textContent=(LB_I+1)+\' / \'+GAL_ALL.length;}\n'
-    + 'function lbNav(d){abrirLightbox(LB_I+d);}\n'
+    + 'function lbIrGaleria(){window.location.href=LB_GAL_URL;}\n'
+    + 'function pintarLbVotos(i){var el=document.getElementById("lb-votes");if(!el)return;var v=(i>=0&&LB_VOTOS[i]!=null)?LB_VOTOS[i]:null;if(v==null){el.style.display="none";el.textContent="";}else{el.style.display="block";el.textContent=v+(v===1?" voto":" votos");}}\n'
+    + 'function abrirLightbox(i){if(!GAL_ALL.length)return;LB_I=(i+GAL_ALL.length)%GAL_ALL.length;LB_MODE="curated";var im=document.getElementById("lb-img");if(im){im.src=GAL_ALL[LB_I];var bg=document.getElementById("lb");if(bg)bg.style.display="flex";}var cap=document.getElementById("lb-cap");if(cap)cap.textContent=(LB_I+1)+" / "+GAL_ALL.length;var pv=document.getElementById("lb-prev");if(pv)pv.style.display="";var nx=document.getElementById("lb-next");if(nx)nx.style.display="";pintarLbVotos(LB_I);}\n'
+    + 'function abrirLightboxHero(url){if(!url)return;var im=document.getElementById("lb-img");if(!im)return;var idx=(typeof GAL_ALL!=="undefined")?GAL_ALL.indexOf(url):-1;LB_MODE="hero";LB_I=idx>=0?idx:0;im.src=url;var bg=document.getElementById("lb");if(bg)bg.style.display="flex";var cap=document.getElementById("lb-cap");if(cap)cap.textContent="Foto del lugar";var pv=document.getElementById("lb-prev");if(pv)pv.style.display="none";var nx=document.getElementById("lb-next");if(nx)nx.style.display="none";pintarLbVotos(idx);}\n'
+    + 'function lbNav(d){if(LB_MODE==="hero")return;abrirLightbox(LB_I+d);}\n'
     + 'function lbClose(){var lb=document.getElementById(\'lb\');if(lb)lb.style.display=\'none\';}\n'
     + 'var lbEl=document.getElementById(\'lb\');if(lbEl&&document.getElementById(\'lb-bg\')){document.getElementById(\'lb-bg\').addEventListener(\'click\',lbClose);}\n'
-    + 'document.addEventListener(\'keydown\',function(e){var lb=document.getElementById(\'lb\');if(!lb||lb.style.display===\'none\')return;if(e.key===\'Escape\')lbClose();if(e.key===\'ArrowLeft\')lbNav(-1);if(e.key===\'ArrowRight\')lbNav(1);});\n'
+    + 'document.addEventListener(\'keydown\',function(e){var lb=document.getElementById(\'lb\');if(!lb||lb.style.display==="none")return;if(e.key==="Escape")lbClose();if(e.key==="ArrowLeft")lbNav(-1);if(e.key==="ArrowRight")lbNav(1);});\n'
     + 'function marcarVisitadoBtn(btn){\n'
     + '  if(!window.ExploraCO){return;}\n'
     + '  if(btn.disabled)return;\n'
@@ -2566,115 +2597,11 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // sin importar el estado visual (ver api/interacciones.js v3).
     + 'if(window.ExploraCO){window.ExploraCO.estaGuardado(DID).then(function(g){if(g){var b=document.getElementById("btn-guardar");if(b)b.classList.add("activo");}});}\n'
     + 'if(document.getElementById("qr-stars")){precargarMiVoto();}\n'
-    // Galeria unificada: fotos curadas + fotos de viajeros en #galeria.
-    // Desbloqueable subir_fotos (nivel 2). FP_URLS mapea id->url para que el
-    // popover de albumes no incruste datos de usuario en el onclick (XSS);
-    // galEsc es el UNICO helper de escape de datos de usuario/foto.
-    + 'function galEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}\n'
-    + 'var FP_URLS={};\n'
-    + 'function fpCaps(){var u=window.ExploraCO&&window.ExploraCO.usuario;return !!(u&&u.capacidades&&u.capacidades.subir_fotos);}\n'
-    + 'function loadFotos(){\n'
-    + '  var grid=document.getElementById("fp-grid");if(!grid)return;\n'
-    + '  var info=document.getElementById("fp-info");\n'
-    + '  fetch("/api/interacciones?tipo=fotos&destino_id="+DID)\n'
-    + '  .then(function(r){return r.json();})\n'
-    + '  .then(function(d){\n'
-    + '    var list=(d&&d.ok&&d.data)||[];\n'
-    + '    FP_URLS={};\n'
-    + '    if(!list.length){grid.innerHTML="<p class=\\"stext\\">Sin fotos de viajeros todav\u00eda. S\u00e9 el primero: desbloquea Subir fotos en el nivel 2 y comparte tu experiencia.</p>";}\n'
-    + '    else{grid.innerHTML=list.map(function(f){var v=parseInt(f.votos||0);FP_URLS[f.id]=f.url;return "<div class=\\"fp-card\\"><img src=\\""+galEsc(f.url)+"\\" alt=\\"Foto de viajero\\" loading=\\"lazy\\"><div class=\\"fp-meta\\">"+galEsc(f.autor_nombre||"Viajero")+"</div><button class=\\"fp-vote"+(f.ya_votado?" on":"")+"\\" id=\\"fpv-"+f.id+"\\" onclick=\\"votarFoto(\\\'"+f.id+"\\\',this)\\">"+(f.ya_votado?"&#10003; Votada":"&#11088; Votar")+" <b>"+v+"</b></button><button class=\\"fp-vote fp-save\\" onclick=\\"abrirAlbumPopover(\\\'"+f.id+"\\\',this)\\">Guardar en album</button></div>";}).join("");}\n'
-    + '    var up=document.getElementById("fp-upload");\n'
-    + '    if(fpCaps()){\n'
-    + '      if(up)up.style.display="flex";\n'
-    + '      if(info)info.innerHTML="<p class=\\"stext\\" style=\\"color:var(--gold)\\">&#128247; Tienes Subir fotos desbloqueado: publica fotos y suma +15 XP.</p>";\n'
-    + '    }else{\n'
-    + '      if(up)up.style.display="none";\n'
-    + '      if(info)info.innerHTML="<p class=\\"stext\\">&#128274; Subir fotos se desbloquea en el nivel 2 (100 XP y tu primera rese\u00f1a).</p>";\n'
-    + '    }\n'
-    + '  }).catch(function(){});\n'
-    + '}\n'
-    + 'function subirFoto(){\n'
-    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
-    + '  if(!u){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para subir fotos");}return;}\n'
-    + '  if(!fpCaps()){alert("Desbloquea Subir fotos (nivel 2) primero.");return;}\n'
-    + '  var inp=document.getElementById("fp-url");if(!inp)return;\n'
-    + '  var url=inp.value.trim();if(!url){alert("Pega el URL de tu foto");return;}\n'
-    + '  var btn=document.querySelector("#fp-upload .wrsub");if(btn){btn.disabled=true;btn.textContent="Subiendo...";}\n'
-    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:"foto",destino_id:DID,usuario_id:u.id,url:url})})\n'
-    + '  .then(function(r){return r.json();})\n'
-    + '  .then(function(d){\n'
-    + '    if(btn){btn.disabled=false;btn.textContent="Subir foto (+15 XP)";}\n'
-    + '    if(d&&d.ok){\n'
-    + '      inp.value="";\n'
-    + '      var ok=document.getElementById("fp-ok");if(ok){ok.style.display="block";setTimeout(function(){ok.style.display="none";},2500);}\n'
-    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=Math.round(((Number(window.ExploraCO.usuario.xp_total)||0)+15)*100)/100;}\n'
-    + '      if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Foto publicada +15 XP","#16a34a");\n'
-    + '      loadFotos();\n'
-    + '    }else{alert((d&&d.error)||"No se pudo subir la foto");}\n'
-    + '  }).catch(function(){if(btn){btn.disabled=false;btn.textContent="Subir foto (+15 XP)";}alert("Error de conexi\u00f3n.");});\n'
-    + '}\n'
-    + 'function votarFoto(fid,btn){\n'
-    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
-    + '  if(!u){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para votar fotos (+5 XP)");}return;}\n'
-    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:"foto_voto",usuario_id:u.id,foto_id:fid})})\n'
-    + '  .then(function(r){return r.json();})\n'
-    + '  .then(function(d){\n'
-    + '    if(d&&d.ok){\n'
-    + '      if(btn){btn.classList.add("on");var b=btn.querySelector("b");btn.innerHTML="&#10003; Votada <b>"+((parseInt(b?b.textContent:"0")||0)+1)+"</b>";}\n'
-    + '      if(window.ExploraCO&&window.ExploraCO.usuario){window.ExploraCO.usuario.xp_total=Math.round(((Number(window.ExploraCO.usuario.xp_total)||0)+5)*100)/100;}\n'
-    + '      if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Voto en foto +5 XP","#E8A020");\n'
-    + '      loadFotos();\n'
-    + '    }else if(d&&d.ya_votado){\n'
-    + '      if(btn){btn.classList.add("on");var b2=btn.querySelector("b");btn.innerHTML="&#10003; Votada <b>"+(parseInt(b2?b2.textContent:"0")||0)+"</b>";}\n'
-    + '    }else{alert((d&&d.error)||"No se pudo votar");}\n'
-    + '  }).catch(function(){alert("Error de conexi\u00f3n.");});\n'
-    + '}\n'
-    // Guardar en album: mini-popover con los albumes PROPIOS del usuario
-    // (GET tipo=albumes). El POST omite autor_original_id a proposito: asi el
-    // dedup del indice (album_id,foto_url,autor_original_id) usa al guardador
-    // y no se acredita XP a un tercero. El listener de cierre va en document
-    // en fase de captura y sigue el patron de cerrarPopoverGuardar: SIEMPRE
-    // comprueba que el click sea fuera del popover (p.contains(ev.target)) y
-    // que no venga del propio boton (.fp-save); sin ese chequeo el boton se
-    // autodestruye (era el bug del boton Guardar).
-    + 'function cerrarAlbumPopover(ev){\n'
-    + '  var p=document.getElementById("gal-albpop");if(!p)return;\n'
-    + '  if(ev&&ev.target&&p.contains(ev.target))return;\n'
-    + '  if(ev&&ev.target&&ev.target.closest&&ev.target.closest(".fp-save"))return;\n'
-    + '  p.remove();\n'
-    + '  document.removeEventListener("click",cerrarAlbumPopover,true);\n'
-    + '}\n'
-    + 'function abrirAlbumPopover(fid,btn){\n'
-    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
-    + '  if(!u||!u.id){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para guardar en tus albumes");}return;}\n'
-    + '  var url=FP_URLS[fid]||"";\n'
-    + '  if(!url){console.warn("[galeria] url de foto no encontrada",fid);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("No se pudo identificar la foto","#ef4444");return;}\n'
-    + '  var prev=document.getElementById("gal-albpop");if(prev)prev.remove();\n'
-    + '  var pop=document.createElement("div");\n'
-    + '  pop.id="gal-albpop";\n'
-    + '  pop.style.cssText="position:fixed;z-index:2500;width:230px;max-height:300px;overflow:auto;background:#0F172A;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);font-family:Outfit,sans-serif";\n'
-    + '  var r=btn.getBoundingClientRect();\n'
-    + '  pop.style.top=Math.min(window.innerHeight-320,Math.max(8,r.bottom+6))+"px";\n'
-    + '  pop.style.left=Math.max(8,r.right-230)+"px";\n'
-    + '  pop.innerHTML="<div style=\\"font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#E8A020;margin-bottom:6px;display:flex;justify-content:space-between\\">Guardar en album<span style=\\"cursor:pointer;color:rgba(255,255,255,.5)\\" onclick=\\"cerrarAlbumPopover()\\">\u2715</span></div>";\n'
-    + '  var cuerpo=document.createElement("div");pop.appendChild(cuerpo);document.body.appendChild(pop);\n'
-    + '  fetch("/api/interacciones?tipo=albumes&usuario_id="+encodeURIComponent(u.id)+"&limit=50").then(function(r){return r.json();}).then(function(dd){\n'
-    + '    var albumes=(dd&&dd.ok&&dd.data)||[];\n'
-    + '    if(!albumes.length){var av=document.createElement("div");av.style.cssText="padding:6px 4px;font-size:11px;color:rgba(255,255,255,.5)";av.textContent="Aun no tienes albumes. Crea uno en Mi Perfil.";cuerpo.appendChild(av);return;}\n'
-    + '    albumes.forEach(function(a){var b=document.createElement("button");b.style.cssText="display:block;width:100%;text-align:left;padding:7px 8px;margin-bottom:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;color:rgba(255,255,255,.9);font-size:11px;font-weight:600;cursor:pointer";b.textContent=a.titulo||"Sin titulo";b.onclick=function(){guardarEnAlbum(a.id,url);};cuerpo.appendChild(b);});\n'
-    + '  }).catch(function(e){console.warn("[galeria] albumes",e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("No se pudieron cargar tus albumes","#ef4444");});\n'
-    + '  setTimeout(function(){if(document.getElementById("gal-albpop"))document.addEventListener("click",cerrarAlbumPopover,true);},0);\n'
-    + '}\n'
-    + 'function guardarEnAlbum(albumId,fotoUrl){\n'
-    + '  var u=window.ExploraCO&&window.ExploraCO.usuario;\n'
-    + '  if(!u||!u.id){if(window.ExploraCO&&window.ExploraCO.mostrarLogin){window.ExploraCO.mostrarLogin("Inicia sesi\u00f3n para guardar en tus albumes");}return;}\n'
-    + '  fetch("/api/interacciones",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:"album_agregar_foto",usuario_id:u.id,album_id:albumId,foto_url:fotoUrl,foto_type:"foto",media_title:""})}).then(function(r){return r.json();}).then(function(d){\n'
-    + '    cerrarAlbumPopover();\n'
-    + '    if(d&&d.ok){if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Guardada en tu album +15 XP","#16a34a");}\n'
-    + '    else{var msg=(d&&d.error)||"No se pudo guardar en el album";if(msg==="ALBUM_AJENO")msg="Ese album no es tuyo";console.warn("[galeria] album_agregar_foto",msg);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(msg,"#ef4444");}\n'
-    + '  }).catch(function(e){console.warn("[galeria] album_agregar_foto",e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast("Error de conexi\u00f3n","#ef4444");});\n'
-    + '}\n'
-    + 'loadFotos();\n'
+    // TSK-111 (CAMBIO 7A): modulo "Fotos de viajeros" RETIRADO de la ficha.
+    // Se eliminaron galEsc/FP_URLS/fpCaps/loadFotos/subirFoto/votarFoto y el
+    // popover Guardar-en-album (cerrarAlbumPopover/abrirAlbumPopover/
+    // guardarEnAlbum) que solo era alcanzable desde la grilla #fp-grid
+    // eliminada. Sin referencias huerfanas a fp-grid.
     + 'fetch("/api/utilidades?tipo=visitas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({destino_id:DID})}).catch(function(){});\n'
     + '<\/script>\n</body>\n</html>';
 }

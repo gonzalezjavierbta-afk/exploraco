@@ -203,11 +203,37 @@ async function run() {
   var haversineMetros = inter.sandbox.module.exports.haversineMetros;
   check('B5: haversineMetros(0,0,0,0) === 0', haversineMetros(0, 0, 0, 0) === 0);
 
-  // B6. resolverRadioM('museo',{},'x') entre 100 y 250.
+  // B6. TSK-111 (CAMBIO 4): el radio urbano bajo de 100 m a 50 m. El
+  // contrato real vive en api/interacciones.js: RADIO_DEFAULT_M=50;
+  // RADIO_POR_CATEGORIA={sitio:50,hostal:50,comida:50,evento:150};
+  // RADIO_POR_SUBCATEGORIA (urbanas 50, parque/concierto 150, festival/
+  // deporte 200, naturaleza/aventura 250); RURAL_KEYWORDS => 250 y se
+  // evalua ANTES de la subcategoria. B6/B6b reflejan esos valores exactos
+  // (no se inventa ninguno).
   var resolverRadioM = inter.sandbox.module.exports.resolverRadioM;
   var radio = resolverRadioM('museo', {}, 'x');
-  check('B6: resolverRadioM(museo,{},x) entre 100 y 250',
-    typeof radio === 'number' && radio >= 100 && radio <= 250);
+  check('B6: resolverRadioM(museo,{},x) === 50 (default urbano)',
+    typeof radio === 'number' && radio === 50);
+  var casosRadio = [
+    ['urbana museo (subcategoria)', ['sitio', { subcategoria: 'museo' }, 'x'], 50],
+    ['urbana bar (subcategoria)', ['comida', { subcategoria: 'bar' }, 'x'], 50],
+    ['urbana exposicion (subcategoria)', ['sitio', { subcategoria: 'exposicion' }, 'x'], 50],
+    ['urbana espacio-publico (subcategoria)', ['sitio', { subcategoria: 'espacio-publico' }, 'x'], 50],
+    ['categoria sitio sin subcategoria', ['sitio', {}, 'x'], 50],
+    ['categoria evento', ['evento', {}, 'x'], 150],
+    ['parque (subcategoria)', ['sitio', { subcategoria: 'parque' }, 'x'], 150],
+    ['concierto (subcategoria)', ['sitio', { subcategoria: 'concierto' }, 'x'], 150],
+    ['festival (subcategoria)', ['sitio', { subcategoria: 'festival' }, 'x'], 200],
+    ['deporte (subcategoria)', ['sitio', { subcategoria: 'deporte' }, 'x'], 200],
+    ['naturaleza (subcategoria rural)', ['sitio', { subcategoria: 'naturaleza' }, 'x'], 250],
+    ['rural keyword sendero gana a la subcategoria',
+      ['sitio', { subcategoria: 'museo', tipo_actividad: 'sendero' }, 'x'], 250],
+    ['radio explicito tiene prioridad', ['sitio', { subcategoria: 'museo' }, 'x', 500], 500]
+  ];
+  casosRadio.forEach(function(c) {
+    var got = resolverRadioM(c[1][0], c[1][1], c[1][2], c[1][3]);
+    check('B6b: ' + c[0] + ' === ' + c[2], got === c[2]);
+  });
 
   // B7/B8. VOCACIONES: 4 items, todos nivel 5.
   var VOCACIONES = inter.sandbox.module.exports.VOCACIONES || [];

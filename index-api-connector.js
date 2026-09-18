@@ -379,6 +379,38 @@
       .catch(function (e) { console.warn('[index-api] Error multimedia mapa:', e.message); });
   }
 
+  // -- ALBUM OFICIAL (TSK-111 Fase 4): fotos curadas de un destino ------
+  // GET /api/interacciones?tipo=multimedia_mapa&destino_id=<uuid> agrega la
+  // clave album_oficial (max 12) al shape ya existente de la rama GET. Se
+  // consulta por uuid REAL de Neon (destino_id), nunca por slug. Devuelve
+  // SIEMPRE un array: uuid invalido, respuesta sin ok o caida de red
+  // degradan a [] (la promesa nunca se rechaza, para que el drawer no
+  // tenga que manejar errores ni dejar contenedores vacios).
+  var ALBUM_OFICIAL_UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+  function cargarAlbumOficialDestino(destinoUuid) {
+    var uuid = (destinoUuid == null) ? '' : String(destinoUuid).trim();
+    if (!ALBUM_OFICIAL_UUID_RE.test(uuid)) return Promise.resolve([]);
+    var url = '/api/interacciones?tipo=multimedia_mapa&destino_id='
+      + encodeURIComponent(uuid) + '&_t=' + Date.now();
+    return fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || d.ok !== true || !Array.isArray(d.album_oficial)) {
+          console.warn('[index-api] album_oficial no disponible:', (d && d.error) || 'vacio');
+          return [];
+        }
+        return d.album_oficial;
+      })
+      .catch(function (e) {
+        console.warn('[index-api] Error album oficial:', e.message);
+        return [];
+      });
+  }
+
+  // Expuesto al index.html (inline): el IIFE oculta el resto del modulo.
+  window.cargarAlbumOficialDestino = cargarAlbumOficialDestino;
+
   // Toggle "Solo mio": actualiza el flag global y recarga la capa.
   window.setMapaMediaSoloMio = function (valor) {
     window.MAPA_MEDIA_SOLO_MIO = (valor === true || valor === 'true');

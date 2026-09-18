@@ -3316,12 +3316,55 @@ function openMapaDrawer(place) {
   drawer.setAttribute('aria-hidden', 'false');
 }
 
+// TSK-111 Fase 4: seccion "Album oficial" (fotos curadas del destino) en el
+// drawer/visor del pin del mapa cultural. Reutiliza la grilla de album ya
+// existente (.md-album-head/.md-album-t/.md-album-loc/.md-album-grid/
+// .md-album-photo) y el visor mdFotoLightbox; no inventa estilos nuevos.
+// La API (window.cargarAlbumOficialDestino) solo se llama con uuid real de
+// Neon y degrada a []: si no hay uuid, si la respuesta no trae
+// album_oficial o si el array viene vacio, NO se inserta ningun contenedor
+// (el drawer/visor queda intacto, sin seccion vacia).
+function mdMapaAlbumOficial(destinoUuid, contenedorSel) {
+  if(!destinoUuid || typeof window.cargarAlbumOficialDestino !== 'function') return;
+  window.cargarAlbumOficialDestino(destinoUuid).then(function(fotos){
+    if(!fotos || !fotos.length) return;
+    var cont = document.querySelector(contenedorSel);
+    if(!cont) return;
+    // Dedupe: si ya se anexo sobre este mismo contenedor, no repetir.
+    if(cont.querySelector('.md-album-oficial')) return;
+    var celdas = '';
+    var n = 0;
+    for(var i = 0; i < fotos.length; i++) {
+      var f = fotos[i] || {};
+      var url = f.url || '';
+      if(!url) continue;
+      var cap = f.caption || '';
+      celdas += '<div class="md-album-cell">'
+        + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
+        + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
+        +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
+        + '</div></div>';
+      n++;
+    }
+    if(!n) return;
+    cont.insertAdjacentHTML('beforeend',
+      '<div class="md-album-oficial" style="margin-top:16px">'
+      + '<div class="md-album-head">'
+      + '<div class="md-album-t">\u00C1lbum oficial</div>'
+      + '<div class="md-album-loc">\uD83D\uDCF7 ' + n + ' fotos</div>'
+      + '</div><div class="md-album-grid">' + celdas + '</div></div>');
+  });
+}
+
 function openMapaMediaDrawer(item) {
   var drawer = document.getElementById('mapa-drawer');
   var cont = document.getElementById('md-content');
   if(!drawer || !cont || !item) return;
   // Album curado del destino: no es un medio individual, abre el visor
   // con la galeria completa de la ficha (mismo patron del album).
+  // TSK-111 Fase 4: aqui NO se anexa "Album oficial" a proposito --
+  // openMapaAlbumDestino ya lista destinos_fotos via galeria_destino, asi
+  // que duplicarlo seria redundante.
   if(item.origen === 'destino_album' && item.origen_id) {
     openMapaAlbumDestino(item);
     return;
@@ -3331,7 +3374,14 @@ function openMapaMediaDrawer(item) {
     if(typeof MAPA_PLACES !== 'undefined') {
       MAPA_PLACES.forEach(function(p){ if(p.slug === item.origen_id) found = p; });
     }
-    if(found) { openMapaDrawer(found); return; }
+    if(found) {
+      openMapaDrawer(found);
+      // TSK-111 Fase 4: el item de MAPA_MEDIA solo trae slug en origen_id
+      // (el backend no emite el uuid del destino); se resuelve con
+      // _uuidDeSlug y, si no hay uuid, no se anexa nada.
+      mdMapaAlbumOficial(_uuidDeSlug(String(item.origen_id)), '#md-content');
+      return;
+    }
   }
   var html = '<div class="md-feat">';
   // FIX 2: el onerror de antes destruia el contenedor con

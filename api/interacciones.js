@@ -1,4 +1,5 @@
-// api/interacciones.js  v19 (ADR-036: compartir con XP por primer share + media unificada votos/comentarios/guardados; base v18 ADR-035 XP numeric(12,2))
+// api/interacciones.js  v20 (ADR-036: compartir con XP por primer share + media unificada votos/comentarios/guardados; base v18 ADR-035 XP numeric(12,2))
+// TSK-111 (v20): radio urbano 50m (CAMBIO 4) + album_oficial en multimedia_mapa (CAMBIO 8)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
 // v19 requiere migraciones 022_media_compartidos.sql y
 // 023_interacciones_media_unificadas.sql aplicadas en Neon ANTES del deploy.
@@ -129,15 +130,20 @@ var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 
 // El gate de album_crear usa calcularNivelLocal (antes Math.floor/100+1).
 // NUEVA rama GET tipo=pandilla_ranking (global por fama_total DESC, con
 // miembros_activos y fallback 42703). Cero endpoints nuevos (8/8).
+// TSK-111 (v20, CAMBIO 4): radio de verificacion urbano reducido de 100 m a
+// 50 m. Bajan SOLO el default y las subcategorias urbanas; el campo rural
+// (RURAL_KEYWORDS -> 250), parque 150, concierto 150, festival 200 y
+// deporte 200 se mantienen. ACCURACY_MAX_M (150 m) NO cambia: es un
+// chequeo de precision GPS, independiente del radio del lugar.
 var TIERRA_RADIO_M = 6371008.8;
-var RADIO_DEFAULT_M = 100;
-var RADIO_POR_CATEGORIA = { sitio: 100, hostal: 100, comida: 100, evento: 150 };
+var RADIO_DEFAULT_M = 50;
+var RADIO_POR_CATEGORIA = { sitio: 50, hostal: 50, comida: 50, evento: 150 };
 var RADIO_POR_SUBCATEGORIA = {
   naturaleza: 250, aventura: 250, parque: 150,
-  'espacio-publico': 100, 'sitio-historico': 100, museo: 100, cultura: 100,
-  religioso: 100, bar: 100, restaurante: 100, cafe: 100, gastrobar: 100,
-  'comida-rapida': 100, dulces: 100, concierto: 150, festival: 200,
-  teatro: 100, exposicion: 100, deporte: 200, cine: 100, fiesta: 100
+  'espacio-publico': 50, 'sitio-historico': 50, museo: 50, cultura: 50,
+  religioso: 50, bar: 50, restaurante: 50, cafe: 50, gastrobar: 50,
+  'comida-rapida': 50, dulces: 50, concierto: 150, festival: 200,
+  teatro: 50, exposicion: 50, deporte: 200, cine: 50, fiesta: 50
 };
 var RURAL_KEYWORDS = ['sendero', 'mirador', 'finca', 'cabana', 'glamping',
   'rural', 'ecotur', 'natural', 'playa', 'montana', 'refugio', 'cascada',
@@ -4311,6 +4317,17 @@ module.exports = async function handler(req, res) {
             mmUsuarioId = mmUsuarioStr;
         }
         if (!mmScopeMio) mmUsuarioId = null;
+        // TSK-111 (CAMBIO 8): destino_id OPCIONAL para el album oficial
+        // del pin del mapa. Se valida con la MISMA regex uuid inline que
+        // usuario_id: si no viene o no es uuid, se ignora y la respuesta
+        // degrada a album_oficial: [] (sin 400, tolerante).
+        var mmDestinoId = null;
+        var mmDestinoRaw = req.query.destino_id;
+        if (mmDestinoRaw !== undefined && mmDestinoRaw !== null) {
+          var mmDestinoStr = String(mmDestinoRaw).trim();
+          if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mmDestinoStr))
+            mmDestinoId = mmDestinoStr;
+        }
         // En un UNION ALL los $N son COMPARTIDOS entre ambas ramas. El
         // indice real de cada parametro se captura al apilarlo
         // (mmIdxTipos/mmIdxCiudad/mmIdxUsuario) y se reutiliza en las 2
@@ -4421,7 +4438,26 @@ module.exports = async function handler(req, res) {
             });
           });
         }
-        return res.status(200).json({ ok: true, data: multimediaRows, tipos_aplicados: mmTiposAplicados });
+
+        // TSK-111 (CAMBIO 8): album_oficial del destino para el drawer del
+        // pin del mapa cultural. Query INDEPENDIENTE del UNION ALL (usa su
+        // propio $1) y solo corre con un destino_id uuid valido. Degrada a
+        // [] si la tabla no existe en Neon (42P01/42703) y NUNCA tumba la
+        // rama. Nota ADR-006: @neondatabase/serverless resuelve sql(...)
+        // como ARRAY de filas (no {rows}), igual que el resto del archivo.
+        // El shape de data/tipos_aplicados NO cambia: solo se agrega clave.
+        var mmFotosOficiales = [];
+        if (mmDestinoId) {
+          mmFotosOficiales = await conDegradacionMedia(sql(
+            'SELECT id, url, caption, orden FROM destinos_fotos'
+            + ' WHERE destino_id = $1::uuid'
+            + ' ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST'
+            + ' LIMIT 12',
+            [mmDestinoId]
+          ), 'destinos_fotos', []);
+          if (!Array.isArray(mmFotosOficiales)) mmFotosOficiales = [];
+        }
+        return res.status(200).json({ ok: true, data: multimediaRows, tipos_aplicados: mmTiposAplicados, album_oficial: mmFotosOficiales });
       }
 
       // Feed de fotos recientes de albumes

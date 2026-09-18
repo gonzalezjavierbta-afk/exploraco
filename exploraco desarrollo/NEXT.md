@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-111 / ADR-037 Geocerca con radio urbano 50 m + `album_oficial` en el mapa cultural + limpieza de modulos del admin + refactor de hero/galeria de la ficha (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+335/-298) + 1 archivo nuevo sin versionar (`PROMPT_OPENCODE_TSK111.md`): `admin.html` (+49/-82; "Que incluye el precio" retirado del admin/render, UI "Orden de modulos" eliminada con `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`, seccion "Operacion" eliminada con `f-capacidad` movido a General, `f-comotransporte` eliminado end-to-end, `moverFila`/`moveFaqRow`); `api/interacciones.js` (+44/-8; header v19 -> v20: `RADIO_DEFAULT_M`/`RADIO_POR_CATEGORIA` 100 -> 50 y subcategorias urbanas a 50, rural 250/parque-concierto 150/festival-deporte 200 intactos, `ACCURACY_MAX_M=150` y bloqueo 422 intactos, `album_oficial` en `multimedia_mapa`); `api/pagina-destino.js` (+121/-194; header v11: guard `edad_minima` con trim, hero botonera en 2 filas `.hctar-row` + grid 1+3 + `abrirLightboxHero`, "Fotos de viajeros" retirado, CTA "Ver todas las fotos"); `index-api-connector.js` (+32/-0; `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`); `index.html` (+51/-1; `mdMapaAlbumOficial`, solo rama `origen='destino'`); `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10) actualizados. Presupuesto 8/8 INTACTO (ADR-001); TSK-111 NO genera migraciones. Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES: `node --check` 8/8 api, ASCII 0/0/0 en `api/interacciones.js`, balance DIVs admin hostal/comida/sitio/evento = 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS (`smoke_test_epic_prompt` 4 FAIL PREEXISTENTES ajenos, DQ-2). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar las migraciones 019, 020, 021, 022 y 023 en Neon (las aplica Javier) ANTES del deploy; despues, commit/push/deploy de los 7 archivos + este cierre documental en un solo release.**
 - TSK-110 / ADR-036 Compartir social con XP (primer share 25 / posteriores 5, tope 10 eventos y 50 XP por 24h) + interacciones de media unificadas (votos/comentarios/guardados en `media_*`) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+1379/-536) + 5 archivos nuevos sin versionar: `api/interacciones.js` (+949/-425; header `v18` -> `v19`: rama POST `compartir` con `validarSesion` y ledger en `media_compartidos`, 3 misiones + 3 logros nuevos, `media_voto`/`media_comentar`/GET `media_interacciones`/`media_comentarios`, alias legacy conservados, TODOS los lectores migrados a `media_*`, `galeria_destino` `items[]` v2 con `fuente`/`votos`/`comentarios`/`ya_votado`/`ya_guardado`/`tipo_voto:'media'`); `galeria.html` (+222/-32; 5 secciones en modo destino + modales VOTAR/GUARDAR/COMPARTIR + comentarios por 3 fuentes); `album-comments.js` (+92/-33; v2.0.0, `mount(target,{fuente,itemId},opts)` retrocompatible); `index.html` (+50/-17; insignia `compartido` derivada del catalogo real de logros); `api/pagina-destino.js` (+40/-27; hero mosaico 1+3 y boton Compartir en `.subnav`); `usuario-session.js` (+24/-0; `aplicarResultadoXp`); `comunidad.html` y `mi-perfil.html` (+1/-1 cada uno: solo cache-bust `album-comments.js?v=2`). NUEVOS: `compartir.js` (295 lineas, `window.ExploraCompartir`), `db/migrations/022_media_compartidos.sql` (131), `db/migrations/023_interacciones_media_unificadas.sql` (408), `scripts/smoke_036_compartir.js` (290) y `scripts/smoke_036_media_unificada.js` (361). Presupuesto 8/8 INTACTO (ADR-001); catalogo real HOY 39 misiones / 33 logros. Verificacion: `node --check` 7/7 OK, ASCII-safe 0 >127 / 0 backticks en `api/*.js`, `compartir.js` y migraciones, smokes 55/55 y 71/71 PASS (mock). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 022 y 023 en Neon ANTES del deploy del backend v19; los smokes NO validan Neon.**
 - TSK-109 / ADR-035 XP decimal `numeric(12,2)` + pestana "Clase" consolidada + rankings de comunidad (Casas/Facciones/Parches) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 10 archivos de codigo modificados (+700/-282) + 1 migracion nueva + 1 preflight nuevos sin versionar (mas `DECISIONS.md` +249/-1 agregado por architect): `db/migrations/021_xp_decimal.sql` (NUEVA, 121 lineas, idempotente ADR-008, ASCII-safe ADR-002; 9 columnas XP -> `numeric(12,2)` con guard `information_schema`, sin indices) + `scripts/verify_021_precheck.js` (NUEVO, read-only, `MIN/MAX/COUNT`); `api/interacciones.js` (+185/-98; header v18: `red2`/half-up, `parseFloat`/`Number`, rama GET `pandilla_ranking` L4257-4284, gate de `album_crear` con `calcularNivelLocal` L5379, guarda de fama `<= 0` L1880-1881); `api/usuarios.js` (+102/-40; header v15: `casa_ranking` con `miembros_activos` y `ORDER BY xp_total DESC` L510-557, rankings sin `::int`); `comunidad.html` (+195/-43; tab Ranking con 4 sub-vistas Viajeros|Casas|Facciones|Parches L372-386, `setRankingVista` L1661, facciones fuera de "Activo Oculto"); `mi-perfil.html` (+101/-50; tab `clase` con arbol + sub-vista `senderos` + vocaciones inline + Mi Casa compacto); `usuario-session.js` (+39/-19; helper `window.ExploraCO.fmtXp`/`redondearXp` L46-60); `api/admin.js` (+29/-14); `admin.html` (+20/-9); `index.html` (+15/-5); `perfil.html` (+9/-1); `api/pagina-destino.js` (+5/-3; header v10). Presupuesto 8/8 INTACTO (ADR-001). BUG-042 pasa a CORREGIDO y se registra BUG-063 (guarda de fama de Parche); deuda de columnas no versionadas (`usuarios.activo`/`ultimo_acceso`/`interacciones.xp_ganado`) anotada con fallback 42703. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar la migracion 021 en Neon ANTES del deploy del backend; desplegar en 2 releases (backend + 021 primero, frontend despues). Checklist en `docs/DEPLOY_021.md`.**
 - TSK-108 / ADR-034 Ficha de destino: hero de 4 fotos, `destinos.sintro` curada, galeria 1+12 y `galeria.html` con 4 secciones + orden de modulos por hostal (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 6 archivos modificados (+663/-95) + 1 migracion nueva: `api/pagina-destino.js` (+283/-65: hero `HERO_THUMBS_MAX=3`, botonera sin "Ver galeria", `sintro` con fallback, galeria 1+12 con `GAL_THUMBS_MAX=12`/6+6 y `.gal-thumbs` 4/2/1, orden de modulos hostal por `tags.orden_modulos`); `api/interacciones.js` (+46/-0: GET `mapas_de_destino` con `validarSesion` para el viewer); `api/admin-destinos.js` (+19/-3: `sintro` en SELECT/INSERT/UPDATE + `normSintro`); `api/publicar-lugar.js` (+12/-2: `sintro` en el INSERT draft); `admin.html` (+150/-5: `#f-sintro`, `HOSTAL_MODULOS_ORDEN_DEFAULT`, reorden por flechas de modulos hostal + Actividades); `galeria.html` (+153/-20: 4 secciones + bloque de subida + `mapas_de_destino`); NUEVA `db/migrations/020_destinos_sintro.sql` (16 lineas, `ADD COLUMN IF NOT EXISTS sintro TEXT`, idempotente ADR-008, ASCII-safe ADR-002). Presupuesto 8/8 INTACTO (ADR-001). ADR-030 actualizado (hero 12->4, CTA "Ver galeria" retirado solo del hero). BUG-062 DETECTADO/PENDIENTE (fotos Unsplash no recolectadas por `getPhotos()`). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar migracion 020 en Neon + commit/push/deploy de los 6 archivos.**
@@ -37,6 +38,92 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-111 "Geocerca 50 m, album_oficial en el mapa, limpieza del admin y refactor de hero/galeria" (2026-09-17) - ADR-037
+
+Tarea TSK-111 implementada en working tree (SIN commitear). La decision consolidada
+vive en `DECISIONS.md` ADR-037, con NOTA DE ENMIENDA fechada en ADR-024 (radios
+urbanos) y ADR-034 (hero/galeria/orden de modulos); la tarea en `TASKS.md` TSK-111.
+NO hay archivos nuevos en `api/` (8/8 intacto, ADR-001) y **NO hay migraciones
+nuevas**: TSK-111 es solo logica de aplicacion, UI y constantes.
+
+**Cambios (verificados contra archivo real, ADR-006; `git diff --numstat` = 7
+archivos modificados, +335/-298, mas 1 archivo nuevo):**
+- `admin.html` (+49/-82): se retira "Que incluye el precio" de la UI; se elimina el
+  control "Orden de modulos" dejando `#hostal-modulos-list` OCULTO (L1234,
+  `display:none aria-hidden`) para PRESERVAR `tags.orden_modulos`; se elimina la
+  seccion "Operacion" y `f-capacidad` se reubica en la pestana General
+  (`#fpanel-general`, L813-818); `f-comotransporte` (codigo muerto) se elimina
+  end-to-end; FAQ estrena Subir/Bajar (`moveFaqRow` L3253) sobre el generico
+  `moverFila` L3234 (Actividades ya lo tenia).
+- `api/interacciones.js` (+44/-8; header v19 -> v20): `RADIO_DEFAULT_M` 100 -> 50
+  (L139) y `RADIO_POR_CATEGORIA` `sitio/hostal/comida` 100 -> 50 (L140; `evento` 150
+  intacto); subcategorias URBANAS a 50 (L141-147); rural 250, parque 150, concierto
+  150, festival 200 y deporte 200 intactos; `ACCURACY_MAX_M=150` (L151) y bloqueo 422
+  intactos. `album_oficial`: la rama `multimedia_mapa` acepta `?destino_id=<uuid>`
+  validado con regex uuid inline (L4324-4330) y agrega la clave aditiva con la query
+  a `destinos_fotos` envuelta en `conDegradacionMedia` (L4449-4460).
+- `api/pagina-destino.js` (+121/-194; header v11): guard de `edad_minima` con
+  `String(...).trim() !== ''` (L1690); hero botonera en 2 filas (`.hctar-row`
+  L189/L2342-2343) con grid 1+3; imagenes del hero clickeables al lightbox existente
+  (`abrirLightboxHero` L2577); "Fotos de viajeros" retirado (`loadFotos`/`subirFoto`/
+  `votarFoto` + CSS `fp-*`; L2079/L2600); CTA renombrado a "Ver todas las fotos"
+  (L1571-1572).
+- `index-api-connector.js` (+32/-0): `cargarAlbumOficialDestino` y su export
+  `window.cargarAlbumOficialDestino` (L391/L412), que degrada con `console.warn` sin
+  romper el mapa.
+- `index.html` (+51/-1): `mdMapaAlbumOficial` (L3327) y su llamada solo en la rama
+  `origen='destino'` (L3382).
+- `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y
+  `scripts/smoke_auditoria_pagina_destino.js` (+9/-10): smokes actualizados por el
+  cambio de radio y por el retiro de modulos de la ficha.
+
+**Decisiones de producto:** el radio urbano baja a 50 m manteniendo el accuracy maximo
+en 150 m (son chequeos independientes); el album oficial del pin viaja como clave
+aditiva `album_oficial` de la rama existente (cero endpoints nuevos); el orden de
+modulos guardado NO se pierde al retirar la UI (nodo oculto); la galeria de viajeros
+se consolida en `galeria.html` (TSK-110). Detalle en ADR-037.
+
+**Verificacion (ADR-006):** Escudo GOLD (qa-auditor) **APTO CON OBSERVACIONES**:
+`node --check` 8/8 en `api/*.js`; `api/interacciones.js` ASCII 0/0/0; balance de DIVs
+de `admin.html` (hostal/comida/sitio/evento) = 0; smokes `check_buildHTML_inline`,
+`smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS.
+`smoke_test_epic_prompt` mantiene 4 FAIL PREEXISTENTES ajenos (DQ-2). Deuda ASCII
+preexistente (no de TSK-111): `api/pagina-destino.js:2431` (1 doble-escape, BUG-002)
+y `api/utilidades.js` (H8).
+
+#### Que sigue
+1. **APLICAR EN NEON las migraciones pendientes 019, 020, 021, 022 y 023
+   (BLOQUEANTE, lo ejecuta Javier, ANTES del deploy).** Correr cada archivo COMPLETO
+   en el editor SQL de Neon (idempotentes ADR-008) y sus preflights read-only.
+   **TSK-111 NO agrega migraciones**; este bloque es el mismo arrastre de
+   TSK-107..TSK-110.
+2. **Deploy en orden:** 019-023 en Neon -> backend (`api/interacciones.js` v20,
+   `api/pagina-destino.js` v10) -> frontend (`admin.html`, `index-api-connector.js`,
+   `index.html`) -> smokes.
+3. **Commit + push en un solo release:** los 7 archivos modificados + los pendientes
+   de TSK-107..TSK-110 sin commitear + este cierre documental (`TASKS.md`, `NEXT.md`,
+   `DECISIONS.md`). NO mezclar los 3 archivos borrados ajenos (`PROMPT.md`,
+   `prompt_exploraco_tsk104.md`, `promptarreglos.txt`).
+4. **Verificacion en vivo:** "Estuve aqui" a <= 50 m en un destino urbano y rechazo
+   422 fuera del radio/accuracy; `album_oficial` visible en el drawer del pin del
+   mapa; chip de `edad_minima` ausente si el campo esta vacio; hero con botonera en 2
+   filas, grid 1+3 y lightbox; ausencia de "Que incluye el precio", "Orden de modulos"
+   y "Operacion"; FAQ reordenable con Subir/Bajar.
+5. **Backlog:** resolver BUG-061 y BUG-062; decidir si el nodo `#hostal-modulos-list`
+   oculto se elimina en una tarea de limpieza (hoy se conserva para preservar el
+   dato); eliminar de verdad `f-comotransporte` si algun dia reaparece en un merge.
+
+#### Riesgos activos
+- **Migraciones 019-023 pendientes (BLOQUEANTE):** sin ellas el backend de TSK-110
+  (v19/v20) y las rutas de media/compartir degradan o fallan; TSK-111 no las empeora
+  pero tampoco puede desplegarse de forma aislada.
+- **Radio urbano de 50 m mas estricto:** el GPS en interiores/canonadas puede quedar
+  fuera; el frontend ya envia `accuracy` y el 422 `PRECISION_INSUFICIENTE` sigue
+  vigente, pero la friccion de "Estuve aqui" sube en destinos urbanos.
+- **`#hostal-modulos-list` oculto pero presente:** es deliberado (preserva
+  `tags.orden_modulos`), aunque deja DOM muerto hasta una limpieza futura.
+- **BUG-061 y BUG-062 siguen ABIERTOS** (no relacionados con TSK-111).
 
 ### Sesion TSK-110 "Compartir social con XP + interacciones de media unificadas" (2026-09-17) - ADR-036
 

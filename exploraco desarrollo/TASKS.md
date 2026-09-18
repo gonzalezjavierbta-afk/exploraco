@@ -3002,5 +3002,62 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-111: Geocerca con radio urbano de 50 m, `album_oficial` en el mapa cultural, limpieza de modulos del admin y refactor de hero/galeria de la ficha de destino [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-17, implementada en working tree, SIN commitear). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar las migraciones pendientes 019, 020, 021, 022 y 023 en Neon (las aplica Javier; cada archivo COMPLETO en una corrida) ANTES del deploy; despues, commit/push/deploy de los 7 archivos modificados + este cierre documental en un solo release. TSK-111 NO genera migraciones.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-17
+- **ADR:** DECISIONS.md ADR-037 (NUEVO, consolidado de TSK-111) + NOTA DE ENMIENDA fechada en ADR-024 (radios urbanos) y ADR-034 (hero/galeria/orden de modulos); las decisiones no se duplican aqui.
+- **Responsable:** build (implementacion) + admin-dev/renderer-dev/backend-dev/js-silo-dev (ejecucion delegada) + docs-keeper (cierre documental).
+- **Precedencia:** continua a TSK-110 / ADR-036; `api/interacciones.js` pasa de v19 a v20 (header real L1-2) y `api/pagina-destino.js` pasa de v10 a v11 (header real L1-10, con el changelog de TSK-111).
+- **Relacion con bugs:** NO cierra BUG-061 (`POST tipo='foto'` sin `validarSesion`; sigue ABIERTO y escalado a `sql-security`) ni BUG-062 (fotos Unsplash en `admin.html`). No abre bug nuevo: la deuda ASCII detectada es PREEXISTENTE (`BUG-002` en `api/pagina-destino.js:2431` y H8 en `api/utilidades.js`), no introducida por TSK-111.
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006; `git diff --numstat` = 7 archivos modificados, +335/-298, mas 1 archivo nuevo sin versionar; TSK-111 NO genera migraciones):**
+
+  1. **CAMBIO 4 - radio de geocerca urbano 100 m -> 50 m.** `RADIO_DEFAULT_M` 100->50 (`api/interacciones.js` L139) y `RADIO_POR_CATEGORIA` `sitio/hostal/comida` 100->50 (L140; `evento` 150 intacto); las subcategorias URBANAS bajan a 50 (`espacio-publico`, `sitio-historico`, `museo`, `cultura`, `religioso`, `bar`, `restaurante`, `cafe`, `gastrobar`, `comida-rapida`, `dulces`, `teatro`, `exposicion`, `cine`, `fiesta`); rural 250, parque 150, concierto 150, festival 200 y deporte 200 INTACTOS. `ACCURACY_MAX_M=150` (L151) y su bloqueo 422 `PRECISION_INSUFICIENTE` SIN cambios (el accuracy es un chequeo de precision GPS, independiente del radio del lugar).
+  2. **CAMBIO 8 - `album_oficial` en `multimedia_mapa`.** La rama GET `?tipo=multimedia_mapa` acepta `?destino_id=<uuid>` validado con la MISMA regex uuid inline de `usuario_id` (ausente o invalido = se ignora, sin 400); query INDEPENDIENTE del UNION ALL a `destinos_fotos` (`SELECT id,url,caption,orden ... WHERE destino_id=$1::uuid ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST LIMIT 12`) envuelta en `conDegradacionMedia` (42P01/42703 -> `[]`); la respuesta agrega la clave aditiva `album_oficial` (`api/interacciones.js` L4324-4330 y L4449-4460). Cliente: `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino` (`index-api-connector.js` L391/L412) y `mdMapaAlbumOficial` (`index.html` L3327, solo rama `origen='destino'` L3382).
+  3. **CAMBIO 2 - guard de `edad_minima`.** El chip de edad minima solo se pinta si `String(...).trim() !== ''` (`api/pagina-destino.js` L1690); el campo sigue existiendo y siendo editable en el admin.
+  4. **CAMBIO 3A - "Que incluye el precio" eliminado** de la UI del admin y del render publico. NO se toco la mision `mis_nomada_digital` ni los seeds: el legacy convive.
+  5. **CAMBIO 3B - UI "Orden de los modulos" eliminada.** El elemento `#hostal-modulos-list` queda OCULTO (`style="display:none" aria-hidden="true"`, `admin.html` L1234) para PRESERVAR el orden guardado (no se pierde el dato); `tags.orden_modulos` y la logica de ensamblado siguen vivos.
+  6. **CAMBIO 3C - seccion "Operacion" eliminada;** `f-capacidad` reubicado en la pestana General (`#fpanel-general`, `admin.html` L813-818); `f-comotransporte` (codigo muerto) eliminado end-to-end.
+  7. **CAMBIO 1 - reordenamiento en el admin.** Actividades ya tenian Subir/Bajar; se anadieron a FAQ (`moveFaqRow` L3253 sobre el generico `moverFila` L3234).
+  8. **CAMBIO 5/6/7A/7B - hero y galeria de la ficha.** Hero botonera en 2 filas (`.hctar-row`, `api/pagina-destino.js` L189/L2342-2343); grid hero 1+3; imagenes del hero clickeables al lightbox existente (`abrirLightboxHero` L2577) con votos/comentarios placeholder/2 CTAs a galeria; eliminado "Fotos de viajeros" (`loadFotos`/`subirFoto`/`votarFoto` + CSS `fp-*`; L2079/L2600) y CTA renombrado a "Ver todas las fotos" (L1571-1572).
+
+- **Archivos en el working tree (SIN commitear; `git diff --numstat`):**
+  - `admin.html` (+49/-82): modulos retirados de la UI, `#hostal-modulos-list` oculto, `f-capacidad` en General, `moverFila`/`moveFaqRow`.
+  - `api/interacciones.js` (+44/-8; header v20): radio urbano 50 m + `album_oficial`.
+  - `api/pagina-destino.js` (+121/-194; header v11): guard `edad_minima`, hero 2 filas 1+3 + lightbox, modulos retirados, CTA "Ver todas las fotos".
+  - `index-api-connector.js` (+32/-0): `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`.
+  - `index.html` (+51/-1): `mdMapaAlbumOficial` (solo rama `origen='destino'`).
+  - `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3): smoke actualizado por el cambio de radio / conteos.
+  - `scripts/smoke_auditoria_pagina_destino.js` (+9/-10): smoke actualizado por el retiro de modulos de la ficha.
+  - NUEVO sin versionar: `PROMPT_OPENCODE_TSK111.md` (449 lineas, prompt de la tarea; no es artefacto de producto).
+  - **Sin migraciones nuevas** (TSK-111 no genera SQL; las 019-023 pendientes son de TSK-107..110).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001 / ADR-010). Cero archivos nuevos en `api/`; `album_oficial` entra como clave aditiva de la rama `?tipo=multimedia_mapa`.
+
+- **Evidencia (ADR-006, verificada en esta sesion documental el 2026-09-17):**
+  - Headers reales: `api/interacciones.js` v20 (`// api/interacciones.js  v20 ...` L1 y `TSK-111 (v20)` L2); `api/pagina-destino.js` v11 con changelog TSK-111 L1-10.
+  - Anclas reales: `api/interacciones.js` L139 (`RADIO_DEFAULT_M = 50`), L140 (`RADIO_POR_CATEGORIA = { sitio: 50, hostal: 50, comida: 50, evento: 150 }`), L141-147 (`RADIO_POR_SUBCATEGORIA`), L151 (`ACCURACY_MAX_M = 150`), L4324-4330 (regex uuid de `destino_id`), L4449-4460 (`album_oficial`); `api/pagina-destino.js` L189 (`.hctar-row`), L820/L2577 (`abrirLightboxHero`), L1571-1572 (CTA "Ver todas las fotos"), L1690 (guard), L2079/L2600 ("Fotos de viajeros" retirado); `admin.html` L816 (`f-capacidad`), L1234 (`#hostal-modulos-list` oculto), L3234/L3253 (`moverFila`/`moveFaqRow`); `index-api-connector.js` L391/L412; `index.html` L3327/L3382.
+  - **Escudo GOLD (qa-auditor): APTO CON OBSERVACIONES.** `node --check` 8/8 en `api/*.js`; `api/interacciones.js` ASCII 0/0/0 (bytes >127, backticks, doble-escape); balance de DIVs de `admin.html` (hostal/comida/sitio/evento) = 0; smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS.
+  - `smoke_test_epic_prompt` mantiene **4 FAIL PREEXISTENTES** ajenos a esta entrega (deuda DQ-2 registrada en `BUGS_HISTORICOS.md:1115-1118`).
+  - **Deuda ASCII preexistente (NO introducida por TSK-111):** `api/pagina-destino.js:2431` (1 doble-escape, BUG-002) y `api/utilidades.js` (H8).
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. **Aplicar en Neon las migraciones pendientes 019, 020, 021, 022 y 023** (cada archivo COMPLETO en una corrida; idempotentes ADR-008, patron BUG-021/BUG-060): `db/migrations/019_media_guardados_radio.sql` (TSK-107), `020_destinos_sintro.sql` (TSK-108), `021_xp_decimal.sql` (TSK-109), `022_media_compartidos.sql` y `023_interacciones_media_unificadas.sql` (TSK-110). **TSK-111 NO agrega migraciones.**
+  2. **Commit + push + deploy en un solo release** de los 7 archivos modificados (`admin.html`, `api/interacciones.js`, `api/pagina-destino.js`, `index-api-connector.js`, `index.html`, `scripts/smoke_016_multinivel_crowdsourcing.js`, `scripts/smoke_auditoria_pagina_destino.js`) + los pendientes de TSK-107..TSK-110 sin commitear + este cierre documental. NO mezclar los 3 archivos borrados ajenos (`PROMPT.md`, `prompt_exploraco_tsk104.md`, `promptarreglos.txt`).
+  3. **Verificacion en vivo:** "Estuve aqui" a <= 50 m en un destino urbano y rechazo 422 fuera del radio/accuracy; `album_oficial` visible en el drawer del pin del mapa; chip de `edad_minima` ausente cuando el campo esta vacio; hero con botonera en 2 filas, grid 1+3 y lightbox; ausencia de "Que incluye el precio", de la UI "Orden de modulos" y de "Operacion" en Contacto; FAQ reordenable con Subir/Bajar.
+
+- **Hallazgos / pendientes derivados:**
+  - **`#hostal-modulos-list` se conserva OCULTO a proposito:** el control visual se retiro (CAMBIO 3B) pero el nodo queda en el DOM con `display:none` para no perder `tags.orden_modulos` guardado; la logica de lectura/ensamblado sigue activa.
+  - **Drift del prompt vs implementacion (ADR-006):** `PROMPT_OPENCODE_TSK111.md` especificaba radio 30 m; la implementacion real uso 50 m. El prompt (untracked) se alineo a 50 m en este cierre documental.
+  - **`f-comotransporte` era codigo muerto:** se elimino end-to-end sin contraparte en backend.
+  - **BUG-061 ABIERTO:** `POST tipo='foto'` sin `validarSesion` (escalado a `sql-security`); **BUG-062 ABIERTO:** fotos Unsplash no recolectadas por `getPhotos()` en `admin.html`.
+  - **Deuda ASCII preexistente:** el doble-escape de `api/pagina-destino.js:2431` (BUG-002) y el baseline no-ASCII de `api/utilidades.js` (H8) siguen ahi; no son de TSK-111.
+
+- **Fuera de alcance:** migraciones SQL (TSK-111 no genera ninguna); BUG-061 y BUG-062; `galeria.html`, `compartir.js` y `album-comments.js` (pertenecen a TSK-110); `api/usuarios.js`, `api/admin.js`, `api/utilidades.js`, `api/destinos.js` y `api/publicar-lugar.js`; verificacion en vivo (post-deploy).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

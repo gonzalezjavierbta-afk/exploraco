@@ -589,6 +589,14 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 
 **ADR previos relacionados:** ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline de verdad), ADR-008 (SQL versionado), ADR-010 (presupuesto 8/8), ADR-012 (gamificacion/logros), ADR-014 (Milestones v2), ADR-018 (Gamificacion v4.0), ADR-022 (indices/constraints de interacciones)
 
+**NOTA DE ENMIENDA (TSK-111, 2026-09-17) -- ajusta los radios urbanos, NO la decision de presencia fisica:**
+- **Radio urbano 100 m -> 50 m.** `RADIO_DEFAULT_M` pasa de 100 a 50 y `RADIO_POR_CATEGORIA` de `sitio`/`hostal`/`comida` pasa de 100 a 50; las subcategorias URBANAS bajan a 50 (`espacio-publico`, `sitio-historico`, `museo`, `cultura`, `religioso`, `bar`, `restaurante`, `cafe`, `gastrobar`, `comida-rapida`, `dulces`, `teatro`, `exposicion`, `cine`, `fiesta`). Anclas: `api/interacciones.js` L139-147.
+- **SIN cambios:** rural (`RURAL_KEYWORDS` -> 250), `parque` 150, `concierto` 150, `festival` 200 y `deporte` 200 siguen iguales; el radio explicito por lugar (`destinos.radio_m`, ADR-033) conserva su prioridad absoluta.
+- **`ACCURACY_MAX_M = 150` y el bloqueo 422 `PRECISION_INSUFICIENTE` NO cambian:** el accuracy es un chequeo de precision del GPS, independiente del radio del lugar.
+- **Motivo:** la geocerca urbana de 100 m permitia marcar la visita sin estar realmente en el lugar; se endurece a 50 m conservando los radios amplios para naturaleza/parques/eventos. Decision consolidada en **ADR-037** (`api/interacciones.js` v20).
+
+**ADRs relacionados de esta enmienda:** ADR-024 (esta misma), ADR-033 (radio explicito por lugar), ADR-037 (consolidado de TSK-111).
+
 ---
 
 ## ADR-025: Sesion Firmada (JWT HMAC SHA-256) y Anti-Sybil (nonce de un solo uso, device fingerprint, email verificado)
@@ -1032,6 +1040,16 @@ Ademas, en `api/interacciones.js` el catch final mapea `err.code === '23505'` a 
 
 **ADRs relacionados:** ADR-001 (presupuesto 8/8 de Vercel Hobby), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-016 (subcategorias y orden condicional), ADR-021 (capa publica de media), ADR-025 (sesion firmada / `validarSesion` para el `viewer`), ADR-030 (galeria unificada y `items[]`; esta ADR ajusta su hero de 12 a 4 fotos y retira el CTA del hero), ADR-031 (visibilidad publica del mapa), ADR-033 (radio; misma familia de configuracion por lugar).
 
+**NOTA DE ENMIENDA (TSK-111, 2026-09-17) -- ajusta la UI de la ficha, NO la decision de hero/galeria:**
+- **UI "Orden de modulos" retirada (no el dato):** el control visual del admin se elimina, pero `#hostal-modulos-list` queda OCULTO (`style="display:none" aria-hidden="true"`, `admin.html` L1234) para PRESERVAR el orden guardado; `tags.orden_modulos` y la logica de ensamblado de modulos siguen vivos. El orden queda "congelado" hasta una limpieza futura.
+- **"Que incluye el precio" eliminado** de la UI del admin y del render publico (`api/pagina-destino.js`); la mision `mis_nomada_digital` y sus seeds NO se tocan (el legacy convive).
+- **Seccion "Operacion" eliminada:** `f-capacidad` reubicado en la pestana General (`#fpanel-general`); `f-comotransporte` (codigo muerto) eliminado end-to-end.
+- **Hero:** botonera en 2 filas (`.hctar-row`), grid 1+3 y las imagenes del hero abren el lightbox existente (`abrirLightboxHero`) con votos/comentarios placeholder y 2 CTAs a galeria.
+- **Galeria:** "Fotos de viajeros" se retira de la ficha (`loadFotos`/`subirFoto`/`votarFoto` + CSS `fp-*`) y se consolida en `galeria.html`; el CTA se renombra a "Ver todas las fotos".
+- **Ajuste de radio urbano relacionado:** ver la NOTA DE ENMIENDA de ADR-024 y el consolidado ADR-037.
+
+**ADRs relacionados de esta enmienda:** ADR-024 (radios urbanos), ADR-030 (galeria unificada que esta ADR ajusto), ADR-034 (esta misma), ADR-037 (consolidado de TSK-111).
+
 ---
 
 ## ADR-035: XP decimal con `numeric(12,2)` y rankings de comunidad (Casas por XP total, Parches global, sub-vistas de Ranking)
@@ -1378,3 +1396,61 @@ Unificar votos/comentarios/guardados en tablas polimorficas `media_*` con `item_
 **Estado final:** Aprobado e implementado en working tree (SIN commitear), 2026-09-17. Aplicar 022 y 023 en Neon antes del deploy del backend v19.
 
 **ADRs relacionados:** ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-017 (albumes), ADR-018 (economia de XP / moneda unica), ADR-023 (comentarios anidados y likes), ADR-025 (sesion firmada / `validarSesion`), ADR-030 (galeria unificada y `items[]`), ADR-031 (capa publica de media), ADR-034 (hero/galeria de la ficha), ADR-035 (XP `numeric(12,2)`), BUG-021/BUG-051/BUG-060/BUG-061 (patrones de esquema no versionado, degradacion y spoofing).
+
+---
+
+## ADR-037: TSK-111 -- geocerca urbana de 50 m, album oficial en el mapa cultural, limpieza de modulos del admin y refactor de hero/galeria de la ficha
+
+**ID:** ADR-037
+**Fecha:** 2026-09-17
+**Estado:** Aprobado e implementado en working tree (SIN commitear). Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar las migraciones 019-023 en Neon (arrastre de TSK-107..TSK-110; TSK-111 NO genera migraciones) ANTES del deploy; despues, commit/push/deploy de los 7 archivos + el cierre documental en un solo release.**
+**Autor:** architect (sintesis documental de TSK-111) + build (implementacion) + docs-keeper (cierre).
+**Nota de numeracion:** el 037 es el consecutivo real tras ADR-036 (mayor registrado en este documento, verificado contra el archivo real, ADR-006).
+
+### Contexto
+
+TSK-111 es un lote de producto sobre la ficha de destino y el mapa cultural, sin endpoints ni migraciones nuevas (presupuesto 8/8, ADR-001). Cubre 8 cambios: (1) reordenamiento de Actividades/FAQ en el admin; (2) guard del chip de edad minima; (3A/3B/3C) retiro de tres modulos del admin/render; (4) geocerca urbana mas estricta; (5/6/7A/7B) rediseno del hero y consolidacion de la galeria; y (8) album oficial de fotos en el drawer del pin del mapa. Ajusta tres decisiones previas: ADR-024 (radios), ADR-034 (hero/galeria/orden de modulos) y ADR-030 (galeria unificada); por eso esta ADR solo consolida el lote y remite a las notas de enmienda.
+
+### Decision tomada
+
+- **Geocerca urbana 100 m -> 50 m (CAMBIO 4):** `RADIO_DEFAULT_M` y `RADIO_POR_CATEGORIA` (`sitio`/`hostal`/`comida`) a 50, subcategorias urbanas a 50; rural 250, parque/concierto 150 y festival/deporte 200 intactos; `ACCURACY_MAX_M=150` y bloqueo 422 intactos. Enmienda ADR-024 (detalle alli).
+- **`album_oficial` (CAMBIO 8):** clave ADITIVA en la rama `GET ?tipo=multimedia_mapa`, activada por `?destino_id=<uuid>` validado con regex uuid inline; query a `destinos_fotos` (`ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST LIMIT 12`) envuelta en `conDegradacionMedia` (42P01/42703 -> `[]`); consumida por `index-api-connector.js` (`cargarAlbumOficialDestino`) e `index.html` (`mdMapaAlbumOficial`, solo rama `origen='destino'`). Sin endpoints nuevos.
+- **Guard `edad_minima` (CAMBIO 2):** el chip solo se pinta con `String(...).trim() !== ''`.
+- **Limpieza del admin (CAMBIO 3A/3B/3C):** "Que incluye el precio" fuera de admin/render (mision `mis_nomada_digital` y seeds intactos); UI "Orden de modulos" retirada dejando `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`; seccion "Operacion" eliminada con `f-capacidad` movido a General y `f-comotransporte` eliminado end-to-end.
+- **Hero/galeria (CAMBIO 5/6/7A/7B):** botonera en 2 filas (`.hctar-row`), grid 1+3, imagenes del hero al lightbox existente (`abrirLightboxHero`); "Fotos de viajeros" retirada de la ficha y consolidada en `galeria.html`; CTA renombrado a "Ver todas las fotos". Enmienda ADR-034/ADR-030 (detalle alli).
+- **Reordenamiento (CAMBIO 1):** FAQ estrena Subir/Bajar sobre el generico `moverFila`, reutilizando el patron ya existente de Actividades (Regla de No-Duplicidad).
+
+### Justificacion
+
+El radio urbano se endurece porque 100 m permitia marcar la visita sin presencia real, sin tocar la precision GPS (`accuracy`), que es un chequeo independiente. `album_oficial` se sirve como clave aditiva de una rama existente (cero endpoints nuevos, ADR-001) y degrada a `[]` si el esquema no la soporta (patron BUG-021). El orden de modulos se preserva ocultando el nodo en lugar de borrarlo (Cero Borrado Logico, Regla de Oro 3). "Que incluye el precio" y "Operacion" se retiran de la UI pero el dato legacy convive, evitando migraciones de datos.
+
+### Impacto
+
+`git diff --numstat` (working tree, snapshot 2026-09-17): **7 archivos modificados, +335/-298**, mas `PROMPT_OPENCODE_TSK111.md` (untracked).
+
+- `admin.html` (+49/-82): limpieza de modulos, `#hostal-modulos-list` oculto, `f-capacidad` en General, `moverFila`/`moveFaqRow`.
+- `api/interacciones.js` (+44/-8; header v19 -> v20): radio urbano 50 m + `album_oficial`.
+- `api/pagina-destino.js` (+121/-194; header v11): guard `edad_minima`, hero 2 filas 1+3 + lightbox, modulos retirados, CTA.
+- `index-api-connector.js` (+32/-0): `cargarAlbumOficialDestino`.
+- `index.html` (+51/-1): `mdMapaAlbumOficial`.
+- `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10).
+- **Presupuesto de endpoints 8/8 INTACTO** (ADR-001). **Sin migraciones nuevas.**
+- **Verificacion (Escudo GOLD, qa-auditor):** APTO CON OBSERVACIONES; `node --check` 8/8 api, `api/interacciones.js` ASCII 0/0/0, balance DIVs admin 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS; `smoke_test_epic_prompt` 4 FAIL preexistentes ajenos (DQ-2).
+
+### Consecuencias positivas
+
+- Presencia fisica mas confiable en destinos urbanos.
+- El drawer del pin gana el album curado del destino sin endpoint nuevo.
+- La UI del admin queda mas limpia sin perder datos (orden e incluye-precio legacy intactos).
+- Hero con jerarquia clara (2 filas + 1+3) y galeria de viajeros unificada en `galeria.html`.
+
+### Consecuencias negativas / riesgos residuales
+
+- **Migraciones 019-023 pendientes (BLOQUEANTE):** arrastre de TSK-107..TSK-110; TSK-111 no puede desplegarse aislada.
+- **50 m mas estricto:** mayor friccion con GPS urbano pobre; el 422 `PRECISION_INSUFICIENTE` sigue vigente.
+- **DOM muerto deliberado:** `#hostal-modulos-list` oculto hasta una limpieza futura.
+- **BUG-061 y BUG-062 siguen ABIERTOS** (no relacionados con esta entrega).
+
+**Estado final:** Aprobado e implementado en working tree (SIN commitear), 2026-09-17.
+
+**ADRs relacionados:** ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-010 (presupuesto de endpoints), ADR-024 (radios, enmendado), ADR-030 (galeria unificada), ADR-033 (radio explicito por lugar), ADR-034 (hero/galeria/orden de modulos, enmendado), ADR-036 (precedente inmediato), BUG-002/BUG-061/BUG-062 (deuda preexistente).

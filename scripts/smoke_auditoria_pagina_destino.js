@@ -90,13 +90,13 @@ var casosBody = [
   ["[foto:javascript:alert(1)|XSS]", "javascript:alert", "foto javascript: BLOQUEADA"],
   ["[foto:data:text/html,<script>x</script>|XSS]", "<script>x</script>", "foto data: BLOQUEADA"],
   ["[foto:ftp://server.com/img.jpg|caption]", "ftp://server.com", "foto ftp: BLOQUEADA"],
-  ["[foto://path-sin-protocolo.jpg|caption]", "<img", "foto sin protocolo BLOQUEADA"],
+  ["[foto://path-sin-protocolo.jpg|caption]", "<img src=\"//path-sin-protocolo.jpg\"", "foto sin protocolo BLOQUEADA"],
   ["[video:https://www.youtube.com/watch?v=ok123]", "youtube.com/embed/ok123", "video youtube valido"],
   ["[video:https://evil.com/x]", "evil.com/x", "video host invalido BLOQUEADO"]
 ];
 casosBody.forEach(function (c) {
   var html = parseBlog(c[0]);
-  var peligrosos = ["javascript:alert", "<script>x</script>", "ftp://server.com", "evil.com/x"];
+  var peligrosos = ["javascript:alert", "<script>x</script>", "ftp://server.com", "evil.com/x", "<img src=\"//path-sin-protocolo.jpg\""];
   var esPeligroso = peligrosos.indexOf(c[1]) >= 0;
   if (esPeligroso) {
     // Esperamos que el payload peligroso NO aparezca en el HTML
@@ -109,12 +109,11 @@ casosBody.forEach(function (c) {
 });
 
 console.log("\n=== AUDIT 3: seccion unificada #galeria + lbHTML (degradacion condicional) ===");
-// Diseno nuevo aprobado (galeria unificada): UNA sola <section id="galeria">
-// que SIEMPRE se emite (hereda el gate historico de secFotos, que no tenia
-// condicion) y que contiene el bloque curado (solo si galAll.length > 1), el
-// ancla invisible <span id="fotos">, la grilla de viajeros #fp-grid y la caja
-// de subida #fp-upload. El lightbox #lb conserva el gate historico
-// galAll.length > 1. Ya NO existe <section id="fotos">.
+// TSK-111 / CAMBIO 7A: la seccion #galeria conserva SOLO la galeria curada
+// (1 grande + miniaturas) y su ancla invisible <span id="fotos">. El modulo
+// "Fotos de viajeros" (#fp-grid, #fp-info, #fp-upload) se retiro de la ficha:
+// este smoke verifica su AUSENCIA. El lightbox #lb se monta con galeria
+// curada o miniaturas del hero. Ya NO existe <section id="fotos">.
 //
 // Ojo: "gal-main"/"gal-thumbs" tambien aparecen en el CSS scoped (.gal-main,
 // .gal-thumbs), por lo que las aserciones negativas usan el atributo de clase
@@ -134,8 +133,8 @@ function auditarGaleriaUnificada(label, html, hayCurada) {
   check("id=galeria presente y unico (" + label + ")", nGal === 1, "ocurrencias=" + nGal);
   check("cero <section id=fotos> (" + label + ")", cuenta(html, /<section[^>]*id="fotos"/g) === 0);
   check("ancla <span id=fotos> presente (" + label + ")", html.indexOf('<span id="fotos"') >= 0);
-  check("fp-grid dentro de #galeria (" + label + ")", sec.indexOf('id="fp-grid"') >= 0);
-  check("fp-upload dentro de #galeria (" + label + ")", sec.indexOf('id="fp-upload"') >= 0);
+  check("fp-grid ausente en #galeria (" + label + ")", sec.indexOf('id="fp-grid"') < 0);
+  check("fp-upload ausente en #galeria (" + label + ")", sec.indexOf('id="fp-upload"') < 0);
   check("bloque curado " + (hayCurada ? "VISIBLE" : "OCULTO") + " (" + label + ")",
     hayCurada
       ? (sec.indexOf('class="gal-main"') >= 0 && sec.indexOf('class="gal-thumbs"') >= 0)
