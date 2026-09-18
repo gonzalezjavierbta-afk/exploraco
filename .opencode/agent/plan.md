@@ -1,7 +1,7 @@
 ---
 description: Planificador y orquestador de ExploraCO. En modo plan actua como coordinador de subagentes: delega exploracion masiva a @explore, investigacion web a @research-agent (o skill gemini-research), y deriva toda implementacion al subagente especializado por dominio. No absorbe trabajo operativo ni exploracion en su contexto.
 mode: primary
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: deny

@@ -21,8 +21,8 @@ Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `o
 
 | Agente | Modelo | Uso |
 |---|---|---|
-| `exp-pickle` | `opencode/big-pickle` | Validaciones de bajo riesgo, linter, smoke tests simples |
-| `qa-auditor` | `opencode/big-pickle` | Escudo GOLD y auditoria (solo reporta, no corrige) |
+| `exp-pickle-free` | `opencode/big-pickle` | Validaciones de bajo riesgo, linter, smoke tests simples |
+| `qa-auditor-free` | `opencode/big-pickle` | Escudo GOLD y auditoria (solo reporta, no corrige) |
 | `explore-free` | `opencode/big-pickle` | Exploracion masiva de codigo (busquedas, regex, listados) |
 | `docs-keeper-free` | `opencode/big-pickle` | Documentacion: TASKS.md, NEXT.md, DECISIONS.md, ADRs, handoffs |
 | `content-loader-free` | `opencode/big-pickle` | Creacion repetitiva de paginas dinamicas (seed+loader+smoke) |
@@ -54,27 +54,27 @@ Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `o
 
 | Agente | Modelo | Uso |
 |---|---|---|
-| `docs-keeper` | `opencode-go/deepseek-v4-flash` | Documentacion: TASKS.md, NEXT.md, DECISIONS.md, ADRs, handoffs |
-| `content-loader` | `opencode-go/deepseek-v4-flash` | Creacion repetitiva de paginas dinamicas (seed+loader+smoke) |
-| `research-agent` | `opencode-go/deepseek-v4-flash` | Investigacion web de destinos y fichas verificadas |
-| `explore` | `opencode-go/deepseek-v4-flash` | Exploracion masiva de codigo (busquedas, regex, listados) |
-| `js-silo-dev` | `opencode-go/deepseek-v4-flash` | Desarrollo JS/TS rutinario y refactor menor |
-| `frontend-tpl` | `opencode-go/minimax-m3` | Frontend y estetica visual (CSS/React/HTML) |
-| `admin-dev` | `opencode-go/minimax-m3` | Panel de administracion admin.html |
-| `renderer-dev` | `opencode-go/minimax-m3` | Motor de renderizado pagina-destino.js |
-| `data-migration` | `opencode-go/minimax-m3` | Operaciones de BD, migraciones y seeds masivos (SQL critico escala a `sql-security`) |
-| `seo-dev` | `opencode-go/qwen3.8-flash` | Sitemap, meta tags, robots.txt, redirects, Search Console |
-| `media-reader` | `opencode-go/mimo-v2.5` | Lectura/analisis de imagen, audio, video y PDF (multimodal) |
+| `docs-keeper` | `opencode-go/deepseek-v4.1-flash` | Documentacion: TASKS.md, NEXT.md, DECISIONS.md, ADRs, handoffs |
+| `content-loader` | `opencode-go/deepseek-v4.1-flash` | Creacion repetitiva de paginas dinamicas (seed+loader+smoke) |
+| `research-agent` | `opencode-go/deepseek-v4.1-flash` | Investigacion web de destinos y fichas verificadas |
+| `explore` | `opencode-go/deepseek-v4.1-flash` | Exploracion masiva de codigo (busquedas, regex, listados) |
+| `js-silo-dev` | `opencode-go/deepseek-v4.1-flash` | Desarrollo JS/TS rutinario y refactor menor |
+| `frontend-tpl` | `opencode-go/deepseek-v4.1-flash` | Frontend y estetica visual (CSS/React/HTML) |
+| `admin-dev` | `opencode-go/deepseek-v4.1-flash` | Panel de administracion admin.html |
+| `renderer-dev` | `opencode-go/deepseek-v4.1-flash` | Motor de renderizado pagina-destino.js |
+| `data-migration` | `opencode-go/deepseek-v4.1-flash` | Operaciones de BD, migraciones y seeds masivos (SQL critico escala a `sql-security`) |
+| `seo-dev` | `opencode-go/deepseek-v4.1-flash` | Sitemap, meta tags, robots.txt, redirects, Search Console |
+| `media-reader` | `opencode-go/deepseek-v4.1-flash` | Lectura/analisis de imagen, audio, video y PDF (multimodal) |
 | `sql-security` | `opencode-go/deepseek-v4.1-flash` | Seguridad critica, RLS, persistencia SQL, migraciones de esquema |
 | `backend-dev` | `opencode-go/deepseek-v4.1-flash` | Backend serverless api/*.js |
 | `architect` | `opencode-go/deepseek-v4.1-flash` | Diseno de esquemas JSONB y decisiones de arquitectura |
-| `architect-review` | `opencode-go/kimi-k3` | Revision de arquitectura y aprobacion de ADRs (segunda opinion) |
+| `architect-review` | `opencode-go/deepseek-v4.1-flash` | Revision de arquitectura y aprobacion de ADRs (segunda opinion) |
 
 **Regla de oro:** todo agente DEBE tener `model:` explicito en su `.md` (prohibido heredar el modelo principal). Los IDS usan el prefijo real del proveedor OpenCode Go (`opencode-go/*`) o los modelos gratis (`opencode/*`); cualquier ID fuera de `opencode models` se considera invalido y se corrige.
 
 **Ruteo por ruta:** los agentes primarios de pago (`plan`/`build`) delegan SIEMPRE a subagentes de pago (`admin-dev`, `backend-dev`, ...). Los agentes primarios gratuitos (`free-plan`/`free-build`) delegan SIEMPRE a subagentes `-free` (`admin-dev-free`, `backend-dev-free`, ...). Prohibido mezclar rutas excepto para escalar seguridad critica (`sql-security-free` → `sql-security`).
 
-**Plan = orquestador:** el agente `plan` (`.opencode/agent/plan.md`) NO ejecuta trabajo operativo. Explora mediante `@explore`, investiga via `gemini-research`/`@research-agent`, y deriva toda implementacion al subagente por dominio. Su modelo es `opencode-go/deepseek-v4-flash` para economizar. `free-plan` hace lo mismo con `@explore-free`/`@research-agent-free` y modelo `opencode/big-pickle`.
+**Plan = orquestador:** el agente `plan` (`.opencode/agent/plan.md`) NO ejecuta trabajo operativo. Explora mediante `@explore`, investiga via `gemini-research`/`@research-agent`, y deriva toda implementacion al subagente por dominio. Su modelo es `opencode-go/deepseek-v4.1-flash` para economizar. `free-plan` hace lo mismo con `@explore-free`/`@research-agent-free` y modelo `opencode/big-pickle`.
 
 **Workflow de investigacion externa:** la investigacion web de NUEVOS items de directorio (hostal, comida, sitio, evento) se ejecuta en Google Gemini (externo, no consume cuota) mediante el skill `gemini-research` (`prompts/GEMINI_MASTER_PROMPT.md`). `research-agent`/`research-agent-free` quedan para fichas legacy o validaciones, y toda ingesta se valida con `scripts/validate_ficha.js` antes de pasar a `create-dynamic-page`.
 
