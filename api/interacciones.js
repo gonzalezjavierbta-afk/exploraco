@@ -1,4 +1,21 @@
-// api/interacciones.js  v21 (TSK-112 / ADR-038: calcularXpFinal clase+Casa, tributacion al cofre, xp_clase/nivel_clase)
+// api/interacciones.js  v22 (release compartido ADR-039 + ADR-040 + T4.5):
+//   (1) Museo URL-only (ADR-039): ramas GET/POST tipo=museo_recurso
+//       (crear/editar/eliminar/listar) sobre album_fotos con visibilidad
+//       POR RECURSO (af.visible, migracion 025) y filtro af.visible=true en
+//       los lectores publicos (multimedia_mapa sin scope=mio, museo_publico
+//       total_fotos, mis_fotos, mi_feed_fotos, fotos_top, album_detalle y
+//       galeria_destino); mis_guardados_media SIN filtro (bookmarks privados).
+//   (2) Acordeon de niveles (ADR-040): MISION_GATE_XP + nivelDeMisionServidor
+//       y campos aditivos gate_nivel/desbloquea/nivel en ?tipo=misiones (y
+//       desbloquea tambien aditivo en ?tipo=logros).
+//   (3) T4.5 / ENMIENDA 1 ADR-039: misiones mis_videografo y mis_sonidista
+//       (video/audio del Museo) en el catalogo MISIONES.
+//   v22 (rev. filtros de conteo en albumes/album_detalle/museo_publico;
+//       gate_nivel de misiones de video/audio; GET museo_recurso usuario_id
+//       opcional; editar por agregador_id).
+//   REQUIERE la migracion 025_album_fotos_visible.sql aplicada en Neon ANTES
+//   del deploy (patron BUG-021/BUG-060). Cero endpoints nuevos (8/8).
+// v21 (TSK-112 / ADR-038: calcularXpFinal clase+Casa, tributacion al cofre, xp_clase/nivel_clase)
 // v20 (ADR-036: compartir con XP por primer share + media unificada votos/comentarios/guardados; base v18 ADR-035 XP numeric(12,2))
 // TSK-111 (v20): radio urbano 50m (CAMBIO 4) + album_oficial en multimedia_mapa (CAMBIO 8)
 // (ASCII-safe: 0 backticks, 0 no-ASCII)
@@ -350,6 +367,39 @@ function calcularEraLocal(nivel) {
   if (nivel <= 10) return 'Patrocinada';
   if (nivel <= 15) return 'Organizador';
   return 'Leyenda';
+}
+
+// ADR-040 (v22): nivel que desbloquea cada mision que abre capacidad.
+// Los valores son el nivel (1-based) cuyo umbral minimo vive en el mismo
+// catalogo NIVELES_LOCAL; nivelDeMisionServidor valida contra ESE catalogo
+// (prohibido declarar una segunda tabla de umbrales, Regla de No-Duplicidad).
+var MISION_GATE_XP = {
+  mis_fotografo: 2,
+  mis_chat_mensajero: 3,
+  mis_chat_moderador: 4,
+  mis_chat_creador: 5,
+  mis_organizador_bogota: 3
+};
+
+// ADR-040 (B): nivel de una mision para el acordeon de Mi Perfil.
+// Prioridad: (a) gate_nivel explicito del catalogo; (b) MISION_GATE_XP;
+// (c) null (sin ancla detectable: sigue en el panel #pf-misiones).
+function nivelDeMisionServidor(item) {
+  if (!item) return null;
+  if (item.gate_nivel != null) return item.gate_nivel;
+  var lvl = MISION_GATE_XP[item.id];
+  if (lvl == null) return null;
+  // calcularNivelLocal sobre el umbral real de ese nivel devuelve el mismo
+  // nivel; mantiene una unica tabla de umbrales (NIVELES_LOCAL).
+  return calcularNivelLocal(NIVELES_LOCAL[lvl - 1]).nivel;
+}
+
+// Normaliza un booleano opcional del body (true/false, 'true'/'false',
+// 1/0, '1'/'0'); cualquier otro valor (o ausente) devuelve null.
+function aBooleano(v) {
+  if (v === true || v === 'true' || v === 1 || v === '1') return true;
+  if (v === false || v === 'false' || v === 0 || v === '0') return false;
+  return null;
 }
 
 // Nombres de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
@@ -1249,6 +1299,36 @@ var MISIONES = [
     },
   },
   {
+    // T4.5 / ENMIENDA 1 ADR-039 (v22): primera pieza de VIDEO del Museo
+    // (album_fotos.foto_type='video'). Sin DDL: progreso_misiones es jsonb.
+    id: 'mis_videografo', grupo: 'fotos', requiere: [],
+    nombre: 'Cronicas en Movimiento', xp: 15,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_fotos af'
+        + ' JOIN albumes a ON a.id = af.album_id'
+        + ' WHERE a.usuario_id=$1 AND af.foto_type=\'video\' AND af.activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
+    // T4.5 / ENMIENDA 1 ADR-039 (v22): primera pieza de AUDIO del Museo
+    // (album_fotos.foto_type='audio'). Sin DDL.
+    id: 'mis_sonidista', grupo: 'fotos', requiere: [],
+    nombre: 'Ecos y Relatos', xp: 15,
+    gate_nivel: 2,
+    check: function(ctx) {
+      return ctx.sql(
+        'SELECT COUNT(*)::int AS n FROM album_fotos af'
+        + ' JOIN albumes a ON a.id = af.album_id'
+        + ' WHERE a.usuario_id=$1 AND af.foto_type=\'audio\' AND af.activo=true',
+        [ctx.usuarioId]
+      ).then(function(r){ return !!(r[0] && r[0].n >= 1); });
+    },
+  },
+  {
     id: 'mis_chat_mensajero', grupo: 'general', requiere: ['mis_primera_resena'],
     nombre: 'Primer mensaje en la comunidad', xp: 25, desbloquea: 'chat',
     check: function(ctx) {
@@ -2138,9 +2218,11 @@ function progresarPandillaRetos(sql, usuarioId, tipoReto) {
 
 // Validador JWT (ADR-025): misma firma que api/usuarios.js v9
 // (HMAC-SHA256 sobre payload base64url con SESSION_JWT_SECRET). El token
-// viaja como Authorization: Bearer <b64.sig>. Devuelve {ok:true} o
-// {ok:false, razon}; el sub del payload debe ser String(usuarioIdEsperado).
-function validarSesion(req, usuarioIdEsperado) {
+// viaja como Authorization: Bearer <b64.sig>.
+// v22: verificarSesion devuelve {ok:true, sub} (usuario de la sesion) o
+// {ok:false, razon}; validarSesion lo reusa y exige que sub sea
+// String(usuarioIdEsperado). El usuario NUNCA se confia al body (BUG-061).
+function verificarSesion(req) {
   var encabezado = req.headers['authorization'] || '';
   if (encabezado.indexOf('Bearer ') !== 0) return { ok: false, razon: 'SESION_REQUERIDA' };
   var token = encabezado.slice(7).trim();
@@ -2163,7 +2245,15 @@ function validarSesion(req, usuarioIdEsperado) {
   } catch (e) { return { ok: false, razon: 'SESION_INVALIDA' }; }
   if (!payload || !payload.exp || !payload.sub) return { ok: false, razon: 'SESION_INVALIDA' };
   if (payload.exp <= Math.floor(Date.now() / 1000)) return { ok: false, razon: 'SESION_EXPIRADA' };
-  if (payload.sub !== String(usuarioIdEsperado)) return { ok: false, razon: 'SESION_INVALIDA' };
+  return { ok: true, sub: String(payload.sub) };
+}
+
+// Valida que la sesion firmada corresponda al usuario esperado. Devuelve
+// {ok:true} o {ok:false, razon}.
+function validarSesion(req, usuarioIdEsperado) {
+  var s = verificarSesion(req);
+  if (!s.ok) return { ok: false, razon: s.razon };
+  if (s.sub !== String(usuarioIdEsperado)) return { ok: false, razon: 'SESION_INVALIDA' };
   return { ok: true };
 }
 
@@ -2605,6 +2695,9 @@ function entregarCatalogo(catalogo, progreso, meta) {
       desc: item.desc || null, xp: item.xp, requiere: item.requiere,
       estado: done ? 'completada' : 'pendiente',
       en: done ? (st.en || null) : null,
+      // ADR-040 (B, aditivo): capacidad que abre la mision/logro (o null).
+      // Compartido: ?tipo=logros tambien lo gana sin regresion.
+      desbloquea: item.desbloquea || null,
     };
     if (meta) meta(fila, item);
     return fila;
@@ -3247,7 +3340,14 @@ module.exports = async function handler(req, res) {
           [usuarioId]
         );
         var progresoMisiones = usrMis2[0].progreso_misiones || {};
-        var resMisiones = entregarCatalogo(MISIONES, progresoMisiones, null);
+        // ADR-040 (B, v22): campos ADITIVOS de nivel/gate para el acordeon.
+        // gate_nivel y nivel = gate efectivo (catalogo o MISION_GATE_XP);
+        // desbloquea ya viaja en la fila base de entregarCatalogo.
+        var resMisiones = entregarCatalogo(MISIONES, progresoMisiones, function(fila, m) {
+          var nivel = nivelDeMisionServidor(m);
+          fila.gate_nivel = nivel;
+          fila.nivel = nivel;
+        });
         return res.status(200).json({
           ok: true,
           data: resMisiones.data,
@@ -3493,9 +3593,9 @@ module.exports = async function handler(req, res) {
         ).catch(function(){ return []; });
         var mpAlbumes = await sql(
           'SELECT a.id, a.titulo, a.tipo, a.portada_url,'
-          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id=a.id AND af.activo=true) AS total_fotos,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id=a.id AND af.activo=true AND af.visible=true) AS total_fotos,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af2 JOIN media_votos mv ON mv.item_id=af2.id::text'
-          + '   WHERE mv.fuente=\'album_foto\' AND mv.activo=true AND af2.album_id=a.id) AS votos'
+          + '   WHERE mv.fuente=\'album_foto\' AND mv.activo=true AND af2.album_id=a.id AND af2.visible=true) AS votos'
           + ' FROM albumes a WHERE a.usuario_id=$1 AND a.activo=true'
           + ' ORDER BY a.creado_en DESC LIMIT 12',
           [mpId]
@@ -3586,6 +3686,95 @@ module.exports = async function handler(req, res) {
             },
           },
         });
+      }
+
+      // Museo multimedia URL-only (ADR-039 C, v22): lista los recursos
+      // (album_fotos) de un usuario con VISIBILIDAD SERVER-SIDE. Quien no
+      // sea el dueno con sesion firmada solo ve af.visible=true; el dueno
+      // ve todo. Requiere la migracion 025 (af.visible). Cero XP.
+      if (tipo === 'museo_recurso') {
+        // ADR-039 (C): usuario_id|id OPCIONAL. Sin query se toma el dueno
+        // de la sesion firmada (verificarSesion); si no hay sesion y no
+        // llega usuario_id, responde 400. El cliente actual siempre lo
+        // envia, por lo que no hay regresion.
+        var MR_USUARIO_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+        var mrSes = verificarSesion(req);
+        var mrUsuarioRaw = String(req.query.usuario_id || req.query.id || '').trim();
+        if (!mrUsuarioRaw) {
+          if (!mrSes.ok)
+            return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+          mrUsuarioRaw = String(mrSes.sub || '').trim();
+        }
+        if (!MR_USUARIO_UUID.test(mrUsuarioRaw))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var mrEsDueno = !!(mrSes.ok && mrSes.sub.toLowerCase() === mrUsuarioRaw.toLowerCase());
+        var mrAlbumFiltro = null;
+        if (req.query.album_id !== undefined && req.query.album_id !== null && String(req.query.album_id).trim() !== '') {
+          mrAlbumFiltro = String(req.query.album_id).trim();
+          if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mrAlbumFiltro))
+            return res.status(400).json({ ok: false, error: 'album_id invalido' });
+        }
+        var mrVisibleFiltro = null;
+        if (req.query.visible !== undefined && req.query.visible !== null && String(req.query.visible).trim() !== '') {
+          mrVisibleFiltro = aBooleano(req.query.visible);
+          if (mrVisibleFiltro === null)
+            return res.status(400).json({ ok: false, error: 'visible invalido' });
+        }
+        var mrLimit = parseInt(req.query.limit || '50', 10);
+        if (!isFinite(mrLimit) || mrLimit < 1) mrLimit = 50;
+        if (mrLimit > 200) mrLimit = 200;
+        var mrOffset = parseInt(req.query.offset || '0', 10);
+        if (!isFinite(mrOffset) || mrOffset < 0) mrOffset = 0;
+        var mrParams = [mrUsuarioRaw];
+        var mrWhere = ' WHERE a.usuario_id = $1::uuid AND a.activo = true AND af.activo = true';
+        if (!mrEsDueno) mrWhere += ' AND af.visible = true';
+        if (mrVisibleFiltro !== null) {
+          mrParams.push(mrVisibleFiltro);
+          mrWhere += ' AND af.visible = $' + mrParams.length;
+        }
+        if (mrAlbumFiltro) {
+          mrParams.push(mrAlbumFiltro);
+          mrWhere += ' AND af.album_id = $' + mrParams.length + '::uuid';
+        }
+        mrParams.push(mrLimit);
+        var mrLimIdx = mrParams.length;
+        mrParams.push(mrOffset);
+        var mrOffIdx = mrParams.length;
+        var mrRows = await sql(
+          'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
+          + ' af.media_title, af.foto_type, a.lat, a.lng, a.ciudad, af.visible, af.creado_en'
+          + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
+          + mrWhere
+          + ' ORDER BY af.creado_en DESC'
+          + ' LIMIT $' + mrLimIdx + ' OFFSET $' + mrOffIdx,
+          mrParams
+        );
+        // Votos unificados (ADR-036): query aparte degradable a 0 si la
+        // migracion 023 no esta aplicada.
+        var mrVotos = {};
+        var mrIds = mrRows.map(function(r){ return String(r.id); });
+        if (mrIds.length) {
+          var mrVotoRows = await conDegradacionMedia(sql(
+            'SELECT item_id, COUNT(*)::int AS n FROM media_votos'
+            + ' WHERE fuente = \'album_foto\' AND activo = true AND item_id = ANY($1::text[])'
+            + ' GROUP BY item_id',
+            [mrIds]
+          ), 'media_votos', []);
+          (mrVotoRows || []).forEach(function(v) {
+            mrVotos[String(v.item_id)] = parseInt(v.n, 10) || 0;
+          });
+        }
+        var mrData = mrRows.map(function(r) {
+          return {
+            id: r.id, album_id: r.album_id, album_titulo: r.album_titulo,
+            foto_url: r.foto_url, media_title: r.media_title,
+            tipo_media: r.foto_type, lat: r.lat, lng: r.lng, ciudad: r.ciudad,
+            visible: r.visible === true,
+            votos: mrVotos[String(r.id)] || 0,
+            creado_en: r.creado_en,
+          };
+        });
+        return res.status(200).json({ ok: true, data: mrData });
       }
 
       // Mensajeria Directa - bandeja de hilos (TSK-103 / ADR-028, WP-3):
@@ -4031,10 +4220,10 @@ module.exports = async function handler(req, res) {
           'SELECT a.id, a.usuario_id, a.titulo, a.descripcion, a.tipo,'
           + ' a.lat, a.lng, a.ciudad, a.region, a.portada_url, a.es_top,'
           + ' a.creado_en, u.nombre AS autor_nombre,'
-          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count,'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true AND af.visible=true) AS fotos_count,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af2'
           + '  JOIN media_votos mv ON mv.item_id = af2.id::text'
-          + '  WHERE mv.fuente = \'album_foto\' AND mv.activo = true AND af2.album_id = a.id) AS votos_count'
+          + '  WHERE mv.fuente = \'album_foto\' AND mv.activo = true AND af2.album_id = a.id AND af2.visible=true) AS votos_count'
           + ' FROM albumes a'
           + ' LEFT JOIN usuarios u ON u.id = a.usuario_id'
           + albumWhere
@@ -4059,7 +4248,7 @@ module.exports = async function handler(req, res) {
           sql,
           'SELECT a.*, u.nombre AS autor_nombre,'
           + ' u.nombre AS usuario_nombre, __FOTO_URL__ AS usuario_avatar,'
-          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true) AS fotos_count'
+          + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true AND af.visible=true) AS fotos_count'
           + ' FROM albumes a LEFT JOIN usuarios u ON u.id = a.usuario_id'
           + ' WHERE a.id = $1 AND a.activo = true',
           [albumId]
@@ -4075,7 +4264,7 @@ module.exports = async function handler(req, res) {
           + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
           + ' FROM album_fotos af'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
-          + ' WHERE af.album_id = $1 AND af.activo = true'
+          + ' WHERE af.album_id = $1 AND af.activo = true AND af.visible = true'
           + ' ORDER BY af.creado_en ASC',
           [albumId]
         ), 'media_votos', []);
@@ -4194,7 +4383,7 @@ module.exports = async function handler(req, res) {
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
-          + ' WHERE af.activo = true AND a.activo = true'
+          + ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
           + ' AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
           + ' AND ABS(a.lat - $1) < 0.01 AND ABS(a.lng - $2) < 0.01'
           + ' ORDER BY votos DESC LIMIT 100',
@@ -4483,6 +4672,10 @@ module.exports = async function handler(req, res) {
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE a.activo=true AND af.activo=true'
+          // ADR-039 (D.1): capa publica solo visible=true; scope=mio (dueno)
+          // conserva sin filtro para que vea sus privados. Clausula FIJA: no
+          // altera los indices $N compartidos por el UNION.
+          + (mmScopeMio ? '' : ' AND af.visible = true')
           + (mmIdxTipos ? ' AND af.foto_type = ANY($' + mmIdxTipos + '::text[])' : '')
           + (mmIdxCiudad ? ' AND a.ciudad = $' + mmIdxCiudad : '')
           + (mmIdxUsuario ? ' AND a.usuario_id = $' + mmIdxUsuario + '::uuid' : '')
@@ -4598,7 +4791,7 @@ module.exports = async function handler(req, res) {
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
-          + ' WHERE af.activo = true AND a.activo = true'
+          + ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
           + (feedOrden === 'top' ? ' ORDER BY votos DESC, af.creado_en DESC' : ' ORDER BY af.creado_en DESC')
           + ' LIMIT $1 OFFSET $2',
           [feedLimit, feedOffset]
@@ -4626,7 +4819,7 @@ module.exports = async function handler(req, res) {
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos,'
           + '  af.creado_en'
           + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
-          + ' WHERE af.agregador_id = $1::uuid AND af.activo = true AND a.activo = true'
+          + ' WHERE af.agregador_id = $1::uuid AND af.activo = true AND af.visible = true AND a.activo = true'
           + ' UNION ALL'
           + ' SELECT i.id::text, i.texto, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  NULL::text, NULL::text, d.ciudad,'
@@ -4685,7 +4878,7 @@ module.exports = async function handler(req, res) {
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' JOIN destinos d ON d.id = $1'
-          + ' WHERE af.activo = true AND a.activo = true'
+          + ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
           + ' AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
           + ' AND ABS(a.lat - d.lat) < 0.01 AND ABS(a.lng - d.lng) < 0.01'
           + ' ORDER BY votos DESC LIMIT 10',
@@ -5994,6 +6187,231 @@ module.exports = async function handler(req, res) {
         if (fotoVotoRes.status !== 200)
           return res.status(fotoVotoRes.status).json({ ok: false, error: fotoVotoRes.error, ya_votado: fotoVotoRes.ya_votado || undefined });
         return res.status(200).json(await completarVotoMedia(sql, usuarioId2, fotoVotoRes));
+      }
+
+      // -- Museo multimedia URL-only (ADR-039 B, v22) ------------------
+      // Recursos del Museo como URLs externas sobre album_fotos (009), con
+      // visibilidad por recurso (025). Auth SIEMPRE por sesion firmada
+      // (ADR-025): el usuario sale del token, NUNCA del body (BUG-061).
+      // Mutaciones por accion=crear|editar|eliminar (patron del archivo).
+      if (tipo2 === 'museo_recurso') {
+        var mrSesPost = verificarSesion(req);
+        if (!mrSesPost.ok) return responderSesion(res, mrSesPost.razon);
+        var mrUser = mrSesPost.sub;
+        var mrAccion = String(body.accion || 'crear').toLowerCase();
+        var MR_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+        if (mrAccion === 'crear') {
+          var mrUrl = String(body.url || '').trim();
+          if (!/^https?:\/\//i.test(mrUrl) || mrUrl.length > 2000)
+            return res.status(400).json({ ok: false, error: 'URL de recurso inv\u00e1lida' });
+          var mrTipo = String(body.tipo_media || '').toLowerCase();
+          if (mrTipo !== 'foto' && mrTipo !== 'video' && mrTipo !== 'audio')
+            return res.status(400).json({ ok: false, error: 'tipo_media invalido' });
+          var mrCaption = '';
+          if (body.caption !== undefined && body.caption !== null) {
+            mrCaption = String(body.caption).trim();
+            if (mrCaption.length > 200)
+              return res.status(400).json({ ok: false, error: 'caption maximo 200 caracteres' });
+          }
+          var mrVisible = aBooleano(body.visible);
+          if (mrVisible === null) mrVisible = false;
+
+          // Gate de creacion: capacidad subir_fotos (mis_fotografo). Las
+          // misiones nuevas mis_videografo/mis_sonidista NO pueden ser
+          // prerequisito: su check exige >=1 recurso ya creado (seria un
+          // deadlock). Se evaluan como hito POST-insert. Desviacion
+          // documentada respecto del literal del pedido.
+          var mrCap = await misionCompletada(sql, mrUser, 'mis_fotografo');
+          if (!mrCap)
+            return res.status(403).json({ ok: false, error: 'Desbloquea Subir fotos (nivel 2) para publicar media' });
+
+          // Album destino: si llega debe ser propio; si no, "Mi Museo".
+          var mrAlbumId = null;
+          if (body.album_id !== undefined && body.album_id !== null && String(body.album_id).trim() !== '') {
+            mrAlbumId = String(body.album_id).trim();
+            if (!MR_UUID.test(mrAlbumId))
+              return res.status(400).json({ ok: false, error: 'album_id invalido' });
+            var mrAlbumPropio = await sql(
+              'SELECT id FROM albumes WHERE id=$1::uuid AND usuario_id=$2::uuid AND activo=true LIMIT 1',
+              [mrAlbumId, mrUser]
+            );
+            if (!mrAlbumPropio.length)
+              return res.status(400).json({ ok: false, error: 'album_id no pertenece al usuario' });
+          } else {
+            await sql(
+              'INSERT INTO albumes (usuario_id, titulo, tipo)'
+              + ' VALUES ($1::uuid, \'Mi Museo\', \'mixto\')'
+              + ' ON CONFLICT DO NOTHING',
+              [mrUser]
+            );
+            var mrMiMuseo = await sql(
+              'SELECT id FROM albumes WHERE usuario_id=$1::uuid AND titulo=\'Mi Museo\' AND activo=true LIMIT 1',
+              [mrUser]
+            );
+            if (!mrMiMuseo.length)
+              return res.status(500).json({ ok: false, error: 'No se pudo preparar el album Mi Museo' });
+            mrAlbumId = mrMiMuseo[0].id;
+          }
+
+          // Coords del payload: ambos o ninguno; se persisten en el album
+          // destino (el recurso hereda la ubicacion de su carpeta). La
+          // tabla albumes no tiene columna barrio: solo ciudad/region.
+          var mrTraeLat = (body.lat !== undefined && body.lat !== null && String(body.lat).trim() !== '');
+          var mrTraeLng = (body.lng !== undefined && body.lng !== null && String(body.lng).trim() !== '');
+          if (mrTraeLat !== mrTraeLng)
+            return res.status(400).json({ ok: false, error: 'lat y lng deben venir juntos' });
+          var mrLat = null, mrLng = null;
+          if (mrTraeLat) {
+            mrLat = parseFloat(body.lat);
+            mrLng = parseFloat(body.lng);
+            if (!isFinite(mrLat) || !isFinite(mrLng) || mrLat < -90 || mrLat > 90 || mrLng < -180 || mrLng > 180)
+              return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+          }
+          var mrCiudad = String(body.ciudad || '').trim().slice(0, 80) || null;
+          var mrRegion = String(body.region || '').trim().slice(0, 80) || null;
+          if (mrLat !== null || mrCiudad || mrRegion) {
+            await sql(
+              'UPDATE albumes SET lat = COALESCE($1, lat), lng = COALESCE($2, lng),'
+              + ' ciudad = COALESCE($3, ciudad), region = COALESCE($4, region),'
+              + ' actualizado_en = NOW()'
+              + ' WHERE id=$5::uuid AND usuario_id=$6::uuid AND activo=true',
+              [mrLat, mrLng, mrCiudad, mrRegion, mrAlbumId, mrUser]
+            );
+          }
+
+          var mrXp = 15;
+          var mrIns = await sql(
+            'INSERT INTO album_fotos'
+            + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
+            + '  media_title, media_source, visible, xp_otorgado_autor)'
+            + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7)'
+            + ' RETURNING id, album_id, visible',
+            [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp]
+          );
+
+          var mrCtx = await contextoXpE(sql, mrUser);
+          var mrXpFinal = calcularXpFinal(mrXp, mrCtx.nivel_clase, mrCtx.clase_id, mrCtx.tag);
+          await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2::uuid', [mrXpFinal, mrUser]).catch(function(e){ console.warn('TRACE: museo_recurso xp no acreditado', e && e.code); });
+          await acreditarClaseYCofre(sql, mrUser, mrCtx, mrXpFinal);
+          await repartirXpReferidos(sql, mrUser, mrXpFinal);
+          var mrMisiones = await evaluarMisiones(sql, mrUser);
+          var mrLogros = await evaluarLogros(sql, mrUser);
+          return res.status(200).json({
+            ok: true,
+            recurso: { id: mrIns[0].id, album_id: mrIns[0].album_id, visible: mrIns[0].visible },
+            xp: mrXpFinal, misiones: mrMisiones, logros: mrLogros,
+          });
+        }
+
+        if (mrAccion === 'editar') {
+          var mrEditId = String(body.id || '').trim();
+          if (!MR_UUID.test(mrEditId))
+            return res.status(400).json({ ok: false, error: 'id requerido' });
+          var mrTraeCaption = (body.caption !== undefined && body.caption !== null);
+          var mrTraeVisible = (body.visible !== undefined && body.visible !== null);
+          var mrTraeAlbum = (body.album_id !== undefined && body.album_id !== null && String(body.album_id).trim() !== '');
+          var mrTraeLat2 = (body.lat !== undefined && body.lat !== null && String(body.lat).trim() !== '');
+          var mrTraeLng2 = (body.lng !== undefined && body.lng !== null && String(body.lng).trim() !== '');
+          if (!mrTraeCaption && !mrTraeVisible && !mrTraeAlbum && !mrTraeLat2 && !mrTraeLng2)
+            return res.status(400).json({ ok: false, error: 'sin campos editables' });
+          if (mrTraeLat2 !== mrTraeLng2)
+            return res.status(400).json({ ok: false, error: 'lat y lng deben venir juntos' });
+
+          var mrEditRows = await sql(
+            'SELECT af.id, af.album_id, af.visible FROM album_fotos af'
+            + ' WHERE af.id=$1::uuid AND af.activo=true'
+            + '   AND af.agregador_id=$2::uuid'
+            + ' LIMIT 1',
+            [mrEditId, mrUser]
+          );
+          if (!mrEditRows.length)
+            return res.status(404).json({ ok: false, error: 'Recurso no encontrado' });
+          var mrAlbumActual = mrEditRows[0].album_id;
+
+          var mrDestino = mrAlbumActual;
+          if (mrTraeAlbum) {
+            mrDestino = String(body.album_id).trim();
+            if (!MR_UUID.test(mrDestino))
+              return res.status(400).json({ ok: false, error: 'album_id invalido' });
+            var mrDestinoPropio = await sql(
+              'SELECT id FROM albumes WHERE id=$1::uuid AND usuario_id=$2::uuid AND activo=true LIMIT 1',
+              [mrDestino, mrUser]
+            );
+            if (!mrDestinoPropio.length)
+              return res.status(400).json({ ok: false, error: 'album_id no pertenece al usuario' });
+          }
+
+          if (mrTraeLat2) {
+            var mrLat2 = parseFloat(body.lat);
+            var mrLng2 = parseFloat(body.lng);
+            if (!isFinite(mrLat2) || !isFinite(mrLng2) || mrLat2 < -90 || mrLat2 > 90 || mrLng2 < -180 || mrLng2 > 180)
+              return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+            await sql(
+              'UPDATE albumes SET lat=$1, lng=$2, actualizado_en=NOW()'
+              + ' WHERE id=$3::uuid AND usuario_id=$4::uuid AND activo=true',
+              [mrLat2, mrLng2, mrDestino, mrUser]
+            );
+          }
+
+          var mrSets = [];
+          var mrParams = [mrEditId, mrUser];
+          if (mrTraeCaption) {
+            var mrCap2 = String(body.caption || '').trim();
+            if (mrCap2.length > 200)
+              return res.status(400).json({ ok: false, error: 'caption maximo 200 caracteres' });
+            mrParams.push(mrCap2);
+            mrSets.push('media_title = $' + mrParams.length);
+          }
+          if (mrTraeVisible) {
+            var mrVis2 = aBooleano(body.visible);
+            if (mrVis2 === null)
+              return res.status(400).json({ ok: false, error: 'visible invalido' });
+            mrParams.push(mrVis2);
+            mrSets.push('visible = $' + mrParams.length);
+          }
+          if (mrTraeAlbum) {
+            mrParams.push(mrDestino);
+            mrSets.push('album_id = $' + mrParams.length + '::uuid');
+          }
+          var mrEditUpd;
+          if (mrSets.length) {
+            mrEditUpd = await sql(
+              'UPDATE album_fotos SET ' + mrSets.join(', ')
+              + ' WHERE id=$1::uuid AND activo=true'
+              + '   AND agregador_id=$2::uuid'
+              + ' RETURNING id, album_id, visible',
+              mrParams
+            );
+            if (!mrEditUpd.length)
+              return res.status(404).json({ ok: false, error: 'Recurso no encontrado' });
+          } else {
+            // Solo cambio de coords del album (sin columnas de album_fotos).
+            mrEditUpd = [{ id: mrEditId, album_id: mrDestino, visible: mrEditRows[0].visible }];
+          }
+          return res.status(200).json({
+            ok: true,
+            recurso: { id: mrEditUpd[0].id, album_id: mrEditUpd[0].album_id, visible: mrEditUpd[0].visible },
+          });
+        }
+
+        if (mrAccion === 'eliminar') {
+          var mrDelId = String(body.id || '').trim();
+          if (!MR_UUID.test(mrDelId))
+            return res.status(400).json({ ok: false, error: 'id requerido' });
+          var mrDel = await sql(
+            'UPDATE album_fotos SET activo=false'
+            + ' WHERE id=$1::uuid AND activo=true'
+            + '   AND album_id IN (SELECT id FROM albumes WHERE usuario_id=$2::uuid AND activo=true)'
+            + ' RETURNING id',
+            [mrDelId, mrUser]
+          );
+          if (!mrDel.length)
+            return res.status(404).json({ ok: false, error: 'Recurso no encontrado' });
+          return res.status(200).json({ ok: true, recurso: { id: mrDel[0].id } });
+        }
+
+        return res.status(400).json({ ok: false, error: 'accion invalida' });
       }
 
       // --- Albums fotograficos POST (ADR-017) ---

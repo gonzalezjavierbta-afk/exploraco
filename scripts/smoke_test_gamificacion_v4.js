@@ -222,11 +222,11 @@ check('74. api/usuarios.js ASCII-safe (0 bytes > 127)', asciiSafe('api/usuarios.
 check('75. db/migrations/010_gamificacion_v4.sql ASCII-safe', asciiSafe('db/migrations/010_gamificacion_v4.sql'));
 
 // --- 10. XP_LEVELS en los 3 HTML (20 elementos cada uno) ---
-function countXpLevels(htmlPath) {
-  var full = fs.readFileSync(path.join(__dirname, '..', htmlPath), 'utf8');
-  var start = full.indexOf('var XP_LEVELS = [');
+function contarMinEnArray(full, marker) {
+  var start = full.indexOf(marker);
   if (start === -1) return -1;
   var arrayStart = full.indexOf('[', start);
+  if (arrayStart === -1) return -1;
   // Find matching bracket
   var depth = 0;
   var end = arrayStart;
@@ -238,6 +238,22 @@ function countXpLevels(htmlPath) {
   var arrStr = full.substring(arrayStart, end);
   var matches = arrStr.match(/\bmin:\s*\d+/g) || arrStr.match(/"min":\s*\d+/g) || arrStr.match(/min:\s*\d+/g);
   return matches ? matches.length : 0;
+}
+// ADR-040: mi-perfil.html ya no declara la tabla literal; aliasa
+// XP_LEVELS desde la fuente unica niveles-data.js. El check sigue
+// validando que la pagina use 20 niveles (leyendo la fuente real).
+function countXpLevels(htmlPath) {
+  var full = fs.readFileSync(path.join(__dirname, '..', htmlPath), 'utf8');
+  if (full.indexOf('var XP_LEVELS = [') !== -1) {
+    return contarMinEnArray(full, 'var XP_LEVELS = [');
+  }
+  var usaAlias = full.indexOf('niveles-data.js') !== -1
+    && full.indexOf('window.NivelesData.XP_LEVELS') !== -1;
+  if (!usaAlias) return -1;
+  var ndPath = path.join(__dirname, '..', 'niveles-data.js');
+  if (!fs.existsSync(ndPath)) return -1;
+  var nd = fs.readFileSync(ndPath, 'utf8');
+  return contarMinEnArray(nd, 'NivelesData.XP_LEVELS = [');
 }
 
 var idxCount = countXpLevels('index.html');

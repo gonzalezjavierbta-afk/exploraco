@@ -420,6 +420,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="map-picker.js"></script>
 </head>
 
 <body>
@@ -2208,8 +2209,10 @@ var currentStatusFilter = 'all';
 var currentVerifiedFilter = 'all';
 var sortKey = 'name';
 var sortAsc = true;
-var pickerMap = null, pickerMarker = null, pickerLatLng = null;
-var miniMap = null, miniMarker = null;
+/* MAP PICKER: modulo compartido map-picker.js con defaults de admin.html
+   (f-lat, f-lng, esb-mini-map, map-picker-modal, map-picker-el,
+   map-picker-coords). Wrappers finos abajo delegan al modulo. */
+var MapPicker = initMapPicker({ toast: showAdminToast });
 var editorStatus = 'published';
 var currentTags = [];
 var pendingCSVData = null;
@@ -4760,116 +4763,14 @@ function livePreview() {
   updateEditorSidebar();
 }
 
-/* ── MINI MAP (in editor sidebar) ── */
-function updateMiniMap() {
-  var lat = parseFloat(v('f-lat')), lng = parseFloat(v('f-lng'));
-  var el = document.getElementById('esb-mini-map');
-  if(!el) return;
-
-  // Sin coords — mostrar placeholder con botón de ayuda
-  if(!lat || !lng || isNaN(lat) || isNaN(lng)) {
-    if(!miniMap) {
-      el.innerHTML = '<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:12px;background:var(--bg2);border-radius:var(--r)">'
-        +'<span style="font-size:24px">📍</span>'
-        +'<span>Ingresa lat/lng para ver el mapa</span>'
-        +'<button onclick="buscarCoordenadas()" style="padding:5px 12px;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">🔍 Buscar por ciudad</button>'
-        +'</div>';
-    }
-    return;
-  }
-
-  if(!miniMap) {
-    // Limpiar placeholder si existe
-    el.innerHTML = '';
-    try {
-      miniMap = L.map('esb-mini-map', {
-        zoomControl: true,
-        scrollWheelZoom: false,
-        dragging: true,
-        tap: false
-      }).setView([lat, lng], 13);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        {attribution:'', maxZoom:19}).addTo(miniMap);
-      miniMarker = L.marker([lat, lng], {draggable: true}).addTo(miniMap);
-      // Al arrastrar el marker, actualizar los inputs
-      miniMarker.on('dragend', function(e) {
-        var pos = e.target.getLatLng();
-        var latEl = document.getElementById('f-lat');
-        var lngEl = document.getElementById('f-lng');
-        if(latEl) latEl.value = pos.lat.toFixed(6);
-        if(lngEl) lngEl.value = pos.lng.toFixed(6);
-      });
-    } catch(e) {
-      console.warn('[minimap]', e.message);
-      return;
-    }
-  } else {
-    miniMap.setView([lat, lng], 13);
-    if(miniMarker) miniMarker.setLatLng([lat, lng]);
-  }
-  setTimeout(function(){ if(miniMap) miniMap.invalidateSize(); }, 150);
-}
-
-// Buscar coordenadas por nombre de ciudad usando Nominatim (gratuito)
-function buscarCoordenadas() {
-  var ciudad = v('f-city') || v('f-nombre') || '';
-  if(!ciudad) { showAdminToast('Primero escribe la ciudad del lugar', 'error'); return; }
-  var query = ciudad + ', Colombia';
-  fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(query)+'&limit=1', {
-    headers: { 'Accept-Language': 'es', 'User-Agent': 'ExploraCO/1.0' }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(results) {
-    if(!results || !results.length) {
-      showAdminToast('No se encontraron coordenadas para "'+ciudad+'"', 'error');
-      return;
-    }
-    var res = results[0];
-    var lat = parseFloat(res.lat);
-    var lng = parseFloat(res.lon);
-    var latEl = document.getElementById('f-lat');
-    var lngEl = document.getElementById('f-lng');
-    if(latEl) latEl.value = lat.toFixed(6);
-    if(lngEl) lngEl.value = lng.toFixed(6);
-    // Destruir mapa anterior para reinicializar
-    if(miniMap) { miniMap.remove(); miniMap = null; miniMarker = null; }
-    updateMiniMap();
-    showAdminToast('📍 Coordenadas de '+ciudad+' cargadas — arrastra el pin para ajustar');
-  })
-  .catch(function(e) {
-    showAdminToast('Error al buscar: ' + e.message, 'error');
-  });
-}
-
-/* ── MAP PICKER ── */
-function openMapPicker() {
-  document.getElementById('map-picker-modal').classList.add('open');
-  setTimeout(function(){
-    if(!pickerMap) {
-      var lat = parseFloat(v('f-lat'))||4.5981, lng = parseFloat(v('f-lng'))||-74.0759;
-      pickerMap = L.map('map-picker-el').setView([lat,lng],10);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:19}).addTo(pickerMap);
-      pickerMap.on('click',function(e){
-        pickerLatLng = e.latlng;
-        if(pickerMarker) pickerMarker.setLatLng(e.latlng);
-        else pickerMarker = L.marker(e.latlng).addTo(pickerMap);
-        setText('map-picker-coords','📍 '+e.latlng.lat.toFixed(6)+', '+e.latlng.lng.toFixed(6));
-      });
-    }
-    pickerMap.invalidateSize();
-  },200);
-}
-function closeMapPicker() {
-  document.getElementById('map-picker-modal').classList.remove('open');
-}
-function confirmMapPicker() {
-  if(!pickerLatLng) return;
-  document.getElementById('f-lat').value = pickerLatLng.lat.toFixed(6);
-  document.getElementById('f-lng').value = pickerLatLng.lng.toFixed(6);
-  closeMapPicker();
-  updateMiniMap();
-  showAdminToast('📍 Coordenadas actualizadas');
-}
+/* ── MINI MAP + MAP PICKER (modulo compartido map-picker.js) ──
+   Los wrappers conservan la firma global que usan los onclick/oninput
+   del HTML. La logica real vive en MapPicker (initMapPicker). */
+function updateMiniMap()    { MapPicker.updateMiniMap(); }
+function buscarCoordenadas(){ MapPicker.buscarCoordenadas(); }
+function openMapPicker()    { MapPicker.openMapPicker(); }
+function closeMapPicker()   { MapPicker.closeMapPicker(); }
+function confirmMapPicker() { MapPicker.confirmMapPicker(); }
 
 /* ── CATEGORY-SPECIFIC EDITORS ── */
 function showCatTab(id) {

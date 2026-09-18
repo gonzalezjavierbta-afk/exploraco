@@ -3161,5 +3161,119 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-114: Museo multimedia URL-only, backend v22 y migracion 025 [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** **IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Verificado contra archivo real (ADR-006): la migracion 025 EXISTE, la rama `?tipo=museo_recurso` y los filtros `af.visible` estan en `api/interacciones.js` v22. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar `db/migrations/025_album_fotos_visible.sql` en Neon ANTES del deploy del backend v22; el orden obligatorio del release es 024 -> 025 -> backend v22 (patron BUG-021/BUG-060).**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-18
+- **ADR:** DECISIONS.md **ADR-039** (Museo URL-only) + **ENMIENDA 1 de ADR-039** (2026-09-18), que corrige la opcion 7 y la decision E del ADR para que el contrato vigente coincida con el codigo. La decision NO se duplica aqui.
+- **Responsable / agentes:** architect + sql-security (migracion 025); backend-dev (rama `museo_recurso` y filtros); qa-auditor-free (Escudo GOLD); docs-keeper (esta entrada documental).
+- **Precedencia:** continua a TSK-113. `api/interacciones.js` pasa de v21 a **v22** (release compartido con ADR-040 y T4.5; header real L1-17).
+- **Relacion con bugs:** NO cierra BUG-061 (la rama legacy `POST tipo='foto'` sigue ABIERTA; la rama nueva SI exige `validarSesion` y toma el usuario de la sesion, cerrando esa clase de spoofing en el contrato nuevo). BUG-002 y BUG-062 siguen ABIERTOS, ajenos. No abre bug nuevo.
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006, 2026-09-18):**
+
+  1. **Migracion 025 - `db/migrations/025_album_fotos_visible.sql` (171 lineas, idempotente ADR-008, ASCII-safe ADR-002):** `ALTER TABLE album_fotos ADD COLUMN IF NOT EXISTS visible boolean NOT NULL DEFAULT false` (privado por defecto, decision b); backfill idempotente `UPDATE album_fotos SET visible=true WHERE activo=true AND visible=false` (el contenido legacy activo conserva su visibilidad publica pre-v22); indice unico parcial `idx_albumes_usuario_mi_museo ON albumes (usuario_id) WHERE titulo='Mi Museo' AND activo=true` (auto-album atomico). Incluye preflight/verificacion post-aplicacion y rollback documentado (LOSSY). NO crea `album_fotos.activo` (ya existe desde la 009).
+  2. **Rama POST `?tipo=museo_recurso` (`api/interacciones.js` L6197-6415):** `accion=crear|editar|eliminar`. Auth SIEMPRE por sesion firmada (`verificarSesion`, ADR-025); el usuario sale del token, NUNCA del body. URL `^https?://` y longitud <= 2000; `tipo_media` en foto|video|audio; `caption` <= 200; `album_id` opcional propio (400 si ajeno); coords ambos o ninguno con rango [-90,90]/[-180,180] (`COORDENADAS_INVALIDAS`). Auto-album "Mi Museo" con `INSERT ... ON CONFLICT DO NOTHING` + re-SELECT. Coords se persisten en `albumes` destino (el recurso hereda la ubicacion de su carpeta).
+  3. **Gate y XP (ENMIENDA 1 de ADR-039):** gate de creacion UNICO `mis_fotografo` para foto, video y audio (L6225-6227), porque `mis_videografo`/`mis_sonidista` cuentan recursos ya creados (deadlock circular); **+15 XP (`mrXp=15`, L6283) para los 3 tipos**, acreditado con `contextoXpE`/`calcularXpFinal`/`acreditarClaseYCofre`/`repartirXpReferidos` y seguido de `evaluarMisiones`/`evaluarLogros` (hitos POST-insert). NO se usa `xp_otorgado_autor=0`.
+  4. **Misiones nuevas (catalogo 39 -> 41):** `mis_videografo` "Cronicas en Movimiento" (L1304, `xp:15`, `gate_nivel:2`) y `mis_sonidista` "Ecos y Relatos" (L1319, `xp:15`, `gate_nivel:2`), grupo `fotos`, sin DDL.
+  5. **Rama GET `?tipo=museo_recurso` (L3695-3777):** `usuario_id`/`id` OPCIONAL (default = dueno de la sesion; sin sesion y sin `usuario_id` -> 400); `visible`/`album_id` opcionales; `limit` 50 (max 200), `offset`. Visibilidad server-side (dueno ve todo; el resto solo `af.visible=true`). Proyeccion real `foto_url` (no `url`), `tipo_media`, `votos` (via `conDegradacionMedia`), `album_titulo`, `ciudad`, `creado_en`.
+  6. **Filtros `af.visible=true` en lectores publicos** (incluidos conteos y subqueries de votos): `multimedia_mapa` sin `scope=mio` (L4678), `mis_fotos` (L4822), `museo_publico` `total_fotos`/`votos` (L3596/L3598), `mi_feed_fotos` (L4794), `fotos_top` (L4881), `album_detalle` (L4223/L4226/L4251/L4267) y `galeria_destino` (L4386). `mis_guardados_media` SIN filtro (L4647).
+  7. **`barrio` DESCARTADO:** `albumes` no tiene esa columna; se persisten `ciudad`/`region` (L6271-6272).
+  8. **`accion=editar`** valida pertenencia por `af.agregador_id = sesion` (L6321-6329) y solo toca `caption`/`visible`/`album_id`/coords; edicion de `url`/`tipo_media` deshabilitada en v1 (requiere cambio de contrato). **`accion=eliminar`** valida por album del usuario y hace soft delete (`activo=false`, Cero Borrado Logico).
+
+- **Archivos en el working tree (SIN commitear):**
+  - `api/interacciones.js` (header v22; ramas `museo_recurso` + filtros `visible` + 2 misiones nuevas).
+  - `db/migrations/025_album_fotos_visible.sql` (NUEVO, 171 lineas).
+  - `scripts/verify_025_precheck.js` (NUEVO, preflight read-only).
+  - `mi-perfil.html` (UI del Museo T5/T7; ver TSK-116).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001/ADR-010). Cero archivos nuevos en `api/`.
+
+- **Evidencia (ADR-006, verificada el 2026-09-18):**
+  - Header real `api/interacciones.js` v22 (L1: release compartido ADR-039 + ADR-040 + T4.5). Migracion 025 existe (171 lineas). Existen `niveles-data.js`, `map-picker.js`, `scripts/smoke_niveles_data.js` y `scripts/verify_025_precheck.js`.
+  - Conteo real del catalogo `MISIONES`: 41 (`id: 'mis_` x41). `mis_videografo`/`mis_sonidista` con `xp:15` y `gate_nivel:2`.
+  - Escudo GOLD (qa-auditor-free, tras correcciones): `node --check` OK; ASCII OK; balance de divs 0; `smoke_niveles_data.js` 31/31; `smoke_test_gamificacion_v4.js` 95/95; `smoke_021_xp_decimal_rankings.js` 45/45; `smoke_038_casas_clases.js` 76/76; `smoke_test_perfil_progreso.js` OK (41 misiones/33 logros); `smoke_test_comunidad.js` OK; `smoke_test_milestones_v2.js` OK; `check_buildHTML_inline.js` OK.
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. Aplicar `db/migrations/024_casas_cofre_y_clases.sql` (pendiente de TSK-112) y despues `db/migrations/025_album_fotos_visible.sql` en Neon (cada archivo COMPLETO en una corrida; idempotentes). Correr `scripts/verify_025_precheck.js` (read-only) antes.
+  2. **Deploy del backend v22** solo despues de 024 y 025; luego el frontend del Museo (TSK-116) y el acordeon (TSK-115).
+  3. Verificacion en vivo: crear recurso foto/video/audio por URL (privado por defecto), activar visible, mover de carpeta, eliminar; confirmar que un tercero jamas ve privados ni en listados ni en conteos.
+  4. Rollback (solo emergencia): `DROP COLUMN visible` + `DROP INDEX idx_albumes_usuario_mi_museo` es LOSSY si ya hay recursos v22.
+
+- **Hallazgos / deuda derivada:** smokes preexistentes en rojo (NO causados por esta entrega): `scripts/smoke_036_compartir.js` (espera el header `v19`, ya fallaba en HEAD) y `scripts/test_logros_catalogo.js` (espera 30 logros, real 33 desde ADR-036), registrados en BUGS_HISTORICOS.md; 12 `catch` vacios preexistentes en `mi-perfil.html` (fuera de alcance). BUG-061 y BUG-002 siguen abiertos sin empeorar.
+
+- **Fuera de alcance:** BUG-061/BUG-002/BUG-062; upload real de archivos; filtros de grid y refresh al cambiar de pestana (backlog); verificacion en vivo (post-deploy).
+
+---
+
+### TSK-115: Acordeon de niveles en Mi Perfil (ADR-040) [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** **IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Sin migraciones y sin archivos nuevos en `api/`: el backend entra como campos ADITIVOS en el payload existente de `?tipo=misiones` de `api/interacciones.js` v22. **PENDIENTE OPERATIVO (BLOQUEANTE): deploy del backend v22 + frontend (mismo release de TSK-114; aplicar 025 en Neon antes).**
+- **Prioridad:** Media
+- **Fecha:** 2026-09-18
+- **ADR:** DECISIONS.md **ADR-040** (acordeon de niveles). La decision NO se duplica aqui.
+- **Responsable / agentes:** architect + architect-review-free (diseno/aprobacion); js-silo-dev-free (`niveles-data.js`, smoke); frontend-tpl-free (acordeon en `mi-perfil.html`); docs-keeper (esta entrada).
+- **Precedencia:** comparte el release v22 con TSK-114.
+- **Relacion con bugs:** ninguno.
+
+- **Alcance ejecutado:**
+  1. **Fuente unica cliente `niveles-data.js` (NUEVO, 9363 bytes):** `XP_LEVELS` (20 niveles) + `CAPACIDADES_DETALLE` + helpers `capacidadesDelNivel(nivel)` y `misionesPorNivel(nivel, misionesData)` + `MISION_GATE_FALLBACK`. Cargado SOLO en `mi-perfil.html` (`<script src="niveles-data.js">`, L988).
+  2. **Backend aditivo v22:** `MISION_GATE_XP` (L376) + `nivelDeMisionServidor` (L387) que reusa `calcularNivelLocal`/`NIVELES_LOCAL`; campos `gate_nivel`/`desbloquea`/`nivel` en el payload de `?tipo=misiones` (y `desbloquea` aditivo en `?tipo=logros`).
+  3. **Acordeon en `mi-perfil.html`:** `renderNiveles` pasa a tarjetas expandibles con capacidades (chips + howto) y misiones por nivel.
+  4. **`GRUPO_NOMBRE` completo** a los 6 grupos reales (general, ciudad, categoria, fotos, artista, perfil).
+
+- **Archivos:** `niveles-data.js` (NUEVO), `scripts/smoke_niveles_data.js` (NUEVO), `api/interacciones.js` v22 (aditivo) y `mi-perfil.html`.
+
+- **Evidencia (ADR-006):** `scripts/smoke_niveles_data.js` **31/31 PASS** (valida umbrales vs `mi-perfil.html`, 20 niveles, 6 grupos, `CAPACIDADES_DETALLE` y fallback de 11); `mi-perfil.html` L988/L1024 cablea la fuente unica; `MISION_GATE_XP`/`nivelDeMisionServidor` presentes en `api/interacciones.js`.
+
+- **Deuda documentada:** `XP_LEVELS` sigue duplicado en `index.html` y `comunidad.html` (swap futuro de 1 linea: `var XP_LEVELS = NivelesData.XP_LEVELS;`); `usuario-session.js` no se toca en v1. Cliente desplegado antes del backend v22 mostrara el acordeon sin misiones ancladas (degradado aceptable).
+
+- **Fuera de alcance:** migraciones SQL; endpoints nuevos; swap de `XP_LEVELS` en index/comunidad; verificacion en vivo.
+
+---
+
+### TSK-116: UI de gestion del Museo + localizacion con pin (T5/T7) [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** **IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Consume el contrato v22 de TSK-114. **PENDIENTE OPERATIVO (BLOQUEANTE): deploy del frontend junto al backend v22 (aplicar 024 y 025 en Neon antes).**
+- **Prioridad:** Media
+- **Fecha:** 2026-09-18
+- **ADR:** ADR-039 (decision F ampliada: la UI de gestion del Museo llega como tarea frontend POSTERIOR al contrato) + ENMIENDA 1 de ADR-039.
+- **Responsable:** frontend-tpl-free (UI) + docs-keeper (esta entrada).
+- **Relacion con bugs:** ninguno; la UI usa la rama nueva con `validarSesion` (no la legacy de BUG-061).
+
+- **Alcance ejecutado:**
+  1. **Tab Museo de `mi-perfil.html`:** vista de dueno con CRUD por URL: listar (`GET tipo=museo_recurso` con JWT, incluye privados, L2254), crear (`POST` con url/tipo_media/caption/album_id/visible), editar (caption/visible/mover) y eliminar (soft delete) sobre `mediaCardHTML`; badge publico/privado y boton de toggle de visibilidad (`museoToggleVisible`).
+  2. **Selector de carpeta:** opcion "Mi Museo (automatico)" que crea la carpeta si no existe (L2213); check "Mostrar publicamente" (`#museo-f-visible`, default false).
+  3. **Localizacion con pin (T7):** contenedor propio `.pf-museo` (L499/L549) y host del modulo compartido `map-picker.js` (L888); orden CDN Leaflet 1.9.4 -> `map-picker.js` -> script inline (L989-991). Validacion de rango de coordenadas Colombia bloqueante.
+
+- **Archivos:** `mi-perfil.html` (tab Museo + localizacion) y `map-picker.js` (compartido; ver TSK-117).
+
+- **Evidencia (ADR-006):** `mi-perfil.html` L858 (hint "Mi Museo"), L862 (`#museo-f-visible`), L905 ("Mi Museo publico"), L2195-2303 (vista de dueno `museo_recurso`, `museoToggleVisible`, badges visible/privado), L888/L989-991 (host y orden de `map-picker.js`); balance de divs y ASCII verificados en el Escudo GOLD.
+
+- **Fuera de alcance:** edicion de link/tipo en v1; filtros de grid y refresh al cambiar de pestana (backlog); verificacion en vivo.
+
+---
+
+### TSK-117: Modulo compartido map-picker.js (refactor anti-duplicidad del selector de coordenadas) [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** **IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). **PENDIENTE OPERATIVO (BLOQUEANTE): deploy del frontend junto al backend v22.**
+- **Prioridad:** Media/Baja
+- **Fecha:** 2026-09-18
+- **ADR:** no requiere ADR nuevo; implementa la Regla de No-Duplicidad (AGENTS.md seccion 2.1).
+- **Responsable:** frontend-tpl-free/js-silo-dev-free + docs-keeper (esta entrada).
+- **Relacion con bugs:** ninguno.
+
+- **Alcance ejecutado:**
+  1. **`map-picker.js` (NUEVO, 11188 bytes):** modulo compartido del mapa de seleccion de coordenadas con defaults de `admin.html` (`f-lat`, `f-lng`, `esb-mini-map`, `map-picker-modal`, `map-picker-el`, `map-picker-coords`).
+  2. **`admin.html` refactorizado:** carga `<script src="map-picker.js">` (L423) y conserva wrappers finos que delegan al modulo (L2212-2214); el CSS/markup del modal se mantiene.
+  3. **`mi-perfil.html`** lo reutiliza para la localizacion del Museo (TSK-116).
+
+- **Evidencia (ADR-006):** `map-picker.js` existe; `admin.html` L423 y L2212-2214; `mi-perfil.html` L888/L989-991. Sin cambios en `api/` (8/8).
+
+- **Fuera de alcance:** reescritura de los wrappers de `admin.html`; nuevos consumidores; verificacion en vivo.
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

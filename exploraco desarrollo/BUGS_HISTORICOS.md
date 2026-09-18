@@ -1144,3 +1144,39 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 - **Evidencia (ADR-006):** `db/migrations/023_interacciones_media_unificadas.sql` encabezado "NO BORRA TABLAS LEGACY" (lineas 24-27) y backfills 5.1/5.4/5.3; `api/interacciones.js` v19 (lectores sobre `media_votos`/`media_comentarios`/`media_comentario_likes`).
 - **Estado:** DEUDA DOCUMENTADA (ADR-036 / TSK-110, 2026-09-17). No bloqueante; el rollback la mantiene como red de seguridad.
 
+---
+
+## Deuda ADR-039 / ADR-040 (2026-09-18) -- recoleccion de QA y `XP_LEVELS`, NO bugs confirmados
+
+**Nota:** estos hallazgos NO son bugs confirmados de la Entrega TSK-114..TSK-117 (2026-09-18); son DEUDA TECNICA / de QA preexistente detectada durante el Escudo GOLD. Se registran aqui para que ninguna IA las asuma resueltas (ADR-006) y se conservan por Regla de Oro 3.
+
+### DQ-3: `scripts/smoke_036_compartir.js` espera el header `v19` (real: v22)
+- **Severidad:** BAJA (deuda QA; NO causada por TSK-114..117).
+- **Contexto:** el smoke asserta literalmente `api/interacciones.js  v19` (L149) y su encabezado dice "tipo='compartir' de api/interacciones.js v19" (L3). El header real HOY es **v22**. YA fallaba antes de esta entrega (el header paso a v20 en TSK-111 y a v21 en TSK-112 sin actualizar el assert).
+- **Recomendacion:** hacer el assert robusto (regex de version) o actualizar la expectativa al subir el header; correr en la proxima tarea de higiene de smokes.
+- **Evidencia (ADR-006):** `scripts/smoke_036_compartir.js` L3/L149; `api/interacciones.js` L1 v22.
+- **Estado:** DEUDA QA DOCUMENTADA (2026-09-18). No bloqueante.
+
+### DQ-4: `scripts/test_logros_catalogo.js` espera 30 logros (real: 33 desde ADR-036)
+- **Severidad:** BAJA (deuda QA; NO causada por TSK-114..117).
+- **Contexto:** el check "LOGROS: 30 trofeos en catalogo" (L34) quedo desactualizado cuando ADR-036 sumo 3 logros de compartir (`logr_primer_compartido`, `logr_compartidor_25`, `logr_viral_100`); el catalogo real es **33**.
+- **Recomendacion:** actualizar la expectativa a la fuente real (`LOGROS.length`) o derivarla del catalogo.
+- **Evidencia (ADR-006):** `scripts/test_logros_catalogo.js` L34; `api/interacciones.js` catalogo LOGROS de 33.
+- **Estado:** DEUDA QA DOCUMENTADA (2026-09-18). No bloqueante; puede contarse junto con DQ-1/DQ-2.
+
+### D-4: `catch` vacios preexistentes en `mi-perfil.html` (fuera de alcance de TSK-116)
+- **Severidad:** BAJA (deuda tecnica preexistente; AGENTS.md seccion 2.2 prohibe capturar y silenciar sin registro).
+- **Contexto:** el QA reporto 12 capturas best-effort/vacias preexistentes en `mi-perfil.html`; no fueron introducidas por TSK-116 y no se corrigieron para no ampliar el alcance. El conteo depende del patron de busqueda (10-12).
+- **Recomendacion:** tarea de higiene separada (tipar/loguear o eliminar las capturas muertas).
+- **Estado:** DEUDA DOCUMENTADA (2026-09-18). No bloqueante.
+
+### D-5: `XP_LEVELS` duplicado en `index.html`, `comunidad.html` y `usuario-session.js` (ADR-040)
+- **Severidad:** BAJA (deuda de No-Duplicidad; AGENTS.md seccion 2.1).
+- **Contexto:** ADR-040 creo la fuente unica `niveles-data.js` y la cableo SOLO en `mi-perfil.html`; `index.html` y `comunidad.html` conservan su copia local (swap futuro de 1 linea: `var XP_LEVELS = NivelesData.XP_LEVELS;`) y `usuario-session.js` no se toco en v1.
+- **Recomendacion:** completar el swap cuando se toque cualquiera de esas 3 superficies; no crear una quinta copia.
+- **Estado:** DEUDA DOCUMENTADA (ADR-040 / TSK-115, 2026-09-18). No bloqueante.
+
+### Nota: BUG-061 y BUG-002 siguen ABIERTOS
+- **BUG-061** (`POST tipo='foto'` sin `validarSesion`) y **BUG-002** (doble escape en `api/pagina-destino.js` L2431) siguen ABIERTOS y NO fueron empeorados por TSK-114..117; la rama nueva `museo_recurso` SI exige sesion, por lo que no repite ese vector.
+- **Estado:** SIN CAMBIO (registro de no-regresion, 2026-09-18).
+

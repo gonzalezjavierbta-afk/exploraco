@@ -3,6 +3,7 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-114..TSK-117 / ADR-039 + ADR-040 + ENMIENDA 1 de ADR-039 "Museo multimedia URL-only + acordeon de niveles + localizacion y map-picker" (2026-09-18, IMPLEMENTADO EN WORKING TREE, SIN commitear) - `api/interacciones.js` **v22** (header real L1-17; release compartido): ramas `POST/GET ?tipo=museo_recurso` (crear/editar/eliminar/listar sobre `album_fotos` con visibilidad server-side), filtros `af.visible=true` en todos los lectores publicos (incluidos conteos y subqueries de votos), misiones `mis_videografo`/`mis_sonidista` (`xp:15`, `gate_nivel:2`; catalogo 39 -> **41**) y campos aditivos `gate_nivel`/`desbloquea`/`nivel` en `?tipo=misiones` (ADR-040, via `MISION_GATE_XP` + `nivelDeMisionServidor`). NUEVOS sin versionar: `db/migrations/025_album_fotos_visible.sql` (171 lineas; `album_fotos.visible` default false + backfill + indice unico parcial `idx_albumes_usuario_mi_museo`), `niveles-data.js` (9363 bytes, fuente unica cliente), `map-picker.js` (11188 bytes, modulo compartido; `admin.html` refactorizado), `scripts/smoke_niveles_data.js` (31/31) y `scripts/verify_025_precheck.js`. `mi-perfil.html`: tab Museo CRUD por URL + localizacion con pin (T5/T7). Gate de creacion de los 3 tipos = `mis_fotografo` (evita deadlock circular) y **+15 XP para foto, video y audio** (ENMIENDA 1 de ADR-039; el texto viejo del ADR decia 0 XP y sin gate). Escudo GOLD APROBADO tras correcciones: `node --check` OK; ASCII OK; divs 0; `smoke_niveles_data` 31/31; `gamificacion_v4` 95/95; `smoke_021` 45/45; `smoke_038` 76/76; `smoke_test_perfil_progreso`/`comunidad`/`milestones_v2`/`check_buildHTML_inline` OK. Presupuesto **8/8 INTACTO**. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 024 y 025 en Neon y LUEGO desplegar el backend v22 + frontend (orden 024 -> 025 -> v22).** Deuda: `smoke_036_compartir.js` (espera header v19) y `test_logros_catalogo.js` (espera 30 logros, real 33) siguen en rojo preexistente; 12 `catch` vacios preexistentes en `mi-perfil.html`.
 - TSK-113 / Sprint Multimedia-Pefil-Galeria-Mapa (2026-09-18, COMPLETADA en working tree, SIN commitear) - 4 archivos modificados (+249/-56; `git diff --numstat` verificado): `api/pagina-destino.js` (+6/-6; header **v12.20260917** con changelog L1-2: fix REFORZADO de BUG-057 en listener capture -- `cerrarPopoverGuardar` ignora `ev.target.id==='btn-guardar'` L2513, checkboxes Tu Mapa L2533 / mapas tematicos L2545 / boton "Nuevo mapa" L2556 con `event.stopPropagation()`; BUG-057 pasa a **CERRADO**, ver BUGS_HISTORICOS.md); `mi-perfil.html` (+82/-27; Grupo 1: `mediaCardHTML` L1832 unifica `foto_url||texto||media_url` en grid 140px con votos y empty state "Aun no tienes fotos..." L1876, guardados por fuente `album`/`album_foto`/`viajero_foto` con placeholder + enlace al destino, geo en `agregarFotoAlbum` con `#album-nueva-foto-lat/lng` L658-660 + `usarMiUbicacionAlbum` L1992 y validacion de rango Colombia, logros con `renderTrofeoCard` L1140 desbloqueados primero y boton colapsable "+N bloqueados" L1155-1192; divs 394/394, script 3/3; comentario `Rev 2026-09-18b` insertado por O1 del Escudo GOLD #92); `galeria.html` (+58/-10; paginacion 12/pagina con `G.galPagina/galPorPagina/galItems` L248, `gGalRenderPage` L882 y `gGalLoadMore` L897, consolidacion curadas->viajeros->albumes, boton `#g-more` REUTILIZADO; divs 84/84); `index.html` (+103/-13; Grupo 3+4: `#md-mapa-destino-titulo` L1245 + `mdSetDestinoTitulo` L3301-3302 en pin L3310 y album L3454, `votarMediaMapa` L3566 con `mostrarLogin` L3569 y 401 L3584, `renderLogrosGrid` L4630 solo `estado==='completada'` L4648 con `tierOrder` L4645; divs 523/523). **Desviacion de alcance O2:** `index-api-connector.js` NO se modifico (el endpoint `multimedia_mapa` filtra solo por `destino_id` y `cargarAlbumOficialDestino` ya envia `destino_id`; el titulo del drawer se resolvio en `index.html`). Escudo GOLD #92 APROBADO CON OBSERVACIONES: `node --check` PASS, ASCII 0/0/0, divs 0/0/0, `smoke_auditoria_pagina_destino` 54/54 PASS. Presupuesto 8/8 INTACTO; sin migraciones; prompt de la tarea `PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md` (untracked). **PENDIENTE OPERATIVO: commit/push/deploy de los 4 archivos + cierre documental en un solo release; NO mezclar archivos ajenos (O3): `opencode.json` + 3 `.opencode/agent/*` modificados + 4 borrados (`PROMPT_OPENCODE_TSK111.md`, `PROMPT_OPENCODE_TSK112.md`, `PROMPT_MULTIMEDIA_GALERIA.md`, `opencode - copia.json`).** Deuda confirmada: BUG-002 sigue ABIERTO en `api/pagina-destino.js` L2431. Detalle en TASKS.md TSK-113 y docs/HANDOFF_037.md.
 - TSK-111 / ADR-037 Geocerca con radio urbano 50 m + `album_oficial` en el mapa cultural + limpieza de modulos del admin + refactor de hero/galeria de la ficha (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+335/-298) + 1 archivo nuevo sin versionar (`PROMPT_OPENCODE_TSK111.md`): `admin.html` (+49/-82; "Que incluye el precio" retirado del admin/render, UI "Orden de modulos" eliminada con `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`, seccion "Operacion" eliminada con `f-capacidad` movido a General, `f-comotransporte` eliminado end-to-end, `moverFila`/`moveFaqRow`); `api/interacciones.js` (+44/-8; header v19 -> v20: `RADIO_DEFAULT_M`/`RADIO_POR_CATEGORIA` 100 -> 50 y subcategorias urbanas a 50, rural 250/parque-concierto 150/festival-deporte 200 intactos, `ACCURACY_MAX_M=150` y bloqueo 422 intactos, `album_oficial` en `multimedia_mapa`); `api/pagina-destino.js` (+121/-194; header v11: guard `edad_minima` con trim, hero botonera en 2 filas `.hctar-row` + grid 1+3 + `abrirLightboxHero`, "Fotos de viajeros" retirado, CTA "Ver todas las fotos"); `index-api-connector.js` (+32/-0; `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`); `index.html` (+51/-1; `mdMapaAlbumOficial`, solo rama `origen='destino'`); `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10) actualizados. Presupuesto 8/8 INTACTO (ADR-001); TSK-111 NO genera migraciones. Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES: `node --check` 8/8 api, ASCII 0/0/0 en `api/interacciones.js`, balance DIVs admin hostal/comida/sitio/evento = 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS (`smoke_test_epic_prompt` 4 FAIL PREEXISTENTES ajenos, DQ-2). **PENDIENTE OPERATIVO: migraciones 019-023 YA APLICADAS en Neon (confirmado por Javier el 2026-09-17; ver sesion TSK-112); solo queda commit/push/deploy de los 7 archivos + este cierre documental en un solo release.**
 - TSK-110 / ADR-036 Compartir social con XP (primer share 25 / posteriores 5, tope 10 eventos y 50 XP por 24h) + interacciones de media unificadas (votos/comentarios/guardados en `media_*`) (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 8 archivos modificados (+1379/-536) + 5 archivos nuevos sin versionar: `api/interacciones.js` (+949/-425; header `v18` -> `v19`: rama POST `compartir` con `validarSesion` y ledger en `media_compartidos`, 3 misiones + 3 logros nuevos, `media_voto`/`media_comentar`/GET `media_interacciones`/`media_comentarios`, alias legacy conservados, TODOS los lectores migrados a `media_*`, `galeria_destino` `items[]` v2 con `fuente`/`votos`/`comentarios`/`ya_votado`/`ya_guardado`/`tipo_voto:'media'`); `galeria.html` (+222/-32; 5 secciones en modo destino + modales VOTAR/GUARDAR/COMPARTIR + comentarios por 3 fuentes); `album-comments.js` (+92/-33; v2.0.0, `mount(target,{fuente,itemId},opts)` retrocompatible); `index.html` (+50/-17; insignia `compartido` derivada del catalogo real de logros); `api/pagina-destino.js` (+40/-27; hero mosaico 1+3 y boton Compartir en `.subnav`); `usuario-session.js` (+24/-0; `aplicarResultadoXp`); `comunidad.html` y `mi-perfil.html` (+1/-1 cada uno: solo cache-bust `album-comments.js?v=2`). NUEVOS: `compartir.js` (295 lineas, `window.ExploraCompartir`), `db/migrations/022_media_compartidos.sql` (131), `db/migrations/023_interacciones_media_unificadas.sql` (408), `scripts/smoke_036_compartir.js` (290) y `scripts/smoke_036_media_unificada.js` (361). Presupuesto 8/8 INTACTO (ADR-001); catalogo real HOY 39 misiones / 33 logros. Verificacion: `node --check` 7/7 OK, ASCII-safe 0 >127 / 0 backticks en `api/*.js`, `compartir.js` y migraciones, smokes 55/55 y 71/71 PASS (mock). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 022 y 023 en Neon ANTES del deploy del backend v19; los smokes NO validan Neon.**
@@ -39,6 +40,107 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-114..TSK-117 "Museo URL-only + acordeon de niveles + localizacion y map-picker" (2026-09-18) - ADR-039 + ADR-040 + ENMIENDA 1 de ADR-039
+
+Tareas TSK-114 (Museo URL-only + backend v22 + migracion 025), TSK-115 (acordeon
+de niveles / ADR-040), TSK-116 (UI Museo + localizacion T5/T7) y TSK-117
+(`map-picker.js`) **IMPLEMENTADAS EN WORKING TREE** (SIN commitear; verificado
+contra archivo real, ADR-006, el 2026-09-18). Las decisiones viven en
+`DECISIONS.md` ADR-039 + **ENMIENDA 1 de ADR-039** y ADR-040; las tareas en
+`TASKS.md` TSK-114..117. NO hay archivos nuevos en `api/` (8/8 intacto,
+ADR-001/ADR-010); SI hay 1 migracion nueva (025), 2 assets frontend nuevos
+(`niveles-data.js`, `map-picker.js`) y 2 scripts nuevos.
+
+**Estado real del working tree (verificado, ADR-006, 2026-09-18):**
+- `api/interacciones.js` **v22** (header real L1-17; release compartido ADR-039 +
+  ADR-040 + T4.5). `db/migrations/025_album_fotos_visible.sql` **EXISTE** (171
+  lineas). Existen `niveles-data.js` (9363 bytes), `map-picker.js` (11188),
+  `scripts/smoke_niveles_data.js` y `scripts/verify_025_precheck.js`.
+- Catalogo real de misiones: **41** (`id: 'mis_` x41); `mis_videografo`
+  ("Cronicas en Movimiento") y `mis_sonidista` ("Ecos y Relatos") con `xp:15` y
+  `gate_nivel:2`. Anclas: `api/interacciones.js` L1304/L1319 (misiones),
+  L376/L387 (`MISION_GATE_XP`/`nivelDeMisionServidor`), L3695-3777 (GET
+  `museo_recurso`), L6197-6415 (POST `museo_recurso`), L3596/L3598/L4223/L4226/
+  L4251/L4267/L4386/L4678/L4794/L4822/L4881 (filtros `visible`).
+- `git status` (2026-09-18): `M api/interacciones.js`, `M mi-perfil.html`,
+  `M admin.html`, `M scripts/smoke_021_xp_decimal_rankings.js`,
+  `M scripts/smoke_038_casas_clases.js`, `M scripts/smoke_test_gamificacion_v4.js`,
+  `M exploraco desarrollo/DECISIONS.md`; sin versionar
+  `?? db/migrations/025_album_fotos_visible.sql`, `?? niveles-data.js`,
+  `?? map-picker.js`, `?? scripts/smoke_niveles_data.js`,
+  `?? scripts/verify_025_precheck.js`.
+
+**Que se hizo (resumen, ver TASKS.md TSK-114..117 para anclas ADR-006):**
+- **Museo URL-only (ADR-039 + ENMIENDA 1):** recursos como URLs externas sobre
+  `album_fotos`; visibilidad POR RECURSO (`album_fotos.visible`, migracion 025,
+  privado por defecto) con filtro server-side en los lectores publicos
+  (incluidos conteos y subqueries de votos); ramas `?tipo=museo_recurso`
+  (crear/editar/eliminar/listar) con `validarSesion` y usuario tomado de la
+  sesion; carpetas = albumes (mover = `album_id`); auto-album "Mi Museo";
+  coords a nivel de album; `mis_guardados_media` sin filtro; `barrio`
+  descartado (solo `ciudad`/`region`).
+- **ENMIENDA 1 de ADR-039 (BLOQUEANTE de QA resuelto):** gate unico
+  `mis_fotografo` para foto/video/audio (evita deadlock circular de
+  `mis_videografo`/`mis_sonidista`), **+15 XP para los 3 tipos** y 2 misiones
+  nuevas (`gate_nivel:2`). El texto viejo de ADR-039 (opcion 7 y decision E)
+  prometia 0 XP y sin gate para video/audio; quedo marcado como SUPERSEDIDO y el
+  contrato vigente es el de la enmienda.
+- **Acordeon de niveles (ADR-040):** `niveles-data.js` como fuente unica cliente
+  (`XP_LEVELS` + `CAPACIDADES_DETALLE` + `capacidadesDelNivel`/`misionesPorNivel`),
+  cableada solo en `mi-perfil.html`; backend aditivo en `?tipo=misiones`
+  (`gate_nivel`/`desbloquea`/`nivel`).
+- **UI Museo + localizacion (T5/T7):** tab Museo de `mi-perfil.html` con CRUD por
+  URL, toggle de visibilidad y selector de carpeta; localizacion con pin sobre
+  `map-picker.js` (host `.pf-museo`).
+- **`map-picker.js` (TSK-117):** modulo compartido del selector de coordenadas;
+  `admin.html` refactorizado para consumirlo (mismos ids).
+
+**Escudo GOLD (APROBADO tras correcciones, 2026-09-18):** `node --check` OK;
+ASCII OK; balance de divs 0; `smoke_niveles_data.js` **31/31**;
+`smoke_test_gamificacion_v4.js` 95/95; `smoke_021_xp_decimal_rankings.js` 45/45;
+`smoke_038_casas_clases.js` 76/76; `smoke_test_perfil_progreso.js` OK (41
+misiones/33 logros); `smoke_test_comunidad.js` OK;
+`smoke_test_milestones_v2.js` OK; `check_buildHTML_inline.js` OK. El QA inicial
+marco BLOQUEANTE SOLO por desincronizacion ADR<->codigo; se resolvio con la
+ENMIENDA 1 de ADR-039.
+
+#### Que sigue
+1. **ORDEN DE DEPLOY OBLIGATORIO (BLOQUEANTE):** aplicar en Neon primero la
+   migracion **024** (pendiente de TSK-112) y despues la **025**
+   (`db/migrations/025_album_fotos_visible.sql`, archivo COMPLETO en una
+   corrida; idempotente). Correr antes `scripts/verify_025_precheck.js`
+   (read-only). Patron BUG-021/BUG-060.
+2. **Deploy del backend v22** (`api/interacciones.js`) DESPUES de 024 y 025;
+   luego el frontend (`mi-perfil.html`, `admin.html`, `niveles-data.js`,
+   `map-picker.js`).
+3. **Verificacion en vivo:** crear foto/video/audio por URL (privado por
+   defecto), activar visible, mover de carpeta y eliminar; confirmar que un
+   tercero no ve privados ni en listados ni en conteos; abrir el acordeon de
+   niveles y ver misiones ancladas; localizar el Museo con el pin.
+4. **Commit + push del release:** incluye los pendientes de TSK-107..TSK-113 y
+   este cierre documental; NO mezclar archivos ajenos/borrados del working tree.
+5. **Backlog:** sanitizar `scripts/smoke_036_compartir.js` (header v19) y
+   `scripts/test_logros_catalogo.js` (30 logros); limpiar los `catch` vacios de
+   `mi-perfil.html`; BUG-061 y BUG-002 abiertos.
+
+#### Riesgos activos
+- **Migracion 025 CREADA pero aun no aplicada en Neon:** desplegar el backend
+  v22 sin la 025 haria fallar `museo_recurso` y los filtros `visible` (columna
+  inexistente, mismo flujo que 017/021). El orden 024 -> 025 -> v22 es
+  obligatorio.
+- **Fuga de privados si falta un filtro:** cualquier lector nuevo de
+  `album_fotos` DEBE filtrar `af.visible=true` (salvo `mis_guardados_media`);
+  el riesgo documentado en ADR-039 es que un lector olvide el filtro. El smoke
+  de la rama GET debe garantizarlo server-side (nunca client-side).
+- **Duplicados de `XP_LEVELS`:** `index.html` y `comunidad.html` conservan su
+  copia local (deuda documentada; swap futuro de 1 linea).
+- **Cliente antes que backend v22:** el acordeon se mostraria sin misiones
+  ancladas (degradado aceptable, sin ruptura).
+- **Smokes preexistentes en rojo** (`smoke_036_compartir.js`,
+  `test_logros_catalogo.js`) NO son de esta entrega, pero contaminan la senal de
+  QA; tratarlos como deuda.
+- **BUG-061 y BUG-002 siguen ABIERTOS** (no relacionados con esta entrega).
 
 ### Sesion TSK-113 "Sprint Multimedia / Perfil / Galeria / Mapa" (2026-09-18) - cierre documental
 

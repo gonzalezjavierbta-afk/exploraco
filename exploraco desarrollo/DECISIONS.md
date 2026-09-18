@@ -1675,3 +1675,181 @@ El factor por poblacion activa es determinista, barato (un agregado sobre tablas
 - Verificacion contra el archivo real (ADR-006): api/interacciones.js v21 (helpers y llamadas en las 14 acciones de la whitelist), api/usuarios.js v16 (rama clase_elegir, sin gate de nivel) y db/migrations/024_casas_cofre_y_clases.sql (sin FK, sin casas_votaciones).
 
 **Estado de la enmienda:** Aprobada e implementada (2026-09-18).
+
+---
+
+## ADR-039: Museo multimedia URL-only (recursos por URL externa, visibilidad por recurso y carpetas = albumes)
+
+**ID:** ADR-039
+**Fecha:** 2026-09-18
+**Estado:** Diseno aprobado por decision de producto del Chief Architect; **IMPLEMENTADO EN WORKING TREE con ENMIENDA 1 (2026-09-18)**. Se aplicaron `db/migrations/025_album_fotos_visible.sql` (TASKS.md TSK-114) y las ramas `tipo=museo_recurso` + filtros de `visible` en `api/interacciones.js` v22; el frontend del Museo (T5/T7) entra en TSK-116. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 025 en Neon ANTES del deploy** (patron BUG-021/BUG-060; ver ENMIENDA 1 al final de este ADR).
+**Autor:** architect (AI-DOS) con decision de producto del Chief Architect.
+**Nota de numeracion:** el 039 es el consecutivo real tras ADR-038 (mayor registrado en este documento al 2026-09-18, verificado con grep sobre el archivo real, ADR-006). La ultima entrada vigente es la ENMIENDA 1 de ADR-038; este ADR se anexa a continuacion.
+
+### Contexto
+
+El Museo (perfil publico, WP-3 / ADR-028) expone hoy media por dos vias separadas: fotos de viajero (interacciones `tipo='foto'`, rama POST en `api/interacciones.js:5944-5971`) y albumes (`albumes` + `album_fotos`, migracion 009). El producto pide una gestion unificada de recursos multimedia del Museo (foto, video y audio) bajo tres restricciones simultaneas:
+
+1. **Vercel Hobby no persiste archivos binarios**; el sistema de media completo guarda URLs externas en la base. La subida real de archivos es TODO futuro documentado en TASKS.md:2407. El Museo no puede ser la excepcion: solo URLs.
+2. **Presupuesto de 8/8 funciones serverless agotado** (ADR-001/ADR-010): ninguna necesidad puede resolverse con un endpoint nuevo.
+3. **`album_fotos` ya soporta `foto_type` foto/video/audio** (migracion 009) pero no tiene via de ingesta para video/audio ni visibilidad por recurso: hoy todo lo de un album activo se muestra en el mapa multimedia (`multimedia_mapa` :4401-4585) y en el perfil publico (Sala V de `perfil.html:606-649` lee `tipo=mis_fotos`) sin distincion publico/privado; `museo_publico` (:3418) cuenta todas las fotos del album sin filtro.
+
+Decisiones de producto cerradas (no reabrir): (a) recursos del Museo SIEMPRE como links/URLs http/https validos, descartando Vercel Blob, Cloudinary y Supabase Storage; (b) visibilidad POR RECURSO con nuevo campo `album_fotos.visible boolean NOT NULL DEFAULT false`, privado por defecto, y filtro OBLIGATORIO en todo endpoint publico; (c) sin limites de cantidad ni tamano (solo scheme http(s) y longitud <= 2000); (d) reuso del schema de albumes como carpetas: mover un recurso = reasignar `album_id`, sin jerarquia nueva; (e) auto-crear el album "Mi Museo" (tipo mixto) si el usuario no tiene album al crear su primer recurso.
+
+### Opciones evaluadas
+
+1. **Storage real de binarios (Vercel Blob / Cloudinary / Supabase Storage).** Descartada: Vercel Hobby no persiste archivos y el ingreso por URL externa ya es el patron vigente (TASKS.md:2407).
+2. **Persistir los recursos del Museo en `interacciones` con tipos nuevos.** Descartada: el CHECK de `interacciones.tipo` no esta versionado (patron BUG-021/BUG-060, ver ADR-036) y las interacciones quedan para acciones de ficha; la media vive en el ecosistema `media_*` / `album_fotos`.
+3. **Tabla nueva `museo_recursos`.** Descartada: `album_fotos` (009) ya cumple el contrato (`foto_url`, `foto_type` con video/audio, `media_title`, `media_source`, `activo`, `agregador_id`/`autor_original_id`) y ya esta integrada con `media_votos`, `media_comentarios`, `media_guardados`, `multimedia_mapa`, `mi_feed_fotos`, `fotos_top` y `museo_publico` (ADR-036). Unica carencia real: visibilidad.
+4. **Visibilidad por album (campo en `albumes`).** Descartada: el producto pide visibilidad POR RECURSO; un album puede mezclar recursos publicos y privados.
+5. **Coords por recurso (columnas `lat/lng` en `album_fotos`).** Descartada: duplicaria la georreferencia que ya vive en `albumes.lat/lng` y obligaria a redisenar el UNION de `multimedia_mapa`; el recurso se georreferencia a traves de su carpeta. Los coords opcionales del payload se persisten en el album destino.
+6. **Endpoint nuevo `/api/museo.js`.** Descartada: 8/8 agotado (ADR-001). Todo entra como ramas `tipo=` en `api/interacciones.js`, con mutaciones por POST + `accion=` (patron vigente del archivo: todas las mutaciones existentes son POST `tipo=`; PATCH/DELETE no se usan en el archivo).
+7. **XP sin gate para video/audio.** Descartada: el XP solo se otorga a `tipo_media=foto` con la mision `mis_fotografo` completada (mismo contrato que la rama legacy, +15 XP con los helpers v21 de la ENMIENDA 1 de ADR-038); video/audio se persisten con `xp_otorgado_autor=0` hasta que T4.5 defina sus misiones. **(CORREGIDO POR ENMIENDA 1, 2026-09-18: el contrato implementado da gate `mis_fotografo` y +15 XP a los TRES tipos; NO existe `xp_otorgado_autor=0` para video/audio. Se descarta que `mis_videografo`/`mis_sonidista` sean prerequisito por deadlock circular. Ver ENMIENDA 1 al final de este ADR.)**
+
+### Decision tomada
+
+**(A) Migracion 025 (`db/migrations/025_album_fotos_visible.sql`)** — la UNICA de este ADR, idempotente (ADR-008) y ASCII-safe (ADR-002):
+- `ALTER TABLE album_fotos ADD COLUMN IF NOT EXISTS visible boolean NOT NULL DEFAULT false;`
+- Indice unico parcial para el album auto-creado: `CREATE UNIQUE INDEX IF NOT EXISTS idx_albumes_usuario_mi_museo ON albumes (usuario_id) WHERE titulo = 'Mi Museo' AND activo = true;` — permite `INSERT ... ON CONFLICT DO NOTHING` + re-SELECT sin duplicar el album bajo concurrencia.
+- Aplicar el archivo COMPLETO en Neon ANTES del deploy (patron BUG-021/BUG-060).
+
+**(B) Rama `POST ?tipo=museo_recurso`** (`api/interacciones.js` v22). Auth: `validarSesion` (ADR-025); el usuario se toma de la sesion, NUNCA del body (cierra la clase de spoofing de BUG-061).
+- `accion=crear` (default). Body: `{url, tipo_media, caption?, album_id?, lat?, lng?, visible?}`. Validaciones: `url` con `/^https?:\/\//` y longitud <= 2000 (mismo regex que la rama legacy :5954); `tipo_media` en foto|video|audio; `caption` <= 200 (columna `media_title varchar(200)`); `album_id` uuid opcional perteneciente al usuario (403/404 si es ajeno); `lat/lng` ambos o ninguno, rangos [-90,90] y [-180,180]; `visible` booleano default false. Si no viene `album_id`: buscar el album "Mi Museo" activo del usuario; si no existe, `INSERT ... ON CONFLICT DO NOTHING` y re-SELECT. Si `tipo_media=foto`: exigir mision `mis_fotografo` completada (gate identico a :5956-5961) y acreditar +15 XP con los helpers v21 (`contextoXpE` / `calcularXpFinal` / `acreditarClaseYCofre` / `repartirXpReferidos` / `evaluarMisiones` / `evaluarLogros`). Si `tipo_media` in video|audio: SIN gate y `xp_otorgado_autor = 0` (T4.5 anexara misiones sin migracion de datos). Persistencia: `INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, activo, xp_otorgado_autor)` con autor = usuario de la sesion y `media_source=''`. Si el payload trae `lat/lng`, se persisten en `albumes.lat/lng` del album destino (el recurso hereda la ubicacion de su carpeta). Respuesta 200: `{ok:true, data:{id, album_id, visible}, xp?, misiones?, logros?}`.
+- `accion=editar` (editar y mover). Body: `{id, caption?, visible?, album_id?, lat?, lng?}` con al menos un campo. `id` uuid OBLIGATORIO y perteneciente al dueno (`WHERE id=$1 AND agregador_id=$2 AND activo=true`; si no, 404). Mover = cambiar `album_id` (validar pertenencia del album nuevo). `lat/lng` se persisten en `albumes.lat/lng` del album (destino si se mueve). UPDATE parcial; `activo` no se toca aqui (Cero Borrado Logico intacto).
+- `accion=eliminar`. Body: `{id}`. Soft delete: `UPDATE album_fotos SET activo = false` (Regla de Oro 3). 404 si no existe o no pertenece.
+- Errores comunes: 400 (url/tipo_media/caption/lat-lng/uuid/sin campos editables), 401 (sesion), 403 (mision no completada en foto), 404 (recurso o album no encontrado / no te pertenece).
+
+**(C) Rama `GET ?tipo=museo_recurso`** (`api/interacciones.js` v22).
+- Query: `usuario_id|id` (uuid opcional; default = dueno de la sesion si la hay), `album_id` (uuid opcional), `limit` (default 50, max 200), `offset` (default 0). Orden: `creado_en DESC`.
+- Regla de visibilidad SERVER-SIDE: si el consultante no es el dueno (o no hay sesion): `WHERE af.visible = true`; si el consultante ES el dueno (sesion valida del mismo usuario): ve todo (incluye privados). `visible` SIEMPRE viaja en cada item de la respuesta.
+- Proyeccion: `af.id, af.album_id, a.titulo AS album_titulo, af.foto_url AS url, af.media_title AS caption, af.foto_type AS tipo_media, a.lat, a.lng, a.ciudad, af.visible, votos` (COUNT de `media_votos` fuente='album_foto' con `conDegradacionMedia`, patron BUG-051/BUG-060), `af.creado_en`. Shape: `{ok:true, data:[...]}`. Cero XP en GET.
+
+**(D) Filtro `af.visible = true` en TODOS los lectores PUBLICOS de `album_fotos`** (regla general). Lista de ramas en `api/interacciones.js`:
+1. `multimedia_mapa` (:4401-4585): la rama album del UNION agrega `AND af.visible = true` cuando NO `scope=mio` (capa publica, default v17/ADR-031); con `scope=mio` (toggle "Solo mio" del dueno) se mantiene sin filtro para que vea sus privados.
+2. `mis_fotos` (Sala V, `perfil.html:606-649`): filtro SIEMPRE `af.visible = true` (es solo lectura y solo publico por diseno del ADR-032; ni el dueno ve privados aqui — los gestiona por su panel). Cero cambios en `perfil.html`.
+3. `museo_publico` (:3418): el conteo `total_fotos` de `mpAlbumes` pasa a `af.activo=true AND af.visible=true` (el museo publico muestra solo lo visible).
+4. `mi_feed_fotos` (:4588), `fotos_top` (:4679), `album_detalle` y `galeria_destino` (parte album): mismo filtro (sin el, el contenido privado se escaparia por estas superficies).
+5. `mis_guardados_media` (:4647): SIN FILTRO — es la lista privada de bookmarks del dueno (migracion 019), no una superficie de publicacion. Un recurso ajeno que se vuelve privado NO se revoca del guardado en v1 (decision documentada, sin logica de re-vocacion).
+
+**(E) XP y misiones.** Foto: gate `mis_fotografo` + 15 XP (contrato identico a la rama legacy `tipo='foto'`, acreditado con los helpers de la ENMIENDA 1 de ADR-038). Video/audio: 0 XP en v1; T4.5 agregara misiones (sin cambios de esquema). Riesgo aceptado y documentado: la misma URL puede recibir 15 XP por `tipo='foto'` (interacciones) y 15 por `museo_recurso` (album_fotos); ambas vias exigen la MISMA mision, el dedup index de la 009 solo previene duplicados dentro del mismo album y el farming entre vias ya existe hoy con `album_agregar_foto` (+10). No se introduce un vector nuevo de mayor escala. **(CORREGIDO POR ENMIENDA 1, 2026-09-18: gate `mis_fotografo` para foto, video y audio; +15 XP para los TRES tipos; se crearon `mis_videografo` y `mis_sonidista` (xp 15, `gate_nivel` 2) como hitos POST-insert; catalogo 39 -> 41 misiones. Ver ENMIENDA 1 al final de este ADR.)**
+
+**(F) Frontend.** Cero cambios en esta iteracion: `perfil.html` Sala V, `galeria.html`, `admin.html` y `mi-perfil.html` consumen los contratos existentes (`mis_fotos`, `multimedia_mapa`, `museo_publico`) que ahora filtran visible server-side. La UI de gestion de recursos del Museo (crear/editar/mover/eliminar/visibilidad) queda como TSK de frontend POSTERIOR al contrato de API.
+
+### Justificacion
+
+Reusar `album_fotos` en lugar de una tabla nueva honra ADR-008 (todo cambio de esquema versionado), el patron polimorfico `media_*` de ADR-036 y la Regla de No-Duplicidad (AGENTS.md 2.1): el 90 por ciento del contrato (`foto_url`, tipo foto/video/audio, `media_title`, autor, dedup, votos, comentarios, guardados, mapa) ya existe y esta integrado; la unica carencia real es la visibilidad por recurso, que se resuelve con una columna booleana + filtros en los lectores. El gate de mision y el XP replican el contrato existente de `tipo='foto'` con los helpers v21, y la exigencia de `validarSesion` cierra de paso la deuda de confianza en `usuario_id` documentada en BUG-061 para el contrato nuevo (el legacy no se toca: retrocompatibilidad). Persistir las coords en el album evita duplicar georreferencia y mantiene el UNION de `multimedia_mapa` intacto. La auto-creacion de "Mi Museo" con indice unico parcial es atomica y sin carrera. El filtro `visible=true` en TODOS los lectores publicos (no solo los del alcance minimo) cumple la decision (b) sin fugas: la Sala V no cambia, pero `album_detalle`, `mi_feed_fotos` y `fotos_top` tampoco pueden exponer lo privado. Todo entra como ramas `tipo=` sin crear archivos en `api/`: el presupuesto 8/8 queda intacto (ADR-001).
+
+### Impacto
+
+- **DB:** `db/migrations/025_album_fotos_visible.sql` (`album_fotos.visible` + `idx_albumes_usuario_mi_museo`). APLICAR EN NEON ANTES del deploy (patron BUG-021/BUG-060, archivo COMPLETO en una corrida). Sin cambios mayores de esquema; sin DROP de tablas legacy (Regla de Oro 3).
+- **api/interacciones.js v22:** rama `POST tipo=museo_recurso` (crear/editar/eliminar) + rama `GET tipo=museo_recurso` (listar con visibilidad server-side) + `AND af.visible = true` en `multimedia_mapa` (:4401, rama publica), `mis_fotos`, `museo_publico` (:3418, conteo `mpAlbumes`), `mi_feed_fotos` (:4588), `fotos_top` (:4679), `album_detalle` y `galeria_destino` (parte album). `mis_guardados_media` (:4647) SIN cambios.
+- **Frontend:** cero cambios en esta iteracion (`perfil.html:606-649` intacto; el backend filtra server-side).
+- **Presupuesto de endpoints:** intacto (8/8, ADR-001/ADR-010).
+- **Riesgos documentados:** (1) farming doble de XP entre vias legacy y `museo_recurso` — mitigado por el gate de la misma mision; (2) guardados de recursos que se vuelven privados no se revocan en v1; (3) la rama GET publica de `museo_recurso` debe probar que jamas filtra por `visible` client-side.
+
+**Estado final:** Aprobado como diseno por decision de producto del Chief Architect; **IMPLEMENTADO EN WORKING TREE con la ENMIENDA 1 (2026-09-18)**: migracion 025 creada y ramas en `api/interacciones.js` v22 implementadas (TASKS.md TSK-114), UI del Museo en `mi-perfil.html` (TSK-116). **Pendiente operativo: aplicar 025 en Neon antes del deploy** (patron BUG-021/BUG-060). El contrato vigente es el de la ENMIENDA 1 al final de este ADR; la opcion 7 y la decision E quedan marcadas como SUPERSEDIDAS.
+
+**ADRs relacionados:** ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado / idempotencia), ADR-010 (presupuesto de endpoints), ADR-017 (albumes, migracion 009), ADR-021 (filtros de mapa), ADR-023 (media polimorfica + `multimedia_mapa`), ADR-025 (sesion firmada), ADR-028 (Museo WP-3), ADR-031 (capa publica del mapa), ADR-032 (Sala V solo lectura publica), ADR-035 (numeric(12,2)), ADR-036 (media unificada + comparticiones), ADR-038 (helpers de XP v21 / ENMIENDA 1), BUG-021/BUG-060 (deuda de columnas no versionadas), BUG-061 (spoofing de `usuario_id`).
+
+---
+
+**ENMIENDA 1 (2026-09-18)**
+
+**Motivo.** El QA (qa-auditor-free) marco BLOQUEANTE que el texto vigente de ADR-039 (opcion 7 y decision E) no coincidia con la implementacion real de TSK-114/TSK-116: el ADR afirmaba que video/audio tendrian 0 XP y sin gate hasta T4.5, mientras que el orquestador aprobo y el codigo implemento gate y +15 XP para los TRES tipos, mas 2 misiones nuevas. Esta enmienda NO cambia codigo: documenta y aprueba el contrato REALMENTE implementado, verificado contra el archivo real (ADR-006: `api/interacciones.js` v22, `db/migrations/025_album_fotos_visible.sql` y `mi-perfil.html`). Donde haya contradiccion, PREVALECE esta enmienda sobre la opcion 7 y la decision E (y sobre el resto del ADR donde se contradiga).
+
+**Resoluciones del contrato implementado (9).**
+
+1. **Gate de creacion UNICO:** mision `mis_fotografo` completada para foto, video y audio (`api/interacciones.js` L6225-6227). Razon: `mis_videografo` y `mis_sonidista` cuentan recursos YA creados (`COUNT(*)` sobre `album_fotos` con `foto_type='video'/'audio'`), de modo que exigirlos como prerequisito del primer recurso seria un **deadlock circular**. Se evaluan como hitos POST-insert con `evaluarMisiones` (L6298). Desviacion documentada respecto del literal del pedido.
+
+2. **+15 XP para foto, video y audio (no 0).** `mrXp = 15` (L6283) para los 3 tipos; el XP pasa por `contextoXpE` + `calcularXpFinal` (clase/Casa) + `acreditarClaseYCofre` + `repartirXpReferidos`; el usuario recibe `xp`/`misiones`/`logros` en la respuesta 200. NO se usa `xp_otorgado_autor=0`.
+
+3. **Misiones nuevas (catalogo 39 -> 41),** grupo `fotos`, `requiere: []`, `xp: 15`, `gate_nivel: 2`, evaluadas post-insert:
+   - `mis_videografo` "Cronicas en Movimiento": check `>=1` video activo del usuario.
+   - `mis_sonidista` "Ecos y Relatos": check `>=1` audio activo del usuario.
+   Sin DDL (el progreso vive en `progreso_misiones` jsonb). El acordeon de ADR-040 las ancla por su `gate_nivel`.
+
+4. **Filtros `af.visible=true` tambien en los CONTEOS y subqueries de votos** (no solo en el SELECT principal) de `mis_fotos`, `album_detalle`, `albumes` y `museo_publico` (`total_fotos` y `votos`); evita fugas de recursos privados por agregados. `mis_guardados_media` mantiene SIN filtro (bookmarks privados del dueno).
+
+5. **`GET ?tipo=museo_recurso`:** `usuario_id` (o `id`) OPCIONAL; default = dueno de la sesion firmada; si no hay sesion y no llega `usuario_id`, 400. Query `visible` opcional, `album_id` opcional, `limit` 50 (max 200), `offset`. La proyeccion real usa `foto_url` (NO `url`), mas `album_titulo`, `tipo_media`, `ciudad`, `votos` y `creado_en`.
+
+6. **`accion=editar`** valida pertenencia por `album_fotos.agregador_id = sesion` (conforme ADR-039 B); **`accion=eliminar`** valida por album del usuario (`album_id IN (SELECT id FROM albumes WHERE usuario_id=sesion AND activo=true)`) y hace soft delete (`activo=false`, Cero Borrado Logico). `album_id` destino ajeno -> 400.
+
+7. **`barrio` DESCARTADO:** la tabla `albumes` no tiene esa columna; se persisten `ciudad` y `region` (ningun dato del payload queda sin persistir).
+
+8. **Validacion de rango de coordenadas bloqueante:** `lat` en [-90,90] y `lng` en [-180,180], ambos o ninguno, con `COORDENADAS_INVALIDAS` (400).
+
+9. **Edicion de `url`/`tipo_media` DESHABILITADA en v1** (requiere cambiar el contrato de la fila); `accion=editar` solo toca `caption`, `visible`, `album_id` y coords del album. El auto-album "Mi Museo" se crea con `INSERT ... ON CONFLICT DO NOTHING` + re-SELECT apoyado en `idx_albumes_usuario_mi_museo` (migracion 025).
+
+**Impacto en el contrato.**
+- Prevalece esta enmienda sobre la opcion 7 y la decision E de ADR-039, y sobre cualquier parrafo que prometa 0 XP o ausencia de gate para video/audio.
+- Se elimina del contrato vigente: "video/audio sin gate y con `xp_otorgado_autor=0`" y "T4.5 agregara misiones" (las misiones YA existen y el esquema no requirio cambios).
+- Se mantiene vigente: el modelo URL-only (descartando Vercel Blob/Cloudinary/Supabase), la visibilidad por recurso (`album_fotos.visible`, default false) con filtros server-side, los recursos sin limite de cantidad (solo scheme http(s) y longitud <= 2000), las carpetas = albumes (mover = cambiar `album_id`), el auto-album "Mi Museo", las coords a nivel de album, la rama `?tipo=museo_recurso` y el presupuesto 8/8 de endpoints.
+- **Decisiones del orquestador:** se descartan Vercel Blob/Cloudinary/Supabase (URL-only); `barrio` descartado; edicion de link/tipo deshabilitada en v1; validacion de rango Colombia bloqueante; los filtros de grid y el refresh al cambiar de pestana quedan como backlog (no bloqueantes).
+- Verificacion contra el archivo real (ADR-006): `api/interacciones.js` v22 (POST `museo_recurso` L6197-6415; GET `museo_recurso` L3695-3777; misiones L1304/L1319; filtros L3596/L3598/L4223/L4226/L4251/L4267/L4386/L4678/L4794/L4822/L4881) y `db/migrations/025_album_fotos_visible.sql` (171 lineas; columna `visible` + backfill + indice unico parcial).
+
+**Estado de la enmienda:** Aprobada e implementada (2026-09-18). Migracion 025 pendiente de aplicar en Neon antes del deploy del backend v22.
+
+---
+
+## ADR-040: Acordeon de niveles en Mi Perfil (fuente unica `niveles-data.js` y misiones con nivel server-side aditivo)
+
+**ID:** ADR-040
+**Fecha:** 2026-09-18
+**Estado:** Aprobado por architect-review-free (2026-09-18) y por decision del orquestador; **IMPLEMENTADO EN WORKING TREE (T1 y T2, 2026-09-18)**. Sin migraciones SQL y sin archivos nuevos en `api/` (presupuesto 8/8 intacto, ADR-001/ADR-010): todo el backend entra como campos ADITIVOS en el payload existente de la rama `?tipo=misiones` de `api/interacciones.js` v22 (mismo release que ADR-039).
+**Autor:** architect (AI-DOS), revisado y aprobado por architect-review-free (segunda opinion).
+**Nota de numeracion:** el 040 es el consecutivo real tras ADR-039 (mayor registrado en este documento al 2026-09-18, verificado con `^## ADR-` sobre el archivo real, ADR-006). No estaba reservado en ninguna spec.
+**Nota de release compartido:** el API v22 de `api/interacciones.js` es el MISMO release que ADR-039 (ramas `museo_recurso` + filtros `visible` + misiones del Museo de la ENMIENDA 1). Ambos ADRs son aditivos y no chocan; el header de version v22 debe contabilizar los dos.
+
+### Contexto
+
+`mi-perfil.html` renderiza hoy la seccion NIVELES como una lista plana de 20 tarjetas (`renderNiveles`, mi-perfil.html:1047-1076) alimentada por `XP_LEVELS` (mi-perfil.html:833-856; 20 umbrales `{min, nombre, emoji, era, capacidades}`). El producto pide un acordeon de niveles que muestre por nivel las capacidades desbloqueadas (chips + howto), las misiones ancladas a ese nivel y el estado (bloqueado/actual/desbloqueado). Tres restricciones rigen el diseno:
+
+1. **Regla de No-Duplicidad (AGENTS.md 2.1).** `XP_LEVELS` esta duplicado en 4 archivos (mi-perfil.html:833, index.html:4283, comunidad.html:499 y usuario-session.js:22). Queda prohibido copiarlo una quinta vez: el acordeon lee una FUENTE UNICA `niveles-data.js`.
+2. **Presupuesto 8/8 (ADR-001/ADR-010).** No hay endpoints nuevos. El nivel/gate de cada mision viaja en el payload EXISTENTE de `GET ?tipo=misiones` (api/interacciones.js:3235-3257, proyeccion en `entregarCatalogo` :2597-2613) como campos aditivos: el payload hoy proyecta `id, grupo, nombre, desc, xp, requiere, estado, en` y no incluye `desbloquea` ni nivel alguno.
+3. **Cero duplicacion de umbrales server-side.** `api/interacciones.js` ya deriva nivel con `calcularNivelLocal` + `NIVELES_LOCAL` (:336-344, los mismos 20 minimos que `api/usuarios.js` NIVELES); el helper nuevo `nivelDeMisionServidor` debe REUSARLO, no declarar otra tabla de umbrales.
+
+Estado real del catalogo (ADR-006): 39 misiones en 6 grupos (`general`, `ciudad`, `categoria`, `fotos`, `artista`, `perfil`); el `GRUPO_NOMBRE` actual de mi-perfil.html:1095 solo cubre 3 (`general`, `ciudad`, `categoria`) y es la unica copia del repo. Cinco misiones tienen gate por XP en su `check()`: `mis_fotografo` (>=100 = nivel 2), `mis_chat_mensajero` (>=250 = 3), `mis_chat_moderador` (>=450 = 4), `mis_chat_creador` (>=700 = 5) y `mis_organizador_bogota` (<300 = nivel 3, :1167); las 5 coinciden con las que llevan `desbloquea` en el catalogo (L1165/1246/1253/1260/1267) y con el comentario de capacidades :1237-1243. La ENMIENDA 1 de ADR-039 suma 2 misiones mas al catalogo (video y audio del Museo, gate propio): el catalogo real pasa a 41 y el acordeon las anclara por sus gates sin trabajo extra.
+
+### Opciones evaluadas
+
+1. **Quinta copia de `XP_LEVELS` dentro de mi-perfil.html (RECHAZADA).** Violaria el tripwire de 5 lineas de AGENTS.md 2.1 y dejaria 5 fuentes que divergen.
+2. **Endpoints nuevos (`?tipo=niveles` / `?tipo=capacidades`) (RECHAZADA).** Rompe el 8/8 (ADR-001/ADR-010) y el dato es 100% derivable desde el catalogo cliente.
+3. **Persistir `gate_nivel` en base (RECHAZADA).** Los gates son derivados de umbrales y del catalogo MISIONES; persistirlos crea segunda fuente de verdad y exige migracion en vano.
+4. **Enriquecer el payload existente de `?tipo=misiones` (ELEGIDA).** Aditivo, cero esquema, cero endpoints, retrocompatible en ambas direcciones: el cliente viejo ignora los campos nuevos y el cliente nuevo degrada sin ellos (fallback transitorio).
+5. **Derivar el nivel SOLO en cliente (fallback permanente) (RECHAZADA).** Duplicaria la logica de umbrales en JS cliente (violacion de No-Duplicidad) y divergiria del servidor (ADR-006); el servidor es la fuente autoritativa.
+
+### Decision tomada
+
+**(A) Fuente unica cliente `niveles-data.js`** (asset frontend, no funcion serverless, no cuenta contra el 8/8).
+- `XP_LEVELS`: los 20 niveles `{min, nombre, emoji, era}` — copia textual de mi-perfil.html:833-856 con los MISMOS umbrales; el string `capacidades` de cada nivel se reemplaza por su version estructurada en `CAPACIDADES_DETALLE`.
+- `CAPACIDADES_DETALLE`: lista de capacidades con `{nombre, howto, nivel}` (nivel = numero del nivel que la desbloquea, 1-based).
+- Helpers: `capacidadesDelNivel(nivel)` (filtra `CAPACIDADES_DETALLE` por `nivel`) y `misionesPorNivel(nivel, misionesData)` (filtra el payload de `?tipo=misiones` por `m.nivel === nivel`).
+- Cableado SOLO en mi-perfil.html. `index.html:4283` y `comunidad.html:499` CONSERVAN su copia local (deuda documentada; swap futuro de 1 linea: `var XP_LEVELS = NivelesData.XP_LEVELS;`). `usuario-session.js:22` no se toca en v1 (getLevel de sesion).
+- Dentro de mi-perfil.html NO conviven dos fuentes: T2 deriva el `XP_LEVELS` local como alias de `NivelesData.XP_LEVELS` (nunca dejar dos tablas de umbrales en la misma pagina).
+
+**(B) Backend aditivo en `api/interacciones.js` v22** (sin migraciones, sin endpoints nuevos).
+- Constante `MISION_GATE_XP = {mis_fotografo:2, mis_chat_mensajero:3, mis_chat_moderador:4, mis_chat_creador:5, mis_organizador_bogota:3}` — el gate de las 5 misiones que abren capacidad (4 del comentario :1237-1243 + `mis_organizador_bogota` cuyo `check()` exige 300 XP = nivel 3 con `NIVELES_LOCAL`).
+- Helper unico `nivelDeMisionServidor(item)`: devuelve `MISION_GATE_XP[item.id]` si existe; si no, `null`. REUSA `calcularNivelLocal`/`NIVELES_LOCAL` si necesita validar contra el nivel del usuario (No-Duplicidad; prohibido declarar otra tabla de umbrales).
+- Rama `?tipo=misiones` (:3235): `entregarCatalogo` (:2597) agrega a cada item tres campos aditivos: `gate_nivel` (del mapa, o null), `desbloquea` (campo real del catalogo MISIONES — hoy no proyectado — o null) y `nivel` (= `gate_nivel` o null, resultado de `nivelDeMisionServidor`). Nota: al extender la fila en `entregarCatalogo` (compartido), `?tipo=logros` tambien gana `desbloquea` de forma aditiva (null para logros; cero regresion). Sin campo `descripcion` nuevo en v1: se conserva el `desc` actual y el howto vive client-side en `CAPACIDADES_DETALLE` (T2).
+- Reglas de asignacion mision->nivel (orden): (a) `gate_nivel` explicito si la mision esta en `MISION_GATE_XP`; (b) en su defecto, umbral XP documentado en el comentario interacciones.js:1237-1243 (coincide con el mapa); (c) una mision que desbloquea una capacidad NO se duplica en el nivel de la capacidad — se lista UNA sola vez, en su gate. Sin ancla detectable = `nivel:null` (la mision sigue visible en el panel `#pf-misiones` existente, no en el acordeon).
+- Fallback cliente `MISION_GATE_FALLBACK` (constante en niveles-data.js, 11 entradas previstas) mientras el payload no traiga `m.nivel` (backend pre-v22): cubre las 5 con gate + misiones ancladas por cadena de `requiere`. La composicion EXACTA de las 11 se verifica en T2 contra el catalogo real (ADR-006) y se congela en el smoke.
+
+**(C) Frontend.**
+- T1 (frontend-tpl-free, mi-perfil.html `renderNiveles` :1047-1076): tarjetas de nivel clicables que abren un panel expandible por nivel con: capacidades del nivel (chips + howto via `capacidadesDelNivel`), misiones del nivel (`misionesPorNivel`) y estado (bloqueado/actual/desbloqueado segun `getLevel(st.xp)`; conserva `pf-level-num`).
+- T2 (js-silo-dev-free): crea `niveles-data.js`, completa `GRUPO_NOMBRE` a los 6 grupos reales (general, ciudad, categoria, fotos, artista, perfil) y entrega `scripts/smoke_niveles_data.js` (valida umbrales vs mi-perfil.html:833-856, 20 niveles, 6 grupos, CAPACIDADES_DETALLE con nivel 1..20 y el fallback de 11).
+
+### Justificacion
+
+El acordeon necesita capacidades y misiones por nivel SIN duplicar logica ni umbrales: la fuente unica cliente (A) respeta AGENTS.md 2.1 y deja un swap de 1 linea documentado para las 2 paginas restantes; el enriquecimiento aditivo de `?tipo=misiones` (B) honra el 8/8 (ADR-001/010), es retrocompatible en ambas direcciones (payload nuevo + cliente viejo = campos ignorados; payload viejo + cliente nuevo = fallback transitorio) y mantiene al servidor como autoridad de los niveles (ADR-006): el cliente solo agrupa, nunca deriva umbrales. Reusar `calcularNivelLocal` evita una segunda tabla de umbrales server-side. Sin migraciones: cero riesgo de `42703` y cero dependencia de Neon.
+
+### Impacto
+
+- **Frontend:** nuevo asset `niveles-data.js` (cargado SOLO en mi-perfil.html); `renderNiveles` pasa a acordeon (T1). `index.html`/`comunidad.html` intactos (deuda de copias documentada). `usuario-session.js` intacto.
+- **api/interacciones.js v22:** `MISION_GATE_XP` + `nivelDeMisionServidor` + 3 campos aditivos (`gate_nivel`/`desbloquea`/`nivel`) en el payload de `?tipo=misiones` (y `desbloquea` tambien en `?tipo=logros`, aditivo). Cero cambios de esquema, cero endpoints, cero migraciones.
+- **Catalogo de misiones:** con la ENMIENDA 1 de ADR-039 el total pasa de 39 a 41 (video/audio del Museo); `total: MISIONES.length` lo refleja solo y el acordeon las ancla por su gate.
+- **Presupuesto de endpoints:** intacto (8/8, ADR-001/ADR-010).
+- **Riesgos documentados:** (1) el fallback de 11 debe congelarse con smoke contra el catalogo real; (2) la deuda de XP_LEVELS duplicado en index/comunidad/usuario-session persiste (swap futuro); (3) cliente desplegado ANTES del backend v22 mostrara el acordeon sin misiones ancladas (degradado aceptable, sin ruptura: el panel `#pf-misiones` sigue funcionando).
+
+**Estado final:** Aprobado por architect-review-free el 2026-09-18 e IMPLEMENTADO EN WORKING TREE (T1: acordeon en `mi-perfil.html`; T2: `niveles-data.js` + `GRUPO_NOMBRE` de 6 grupos + `scripts/smoke_niveles_data.js` 31/31). Sin pasos manuales en Neon. Compatible con el release v22 compartido con ADR-039 (aplicar migracion 025 ANTES de ese deploy, patron BUG-021/BUG-060).
+
+**ADRs relacionados:** ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-006 (baseline real), ADR-010 (presupuesto de endpoints), ADR-014 (milestones y gates por XP), ADR-035 (XP decimal y niveles derivados), ADR-038 (helpers v21 / ENMIENDA 1), ADR-039 (release v22 compartido + ENMIENDA 1 de misiones del Museo).

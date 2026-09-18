@@ -24,6 +24,15 @@ function contarMinObjetos(t) {
   if (j < 0) return 0;
   return (t.slice(i, j).match(/\bmin\s*:/g) || []).length;
 }
+// ADR-040: index/comunidad conservan la tabla literal; mi-perfil la
+// aliasa desde niveles-data.js. Se valida el contrato nuevo completo
+// (carga de niveles-data.js + alias a window.NivelesData.XP_LEVELS + 20).
+function nivelesEnHtml(t) {
+  if (t.indexOf('XP_LEVELS = [') !== -1) return contarMinObjetos(t);
+  if (t.indexOf('niveles-data.js') === -1) return 0;
+  if (t.indexOf('window.NivelesData.XP_LEVELS') === -1) return 0;
+  return contarMinObjetos(leer('niveles-data.js'));
+}
 
 var USA = leer('api/usuarios.js');
 var INT = leer('api/interacciones.js');
@@ -146,7 +155,7 @@ HTMLS.forEach(function (f) {
   check('12: ' + f + ' formatea XP con fmtXp', HTML[f].indexOf('fmtXp') !== -1);
 });
 ['index.html', 'mi-perfil.html', 'comunidad.html'].forEach(function (f) {
-  check('13: ' + f + ' conserva los 20 XP_LEVELS', contarMinObjetos(HTML[f]) === 20);
+  check('13: ' + f + ' conserva los 20 XP_LEVELS', nivelesEnHtml(HTML[f]) === 20);
 });
 
 var selfAscii = asciiSafe('scripts/smoke_021_xp_decimal_rankings.js');

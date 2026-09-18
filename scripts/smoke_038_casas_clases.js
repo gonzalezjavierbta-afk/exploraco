@@ -22,7 +22,7 @@
 //      - calcularXpFinal (110 / 143 / 93.5 + red2) y calcularNivelClase.
 //      - acreditarClaseYCofre (50% clase + 10% cofre, sin clase/casa y
 //        best-effort ante sql que falla).
-//      - whitelist de 14 puntos con contextoXpE + calcularXpFinal +
+//      - whitelist de 15 puntos con contextoXpE + calcularXpFinal +
 //        acreditarClaseYCofre, y EXCLUIDOS sin el helper.
 //      - contadores total_resenas/total_guardados/total_visitas; +10 al
 //        autor original fuera del helper; bono rural plano.
@@ -583,9 +583,12 @@ async function run() {
   check('B4f: acreditarClaseYCofre registra el fallo best-effort con console.error',
     errCapt.length >= 1);
 
-  // --- B5. Whitelist de 14 puntos ---
+  // --- B5. Whitelist de 15 puntos ---
   // Ancla en TODOS los call-sites de contextoXpE (incluye el encadenado
   // sin await de la rama comentario), excluyendo su definicion.
+  // 15 = los 14 originales + la acreditacion de clase/cofre agregada en
+  // la rama museo_recurso (TSK-112 / ADR-038).
+  var XP_CALLSITES_ESPERADOS = 15;
   var anclas = [];
   var posCtx = srcInt.indexOf('contextoXpE(');
   while (posCtx !== -1) {
@@ -599,14 +602,14 @@ async function run() {
     if (win.indexOf('calcularXpFinal(') !== -1
         && win.indexOf('acreditarClaseYCofre(') !== -1) anclasCompletas++;
   });
-  check('B5a: hay 14 call-sites de contextoXpE',
-    anclas.length === 14);
-  check('B5b: los 14 puntos llaman calcularXpFinal + acreditarClaseYCofre por proximidad',
-    anclasCompletas === 14);
-  check('B5c: calcularXpFinal se invoca 14 veces (fuera de su definicion)',
-    cuenta(srcInt, /calcularXpFinal\(/g) - 1 === 14);
-  check('B5d: acreditarClaseYCofre se invoca 14 veces (fuera de su definicion)',
-    cuenta(srcInt, /acreditarClaseYCofre\(/g) - 1 === 14);
+  check('B5a: hay ' + XP_CALLSITES_ESPERADOS + ' call-sites de contextoXpE',
+    anclas.length === XP_CALLSITES_ESPERADOS);
+  check('B5b: los ' + XP_CALLSITES_ESPERADOS + ' puntos llaman calcularXpFinal + acreditarClaseYCofre por proximidad',
+    anclasCompletas === XP_CALLSITES_ESPERADOS);
+  check('B5c: calcularXpFinal se invoca ' + XP_CALLSITES_ESPERADOS + ' veces (fuera de su definicion)',
+    cuenta(srcInt, /calcularXpFinal\(/g) - 1 === XP_CALLSITES_ESPERADOS);
+  check('B5d: acreditarClaseYCofre se invoca ' + XP_CALLSITES_ESPERADOS + ' veces (fuera de su definicion)',
+    cuenta(srcInt, /acreditarClaseYCofre\(/g) - 1 === XP_CALLSITES_ESPERADOS);
 
   // --- B6. EXCLUIDOS: no llaman al helper ---
   var excluidos = [

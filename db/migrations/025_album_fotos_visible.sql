@@ -1,0 +1,171 @@
+-- ============================================================================
+-- Migration 025: Museo URL-only - visibilidad por recurso de album_fotos
+-- ADR-039 (DECISIONS.md, L1681-1752)
+-- Fecha: 2026-09-18
+-- Aplicar en Neon ANTES del deploy del backend v22 (api/interacciones.js,
+-- ramas POST/GET tipo=museo_recurso y filtros af.visible en los lectores
+-- publicos). Patron BUG-021/BUG-060: archivo COMPLETO en una corrida.
+-- Requiere: migraciones 009 (albumes + album_fotos) y 024 previamente
+--   aplicadas en Neon (la 024 es la unica pendiente de TSK-112; ver
+--   TASKS.md L3108-3110 y PROJECT.md L117).
+--
+-- QUE HACE
+--   1) album_fotos.visible boolean NOT NULL DEFAULT false: visibilidad POR
+--      RECURSO, privado por defecto (ADR-039, decision b). Todo lector
+--      publico de album_fotos (multimedia_mapa, mis_fotos, museo_publico,
+--      mi_feed_fotos, fotos_top, album_detalle, galeria_destino) debe
+--      filtrar con af.visible = true; solo el dueno ve sus privados.
+--   2) BACKFILL IDEMPOTENTE (decision orquestador 2026-09-18): el contenido
+--      legacy ACTIVO publicable conserva su visibilidad publica pre-v22
+--      (UPDATE album_fotos SET visible = true WHERE activo = true AND
+--      visible = false); lo NUEVO nacido con la rama museo_recurso nace
+--      privado (visible=false). Al re-ejecutar es no-op real: no quedan
+--      filas con activo=true y visible=false en la segunda corrida.
+--   3) Indice unico parcial idx_albumes_usuario_mi_museo (ADR-039,
+--      decision e): garantiza UN album "Mi Museo" activo por usuario y
+--      permite auto-crearlo de forma atomica con
+--      INSERT ... ON CONFLICT DO NOTHING + re-SELECT al crear el primer
+--      recurso sin album_id (cero duplicados bajo concurrencia).
+--
+-- NO CREA album_fotos.activo
+--   La columna activo YA EXISTE desde la migracion 009 (L55:
+--   boolean NOT NULL DEFAULT true) y NINGUN ALTER posterior la toca
+--   (verificado con grep: cero ALTER TABLE album_fotos en db/migrations/).
+--   El soft-delete del backend v22 (accion=eliminar) reusa activo tal cual
+--   (Cero Borrado Logico, Regla de Oro 3).
+--
+-- ADITIVA / IDEMPOTENTE (ADR-008)
+--   Todo con IF NOT EXISTS: ADD COLUMN y CREATE UNIQUE INDEX; el BACKFILL usa
+--   UPDATE ... WHERE activo=true AND visible=false (nunca DELETE ni INSERT):
+--   en la segunda corrida el WHERE no matchea ninguna fila y el UPDATE es
+--   no-op real. Re-ejecutar el archivo COMPLETO N veces es no-op seguro.
+--   ADITIVA: no elimina ni renombra nada; NO toca objetos de 001-023.
+--
+-- ASCII-SAFE (ADR-002): cero bytes > 127, cero tildes y cero ene, cero
+--   backticks, cero emojis (BUG-026). El texto va sin acentos.
+--
+-- ROLLBACK (emergencia, LOSSY si ya hay recursos creados con la rama v22)
+--   ALTER TABLE album_fotos DROP COLUMN IF EXISTS visible;
+--   DROP INDEX IF EXISTS idx_albumes_usuario_mi_museo;
+--   Quitar visible sin backfill pierde la visibilidad por recurso de los
+--   items ya creados; no va en el flujo normal.
+-- ============================================================================
+
+-- ============================================================
+-- 1. VISIBILIDAD POR RECURSO (ADR-039, decision b)
+-- ============================================================
+-- Privado por defecto para lo NUEVO (rama museo_recurso y cualquier INSERT
+-- que no explicite visible): el default es false. El contenido LEGACY activo
+-- publicable conserva su visibilidad publica pre-v22 mediante el BACKFILL
+-- del bloque 2 (justo despues de este ADD COLUMN, para que la columna
+-- visible YA exista al correr el UPDATE). El backend v22 setea el valor en
+-- crear/editar (body.visible, default false).
+
+ALTER TABLE album_fotos
+  ADD COLUMN IF NOT EXISTS visible boolean NOT NULL DEFAULT false;
+
+-- ============================================================
+-- 2. BACKFILL DE VISIBILIDAD DEL CONTENIDO LEGACY
+--    (decision orquestador 2026-09-18)
+-- ============================================================
+-- BACKFILL (decision orquestador 2026-09-18): el contenido legacy ACTIVO
+-- publicable conserva su visibilidad publica pre-v22. Lo NUEVO (creado con
+-- la rama museo_recurso) nace visible=false por defecto. Idempotente: al
+-- re-ejecutar, TODAS las filas ya tienen visible=true (el UPDATE no cambia
+-- nada); seguro bajo ADR-008.
+UPDATE album_fotos SET visible = true WHERE activo = true AND visible = false;
+
+-- ============================================================
+-- 3. ALBUM AUTO-CREADO "MI MUSEO" (ADR-039, decision e)
+-- ============================================================
+-- Unico parcial por usuario (titulo fijo + solo activos): limita a UN album
+-- "Mi Museo" activo por usuario. El backend v22, al recibir un recurso sin
+-- album_id, ejecuta:
+--   INSERT INTO albumes (usuario_id, titulo, tipo)
+--   VALUES ($1, 'Mi Museo', 'mixto')
+--   ON CONFLICT DO NOTHING;
+-- y re-SELECT del id; el indice convierte la carrera concurrente en no-op
+-- seguro (ningun duplicado, ningun error 23505).
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_albumes_usuario_mi_museo
+  ON albumes (usuario_id)
+  WHERE titulo = 'Mi Museo' AND activo = true;
+
+-- ============================================================================
+-- PREFLIGHT (solo lectura; NO se ejecuta dentro de la migracion). Copiar y
+-- correr sentencia por sentencia ANTES de aplicar la 025 y confirmar cada
+-- resultado esperado.
+-- ============================================================================
+-- (a) Estado de columnas de album_fotos. Esperado en base limpia: 1 fila
+--     (solo activo, heredada de la 009). Tras la 025: 2 filas.
+-- SELECT column_name, data_type, is_nullable, column_default
+--   FROM information_schema.columns
+--   WHERE table_schema = 'public' AND table_name = 'album_fotos'
+--     AND column_name IN ('visible','activo')
+--   ORDER BY column_name;
+--
+-- (b) Indice de la 009 vigente (idx_album_fotos_dedup) y ausencia del nuevo.
+--     Esperado en base limpia: 1 fila (solo dedup). Tras la 025: 2 filas.
+-- SELECT indexname FROM pg_indexes
+--   WHERE schemaname = 'public'
+--   AND indexname IN ('idx_album_fotos_dedup','idx_albumes_usuario_mi_museo')
+--   ORDER BY indexname;
+--
+-- (c) ALERTA DE DUPLICADOS PRE-EXISTENTES. El CREATE UNIQUE INDEX falla con
+--     23505 si YA existen 2+ albumes activos titulo='Mi Museo' para un mismo
+--     usuario en produccion. Si este query devuelve filas, DETENER e
+--     investigar/limpiar antes de aplicar (patron BUG-021).
+--     Esperado: 0 filas.
+-- SELECT usuario_id, COUNT(*) AS n
+--   FROM albumes
+--   WHERE titulo = 'Mi Museo' AND activo = true
+--   GROUP BY usuario_id
+--   HAVING COUNT(*) > 1;
+--
+-- (d) BACKFILL PROYECTADO (informativo pre-v22): filas LEGACY activas que la
+--     primera corrida de la 025 pasara a visible=true. Esperado: la cantidad
+--     real de contenido activo publicable (0 en bases nuevas). Nota: visible
+--     AUN NO existe al correr este preflight, por eso el filtro usa solo
+--     activo.
+-- SELECT COUNT(*) AS filas_que_se_publicaran
+--   FROM album_fotos
+--   WHERE activo = true;
+
+-- ============================================================================
+-- VERIFICACION POST-APLICACION (solo lectura; NO se ejecuta dentro de la
+-- migracion). Copiar y correr sentencia por sentencia en el editor de Neon.
+-- ============================================================================
+-- (a) Columnas visible y activo presentes (2 filas) con sus defaults
+--     (visible -> false, activo -> true):
+-- SELECT column_name, data_type, is_nullable, column_default
+--   FROM information_schema.columns
+--   WHERE table_schema = 'public' AND table_name = 'album_fotos'
+--     AND column_name IN ('visible','activo')
+--   ORDER BY column_name;
+--
+-- (b) Indice unico parcial creado (1 fila; indexdef debe contener
+--     WHERE titulo = 'Mi Museo' AND activo = true):
+-- SELECT indexname, indexdef FROM pg_indexes
+--   WHERE schemaname = 'public' AND indexname = 'idx_albumes_usuario_mi_museo';
+--
+-- (c) Idempotencia: correr el archivo COMPLETO una segunda vez; la segunda
+--     corrida debe ser no-op (los dos DDL llevan IF NOT EXISTS y el UPDATE
+--     del backfill no encuentra filas activo=true y visible=false; los
+--     resultados de (a), (b) y (d) no cambian).
+--
+-- (d) Backfill aplicado: inmediatamente tras la primera corrida NINGUNA fila
+--     activa queda privada por default. Esperado: 0.
+--     NOTA: deja de ser 0 cuando la UI de gestion del Museo permita ocultar
+--     recursos con accion=editar (visible=false explicito del dueno), lo
+--     cual es comportamiento CORRECTO post-v22.
+-- SELECT COUNT(*) AS activas_privadas_por_default
+--   FROM album_fotos
+--   WHERE activo = true AND visible = false;
+--
+-- (e) Rutina de auto-creacion del album (ejemplo, solo lectura util):
+--     INSERT INTO albumes (usuario_id, titulo, tipo)
+--     VALUES ('<uuid-de-prueba>', 'Mi Museo', 'mixto')
+--     ON CONFLICT DO NOTHING;
+--     SELECT id, titulo, activo FROM albumes
+--     WHERE usuario_id = '<uuid-de-prueba>' AND titulo = 'Mi Museo' AND activo = true;
+--     Repetida N veces debe devolver SIEMPRE 1 fila con el mismo id.
