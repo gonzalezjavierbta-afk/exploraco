@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "ollama/qwen2.5-coder:7b",
-  "small_model": "ollama/qwen2.5-coder:7b",
-  "default_agent": "free-build",
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/big-pickle",
+  "default_agent": "free-plan",
   "subagent_depth": 2,
   "permission": {
     "edit": "ask",
@@ -25,26 +25,5 @@
     ]
   },
   "formatter": true,
-  "lsp": true,
-  "provider": {
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama Local",
-      "options": {
-        "baseURL": "http://127.0.0.1:11434/v1",
-        "apiKey": "ollama",
-        "timeout": false,
-        "chunkTimeout": false
-      },
-      "models": {
-        "qwen2.5-coder:7b": {
-          "name": "qwen2.5-coder:7b",
-          "tools": true
-        },
-        "llama3.1:latest": {
-          "name": "llama3.1:latest"
-        }
-      }
-    }
-  }
+  "lsp": true
 }
