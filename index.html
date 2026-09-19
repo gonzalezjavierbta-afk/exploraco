@@ -879,6 +879,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 </style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="agenda-shared.js"></script>
+<script src="mapa-cultural.js"></script>
 </head><body>
 
 <nav class="hnav" id="hnav">
@@ -1092,10 +1093,10 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)">📍 Cerca de mí</div>
       <div class="mf-btn" onclick="resetMapaColombia()">🗺️ Colombia</div>
       <span class="mf-sep"></span>
-      <div class="mf-btn" data-media="all" onclick="toggleMapaMedia(this)">📸 Media</div>
-      <div class="mf-btn" data-media="foto" onclick="filterMapaMedia(this,'foto')">Fotos</div>
-      <div class="mf-btn" data-media="video" onclick="filterMapaMedia(this,'video')">Videos</div>
-      <div class="mf-btn" data-media="audio" onclick="filterMapaMedia(this,'audio')">Audios</div>
+      <div class="mf-btn" data-media="all">📸 Media</div>
+      <div class="mf-btn" data-media="foto">Fotos</div>
+      <div class="mf-btn" data-media="video">Videos</div>
+      <div class="mf-btn" data-media="audio">Audios</div>
       <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))">Solo mío</div>
     </div>
   </div>
@@ -1287,19 +1288,7 @@ var mmVisited = [];
 var destCat   = 'all';
 var destSearch = '';
 var mapaMap   = null;
-var mapaMarkers = {};
-var mapaActiveCat = 'all';
-var mapaActiveId  = null;
-var mapaClusterLayer = null;
-var mapaPlaces = [];
 var MAPA_MEDIA = [];
-var mapaMediaLayer = null;
-var mapaUserPos = null;
-var mapaPendingPopupId = null;
-var mapaReclusterTimer = null;
-var mapaPendingClearTimer = null;
-var mapaNoteTimer = null;
-var mapaGeoRequested = false;
 var v360Cur   = 0;
 var agendaCat = 'all';
 var agendaCityFilter = '';
@@ -2253,408 +2242,89 @@ function joinPlan(btn, name) {
   }, 1200);
 }
 
-/* ── MAPA INTERACTIVO LEAFLET ── */
+/* ── MAPA INTERACTIVO (motor compartido mapa-cultural.js) ──
+   TSK-134: se retiro el motor Leaflet inline duplicado. La pagina
+   consume window.MapaCultural (mapa-cultural.js) con paridad 1:1.
+   El connector sigue viendo window.mapaMap (var global, seteado en
+   onMapReady) y las funciones globales initMapaSection /
+   refreshMapaMarkers / openMapaDrawer / closeMapaDrawer y demas
+   shims delgados sobre la instancia compartida. */
+var mcMapa = null;
+
+var INDEX_MC_OPTS = {
+  map: 'leaflet-map',
+  tiles: 'carto-voyager',
+  center: [4.711, -74.072],
+  zoom: 14,
+  maxZoom: 19,
+  clusterPx: 40,
+  drawer: 'mapa-drawer',
+  list: 'mapa-list-inner',
+  note: 'mapa-note',
+  categories: '.mapa-filters',
+  mediaControls: '.mapa-filters',
+  enableMediaOnAll: true,
+  mediaEnabled: false,
+  mediaFilter: false,
+  mediaPhotoIcon: '\uD83D\uDCF8',
+  clusterLinksNavigate: true,
+  isSaved: function(p) { return mmSaved.indexOf(p.slug) !== -1; },
+  onToggleSave: function(p, el) { toggleMapaSave(p.key, el); },
+  onMapReady: function(m) { mapaMap = m; }
+};
+
 function initMapaSection() {
-  var mapEl = document.getElementById('leaflet-map');
-  if(!mapEl || typeof L === 'undefined') return;
-
-  // Si el mapa ya existe solo refrescar markers — NO reinicializar
-  if(mapaMap) {
-    refreshMapaMarkers();
-    return;
+  if(typeof window.MapaCultural === 'undefined') return null;
+  if(!mcMapa) {
+    mcMapa = window.MapaCultural.init(INDEX_MC_OPTS);
+  } else if(!mcMapa.getMap()) {
+    // Paridad con el init inline original: si el primer intento no logro
+    // crear el mapa, un llamado posterior debe reintentar (antes
+    // dependia de que mapaMap siguiera null).
+    mcMapa.init(INDEX_MC_OPTS);
   }
-
-  // Destruir cualquier instancia previa de Leaflet en el contenedor
-  try {
-    if(mapEl._leaflet_id) {
-      L.map(mapEl).remove();
-      mapEl._leaflet_id = null;
-    }
-  } catch(_) {}
-
-  try {
-    mapaMap = L.map('leaflet-map', {
-      center:[4.711,-74.072], zoom:14,
-      scrollWheelZoom:true,
-      tap:false
-    });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19}).addTo(mapaMap);
-    mapaClusterLayer = L.layerGroup().addTo(mapaMap);
-    mapaMediaLayer = L.layerGroup().addTo(mapaMap);
-    mapaMap.on('moveend', onMapaMoved);
-  } catch(e) {
-    console.warn('[mapa] init error:', e.message);
-    return;
-  }
-
-  refreshMapaMarkers();
-
-  document.querySelectorAll('.mf-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      if(!btn.dataset.cat) return; // botones de control (Cerca de mí / Colombia)
-      var yaActivo = btn.classList.contains('on');
-      document.querySelectorAll('.mf-btn[data-cat]').forEach(function(b){ b.classList.remove('on'); });
-      if(yaActivo) {
-        // R1: deseleccion -> ninguna categoria activa, capa directorio off.
-        mapaActiveCat = 'off';
-        renderMapaList('off');
-        filterMapaPins('off');
-        return;
-      }
-      btn.classList.add('on');
-      mapaActiveCat = btn.dataset.cat;
-      renderMapaList(mapaActiveCat);
-      filterMapaPins(mapaActiveCat);
-      // H1 QA: el filtro "Todo" tambien activa la capa multimedia:
-      // los pines media se muestran junto a los de destino.
-      if(mapaActiveCat === 'all') {
-        if(!mapaMediaOn && mapaMap && mapaMediaLayer) {
-          mapaMediaOn = true;
-          if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
-        }
-        syncMapaMediaBtns();
-        renderMapaMedia();
-      }
-    });
-  });
+  // Paridad: el init inline original terminaba llamando a
+  // refreshMapaMarkers() (ya con MAPA_PLACES/MAPA_MEDIA poblados por
+  // el connector). Se replica siempre que el mapa exista.
+  if(mcMapa && mcMapa.getMap()) refreshMapaMarkers();
+  return mcMapa;
 }
 
-// Redibuja markers desde MAPA_PLACES[] sin reinicializar el mapa.
-// Los markers individuales se crean una vez y se añaden/ocultan
-// dinámicamente en la capa de clusters según el zoom (reclusterMapa).
+// Redibuja pines/media desde MAPA_PLACES[]/MAPA_MEDIA[] (contrato del
+// connector) sin reinicializar el mapa. setPlaces/setMedia antes de
+// init quedan encolados por el propio modulo; refresh() es no-op si el
+// mapa aun no se inicializo. No llama a initMapaSection para evitar
+// recursion.
 function refreshMapaMarkers() {
-  if(!mapaMap || typeof L === 'undefined') return;
-
-  Object.keys(mapaMarkers).forEach(function(k) {
-    try { mapaMap.removeLayer(mapaMarkers[k]); } catch(_) {}
-  });
-  mapaMarkers = {};
-
-  var places = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES : [];
-  if(!places.length) {
-    console.warn('[mapa] MAPA_PLACES vacío o no cargado aún');
-    // Re-sync de la capa multimedia: MAPA_MEDIA puede estar poblada
-    // aunque los destinos aun no hayan llegado del connector.
-    renderMapaMedia();
-    return;
-  }
-
-  var added = 0;
-  places.forEach(function(p){
-    var lat = parseFloat(p.lat || 0);
-    var lng = parseFloat(p.lng || 0);
-    if(!lat || !lng) return;
-
-    var color   = p.color || '#E8A020';
-    var emoji   = p.emoji || '📍';
-    var name    = p.name  || '';
-
-    var ico = L.divIcon({
-      html: '<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;'
-          + 'transform:rotate(-45deg);background:' + color + ';'
-          + 'display:flex;align-items:center;justify-content:center;'
-          + 'box-shadow:0 3px 10px rgba(0,0,0,.35);border:2.5px solid #fff">'
-          + '<span style="transform:rotate(45deg);font-size:12px;display:block">' + emoji + '</span>'
-          + '</div>',
-      iconSize:[30,30], iconAnchor:[15,30], className:''
-    });
-
-    try {
-      var marker = L.marker([lat, lng], {icon:ico});
-      marker.on('click', function(){ setMapaActive(p.id); });
-      mapaMarkers[p.id] = marker;
-      added++;
-    } catch(e) {
-      console.warn('[mapa] marker error ' + name + ':', e.message);
-    }
-  });
-
-  mapaPlaces = places.slice();
-  filterMapaPins(mapaActiveCat || 'all');
-  renderMapaList(mapaActiveCat || 'all');
-  renderMapaMedia();
-  console.log('[mapa] ' + added + ' markers de ' + places.length + ' lugares');
+  if(typeof window.MapaCultural === 'undefined') return;
+  window.MapaCultural.setPlaces(MAPA_PLACES);
+  window.MapaCultural.setMedia(MAPA_MEDIA);
+  return window.MapaCultural.refresh();
 }
 
-// ── CLUSTERING POR PROXIMIDAD DE PÍXELES ──
-// Agrupa los markers visibles cuyo centroide esté a <=40px en píxeles.
-// Cada cluster muestra un badge circular con el conteo (estilo Upland).
-function onMapaMoved() {
-  clearTimeout(mapaReclusterTimer);
-  mapaReclusterTimer = setTimeout(function(){
-    reclusterMapa();
-  }, 150);
-}
-
-function placeById(id) {
-  var out = null;
-  MAPA_PLACES.forEach(function(p){ if(p.id === id) out = p; });
-  return out;
-}
-
-// true si al zoom maximo (18) algun miembro del cluster queda a >45px de
-// los demas (es decir, el zoom SI puede separarlo). Con coords identicas
-// nunca se aislaria, por eso la lista del popup es la salida correcta.
-function clAislable(ids) {
-  if(!mapaMap) return false;
-  var z = 18;
-  for(var i = 0; i < ids.length; i++) {
-    var p = placeById(ids[i]);
-    if(!p) continue;
-    var a = mapaMap.project([p.lat, p.lng], z);
-    var isolated = true;
-    for(var j = 0; j < ids.length; j++) {
-      if(j === i) continue;
-      var q = placeById(ids[j]);
-      if(!q) continue;
-      var b = mapaMap.project([q.lat, q.lng], z);
-      var dx = a.x - b.x, dy = a.y - b.y;
-      if(dx*dx + dy*dy < 45*45) { isolated = false; break; }
-    }
-    if(isolated) return true;
-  }
-  return false;
-}
-
-// Popup de cluster: lista todos los lugares agrupados con link y boton
-// de guardar (misma funcion toggleMapaSave que el popup individual).
-function openClusterPopup(ids, lat, lng) {
-  if(!mapaMap) return;
-  var items = ids.map(function(id){ return placeById(id); }).filter(Boolean);
-  var html = '<div style="min-width:200px;max-width:270px;max-height:280px;overflow:auto;font-family:Outfit,sans-serif">'
-    + '<div class="lp-name">🗂️ ' + items.length + ' lugar' + (items.length !== 1 ? 'es' : '') + ' aquí</div>';
-  items.forEach(function(p){
-    var isSaved = mmSaved.indexOf(p.slug) !== -1;
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(0,0,0,.06)">'
-      + '<span style="font-size:15px;width:18px;text-align:center;flex-shrink:0">' + (p.emoji || '📍') + '</span>'
-      + '<div style="flex:1;min-width:0">'
-      + '<div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + p.name + '</div>'
-      + '<div style="font-size:10px;color:#888">' + p.city + '</div></div>'
-      + '<a class="lp-li-go" href="' + p.slug + '.html">Ver →</a>'
-      + '<button class="lp-li-save' + (isSaved ? ' saved' : '') + '" id="lpsave-' + p.id + '"'
-      + ' onclick="toggleMapaSave(' + p.id + ',this)">' + (isSaved ? '♥' : '♡') + '</button></div>';
-  });
-  html += '</div>';
-  var cm = L.marker([lat, lng], {opacity:0, interactive:false});
-  cm.addTo(mapaClusterLayer);
-  cm.bindPopup(html, {maxWidth:290}).openPopup();
-  cm.on('popupclose', function(){ try { mapaClusterLayer.removeLayer(cm); } catch(_) {} });
-}
-
-function mapaClusterIcon(count, emoji) {
-  var size = count < 10 ? 40 : (count < 100 ? 46 : 54);
-  return L.divIcon({
-    html: '<div class="mapa-cluster" style="width:' + size + 'px;height:' + size + 'px">'
-        + '<span class="mapa-cl-emoji">' + emoji + '</span>'
-        + '<span class="mapa-cl-num">' + count + '</span></div>',
-    iconSize:[size,size], iconAnchor:[size/2,size/2], className:''
-  });
-}
-
-function reclusterMapa() {
-  if(!mapaMap || !mapaClusterLayer) return;
-  mapaClusterLayer.clearLayers();
-
-  // Agrupación por proximidad en píxeles: cada lugar entra al primer
-  // cluster cuyo centroide esté a <=40px (evita el corte por bordes de grilla).
-  var cellSize = 40;
-  var zoom = mapaMap.getZoom();
-  var clusters = [];
-  mapaPlaces.forEach(function(p){
-    var m = mapaMarkers[p.id];
-    if(!m) return;
-    var pt = mapaMap.project(m.getLatLng(), zoom);
-    var joined = null;
-    for(var i = 0; i < clusters.length; i++) {
-      var cp = mapaMap.project([clusters[i].lat, clusters[i].lng], zoom);
-      var dx = cp.x - pt.x, dy = cp.y - pt.y;
-      if(dx*dx + dy*dy <= cellSize*cellSize) { joined = clusters[i]; break; }
-    }
-    if(joined) {
-      joined.lat = (joined.lat * joined.cnt + p.lat) / (joined.cnt + 1);
-      joined.lng = (joined.lng * joined.cnt + p.lng) / (joined.cnt + 1);
-      joined.cnt++;
-      joined.ids.push(p.id);
-    } else {
-      clusters.push({ lat: p.lat, lng: p.lng, cnt: 1, ids: [p.id] });
-    }
-  });
-
-  clusters.forEach(function(cl){
-    if(cl.ids.length === 1) {
-      var solo = mapaMarkers[cl.ids[0]];
-      if(solo) mapaClusterLayer.addLayer(solo);
-      return;
-    }
-    var emoCounts = {};
-    cl.ids.forEach(function(id){
-      var p = placeById(id);
-      if(!p) return;
-      var e = p.emoji || '📍';
-      emoCounts[e] = (emoCounts[e] || 0) + 1;
-    });
-    var topEmoji = '📍', topN = 0;
-    Object.keys(emoCounts).forEach(function(e){
-      if(emoCounts[e] > topN) { topN = emoCounts[e]; topEmoji = e; }
-    });
-    var cm = L.marker([cl.lat, cl.lng], {icon:mapaClusterIcon(cl.ids.length, topEmoji)});
-    cm.on('click', function(){
-      // Fix: si el cluster no puede aislarse (miembros en las mismas coords
-      // o zoom ya al maximo) se abre un popup con la lista completa de
-      // lugares, en vez de un zoom infinito que nunca los separa.
-      if(zoom >= 17 || !clAislable(cl.ids)) {
-        openClusterPopup(cl.ids, cl.lat, cl.lng);
-        return;
-      }
-      var next = Math.min(zoom + 2, 18);
-      mapaMap.flyTo([cl.lat, cl.lng], next, {animate:true});
-    });
-    cm.addTo(mapaClusterLayer);
-  });
-}
-
-// Primer zoom (>= startZ) donde el lugar queda aislado en su celda de grilla
-function firstIsolatedZoom(id, startZ) {
-  var p = placeById(id);
-  if(!p) return startZ;
-  for(var z = startZ; z <= 18; z++) {
-    var pt = mapaMap.project([p.lat, p.lng], z);
-    var isolated = true;
-    mapaPlaces.forEach(function(o){
-      if(o.id === id) return;
-      var m = mapaMarkers[o.id];
-      if(!m) return;
-      var op = mapaMap.project(m.getLatLng(), z);
-      var dx = op.x - pt.x, dy = op.y - pt.y;
-      if(Math.sqrt(dx*dx + dy*dy) < 45) isolated = false;
-    });
-    if(isolated) return z;
-  }
-  return 18;
-}
-
-// Aislamiento por haversine para ordenar la lista por cercanía
-function haversineKm(lat1, lng1, lat2, lng2) {
-  var R = 6371;
-  var dLat = (lat2 - lat1) * Math.PI / 180;
-  var dLng = (lng2 - lng1) * Math.PI / 180;
-  var a = Math.sin(dLat/2)*Math.sin(dLat/2)
-        + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)
-        * Math.sin(dLng/2)*Math.sin(dLng/2);
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return Math.round(R*c*10) / 10;
-}
-
-function recomputeDists() {
-  if(!mapaUserPos) return;
-  MAPA_PLACES.forEach(function(p){
-    p._dist = haversineKm(mapaUserPos.lat, mapaUserPos.lng, p.lat, p.lng);
-  });
-}
-
-// ── GEOLOCALIZACIÓN ──
-function showMapaNote(msg) {
-  var el = document.getElementById('mapa-note');
-  if(!el) return;
-  clearTimeout(mapaNoteTimer);
-  if(!msg) { el.classList.remove('show'); return; }
-  el.textContent = msg;
-  el.classList.add('show');
-  mapaNoteTimer = setTimeout(function(){ el.classList.remove('show'); }, 4500);
-}
-
-function geolocateMapa(btnEl) {
-  var btn = btnEl || document.getElementById('mf-locate');
-  if(btn) btn.textContent = '⏳ Buscando…';
-  if(!mapaMap || typeof navigator === 'undefined' || !navigator.geolocation) {
-    showMapaNote('Tu navegador no soporta geolocalización — mostrando Bogotá.');
-    if(btn) btn.textContent = '📍 Cerca de mí';
-    return;
-  }
-  var done = false;
-  function finish() {
-    if(done) return; done = true;
-    if(btn) btn.textContent = '📍 Cerca de mí';
-  }
-  try {
-    navigator.geolocation.getCurrentPosition(function(pos){
-      mapaUserPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      recomputeDists();
-      renderMapaList(mapaActiveCat);
-      showMapaNote(null);
-      mapaMap.flyTo([mapaUserPos.lat, mapaUserPos.lng], 16, {animate:true});
-      finish();
-    }, function(err){
-      mapaUserPos = null;
-      showMapaNote('No pudimos obtener tu ubicación — mostrando Bogotá.');
-      finish();
-    }, {timeout:10000, maximumAge:300000});
-  } catch(e) {
-    mapaUserPos = null;
-    showMapaNote('No pudimos obtener tu ubicación — mostrando Bogotá.');
-    if(btn) btn.textContent = '📍 Cerca de mí';
-  }
+// Shims de los onclick estaticos del markup del mapa.
+function geolocateMapa(b) {
+  if(mcMapa) mcMapa.geolocate();
 }
 
 function resetMapaColombia() {
-  if(!mapaMap) return;
-  mapaMap.flyTo([5.5, -74.5], 6, {animate:true});
+  if(mcMapa) mcMapa.resetColombia();
 }
 
-function renderMapaList(cat) {
-  var el = document.getElementById('mapa-list-inner');
-  if(!el) return;
-  if(cat === 'off') {
-    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:16px">Sin categoria seleccionada - activa una para ver destinos</div>';
-    return;
-  }
-  var arr = (cat==='all') ? MAPA_PLACES.slice() : MAPA_PLACES.filter(function(p){ return p.cat===cat; });
-  if(mapaUserPos) {
-    arr.sort(function(a,b){
-      return ((a._dist != null) ? a._dist : 1e9) - ((b._dist != null) ? b._dist : 1e9);
-    });
-  }
-  var html = '';
-  arr.forEach(function(p){
-    var ac = (mapaActiveId===p.id) ? ' active' : '';
-    var dist = (mapaUserPos && p._dist != null) ? ' · ' + p._dist + ' km' : '';
-    html += '<a class="mapa-list-item'+ac+'" href="'+p.slug+'.html" onclick="event.preventDefault();setMapaActive('+p.id+')">'
-      +'<div class="mapa-li-ico" style="background:'+p.color+'22">'+p.emoji+'</div>'
-      +'<div><div class="mapa-li-name">'+p.name+'</div><div class="mapa-li-loc">📍 '+p.city+dist+'</div></div>'
-      +'<div class="mapa-li-stars">★'+p.rating.toFixed(1)+'</div>'
-      +'</a>';
-  });
-  el.innerHTML = html;
+function closeMapaDrawer() {
+  if(mcMapa) mcMapa.closeDrawer();
+  else if(window.MapaCultural) window.MapaCultural.closeDrawer();
 }
 
-function setMapaActive(id) {
-  mapaActiveId = id;
-  var p = placeById(id);
-  if(!p || !mapaMap) return;
-  var curZ = mapaMap.getZoom();
-  var targetZ = Math.max(curZ, firstIsolatedZoom(id, curZ));
-  if(targetZ === curZ) {
-    // Sin cambio de zoom: solo pan centrado. El pin ya es individual.
-    mapaMap.panTo([p.lat, p.lng], {animate:true});
-  } else {
-    // Estaba dentro de un cluster: subir solo lo necesario para aislarlo.
-    mapaMap.flyTo([p.lat, p.lng], targetZ, {animate:true});
-  }
-  openMapaDrawer(p);
-  renderMapaList(mapaActiveCat);
+// Lo usa tambien Mi Mapa legacy (updateMMMarkers) para abrir el drawer.
+function openMapaDrawer(place) {
+  if(!mcMapa) initMapaSection();
+  if(mcMapa) return mcMapa.openDrawer(place);
+  if(window.MapaCultural) return window.MapaCultural.openDrawer(place);
 }
 
-function filterMapaPins(cat) {
-  mapaActiveCat = cat;
-  if(!mapaMap) return;
-  if(cat === 'off') mapaPlaces = [];
-  else if(cat === 'all') mapaPlaces = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES.slice() : [];
-  else mapaPlaces = (typeof MAPA_PLACES !== 'undefined') ? MAPA_PLACES.filter(function(p){ return p.cat === cat; }) : [];
-  reclusterMapa();
-  renderMapaList(cat);
-}
-
+// Index-especifico: guardar/quitar un lugar en Mi Viaje desde el popup
+// del cluster (el modulo lo invoca via la opcion onToggleSave).
 function toggleMapaSave(id, el) {
   id = _slugDeId(id);
   var idx = mmSaved.indexOf(id);
@@ -2664,39 +2334,14 @@ function toggleMapaSave(id, el) {
   renderMyMap();
 }
 
-/* -- MAPA | CAPA MULTIMEDIA (Modelo A) -- */
-var mapaMediaOn = false;
-
-// Filtro multimedia MULTI-TIPO: cada tipo (foto/video/audio) es un
-// toggle independiente y varios pueden estar activos a la vez.
-// "Media" es el interruptor maestro de la capa completa.
-var MAPA_MEDIA_TIPOS = { foto: false, video: false, audio: false };
-
-// Cuenta cuantos tipos de media estan activos en el filtro multi-tipo.
-function mapaMediaTiposActivos() {
-  var n = 0;
-  if(MAPA_MEDIA_TIPOS.foto) n++;
-  if(MAPA_MEDIA_TIPOS.video) n++;
-  if(MAPA_MEDIA_TIPOS.audio) n++;
-  return n;
-}
-
+/* Helpers compartidos por renderDest y otras features del index: NO
+   pertenecen al motor del mapa (el modulo tiene sus propias copias). */
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// FIX 2: placeholder NEUTRO reutilizable. Solo se inyecta cuando la
-// foto es cadena vacia o falla la carga -- NUNCA una URL externa (ver
-// BUGS_HISTORICOS.md BUG-022 sobre hash/tamano invalido de Wikimedia,
-// mismo principio anti-placeholder). Variants:
-//   'card' -> <span> pequeno dentro del .dcard-img (home)
-//   'hero' -> <div> grande dentro del .md-hero (drawer multimedia)
-// En ambos casos el fondo neutro lo pone el contenedor padre
-// (hero_bg en cards, mdHeroBgSafe en drawer); aqui solo va el emoji
-// grande de la categoria sobre un leve dim. Esto centraliza el patron
-// para que un cambio de estilo o de fallback se haga en 1 sola linea.
 function photoPlaceholderHTML(emoji, variant) {
   var e = emoji || '\uD83D\uDCCD'; // pin por defecto
   if(variant === 'hero') {
@@ -2705,735 +2350,17 @@ function photoPlaceholderHTML(emoji, variant) {
   return '<span class="photo-ph">' + e + '</span>';
 }
 
-function normaliza(s) {
-  var out = String(s == null ? '' : s).toLowerCase();
-  out = out.replace(/\u00e1/g,'a').replace(/\u00e9/g,'e').replace(/\u00ed/g,'i')
-           .replace(/\u00f3/g,'o').replace(/\u00fa/g,'u').replace(/\u00fc/g,'u')
-           .replace(/\u00f1/g,'n');
-  return out;
-}
-
-function mismaCiudad(a, b) {
-  var na = normaliza(a);
-  var nb = normaliza(b);
-  return na !== '' && nb !== '' && na === nb;
-}
-
-function dentroRadio(lat1, lng1, lat2, lng2, km) {
-  if(!km) km = 10;
-  return haversineKm(lat1, lng1, lat2, lng2) <= km;
-}
-
-function mapaMediaIcon(item) {
-  var tipo = item.media_type || 'foto';
-  // TSK-106: color por ORIGEN. Album de usuario: ambar/rojo/violeta segun
-  // el tipo de medio. Destino: verde azulado, para que el material curado
-  // del destino se distinga de las subidas de la comunidad.
-  var esDestino = (item.origen === 'destino');
-  // Album curado del destino (origen='destino_album', media_type='album'):
-  // pin ambar con icono de album. No es un medio individual, agrupa la
-  // galeria completa de la ficha.
-  var esAlbumDestino = (item.origen === 'destino_album');
-  var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : (esDestino ? '#1f8a70' : '#E8A020'));
-  if(esAlbumDestino) color = '#d97706';
-  var ico = esAlbumDestino ? '📚' : ((tipo === 'video') ? '▶' : ((tipo === 'audio') ? '♫' : '📸'));
-  return L.divIcon({
-    html: '<div class="mpa-media-pin' + (esDestino ? ' mpa-media-pin-dest' : '') + (esAlbumDestino ? ' mpa-media-pin-album' : '') + (!esAlbumDestino && !esDestino && tipo === 'video' ? ' mpa-media-pin-video' : '') + '" style="background:' + color + '">' + ico + '</div>',
-    iconSize:[34,34], iconAnchor:[17,17], className:''
-  });
-}
-
-function renderMapaMedia() {
-  if(!mapaMap || typeof L === 'undefined' || !mapaMediaLayer) return;
-  mapaMediaLayer.clearLayers();
-  if(!mapaMediaOn) return;
-  var items = (typeof MAPA_MEDIA !== 'undefined') ? MAPA_MEDIA : [];
-  if(!items.length) return;
-  var bounds = mapaMap.getBounds();
-  var n = 0;
-  // TSK-106: la capa ahora trae tambien items origen='destino'. Para no
-  // saturar el mapa: (a) dedupe por origen_id -- un solo pin por destino
-  // aunque tenga varias fotos -- y (b) tope duro de markers visibles.
-  var TOPE_MEDIA_PINS = 300;
-  var destinosVistos = {};
-  var albumesVistos = {};
-  items.forEach(function(item){
-    var lat = parseFloat(item.lat);
-    var lng = parseFloat(item.lng);
-    if(!lat || !lng) return;
-    // Album curado del destino: no pertenece a los tipos foto/video/audio
-    // del filtro, por eso se muestra siempre que la capa este encendida.
-    var esAlbumDestino = (item.origen === 'destino_album');
-    if(!esAlbumDestino && !MAPA_MEDIA_TIPOS[item.media_type]) return; // multi-tipo: solo tipos activos
-    if(!bounds.contains([lat, lng])) return;
-    if(n >= TOPE_MEDIA_PINS) return;
-    if(item.origen === 'destino' && item.origen_id) {
-      if(destinosVistos[item.origen_id]) return;
-      destinosVistos[item.origen_id] = true;
-    }
-    if(esAlbumDestino && item.origen_id) {
-      if(albumesVistos[item.origen_id]) return;
-      albumesVistos[item.origen_id] = true;
-    }
-    try {
-      var marker = L.marker([lat, lng], { icon: mapaMediaIcon(item) });
-      marker.on('click', function(){ openMapaMediaDrawer(item); });
-      if(esAlbumDestino) {
-        // Tooltip: nombre del destino + numero de fotos del album.
-        marker.bindTooltip((item.album_titulo || 'Álbum del destino') + ' · ' + (parseInt(item.fotos_count,10) || 0) + ' fotos');
-      }
-      marker.addTo(mapaMediaLayer);
-      n++;
-    } catch(e) {
-      console.warn('[mapa] media marker error:', e.message);
-    }
-  });
-}
-
-function syncMapaMediaBtns() {
-  var btnAll = document.querySelector('[data-media="all"]');
-  var btns = document.querySelectorAll('.mf-btn[data-media]');
-  if(btnAll) {
-    if(mapaMediaOn) btnAll.classList.add('on');
-    else btnAll.classList.remove('on');
-  }
-  for(var i = 0; i < btns.length; i++) {
-    var b = btns[i];
-    var t = b.getAttribute('data-media');
-    if(t === 'all') continue;
-    if(MAPA_MEDIA_TIPOS[t] === true) b.classList.add('on');
-    else b.classList.remove('on');
-  }
-}
-
-function toggleMapaMedia(btn) {
-  if(!mapaMap || !mapaMediaLayer) return;
-  if(mapaMediaOn) {
-    mapaMediaOn = false;
-    if(mapaMap.hasLayer(mapaMediaLayer)) mapaMap.removeLayer(mapaMediaLayer);
-  } else {
-    // Encender la capa completa: si ningun tipo esta activo, se activan los 3.
-    if(mapaMediaTiposActivos() === 0) {
-      MAPA_MEDIA_TIPOS.foto = true;
-      MAPA_MEDIA_TIPOS.video = true;
-      MAPA_MEDIA_TIPOS.audio = true;
-    }
-    mapaMediaOn = true;
-    if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
-    renderMapaMedia();
-  }
-  syncMapaMediaBtns();
-}
-
-function filterMapaMedia(btn, tipo) {
-  if(!mapaMap || !mapaMediaLayer) return;
-  if(!MAPA_MEDIA_TIPOS.hasOwnProperty(tipo)) return;
-  var antesActivo = MAPA_MEDIA_TIPOS[tipo];
-  MAPA_MEDIA_TIPOS[tipo] = !antesActivo;
-  if(mapaMediaTiposActivos() === 0) {
-    // Se deselecciono el ultimo tipo activo: se apaga la capa completa.
-    mapaMediaOn = false;
-    if(mapaMap.hasLayer(mapaMediaLayer)) mapaMap.removeLayer(mapaMediaLayer);
-  } else if(!antesActivo && !mapaMediaOn) {
-    // Se selecciono un tipo con la capa apagada: se enciende la capa.
-    mapaMediaOn = true;
-    if(!mapaMap.hasLayer(mapaMediaLayer)) mapaMediaLayer.addTo(mapaMap);
-  }
-  syncMapaMediaBtns();
-  renderMapaMedia();
-}
-
-/* -- MAPA | DRAWER LATERAL (Modelo C) -- */
-function mdCatLabel(cat) {
-  if(cat === 'hostal') return 'Hospedaje';
-  if(cat === 'comida') return 'Comida';
-  if(cat === 'sitio') return 'Naturaleza';
-  if(cat === 'evento') return 'Eventos';
-  return 'Sitio';
-}
-
-function mdMediaBadge(tipo) {
-  if(tipo === 'video') return 'Video';
-  if(tipo === 'audio') return 'Audio';
-  return 'Foto';
-}
-
-function mdCapMedia(titulo, autor, votos) {
-  var c = titulo || '';
-  if(autor) c += ' \u00b7 ' + autor;
-  if(votos && votos > 0) c += ' \u2b50 ' + votos;
-  return c;
-}
-
-// M2 QA: valida hero_bg antes de inyectarlo en el estilo del hero del
-// drawer. Solo acepta un gradiente CSS plano sin comillas ni apóstrofes,
-// de modo que no pueda cerrar el atributo style ni inyectar HTML.
-function mdHeroBgSafe(bg, fallback) {
-  if(typeof bg === 'string' && /^linear-gradient\([^"']{1,200}\)$/.test(bg)) return bg;
-  return fallback;
-}
-
-function mdMediasCercanas(place) {
-  if(typeof MAPA_MEDIA === 'undefined') return [];
-  var out = [];
-  var pl = place || {};
-  MAPA_MEDIA.forEach(function(it){
-    // TSK-106: los items origen='destino' (fotos curadas del destino por
-    // el backend) tambien alimentan el drawer, no solo los albumes.
-    if(!it.lat || !it.lng) return;
-    var ok = mismaCiudad(pl.city, it.ciudad);
-    if(!ok) ok = dentroRadio(parseFloat(pl.lat), parseFloat(pl.lng), parseFloat(it.lat), parseFloat(it.lng), 10);
-    if(ok && out.length < 40) out.push(it);
-  });
-  return out;
-}
-
-function mdVideoEmbed(url) {
-  if(!url) return '';
-  var yt = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/.exec(url);
-  if(yt && yt[1]) {
-    return '<iframe class="md-lb-media" src="https://www.youtube.com/embed/' + yt[1]
-      + '" frameborder="0" allowfullscreen></iframe>';
-  }
-  var vm = /vimeo\.com\/(\d+)/.exec(url);
-  if(vm && vm[1]) {
-    return '<iframe class="md-lb-media" src="https://player.vimeo.com/video/' + vm[1]
-      + '" frameborder="0" allowfullscreen></iframe>';
-  }
-  return '<video class="md-lb-media" controls src="' + esc(url) + '"></video>';
-}
-
-function mdEnsureLightbox() {
-  var lb = document.getElementById('md-lbox');
-  if(lb) return lb;
-  lb = document.createElement('div');
-  lb.id = 'md-lbox';
-  lb.className = 'md-lbox';
-  lb.onclick = function(e){ if(e && e.target === lb) mdCloseLightbox(); };
-  document.body.appendChild(lb);
-  return lb;
-}
-
-function mdOpenLightbox(html, cap) {
-  var lb = mdEnsureLightbox();
-  lb.innerHTML = '<button class="md-lb-close" onclick="mdCloseLightbox()" aria-label="Cerrar">&times;</button>'
-    + '<div class="md-lb-wrap">' + html + '</div>'
-    + (cap ? '<div class="md-lb-cap">' + esc(cap) + '</div>' : '');
-  lb.classList.add('open');
-}
-
-function mdCloseLightbox() {
-  var lb = document.getElementById('md-lbox');
-  if(!lb) return;
-  lb.classList.remove('open');
-  lb.innerHTML = '';
-}
-
-function mdFotoLightbox(url, cap) {
-  mdOpenLightbox('<img class="md-lb-media" src="' + esc(url) + '" alt="' + esc(cap || '') + '">', cap);
-}
-
-function mdVideoLightbox(url, cap, autor, votos) {
-  mdOpenLightbox(mdVideoEmbed(url), mdCapMedia(cap, autor, votos));
-}
-
-function mdSwitchTab(btn, tab) {
-  var scope = btn.parentNode.parentNode;
-  var tabs = scope.querySelectorAll('.md-tab');
-  for(var i = 0; i < tabs.length; i++) tabs[i].classList.remove('on');
-  btn.classList.add('on');
-  var panes = scope.querySelectorAll('.md-pane');
-  for(var j = 0; j < panes.length; j++) {
-    panes[j].classList.toggle('on', panes[j].getAttribute('data-mdpane') === tab);
-  }
-}
-
-function mdTabHtml(place) {
-  var cercanas = mdMediasCercanas(place);
-  var videos = [];
-  var audios = [];
-  var fotosMedia = [];
-  cercanas.forEach(function(it){
-    if(it.media_type === 'video') videos.push(it);
-    else if(it.media_type === 'audio') audios.push(it);
-    else fotosMedia.push(it);
-  });
-  var fotosArr = [];
-  if(place.photos && place.photos.length) {
-    place.photos.forEach(function(ph){
-      var u = (typeof ph === 'string') ? ph : (ph.url || '');
-      if(u && fotosArr.indexOf(u) === -1) fotosArr.push(u);
-    });
-  }
-  if(place.foto && fotosArr.indexOf(place.foto) === -1) fotosArr.push(place.foto);
-  var hasFotos = fotosArr.length > 0 || fotosMedia.length > 0;
-  var hasVideos = videos.length > 0;
-  var hasAudios = audios.length > 0;
-  var html = '<div class="md-media"><h4>📸 Multimedia</h4>';
-  if(!hasFotos && !hasVideos && !hasAudios) {
-    html += '<div class="md-no-media"><div class="md-nm-ico">📸</div>'
-      + '<div class="md-nm-t">Sin multimedia cercana aún</div>'
-      + '<div class="md-nm-s">¡Sé el primero en subir fotos y videos de este lugar!</div></div>';
-    html += '</div>';
-    return html;
-  }
-  html += '<div class="md-tabs">';
-  if(hasFotos) html += '<button class="md-tab on" data-mdtab="fotos" onclick="mdSwitchTab(this,\'fotos\')">Fotos</button>';
-  if(hasVideos) html += '<button class="md-tab' + (hasFotos ? '' : ' on') + '" data-mdtab="videos" onclick="mdSwitchTab(this,\'videos\')">Videos</button>';
-  if(hasAudios) html += '<button class="md-tab' + ((hasFotos || hasVideos) ? '' : ' on') + '" data-mdtab="audios" onclick="mdSwitchTab(this,\'audios\')">Audios</button>';
-  html += '</div>';
-
-  html += '<div class="md-pane' + (hasFotos ? ' on' : '') + '" data-mdpane="fotos"><div class="md-thumbs">';
-  if(hasFotos) {
-    fotosArr.forEach(function(u){
-      html += '<div class="md-thumb" data-url="' + esc(u) + '" data-cap="' + esc(place.name || 'Foto') + '"'
-        + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
-        + '<img src="' + esc(u) + '" alt="' + esc(place.name || '') + '" loading="lazy">'
-        + '<span class="md-thb-ico">📸</span></div>';
-    });
-    fotosMedia.forEach(function(it){
-      var itVotos = parseInt(it.votos, 10) || 0;
-      // 3-B: voto interactivo solo si el item trae id+fuente (album_foto /
-      // viajero_foto / curada). Los items de MAPA_MEDIA no emiten id por
-      // foto (solo album_id/origen_id), asi que sin id se muestra un badge
-      // estatico de votos: ver nota 3-B en el reporte.
-      var votoCtrl = '';
-      if(it.id && it.fuente) {
-        votoCtrl = '<button type="button" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:var(--gold);border:1px solid rgba(232,160,32,.35);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer;line-height:1.4"'
-          + ' onclick="event.stopPropagation();votarMediaMapa(\'' + esc(String(it.id)) + '\',\'' + esc(String(it.fuente)) + '\',this)">\u2B50 ' + itVotos + '</button>';
-      } else {
-        votoCtrl = '<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.7);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.4">\u2B50 ' + itVotos + '</span>';
-      }
-      html += '<div class="md-thumb" data-url="' + esc(it.media_url) + '"'
-        + ' data-cap="' + esc(mdCapMedia(it.media_title, it.autor_nombre, it.votos)) + '"'
-        + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
-        + '<img src="' + esc(it.media_url) + '" alt="' + esc(it.media_title || '') + '" loading="lazy">'
-        + '<span class="md-thb-ico">📸</span>' + votoCtrl + '</div>';
-    });
-  }
-  html += '</div></div>';
-
-  if(hasVideos) {
-    html += '<div class="md-pane' + (hasFotos ? '' : ' on') + '" data-mdpane="videos">';
-    videos.forEach(function(it){
-      html += '<div class="md-mcard" data-url="' + esc(it.media_url) + '" data-cap="' + esc(it.media_title || 'Video') + '"'
-        + ' data-autor="' + esc(it.autor_nombre || '') + '" data-votos="' + (parseInt(it.votos, 10) || 0) + '"'
-        + ' onclick="mdVideoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;),this.getAttribute(&quot;data-autor&quot;),parseInt(this.getAttribute(&quot;data-votos&quot;)||0,10))">'
-        + '<span class="md-mcard-ico md-mcard-video">▶</span>'
-        + '<div class="md-mcard-body"><div class="md-mcard-t">' + esc(it.media_title || 'Video') + '</div>'
-        + (it.autor_nombre ? '<div class="md-mcard-a">' + esc(it.autor_nombre) + '</div>' : '')
-        + (it.votos > 0 ? '<div class="md-mcard-v">⭐ ' + it.votos + '</div>' : '')
-        + '</div><span class="md-mcard-type video">Video</span></div>';
-    });
-    html += '</div>';
-  }
-
-  if(hasAudios) {
-    html += '<div class="md-pane' + ((hasFotos || hasVideos) ? '' : ' on') + '" data-mdpane="audios">';
-    audios.forEach(function(it){
-      html += '<div class="md-audio-row"><div class="md-audio-t">' + esc(it.media_title || 'Audio') + '</div>'
-        + (it.autor_nombre ? '<div class="md-audio-a">' + esc(it.autor_nombre) + '</div>' : '')
-        + '<audio controls preload="metadata" src="' + esc(it.media_url) + '"></audio></div>';
-    });
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-// 3-A: header del drawer con el nombre del destino que se esta viendo.
-// Fue añadido al markup (#md-mapa-destino-titulo) y se rellena en cada
-// apertura; se limpia al cerrar el drawer.
-function mdSetDestinoTitulo(txt) {
-  var el = document.getElementById('md-mapa-destino-titulo');
-  if(el) el.textContent = txt || '';
-}
-
-function openMapaDrawer(place) {
-  var drawer = document.getElementById('mapa-drawer');
-  var cont = document.getElementById('md-content');
-  if(!drawer || !cont || !place) return;
-  mdSetDestinoTitulo(place.name || '');
-  var heroBg = mdHeroBgSafe(place.hero_bg, 'linear-gradient(135deg,#1a3a5c,#2a4a7c)');
-  var foto = place.foto || '';
-  var rating = parseFloat(place.rating) || 0;
-  // FIX 2: helper reutilizable. Si hay foto, la inyectamos con onerror
-  // que muestra el .md-hero-ph subyacente. Si NO hay foto, el placeholder
-  // neutro (emoji + gradiente del .md-hero) se inyecta directo.
-  var html = '<div class="md-hero" style="background:' + heroBg + '">';
-  if(foto) {
-    html += '<img src="' + esc(foto) + '" alt="' + esc(place.name || '') + '" loading="lazy"'
-      + ' onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.md-hero-ph\').style.display=\'flex\';">';
-    html += photoPlaceholderHTML(place.emoji || '\uD83D\uDCF7', 'hero').replace('class="md-hero-ph"', 'class="md-hero-ph" style="display:none"');
-  } else {
-    html += photoPlaceholderHTML(place.emoji || '\uD83D\uDCF7', 'hero');
-  }
-  html += '</div>';
-  html += '<div class="md-head">';
-  html += '<span class="md-badge md-cat-' + esc(place.cat || 'sitio') + '">' + mdCatLabel(place.cat) + '</span>';
-  html += '<div class="md-title">' + esc(place.name || '') + '</div>';
-  html += '<div class="md-meta">📍 ' + esc(place.city || '') + (place.region ? ' · ' + esc(place.region) : '') + '</div>';
-  html += '<div class="md-stars">' + starHtml(rating) + ' ' + rating.toFixed(1) + '</div>';
-  if(place.price) html += '<div class="md-price">' + esc(place.price) + '</div>';
-  if(place.lead) html += '<div class="md-lead">' + esc(place.lead) + '</div>';
-  if(place.slug) html += '<a class="md-link" href="' + esc(place.slug) + '.html">Ver lugar completo →</a>';
-  html += '</div>';
-  html += mdTabHtml(place);
-  cont.innerHTML = html;
-  drawer.classList.add('open');
-  drawer.setAttribute('aria-hidden', 'false');
-}
-
-// TSK-111 Fase 4: seccion "Album oficial" (fotos curadas del destino) en el
-// drawer/visor del pin del mapa cultural. Reutiliza la grilla de album ya
-// existente (.md-album-head/.md-album-t/.md-album-loc/.md-album-grid/
-// .md-album-photo) y el visor mdFotoLightbox; no inventa estilos nuevos.
-// La API (window.cargarAlbumOficialDestino) solo se llama con uuid real de
-// Neon y degrada a []: si no hay uuid, si la respuesta no trae
-// album_oficial o si el array viene vacio, NO se inserta ningun contenedor
-// (el drawer/visor queda intacto, sin seccion vacia).
-function mdMapaAlbumOficial(destinoUuid, contenedorSel) {
-  if(!destinoUuid || typeof window.cargarAlbumOficialDestino !== 'function') return;
-  window.cargarAlbumOficialDestino(destinoUuid).then(function(fotos){
-    if(!fotos || !fotos.length) return;
-    var cont = document.querySelector(contenedorSel);
-    if(!cont) return;
-    // Dedupe: si ya se anexo sobre este mismo contenedor, no repetir.
-    if(cont.querySelector('.md-album-oficial')) return;
-    var celdas = '';
-    var n = 0;
-    for(var i = 0; i < fotos.length; i++) {
-      var f = fotos[i] || {};
-      var url = f.url || '';
-      if(!url) continue;
-      var cap = f.caption || '';
-      celdas += '<div class="md-album-cell">'
-        + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
-        + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
-        +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
-        + '</div></div>';
-      n++;
-    }
-    if(!n) return;
-    cont.insertAdjacentHTML('beforeend',
-      '<div class="md-album-oficial" style="margin-top:16px">'
-      + '<div class="md-album-head">'
-      + '<div class="md-album-t">\u00C1lbum oficial</div>'
-      + '<div class="md-album-loc">\uD83D\uDCF7 ' + n + ' fotos</div>'
-      + '</div><div class="md-album-grid">' + celdas + '</div></div>');
-  });
-}
-
-function openMapaMediaDrawer(item) {
-  var drawer = document.getElementById('mapa-drawer');
-  var cont = document.getElementById('md-content');
-  if(!drawer || !cont || !item) return;
-  // Album curado del destino: no es un medio individual, abre el visor
-  // con la galeria completa de la ficha (mismo patron del album).
-  // TSK-111 Fase 4: aqui NO se anexa "Album oficial" a proposito --
-  // openMapaAlbumDestino ya lista destinos_fotos via galeria_destino, asi
-  // que duplicarlo seria redundante.
-  if(item.origen === 'destino_album' && item.origen_id) {
-    openMapaAlbumDestino(item);
-    return;
-  }
-  if(item.origen === 'destino' && item.origen_id) {
-    var found = null;
-    if(typeof MAPA_PLACES !== 'undefined') {
-      MAPA_PLACES.forEach(function(p){ if(p.slug === item.origen_id) found = p; });
-    }
-    if(found) {
-      openMapaDrawer(found);
-      // TSK-111 Fase 4: el item de MAPA_MEDIA solo trae slug en origen_id
-      // (el backend no emite el uuid del destino); se resuelve con
-      // _uuidDeSlug y, si no hay uuid, no se anexa nada.
-      mdMapaAlbumOficial(_uuidDeSlug(String(item.origen_id)), '#md-content');
-      return;
-    }
-  }
-  var html = '<div class="md-feat">';
-  // FIX 2: el onerror de antes destruia el contenedor con
-  // `this.parentNode.innerHTML='X'`. Ahora usa el helper neutro para
-  // que el drawer mantenga su estructura (badge/titulo/acciones).
-  if(item.media_type === 'video') html += mdVideoEmbed(item.media_url);
-  else if(item.media_type === 'audio') html += '<audio controls preload="metadata" src="' + esc(item.media_url) + '"></audio>';
-  else html += '<img src="' + esc(item.media_url) + '" alt="' + esc(item.media_title || '') + '" loading="lazy"'
-    + ' onerror="this.parentNode.innerHTML=\'' + photoPlaceholderHTML('\uD83D\uDCF7', 'hero') + '\';">';
-  html += '</div>';
-  html += '<div class="md-head">';
-  html += '<span class="md-badge md-cat-' + ((item.media_type === 'video') ? 'evento' : ((item.media_type === 'audio') ? 'comida' : 'sitio')) + '">' + mdMediaBadge(item.media_type) + '</span>';
-  // TSK-106: los items origen='destino' pueden traer media_title vacio y el
-  // nombre del destino en album_titulo (el backend lo llena con d.nombre).
-  // Se usa ese nombre como titulo y se evita repetirlo dos veces.
-  var esDestMedia = (item.origen === 'destino');
-  var tituloMedia = item.media_title || item.album_titulo || 'Multimedia';
-  var subMedia = (item.album_titulo && item.album_titulo !== tituloMedia) ? item.album_titulo : '';
-  html += '<div class="md-title">' + esc(tituloMedia) + '</div>';
-  if(subMedia) html += '<div class="md-meta">' + esc(subMedia) + '</div>';
-  if(esDestMedia) html += '<div class="md-meta">📸 Foto del destino</div>';
-
-  // FIX 4: trazabilidad autor -> /mi-perfil.html?id=<usuario_id>.
-  // Si NO hay usuario_id pero si autor_nombre (caso legacy, datos
-  // viejos sin JOIN de usuarios), caemos al texto plano como antes.
-  if(item.usuario_id) {
-    var nombreAut = item.usuario_nombre || item.autor_nombre || '';
-    var inicial = (nombreAut || '?').charAt(0).toUpperCase();
-    var avHtml;
-    if(item.usuario_avatar) {
-      avHtml = '<img class="md-author-av" src="' + esc(item.usuario_avatar) + '" alt="' + esc(nombreAut) + '"'
-        + ' onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\';">'
-        + '<span class="md-author-av-fb" style="display:none">' + esc(inicial) + '</span>';
-    } else {
-      avHtml = '<span class="md-author-av-fb">' + esc(inicial) + '</span>';
-    }
-    html += '<a class="md-author" href="/mi-perfil.html?id=' + encodeURIComponent(item.usuario_id) + '">'
-         +   avHtml
-         +   '<span class="md-author-name">' + esc(nombreAut) + '</span>'
-         + '</a>';
-  } else if(item.autor_nombre) {
-    html += '<div class="md-meta">Por ' + esc(item.autor_nombre) + '</div>';
-  }
-
-  if(item.votos > 0) html += '<div class="md-stars">\u2B50 ' + item.votos + ' votos</div>';
-  if(item.ciudad) html += '<div class="md-meta">\uD83D\uDCCD ' + esc(item.ciudad) + '</div>';
-
-  mdSetDestinoTitulo(item.album_titulo || tituloMedia);
-
-  // FIX 4: trazabilidad album -> modal de fotos del album (no JSON crudo)
-  if(item.album_id) {
-    // El album_id puede ser uuid/numero: lo escapamos para atributos HTML
-    // y lo inyectamos como string JS entre comillas simples.
-    html += '<button class="md-link" onclick="openAlbumModal(\'' + esc(String(item.album_id)) + '\')">\uD83D\uDCDA Ver \u00e1lbum</button>';
-  }
-  // FIX 4 (bonus): centrar mapa en la foto si tiene coordenadas
-  if(item.ciudad && item.lat && item.lng) {
-    html += '<button class="md-link" onclick="mapaMap.setView([' + parseFloat(item.lat) + ',' + parseFloat(item.lng) + '],13);closeMapaDrawer();">\uD83D\uDCCD Ver en el mapa</button>';
-  }
-  html += '</div>';
-  cont.innerHTML = html;
-  drawer.classList.add('open');
-  drawer.setAttribute('aria-hidden', 'false');
-}
-
-// Album curado de un destino (item.origen='destino_album'): abre un visor
-// con la galeria completa de la ficha. Endpoint:
-// GET /api/interacciones?tipo=galeria_destino&slug=<slug> -> {ok, items}
-// Reutiliza el overlay y el estilo del modal de album (md-lbox + md-album-*).
-function openMapaAlbumDestino(item) {
-  if(!item || !item.origen_id) return;
-  var slug = String(item.origen_id);
-  var lb = mdEnsureLightbox();
-  lb.innerHTML = '<button class="md-lb-close" onclick="mdCloseLightbox()" aria-label="Cerrar">&times;</button>'
-    + '<div class="md-album-wrap"><div class="md-album-loading">Cargando galería…</div></div>';
-  lb.classList.add('open');
-  fetch('/api/interacciones?tipo=galeria_destino&slug=' + encodeURIComponent(slug))
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      var wrap = lb.querySelector('.md-album-wrap');
-      if(!wrap) return;
-      var fotos = (res && res.ok && res.items) ? res.items : [];
-      var titulo = item.album_titulo || 'Galería del destino';
-      var html = '<div class="md-album-head">'
-        + '<div class="md-album-t">' + esc(titulo) + '</div>'
-        + '<div class="md-album-loc">\uD83D\uDCF7 ' + fotos.length + ' fotos</div>'
-        + '</div>';
-      if(!fotos.length) {
-        html += '<div class="md-album-empty">Este destino aún no tiene fotos.</div>';
-      } else {
-        html += '<div class="md-album-grid">';
-        for(var i = 0; i < fotos.length; i++) {
-          var f = fotos[i] || {};
-          var url = f.url || f.foto_url || f.media_url || '';
-          if(!url) continue;
-          var cap = f.caption || f.media_title || titulo;
-          html += '<div class="md-album-cell">'
-            + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
-            + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
-            +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
-            + '</div>'
-            + '</div>';
-        }
-        html += '</div>';
-      }
-      html += '<div class="md-album-actions">'
-        + '<button type="button" class="md-link" onclick="mdAlbumDestinoFicha(\'' + esc(slug) + '\')">Ver ficha</button>'
-        + '</div>';
-      wrap.innerHTML = html;
-    })
-    .catch(function(){
-      var wrap = lb.querySelector('.md-album-wrap');
-      if(wrap) wrap.innerHTML = '<div class="md-album-empty">Error de conexión.</div>';
-    });
-}
-
-// Cierra el visor del album de destino y abre el drawer del lugar en el
-// mapa, buscando el place por slug en MAPA_PLACES. Si no existe, no hace nada.
-function mdAlbumDestinoFicha(slug) {
-  mdCloseLightbox();
-  var found = null;
-  if(typeof MAPA_PLACES !== 'undefined') {
-    MAPA_PLACES.forEach(function(p){ if(p.slug === slug) found = p; });
-  }
-  if(found && typeof openMapaDrawer === 'function') openMapaDrawer(found);
-}
-
-// FIX 4: modal de album. Reutiliza el overlay de md-lbox (mismo patron
-// que el lightbox de medios) pero con un grid de fotos del album.
-// Endpoint: GET /api/interacciones?tipo=album_detalle&album_id=<id>
-// (mismo prefijo que multimedia_mapa -- ADR-017, sin nuevos endpoints).
-// NO abre el JSON crudo: renderiza un grid de miniaturas y cada foto
-// se puede abrir en el lightbox mdFotoLightbox ya existente.
-// ADR-032: guardar (bookmark) una foto o album en "Mis guardados" del
-// museo. fuente: 'album' | 'album_foto' | 'viajero_foto'. Requiere sesion.
-function guardarMedia(fuente, itemId, btn){
-  var u = window.ExploraCO && window.ExploraCO.usuario;
-  if(!u || !u.id){
-    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesi\u00f3n para guardar');
-    return;
-  }
-  if(!itemId) return;
-  if(btn) btn.disabled = true;
-  fetch('/api/interacciones',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({tipo:'guardar_media',usuario_id:u.id,fuente:fuente,item_id:itemId})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    if(btn){ btn.disabled=false; if(d&&d.ok){ btn.classList.add('on'); btn.textContent='\u2713 Guardado'; } }
-    if(window.ExploraCO && window.ExploraCO.mostrarToast)
-      window.ExploraCO.mostrarToast((d&&d.ok)?'Guardado en tu museo':'No se pudo guardar', (d&&d.ok)?'#16a34a':'#ef4444');
-  })
-  .catch(function(){ if(btn) btn.disabled=false; });
-}
-
-// 3-B: like (voto) en media unificada desde el drawer del mapa.
-// Requiere sesion (Authorization Bearer via authHeaders de usuario-session.js).
-// POST /api/interacciones?tipo=media_voto — patron galeria.html gMediaVoto.
-function votarMediaMapa(itemId, fuente, btn){
-  var u = window.ExploraCO && window.ExploraCO.usuario;
-  if(!u || !u.id){
-    if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesi\u00f3n para votar');
-    return;
-  }
-  if(!itemId || !fuente) return;
-  if(btn) btn.disabled = true;
-  var headers = { 'Content-Type': 'application/json' };
-  var auth = (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function') ? window.ExploraCO.authHeaders() : {};
-  for(var k in auth){ if(Object.prototype.hasOwnProperty.call(auth,k)) headers[k] = auth[k]; }
-  fetch('/api/interacciones?tipo=media_voto',{
-    method:'POST', headers:headers,
-    body:JSON.stringify({tipo:'media_voto',usuario_id:String(u.id),fuente:fuente,item_id:String(itemId)})
-  })
-  .then(function(r){
-    if(r.status === 401){
-      if(btn) btn.disabled=false;
-      if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Sesi\u00f3n expirada \u2014 vuelve a iniciar');
-      return null;
-    }
-    return r.json();
-  })
-  .then(function(d){
-    if(!d) return;
-    if(btn) btn.disabled=false;
-    if(d && d.ok){
-      if(btn) btn.textContent = '\u2B50 ' + (d.votos != null ? d.votos : '');
-      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast('Voto registrado', '#16a34a');
-    } else if(d && d.error){
-      if(window.ExploraCO && window.ExploraCO.mostrarToast) window.ExploraCO.mostrarToast(d.error, '#E8A020');
-    }
-  })
-  .catch(function(){ if(btn) btn.disabled=false; });
-}
-
-function openAlbumModal(albumId) {
-  if(!albumId) return;
-  var lb = mdEnsureLightbox();
-  lb.innerHTML = '<button class="md-lb-close" onclick="mdCloseLightbox()" aria-label="Cerrar">&times;</button>'
-    + '<div class="md-album-wrap"><div class="md-album-loading">Cargando \u00e1lbum\u2026</div></div>';
-  lb.classList.add('open');
-  fetch('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId))
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      var wrap = lb.querySelector('.md-album-wrap');
-      if(!wrap) return;
-      // El handler album_detalle responde { ok, album, fotos } (sin data).
-      if(!res || !res.ok || !res.album) {
-        wrap.innerHTML = '<div class="md-album-empty">No se pudo cargar el \u00e1lbum.</div>';
-        return;
-      }
-      var al = res.album;
-      var fotos = res.fotos || [];
-      var html = '<div class="md-album-head">'
-        + '<div class="md-album-t">' + esc(al.titulo || al.nombre || '\u00c1lbum') + '</div>'
-        + (al.ciudad ? '<div class="md-album-loc">\uD83D\uDCCD ' + esc(al.ciudad) + '</div>' : '')
-        + '</div>';
-      if(!fotos.length) {
-        html += '<div class="md-album-empty">Este \u00e1lbum a\u00fan no tiene fotos.</div>';
-      } else {
-        html += '<div class="md-album-grid">';
-        for(var i = 0; i < fotos.length; i++) {
-          var f = fotos[i];
-          var url = (typeof f === 'string') ? f : (f.foto_url || f.url || f.media_url || '');
-          var cap = (typeof f === 'string') ? (al.titulo || '') : (f.cap || f.media_title || al.titulo || '');
-          if(!url) continue;
-          // Atributo escapado: usamos entidad &#39; en onclick para
-          // evitar comilla escapada rota (mismo patron que BUG-031 fix).
-          html += '<div class="md-album-cell">'
-            + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '"'
-            + ' onclick="mdFotoLightbox(this.getAttribute(&quot;data-url&quot;),this.getAttribute(&quot;data-cap&quot;))">'
-            +   '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
-            + '</div>';
-          if(typeof f !== 'string' && f.id) {
-            html += '<button type="button" class="md-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
-              + ' onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios'
-              + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '')
-              + '</button>'
-              + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>'
-              + '<button type="button" class="md-album-com-btn" onclick="guardarMedia(\'album_foto\',\'' + esc(String(f.id)) + '\',this)">\uD83D\uDD16 Guardar</button>'
-              + '<button type="button" class="md-album-com-btn" onclick="votarMediaMapa(\'' + esc(String(f.id)) + '\',\'album_foto\',this)">\u2B50 '
-              + (f.ya_votado ? 'Votado' : ((typeof f.votos === 'number' && f.votos > 0) ? 'Votar · ' + f.votos : 'Votar'))
-              + '</button>';
-          }
-          html += '</div>';
-        }
-        html += '</div>';
-      }
-      if(fotos.length) {
-        html += '<div class="md-album-actions">'
-          + '<button type="button" class="md-album-com-btn" onclick="guardarMedia(\'album\',\'' + esc(String(albumId)) + '\',this)">\uD83D\uDD16 Guardar \u00e1lbum</button>'
-          + '</div>';
-      }
-      wrap.innerHTML = html;
-    })
-    .catch(function(){
-      var wrap = lb.querySelector('.md-album-wrap');
-      if(wrap) wrap.innerHTML = '<div class="md-album-empty">Error de conexi\u00f3n.</div>';
-    });
-}
-
-function closeMapaDrawer() {
-  var drawer = document.getElementById('mapa-drawer');
-  var cont = document.getElementById('md-content');
-  mdSetDestinoTitulo('');
-  if(cont) cont.innerHTML = '';
-  if(drawer) {
-    drawer.classList.remove('open');
-    drawer.setAttribute('aria-hidden', 'true');
-  }
-  mdCloseLightbox();
-}
-
 document.addEventListener('keydown', function(e){
   if(e && e.key === 'Escape') closeMapaDrawer();
 });
 
-// Init mapa lazily + geolocalización en el primer viewport
+// Init mapa lazily + geolocalizacion en el primer viewport.
 (function(){
   var el = document.getElementById('mapa-section');
   if(!el) return;
   var done = false;
   function tryInit(){ if(done) return; done=true; initMapaSection(); }
-  function tryInitAndGeo(){ if(done) return; done=true; initMapaSection(); if(!mapaGeoRequested){ mapaGeoRequested=true; setTimeout(geolocateMapa, 700); } }
+  function tryInitAndGeo(){ if(done) return; done=true; initMapaSection(); setTimeout(geolocateMapa, 700); }
   if(typeof IntersectionObserver !== 'undefined'){
     var obs = new IntersectionObserver(function(entries){
       if(entries[0].isIntersecting) tryInitAndGeo();

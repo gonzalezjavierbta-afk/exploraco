@@ -2197,7 +2197,7 @@ Es la misma solucion ya validada en el proyecto para piezas compartidas de front
 
 **ID:** ADR-045
 **Fecha:** 2026-09-19
-**Estado:** **APROBADO E IMPLEMENTADO EN WORKING TREE** (2026-09-19, SIN commitear). Verificado contra archivo real (ADR-006): `mapa-cultural.js` (65282 bytes; `window.MapaCultural` en L1597), `mapa-cultural.css` (121 reglas/121 llaves, 0 `!important` reales, scope `.mc-root`), `scripts/smoke_mapa_cultural.js` (56/56 PASS) y `mymapa.js` consumiendolo (`MapaCultural.create` L125). QA APTO CON OBSERVACIONES; `index.html` y `api/*` intactos (diff vacio).
+**Estado:** **APROBADO E IMPLEMENTADO** (2026-09-19). TSK-133 (comunidad) quedo COMMITTEADA en `b4ffd4e` ("maps"); TSK-134 (index) queda en working tree, SIN commitear. Verificado contra archivo real (ADR-006): `mapa-cultural.js` (hoy **v1.1.0**, 68417 bytes; `window.MapaCultural` en L1597), `mapa-cultural.css` (121 reglas/121 llaves, 0 `!important` reales, scope `.mc-root`), `scripts/smoke_mapa_cultural.js` (**58/58 PASS**) y `mymapa.js` consumiendolo (`MapaCultural.create` L125). QA APTO CON OBSERVACIONES; `index.html` quedo **MIGRADO** por TSK-134 (ya NO intacto) y `api/*` sigue intacto (diff vacio).
 **Autor:** frontend-tpl/js-silo-dev (AI-DOS); origen: feature "Mis mapas personales (comunidad) con paridad al mapa cultural del index"; cierre documental por docs-keeper.
 **Nota de numeracion:** el 045 es el consecutivo real tras ADR-044 (2026-09-18); la "Nota de practica operativa" de Modo Express que aparece a continuacion NO usa numero ADR (no define arquitectura).
 **Alcance:** assets frontend compartidos en la raiz. NO toca esquema, endpoints ni el presupuesto 8/8 (ADR-001/ADR-010): `mapa-cultural.js` y `mapa-cultural.css` son assets de pagina y NO cuentan contra las funciones serverless.
@@ -2219,7 +2219,7 @@ La feature requeria dar al tab **Mapa** de `comunidad.html` (Mapas personales, `
 3. **CSS scopado** `mapa-cultural.css`: 121 reglas extraidas 1:1 del CSS del mapa del index, todas bajo `.mc-root`, 0 `!important` (ADR-004, aislamiento atomico de estilos); se enlaza desde `comunidad.html`.
 4. **Capa de media filtrada:** SOLO items de los destinos del mapa activo. Match estricto por slug para `origen='destino'`/`'destino_album'`; `origen='album'` SIEMPRE excluido (no tiene vinculo a destino). Una sola peticion cacheada a `/api/interacciones?tipo=multimedia_mapa` con filtro en cliente; sin cambios de backend.
 5. **Paridad total:** tiles CARTO Voyager, clustering por proximidad de 40 px, drawer completo al clic en pin y capa de media encendida por defecto si el mapa activo tiene media.
-6. **Migracion del `index.html` DIFERIDA** a una entrega posterior CONTROLADA (no arriesgar el mapa del index en esta feature); el header del modulo deja la nota anotada. Se registra como tarea pendiente (TSK-134).
+6. **Migracion del `index.html` DIFERIDA** a una entrega posterior CONTROLADA (no arriesgar el mapa del index en esta feature); el header del modulo deja la nota anotada. Se registra como tarea pendiente (TSK-134). **[Actualizacion 2026-09-19]:** TSK-134 EJECUTO la migracion (ver "Actualizacion (TSK-134)" al final de este ADR); el index ya consume `MapaCultural`.
 
 ### Justificacion
 
@@ -2227,28 +2227,38 @@ Es la misma solucion ya validada en el proyecto para piezas compartidas de front
 
 ### Impacto
 
-- **NUEVOS (assets frontend, no cuentan contra 8/8):** `mapa-cultural.js` (65282 bytes; API `window.MapaCultural` en L1597), `mapa-cultural.css` (121 reglas scopadas, 0 `!important`) y `scripts/smoke_mapa_cultural.js` (56/56 PASS).
+- **NUEVOS (assets frontend, no cuentan contra 8/8):** `mapa-cultural.js` (al cierre de TSK-133: 65282 bytes; hoy **v1.1.0**, 68417 bytes; API `window.MapaCultural` en L1597), `mapa-cultural.css` (121 reglas scopadas, 0 `!important`) y `scripts/smoke_mapa_cultural.js` (56/56 PASS al cierre de TSK-133; **58/58 PASS** tras TSK-134).
 - **`mymapa.js`:** elimina su Leaflet propio y `bindPopup`; pasa a consumir `MapaCultural.create` (L125); el clic en pin abre el drawer completo y agrega la capa de media con toggle (`.mmx-media`/`.mmx-mbtn`, default ON si el mapa activo tiene media).
 - **`comunidad.html`:** agrega `<link>` a `mapa-cultural.css` (L14) y `<script src="mapa-cultural.js">` (L559) ANTES de `mymapa.js` (L561), mas los estilos del toggle.
-- **`index.html` / `api/*` / `index-api-connector.js`:** SIN CAMBIOS (diff vacio). El mapa del index sigue con su implementacion actual hasta TSK-134.
+- **`index.html` / `api/*` / `index-api-connector.js` (al cierre de TSK-133):** SIN CAMBIOS (diff vacio). **[Actualizacion TSK-134]:** `index.html` fue MIGRADO despues al modulo; `api/*` e `index-api-connector.js` siguen SIN CAMBIOS.
 - **Mitigacion de seguridad (BUG-061):** `mapa-cultural.js` extrajo `jsonAuthHeaders()` (L1354) y `guardarMedia` (L1361) y `votarMedia` (L1378) envian `Authorization`; reduce el punto de amplificacion, pero el backend de BUG-061 sigue ABIERTO (escalado a `sql-security`).
-- Nuevo grupo de tareas: TSK-133 (feature, COMPLETADA) y TSK-134 (migracion del index, PENDIENTE).
+- Nuevo grupo de tareas: TSK-133 (feature, COMPLETADA/commiteada) y TSK-134 (migracion del index, **COMPLETADA en working tree**).
 
 ### Consecuencias positivas
 
 - Un solo motor y un solo contrato de datos para el mapa cultural; cualquier cambio futuro aplica a Comunidad y (tras TSK-134) al index.
 - Paridad real: mismo clustering (40 px), mismos tiles (CARTO Voyager) y mismo drawer en ambos mapas.
 - CSS scopado bajo `.mc-root` (ADR-004) sin `!important`, sin colisiones con el CSS del anfitrion.
-- Verificacion reproducible: `scripts/smoke_mapa_cultural.js` (56/56) queda versionado (a diferencia de la deuda D-14 de `media-actions.js`).
+- Verificacion reproducible: `scripts/smoke_mapa_cultural.js` (56/56 al cierre de TSK-133; **58/58** tras TSK-134) queda versionado (a diferencia de la deuda D-14 de `media-actions.js`).
 - No consume el presupuesto de funciones serverless (8/8) ni crea migraciones.
 
 ### Consecuencias negativas / riesgos residuales
 
-- **Doble motor temporal:** hasta TSK-134, el index conserva su mapa inline y el modulo existe en paralelo; hay que evitar que divergan (el header del modulo anota la migracion pendiente).
+- **Doble motor temporal (RESUELTO por TSK-134):** hasta la migracion, el index conservo su mapa inline en paralelo al modulo (riesgo de divergencia); TSK-134 elimino el inline y el index consume `MapaCultural`, por lo que ya hay un solo motor.
 - **BUG-061 sigue ABIERTO:** la mitigacion con Bearer en el modulo no corrige el backend (`guardar_media`/`tipo='foto'`); escalado a `sql-security`.
 - **QA visual en navegador pendiente:** el smoke es Node vm; falta validar el tab Mapa de `comunidad.html` en navegador real (drawer, toggle de media, lightbox).
 - **Shape real de `tipo=mapa` sin validar contra Neon:** el contrato de normalizacion se verifico en smoke con ambos shapes, pero no contra datos reales de la tabla.
-- **Migracion del index con riesgos conocidos (TSK-134):** contrato `window.mapaMap` via `onMapReady`, helpers compartidos que NO deben migrar, colisiones `.md-link`/`.md-close`, lightbox y ~1190 lineas de extraccion 1:1.
+- **Migracion del index (TSK-134, EJECUTADA):** el riesgo se materializo de forma controlada y quedo cubierto por los shims (`window.mapaMap` via `onMapReady`, helpers conservados, `mediaControls` en lugar de los `onclick`); residual: QA visual en navegador (TSK-135) y que `mapa-cultural.css` NO se enlace en el index (conserva su CSS inline a proposito).
+
+### Actualizacion (TSK-134, 2026-09-19)
+
+La migracion del `index.html` que este ADR habia diferido se EJECUTO como **TSK-134** (working tree, SIN commitear). Alcance real verificado contra archivo real (ADR-006):
+
+- **`index.html` (+79/-1152):** retira el motor Leaflet inline (~1190 lineas, bloque 2256-3445) y su estado muerto; agrega los shims `initMapaSection` (retry si `!mcMapa.getMap()`), `refreshMapaMarkers` (sin recursion), `geolocateMapa`, `resetMapaColombia`, `openMapaDrawer`/`closeMapaDrawer`, `INDEX_MC_OPTS` (L2254) y `var mcMapa` (L2252) + carga lazy (IntersectionObserver/scroll/timeout 2 s); conserva `esc`/`photoPlaceholderHTML`/`starHtml`/`toggleMapaSave`/`renderMyMap`/`MAPA_PLACES`/`MAPA_MEDIA`/`mapaMap` y quita los 4 `onclick` de `[data-media]` (los engancha el modulo via `mediaControls`). `<script src="mapa-cultural.js">` en L882; **sin** `<link>` a `mapa-cultural.css` (CSS inline conservado por paridad visual).
+- **`mapa-cultural.js` (+80/-20, v1.1.0):** opciones de compatibilidad con default = comportamiento comunidad (`enableMediaOnAll`, `mediaEnabled`, `mediaFilter` [null estricto / `false` sin filtro], `mediaPhotoIcon`, `clusterLinksNavigate`, `mediaControls`, `bindList`, `data-comments-*`); el index usa `enableMediaOnAll:true`, `mediaEnabled:false`, `mediaFilter:false`, `mediaPhotoIcon` U+1F4F8 y `clusterLinksNavigate:true`.
+- **`scripts/smoke_mapa_cultural.js` (+13/-1):** **58/58 PASS** (+2 checks de index-compat).
+- **Sin cambios:** `api/*` e `index-api-connector.js`. Presupuesto **8/8 INTACTO**.
+- **QA:** APTO CON OBSERVACIONES (divs 370/370, contrato del connector OK, sin bloqueantes); QA visual en navegador pendiente (TSK-135).
 
 **ADRs relacionados:** ADR-001 (sin frameworks / Vanilla JS), ADR-002 (ASCII-safe), ADR-004 (aislamiento atomico de estilos / Scoped CSS), ADR-006 (baseline real), ADR-010 (presupuesto 8/8), ADR-021 (capa audiovisual estricta / paridad de drawer), ADR-025 (sesion firmada JWT/Bearer), ADR-036 (media unificada `media_*`), ADR-040 y TSK-117 (precedentes de asset compartido: `niveles-data.js`, `map-picker.js`), ADR-044 (`media-actions.js`), BUG-061 (spoofing de usuario_id, mitigado no cerrado).
 

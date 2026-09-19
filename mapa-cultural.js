@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural ExploraCO
-   Version 1.0.0. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.1.0. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -22,13 +22,26 @@
        setMediaTypes, getMap, getState, openDrawer, closeDrawer,
        geolocate, resetColombia, fitBounds }
 
+   Opciones index-compatibles (default = comportamiento comunidad):
+     enableMediaOnAll (false): al seleccionar la categoria 'all' por clic
+       de usuario se enciende la capa media (equivalente al index).
+     mediaEnabled (false): estado inicial de la capa media.
+     mediaFilter (null): null/undefined usa filterMediaDefault (estricto,
+       comunidad); false desactiva el filtro y usa TODA la media (index,
+       que pinta toda la capa). La seccion multimedia del drawer usa
+       SIEMPRE st.media completa con logica de cercania, sin filtro.
+     clusterLinksNavigate (false): true deja que "Ver" del popup de
+       cluster navegue por href (index); false abre el drawer (comunidad).
+     list: si se define, los items de la lista delegan en setActive
+       (pan + drawer) como el index.
+
    Dependencias externas permitidas: Leaflet (window.L) y, con
    guard, las utilidades de sesion de window.ExploraCO.
    ============================================================= */
 (function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -302,6 +315,10 @@
       isSaved: null,
       onToggleSave: null,
       mediaFilter: null,
+      mediaEnabled: false,
+      enableMediaOnAll: false,
+      clusterLinksNavigate: false,
+      mediaPhotoIcon: null,
       cargarAlbumOficial: null,
       usuario: null,
       mostrarLogin: null,
@@ -344,6 +361,7 @@
       drawerBound: false,
       mediaRoot: null,
       catRoot: null,
+      listBound: false,
       reclusterTimer: null,
       noteTimer: null
     };
@@ -380,6 +398,10 @@
     }
 
     function apiPref() { return st.options.apiBase || ''; }
+
+    // Emoji de "foto" del modulo de media/capa (index usa 1F4F8 y la
+    // comunidad 1F4F7). El hero y el album-loc conservan CAMARA.
+    function fotoIcon() { return st.options.mediaPhotoIcon || CAMARA; }
 
     function fetchJson(url) {
       return fetch(apiPref() + url).then(function (r) { return r.json(); });
@@ -634,7 +656,7 @@
       var esAlbumDestino = (item.origen === 'destino_album');
       var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : (esDestino ? '#1f8a70' : '#E8A020'));
       if (esAlbumDestino) color = '#d97706';
-      var ico = esAlbumDestino ? '\uD83D\uDCDA' : ((tipo === 'video') ? '\u25B6' : ((tipo === 'audio') ? '\u266B' : CAMARA));
+      var ico = esAlbumDestino ? '\uD83D\uDCDA' : ((tipo === 'video') ? '\u25B6' : ((tipo === 'audio') ? '\u266B' : fotoIcon()));
       var cls = 'mpa-media-pin'
         + (esDestino ? ' mpa-media-pin-dest' : '')
         + (esAlbumDestino ? ' mpa-media-pin-album' : '')
@@ -729,14 +751,18 @@
             btn.addEventListener('click', function () { toggleSave(btn.getAttribute('data-mc-save'), btn); });
           })(saves[i]);
         }
-        var gos = node.querySelectorAll('[data-mc-go]');
-        for (var j = 0; j < gos.length; j++) {
-          (function (a) {
-            a.addEventListener('click', function (e) {
-              e.preventDefault();
-              setActive(a.getAttribute('data-mc-go'));
-            });
-          })(gos[j]);
+        // Index: "Ver" navega por href (paridad con el popup del index).
+        // Comunidad: "Ver" abre el drawer del lugar.
+        if (!st.options.clusterLinksNavigate) {
+          var gos = node.querySelectorAll('[data-mc-go]');
+          for (var j = 0; j < gos.length; j++) {
+            (function (a) {
+              a.addEventListener('click', function (e) {
+                e.preventDefault();
+                setActive(a.getAttribute('data-mc-go'));
+              });
+            })(gos[j]);
+          }
         }
       });
       cm.on('popupclose', function () {
@@ -858,7 +884,7 @@
       renderList(st.activeCat);
     }
 
-    function filterPins(cat) {
+    function filterPins(cat, fromUser) {
       st.activeCat = cat;
       if (!st.map) return;
       if (cat === 'off') st.visible = [];
@@ -866,6 +892,15 @@
       else st.visible = st.places.filter(function (p) { return p.cat === cat; });
       recluster();
       renderList(cat);
+      // Index-compat: al seleccionar "Todo" con clic de usuario se enciende
+      // la capa media (equivalente a index L2309-2318), SIN activar los
+      // tipos foto/video/audio (eso solo lo hace el maestro). No se aplica
+      // en los refresh internos para conservar el arranque apagado.
+      if (fromUser && cat === 'all' && st.options.enableMediaOnAll) {
+        if (!st.mediaEnabled) { st.mediaEnabled = true; addMediaLayer(); }
+        syncMediaBtns();
+        renderMedia();
+      }
     }
 
     function showNote(msg) {
@@ -920,6 +955,10 @@
     /* ---------- capa multimedia ---------- */
 
     function mediaItems() {
+      // mediaFilter === false => capa SIN filtro (comportamiento index,
+      // que pinta toda la media). null/undefined => filtro default
+      // estricto de comunidad.
+      if (st.options.mediaFilter === false) return st.media.slice();
       if (typeof st.options.mediaFilter === 'function') {
         try { return st.options.mediaFilter(st.media, st.places) || []; }
         catch (e) { log('mediaFilter', e); return []; }
@@ -1066,9 +1105,24 @@
         var ya = b.classList.contains('on');
         var all = root.querySelectorAll('[data-cat]');
         for (var i = 0; i < all.length; i++) all[i].classList.remove('on');
-        if (ya) { filterPins('off'); return; }
+        if (ya) { filterPins('off', true); return; }
         b.classList.add('on');
-        filterPins(b.getAttribute('data-cat'));
+        filterPins(b.getAttribute('data-cat'), true);
+      });
+    }
+
+    // Los items de la lista abren drawer + encuadran (index). Solo aplica
+    // cuando se configura list (comunidad pasa list:null => sin efecto).
+    function bindList() {
+      if (st.listBound || !st.options.list || typeof document === 'undefined') return;
+      var root = document.getElementById(st.options.list);
+      if (!root) return;
+      st.listBound = true;
+      root.addEventListener('click', function (e) {
+        var a = (e.target && e.target.closest) ? e.target.closest('[data-mc-go]') : null;
+        if (!a) return;
+        if (e.preventDefault) e.preventDefault();
+        setActive(a.getAttribute('data-mc-go'));
       });
     }
 
@@ -1104,9 +1158,9 @@
       var hasVideos = videos.length > 0;
       var hasAudios = audios.length > 0;
 
-      var html = '<div class="md-media"><h4>' + CAMARA + ' Multimedia</h4>';
+      var html = '<div class="md-media"><h4>' + fotoIcon() + ' Multimedia</h4>';
       if (!hasFotos && !hasVideos && !hasAudios) {
-        html += '<div class="md-no-media"><div class="md-nm-ico">' + CAMARA + '</div>'
+        html += '<div class="md-no-media"><div class="md-nm-ico">' + fotoIcon() + '</div>'
           + '<div class="md-nm-t">Sin multimedia cercana a\u00fan</div>'
           + '<div class="md-nm-s">\u00a1S\u00e9 el primero en subir fotos y videos de este lugar!</div></div>';
         html += '</div>';
@@ -1123,7 +1177,7 @@
         fotosArr.forEach(function (u) {
           html += '<div class="md-thumb" data-url="' + esc(u) + '" data-cap="' + esc(place.nombre || 'Foto') + '">'
             + '<img src="' + esc(u) + '" alt="' + esc(place.nombre || '') + '" loading="lazy">'
-            + '<span class="md-thb-ico">' + CAMARA + '</span></div>';
+            + '<span class="md-thb-ico">' + fotoIcon() + '</span></div>';
         });
         fotosMedia.forEach(function (it) {
           var itVotos = parseInt(it.votos, 10) || 0;
@@ -1136,7 +1190,7 @@
           }
           html += '<div class="md-thumb" data-url="' + esc(it.media_url) + '" data-cap="' + esc(mdCapMedia(it.media_title, it.autor_nombre, it.votos)) + '">'
             + '<img src="' + esc(it.media_url) + '" alt="' + esc(it.media_title || '') + '" loading="lazy">'
-            + '<span class="md-thb-ico">' + CAMARA + '</span>' + votoCtrl + '</div>';
+            + '<span class="md-thb-ico">' + fotoIcon() + '</span>' + votoCtrl + '</div>';
         });
       }
       html += '</div></div>';
@@ -1260,7 +1314,7 @@
       var subMedia = (item.album_titulo && item.album_titulo !== tituloMedia) ? item.album_titulo : '';
       html += '<div class="md-title">' + esc(tituloMedia) + '</div>';
       if (subMedia) html += '<div class="md-meta">' + esc(subMedia) + '</div>';
-      if (esDestMedia) html += '<div class="md-meta">' + CAMARA + ' Foto del destino</div>';
+      if (esDestMedia) html += '<div class="md-meta">' + fotoIcon() + ' Foto del destino</div>';
 
       if (item.usuario_id) {
         var nombreAut = item.usuario_nombre || item.autor_nombre || '';
@@ -1440,7 +1494,8 @@
                 + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '">'
                 + '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy"></div>';
               if (typeof f !== 'string' && f.id) {
-                html += '<button type="button" class="md-album-com-btn" data-mc-comments="' + esc(String(f.id)) + '" data-mc-comments-fuente="album_foto">\uD83D\uDCAC Comentarios'
+                html += '<button type="button" class="md-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
+                + ' data-comments-fuente="album_foto" data-mc-comments="' + esc(String(f.id)) + '" data-mc-comments-fuente="album_foto">\uD83D\uDCAC Comentarios'
                   + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios, 10) + ')</span>' : '') + '</button>'
                   + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>'
                   + '<button type="button" class="md-album-com-btn" data-mc-guardar="1" data-mc-fuente="album_foto" data-mc-item="' + esc(String(f.id)) + '">\uD83D\uDD16 Guardar</button>'
@@ -1525,6 +1580,7 @@
       wireDrawer();
       bindDrawerOnce();
       if (st.map) {
+        bindList();
         if (st.initialized) { renderMarkers(); renderMedia(); }
         return inst;
       }
@@ -1546,6 +1602,9 @@
           maxZoom: o.maxZoom
         }).addTo(st.map);
         st.clusterLayer = L.layerGroup().addTo(st.map);
+        // Estado inicial de la capa media pedido por opcion (index arranca
+        // APAGADA). Solo se aplica al construir el mapa, no en re-init.
+        st.mediaEnabled = !!o.mediaEnabled;
         st.mediaLayer = L.layerGroup();
         if (st.mediaEnabled) st.mediaLayer.addTo(st.map);
         st.map.on('moveend', onMoved);
@@ -1555,6 +1614,7 @@
         }
         bindCategories();
         bindMediaControls();
+        bindList();
         renderMarkers();
         renderMedia();
       } catch (e) {

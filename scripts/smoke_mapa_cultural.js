@@ -20,7 +20,7 @@ vm.runInContext(src, sandbox, { filename: 'mapa-cultural.js' });
 
 const MC = sandbox.window.MapaCultural;
 check('API: window.MapaCultural expuesto', !!MC);
-check('API: version 1.0.0', MC && MC.version === '1.0.0');
+check('API: version 1.1.0', MC && MC.version === '1.1.0');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
@@ -111,6 +111,18 @@ const origenes = filtrado.map(function (it) { return it.origen_id + ':' + it.ori
 check('filterMediaDefault: excluye origen album', filtrado.every(function (it) { return it.origen !== 'album'; }));
 check('filterMediaDefault: incluye destino/destino_album con slug activo', filtrado.length === 2 && origenes.indexOf('cafe-y:destino') !== -1 && origenes.indexOf('cafe-y:destino_album') !== -1);
 check('filterMediaDefault: descarta origen_id sin slug activo', filtrado.every(function (it) { return it.origen_id === 'cafe-y'; }));
+
+// ---- (5) index-compat: mediaFilter:false = capa SIN filtro ---------
+const mediaMixta = [
+  { origen: 'album', origen_id: 'album-1', media_url: 'a', media_type: 'foto' },
+  { origen: 'destino', origen_id: 'sin-slug', media_url: 'b', media_type: 'foto' }
+];
+const instAll = MC.create({ mediaFilter: false });
+instAll.setMedia(mediaMixta);
+check('mediaFilter false: capa usa TODA la media (index)', instAll.getState().mediaFiltered.length === 2);
+const instStrict = MC.create({});
+instStrict.setMedia(mediaMixta);
+check('mediaFilter default: capa filtra estricto (comunidad)', instStrict.getState().mediaFiltered.length === 0);
 
 // ---- (extra) instancia: metodos del contrato -----------------------
 ['init', 'refresh', 'destroy', 'setPlaces', 'setMedia', 'setMediaEnabled',
