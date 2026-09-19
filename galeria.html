@@ -257,6 +257,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       .replace(/'/g, '&#39;');
   }
 
+  // Orden defensivo por votos DESC (el backend ya rankea; esto protege si
+  // el API degrada). Helper unico reutilizado por curadas y comunidad.
+  function gSortVotos(arr) {
+    return (arr || []).slice().sort(function (a, b) {
+      return (parseInt(b && b.votos, 10) || 0) - (parseInt(a && a.votos, 10) || 0);
+    });
+  }
+
   function gUsuarioId() {
     var u = window.ExploraCO && window.ExploraCO.usuario;
     return (u && u.id) ? String(u.id) : null;
@@ -795,8 +803,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         document.getElementById('g-dest-sub').textContent = (d.ciudad ? d.ciudad + ' \u00b7 ' : '') + 'Fotos curadas y aportes de la comunidad.';
         var items = gDestinoItems(res);
         var albumes = gAlbumesDeItems(items);
-        var curadaItems = items.filter(function (it) { return it.origen === 'curada'; });
-        var comItems = items.filter(function (it) { return it.origen !== 'curada'; });
+        var curadaItems = gSortVotos(items.filter(function (it) { return it.origen === 'curada'; }));
+        var comItems = gSortVotos(items.filter(function (it) { return it.origen !== 'curada'; }));
         G.galItems = curadaItems;
         G.galPagina = 1;
         if (!items.length && !albumes.length) {

@@ -4437,6 +4437,16 @@ module.exports = async function handler(req, res) {
           f.ya_votado = !!gdMetCuradaRows.ya_votado[k];
           f.ya_guardado = !!gdMetCuradaRows.ya_guardado[k];
         });
+        // dos rankings. Copia ordenada por votos (curadas) para items[]
+        // sin mutar gdFotos: el array legacy fotos[] conserva su orden actual
+        // por orden ASC. Desempate por orden ASC (nulls al final).
+        var gdFotosRank = gdFotos.slice().sort(function(a, b) {
+          var va = parseInt(a.votos, 10) || 0, vb = parseInt(b.votos, 10) || 0;
+          if (vb !== va) return vb - va;
+          var oa = (a.orden == null) ? 1e9 : parseInt(a.orden, 10);
+          var ob = (b.orden == null) ? 1e9 : parseInt(b.orden, 10);
+          return oa - ob;
+        });
 
         // BUG-A (v12) / ADR-036 (v19): el contador de comentarios se calcula
         // post-query con contarComentarioSafe, que degrada a 0 si la
@@ -4495,7 +4505,7 @@ module.exports = async function handler(req, res) {
               + ' FROM interacciones f LEFT JOIN usuarios u ON u.id = f.usuario_id'
               + ' WHERE f.destino_id=$1 AND f.tipo=\'foto\' AND f.activo=true'
               + ' AND (f.dims IS NULL OR NOT (f.dims ? \'voto_foto_id\'))'
-              + ' ORDER BY f.creado_en DESC LIMIT 60',
+              + ' ORDER BY votos DESC, f.creado_en DESC LIMIT 60',
               [gdDestino.id]
             );
           }
@@ -4526,8 +4536,9 @@ module.exports = async function handler(req, res) {
           var gdMetViajero = gdMetDe(gdMetricas[1]);
           var gdMetAlbum = gdMetDe(gdMetricas[2]);
 
-          // Orden determinista: curadas (orden ASC) -> viajeros (creado_en
-          // DESC) -> album (votos DESC). Dedupe por URL con trim y
+          // Orden determinista: curadas (votos DESC, orden ASC) -> viajeros
+          // (votos DESC, creado_en DESC) -> album (votos DESC). Dedupe por URL
+          // con trim y
           // precedencia curada > viajero > album: como se agrega en ese
           // mismo orden, la primera aparicion gana (Cero Borrado Logico:
           // la fila descartada sigue viva en su tabla de origen).
@@ -4543,9 +4554,9 @@ module.exports = async function handler(req, res) {
           };
 
           // v20: sin tope artificial de curadas. La respuesta entrega TODAS
-          // las fotos de destinos_fotos (orden ASC); galeria.html pagina
-          // 12/pagina en cliente. Antes se truncaba a 12 aqui.
-          gdFotos.forEach(function(f){
+          // las fotos de destinos_fotos (votos DESC, orden ASC); galeria.html
+          // pagina 12/pagina en cliente. Antes se truncaba a 12 aqui.
+          gdFotosRank.forEach(function(f){
             var mCu = gdMetCurada(f.id);
             gdAgregarItem({
               origen: 'curada',
@@ -4741,7 +4752,8 @@ module.exports = async function handler(req, res) {
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
           + '  u.nombre AS usuario_nombre, __FOTO_URL__ AS usuario_avatar,'
           + '  af.autor_original_id::text AS usuario_id, a.id::text AS album_id,'
-          + '  \'album\' AS origen, a.id::text AS origen_id,'
+          + '  \'album\' AS origen, a.id::text AS origen_id, af.id::text AS media_id,'
+          + '  \'album_foto\' AS fuente,'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
@@ -4759,7 +4771,8 @@ module.exports = async function handler(req, res) {
           + '  df.caption AS media_title, \'\' AS media_source, d.lat, d.lng, d.ciudad,'
           + '  d.nombre AS album_titulo, \'\' AS autor_nombre,'
           + '  \'\' AS usuario_nombre, \'\' AS usuario_avatar, NULL::text AS usuario_id, NULL::text AS album_id,'
-          + '  \'destino\' AS origen, d.slug AS origen_id,'
+          + '  \'destino\' AS origen, d.slug AS origen_id, df.id::text AS media_id,'
+          + '  \'curada\' AS fuente,'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'curada\' AND mv.item_id = df.id::text AND mv.activo = true) AS votos'
           + ' FROM destinos_fotos df'
           + ' JOIN destinos d ON d.id = df.destino_id'
@@ -4841,9 +4854,12 @@ module.exports = async function handler(req, res) {
         var mmFotosOficiales = [];
         if (mmDestinoId) {
           mmFotosOficiales = await conDegradacionMedia(sql(
-            'SELECT id, url, caption, orden FROM destinos_fotos'
-            + ' WHERE destino_id = $1::uuid'
-            + ' ORDER BY es_hero DESC NULLS LAST, orden ASC NULLS LAST'
+            'SELECT df.id, df.url, df.caption, df.orden,'
+            + ' (SELECT COUNT(*)::int FROM media_votos mv'
+            + '   WHERE mv.fuente = \'curada\' AND mv.item_id = df.id::text AND mv.activo = true) AS votos'
+            + ' FROM destinos_fotos df'
+            + ' WHERE df.destino_id = $1::uuid'
+            + ' ORDER BY votos DESC, df.es_hero DESC NULLS LAST, df.orden ASC NULLS LAST'
             + ' LIMIT 12',
             [mmDestinoId]
           ), 'destinos_fotos', []);
@@ -4957,25 +4973,33 @@ module.exports = async function handler(req, res) {
           + ' SELECT \'album\' AS fuente, mg.item_id::text AS item_id, mg.creado_en,'
           + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, \'album\' AS media_type,'
           + '  a.ciudad AS ciudad, a.id::text AS album_id, NULL::text AS destino_slug'
-          + ' FROM media_guardados mg JOIN albumes a ON a.id = mg.item_id'
+          + ' FROM media_guardados mg JOIN albumes a ON a.id::text = mg.item_id'
           + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true AND a.activo = true'
           + ' UNION ALL'
           + ' SELECT \'album_foto\', mg.item_id::text, mg.creado_en,'
           + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, af.foto_type,'
           + '  a.ciudad, a.id::text, NULL::text'
-          + ' FROM media_guardados mg JOIN album_fotos af ON af.id = mg.item_id'
+          + ' FROM media_guardados mg JOIN album_fotos af ON af.id::text = mg.item_id'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true AND af.activo = true'
           + ' UNION ALL'
           + ' SELECT \'viajero_foto\', mg.item_id::text, mg.creado_en,'
           + '  d.nombre AS titulo, i.texto AS media_url, \'foto\' AS media_type,'
           + '  d.ciudad, NULL::text, d.slug'
-          + ' FROM media_guardados mg JOIN interacciones i ON i.id = mg.item_id'
+          + ' FROM media_guardados mg JOIN interacciones i ON i.id::text = mg.item_id'
           + ' JOIN destinos d ON d.id = i.destino_id'
           + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
+          + ' UNION ALL'
+          + ' SELECT \'curada\', mg.item_id::text, mg.creado_en,'
+          + '  d.nombre AS titulo, df.url AS media_url, \'foto\' AS media_type,'
+          + '  d.ciudad, NULL::text, d.slug'
+          + ' FROM media_guardados mg'
+          + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
+          + ' JOIN destinos d ON d.id = df.destino_id'
+          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'curada\' AND mg.activo = true'
           + ' ) sub ORDER BY sub.creado_en DESC LIMIT 200',
           [mgUsuario]
-        ).catch(function(){ return []; });
+        ).catch(function(eMg){ console.warn('[interacciones] mis_guardados_media fallo: ' + (eMg && eMg.message ? eMg.message : eMg)); return []; });
         return res.status(200).json({ ok: true, data: mgRows });
       }
 

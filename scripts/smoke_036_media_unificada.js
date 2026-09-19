@@ -391,6 +391,18 @@ async function run() {
     /mis_favorito_del_pueblo[\s\S]{0,600}FROM media_votos mv/.test(SRC)
     && /logr_favorito_comunidad[\s\S]{0,600}FROM media_votos mv/.test(SRC));
 
+  // ============ L. mis_guardados_media: casts uuid->text (anti R1) ============
+  check('L1: mis_guardados_media castea a.id::text',
+    SRC.indexOf('JOIN albumes a ON a.id::text = mg.item_id') !== -1);
+  check('L2: mis_guardados_media castea af.id::text',
+    SRC.indexOf('JOIN album_fotos af ON af.id::text = mg.item_id') !== -1);
+  check('L3: mis_guardados_media castea i.id::text',
+    SRC.indexOf('JOIN interacciones i ON i.id::text = mg.item_id') !== -1);
+  check('L4: mis_guardados_media castea df.id::text (rama curada)',
+    SRC.indexOf('JOIN destinos_fotos df ON df.id::text = mg.item_id') !== -1);
+  check('L5: sin joins uuid=text sin cast en mis_guardados_media',
+    !/ON a\.id = mg\.item_id|ON af\.id = mg\.item_id|ON i\.id = mg\.item_id/.test(SRC));
+
   // ============ K. ASCII-safety ============
   var bInt = fs.readFileSync(path.join(__dirname, '..', 'api/interacciones.js'));
   check('K1: api/interacciones.js 0 bytes > 127', asciiSafeBytes(bInt));

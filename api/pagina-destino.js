@@ -1582,15 +1582,25 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // bloque curado y el lightbox usan > 1 (gate historico), que cumple
   // "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0 curadas.
   var hayGaleriaCurada = galAll.length > 1;
-  // ADR-034 (ajuste): set explicito de la galeria. La grande (curada #1 /
-  // hero) se mantiene aparte y se arman hasta 12 miniaturas con orden
-  // comunidad -> curadas: primero hasta 6 fotos de comunidad (merge
-  // viajeros+albumes por votos DESC, dedup URL); luego las curadas en orden
-  // (excluyendo la grande) hasta completar 12. Si no hay comunidad, se
-  // listan hasta 12 curadas. Nunca se repite la grande ni una URL.
+  // ADR-034 (ajuste) + ADR-036: set explicito de la galeria. La grande
+  // (curada #1 / hero) se mantiene aparte y se arman hasta 12 miniaturas
+  // con orden comunidad -> curadas: primero hasta 6 fotos de comunidad
+  // (merge viajeros+albumes por votos DESC, dedup URL); luego las curadas
+  // por votos DESC (tiebreak: orden original, excluyendo la grande) hasta
+  // completar 12. Si no hay comunidad, se listan hasta 12 curadas. Nunca
+  // se repite la grande ni una URL.
   var GAL_THUMBS_MAX = 12;
   var GAL_COMUNIDAD_MAX = 6;
   var galBig = galAll[0];
+  // ADR-036: votos de las curadas (destinos_fotos.id via media_votos). El
+  // mapa url->votos rankea las miniaturas curadas y alimenta el lightbox.
+  // El fallback de la query no trae votos -> todas quedan en 0 (orden intacto).
+  var galCuradaVotosMap = {};
+  (fotos || []).forEach(function(f){
+    var u = (f && f.url) ? String(f.url).trim() : '';
+    if (!u || galCuradaVotosMap[u] !== undefined) return;
+    galCuradaVotosMap[u] = parseInt(f && f.votos, 10) || 0;
+  });
   // 1) Comunidad primero (tope 6, votos DESC, dedup por URL).
   var galComunidadThumbs = [];
   for (var gcj = 0; gcj < comunidadUrls.length && galComunidadThumbs.length < GAL_COMUNIDAD_MAX; gcj++) {
@@ -1600,9 +1610,18 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     galComunidadThumbs.push(gcu);
   }
   var galThumbsList = galComunidadThumbs.slice();
-  // 2) Curadas restantes hasta completar 12 (sin repetir grande ni comunidad).
-  for (var gci = 1; gci < galAll.length && galThumbsList.length < GAL_THUMBS_MAX; gci++) {
-    var gku = galAll[gci];
+  // 2) Curadas restantes hasta completar 12, por votos DESC (tiebreak:
+  // orden original). No muta galAll: ordena una copia (slice(1)).
+  var galCuradasResto = galAll.slice(1).map(function(u, i){ return { u: u, i: i }; });
+  galCuradasResto.sort(function(a, b){
+    var va = galCuradaVotosMap[a.u] || 0;
+    var vb = galCuradaVotosMap[b.u] || 0;
+    if (vb !== va) return vb - va;
+    return a.i - b.i;
+  });
+  galCuradasResto = galCuradasResto.map(function(x){ return x.u; });
+  for (var gci = 0; gci < galCuradasResto.length && galThumbsList.length < GAL_THUMBS_MAX; gci++) {
+    var gku = galCuradasResto[gci];
     if (gku === galBig || galThumbsList.indexOf(gku) !== -1) continue;
     galThumbsList.push(gku);
   }
@@ -1615,6 +1634,14 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // OMITE el conteo en vez de mostrar 0. Nunca rompe si no hay datos.
   var galVotosMap = {};
   comunidadMerge.forEach(function(x){ if (galVotosMap[x.url] === undefined) galVotosMap[x.url] = x.votos; });
+  // ADR-036: sumar votos de curadas (solo > 0, para conservar la omision
+  // del conteo cuando no hay dato). Nunca sobreescribe a comunidad.
+  (fotos || []).forEach(function(f){
+    var u = (f && f.url) ? String(f.url).trim() : '';
+    if (!u || galVotosMap[u] !== undefined) return;
+    var v = galCuradaVotosMap[u] || 0;
+    if (v > 0) galVotosMap[u] = v;
+  });
   var galLightboxVotos = galLightbox.map(function(u){ return (galVotosMap[u] !== undefined) ? galVotosMap[u] : null; });
   // URL de los CTAs "Guardar en album"/"Agregar a album" del lightbox.
   var galeriaUrl = d.slug ? '/galeria.html?destino=' + encodeURIComponent(d.slug) : '/galeria.html';
@@ -2640,10 +2667,24 @@ module.exports = async function handler(req, res) {
     // TSK-106 fix R10: sin LIMIT artificial. galAll puede tener >24 fotos;
     // buildHTML() ya limita la galeria curada a 1 grande + 12 miniaturas.
     // El LIMIT 200 es un tope de seguridad razonable para no traer miles.
-    var fotosRows = await sql(
-      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 200',
-      [d.id]
-    );
+    var fotosRows = [];
+    try {
+      fotosRows = await sql(
+        'SELECT df.url, df.caption,'
+        + ' (SELECT COUNT(*)::int FROM media_votos mv'
+        + '   WHERE mv.fuente = \'curada\' AND mv.activo = true'
+        + '     AND mv.item_id = df.id::text) AS votos'
+        + ' FROM destinos_fotos df WHERE df.destino_id=$1'
+        + ' ORDER BY df.orden ASC NULLS LAST, df.es_hero DESC LIMIT 200',
+        [d.id]
+      );
+    } catch (eFotos) {
+      console.warn('[pagina-destino] fotos curadas con votos fallo (migracion pendiente?): ' + eFotos.message);
+      fotosRows = await sql(
+        'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 200',
+        [d.id]
+      );
+    }
 
     // ADR-034: fotos de comunidad para el hero (3 miniaturas) y la galeria
     // (6 miniaturas). Cada consulta lleva su PROPIO try/catch: si falla

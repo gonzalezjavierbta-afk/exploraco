@@ -45,6 +45,12 @@
   var MEDIA_CARGANDO = false;
   var MEDIA_USER_TOUCHED = false;
 
+  // Set de media guardada por el usuario con claves "fuente:item_id"
+  // (contrato del backend: fuente album_foto|curada y media_id). Lo puebla
+  // cargarGuardados() para que el filtro de la capa media incluya los
+  // bookmarks aunque su album no pertenezca a un destino del mapa.
+  var SET_GUARDADOS = {};
+
   function logWarn(msg, e) {
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('[mymapa] ' + msg, e || '');
@@ -128,6 +134,7 @@
       list: null,
       drawer: true,
       apiBase: api(),
+      mediaFilter: filterMisMapa,
       // onMapReady llega sincrono antes de que mc quede asignado:
       // por eso se usa el mapa recibido, no mc.getMap().
       onMapReady: function (map) {
@@ -147,9 +154,63 @@
     }, 120);
   }
 
+  /* ---------- capa de media: guardados + filtro ---------- */
+
+  // Clave del contrato del backend: "fuente:media_id". Devuelve cadena
+  // vacia si el item no trae ambos campos.
+  function claveGuardado(it) {
+    if (!it || !it.fuente || it.media_id == null) return '';
+    return String(it.fuente) + ':' + String(it.media_id);
+  }
+
+  // Filtro de la capa media de "Mis mapas": conserva el filtro estricto
+  // compartido (destino/destino_album con slug activo, reutilizado desde
+  // mapa-cultural.js para no duplicar la regla) y ademas incluye la media
+  // guardada por el usuario (SET_GUARDADOS) sin importar su origen. Asi un
+  // video o foto de album guardado aparece como pin en el mapa.
+  function filterMisMapa(items, places) {
+    var arr = items || [];
+    var estrictos = {};
+    if (window.MapaCultural && typeof window.MapaCultural.filterMediaDefault === 'function') {
+      window.MapaCultural.filterMediaDefault(arr, places).forEach(function (it) {
+        if (it && it.key != null) estrictos[it.key] = true;
+      });
+    }
+    return arr.filter(function (it) {
+      if (!it || !it.media_url) return false;
+      var k = claveGuardado(it);
+      if (k && SET_GUARDADOS[k]) return true;
+      return !!(it.key != null && estrictos[it.key]);
+    });
+  }
+
+  // Carga los bookmarks de media del usuario y re-aplica la capa para que
+  // los guardados salgan como pines. No bloquea el render de destinos: si
+  // falla solo registra el aviso y conserva el set cargado previamente.
+  function cargarGuardados() {
+    var u = usuario();
+    if (!u || !u.id) { SET_GUARDADOS = {}; return; }
+    getJson('/api/interacciones?tipo=mis_guardados_media&usuario_id=' + encodeURIComponent(u.id))
+      .then(function (d) {
+        var set = {};
+        if (d && d.ok && d.data) {
+          d.data.forEach(function (row) {
+            if (!row) return;
+            set[String(row.fuente) + ':' + String(row.item_id)] = true;
+          });
+        }
+        SET_GUARDADOS = set;
+        if (mc) {
+          mc.setMedia(MEDIA_CACHE || []);
+          medirMediaActiva();
+        }
+      })
+      .catch(function (e) { logWarn('guardados media', e); });
+  }
+
   // ---- Capa de media (multimedia_mapa) --------------------------------
-  // Un unico fetch cacheado; el modulo filtra por slug de los destinos
-  // activos con su filtro default (origen destino/destino_album).
+  // Un unico fetch cacheado; el modulo filtra con filterMisMapa (estricto
+  // por slug de destinos activos + media guardada por el usuario).
   function recargarMedia() {
     var m = ensureMC();
     if (!m) return;
@@ -185,6 +246,8 @@
     var hay = false;
     (MEDIA_CACHE || []).forEach(function (it) {
       if (hay || !it) return;
+      var k = claveGuardado(it);
+      if (k && SET_GUARDADOS[k]) { hay = true; return; }
       if (it.origen === 'album') return;
       if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
     });
@@ -311,6 +374,7 @@
     S.mapas = [];
     S.sel = null;
     S.destinos = [];
+    SET_GUARDADOS = {};
     var pills = el(S.opts.pills);
     if (pills) {
       pills.innerHTML = '<span class="mmx-empty">Inicia sesion para crear tus mapas</span>'
@@ -345,6 +409,7 @@
         if (S.sel && !findMapa(S.sel)) S.sel = null;
         renderPills();
         renderEditbar();
+        cargarGuardados();
         loadDestinos();
       })
       .catch(function () { toast('Error de red al cargar tus mapas', '#ef4444'); });
