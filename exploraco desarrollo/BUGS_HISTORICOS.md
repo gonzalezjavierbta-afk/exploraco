@@ -1097,6 +1097,47 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `comunidad.html` L2022-2026 (`cargarAudiovisual`), L2028-2030 (`avCargarMas`), L2032-2058 (`cargarAlbumesAV`); QA runtime APTO sin bloqueantes (balance de divs 307/307).
 **Estado:** CERRADO / CORREGIDO (working tree, 2026-09-18; SIN commitear). Ver TSK-123.
 
+## BUG-068: `POST ?tipo=museo_recurso` bloqueaba el reintento de un recurso nacido oculto con `23505` -- media invisible y 409 "Registro duplicado"
+
+**Severidad:** MEDIA-ALTA (consistencia de visibilidad + bloqueo de alta: el usuario no podia republicar su propia media).
+**Contexto:** detectado el 2026-09-19 en la sesion express (TSK-129) al investigar por que la media de la cuenta `gonzalezjavierbta@gmail.com` no aparecia en el mapa cultural y al re-subirla devolvia "Registro duplicado". Es hermano de **BUG-065** (misma raiz de visibilidad por `album_fotos.visible`, migracion 025 / ADR-039), pero por la via URL-only `museo_recurso`.
+**Sintoma:** al crear (`accion=crear`) un recurso cuya clave `(album_id, foto_url, autor_original_id)` ya existia con `visible=false` (o `activo=false`), el `INSERT` chocaba con el indice unico `idx_album_fotos_dedup` (migracion 009) y el alta fallaba; la fila existente seguia oculta y por tanto fuera de la capa publica.
+**Causa raiz:** el `INSERT` de `museo_recurso` no contemplaba la colision `23505`; la fila previa (nacida con el `DEFAULT false` de la 025) ocupaba la clave y bloqueaba el reintento en vez de republicarse.
+**Resolucion aplicada (misma sesion, commit `dfde7e7`; header v23 sin bump):** `api/interacciones.js` captura `23505` y hace reintento idempotente: si la fila existente no es `activo && visible`, la reactiva y publica (`UPDATE album_fotos SET activo=true, visible=true ... RETURNING`) y responde `200 {ok, reactivado:true}` **sin re-otorgar XP** (el recurso ya existia); si ya era publica responde `409 {duplicado:true}`. El `INSERT` sigue escribiendo `visible` explicito.
+**Evidencia (ADR-006):** `api/interacciones.js` `museo_recurso` reintento `mrInsErr.code === '23505'` L6506-6529; INSERT con `visible` L6498-6505. Diagnostico read-only y remediacion de datos: `scripts/diagnose_media_oculta.js` y `db/cleanups/003_publicar_media_oculta.sql`.
+**Remediacion de datos (PENDIENTE en Neon):** `db/cleanups/003_publicar_media_oculta.sql` pone `visible=true` en las filas que ya estaban `activo=true` (idempotente, NO borra filas, Regla de Oro 3); requiere respaldo previo.
+**Estado:** CORREGIDO en codigo (commit `dfde7e7`, 2026-09-19; **ultimo commit local sin push**). Remediacion de datos PENDIENTE en Neon.
+
+## BUG-069: starvation en `?tipo=multimedia_mapa` -- un unico `ORDER BY votos DESC LIMIT 200` sobre el `UNION ALL` desplazaba la media de usuarios
+
+**Severidad:** MEDIA (la media subida por usuarios no aparecia en el mapa cultural aunque estuviera activa y visible).
+**Contexto:** detectado el 2026-09-19 (TSK-130) durante la investigacion de la media invisible de TSK-129.
+**Sintoma:** con suficientes fotos curadas/globales de alto voto, las filas de las ramas de usuarios (album/oficial) quedaban fuera del `LIMIT` compartido y no se pintaban en el mapa, pese a que el filtro `af.visible=true` las admitia.
+**Causa raiz:** la rama armaba un `UNION ALL` de 3 subconsultas (album de usuarios, destinos/global, variantes) y aplicaba al final un unico `ORDER BY votos DESC LIMIT 200`; el ranking global consumia el cupo antes de que las filas de usuarios pudieran entrar (starvation).
+**Resolucion aplicada (working tree, 2026-09-19; header v23 sin bump):** cada rama lleva su propio tope interno (`ORDER BY votos DESC LIMIT 300` en album y `LIMIT 300` en destinos) y el `UNION ALL` cierra con `ORDER BY votos DESC LIMIT 600`. Se preserva el orden por votos y se da cupo garantizado a cada origen.
+**Evidencia (ADR-006):** `api/interacciones.js` L4757 (`... LIMIT 300) UNION ALL (`) y L4770 (`... LIMIT 300) ORDER BY votos DESC LIMIT 600`); `git diff` sin commitear.
+**Estado:** CORREGIDO en codigo (working tree, 2026-09-19; **SIN commitear**). PENDIENTE deploy de `api/interacciones.js`.
+
+## BUG-070: el conteo de votos de fotos de viajero en la ficha usaba el store legacy `interacciones.dims->>'voto_foto_id'`
+
+**Severidad:** MEDIA (dato incorrecto/desactualizado en la ficha publica del destino).
+**Contexto:** detectado el 2026-09-19 (TSK-131) al revisar la migracion de la media a `media_votos` (ADR-036).
+**Sintoma:** las fotos de viajero en `api/pagina-destino.js` mostraban un numero de votos distinto del que reflejaba `media_votos` (la fuente canonica desde ADR-036), por seguir leyendo el store legacy.
+**Causa raiz:** la subquery de `votos` contaba `interacciones` con `dims->>'voto_foto_id' = i.id::text`, esquema anterior a la media unificada; los votos nuevos se escriben en `media_votos` con `fuente='viajero_foto'`, por lo que el legacy quedo desincronizado.
+**Resolucion aplicada (working tree, 2026-09-19):** la subquery pasa a `SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente='viajero_foto' AND mv.activo=true AND mv.item_id = i.id::text`, coherente con `galeria_destino` (ADR-036).
+**Evidencia (ADR-006):** `api/pagina-destino.js` L2655-2666 (subquery `FROM media_votos mv`); `git diff` sin commitear (header sin bump: `v12.20260917`).
+**Estado:** CORREGIDO en codigo (working tree, 2026-09-19; **SIN commitear**). PENDIENTE deploy; backfill de votos legacy si aparecen registros historicos fuera de `media_votos`.
+
+## Nota de re-confirmacion de BUG-066 (sesion express 2026-09-18/19) -- no es un bug nuevo
+
+El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regresion de anidacion `#pf-clase`/`#arbolPintar` corregida con `#arbol-body`". Contra archivo real (ADR-006), ese hallazgo es EXACTAMENTE **BUG-066** (regresion FE-02 de TSK-119, CERRADO con `#arbol-body`), no una falla distinta. **No se crea un BUG nuevo para no duplicar el registro historico (Regla de Oro 3).** Lo que hizo la sesion express (TSK-127) fue retirar por completo `#pf-clase` y absorber Clase/Tabla de Destino/Vocaciones en el Arbol de Progreso, **reutilizando** el host persistente `#arbol-body` y el patron anti-regresion de **ADR-043**. El caso queda documentado como riesgo D.1 en `MODO_EXPRESS_ANALISIS.md`.
+
+## Preexistentes NO resueltos arrastrados por la sesion express (2026-09-18/19) -- NO atribuibles a la sesion
+
+- **BUG-002 ABIERTO:** `api/pagina-destino.js` **L2431** conserva 1 doble escape real (`'\\u2605'` en `addRvOptimista`; verificado contra archivo real). Deuda de limpieza, ajena a esta sesion.
+- **FAIL preexistente `A3d`** de `scripts/smoke_038_casas_clases.js` (check en L356); se mantiene como fallo conocido y debe distinguirse de cualquier regresion nueva al correr esa suite.
+- **BUG-061 y BUG-065 ABIERTOS:** ver sus entradas; BUG-061 queda amplificado por los nuevos accesos de media y BUG-065 es la raiz hermana de BUG-068.
+
 ## Deuda ADR-035: columnas no versionadas de las que dependen los rankings (patron BUG-021)
 
 **Nota:** los rankings de la Entrega TSK-109 dependen de tres columnas que siguen SIN migracion versionada, igual que BUG-021: `usuarios.activo` y `usuarios.ultimo_acceso` (definicion de "miembro activo vigente" a 30 dias en `casa_ranking` y `pandilla_ranking`) e `interacciones.xp_ganado` (columna de XP, no versionada; la migracion 021 la cubre con guard `IF EXISTS` y el preflight la marca como opcional).

@@ -2190,3 +2190,24 @@ Es la misma solucion ya validada en el proyecto para piezas compartidas de front
 - **Lectura por `usuario_id`:** permite inferir los booleanos `ya_votado`/`ya_guardado` de un usuario sin sesion (enumeracion de baja severidad, deuda D-11).
 
 **ADRs relacionados:** ADR-001 (sin frameworks / Vanilla JS), ADR-002 (ASCII-safe), ADR-006 (baseline real), ADR-010 (presupuesto 8/8), ADR-025 (sesion firmada JWT/Bearer), ADR-036 (media unificada `media_*`), ADR-040 y TSK-117 (precedentes de asset compartido: `niveles-data.js`, `map-picker.js`), ADR-043 (patron anti-regresion de UI), BUG-061 (usuario_id sin sesion ampliado), BUG-067 (append invertido corregido en la misma sesion).
+
+---
+
+## Nota de practica operativa (NO es un ADR): Modo Express + skill `express-mode`
+
+**ID:** (sin numeracion ADR, a proposito: este documento registra decisiones de arquitectura; esta es una decision de PROCESO)
+**Fecha:** 2026-09-19
+**Autor:** Documentation Specialist (AI-DOS); origen: sesion express 2026-09-18/19 (TASKS.md TSK-132).
+**Estado:** VIGENTE (adoptada en la sesion express 2026-09-18/19; assets en working tree, SIN commitear).
+
+**Decision de proceso:** se adopta el **"modo express / xpress"** como practica operativa del proyecto para cambios funcionales acotados, gobernada por la skill `.opencode/skills/express-mode/SKILL.md` y por la directriz de `agents.md`. El modo se activa cuando el usuario pide trabajar "express", "xpress" o "rapido", y NO elimina controles: cambia su orden y profundidad.
+
+**Reglas clave del modo:** (1) brief quirurgico de delegacion por dominio (ruta + lineas + bloque `old`/`new`); (2) verificacion local minima de 6 puntos (`node --check`, ASCII-safety, balance de divs, grep de residuos, smoke puntual y QA runtime obligatorio si se anidan contenedores dinamicos); (3) documentacion y deuda DIFERIDAS a un unico cierre de sesion (etiqueta `[DEUDA-EXPRESS]` en NEXT.md); (4) escalado obligatorio a modo normal en arquitectura, esquema/RLS/seguridad, migraciones de datos, refactors compartidos o alcance > 3 archivos criticos o > 10 en total.
+
+**Justificacion:** las sesiones de cambio de UI/UX y wiring no necesitan el plan formal ni el Escudo GOLD completo por cada micro-edicion; concentrar la verificacion en lo que puede romperse y documentar en un solo pase reduce turnos y costo sin aumentar el riesgo neto. La sesion express verifico el limite real de la practica: el unico bug no detectado por checks estaticos (regresion de anidacion, **BUG-066**) aparecio precisamente porque ESE cambio si corrio QA runtime; de ahi la regla de QA obligatorio en anidacion.
+
+**Impacto:** NO toca esquema, endpoints ni el presupuesto 8/8 (ADR-010). Nueva evidencia: `MODO_EXPRESS_ANALISIS.md` (manual interno v1.0), `SKILL_MODO_EXPRESS.md` (copia de registro) y `scripts/express_check.js` (comando unico de verificaciones minimas). Los pendientes que express difiere se listan como `[DEUDA-EXPRESS]` en NEXT.md.
+
+**Referencia de detalle:** `exploraco desarrollo/ampliacion desarrollo/MODO_EXPRESS_ANALISIS.md`; skill operativa `.opencode/skills/express-mode/SKILL.md`; directriz en `agents.md` seccion 1 y referencia cruzada en `GUIA_DE_DESARROLLO.md` (Apendice B) y `orquestacion agentes.md` (Skill 4).
+
+**NO es un ADR:** no se le asigna numero ADR-045 porque no define arquitectura, contrato de datos ni seguridad; si en el futuro el modo express requiere una decision de arquitectura, se registrara como ADR numerado segun el formato de este documento.

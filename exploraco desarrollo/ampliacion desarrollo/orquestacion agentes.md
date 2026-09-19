@@ -212,6 +212,15 @@ SET tags = COALESCE(tags, '{}') || $1::jsonb
 WHERE id = $2;
 ```
 
+### Skill 4: Modo Express (transversal)
+Cuando el usuario pida trabajar "express", "xpress" o "rapido", el skill `express-mode` (`.opencode/skills/express-mode/SKILL.md`) rige toda la sesión como skill **transversal** a cualquier dominio y ruta (gratuita o de pago):
+1. **Brief quirurgico de delegacion:** un subagente por dominio con rutas exactas + números de línea + bloque `old`/`new`; sin exploración masiva (solo `grep`/`read` dirigido y 1 `@explore` si es imprescindible).
+2. **Verificacion local minima** proporcional al riesgo (sintaxis, ASCII-safety, balance de divs, `grep` de residuos, smoke puntual); Escudo GOLD formal y QA de subagente solo si el cambio puede romper runtime.
+3. **Documentacion y deuda diferidas** a un único cierre de sesión (`TASKS.md` + `NEXT.md` + ADR/BUGS si aplica).
+4. **Escalado obligatorio a modo normal** en arquitectura, esquema/RLS/seguridad, migraciones de datos, refactors compartidos o cambios de gran alcance (> 3 archivos críticos o > 10 en total).
+
+Manual ampliado: `MODO_EXPRESS_ANALISIS.md` (copia de registro del skill en `SKILL_MODO_EXPRESS.md`).
+
 ---
 
 ## 6. CONFIGURACIÓN COMPLETA DE OPENCODE (`opencode.json`)

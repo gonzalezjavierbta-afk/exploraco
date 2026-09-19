@@ -4754,7 +4754,7 @@ module.exports = async function handler(req, res) {
           + (mmIdxTipos ? ' AND af.foto_type = ANY($' + mmIdxTipos + '::text[])' : '')
           + (mmIdxCiudad ? ' AND a.ciudad = $' + mmIdxCiudad : '')
           + (mmIdxUsuario ? ' AND a.usuario_id = $' + mmIdxUsuario + '::uuid' : '')
-          + ') UNION ALL ('
+          + ' ORDER BY votos DESC LIMIT 300) UNION ALL ('
           + ' SELECT df.url AS media_url, \'foto\' AS media_type,'
           + '  df.caption AS media_title, \'\' AS media_source, d.lat, d.lng, d.ciudad,'
           + '  d.nombre AS album_titulo, \'\' AS autor_nombre,'
@@ -4767,7 +4767,7 @@ module.exports = async function handler(req, res) {
           + ((mmTipos && mmTipos.indexOf('foto') === -1) || mmOrigen === 'album' ? ' AND FALSE' : '')
           + (mmIdxCiudad ? ' AND d.ciudad = $' + mmIdxCiudad : '')
           + (mmIdxUsuario ? ' AND d.id IN (SELECT i.destino_id FROM interacciones i WHERE i.usuario_id = $' + mmIdxUsuario + '::uuid AND i.tipo IN (\'guardado\',\'voto\',\'rating\') AND i.activo = true)' : '')
-          + ') ORDER BY votos DESC LIMIT 200',
+          + ' ORDER BY votos DESC LIMIT 300) ORDER BY votos DESC LIMIT 600',
           mmParams
         ), 'media_votos', []);
 

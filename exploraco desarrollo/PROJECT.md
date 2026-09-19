@@ -1,7 +1,7 @@
 # PROJECT.md - ExploraCO
 
 ## Estado del documento
-- Version: v1.8 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17 + ADR-038 TSK-112, 2026-09-18 + ADR-039/ADR-040 y ENMIENDA 1 de ADR-039 TSK-114..TSK-117, 2026-09-18 + ADR-041 TSK-118 y sus hotfixes post-QA J-1/J-2/J-3, 2026-09-18 + ADR-042/ADR-043 y paquete TSK-119..TSK-122 -- zonas/marcas/patrocinios, fix R10, perfil/mapa y cleanup de fotos, 2026-09-18 + ADR-044 TSK-123 correccion Comunidad > Audiovisual y abstraccion `media-actions.js`, 2026-09-18)
+- Version: v1.8 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17 + ADR-038 TSK-112, 2026-09-18 + ADR-039/ADR-040 y ENMIENDA 1 de ADR-039 TSK-114..TSK-117, 2026-09-18 + ADR-041 TSK-118 y sus hotfixes post-QA J-1/J-2/J-3, 2026-09-18 + ADR-042/ADR-043 y paquete TSK-119..TSK-122 -- zonas/marcas/patrocinios, fix R10, perfil/mapa y cleanup de fotos, 2026-09-18 + ADR-044 TSK-123 correccion Comunidad > Audiovisual y abstraccion `media-actions.js`, 2026-09-18; + sesion express TSK-124..TSK-132 modo express, 2026-09-19)
 - Fecha: Julio 2026 (actualizado Septiembre 2026)
 - Fuente: EXPLORACO_CONTEXT_V4.md + Reglas de Oro ExploraCO v5 + documentos maestros v5
 - Documento obligatorio del AI-DOS Core (Cap. 9.4). Es el primer documento que debe leer cualquier IA.
@@ -148,6 +148,15 @@ Sobre el cofre de Casas y la media unificada se implemento el paquete "Modulos n
 - **Fixes de la misma sesion:** `api/pagina-destino.js` `LIMIT 24 -> 200` (fix R10 de galeria); `mi-perfil.html` "Fotos publicadas" visible SOLO para `brsk84@gmail.com` (FE-01) y fusion "Clase & Arbol de Progreso" con host `#arbol-body` (FE-02; ver BUG-066 y ADR-043); `index.html` `.mpa-media-pin-video` para video individual en el mapa (FE-03).
 - **Remediacion de datos:** `scripts/diagnose_fotos_brsk84.js` (read-only) y `db/cleanups/002_fix_fotos_brsk84.sql` (soft-delete idempotente para fotos con URL vacia). Causa raiz: **BUG-065** (el INSERT legacy `album_agregar_foto` no escribe `visible` y hereda el `DEFAULT false` de la 025).
 - **PENDIENTE OPERATIVO (BLOQUEANTE):** aplicar `db/migrations/027_zonas_marcas.sql` en Neon (preflight `scripts/verify_027_precheck.js`) ANTES del deploy de las ramas `marca_*`/`mi_marca`; aplicar aparte el cleanup 002. La 024/025/026 siguen su propio orden de release.
+
+### Sesion express TSK-124..TSK-132 (modo express, 2026-09-18/19)
+
+Cierre documental de la sesion ejecutada en "modo express" (skill `express-mode`), verificada contra archivo real (ADR-006). NO crea funciones serverless (8/8, ADR-001/ADR-010) ni migraciones nuevas. La mayor parte ya esta commiteada en `main` (commits `26d2e3c`, `66db2e6`, `604fa0d`, `d309e17`, `b41e3ba`, `68e50a4`, `dfde7e7`; este ultimo es el unico commit local sin push); TSK-130/TSK-131 y los assets del modo express siguen en working tree.
+
+- **Nuevo modulo frontend `mymapa.js`:** mapas personalizados (`window.MyMap`) integrados al tab Mapa de `comunidad.html`; `index.html` retira la seccion "Mi Viaje"/`#mymapa-section` y ~93 HTML repuntan su ancla a `mi-perfil.html`.
+- **Media del mapa cultural y de la ficha:** `multimedia_mapa` pasa a LIMIT por rama (album 300 / destinos 300 / global 600) contra la starvation (**BUG-069**); `museo_recurso` republica recursos ocultos al chocar con `23505` sin re-otorgar XP (**BUG-068**); `album_agregar_foto` escribe `visible` default true; la ficha cuenta votos de viajero desde `media_votos` (**BUG-070**). Diagnostico/remediacion: `scripts/diagnose_media_oculta.js`, `scripts/diagnose_video_mapa.js` y `db/cleanups/003_publicar_media_oculta.sql`.
+- **UI de perfil/galeria/comunidad:** se retira "Fotos publicadas" del Museo; "Clase"/"Tabla de Destino"/"Vocaciones" se fusionan en el "Arbol de Progreso" (`#arbol-body`, ADR-043/BUG-066); `galeria.html` queda en 2 bloques (curadas/comunidad) sin tope de 12; "Media reciente" abre popup reutilizando `#av-album-modal`.
+- **Proceso:** se adopta el modo express como practica operativa (skill `.opencode/skills/express-mode/SKILL.md`, manual `MODO_EXPRESS_ANALISIS.md`, `scripts/express_check.js`), registrado como nota de practica (no ADR) en DECISIONS.md. Detalle en TASKS.md TSK-124..TSK-132 y NEXT.md.
 
 ### Documentacion maestra
 

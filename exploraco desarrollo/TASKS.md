@@ -3470,5 +3470,130 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Archivos en el working tree (SIN commitear):** `media-actions.js` (NUEVO, untracked); `api/interacciones.js` (M); `comunidad.html` (M); `galeria.html` (M).
 - **Fuera de alcance:** migrar `index.html` a `media-actions.js`; auth de `guardar_media`/`quitar_guardado_media` (BUG-061); fix de BUG-065; versionar el smoke de `media-actions.js`.
 
+## Prioridad SESION EXPRESS 2026-09-18/19 - "modo express" (skill `express-mode`)
+
+> Cierre documental en un solo pase (AI-DOS Cap. 9.9) de la sesion ejecutada en
+> "modo express" (skill `express-mode`, ver TSK-132). Origen: pedido directo de
+> UI/UX + fixes de media. Numeracion: el ultimo TSK real antes de esta sesion es
+> **TSK-123** (verificado, ADR-006); las tareas nuevas van **TSK-124..TSK-132**.
+> IMPORTANTE (ADR-006): el contexto de relevo describia estos cambios como "sin
+> commitear"; contra archivo real la mayor parte YA ESTA COMMITEADA en `main`
+> (commits `26d2e3c`, `66db2e6`, `604fa0d`, `d309e17`, `b41e3ba`, `68e50a4` y
+> `dfde7e7`). Solo siguen en working tree sin commitear: los fixes de mapa/votos
+> de TSK-130/TSK-131 (`api/interacciones.js`, `api/pagina-destino.js`) y los
+> assets/docs del modo express de TSK-132.
+
+### TSK-124: Quitar la seccion "Fotos publicadas" del museo propio (`mi-perfil.html`) [COMPLETADA]
+
+- **Estado:** COMPLETADA (commit `26d2e3c`, 2026-09-18). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Media (limpieza de UI; el inventario de museo se unifica en Guardados + gestion T5).
+- **Fecha:** 2026-09-18
+- **Origen:** pedido del usuario de simplificar el museo propio (la grilla "Fotos publicadas" era de solo lectura y duplicaba informacion ya presente en la gestion del Museo).
+- **Responsable / agentes:** frontend-tpl (`mi-perfil.html`), docs-keeper (esta entrada).
+- **Detalle:** `mi-perfil.html` elimina el titulo `#mis-fotos-title`, la grilla `#mis-fotos-grid`, el helper `esCuentaFotosPublicadas()` y el loader `cargarMisFotos()`, junto con sus llamadas en `renderPerfil()`, `museoGuardar()`/`museoEliminar()`/`museoToggleVisible()` y `pfTab('clase')`. El tab Museo conserva "Guardados (fotos y albumes)" (`mis_guardados_media`) y la gestion CRUD por URL del T5 (ADR-039). Cero endpoints nuevos (8/8 intacto).
+- **Evidencia (ADR-006):** commit `26d2e3c` (`mi-perfil.html` +3/-32); grep `Fotos publicadas`/`esCuentaFotosPublicadas`/`cargarMisFotos` = 0 en el archivo real; balance de divs de `mi-perfil.html` sin cambios estructurales.
+- **Relacion con bugs:** hereda la deuda previa de los `catch` vacios de `mi-perfil.html` (D-4), no la amplia.
+- **Fuera de alcance:** la gestion T5 del Museo (ADR-039) y los guardados privados quedan como estaban.
+
+### TSK-125: Popup de detalle de "Media reciente" reutilizando el modal de album (`comunidad.html`) [COMPLETADA]
+
+- **Estado:** COMPLETADA (commit `d309e17`, 2026-09-18). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Media (UX: las tarjetas del feed Audiovisual no tenian vista grande ni acciones completas).
+- **Fecha:** 2026-09-18
+- **Origen:** continuacion de TSK-123/ADR-044 (tarjetas interactivas en "Media reciente").
+- **Responsable / agentes:** frontend-tpl (`comunidad.html`), docs-keeper (esta entrada).
+- **Detalle:** `avMediaHTML(item, large)` gana el parametro `large` (media a pantalla completa para foto/video/audio); NUEVO `abrirMediaModal(f)` reutiliza el modal existente `#av-album-modal` con titulo dinamico `#av-album-bar-title` y pinta media + like/comentarios/guardar (`avActLikeHTML`/`avActSaveHTML`, `AlbumComments.toggle`, `avBindMediaActions`/`avSyncMediaActions`); `feedCardAV` marca la tarjeta clickeable y abre el popup ignorando clics dentro de `.av-feed-actions` (Regla de No-Duplicidad: no se creo modal nuevo).
+- **Evidencia (ADR-006):** `comunidad.html` (`abrirMediaModal` L2035, `avMediaHTML` L1908, `feedCardAV` L2235-2253, modal `#av-album-modal` L514); balance de divs de `comunidad.html` 307/307; `media-actions.js` cargado (L543).
+- **Relacion con bugs:** reusa la superficie de `guardar_media` (nota de amplificacion de BUG-061) y depende de `media-actions.js` (ADR-044).
+- **Pendiente operativo:** confirmar en vivo tras el deploy; requiere las migraciones 019/023 para el guardado real.
+
+### TSK-126: Galeria ampliada en 2 bloques (curadas / comunidad) y sin tope artificial de 12 (`galeria.html`) [COMPLETADA]
+
+- **Estado:** COMPLETADA (commit `b41e3ba`, 2026-09-18). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Media (la galeria del destino truncaba las curadas a 12 y no separaba comunidad).
+- **Fecha:** 2026-09-18
+- **Origen:** pedido del usuario de ver todas las fotos del lugar y distinguir curadas de aportes de la comunidad.
+- **Responsable / agentes:** js-silo-dev (`api/interacciones.js`), frontend-tpl (`galeria.html`), docs-keeper (esta entrada).
+- **Detalle:** en `galeria.html`, `gLoadDestino` separa `curadaItems` (`origen='curada'`) y `comItems` (`origen!=='curada'`): pinta las curadas en `#g-sec-dest` con paginacion cliente 12/pagina (`gGalRenderPage`/`gGalLoadMore`) y los aportes de la comunidad en `#g-sec-com` (`gFillGrid`); la rama `galeria_destino` deja de truncar con `gdFotos.slice(0,12)` y entrega TODAS las fotos (`gdFotos.forEach`), apoyandose en el `LIMIT 200` de `destinos_fotos` (fix R10, TSK-119). Cero endpoints nuevos (8/8 intacto).
+- **Evidencia (ADR-006):** commit `b41e3ba` (`api/interacciones.js` +4/-1, `galeria.html` +15/-4); `galeria.html` `gLoadDestino` L762-832 (`curadaItems`/`comItems` L798-799, `g-sec-com` L814-815); grep `slice(0, 12)` = 0 en la rama.
+- **Relacion con bugs:** ninguno abierto propio; mejora la visibilidad de la media publica (dependiente de `af.visible=true`, ADR-039).
+- **Fuera de alcance:** el modo comunitario global de la galeria (sin `?destino=`).
+
+### TSK-127: Fusion de "Clase" + "Tabla de Destino" + "Vocaciones" dentro del "Arbol de Progreso" (`mi-perfil.html`) [COMPLETADA]
+
+- **Estado:** COMPLETADA (commits `66db2e6` y `604fa0d`, 2026-09-18). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (consolidacion de la UI de progresion; eliminaba pestanas/sub-vistas redundantes).
+- **Fecha:** 2026-09-18
+- **Origen:** pedido del usuario de unificar la progresion del perfil en un solo lugar ("Arbol de Progreso").
+- **Responsable / agentes:** frontend-tpl (`mi-perfil.html`), qa-auditor (QA runtime de anidacion), docs-keeper (esta entrada).
+- **Detalle:** el tab "Clase" pasa a rotularse **"Progreso"** y el titulo a **"Arbol de Progreso"**; se retiran del DOM/JS: el widget `#pf-clase` + `#modal-clase` (Clase Rising Star), la Tabla de Destino (`cargarTablaDestino`/`renderTablaSVG`/`#pf-tabla` y el pseudo-tab `senderos`) y la grilla de Vocaciones (`cargarVocaciones`/`arbolVocacionesHtml`/`#pf-vocaciones-grid`). `renderPerfil()` y `pfTab('clase')` dejan de invocarlas y toda la progresion se absorbe en el Arbol de Clases/Progreso, cuyo host de inyeccion dinamica es **`#arbol-body`** (patron anti-regresion de ADR-043 / BUG-066).
+- **Evidencia (ADR-006):** commits `66db2e6` (llamadas retiradas) y `604fa0d` (mi-perfil +7/-362); `mi-perfil.html` `#arbol-body` L866, `arbolPintar`/`cargarArbolClases` L3367/L3381 usan `getElementById('arbol-body')`; grep `pf-clase`/`pf-vocaciones-grid`/`renderTablaSVG`/`senderos` = 0 relevantes.
+- **Relacion con bugs:** reusa la prevencion de **BUG-066** (ver nota de re-confirmacion en BUGS_HISTORICOS.md); el QA runtime se ejecuto por el riesgo de anidacion (modo express lo exige).
+- **Fuera de alcance:** no se toca el backend de Clases (ADR-038), que sigue vigente como dato aunque su UI se integre.
+
+### TSK-128: "Mi Viaje" -> modulo `mymapa.js` en Comunidad + retiro de la seccion del `index.html` [COMPLETADA]
+
+- **Estado:** COMPLETADA (commit `68e50a4` "mymapa", 2026-09-18/19). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (nuevo modulo compartido; retira codigo muerto/duplicado del home).
+- **Fecha:** 2026-09-18/19
+- **Origen:** pedido del usuario de mover los mapas personalizados del home a la Comunidad y reutilizarlos.
+- **Responsable / agentes:** frontend-tpl/js-silo-dev (`mymapa.js`, `comunidad.html`, `index.html`), docs-keeper (esta entrada).
+- **Detalle:** NUEVO `mymapa.js` (IIFE, ASCII-safe, sin backticks) expone `window.MyMap` (init/crear/editar mapas personales sobre Leaflet); el tab **Mapa** de `comunidad.html` lo integra (`#mm-personal-pills`, `#mm-personal-editbar`, `#mm-personal-map`, `#mm-personal-list`; `onTabMapaAV` -> `MyMap.init`); `index.html` elimina la seccion `#mymapa-section` (-265 lineas) y **~93 archivos HTML** repuntan sus anclas `index.html#mymapa-section` -> `mi-perfil.html`. Se conservan como backups con el ancla (Regla de Oro 3): `index_pre_full.html` y `_lacandelaria3_body.html`.
+- **Evidencia (ADR-006):** commit `68e50a4` (95 archivos: `mymapa.js` nuevo +486, `comunidad.html` +50, `index.html` -265, `mi-perfil.html`, `galeria.html` y ~90 paginas .html con el ancla); `git grep -l mymapa-section 68e50a4^ -- *.html` = 95 y `... 68e50a4 -- *.html` = 2 (los backups); `mymapa.js` L18 IIFE, `window.MyMap`; `comunidad.html` script `mymapa.js` L544, `onTabMapaAV` L2063-2067.
+- **Relacion con bugs:** ninguno propio; la deuda de JS muerto `mm*` y de anclas en backups queda registrada en NEXT.md como `[DEUDA-EXPRESS]`.
+- **Pendiente operativo:** deploy del frontend (el home deja de ofrecer el ancla vieja).
+
+### TSK-129: Visibilidad/dedup de media (video de la cuenta `gonzalezjavierbta`) + diagnostico y cleanup [COMPLETADA]
+
+- **Estado:** COMPLETADA en codigo (commit `dfde7e7` "media", 2026-09-19; **ultimo commit local sin push**, `main` ahead 1 de `origin/main`). Remediacion de datos PENDIENTE en Neon.
+- **Prioridad:** Alta (reporte directo: videos subidos que no aparecen en el mapa cultural y reintento bloqueado por 23505).
+- **Fecha:** 2026-09-18/19
+- **Origen:** reporte del usuario de que la media de la cuenta `gonzalezjavierbta@gmail.com` no aparecia y al re-subir chocaba con "Registro duplicado".
+- **Responsable / agentes:** backend-dev (`api/interacciones.js`), sql-security (cleanup 003 + diagnosticos read-only), docs-keeper (esta entrada).
+- **Detalle (backend, header v23 sin bump):**
+  1. `POST ?tipo=museo_recurso` (crear) captura `23505` del indice unico `idx_album_fotos_dedup` y hace reintento idempotente: si la fila existente estaba oculta/inactiva la reactiva y publica (`activo=true, visible=true`) sin re-otorgar XP; si ya era publica responde 409. Antes el alta fallaba y la fila quedaba invisible.
+  2. `POST ?tipo=album_agregar_foto` escribe `visible` explicito con default **true** (`aBooleano(body.visible)`; `null` -> true) y su dedup es republicable (reactiva la fila oculta SIN re-otorgar XP); el INSERT incluye la columna `visible` (cierra el patron de BUG-065 por esa via).
+- **Detalle (diagnostico/remediacion, NUEVOS):** `scripts/diagnose_media_oculta.js` (read-only, 344 lineas), `db/cleanups/003_publicar_media_oculta.sql` (idempotente, 140 lineas, no borra filas), `scripts/diagnose_video_mapa.js` (read-only, sin versionar) y `scripts/smoke_036_media_unificada.js` con la asercion **J21** ampliada (ventana 900 -> 2400 para `mi_feed_fotos`).
+- **Evidencia (ADR-006):** `api/interacciones.js` `museo_recurso` reintento 23505 L6506-6529; `album_agregar_foto` `afVisible` default true L6744-6745, dedup L6749-6758, INSERT con `visible` L6763; `smoke_036_media_unificada.js` J21 L374-375 (2400).
+- **Relacion con bugs:** registra **BUG-068** (dedup 23505 bloqueante de recursos ocultos) y reconoce **BUG-065** (INSERT legacy sin `visible`) como causa hermana; `db/cleanups/003` complementa `db/cleanups/002`.
+- **Pendiente operativo (BLOQUEANTE de dato):** correr `scripts/diagnose_media_oculta.js` y `scripts/diagnose_video_mapa.js` con `DATABASE_URL` y aplicar `db/cleanups/003_publicar_media_oculta.sql` en Neon; pushear `dfde7e7` y desplegar `api/interacciones.js`.
+
+### TSK-130: Fix de starvation del mapa cultural (`multimedia_mapa` con LIMIT por rama) [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE (2026-09-19, **SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (la media de usuarios no aparecia en el mapa cultural por el LIMIT compartido del UNION ALL).
+- **Fecha:** 2026-09-19
+- **Origen:** hallazgo al investigar la media perdida de TSK-129.
+- **Responsable / agentes:** backend-dev (`api/interacciones.js`), docs-keeper (esta entrada).
+- **Detalle:** la rama `?tipo=multimedia_mapa` aplicaba un unico `ORDER BY votos DESC LIMIT 200` al final del `UNION ALL`, de modo que las filas de mayor voto de la rama global/album desplazaban a la media de usuarios (starvation). Ahora cada rama lleva su propio tope interno (`ORDER BY votos DESC LIMIT 300` en album e `LIMIT 300` en destinos) y el UNION ALL cierra con `ORDER BY votos DESC LIMIT 600`. Header **v23 sin bump** (cambio aditivo).
+- **Evidencia (ADR-006):** `api/interacciones.js` L4757 (`ORDER BY votos DESC LIMIT 300) UNION ALL (`) y L4770 (`ORDER BY votos DESC LIMIT 300) ORDER BY votos DESC LIMIT 600`); `git diff` sin commitear.
+- **Relacion con bugs:** registra **BUG-069** (starvation por LIMIT compartido, CORREGIDO en working tree).
+- **Pendiente operativo:** deploy de `api/interacciones.js` tras pushear.
+
+### TSK-131: Fix del conteo de votos de fotos de viajero en la ficha de destino (store legacy -> `media_votos`) [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE (2026-09-19, **SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (los votos de las fotos de viajero en la ficha mostraban un conteo desactualizado/incorrecto).
+- **Fecha:** 2026-09-19
+- **Origen:** parte del fix de media de la sesion (la ficha aun leia el store legacy).
+- **Responsable / agentes:** backend-dev (`api/pagina-destino.js`), docs-keeper (esta entrada).
+- **Detalle:** `api/pagina-destino.js` calculaba `votos` de fotos de viajero contando `interacciones` con `dims->>'voto_foto_id'` (store legacy). Se migra al canonico `media_votos` con `fuente='viajero_foto' AND activo=true AND item_id = i.id::text`, coherente con la media unificada de ADR-036 y con `galeria_destino`.
+- **Evidencia (ADR-006):** `api/pagina-destino.js` L2655-2666 (subquery `FROM media_votos mv WHERE mv.fuente='viajero_foto'`); `git diff` sin commitear (header sin bump: sigue `v12.20260917`).
+- **Relacion con bugs:** registra **BUG-070** (votos de viajero con store legacy, CORREGIDO en working tree).
+- **Pendiente operativo:** deploy de `api/pagina-destino.js`; backfill de votos legacy si aparecen registros historicos (ver `[DEUDA-EXPRESS]` en NEXT.md).
+
+### TSK-132: Adopcion del "Modo Express" como practica operativa + skill `express-mode` [COMPLETADA]
+
+- **Estado:** COMPLETADA (working tree, 2026-09-19, **SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Media (proceso: agiliza sesiones de cambio funcional manteniendo controles proporcionales).
+- **Fecha:** 2026-09-18/19
+- **Origen:** pedido del usuario de trabajar "express/xpress/rapido" y dejarlo gobernado.
+- **Responsable / agentes:** docs-keeper/plan (skill, AGENTS.md y manual), qa-auditor (revision de riesgos), docs-keeper (esta entrada).
+- **Detalle:** NUEVA skill `.opencode/skills/express-mode/SKILL.md` (briefs quirurgicos por dominio, verificacion local de 6 puntos, documentacion diferida al cierre y escalado obligatorio a modo normal en arquitectura/seguridad/migraciones/refactors/alcance > 3 archivos criticos o > 10 totales); NUEVOS manual `exploraco desarrollo/ampliacion desarrollo/MODO_EXPRESS_ANALISIS.md` (v1.0, 2026-09-19) y copia de registro `SKILL_MODO_EXPRESS.md`; NUEVO `scripts/express_check.js` (un comando para `node --check` + ASCII-safety de `api/*.js`/`scripts/*.js` y balance de divs de los HTML clave). MODIFICADOS: `agents.md` (directriz Modo Express), `GUIA_DE_DESARROLLO.md` (Apendice B: fila del skill) y `orquestacion agentes.md` (Skill 4 transversal). Cero cambios en la app.
+- **Evidencia (ADR-006):** `.opencode/skills/express-mode/SKILL.md` (85 lineas); `MODO_EXPRESS_ANALISIS.md` (13603 bytes); `SKILL_MODO_EXPRESS.md` (4880 bytes); `scripts/express_check.js`; `git diff` de `agents.md`/`GUIA_DE_DESARROLLO.md`/`orquestacion agentes.md`.
+- **Relacion con bugs:** los riesgos observados en la sesion (anidacion de contenedores, regresion no detectable por checks estaticos) quedan documentados en `MODO_EXPRESS_ANALISIS.md` seccion D y enlazados a **BUG-066**.
+- **Decision:** se registra como NOTA DE PRACTICA OPERATIVA (no ADR) en DECISIONS.md; el detalle vive en `MODO_EXPRESS_ANALISIS.md`.
+- **Fuera de alcance:** no se crean endpoints ni migraciones; el presupuesto sigue 8/8 (ADR-010).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

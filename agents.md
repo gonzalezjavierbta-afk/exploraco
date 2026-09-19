@@ -78,6 +78,8 @@ Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `o
 
 **Workflow de investigacion externa:** la investigacion web de NUEVOS items de directorio (hostal, comida, sitio, evento) se ejecuta en Google Gemini (externo, no consume cuota) mediante el skill `gemini-research` (`prompts/GEMINI_MASTER_PROMPT.md`). `research-agent`/`research-agent-free` quedan para fichas legacy o validaciones, y toda ingesta se valida con `scripts/validate_ficha.js` antes de pasar a `create-dynamic-page`.
 
+**Modo Express (xpress):** cuando el usuario pida trabajar "express", "xpress" o "rapido", usar el skill `express-mode`: briefs quirurgicos por dominio (rutas + lineas + bloque `old`/`new`), verificacion local proporcional al riesgo y documentacion diferida a un unico cierre de sesion. Escalar a modo normal en arquitectura, esquema/RLS/seguridad, migraciones de datos, refactors compartidos o cambios de gran alcance (> 3 archivos criticos o > 10 en total).
+
 ## 2. Reglas del Espacio de Trabajo contra la Deuda Técnica
 Para mitigar la crisis de mantenibilidad, duplicación de código y rotación de commits, el runtime de OpenCode aplicará las siguientes restricciones:
 1. **Regla de No-Duplicidad (Tripwire de 5 líneas)**: Queda prohibido copiar y pegar bloques de código existentes de más de 5 líneas para adaptarlos localmente. Si se requiere una funcionalidad similar en otra sección, se debe refactorizar el código base para crear una abstracción o función reutilizable.

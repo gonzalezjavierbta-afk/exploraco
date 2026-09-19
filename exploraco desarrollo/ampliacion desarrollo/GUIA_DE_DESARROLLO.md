@@ -1368,10 +1368,15 @@ scripts de `scripts/` (seed/loader/smoke).
 
 ## Apendice B. Referencias cruzadas a skills de opencode
 
+### Skill: Modo Express
+
+Cuando el usuario pide trabajar "express", "xpress" o "rapido", el skill `express-mode` prioriza el **cambio funcional**, delega **briefs quirurgicos por dominio** (rutas + numeros de linea + bloque `old`/`new`), aplica una **verificacion local minima** proporcional al riesgo y **difiere la documentacion y la deuda** al cierre de sesion en un solo pase. No se usa en arquitectura, esquema/RLS/seguridad, migraciones de datos, refactors compartidos ni cambios de gran alcance (> 3 archivos criticos o > 10 en total). Manual ampliado: `MODO_EXPRESS_ANALISIS.md`.
+
 | Skill | Uso |
 |---|---|
 | `create-dynamic-page` | Orquesta el flujo completo de una pagina dinamica nueva (validacion, ficha, seed, loader, smoke, Escudo GOLD, produccion, docs). |
 | `gold-shield` | Ejecuta el Escudo GOLD (sintaxis, ASCII-safety, balance de divs). |
+| `express-mode` | Modo express/xpress: prioriza el cambio funcional, briefs quirurgicos, verificacion proporcional y documentacion diferida al cierre. |
 | `batch-create` | Crea varias paginas dinamicas a la vez para optimizar cuota. |
 | `research-destination` | Investiga un destino en multiples fuentes y genera la ficha .md. |
 | `brainstorming` / `grill-me` | Afinar requerimientos y diseno antes de implementar. |

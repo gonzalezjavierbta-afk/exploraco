@@ -2655,9 +2655,9 @@ module.exports = async function handler(req, res) {
       fotosViajeros = await sql(
         'SELECT i.id, i.texto AS url, i.usuario_id AS autor_id, i.creado_en,'
         + ' u.nombre AS autor_nombre,'
-        + ' (SELECT COUNT(*)::int FROM interacciones v'
-        + '   WHERE v.tipo=\'foto\' AND v.activo=true'
-        + '     AND v.dims->>\'voto_foto_id\' = i.id::text) AS votos'
+        + ' (SELECT COUNT(*)::int FROM media_votos mv'
+        + '   WHERE mv.fuente=\'viajero_foto\' AND mv.activo=true'
+        + '     AND mv.item_id = i.id::text) AS votos'
         + ' FROM interacciones i LEFT JOIN usuarios u ON u.id = i.usuario_id'
         + ' WHERE i.destino_id=$1 AND i.tipo=\'foto\' AND i.activo=true'
         + '   AND (i.dims IS NULL OR NOT (i.dims ? \'voto_foto_id\'))'
