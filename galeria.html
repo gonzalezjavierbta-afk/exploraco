@@ -502,7 +502,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     var publico = !!m.publico;
     card.href = publico
       ? 'mapas.html?id=' + encodeURIComponent(m.id)
-      : 'index.html#mymapa-section';
+      : 'mi-perfil.html';
     var badge = publico ? 'Publico' : (m.es_mio ? 'Tuyo' : 'Privado');
     card.innerHTML = '<div class="g-map-ph">' + esc(m.emoji || '\uD83D\uDDFA') + '</div>'
       + '<div class="g-album-body">'

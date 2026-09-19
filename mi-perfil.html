@@ -884,7 +884,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
   <!-- ACCIONES -->
   <div class="pf-actions" data-tab="cuenta">
-    <button class="pf-btn" onclick="window.location.href='index.html#mymapa-section'">🗺️ Mi Mapa</button>
+    <button class="pf-btn" onclick="window.location.href='comunidad.html'">🗺️ Mi Mapa</button>
     <button class="pf-btn" onclick="window.location.href='directorio.html'">📍 Explorar</button>
     <button class="pf-btn pf-btn-gold" onclick="editarNombre()">✏️ Editar nombre</button>
     <button class="pf-btn pf-btn-danger" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
@@ -1425,7 +1425,7 @@ function renderQuickActions(st) {
     actions.push({emoji:'✍️', label:'Escribe una reseña', xp:'+25 XP', hint:'Abre cualquier lugar y usa la sección de reseñas', action:function(){ window.location.href='directorio.html'; }});
   }
   if(st.saved > 0 && st.visited === 0) {
-    actions.push({emoji:'✅', label:'Marca un lugar como visitado', xp:'+10 XP', hint:'En Tu Mapa (ExploraCO) usa el botón "Ya fui"', action:function(){ window.location.href='index.html#mymapa-section'; }});
+    actions.push({emoji:'✅', label:'Marca un lugar como visitado', xp:'+10 XP', hint:'En Tu Mapa (ExploraCO) usa el botón "Ya fui"', action:function(){ window.location.href='comunidad.html'; }});
   }
   if(actions.length === 0) {
     el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);padding:8px 0">Vas muy bien! Sigue explorando Colombia 🇨🇴</div>';

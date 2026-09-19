@@ -258,6 +258,43 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .ao-voto.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
 .ao-voto-contra{background:transparent;border:1px solid rgba(239,68,68,.3);border-radius:4px;color:#ef4444;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 10px;transition:all .15s;font-family:'Outfit',sans-serif}
 .ao-voto-contra:hover{background:#ef4444;border-color:#ef4444;color:#fff}
+/* MIS MAPAS PERSONALIZADOS (modulo compartido mymapa.js) */
+.mmx-card{background:rgba(255,255,255,.03);border:1px solid rgba(232,160,32,.18);border-radius:12px;padding:14px;margin-bottom:18px}
+.mmx-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.mmx-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#fff}
+.mmx-new{background:var(--gold);border:none;border-radius:5px;padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black);transition:opacity .15s}
+.mmx-new:hover{opacity:.88}
+.mmx-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.mmx-pill{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:6px 12px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
+.mmx-pill:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
+.mmx-pill.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
+.mmx-pill-n{background:rgba(255,255,255,.12);border-radius:10px;padding:0 6px;font-size:10px;font-weight:700}
+.mmx-editbar{flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+.mmx-eb-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold);letter-spacing:.5px;margin-right:4px}
+.mmx-ebtn{background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:5px;color:rgba(255,255,255,.72);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:5px 10px;cursor:pointer;transition:all .15s}
+.mmx-ebtn:hover{border-color:rgba(232,160,32,.5);color:var(--gold)}
+.mmx-ebtn-danger:hover{border-color:rgba(239,68,68,.6);color:#ef4444}
+.mmx-list{margin-top:10px;max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;scrollbar-width:thin;scrollbar-color:rgba(232,160,32,.25) transparent}
+.mmx-list-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.45);margin-bottom:2px}
+.mmx-item{display:block;padding:7px 10px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.82);font-size:12px;text-decoration:none;transition:all .15s}
+a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
+.mmx-li-city{color:rgba(255,255,255,.4);font-size:10px}
+.mmx-empty{font-size:11px;color:rgba(255,255,255,.4);padding:8px 2px}
+.mmx-login{background:var(--gold);border:none;border-radius:5px;padding:5px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black)}
+.mmx-pop-link{color:var(--gold);text-decoration:none;font-weight:600}
+.mmx-pop-title{font-weight:700;color:#111;font-size:13px}
+.mmx-pop-meta{font-size:11px;color:#666;margin-top:1px}
+.mm-personal-modal{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);padding:16px}
+.mm-personal-box{background:#0F172A;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:20px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.mm-personal-head{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:14px}
+.mm-personal-lbl{display:block;font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.6px;margin-bottom:4px}
+.mm-personal-inp{width:100%;box-sizing:border-box;padding:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-family:'Outfit',sans-serif;font-size:13px;margin-bottom:10px}
+.mm-personal-inp:focus{outline:none;border-color:var(--gold)}
+.mm-personal-check{display:flex;align-items:center;gap:7px;font-size:11px;color:rgba(255,255,255,.85);margin-bottom:14px;cursor:pointer}
+.mm-personal-actions{display:flex;gap:8px}
+.mm-personal-btn{flex:1;padding:9px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;cursor:pointer}
+.mm-personal-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+.mm-personal-btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
 </style>
 </head>
 <body>
@@ -405,6 +442,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
     <!-- MAPA AUDIOVISUAL -->
     <div class="cpanel" id="cpanel-mapa">
+      <!-- Mis mapas personalizados (modulo compartido mymapa.js) -->
+      <div class="mmx-card"><div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">＋ Nuevo</button></div><div class="mmx-pills" id="mm-personal-pills"></div><div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div><div id="mm-personal-map" style="height:340px;border-radius:10px;overflow:hidden;background:#222"></div><div class="mmx-list" id="mm-personal-list"></div></div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
         <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>
@@ -502,6 +541,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="media-actions.js"></script>
+<script src="mymapa.js"></script>
 <script>
 /* =============================================================
    COMUNIDAD EXPLORACO — hub de interaccion social
@@ -2021,6 +2061,16 @@ function abrirMediaModal(f) {
 
 var _avMapInitialized = false;
 function onTabMapaAV() {
+  /* Mis mapas personalizados: modulo compartido mymapa.js.
+     init es idempotente (__mmBound); no afecta al mapa de comunidad. */
+  if (window.MyMap && window.MyMap.init) {
+    window.MyMap.init({
+      contenedor: 'mm-personal-map',
+      pills: 'mm-personal-pills',
+      editbar: 'mm-personal-editbar',
+      lista: 'mm-personal-list'
+    });
+  }
   if (!_avMapInitialized) {
     _avMapInitialized = true;
     setTimeout(initAudiovisualMap, 100);
