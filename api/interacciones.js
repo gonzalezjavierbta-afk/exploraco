@@ -6493,14 +6493,41 @@ module.exports = async function handler(req, res) {
           }
 
           var mrXp = 15;
-          var mrIns = await sql(
-            'INSERT INTO album_fotos'
-            + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
-            + '  media_title, media_source, visible, xp_otorgado_autor)'
-            + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7)'
-            + ' RETURNING id, album_id, visible',
-            [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp]
-          );
+          var mrIns;
+          try {
+            mrIns = await sql(
+              'INSERT INTO album_fotos'
+              + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
+              + '  media_title, media_source, visible, xp_otorgado_autor)'
+              + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7)'
+              + ' RETURNING id, album_id, visible',
+              [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp]
+            );
+          } catch (mrInsErr) {
+            // ADR-039 + migracion 025: el indice unico
+            // idx_album_fotos_dedup (album_id, foto_url, autor_original_id)
+            // choca con recursos nacidos ocultos (visible=false). Reintento
+            // idempotente: reactiva el registro existente en vez de
+            // bloquear. NO se otorga XP porque el recurso ya existia.
+            if (mrInsErr && mrInsErr.code === '23505') {
+              var mrDup = await sql(
+                'SELECT id, album_id, visible, activo FROM album_fotos'
+                + ' WHERE album_id=$1::uuid AND foto_url=$2 AND autor_original_id=$3::uuid LIMIT 1',
+                [mrAlbumId, mrUrl, mrUser]
+              ).catch(function(){ return []; });
+              if (mrDup.length) {
+                if (mrDup[0].activo && mrDup[0].visible)
+                  return res.status(409).json({ ok:false, error:'Registro duplicado', duplicado:true, recurso_id: mrDup[0].id });
+                var mrRep = await sql(
+                  'UPDATE album_fotos SET activo=true, visible=true WHERE id=$1::uuid'
+                  + ' RETURNING id, album_id, visible',
+                  [mrDup[0].id]
+                );
+                return res.status(200).json({ ok:true, reactivado:true, recurso:{ id: mrRep[0].id, album_id: mrRep[0].album_id, visible: mrRep[0].visible } });
+              }
+            }
+            throw mrInsErr;
+          }
 
           var mrCtx = await contextoXpE(sql, mrUser);
           var mrXpFinal = calcularXpFinal(mrXp, mrCtx.nivel_clase, mrCtx.clase_id, mrCtx.tag);
@@ -6712,20 +6739,30 @@ module.exports = async function handler(req, res) {
         var afFotoType = ['foto','video','audio'].includes(body.foto_type) ? body.foto_type : 'foto';
         var afMediaTitle = String(body.media_title || '').trim().slice(0, 200);
         var afMediaSource = String(body.media_source || '').trim().slice(0, 100);
+        // ADR-032: el contenido subido al album/album de comunidad es
+        // PUBLICO por defecto; solo un false explicito lo oculta.
+        var afVisible = aBooleano(body.visible);
+        if (afVisible === null) afVisible = true;
 
-        // Check dedup
+        // Check dedup (025): un registro oculto o inactivo NO bloquea el
+        // reintento; se republica reactivandolo, SIN re-otorgar XP.
         var afDedup = await sql(
-          'SELECT 1 AS uno FROM album_fotos WHERE album_id=$1 AND foto_url=$2 AND autor_original_id=$3 LIMIT 1',
+          'SELECT id, activo, visible FROM album_fotos WHERE album_id=$1 AND foto_url=$2 AND autor_original_id=$3 LIMIT 1',
           [afAlbumId, afFotoUrl, afAutorOriginal]
         ).catch(function(){ return []; });
-        if (afDedup.length) return res.status(409).json({ ok: false, error: 'Foto ya existe en este album' });
+        if (afDedup.length) {
+          if (afDedup[0].activo && afDedup[0].visible)
+            return res.status(409).json({ ok: false, error: 'Foto ya existe en este album' });
+          var afRep = await sql('UPDATE album_fotos SET activo=true, visible=true WHERE id=$1 RETURNING *', [afDedup[0].id]);
+          return res.status(200).json({ ok: true, reactivado: true, foto: afRep[0] });
+        }
 
         var afIns;
         try {
           afIns = await sql(
-            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, xp_otorgado_autor) '
-            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, 15) RETURNING *',
-            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource]
+            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor) '
+            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 15) RETURNING *',
+            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible]
           );
         } catch (afInsErr) {
           // La FK autor_original_id -> usuarios.id (009) convierte un id

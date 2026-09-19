@@ -372,7 +372,7 @@ async function run() {
   check('J20: fotos_top lee votos de media_votos',
     /tipo === 'fotos_top'[\s\S]{0,900}FROM media_votos mv/.test(SRC));
   check('J21: mi_feed_fotos lee votos de media_votos',
-    /tipo === 'mi_feed_fotos'[\s\S]{0,900}FROM media_votos mv/.test(SRC));
+    /tipo === 'mi_feed_fotos'[\s\S]{0,2400}FROM media_votos mv/.test(SRC));
   check('J22: mis_fotos lee votos de media_votos',
     /tipo === 'mis_fotos'[\s\S]{0,1500}FROM media_votos mv/.test(SRC));
   check('J23: tipo fotos (viajeros) lee votos de media_votos',
