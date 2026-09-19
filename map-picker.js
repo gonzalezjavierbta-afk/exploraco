@@ -263,7 +263,9 @@
       buscarCoordenadas: buscarCoordenadas,
       openMapPicker: openMapPicker,
       closeMapPicker: closeMapPicker,
-      confirmMapPicker: confirmMapPicker
+      confirmMapPicker: confirmMapPicker,
+      getPickerMap: function () { return pickerMap; },
+      getMiniMap: function () { return miniMap; }
     };
   }
 

@@ -3,6 +3,8 @@
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
 ## Completado reciente
+- TSK-118 / ADR-041 "Comunicacion oficial + Casas (tributo configurable/lider/misiones) + eras y titulos + admin mapa" (2026-09-18, IMPLEMENTADO EN WORKING TREE + HOTFIXES POST-QA, SIN commitear) - 6 archivos de codigo modificados (+549/-41 acumulado incl. hotfixes; `git diff --numstat` verificado) + 1 migracion nueva sin versionar: `usuario-session.js` (+245/-0; `TITULOS_POR_NIVEL` de 20 titulos L82, `ERAS` Mundana/Patrocinada/Organizador/Leyenda + `getEra` L106-113, modales `mostrarModalNivelUp`/`mostrarModalCambioEra` L116+ disparados desde `aplicarResultadoXp` al subir de nivel); `api/interacciones.js` (+173/-21 acumulado incl. hotfixes; header v22 -> **v23**: `acreditarClaseYCofre` L338-345 lee `casas_cofre.tributo_pct` (default 10, clamp 0..15), helper `avanzarMisionesCasa` L360 + `CASA_MISIONES_META`, `GET ?tipo=chat_salas` expone `es_oficial` L3518, `GET ?tipo=casa_misiones` L5270, `POST ?tipo=anuncio_oficial` L5769 (solo Bearer `ADMIN_SECRET`), `POST ?tipo=casa_tributo_config` L5824 (admin o `lider_user_id`; hotfix J-2: authz por `validarSesion` L5835), bloqueo 403 de no-admin en `chat_msg` sobre sala `es_oficial`, hooks de misiones en foto/resena/visita/xp); `api/usuarios.js` (+66/-11 acumulado incl. hotfix J-3; header v16 -> v17 -> **v18**: `casa_ranking` expone `lider_user_id`/`tributo_pct` con degradacion escalonada 42P01/42703 y refresco best-effort del lider por Casa antes de leer, ya con throttle de 60 s por instancia desde v18); `comunidad.html` (+32/-4; sala oficial al tope via `sort`, borde/fondo dorado + badge "OFICIAL", input y boton ocultos para no-admin con hint, limpieza del input en `onOk`); `admin.html` (+30/-4; `#map-picker-el` 380 -> 500 px, `adm_actualizarCirculoRango()` con `L.circle` sobre `MapPicker.getPickerMap()` y hooks en `oninput`/`openMapPicker`/`confirmMapPicker`); `map-picker.js` (+3/-1; expone `getPickerMap()`/`getMiniMap()` L267-268). NUEVO sin versionar: `db/migrations/026_casas_comunicaciones.sql` (329 lineas, idempotente ADR-008, ASCII-safe ADR-002: 0 bytes >127 y 0 backticks; `chat_salas.es_oficial` + canal "Anuncios ExploraCO" + `uq_chat_salas_oficial`; `casas_cofre.tributo_pct` + CHECK 0..15 + `lider_user_id`; tablas `casa_roles` y `casa_misiones`; backfill de lider y 1 mision base por Casa). Presupuesto **8/8 INTACTO** (ADR-001/ADR-010). Decisiones (a)-(h) en `DECISIONS.md` ADR-041; tarea en `TASKS.md` TSK-118; relevo en `docs/HANDOFF_041.md`. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 026 en Neon (024/025 YA aplicadas por indicacion del usuario, 2026-09-18) -> deploy backend (v23/v18) -> frontend.** Deuda: misiones base no diferenciadas por Casa; `casa_roles` solo puebla `lider`; linea-titulo L1 de `interacciones.js` aun v22 (changelog ya en v23); circulo de rango sin validar en produccion.
+- HOTFIX post-QA TSK-118 / ADR-041 (2026-09-18, working tree, SIN commitear): `api/interacciones.js` paso a **v23** por los hallazgos J-1 (degradacion 42703 en `GET ?tipo=chat_salas` y `POST chat_msg` si la 026 no esta aplicada; se elimino el catch silencioso de `chat_msg`, AGENTS.md 2.2) y J-2 (seguridad: `POST ?tipo=casa_tributo_config` ahora exige `validarSesion(req, usuarioId2).ok` para autorizar al lider, cerrando el IDOR registrado como `BUGS_HISTORICOS.md` **BUG-064 CERRADO**); `api/usuarios.js` paso a **v18** por J-3 (throttle de 60 s por instancia al refresco del lider en `GET ?tipo=casa_ranking`, limitando las 3 escrituras sin tocar las lecturas). Escudo GOLD post-hotfix: `node --check` OK en 4 archivos (`api/interacciones.js`, `api/usuarios.js`, `usuario-session.js`, `map-picker.js`), ASCII-safe 0 bytes >127 en `api/`, balance de divs 0 y presupuesto 8/8 INTACTO. **BUG-061 sigue ABIERTO y los hooks `avanzarMisionesCasa` lo amplifican.** Orden de release vigente: 024 -> 025 -> 026 -> backend v23/v18 -> frontend.
 - TSK-114..TSK-117 / ADR-039 + ADR-040 + ENMIENDA 1 de ADR-039 "Museo multimedia URL-only + acordeon de niveles + localizacion y map-picker" (2026-09-18, IMPLEMENTADO EN WORKING TREE, SIN commitear) - `api/interacciones.js` **v22** (header real L1-17; release compartido): ramas `POST/GET ?tipo=museo_recurso` (crear/editar/eliminar/listar sobre `album_fotos` con visibilidad server-side), filtros `af.visible=true` en todos los lectores publicos (incluidos conteos y subqueries de votos), misiones `mis_videografo`/`mis_sonidista` (`xp:15`, `gate_nivel:2`; catalogo 39 -> **41**) y campos aditivos `gate_nivel`/`desbloquea`/`nivel` en `?tipo=misiones` (ADR-040, via `MISION_GATE_XP` + `nivelDeMisionServidor`). NUEVOS sin versionar: `db/migrations/025_album_fotos_visible.sql` (171 lineas; `album_fotos.visible` default false + backfill + indice unico parcial `idx_albumes_usuario_mi_museo`), `niveles-data.js` (9363 bytes, fuente unica cliente), `map-picker.js` (11188 bytes, modulo compartido; `admin.html` refactorizado), `scripts/smoke_niveles_data.js` (31/31) y `scripts/verify_025_precheck.js`. `mi-perfil.html`: tab Museo CRUD por URL + localizacion con pin (T5/T7). Gate de creacion de los 3 tipos = `mis_fotografo` (evita deadlock circular) y **+15 XP para foto, video y audio** (ENMIENDA 1 de ADR-039; el texto viejo del ADR decia 0 XP y sin gate). Escudo GOLD APROBADO tras correcciones: `node --check` OK; ASCII OK; divs 0; `smoke_niveles_data` 31/31; `gamificacion_v4` 95/95; `smoke_021` 45/45; `smoke_038` 76/76; `smoke_test_perfil_progreso`/`comunidad`/`milestones_v2`/`check_buildHTML_inline` OK. Presupuesto **8/8 INTACTO**. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 024 y 025 en Neon y LUEGO desplegar el backend v22 + frontend (orden 024 -> 025 -> v22).** Deuda: `smoke_036_compartir.js` (espera header v19) y `test_logros_catalogo.js` (espera 30 logros, real 33) siguen en rojo preexistente; 12 `catch` vacios preexistentes en `mi-perfil.html`.
 - TSK-113 / Sprint Multimedia-Pefil-Galeria-Mapa (2026-09-18, COMPLETADA en working tree, SIN commitear) - 4 archivos modificados (+249/-56; `git diff --numstat` verificado): `api/pagina-destino.js` (+6/-6; header **v12.20260917** con changelog L1-2: fix REFORZADO de BUG-057 en listener capture -- `cerrarPopoverGuardar` ignora `ev.target.id==='btn-guardar'` L2513, checkboxes Tu Mapa L2533 / mapas tematicos L2545 / boton "Nuevo mapa" L2556 con `event.stopPropagation()`; BUG-057 pasa a **CERRADO**, ver BUGS_HISTORICOS.md); `mi-perfil.html` (+82/-27; Grupo 1: `mediaCardHTML` L1832 unifica `foto_url||texto||media_url` en grid 140px con votos y empty state "Aun no tienes fotos..." L1876, guardados por fuente `album`/`album_foto`/`viajero_foto` con placeholder + enlace al destino, geo en `agregarFotoAlbum` con `#album-nueva-foto-lat/lng` L658-660 + `usarMiUbicacionAlbum` L1992 y validacion de rango Colombia, logros con `renderTrofeoCard` L1140 desbloqueados primero y boton colapsable "+N bloqueados" L1155-1192; divs 394/394, script 3/3; comentario `Rev 2026-09-18b` insertado por O1 del Escudo GOLD #92); `galeria.html` (+58/-10; paginacion 12/pagina con `G.galPagina/galPorPagina/galItems` L248, `gGalRenderPage` L882 y `gGalLoadMore` L897, consolidacion curadas->viajeros->albumes, boton `#g-more` REUTILIZADO; divs 84/84); `index.html` (+103/-13; Grupo 3+4: `#md-mapa-destino-titulo` L1245 + `mdSetDestinoTitulo` L3301-3302 en pin L3310 y album L3454, `votarMediaMapa` L3566 con `mostrarLogin` L3569 y 401 L3584, `renderLogrosGrid` L4630 solo `estado==='completada'` L4648 con `tierOrder` L4645; divs 523/523). **Desviacion de alcance O2:** `index-api-connector.js` NO se modifico (el endpoint `multimedia_mapa` filtra solo por `destino_id` y `cargarAlbumOficialDestino` ya envia `destino_id`; el titulo del drawer se resolvio en `index.html`). Escudo GOLD #92 APROBADO CON OBSERVACIONES: `node --check` PASS, ASCII 0/0/0, divs 0/0/0, `smoke_auditoria_pagina_destino` 54/54 PASS. Presupuesto 8/8 INTACTO; sin migraciones; prompt de la tarea `PROMPT_OPENCODE_MULTIMEDIA_PERFIL_GALERIA.md` (untracked). **PENDIENTE OPERATIVO: commit/push/deploy de los 4 archivos + cierre documental en un solo release; NO mezclar archivos ajenos (O3): `opencode.json` + 3 `.opencode/agent/*` modificados + 4 borrados (`PROMPT_OPENCODE_TSK111.md`, `PROMPT_OPENCODE_TSK112.md`, `PROMPT_MULTIMEDIA_GALERIA.md`, `opencode - copia.json`).** Deuda confirmada: BUG-002 sigue ABIERTO en `api/pagina-destino.js` L2431. Detalle en TASKS.md TSK-113 y docs/HANDOFF_037.md.
 - TSK-111 / ADR-037 Geocerca con radio urbano 50 m + `album_oficial` en el mapa cultural + limpieza de modulos del admin + refactor de hero/galeria de la ficha (2026-09-17, IMPLEMENTADO EN WORKING TREE, SIN commitear) - 7 archivos modificados (+335/-298) + 1 archivo nuevo sin versionar (`PROMPT_OPENCODE_TSK111.md`): `admin.html` (+49/-82; "Que incluye el precio" retirado del admin/render, UI "Orden de modulos" eliminada con `#hostal-modulos-list` OCULTO para preservar `tags.orden_modulos`, seccion "Operacion" eliminada con `f-capacidad` movido a General, `f-comotransporte` eliminado end-to-end, `moverFila`/`moveFaqRow`); `api/interacciones.js` (+44/-8; header v19 -> v20: `RADIO_DEFAULT_M`/`RADIO_POR_CATEGORIA` 100 -> 50 y subcategorias urbanas a 50, rural 250/parque-concierto 150/festival-deporte 200 intactos, `ACCURACY_MAX_M=150` y bloqueo 422 intactos, `album_oficial` en `multimedia_mapa`); `api/pagina-destino.js` (+121/-194; header v11: guard `edad_minima` con trim, hero botonera en 2 filas `.hctar-row` + grid 1+3 + `abrirLightboxHero`, "Fotos de viajeros" retirado, CTA "Ver todas las fotos"); `index-api-connector.js` (+32/-0; `cargarAlbumOficialDestino`/`window.cargarAlbumOficialDestino`); `index.html` (+51/-1; `mdMapaAlbumOficial`, solo rama `origen='destino'`); `scripts/smoke_016_multinivel_crowdsourcing.js` (+29/-3) y `scripts/smoke_auditoria_pagina_destino.js` (+9/-10) actualizados. Presupuesto 8/8 INTACTO (ADR-001); TSK-111 NO genera migraciones. Escudo GOLD (qa-auditor) APTO CON OBSERVACIONES: `node --check` 8/8 api, ASCII 0/0/0 en `api/interacciones.js`, balance DIVs admin hostal/comida/sitio/evento = 0, smokes `check_buildHTML_inline`, `smoke_auditoria_pagina_destino` (54), `smoke_016` (52) y `smoke_021` (45) PASS (`smoke_test_epic_prompt` 4 FAIL PREEXISTENTES ajenos, DQ-2). **PENDIENTE OPERATIVO: migraciones 019-023 YA APLICADAS en Neon (confirmado por Javier el 2026-09-17; ver sesion TSK-112); solo queda commit/push/deploy de los 7 archivos + este cierre documental en un solo release.**
@@ -40,6 +42,114 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Sesion TSK-118 "Comunicacion oficial + Casas + Admin Mapa" (2026-09-18) - ADR-041
+
+Tarea TSK-118 **IMPLEMENTADA EN WORKING TREE + HOTFIXES POST-QA** (SIN commitear;
+verificado contra archivo real, ADR-006, el 2026-09-18). La decision consolidada vive en
+`DECISIONS.md` **ADR-041** (decisiones a-h de la sesion; la tarea en `TASKS.md`
+TSK-118; el relevo corto en `docs/HANDOFF_041.md`). NO hay archivos nuevos en
+`api/` (8/8 intacto, ADR-001/ADR-010); SI hay 1 migracion nueva sin versionar
+(`db/migrations/026_casas_comunicaciones.sql`, 329 lineas).
+
+**Estado real del working tree (verificado, ADR-006, 2026-09-18):**
+- `db/migrations/026_casas_comunicaciones.sql`: **EXISTE** (329 lineas;
+  idempotente ADR-008; ASCII-safe ADR-002: 0 bytes >127 y 0 backticks).
+- Headers reales: `api/usuarios.js` **v18** (v17 + hotfix J-3);
+  `api/interacciones.js` **v23** (base v22 de ADR-039/ADR-040 + hotfixes
+  post-QA J-1/J-2; entrada de changelog v23 en L18, la linea-titulo L1 aun
+  rotula v22).
+- Anclas `api/interacciones.js`: `acreditarClaseYCofre` L338-345,
+  `avanzarMisionesCasa` L360, `chat_salas` con `es_oficial` L3518,
+  `casa_misiones` L5270, `anuncio_oficial` L5769, `casa_tributo_config` L5797.
+  Authz J-2: `validarSesion` en L5835. Degradacion J-1: L3537-3539
+  (`chat_salas`) y L5724-5729 (`chat_msg`). Ancla J-3 en `api/usuarios.js`:
+  `CR_LIDER_REFRESH_MS` L241 y throttle L612-625.
+- `usuario-session.js`: `TITULOS_POR_NIVEL` L82, `getEra` L106, modales L116+.
+- `map-picker.js`: `getPickerMap`/`getMiniMap` L267-268; `admin.html` L1718/L2129/L4768+.
+- `git status` (2026-09-18): `M api/interacciones.js`, `M api/usuarios.js`,
+  `M usuario-session.js`, `M comunidad.html`, `M admin.html`, `M map-picker.js`;
+  sin versionar `?? db/migrations/026_casas_comunicaciones.sql`. La migracion
+  024 y la 025 se consideran **YA APLICADAS** en Neon por indicacion del usuario
+  (2026-09-18).
+
+**Que se hizo (resumen, ver TASKS.md TSK-118 para anclas ADR-006):**
+- **Canal oficial (decisiones c, h):** `chat_salas.es_oficial` + canal "Anuncios
+  ExploraCO" (en la 026); `GET chat_salas` expone `es_oficial` con degradacion
+  42703 (hotfix J-1); `chat_msg`
+  bloquea 403 a no-admin en la sala oficial (Bearer `ADMIN_SECRET` o email
+  `brsk84@gmail.com`) y tambien degrada 42703; NUEVA rama `POST ?tipo=anuncio_oficial` (solo Bearer
+  `ADMIN_SECRET`); `comunidad.html` con badge "OFICIAL", pin al tope y bloqueo
+  de input. **NO se agrega `usuarios.rol`.**
+- **Casas (decisiones d, e, g):** NUEVA rama `POST ?tipo=casa_tributo_config`
+  (admin o `lider_user_id`, rango 0..15; hotfix J-2: el lider exige
+  `validarSesion`); el tributo de `acreditarClaseYCofre`
+  ya no es `0.10` literal sino `casas_cofre.tributo_pct` (default 10, clamp
+  0..15); `GET casa_ranking` (v18) expone `lider_user_id`/`tributo_pct` con
+  degradacion escalonada y refresco perezoso del lider, con throttle de 60 s
+  por instancia (hotfix J-3); misiones conjuntas con
+  `avanzarMisionesCasa` (hooks en foto/resena/visita/xp_total) y GET unico
+  `?tipo=casa_misiones`.
+- **Eras y titulos (decision f):** 20 titulos + 4 eras + `getEra` y modales de
+  nivel-up/cambio de era en `usuario-session.js`; "Ampliar info" dispara
+  `#btn-perfil-viajero` (NO se creo `abrirPerfil`).
+- **Admin mapa (decision b):** picker a 500 px + circulo vectorial de rango via
+  `MapPicker.getPickerMap()` (NO se asume `MapPicker._map`).
+
+#### Que sigue
+1. **APLICAR `db/migrations/026_casas_comunicaciones.sql` EN NEON (BLOQUEANTE,
+   lo ejecuta Javier).** Correr primero el PREFLIGHT (seccion 0 del `.sql`,
+   read-only) y luego el archivo COMPLETO en el editor SQL de Neon;
+   re-ejecutar es no-op. La **024 y la 025 se consideran YA aplicadas** por
+   indicacion del usuario (2026-09-18); su registro historico como pendientes
+   (sesiones TSK-112/TSK-114) se conserva (Regla de Oro 3). **Orden obligatorio
+   del release: 024 -> 025 -> 026 -> backend (interacciones.js v23 + usuarios.js
+   v18) -> frontend.**
+2. **Deploy del backend DESPUES de la 026:** `api/usuarios.js` **v18** +
+   `api/interacciones.js` **v23** (J-1/J-2 sobre la base v22 no desplegada de
+   ADR-039/ADR-040; J-3 en usuarios v18).
+3. **Deploy del frontend:** `usuario-session.js`, `comunidad.html`,
+   `admin.html` y `map-picker.js`.
+4. **Verificacion en vivo:** publicar un anuncio oficial y confirmar que un
+   tercero NO puede escribir en el canal (input oculto + 403 server-side);
+   configurar `tributo_pct` como admin/lider y ver el efecto en el cofre
+   (confirmar que un `usuario_id` ajeno SIN JWT recibe 403, hotfix J-2);
+   confirmar `lider_user_id` en `casa_ranking` y la fila `lider` en
+   `casa_roles`; avanzar una mision de Casa; ver los modales de nivel-up/era;
+   ver el circulo de rango en el admin con un `radio_m` real.
+5. **Commit + push del release:** incluye los pendientes de TSK-107..TSK-117 +
+   esta sesion + el cierre documental (`TASKS.md`, `NEXT.md`, `DECISIONS.md`
+   ADR-041, `PROJECT.md`, `BLUEPRINT.md`, `BUGS_HISTORICOS.md`,
+   `docs/HANDOFF_041.md`). NO mezclar archivos ajenos/borrados del working tree.
+6. **Backlog / deuda:** misiones base diferenciadas por Casa; asignacion de
+   roles `oficial`/`mariscal`/`miembro`; corregir la linea-titulo L1 de
+   `api/interacciones.js` (aun `v22`; el changelog ya entro a `v23`); BUG-061
+   (AMPLIFICADO por los hooks de Casa), BUG-002 y BUG-062 siguen abiertos.
+
+#### Riesgos activos
+- **Migracion 026 CREADA pero aun no aplicada en Neon:** desplegar el backend
+  v23/v18 sin la 026 haria fallar `anuncio_oficial`, `casa_tributo_config`,
+  `casa_misiones` y las columnas `lider_user_id`/`tributo_pct` (columna
+  inexistente, mismo flujo que 017/021). El hotfix J-1 evita la caida de
+  `chat_salas`/`chat_msg`, pero la 026 SIGUE siendo obligatoria. El orden
+  024 -> 025 -> 026 -> deploy es obligatorio.
+- **Linea-titulo L1 de `interacciones.js` aun v22:** el changelog ya entro a
+  v23; drift documental menor (ADR-006) a corregir en el commit.
+- **J-3 mitigado, no eliminado:** el throttle del refresco del lider es por
+  instancia (no distribuido); con N instancias hay hasta N refrescos/min.
+- **J-1/J-2 verificados solo en working tree:** los hotfixes no se han probado
+  en vivo; la authz por `validarSesion` y la degradacion 42703 deben
+  confirmarse con el backend desplegado.
+- **Normalizacion silenciosa del tributo:** un `tributo_pct` invalido en la
+  columna se normaliza a 10 en runtime sin log; el CHECK 0..15 lo acota.
+- **`casa_roles` solo puebla `lider`:** los otros roles del CHECK no tienen
+  flujo de asignacion en v1 (no bloqueante).
+- **Circulo de rango sin validar en produccion:** depende del deploy; validar
+  en desktop y movil.
+- **BUG-061 sigue ABIERTO y AMPLIFICADO:** `POST tipo='foto'` no valida sesion
+  y los hooks `avanzarMisionesCasa` (foto/resena/visita) escriben a nombre del
+  `usuario_id` recibido. **BUG-002 y BUG-062 siguen ABIERTOS** (ajenos a esta
+  sesion).
 
 ### Sesion TSK-114..TSK-117 "Museo URL-only + acordeon de niveles + localizacion y map-picker" (2026-09-18) - ADR-039 + ADR-040 + ENMIENDA 1 de ADR-039
 
@@ -110,7 +220,10 @@ ENMIENDA 1 de ADR-039.
    migracion **024** (pendiente de TSK-112) y despues la **025**
    (`db/migrations/025_album_fotos_visible.sql`, archivo COMPLETO en una
    corrida; idempotente). Correr antes `scripts/verify_025_precheck.js`
-   (read-only). Patron BUG-021/BUG-060.
+   (read-only). Patron BUG-021/BUG-060. **(Actualizacion TSK-118, 2026-09-18:
+   la migracion 026 tambien entra al release; el orden vigente es
+   `024 -> 025 -> 026 -> deploy del backend`. Ver la sesion TSK-118 al inicio
+   de este documento.)**
 2. **Deploy del backend v22** (`api/interacciones.js`) DESPUES de 024 y 025;
    luego el frontend (`mi-perfil.html`, `admin.html`, `niveles-data.js`,
    `map-picker.js`).

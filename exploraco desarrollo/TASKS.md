@@ -3275,5 +3275,67 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-118: Comunicacion oficial (canal broadcast), Casas (tributo configurable, lider automatico y misiones conjuntas), eras/titulos y circulo de rango del admin [IMPLEMENTADO EN WORKING TREE + HOTFIXES POST-QA]
+
+- **Estado:** **IMPLEMENTADO EN WORKING TREE + HOTFIXES POST-QA** (2026-09-18, SIN commitear). Los entregables estan verificados contra el archivo real (ADR-006): la migracion 026 EXISTE (329 lineas), `api/usuarios.js` esta en **v18** (v17 + hotfix J-3), `api/interacciones.js` esta en **v23** (hotfixes J-1/J-2 sobre la base v22), los modales estan en `usuario-session.js`, el badge/bloqueo en `comunidad.html`, la altura + circulo en `admin.html` y los getters en `map-picker.js`. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar `db/migrations/026_casas_comunicaciones.sql` en Neon (024 y 025 YA aplicadas por indicacion del usuario, 2026-09-18) ANTES del deploy del backend (`api/usuarios.js` v18 + `api/interacciones.js` v23) y del frontend.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-18
+- **ADR:** DECISIONS.md **ADR-041** (decisiones a-h de la sesion; verificado contra archivo real, ADR-006). La decision NO se duplica aqui.
+- **Responsable / agentes:** architect + architect-review (contrato); sql-security (migracion 026); backend-dev (`api/interacciones.js`, `api/usuarios.js`); frontend-tpl/js-silo-dev (`usuario-session.js`, `comunidad.html`, `admin.html`, `map-picker.js`).
+- **Precedencia:** continua a TSK-114..TSK-117 / ADR-039 + ADR-040. `api/usuarios.js` pasa de v16 a **v17** y luego a **v18** (hotfix J-3, 2026-09-18); `api/interacciones.js` pasa de v22 a **v23** con los hotfixes J-1/J-2 (2026-09-18). El detalle esta en la seccion "Hotfixes post-QA" de esta tarea y en `DECISIONS.md` ADR-041.
+- **Migracion:** `db/migrations/026_casas_comunicaciones.sql` (NUEVA, **329 lineas**, idempotente ADR-008, ASCII-safe ADR-002: 0 bytes >127 y 0 backticks). La numeracion es **026 (no 019)** por colision con `019_media_guardados_radio.sql` (decision a del ADR-041).
+- **Relacion con bugs:** la auditoria QA posterior a la implementacion detecto el IDOR de `casa_tributo_config`, registrado y **CERRADO** como `BUGS_HISTORICOS.md` **BUG-064** (corregido en `api/interacciones.js` v23, hotfix J-2). La decision h del ADR-041 agrega `console.error` a 2 capturas antes silenciosas (`chat_msg`/`casa_tributo_config`). **BUG-061 sigue ABIERTO y los hooks de Casa (`avanzarMisionesCasa`) lo amplifican** (ver `BUGS_HISTORICOS.md` BUG-061); BUG-002 y BUG-062 siguen ABIERTOS y ajenos.
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006, 2026-09-18):**
+  1. **Migracion 026 (5 bloques + backfill + semilla):** `chat_salas.es_oficial boolean DEFAULT false` + semilla idempotente del canal "Anuncios ExploraCO" (icono altavoz como `E'\U0001F4E3'`, tipo `'viajeros'`, `orden=-1`, creador = cuenta admin) + indice unico parcial `uq_chat_salas_oficial`; `casas_cofre.tributo_pct NUMERIC(4,2) DEFAULT 10.00` + `casas_cofre.lider_user_id UUID REFERENCES usuarios(id)` + CHECK `casas_cofre_tributo_pct_check` (0..15); tabla `casa_roles` (`rol IN lider|oficial|mariscal|miembro`, UNIQUE `(casa, usuario_id)`, `activo`); tabla `casa_misiones` (`meta_tipo IN visitas|xp_total|resenas|fotos`, `meta_valor`, `progreso_actual`, `recompensa_xp`, `estado IN activa|completada|expirada`); backfill del lider por `DISTINCT ON (casa) ... ORDER BY xp_total DESC` + poblado/degradacion de `casa_roles`; semilla de 1 mision base por Casa ("Primera Expedicion de Casa": `visitas` 10, 500 XP).
+  2. **Canal oficial broadcast (decisiones c, h):** `GET ?tipo=chat_salas` expone `es_oficial`; `POST chat_msg` responde 403 a no-admin cuando la sala es `es_oficial` (acepta Bearer `ADMIN_SECRET` o el email de sesion `brsk84@gmail.com`); NUEVA rama `POST ?tipo=anuncio_oficial` (solo Bearer `ADMIN_SECRET`; texto <= 1000; inserta en la sala oficial con nombre "ExploraCO Oficial"); `comunidad.html` ordena la sala oficial al tope, pinta badge "OFICIAL" y oculta input/boton a no-admin. `usuarios` NO tiene columna `rol`: se rechaza agregarla.
+  3. **Casas (decisiones d, e, g):** NUEVA rama `POST ?tipo=casa_tributo_config` (Bearer admin o `lider_user_id` de la Casa; 400 fuera de 0..15); `acreditarClaseYCofre` lee `casas_cofre.tributo_pct` (default 10, clamp 0..15) en lugar del literal `0.10`; `GET ?tipo=casa_ranking` expone `lider_user_id`/`tributo_pct` con degradacion escalonada (42P01 -> sin JOIN; 42703 -> `conLider=false`) y refresca el lider best-effort (3 sentencias) antes de leer; misiones conjuntas `avanzarMisionesCasa` (hooks en `foto`, `resena`, `visita` y `xp_total`) y GET unico `?tipo=casa_misiones`.
+  4. **Eras y titulos + modales (decision f):** `usuario-session.js` agrega `TITULOS_POR_NIVEL` (20 titulos), `ERAS` (Mundana 1-5, Patrocinada 6-10, Organizador 11-15, Leyenda 16-20), `getEra` y los modales `mostrarModalNivelUp`/`mostrarModalCambioEra`, disparados desde `aplicarResultadoXp` al detectar subida de nivel. El boton "Ampliar info" dispara `#btn-perfil-viajero` si existe (NO se creo `abrirPerfil`).
+  5. **Admin mapa (decision b):** `admin.html` sube la altura del picker de 380 a 500px y agrega `adm_actualizarCirculoRango` (circulo vectorial `L.circle` con el radio de `#f-radio-m`), invocado en `oninput`, `openMapPicker` y `confirmMapPicker`; `map-picker.js` expone `getPickerMap()`/`getMiniMap()` en lugar de asumir `MapPicker._map`.
+
+- **Archivos en el working tree (SIN commitear; `git diff --numstat` verificado el 2026-09-18):**
+  - `api/interacciones.js` (+173/-21 acumulado incl. hotfixes; header v22 -> **v23**).
+  - `api/usuarios.js` (+66/-11 acumulado incl. hotfix J-3; header v16 -> v17 -> **v18**).
+  - `usuario-session.js` (+245/-0).
+  - `comunidad.html` (+32/-4).
+  - `admin.html` (+30/-4).
+  - `map-picker.js` (+3/-1).
+  - NUEVO sin versionar: `db/migrations/026_casas_comunicaciones.sql` (329 lineas).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001/ADR-010). Cero archivos nuevos en `api/`.
+
+- **Evidencia (ADR-006, verificada el 2026-09-18):**
+  - Migracion 026: 329 lineas, 0 bytes >127, 0 backticks.
+  - Headers reales: `api/usuarios.js` **v18** (v17 + hotfix J-3); `api/interacciones.js` **v23** (entrada de changelog v23 en L18; ver nota de la linea-titulo L1 en deuda/observaciones). Anclas de `api/interacciones.js`: `avanzarMisionesCasa` L360, `chat_salas` con `es_oficial` L3518, `casa_misiones` L5270, `anuncio_oficial` L5769, `casa_tributo_config` L5797/L5824, `validarSesion` en la authz del tributo L5835, degradacion `42703` de `chat_salas` L3537-3539 y de `chat_msg` L5724-5729, tributo configurable en `acreditarClaseYCofre` L338-345. Ancla del hotfix J-3: `api/usuarios.js` `CR_LIDER_REFRESH_MS` L241 y throttle L612-625.
+  - `usuario-session.js`: `TITULOS_POR_NIVEL` L82, `getEra` L106, modales L116+.
+  - `map-picker.js`: `getPickerMap`/`getMiniMap` L267-268.
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. Correr el PREFLIGHT (seccion 0 del `.sql`) y luego aplicar `db/migrations/026_casas_comunicaciones.sql` COMPLETO en Neon. La 024 y la 025 se consideran YA aplicadas (indicacion del usuario, 2026-09-18).
+  2. Deploy del backend (`api/usuarios.js` **v18** + `api/interacciones.js` **v23**) DESPUES de la 026.
+  3. Deploy del frontend (`usuario-session.js`, `comunidad.html`, `admin.html`, `map-picker.js`).
+  4. Verificacion en vivo: canal oficial (anuncio del admin y bloqueo de input a terceros), tributo configurable en `casas_cofre.tributo_pct`, lider por Casa en `casa_ranking`/`casa_roles`, misiones conjuntas, modales de nivel-up/era y circulo de rango en el admin.
+  5. Commit + push del release junto con los pendientes de TSK-107..TSK-117 sin commitear (orden 024 -> 025 -> 026 -> backend v23/v18 -> frontend).
+
+- **Hotfixes post-QA (auditoria de la sesion TSK-118 / ADR-041, 2026-09-18):** no cambian el alcance funcional; solo seguridad, degradacion y control de escritura.
+  1. **J-2 SEGURIDAD (IDOR corregido) - BUG-064:** en `POST ?tipo=casa_tributo_config` la autorizacion del lider ya NO se resuelve comparando el `usuario_id` del body contra `casas_cofre.lider_user_id`; ahora exige `validarSesion(req, usuarioId2).ok` (JWT, ADR-025) antes de comparar (L5835). Antes, cualquiera podia leer `lider_user_id` del ranking publico (`GET ?tipo=casa_ranking`) y enviar ese uuid en el body para spoofear la autorizacion. Registrado y **CERRADO** como BUG-064.
+  2. **J-1 (degradacion 42703):** `GET ?tipo=chat_salas` y `POST chat_msg` reintentan la MISMA consulta con `false AS es_oficial` si la migracion 026 aun no esta aplicada, de modo que el listado de salas y el envio de mensajes NO se rompen (patron BUG-021/BUG-060). En `chat_msg` se elimino la captura silenciosa: el fallo no-42703 se registra con `console.error` y se re-lanza (AGENTS.md 2.2).
+  3. **J-3 (amplificacion de escritura en GET publico):** `api/usuarios.js` v18 aplica un throttle de 60 s por instancia (`CR_LIDER_REFRESH_MS`, cache de proceso) al refresco del lider en `GET ?tipo=casa_ranking`, limitando las 3 escrituras (`UPDATE casas_cofre` + upsert/degradacion de `casa_roles`) sin alterar las lecturas del ranking. Con multiples instancias serverless hay hasta N refrescos/min (N = instancias activas): es una mitigacion, no una eliminacion.
+  4. **Escudo GOLD post-hotfix (2026-09-18):** `node --check` OK en 4 archivos (`api/interacciones.js`, `api/usuarios.js`, `usuario-session.js`, `map-picker.js`); ASCII-safe 0 bytes >127 en `api/`; balance de divs 0 (`admin.html`/`comunidad.html`); presupuesto 8/8 funciones INTACTO.
+
+- **Deuda / observaciones (patron ADR-006):**
+  - No hay misiones semilla diferenciadas por Casa: la 026 siembra UNA mision base identica para las 3 Casas.
+  - `casa_roles` solo puebla el rol `lider`; `oficial`/`mariscal`/`miembro` quedan sin flujo de asignacion en v1.
+  - El header de `api/interacciones.js` quedo en **v23** con entrada de changelog en L18 (canal oficial con degradacion 42703, authz de `casa_tributo_config` por `validarSesion` y fix del IDOR del lider). Nota ADR-006: la linea-titulo L1 aun rotula `v22` (drift menor de la linea descriptiva, sin efecto funcional).
+  - J-3 MITIGADO por throttle de 60 s POR INSTANCIA (cache de proceso, no distribuida): con N instancias activas hay hasta N refrescos/min.
+  - J-1 MITIGADO con degradacion 42703 en `chat_salas`/`chat_msg`, pero la 026 SIGUE siendo obligatoria antes del deploy del backend.
+  - BUG-061 (`POST tipo='foto'` sin `validarSesion`) sigue ABIERTO y los hooks `avanzarMisionesCasa` (foto/resena/visita) lo amplifican al escribir a nombre del `usuario_id` recibido.
+  - El circulo de rango del admin no se ha validado en produccion (depende del deploy).
+  - `avanzarMisionesCasa` degrada con `console.warn` (42P01) si la 026 aun no esta aplicada; no bloquea la entrega de XP.
+
+- **Fuera de alcance:** `usuarios.rol` (RECHAZADO); endpoint `casa_misiones` en `usuarios.js` (RECHAZADO); funcion `entregarXp` (no existia); `abrirPerfil` (no existia); misiones diferenciadas por Casa; asignacion de roles distintos de `lider`; verificacion en vivo (post-deploy); BUG-061/BUG-002/BUG-062 (BUG-064 SI se corrigio en el hotfix J-2).
+
+---
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

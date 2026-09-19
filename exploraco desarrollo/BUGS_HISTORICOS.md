@@ -1021,7 +1021,8 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Impacto:** un atacante autenticado (o anonimo, si la rama no exige sesion) puede atribuir una foto a cualquier `usuario_id`; contamina el feed/galeria del destino y el conteo de XP/misiones del usuario suplantado. No permite leer datos de terceros ni modificar su cuenta.
 **Recomendacion (escalada a `sql-security`):** exigir `Authorization: Bearer` y validar la identidad con `validarSesion(req, usuarioId2)` (JWT HMAC, ADR-025), tomando el `usuario_id` del token y NO del body; responder 401 `SESION_*` cuando no coincida. Revisar en la misma pasada las demas ramas POST que usan `usuarioId2` sin `validarSesion`.
 **Evidencia (ADR-006):** `api/interacciones.js` L4136 (`var usuarioId2= body.usuario_id || null;`), L1911 (`function validarSesion`), L5024-5035 (rama `tipo='foto'`); `galeria.html` `gShareFoto()` (cliente nuevo que expone el flujo).
-**Estado:** ABIERTO (working tree, 2026-09-16); NO corregido en TSK-106 por decision H-2. Escalar a `sql-security`.
+**Nota de amplificacion (TSK-118 / ADR-041, 2026-09-18):** los hooks `avanzarMisionesCasa` de la sesion TSK-118 (foto/resena/visita) reutilizan el `usuario_id` del body y escriben progreso en `casa_misiones` (y XP/estado) a nombre del usuario recibido; el mismo vector de suplantacion de BUG-061 amplifica sus efectos (mas puntos que confian en el `usuario_id` del body). La rama nueva `casa_tributo_config` SI exige `validarSesion` desde el hotfix J-2 (v23, BUG-064).
+**Estado:** ABIERTO (working tree, 2026-09-16; re-confirmado el 2026-09-18 tras TSK-118); NO corregido en TSK-106 por decision H-2. **Amplificado por los hooks de Casa de TSK-118.** Escalar a `sql-security`.
 
 ## BUG-062: fotos agregadas por Unsplash no se recolectan en `admin.html` -- `addPhotoFieldWithUrl` usa la clase `photo-url-input` y `getPhotos()` busca `.photo-url-inp`
 
@@ -1051,6 +1052,16 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Impacto del fix:** solo cambia el calculo hacia adelante (no hay recomputo historico; ver ADR-035: `pandillas.fama_total` NO se recomputa, solo cambia de tipo). Ya NO se descartan micro-fama.
 **Evidencia (ADR-006):** `api/interacciones.js` L1880-1885 (verificado en esta sesion documental el 2026-09-17).
 **Estado:** CORREGIDO (ADR-035 / TSK-109, working tree 2026-09-17).
+
+## BUG-064: `POST ?tipo=casa_tributo_config` autorizaba por `usuario_id` del body (IDOR) -- spoofing del lider de Casa
+
+**Severidad:** ALTA (seguridad: cualquier usuario podia cambiar `tributo_pct` de una Casa suplantando al lider).
+**Contexto:** detectado por la auditoria QA posterior a la implementacion de TSK-118 / ADR-041 (2026-09-18), al revisar la autorizacion de la rama nueva `casa_tributo_config`. Se corrigio dentro de la misma sesion (hotfix J-2) y por eso no llego a un release desplegado.
+**Sintoma:** `POST /api/interacciones?tipo=casa_tributo_config` con `{ casa, tributo_pct, usuario_id:<uuid del lider> }` permitia cambiar el tributo de la Casa sin poseer la sesion del lider.
+**Causa raiz:** la rama autorizaba al lider comparando el `usuario_id` recibido en el body contra `casas_cofre.lider_user_id`. Como `GET ?tipo=casa_ranking` expone `lider_user_id` publicamente, el atacante solo necesitaba leer el ranking y enviar ese uuid en el body (IDOR de escritura, mismo patron que BUG-059).
+**Resolucion aplicada (v23, hotfix J-2):** `api/interacciones.js` exige `validarSesion(req, usuarioId2).ok` (JWT HMAC, ADR-025) ANTES de consultar `casas_cofre.lider_user_id` y comparar; sin sesion valida no se evalua la rama de lider (solo queda el Bearer `ADMIN_SECRET`). El `usuario_id` del body ya no es fuente de autorizacion.
+**Evidencia (ADR-006):** `api/interacciones.js` v23 L5824-5849 (rama `casa_tributo_config`), L5835 (`validarSesion(req, usuarioId2).ok`), L5837-5841 (lookup + comparacion de `lider_user_id`); L18 (entrada de changelog v23).
+**Estado:** CERRADO / CORREGIDO (hotfix J-2, `api/interacciones.js` v23, working tree 2026-09-18; SIN commitear).
 
 ## Deuda ADR-035: columnas no versionadas de las que dependen los rankings (patron BUG-021)
 
@@ -1179,4 +1190,53 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 ### Nota: BUG-061 y BUG-002 siguen ABIERTOS
 - **BUG-061** (`POST tipo='foto'` sin `validarSesion`) y **BUG-002** (doble escape en `api/pagina-destino.js` L2431) siguen ABIERTOS y NO fueron empeorados por TSK-114..117; la rama nueva `museo_recurso` SI exige sesion, por lo que no repite ese vector.
 - **Estado:** SIN CAMBIO (registro de no-regresion, 2026-09-18).
+
+---
+
+## Deuda TSK-118 / ADR-041 (2026-09-18) -- NO son bugs confirmados
+
+**Nota:** esta sesion ("Comunicacion oficial + Casas + Admin Mapa") y su auditoria QA posterior se registran aqui. La implementacion original no abrio bugs; la auditoria detecto el IDOR de `casa_tributo_config`, que quedo como **BUG-064 (CERRADO en v23)**. Se conservan ademas sus pendientes y observaciones de gobernanza para que ninguna IA las asuma resueltas (ADR-006). Se conservan por Regla de Oro 3 (Cero Borrado Logico).
+
+### D-6: misiones conjuntas de Casa sin diferenciacion -- la 026 siembra la MISMA mision base para las 3 Casas
+- **Severidad:** BAJA (deuda de contenido/diseno; no bloquea el flujo).
+- **Contexto:** `db/migrations/026_casas_comunicaciones.sql` siembra 1 mision base por Casa ("Primera Expedicion de Casa": `visitas` 10, 500 XP) con un `VALUES ('condor'),('jaguar'),('delfin')`; el contenido es identico para las 3.
+- **Recomendacion:** una tarea de producto defina misiones diferenciadas por Casa; el modelo `casa_misiones` ya lo soporta sin cambio de esquema.
+- **Estado:** DEUDA DOCUMENTADA (TSK-118 / ADR-041, 2026-09-18). No bloqueante.
+
+### D-7: `casa_roles` solo puebla el rol `lider`
+- **Severidad:** BAJA (deuda de producto; el CHECK admite mas roles de los que se usan).
+- **Contexto:** la 026 crea `casa_roles` con `rol IN lider|oficial|mariscal|miembro`, pero el backfill/refresco solo asigna/degrada `lider`/`oficial`. `mariscal` y `miembro` no tienen flujo de asignacion en v1.
+- **Recomendacion:** definir el flujo de asignacion (admin o lider) en una tarea futura; no crear columnas nuevas.
+- **Estado:** DEUDA DOCUMENTADA (TSK-118 / ADR-041, 2026-09-18). No bloqueante.
+
+### D-8: `api/interacciones.js` conserva la linea-titulo v22 aunque su changelog ya entro a v23
+- **Severidad:** BAJA (drift documental; ADR-006).
+- **Contexto:** la sesion TSK-118 agrega ramas y helpers reales sobre `api/interacciones.js`. Tras el hotfix post-QA, el changelog incorporo la entrada **v23** en L18 (`canal oficial es_oficial con degradacion 42703; authz de casa_tributo_config via validarSesion; fix IDOR lider`), pero la linea-titulo L1 aun rotula `v22` (release compartido ADR-039/ADR-040).
+- **Recomendacion:** bumpear la linea-titulo L1 a v23 en la proxima edicion del archivo (cambio de 1 linea, sin efecto funcional) para que el encabezado y el changelog coincidan.
+- **Estado:** DEUDA DOCUMENTAL MENOR (TSK-118 / ADR-041, post-hotfix 2026-09-18). No bloqueante.
+
+### D-9: circulo de rango del admin sin validacion en produccion
+- **Severidad:** BAJA (funcionalidad nueva no verificada en vivo).
+- **Contexto:** `admin.html` `adm_actualizarCirculoRango` (`L.circle`) y `map-picker.js` `getPickerMap()` no se han probado contra el deploy real ni en movil.
+- **Recomendacion:** verificar con un `destino.radio_m` real tras el deploy (parte del checklist de TSK-118).
+- **Estado:** DEUDA DOCUMENTADA (TSK-118 / ADR-041, 2026-09-18). No bloqueante.
+
+### J-1: `GET chat_salas` / `POST chat_msg` sin degradacion si la 026 no esta aplicada (MITIGADO)
+- **Severidad:** MEDIA si la 026 no se aplica (el canal oficial y el chat se rompian con `42703`).
+- **Contexto:** con la 026 pendiente en Neon, `chat_salas.es_oficial` no existe y la consulta fallaba, tumbando el listado de salas y el envio de mensajes; ademas `chat_msg` tenia una captura silenciosa del error de lookup (AGENTS.md 2.2).
+- **Resolucion (hotfix J-1, `api/interacciones.js` v23):** `chat_salas` y `chat_msg` reintentan la MISMA consulta con `false AS es_oficial` ante `42703` (L3537-3539 y L5724-5729); en `chat_msg` el fallo no-42703 se registra con `console.error` y se re-lanza. Queda neutralizado el riesgo de caida por esquema ausente.
+- **Estado:** MITIGADO (2026-09-18, v23). **Aplicar 024 -> 025 -> 026 ANTES del deploy SIGUE siendo obligatorio** (la degradacion evita la caida, no sustituye la migracion).
+
+### J-3: amplificacion de escritura en `GET casa_ranking` publico (MITIGADO con throttle por instancia)
+- **Severidad:** MEDIA (un GET publico disparaba 3 escrituras por peticion: `UPDATE casas_cofre` + upsert/degradacion en `casa_roles`).
+- **Contexto:** el refresco best-effort del lider (ADR-041 decision d) corria en CADA lectura del ranking, sin limite.
+- **Resolucion (hotfix J-3, `api/usuarios.js` v18):** el refresco se ejecuta como maximo una vez cada 60 s por instancia (cache de proceso `CR_LIDER_REFRESH_MS`); las lecturas del ranking no se alteran.
+- **Limitacion:** la cache es por instancia, no distribuida; con N instancias serverless hay hasta N refrescos/min. Es una mitigacion de costo, no una eliminacion del patron.
+- **Estado:** MITIGADO (2026-09-18, v18). No bloqueante; considerar cache distribuida/scheduler en una tarea futura.
+
+### Nota: decision h de ADR-041 corrige 2 capturas silenciosas (mejora, no bug)
+- La sesion TSK-118 agrega `console.error` a la busqueda de email admin en `chat_msg` y al lookup de `lider_user_id` en `casa_tributo_config`, que de otro modo habrian quedado como capturas vacias (AGENTS.md seccion 2.2). No se registra como bug porque fueron introducidas y corregidas dentro de la misma sesion, antes de cualquier cierre.
+- **BUG-064 (NUEVO, CERRADO):** la auditoria QA posterior detecto el IDOR de `casa_tributo_config`; se registro y corrigio en el hotfix J-2 (ver BUG-064).
+- **BUG-061 sigue ABIERTO y AMPLIFICADO:** los hooks `avanzarMisionesCasa` (foto/resena/visita) escriben progreso de Casa a nombre del `usuario_id` recibido, ampliando el mismo vector de suplantacion (ver la nota de amplificacion en BUG-061). **BUG-002 y BUG-062 siguen ABIERTOS** y ajenos.
+- **Estado:** HOTFIX APLICADO (2026-09-18).
 

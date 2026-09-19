@@ -1,4 +1,6 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v18 (TSK-118 hotfix: throttle 60s del refresco de lider en casa_ranking)
+// v17 (migracion 026: casa_ranking expone lider_user_id + tributo_pct con degradacion; refresco best-effort del lider por Casa)
 // v16 (TSK-112 / ADR-038: casas_cofre + factor de nivelacion; clase_elegir y clases Rising Star)
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
@@ -232,6 +234,12 @@ var CASAS_VALIDAS = ['condor', 'jaguar', 'delfin'];
 // 024 (TSK-112 / ADR-038). COEXISTEN con el Arbol de Clases de 16 ramas
 // (usuarios.progreso_arbol): son una capa nueva, no un reemplazo.
 var CLASES_VALIDAS = ['cartografo', 'cronista', 'explorador'];
+
+// TSK-118: el refresco del lider de Casa se ejecuta como maximo una vez
+// cada 60 s por instancia (evita amplificacion de escritura en un GET
+// publico). Es cache de proceso, no estado persistente.
+var CR_LIDER_REFRESH_MS = 60000;
+var crLiderUltimoRefresco = 0;
 
 // Envio de email con Resend. EXCEPCION controlada al tripwire de
 // no-duplicidad (5 lineas): admin.js y usuarios.js son endpoints
@@ -529,7 +537,14 @@ module.exports = async (req, res) => {
         // sus campos son cache NO autoritativa. conCofre=false es la
         // degradacion 42P01 (migracion 024 aun no aplicada): responde el
         // cofre en cero y factor neutro sin romper el contrato.
-        var crSql = function (filtroAct, conCofre) {
+        // Migracion 026: conLider controla si se leen las columnas nuevas
+        // casas_cofre.lider_user_id / tributo_pct. Si la 026 aun no esta
+        // aplicada, la degradacion 42703 reintenta con conLider=false para
+        // seguir respondiendo el ranking sin perder xp_cofre_total /
+        // factor_conversion (que vienen de la 024). El resultado siempre
+        // expone lider_user_id y tributo_pct (default NULL / 10).
+        var crSql = function (filtroAct, conCofre, conLider) {
+          if (conLider === undefined) conLider = true;
           return 'SELECT u.casa,'
             + ' COUNT(*)::int AS miembros,'
             + (filtroAct
@@ -550,26 +565,64 @@ module.exports = async (req, res) => {
             + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d,'
             + (conCofre
                 ? ' COALESCE(ct.xp_cofre_total, 0) AS xp_cofre_total,'
-                  + ' COALESCE(ct.factor_conversion, 1) AS factor_conversion'
-                : ' 0 AS xp_cofre_total, 1 AS factor_conversion')
+                  + ' COALESCE(ct.factor_conversion, 1) AS factor_conversion,'
+                  + (conLider
+                      ? ' COALESCE(ct.lider_user_id, NULL) AS lider_user_id,'
+                        + ' COALESCE(ct.tributo_pct, 10) AS tributo_pct'
+                      : ' NULL AS lider_user_id, 10 AS tributo_pct')
+                : ' 0 AS xp_cofre_total, 1 AS factor_conversion,'
+                  + ' NULL AS lider_user_id, 10 AS tributo_pct')
             + ' FROM usuarios u'
             + (conCofre ? ' LEFT JOIN casas_cofre ct ON ct.casa = u.casa' : '')
             + ' WHERE u.casa IS NOT NULL'
             + ' GROUP BY u.casa'
             + (conCofre ? ', ct.xp_cofre_total, ct.factor_conversion' : '')
+            + (conCofre && conLider ? ', ct.lider_user_id, ct.tributo_pct' : '')
             + ' ORDER BY COALESCE(ROUND(SUM(u.xp_total), 2), 0) DESC';
         };
-        // Reintenta quitando el JOIN si casas_cofre no existe (42P01),
-        // registrando siempre el motivo (nunca catch vacio).
-        var crConsultar = async function (filtroAct, conCofre) {
+        // Degradacion escalonada (nunca catch vacio; siempre se registra el
+        // motivo con warn y se propaga si no aplica):
+        //   - 42P01 (casas_cofre ausente, migracion 024): quita el JOIN.
+        //   - 42703 (lider_user_id/tributo_pct ausentes, migracion 026
+        //     pendiente): reintenta con conLider=false conservando el cofre
+        //     de la 024 (xp_cofre_total / factor_conversion).
+        var crConsultar = async function (filtroAct, conCofre, conLider) {
+          if (conLider === undefined) conLider = true;
           try {
-            return await sql(crSql(filtroAct, conCofre));
-          } catch (crErr42P01) {
-            if (!conCofre || !crErr42P01 || crErr42P01.code !== '42P01') throw crErr42P01;
-            console.warn('[usuarios] casa_ranking sin casas_cofre 42P01: ' + crErr42P01.message);
-            return await crConsultar(filtroAct, false);
+            return await sql(crSql(filtroAct, conCofre, conLider));
+          } catch (crErr) {
+            var crCode = crErr && crErr.code;
+            if (crCode === '42P01' && conCofre) {
+              console.warn('[usuarios] casa_ranking sin casas_cofre 42P01: ' + crErr.message);
+              return await crConsultar(filtroAct, false, conLider);
+            }
+            if (crCode === '42703' && conLider) {
+              console.warn('[usuarios] casa_ranking sin lider/tributo 42703: ' + crErr.message);
+              return await crConsultar(filtroAct, conCofre, false);
+            }
+            throw crErr;
           }
         };
+        // Migracion 026: refresco best-effort del lider por Casa antes de
+        // leer el ranking. Nunca bloquea la respuesta: si 024 (casas_cofre),
+        // 026 (lider_user_id) o casa_roles no existen todavia, registra el
+        // error con console.error y continua (patron BUG-021/BUG-060).
+        // TSK-118: throttle a 60 s por instancia para que un GET publico no
+        // amplifique escrituras; las lecturas del ranking no se tocan.
+        var crAhoraMs = Date.now();
+        if (crAhoraMs - crLiderUltimoRefresco >= CR_LIDER_REFRESH_MS) {
+          crLiderUltimoRefresco = crAhoraMs;
+          try {
+            // 1) recalcular el lider (usuario con mas xp_total por Casa).
+            await sql('UPDATE casas_cofre cc SET lider_user_id = sub.id, actualizado_en = NOW() FROM (SELECT DISTINCT ON (casa) casa, id FROM usuarios WHERE casa IS NOT NULL AND activo = true ORDER BY casa, xp_total DESC) sub WHERE cc.casa = sub.casa AND (cc.lider_user_id IS DISTINCT FROM sub.id)', []);
+            // 2) upsert del nuevo lider en casa_roles.
+            await sql('INSERT INTO casa_roles (casa, usuario_id, rol) SELECT casa, lider_user_id, \'lider\' FROM casas_cofre WHERE lider_user_id IS NOT NULL ON CONFLICT (casa, usuario_id) DO UPDATE SET rol = \'lider\', activo = true, asignado_en = NOW()', []);
+            // 3) degradar a oficial los lideres anteriores de la misma Casa.
+            await sql('UPDATE casa_roles cr SET rol = \'oficial\' FROM casas_cofre cc WHERE cr.casa = cc.casa AND cr.rol = \'lider\' AND cc.lider_user_id IS NOT NULL AND cr.usuario_id IS DISTINCT FROM cc.lider_user_id', []);
+          } catch (e) {
+            console.error('[casa_ranking] lider best-effort: ' + (e && e.message));
+          }
+        }
         var crCasas;
         try {
           crCasas = await crConsultar(crActividad, true);
@@ -584,6 +637,8 @@ module.exports = async (req, res) => {
           c.miembros_activos = Number(c.miembros_activos) || 0;
           c.xp_cofre_total = red2(parseFloat(c.xp_cofre_total) || 0);
           c.factor_conversion = parseFloat(c.factor_conversion) || 1;
+          c.lider_user_id = c.lider_user_id || null;
+          c.tributo_pct = parseFloat(c.tributo_pct) || 10;
           return c;
         });
         // Factor de nivelacion runtime (ADR-038 seccion D): el tag de cada

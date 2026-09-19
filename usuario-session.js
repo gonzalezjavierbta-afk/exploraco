@@ -76,6 +76,239 @@
 
   window.ExploraCO.CAPACIDADES_POR_NIVEL = CAPACIDADES_POR_NIVEL;
 
+  // ---- Sistema de eras + titulos por nivel (v5) ----
+  // Catalogo local puro (sin BD). Los titulos con tilde o enie usan
+  // escapes Unicode para mantener ASCII puro (ADR-002).
+  var TITULOS_POR_NIVEL = {
+    1:'Viajero Novato', 2:'Explorador', 3:'Aventurero', 4:'Descubridor',
+    5:'Cart\u00f3grafo', 6:'Cronista', 7:'Gu\u00eda Local', 8:'Embajador',
+    9:'Maestro Viajero', 10:'Leyenda Urbana', 11:'Patriarca Cultural',
+    12:'Se\u00f1or del Territorio', 13:'Guardi\u00e1n de Rutas', 14:'Gran Explorador',
+    15:'Orquestador', 16:'Arquitecto Cultural', 17:'Inmortal Andino',
+    18:'Embajador Legendario', 19:'Maestro Supremo', 20:'Leyenda de Colombia'
+  };
+
+  var ERAS = [
+    { nombre:'Mundana', niveles:[1,5], emoji:'\uD83C\uDF0D', color:'#6B7280',
+      beneficios:['XP por visitas y rese\u00f1as','Acceso al mapa y al chat b\u00e1sico','Creaci\u00f3n de perfil'],
+      mecanicas:['Explorar puntos culturales','Registrar visitas con geocerca'] },
+    { nombre:'Patrocinada', niveles:[6,10], emoji:'\uD83C\uDFC6', color:'#E8A020',
+      beneficios:['Crear planes de viaje','Emojis premium en el chat','Sello de sala'],
+      mecanicas:['Misiones de Casa','Bonos de XP por actividad grupal'] },
+    { nombre:'Organizador', niveles:[11,15], emoji:'\uD83D\uDE80', color:'#6366F1',
+      beneficios:['Organizar actividades','Fundar pandillas','Moderar galer\u00edas'],
+      mecanicas:['Liderar Casas','Misiones colectivas de alto valor'] },
+    { nombre:'Leyenda', niveles:[16,20], emoji:'\uD83D\uDC51', color:'#EC4899',
+      beneficios:['Cromo dorado','Mariscal de parche','Inmortal: XP nunca decae'],
+      mecanicas:['Recompensas exclusivas de temporada','Voto en decisiones de la plataforma'] }
+  ];
+
+  function expEra_getEra(nivel) {
+    for (var i = 0; i < ERAS.length; i++) {
+      if (nivel >= ERAS[i].niveles[0] && nivel <= ERAS[i].niveles[1]) return ERAS[i];
+    }
+    return ERAS[0];
+  }
+  window.ExploraCO.getEra = expEra_getEra;
+  window.ExploraCO.TITULOS_POR_NIVEL = TITULOS_POR_NIVEL;
+  window.ExploraCO.ERAS = ERAS;
+
+  // ---- Modales de nivel-up y cambio de era (v5) ----
+  // DOM inyectado al vuelo y auto-limpiante: no requiere HTML previo.
+  // Todo texto nuevo usa escapes Unicode (ASCII puro, ADR-002).
+
+  function expNvl_cerrarModal() {
+    var ov = document.getElementById('expNvl-modal-overlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  function expNvl_mostrarModalNivelUp(nivelAnterior, nivelNuevo) {
+    if (!nivelNuevo || nivelNuevo < 1) return;
+    expNvl_cerrarModal();
+
+    var titulo = TITULOS_POR_NIVEL[nivelNuevo] || ('Nivel ' + nivelNuevo);
+    var desbloqueadas = [];
+    for (var k in CAPACIDADES_POR_NIVEL) {
+      if (!Object.prototype.hasOwnProperty.call(CAPACIDADES_POR_NIVEL, k)) continue;
+      var umbral = parseInt(k, 10);
+      if (umbral > nivelAnterior && umbral <= nivelNuevo) {
+        desbloqueadas.push(CAPACIDADES_POR_NIVEL[k]);
+      }
+    }
+
+    var overlay = document.createElement('div');
+    overlay.id = 'expNvl-modal-overlay';
+    overlay.style.cssText = [
+      'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;',
+      'display:flex;align-items:center;justify-content:center;',
+      'background:rgba(0,0,0,.72);padding:20px;font-family:inherit;'
+    ].join('');
+
+    var card = document.createElement('div');
+    card.style.cssText = [
+      'max-width:420px;width:100%;text-align:center;',
+      'background:linear-gradient(160deg,#111827,#0d1117);',
+      'border:1px solid rgba(232,160,32,.55);border-radius:18px;',
+      'padding:26px 22px;color:#F9FAFB;',
+      'box-shadow:0 24px 60px rgba(0,0,0,.55);'
+    ].join('');
+
+    var emoji = document.createElement('div');
+    emoji.textContent = '\uD83C\uDF89';
+    emoji.style.cssText = 'font-size:44px;line-height:1;margin-bottom:8px;';
+    card.appendChild(emoji);
+
+    var kicker = document.createElement('div');
+    kicker.textContent = 'Nivel alcanzado';
+    kicker.style.cssText = 'font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#E8A020;font-weight:700;';
+    card.appendChild(kicker);
+
+    var numero = document.createElement('div');
+    numero.textContent = String(nivelNuevo);
+    numero.style.cssText = 'font-size:54px;font-weight:800;line-height:1.1;color:#fff;';
+    card.appendChild(numero);
+
+    var tituloEl = document.createElement('div');
+    tituloEl.textContent = titulo;
+    tituloEl.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:14px;';
+    card.appendChild(tituloEl);
+
+    if (desbloqueadas.length) {
+      var capTitle = document.createElement('div');
+      capTitle.textContent = 'Nuevas capacidades';
+      capTitle.style.cssText = 'font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#9CA3AF;margin:10px 0 6px;';
+      card.appendChild(capTitle);
+
+      var ul = document.createElement('ul');
+      ul.style.cssText = 'list-style:none;margin:0 0 12px;padding:0;text-align:left;';
+      for (var i = 0; i < desbloqueadas.length; i++) {
+        var li = document.createElement('li');
+        li.textContent = '\u2705 ' + String(desbloqueadas[i]).replace(/_/g, ' ');
+        li.style.cssText = 'padding:5px 0;font-size:14px;color:#E5E7EB;';
+        ul.appendChild(li);
+      }
+      card.appendChild(ul);
+    }
+
+    var xpAhora = (window.ExploraCO.usuario && Number(window.ExploraCO.usuario.xp_total)) || 0;
+    var tip = document.createElement('div');
+    tip.style.cssText = 'font-size:13px;color:#9CA3AF;margin:8px 0 16px;';
+    if (nivelNuevo < MAX_NIVEL) {
+      var xpSig = XP_LEVELS[nivelNuevo];
+      var falta = Math.max(0, redondearXp(xpSig - xpAhora));
+      tip.textContent = 'Pro-tip: te faltan ' + fmtXp(falta) + ' XP para el Nivel ' + (nivelNuevo + 1) + '.';
+    } else {
+      tip.textContent = 'Has alcanzado el nivel maximo. Leyenda de Colombia.';
+    }
+    card.appendChild(tip);
+
+    var btnCerrar = document.createElement('button');
+    btnCerrar.id = 'expNvl-btn-cerrar';
+    btnCerrar.textContent = 'Cerrar';
+    btnCerrar.style.cssText = [
+      'width:100%;padding:11px 16px;border-radius:10px;border:0;',
+      'background:#E8A020;color:#0d1117;font-weight:700;font-size:14px;',
+      'cursor:pointer;font-family:inherit;'
+    ].join('');
+    btnCerrar.onclick = function () { expNvl_cerrarModal(); };
+    card.appendChild(btnCerrar);
+
+    if (document.getElementById('btn-perfil-viajero')) {
+      var btnInfo = document.createElement('button');
+      btnInfo.textContent = 'Ampliar info';
+      btnInfo.style.cssText = [
+        'width:100%;padding:10px 16px;border-radius:10px;margin-top:8px;',
+        'background:transparent;color:#E8A020;border:1px solid rgba(232,160,32,.55);',
+        'font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;'
+      ].join('');
+      btnInfo.onclick = function () {
+        expNvl_cerrarModal();
+        var pb = document.getElementById('btn-perfil-viajero');
+        if (pb) pb.click();
+      };
+      card.appendChild(btnInfo);
+    }
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+
+  function expEra_mostrarModalCambioEra(eraAnterior, eraNueva) {
+    if (!eraNueva) return;
+    var previo = document.getElementById('expEra-modal-overlay');
+    if (previo && previo.parentNode) previo.parentNode.removeChild(previo);
+
+    var color = eraNueva.color || '#E8A020';
+    var overlay = document.createElement('div');
+    overlay.id = 'expEra-modal-overlay';
+    overlay.style.cssText = [
+      'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;',
+      'display:flex;align-items:center;justify-content:center;',
+      'background:rgba(0,0,0,.82);padding:20px;font-family:inherit;'
+    ].join('');
+
+    var card = document.createElement('div');
+    card.style.cssText = [
+      'max-width:460px;width:100%;text-align:center;',
+      'background:#0d1117;border:1px solid ' + color + ';',
+      'border-radius:18px;padding:28px 22px;color:#F9FAFB;',
+      'box-shadow:0 24px 60px rgba(0,0,0,.6);'
+    ].join('');
+
+    var emoji = document.createElement('div');
+    emoji.textContent = eraNueva.emoji || '';
+    emoji.style.cssText = 'font-size:52px;line-height:1;margin-bottom:10px;';
+    card.appendChild(emoji);
+
+    var kicker = document.createElement('div');
+    kicker.textContent = 'Nueva era';
+    kicker.style.cssText = 'font-size:12px;letter-spacing:2px;text-transform:uppercase;color:' + color + ';font-weight:700;';
+    card.appendChild(kicker);
+
+    var nombre = document.createElement('div');
+    nombre.textContent = eraNueva.nombre;
+    nombre.style.cssText = 'font-size:26px;font-weight:800;margin-bottom:16px;';
+    card.appendChild(nombre);
+
+    function bloqueEra(titulo, items) {
+      var t = document.createElement('div');
+      t.textContent = titulo;
+      t.style.cssText = 'font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#9CA3AF;margin:12px 0 6px;text-align:left;';
+      card.appendChild(t);
+      var lista = document.createElement('ul');
+      lista.style.cssText = 'list-style:none;margin:0 0 8px;padding:0;text-align:left;';
+      (items || []).forEach(function (it) {
+        var li = document.createElement('li');
+        li.textContent = '\u2022 ' + it;
+        li.style.cssText = 'padding:4px 0;font-size:14px;color:#E5E7EB;';
+        lista.appendChild(li);
+      });
+      card.appendChild(lista);
+    }
+
+    bloqueEra('Beneficios', eraNueva.beneficios);
+    bloqueEra('Mecanicas', eraNueva.mecanicas);
+
+    var btn = document.createElement('button');
+    btn.textContent = 'Entendido';
+    btn.style.cssText = [
+      'width:100%;padding:11px 16px;border-radius:10px;border:0;margin-top:14px;',
+      'background:' + color + ';color:#0d1117;font-weight:700;font-size:14px;',
+      'cursor:pointer;font-family:inherit;'
+    ].join('');
+    btn.onclick = function () {
+      var ov = document.getElementById('expEra-modal-overlay');
+      if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    };
+    card.appendChild(btn);
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+
+  window.ExploraCO.mostrarModalNivelUp = expNvl_mostrarModalNivelUp;
+  window.ExploraCO.mostrarModalCambioEra = expEra_mostrarModalCambioEra;
+
   // ---- Catalogo global de vocaciones (backend usuario-session) ----
   // Mismo catalogo que expone el backend para que los frontends lo
   // lean sin fetch. Acentos y emojis SOLO como escapes \uXXXX
@@ -1083,6 +1316,18 @@
     if (window.ExploraCO.usuario) {
       aplicarDesbloqueos(data.misiones);
       window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + total);
+      // Deteccion de subida de nivel: el nivel previo se reconstruye
+      // restando el delta ya acreditado (xp_total en L1085 ya es el nuevo).
+      var nvlAnt = calcularNivel((Number(window.ExploraCO.usuario.xp_total) || 0) - total);
+      var nvlNvo = calcularNivel(window.ExploraCO.usuario.xp_total);
+      if (nvlNvo > nvlAnt) {
+        setTimeout(function() { expNvl_mostrarModalNivelUp(nvlAnt, nvlNvo); }, 600);
+        var eraAnt = expEra_getEra(nvlAnt);
+        var eraNva = expEra_getEra(nvlNvo);
+        if (eraNva && eraAnt && eraNva.nombre !== eraAnt.nombre) {
+          setTimeout(function() { expEra_mostrarModalCambioEra(eraAnt, eraNva); }, 3200);
+        }
+      }
       guardarSesion(window.ExploraCO.usuario);
       actualizarUI();
     }

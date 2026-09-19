@@ -1853,3 +1853,128 @@ El acordeon necesita capacidades y misiones por nivel SIN duplicar logica ni umb
 **Estado final:** Aprobado por architect-review-free el 2026-09-18 e IMPLEMENTADO EN WORKING TREE (T1: acordeon en `mi-perfil.html`; T2: `niveles-data.js` + `GRUPO_NOMBRE` de 6 grupos + `scripts/smoke_niveles_data.js` 31/31). Sin pasos manuales en Neon. Compatible con el release v22 compartido con ADR-039 (aplicar migracion 025 ANTES de ese deploy, patron BUG-021/BUG-060).
 
 **ADRs relacionados:** ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-006 (baseline real), ADR-010 (presupuesto de endpoints), ADR-014 (milestones y gates por XP), ADR-035 (XP decimal y niveles derivados), ADR-038 (helpers v21 / ENMIENDA 1), ADR-039 (release v22 compartido + ENMIENDA 1 de misiones del Museo).
+
+---
+
+## ADR-041: Comunicacion oficial (canal broadcast), Casas (tributo configurable, lider automatico y misiones conjuntas), eras/titulos y circulo de rango del admin
+
+**ID:** ADR-041
+**Fecha:** 2026-09-18
+**Estado:** Aprobado e **IMPLEMENTADO EN WORKING TREE + HOTFIXES POST-QA** (2026-09-18, SIN commitear). Verificado contra el archivo real (ADR-006): existe `db/migrations/026_casas_comunicaciones.sql` (329 lineas), `api/usuarios.js` esta en **v18** (v17 + hotfix J-3), las ramas nuevas viven en `api/interacciones.js` (**v23**; hotfixes J-1/J-2), los modales estan en `usuario-session.js`, el badge/bloqueo en `comunidad.html`, la altura + circulo en `admin.html` y los getters en `map-picker.js`. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar 026 en Neon ANTES del deploy del backend (v23/v18) y del frontend** (patron BUG-021/BUG-060; la 024 y la 025 se consideran YA aplicadas por indicacion del usuario el 2026-09-18).
+**Autor:** architect (AI-DOS) con decisiones del propietario del producto (Javier, 2026-09-18); revisado por architect-review.
+**Nota de numeracion:** el 041 es el consecutivo real tras ADR-040 (mayor registrado en este documento al 2026-09-18, verificado con `^## ADR-` sobre el archivo real, ADR-006). No estaba reservado en ninguna spec.
+**Alcance de esquema:** esta ADR NO toca `destinos.tags` JSONB ni ninguna categoria del directorio. Opera sobre `chat_salas` (columna nueva), `casas_cofre` (columnas nuevas), y las tablas nuevas `casa_roles` y `casa_misiones`.
+
+### Contexto
+
+La sesion "Comunicacion + Casas + Admin Mapa" cierra cuatro frentes de producto sobre el sistema social/gaming existente, sin crear funciones serverless (presupuesto 8/8, ADR-001/ADR-010):
+
+1. **Comunicacion oficial:** se necesita un canal de anuncios de la plataforma dentro de `comunidad.html` (chat), con publicacion restringida al administrador y lectura para todos.
+2. **Casas:** el cofre de ADR-038 tributaba un `0.10` literal no configurable; faltaba un lider visible por Casa, misiones colectivas y una tabla de roles.
+3. **Progresion:** la gamificacion ya tenia 20 niveles en 4 eras (ADR-035), pero sin titulos por nivel ni feedback de subida de nivel / cambio de era en el cliente.
+4. **Admin mapa:** el selector de coordenadas (`map-picker.js`, TSK-117) no visualizaba el radio de verificacion (`destinos.radio_m`, ADR-033/TSK-107) que el formulario ya capturaba.
+
+Restricciones vigentes: 8/8 de funciones serverless (ADR-001/ADR-010), cero borrado logico (ADR-003/Regla de Oro 3), migraciones aditivas e idempotentes (ADR-008), ASCII-safe (ADR-002) y baseline = archivo real (ADR-006).
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Numerar la migracion 019 (prompt original) vs 026 (ELEGIDA).** El 019 ya esta ocupado por `019_media_guardados_radio.sql` (TSK-107); usar 019 colisionaria dos migraciones distintas. Se elige **026**, el consecutivo real tras la 025 (ADR-006). *Decision (a).*
+2. **Asumir `MapPicker._map` (RECHAZADA) vs exponer getters `getPickerMap()`/`getMiniMap()` (ELEGIDA).** El campo privado no existia; modificar `map-picker.js` (modulo compartido de TSK-117) para exponer una API publica evita acoplarse a un detalle interno y respeta el encapsulamiento. *Decision (b).*
+3. **Agregar `usuarios.rol` (RECHAZADA) vs Bearer `ADMIN_SECRET` + email de sesion (ELEGIDA).** La columna `rol` no existe en `usuarios` y crearla introduciria una segunda fuente de autorizacion; el patron vigente de admin es `ADMIN_SECRET` (Bearer) y `brsk84@gmail.com` (ADR-029). *Decision (c).*
+4. **`casa_misiones` tambien en `usuarios.js` (RECHAZADA) vs un unico GET en `interacciones.js` (ELEGIDA).** El prompt original era contradictorio (lo ponia en ambos endpoints); un solo dueno del contrato evita duplicidad y drift. *Decision (e).*
+5. **Crear `entregarXp` para resolver el lider (RECHAZADA) vs evaluacion perezosa en `GET casa_ranking` (ELEGIDA).** La funcion `entregarXp` no existe en el archivo real; el lider se resuelve donde ya se lee el ranking, sin punto de escritura nuevo. *Decision (d).*
+6. **Crear `abrirPerfil()` en el modal (RECHAZADA) vs click sobre `#btn-perfil-viajero` existente (ELEGIDA).** No existe `abrirPerfil`; reutilizar el boton existente evita codigo muerto y No-Duplicidad (AGENTS.md 2.1). *Decision (f).*
+7. **Mantener el tributo `0.10` hardcodeado (RECHAZADA) vs `casas_cofre.tributo_pct` configurable (ELEGIDA).** El porcentaje debe ser administrable por Casa y auditable; se persiste en columna con default 10 y rango 0..15. *Decision (g).*
+8. **Capturas silenciosas sin log (RECHAZADA) vs `console.error`/`console.warn` tipados (ELEGIDA).** AGENTS.md seccion 2.2 prohibe capturar y silenciar sin registro; se corrigieron las 2 capturas nuevas antes vacias. *Decision (h).*
+
+### Decision tomada
+
+**(A) Migracion 026 (`db/migrations/026_casas_comunicaciones.sql`)** - la UNICA de este ADR, aditiva, idempotente (ADR-008) y ASCII-safe (ADR-002; 329 lineas, 0 bytes >127, 0 backticks):
+- **Comunicacion:** `ALTER TABLE chat_salas ADD COLUMN IF NOT EXISTS es_oficial boolean DEFAULT false`; semilla idempotente del canal "Anuncios ExploraCO" (`WHERE NOT EXISTS (es_oficial=true)` + requiere la cuenta admin; icono altavoz `E'\U0001F4E3'`; `tipo='viajeros'` para NO tocar `chk_chat_salas_tipo`; `orden=-1`); indice unico parcial `uq_chat_salas_oficial` (garantiza UNA sala oficial).
+- **Casas:** `casas_cofre.tributo_pct NUMERIC(4,2) DEFAULT 10.00` + CHECK `casas_cofre_tributo_pct_check` (0..15, guard `pg_constraint`); `casas_cofre.lider_user_id UUID REFERENCES usuarios(id)` (sin ON DELETE CASCADE: el proyecto no borra usuarios); tabla `casa_roles` (`casa` con CHECK espejo, `usuario_id` FK ON DELETE CASCADE, `rol IN lider|oficial|mariscal|miembro`, `asignado_en`, `activo`, UNIQUE `(casa, usuario_id)`, indices `(casa, activo)` y `(usuario_id)`); tabla `casa_misiones` (`casa`, `nombre`, `descripcion`, `meta_tipo IN visitas|xp_total|resenas|fotos`, `meta_valor > 0`, `progreso_actual` cache NO autoritativa, `recompensa_xp`, `estado IN activa|completada|expirada`, `creado_en`, `expira_en`, `completado_en`, indice `(casa, estado, meta_tipo)`).
+- **Backfill y semilla:** lider por Casa `DISTINCT ON (casa) ... ORDER BY xp_total DESC` con `IS DISTINCT FROM` (no-op en re-ejecucion); poblado de `casa_roles` con `ON CONFLICT (casa, usuario_id) DO UPDATE` y degradacion a `'oficial'` del lider anterior; 1 mision base por Casa ("Primera Expedicion de Casa": `visitas` 10, 500 XP) con `WHERE NOT EXISTS`.
+
+**(B) Canal oficial broadcast (decisiones c, h).**
+- `GET ?tipo=chat_salas` proyecta `s.es_oficial` (aditivo).
+- `POST chat_msg`: si la sala es `'viajeros'` con `es_oficial=true` y el emisor NO es admin, responde 403. El admin se resuelve por Bearer `ADMIN_SECRET` (fallback `exploraco12345`) o por el email de sesion `brsk84@gmail.com`.
+- NUEVA rama `POST ?tipo=anuncio_oficial`: exige Bearer `ADMIN_SECRET` (403 si falta), texto requerido <= 1000 caracteres, busca la sala oficial (404 si no existe) e inserta con `nombre='ExploraCO Oficial'` y `usuario_id` opcional (nullable; jamas se inventa un id inexistente).
+- Frontend `comunidad.html`: la sala oficial se ordena al tope, se pinta con borde/fondo dorado y badge "OFICIAL"; para no-admin se ocultan input y boton de envio y se muestra "Solo el administrador puede publicar aqui". La sesion solo aporta el email para la UI; la autorizacion real es server-side.
+- **NO se agrega `usuarios.rol`.** La tabla `casa_roles` es un concepto distinto (rol dentro de una Casa) y no autoriza el canal oficial.
+
+**(C) Casas: tributo configurable, lider automatico y misiones conjuntas (decisiones d, e, g).**
+- **Tributo configurable (g):** `acreditarClaseYCofre` (`api/interacciones.js`) deja de usar el literal `0.10` y lee `SELECT COALESCE(tributo_pct, 10) FROM casas_cofre WHERE casa=$1`; si el valor no es finito o cae fuera de 0..15, se normaliza a 10. El cofre sigue siendo best-effort (nunca bloquea la entrega de XP).
+- **Configuracion:** NUEVA rama `POST ?tipo=casa_tributo_config`; la autorizan el Bearer `ADMIN_SECRET` o el `lider_user_id` de la Casa. **HOTFIX post-QA J-2 (v23, BUG-064):** la autorizacion del lider exige `validarSesion(req, usuarioId2).ok` (JWT, ADR-025) ANTES de comparar contra `casas_cofre.lider_user_id`; el `usuario_id` del body ya no es fuente de autorizacion (evita el IDOR que permitia leer `lider_user_id` del ranking publico y spoofearlo). Valida `casa` en `condor|jaguar|delfin` y `tributo_pct` en 0..15 (400 fuera de rango).
+- **Lider automatico (d):** `GET ?tipo=casa_ranking` (`api/usuarios.js` v17 -> v18) refresca best-effort el lider de cada Casa ANTES de leer (3 sentencias: recalcular por `xp_total DESC`, upsert del lider en `casa_roles`, degradar a `'oficial'` los lideres anteriores) y expone `lider_user_id`/`tributo_pct`. **HOTFIX post-QA J-3 (v18):** el refresco se ejecuta como maximo una vez cada 60 s por instancia (cache de proceso `CR_LIDER_REFRESH_MS`, no distribuida) para no amplificar escrituras desde un GET publico; con N instancias activas hay hasta N refrescos/min. Las lecturas del ranking no se alteran. La degradacion es escalonada: `42P01` (sin `casas_cofre`, 024) quita el JOIN; `42703` (`lider_user_id`/`tributo_pct` ausentes, 026 pendiente) reintenta con `conLider=false` conservando el cofre de la 024; cualquier otro error se propaga. Sin `entregarXp`: la resolucion es perezosa en la lectura del ranking.
+- **Misiones conjuntas (e):** NUEVO helper `avanzarMisionesCasa(sql, usuarioId, metaTipo, delta)` con catalogo `CASA_MISIONES_META` (`visitas|xp_total|resenas|fotos`); para `xp_total` el delta es el XP entregado y para el resto es 1. Se invoca desde `acreditarClaseYCofre` (`xp_total`) y con hooks explicitos en `foto` (`fotos`), `resena` (`resenas`) y `visita` (`visitas`). Degrada con `console.warn` si la 026 no existe (`42P01`) y con `console.error` en cualquier otro fallo. El listado se expone en UN UNICO `GET ?tipo=casa_misiones&casa=...` en `api/interacciones.js` (no se duplica en `usuarios.js`).
+
+**(D) Eras y titulos + modales de progresion (decision f).**
+- `usuario-session.js` agrega catalogos cliente puros: `TITULOS_POR_NIVEL` (20 titulos, niveles 1..20) y `ERAS` (Mundana 1-5, Patrocinada 6-10, Organizador 11-15, Leyenda 16-20, con `emoji`/`color`/`beneficios`/`mecanicas`), mas el helper `getEra(nivel)`.
+- Modales sin HTML previo (DOM inyectado y auto-limpiante): `mostrarModalNivelUp(nivelAnterior, nivelNuevo)` y `mostrarModalCambioEra(eraAnterior, eraNueva)`.
+- Se disparan desde `aplicarResultadoXp` al detectar subida de nivel (el nivel previo se reconstruye restando el delta ya acreditado); el modal de era se muestra 3.2 s despues del de nivel-up.
+- El boton "Ampliar info" del modal de nivel-up dispara `document.getElementById('btn-perfil-viajero').click()` SI existe; NO se crea `abrirPerfil`.
+
+**(E) Admin mapa: circulo de rango y getters del `map-picker` (decision b).**
+- `admin.html`: la altura del contenedor `#map-picker-el` pasa de 380 a 500 px; nueva funcion `adm_actualizarCirculoRango()` que dibuja un `L.circle([lat,lng], {radius: radio_m, ...})` sobre el mapa del picker, invocada en `oninput` de `#f-radio-m`, en `openMapPicker` (con `setTimeout` de 350 ms) y en `confirmMapPicker`.
+- `map-picker.js`: el modulo compartido expone `getPickerMap()` y `getMiniMap()` en su retorno publico; el admin los consume y NUNCA accede a `MapPicker._map`. Si `getPickerMap` no existe o no hay mapa/capas, la funcion retorna sin error.
+
+### Actualizacion post-QA (hotfixes J-1..J-3, 2026-09-18) -- no cambian la decision
+
+La auditoria QA posterior a la implementacion de TSK-118 detecto tres hallazgos que se corrigieron sin alterar el alcance funcional de la decision (seguridad, degradacion y control de escritura):
+
+- **J-2 SEGURIDAD (IDOR, corregido) -> `BUGS_HISTORICOS.md` BUG-064:** `POST ?tipo=casa_tributo_config` autorizaba al lider comparando el `usuario_id` del body contra `casas_cofre.lider_user_id`. Como `lider_user_id` es publico en `GET ?tipo=casa_ranking`, cualquiera podia spoofear al lider. En v23 la autorizacion exige `validarSesion(req, usuarioId2).ok` (JWT, ADR-025); recien con la sesion valida se compara contra `lider_user_id`. **BUG-064: CERRADO / Corregido en v23.**
+- **J-1 degradacion (mitigada):** `GET ?tipo=chat_salas` y `POST chat_msg` degradan con fallback `42703` (`false AS es_oficial`) si la migracion 026 aun no esta aplicada; el listado de salas y el envio de mensajes siguen operativos. En `chat_msg` se elimino la captura silenciosa: el fallo no-42703 se registra con `console.error` y se re-lanza (AGENTS.md 2.2). Aplicar 024 -> 025 -> 026 antes del deploy SIGUE siendo obligatorio.
+- **J-3 amplificacion de escritura (mitigada):** el refresco del lider en `GET ?tipo=casa_ranking` quedo con throttle de 60 s por instancia (cache de proceso). No altera las lecturas del ranking; con multiples instancias serverless hay hasta N refrescos/min (mitigacion, no eliminacion).
+
+**Estado post-hotfix:** `api/interacciones.js` **v23** y `api/usuarios.js` **v18**, verificados contra el archivo real (ADR-006). Escudo GOLD post-hotfix: `node --check` OK en 4 archivos (`api/interacciones.js`, `api/usuarios.js`, `usuario-session.js`, `map-picker.js`), ASCII-safe 0 bytes >127 en `api/`, balance de divs 0 y presupuesto 8/8 INTACTO. **Sigue abierto:** BUG-061 (`POST tipo='foto'` sin `validarSesion`), que los hooks de Casa de la sesion amplifican (mas puntos que escriben XP/estado a nombre del usuario); ver `BUGS_HISTORICOS.md` BUG-061.
+
+### Justificacion
+
+Reusar el patron admin existente (Bearer `ADMIN_SECRET` + email de sesion) evita crear una columna de rol que no existe y que abriria una segunda fuente de autorizacion (ADR-006/ADR-029). Un unico endpoint para `casa_misiones` y un unico helper `avanzarMisionesCasa` honran la Regla de No-Duplicidad (AGENTS.md 2.1) y eliminan la contradiccion del prompt original. La evaluacion perezosa del lider en `GET casa_ranking` no crea puntos de escritura nuevos ni requiere scheduler, y su degradacion escalonada mantiene la API util aun con la 026 sin aplicar (patron BUG-021/BUG-060). Persistir `tributo_pct` con default 10 y rango 0..15 hace auditable la economia del cofre sin alterar el comportamiento historico. Exponer getters publicos en `map-picker.js` desacopla al admin de una propiedad privada y mantiene el modulo reutilizable (TSK-116/TSK-117). Los catalogos de titulos/eras viven en el cliente porque son de presentacion pura y no necesitan columna ni endpoint (8/8 intacto). Todo es aditivo e idempotente: cero DROP, cero endpoints nuevos, ASCII-safe.
+
+### Impacto
+
+- **Migracion NUEVA** `db/migrations/026_casas_comunicaciones.sql` (329 lineas, idempotente ADR-008, ASCII-safe ADR-002). Aplicar el archivo COMPLETO en Neon despues de 024 y 025; re-ejecutar es no-op.
+- **`api/usuarios.js` v16 -> v17 -> v18:** `casa_ranking` expone `lider_user_id`/`tributo_pct` con degradacion escalonada 42P01/42703 y refresco best-effort del lider por Casa (sin endpoint nuevo); **v18** agrega el throttle de 60 s por instancia al refresco (hotfix J-3).
+- **`api/interacciones.js` v22 -> v23:** `acreditarClaseYCofre` con tributo configurable; helper `avanzarMisionesCasa` + hooks; `GET ?tipo=chat_salas` con `es_oficial`; bloqueo admin en `chat_msg`; ramas nuevas `POST ?tipo=anuncio_oficial`, `POST ?tipo=casa_tributo_config` y `GET ?tipo=casa_misiones`. La **v23** agrega la degradacion 42703 de `chat_salas`/`chat_msg` (J-1) y la autorizacion por `validarSesion` de `casa_tributo_config` (J-2).
+- **Frontend:** `usuario-session.js` (titulos/eras/modales), `comunidad.html` (canal oficial: tope, badge, bloqueo de input), `admin.html` (picker 500 px + circulo de rango) y `map-picker.js` (getters publicos). Assets frontend: no cuentan contra el 8/8.
+- **Presupuesto 8/8 INTACTO** (ADR-001/ADR-010): cero archivos nuevos en `api/`. Sin `tags` JSONB tocados.
+- **Verificacion exigible al cierre:** Escudo GOLD (`node --check`, ASCII-safe 0 bytes >127 y 0 backticks en `api/*.js` y la migracion, balance de divs); preflight y verificacion post-aplicacion de la 026 (secciones 0 y final del `.sql`); prueba en vivo del canal oficial, el tributo configurable, el lider en `casa_ranking`/`casa_roles`, las misiones conjuntas, los modales y el circulo de rango (post-deploy).
+
+### Consecuencias positivas
+
+- Canal oficial con lectura publica y publicacion restringida, sin columna de rol ni endpoint nuevo.
+- Tributo del cofre administrable por Casa (0..15) y auditable en `casas_cofre.tributo_pct`.
+- Lider de Casa automatico y visible, sincronizado con `casa_roles`, sin scheduler ni funcion de entrega nueva.
+- Misiones colectivas por Casa con un unico helper y un unico endpoint.
+- Feedback de progresion (titulos y cambio de era) sin tocar el backend ni la logica de niveles.
+- El admin visualiza el radio real de verificacion sobre el mapa del picker.
+- Todo aditivo/idempotente: cero DROP, cero endpoints nuevos, ASCII-safe.
+
+### Consecuencias negativas / riesgos residuales
+
+- **Migracion 026 pendiente (BLOQUEANTE):** sin aplicarla en Neon, el canal oficial, `casa_tributo_config`, `casa_misiones` y `lider_user_id`/`tributo_pct` fallan o degradan; aplicar ANTES del deploy del backend v23/v18. La degradacion J-1 mantiene en pie `chat_salas`/`chat_msg`, pero NO sustituye la migracion.
+- **Header de `api/interacciones.js` RESUELTO a v23:** el changelog L18 ya documenta la sesion TSK-118 y los hotfixes J-1/J-2. Nota ADR-006: la linea-titulo L1 aun rotula `v22` (drift menor de la linea descriptiva, sin efecto funcional).
+- **BUG-061 AMPLIFICADO por los hooks de Casa:** `POST tipo='foto'` sigue sin `validarSesion`; los hooks `avanzarMisionesCasa` (foto/resena/visita) reutilizan el `usuario_id` del body y por tanto amplian la superficie de suplantacion (mas efectos por el mismo vector). Sigue ABIERTO y escalado a `sql-security`.
+- **Normalizacion silenciosa del tributo:** un valor invalido en `casas_cofre.tributo_pct` se normaliza a 10 en runtime sin aviso; el CHECK 0..15 acota la columna, pero el fallback no se registra.
+- **`casa_roles` solo puebla `lider`:** los roles `oficial`/`mariscal`/`miembro` existen en el CHECK pero no tienen flujo de asignacion en v1.
+- **Misiones base sin diferenciacion:** la 026 siembra la misma mision base para las 3 Casas; el contenido diferenciado queda como backlog.
+- **`conCofre`/`conLider` y cache:** `casas_cofre.poblacion_activa`/`factor_conversion` siguen siendo cache NO autoritativa (heredado de ADR-038).
+- **Circulo de rango no validado en produccion:** depende del deploy; el area `L.circle` no se ha verificado con datos reales ni en movil.
+- **BUG-061, BUG-002 y BUG-062 siguen ABIERTOS** (ajenos a esta entrega).
+
+### Decisiones de la sesion (mapeo explicito a-h)
+
+| Letra | Decision registrada |
+|---|---|
+| (a) | Migracion **026** (no 019) por colision de numeracion con `019_media_guardados_radio.sql`. |
+| (b) | Exponer `getPickerMap()`/`getMiniMap()` en `map-picker.js` en lugar de asumir `MapPicker._map` (que no existia). |
+| (c) | Gating admin con Bearer `ADMIN_SECRET` en backend + email de sesion para UI; **no** se agrega columna `rol` (no existe en `usuarios`). |
+| (d) | Lider de Casa evaluado de forma perezosa en `GET casa_ranking`; no se crea `entregarXp` (no existia). |
+| (e) | `casa_misiones` se expone en un **unico** `GET` en `interacciones.js`; se elimina la contradiccion del prompt que lo ponia tambien en `usuarios.js`. |
+| (f) | El boton "Ampliar info" del modal de nivel-up dispara `#btn-perfil-viajero` si existe; no se crea `abrirPerfil`. |
+| (g) | El tributo ya no es `0.10` hardcodeado: se lee `casas_cofre.tributo_pct` (default 10, rango 0..15). |
+| (h) | Se agregan logs a 2 capturas antes silenciosas (`chat_msg`/`casa_tributo_config`) conforme a AGENTS.md seccion 2.2. |
+
+**Hotfixes post-QA (J-1..J-3, 2026-09-18):** no corresponden a decisiones nuevas; implementan las decisiones (c), (d) y (h) con seguridad y degradacion. J-2 corrige un IDOR (BUG-064, CERRADO en v23), J-1 mitiga con degradacion 42703 y J-3 con throttle por instancia. Detalle en la seccion "Actualizacion post-QA" de este ADR.
+
+**ADRs relacionados:** ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico), ADR-006 (baseline real), ADR-008 (idempotencia), ADR-010 (presupuesto de endpoints), ADR-025 (sesion firmada), ADR-028 (Casas `usuarios.casa` y chat/DM), ADR-029 (admin por email/`ADMIN_SECRET`), ADR-033 (radio de verificacion), ADR-035 (niveles/eras y `red2`), ADR-038 (cofre de Casa y `acreditarClaseYCofre`), ADR-039/ADR-040 (release v22 compartido), BUG-021 (deuda de columnas no versionadas).

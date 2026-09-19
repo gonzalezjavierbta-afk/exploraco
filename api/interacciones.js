@@ -1,4 +1,4 @@
-// api/interacciones.js  v22 (release compartido ADR-039 + ADR-040 + T4.5):
+// api/interacciones.js  v23 (TSK-118/ADR-041 incremento sobre el release v22 ADR-039 + ADR-040 + T4.5):
 //   (1) Museo URL-only (ADR-039): ramas GET/POST tipo=museo_recurso
 //       (crear/editar/eliminar/listar) sobre album_fotos con visibilidad
 //       POR RECURSO (af.visible, migracion 025) y filtro af.visible=true en
@@ -14,7 +14,8 @@
 //       gate_nivel de misiones de video/audio; GET museo_recurso usuario_id
 //       opcional; editar por agregador_id).
 //   REQUIERE la migracion 025_album_fotos_visible.sql aplicada en Neon ANTES
-//   del deploy (patron BUG-021/BUG-060). Cero endpoints nuevos (8/8).
+// del deploy (patron BUG-021/BUG-060). Cero endpoints nuevos (8/8).
+// v23 (TSK-118: canal oficial es_oficial con degradacion 42703; authz de casa_tributo_config via validarSesion; fix IDOR lider)
 // v21 (TSK-112 / ADR-038: calcularXpFinal clase+Casa, tributacion al cofre, xp_clase/nivel_clase)
 // v20 (ADR-036: compartir con XP por primer share + media unificada votos/comentarios/guardados; base v18 ADR-035 XP numeric(12,2))
 // TSK-111 (v20): radio urbano 50m (CAMBIO 4) + album_oficial en multimedia_mapa (CAMBIO 8)
@@ -335,14 +336,50 @@ async function acreditarClaseYCofre(sql, usuarioId, ctx, xp_final) {
   }
   if (c.casa) {
     try {
-      var tributo = red2(xp_final * 0.10);
+      var pctRows = await sql('SELECT COALESCE(tributo_pct, 10) AS pct FROM casas_cofre WHERE casa = $1', [c.casa]);
+      var pct = parseFloat((pctRows && pctRows[0] && pctRows[0].pct) || 10);
+      if (!isFinite(pct) || pct < 0 || pct > 15) pct = 10;
+      var tributo = red2(xp_final * (pct / 100));
       await sql(
         'UPDATE casas_cofre SET xp_cofre_total = xp_cofre_total + $1, actualizado_en = NOW() WHERE casa = $2',
         [tributo, c.casa]
       );
+      await avanzarMisionesCasa(sql, usuarioId, 'xp_total', xp_final);
     } catch (errCofre) {
-      console.error('[entregarXp] clase/cofre best-effort: ' + (errCofre && errCofre.message));
+      console.error('[acreditarClaseYCofre] cofre/mision best-effort: ' + (errCofre && errCofre.message));
     }
+  }
+}
+
+// Misiones conjuntas de Casa (comunicacion Casas, 2026-09-18): avanza
+// best-effort las misiones activas de la Casa del usuario. metaTipo debe
+// pertenecer al catalogo del CHECK de casa_misiones; para 'xp_total' el
+// delta es el XP entregado y para el resto es 1 accion. Nunca lanza: si
+// la migracion aun no corrio (42P01) degrada registrando el motivo
+// (AGENTS.md 2.2, prohibido el catch vacio que silencia fallos).
+var CASA_MISIONES_META = ['visitas', 'xp_total', 'resenas', 'fotos'];
+async function avanzarMisionesCasa(sql, usuarioId, metaTipo, delta) {
+  if (!usuarioId) return;
+  if (CASA_MISIONES_META.indexOf(metaTipo) === -1) return;
+  var inc = metaTipo === 'xp_total' ? delta : 1;
+  inc = Math.round(Number(inc));
+  if (!isFinite(inc) || inc <= 0) inc = 1;
+  try {
+    await sql(
+      'UPDATE casa_misiones cm '
+      + 'SET progreso_actual = LEAST(cm.progreso_actual + $3::int, cm.meta_valor), '
+      + 'estado = CASE WHEN LEAST(cm.progreso_actual + $3::int, cm.meta_valor) >= cm.meta_valor THEN \'completada\' ELSE cm.estado END, '
+      + 'completado_en = CASE WHEN LEAST(cm.progreso_actual + $3::int, cm.meta_valor) >= cm.meta_valor AND cm.completado_en IS NULL THEN NOW() ELSE cm.completado_en END '
+      + 'WHERE cm.casa = (SELECT casa FROM usuarios WHERE id = $1::uuid) '
+      + 'AND cm.estado = \'activa\' AND cm.meta_tipo = $2',
+      [usuarioId, metaTipo, inc]
+    );
+  } catch (errMision) {
+    if (errMision && errMision.code === '42P01') {
+      console.warn('[avanzarMisionesCasa] casa_misiones no existe (migracion pendiente)');
+      return;
+    }
+    console.error('[avanzarMisionesCasa] best-effort: ' + (errMision && errMision.message));
   }
 }
 
@@ -3478,20 +3515,32 @@ module.exports = async function handler(req, res) {
       // el frontend (sin websockets en Vercel Hobby); aqui solo se sirve
       // el dato de contenido.
       if (tipo === 'chat_salas') {
-        var salasRows = await sql(
-          'SELECT s.id, s.nombre, s.icono, s.descripcion, s.tipo, s.creador_id, s.creado_en,'
-          + ' (SELECT m.texto FROM chat_mensajes m'
-          + '   WHERE m.sala_id = s.id AND m.activo = true ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_texto,'
-          + ' (SELECT COALESCE(NULLIF(m.nombre,\'\'), u.nombre, \'Viajero\') FROM chat_mensajes m'
-          + '   LEFT JOIN usuarios u ON u.id = m.usuario_id'
-          + '   WHERE m.sala_id = s.id AND m.activo = true ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_usuario,'
-          + ' (SELECT COUNT(*)::int FROM chat_mensajes m'
-          + '   WHERE m.sala_id = s.id AND m.activo = true) AS total_mensajes'
-          + ' FROM chat_salas s'
-          + ' WHERE s.activo = true AND (s.tipo IS NULL OR s.tipo NOT IN (\'plan\',\'dm\'))'
-          + ' ORDER BY s.orden DESC, s.creado_en ASC',
-          []
-        );
+        var chatSalasSql = function (conOficial) {
+          return 'SELECT s.id, s.nombre, s.icono, s.descripcion, s.tipo, '
+            + (conOficial ? 's.es_oficial,' : 'false AS es_oficial,')
+            + ' s.creador_id, s.creado_en,'
+            + ' (SELECT m.texto FROM chat_mensajes m'
+            + '   WHERE m.sala_id = s.id AND m.activo = true ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_texto,'
+            + ' (SELECT COALESCE(NULLIF(m.nombre,\'\'), u.nombre, \'Viajero\') FROM chat_mensajes m'
+            + '   LEFT JOIN usuarios u ON u.id = m.usuario_id'
+            + '   WHERE m.sala_id = s.id AND m.activo = true ORDER BY m.creado_en DESC LIMIT 1) AS ultimo_usuario,'
+            + ' (SELECT COUNT(*)::int FROM chat_mensajes m'
+            + '   WHERE m.sala_id = s.id AND m.activo = true) AS total_mensajes'
+            + ' FROM chat_salas s'
+            + ' WHERE s.activo = true AND (s.tipo IS NULL OR s.tipo NOT IN (\'plan\',\'dm\'))'
+            + ' ORDER BY s.orden DESC, s.creado_en ASC';
+        };
+        var salasRows;
+        try {
+          salasRows = await sql(chatSalasSql(true), []);
+        } catch (salasErr) {
+          if (salasErr && salasErr.code === '42703') {
+            console.warn('[chat_salas] es_oficial ausente (026 pendiente): fallback sin es_oficial');
+            salasRows = await sql(chatSalasSql(false), []);
+          } else {
+            throw salasErr;
+          }
+        }
         return res.status(200).json({ ok: true, data: salasRows });
       }
 
@@ -5228,6 +5277,20 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: prRows2 });
       }
 
+      // Misiones conjuntas de Casa (comunicacion Casas, 2026-09-18): GET
+      // ?tipo=casa_misiones&casa=condor|jaguar|delfin devuelve las misiones
+      // ACTIVAS de esa Casa. Unico endpoint (no se duplica en usuarios.js).
+      if (tipo === 'casa_misiones') {
+        var casaMis = String(req.query.casa || '').toLowerCase();
+        if (['condor', 'jaguar', 'delfin'].indexOf(casaMis) === -1)
+          return res.status(400).json({ ok: false, error: 'casa invalida' });
+        var misionesCasaRows = await sql(
+          'SELECT * FROM casa_misiones WHERE casa=$1 AND estado=\'activa\' ORDER BY creado_en DESC',
+          [casaMis]
+        );
+        return res.status(200).json({ ok: true, data: misionesCasaRows });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -5651,10 +5714,24 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'mensaje vacio' });
         if (msgTexto.length > 500)
           return res.status(400).json({ ok: false, error: 'mensaje maximo 500 caracteres' });
-        var salaValida = await sql(
-          'SELECT id, tipo FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
-          [msgSala]
-        ).catch(function(){ return []; });
+        var salaValida;
+        try {
+          salaValida = await sql(
+            'SELECT id, tipo, es_oficial FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+            [msgSala]
+          );
+        } catch (salaErr) {
+          if (salaErr && salaErr.code === '42703') {
+            console.warn('[chat_msg] es_oficial ausente (026 pendiente): fallback sin es_oficial');
+            salaValida = await sql(
+              'SELECT id, tipo, false AS es_oficial FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+              [msgSala]
+            );
+          } else {
+            console.error('[chat_msg] sala lookup: ' + (salaErr && salaErr.message));
+            throw salaErr;
+          }
+        }
         if (!salaValida.length)
           return res.status(404).json({ ok: false, error: 'Sala no encontrada' });
         // v12 (chat privado por plan) + WP-3 (DM): las salas tipo='plan'
@@ -5664,6 +5741,19 @@ module.exports = async function handler(req, res) {
           return res.status(403).json({ ok: false, error: 'Esta sala es privada del plan' });
         if (salaValida[0].tipo === 'dm')
           return res.status(403).json({ ok: false, error: 'SALA_PRIVADA' });
+        // Canal oficial (sub-modulo 3B): la sala es_oficial solo la
+        // publica el admin (Bearer ADMIN_SECRET o email brsk84@gmail.com).
+        var chatEsAdmin = false;
+        var chatBearer = (req.headers.authorization || '');
+        if (chatBearer.indexOf('Bearer ') === 0) {
+          chatEsAdmin = (chatBearer.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345'));
+        }
+        if (!chatEsAdmin && usuarioId2) {
+          var chatUE = await sql('SELECT email FROM usuarios WHERE id=$1::uuid LIMIT 1', [usuarioId2]).catch(function(e){ console.error('[chat_msg] admin email lookup: ' + (e && e.message)); return []; });
+          if (chatUE && chatUE[0] && String(chatUE[0].email || '').toLowerCase() === 'brsk84@gmail.com') chatEsAdmin = true;
+        }
+        if (salaValida[0].tipo === 'viajeros' && salaValida[0].es_oficial === true && !chatEsAdmin)
+          return res.status(403).json({ ok: false, error: 'Solo el administrador puede publicar en el canal oficial' });
         var autorMsg = await sql('SELECT nombre FROM usuarios WHERE id=$1 LIMIT 1', [usuarioId2]).catch(function(){ return []; });
         var nombreMsg = autorMsg[0] && autorMsg[0].nombre ? String(autorMsg[0].nombre).slice(0, 60) : 'Viajero';
         var msgIns = await sql(
@@ -5698,6 +5788,65 @@ module.exports = async function handler(req, res) {
           misiones: misionesChat,
           logros: logrosChat
         });
+      }
+
+      // Canal oficial (sub-modulo 3B): anuncio broadcast del admin a la
+      // sala es_oficial. Exige Bearer ADMIN_SECRET; el usuario_id es
+      // opcional (columna nullable) y jamas se inventa un id inexistente.
+      if (tipo2 === 'anuncio_oficial') {
+        var anunBearer = req.headers.authorization || '';
+        var anunEsAdmin = anunBearer.indexOf('Bearer ') === 0
+          && anunBearer.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+        if (!anunEsAdmin)
+          return res.status(403).json({ ok: false, error: 'Solo el administrador puede publicar anuncios oficiales' });
+        var anunTexto = String(body.texto || '').trim();
+        if (!anunTexto)
+          return res.status(400).json({ ok: false, error: 'texto requerido' });
+        if (anunTexto.length > 1000)
+          return res.status(400).json({ ok: false, error: 'texto maximo 1000 caracteres' });
+        var anunSala = await sql(
+          'SELECT id FROM chat_salas WHERE es_oficial = true LIMIT 1',
+          []
+        );
+        if (!anunSala.length)
+          return res.status(404).json({ ok: false, error: 'No existe una sala oficial' });
+        var anunUsuario = usuarioId2 || null;
+        var anunIns = await sql(
+          'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto) '
+          + 'VALUES ($1, $2, \'ExploraCO Oficial\', $3) RETURNING id, creado_en',
+          [anunSala[0].id, anunUsuario, anunTexto]
+        );
+        return res.status(200).json({ ok: true, data: { id: anunIns[0].id, creado_en: anunIns[0].creado_en } });
+      }
+
+      // Tributo configurable de Casa (sub-modulo 4C): el admin (Bearer)
+      // o el lider_user_id de la Casa pueden fijar tributo_pct (0-15).
+      if (tipo2 === 'casa_tributo_config') {
+        var ctcCasa = String(body.casa || '').toLowerCase();
+        var ctcPct = parseFloat(body.tributo_pct);
+        if (['condor', 'jaguar', 'delfin'].indexOf(ctcCasa) === -1)
+          return res.status(400).json({ ok: false, error: 'casa invalida' });
+        if (!isFinite(ctcPct) || ctcPct < 0 || ctcPct > 15)
+          return res.status(400).json({ ok: false, error: 'tributo_pct debe estar entre 0 y 15' });
+        var ctcBearer = req.headers.authorization || '';
+        var ctcEsAdmin = ctcBearer.indexOf('Bearer ') === 0
+          && ctcBearer.slice(7) === (process.env.ADMIN_SECRET || 'exploraco12345');
+        var ctcAutorizado = ctcEsAdmin;
+        if (!ctcAutorizado && usuarioId2 && validarSesion(req, usuarioId2).ok) {
+          var ctcLider = await sql(
+            'SELECT lider_user_id FROM casas_cofre WHERE casa=$1 LIMIT 1',
+            [ctcCasa]
+          ).catch(function(e){ console.error('[casa_tributo_config] lider lookup: ' + (e && e.message)); return []; });
+          if (ctcLider.length && ctcLider[0].lider_user_id
+              && String(ctcLider[0].lider_user_id) === String(usuarioId2)) ctcAutorizado = true;
+        }
+        if (!ctcAutorizado)
+          return res.status(403).json({ ok: false, error: 'Solo el administrador o el lider de la Casa pueden configurar el tributo' });
+        await sql(
+          'UPDATE casas_cofre SET tributo_pct=$1, actualizado_en=NOW() WHERE casa=$2',
+          [ctcPct, ctcCasa]
+        );
+        return res.status(200).json({ ok: true, casa: ctcCasa, tributo_pct: ctcPct });
       }
 
       // Moderacion de chat (capacidad moderador_chat, nivel 4): fijar
@@ -6163,6 +6312,7 @@ module.exports = async function handler(req, res) {
         var xpFotoFinal = calcularXpFinal(15, ctxFoto.nivel_clase, ctxFoto.clase_id, ctxFoto.tag);
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpFotoFinal, usuarioId2]).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxFoto, xpFotoFinal);
+        await avanzarMisionesCasa(sql, usuarioId2, 'fotos', 1);
         // v13: reparto multinivel del XP ganado (no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpFotoFinal);
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
@@ -7926,6 +8076,7 @@ module.exports = async function handler(req, res) {
             [xpResenaEntregado, usuarioId2]
           ).catch(function(){});
           await acreditarClaseYCofre(sql, usuarioId2, ctxResena, xpResenaEntregado);
+          await avanzarMisionesCasa(sql, usuarioId2, 'resenas', 1);
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
           // v9 (ADR-018): chance de cromo (15%) y aporte de fama a la
@@ -8241,6 +8392,7 @@ module.exports = async function handler(req, res) {
           [xpTotalVisita, usuarioId2]
         ).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxVisita, xpTotalVisita);
+        await avanzarMisionesCasa(sql, usuarioId2, 'visitas', 1);
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);

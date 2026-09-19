@@ -1718,7 +1718,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Radio de verificación (metros)</label>
-              <input class="form-input" id="f-radio-m" type="number" min="25" max="100000" step="5" placeholder="100" oninput="_syncRadioPresetChips()">
+              <input class="form-input" id="f-radio-m" type="number" min="25" max="100000" step="5" placeholder="100" oninput="_syncRadioPresetChips(); adm_actualizarCirculoRango()">
               <div id="radio-m-presets" class="status-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
                 <button class="status-pill" data-m="100" onclick="setRadioPreset(100)">Punto 100m</button>
                 <button class="status-pill" data-m="300" onclick="setRadioPreset(300)">Manzana 300m</button>
@@ -2129,7 +2129,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div style="color:#fff;font-weight:700;font-size:13px">📍 Seleccionar ubicación en el mapa</div>
       <button onclick="closeMapPicker()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">✕</button>
     </div>
-    <div id="map-picker-el" style="height:380px"></div>
+    <div id="map-picker-el" style="height:500px"></div>
     <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
       <div id="map-picker-coords" style="font-size:12px;color:var(--muted);font-family:monospace">Haz clic en el mapa para seleccionar</div>
       <div style="display:flex;gap:8px">
@@ -4768,9 +4768,35 @@ function livePreview() {
    del HTML. La logica real vive en MapPicker (initMapPicker). */
 function updateMiniMap()    { MapPicker.updateMiniMap(); }
 function buscarCoordenadas(){ MapPicker.buscarCoordenadas(); }
-function openMapPicker()    { MapPicker.openMapPicker(); }
+function openMapPicker()    { MapPicker.openMapPicker(); setTimeout(adm_actualizarCirculoRango, 350); }
 function closeMapPicker()   { MapPicker.closeMapPicker(); }
-function confirmMapPicker() { MapPicker.confirmMapPicker(); }
+function confirmMapPicker() { MapPicker.confirmMapPicker(); adm_actualizarCirculoRango(); }
+
+/* ADR-033 / TSK-107: circulo de radio del picker.
+   map-picker.js expone la instancia Leaflet interna via
+   getPickerMap(): nunca se accede a propiedades privadas. */
+function adm_actualizarCirculoRango() {
+  try {
+    var latEl = document.getElementById('f-lat');
+    var lngEl = document.getElementById('f-lng');
+    var radEl = document.getElementById('f-radio-m');
+    var lat = latEl ? parseFloat(latEl.value) : NaN;
+    var lng = lngEl ? parseFloat(lngEl.value) : NaN;
+    var radio = radEl ? parseInt(radEl.value, 10) : NaN;
+    if (typeof MapPicker === 'undefined' || !MapPicker || typeof MapPicker.getPickerMap !== 'function') return;
+    var pmap = MapPicker.getPickerMap();
+    if (!pmap) return;
+    if (window._adminRangoCircle) { pmap.removeLayer(window._adminRangoCircle); window._adminRangoCircle = null; }
+    if (!isFinite(lat) || !isFinite(lng) || !isFinite(radio) || radio <= 0) return;
+    if (typeof L === 'undefined') return;
+    window._adminRangoCircle = L.circle([lat, lng], {
+      radius: radio, color: '#E8A020', fillColor: '#E8A020', fillOpacity: 0.12, weight: 2
+    }).addTo(pmap);
+  } catch (e) {
+    console.error('[adm_actualizarCirculoRango] ' + (e && e.message));
+  }
+}
+
 
 /* ── CATEGORY-SPECIFIC EDITORS ── */
 function showCatTab(id) {

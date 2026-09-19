@@ -771,6 +771,7 @@ function renderChatRooms() {
     .then(function(r){ return r.json(); })
     .then(function(res){
       var salas = ((res && res.data) || []).filter(function(s){ return s.tipo !== 'plan'; });
+      salas.sort(function(a,b){ return (b.es_oficial ? 1 : 0) - (a.es_oficial ? 1 : 0); });
       chatSalasCache = {};
       salas.forEach(function(s){ chatSalasCache[s.id] = s; });
       if(!salas.length) {
@@ -787,6 +788,14 @@ function renderChatRooms() {
           + '<div class="cr-info"><div class="cr-name">' + esc(s.nombre) + '</div>'
           + '<div class="cr-last">' + esc(lastInfo) + '</div></div>'
           + '<div class="cr-online"></div>';
+        if (s.es_oficial) {
+          div.style.borderLeft = '3px solid #E8A020';
+          div.style.background = 'rgba(232,160,32,.08)';
+          var badge = document.createElement('span');
+          badge.textContent = 'OFICIAL';
+          badge.style.cssText = 'font-size:8px;font-weight:800;background:#E8A020;color:#000;padding:1px 5px;border-radius:3px;margin-left:auto;letter-spacing:.5px;flex-shrink:0;';
+          div.appendChild(badge);
+        }
         div.onclick = (function(rid){ return function(){ openChatRoom(rid); }; })(s.id);
         list.appendChild(div);
       });
@@ -807,9 +816,27 @@ function openChatRoom(roomId) {
   var modHint = document.getElementById('chat-mod-hint');
   if(modHint) modHint.style.display = capC('moderador_chat') ? '' : 'none';
   loadChatMsgs(roomId);
-  startChatPoll();
+  var u = sesion();
+  var isAdmin = !!(u && String(u.email || '').toLowerCase() === 'brsk84@gmail.com');
   var inp = document.getElementById('chat-inp');
-  if(inp) inp.focus();
+  var sendBtn = document.querySelector('.chat-input-row .chat-send');
+  var hint = document.getElementById('chat-readonly-hint');
+  var locked = !!room.es_oficial && !isAdmin;
+  if(inp) inp.style.display = locked ? 'none' : '';
+  if(sendBtn) sendBtn.style.display = locked ? 'none' : '';
+  if(locked) {
+    if(!hint && inp && inp.parentNode) {
+      hint = document.createElement('div');
+      hint.id = 'chat-readonly-hint';
+      hint.textContent = 'Solo el administrador puede publicar aqu\u00ed';
+      hint.style.cssText = 'font-size:10px;color:rgba(255,255,255,.4);padding:10px 2px';
+      inp.parentNode.appendChild(hint);
+    }
+  } else if(hint && hint.parentNode) {
+    hint.parentNode.removeChild(hint);
+  }
+  startChatPoll();
+  if(inp && inp.style.display !== 'none') inp.focus();
 }
 
 function closeChatRoom() {
@@ -961,6 +988,7 @@ function enviarMensajeOpt(body, opts) {
         if(opts.cacheSet) opts.cacheSet(arr);
         opts.render();
         toastGaming(res);
+        if(opts.onOk) opts.onOk(res);
       } else if(res && res.error) {
         showXPToastComm('\u26A0\uFE0F ' + res.error);
         var arr2 = (opts.cacheGet && opts.cacheGet()) || [];
@@ -980,14 +1008,14 @@ function sendChatMsg() {
   if(!text) return;
   var u = sesion();
   if(!u || !chatSalaActiva) return;
-  inp.value = '';
   enviarMensajeOpt(
     {tipo:'chat_msg', usuario_id:u.id, sala_id:chatSalaActiva, texto:text},
     {
       texto:text, usuarioId:u.id, nombre:myName(),
       cacheGet: function(){ return chatMsgsCache[chatSalaActiva]; },
       cacheSet: function(a){ chatMsgsCache[chatSalaActiva] = a; },
-      render: function(){ renderChatMessages(chatSalaActiva, chatMsgsCache[chatSalaActiva] || []); }
+      render: function(){ renderChatMessages(chatSalaActiva, chatMsgsCache[chatSalaActiva] || []); },
+      onOk: function(){ if(inp) inp.value = ''; }
     }
   );
 }
