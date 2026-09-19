@@ -2265,7 +2265,16 @@ var INDEX_MC_OPTS = {
   mediaControls: '.mapa-filters',
   enableMediaOnAll: true,
   mediaEnabled: false,
-  mediaFilter: false,
+  // Solo fotografias de espacios creados de forma dinamica: la capa
+  // conserva origen 'destino' (fotos curadas de la ficha) y
+  // 'destino_album' (album del espacio); oculta 'album' (medios de
+  // albumes de usuarios) y cualquier otro origen no ligado a un destino.
+  mediaFilter: function(items) {
+    return (items || []).filter(function(it) {
+      return !!it && !!it.media_url
+        && (it.origen === 'destino' || it.origen === 'destino_album');
+    });
+  },
   mediaPhotoIcon: '\uD83D\uDCF8',
   clusterLinksNavigate: true,
   isSaved: function(p) { return mmSaved.indexOf(p.slug) !== -1; },
