@@ -4542,7 +4542,10 @@ module.exports = async function handler(req, res) {
             gdItems.push(it);
           };
 
-          gdFotos.slice(0, 12).forEach(function(f){
+          // v20: sin tope artificial de curadas. La respuesta entrega TODAS
+          // las fotos de destinos_fotos (orden ASC); galeria.html pagina
+          // 12/pagina en cliente. Antes se truncaba a 12 aqui.
+          gdFotos.forEach(function(f){
             var mCu = gdMetCurada(f.id);
             gdAgregarItem({
               origen: 'curada',

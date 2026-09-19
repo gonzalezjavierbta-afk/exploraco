@@ -795,16 +795,27 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         document.getElementById('g-dest-sub').textContent = (d.ciudad ? d.ciudad + ' \u00b7 ' : '') + 'Fotos curadas y aportes de la comunidad.';
         var items = gDestinoItems(res);
         var albumes = gAlbumesDeItems(items);
-        G.galItems = items;
+        var curadaItems = items.filter(function (it) { return it.origen === 'curada'; });
+        var comItems = items.filter(function (it) { return it.origen !== 'curada'; });
+        G.galItems = curadaItems;
         G.galPagina = 1;
         if (!items.length && !albumes.length) {
           box.innerHTML = gEmptyHTML('Este destino todavia no tiene fotos.');
           if (count) { count.textContent = '0 fotos'; }
           if (more) { more.style.display = 'none'; }
         } else {
-          gSecVis('g-sec-dest', items.length > 0);
-          if (items.length) { gGalRenderPage(); }
-          gSecVis('g-sec-com', false);
+          if (curadaItems.length) {
+            gSecVis('g-sec-dest', true);
+            gGalRenderPage();
+          } else {
+            gSecVis('g-sec-dest', false);
+          }
+          if (comItems.length) {
+            gSecVis('g-sec-com', true);
+            gFillGrid('g-dest-com', 'g-dest-com-count', comItems, gItemCard, 'foto', 'fotos');
+          } else {
+            gSecVis('g-sec-com', false);
+          }
           gSecVis('g-sec-albumes', albumes.length > 0);
           if (albumes.length) { gFillGrid('g-dest-albumes', 'g-dest-alb-count', albumes, gAlbumCard, 'album', 'albumes'); }
         }
