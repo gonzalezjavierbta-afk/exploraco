@@ -1570,30 +1570,29 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var btnGaleriaAmpliada = d.slug
     ? '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html?destino=&#39;+encodeURIComponent(&#39;'+esc(d.slug)+'&#39;)">Ver todas las fotos</button>'
     : '<button class="glbtn" onclick="abrirLightbox(0)">Ver todas las fotos</button>';
-  // -- SECCION: Galeria curada (TSK-111 / CAMBIO 7A) -------------------
-  // La seccion conserva la galeria curada (1 grande + hasta 12 miniaturas)
-  // y su CTA a galeria.html. El modulo "Fotos de viajeros" (#fp-grid,
-  // #fp-info, #fp-upload) y su JS cliente (loadFotos/subirFoto/votarFoto)
-  // se retiraron de la ficha; el ancla invisible #fotos se conserva por
-  // compatibilidad de enlaces. La seccion sigue emitiendose siempre.
+  // -- SECCION: Galeria de fotos (ranking unico mezclado) --------------
+  // La seccion conserva la galeria de la ficha (1 grande + hasta 12
+  // miniaturas) y su CTA a galeria.html. El modulo "Fotos de viajeros"
+  // (#fp-grid, #fp-info, #fp-upload) y su JS cliente (loadFotos/subirFoto/
+  // votarFoto) se retiraron de la ficha; el ancla invisible #fotos se
+  // conserva por compatibilidad de enlaces. La seccion sigue emitiendose
+  // siempre.
   //
-  // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash en
-  // buildHTML), por lo que "galAll.length > 0" es trivialmente verdadero. El
-  // bloque curado y el lightbox usan > 1 (gate historico), que cumple
-  // "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0 curadas.
-  var hayGaleriaCurada = galAll.length > 1;
-  // ADR-034 (ajuste) + ADR-036: set explicito de la galeria. La grande
-  // (curada #1 / hero) se mantiene aparte y se arman hasta 12 miniaturas
-  // con orden comunidad -> curadas: primero hasta 6 fotos de comunidad
-  // (merge viajeros+albumes por votos DESC, dedup URL); luego las curadas
-  // por votos DESC (tiebreak: orden original, excluyendo la grande) hasta
-  // completar 12. Si no hay comunidad, se listan hasta 12 curadas. Nunca
-  // se repite la grande ni una URL.
+  // Ranking UNICO mezclado por votos DESC (curadas + comunidad): la de
+  // mayor puntaje es la foto grande destacada (galBig) y las siguientes
+  // 12 (GAL_THUMBS_MAX) son las miniaturas. Los empates conservan el orden
+  // de insercion (curadas por su orden original y, luego, comunidad por su
+  // ranking de votos/recientes). La subpagina /galeria.html conserva sus
+  // DOS rankings separados y NO se toca aqui.
+  //
+  // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash
+  // en buildHTML), por lo que "galAll.length > 0" es trivialmente
+  // verdadero. El bloque y el lightbox usan > 1 (gate historico), que
+  // cumple "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0
+  // curadas.
   var GAL_THUMBS_MAX = 12;
-  var GAL_COMUNIDAD_MAX = 6;
-  var galBig = galAll[0];
   // ADR-036: votos de las curadas (destinos_fotos.id via media_votos). El
-  // mapa url->votos rankea las miniaturas curadas y alimenta el lightbox.
+  // mapa url->votos rankea las fotos curadas dentro del ranking mezclado.
   // El fallback de la query no trae votos -> todas quedan en 0 (orden intacto).
   var galCuradaVotosMap = {};
   (fotos || []).forEach(function(f){
@@ -1601,48 +1600,36 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (!u || galCuradaVotosMap[u] !== undefined) return;
     galCuradaVotosMap[u] = parseInt(f && f.votos, 10) || 0;
   });
-  // 1) Comunidad primero (tope 6, votos DESC, dedup por URL).
-  var galComunidadThumbs = [];
-  for (var gcj = 0; gcj < comunidadUrls.length && galComunidadThumbs.length < GAL_COMUNIDAD_MAX; gcj++) {
-    var gcu = comunidadUrls[gcj];
-    if (gcu === galBig) continue;
-    if (galComunidadThumbs.indexOf(gcu) !== -1) continue;
-    galComunidadThumbs.push(gcu);
+  // Ranking mezclado deduplicado por URL. Las curadas primero definen la
+  // precedencia de dedupe (curada > comunidad); la comunidad entra despues.
+  var galMerge = [];
+  var galMergeVistos = {};
+  function galPushMerge(url, votos, prio) {
+    var u = String(url || '').trim();
+    if (!u || galMergeVistos[u]) return;
+    galMergeVistos[u] = true;
+    galMerge.push({ url: u, votos: parseInt(votos, 10) || 0, prio: prio });
   }
-  var galThumbsList = galComunidadThumbs.slice();
-  // 2) Curadas restantes hasta completar 12, por votos DESC (tiebreak:
-  // orden original). No muta galAll: ordena una copia (slice(1)).
-  var galCuradasResto = galAll.slice(1).map(function(u, i){ return { u: u, i: i }; });
-  galCuradasResto.sort(function(a, b){
-    var va = galCuradaVotosMap[a.u] || 0;
-    var vb = galCuradaVotosMap[b.u] || 0;
-    if (vb !== va) return vb - va;
-    return a.i - b.i;
+  galAll.forEach(function(u, i){ galPushMerge(u, galCuradaVotosMap[u] || 0, i); });
+  comunidadMerge.forEach(function(x, i){ galPushMerge(x.url, x.votos || 0, 1000 + i); });
+  // Ranking unico: votos DESC; empate -> orden de insercion (curadas por su
+  // orden original, luego comunidad por su ranking de votos/recientes).
+  galMerge.sort(function(a, b){
+    if (b.votos !== a.votos) return b.votos - a.votos;
+    return a.prio - b.prio;
   });
-  galCuradasResto = galCuradasResto.map(function(x){ return x.u; });
-  for (var gci = 0; gci < galCuradasResto.length && galThumbsList.length < GAL_THUMBS_MAX; gci++) {
-    var gku = galCuradasResto[gci];
-    if (gku === galBig || galThumbsList.indexOf(gku) !== -1) continue;
-    galThumbsList.push(gku);
-  }
-  if (galThumbsList.length > GAL_THUMBS_MAX) galThumbsList = galThumbsList.slice(0, GAL_THUMBS_MAX);
+  var hayGaleriaCurada = galMerge.length > 1;
+  var galBig = galMerge.length ? galMerge[0].url : '';
+  var galThumbsList = galMerge.slice(1, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });
   // GAL_ALL para el lightbox: la grande + las miniaturas en el MISMO orden
   // que la grilla, para que los indices de abrirLightbox() sigan alineados.
-  var galLightbox = [galBig].concat(galThumbsList);
-  // TSK-111 (CAMBIO 6B): votos por URL de comunidad para el lightbox. Si una
-  // URL no tiene dato de votos (curada), su entrada queda null -> el lightbox
-  // OMITE el conteo en vez de mostrar 0. Nunca rompe si no hay datos.
+  var galLightbox = galMerge.slice(0, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });
+  // Votos por URL del ranking mezclado para el lightbox. Si una foto no
+  // tiene votos (> 0), su entrada queda null -> el lightbox OMITE el conteo
+  // en vez de mostrar 0. Nunca rompe si no hay datos.
   var galVotosMap = {};
-  comunidadMerge.forEach(function(x){ if (galVotosMap[x.url] === undefined) galVotosMap[x.url] = x.votos; });
-  // ADR-036: sumar votos de curadas (solo > 0, para conservar la omision
-  // del conteo cuando no hay dato). Nunca sobreescribe a comunidad.
-  (fotos || []).forEach(function(f){
-    var u = (f && f.url) ? String(f.url).trim() : '';
-    if (!u || galVotosMap[u] !== undefined) return;
-    var v = galCuradaVotosMap[u] || 0;
-    if (v > 0) galVotosMap[u] = v;
-  });
-  var galLightboxVotos = galLightbox.map(function(u){ return (galVotosMap[u] !== undefined) ? galVotosMap[u] : null; });
+  galMerge.forEach(function(x){ galVotosMap[x.url] = x.votos; });
+  var galLightboxVotos = galLightbox.map(function(u){ return (galVotosMap[u] > 0) ? galVotosMap[u] : null; });
   // URL de los CTAs "Guardar en album"/"Agregar a album" del lightbox.
   var galeriaUrl = d.slug ? '/galeria.html?destino=' + encodeURIComponent(d.slug) : '/galeria.html';
   // El lightbox se monta si hay galeria curada navegable o miniaturas de hero.

@@ -277,6 +277,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mmx-mbtn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;transition:all .15s}
 .mmx-mbtn:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
 .mmx-mbtn.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
+/* Filtros por categoria del mapa personal (.mmx-cats / .mmx-cbtn).
+   Reutiliza el look de .mmx-mbtn y el tema oscuro de comunidad. */
+.mmx-cats{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
+.mmx-cbtn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;transition:all .15s}
+.mmx-cbtn:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
+.mmx-cbtn.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
 /* Caso "sin media": el modulo puede ocultarlo ([hidden] o display:none)
    o deshabilitar sus botones si no hay pines multimedia. */
 .mmx-media[hidden]{display:none}
@@ -284,6 +290,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 @media(max-width:520px){
   .mmx-media-lbl{width:100%;margin-bottom:2px}
   .mmx-mbtn{flex:1 1 auto;text-align:center}
+  .mmx-cbtn{flex:1 1 auto;text-align:center}
 }
 .mmx-editbar{flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 .mmx-eb-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold);letter-spacing:.5px;margin-right:4px}
@@ -459,7 +466,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
     <!-- MAPA AUDIOVISUAL -->
     <div class="cpanel" id="cpanel-mapa">
       <!-- Mis mapas personalizados (modulo compartido mymapa.js) -->
-      <div class="mmx-card"><div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">＋ Nuevo</button></div><div class="mmx-pills" id="mm-personal-pills"></div><div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div><div id="mm-personal-map" style="height:340px;border-radius:10px;overflow:hidden;background:#222"></div><div class="mmx-list" id="mm-personal-list"></div></div>
+      <div class="mmx-card"><div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">＋ Nuevo</button></div><div class="mmx-pills" id="mm-personal-pills"></div><div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div><div class="mmx-cats" id="mm-personal-cats"><button type="button" class="mmx-cbtn on" data-cat="all">Todos</button><button type="button" class="mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button><button type="button" class="mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button><button type="button" class="mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button><button type="button" class="mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button></div><div id="mm-personal-map" style="height:340px;border-radius:10px;overflow:hidden;background:#222"></div><div class="mmx-list" id="mm-personal-list"></div></div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
         <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>

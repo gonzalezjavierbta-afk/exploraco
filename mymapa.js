@@ -135,11 +135,18 @@
       drawer: true,
       apiBase: api(),
       mediaFilter: filterMisMapa,
+      // Barra de categorias que aporta comunidad.html: el motor resuelve
+      // el id string y engancha los clicks de [data-cat].
+      categories: '#mm-personal-cats',
       // onMapReady llega sincrono antes de que mc quede asignado:
-      // por eso se usa el mapa recibido, no mc.getMap().
+      // por eso se usa el mapa recibido, no mc.getMap(). Tras
+      // invalidateSize(), fuera del ciclo sincrono, mc ya esta asignado.
       onMapReady: function (map) {
         setTimeout(function () {
           try { map.invalidateSize(); } catch (e) { logWarn('invalidateSize', e); }
+          if (mc && typeof mc.refresh === 'function') {
+            try { mc.refresh(); } catch (e) { logWarn('refresh', e); }
+          }
         }, 120);
       }
     });
@@ -151,6 +158,9 @@
     if (!map) return;
     setTimeout(function () {
       try { map.invalidateSize(); } catch (e) { logWarn('invalidateSize', e); }
+      if (mc && typeof mc.refresh === 'function') {
+        try { mc.refresh(); } catch (e) { logWarn('refresh', e); }
+      }
     }, 120);
   }
 
@@ -217,6 +227,7 @@
     if (MEDIA_CACHE) {
       m.setMedia(MEDIA_CACHE);
       medirMediaActiva();
+      if (typeof m.refresh === 'function') m.refresh();
       return;
     }
     if (MEDIA_CARGANDO) return;
@@ -229,6 +240,7 @@
         var mm = ensureMC();
         if (mm) mm.setMedia(MEDIA_CACHE);
         medirMediaActiva();
+        if (mm && typeof mm.refresh === 'function') mm.refresh();
       })
       .catch(function (e) {
         MEDIA_CARGANDO = false;
@@ -251,7 +263,10 @@
       if (it.origen === 'album') return;
       if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
     });
-    if (hay && !MEDIA_USER_TOUCHED && !m.getState().mediaEnabled) m.setMediaEnabled(true);
+    if (hay && !MEDIA_USER_TOUCHED && !m.getState().mediaEnabled) {
+      m.setMediaEnabled(true);
+      if (typeof m.refresh === 'function') m.refresh();
+    }
     sincronizarToggleMedia();
   }
 
@@ -390,6 +405,8 @@
     if (map) map.setView([4.5, -74.0], 5);
     var box = document.getElementById('mm-personal-media');
     if (box) box.style.display = 'none';
+    var cats = document.getElementById('mm-personal-cats');
+    if (cats) cats.style.display = 'none';
     invalidarTamano();
   }
 
@@ -399,6 +416,10 @@
     if (!cont) return;
     var u = usuario();
     if (!u || !u.id) { renderGuest(); return; }
+    // Re-muestra los controles que renderGuest() oculto si se inicio
+    // sesion en caliente (guest -> login) sin recargar la pagina.
+    var catsOn = document.getElementById('mm-personal-cats');
+    if (catsOn) catsOn.style.display = '';
     getJson('/api/interacciones?tipo=mapas_mios&usuario_id=' + encodeURIComponent(u.id))
       .then(function (d) {
         if (!d || !d.ok) {
