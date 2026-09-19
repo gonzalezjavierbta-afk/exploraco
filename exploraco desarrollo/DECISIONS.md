@@ -2282,3 +2282,110 @@ La migracion del `index.html` que este ADR habia diferido se EJECUTO como **TSK-
 **Referencia de detalle:** `exploraco desarrollo/ampliacion desarrollo/MODO_EXPRESS_ANALISIS.md`; skill operativa `.opencode/skills/express-mode/SKILL.md`; directriz en `agents.md` seccion 1 y referencia cruzada en `GUIA_DE_DESARROLLO.md` (Apendice B) y `orquestacion agentes.md` (Skill 4).
 
 **NO es un ADR:** no se le asigna numero ADR-045 porque no define arquitectura, contrato de datos ni seguridad; si en el futuro el modo express requiere una decision de arquitectura, se registrara como ADR numerado segun el formato de este documento. **[Actualizacion 2026-09-19]:** el numero ADR-045 fue asignado despues al motor compartido del Mapa Cultural (`mapa-cultural.js`, TSK-133); esta nota de proceso permanece SIN numero ADR.
+
+---
+
+## ADR-046: Contrato del hero de la ficha de destino -- la imagen principal es la seleccion editorial (`foto_hero`) y los votos solo ordenan las 3 miniaturas
+
+**ID:** ADR-046
+**Fecha:** 2026-09-19
+**Estado:** **APROBADO E IMPLEMENTADO** (2026-09-19). Commit final `3ffd7a9` ("fotos hero"); primera iteracion (revertida) `41a3f71` ("destinos"). Verificado contra archivo real (ADR-006): `api/pagina-destino.js` L800-872 (`mediaRank` + contrato del hero); smoke `scripts/smoke_auditoria_pagina_destino.js` 61 checks PASS y `scripts/smoke_036_media_unificada.js` 90/90 PASS. Cierra el incidente **BUG-077**.
+**Autor:** renderer-dev/frontend-tpl (AI-DOS); origen: pedido del usuario de ordenar galeria/hero por votos (ADR-036); cierre documental por docs-keeper.
+**Alcance:** render server-side de la ficha (`api/pagina-destino.js`) y orden de `galeria.html`. No toca el esquema ni los endpoints (el store de votos sigue en `media_votos`, ADR-036).
+
+### Contexto
+
+ADR-036 unifico los votos en `media_votos` para las 3 fuentes (`curada`, `viajero_foto`, `album_foto`). Al conectar esos votos con el hero, la primera iteracion (`41a3f71`) hizo que la foto con MAS votos pasara a ser la imagen principal del hero. El resultado contradijo la intencion de producto: la imagen principal de la ficha es una decision editorial del operador (`destinos.foto_hero`), no un ranking de la comunidad. Ademas quedo indefinido que fuentes componen las 3 miniaturas y si un video/audio con votos podia llegar a ser `background-image`.
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **La foto con mas votos desplaza a la principal (IMPLEMENTADA EN `41a3f71`, RECHAZADA).** Otorga el control de la portada del destino a la comunidad; un video/audio votado podia degradar el hero (la miniatura es `background-image`); provoco la regresion BUG-077.
+2. **El hero ignora los votos por completo (RECHAZADA).** Desperdicia la senal de la comunidad que ADR-036 introdujo y deja la galeria sin criterio de orden.
+3. **Principal editorial + miniaturas por votos segmentadas por fuente (ELEGIDA).** Conserva el control editorial de la portada y usa los votos para ordenar el resto, con reglas explicitas de fuente y tipo.
+
+### Decision tomada
+
+1. **Imagen PRINCIPAL = seleccion del usuario (`destinos.foto_hero` editorial).** Los votos NO la desplazan.
+2. **3 miniaturas (`HERO_THUMBS_MAX = 3`):** (1) la mejor foto del ESPACIO (curada) por votos; (2-3) las 2 mejores fotos de la COMUNIDAD (viajeros + albumes) por votos. Si no hay votos, se cae al orden de insercion historico (2a curada, viajero mas reciente, album), con relleno para no dejar huecos.
+3. **Nunca videos/audio en el hero:** pueden aparecer en la galeria y en el drawer, pero jamas como imagen principal ni miniatura.
+4. **Ranking unico por votos:** `mediaRank` se calcula UNA sola vez (curadas `galAll` + comunidad `comunidadMerge`, dedupe por URL, `votos DESC`, empate por orden de insercion) y lo comparten hero y galeria. Cada item lleva `fuente` (`espacio|comunidad`) y `tipo` para segmentar la composicion sin recalcular.
+5. **`galeria_destino` y `album_oficial` ordenan por votos** (curadas `votos DESC, orden ASC`), con `gSortVotos()` en `galeria.html` como orden defensivo.
+
+### Justificacion
+
+Es la misma separacion de responsabilidades que el proyecto usa en otros contratos: el operador cuida la identidad visual (portada) y la comunidad ordena el resto. Fijar el contrato por escrito (fuente, orden, tipo) elimina la ambiguedad que produjo 2 iteraciones (BUG-077) y deja una guarda verificable por smoke. Reutilizar `mediaRank` como fuente unica evita recalcular el mismo derivado en dos secciones (regla propuesta P17 del documento de analisis).
+
+### Impacto
+
+- **`api/pagina-destino.js`:** `mediaRank`/`mediaRankAdd` con `fuente`; bloque del hero reescrito (principal editorial + 1 curada + 2 comunidad por votos + relleno solo-fotos).
+- **`api/interacciones.js`:** `galeria_destino` ordena curadas por votos y `album_oficial` por `votos DESC`.
+- **`galeria.html`:** `gSortVotos()` aplicado a curadas y comunidad.
+- **Sin cambios:** esquema, migraciones y presupuesto 8/8 (ADR-001/ADR-010).
+- **Bugs relacionados:** cierra **BUG-077** (regresion del hero por contrato no fijado).
+
+### Consecuencias positivas
+
+- La portada del destino queda bajo control editorial; los votos ordenan el resto.
+- Un solo ranking por votos compartido por hero y galeria (sin divergencia).
+- Videos/audio quedan fuera del hero por construccion (`background-image`).
+- Guarda de regresion en `scripts/smoke_auditoria_pagina_destino.js` (principal = seleccion del usuario; video votado no entra al hero).
+
+### Consecuencias negativas / riesgos residuales
+
+- El hero no refleja de forma directa el "top" de la comunidad; es una decision de producto aceptada.
+- La galeria depende del orden del backend; `gSortVotos()` es defensivo, no autoritativo.
+- QA visual en navegador pendiente (el smoke es Node con datos simulados).
+
+**ADRs relacionados:** ADR-001 (Vanilla/ASCII), ADR-006 (baseline real), ADR-036 (media unificada `media_*`), ADR-037 y ADR-030 (refactor previo del hero/galeria), ADR-047 (propiedad de medios del mapa), BUG-077.
+
+---
+
+## ADR-047: Regla de propiedad de medios del mapa cultural -- fotos solo del espacio dinamico; videos/audio de comunidad por cercania; el drawer nunca mezcla espacios
+
+**ID:** ADR-047
+**Fecha:** 2026-09-19
+**Estado:** **APROBADO E IMPLEMENTADO** (2026-09-19). Commits `e7445c3` ("mapa", filtro estricto) y `3ffd7a9` ("fotos hero", restaura video/audio de comunidad). Verificado contra archivo real (ADR-006): `mapa-cultural.js` L187-200 (`filterMediaDefault`), L202-239 (`filterMediaPropios`), L1160 (drawer), L1708 (exportacion); smoke `scripts/smoke_mapa_cultural.js` **73 checks, 0 FAIL**. Cierra **BUG-075** y **BUG-076**.
+**Autor:** frontend-tpl/js-silo-dev (AI-DOS); origen: el drawer del pin del mapa cultural mostraba fotos de otros lugares; cierre documental por docs-keeper.
+**Alcance:** frontend compartido (`mapa-cultural.js`). No toca el backend ni el contrato de `?tipo=multimedia_mapa`; no crea migraciones (assets frontend, no cuentan contra 8/8).
+
+### Contexto
+
+El mapa cultural consume una capa de media unica (`?tipo=multimedia_mapa`) que mezcla origenes: fotos curadas del espacio (`destino`), album del espacio (`destino_album`), fotos/videos/audios de la comunidad (`album`) y viajeros. El drawer de un pin usaba `mediasCercanas()` (misma ciudad o radio de 10 km), de modo que al abrir `hostal-r10-bogota` aparecian fotos de La Candelaria y Monserrate (BUG-075). Al restringir la media a `destino`/`destino_album`, desaparecieron los videos de la comunidad, que son `origen='album'` (BUG-076).
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Filtrar el drawer por proximidad geografica (ciudad/radio) (IMPLEMENTADA, RECHAZADA).** La cercania no prueba pertenencia al espacio; mezcla fotos de otros lugares (BUG-075).
+2. **Restringir TODA la media a `destino`/`destino_album` (IMPLEMENTADA, RECHAZADA).** Oculta videos/audios de comunidad (`origen='album'`) y deja vacia la pestana Videos/Audios del drawer (BUG-076).
+3. **Regla de pertenencia por tipo y por espacio (ELEGIDA):** las fotos del drawer son solo las del propio espacio; los videos/audios de comunidad se admiten por cercania; la capa general mantiene su criterio estricto.
+
+### Decision tomada
+
+1. **FOTOS del drawer = solo del espacio abierto:** `origen='destino'`/`'destino_album'` cuyo `origen_id` (slug emitido por el backend) coincide con el `slug`/`uuid` del place; se excluyen las fotos de otros lugares aunque esten en la misma ciudad o a <= 10 km (`filterMediaPropios`).
+2. **VIDEO/AUDIO = se conservan los de comunidad (`origen='album'`)** de la misma ciudad o a <= 10 km del espacio, porque los espacios dinamicos no emiten video/audio propio; sin esto la pestana del drawer queda vacia. Las FOTOS de albumes de usuario siguen ocultas.
+3. **Capa general del mapa (`filterMediaDefault`) sin cambios:** solo `destino`/`destino_album` de los destinos activos; `origen='album'` excluido; dedupe por URL.
+4. **Cache-busting:** `mapa-cultural.js` se referencia versionado en los HTML consumidores (`?v=3` en `e7445c3`, `?v=4` en `3ffd7a9`).
+
+### Justificacion
+
+La pertenencia no es geografica: un medio pertenece al espacio si su `origen_id` es su slug/uuid. Separar por tipo (foto vs video/audio) permite conservar la curaduria del espacio sin perder el aporte audiovisual de la comunidad. Es una regla de producto explicita, verificable por funciones puras (`filterMediaPropios`) y cubierta por smoke, en linea con el patron de `filterMediaDefault` introducido en ADR-045.
+
+### Impacto
+
+- **`mapa-cultural.js`:** `filterMediaPropios` (nueva, L202-239) reemplaza `mediasCercanas`/`mismaCiudad`/`dentroRadio`; se exporta en `window.MapaCultural` (L1708); el drawer la usa (L1160). `filterMediaDefault` se mantiene (L187-200).
+- **`comunidad.html` / `index.html`:** cache-bust `?v=3` -> `?v=4`.
+- **Sin cambios:** `api/*` (el backend sigue emitiendo `origen`/`origen_id`), esquema, migraciones y presupuesto 8/8.
+- **Bugs relacionados:** cierra **BUG-075** y **BUG-076**; complementa ADR-045 y ADR-021 (capa audiovisual estricta).
+
+### Consecuencias positivas
+
+- El drawer del pin muestra SOLO los medios propios del espacio: no mezcla lugares.
+- Se conserva el aporte audiovisual de la comunidad (Videos/Audios del drawer no queda vacio).
+- Regla verificable por funciones puras y por smoke (sin depender del mapa real).
+
+### Consecuencias negativas / riesgos residuales
+
+- La pertenencia por `slug`/`uuid` depende de que el backend emita `origen_id` con el slug correcto; si cambia el contrato, el filtro deja de resolver (guarda en smoke).
+- Los videos/audios por cercania siguen siendo una concesion: un video de comunidad de otra ciudad no aparece (comportamiento esperado).
+- QA visual en navegador pendiente (TSK-135).
+
+**ADRs relacionados:** ADR-001 (Vanilla/ASCII), ADR-004 (aislamiento), ADR-006 (baseline real), ADR-021 (capa audiovisual estricta/paridad de drawer), ADR-036 (media unificada), ADR-045 (motor compartido del mapa), BUG-075, BUG-076.

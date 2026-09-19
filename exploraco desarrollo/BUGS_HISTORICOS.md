@@ -1129,6 +1129,83 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `api/pagina-destino.js` L2655-2666 (subquery `FROM media_votos mv`); `git diff` sin commitear (header sin bump: `v12.20260917`).
 **Estado:** CORREGIDO en codigo (working tree, 2026-09-19; **SIN commitear**). PENDIENTE deploy; backfill de votos legacy si aparecen registros historicos fuera de `media_votos`.
 
+## BUG-071: `mis_guardados_media` comparaba `uuid = text` y el catch silencioso devolvia `[]` -- el endpoint SIEMPRE quedaba vacio
+
+**Severidad:** ALTA (funcionalidad muerta: los guardados de media nunca aparecian, ni en "Mis guardados" ni como pines del mapa personal).
+**Contexto:** detectado el 2026-09-19 en la sesion de cierre de galeria/mapa/media, al revisar por que los guardados de media no se pintaban. La migracion 023 (ADR-036) convirtio `media_guardados.item_id` a TEXT, pero los joins quedaron comparando contra columnas uuid.
+**Sintoma:** `GET ?tipo=mis_guardados_media&usuario_id=<uuid>` respondia `200 {ok:true, data:[]}` siempre, aunque existieran filas activas en `media_guardados` para ese usuario. El frontend no pintaba los guardados como pines.
+**Causa raiz:** (a) tres joins comparaban `a.id = mg.item_id`, `af.id = mg.item_id` e `i.id = mg.item_id` -- columnas uuid contra `item_id` TEXT (incompatibles; Postgres no tiene `uuid = text` sin cast); (b) el `.catch(function(){ return []; })` silenciaba el error de tipo y lo convertia en una lista vacia, ocultando la falla (violacion de AGENTS.md 2.2).
+**Resolucion aplicada (commit `6c84f9d` "videos"):** (1) casts explicitos `::text` en los 3 joins (`a.id::text = mg.item_id`, `af.id::text = mg.item_id`, `i.id::text = mg.item_id`); (2) nueva rama `UNION ALL` para `fuente='curada'` contra `destinos_fotos` (`df.id::text = mg.item_id`); (3) el `.catch` conserva el fallback `[]` pero registra `console.warn('[interacciones] mis_guardados_media fallo: ...')`. `multimedia_mapa` expone `media_id` y `fuente` para que `mymapa.js` los convierta en pines (`filterMisMapa` + `SET_GUARDADOS`, clave `fuente:media_id`).
+**Evidencia (ADR-006):** `api/interacciones.js` L4967-5004 (L4976/L4982/L4989 casts `::text`; L4993-4999 rama `curada`; L5002 `console.warn`); L4755/L4774 (`media_id`/`fuente` en `multimedia_mapa`); `mymapa.js` L179-227; `git show 6c84f9d`. Smoke `scripts/smoke_036_media_unificada.js` 90/90 PASS.
+**Prevencion:** no-catch-silencioso (toda degradacion con log tipado, nunca `[]`/`null` sin traza) + verificacion de tipos de esquema al cruzar columnas (`uuid` vs `text`). Regla propuesta P11 en `ANALISIS_AI-DOS_v1.1_y_REGLAS_DE_ORO_v5.md`; ver TSK-138.
+**Estado:** CERRADO / CORREGIDO (commit `6c84f9d`, 2026-09-19). Requiere que la migracion 023 este aplicada en Neon.
+
+## BUG-072: filtros de categoria del mapa personal inertes por wiring -- la barra se pasaba como string y el motor no enganchaba nada
+
+**Severidad:** MEDIA-ALTA (UI inerte: la barra de categorias existia pero los clics no filtraban ni ocultaban pines).
+**Contexto:** detectado el 2026-09-19 al probar los filtros por categoria (hospedaje/comida/lugares/eventos) del tab Mapa de `comunidad.html` (TSK-137). El motor `mapa-cultural.js` resuelve `options.categories` con `document.querySelector(sel)` cuando llega como string.
+**Sintoma:** al pulsar un boton `data-cat` no cambiaba `activeCat`, no se filtraban/ocultaban pines; el wiring estaba "puesto" en el codigo pero no producia efecto.
+**Causa raiz:** la barra se paso como string de selector; una variante sin `#` se interpreta como selector de etiqueta (`mm-personal-cats`) y `querySelector` no resuelve -> `bindCategories` retorna sin enganchar. Nota de verificacion (ADR-006): el valor COMMITEADO en `600e656` es `'#mm-personal-cats'` (con `#`); la variante sin `#` esta documentada como incidente I2 en `ANALISIS_AI-DOS_v1.1_y_REGLAS_DE_ORO_v5.md` (L65) y cubierta por el smoke. El fix definitivo elimina la dependencia del parseo de selector.
+**Resolucion aplicada (commit `8fe7b47` "mapa"):** `mymapa.js` pasa el ELEMENTO DOM (`categories: document.getElementById('mm-personal-cats')`) en vez de un string; el motor acepta string o elemento (`mapa-cultural.js` L1122-1123) y engancha los clicks de `[data-cat]`.
+**Evidencia (ADR-006):** `mymapa.js` L138-141; `mapa-cultural.js` L1120-1134 (`bindCategories`), L1646 (invocacion); `comunidad.html` L469 (`id="mm-personal-cats"` + botones `data-cat`); `scripts/smoke_mapa_cultural.js` L158-236 (stub que documenta que un id sin `#` no resuelve) con **73 checks, 0 FAIL**.
+**Prevencion:** verificacion de wiring en runtime (una opcion no esta integrada hasta que un smoke/runtime demuestre el efecto) + guarda de regresion en smoke. Regla propuesta P12; ver TSK-137.
+**Estado:** CERRADO / CORREGIDO (commit `8fe7b47`, 2026-09-19).
+
+## BUG-073: el fix no se veia en el navegador por cache de assets compartidos sin version
+
+**Severidad:** MEDIA (el fix llegaba al repo pero no al usuario; retrabajo percibido como "sigue roto").
+**Contexto:** detectado el 2026-09-19 al iterar sobre `mapa-cultural.js`/`mymapa.js`: los cambios de media/filtros no se reflejaban en el navegador que ya tenia cacheado el asset sin `?v=`.
+**Sintoma:** el comportamiento seguia siendo el anterior aun despues de desplegar el archivo corregido.
+**Causa raiz:** `mapa-cultural.js` y `mymapa.js` se referenciaban sin parametro de version en `comunidad.html`/`index.html`; el navegador servia la copia cacheada.
+**Resolucion aplicada:** cache-busting de los assets compartidos: `mapa-cultural.js?v=3` (commit `e7445c3`) y `?v=4` (commit `3ffd7a9`) en `comunidad.html` (L566) e `index.html` (L882); `mymapa.js?v=3` (commit `8fe7b47`) en `comunidad.html` (L568).
+**Evidencia (ADR-006):** `git show e7445c3 -- comunidad.html index.html` (`?v=2` -> `?v=3` y sin version -> `?v=3`); `git show 3ffd7a9` (`?v=4` en ambos HTML); `git log -S 'mymapa.js?v='` -> commit `8fe7b47` (`?v=3`); archivos reales `comunidad.html` L566/L568 e `index.html` L882.
+**Prevencion:** al cambiar un asset compartido, versionar su referencia en TODOS los HTML consumidores. Regla propuesta P13; ver TSK-137.
+**Estado:** CERRADO / CORREGIDO (commits `e7445c3`, `8fe7b47`, `3ffd7a9`, 2026-09-19). Riesgo residual: cualquier HTML nuevo que referencie el asset debe recordar la version.
+
+## BUG-074: la media del mapa personal no pintaba al abrir -- `renderMedia()` filtraba por `getBounds()` con contenedor de tamano 0 y sin re-render
+
+**Severidad:** MEDIA (la capa de media aparecia "activada por defecto" pero vacia hasta interactuar con el mapa).
+**Contexto:** detectado el 2026-09-19 probando "Mis mapas personales" (TSK-137). El modulo `mapa-cultural.js` filtra los pines de media por `map.getBounds()`.
+**Sintoma:** al abrir el tab Mapa, el toggle de media estaba ON pero no se veia ningun pin de media; al mover/redimensionar el mapa aparecian.
+**Causa raiz:** en el primer render el contenedor tenia tamano 0 (Leaflet aun no habia calculado el viewport) y no habia un re-render tras `invalidateSize()`; el `getBounds()` devolvia un area que no contenia la media, que quedaba fuera de bounds.
+**Resolucion aplicada (commit `8fe7b47`, reforzado en `600e656`):** `mymapa.js` ejecuta `invalidateSize()` y luego `mc.fitBounds()` (encuadra los destinos del mapa activo para que la media cercana quede dentro de bounds) seguido de `mc.refresh()`, tanto en `onMapReady` como en `invalidarTamano()`; ademas fuerza `setMediaEnabled(true)` cuando hay media para el mapa activo.
+**Evidencia (ADR-006):** `mymapa.js` L145-173 (`onMapReady` con `invalidateSize`+`refresh`; `invalidarTamano` con `fitBounds`+`refresh` y comentario explicito del bounds). Smoke `scripts/smoke_mapa_cultural.js` (73 checks, 0 FAIL).
+**Prevencion:** re-render explicito tras cambios de layout (`invalidateSize()`/cambio de visibilidad) en mapas/tabs/contenedores ocultos. Regla propuesta P14; ver TSK-137.
+**Estado:** CERRADO / CORREGIDO (commit `8fe7b47`, 2026-09-19). QA visual en navegador pendiente (TSK-135).
+
+## BUG-075: el drawer del pin mostraba fotos de otros lugares -- filtro por ciudad/radio 10 km mezclaba espacios
+
+**Severidad:** MEDIA (dato incorrecto: el drawer de un lugar mostraba medios ajenos).
+**Contexto:** detectado el 2026-09-19 al abrir el pin de `hostal-r10-bogota`: aparecian fotos de La Candelaria y Monserrate (TSK-139).
+**Sintoma:** el drawer de un espacio listaba medios de OTROS destinos de la misma ciudad o a <= 10 km.
+**Causa raiz:** `mapa-cultural.js` usaba `mediasCercanas()`, que aceptaba un medio si `mismaCiudad(place.ciudad, it.ciudad)` o si estaba dentro de un radio de 10 km; la proximidad geografica no prueba pertenencia al espacio.
+**Resolucion aplicada (commit `e7445c3` "mapa"):** se reemplaza por `filterMediaPropios(items, place)`: las FOTOS del drawer son SOLO `origen='destino'`/`'destino_album'` cuyo `origen_id` (slug que emite el backend) coincide con el `slug`/`uuid` del place abierto; dedupe por URL. Ver ADR-047.
+**Evidencia (ADR-006):** `mapa-cultural.js` L202-239 (`filterMediaPropios`), L1160 (uso en el drawer), L1708 (exportacion); se eliminaron `normaliza`/`mismaCiudad`/`dentroRadio`; `git show e7445c3`. Smoke: checks `filterMediaPropios: excluye foto de otro lugar` / `foto de album de usuario sigue oculta`.
+**Prevencion:** fijar la regla de pertenencia (solo medios del espacio) antes de filtrar. Regla propuesta P15; ver TSK-139 y ADR-047.
+**Estado:** CERRADO / CORREGIDO (commit `e7445c3`, 2026-09-19).
+
+## BUG-076: al restringir la media a `destino`/`destino_album` se ocultaron los videos de comunidad (`origen='album'`)
+
+**Severidad:** MEDIA (regresion funcional: la pestana Videos/Audios del drawer quedaba vacia).
+**Contexto:** regresion introducida por el fix de BUG-075 (`e7445c3`), detectada en la misma sesion (TSK-139) al notar que desaparecieron los videos del drawer.
+**Sintoma:** tras restringir las fotos a `destino`/`destino_album`, el drawer ya no mostraba ningun video ni audio.
+**Causa raiz:** los espacios dinamicos NO emiten video/audio propio; los videos/audios de la comunidad viven en `origen='album'`, que el filtro estricto excluia por completo. Un filtro global (`return` temprano para todo lo que no sea `destino`/`destino_album`) rompio una feature no relacionada.
+**Resolucion aplicada (commit `3ffd7a9` "fotos hero"):** `filterMediaPropios` conserva los VIDEO/AUDIO de comunidad (`origen='album'`) de la misma ciudad o a <= 10 km del espacio; las FOTOS de albumes de usuario siguen ocultas. La capa general (`filterMediaDefault`) mantiene la exclusion de `origen='album'`.
+**Evidencia (ADR-006):** `mapa-cultural.js` L202-239 (`esVideoAudio`/`cerca` por ciudad o `haversineKm <= 10`); `git show 3ffd7a9`. Smoke: `filterMediaPropios: incluye video/audio de la ciudad` y `excluye video de otra ciudad lejana`.
+**Prevencion:** analisis de impacto de filtros globales (que consumidores/tipos rompe) antes de aplicarlos. Regla propuesta P15; ver TSK-139 y ADR-047.
+**Estado:** CERRADO / CORREGIDO (commit `3ffd7a9`, 2026-09-19).
+
+## BUG-077: regresion del hero en 2 iteraciones por contrato de producto no fijado (principal vs votos; fuentes de miniaturas)
+
+**Severidad:** MEDIA (retrabajo de producto: dos rondas completas de implementacion + smoke sobre el hero).
+**Contexto:** detectado el 2026-09-19 en la sesion de galeria/hero por votos (TSK-136). La primera iteracion (`41a3f71`) hizo que la foto con mas votos desplazara a la imagen principal; el usuario corrigio el contrato.
+**Sintoma:** el hero mostraba como principal una foto votada por la comunidad en vez de la seleccion editorial (`foto_hero`); la composicion de las 3 miniaturas no respetaba el criterio por fuente.
+**Causa raiz:** la regla de producto no estaba fijada antes de implementar: (a) quien es la imagen principal; (b) que fuentes componen las miniaturas; (c) si videos/audio pueden entrar. Cada ambiguedad costo una iteracion.
+**Resolucion aplicada (commit `3ffd7a9` "fotos hero"):** contrato final (ADR-046): la PRINCIPAL es la seleccion del usuario (`foto_hero` editorial) y los votos NO la desplazan; las 3 miniaturas son (1) la mejor foto del espacio (curada) por votos + (2-3) las 2 mejores de comunidad por votos, con relleno historico; los videos/audio nunca entran al hero. El ranking agrega `fuente` (`espacio|comunidad`) y la guarda queda en smoke.
+**Evidencia (ADR-006):** `api/pagina-destino.js` L800-872 (hero L815-872); `git show 3ffd7a9 -- api/pagina-destino.js` (retira `heroRankeado` y `hero = heroTopFoto.url`, agrega `heroCuradaTop` + 2 de comunidad). Smoke `scripts/smoke_auditoria_pagina_destino.js` (61 checks) con `hero sin votos: principal = seleccion del usuario` y `hero: video con mas votos NO entra al hero`.
+**Prevencion:** definir el contrato de datos/UX (fuente, orden, pertenencia) antes de implementar, y dejar su guarda de regresion. Regla propuesta P15; ver TSK-136 y ADR-046.
+**Estado:** CERRADO / CORREGIDO (commit `3ffd7a9`, 2026-09-19).
+
 ## Nota de re-confirmacion de BUG-066 (sesion express 2026-09-18/19) -- no es un bug nuevo
 
 El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regresion de anidacion `#pf-clase`/`#arbolPintar` corregida con `#arbol-body`". Contra archivo real (ADR-006), ese hallazgo es EXACTAMENTE **BUG-066** (regresion FE-02 de TSK-119, CERRADO con `#arbol-body`), no una falla distinta. **No se crea un BUG nuevo para no duplicar el registro historico (Regla de Oro 3).** Lo que hizo la sesion express (TSK-127) fue retirar por completo `#pf-clase` y absorber Clase/Tabla de Destino/Vocaciones en el Arbol de Progreso, **reutilizando** el host persistente `#arbol-body` y el patron anti-regresion de **ADR-043**. El caso queda documentado como riesgo D.1 en `MODO_EXPRESS_ANALISIS.md`.
