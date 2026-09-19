@@ -2128,3 +2128,65 @@ La separacion es minima (un `div` intermedio), no cambia la estructura visual ni
 - **Leccion de QA:** la UI anidada solo se detecta ejecutando; la verificacion estatica (parser/balance) da falsos APTO. Ver tambien la seccion "Prevencion" de BUG-066.
 
 **ADRs relacionados:** ADR-002 (ASCII-safe), ADR-004 (aislamiento atomico de estilos), ADR-006 (baseline real), ADR-028 (Arbol de Clases), ADR-038 (Mi Clase / Clases Rising Star), ADR-039/ADR-041 (precedentes de QA de UI), BUG-020 (patron de UI desconectada detectada solo en runtime), BUG-066 (regresion que origina este patron).
+
+---
+
+## ADR-044: Abstraccion compartida `media-actions.js` para acciones de media (voto/guardado) -- patron anti-duplicidad
+
+**ID:** ADR-044
+**Fecha:** 2026-09-18
+**Estado:** **APROBADO E IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Verificado contra archivo real (ADR-006): `media-actions.js` (259 lineas, untracked; 0 bytes >127), consumido por `galeria.html` (script L242, `MediaActions.bind`/`sync` L563-565) y `comunidad.html` (script L499, `avBindMediaActions`/`avSyncMediaActions` L2107-2113). QA APTO sin bloqueantes.
+**Autor:** js-silo-dev/frontend-tpl (AI-DOS); origen: TSK-123; cierre documental por docs-keeper.
+**Nota de numeracion:** el 044 es el consecutivo real tras ADR-043 (2026-09-18).
+**Alcance:** asset frontend compartido. NO toca esquema, endpoints ni el presupuesto 8/8 (ADR-010).
+
+### Contexto
+
+La Entrega TSK-123 necesitaba dotar de like/comentar/guardar a las tarjetas de "Media reciente" y a las fotos del modal de album en `comunidad.html`, acciones que ya existian en `galeria.html` (ADR-036) implementadas inline (`gPostJson`, `gPintaVoto`, `gMediaVoto`, `gMediaGuardar`). Copiar esos bloques a `comunidad.html` habria violado la Regla de No-Duplicidad (tripwire de 5 lineas, AGENTS.md 2.1) y habria dejado tres copias divergentes del mismo contrato (galeria, comunidad e `index.html`, que aun conserva su version inline). Se requeria una sola implementacion reutilizable, sin frameworks (ADR-001) y sin build step.
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Duplicar la logica de like/guardar en `comunidad.html` (RECHAZADA).** Viola la Regla de No-Duplicidad (AGENTS.md 2.1): Bearer, manejo de 401/503, XP y estados quedarian replicados y divergirian con cada cambio.
+2. **Mover la logica a `usuario-session.js` (RECHAZADA).** `usuario-session.js` gestiona identidad/sesion y badges; mezclar UI de media acoplaria dos responsabilidades distintas y cargaria la logica en todas las paginas aunque no la usen.
+3. **Extraer `media-actions.js` como modulo con API publica `window.MediaActions` y marcado por data-attributes (ELEGIDA).** Un archivo, una responsabilidad, consumible por cualquier pagina mediante `data-ma-*`; compatible con el patron de concatenacion de strings + handlers inyectados (ADR-001).
+4. **Crear un Web Component / custom element (RECHAZADA).** ADR-001 prohibe frameworks y el proyecto renderiza HTML por concatenacion de strings con `onclick` fisico.
+
+### Decision tomada
+
+Centralizar voto y guardado de media en el asset frontend `media-actions.js` (raiz), que expone:
+
+- `window.MediaActions.voto(btn, ctx)` -- POST `tipo=media_voto` con `Authorization: Bearer`; `ctx.esPropia` corta con toast (coherente con el 403 del backend); sin sesion invoca `pedirLogin`.
+- `window.MediaActions.guardar(btn, ctx)` -- alterna `guardar_media`/`quitar_guardado_media`; maneja 400/401/503 y red.
+- `window.MediaActions.sync(root)` -- pinta el estado inicial desde los atributos `data-ma-*` del propio boton.
+- `window.MediaActions.bind(root, opts)` -- un unico listener de click delegado (marca `root.__maBound` para evitar doble bind); `opts = {toast, pedirLogin}`.
+
+Contrato de marcado: `data-ma-voto`/`data-ma-save` + `data-ma-fuente` + `data-ma-item` + `data-ma-votos`/`data-ma-ya-votado`/`data-ma-es-propia`/`data-ma-ya-guardado`; nodos internos opcionales `[data-ma-count]` y `[data-ma-label]`. Las paginas solo declaran atributos; los estados provienen del backend (`mi_feed_fotos`/`album_detalle` devuelven `es_propia`/`ya_votado`/`ya_guardado`).
+
+### Justificacion
+
+Es la misma solucion ya validada en el proyecto para piezas compartidas de frontend: `map-picker.js` (TSK-117) y `niveles-data.js` (ADR-040). Elimina 3 copias de la logica de media, concentra en un solo archivo el Bearer, los estados del boton y el manejo de degradacion (503 de guardados), y permite que `galeria.html` se refactorice sin cambio de comportamiento. No requiere endpoint, migracion ni build step, y no cuenta contra el presupuesto de 8 funciones serverless (ADR-010).
+
+### Impacto
+
+- `galeria.html`: elimina `gPostJson`/`gPintaVoto`/`gMediaVoto`/`gMediaGuardar` y consume `window.MediaActions` (comportamiento preservado: like con XP y guardado con toast; boton Compartir intacto).
+- `comunidad.html`: gana like/guardar en el feed y en el modal de album mediante los mismos `data-ma-*`.
+- `index.html`: conserva su implementacion inline de `media_voto` (duplicacion pendiente de migrar; deuda D-13).
+- Backend aditivo (header sin bump: v23): `mi_feed_fotos`/`album_detalle` aceptan `usuario_id` opcional y devuelven los flags; `albumes` acepta `excluir_museo=1`.
+- Nuevo asset frontend `media-actions.js` (no versionado aun; no cuenta contra 8/8).
+
+### Consecuencias positivas
+
+- Una sola implementacion de voto/guardado; cualquier cambio futuro se hace en un solo archivo.
+- Estados `es_propia`/`ya_votado`/`ya_guardado` coherentes con el backend (misma columna `af.autor_original_id` que el 403 de `media_voto`).
+- Reutilizable por cualquier pagina presente o futura (queda pendiente `index.html`).
+- ASCII-safe (ADR-002) y sin dependencias externas.
+
+### Consecuencias negativas / riesgos residuales
+
+- **`OPT` a nivel de modulo:** las `opts` del ultimo `bind` ganan para todas las llamadas de `voto()`/`guardar()`; hoy es inocuo (comunidad pasa las mismas opts a 2 roots), pero conviene encapsular por-root si el modulo se reutiliza en mas paginas (deuda D-10).
+- **`guardar` depende de `guardar_media`/`quitar_guardado_media`,** que confian en `body.usuario_id` sin Bearer (BUG-061); los nuevos botones ensanchan su superficie (nota de amplificacion en BUG-061).
+- **Carga requerida:** sin `media-actions.js`, `avBindMediaActions` degrada silenciosamente (no bindea). Las paginas deben incluir el script antes de usarlo.
+- **Smoke no versionado:** la verificacion 41/41 se ejecuto ad-hoc (Node vm) y no quedo en `scripts/` (deuda D-14).
+- **Lectura por `usuario_id`:** permite inferir los booleanos `ya_votado`/`ya_guardado` de un usuario sin sesion (enumeracion de baja severidad, deuda D-11).
+
+**ADRs relacionados:** ADR-001 (sin frameworks / Vanilla JS), ADR-002 (ASCII-safe), ADR-006 (baseline real), ADR-010 (presupuesto 8/8), ADR-025 (sesion firmada JWT/Bearer), ADR-036 (media unificada `media_*`), ADR-040 y TSK-117 (precedentes de asset compartido: `niveles-data.js`, `map-picker.js`), ADR-043 (patron anti-regresion de UI), BUG-061 (usuario_id sin sesion ampliado), BUG-067 (append invertido corregido en la misma sesion).

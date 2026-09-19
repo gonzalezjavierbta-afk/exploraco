@@ -210,6 +210,17 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .av-feed-title{font-size:11px;font-weight:700;color:#fff;text-align:center;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .av-feed-meta{font-size:10px;color:rgba(255,255,255,.45);text-align:center}
 .av-feed-votos{font-size:10px;color:var(--gold);font-weight:700}
+/* Acciones de media (voto/guardar/comentarios) del feed y del modal de album;
+   estilos coherentes con la paleta del tab (var(--gold), Barlow Condensed). */
+.av-feed-actions{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;width:100%;margin-top:2px}
+.av-act{background:transparent;border:1px solid rgba(255,255,255,.14);border-radius:6px;color:rgba(255,255,255,.62);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 9px;transition:all .15s;display:inline-flex;align-items:center;gap:4px;line-height:1}
+.av-act:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
+.av-act:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.av-act.on{background:rgba(232,160,32,.14);border-color:rgba(232,160,32,.5);color:var(--gold)}
+.av-act:disabled{opacity:.55;cursor:default}
+.av-act-save.on{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.45);color:#22C55E}
+.av-feed-comments{width:100%;margin-top:4px}
+.av-album-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px 0}
 @media (max-width:540px){.av-feed-grid{grid-template-columns:repeat(2,1fr);gap:8px}}
 /* PANDILLAS (Gamificacion v4) */
 .pand-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;margin-bottom:12px}
@@ -485,6 +496,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="media-actions.js"></script>
 <script>
 /* =============================================================
    COMUNIDAD EXPLORACO — hub de interaccion social
@@ -547,6 +559,13 @@ try{mmVisited=JSON.parse(localStorage.getItem('mm_visited')||'[]');}catch(e){}
 
 /* ---- SESSION (real) ---- */
 function sesion() { return (window.ExploraCO && window.ExploraCO.usuario) || null; }
+/* Id del usuario logueado como string para armar queries de media que
+   pintan es_propia/ya_votado/ya_guardado (media-actions no lo envia).
+   Cadena vacia cuando no hay sesion. */
+function avUidActual() {
+  var u = (typeof sesion === 'function') ? sesion() : null;
+  return (u && u.id) ? String(u.id) : '';
+}
 function statsU() {
   var u = sesion();
   return {
@@ -1913,7 +1932,8 @@ function abrirAlbumModal(albumId) {
   if (!modal || !body) return;
   modal.classList.add('on');
   body.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,.4);font-size:12px">Cargando \u00e1lbum\u2026</div>';
-  fetch('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId))
+  fetch('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId)
+    + (avUidActual() ? '&usuario_id=' + encodeURIComponent(avUidActual()) : ''))
     .then(function(r){ return r.json(); })
     .then(function(res){
       if (!res || !res.ok || !res.album) {
@@ -1939,16 +1959,20 @@ function abrirAlbumModal(albumId) {
           + '<div class="av-album-photo-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>'
           + '</div>';
         if(f.id) {
-          grid += '<button type="button" class="av-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
+          grid += '<div class="av-album-actions">' + avActLikeHTML(f) + avActSaveHTML(f) + '</div>'
+            + '<button type="button" class="av-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
+            + ' data-comments-fuente="album_foto"'
             + ' onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios'
             + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios,10) + ')</span>' : '')
             + '</button>'
-            + '<div class="av-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>';
+            + '<div class="av-album-comments" data-comments-for="' + esc(String(f.id)) + '" data-comments-fuente="album_foto" style="display:none"></div>';
         }
         grid += '</div>';
       });
       grid += '</div>';
       body.innerHTML = head + grid;
+      avBindMediaActions(body);
+      avSyncMediaActions(body);
     })
     .catch(function(){
       body.innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;font-size:12px">Error de red al cargar el \u00e1lbum</div>';
@@ -1997,7 +2021,7 @@ function setAVOrden(orden) {
 
 function cargarAudiovisual(reset) {
   if (reset) _avAlbumesOffset = 0;
-  cargarAlbumesAV(reset);
+  cargarAlbumesAV(!reset);
   if (reset) cargarFeedAV();
 }
 
@@ -2010,7 +2034,7 @@ function cargarAlbumesAV(append) {
   if (!grid) return;
   if (!append) grid.innerHTML = '<div style="grid-column:1/-1;padding:30px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">Cargando \u00e1lbumes\u2026</div>';
   fetch('/api/interacciones?tipo=albumes&orden=' + encodeURIComponent(_avOrdenActual)
-    + '&limit=' + AV_ALBUM_LIMIT + '&offset=' + _avAlbumesOffset)
+    + '&limit=' + AV_ALBUM_LIMIT + '&offset=' + _avAlbumesOffset + '&excluir_museo=1')
     .then(function(r){ return r.json(); })
     .then(function(res){
       var albumes = (res && res.data) || [];
@@ -2052,6 +2076,42 @@ function albumCardAV(a) {
   return card;
 }
 
+/* Acciones de media (voto/guardar) delegadas a media-actions.js (Regla de
+   No-Duplicidad). Un solo helper genera los data-ma-* que consumen tanto el
+   feed como el modal de album; los estados vienen del backend y caen a 0. */
+function avFlag01(v) { return (v === true || v === 1 || v === '1') ? 1 : 0; }
+function avActLikeHTML(f, extraClass) {
+  var votos = parseInt(f.votos, 10) || 0;
+  var ya = avFlag01(f.ya_votado);
+  var propia = avFlag01(f.es_propia);
+  return '<button type="button" class="av-act av-act-like' + (ya ? ' on' : '') + (extraClass ? ' ' + extraClass : '')
+    + '" data-ma-voto data-ma-fuente="album_foto" data-ma-item="' + esc(String(f.id))
+    + '" data-ma-votos="' + votos + '" data-ma-ya-votado="' + ya + '" data-ma-es-propia="' + propia
+    + '" aria-pressed="' + (ya ? 'true' : 'false') + '">\u2B50 <span data-ma-count>' + votos + '</span></button>';
+}
+function avActSaveHTML(f, extraClass) {
+  var ya = avFlag01(f.ya_guardado);
+  return '<button type="button" class="av-act av-act-save' + (ya ? ' on' : '') + (extraClass ? ' ' + extraClass : '')
+    + '" data-ma-save data-ma-fuente="album_foto" data-ma-item="' + esc(String(f.id))
+    + '" data-ma-ya-guardado="' + ya + '" aria-pressed="' + (ya ? 'true' : 'false') + '">'
+    + (ya ? 'Guardado' : 'Guardar') + '</button>';
+}
+/* Helpers de binding: se apoyan en window.MediaActions (cargado con el resto
+   de dependencias) y usan los helpers reales de la pagina para toast/login. */
+function avMediaOpts() {
+  return {
+    toast: (window.ExploraCO && window.ExploraCO.mostrarToast) || showXPToastComm,
+    pedirLogin: loginGate
+  };
+}
+function avBindMediaActions(root) {
+  if (!root || !window.MediaActions || !window.MediaActions.bind) return;
+  window.MediaActions.bind(root, avMediaOpts());
+}
+function avSyncMediaActions(root) {
+  if (root && window.MediaActions && window.MediaActions.sync) window.MediaActions.sync(root);
+}
+
 /* Feed de media: mi_feed_fotos devuelve foto_url/foto_type; se normaliza
    al shape media_url/media_type que consume avMediaHTML (reuso sin duplicar).
    'populares' se mapea a 'top' porque el feed solo acepta recientes|top. */
@@ -2062,8 +2122,10 @@ function avFeedOrden() {
 function cargarFeedAV() {
   var cont = document.getElementById('av-feed');
   if (!cont) return;
+  avBindMediaActions(cont);
   cont.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">Cargando media\u2026</div>';
-  fetch('/api/interacciones?tipo=mi_feed_fotos&orden=' + avFeedOrden() + '&limit=12&offset=0')
+  fetch('/api/interacciones?tipo=mi_feed_fotos&orden=' + avFeedOrden() + '&limit=12&offset=0'
+    + (avUidActual() ? '&usuario_id=' + encodeURIComponent(avUidActual()) : ''))
     .then(function(r){ return r.json(); })
     .then(function(res){
       var items = (res && res.data) || [];
@@ -2073,6 +2135,7 @@ function cargarFeedAV() {
       }
       cont.innerHTML = '';
       items.forEach(function(f){ cont.appendChild(feedCardAV(f)); });
+      avSyncMediaActions(cont);
     })
     .catch(function(){
       cont.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:rgba(255,255,255,.3);font-size:11px">No se pudo cargar la media</div>';
@@ -2088,7 +2151,15 @@ function feedCardAV(f) {
     + '<div class="av-feed-meta">' + esc(f.autor_nombre || 'Viajero')
     + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '')
     + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '') + '</div>'
-    + '<div class="av-feed-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>';
+    + '<div class="av-feed-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>'
+    + '<div class="av-feed-actions">'
+    + avActLikeHTML(f)
+    + '<button type="button" class="av-act" data-comments-for="' + esc(String(f.id))
+    + '" data-comments-fuente="album_foto" onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios</button>'
+    + '<div class="av-feed-comments" data-comments-for="' + esc(String(f.id))
+    + '" data-comments-fuente="album_foto" style="display:none"></div>'
+    + avActSaveHTML(f)
+    + '</div>';
   return card;
 }
 

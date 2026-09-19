@@ -4256,10 +4256,15 @@ module.exports = async function handler(req, res) {
         var albumLimit = Math.min(parseInt(req.query.limit || '20'), 50);
         var albumOffset = parseInt(req.query.offset || '0');
         var albumOrden = req.query.orden || 'recientes';
+        // Opt-in (excluir_museo=1|true): oculta el album auto-creado
+        // "Mi Museo" de todos los usuarios. Por defecto NO se filtra para no
+        // alterar a galeria.html, museo_publico ni otros consumidores.
+        var albumExcluirMuseo = (req.query.excluir_museo === '1' || req.query.excluir_museo === 'true');
 
         var albumParams = [];
         var np = 0;
         var albumWhere = ' WHERE a.activo = true';
+        if (albumExcluirMuseo) albumWhere += " AND LOWER(a.titulo) <> 'mi museo'";
         if (albumUsuarioId) { np++; albumWhere += ' AND a.usuario_id = $' + np; albumParams.push(albumUsuarioId); }
         if (albumCiudad) { np++; albumWhere += ' AND a.ciudad = $' + np; albumParams.push(albumCiudad); }
         if (albumTipo) { np++; albumWhere += ' AND a.tipo = $' + np; albumParams.push(albumTipo); }
@@ -4326,16 +4331,34 @@ module.exports = async function handler(req, res) {
           return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
         }));
 
-        // Marcar ya_votado para el usuario actual
+        // Marcar ya_votado / ya_guardado / es_propia para el usuario actual.
+        // BUG-A (v12) / ADR-036: las 3 metricas son degradables; si la
+        // migracion 023 (media_votos) o 019 (media_guardados) falta,
+        // conDegradacionMedia degrada a [] y el detalle del album NO se
+        // tumba (patron BUG-021). es_propia usa autor_original_id, la MISMA
+        // columna que resolverMediaItem/media_voto (quien devuelve 403 al
+        // votar la propia), para que el flag coincida con el backend.
         var yaVotoAlbum = {};
+        var yaGuardadoAlbum = {};
         if (usuarioId) {
           var misVotosAlbum = await conDegradacionMedia(sql(
             'SELECT item_id AS foto_id FROM media_votos WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
             [usuarioId]
           ), 'media_votos', []);
           misVotosAlbum.forEach(function(v){ yaVotoAlbum[String(v.foto_id)] = true; });
+
+          var misGuardadosAlbum = await conDegradacionMedia(sql(
+            'SELECT item_id AS foto_id FROM media_guardados WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
+            [usuarioId]
+          ), 'media_guardados', []);
+          misGuardadosAlbum.forEach(function(g){ yaGuardadoAlbum[String(g.foto_id)] = true; });
         }
-        fotosDetRows.forEach(function(r){ r.ya_votado = !!yaVotoAlbum[String(r.id)]; });
+        fotosDetRows.forEach(function(r){
+          r.ya_votado = !!yaVotoAlbum[String(r.id)];
+          r.ya_guardado = !!yaGuardadoAlbum[String(r.id)];
+          r.es_propia = !!(usuarioId && r.autor_original_id
+            && String(r.autor_original_id) === String(usuarioId));
+        });
 
         return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows });
       }
@@ -4831,11 +4854,27 @@ module.exports = async function handler(req, res) {
         var feedLimit = Math.min(parseInt(req.query.limit || '20'), 50);
         var feedOffset = parseInt(req.query.offset || '0');
         var feedOrden = req.query.orden === 'top' ? 'top' : 'recientes';
+        // usuario_id es OPCIONAL: pinta es_propia/ya_votado/ya_guardado para
+        // los botones de comunidad. Si no es uuid valido se ignora (tratado
+        // como vacio) en vez de tirar 400 y romper el feed publico.
+        var feedUid = req.query.usuario_id ? String(req.query.usuario_id).trim() : '';
+        if (feedUid && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(feedUid))
+          feedUid = '';
+        var feedParams = [feedLimit, feedOffset];
+        if (feedUid) feedParams.push(feedUid);
+        // autor_id usa af.autor_original_id: la MISMA columna que
+        // resolverMediaItem('album_foto') para que es_propia coincida con el
+        // 403 de registrarVotoMedia. media_votos ya se usaba aqui; si falta,
+        // conDegradacionMedia degrada el feed entero a [].
         var feedRows = await conDegradacionMedia(sql(
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' a.titulo AS album_titulo, a.ciudad, a.id AS album_id,'
-          + ' u.nombre AS autor_nombre,'
+          + ' u.nombre AS autor_nombre, af.autor_original_id AS autor_id,'
           + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos,'
+          + (feedUid
+              ? ' COALESCE(af.autor_original_id = $3::uuid, false) AS es_propia,'
+                + ' EXISTS(SELECT 1 FROM media_votos mv2 WHERE mv2.fuente = \'album_foto\' AND mv2.item_id = af.id::text AND mv2.usuario_id = $3::uuid AND mv2.activo = true) AS ya_votado,'
+              : ' false AS es_propia, false AS ya_votado,')
           + ' af.creado_en'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
@@ -4843,8 +4882,28 @@ module.exports = async function handler(req, res) {
           + ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
           + (feedOrden === 'top' ? ' ORDER BY votos DESC, af.creado_en DESC' : ' ORDER BY af.creado_en DESC')
           + ' LIMIT $1 OFFSET $2',
-          [feedLimit, feedOffset]
+          feedParams
         ), 'media_votos', []);
+        // ya_guardado va APARTE: media_guardados (migracion 019) puede faltar
+        // y un 42P01 tumbaria todo el feed. Se degrada a [] y se mapea por fila.
+        var feedGuardados = {};
+        if (feedUid) {
+          var feedIds = feedRows.map(function(f){ return String(f.id); });
+          if (feedIds.length) {
+            var feedGdRows = await conDegradacionMedia(sql(
+              'SELECT item_id FROM media_guardados'
+              + ' WHERE usuario_id = $1::uuid AND fuente = \'album_foto\' AND activo = true'
+              + ' AND item_id = ANY($2::text[])',
+              [feedUid, feedIds]
+            ), 'media_guardados', []);
+            feedGdRows.forEach(function(r){ feedGuardados[String(r.item_id)] = true; });
+          }
+        }
+        feedRows.forEach(function(f){
+          if (f.es_propia !== true) f.es_propia = false;
+          if (f.ya_votado !== true) f.ya_votado = false;
+          f.ya_guardado = feedGuardados[String(f.id)] === true;
+        });
         // BUG-A (v12): contador de comentarios post-query degradable.
         await Promise.all(feedRows.map(function(f) {
           return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });

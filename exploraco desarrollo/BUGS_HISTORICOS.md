@@ -1023,6 +1023,7 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `api/interacciones.js` L4136 (`var usuarioId2= body.usuario_id || null;`), L1911 (`function validarSesion`), L5024-5035 (rama `tipo='foto'`); `galeria.html` `gShareFoto()` (cliente nuevo que expone el flujo).
 **Nota de amplificacion (TSK-118 / ADR-041, 2026-09-18):** los hooks `avanzarMisionesCasa` de la sesion TSK-118 (foto/resena/visita) reutilizan el `usuario_id` del body y escriben progreso en `casa_misiones` (y XP/estado) a nombre del usuario recibido; el mismo vector de suplantacion de BUG-061 amplifica sus efectos (mas puntos que confian en el `usuario_id` del body). La rama nueva `casa_tributo_config` SI exige `validarSesion` desde el hotfix J-2 (v23, BUG-064).
 **Estado:** ABIERTO (working tree, 2026-09-16; re-confirmado el 2026-09-18 tras TSK-118); NO corregido en TSK-106 por decision H-2. **Amplificado por los hooks de Casa de TSK-118.** Escalar a `sql-security`.
+**Nota de amplificacion (TSK-123 / ADR-044, 2026-09-18):** los nuevos botones Guardar de `media-actions.js` (`guardar_media`/`quitar_guardado_media`) siguen confiando en `body.usuario_id` sin Bearer; al habilitarlos en todo el feed y en el modal de album de `comunidad.html`, crece la superficie del mismo vector (un `usuario_id` ajeno puede marcar/desmarcar guardados a nombre de otro). No es una regresion nueva, es la misma deuda con mas puntos de uso. La lectura por `usuario_id` de `mi_feed_fotos`/`album_detalle` tambien permite observar `ya_votado`/`ya_guardado` de terceros sin sesion (enumeracion de baja severidad; ver deuda D-11).
 
 ## BUG-062: fotos agregadas por Unsplash no se recolectan en `admin.html` -- `addPhotoFieldWithUrl` usa la clase `photo-url-input` y `getPhotos()` busca `.photo-url-inp`
 
@@ -1085,6 +1086,16 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Leccion de QA runtime:** el patron es IDENTICO a BUG-020/TSK-065: la UI anidada se desconecta SOLO al ejecutar; el balance de divs y la presencia de ids en el HTML no prueban que el runtime los conserve. La verificacion confiable es ejecutar la funcion real y comprobar el efecto observable (parser DOM + sandbox), no solo releer el HTML.
 **Prevencion (ver ADR-043):** cuando un contenedor persistente deba convivir con un render dinamico, separar SIEMPRE el host de inyeccion del contenedor persistente y NUNCA usar `innerHTML=` sobre un ancestro que contenga widgets estaticos.
 **Estado:** CERRADO / CORREGIDO (regresion FE-02, `mi-perfil.html`, working tree 2026-09-18; SIN commitear). Ver ADR-043 (patron derivado) y TSK-119.
+
+## BUG-067: `cargarAudiovisual(reset)` invertia el `append` de `cargarAlbumesAV` -- albumes duplicados al cambiar de orden
+
+**Severidad:** MEDIA (UI: la grilla de albumes de Comunidad > Audiovisual duplicaba tarjetas al cambiar el orden o recargar).
+**Contexto:** detectado y corregido durante TSK-123 (2026-09-18), al construir el tab Audiovisual interactivo. La paginacion usa un booleano `append` con el contador `_avAlbumesOffset`.
+**Sintoma:** al cambiar el orden (`setAVOrden` -> `cargarAudiovisual(true)`) la grilla mostraba los albumes anteriores y los nuevos mezclados (duplicados), y el offset avanzaba sobre una grilla que no se habia limpiado.
+**Causa raiz:** `cargarAudiovisual(reset)` llamaba `cargarAlbumesAV(reset)`; con `reset=true` (carga inicial / cambio de orden) pasaba `append=true`, de modo que en vez de limpiar la grilla (`grid.innerHTML=''`) y reubicar el offset, VOLVIA a agregar tarjetas al final.
+**Resolucion aplicada (misma sesion, working tree):** `comunidad.html` L2022-2026: `cargarAudiovisual(reset)` ahora llama `cargarAlbumesAV(!reset)`; con `reset=true` -> `append=false` (limpia y reinicia `_avAlbumesOffset=0`) y `avCargarMas()` (L2028-2030) sigue llamando `cargarAlbumesAV(true)` para paginar. `cargarAlbumesAV` (L2032-2058) recibe el flag coherente.
+**Evidencia (ADR-006):** `comunidad.html` L2022-2026 (`cargarAudiovisual`), L2028-2030 (`avCargarMas`), L2032-2058 (`cargarAlbumesAV`); QA runtime APTO sin bloqueantes (balance de divs 307/307).
+**Estado:** CERRADO / CORREGIDO (working tree, 2026-09-18; SIN commitear). Ver TSK-123.
 
 ## Deuda ADR-035: columnas no versionadas de las que dependen los rankings (patron BUG-021)
 
@@ -1262,4 +1273,47 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 - **BUG-064 (NUEVO, CERRADO):** la auditoria QA posterior detecto el IDOR de `casa_tributo_config`; se registro y corrigio en el hotfix J-2 (ver BUG-064).
 - **BUG-061 sigue ABIERTO y AMPLIFICADO:** los hooks `avanzarMisionesCasa` (foto/resena/visita) escriben progreso de Casa a nombre del `usuario_id` recibido, ampliando el mismo vector de suplantacion (ver la nota de amplificacion en BUG-061). **BUG-002 y BUG-062 siguen ABIERTOS** y ajenos.
 - **Estado:** HOTFIX APLICADO (2026-09-18).
+
+---
+
+## Deuda TSK-123 / ADR-044 (2026-09-18) -- NO son bugs confirmados
+
+**Nota:** la correccion "Comunidad > Audiovisual" (TSK-123 / ADR-044) se registro aqui para que ninguna IA asuma resueltos sus pendientes (ADR-006). Abrio y cerro **BUG-067** (append invertido) y amplifico **BUG-061** (nota ya insertada). Se conservan por Regla de Oro 3 (Cero Borrado Logico).
+
+### D-10: `MediaActions` guarda las `opts` a nivel de modulo (el ultimo `bind` gana)
+- **Severidad:** BAJA (diseno del modulo; hoy inocuo).
+- **Contexto:** `media-actions.js` almacena `OPT = {toast, pedirLogin}` en el cierre del modulo; `bind(root, opts)` la sobreescribe globalmente. `comunidad.html` pasa las MISMAS opts a 2 roots (feed y modal), por lo que no hay conflicto; `galeria.html` pasa las suyas.
+- **Riesgo:** si el modulo se reutiliza en una pagina con dos raices que necesiten toasts/logins distintos, el ultimo `bind` gobernara ambos.
+- **Recomendacion:** encapsular las opts por-root (mapa debil `WeakMap` o guardarlas en el nodo `root`) cuando aparezca un tercer consumidor con opts distintas.
+- **Estado:** DEUDA DOCUMENTADA (TSK-123 / ADR-044, 2026-09-18). No bloqueante.
+
+### D-11: lectura por `usuario_id` en `mi_feed_fotos`/`album_detalle` permite enumerar booleanos de un tercero
+- **Severidad:** BAJA (seguridad: enumeracion de baja severidad, sin exposicion de PII).
+- **Contexto:** ambos GET aceptan `usuario_id` opcional SIN exigir sesion y devuelven `ya_votado`/`ya_guardado`/`es_propia`; con un `usuario_id` conocido se puede inferir en que fotos publicas voto/guardo.
+- **Recomendacion:** cuando se aborde el endurecimiento (junto con BUG-061), derivar el `usuario_id` de `validarSesion`/Bearer en vez de aceptarlo por query, o aceptarlo solo para el propio usuario autenticado.
+- **Estado:** DEUDA DOCUMENTADA (TSK-123 / ADR-044, 2026-09-18). No bloqueante.
+
+### D-12: el boton de comentarios del feed no muestra contador inicial
+- **Severidad:** BAJA (cosmetica/consistencia).
+- **Contexto:** `feedCardAV` (`comunidad.html` L2157-2158) inyecta el boton de comentarios sin `data-ac-btn-count`, por lo que el contador solo aparece tras abrir/cerrar el hilo; el modal de album si lo usa.
+- **Recomendacion:** pasar `data-ac-btn-count="<n comentarios>"` (el backend `mi_feed_fotos` ya devuelve `comentarios` por fila).
+- **Estado:** DEUDA DOCUMENTADA (TSK-123, 2026-09-18). No bloqueante.
+
+### D-13: `index.html` conserva su implementacion inline de `media_voto`
+- **Severidad:** BAJA (deuda de No-Duplicidad; AGENTS.md 2.1).
+- **Contexto:** `index.html` mantiene su propio `votarMediaMapa`/`POST media_voto`; no se migro a `media-actions.js` en TSK-123 para no ampliar el alcance sobre un archivo de 523 divs con otro lote en vuelo.
+- **Recomendacion:** migrarlo cuando se toque la capa de media del mapa; no crear una nueva copia.
+- **Estado:** DEUDA DOCUMENTADA (TSK-123 / ADR-044, 2026-09-18). No bloqueante.
+
+### D-14: el smoke 41/41 de `media-actions.js` no esta versionado
+- **Severidad:** BAJA (deuda QA: la evidencia no es reproducible).
+- **Contexto:** la verificacion de TSK-123 reporta un smoke Node vm de `media-actions.js` 41/41 PASS que no existe en `scripts/` (verificado por ADR-006: no hay script con `MediaActions`/`media-actions`).
+- **Recomendacion:** versionar `scripts/smoke_media_actions.js` o mover esos checks a un smoke existente para que el Escudo GOLD los ejecute de forma reproducible.
+- **Estado:** DEUDA QA DOCUMENTADA (TSK-123, 2026-09-18). No bloqueante.
+
+### Nota: BUG-065, BUG-061 y BUG-002 siguen ABIERTOS
+- **BUG-065** (`album_agregar_foto` inserta sin `visible`) sigue ABIERTO y afecta directamente que la media aparezca en el feed de Comunidad > Audiovisual: el lector `mi_feed_fotos` filtra `af.visible=true` (ADR-039), por lo que una foto subida por la via legacy no se ve aunque la mision la cuente.
+- **BUG-061** (spoofing de `usuario_id` sin sesion) sigue ABIERTO y quedo AMPLIFICADO por los nuevos botones Guardar (nota en su ficha).
+- **BUG-002** (doble escape en `api/pagina-destino.js` L2431) y **BUG-062** siguen ABIERTOS y ajenos.
+- **Estado:** SIN CAMBIO (registro de no-regresion, 2026-09-18).
 

@@ -165,6 +165,15 @@ La sesion "Modulos nuevos + bugs activos" (2026-09-18) agrega superficie de dato
 - **Fixes de UI de la misma sesion:** `api/pagina-destino.js` `LIMIT 24 -> 200` (fix R10); `mi-perfil.html` FE-01 (Fotos publicadas solo para `brsk84@gmail.com`) y FE-02 (fusion "Clase & Arbol de Progreso" + host `#arbol-body`, BUG-066); `index.html` FE-03 (`mpa-media-pin-video` para video individual). Patron anti-regresion en ADR-043.
 - **Paso manual obligatorio:** aplicar la 027 en Neon ANTES del deploy (preflight read-only `scripts/verify_027_precheck.js`); el cleanup de datos `db/cleanups/002_fix_fotos_brsk84.sql` es un paso aparte (patron BUG-021/BUG-060; causa en BUG-065).
 
+### Nota ADR-044 (TSK-123, sin migracion) -- interacciones de media en Comunidad y asset compartido `media-actions.js`
+
+La correccion "Comunidad > Audiovisual" (2026-09-18) NO crea funciones serverless (8/8 intacto, ADR-001/ADR-010) ni migraciones: extiende ramas `?tipo=` existentes de `api/interacciones.js` (header sin bump: sigue **v23**) y agrega 1 asset frontend.
+
+- **Backend aditivo:** `GET ?tipo=mi_feed_fotos` (~L4853-4912) acepta `usuario_id` OPCIONAL (ignorado si no es UUID valido) y agrega `autor_id` (`af.autor_original_id`), `es_propia`, `ya_votado` y `ya_guardado`; el `ya_guardado` corre en una query separada envuelta en `conDegradacionMedia(..., 'media_guardados', [])` para que la ausencia de la migracion 019 no tumbe el feed. `GET ?tipo=albumes` (~L4252-4293) agrega el param OPT-IN `excluir_museo=1|true` (`AND LOWER(a.titulo) <> 'mi museo'`); sin el param el contrato queda intacto (galeria.html/museo_publico). `GET ?tipo=album_detalle` (~L4296-4364) devuelve `ya_guardado` y `es_propia` por foto ademas del `ya_votado` preexistente.
+- **Asset frontend (no cuenta contra 8/8):** `media-actions.js` (raiz, 259 lineas, ASCII-safe) expone `window.MediaActions.{voto,guardar,sync,bind}` y un contrato de marcado `data-ma-*` (`data-ma-voto`/`data-ma-save` + `data-ma-fuente`/`data-ma-item`/estados). `voto` usa Bearer y respeta `esPropia`; `guardar` alterna `guardar_media`/`quitar_guardado_media`. Consumido por `galeria.html` (que elimina `gPostJson`/`gPintaVoto`/`gMediaVoto`/`gMediaGuardar`) y `comunidad.html`; patron identico al de `map-picker.js`/`niveles-data.js` (ADR-040, TSK-117). Detalle en DECISIONS.md ADR-044.
+- **Bug corregido en la misma sesion:** `cargarAudiovisual(reset)` de `comunidad.html` invertia el `append` de `cargarAlbumesAV` y duplicaba albumes al cambiar de orden (BUG-067, CERRADO).
+- **Pendiente operativo:** confirmar/aplicar 019 (`media_guardados`) y 023 en Neon; sin ellas el guardado degrada a `ya_guardado=false`. **BUG-065 (album_foto.visible) sigue ABIERTO** y afecta que la media legacy aparezca en el feed. **BUG-061 amplificado** por los nuevos botones Guardar.
+
 ## 4. Motor de tags JSONB (modulo central)
 
 El campo `destinos.tags` es el mecanismo que permite escalar a nuevas categorias sin alterar el esquema relacional. Cada categoria define su propia forma de tags:
@@ -256,7 +265,7 @@ Hasta TASK-007 este archivo ya existia y estaba en produccion, pero no figuraba 
 | Ranking | `ranking` | GET `/api/usuarios?tipo=leaderboard` |
 | Parches | `pandillas` | GET `pandilla_detalle`, POST `pandilla_crear`/`pandilla_unirse`/`pandilla_salir`/`pandilla_reto` |
 | Activo Oculto | `wayfarer` | POST `activo_oculto_proponer`/`activo_oculto_votar`, GET `activos_ocultos_pendientes`, GET `/api/usuarios?tipo=faccion_ranking` |
-| Audiovisual | `av` | GET `albumes`, GET `mi_feed_fotos`; asset externo `album-comments.js` |
+| Audiovisual | `av` | GET `albumes` (opt-in `excluir_museo=1`), GET `mi_feed_fotos` (`usuario_id` opcional), GET `album_detalle`; assets externos `album-comments.js` y `media-actions.js` (likes/guardados, ADR-044) |
 
 Nota de nomenclatura: la API y el esquema conservan el termino historico `pandilla*` (`pandillas`, `pandillas_miembros`, `pandilla_retos`, `pandilla_crear`, ...); "Parche" es un relabel SOLO de texto visible en la UI. No confundir en busquedas futuras (`ExploraCO_Sistema_Social_v5.md` seccion 3.5).
 

@@ -239,6 +239,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="usuario-session.js"></script>
 <script src="/compartir.js"></script>
 <script src="album-comments.js?v=2"></script>
+<script src="media-actions.js"></script>
 <script>
 /* ExploraCO - galeria.html (subpagina de galeria ampliada) */
 /* Modo global: feed top + albumes populares. Modo destino: ?destino=<slug>. */
@@ -298,15 +299,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       return 'La galeria de la comunidad no esta disponible todavia';
     }
     return res.error || 'No se pudo completar la solicitud';
-  }
-
-  function gPostJson(body) {
-    var headers = { 'Content-Type': 'application/json' };
-    var auth = gAuthHeaders();
-    for (var k in auth) {
-      if (Object.prototype.hasOwnProperty.call(auth, k)) { headers[k] = auth[k]; }
-    }
-    return gFetchJson('/api/interacciones', { method: 'POST', headers: headers, body: JSON.stringify(body) });
   }
 
   function gToast(msg, color) {
@@ -548,9 +540,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     var h = '<div class="g-detail-actions">';
     if (st.votoItem) {
       h += '<button type="button" class="g-act' + (st.ya_votado ? ' on' : '') + '" id="g-act-vote"'
-        + (st.es_propia ? ' disabled' : '') + '>\u2B50 <span id="g-act-vote-n">' + (parseInt(st.votos, 10) || 0) + '</span></button>';
+        + ' data-ma-voto data-ma-fuente="' + esc(st.votoFuente || 'album_foto') + '"'
+        + ' data-ma-item="' + esc(String(st.votoItem)) + '"'
+        + ' data-ma-votos="' + (parseInt(st.votos, 10) || 0) + '"'
+        + ' data-ma-ya-votado="' + (st.ya_votado ? '1' : '0') + '"'
+        + ' data-ma-es-propia="' + (st.es_propia ? '1' : '0') + '"'
+        + (st.es_propia ? ' disabled' : '')
+        + '>\u2B50 <span id="g-act-vote-n" data-ma-count>' + (parseInt(st.votos, 10) || 0) + '</span></button>';
     }
-    h += '<button type="button" class="g-act' + (st.ya_guardado ? ' on' : '') + '" id="g-act-save">'
+    h += '<button type="button" class="g-act' + (st.ya_guardado ? ' on' : '') + '" id="g-act-save"'
+      + ' data-ma-save data-ma-fuente="' + esc(st.saveFuente || 'album_foto') + '"'
+      + ' data-ma-item="' + esc(String(st.saveItem == null ? '' : st.saveItem)) + '"'
+      + ' data-ma-ya-guardado="' + (st.ya_guardado ? '1' : '0') + '">'
       + (st.ya_guardado ? 'Guardado' : 'Guardar') + '</button>'
       + '<button type="button" class="g-act" id="g-modal-share">Compartir</button>'
       + '</div>';
@@ -558,10 +559,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   }
 
   function gBindAcciones() {
-    var btnVote = document.getElementById('g-act-vote');
-    if (btnVote) { btnVote.addEventListener('click', gMediaVoto); }
-    var btnSave = document.getElementById('g-act-save');
-    if (btnSave) { btnSave.addEventListener('click', gMediaGuardar); }
+    var body = document.getElementById('g-modal-body');
+    if (body && window.MediaActions) {
+      window.MediaActions.bind(body, { toast: gToast, pedirLogin: gPedirLogin });
+      window.MediaActions.sync(body);
+    }
     var btnShare = document.getElementById('g-modal-share');
     if (!btnShare) { return; }
     if (window.ExploraCompartir && typeof window.ExploraCompartir.init === 'function') {
@@ -577,67 +579,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     } else {
       btnShare.style.display = 'none';
     }
-  }
-
-  function gPintarVoto() {
-    var btn = document.getElementById('g-act-vote');
-    var n = document.getElementById('g-act-vote-n');
-    if (n && G.media) { n.textContent = parseInt(G.media.votos, 10) || 0; }
-    if (btn && G.media) {
-      if (G.media.ya_votado) { btn.classList.add('on'); } else { btn.classList.remove('on'); }
-    }
-  }
-
-  function gMediaVoto() {
-    var st = G.media;
-    var btn = document.getElementById('g-act-vote');
-    if (!st || !st.votoItem || !btn) { return; }
-    var uid = gUsuarioId() || G.usuarioId;
-    if (!uid) { gPedirLogin('Inicia sesion para votar esta foto.'); return; }
-    if (st.es_propia) { gToast('No puedes votar tu propia foto.', '#E8A020'); return; }
-    var accion = st.ya_votado ? 'unlike' : 'like';
-    btn.disabled = true;
-    gPostJson({ tipo: 'media_voto', usuario_id: uid, fuente: st.votoFuente, item_id: st.votoItem, accion: accion })
-      .then(function (res) {
-        btn.disabled = false;
-        if (res.ok) {
-          st.ya_votado = !!res.ya_votado;
-          st.votos = parseInt(res.votos, 10) || 0;
-          gPintarVoto();
-          if (res.xp > 0) { gToast('+' + res.xp + ' XP', '#16a34a'); }
-          return;
-        }
-        if (res.__status === 409) { st.ya_votado = true; gPintarVoto(); return; }
-        if (res.__status === 400 || res.__status === 401) { gPedirLogin('Inicia sesion para votar esta foto.'); return; }
-        if (res.__status === 429) { gToast(res.error || 'Limite de votos por dia alcanzado', '#E8A020'); return; }
-        gToast(res.error || 'No se pudo registrar tu voto', '#ef4444');
-      })
-      .catch(function () { btn.disabled = false; gToast('Error de red al votar', '#ef4444'); });
-  }
-
-  function gMediaGuardar() {
-    var st = G.media;
-    var btn = document.getElementById('g-act-save');
-    if (!st || !st.saveItem || !btn) { return; }
-    var uid = gUsuarioId() || G.usuarioId;
-    if (!uid) { gPedirLogin('Inicia sesion para guardar esta foto.'); return; }
-    var tipo = st.ya_guardado ? 'quitar_guardado_media' : 'guardar_media';
-    btn.disabled = true;
-    gPostJson({ tipo: tipo, usuario_id: uid, fuente: st.saveFuente, item_id: st.saveItem })
-      .then(function (res) {
-        btn.disabled = false;
-        if (!res.ok) {
-          if (res.__status === 503) { gToast('Los guardados no estan disponibles todavia', '#E8A020'); return; }
-          if (res.__status === 400 || res.__status === 401) { gPedirLogin('Inicia sesion para guardar esta foto.'); return; }
-          gToast(res.error || 'No se pudo guardar', '#ef4444');
-          return;
-        }
-        st.ya_guardado = (res.guardado === undefined) ? !st.ya_guardado : !!res.guardado;
-        btn.textContent = st.ya_guardado ? 'Guardado' : 'Guardar';
-        if (st.ya_guardado) { btn.classList.add('on'); } else { btn.classList.remove('on'); }
-        gToast(st.ya_guardado ? 'Guardado en Tu Mapa' : 'Quitado de tus guardados', st.ya_guardado ? '#E8A020' : '#888');
-      })
-      .catch(function () { btn.disabled = false; gToast('Error de red al guardar', '#ef4444'); });
   }
 
   function gAlbumPortada(album, fotos) {
