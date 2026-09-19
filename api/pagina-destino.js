@@ -768,7 +768,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   function comUrl(x) { return (x && x.url) ? String(x.url).trim() : ''; }
   function comVotos(x) { var v = parseInt(x && x.votos, 10); return isNaN(v) ? 0 : v; }
   function ordenaComunidad(arr) {
-    return (arr || []).map(function(x){ return { url: comUrl(x), votos: comVotos(x) }; })
+    return (arr || []).map(function(x){
+      return {
+        url: comUrl(x),
+        votos: comVotos(x),
+        // foto_type/ media_type: el hero solo promueve FOTOS (nunca un
+        // video/audio con votos) a imagen principal.
+        tipo: String((x && (x.foto_type || x.media_type)) || 'foto')
+      };
+    })
       .filter(function(x){ return !!x.url; })
       .sort(function(a, b){ return b.votos - a.votos; });
   }
@@ -781,12 +789,42 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (comunidadUrls.indexOf(x.url) === -1) comunidadUrls.push(x.url);
   });
 
-  // -- HERO: imagen principal + 3 miniaturas (ADR-034) -----------------
-  // Composicion: (1) 2a foto curada por orden (sin repetir el hero),
-  // (2) foto de viajero mas votada, (3) foto de album mas votada. Los
-  // faltantes se rellenan con curadas restantes y, si aun faltan, con el
-  // resto de la comunidad; siempre sin duplicar URL.
+  // -- RANKING UNICO DE FOTOS POR VOTOS (hero + galeria) ----------------
+  // Se calcula UNA sola vez y lo comparten el hero y la galeria: curadas
+  // (galAll, que ya incluye el hero editorial) primero para la precedencia
+  // de dedupe y luego la comunidad; orden final votos DESC (empate: orden
+  // de insercion). Evita duplicar la logica entre ambas secciones.
+  var mediaVotosPorUrl = {};
+  (fotos || []).forEach(function(f){
+    var u = (f && f.url) ? String(f.url).trim() : '';
+    if (!u || mediaVotosPorUrl[u] !== undefined) return;
+    var v = parseInt(f && f.votos, 10);
+    mediaVotosPorUrl[u] = isNaN(v) ? 0 : v;
+  });
+  var mediaRank = [];
+  var mediaRankVistos = {};
+  function mediaRankAdd(url, votos, prio, tipo) {
+    var u = String(url || '').trim();
+    if (!u || mediaRankVistos[u]) return;
+    mediaRankVistos[u] = true;
+    mediaRank.push({ url: u, votos: parseInt(votos, 10) || 0, prio: prio, tipo: tipo || 'foto' });
+  }
+  galAll.forEach(function(u, i){ mediaRankAdd(u, mediaVotosPorUrl[u] || 0, i, 'foto'); });
+  comunidadMerge.forEach(function(x, i){ mediaRankAdd(x.url, x.votos || 0, 1000 + i, x.tipo || 'foto'); });
+  mediaRank.sort(function(a, b){ return (b.votos - a.votos) || (a.prio - b.prio); });
+
+  // -- HERO: imagen principal + 3 miniaturas (ADR-034 + votos) ---------
+  // Si la foto con mas votos (solo tipo foto) tiene votos > 0, pasa a ser
+  // la imagen principal del hero y las 3 siguientes por votos son las
+  // miniaturas. Sin votos se conserva el hero editorial y la composicion
+  // original (2a curada por orden, viajero mas votado, album mas votado).
   var HERO_THUMBS_MAX = 3;
+  var heroTopFoto = null;
+  for (var hri = 0; hri < mediaRank.length; hri++) {
+    if (mediaRank[hri].tipo === 'foto') { heroTopFoto = mediaRank[hri]; break; }
+  }
+  var heroRankeado = !!(heroTopFoto && heroTopFoto.votos > 0);
+  if (heroRankeado) hero = heroTopFoto.url;
   var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
   var curadasTodas = [];
   (fotos || []).forEach(function(f){
@@ -808,11 +846,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (heroThumbsList.length >= HERO_THUMBS_MAX) return;
     heroThumbsList.push(u);
   }
-  addHeroThumb(segundaCurada);
-  addHeroThumb(viajerosOrden.length ? viajerosOrden[0].url : '');
-  addHeroThumb(albumOrden.length ? albumOrden[0].url : '');
-  curadasOrden.forEach(addHeroThumb);
-  comunidadUrls.forEach(addHeroThumb);
+  if (heroRankeado) {
+    mediaRank.forEach(function(x){ if (x.tipo === 'foto') addHeroThumb(x.url); });
+  } else {
+    addHeroThumb(segundaCurada);
+    addHeroThumb(viajerosOrden.length ? viajerosOrden[0].url : '');
+    addHeroThumb(albumOrden.length ? albumOrden[0].url : '');
+    curadasOrden.forEach(addHeroThumb);
+    comunidadUrls.forEach(addHeroThumb);
+  }
   // TSK-111 (CAMBIO 6B): cada miniatura del hero abre el lightbox
   // compartido. Se pasa HERO_ALL[k] (array emitido en el script de la
   // pagina) en vez de la URL cruda, para no inyectar datos en el onclick.
@@ -1591,33 +1633,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // cumple "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0
   // curadas.
   var GAL_THUMBS_MAX = 12;
-  // ADR-036: votos de las curadas (destinos_fotos.id via media_votos). El
-  // mapa url->votos rankea las fotos curadas dentro del ranking mezclado.
-  // El fallback de la query no trae votos -> todas quedan en 0 (orden intacto).
-  var galCuradaVotosMap = {};
-  (fotos || []).forEach(function(f){
-    var u = (f && f.url) ? String(f.url).trim() : '';
-    if (!u || galCuradaVotosMap[u] !== undefined) return;
-    galCuradaVotosMap[u] = parseInt(f && f.votos, 10) || 0;
-  });
-  // Ranking mezclado deduplicado por URL. Las curadas primero definen la
-  // precedencia de dedupe (curada > comunidad); la comunidad entra despues.
-  var galMerge = [];
-  var galMergeVistos = {};
-  function galPushMerge(url, votos, prio) {
-    var u = String(url || '').trim();
-    if (!u || galMergeVistos[u]) return;
-    galMergeVistos[u] = true;
-    galMerge.push({ url: u, votos: parseInt(votos, 10) || 0, prio: prio });
-  }
-  galAll.forEach(function(u, i){ galPushMerge(u, galCuradaVotosMap[u] || 0, i); });
-  comunidadMerge.forEach(function(x, i){ galPushMerge(x.url, x.votos || 0, 1000 + i); });
-  // Ranking unico: votos DESC; empate -> orden de insercion (curadas por su
-  // orden original, luego comunidad por su ranking de votos/recientes).
-  galMerge.sort(function(a, b){
-    if (b.votos !== a.votos) return b.votos - a.votos;
-    return a.prio - b.prio;
-  });
+  // ADR-036: el ranking unico por votos (curadas + comunidad, con la
+  // precedencia de dedupe curada > comunidad) ya se calculo en `mediaRank`
+  // y lo comparte el hero. Aqui solo se reutiliza.
+  var galMerge = mediaRank;
   var hayGaleriaCurada = galMerge.length > 1;
   var galBig = galMerge.length ? galMerge[0].url : '';
   var galThumbsList = galMerge.slice(1, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });

@@ -186,6 +186,52 @@ check("secContact VISIBLE en sitio con whatsapp", sitioConWA.indexOf('id="contac
 var sitioSinContacto = buildHTML(base({ categoria_slug: "sitio" }), {}, [], [], null, []);
 check("secContact OCULTA si no hay datos de contacto", sitioSinContacto.indexOf('id="contact"') < 0);
 
+console.log("\n=== AUDIT 7: hero por votos (mayor puntaje = imagen principal) ===");
+function heroUrl(html) {
+  var m = /class="psm" style="background-image:url\('([^']+)'\)/.exec(html);
+  return m ? m[1] : '';
+}
+function heroAll(html) {
+  var m = /var HERO_ALL=(\[[^\]]*\])/.exec(html);
+  if (!m) return [];
+  try { return JSON.parse(m[1]); } catch (e) { return []; }
+}
+// Curadas con votos: la de 5 debe ser la principal aunque foto_hero sea otra.
+var heroVotos = buildHTML(
+  base({ foto_hero: "https://e.com/a.jpg" }),
+  {},
+  [
+    { url: "https://e.com/a.jpg", votos: 1 },
+    { url: "https://e.com/b.jpg", votos: 5 },
+    { url: "https://e.com/c.jpg", votos: 0 }
+  ],
+  [], null, []
+);
+check("hero: imagen principal = mayor puntaje", heroUrl(heroVotos) === "https://e.com/b.jpg", heroUrl(heroVotos));
+check("hero: HERO_ALL[0] = mayor puntaje", heroAll(heroVotos)[0] === "https://e.com/b.jpg", JSON.stringify(heroAll(heroVotos)));
+check("hero: miniaturas por votos (siguiente = a.jpg)", heroAll(heroVotos)[1] === "https://e.com/a.jpg", JSON.stringify(heroAll(heroVotos)));
+
+// Sin votos: se conserva el hero editorial.
+var heroSinVotos = buildHTML(
+  base({ foto_hero: "https://e.com/a.jpg" }),
+  {},
+  [{ url: "https://e.com/a.jpg" }, { url: "https://e.com/b.jpg" }],
+  [], null, []
+);
+check("hero sin votos: conserva foto_hero editorial", heroUrl(heroSinVotos) === "https://e.com/a.jpg", heroUrl(heroSinVotos));
+
+// Un video con mas votos NO debe ser la imagen principal (solo fotos).
+var heroConVideo = buildHTML(
+  base({ foto_hero: "https://e.com/a.jpg" }),
+  {},
+  [{ url: "https://e.com/a.jpg", votos: 2 }],
+  [], null, [],
+  {}, null,
+  [],
+  [{ url: "https://e.com/vid.mp4", votos: 99, foto_type: "video" }]
+);
+check("hero: video con mas votos NO desplaza a la foto", heroUrl(heroConVideo) === "https://e.com/a.jpg", heroUrl(heroConVideo));
+
 console.log("\n=== RESUMEN ===");
 console.log(fails === 0 ? "TODOS LOS SMOKE TESTS PASARON (" + total + " checks)" : fails + " smoke test(s) FALLARON de " + total);
 process.exit(fails > 0 ? 1 : 0);
