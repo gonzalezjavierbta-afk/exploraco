@@ -114,24 +114,6 @@
     return Math.round(R * c * 10) / 10;
   }
 
-  function normaliza(s) {
-    var out = String(s == null ? '' : s).toLowerCase();
-    out = out.replace(/\u00e1/g, 'a').replace(/\u00e9/g, 'e').replace(/\u00ed/g, 'i')
-      .replace(/\u00f3/g, 'o').replace(/\u00fa/g, 'u').replace(/\u00fc/g, 'u')
-      .replace(/\u00f1/g, 'n');
-    return out;
-  }
-
-  function mismaCiudad(a, b) {
-    var na = normaliza(a), nb = normaliza(b);
-    return na !== '' && nb !== '' && na === nb;
-  }
-
-  function dentroRadio(lat1, lng1, lat2, lng2, km) {
-    if (!km) km = 10;
-    return haversineKm(lat1, lng1, lat2, lng2) <= km;
-  }
-
   /* ---------- normalizacion unificada ---------- */
 
   function normalizeMedia(raw) {
@@ -215,6 +197,29 @@
       }
       return false;
     });
+  }
+
+  // Filtro de los medios PROPIOS de un espacio (ficha del lugar):
+  // conserva origen 'destino' (fotos curadas) y 'destino_album' (album
+  // del espacio) cuyo origen_id (slug que emite el backend) coincide con
+  // el slug/uuid del place abierto. Excluye 'album' (albumes de usuarios)
+  // y cualquier medio de OTRO lugar, aunque este cerca o en la misma
+  // ciudad. Puro: testeable sin mapa.
+  function filterMediaPropios(items, place) {
+    var slug = String((place && place.slug) || '');
+    var uuid = String((place && (place.uuid || place._uuid)) || '');
+    var vistos = {};
+    var out = [];
+    (items || []).forEach(function (it) {
+      if (!it || !it.media_url) return;
+      if (it.origen !== 'destino' && it.origen !== 'destino_album') return;
+      var oid = String(it.origen_id || '');
+      if (!((slug && oid === slug) || (uuid && oid === uuid))) return;
+      if (vistos[it.media_url]) return;
+      vistos[it.media_url] = true;
+      out.push(it);
+    });
+    return out;
   }
 
   /* ---------- clustering por proximidad de pixeles ---------- */
@@ -1129,15 +1134,11 @@
     /* ---------- drawer: contenido ---------- */
 
     function mediasCercanas(place) {
-      var out = [];
-      var pl = place || {};
-      st.media.forEach(function (it) {
-        if (!it.lat || !it.lng) return;
-        var ok = mismaCiudad(pl.ciudad, it.ciudad);
-        if (!ok) ok = dentroRadio(parseFloat(pl.lat), parseFloat(pl.lng), parseFloat(it.lat), parseFloat(it.lng), 10);
-        if (ok && out.length < 40) out.push(it);
-      });
-      return out;
+      // Nombre historico: el drawer muestra SOLO los medios del propio
+      // espacio (fotos de la ficha / su album), no los de lugares
+      // cercanos. La proximidad ciudad/radio se descarto porque mezclaba
+      // fotos de otros lugares (p.ej. La Candelaria o Monserrate en r10).
+      return filterMediaPropios(st.media, place).slice(0, 40);
     }
 
     function tabHtml(place) {
@@ -1154,6 +1155,17 @@
         if (u && fotosArr.indexOf(u) === -1) fotosArr.push(u);
       });
       if (place.foto && fotosArr.indexOf(place.foto) === -1) fotosArr.push(place.foto);
+      // Evita duplicados: la galeria propia del lugar (place.fotos) ya
+      // puede contener las mismas URLs que la capa de media curada del
+      // espacio. Se deduplica por URL antes de calcular hasFotos.
+      var galeriaVistas = {};
+      fotosArr.forEach(function (u) { galeriaVistas[u] = true; });
+      fotosMedia = fotosMedia.filter(function (it) {
+        var u = it && it.media_url;
+        if (!u || galeriaVistas[u]) return false;
+        galeriaVistas[u] = true;
+        return true;
+      });
       var hasFotos = fotosArr.length > 0 || fotosMedia.length > 0;
       var hasVideos = videos.length > 0;
       var hasAudios = audios.length > 0;
@@ -1673,6 +1685,7 @@
     photoPlaceholderHTML: photoPlaceholderHTML,
     haversineKm: haversineKm,
     clusterize: clusterize,
-    filterMediaDefault: filterMediaDefault
+    filterMediaDefault: filterMediaDefault,
+    filterMediaPropios: filterMediaPropios
   };
 })();

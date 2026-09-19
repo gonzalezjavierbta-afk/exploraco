@@ -235,4 +235,29 @@ clickCat({ target: btnAll });
 check('bindCategories: re-click en activo -> activeCat off (oculta pines)', inst2.getState().activeCat === 'off');
 check('bindCategories: selector sin "#" no resuelve (stub)', doc.querySelector('mm-personal-cats') === null);
 
+// ---- (7) filterMediaPropios: el drawer solo muestra medios del propio
+//          espacio (fotos de la ficha / su album), no de lugares cercanos
+//          ni albumes de usuarios (bug: al abrir r10 salian La Candelaria
+//          y Monserrate). -------------------------------------------------
+const mProp = MC.filterMediaPropios;
+check('filterMediaPropios: API exportada', typeof mProp === 'function');
+const r10 = { slug: 'hostal-r10-bogota', uuid: 'uuid-r10', ciudad: 'Bogota', lat: 4.6, lng: -74.06 };
+const mediosMixtos = [
+  { origen: 'destino', origen_id: 'hostal-r10-bogota', media_url: 'r10-a', media_type: 'foto' },
+  { origen: 'destino', origen_id: 'hostal-r10-bogota', media_url: 'r10-b', media_type: 'foto' },
+  { origen: 'destino_album', origen_id: 'hostal-r10-bogota', media_url: 'r10-c', media_type: 'album' },
+  // Mismo lugar y cercania: otra ciudad no, mismo barrio si.
+  { origen: 'destino', origen_id: 'la-candelaria-bogota', media_url: 'cand', media_type: 'foto' },
+  { origen: 'destino', origen_id: 'monserrate-bogota', media_url: 'mons', media_type: 'foto' },
+  // Album de usuario (misma ciudad): NUNCA debe entrar.
+  { origen: 'album', origen_id: 'album-u1', media_url: 'alb', media_type: 'foto' }
+];
+const propios = mProp(mediosMixtos, r10);
+const propiosUrls = propios.map(function (it) { return it.media_url; });
+check('filterMediaPropios: solo medios del slug abierto', propios.length === 3 && propiosUrls.indexOf('cand') === -1 && propiosUrls.indexOf('mons') === -1);
+check('filterMediaPropios: incluye destino y destino_album del espacio', propiosUrls.indexOf('r10-a') !== -1 && propiosUrls.indexOf('r10-c') !== -1);
+check('filterMediaPropios: excluye album de usuario', propiosUrls.indexOf('alb') === -1);
+check('filterMediaPropios: deduplica por URL', mProp([{ origen: 'destino', origen_id: 'x', media_url: 'u' }, { origen: 'destino', origen_id: 'x', media_url: 'u' }], { slug: 'x' }).length === 1);
+check('filterMediaPropios: place sin slug/uuid -> vacio', mProp(mediosMixtos, {}).length === 0);
+
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');
