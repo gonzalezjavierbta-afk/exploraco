@@ -205,8 +205,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .av-album-card-meta{font-size:10px;color:rgba(255,255,255,.45)}
 .av-album-card-stats{font-size:10px;color:var(--gold);font-weight:700;margin-top:2px}
 .av-feed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.av-feed-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.av-feed-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:center;cursor:pointer}
 .av-feed-card img,.av-feed-card video,.av-feed-card audio{max-width:100%}
+/* Detalle de media en pop up (reusa #av-album-modal al hacer click en una tarjeta del feed) */
+.av-media-detail{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.av-media-detail img,.av-media-detail video{max-width:100%;border-radius:10px;background:#000;display:block}
+.av-media-detail audio{width:100%;display:block}
+.av-media-detail .av-feed-actions{justify-content:center}
 .av-feed-title{font-size:11px;font-weight:700;color:#fff;text-align:center;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .av-feed-meta{font-size:10px;color:rgba(255,255,255,.45);text-align:center}
 .av-feed-votos{font-size:10px;color:var(--gold);font-weight:700}
@@ -470,7 +475,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <div id="av-album-modal" class="av-album-modal" role="dialog" aria-label="Álbum de la comunidad">
   <div class="av-album-box" onclick="event.stopPropagation()">
     <div class="av-album-bar">
-      <div class="av-album-bar-title">Álbum de la comunidad</div>
+      <div class="av-album-bar-title" id="av-album-bar-title">Álbum de la comunidad</div>
       <button class="av-album-close" onclick="cerrarAlbumModal()" aria-label="Cerrar">&times;</button>
     </div>
     <div id="av-album-body" class="av-album-body"></div>
@@ -1860,22 +1865,25 @@ function avEmbedUrl(url) {
   if (m) return 'https://player.vimeo.com/video/' + m[1];
   return null;
 }
-function avMediaHTML(item) {
+function avMediaHTML(item, large) {
   var url = esc(item.media_url || '');
   var type = item.media_type;
   if (type === 'foto') {
-    return '<img src="' + url + '" style="max-width:200px;max-height:150px;border-radius:8px" loading="lazy" onerror="this.style.display=\'none\'">';
+    return '<img src="' + url + '" style="' + (large ? 'max-width:100%;max-height:60vh' : 'max-width:200px;max-height:150px') + ';border-radius:8px" loading="lazy" onerror="this.style.display=\'none\'">';
   }
   if (type === 'video') {
     var embed = avEmbedUrl(item.media_url);
     if (embed) {
-      return '<div style="position:relative;width:100%;max-width:200px;height:113px;border-radius:8px;overflow:hidden;background:#000">'
+      var wrapStyle = large
+        ? 'position:relative;width:100%;max-width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000'
+        : 'position:relative;width:100%;max-width:200px;height:113px;border-radius:8px;overflow:hidden;background:#000';
+      return '<div style="' + wrapStyle + '">'
         + '<iframe src="' + esc(embed) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media" allowfullscreen></iframe></div>';
     }
-    return '<video controls src="' + url + '" style="max-width:200px;max-height:150px;border-radius:8px;background:#000;display:block" preload="metadata"></video>';
+    return '<video controls src="' + url + '" style="' + (large ? 'max-width:100%' : 'max-width:200px;max-height:150px') + ';border-radius:8px;background:#000;display:block" preload="metadata"></video>';
   }
   if (type === 'audio') {
-    return '<audio controls src="' + url + '" style="width:100%;max-width:200px;display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
+    return '<audio controls src="' + url + '" style="width:100%;' + (large ? 'max-width:100%' : 'max-width:200px') + ';display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
   }
   return '<div style="font-size:10px;color:#999;padding:6px">Tipo no soportado</div>';
 }
@@ -1931,6 +1939,8 @@ function abrirAlbumModal(albumId) {
   var body = document.getElementById('av-album-body');
   if (!modal || !body) return;
   modal.classList.add('on');
+  var barTitle = document.getElementById('av-album-bar-title');
+  if (barTitle) barTitle.textContent = '\u00c1lbum de la comunidad';
   body.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,.4);font-size:12px">Cargando \u00e1lbum\u2026</div>';
   fetch('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId)
     + (avUidActual() ? '&usuario_id=' + encodeURIComponent(avUidActual()) : ''))
@@ -1981,6 +1991,32 @@ function abrirAlbumModal(albumId) {
 function cerrarAlbumModal() {
   var modal = document.getElementById('av-album-modal');
   if (modal) modal.classList.remove('on');
+}
+function abrirMediaModal(f) {
+  var modal = document.getElementById('av-album-modal');
+  var body = document.getElementById('av-album-body');
+  if (!modal || !body || !f) return;
+  modal.classList.add('on');
+  var t = document.getElementById('av-album-bar-title');
+  if (t) t.textContent = 'Publicaci\u00f3n';
+  var item = { media_url: f.foto_url, media_type: f.foto_type, media_title: f.media_title };
+  body.innerHTML = '<div class="av-media-detail">'
+    + avMediaHTML(item, true)
+    + (f.media_title ? '<div class="av-feed-title">' + esc(f.media_title) + '</div>' : '')
+    + '<div class="av-feed-meta">' + esc(f.autor_nombre || 'Viajero')
+    + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '')
+    + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '') + '</div>'
+    + '<div class="av-feed-actions">'
+    + avActLikeHTML(f)
+    + '<button type="button" class="av-act" data-comments-for="' + esc(String(f.id))
+    + '" data-comments-fuente="album_foto" onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios</button>'
+    + '<div class="av-feed-comments" data-comments-for="' + esc(String(f.id))
+    + '" data-comments-fuente="album_foto" style="display:none"></div>'
+    + avActSaveHTML(f)
+    + '</div>'
+    + '</div>';
+  avBindMediaActions(body);
+  avSyncMediaActions(body);
 }
 
 var _avMapInitialized = false;
@@ -2160,6 +2196,12 @@ function feedCardAV(f) {
     + '" data-comments-fuente="album_foto" style="display:none"></div>'
     + avActSaveHTML(f)
     + '</div>';
+  card.style.cursor = 'pointer';
+  card.onclick = function(ev){
+    var t = ev && ev.target;
+    if (t && t.closest && t.closest('.av-feed-actions')) return;
+    abrirMediaModal(f);
+  };
   return card;
 }
 
