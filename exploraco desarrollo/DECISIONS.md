@@ -1978,3 +1978,153 @@ Reusar el patron admin existente (Bearer `ADMIN_SECRET` + email de sesion) evita
 **Hotfixes post-QA (J-1..J-3, 2026-09-18):** no corresponden a decisiones nuevas; implementan las decisiones (c), (d) y (h) con seguridad y degradacion. J-2 corrige un IDOR (BUG-064, CERRADO en v23), J-1 mitiga con degradacion 42703 y J-3 con throttle por instancia. Detalle en la seccion "Actualizacion post-QA" de este ADR.
 
 **ADRs relacionados:** ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico), ADR-006 (baseline real), ADR-008 (idempotencia), ADR-010 (presupuesto de endpoints), ADR-025 (sesion firmada), ADR-028 (Casas `usuarios.casa` y chat/DM), ADR-029 (admin por email/`ADMIN_SECRET`), ADR-033 (radio de verificacion), ADR-035 (niveles/eras y `red2`), ADR-038 (cofre de Casa y `acreditarClaseYCofre`), ADR-039/ADR-040 (release v22 compartido), BUG-021 (deuda de columnas no versionadas).
+
+---
+
+## ADR-042: Zonas geograficas, modulo Marcas/patrocinios y extension de consumibles para canjes de marca (migracion 027)
+
+**ID:** ADR-042
+**Fecha:** 2026-09-18
+**Estado:** **IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Verificado contra archivo real (ADR-006): existe `db/migrations/027_zonas_marcas.sql` (348 lineas, idempotente ADR-008, ASCII-safe ADR-002: 0 bytes >127) y existen `scripts/verify_027_precheck.js` (258 lineas), `scripts/diagnose_fotos_brsk84.js` (310 lineas) y `db/cleanups/002_fix_fotos_brsk84.sql` (151 lineas); las ramas `marca_activar`/`marca_patrocinar`/`mi_marca` viven en `api/usuarios.js` (L1192-1266 y L296-306). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar la 027 y el cleanup 002 en Neon ANTES del deploy** (patron BUG-021/BUG-060; no hay `DATABASE_URL` local).
+**Autor:** sql-security + architect (AI-DOS); origen: paquete `prompt.md` (untracked) DB-01/DB-02 + BE-01; cierre documental por docs-keeper.
+**Nota de numeracion:** el 042 es el consecutivo real tras ADR-041 (mayor registrado en este documento al 2026-09-18, verificado con `^## ADR-` sobre el archivo real, ADR-006). No estaba reservado.
+**Alcance de esquema:** crea `zonas_geograficas`, `areas_geograficas`, `ranking_zonas`, `marcas` y `patrocinios`; altera `consumibles` (aditivo) y crea la vista `consumibles_precio`. NO toca `destinos.tags` JSONB ni ninguna categoria del directorio.
+
+### Contexto
+
+La sesion "Modulos nuevos + bugs activos" del 2026-09-18 (TSK-119..TSK-122) introduce una capa territorial y un modulo de Marcas/patrocinadores sobre el sistema social/gaming, sin crear funciones serverless (presupuesto 8/8, ADR-001/ADR-010):
+
+1. **Territorio:** se necesitan zonas geograficas fijas (Caribe/Pacifico/Andes/Llanos/Amazonia), areas/barrios con centroide lat/lng y radio, y un ranking por capa territorial (area/ciudad/zona) sobre recursos de media (`album_fotos`).
+2. **Marcas:** un usuario de nivel >= 5 puede activar una Marca (1 por usuario) y patrocinar objetivos (evento/artista/parche/mision), con consumo de XP.
+3. **Canjes de marca:** los consumibles necesitan stock, precio efectivo oferta/demanda y tipo de canje (`qr`/`codigo`/`ticket`), asociables a una Marca.
+
+Restricciones vigentes: 8/8 de funciones serverless (ADR-001/ADR-010), cero borrado logico (ADR-003/Regla de Oro 3), migraciones aditivas e idempotentes (ADR-008), ASCII-safe (ADR-002) y baseline = archivo real (ADR-006).
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Numerar la migracion `001_zonas_marcas.sql` (prompt original) vs `027` (ELEGIDA).** El consecutivo real tras la 026 es 027; el 001 colisionaria con `001_*` historico y rompe la trazabilidad de `db/migrations/`. *Decision (a).*
+2. **`precio_xp_base`/`precio_xp_actual` como `INTEGER` (prompt) vs `NUMERIC(12,2)` (ELEGIDA).** La 021 convirtio `consumibles.precio_xp` a `numeric(12,2)`; mantener el precio nuevo en `numeric(12,2)` evita mezclar escalas de XP y respeta el redondeo unico (ADR-035). *Decision (b).*
+3. **FK polimorfica en `patrocinios (tipo_objetivo, objetivo_id)` (RECHAZADA) vs SIN FK con deuda documentada (ELEGIDA).** No existen tablas `eventos`/`artistas`/`misiones` en el esquema (el "parche" real es `pandillas`); una FK exigiria inventar entidades. La integridad queda a cargo del backend (`TIPOS_VALIDOS` en `marca_patrocinar`). Deuda consciente. *Decision (c).*
+4. **`ranking_zonas.recurso_tipo` default `'album_foto'` (prompt) vs `'album_fotos'` (ELEGIDA).** La tabla real es `album_fotos` (plural); el default debe coincidir con la tabla real. *Decision (d).*
+5. **Sembrar `areas_geograficas` en la migracion (RECHAZADA en v1) vs tabla vacia + siembra posterior con lat/lng reales (ELEGIDA).** No hay coordenadas verificadas de las areas; sembrar datos inventados seria peor que diferir. Se documenta como siguiente paso (OSM). *Decision (e).*
+6. **Gate de nivel con `usuarios.nivel` (prompt) vs `calcularNivel(xp_total).nivel` (ELEGIDA).** `usuarios.nivel` esta STALE (se deriva de `xp_total` en lectura, ADR-035); el gate debe usar la funcion derivada. *Decision (f).*
+7. **`mi_marca` owner-only con JWT vs lectura publica por `usuario_id` (ELEGIDA provisionalmente, ABIERTA).** El prompt no definio auth para el GET; se implemento lectura publica con subquery de patrocinios. Queda como decision pendiente si debe exigir `validarSesionUsuario`. *Decision (g).*
+
+### Decision tomada
+
+**(A) Migracion 027 (`db/migrations/027_zonas_marcas.sql`)** - la UNICA de este ADR, aditiva, idempotente (ADR-008) y ASCII-safe (ADR-002):
+- **`zonas_geograficas`:** `id SERIAL`, `slug TEXT UNIQUE`, `nombre`, `emoji` (via `U&'\+xxxxxx'`: `+01F30A`/`+01F333`/`+0026F0`/`+01F33E`/`+01F40D`), `poligono JSONB` (GeoJSON simplificado futuro), `creado_en`. Seed idempotente de 5 zonas (`caribe`/`pacifico`/`andes`/`llanos`/`amazonia`) con `ON CONFLICT (slug) DO NOTHING`; el slug es la clave natural que referencian areas y ranking.
+- **`areas_geograficas`:** `id SERIAL`, `slug TEXT UNIQUE`, `nombre`, `ciudad`, `zona_slug REFERENCES zonas_geograficas(slug)`, `lat`/`lng NUMERIC(10,7)`, `radio_km NUMERIC(6,3) DEFAULT 1.5`, `activo DEFAULT TRUE`, `creado_en`; indice `idx_areas_ciudad_zona`. **Sin filas sembradas en v1.**
+- **`ranking_zonas`:** `id SERIAL`, `recurso_id TEXT`, `recurso_tipo TEXT NOT NULL DEFAULT 'album_fotos'`, `punto_lat`/`punto_lng`, `area_slug`/`ciudad`/`zona_slug`, `score_area`/`score_ciudad`/`score_zona INTEGER DEFAULT 0`, `likes_total`/`comentarios_total INTEGER DEFAULT 0`, `actualizado_en`, `UNIQUE (recurso_id, recurso_tipo)` + indices `idx_ranking_area`/`idx_ranking_ciudad`/`idx_ranking_zona`.
+- **`marcas`:** `id UUID`, `usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE`, `nombre`, `logo_url`, `banner_url`, `descripcion`, `areas_influencia JSONB DEFAULT '[]'`, `enlaces JSONB DEFAULT '{}'`, `activa DEFAULT TRUE`, `verificada DEFAULT FALSE`, `nivel_requerido INTEGER DEFAULT 5`, `creado_en`, `UNIQUE (usuario_id)` (1 marca por usuario); indice parcial `idx_marcas_activa`.
+- **`patrocinios`:** `id UUID`, `marca_id UUID NOT NULL REFERENCES marcas(id) ON DELETE CASCADE`, `tipo_objetivo TEXT`, `objetivo_id TEXT` (**sin FK, ver deuda**), `xp_aportada`/`fama_bonus INTEGER DEFAULT 0`, `branding_data JSONB DEFAULT '{}'`, `activo DEFAULT TRUE`, `creado_en`; indices `idx_patrocinios_marca` e `idx_patrocinios_objetivo`.
+- **`consumibles` (DB-02, aditivo):** `marca_id UUID REFERENCES marcas(id)` (nullable), `stock_total INTEGER` (NULL = ilimitado), `stock_usado INTEGER NOT NULL DEFAULT 0`, `precio_xp_base NUMERIC(12,2) NOT NULL DEFAULT 0`, `precio_xp_actual NUMERIC(12,2)` (NULL = usa base), `tipo_canje TEXT` (`qr`/`codigo`/`ticket`); indice parcial `idx_consumibles_marca`.
+- **Vista `consumibles_precio`:** `precio_xp_efectivo` con ley de oferta/demanda (`GREATEST(precio_xp_base, ROUND(precio_xp_base * (1 + stock_usado/stock_total)))`) y `stock_disponible` (`COALESCE(stock_total - stock_usado, 99999)`), filtrando `activo=TRUE`.
+
+**(B) Backend (`api/usuarios.js`) - ramas de Marca (TSK-120..TSK-122).** Ver el detalle en TASKS.md:
+- `POST ?tipo=marca_activar`: auth JWT (`validarSesionUsuario(...).ok`), gate `calcularNivel(xp_total).nivel >= 5`, UPSERT por `usuario_id` con MERGE JSONB (`||`) y `COALESCE`.
+- `POST ?tipo=marca_patrocinar`: auth JWT, `tipo_objetivo` en `['evento','artista','parche','mision']`, Marca propia y activa obligatoria, `INSERT ... RETURNING id`.
+- `GET ?tipo=mi_marca`: `SELECT m.*` + `COUNT` de patrocinios activos; `LIMIT 1`; **auth abierta (decision g pendiente)**.
+
+**(C) Remediacion de datos (fuera del DDL).** `db/cleanups/002_fix_fotos_brsk84.sql` (NUEVO, 151 lineas) aplica soft-delete a las fotos con `foto_url` vacia de la cuenta reportada (`visible=false`/`activo=false`), acotado por email y estado exacto, idempotente y sin borrar filas (Regla de Oro 3). Su causa raiz es BUG-065 (el INSERT legacy `album_agregar_foto` no escribe `visible` y hereda el `DEFAULT false` de la 025).
+
+### Justificacion
+
+Versionar las 5 tablas y la extension de `consumibles` en una unica migracion aditiva mantiene el principio ADR-008 (todo cambio de esquema reproducible desde el repo) sin tocar `destinos.tags` (ADR-004). Elegir `027` sobre `001` preserva la secuencia real. Mantener `precio_xp_base`/`precio_xp_actual` en `numeric(12,2)` respeta el contrato de XP decimal de ADR-035. No crear FK sobre `patrocinios (tipo_objetivo, objetivo_id)` es la unica opcion coherente mientras no existan las entidades destino; se documenta como deuda para no fingir integridad que el esquema no puede dar. Reusar `marcas`/`patrocinios` en lugar de JSONB en `usuarios` permite consultar patrocinios por objetivo e integrar consumibles de marca por indice. El gate con `calcularNivel(xp_total)` evita la columna stale. Todo entra como ramas `?tipo=` sin crear archivos en `api/`: el presupuesto 8/8 queda intacto.
+
+### Impacto
+
+- **Migracion NUEVA** `db/migrations/027_zonas_marcas.sql` (348 lineas). Aplicar el archivo COMPLETO en Neon (preflight read-only `scripts/verify_027_precheck.js`); re-ejecutar es no-op.
+- **Backend:** `api/usuarios.js` agrega 3 ramas (`marca_activar` L1197, `marca_patrocinar` L1238, `mi_marca` L297) sin endpoint nuevo. **Header sin bump (sigue v18)** -> drift de version documentado (ADR-006).
+- **Frontend:** `mi-perfil.html` (FE-01/FE-02 + `#arbol-body`) e `index.html` (FE-03); `api/pagina-destino.js` (BE-02, LIMIT 24 -> 200). Los assets frontend no cuentan contra 8/8.
+- **Datos:** `db/cleanups/002_fix_fotos_brsk84.sql` (remediacion idempotente) y `scripts/diagnose_fotos_brsk84.js` (diagnostico read-only).
+- **PyP:** `marcas`/`patrocinios` alimentan una futura UI de Marcas y patrocinios; `consumibles_precio` habilita precios dinamicos por stock.
+- **Verificacion exigible al cierre:** Escudo GOLD (`node --check` 4 `.js`, ASCII-safe 0 bytes >127 en `.js`/`.sql`, balance de divs 446/446 en `mi-perfil.html` y 523/523 en `index.html`); `c.tipo === 'marca_` = 2; `mpa-media-pin-video` = 2; `destinos_fotos ... LIMIT 200` = 1; ids unicos.
+
+### Consecuencias positivas
+
+- Capa territorial y modulo de Marcas versionados y reproducibles desde el repo.
+- Ranking por tres capas (area/ciudad/zona) sin duplicar datos: el score se materializa en `ranking_zonas`.
+- Consumibles con stock y precio efectivo calculado en una vista, sin tocar el catalogo base.
+- Patrocinios consultables por objetivo mediante indice, con `branding_data` JSONB para personalizacion.
+- Cero endpoints nuevos, cero DROP, ASCII-safe e idempotencia ADR-008.
+
+### Consecuencias negativas / riesgos residuales
+
+- **Migracion 027 pendiente (BLOQUEANTE):** sin aplicarla, `marca_activar`/`marca_patrocinar`/`mi_marca` fallan; aplicar ANTES del deploy.
+- **`areas_geograficas` vacia:** las areas reales con lat/lng (y su radio) quedan como siguiente paso; sin ellas el ranking territorial no tiene insumo.
+- **`patrocinios` sin integridad referencial:** `objetivo_id` puede apuntar a un objetivo inexistente; el backend solo valida el tipo, no la existencia (deuda c).
+- **`areas_influencia` sin dedupe:** el MERGE con `||` acumula duplicados en reenvios.
+- **Datos de los patrocinios no acreditan nada:** `xp_aportada`/`fama_bonus` se persisten pero no se aplican a objetivos ni a la economia en v1 (solo registro).
+- **`mi_marca` sin auth (decision g abierta):** superficie enumerable por `usuario_id`.
+- **Header drift:** `api/usuarios.js` sigue rotulado v18 y `api/pagina-destino.js` no subio por el fix de 1 linea; corregir en el commit.
+- **BUG-065 ABIERTO:** el INSERT de `album_agregar_foto` sigue sin `visible`; la remediacion 002 corrige datos, no la causa. **BUG-066 CERRADO** (regresion FE-02). BUG-002/BUG-061 siguen ABIERTOS.
+
+### Decisiones de la sesion (mapeo explicito a-g)
+
+| Letra | Decision registrada |
+|---|---|
+| (a) | Migracion **027** (no `001`) por consecutivo real tras la 026. |
+| (b) | `precio_xp_base`/`precio_xp_actual` en `NUMERIC(12,2)` (no `INTEGER`) por consistencia con 021/ADR-035. |
+| (c) | `patrocinios.objetivo_id` polimorfico **sin FK**; integridad al backend (deuda documentada). |
+| (d) | `ranking_zonas.recurso_tipo` default `'album_fotos'` (tabla real). |
+| (e) | `areas_geograficas` se crea VACIA; la siembra con lat/lng reales (OSM) queda como siguiente paso. |
+| (f) | Gate de nivel con `calcularNivel(xp_total).nivel >= 5` (no `usuarios.nivel`, stale). |
+| (g) | `GET mi_marca` queda como lectura publica por `usuario_id` (auth owner-only = decision PENDIENTE). |
+
+**ADRs relacionados:** ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / MERGE JSONB), ADR-006 (baseline real), ADR-008 (SQL versionado / idempotencia), ADR-010 (presupuesto de endpoints), ADR-025 (sesion firmada), ADR-035 (XP `numeric(12,2)` y niveles derivados), ADR-039/ADR-041 (precedentes de migracion aditiva y degradacion), ADR-043 (patron de UI derivado de FE-02), BUG-021/BUG-060 (deuda de columnas no versionadas), BUG-065 (INSERT sin `visible`).
+
+---
+
+## ADR-043: Contenedor persistente separado del host de inyeccion dinamica (patron anti-regresion de UI anidada)
+
+**ID:** ADR-043
+**Fecha:** 2026-09-18
+**Estado:** **APROBADO E IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Verificado contra archivo real (ADR-006): `mi-perfil.html` L953-960 (titulo fusionado + `#arbol-body`), L3639-3640 y L3655-3656 (las funciones de arbol apuntan a `#arbol-body`). Re-QA con parser DOM + `node vm`: APTO.
+**Autor:** qa-auditor + frontend-tpl (AI-DOS); origen: regresion FE-02 de TSK-119 (BUG-066); cierre documental por docs-keeper.
+**Nota de numeracion:** el 043 es el consecutivo real tras ADR-042 (2026-09-18).
+**Alcance:** patron de UI/plantillas. NO toca esquema, endpoints ni el presupuesto 8/8.
+
+### Contexto
+
+FE-02 de TSK-119 fusiono "Mi Clase" dentro de "Arbol de Clases" en `mi-perfil.html`: `#pf-clase` (widget estatico de la profesion Rising Star) paso a ser un hijo de `#arbol-clases`. Sin embargo, `arbolPintar()` y `cargarArbolClases()` renderizaban el arbol con `host.innerHTML = ...` sobre `#arbol-clases` (el ANCESTRO de `#pf-clase`), de modo que cada refresco destruia el widget anidado en runtime. El sintoma no se veia en el HTML estatico (divs 446/446, ambos ids presentes) y solo aparecia al ejecutar la carga del arbol: es el mismo patron de BUG-020/TSK-065 (UI desconectada detectable solo en runtime). El detalle del bug vive en `BUGS_HISTORICOS.md` BUG-066.
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Dejar `#pf-clase` dentro del host dinamico y re-inyectarlo en cada render (RECHAZADA).** Acopla el widget estatico al ciclo de render del arbol, obliga a reconstruirlo y es facil de olvidar en cada nuevo `innerHTML=`.
+2. **Reemplazar `innerHTML=` por `appendChild`/`replaceChildren` selectivo en las funciones del arbol (RECHAZADA como solucion unica).** Exige un refactor amplio de varias funciones y no protege a futuros contenedores que vuelvan a anidarse.
+3. **Host de inyeccion dedicado `#arbol-body` con `#pf-clase` como hijo directo persistente (ELEGIDA).** El render dinamico escribe SOLO en `#arbol-body`; `#pf-clase` queda fuera de su alcance y sobrevive a cualquier refresco.
+4. **Mover `#pf-clase` fuera de `#arbol-clases` (RECHAZADA).** Rompe la fusion de FE-02 (el requerimiento pedia integrar la Clase al Arbol de Clases).
+
+### Decision tomada
+
+En `mi-perfil.html`, la seccion "Clase & Arbol de Progreso" se estructura en dos contenedores hermanos:
+
+- `#pf-clase` como hijo DIRECTO y persistente de `#arbol-clases` (nunca tocado por el render del arbol).
+- `#arbol-body` como host EXCLUSIVO de la inyeccion dinamica (`arbolPintar()` y `cargarArbolClases()` hacen `getElementById('arbol-body')` y escriben ahi).
+
+Regla general: **cuando un contenedor persistente deba convivir con un render dinamico, el host de inyeccion se separa en un nodo propio; prohibido `innerHTML=` sobre un ancestro que contenga widgets estaticos.**
+
+### Justificacion
+
+La separacion es minima (un `div` intermedio), no cambia la estructura visual ni el contrato de datos, y elimina de raiz la clase de regresion: cualquier futuro `innerHTML=` en el render del arbol escribe en un nodo que no contiene la Clase. Las opciones 1/2 dependen de disciplina o de un refactor grande; la opcion 3 es estructural y barata, y ademas coincide con el patron ya usado en el proyecto para aislar host de inyeccion y widgets persistente (sub-tabs del admin). No requiere endpoint ni migracion.
+
+### Impacto
+
+- `mi-perfil.html`: `#arbol-clases` contiene `#pf-clase` (persistente) + `#arbol-body` (dinamico). Sin cambios de esquema, backend, endpoints ni `api/` (8/8 intacto).
+- Re-QA obligatoria: la verificacion debe ejecutar las funciones reales (parser DOM + `node vm`) y comprobar que `#pf-clase` sigue en el DOM DESPUES de `arbolPintar()`/`cargarArbolClases()`; el balance de divs y la presencia de ids en el HTML estatico NO bastan.
+- Compatible con el Escudo GOLD vigente (`node --check`, ASCII-safe, balance de divs).
+
+### Consecuencias positivas
+
+- `#pf-clase` sobrevive a cualquier refresco del Arbol de Clases (regresion BUG-066 cerrada de raiz).
+- Patron reutilizable y barato para futuras secciones con contenido estatico + render dinamico.
+- Sin deuda tecnica nueva: cero endpoints, cero migraciones, cero dependencias.
+
+### Consecuencias negativas / riesgos residuales
+
+- Un contenedor extra (`#arbol-body`) en el DOM; nulo impacto visual.
+- El patron depende de que el render dinamico NO se vuelva a apuntar a `#arbol-clases`; el re-QA runtime y esta ADR son el guardrail. Un futuro desarrollador debe consultar esta ADR antes de tocar `arbolPintar()`/`cargarArbolClases()`.
+- **Leccion de QA:** la UI anidada solo se detecta ejecutando; la verificacion estatica (parser/balance) da falsos APTO. Ver tambien la seccion "Prevencion" de BUG-066.
+
+**ADRs relacionados:** ADR-002 (ASCII-safe), ADR-004 (aislamiento atomico de estilos), ADR-006 (baseline real), ADR-028 (Arbol de Clases), ADR-038 (Mi Clase / Clases Rising Star), ADR-039/ADR-041 (precedentes de QA de UI), BUG-020 (patron de UI desconectada detectada solo en runtime), BUG-066 (regresion que origina este patron).

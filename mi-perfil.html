@@ -433,7 +433,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-casa .pf-casa-actual{font-size:11px;font-weight:700;color:#22C55E;padding:6px 0}
 .pf-casa .pf-casa-tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;margin-top:8px}
 .pf-casa .pf-casa-dato{font-size:10px;color:rgba(255,255,255,.45);margin-top:4px}
-/* TSK-112 / ADR-038: Mi Clase (profesion Rising Star; coexiste con el arbol) */
+/* TSK-112 / ADR-038 + FE-02: Mi Clase (profesion Rising Star; integrada en la misma tarjeta .arbol-clases) */
 .pf-clase{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px}
 .pf-clase .pf-clase-cabeza{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .pf-clase .pf-clase-nombre{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#fff}
@@ -675,7 +675,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   </div>
 
   <!-- FOTOS PUBLICADAS (ADR-032: solo lectura publica, visible=true server-side) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F4F8; Fotos publicadas</div>
+  <div class="pf-section-title" id="mis-fotos-title" style="margin-top:20px" data-tab="museo">&#x1F4F8; Fotos publicadas</div>
   <div id="mis-fotos-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:12px;">
     <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando fotos...</p>
   </div>
@@ -920,9 +920,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3E0; Mi Casa</div>
   <div class="pf-casa" id="pf-casa" data-tab="clase"></div>
 
-  <!-- TSK-112 / ADR-038: MI CLASE (profesion Rising Star; coexiste con el arbol de 16 ramas) -->
-  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">Mi Clase</div>
-  <div class="pf-clase" id="pf-clase" data-tab="clase"></div>
   <div id="modal-clase" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1200;justify-content:center;align-items:center;padding:16px;" onclick="if(event.target===this)cerrarModalClase()">
     <div style="background:#111;border:1px solid rgba(232,160,32,.35);border-radius:12px;padding:20px;width:min(460px,100%);font-family:Outfit,sans-serif;">
       <div class="pf-clase-modal-title">Elegir / Cambiar Clase</div>
@@ -953,9 +950,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   </div>
 
   <!-- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES -->
-  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x2694;&#xFE0F; Arbol de Clases</div>
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x2694;&#xFE0F; Clase &amp; Arbol de Progreso</div>
   <div class="arbol-clases" id="arbol-clases" data-tab="clase">
-    <div class="arbol-cargando">Abriendo tu Arbol de Clases&#8230;</div>
+    <!-- TSK-112 / ADR-038 + FE-02: Clase (profesion Rising Star) integrada al arbol -->
+    <div class="pf-clase" id="pf-clase" data-tab="clase" style="margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:14px;"></div>
+    <div id="arbol-body">
+      <div class="arbol-cargando">Abriendo tu Arbol de Clases&#8230;</div>
+    </div>
   </div>
   <!-- GAMING v5.0 / ADR-028: MENSAJES DIRECTOS (DM) -->
   <div class="pf-section-title" style="margin-top:28px" data-tab="mensajes">&#x1F4E8; Mensajes</div>
@@ -1189,8 +1190,13 @@ function renderPerfil() {
   if (btnAlbum) btnAlbum.style.display = 'block';
   cargarMisAlbumes();
 
-  /* mis fotos y guardados de media (ADR-032) */
-  cargarMisFotos();
+  /* mis fotos y guardados de media (ADR-032); Fotos publicadas solo admin (FE-01) */
+  if (esCuentaFotosPublicadas()) {
+    cargarMisFotos();
+  } else {
+    setStyle('mis-fotos-title', 'display', 'none');
+    setStyle('mis-fotos-grid', 'display', 'none');
+  }
   cargarMisGuardadosMedia();
 
   /* T5 (ADR-039): gestion del Museo (todos los recursos, privados incluidos) */
@@ -2132,6 +2138,13 @@ function mediaCardHTML(m, opts) {
     + '</div></div>';
 }
 
+/* FE-01: "Fotos publicadas" solo se muestra a la cuenta admin. Unico helper
+   de visibilidad (Regla de No-Duplicidad); reusa sesion(). */
+function esCuentaFotosPublicadas() {
+  var u = sesion();
+  return !!(u && u.email === 'brsk84@gmail.com');
+}
+
 function cargarMisFotos() {
   cargarMediaGrid({ gridId: 'mis-fotos-grid', tipo: 'mis_fotos', quitar: false,
     cargando: 'Cargando fotos...',
@@ -2470,7 +2483,7 @@ function museoGuardar() {
     if (res.logros && res.logros.length) res.logros.forEach(function(l){ showToast('\uD83C\uDFC6 Logro: ' + (l.nombre || l.id)); });
     museoCerrarModal();
     museoRefrescar();
-    cargarMisFotos();
+    if (esCuentaFotosPublicadas()) cargarMisFotos();
     cargarMuseoPreview(u.id);
   }, function(msg){
     museoFormMsg(msg, false);
@@ -2487,7 +2500,7 @@ function museoEliminar(id) {
     showToast('Recurso eliminado');
     var u = sesion();
     museoRefrescar();
-    cargarMisFotos();
+    if (esCuentaFotosPublicadas()) cargarMisFotos();
     if (u) cargarMuseoPreview(u.id);
   });
 }
@@ -2498,7 +2511,7 @@ function museoToggleVisible(id, visible) {
     showToast(visible ? 'Recurso ahora es publico' : 'Recurso ahora es privado');
     var u = sesion();
     museoRefrescar();
-    cargarMisFotos();
+    if (esCuentaFotosPublicadas()) cargarMisFotos();
     if (u) cargarMuseoPreview(u.id);
   });
 }
@@ -3624,7 +3637,7 @@ function arbolPanelHtml(faccion) {
   return h;
 }
 function arbolPintar() {
-  var host = document.getElementById('arbol-clases');
+  var host = document.getElementById('arbol-body');
   if (!host) return;
   var facciones = arbolFaccionesDisponibles();
   ARBOL_ESTADO.tip = {};
@@ -3640,7 +3653,7 @@ function arbolPintar() {
   if (ARBOL_ESTADO.tab === 'artistas') { cargarVocaciones(ARBOL_ESTADO.uid); cargarMisionesArtista(ARBOL_ESTADO.uid); }
 }
 function cargarArbolClases(uid) {
-  var host = document.getElementById('arbol-clases');
+  var host = document.getElementById('arbol-body');
   if (!host || !uid) return;
   if (ARBOL_ESTADO.uid !== String(uid)) {
     ARBOL_ESTADO.uid = String(uid);
@@ -4429,7 +4442,7 @@ function renderClase(data) {
   var meta = pfClaseMeta(data && data.clase_id);
   if (!meta) {
     con.innerHTML = '<div class="pf-clase-cabeza"><span class="pf-clase-nombre">Sin Clase</span></div>'
-      + '<div class="pf-clase-nota">Elige una profesion: tu Clase sube de nivel y multiplica tu XP. Coexiste con el Arbol de Clases.</div>'
+      + '<div class="pf-clase-nota">Elige una profesion: tu Clase sube de nivel y multiplica tu XP. Ahora vive integrada en tu Arbol de Clases, aqui arriba.</div>'
       + '<button type="button" class="pf-clase-btn" id="btn-elegir-clase" onclick="abrirModalClase()">Elegir Clase</button>';
     return;
   }

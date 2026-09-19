@@ -1063,6 +1063,29 @@ el Escudo GOLD a futuro: grep de `explorac\u043E` en los HTML estaticos.
 **Evidencia (ADR-006):** `api/interacciones.js` v23 L5824-5849 (rama `casa_tributo_config`), L5835 (`validarSesion(req, usuarioId2).ok`), L5837-5841 (lookup + comparacion de `lider_user_id`); L18 (entrada de changelog v23).
 **Estado:** CERRADO / CORREGIDO (hotfix J-2, `api/interacciones.js` v23, working tree 2026-09-18; SIN commitear).
 
+## BUG-065: `album_agregar_foto` inserta fotos sin `visible` -- con el `DEFAULT false` de la 025 las fotos nacen privadas aunque las misiones las cuenten como publicadas
+
+**Severidad:** MEDIA-ALTA (consistencia de visibilidad: fotos legitimas invisibles y conteos de mision inflados).
+**Contexto:** detectado el 2026-09-18 durante la remediacion de las fotos de brsk84 (TSK-119), al investigar por que "5 fotos figuran publicadas y no se ven". Tambien explica el sintoma reportado en la cuenta.
+**Sintoma:** `GET ?tipo=mis_fotos` y los checks de misiones cuentan/devuelven fotos del usuario como publicadas, pero la UI no puede renderizarlas o el lector publico no las muestra porque `album_fotos.visible=false`.
+**Causa raiz:** la migracion 025 dejo `album_fotos.visible boolean NOT NULL DEFAULT false` (ADR-039: privado por defecto). El endpoint legacy `album_agregar_foto` (`api/interacciones.js` ~L6663-6667) hace `INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, xp_otorgado_autor) VALUES (...) RETURNING *` SIN la columna `visible`; por tanto toda foto subida por esa via nace privada. Como los checks de misiones cuentan `album_fotos` por `agregador_id` sin filtrar `visible`/`activo`, para el usuario "publicada" y para el publico invisible.
+**Evidencia (ADR-006):** `api/interacciones.js` L6663-6667 (INSERT sin `visible`); `db/migrations/025_album_fotos_visible.sql` (`DEFAULT false`); `scripts/diagnose_fotos_brsk84.js` (reporte read-only, L85-97); `db/cleanups/002_fix_fotos_brsk84.sql` (remediacion de datos).
+**Remediacion de datos creada (working tree, PENDIENTE en Neon):** `db/cleanups/002_fix_fotos_brsk84.sql` marca `visible=false`/`activo=false` en `album_fotos` con `foto_url` vacia y `activo=false` en `interacciones tipo='foto'` con texto vacio, acotado por email y estado exacto (idempotente; NO borra filas, Regla de Oro 3). Requiere respaldo previo (bloque [0]).
+**Fix de codigo PENDIENTE (NO aplicado en esta sesion):** (a) agregar `visible` al INSERT de `album_agregar_foto` (o derivarlo de la intencion del usuario); (b) que los checks de misiones cuenten solo `visible=true AND activo=true` para no inflar el progreso.
+**Estado:** DETECTADO / ABIERTO (remediacion de datos creada; fix de codigo pendiente). TSK-119 / ADR-042, working tree 2026-09-18.
+
+## BUG-066: regresion FE-02 -- `arbolPintar()`/`cargarArbolClases()` hacian `innerHTML=` sobre `#arbol-clases` y destruian `#pf-clase` en runtime
+
+**Severidad:** MEDIA (UI desconectada en runtime; el HTML estatico era correcto, fallaba solo al ejecutar).
+**Contexto:** regresion introducida por FE-02 de TSK-119 (fusion "Mi Clase" -> "Arbol de Clases"): `#pf-clase` quedo DENTRO de `#arbol-clases`.
+**Sintoma:** al cargar el Arbol de Clases, el widget "Mi Clase" desaparecia (aunque existia en el HTML estatico y el balance de divs daba 446/446).
+**Causa raiz:** `arbolPintar()` y `cargarArbolClases()` (`mi-perfil.html`) hacian `host.innerHTML = ...` sobre `#arbol-clases`, que era ANCESTRO de `#pf-clase`; reemplazar `innerHTML` borra todos los hijos, incluido el widget estatico. El QA de HTML estatico (parser/balance) NO lo detecta porque el DOM inicial es correcto.
+**Resolucion aplicada (misma sesion, working tree):** se introdujo `<div id="arbol-body">` como host EXCLUSIVO de la inyeccion dinamica; `#pf-clase` quedo como hijo DIRECTO persistente de `#arbol-clases` (L954-960). `arbolPintar()` L3639-3640 y `cargarArbolClases()` L3655-3656 apuntan ahora a `getElementById('arbol-body')`; `host.innerHTML` (L3648) escribe solo en ese host.
+**Evidencia (ADR-006):** `mi-perfil.html` L953-960 (estructura), L3639-3640, L3655-3656, L3648 (`host.innerHTML`); re-QA con parser DOM + `node vm`: APTO.
+**Leccion de QA runtime:** el patron es IDENTICO a BUG-020/TSK-065: la UI anidada se desconecta SOLO al ejecutar; el balance de divs y la presencia de ids en el HTML no prueban que el runtime los conserve. La verificacion confiable es ejecutar la funcion real y comprobar el efecto observable (parser DOM + sandbox), no solo releer el HTML.
+**Prevencion (ver ADR-043):** cuando un contenedor persistente deba convivir con un render dinamico, separar SIEMPRE el host de inyeccion del contenedor persistente y NUNCA usar `innerHTML=` sobre un ancestro que contenga widgets estaticos.
+**Estado:** CERRADO / CORREGIDO (regresion FE-02, `mi-perfil.html`, working tree 2026-09-18; SIN commitear). Ver ADR-043 (patron derivado) y TSK-119.
+
 ## Deuda ADR-035: columnas no versionadas de las que dependen los rankings (patron BUG-021)
 
 **Nota:** los rankings de la Entrega TSK-109 dependen de tres columnas que siguen SIN migracion versionada, igual que BUG-021: `usuarios.activo` y `usuarios.ultimo_acceso` (definicion de "miembro activo vigente" a 30 dias en `casa_ranking` y `pandilla_ranking`) e `interacciones.xp_ganado` (columna de XP, no versionada; la migracion 021 la cubre con guard `IF EXISTS` y el preflight la marca como opcional).

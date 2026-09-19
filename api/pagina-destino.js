@@ -2637,10 +2637,11 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // TSK-106 (PROBLEMA 4): LIMIT ampliado de 12 a 24 para que galAll
-    // tenga material suficiente y el hero muestre 12 miniaturas reales.
+    // TSK-106 fix R10: sin LIMIT artificial. galAll puede tener >24 fotos;
+    // buildHTML() ya limita la galeria curada a 1 grande + 12 miniaturas.
+    // El LIMIT 200 es un tope de seguridad razonable para no traer miles.
     var fotosRows = await sql(
-      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 24',
+      'SELECT url,caption FROM destinos_fotos WHERE destino_id=$1 ORDER BY orden ASC NULLS LAST, es_hero DESC LIMIT 200',
       [d.id]
     );
 

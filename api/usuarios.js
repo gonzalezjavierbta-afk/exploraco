@@ -293,6 +293,17 @@ module.exports = async (req, res) => {
     const { id, tipo, limit = '10' } = req.query;
 
     if (req.method === 'GET') {
+      // ---- GET: mi_marca (TSK-122) --------------------------------
+      if (tipo === 'mi_marca' && (id || req.query.usuario_id)) {
+        var mmId = String(id || req.query.usuario_id || '');
+        var mmRows = await sql(
+          'SELECT m.*, '
+          + '(SELECT COUNT(*)::int FROM patrocinios p WHERE p.marca_id=m.id AND p.activo=TRUE) AS total_patrocinios '
+          + 'FROM marcas m WHERE m.usuario_id=$1 LIMIT 1',
+          [mmId]
+        );
+        return res.json({ ok: true, data: mmRows.length ? mmRows[0] : null });
+      }
       if (tipo === 'leaderboard') {
         const rows = await sql(
           'SELECT id, nombre, avatar_url, perfil_tipo, xp_total, nivel, '
@@ -1176,6 +1187,82 @@ module.exports = async (req, res) => {
         if (!vFilas.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         return res.json({ ok: true, usuario_id: vId, email_verificado: vVal });
+      }
+
+      // ---- Rama: activar / actualizar Marca del usuario (TSK-120) ---
+      // POST { tipo:'marca_activar', usuario_id, nombre, logo_url?,
+      //        banner_url?, descripcion?, areas_influencia?, enlaces? }
+      // Requiere JWT valido del propio usuario. Nivel minimo: 5.
+      // MERGE JSONB: cero reemplazo total (ADR-003).
+      if (c.tipo === 'marca_activar') {
+        var maUid = String(c.usuario_id || '');
+        if (!maUid) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var maJwt = validarSesionUsuario(req, maUid);
+        if (!maJwt || !maJwt.ok) return res.status(401).json({ ok: false, error: 'No autorizado' });
+        var maNombre = String(c.nombre || '').trim().slice(0, 120);
+        if (!maNombre) return res.status(400).json({ ok: false, error: 'nombre requerido' });
+        // Nivel minimo 5. usuarios.nivel esta STALE: se recalcula en
+        // lectura con calcularNivel(xp_total) (misma funcion que conNivel).
+        var maUser = await sql('SELECT xp_total FROM usuarios WHERE id=$1 LIMIT 1', [maUid]);
+        if (!maUser.length || calcularNivel(maUser[0].xp_total).nivel < 5)
+          return res.status(403).json({ ok: false, error: 'Nivel m\u00ednimo 5 requerido para activar una Marca' });
+        var maAreas  = c.areas_influencia ? JSON.stringify(c.areas_influencia) : null;
+        var maLinks  = c.enlaces          ? JSON.stringify(c.enlaces)           : null;
+        var maFila = await sql(
+          'INSERT INTO marcas (usuario_id, nombre, logo_url, banner_url, descripcion, areas_influencia, enlaces) '
+          + 'VALUES ($1,$2,$3,$4,$5,'
+          + 'COALESCE($6::jsonb,\'[]\'::jsonb),'
+          + 'COALESCE($7::jsonb,\'{}\'::jsonb)) '
+          + 'ON CONFLICT (usuario_id) DO UPDATE SET '
+          + 'nombre      = EXCLUDED.nombre, '
+          + 'logo_url    = COALESCE(EXCLUDED.logo_url, marcas.logo_url), '
+          + 'banner_url  = COALESCE(EXCLUDED.banner_url, marcas.banner_url), '
+          + 'descripcion = COALESCE(EXCLUDED.descripcion, marcas.descripcion), '
+          + 'areas_influencia = marcas.areas_influencia || COALESCE(EXCLUDED.areas_influencia, \'[]\'::jsonb), '
+          + 'enlaces     = marcas.enlaces || COALESCE(EXCLUDED.enlaces, \'{}\'::jsonb), '
+          + 'activa      = TRUE '
+          + 'RETURNING id, nombre, activa, verificada',
+          [maUid, maNombre,
+           c.logo_url    ? String(c.logo_url).slice(0,512)    : null,
+           c.banner_url  ? String(c.banner_url).slice(0,512)  : null,
+           c.descripcion ? String(c.descripcion).slice(0,500) : null,
+           maAreas, maLinks]
+        );
+        return res.json({ ok: true, data: maFila[0] });
+      }
+
+      // ---- Rama: crear patrocinio (TSK-121) ----------------------
+      // POST { tipo:'marca_patrocinar', usuario_id, tipo_objetivo,
+      //        objetivo_id, xp_aportada?, fama_bonus?, branding_data? }
+      // La marca debe pertenecer al usuario y estar activa.
+      if (c.tipo === 'marca_patrocinar') {
+        var mpUid = String(c.usuario_id || '');
+        if (!mpUid) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var mpJwt = validarSesionUsuario(req, mpUid);
+        if (!mpJwt || !mpJwt.ok) return res.status(401).json({ ok: false, error: 'No autorizado' });
+        var mpTipo = String(c.tipo_objetivo || '');
+        var mpObjId = String(c.objetivo_id || '');
+        if (!mpTipo || !mpObjId)
+          return res.status(400).json({ ok: false, error: 'tipo_objetivo y objetivo_id requeridos' });
+        var TIPOS_VALIDOS = ['evento','artista','parche','mision'];
+        if (TIPOS_VALIDOS.indexOf(mpTipo) === -1)
+          return res.status(400).json({ ok: false, error: 'tipo_objetivo inv\u00e1lido' });
+        // Verificar que la marca es del usuario y esta activa
+        var mpMarca = await sql(
+          'SELECT id FROM marcas WHERE usuario_id=$1 AND activa=TRUE LIMIT 1',
+          [mpUid]
+        );
+        if (!mpMarca.length)
+          return res.status(404).json({ ok: false, error: 'Marca activa no encontrada. Activa tu marca primero.' });
+        var mpXp    = Math.max(0, parseInt(c.xp_aportada   || 0, 10));
+        var mpFama  = Math.max(0, parseInt(c.fama_bonus     || 0, 10));
+        var mpBrand = c.branding_data ? JSON.stringify(c.branding_data) : '{}';
+        var mpFila = await sql(
+          'INSERT INTO patrocinios (marca_id, tipo_objetivo, objetivo_id, xp_aportada, fama_bonus, branding_data) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING id',
+          [mpMarca[0].id, mpTipo, mpObjId, mpXp, mpFama, mpBrand]
+        );
+        return res.json({ ok: true, patrocinio_id: mpFila[0].id });
       }
 
       // ---- Upsert de registro (login con email / google) ------------

@@ -541,6 +541,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* Album curado del destino (origen='destino_album'): borde solido claro y
    ligero realce ambar para diferenciarlo de las fotos individuales. */
 .mpa-media-pin-album{border-style:solid;border-color:#fff3d6;box-shadow:0 3px 10px rgba(217,119,6,.55)}
+.mpa-media-pin-video{border-radius:8px;border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
 
 /* -- MAPA | DRAWER LATERAL -- */
 .mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}
@@ -2992,7 +2993,7 @@ function mapaMediaIcon(item) {
   if(esAlbumDestino) color = '#d97706';
   var ico = esAlbumDestino ? '📚' : ((tipo === 'video') ? '▶' : ((tipo === 'audio') ? '♫' : '📸'));
   return L.divIcon({
-    html: '<div class="mpa-media-pin' + (esDestino ? ' mpa-media-pin-dest' : '') + (esAlbumDestino ? ' mpa-media-pin-album' : '') + '" style="background:' + color + '">' + ico + '</div>',
+    html: '<div class="mpa-media-pin' + (esDestino ? ' mpa-media-pin-dest' : '') + (esAlbumDestino ? ' mpa-media-pin-album' : '') + (!esAlbumDestino && !esDestino && tipo === 'video' ? ' mpa-media-pin-video' : '') + '" style="background:' + color + '">' + ico + '</div>',
     iconSize:[34,34], iconAnchor:[17,17], className:''
   });
 }

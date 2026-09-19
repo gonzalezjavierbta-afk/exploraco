@@ -3337,5 +3337,114 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ---
 
+### TSK-119: Paquete 18-sep-2026 (DB-01/DB-02, BE-02, FE-01, FE-02, FE-03 y remediacion de fotos) -- migracion 027 zonas/marcas/patrocinios, fix galeria R10, ajustes de perfil/mapa y cleanup de fotos de brsk84 [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** **IMPLEMENTADO EN WORKING TREE** (2026-09-18, SIN commitear). Verificado contra archivo real (ADR-006): existe `db/migrations/027_zonas_marcas.sql` (348 lineas, ASCII-safe: 0 bytes >127, emojis via escape `U&'\+xxxxxx'`); existen `scripts/verify_027_precheck.js` (258 lineas), `scripts/diagnose_fotos_brsk84.js` (310 lineas) y `db/cleanups/002_fix_fotos_brsk84.sql` (151 lineas). Los conteos de lineas son referenciales (ADR-006). **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar la 027 y el cleanup 002 en Neon** (no hay `DATABASE_URL` local).
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-18
+- **Origen:** paquete `prompt.md` (untracked) "Modulos nuevos + bugs activos"; los tickets DB-01/DB-02/BE-02/FE-01/FE-02/FE-03 corresponden a ese paquete. BE-01 (`marca_activar`/`marca_patrocinar`/`mi_marca`) se desglosa en TSK-120..TSK-122.
+- **ADR:** DECISIONS.md **ADR-042** (esquema zonas geograficas + modulo Marcas/patrocinios + extension de consumibles) y **ADR-043** (patron "contenedor persistente separado del host de inyeccion", derivado de la regresion FE-02).
+- **Responsable / agentes:** sql-security (migracion 027 y cleanup 002); backend-dev (`api/pagina-destino.js`); frontend-tpl/js-silo-dev (`mi-perfil.html`, `index.html`); qa-auditor (Escudo GOLD + re-QA runtime); docs-keeper (esta entrada).
+- **Precedencia:** continua a TSK-118 / ADR-041. NO crea archivos en `api/` (presupuesto 8/8, ADR-001/ADR-010).
+- **Migracion:** `db/migrations/027_zonas_marcas.sql` (NUEVA, 348 lineas, idempotente ADR-008, ASCII-safe ADR-002: 0 bytes >127). La numeracion es **027** (consecutivo real tras la 026); el prompt la rotulaba `001_zonas_marcas.sql`.
+- **Relacion con bugs:** abre `BUGS_HISTORICOS.md` **BUG-065** (el endpoint legacy `album_agregar_foto` inserta sin `visible`, por lo que las fotos nacen privadas con el `DEFAULT false` de la 025; causa raiz probable del sintoma de brsk84) y **BUG-066** (regresion FE-02: `innerHTML=` sobre `#arbol-clases` destruia `#pf-clase` en runtime; corregida en la misma sesion con `#arbol-body`). BUG-002 y BUG-061 siguen ABIERTOS y ajenos.
+
+- **Alcance ejecutado (verificado contra archivo real, ADR-006, 2026-09-18):**
+  1. **DB-01/DB-02 -> migracion 027 (NUEVA):** tablas `zonas_geograficas` (5 zonas, emoji via `U&'\+01F30A'`/`+01F333`/`+0026F0`/`+01F33E`/`+01F40D`, L120-124), `areas_geograficas` (lat/lng/radio_km; SIN filas sembradas), `ranking_zonas` (`recurso_tipo` default `'album_fotos'`, scores area/ciudad/zona + indices), `marcas` (`usuario_id UUID UNIQUE` FK a `usuarios`, `areas_influencia`/`enlaces` JSONB, `nivel_requerido` default 5) y `patrocinios` (`marca_id` FK a `marcas`; `objetivo_id` polimorfico SIN FK = deuda documentada). Extension `consumibles` (`marca_id`, `stock_total`, `stock_usado`, `precio_xp_base`/`precio_xp_actual NUMERIC(12,2)` por consistencia con 021, `tipo_canje`) y vista `consumibles_precio` (precio efectivo oferta/demanda). NUEVO `scripts/verify_027_precheck.js` (read-only, exit 0).
+  2. **BE-02 -> `api/pagina-destino.js` L2644:** `destinos_fotos ... LIMIT 24 -> LIMIT 200` (fix R10: el hostal con >24 fotos no enviaba las restantes; `buildHTML()` ya limita la galeria curada a 1 grande + 12 miniaturas). Comentario actualizado en L2642. `node --check` OK; ASCII 0 bytes >127.
+  3. **FE-01 -> `mi-perfil.html`:** la seccion "Fotos publicadas" SE CONSERVA, pero visible SOLO para `brsk84@gmail.com` (`id="mis-fotos-title"` L678; helper unico `esCuentaFotosPublicadas()` L2143; init condicional L1194-1198 con `setStyle(...'none')` para el resto; refrescos de `cargarMisFotos()` condicionados L2486/L2503/L2514). NO se toco `cargarMediaGrid` ni la seccion Guardados. **Desviacion de alcance O1:** el prompt ofrecia eliminar el bloque global o condicionarlo; se ejecuto la opcion condicional de producto (solo la cuenta admin).
+  4. **FE-02 -> `mi-perfil.html`:** fusion "Mi Clase" -> "Arbol de Clases": el titulo pasa a "Clase & Arbol de Progreso" (L953) y `#pf-clase` queda DENTRO de `#arbol-clases` (L954-960); `#modal-clase` no se toco.
+  5. **FE-02 FIX de regresion -> `#arbol-body`:** QA detecto en runtime que `arbolPintar()` (L3639) y `cargarArbolClases()` (L3655) hacian `innerHTML=` sobre `#arbol-clases` y destruian `#pf-clase` (hijo anidado). Se introdujo `<div id="arbol-body">` (L957) como host EXCLUSIVO de la inyeccion dinamica; `#pf-clase` queda como hijo directo persistente. Patron identico a BUG-020/TSK-065 (UI desconectada detectada solo en runtime). Re-QA con parser DOM + `node vm`: APTO. Ver **BUG-066** y **ADR-043**.
+  6. **FE-03 -> `index.html`:** NUEVA clase CSS `.mpa-media-pin-video` (L544, cuadrado redondeado rojo `#e74c3c`) y condicional en `mapaMediaIcon()` (L2996) que la aplica SOLO a video individual (`!esAlbumDestino && !esDestino && tipo === 'video'`), distinto del pin de album (`-album`) y de destino (`-dest`).
+  7. **Remediacion de fotos de brsk84:** NUEVOS `scripts/diagnose_fotos_brsk84.js` (read-only, solo SELECT) y `db/cleanups/002_fix_fotos_brsk84.sql` (idempotente, soft-delete: `visible=false`/`activo=false` para `foto_url` vacia; NO borra filas, Regla de Oro 3). Hallazgo del agente: el endpoint legacy `album_agregar_foto` de `api/interacciones.js` (~L6663-6667) hace `INSERT ... RETURNING *` SIN `visible`; como la 025 dejo `DEFAULT false`, las fotos subidas por esa via nacen privadas aunque el conteo de misiones las cuente como publicadas. Esto explica el sintoma de brsk84 (5 figuran publicadas y no se ven) -> **BUG-065**.
+
+- **Archivos en el working tree (SIN commitear):**
+  - `db/migrations/027_zonas_marcas.sql` (NUEVO, 348 lineas).
+  - `scripts/verify_027_precheck.js` (NUEVO, 258 lineas).
+  - `scripts/diagnose_fotos_brsk84.js` (NUEVO, 310 lineas).
+  - `db/cleanups/002_fix_fotos_brsk84.sql` (NUEVO, 151 lineas).
+  - `api/pagina-destino.js` (M, LIMIT 24 -> 200; header sin bump).
+  - `mi-perfil.html` (M; FE-01 + FE-02 + `#arbol-body`).
+  - `index.html` (M; FE-03).
+
+- **Presupuesto de endpoints:** **8/8 INTACTO** (ADR-001/ADR-010). Cero archivos nuevos en `api/`.
+
+- **Evidencia (ADR-006, verificada el 2026-09-18):**
+  - `db/migrations/027_zonas_marcas.sql`: 348 lineas, 0 bytes >127; emojis L120-124.
+  - `api/pagina-destino.js` L2644: exactamente 1 ocurrencia `destinos_fotos ... LIMIT 200`; bytes >127 = 0.
+  - `api/usuarios.js`: 1398 lineas, bytes >127 = 0 (la migracion y los scripts tambien en 0).
+  - `mi-perfil.html`: divs 446/446; `#arbol-body` L957; `arbolPintar` L3639 y `cargarArbolClases` L3655 apuntan a `#arbol-body`; `esCuentaFotosPublicadas` L2143; init condicional L1194.
+  - `index.html`: divs 523/523; `.mpa-media-pin-video` con 2 ocurrencias (CSS L544 + HTML generado L2996).
+  - `db/cleanups/002_fix_fotos_brsk84.sql` L108-121: UPDATE acotado por email y estado exacto.
+
+- **PENDIENTE OPERATIVO (bloqueante, lo ejecuta Javier; requiere Neon):**
+  1. **APLICAR `db/migrations/027_zonas_marcas.sql` en Neon** (correr antes `node scripts/verify_027_precheck.js` y las secciones 0/final del `.sql`; re-ejecutar es no-op, ADR-008). Sin la 027, las ramas `marca_*`/`mi_marca` de TSK-120..TSK-122 fallan por tabla inexistente (patron BUG-021/BUG-060).
+  2. **APLICAR `db/cleanups/002_fix_fotos_brsk84.sql`** (respaldo previo del bloque [0]; idempotente). Requiere `album_fotos.visible` (025 ya aplicada por indicacion del usuario).
+  3. **Correr `node scripts/diagnose_fotos_brsk84.js` con `DATABASE_URL`** para confirmar la causa de las 5 fotos de brsk84 (reporte JSON; solo SELECT).
+  4. **Commit + push + deploy** de los 7 archivos + este cierre documental.
+
+- **Deuda / observaciones (patron ADR-006):**
+  - `areas_geograficas` queda SIN filas: falta sembrar areas reales con lat/lng (propuesta: OSM) y decidir el radio de asignacion automatica.
+  - `patrocinios.objetivo_id` es polimorfico SIN FK (no existen tablas `eventos`/`artistas`/`misiones`; el "parche" real es `pandillas`); la integridad del objetivo queda en el backend.
+  - `marcas.areas_influencia` se actualiza con `||` (concatenacion de arrays JSONB): puede DUPLICAR slugs en reenvios; falta dedupe server-side.
+  - `GET ?tipo=mi_marca` NO valida sesion (decision pendiente): hoy es lectura publica por `usuario_id`.
+  - `marcas.nivel_requerido` (default 5) NO gobierna el gate: el backend usa `calcularNivel(xp_total).nivel >= 5` hardcodeado (correcto, porque `usuarios.nivel` esta stale); decidir si la columna pasa a gobernar.
+  - `api/usuarios.js` NO subio de header (sigue **v18** de TSK-118); las 3 ramas nuevas no agregaron entrada de changelog -> version drift a corregir en el commit. `api/pagina-destino.js` tampoco subio por el fix de 1 linea.
+
+- **Fuera de alcance:** UI de creacion de Marcas/patrocinios (solo backend en esta sesion); siembra de `areas_geograficas`; thumbnails de video (item 2 del prompt); admin de vocaciones (ADM-01: ya existe, no tocar); autenticacion de `GET mi_marca`; BUG-002/BUG-061/BUG-062; el archivo borrado ajeno `prompt_maestro_comunicacion_casas.md` y el untracked `prompt.md` (no se incluyen en este release).
+
+---
+
+### TSK-120: Marca del usuario -- rama `POST ?tipo=marca_activar` en `api/usuarios.js` [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE (2026-09-18, SIN commitear). Verificado contra archivo real (ADR-006): rama en `api/usuarios.js` L1192-1232. **PENDIENTE OPERATIVO (BLOQUEANTE): aplicar migracion 027 en Neon (crea `marcas`) antes del deploy.**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-18
+- **ADR:** DECISIONS.md ADR-042 (tabla `marcas`).
+- **Origen:** BE-01 (paquete `prompt.md`).
+- **Responsable / agentes:** backend-dev + docs-keeper.
+- **Alcance ejecutado:**
+  1. NUEVA rama `POST { tipo:'marca_activar', usuario_id, nombre, logo_url?, banner_url?, descripcion?, areas_influencia?, enlaces? }`.
+  2. Auth por `validarSesionUsuario(req, usuario_id)` con `.ok` (JWT, ADR-025); 401 si no autoriza.
+  3. Gate de nivel: `calcularNivel(xp_total).nivel >= 5` (NO la columna `usuarios.nivel`, que esta STALE); 403 por debajo. Nota ADR-006: el prompt original leia `usuarios.nivel`; se corrigio a la funcion derivada.
+  4. UPSERT por `ON CONFLICT (usuario_id) DO UPDATE` con MERGE JSONB: `areas_influencia = marcas.areas_influencia || EXCLUDED.areas_influencia` y `enlaces = marcas.enlaces || EXCLUDED.enlaces` (ADR-003); `logo_url`/`banner_url`/`descripcion` con `COALESCE`; `activa=TRUE`. `RETURNING id, nombre, activa, verificada`.
+- **Evidencia (ADR-006):** `api/usuarios.js` L1192 (comentario), L1197 (`if (c.tipo === 'marca_activar')`), L1200 (`validarSesionUsuario`), L1207 (`calcularNivel(...).nivel < 5`), L1211-1231 (UPSERT + RETURNING).
+- **Deuda:** header de `api/usuarios.js` sin bump (v18); `areas_influencia` sin dedupe.
+- **Fuera de alcance:** UI de activacion de Marca; verificacion de `logo_url`/`banner_url` (solo se truncan a 512).
+
+### TSK-121: Patrocinio de Marca -- rama `POST ?tipo=marca_patrocinar` en `api/usuarios.js` [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE (2026-09-18, SIN commitear). Rama en `api/usuarios.js` L1234-1266. **PENDIENTE OPERATIVO (BLOQUEANTE): migracion 027 (crea `patrocinios`).**
+- **Prioridad:** Alta
+- **Fecha:** 2026-09-18
+- **ADR:** DECISIONS.md ADR-042 (tabla `patrocinios` + deuda polimorfica).
+- **Origen:** BE-01 (paquete `prompt.md`).
+- **Responsable / agentes:** backend-dev + docs-keeper.
+- **Alcance ejecutado:**
+  1. NUEVA rama `POST { tipo:'marca_patrocinar', usuario_id, tipo_objetivo, objetivo_id, xp_aportada?, fama_bonus?, branding_data? }`.
+  2. Auth por `validarSesionUsuario(req, usuario_id).ok`; 401 si no autoriza.
+  3. Valida `tipo_objetivo` en `['evento','artista','parche','mision']` (400 fuera de lista) y exige `objetivo_id`.
+  4. Verifica que la Marca es del usuario y esta activa (`marcas activa=TRUE`); 404 si no existe.
+  5. `xp_aportada`/`fama_bonus` con `Math.max(0, parseInt(...))`; `branding_data` JSONB; `INSERT ... RETURNING id` -> `{ok:true, patrocinio_id}`.
+- **Evidencia (ADR-006):** `api/usuarios.js` L1234 (comentario), L1238 (`if (c.tipo === 'marca_patrocinar')`), L1247 (`TIPOS_VALIDOS`), L1251-1254 (`SELECT id FROM marcas ... activa=TRUE`), L1260-1264 (`INSERT INTO patrocinios`).
+- **Deuda:** `objetivo_id` SIN FK (no existen esas tablas; ver ADR-042); NO se valida la EXISTENCIA real del objetivo en runtime (solo el tipo) -> patrocinio huerfano posible.
+- **Fuera de alcance:** efectos economicos del patrocinio (`xp_aportada`/`fama_bonus` no se acreditan a nadie en v1); UI.
+
+### TSK-122: Perfil de Marca propia -- rama `GET ?tipo=mi_marca` en `api/usuarios.js` [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE (2026-09-18, SIN commitear). Rama en `api/usuarios.js` L296-306 (antes de `leaderboard`). **PENDIENTE OPERATIVO (BLOQUEANTE): migracion 027 (crea `marcas`/`patrocinios`).**
+- **Prioridad:** Media
+- **Fecha:** 2026-09-18
+- **ADR:** DECISIONS.md ADR-042.
+- **Origen:** BE-01 (paquete `prompt.md`).
+- **Responsable / agentes:** backend-dev + docs-keeper.
+- **Alcance ejecutado:**
+  1. NUEVA rama `GET ?tipo=mi_marca&id=UUID` (acepta tambien `usuario_id`).
+  2. `SELECT m.*` + subquery `COUNT(*)::int FROM patrocinios WHERE marca_id=m.id AND activo=TRUE AS total_patrocinios`; `LIMIT 1`.
+  3. Responde `{ok:true, data:<marca|null>}`.
+- **Evidencia (ADR-006):** `api/usuarios.js` L296 (`// ---- GET: mi_marca (TSK-122)`), L297 condicional, L299-305 consulta + subquery.
+- **Deuda / decision pendiente:** la rama NO exige sesion (lectura publica por `usuario_id`) -> decidir si `mi_marca` debe ser owner-only con `validarSesionUsuario`. No expone datos sensibles hoy (nombre/logo/descripcion/enlaces), pero es una superficie enumerable.
+- **Fuera de alcance:** edicion/desactivacion de Marca desde esta rama; listado de patrocinios detallado.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
