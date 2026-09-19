@@ -12,8 +12,9 @@
      GET  /api/interacciones?tipo=mapa_detalle&id=<id>&usuario_id=<uuid>
      POST /api/interacciones  (mapa_crear|mapa_editar|mapa_eliminar)
 
-   Dependencias externas permitidas: Leaflet (window.L) y las
-   utilidades de sesion en window.ExploraCO (mostrarLogin/mostrarToast).
+   Dependencias externas permitidas: Leaflet (window.L), el motor
+   compartido window.MapaCultural (mapa-cultural.js) y las utilidades
+   de sesion en window.ExploraCO (mostrarLogin/mostrarToast).
    ============================================================= */
 (function () {
   'use strict';
@@ -28,13 +29,27 @@
   // Estado interno del modulo (una sola instancia por pagina).
   var S = {
     opts: null,      // ids resueltos de los contenedores
-    map: null,       // instancia Leaflet propia
-    layer: null,     // capa de marcadores
     mapas: [],       // mapas tematicos del usuario
     sel: null,       // id del mapa activo (null = "Mi Mapa")
     destinos: [],    // destinos del mapa activo (para pines y lista)
     modo: null       // id en edicion dentro del modal (null = crear)
   };
+
+  // Motor del mapa: instancia perezosa del modulo compartido
+  // mapa-cultural.js (window.MapaCultural). Reemplaza el Leaflet propio.
+  var mc = null;
+
+  // Cache del fetch unico de multimedia_mapa (endpoint existente) y
+  // banderas de carga / interaccion del usuario con el toggle Media.
+  var MEDIA_CACHE = null;
+  var MEDIA_CARGANDO = false;
+  var MEDIA_USER_TOUCHED = false;
+
+  function logWarn(msg, e) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[mymapa] ' + msg, e || '');
+    }
+  }
 
   /* ---------- utilidades ---------- */
   function el(id) { return document.getElementById(id); }
@@ -98,52 +113,130 @@
     return null;
   }
 
-  /* ---------- mapa Leaflet propio ---------- */
-  function ensureMap() {
+  /* ---------- mapa compartido (mapa-cultural.js) ---------- */
+  // Crea (una sola vez) la instancia del Mapa Cultural sobre el
+  // contenedor de MyMap. list:null porque MyMap conserva su lista
+  // textual; drawer:true porque el modulo crea su propio panel.
+  function ensureMC() {
+    if (mc) return mc;
+    if (typeof window.MapaCultural === 'undefined') return null;
     var cont = el(S.opts.contenedor);
-    if (!cont || typeof L === 'undefined') return null;
-    if (S.map) return S.map;
-    S.map = L.map(S.opts.contenedor).setView([4.5, -74.0], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'OSM',
-      maxZoom: 18
-    }).addTo(S.map);
-    S.layer = L.layerGroup().addTo(S.map);
-    return S.map;
+    if (!cont) return null;
+    mc = window.MapaCultural.create({
+      map: S.opts.contenedor,
+      tiles: 'carto-voyager',
+      list: null,
+      drawer: true,
+      apiBase: api(),
+      // onMapReady llega sincrono antes de que mc quede asignado:
+      // por eso se usa el mapa recibido, no mc.getMap().
+      onMapReady: function (map) {
+        setTimeout(function () {
+          try { map.invalidateSize(); } catch (e) { logWarn('invalidateSize', e); }
+        }, 120);
+      }
+    });
+    return mc;
   }
 
   function invalidarTamano() {
-    if (!S.map) return;
+    var map = (mc && mc.getMap) ? mc.getMap() : null;
+    if (!map) return;
     setTimeout(function () {
-      try { S.map.invalidateSize(); } catch (e) {}
+      try { map.invalidateSize(); } catch (e) { logWarn('invalidateSize', e); }
     }, 120);
   }
 
-  function drawMarkers() {
-    var map = ensureMap();
-    if (!map || !S.layer) return;
-    S.layer.clearLayers();
-    var pts = [];
-    S.destinos.forEach(function (d) {
-      var lat = parseFloat(d.lat), lng = parseFloat(d.lng);
-      if (!isFinite(lat) || !isFinite(lng)) return;
-      pts.push([lat, lng]);
-      var foto = d.foto_hero
-        ? '<img src="' + esc(d.foto_hero) + '" alt="" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px" onerror="this.style.display=\'none\'">'
-        : '';
-      var link = d.slug
-        ? '<div style="margin-top:6px"><a class="mmx-pop-link" href="/' + esc(d.slug) + '.html">Ver destino \u2192</a></div>'
-        : '';
-      var html = '<div class="mmx-pop">' + foto
-        + '<div class="mmx-pop-title">' + esc(d.nombre || 'Destino') + '</div>'
-        + (d.ciudad ? '<div class="mmx-pop-meta">' + esc(d.ciudad) + '</div>' : '')
-        + link + '</div>';
-      L.marker([lat, lng]).bindPopup(html, { maxWidth: 230 }).addTo(S.layer);
+  // ---- Capa de media (multimedia_mapa) --------------------------------
+  // Un unico fetch cacheado; el modulo filtra por slug de los destinos
+  // activos con su filtro default (origen destino/destino_album).
+  function recargarMedia() {
+    var m = ensureMC();
+    if (!m) return;
+    if (MEDIA_CACHE) {
+      m.setMedia(MEDIA_CACHE);
+      medirMediaActiva();
+      return;
+    }
+    if (MEDIA_CARGANDO) return;
+    MEDIA_CARGANDO = true;
+    fetch(api() + '/api/interacciones?tipo=multimedia_mapa')
+      .then(leerJson)
+      .then(function (d) {
+        MEDIA_CARGANDO = false;
+        MEDIA_CACHE = (d && d.ok && d.data) ? d.data : [];
+        var mm = ensureMC();
+        if (mm) mm.setMedia(MEDIA_CACHE);
+        medirMediaActiva();
+      })
+      .catch(function (e) {
+        MEDIA_CARGANDO = false;
+        logWarn('media mapa', e);
+      });
+  }
+
+  // Enciende el maestro por defecto si el mapa activo tiene media y el
+  // usuario aun no ha tocado el toggle en esta sesion.
+  function medirMediaActiva() {
+    var m = ensureMC();
+    if (!m) return;
+    var slugs = {};
+    S.destinos.forEach(function (d) { if (d && d.slug) slugs[d.slug] = true; });
+    var hay = false;
+    (MEDIA_CACHE || []).forEach(function (it) {
+      if (hay || !it) return;
+      if (it.origen === 'album') return;
+      if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
     });
-    if (pts.length) {
-      try { map.fitBounds(pts, { padding: [30, 30], maxZoom: 12 }); } catch (e) {}
-    } else {
-      map.setView([4.5, -74.0], 5);
+    if (hay && !MEDIA_USER_TOUCHED && !m.getState().mediaEnabled) m.setMediaEnabled(true);
+    sincronizarToggleMedia();
+  }
+
+  function asegurarToggleMedia() {
+    var existente = document.getElementById('mm-personal-media');
+    if (existente) { existente.style.display = ''; return; }
+    var card = document.querySelector('.mmx-card');
+    if (!card) return;
+    var head = card.querySelector('.mmx-head');
+    var box = document.createElement('div');
+    box.id = 'mm-personal-media';
+    box.className = 'mmx-media';
+    box.innerHTML = '<span class="mmx-media-lbl">Media</span>'
+      + '<button type="button" class="mmx-mbtn" data-media="all">Todo</button>'
+      + '<button type="button" class="mmx-mbtn" data-media="foto">Fotos</button>'
+      + '<button type="button" class="mmx-mbtn" data-media="video">Videos</button>'
+      + '<button type="button" class="mmx-mbtn" data-media="audio">Audios</button>';
+    if (head && head.parentNode === card) card.insertBefore(box, head.nextSibling);
+    else card.appendChild(box);
+    box.addEventListener('click', function (e) {
+      var b = (e.target && e.target.closest) ? e.target.closest('[data-media]') : null;
+      if (!b) return;
+      var m = ensureMC();
+      if (!m) return;
+      MEDIA_USER_TOUCHED = true;
+      var tipo = b.getAttribute('data-media');
+      if (tipo === 'all') {
+        m.setMediaEnabled(!m.getState().mediaEnabled);
+      } else {
+        var activos = m.getState().mediaTypes;
+        var nt = {};
+        nt[tipo] = !activos[tipo];
+        m.setMediaTypes(nt);
+      }
+      sincronizarToggleMedia();
+    });
+  }
+
+  function sincronizarToggleMedia() {
+    var box = document.getElementById('mm-personal-media');
+    if (!box) return;
+    var m = ensureMC();
+    var estado = m ? m.getState() : { mediaEnabled: false, mediaTypes: {} };
+    var btns = box.querySelectorAll('[data-media]');
+    for (var i = 0; i < btns.length; i++) {
+      var t = btns[i].getAttribute('data-media');
+      var on = (t === 'all') ? !!estado.mediaEnabled : !!(estado.mediaTypes && estado.mediaTypes[t]);
+      btns[i].classList.toggle('on', on);
     }
   }
 
@@ -227,8 +320,12 @@
     if (eb) { eb.style.display = 'none'; eb.innerHTML = ''; }
     var lista = el(S.opts.lista);
     if (lista) lista.innerHTML = '';
-    var map = ensureMap();
+    var m = ensureMC();
+    if (m) { m.setPlaces([]); m.setMedia([]); }
+    var map = (m && m.getMap) ? m.getMap() : null;
     if (map) map.setView([4.5, -74.0], 5);
+    var box = document.getElementById('mm-personal-media');
+    if (box) box.style.display = 'none';
     invalidarTamano();
   }
 
@@ -253,6 +350,15 @@
       .catch(function () { toast('Error de red al cargar tus mapas', '#ef4444'); });
   }
 
+  // Aplica los destinos activos al motor del mapa y recarga su capa de
+  // media (cacheada). La lista textual sigue usando S.destinos crudo.
+  function aplicarDestinos() {
+    var m = ensureMC();
+    if (m) m.setPlaces(S.destinos);
+    asegurarToggleMedia();
+    recargarMedia();
+  }
+
   // Carga los destinos del mapa activo. Reutiliza un solo fetch tanto para
   // los pines del mapa como para la lista textual (nada duplicado).
   function loadDestinos() {
@@ -268,14 +374,15 @@
         var msg = 'No se pudo cargar el mapa.';
         if (d && d.__status === 403) msg = 'Este mapa es privado y no te pertenece.';
         else if (d && d.error) msg = d.error;
-        renderPills(); drawMarkers(); renderList(msg); invalidarTamano();
+        renderPills(); renderList(msg); aplicarDestinos(); invalidarTamano();
         return;
       }
       S.destinos = (esMiMapa ? (d.data && d.data.guardados) : (d.data && d.data.destinos)) || [];
-      renderPills(); drawMarkers(); renderList(''); invalidarTamano();
-    }).catch(function () {
+      renderPills(); renderList(''); aplicarDestinos(); invalidarTamano();
+    }).catch(function (e) {
+      logWarn('loadDestinos', e);
       S.destinos = [];
-      renderPills(); drawMarkers(); renderList('Error de red al cargar el mapa.'); invalidarTamano();
+      renderPills(); renderList('Error de red al cargar el mapa.'); aplicarDestinos(); invalidarTamano();
     });
   }
 
@@ -475,6 +582,7 @@
       cont.__mmBound = true;
       bind();
     }
+    asegurarToggleMedia();
     refresh();
   }
 

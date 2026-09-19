@@ -1,0 +1,163 @@
+/* =============================================================
+   mapa-cultural.css -- Estilos compartidos del motor MapaCultural
+   (mapa-cultural.js). Extraidos de index.html y SCOPEADOS bajo
+   .mc-root para no colisionar con el menu movil ni con el tema
+   de cada pagina. ASCII-safe, sin backticks y sin !important.
+
+   Uso: incluir <link rel="stylesheet" href="mapa-cultural.css">
+   ANTES del <style> propio de la pagina (ver comunidad.html).
+   El motor agrega .mc-root a:
+     - el contenedor del mapa recibido en opts.map,
+     - el drawer propio #mc-drawer (o al drawer reutilizado),
+     - el holder del lightbox de media (creado en document.body).
+   Por eso los selectores de popups/pines/clusters usan
+   ".mc-root .X" (X descendiente del mapa) y los del drawer raiz
+   usan ".mc-root.mapa-drawer" (el propio contenedor).
+   ============================================================= */
+
+/* Ancla de posicionamiento para .mapa-note y los panes de Leaflet.
+   Leaflet agrega .leaflet-container al mismo div que recibe .mc-root. */
+.mc-root.leaflet-container{position:relative}
+
+/* ---- Popups de Leaflet + contenido .lp-* ---------------------- */
+/* Sin !important: .mc-root .X (0,2,0 / 0,3,0) ya gana al CSS de
+   Leaflet (.leaflet-popup-* = 0,1,0), que se carga antes. */
+.mc-root .leaflet-popup-content-wrapper{background:rgba(10,16,32,.96);border:1px solid rgba(255,255,255,.15);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.4);color:#fff}
+.mc-root .leaflet-popup-tip-container .leaflet-popup-tip{background:rgba(10,16,32,.96)}
+.mc-root .leaflet-popup-content{margin:10px 12px}
+.mc-root .lp-name{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:#F5E6D0;margin-bottom:3px}
+.mc-root .lp-loc{font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px}
+.mc-root .lp-stars{color:var(--gold);font-size:11px;margin-bottom:8px}
+.mc-root .lp-btn{display:block;width:100%;background:var(--gold);color:#fff;border:none;border-radius:3px;padding:5px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;margin-bottom:5px;text-align:center;text-decoration:none}
+.mc-root .lp-save-btn{display:block;width:100%;background:transparent;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:4px;font-size:9px;cursor:pointer;text-align:center;font-family:'Outfit',sans-serif;transition:all .15s}
+.mc-root .lp-save-btn:hover,.mc-root .lp-save-btn.saved{border-color:var(--gold);color:var(--gold)}
+/* Items compactos del popup de cluster (Ver + corazon inline) */
+.mc-root .lp-li-go{flex-shrink:0;font-size:10px;font-weight:700;color:var(--gold);text-decoration:none;text-transform:uppercase;letter-spacing:.4px}
+.mc-root .lp-li-go:hover{text-decoration:underline}
+.mc-root .lp-li-save{flex-shrink:0;background:transparent;border:1px solid rgba(0,0,0,.15);border-radius:4px;width:24px;height:24px;font-size:12px;cursor:pointer;color:#999;transition:all .15s;line-height:1}
+.mc-root .lp-li-save:hover,.mc-root .lp-li-save.saved{border-color:var(--gold);color:var(--gold)}
+
+/* ---- Clusters + nota flotante --------------------------------- */
+.mc-root .mapa-cluster{position:relative;border-radius:50%;background:rgba(16,24,40,.97);border:2px solid var(--gold);box-shadow:0 3px 14px rgba(0,0,0,.5),inset 0 0 0 2px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s}
+.mc-root .mapa-cluster:hover{transform:scale(1.08)}
+.mc-root .mapa-cl-emoji{font-size:13px;line-height:1}
+.mc-root .mapa-cl-num{font-size:13px;font-weight:900;color:#fff;font-family:'Barlow Condensed',sans-serif;line-height:1;margin-top:1px}
+.mc-root .mapa-note{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(8px);background:rgba(10,16,32,.97);border:1px solid var(--gold);color:#F5E6D0;font-size:11px;font-family:'Outfit',sans-serif;padding:8px 14px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:900;max-width:80%;text-align:center}
+.mc-root .mapa-note.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---- Separador de filtros + pines multimedia ------------------ */
+.mc-root .mf-sep{width:1px;height:20px;background:rgba(255,255,255,.16);margin:0 3px;flex-shrink:0}
+.mc-root .mpa-media-pin{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(0,0,0,.45);border:2.5px solid #fff;cursor:pointer;transition:transform .14s}
+.mc-root .mpa-media-pin:hover{transform:scale(1.15);z-index:1000}
+/* Los pines de fotos curadas del destino (origen='destino') usan
+   borde punteado para distinguirse de los albumes de usuarios. */
+.mc-root .mpa-media-pin-dest{border-style:dashed;border-color:#f2d9a0}
+/* Album curado del destino (origen='destino_album'): borde solido
+   claro y ligero realce ambar. */
+.mc-root .mpa-media-pin-album{border-style:solid;border-color:#fff3d6;box-shadow:0 3px 10px rgba(217,119,6,.55)}
+.mc-root .mpa-media-pin-video{border-radius:8px;border-style:solid;border-color:#ff8a80;box-shadow:0 3px 10px rgba(231,76,60,.55)}
+
+/* ---- Drawer lateral ------------------------------------------- */
+/* El drawer raiz lleva .mc-root + .mapa-drawer en el mismo nodo. */
+.mc-root.mapa-drawer{position:fixed;inset:0;z-index:1200;visibility:hidden;pointer-events:none}
+.mc-root.mapa-drawer.open{visibility:visible;pointer-events:auto}
+.mc-root .md-backdrop{position:absolute;inset:0;background:rgba(8,12,24,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .25s}
+.mc-root.mapa-drawer.open .md-backdrop{opacity:1}
+.mc-root .md-panel{position:absolute;top:0;right:0;height:100%;width:410px;max-width:100vw;background:#0D1520;box-shadow:-18px 0 50px rgba(0,0,0,.55);transform:translateX(105%);transition:transform .32s cubic-bezier(.22,.8,.24,1);display:flex;flex-direction:column;overflow:hidden;color:#fff}
+.mc-root.mapa-drawer.open .md-panel{transform:translateX(0)}
+.mc-root .md-close{position:absolute;top:14px;right:14px;z-index:6;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.mc-root .md-close:hover{background:var(--gold);border-color:var(--gold);color:#111;transform:rotate(90deg)}
+.mc-root .md-content{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.mc-root .md-content::-webkit-scrollbar{width:5px}
+.mc-root .md-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+.mc-root .md-hero{position:relative;height:210px;overflow:hidden}
+.mc-root .md-hero img{width:100%;height:100%;object-fit:cover;display:block}
+.mc-root .md-hero-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:58px}
+.mc-root .md-head{padding:16px 18px 8px}
+.mc-root .md-badge{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 9px;border-radius:3px;margin-bottom:8px}
+.mc-root .md-cat-hostal{background:#2196F322;color:#7cc0ff;border:1px solid #2196F355}
+.mc-root .md-cat-comida{background:#FF980020;color:#ffb85c;border:1px solid #FF980055}
+.mc-root .md-cat-sitio{background:#4CAF5020;color:#7de08d;border:1px solid #4CAF5055}
+.mc-root .md-cat-evento{background:#A855F720;color:#c99bff;border:1px solid #A855F755}
+.mc-root .md-title{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#F5E6D0;line-height:1.05;margin-bottom:4px}
+.mc-root .md-meta{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px;line-height:1.5}
+.mc-root .md-stars{color:var(--gold);font-size:13px;letter-spacing:1px;margin-bottom:8px}
+.mc-root .md-price{display:inline-block;background:rgba(232,160,32,.14);border:1px solid rgba(232,160,32,.5);color:var(--gold);font-size:11px;font-weight:800;padding:3px 10px;border-radius:3px;margin-bottom:10px}
+.mc-root .md-lead{font-size:12px;color:rgba(255,255,255,.6);line-height:1.7;margin-bottom:12px}
+.mc-root .md-link{display:block;background:var(--gold);color:#111;text-align:center;padding:10px 14px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;text-decoration:none;transition:background .15s}
+.mc-root .md-link:hover{background:var(--gold-dark, #C8860A);color:#fff}
+.mc-root .md-media{padding:16px 18px 20px;border-top:1px solid rgba(255,255,255,.08);margin-top:6px}
+.mc-root .md-media h4{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#F5E6D0;margin-bottom:12px}
+.mc-root .md-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.mc-root .md-tab{padding:6px 14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;cursor:pointer;border-radius:3px;transition:all .15s}
+.mc-root .md-tab:hover,.mc-root .md-tab.on{border-color:var(--gold);color:var(--gold);background:rgba(232,160,32,.1)}
+.mc-root .md-pane{display:none}
+.mc-root .md-pane.on{display:block}
+.mc-root .md-thumbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mc-root .md-thumb{position:relative;aspect-ratio:4/3;border-radius:6px;overflow:hidden;cursor:pointer;background:#0A101C}
+.mc-root .md-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.mc-root .md-thumb:hover img{transform:scale(1.06)}
+.mc-root .md-thumb .md-thb-ico{position:absolute;bottom:5px;right:6px;font-size:11px;background:rgba(0,0,0,.5);border-radius:3px;padding:1px 5px}
+.mc-root .md-mcard{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:6px;background:rgba(255,255,255,.03);margin-bottom:8px;cursor:pointer;transition:all .15s}
+.mc-root .md-mcard:hover{border-color:var(--gold);background:rgba(232,160,32,.07)}
+.mc-root .md-mcard-ico{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:#fff}
+.mc-root .md-mcard-foto{background:#E8A020}
+.mc-root .md-mcard-video{background:#e74c3c}
+.mc-root .md-mcard-audio{background:#9b59b6}
+.mc-root .md-mcard-body{flex:1;min-width:0}
+.mc-root .md-mcard-t{font-size:12px;font-weight:800;color:#F5E6D0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-root .md-mcard-a{font-size:10px;color:rgba(255,255,255,.45)}
+.mc-root .md-mcard-v{font-size:10px;color:var(--gold);margin-top:2px}
+.mc-root .md-mcard-type{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff;padding:2px 6px;border-radius:3px;flex-shrink:0}
+.mc-root .md-mcard-type.foto{background:#E8A020}
+.mc-root .md-mcard-type.video{background:#e74c3c}
+.mc-root .md-mcard-type.audio{background:#9b59b6}
+.mc-root .md-audio-row{padding:11px 12px;border:1px solid rgba(255,255,255,.1);border-radius:6px;background:rgba(255,255,255,.03);margin-bottom:8px}
+.mc-root .md-audio-t{font-size:12px;font-weight:800;color:#F5E6D0;margin-bottom:2px}
+.mc-root .md-audio-a{font-size:10px;color:rgba(255,255,255,.45);margin-bottom:8px}
+.mc-root .md-audio-row audio{width:100%;height:34px}
+.mc-root .md-no-media{text-align:center;padding:22px 14px;border:1px dashed rgba(255,255,255,.18);border-radius:8px}
+.mc-root .md-no-media .md-nm-ico{font-size:30px;margin-bottom:8px}
+.mc-root .md-no-media .md-nm-t{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;color:#F5E6D0;text-transform:uppercase;letter-spacing:1px}
+.mc-root .md-no-media .md-nm-s{font-size:11px;color:rgba(255,255,255,.45);margin-top:4px}
+.mc-root .md-feat{background:#0A101C;min-height:200px;display:flex;align-items:center;justify-content:center}
+.mc-root .md-feat img{max-width:100%;max-height:300px;object-fit:contain}
+.mc-root .md-feat video,.mc-root .md-feat audio,.mc-root .md-feat iframe{width:100%;max-width:100%}
+
+/* ---- Lightbox de media (holder .mc-root) ---------------------- */
+.mc-root .md-lbox{position:fixed;inset:0;z-index:1300;background:rgba(4,8,16,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:4%;visibility:hidden;opacity:0;transition:opacity .2s;pointer-events:none}
+.mc-root .md-lbox.open{visibility:visible;opacity:1;pointer-events:auto}
+.mc-root .md-lb-close{position:absolute;top:16px;right:18px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.mc-root .md-lb-close:hover{background:var(--gold);color:#111;transform:rotate(90deg)}
+.mc-root .md-lb-media{max-width:92vw;max-height:78vh;border-radius:8px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+.mc-root .md-lb-wrap{display:flex;align-items:center;justify-content:center;width:100%}
+.mc-root .md-lb-wrap iframe,.mc-root .md-lb-wrap video{width:100%;max-width:92vw}
+.mc-root .md-lb-cap{font-size:12px;color:rgba(255,255,255,.6);max-width:80%;text-align:center;line-height:1.5}
+
+/* ---- Responsive del drawer ------------------------------------ */
+@media(max-width:768px){
+  .mc-root.mapa-drawer .md-panel{width:100%;height:100%;box-shadow:none;transform:translateY(105%)}
+  .mc-root.mapa-drawer.open .md-panel{transform:translateY(0)}
+  .mc-root .md-hero{height:190px}
+}
+
+/* ---- Autor y album (trazabilidad foto -> album -> usuario) ---- */
+.mc-root .md-author{display:inline-flex;align-items:center;gap:8px;margin:6px 0;padding:4px 0;text-decoration:none;color:rgba(255,255,255,.8);font-size:11px;transition:color .15s}
+.mc-root .md-author:hover{color:var(--gold)}
+.mc-root .md-author-av{width:24px;height:24px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.08);flex-shrink:0}
+.mc-root .md-author-av-fb{width:24px;height:24px;border-radius:50%;background:rgba(232,160,32,.15);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;color:var(--gold);flex-shrink:0}
+.mc-root .md-author-name{font-weight:600}
+.mc-root .md-album-wrap{padding:24px;max-width:min(960px,92vw);max-height:90vh;overflow:auto;color:#fff;background:#0D1520;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.mc-root .md-album-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.mc-root .md-album-t{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
+.mc-root .md-album-loc{font-size:11px;color:rgba(255,255,255,.5)}
+.mc-root .md-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.mc-root .md-album-cell{display:flex;flex-direction:column;gap:6px}
+.mc-root .md-album-photo{cursor:pointer;aspect-ratio:1/1;border-radius:6px;overflow:hidden;background:#0A101C;transition:transform .15s}
+.mc-root .md-album-photo:hover{transform:scale(1.02)}
+.mc-root .md-album-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.mc-root .md-album-com-btn{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center}
+.mc-root .md-album-com-btn:hover{background:rgba(232,160,32,.18)}
+.mc-root .md-album-comments{width:100%}
+.mc-root .md-album-loading,.mc-root .md-album-empty{padding:40px 20px;text-align:center;font-size:12px;color:rgba(255,255,255,.5)}
+.mc-root .md-album-actions{margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end}

@@ -3595,5 +3595,52 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Decision:** se registra como NOTA DE PRACTICA OPERATIVA (no ADR) en DECISIONS.md; el detalle vive en `MODO_EXPRESS_ANALISIS.md`.
 - **Fuera de alcance:** no se crean endpoints ni migraciones; el presupuesto sigue 8/8 (ADR-010).
 
+## Prioridad MAPA CULTURAL COMPARTIDO - 2026-09-19 (ADR-045)
+
+> Feature "Mis mapas personales (comunidad) con paridad al mapa cultural del index".
+> Origen: pedido directo del usuario. Numeracion: el ultimo TSK real antes de esta
+> entrega es **TSK-132** (verificado, ADR-006); las tareas nuevas van
+> **TSK-133..TSK-134**. NO crea funciones serverless (8/8, ADR-001/ADR-010) ni
+> migraciones: son assets frontend de la raiz.
+
+### TSK-133: Motor compartido del Mapa Cultural (`mapa-cultural.js`/`.css`) y paridad del mapa de Comunidad [COMPLETADA]
+
+- **Estado:** COMPLETADA (working tree, 2026-09-19, **SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (paridad de producto del mapa de Comunidad con el mapa cultural del index).
+- **Fecha:** 2026-09-19
+- **Origen:** pedido del usuario de "Mis mapas personales (comunidad) con paridad al mapa cultural del index".
+- **ADR:** DECISIONS.md **ADR-045** (motor compartido multi-instancia, patron anti-duplicidad).
+- **Responsable / agentes:** frontend-tpl/js-silo-dev (`mapa-cultural.js`, `mapa-cultural.css`, `mymapa.js`, `comunidad.html`), qa-auditor (Escudo GOLD/QA), docs-keeper (esta entrada).
+- **Precedencia:** continua a TSK-128 (`mymapa.js`) y reutiliza el patron anti-duplicidad de ADR-044 y TSK-117. NO crea archivos en `api/` (presupuesto **8/8 INTACTO**, ADR-001/ADR-010); SI crea assets frontend (no cuentan contra las funciones serverless).
+- **Detalle - motor compartido:** NUEVO `mapa-cultural.js` (raiz, IIFE ASCII-safe, sin backticks, 65282 bytes) expone `window.MapaCultural` (L1597) con API multi-instancia `create(opts)`/`init(opts)` + `setPlaces`/`setMedia`/`setMediaEnabled`/`setMediaTypes`/`refresh`/`getMap`/`openDrawer`/`closeDrawer`/`destroy` y helpers `esc`/`starHtml`/`photoPlaceholderHTML`/`haversineKm`. Motor: pines por categoria (`divIcon`/color), clustering por proximidad de 40 px, drawer completo (hero, badge, rating, precio, lead, tabs multimedia, "Ver lugar completo"), capa de media (iconos, bounds, tope 300, dedupe) y lightbox/album. Normalizacion unica `normalizePlace`/`normalizeMedia` (`cat = categoria_slug || cat`; `uuid = _uuid || destino_id`; rating por defecto 0; descarta lat/lng no finitos).
+- **Detalle - CSS:** NUEVO `mapa-cultural.css` (raiz, 16112 bytes): 121 reglas extraidas 1:1 del CSS del mapa del index, todas scopadas bajo `.mc-root`, 0 `!important` reales (ADR-004); `<link>` agregado en `comunidad.html` (L14).
+- **Detalle - paridad:** tiles CARTO Voyager + clustering por proximidad de 40 px + drawer completo al clic en pin, identico al mapa cultural del index.
+- **Detalle - capa de media (decision de producto):** SOLO items de los destinos del mapa activo; match estricto por slug para `origen='destino'`/`'destino_album'`; `origen='album'` SIEMPRE excluido (no tiene vinculo a destino). Una sola peticion cacheada a `/api/interacciones?tipo=multimedia_mapa`, filtrada en cliente al mapa activo; sin cambios de backend. Toggle `.mmx-media`/`.mmx-mbtn` encendido por defecto si el mapa activo tiene media.
+- **Detalle - `mymapa.js` (MODIFICADO, +154/-46):** elimina su Leaflet propio y `bindPopup`; consume `MapaCultural.create` (L125); el clic en pin abre el drawer completo y agrega la capa de media con toggle (`comunidad.html` estilos del toggle en su `<style>`).
+- **Detalle - `comunidad.html` (MODIFICADO, +17/-0):** `<link rel="stylesheet" href="mapa-cultural.css">` (L14) y `<script src="mapa-cultural.js">` (L559) ANTES de `<script src="mymapa.js">` (L561).
+- **Decision de aplazamiento:** la migracion de `index.html` a `mapa-cultural.js` se DIFIERE a una entrega posterior CONTROLADA (no arriesgar el mapa del index); el header del modulo deja la nota anotada. Registrada como TSK-134.
+- **Evidencia / Escudo GOLD (verificado en esta sesion):** `node --check` OK (`mapa-cultural.js`, `mymapa.js`); ASCII-safe 0 bytes >127 en los 3 archivos nuevos; balance de divs de `comunidad.html` 319/319; llaves CSS 121/121; 0 `!important` reales; CSS 100% scopado bajo `.mc-root`; `scripts/smoke_mapa_cultural.js` **56/56 PASS** (`node scripts/smoke_mapa_cultural.js`); integracion Node vm 23/23 PASS (reportada por QA); `index.html`/`api/*` intactos (diff vacio). Veredicto QA: **APTO CON OBSERVACIONES**. Sin reincidencia de BUG-020/066/067/017-019/002.
+- **Relacion con bugs:** MITIGA (no cierra) **BUG-061**: `mapa-cultural.js` extrajo `jsonAuthHeaders()` (L1354) y ahora `guardarMedia` (L1361) y `votarMedia` (L1378) envian `Authorization`, reduciendo el punto de amplificacion; el backend de `guardar_media`/`tipo='foto'` sigue ABIERTO (escalado a `sql-security`). Ver nota de amplificacion en `BUGS_HISTORICOS.md` BUG-061. BUG-002/BUG-062/BUG-065 siguen ABIERTOS y ajenos.
+- **Pendiente operativo:** QA visual en navegador del tab Mapa de `comunidad.html` (drawer, toggle de media, lightbox); validar el shape real de `?tipo=mapa` contra Neon; deploy de los assets frontend (`mapa-cultural.js`/`mapa-cultural.css` + `mymapa.js`/`comunidad.html`); commit + push.
+- **Archivos en el working tree (SIN commitear):** `mapa-cultural.js` (NUEVO, untracked), `mapa-cultural.css` (NUEVO, untracked), `scripts/smoke_mapa_cultural.js` (NUEVO, untracked); `mymapa.js` (M), `comunidad.html` (M).
+- **Fuera de alcance:** migracion de `index.html` (TSK-134); `api/*` e `index-api-connector.js`; autenticacion del backend de BUG-061.
+
+### TSK-134: Migracion de `index.html` a `mapa-cultural.js` (DIFERIDA) [PENDIENTE]
+
+- **Estado:** PENDIENTE (diferida por decision de producto; ver ADR-045 y TSK-133).
+- **Prioridad:** Media (elimina el doble motor y unifica el contrato de datos del mapa; se hace CONTROLADA para no arriesgar el mapa del index).
+- **Fecha:** planificada posterior a TSK-133 (2026-09-19+).
+- **Origen:** consecuencia directa de TSK-133/ADR-045: el modulo se creo reutilizable, pero `index.html` todavia usa su mapa cultural inline.
+- **Responsable / agentes:** renderer-dev/frontend-tpl (`index.html`, `index-api-connector.js`), qa-auditor (Escudo GOLD + QA runtime), docs-keeper (cierre).
+- **Alcance:** reemplazar el mapa cultural inline del `index.html` por `MapaCultural`, conservando el comportamiento actual (pines, clustering, drawer, capa de media, lightbox).
+- **Riesgos conocidos (documentados):**
+  1. **Contrato `window.mapaMap` via `onMapReady`:** otros scripts del index consumen ese punto de enganche; hay que mantenerlo o migrar a todos los consumidores.
+  2. **Helpers compartidos que NO deben migrar:** utilidades del index ajenas al mapa no deben moverse al modulo.
+  3. **Colisiones de clases `.md-link`/`.md-close`:** el CSS del drawer del index colisiona con nombres del modulo; revisar el scope.
+  4. **Lightbox/album del index:** verificar que el modulo cubra el flujo completo antes de retirar el inline.
+  5. **~1190 lineas de extraccion 1:1** del CSS/JS del mapa; requiere revision por bloques y verificacion de paridad.
+- **Verificacion esperada:** paridad funcional en navegador (pines, clustering 40 px, drawer, capa de media, lightbox), `node scripts/smoke_mapa_cultural.js` 56/56 PASS y smoke del index; Escudo GOLD.
+- **Dependencia:** TSK-133 (COMPLETADA).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

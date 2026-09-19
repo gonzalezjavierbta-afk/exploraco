@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="mapa-cultural.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
@@ -269,6 +270,21 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mmx-pill:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
 .mmx-pill.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
 .mmx-pill-n{background:rgba(255,255,255,.12);border-radius:10px;padding:0 6px;font-size:10px;font-weight:700}
+/* Toggle de media del mapa personal (mymapa.js): .mmx-media / .mmx-mbtn.
+   Consistente con los .mmx-pill y el tema oscuro de comunidad. */
+.mmx-media{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
+.mmx-media-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.45);margin-right:2px}
+.mmx-mbtn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;transition:all .15s}
+.mmx-mbtn:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
+.mmx-mbtn.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
+/* Caso "sin media": el modulo puede ocultarlo ([hidden] o display:none)
+   o deshabilitar sus botones si no hay pines multimedia. */
+.mmx-media[hidden]{display:none}
+.mmx-mbtn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+@media(max-width:520px){
+  .mmx-media-lbl{width:100%;margin-bottom:2px}
+  .mmx-mbtn{flex:1 1 auto;text-align:center}
+}
 .mmx-editbar{flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 .mmx-eb-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold);letter-spacing:.5px;margin-right:4px}
 .mmx-ebtn{background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:5px;color:rgba(255,255,255,.72);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:5px 10px;cursor:pointer;transition:all .15s}
@@ -540,6 +556,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="mapa-cultural.js"></script>
 <script src="media-actions.js"></script>
 <script src="mymapa.js"></script>
 <script>

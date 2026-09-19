@@ -1,7 +1,7 @@
 # PROJECT.md - ExploraCO
 
 ## Estado del documento
-- Version: v1.8 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17 + ADR-038 TSK-112, 2026-09-18 + ADR-039/ADR-040 y ENMIENDA 1 de ADR-039 TSK-114..TSK-117, 2026-09-18 + ADR-041 TSK-118 y sus hotfixes post-QA J-1/J-2/J-3, 2026-09-18 + ADR-042/ADR-043 y paquete TSK-119..TSK-122 -- zonas/marcas/patrocinios, fix R10, perfil/mapa y cleanup de fotos, 2026-09-18 + ADR-044 TSK-123 correccion Comunidad > Audiovisual y abstraccion `media-actions.js`, 2026-09-18; + sesion express TSK-124..TSK-132 modo express, 2026-09-19)
+- Version: v1.8 (generado bajo AI-DOS v1.1; consolidacion Gaming v5.0 2026-09-14 + ADR-035/ADR-036, 2026-09-17 + ADR-038 TSK-112, 2026-09-18 + ADR-039/ADR-040 y ENMIENDA 1 de ADR-039 TSK-114..TSK-117, 2026-09-18 + ADR-041 TSK-118 y sus hotfixes post-QA J-1/J-2/J-3, 2026-09-18 + ADR-042/ADR-043 y paquete TSK-119..TSK-122 -- zonas/marcas/patrocinios, fix R10, perfil/mapa y cleanup de fotos, 2026-09-18 + ADR-044 TSK-123 correccion Comunidad > Audiovisual y abstraccion `media-actions.js`, 2026-09-18; + sesion express TSK-124..TSK-132 modo express, 2026-09-19; + ADR-045 TSK-133 motor compartido del mapa cultural (comunidad), 2026-09-19)
 - Fecha: Julio 2026 (actualizado Septiembre 2026)
 - Fuente: EXPLORACO_CONTEXT_V4.md + Reglas de Oro ExploraCO v5 + documentos maestros v5
 - Documento obligatorio del AI-DOS Core (Cap. 9.4). Es el primer documento que debe leer cualquier IA.
@@ -157,6 +157,16 @@ Cierre documental de la sesion ejecutada en "modo express" (skill `express-mode`
 - **Media del mapa cultural y de la ficha:** `multimedia_mapa` pasa a LIMIT por rama (album 300 / destinos 300 / global 600) contra la starvation (**BUG-069**); `museo_recurso` republica recursos ocultos al chocar con `23505` sin re-otorgar XP (**BUG-068**); `album_agregar_foto` escribe `visible` default true; la ficha cuenta votos de viajero desde `media_votos` (**BUG-070**). Diagnostico/remediacion: `scripts/diagnose_media_oculta.js`, `scripts/diagnose_video_mapa.js` y `db/cleanups/003_publicar_media_oculta.sql`.
 - **UI de perfil/galeria/comunidad:** se retira "Fotos publicadas" del Museo; "Clase"/"Tabla de Destino"/"Vocaciones" se fusionan en el "Arbol de Progreso" (`#arbol-body`, ADR-043/BUG-066); `galeria.html` queda en 2 bloques (curadas/comunidad) sin tope de 12; "Media reciente" abre popup reutilizando `#av-album-modal`.
 - **Proceso:** se adopta el modo express como practica operativa (skill `.opencode/skills/express-mode/SKILL.md`, manual `MODO_EXPRESS_ANALISIS.md`, `scripts/express_check.js`), registrado como nota de practica (no ADR) en DECISIONS.md. Detalle en TASKS.md TSK-124..TSK-132 y NEXT.md.
+
+### Motor compartido del Mapa Cultural (`mapa-cultural.js` / `mapa-cultural.css`) -- ADR-045 (TSK-133, 2026-09-19)
+
+Sobre el tab Mapa de `comunidad.html` (`mymapa.js`, TSK-128) se implemento la paridad total con el mapa cultural del `index.html` extrayendo el motor a un asset compartido. NO crea funciones serverless (8/8, ADR-001/ADR-010) ni migraciones: los assets de la raiz NO cuentan contra el presupuesto de funciones serverless.
+
+- **NUEVOS `mapa-cultural.js` y `mapa-cultural.css` (raiz, assets frontend):** motor compartido multi-instancia `window.MapaCultural` (pines por categoria, clustering por proximidad de 40 px, drawer completo, capa de media con toggle y lightbox/album) con normalizacion unica `normalizePlace`/`normalizeMedia`; CSS de 121 reglas scopadas bajo `.mc-root`, 0 `!important` (ADR-004). Patron de asset compartido identico a `map-picker.js`/`niveles-data.js`/`media-actions.js`.
+- **`mymapa.js`:** elimina su Leaflet propio y `bindPopup`; consume `MapaCultural.create`; el clic en pin abre el drawer completo y agrega la capa de media (toggle `.mmx-media`/`.mmx-mbtn`, default ON si el mapa activo tiene media) alimentada por UN fetch cacheado de `?tipo=multimedia_mapa` filtrado al mapa activo (match estricto por slug; `origen='album'` excluido).
+- **`comunidad.html`:** `<link>` al CSS (L14) y `<script src="mapa-cultural.js">` (L559) antes de `mymapa.js` (L561).
+- **`index.html` / `api/*`:** intactos (diff vacio). La migracion del index a `mapa-cultural.js` queda DIFERIDA a una entrega CONTROLADA (TSK-134).
+- **Verificacion:** Escudo GOLD verde y `scripts/smoke_mapa_cultural.js` 56/56 PASS; QA APTO CON OBSERVACIONES. Mitigacion de BUG-061: `jsonAuthHeaders()` hace que `guardarMedia`/`votarMedia` envien `Authorization` (el backend sigue ABIERTO, escalado a `sql-security`).
 
 ### Documentacion maestra
 

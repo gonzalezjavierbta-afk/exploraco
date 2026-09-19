@@ -187,6 +187,19 @@ La sesion ejecutada en "modo express" (skill `express-mode`, ver TSK-132) NO cre
 - **Skill `express-mode`:** `.opencode/skills/express-mode/SKILL.md` + manual `exploraco desarrollo/ampliacion desarrollo/MODO_EXPRESS_ANALISIS.md` + `SKILL_MODO_EXPRESS.md`; referencia en `agents.md`, `GUIA_DE_DESARROLLO.md` (Apendice B) y `orquestacion agentes.md` (Skill 4). Se registra como nota de practica (no ADR) en DECISIONS.md.
 - **Paso manual obligatorio:** aplicar `db/migrations/027` (previa) y los cleanups `002`/`003` en Neon, confirmar 019/023 y desplegar `api/interacciones.js` + `api/pagina-destino.js`.
 
+### Motor del Mapa Cultural (`mapa-cultural.js`) -- ADR-045 (TSK-133, sin migracion)
+
+La feature "Mis mapas personales (comunidad) con paridad al mapa cultural del index" (2026-09-19) NO crea funciones serverless (8/8 intacto, ADR-001/ADR-010) ni migraciones: agrega 2 assets frontend, 1 smoke y modifica 2 archivos.
+
+- **`mapa-cultural.js` (raiz, IIFE ASCII-safe, sin backticks):** motor compartido multi-instancia que expone `window.MapaCultural`. API publica: `create(opts)`/`init(opts)`, `setPlaces`, `setMedia`, `setMediaEnabled`, `setMediaTypes`, `refresh`, `getMap`, `openDrawer`, `closeDrawer`, `destroy`; helpers `esc`, `starHtml`, `photoPlaceholderHTML`, `haversineKm`. Motor: pines por categoria (`divIcon`/color), clustering por proximidad de 40 px, drawer completo (hero, badge, rating, precio, lead, tabs multimedia, "Ver lugar completo"), capa de media (iconos, bounds, tope 300, dedupe) y lightbox/album. Patron identico a `map-picker.js`/`niveles-data.js`/`media-actions.js`.
+- **Contrato de datos (normalizacion unica):** `normalizePlace` (`cat = categoria_slug || cat`, `uuid = _uuid || destino_id`, rating por defecto 0, descarta lat/lng no finitos) y `normalizeMedia`. Un solo shape para cualquier consumidor, sin importar el origen (directorio, mapa personal, etc.).
+- **`mapa-cultural.css` (raiz):** 121 reglas extraidas 1:1 del CSS del mapa del index, scopadas bajo `.mc-root`, 0 `!important` reales (ADR-004); se enlaza desde `comunidad.html` (L14).
+- **Consumidor actual `mymapa.js`:** elimina su Leaflet propio y `bindPopup`; usa `MapaCultural.create` (L125), el clic en pin abre el drawer completo y agrega la capa de media con toggle (`.mmx-media`/`.mmx-mbtn`, default ON si el mapa activo tiene media) alimentada por UN fetch cacheado de `/api/interacciones?tipo=multimedia_mapa` filtrado en cliente al mapa activo. `comunidad.html` carga `mapa-cultural.js` (L559) antes de `mymapa.js` (L561).
+- **Capa de media - regla de filtrado:** SOLO items de los destinos del mapa activo; match estricto por slug para `origen='destino'`/`'destino_album'`; `origen='album'` SIEMPRE excluido. Sin cambios de backend.
+- **`index.html` pendiente:** se migrara a `mapa-cultural.js` en una entrega CONTROLADA (TSK-134); hasta entonces su contrato `window.mapaMap`/`onMapReady` se conserva intacto y su mapa inline sigue siendo la fuente de verdad del home.
+- **Verificacion:** `scripts/smoke_mapa_cultural.js` 56/56 PASS (normalizacion de ambos shapes, `setPlaces` antes de init, clustering 40 px, filtro de media); Escudo GOLD verde (`node --check` OK, ASCII 0/0/0 en los 3 nuevos, divs `comunidad.html` 319/319, llaves CSS 121/121).
+- **Seguridad:** `jsonAuthHeaders()` (L1354) hace que `guardarMedia`/`votarMedia` envien `Authorization`; mitiga (no cierra) la amplificacion de **BUG-061** (backend sigue ABIERTO, escalado a `sql-security`). Detalle en DECISIONS.md ADR-045.
+
 ## 4. Motor de tags JSONB (modulo central)
 
 El campo `destinos.tags` es el mecanismo que permite escalar a nuevas categorias sin alterar el esquema relacional. Cada categoria define su propia forma de tags:
