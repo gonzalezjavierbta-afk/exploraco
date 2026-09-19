@@ -125,15 +125,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .trofeo-card.earned.tier-oro{border-color:rgba(255,215,0,.55)}
 .trofeo-card.earned.tier-platino{border-color:rgba(180,200,240,.6)}
 .trofeo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:28px}
-/* TABLA DE DESTINO (Milestones v2 / ADR-014) */
-.td-wrap{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;margin-bottom:28px}
-.td-svg{width:100%;max-width:560px;height:auto;display:block;margin:0 auto}
-.td-legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:10px;font-size:10px;color:rgba(255,255,255,.45)}
-.td-legend span{display:inline-flex;align-items:center;gap:5px}
-.td-node-on{filter:drop-shadow(0 0 6px rgba(232,160,32,.55))}
-.td-path-label{font-family:'Barlow Condensed',sans-serif;font-weight:900;letter-spacing:1px;fill:#fff}
-.td-path-sub{font-size:10px;fill:rgba(255,255,255,.5)}
-.td-node-text{font-size:8px;fill:#fff;text-anchor:middle}
 /* QUICK ACTIONS */
 .qa-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer}
 .qa-card:hover{border-color:rgba(232,160,32,.2)}
@@ -176,22 +167,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-uso-btn{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;border-radius:8px;padding:9px 16px;cursor:pointer;border:1px solid var(--gold);background:var(--gold);color:var(--black)}
 .pf-uso-btn.ghost{background:transparent;color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.18)}
 .pf-uso-btn:disabled{opacity:.45;cursor:not-allowed}
-/* VOCACIONES DE ARTISTA */
-.voc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:12px}
-.voc-card{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;background:rgba(255,255,255,.03);position:relative}
-.voc-card.activa{border-color:rgba(232,160,32,.45);background:rgba(232,160,32,.07)}
-.voc-card.locked{opacity:.45;filter:grayscale(.4)}
-.voc-emoji{font-size:30px;margin-bottom:8px}
-.voc-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
-.voc-nivel{font-size:10px;color:var(--gold);font-weight:600;margin-bottom:8px}
-.voc-habs{font-size:10px;color:rgba(255,255,255,.4);line-height:1.5;margin-bottom:10px}
-.voc-state{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
-.voc-state.on{color:#22C55E}
-.voc-state.lock{color:rgba(255,255,255,.3)}
-.voc-btn{width:100%;padding:7px 0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:5px;color:rgba(255,255,255,.6);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:all .15s}
-.voc-btn:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
-.voc-btn:disabled{cursor:not-allowed;opacity:.5}
-.voc-btn.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
 /* MUSEO: LINEA RESUMEN + VITRINA reforzada */
 .pf-museo-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:rgba(255,255,255,.55);font-family:'Outfit',sans-serif}
 .pf-museo-line .museo-dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.25)}
@@ -386,7 +361,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .arbol-clases .arbol-fac{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .arbol-clases .arbol-fac-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
 .arbol-clases .arbol-facc-panel{margin-bottom:12px}
-.arbol-clases .arbol-voc{margin-top:14px;border-top:1px solid rgba(255,255,255,.07);padding-top:12px}
 /* ---- WP-5 (TSK-103 / ADR-028): ADMINISTRADOR DE PERFIL POR PESTANAS ----
    Silos atomicos: .pf-tabs, .pf-datos, .pf-completa, .pf-casa,
    .pf-museo-preview y .pf-cuenta (Regla de Oro 4 / ADR-004). */
@@ -433,34 +407,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-casa .pf-casa-actual{font-size:11px;font-weight:700;color:#22C55E;padding:6px 0}
 .pf-casa .pf-casa-tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;margin-top:8px}
 .pf-casa .pf-casa-dato{font-size:10px;color:rgba(255,255,255,.45);margin-top:4px}
-/* TSK-112 / ADR-038 + FE-02: Mi Clase (profesion Rising Star; integrada en la misma tarjeta .arbol-clases) */
-.pf-clase{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px}
-.pf-clase .pf-clase-cabeza{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.pf-clase .pf-clase-nombre{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#fff}
-.pf-clase .pf-clase-nivel{font-family:'Geist','Barlow Condensed',sans-serif;font-size:11px;font-weight:900;color:var(--gold)}
-.pf-clase .pf-clase-bonus{font-size:11px;color:rgba(255,255,255,.55);margin-bottom:8px}
-.pf-clase .pf-clase-barra{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:6px}
-.pf-clase .pf-clase-barra-in{height:100%;border-radius:999px;background:linear-gradient(90deg,#E8A020,#F5C46B)}
-.pf-clase .pf-clase-xp{font-family:'Geist','Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,.45)}
-.pf-clase .pf-clase-nota{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px;line-height:1.5}
-.pf-clase .pf-clase-btn{background:transparent;border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:7px 16px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
-.pf-clase .pf-clase-btn:hover{background:rgba(232,160,32,.12)}
-.pf-clase .pf-clase-btn:disabled{opacity:.35;cursor:not-allowed}
-.pf-clase .pf-clase-cargando{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:14px}
-.pf-clase-modal-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:6px}
-.pf-clase-modal-nota{font-size:11px;color:rgba(255,255,255,.5);line-height:1.5;margin-bottom:12px}
-.pf-clase-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
-.pf-clase-op{display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;cursor:pointer;text-align:left;color:#fff;transition:border-color .15s,background .15s}
-.pf-clase-op:hover{border-color:rgba(232,160,32,.45);background:rgba(232,160,32,.06)}
-.pf-clase-op:disabled{opacity:.4;cursor:not-allowed}
-.pf-clase-op-ico{font-family:'Geist','Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold)}
-.pf-clase-op-nombre{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px}
-.pf-clase-op-bonus{font-size:10px;color:#22C55E;font-weight:700}
-.pf-clase-op-desc{font-size:10px;color:rgba(255,255,255,.45);line-height:1.4}
-.pf-clase-msg{font-size:11px;color:#ef4444;min-height:14px;margin-top:10px;line-height:1.5}
-.pf-clase-msg.ok{color:#22C55E}
-.pf-clase-cerrar{width:100%;margin-top:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:12px;padding:8px;cursor:pointer}
-.pf-clase-cerrar:hover{border-color:rgba(255,255,255,.3)}
 /* Mi Museo publico: vista previa (MUSEO) */
 .pf-museo-preview{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
 .pf-museo-preview .pf-mp-cargando,.pf-museo-preview .pf-mp-vacio,.pf-museo-preview .pf-mp-privado{text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:16px;line-height:1.6}
@@ -582,7 +528,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
        NO se movieron: cada uno lleva data-tab y se muestra/oculta. -->
   <nav class="pf-tabs" id="pf-tabs" role="tablist" aria-label="Secciones de mi perfil">
     <button type="button" class="pf-tab on" role="tab" data-tab="perfil" aria-selected="true" onclick="pfTab('perfil')">&#x1F464; Perfil</button>
-    <button type="button" class="pf-tab" role="tab" data-tab="clase" aria-selected="false" onclick="pfTab('clase')">&#x2694;&#xFE0F; Clase</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="clase" aria-selected="false" onclick="pfTab('clase')">&#x2694;&#xFE0F; Progreso</button>
     <button type="button" class="pf-tab" role="tab" data-tab="red" aria-selected="false" onclick="pfTab('red')">&#x1F517; Mi Red</button>
     <button type="button" class="pf-tab" role="tab" data-tab="museo" aria-selected="false" onclick="pfTab('museo')">&#x1F3DB;&#xFE0F; Museo</button>
     <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Inventario</button>
@@ -914,40 +860,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F3E0; Mi Casa</div>
   <div class="pf-casa" id="pf-casa" data-tab="clase"></div>
 
-  <div id="modal-clase" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1200;justify-content:center;align-items:center;padding:16px;" onclick="if(event.target===this)cerrarModalClase()">
-    <div style="background:#111;border:1px solid rgba(232,160,32,.35);border-radius:12px;padding:20px;width:min(460px,100%);font-family:Outfit,sans-serif;">
-      <div class="pf-clase-modal-title">Elegir / Cambiar Clase</div>
-      <div class="pf-clase-modal-nota">Primera eleccion gratis. Recambio: 300 XP y 30 dias de espera. Nivel maximo 10.</div>
-      <div class="pf-clase-grid">
-        <button type="button" class="pf-clase-op" data-clase="cartografo" onclick="elegirClase('cartografo',this)">
-          <span class="pf-clase-op-ico">//</span>
-          <span class="pf-clase-op-nombre">Cartografo</span>
-          <span class="pf-clase-op-bonus">+8% XP por nivel</span>
-          <span class="pf-clase-op-desc">Cartografia, rutas y territorio.</span>
-        </button>
-        <button type="button" class="pf-clase-op" data-clase="cronista" onclick="elegirClase('cronista',this)">
-          <span class="pf-clase-op-ico">[]</span>
-          <span class="pf-clase-op-nombre">Cronista</span>
-          <span class="pf-clase-op-bonus">+10% XP por nivel</span>
-          <span class="pf-clase-op-desc">Relatos, resenas e historias.</span>
-        </button>
-        <button type="button" class="pf-clase-op" data-clase="explorador" onclick="elegirClase('explorador',this)">
-          <span class="pf-clase-op-ico">&gt;&gt;</span>
-          <span class="pf-clase-op-nombre">Explorador</span>
-          <span class="pf-clase-op-bonus">+7% XP por nivel</span>
-          <span class="pf-clase-op-desc">Salidas, check-ins y hallazgos.</span>
-        </button>
-      </div>
-      <div id="pf-clase-msg" class="pf-clase-msg"></div>
-      <button type="button" class="pf-clase-cerrar" onclick="cerrarModalClase()">Cerrar</button>
-    </div>
-  </div>
-
   <!-- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES -->
-  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x2694;&#xFE0F; Clase &amp; Arbol de Progreso</div>
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x2694;&#xFE0F; Arbol de Progreso</div>
   <div class="arbol-clases" id="arbol-clases" data-tab="clase">
-    <!-- TSK-112 / ADR-038 + FE-02: Clase (profesion Rising Star) integrada al arbol -->
-    <div class="pf-clase" id="pf-clase" data-tab="clase" style="margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:14px;"></div>
     <div id="arbol-body">
       <div class="arbol-cargando">Abriendo tu Arbol de Clases&#8230;</div>
     </div>
@@ -1187,9 +1102,8 @@ function renderPerfil() {
   /* mis lugares */
   cargarMisLugares(u.id);
 
-  /* Gaming v5.0: red de referidos y DM. La faccion y los caminos de
-     artista los gobierna el Arbol de Progreso (arbolFaccionCargar /
-     sub-vista artistas), no se recargan por separado. */
+  /* Gaming v5.0: red de referidos y DM. La faccion la gobierna el
+     Arbol de Progreso (arbolFaccionCargar), no se recarga por separado. */
   cargarMiRed(u.id);
   cargarArbolClases(u.id);
   cargarMensajes(u.id);
@@ -1449,56 +1363,6 @@ function cargarTrofeos(uid) {
     });
 }
 
-/* ---- TABLA DE DESTINO (Milestones v2 / ADR-014, Albion) ---- */
-var TD_COLORS = ['#22C55E', '#3B82F6', '#A855F7'];
-var TD_TIER_NAMES = ['Semilla', 'Aprendiz', 'Practicante', 'Especialista', 'Maestro'];
-function cargarTablaDestino(uid) {
-  var wrap = document.getElementById('pf-tabla');
-  if (!wrap || !uid) return;
-  fetch('/api/interacciones?tipo=tabla_destino&usuario_id=' + encodeURIComponent(uid))
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      var data = (res && res.data) || null;
-      if (!data || !data.senderos || !data.senderos.length) {
-        wrap.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aún no tienes actividad para armar tu Tabla de Destino. Guarda, visita, resena y crea mapas para progresar 🕸️</div>';
-        return;
-      }
-      renderTablaSVG(wrap, data.senderos);
-    })
-    .catch(function(){
-      wrap.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar la Tabla de Destino. Intenta de nuevo más tarde.</div>';
-    });
-}
-function renderTablaSVG(wrap, senderos) {
-  var W = 560, H = 300, top = 44, rowH = 46, nodeR = 16;
-  var colW = (W - 80) / 3;
-  var svg = '<svg class="td-svg" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
-  svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" rx="12" fill="rgba(255,255,255,.02)"/>';
-  senderos.forEach(function(s, c) {
-    var cx = 40 + colW * c + colW / 2;
-    var color = TD_COLORS[c % TD_COLORS.length];
-    var lvl = (s.sendero && s.sendero.nivel) || 1;
-    svg += '<line x1="' + cx + '" y1="' + (top + rowH - nodeR) + '" x2="' + cx + '" y2="' + (top + 4 * rowH + nodeR) + '" stroke="rgba(255,255,255,.12)" stroke-width="2"/>';
-    svg += '<text class="td-path-label" x="' + cx + '" y="' + (top - 18) + '" text-anchor="middle" font-size="15">' + s.emoji + ' ' + s.nombre + '</text>';
-    svg += '<text class="td-path-sub" x="' + cx + '" y="' + (top - 4) + '" text-anchor="middle">' + fmtXp(s.fama) + ' fama</text>';
-    for (var t = 0; t < 5; t++) {
-      var y = top + t * rowH;
-      var on = (t + 1) <= lvl;
-      svg += '<circle class="' + (on ? 'td-node-on' : '') + '" cx="' + cx + '" cy="' + y + '" r="' + nodeR + '" fill="' + (on ? color : 'rgba(255,255,255,.06)') + '" stroke="' + (on ? color : 'rgba(255,255,255,.15)') + '" stroke-width="1.5"/>';
-      svg += '<text class="td-node-text" x="' + cx + '" y="' + (y + 3) + '">' + (on ? '\u2713' : (t + 1)) + '</text>';
-    }
-    var tierName = (s.sendero && s.sendero.nombre) || 'Semilla';
-    svg += '<text class="td-path-sub" x="' + cx + '" y="' + (top + 5 * rowH + 10) + '" text-anchor="middle">' + tierName + '</text>';
-  });
-  svg += '</svg>';
-  var legend = '<div class="td-legend">'
-    + senderos.map(function(s, c){
-        return '<span><span style="width:9px;height:9px;border-radius:50%;background:' + TD_COLORS[c % TD_COLORS.length] + '"></span>' + s.nombre + ': ' + fmtXp(s.fama) + ' fama · Nivel ' + ((s.sendero && s.sendero.nivel) || 1) + '</span>';
-      }).join('')
-    + '</div>';
-  wrap.innerHTML = svg + legend;
-}
-
 /* ---- MIS LUGARES (api/interacciones?tipo=mapa) ---- */
 function cargarMisLugares(uid) {
   if(!uid) return;
@@ -1621,52 +1485,6 @@ function syncMuseoLine(uid, fuerza) {
   });
 }
 
-/* ---- VOCACIONES DE ARTISTA (ADR-018 / ADR-026) ---- */
-function cargarVocaciones(uid) {
-  var grid = document.getElementById('pf-vocaciones-grid');
-  if (!grid || !uid) return;
-  var lvl = getLevel(statsU().xp);
-  var bloqueado = !lvl || lvl.min < 700;
-  if (bloqueado) {
-    grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.45);font-size:12px;padding:22px;border:1px dashed rgba(168,85,247,.3);border-radius:10px;">'
-      + '\uD83D\uDD12 Las vocaciones de artista se desbloquean en el nivel 5 (Vanguardia Territorial, 700 XP). '
-      + 'Sigue explorando para cerrar tu camino creativo.</div>';
-    return;
-  }
-  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando vocaciones\u2026</div>';
-  fetch('/api/interacciones?tipo=vocaciones_usuario&usuario_id=' + encodeURIComponent(uid))
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      if (!res || !res.ok || !res.data) {
-        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar las vocaciones.</div>';
-        return;
-      }
-      var activas = (res.data.activadas) || [];
-      var cat = (res.data.catalogo) || [];
-      if (!cat.length) {
-        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No hay vocaciones disponibles aun.</div>';
-        return;
-      }
-      var mapaAct = {};
-      for (var a = 0; a < activas.length; a++) mapaAct[activas[a]] = true;
-      grid.innerHTML = cat.map(function(v){
-        var on = !!mapaAct[v.id];
-        var skills = (v.habilidades || []).map(function(h){ return '<span class="voc-skill">' + esc(h) + '</span>'; }).join('');
-        return '<div class="voc-card' + (on ? ' activa' : '') + '" data-voc="' + esc(v.id) + '">'
-          + '<div class="voc-emoji" style="font-size:30px;height:64px;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,rgba(168,85,247,.16),rgba(255,255,255,.03));border-radius:8px;margin-bottom:8px;">' + (v.emoji || '\uD83C\uDFA4') + '</div>'
-          + '<div class="voc-nombre" style="font-size:13px;font-weight:700;color:#fff;">' + esc(v.nombre) + '</div>'
-          + '<div class="voc-nivel" style="font-size:10px;color:rgba(255,255,255,.4);margin:2px 0 8px;">Requiere nivel ' + (v.nivel || 1) + '</div>'
-          + '<div class="voc-skills" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">' + skills + '</div>'
-          + '<button onclick="activarVocacion(\'' + esc(v.id) + '\',this)"'
-          + (on ? ' style="background:rgba(34,197,94,.18);color:#22C55E;border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">&#x2713; Activa</button>'
-              : ' style="border:1px solid rgba(168,85,247,.4);color:#C084FC;background:transparent;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;font-family:Outfit,sans-serif;cursor:pointer;">Activar</button>')
-          + '</div>';
-      }).join('');
-    })
-    .catch(function(){
-      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar las vocaciones.</div>';
-    });
-}
 function activarVocacion(vocId, btn) {
   var u0 = sesion();
   if (!u0) return;
@@ -1683,6 +1501,7 @@ function activarVocacion(vocId, btn) {
       if (res && res.ok) {
         showToast('Vocacion actualizada');
         refrescarSesion();
+        cargarArbolClases(u0.id);
       } else {
         btn.disabled = false;
         btn.textContent = origTxt;
@@ -3215,45 +3034,6 @@ function elegirFaccion(faccion, btn) {
   });
 }
 
-/* ---- Caminos de artista (misiones grupo 'artista') ---- */
-function cargarMisionesArtista(uid) {
-  var con = document.getElementById('pf-voc-misiones');
-  if (!con || !uid) return;
-  con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:14px">Cargando caminos de artista\u2026</div>';
-  fetch('/api/interacciones?tipo=misiones&usuario_id=' + encodeURIComponent(uid))
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      var list = ((res && res.data) || []).filter(function(m){ return (m.grupo || '') === 'artista'; });
-      if (!list.length) {
-        con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.4);font-size:11px;padding:14px">Los caminos de artista apareceran al desbloquear tus vocaciones (nivel 5).</div>';
-        return;
-      }
-      var doneIds = {};
-      list.forEach(function(m){ if (m.estado === 'completada') doneIds[m.id] = true; });
-      var html = '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);margin:8px 0 6px;">Caminos de artista</div>';
-      html += list.map(function(m){
-        var done = m.estado === 'completada';
-        var reqsPend = (m.requiere || []).filter(function(r){ return !doneIds[r]; });
-        var bloqueada = !done && reqsPend.length > 0;
-        var icono = done ? '\u2705' : (bloqueada ? '\uD83D\uDD12' : '\u23F3');
-        var estadoTxt = done ? 'Completada' : (bloqueada ? 'Bloqueada' : 'Disponible');
-        var reqsTxt = reqsPend.length ? ' · Requiere: ' + reqsPend.join(', ') : '';
-        return '<div class="mis-card' + (done ? ' done' : '') + '">'
-          + '<div class="mis-emoji">' + icono + '</div>'
-          + '<div class="mis-body">'
-          + '<div class="mis-nombre">' + esc(m.nombre || m.id) + '</div>'
-          + '<div class="mis-meta">Artista · ' + estadoTxt + reqsTxt + '</div>'
-          + '</div>'
-          + '<div class="mis-xp">+' + fmtXp(m.xp) + ' XP</div>'
-          + '</div>';
-      }).join('');
-      con.innerHTML = html;
-    })
-    .catch(function(){
-      con.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.4);font-size:11px;padding:14px">No se pudieron cargar los caminos de artista.</div>';
-    });
-}
-
 /* ---- GAMING v5.0 / ADR-028 (WP-4): ARBOL DE CLASES ----
    Contrato real de las ramas tipo= de api/interacciones.js (v14):
      GET  ?tipo=arbol_catalogo            -> {ok,data:{ramas:[16]{id,faccion,nombre,emoji,desc,fuente,
@@ -3313,8 +3093,6 @@ function arbolEfectoTexto(ef) {
 }
 function arbolFacMeta(id) {
   var k = String(id || '').toLowerCase();
-  /* Pseudo-tab interno del componente: la Tabla de Destino (senderos). */
-  if (k === 'senderos') return { id:'senderos', nombre:'Tabla de Destino', emoji:'\uD83D\uDD78\uFE0F', color:'#A855F7', desc:'' };
   for (var i = 0; i < FACCION_META.length; i++) if (FACCION_META[i].id === k) return FACCION_META[i];
   return { id:k, nombre:(k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Faccion'), emoji:'\u2694\uFE0F', color:'#E8A020', desc:'' };
 }
@@ -3399,8 +3177,6 @@ function arbolFaccionesDisponibles() {
   function tiene(f) { return cat.some(function (r) { return String(r.faccion || '').toLowerCase() === f; }); }
   ARBOL_FACCIONES.forEach(function (f) { if (tiene(f)) out.push(f); });
   cat.forEach(function (r) { var f = String(r.faccion || '').toLowerCase(); if (f && out.indexOf(f) < 0) out.push(f); });
-  /* Sub-vista "senderos" (Tabla de Destino): ultimo pseudo-tab del arbol. */
-  if (out.indexOf('senderos') < 0) out.push('senderos');
   return out;
 }
 function arbolRamasDeFaccion(f) {
@@ -3575,19 +3351,7 @@ function arbolRamaHtml(catRama) {
   h += arbolRamaAccionHtml(id, activa);
   return h + '</div>';
 }
-function arbolVocacionesHtml() {
-  return '<div class="arbol-voc">'
-    + '<div class="arbol-bono-txt">\uD83C\uDFA4 Vocaciones de artista</div>'
-    + '<div class="voc-grid" id="pf-vocaciones-grid"></div>'
-    + '<div id="pf-voc-misiones"></div>'
-    + '</div>';
-}
 function arbolPanelHtml(faccion) {
-  /* Sub-vista senderos: la Tabla de Destino vive dentro del componente. */
-  if (faccion === 'senderos') {
-    return '<div class="arbol-nota">Tus senderos de especializacion: guarda, visita y resena para subir cada camino.</div>'
-      + '<div id="pf-tabla" class="td-wrap"></div>';
-  }
   var ramas = arbolRamasDeFaccion(faccion), m = arbolFacMeta(faccion);
   var h = m.desc ? '<div class="arbol-nota">' + esc(m.desc) + '</div>' : '';
   if (!ramas.length) {
@@ -3597,8 +3361,6 @@ function arbolPanelHtml(faccion) {
     ramas.forEach(function (r) { h += arbolRamaHtml(r); });
     h += '</div>';
   }
-  /* La faccion artistas integra ademas vocaciones y caminos de artista. */
-  if (faccion === 'artistas') h += arbolVocacionesHtml();
   return h;
 }
 function arbolPintar() {
@@ -3612,10 +3374,8 @@ function arbolPintar() {
   }
   host.innerHTML = arbolFaccionHeaderHtml() + arbolTabsHtml(facciones) + arbolBonoHtml() + arbolPanelHtml(ARBOL_ESTADO.tab)
     + '<div class="arbol-tip" id="arbol-tip" role="status" aria-live="polite"></div>';
-  /* Las sub-vistas pintan contenedores que se recargan aqui mismo. */
+  /* El panel de faccion se recarga aqui mismo si esta abierto. */
   if (ARBOL_ESTADO.faccOpen) arbolFaccionCargar();
-  if (ARBOL_ESTADO.tab === 'senderos') cargarTablaDestino(ARBOL_ESTADO.uid);
-  if (ARBOL_ESTADO.tab === 'artistas') { cargarVocaciones(ARBOL_ESTADO.uid); cargarMisionesArtista(ARBOL_ESTADO.uid); }
 }
 function cargarArbolClases(uid) {
   var host = document.getElementById('arbol-body');
@@ -4012,7 +3772,7 @@ function pfTab(tab) {
   var u = sesion();
   if (tab === 'perfil' && u && u.id) renderDatosPerfil();
   if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
-  if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarClase(u.id); cargarArbolClases(u.id); }
+  if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
   if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); }
@@ -4354,16 +4114,6 @@ function elegirCasa(casa, btn) {
   });
 }
 
-/* ---- TSK-112 / ADR-038: CLASE (profesion Rising Star) ----
-   Coexiste con el arbol de 16 ramas. El GET del usuario propio (SELECT *)
-   trae clase_id/nivel_clase/xp_clase; POST clase_elegir elige/recambia. */
-var CLASES_META = {
-  cartografo: { nombre:'Cartografo', bonus:0.08, icono:'//', desc:'Cartografia, rutas y territorio.' },
-  cronista:   { nombre:'Cronista',   bonus:0.10, icono:'[]', desc:'Relatos, resenas e historias.' },
-  explorador: { nombre:'Explorador', bonus:0.07, icono:'>>', desc:'Salidas, check-ins y hallazgos.' }
-};
-/* Espejo front de XP_NIVEL_CLASE del backend (nivel 1..10). */
-var XP_NIVEL_CLASE = [0,100,250,500,900,1400,2100,3000,4200,5700,7500];
 /* Tag de nivelacion runtime de la Casa (ADR-038 seccion D). */
 var CASA_TAGS = {
   dominante:   { label:'Dominante',   color:'#ef4444' },
@@ -4371,15 +4121,6 @@ var CASA_TAGS = {
   rezagada:    { label:'Rezagada',    color:'#22C55E' }
 };
 function pfXpFmt(v) { var n = Number(v) || 0; return Math.round(n * 100) / 100; }
-function pfClaseMeta(id) { return CLASES_META[String(id || '').toLowerCase()] || null; }
-function claseNivelDatos(nivel, xpClase) {
-  var n = Math.min(Math.max(parseInt(nivel, 10) || 1, 1), 10);
-  var xp = Number(xpClase) || 0;
-  var base = XP_NIVEL_CLASE[n - 1];
-  var sig = n < 10 ? XP_NIVEL_CLASE[n] : XP_NIVEL_CLASE[10];
-  var pct = (n >= 10 || sig <= base) ? 100 : Math.max(0, Math.min(100, Math.round((xp - base) / (sig - base) * 100)));
-  return { nivel:n, base:base, sig:sig, pct:pct };
-}
 /* HTML extra (degradable) del card de tu Casa con los campos de casa_ranking. */
 function pfCasaExtraHtml(fila) {
   if (!fila) return '';
@@ -4390,102 +4131,6 @@ function pfCasaExtraHtml(fila) {
   if (fila.xp_cofre_total != null) html += '<div class="pf-casa-dato">Cofre: ' + pfXpFmt(fila.xp_cofre_total) + ' XP</div>';
   return html;
 }
-function cargarClase(uid) {
-  var con = document.getElementById('pf-clase');
-  if (!con || !uid) return;
-  con.innerHTML = '<div class="pf-clase-cargando">Cargando tu Clase\u2026</div>';
-  fetchConJwt('/api/usuarios?id=' + encodeURIComponent(uid))
-    .then(function(res){
-      if (!(res && res.ok && res.data)) { con.innerHTML = '<div class="pf-clase-nota">No se pudo cargar tu Clase.</div>'; return; }
-      renderClase(res.data);
-    })
-    .catch(function(){ con.innerHTML = '<div class="pf-clase-nota">No se pudo cargar tu Clase.</div>'; });
-}
-function renderClase(data) {
-  var con = document.getElementById('pf-clase');
-  if (!con) return;
-  var meta = pfClaseMeta(data && data.clase_id);
-  if (!meta) {
-    con.innerHTML = '<div class="pf-clase-cabeza"><span class="pf-clase-nombre">Sin Clase</span></div>'
-      + '<div class="pf-clase-nota">Elige una profesion: tu Clase sube de nivel y multiplica tu XP. Ahora vive integrada en tu Arbol de Clases, aqui arriba.</div>'
-      + '<button type="button" class="pf-clase-btn" id="btn-elegir-clase" onclick="abrirModalClase()">Elegir Clase</button>';
-    return;
-  }
-  var d = claseNivelDatos(data.nivel_clase, data.xp_clase);
-  var bonusTxt = '+' + Math.round(meta.bonus * 100) + '% XP por nivel';
-  var xpTxt = d.nivel >= 10
-    ? ('Nivel maximo \u00b7 ' + d.sig + ' XP de clase')
-    : (pfXpFmt(data.xp_clase) + ' / ' + d.sig + ' XP de clase');
-  con.innerHTML = '<div class="pf-clase-cabeza">'
-    + '<span class="pf-clase-nombre">' + meta.icono + ' ' + meta.nombre + '</span>'
-    + '<span class="pf-clase-nivel">Nivel ' + d.nivel + '</span></div>'
-    + '<div class="pf-clase-bonus">' + bonusTxt + '</div>'
-    + '<div class="pf-clase-barra"><div class="pf-clase-barra-in" style="width:' + d.pct + '%"></div></div>'
-    + '<div class="pf-clase-xp">' + xpTxt + '</div>'
-    + '<div class="pf-clase-nota" style="margin-top:10px">Cambiar de Clase cuesta 300 XP y 30 dias de espera.</div>'
-    + '<button type="button" class="pf-clase-btn" id="btn-elegir-clase" onclick="abrirModalClase()">Elegir / Cambiar Clase</button>';
-}
-function abrirModalClase() {
-  var u = sesion();
-  var actual = u ? String(u.clase_id || '') : '';
-  var botones = document.querySelectorAll('#modal-clase .pf-clase-op');
-  for (var i = 0; i < botones.length; i++) {
-    var es = botones[i].getAttribute('data-clase') === actual;
-    botones[i].disabled = es;
-    botones[i].style.opacity = es ? '0.5' : '';
-  }
-  var msg = document.getElementById('pf-clase-msg');
-  if (msg) { msg.textContent = ''; msg.className = 'pf-clase-msg'; }
-  var m = document.getElementById('modal-clase');
-  if (m) m.style.display = 'flex';
-}
-function cerrarModalClase() {
-  var m = document.getElementById('modal-clase');
-  if (m) m.style.display = 'none';
-}
-function claseErrorMsg(err) {
-  if (err === 'CLASE_YA_ELEGIDA') return 'Ya tienes una Clase. Usa el recambio (300 XP + 30 dias).';
-  if (err === 'COOLDOWN_CLASE') return 'Debes esperar 30 dias desde tu ultima eleccion de Clase.';
-  if (err === 'PUNTOS_INSUFICIENTES') return 'Necesitas 300 XP para cambiar de Clase.';
-  if (err === 'EMAIL_SIN_VERIFICAR') return 'Verifica tu email antes de elegir tu Clase.';
-  if (err === 'CLASE_INVALIDA') return 'Clase invalida.';
-  if (err === 'SESION_REQUERIDA' || err === 'SESION_EXPIRADA' || err === 'SESION_INVALIDA') return 'Inicia sesion de nuevo para elegir tu Clase.';
-  return err || 'No se pudo actualizar tu Clase.';
-}
-function elegirClase(claseId, btn) {
-  var u = sesion();
-  if (!u || !u.id) return;
-  var meta = pfClaseMeta(claseId);
-  if (!meta) return;
-  var msg = document.getElementById('pf-clase-msg');
-  if (u.clase_id && !window.confirm('El recambio cuesta 300 XP y no podras volver a cambiar en 30 dias. Deseas cambiar a ' + meta.nombre + '?')) return;
-  if (btn) btn.disabled = true;
-  if (msg) { msg.textContent = 'Guardando\u2026'; msg.className = 'pf-clase-msg ok'; }
-  fetchConJwt('/api/usuarios', {
-    method: 'POST',
-    body: JSON.stringify({ tipo: 'clase_elegir', usuario_id: String(u.id), clase_id: claseId })
-  }).then(function(res){
-    if (res && res.ok && res.data) {
-      u.clase_id = res.data.clase_id || claseId;
-      u.clase_elegida_en = res.data.clase_elegida_en || u.clase_elegida_en;
-      if (res.data.xp_total_nuevo != null) u.xp_total = res.data.xp_total_nuevo;
-      if (res.data.nivel_nuevo != null) u.nivel_clase = res.data.nivel_nuevo;
-      try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
-      showToast('Clase elegida: ' + meta.nombre);
-      if (res.data.bajo_nivel) showToast('Ojo: con este cambio bajaste de nivel', '#ef4444');
-      cerrarModalClase();
-      cargarClase(u.id);
-      if (typeof refrescarSesion === 'function') refrescarSesion();
-      return;
-    }
-    if (btn) btn.disabled = false;
-    if (msg) { msg.textContent = claseErrorMsg(res && res.error); msg.className = 'pf-clase-msg'; }
-  }).catch(function(){
-    if (btn) btn.disabled = false;
-    if (msg) { msg.textContent = 'Error de conexion.'; msg.className = 'pf-clase-msg'; }
-  });
-}
-
 /* ---- Vista previa del museo publico (MUSEO) ----
    Un solo GET tipo=museo_publico (WP-3). Boton a perfil.html?id=<uid>. */
 function pfMpStat(n, label) {
