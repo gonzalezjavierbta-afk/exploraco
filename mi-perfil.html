@@ -1165,9 +1165,6 @@ function renderPerfil() {
   /* museo-line (hero): sync de conteos con backfill real */
   syncMuseoLine(u.id, true);
 
-  /* tabla de destino (Milestones v2) */
-  cargarTablaDestino(u.id);
-
   /* museo-line: barra de museo en el hero (sync con backfill) */
   syncMuseoLine(u.id, true);
 
@@ -1175,9 +1172,6 @@ function renderPerfil() {
   cargarTienda(u.id);
   cargarInventario(u.id);
   cargarCromos(u.id);
-
-  /* vocaciones de artista (perfil-artista v1 / ADR-015) */
-  cargarVocaciones(u.id);
 
   /* mis albumes (ADR-017) */
   var btnAlbum = document.getElementById('btn-crear-album');
@@ -1193,11 +1187,11 @@ function renderPerfil() {
   /* mis lugares */
   cargarMisLugares(u.id);
 
-  /* Gaming v5.0: red de referidos, faccion, caminos de artista y DM */
+  /* Gaming v5.0: red de referidos y DM. La faccion y los caminos de
+     artista los gobierna el Arbol de Progreso (arbolFaccionCargar /
+     sub-vista artistas), no se recargan por separado. */
   cargarMiRed(u.id);
-  cargarFacciones(u.id);
   cargarArbolClases(u.id);
-  cargarMisionesArtista(u.id);
   cargarMensajes(u.id);
 
   /* quick actions */
@@ -4018,7 +4012,7 @@ function pfTab(tab) {
   var u = sesion();
   if (tab === 'perfil' && u && u.id) renderDatosPerfil();
   if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
-  if (tab === 'clase' && u && u.id) { cargarFacciones(u.id); cargarCasas(u.id); cargarClase(u.id); cargarArbolClases(u.id); cargarVocaciones(u.id); }
+  if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarClase(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
   if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); }
