@@ -674,12 +674,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
-  <!-- FOTOS PUBLICADAS (ADR-032: solo lectura publica, visible=true server-side) -->
-  <div class="pf-section-title" id="mis-fotos-title" style="margin-top:20px" data-tab="museo">&#x1F4F8; Fotos publicadas</div>
-  <div id="mis-fotos-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:12px;">
-    <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando fotos...</p>
-  </div>
-
   <!-- GUARDADOS DE MEDIA (ADR-032) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F516; Guardados (fotos y albumes)</div>
   <div id="mis-guardados-media-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:28px;">
@@ -1190,13 +1184,7 @@ function renderPerfil() {
   if (btnAlbum) btnAlbum.style.display = 'block';
   cargarMisAlbumes();
 
-  /* mis fotos y guardados de media (ADR-032); Fotos publicadas solo admin (FE-01) */
-  if (esCuentaFotosPublicadas()) {
-    cargarMisFotos();
-  } else {
-    setStyle('mis-fotos-title', 'display', 'none');
-    setStyle('mis-fotos-grid', 'display', 'none');
-  }
+  /* guardados de media del museo propio (ADR-032) */
   cargarMisGuardadosMedia();
 
   /* T5 (ADR-039): gestion del Museo (todos los recursos, privados incluidos) */
@@ -2093,7 +2081,7 @@ function cargarMisAlbumes() {
 }
 
 /* ---- MIS FOTOS Y GUARDADOS DE MEDIA (ADR-032) ----
-   Dos GET del museo propio (mis_fotos / mis_guardados_media) y un POST
+   Un GET del museo propio (mis_guardados_media) y un POST
    de baja de bookmark (quitar_guardado_media). Las tarjetas comparten el
    helper mediaCardHTML() para no duplicar el markup de miniatura. Los
    guardados son privados por decision de producto: solo se pintan aqui. */
@@ -2138,20 +2126,6 @@ function mediaCardHTML(m, opts) {
     + '</div></div>';
 }
 
-/* FE-01: "Fotos publicadas" solo se muestra a la cuenta admin. Unico helper
-   de visibilidad (Regla de No-Duplicidad); reusa sesion(). */
-function esCuentaFotosPublicadas() {
-  var u = sesion();
-  return !!(u && u.email === 'brsk84@gmail.com');
-}
-
-function cargarMisFotos() {
-  cargarMediaGrid({ gridId: 'mis-fotos-grid', tipo: 'mis_fotos', quitar: false,
-    cargando: 'Cargando fotos...',
-    vacio: 'Aun no tienes fotos. Agrega una desde un Album. <a href="mi-perfil.html#mis-albumes-grid" style="color:var(--gold);text-decoration:none;">Ir a Albumes &#x2192;</a>',
-    error: 'No se pudieron cargar tus fotos.' });
-}
-
 function cargarMisGuardadosMedia() {
   cargarMediaGrid({ gridId: 'mis-guardados-media-grid', tipo: 'mis_guardados_media', quitar: true,
     cargando: 'Cargando guardados...',
@@ -2160,7 +2134,7 @@ function cargarMisGuardadosMedia() {
 }
 
 /* Loader generico de rejillas de media: un solo camino de fetch/estado
-   para mis_fotos y mis_guardados_media (Regla de No-Duplicidad). */
+   para mis_guardados_media (Regla de No-Duplicidad). */
 function cargarMediaGrid(cfg) {
   if (!window.ExploraCO || !window.ExploraCO.usuario) return;
   var grid = document.getElementById(cfg.gridId);
@@ -2483,7 +2457,6 @@ function museoGuardar() {
     if (res.logros && res.logros.length) res.logros.forEach(function(l){ showToast('\uD83C\uDFC6 Logro: ' + (l.nombre || l.id)); });
     museoCerrarModal();
     museoRefrescar();
-    if (esCuentaFotosPublicadas()) cargarMisFotos();
     cargarMuseoPreview(u.id);
   }, function(msg){
     museoFormMsg(msg, false);
@@ -2500,7 +2473,6 @@ function museoEliminar(id) {
     showToast('Recurso eliminado');
     var u = sesion();
     museoRefrescar();
-    if (esCuentaFotosPublicadas()) cargarMisFotos();
     if (u) cargarMuseoPreview(u.id);
   });
 }
@@ -2511,7 +2483,6 @@ function museoToggleVisible(id, visible) {
     showToast(visible ? 'Recurso ahora es publico' : 'Recurso ahora es privado');
     var u = sesion();
     museoRefrescar();
-    if (esCuentaFotosPublicadas()) cargarMisFotos();
     if (u) cargarMuseoPreview(u.id);
   });
 }
