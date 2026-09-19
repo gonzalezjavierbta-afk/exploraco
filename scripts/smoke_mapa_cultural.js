@@ -131,4 +131,108 @@ check('mediaFilter default: capa filtra estricto (comunidad)', instStrict.getSta
   check('instancia: metodo ' + fn, inst && typeof inst[fn] === 'function');
 });
 
+// ---- (6) bindCategories / filtros por categoria --------------------
+// Guarda de regresion: el sandbox original NO tiene document, por eso
+// bindCategories nunca se ejecutaba y un selector mal formado pasaba
+// inadvertido. Aqui se crea un SEGUNDO sandbox con stubs minimos de
+// document + L que permiten montar el mapa y enganchar los filtros.
+function mkEl(id) {
+  return {
+    id: id, style: {}, __handlers: {}, _on: [],
+    classList: {
+      _s: {},
+      add: function (c) { this._s[c] = true; },
+      remove: function (c) { delete this._s[c]; },
+      contains: function (c) { return !!this._s[c]; },
+      toggle: function (c, v) { if (v) this._s[c] = true; else delete this._s[c]; }
+    },
+    addEventListener: function (t, fn) { this.__handlers[t] = fn; },
+    removeEventListener: function () {},
+    querySelectorAll: function () { return this._on; },
+    querySelector: function () { return null; },
+    insertBefore: function () {}, appendChild: function () {},
+    setAttribute: function () {}, getAttribute: function () { return null; }
+  };
+}
+
+var mapEl = mkEl('mm-personal-map');
+var catsRoot = mkEl('mm-personal-cats');
+var btnAll = mkEl('');
+btnAll.getAttribute = function (n) { return (n === 'data-cat') ? 'all' : null; };
+btnAll.closest = function (s) { return (s === '[data-cat]') ? this : null; };
+var btnHostal = mkEl('');
+btnHostal.getAttribute = function (n) { return (n === 'data-cat') ? 'hostal' : null; };
+btnHostal.closest = function (s) { return (s === '[data-cat]') ? this : null; };
+catsRoot._on = [btnAll, btnHostal];
+
+var doc = {
+  getElementById: function (id) { return (id === 'mm-personal-map') ? mapEl : null; },
+  // El motor resuelve options.categories con document.querySelector(sel)
+  // cuando llega como string; por eso debe ser un selector valido como
+  // '#mm-personal-cats'. Un id sin '#' se interpreta como selector de
+  // etiqueta y NO engancha: aqui devuelve null a proposito.
+  querySelector: function (sel) { return (sel === '#mm-personal-cats') ? catsRoot : null; },
+  querySelectorAll: function () { return []; },
+  createElement: function () { return mkEl(''); },
+  body: { appendChild: function () {} },
+  addEventListener: function () {}
+};
+
+var mapStub = {
+  setView: function () { return this; },
+  getZoom: function () { return 14; },
+  project: function () { return { x: 0, y: 0 }; },
+  on: function () { return this; },
+  off: function () { return this; },
+  hasLayer: function () { return false; },
+  addLayer: function () { return this; },
+  removeLayer: function () { return this; },
+  remove: function () {},
+  fitBounds: function () { return this; },
+  panTo: function () { return this; },
+  flyTo: function () { return this; },
+  getBounds: function () { return { contains: function () { return true; } }; }
+};
+function layerStub() {
+  return {
+    addTo: function () { return this; },
+    clearLayers: function () {},
+    addLayer: function () { return this; },
+    removeLayer: function () { return this; },
+    bindPopup: function () { return this; },
+    openPopup: function () { return this; }
+  };
+}
+var markerStub = {
+  on: function () { return this; },
+  addTo: function () { return this; },
+  bindPopup: function () { return this; },
+  openPopup: function () { return this; },
+  getLatLng: function () { return { lat: 0, lng: 0 }; }
+};
+var L2 = {
+  map: function () { return mapStub; },
+  tileLayer: function () { return { addTo: function () { return this; } }; },
+  layerGroup: layerStub,
+  marker: function () { return markerStub; },
+  divIcon: function () { return {}; }
+};
+
+var sandbox2 = { window: {}, console: console, document: doc, L: L2, setTimeout: setTimeout, clearTimeout: clearTimeout };
+vm.createContext(sandbox2);
+vm.runInContext(src, sandbox2, { filename: 'mapa-cultural.js' });
+var MC2 = sandbox2.window.MapaCultural;
+
+var inst2 = MC2.create({ map: 'mm-personal-map', categories: '#mm-personal-cats' });
+check('bindCategories: init con document/L -> initialized', inst2.getState().initialized === true);
+check('bindCategories: engancha click en el root de categorias', typeof catsRoot.__handlers.click === 'function');
+var clickCat = catsRoot.__handlers.click;
+clickCat({ target: btnHostal });
+check('bindCategories: click data-cat=hostal -> activeCat hostal', inst2.getState().activeCat === 'hostal');
+clickCat({ target: btnAll });
+check('bindCategories: click data-cat=all -> activeCat all', inst2.getState().activeCat === 'all');
+clickCat({ target: btnAll });
+check('bindCategories: re-click en activo -> activeCat off (oculta pines)', inst2.getState().activeCat === 'off');
+check('bindCategories: selector sin "#" no resuelve (stub)', doc.querySelector('mm-personal-cats') === null);
+
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

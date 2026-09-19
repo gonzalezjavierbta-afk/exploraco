@@ -135,9 +135,10 @@
       drawer: true,
       apiBase: api(),
       mediaFilter: filterMisMapa,
-      // Barra de categorias que aporta comunidad.html: el motor resuelve
-      // el id string y engancha los clicks de [data-cat].
-      categories: '#mm-personal-cats',
+      // Barra de categorias que aporta comunidad.html. Se pasa el ELEMENTO
+      // (no un string) para no depender del parseo de selector: el motor
+      // engancha los clicks de [data-cat] y permite filtrar/ocultar pines.
+      categories: document.getElementById('mm-personal-cats'),
       // onMapReady llega sincrono antes de que mc quede asignado:
       // por eso se usa el mapa recibido, no mc.getMap(). Tras
       // invalidateSize(), fuera del ciclo sincrono, mc ya esta asignado.
@@ -158,6 +159,13 @@
     if (!map) return;
     setTimeout(function () {
       try { map.invalidateSize(); } catch (e) { logWarn('invalidateSize', e); }
+      // Encuadra los destinos del mapa activo: garantiza que la media
+      // cercana quede dentro de bounds y se pinte en el primer render
+      // (sin encuadre el mapa quedaba en el centro por defecto y los
+      // pines de media, que si filtran por bounds, no se dibujaban).
+      if (mc && S.destinos.length && typeof mc.fitBounds === 'function') {
+        try { mc.fitBounds(); } catch (e) { logWarn('fitBounds', e); }
+      }
       if (mc && typeof mc.refresh === 'function') {
         try { mc.refresh(); } catch (e) { logWarn('refresh', e); }
       }
@@ -263,7 +271,11 @@
       if (it.origen === 'album') return;
       if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
     });
-    if (hay && !MEDIA_USER_TOUCHED && !m.getState().mediaEnabled) {
+    // Fuerza el encendido maestro cuando hay media para el mapa activo,
+    // sin importar el estado previo: setMediaEnabled(true) rellena los
+    // tipos (foto/video/audio) si estan en cero y vuelve a renderizar,
+    // de modo que la capa no queda "marcada pero vacia".
+    if (hay && !MEDIA_USER_TOUCHED) {
       m.setMediaEnabled(true);
       if (typeof m.refresh === 'function') m.refresh();
     }
