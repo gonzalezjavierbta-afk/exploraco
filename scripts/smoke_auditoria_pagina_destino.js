@@ -186,7 +186,7 @@ check("secContact VISIBLE en sitio con whatsapp", sitioConWA.indexOf('id="contac
 var sitioSinContacto = buildHTML(base({ categoria_slug: "sitio" }), {}, [], [], null, []);
 check("secContact OCULTA si no hay datos de contacto", sitioSinContacto.indexOf('id="contact"') < 0);
 
-console.log("\n=== AUDIT 7: hero por votos (mayor puntaje = imagen principal) ===");
+console.log("\n=== AUDIT 7: hero (principal = seleccion del usuario; 1 espacio + 2 comunidad) ===");
 function heroUrl(html) {
   var m = /class="psm" style="background-image:url\('([^']+)'\)/.exec(html);
   return m ? m[1] : '';
@@ -196,41 +196,51 @@ function heroAll(html) {
   if (!m) return [];
   try { return JSON.parse(m[1]); } catch (e) { return []; }
 }
-// Curadas con votos: la de 5 debe ser la principal aunque foto_hero sea otra.
+// La principal es SIEMPRE foto_hero (seleccion del usuario), aunque una
+// curada o de comunidad tenga mas votos. Las 3 miniaturas: la mejor del
+// espacio (curada) por votos + las 2 mejores de comunidad por votos.
 var heroVotos = buildHTML(
-  base({ foto_hero: "https://e.com/a.jpg" }),
+  base({ foto_hero: "https://e.com/hero.jpg" }),
   {},
   [
-    { url: "https://e.com/a.jpg", votos: 1 },
-    { url: "https://e.com/b.jpg", votos: 5 },
-    { url: "https://e.com/c.jpg", votos: 0 }
+    { url: "https://e.com/hero.jpg", votos: 0 },
+    { url: "https://e.com/espacio-a.jpg", votos: 3 },
+    { url: "https://e.com/espacio-b.jpg", votos: 1 }
   ],
-  [], null, []
+  [], null, [],
+  {}, null,
+  [
+    { url: "https://e.com/com-v1.jpg", votos: 9 },
+    { url: "https://e.com/com-v2.jpg", votos: 7 }
+  ],
+  [{ url: "https://e.com/com-alb.jpg", votos: 5 }]
 );
-check("hero: imagen principal = mayor puntaje", heroUrl(heroVotos) === "https://e.com/b.jpg", heroUrl(heroVotos));
-check("hero: HERO_ALL[0] = mayor puntaje", heroAll(heroVotos)[0] === "https://e.com/b.jpg", JSON.stringify(heroAll(heroVotos)));
-check("hero: miniaturas por votos (siguiente = a.jpg)", heroAll(heroVotos)[1] === "https://e.com/a.jpg", JSON.stringify(heroAll(heroVotos)));
+check("hero: principal = seleccion del usuario (foto_hero)", heroUrl(heroVotos) === "https://e.com/hero.jpg", heroUrl(heroVotos));
+check("hero: HERO_ALL[0] = seleccion del usuario", heroAll(heroVotos)[0] === "https://e.com/hero.jpg", JSON.stringify(heroAll(heroVotos)));
+check("hero: miniatura 1 = mejor foto del espacio (curada)", heroAll(heroVotos)[1] === "https://e.com/espacio-a.jpg", JSON.stringify(heroAll(heroVotos)));
+check("hero: miniaturas 2-3 = mejores de comunidad", heroAll(heroVotos)[2] === "https://e.com/com-v1.jpg" && heroAll(heroVotos)[3] === "https://e.com/com-v2.jpg", JSON.stringify(heroAll(heroVotos)));
+check("hero: exactamente 3 miniaturas", heroAll(heroVotos).length === 4, "len=" + heroAll(heroVotos).length);
 
-// Sin votos: se conserva el hero editorial.
+// Sin votos: principal sigue siendo la del usuario; el relleno completa.
 var heroSinVotos = buildHTML(
-  base({ foto_hero: "https://e.com/a.jpg" }),
+  base({ foto_hero: "https://e.com/hero.jpg" }),
   {},
-  [{ url: "https://e.com/a.jpg" }, { url: "https://e.com/b.jpg" }],
+  [{ url: "https://e.com/hero.jpg" }, { url: "https://e.com/b.jpg" }],
   [], null, []
 );
-check("hero sin votos: conserva foto_hero editorial", heroUrl(heroSinVotos) === "https://e.com/a.jpg", heroUrl(heroSinVotos));
+check("hero sin votos: principal = seleccion del usuario", heroUrl(heroSinVotos) === "https://e.com/hero.jpg", heroUrl(heroSinVotos));
 
-// Un video con mas votos NO debe ser la imagen principal (solo fotos).
+// Un video con mas votos NUNCA entra al hero (ni principal ni miniatura).
 var heroConVideo = buildHTML(
-  base({ foto_hero: "https://e.com/a.jpg" }),
+  base({ foto_hero: "https://e.com/hero.jpg" }),
   {},
-  [{ url: "https://e.com/a.jpg", votos: 2 }],
+  [{ url: "https://e.com/hero.jpg", votos: 2 }],
   [], null, [],
   {}, null,
   [],
   [{ url: "https://e.com/vid.mp4", votos: 99, foto_type: "video" }]
 );
-check("hero: video con mas votos NO desplaza a la foto", heroUrl(heroConVideo) === "https://e.com/a.jpg", heroUrl(heroConVideo));
+check("hero: video con mas votos NO entra al hero", heroUrl(heroConVideo) === "https://e.com/hero.jpg" && heroAll(heroConVideo).indexOf("https://e.com/vid.mp4") === -1, JSON.stringify(heroAll(heroConVideo)));
 
 console.log("\n=== RESUMEN ===");
 console.log(fails === 0 ? "TODOS LOS SMOKE TESTS PASARON (" + total + " checks)" : fails + " smoke test(s) FALLARON de " + total);

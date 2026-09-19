@@ -784,10 +784,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var albumOrden    = ordenaComunidad(comunidadAlbum);
   var comunidadMerge = viajerosOrden.concat(albumOrden);
   comunidadMerge.sort(function(a, b){ return b.votos - a.votos; });
-  var comunidadUrls = [];
-  comunidadMerge.forEach(function(x){
-    if (comunidadUrls.indexOf(x.url) === -1) comunidadUrls.push(x.url);
-  });
 
   // -- RANKING UNICO DE FOTOS POR VOTOS (hero + galeria) ----------------
   // Se calcula UNA sola vez y lo comparten el hero y la galeria: curadas
@@ -803,28 +799,28 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   });
   var mediaRank = [];
   var mediaRankVistos = {};
-  function mediaRankAdd(url, votos, prio, tipo) {
+  function mediaRankAdd(url, votos, prio, tipo, fuente) {
     var u = String(url || '').trim();
     if (!u || mediaRankVistos[u]) return;
     mediaRankVistos[u] = true;
-    mediaRank.push({ url: u, votos: parseInt(votos, 10) || 0, prio: prio, tipo: tipo || 'foto' });
+    mediaRank.push({
+      url: u, votos: parseInt(votos, 10) || 0, prio: prio,
+      tipo: tipo || 'foto', fuente: fuente || 'espacio'
+    });
   }
-  galAll.forEach(function(u, i){ mediaRankAdd(u, mediaVotosPorUrl[u] || 0, i, 'foto'); });
-  comunidadMerge.forEach(function(x, i){ mediaRankAdd(x.url, x.votos || 0, 1000 + i, x.tipo || 'foto'); });
+  galAll.forEach(function(u, i){ mediaRankAdd(u, mediaVotosPorUrl[u] || 0, i, 'foto', 'espacio'); });
+  comunidadMerge.forEach(function(x, i){ mediaRankAdd(x.url, x.votos || 0, 1000 + i, x.tipo || 'foto', 'comunidad'); });
   mediaRank.sort(function(a, b){ return (b.votos - a.votos) || (a.prio - b.prio); });
 
-  // -- HERO: imagen principal + 3 miniaturas (ADR-034 + votos) ---------
-  // Si la foto con mas votos (solo tipo foto) tiene votos > 0, pasa a ser
-  // la imagen principal del hero y las 3 siguientes por votos son las
-  // miniaturas. Sin votos se conserva el hero editorial y la composicion
-  // original (2a curada por orden, viajero mas votado, album mas votado).
+  // -- HERO: imagen principal + 3 miniaturas ---------------------------
+  // La imagen PRINCIPAL es la que selecciono el usuario/espacio
+  // (foto_hero editorial): los votos NO la desplazan. Las 3 miniaturas se
+  // componen por puntaje: (1) la mejor foto del ESPACIO (curada) por
+  // votos y (2-3) las 2 mejores fotos de la COMUNIDAD (viajeros +
+  // albumes) por votos. Si no hay votos, el ranking cae al orden de
+  // insercion (2a curada, viajero mas reciente, album), preservando la
+  // composicion historica; el relleno evita dejar huecos.
   var HERO_THUMBS_MAX = 3;
-  var heroTopFoto = null;
-  for (var hri = 0; hri < mediaRank.length; hri++) {
-    if (mediaRank[hri].tipo === 'foto') { heroTopFoto = mediaRank[hri]; break; }
-  }
-  var heroRankeado = !!(heroTopFoto && heroTopFoto.votos > 0);
-  if (heroRankeado) hero = heroTopFoto.url;
   var heroMainStyle = hero ? "background-image:url('"+esc(hero)+"')" : "background:"+grad;
   var curadasTodas = [];
   (fotos || []).forEach(function(f){
@@ -834,9 +830,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     curadasTodas.push(u);
   });
   var curadasOrden = curadasTodas.filter(function(u){ return u !== hero; });
-  var segundaCurada = '';
-  if (curadasTodas.length > 1 && curadasTodas[1] !== hero) segundaCurada = curadasTodas[1];
-  if (!segundaCurada && curadasOrden.length) segundaCurada = curadasOrden[0];
   var heroThumbsList = [];
   function addHeroThumb(u) {
     if (!u) return;
@@ -846,15 +839,31 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     if (heroThumbsList.length >= HERO_THUMBS_MAX) return;
     heroThumbsList.push(u);
   }
-  if (heroRankeado) {
-    mediaRank.forEach(function(x){ if (x.tipo === 'foto') addHeroThumb(x.url); });
-  } else {
-    addHeroThumb(segundaCurada);
-    addHeroThumb(viajerosOrden.length ? viajerosOrden[0].url : '');
-    addHeroThumb(albumOrden.length ? albumOrden[0].url : '');
-    curadasOrden.forEach(addHeroThumb);
-    comunidadUrls.forEach(addHeroThumb);
+  // (1) mejor foto del espacio (curada) por votos, sin repetir la principal.
+  var heroCuradaTop = '';
+  for (var hci = 0; hci < mediaRank.length; hci++) {
+    var mrc = mediaRank[hci];
+    if (mrc.fuente === 'espacio' && mrc.tipo === 'foto' && mrc.url !== hero) {
+      heroCuradaTop = mrc.url;
+      break;
+    }
   }
+  addHeroThumb(heroCuradaTop || (curadasOrden.length ? curadasOrden[0] : ''));
+  // (2-3) las 2 mejores fotos de la comunidad por votos.
+  var comAgregadas = 0;
+  for (var hvi = 0; hvi < mediaRank.length && comAgregadas < 2; hvi++) {
+    var mrv = mediaRank[hvi];
+    if (mrv.fuente !== 'comunidad' || mrv.tipo !== 'foto' || mrv.url === hero) continue;
+    var antes = heroThumbsList.length;
+    addHeroThumb(mrv.url);
+    if (heroThumbsList.length > antes) comAgregadas++;
+  }
+  // Relleno: resto de curadas y comunidad (solo FOTOS) para completar las
+  // 3 miniaturas. Nunca un video/audio (la miniatura es background-image).
+  curadasOrden.forEach(addHeroThumb);
+  mediaRank.forEach(function(x){
+    if (x.fuente === 'comunidad' && x.tipo === 'foto') addHeroThumb(x.url);
+  });
   // TSK-111 (CAMBIO 6B): cada miniatura del hero abre el lightbox
   // compartido. Se pasa HERO_ALL[k] (array emitido en el script de la
   // pagina) en vez de la URL cruda, para no inyectar datos en el onclick.

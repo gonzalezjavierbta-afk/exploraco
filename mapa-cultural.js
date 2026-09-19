@@ -199,22 +199,41 @@
     });
   }
 
-  // Filtro de los medios PROPIOS de un espacio (ficha del lugar):
-  // conserva origen 'destino' (fotos curadas) y 'destino_album' (album
-  // del espacio) cuyo origen_id (slug que emite el backend) coincide con
-  // el slug/uuid del place abierto. Excluye 'album' (albumes de usuarios)
-  // y cualquier medio de OTRO lugar, aunque este cerca o en la misma
-  // ciudad. Puro: testeable sin mapa.
+  // Filtro de los medios que muestra el drawer de un espacio:
+  // - FOTOS: solo origen 'destino' / 'destino_album' del propio espacio
+  //   (curadas de su ficha y su album). Las fotos de OTROS lugares se
+  //   ocultan aunque esten cerca o en la misma ciudad.
+  // - VIDEOS/AUDIOS: se conservan los de la comunidad (origen 'album')
+  //   que esten en la misma ciudad o a <=10 km del espacio, porque los
+  //   espacios dinamicos no emiten video/audio propio y sin esto la
+  //   pestana Videos/Audios del drawer quedaba vacia.
+  // Puro: testeable sin mapa.
   function filterMediaPropios(items, place) {
     var slug = String((place && place.slug) || '');
     var uuid = String((place && (place.uuid || place._uuid)) || '');
+    var ciudad = String((place && place.ciudad) || '').trim().toLowerCase();
+    var lat = parseFloat(place && place.lat);
+    var lng = parseFloat(place && place.lng);
     var vistos = {};
     var out = [];
     (items || []).forEach(function (it) {
       if (!it || !it.media_url) return;
-      if (it.origen !== 'destino' && it.origen !== 'destino_album') return;
-      var oid = String(it.origen_id || '');
-      if (!((slug && oid === slug) || (uuid && oid === uuid))) return;
+      var propio = false;
+      if (it.origen === 'destino' || it.origen === 'destino_album') {
+        var oid = String(it.origen_id || '');
+        propio = !!((slug && oid === slug) || (uuid && oid === uuid));
+      }
+      var esVideoAudio = (it.media_type === 'video' || it.media_type === 'audio');
+      var cerca = false;
+      if (esVideoAudio) {
+        var ci = String(it.ciudad || '').trim().toLowerCase();
+        cerca = !!(ciudad && ci && ciudad === ci);
+        var itLat = parseFloat(it.lat), itLng = parseFloat(it.lng);
+        if (!cerca && isFinite(lat) && isFinite(lng) && isFinite(itLat) && isFinite(itLng)) {
+          cerca = haversineKm(lat, lng, itLat, itLng) <= 10;
+        }
+      }
+      if (!propio && !cerca) return;
       if (vistos[it.media_url]) return;
       vistos[it.media_url] = true;
       out.push(it);

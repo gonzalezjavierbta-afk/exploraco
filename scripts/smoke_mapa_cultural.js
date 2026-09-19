@@ -260,4 +260,17 @@ check('filterMediaPropios: excluye album de usuario', propiosUrls.indexOf('alb')
 check('filterMediaPropios: deduplica por URL', mProp([{ origen: 'destino', origen_id: 'x', media_url: 'u' }, { origen: 'destino', origen_id: 'x', media_url: 'u' }], { slug: 'x' }).length === 1);
 check('filterMediaPropios: place sin slug/uuid -> vacio', mProp(mediosMixtos, {}).length === 0);
 
+// Videos/audios de la comunidad: SI se muestran si estan en la ciudad o a
+// <=10 km (restauran la pestana Videos/Audios del drawer). Las FOTOS de
+// otros lugares siguen ocultas.
+const conMedia = mediosMixtos.concat([
+  { origen: 'album', origen_id: 'album-v1', media_url: 'vid-ciudad', media_type: 'video', ciudad: 'Bogota', lat: 4.65, lng: -74.10 },
+  { origen: 'album', origen_id: 'album-a1', media_url: 'aud-ciudad', media_type: 'audio', ciudad: 'Bogota' },
+  { origen: 'album', origen_id: 'album-v2', media_url: 'vid-lejos', media_type: 'video', ciudad: 'Cali', lat: 3.45, lng: -76.53 }
+]);
+const conMediaUrls = mProp(conMedia, r10).map(function (it) { return it.media_url; });
+check('filterMediaPropios: incluye video/audio de la ciudad', conMediaUrls.indexOf('vid-ciudad') !== -1 && conMediaUrls.indexOf('aud-ciudad') !== -1);
+check('filterMediaPropios: excluye video de otra ciudad lejana', conMediaUrls.indexOf('vid-lejos') === -1);
+check('filterMediaPropios: foto de album de usuario sigue oculta', conMediaUrls.indexOf('alb') === -1);
+
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

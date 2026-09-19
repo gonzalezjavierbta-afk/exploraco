@@ -879,7 +879,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 </style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="agenda-shared.js"></script>
-<script src="mapa-cultural.js?v=3"></script>
+<script src="mapa-cultural.js?v=4"></script>
 </head><body>
 
 <nav class="hnav" id="hnav">
@@ -2265,14 +2265,17 @@ var INDEX_MC_OPTS = {
   mediaControls: '.mapa-filters',
   enableMediaOnAll: true,
   mediaEnabled: false,
-  // Solo fotografias de espacios creados de forma dinamica: la capa
-  // conserva origen 'destino' (fotos curadas de la ficha) y
-  // 'destino_album' (album del espacio); oculta 'album' (medios de
-  // albumes de usuarios) y cualquier otro origen no ligado a un destino.
+  // Media del mapa cultural: se conservan las FOTOS de espacios creados
+  // de forma dinamica ('destino' curadas de la ficha y 'destino_album')
+  // y se ocultan las fotos sueltas de albumes de usuarios. Los VIDEOS y
+  // AUDIOS de la comunidad (origen 'album') SI se muestran: los espacios
+  // dinamicos no emiten video/audio propio y sin ellos desaparecia la
+  // capa audiovisual del mapa.
   mediaFilter: function(items) {
     return (items || []).filter(function(it) {
-      return !!it && !!it.media_url
-        && (it.origen === 'destino' || it.origen === 'destino_album');
+      if (!it || !it.media_url) return false;
+      if (it.origen === 'destino' || it.origen === 'destino_album') return true;
+      return it.media_type === 'video' || it.media_type === 'audio';
     });
   },
   mediaPhotoIcon: '\uD83D\uDCF8',
