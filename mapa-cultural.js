@@ -15,7 +15,8 @@
      getMap, openDrawer, closeDrawer,
      normalizePlace, normalizeMedia, esc, starHtml,
      photoPlaceholderHTML, haversineKm
-     (extras de apoyo a pruebas: clusterize, filterMediaDefault)
+     (extras de apoyo a pruebas: clusterize, filterMediaDefault,
+      filterMediaPropios)
 
    Instancia:
      { init, refresh, destroy, setPlaces, setMedia, setMediaEnabled,
@@ -29,7 +30,9 @@
      mediaFilter (null): null/undefined usa filterMediaDefault (estricto,
        comunidad); false desactiva el filtro y usa TODA la media (index,
        que pinta toda la capa). La seccion multimedia del drawer usa
-       SIEMPRE st.media completa con logica de cercania, sin filtro.
+       SIEMPRE st.media filtrada por filterMediaPropios: SOLO media con
+       vinculo explicito al espacio (origen 'destino'/'destino_album' y
+       origen_id === slug/uuid); sin cercania geografica.
      clusterLinksNavigate (false): true deja que "Ver" del popup de
        cluster navegue por href (index); false abre el drawer (comunidad).
      list: si se define, los items de la lista delegan en setActive
@@ -200,20 +203,18 @@
   }
 
   // Filtro de los medios que muestra el drawer de un espacio:
-  // - FOTOS: solo origen 'destino' / 'destino_album' del propio espacio
-  //   (curadas de su ficha y su album). Las fotos de OTROS lugares se
-  //   ocultan aunque esten cerca o en la misma ciudad.
-  // - VIDEOS/AUDIOS: se conservan los de la comunidad (origen 'album')
-  //   que esten en la misma ciudad o a <=10 km del espacio, porque los
-  //   espacios dinamicos no emiten video/audio propio y sin esto la
-  //   pestana Videos/Audios del drawer quedaba vacia.
+  // SOLO media con vinculo explicito al propio espacio: origen
+  // 'destino' / 'destino_album' cuyo origen_id coincide con el
+  // slug/uuid del lugar (fotos curadas de su ficha y su album).
+  // Los videos/audios de comunidad (origen 'album') NO se muestran
+  // en el drawer: la cercania geografica (misma ciudad o <=10 km)
+  // se descarto porque adjuntaba media de otros lugares a cualquier
+  // pin de la ciudad (p.ej. todos los videos de Bogota en el pin de
+  // r10). La capa del mapa sigue mostrando esos pines en su lugar.
   // Puro: testeable sin mapa.
   function filterMediaPropios(items, place) {
     var slug = String((place && place.slug) || '');
     var uuid = String((place && (place.uuid || place._uuid)) || '');
-    var ciudad = String((place && place.ciudad) || '').trim().toLowerCase();
-    var lat = parseFloat(place && place.lat);
-    var lng = parseFloat(place && place.lng);
     var vistos = {};
     var out = [];
     (items || []).forEach(function (it) {
@@ -223,17 +224,7 @@
         var oid = String(it.origen_id || '');
         propio = !!((slug && oid === slug) || (uuid && oid === uuid));
       }
-      var esVideoAudio = (it.media_type === 'video' || it.media_type === 'audio');
-      var cerca = false;
-      if (esVideoAudio) {
-        var ci = String(it.ciudad || '').trim().toLowerCase();
-        cerca = !!(ciudad && ci && ciudad === ci);
-        var itLat = parseFloat(it.lat), itLng = parseFloat(it.lng);
-        if (!cerca && isFinite(lat) && isFinite(lng) && isFinite(itLat) && isFinite(itLng)) {
-          cerca = haversineKm(lat, lng, itLat, itLng) <= 10;
-        }
-      }
-      if (!propio && !cerca) return;
+      if (!propio) return;
       if (vistos[it.media_url]) return;
       vistos[it.media_url] = true;
       out.push(it);
@@ -1154,9 +1145,9 @@
 
     function mediasCercanas(place) {
       // Nombre historico: el drawer muestra SOLO los medios del propio
-      // espacio (fotos de la ficha / su album), no los de lugares
-      // cercanos. La proximidad ciudad/radio se descarto porque mezclaba
-      // fotos de otros lugares (p.ej. La Candelaria o Monserrate en r10).
+      // espacio (ficha / su album) con vinculo explicito. La proximidad
+      // ciudad/radio se descarto del todo: mezclaba fotos Y videos/audios
+      // de otros lugares en cualquier pin de la misma ciudad.
       return filterMediaPropios(st.media, place).slice(0, 40);
     }
 

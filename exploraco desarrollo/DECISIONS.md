@@ -2340,11 +2340,11 @@ Es la misma separacion de responsabilidades que el proyecto usa en otros contrat
 
 ---
 
-## ADR-047: Regla de propiedad de medios del mapa cultural -- fotos solo del espacio dinamico; videos/audio de comunidad por cercania; el drawer nunca mezcla espacios
+## ADR-047: Regla de propiedad de medios del mapa cultural -- fotos solo del espacio dinamico; videos/audio de comunidad por cercania; el drawer nunca mezcla espacios [ENMENDADO 2026-09-20: la cercania para video/audio queda ELIMINADA; ver ENMIENDA 1 al final]
 
 **ID:** ADR-047
 **Fecha:** 2026-09-19
-**Estado:** **APROBADO E IMPLEMENTADO** (2026-09-19). Commits `e7445c3` ("mapa", filtro estricto) y `3ffd7a9` ("fotos hero", restaura video/audio de comunidad). Verificado contra archivo real (ADR-006): `mapa-cultural.js` L187-200 (`filterMediaDefault`), L202-239 (`filterMediaPropios`), L1160 (drawer), L1708 (exportacion); smoke `scripts/smoke_mapa_cultural.js` **73 checks, 0 FAIL**. Cierra **BUG-075** y **BUG-076**.
+**Estado:** **APROBADO E IMPLEMENTADO** (2026-09-19); **ENMENDADO (2026-09-20)**: la regla VIGENTE es la ENMIENDA 1 al final de este ADR (pertenencia SOLO por vinculo explicito; cercania para video/audio ELIMINADA). Commits `e7445c3` ("mapa", filtro estricto) y `3ffd7a9` ("fotos hero", restaura video/audio de comunidad). Verificado contra archivo real (ADR-006): `mapa-cultural.js` L187-200 (`filterMediaDefault`), L202-239 (`filterMediaPropios`), L1160 (drawer), L1708 (exportacion); smoke `scripts/smoke_mapa_cultural.js` **73 checks, 0 FAIL**. Cierra **BUG-075** y **BUG-076**.
 **Autor:** frontend-tpl/js-silo-dev (AI-DOS); origen: el drawer del pin del mapa cultural mostraba fotos de otros lugares; cierre documental por docs-keeper.
 **Alcance:** frontend compartido (`mapa-cultural.js`). No toca el backend ni el contrato de `?tipo=multimedia_mapa`; no crea migraciones (assets frontend, no cuentan contra 8/8).
 
@@ -2388,7 +2388,33 @@ La pertenencia no es geografica: un medio pertenece al espacio si su `origen_id`
 - Los videos/audios por cercania siguen siendo una concesion: un video de comunidad de otra ciudad no aparece (comportamiento esperado).
 - QA visual en navegador pendiente (TSK-135).
 
+**ENMIENDA 1 (2026-09-20) -- APROBADO (decision del operador)**
+
+**Motivo.** El drawer del pin seguia adjuntando VIDEO/AUDIO de comunidad por cercania (misma ciudad o <=10 km), concesion heredada de la mitigacion de BUG-076 (decision tomada, punto 2). El efecto real era un fallo global: al abrir el pin de un lugar (p.ej. `hostal-r10-bogota`) el drawer mostraba TODOS los videos/audios de Bogota. Por decision de producto del operador la pertenencia queda SIEMPRE por vinculo explicito. Donde haya contradiccion, PREVALECE esta enmienda sobre la opcion 2/3 y la decision tomada (puntos 2 y 3) de ADR-047. NO se borra el historial: el texto previo permanece como registro de la decision de 2026-09-19.
+
+**Regla nueva (VIGENTE).**
+
+1. **Pertenencia de medios del drawer = SOLO vinculo explicito.** Un medio entra al drawer del pin si y solo si su `origen` es `destino`/`destino_album` y su `origen_id` es IGUAL al `slug` o `uuid` del lugar abierto. Aplica por igual a FOTOS, VIDEOS y AUDIOS (`filterMediaPropios`, `mapa-cultural.js` L202-230; exportada en `window.MapaCultural`).
+2. **Se ELIMINA la heuristica de cercania** (misma ciudad / radio <=10 km) para video y audio. El drawer no conserva ninguna ruta de pertenencia geografica; `mediasCercanas()` (L1143-1149) mantiene el nombre historico pero solo delega en `filterMediaPropios`.
+3. La capa/pines NO cambia por esta decision: `filterMediaDefault` (L182-200) conserva su regla estricta (solo `destino`/`destino_album`; `origen='album'` excluido). Los pines de video/audio del index provienen de su `mediaFilter` propio (`index.html` L2274-2280) y de `filterMisMapa`; en `comunidad.html` no se muestran salvo media guardada. El drawer no altera la capa.
+4. **Consecuencia ACEPTADA (decision de producto).** Como ningun destino emite video/audio propio, las pestanas Videos/Audios del drawer quedan VACIAS; el estado vacio "Sin multimedia cercana aun" cubre el caso. Es el comportamiento deseado por el operador, no un bug.
+5. **Via futura (documentada, FUERA DE ALCANCE).** Si se quiere mostrar video/audio en el drawer SOLO cuando fue compartido al destino, el vinculo real ya existe en `media_compartidos` (migracion 022: `fuente='album_foto'` + `destino_id`). Hoy `?tipo=multimedia_mapa` NO emite ese vinculo (esa rama solo lee `media`/albumes; `media_compartidos` se usa en el flujo POST de compartir/XP), de modo que habilitarlo requeriria un cambio de backend en `api/interacciones.js` (sin endpoint nuevo, presupuesto 8/8 de ADR-001). Se deja como via futura, no implementada.
+
+**Impacto.**
+
+- **`mapa-cultural.js`:** `filterMediaPropios` (L202-230) y `mediasCercanas` (L1143-1149) sin cercania; `filterMediaDefault` intacto; export en `window.MapaCultural` (L1695-1696).
+- **`scripts/smoke_mapa_cultural.js`:** seccion (7) actualizada (`filterMediaPropios: excluye video/audio de comunidad (misma ciudad)`, `excluye video de otra ciudad lejana`, `foto de album de usuario sigue oculta`).
+- **Cache-busting:** `mapa-cultural.js?v=5` en `comunidad.html` (L566) e `index.html` (L882).
+- **Sin cambios:** `api/*` (el contrato de `?tipo=multimedia_mapa` sigue emitiendo `origen`/`origen_id`), esquema, migraciones y presupuesto 8/8.
+- **Estado real (ADR-006):** cambio en working tree al 2026-09-20, SIN commitear (ultimo commit `50faa5e`); modificados `mapa-cultural.js`, `scripts/smoke_mapa_cultural.js`, `index.html`, `comunidad.html`.
+
+**Trazabilidad con BUG-076.** Esta enmienda REVIERTE concretamente la mitigacion de **BUG-076** (commit `3ffd7a9`, 2026-09-19), que habia restaurado el video/audio de comunidad por cercania. **BUG-075 permanece CERRADO** (la pertenencia por vinculo explicito lo resuelve). **BUG-076 se RECLASIFICA**: su sintoma (pestanas Videos/Audios vacias) se acepta ahora como decision de producto (punto 4) y NO se mitiga por cercania; su mitigacion por cercania queda anulada. Se deja constancia explicita de la reversion para que el historial no se lea como contradiccion accidental.
+
+**Estado de la enmienda:** APROBADO (2026-09-20) por decision del operador. Regla vigente: pertenencia SOLO por vinculo explicito; cercania ELIMINADA.
+
 **ADRs relacionados:** ADR-001 (Vanilla/ASCII), ADR-004 (aislamiento), ADR-006 (baseline real), ADR-021 (capa audiovisual estricta/paridad de drawer), ADR-036 (media unificada), ADR-045 (motor compartido del mapa), BUG-075, BUG-076.
+
+Revision architect-review: APROBADA (2026-09-20) -- verificado contra archivo real: filterMediaPropios L202-230 sin cercania, mediasCercanas L1143-1149, export L1695-1696, cache-bust v=5, smoke 73/73; BUG-075 CERRADO, BUG-076 RECLASIFICADO; ADR-031/ADR-039 sin contradiccion; 8/8 intacto.
 
 ---
 

@@ -11,7 +11,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### Tareas no completadas / estado actual
 
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
-- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa) y TSK-131 (votos de viajero en la ficha). Verificar commit/deploy real contra el archivo real (ADR-006).
+- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha) y TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **PENDIENTE DE APROBACION del operador:** TSK-140 (documento de analisis AI-DOS v1.1 / Reglas de Oro v5; archivo COMPLETADO en disco).
 - **BLOQUEADA (historica, archivada):** TSK-044 (blog multi-tema); su bloqueo de deploy (TASK-011) figura COMPLETADA, revisar si aplica cierre.
 
@@ -28,6 +28,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad GEMA GEMINI RESEARCH - 2026-09-20 (cierre express)](#prioridad-gema-gemini-research---2026-09-20-cierre-express)
 - [Prioridad AGENTES HYBRID - 2026-09-20 (ADR-048)](#prioridad-agentes-hybrid---2026-09-20-adr-048)
 - [Prioridad SALTO DEL TEQUENDAMA - 2026-09-20 (cierre express)](#prioridad-salto-del-tequendama---2026-09-20-cierre-express)
+- [Prioridad DRAWER MAPA CULTURAL - 2026-09-20 (cierre express / ENMIENDA 1 ADR-047)](#prioridad-drawer-mapa-cultural---2026-09-20-cierre-express--enmienda-1-adr-047)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3076,6 +3077,36 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Pendiente operativo:** deuda etiquetada `[DEUDA-EXPRESS]` en NEXT.md (horario a revalidar, contacto sin verificar, itinerario de 2 paradas, archivos fuente/artifact en la raiz).
 - **Dependencia:** patron seed+loader+smoke validado (TSK-066/068/069/077); compliance BUG-022 en fotos.
 - **Fuera de alcance:** tocar codigo del motor; DECISIONS.md ni BUGS_HISTORICOS.md; editar el `.txt` original.
+
+## Prioridad DRAWER MAPA CULTURAL - 2026-09-20 (cierre express / ENMIENDA 1 ADR-047)
+
+> Cierre documental EXPRESS (skill `express-mode`: un solo pase, sin tocar codigo) de la
+> eliminacion de la heuristica de cercania del drawer del mapa cultural: la media del
+> resumen de un pin queda SOLO con vinculo explicito al lugar. La ENMIENDA 1 del ADR-047
+> (DECISIONS.md, escrita por architect el 2026-09-20) es la decision de arquitectura;
+> esta entrada documenta el alcance real ejecutado. NO crea funciones serverless (8/8,
+> ADR-001/ADR-010) ni migraciones.
+
+### TSK-143: Drawer del mapa cultural solo por vinculo explicito (fin de la cercania para video/audio) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental express; **working tree, SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (fallo global de producto: media ajena adjuntada a cualquier pin de la ciudad).
+- **Fecha:** 2026-09-20
+- **Origen:** el drawer/resumen de un pin seguia mostrando VIDEO/AUDIO de comunidad (`origen='album'`) por heuristica de cercania (misma ciudad o <= 10 km), concesion heredada de la mitigacion de BUG-076 (`3ffd7a9`); al abrir `hostal-r10-bogota` aparecian TODOS los videos/audios de Bogota. Decision de producto del operador: pertenencia SIEMPRE por vinculo explicito, para todos los media types.
+- **ADR:** DECISIONS.md **ADR-047 + ENMIENDA 1 (2026-09-20)** (escrita por architect; esta entrada NO la modifica). La enmienda reclasifica/revierte explicitamente la mitigacion de **BUG-076**.
+- **Responsable / agentes:** frontend-tpl/js-silo-dev (`mapa-cultural.js`, `index.html`, `comunidad.html`), qa-auditor (Escudo GOLD + smoke), docs-keeper-free (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **`filterMediaPropios` simplificada en `mapa-cultural.js` (aprox. L202-230):** se eliminan `ciudad`/`lat`/`lng`/`esVideoAudio`/`cerca`/`haversineKm <= 10`; el drawer muestra SOLO media con vinculo explicito (`origen='destino'`/`'destino_album'` y `origen_id === slug|uuid` del lugar), para FOTOS, VIDEOS y AUDIOS. Dedupe por URL conservado.
+  2. **Comentarios actualizados (ADR-006):** bloque L202-208 y el de `mediasCercanas` (aprox. L1143-1149) explican que la cercania se descarto. `haversineKm` sigue viva (L106 definicion; uso en orden por distancia al geolocalizar).
+  3. **La CAPA del mapa NO cambia:** `filterMediaDefault` (`mapa-cultural.js` L190-203) conserva su regla estricta (solo `origen='destino'`/`'destino_album'`; `origen='album'` excluido SIEMPRE; el backend emite video/audio solo en la rama `origen='album'`). Los pines de video/audio del index provienen de su `mediaFilter` propio (`index.html` L2274-2280) y de `filterMisMapa` (`mymapa.js` L189); en `comunidad.html` no se muestran salvo media guardada (coherente con el pendiente operativo: video/audio de comunidad no guardado no aparece ni en la capa ni en el drawer).
+  4. **Cache-busting:** `mapa-cultural.js?v=4` -> `?v=5` en `index.html` (L882) y `comunidad.html` (L566).
+  5. **Smoke actualizado:** check de `scripts/smoke_mapa_cultural.js` L272 invertido a `'filterMediaPropios: excluye video/audio de comunidad (misma ciudad)'`.
+- **Evidencia (ADR-006):** `mapa-cultural.js` L202-230 (`filterMediaPropios` sin heuristica), L106 (`haversineKm`), L1143-1149 (`mediasCercanas` como envoltorio del filtro puro); `index.html` L882 y `comunidad.html` L566 (`?v=5`); `scripts/smoke_mapa_cultural.js` L272/L273/L274 (checks de exclusion) y cierre `SMOKE MAPA CULTURAL: OK`. Ademas, (a) el docstring de cabecera de `mapa-cultural.js` fue corregido por ESTE mismo cambio: listado de exports L17-18 agrega `filterMediaPropios` a los extras de apoyo a pruebas y el docstring L29-32 reescribe la opcion `mediaFilter` (la seccion multimedia del drawer usa `st.media` filtrada por `filterMediaPropios`, sin cercania), verificado en `git diff -- mapa-cultural.js`; (b) la ENMIENDA 1 del ADR-047 fue revisada y APROBADA por architect-review (2026-09-20, DECISIONS.md).
+- **Smokes / verificacion:** `node scripts/smoke_mapa_cultural.js` = **73 checks, 0 FAIL** (2026-09-20). Escudo GOLD (qa-auditor): `node --check` OK, ASCII 0 bytes >127, balance de divs diff 0 en `index.html` y `comunidad.html`; veredicto **APTO CON OBSERVACIONES**.
+- **Relacion con bugs:** **BUG-076 RECLASIFICADO** (su mitigacion por cercania ELIMINADA; su sintoma = comportamiento de producto aceptado) y **BUG-075** con nota cruzada (sigue CERRADO; pertenencia explicita para todos los media types). Ver BUGS_HISTORICOS.md y la ENMIENDA 1 del ADR-047.
+- **Pendiente operativo:** QA visual en navegador del drawer (verificar que el pin de `hostal-r10-bogota` ya no muestra videos/audios ajenos y que las pestanas de un lugar con vinculos propios estan bien); commit/deploy del asset con cache-bust v5; **decision de producto sobre `comunidad.html`**: un video/audio de comunidad NO guardado en el destino ya no aparece ni en la capa ni en el drawer (consecuencia intencional, a validar con producto).
+- **Dependencia:** TSK-139/ADR-047 (regla de propiedad previa); ENMIENDA 1 del ADR-047 (decision vigente).
+- **Fuera de alcance:** `api/*.js` (8/8 INTACTO; el backend hoy NO emite `media_compartidos` por `?tipo=multimedia_mapa`); la via futura de mostrar video/audio en el drawer via `media_compartidos` (migracion 022: `fuente='album_foto'` + `destino_id`) requeriria cambio de backend; el docstring de cabecera de `mapa-cultural.js` (L31-32 del trabajado previo; corregido por ESTE mismo cambio, ver Evidencia (a)); NO se toco `DECISIONS.md` (la enmienda la escribio architect y fue revisada y aprobada por architect-review el 2026-09-20).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

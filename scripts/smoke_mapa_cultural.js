@@ -235,10 +235,10 @@ clickCat({ target: btnAll });
 check('bindCategories: re-click en activo -> activeCat off (oculta pines)', inst2.getState().activeCat === 'off');
 check('bindCategories: selector sin "#" no resuelve (stub)', doc.querySelector('mm-personal-cats') === null);
 
-// ---- (7) filterMediaPropios: el drawer solo muestra medios del propio
-//          espacio (fotos de la ficha / su album), no de lugares cercanos
-//          ni albumes de usuarios (bug: al abrir r10 salian La Candelaria
-//          y Monserrate). -------------------------------------------------
+// ---- (7) filterMediaPropios: el drawer solo muestra medios con vinculo
+//          explicito al espacio (fotos de la ficha / su album). Ni fotos
+//          de otros lugares ni video/audio de comunidad (origen 'album')
+//          entran, aunque esten en la misma ciudad. ----------------------
 const mProp = MC.filterMediaPropios;
 check('filterMediaPropios: API exportada', typeof mProp === 'function');
 const r10 = { slug: 'hostal-r10-bogota', uuid: 'uuid-r10', ciudad: 'Bogota', lat: 4.6, lng: -74.06 };
@@ -260,16 +260,16 @@ check('filterMediaPropios: excluye album de usuario', propiosUrls.indexOf('alb')
 check('filterMediaPropios: deduplica por URL', mProp([{ origen: 'destino', origen_id: 'x', media_url: 'u' }, { origen: 'destino', origen_id: 'x', media_url: 'u' }], { slug: 'x' }).length === 1);
 check('filterMediaPropios: place sin slug/uuid -> vacio', mProp(mediosMixtos, {}).length === 0);
 
-// Videos/audios de la comunidad: SI se muestran si estan en la ciudad o a
-// <=10 km (restauran la pestana Videos/Audios del drawer). Las FOTOS de
-// otros lugares siguen ocultas.
+// Videos/audios de la comunidad (origen 'album'): YA NO se muestran en el
+// drawer aunque esten en la misma ciudad. Solo entra media con vinculo
+// explicito (origen_id === slug/uuid del lugar).
 const conMedia = mediosMixtos.concat([
   { origen: 'album', origen_id: 'album-v1', media_url: 'vid-ciudad', media_type: 'video', ciudad: 'Bogota', lat: 4.65, lng: -74.10 },
   { origen: 'album', origen_id: 'album-a1', media_url: 'aud-ciudad', media_type: 'audio', ciudad: 'Bogota' },
   { origen: 'album', origen_id: 'album-v2', media_url: 'vid-lejos', media_type: 'video', ciudad: 'Cali', lat: 3.45, lng: -76.53 }
 ]);
 const conMediaUrls = mProp(conMedia, r10).map(function (it) { return it.media_url; });
-check('filterMediaPropios: incluye video/audio de la ciudad', conMediaUrls.indexOf('vid-ciudad') !== -1 && conMediaUrls.indexOf('aud-ciudad') !== -1);
+check('filterMediaPropios: excluye video/audio de comunidad (misma ciudad)', conMediaUrls.indexOf('vid-ciudad') === -1 && conMediaUrls.indexOf('aud-ciudad') === -1);
 check('filterMediaPropios: excluye video de otra ciudad lejana', conMediaUrls.indexOf('vid-lejos') === -1);
 check('filterMediaPropios: foto de album de usuario sigue oculta', conMediaUrls.indexOf('alb') === -1);
 
