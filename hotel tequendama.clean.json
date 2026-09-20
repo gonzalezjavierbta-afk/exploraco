@@ -1,0 +1,94 @@
+{
+  "BASE": {
+    "slug": "salto-del-tequendama",
+    "nombre": "Salto del Tequendama",
+    "categoria_slug": "sitio",
+    "lead": "Ca\u00edda de agua natural de 157 metros impregnada de historia, mito chibcha y arquitectura patrimonial en los bordes de la sabana de Bogot\u00e1.",
+    "descripcion": "El Salto del Tequendama es una de las formaciones geogr\u00e1ficas y culturales m\u00e1s emblem\u00e1ticas de Colombia. Ubicado a menos de dos horas de Bogot\u00e1, sobre el r\u00edo Bogot\u00e1, esta imponente cascada frena abruptamente el transcurso de las aguas de la sabana para precipitarse en un abismo de m\u00e1s de 150 metros rodeado de bosque de niebla.\n\nSeg\u00fan la mitolog\u00eda Muisca, la cascada fue creada por el dios Bochica, quien rompi\u00f3 la roca con su b\u00e1culo para drenar las aguas que inundaban la sabana de Bogot\u00e1. Durante el siglo XX, el lugar se consolid\u00f3 como el principal destino tur\u00edstico de la \u00e9lite bogotana, \u00e9poca en la que se construy\u00f3 el imponente Hotel del Salto, una joya arquitect\u00f3nica de estilo franc\u00e9s que hoy alberga la Casa Museo Tequendama.\n\nActualmente, el sitio combina la observaci\u00f3n paisaj\u00edstica con recorridos de educaci\u00f3n ambiental e historia patrimonial. Aunque la calidad del agua del r\u00edo Bogot\u00e1 limita las actividades acu\u00e1ticas, el valor hist\u00f3rico, el espect\u00e1culo visual del mirador y la niebla envolvente convierten la visita en una experiencia imperdible cerca de la capital.",
+    "highlight": "157 metros de ca\u00edda \u00b7 Casa Museo Patrimonial \u00b7 Bosque de niebla",
+    "ciudad": "Soacha",
+    "region": "Cundinamarca",
+    "barrio": "Vereda San Rafael",
+    "lat": 4.5808,
+    "lng": -74.2982,
+    "whatsapp": "573102456789",
+    "telefono": "+57 310 245 6789",
+    "email": "info@casamuseotequendama.org",
+    "web": "https://casamuseotequendama.org",
+    "instagram": "@casamuseotequendama",
+    "precio_desde": "Desde $10.000 COP (Casa Museo)",
+    "horario": "Mar-Dom 9:00 AM - 5:00 PM",
+    "emoji": "\u26f0",
+    "hero_bg": "linear-gradient(180deg, rgba(17,17,17,0.2) 0%, rgba(17,17,17,0.8) 100%)",
+    "foto_hero": "",
+    "tipo": "Cascada natural \u00b7 Mirador hist\u00f3rico \u00b7 Museo patrimonial",
+    "capacidad": "Aforo controlado en museo",
+    "como_llegar": "Buses desde el Terminal del Sur o San Mateo hacia Mesitas del Colegio.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Sightseeing \u00b7 Fotograf\u00eda \u00b7 Historia",
+    "dificultad": "Facil",
+    "dificultad_desc": "Accesibilidad directa desde la carretera principal a los miradores.",
+    "duracion": "2-3 horas",
+    "altitud": "2470",
+    "temporada": ["May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov"],
+    "precio_entrada": "Mirador libre / Museo $10.000 COP",
+    "distancia": "30 km desde Bogot\u00e1",
+    "como_llegar": "Tomar transporte en el Terminal del Sur ruta Soacha - Mesitas.",
+    "permisos": "Sin reserva para miradores. Boleta directa en taquilla del museo.",
+    "temporada_nota": "Mayor caudal durante la temporada de lluvias.",
+    "fauna_flora": [
+      { "emoji": "\ud83e\udd85", "nombre": "Aves de niebla", "hecho": "H\u00e1bitat de p\u00e1jaros carpinteros y colibr\u00edes de alta monta\u00f1a." },
+      { "emoji": "\ud83c\udf32", "nombre": "Quercus humboldtii", "hecho": "Presencia de robledales y vegetaci\u00f3n t\u00edpica de bosque altoandino." }
+    ],
+    "secretos": [
+      {
+        "icono": "\ud83c\udfdb\ufe0f",
+        "titulo": "Leyenda de Bochica",
+        "texto": "Seg\u00fan la tradici\u00f3n Muisca, el abismo fue abierto a golpe de b\u00e1culo para salvar a la sabana de la gran inundaci\u00f3n.",
+        "tag": "Mito Muisca",
+        "tag_color": "gold"
+      },
+      {
+        "icono": "\ud83c\udfe8",
+        "titulo": "El antiguo Hotel",
+        "texto": "Inaugurado en 1927 como estaci\u00f3n de tren y hotel de lujo, cerr\u00f3 d\u00e9cadas despu\u00e9s y fue restaurado como centro cultural.",
+        "tag": "Patrimonio",
+        "tag_color": "purple"
+      }
+    ],
+    "regulaciones": "Prohibido el paso de barreras de seguridad en los miradores. No arrojar basura.",
+    "checklist_tip": "Llevar chaqueta impermeable y calzado con buen agarre por la humedad constante.",
+    "entradas": [
+      { "tipo": "General Casa Museo", "precio": "$10.000 COP", "incluye": "Recorrido guiado por exposiciones de biodiversidad", "link": "https://casamuseotequendama.org" }
+    ],
+    "tours": [
+      {
+        "nombre": "Recorrido Hist\u00f3rico y Ambiental",
+        "precio": "$10.000 COP",
+        "precio_sub": "por persona",
+        "duracion": "45 minutos",
+        "tipo_tour": "Guiado",
+        "idioma": "Espa\u00f1ol",
+        "max_personas": "20",
+        "rating": "",
+        "review_count": 0,
+        "descripcion": "Guianza por los salones de la Casa Museo e interpretaci\u00f3n del ecosistema del bosque de niebla.",
+        "incluye": ["Entrada al museo", "Gu\u00eda local"],
+        "no_incluye": ["Transporte", "Alimentaci\u00f3n"],
+        "link_reserva": "https://casamuseotequendama.org",
+        "featured": true
+      }
+    ],
+    "equipamiento": [
+      { "item": "Chaqueta impermeable", "prioridad": "Obligatorio" },
+      { "item": "C\u00e1mara fotogr\u00e1fica", "prioridad": "Recomendado" }
+    ],
+    "itinerario": [
+      { "dia": "1", "hora": "09:30 AM", "titulo": "Llegada al Mirador Principal", "icono": "\ud83d\udcf8", "detalle": "Observaci\u00f3n de la ca\u00edda de agua desde los puntos panor\u00e1micos de la carretera.", "tags": ["Fotograf\u00eda"] },
+      { "dia": "1", "hora": "10:30 AM", "titulo": "Visita Casa Museo Tequendama", "icono": "\ud83c\udfdb\ufe0f", "detalle": "Ingreso y recorrido guiado por las salas de historia y biodiversidad.", "tags": ["Cultura"] }
+    ]
+  }
+}

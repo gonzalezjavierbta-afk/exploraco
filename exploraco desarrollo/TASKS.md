@@ -25,6 +25,9 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad SESION EXPRESS 2026-09-18/19](#prioridad-sesion-express-2026-09-1819---modo-express-skill-express-mode)
 - [Prioridad MAPA CULTURAL COMPARTIDO 2026-09-19 (ADR-045)](#prioridad-mapa-cultural-compartido---2026-09-19-adr-045)
 - [Prioridad GALERIA / MAPA / MIS MAPAS / MEDIA 2026-09-19 (ADR-046 + ADR-047)](#prioridad-galeria--mapa-cultural--mis-mapas--media---2026-09-19-adr-046--adr-047)
+- [Prioridad GEMA GEMINI RESEARCH - 2026-09-20 (cierre express)](#prioridad-gema-gemini-research---2026-09-20-cierre-express)
+- [Prioridad AGENTES HYBRID - 2026-09-20 (ADR-048)](#prioridad-agentes-hybrid---2026-09-20-adr-048)
+- [Prioridad SALTO DEL TEQUENDAMA - 2026-09-20 (cierre express)](#prioridad-salto-del-tequendama---2026-09-20-cierre-express)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -2983,6 +2986,96 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Relacion con bugs:** su tabla de incidentes I1-I8 es la fuente de los BUG-071..BUG-077 de esta sesion.
 - **Pendiente operativo (BLOQUEANTE de proceso):** aprobacion del operador; commit del `.md` y del `.docx` (hoy untracked); aplicar las propuestas a los documentos maestros solo tras aprobacion.
 - **Fuera de alcance:** editar `AI-DOS Master Specification v1.1.docx` o `Reglas de Oro ExploraCO - v5.md` (no autorizado).
+
+## Prioridad GEMA GEMINI RESEARCH - 2026-09-20 (cierre express)
+
+> Cierre documental EXPRESS (skill `express-mode`: documentacion diferida en un solo
+> pase, sin tocar codigo). La gema es un articulo de configuracion de prompts, NO
+> arquitectura del sistema: no nace ADR nuevo y no se toca DECISIONS.md.
+> BUGS_HISTORICOS.md tampoco se toca: BUG-034 (drift de `scripts/validate_ficha.js`)
+> ya esta registrado y se re-confirma vigente en esta sesion (ADR-006).
+
+### TSK-141: Gema Gemini "ExploraCO Research" -- GEMINI_GEMA_INVESTIGACION.md (investigacion web autogestionada) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental express). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Media (pipeline de ingesta del skill gemini-research; no bloquea runtime ni deploy).
+- **Fecha:** 2026-09-20
+- **Origen:** pedido del operador de una gema/instruccion de Gemini que reciba nombre+lugar (destinos, uno a uno) o un lote de N (eventos) y ejecute TODA la investigacion web por su cuenta.
+- **Archivo NUEVO (untracked, sin commitear):** `.opencode/skills/gemini-research/prompts/GEMINI_GEMA_INVESTIGACION.md` (**154 lineas**, verificadas 2026-09-20 con `Test-Path` y conteo de lineas).
+- **ADR:** no nace ADR nuevo (configuracion de prompts, no decision de arquitectura del sistema).
+- **Responsable / agentes:** research-agent-free (autoria de la gema), docs-keeper-free (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. La gema pide al usuario SOLO nombre+lugar (uno a uno para destinos) o una lista de N (lote para eventos) y ejecuta TODA la investigacion web por si misma, usando como archivos adjuntos de referencia los 3 recursos canonicos existentes (`GEMINI_MASTER_PROMPT.md`, `GEMINI_EVENTOS_PROMPT.md`, `ficha_template.md`) SIN duplicar su contenido (Tripwire de 5 lineas cumplido).
+  2. Entrega: ficha .md completa segun `ficha_template` + bloque JSON final (esquema de la seccion 6 del master, TAGS por categoria) o array JSON de eventos; con clogs Escudo GOLD (INFO/DEBUG/LINK/TRACE/TIME) y cierre `==FIN==`.
+  3. NO edita codigo: los mandatos de edicion (seed/loader/upload) quedan explicitamente FUERA de la gema; los ejecuta el pipeline de ExploraCO downstream.
+  4. Validacion downstream: `node .opencode/skills/gemini-research/scripts/validate_ficha.js` (fichas) y `node scripts/validate_eventos.js` (eventos).
+- **Hallazgos adicionales (deuda registrada):**
+  - **GAP de infraestructura (candidato):** `exp-pickle-free` aparece listado en `AGENTS.md` seccion 1.1 (matriz de routing gratuita) pero NO existe `.opencode/agent/exp-pickle-free.md` (el runtime responde "unknown agent type"). Queda como deuda para crear/revisar el agente. **[DEUDA-EXPRESS]**
+  - La gema NO esta referenciada todavia en `.opencode/skills/gemini-research/SKILL.md` (opcional: el operador puede configurar la gema directamente desde su ruta). Es decision del operador si se integra al skill mas adelante. **[DEUDA-EXPRESS]**
+- **Evidencia (ADR-006):** archivo real de 154 lineas en la ruta citada (`Test-Path` = True); `validate_ficha.js` confirmado SOLO en `.opencode/skills/gemini-research/scripts/validate_ficha.js` (`scripts/validate_ficha.js` sigue inexistente, BUG-034 vigente); `.opencode/agent/exp-pickle-free.md` confirmado inexistente (`Test-Path` = False; en `.opencode/agent/` solo existe `exp-pickle.md`).
+- **Smokes / verificacion:** esta tarea no genero codigo ejecutable; la validacion funcional de la gema (salida vs validador real) queda como QA manual en Gemini, ver NEXT.md "Que sigue".
+- **Relacion con bugs:** BUG-034 sigue ABIERTO (drift documental de `scripts/validate_ficha.js`); re-confirmado contra el archivo real en esta sesion.
+- **Pendiente operativo:** decidir: (a) probar la gema pegando el `.md` + adjuntando los 3 recursos en Gemini y validando la salida con `validate_ficha.js`/`validate_eventos.js`; (b) si se referencia la gema en `gemini-research/SKILL.md`; (c) crear `.opencode/agent/exp-pickle-free.md`.
+- **Dependencia:** recursos canonicos del skill (`GEMINI_MASTER_PROMPT.md`, `GEMINI_EVENTOS_PROMPT.md`, `ficha_template.md`).
+- **Fuera de alcance:** editar los prompts canonicos; editar codigo; tocar DECISIONS.md ni BUGS_HISTORICOS.md (sin ADR ni bug nuevo que justifique).
+
+## Prioridad AGENTES HYBRID - 2026-09-20 (ADR-048)
+
+> Tercer grupo de agentes primarios (esquema tripartito de orquestacion: Standard/Pro,
+> Free y Hybrid con ruteo por riesgo). NO toca app/runtime/BD: gobernanza de orquestacion
+> solamente (`.opencode/agent/*.md`, AGENTS.md, `orquestacion agentes.md` v1.1). La
+> decision vive en DECISIONS.md ADR-048 (APROBADO 2026-09-20).
+
+### TSK-HYBRID-001: Tercer grupo de agentes hybrid-plan/hybrid-build (ruteo por riesgo) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Media (gobernanza de proceso; no bloquea codigo, runtime ni deploy).
+- **Fecha:** 2026-09-20
+- **Origen:** analisis de consumo real de opencode.db (821 sesiones ago-sep 2026): `build` PRO = 35% del gasto, tareas rutinarias = 23% migrables a la ruta free, criticas = 38% permanecen PRO; `explore` PRO **$2.41 en 146 sesiones** vs `explore-free` **$0.12** para la misma lectura del repo.
+- **ADR:** DECISIONS.md **ADR-048** ("Esquema tripartito de orquestacion de agentes -- ruteo por riesgo", APROBADO 2026-09-20).
+- **Responsable / agentes:** architect-free (analisis + autoria del ADR-048), docs-keeper-free (matriz en el doc v1.1 + esta entrada de cierre), qa-auditor (auditoria).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **NUEVOS `.opencode/agent/hybrid-plan.md` y `.opencode/agent/hybrid-build.md`** (ambos `model: opencode-go/deepseek-v4.1-flash`, `mode: primary`): `hybrid-plan` con edit/bash **deny** (solo invoca `@explore-free`/`@research-agent-free`; asigna la implementacion por nombre en la tabla del plan para que la ejecute `hybrid-build` en una sesion posterior); `hybrid-build` con edit/bash **allow** (orquestador ejecutor, rutea cada tarea atomica por riesgo y criterio).
+  2. **Matriz de ruteo (fuente de verdad = prompt real del agente + AGENTS.md seccion 1.2 + doc v1.1):** PRO = `backend-dev`, `admin-dev`, `renderer-dev`, `frontend-tpl`, `sql-security`, `architect` + `architect-review`; FREE = `explore-free`, `content-loader-free`, `js-silo-dev-free`/`exp-pickle-free`, `data-migration-free`, `seo-dev-free`, `qa-auditor-free`, `docs-keeper-free`, `media-reader-free`, `research-agent-free`/gemini-research.
+  3. **DECISIONS.md:** NUEVO **ADR-048** (APROBADO 2026-09-20).
+  4. **AGENTS.md:** encabezado "tres rutas completas" + nueva subseccion **1.2 "Ruta HYBRID"**; la seccion de PAGO queda renumerada a 1.3.
+  5. **`exploraco desarrollo/ampliacion desarrollo/orquestacion agentes.md`:** actualizado a **v1.1** (matriz hybrid exacta, nota de consumo, filas `hybrid-build`/`hybrid-plan` con el modelo corregido a `deepseek-v4.1-flash`).
+  6. **`opencode.json` NO se modifico** (consciente y documentado en ADR-048): `default_agent` sigue en `free-plan`.
+- **Evidencia (ADR-006):** archivos reales verificados hoy: `hybrid-build.md` (L2-26: `model: opencode-go/deepseek-v4.1-flash`, `mode: primary`, edit/bash allow, matriz PRO/FREE resumida) y `hybrid-plan.md` (edit deny, solo `@explore-free`/`@research-agent-free`); `opencode.json` L5 `"default_agent": "free-plan"` INTACTO; `AGENTS.md` subseccion 1.2 presente; `orquestacion agentes.md` filas hybrid en `deepseek-v4.1-flash` (L68-69); `.opencode/agent/` con **17/17 agentes citados por la matriz presentes** (incluido `exp-pickle-free.md`, GAP de TSK-141 resuelto).
+- **Smokes / verificacion:** QA audit completo: frontmatter YAML valido, campos permitidos, modelo con prefijo valido, `mode: primary`, permisos rol-coherentes, 17/17 agentes citados existen, `default_agent` intacto, duplicidad resuelta (F-1/F-2 corregidos; el unico "run" restante es el bloque `permission` del frontmatter, boilerplate normativo compartido por los 4 primarios -- no constitutivo de duplicidad).
+- **Relacion con bugs:** ninguno nuevo; **BUG-034** sigue ABIERTO (ajeno a esta sesion). El GAP de `exp-pickle-free` documentado en TSK-141 quedo resuelto (el archivo existe hoy).
+- **Pendiente operativo:** **[DEUDA-EXPRESS]** los parametros de OpenAI-GO (que modelos para hybrid vs free) se decidieron en esta sesion basados en datos de consumo; si el operador quiere cambiar el `default_agent` a `hybrid-build`, es una **sesion separada** de 1 cambio en `opencode.json` + restart.
+- **Dependencia:** ADR-048.
+- **Fuera de alcance:** `api/*.js`, esquema, BD, presupuesto 8/8; `opencode.json` (0 cambios).
+
+## Prioridad SALTO DEL TEQUENDAMA - 2026-09-20 (cierre express)
+
+> Cierre documental EXPRESS (skill `express-mode`: un solo pase, baja profundidad,
+> sin tocar codigo). Publicacion a produccion de la pagina dinamica del destino
+> Salto del Tequendama a partir del archivo fuente corrupto `hotel tequendama.txt`.
+> No nace ADR nuevo ni bug de ExploraCO (la data corrupta es del archivo fuente y se
+> descarto): DECISIONS.md y BUGS_HISTORICOS.md NO se tocaron.
+
+### TSK-142: Pagina dinamica salto-del-tequendama (sitio, Soacha/Cundinamarca) desde hotel tequendama.txt [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental express). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (contenido nuevo en produccion; no bloquea runtime ni deploy pendiente).
+- **Fecha:** 2026-09-20
+- **Origen:** archivo `hotel tequendama.txt` (ficha JSON a medio generar con data corrupta: lineas 92-119 eran texto de error de Gemini pegado).
+- **Slug / destino en produccion:** `salto-del-tequendama` (categoria `sitio`, ciudad Soacha, region Cundinamarca); **id Neon `8c2b48fc-c6c5-4ec4-ad42-909a73911ce0`**, `status=published`. URL viva: https://exploraco.vercel.app/salto-del-tequendama.html
+- **Alcance REAL ejecutado (no el plan original si difiere, ADR-006):**
+  1. **Ficha saneada** -> `ficha/ficha-salto-del-tequendama.md` (JSON valido, FAQS x5, FOTOS_SUGERIDAS con 5 URLs reales verificadas HEAD 200, FUENTES: casamuseotequendama.org + maps). Nota de ruta: la ficha vive en `ficha/`, no en `exploraco desarrollo/`.
+  2. **5 fotos resueltas en Wikimedia Commons** (compliance BUG-022): hero profesional + 4 galeria.
+  3. **3 scripts creados** siguiendo patrones existentes: `scripts/seed-salto-del-tequendama.js` (upsert Neon, ON CONFLICT slug, `--dry`), `scripts/load-salto-del-tequendama-api.js` (loader API DELETE+POST, token default), `scripts/smoke_test_salto-del-tequendama.js` (fake_neon + buildHTML).
+  4. **Verificacion local (Escudo GOLD):** `node --check` OK x3; ASCII-safety 0 bytes >127; smoke **15/15 PASS**; divs diff=0.
+  5. **CARGA A PRODUCCION ejecutada y verificada:** `node scripts/load-salto-del-tequendama-api.js` -> `OK - destino salto-del-tequendama (8c2b48fc-c6c5-4ec4-ad42-909a73911ce0) status=published`. La URL renderiza completa (hero, galeria, entradas, tours, itinerario, FAQ, mapa, JSON-LD TouristAttraction) y `/api/destinos` devuelve el slug con `status=published`.
+  6. **Typo del archivo fuente corregido:** "Caoda" -> "Caida" en seed + ficha + clean.json (`hotel tequendama.txt` original se dejo intacto; `hotel tequendama.clean.json` quedo como artifact de respaldo en la raiz).
+- **Evidencia (ADR-006):** archivos reales verificados hoy: `ficha/ficha-salto-del-tequendama.md`, `scripts/seed-salto-del-tequendama.js`, `scripts/load-salto-del-tequendama-api.js`, `scripts/smoke_test_salto-del-tequendama.js`, `hotel tequendama.txt` y `hotel tequendama.clean.json` (todos presentes en el repo).
+- **Smokes / verificacion:** `smoke_test_salto-del-tequendama.js` **15/15 PASS**; `node --check` 3/3; ASCII-safety 0 bytes >127; divs diff=0.
+- **Relacion con bugs:** ninguno nuevo (la data corrupta es del archivo fuente, no de ExploraCO); DECISIONS.md y BUGS_HISTORICOS.md NO se tocaron.
+- **Pendiente operativo:** deuda etiquetada `[DEUDA-EXPRESS]` en NEXT.md (horario a revalidar, contacto sin verificar, itinerario de 2 paradas, archivos fuente/artifact en la raiz).
+- **Dependencia:** patron seed+loader+smoke validado (TSK-066/068/069/077); compliance BUG-022 en fotos.
+- **Fuera de alcance:** tocar codigo del motor; DECISIONS.md ni BUGS_HISTORICOS.md; editar el `.txt` original.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

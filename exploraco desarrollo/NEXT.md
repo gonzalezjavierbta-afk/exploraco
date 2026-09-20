@@ -9,7 +9,10 @@ Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA co
 
 ### Estado actual (resumen ejecutivo)
 
-- Ultima sesion documentada: 2026-09-19 "Galeria/hero por votos + Mis mapas personales + guardados de media + propiedad de medios del mapa" -> TSK-136..TSK-140, ADR-046 + ADR-047, BUG-071..BUG-077. Todo COMMITEADO en main (HEAD 3ffd7a9, main == origin/main).
+- Cierre documental **2026-09-20** (gobernanza de orquestacion): TERCER grupo de agentes primarios `hybrid-plan`/`hybrid-build` (esquema tripartito, ruteo por riesgo) -> **TSK-HYBRID-001 COMPLETADA** en TASKS.md, **ADR-048 APROBADO** en DECISIONS.md, AGENTS.md seccion 1.2 "Ruta HYBRID" y `orquestacion agentes.md` v1.1. `opencode.json` INTACTO (`default_agent` sigue `free-plan`; el bump a `hybrid-build` queda pendiente de decision del operador).
+- Cierre documental EXPRESS **2026-09-20**: NUEVA gema Gemini "ExploraCO Research" (`GEMINI_GEMA_INVESTIGACION.md`, 154 lineas, **untracked**; TSK-141 COMPLETADA en TASKS.md). GAP de infraestructura detectado: `exp-pickle-free` listado en la matriz del AGENTS.md sin archivo de agente (runtime: "unknown agent type"). [Resuelto en la sesion posterior del mismo dia: `.opencode/agent/exp-pickle-free.md` ya existe HOY; ver TSK-HYBRID-001 / ADR-048.] HEAD real HOY `15c173d` (`main` == `origin/main`; los commits de docs `dbec863` "cierre documental + indice docs core" y `15c173d` "corte NEXT historico" son posteriores al registro de la sesion 2026-09-19).
+- Cierre documental EXPRESS **2026-09-20**: pagina dinamica **salto-del-tequendama** (categoria `sitio`, ciudad Soacha, region Cundinamarca) **PUBLICADA en produccion** (id Neon `8c2b48fc-c6c5-4ec4-ad42-909a73911ce0`, `status=published`) desde el archivo corrupto `hotel tequendama.txt` -> **TSK-142 COMPLETADA** en TASKS.md. Ficha saneada en `ficha/`, 5 fotos Wikimedia verificadas (BUG-022), 3 scripts, smoke 15/15 PASS. Sin ADR nuevo ni bug de ExploraCO (data corrupta = archivo fuente). Deuda `[DEUDA-EXPRESS]` (horario/contacto/itinerario/archivos en la raiz) en la sesion de relevo.
+- Ultima sesion documentada: 2026-09-20 "Pagina dinamica salto-del-tequendama (cierre express)" -> TSK-142 (contenido publicado). Anteriores: 2026-09-20 "Agentes hybrid-plan/hybrid-build (esquema tripartito de orquestacion)" -> TSK-HYBRID-001 + ADR-048 (gobernanza; archivos sin commitear) y 2026-09-20 gema Gemini (TSK-141, cierre express).
 - Sesion inmediatamente anterior: 2026-09-19 "Motor compartido del Mapa Cultural" -> TSK-133 (comunidad, commit b4ffd4e) + TSK-134 (migracion del index, commit 61392c0), ADR-045.
 - Que sigue: aprobar/aplicar las propuestas de gobernanza (PENDIENTE DE APROBACION del operador); commitear el doc de analisis ANALISIS_AI-DOS_v1.1_y_REGLAS_DE_ORO_v5.md y el .docx (untracked); QA visual en navegador (TSK-135 + esta sesion); deploy del release; confirmar la migracion 023 en Neon.
 - Riesgos activos: cache de assets compartidos sin bump de ?v=N (BUG-073); documentos Core de ~1.28 MB que encarecen el contexto; BUG-061 y BUG-065 ABIERTOS; QA visual y shape real de ?tipo=mapa sin validar contra Neon.
@@ -25,6 +28,9 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 - [Completado reciente](#completado-reciente)
 - [Que se estaba haciendo](#que-se-estaba-haciendo)
+- [Sesion 2026-09-20 - Agentes hybrid (ADR-048 / TSK-HYBRID-001)](#agentes-hybrid-planhybrid-build-esquema-tripartito-de-orquestacion---relevo-2026-09-20-adr-048)
+- [Sesion 2026-09-20 - Pagina salto-del-tequendama (cierre express / TSK-142)](#pagina-dinamica-salto-del-tequendama-sitio-soachacundinamarca---relevo-2026-09-20-cierre-express)
+- [Sesion 2026-09-20 - Gema Gemini ExploraCO Research (cierre express)](#gema-gemini-exploraco-research---cierre-documental-express-2026-09-20)
 - [Sesion 2026-09-19 - Galeria/hero + Mis mapas (ADR-046 + ADR-047 / TSK-136..TSK-140)](#galeriahero-por-votos--mis-mapas-personales--guardados-de-media--propiedad-de-medios-del-mapa-2026-09-19---adr-046--adr-047--tsk-136tsk-140)
 - [Sesion 2026-09-18/19 - Express (TSK-124..TSK-132)](#sesion-express-tsk-124tsk-132-ui-de-perfilgaleriacomunidad--media--modo-express-2026-09-1819---sin-adr-nuevo-nota-de-practica)
 - [Sesion 2026-09-18 - Comunidad > Audiovisual (ADR-044 / TSK-123)](#sesion-tsk-123-correccion-comunidad--audiovisual-2026-09-18---adr-044)
@@ -43,6 +49,9 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - [Historico (sesiones del 2026-09-15 y anteriores; TSK-104 y previas) - ver NEXT_ARCHIVO.md](NEXT_ARCHIVO.md)
 
 ## Completado reciente
+- Cierre documental express **2026-09-20** (TSK-142, modo express) - pagina dinamica **`salto-del-tequendama`** (categoria `sitio`, ciudad Soacha, region Cundinamarca) **PUBLICADA en produccion** desde el archivo fuente corrupto `hotel tequendama.txt` (ficha JSON a medio generar; lineas 92-119 con texto de error de Gemini). Saneada la ficha -> `ficha/ficha-salto-del-tequendama.md` (JSON valido, FAQS x5, FOTOS_SUGERIDAS con 5 URLs reales verificadas HEAD 200, FUENTES: casamuseotequendama.org + maps); 5 fotos resueltas en Wikimedia Commons (compliance BUG-022); 3 scripts (`seed-` upsert ON CONFLICT slug con `--dry`, `load-` API DELETE+POST token default, `smoke_test_` con fake_neon + buildHTML); Escudo GOLD local (`node --check` x3, ASCII 0 bytes >127, smoke **15/15 PASS**, divs diff=0). CARGA A PRODUCCION verificada: loader OK, destino **id `8c2b48fc-c6c5-4ec4-ad42-909a73911ce0`** `status=published`; https://exploraco.vercel.app/salto-del-tequendama.html renderiza completa (hero, galeria, entradas, tours, itinerario, FAQ, mapa, JSON-LD TouristAttraction). Typo del archivo fuente corregido ("Caoda"->"Caida") en seed+ficha+clean.json. SIN ADR nuevo ni bug de ExploraCO: DECISIONS.md y BUGS_HISTORICOS.md NO se tocaron. Deuda etiquetada `[DEUDA-EXPRESS]` (horario a revalidar, contacto sin verificar, itinerario de 2 paradas, archivos fuente en la raiz). Detalle en "Que se estaba haciendo" y en `TASKS.md` TSK-142.
+- Cierre documental **2026-09-20** (gobernanza de orquestacion): TERCER grupo de agentes primarios **`hybrid-plan`/`hybrid-build`** (esquema tripartito de orquestacion con ruteo por riesgo) + **ADR-048 APROBADO** + AGENTS.md seccion 1.2 + `orquestacion agentes.md` v1.1. `opencode.json` INTACTO (`default_agent: free-plan`). Tarea **TSK-HYBRID-001 COMPLETADA**. Verificado ADR-006: archivos reales de ambos agentes; 17/17 agentes citados por la matriz existen (GAP `exp-pickle-free` de TSK-141 resuelto). Sin cambios en `api/*` (8/8 INTACTO), sin migraciones. Detalle en "Que se estaba haciendo".
+- Cierre documental express **2026-09-20** (TSK-141, modo express) - NUEVA gema Gemini **"ExploraCO Research"**: `.opencode/skills/gemini-research/prompts/GEMINI_GEMA_INVESTIGACION.md` (154 lineas, 12 bytes >127 = tildes/glifos propios de un prompt; NO es codigo runtime, ADR-002 aplica a `api/*.js`; **untracked**). El usuario da nombre+lugar (destinos, uno a uno) o un lote de N (eventos) y la gema ejecuta TODA la investigacion web por si misma, usando como adjuntos de referencia los 3 recursos canonicos (`GEMINI_MASTER_PROMPT.md`, `GEMINI_EVENTOS_PROMPT.md`, `ficha_template.md`) sin duplicar contenido; entrega ficha .md + bloque JSON final (esquema seccion 6 master) o array JSON de eventos, con clogs Escudo GOLD (INFO/DEBUG/LINK/TRACE/TIME) y cierre `==FIN==`; NO edita codigo (los mandatos los ejecuta el pipeline ExploraCO). Validacion downstream: `node .opencode/skills/gemini-research/scripts/validate_ficha.js` (fichas; ruta canonica, BUG-034 vigente) y `node scripts/validate_eventos.js` (eventos). GAP de infraestructura: `exp-pickle-free` en la matriz del AGENTS.md 1.1 sin archivo de agente. Detalle en `TASKS.md` TSK-141 y en "Que se estaba haciendo".
 - Sesion "Galeria/hero por votos + Mis mapas personales + guardados de media + propiedad de medios del mapa" (2026-09-19) - 5 tareas TSK-136..TSK-140 + 2 ADR nuevos (**ADR-046** contrato del hero, **ADR-047** regla de propiedad de medios) + 7 BUG (BUG-071..BUG-077). **Todo COMMITEADO** en `main` (commits `6c84f9d` "videos", `600e656`/`8fe7b47`/`e7445c3` "mapa", `afb3b5d` "Update index.html", `41a3f71` "destinos", `3ffd7a9` "fotos hero"; HEAD `3ffd7a9`; `main` a la par de `origin/main`). Doc de analisis `exploraco desarrollo/ampliacion desarrollo/ANALISIS_AI-DOS_v1.1_y_REGLAS_DE_ORO_v5.md` (NUEVO, 285 lineas, 0 bytes >127) y `AI-DOS Master Specification v1.1.docx` siguen **untracked**. Presupuesto **8/8 INTACTO**; sin migraciones. Smokes: `smoke_mapa_cultural.js` 73 checks 0 FAIL, `smoke_auditoria_pagina_destino.js` 61 checks PASS, `smoke_036_media_unificada.js` 90/90 PASS.
 - Feature "Migracion de `index.html` al motor compartido del Mapa Cultural" / ADR-045 -- TSK-134 (2026-09-19, **working tree, SIN commitear**) - ELIMINA el motor Leaflet inline del `index.html` (~1190 lineas, bloque 2256-3445) y su estado muerto (12 vars + `mapaGeoRequested`); lo reemplaza por shims (`initMapaSection` con retry si `!mcMapa.getMap()`, `refreshMapaMarkers` sin recursion, `geolocateMapa`, `resetMapaColombia`, `openMapaDrawer`/`closeMapaDrawer`, `INDEX_MC_OPTS`, `var mcMapa`) + bloque lazy (IntersectionObserver/scroll/timeout 2 s); agrega `<script src="mapa-cultural.js">` (L882) ANTES del inline y del connector. CONSERVA `esc`/`photoPlaceholderHTML`/`starHtml`/`toggleMapaSave`/`renderMyMap`/Mi Mapa legacy/`MAPA_PLACES`/`MAPA_MEDIA`/`mapaMap` y el **CSS inline a proposito** (paridad visual; 0 refs a `mapa-cultural.css`). `mapa-cultural.js` SUBE a **v1.1.0** (68417 bytes) con opciones de compatibilidad: `enableMediaOnAll`/`mediaEnabled`/`mediaFilter` (`false` = capa SIN filtro)/`mediaPhotoIcon`/`clusterLinksNavigate`/`mediaControls`/`bindList`/`data-comments-*` (default = comportamiento comunidad). `git diff --numstat`: `index.html` +79/-1152, `mapa-cultural.js` +80/-20, `scripts/smoke_mapa_cultural.js` +13/-1; `api/*` e `index-api-connector.js` **INTACTOS**. Presupuesto **8/8 INTACTO**; sin migraciones. Smoke **58/58 PASS** (`SMOKE MAPA CULTURAL: OK`); Escudo GOLD y QA **APTO CON OBSERVACIONES** (divs 370/370, contrato del connector OK, sin bloqueantes). Pendiente **TSK-135** (QA visual en navegador). Detalle en `TASKS.md` TSK-134. Se apoya en TSK-133. **[Actualizacion cierre 2026-09-19]:** TSK-134 SI quedo COMMITEADA en `61392c0` "mapa" (verificado ADR-006).
 - Feature "Mis mapas personales (comunidad) con paridad al mapa cultural del index" / ADR-045 -- TSK-133 (2026-09-19, **commiteada en `b4ffd4e` "maps"**, 11 archivos) - NUEVOS assets frontend `mapa-cultural.js` (motor `window.MapaCultural`, ASCII-safe, 65282 bytes al cierre, L1597) y `mapa-cultural.css` (121 reglas scopadas bajo `.mc-root`, 0 `!important`) + `scripts/smoke_mapa_cultural.js` (56/56 PASS al cierre; hoy 58/58 tras TSK-134); MODIFICADOS `mymapa.js` (+154/-46; consume `MapaCultural.create` L125, elimina Leaflet propio y `bindPopup`) y `comunidad.html` (+17/-0; `<link>` L14 y `<script>` L559 antes de `mymapa.js` L561). `index.html` intacto AL CIERRE de TSK-133; `api/*` intacto. Presupuesto **8/8 INTACTO**; sin migraciones. QA **APTO CON OBSERVACIONES**. Mitiga (no cierra) **BUG-061** con `jsonAuthHeaders()`. Se completa con la migracion del index en **TSK-134**. Detalle en `TASKS.md` TSK-133 y en la sesion de "Que se estaba haciendo".
@@ -88,6 +97,83 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Pagina dinamica salto-del-tequendama (sitio, Soacha/Cundinamarca) - relevo 2026-09-20 (cierre express)
+
+Cierre documental EXPRESS (skill `express-mode`: un solo pase, baja profundidad, sin tocar codigo). **Publicacion en PRODUCCION** de la pagina dinamica del destino **Salto del Tequendama** a partir del archivo fuente corrupto `hotel tequendama.txt` (ficha JSON a medio generar; lineas 92-119 eran texto de error de Gemini pegado). Tarea en `TASKS.md` **TSK-142 (COMPLETADA)**. NO nace ADR nuevo ni bug de ExploraCO (la data corrupta es del archivo fuente y se descarto): `DECISIONS.md` y `BUGS_HISTORICOS.md` NO se tocaron. Verificado contra archivo real (ADR-006): los 6 archivos citados existen en el repo.
+
+**Que se estaba haciendo:**
+- **Pagina publicada y verificada:** slug `salto-del-tequendama` (categoria `sitio`, ciudad Soacha, region Cundinamarca), **id Neon `8c2b48fc-c6c5-4ec4-ad42-909a73911ce0`**, `status=published`. https://exploraco.vercel.app/salto-del-tequendama.html renderiza completa (hero, galeria, entradas, tours, itinerario, FAQ, mapa, JSON-LD TouristAttraction) y `/api/destinos` devuelve el slug publicado.
+- **Ficha saneada:** `ficha/ficha-salto-del-tequendama.md` (JSON valido, FAQS x5, FOTOS_SUGERIDAS con 5 URLs reales verificadas HEAD 200, FUENTES: casamuseotequendama.org + maps).
+- **Fotos:** 5 resueltas en Wikimedia Commons (compliance BUG-022): hero profesional + 4 galeria.
+- **Scripts (3):** `scripts/seed-salto-del-tequendama.js` (upsert Neon, ON CONFLICT slug, `--dry`), `scripts/load-salto-del-tequendama-api.js` (loader API DELETE+POST, token default), `scripts/smoke_test_salto-del-tequendama.js` (fake_neon + buildHTML).
+- **Verificacion local (Escudo GOLD):** `node --check` OK x3; ASCII-safety 0 bytes >127; smoke **15/15 PASS**; divs diff=0. Carga a prod ejecutada y verificada (loader OK, `status=published`).
+- **Typo del archivo fuente corregido:** "Caoda" -> "Caida" en seed + ficha + clean.json (`hotel tequendama.txt` original intacto). `hotel tequendama.clean.json` quedo como artifact de respaldo en la raiz.
+
+#### Que sigue
+
+Nada bloqueante. Opcional / verificacion humana:
+1. **Verificacion visual del render** de https://exploraco.vercel.app/salto-del-tequendama.html por un humano (hero, galeria, entradas, tours, itinerario, FAQ, mapa).
+2. **Revalidar el horario:** la web oficial casamuseotequendama.org publica actualmente "fines de semana y festivos 9am-4pm", mientras la ficha conserva "Mar-Dom 9:00 AM - 5:00 PM" del archivo origen (pendiente de revalidar). Ver deuda (a).
+
+#### Riesgos activos
+
+- No hay bloques activos (publicacion verificada en produccion). Deuda etiquetada abajo.
+
+#### Deuda `[DEUDA-EXPRESS]`
+
+- `[DEUDA-EXPRESS]` a) **Revalidar horario oficial del Salto del Tequendama:** la ficha dice "Mar-Dom 9:00 AM - 5:00 PM" (del archivo origen); la web oficial hoy publica "sab-dom/festivos 9am-4pm". Si procede, actualizar seed + ficha y re-cargar si cambia contenido publicado.
+- `[DEUDA-EXPRESS]` b) **WhatsApp/email del archivo (573102456789 / info@casamuseotequendama.org) NO fueron verificados contra una fuente oficial:** verificar antes de dar datos de contacto a produccion si se confia en ellos.
+- `[DEUDA-EXPRESS]` c) **Itinerario quedo con 2 paradas** (la 3a estaba corrupta en el archivo origen y se descarto por no inventar datos): el contrato `ficha_template` pide 3-5, evaluar si se amplia luego.
+- `[DEUDA-EXPRESS]` d) **`hotel tequendama.txt` (fuente corrupta) sigue en la raiz** junto a `hotel tequendama.clean.json` (artifact): decidir si se archivan/mueven.
+
+### Agentes hybrid-plan/hybrid-build (esquema tripartito de orquestacion) - relevo 2026-09-20 (ADR-048)
+
+Relevo de la creacion del TERCER grupo de agentes primarios de orquestacion (esquema tripartito: Standard/Pro, Free y **Hybrid** con ruteo por riesgo). Decision en `DECISIONS.md` **ADR-048 (APROBADO, 2026-09-20)**; tarea en `TASKS.md` **TSK-HYBRID-001 (COMPLETADA)**. Verificado contra archivo real (ADR-006) el 2026-09-20. NO toca `api/*.js` (**8/8 INTACTO**, ADR-001/ADR-010), ni esquema, ni BD, ni el presupuesto de Vercel Hobby.
+
+**Que se estaba haciendo (resumen; ancla ADR-006 en TASKS.md TSK-HYBRID-001):**
+- **NUEVOS `.opencode/agent/hybrid-plan.md` y `.opencode/agent/hybrid-build.md`** (ambos `model: opencode-go/deepseek-v4.1-flash`, `mode: primary`): `hybrid-plan` = edit/bash **deny** (solo invoca `@explore-free`/`@research-agent-free`; asigna la implementacion por nombre en el plan para que la ejecute `hybrid-build` en sesion posterior); `hybrid-build` = edit/bash **allow** (orquestador ejecutor, rutea por riesgo y criterio, nunca por preferencia).
+- **Matriz de ruteo:** PRO = `backend-dev`, `admin-dev`, `renderer-dev`, `frontend-tpl`, `sql-security`, `architect` + `architect-review`; FREE = `explore-free`, `content-loader-free`, `js-silo-dev-free`/`exp-pickle-free`, `data-migration-free`, `seo-dev-free`, `qa-auditor-free`, `docs-keeper-free`, `media-reader-free`, `research-agent-free`/gemini-research.
+- **DECISIONS.md:** NUEVO **ADR-048** (APROBADO), derivado del analisis de consumo real de opencode.db (821 sesiones ago-sep 2026): `build` PRO = 35% del gasto, tareas rutinarias = 23% migrables a free (costo ~0), criticas = 38% permanecen PRO; `explore` PRO **$2.41/146 sesiones** vs `explore-free` **$0.12**.
+- **AGENTS.md:** encabezado "tres rutas completas" + nueva subseccion **1.2 "Ruta HYBRID"**; la seccion de PAGO queda renumerada a 1.3.
+- **`exploraco desarrollo/ampliacion desarrollo/orquestacion agentes.md`:** actualizado a **v1.1** (matriz hybrid exacta, nota de consumo, filas hybrid en `deepseek-v4.1-flash`).
+- **`opencode.json` NO se toco:** `default_agent` sigue en `free-plan` (INTACTO, verificado en el archivo real; consciente y documentado en ADR-048 como pendiente de decision del operador).
+- **QA audit:** frontmatter YAML valido, campos permitidos, modelo con prefijo valido, `mode: primary`, permisos rol-coherentes, **17/17 agentes citados por la matriz existen** (incluido `exp-pickle-free.md`, GAP de TSK-141 resuelto), `default_agent` intacto, duplicidad resuelta (F-1/F-2 corregidos; unico run restante = bloque `permission` del frontmatter, boilerplate normativo compartido por los 4 primarios -- no constitutivo).
+
+#### Que sigue
+
+1. **[DEUDA-EXPRESS][OPCIONAL] Activar el Hybrid como default:** si el operador lo decide, 1 cambio en `opencode.json` (`default_agent` -> `hybrid-build`) + restart, en **sesion separada**. Hoy el esquema Hybrid requiere activacion por nombre (`@hybrid-plan`/`@hybrid-build`).
+2. **[DEUDA-EXPRESS][FASE 2 PROPUESTA] Evaluar la migracion de los subagentes `-free` de `opencode/big-pickle`** a `deepseek-v4-flash-free`/laguna para mayor velocidad; NO se ejecuto nada en esta sesion, queda como propuesta.
+3. **Commitear los archivos sin versionar:** `.opencode/agent/hybrid-plan.md` y `.opencode/agent/hybrid-build.md` (+ AGENTS.md y `orquestacion agentes.md` actualizados) junto al proximo pase de docs; no mezclarlos con commits de codigo.
+4. **Trazabilidad PRO/FREE de cada sesion Hybrid:** el resumen de entrega debe indicar que tareas fueron PRO y cuales FREE y el ahorro probable (regla de oro del ADR-048).
+
+#### Riesgos activos
+
+- **`default_agent` sigue `free-plan`:** el esquema Hybrid NO se activa solo; ninguna sesion nueva rutea por riesgo a menos que el operador invoque `@hybrid-plan`/`@hybrid-build` o cambie el default.
+- **Activacion por nombre requerida:** mientras el default no cambie, el ahorro del ADR-048 (~23% del gasto PRO a costo ~0) solo se captura si el operador usa los agentes hybrid.
+- **Doc de orquestacion con citas legacy:** `orquestacion agentes.md` conserva `deepseek-v4-flash` en las secciones 3/4 para los agentes Pro legacy (fuera del alcance de esta sesion); las filas hybrid (68-69) ya estan en `deepseek-v4.1-flash`. El archivo real manda (ADR-006).
+- **Riesgo de mal ruteo:** la regla de oro del ADR-048 prohibe invocar un subagente FREE en un dominio de la ruta PRO (backend, admin, renderer, sql-security, arquitectura); es obligatoria y verificable en el prompt real de `hybrid-build`.
+
+### Gema Gemini ExploraCO Research - cierre documental express (2026-09-20)
+
+Cierre documental EXPRESS de la creacion de la gema Gemini **"ExploraCO Research"** (`GEMINI_GEMA_INVESTIGACION.md`, 154 lineas, **untracked**; skill `express-mode`: un solo pase de docs, sin tocar codigo). Tarea en `TASKS.md` **TSK-141 (COMPLETADA)**. NO nace ADR nuevo (configuracion de prompts, no arquitectura); `DECISIONS.md` y `BUGS_HISTORICOS.md` NO se tocaron (BUG-034 ya registrado y re-confirmado vigente contra el archivo real 2026-09-20).
+
+**Que se estaba haciendo (resumen; ancla ADR-006 en TASKS.md TSK-141):**
+- **Gema (creada, sin commitear):** el usuario da nombre+lugar (destinos, uno a uno) o lote de N (eventos); la gema ejecuta TODA la investigacion web por si misma, anexando los 3 recursos canonicos (`GEMINI_MASTER_PROMPT.md`, `GEMINI_EVENTOS_PROMPT.md`, `ficha_template.md`) SIN duplicar su contenido (Tripwire 5 lineas). Entrega ficha .md + bloque JSON final (esquema seccion 6 del master, TAGS por categoria) o array JSON de eventos, con clogs Escudo GOLD y cierre `==FIN==`. NO contiene mandatos de edicion de codigo (los ejecuta el pipeline ExploraCO). Validacion downstream: `.opencode/skills/gemini-research/scripts/validate_ficha.js` (fichas) y `scripts/validate_eventos.js` (eventos).
+- **Verificado contra archivo real (ADR-006):** la gema existe (154 lineas); el validador canonico solo vive en `.opencode/skills/gemini-research/scripts/` (`scripts/validate_ficha.js` sigue inexistente -> BUG-034 vigente); `exp-pickle-free.md` NO existe en `.opencode/agent/` (solo `exp-pickle.md`).
+
+#### Que sigue
+
+1. **[DEUDA-EXPRESS] Probar la gema (QA manual en Gemini):** pegar el contenido de `GEMINI_GEMA_INVESTIGACION.md`, adjuntar los 3 recursos canonicos, pedir un destino (uno a uno) o un lote de N eventos, y validar la salida con `node .opencode/skills/gemini-research/scripts/validate_ficha.js` y `node scripts/validate_eventos.js`. Cuidado BUG-034: la ruta corta `scripts/validate_ficha.js` NO existe.
+2. **[DEUDA-EXPRESS] Referenciar la gema en `.opencode/skills/gemini-research/SKILL.md`** si el operador decide integrarla al skill (hoy se configura directamente desde su ruta).
+3. **[DEUDA-EXPRESS] Crear `.opencode/agent/exp-pickle-free.md`:** gap de infraestructura (listado en la matriz del AGENTS.md seccion 1.1, pero el runtime responde "unknown agent type").
+4. **Commitear `GEMINI_GEMA_INVESTIGACION.md`** (untracked) junto al proximo pase de docs; no mezclarlo con los commits de codigo.
+
+#### Riesgos activos
+
+- **BUG-034 ABIERTO:** `scripts/validate_ficha.js` inexistente; el canonico vive en `.opencode/skills/gemini-research/scripts/` (drift documental en BLUEPRINT.md seccion 4, DECISIONS.md ADR-016 y 2 SKILL.md).
+- **Gap `exp-pickle-free`:** nombre de agente en la matriz de routing gratuita sin archivo; cualquier ruteo a ese agente falla con "unknown agent type".
+- **Gema sin QA funcional:** la salida de la gema aun no se valido contra el validador real; es un prompt (no runtime), no bloquea deploy.
 
 ### Galeria/hero por votos + Mis mapas personales + guardados de media + propiedad de medios del mapa (2026-09-19) - ADR-046 + ADR-047 / TSK-136..TSK-140
 

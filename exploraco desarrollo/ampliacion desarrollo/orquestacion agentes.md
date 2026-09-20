@@ -1,7 +1,7 @@
 # ORQUESTACIÓN DE AGENTES, SUBAGENTES Y SKILLS — EXPLORACO (AI-DOS)
 
 ## Estado
-- **Versión**: v1.0 (Esquema Tripartito: Standard/Pro, Free/Open-Source y Hybrid)
+- **Versión**: v1.1 (Esquema Tripartito con ruteo por riesgo - datos de consumo opencode.db sep 2026)
 - **Referencia del Sistema**: Framework de Gobernanza AI-DOS Core & OpenCode Orchestration Architecture
 - **Ubicación de Configuración Global**: `opencode.json` / `.opencode/agents/*.md`
 
@@ -48,12 +48,10 @@ El sistema permite alternar dinámicamente entre **3 esquemas de operación** se
 * **Agente Principal por defecto**: `hybrid-build` / `hybrid-plan`
 * **Modelos Utilizados**: Combinación estratégica de modelos Pro (para toma de decisiones/código crítico) y Free (para lectura/plantillas/docs).
 * **Propósito**: Maximizar el rendimiento del presupuesto. Minimiza el gasto de tokens Pro delegando tareas de bajo riesgo a modelos gratuitos.
-* **Matriz de Enrutamiento Hybrid**:
-  * **Análisis y lectura del repositorio**: Se delega a `explore-free` (Modelo Free).
-  * **Escritura Backend (`api/*.js`)**: Se delega a `backend-dev` (Modelo Pro).
-  * **Edición de Panel Admin (`admin.html`)**: Se delega a `admin-dev` (Modelo Pro).
-  * **Carga de Contenido y Seeds**: Se delega a `content-loader-free` (Modelo Free).
-  * **Actualización Documental AI-DOS**: Se delega a `docs-keeper-free` (Modelo Free).
+* **Matriz de Enrutamiento Hybrid** (ruteo por riesgo; detalle por dominio en el ADR del esquema tripartito en DECISIONS.md):
+  * **PRO** (esfuerzo/criterio/riesgo runtime): `backend-dev`, `admin-dev`, `renderer-dev`, `frontend-tpl`, `sql-security`, `architect` + `architect-review`.
+  * **FREE** (rutinario/repetitivo/dispendioso): `explore-free`, `content-loader-free`, `js-silo-dev-free`/`exp-pickle-free`, `data-migration-free`, `seo-dev-free`, `qa-auditor-free`, `docs-keeper-free`, `media-reader-free`, `research-agent-free`/skill `gemini-research`.
+* **Nota de consumo real (opencode.db, 821 sesiones, ago-sep 2026)**: build PRO = 35% del costo, rutinarias 23% migrables a free, criticas 38% permanecen PRO; explore PRO ($2.41/146 ses) -> free ahorra 95%.
 
 ---
 
@@ -67,8 +65,8 @@ Los agentes principales son los puntos de entrada interactivos en una sesión de
 | **`plan`** | Standard / Pro | `opencode-go/deepseek-v4-flash` | Agente principal de arquitectura y diseño. Crea planes detallados en `TASKS.md` antes de editar código. |
 | **`free-build`** | Free | `opencode/big-pickle` | Agente principal interactivo por defecto en `opencode.json`. Ejecuta tareas usando la matriz de subagentes gratuitos. |
 | **`free-plan`** | Free | `opencode/big-pickle` | Planificador ligero de costo cero. Diseña la secuencia de trabajo sin consumir APIs comerciales. |
-| **`hybrid-build`** | Hybrid | `opencode-go/deepseek-v4-flash` | Orquestador ejecutor inteligente. Evalúa el riesgo del archivo antes de invocar subagentes Pro o Free. |
-| **`hybrid-plan`** | Hybrid | `opencode-go/deepseek-v4-flash` | Planificador que combina razonamiento Pro para arquitectura con exploración Free para lectura del repo. |
+| **`hybrid-build`** | Hybrid | `opencode-go/deepseek-v4.1-flash` | Orquestador ejecutor hibrido. Decide el ruteo PRO/FREE por riesgo y criterio (matriz del ADR), nunca por preferencia. |
+| **`hybrid-plan`** | Hybrid | `opencode-go/deepseek-v4.1-flash` | Planificador hibrido. Combina razonamiento Pro para arquitectura y criterio de riesgo con exploracion Free para lectura del repo. |
 
 ---
 

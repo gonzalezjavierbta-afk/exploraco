@@ -2389,3 +2389,72 @@ La pertenencia no es geografica: un medio pertenece al espacio si su `origen_id`
 - QA visual en navegador pendiente (TSK-135).
 
 **ADRs relacionados:** ADR-001 (Vanilla/ASCII), ADR-004 (aislamiento), ADR-006 (baseline real), ADR-021 (capa audiovisual estricta/paridad de drawer), ADR-036 (media unificada), ADR-045 (motor compartido del mapa), BUG-075, BUG-076.
+
+---
+
+## ADR-048: Esquema tripartito de orquestacion de agentes -- ruteo por riesgo (Standard/Pro, Free/Open-Source y Hybrid)
+
+**ID:** ADR-048
+**Fecha:** 2026-09-20
+**Estado:** **APROBADO** (2026-09-20). Implementado con los agentes primarios `hybrid-build` y `hybrid-plan` (ambos PRO, `opencode-go/deepseek-v4.1-flash`); verificados contra archivo real (ADR-006): `.opencode/agent/hybrid-build.md` (edit allow, rutea por riesgo) y `.opencode/agent/hybrid-plan.md` (edit deny, solo invoca `@explore-free`/`@research-agent-free`). Matriz de ruteo documentada en el prompt real del agente y en `orquestacion agentes.md`. Cero cambios en la app, runtime o BD.
+**Autor:** architect-free (AI-DOS); decision derivada del analisis de consumo real de opencode.db (821 sesiones, ago-sep 2026); cierre documental por docs-keeper.
+**Alcance:** gobernanza de orquestacion de agentes (`.opencode/agent/*.md`, `opencode.json`, AGENTS.md). No toca `api/*.js`, esquema ni presupuesto 8/8 de Vercel Hobby.
+
+### Contexto
+
+La orquestacion de ExploraCO tenia 2 rutas: Standard/Pro (`build`/`plan`, `opencode-go/deepseek-v4.1-flash`) y Free (`free-build`/`free-plan`, `opencode/big-pickle`). El analisis de consumo real (opencode.db, 821 sesiones, ago-sep 2026) demostro que el gasto PRO no se concentraba donde se habia asumido:
+
+- `build` PRO concentra **35% del gasto ($11.46)**; `frontend-tpl` PRO el **20% ($6.43)** con sesiones individuales de hasta **$4.08**.
+- Las tareas **rutinarias** (docs $2.23, qa $2.10, js-silo $0.79, content-loader, data-migration, seo, media, research) suman **~$7.53 (23%)** y son ejecutables por la ruta free a costo ~0 sin diferencia de resultado.
+- `explore` PRO (146 sesiones, **$2.41**, solo lectura) es **~95% mas caro** que `explore-free` (**$0.12**) para el mismo trabajo de lectura del repo.
+- Las tareas **criticas** (backend, admin, renderer, sql-security, arquitectura) suman **~$12.3 (38%)** y justifican quedarse en PRO.
+
+Conclusion: se pagaba por VOLUMEN de tokens en lugar de por RIESGO y CRITERIO. La ruta free no puede tomar tareas criticas (riesgo de romper runtime) y la ruta PRO no deberia tomar tareas mecanicas (desperdicio de presupuesto medido en datos).
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Mantener solo las 2 rutas (PRO/Free) (RECHAZADA).** Forzaba a elegir calidad o costo por sesion completa: la ruta PRO seguia quemando presupuesto en lectura y mecanica (23% documentado), y la free no podia ejecutar nada critico.
+2. **Mover todas las tareas a la ruta free (RECHAZADA).** El 38% critico (backend, admin, renderer, sql-security, arquitectura) no puede delegarse a `*-free`: riesgo de romper runtime, corromper datos o debilitar seguridad (RLS, claves, autenticacion).
+3. **Tercera ruta Hybrid con ruteo por riesgo (ELEGIDA).** Un orquestador PRO decide y rutea cada tarea atomica: las de criterio/riesgo alto a subagentes PRO, las mecanicas/repetitivas a `*-free`. Se paga por RIESGO y CRITERIO, no por VOLUMEN.
+
+### Decision tomada
+
+1. **Crear el esquema Hybrid como tercera ruta de orquestacion**, con 2 agentes primarios PRO (`opencode-go/deepseek-v4.1-flash`):
+   - `hybrid-plan`: edit deny; combina razonamiento PRO para arquitectura con exploracion FREE (`@explore-free`/`@research-agent-free`) para lectura del repo.
+   - `hybrid-build`: edit allow; evalua el riesgo del archivo antes de invocar subagentes PRO o FREE (orquestador ejecutor inteligente).
+2. **Matriz de ruteo Hybrid (fuente de verdad, documentada en el prompt del agente y en `orquestacion agentes.md` v1.1):**
+   - **Ruta PRO:** `backend-dev` (api/*.js), `admin-dev` (admin.html/publicar-lugar.js), `renderer-dev` (pagina-destino.js), `frontend-tpl` (UI/estetica compleja), `sql-security` (SQL/RLS/claves/persistencia), `architect` + `architect-review` (arquitectura/ADRs).
+   - **Ruta FREE:** `explore-free` (lectura masiva), `content-loader-free` (paginas dinamicas), `js-silo-dev-free`/`exp-pickle-free` (JS rutinario), `data-migration-free` (seeds masivos), `seo-dev-free` (sitemap/meta/OG), `qa-auditor-free` (Escudo GOLD mecanico), `docs-keeper-free` (documentacion), `media-reader-free` (imagen/audio/video/PDF), `research-agent-free` o skill `gemini-research` (investigacion).
+3. **Regla de oro de ruteo (mitigacion del mal ruteo):**
+   - Prohibido invocar un subagente FREE en un dominio de la ruta PRO (backend, admin, renderer, seguridad SQL, UI de criterio). El ahorro nunca justifica romper runtime o corromper datos.
+   - Prohibido invocar un subagente PRO en trabajo mecanico que un FREE hace igual de bien (exploracion, docs, seeds, smokes, SEO de plantilla): esas tareas resultaron ~95% mas baratas en free sin diferencia de resultado.
+   - Seguridad critica (SQL critico, RLS, claves, autenticacion) escala SIEMPRE a `sql-security` PRO; prohibido `sql-security-free` en ese dominio.
+4. **`opencode.json`:** el `default_agent` sigue en `free-plan` (ruta gratuita, sin cambios en la sesion de implementacion); convertir `hybrid-build` en el default del proyecto queda como decision operativa pendiente de confirmacion del operador (ADR-006: manda el archivo real).
+
+### Justificacion
+
+Los datos de consumo demostraron que el 23% del gasto PRO (~$7.53 en la ventana analizada) se iba en tareas mecanicas sustituibles por la ruta free a costo ~0, y que la lectura del repo costaba ~95% menos en `explore-free` ($0.12 vs $2.41). Ruteando por riesgo se captura ese ahorro sin exponer el 38% critico: el cerebro PRO paga solo donde hay criterio o riesgo de runtime, y el trabajo repetitivo baja a costo ~0. La regla de oro (prohibido FREE en dominios PRO) mitiga el riesgo de mal ruteo: un ahorro mal aplicado nunca justifica romper el runtime, corromper datos ni debilitar RLS/claves. El esquema es el mismo principio del proyecto expresado para la orquestacion: separar responsabilidades y pagar por lo que aporta riesgo real.
+
+### Impacto
+
+- **`.opencode/agent/`: NUEVOS `hybrid-plan.md` y `hybrid-build.md`** (primarios PRO, `opencode-go/deepseek-v4.1-flash`); ambos verificados contra archivo real (ADR-006). Git los muestra como untracked hasta el commit.
+- **`opencode.json`:** sin cambios (se mantiene `default_agent: free-plan`); el bump a `hybrid-build` queda pendiente de decision del operador.
+- **AGENTS.md y `orquestacion agentes.md` (v1.1):** matriz de ruteo Hybrid como fuente de verdad de la gobernanza.
+- **Ahorro estimado:** ~23% del gasto PRO (~$7.53 por ventana analizada) migra a costo ~0 por la ruta free; el 38% critico permanece en PRO.
+- **Sin cambios en la app:** cero endpoints nuevos (presupuesto 8/8 intocable), cero migraciones, cero cambios de esquema.
+- **Costo del analisis:** 0 dolares adicionales; todo se decidio sobre opencode.db existente.
+
+### Consecuencias positivas
+
+- El presupuesto PRO queda concentrado donde hay riesgo/criterio real (backend, admin, renderer, sql-security, arquitectura).
+- Las tareas rutinarias siguen ejecutandose a costo ~0 con la misma calidad de resultado.
+- Mantener `free-plan` como default significa que el esquema Hybrid requiere activacion por nombre (`@hybrid-plan`/`@hybrid-build`); si el operador decide hacerlo default mas adelante, toda sesion nueva rutea por riesgo sin depender de activarlo manualmente.
+
+### Consecuencias negativas / riesgos residuales
+
+- Dependencia del criterio del orquestador para clasificar riesgo tarea a tarea; una clasificacion incorrecta (FREE en dominio critico) se mitiga con la regla de oro, que es obligatoria y verificable en el prompt real del agente.
+- El ahorro real depende de la disciplina de ruteo de cada sesion; se exige trazabilidad de que tareas fueron PRO y cuales FREE en el resumen de entrega.
+- `orquestacion agentes.md` ya quedo en v1.1 (cabecera y tabla de primarios actualizados con `deepseek-v4.1-flash` y la matriz Hybrid documentada por docs-keeper-free en la misma sesion); la matriz autoritativa vive en el prompt real de `hybrid-build` (ADR-006: archivo real como baseline).
+- El doc de orquestacion conserva citas `deepseek-v4-flash` en las secciones 3/4 para los agentes Pro legacy (fuera del alcance de esta sesion); las filas hybrid (68-69) ya estan en `deepseek-v4.1-flash`. El archivo real manda (ADR-006).
+
+**ADRs relacionados:** ADR-001 (Vanilla), ADR-002 (ASCII-safe), ADR-006 (baseline de verdad = archivo real), regla de oro 8 (handoff), TSK-132 (registro de la skill express-mode como practica), doc `exploraco desarrollo/ampliacion desarrollo/orquestacion agentes.md` (v1.1, esquema tripartito).

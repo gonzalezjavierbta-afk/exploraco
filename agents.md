@@ -6,7 +6,7 @@ Este repositorio utiliza el Desarrollo Dirigido por Subagentes (SDD). Queda proh
 
 Antes de procesar cualquier código, los agentes principales deben delegar las tareas a los subagentes especializados configurados en la carpeta `.opencode/agent/` según el lenguaje o dominio de la tarea. La tabla es la fuente de verdad (ADR-006).
 
-Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `opencode/*` de costo cero) y una de PAGO (agentes pro/económicos `opencode-go/*`). Los agentes gratuitos se identifican con el sufijo `-free`. La ruta gratuita es el default de `opencode.json` (`free-plan`).
+Existen **tres rutas completas**: una GRATUITA (todos los agentes usan modelos `opencode/*` de costo cero), una de PAGO (agentes pro/economicos `opencode-go/*`) y una HYBRID (mezcla deliberada PRO/FREE en una misma sesion, ruteo por riesgo). Los agentes gratuitos se identifican con el sufijo `-free`. La ruta gratuita es el default de `opencode.json` (`free-plan`).
 
 ### 1.1 Ruta GRATUITA (0 costo — default)
 
@@ -41,7 +41,20 @@ Existen **dos rutas completas**: una GRATUITA (todos los agentes usan modelos `o
 
 **Limitación de `sql-security-free`:** NO gestiona RLS, autenticación, claves ni integridad de datos crítica. Esas tareas SIEMPRE se escalan a `sql-security` (versión pro).
 
-### 1.2 Ruta de PAGO (costo `opencode-go/*` — opcional, mayor calidad)
+### 1.2 Ruta HYBRID (mixta - ruteo por riesgo)
+
+Esquema tripartito: la ruta Hybrid mezcla en una misma sesion agentes PRO (`opencode-go/*`, criterio, esfuerzo y riesgo de runtime) y agentes FREE (`opencode/*`, trabajo rutinario, repetitivo y dispendioso de bajo riesgo), segun la tarea.
+
+**Agentes primarios hybrid:**
+
+| Agente | Modelo | Uso |
+|---|---|---|
+| `hybrid-plan` | `opencode-go/deepseek-v4.1-flash` | Planificador hibrido (mode primary, edit/bash deny) |
+| `hybrid-build` | `opencode-go/deepseek-v4.1-flash` | Build hibrido (mode primary, edit/bash allow) |
+
+**Regla de oro del ruteo hybrid:** el ruteo PRO/FREE se decide por riesgo y criterio (matriz del ADR correspondiente), nunca por preferencia. Nunca asignar un dominio PRO a un agente FREE (riesgo de runtime/seguridad); nunca gastar cuota PRO en trabajo mecanico que FREE resuelve igual (ahorro ~95% en tareas rutinarias). La matriz detallada por dominio vive en el ADR del esquema tripartito de rutas en DECISIONS.md.
+
+### 1.3 Ruta de PAGO (costo `opencode-go/*` — opcional, mayor calidad)
 
 **Agentes primarios de pago:**
 
