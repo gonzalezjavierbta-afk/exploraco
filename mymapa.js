@@ -10,6 +10,8 @@
      GET  /api/interacciones?tipo=mapa&usuario_id=<uuid>
           -> { guardados:[...lat/lng] } (contenido de "Mi Mapa")
      GET  /api/interacciones?tipo=mapa_detalle&id=<id>&usuario_id=<uuid>
+     GET  /api/interacciones?tipo=mis_guardados_media
+          -> { data:[{fuente,item_id}] } (exige sesion Bearer, ADR-054)
      POST /api/interacciones  (mapa_crear|mapa_editar|mapa_eliminar)
 
    Dependencias externas permitidas: Leaflet (window.L), el motor
@@ -100,8 +102,22 @@
     });
   }
 
-  function getJson(url) {
-    return fetch(api() + url).then(leerJson);
+  // Cabeceras con Authorization: Bearer, reutilizando el helper canonico
+  // de sesion (usuario-session.js, window.ExploraCO.authHeaders). Sin
+  // sesion devuelve {} para no romper los fetches publicos.
+  function authHeaders() {
+    if (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function') {
+      try { return window.ExploraCO.authHeaders() || {}; }
+      catch (e) { logWarn('authHeaders', e); return {}; }
+    }
+    return {};
+  }
+
+  // GET -> JSON. conAuth=true adjunta Authorization: Bearer para los
+  // endpoints con sesion obligatoria (p.ej. mis_guardados_media, ADR-054).
+  function getJson(url, conAuth) {
+    var opts = conAuth ? { headers: authHeaders() } : undefined;
+    return fetch(api() + url, opts).then(leerJson);
   }
 
   function postJson(body) {
@@ -211,15 +227,22 @@
   function cargarGuardados() {
     var u = usuario();
     if (!u || !u.id) { SET_GUARDADOS = {}; return; }
-    getJson('/api/interacciones?tipo=mis_guardados_media&usuario_id=' + encodeURIComponent(u.id))
+    // mis_guardados_media exige sesion firmada (ADR-054) y deriva el
+    // usuario del token: la URL ya NO envia usuario_id. Sin token no se
+    // llama al endpoint y el mapa queda como esta.
+    if (!authHeaders().Authorization) return;
+    getJson('/api/interacciones?tipo=mis_guardados_media', true)
       .then(function (d) {
-        var set = {};
-        if (d && d.ok && d.data) {
-          d.data.forEach(function (row) {
-            if (!row) return;
-            set[String(row.fuente) + ':' + String(row.item_id)] = true;
-          });
+        if (!d || !d.ok) {
+          // 401 = token ausente/vencido: se conserva el set previo.
+          logWarn('guardados media status ' + (d && d.__status), d && d.error);
+          return;
         }
+        var set = {};
+        (d.data || []).forEach(function (row) {
+          if (!row) return;
+          set[String(row.fuente) + ':' + String(row.item_id)] = true;
+        });
         SET_GUARDADOS = set;
         if (mc) {
           mc.setMedia(MEDIA_CACHE || []);
@@ -292,12 +315,8 @@
         var publicos = (d && d.ok && d.data) ? d.data : [];
         var u = usuario();
         if (!u || !u.id) { aplicarMedia(publicos); return null; }
-        var headers = {};
-        if (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function') {
-          headers = window.ExploraCO.authHeaders() || {};
-        }
         return fetch(api() + '/api/interacciones?tipo=multimedia_mapa&scope=mio',
-          { headers: headers })
+          { headers: authHeaders() })
           .then(leerJson)
           .then(function (p) {
             var propios = (p && p.ok && p.data) ? p.data : [];

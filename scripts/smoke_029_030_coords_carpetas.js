@@ -1,7 +1,6 @@
 // scripts/smoke_029_030_coords_carpetas.js
-// Smoke offline (sin red, sin DB) de las ramas v24 de api/interacciones.js
-// cubiertas por las migraciones 029 (album_fotos coords propias) y 030
-// (guardados_carpetas):
+// Smoke offline (sin red, sin DB) de las ramas de coords de api/interacciones.js
+// cubiertas por la migracion 029 (album_fotos coords propias):
 //   1) multimedia_mapa: la rama album proyecta COALESCE(af.lat,a.lat) /
 //      COALESCE(af.lng,a.lng); coords propias ganan, sin propias hereda
 //      del album.
@@ -11,11 +10,8 @@
 //   3) museo_recurso GET: emite lat_propia/lng_propia/coords_heredadas.
 //   4) museo_recurso POST editar: quitar_coords -> lat/lng NULL; lat/lng
 //      -> coords del recurso.
-//   5) mis_guardados_media: carpetas + carpeta_id; fallo 42P01/42703 ->
-//      503 SCHEMA_NOT_MIGRATED (NUNCA data:[]).
-//   6) guardados_carpeta: sesion obligatoria, crear duplicado -> 409
-//      CARPETA_DUPLICADA, mover con doble pertenencia y eliminar
-//      reasignando carpeta_id=NULL sin borrar bookmarks.
+// ADR-054: el contrato de carpetas de guardados (ADR-052) fue retirado; los
+// guardados en albumes se cubren en scripts/smoke_032_guardados_album.js.
 // Carga el handler REAL en un sandbox vm con @neondatabase/serverless
 // redirigido a un mock en memoria (global.__MOCKSQL__). El harness minimo
 // se replica de scripts/smoke_036_media_unificada.js (mismo patron).
@@ -107,7 +103,6 @@ var SRC = readSrc('api/interacciones.js');
 var handler = cargarApi('api/interacciones.js');
 var U = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 var OTRO = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-var CARPETA = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 var REC = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 var ALBUM = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 
@@ -241,116 +236,6 @@ async function run() {
   check('D7: lat/lng -> params con las coords del recurso',
     !!qLat && qLat.p[2] === 4.711 && qLat.p[3] === -74.072);
 
-  // ============ E. mis_guardados_media: carpetas y SCHEMA_NOT_MIGRATED ============
-  var mMgOk = crearMock([
-    { test: 'FROM media_guardados mg', reply: [
-      { fuente: 'album_foto', item_id: 'p1', creado_en: 't', titulo: 'T', media_url: 'u', media_type: 'foto', ciudad: 'X', album_id: ALBUM, destino_slug: null, carpeta_id: CARPETA, carpeta_nombre: 'Viajes' }
-    ] },
-    { test: 'FROM guardados_carpetas', reply: [{ id: CARPETA, nombre: 'Viajes', orden: 0 }] }
-  ]);
-  global.__MOCKSQL__ = mMgOk.fn;
-  var resMgOk = makeRes();
-  await handler({ method: 'GET', body: {}, query: { tipo: 'mis_guardados_media', usuario_id: U }, headers: {} }, resMgOk);
-  var bMgOk = resMgOk.body || {};
-  check('E1: mis_guardados_media 200', resMgOk.statusCode === 200);
-  check('E2: respuesta incluye carpetas', Array.isArray(bMgOk.carpetas) && bMgOk.carpetas.length === 1);
-  check('E3: cada bookmark expone carpeta_id', bMgOk.data[0] && bMgOk.data[0].carpeta_id === CARPETA);
-  check('E4: query une guardados_carpetas para el nombre',
-    mMgOk.alguna('LEFT JOIN guardados_carpetas gc'));
-
-  var mMg42P01 = crearMock([{ test: 'FROM media_guardados mg', reject: { code: '42P01', message: 'relation "guardados_carpetas" does not exist' } }]);
-  global.__MOCKSQL__ = mMg42P01.fn;
-  var resMg42P01 = makeRes();
-  await handler({ method: 'GET', body: {}, query: { tipo: 'mis_guardados_media', usuario_id: U }, headers: {} }, resMg42P01);
-  check('E5: 42P01 -> 503 SCHEMA_NOT_MIGRATED (no data:[])',
-    resMg42P01.statusCode === 503 && !!(resMg42P01.body && resMg42P01.body.error === 'SCHEMA_NOT_MIGRATED')
-    && resMg42P01.body.data === undefined);
-
-  var mMg42703 = crearMock([
-    { test: 'FROM media_guardados mg', reply: [] },
-    { test: 'FROM guardados_carpetas', reject: { code: '42703', message: 'column does not exist' } }
-  ]);
-  global.__MOCKSQL__ = mMg42703.fn;
-  var resMg42703 = makeRes();
-  await handler({ method: 'GET', body: {}, query: { tipo: 'mis_guardados_media', usuario_id: U }, headers: {} }, resMg42703);
-  check('E6: 42703 -> 503 SCHEMA_NOT_MIGRATED',
-    resMg42703.statusCode === 503 && !!(resMg42703.body && resMg42703.body.error === 'SCHEMA_NOT_MIGRATED'));
-
-  // ============ F. guardados_carpeta: sesion, duplicado, mover, eliminar ============
-  var mGcNoAuth = crearMock([]);
-  global.__MOCKSQL__ = mGcNoAuth.fn;
-  var resGcNoAuth = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', accion: 'crear', nombre: 'Viajes' }, query: {}, headers: {} }, resGcNoAuth);
-  check('F1: guardados_carpeta sin sesion -> 401', resGcNoAuth.statusCode === 401);
-  check('F2: guardados_carpeta sin sesion no toca la base', mGcNoAuth.queries.length === 0);
-
-  var mGcOtro = crearMock([]);
-  global.__MOCKSQL__ = mGcOtro.fn;
-  var resGcOtro = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'crear', nombre: 'Viajes' }, query: {}, headers: authHeaders(OTRO) }, resGcOtro);
-  check('F3: guardados_carpeta con token de otro usuario -> 401', resGcOtro.statusCode === 401);
-
-  var mGcDup = crearMock([{ test: 'INSERT INTO guardados_carpetas', reply: [] }]);
-  global.__MOCKSQL__ = mGcDup.fn;
-  var resGcDup = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'crear', nombre: 'Viajes' }, query: {}, headers: authHeaders(U) }, resGcDup);
-  check('F4: crear duplicado -> 409 CARPETA_DUPLICADA',
-    resGcDup.statusCode === 409 && !!(resGcDup.body && resGcDup.body.error === 'CARPETA_DUPLICADA'));
-  check('F5: crear usa ON CONFLICT DO NOTHING', mGcDup.alguna('ON CONFLICT DO NOTHING'));
-
-  var mGcCrear = crearMock([
-    { test: 'INSERT INTO guardados_carpetas', reply: [{ id: CARPETA }] },
-    { test: 'SELECT id::text AS id, nombre, orden FROM guardados_carpetas', reply: [{ id: CARPETA, nombre: 'Viajes', orden: 0 }] }
-  ]);
-  global.__MOCKSQL__ = mGcCrear.fn;
-  var resGcCrear = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'crear', nombre: 'Viajes' }, query: {}, headers: authHeaders(U) }, resGcCrear);
-  check('F6: crear ok -> 201 con la carpeta',
-    resGcCrear.statusCode === 201 && !!(resGcCrear.body && resGcCrear.body.carpeta && resGcCrear.body.carpeta.id === CARPETA));
-
-  var mGcMoverA = crearMock([{ test: 'SELECT id FROM guardados_carpetas', reply: [] }]);
-  global.__MOCKSQL__ = mGcMoverA.fn;
-  var resGcMoverA = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'mover', fuente: 'album_foto', item_id: 'p1', carpeta_id: CARPETA }, query: {}, headers: authHeaders(U) }, resGcMoverA);
-  check('F7: mover a carpeta ajena -> 404 CARPETA_NO_ENCONTRADA',
-    resGcMoverA.statusCode === 404 && !!(resGcMoverA.body && resGcMoverA.body.error === 'CARPETA_NO_ENCONTRADA'));
-  check('F8: mover con carpeta ajena no toca media_guardados', !mGcMoverA.alguna('UPDATE media_guardados'));
-
-  var mGcMoverB = crearMock([
-    { test: 'SELECT id FROM guardados_carpetas', reply: [{ id: CARPETA }] },
-    { test: 'UPDATE media_guardados SET carpeta_id', reply: [] }
-  ]);
-  global.__MOCKSQL__ = mGcMoverB.fn;
-  var resGcMoverB = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'mover', fuente: 'album_foto', item_id: 'p1', carpeta_id: CARPETA }, query: {}, headers: authHeaders(U) }, resGcMoverB);
-  check('F9: doble pertenencia exige el bookmark propio -> 404 GUARDADO_NO_ENCONTRADO',
-    resGcMoverB.statusCode === 404 && !!(resGcMoverB.body && resGcMoverB.body.error === 'GUARDADO_NO_ENCONTRADO'));
-  var qMover = mGcMoverB.ultima('UPDATE media_guardados SET carpeta_id');
-  check('F10: mover filtra por usuario_id + fuente + item_id activo',
-    !!qMover && qMover.q.indexOf('usuario_id = $2::uuid') !== -1
-    && qMover.q.indexOf('fuente = $3') !== -1 && qMover.q.indexOf('item_id = $4') !== -1
-    && qMover.q.indexOf('activo = true') !== -1);
-
-  var mGcDel = crearMock([
-    { test: 'UPDATE guardados_carpetas SET activo = false', reply: [{ id: CARPETA }] },
-    { test: 'UPDATE media_guardados SET carpeta_id = NULL', reply: [] }
-  ]);
-  global.__MOCKSQL__ = mGcDel.fn;
-  var resGcDel = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'eliminar', carpeta_id: CARPETA }, query: {}, headers: authHeaders(U) }, resGcDel);
-  check('F11: eliminar -> 200 eliminada true',
-    resGcDel.statusCode === 200 && !!(resGcDel.body && resGcDel.body.eliminada === true));
-  check('F12: eliminar reasigna carpeta_id = NULL y NO borra bookmarks',
-    mGcDel.alguna('UPDATE media_guardados SET carpeta_id = NULL')
-    && !mGcDel.alguna('DELETE FROM media_guardados'));
-
-  var mGc23505 = crearMock([{ test: 'INSERT INTO guardados_carpetas', reject: { code: '23505', message: 'duplicate key' } }]);
-  global.__MOCKSQL__ = mGc23505.fn;
-  var resGc23505 = makeRes();
-  await handler({ method: 'POST', body: { tipo: 'guardados_carpeta', usuario_id: U, accion: 'crear', nombre: 'Viajes' }, query: {}, headers: authHeaders(U) }, resGc23505);
-  check('F13: 23505 en crear -> 409 CARPETA_DUPLICADA',
-    resGc23505.statusCode === 409 && !!(resGc23505.body && resGc23505.body.error === 'CARPETA_DUPLICADA'));
-
   // ============ G. Estructura estatica del API ============
   check('G1: rama multimedia_mapa presente', SRC.indexOf("tipo === 'multimedia_mapa'") !== -1);
   check('G2: scope=mio exige verificarSesion',
@@ -362,13 +247,7 @@ async function run() {
   check('G6: museo_recurso GET expone coords_heredadas', SRC.indexOf('coords_heredadas') !== -1);
   check('G7: museo_recurso POST editar con quitar_coords -> NULL',
     /mrQuitarCoords[\s\S]{0,200}lat = NULL/.test(SRC));
-  check('G8: rama mis_guardados_media presente', SRC.indexOf("tipo === 'mis_guardados_media'") !== -1);
-  check('G9: mis_guardados_media responde SCHEMA_NOT_MIGRATED',
-    /tipo === 'mis_guardados_media'[\s\S]{0,4600}error: 'SCHEMA_NOT_MIGRATED'/.test(SRC));
-  check('G10: rama guardados_carpeta presente', SRC.indexOf("tipo2 === 'guardados_carpeta'") !== -1);
-  check('G11: guardados_carpeta elimina reasignando carpeta_id NULL',
-    SRC.indexOf('UPDATE media_guardados SET carpeta_id = NULL') !== -1);
-  check('G12: helper esEsquemaFaltante cubre 42P01/42703',
+  check('G8: helper esEsquemaFaltante cubre 42P01/42703',
     /function esEsquemaFaltante[\s\S]{0,120}42P01[\s\S]{0,40}42703/.test(SRC));
 
   // ============ H. ASCII-safety ============
@@ -382,10 +261,10 @@ async function run() {
 
 function finish() {
   console.log('');
-  console.log('=== SMOKE 029/030 COORDS + CARPETAS ===');
+  console.log('=== SMOKE 029/030 COORDS ===');
   console.log('Checks: ' + (passed + failed) + ' total, ' + passed + ' PASS, ' + failed + ' FAIL');
-  if (failed === 0) console.log('SMOKE 029/030 COORDS + CARPETAS: OK');
-  else { console.log('SMOKE 029/030 COORDS + CARPETAS: ' + failed + ' FALLO(S)'); process.exitCode = 1; }
+  if (failed === 0) console.log('SMOKE 029/030 COORDS: OK');
+  else { console.log('SMOKE 029/030 COORDS: ' + failed + ' FALLO(S)'); process.exitCode = 1; }
 }
 
 run().then(finish).catch(function(err) {

@@ -350,8 +350,8 @@ async function run() {
     && !/tipo2 === 'foto_voto'[\s\S]{0,500}validarSesion\(req/.test(SRC)
     && !/tipo2 === 'comentario_foto'[\s\S]{0,500}validarSesion\(req/.test(SRC)
     && !/tipo2 === 'guardar_media'[\s\S]{0,500}validarSesion\(req/.test(SRC));
-  check('J35: deuda BUG-061 documentada en los 4 alias/guardado',
-    (SRC.match(/DEUDA \(BUG-061\)/g) || []).length >= 4);
+  check('J35: deuda BUG-061 documentada en los 3 alias restantes',
+    (SRC.match(/DEUDA \(BUG-061\)/g) || []).length === 3);
   check('J36: compartir tambien valida sesion',
     /tipo2 === 'compartir'[\s\S]{0,600}validarSesion\(req, usuarioId2\)/.test(SRC));
 

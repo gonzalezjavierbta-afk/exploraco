@@ -1512,6 +1512,18 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Prevencion:** toda rama que lea datos de un usuario debe exigir sesion firmada y derivar el uuid del token, NUNCA de un query/body (patron BUG-061); y toda supresion de un filtro de visibilidad debe condicionarse a un dueno AUTENTICADO, no a la mera presencia de un query param. Vale para `multimedia_mapa` y para cualquier lector con `scope=mio`.
 **Estado:** CORREGIDO EN CODIGO (2026-09-21, working tree SIN commitear). **PENDIENTE: deploy (commit/push + Vercel) del backend v24 para que el fix llegue a produccion.** Ver TASKS.md TSK-147 y DECISIONS.md ADR-051/ADR-052 (mismo release).
 
+## BUG-082: fuga de privacidad en la ficha -- `api/pagina-destino.js` consultaba fotos de album por cercania SIN `af.visible = true`
+
+**Severidad:** ALTA (fuga de privacidad: recursos de album privados (`album_fotos.visible = false`) se renderizaban en la ficha publica de un destino por cercania geografica).
+**Contexto:** detectado por la revision de `@architect-review` del ADR-054 (2026-09-21) contra el archivo real (ADR-006); quedo como pendiente obligatorio P1 del ADR y se corrigio en el MISMO release `api/interacciones.js` **v26** / ADR-054. Viola la regla D.1 de ADR-039 (visibilidad POR RECURSO: todo lector publico filtra `af.visible = true`).
+**Sintoma:** la ficha de un destino mostraba fotos de album de usuarios que el autor habia dejado privadas (`album_fotos.visible = false`), siempre que la media cayera en el radio de cercania del destino.
+**Causa raiz:** en `api/pagina-destino.js` la consulta "de album por cercania" filtraba `af.activo=true AND a.activo=true` y ademas `a.lat IS NOT NULL AND a.lng IS NOT NULL` + `ABS(...) < 0.01`, pero OMITIA `af.visible=true`. Como el filtro de visibilidad por recurso de ADR-039 (migracion 025) es `af.visible`, esa rama era la unica superficie publica de la ficha que no lo aplicaba.
+**Resolucion aplicada (working tree, 2026-09-21; mismo release que ADR-054):**
+   1. **`api/pagina-destino.js`:** el `WHERE` de la consulta de fotos de album por cercania agrega `AND af.visible=true` (hoy L2762). Con eso la ficha solo renderiza recursos publicos.
+**Evidencia (ADR-006):** `api/pagina-destino.js` L2762: `WHERE af.activo=true AND af.visible=true AND a.activo=true AND a.lat IS NOT NULL AND a.lng IS NOT NULL` (verificado en el archivo real HOY). `npm test` incluye el check **C13** de `scripts/smoke_032_guardados_album.js` ("api/pagina-destino.js conserva af.visible = true (BUG-082)") en VERDE.
+**Prevencion:** todo lector publico de `album_fotos` debe filtrar `af.visible=true` (ADR-039 D.1); al agregar ramas nuevas de lectura por cercania o subqueries de votos/conteos, revisar la lista de filtros contra la migracion 025. Vale para `api/pagina-destino.js` y para cualquier lector polimorfico de media.
+**Estado:** CORREGIDO EN CODIGO (2026-09-21, working tree, deploy pendiente). **PENDIENTE: deploy del backend (`api/pagina-destino.js` + `api/interacciones.js` v26) en el orden 032 -> backend -> frontend.** Ver TASKS.md TSK-149 y DECISIONS.md ADR-054 (mismo release).
+
 ## Errata corregida (TSK-148 / ADR-053, 2026-09-21) -- titulo 11 `Estrat\u00e9ga` -> `Estratega Comunitario` -- NO es un bug de runtime
 
 **Contexto:** el ADR-053 (R-10) habia declarado la tilde mal ubicada del titulo 11 (`Estrat\u00e9ga Comunitario`, con la tilde sobre la "a" equivocada) como deuda FUERA de alcance, porque corregirla arrastra los 7+ espejos. En la implementacion de la Gamificacion v6 (TSK-148) se corrigio de forma explicita en la fuente y se sincronizaron los espejos.

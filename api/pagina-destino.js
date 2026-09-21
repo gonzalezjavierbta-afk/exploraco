@@ -2759,7 +2759,7 @@ module.exports = async function handler(req, res) {
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = COALESCE(af.autor_original_id, af.agregador_id)'
-          + ' WHERE af.activo=true AND a.activo=true AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
+          + ' WHERE af.activo=true AND af.visible=true AND a.activo=true AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
           + '   AND ABS(a.lat-$1) < 0.01 AND ABS(a.lng-$2) < 0.01'
           + ' ORDER BY votos DESC, af.creado_en DESC LIMIT 12',
           [d.lat, d.lng]

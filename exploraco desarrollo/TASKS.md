@@ -11,7 +11,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### Tareas no completadas / estado actual
 
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
-- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028), TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080), TSK-147 (ubicacion por recurso de album + carpetas de guardados + fix de seguridad `scope=mio`; ADR-051/ADR-052, migraciones 029/030 APLICADAS en Neon) y TSK-148 (Gamificacion v6 / ADR-053: `M_nivel` x1.0-x3.0 con doble cap 5.0/10.0, 20 umbrales techo 42000, `xp_ledger`, `gamificacion_config`, `usuarios.nivel_max`, repricing y `?recurso=salud_red`; migracion 031 APLICADA en Neon; backend+smokes COMMITEADOS en `9efbfc7`, frontend/8 espejos en working tree). Verificar commit/deploy real contra el archivo real (ADR-006).
+- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028), TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080), TSK-147 (ubicacion por recurso de album + carpetas de guardados + fix de seguridad `scope=mio`; ADR-051/ADR-052, migraciones 029/030 APLICADAS en Neon), TSK-149 (guardados de media en "Mis Albumes" / ADR-054: carpetas de guardados ELIMINADAS y `media_guardados.album_id`/`visible` con publicacion por guardado; migracion 032 NUEVA **NO aplicada aun en Neon**; `api/interacciones.js` v26 + `api/pagina-destino.js` fix BUG-082 + frontend + smokes; `npm test` 536 PASS / 0 FAIL) y TSK-148 (Gamificacion v6 / ADR-053: `M_nivel` x1.0-x3.0 con doble cap 5.0/10.0, 20 umbrales techo 42000, `xp_ledger`, `gamificacion_config`, `usuarios.nivel_max`, repricing y `?recurso=salud_red`; migracion 031 APLICADA en Neon; backend+smokes COMMITEADOS en `9efbfc7`, frontend/8 espejos en working tree). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **PENDIENTE DE APROBACION del operador:** TSK-140 (documento de analisis AI-DOS v1.1 / Reglas de Oro v5; archivo COMPLETADO en disco).
 - **BLOQUEADA (historica, archivada):** TSK-044 (blog multi-tema); su bloqueo de deploy (TASK-011) figura COMPLETADA, revisar si aplica cierre.
 
@@ -35,6 +35,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad FIX DE RENDER DE MEDIA DEL MAPA CULTURAL + DIAGNOSTICO NEON - 2026-09-21 (BUG-080 / TSK-146)](#prioridad-fix-de-render-de-media-del-mapa-cultural--diagnostico-neon---2026-09-21-bug-080--tsk-146)
 - [Prioridad UBICACION POR RECURSO + CARPETAS DE GUARDADOS + FIX DE SEGURIDAD DEL MAPA - 2026-09-21 (ADR-051 / ADR-052 / BUG-081 / TSK-147)](#prioridad-ubicacion-por-recurso--carpetas-de-guardados--fix-de-seguridad-del-mapa---2026-09-21-adr-051--adr-052--bug-081--tsk-147)
 - [Prioridad GAMIFICACION v6 / ADR-053 - 2026-09-21 (TSK-148)](#prioridad-gamificacion-v6--adr-053---2026-09-21-tsk-148)
+- [Prioridad GUARDADOS DE MEDIA EN "MIS ALBUMES" - 2026-09-21 (ADR-054 / BUG-082 / TSK-149)](#prioridad-guardados-de-media-en-mis-albumes---2026-09-21-adr-054--bug-082--tsk-149)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3318,6 +3319,44 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Deploy (HECHO 2026-09-21):** `main` = `origin/main` = **`d803ce7`** (commits `c875675` migracion/ADR -> `9efbfc7` backend+smokes -> `d803ce7` frontend/8 espejos+UI+admin). Vercel despliega al push; **cache-bust NO requerido** (`vercel.json` sirve todo `/(.*)\.js` con `Cache-Control: no-store`). La migracion 031 esta aplicada en Neon. Residual: verificacion visual en produccion (toast con desglose, barra de progreso, UI de cupo y pestana "Salud de la Red").
 - **Dependencia:** migracion 031 aplicada en Neon (YA) y el resto del working tree 2026-09-20/21 para el deploy conjunto.
 - **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**, ADR-001/ADR-010); NO toca `destinos.tags` (sin campos JSONB nuevos, ADR-003); el "Rising Star Decay" y la tabla `user_action_decay` quedan SUPERSEDIDOS explicitamente; el valor de la credencial de Neon (`.env.local`) NUNCA se documenta (politica de secretos).
+
+## Prioridad GUARDADOS DE MEDIA EN "MIS ALBUMES" - 2026-09-21 (ADR-054 / BUG-082 / TSK-149)
+
+> Cierre del release "Guardados en Mis Albumes" (ADR-054): se ELIMINA el concepto de
+> carpetas privadas de guardados (ADR-052) y los bookmarks de `media_guardados` se
+> organizan en `albumes` propios, con PUBLICACION POR GUARDADO (visible solo en el
+> detalle del album). Sobre el MISMO release: fix de privacidad ALTA **BUG-082** en
+> `api/pagina-destino.js`. Migracion NUEVA **032** (idempotente/ASCII-safe),
+> **NO APLICADA AUN en Neon**. NO crea funciones serverless (**8/8 INTACTO**,
+> ADR-001/ADR-010). Decision: **ADR-054** en DECISIONS.md (Estado actualizado a
+> IMPLEMENTADO en working tree).
+
+### TSK-149: Guardados de media en "Mis Albumes" (ADR-054) + migracion 032 + fix BUG-082 [COMPLETADA en codigo]
+
+- **Estado:** COMPLETADA EN CODIGO (2026-09-21; **working tree, SIN commitear**; deploy pendiente). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (rediseno del modelo de guardados: unifica el concepto de contenedor + fix de privacidad ALTA).
+- **Fecha:** 2026-09-21
+- **Origen:** decision de producto del operador: eliminar las carpetas privadas de guardados (ADR-052) y organizarlos dentro de "Mis Albumes", con publicacion opcional por guardado.
+- **ADR:** DECISIONS.md **ADR-054 (APROBADO + revision de `@architect-review` con condiciones C1-C5)**; supersede el concepto de carpetas de ADR-052 (se conservan sesion firmada y 503 tipado).
+- **Responsable / agentes:** architect/architect-review (diseno + condiciones C1-C5), backend-dev/sql-security-free (`api/interacciones.js` v26 + `api/pagina-destino.js` BUG-082), data-migration (`db/migrations/032`), frontend-tpl/renderer-dev (`mi-perfil.html`, `mymapa.js`), qa-auditor (Escudo GOLD), docs-keeper (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **Migracion 032 / ADR-054:** `db/migrations/032_guardados_album.sql` (NUEVA, idempotente/ASCII-safe, 17152 bytes): agrega `media_guardados.album_id uuid NULL REFERENCES albumes(id) ON DELETE SET NULL` + `visible boolean NOT NULL DEFAULT false` + CHECK `media_guardados_visible_album_chk (visible=false OR album_id IS NOT NULL)` + 2 indices; y **DROP** de `guardados_carpetas` y de `media_guardados.carpeta_id`. **NO APLICADA AUN en Neon.**
+  2. **Backend `api/interacciones.js` v26:** `mis_guardados_media` EXIGE sesion (deriva el dueno del token e ignora `usuario_id` del query), devuelve `albumes[]` + `mi_album_id`/`mi_album_titulo`/`visible` por item y conserva `data[]` (shape de `mymapa.js`) y el 503 `SCHEMA_NOT_MIGRATED` tipado; `guardados_carpeta` se reescribe a `accion=album|publicar` (crear/renombrar/eliminar/mover -> 410 `CARPETAS_DEPRECADAS`; album ajeno -> 404 `ALBUM_NO_ENCONTRADO`; bookmark ajeno -> 404 `GUARDADO_NO_ENCONTRADO`; desasignar fuerza `visible=false` en la MISMA sentencia); `album_detalle` agrega `guardados[]`/`albumes_guardados[]` con invariante de no-fuga; hardening **BUG-061** en `guardar_media`/`quitar_guardado_media`/`album_crear`.
+  3. **Fix de privacidad (BUG-082):** `api/pagina-destino.js` agrega `AND af.visible=true` (L2762) a la consulta de fotos de album por cercania.
+  4. **Frontend:** `mi-perfil.html` (chips/select por album + toggle "Hacer publico" + `fetchConJwt`), `mymapa.js` (Bearer). Escudo GOLD HTML: divs 419/419.
+- **Evidencia (ADR-006):** `db/migrations/032_guardados_album.sql` (17152 bytes, 0 bytes >127); `api/interacciones.js` header v26 L1-6; `api/pagina-destino.js` L2762 (`WHERE af.activo=true AND af.visible=true AND ...`); `scripts/smoke_032_guardados_album.js` (15621 bytes). `git status` (working tree, SIN commitear): `M api/interacciones.js`, `M api/pagina-destino.js`, `M mi-perfil.html`, `M mymapa.js`, `M package.json`, `M scripts/smoke_029_030_coords_carpetas.js`, `M scripts/smoke_036_media_unificada.js`, `?? db/migrations/032_guardados_album.sql`, `?? scripts/smoke_032_guardados_album.js`.
+- **Smokes / verificacion:** NUEVO `scripts/smoke_032_guardados_album.js` (**45 checks**); poda de `scripts/smoke_029_030_coords_carpetas.js` (**42**); `scripts/smoke_036_media_unificada.js` J35 (**90**); `package.json` encadena los 3. **`npm test` = 536 PASS / 0 FAIL (exit 0)**, corrido contra archivo real. Escudo GOLD HTML divs 419/419.
+- **Relacion con bugs:** **BUG-082 NUEVO (CORREGIDO EN CODIGO)** en BUGS_HISTORICOS.md (fuga de privacidad ALTA; viola ADR-039 D.1). Hardening del **BUG-061** (el alias legacy `POST tipo='foto'` sigue confiando en `usuario_id`; ver deuda).
+- **Handoff de migraciones / orden de deploy OBLIGATORIO:** aplicar **032 en Neon -> deploy backend v26 -> frontend**. El DROP de la 032 abre una ventana de 503 para el backend v24/v25 vivo si se aplica ANTES del deploy del backend nuevo (el backend viejo lee `guardados_carpetas`/`carpeta_id` que la 032 elimina).
+- **Pendiente operativo (BLOQUEANTE para produccion):** aplicar la 032 en Neon y desplegar en orden 032 -> backend v26 -> frontend.
+- **Deuda registrada (para NEXT.md) [DEUDA]:**
+  (a) `api/utilidades.js` con 24 backticks + 3 dobles escapes (ADR-002), preexistente.
+  (b) catch vacios preexistentes en `api/interacciones.js` / `api/pagina-destino.js`.
+  (c) alias legacy `POST tipo='foto'` (raiz de BUG-061) sigue confiando en `usuario_id`.
+  (d) `albumes.fotos_count` no suma guardados publicados (v1 solo detalle de album).
+  (e) vocabulario "Carpeta" del Museo (ADR-039) sin unificar.
+- **Dependencia:** working tree del release; migracion 032 sin aplicar en Neon.
+- **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); el DROP de `guardados_carpetas` es irreversible (perdida aceptada de la organizacion previa, ADR-054); la credencial de conexion a Neon (`.env.local`) NUNCA se documenta (politica de secretos).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

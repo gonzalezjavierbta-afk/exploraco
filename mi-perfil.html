@@ -620,8 +620,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
-  <!-- GUARDADOS DE MEDIA (ADR-032 / ADR-052) -->
+  <!-- GUARDADOS DE MEDIA (ADR-032 / ADR-054) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F516; Guardados (fotos y albumes)</div>
+  <div data-tab="museo" style="color:rgba(255,255,255,.35);font-size:11px;margin:-6px 0 12px;">Organizalos en tus Albumes y publicalos si quieres.</div>
   <div id="mis-guardados-media-chips" data-tab="museo" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
   <div id="mis-guardados-media-grid" data-tab="museo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:28px;">
     <p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Cargando guardados...</p>
@@ -709,6 +710,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <button id="album-nueva-foto-btn" onclick="agregarFotoAlbum()" style="margin-top:8px;padding:7px 14px;background:var(--gold);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">+ Agregar foto</button>
       </div>
       <div id="album-det-fotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
+      </div>
+      <div id="album-det-guardados-wrap" style="display:none;margin-top:16px;">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px;">&#x1F516; Guardados organizados aqui</div>
+        <div id="album-det-guardados" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;"></div>
+      </div>
+      <div id="album-det-albumes-wrap" style="display:none;margin-top:16px;">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px;">&#x1F5BC; Albumes guardados aqui</div>
+        <div id="album-det-albumes" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
     </div>
   </div>
@@ -844,7 +853,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
-  <!-- ADR-052: espacio del recurso guardado (media grande + voto + carpeta) -->
+  <!-- ADR-054: espacio del recurso guardado (media grande + voto + album) -->
   <div id="modal-espacio-media" class="pf-museo-modal" onclick="if(event.target===this)misCerrarEspacio()">
     <div class="pf-museo-modal-box">
       <div class="pf-museo-modal-head">
@@ -861,9 +870,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <button type="button" class="pf-museo-btn ghost" id="espacio-media-quitar" onclick="misEspacioQuitar()">&#x1F5D1; Quitar guardado</button>
       </div>
       <div class="pf-museo-field">
-        <label class="pf-museo-lbl" for="espacio-media-carpeta">Carpeta personal</label>
-        <select id="espacio-media-carpeta" class="pf-museo-input" onchange="misEspacioMover(this.value)"></select>
-        <div class="pf-museo-hint">Organiza este guardado. "Sin carpeta" lo saca de toda carpeta.</div>
+        <label class="pf-museo-lbl" for="espacio-media-album">Album</label>
+        <select id="espacio-media-album" class="pf-museo-input" onchange="misEspacioMover(this.value)"></select>
+        <div class="pf-museo-hint">Organiza este guardado en tus Albumes. Sin album queda suelto.</div>
+      </div>
+      <div class="pf-museo-field">
+        <label class="pf-museo-check"><input type="checkbox" id="espacio-media-publico" onchange="misEspacioPublicar(this.checked)"> Hacer publico este guardado</label>
+        <div class="pf-museo-hint">Solo se puede publicar dentro de un album; otros lo veran al abrir ese album.</div>
       </div>
       <div id="espacio-media-msg" class="pf-museo-form-msg" style="display:none"></div>
       <div class="pf-museo-actions">
@@ -1126,7 +1139,7 @@ function renderPerfil() {
   if (btnAlbum) btnAlbum.style.display = 'block';
   cargarMisAlbumes();
 
-  /* guardados de media del museo propio (ADR-032 / ADR-052) */
+  /* guardados de media del museo propio (ADR-032 / ADR-054) */
   misBindGridGuardados();
   cargarMisGuardadosMedia();
 
@@ -1978,25 +1991,27 @@ function mediaCardHTML(m, opts) {
     + '</div></div>';
 }
 
-/* ADR-052: caches de la rejilla de guardados + filtro de carpeta activo. */
-var misGuardadosCache = { data: [], carpetas: [] };
+/* ADR-054: caches de la rejilla de guardados + filtro de album activo. */
+var misGuardadosCache = { data: [], albumes: [] };
 var misGuardadosFiltro = '';
 var misEspacioItem = null;
+/* ADR-054: true cuando "Nuevo album" se lanzo desde los chips de Guardados. */
+var misFiltroAlbumNuevo = false;
 
 /* Una sola tarjeta de guardado (Regla de No-Duplicidad). */
 function misGuardadoCard(m) { return mediaCardHTML(m, { quitar: true, clickable: true }); }
 function misRenderListaGuardados(lista) { return lista.map(misGuardadoCard).join(''); }
 function misFiltrarGuardados(lista) {
   if (!misGuardadosFiltro) return lista;
-  if (misGuardadosFiltro === '__sin__') return lista.filter(function(m){ return !m.carpeta_id; });
-  return lista.filter(function(m){ return String(m.carpeta_id || '') === misGuardadosFiltro; });
+  if (misGuardadosFiltro === '__sin__') return lista.filter(function(m){ return !m.mi_album_id; });
+  return lista.filter(function(m){ return String(m.mi_album_id || '') === misGuardadosFiltro; });
 }
 function misGuardadosVacioHtml() {
-  var txt = misGuardadosFiltro ? 'No hay guardados en esta carpeta.' : 'Aun no has guardado fotos de la comunidad.';
+  var txt = misGuardadosFiltro ? 'No hay guardados en este album.' : 'Aun no has guardado fotos de la comunidad.';
   return '<p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">' + txt + '</p>';
 }
 
-/* Chips de carpeta (Todas / Sin carpeta / cada carpeta) + Nueva carpeta. */
+/* Chips de album (Todos / Sin album / cada album) + Nuevo album. */
 function misChipHtml(val, txt) {
   var on = String(misGuardadosFiltro) === String(val);
   var estilo = on
@@ -2007,10 +2022,15 @@ function misChipHtml(val, txt) {
 function pintarChipsGuardados() {
   var box = document.getElementById('mis-guardados-media-chips');
   if (!box) return;
-  var html = misChipHtml('', 'Todas') + misChipHtml('__sin__', 'Sin carpeta');
-  (misGuardadosCache.carpetas || []).forEach(function(c){ html += misChipHtml(String(c.id), c.nombre || 'Carpeta'); });
-  html += '<button type="button" onclick="misNuevaCarpeta()" style="padding:5px 11px;border-radius:999px;cursor:pointer;font-family:Outfit,sans-serif;font-size:11px;font-weight:700;background:transparent;color:var(--gold);border:1px dashed rgba(232,160,32,.5);">+ Nueva carpeta</button>';
+  var html = misChipHtml('', 'Todos') + misChipHtml('__sin__', 'Sin album');
+  (misGuardadosCache.albumes || []).forEach(function(c){ html += misChipHtml(String(c.id), c.titulo || 'Album'); });
+  html += '<button type="button" onclick="misNuevoAlbumDesdeChips()" style="padding:5px 11px;border-radius:999px;cursor:pointer;font-family:Outfit,sans-serif;font-size:11px;font-weight:700;background:transparent;color:var(--gold);border:1px dashed rgba(232,160,32,.5);">+ Nuevo album</button>';
   box.innerHTML = html;
+}
+/* Chips de Guardados: crea un album y deja el filtro en el album nuevo. */
+function misNuevoAlbumDesdeChips() {
+  misFiltroAlbumNuevo = true;
+  abrirModalCrearAlbum();
 }
 function misSetFiltroGuardados(val) {
   misGuardadosFiltro = String(val || '');
@@ -2025,19 +2045,20 @@ function cargarMisGuardadosMedia() {
   cargarMediaGrid({ gridId: 'mis-guardados-media-grid', tipo: 'mis_guardados_media', quitar: true, clickable: true,
     cargando: 'Cargando guardados...',
     vacio: 'Aun no has guardado fotos de la comunidad.',
-    vacioFiltro: 'No hay guardados en esta carpeta.',
+    vacioFiltro: 'No hay guardados en este album.',
     error: 'No se pudieron cargar tus guardados.',
     render: misRenderListaGuardados,
     filtro: misFiltrarGuardados,
     onData: function(data) {
       misGuardadosCache.data = (data && data.data) ? data.data : [];
-      misGuardadosCache.carpetas = (data && data.carpetas) ? data.carpetas : [];
+      misGuardadosCache.albumes = (data && data.albumes) ? data.albumes : [];
       pintarChipsGuardados();
     } });
 }
 
 /* Loader generico de rejillas de media: un solo camino de fetch/estado
-   para mis_guardados_media (Regla de No-Duplicidad). */
+   para mis_guardados_media (Regla de No-Duplicidad). Bearer obligatorio
+   (ADR-054/C4): el backend deriva el dueno del token, no del query. */
 function cargarMediaGrid(cfg) {
   if (!window.ExploraCO || !window.ExploraCO.usuario) return;
   var grid = document.getElementById(cfg.gridId);
@@ -2045,11 +2066,11 @@ function cargarMediaGrid(cfg) {
   var estilo = 'color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;';
   function mensaje(txt) { if (grid) grid.innerHTML = '<p style="' + estilo + '">' + txt + '</p>'; }
   mensaje(cfg.cargando);
-  fetch('/api/interacciones?tipo=' + cfg.tipo + '&usuario_id=' + encodeURIComponent(window.ExploraCO.usuario.id))
-    .then(function(r){ return r.json(); })
+  fetchConJwt('/api/interacciones?tipo=' + cfg.tipo)
     .then(function(data) {
       if (!grid) return;
       if (cfg.onData) cfg.onData(data || {});
+      if (data && data.error) { mensaje(misGuardadoErrorTexto(data.error) || cfg.error); return; }
       if (!data || !data.ok || !data.data || !data.data.length) { mensaje(cfg.vacio); return; }
       var lista = cfg.filtro ? cfg.filtro(data.data) : data.data;
       if (!lista.length) { mensaje(cfg.vacioFiltro || cfg.vacio); return; }
@@ -2060,9 +2081,8 @@ function cargarMediaGrid(cfg) {
 
 function quitarGuardadoMedia(fuente, itemId) {
   if (!window.ExploraCO || !window.ExploraCO.usuario) return;
-  fetch('/api/interacciones', {
+  fetchConJwt('/api/interacciones', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       tipo: 'quitar_guardado_media',
       usuario_id: window.ExploraCO.usuario.id,
@@ -2070,13 +2090,12 @@ function quitarGuardadoMedia(fuente, itemId) {
       item_id: itemId
     })
   })
-    .then(function(r){ return r.json(); })
     .then(function(d) {
       if (d && d.ok) {
         if (typeof showToast === 'function') showToast('Guardado eliminado');
         cargarMisGuardadosMedia();
       } else if (typeof toastError === 'function') {
-        toastError((d && d.error) || 'No se pudo quitar el guardado');
+        toastError(misGuardadoErrorTexto(d && d.error) || 'No se pudo quitar el guardado');
       }
     })
     .catch(function() {
@@ -2084,44 +2103,61 @@ function quitarGuardadoMedia(fuente, itemId) {
     });
 }
 
-/* --- ADR-052: espacio del recurso guardado ---------------------------- */
+/* --- ADR-054: espacio del recurso guardado ---------------------------- */
 
-/* POST unico de carpetas personales via fetchConJwt (Bearer + retry 401).
-   El backend responde 409 CARPETA_DUPLICADA / 503 SCHEMA_NOT_MIGRATED. */
-function misPostCarpeta(body, exito, errorFn) {
+/* POST unico de organizacion de guardados via fetchConJwt (Bearer + retry 401).
+   El backend responde 409 SIN_ALBUM / 410 CARPETAS_DEPRECADAS / 404 ... */
+function misPostGuardado(body, exito, errorFn) {
   fetchConJwt('/api/interacciones?tipo=guardados_carpeta', { method: 'POST', body: JSON.stringify(body) })
     .then(function(res){
       if (res && res.ok) { exito(res); return; }
       var msg = (res && res.error) ? res.error : 'No se pudo completar la operacion';
-      if (errorFn) errorFn(msg); else misCarpetaError(msg);
+      if (errorFn) errorFn(msg); else misGuardadoError(msg);
     })
-    .catch(function(){ misCarpetaError('Error de conexion'); });
+    .catch(function(){ misGuardadoError('Error de conexion'); });
 }
 
-/* Errores de carpetas tipados, nunca en silencio. */
-function misCarpetaError(msg) {
-  var txt = 'No se pudo completar la operacion';
-  if (msg === 'CARPETA_DUPLICADA') txt = 'Ya existe una carpeta con ese nombre.';
-  else if (msg === 'SCHEMA_NOT_MIGRATED') txt = 'Las carpetas no estan disponibles todavia.';
-  else if (msg) txt = msg;
+/* Traduce los codigos del contrato v26 (ADR-054) a texto humano.
+   Un solo mapa, nunca en silencio (Regla de No-Duplicidad). */
+function misGuardadoErrorTexto(msg) {
+  if (msg === 'CARPETAS_DEPRECADAS') return 'Las carpetas ya no se usan: organiza tus guardados en Albumes.';
+  if (msg === 'SIN_ALBUM') return 'Primero asigna un album para poder publicar este guardado.';
+  if (msg === 'ALBUM_NO_ENCONTRADO') return 'El album ya no existe o no es tuyo.';
+  if (msg === 'GUARDADO_NO_ENCONTRADO') return 'Ese guardado ya no existe.';
+  if (msg === 'SESION_REQUERIDA' || msg === 'SESION_EXPIRADA' || msg === 'SESION_INVALIDA') return 'Inicia sesion para gestionar tus guardados.';
+  if (msg === 'SCHEMA_NOT_MIGRATED') return 'La organizacion de guardados no esta disponible todavia.';
+  return msg || '';
+}
+
+/* Errores de guardados tipados, nunca en silencio. */
+function misGuardadoError(msg) {
+  var txt = misGuardadoErrorTexto(msg) || 'No se pudo completar la operacion';
   var el = document.getElementById('espacio-media-msg');
   if (el) { el.textContent = txt; el.style.display = 'block'; }
   if (typeof showToast === 'function') showToast(txt, '#ef4444');
 }
 
-function misCarpetaOptions(sel) {
-  var html = '<option value="">Sin carpeta</option>';
-  (misGuardadosCache.carpetas || []).forEach(function(c){
+function misAlbumOptions(sel) {
+  var html = '<option value="">Sin album</option>';
+  (misGuardadosCache.albumes || []).forEach(function(c){
     html += '<option value="' + esc(c.id) + '"' + (String(c.id) === String(sel) ? ' selected' : '') + '>'
-      + esc(c.nombre || 'Carpeta') + '</option>';
+      + esc(c.titulo || 'Album') + '</option>';
   });
-  html += '<option value="__nueva__">Nueva carpeta...</option>';
+  html += '<option value="__nuevo__">Nuevo album...</option>';
   return html;
 }
 
 function misEspacioCargarSelect(m) {
-  var sel = document.getElementById('espacio-media-carpeta');
-  if (sel) sel.innerHTML = misCarpetaOptions(m ? m.carpeta_id : '');
+  var sel = document.getElementById('espacio-media-album');
+  if (sel) sel.innerHTML = misAlbumOptions(m ? m.mi_album_id : '');
+}
+
+/* ADR-054: sincroniza select de album + toggle de publicacion con el item.
+   El toggle queda disabled sin album (no se puede publicar fuera de album). */
+function misEspacioSync(m) {
+  misEspacioCargarSelect(m);
+  var pub = document.getElementById('espacio-media-publico');
+  if (pub) { pub.checked = !!m.visible; pub.disabled = !m.mi_album_id; }
 }
 
 /* Vista grande reutilizando el helper compartido de preview del Museo. */
@@ -2150,7 +2186,7 @@ function misAbrirEspacio(fuente, itemId) {
   if (prev) prev.innerHTML = misEspacioPreview(m);
   var msg = document.getElementById('espacio-media-msg');
   if (msg) { msg.textContent = ''; msg.style.display = 'none'; }
-  misEspacioCargarSelect(m);
+  misEspacioSync(m);
   /* media_voto NO admite fuente 'album': se oculta el boton. */
   var voto = document.getElementById('espacio-media-voto');
   if (voto) {
@@ -2189,64 +2225,77 @@ function misEspacioQuitar() {
   quitarGuardadoMedia(m.fuente, m.item_id);
 }
 
-/* Mueve el guardado y recarga la rejilla conservando el filtro activo. */
-function misEspacioMoverA(m, carpetaId) {
+/* Asigna/quita el album del guardado SIN cerrar el modal: deja el toggle
+   listo para publicar en el mismo gesto (ADR-054). */
+function misEspacioMoverA(m, albumId) {
   var u = window.ExploraCO && window.ExploraCO.usuario;
-  if (!u || !u.id) { misCarpetaError('Sesion requerida'); return; }
-  misPostCarpeta({
-    accion: 'mover', usuario_id: String(u.id),
+  if (!u || !u.id) { misGuardadoError('SESION_REQUERIDA'); return; }
+  misPostGuardado({
+    accion: 'album', usuario_id: String(u.id),
     fuente: m.fuente, item_id: String(m.item_id),
-    carpeta_id: carpetaId || null
+    album_id: albumId || null
   }, function(){
-    if (typeof showToast === 'function') showToast(carpetaId ? 'Guardado movido de carpeta' : 'Guardado sin carpeta');
-    misCerrarEspacio();
+    m.mi_album_id = albumId || null;
+    /* El backend fuerza visible=false al desasignar; se refleja localmente. */
+    if (!albumId) m.visible = false;
+    misEspacioSync(m);
+    if (typeof showToast === 'function') showToast(albumId ? 'Guardado organizado en el album' : 'Guardado sin album');
     cargarMisGuardadosMedia();
-  }, function(msg){ misCarpetaError(msg); misEspacioCargarSelect(m); });
+  }, function(msg){ misGuardadoError(msg); misEspacioCargarSelect(m); });
 }
 
 function misEspacioMover(val) {
   var m = misEspacioItem;
   if (!m) return;
   var u = window.ExploraCO && window.ExploraCO.usuario;
-  if (!u || !u.id) { misCarpetaError('Sesion requerida'); return; }
-  if (val === '__nueva__') {
-    var nombre = (window.prompt('Nombre de la nueva carpeta:') || '').trim();
-    if (!nombre) { misEspacioCargarSelect(m); return; }
-    misPostCarpeta({ accion: 'crear', usuario_id: String(u.id), nombre: nombre }, function(res){
-      if (typeof showToast === 'function') showToast('Carpeta creada');
-      var nueva = (res.carpeta && res.carpeta.id) ? String(res.carpeta.id) : '';
-      if (nueva) misEspacioMoverA(m, nueva); else { misCerrarEspacio(); cargarMisGuardadosMedia(); }
-    }, function(msg){ misCarpetaError(msg); misEspacioCargarSelect(m); });
+  if (!u || !u.id) { misGuardadoError('SESION_REQUERIDA'); return; }
+  if (val === '__nuevo__') {
+    /* ADR-054: reutiliza el modal de crear album. Se oculta el espacio
+       (z-index 1300) sin perder misEspacioItem; al crear se asignara. */
+    var esp = document.getElementById('modal-espacio-media');
+    if (esp) esp.classList.remove('open');
+    abrirModalCrearAlbum();
     return;
   }
   misEspacioMoverA(m, val || '');
 }
 
-/* Nueva carpeta desde los chips (sin mover ningun guardado). */
-function misNuevaCarpeta() {
+/* ADR-054: publica/oculta el guardado (solo dentro de un album). */
+function misEspacioPublicar(checked) {
+  var m = misEspacioItem;
+  if (!m) return;
   var u = window.ExploraCO && window.ExploraCO.usuario;
-  if (!u || !u.id) { misCarpetaError('Sesion requerida'); return; }
-  var nombre = (window.prompt('Nombre de la nueva carpeta:') || '').trim();
-  if (!nombre) return;
-  misPostCarpeta({ accion: 'crear', usuario_id: String(u.id), nombre: nombre }, function(res){
-    if (typeof showToast === 'function') showToast('Carpeta creada');
-    if (res.carpeta && res.carpeta.id) misGuardadosFiltro = String(res.carpeta.id);
+  if (!u || !u.id) { misGuardadoError('SESION_REQUERIDA'); return; }
+  misPostGuardado({
+    accion: 'publicar', usuario_id: String(u.id),
+    fuente: m.fuente, item_id: String(m.item_id),
+    visible: !!checked
+  }, function(){
+    m.visible = !!checked;
+    if (typeof showToast === 'function') showToast(checked ? 'Guardado publicado' : 'Guardado oculto');
     cargarMisGuardadosMedia();
-  }, function(msg){ misCarpetaError(msg); });
+  }, function(msg){
+    misGuardadoError(msg);
+    var pub = document.getElementById('espacio-media-publico');
+    if (pub) pub.checked = !!m.visible;
+  });
 }
 
-/* Un solo listener delegado: la tarjeta abre el espacio del recurso.
-   Los controles internos (Quitar, select) no disparan el modal. */
+/* Un solo listener delegado (rejilla de guardados + guardados del detalle
+   de album): la tarjeta abre el espacio del recurso. Los controles internos
+   (Quitar, select) no disparan el modal. */
 function misBindGridGuardados() {
-  var grid = document.getElementById('mis-guardados-media-grid');
-  if (!grid) return;
-  grid.addEventListener('click', function(ev){
-    var t = ev.target;
-    if (!t || typeof t.closest !== 'function') return;
-    if (t.closest('button, a, select, input')) return;
-    var card = t.closest('[data-fuente][data-item-id]');
-    if (!card || !grid.contains(card)) return;
-    misAbrirEspacio(card.getAttribute('data-fuente'), card.getAttribute('data-item-id'));
+  ['mis-guardados-media-grid', 'album-det-guardados'].forEach(function(id){
+    var grid = document.getElementById(id);
+    if (!grid) return;
+    grid.addEventListener('click', function(ev){
+      var t = ev.target;
+      if (!t || typeof t.closest !== 'function') return;
+      if (t.closest('button, a, select, input')) return;
+      var card = t.closest('[data-fuente][data-item-id]');
+      if (!card || !grid.contains(card)) return;
+      misAbrirEspacio(card.getAttribute('data-fuente'), card.getAttribute('data-item-id'));
+    });
   });
 }
 
@@ -2660,6 +2709,22 @@ function abrirModalCrearAlbum() {
 function cerrarModalCrearAlbum() {
   var modal = document.getElementById('modal-crear-album');
   if (modal) modal.style.display = 'none';
+  misFiltroAlbumNuevo = false;
+  /* ADR-054: si se abrio desde el espacio de un guardado, reabre el
+     espacio con su album vigente (cancelar no pierde el contexto). */
+  if (misEspacioItem) {
+    misEspacioSync(misEspacioItem);
+    var esp = document.getElementById('modal-espacio-media');
+    if (esp) esp.classList.add('open');
+  }
+}
+
+/* Limpia el formulario del modal de crear album (Regla de No-Duplicidad). */
+function limpiarFormCrearAlbum() {
+  ['album-titulo', 'album-descripcion', 'album-ciudad', 'album-portada', 'album-lat', 'album-lng'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
 }
 
 function crearAlbum() {
@@ -2672,9 +2737,11 @@ function crearAlbum() {
   var latNum = parseFloat(latRaw);
   var lngNum = parseFloat(lngRaw);
   var tieneCoords = isFinite(latNum) && isFinite(lngNum);
-  fetch('/api/interacciones?tipo=album_crear', {
+  /* ADR-054: guardado en curso y filtro de chips, capturados antes del POST. */
+  var pendiente = misEspacioItem;
+  var filtroNuevo = misFiltroAlbumNuevo;
+  fetchConJwt('/api/interacciones?tipo=album_crear', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       usuario_id: uid,
       titulo: titulo,
@@ -2686,24 +2753,40 @@ function crearAlbum() {
       lng: tieneCoords ? lngNum : null
     })
   })
-  .then(function(r){ return r.json(); })
   .then(function(d) {
-    if (d.ok) {
+    if (d && d.ok) {
+      var nuevoId = (d.album && d.album.id) ? String(d.album.id) : '';
+      /* Cache local del album nuevo: el select lo muestra seleccionado antes
+         de que resuelva el refresco de la rejilla. */
+      if (nuevoId && !misGuardadosCache.albumes.some(function(a){ return String(a.id) === nuevoId; }))
+        misGuardadosCache.albumes.unshift({ id: nuevoId, titulo: titulo, tipo: document.getElementById('album-tipo').value || 'fotos' });
+      if (pendiente && nuevoId) pendiente.mi_album_id = nuevoId;
       cerrarModalCrearAlbum();
-      document.getElementById('album-titulo').value = '';
-      document.getElementById('album-descripcion').value = '';
-      document.getElementById('album-ciudad').value = '';
-      document.getElementById('album-portada').value = '';
-      document.getElementById('album-lat').value = '';
-      document.getElementById('album-lng').value = '';
+      limpiarFormCrearAlbum();
       cargarMisAlbumes();
       if (d.misiones && d.misiones.length) {
         d.misiones.forEach(function(m) {
           if (typeof showToast === 'function') showToast('Mision completada: ' + m.nombre);
         });
       }
+      if (pendiente && nuevoId) {
+        /* Asigna el guardado y deja el modal ABIERTO con el toggle habilitado
+           (cerrarModalCrearAlbum ya reabrio el espacio y sincronizo el toggle). */
+        misPostGuardado({
+          accion: 'album', usuario_id: String(uid),
+          fuente: pendiente.fuente, item_id: String(pendiente.item_id),
+          album_id: nuevoId
+        }, function(){
+          if (typeof showToast === 'function') showToast('Guardado organizado en el album nuevo');
+          cargarMisGuardadosMedia();
+        }, function(msg){ misGuardadoError(msg); misEspacioCargarSelect(pendiente); });
+      } else {
+        /* Chips de Guardados: deja el filtro en el album recien creado. */
+        if (filtroNuevo && nuevoId) misGuardadosFiltro = nuevoId;
+        cargarMisGuardadosMedia();
+      }
     } else {
-      alert(d.error || 'Error al crear album');
+      alert((d && d.error) ? (misGuardadoErrorTexto(d.error) || d.error) : 'Error al crear album');
     }
   })
   .catch(function() { alert('Error de conexion'); });
@@ -2735,13 +2818,50 @@ function usarMiUbicacionAlbum(idLat, idLng, btn) {
    el id sin re-pedirlo. Re-render tras cada accion. */
 window._albumDetalleActual = null;
 
+/* ADR-054: guardados organizados en el album (reutiliza mediaCardHTML).
+   Normaliza el shape del backend (origen_fuente/id) al del helper. */
+function renderDetalleGuardados(lista) {
+  var wrap = document.getElementById('album-det-guardados-wrap');
+  var box = document.getElementById('album-det-guardados');
+  if (!wrap || !box) return;
+  if (!lista.length) { wrap.style.display = 'none'; box.innerHTML = ''; return; }
+  var badge = '<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);border-radius:4px;padding:2px 5px;font-size:10px;">&#x1F516;</span>';
+  box.innerHTML = lista.map(function(g){
+    return mediaCardHTML({
+      fuente: g.origen_fuente, item_id: g.id,
+      foto_url: g.foto_url, foto_type: g.foto_type,
+      media_url: g.foto_url, media_type: g.foto_type,
+      media_title: g.media_title, titulo: g.media_title, votos: g.votos
+    }, { clickable: true, badgeHtml: badge });
+  }).join('');
+  wrap.style.display = 'block';
+}
+
+/* ADR-054: bookmarks de albums enteros organizados en este album. */
+function renderDetalleAlbumesGuardados(lista) {
+  var wrap = document.getElementById('album-det-albumes-wrap');
+  var box = document.getElementById('album-det-albumes');
+  if (!wrap || !box) return;
+  if (!lista.length) { wrap.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = lista.map(function(a){
+    var portada = a.portada_url
+      ? '<img src="' + esc(a.portada_url) + '" style="width:34px;height:34px;object-fit:cover;border-radius:6px;" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<span style="font-size:18px;">&#x1F5BC;</span>';
+    return '<a href="javascript:void(0)" onclick="verDetalleAlbum(\'' + esc(a.id) + '\')" style="display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#fff;text-decoration:none;font-size:13px;font-family:Outfit,sans-serif;">'
+      + portada
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.titulo || 'Album') + '</span>'
+      + '<span style="color:var(--gold);font-size:11px;">&#x1F516;</span></a>';
+  }).join('');
+  wrap.style.display = 'block';
+}
+
 function verDetalleAlbum(albumId) {
   var ses = (window.ExploraCO && window.ExploraCO.usuario) || null;
   var uid = ses ? ses.id : null;
   var qs = '/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId);
   if (uid) qs += '&usuario_id=' + encodeURIComponent(uid);
-  fetch(qs)
-    .then(function(r){ return r.json(); })
+  /* ADR-054/C4: Bearer para que el dueno vea sus guardados[] privados. */
+  fetchConJwt(qs)
     .then(function(data) {
       if (!data || !data.ok) {
         toastError((data && data.error) ? data.error : 'No se pudo cargar el album');
@@ -2749,12 +2869,15 @@ function verDetalleAlbum(albumId) {
       }
       var album = data.album;
       var fotos = data.fotos || [];
+      var guardados = data.guardados || [];
+      var albumesGuardados = data.albumes_guardados || [];
       window._albumDetalleActual = album;
       var esCreador = uid && String(album.usuario_id) === String(uid);
       document.getElementById('album-det-titulo').textContent = album.titulo || '';
       document.getElementById('album-det-info').textContent =
         (album.descripcion || 'Sin descripcion') + ' | '
         + fotos.length + ' fotos | '
+        + (guardados.length ? guardados.length + ' guardados | ' : '')
         + (album.ciudad || 'Sin ubicacion')
         + (album.lat && album.lng ? '' : ' | &#x26A0; Sin mapa');
       var acciones = document.getElementById('album-det-acciones');
@@ -2811,6 +2934,8 @@ function verDetalleAlbum(albumId) {
         }
         grid.appendChild(cell);
       });
+      renderDetalleGuardados(guardados);
+      renderDetalleAlbumesGuardados(albumesGuardados);
       document.getElementById('modal-detalle-album').style.display = 'flex';
     })
     .catch(function(err){

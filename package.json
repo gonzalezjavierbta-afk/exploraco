@@ -2,7 +2,7 @@
   "name": "exploraco",
   "version": "1.0.0",
   "scripts": {
-    "test": "node scripts/smoke_gamificacion_v6.js && node scripts/smoke_niveles_espejos.js && node scripts/smoke_test_gamificacion_v4.js && node scripts/smoke_038_casas_clases.js && node scripts/smoke_021_xp_decimal_rankings.js && node scripts/smoke_036_compartir.js && node scripts/smoke_visita_geocerca.js && node scripts/smoke_niveles_data.js",
+    "test": "node scripts/smoke_gamificacion_v6.js && node scripts/smoke_niveles_espejos.js && node scripts/smoke_test_gamificacion_v4.js && node scripts/smoke_038_casas_clases.js && node scripts/smoke_021_xp_decimal_rankings.js && node scripts/smoke_036_compartir.js && node scripts/smoke_visita_geocerca.js && node scripts/smoke_niveles_data.js && node scripts/smoke_029_030_coords_carpetas.js && node scripts/smoke_036_media_unificada.js && node scripts/smoke_032_guardados_album.js",
     "smoke:gamificacion": "node scripts/smoke_gamificacion_v6.js && node scripts/smoke_test_gamificacion_v4.js && node scripts/smoke_038_casas_clases.js && node scripts/smoke_021_xp_decimal_rankings.js && node scripts/smoke_036_compartir.js && node scripts/smoke_visita_geocerca.js",
     "smoke:espejos": "node scripts/smoke_niveles_espejos.js"
   },

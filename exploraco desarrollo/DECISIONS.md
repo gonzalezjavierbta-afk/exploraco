@@ -2674,7 +2674,7 @@ El pin por recurso es la unica forma de representar un lugar concreto por video/
 
 **ID:** ADR-052
 **Fecha:** 2026-09-21
-**Estado:** **APROBADO** (2026-09-21). Implementado en working tree junto al release `api/interacciones.js` **v24** (SIN commitear; ADR-006 rige: verificar el archivo real). Migracion `db/migrations/030_guardados_carpetas.sql` **APLICADA en Neon el 2026-09-21**. **PENDIENTE: deploy (commit/push + Vercel).**
+**Estado:** **APROBADO** (2026-09-21) `[SUPERSEDED en su concepto de carpetas por ADR-054; se conserva el resto]`. Implementado en working tree junto al release `api/interacciones.js` **v24** (SIN commitear; ADR-006 rige: verificar el archivo real). Migracion `db/migrations/030_guardados_carpetas.sql` **APLICADA en Neon el 2026-09-21**. **PENDIENTE: deploy (commit/push + Vercel).**
 **Autor:** architect (AI-DOS); decision de producto confirmada por el operador.
 **Alcance:** `db/migrations/030_guardados_carpetas.sql` (tabla `guardados_carpetas` + `media_guardados.carpeta_id`), `api/interacciones.js` v24 (GET `mis_guardados_media` + nueva rama POST `?tipo=guardados_carpeta`), `mi-perfil.html` (chips de carpetas + modal). **NO toca el Museo ni `albumes`/`album_fotos`.** Sin endpoints nuevos (8/8, ADR-001).
 
@@ -3091,3 +3091,70 @@ El repricing no es un capricho: sin el, el XP extra que aporta `M_nivel` se trad
 - **Cierres colaterales:** **BUG-002 CERRADO** (`api/pagina-destino.js` backticks 0 y doble escape 0; las lineas `:1646` y `:2473` son las limpiadas) y cierre del **doble toast de XP** de `NEXT.md:246` (deduplicacion en la UI). **Deuda abierta registrada:** `spot_atributos` "nunca al creador" no enforceable sin `destinos.creado_por`; contrato `estado_cupo` aun no expuesto por el backend; >100 fichas estaticas legacy con XP inline en `localStorage`; `smoke_test_epic_prompt.js` con 4 FAIL preexistentes (DQ-2); `gamificacion_config` no parametriza umbrales (R-6); techo 42000 sin datos de calibracion; migraciones **027 y 028 siguen SIN aplicar**.
 
 **ADRs relacionados:** ADR-001 (8/8 endpoints; extender `api/admin.js` por `?recurso=` y `api/usuarios.js` por `?tipo=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / MERGE JSONB / no reescribir acumuladores historicos), ADR-006 (baseline = archivo real; auditoria de BD provista por el operador), ADR-008 (esquema versionado e idempotente), ADR-014/ADR-018 (milestones y gamificacion v4: niveles, consumibles, influencia global; de-nivel preservado por Enmienda 1), ADR-024 (presencia fisica y caps de visita), ADR-025 (sesion firmada en mutaciones), ADR-028 (gaming v5.0: facciones, Casas, consumibles, misiones), ADR-033 (factor de area de visita), ADR-034 (ficha por modulos), ADR-035 (XP numeric(12,2) y helpers `red2`/`numXp`/`fmtXp`), ADR-036 (compartir con tope 50/24h), ADR-038 (factor de nivelacion de Casa, clases Rising Star, `calcularXpFinal` y `acreditarClaseYCofre`; el x0.85 de Casa dominante se preserva), ADR-040 (fuente unica cliente `niveles-data.js`, hoy incumplida), ADR-042 (migracion 027 `precio_xp_base`/`consumibles_precio`, NO aplicada), BUG-021/BUG-060 (patron migracion-antes-de-deploy y columna no versionada), BUG-061 (spoofing de usuario_id), BUG-081, NEXT.md:246 (doble toast), AGENTS.md 2.1 (Regla de No-Duplicidad) y 2.2 (prohibicion de catch vacio).
+
+---
+
+## ADR-054: Guardados de media dentro de "Mis Albumes" (supersede el concepto de carpetas privadas de ADR-052)
+
+**ID:** ADR-054
+**Fecha:** 2026-09-21
+**Estado:** **APROBADO (2026-09-21)** por `@architect-review` (con condiciones; ver "Revision de architect-review" al final del ADR. C1-C5 son BLOQUEANTES para la implementacion). **IMPLEMENTADO en working tree (2026-09-21):** migracion 032 + backend v26 + frontend + smokes; **PENDIENTE aplicar 032 en Neon y deploy en orden 032 -> backend -> frontend.**
+**Autor:** architect (AI-DOS); decision de producto del operador.
+
+**Alcance:** `db/migrations/032_guardados_album.sql` (NUEVA), `api/interacciones.js` (`mis_guardados_media`, `guardados_carpeta`, `album_detalle`, `albumes`, `guardar_media`/`quitar_guardado_media`, `album_crear`), `api/pagina-destino.js`, `mi-perfil.html`, `mymapa.js`. Sin endpoints nuevos (8/8 intacto, ADR-001/ADR-010).
+
+### Problema
+ADR-052 introdujo `guardados_carpetas` como espacio privado paralelo a `albumes`, duplicando el concepto de contenedor ("carpeta" vs "album"), impidiendo publicar y creando un segundo vocabulario en la UI. El operador decide eliminar las carpetas y organizar los guardados en los albumes de "Mis Albumes", con publicacion opcional.
+
+### Opciones evaluadas
+1. FK `media_guardados.album_id` + `visible` por guardado (ELEGIDA).
+2. Copiar/importar el guardado a `album_fotos` (repin). Descartada: contradice el contrato de 019 ("referencia personal, no copia"), duplica datos, pierde votos/comentarios, desincroniza y no puede representar `fuente='album'` (album entero sin `foto_url`).
+3. Tabla puente `album_guardados` (M:N). Descartada por sobredimensionada (tercera tabla media_*, doble JOIN en los lectores, cambio de producto de 1 contenedor a N). Queda como ruta de evolucion documentada.
+
+### Decision
+1. `media_guardados.album_id uuid NULL REFERENCES albumes(id) ON DELETE SET NULL` y `visible boolean NOT NULL DEFAULT false` (migracion 032, aditiva salvo el DROP del punto 6) + `CHECK (visible = false OR album_id IS NOT NULL)` + 2 indices parciales.
+2. Visibilidad POR OBJETO (guardado), nunca por album: coherente con ADR-039, cuya opcion de visibilidad por album fue descartada.
+3. `GET mis_guardados_media` reemplaza `carpetas[]` por `albumes[]`; conserva `data[]` para `mymapa.js`; sigue con 503 SCHEMA_NOT_MIGRATED tipado.
+4. `POST ?tipo=guardados_carpeta` se reutiliza: `accion=album` y `accion=publicar`; `crear|renombrar|eliminar` responden 410 CARPETAS_DEPRECADAS. Sesion firmada obligatoria (se hereda el acierto de ADR-052). Al desasignar album se fuerza `visible=false` (por el CHECK).
+5. `GET album_detalle` fusiona referencias: `guardados[]` (fuentes album_foto/viajero_foto/curada) y `albumes_guardados[]` (`fuente='album'`), con invariante de no-fuga: un guardado jamas se emite si su origen no es publico. El dueno (derivado del token, nunca del query param) ve su organizacion completa. NO se extiende a v1 el perfil publico, Mis Fotos, ni el mapa (deuda documentada).
+6. `guardados_carpetas` y `media_guardados.carpeta_id` se ELIMINAN (DROP) en la migracion 032. El operador acepta explicitamente perder la organizacion previa en carpetas; el preflight solo reporta el conteo por NOTICE. Rollback lossy documentado.
+7. Endurecimiento incluido (BUG-061): `validarSesion` en `guardar_media`, `quitar_guardado_media` y `album_crear`; y sesion obligatoria en `mis_guardados_media`.
+8. Fix colateral obligatorio (BUG-082): `api/pagina-destino.js` debe agregar `AND af.visible = true` (violacion de ADR-039 D.1).
+
+### Justificacion
+Es el unico modelo que unifica sin duplicar datos, honra el contrato fundacional de `media_guardados` (referencia, no copia), conserva la PK `(usuario_id, fuente, item_id)` y el shape que consume `mymapa.js`, y no toca el presupuesto de funciones serverless. Filtrar el origen en tiempo de lectura vuelve la publicacion segura por construccion (revocacion implicita).
+
+### Consecuencias
+Positivas: un solo vocabulario (album), publicacion por objeto, cero duplicacion, reversible salvo el DROP de carpetas.
+Negativas/riesgos: `album_detalle` gana polimorfismo y sesion opcional; `albumes.fotos_count` pasa a subconsulta con filtro de origen (revisar plan de ejecucion); la publicacion depende de la visibilidad del origen; el DROP de `guardados_carpetas` es irreversible y descarta organizacion previa; deuda de mapa/conteo publico.
+
+**ADRs relacionados:** ADR-052 (superseded en su concepto de carpetas; se conservan sesion firmada y 503 tipado), ADR-032/ADR-036, ADR-039 (visibilidad por objeto; D.1), ADR-051, ADR-017/ADR-008, ADR-003/ADR-002/ADR-001/ADR-006, ADR-025. Bugs: BUG-061, BUG-081, BUG-082.
+
+---
+
+### Revision de architect-review: ADR-054 (2026-09-21)
+
+**Veredicto: APROBADO CON CONDICIONES.** Segunda opinion de `@architect-review` contra archivo real (ADR-006). El modelo elegido (Opcion 1: FK `media_guardados.album_id` + `visible` por guardado) es el correcto: unifica el concepto de contenedor sin duplicar datos, honra el contrato de referencia (no copia) de ADR-032/019, conserva la PK `(usuario_id, fuente, item_id)` y el shape `data[]` que consume `mymapa.js`, mantiene visibilidad POR OBJETO (ADR-039) y no toca el presupuesto 8/8 (ADR-001/ADR-010; verificado: `api/` sigue con 8 archivos). Las opciones 2 (repin) y 3 (tabla puente) quedan bien descartadas.
+
+**Evidencia verificada (baseline real):**
+- `api/interacciones.js` L5385-5437 (`mis_guardados_media`: hoy usa `req.query.usuario_id` sin sesion + `LEFT JOIN guardados_carpetas` + `carpetas[]`); L7764-7883 (`guardados_carpeta`, ya con `validarSesion`); L7711-7757 (`guardar_media`/`quitar_guardado_media` SIN `validarSesion`; DEUDA (BUG-061) declarada en L7709-7710); L7367-7422 (`album_crear` sin `validarSesion`); L4704-4772 (`album_detalle` publico; filtra `af.visible=true` en `fotos[]` pero NO en la consulta de `ya_guardado`); L4660-4701 (`albumes`, `fotos_count` por subconsulta); L3162-3190 (`resolverMediaItem` NO filtra `af.visible` en la rama `album_foto`); L3130-3143 (`esEsquemaFaltante`/`normalizarNombreCarpeta`).
+- `api/pagina-destino.js` L2759-2766: confirma la violacion de ADR-039 D.1 (el `WHERE` tiene `af.activo=true AND a.activo=true` y le FALTA `af.visible=true`). El diagnostico de BUG-082 es real.
+- `mymapa.js` L103-105 (`getJson` sin `Authorization`) y L214 (`mis_guardados_media&usuario_id=`); shape consumido = `d.data[].fuente/item_id` (compatible con el ADR).
+- `mi-perfil.html` L2048 (`cargarMediaGrid` sin Bearer), L2061-2085 (`quitarGuardadoMedia` sin Bearer), L2675 (`crearAlbum` sin Bearer); L1982-2037 (caches `carpetas`/`carpeta_id` de ADR-052, a reemplazar).
+- Clientes YA compatibles con sesion obligatoria: `media-actions.js` L81-99/L221 (`postJson(..., true)` con `authHeaders`) y `mapa-cultural.js` L1463-1478 (`jsonAuthHeaders`).
+- `BUG-082` NO esta registrado en `BUGS_HISTORICOS.md` (el ultimo es BUG-081).
+
+**Condiciones BLOQUEANTES para la implementacion (C1-C5):**
+- **C1 (no-fuga a no-duenos).** La Decision 5 solo redacta el invariante de ORIGEN. Falta la clausula de `visible`: a un NO-dueno (`album_detalle` es PUBLICO) solo se le emiten guardados con `visible=true` Y origen publico; el dueno (sub del token == `albumes.usuario_id`) ve su organizacion completa. Sin esa clausula, se expondrian los bookmarks no publicados del dueno. Amendar la Decision 5 con el filtro `visible=true` para no-duenos.
+- **C2 (IDOR de escritura al publicar).** `accion=album`/`accion=publicar` deben validar (a) que `album_id` pertenece al usuario de la sesion y esta `activo=true`, y (b) que el `media_guardados` objetivo es del mismo usuario. Sin (a) se puede publicar dentro de un album ajeno.
+- **C3 (desasignar album).** El `CHECK (visible=false OR album_id IS NOT NULL)` no "fuerza": RECHAZA (23514). El UPDATE de desasignacion debe ser atomico `SET album_id=NULL, visible=false` en la MISMA sentencia; si no, cae al catch generico como 500. Corregir la redaccion de la Decision 4 ("por el CHECK").
+- **C4 (clientes con Bearer).** Con sesion obligatoria hay que migrar a `fetchConJwt`/`authHeaders`: `mi-perfil.html` L2048, L2061 y L2675, y `mymapa.js` L103-105/L214 (hoy `cargarGuardados` fallaria en silencio y el mapa personal perderia los pines de guardados). `media-actions.js` L221 y `mapa-cultural.js` L1476 ya cumplen.
+- **C5 (smokes / gating de PR, AGENTS.md 2.4).** Actualizar `scripts/smoke_029_030_coords_carpetas.js` (checks E1-E6, F1-F13 y G8-G11 afirman el contrato ADR-052 que se elimina) y `scripts/smoke_036_media_unificada.js` (J34/J35 afirman que `guardar_media` NO valida sesion). Agregar un smoke de la 032 (23514 del CHECK, 410 CARPETAS_DEPRECADAS, publicar, no-fuga) y engancharlo a `npm test`.
+
+**Pendientes NO bloqueantes:**
+- **P1.** Registrar `BUG-082` en `BUGS_HISTORICOS.md` (hoy inexistente) al implementar; el hallazgo en `api/pagina-destino.js` L2762 esta verificado.
+- **P2.** Elevar el "conteo de albumes" (hoy solo en Consecuencias) a decision explicita: nombre/campo del conteo y si `albumes.fotos_count` cambia de contrato, para fijar a los consumidores de `albumes`.
+- **P3.** `resolverMediaItem` (L3182-3187) no filtra `af.visible`: guardar media privada de terceros sigue siendo un oraculo de existencia. No es regresion de este ADR, pero el filtro de no-fuga NO debe delegarse en ese helper.
+- **P4 (recomendacion de orden).** El DROP de `guardados_carpetas`/`carpeta_id` dentro de la 032 deja una ventana en la que el backend viejo (produccion) responde 503 `SCHEMA_NOT_MIGRATED` en `mis_guardados_media` hasta que se despliegue el backend nuevo. Se recomienda partir en 032 aditiva (`album_id`, `visible`, indices) + backend desplegado, y una migracion posterior que haga el DROP cuando no quede lector. El operador ya acepto la perdida irreversible de la organizacion previa (Cero Borrado Logico exige soft-delete del CONTENIDO, no de la tabla de organizacion).
+
+**Sin objeciones a:** DROP de carpetas (decision de producto aceptada), no contemplar perfil publico / Mis Fotos / mapa en v1, reutilizacion de la rama `POST ?tipo=guardados_carpeta` con 410 `CARPETAS_DEPRECADAS`, y el fix de `api/pagina-destino.js` (BUG-082).

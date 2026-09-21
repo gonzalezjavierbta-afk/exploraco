@@ -1,3 +1,29 @@
+// api/interacciones.js  v26 (ADR-054, guardados de media en Mis Albumes):
+//   (1) mis_guardados_media EXIGE sesion firmada (verificarSesion): el
+//       dueno sale del TOKEN y el usuario_id del query se IGNORA (leccion
+//       BUG-081). Reemplaza el contrato de carpetas privadas (ADR-052) por
+//       albumes[] + mi_album_id/mi_album_titulo/visible; conserva data[]
+//       (shape de mymapa.js) y el 503 SCHEMA_NOT_MIGRATED tipado (ahora
+//       migracion 032).
+//   (2) POST ?tipo=guardados_carpeta reescrito sobre ALBUMES: accion=album
+//       (asignar/quitar album; C2 anti-IDOR del album destino y C3
+//       desasignacion atomica con visible=false) y accion=publicar (409
+//       SIN_ALBUM si no tiene album); crear|renombrar|eliminar|mover -> 410
+//       CARPETAS_DEPRECADAS. Se elimina TODO el SQL de carpetas.
+//   (3) album_detalle fusiona guardados[] (referencias album_foto/
+//       viajero_foto/curada) y albumes_guardados[] (fuente='album') con
+//       invariante de no-fuga (C1): a un no-dueno solo visible=true Y origen
+//       publico; el dueno (token == albumes.usuario_id) ve su organizacion
+//       completa. Sesion opcional, JAMAS derivada del query param.
+//   (4) Endurecimiento BUG-061: guardar_media/quitar_guardado_media y
+//       album_crear exigen sesion firmada y derivan el usuario del token
+//       (el usuario_id del body se ignora).
+//   (5) BUG-082 (colateral): api/pagina-destino.js filtra af.visible=true
+//       en las fotos de album por cercania (ADR-039 D.1).
+//   REQUIERE la migracion 032_guardados_album.sql aplicada en Neon ANTES
+//   del deploy (patron BUG-021/BUG-060); sin ella mis_guardados_media
+//   responde 503 SCHEMA_NOT_MIGRATED y album_detalle degrada las claves
+//   nuevas a [].
 // api/interacciones.js  v25 (TSK gamificacion v6 / ADR-053):
 //   (1) Motor unico de XP: XP_BASES (catalogo v2.1, unico), M_nivel
 //       x1.0..x3.0 sobre el nivel DERIVADO de xp_total y doble cap
@@ -26,11 +52,10 @@
 //       usuario_id se ignora. La clausula af.visible solo se suprime con
 //       dueno autenticado (mmScopeMio && mmUsuarioId): no se puede leer
 //       media privada de terceros ni de todos sin Bearer.
-//   (2) ADR-052 (carpetas de guardados): helper normalizarNombreCarpeta;
-//       mis_guardados_media expone carpeta_id/carpeta_nombre + listado de
-//       carpetas (503 SCHEMA_NOT_MIGRATED tipado, sin degradar a []); nueva
-//       rama POST ?tipo=guardados_carpeta (crear|renombrar|eliminar|mover)
-//       con sesion firmada.
+//   (2) ADR-052 (carpetas de guardados): organizacion privada de bookmarks
+//       (nombre + orden) con 503 SCHEMA_NOT_MIGRATED tipado, sin degradar
+//       a []; rama POST ?tipo=guardados_carpeta (crear|renombrar|eliminar|
+//       mover) con sesion firmada. SUPERSEDED por ADR-054 (v26).
 //   (3) Feature A / ADR-051 (migracion 029): ubicacion individual por
 //       recurso de album. multimedia_mapa emite COALESCE(af.lat,a.lat)
 //       (fallback vivo recurso -> album -> autor); museo_recurso GET
@@ -38,9 +63,8 @@
 //       efectivas; POST crear|editar persisten af.lat/lng del recurso,
 //       aceptan album_lat/album_lng hacia albumes (COALESCE al sembrar,
 //       nunca sobrescriben) y quitar_coords vuelve a heredar del album.
-//   REQUIERE las migraciones 029 (album_fotos.lat/lng) y 030
-//   (guardados_carpetas + media_guardados.carpeta_id) aplicadas en Neon
-//   ANTES del deploy (patron BUG-021/BUG-060).
+//   REQUIERE las migraciones 029 (album_fotos.lat/lng) y 030 (carpetas de
+//   guardados) aplicadas en Neon ANTES del deploy (patron BUG-021/BUG-060).
 // api/interacciones.js  v23 (TSK-118/ADR-041 incremento sobre el release v22 ADR-039 + ADR-040 + T4.5):
 //   (1) Museo URL-only (ADR-039): ramas GET/POST tipo=museo_recurso
 //       (crear/editar/eliminar/listar) sobre album_fotos con visibilidad
@@ -3111,6 +3135,14 @@ function mediaFuenteValida(f) {
   return MEDIA_FUENTES.indexOf(String(f || '').toLowerCase()) !== -1;
 }
 
+// v26 (ADR-054): fuentes validas de un bookmark de media. Incluye 'album'
+// (album entero, sin foto_url) ademas de las 3 fuentes de MEDIA_FUENTES.
+// La comparten guardar_media y guardados_carpeta (Regla de No-Duplicidad).
+var GUARDADO_FUENTES = ['album', 'album_foto', 'viajero_foto', 'curada'];
+function guardadoFuenteValida(f) {
+  return GUARDADO_FUENTES.indexOf(String(f || '').toLowerCase()) !== -1;
+}
+
 // Ejecuta una promesa SQL y degrada SOLO el esquema ausente (42P01/42703)
 // al valor indicado con warn; el resto de errores se re-lanzan.
 function conDegradacionMedia(promesa, etiqueta, valor) {
@@ -3129,17 +3161,6 @@ function conDegradacionMedia(promesa, etiqueta, valor) {
 // silencio o caer al 500 global.
 function esEsquemaFaltante(e) {
   return !!(e && (e.code === '42P01' || e.code === '42703'));
-}
-
-// v24 (ADR-052): normaliza el nombre de una carpeta de guardados: trim,
-// colapso de espacios internos y corte a 80 (varchar(80) CHECK 1..80).
-// Devuelve '' si queda vacio; el caller responde 400. Sin duplicar el
-// saneamiento en las 4 acciones (Regla de No-Duplicidad).
-function normalizarNombreCarpeta(nombre) {
-  return String(nombre === undefined || nombre === null ? '' : nombre)
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, 80);
 }
 
 // Progreso anti-spam (usuarios.progreso_album): lo comparten albumes,
@@ -4768,7 +4789,66 @@ module.exports = async function handler(req, res) {
             && String(r.autor_original_id) === String(usuarioId));
         });
 
-        return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows });
+        // ADR-054 (v26): fusion de guardados. El dueno se deriva del TOKEN
+        // (verificarSesion), NUNCA del query param. Invariante de no-fuga
+        // (C1): a un no-dueno solo se le emiten bookmarks visible=true cuyo
+        // ORIGEN sea publico; el dueno ve su organizacion completa. El
+        // origen de 'curada' es publico por la propia existencia de la fila
+        // en destinos_fotos (el JOIN lo garantiza).
+        var adSes = verificarSesion(req);
+        var adEsDueno = !!(adSes.ok && albumDetRows[0].usuario_id
+          && String(adSes.sub) === String(albumDetRows[0].usuario_id));
+
+        var adGuardados = await conDegradacionMedia(sql(
+          'SELECT sub.* FROM ('
+          + ' SELECT mg.item_id::text AS id, af.foto_url, af.foto_type, af.media_title,'
+          + '  af.creado_en, COALESCE(u.nombre, \'\') AS autor_nombre,'
+          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = mg.item_id AND mv.activo = true) AS votos,'
+          + '  \'album_foto\' AS origen_fuente, mg.visible'
+          + ' FROM media_guardados mg'
+          + ' JOIN album_fotos af ON af.id::text = mg.item_id'
+          + ' JOIN albumes a ON a.id = af.album_id'
+          + ' LEFT JOIN usuarios u ON u.id = COALESCE(af.autor_original_id, af.agregador_id)'
+          + ' WHERE mg.album_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true'
+          + '  AND ($2::boolean OR (mg.visible AND af.activo AND af.visible AND a.activo))'
+          + ' UNION ALL'
+          + ' SELECT mg.item_id::text, i.texto, \'foto\' AS foto_type, \'\' AS media_title,'
+          + '  i.creado_en, COALESCE(u.nombre, \'\'),'
+          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'viajero_foto\' AND mv.item_id = mg.item_id AND mv.activo = true),'
+          + '  \'viajero_foto\', mg.visible'
+          + ' FROM media_guardados mg'
+          + ' JOIN interacciones i ON i.id::text = mg.item_id'
+          + ' LEFT JOIN usuarios u ON u.id = i.usuario_id'
+          + ' WHERE mg.album_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
+          + '  AND ($2::boolean OR (mg.visible AND i.activo))'
+          + ' UNION ALL'
+          + ' SELECT mg.item_id::text, df.url, \'foto\' AS foto_type, \'\' AS media_title,'
+          + '  df.creado_en, \'\' AS autor_nombre,'
+          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'curada\' AND mv.item_id = mg.item_id AND mv.activo = true),'
+          + '  \'curada\', mg.visible'
+          + ' FROM media_guardados mg'
+          + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
+          + ' WHERE mg.album_id = $1::uuid AND mg.fuente = \'curada\' AND mg.activo = true'
+          + '  AND ($2::boolean OR mg.visible)'
+          + ' ) sub ORDER BY sub.creado_en DESC LIMIT 200',
+          [albumId, adEsDueno]
+        ), 'media_guardados', []);
+        adGuardados.forEach(function(g){ g.guardado = true; });
+
+        // Bookmark de un ALBUM entero (fuente='album') organizado en este
+        // album: se publica solo si es visible Y el album origen sigue
+        // activo; el dueno ve todos sus bookmarks.
+        var adAlbumesGuardados = await conDegradacionMedia(sql(
+          'SELECT a.id::text AS id, a.titulo, COALESCE(a.portada_url, \'\') AS portada_url'
+          + ' FROM media_guardados mg'
+          + ' JOIN albumes a ON a.id::text = mg.item_id'
+          + ' WHERE mg.album_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true'
+          + '  AND ($2::boolean OR (mg.visible AND a.activo))'
+          + ' ORDER BY mg.creado_en DESC LIMIT 100',
+          [albumId, adEsDueno]
+        ), 'media_guardados', []);
+
+        return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows, guardados: adGuardados, albumes_guardados: adAlbumesGuardados });
       }
 
       // Galeria de un destino (ficha publica): fotos curadas de
@@ -5375,66 +5455,66 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: mfRows });
       }
 
-      // ADR-032 (v17) + ADR-052 (v24): "Mis guardados" de media del museo
-      // (bookmarks de fotos y albumes de terceros). Cada bookmark emite su
-      // carpeta (migracion 030) y la respuesta suma el listado de carpetas
-      // activas del usuario. Si la migracion 030 no esta aplicada
-      // (42P01/42703) se responde 503 SCHEMA_NOT_MIGRATED tipado: NUNCA se
-      // degrada a [] en silencio (hallazgo H-4) para no confundir "sin
-      // datos" con "esquema pendiente".
+      // ADR-054 (v26): "Mis guardados" de media. El dueno se deriva de la
+      // sesion firmada (verificarSesion); el usuario_id del query se IGNORA
+      // (leccion BUG-081). Cada bookmark expone su album de organizacion
+      // (mi_album_id/mi_album_titulo/visible, migracion 032) y la respuesta
+      // suma los albumes activos del usuario. Si la migracion 032 no esta
+      // aplicada (42P01/42703) se responde 503 SCHEMA_NOT_MIGRATED tipado:
+      // NUNCA se degrada a [] en silencio (hallazgo H-4).
       if (tipo === 'mis_guardados_media') {
-        var mgUsuario = usuarioId ? String(usuarioId).trim() : '';
-        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mgUsuario))
-          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
-        var mgRows, mgCarpetas;
+        var mgSes = verificarSesion(req);
+        if (!mgSes.ok) return responderSesion(res, mgSes.razon);
+        var mgUsuario = String(mgSes.sub || '').trim();
+        var mgRows, mgAlbumes;
         try {
           mgRows = await sql(
-            'SELECT sub.*, COALESCE(gc.nombre, \'\') AS carpeta_nombre FROM ('
+            'SELECT sub.*, COALESCE(ga.titulo, \'\') AS mi_album_titulo FROM ('
             + ' SELECT \'album\' AS fuente, mg.item_id::text AS item_id, mg.creado_en,'
             + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, \'album\' AS media_type,'
             + '  a.ciudad AS ciudad, a.id::text AS album_id, NULL::text AS destino_slug,'
-            + '  mg.carpeta_id::text AS carpeta_id'
+            + '  mg.album_id::text AS mi_album_id, mg.visible'
             + ' FROM media_guardados mg JOIN albumes a ON a.id::text = mg.item_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true AND a.activo = true'
             + ' UNION ALL'
             + ' SELECT \'album_foto\', mg.item_id::text, mg.creado_en,'
             + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, af.foto_type,'
-            + '  a.ciudad, a.id::text, NULL::text, mg.carpeta_id::text'
+            + '  a.ciudad, a.id::text, NULL::text, mg.album_id::text, mg.visible'
             + ' FROM media_guardados mg JOIN album_fotos af ON af.id::text = mg.item_id'
             + ' JOIN albumes a ON a.id = af.album_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true AND af.activo = true'
             + ' UNION ALL'
             + ' SELECT \'viajero_foto\', mg.item_id::text, mg.creado_en,'
             + '  d.nombre AS titulo, i.texto AS media_url, \'foto\' AS media_type,'
-            + '  d.ciudad, NULL::text, d.slug, mg.carpeta_id::text'
+            + '  d.ciudad, NULL::text, d.slug, mg.album_id::text, mg.visible'
             + ' FROM media_guardados mg JOIN interacciones i ON i.id::text = mg.item_id'
             + ' JOIN destinos d ON d.id = i.destino_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
             + ' UNION ALL'
             + ' SELECT \'curada\', mg.item_id::text, mg.creado_en,'
             + '  d.nombre AS titulo, df.url AS media_url, \'foto\' AS media_type,'
-            + '  d.ciudad, NULL::text, d.slug, mg.carpeta_id::text'
+            + '  d.ciudad, NULL::text, d.slug, mg.album_id::text, mg.visible'
             + ' FROM media_guardados mg'
             + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
             + ' JOIN destinos d ON d.id = df.destino_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'curada\' AND mg.activo = true'
             + ' ) sub'
-            + ' LEFT JOIN guardados_carpetas gc ON gc.id = sub.carpeta_id::uuid AND gc.activo = true'
+            + ' LEFT JOIN albumes ga ON ga.id = sub.mi_album_id::uuid AND ga.activo = true'
             + ' ORDER BY sub.creado_en DESC LIMIT 200',
             [mgUsuario]
           );
-          mgCarpetas = await sql(
-            'SELECT id::text AS id, nombre, orden FROM guardados_carpetas'
+          mgAlbumes = await sql(
+            'SELECT id::text AS id, titulo, tipo FROM albumes'
             + ' WHERE usuario_id = $1::uuid AND activo = true'
-            + ' ORDER BY orden ASC, creado_en ASC',
+            + ' ORDER BY creado_en DESC LIMIT 50',
             [mgUsuario]
           );
         } catch (eMg) {
           if (!esEsquemaFaltante(eMg)) throw eMg;
-          console.error('[interacciones] mis_guardados_media sin migracion 030 (carpetas): ' + (eMg.message || eMg));
+          console.error('[interacciones] mis_guardados_media sin migracion 032 (albumes): ' + (eMg.message || eMg));
           return res.status(503).json({ ok: false, error: 'SCHEMA_NOT_MIGRATED' });
         }
-        return res.status(200).json({ ok: true, data: mgRows, carpetas: mgCarpetas });
+        return res.status(200).json({ ok: true, data: mgRows, albumes: mgAlbumes });
       }
 
       // Top fotos para curacion de directorios (por coord match)
@@ -7365,18 +7445,22 @@ module.exports = async function handler(req, res) {
 
       // Crear album
       if (tipo2 === 'album_crear') {
-        if (!usuarioId2) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        // v26 (ADR-054, BUG-061): sesion firmada obligatoria; el dueno sale
+        // del TOKEN y el usuario_id del body se ignora.
+        var alSes = verificarSesion(req);
+        if (!alSes.ok) return responderSesion(res, alSes.razon);
+        var alUsuario = String(alSes.sub || '').trim();
         var alTitulo = String(body.titulo || '').trim();
         if (!alTitulo) return res.status(400).json({ ok: false, error: 'titulo requerido' });
         if (alTitulo.length > 120) return res.status(400).json({ ok: false, error: 'titulo maximo 120 caracteres' });
 
         // Check nivel >= 2
-        var nivelCheck = await sql('SELECT xp_total FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
+        var nivelCheck = await sql('SELECT xp_total FROM usuarios WHERE id=$1', [alUsuario]).catch(function(){ return []; });
         var nivelCalc = nivelCheck[0] ? calcularNivelLocal(nivelCheck[0].xp_total).nivel : 1;
         if (nivelCalc < 2) return res.status(403).json({ ok: false, error: 'Nivel insuficiente (requiere nivel 2)' });
 
         // Anti-spam: max 5 albumes/mes
-        var pa = await getProgresoAlbum(sql, usuarioId2);
+        var pa = await getProgresoAlbum(sql, alUsuario);
         var mesActual = hoy().slice(0, 7);
         if ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual && (pa.albumes_mes || 0) >= 5)
           return res.status(429).json({ ok: false, error: 'Limite de 5 albumes por mes alcanzado' });
@@ -7392,21 +7476,21 @@ module.exports = async function handler(req, res) {
         var albumIns = await sql(
           'INSERT INTO albumes (usuario_id, titulo, descripcion, tipo, lat, lng, ciudad, region, portada_url) '
           + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-          [usuarioId2, alTitulo, alDesc, alTipo, alLat, alLng, alCiudad, alRegion, alPortada]
+          [alUsuario, alTitulo, alDesc, alTipo, alLat, alLng, alCiudad, alRegion, alPortada]
         );
 
         // XP +20
-        var ctxAlbum = await contextoXpE(sql, usuarioId2);
+        var ctxAlbum = await contextoXpE(sql, alUsuario);
         var resAlbum = await calcularXpAcreditado(sql, XP_BASES.album_crear,
           ctxAlbum.nivel_clase, ctxAlbum.clase_id, ctxAlbum.tag,
           { nivel_usuario: ctxAlbum.nivel_usuario });
         var xpAlbumFinal = resAlbum.xp_final;
-        await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFinal, usuarioId2]).catch(function(){});
-        await acreditarClaseYCofre(sql, usuarioId2, ctxAlbum, xpAlbumFinal);
+        await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFinal, alUsuario]).catch(function(){});
+        await acreditarClaseYCofre(sql, alUsuario, ctxAlbum, xpAlbumFinal);
         // v13: reparto multinivel sobre el XP REAL entregado (+20).
-        await repartirXpReferidos(sql, usuarioId2, xpAlbumFinal);
+        await repartirXpReferidos(sql, alUsuario, xpAlbumFinal);
         await registrarXpLedger(sql, {
-          usuario_id: usuarioId2, accion: 'album_crear', xp_base: XP_BASES.album_crear,
+          usuario_id: alUsuario, accion: 'album_crear', xp_base: XP_BASES.album_crear,
           mult_nivel: resAlbum.m_nivel, mult_stack: resAlbum.mult_stack,
           mult_final: resAlbum.mult_global_c, cap_aplicado: resAlbum.cap_aplicado,
           xp_final: xpAlbumFinal, contexto: { album_id: albumIns[0].id }
@@ -7414,10 +7498,10 @@ module.exports = async function handler(req, res) {
 
         // Actualizar progreso_album
         var nuevoAlbumesMes = ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual) ? (pa.albumes_mes || 0) + 1 : 1;
-        await updProgresoAlbum(sql, usuarioId2, { albumes_mes: nuevoAlbumesMes, albumes_mes_fecha: hoy() });
+        await updProgresoAlbum(sql, alUsuario, { albumes_mes: nuevoAlbumesMes, albumes_mes_fecha: hoy() });
 
-        var misionesAlbum = await evaluarMisiones(sql, usuarioId2);
-        var logrosAlbum = await evaluarLogros(sql, usuarioId2);
+        var misionesAlbum = await evaluarMisiones(sql, alUsuario);
+        var logrosAlbum = await evaluarLogros(sql, alUsuario);
         return res.status(200).json({ ok: true, album: albumIns[0], xp: xpAlbumFinal, xp_detalle: armarXpDetalle(XP_BASES.album_crear, resAlbum, 0), misiones: misionesAlbum, logros: logrosAlbum });
       }
 
@@ -7700,19 +7784,20 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
-      // ADR-032 (v17) + ADR-036 (v19): guardado (bookmark) de media. fuente
-      // valida el tipo de item: album -> albumes.id, album_foto ->
-      // album_fotos.id, viajero_foto -> interacciones.id (tipo='foto'),
-      // curada -> destinos_fotos.id. item_id acepta uuid o digitos
-      // (migracion 023: media_guardados.item_id text). No es voto ni copia.
-      // Requiere migracion 019 (ampliada por 023); si falta, 503 explicito.
-      // DEUDA (BUG-061): mantiene trust de usuario_id sin Bearer; pendiente
-      // de validarSesion cuando sus multiples clientes migren.
+      // ADR-032 (v17) + ADR-036 (v19) + ADR-054 (v26): guardado (bookmark)
+      // de media. fuente valida el tipo de item: album -> albumes.id,
+      // album_foto -> album_fotos.id, viajero_foto -> interacciones.id
+      // (tipo='foto'), curada -> destinos_fotos.id. item_id acepta uuid o
+      // digitos (migracion 023: media_guardados.item_id text). No es voto ni
+      // copia. Requiere migracion 019 (ampliada por 023); si falta, 503.
+      // v26 (BUG-061): sesion firmada obligatoria; el usuario se deriva del
+      // TOKEN y el usuario_id del body se ignora.
       if (tipo2 === 'guardar_media' || tipo2 === 'quitar_guardado_media') {
-        if (!usuarioId2)
-          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var gmSes = verificarSesion(req);
+        if (!gmSes.ok) return responderSesion(res, gmSes.razon);
+        var gmUsuario = String(gmSes.sub || '').trim();
         var gmFuente = String(body.fuente || '').toLowerCase();
-        if (['album', 'album_foto', 'viajero_foto', 'curada'].indexOf(gmFuente) === -1)
+        if (!guardadoFuenteValida(gmFuente))
           return res.status(400).json({ ok: false, error: 'fuente invalida (album|album_foto|viajero_foto|curada)' });
         var gmItem = String(body.item_id || '').trim();
         if (!MEDIA_ITEM_RE.test(gmItem))
@@ -7723,7 +7808,7 @@ module.exports = async function handler(req, res) {
             await sql(
               'UPDATE media_guardados SET activo = false'
               + ' WHERE usuario_id = $1 AND fuente = $2 AND item_id = $3',
-              [usuarioId2, gmFuente, gmItem]
+              [gmUsuario, gmFuente, gmItem]
             );
             return res.status(200).json({ ok: true, guardado: false });
           }
@@ -7744,7 +7829,7 @@ module.exports = async function handler(req, res) {
             + ' VALUES ($1, $2, $3, true, NOW())'
             + ' ON CONFLICT (usuario_id, fuente, item_id)'
             + ' DO UPDATE SET activo = true, creado_en = NOW()',
-            [usuarioId2, gmFuente, gmItem]
+            [gmUsuario, gmFuente, gmItem]
           );
           return res.status(200).json({ ok: true, guardado: true });
         } catch (eGuardarMedia) {
@@ -7756,128 +7841,94 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // ADR-052 (v24): carpetas PERSONALES de guardados (organizacion
-      // privada; no son albumes ni tocan el Museo). Auth SIEMPRE por sesion
-      // firmada (BUG-061): el dueno sale del token, nunca del body. Requiere
-      // la migracion 030; si falta (42P01/42703) -> 503 SCHEMA_NOT_MIGRATED
-      // tipado. Acciones: crear|renombrar|eliminar|mover.
+      // ADR-054 (v26): POST ?tipo=guardados_carpeta reutilizado sobre
+      // ALBUMES (supersede las carpetas privadas de ADR-052). Auth SIEMPRE
+      // por sesion firmada: el dueno sale del token, nunca del body.
+      //   accion=album    -> asigna/quita el album de un bookmark; el album
+      //                      destino debe ser del usuario (C2, anti-IDOR) y
+      //                      la desasignacion fuerza visible=false en la
+      //                      MISMA sentencia (C3, CHECK 23514).
+      //   accion=publicar -> visible=true|false; exige album previo (409
+      //                      SIN_ALBUM).
+      //   crear|renombrar|eliminar -> 410 CARPETAS_DEPRECADAS (sin
+      //                      silencio: la UI vieja debe migrar).
+      // Requiere la migracion 032; si falta (42P01/42703) -> 503 tipado.
       if (tipo2 === 'guardados_carpeta') {
-        // El usuario de la sesion es la UNICA fuente de verdad. Si el body
-        // trae usuario_id se exige que coincida (validarSesion); si no,
-        // basta la sesion (verificarSesion).
         var gcSes = usuarioId2 ? validarSesion(req, usuarioId2) : verificarSesion(req);
         if (!gcSes.ok) return responderSesion(res, gcSes.razon);
         var gcUsuario = usuarioId2 ? String(usuarioId2).trim() : String(gcSes.sub || '').trim();
         var gcAccion = String(body.accion || '').toLowerCase();
-        if (['crear', 'renombrar', 'eliminar', 'mover'].indexOf(gcAccion) === -1)
-          return res.status(400).json({ ok: false, error: 'accion invalida (crear|renombrar|eliminar|mover)' });
-        var gcCarpetaId = String(body.carpeta_id || '').trim();
         var GC_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
+        if (['crear', 'renombrar', 'eliminar', 'mover'].indexOf(gcAccion) !== -1)
+          return res.status(410).json({ ok: false, error: 'CARPETAS_DEPRECADAS' });
+
+        var gcFuente = String(body.fuente || '').toLowerCase();
+        var gcItem = String(body.item_id || '').trim();
+        if (gcAccion !== 'album' && gcAccion !== 'publicar')
+          return res.status(400).json({ ok: false, error: 'accion invalida (album|publicar)' });
+        if (!guardadoFuenteValida(gcFuente))
+          return res.status(400).json({ ok: false, error: 'fuente invalida (album|album_foto|viajero_foto|curada)' });
+        if (!MEDIA_ITEM_RE.test(gcItem))
+          return res.status(400).json({ ok: false, error: 'item_id invalido' });
+
         try {
-          if (gcAccion === 'crear') {
-            var gcNombreNuevo = normalizarNombreCarpeta(body.nombre);
-            if (!gcNombreNuevo)
-              return res.status(400).json({ ok: false, error: 'NOMBRE_REQUERIDO' });
-            var gcOrdenNuevo = parseInt(body.orden, 10);
-            if (!isFinite(gcOrdenNuevo)) gcOrdenNuevo = 0;
-            // ON CONFLICT DO NOTHING + RETURNING (patron "Mi Museo"): si el
-            // indice unico parcial (usuario_id, lower(nombre)) WHERE activo
-            // choca, no hay fila nueva -> 409 CARPETA_DUPLICADA (no 500).
-            var gcIns = await sql(
-              'INSERT INTO guardados_carpetas (usuario_id, nombre, orden)'
-              + ' VALUES ($1::uuid, $2, $3) ON CONFLICT DO NOTHING'
-              + ' RETURNING id::text AS id',
-              [gcUsuario, gcNombreNuevo, gcOrdenNuevo]
+          if (gcAccion === 'album') {
+            var gcTraeAlbum = (body.album_id !== undefined && body.album_id !== null && String(body.album_id).trim() !== '');
+            var gcAlbumDestino = null;
+            if (gcTraeAlbum) {
+              gcAlbumDestino = String(body.album_id).trim();
+              if (!GC_UUID.test(gcAlbumDestino))
+                return res.status(400).json({ ok: false, error: 'album_id invalido' });
+              // C2: el album destino debe ser del usuario de la sesion y
+              // estar activo; si no -> 404 ALBUM_NO_ENCONTRADO (no se
+              // publica ni organiza dentro de un album ajeno).
+              var gcAlbumOwn = await sql(
+                'SELECT id FROM albumes'
+                + ' WHERE id = $1::uuid AND usuario_id = $2::uuid AND activo = true LIMIT 1',
+                [gcAlbumDestino, gcUsuario]
+              );
+              if (!gcAlbumOwn.length)
+                return res.status(404).json({ ok: false, error: 'ALBUM_NO_ENCONTRADO' });
+            }
+            // C3: desasignar (album_id NULL) fuerza visible=false en la
+            // MISMA sentencia para no violar el CHECK (23514).
+            var gcUpdAlbum = await sql(
+              'UPDATE media_guardados SET album_id = $1::uuid,'
+              + ' visible = CASE WHEN $1::uuid IS NULL THEN false ELSE visible END'
+              + ' WHERE usuario_id = $2::uuid AND fuente = $3 AND item_id = $4 AND activo = true'
+              + ' RETURNING item_id',
+              [gcAlbumDestino, gcUsuario, gcFuente, gcItem]
             );
-            if (!gcIns.length)
-              return res.status(409).json({ ok: false, error: 'CARPETA_DUPLICADA' });
-            var gcNueva = await sql(
-              'SELECT id::text AS id, nombre, orden FROM guardados_carpetas'
-              + ' WHERE id = $1::uuid AND activo = true LIMIT 1',
-              [gcIns[0].id]
-            );
-            return res.status(201).json({ ok: true, carpeta: gcNueva[0] || { id: gcIns[0].id, nombre: gcNombreNuevo, orden: gcOrdenNuevo } });
+            if (!gcUpdAlbum.length)
+              return res.status(404).json({ ok: false, error: 'GUARDADO_NO_ENCONTRADO' });
+            return res.status(200).json({ ok: true, album_id: gcAlbumDestino });
           }
 
-          if (gcAccion === 'renombrar') {
-            if (!GC_UUID.test(gcCarpetaId))
-              return res.status(400).json({ ok: false, error: 'carpeta_id invalido' });
-            var gcNombreRen = normalizarNombreCarpeta(body.nombre);
-            if (!gcNombreRen)
-              return res.status(400).json({ ok: false, error: 'NOMBRE_REQUERIDO' });
-            var gcRen = await sql(
-              'UPDATE guardados_carpetas SET nombre = $1, actualizado_en = NOW()'
-              + ' WHERE id = $2::uuid AND usuario_id = $3::uuid AND activo = true'
-              + ' RETURNING id::text AS id, nombre, orden',
-              [gcNombreRen, gcCarpetaId, gcUsuario]
-            );
-            if (!gcRen.length)
-              return res.status(404).json({ ok: false, error: 'CARPETA_NO_ENCONTRADA' });
-            return res.status(200).json({ ok: true, carpeta: gcRen[0] });
-          }
-
-          if (gcAccion === 'eliminar') {
-            if (!GC_UUID.test(gcCarpetaId))
-              return res.status(400).json({ ok: false, error: 'carpeta_id invalido' });
-            // Cero Borrado Logico (ADR-003): la carpeta se desactiva y sus
-            // bookmarks NO se borran; se reasignan a NULL ("Sin carpeta").
-            var gcDel = await sql(
-              'UPDATE guardados_carpetas SET activo = false, actualizado_en = NOW()'
-              + ' WHERE id = $1::uuid AND usuario_id = $2::uuid AND activo = true'
-              + ' RETURNING id',
-              [gcCarpetaId, gcUsuario]
-            );
-            if (!gcDel.length)
-              return res.status(404).json({ ok: false, error: 'CARPETA_NO_ENCONTRADA' });
-            await sql(
-              'UPDATE media_guardados SET carpeta_id = NULL'
-              + ' WHERE usuario_id = $1::uuid AND carpeta_id = $2::uuid',
-              [gcUsuario, gcCarpetaId]
-            );
-            return res.status(200).json({ ok: true, eliminada: true });
-          }
-
-          // mover: carpeta_id puede ser NULL (sacar de carpeta).
-          var gcMoverFuente = String(body.fuente || '').toLowerCase();
-          if (['album', 'album_foto', 'viajero_foto', 'curada'].indexOf(gcMoverFuente) === -1)
-            return res.status(400).json({ ok: false, error: 'fuente invalida (album|album_foto|viajero_foto|curada)' });
-          var gcMoverItem = String(body.item_id || '').trim();
-          if (!MEDIA_ITEM_RE.test(gcMoverItem))
-            return res.status(400).json({ ok: false, error: 'item_id invalido' });
-          var gcMoverDestino = null;
-          var gcTraeCarpeta = (body.carpeta_id !== undefined && body.carpeta_id !== null && String(body.carpeta_id).trim() !== '');
-          if (gcTraeCarpeta) {
-            gcMoverDestino = String(body.carpeta_id).trim();
-            if (!GC_UUID.test(gcMoverDestino))
-              return res.status(400).json({ ok: false, error: 'carpeta_id invalido' });
-          }
-          // DOBLE pertenencia: la carpeta destino (si hay) debe ser del
-          // usuario; la fila media_guardados (PK usuario_id,fuente,item_id)
-          // tambien. Si el item no esta guardado activo -> 404.
-          if (gcMoverDestino) {
-            var gcOwn = await sql(
-              'SELECT id FROM guardados_carpetas'
-              + ' WHERE id = $1::uuid AND usuario_id = $2::uuid AND activo = true LIMIT 1',
-              [gcMoverDestino, gcUsuario]
-            );
-            if (!gcOwn.length)
-              return res.status(404).json({ ok: false, error: 'CARPETA_NO_ENCONTRADA' });
-          }
-          var gcUpd = await sql(
-            'UPDATE media_guardados SET carpeta_id = $1::uuid'
+          // accion=publicar: leer primero el album del bookmark; sin album
+          // no se puede publicar (el CHECK exige album_id si visible=true).
+          var gcVisible = !!body.visible;
+          var gcRowPub = await sql(
+            'SELECT album_id FROM media_guardados'
+            + ' WHERE usuario_id = $1::uuid AND fuente = $2 AND item_id = $3 AND activo = true LIMIT 1',
+            [gcUsuario, gcFuente, gcItem]
+          );
+          if (!gcRowPub.length)
+            return res.status(404).json({ ok: false, error: 'GUARDADO_NO_ENCONTRADO' });
+          if (!gcRowPub[0].album_id)
+            return res.status(409).json({ ok: false, error: 'SIN_ALBUM' });
+          var gcUpdPub = await sql(
+            'UPDATE media_guardados SET visible = $1'
             + ' WHERE usuario_id = $2::uuid AND fuente = $3 AND item_id = $4 AND activo = true'
             + ' RETURNING item_id',
-            [gcMoverDestino, gcUsuario, gcMoverFuente, gcMoverItem]
+            [gcVisible, gcUsuario, gcFuente, gcItem]
           );
-          if (!gcUpd.length)
+          if (!gcUpdPub.length)
             return res.status(404).json({ ok: false, error: 'GUARDADO_NO_ENCONTRADO' });
-          return res.status(200).json({ ok: true, movida: true, carpeta_id: gcMoverDestino });
+          return res.status(200).json({ ok: true, visible: gcVisible });
         } catch (eGc) {
-          if (eGc && eGc.code === '23505')
-            return res.status(409).json({ ok: false, error: 'CARPETA_DUPLICADA' });
           if (!esEsquemaFaltante(eGc)) throw eGc;
-          console.error('[interacciones] guardados_carpeta sin migracion 030: ' + (eGc.message || eGc));
+          console.error('[interacciones] guardados_carpeta sin migracion 032: ' + (eGc.message || eGc));
           return res.status(503).json({ ok: false, error: 'SCHEMA_NOT_MIGRATED' });
         }
       }
