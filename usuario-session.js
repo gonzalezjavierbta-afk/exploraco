@@ -18,10 +18,14 @@
 
   // ── Niveles XP (fuente de verdad, 20 niveles) ────────────
   // XP_LEVELS[i] = xp minimo para alcanzar el nivel (i+1).
-  // Nivel 1 = 0 XP, Nivel 20 = 30000 XP.
+  // Nivel 1 = 0 XP, Nivel 20 = 42000 XP (techo v6, ADR-053).
+  // Espejo de api/usuarios.js NIVELES; validado por
+  // scripts/smoke_niveles_espejos.js.
+  // TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
+  // (evita la copia; hoy se conserva por costo de red/carga).
   var XP_LEVELS = [
-    0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200,
-    4000, 5200, 6800, 8500, 10500, 13000, 16000, 19500, 24000, 30000
+    0, 100, 250, 450, 700, 1050, 1500, 2100, 2900, 3900,
+    5200, 6800, 8800, 11200, 14200, 17800, 22200, 27500, 34000, 42000
   ];
   var MAX_NIVEL = XP_LEVELS.length; // 20
 
@@ -58,6 +62,107 @@
 
   window.ExploraCO.redondearXp = redondearXp;
   window.ExploraCO.fmtXp = fmtXp;
+
+  // ---- Desglose de XP (ADR-053 Decision 13): fuente unica del toast ----
+  // Recibe el xp_detalle del servidor (shape de armarXpDetalle en
+  // api/interacciones.js) y devuelve una linea breve y legible:
+  //   +32.60 XP  (base 20.00 x 1.63) [ + bono 25.00] [ . cap aplicado]
+  // Reusa fmtXp (helper unico de formato, ADR-035): NO crea otro
+  // formateador (Regla de No-Duplicidad). El multiplicador efectivo es
+  // mult_global (post-cap); si el backend marco un recorte
+  // (cap_aplicado !== 'ninguno') se indica para que el numero sea
+  // explicable. Devuelve '' si no hay total: el caller no muestra nada.
+  function fmtXpDetalle(detalle) {
+    if (!detalle || typeof detalle !== 'object') return '';
+    var total = Number(detalle.total);
+    if (!isFinite(total)) return '';
+    var txt = '+' + fmtXp(total) + ' XP';
+    var base = Number(detalle.base);
+    var mult = Number(detalle.mult_global);
+    if (isFinite(base) && isFinite(mult)) {
+      txt += '  (base ' + fmtXp(base) + ' x ' + mult.toFixed(2) + ')';
+    }
+    var bonos = Number(detalle.bonos_planos);
+    if (isFinite(bonos) && bonos > 0) txt += ' + bono ' + fmtXp(bonos);
+    if (detalle.cap_aplicado && detalle.cap_aplicado !== 'ninguno') {
+      txt += ' \u00b7 cap aplicado';
+    }
+    return txt;
+  }
+  window.ExploraCO.fmtXpDetalle = fmtXpDetalle;
+
+  // ---- Progreso al siguiente nivel (ADR-053 Decision 13) ----
+  // Umbrales SIEMPRE desde window.NivelesData.XP_LEVELS (fuente unica
+  // cliente, ADR-040) con fallback a XP_LEVELS de esta sesion: la UI
+  // NUNCA escribe umbrales (Regla de No-Duplicidad). Devuelve
+  // {nivel, min, minSiguiente, pct}; minSiguiente = null en el tope.
+  function nivelesFuente() {
+    if (typeof window !== 'undefined' && window.NivelesData
+        && Array.isArray(window.NivelesData.XP_LEVELS)
+        && window.NivelesData.XP_LEVELS.length) {
+      return window.NivelesData.XP_LEVELS;
+    }
+    // Fallback: XP_LEVELS de esta sesion es un arreglo PLANO de umbrales
+    // (numeros), a diferencia del arreglo de objetos de NivelesData.
+    // Se normaliza a {min} para un unico contrato de lectura.
+    return XP_LEVELS.map(function (m) { return { min: Number(m) }; });
+  }
+  function progresoNivel(xpTotal) {
+    var tabla = nivelesFuente();
+    var xp = Number(xpTotal) || 0;
+    if (xp < 0) xp = 0;
+    var idx = 0;
+    for (var i = tabla.length - 1; i >= 0; i--) {
+      if (xp >= tabla[i].min) { idx = i; break; }
+    }
+    var min = tabla[idx].min;
+    var esTope = idx >= tabla.length - 1;
+    var minSig = esTope ? null : tabla[idx + 1].min;
+    var pct = esTope ? 100 : Math.round((xp - min) / (minSig - min) * 100);
+    if (!isFinite(pct)) pct = 0;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    return { nivel: idx + 1, min: min, minSiguiente: minSig, pct: pct };
+  }
+  window.ExploraCO.nivelesFuente = nivelesFuente;
+  window.ExploraCO.progresoNivel = progresoNivel;
+
+  // ---- UI informativa de cupo / enfriamiento (ADR-053 Decision 13.2) ----
+  // Sustituye al Rising Star Decay (descartado): SOLO informa, NUNCA
+  // bloquea por cuenta propia (la verdad la aplica el backend).
+  // Contrato esperado del campo `estado_cupo` que el backend DEBE exponer
+  // por accion (hoy solo algunas acciones lo informan de forma parcial):
+  //   { tipo:'cupo'|'cooldown', mensaje?:string,
+  //     reinicia_en_seg?:number, restante?:number, limite?:number,
+  //     usado?:number }
+  // TODO ADR-053/estado_cupo: pedir al backend que adjunte `estado_cupo`
+  // en la respuesta de cada accion capada (visitas 30/dia, ao_proponer
+  // 3/dia, ao_checkin 90s+30/dia, plan_crear 3/dia, plan_unirse 5/dia,
+  // chat 10 XP/dia, compartir 50 XP/24h). Mientras no venga, esta
+  // funcion no muestra nada (no inventa campos).
+  function fmtEstadoCupo(estado) {
+    if (!estado || typeof estado !== 'object') return '';
+    if (estado.mensaje) return String(estado.mensaje);
+    var seg = Number(estado.reinicia_en_seg);
+    var haySeg = isFinite(seg) && seg >= 0;
+    if (estado.tipo === 'cooldown') {
+      return haySeg ? ('Enfriamiento activo ' + Math.ceil(seg / 60) + ' min') : 'Enfriamiento activo';
+    }
+    if (estado.tipo === 'cupo') {
+      if (!haySeg) return 'Cupo diario alcanzado';
+      var cuando = seg >= 3600 ? (Math.ceil(seg / 3600) + ' h') : (Math.ceil(seg / 60) + ' min');
+      return 'Cupo diario alcanzado \u00b7 vuelve en ' + cuando;
+    }
+    return '';
+  }
+  // Unico punto que muestra el estado de cupo (no se copia por accion).
+  function mostrarEstadoCupo(estado, color) {
+    var txt = fmtEstadoCupo(estado);
+    if (txt) mostrarToast(txt, color || '#E8A020');
+    return txt;
+  }
+  window.ExploraCO.fmtEstadoCupo = fmtEstadoCupo;
+  window.ExploraCO.mostrarEstadoCupo = mostrarEstadoCupo;
 
   // ── Mapa de capacidades por umbral de nivel ───────────────
   // Clave = nivel minimo, valor = nombre de la capacidad.
@@ -692,22 +797,12 @@
         }),
       });
       var data = await res.json();
-      if (data.ok && data.xp > 0) {
+      if (data.ok && (data.xp > 0 || data.xp_detalle)) {
         // Antes decia data.xp_ganado, pero interacciones.js siempre
-        // devuelve el campo como 'xp' -- este toast nunca disparaba con
-        // el XP real (quedaba en silencio, ok seguia siendo true).
-        mostrarToast('♥ Guardado · +' + fmtXp(data.xp) + ' XP', '#E8A020');
-        // Actualizar perfil local con nuevo XP (accion + bonus de misiones)
-        if (window.ExploraCO.usuario) {
-          var misionesXp = sumaMisionesXp(data.misiones);
-          var logrosXp = sumaLogrosXp(data.logros);
-          aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp);
-          guardarSesion(window.ExploraCO.usuario);
-          actualizarUI();
-        }
-        mostrarMisionesToast(data.misiones);
-        mostrarLogrosToast(data.logros);
+        // devuelve el campo como 'xp'. ADR-053 Dec 13.1: un unico helper
+        // encadena la acreditacion y deduplica el toast local (sin numero
+        // si el servidor manda xp_detalle).
+        toastAccionXp(data, '\u2665 Guardado', '#E8A020');
       }
       return data.ok;
     } catch (err) {
@@ -745,18 +840,9 @@
       var data = await res.json();
       if (data.ok) {
         // Mismo bug de nombre de campo que guardarDestino: era
-        // data.xp_ganado, interacciones.js devuelve 'xp'.
-        mostrarToast('⭐ Reseña publicada · +' + fmtXp(data.xp || 0) + ' XP', '#16a34a');
-        if (window.ExploraCO.usuario) {
-          var misionesXp = sumaMisionesXp(data.misiones);
-          var logrosXp = sumaLogrosXp(data.logros);
-          aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + (data.xp || 0) + misionesXp + logrosXp);
-          guardarSesion(window.ExploraCO.usuario);
-          actualizarUI();
-        }
-        mostrarMisionesToast(data.misiones);
-        mostrarLogrosToast(data.logros);
+        // data.xp_ganado, interacciones.js devuelve 'xp'. ADR-053 Dec 13.1:
+        // dedup del toast local + acreditacion en un unico helper.
+        toastAccionXp(data, '\u2B50 Rese\u00f1a publicada', '#16a34a');
       } else {
         // Antes un rechazo del backend (ej. reseña duplicada, ver
         // api/interacciones.js v3) quedaba en silencio para el usuario.
@@ -802,18 +888,10 @@
       if (btnEl) btnEl.classList.toggle('activo', ahoraGuardado);
 
       if (ahoraGuardado) {
-        if (data.xp > 0) {
-          mostrarToast('♥ Guardado · +' + fmtXp(data.xp) + ' XP', '#E8A020');
-          var misionesXp = sumaMisionesXp(data.misiones);
-          var logrosXp = sumaLogrosXp(data.logros);
-          aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp);
-          guardarSesion(window.ExploraCO.usuario);
-          actualizarUI();
-          mostrarMisionesToast(data.misiones);
-          mostrarLogrosToast(data.logros);
+        if (data.xp > 0 || data.xp_detalle) {
+          toastAccionXp(data, '\u2665 Guardado', '#E8A020');
         } else {
-          mostrarToast('♥ Guardado de nuevo en Tu Mapa', '#E8A020');
+          mostrarToast('\u2665 Guardado de nuevo en Tu Mapa', '#E8A020');
         }
       } else {
         mostrarToast('Quitado de Tu Mapa', '#888');
@@ -1069,22 +1147,18 @@
 
       var data = r.data;
       if (!data.ok || data.code) {
+        // ADR-053 Dec 13.2: cupo/cooldown por el helper unico; el resto de
+        // errores (NONCE, geocerca, precision, sesion) conserva su mensaje.
+        if (data.code === 'RATE_LIMIT') { mostrarEstadoCupo({ tipo: 'cooldown' }); return false; }
+        if (data.code === 'LIMITE_DIARIO') { mostrarEstadoCupo({ tipo: 'cupo' }); return false; }
         mostrarToast(mensajeErrorVisita(data), '#ef4444');
         return false;
       }
-      if (data.xp > 0) {
+      if (data.xp > 0 || data.xp_detalle) {
         var extra = (data.dist_m != null)
           ? ' a ' + data.dist_m + ' m' + (data.zona ? ', zona ' + data.zona : '')
           : '';
-        mostrarToast('Visita confirmada' + extra + ' · +' + fmtXp(data.xp) + ' XP', '#16a34a');
-        var misionesXp = sumaMisionesXp(data.misiones);
-          aplicarDesbloqueos(data.misiones);
-        var logrosXp = sumaLogrosXp(data.logros);
-        window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + data.xp + misionesXp + logrosXp);
-        guardarSesion(window.ExploraCO.usuario);
-        actualizarUI();
-        mostrarMisionesToast(data.misiones);
-        mostrarLogrosToast(data.logros);
+        toastAccionXp(data, 'Visita confirmada' + extra, '#16a34a', data.xp);
       } else if (data.ya_visitado) {
         mostrarToast('Ya habías marcado que estuviste aquí', '#888');
       } else {
@@ -1168,17 +1242,8 @@
       });
       var data = await res.json();
       if (data.ok) {
-        mostrarToast('⭐ Voto guardado · +' + fmtXp(data.xp || 0) + ' XP', '#16a34a');
-        if (window.ExploraCO.usuario) {
-          var misionesXp = sumaMisionesXp(data.misiones);
-          var logrosXp = sumaLogrosXp(data.logros);
-          aplicarDesbloqueos(data.misiones);
-          window.ExploraCO.usuario.xp_total = redondearXp((Number(window.ExploraCO.usuario.xp_total) || 0) + (data.xp || 0) + misionesXp + logrosXp);
-          guardarSesion(window.ExploraCO.usuario);
-          actualizarUI();
-        }
-        mostrarMisionesToast(data.misiones);
-        mostrarLogrosToast(data.logros);
+        // ADR-053 Dec 13.1: dedup del toast local + acreditacion unica.
+        toastAccionXp(data, '\u2B50 Voto guardado', '#16a34a');
         return { ok: true };
       }
       if (data.ya_votado) {
@@ -1317,12 +1382,13 @@
       if (m.desbloquea) window.ExploraCO.usuario.capacidades[m.desbloquea] = true;
     });
   }
-  function mostrarMisionesToast(misiones) {
+  function mostrarMisionesToast(misiones, offsetMs) {
     if (!misiones || !misiones.length) return;
+    var base = Number(offsetMs) || 0;
     misiones.forEach(function (m, i) {
       setTimeout(function () {
         mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + fmtXp(m.xp) + ' XP', '#E8A020');
-      }, i * 1600);
+      }, base + i * 1600);
     });
   }
 
@@ -1336,12 +1402,13 @@
     if (!logros || !logros.length) return 0;
     return logros.reduce(function (s, l) { return s + (Number(l.xp) || 0); }, 0);
   }
-  function mostrarLogrosToast(logros) {
+  function mostrarLogrosToast(logros, offsetMs) {
     if (!logros || !logros.length) return;
+    var base = Number(offsetMs) || 0;
     logros.forEach(function (l, i) {
       setTimeout(function () {
         mostrarToast((l.emoji || '🏆') + ' Trofeo desbloqueado: ' + l.nombre + ' · +' + fmtXp(l.xp) + ' XP', '#E8A020');
-      }, i * 1600 + 900);
+      }, base + i * 1600 + 900);
     });
   }
 
@@ -1375,11 +1442,40 @@
       guardarSesion(window.ExploraCO.usuario);
       actualizarUI();
     }
-    mostrarMisionesToast(data.misiones);
-    mostrarLogrosToast(data.logros);
+    // ADR-053 Decision 13.1: el servidor es la fuente unica del toast de
+    // XP. Si la respuesta trae xp_detalle se muestra el desglose y los
+    // callers locales DEBEN suprimir su toast propio (dedup, NEXT.md:246).
+    if (data.xp_detalle) {
+      var txtXp = fmtXpDetalle(data.xp_detalle);
+      if (txtXp) mostrarToast(txtXp, '#E8A020');
+    }
+    // Si hubo desglose de XP, se retrasan misiones/logros para no pisar
+    // el toast de XP en el mismo instante.
+    var offsetToast = data.xp_detalle ? 1600 : 0;
+    mostrarMisionesToast(data.misiones, offsetToast);
+    mostrarLogrosToast(data.logros, offsetToast);
     return total;
   }
   window.ExploraCO.aplicarResultadoXp = aplicarResultadoXp;
+
+  // ── Toast local de exito de una accion de XP (ADR-053 Dec 13.1) ──
+  // Un unico punto (Regla de No-Duplicidad) que reutiliza aplicarResultadoXp
+  // y fmtXp: encadena la acreditacion (XP + misiones/logros) y muestra el
+  // mensaje local de exito. Si el servidor trae xp_detalle, el numero de XP
+  // lo da UNICAMENTE el toast de desglose, asi que el mensaje local va SIN
+  // '+X XP' (dedup; evita el doble toast de NEXT.md:246). Sin xp_detalle se
+  // conserva el '+X XP' de siempre. `xp` permite mostrar un valor distinto
+  // de data.xp (p. ej. la visita, donde data.xp es el total acreditado).
+  function toastAccionXp(data, msg, color, xp) {
+    var detalle = !!(data && data.xp_detalle);
+    var n = (xp === undefined || xp === null) ? (Number(data && data.xp) || 0) : (Number(xp) || 0);
+    var texto = msg;
+    if (!detalle && n > 0) texto += ' \u00b7 +' + fmtXp(n) + ' XP';
+    if (texto) mostrarToast(texto, color || '#16a34a');
+    // Emite el desglose del servidor (si viene) y encadena misiones/logros.
+    aplicarResultadoXp(data);
+    return texto;
+  }
 
   // Deriva el contador de compartidos del catalogo de logros
   // (GET ?tipo=logros). Los tres logros de ADR-036 son acumulativos y
@@ -1482,6 +1578,15 @@
         if (nameEl) nameEl.textContent = usuario.nombre;
         if (xpEl)   xpEl.textContent   = fmtXp(usuario.xp_total) + ' XP';
         if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
+        // Barra de progreso del navbar (ADR-053 Decision 13): umbrales
+        // desde nivelesFuente() (window.NivelesData con fallback), nunca
+        // escritos en la UI.
+        var prg = progresoNivel(usuario.xp_total);
+        var xpFill = document.getElementById('perfil-xp-fill');
+        if (xpFill) xpFill.style.width = prg.pct + '%';
+        perfilBtn.title = prg.minSiguiente
+          ? ('Nivel ' + prg.nivel + ' \u00b7 faltan ' + fmtXp(prg.minSiguiente - (Number(usuario.xp_total) || 0)) + ' XP para el siguiente')
+          : ('Nivel ' + prg.nivel + ' \u00b7 nivel maximo');
       }
     } else {
       if (loginBtn) loginBtn.style.display = '';

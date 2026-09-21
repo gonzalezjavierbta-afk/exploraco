@@ -135,8 +135,17 @@
     return _cargarUuids().then(function () { return _uuidCache[slug] || null; });
   }
 
-  // -- XP local + toast (comportamiento previo, preservado) --
+  // -- XP local + toast (solo modo anonimo/local) --
+  // ADR-053 Dec 13.1 / NEXT.md:246: con sesion activa el XP real lo
+  // acredita el servidor y usuario-session.js ya muestra su toast (y el
+  // desglose del servidor). Se suprime el aviso local para no duplicar:
+  // el servidor es la fuente unica del toast de XP. Sin sesion (modo
+  // anonimo/local) el XP solo vive en localStorage y este aviso es la
+  // unica retroalimentacion, por eso se conserva el comportamiento previo.
+  // Deteccion de sesion: mismo mecanismo ya usado por este modulo (ver
+  // tSave/hidratar): window.ExploraCO.usuario.
   function _xpLocal() {
+    if (window.ExploraCO && window.ExploraCO.usuario) return;
     try {
       var pts = JSON.parse(localStorage.getItem('user_points') || '{}');
       pts.xp = (pts.xp || 0) + 5;
@@ -145,7 +154,9 @@
       pts.history.unshift({ action: 'guardar', xp: 5, label: 'Lugar guardado en Mi Mapa', ts: Date.now() });
       if (pts.history.length > 50) pts.history.length = 50;
       localStorage.setItem('user_points', JSON.stringify(pts));
-    } catch (e) {}
+    } catch (e) {
+      if (window.console && window.console.warn) console.warn('[directorio] _xpLocal', e);
+    }
     var t = document.getElementById('xp-dir-toast');
     if (!t) {
       t = document.createElement('div');

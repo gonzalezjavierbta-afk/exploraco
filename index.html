@@ -804,6 +804,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .xpc-fill{height:100%;background:var(--gold);border-radius:4px;transition:width .4s;width:0%}
 .badges-head{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin:2px 0 2px}
 .badges-head span{color:var(--gold)}
+/* Barra de XP del chip de perfil en el navbar (ADR-053 Dec 13) */
+.perfil-xp-bar{width:56px;height:4px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;flex-shrink:0}
+.perfil-xp-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#E8A020,#FFD700);transition:width .4s}
 #badges-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
 /* Logros / trofeos (estilo consola + Upland) */
 .logros-progress{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 12px 4px}
@@ -909,6 +912,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <span id="perfil-xp" style="color:#E8A020;margin-left:4px"></span>
       <span id="perfil-badge" style="color:rgba(255,255,255,.45);margin-left:4px"></span>
     </div>
+    <div class="perfil-xp-bar" aria-hidden="true"><div class="perfil-xp-fill" id="perfil-xp-fill"></div></div>
   </div><div class="hna">
     <div class="hnsb" onclick="document.getElementById('sinp').focus();window.scrollTo({top:0,behavior:'smooth'})">🔍 Buscar…</div>
     <button class="hncta" onclick="window.location.href='publicar.html'">Publicar lugar</button>
@@ -2964,29 +2968,31 @@ renderMyMap = function() {
 ══════════════════════════════════════════════════════ */
 
 // 20 niveles en 4 Eras (Mundana/Patrocinada/Leyenda/Gran Maestro).
-// Mismos umbrales que api/usuarios.js NIVELES y api/usuarios.js.
+// Mismos umbrales que api/usuarios.js NIVELES (v6, techo 42000, ADR-053).
 // max se computa automaticamente a partir del min del siguiente nivel.
+// TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
+// (evita la copia; hoy se conserva por costo de red/carga).
 var XP_LEVELS = [
   { min: 0,     nombre: 'Caminante Novato',      emoji: '\uD83C\uDF31', era: 'Era 1 Mundana',  capacidades: 'Guardar en Mi Viaje; Quick-Ratings; lectura de mapas' },
   { min: 100,   nombre: 'Rastreador Local',      emoji: '\uD83E\uDDED', era: 'Era 1',          capacidades: 'Resenas simples; primera foto; Chat Publico' },
   { min: 250,   nombre: 'Explorador Urbano',     emoji: '\uD83E\uDDED', era: 'Era 1',          capacidades: 'Mapas privados; Visitas confirmadas; unirse a Planes' },
   { min: 450,   nombre: 'Aventurero Regional',   emoji: '\uD83E\uDD7E', era: 'Era 1',          capacidades: 'Re-pin de fotos; resenas con dimensiones' },
   { min: 700,   nombre: 'Vanguardia Territorial',emoji: '\uD83C\uDFD9\uFE0F', era: 'Era 1',    capacidades: 'Mapas publicos; votos de utilidad (Own the Spot)' },
-  { min: 1000,  nombre: 'Embajador de Zona',     emoji: '\uD83C\uDFDB\uFE0F', era: 'Era 2 Patrocinada', capacidades: 'Crear Planes; acceso a tienda de canje' },
-  { min: 1400,  nombre: 'Fotografo de Ruta',     emoji: '\u2B50', era: 'Era 2',          capacidades: 'Albumes georreferenciados; fijar mensajes en salas' },
-  { min: 1900,  nombre: 'Cronista de Historias', emoji: '\uD83D\uDCD6', era: 'Era 2',          capacidades: 'Postular articulos (Inspirate); etiquetas en mapas' },
-  { min: 2500,  nombre: 'Buscador de Leyendas',  emoji: '\uD83E\uDDF0', era: 'Era 2',          capacidades: 'Ver rareza global; prioridad en moderacion' },
-  { min: 3200,  nombre: 'Guia de Fronteras',     emoji: '\uD83E\uDDED', era: 'Era 2',          capacidades: '50 mapas/200 guardados; desbloqueo cromos por ciudad' },
-  { min: 4000,  nombre: 'Estratega Comunitario', emoji: '\uD83C\uDFAF', era: 'Era 3',          capacidades: 'organizar_actividad; presidir salas regionales' },
-  { min: 5200,  nombre: 'Documentalista Visual', emoji: '\uD83C\uDFAC', era: 'Era 3',          capacidades: 'Video-Reels en fichas; galeria destacada en Blog' },
-  { min: 6800,  nombre: 'Senor del Spot',        emoji: '\uD83D\uDC51', era: 'Era 3',          capacidades: 'Disputa avanzada Own the Spot; x1.1 XP en esa ciudad' },
-  { min: 8500,  nombre: 'Cartografo de Cine',    emoji: '\uD83C\uDF05', era: 'Era 3',          capacidades: 'Mapas de Cine; FUNDAR PARCHE' },
-  { min: 10500, nombre: 'Protector del Patrimonio', emoji: '\uD83D\uDEE1\uFE0F', era: 'Era 3', capacidades: 'Moderacion galerias/resenas; badge Plata Neon' },
-  { min: 13000, nombre: 'Curador de Colombia',   emoji: '\uD83E\uD489', era: 'Era 4 Leyenda',  capacidades: 'Cromos dorados; insignias legendarias (+100 XP)' },
-  { min: 16000, nombre: 'Mariscal de Parche',    emoji: '\uD83D\uDCA5', era: 'Era 4',          capacidades: 'x1.2 XP de Parche grupal; pases VIP' },
-  { min: 19500, nombre: 'Cineasta de Territorio', emoji: '\uD83C\uDFA5', era: 'Era 4',         capacidades: 'Videos en Hero; destacado permanente' },
-  { min: 24000, nombre: 'Inmortal del Mapa',     emoji: '\uD83D\uDD25', era: 'Era 4',          capacidades: 'Marco avatar Neon Fuego; acceso beta' },
-  { min: 30000, nombre: 'Gran Maestro ExploraCO', emoji: '\uD83D\uDC51', era: 'Era 4',          capacidades: 'Maximo prestigio; A2A Agent Card' },
+  { min: 1050,  nombre: 'Embajador de Zona',     emoji: '\uD83C\uDFDB\uFE0F', era: 'Era 2 Patrocinada', capacidades: 'Crear Planes; acceso a tienda de canje' },
+  { min: 1500,  nombre: 'Fotografo de Ruta',     emoji: '\u2B50', era: 'Era 2',          capacidades: 'Albumes georreferenciados; fijar mensajes en salas' },
+  { min: 2100,  nombre: 'Cronista de Historias', emoji: '\uD83D\uDCD6', era: 'Era 2',          capacidades: 'Postular articulos (Inspirate); etiquetas en mapas' },
+  { min: 2900,  nombre: 'Buscador de Leyendas',  emoji: '\uD83E\uDDF0', era: 'Era 2',          capacidades: 'Ver rareza global; prioridad en moderacion' },
+  { min: 3900,  nombre: 'Guia de Fronteras',     emoji: '\uD83E\uDDED', era: 'Era 2',          capacidades: '50 mapas/200 guardados; desbloqueo cromos por ciudad' },
+  { min: 5200,  nombre: 'Estratega Comunitario', emoji: '\uD83C\uDFAF', era: 'Era 3',          capacidades: 'organizar_actividad; presidir salas regionales' },
+  { min: 6800,  nombre: 'Documentalista Visual', emoji: '\uD83C\uDFAC', era: 'Era 3',          capacidades: 'Video-Reels en fichas; galeria destacada en Blog' },
+  { min: 8800,  nombre: 'Senor del Spot',        emoji: '\uD83D\uDC51', era: 'Era 3',          capacidades: 'Disputa avanzada Own the Spot; x1.1 XP en esa ciudad' },
+  { min: 11200, nombre: 'Cartografo de Cine',    emoji: '\uD83C\uDF05', era: 'Era 3',          capacidades: 'Mapas de Cine; FUNDAR PARCHE' },
+  { min: 14200, nombre: 'Protector del Patrimonio', emoji: '\uD83D\uDEE1\uFE0F', era: 'Era 3', capacidades: 'Moderacion galerias/resenas; badge Plata Neon' },
+  { min: 17800, nombre: 'Curador de Colombia',   emoji: '\uD83E\uD489', era: 'Era 4 Leyenda',  capacidades: 'Cromos dorados; insignias legendarias (+100 XP)' },
+  { min: 22200, nombre: 'Mariscal de Parche',    emoji: '\uD83D\uDCA5', era: 'Era 4',          capacidades: 'x1.2 XP de Parche grupal; pases VIP' },
+  { min: 27500, nombre: 'Cineasta de Territorio', emoji: '\uD83C\uDFA5', era: 'Era 4',         capacidades: 'Videos en Hero; destacado permanente' },
+  { min: 34000, nombre: 'Inmortal del Mapa',     emoji: '\uD83D\uDD25', era: 'Era 4',          capacidades: 'Marco avatar Neon Fuego; acceso beta' },
+  { min: 42000, nombre: 'Gran Maestro ExploraCO', emoji: '\uD83D\uDC51', era: 'Era 4',          capacidades: 'Maximo prestigio; A2A Agent Card' },
 ];
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;
@@ -3148,7 +3154,13 @@ var _ultimoNivelVisto = null;
    Unico punto que lee window.ExploraCO.usuario. Se llama despues de
    login, de guardar/quitar/visitar, de publicar resena y al cargar la
    pagina (ver window.onExploraCOUpdate mas abajo, que usuario-session.js
-   invoca cada vez que actualiza su propio estado). */
+   invoca cada vez que actualiza su propio estado).
+   NOTA ADR-053 Dec 13 (huerfanos): los contenedores legacy #pts-xp,
+   #pts-level, #pts-bar, #badges-grid, #logros-grid y #mm-level-* YA NO
+   existen en el DOM (comunidad unificada). Cada acceso va con guarda
+   `if(el)` y las funciones salen sin error; el unico display activo es
+   #perfil-xp/#perfil-badge (+ #perfil-xp-fill) del navbar, que actualiza
+   usuario-session.js. El modal #levelup-modal si existe y se conserva. */
 function updatePointsUI() {
   var pu  = puntosUsuarioActual();
   var lvl = getLevel(pu.xp);
@@ -3289,6 +3301,11 @@ function _compartidosDeLogros(logros) {
   return f ? f(logros) : 0;
 }
 function cargarLogros() {
+  // ADR-053 Dec 13: #logros-grid / #badges-grid ya NO existen en el DOM
+  // (comunidad unificada). Sin contenedor no se hace el fetch: la funcion
+  // sale sin error y sin trafico inutil. Si se repone el contenedor,
+  // vuelve a operar (mismo patron de guarda conservadora que el resto).
+  if (!document.getElementById('logros-grid') && !document.getElementById('badges-grid')) return;
   var u = window.ExploraCO && window.ExploraCO.usuario;
   if (!u || !u.id) {
     _LOGROS_CACHE = [];
@@ -3311,7 +3328,7 @@ function cargarLogros() {
         if (earned) _toastBadgesNuevos(earned);
       }
     })
-    .catch(function() {});
+    .catch(function(e) { if (window.console) console.warn('[index] cargarLogros', e); });
 }
 function renderLogrosGrid() {
   var grid = document.getElementById('logros-grid');

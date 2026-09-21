@@ -174,12 +174,31 @@
           c.yaVotado = !!res.ya_votado;
           c.votos = num(res.votos);
           pintarVoto(btn, c);
-          if (res.xp > 0) { toast('+' + res.xp + ' XP', '#16a34a'); }
+          // ADR-053 Dec 13.1: el servidor es la fuente unica del toast de XP.
+          // Con xp_detalle manda aplicarResultadoXp (desglose); se suprime el
+          // toast local para no duplicar (NEXT.md:246).
+          var aplicaXp = (window.ExploraCO && typeof window.ExploraCO.aplicarResultadoXp === 'function')
+            ? window.ExploraCO.aplicarResultadoXp : null;
+          if (res.xp_detalle && aplicaXp) {
+            aplicaXp(res);
+          } else {
+            if (num(res.xp) > 0) { toast('+' + num(res.xp) + ' XP', '#16a34a'); }
+            if (aplicaXp) { aplicaXp(res); }
+          }
           return res;
         }
         if (res.__status === 409) { c.yaVotado = true; pintarVoto(btn, c); return res; }
         if (res.__status === 400 || res.__status === 401) { pedirLogin('Inicia sesi\u00f3n para votar esta foto.'); return res; }
-        if (res.__status === 429) { toast(res.error || 'Limite de votos por dia alcanzado', '#E8A020'); return res; }
+        if (res.__status === 429) {
+          // ADR-053 Dec 13.2: el cupo/enfriamiento se informa con el helper
+          // unico de usuario-session.js (la UI solo informa, nunca bloquea).
+          if (window.ExploraCO && typeof window.ExploraCO.mostrarEstadoCupo === 'function') {
+            window.ExploraCO.mostrarEstadoCupo({ tipo: 'cupo', mensaje: res.error || '' });
+          } else {
+            toast(res.error || 'Limite de votos por dia alcanzado', '#E8A020');
+          }
+          return res;
+        }
         toast(res.error || 'No se pudo registrar tu voto', '#ef4444');
         return res;
       })

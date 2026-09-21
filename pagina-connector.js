@@ -159,11 +159,20 @@
         var data = await res.json();
 
         if (data.ok) {
-          var xp = data.xp_ganado || 0;
-          mostrarXpToast(xp > 0 ? '⭐ Reseña guardada · +' + xp + ' XP' : '⭐ Reseña guardada', '#16a34a');
+          // ADR-053 Dec 13.1: el servidor es la fuente unica del toast de XP.
+          // Si la respuesta trae xp_detalle, el toast con desglose
+          // (aplicarResultadoXp) lo muestra y aqui se suprime el numero para
+          // no duplicar (NEXT.md:246). El campo real del backend es xp
+          // (no xp_ganado, ver BUG-012).
+          var detalleXp = !!data.xp_detalle;
+          var xp = Number(data.xp) || 0;
+          mostrarXpToast('⭐ Reseña guardada' + (!detalleXp && xp > 0 ? ' · +' + xp + ' XP' : ''), '#16a34a');
 
-          // Actualizar XP local
-          if (window.ExploraCO && window.ExploraCO.usuario) {
+          // Acreditacion + misiones/logros + sincronizacion de XP local en el
+          // helper unico de usuario-session.js (Regla de No-Duplicidad).
+          if (window.ExploraCO && typeof window.ExploraCO.aplicarResultadoXp === 'function') {
+            window.ExploraCO.aplicarResultadoXp(data);
+          } else if (window.ExploraCO && window.ExploraCO.usuario && xp > 0) {
             window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + xp;
           }
 
@@ -217,10 +226,20 @@
         });
         var data = await res.json();
 
-        if (data.ok && saving && data.xp_ganado > 0) {
-          mostrarXpToast('♥ Guardado permanentemente · +' + data.xp_ganado + ' XP', '#E8A020');
-          if (window.ExploraCO && window.ExploraCO.usuario) {
-            window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp_ganado;
+        if (data.ok && saving) {
+          // ADR-053 Dec 13.1: si el servidor manda xp_detalle, el toast con
+          // desglose (aplicarResultadoXp) es la unica fuente de XP; se suprime
+          // el numero local para no duplicar (NEXT.md:246). El campo real del
+          // backend es xp (no xp_ganado, ver BUG-012).
+          var detalleG = !!data.xp_detalle;
+          var xpG = Number(data.xp) || 0;
+          if (detalleG || xpG > 0) {
+            mostrarXpToast('♥ Guardado permanentemente' + (!detalleG && xpG > 0 ? ' · +' + xpG + ' XP' : ''), '#E8A020');
+          }
+          if (window.ExploraCO && typeof window.ExploraCO.aplicarResultadoXp === 'function') {
+            window.ExploraCO.aplicarResultadoXp(data);
+          } else if (window.ExploraCO && window.ExploraCO.usuario && xpG > 0) {
+            window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + xpG;
           }
         }
       } catch (err) {

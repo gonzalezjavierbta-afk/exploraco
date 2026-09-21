@@ -117,22 +117,32 @@
           }),
         });
         var data = await res.json();
-        if (data.ok && data.xp_ganado > 0) {
-          // Mostrar XP ganado
-          var xpBadge = document.createElement('div');
-          xpBadge.style.cssText = [
-            'position:fixed;bottom:24px;right:24px;',
-            'background:#16a34a;color:#fff;',
-            'padding:10px 18px;border-radius:8px;',
-            'font-weight:700;font-size:13px;z-index:9999;',
-          ].join('');
-          xpBadge.textContent = '⭐ Reseña guardada · +' + data.xp_ganado + ' XP';
-          document.body.appendChild(xpBadge);
-          setTimeout(function () { xpBadge.remove(); }, 3000);
+        if (data.ok) {
+          // ADR-053 Dec 13.1: el servidor es la fuente unica del toast de XP.
+          // Con xp_detalle el toast con desglose (aplicarResultadoXp) lo
+          // muestra; aqui se suprime el numero para no duplicar (NEXT.md:246).
+          // El campo real del backend es xp (no xp_ganado, ver BUG-012).
+          var detalleR = !!data.xp_detalle;
+          var xpR = Number(data.xp) || 0;
+          if (detalleR || xpR > 0) {
+            var xpBadge = document.createElement('div');
+            xpBadge.style.cssText = [
+              'position:fixed;bottom:24px;right:24px;',
+              'background:#16a34a;color:#fff;',
+              'padding:10px 18px;border-radius:8px;',
+              'font-weight:700;font-size:13px;z-index:9999;',
+            ].join('');
+            xpBadge.textContent = '⭐ Reseña publicada' + (!detalleR && xpR > 0 ? ' · +' + xpR + ' XP' : '');
+            document.body.appendChild(xpBadge);
+            setTimeout(function () { xpBadge.remove(); }, 3000);
+          }
 
-          // Actualizar XP en sesión local
-          if (window.ExploraCO && window.ExploraCO.usuario) {
-            window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + data.xp_ganado;
+          // Acreditacion + misiones/logros + sincronizacion de XP local en el
+          // helper unico de usuario-session.js (Regla de No-Duplicidad).
+          if (window.ExploraCO && typeof window.ExploraCO.aplicarResultadoXp === 'function') {
+            window.ExploraCO.aplicarResultadoXp(data);
+          } else if (window.ExploraCO && window.ExploraCO.usuario && xpR > 0) {
+            window.ExploraCO.usuario.xp_total = (window.ExploraCO.usuario.xp_total || 0) + xpR;
           }
         }
       } catch (err) {

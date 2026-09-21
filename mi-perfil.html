@@ -3298,7 +3298,10 @@ function cargarMiRed(uid) {
   });
 }
 
-/* ---- Tu Faccion (primera gratis, cambios 500 XP / 15 dias) ---- */
+/* ---- Tu Faccion (primera gratis, cambios 800 XP / 15 dias) ----
+   Costo unico (ADR-053 Dec 10: era 500): se reutiliza COSTO_FACCION en
+   todos los textos para no duplicar el literal (Regla de No-Duplicidad). */
+var COSTO_FACCION = 800;
 function faccionDiasRestantes(u) {
   if (!u || !u.faccion || !u.faccion_elegida_en) return 0;
   var t = Date.parse(u.faccion_elegida_en);
@@ -3323,11 +3326,11 @@ function cargarFacciones(uid) {
     html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
       + '<span class="facc-current">Tu faccion: ' + esc(actual) + '</span>'
       + '<span style="font-size:11px;color:rgba(255,255,255,.5);">'
-      + (dias > 0 ? 'Cambio disponible en ' + dias + ' d\u00EDas (500 XP)' : 'Puedes cambiar de faccion (500 XP)')
+      + (dias > 0 ? 'Cambio disponible en ' + dias + ' d\u00EDas (' + COSTO_FACCION + ' XP)' : 'Puedes cambiar de faccion (' + COSTO_FACCION + ' XP)')
       + '</span>'
       + '</div>';
   } else {
-    html += '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px;">Primera eleccion gratis. Cambios posteriores: 500 XP con 15 dias de espera.</div>';
+    html += '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px;">Primera eleccion gratis. Cambios posteriores: ' + COSTO_FACCION + ' XP con 15 dias de espera.</div>';
   }
   html += '<div class="facc-grid">';
   for (var i = 0; i < FACCION_META.length; i++) {
@@ -3365,7 +3368,7 @@ function elegirFaccion(faccion, btn) {
     if (err === 'EMAIL_SIN_VERIFICAR') msg = 'Verifica tu email antes de elegir faccion';
     else if (err === 'FACCION_YA_ELEGIDA') msg = 'Ya elegiste faccion en esta cuenta';
     else if (err === 'COOLDOWN_FACCION') msg = 'Debes esperar 15 dias desde tu ultimo cambio de faccion';
-    else if (err === 'PUNTOS_INSUFICIENTES') msg = 'Necesitas 500 XP para cambiar de faccion';
+    else if (err === 'PUNTOS_INSUFICIENTES') msg = 'Necesitas ' + COSTO_FACCION + ' XP para cambiar de faccion';
     else if (err === 'FACCION_INVALIDA') msg = 'Faccion invalida';
     showToast(msg, '#ef4444');
   }).catch(function(){
@@ -4329,9 +4332,12 @@ function renderCuentaPanel() {
 }
 
 /* ---- Mi Casa (identidad de equipo) ----
-   Primera eleccion gratis desde nivel 2; cambio: 300 XP + cooldown 30 dias.
+   Primera eleccion gratis desde nivel 2; cambio: 500 XP + cooldown 30 dias
+   (costo unico ADR-053 Dec 10: era 300; se reutiliza COSTO_CASA para no
+   duplicar el literal, Regla de No-Duplicidad).
    Sesion firmada JWT obligatoria. La confirmacion del costo y del posible
    de-nivel es explicita antes de enviar. */
+var COSTO_CASA = 500;
 var CASAS_META = [
   { id:'condor', nombre:'Casa Condor', emoji:'\uD83E\uDD85', color:'#3B82F6', desc:'Andes y altura: montana, caminatas, miradores y patrimonio andino.' },
   { id:'jaguar', nombre:'Casa Jaguar', emoji:'\uD83D\uDC06', color:'#22C55E', desc:'Selva y Pacifico: biodiversidad, rutas remotas y naturaleza densa.' },
@@ -4364,9 +4370,9 @@ function cargarCasas(uid) {
   var html = '';
   if (actual) {
     html += '<div class="pf-casa-cabeza"><span class="facc-current">Tu Casa: ' + esc(pfCasaNombre(actual)) + '</span>'
-      + '<span class="pf-casa-meta">' + (dias > 0 ? 'Cambio disponible en ' + dias + ' dias (300 XP)' : 'Puedes cambiar de Casa (300 XP)') + '</span></div>';
+      + '<span class="pf-casa-meta">' + (dias > 0 ? 'Cambio disponible en ' + dias + ' dias (' + COSTO_CASA + ' XP)' : 'Puedes cambiar de Casa (' + COSTO_CASA + ' XP)') + '</span></div>';
   } else {
-    html += '<div class="pf-casa-nota">Primera eleccion gratis (nivel 2 en adelante). Cambiarla cuesta 300 XP y 30 dias de espera.</div>';
+    html += '<div class="pf-casa-nota">Primera eleccion gratis (nivel 2 en adelante). Cambiarla cuesta ' + COSTO_CASA + ' XP y 30 dias de espera.</div>';
   }
   if (!actual && nivel < 2) html += '<div class="pf-casa-nota">Necesitas nivel 2 para elegir tu Casa.</div>';
   html += '<div class="facc-grid">';
@@ -4407,7 +4413,7 @@ function cargarCasas(uid) {
   }
 }
 function casaErrorMsg(err, u) {
-  if (err === 'PUNTOS_INSUFICIENTES') return 'Necesitas 300 XP para cambiar de Casa';
+  if (err === 'PUNTOS_INSUFICIENTES') return 'Necesitas ' + COSTO_CASA + ' XP para cambiar de Casa';
   if (err === 'COOLDOWN_CASA') {
     var d = casaDiasRestantes(u);
     return d > 0 ? ('Debes esperar ' + d + ' dias para cambiar de Casa') : 'Tu Casa sigue en periodo de espera';
@@ -4424,9 +4430,9 @@ function elegirCasa(casa, btn) {
   if (!u) return;
   var nombre = pfCasaNombre(casa);
   if (u.casa) {
-    if (!window.confirm('Este cambio cuesta 300 XP y puede bajarte de nivel. Tampoco podras volver a cambiar tu Casa en 30 dias. Deseas cambiar a ' + nombre + '?')) return;
+    if (!window.confirm('Este cambio cuesta ' + COSTO_CASA + ' XP y puede bajarte de nivel. Tampoco podras volver a cambiar tu Casa en 30 dias. Deseas cambiar a ' + nombre + '?')) return;
   } else {
-    if (!window.confirm('Tu primera Casa es gratis. Despues, cambiarla cuesta 300 XP y tiene 30 dias de espera. Deseas jurar por ' + nombre + '?')) return;
+    if (!window.confirm('Tu primera Casa es gratis. Despues, cambiarla cuesta ' + COSTO_CASA + ' XP y tiene 30 dias de espera. Deseas jurar por ' + nombre + '?')) return;
   }
   var etiqueta = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando\u2026'; }

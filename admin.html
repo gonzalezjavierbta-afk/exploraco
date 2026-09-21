@@ -498,6 +498,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('jugadores')" id="snav-jugadores">
     <span class="snav-icon">&#127918;</span>Jugadores
   </div>
+  <div class="snav-item" onclick="showScreen('salud')" id="snav-salud">
+    <span class="snav-icon">&#128147;</span>Salud de la Red
+  </div>
 </nav>
 
 <!-- ─── WORKSPACE ───────────────────────────────── -->
@@ -2090,6 +2093,38 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 </div>
 <!-- /screen-jugadores -->
 
+<!-- ==== SALUD DE LA RED (gamificacion v6 / ADR-053 Dec 13.3) ==== -->
+<div class="ws-screen" id="screen-salud">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">SALUD DE LA RED</div>
+      <div class="ws-subtitle">Metricas del ledger de XP (xp_ledger) y leaderboard de viajeros</div>
+    </div>
+    <div class="ws-actions">
+      <select class="form-input" id="salud-dias" onchange="cargarSaludRed()" style="width:120px">
+        <option value="7">7 dias</option>
+        <option value="30" selected>30 dias</option>
+        <option value="90">90 dias</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="cargarSaludRed()">&#8635; Actualizar</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+    <style>
+      #screen-salud .stats-grid{padding:0;grid-template-columns:repeat(4,1fr)}
+      @media(max-width:900px){#screen-salud .stats-grid{grid-template-columns:1fr 1fr}}
+      #screen-salud .slud-bar-row{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:6px}
+      #screen-salud .slud-bar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+      #screen-salud .slud-bar-fill{display:block;height:100%;border-radius:4px}
+      #screen-salud .slud-note{font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5}
+      #screen-salud .slud-aviso{background:#FFF4E5;border:1px solid var(--gold);border-radius:10px;padding:12px 14px;font-size:12px;color:#7A4B10;line-height:1.5}
+    </style>
+    <div class="stats-grid" id="salud-stats"></div>
+    <div id="salud-cuerpo"></div>
+  </div>
+</div>
+
 <!-- ════ MODAL: EDITAR CONSUMIBLE (ADR-018) ════ -->
 <div id="consumible-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;width:min(520px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
@@ -2337,6 +2372,7 @@ function showScreen(name) {
     else { loadPendientes(); }
   }
   if(name === 'consumibles') loadConsumibles();
+  if(name === 'salud') cargarSaludRed();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
     return;
@@ -7359,7 +7395,11 @@ function fmtXp(n) {
    GET  /api/interacciones?tipo=vocaciones_usuario&usuario_id=ID
         -> { ok:true, data:{ activadas:[slugs], catalogo:[{slug,nombre,min_nivel}] } }
    Errores tipificados 400/401/403/404 -> { error: '...' } */
-var _jugNiveles = [0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000];
+/* Espejo #3 de los 8 de la tabla de 20 umbrales (ADR-053 Decision 11;
+   Enmienda 1 lo reintegro al conteo: antes estaba OMITIDO del smoke).
+   Sincronizado con la fuente servidor api/usuarios.js:NIVELES (techo 42000).
+   Gate: node scripts/smoke_niveles_espejos.js (debe pasar admin.html). */
+var _jugNiveles = [0,100,250,450,700,1050,1500,2100,2900,3900,5200,6800,8800,11200,14200,17800,22200,27500,34000,42000];
 var _jugActivo = null;
 var _jugActivoData = null;
 var _jugActivoVocaciones = null;
@@ -7446,8 +7486,11 @@ function jugRender(u, conVocaciones) {
   var acciones = document.getElementById('jug-acciones');
   var xpActual = Number(p.xp_total) || 0;
   var lvl = Number(p.nivel) || 1;
-  var xpMin = _jugNiveles[lvl] || 0;
-  var xpMax = (lvl < 20) ? (_jugNiveles[lvl + 1] || 999999) : 999999;
+  /* Bandas de nivel 1..20 (ADR-053 Dec 11): _jugNiveles es 0-based (indice
+     lvl-1 = min del nivel actual); el techo del Nv20 se DERIVA del espejo
+     (_jugNiveles[19] = 42000), sin literales magicos sueltos. */
+  var xpMin = _jugNiveles[lvl - 1] || 0;
+  var xpMax = (lvl < 20) ? _jugNiveles[lvl] : _jugNiveles[_jugNiveles.length - 1];
   var pct = Math.max(0, Math.min(100, Math.round(((xpActual - xpMin) / Math.max(1, xpMax - xpMin)) * 100)));
   var html = '';
   html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">';
@@ -7602,6 +7645,272 @@ function limpiarPanelJugadores() {
 }
 
 
+/* ===== SALUD DE LA RED (gamificacion v6 / ADR-053 Dec 13.3) =====
+   Consume la rama REAL GET /api/admin?recurso=salud_red&dias=N de
+   api/admin.js v4 y reusa GET /api/usuarios?tipo=leaderboard (ya
+   existente). Prefijo "salud" en funciones/ids para evitar colisiones
+   (BUG-006/018/019). Auth con _adminHeaders() (helper unico del panel,
+   sin duplicar headers). Cero endpoints nuevos (8/8, ADR-001).
+   Shape verificado contra el archivo real (ADR-006):
+     data = { ventana_dias, xp_total_entregado,
+              por_dia:[{dia,xp,eventos}],
+              por_accion:[{accion,xp_entregado,eventos,cap_aplicado_top}],
+              usuarios_activos,
+              usuarios_activos_por_dia:[{dia,usuarios}],
+              caps_por_accion:[{accion,cap_aplicado,n}],
+              caps:{cap_progresion_veces,cap_global_veces},
+              distribucion_nivel:{derivado:[{nivel,usuarios}],
+                                  visible:[{nivel,usuarios}]},
+              exentos:{xp_total_entregado,eventos,
+                       por_accion:[{accion,xp_entregado,eventos}]},
+              nivel_max_vs_derivado:{total,protegidos,brecha_max},
+              alertas:[{tipo,detalle}] }
+   Degradacion backend: 200 {ok:true,degradado:true,motivo} si falta
+   xp_ledger (migracion 031); la UI avisa, nunca muestra NaN. */
+
+function saludDias() {
+  var sel = document.getElementById('salud-dias');
+  var n = sel ? parseInt(sel.value, 10) : 30;
+  if (!isFinite(n) || n < 1) n = 30;
+  return n;
+}
+
+function saludFecha(dia) {
+  var s = String(dia == null ? '' : dia);
+  return s.slice(0, 10);
+}
+
+function saludFmtInt(n) {
+  var v = parseInt(n, 10);
+  if (!isFinite(v)) v = 0;
+  return String(v);
+}
+
+function saludCard(titulo, inner) {
+  return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">' + titulo + '</div>'
+    + inner + '</div>';
+}
+
+function saludStatCard(num, label, sub, color) {
+  return '<div class="stat-card">'
+    + '<div class="stat-num">' + num + '</div>'
+    + '<div class="stat-label">' + label + '</div>'
+    + '<div class="stat-sub">' + (sub || '') + '</div>'
+    + '<div class="stat-bar"><div class="stat-bar-fill" style="width:100%;background:' + (color || 'var(--gold)') + '"></div></div>'
+    + '</div>';
+}
+
+function saludBars(items, valFn, labelFn, color, fmtFn) {
+  if (!items.length) return '<div class="slud-note">Sin datos en la ventana.</div>';
+  var max = 0;
+  items.forEach(function(it){ var v = Number(valFn(it)) || 0; if (v > max) max = v; });
+  var html = '';
+  items.forEach(function(it){
+    var v = Number(valFn(it)) || 0;
+    var pct = max > 0 ? Math.max(0, Math.min(100, Math.round(v / max * 100))) : 0;
+    html += '<div class="slud-bar-row">'
+      + '<span style="width:74px;flex:none;color:var(--muted)">' + _esc(labelFn(it)) + '</span>'
+      + '<span class="slud-bar-track"><span class="slud-bar-fill" style="width:' + pct + '%;background:' + color + '"></span></span>'
+      + '<span style="width:84px;flex:none;text-align:right;font-weight:700">' + fmtFn(v) + '</span>'
+      + '</div>';
+  });
+  return html;
+}
+
+function saludTabla(headers, filas, aligns, nota) {
+  var html = '<table class="data-table"><thead><tr>';
+  headers.forEach(function(h, i){
+    html += '<th' + (aligns && aligns[i] ? ' style="' + aligns[i] + '"' : '') + '>' + h + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+  if (!filas.length) {
+    html += '<tr><td colspan="' + headers.length + '" style="color:var(--muted)">Sin datos en la ventana.</td></tr>';
+  } else {
+    filas.forEach(function(fila){
+      html += '<tr>';
+      for (var i = 0; i < headers.length; i++) {
+        html += '<td' + (aligns && aligns[i] ? ' style="' + aligns[i] + '"' : '') + '>' + (fila[i] == null ? '' : fila[i]) + '</td>';
+      }
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table>';
+  if (nota) html += '<div class="slud-note">' + nota + '</div>';
+  return html;
+}
+
+function saludSubtabla(etiqueta, rows) {
+  var t = '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">' + etiqueta + '</div>';
+  t += '<table class="data-table" style="margin-top:0"><thead><tr><th>Nivel</th><th style="text-align:right">Usuarios</th></tr></thead><tbody>';
+  if (!rows.length) t += '<tr><td colspan="2" style="color:var(--muted)">Sin usuarios activos.</td></tr>';
+  else rows.forEach(function(r){
+    t += '<tr><td>Nv ' + saludFmtInt(r.nivel) + '</td><td style="text-align:right">' + saludFmtInt(r.usuarios) + '</td></tr>';
+  });
+  t += '</tbody></table>';
+  return t;
+}
+
+function saludRenderAviso(msgHtml) {
+  var stats = document.getElementById('salud-stats');
+  var cuerpo = document.getElementById('salud-cuerpo');
+  if (stats) stats.innerHTML = '';
+  if (!cuerpo) return;
+  cuerpo.innerHTML = saludCard('Metricas no disponibles',
+    '<div class="slud-aviso">' + msgHtml + '</div>'
+    + '<div id="salud-leaderboard" style="margin-top:14px"><div class="slud-note">Cargando leaderboard...</div></div>');
+  saludCargarLeaderboard();
+}
+
+function saludCargarLeaderboard() {
+  var box = document.getElementById('salud-leaderboard');
+  if (!box) return;
+  fetch('/api/usuarios?tipo=leaderboard&limit=20', { headers: _adminHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (!res || !res.ok || !res.data) {
+        box.innerHTML = '<div class="slud-note" style="color:var(--red)">No se pudo cargar el leaderboard.</div>';
+        return;
+      }
+      var rows = res.data;
+      var html = '<table class="data-table"><thead><tr>'
+        + '<th>#</th><th>Viajero</th><th>Nivel</th><th>Insignia</th>'
+        + '<th style="text-align:right">XP</th></tr></thead><tbody>';
+      if (!rows.length) {
+        html += '<tr><td colspan="5" style="color:var(--muted)">Sin viajeros registrados.</td></tr>';
+      } else {
+        rows.forEach(function(u, i){
+          var lvlNum = parseInt(u.nivel, 10) || 0;
+          var max = parseInt(u.nivel_max, 10) || 0;
+          var nvlTxt = 'Nv ' + lvlNum + (max > lvlNum ? ' (max ' + max + ')' : '');
+          html += '<tr>'
+            + '<td style="font-weight:700">' + (i + 1) + '</td>'
+            + '<td>' + _esc(u.nombre || '(sin nombre)') + '</td>'
+            + '<td>' + _esc(nvlTxt) + '</td>'
+            + '<td>' + _esc(u.badge_actual || '') + '</td>'
+            + '<td style="text-align:right;font-weight:700">' + fmtXp(u.xp_total) + '</td>'
+            + '</tr>';
+        });
+      }
+      html += '</tbody></table>';
+      box.innerHTML = html;
+    })
+    .catch(function(err){
+      box.innerHTML = '<div class="slud-note" style="color:var(--red)">No se pudo cargar el leaderboard'
+        + (err && err.message ? ': ' + _esc(err.message) : '') + '. Reintenta con Actualizar.</div>';
+    });
+}
+
+function saludRender(d, dias) {
+  var stats = document.getElementById('salud-stats');
+  var cuerpo = document.getElementById('salud-cuerpo');
+  if (!stats || !cuerpo) return;
+
+  var porDia = Array.isArray(d.por_dia) ? d.por_dia.slice().reverse() : [];
+  var porAccion = Array.isArray(d.por_accion) ? d.por_accion : [];
+  var caps = Array.isArray(d.caps_por_accion) ? d.caps_por_accion : [];
+  var exentos = d.exentos || {};
+  var dist = d.distribucion_nivel || { derivado: [], visible: [] };
+  var alertas = Array.isArray(d.alertas) ? d.alertas : [];
+  var totalEventos = 0;
+  porDia.forEach(function(x){ totalEventos += parseInt(x.eventos, 10) || 0; });
+  var totalCaps = 0;
+  caps.forEach(function(x){ totalCaps += parseInt(x.n, 10) || 0; });
+
+  stats.innerHTML =
+      saludStatCard(fmtXp(d.xp_total_entregado), 'XP entregado', 'ventana de ' + dias + ' d&iacute;as', 'var(--gold)')
+    + saludStatCard(saludFmtInt(totalEventos), 'Eventos', 'acreditaciones no exentas', 'var(--blue)')
+    + saludStatCard(saludFmtInt(d.usuarios_activos), 'Usuarios activos', 'distintos en la ventana', '#8b5cf6')
+    + saludStatCard(saludFmtInt(totalCaps), 'Caps aplicados', 'acciones recortadas', 'var(--red)');
+
+  var html = '';
+
+  if (alertas.length) {
+    html += '<div class="slud-aviso" style="margin-bottom:14px">'
+      + alertas.map(function(a){ return _esc(a.detalle || a.tipo || ''); }).join('<br>')
+      + '</div>';
+  }
+
+  var serieHtml = saludBars(porDia, function(x){ return x.xp; }, function(x){ return saludFecha(x.dia); }, 'var(--gold)', fmtXp)
+    + '<div style="height:10px"></div>'
+    + saludBars(porDia, function(x){ return x.eventos; }, function(x){ return saludFecha(x.dia); }, 'var(--blue)', saludFmtInt);
+  html += saludCard('Serie por d&iacute;a (XP entregado y eventos)', serieHtml
+    + '<div class="slud-note">Orden cronol&oacute;gico de la ventana. Barra superior: XP entregado. Barra inferior: n&uacute;mero de eventos.</div>');
+
+  var filasAccion = porAccion.map(function(a){
+    return [_esc(a.accion), fmtXp(a.xp_entregado), saludFmtInt(a.eventos), _esc(a.cap_aplicado_top || '-')];
+  });
+  html += saludCard('Top acciones por XP entregado',
+    saludTabla(['Acci&oacute;n', 'XP entregado', 'Eventos', 'Cap top'], filasAccion,
+      [null, 'text-align:right', 'text-align:right', 'text-align:right'], ''));
+
+  var filasCaps = caps.map(function(c){
+    return [_esc(c.accion), _esc(c.cap_aplicado || ''), saludFmtInt(c.n)];
+  });
+  html += saludCard('Tasa de caps por acci&oacute;n',
+    saludTabla(['Acci&oacute;n', 'Cap aplicado', 'n'], filasCaps,
+      [null, null, 'text-align:right'],
+      'Conteo de filas del ledger donde el cap recort&oacute; XP (progresi&oacute;n, global o de acci&oacute;n).'));
+
+  var distDer = Array.isArray(dist.derivado) ? dist.derivado : [];
+  var distVis = Array.isArray(dist.visible) ? dist.visible : [];
+  var distHtml = '<div style="display:flex;gap:16px;flex-wrap:wrap">'
+    + '<div style="flex:1 1 220px">' + saludSubtabla('Derivado (economia / M_nivel)', distDer) + '</div>'
+    + '<div style="flex:1 1 220px">' + saludSubtabla('Visible (insignia exhibida)', distVis) + '</div>'
+    + '</div>'
+    + '<div class="slud-note">La vista <b>derivado</b> se calcula de xp_total y es la que manda para M_nivel: gastar XP puede bajar el multiplicador. La vista <b>visible</b> aplica nivel_max sobre la insignia (se conserva el mayor nivel alcanzado aunque el XP baje).</div>';
+  html += saludCard('Distribuci&oacute;n de nivel (dos vistas)', distHtml);
+
+  var exPorAccion = Array.isArray(exentos.por_accion) ? exentos.por_accion : [];
+  var filasEx = exPorAccion.map(function(a){
+    return [_esc(a.accion), fmtXp(a.xp_entregado), saludFmtInt(a.eventos)];
+  });
+  html += saludCard('Exentos (fuera de multiplicadores y caps)',
+    '<div class="stat-sub" style="margin-bottom:6px">Total en la ventana: <b>' + fmtXp(exentos.xp_total_entregado) + ' XP</b> en ' + saludFmtInt(exentos.eventos) + ' eventos.</div>'
+    + saludTabla(['Acci&oacute;n', 'XP entregado', 'Eventos'], filasEx, [null, 'text-align:right', 'text-align:right'],
+      'Misiones, logros, referidos y admin_xp NO pasan por M_nivel ni por caps: se reportan aparte.'));
+
+  html += saludCard('Leaderboard &mdash; top viajeros por XP',
+    '<div id="salud-leaderboard"><div class="slud-note">Cargando leaderboard...</div></div>');
+
+  cuerpo.innerHTML = html;
+  saludCargarLeaderboard();
+}
+
+function cargarSaludRed() {
+  var stats = document.getElementById('salud-stats');
+  var cuerpo = document.getElementById('salud-cuerpo');
+  if (!stats || !cuerpo) return;
+  stats.innerHTML = '';
+  cuerpo.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--muted)">'
+    + '<div style="font-size:26px;margin-bottom:10px">&#128147;</div>'
+    + '<div style="font-size:13px;font-weight:600">Cargando m&eacute;tricas del ledger...</div></div>';
+  var dias = saludDias();
+  fetch('/api/admin?recurso=salud_red&dias=' + dias, { headers: _adminHeaders() })
+    .then(function(r){ return r.json().then(function(res){ return { status: r.status, res: res }; }); })
+    .then(function(br){
+      var res = br.res || {};
+      if (br.status >= 400 || !res.ok) {
+        saludRenderAviso('No se pudieron cargar las m&eacute;tricas (HTTP ' + br.status
+          + (res.error ? ': ' + _esc(res.error) : '') + '). Verifica la sesi&oacute;n admin y reintenta.');
+        return;
+      }
+      if (res.degradado) {
+        saludRenderAviso('M&eacute;tricas no disponibles a&uacute;n: falta el ledger (xp_ledger). '
+          + (res.motivo ? 'Motivo: ' + _esc(res.motivo) + '. ' : '')
+          + 'Aplica la migraci&oacute;n 031 para habilitar la Salud de la Red.');
+        return;
+      }
+      saludRender(res.data || {}, dias);
+    })
+    .catch(function(err){
+      saludRenderAviso('Error de red al consultar salud_red'
+        + (err && err.message ? ': ' + _esc(err.message) : '') + '. Revisa la conexi&oacute;n y reintenta.');
+    });
+}
+
+
+
 
 
 
@@ -7612,7 +7921,7 @@ function limpiarPanelJugadores() {
 
 // ── AUTO-DIAGNÓSTICO DE VERSIÓN ──────────────────────────────────
 (function checkVersion() {
-  var VERSION = 'admin-v9.20260920';
+  var VERSION = 'admin-v10.20260921';
   var checks = [
     ['f-tipo-actividad', !!document.getElementById('f-tipo-actividad'),   'Campo tipo actividad (sitio)'],
     ['f-distancia-sitio',!!document.getElementById('f-distancia-sitio'),  'Campo distancia (sitio)'],
@@ -7620,6 +7929,7 @@ function limpiarPanelJugadores() {
     ['toggleDestacadoId',typeof toggleDestacadoId === 'function',         'Botón destacar en tabla'],
     ['deletePlaceId-neon',typeof deletePlaceId === 'function',            'Borrar en Neon'],
     ['renderDashboard-async', typeof renderDashboard === 'function',      'Dashboard analítica'],
+    ['cargarSaludRed', typeof cargarSaludRed === 'function',              'Panel Salud de la Red'],
   ];
   var allOk = checks.every(function(c){ return c[1]; });
   var icon = allOk ? '✅' : '⚠️';

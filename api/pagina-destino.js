@@ -1643,7 +1643,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // curadas.
   var GAL_THUMBS_MAX = 12;
   // ADR-036: el ranking unico por votos (curadas + comunidad, con la
-  // precedencia de dedupe curada > comunidad) ya se calculo en `mediaRank`
+  // precedencia de dedupe curada > comunidad) ya se calculo en mediaRank
   // y lo comparte el hero. Aqui solo se reutiliza.
   var galMerge = mediaRank;
   var hayGaleriaCurada = galMerge.length > 1;
@@ -2470,7 +2470,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  var stars=[1,2,3,4,5].map(function(i){return \'<span class="rvst\'+(i<=score?" on":"")+\'">*</span>\';}).join("");\n'
     + '  var travHtml=trav?\'<span class="rvtag">\'+trav+\'</span>\':\'\';\n'
     + '  var dimsHtml=\'\';\n'
-    + '  if(dims){var parts=Object.keys(dims).filter(function(k){return parseInt(dims[k],10)>0;}).map(function(k){return \'<span>\'+(DIM_LABELS[k]||k.charAt(0).toUpperCase()+k.slice(1))+\': <b>\'+dims[k]+\'\\u2605</b></span>\';});if(parts.length)dimsHtml=\'<div class="rvdims">\'+parts.join("")+\'</div>\';}\n'
+    + '  if(dims){var parts=Object.keys(dims).filter(function(k){return parseInt(dims[k],10)>0;}).map(function(k){return \'<span>\'+(DIM_LABELS[k]||k.charAt(0).toUpperCase()+k.slice(1))+\': <b>\'+dims[k]+\'\u2605</b></span>\';});if(parts.length)dimsHtml=\'<div class="rvdims">\'+parts.join("")+\'</div>\';}\n'
     + '  var div=document.createElement("div");\n'
     + '  div.className="rvitem";\n'
     + '  div.innerHTML=\'<div class="rvhead"><div class="rvav"></div><div class="rvname"></div><div class="rvstars">\'+stars+\'</div></div>\'+(travHtml||dimsHtml?\'<div style="margin:2px 0 4px">\'+travHtml+\'</div>\'+dimsHtml:\'\')+\'<div class="rvtx"></div>\';\n'

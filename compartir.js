@@ -101,8 +101,20 @@
         var data = (res && res.data) ? res.data : {};
         if (res && res.status === 401) { aviso('Inicia sesi\u00f3n para ganar XP', '#E8A020'); return; }
         if (!data.ok) return;
-        if (data.tope_diario) { aviso('Cupo diario de XP alcanzado', '#E8A020'); return; }
-        if (data.xp > 0) { aviso('+' + data.xp + ' XP', '#16a34a'); }
+        // ADR-053 Dec 13.2: el estado de cupo se informa con el helper
+        // unico de usuario-session.js (no se copia el mensaje por accion).
+        if (data.tope_diario) {
+          if (window.ExploraCO && typeof window.ExploraCO.mostrarEstadoCupo === 'function') {
+            window.ExploraCO.mostrarEstadoCupo({ tipo: 'cupo' });
+          } else {
+            aviso('Cupo diario de XP alcanzado', '#E8A020');
+          }
+          return;
+        }
+        // ADR-053 Dec 13.1: si el servidor manda xp_detalle, el toast con
+        // desglose (aplicarResultadoXp) es la unica fuente; se suprime el
+        // toast local para no duplicar (NEXT.md:246).
+        if (data.xp > 0 && !data.xp_detalle) { aviso('+' + data.xp + ' XP', '#16a34a'); }
         // Misiones y logros nuevos + sincronizacion de XP local: delega
         // en usuario-session.js para no duplicar la acreditacion ni los
         // toasts (el backend los devuelve tras evaluar tras compartir).

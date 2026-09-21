@@ -776,7 +776,7 @@ var BADGES_LOCAL = [
   'Caminante Novato', 'Rastreador Local', 'Explorador Urbano',
   'Aventurero Regional', 'Vanguardia Territorial', 'Embajador de Zona',
   'Fot\u00f3grafo de Ruta', 'Cronista de Historias', 'Buscador de Leyendas',
-  'Gu\u00eda de Fronteras', 'Estrat\u00e9ga Comunitario', 'Documentalista Visual',
+  'Gu\u00eda de Fronteras', 'Estratega Comunitario', 'Documentalista Visual',
   'Se\u00f1or del Spot', 'Cart\u00f3grafo de Cine', 'Protector del Patrimonio',
   'Curador de Colombia', 'Mariscal de Parche', 'Cineasta de Territorio',
   'Inmortal del Mapa', 'Gran Maestro ExploraCO'

@@ -11,27 +11,31 @@
   /* ---- XP_LEVELS: 20 rangos / 4 Eras ---- */
   /* Copia textual de mi-perfil.html:833-856 con los MISMOS umbrales.
    * El campo capacidades string se reemplaza por CAPACIDADES_DETALLE. */
+  /* ADR-053 T6: umbrales v6 (techo 42000) y grafia CORREGIDA del titulo 11
+   * ('Estratega Comunitario', no 'Estrat\u00e9ga'). Espejo de api/usuarios.js
+   * NIVELES; validado por scripts/smoke_niveles_espejos.js. Los titulos con
+   * tilde/ene usan escapes \uXXXX (ASCII-safe, ADR-002). */
   NivelesData.XP_LEVELS = [
     {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31',era:'Era 1 Mundana'},
     {min:100,nombre:'Rastreador Local',emoji:'\uD83E\uDDED',era:'Era 1'},
     {min:250,nombre:'Explorador Urbano',emoji:'\uD83E\uDDED',era:'Era 1'},
     {min:450,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E',era:'Era 1'},
     {min:700,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F',era:'Era 1'},
-    {min:1000,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F',era:'Era 2 Patrocinada'},
-    {min:1400,nombre:'Fotografo de Ruta',emoji:'\u2B50',era:'Era 2'},
-    {min:1900,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6',era:'Era 2'},
-    {min:2500,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0',era:'Era 2'},
-    {min:3200,nombre:'Guia de Fronteras',emoji:'\uD83E\uDDED',era:'Era 2'},
-    {min:4000,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF',era:'Era 3'},
-    {min:5200,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC',era:'Era 3'},
-    {min:6800,nombre:'Senor del Spot',emoji:'\uD83D\uDC51',era:'Era 3'},
-    {min:8500,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05',era:'Era 3'},
-    {min:10500,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F',era:'Era 3'},
-    {min:13000,nombre:'Curador de Colombia',emoji:'\uD83E\uD489',era:'Era 4 Leyenda'},
-    {min:16000,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Era 4'},
-    {min:19500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5',era:'Era 4'},
-    {min:24000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25',era:'Era 4'},
-    {min:30000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51',era:'Era 4'}
+    {min:1050,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F',era:'Era 2 Patrocinada'},
+    {min:1500,nombre:'Fot\u00f3grafo de Ruta',emoji:'\u2B50',era:'Era 2'},
+    {min:2100,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6',era:'Era 2'},
+    {min:2900,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0',era:'Era 2'},
+    {min:3900,nombre:'Gu\u00eda de Fronteras',emoji:'\uD83E\uDDED',era:'Era 2'},
+    {min:5200,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF',era:'Era 3'},
+    {min:6800,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC',era:'Era 3'},
+    {min:8800,nombre:'Se\u00f1or del Spot',emoji:'\uD83D\uDC51',era:'Era 3'},
+    {min:11200,nombre:'Cart\u00f3grafo de Cine',emoji:'\uD83C\uDF05',era:'Era 3'},
+    {min:14200,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F',era:'Era 3'},
+    {min:17800,nombre:'Curador de Colombia',emoji:'\uD83E\uD489',era:'Era 4 Leyenda'},
+    {min:22200,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Era 4'},
+    {min:27500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5',era:'Era 4'},
+    {min:34000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25',era:'Era 4'},
+    {min:42000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51',era:'Era 4'}
   ];
 
   /* ---- CAPACIDADES_DETALLE: 13 capacidades desbloqueables por nivel ---- */

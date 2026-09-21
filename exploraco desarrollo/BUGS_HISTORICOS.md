@@ -16,6 +16,7 @@ Documento bajo demanda del AI-DOS Core (Cap. 9.4 / 9.5). Registra fallas ya iden
 - **Fix:** usar exclusivamente escapes Unicode simples. El doble escape queda documentado como bug conocido y prohibido, no como solucion valida.
 - **Estado:** Resuelto. Prevencion: script de verificacion cuenta ocurrencias de doble escape (`\\u`), debe dar 0.
 - **Nota ADR-006 (2026-09-18):** la deuda persiste en el codigo. Verificado contra archivo real: `api/pagina-destino.js` **L2431** mantiene 1 doble-escape real (`'\\u2605'` en `addRvOptimista`, idéntico a HEAD). El script de prevencion sigue activo (0 ocurrencias en el resto de `api/*.js`) pero BUG-002 queda **ABIERTO** hasta limpiar esa linea (tarea de limpieza pendiente, registrada en TASKS.md TSK-113).
+- **Nota de cierre (2026-09-21, TSK-148 / ADR-053):** BUG-002 queda **CERRADO**. Evidencia contra archivo real (ADR-006): `api/pagina-destino.js` ahora tiene **0 backticks, 0 dobles escapes (`\\u`) y 0 bytes > 127** (conteo sobre el archivo completo). Las dos lineas pendientes quedaron limpias en working tree: los 2 backticks del comentario (hoy L1646, `mediaRank` ya sin backticks) y el doble escape `'\\u2605'` de la ficha de resena optimista (hoy L2473, ahora `'\u2605'` simple). Se conservan las notas historicas de arriba (Cero Borrado Logico, Regla de Oro 3).
 
 ## BUG-003: Codigo HTML visible en pantalla (comentarios o divs rotos)
 
@@ -1318,7 +1319,8 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 ### DQ-2: `scripts/smoke_test_epic_prompt.js` con expectativas desactualizadas (VOCACIONES y `chat_salas`)
 - **Severidad:** BAJA (smoke desactualizado; falso negativo).
 - **Observacion:** espera `VOCACIONES` 3 vs 4 reales, y `chat_salas` `plan` vs `plan+dm` reales (tras TSK-103: 4 vocaciones y DM `tipo='dm'`). Candidato: actualizar las expectativas.
-- **Estado:** DEUDA QA (preexistente, no bloqueante, 2026-09-15).
+- **Verificacion (2026-09-21, TSK-148 / ADR-053):** corrido contra archivo real: `node scripts/smoke_test_epic_prompt.js` = **53 checks, 49 PASS, 4 FAIL**. Los 4 FAIL son los preexistentes ya descritos (vocaciones 3->4 por ADR-026 y el filtro de `chat_salas` que excluye salas `plan`); NO son regresiones de la Gamificacion v6 (`npm test` no incluye este smoke justamente por esta deuda). Sigue sin corregirse para no ampliar el alcance de la entrega.
+- **Estado:** DEUDA QA (preexistente, no bloqueante, 2026-09-15; re-verificada 2026-09-21 con 4 FAIL).
 
 ---
 
@@ -1472,7 +1474,7 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 - **BUG-065** (`album_agregar_foto` inserta sin `visible`) sigue ABIERTO y afecta directamente que la media aparezca en el feed de Comunidad > Audiovisual: el lector `mi_feed_fotos` filtra `af.visible=true` (ADR-039), por lo que una foto subida por la via legacy no se ve aunque la mision la cuente.
 - **BUG-061** (spoofing de `usuario_id` sin sesion) sigue ABIERTO y quedo AMPLIFICADO por los nuevos botones Guardar (nota en su ficha).
 - **BUG-002** (doble escape en `api/pagina-destino.js` L2431) y **BUG-062** siguen ABIERTOS y ajenos.
-- **Estado:** SIN CAMBIO (registro de no-regresion, 2026-09-18).
+- **Estado:** SIN CAMBIO (registro de no-regresion, 2026-09-18). **Addendum 2026-09-21 (TSK-148 / ADR-053): BUG-002 quedo CERRADO** (backticks 0 y doble escape 0 en `api/pagina-destino.js`; ver su entrada). BUG-061 y BUG-065 siguen ABIERTOS.
 
 ### Nota de prevencion (TSK-145 / migracion 028, 2026-09-20) -- NO es un bug: CHECK que rechaza `''` en INSERTs legacy
 - **Contexto:** al agregar la columna `destinos.zona` con la CHECK `destinos_zona_chk` (migracion 028, permite NULL o los 5 valores cerrados), el INSERT inicial de `api/admin-destinos.js` enviaba `zona:''` (string vacio) cuando el `<select id="f-zona">` del admin quedaba sin opcion -> la CHECK rechazaba `''` (no es NULL) -> 500 en el pipeline de los 103 `scripts/load-*-api.js`. QA lo detecto y se corregio ANTES del deploy: el backend normaliza a NULL `(b.zona ? String(b.zona).trim() : null)` (api/admin-destinos.js L187). **No se registra como BUG porque se corrigio pre-deploy.**
@@ -1509,4 +1511,11 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Evidencia (ADR-006):** `api/interacciones.js` v24: header L1-7 (H-1/H-2); `mmScopeMio` L4761; `mmUsuarioId` L4767-4775; parametro de dueno L4800; clausula corregida L4821-4824. `index-api-connector.js` L358-361 manda `scope=mio&usuario_id` + `Authorization: Bearer`; `mymapa.js` L247-257 marca `_propia` desde el fetch autenticado.
 **Prevencion:** toda rama que lea datos de un usuario debe exigir sesion firmada y derivar el uuid del token, NUNCA de un query/body (patron BUG-061); y toda supresion de un filtro de visibilidad debe condicionarse a un dueno AUTENTICADO, no a la mera presencia de un query param. Vale para `multimedia_mapa` y para cualquier lector con `scope=mio`.
 **Estado:** CORREGIDO EN CODIGO (2026-09-21, working tree SIN commitear). **PENDIENTE: deploy (commit/push + Vercel) del backend v24 para que el fix llegue a produccion.** Ver TASKS.md TSK-147 y DECISIONS.md ADR-051/ADR-052 (mismo release).
+
+## Errata corregida (TSK-148 / ADR-053, 2026-09-21) -- titulo 11 `Estrat\u00e9ga` -> `Estratega Comunitario` -- NO es un bug de runtime
+
+**Contexto:** el ADR-053 (R-10) habia declarado la tilde mal ubicada del titulo 11 (`Estrat\u00e9ga Comunitario`, con la tilde sobre la "a" equivocada) como deuda FUERA de alcance, porque corregirla arrastra los 7+ espejos. En la implementacion de la Gamificacion v6 (TSK-148) se corrigio de forma explicita en la fuente y se sincronizaron los espejos.
+**Correccion:** `api/usuarios.js` (fuente servidor `NIVELES`, L31/L44) pasa el titulo 11 a **`Estratega Comunitario`**. **Arrastre de espejos (todos corregidos):** `api/interacciones.js` (`BADGES_LOCAL`, hoy `'Estratega Comunitario'`), `admin.html` (`_jugNiveles`), `usuario-session.js` (`XP_LEVELS`), `index.html` (L2986), `comunidad.html` (L595), `niveles-data.js` (L15/L29) y `api/admin.js` (`NIVEL_DERIVADO_SQL`). El smoke `scripts/smoke_niveles_espejos.js` valida ademas los 20 titulos (`BADGES_LOCAL` y `niveles-data.js`) contra la fuente.
+**Evidencia (ADR-006, 2026-09-21):** `grep` de `Estrat` en los 8 archivos: la fuente `api/usuarios.js` ya dice `Estratega Comunitario`; cero ocurrencias de `Estrat\u00e9ga` en los espejos (verificado por `smoke_niveles_espejos.js` 10/10 PASS). `api/usuarios.js` quedo COMMITEADO en `9efbfc7`; los espejos cliente/admin quedan en working tree (deploy pendiente).
+**Estado:** CORREGIDO (2026-09-21). No se registra como BUG de runtime: era una errata de texto del catalogo de titulos, no una falla funcional. Se conserva por Cero Borrado Logico (Regla de Oro 3) como registro de la correccion.
 

@@ -577,27 +577,31 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
    ============================================================= */
 
 /* ---- POINTS CONFIG (20 rangos / 4 Eras) ---- */
+/* Espejo de api/usuarios.js NIVELES (v6, techo 42000, ADR-053); validado
+   por scripts/smoke_niveles_espejos.js.
+   TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
+   (evita la copia; hoy se conserva por costo de red/carga). */
 var XP_LEVELS = [
   {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31'},
   {min:100,nombre:'Rastreador Local',emoji:'\uD83E\uDDED'},
   {min:250,nombre:'Explorador Urbano',emoji:'\uD83E\uDDED'},
   {min:450,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E'},
   {min:700,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F'},
-  {min:1000,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F'},
-  {min:1400,nombre:'Fotografo de Ruta',emoji:'\u2B50'},
-  {min:1900,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6'},
-  {min:2500,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0'},
-  {min:3200,nombre:'Guia de Fronteras',emoji:'\uD83E\uDDED'},
-  {min:4000,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF'},
-  {min:5200,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC'},
-  {min:6800,nombre:'Senor del Spot',emoji:'\uD83D\uDC51'},
-  {min:8500,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05'},
-  {min:10500,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F'},
-  {min:13000,nombre:'Curador de Colombia',emoji:'\uD83E\uD489'},
-  {min:16000,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5'},
-  {min:19500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5'},
-  {min:24000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25'},
-  {min:30000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51'},
+  {min:1050,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F'},
+  {min:1500,nombre:'Fotografo de Ruta',emoji:'\u2B50'},
+  {min:2100,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6'},
+  {min:2900,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0'},
+  {min:3900,nombre:'Guia de Fronteras',emoji:'\uD83E\uDDED'},
+  {min:5200,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF'},
+  {min:6800,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC'},
+  {min:8800,nombre:'Senor del Spot',emoji:'\uD83D\uDC51'},
+  {min:11200,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05'},
+  {min:14200,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F'},
+  {min:17800,nombre:'Curador de Colombia',emoji:'\uD83E\uD489'},
+  {min:22200,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5'},
+  {min:27500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5'},
+  {min:34000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25'},
+  {min:42000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51'},
 ];
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;
