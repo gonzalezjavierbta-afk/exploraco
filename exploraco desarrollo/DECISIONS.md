@@ -2717,3 +2717,367 @@ Una tabla propia y privada es la minima abstraccion que resuelve organizacion si
 - **Pendiente de deploy:** v24 no esta en produccion; el gate es 029/030 en Neon (YA aplicadas) -> backend v24 -> frontend.
 
 **ADRs relacionados:** ADR-032 (media_guardados; su degradacion a `[]` queda supersedida en esta rama), ADR-036 (media unificada + fuentes), ADR-039 (Museo/albumes NO se tocan), ADR-025 (sesion firmada / `validarSesion`), ADR-003 (Cero Borrado Logico / soft-delete), ADR-008 (SQL versionado/idempotente), ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), BUG-061, BUG-081.
+
+---
+
+## ADR-053: Gamificacion v6 -- multiplicador de nivel M_nivel (x1.0 a x3.0) con doble cap secuencial (5.0/10.0), reescalado de los 20 umbrales y ledger de XP [ENMENDADO 2026-09-21 por la segunda opinion: router `?recurso=`, 7+ espejos, 22 puntos de escritura, semantica de `mult_stack`; ver ENMIENDA 1 al final]
+
+**ID:** ADR-053
+**Fecha:** 2026-09-21
+**Estado:** **APROBADO** (2026-09-21); **ENMENDADO (2026-09-21) por la segunda opinion (`@architect-review`, APROBADO CON CAMBIOS): la regla vigente es la ENMIENDA 1 al final de este ADR** (router `?recurso=`, 7+ espejos, 22 puntos de escritura, semantica de `mult_stack`, `M_nivel` con nivel derivado, `cap_aplicado='accion'`). Diseno de Fase 1 CONGELADO (decisiones de producto confirmadas por el operador); implementacion PENDIENTE (backend + UI + admin + migracion 031). Verificacion contra archivo real (ADR-006) el 2026-09-21 sobre `api/interacciones.js` v24, `api/usuarios.js` v18, `api/admin.js`, `usuario-session.js`, `niveles-data.js`, `index.html`, `comunidad.html`, `mi-perfil.html` y `admin.html`: las lineas citadas son del working tree de esa fecha y se REVERIFICAN antes de implementar. Los hallazgos de BD real fueron auditados por el operador con `scripts/neon_select.js` (modo real) el 2026-09-21.
+**Autor:** Chief Architect (AI-DOS); decisiones de producto congeladas por el operador.
+**Alcance:** `api/interacciones.js` (UNICO calculo de XP + catalogo unico de bases), `api/usuarios.js` (tabla de 20 niveles + costos de eleccion), `api/admin.js` (repricing de consumibles + rama nueva `GET ?recurso=salud_red`), `db/migrations/031_gamificacion_v6_nivel_scaling.sql` (`usuarios.nivel_max`, `gamificacion_config`, `xp_ledger`), los 7+ espejos de umbrales y las superficies de XP (`mi-perfil.html`, `comunidad.html`, `index.html`, `admin.html`). NO crea endpoints nuevos (presupuesto 8/8, ADR-001): todo entra por ramas: `?recurso=` en `api/admin.js` y `?tipo=` en `api/usuarios.js` (router real verificado; **corregido por Enmienda 1**). NO toca `destinos.tags` (no hay campos JSONB nuevos; Cero Borrado Logico, ADR-003).
+**Supersede:** descarta de forma explicita el "Rising Star Decay" y la tabla `user_action_decay` propuestos en `gamming.txt`; supersede la tabla de umbrales con techo 30000 XP vigente (ADR-018 / ADR-035) y el catalogo de precios de consumibles vigente (ADR-028 / migracion 018).
+
+### Contexto
+
+`gamming.txt` propone "Gamificacion v2.0": (a) multiplicador de nivel de x1.0 a x3.0 segun el nivel del usuario, (b) decaimiento de progreso "Rising Star Decay" sobre una tabla `user_action_decay`, y (c) una nueva tabla de umbrales de XP. La auditoria del codigo real (ADR-006) muestra un sistema de XP ya muy ramificado y con una forma distinta a la que el documento raiz asumia:
+
+- **El calculo de XP ya tiene UNICO punto:** `calcularXpFinal()` (`api/interacciones.js:275-283`), con el comentario "UNICO catalogo" en `:257-261`; aplica `BONUS_CLASE` (`:262`), `XP_NIVEL_CLASE` (`:263`) y `factorCasa` (`:280-281`). **Hoy la progresion de nivel NO da ninguna ventaja de XP:** el nivel solo se deriva de `xp_total` (`api/usuarios.js:45-69`) y el multiplicador de nivel no existe.
+- **El stack vigente ya es enorme y SIN cap.** Caso top actual: clase nivel 10 (`1 + 10*0.10 = x2.0`) x Casa rezagada (x1.3) x amuleto x2 (`aplicarAmuletoX2`, `:2136`) x lider de ciudad x1.1 (`xpConMultiplicador`, `:2085-2094`) = **x5.72**. Si se le suma `M_nivel` x3.0 sin cap, el techo combinado llega a **x17.16** (3.0 x 2.0 x 1.3 x 2.0 x 1.1). Sin cap, la economia se perfora por arriba (umbrales decorativos y XP trivial para el top) o por abajo (farming).
+- **El decaimiento choca con la Cero Borrado Logico.** Revertir XP ya entregado exige reescribir acumuladores historicos one-way (`usuarios.xp_total`, `usuarios.xp_clase`, `casas_cofre.xp_cofre_total`, `pandillas.fama_total`) y no existe ledger previo que haga el decaimiento auditable. Ademas castiga la ausencia, antiproducto en un directorio turistico de uso esporadico.
+- **Los umbrales estan duplicados en 7+ espejos** (deuda activa, Decision 11; conteo corregido por Enmienda 1): `api/usuarios.js:16-37` (fuente servidor), `api/interacciones.js:412-415` (`NIVELES_LOCAL`), `usuario-session.js:19-26`, `index.html:2969-2994`, `comunidad.html:580-603`, `niveles-data.js:14-35` y `admin.html:7362` (`_jugNiveles = [0..30000]`, antes omitido). Adicionalmente `api/interacciones.js:466` (`BADGES_LOCAL`) carga los 20 TITULOS (no umbrales) y tambien debe validarse en el smoke. ADR-040 declaro a `niveles-data.js` fuente unica cliente, pero hoy solo `mi-perfil.html:929` lo carga: los demas archivos conservan copias propias (incumplimiento documentado).
+- **No hay ledger de XP.** Existen **al menos 22** puntos de escritura de `xp_total` en `api/interacciones.js` (conteo corregido por Enmienda 1): los 19 del grep `UPDATE usuarios SET xp_total` (L2260, 2907, 3122, 5584, 5690, 5936, 6207, 6313, 6478, 6654, 6845, 6926, 6936, 7377, 7765, 8309, 8545, 8763, 8872) **mas 3 multilinea** que el grep simple no captura (`xp_total = xp_total + $2` en L2586 misiones y L2729 logros; `xp_total = xp_total + $1` en L8444 resena), y los de `api/usuarios.js`. **TODOS deben instrumentarse en el ledger** (incluidos los exentos, que se registran con `es_exento = true`), o el smoke de reconciliacion falla. Solo algunos dejan rastro parcial en `interacciones.xp_ganado` (y ese valor guarda la BASE, no el XP entregado); en cambio **`media_compartidos.xp_ganado` (`:8310`) guarda el XP FINAL**, no la base (corregido por Enmienda 1). Sin desglose por accion no hay toast honesto ni panel de salud.
+- **Datos de BD real (7 usuarios, 6 con `xp_total > 0`):** max `xp_total = 1616.92`, que es **Nivel 7 con la tabla vieja y Nivel 7 con la tabla nueva** (1500 <= 1616.92 < 2100); el segundo usuario es 1511.71 (tambien Nivel 7 antes y despues); promedio 548.94. **Ningun usuario regresa de nivel con los umbrales aprobados.** El techo 42000 es aspiracional: no hay poblacion en la cola alta para calibrar; se mantiene por decreto de diseno (Decision 3) con la nota de datos explicita.
+- **Estado real de la BD:** migraciones 024, 026 y 030 aplicadas; **027 y 028 NO aplicadas**. `usuarios.nivel` y `usuarios.badge_actual` EXISTEN como columnas legacy que el backend NUNCA escribe. **NO existen** `xp_ledger`, `gamificacion_config`, `usuarios.nivel_max`, `consumibles.precio_xp_base`, `consumibles.precio_xp_actual` ni la vista `consumibles_precio` (las 3 ultimas viven en la 027 no aplicada). La ultima migracion versionada es `030_guardados_carpetas.sql`: la nueva es **`031_gamificacion_v6_nivel_scaling.sql`** (029 y 030 ya estan ocupadas).
+- **Catalogo real de consumibles (17 filas, columna `consumibles.precio_xp` numeric):** coleccion `cuaderno_expedicion` 450, `pergamino_mapa` 500; general `pluma_inspirada` 600; impulso `amuleto_x2` 350, `imantador_cromos` 400, `trompeta_fama` 500; perfil `perfil_marco_plata` 300, `perfil_tema_oscuro` 500, `perfil_vitrina_destacada` 650, `perfil_marco_dorado` 700, `perfil_titulo_custom` 800, `perfil_banda_artista` 900, `perfil_fondo_paisaje` 1000; social `pin_cromado` 250, `vitrina_estelar` 300, `sala_efimera` 800, `pase_vip` 1500.
+- **Restricciones vigentes:** 8/8 endpoints agotados (ADR-001), ASCII-safe (ADR-002), Cero Borrado Logico y MERGE JSONB (ADR-003), gobernanza de esquema por SQL versionado e idempotente (ADR-008), XP `numeric(12,2)` con `red2`/`numXp` y prohibicion de `parseInt`/`::int` sobre columnas XP (ADR-035), Regla de No-Duplicidad (AGENTS.md 2.1: un solo catalogo de bases y un solo calculo).
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Implementar `gamming.txt` completo, incluido Rising Star Decay (RECHAZADA).** Exige tabla nueva (`user_action_decay`) + job periodico de decaimiento + reescritura de acumuladores historicos one-way (viola ADR-003), castiga al usuario ausente y no hay ledger previo que lo haga auditable. La INTENCION (acotar el farming) se conserva por otra via: reforzar los caps ya existentes + UI informativa de enfriamiento/cupo.
+2. **`M_nivel` sin cap (RECHAZADA).** El techo combinado pasa de x5.72 a x17.16 y el XP del top crece hasta 3 veces mas rapido que su curva de umbrales, volviendo decorativos los 20 niveles y deflactando la economia (consumibles y costos de eleccion quedan gratis para el top).
+3. **Cap unico sobre `xp_final` (RECHAZADA).** Un solo cap mezcla dos fenomenos distintos (progresion personal vs. bonus temporales), no permite auditar de donde vino el recorte y hace que un jugador con amuleto activo no pueda distinguir su ventaja real.
+4. **Doble cap secuencial (progresion 5.0 / global 10.0) + reescalado de los 20 umbrales + reposicionamiento de consumibles (ELEGIDA).** Cada etapa queda acotada y auditable en el ledger; el top se estabiliza en x10.0 (no x17.16); los bonus temporales siguen valiendo pero no rompen la curva; y la economia se recalibra de forma explicita en la misma entrega.
+5. **Solo subir los umbrales sin `M_nivel` (RECHAZADA).** No cumple el objetivo de producto (progresion con recompensa creciente) y deja la curva plana hasta el nivel 20, con el techo actual de 30000 sin justificacion de juego.
+
+### Decision tomada
+
+#### 1. `M_nivel` (formula congelada)
+
+    M_nivel(N) = 1.0 + ((N - 1) / 19) * 2.0      con N entero en 1..20
+    M_nivel(1)  = 1.000000
+    M_nivel(20) = 3.000000
+    paso constante = 2.0 / 19 = 0.105263...
+
+Se elige **lineal** y no exponencial: (a) es explicable al usuario ("cada nivel suma ~10.5% de XP sobre la base"); (b) no introduce saltos que desbalanceen bandas; (c) una exponencial tipo `1.15^(N-1)` llegaria a x14.2 en N20 y haria irrelevante el cap de progresion 5.0, forzando un cap mas agresivo y menos intuitivo.
+
+#### 2. Doble cap SECUENCIAL (congelado)
+
+    xp_base           = base de la accion (UNICO catalogo, Decision 9)
+    m_nivel           = M_nivel(nivel_usuario)                    // 1.0 .. 3.0
+    mult_clase        = 1 + nivel_clase * BONUS_CLASE[clase_id]   // 1.0 .. 2.0  (BONUS_CLASE :262)
+    factor_casa       = 1.30 rezagada | 1.00 equilibrada | 0.85 dominante   (:280-281)
+    mult_stack        = mult_clase * factor_casa * (amuleto_x2 ? 2.0 : 1.0) * (esLiderDeCiudad ? 1.1 : 1.0)
+    mult_progresion   = m_nivel * mult_clase * factor_casa
+    mult_progresion_c = min(mult_progresion, CAP_PROGRESION = 5.0)
+    mult_global       = mult_progresion_c * (amuleto_x2 ? 2.0 : 1.0) * (esLiderDeCiudad ? 1.1 : 1.0)
+    mult_global_c     = min(mult_global, CAP_GLOBAL = 10.0)
+    xp_final          = red2(xp_base * mult_global_c)
+    bonos_planos      = bono rural de visita (VISITA_BONO_RURAL), o 0
+    xp_acreditable    = red2(xp_final + bonos_planos)             // es lo que va a xp_total
+
+**Semantica unica de `mult_stack` (congelada por Enmienda 1, elimina la contradiccion entre Decision 2 y Decision 7).** `mult_stack` es el producto de **TODO el stack EXCEPTO `M_nivel`**: `mult_clase * factor_casa * (amuleto ? 2 : 1) * (lider ? 1.1 : 1)`. Por tanto `m_nivel * mult_stack` es el **producto crudo completo** (sin caps), `mult_global_c` es el **efectivo post-caps** y `cap_aplicado` explica el recorte. `mult_stack` es un agregado de REPORTE del ledger (no se re-multiplica para hallar el cap global: la cadena del cap usa `mult_progresion_c` por separado). Invariante de reconstruccion del ledger: `xp_final = ROUND(xp_base * mult_final, 2) + bonos_planos` con `mult_final = mult_global_c`; la salvedad es la cuantizacion (ambos lados pasan por `red2`) y los caps de accion (`compartir`/`chat`, cuyos recortes van como `cap_aplicado = 'accion'`, ver Decision 7).
+
+**Aclaracion de contrato (ambiguedad resuelta en esta Fase 1).** En la expresion `mult_global = mult_progresion_c * (amuleto) * (lider)`, el termino `mult_progresion` es el valor **YA CAPADO** (`mult_progresion_c`). La cadena es SECUENCIAL: cap de progresion -> aplicar stack temporal -> cap global. No existe una variante que recalcule el cap de progresion sobre el valor crudo. Razon: si el cap de progresion no alimentara al global, quedaria sin efecto practico apenas el stack temporal sea mayor a 1 (el global 10.0 lo haria irrelevante) y el "doble cap" seria decorativo; ademas el ledger necesita un unico valor efectivo por etapa. El agregado de reporte `mult_stack` de la Enmienda 1 NO participa de esta cadena (solo describe el stack en el ledger); el cap global se calcula con `mult_progresion_c`.
+
+**Rangos efectivos:** `mult_global_c` vive en [0.85, 10.0] (minimo = Nivel 1 con Casa dominante y sin bonus). El techo historico sin cap era x17.16; con el cap queda en **x10.0** (recorte del 41.7% del techo del top). El maximo de progresion sin stack es x7.8 (N20 + clase 10 + Casa rezagada) y queda acotado a 5.0 por `mult_progresion_c`, es decir: **`M_nivel` NO puede superar x5.0 aportando solo progresion**; llegar a x10.0 exige consumir un amuleto x2 y ser lider de ciudad.
+
+**Sin piso 1.0 en el cap global (aclarado por Enmienda 1).** NO se introduce un piso `max(1.0, mult_global_c)`. El rango `[0.85, 10.0]` se preserva a proposito: el x0.85 es el factor `factorCasa` de Casa dominante **ya vigente desde ADR-038** (penalizacion de economia de Casa, no una regresion de `M_nivel`). `M_nivel` es siempre >= 1.0, de modo que el unico valor por debajo de 1.0 solo puede venir de la Casa. Pisar el resultado anularia esa penalizacion vigente y cambiaria la economia de Casas sin ADR propio.
+
+#### 3. Tabla escalar de 20 niveles (congelada)
+
+Umbrales aprobados (N1..N20), con su titulo real tomado de `api/usuarios.js:16-37` y su `M_nivel`. Los titulos se romanizan a ASCII por ADR-002; la fuente los guarda con escapes unicode (por ejemplo `Fot\u00f3grafo de Ruta`) y la UI los renderiza CON tilde.
+
+| N | Umbral viejo | Umbral nuevo | Delta | M_nivel | Titulo (fuente) |
+|---|---|---|---|---|---|
+| 1 | 0 | 0 | 0 | x1.000 | Caminante Novato |
+| 2 | 100 | 100 | 0 | x1.105 | Rastreador Local |
+| 3 | 250 | 250 | 0 | x1.211 | Explorador Urbano |
+| 4 | 450 | 450 | 0 | x1.316 | Aventurero Regional |
+| 5 | 700 | 700 | 0 | x1.421 | Vanguardia Territorial |
+| 6 | 1000 | 1050 | +50 | x1.526 | Embajador de Zona |
+| 7 | 1400 | 1500 | +100 | x1.632 | Fotografo de Ruta |
+| 8 | 1900 | 2100 | +200 | x1.737 | Cronista de Historias |
+| 9 | 2500 | 2900 | +400 | x1.842 | Buscador de Leyendas |
+| 10 | 3200 | 3900 | +700 | x1.947 | Guia de Fronteras |
+| 11 | 4000 | 5200 | +1200 | x2.053 | Estratega Comunitario |
+| 12 | 5200 | 6800 | +1600 | x2.158 | Documentalista Visual |
+| 13 | 6800 | 8800 | +2000 | x2.263 | Senor del Spot |
+| 14 | 8500 | 11200 | +2700 | x2.368 | Cartografo de Cine |
+| 15 | 10500 | 14200 | +3700 | x2.474 | Protector del Patrimonio |
+| 16 | 13000 | 17800 | +4800 | x2.579 | Curador de Colombia |
+| 17 | 16000 | 22200 | +6200 | x2.684 | Mariscal de Parche |
+| 18 | 19500 | 27500 | +8000 | x2.789 | Cineasta de Territorio |
+| 19 | 24000 | 34000 | +10000 | x2.895 | Inmortal del Mapa |
+| 20 | 30000 | 42000 | +12000 | x3.000 | Gran Maestro ExploraCO |
+
+Notas obligatorias de la tabla:
+- **(a) Forma de la curva.** Los umbrales nuevos son mayores o iguales que los viejos en TODOS los niveles (monotonia estricta), y el crecimiento es progresivo (de +50 en N6 a +12000 en N20). Esto significa que `nivel_nuevo(xp) <= nivel_viejo(xp)` para todo `xp`: la tabla nueva NUNCA regala niveles, pero SI puede quitar uno en las bandas de transicion.
+- **(b) Techo 42000 por decreto de diseno + meta de ritmo (agregada por Enmienda 1).** Se mantiene el techo aprobado pese a que la BD real (max 1616.92, promedio 548.94, 6 usuarios con XP) no tiene poblacion en la cola alta para calibrarlo. El arquitecto NO lo baja: 42000 define la aspiracion declarada del nivel 20 y su coherencia con `M_nivel(20)=3.0`. **Meta de ritmo declarada (Enmienda 1): N20 en 3-6 meses de uso activo.** Verificacion de coherencia: la estimacion de la segunda opinion (usuario muy activo ~N20 en 1-2 meses; casual ~N20 en ~8 meses) sugiere que 42000 se alcanza MAS rapido que la meta para el usuario muy activo; se documenta la diferencia como **deuda de calibracion** (NO se cambia el techo: decision del operador) que se reformula con datos reales del ledger (ver R-6 reescrito en Riesgos).
+- **(d) `spot_atributos` (aclaracion Enmienda 1).** Entra con `M_nivel` (+10 x nivel). Su definicion funcional exacta (que evento/campos lo disparan y donde se instrumenta) queda DIFERIDA a la fase de backend (Q6); no toca la 031.
+- **(c) Defecto de fuente detectado (no se corrige aqui).** El titulo 11 esta escrito en la fuente como `Estrat\u00e9ga Comunitario` (tilde mal ubicada; deberia ser "Estratega"). Se registra como deuda de texto; cualquier cambio de titulo entra en la Decision 11 (sincronizacion de espejos) y no en esta entrega.
+
+#### 4. Precedencia y exenciones
+
+**Reciben `M_nivel`** (las 14 acciones de la whitelist de ADR-038 mas las nuevas instrumentadas): visita, rating, guardado, resena, foto de viajero, album crear, album foto, comentario de media, voto de media, compartir, Activo Oculto proponer (parte directa), Activo Oculto checkin, crear plan (parte directa), unirse a plan (parte directa) y completar atributos de spot.
+
+**Quedan EXENTAS de `M_nivel` (y por tanto de ambos caps) y siguen pagando XP FIJO y DETERMINISTA:**
+- **Misiones** (catalogo `MISIONES`, **41 entradas** verificadas con `id: 'mis_`): el campo `xp` de la mision es fijo.
+- **Logros** (catalogo `LOGROS`, **33 entradas** verificadas con `tier`): idem.
+- **`admin_xp`** (`api/interacciones.js:7337`, Bearer ADMIN_SECRET): el operador entrega exactamente `delta_xp` (`:7351`), sin multiplicadores.
+- **Bonos de referidos** (`repartirXpReferidos`): el % escalonado del padrino NO se multiplica por el nivel del padrino ni del referido.
+
+**Orden estricto de la acreditacion (contrato operativo):** (1) resolver `xp_base` del catalogo; (2) calcular y capear la progresion; (3) calcular y capear el global; (4) `xp_final = red2(xp_base * mult_global_c)`; (5) sumar `bonos_planos` DESPUES del cap (el bono rural NO se multiplica ni consume cap, tal como hoy en `:8756-8761`, donde se suma plano al resultado de `calcularXpFinal`); (6) escribir `xp_total`; (7) `acreditarClaseYCofre` y `repartirXpReferidos` sobre el valor POST-CAP (`xp_acreditable`); (8) insertar la fila de `xp_ledger`.
+
+#### 5. Mitigacion de regresion de nivel: `usuarios.nivel_max`
+
+El reescalado puede quitar niveles en las bandas de transicion (maximo 2 niveles, y solo en la banda 30000..33999, que pasa de N20 a N18/N19). La BD real NO tiene usuarios en esas bandas (auditado), pero la proteccion se implementa igual porque el reescalado si mueve usuarios reales cerca del limite: por ejemplo `xp = 1000` era N6 y pasa a N5 (1050 > 1000).
+
+Regla congelada:
+- **`usuarios.nivel_max smallint NOT NULL DEFAULT 1`** (columna NUEVA, aditiva): maximo nivel historico alcanzado.
+- `nivel_visible = GREATEST(calcularNivel(xp_total).nivel, COALESCE(nivel_max, 1))`.
+- `nivel_max` se actualiza con un **MERGE monotono** en cada acreditacion: `nivel_max = GREATEST(COALESCE(nivel_max,1), calc.nivel)` (nunca decrece; `nada pierde insignia`).
+- **Separacion de responsabilidades (aclarada por Enmienda 1): `M_nivel` usa el nivel DERIVADO de `xp_total` (`calcularNivel(xp_total).nivel`), NO `nivel_visible` ni `nivel_max`.** `nivel_max`/`nivel_visible` protegen UNICAMENTE la INSIGNIA (lo que el usuario ve); NO neutralizan el castigo economico del de-nivel. Se preserva asi el contrato de ADR-018: gastar XP puede bajar el multiplicador de nivel aunque la insignia se conserve. El `GREATEST` de `nivel_visible` no debe leerse como neutralizacion del de-nivel.
+- **`usuarios.nivel` y `usuarios.badge_actual` siguen siendo columnas legacy DERIVADAS y NUNCA persistidas.** El backend no las escribe (comportamiento real hoy, `api/usuarios.js:10-15` y `:61-69`); la insignia exhibida se calcula desde `nivel_visible` usando el titulo de la tabla unica. No se agrega ninguna escritura nueva a esas 2 columnas: hacerlo seria una segunda fuente de verdad.
+- En la migracion 031 se **siembra** `nivel_max` una sola vez con el nivel derivado del `xp_total` existente y con la tabla VIEJA (`UPDATE usuarios SET nivel_max = <nivel viejo>`), para que la transicion no reste insignias ya visibles a nadie.
+
+#### 6. `gamificacion_config` (ajuste sin deploy)
+
+Tabla clave/valor con los 3 parametros congelados como SEED, para poder recalibrar sin commit:
+
+| clave | valor semilla | role |
+|---|---|---|
+| `cap_progresion` | 5.0 | techo de `m_nivel * mult_clase * factor_casa` |
+| `cap_global` | 10.0 | techo de `mult_progresion_c * (amuleto) * (lider)` (el agregado de reporte `mult_stack` incluye clase/casa; Enmienda 1) |
+| `m_nivel_max` | 3.0 | valor de `M_nivel` en N20 (el resto se interpola) |
+
+Contrato de lectura: `api/interacciones.js` lee la config con **1 SELECT** por acreditacion (`SELECT clave, valor FROM gamificacion_config`) y **degrada a las constantes en codigo** si la tabla no existe (42P01), registrando el motivo (patron BUG-021 / AGENTS.md 2.2: prohibido el catch vacio). Las constantes en codigo son el FALLBACK y el valor semilla, nunca una segunda fuente divergente. Cache en memoria con TTL: **DIFERIDA** (un SELECT extra por acreditacion es aceptable a esta escala; se reevalua si el volumen crece).
+
+**Alcance acotado de `gamificacion_config` (corregido por Enmienda 1).** La config parametriza **SOLO los CAPS** (`cap_progresion`, `cap_global`, `m_nivel_max`). **NO contiene umbrales de nivel** y por tanto **NO es una valvula real para recalibrar la curva de 42000**. Decision del operador (Q4): NO se agregan umbrales a la config, para evitar una segunda fuente de verdad; los umbrales siguen viviendo en codigo/espejos y **requieren deploy**. La recalibracion de la curva es por deploy (ver R-6 reescrito).
+
+#### 7. `xp_ledger` (ledger unico con desglose)
+
+Tabla NUEVA, aditiva, sin backfill (hoy no existe; el historico no se reconstruye: Cero Borrado Logico significa no destruir, no inventar). Es lo que habilita el toast con desglose y el panel de salud.
+
+| columna | tipo | proposito |
+|---|---|---|
+| `id` | `bigserial PK` | orden de emision |
+| `usuario_id` | `uuid NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE` | dueno del XP |
+| `accion` | `text NOT NULL` | id del catalogo de bases (Decision 9) o de mision/logro |
+| `xp_base` | `numeric(12,2) NOT NULL DEFAULT 0` | base antes de multiplicar |
+| `mult_nivel` | `numeric(10,6) NOT NULL DEFAULT 1` | `M_nivel(N)` aplicado (nivel DERIVADO de `xp_total`) |
+| `mult_stack` | `numeric(10,6) NOT NULL DEFAULT 1` | TODO el stack EXCEPTO `M_nivel`: `mult_clase * factor_casa * amuleto * lider` (Enmienda 1) |
+| `mult_final` | `numeric(10,6) NOT NULL DEFAULT 1` | multiplicador efectivo post-caps (`mult_global_c`) |
+| `cap_aplicado` | `text NOT NULL DEFAULT 'ninguno'` | `ninguno` / `progresion` / `global` / `accion` (caps denominados en XP: compartir/chat; Enmienda 1) |
+| `bonos_planos` | `numeric(12,2) NOT NULL DEFAULT 0` | bono rural u otros sumados DESPUES del cap |
+| `xp_final` | `numeric(12,2) NOT NULL DEFAULT 0` | XP EFECTIVAMENTE acreditado a `xp_total` |
+| `es_exento` | `boolean NOT NULL DEFAULT false` | true en misiones/logros/referidos/admin_xp |
+| `contexto` | `jsonb NULL` | datos libres (destino_id, ref, origen) para depuracion |
+| `creado_en` | `timestamptz NOT NULL DEFAULT NOW()` | orden temporal |
+
+Invariante de reconciliacion (verificable por smoke): `xp_final = ROUND(xp_base * mult_final, 2) + bonos_planos` para las filas con `es_exento = false`. **Salvedad (Enmienda 1):** el invariante vale para acciones **SIN cap denominado en XP**. `compartir` (tope 50 XP/24h) y `chat` (10 XP/dia) son la EXCEPCION: su recorte no es multiplicativo y su fila debe registrarse con **`cap_aplicado = 'accion'`** (y `xp_final` = XP realmente acreditado, ya recortado por el cupo). `sql-security` ya esta ajustando el CHECK de `cap_aplicado` para incluir `'accion'` y subiendo la precision de los multiplicadores a `numeric(10,6)`. Indices: `idx_xp_ledger_usuario_creado (usuario_id, creado_en DESC)` y `idx_xp_ledger_accion_creado (accion, creado_en DESC)` (este ultimo es el que sirve al panel de salud y a futuros caps por accion/dia).
+
+Rol de `interacciones.xp_ganado`: se mantiene como esta (guarda la BASE de la accion y es el insumo de Origen/fama/vocaciones; `api/interacciones.js:1246` compara `xp_ganado>=25` para `mis_primera_resena`). `xp_ledger` NO lo reemplaza: es el ledger por evento con el XP ENTREGADO. Queda como deuda consciente la convivencia de ambos (documentada en la Decision 9 y en Riesgos) y el hecho de que `interacciones.xp_ganado` NO esta versionada (patron BUG-021).
+
+**Distincion `interacciones` vs `media_compartidos` (corregida por Enmienda 1).** La afirmacion "`xp_ganado` guarda la base" es cierta SOLO para `interacciones`. **`media_compartidos.xp_ganado` (`api/interacciones.js:8310`) guarda el XP FINAL**, no la base. Consecuencia con `M_nivel`: el tope de compartir (50 XP/24h) se agota con MENOS acciones, porque cada accion aporta mas XP; el contador del tope suma el valor FINAL y la UI de "cupo restante" debe explicarlo (ver R-12).
+
+#### 8. Efectos colaterales obligatorios
+
+1. **`acreditarClaseYCofre` (`:346-374`) debe acreditarse sobre el XP POST-CAP.** Hoy recibe `xp_final` (salida de `calcularXpFinal`) y acredita 50% a `xp_clase` + `pct` (10% por defecto) al cofre de la Casa. Con `M_nivel` y caps, el valor recibido debe ser `xp_acreditable` (post-cap, incluidos los `bonos_planos`, tal como hoy en la visita, donde se le pasa `xpTotalVisita`, `:8766`). Es decir: `calcularXpFinal()` devuelve el XP ya capeado y los callers dejan de aplicar multiplicadores ANTES o DESPUES por fuera.
+2. **`repartirXpReferidos` se acredita sobre el valor POST-CAP** (hoy ya recibe `xpResenaEntregado`/`xpTotalVisita`, `:8459`/`:8776`), pero el bono del padrino NO se multiplica por `M_nivel` (Decision 4).
+3. **`aplicarFamaPandilla`** (10% a `pandillas.fama_total`) usa el XP entregado. **Hallazgo de inconsistencia preexistente:** en la visita, la fama usa `xpVisitaEscalado` (`:8773`, PRE bono rural) mientras el cofre usa `xpTotalVisita` (`:8766`, POST bono rural). Con el rediseno se unifica el criterio: **ambos usan `xp_acreditable`** (post-cap, con bonos planos). Se registra como cambio de comportamiento deliberado en la misma entrega.
+4. **`avanzarMisionesCasa(sql, usuarioId, 'xp_total', delta)`** recibe el XP entregado (`:369`): debe recibir `xp_acreditable` (post-cap) para que la mision de Casa mida lo que el usuario realmente recibio.
+5. **`album_foto_autor` son 4 literales `+10`, no 1 (corregido por Enmienda 1).** En `api/interacciones.js`: `:6936` (`UPDATE usuarios SET xp_total=xp_total+10`), `:6939` (`repartirXpReferidos(...,10)`), `:6940` (tope diario `xp_autor_dia < 10` sobre `progreso_album` JSONB) y `:6951` (`xp_autor_original: ... ? 10 : 0` en la respuesta); mas el `INSERT` de `:6911` con base 15. Violacion viva de la Regla de No-Duplicidad. **Exigencia:** rutear los CUATRO por el catalogo unico (`accion = 'album_foto_autor'`) o **declarar `album_foto_autor` EXENTA completa con su constante unica** (una sola constante que alimente los 4 usos), porque instrumentar solo el `UPDATE` y dejar `:6940` hardcodeado rompe el contador del tope diario. No puede quedar ningun literal suelto.
+6. **`interacciones.xp_ganado` es un SEGUNDO ledger derivado** (Origen, fama, vocaciones, `cur_critico`, `art_literatura`): subir bases mueve tambien esas metricas. Es efecto esperado, pero se documenta para que no se lea como bug.
+
+#### 9. Bases de XP v2.1 (catalogo unico congelado)
+
+Regla: **un solo catalogo de bases** (`XP_BASES` en `api/interacciones.js`, junto a `calcularXpFinal`) y **un solo calculo**. Toda base citada en el codigo debe salir de ahi; quedan prohibidos los literales sueltos.
+
+| Accion (id de catalogo) | Base hoy | Base v2.1 | Cap | Recibe `M_nivel` | Evidencia (archivo:linea) |
+|---|---|---|---|---|---|
+| `visita` | `20 * factor_area` | sin cambio | 30/dia (`VISITAS_DIA_MAX` `:195`) | SI | `:8667` |
+| `visita_bono_rural` | `VISITA_BONO_RURAL = 20` plano | **25** plano | - | **NO** (post-cap) | `:198`, `:8726`, `:8761`; `factorXpPorRadio` `:205` NO cambia |
+| `resena_larga` (>50 chars) | 25 | **30** | - | SI | `:8392` |
+| `resena_corta` | 10 | 10 | - | SI | `:8393` |
+| `rating` | 5 | 5 | - | SI | `:2906` |
+| `guardado` | 5 | 5 | - | SI | `:8538-8543` |
+| `chat_comentario` | 2 | 2 | **10 XP/dia** (20 XP = 10 mensajes) | SI | `:2438-2459` |
+| `compartir` | 25 primera / 5 posteriores | sin cambio | 10 eventos y 50 XP/24h | SI | ADR-036 / `:8309` |
+| `foto_viajero` | 15 | **20** | - | SI | `:6477` |
+| `album_crear` | 20 | 20 | - | SI | `:6844` |
+| `album_foto` | 15 | 15 | - | SI | `:6925` |
+| `album_foto_autor` | 10 (**4 literales**) | 10 | - | SI (por catalogo) **o EXENTA con constante unica** (ver Decision 8.5) | `:6936`, `:6939`, `:6940`, `:6951`; insert `:6911` |
+| `voto_media` | 5 | 5 | - | SI | `:2906` |
+| `ao_proponer` | 0 directo (+50 al aprobar) | **+30 directo** (+50 al aprobar) | **3/dia con XP** | SI | handler `:5476-5507` (hoy NO acredita) |
+| `ao_checkin` | 15 | **20** | cooldown 90 s + 30/dia | SI | `:5688` |
+| `plan_crear` | 0 directo (mision 25 unica) | **+20 directo** + mision **10** | **3/dia** | SI el directo / **NO** la mision | handler `:6056-6101`; mision `:1430` (`xp: 25`) |
+| `plan_unirse` | 0 directo (mision 15 unica) | **+6 directo** + mision **10** | **5/dia** | SI el directo / **NO** la mision | handler `:6106-6137`; mision `:1442` (`xp: 15`) |
+| `spot_atributos` | **NO EXISTE** (evento nuevo) | **+10** | - | SI | a instrumentar |
+
+Salvedades obligatorias:
+- **Las acciones ya capadas NO se tocan** en su cap (rating, guardado, chat/comentario, compartir): solo cambian las bases indicadas.
+- **Bajar misiones (25 -> 10 y 15 -> 10) es obligatorio** para que el XP directo no duplique el pago: el total objetivo por crear un plan pasa de 25 (una sola vez) a 20/dia con cap x3 + 10 una vez.
+- **`mis_primera_resena` (`:1246`) compara `xp_ganado >= 25`:** subir `resena_larga` a 30 mantiene el check (30 >= 25); bajarlo lo habria roto. Se documenta el acoplamiento (la mision depende de la BASE, no del XP entregado) para que ningun cambio futuro lo ignore.
+
+#### 10. Repricing (evita deflactar la economia)
+
+Con `M_nivel` y el cap global, el XP del usuario activo crece; los precios vigentes de eleccion y consumibles quedarian baratos. Repricing aprobado:
+
+**Costos de eleccion (`api/usuarios.js`):**
+
+| Eleccion | Hoy | Nuevo | Evidencia |
+|---|---|---|---|
+| Cambio de faccion | 500 | **800** | `:775-776` (`xp_total >= 500`) |
+| Cambio de Casa | 300 | **500** | `:863-864` |
+| Recambio de Clase | 300 | **500** | `:947-949` |
+
+**Consumibles (`consumibles.precio_xp`, 17 filas):** **categoria impulso x2.0** y **categoria perfil/social/coleccion/general x1.6**, redondeado half-up a entero terminado en 0 (o al entero mas cercano multiplo de 10, criterio unico a fijar por `sql-security` en la migracion y verificado por smoke):
+
+| categoria | item | precio hoy | factor | precio nuevo |
+|---|---|---|---|---|
+| impulso | `amuleto_x2` | 350 | x2.0 | 700 |
+| impulso | `imantador_cromos` | 400 | x2.0 | 800 |
+| impulso | `trompeta_fama` | 500 | x2.0 | 1000 |
+| coleccion | `cuaderno_expedicion` | 450 | x1.6 | 720 |
+| coleccion | `pergamino_mapa` | 500 | x1.6 | 800 |
+| general | `pluma_inspirada` | 600 | x1.6 | 960 |
+| perfil | `perfil_marco_plata` | 300 | x1.6 | 480 |
+| perfil | `perfil_tema_oscuro` | 500 | x1.6 | 800 |
+| perfil | `perfil_vitrina_destacada` | 650 | x1.6 | 1040 |
+| perfil | `perfil_marco_dorado` | 700 | x1.6 | 1120 |
+| perfil | `perfil_titulo_custom` | 800 | x1.6 | 1280 |
+| perfil | `perfil_banda_artista` | 900 | x1.6 | 1440 |
+| perfil | `perfil_fondo_paisaje` | 1000 | x1.6 | 1600 |
+| social | `pin_cromado` | 250 | x1.6 | 400 |
+| social | `vitrina_estelar` | 300 | x1.6 | 480 |
+| social | `sala_efimera` | 800 | x1.6 | 1280 |
+| social | `pase_vip` | 1500 | x1.6 | 2400 |
+
+**Contrato obligatorio con la migracion 027 (NO aplicada).** La 027 (ADR-042) define `consumibles.precio_xp_base`, `consumibles.precio_xp_actual` y la vista `consumibles_precio` (oferta/demanda). Como **la 027 NO esta aplicada**, esas columnas NO existen hoy en la BD real. Por lo tanto la migracion 031 debe:
+1. Escribir el precio nuevo en la columna que SI existe: **`consumibles.precio_xp`**.
+2. Ser **idempotente y robusta al orden** (ADR-008): si la 027 ya se aplico, dejar `precio_xp_base` COHERENTE con `precio_xp` (mismo valor) para que la vista `consumibles_precio` no arranque con precios viejos; si la 027 no se aplico, no fallar (guard `information_schema.columns` antes de tocar las columnas de la 027) y dejar la obligacion documentada.
+3. Dejar el contrato explicito: **si la 027 se aplica DESPUES de la 031, el operador debe re-sembrar `precio_xp_base` desde `precio_xp`** (script idempotente o bloque de verificacion al final de la 031). Esto es una deuda de orden de migraciones, no un supuesto.
+
+**Textos de UI que mienten si no se sincronizan:** `mi-perfil.html:3330` ("500 XP con 15 dias de espera") y `:3326`/`:3368` (faccion, 500 XP), `:4332`/`:4367`/`:4369`/`:4410`/`:4427`/`:4429` (Casa, 300 XP + cooldown 30 dias). Deben pasar a 800/500. **Nota de hallazgo:** no se localizo texto hardcodeado equivalente para el recambio de Clase (300 XP) en `mi-perfil.html`; antes de implementar se REVERIFICA (puede venir del API) y, si existe, se sincroniza (ver Preguntas/Pendientes).
+
+#### 11. Umbrales: los 7+ espejos y la fuente unica (corregido por Enmienda 1)
+
+Los 20 umbrales viven HOY duplicados en **7+ lugares** que DEBEN quedar sincronizados con la tabla de la Decision 3:
+
+| # | Archivo | Evidencia | Forma |
+|---|---|---|---|
+| 1 | `api/usuarios.js` | `:16-37` | `NIVELES[{min,nombre}]` (fuente servidor) |
+| 2 | `api/interacciones.js` | `:412-415` | `NIVELES_LOCAL[]` (plano) |
+| 3 | `usuario-session.js` | `:19-26` | `XP_LEVELS[]` (plano) + `MAX_NIVEL` |
+| 4 | `index.html` | `:2969-2994` | `XP_LEVELS[{min,nombre}]` + relleno de `.max` |
+| 5 | `comunidad.html` | `:580-603` | `XP_LEVELS[{min,...}]` + relleno de `.max` |
+| 6 | `niveles-data.js` | `:14-35` | `NivelesData.XP_LEVELS[{min,nombre,emoji,era}]` (fuente unica cliente declarada por ADR-040, hoy solo cargada por `mi-perfil.html:929`) |
+| 7 | `admin.html` | `:7362` | `_jugNiveles = [0,100,...,30000]` (antes OMITIDO del conteo) |
+| 8 | `api/interacciones.js` | `:466` | `BADGES_LOCAL[]` (20 TITULOS, no umbrales; tambien debe validarse) |
+
+Decisiones:
+- **La fuente servidor es `api/usuarios.js:NIVELES`** (se le agrega el campo `mult` de `M_nivel` para que el backend tenga la tabla completa en un solo lugar).
+- **NO hay `require` cruzado entre funciones serverless.** `api/interacciones.js` NO puede consumir `NIVELES` de `api/usuarios.js`: los archivadores `api/*.js` se despliegan como funciones independientes y son autosuficientes (patron documentado en `api/admin.js:56-59`). Por tanto `NIVELES_LOCAL` se **mantiene como espejo sincronizado** y el "consumir la matematica desde `api/usuarios.js`" es **inviable** (corregido por Enmienda 1). **Opcion a documentar (no a implementar ahora):** mover la tabla a un modulo fuera de `api/` (p.ej. `lib/`) para eliminar el espejo; se evalua en una fase futura, no en esta entrega.
+- **La fuente cliente es `niveles-data.js`** (ADR-040, hoy incumplida): `index.html`, `comunidad.html` y `usuario-session.js` deben dejar de declarar su propia copia y consumir `window.NivelesData.XP_LEVELS`; si se decide no cargarlo en esas paginas por costo de red, entonces el archivo debe generarse/derivarse y el desfase debe ser detectable por smoke (nunca silencioso).
+- **Se exige un smoke comparador** (`scripts/smoke_niveles_espejos.js`) que lea **los 7+ archivos** (incluidos `admin.html:7362` y `BADGES_LOCAL`), extraiga los 20 umbrales (y los 20 titulos de `BADGES_LOCAL`) y falle si algun espejo difiere de `api/usuarios.js:NIVELES`. Este smoke es el gate de la Decision 11 en la fase de QA.
+- **Falso positivo a EVITAR en el smoke:** `RAMA_TIERS`/`ARBOL_UMBRALES` (`api/interacciones.js:554`, `mi-perfil.html:3387`, `perfil.html:655`) comparten 5 valores (0/100/250/450/700) pero **NO son espejos de la tabla de 20** (son tiers del Arbol de Clases): no deben incluirse como si lo fueran ni hacer fallar el comparador.
+- **Deuda reconocida:** mientras el smoke no exista, el riesgo de desfase es real y ya se materializo (los espejos hoy coinciden por disciplina manual, no por verificacion automatica).
+
+#### 12. Migraciones y orden de despliegue
+
+Migracion NUEVA: **`db/migrations/031_gamificacion_v6_nivel_scaling.sql`** (029 y 030 ocupadas). Contenido: `usuarios.nivel_max` (+ siembra unica con la tabla vieja), `gamificacion_config` (+ seed de 3 filas), `xp_ledger` (+ 2 indices) y repricing de `consumibles.precio_xp` con guard para las columnas de la 027. Aditiva, idempotente (ADR-008) y 100% ASCII-safe (ADR-002). Aprobada por `sql-security`.
+
+**Orden MANDATORIO (patron BUG-021/BUG-060):**
+1. Aplicar la 031 COMPLETA en Neon.
+2. Resolver el estado de **027 y 028** (hoy NO aplicadas): si se aplican, hacerlo ANTES del deploy del backend y re-sembrar `precio_xp_base` desde `precio_xp`; la 028 (`destinos.zona`) es independiente de esta entrega pero su falta deja `zona` sin efecto.
+3. Deploy del backend (`api/interacciones.js`, `api/usuarios.js`, `api/admin.js`).
+4. Deploy del frontend (`niveles-data.js`, `usuario-session.js`, `index.html`, `comunidad.html`, `mi-perfil.html`, `admin.html`) con cache-bust.
+
+Invertir 1 y 2 respecto del deploy produce `42703 column does not exist` (ledger/config/nivel_max) en cada acreditacion de XP.
+
+#### 13. UI/UX (alcance aprobado)
+
+1. **Toast con desglose de XP + barra de progreso.** El contrato de respuesta de las acciones de XP expone `xp_detalle` (precedente real: la visita ya lo emite en `:8782-8789` con `base`, `factor_area`, `multiplicador`, `amuleto`, `bono_rural`, `total`). Se generaliza el shape a `{ base, m_nivel, mult_clase, factor_casa, mult_progresion, cap_progresion, mult_stack, mult_global, cap_global, cap_aplicado, bonos_planos, total }` y el toast reusa `window.ExploraCO.fmtXp` (helper unico, ADR-035). La barra de progreso usa `niveles-data.js` (`min` actual y `min` siguiente) para no duplicar umbrales. **Deduplicacion obligatoria (Enmienda 1):** la UI de toast de TODAS las acciones de XP debe **suprimir el toast local si la respuesta del servidor ya trae `xp_detalle`** (el servidor es la unica fuente del toast de XP). Esto evita el doble toast ya registrado en `NEXT.md:246` (XP local + toast del servidor).
+2. **UI informativa de enfriamiento/cupo diario** (sustituye al Rising Star Decay): en la ficha/mapa y en el perfil, mostrar cooldown restante y cupo restante del dia por accion capada (visitas, AO proponer 3/dia, AO checkin, plan crear 3/dia, plan unirse 5/dia, chat 10 XP/dia, compartir 50 XP/24h). Fuente de verdad: los cap ya existentes en el backend; la UI solo informa, nunca bloquea por su cuenta.
+3. **Panel admin "Salud de la Red" + leaderboard.** Rama NUEVA **`GET /api/admin?recurso=salud_red`** en `api/admin.js` (corregido por Enmienda 1: el router real enruta por `?recurso=`, `admin.js:132`; `tipo` solo existe DENTRO de `recurso=consumibles`, `:330-333`; el 404 de recurso invalido esta en `:514-517`). El gate Bearer es `auth()` en `:28-31`, aplicado en `:331` (no en `:29-34`). Agrega por dia/accion desde `xp_ledger` (XP entregado, `cap_aplicado`, top acciones, usuarios activos, `nivel_max` vs nivel derivado). **NO se agrega un despachador global `?tipo=` en `api/admin.js`** (decision del operador, Q1: se respeta el router real). El leaderboard reusa `GET /api/usuarios?tipo=leaderboard` (ya existe). **Cero endpoints nuevos (8/8, ADR-001).**
+
+### Justificacion
+
+`M_nivel` es el mecanismo de "recompensa creciente" que hoy NO existe: hasta ahora el nivel solo cambiaba la insignia, no la economia. Pero introducirlo sin cap sobre un stack que ya llega a x5.72 (y a x17.16 con nivel x3.0) destruiria la curva de umbrales y volveria decorativos los precios. El doble cap SECUENCIAL resuelve el problema separando dos cosas distintas: la **progresion** (nivel + clase + Casa), que se acota en 5.0 porque es permanente y estructural, y el **stack temporal** (amuleto x2 + lider x1.1), que se acota en 10.0 porque es consumible y esta autolimitado por inventario y por liderazgo. El resultado conserva el incentivo (subir de nivel se siente y se mide) sin perforar la economia, y hace explicables los numeros al usuario ("tu base 20 x nivel 1.63 = 32.6 XP").
+
+Los umbrales nuevos acompanan ese techo (42000 = 30000 + 40%), preservan el ritmo de las primeras 5 bandas (0/100/250/450/700 intactos, asi los usuarios nuevos no sienten friccion) y endurecen solo la cola alta. La BD real muestra que la transicion es segura hoy (nadie regresa: 1616.92 y 1511.71 se quedan en Nivel 7 antes y despues), y `nivel_max` garantiza que ni siquiera en el futuro alguien pierda una insignia ganada.
+
+La decision de NO implementar el Rising Star Decay es de arquitectura y de producto: destruir XP ya entregado exigiria reescribir acumuladores historicos one-way (viola ADR-003), castigaria la ausencia en un directorio turistico de uso esporadico y no seria auditable sin el ledger que precisamente recien se crea. En su lugar se refuerzan los caps existentes (que ya son la contencion real: cooldown 90 s, 30 visitas/dia, 10 XP/dia de chat, 50 XP/24h de compartir) y se hace visible al usuario lo que el backend ya aplica: informacion en vez de castigo.
+
+El ledger es la pieza que habilita las dos mitades de la UX aprobada (toast con desglose + panel de salud) y, ademas, convierte el XP en algo verificable: hoy hay **al menos 22** escrituras de `xp_total` sin desglose y sin reconciliacion posible (Enmienda 1). La convivencia con `interacciones.xp_ganado` se conserva porque ese dato alimenta Origen, fama y vocaciones (una metrica distinta, sobre la BASE, no sobre el entregado); distinto es `media_compartidos.xp_ganado`, que guarda el FINAL (Enmienda 1).
+
+El repricing no es un capricho: sin el, el XP extra que aporta `M_nivel` se traduciria en inflacion (todo gratis para el top) y el trabajo de reescalado quedaria neutralizado. Subir consumibles de impulso x2.0 y el resto x1.6, y las elecciones 500->800 / 300->500, mantiene el poder de compra aproximadamente constante contra la nueva curva.
+
+### Impacto
+
+- **DB:** `db/migrations/031_gamificacion_v6_nivel_scaling.sql` (NUEVA, aditiva/idempotente/ASCII-safe): `usuarios.nivel_max smallint NOT NULL DEFAULT 1` + siembra unica; `gamificacion_config(clave PK, valor numeric(12,4), descripcion, actualizado_en)` + seed `cap_progresion=5.0`, `cap_global=10.0`, `m_nivel_max=3.0`; `xp_ledger` (Decision 7, multiplicadores en `numeric(10,6)` y `cap_aplicado` con CHECK que incluye `'accion'`, ajustado por `sql-security` segun Enmienda 1) + `idx_xp_ledger_usuario_creado` y `idx_xp_ledger_accion_creado`; repricing de `consumibles.precio_xp` con guard `information_schema` para las columnas de la 027. Rollback: `DROP TABLE xp_ledger`, `DROP TABLE gamificacion_config`, `ALTER TABLE usuarios DROP COLUMN nivel_max` (LOSSY si ya hay XP emitido sin ledger; respaldar antes).
+- **`api/interacciones.js`:** `calcularXpFinal()` reescrito como unico punto (recibe `nivel_usuario` DERIVADO de `xp_total`, `nivel_clase`, `clase_id`, `casa_tag`, `stack`), lee `gamificacion_config` con degradacion, expone `mult_progresion_c`/`mult_global_c`/`cap_aplicado`; catalogo unico `XP_BASES` con las 17 bases de la Decision 9; `NIVELES_LOCAL` **sincronizado como espejo** (sin `require` cruzado: las funciones serverless son independientes, `admin.js:56-59`; Enmienda 1); rama AO proponer instrumentada (+30 directo, cap 3/dia); rama plan_crear/plan_unirse con XP directo y caps; `spot_atributos` instrumentado (+10, con `M_nivel`); **los 4 literales de `album_foto_autor`** (`:6936`, `:6939`, `:6940`, `:6951`; insert `:6911`) ruteados al catalogo unico o declarados EXENTA con constante unica; **los al menos 22 puntos de escritura de `xp_total` instrumentados** en el ledger (incluidos los exentos con `es_exento = true`); insercion de `xp_ledger` en cada acreditacion; `acreditarClaseYCofre` y `avanzarMisionesCasa(...,'xp_total',...)` y `aplicarFamaPandilla` sobre el valor POST-CAP; `xp_detalle` generalizado en las respuestas.
+- **`api/usuarios.js`:** `NIVELES` con los 20 umbrales nuevos + campo `mult`; costos de eleccion 800/500/500 en `:775-776`, `:863-864`, `:947-949`; exposicion de `nivel_max` y `nivel`/`badge_actual` derivados con `GREATEST` (el `GREATEST` protege SOLO la insignia; `M_nivel` usa el nivel DERIVADO, Enmienda 1).
+- **`api/admin.js`:** rama NUEVA **`GET ?recurso=salud_red`** (admin-gated via `auth()` en `:28-31` aplicado en `:331`; router real por `?recurso=`, `:132`; lee `xp_ledger`); repricing de consumibles via `consumibles_editar` (`:381`) - o el UPDATE de la 031.
+- **Frontend:** `niveles-data.js` (umbrales + `mult` + etiqueta de multiplicador), `usuario-session.js` (umbrales + `MAX_NIVEL`), `index.html:2969-2994`, `comunidad.html:580-603`, `mi-perfil.html` (textos 800/500 + UI de enfriamiento/cupo + toast/barra), `admin.html` (tab "Salud de la Red").
+- **Presupuesto:** 8/8 intacto (ADR-001). Cero endpoints nuevos; todo por ramas existentes: `?recurso=` en `api/admin.js` y `?tipo=` en `api/usuarios.js` (Enmienda 1).
+- **Sin cambios en `tags`:** ningun campo JSONB nuevo; MERGE y Cero Borrado Logico intactos.
+- **Compatibilidad:** `M_nivel` arranca de la tabla de umbrales; mientras la 031 no este aplicada, las rutas degradan a los defaults en codigo y el ledger no escribe (nunca rompe la acreditacion del usuario: el XP se entrega igual).
+
+### Consecuencias positivas
+
+- La progresion de nivel pasa a tener efecto economico real, medible y explicable, con techo controlado (x10.0 global).
+- El XP deja de ser una caja negra: `xp_ledger` habilita el toast con desglose, el panel "Salud de la Red" y la reconciliacion (`xp_final = red2(xp_base * mult_final) + bonos_planos`).
+- `nivel_max` cierra la clase de bug "el reescalado te quito la insignia" sin persistir el nivel (una sola fuente derivada).
+- La economia queda recalibrada en la misma entrega: el XP extra no se convierte en inflacion.
+- Cero endpoints nuevos, cero cambios en `tags`, esquema aditivo e idempotente.
+- Los caps se vuelven VISIBLES al usuario (enfriamiento/cupo) en lugar de castigarlo ocultamente.
+
+### Consecuencias negativas / riesgos residuales
+
+- **R-1 (ALTO, orden de migraciones).** La 031 debe aplicarse ANTES del deploy del backend; si no, cada acreditacion falla con `42703` (`nivel_max`/`xp_ledger`/`gamificacion_config`). Mitigacion: degradacion escalonada obligatoria (el XP se entrega igual; el ledger se salta con `console.warn`), orden mandatorio de la Decision 12 y verificacion post-deploy.
+- **R-2 (ALTO, deuda 027/028).** La 027 NO esta aplicada, asi que `precio_xp_base`/`precio_xp_actual`/`consumibles_precio` NO existen: el repricing DEBE escribir `consumibles.precio_xp` y sobrevivir a que la 027 se aplique despues. Mitigacion: guard `information_schema` + bloque de verificacion/re-seed en la 031 + smoke que compare ambos precios cuando la 027 exista.
+- **R-3 (MEDIO, 7+ espejos de umbrales).** Desfase silencioso entre servidor y clientes (hoy coinciden por disciplina manual). Incluye `admin.html:7362` (`_jugNiveles`) y `BADGES_LOCAL` (`interacciones.js:466`, titulos). Mitigacion: `scripts/smoke_niveles_espejos.js` como gate de QA (con el falso positivo de `RAMA_TIERS`/`ARBOL_UMBRALES` explicitamente EXCLUIDO) y migracion gradual a `niveles-data.js`.
+- **R-4 (MEDIO, textos de UI).** `mi-perfil.html` miente si no se sincroniza (500->800 y 300->500); hay un caso (recambio de Clase) cuya ubicacion exacta NO se pudo confirmar en esta fase.
+- **R-5 (MEDIO, economia).** `interacciones.xp_ganado` es un segundo ledger derivado (Origen, fama, vocaciones): subir bases mueve esas metricas. Mitigacion: documentado (Decision 8.6) y verificable por smoke de Origen antes/despues.
+- **R-6 (MEDIO, calibracion sin datos; REESCRITO por Enmienda 1).** El techo 42000 es por decreto: con 7 usuarios y max 1616.92 no hay datos para validar la cola alta. Ademas la meta de ritmo declarada (N20 en 3-6 meses de uso activo) no se sostiene con 42000 segun la estimacion de la segunda opinion (muy activo ~1-2 meses). **`gamificacion_config` NO es valvula real para la curva**: solo parametriza CAPS, no umbrales (Decision 6). **Deuda aceptada:** recalibrar los umbrales exige deploy; se revisa cuando exista poblacion (>= 10 usuarios en Nivel >= 12 o 90 dias de datos del ledger). NO se bajan/agregan umbrales ahora (decision del operador, Q4: evitar segunda fuente de verdad).
+- **R-7 (BAJO, cap vs. redondeo).** El rediseno colapsa varios `red2` intermedios (hoy: base x factor_area -> x1.1 -> x2 -> `calcularXpFinal`) en un solo `red2` final. Puede haber diferencias de 1 centavo frente al XP historico. Mitigacion: se acepta (el XP ya entregado no se toca: ADR-003) y el ledger permite explicar cualquier diferencia futura.
+- **R-8 (BAJO, `gamificacion_config` sin cache).** Un SELECT extra por acreditacion. Aceptable a esta escala; cache con TTL diferido.
+- **R-9 (BAJO, miniaturas de `nivel_max`).** La siembra usa la tabla VIEJA una sola vez; si la 031 se ejecuta despues de que existan usuarios nuevos (post-deploy), se debe correr la siembra solo para `nivel_max IS NULL` (idempotente).
+- **R-10 (BAJO, fidelidad de la tabla).** El titulo 11 de la fuente tiene la tilde mal ubicada (`Estrat\u00e9ga`); corregirlo es un cambio de texto que arrastra los 7+ espejos y queda fuera de esta entrega.
+- **R-11 (ALTO, versionado de artefactos; NUEVO en Enmienda 1).** `db/migrations/031_gamificacion_v6_nivel_scaling.sql` y la spec `docs/superpowers/specs/2026-09-21-gamificacion-nivel-scaling-v6-design.md` existen en el arbol pero **NO estan commiteados** (`git status`: `M DECISIONS.md`, `?? 031...sql`, `?? spec`). Debe versionarse ANTES de aplicarse en Neon o el baseline de migraciones queda desfasado (ADR-006/ADR-008). **El commit es decision del operador; NO se ejecuta en esta ventana.**
+- **R-12 (MEDIO, caps denominados en XP; NUEVO en Enmienda 1).** Los caps denominados en XP (`compartir` 50 XP/24h, `chat` 10 XP/dia) se agotan con MENOS acciones al subir `M_nivel` (cada accion aporta mas XP). Mitigacion: la UI de "cupo restante" debe explicar que el cupo es en XP, no en numero de acciones; el ledger registra el recorte como `cap_aplicado = 'accion'`.
+- **R-13 (MEDIO, `admin.html:_jugNiveles`; NUEVO en Enmienda 1).** `admin.html:7362` no estaba en el smoke; el panel admin mostraria niveles viejos y sembraria reportes falsos de desincronizacion (el admin es ademas el consumidor de "Salud de la Red"). Mitigacion: incluirlo en `scripts/smoke_niveles_espejos.js` (junto a `BADGES_LOCAL`).
+
+### Enmienda 1 (2026-09-21) -- segunda opinion
+
+**Motivo.** `@architect-review` dictamino **APROBADO CON CAMBIOS** con 4 hallazgos ALTO. La segunda opinion verifico el archivo real (ADR-006) y encontro que el ADR citaba mal el router de `api/admin.js`, subcontaba los espejos de umbrales y los puntos de escritura de `xp_total`, y afirmaba que `interacciones.xp_ganado` guarda la base sin distinguir `media_compartidos.xp_ganado`. Esta enmienda NO cambia codigo ni SQL: corrige el diseno documentado, congela la semantica de `mult_stack` y registra los riesgos nuevos. Donde haya contradiccion, PREVALECE esta enmienda sobre el cuerpo del ADR y sobre la spec. NO se borra el historial: el texto previo permanece como registro de la decision original.
+
+**Correcciones factuales (baseline = archivo real, ADR-006).**
+
+1. **Router de `api/admin.js` = `?recurso=`, NO `?tipo=`.** Evidencia: `admin.js:132` (`req.query.recurso`), `:330-333` (`tipo` solo dentro de `recurso=consumibles`), `:514-517` (404/400 "recurso invalido"). El gate Bearer es `auth()` en `:28-31`, aplicado en `:331`. La rama nueva es **`GET /api/admin?recurso=salud_red`** (Dec 13.3, Impacto y spec corregidos). Decision del operador (Q1): NO se agrega un despachador global `?tipo=`; se respeta el router real.
+2. **Espejos de umbrales: 7+, no 6.** Faltaba `admin.html:7362` (`_jugNiveles = [0..30000]`); ademas `api/interacciones.js:466 BADGES_LOCAL` carga los 20 TITULOS (no umbrales) y tambien se valida. Dec 11 y su tabla pasan a 7+ entradas. El smoke se llama `scripts/smoke_niveles_espejos.js` (Q3: SI incluir `admin.html` y `BADGES_LOCAL`).
+3. **Puntos de escritura de `xp_total`: al menos 22, no 19.** Faltaban los multilinea `interacciones.js:2586` (misiones), `:2729` (logros) y `:8444` (resena). TODOS deben instrumentarse en el ledger (incluidos los exentos con `es_exento = true`) o el smoke de reconciliacion falla.
+4. **`media_compartidos.xp_ganado` guarda el XP FINAL, no la BASE** (`interacciones.js:8310`). La afirmacion "`xp_ganado` guarda la base" es cierta solo para `interacciones`. Consecuencia: con `M_nivel` el tope de compartir (50 XP/24h) se agota con MENOS acciones (R-12).
+5. **El literal `+10` de album foto al autor son 4 literales, no 1:** `:6936`, `:6939` (`repartirXpReferidos(...,10)`), `:6940` (`xp_autor_dia < 10`, tope diario en `progreso_album` JSONB) y `:6951`; mas el insert `:6911` con base 15. Dec 8.5 exige rutear los 4 o declarar `album_foto_autor` EXENTA completa con su constante unica, para no romper el contador del tope diario.
+6. **No hay `require` cruzado entre funciones serverless** (ver `admin.js:56-59`): `api/interacciones.js` NO puede consumir `NIVELES` de `api/usuarios.js`. Se mantiene el espejo sincronizado + smoke comparador obligatorio; el "consumir la matematica desde `usuarios.js`" es inviable. Opcion a documentar (no a implementar ahora): mover la tabla a un modulo fuera de `api/` (p.ej. `lib/`).
+
+**Cambios de diseno.**
+
+7. **Semantica unica de `mult_stack` (congelada).** `mult_stack` = producto de TODO el stack EXCEPTO `M_nivel`: `mult_clase * factor_casa * (amuleto?2:1) * (lider?1.1:1)`. Asi `mult_nivel * mult_stack` = producto crudo completo, `mult_final` = efectivo post-caps y `cap_aplicado` explica el recorte. El ledger queda reconstruible sin cambiar las 13 columnas (salvedad de cuantizacion y de caps de accion).
+8. **`M_nivel` usa el nivel DERIVADO de `xp_total`, NO `nivel_visible`/`nivel_max`** (Q2). Se preserva el castigo economico del de-nivel de ADR-018 (gastar XP baja el multiplicador); `nivel_max` solo protege la INSIGNIA. El `GREATEST` de `nivel_visible` no neutraliza el de-nivel.
+9. **Sin piso 1.0 en el cap global.** El rango `[0.85, 10.0]` se preserva a proposito: el x0.85 es `factorCasa` de Casa dominante ya vigente (ADR-038), no una regresion de `M_nivel`.
+10. **Invariante del ledger.** Valido para acciones SIN cap denominado en XP. `compartir` (50 XP/24h) y `chat` (10 XP/dia) son la excepcion y registran `cap_aplicado = 'accion'`. `sql-security` ya ajusta el CHECK de `cap_aplicado` para incluir `'accion'` y sube la precision de los multiplicadores a `numeric(10,6)`.
+11. **Meta de ritmo.** N20 en **3-6 meses de uso activo**. Verificacion: la estimacion de la segunda opinion (muy activo ~1-2 meses; casual ~8 meses) sugiere que 42000 se alcanza mas rapido que la meta; se documenta como deuda de calibracion y NO se cambia el techo (aprobado por el operador).
+12. **Doble toast.** La UI de toast de TODAS las acciones de XP debe deduplicar: suprimir el toast local si la respuesta del servidor ya trae `xp_detalle` (riesgo ya registrado en `NEXT.md:246`).
+13. **R-6 corregido.** `gamificacion_config` solo parametriza CAPS, no umbrales; NO es valvula real para la curva 42000. Decision del operador (Q4): NO se agregan umbrales a la config; los umbrales siguen en codigo/espejos y requieren deploy. Deuda aceptada.
+
+**Riesgos nuevos.** R-11 (ALTO, 031 y spec sin commitear), R-12 (MEDIO, caps en XP se agotan con menos acciones), R-13 (MEDIO, `admin.html:_jugNiveles` fuera del smoke). Falso positivo a EVITAR en el smoke: `RAMA_TIERS`/`ARBOL_UMBRALES` (`interacciones.js:554`, `mi-perfil.html:3387`, `perfil.html:655`) comparten 5 valores pero NO son espejos de la tabla de 20.
+
+**Respuestas del operador (Q1-Q6).** Q1 `?recurso=salud_red` (respeta el router real). Q2 `M_nivel` con nivel DERIVADO. Q3 SI incluir `admin.html` y `BADGES_LOCAL` en el smoke (7+). Q4 NO parametrizar umbrales; R-6 reescrito como deuda aceptada. Q5 la 031 queda SIN aplicar y SIN commitear en esta ventana; 027/028 se quedan fuera. Q6 `spot_atributos` +10 con `M_nivel`, definicion funcional diferida a la fase de backend, no toca la 031.
+
+**Estado de la enmienda:** APROBADO CON CAMBIOS incorporados (2026-09-21). Sigue siendo Fase 1: SOLO documentacion; NO se toco codigo ni SQL. El cuerpo del ADR y la spec quedan corregidos en los puntos anteriores.
+
+**ADRs relacionados:** ADR-001 (8/8 endpoints; extender `api/admin.js` por `?recurso=` y `api/usuarios.js` por `?tipo=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / MERGE JSONB / no reescribir acumuladores historicos), ADR-006 (baseline = archivo real; auditoria de BD provista por el operador), ADR-008 (esquema versionado e idempotente), ADR-014/ADR-018 (milestones y gamificacion v4: niveles, consumibles, influencia global; de-nivel preservado por Enmienda 1), ADR-024 (presencia fisica y caps de visita), ADR-025 (sesion firmada en mutaciones), ADR-028 (gaming v5.0: facciones, Casas, consumibles, misiones), ADR-033 (factor de area de visita), ADR-034 (ficha por modulos), ADR-035 (XP numeric(12,2) y helpers `red2`/`numXp`/`fmtXp`), ADR-036 (compartir con tope 50/24h), ADR-038 (factor de nivelacion de Casa, clases Rising Star, `calcularXpFinal` y `acreditarClaseYCofre`; el x0.85 de Casa dominante se preserva), ADR-040 (fuente unica cliente `niveles-data.js`, hoy incumplida), ADR-042 (migracion 027 `precio_xp_base`/`consumibles_precio`, NO aplicada), BUG-021/BUG-060 (patron migracion-antes-de-deploy y columna no versionada), BUG-061 (spoofing de usuario_id), BUG-081, NEXT.md:246 (doble toast), AGENTS.md 2.1 (Regla de No-Duplicidad) y 2.2 (prohibicion de catch vacio).

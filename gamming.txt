@@ -1,0 +1,221 @@
+Markdown
+# Propuesta de Arquitectura y Rediseño del Motor de Gamificación ExploraCO v2.0
+
+**A:** Javier Ricardo González Rodríguez (Lead Developer / Arquitecto ExploraCO)  
+**DE:** Lead Developer / AI Kernel (AI-DOS v1.2 / Reglas de Oro v5.202607)  
+**ASUNTO:** Rediseño del Motor de Puntos, Escala Progresiva x3.0 (Level Scaling), Curva de Experiencia Dinámica (Rising Star Dynamic Decay) y Reestructuración de Nutrición de Datos  
+**FECHA:** Septiembre 21, 2026  
+
+---
+
+## 1. Análisis del Problema y Objetivos del Rediseño
+
+Para que ExploraCO sea autosostenible, orgánico y vibrante, el sistema de incentivos debe resolver tres desafíos estructurales:
+
+1. **Curva de Experiencia Progresiva (Level Scaling hasta x3.0):** La cantidad de XP otorgada por acción ya no es fija. Para motivar al usuario a subir de nivel y hacer que el avance sea gratificante, se implementa un **Multiplicador de Nivel** ($M_{\text{nivel}}$) que escala paso a paso desde **x1.0 en el Nivel 1** hasta alcanzar **x3.0 en el Nivel 20**.
+2. **Prevención de Spam y Anti-Farming (Rising Star Decay System):** Las acciones repetitivas (como votar fotos masivamente o enviar mensajes vacíos) generan ruido en la base de datos. Se implementa una **curva de ráfaga con decaimiento por enfriamiento (Cooldown/Ramping Decay)** inspirada en *Rising Star*, donde el rendimiento de puntos disminuye hasta $0$ tras $N$ ejecuciones consecutivas dentro de una ventana temporal, restaurándose gradualmente.
+3. **Nutrición Orgánica del Ecosistema (Mapa, Puntos y Planes):** El negocio requiere tres pilares para crecer:
+   - **Puntos en el mapa (Geometría/Destinos):** Recompensar fuertemente la creación, verificación y completado de atributos en spots turísticos/ocultos.
+   - **Usuarios alimentando el mapa (Comunidad/Wayfarers):** Recompensar fotos de calidad con coordenadas exactas, reseñas estructuradas y validación comunitaria.
+   - **Medios que ayuden a alimentar estos recursos (Planes/Interactividad):** Convertir el mapa estático en rutas y agendas dinámicas donde la gente interactúe, asista y converse.
+
+---
+
+## 2. Nueva Fórmula General de Cálculo de XP Server-Side
+
+Cada acción $A$ ejecutada por un usuario $u$ en un contexto $c$ generará experiencia según la fórmula:
+
+$$\text{XP}_{\text{ganada}} = \text{BaseXP}(A) \times M_{\text{nivel}}(N) \times D_{\text{decay}}(A, u) \times M_{\text{contexto}}(c) \times M_{\text{casa}}(u)$$
+
+---
+
+### A. Multiplicador de Nivel ($M_{\text{nivel}}$) — Escala x1.0 a x3.0
+
+Para motivar la progresión continua, subir de nivel incrementa progresivamente el retorno de XP en todas las actividades hasta duplicar el rendimiento base adicional en el Nivel 20 ($+200\% \rightarrow x3.0$):
+
+$$M_{\text{nivel}}(N) = 1.0 + \left( \frac{N - 1}{19} \right) \times 2.0$$
+
+Donde $N$ es el nivel actual del usuario ($1 \le N \le 20$).
+
+#### Tabla Escalar de Multiplicadores por Nivel
+
+| Nivel | Rango / Título ExploraCO | Multiplicador ($M_{\text{nivel}}$) | Incremento Relativo |
+|---|---|---|---|
+| **Nivel 1** | Caminante Novato | **x1.000** | Base |
+| **Nivel 2** | Rastreador Local | **x1.105** | +10.5% |
+| **Nivel 3** | Explorador Urbano | **x1.211** | +21.1% |
+| **Nivel 4** | Aventurero Regional | **x1.316** | +31.6% |
+| **Nivel 5** | Vanguardia Territorial | **x1.421** | +42.1% |
+| **Nivel 6** | Embajador de Zona | **x1.526** | +52.6% |
+| **Nivel 7** | Fotógrafo de Ruta | **x1.632** | +63.2% |
+| **Nivel 8** | Cronista de Historias | **x1.737** | +73.7% |
+| **Nivel 9** | Buscador de Leyendas | **x1.842** | +84.2% |
+| **Nivel 10** | Guía de Fronteras | **x1.947** | +94.7% |
+| **Nivel 11** | Estratégia Comunitario | **x2.053** | +105.3% |
+| **Nivel 12** | Documentalista Visual | **x2.158** | +115.8% |
+| **Nivel 13** | Señor del Spot | **x2.263** | +126.3% |
+| **Nivel 14** | Cartógrafo de Cine | **x2.368** | +136.8% |
+| **Nivel 15** | Protector del Patrimonio | **x2.474** | +147.4% |
+| **Nivel 16** | Curador de Colombia | **x2.579** | +157.9% |
+| **Nivel 17** | Mariscal de Parche | **x2.684** | +168.4% |
+| **Nivel 18** | Cineasta de Territorio | **x2.789** | +178.9% |
+| **Nivel 19** | Inmortal del Mapa | **x2.895** | +189.5% |
+| **Nivel 20** | Gran Maestro ExploraCO | **x3.000** | **+200.0% (Límite Máximo)** |
+
+---
+
+### B. Curva Rising Star Decay ($D_{\text{decay}}$)
+
+Las acciones altamente repetibles usan un contador de ráfaga en la base de datos dentro de una ventana temporal `ventanaMinutos`.
+
+$$\text{Factor Decay } D(k) = \max\left(0, \ 1.0 - \left( \frac{k - 1}{K_{\text{max}} - 1} \right)^\alpha \right)$$
+
+Donde $k$ es el número de repeticiones acumuladas en la ventana y $K_{\text{max}}$ es el límite de agotamiento.
+
+| Acción | $K_{\text{max}}$ (Límite Ráfaga) | $\alpha$ (Curva) | Puntos x Ejecución en Ráfaga (Base=5) | Cooldown Total |
+|---|---|---|---|---|
+| **Votar Foto de Destino / Álbum** | 10 | 1.5 | $5 \rightarrow 4 \rightarrow 4 \rightarrow 3 \rightarrow 3 \rightarrow 2 \rightarrow 1 \rightarrow 1 \rightarrow 0 \rightarrow 0$ | 60 minutos |
+| **Comentar Media / Mensaje Chat** | 8 | 1.0 | $2 \rightarrow 2 \rightarrow 1 \rightarrow 1 \rightarrow 1 \rightarrow 0 \rightarrow 0 \rightarrow 0$ | 30 minutos |
+| **Check-in / Visita Confirmada** | 3 | 2.0 | $30 \rightarrow 22 \rightarrow 0$ | 120 minutos |
+
+---
+
+### C. Reestructuración de la Tabla de Recompensas (Objetivo Nutrición Mapa y Planes)
+
+| Categoría | Acción | Base XP Anterior | Nueva Base XP (v2.0) | Justificación de Nutrición de Datos |
+|---|---|---|---|---|
+| **Puntos en Mapa** | Proponer Activo Oculto (Spot Nuevo) | +50 | **+100 XP** | Incentiva llenar vacíos geográficos en Colombia |
+| **Puntos en Mapa** | Completar Atributos (Horario/Dirección/Tag) | 0 | **+25 XP** | Mantiene la calidad de datos en Neon DB |
+| **Puntos en Mapa** | Visita Confirmada (GPS Geofence) | +20 | **+30 XP** (+20 Bonus Rural) | Malla de verificación física |
+| **Usuarios** | Reseña Estructurada Larga (>120 caracteres) | +25 | **+40 XP** | Aporta información real a la ficha |
+| **Usuarios** | Subir Foto Verificada con EXIF/Location | +15 | **+25 XP** | Alimenta galerías y mapa visual |
+| **Usuarios** | Voto Wayfarer (Aprobar/Rechazar Spot) | +5 | **+10 XP** (con Decay) | Valida puntos comunitarios rápidamente |
+| **Medios/Planes** | **Crear Plan Público / Ruta en Mapa** | 0 | **+60 XP** | Convierte datos pasivos en experiencias activas |
+| **Medios/Planes** | **Unirse a un Plan / Confirmar Asistencia** | 0 | **+15 XP** | Fomenta interacción social real |
+| **Medios/Planes** | **Compartir/Exportar Ruta a Chat/Social** | 0 | **+10 XP** | Viralidad del mapa y tráfico hacia la Web App |
+
+---
+
+## 3. Especificación Técnica de Implementación
+
+### A. Esquema DDL (Neon PostgreSQL)
+
+```sql
+-- Tabla para control de ráfagas y enfriamiento (Rising Star Decay)
+CREATE TABLE IF NOT EXISTS user_action_decay (
+    id BIGSERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    accion VARCHAR(50) NOT NULL,
+    conteo_rafaga INT DEFAULT 1,
+    ultimo_evento TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_usuario_accion UNIQUE (usuario_id, accion)
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_decay_lookup 
+ON user_action_decay (usuario_id, accion, ultimo_evento);
+B. Implementación Server-Side (api/interacciones.js)
+Nota: Código en CommonJS estricto, libre de backticks, 100% ASCII-Safe (Reglas de Oro v5.202607).
+
+JavaScript
+// Fragmento de calculo XP con Multiplicador Nivel (x1.0 a x3.0) y Rising Star Decay
+// Archivo: api/interacciones.js
+
+function obtenerMultiplicadorNivel(nivel) {
+  var n = Math.max(1, Math.min(20, nivel || 1));
+  return 1.0 + ((n - 1) / 19.0) * 2.0;
+}
+
+async function calcularExperienciaAccion(client, usuarioId, accion, nivelUsuario) {
+  var basesXP = {
+    'resena_larga': 40,
+    'resena_corta': 10,
+    'visita_confirmada': 30,
+    'voto_foto': 5,
+    'subir_foto': 25,
+    'proponer_spot': 100,
+    'completar_spot': 25,
+    'crear_plan': 60,
+    'unirse_plan': 15,
+    'voto_wayfarer': 10
+  };
+
+  var limitesDecay = {
+    'voto_foto': { kMax: 10, ventanaMinutos: 60, alpha: 1.5 },
+    'comentar_media': { kMax: 8, ventanaMinutos: 30, alpha: 1.0 },
+    'voto_wayfarer': { kMax: 15, ventanaMinutos: 60, alpha: 1.2 }
+  };
+
+  var xpBase = basesXP[accion] || 2;
+  var factorDecay = 1.0;
+
+  // Evaluacion de Decay si la accion es repetitiva
+  if (limitesDecay[accion]) {
+    var conf = limitesDecay[accion];
+    var resDecay = await client.query(
+      "SELECT conteo_rafaga, ultimo_evento FROM user_action_decay WHERE usuario_id = $1 AND accion = $2",
+      [usuarioId, accion]
+    );
+
+    var ahora = new Date();
+    var conteo = 1;
+
+    if (resDecay.rows.length > 0) {
+      var ultimo = new Date(resDecay.rows[0].ultimo_evento);
+      var difMinutos = (ahora - ultimo) / (1000 * 60);
+
+      if (difMinutos < conf.ventanaMinutos) {
+        conteo = resDecay.rows[0].conteo_rafaga + 1;
+      } else {
+        conteo = 1; // Reinicio por enfriamiento cumplido
+      }
+    }
+
+    // Upsert contador de ráfaga
+    await client.query(
+      "INSERT INTO user_action_decay (usuario_id, accion, conteo_rafaga, ultimo_evento) " +
+      "VALUES ($1, $2, $3, NOW()) " +
+      "ON CONFLICT (usuario_id, accion) DO UPDATE SET conteo_rafaga = $3, ultimo_evento = NOW()",
+      [usuarioId, accion, conteo]
+    );
+
+    // Calculo del factor decay con exponente alpha
+    if (conteo >= conf.kMax) {
+      factorDecay = 0.0;
+    } else {
+      var ratio = (conteo - 1) / (conf.kMax - 1);
+      factorDecay = Math.max(0.0, 1.0 - Math.pow(ratio, conf.alpha));
+    }
+  }
+
+  var mNivel = obtenerMultiplicadorNivel(nivelUsuario);
+  var xpFinal = Math.round(xpBase * mNivel * factorDecay);
+
+  return {
+    xpOtorgada: xpFinal,
+    factorDecay: factorDecay,
+    multiplicadorNivel: mNivel
+  };
+}
+4. Desglose de Archivos Requeridos para Revisión e Implementación
+Ruta de Archivo	Responsabilidad en la Actualización
+api/interacciones.js	Inyección de la función calcularExperienciaAccion(), evaluación del decay y aplicación del multiplicador M 
+nivel
+​
+  (x1.0→x3.0).
+api/usuarios.js	Actualización de los umbrales de nivel y recalculo derivado de xp_total.
+api/pagina-destino.js	Renderizado UI para notificar cuando una acción entra en Modo Enfriamiento (Cooldown) por decay.
+admin.html	Sub-panel en la pestaña administrativa para monitorear métricas de salud de la red (spots creados, planes activos y tasa de decay).
+scripts/seed-gamificacion.sql	Ejecución del DDL de la tabla user_action_decay y actualización de configuraciones por defecto.
+5. Ventajas del Modelo v2.0 para ExploraCO
+Hiper-Incentivo de Progresión: Al subir de nivel, realizar la misma acción llega a rendir hasta 3 veces más XP (x3.0) en Nivel 20, convirtiendo la subida de nivel en el activo más valioso del juego.
+
+Defensa de la Base de Datos: El decaimiento progresivo (Rising Star Decay) inhabilita granjas de clics o votaciones masivas desmedidas, obligando al usuario a explorar el mapa y participar en distintas actividades.
+
+Sostenibilidad del Mapa Vivo: Alinea la economía del juego con el negocio: proponer lugares, verificar datos en terreno y organizar planes comunitarios son ahora las acciones que otorgan mayor XP.
+
+
+3. Especificación del Motor de Gamificación y Multiplicador de Nivel ($M_{\text{nivel}}$)Para incentivar la progresión continua y hacer que conseguir XP sea progresivamente más gratificante a medida que el usuario escala en los 20 Niveles del sistema, se aplica la siguiente curva de multiplicador:A. Fórmula del Multiplicador de Nivel ($M_{\text{nivel}}$)El multiplicador incrementa progresivamente nivel por nivel desde $x1.0$ (Nivel 1) hasta alcanzar exactamente $x3.0$ en el Nivel 20:$$M_{\text{nivel}}(N) = 1.0 + \left( \frac{N - 1}{19} \right) \times 2.0$$Donde $N$ es el nivel del usuario ($1 \le N \le 20$).B. Tabla Escalar de Multiplicadores por NivelNivelRango / Título ExploraCOMultiplicador (Mnivel​)Incremento RelativoNivel 1Caminante Novatox1.000BaseNivel 2Rastreador Localx1.105+10.5%Nivel 3Explorador Urbanox1.211+21.1%Nivel 4Aventurero Regionalx1.316+31.6%Nivel 5Vanguardia Territorialx1.421+42.1%Nivel 6Embajador de Zonax1.526+52.6%Nivel 7Fotógrafo de Rutax1.632+63.2%Nivel 8Cronista de Historiasx1.737+73.7%Nivel 9Buscador de Leyendasx1.842+84.2%Nivel 10Guía de Fronterasx1.947+94.7%Nivel 11Estratégia Comunitariox2.053+105.3%Nivel 12Documentalista Visualx2.158+115.8%Nivel 13Señor del Spotx2.263+126.3%Nivel 14Cartógrafo de Cinex2.368+136.8%Nivel 15Protector del Patrimoniox2.474+147.4%Nivel 16Curador de Colombiax2.579+157.9%Nivel 17Mariscal de Parchex2.684+168.4%Nivel 18Cineasta de Territoriox2.789+178.9%Nivel 19Inmortal del Mapax2.895+189.5%Nivel 20Gran Maestro ExploraCOx3.000+200.0% (Límite Máximo)4. Entrada del UsuarioLa gema recibe por chat, en lenguaje natural:Destino individual (investigación UNO A UNO): Nombre del establecimiento, lugar o evento MÁS el lugar (ciudad/municipio/región). Opcionalmente la categoría esperada (hostal | comida | sitio | evento) y datos base adicionales.Lote de eventos (investigación en lote de N): Lista de eventos con nombre MÁS lugar; puede incluir fechas aproximadas.5. Enrutamiento de la InvestigaciónLa gema decide la ruta según la entrada:Un destino individual -> Aplica GEMINI_MASTER_PROMPT.md: completa la sección "2. Entrada a investigar" con el nombre y lugar dados, y exige la estructura de entrega de ficha_template.md, incluido el bloque JSON final del esquema con los TAGS según categoría.Lote de eventos -> Aplica GEMINI_EVENTOS_PROMPT.md: completa la sección "2. Lote a investigar" con el lote recibido y entrega el array JSON listo para eventos/eventos.json.En ambos casos la gema ejecuta TODA la investigación web por sí misma. Orden de fuentes: (1) web oficial, (2) fuentes gubernamentales u oficiales, (3) Google Maps / Google Business, (4) TripAdvisor / Booking / Hostelworld, (5) Wikipedia y Wikimedia Commons para fotos, (6) prensa local y blogs confiables. Se cruzan mínimo 2 fuentes por dato clave.6. Reglas Duras de la InvestigaciónNO inventar datos: ante duda se usa null o la nota (referencia).Datos vigentes 2026; fuentes anteriores a 2025 se marcan como referencia.Sin ratings ni calificaciones en el JSON (ADR-009); las valoraciones reales solo se mencionan en la ficha humana, nunca en el JSON.Coordenadas decimales verificadas; NUNCA 0,0 ni genéricas.Fotos SOLO como sugerencias de Wikimedia Commons verificables (tema, caption y nombres de archivo File:...); el pipeline resuelve la URL real y verifica HEAD 200 (BUG-022). Nunca se entregan URLs finales en foto_hero / fotos_galeria.Fechas de eventos SIEMPRE YYYY-MM-DD; evento de un día lleva fecha_inicio == fecha_fin; multidía con rango exacto.Responder SIEMPRE en español: ficha humana con acentos normales, bloque JSON con escapes ASCII-safe.7. Contrato de Entrega de la GemaDestino individual: La ficha .md COMPLETA según ficha_template.md con todas las secciones llenas (Datos generales, Específico <categoria>, FAQ, Imágenes sugeridas, Fuentes) y, al final, el ÚNICO bloque json de entrega con la estructura EXACTA del master (BASE, TAGS según categoría, FAQS, FOTOS_SUGERIDAS, FUENTES). Se acompañan los clogs del Escudo GOLD (INFO/DEBUG/LINK/TRACE/TIME).Eventos: Un ÚNICO bloque json final con el ARRAY de N eventos según el esquema de GEMINI_EVENTOS_PROMPT.md, listo para eventos/eventos.json tal cual (sin comentarios), más la sección ## Fuentes en markdown fuera del bloque y clogs GOLD por evento.Cierre: La respuesta termina con la marca ==FIN==. No se agrega markdown fuera de lo pedido.8. Validación Downstream y Checklist FinalChecklist final de la gema antes de cerrar con ==FIN==:[ ] Todos los campos de la plantilla cubiertos (null si no aplica).[ ] TAGS según categoría, sin campos eliminados ni renombrados.[ ] Coordenadas verificadas, distintas de 0,0.[ ] Fechas de eventos en YYYY-MM-DD con rango exacto.[ ] Fotos solo como sugerencias File:..., sin URLs finales.[ ] Multiplicadores de nivel calculados con la escala $x1.0 \rightarrow x3.0$ en el Nivel 20.[ ] Respuesta en español y bloque JSON ASCII-safe.FIN
+
+
+
+Con esta informacion, plantear mejoraas en el sistema de gamming y en la tabl de XP, para mejorar la experiencia del usuario
