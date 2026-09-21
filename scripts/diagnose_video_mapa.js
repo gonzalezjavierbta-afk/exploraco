@@ -419,6 +419,7 @@ function imprimirResumen(reporte) {
 
 async function main() {
   var email = emailObjetivo();
+  require('./load_env_local')();
   var url = urlValida(process.env.DATABASE_URL);
   console.log('=== DIAGNOSTICO VIDEO EN MAPA ' + email + ' (READ-ONLY) ===');
 

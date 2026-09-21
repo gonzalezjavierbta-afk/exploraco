@@ -185,47 +185,93 @@ var doc = {
   addEventListener: function () {}
 };
 
-var mapStub = {
-  setView: function () { return this; },
-  getZoom: function () { return 14; },
-  project: function () { return { x: 0, y: 0 }; },
-  on: function () { return this; },
-  off: function () { return this; },
-  hasLayer: function () { return false; },
-  addLayer: function () { return this; },
-  removeLayer: function () { return this; },
-  remove: function () {},
-  fitBounds: function () { return this; },
-  panTo: function () { return this; },
-  flyTo: function () { return this; },
-  getBounds: function () { return { contains: function () { return true; } }; }
-};
+// Stubs ampliados para los casos de regresion (no se toca el motor):
+//  - map: guarda handlers y permite disparar 'moveend' con __fire();
+//    el bounds es configurable via __boundsContains para simular paneo.
+//  - layerGroup: registra los layers agregados en __added para poder
+//    contar los pines de media tras cada renderMedia().
+//  - marker: instancia nueva por llamada; addTo() delega en layer.addLayer.
+//  - setTimeout/clearTimeout: cola falsa con flush sincrono (el motor
+//    difiere onMoved 150 ms, que el smoke ejecuta a mano).
+var groups = [];
+var lastMapStub = null;
+function mkMapStub() {
+  var ms = {
+    __handlers: {},
+    __boundsContains: true,
+    __layers: [],
+    setView: function () { return this; },
+    getZoom: function () { return 14; },
+    project: function () { return { x: 0, y: 0 }; },
+    on: function (t, fn) { this.__handlers[t] = fn; return this; },
+    off: function () { return this; },
+    __fire: function (t) {
+      var fn = this.__handlers[t];
+      if (typeof fn === 'function') return fn({ type: t, target: this });
+      return undefined;
+    },
+    hasLayer: function () { return false; },
+    addLayer: function (l) { this.__layers.push(l); return this; },
+    removeLayer: function () { return this; },
+    remove: function () {},
+    fitBounds: function () { return this; },
+    panTo: function () { return this; },
+    flyTo: function () { return this; },
+    getBounds: function () {
+      var self = this;
+      return { contains: function () { return self.__boundsContains; } };
+    }
+  };
+  lastMapStub = ms;
+  return ms;
+}
 function layerStub() {
   return {
-    addTo: function () { return this; },
-    clearLayers: function () {},
-    addLayer: function () { return this; },
+    __added: [],
+    addTo: function (m) { if (m && typeof m.addLayer === 'function') m.addLayer(this); return this; },
+    clearLayers: function () { this.__added = []; },
+    addLayer: function (l) { this.__added.push(l); return this; },
     removeLayer: function () { return this; },
     bindPopup: function () { return this; },
     openPopup: function () { return this; }
   };
 }
-var markerStub = {
-  on: function () { return this; },
-  addTo: function () { return this; },
-  bindPopup: function () { return this; },
-  openPopup: function () { return this; },
-  getLatLng: function () { return { lat: 0, lng: 0 }; }
-};
+function mkMarker() {
+  return {
+    on: function () { return this; },
+    addTo: function (layer) {
+      if (layer && typeof layer.addLayer === 'function') layer.addLayer(this);
+      return this;
+    },
+    bindPopup: function () { return this; },
+    bindTooltip: function () { return this; },
+    openPopup: function () { return this; },
+    getLatLng: function () { return { lat: 0, lng: 0 }; }
+  };
+}
 var L2 = {
-  map: function () { return mapStub; },
+  _markers: [],
+  map: function () { return mkMapStub(); },
   tileLayer: function () { return { addTo: function () { return this; } }; },
-  layerGroup: layerStub,
-  marker: function () { return markerStub; },
+  layerGroup: function () { var g = layerStub(); groups.push(g); return g; },
+  marker: function () { var m = mkMarker(); L2._markers.push(m); return m; },
   divIcon: function () { return {}; }
 };
 
-var sandbox2 = { window: {}, console: console, document: doc, L: L2, setTimeout: setTimeout, clearTimeout: clearTimeout };
+var timerSeq = 0;
+var pendingTimers = {};
+function fakeSetTimeout(fn) { timerSeq++; pendingTimers[timerSeq] = fn; return timerSeq; }
+function fakeClearTimeout(id) { if (id) delete pendingTimers[id]; }
+function flushTimers() {
+  var ids = Object.keys(pendingTimers);
+  for (var i = 0; i < ids.length; i++) {
+    var fn = pendingTimers[ids[i]];
+    delete pendingTimers[ids[i]];
+    if (typeof fn === 'function') fn();
+  }
+}
+
+var sandbox2 = { window: {}, console: console, document: doc, L: L2, setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout };
 vm.createContext(sandbox2);
 vm.runInContext(src, sandbox2, { filename: 'mapa-cultural.js' });
 var MC2 = sandbox2.window.MapaCultural;
@@ -279,5 +325,60 @@ const conMediaUrls = mProp(conMedia, r10).map(function (it) { return it.media_ur
 check('filterMediaPropios: excluye video/audio de comunidad (misma ciudad)', conMediaUrls.indexOf('vid-ciudad') === -1 && conMediaUrls.indexOf('aud-ciudad') === -1);
 check('filterMediaPropios: excluye video de otra ciudad lejana', conMediaUrls.indexOf('vid-lejos') === -1);
 check('filterMediaPropios: foto de album de usuario sigue oculta', conMediaUrls.indexOf('alb') === -1);
+
+// ---- (8) REGRESION: onMoved re-renderiza la capa media -------------
+// Bug corregido: onMoved() solo llamaba recluster(); los pines de media
+// (filtrados por st.map.getBounds() en renderMedia) quedaban congelados
+// fuera del viewport al mover/zoom el mapa. El fix agrega renderMedia()
+// dentro del setTimeout de 150 ms. Aqui se simula el paneo con un bounds
+// artificial que primero EXCLUYE la media y luego la incluye, y se usa la
+// cola falsa de timers para flush sincrono del debounce.
+groups.length = 0;
+L2._markers.length = 0;
+var regInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false });
+check('regresion onMoved: init crea la capa media (2 layerGroups)', regInst.getState().initialized === true && groups.length === 2);
+var mediaLayer = groups[1];
+lastMapStub.__boundsContains = false; // media fuera del viewport
+regInst.setMedia([
+  { origen: 'destino', origen_id: 'cafe-y', media_url: 'rm-in', media_type: 'foto', lat: 4.6, lng: -74.1 }
+]);
+// setMediaEnabled(true) rellena foto/video/audio; con bounds cerrado la
+// media queda fuera y renderMedia no pinta nada (0 pines).
+regInst.setMediaEnabled(true);
+var rSt = regInst.getState();
+check('regresion onMoved: capa media activa con tipos rellenos', rSt.mediaEnabled === true && rSt.mediaTypes.foto === true);
+check('regresion onMoved: sin paneo (media fuera de bounds) -> 0 pines', mediaLayer.__added.length === 0);
+// El usuario mueve/hace zoom: la media entra al viewport; Leaflet dispara
+// 'moveend' y el fix debe re-renderizar la capa media.
+lastMapStub.__boundsContains = true;
+lastMapStub.__fire('moveend');
+flushTimers();
+check('regresion onMoved: moveend re-renderiza y CREA el pin de media', mediaLayer.__added.length === 1);
+
+// ---- (9) REGRESION: clic "Todo" rellena mediaTypes -----------------
+// Bug corregido: el atajo de filterPins('all') encendia st.mediaEnabled
+// sin rellenar st.mediaTypes (foto/video/audio), por lo que renderMedia
+// descartaba toda la media (L1038). El fix delega en setMediaEnabled(true)
+// cuando !mediaEnabled o mediaTiposActivos() === 0.
+groups.length = 0;
+var allInst = MC2.create({
+  map: 'mm-personal-map',
+  categories: '#mm-personal-cats',
+  enableMediaOnAll: true,
+  mediaEnabled: false,
+  mediaFilter: false
+});
+allInst.setMedia([
+  { origen: 'destino', origen_id: 'cafe-y', media_url: 'rm-all', media_type: 'foto', lat: 4.6, lng: -74.1 }
+]);
+var allLayer = groups[1];
+var allSt = allInst.getState();
+check('regresion Todo: arranque con capa apagada y 3 tipos off', allSt.mediaEnabled === false && allSt.mediaTypes.foto === false && allSt.mediaTypes.video === false && allSt.mediaTypes.audio === false);
+clickCat = catsRoot.__handlers.click; // el bind mas reciente pertenece a allInst
+clickCat({ target: btnAll });
+allSt = allInst.getState();
+check('regresion Todo: clic data-cat=all -> capa media habilitada', allSt.mediaEnabled === true);
+check('regresion Todo: clic data-cat=all -> 3 tipos activos', allSt.mediaTypes.foto === true && allSt.mediaTypes.video === true && allSt.mediaTypes.audio === true);
+check('regresion Todo: clic data-cat=all -> renderMedia pinta el pin', allLayer.__added.length === 1);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

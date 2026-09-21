@@ -662,7 +662,7 @@
 
     function onMoved() {
       clearTimeout(st.reclusterTimer);
-      st.reclusterTimer = setTimeout(function () { recluster(); }, 150);
+      st.reclusterTimer = setTimeout(function () { recluster(); renderMedia(); }, 150);
     }
 
     function placeByKey(key) {
@@ -939,13 +939,14 @@
       recluster();
       renderList(cat);
       // Index-compat: al seleccionar "Todo" con clic de usuario se enciende
-      // la capa media (equivalente a index L2309-2318), SIN activar los
-      // tipos foto/video/audio (eso solo lo hace el maestro). No se aplica
-      // en los refresh internos para conservar el arranque apagado.
+      // la capa media (equivalente a index L2309-2318). Se delega en
+      // setMediaEnabled(true), que ademas rellena los tipos foto/video/audio
+      // cuando estan todos apagados (si no, renderMedia los descartaria por
+      // st.mediaTypes). No se aplica en los refresh internos para conservar
+      // el arranque apagado.
       if (fromUser && cat === 'all' && st.options.enableMediaOnAll) {
-        if (!st.mediaEnabled) { st.mediaEnabled = true; addMediaLayer(); }
-        syncMediaBtns();
-        renderMedia();
+        if (!st.mediaEnabled || mediaTiposActivos() === 0) setMediaEnabled(true);
+        else renderMedia();
       }
     }
 

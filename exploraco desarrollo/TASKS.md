@@ -11,7 +11,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### Tareas no completadas / estado actual
 
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
-- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha) y TSK-145 (campo zona, migracion 028). Verificar commit/deploy real contra el archivo real (ADR-006).
+- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028) y TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **PENDIENTE DE APROBACION del operador:** TSK-140 (documento de analisis AI-DOS v1.1 / Reglas de Oro v5; archivo COMPLETADO en disco).
 - **BLOQUEADA (historica, archivada):** TSK-044 (blog multi-tema); su bloqueo de deploy (TASK-011) figura COMPLETADA, revisar si aplica cierre.
 
@@ -32,6 +32,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad ESTADO PERSISTENTE DEL USUARIO - 2026-09-20 (cierre express)](#prioridad-estado-persistente-del-usuario-directorios--ficha--resena-con-nombre---2026-09-20-cierre-express)
 - [Prioridad CAMPO ZONA (region natural) - 2026-09-20 (cierre express)](#prioridad-campo-zona-region-natural-en-el-admin-general---2026-09-20-cierre-express)
 - [Prioridad FIX DE VOTOS DE FOTOS CURADAS (BUG-079) - 2026-09-20 (cierre express)](#prioridad-fix-de-votos-de-fotos-curadas-bug-079---2026-09-20-cierre-express)
+- [Prioridad FIX DE RENDER DE MEDIA DEL MAPA CULTURAL + DIAGNOSTICO NEON - 2026-09-21 (BUG-080 / TSK-146)](#prioridad-fix-de-render-de-media-del-mapa-cultural--diagnostico-neon---2026-09-21-bug-080--tsk-146)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3208,6 +3209,36 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   (d) `es_hero` no exclusivo por contrato (si el front manda dos, gana la ultima).
 - **Dependencia:** semantica REPLACE previa (BUG-056/ADR-030) y todo el working tree del 2026-09-20 (028/estado persistente/drawer) para el deploy.
 - **Fuera de alcance:** el texto original del ADR-030 NO se toca (Cero Borrado Logico; el ADR-050 lo enmienda); `api/interacciones.js` NO se toco (**8/8 INTACTO**); la ficha (`api/pagina-destino.js`) sigue sin votar fotos curadas (MVP del ADR-030 intacto, ahora con ancla estable disponible a futuro).
+
+## Prioridad FIX DE RENDER DE MEDIA DEL MAPA CULTURAL + DIAGNOSTICO NEON - 2026-09-21 (BUG-080 / TSK-146)
+
+> Cierre del reporte directo del operador: los videos de viajero de la cuenta
+> `gonzalezjavierbta@gmail.com` no aparecian como pines en el mapa de `index.html`
+> (ni volvian a aparecer al navegar hacia su ubicacion), y un supuesto 4o video
+> "rastro mc-trampas" no aparecia ni en Museo ni en mapas. La investigacion (ADR-006)
+> confirmo un fallo de FRONTEND en el motor compartido `mapa-cultural.js` y que el
+> video reportado NO EXISTE en la BD. NO crea funciones serverless (**8/8 INTACTO**,
+> ADR-001/ADR-010) ni migraciones; `api/interacciones.js` NO se toco. Bug registrado:
+> **BUGS_HISTORICOS.md BUG-080**. Sin ADR nuevo (fix de defecto, sin decision de
+> arquitectura).
+
+### TSK-146: Fix de render de media del mapa cultural + diagnostico Neon del video reportado [COMPLETADA en codigo]
+
+- **Estado:** COMPLETADA EN CODIGO (2026-09-21; **working tree, SIN commitear**; deploy pendiente). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (reporte directo del usuario).
+- **Fecha:** 2026-09-21
+- **Origen:** reporte de que los videos de `gonzalezjavierbta@gmail.com` no aparecian en el mapa de `index.html` ni de `comunidad.html`, y que un supuesto 4o video "rastro mc-trampas" no aparecia ni en Museo ni en mapas. Bug registrado: **BUGS_HISTORICOS.md BUG-080**.
+- **Responsable / agentes:** renderer-dev/frontend-tpl (`mapa-cultural.js`, `index.html`, `comunidad.html`), data-migration/sql-security-free (diagnostico read-only contra Neon), docs-keeper (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **Causa raiz frontend y fix (ver BUG-080):** `onMoved()` de `mapa-cultural.js` (L663-666) ahora re-ejecuta tambien `renderMedia()` ademas de `recluster()`; el atajo "Todo" de `filterPins()` (L947-950) delega en `setMediaEnabled(true)` cuando `!st.mediaEnabled || mediaTiposActivos() === 0` (rellena los 3 tipos) y si no llama `renderMedia()`; cache-bust `mapa-cultural.js?v=6` -> `?v=7` en `index.html` (L883) y `comunidad.html` (L566).
+  2. **Diagnostico read-only contra Neon:** confirmo que el backend SI devuelve la media (`?tipo=multimedia_mapa` devolvia los 3 videos vigentes) y que "rastro mc-trampas" NO existe en la BD (busqueda `ILIKE '%rastro%'` en `album_fotos`, `destinos_fotos` e `interacciones` = 0 filas). El backend no era la causa.
+  3. **Herramientas nuevas de diagnostico (working tree, SIN commitear):** `scripts/neon_select.js` (SELECT/WITH read-only; rechaza escritura), `scripts/load_env_local.js` (carga la credencial de conexion a Neon desde `.env.local`, ignorado por git; el valor nunca se documenta) y `db/queries/q1_rastro_video.sql` .. `q4_rastro_busca_global.sql`.
+- **Evidencia (ADR-006):** ver BUGS_HISTORICOS.md BUG-080. Respuestas JSON de `node scripts/neon_select.js -f db/queries/q1_rastro_video.sql` (5 videos de la cuenta) y de `scripts/diagnose_video_mapa.js` (videos mapa_ok=3, fallan=2 por `activo=false`); `git status` = `M mapa-cultural.js`, `M index.html`, `M comunidad.html`, `M scripts/diagnose_video_mapa.js`, `?? scripts/neon_select.js`, `?? scripts/load_env_local.js`, `?? db/queries/`.
+- **Smokes / verificacion:** `node --check mapa-cultural.js` OK; ASCII 0 bytes >127; balance de divs (index 370/370, comunidad 320/320); `scripts/smoke_mapa_cultural.js` OK. **Ampliacion del smoke con casos de regresion EN CURSO** (moveend re-renderiza media; "Todo" rellena tipos).
+- **Relacion con bugs:** **BUG-080 NUEVO (CORREGIDO EN CODIGO)** en BUGS_HISTORICOS.md. El hallazgo de "rastro mc-trampas" queda como **nota operativa dentro del mismo BUG-080** (video reportado como subido que no existe en la BD). **NO es un bug de backend** (el backend devolvia la media correctamente). Descarta la hipotesis de starvation BUG-069 para este caso (5 filas de album / 1147 de destinos, muy por debajo de 300/600).
+- **Pendiente operativo (BLOQUEANTE para produccion):** **deploy del fix** (commit/push + Vercel) para que el cache `?v=7` llegue a produccion; ampliar `scripts/smoke_mapa_cultural.js` con los casos de regresion. Confirmar con el usuario el mapa de `comunidad.html`: el mapa personal "Mi Viaje" excluye la media de album por diseno (**ADR-047 Enmienda 1 / BUG-074**).
+- **Dependencia:** motor compartido `mapa-cultural.js` (ADR-045); `?tipo=multimedia_mapa` del backend (sin cambios).
+- **Fuera de alcance:** `api/*.js` NO se toco (**8/8 INTACTO**); sin migraciones; sin ADR nuevo; el valor de la credencial de Neon (`.env.local`) NUNCA se documenta (politica de secretos).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
