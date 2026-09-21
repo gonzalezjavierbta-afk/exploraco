@@ -3287,7 +3287,8 @@ module.exports = async function handler(req, res) {
       // patron de columnas que tipo=guardados mas lat/lng para el mapa.
       if (tipo === 'mapa' && usuarioId) {
         var mapaGuardados = await sql(
-          'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
+          'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng, '
+          + ' d.tags->>\'subcategoria\' AS subcategoria'
           + ' FROM interacciones i'
           + ' JOIN destinos d ON d.id = i.destino_id'
           + ' WHERE i.usuario_id = $1 AND i.tipo = \'guardado\' AND i.activo = true'
@@ -3295,7 +3296,8 @@ module.exports = async function handler(req, res) {
           [usuarioId]
         );
         var mapaVisitas = await sql(
-          'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
+          'SELECT DISTINCT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng, '
+          + ' d.tags->>\'subcategoria\' AS subcategoria'
           + ' FROM interacciones i'
           + ' JOIN destinos d ON d.id = i.destino_id'
           + ' WHERE i.usuario_id = $1 AND i.tipo = \'visita\' AND i.activo = true'
@@ -3453,7 +3455,8 @@ module.exports = async function handler(req, res) {
             return res.status(403).json({ ok: false, error: 'No autorizado' });
         }
         var mapaDestinos = await sql(
-          'SELECT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng'
+          'SELECT d.id AS destino_id, d.nombre, d.slug, d.foto_hero, d.ciudad, d.categoria_slug, d.lat, d.lng, '
+          + ' d.tags->>\'subcategoria\' AS subcategoria'
           + ' FROM mapa_destinos md'
           + ' JOIN destinos d ON d.id = md.destino_id'
           + ' WHERE md.mapa_id = $1'
@@ -6451,7 +6454,7 @@ module.exports = async function handler(req, res) {
               return res.status(400).json({ ok: false, error: 'caption maximo 200 caracteres' });
           }
           var mrVisible = aBooleano(body.visible);
-          if (mrVisible === null) mrVisible = false;
+          if (mrVisible === null) mrVisible = true;
 
           // Gate de creacion: capacidad subir_fotos (mis_fotografo). Las
           // misiones nuevas mis_videografo/mis_sonidista NO pueden ser

@@ -43,6 +43,7 @@ function toPlace(row) {
     slug:        row.slug          || '',
     name:        row.nombre        || '',
     cat:         cat,
+    subcategoria: tags.subcategoria || '',
     city:        row.ciudad        || '',
     region:      row.region        || '',
     barrio:      row.barrio        || '',
@@ -166,7 +167,8 @@ module.exports = async function handler(req, res) {
     if (modo === 'mapa') {
       var mapaRows = await sql(
         'SELECT id, slug, nombre, categoria_slug, ciudad, region, zona, '
-        + 'lat, lng, emoji, hero_bg, foto_hero, rating, total_resenas, destacado '
+        + 'lat, lng, emoji, hero_bg, foto_hero, rating, total_resenas, destacado, '
+        + 'tags->>\'subcategoria\' AS subcategoria '
         + 'FROM destinos d '
         + 'WHERE ' + where + ' AND lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0 '
         + 'ORDER BY destacado DESC, rating DESC NULLS LAST '
@@ -184,6 +186,7 @@ module.exports = async function handler(req, res) {
             slug:     d.slug,
             name:     d.nombre,
             cat:      cat,
+            subcat:   d.subcategoria || '',
             city:     d.ciudad || '',
             region:   d.region || '',
             zona:     d.zona   || '',

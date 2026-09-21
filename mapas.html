@@ -90,6 +90,7 @@ main{flex:1}
 .dd-fb{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:56px}
 .dd-body{padding:16px 18px 22px}
 .dd-badge{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;padding:3px 10px;border-radius:3px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--gold);margin-bottom:9px}
+.dd-subcat{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.8px;padding:3px 10px;border-radius:3px;margin-left:4px;text-transform:capitalize;margin-bottom:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.6)}
 .dd-titulo{font-family:'Barlow Condensed',sans-serif;font-size:25px;font-weight:900;line-height:1.05;margin-bottom:5px}
 .dd-ciudad{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:15px;line-height:1.5}
 .dd-cta{display:block;background:var(--gold);color:var(--black);text-align:center;padding:11px 14px;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:all .15s}
@@ -172,6 +173,12 @@ var BASE='';
 var CAT_COLORS={hostal:'#2196F3',comida:'#FF9800',sitio:'#4CAF50',evento:'#A855F7'};
 var CAT_ICOS={hostal:'🏨',comida:'🍽️',sitio:'🏛️',evento:'🎉'};
 var CAT_LBL={hostal:'Hospedaje',comida:'Comida',sitio:'Sitio',evento:'Evento'};
+// Labels de subcategoria (mirror SUBCAT_LABEL de pagina-destino.js). ASCII-safe.
+var SCAT_LBL={naturaleza:'Naturaleza',museo:'Museo',cultura:'Cultura',bar:'Bar',parque:'Parque Urbano',
+  'espacio-publico':'Espacio P\u00fablico','sitio-historico':'Sitio Hist\u00f3rico',religioso:'Religioso',aventura:'Aventura',
+  restaurante:'Restaurante',cafe:'Caf\u00e9',gastrobar:'Gastrobar','comida-rapida':'Comida R\u00e1pida',dulces:'Dulces',
+  concierto:'Concierto',festival:'Festival',teatro:'Teatro',exposicion:'Exposici\u00f3n',deporte:'Deporte',cine:'Cine',fiesta:'Fiesta'};
+function _scat(s){ return (s && SCAT_LBL[s]) ? SCAT_LBL[s] : (s||''); }
 var detMap=null;
 
 function _esc(s){
@@ -340,6 +347,7 @@ function abrirDrawerDetalle(x){
   }
   html+='</div><div class="dd-body">'
     +'<div class="dd-badge">'+_esc(CAT_LBL[cat]||'Lugar')+'</div>'
+    +(_scat(x.subcategoria)?'<div class="dd-subcat">'+_esc(_scat(x.subcategoria))+'</div>':'')
     +'<div class="dd-titulo">'+_esc(x.nombre)+'</div>'
     +'<div class="dd-ciudad">'+_esc(x.ciudad||'')+'</div>'
     +'<a class="dd-cta" href="'+_esc(x.slug)+'.html">Ver lugar completo \u2192</a>'

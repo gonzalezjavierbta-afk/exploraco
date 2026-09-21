@@ -84,6 +84,7 @@
       slug:    item.slug    || '',
       name:    item.name    || '',
       cat:     item.cat     || 'sitio',
+      subcategoria: item.subcategoria || '',
       city:    item.city    || '',
       region:  item.region  || '',
       rating:  item.rating  || 0,

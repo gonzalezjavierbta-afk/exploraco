@@ -46,6 +46,13 @@ check('normalizePlace index: rating 4.5', pIdx && pIdx.rating === 4.5);
 check('normalizePlace index: color/emoji/foto/fotos', pIdx && pIdx.color === '#2196F3' && pIdx.emoji === '\uD83C\uDFE8' && pIdx.foto === 'https://ejemplo/a.jpg' && pIdx.fotos.length === 1);
 check('normalizePlace index: lat/lng numericos', pIdx && pIdx.lat === 4.6 && pIdx.lng === -74.1);
 check('normalizePlace index: conserva raw', pIdx && pIdx.raw === idxRaw);
+check('normalizePlace index: subcat ausente -> \'\'', pIdx && pIdx.subcat === '');
+check('normalizePlace: subcat desde subcategoria', MC.normalizePlace({ slug: 'z', cat: 'sitio', subcategoria: 'parque', lat: 4, lng: -74 }) && MC.normalizePlace({ slug: 'z', cat: 'sitio', subcategoria: 'parque', lat: 4, lng: -74 }).subcat === 'parque');
+check('mdCatLabel: sitio ya no es Naturaleza', MC.mdCatLabel('sitio') === 'Sitio');
+check('mdCatLabel: evento singular', MC.mdCatLabel('evento') === 'Evento');
+check('mdSubcatLabel: parque -> Parque Urbano', MC.mdSubcatLabel('parque') === 'Parque Urbano');
+check('mdSubcatLabel: museo -> Museo', MC.mdSubcatLabel('museo') === 'Museo');
+check('mdSubcatLabel: desconocida pasa tal cual', MC.mdSubcatLabel('pelagatos') === 'pelagatos');
 
 // ---- (1b) normalizePlace: shape tipo=mapa --------------------------
 const mapRaw = {

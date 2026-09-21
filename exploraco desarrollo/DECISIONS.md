@@ -2549,3 +2549,52 @@ Una region natural es un atributo transversal de la ficha y por eso se modela co
 - El orden de despliegue es estricto; invertirlo dispara `42703` (patron BUG-021/BUG-060).
 
 **ADRs relacionados:** ADR-001 (Vanilla/8 endpoints agotados), ADR-002 (ASCII-safe), ADR-003 (cero borrado logico / no toca tags), ADR-006 (baseline = archivo real), ADR-008 (schema versionado e idempotente), ADR-042 (migracion 027 zonas/marcas/patrocinios -- catalogo `zonas_geograficas` con slugs `andes`/`amazonia`, origen de la deuda de slugs), BUG-021/BUG-060 (patron migracion-antes-de-deploy).
+
+---
+
+## ADR-050: Addendum al ADR-030 -- `destinos_fotos.id` SI es estable mientras la fila se preserva (MERGE por id en `reemplazarFotosGaleria`); la inestabilidad era efecto del REPLACE, no del esquema
+
+**ID:** ADR-050
+**Fecha:** 2026-09-20
+**Estado:** **APROBADO** (2026-09-20). Implementado en working tree al cierre de este ADR (SIN commitear; ADR-006 rige: verificar el archivo real `api/admin-destinos.js` v2.2 y `admin.html`).
+**Autor:** Chief Architect (AI-DOS); decisiones de producto confirmadas por el operador.
+**Alcance:** `api/admin-destinos.js` v2.2 (`normFotosGaleria` + `reemplazarFotosGaleria`, MERGE transaccional), `admin.html` (preservacion de `id_neon`/caption y fusion por URL), la galeria de la ficha (ADR-034/ADR-046). NO crea endpoints nuevos (8/8, ADR-001) ni migraciones. NO invalida el recorte del MVP de voto curado del ADR-030 (la ficha sigue sin votar fotos curadas); solo corrige la PREMISA que lo justificaba.
+
+### Contexto
+
+El **ADR-030** (2026-09-16) documento dos premisas sobre `destinos_fotos` (L822-823): (a) `destinos_fotos.id` NO es un ancla estable de voto y (b) la razon era la semantica REPLACE de la galeria (`DELETE` + reinsert deduplicado, BUG-056) que re-creaba las filas en cada guardado. Esa descripcion era CIERTA hasta 2026-09-16 como estado de hecho; lo INCORRECTO era tratar la inestabilidad como inherente al esquema. La inestabilidad venia de la implementacion, no del modelo: era el REPLACE, y un REPLACE se puede reemplazar por un MERGE. **BUG-079** (2026-09-20) demostro el costo real de esa eleccion: los votos/comentarios de media curada (`media_votos`/`media_comentarios` con `fuente='curada'`) cuelgan de `destinos_fotos.id::text`, asi que CADA guardado desde el admin dejaba votos huerfanos, es decir, se perdia la puntuacion de las fotos al actualizar una entrada del directorio.
+
+### Decision tomada
+
+1. **`destinos_fotos.id` SI es estable mientras la fila se preserva.** La inestabilidad del ADR-030 era efecto del REPLACE (borrar + recrear la fila), no un atributo del esquema. Con un MERGE que conserva el id, los votos curados persisten entre guardados.
+2. **`reemplazarFotosGaleria()` = MERGE transaccional (nueva semantica de reemplazo de la galeria en `api/admin-destinos.js` v2.2):** dentro de `sql.transaction`: (a) empareja por id (uuid canonico o serial de 1-10 digitos; invalido -> null) -> UPDATE conservando el id; (b) sin id, fallback por url unica NO usada por otra fila -> UPDATE conservando el id; (c) sin match -> INSERT; (d) DELETE parametrizado SOLO de filas que quedaron sin usar; (e) coherencia `es_hero` con `foto_hero`. La semantica REPLACE de BUG-056 (DELETE + reinsert deduplicado con guard anti-perdida 400) queda REEMPLAZADA por esta en el flujo del admin.
+3. **El frontend `admin.html` preserva la identidad de las fotos:** `_photoToObj()`/`getPhotos()` entregan `{url,caption,id_neon,es_hero,orden}` y `_placeToAPI()` envia TODAS las fotos desde indice 0 (la hero viaja con su `id_neon` y `es_hero:true`; `foto_hero` sigue string aparte); `_cargarFotosDeNeon()` FUSIONA por URL y corre SIEMPRE al editar una entrada publicada (tambien cierra BUG-062). Sin este lado, el MERGE no tendria con que emparejar.
+4. **Casos borde:** sin fotos en el payload -> el merge se omite y la galeria Neon existente se PRESERVA (no hay via para vaciarla desde el admin; deuda consciente documentada en BUG-079); 400 anti-perdida SOLO cuando hay items pero ninguno con url valida; `es_hero` se aplica como viene (si el front manda dos heroes, gana la ultima -- decision de exclusividad pendiente).
+5. **El MVP de voto curado del ADR-030 NO cambia:** la ficha sigue sin votar fotos curadas; este ADR desbloquea a futuro esa entrega con un ancla estable (id preservado) y corrige el dano real ya observado (votos huerfanos).
+
+### Justificacion
+
+El patron de la tabla no versionada (BUG-021) manda conservar los id cuando de ellos cuelgan otros registros: `destinos_fotos.id` es la PK que `media_votos`/`media_comentarios` referencian como `id::text`, asi que borrar y recrear la fila equivale a borrar los votos. El MERGE por id es el remedio de raiz (UPDATE conserva el id) y mantiene los dos objetivos del REPLACE original del ADR-030/BUG-056 (dedup por url contra duplicados historicos y anti-perdida contra la lista vacia). La premisa del ADR-030 queda enmendada sin borrar su texto (Cero Borrado Logico, ADR-003): se conserva como registro historico del estado previo.
+
+### Impacto
+
+- **`api/admin-destinos.js` v2.2:** `normFotosGaleria()` (L38) y `reemplazarFotosGaleria()` (L83) transaccional (L168) con los 5 pasos de la Decision; 5 comentarios `BUG-079` (L8, L35, L67, L353, L485).
+- **`admin.html`:** `_photoToObj()` (L4656-4671), `getPhotos()` con `id_neon`/`es_hero`/`orden` (L4712-4735), `_placeToAPI()` con `fotos_galeria` completa desde indice 0 (L6068+), `_cargarFotosDeNeon()` por fusion de URL siempre (L6219+); VERSION `admin-v9.20260920` (8 comentarios `BUG-079`: L2818, L3300, L4656, L4677, L4713, L6076, L6214, L6712).
+- **Bug registrado:** BUGS_HISTORICOS.md **BUG-079 (CERRADO)**, con smoke vm 4/4 y verificacion `node --check` OK x2 / ASCII 0/0/0 / divs 815/815 diff 0.
+- **Pendiente de produccion:** `scripts/diagnose_fotos_huerfanas.js` (NUEVO, read-only) contra Neon para cuantificar votos ya huerfanos por el REPLACE historico y decidir remedio (reanclar por url, con backup).
+
+### Consecuencias positivas
+
+- Los votos/comentarios curados sobreviven a la actualizacion de un destino desde el admin (fin de la perdida de puntuacion, BUG-079).
+- `destinos_fotos.id` vuelve a ser un ancla estable: desbloquea a futuro el voto de fotos curadas en la ficha que el MVP del ADR-030 recorto por esta premisa.
+- Compatible con el indice unico `idx_destinos_fotos_destino_url` de BUG-056 (el fallback por url unica no lo viola).
+- Cierra BUG-062 (fotos Unsplash del registro local no recolectadas al editar).
+
+### Consecuencias negativas / riesgos residuales
+
+- **Dano historico:** los votos huerfanados por REPLACE previos al fix siguen en Neon (no se re-anclan solos); requiere la medicion del script y un re-anclaje por url con backup.
+- **Sin via para vaciar la galeria desde el admin:** el caso "sin fotos" preserva lo existente a proposito (anti-perdida); si se necesita vaciar, hay que disenar una accion explicita.
+- **`es_hero` no exclusivo por contrato:** si el front envia dos heroes, gana la ultima (decision de exclusividad pendiente).
+- **Dependencia del frontend:** un cliente legacy que envie fotos sin `id_neon` cae al fallback por url unica; sin url valida -> 400 anti-perdida (comportamiento intencional).
+
+**ADRs relacionados:** ADR-030 (este mismo; premisa L822-823 enmendada por este addendum), ADR-003 (Cero Borrado Logico: no se borra el texto original del ADR-030), ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-008 (esquema versionado e idempotente), ADR-034/ADR-046 (hero y galeria de la ficha), BUG-021 (patron de tabla no versionada), BUG-056, BUG-062, BUG-079.

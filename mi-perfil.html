@@ -2189,7 +2189,7 @@ function museoAbrirModal(id) {
   museoSet('museo-f-lat', rec && rec.lat != null ? rec.lat : '');
   museoSet('museo-f-lng', rec && rec.lng != null ? rec.lng : '');
   var vis = document.getElementById('museo-f-visible');
-  if (vis) vis.checked = rec ? (rec.visible === true) : false;
+  if (vis) vis.checked = rec ? (rec.visible === true) : true;
   var sel = document.getElementById('museo-f-album');
   if (sel) sel.innerHTML = museoAlbumOptions(rec ? rec.album_id : '', !museoEditandoId);
   /* El contrato editar solo acepta caption/visible/album_id/lat-lng: el link

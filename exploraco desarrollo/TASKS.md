@@ -31,6 +31,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad DRAWER MAPA CULTURAL - 2026-09-20 (cierre express / ENMIENDA 1 ADR-047)](#prioridad-drawer-mapa-cultural---2026-09-20-cierre-express--enmienda-1-adr-047)
 - [Prioridad ESTADO PERSISTENTE DEL USUARIO - 2026-09-20 (cierre express)](#prioridad-estado-persistente-del-usuario-directorios--ficha--resena-con-nombre---2026-09-20-cierre-express)
 - [Prioridad CAMPO ZONA (region natural) - 2026-09-20 (cierre express)](#prioridad-campo-zona-region-natural-en-el-admin-general---2026-09-20-cierre-express)
+- [Prioridad FIX DE VOTOS DE FOTOS CURADAS (BUG-079) - 2026-09-20 (cierre express)](#prioridad-fix-de-votos-de-fotos-curadas-bug-079---2026-09-20-cierre-express)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3174,6 +3175,39 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   (d) etiqueta `#f-barrio` sigue siendo "Barrio / Zona" (posible confusion con el nuevo campo "Zona").
 - **Dependencia:** migraciones 003-027 aplicadas en Neon (la 028 es la siguiente).
 - **Fuera de alcance:** DECISIONS.md (el ADR-049 lo escribio `architect` y NO se toca en este cierre); `api/interacciones.js` NO se toco (8/8 INTACTO); directorios/mapa/ficha no renderizan la zona aun (deuda b); `api/publicar-lugar.js`/loaders/upload-eventos sin `zona` (deuda a).
+
+## Prioridad FIX DE VOTOS DE FOTOS CURADAS (BUG-079) - 2026-09-20 (cierre express)
+
+> Cierre documental EXPRESS (skill `express-mode`: un solo pase, docs-only, ruta FREE,
+> sin tocar codigo) del fix que evita que al actualizar los datos de una entrada del
+> directorio desde el admin se pierda la puntuacion de las fotos (votos/comentarios de
+> media curada huerfanos por la semantica REPLACE de la galeria). NO existia tarea
+> abierta de galeria/fotos (TSK-136..TSK-140 COMPLETADAS) -> cierre directo del bug sin
+> TSK nuevo ni IDs inventados. NO crea funciones serverless (**8/8 INTACTO**, ADR-001)
+> ni migraciones. Decision de arquitectura: **ADR-050** en DECISIONS.md.
+
+### Cierre BUG-079: al actualizar los datos de una entrada del directorio se perdia la puntuacion de las fotos (votos de media curada) [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental express; **working tree, SIN commitear**). Verificado contra archivo real (ADR-006). Bug registrado: **BUGS_HISTORICOS.md BUG-079 (CERRADO)**; decision: **DECISIONS.md ADR-050 (APROBADO)**.
+- **Prioridad:** Alta (perdida real de datos de producto: la puntuacion de las fotos curadas desaparecia en cada guardado del admin).
+- **Fecha:** 2026-09-20
+- **Origen:** reporte del operador: al actualizar los datos de una entrada del directorio se pierde la puntuacion de las fotos. Causa raiz DOBLE: (1) `api/admin-destinos.js` hacia REPLACE total de `destinos_fotos` (DELETE + re-INSERT) generando ids nuevos -> `media_votos`/`media_comentarios` (fuente='curada'), que cuelgan de `destinos_fotos.id::text`, quedaban huerfanos (patron de tabla no versionada BUG-021); (2) `admin.html` no preservaba `id_neon`/caption al recomponer el payload y `_cargarFotosDeNeon()` solo fusionaba con el registro local VACIO (nunca al editar; dejaba sin recolectar fotos Unsplash, BUG-062).
+- **ADR:** DECISIONS.md **ADR-050 (APROBADO, 2026-09-20)** -- addendum que enmienda la premisa "`destinos_fotos.id` NO es ancla estable" del ADR-030 (L822-823): el id SI es estable mientras la fila se preserva; la inestabilidad era del REPLACE, no del esquema.
+- **Responsable / agentes:** admin-dev/renderer-dev (`admin.html`), backend-dev (`api/admin-destinos.js` v2.2), qa-auditor (Escudo GOLD + smoke vm), docs-keeper-free (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **`admin.html`:** `_photoToObj()` (L4656-4671) normaliza fotos a objetos; `getPhotos()` devuelve `{url,caption,id_neon,es_hero,orden}` (L4712-4735); `_placeToAPI()` envia `fotos_galeria` con TODAS las fotos desde indice 0 (la hero viaja con `id_neon` + `es_hero:true`; `foto_hero` string aparte) (L6068+); `_cargarFotosDeNeon()` FUSIONA por URL (local gana caption; id_neon/es_hero/orden de Neon) y corre SIEMPRE al editar una entrada publicada (L6219+; cierra BUG-062). VERSION bump a `admin-v9.20260920`.
+  2. **`api/admin-destinos.js` (v2.2):** `normFotosGaleria()` (L38; id uuid canonico o serial 1-10 digitos, invalido -> null) y `reemplazarFotosGaleria()` (L83) = MERGE transaccional `sql.transaction` (L168): match por id -> UPDATE conservando el id; sin id, fallback por url unica no usada -> UPDATE conservando el id; sin match -> INSERT; DELETE parametrizado SOLO de filas no usadas; coherencia `es_hero` con `foto_hero`; guard anti-perdida 400 SOLO con items pero ninguno con url valida. **Caso "sin fotos":** merge omitido, galeria Neon preservada, sin 400.
+- **Evidencia (ADR-006):** 8 comentarios `BUG-079` en `admin.html` (L2818/L3300/L4656/L4677/L4713/L6076/L6214/L6712) y 5 en `api/admin-destinos.js` (L8/L35/L67/L353/L485); VERSION `admin-v9.20260920`; cero 'BUG-056' residual en ambos archivos.
+- **Smokes / verificacion:** smoke vm **4/4** (A: hero + galeria curadas preservan ids; B: solo hero sin 400; C: sin fotos -> galeria Neon preservada, sin 400; D: 400 solo con items invalidos). `node --check` OK x2; ASCII-safety 0/0/0; balance de divs `admin.html` 815/815 diff 0. QA (qa-auditor): **APTO**.
+- **Relacion con bugs:** **BUG-079 NUEVO (CERRADO)** y **BUG-062 CERRADO** (colateral: las fotos Unsplash del registro local ahora se recolectan al editar). **BUG-056** sigue como precedente del REPLACE (pendiente `dedupe_destinos_fotos.js --apply` + indice unico para datos historicos). Decision: **ADR-050**.
+- **Pendiente operativo:** correr `scripts/diagnose_fotos_huerfanas.js` (NUEVO, read-only) en produccion con `DATABASE_URL` para cuantificar los votos curados YA huerfanos por el REPLACE historico y decidir remedio (reanclar por url a la fila actual unica, con backup, tipo db/cleanups/); commit/deploy del release junto a TSK-145/TSK-144/TSK-143 (028/estado persistente/drawer pendientes del mismo working tree).
+- **Deuda registrada (para NEXT.md):**
+  (a) votos huerfanos historicos en Neon (medicion + re-anclaje pendientes).
+  (b) sin via desde el admin para vaciar por completo la galeria (minimo 1 foto; el caso "sin fotos" preserva lo existente).
+  (c) `_syncFotosGaleria` en `admin.html` (L6193, 0 call-sites) = codigo muerto; `GUIA_DE_DESARROLLO.md` L482 lo cita como flujo vivo (doc-drift).
+  (d) `es_hero` no exclusivo por contrato (si el front manda dos, gana la ultima).
+- **Dependencia:** semantica REPLACE previa (BUG-056/ADR-030) y todo el working tree del 2026-09-20 (028/estado persistente/drawer) para el deploy.
+- **Fuera de alcance:** el texto original del ADR-030 NO se toca (Cero Borrado Logico; el ADR-050 lo enmienda); `api/interacciones.js` NO se toco (**8/8 INTACTO**); la ficha (`api/pagina-destino.js`) sigue sin votar fotos curadas (MVP del ADR-030 intacto, ahora con ancla estable disponible a futuro).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

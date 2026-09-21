@@ -158,6 +158,7 @@
       slug: raw.slug || '',
       nombre: raw.nombre || raw.name || 'Destino',
       cat: cat,
+      subcat: raw.subcategoria || '',
       ciudad: raw.ciudad || raw.city || '',
       region: raw.region || '',
       lat: lat,
@@ -267,9 +268,39 @@
   function mdCatLabel(cat) {
     if (cat === 'hostal') return 'Hospedaje';
     if (cat === 'comida') return 'Comida';
-    if (cat === 'sitio') return 'Naturaleza';
-    if (cat === 'evento') return 'Eventos';
+    if (cat === 'sitio') return 'Sitio';
+    if (cat === 'evento') return 'Evento';
     return 'Sitio';
+  }
+
+  // Etiquetas de subcategoria (mirror de SUBCAT_LABEL de pagina-destino.js,
+  // ASCII-safe: tildes como escapes).
+  function mdSubcatLabel(sc) {
+    if (!sc) return '';
+    var scMap = {
+      'naturaleza': 'Naturaleza',
+      'museo': 'Museo',
+      'cultura': 'Cultura',
+      'bar': 'Bar',
+      'parque': 'Parque Urbano',
+      'espacio-publico': 'Espacio P\u00fablico',
+      'sitio-historico': 'Sitio Hist\u00f3rico',
+      'religioso': 'Religioso',
+      'aventura': 'Aventura',
+      'restaurante': 'Restaurante',
+      'cafe': 'Caf\u00e9',
+      'gastrobar': 'Gastrobar',
+      'comida-rapida': 'Comida R\u00e1pida',
+      'dulces': 'Dulces',
+      'concierto': 'Concierto',
+      'festival': 'Festival',
+      'teatro': 'Teatro',
+      'exposicion': 'Exposici\u00f3n',
+      'deporte': 'Deporte',
+      'cine': 'Cine',
+      'fiesta': 'Fiesta'
+    };
+    return scMap[sc] || sc;
   }
 
   function mdMediaBadge(tipo) {
@@ -1262,6 +1293,7 @@
       html += '</div>';
       html += '<div class="md-head">';
       html += '<span class="md-badge md-cat-' + esc(p.cat || 'sitio') + '">' + mdCatLabel(p.cat) + '</span>';
+      if (p.subcat) html += '<span class="md-subcat-chip">' + esc(mdSubcatLabel(p.subcat)) + '</span>';
       html += '<div class="md-title">' + esc(p.nombre || '') + '</div>';
       html += '<div class="md-meta">' + PIN_DEFECTO + ' ' + esc(p.ciudad || '') + (p.region ? ' \u00b7 ' + esc(p.region) : '') + '</div>';
       html += '<div class="md-stars">' + starHtml(rating) + ' ' + rating.toFixed(1) + '</div>';
@@ -1696,6 +1728,8 @@
     haversineKm: haversineKm,
     clusterize: clusterize,
     filterMediaDefault: filterMediaDefault,
-    filterMediaPropios: filterMediaPropios
+    filterMediaPropios: filterMediaPropios,
+    mdCatLabel: mdCatLabel,
+    mdSubcatLabel: mdSubcatLabel
   };
 })();

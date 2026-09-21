@@ -79,6 +79,7 @@
 .mc-root .md-cat-comida{background:#FF980020;color:#ffb85c;border:1px solid #FF980055}
 .mc-root .md-cat-sitio{background:#4CAF5020;color:#7de08d;border:1px solid #4CAF5055}
 .mc-root .md-cat-evento{background:#A855F720;color:#c99bff;border:1px solid #A855F755}
+.mc-root .md-subcat-chip{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.8px;padding:3px 9px;border-radius:3px;margin-bottom:8px;margin-left:4px;text-transform:capitalize;background:rgba(255,255,255,.07);color:rgba(255,255,255,.62);border:1px solid rgba(255,255,255,.16)}
 .mc-root .md-title{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#F5E6D0;line-height:1.05;margin-bottom:4px}
 .mc-root .md-meta{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px;line-height:1.5}
 .mc-root .md-stars{color:var(--gold);font-size:13px;letter-spacing:1px;margin-bottom:8px}

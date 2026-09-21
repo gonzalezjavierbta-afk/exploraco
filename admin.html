@@ -2815,6 +2815,9 @@ function clearForm() {
   currentTags = [];
   renderTagPills();
   renderPhotoList([]);
+  /* BUG-079: limpiar el id_neon del hero heredado del lugar anterior */
+  var heroNidClr = document.getElementById('f-photo-hero');
+  if (heroNidClr) heroNidClr.removeAttribute('data-id-neon');
   setStatus('published');
   var fpCat = document.getElementById('fp-general-cat');
   if(fpCat) fpCat.innerHTML = '';
@@ -3294,6 +3297,14 @@ function loadForm(p) {
     var el=document.getElementById(id);
     if(el && map[id]!==undefined && map[id]!==null) el.value=map[id];
   });
+  /* BUG-079: el id_neon del hero se guarda en data-id-neon del input
+     para que getPhotos() lo recupere al recomponer el array. */
+  var heroNidEl = document.getElementById('f-photo-hero');
+  if (heroNidEl) {
+    var h0x = (p.photos && p.photos[0]) ? _photoToObj(p.photos[0]) : null;
+    if (h0x && h0x.id_neon) heroNidEl.setAttribute('data-id-neon', h0x.id_neon);
+    else heroNidEl.removeAttribute('data-id-neon');
+  }
   /* ADR-033: radio de "Estuve aqui" (columna escalar destinos.radio_m).
      Va aparte del map porque null debe LIMPIAR el input -- el map solo
      escribe valores presentes y dejaria el radio del lugar anterior. */
@@ -4642,14 +4653,35 @@ function updateSlugPreview() {
 }
 
 /* ── PHOTO MANAGER ── */
+/* BUG-079: normaliza cualquier item del array local de fotos (string
+   legacy u objeto {url,cap/caption,id_neon,es_hero}) a objeto
+   {url,cap,id_neon,es_hero}. Unico punto de normalizacion usado por
+   renderPhotoList/getPhotos/_placeToAPI/_cargarFotosDeNeon. */
+function _photoToObj(f) {
+  if (typeof f === 'string') return { url: f, cap: '', id_neon: null, es_hero: false };
+  if (f && typeof f === 'object') {
+    return {
+      url:     f.url || '',
+      cap:     f.cap || f.caption || '',
+      id_neon: f.id_neon || f.id || null,
+      es_hero: !!(f.es_hero)
+    };
+  }
+  return { url: '', cap: '', id_neon: null, es_hero: false };
+}
 function renderPhotoList(photos) {
   var list = document.getElementById('photo-list');
   if(!list) return;
-  list.innerHTML = photos.slice(1).map(function(url,i){
-    return '<div class="photo-row" id="photo-row-'+i+'">'
+  list.innerHTML = photos.slice(1).map(function(f,i){
+    var o = _photoToObj(f);
+    /* BUG-079: el id_neon y es_hero viajan en atributos data-* del row
+       para que getPhotos() los recupere al recomponer el array. */
+    var nidAttr   = o.id_neon ? ' data-id-neon="'+o.id_neon+'"' : '';
+    var heroAttr  = o.es_hero ? ' data-es-hero="1"' : '';
+    return '<div class="photo-row" id="photo-row-'+i+'"'+nidAttr+heroAttr+'>'
       +'<div class="photo-thumb-placeholder">🖼️</div>'
-      +'<input class="form-input photo-url-inp" type="url" value="'+(url||'')+'" placeholder="https://images.unsplash.com/…" oninput="updatePhotoPreview(this,'+i+')">'
-      +'<input class="form-input photo-cap-inp" type="text" placeholder="Descripción de la foto">'
+      +'<input class="form-input photo-url-inp" type="url" value="'+_esc(o.url)+'" placeholder="https://images.unsplash.com/…" oninput="updatePhotoPreview(this,'+i+')">'
+      +'<input class="form-input photo-cap-inp" type="text" value="'+_esc(o.cap)+'" placeholder="Descripción de la foto">'
       +'<button class="btn btn-danger btn-icon btn-sm" onclick="removePhotoField('+i+')">✕</button>'
       +'</div>';
   }).join('');
@@ -4678,10 +4710,27 @@ function updatePhotoPreview(inp, i) {
   }
 }
 function getPhotos() {
-  var hero = v('f-photo-hero');
-  var rows = document.querySelectorAll('#photo-list .photo-url-inp');
-  var photos = hero ? [hero] : [];
-  rows.forEach(function(r){ if(r.value.trim()) photos.push(r.value.trim()); });
+  /* BUG-079: devuelve objetos {url,caption,id_neon,es_hero,orden} para
+     que _placeToAPI() pueda mandar el id de destinos_fotos al backend
+     (merge por id) y no se pierdan votos/comentarios al actualizar. */
+  var heroEl = document.getElementById('f-photo-hero');
+  var hero = heroEl ? heroEl.value.trim() : '';
+  var heroNid = (heroEl && heroEl.getAttribute('data-id-neon')) || null;
+  var photos = hero ? [{ url: hero, caption: '', id_neon: heroNid, es_hero: true, orden: 0 }] : [];
+  /* Cubre ambas clases de fila: .photo-url-inp (Photo Manager) y
+     .photo-url-input (picker Unsplash) que comparten #photo-list. */
+  document.querySelectorAll('#photo-list .photo-row').forEach(function(row){
+    var uInp = row.querySelector('.photo-url-inp, .photo-url-input');
+    if(!uInp || !uInp.value.trim()) return;
+    var capInp = row.querySelector('.photo-cap-inp, .photo-caption-input');
+    photos.push({
+      url:     uInp.value.trim(),
+      caption: capInp ? capInp.value.trim() : '',
+      id_neon: row.getAttribute('data-id-neon') || null,
+      es_hero: row.getAttribute('data-es-hero') === '1',
+      orden:   photos.length
+    });
+  });
   return photos;
 }
 function previewHero(url) {
@@ -5105,9 +5154,8 @@ function removeRow(btn) {
 function generateExportCode() {
   var plArr = places.map(function(p, i) {
     var photos = (p.photos||[]).map(function(ph){
-      var url = typeof ph==='string'?ph:(ph.url||'');
-      var cap = typeof ph==='object'?(ph.cap||''):'';
-      return '{"type":"photo","url":"'+url.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'","cap":"'+cap.replace(/"/g,'\\"')+'"}';
+      var o = _photoToObj(ph);
+      return '{"type":"photo","url":"'+o.url.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'","cap":"'+o.cap.replace(/"/g,'\\"')+'"}';
     }).join(',');
     function esc(s){ return s ? String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' ') : ''; }
     return '{"id":'+(i+1)
@@ -5770,9 +5818,8 @@ function buildPlCode() {
   var published = places.filter(function(p){ return p.status==='published'; });
   var plArr = published.map(function(p,i) {
     var photos = (p.photos||[]).map(function(ph){
-      var url=typeof ph==='string'?ph:(ph.url||'');
-      var cap=typeof ph==='object'?(ph.cap||''):'';
-      return '{"type":"photo","url":"'+url.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'","cap":"'+cap.replace(/"/g,'\\"')+'"}';
+      var o = _photoToObj(ph);
+      return '{"type":"photo","url":"'+o.url.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'","cap":"'+o.cap.replace(/"/g,'\\"')+'"}';
     }).join(',');
     function esc(s){ return s?String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,' '):''; }
     var obj = '{"id":'+(i+1)
@@ -6022,18 +6069,28 @@ function _placeToAPI(p) {
   // Foto hero = primera foto del array
   var fotoHero = '';
   if (p.photos && p.photos.length > 0) {
-    var first = p.photos[0];
-    fotoHero = typeof first === 'string' ? first : (first.url || '');
+    fotoHero = _photoToObj(p.photos[0]).url;
   }
 
-  // Galería = fotos 2 en adelante (excluye la hero)
+  /* Galería completa = todas las fotos (incluye la hero como primer
+     elemento). BUG-079: la fila es_hero=true de destinos_fotos puede
+     tener votos/comentarios curados colgando de su id::text; si la hero
+     no viaja en fotos_galeria el merge del backend (reemplazarFotosGaleria)
+     la marca "no usada" y la borra (DELETE), huerfanando esos votos. Al
+     recorrer desde indice 0 la hero llega como objeto con su id_neon
+     (capturado por getPhotos()) y el backend la preserva por id (fallback
+     por url). Con una sola foto la lista no queda vacia y no se dispara el
+     guard anti-perdida (400) del backend. */
   var galeriaUrls = [];
-  if (p.photos && p.photos.length > 1) {
-    for (var i = 1; i < p.photos.length; i++) {
-      var f = p.photos[i];
-      var url = typeof f === 'string' ? f : (f.url || '');
-      if (url) galeriaUrls.push({ url: url, caption: f.cap || f.caption || '', orden: i });
-    }
+  for (var i = 0; i < (p.photos||[]).length; i++) {
+    var foto = _photoToObj(p.photos[i]);
+    if (foto.url) galeriaUrls.push({
+      id:      (foto.id_neon || null),
+      url:     foto.url,
+      caption: (foto.cap || foto.caption || ''),
+      es_hero: (i === 0 ? true : (foto.es_hero || false)),
+      orden:   i
+    });
   }
 
   // Tags JSONB — datos específicos por categoría
@@ -6153,7 +6210,12 @@ async function _syncFotosGaleria(destinoUUID, fotos) {
   }
 }
 
-// Cargar fotos desde Neon al editar un lugar
+// Cargar fotos desde Neon al editar un lugar.
+// BUG-079: ya no "reemplaza si no hay fotos locales" -- FUSIONA por URL
+// para que cada foto de destinos_fotos conserve su id_neon (votos/
+// comentarios) y su caption al recomponer el payload. Las fotos locales
+// agregadas por el usuario se conservan; las de Neon sin match local se
+// agregan; las que matchean por url reciben id_neon/es_hero de Neon.
 async function _cargarFotosDeNeon(destinoUUID, localId) {
   if (!destinoUUID) return;
   try {
@@ -6161,29 +6223,47 @@ async function _cargarFotosDeNeon(destinoUUID, localId) {
       headers: _adminHeaders()
     });
     var d = await r.json();
-    if (!d.ok || !d.data || !d.data.length) return;
+    var neonFotos = (d && d.ok && d.data) ? d.data : [];
+    if (!neonFotos.length) return;
 
-    // Buscar el lugar en PL[] y actualizar sus photos
-    var lugar = PL.find(function(p){ return p.id == localId; });
+    // Buscar el lugar en places[] y actualizar sus photos
+    var lugar = places.find(function(p){ return p.id == localId; });
     if (!lugar) return;
 
-    // Reconstruir photos[]: hero primero, luego galería ordenada
-    var todasFotos = d.data.map(function(f){
-      return { url: f.url, cap: f.caption || '', id_neon: f.id, es_hero: f.es_hero };
+    // Lista local normalizada (tolera strings legacy y objetos)
+    var locales = (lugar.photos || []).map(_photoToObj);
+
+    // Mapa por URL de las locales para match sin duplicados
+    var porUrl = {};
+    locales.forEach(function(f){ porUrl[f.url] = f; });
+
+    // Fusion: las fotos de Neon se integran conservando id_neon/caption
+    neonFotos.forEach(function(nf){
+      var ex = porUrl[nf.url];
+      if (ex) {
+        // Ya existe localmente: adjuntar id_neon, es_hero y rellenar
+        // caption solo si el local esta vacio (no pisa lo editado).
+        if (!ex.id_neon && nf.id) ex.id_neon = nf.id;
+        if (nf.es_hero) ex.es_hero = true;
+        if (!ex.cap && nf.caption) ex.cap = nf.caption;
+      } else {
+        var nuevo = { url: nf.url, cap: nf.caption || '', id_neon: nf.id || null, es_hero: !!nf.es_hero };
+        locales.push(nuevo);
+        porUrl[nf.url] = nuevo;
+      }
     });
 
-    // Si no hay fotos en el array local, reemplazar con las de Neon
-    if (!lugar.photos || !lugar.photos.length) {
-      lugar.photos = todasFotos.map(function(f){ return { type:'photo', url:f.url, cap:f.cap }; });
-      // Guardar en localStorage para persistir
-      var lsKey = 'place_'+localId;
-      try {
-        var ls = JSON.parse(localStorage.getItem(lsKey)||'{}');
-        ls.photos = lugar.photos;
-        localStorage.setItem(lsKey, JSON.stringify(ls));
-      } catch(_) {}
-      console.log('[admin-fotos] '+todasFotos.length+' fotos cargadas de Neon para lugar '+localId);
-    }
+    if (!locales.length) return;
+
+    lugar.photos = locales;
+    // Guardar en localStorage para persistir
+    var lsKey = 'place_'+localId;
+    try {
+      var ls = JSON.parse(localStorage.getItem(lsKey)||'{}');
+      ls.photos = lugar.photos;
+      localStorage.setItem(lsKey, JSON.stringify(ls));
+    } catch(_) {}
+    console.log('[admin-fotos] '+neonFotos.length+' fotos de Neon fusionadas por url para lugar '+localId);
   } catch(e) {
     console.warn('[admin-fotos] cargar error:', e.message);
   }
@@ -6567,7 +6647,7 @@ async function migrarFotosANeon() {
    (_fetchAndMergeDestino), para que ambos caminos queden
    simetricos con lo que escribe _placeToAPI(). Antes esta logica
    vivia solo dentro de syncFromNeon() y solo cubria "sitio". */
-function _mergeNeonRowIntoLocal(local, d) {
+async function _mergeNeonRowIntoLocal(local, d) {
   local.city    = d.ciudad        || local.city;
   local.region  = d.region        || local.region;
   local.zona    = d.zona          || local.zona;
@@ -6629,8 +6709,15 @@ function _mergeNeonRowIntoLocal(local, d) {
   console.log('%c[INFO]', 'color:#16a34a;font-weight:bold',
     'Lugar sincronizado: '+(d.slug||'(sin slug)')+' <-> '+d.id);
 
-  // Si el lugar local no tiene fotos, cargarlas de Neon en background
-  if (!local.photos || !local.photos.length) {
+  /* BUG-079: cuando se edita ESTE lugar (currentId === local.id) se
+     ejecuta SIEMPRE la carga de Neon y se FUSIONA por URL, para que
+     cada foto de destinos_fotos conserve su id_neon (votos/comentarios)
+     y caption al recomponer el payload. En el sync masivo (no es el
+     lugar activo) se mantiene la carga legado: solo si no hay fotos
+     locales, evitando N fetches al abrir el panel. */
+  if (currentId === local.id && d.id) {
+    await _cargarFotosDeNeon(d.id, local.id);
+  } else if (!local.photos || !local.photos.length) {
     _cargarFotosDeNeon(d.id, local.id);
   }
   return local;
@@ -6648,7 +6735,7 @@ async function _fetchAndMergeDestino(local) {
   try {
     var res  = await fetch('/api/admin-destinos?id='+uuid, { headers:_adminHeaders() });
     var data = await res.json();
-    if (data.ok && data.data) _mergeNeonRowIntoLocal(local, data.data);
+    if (data.ok && data.data) await _mergeNeonRowIntoLocal(local, data.data);
   } catch(err) {
     console.warn('[admin-online] fetch puntual error:', err.message);
   }
@@ -6672,7 +6759,7 @@ async function _resolveAndMergeBySlug(local) {
     if (!match) return local;
     _localToUUID[local.id] = match.id;
     localStorage.setItem('admin_local_to_uuid', JSON.stringify(_localToUUID));
-    _mergeNeonRowIntoLocal(local, match);
+    await _mergeNeonRowIntoLocal(local, match);
   } catch(err) {
     console.warn('[admin-online] resolucion por slug error:', err.message);
   }
@@ -7525,7 +7612,7 @@ function limpiarPanelJugadores() {
 
 // ── AUTO-DIAGNÓSTICO DE VERSIÓN ──────────────────────────────────
 (function checkVersion() {
-  var VERSION = 'admin-v9.20260702';
+  var VERSION = 'admin-v9.20260920';
   var checks = [
     ['f-tipo-actividad', !!document.getElementById('f-tipo-actividad'),   'Campo tipo actividad (sitio)'],
     ['f-distancia-sitio',!!document.getElementById('f-distancia-sitio'),  'Campo distancia (sitio)'],
