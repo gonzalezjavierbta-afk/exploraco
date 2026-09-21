@@ -3098,7 +3098,7 @@ El repricing no es un capricho: sin el, el XP extra que aporta `M_nivel` se trad
 
 **ID:** ADR-054
 **Fecha:** 2026-09-21
-**Estado:** **APROBADO (2026-09-21)** por `@architect-review` (con condiciones; ver "Revision de architect-review" al final del ADR. C1-C5 son BLOQUEANTES para la implementacion). **IMPLEMENTADO en working tree (2026-09-21):** migracion 032 + backend v26 + frontend + smokes; **PENDIENTE aplicar 032 en Neon y deploy en orden 032 -> backend -> frontend.**
+**Estado:** **APROBADO (2026-09-21)** por `@architect-review` (con condiciones; ver "Revision de architect-review" al final del ADR. C1-C5 son BLOQUEANTES para la implementacion). **IMPLEMENTADO Y DESPLEGADO (2026-09-21):** migracion 032 APLICADA en Neon (idempotente verificada) + release en `origin/main` (push `b4ad861`). **Pendiente: QA runtime en produccion.**
 **Autor:** architect (AI-DOS); decision de producto del operador.
 
 **Alcance:** `db/migrations/032_guardados_album.sql` (NUEVA), `api/interacciones.js` (`mis_guardados_media`, `guardados_carpeta`, `album_detalle`, `albumes`, `guardar_media`/`quitar_guardado_media`, `album_crear`), `api/pagina-destino.js`, `mi-perfil.html`, `mymapa.js`. Sin endpoints nuevos (8/8 intacto, ADR-001/ADR-010).

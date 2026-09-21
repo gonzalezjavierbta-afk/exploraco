@@ -1522,7 +1522,7 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
    1. **`api/pagina-destino.js`:** el `WHERE` de la consulta de fotos de album por cercania agrega `AND af.visible=true` (hoy L2762). Con eso la ficha solo renderiza recursos publicos.
 **Evidencia (ADR-006):** `api/pagina-destino.js` L2762: `WHERE af.activo=true AND af.visible=true AND a.activo=true AND a.lat IS NOT NULL AND a.lng IS NOT NULL` (verificado en el archivo real HOY). `npm test` incluye el check **C13** de `scripts/smoke_032_guardados_album.js` ("api/pagina-destino.js conserva af.visible = true (BUG-082)") en VERDE.
 **Prevencion:** todo lector publico de `album_fotos` debe filtrar `af.visible=true` (ADR-039 D.1); al agregar ramas nuevas de lectura por cercania o subqueries de votos/conteos, revisar la lista de filtros contra la migracion 025. Vale para `api/pagina-destino.js` y para cualquier lector polimorfico de media.
-**Estado:** CORREGIDO EN CODIGO (2026-09-21, working tree, deploy pendiente). **PENDIENTE: deploy del backend (`api/pagina-destino.js` + `api/interacciones.js` v26) en el orden 032 -> backend -> frontend.** Ver TASKS.md TSK-149 y DECISIONS.md ADR-054 (mismo release).
+**Estado:** CORREGIDO Y DESPLEGADO en `b4ad861` (2026-09-21); pendiente: QA runtime en produccion. Ver TASKS.md TSK-149 y DECISIONS.md ADR-054 (mismo release).
 
 ## Errata corregida (TSK-148 / ADR-053, 2026-09-21) -- titulo 11 `Estrat\u00e9ga` -> `Estratega Comunitario` -- NO es un bug de runtime
 

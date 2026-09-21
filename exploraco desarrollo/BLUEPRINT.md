@@ -217,7 +217,7 @@ La Entrega TSK-148 agrega superficie de datos aditiva e idempotente (ADR-008) y 
 
 ### Nota ADR-054 (TSK-149, migracion 032) -- Guardados de media en "Mis Albumes": `media_guardados.album_id`/`visible` y fin de las carpetas privadas
 
-La Entrega TSK-149 reorganiza los guardados de media dentro de "Mis Albumes" y NO crea archivos en `api/` (8/8 intacto, ADR-001/ADR-010): todo entra como cambios de `api/interacciones.js` v26 + un fix de `api/pagina-destino.js`. Migracion **`db/migrations/032_guardados_album.sql`** (17152 bytes, idempotente/ASCII-safe) **NO APLICADA AUN en Neon**.
+La Entrega TSK-149 reorganiza los guardados de media dentro de "Mis Albumes" y NO crea archivos en `api/` (8/8 intacto, ADR-001/ADR-010): todo entra como cambios de `api/interacciones.js` v26 + un fix de `api/pagina-destino.js`. Migracion **`db/migrations/032_guardados_album.sql`** (17152 bytes, idempotente/ASCII-safe) **APLICADA en Neon el 2026-09-21 (idempotente verificada)**.
 
 - **`media_guardados` (032):** `album_id uuid NULL REFERENCES albumes(id) ON DELETE SET NULL` + `visible boolean NOT NULL DEFAULT false` + CHECK `media_guardados_visible_album_chk (visible=false OR album_id IS NOT NULL)` + 2 indices. Visibilidad POR GUARDADO (nunca por album), coherente con ADR-039. La publicacion solo es visible en el detalle del album, con invariante de no-fuga (un guardado jamas se emite si su origen no es publico).
 - **ELIMINADAS por la 032 (DROP):** tabla `guardados_carpetas` y columna `media_guardados.carpeta_id` (carpetas privadas de ADR-052, superseded). El DROP es irreversible; el preflight solo reporta el conteo por NOTICE (rollback lossy).
