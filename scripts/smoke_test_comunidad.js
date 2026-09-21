@@ -49,8 +49,10 @@ const mc = MISIONES.filter(function(m){ return m.id === 'mis_chat_activo'; })[0]
 const mp = MISIONES.filter(function(m){ return m.id === 'mis_plan_creador'; })[0];
 const mj = MISIONES.filter(function(m){ return m.id === 'mis_plan_unido'; })[0];
 check('MISIONES: mis_chat_activo +20 XP (10 mensajes)', mc && mc.xp === 20);
-check('MISIONES: mis_plan_creador +25 XP (1 plan)', mp && mp.xp === 25);
-check('MISIONES: mis_plan_unido +15 XP (1 join)', mj && mj.xp === 15);
+// ADR-053 Dec 9 (v25): las misiones de plan bajan a 10 XP (25 -> 10 y
+// 15 -> 10); el XP directo de plan_crear/plan_unirse sube en su lugar.
+check('MISIONES: mis_plan_creador +10 XP (ADR-053 Dec 9)', mp && mp.xp === 10);
+check('MISIONES: mis_plan_unido +10 XP (ADR-053 Dec 9)', mj && mj.xp === 10);
 
 check('LOGROS: incluye logr_social_chat', logrIds.indexOf('logr_social_chat') !== -1);
 check('LOGROS: incluye logr_social_plan', logrIds.indexOf('logr_social_plan') !== -1);

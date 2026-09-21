@@ -110,22 +110,26 @@ var cromoKeys = Object.keys(CROMO);
 var rarezasMatch = rarezasValidas.every(function(r) { return cromoKeys.indexOf(r) !== -1; });
 check('23. CROMO_PROBABILIDADES rarezas match CHECK constraint', rarezasMatch);
 
-// --- 3. NIVELES v4: 20 niveles, bornes correctos ---
+// --- 3. NIVELES v6: 20 niveles, bornes correctos ---
+// ADR-053 Decision 11 (v25): umbrales NUEVOS v6 (techo 42000). Reemplazan
+// los bornes v4 (0..30000). Espejo sincronizado con api/usuarios.js:NIVELES.
+var V6_BORNES = [0,100,250,450,700,1050,1500,2100,2900,3900,
+  5200,6800,8800,11200,14200,17800,22200,27500,34000,42000];
 var NIVELES_LOCAL = sandboxInt.module.exports.NIVELES_LOCAL;
 check('24. NIVELES_LOCAL tiene 20 bornes', NIVELES_LOCAL.length === 20);
 check('25. NIVELES_LOCAL bornes son monotonicos crecientes',
   NIVELES_LOCAL.every(function(v, i) { return i === 0 || v > NIVELES_LOCAL[i - 1]; }));
-check('26. NIVELES_LOCAL ultimo borne == 30000', NIVELES_LOCAL[19] === 30000);
-check('27. NIVELES_LOCAL bornes exactos del spec',
-  JSON.stringify(NIVELES_LOCAL) === JSON.stringify([0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000]));
+check('26. NIVELES_LOCAL ultimo borne == 42000 (ADR-053 Dec 11)', NIVELES_LOCAL[19] === 42000);
+check('27. NIVELES_LOCAL bornes exactos del spec v6',
+  JSON.stringify(NIVELES_LOCAL) === JSON.stringify(V6_BORNES));
 
 // calcularNivelLocal
 var cn = sandboxInt.module.exports.calcularNivelLocal;
 check('28. calcularNivelLocal(0) -> nivel 1', cn(0).nivel === 1);
-check('29. calcularNivelLocal(30000) -> nivel 20', cn(30000).nivel === 20);
-check('30. calcularNivelLocal(8499) -> nivel 14 (8500 es nivel 14)', cn(8499).nivel === 13);
-check('31. calcularNivelLocal(8500) -> nivel 14 (Cartografo de Cine)', cn(8500).nivel === 14);
-check('32. calcularNivelLocal(29999) -> nivel 19 (Inmortal)', cn(29999).nivel === 19);
+check('29. calcularNivelLocal(42000) -> nivel 20', cn(42000).nivel === 20);
+check('30. calcularNivelLocal(11199) -> nivel 13 (11200 es nivel 14)', cn(11199).nivel === 13);
+check('31. calcularNivelLocal(11200) -> nivel 14 (Cartografo de Cine)', cn(11200).nivel === 14);
+check('32. calcularNivelLocal(41999) -> nivel 19 (Inmortal)', cn(41999).nivel === 19);
 
 // calcularEraLocal
 var ce = sandboxInt.module.exports.calcularEraLocal;
@@ -150,11 +154,11 @@ vm.runInContext(srcUsu + '\nmodule.exports.NIVELES = NIVELES;'
 
 var NIVELES = sandboxUsu.module.exports.NIVELES;
 check('41. api/usuarios.js NIVELES tiene 20 elementos', NIVELES.length === 20);
-check('42. NIVELES ultimo nivel es 30000', NIVELES[19].min === 30000);
+check('42. NIVELES ultimo nivel es 42000 (ADR-053 Dec 11)', NIVELES[19].min === 42000);
 check('43. NIVELES[19] contiene Gran Maestro', NIVELES[19].nombre.indexOf('Maestro') !== -1);
 var umbrales = NIVELES.map(function(n) { return n.min; });
-check('44. NIVELES umbrales sincronizados con spec v4',
-  JSON.stringify(umbrales) === JSON.stringify([0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000]));
+check('44. NIVELES umbrales sincronizados con spec v6',
+  JSON.stringify(umbrales) === JSON.stringify(V6_BORNES));
 
 // BUG-1: conMisiones debe hacer MERGE (Object.assign) y NO sobreescribir capacidades
 var conMisionesSrc = srcUsu.substring(srcUsu.indexOf('function conMisiones'), srcUsu.indexOf('function conMisiones') + 500);
@@ -170,7 +174,7 @@ check('47. BUG-1: doc de usuarios.js menciona MERGE en conMisiones',
 // calcularNivel de usuarios.js
 var calcNivelUsu = sandboxUsu.module.exports.calcularNivel;
 check('48. calcularNivel(0) -> nivel 1', calcNivelUsu(0).nivel === 1);
-check('49. calcularNivel(8500) -> nivel 14', calcNivelUsu(8500).nivel === 14);
+check('49. calcularNivel(11200) -> nivel 14 (ADR-053 Dec 11)', calcNivelUsu(11200).nivel === 14);
 
 // --- 5. Helpers puros de interacciones.js (leerCapacidades, etc.) ---
 // leerCapacidades llama sql; solo verificamos que existe y es funcion
@@ -264,7 +268,7 @@ var comCount = countXpLevels('comunidad.html');
 check('78. comunidad.html XP_LEVELS tiene 20 elementos', comCount === 20);
 
 // --- 11. Spec v4: NIVELES sincronizados con spec ---
-var specBornes = [0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000];
+var specBornes = V6_BORNES; // ADR-053 Dec 11: spec v6 (techo 42000)
 var specNames = [
   'Caminante Novato', 'Rastreador Local', 'Explorador Urbano', 'Aventurero Regional',
   'Vanguardia Territorial', 'Embajador de Zona', 'Fotografo de Ruta', 'Cronista de Historias',
@@ -279,7 +283,7 @@ var nivelesNamesOk = NIVELES.every(function(n, i) {
   return specNames[i].indexOf(norm.substring(0,5)) !== -1 || norm.indexOf(specNames[i].substring(0,5)) !== -1;
 });
 // More lenient: just check count and bornes (names have unicode escapes)
-check('79. api/usuarios.js NIVELES bornes exactos del spec v4',
+check('79. api/usuarios.js NIVELES bornes exactos del spec v6',
   JSON.stringify(NIVELES.map(function(n){ return n.min; })) === JSON.stringify(specBornes));
 
 // --- 12. Shape de operaciones documentadas (sin DB) ---
@@ -304,8 +308,11 @@ check('86. intentarObtenerCromo es funcion', typeof sandboxInt.module.exports.MI
 check('87. leerCapacidades actualiza via MERGE ||',
   srcInt.indexOf("COALESCE(capacidades,'{}'::jsonb)") !== -1 ||
   srcInt.indexOf("COALESCE(capacidades,\\'{}\\'::jsonb)") !== -1);
-check('88. aplicarAmuletoX2 duplica XP (x2)',
-  srcInt.indexOf('xpBase * 2') !== -1 || srcInt.indexOf('xpBase *2') !== -1);
+// ADR-053 Dec 8.1 (v25): aplicarAmuletoX2 ya no premultiplica; reporta
+// doubled=true y el x2 viaja en ctx.amuleto del punto unico.
+check('88. aplicarAmuletoX2 reporta doubled sin premultiplicar (ADR-053)',
+  srcInt.indexOf('xpBase * 2') === -1 && srcInt.indexOf('xpBase *2') === -1
+  && srcInt.indexOf('xp: base, doubled: true') !== -1);
 check('89. aplicarFamaPandilla usa ROUND(xpGanado * 0.10)',
   srcInt.indexOf('xpGanado * 0.10') !== -1);
 
@@ -326,8 +333,8 @@ check('94. migracion 010: cero bytes > 127', asciiSafe('db/migrations/010_gamifi
 
 // --- 17. Concurrencia de especificacion: NIVELES en interacciones.js ---
 var NIVELES_LOCAL_v = sandboxInt.module.exports.NIVELES_LOCAL;
-check('95. NIVELES_LOCAL (interacciones) == NIVELES_LOCAL de spec',
-  JSON.stringify(NIVELES_LOCAL_v) === JSON.stringify(specBornes));
+check('95. NIVELES_LOCAL (interacciones) == umbrales v6 (ADR-053 Dec 11)',
+  JSON.stringify(NIVELES_LOCAL_v) === JSON.stringify(V6_BORNES));
 
 // --- Resumen ---
 console.log('');

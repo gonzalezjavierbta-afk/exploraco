@@ -108,9 +108,12 @@ var NIVELES_LOCAL = sandboxInt.module.exports.NIVELES_LOCAL;
 
 // --- 6b. Constantes del epic -----------------------------------------
 check('NIVELES_ADMIN es alias de NIVELES_LOCAL', NIVELES_ADMIN === NIVELES_LOCAL);
-check('NIVELES_ADMIN: 20 bornes, ultimo 30000', NIVELES_ADMIN.length === 20 && NIVELES_ADMIN[19] === 30000);
-check('NIVELES_ADMIN: bornes exactos del spec',
-  JSON.stringify(NIVELES_ADMIN) === JSON.stringify([0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000]));
+// ADR-053 Dec 11 (v25): umbrales NUEVOS v6 (techo 42000); NIVELES_ADMIN
+// aliasa NIVELES_LOCAL de api/interacciones.js.
+check('NIVELES_ADMIN: 20 bornes, ultimo 42000 (ADR-053 Dec 11)',
+  NIVELES_ADMIN.length === 20 && NIVELES_ADMIN[19] === 42000);
+check('NIVELES_ADMIN: bornes exactos del spec v6',
+  JSON.stringify(NIVELES_ADMIN) === JSON.stringify([0,100,250,450,700,1050,1500,2100,2900,3900,5200,6800,8800,11200,14200,17800,22200,27500,34000,42000]));
 check('VOCACIONES: 3 items con niveles 5/8/11',
   VOCACIONES.length === 3 && VOCACIONES[0].nivel === 5 && VOCACIONES[1].nivel === 8 && VOCACIONES[2].nivel === 11);
 

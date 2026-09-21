@@ -4,8 +4,30 @@
 // scripts/fake_neon.js y un sql simulado que responde por patron de texto
 // (contains). Cubre validaciones tempranas, dedup idempotente,
 // anti-farming (cooldown y tope diario) y los caminos felices urbano/rural.
+//
+// ARNES (corregido): la rama visita exige sesion firmada (ADR-025) y nonce
+// de un solo uso ANTES de la geocerca. El mock ahora inyecta un
+// Authorization: Bearer firmado con el MISMO contrato de api/usuarios.js
+// (HMAC-SHA256 / dev_secret) y consume el nonce. Antes el req no traia
+// headers y las 14 aserciones morian con 500 (harness roto, no el api).
 // Ejecutar: node scripts/smoke_visita_geocerca.js
 'use strict';
+
+var crypto = require('crypto');
+
+// Firma de sesion identica al contrato ADR-025 (payload base64url + HMAC).
+function firmarSesion(usuarioId) {
+  var iat = Math.floor(Date.now() / 1000);
+  var exp = iat + 7 * 24 * 3600;
+  var payload = { sub: String(usuarioId), iat: iat, exp: exp };
+  var payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  var firma = crypto.createHmac('sha256', process.env.SESSION_JWT_SECRET || 'dev_secret')
+    .update(payloadB64).digest('base64url');
+  return payloadB64 + '.' + firma;
+}
+var U_ID = 'u1';
+var TOKEN = firmarSesion(U_ID);
+var NONCE = 'nonce-smoke-visita';
 
 // Carga api/interacciones.js en un sandbox vm con el modulo Neon falso.
 // Factorizado para no duplicar el patron de los smokes existentes.
@@ -31,6 +53,9 @@ function cargarSandboxHandler() {
     require: require,
     console: console,
     process: process,
+    Buffer: Buffer,
+    setTimeout: setTimeout,
+    clearTimeout: clearTimeout,
     fetch: function(){ return Promise.resolve({ json: function(){ return Promise.resolve({}); } }); }
   };
   sandbox.exports = sandbox.module.exports;
@@ -39,9 +64,11 @@ function cargarSandboxHandler() {
   return sandbox;
 }
 
+var passed = 0;
+var failed = 0;
 function check(label, cond) {
-  console.log((cond ? 'PASS' : 'FAIL') + ' - ' + label);
-  if (!cond) process.exitCode = 1;
+  if (cond) { passed++; console.log('PASS - ' + label); }
+  else { failed++; console.log('FAIL - ' + label); }
 }
 
 // ---- Mock sql por contenido (contains) ------------------------------
@@ -54,6 +81,10 @@ function makeMock(cfg) {
     return cfg[key] !== undefined ? cfg[key] : fallback;
   }
   return function(query) {
+    // ADR-025: el nonce de un solo uso se consume ANTES del dedup. El mock
+    // responde "consumido" (1 fila) salvo que el caso lo sobreescriba.
+    if (query.indexOf('UPDATE geo_nonces SET usado=true') !== -1)
+      return Promise.resolve(pick('nonce', [{ id: 'nonce-ok' }]));
     if (query.indexOf('FROM interacciones WHERE destino_id') !== -1)
       return Promise.resolve(pick('dedup', []));
     if (query.indexOf('categoria_slug') !== -1)
@@ -80,7 +111,8 @@ var DEST_LEJOS = { id: 'd4', lat: 10.0, lng: -75.0, categoria_slug: 'sitio', tag
 
 var sandbox = cargarSandboxHandler();
 
-// Invoca el handler POST y captura status + payload reales.
+// Invoca el handler POST y captura status + payload reales. Inyecta la
+// sesion firmada y el nonce del arnes salvo que el caso los sobreescriba.
 function invoke(body, mock) {
   return new Promise(function(resolve) {
     global.__MOCKSQL__ = mock || function(){ return Promise.resolve([]); };
@@ -90,8 +122,15 @@ function invoke(body, mock) {
       status: function(code){ captured.status = code; return this; },
       json: function(payload){ captured.body = payload; resolve(captured); }
     };
+    var reqBody = Object.assign({ nonce: NONCE }, body || {});
+    var req = {
+      method: 'POST',
+      body: reqBody,
+      query: {},
+      headers: { authorization: 'Bearer ' + TOKEN }
+    };
     try {
-      var p = sandbox.module.exports({ method: 'POST', body: body, query: {} }, res);
+      var p = sandbox.module.exports(req, res);
       if (p && typeof p.catch === 'function')
         p.catch(function(err){ resolve({ status: 0, body: { ok: false, error: err.message } }); });
     } catch (e) {
@@ -174,15 +213,25 @@ async function run() {
   check('Camino feliz urbano -> 200 xp 20', r14.status === 200 && r14.body.ok === true && r14.body.xp === 20 && r14.body.xp_detalle.base === 20 && r14.body.xp_detalle.bono_rural === 0 && r14.body.zona === 'urbana');
   if (!(r14.status === 200 && r14.body && r14.body.xp === 20)) console.log('    detalle: ' + JSON.stringify(r14));
 
-  // 15) Camino feliz rural (subcategoria naturaleza): XP 20 + bono plano 20.
+  // 15) Camino feliz rural (subcategoria naturaleza): XP 20 + bono plano
+  // 25 (ADR-053 Dec 8.3: VISITA_BONO_RURAL 20 -> 25), sumado DESPUES del cap.
   var r15 = await invoke({ tipo: 'visita', destino_id: 'd2', usuario_id: 'u1', lat: U_LAT, lng: U_LNG }, M({ destino: [DEST_RURAL], vecinos: [{ n: 10 }] }));
-  check('Camino feliz rural -> 200 xp 40 (bono +20)', r15.status === 200 && r15.body.ok === true && r15.body.xp === 40 && r15.body.xp_detalle.bono_rural === 20 && r15.body.zona === 'rural');
-  if (!(r15.status === 200 && r15.body && r15.body.xp === 40)) console.log('    detalle: ' + JSON.stringify(r15));
+  check('Camino feliz rural -> 200 xp 45 (bono +25, ADR-053 Dec 8.3)',
+    r15.status === 200 && r15.body.ok === true && r15.body.xp === 45
+    && r15.body.xp_detalle.bono_rural === 25 && r15.body.xp_detalle.base === 20
+    && r15.body.zona === 'rural');
+  if (!(r15.status === 200 && r15.body && r15.body.xp === 45)) console.log('    detalle: ' + JSON.stringify(r15));
 
-  console.log('SMOKE VISITA GEOCERCA: OK');
+  if (failed === 0) {
+    console.log('RESULTADO: OK - ' + passed + ' verificaciones pasaron.');
+    process.exit(0);
+  } else {
+    console.log('RESULTADO: FAIL - ' + failed + ' de ' + (passed + failed) + ' verificaciones fallaron.');
+    process.exit(1);
+  }
 }
 
 run().catch(function(err) {
   console.log('FAIL - smoke visita lanzo error: ' + err.message);
-  process.exitCode = 1;
+  process.exit(1);
 });

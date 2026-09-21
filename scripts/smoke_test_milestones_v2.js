@@ -36,12 +36,14 @@ const NIVELES = sandboxUsu.module.exports.NIVELES;
 const calcularNivel = sandboxUsu.module.exports.calcularNivel;
 check('NIVELES: 20 rangos (4 Eras)', NIVELES.length === 20);
 const umbrales = NIVELES.map(function(n){ return n.min; });
-check('NIVELES: umbrales del spec v4 (0..30000)',
-  JSON.stringify(umbrales) === JSON.stringify([0,100,250,450,700,1000,1400,1900,2500,3200,4000,5200,6800,8500,10500,13000,16000,19500,24000,30000]));
-check('NIVELES: Gran Maestro ExploraCO en 30000', NIVELES[19].nombre.indexOf('Maestro') !== -1);
+// ADR-053 Dec 11 (v25): umbrales NUEVOS v6 (techo 42000); reemplazan los
+// bornes v4 (0..30000) que afirmaba este smoke.
+check('NIVELES: umbrales del spec v6 (ADR-053 Dec 11)',
+  JSON.stringify(umbrales) === JSON.stringify([0,100,250,450,700,1050,1500,2100,2900,3900,5200,6800,8800,11200,14200,17800,22200,27500,34000,42000]));
+check('NIVELES: Gran Maestro ExploraCO en 42000', NIVELES[19].nombre.indexOf('Maestro') !== -1);
 check('NIVELES: calcularNivel(0) -> nivel 1', calcularNivel(0).nivel === 1);
-check('NIVELES: calcularNivel(11000) -> nivel 15', calcularNivel(11000).nivel === 15);
-check('NIVELES: calcularNivel(2000) -> nivel 8 (Cronista, 1900<=2000<2500)', calcularNivel(2000).nivel === 8);
+check('NIVELES: calcularNivel(14200) -> nivel 15 (ADR-053 Dec 11)', calcularNivel(14200).nivel === 15);
+check('NIVELES: calcularNivel(2100) -> nivel 8 (Cronista, 2100<=2100<2900)', calcularNivel(2100).nivel === 8);
 
 // ---- 2) GET tabla_destino (3 senderos + patrocinios) ---------------
 // Se evalua la logica de forma directa: el GET vive en el handler; aqui

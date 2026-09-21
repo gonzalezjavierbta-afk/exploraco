@@ -1,3 +1,24 @@
+// api/interacciones.js  v25 (TSK gamificacion v6 / ADR-053):
+//   (1) Motor unico de XP: XP_BASES (catalogo v2.1, unico), M_nivel
+//       x1.0..x3.0 sobre el nivel DERIVADO de xp_total y doble cap
+//       secuencial 5.0/10.0 con gamificacion_config (1 SELECT; fallback a
+//       constantes; degrada 42P01/42703 con warn). Sin piso 1.0.
+//   (2) xp_ledger: registrarXpLedger en TODOS los puntos de escritura de
+//       xp_total (incluidos los exentos: misiones/logros/pandilla reto/
+//       admin_xp; restas de compras y DM con xp_final negativo) y
+//       actualizacion monotona de usuarios.nivel_max.
+//   (3) Bases/acciones: visita_bono_rural 25, resena_larga 30,
+//       foto_viajero 20, ao_checkin 20, ao_proponer +30 (cap 3/dia),
+//       plan_crear +20 (cap 3/dia), plan_unirse +6 (cap 5/dia),
+//       spot_atributos +10 (NUEVA rama, dedup por ledger; completitud por
+//       categoria: tags.subcategoria en sitio/comida/evento, cualquier tag
+//       no vacio en hostal/vacia, ADR-016), album_foto_autor por catalogo.
+//       Misiones de plan 25->10 y 15->10. xp_detalle generalizado (shape
+//       del ADR + alias legacy de la visita).
+//   (4) NIVELES_LOCAL sincronizado con los 20 umbrales v6 (techo 42000).
+//   REQUIERE la migracion 031_gamificacion_v6_nivel_scaling.sql aplicada en
+//   Neon ANTES del deploy (patron BUG-021/BUG-060). Si no esta, el XP se
+//   entrega igual y tanto el ledger como la config degradan con warn.
 // api/interacciones.js  v24 (seguridad multimedia_mapa H-1/H-2 + ADR-052
 // carpetas de guardados):
 //   (1) H-1/H-2 (multimedia_mapa): scope=mio EXIGE sesion firmada
@@ -195,7 +216,7 @@ var MAX_VELOCIDAD_MPS = 69.4;
 var VISITAS_DIA_MAX = 30;
 var VECINOS_RURAL_MAX = 3;
 var VECINOS_BBOX_DEG = 0.02;
-var VISITA_BONO_RURAL = 20;
+var VISITA_BONO_RURAL = 25;
 // ADR-033 (v17): escalado de XP segun la amplitud del area de verificacion
 // del lugar. Areas extensas (ciudades, parques metropolitanos) debilitan la
 // presencia fisica, asi que rinden menos XP. La visita SIEMPRE se registra
@@ -256,11 +277,57 @@ function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
 
 // TSK-112 (v21, ADR-038): Clases Rising Star + factor de nivelacion por
 // Casa. UNICO catalogo de bonus/umbrales y UNICO calculo de XP final.
-// Regla de No-Duplicidad (AGENTS.md 2.1): las 14 acciones propias de la
-// whitelist llaman a calcularXpFinal + acreditarClaseYCofre; nunca
-// copian esta matematica.
+// Regla de No-Duplicidad (AGENTS.md 2.1): las acciones de la whitelist
+// llaman al motor calcularXpFinal/calcularXpAcreditado; nunca copian esta
+// matematica.
 var BONUS_CLASE = { cartografo: 0.08, cronista: 0.10, explorador: 0.07 };
 var XP_NIVEL_CLASE = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5700, 7500];
+
+// ADR-053 Decision 9 (v25): catalogo UNICO de bases de XP v2.1. Toda base
+// de accion sale de aqui; prohibido el literal suelto. 'compartir' conserva
+// los dos montos del ADR (primero/posterior). 'ao_votar' NO figuraba en la
+// tabla del ADR pero SI es un punto de escritura real de xp_total (:5584,
+// +5): se cataloga para no dejar un literal suelto (ver desviaciones).
+var XP_BASES = {
+  visita: 20,
+  visita_bono_rural: VISITA_BONO_RURAL,
+  resena_larga: 30,
+  resena_corta: 10,
+  rating: 10,
+  guardado: 5,
+  chat_comentario: 2,
+  compartir: { primero: 25, posterior: 5 },
+  foto_viajero: 20,
+  album_crear: 20,
+  album_foto: 15,
+  album_foto_autor: 10,
+  voto_media: 5,
+  ao_votar: 5,
+  ao_proponer: 30,
+  ao_checkin: 20,
+  plan_crear: 20,
+  plan_unirse: 6,
+  spot_atributos: 10
+};
+
+// ADR-053 Decision 1/2 (v25): M_nivel lineal de x1.0 (N1) a x3.0 (N20) y
+// FALLBACK en codigo de los 3 parametros de gamificacion_config. Las
+// constantes son el fallback y el valor semilla, nunca una segunda fuente.
+var CAP_PROGRESION_DEFAULT = 5.0;
+var CAP_GLOBAL_DEFAULT = 10.0;
+var M_NIVEL_MAX_DEFAULT = 3.0;
+
+// M_nivel(N) = 1.0 + ((N-1)/19) * (m_nivel_max - 1.0). Con el default
+// m_nivel_max = 3.0 el paso es 2.0/19 (formula congelada del ADR-053).
+// n se acota a [1, 20]; mNivelMax permite recalibrar sin deploy.
+function obtenerMultiplicadorNivel(nivel, mNivelMax) {
+  var n = parseInt(nivel, 10);
+  if (!isFinite(n) || n < 1) n = 1;
+  if (n > 20) n = 20;
+  var tope = numXp(mNivelMax);
+  if (!isFinite(tope) || tope < 1) tope = M_NIVEL_MAX_DEFAULT;
+  return 1.0 + ((n - 1) / 19) * (tope - 1.0);
+}
 
 function calcularNivelClase(xpClaseTotal) {
   var xp = numXp(xpClaseTotal);
@@ -272,14 +339,250 @@ function calcularNivelClase(xpClaseTotal) {
   return Math.min(nivel, 10);
 }
 
-function calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag) {
+// ADR-053 Decision 6 (v25): 1 SELECT a gamificacion_config por
+// acreditacion (sin cache, aceptado por el operador). DEGRADA a las
+// constantes en codigo si la tabla no existe (42P01/42703) o si la lectura
+// falla, registrando el motivo (patron BUG-021 / AGENTS.md 2.2: prohibido
+// el catch vacio). NUNCA lanza.
+async function leerConfigGamificacion(sql) {
+  var cfg = {
+    capProgresion: CAP_PROGRESION_DEFAULT,
+    capGlobal: CAP_GLOBAL_DEFAULT,
+    mNivelMax: M_NIVEL_MAX_DEFAULT
+  };
+  try {
+    var rows = await sql('SELECT clave, valor FROM gamificacion_config');
+    (rows || []).forEach(function(r) {
+      var v = numXp(r.valor);
+      if (r.clave === 'cap_progresion' && v > 0) cfg.capProgresion = v;
+      else if (r.clave === 'cap_global' && v > 0) cfg.capGlobal = v;
+      else if (r.clave === 'm_nivel_max' && v >= 1) cfg.mNivelMax = v;
+    });
+  } catch (eCfg) {
+    if (eCfg && (eCfg.code === '42P01' || eCfg.code === '42703')) {
+      console.warn('[gamificacion] gamificacion_config ausente (' + eCfg.code + '): caps por constante');
+    } else {
+      console.warn('[gamificacion] config no leida, caps por constante: ' + (eCfg && eCfg.message));
+    }
+  }
+  return cfg;
+}
+
+// ADR-053 Decision 2 (v25): UNICO calculo de XP final. Firma retrocompatible
+// (xp_base, nivel_clase, clase_id, casa_tag, ctx). ctx =
+// { nivel_usuario, amuleto, lider, capProgresion, capGlobal, mNivelMax };
+// defaults seguros: nivel_usuario ausente -> 1, amuleto/lider -> false.
+// CADENA SECUENCIAL CONGELADA:
+//   m_nivel         = M_nivel(nivel_usuario)                 // 1.0 .. 3.0
+//   mult_clase      = 1 + nivel_clase * BONUS_CLASE[clase_id] // 1.0 .. 2.0
+//   factor_casa     = 1.30 rezagada | 1.00 equilibrada | 0.85 dominante
+//   mult_progresion = m_nivel * mult_clase * factor_casa
+//   mult_prog_c     = min(mult_progresion, CAP_PROGRESION)   // 5.0
+//   stack_temp      = (amuleto ? 2 : 1) * (lider ? 1.1 : 1)
+//   mult_stack      = mult_clase * factor_casa * stack_temp  // reporte
+//   mult_global     = mult_prog_c * stack_temp
+//   mult_global_c   = min(mult_global, CAP_GLOBAL)           // 10.0
+//   xp_final        = red2(xp_base * mult_global_c)
+// Sin piso 1.0: el x0.85 de Casa dominante (ADR-038) se preserva a proposito.
+// El bono rural y demas bonos PLANOS se suman DESPUES del cap (caller).
+// Devuelve el desglose completo para el ledger y el toast (xp_detalle).
+function calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag, ctx) {
+  var c = ctx || {};
+  var capProgresion = numXp(c.capProgresion);
+  if (!isFinite(capProgresion) || capProgresion <= 0) capProgresion = CAP_PROGRESION_DEFAULT;
+  var capGlobal = numXp(c.capGlobal);
+  if (!isFinite(capGlobal) || capGlobal <= 0) capGlobal = CAP_GLOBAL_DEFAULT;
+  var m_nivel = obtenerMultiplicadorNivel(
+    c.nivel_usuario === undefined || c.nivel_usuario === null ? 1 : c.nivel_usuario,
+    c.mNivelMax
+  );
   var bonus = BONUS_CLASE[clase_id] || 0;
   var nivel = parseInt(nivel_clase, 10);
   if (!isFinite(nivel) || nivel < 1) nivel = 1;
-  var xp_clase_calc = (Number(xp_base) || 0) * (1 + (nivel * bonus));
+  if (nivel > 10) nivel = 10;
+  var mult_clase = 1 + (nivel * bonus);
   var factor_casa = (casa_tag === 'rezagada') ? 1.30
     : (casa_tag === 'dominante') ? 0.85 : 1.0;
-  return red2(xp_clase_calc * factor_casa);
+  var mult_progresion = m_nivel * mult_clase * factor_casa;
+  var capProgAplicado = mult_progresion > capProgresion;
+  var mult_progresion_c = capProgAplicado ? capProgresion : mult_progresion;
+  var stackTemp = (c.amuleto ? 2.0 : 1.0) * (c.lider ? 1.1 : 1.0);
+  var mult_stack = mult_clase * factor_casa * stackTemp;
+  var mult_global = mult_progresion_c * stackTemp;
+  var capGlobAplicado = mult_global > capGlobal;
+  var mult_global_c = capGlobAplicado ? capGlobal : mult_global;
+  var cap_aplicado = capGlobAplicado ? 'global'
+    : (capProgAplicado ? 'progresion' : 'ninguno');
+  return {
+    xp_final: red2(numXp(xp_base) * mult_global_c),
+    m_nivel: m_nivel,
+    mult_clase: mult_clase,
+    factor_casa: factor_casa,
+    mult_progresion: mult_progresion,
+    mult_progresion_c: mult_progresion_c,
+    cap_progresion: capProgresion,
+    mult_stack: mult_stack,
+    mult_global: mult_global,
+    mult_global_c: mult_global_c,
+    cap_global: capGlobal,
+    cap_aplicado: cap_aplicado
+  };
+}
+
+// v25: envoltorio async del punto unico. Lee la config de caps (1 SELECT) y
+// delega en calcularXpFinal. Evita duplicar la lectura en cada caller
+// (Regla de No-Duplicidad) y es el punto que usan las acreditaciones.
+async function calcularXpAcreditado(sql, xp_base, nivel_clase, clase_id, casa_tag, ctx) {
+  var cfg = await leerConfigGamificacion(sql);
+  var c = Object.assign({}, ctx || {});
+  c.capProgresion = cfg.capProgresion;
+  c.capGlobal = cfg.capGlobal;
+  c.mNivelMax = cfg.mNivelMax;
+  return calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag, c);
+}
+
+// v25: desglose aditivo para la UI (ADR-053 Decision 13/spec 9.1). El shape
+// del ADR se conserva; total y cap_aplicado pueden sobreescribirse cuando el
+// caller aplica un cap DENOMINADO EN XP (compartir/chat, cap_aplicado
+// 'accion') o suma bonos planos.
+function armarXpDetalle(base, res, bonosPlanos, totalReal, capAplicadoReal) {
+  var r = res || {};
+  var bonos = numXp(bonosPlanos);
+  return {
+    base: numXp(base),
+    m_nivel: r.m_nivel,
+    mult_clase: r.mult_clase,
+    factor_casa: r.factor_casa,
+    mult_progresion: r.mult_progresion_c,
+    cap_progresion: r.cap_progresion,
+    mult_stack: r.mult_stack,
+    mult_global: r.mult_global_c,
+    cap_global: r.cap_global,
+    cap_aplicado: capAplicadoReal || r.cap_aplicado,
+    bonos_planos: bonos,
+    total: (totalReal === undefined || totalReal === null)
+      ? red2(numXp(r.xp_final) + bonos)
+      : red2(numXp(totalReal))
+  };
+}
+
+// ADR-053 Decision 7 (v25): ledger unico de XP. BEST-EFFORT: se aisla en su
+// propio try/catch con console.warn (nunca bloquea ni revierte la
+// acreditacion; si la 031 no esta aplicada, degrada). El parametro opcional
+// 'nivel' actualiza ademas usuarios.nivel_max de forma MONOTONA y tambien
+// best-effort (Decision 5; el GREATEST jamas decrece). Prohibido el catch
+// vacio (AGENTS.md 2.2): todo catch registra el motivo.
+async function registrarXpLedger(sql, datos) {
+  var d = datos || {};
+  try {
+    var cap = (d.cap_aplicado === 'progresion' || d.cap_aplicado === 'global'
+      || d.cap_aplicado === 'accion') ? d.cap_aplicado : 'ninguno';
+    await sql(
+      'INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
+      + ' mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, contexto)'
+      + ' VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)',
+      [d.usuario_id, String(d.accion || 'desconocida'), red2(d.xp_base),
+       numXp(d.mult_nivel) || 1, numXp(d.mult_stack) || 1, numXp(d.mult_final) || 1,
+       cap, red2(d.bonos_planos), red2(d.xp_final), d.es_exento === true,
+       d.contexto ? JSON.stringify(d.contexto) : null]
+    );
+  } catch (eLed) {
+    console.warn('[xp_ledger] fila no registrada ('
+      + (eLed && eLed.code ? eLed.code + ' ' : '') + (eLed && eLed.message) + ')');
+  }
+  if (d.nivel !== undefined && d.nivel !== null) {
+    var lvl = parseInt(d.nivel, 10);
+    if (isFinite(lvl) && lvl >= 1) {
+      try {
+        await sql(
+          'UPDATE usuarios SET nivel_max = GREATEST(COALESCE(nivel_max, 1), $2::smallint) WHERE id=$1::uuid',
+          [d.usuario_id, lvl]
+        );
+      } catch (eNivelMax) {
+        if (eNivelMax && (eNivelMax.code === '42703' || eNivelMax.code === '42P01')) {
+          console.warn('[nivel_max] columna/tabla ausente (031 pendiente); insignia derivada intacta');
+        } else {
+          console.warn('[nivel_max] no actualizado: ' + (eNivelMax && eNivelMax.message));
+        }
+      }
+    }
+  }
+}
+
+// v25: true si el usuario es lider de la ciudad del destino (stack x1.1).
+// Sustituye a xpConMultiplicador (que multiplicaba FUERA del punto unico):
+// ahora el caller resuelve el booleano y lo pasa en ctx.lider. Degrada a
+// false registrando el motivo; nunca lanza.
+function esLiderDestino(sql, usuarioId, destinoId) {
+  if (!usuarioId || !destinoId) return Promise.resolve(false);
+  return sql('SELECT ciudad FROM destinos WHERE id=$1 LIMIT 1', [destinoId])
+    .then(function(r) {
+      var ciudad = r[0] ? r[0].ciudad : '';
+      if (!ciudad) return false;
+      return esLiderDeCiudad(sql, usuarioId, ciudad);
+    })
+    .catch(function(eLid) {
+      console.warn('[xp] lider de ciudad no resuelto: ' + (eLid && eLid.message));
+      return false;
+    });
+}
+
+// ADR-053 Dec 9 + ADR-016 (v25): regla de COMPLETITUD de spot_atributos.
+// Exige 3 campos nucleo SIEMPRE (ciudad; direccion fisica = destinos.address
+// con barrio de respaldo, migracion 011; contacto = telefono, o precio_desde
+// en hostal/comida) mas una senal de taxonomia segun la categoria:
+//   - categoria con taxonomia de subcategoria declarada (sitio, comida,
+//     evento; ADR-016): al menos 1 valor no vacio en tags.subcategoria.
+//   - categoria SIN taxonomia de subcategoria (hostal, blog, vacia o
+//     desconocida): al menos 1 valor no vacio en CUALQUIER clave de tags
+//     (barra mas debil pero alcanzable). Un hostal jamas tendria
+//     tags.subcategoria en el flujo del admin, por lo que exigirlo haria
+//     inalcanzable su +10 XP.
+// Nunca lanza: entradas raras degradan a false (incompleto) sin error.
+// DEUDA (ADR-053): destinos NO tiene columna de creador (verificado en
+// admin-destinos.js / publicar-lugar.js), asi que la regla "nunca al
+// creador" NO es verificable server-side; el dedup real es por
+// (usuario, destino) contra xp_ledger. Cerrarla exige una futura columna
+// destinos.creado_por.
+var SPOT_CATS_SUBCATEGORIA = ['sitio', 'comida', 'evento'];
+
+function valorNoVacio(v) {
+  if (Array.isArray(v))
+    return v.some(function(x){ return String(x == null ? '' : x).trim() !== ''; });
+  if (v && typeof v === 'object')
+    return Object.keys(v).some(function(k){ return valorNoVacio(v[k]); });
+  return v !== undefined && v !== null && String(v).trim() !== '';
+}
+
+function tieneTagNoVacio(tags) {
+  if (!tags || typeof tags !== 'object') return false;
+  return Object.keys(tags).some(function(k) {
+    var v = tags[k];
+    if (Array.isArray(v)) return valorNoVacio(v);
+    if (v && typeof v === 'object') {
+      return Object.keys(v).some(function(k2){ return valorNoVacio(v[k2]); });
+    }
+    return valorNoVacio(v);
+  });
+}
+
+function completitudSpotAtributos(destinoRow) {
+  var d = destinoRow || {};
+  var cat = String(d.categoria_slug || '').toLowerCase();
+  var requierePrecio = (cat === 'hostal' || cat === 'comida');
+  var dir = String(d.address || d.barrio || '').trim();
+  var ciudad = String(d.ciudad || '').trim();
+  var contacto = requierePrecio
+    ? (d.precio_desde !== undefined && d.precio_desde !== null && String(d.precio_desde).trim() !== '')
+    : String(d.telefono || '').trim() !== '';
+  if (!ciudad || !dir || !contacto) return false;
+  var tags = d.tags || {};
+  if (SPOT_CATS_SUBCATEGORIA.indexOf(cat) !== -1) {
+    // sitio / comida / evento: taxonomia obligatoria (ADR-016).
+    return valorNoVacio(tags.subcategoria);
+  }
+  // hostal / blog / categoria vacia o desconocida: barra debil alcanzable.
+  return tieneTagNoVacio(tags);
 }
 
 function calcularTagCasa(miembros_casa, total_miembros) {
@@ -311,7 +614,11 @@ async function contextoXpE(sql, usuarioId) {
       nivel_clase: nivel,
       xp_clase: numXp(r.xp_clase),
       casa: r.casa || null,
-      tag: calcularTagCasa(isFinite(miembros) ? miembros : 0, isFinite(total) ? total : 0)
+      tag: calcularTagCasa(isFinite(miembros) ? miembros : 0, isFinite(total) ? total : 0),
+      // ADR-053 Enmienda 1: M_nivel usa el nivel DERIVADO de xp_total
+      // (calcularNivel), NUNCA nivel_max/nivel_visible. Gastar XP puede
+      // bajar el multiplicador aunque la insignia se conserve (ADR-018).
+      nivel_usuario: calcularNivelLocal(numXp(r.xp_total)).nivel
     };
   }
   try {
@@ -328,7 +635,7 @@ async function contextoXpE(sql, usuarioId) {
   }
   try {
     var minRows = await sql(
-      'SELECT clase_id, nivel_clase, xp_clase, casa FROM usuarios WHERE id = $1::uuid',
+      'SELECT clase_id, nivel_clase, xp_clase, casa, xp_total FROM usuarios WHERE id = $1::uuid',
       [usuarioId]
     );
     return armarCtx(minRows && minRows[0]);
@@ -405,13 +712,15 @@ async function avanzarMisionesCasa(sql, usuarioId, metaTipo, delta) {
   }
 }
 
-// Bornes de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
-// la UI sincroniza XP_LEVELS en index/mi-perfil/comunidad). Se usan
-// para calcular nivel y era en GETs locales (inventario) sin depender
-// de api/usuarios.js.
+// Bornes de los 20 niveles (espejo sincronizado de api/usuarios.js NIVELES;
+// NO hay require cruzado entre funciones serverless: admin.js:56-59). La UI
+// sincroniza XP_LEVELS en index/mi-perfil/comunidad. ADR-053 Decision 11:
+// umbrales NUEVOS v6 (techo 42000), mismos para el nivel derivado de
+// M_nivel. Se usan para calcular nivel y era en GETs locales (inventario)
+// sin depender de api/usuarios.js.
 var NIVELES_LOCAL = [
-  0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200,
-  4000, 5200, 6800, 8500, 10500, 13000, 16000, 19500, 24000, 30000
+  0, 100, 250, 450, 700, 1050, 1500, 2100, 2900, 3900,
+  5200, 6800, 8800, 11200, 14200, 17800, 22200, 27500, 34000, 42000
 ];
 function calcularNivelLocal(xpTotal) {
   var xp = Number(xpTotal) || 0;
@@ -1427,7 +1736,7 @@ var MISIONES = [
   },
   {
     id: 'mis_plan_creador', grupo: 'general', requiere: ['mis_chat_mensajero'],
-    nombre: 'Creador de planes', xp: 25,
+    nombre: 'Creador de planes', xp: 10,
     rama: 'cre_planes', puntos_rama: 25,
     check: function(ctx) {
       return ctx.sql(
@@ -1439,7 +1748,7 @@ var MISIONES = [
   },
   {
     id: 'mis_plan_unido', grupo: 'general', requiere: [],
-    nombre: 'Viajero en grupo', xp: 15,
+    nombre: 'Viajero en grupo', xp: 10,
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM planes_miembros WHERE usuario_id=$1',
@@ -2080,20 +2389,6 @@ function esLiderDeCiudad(sql, usuarioId, ciudad) {
   ).then(function(r){ return r.length > 0; }).catch(function(){ return false; });
 }
 
-// Aplica el multiplicador x1.1 a la XP base de una accion si el usuario
-// es lider de algun spot en la ciudad del destino (bajo demanda).
-function xpConMultiplicador(sql, usuarioId, destinoId, xpBase) {
-  if (!usuarioId) return Promise.resolve(xpBase);
-  return sql('SELECT ciudad FROM destinos WHERE id=$1 LIMIT 1', [destinoId])
-    .then(function(r){
-      var ciudad = r[0] ? r[0].ciudad : '';
-      if (!ciudad) return xpBase;
-      return esLiderDeCiudad(sql, usuarioId, ciudad).then(function(es){
-        return es ? red2(xpBase * 1.1) : red2(xpBase);
-      });
-    }).catch(function(){ return xpBase; });
-}
-
 // Capacidad desbloqueada por mision (patron de la foto en el POST):
 // lee usuarios.progreso_misiones y devuelve true si la mision esta
 // 'completada'. Nunca lanza: un fallo degrada a false.
@@ -2131,16 +2426,20 @@ function actualizarCapacidad(sql, usuarioId, clave, valor) {
 }
 
 // Amuleto de Doble XP (clave amuleto_x2): si capacidades->
-// multiplicador_x2_usos > 0, duplica el XP de la accion y decrementa
-// el contador. Nunca lanza: fallo degrada a XP normal.
+// multiplicador_x2_usos > 0, CONSUME un uso y reporta doubled=true.
+// ADR-053 (v25): YA NO multiplica el XP aqui; el x2 entra como parte del
+// stack temporal dentro del punto unico (ctx.amuleto) para que el cap
+// global vea el stack real y xp_base nunca llegue pre-multiplicado. El
+// campo xp devuelto es la base intacta (compatibilidad de firma). Nunca
+// lanza: fallo degrada a sin amuleto.
 function aplicarAmuletoX2(sql, usuarioId, xpBase) {
-  xpBase = red2(xpBase);
-  if (!usuarioId) return Promise.resolve({ xp: xpBase, doubled: false });
+  var base = red2(xpBase);
+  if (!usuarioId) return Promise.resolve({ xp: base, doubled: false });
   return leerCapacidades(sql, usuarioId).then(function(caps) {
     var usos = parseInt(caps.multiplicador_x2_usos, 10) || 0;
-    if (usos <= 0) return { xp: xpBase, doubled: false };
+    if (usos <= 0) return { xp: base, doubled: false };
     return actualizarCapacidad(sql, usuarioId, 'multiplicador_x2_usos', usos - 1)
-      .then(function() { return { xp: red2(xpBase * 2), doubled: true }; });
+      .then(function() { return { xp: base, doubled: true }; });
   });
 }
 
@@ -2256,12 +2555,24 @@ function progresarPandillaRetos(sql, usuarioId, tipoReto) {
       completados.forEach(function(r) {
         if (!(numXp(r.xp_bono) > 0)) return;
         cadena = cadena.then(function() {
+          var bonoReto = red2(numXp(r.xp_bono));
           return sql(
             'UPDATE usuarios SET xp_total = xp_total + $1'
             + ' WHERE id IN (SELECT usuario_id FROM pandillas_miembros'
-            + ' WHERE pandilla_id=$2 AND activo=true)',
-            [red2(numXp(r.xp_bono)), prPandillaId]
-          );
+            + ' WHERE pandilla_id=$2 AND activo=true) RETURNING id',
+            [bonoReto, prPandillaId]
+          ).then(function(dest) {
+            // ADR-053 (v25): bono de reto EXENTO de M_nivel, repartido a
+            // TODOS los miembros activos -> una fila de ledger por usuario.
+            return Promise.all((dest || []).map(function(fila) {
+              return registrarXpLedger(sql, {
+                usuario_id: fila.id, accion: 'pandilla_reto', xp_base: bonoReto,
+                mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+                bonos_planos: 0, xp_final: bonoReto, es_exento: true,
+                contexto: { pandilla_id: prPandillaId, reto_id: r.id, titulo: r.titulo }
+              });
+            }));
+          });
         });
       });
       return cadena.then(function() {
@@ -2448,7 +2759,7 @@ function chatXpDisponible(sql, usuarioId) {
     .then(function(r){
       var ps = (r[0] && r[0].progreso_social) || {};
       var n = (ps.chat_dia === hoyStr) ? (parseInt(ps.chat_n, 10) || 0) : 0;
-      return { disponible: n < 10, xp: n < 10 ? 2 : 0, hoy: hoyStr, n: n };
+      return { disponible: n < 10, xp: n < 10 ? XP_BASES.chat_comentario : 0, hoy: hoyStr, n: n };
     })
     .catch(function(){ return { disponible: false, xp: 0, hoy: hoyStr, n: 0 }; });
 }
@@ -2587,6 +2898,16 @@ function evaluarMisiones(sql, usuarioId) {
         + ' WHERE id = $3',
         [JSON.stringify(progreso), xpBonus, usuarioId]
       ).then(function() {
+        // ADR-053 (v25): misiones EXENTAS de M_nivel (xp fijo). Se
+        // instrumenta la acreditacion en el ledger con es_exento=true.
+        return registrarXpLedger(sql, {
+          usuario_id: usuarioId, accion: 'mision', xp_base: xpBonus,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: xpBonus, es_exento: true,
+          nivel: calcularNivelLocal(numXp(u.xp_total) + xpBonus).nivel,
+          contexto: { misiones: nuevas.map(function(m){ return m.id; }) }
+        });
+      }).then(function() {
         // Arbol de Clases (WP-4): suma los puntos_rama SOLO en la primera
         // transicion a completada (nuevas ya excluye lo completado). El
         // merge es ANIDADO por rama: nunca reemplaza el objeto bonos
@@ -2729,7 +3050,16 @@ function evaluarLogros(sql, usuarioId) {
         + '   xp_total = xp_total + $2'
         + ' WHERE id = $3',
         [JSON.stringify(progreso), xpBonus, usuarioId]
-      ).then(function() { return nuevos; });
+      ).then(function() {
+        // ADR-053 (v25): logros EXENTOS de M_nivel (xp fijo). Ledger.
+        return registrarXpLedger(sql, {
+          usuario_id: usuarioId, accion: 'logro', xp_base: xpBonus,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: xpBonus, es_exento: true,
+          nivel: calcularNivelLocal(numXp(u.xp_total) + xpBonus).nivel,
+          contexto: { logros: nuevos.map(function(l){ return l.id; }) }
+        });
+      }).then(function() { return nuevos; });
     });
   }).catch(function(err) {
     console.error('[logros]', err.message);
@@ -2900,13 +3230,22 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion) {
         return sqlFn('UPDATE media_votos SET activo=true, actualizado_en=NOW() WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3', [usuarioId, f, id])
           .then(function(){ return base({ reactivado: true }); });
       }
-      return sqlFn('INSERT INTO media_votos (usuario_id, fuente, item_id, xp_ganado, activo) VALUES ($1,$2,$3,$4,true)', [usuarioId, f, id, 5])
+      return sqlFn('INSERT INTO media_votos (usuario_id, fuente, item_id, xp_ganado, activo) VALUES ($1,$2,$3,$4,true)', [usuarioId, f, id, XP_BASES.voto_media])
         .then(async function() {
           var ctxVoto = await contextoXpE(sqlFn, usuarioId);
-          var xpVotoFinal = calcularXpFinal(5, ctxVoto.nivel_clase, ctxVoto.clase_id, ctxVoto.tag);
+          var resVoto = await calcularXpAcreditado(sqlFn, XP_BASES.voto_media,
+            ctxVoto.nivel_clase, ctxVoto.clase_id, ctxVoto.tag,
+            { nivel_usuario: ctxVoto.nivel_usuario });
+          var xpVotoFinal = resVoto.xp_final;
           await sqlFn('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpVotoFinal, usuarioId]).catch(function(){});
           await acreditarClaseYCofre(sqlFn, usuarioId, ctxVoto, xpVotoFinal);
-          return base({ nuevo: true, xp: xpVotoFinal });
+          await registrarXpLedger(sqlFn, {
+            usuario_id: usuarioId, accion: 'voto_media', xp_base: XP_BASES.voto_media,
+            mult_nivel: resVoto.m_nivel, mult_stack: resVoto.mult_stack,
+            mult_final: resVoto.mult_global_c, cap_aplicado: resVoto.cap_aplicado,
+            xp_final: xpVotoFinal, contexto: { fuente: f, item_id: id }
+          });
+          return base({ nuevo: true, xp: xpVotoFinal, xp_detalle: armarXpDetalle(XP_BASES.voto_media, resVoto, 0) });
         });
     });
   });
@@ -2969,7 +3308,7 @@ function registrarVotoMedia(sqlFn, usuarioId, fuente, itemId, noEncontrada) {
     return aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, 'like').then(function(r) {
       if (r.tope) return { status: 429, error: 'Limite de 20 votos por dia alcanzado' };
       if (r.duplicado) return { status: 409, error: 'Ya votaste esta foto', ya_votado: true };
-      return { status: 200, xp: r.xp, votos: r.votos, ya_votado: true, reactivado: r.reactivado };
+      return { status: 200, xp: r.xp, votos: r.votos, ya_votado: true, reactivado: r.reactivado, xp_detalle: r.xp_detalle || undefined };
     });
   });
 }
@@ -2980,7 +3319,7 @@ function completarVotoMedia(sqlFn, usuarioId, r) {
   return repartirXpReferidos(sqlFn, usuarioId, r.xp).then(function() {
     return Promise.all([evaluarMisiones(sqlFn, usuarioId), evaluarLogros(sqlFn, usuarioId)]);
   }).then(function(ml) {
-    return { ok: true, xp: r.xp, votos: r.votos, ya_votado: r.ya_votado, misiones: ml[0], logros: ml[1] };
+    return { ok: true, xp: r.xp, votos: r.votos, ya_votado: r.ya_votado, misiones: ml[0], logros: ml[1], xp_detalle: r.xp_detalle || undefined };
   });
 }
 
@@ -3114,15 +3453,30 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId)
             return getProgresoAlbum(sqlFn, usuarioId).then(function(prog) {
               var h = hoy();
               var dia = (prog.comentarios_dia_fecha === h) ? (parseInt(prog.comentarios_dia, 10) || 0) : 0;
-              var xp = dia < 10 ? 2 : 0;
+              var xp = dia < 10 ? XP_BASES.chat_comentario : 0;
               var xpComentarioEntregado = 0;
+              var detalleComentario = null;
+              // ADR-053 Dec 7 (v25): el cupo del chat/comentario es de 10
+              // XP/dia, por eso la fila del ledger va con cap_aplicado
+              // 'accion' (el invariante multiplicativo no aplica a este cap
+              // denominado en XP; xp_final es lo realmente acreditado).
               var aplicar = xp > 0
-                ? contextoXpE(sqlFn, usuarioId).then(function(ctxComentario) {
-                    xpComentarioEntregado = calcularXpFinal(xp, ctxComentario.nivel_clase, ctxComentario.clase_id, ctxComentario.tag);
-                    return sqlFn('UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2', [xpComentarioEntregado, usuarioId]).catch(function(){})
-                      .then(function(){ return acreditarClaseYCofre(sqlFn, usuarioId, ctxComentario, xpComentarioEntregado); })
-                      .then(function(){ return repartirXpReferidos(sqlFn, usuarioId, xpComentarioEntregado); })
-                      .then(function(){ return updProgresoAlbum(sqlFn, usuarioId, { comentarios_dia: dia + 1, comentarios_dia_fecha: h }); });
+                ? contextoXpE(sqlFn, usuarioId).then(async function(ctxComentario) {
+                    var resCom = await calcularXpAcreditado(sqlFn, XP_BASES.chat_comentario,
+                      ctxComentario.nivel_clase, ctxComentario.clase_id, ctxComentario.tag,
+                      { nivel_usuario: ctxComentario.nivel_usuario });
+                    xpComentarioEntregado = resCom.xp_final;
+                    detalleComentario = armarXpDetalle(XP_BASES.chat_comentario, resCom, 0, xpComentarioEntregado, 'accion');
+                    await sqlFn('UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2', [xpComentarioEntregado, usuarioId]).catch(function(){});
+                    await acreditarClaseYCofre(sqlFn, usuarioId, ctxComentario, xpComentarioEntregado);
+                    await repartirXpReferidos(sqlFn, usuarioId, xpComentarioEntregado);
+                    await updProgresoAlbum(sqlFn, usuarioId, { comentarios_dia: dia + 1, comentarios_dia_fecha: h });
+                    await registrarXpLedger(sqlFn, {
+                      usuario_id: usuarioId, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
+                      mult_nivel: resCom.m_nivel, mult_stack: resCom.mult_stack,
+                      mult_final: resCom.mult_global_c, cap_aplicado: 'accion',
+                      xp_final: xpComentarioEntregado, contexto: { fuente: f, item_id: id, canal: 'comentario_media' }
+                    });
                   })
                 : Promise.resolve();
               return aplicar.then(function() {
@@ -3146,6 +3500,7 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId)
                     respuestas: [],
                   },
                   xp: xpComentarioEntregado,
+                  xp_detalle: detalleComentario || undefined,
                   misiones: ml[0],
                   logros: ml[1],
                 };
@@ -5504,7 +5859,55 @@ module.exports = async function handler(req, res) {
           + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, estado',
           [usuarioId2, aoNombre, aoDesc, aoLat, aoLng, aoFoto, aoCategoria, aoCiudad]
         );
-        return res.json({ ok: true, data: { activo_id: aoIns[0].id, estado: aoIns[0].estado } });
+        // ADR-053 Dec 9 (v25): ao_proponer acredita +30 XP DIRECTO con
+        // M_nivel y cap de 3/dia CON XP. La 4a propuesta del dia se ACEPTA
+        // funcionalmente pero SIN XP: se registra en el ledger con
+        // xp_final=0 y cap_aplicado='accion'. El +50 al aprobar (quorum)
+        // NO se toca.
+        var aoPropHoy = await sql(
+          'SELECT COUNT(*)::int AS n FROM activos_ocultos '
+          + 'WHERE propuesto_por=$1 AND creado_en > NOW() - INTERVAL \'1 day\'',
+          [usuarioId2]
+        ).catch(function(eProp) {
+          console.warn('[ao_proponer] conteo diario no leido: ' + (eProp && eProp.message));
+          return [];
+        });
+        var aoPropN = (aoPropHoy[0] && parseInt(aoPropHoy[0].n, 10)) || 0;
+        var aoPropXpFinal = 0;
+        var aoPropDetalle = null;
+        var aoPropCtx = await contextoXpE(sql, usuarioId2);
+        if (aoPropN <= 3) {
+          var resAoProp = await calcularXpAcreditado(sql, XP_BASES.ao_proponer,
+            aoPropCtx.nivel_clase, aoPropCtx.clase_id, aoPropCtx.tag,
+            { nivel_usuario: aoPropCtx.nivel_usuario });
+          aoPropXpFinal = resAoProp.xp_final;
+          aoPropDetalle = armarXpDetalle(XP_BASES.ao_proponer, resAoProp, 0);
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+            [aoPropXpFinal, usuarioId2]
+          ).catch(function(eAop) { console.warn('[ao_proponer] xp no acreditado: ' + (eAop && eAop.message)); });
+          await acreditarClaseYCofre(sql, usuarioId2, aoPropCtx, aoPropXpFinal);
+          await repartirXpReferidos(sql, usuarioId2, aoPropXpFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'ao_proponer', xp_base: XP_BASES.ao_proponer,
+            mult_nivel: resAoProp.m_nivel, mult_stack: resAoProp.mult_stack,
+            mult_final: resAoProp.mult_global_c, cap_aplicado: resAoProp.cap_aplicado,
+            xp_final: aoPropXpFinal, contexto: { activo_id: aoIns[0].id }
+          });
+        } else {
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'ao_proponer', xp_base: XP_BASES.ao_proponer,
+            mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'accion',
+            xp_final: 0, contexto: { activo_id: aoIns[0].id, motivo: 'cap_diario_3' }
+          });
+        }
+        return res.json({
+          ok: true,
+          data: {
+            activo_id: aoIns[0].id, estado: aoIns[0].estado,
+            xp: aoPropXpFinal, xp_detalle: aoPropDetalle || undefined
+          }
+        });
       }
 
       // Votar una propuesta (quorum +/-3 para aprobar/rechazar en una
@@ -5577,15 +5980,26 @@ module.exports = async function handler(req, res) {
           [usuarioId2]
         );
         var aoVotosN = (aoVotosHoy[0] && parseInt(aoVotosHoy[0].n, 10)) || 0;
+        var aoVotoDetalle = null;
         if (aoVotosN <= 6) {
           var ctxAoVoto = await contextoXpE(sql, usuarioId2);
-          var xpAoVotoFinal = calcularXpFinal(5, ctxAoVoto.nivel_clase, ctxAoVoto.clase_id, ctxAoVoto.tag);
+          var resAoVoto = await calcularXpAcreditado(sql, XP_BASES.ao_votar,
+            ctxAoVoto.nivel_clase, ctxAoVoto.clase_id, ctxAoVoto.tag,
+            { nivel_usuario: ctxAoVoto.nivel_usuario });
+          var xpAoVotoFinal = resAoVoto.xp_final;
+          aoVotoDetalle = armarXpDetalle(XP_BASES.ao_votar, resAoVoto, 0);
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
             [xpAoVotoFinal, usuarioId2]
           ).catch(function(e){ console.warn('gaming016 xp_voto no acreditado', e && e.code); });
           await acreditarClaseYCofre(sql, usuarioId2, ctxAoVoto, xpAoVotoFinal);
           await repartirXpReferidos(sql, usuarioId2, xpAoVotoFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'ao_votar', xp_base: XP_BASES.ao_votar,
+            mult_nivel: resAoVoto.m_nivel, mult_stack: resAoVoto.mult_stack,
+            mult_final: resAoVoto.mult_global_c, cap_aplicado: resAoVoto.cap_aplicado,
+            xp_final: xpAoVotoFinal, contexto: { activo_id: aoActivoId, voto: aoVoto }
+          });
         } else {
           return res.status(200).json({ ok: true, ya_votado: false, xp_otorgado: false });
         }
@@ -5593,7 +6007,7 @@ module.exports = async function handler(req, res) {
         var aoVLogros = await evaluarLogros(sql, usuarioId2);
         return res.json({
           ok: true,
-          data: { ya_votado: false, xp_otorgado: true, xp: xpAoVotoFinal, misiones: aoVMisiones, logros: aoVLogros }
+          data: { ya_votado: false, xp_otorgado: true, xp: xpAoVotoFinal, xp_detalle: aoVotoDetalle || undefined, misiones: aoVMisiones, logros: aoVLogros }
         });
       }
 
@@ -5685,16 +6099,25 @@ module.exports = async function handler(req, res) {
         if (!acIns.length)
           return res.status(200).json({ ok: true, ya_checkin: true, xp: 0 });
         var ctxCheckin = await contextoXpE(sql, usuarioId2);
-        var xpCheckinFinal = calcularXpFinal(15, ctxCheckin.nivel_clase, ctxCheckin.clase_id, ctxCheckin.tag);
+        var resCheckin = await calcularXpAcreditado(sql, XP_BASES.ao_checkin,
+          ctxCheckin.nivel_clase, ctxCheckin.clase_id, ctxCheckin.tag,
+          { nivel_usuario: ctxCheckin.nivel_usuario });
+        var xpCheckinFinal = resCheckin.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
           [xpCheckinFinal, usuarioId2]
         ).catch(function(e){ console.warn('gaming016 xp_checkin no acreditado', e && e.code); });
         await acreditarClaseYCofre(sql, usuarioId2, ctxCheckin, xpCheckinFinal);
         await repartirXpReferidos(sql, usuarioId2, xpCheckinFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'ao_checkin', xp_base: XP_BASES.ao_checkin,
+          mult_nivel: resCheckin.m_nivel, mult_stack: resCheckin.mult_stack,
+          mult_final: resCheckin.mult_global_c, cap_aplicado: resCheckin.cap_aplicado,
+          xp_final: xpCheckinFinal, contexto: { activo_id: aoCheckId }
+        });
         var acMis = await evaluarMisiones(sql, usuarioId2);
         var acLog = await evaluarLogros(sql, usuarioId2);
-        return res.json({ ok: true, data: { checkin_id: acIns[0].id, xp: xpCheckinFinal, misiones: acMis, logros: acLog } });
+        return res.json({ ok: true, data: { checkin_id: acIns[0].id, xp: xpCheckinFinal, xp_detalle: armarXpDetalle(XP_BASES.ao_checkin, resCheckin, 0), misiones: acMis, logros: acLog } });
       }
 
       // -- Mapas tematicos (spec mapas publicos/privados 2026-09-05) --
@@ -5927,11 +6350,18 @@ module.exports = async function handler(req, res) {
           [msgSala, usuarioId2, nombreMsg, msgTexto]
         );
         var xpChat = 0, misionesChat = [], logrosChat = [];
+        var detalleChat = null;
         var dispChat = await chatXpDisponible(sql, usuarioId2);
         if (dispChat.disponible) {
           xpChat = dispChat.xp;
           var ctxChat = await contextoXpE(sql, usuarioId2);
-          var xpChatFinal = calcularXpFinal(xpChat, ctxChat.nivel_clase, ctxChat.clase_id, ctxChat.tag);
+          var resChat = await calcularXpAcreditado(sql, XP_BASES.chat_comentario,
+            ctxChat.nivel_clase, ctxChat.clase_id, ctxChat.tag,
+            { nivel_usuario: ctxChat.nivel_usuario });
+          var xpChatFinal = resChat.xp_final;
+          // ADR-053 Dec 7 (v25): cupo de chat = 10 XP/dia -> la fila del
+          // ledger va con cap_aplicado 'accion' y xp_final real.
+          detalleChat = armarXpDetalle(XP_BASES.chat_comentario, resChat, 0, xpChatFinal, 'accion');
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
             [xpChatFinal, usuarioId2]
@@ -5941,6 +6371,12 @@ module.exports = async function handler(req, res) {
           // v13: reparto multinivel del XP ganado (piramide de
           // referidos, no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpChatFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
+            mult_nivel: resChat.m_nivel, mult_stack: resChat.mult_stack,
+            mult_final: resChat.mult_global_c, cap_aplicado: 'accion',
+            xp_final: xpChatFinal, contexto: { sala_id: msgSala, canal: 'chat' }
+          });
           xpChat = xpChatFinal;
         }
         misionesChat = await evaluarMisiones(sql, usuarioId2);
@@ -5950,6 +6386,7 @@ module.exports = async function handler(req, res) {
           id: msgIns[0].id,
           creado_en: msgIns[0].creado_en,
           xp: xpChat,
+          xp_detalle: detalleChat || undefined,
           misiones: misionesChat,
           logros: logrosChat
         });
@@ -6095,9 +6532,50 @@ module.exports = async function handler(req, res) {
           ).catch(function(){});
           planIns[0].sala_id = planSalaIns[0].id;
         }
+        // ADR-053 Dec 9 (v25): plan_crear acredita +20 XP DIRECTO con
+        // M_nivel y cap de 3/dia. La mision mis_plan_creador baja a 10 y se
+        // evalua aparte (EXENTA). El conteo incluye este plan (ya
+        // insertado): los 3 primeros del dia pagan; el 4+ no.
+        var planHoy = await sql(
+          'SELECT COUNT(*)::int AS n FROM planes_viaje '
+          + 'WHERE creador_id=$1 AND creado_en > NOW() - INTERVAL \'1 day\'',
+          [usuarioId2]
+        ).catch(function(ePlan) {
+          console.warn('[plan_crear] conteo diario no leido: ' + (ePlan && ePlan.message));
+          return [];
+        });
+        var planN = (planHoy[0] && parseInt(planHoy[0].n, 10)) || 0;
+        var planXpFinal = 0;
+        var detallePlan = null;
+        if (planN <= 3) {
+          var ctxPlan = await contextoXpE(sql, usuarioId2);
+          var resPlan = await calcularXpAcreditado(sql, XP_BASES.plan_crear,
+            ctxPlan.nivel_clase, ctxPlan.clase_id, ctxPlan.tag,
+            { nivel_usuario: ctxPlan.nivel_usuario });
+          planXpFinal = resPlan.xp_final;
+          detallePlan = armarXpDetalle(XP_BASES.plan_crear, resPlan, 0);
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+            [planXpFinal, usuarioId2]
+          ).catch(function(ePlanXp) { console.warn('[plan_crear] xp no acreditado: ' + (ePlanXp && ePlanXp.message)); });
+          await acreditarClaseYCofre(sql, usuarioId2, ctxPlan, planXpFinal);
+          await repartirXpReferidos(sql, usuarioId2, planXpFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'plan_crear', xp_base: XP_BASES.plan_crear,
+            mult_nivel: resPlan.m_nivel, mult_stack: resPlan.mult_stack,
+            mult_final: resPlan.mult_global_c, cap_aplicado: resPlan.cap_aplicado,
+            xp_final: planXpFinal, contexto: { plan_id: planIns[0].id }
+          });
+        } else {
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'plan_crear', xp_base: XP_BASES.plan_crear,
+            mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'accion',
+            xp_final: 0, contexto: { plan_id: planIns[0].id, motivo: 'cap_diario_3' }
+          });
+        }
         var misionesPlan = await evaluarMisiones(sql, usuarioId2);
         var logrosPlan = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, id: planIns[0].id, xp: 0, misiones: misionesPlan, logros: logrosPlan });
+        return res.status(200).json({ ok: true, id: planIns[0].id, xp: planXpFinal, xp_detalle: detallePlan || undefined, misiones: misionesPlan, logros: logrosPlan });
       }
 
       // Unirse a un plan (libre para registrados). Dedup por PK (409),
@@ -6132,9 +6610,50 @@ module.exports = async function handler(req, res) {
         } catch (eJoin) {
           return res.status(409).json({ ok: false, error: 'Ya estas en este plan' });
         }
+        // ADR-053 Dec 9 (v25): plan_unirse acredita +6 XP DIRECTO con
+        // M_nivel y cap de 5/dia. La mision mis_plan_unido baja a 10 y se
+        // evalua aparte (EXENTA). El conteo incluye esta unirse (ya
+        // insertada): las 5 primeras del dia pagan; la 6+ no.
+        var joinHoy = await sql(
+          'SELECT COUNT(*)::int AS n FROM planes_miembros '
+          + 'WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL \'1 day\'',
+          [usuarioId2]
+        ).catch(function(eJoinC) {
+          console.warn('[plan_unirse] conteo diario no leido: ' + (eJoinC && eJoinC.message));
+          return [];
+        });
+        var joinN = (joinHoy[0] && parseInt(joinHoy[0].n, 10)) || 0;
+        var joinXpFinal = 0;
+        var detalleJoin = null;
+        if (joinN <= 5) {
+          var ctxJoin = await contextoXpE(sql, usuarioId2);
+          var resJoin = await calcularXpAcreditado(sql, XP_BASES.plan_unirse,
+            ctxJoin.nivel_clase, ctxJoin.clase_id, ctxJoin.tag,
+            { nivel_usuario: ctxJoin.nivel_usuario });
+          joinXpFinal = resJoin.xp_final;
+          detalleJoin = armarXpDetalle(XP_BASES.plan_unirse, resJoin, 0);
+          await sql(
+            'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+            [joinXpFinal, usuarioId2]
+          ).catch(function(eJoinXp) { console.warn('[plan_unirse] xp no acreditado: ' + (eJoinXp && eJoinXp.message)); });
+          await acreditarClaseYCofre(sql, usuarioId2, ctxJoin, joinXpFinal);
+          await repartirXpReferidos(sql, usuarioId2, joinXpFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'plan_unirse', xp_base: XP_BASES.plan_unirse,
+            mult_nivel: resJoin.m_nivel, mult_stack: resJoin.mult_stack,
+            mult_final: resJoin.mult_global_c, cap_aplicado: resJoin.cap_aplicado,
+            xp_final: joinXpFinal, contexto: { plan_id: joinPlan }
+          });
+        } else {
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'plan_unirse', xp_base: XP_BASES.plan_unirse,
+            mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'accion',
+            xp_final: 0, contexto: { plan_id: joinPlan, motivo: 'cap_diario_5' }
+          });
+        }
         var misionesJoin = await evaluarMisiones(sql, usuarioId2);
         var logrosJoin = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, xp: 0, misiones: misionesJoin, logros: logrosJoin });
+        return res.status(200).json({ ok: true, xp: joinXpFinal, xp_detalle: detalleJoin || undefined, misiones: misionesJoin, logros: logrosJoin });
       }
 
       // Salir de un plan.
@@ -6198,11 +6717,16 @@ module.exports = async function handler(req, res) {
           [pcmPlan[0].sala_id, usuarioId2, nombrePcm, pcmTexto]
         );
         var xpPcm = 0, misionesPcm = [], logrosPcm = [];
+        var detallePcm = null;
         var dispPcm = await chatXpDisponible(sql, usuarioId2);
         if (dispPcm.disponible) {
           xpPcm = dispPcm.xp;
           var ctxPcm = await contextoXpE(sql, usuarioId2);
-          var xpPcmFinal = calcularXpFinal(xpPcm, ctxPcm.nivel_clase, ctxPcm.clase_id, ctxPcm.tag);
+          var resPcm = await calcularXpAcreditado(sql, XP_BASES.chat_comentario,
+            ctxPcm.nivel_clase, ctxPcm.clase_id, ctxPcm.tag,
+            { nivel_usuario: ctxPcm.nivel_usuario });
+          var xpPcmFinal = resPcm.xp_final;
+          detallePcm = armarXpDetalle(XP_BASES.chat_comentario, resPcm, 0, xpPcmFinal, 'accion');
           await sql(
             'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id = $2',
             [xpPcmFinal, usuarioId2]
@@ -6211,6 +6735,12 @@ module.exports = async function handler(req, res) {
           await registrarChatXp(sql, usuarioId2, dispPcm.hoy, dispPcm.n);
           // v13: reparto multinivel del XP ganado (no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpPcmFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
+            mult_nivel: resPcm.m_nivel, mult_stack: resPcm.mult_stack,
+            mult_final: resPcm.mult_global_c, cap_aplicado: 'accion',
+            xp_final: xpPcmFinal, contexto: { plan_id: pcmPlanId, canal: 'plan_chat' }
+          });
           xpPcm = xpPcmFinal;
         }
         misionesPcm = await evaluarMisiones(sql, usuarioId2);
@@ -6221,6 +6751,7 @@ module.exports = async function handler(req, res) {
           creado_en: pcmIns[0].creado_en,
           plan_id: pcmPlanId,
           xp: xpPcm,
+          xp_detalle: detallePcm || undefined,
           misiones: misionesPcm,
           logros: logrosPcm
         });
@@ -6321,6 +6852,14 @@ module.exports = async function handler(req, res) {
             dmSalaId = dmCobro.sala_id;
             dmXpCobrado = 20;
             dmXpNuevo = numXp(dmCobro.xp_total);
+            // ADR-053 (v25): las RESTAS de XP se registran EXENTAS con
+            // xp_final negativo (apertura de hilo DM: -20).
+            await registrarXpLedger(sql, {
+              usuario_id: usuarioId2, accion: 'dm_nuevo', xp_base: 20,
+              mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+              bonos_planos: 0, xp_final: -20, es_exento: true,
+              contexto: { clave_dm: dmClave, sala_id: dmSalaId }
+            });
           } else {
             // Sin fila de cobro: o xp < 20 (402) o carrera perdida contra
             // otro request que creo el hilo (se reusa, xp_cobrado 0).
@@ -6469,20 +7008,29 @@ module.exports = async function handler(req, res) {
 
         var fotoIns = await sql(
           "INSERT INTO interacciones (destino_id, usuario_id, tipo, texto, xp_ganado, creado_en) "
-          + "VALUES ($1, $2, 'foto', $3, 15, NOW()) RETURNING id",
-          [destinoId2, usuarioId2, fotoUrl]
+          + "VALUES ($1, $2, 'foto', $3, $4, NOW()) RETURNING id",
+          [destinoId2, usuarioId2, fotoUrl, XP_BASES.foto_viajero]
         );
         var misionesFoto = [], logrosFoto = [];
         var ctxFoto = await contextoXpE(sql, usuarioId2);
-        var xpFotoFinal = calcularXpFinal(15, ctxFoto.nivel_clase, ctxFoto.clase_id, ctxFoto.tag);
+        var resFoto = await calcularXpAcreditado(sql, XP_BASES.foto_viajero,
+          ctxFoto.nivel_clase, ctxFoto.clase_id, ctxFoto.tag,
+          { nivel_usuario: ctxFoto.nivel_usuario });
+        var xpFotoFinal = resFoto.xp_final;
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpFotoFinal, usuarioId2]).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxFoto, xpFotoFinal);
         await avanzarMisionesCasa(sql, usuarioId2, 'fotos', 1);
         // v13: reparto multinivel del XP ganado (no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpFotoFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'foto_viajero', xp_base: XP_BASES.foto_viajero,
+          mult_nivel: resFoto.m_nivel, mult_stack: resFoto.mult_stack,
+          mult_final: resFoto.mult_global_c, cap_aplicado: resFoto.cap_aplicado,
+          xp_final: xpFotoFinal, contexto: { destino_id: destinoId2, tipo: 'foto' }
+        });
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
         logrosFoto = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, misiones: misionesFoto, logros: logrosFoto });
+        return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, xp_detalle: armarXpDetalle(XP_BASES.foto_viajero, resFoto, 0), misiones: misionesFoto, logros: logrosFoto });
       }
 
       // -- Voto en foto (+5 XP al votante) --
@@ -6612,7 +7160,7 @@ module.exports = async function handler(req, res) {
             );
           }
 
-          var mrXp = 15;
+          var mrXp = XP_BASES.album_foto;
           var mrIns;
           try {
             mrIns = await sql(
@@ -6650,16 +7198,24 @@ module.exports = async function handler(req, res) {
           }
 
           var mrCtx = await contextoXpE(sql, mrUser);
-          var mrXpFinal = calcularXpFinal(mrXp, mrCtx.nivel_clase, mrCtx.clase_id, mrCtx.tag);
+          var mrRes = await calcularXpAcreditado(sql, mrXp, mrCtx.nivel_clase, mrCtx.clase_id, mrCtx.tag,
+            { nivel_usuario: mrCtx.nivel_usuario });
+          var mrXpFinal = mrRes.xp_final;
           await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2::uuid', [mrXpFinal, mrUser]).catch(function(e){ console.warn('TRACE: museo_recurso xp no acreditado', e && e.code); });
           await acreditarClaseYCofre(sql, mrUser, mrCtx, mrXpFinal);
           await repartirXpReferidos(sql, mrUser, mrXpFinal);
+          await registrarXpLedger(sql, {
+            usuario_id: mrUser, accion: 'album_foto', xp_base: mrXp,
+            mult_nivel: mrRes.m_nivel, mult_stack: mrRes.mult_stack,
+            mult_final: mrRes.mult_global_c, cap_aplicado: mrRes.cap_aplicado,
+            xp_final: mrXpFinal, contexto: { recurso_id: mrIns[0].id, canal: 'museo_recurso' }
+          });
           var mrMisiones = await evaluarMisiones(sql, mrUser);
           var mrLogros = await evaluarLogros(sql, mrUser);
           return res.status(200).json({
             ok: true,
             recurso: { id: mrIns[0].id, album_id: mrIns[0].album_id, visible: mrIns[0].visible },
-            xp: mrXpFinal, misiones: mrMisiones, logros: mrLogros,
+            xp: mrXpFinal, xp_detalle: armarXpDetalle(mrXp, mrRes, 0), misiones: mrMisiones, logros: mrLogros,
           });
         }
 
@@ -6841,11 +7397,20 @@ module.exports = async function handler(req, res) {
 
         // XP +20
         var ctxAlbum = await contextoXpE(sql, usuarioId2);
-        var xpAlbumFinal = calcularXpFinal(20, ctxAlbum.nivel_clase, ctxAlbum.clase_id, ctxAlbum.tag);
+        var resAlbum = await calcularXpAcreditado(sql, XP_BASES.album_crear,
+          ctxAlbum.nivel_clase, ctxAlbum.clase_id, ctxAlbum.tag,
+          { nivel_usuario: ctxAlbum.nivel_usuario });
+        var xpAlbumFinal = resAlbum.xp_final;
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFinal, usuarioId2]).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxAlbum, xpAlbumFinal);
         // v13: reparto multinivel sobre el XP REAL entregado (+20).
         await repartirXpReferidos(sql, usuarioId2, xpAlbumFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'album_crear', xp_base: XP_BASES.album_crear,
+          mult_nivel: resAlbum.m_nivel, mult_stack: resAlbum.mult_stack,
+          mult_final: resAlbum.mult_global_c, cap_aplicado: resAlbum.cap_aplicado,
+          xp_final: xpAlbumFinal, contexto: { album_id: albumIns[0].id }
+        });
 
         // Actualizar progreso_album
         var nuevoAlbumesMes = ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual) ? (pa.albumes_mes || 0) + 1 : 1;
@@ -6853,7 +7418,7 @@ module.exports = async function handler(req, res) {
 
         var misionesAlbum = await evaluarMisiones(sql, usuarioId2);
         var logrosAlbum = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, album: albumIns[0], xp: xpAlbumFinal, misiones: misionesAlbum, logros: logrosAlbum });
+        return res.status(200).json({ ok: true, album: albumIns[0], xp: xpAlbumFinal, xp_detalle: armarXpDetalle(XP_BASES.album_crear, resAlbum, 0), misiones: misionesAlbum, logros: logrosAlbum });
       }
 
       // Agregar foto a album (Pinterest-style)
@@ -6908,8 +7473,8 @@ module.exports = async function handler(req, res) {
         try {
           afIns = await sql(
             'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor) '
-            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 15) RETURNING *',
-            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible]
+            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible, XP_BASES.album_foto]
           );
         } catch (afInsErr) {
           // La FK autor_original_id -> usuarios.id (009) convierte un id
@@ -6922,23 +7487,50 @@ module.exports = async function handler(req, res) {
 
         // XP +15 al agregador
         var ctxAlbumFoto = await contextoXpE(sql, usuarioId2);
-        var xpAlbumFotoFinal = calcularXpFinal(15, ctxAlbumFoto.nivel_clase, ctxAlbumFoto.clase_id, ctxAlbumFoto.tag);
+        var resAlbumFoto = await calcularXpAcreditado(sql, XP_BASES.album_foto,
+          ctxAlbumFoto.nivel_clase, ctxAlbumFoto.clase_id, ctxAlbumFoto.tag,
+          { nivel_usuario: ctxAlbumFoto.nivel_usuario });
+        var xpAlbumFotoFinal = resAlbumFoto.xp_final;
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFotoFinal, usuarioId2]).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxAlbumFoto, xpAlbumFotoFinal);
         // v13: reparto multinivel del XP ganado por el agregador (no
         // bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpAlbumFotoFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'album_foto', xp_base: XP_BASES.album_foto,
+          mult_nivel: resAlbumFoto.m_nivel, mult_stack: resAlbumFoto.mult_stack,
+          mult_final: resAlbumFoto.mult_global_c, cap_aplicado: resAlbumFoto.cap_aplicado,
+          xp_final: xpAlbumFotoFinal, contexto: { foto_id: afIns[0].id, canal: 'album_agregar_foto' }
+        });
 
-        // XP +10 al autor original si es foto de otro (tope 10 XP/dia)
+        // XP al autor original si es foto de otro. ADR-053 Dec 8.5 (v25):
+        // album_foto_autor se rutea por el catalogo unico (antes eran 4
+        // literales +10) y recibe M_nivel; el tope diario se mide contra la
+        // BASE del catalogo (XP_BASES.album_foto_autor), no contra un
+        // literal, para no romper el contador de progreso_album.
+        var xpAutorOriginalResp = 0;
         if (afAutorOriginal !== usuarioId2) {
           var pa3 = await getProgresoAlbum(sql, afAutorOriginal);
-          if ((pa3.xp_autor_fecha || '') !== hoy() || (pa3.xp_autor_dia || 0) < 10) {
-            await sql('UPDATE usuarios SET xp_total=xp_total+10, ultimo_acceso=NOW() WHERE id=$1', [afAutorOriginal]).catch(function(){});
-            // v13: reparto multinivel para el autor original (no
-            // bloquea).
-            await repartirXpReferidos(sql, afAutorOriginal, 10);
-            var nuevoXpAutor = ((pa3.xp_autor_fecha || '') === hoy()) ? (pa3.xp_autor_dia || 0) + 10 : 10;
+          var capAutorDia = XP_BASES.album_foto_autor;
+          if ((pa3.xp_autor_fecha || '') !== hoy() || (pa3.xp_autor_dia || 0) < capAutorDia) {
+            var ctxAutor = await contextoXpE(sql, afAutorOriginal);
+            var resAutor = await calcularXpAcreditado(sql, XP_BASES.album_foto_autor,
+              ctxAutor.nivel_clase, ctxAutor.clase_id, ctxAutor.tag,
+              { nivel_usuario: ctxAutor.nivel_usuario });
+            var xpAutorFinal = resAutor.xp_final;
+            await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAutorFinal, afAutorOriginal]).catch(function(){});
+            // v13: reparto multinivel para el autor original (no bloquea).
+            await repartirXpReferidos(sql, afAutorOriginal, xpAutorFinal);
+            await registrarXpLedger(sql, {
+              usuario_id: afAutorOriginal, accion: 'album_foto_autor', xp_base: XP_BASES.album_foto_autor,
+              mult_nivel: resAutor.m_nivel, mult_stack: resAutor.mult_stack,
+              mult_final: resAutor.mult_global_c, cap_aplicado: resAutor.cap_aplicado,
+              xp_final: xpAutorFinal, contexto: { foto_id: afIns[0].id, agregador_id: usuarioId2 }
+            });
+            var nuevoXpAutor = ((pa3.xp_autor_fecha || '') === hoy())
+              ? red2((pa3.xp_autor_dia || 0) + xpAutorFinal) : red2(xpAutorFinal);
             await updProgresoAlbum(sql, afAutorOriginal, { xp_autor_dia: nuevoXpAutor, xp_autor_fecha: hoy() });
+            xpAutorOriginalResp = xpAutorFinal;
           }
         }
 
@@ -6948,7 +7540,7 @@ module.exports = async function handler(req, res) {
 
         var misionesFoto = await evaluarMisiones(sql, usuarioId2);
         var logrosFoto = await evaluarLogros(sql, usuarioId2);
-        return res.status(200).json({ ok: true, foto: afIns[0], xp: xpAlbumFotoFinal, xp_autor_original: afAutorOriginal !== usuarioId2 ? 10 : 0, misiones: misionesFoto, logros: logrosFoto });
+        return res.status(200).json({ ok: true, foto: afIns[0], xp: xpAlbumFotoFinal, xp_detalle: armarXpDetalle(XP_BASES.album_foto, resAlbumFoto, 0), xp_autor_original: xpAutorOriginalResp, misiones: misionesFoto, logros: logrosFoto });
       }
 
       // Votar foto de album (alias legacy de media_voto, ADR-036 v19):
@@ -7006,6 +7598,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           ok: true, xp: mvRes.xp, votos: mvRes.votos,
           ya_votado: mvAccion === 'like', reactivado: mvRes.reactivado || undefined,
+          xp_detalle: mvRes.xp_detalle || undefined,
           misiones: mvMisiones, logros: mvLogros,
         });
       }
@@ -7379,6 +7972,15 @@ module.exports = async function handler(req, res) {
         );
         var axFila = axUpd && axUpd.length ? axUpd[0] : axUsr[0];
         var axCalc = calcularNivelLocal(axNuevoXp);
+        // ADR-053 Dec 4 (v25): admin_xp EXENTO de M_nivel; entrega exacta
+        // del delta (puede ser negativa). Se registra en el ledger.
+        await registrarXpLedger(sql, {
+          usuario_id: axUserId, accion: 'admin_xp',
+          xp_base: red2(axTieneNivel ? (axNuevoXp - axXpActual) : axDelta),
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(axNuevoXp - axXpActual), es_exento: true,
+          nivel: axCalc.nivel, contexto: { origen: 'admin_xp', modo: axTieneNivel ? 'nivel' : 'delta' }
+        });
         var axEra = calcularEraLocal(axCalc.nivel);
         return res.status(200).json({
           ok: true,
@@ -7778,6 +8380,14 @@ module.exports = async function handler(req, res) {
         ).catch(function(){});
         var ccXpNuevo = numXp(ccUpd[0].xp_total);
         var ccNivelNuevo = calcularNivelLocal(ccXpNuevo).nivel;
+        // ADR-053 (v25): las COMPRAS restan XP -> fila EXENTA con xp_final
+        // negativo (misma via que la apertura de DM: resta auditada).
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'compra_consumible', xp_base: ccPrecio,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(-ccPrecio), es_exento: true,
+          nivel: ccNivelNuevo, contexto: { consumible: ccClave, consumible_id: ccCons[0].id }
+        });
         return res.status(200).json({
           ok: true,
           precio_base: ccPrecioBase,
@@ -8291,27 +8901,42 @@ module.exports = async function handler(req, res) {
           'media_compartidos', [{ s: 0 }]
         );
         var cpDiaPrevio = cpXpDiaPrevio[0] ? numXp(cpXpDiaPrevio[0].s) : 0;
-        var cpBase = cpPrimero ? 25 : 5;
+        var cpBase = cpPrimero ? XP_BASES.compartir.primero : XP_BASES.compartir.posterior;
         var cpRemanente = Math.max(0, red2(50 - cpDiaPrevio));
         var cpBaseCap = Math.min(cpBase, cpRemanente);
-        var cpPreClase = cpBaseCap > 0 ? red2(await xpConMultiplicador(sql, usuarioId2, cpDestinoId, cpBaseCap)) : 0;
         var cpAmuleto = { doubled: false };
+        var cpResult = null;
         var cpXpFinal = 0;
-        if (cpPreClase > 0) {
-          cpAmuleto = await aplicarAmuletoX2(sql, usuarioId2, cpPreClase);
-          cpPreClase = red2(cpAmuleto.xp);
-          // ADR-038/ADR-036: el ledger media_compartidos.xp_ganado y el
-          // tope rodante de 50 XP/24h cuentan sobre el xp_final
-          // (post clase + Casa); el cap post-factor evita que el factor
-          // > 1 desborde el remanente de la ventana.
+        var cpCapLedger = 'accion';
+        if (cpBaseCap > 0) {
           var ctxCompartir = await contextoXpE(sql, usuarioId2);
-          cpXpFinal = red2(Math.min(calcularXpFinal(cpPreClase, ctxCompartir.nivel_clase, ctxCompartir.clase_id, ctxCompartir.tag), cpRemanente));
-          await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [cpXpFinal, usuarioId2]).catch(function(){});
-          await sql('UPDATE media_compartidos SET xp_ganado=$1 WHERE id=$2', [cpXpFinal, cpFilaId]).catch(function(){});
-          await acreditarClaseYCofre(sql, usuarioId2, ctxCompartir, cpXpFinal);
-          await aplicarFamaPandilla(sql, usuarioId2, cpXpFinal);
-          await repartirXpReferidos(sql, usuarioId2, cpXpFinal);
+          cpAmuleto = await aplicarAmuletoX2(sql, usuarioId2, cpBaseCap);
+          var cpLider = await esLiderDestino(sql, usuarioId2, cpDestinoId);
+          cpResult = await calcularXpAcreditado(sql, cpBaseCap, ctxCompartir.nivel_clase,
+            ctxCompartir.clase_id, ctxCompartir.tag,
+            { nivel_usuario: ctxCompartir.nivel_usuario, amuleto: cpAmuleto.doubled, lider: cpLider });
+          // ADR-038/ADR-036: el ledger media_compartidos.xp_ganado y el
+          // tope rodante de 50 XP/24h cuentan sobre el xp_final; el recorte
+          // por cupo (cap denominado en XP) se registra como 'accion'
+          // (ADR-053 Dec 7 / R-12).
+          cpXpFinal = red2(Math.min(cpResult.xp_final, cpRemanente));
+          cpCapLedger = (cpXpFinal < cpResult.xp_final) ? 'accion' : cpResult.cap_aplicado;
+          if (cpXpFinal > 0) {
+            await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [cpXpFinal, usuarioId2]).catch(function(){});
+            await sql('UPDATE media_compartidos SET xp_ganado=$1 WHERE id=$2', [cpXpFinal, cpFilaId]).catch(function(){});
+            await acreditarClaseYCofre(sql, usuarioId2, ctxCompartir, cpXpFinal);
+            await aplicarFamaPandilla(sql, usuarioId2, cpXpFinal);
+            await repartirXpReferidos(sql, usuarioId2, cpXpFinal);
+          }
         }
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'compartir', xp_base: cpBase,
+          mult_nivel: cpResult ? cpResult.m_nivel : 1,
+          mult_stack: cpResult ? cpResult.mult_stack : 1,
+          mult_final: cpResult ? cpResult.mult_global_c : 1,
+          cap_aplicado: cpCapLedger, bonos_planos: 0, xp_final: cpXpFinal,
+          contexto: { fuente: cpFuente, item_id: cpItem, canal: cpCanal, destino_id: cpDestinoId, primero: cpPrimero }
+        });
         var cpMisiones = await evaluarMisiones(sql, usuarioId2);
         var cpLogros = await evaluarLogros(sql, usuarioId2);
         var cpReto = await progresarPandillaRetos(sql, usuarioId2, 'compartir');
@@ -8321,12 +8946,93 @@ module.exports = async function handler(req, res) {
         var cpResp = {
           ok: true, xp: cpXpFinal, primero: cpPrimero, canal: cpCanal,
           xp_dia: cpXpDia, tope_diario: cpXpDia >= 50,
+          xp_detalle: cpResult ? armarXpDetalle(cpBase, cpResult, 0, cpXpFinal, cpCapLedger) : undefined,
           misiones: cpMisiones, logros: cpLogros,
         };
         if (cpAmuleto.doubled) cpResp.amuleto_x2 = true;
         if (cpCromo) cpResp.cromo = cpCromo;
         if (cpReto) cpResp.reto_completado = cpReto;
         return res.status(200).json(cpResp);
+      }
+
+      // -- Completar atributos de un spot (ADR-053 Dec 9, v25) ---------
+      // {tipo:'spot_atributos', usuario_id, destino_id}. Otorga +10 XP con
+      // M_nivel UNA SOLA VEZ por (usuario, destino), SOLO a quien completa
+      // (nunca en la creacion). El servidor RELEE destinos y valida la
+      // completitud con completitudSpotAtributos: 3 campos nucleo no vacios
+      // (ciudad, direccion = address/barrio, telefono o precio_desde en
+      // hostal/comida) + taxonomia por categoria (tags.subcategoria en
+      // sitio/comida/evento; cualquier tag no vacio en hostal/blog/vacia,
+      // ADR-016). Sin completitud -> 200 {ok:true, xp:0, motivo:'incompleto'}
+      // (no es error). Dedup contra el propio ledger (degrada si la 031 no
+      // esta aplicada; la deuda "nunca al creador" por falta de
+      // destinos.creado_por queda documentada en el helper).
+      if (tipo2 === 'spot_atributos') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var spSes = validarSesion(req, usuarioId2);
+        if (!spSes.ok) return responderSesion(res, spSes.razon);
+        var spDestino = String(body.destino_id || destinoId2 || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(spDestino))
+          return res.status(400).json({ ok: false, error: 'destino_id invalido' });
+        var spD = await sql(
+          'SELECT id, categoria_slug, ciudad, address, barrio, telefono, precio_desde, tags '
+          + 'FROM destinos WHERE id=$1::uuid LIMIT 1',
+          [spDestino]
+        ).catch(function(eSp) {
+          if (eSp && (eSp.code === '42P01' || eSp.code === '42703')) {
+            console.warn('[spot_atributos] esquema de destinos incompleto: ' + eSp.code);
+          } else {
+            console.warn('[spot_atributos] destino no leido: ' + (eSp && eSp.message));
+          }
+          return [];
+        });
+        if (!spD.length)
+          return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        var spRow = spD[0];
+        // Dedup contra el ledger: 1 sola vez por (usuario, destino).
+        var spYa = false;
+        try {
+          var spLed = await sql(
+            'SELECT 1 AS uno FROM xp_ledger '
+            + 'WHERE usuario_id=$1::uuid AND accion=\'spot_atributos\' '
+            + 'AND contexto->>\'destino_id\'=$2 LIMIT 1',
+            [usuarioId2, spDestino]
+          );
+          spYa = !!(spLed && spLed.length);
+        } catch (eSpLed) {
+          console.warn('[spot_atributos] dedup de ledger no disponible: ' + (eSpLed && eSpLed.code));
+        }
+        if (spYa)
+          return res.status(200).json({ ok: true, xp: 0, motivo: 'ya_otorgado' });
+        // Completitud por categoria (ver completitudSpotAtributos): 3 campos
+        // nucleo siempre + taxonomia de subcategoria (sitio/comida/evento,
+        // ADR-016); hostal/blog/vacia admiten "al menos 1 tag no vacio".
+        if (!completitudSpotAtributos(spRow))
+          return res.status(200).json({ ok: true, xp: 0, motivo: 'incompleto' });
+        var spCtx = await contextoXpE(sql, usuarioId2);
+        var resSpot = await calcularXpAcreditado(sql, XP_BASES.spot_atributos,
+          spCtx.nivel_clase, spCtx.clase_id, spCtx.tag,
+          { nivel_usuario: spCtx.nivel_usuario });
+        var xpSpotFinal = resSpot.xp_final;
+        await sql(
+          'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
+          [xpSpotFinal, usuarioId2]
+        ).catch(function(eSpXp) { console.warn('[spot_atributos] xp no acreditado: ' + (eSpXp && eSpXp.message)); });
+        await acreditarClaseYCofre(sql, usuarioId2, spCtx, xpSpotFinal);
+        await repartirXpReferidos(sql, usuarioId2, xpSpotFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'spot_atributos', xp_base: XP_BASES.spot_atributos,
+          mult_nivel: resSpot.m_nivel, mult_stack: resSpot.mult_stack,
+          mult_final: resSpot.mult_global_c, cap_aplicado: resSpot.cap_aplicado,
+          xp_final: xpSpotFinal, contexto: { destino_id: spDestino }
+        });
+        var spMisiones = await evaluarMisiones(sql, usuarioId2);
+        var spLogros = await evaluarLogros(sql, usuarioId2);
+        return res.status(200).json({
+          ok: true, xp: xpSpotFinal, xp_detalle: armarXpDetalle(XP_BASES.spot_atributos, resSpot, 0),
+          misiones: spMisiones, logros: spLogros
+        });
       }
 
       if (!tipo2 || !destinoId2)
@@ -8390,7 +9096,7 @@ module.exports = async function handler(req, res) {
           : null;
 
         var xpGanado = textoFinal && textoFinal.replace(nombrePrefijo,'').trim().length > 50
-          ? 25 : 10;
+          ? XP_BASES.resena_larga : XP_BASES.resena_corta;
 
         var result = await sql(
           'INSERT INTO interacciones '
@@ -8424,21 +9130,22 @@ module.exports = async function handler(req, res) {
         var logrosNuevas = [];
         var xpResenaEntregado = xpGanado;
         var amuletoResena = { doubled: false };
+        var resResena = null;
+        var detalleResena = null;
         var cromoResena = null;
         if (usuarioId2) {
-          // Milestones v2 (ADR-014): el lider del spot gana x1.1 en su
-          // ciudad. Se aplica sobre el XP que recibe el usuario (la fila
-          // de interacciones conserva la xp base para no romper el check
-          // de mis_primera_resena que mira xp_ganado>=25).
-          xpResenaEntregado = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGanado);
-          // v9 (ADR-018): amuleto_x2 duplica el XP entregado y decrementa
-          // el contador de usos (nunca modifica la fila de interacciones).
-          amuletoResena = await aplicarAmuletoX2(sql, usuarioId2, xpResenaEntregado);
-          xpResenaEntregado = red2(amuletoResena.xp);
-          // v21 (ADR-038): clase + Casa en UNA sola aplicacion; el UPDATE
-          // conserva el contador total_resenas.
           var ctxResena = await contextoXpE(sql, usuarioId2);
-          xpResenaEntregado = calcularXpFinal(xpResenaEntregado, ctxResena.nivel_clase, ctxResena.clase_id, ctxResena.tag);
+          // ADR-018: amuleto_x2 y lider de ciudad entran al STACK del punto
+          // unico (no multiplican por fuera). La fila de interacciones
+          // conserva la BASE (xpGanado) para no romper mis_primera_resena
+          // (xp_ganado >= 25 con resena_larga = 30).
+          amuletoResena = await aplicarAmuletoX2(sql, usuarioId2, xpGanado);
+          var liderResena = await esLiderDestino(sql, usuarioId2, destinoId2);
+          resResena = await calcularXpAcreditado(sql, xpGanado, ctxResena.nivel_clase,
+            ctxResena.clase_id, ctxResena.tag,
+            { nivel_usuario: ctxResena.nivel_usuario, amuleto: amuletoResena.doubled, lider: liderResena });
+          xpResenaEntregado = resResena.xp_final;
+          detalleResena = armarXpDetalle(xpGanado, resResena, 0);
           await sql(
             'UPDATE usuarios SET '
             + 'xp_total = xp_total + $1, '
@@ -8449,6 +9156,13 @@ module.exports = async function handler(req, res) {
           ).catch(function(){});
           await acreditarClaseYCofre(sql, usuarioId2, ctxResena, xpResenaEntregado);
           await avanzarMisionesCasa(sql, usuarioId2, 'resenas', 1);
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2,
+            accion: xpGanado === XP_BASES.resena_larga ? 'resena_larga' : 'resena_corta',
+            xp_base: xpGanado, mult_nivel: resResena.m_nivel, mult_stack: resResena.mult_stack,
+            mult_final: resResena.mult_global_c, cap_aplicado: resResena.cap_aplicado,
+            xp_final: xpResenaEntregado, contexto: { destino_id: destinoId2 }
+          });
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
           // v9 (ADR-018): chance de cromo (15%) y aporte de fama a la
@@ -8493,7 +9207,7 @@ module.exports = async function handler(req, res) {
           }
         } catch(_) {}
 
-        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, misiones: misionesNuevas, logros: logrosNuevas, cromo: cromoResena || undefined, amuleto_x2: amuletoResena.doubled || undefined, reto_completado: retoResena || null });
+        return res.status(200).json({ ok: true, id: result[0].id, xp: xpResenaEntregado, xp_detalle: detalleResena || undefined, misiones: misionesNuevas, logros: logrosNuevas, cromo: cromoResena || undefined, amuleto_x2: amuletoResena.doubled || undefined, reto_completado: retoResena || null });
       }
 
       // -- Guardado --
@@ -8524,7 +9238,7 @@ module.exports = async function handler(req, res) {
           return res.status(200).json({ ok: true, reactivado: true, xp: 0, misiones: [], logros: [] });
         }
 
-        var xpGuardado = 5;
+        var xpGuardado = XP_BASES.guardado;
         await sql(
           'INSERT INTO interacciones (destino_id, usuario_id, tipo, xp_ganado, creado_en) VALUES ($1, $2, \'guardado\', $3, NOW())',
           [destinoId2, usuarioId2, xpGuardado]
@@ -8535,17 +9249,26 @@ module.exports = async function handler(req, res) {
         // local en index.html (userPoints.saved via Math.max()). Sirve
         // como base fiable para futuras insignias/misiones ("guardaste
         // 5 lugares alguna vez"), sin depender del estado activo actual.
-        var xpGuardadoFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpGuardado);
-        // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
-        var amuletoGuardado = await aplicarAmuletoX2(sql, usuarioId2, xpGuardadoFinal);
-        xpGuardadoFinal = red2(amuletoGuardado.xp);
         var ctxGuardado = await contextoXpE(sql, usuarioId2);
-        xpGuardadoFinal = calcularXpFinal(xpGuardadoFinal, ctxGuardado.nivel_clase, ctxGuardado.clase_id, ctxGuardado.tag);
+        // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
+        // punto unico (no multiplican por fuera).
+        var amuletoGuardado = await aplicarAmuletoX2(sql, usuarioId2, xpGuardado);
+        var liderGuardado = await esLiderDestino(sql, usuarioId2, destinoId2);
+        var resGuardado = await calcularXpAcreditado(sql, xpGuardado, ctxGuardado.nivel_clase,
+          ctxGuardado.clase_id, ctxGuardado.tag,
+          { nivel_usuario: ctxGuardado.nivel_usuario, amuleto: amuletoGuardado.doubled, lider: liderGuardado });
+        var xpGuardadoFinal = resGuardado.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
           [xpGuardadoFinal, usuarioId2]
         ).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxGuardado, xpGuardadoFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'guardado', xp_base: xpGuardado,
+          mult_nivel: resGuardado.m_nivel, mult_stack: resGuardado.mult_stack,
+          mult_final: resGuardado.mult_global_c, cap_aplicado: resGuardado.cap_aplicado,
+          xp_final: xpGuardadoFinal, contexto: { destino_id: destinoId2 }
+        });
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
         var logrosGuardado = await evaluarLogros(sql, usuarioId2);
@@ -8556,7 +9279,7 @@ module.exports = async function handler(req, res) {
         await repartirXpReferidos(sql, usuarioId2, xpGuardadoFinal);
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoGuardado = await progresarPandillaRetos(sql, usuarioId2, 'guardado');
-        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null });
+        return res.status(200).json({ ok: true, xp: xpGuardadoFinal, xp_detalle: armarXpDetalle(xpGuardado, resGuardado, 0), misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null });
       }
 
       // -- Quitar guardado --
@@ -8664,7 +9387,7 @@ module.exports = async function handler(req, res) {
         // geocerca se usa el radio resuelto; sin coords (sin_geocerca) no
         // hay penalizacion porque no hay area que abusar.
         var factorAreaVisita = modoVisita === 'geocerca' ? factorXpPorRadio(radioVisita) : 1;
-        var xpBaseVisita = red2(20 * factorAreaVisita);
+        var xpBaseVisita = red2(XP_BASES.visita * factorAreaVisita);
 
         // 9) Anti-farming: cooldown, velocidad imposible y tope diario.
         var prevVisita = await sql(
@@ -8748,29 +9471,39 @@ module.exports = async function handler(req, res) {
             return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
           throw eVisitaIns;
         }
-        var xpVisitaFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, xpBaseVisita);
-        var multiplicadorVisita = xpVisitaFinal > xpBaseVisita ? 1.1 : 1;
-        // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
-        var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpVisitaFinal);
-        xpVisitaFinal = red2(amuletoVisita.xp);
-        // v21 (ADR-038): clase + Casa se aplican SOLO al XP de visita (ya
-        // multiplicado y amuletado). El bono rural sigue siendo PLANO: se
-        // suma despues, sin factor ni amuleto, y NO aporta fama.
+        // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
+        // punto unico. v25 (ADR-053): la visita usa M_nivel DERIVADO.
         var ctxVisita = await contextoXpE(sql, usuarioId2);
-        var xpVisitaEscalado = calcularXpFinal(xpVisitaFinal, ctxVisita.nivel_clase, ctxVisita.clase_id, ctxVisita.tag);
-        var xpTotalVisita = red2(xpVisitaEscalado + bonoRuralVisita);
+        var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpBaseVisita);
+        var liderVisita = await esLiderDestino(sql, usuarioId2, destinoId2);
+        var resVisita = await calcularXpAcreditado(sql, xpBaseVisita, ctxVisita.nivel_clase,
+          ctxVisita.clase_id, ctxVisita.tag,
+          { nivel_usuario: ctxVisita.nivel_usuario, amuleto: amuletoVisita.doubled, lider: liderVisita });
+        // El bono rural sigue siendo PLANO: se suma DESPUES del cap, sin
+        // factor ni amuleto. Se unifica fama y cofre al valor POST-CAP +
+        // bonos (xp_acreditable) - cambio deliberado Decision 8.3.
+        var xpTotalVisita = red2(resVisita.xp_final + bonoRuralVisita);
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
           [xpTotalVisita, usuarioId2]
         ).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxVisita, xpTotalVisita);
         await avanzarMisionesCasa(sql, usuarioId2, 'visitas', 1);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'visita', xp_base: xpBaseVisita,
+          mult_nivel: resVisita.m_nivel, mult_stack: resVisita.mult_stack,
+          mult_final: resVisita.mult_global_c, cap_aplicado: resVisita.cap_aplicado,
+          bonos_planos: bonoRuralVisita, xp_final: xpTotalVisita,
+          contexto: { destino_id: destinoId2, zona: zonaVisita }
+        });
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
+        // ADR-053 Dec 8.3: fama sobre xp_acreditable (antes usaba el PRE
+        // bono rural: inconsistencia preexistente corregida).
         var cromoVisita = await intentarObtenerCromo(sql, usuarioId2, destinoId2);
-        await aplicarFamaPandilla(sql, usuarioId2, xpVisitaEscalado);
+        await aplicarFamaPandilla(sql, usuarioId2, xpTotalVisita);
         // v13: reparto multinivel del XP TOTAL ganado en la visita
         // (incluye bono rural, no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpTotalVisita);
@@ -8779,14 +9512,12 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           ok: true,
           xp: xpTotalVisita,
-          xp_detalle: {
-            base: xpBaseVisita,
+          xp_detalle: Object.assign(armarXpDetalle(xpBaseVisita, resVisita, bonoRuralVisita), {
             factor_area: factorAreaVisita,
-            multiplicador: multiplicadorVisita,
+            multiplicador: resVisita.mult_global_c,
             amuleto: amuletoVisita.doubled ? 2 : 1,
-            bono_rural: bonoRuralVisita,
-            total: xpTotalVisita
-          },
+            bono_rural: bonoRuralVisita
+          }),
           dist_m: distVisita === null ? null : Math.round(distVisita),
           radio_m: radioVisita,
           zona: zonaVisita,
@@ -8842,8 +9573,8 @@ module.exports = async function handler(req, res) {
 
         await sql(
           'INSERT INTO interacciones (destino_id, usuario_id, tipo, rating, xp_ganado, creado_en) '
-          + 'VALUES ($1, $2, \'rating\', $3, 10, NOW())',
-          [destinoId2, usuarioId2, rVal]
+          + 'VALUES ($1, $2, \'rating\', $3, $4, NOW())',
+          [destinoId2, usuarioId2, rVal, XP_BASES.rating]
         );
 
         // Alinear AVG y COUNT sobre resena+rating para que el contador
@@ -8862,17 +9593,26 @@ module.exports = async function handler(req, res) {
         // Sumar XP al usuario logueado y evaluar misiones + logros.
         var misionesRating = [];
         var logrosRating = [];
-        var xpRatingFinal = await xpConMultiplicador(sql, usuarioId2, destinoId2, 10);
-        // v9 (ADR-018): amuleto_x2 duplica el XP entregado.
-        var amuletoRating = await aplicarAmuletoX2(sql, usuarioId2, xpRatingFinal);
-        xpRatingFinal = red2(amuletoRating.xp);
         var ctxRating = await contextoXpE(sql, usuarioId2);
-        xpRatingFinal = calcularXpFinal(xpRatingFinal, ctxRating.nivel_clase, ctxRating.clase_id, ctxRating.tag);
+        // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
+        // punto unico (v25 / ADR-053: no multiplican por fuera).
+        var amuletoRating = await aplicarAmuletoX2(sql, usuarioId2, XP_BASES.rating);
+        var liderRating = await esLiderDestino(sql, usuarioId2, destinoId2);
+        var resRating = await calcularXpAcreditado(sql, XP_BASES.rating, ctxRating.nivel_clase,
+          ctxRating.clase_id, ctxRating.tag,
+          { nivel_usuario: ctxRating.nivel_usuario, amuleto: amuletoRating.doubled, lider: liderRating });
+        var xpRatingFinal = resRating.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
           [xpRatingFinal, usuarioId2]
         ).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxRating, xpRatingFinal);
+        await registrarXpLedger(sql, {
+          usuario_id: usuarioId2, accion: 'rating', xp_base: XP_BASES.rating,
+          mult_nivel: resRating.m_nivel, mult_stack: resRating.mult_stack,
+          mult_final: resRating.mult_global_c, cap_aplicado: resRating.cap_aplicado,
+          xp_final: xpRatingFinal, contexto: { destino_id: destinoId2 }
+        });
         misionesRating = await evaluarMisiones(sql, usuarioId2);
         logrosRating = await evaluarLogros(sql, usuarioId2);
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.
@@ -8884,7 +9624,7 @@ module.exports = async function handler(req, res) {
         // los retos de parche (regla del contrato).
         var retoRating = await progresarPandillaRetos(sql, usuarioId2, 'visita');
 
-        return res.status(200).json({ ok: true, xp: xpRatingFinal, misiones: misionesRating, logros: logrosRating, cromo: cromoRating || undefined, amuleto_x2: amuletoRating.doubled || undefined, reto_completado: retoRating || null });
+        return res.status(200).json({ ok: true, xp: xpRatingFinal, xp_detalle: armarXpDetalle(XP_BASES.rating, resRating, 0), misiones: misionesRating, logros: logrosRating, cromo: cromoRating || undefined, amuleto_x2: amuletoRating.doubled || undefined, reto_completado: retoRating || null });
       }
 
       return res.status(400).json({ ok: false, error: 'tipo no implementado: ' + tipo2 });

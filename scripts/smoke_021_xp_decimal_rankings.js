@@ -103,8 +103,15 @@ check('4a: aplicarFamaPandilla conserva xpGanado * 0.10', fnFama.indexOf('xpGana
 check('4b: aplicarFamaPandilla conserva la guarda famaBase <= 0', fnFama.indexOf('famaBase <= 0') !== -1);
 check('4c: aplicarFamaPandilla sigue actualizando pandillas.fama_total', fnFama.indexOf('UPDATE pandillas SET fama_total') !== -1);
 
+// ADR-053 Dec 8.1 (v25): aplicarAmuletoX2 YA NO multiplica xpBase * 2 por
+// dentro; consume un uso y reporta doubled=true. El x2 entra como
+// ctx.amuleto en el punto unico (para que el cap global vea el stack real).
+// La asercion vieja (xpBase * 2) quedo obsoleta por el contrato nuevo.
 var fnAmu = extraerFn(INT, 'aplicarAmuletoX2');
-check('5a: aplicarAmuletoX2 conserva xpBase * 2', fnAmu.indexOf('xpBase * 2') !== -1);
+check('5a: aplicarAmuletoX2 NO premultiplica (base intacta + doubled)',
+  fnAmu.indexOf('xpBase * 2') === -1
+  && fnAmu.indexOf('xp: base, doubled: true') !== -1
+  && fnAmu.indexOf('xp: base, doubled: false') !== -1);
 
 var bloqueInv = bloque(INT, "tipo === 'inventario'", '// Coleccion de cromos');
 check('6a: inventario conserva xp_total: invXp', bloqueInv.indexOf('xp_total: invXp') !== -1);

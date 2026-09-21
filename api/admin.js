@@ -8,7 +8,22 @@
 //   activos_ocultos -> moderar propuestas Wayfarer (tipo=activo_oculto_moderar,
 //     Entrega 016 / migracion 016: aprobar otorga +50 XP al proponente con
 //     reparto piramidal; rechazar no paga nada. Cero borrado fisico)
+//   salud_red    -> panel "Salud de la Red" (ADR-053): agrega xp_ledger por
+//     dia/accion (XP entregado, usuarios activos, caps, distribucion_nivel
+//     {derivado, visible}, exentos y nivel_max vs nivel derivado). GET;
+//     degrada 42P01 si la migracion 031 no corrio
 // Auth: Bearer exploraco12345 en todos los casos
+// v4 (ADR-053, 2026-09-21): en salud_red, distribucion_nivel pasa a exponer
+// las DOS vistas {derivado, visible} (economia vs insignia, Dec 5) y se
+// agrega el bloque exentos {xp_total_entregado, eventos, por_accion}
+// (misiones/logros/referidos/admin_xp y restas), filtrado por la misma
+// ventana dias. Degradacion intacta (42P01 en xp_ledger -> 200 degradado).
+// v3 (ADR-053 / Enmienda 1, 2026-09-21): rama NUEVA GET ?recurso=salud_red
+// (router real por ?recurso=, gate auth()) con degradacion 42P01; expone
+// por_dia/por_accion/usuarios/caps/nivel_max_vs_derivado/distribucion_nivel/
+// alertas. No crea
+// endpoints (8/8, ADR-001). El repricing de consumibles lo aplica la
+// migracion 031 en consumibles.precio_xp; aqui NO hay precios hardcodeados.
 // v2 (ADR-035, 2026-09-17): precio_xp acepta decimal (punto o coma) y el
 // reparto de referidos usa ROUND(...,2) con Number; las respuestas de
 // resenas/consumibles normalizan las columnas XP (numeric llega string).
@@ -38,6 +53,42 @@ function authInternal(req) {
 // entrega como STRING. red2 = half-up a 2 decimales; numXp = a Number.
 function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
 function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
+// Espejo de REPORTE de los 20 umbrales de api/usuarios.js:NIVELES (ADR-053
+// Decision 3) para resolver el nivel DERIVADO de xp_total dentro de SQL puro
+// en la rama admin salud_red. NO hay require cruzado entre funciones
+// serverless (patron documentado arriba, admin.js:56-59): este CASE es solo
+// LECTURA para el reporte (nivel_max vs nivel derivado); no alimenta M_nivel
+// ni escribe nada. Si los umbrales cambian en la fuente, este espejo debe
+// actualizarse (lo cubre el smoke de espejos de umbrales).
+var NIVEL_DERIVADO_SQL = 'CASE '
+  + 'WHEN xp_total >= 42000 THEN 20 '
+  + 'WHEN xp_total >= 34000 THEN 19 '
+  + 'WHEN xp_total >= 27500 THEN 18 '
+  + 'WHEN xp_total >= 22200 THEN 17 '
+  + 'WHEN xp_total >= 17800 THEN 16 '
+  + 'WHEN xp_total >= 14200 THEN 15 '
+  + 'WHEN xp_total >= 11200 THEN 14 '
+  + 'WHEN xp_total >= 8800 THEN 13 '
+  + 'WHEN xp_total >= 6800 THEN 12 '
+  + 'WHEN xp_total >= 5200 THEN 11 '
+  + 'WHEN xp_total >= 3900 THEN 10 '
+  + 'WHEN xp_total >= 2900 THEN 9 '
+  + 'WHEN xp_total >= 2100 THEN 8 '
+  + 'WHEN xp_total >= 1500 THEN 7 '
+  + 'WHEN xp_total >= 1050 THEN 6 '
+  + 'WHEN xp_total >= 700 THEN 5 '
+  + 'WHEN xp_total >= 450 THEN 4 '
+  + 'WHEN xp_total >= 250 THEN 3 '
+  + 'WHEN xp_total >= 100 THEN 2 '
+  + 'ELSE 1 END';
+
+// Errores de esquema ausente (migracion pendiente, patron BUG-021): tabla
+// (42P01) o columna (42703) que aun no existe. Unico predicado para no
+// repetir el codigo en cada degradacion de salud_red (Regla de No-Duplicidad).
+function esquemaAusente(e) {
+  return !!(e && (e.code === '42P01' || e.code === '42703'));
+}
 
 // == CATEGORIA DE CONSUMIBLE (WP-6, TSK-103 / ADR-028) ====================
 // Categorias conocidas del catalogo (migracion 018): perfil | impulso |
@@ -511,9 +562,235 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok:false, error:'tipo invalido para recurso activos_ocultos' });
   }
 
+  // == SALUD DE LA RED (gamificacion v6 / ADR-053 Decision 13.3) ==========
+  // Rama NUEVA GET ?recurso=salud_red. El router real enruta por ?recurso=
+  // (no se agrega un despachador global ?tipo=, Enmienda 1 Q1) y el gate
+  // Bearer reusa auth(), mismo patron que las demas ramas. Agrega el
+  // xp_ledger por dia/accion para el panel "Salud de la Red".
+  // Degradacion obligatoria (patron BUG-021 / ADR-053 R-1): si la migracion
+  // 031 no corrio y xp_ledger no existe (42P01), responde 200 con
+  // degradado:true y console.warn, nunca 500 ni catch vacio.
+  // Sin SELECT *: cada consulta lista sus columnas explicitamente.
+  if (recurso === 'salud_red') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (req.method !== 'GET') return res.status(405).end();
+
+    // Ventana parametrizable en dias (default 30), acotada 1..365 para no
+    // permitir intervalos arbitrarios.
+    var diasSR = parseInt(req.query.dias, 10);
+    if (!isFinite(diasSR) || diasSR < 1) diasSR = 30;
+    if (diasSR > 365) diasSR = 365;
+
+    var ledgerSR;
+    try {
+      ledgerSR = await sql(
+        'SELECT date_trunc(\'day\', creado_en) AS dia, '
+        + 'COALESCE(SUM(xp_final), 0) AS xp, COUNT(*)::int AS eventos '
+        + 'FROM xp_ledger '
+        + 'WHERE creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+        + 'AND es_exento = false GROUP BY 1 ORDER BY 1 DESC',
+        [diasSR]
+      );
+    } catch (eSR) {
+      if (eSR && eSR.code === '42P01') {
+        console.warn('[admin] salud_red degradado 42P01: xp_ledger no disponible (' + eSR.message + ')');
+        return res.status(200).json({ ok: true, degradado: true, motivo: 'xp_ledger no disponible' });
+      }
+      throw eSR;
+    }
+
+    // Top acciones por XP entregado.
+    var topAcciones = await sql(
+      'SELECT accion, COALESCE(SUM(xp_final), 0) AS xp, COUNT(*)::int AS n '
+      + 'FROM xp_ledger WHERE es_exento = false '
+      + 'GROUP BY 1 ORDER BY 2 DESC LIMIT 20'
+    );
+
+    // Usuarios activos (distintos) por dia y en la ventana.
+    var activosDia = await sql(
+      'SELECT date_trunc(\'day\', creado_en) AS dia, COUNT(DISTINCT usuario_id)::int AS usuarios '
+      + 'FROM xp_ledger '
+      + 'WHERE creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+      + 'AND es_exento = false GROUP BY 1 ORDER BY 1 DESC',
+      [diasSR]
+    );
+    var activosVentana = await sql(
+      'SELECT COUNT(DISTINCT usuario_id)::int AS n FROM xp_ledger '
+      + 'WHERE creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+      + 'AND es_exento = false',
+      [diasSR]
+    );
+
+    // Tasa de caps por accion (solo filas donde algun cap recorto).
+    var capsAccion = await sql(
+      'SELECT accion, cap_aplicado, COUNT(*)::int AS n FROM xp_ledger '
+      + 'WHERE cap_aplicado <> \'ninguno\' GROUP BY 1, 2 ORDER BY 3 DESC'
+    );
+
+    // nivel_max vs nivel DERIVADO de xp_total (misma tabla de umbrales):
+    // detecta usuarios cuya insignia quedo protegida por el reescalado.
+    // Degrada 42703/42P01 si nivel_max no existiera (031 sin correr).
+    var nivelMaxSR = null;
+    try {
+      var derSR = await sql(
+        'WITH d AS (SELECT nivel_max, ' + NIVEL_DERIVADO_SQL + ' AS nivel_derivado '
+        + 'FROM usuarios WHERE activo = true) '
+        + 'SELECT COUNT(*)::int AS total, '
+        + 'COUNT(*) FILTER (WHERE nivel_max > nivel_derivado)::int AS protegidos, '
+        + 'COALESCE(MAX(nivel_max - nivel_derivado), 0)::int AS brecha_max FROM d'
+      );
+      nivelMaxSR = derSR.length ? derSR[0] : { total: 0, protegidos: 0, brecha_max: 0 };
+    } catch (eNM) {
+      if (esquemaAusente(eNM)) {
+        console.warn('[admin] salud_red: nivel_max no disponible ' + eNM.code + ' (' + eNM.message + ')');
+        nivelMaxSR = { degradado: true, motivo: 'nivel_max no disponible' };
+      } else {
+        throw eNM;
+      }
+    }
+
+    // Distribucion de usuarios por banda de nivel. Las DOS vistas conviven
+    // (ADR-053 Decision 5), porque miden cosas distintas:
+    //   - derivado: nivel calculado de xp_total con la tabla nueva. Es el que
+    //     MANDA para M_nivel y para el castigo economico del de-nivel: gastar
+    //     XP puede bajar el multiplicador aunque la insignia se conserve
+    //     (ADR-018).
+    //   - visible: GREATEST(nivel_derivado, COALESCE(nivel_max,1)). Es la
+    //     INSIGNIA que se exhibe; nivel_max solo protege la insignia y NO
+    //     neutraliza el castigo economico.
+    var distribucionNivel = { derivado: [], visible: [] };
+    try {
+      var distDerivado = await sql(
+        'SELECT ' + NIVEL_DERIVADO_SQL + ' AS nivel, COUNT(*)::int AS usuarios '
+        + 'FROM usuarios WHERE activo = true GROUP BY 1 ORDER BY 1'
+      );
+      distribucionNivel.derivado = distDerivado.map(function (x) {
+        x.usuarios = parseInt(x.usuarios, 10) || 0;
+        return x;
+      });
+    } catch (eDer) {
+      if (esquemaAusente(eDer)) {
+        console.warn('[admin] salud_red: distribucion derivada degradada ' + eDer.code + ' (' + eDer.message + ')');
+      } else {
+        throw eDer;
+      }
+    }
+    try {
+      var distVisible = await sql(
+        'SELECT GREATEST(' + NIVEL_DERIVADO_SQL + ', COALESCE(nivel_max, 1)) AS nivel, '
+        + 'COUNT(*)::int AS usuarios '
+        + 'FROM usuarios WHERE activo = true GROUP BY 1 ORDER BY 1'
+      );
+      distribucionNivel.visible = distVisible.map(function (x) {
+        x.usuarios = parseInt(x.usuarios, 10) || 0;
+        return x;
+      });
+    } catch (eVis) {
+      if (esquemaAusente(eVis)) {
+        console.warn('[admin] salud_red: distribucion visible degradada ' + eVis.code + ' (' + eVis.message + ')');
+      } else {
+        throw eVis;
+      }
+    }
+
+    // Filas EXENTAS (es_exento = true) de la MISMA ventana: misiones, logros,
+    // referidos, admin_xp y las restas de compras registradas como exentas.
+    // NO pasan por M_nivel ni por caps: se reportan aparte para medir el
+    // volumen de XP que queda fuera del sistema de multiplicadores.
+    var exentosAccion = await sql(
+      'SELECT accion, COALESCE(SUM(xp_final), 0) AS xp, COUNT(*)::int AS n '
+      + 'FROM xp_ledger WHERE es_exento = true '
+      + 'AND creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+      + 'GROUP BY 1 ORDER BY 2 DESC LIMIT 20',
+      [diasSR]
+    );
+    var exentosTotal = await sql(
+      'SELECT COALESCE(SUM(xp_final), 0) AS xp, COUNT(*)::int AS eventos '
+      + 'FROM xp_ledger WHERE es_exento = true '
+      + 'AND creado_en >= NOW() - ($1::int * INTERVAL \'1 day\')',
+      [diasSR]
+    );
+
+    // Normalizacion (numeric llega string; bigint tambien).
+    var xpTotalEntregado = 0;
+    var porDia = ledgerSR.map(function (d) {
+      d.xp = red2(numXp(d.xp));
+      d.eventos = parseInt(d.eventos, 10) || 0;
+      xpTotalEntregado = red2(xpTotalEntregado + d.xp);
+      return d;
+    });
+    var capsPorAccion = capsAccion.map(function (c) {
+      c.n = parseInt(c.n, 10) || 0;
+      return c;
+    });
+    var capTopAccion = {};
+    capsPorAccion.forEach(function (c) {
+      if (!capTopAccion[c.accion] || c.n > capTopAccion[c.accion].n) capTopAccion[c.accion] = c;
+    });
+    var porAccion = topAcciones.map(function (a) {
+      var capTop = capTopAccion[a.accion];
+      return {
+        accion: a.accion,
+        xp_entregado: red2(numXp(a.xp)),
+        eventos: parseInt(a.n, 10) || 0,
+        cap_aplicado_top: capTop ? capTop.cap_aplicado : null,
+      };
+    });
+    var capsProgresion = 0;
+    var capsGlobal = 0;
+    capsPorAccion.forEach(function (c) {
+      if (c.cap_aplicado === 'progresion') capsProgresion += c.n;
+      if (c.cap_aplicado === 'global') capsGlobal += c.n;
+    });
+    var exentosPorAccion = exentosAccion.map(function (a) {
+      return {
+        accion: a.accion,
+        xp_entregado: red2(numXp(a.xp)),
+        eventos: parseInt(a.n, 10) || 0,
+      };
+    });
+    var exentosVentana = exentosTotal.length
+      ? { xp_entregado: red2(numXp(exentosTotal[0].xp)), eventos: parseInt(exentosTotal[0].eventos, 10) || 0 }
+      : { xp_entregado: 0, eventos: 0 };
+    var alertas = [];
+    if (nivelMaxSR && nivelMaxSR.degradado) {
+      alertas.push({ tipo: 'nivel_max_degradado', detalle: String(nivelMaxSR.motivo) });
+    } else if (nivelMaxSR && nivelMaxSR.protegidos > 0) {
+      alertas.push({
+        tipo: 'nivel_max_protegido',
+        detalle: nivelMaxSR.protegidos + ' usuario(s) conservan una insignia mayor al nivel derivado de su xp_total (brecha max ' + nivelMaxSR.brecha_max + ')',
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      data: {
+        ventana_dias: diasSR,
+        xp_total_entregado: xpTotalEntregado,
+        por_dia: porDia,
+        por_accion: porAccion,
+        usuarios_activos: activosVentana.length ? (parseInt(activosVentana[0].n, 10) || 0) : 0,
+        usuarios_activos_por_dia: activosDia.map(function (d) {
+          d.usuarios = parseInt(d.usuarios, 10) || 0;
+          return d;
+        }),
+        caps_por_accion: capsPorAccion,
+        caps: { cap_progresion_veces: capsProgresion, cap_global_veces: capsGlobal },
+        distribucion_nivel: distribucionNivel,
+        exentos: {
+          xp_total_entregado: exentosVentana.xp_entregado,
+          eventos: exentosVentana.eventos,
+          por_accion: exentosPorAccion,
+        },
+        nivel_max_vs_derivado: nivelMaxSR,
+        alertas: alertas,
+      },
+    });
+  }
+
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red',
   });
 };

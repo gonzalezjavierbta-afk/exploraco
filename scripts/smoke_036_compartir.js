@@ -146,7 +146,13 @@ async function run() {
   var handler = cargarApi('api/interacciones.js');
 
   // ---------- A. Estructura estatica ----------
-  check('A1: header v19 presente', SRC.indexOf('api/interacciones.js  v19') !== -1);
+  // Asercion corregida: el literal 'v19' no era el header ni en HEAD
+  // (git show HEAD:api/interacciones.js daba v24), asi que fallaba de
+  // origen. Se valida el contrato real: header parseable y version >= 19,
+  // que es cuando llego la rama compartir (ADR-036).
+  var verInt = (SRC.match(/^\/\/ api\/interacciones\.js\s+v(\d+)/m) || [])[1];
+  check('A1: header de api/interacciones.js con version >= v19',
+    !!verInt && parseInt(verInt, 10) >= 19);
   check('A2: la rama compartir existe', SRC.indexOf("tipo2 === 'compartir'") !== -1);
   check('A3: compartir exige validarSesion', /tipo2 === 'compartir'[\s\S]{0,600}validarSesion\(req, usuarioId2\)/.test(SRC));
   check('A4: item_id regex ^[0-9A-Za-z_-]{1,64}$',

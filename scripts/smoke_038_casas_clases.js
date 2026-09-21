@@ -213,7 +213,9 @@ function mockClase(cfg) {
       return Promise.resolve(cfg.fila ? [cfg.fila] : []);
     if (q.indexOf('clase_id IS NULL') !== -1 && q.indexOf('clase_elegida_en=NOW()') !== -1)
       return Promise.resolve(cfg.prim || []);
-    if (q.indexOf('xp_total = xp_total - 300') !== -1)
+    // ADR-053 Dec 10: el recambio de Clase cuesta COSTO_CLASE (500, era 300)
+    // y el SQL se arma por concatenacion de la constante.
+    if (q.indexOf('xp_total = xp_total - 500') !== -1)
       return Promise.resolve(cfg.cambio || []);
     return Promise.resolve([]);
   };
@@ -353,8 +355,12 @@ async function run() {
     }));
   check('A3c: registra console.warn con el codigo 42P01',
     warns42.some(function(w) { return w.indexOf('42P01') !== -1; }));
+  // Asercion obsoleta corregida: el refactor interno renombro la variable a
+  // crCode (var crCode = crErr && crErr.code; if (crCode === '42P01')).
+  // El comportamiento real ya lo cubren A3a/A3b/A3c.
   check('A3d: la rama 42P01 existe en el fuente con el codigo tipado',
-    srcUsu.indexOf("crErr42P01.code !== '42P01'") !== -1);
+    srcUsu.indexOf("var crCode = crErr && crErr.code") !== -1
+    && srcUsu.indexOf("crCode === '42P01'") !== -1);
   check('A3e: el fuente advierte casa_ranking sin casas_cofre',
     srcUsu.indexOf('casa_ranking sin casas_cofre 42P01') !== -1);
   check('A3f: la degradacion 42703 existente se conserva',
@@ -425,7 +431,7 @@ async function run() {
     headers: { authorization: 'Bearer ' + tokenClase },
     mock: mockClase({ fila: { id: 'u-clase', clase_id: 'cronista', clase_elegida_en: hace60d, xp_total: '100', email_verificado: true }, cambio: [] })
   });
-  check('A4g: recambio con xp<300 -> 402 PUNTOS_INSUFICIENTES',
+  check('A4g: recambio con xp<500 -> 402 PUNTOS_INSUFICIENTES',
     clPobre.status === 402 && clPobre.body.error === 'PUNTOS_INSUFICIENTES');
 
   // --- A5. clase_elegir: primera eleccion y recambio ---
@@ -461,11 +467,11 @@ async function run() {
     clCambioOk.status === 200 && clCambioOk.body.data.xp_total_nuevo === 200
     && clCambioOk.body.data.nivel_anterior === 4 && clCambioOk.body.data.nivel_nuevo === 2
     && clCambioOk.body.data.bajo_nivel === true);
-  check('A5d: recambio descuenta 300 XP con ventana de 30 dias',
+  check('A5d: recambio descuenta 500 XP (ADR-053 Dec 10) con ventana de 30 dias',
     mCambio.log.some(function(q) {
-      return q.indexOf('xp_total = xp_total - 300') !== -1
+      return q.indexOf('xp_total = xp_total - 500') !== -1
         && q.indexOf('30 days') !== -1
-        && q.indexOf('xp_total >= 300') !== -1;
+        && q.indexOf('xp_total >= 500') !== -1;
     }));
 
   // --- A6. casa_elegir: contrato + refresco best-effort del cofre ---
@@ -512,19 +518,21 @@ async function run() {
   check('B1b: XP_NIVEL_CLASE exacto [0,100,250,500,900,1400,2100,3000,4200,5700,7500]',
     JSON.stringify(XP_NIVEL_CLASE) === '[0,100,250,500,900,1400,2100,3000,4200,5700,7500]');
 
-  // --- B2. calcularXpFinal ---
-  check('B2a: calcularXpFinal base 100 nivel 1 cronista equilibrada -> 110',
-    calcularXpFinal(100, 1, 'cronista', 'equilibrada') === 110);
-  check('B2b: calcularXpFinal base 100 nivel 1 cronista rezagada -> 143',
-    calcularXpFinal(100, 1, 'cronista', 'rezagada') === 143);
-  check('B2c: calcularXpFinal base 100 nivel 1 cronista dominante -> 93.5',
-    calcularXpFinal(100, 1, 'cronista', 'dominante') === 93.5);
+  // --- B2. calcularXpFinal (ADR-053 Dec 2/8: devuelve OBJETO, no numero) ---
+  // Con ctx default (nivel_usuario 1 -> m_nivel 1.0, sin amuleto/lider) los
+  // montos del contrato ADR-038 se conservan en res.xp_final.
+  check('B2a: calcularXpFinal base 100 nivel 1 cronista equilibrada -> xp_final 110',
+    calcularXpFinal(100, 1, 'cronista', 'equilibrada').xp_final === 110);
+  check('B2b: calcularXpFinal base 100 nivel 1 cronista rezagada -> xp_final 143',
+    calcularXpFinal(100, 1, 'cronista', 'rezagada').xp_final === 143);
+  check('B2c: calcularXpFinal base 100 nivel 1 cronista dominante -> xp_final 93.5',
+    calcularXpFinal(100, 1, 'cronista', 'dominante').xp_final === 93.5);
   check('B2d: calcularXpFinal aplica red2 a 2 decimales (7.77 * 1.07 -> 8.31)',
-    calcularXpFinal(7.77, 1, 'explorador', 'equilibrada') === 8.31);
+    calcularXpFinal(7.77, 1, 'explorador', 'equilibrada').xp_final === 8.31);
   check('B2e: calcularXpFinal normaliza el xp_base string de Neon',
-    calcularXpFinal('100', 1, 'cronista', 'equilibrada') === 110);
+    calcularXpFinal('100', 1, 'cronista', 'equilibrada').xp_final === 110);
   check('B2f: sin clase y casa equilibrada el XP no cambia',
-    calcularXpFinal(50, 1, null, 'equilibrada') === 50);
+    calcularXpFinal(50, 1, null, 'equilibrada').xp_final === 50);
 
   // --- B3. calcularNivelClase y calcularTagCasa ---
   check('B3a: calcularNivelClase 0 -> 1 y 99 -> 1',
@@ -583,12 +591,18 @@ async function run() {
   check('B4f: acreditarClaseYCofre registra el fallo best-effort con console.error',
     errCapt.length >= 1);
 
-  // --- B5. Whitelist de 15 puntos ---
+  // --- B5. Whitelist de puntos de XP (ADR-053 Dec 2/8) ---
   // Ancla en TODOS los call-sites de contextoXpE (incluye el encadenado
   // sin await de la rama comentario), excluyendo su definicion.
-  // 15 = los 14 originales + la acreditacion de clase/cofre agregada en
-  // la rama museo_recurso (TSK-112 / ADR-038).
-  var XP_CALLSITES_ESPERADOS = 15;
+  // v25: los call-sites usan el wrapper calcularXpAcreditado (lee caps +
+  // delega en calcularXpFinal) en vez de llamar calcularXpFinal directo.
+  // 20 = los 15 de v21 + ao_proponer, spot_atributos, plan_crear,
+  // plan_unirse y album_foto_autor ruteado por catalogo (ADR-053 Dec 9).
+  var XP_CALLSITES_ESPERADOS = 20;
+  var XP_ACREDITADO_ESPERADOS = 20;
+  // El +10 al autor original de album_agregar_foto queda EXENTO de
+  // acreditarClaseYCofre (no tributa clase/cofre), pero SI usa el motor.
+  var ACREDITAR_CLASE_ESPERADOS = 19;
   var anclas = [];
   var posCtx = srcInt.indexOf('contextoXpE(');
   while (posCtx !== -1) {
@@ -596,20 +610,23 @@ async function run() {
     if (antes.indexOf('function') === -1) anclas.push(posCtx);
     posCtx = srcInt.indexOf('contextoXpE(', posCtx + 1);
   }
-  var anclasCompletas = 0;
+  var anclasMotor = 0;
+  var anclasClase = 0;
   anclas.forEach(function(idx) {
     var win = srcInt.slice(idx, idx + 1500);
-    if (win.indexOf('calcularXpFinal(') !== -1
-        && win.indexOf('acreditarClaseYCofre(') !== -1) anclasCompletas++;
+    if (win.indexOf('calcularXpAcreditado(') !== -1) anclasMotor++;
+    if (win.indexOf('acreditarClaseYCofre(') !== -1) anclasClase++;
   });
   check('B5a: hay ' + XP_CALLSITES_ESPERADOS + ' call-sites de contextoXpE',
     anclas.length === XP_CALLSITES_ESPERADOS);
-  check('B5b: los ' + XP_CALLSITES_ESPERADOS + ' puntos llaman calcularXpFinal + acreditarClaseYCofre por proximidad',
-    anclasCompletas === XP_CALLSITES_ESPERADOS);
-  check('B5c: calcularXpFinal se invoca ' + XP_CALLSITES_ESPERADOS + ' veces (fuera de su definicion)',
-    cuenta(srcInt, /calcularXpFinal\(/g) - 1 === XP_CALLSITES_ESPERADOS);
-  check('B5d: acreditarClaseYCofre se invoca ' + XP_CALLSITES_ESPERADOS + ' veces (fuera de su definicion)',
-    cuenta(srcInt, /acreditarClaseYCofre\(/g) - 1 === XP_CALLSITES_ESPERADOS);
+  check('B5b: los ' + XP_CALLSITES_ESPERADOS + ' puntos llaman calcularXpAcreditado por proximidad',
+    anclasMotor === XP_ACREDITADO_ESPERADOS);
+  check('B5c: calcularXpAcreditado se invoca ' + XP_ACREDITADO_ESPERADOS + ' veces (fuera de su definicion)',
+    cuenta(srcInt, /calcularXpAcreditado\(/g) - 1 === XP_ACREDITADO_ESPERADOS);
+  check('B5d: acreditarClaseYCofre se invoca ' + ACREDITAR_CLASE_ESPERADOS + ' veces (autor original exento)',
+    cuenta(srcInt, /acreditarClaseYCofre\(/g) - 1 === ACREDITAR_CLASE_ESPERADOS);
+  check('B5e: el wrapper reusa el punto unico calcularXpFinal (Regla de No-Duplicidad)',
+    srcInt.indexOf('return calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag, c)') !== -1);
 
   // --- B6. EXCLUIDOS: no llaman al helper ---
   var excluidos = [
@@ -637,20 +654,26 @@ async function run() {
   check('B7c: total_visitas sigue en su UPDATE',
     /total_visitas\s*=\s*total_visitas\s*\+\s*1/.test(srcInt));
 
-  // --- B8. +10 al autor original fuera del helper ---
+  // --- B8. album_foto_autor por catalogo + motor (ADR-053 Dec 8.5) ---
+  // v25: los 4 literales +10 del autor original se rutean por el catalogo
+  // XP_BASES.album_foto_autor y reciben M_nivel via el motor; el tope
+  // diario se mide contra la base del catalogo. Ya NO es un literal suelto.
   var afBloque = bloqueLlaves(srcInt, 'if (afAutorOriginal !== usuarioId2)');
-  check('B8a: el +10 al autor original existe en album_agregar_foto',
-    afBloque.indexOf('xp_total+10') !== -1);
-  check('B8b: el +10 al autor original NO pasa por el helper',
-    afBloque.indexOf('contextoXpE') === -1
-    && afBloque.indexOf('calcularXpFinal') === -1
-    && afBloque.indexOf('acreditarClaseYCofre') === -1);
+  check('B8a: album_foto_autor sale del catalogo XP_BASES (no literal +10)',
+    afBloque.indexOf('XP_BASES.album_foto_autor') !== -1
+    && afBloque.indexOf('xp_total+10') === -1);
+  check('B8b: album_foto_autor pasa por calcularXpAcreditado (M_nivel)',
+    afBloque.indexOf('calcularXpAcreditado(') !== -1
+    && afBloque.indexOf('XP_BASES.album_foto_autor') !== -1);
+  check('B8c: album_foto_autor registra su fila en xp_ledger',
+    afBloque.indexOf('registrarXpLedger(') !== -1
+    && afBloque.indexOf("accion: 'album_foto_autor'") !== -1);
 
-  // --- B9. Bono rural plano ---
-  check('B9a: VISITA_BONO_RURAL = 20 existe',
-    srcInt.indexOf('var VISITA_BONO_RURAL = 20') !== -1);
-  check('B9b: el bono rural se suma plano al XP escalado',
-    /var xpTotalVisita = red2\(xpVisitaEscalado \+ bonoRuralVisita\)/.test(srcInt));
+  // --- B9. Bono rural plano (ADR-053 Dec 8.3: 20 -> 25) ---
+  check('B9a: VISITA_BONO_RURAL = 25 (ADR-053 Dec 8.3)',
+    srcInt.indexOf('var VISITA_BONO_RURAL = 25') !== -1);
+  check('B9b: el bono rural se suma plano al xp_final del motor',
+    /var xpTotalVisita = red2\(resVisita\.xp_final \+ bonoRuralVisita\)/.test(srcInt));
   check('B9c: el bono rural NO se multiplica por casa_tag ni por factor',
     srcInt.indexOf('bonoRuralVisita *') === -1
     && srcInt.indexOf('* bonoRuralVisita') === -1

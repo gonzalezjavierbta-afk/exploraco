@@ -1,39 +1,56 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v19 (ADR-053 / Enmienda 1, 2026-09-21): NIVELES pasa a ser la fuente
+// SERVIDOR de los 20 umbrales nuevos (techo 42000) + campo mult (M_nivel);
+// conNivel expone nivel_visible = GREATEST(nivel derivado, nivel_max) y
+// agrega nivel_max a la respuesta (nivel/badge_actual siguen DERIVADOS y
+// NUNCA persistidos); repricing de elecciones en constantes unicas
+// (faccion 500->800, Casa 300->500, Clase 300->500). NO toca tags ni crea
+// endpoints (8/8, ADR-001).
 // v18 (TSK-118 hotfix: throttle 60s del refresco de lider en casa_ranking)
 // v17 (migracion 026: casa_ranking expone lider_user_id + tributo_pct con degradacion; refresco best-effort del lider por Casa)
 // v16 (TSK-112 / ADR-038: casas_cofre + factor de nivelacion; clase_elegir y clases Rising Star)
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
-// Mismos umbrales que XP_LEVELS en index.html (~linea 3959 del motor de
-// puntos local) y en mi-perfil/comunidad. 20 niveles en 4 Eras
-// (Mundana/Patrocinada/Leyenda/Gran Maestro).
+// FUENTE SERVIDOR de los 20 umbrales de nivel (ADR-053 Decision 3, techo
+// 42000). Los espejos cliente (index.html, comunidad.html, niveles-data.js,
+// usuario-session.js y admin.html: _jugNiveles) y el espejo servidor
+// NIVELES_LOCAL de api/interacciones.js se validan con
+// scripts/smoke_niveles_espejos.js (no hay require cruzado entre funciones
+// serverless). 20 niveles en 4 Eras (Mundana/Patrocinada/Organizador/
+// Leyenda).
+// El campo mult es M_nivel(N) = 1 + ((N-1)/19)*2, redondeado a 3 decimales
+// (1.000 en N1 .. 3.000 en N20). Es la tabla INFORMATIVA del backend:
+// usuarios.js solo expone niveles; el calculo de multiplicadores vive en el
+// punto unico de api/interacciones.js.
 // nivel/badge_actual existian como columnas en usuarios pero
 // interacciones.js nunca las escribia -- se calculan aqui en cada
 // lectura a partir de xp_total en vez de guardarse, para que nunca
 // puedan desincronizarse sin tener que coordinar una escritura extra en
-// cada uno de los 3 lugares de interacciones.js que suman XP.
+// cada uno de los 20+ puntos de api/interacciones.js que suman XP.
+// ADR-053: el titulo 11 se corrigio de 'Estrat\u00e9ga' a 'Estratega'
+// (errata de la fuente original); los 8 espejos deben copiar esta grafia.
 const NIVELES = [
-  { min: 0,     nombre: 'Caminante Novato' },
-  { min: 100,   nombre: 'Rastreador Local' },
-  { min: 250,   nombre: 'Explorador Urbano' },
-  { min: 450,   nombre: 'Aventurero Regional' },
-  { min: 700,   nombre: 'Vanguardia Territorial' },
-  { min: 1000,  nombre: 'Embajador de Zona' },
-  { min: 1400,  nombre: 'Fot\u00f3grafo de Ruta' },
-  { min: 1900,  nombre: 'Cronista de Historias' },
-  { min: 2500,  nombre: 'Buscador de Leyendas' },
-  { min: 3200,  nombre: 'Gu\u00eda de Fronteras' },
-  { min: 4000,  nombre: 'Estrat\u00e9ga Comunitario' },
-  { min: 5200,  nombre: 'Documentalista Visual' },
-  { min: 6800,  nombre: 'Se\u00f1or del Spot' },
-  { min: 8500,  nombre: 'Cart\u00f3grafo de Cine' },
-  { min: 10500, nombre: 'Protector del Patrimonio' },
-  { min: 13000, nombre: 'Curador de Colombia' },
-  { min: 16000, nombre: 'Mariscal de Parche' },
-  { min: 19500, nombre: 'Cineasta de Territorio' },
-  { min: 24000, nombre: 'Inmortal del Mapa' },
-  { min: 30000, nombre: 'Gran Maestro ExploraCO' },
+  { min: 0,     mult: 1.000, nombre: 'Caminante Novato' },
+  { min: 100,   mult: 1.105, nombre: 'Rastreador Local' },
+  { min: 250,   mult: 1.211, nombre: 'Explorador Urbano' },
+  { min: 450,   mult: 1.316, nombre: 'Aventurero Regional' },
+  { min: 700,   mult: 1.421, nombre: 'Vanguardia Territorial' },
+  { min: 1050,  mult: 1.526, nombre: 'Embajador de Zona' },
+  { min: 1500,  mult: 1.632, nombre: 'Fot\u00f3grafo de Ruta' },
+  { min: 2100,  mult: 1.737, nombre: 'Cronista de Historias' },
+  { min: 2900,  mult: 1.842, nombre: 'Buscador de Leyendas' },
+  { min: 3900,  mult: 1.947, nombre: 'Gu\u00eda de Fronteras' },
+  { min: 5200,  mult: 2.053, nombre: 'Estratega Comunitario' },
+  { min: 6800,  mult: 2.158, nombre: 'Documentalista Visual' },
+  { min: 8800,  mult: 2.263, nombre: 'Se\u00f1or del Spot' },
+  { min: 11200, mult: 2.368, nombre: 'Cart\u00f3grafo de Cine' },
+  { min: 14200, mult: 2.474, nombre: 'Protector del Patrimonio' },
+  { min: 17800, mult: 2.579, nombre: 'Curador de Colombia' },
+  { min: 22200, mult: 2.684, nombre: 'Mariscal de Parche' },
+  { min: 27500, mult: 2.789, nombre: 'Cineasta de Territorio' },
+  { min: 34000, mult: 2.895, nombre: 'Inmortal del Mapa' },
+  { min: 42000, mult: 3.000, nombre: 'Gran Maestro ExploraCO' },
 ];
 
 // XP decimal (ADR-035): las columnas XP son numeric(12,2). Neon entrega
@@ -58,13 +75,26 @@ function calcularEra(nivel) {
   return 'Leyenda';
 }
 
+// Insignia vs nivel economico (ADR-053 Decision 5 / Enmienda 1):
+//   nivel_visible = GREATEST(nivel derivado de xp_total, nivel_max historico)
+// El campo nivel y badge_actual que expone la API corresponden a
+// nivel_visible (asi nadie pierde la insignia por el reescalado) y era se
+// calcula tambien sobre nivel_visible. nivel_max SOLO protege la insignia:
+// M_nivel (en api/interacciones.js) usa el nivel DERIVADO, nunca
+// nivel_visible ni nivel_max. nivel/badge_actual siguen siendo columnas
+// legacy DERIVADAS y NUNCA persistidas: el backend no escribe esas columnas.
+// Degradacion: si nivel_max no existiera, COALESCE/Number lo asumen en 1.
 function conNivel(row) {
   if (!row) return row;
   row.xp_total = red2(numXp(row.xp_total));
   const calc = calcularNivel(row.xp_total);
-  row.nivel = calc.nivel;
-  row.badge_actual = calc.badge_actual;
-  row.era = calcularEra(calc.nivel);
+  row.nivel_max = Number(row.nivel_max) || 1;
+  const nivelVisible = Math.max(calc.nivel, row.nivel_max);
+  const idxVisible = Math.min(Math.max(nivelVisible, 1), NIVELES.length);
+  row.nivel_visible = idxVisible;
+  row.nivel = idxVisible;
+  row.badge_actual = NIVELES[idxVisible - 1].nombre;
+  row.era = calcularEra(idxVisible);
   return row;
 }
 
@@ -235,6 +265,15 @@ var CASAS_VALIDAS = ['condor', 'jaguar', 'delfin'];
 // (usuarios.progreso_arbol): son una capa nueva, no un reemplazo.
 var CLASES_VALIDAS = ['cartografo', 'cronista', 'explorador'];
 
+// ADR-053 Decision 10 (repricing de elecciones). Constantes UNICAS para no
+// dejar literales sueltos (Regla de No-Duplicidad): cambio de faccion
+// 500 -> 800, cambio de Casa 300 -> 500 y recambio de Clase 300 -> 500. Se
+// interpolan en el SQL (valores numericos de codigo, nunca de usuario) y el
+// guard WHERE xp_total >= COSTO_* se mantiene para no dejar XP negativo.
+var COSTO_FACCION = 800;
+var COSTO_CASA = 500;
+var COSTO_CLASE = 500;
+
 // TSK-118: el refresco del lider de Casa se ejecuta como maximo una vez
 // cada 60 s por instancia (evita amplificacion de escritura en un GET
 // publico). Es cache de proceso, no estado persistente.
@@ -307,7 +346,7 @@ module.exports = async (req, res) => {
       if (tipo === 'leaderboard') {
         const rows = await sql(
           'SELECT id, nombre, avatar_url, perfil_tipo, xp_total, nivel, '
-          + 'badge_actual, total_resenas, total_guardados '
+          + 'badge_actual, nivel_max, total_resenas, total_guardados '
           + 'FROM usuarios WHERE activo = true '
           + 'ORDER BY xp_total DESC '
           + 'LIMIT $1',
@@ -327,7 +366,7 @@ module.exports = async (req, res) => {
         const palabra = String(req.query.buscar || '').trim();
         if (palabra.length < 2) return res.status(400).json({ ok: false, error: 'Minimo 2 caracteres' });
         const rows = await sql(
-          'SELECT id, nombre, email, avatar_url, xp_total, total_resenas, total_guardados '
+          'SELECT id, nombre, email, avatar_url, xp_total, nivel_max, total_resenas, total_guardados '
           + 'FROM usuarios WHERE activo = true AND (nombre ILIKE $1 OR email ILIKE $1) '
           + 'ORDER BY xp_total DESC LIMIT $2',
           ['%' + palabra + '%', 20]
@@ -353,7 +392,7 @@ module.exports = async (req, res) => {
         var ppRows;
         try {
           ppRows = await sql(
-            'SELECT id, nombre, avatar_url, foto_url, xp_total, faccion, casa, perfil_publico'
+            'SELECT id, nombre, avatar_url, foto_url, xp_total, nivel_max, faccion, casa, perfil_publico'
             + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
             [ppTarget]
           );
@@ -361,7 +400,7 @@ module.exports = async (req, res) => {
           if (!eFoto || eFoto.code !== '42703') throw eFoto;
           console.error('[usuarios] perfil_publico degradado 42703: ' + eFoto.message);
           ppRows = await sql(
-            'SELECT id, nombre, avatar_url, xp_total, faccion, casa, perfil_publico'
+            'SELECT id, nombre, avatar_url, xp_total, nivel_max, faccion, casa, perfil_publico'
             + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
             [ppTarget]
           );
@@ -369,7 +408,9 @@ module.exports = async (req, res) => {
         if (!ppRows.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         var ppU = ppRows[0];
-        var ppNivel = calcularNivel(ppU.xp_total).nivel;
+        // ADR-053: la insignia publica tambien respeta nivel_max (GREATEST
+        // con el nivel derivado); sin nivel_max degrada a 1.
+        var ppNivel = Math.max(calcularNivel(ppU.xp_total).nivel, Number(ppU.nivel_max) || 1);
         var ppPublico = (ppU.perfil_publico !== false);
         if (!ppPublico) {
           var ppSes = validarSesionUsuario(req, String(ppU.id));
@@ -737,10 +778,11 @@ module.exports = async (req, res) => {
       var c = req.body || {};
 
       // ---- Rama: elegir o cambiar faccion (Gaming v5.0) -------------
-      // Primera eleccion: gratis. Cambios posteriores: producto de 500
-      // xp_total con cooldown de 15 dias (la moneda del juego es
-      // xp_total, ADR-018). Todas las escrituras son UPDATE condicional
-      // para resolver carreras del lado de la BD.
+      // Primera eleccion: gratis. Cambios posteriores: producto de
+      // COSTO_FACCION (800) xp_total con cooldown de 15 dias (la moneda del
+      // juego es xp_total, ADR-018; precio ADR-053 Decision 10). Todas las
+      // escrituras son UPDATE condicional para resolver carreras del lado de
+      // la BD.
       if (c.tipo === 'faccion_elegir') {
         var feId = String(c.usuario_id || '');
         var feFaccion = String(c.faccion || '');
@@ -768,12 +810,13 @@ module.exports = async (req, res) => {
             return res.status(409).json({ ok: false, error: 'FACCION_YA_ELEGIDA' });
           return res.json({ ok: true, data: { faccion: fePrim[0].faccion, faccion_elegida_en: fePrim[0].faccion_elegida_en } });
         }
-        // Cambio de faccion: pago 500 xp, cooldown de 15 dias. El UPDATE
-        // condicional es la fuente de verdad; si no afecta filas se
-        // distingue el motivo con los datos ya leidos.
+        // Cambio de faccion: pago COSTO_FACCION (800) xp, cooldown de 15
+        // dias (ADR-053 Decision 10). El UPDATE condicional es la fuente de
+        // verdad; si no afecta filas se distingue el motivo con los datos ya
+        // leidos.
         var feCambio = await sql(
-          'UPDATE usuarios SET xp_total = xp_total - 500, faccion=$2, faccion_elegida_en=NOW() '
-          + 'WHERE id=$1 AND xp_total >= 500 '
+          'UPDATE usuarios SET xp_total = xp_total - ' + COSTO_FACCION + ', faccion=$2, faccion_elegida_en=NOW() '
+          + 'WHERE id=$1 AND xp_total >= ' + COSTO_FACCION + ' '
           + 'AND (faccion_elegida_en IS NULL OR faccion_elegida_en <= NOW() - INTERVAL \'15 days\') '
           + 'RETURNING faccion, faccion_elegida_en',
           [feId, feFaccion]
@@ -795,8 +838,9 @@ module.exports = async (req, res) => {
       // diferencias deliberadas: (1) exige sesion firmada del propio
       // usuario (ADR-025), porque casa_elegida_en es dato de su cuenta;
       // (2) la primera eleccion exige nivel >= 2. Primera eleccion:
-      // gratis (WHERE casa IS NULL). Cambio: cuesta 300 xp_total (debito
-      // atomico con WHERE xp_total >= 300, patron de comprar_consumible)
+      // gratis (WHERE casa IS NULL). Cambio: cuesta COSTO_CASA (500)
+      // xp_total (debito atomico con WHERE xp_total >= COSTO_CASA, patron de
+      // comprar_consumible; precio ADR-053 Decision 10)
       // y tiene cooldown de 30 dias via casa_elegida_en. La moneda del
       // juego es xp_total (ADR-018). Devuelve nivel_anterior/nivel_nuevo/
       // bajo_nivel para que la UI avise si el debito baja de nivel.
@@ -856,12 +900,13 @@ module.exports = async (req, res) => {
             bajo_nivel: ceNivelPrim < ceNivelAnt,
           } });
         }
-        // Cambio de Casa: pago 300 xp, cooldown de 30 dias. El UPDATE
-        // condicional es la fuente de verdad; si no afecta filas se
-        // distingue el motivo con los datos ya leidos.
+        // Cambio de Casa: pago COSTO_CASA (500) xp, cooldown de 30 dias
+        // (ADR-053 Decision 10). El UPDATE condicional es la fuente de
+        // verdad; si no afecta filas se distingue el motivo con los datos ya
+        // leidos.
         var ceCambio = await sql(
-          'UPDATE usuarios SET xp_total = xp_total - 300, casa=$2, casa_elegida_en=NOW() '
-          + 'WHERE id=$1 AND xp_total >= 300 '
+          'UPDATE usuarios SET xp_total = xp_total - ' + COSTO_CASA + ', casa=$2, casa_elegida_en=NOW() '
+          + 'WHERE id=$1 AND xp_total >= ' + COSTO_CASA + ' '
           + 'AND (casa_elegida_en IS NULL OR casa_elegida_en <= NOW() - INTERVAL \'30 days\') '
           + 'RETURNING casa, casa_elegida_en, xp_total',
           [ceId, ceCasa]
@@ -899,8 +944,9 @@ module.exports = async (req, res) => {
 
       // ---- Rama: elegir o cambiar Clase Rising Star (TSK-112 / ADR-038) --
       // Espejo de casa_elegir (sesion firmada ADR-025, email verificado,
-      // primera eleccion gratis y recambio con coste de 300 XP + cooldown
-      // de 30 dias via clase_elegida_en), SIN gate de nivel. NO toca el
+      // primera eleccion gratis y recambio con coste de COSTO_CLASE (500)
+      // XP + cooldown de 30 dias via clase_elegida_en (ADR-053 Decision 10),
+      // SIN gate de nivel. NO toca el
       // Arbol de Clases de 16 ramas (usuarios.progreso_arbol): la Clase es
       // una capa nueva que COEXISTE con el arbol (ADR-038). Al recambiar,
       // nivel_clase vuelve a 1 y xp_clase a 0: la nueva profesion empieza
@@ -940,13 +986,14 @@ module.exports = async (req, res) => {
             clase_elegida_en: clPrim[0].clase_elegida_en,
           } });
         }
-        // Recambio de Clase: pago 300 XP, cooldown de 30 dias. El UPDATE
-        // condicional es la fuente de verdad; si no afecta filas se
-        // distingue el motivo con los datos ya leidos.
+        // Recambio de Clase: pago COSTO_CLASE (500) XP, cooldown de 30 dias
+        // (ADR-053 Decision 10). El UPDATE condicional es la fuente de
+        // verdad; si no afecta filas se distingue el motivo con los datos ya
+        // leidos.
         var clCambio = await sql(
-          'UPDATE usuarios SET xp_total = xp_total - 300, clase_id=$2, nivel_clase=1, xp_clase=0, '
+          'UPDATE usuarios SET xp_total = xp_total - ' + COSTO_CLASE + ', clase_id=$2, nivel_clase=1, xp_clase=0, '
           + 'clase_elegida_en=NOW() '
-          + 'WHERE id=$1 AND xp_total >= 300 '
+          + 'WHERE id=$1 AND xp_total >= ' + COSTO_CLASE + ' '
           + 'AND (clase_elegida_en IS NULL OR clase_elegida_en <= NOW() - INTERVAL \'30 days\') '
           + 'RETURNING clase_id, clase_elegida_en, xp_total',
           [clId, clClase]
