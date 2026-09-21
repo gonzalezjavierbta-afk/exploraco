@@ -1456,3 +1456,8 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 - **BUG-002** (doble escape en `api/pagina-destino.js` L2431) y **BUG-062** siguen ABIERTOS y ajenos.
 - **Estado:** SIN CAMBIO (registro de no-regresion, 2026-09-18).
 
+### Nota de prevencion (TSK-145 / migracion 028, 2026-09-20) -- NO es un bug: CHECK que rechaza `''` en INSERTs legacy
+- **Contexto:** al agregar la columna `destinos.zona` con la CHECK `destinos_zona_chk` (migracion 028, permite NULL o los 5 valores cerrados), el INSERT inicial de `api/admin-destinos.js` enviaba `zona:''` (string vacio) cuando el `<select id="f-zona">` del admin quedaba sin opcion -> la CHECK rechazaba `''` (no es NULL) -> 500 en el pipeline de los 103 `scripts/load-*-api.js`. QA lo detecto y se corregio ANTES del deploy: el backend normaliza a NULL `(b.zona ? String(b.zona).trim() : null)` (api/admin-destinos.js L187). **No se registra como BUG porque se corrigio pre-deploy.**
+- **Leccion/prevencion (patron BUG-021/BUG-060):** una CHECK nueva que permite NULL NO acepta la cadena vacia `''`; cualquier INSERT/UPDATE legacy que envie strings vacios para columnas nuevas viola la constraint y revienta con 500. Regla: normalizar `''` -> NULL en el backend (o en el UPDATE fieldMap) cada vez que una columna nueva nullable llegue desde formularios con `<select>`/inputs vacios.
+- **Estado:** PREVENCION REGISTRADA (TSK-145 / migracion 028, 2026-09-20). Sin bug abierto.
+

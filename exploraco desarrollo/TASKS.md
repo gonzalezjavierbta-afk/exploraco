@@ -11,7 +11,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### Tareas no completadas / estado actual
 
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
-- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha) y TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047). Verificar commit/deploy real contra el archivo real (ADR-006).
+- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha) y TSK-145 (campo zona, migracion 028). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **PENDIENTE DE APROBACION del operador:** TSK-140 (documento de analisis AI-DOS v1.1 / Reglas de Oro v5; archivo COMPLETADO en disco).
 - **BLOQUEADA (historica, archivada):** TSK-044 (blog multi-tema); su bloqueo de deploy (TASK-011) figura COMPLETADA, revisar si aplica cierre.
 
@@ -29,6 +29,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad AGENTES HYBRID - 2026-09-20 (ADR-048)](#prioridad-agentes-hybrid---2026-09-20-adr-048)
 - [Prioridad SALTO DEL TEQUENDAMA - 2026-09-20 (cierre express)](#prioridad-salto-del-tequendama---2026-09-20-cierre-express)
 - [Prioridad DRAWER MAPA CULTURAL - 2026-09-20 (cierre express / ENMIENDA 1 ADR-047)](#prioridad-drawer-mapa-cultural---2026-09-20-cierre-express--enmienda-1-adr-047)
+- [Prioridad ESTADO PERSISTENTE DEL USUARIO - 2026-09-20 (cierre express)](#prioridad-estado-persistente-del-usuario-directorios--ficha--resena-con-nombre---2026-09-20-cierre-express)
+- [Prioridad CAMPO ZONA (region natural) - 2026-09-20 (cierre express)](#prioridad-campo-zona-region-natural-en-el-admin-general---2026-09-20-cierre-express)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3136,6 +3138,42 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Pendiente operativo:** QA visual en navegador de los 5 directorios y de la ficha (corazones, "estuve aqui" y resena con el nombre de la cuenta en una sola sesion); commit/deploy del release (assets frontend + `api/pagina-destino.js`; los assets NO cuentan contra el presupuesto 8/8).
 - **Dependencia:** patron `usuario-session.js` existente (`refrescarSesion`, `cargarMiMapa`, `guardarDestino`/`quitarGuardado`); smokes previos de la ficha.
 - **Fuera de alcance:** `api/interacciones.js` NO se toco (8/8 INTACTO); backend/`media_compartidos`; legacy R2 (consumidores `.then(function(ok){ if(ok) })` de `publicarResena` en `Monserrate2.html`, `lacandelaria2.html`, `gen_body7.js`, `_lacandelaria2_body.html`, `_monserrate2_body.html`, `_check_monserrate2.js`, `_tmp_lac2.js` - fuera de flujo Vercel); DECISIONS.md (sin ADR nuevo: se reusan GET existentes).
+
+## Prioridad CAMPO ZONA (region natural) en el ADMIN general - 2026-09-20 (cierre express)
+
+> Cierre documental EXPRESS (skill `express-mode`: un solo pase, docs-only, ruta FREE,
+> sin tocar codigo) del nuevo campo `zona` (region natural) en el admin general
+> (todas las categorias, incl. eventos) con migracion NUEVA 028 + exposicion en API.
+> NO crea funciones serverless (**8/8 INTACTO**, ADR-001/ADR-010). La decision de
+> arquitectura es el **ADR-049 (APROBADO)** en DECISIONS.md, escrito por `architect`
+> (2026-09-20, NO se toca en este cierre) y NO se registra bug (el unico defecto QA
+> se detecto y corrigio ANTES del deploy).
+
+### TSK-145: Campo `zona` (region natural) en el admin general + migracion 028 + API [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental express; **working tree, SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (dato curado de producto: region natural del destino, una sola, obligatoria en el admin).
+- **Fecha:** 2026-09-20
+- **Origen:** decision de producto del operador: agregar la region natural (`zona`) al destino, capturable desde el ADMIN general (todas las categorias, incl. eventos), con una sola zona OBLIGATORIA y valores cerrados Andina/Amazonica/Llanos/Caribe/Pacifico. `region` sigue siendo el departamento (campo existente, NO se toca). Documentado como **ADR-049** en DECISIONS.md.
+- **ADR:** DECISIONS.md **ADR-049 (APROBADO, 2026-09-20)** -- escrito por `architect`; este cierre NO lo modifica (restriccion del cierre: un ADR lo escribe `architect`).
+- **Responsable / agentes:** backend-dev/sql-security-free (migracion 028 + `api/admin-destinos.js` + `api/destinos.js`), admin-dev (`admin.html`), qa-auditor (Escudo GOLD + deteccion del defecto pre-deploy), docs-keeper-free (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **NUEVA migracion `db/migrations/028_destinos_zona.sql` (100 lineas, ADITIVA, idempotente ADR-008, ASCII-safe ADR-002):** `ALTER TABLE destinos ADD COLUMN IF NOT EXISTS zona TEXT` (L51-52); CHECK `destinos_zona_chk` idempotente via `DO $$ ... pg_constraint` (patron de 019/026) que permite NULL o los 5 valores cerrados (L59-68); indice `idx_destinos_zona` con `CREATE INDEX IF NOT EXISTS` (L74-75). Comentada y explicita la nomenclatura pendiente de alinear con la 027 (`andina`/`amazonica` vs `andes`/`amazonia`, sin FK por ahora; L31-36).
+  2. **`admin.html`:** NUEVO `<select id="f-zona">` (L771) en el form general (UNA sola, compartida por las 5 categorias), con cableado completo: `clearForm` (ids L2674), `loadForm` (L3284 `'f-zona':p.zona||''`), `savePlace` (L3948 `zona: v('f-zona')`), `_placeToAPI` (L6057 `zona: p.zona||''`) y `_mergeNeonRowIntoLocal` (L6573 `local.zona = d.zona || local.zona`). Validacion OBLIGATORIA en `validateForm()` (L4076-4096): nueva fila `['fg-zona','f-zona','Selecciona la zona (region natural)']` (L4081) + guard dedicado que bloquea el guardado con toast (L4089-4093).
+  3. **`api/admin-destinos.js`:** INSERT agrega columna/param `zona` (L153/L164/L187) normalizado a NULL cuando ausente/vacio (`(b.zona ? String(b.zona).trim() : null)`, L187) -- critico para no violar la CHECK; PUT agrega `zona` al fieldMap (L274); GET listar agrega `d.zona` al SELECT (L110).
+  4. **`api/destinos.js`:** `toPlace()` expone `zona` (L49); modo mapa la incluye en el SELECT (L168) y en la proyeccion (L189).
+  5. **Decision de producto registrada:** una sola zona por destino, obligatoria en UI admin, valores Andina/Amazonica/Llanos/Caribe/Pacifico; cubre eventos; `region` sigue siendo departamento.
+- **Evidencia (ADR-006):** anclas reales verificadas el 2026-09-20: `db/migrations/028_destinos_zona.sql` (100 lineas, cabecera L1-45, CHECK L59-68, indice L74-75); `admin.html` L771 (`f-zona`), L2674, L3284, L3948, L4081/L4089-4093 (`validateForm`), L6057, L6573; `api/admin-destinos.js` L110/L153/L164/L187/L274; `api/destinos.js` L49/L168/L189.
+- **Smokes / verificacion:** `node --check` OK en `api/admin-destinos.js` y `api/destinos.js`; ASCII 0 bytes > 127 en la migracion y en ambos APIs; balance de divs `admin.html` 815/815 diff 0; INSERT 35:35:35 (columnas con placeholder : placeholders : params) verificado; `validateForm` bloquea sin zona (codigo real L4089-4093); migracion aditiva/idempotente y CHECK permite NULL (L66). QA (qa-auditor) detecto y se corrigio ANTES del deploy un defecto: el INSERT enviaba `''` que la CHECK rechazaba -> 500 en el pipeline de los 103 `load-*-api.js`; corregido a NULL en L187.
+- **Relacion con bugs:** NO se registra bug nuevo (el defecto del `''` se detecto y corrigio pre-deploy; solo nota breve en BUGS_HISTORICOS.md seccion de observaciones). Decision de arquitectura: **ADR-049 (APROBADO)** en DECISIONS.md, escrito por `architect` (NO se toca en este cierre).
+- **Pendiente operativo (BLOQUEANTE):** aplicar `db/migrations/028_destinos_zona.sql` en Neon ANTES de desplegar el backend (si no, `42703 column does not exist`); luego deploy + commit. Orden obligatorio: 028 en Neon -> deploy backend -> commit.
+- **Deuda registrada (para NEXT.md):**
+  (a) los 103 `scripts/load-*-api.js`, `api/publicar-lugar.js` (mi-lugar.html) y `scripts/upload-eventos.js` NO envian `zona` -> fichas/eventos creados por esas vias quedan SIN zona (deuda).
+  (b) la zona NO se muestra ni se filtra aun en directorios/mapa/ficha (solo admin + API).
+  (c) slugs `andina`/`amazonica` (028) vs `andes`/`amazonia` (027) -- sin FK por ahora.
+  (d) etiqueta `#f-barrio` sigue siendo "Barrio / Zona" (posible confusion con el nuevo campo "Zona").
+- **Dependencia:** migraciones 003-027 aplicadas en Neon (la 028 es la siguiente).
+- **Fuera de alcance:** DECISIONS.md (el ADR-049 lo escribio `architect` y NO se toca en este cierre); `api/interacciones.js` NO se toco (8/8 INTACTO); directorios/mapa/ficha no renderizan la zona aun (deuda b); `api/publicar-lugar.js`/loaders/upload-eventos sin `zona` (deuda a).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

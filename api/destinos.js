@@ -46,6 +46,7 @@ function toPlace(row) {
     city:        row.ciudad        || '',
     region:      row.region        || '',
     barrio:      row.barrio        || '',
+    zona:        row.zona          || '',
     lead:        row.lead          || '',
     desc:        row.descripcion   || row.lead || '',
     highlight:   row.highlight     || '',
@@ -164,7 +165,7 @@ module.exports = async function handler(req, res) {
     // -- Modo mapa: campos minimos + color --------------------------
     if (modo === 'mapa') {
       var mapaRows = await sql(
-        'SELECT id, slug, nombre, categoria_slug, ciudad, region, '
+        'SELECT id, slug, nombre, categoria_slug, ciudad, region, zona, '
         + 'lat, lng, emoji, hero_bg, foto_hero, rating, total_resenas, destacado '
         + 'FROM destinos d '
         + 'WHERE ' + where + ' AND lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0 '
@@ -185,6 +186,7 @@ module.exports = async function handler(req, res) {
             cat:      cat,
             city:     d.ciudad || '',
             region:   d.region || '',
+            zona:     d.zona   || '',
             lat:      parseFloat(d.lat),
             lng:      parseFloat(d.lng),
             emoji:    d.emoji   || CAT_EMOJI[cat] || '\ud83d\udccd',

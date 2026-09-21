@@ -107,7 +107,7 @@ module.exports = async function handler(req, res) {
       var pi = params.length + 1;
 
       var rows2 = await sql(
-        'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region, '
+        'SELECT d.id, d.slug, d.nombre, d.categoria_slug, d.ciudad, d.region, d.zona, '
         + 'd.lead, d.descripcion, d.highlight, d.sintro, d.foto_hero, d.hero_bg, '
         + 'd.lat, d.lng, d.radio_m, d.whatsapp, d.telefono, d.email, d.web, d.instagram, '
         + 'd.precio_desde, d.horario, d.emoji, d.status, d.destacado, d.verificado, '
@@ -150,7 +150,7 @@ module.exports = async function handler(req, res) {
         'INSERT INTO destinos ( '
         + 'slug, nombre, categoria_slug, '
         + 'lead, descripcion, highlight, '
-        + 'ciudad, region, barrio, address, '
+        + 'ciudad, region, barrio, zona, address, '
         + 'lat, lng, '
         + 'whatsapp, telefono, email, web, instagram, '
         + 'precio_desde, horario, emoji, hero_bg, foto_hero, '
@@ -161,13 +161,13 @@ module.exports = async function handler(req, res) {
         + ') VALUES ( '
         + '$1, $2, $3, '
         + '$4, $5, $6, '
-        + '$7, $8, $9, $10, '
-        + '$11, $12, '
-        + '$13, $14, $15, $16, $17, '
-        + '$18, $19, $20, $21, $22, '
-        + '$23, $24, $25, '
-        + '$26, $27, $28, '
-        + '$29, $30, $31, $32, $33, $34, '
+        + '$7, $8, $9, $10, $11, '
+        + '$12, $13, '
+        + '$14, $15, $16, $17, $18, '
+        + '$19, $20, $21, $22, $23, '
+        + '$24, $25, $26, '
+        + '$27, $28, $29, '
+        + '$30, $31, $32, $33, $34, $35, '
         + 'NOW(), NOW() '
         + ') '
         + 'ON CONFLICT (slug) DO UPDATE SET '
@@ -184,6 +184,7 @@ module.exports = async function handler(req, res) {
           String(b.ciudad||b.city||'').trim(),
           String(b.region||'').trim(),
           String(b.barrio||'').trim(),
+          (b.zona ? String(b.zona).trim() : null),
           String(b.address||'').trim(),
           b.lat ? parseFloat(b.lat) : null,
           b.lng ? parseFloat(b.lng) : null,
@@ -270,6 +271,7 @@ module.exports = async function handler(req, res) {
         ciudad:         b.ciudad || b.city,
         region:         b.region,
         barrio:         b.barrio,
+        zona:           b.zona,
         address:        b.address,
         whatsapp:       b.whatsapp,
         telefono:       b.telefono || b.tel,

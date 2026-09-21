@@ -2484,3 +2484,68 @@ Los datos de consumo demostraron que el 23% del gasto PRO (~$7.53 en la ventana 
 - El doc de orquestacion conserva citas `deepseek-v4-flash` en las secciones 3/4 para los agentes Pro legacy (fuera del alcance de esta sesion); las filas hybrid (68-69) ya estan en `deepseek-v4.1-flash`. El archivo real manda (ADR-006).
 
 **ADRs relacionados:** ADR-001 (Vanilla), ADR-002 (ASCII-safe), ADR-006 (baseline de verdad = archivo real), regla de oro 8 (handoff), TSK-132 (registro de la skill express-mode como practica), doc `exploraco desarrollo/ampliacion desarrollo/orquestacion agentes.md` (v1.1, esquema tripartito).
+
+---
+
+## ADR-049: Campo `zona` (region natural de Colombia) en `destinos` -- una sola zona obligatoria en la UI del admin general (incluye eventos), columna aditiva nullable
+
+**ID:** ADR-049
+**Fecha:** 2026-09-20
+**Estado:** **APROBADO** (2026-09-20). Implementado en working tree al cierre de este ADR (SIN commitear; ADR-006 rige: verificar el archivo real). Migracion `028` PENDIENTE de aplicar en Neon: el despliegue del backend debe seguir el orden mandatorio del Impacto.
+**Autor:** Chief Architect (AI-DOS); decisiones de producto confirmadas por el operador.
+**Alcance:** esquema `destinos` (migracion 028), admin general (aplica a TODAS las categorias, incluidos eventos), `api/admin-destinos.js` y `api/destinos.js`. NO crea endpoints nuevos (presupuesto 8/8 de ADR-001 intacto). NO toca `tags` (no es un campo JSONB; es una columna gestionada como `region`/`verificado`).
+
+### Contexto
+
+`destinos` ya distinguia ubicacion por `ciudad` y `region`, pero en ExploraCO `region` es el DEPARTAMENTO (p.ej. "Cundinamarca", "Bolivar"); no existia una columna para la REGION NATURAL de Colombia (Andina, Amazonica, Caribe, Pacifico, Llanos). La migracion `027_zonas_marcas.sql` creo el catalogo `zonas_geograficas` (5 slugs) para el modulo de zonas/marcas/patrocinios, pero ese catalogo NO estaba enlazado a `destinos` y su granularidad es de ranking/areas, no de atributo de ficha. Se pidio que cada lugar/evento del directorio pudiera declarar su region natural, capturada desde el admin general (una sola, obligatoria), reutilizable a futuro para filtros/SEO/mapa. Restricciones vigentes: 8/8 endpoints agotados (ADR-001), cero borrado logico (ADR-003), ASCII-safe (ADR-002), gobernanza de esquema via SQL versionado e idempotente (ADR-008) y patron BUG-021/BUG-060 de aplicar la migracion antes del deploy de las ramas que leen la columna nueva.
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Guardar la zona dentro de `tags` JSONB (RECHAZADA).** Es un atributo transversal de la ficha (aplica a todas las categorias) y no un dato especifico de categoria; meterlo en `tags` lo volveria invisible al contrato de columnas y exigiria logica por categoria. Ademas las columnas gestionadas de `destinos` (`region`, `verificado`) ya son el patron para atributos transversales.
+2. **Columna nueva `destinos.zona TEXT` con CHECK de lista cerrada e indice (ELEGIDA).** Aditiva, idempotente, sin FK por ahora, expuesta por los mismos endpoints.
+3. **Reutilizar/renombrar `region` para que signifique region natural (RECHAZADA).** Cambiaria la semantica de un campo en produccion (hoy departamento) y romperia seeds, formularios y datos existentes. Decision de producto explicita: `region` NO cambia.
+4. **Enlazar FK a `zonas_geograficas.slug` en esta entrega (DIFERIDA).** Los slugs del catalogo 027 (`andes`, `amazonia`) NO coinciden con los del producto (`andina`, `amazonica`); enlazar ahora exigiria migrar/aliasar el catalogo. Se difiere como deuda consciente (ver punto 7 de la Decision).
+
+### Decision tomada
+
+1. **Catalogo cerrado de 5 valores (slug ASCII):** `andina`, `amazonica`, `caribe`, `pacifico`, `llanos`. Son la region natural del destino; la constraint `destinos_zona_chk` los hace cumplir y permite `NULL`.
+2. **Una sola zona por destino y OBLIGATORIA en la UI del admin general.** El formulario general tiene un unico `<select id="f-zona">` (no multi-select); `validateForm()` bloquea el guardado si no se selecciona zona. La obligatoriedad es de la UI, NO de la base de datos (ver punto 5).
+3. **Cubre TODAS las categorias, incluidos eventos.** No es un campo por categoria: el mismo selector se guarda para hostal, comida, sitio, evento y blog desde el admin general.
+4. **`region` NO cambia de semantica:** sigue siendo el DEPARTAMENTO. `zona` es una columna NUEVA y separada; no se sobrescribe ni se deriva `region`.
+5. **La columna es NULLABLE en DB a proposito.** `zona TEXT` acepta `NULL`; la obligatoriedad vive SOLO en la UI del admin. Razon: no romper los caminos que todavia no envian `zona` (seeds, `publicar-lugar.js`, `upload-eventos.js`) ni los ~103 scripts `load-*-api.js`. Un destino sin zona es un estado valido en datos.
+6. **Exposicion por API (sin endpoint nuevo):** `api/admin-destinos.js` INSERT con columna/param `zona` (normalizado a `NULL` si viene ausente/vacio: `(b.zona ? String(b.zona).trim() : null)`), PUT con `zona` en el fieldMap, GET de listado con `d.zona`; `api/destinos.js` expone `zona` en `toPlace()` y en el modo mapa.
+7. **Deuda de slugs vs migracion 027 (consciente y documentada).** El catalogo `zonas_geograficas` de la 027 usa `andes`/`amazonia`; `destinos.zona` usa `andina`/`amazonica`. NO hay FK entre ambos. Si algun dia se enlaza el catalogo, hay que unificar los slugs (`andina` -> `andes`, `amazonica` -> `amazonia`) o mapear en el backend. Queda pendiente.
+8. **Orden de despliegue MANDATORIO:** aplicar `db/migrations/028_destinos_zona.sql` COMPLETA en Neon ANTES de desplegar el backend. Invertir el orden produce `42703 column does not exist` en el listado/insert/mapa (patron BUG-021/BUG-060). Re-ejecutar la 028 es no-op (idempotente, ADR-008).
+
+### Justificacion
+
+Una region natural es un atributo transversal de la ficha y por eso se modela como COLUMNA gestionada (como `region`/`verificado`), no como campo JSONB por categoria: asi el contrato de columnas de `/api/destinos` y `/api/admin-destinos` la expone de forma uniforme sin logica por categoria ni migracion de `tags` (cero borrado logico, ADR-003). La columna aditiva idempotente con CHECK de lista cerrada e indice sigue exactamente el patron de gobernanza de esquema (ADR-008) y permite filtrar/agrupar por zona a futuro sin tabla intermedia. Mantener `region` como departamento evita romper la semantica vigente y los datos existentes. Dejar `zona` nullable en DB y obligatoria solo en la UI es la via que preserva la compatibilidad con todos los caminos de carga legacy mientras el producto ya captura el dato nuevo en el admin. La decision de no crear FK hacia `zonas_geograficas` (027) reconoce que el catalogo de ranking y el atributo de ficha son hoy ortogonales y que unificarlos es una migracion aparte, no un efecto colateral de esta entrega. Cumple ADR-002: la 028 y el codigo tocado son 100% ASCII-safe.
+
+### Impacto
+
+- **`db/migrations/028_destinos_zona.sql` (NUEVO, 100 lineas, ASCII-safe, idempotente ADR-008):** `ALTER TABLE destinos ADD COLUMN IF NOT EXISTS zona TEXT`; constraint `destinos_zona_chk` creada dentro de un DO block que consulta `pg_constraint` (permite `NULL`); indice `idx_destinos_zona ON destinos (zona)`. Aditiva/no destructiva; rollback `DROP COLUMN IF EXISTS zona` (LOSSY si ya hay datos).
+- **`admin.html`:** `<select id="f-zona">` (L771) en el form general con las 5 opciones + option vacia (L772); cableado en `clearForm` (L2674), `loadForm` (L3284), `collectPlace` (L3948, `zona: v('f-zona')`), `validateForm` (L4081-4091, mensaje "Selecciona la zona (region natural)"), `_placeToAPI` (L6057) y `_mergeNeonRowIntoLocal` (L6573).
+- **`api/admin-destinos.js`:** `zona` en el SELECT del listado (L110), en el INSERT columna/param (L153, normalizacion L187) y en el fieldMap del PUT (L274).
+- **`api/destinos.js`:** `zona` en `toPlace()` (L49) y en el modo mapa (L168/L189).
+- **Orden de despliegue (BLOQUEANTE):** primero la 028 en Neon, despues el backend. Sin la columna, listado/insert/mapa fallan con `42703`.
+- **Deuda de cobertura:** los ~103 `scripts/load-*-api.js` y `publicar-lugar.js` NO envian `zona`; las fichas creadas por esas vias quedan sin zona hasta su reclasificacion. `upload-eventos.js` tampoco la envia (los eventos cargados por seed quedan sin zona).
+- **Sin render/filtro todavia:** `zona` se captura, persiste y expone por API, pero aun NO se muestra ni se filtra en directorios, mapa ni ficha. Es backlog.
+- **QA (defecto detectado y corregido ANTES del deploy):** el INSERT enviaba `''` para `zona` ausente, que la CHECK rechazaba (500 en el pipeline); se corrigio normalizando a `NULL` (`(b.zona ? String(b.zona).trim() : null)`). No llego a produccion.
+- **Sin endpoints nuevos:** presupuesto 8/8 de Vercel Hobby intacto (ADR-001). Sin cambios en `tags` ni en el motor generico `CATEGORY_TAG_FIELDS`/`CATEGORY_TAG_LISTS` (no aplica: no es campo de tags).
+
+### Consecuencias positivas
+
+- Atributo transversal de primera clase, uniforme para todas las categorias (incluidos eventos), disponible en el contrato de `/api/destinos` y `/api/admin-destinos`.
+- Esquema aditivo, idempotente y ASCII-safe, auditable en el repo (ADR-008) y seguro de re-aplicar.
+- `region` (departamento) conserva su semantica; cero regresion sobre datos existentes.
+- Habilita a futuro filtros de directorio, SEO y agrupacion en mapa por region natural sin tabla intermedia.
+
+### Consecuencias negativas / riesgos residuales
+
+- Doble vocabulario de slugs (`destinos.zona` vs `zonas_geograficas` de la 027): deuda consciente sin FK; unificar si se enlaza el catalogo.
+- Obligatoriedad solo en UI: la DB acepta `NULL`, por lo que datos cargados por script pueden quedar sin zona.
+- Los ~103 `load-*-api.js`, `publicar-lugar.js` y `upload-eventos.js` aun no envian `zona` (cobertura parcial hasta su actualizacion).
+- Campo capturado pero aun no visible ni filtrable (valor de producto parcial hasta el backlog de render).
+- El orden de despliegue es estricto; invertirlo dispara `42703` (patron BUG-021/BUG-060).
+
+**ADRs relacionados:** ADR-001 (Vanilla/8 endpoints agotados), ADR-002 (ASCII-safe), ADR-003 (cero borrado logico / no toca tags), ADR-006 (baseline = archivo real), ADR-008 (schema versionado e idempotente), ADR-042 (migracion 027 zonas/marcas/patrocinios -- catalogo `zonas_geograficas` con slugs `andes`/`amazonia`, origen de la deuda de slugs), BUG-021/BUG-060 (patron migracion-antes-de-deploy).

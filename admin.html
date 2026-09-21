@@ -766,6 +766,17 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <label class="form-label">Barrio / Zona</label>
             <input class="form-input" id="f-barrio" type="text" placeholder="La Candelaria">
           </div>
+          <div class="form-group" id="fg-zona">
+            <label class="form-label">Zona <span class="req">*</span></label>
+            <select class="form-input" id="f-zona">
+              <option value="">Selecciona una zona</option>
+              <option value="andina">Andina</option>
+              <option value="amazonica">Amazonica</option>
+              <option value="llanos">Llanos</option>
+              <option value="caribe">Caribe</option>
+              <option value="pacifico">Pacifico</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Dirección</label>
@@ -2660,7 +2671,7 @@ async function editPlace(id) {
 
 function clearForm() {
   /* ── Basic field IDs ── */
-  var ids = ['f-name','f-slug','f-cat','f-city','f-region','f-barrio','f-address',
+  var ids = ['f-name','f-slug','f-cat','f-city','f-region','f-barrio','f-zona','f-address',
              'f-price','f-emoji','f-color','f-lead','f-desc','f-sintro','f-highlight',
              'f-horario','f-tipo','f-capacidad','f-duracion',
              'f-whatsapp','f-tel','f-email','f-web','f-instagram','f-booking',
@@ -3270,7 +3281,7 @@ function _faqMoveBtns() {
 function loadForm(p) {
   var map = {
     'f-name':p.name,'f-slug':p.slug,'f-cat':p.cat,'f-city':p.city,'f-region':p.region,
-    'f-barrio':p.barrio,'f-address':p.address,'f-price':p.price,'f-emoji':p.emoji,
+    'f-barrio':p.barrio,'f-zona':p.zona||'','f-address':p.address,'f-price':p.price,'f-emoji':p.emoji,
     'f-color':p.color,'f-lead':p.lead,'f-desc':p.desc,'f-sintro':p.sintro,'f-highlight':p.highlight,
     'f-horario':p.horario,'f-tipo':p.tipo,'f-capacidad':p.capacidad,
     'f-whatsapp':p.whatsapp,'f-tel':p.tel,
@@ -3934,7 +3945,7 @@ function savePlace() {
   var p = {
     id: currentId, status: editorStatus,
     name: v('f-name'), slug: v('f-slug'), cat: cat,
-    city: v('f-city'), region: v('f-region'), barrio: v('f-barrio'),
+    city: v('f-city'), region: v('f-region'), barrio: v('f-barrio'), zona: v('f-zona'),
     address: v('f-address'), price: v('f-price'), emoji: v('f-emoji'),
     color: v('f-color'), lead: v('f-lead'), desc: v('f-desc'),
     sintro: v('f-sintro'),
@@ -4066,7 +4077,8 @@ function validateForm() {
   var ok = true;
   [['fg-name','f-name','El nombre es obligatorio'],
    ['fg-cat','f-cat','Selecciona una categoría'],
-   ['fg-city','f-city','La ciudad es obligatoria']].forEach(function(r){
+   ['fg-city','f-city','La ciudad es obligatoria'],
+   ['fg-zona','f-zona','Selecciona la zona (region natural)']].forEach(function(r){
     var fg=document.getElementById(r[0]);
     var fi=document.getElementById(r[1]);
     if(fg&&fi){ var empty=!fi.value.trim();
@@ -4074,6 +4086,11 @@ function validateForm() {
       if(empty) ok=false;
     }
   });
+  var zonaEl = document.getElementById('f-zona');
+  if (zonaEl && !zonaEl.value.trim()) {
+    showAdminToast('Selecciona la zona (region natural)','error');
+    return false;
+  }
   if(!ok) showAdminToast('⚠️ Completa los campos obligatorios','error');
   return ok;
 }
@@ -6037,6 +6054,7 @@ function _placeToAPI(p) {
     ciudad:         p.city||'',
     region:         p.region||'',
     barrio:         p.barrio||'',
+    zona:           p.zona||'',
     address:        p.address||'',
     lat:            p.lat||null,
     lng:            p.lng||null,
@@ -6552,6 +6570,7 @@ async function migrarFotosANeon() {
 function _mergeNeonRowIntoLocal(local, d) {
   local.city    = d.ciudad        || local.city;
   local.region  = d.region        || local.region;
+  local.zona    = d.zona          || local.zona;
   local.price   = d.precio_desde  || local.price;
   local.tel     = d.telefono      || local.tel;
   local.desc    = d.descripcion   || local.desc;
