@@ -2416,6 +2416,21 @@ La pertenencia no es geografica: un medio pertenece al espacio si su `origen_id`
 
 Revision architect-review: APROBADA (2026-09-20) -- verificado contra archivo real: filterMediaPropios L202-230 sin cercania, mediasCercanas L1143-1149, export L1695-1696, cache-bust v=5, smoke 73/73; BUG-075 CERRADO, BUG-076 RECLASIFICADO; ADR-031/ADR-039 sin contradiccion; 8/8 intacto.
 
+**ENMIENDA 2 (2026-09-21) -- APROBADO (decision de producto del operador)**
+
+**Motivo.** La ENMIENDA 1 (2026-09-20, punto 3) nombraba `filterMisMapa` entre las superficies que "NO cambian" por la decision, al listarla como origen de pines de video/audio del index. Con la ubicacion individual por recurso (ADR-051) y el merge de la media de album PROPIA del dueno (`scope=mio`), el mapa personal SI incorpora esa media propia; el cambio es DELIBERADO y queda acotado a `filterMisMapa`. Donde haya contradiccion, PREVALECE esta enmienda. NO se borra el historial: el texto previo permanece como registro de la decision de 2026-09-20.
+
+**Regla nueva (VIGENTE).**
+
+1. **`filterMisMapa` (mapa personal "Mi Viaje", `mymapa.js`) SI incluye la media de album PROPIA del dueno** cuando viene marcada `_propia=true`: el fetch `?tipo=multimedia_mapa&scope=mio` viaja con `Authorization: Bearer` (uuid derivado de la sesion) y el merge marca `_propia` tanto en items nuevos como en los que ya estaban en la capa publica (`mymapa.js` L247-257); `filterMisMapa` los admite (L203) y `medirMediaActiva` los cuenta (L319-330). La pertenencia sigue siendo **SOLO por vinculo explicito** (ENMIENDA 1, punto 1): NO se reabre la heuristica de cercania.
+2. **`filterMediaDefault` (capa general del mapa cultural) se mantiene INTACTO** (L182-200): solo `destino`/`destino_album` de los destinos activos; `origen='album'` excluido. La enmienda NO altera la capa publica.
+3. **Cache-busting:** `mymapa.js?v=4`, `index-api-connector.js?v=2` (Bearer en el fetch `scope=mio`) y `mapa-cultural.js?v=7`, referenciados en los HTML consumidores.
+4. **Sin cambios de contrato:** `?tipo=multimedia_mapa` sigue emitiendo `origen`/`origen_id`; el backend solo adjunta el `Bearer` al consumir `scope=mio`. Presupuesto 8/8 intacto (ADR-001).
+
+**Estado de la enmienda:** APROBADO (2026-09-21). Regla vigente: el mapa personal incluye la media de album propia del dueno; `filterMediaDefault` intacto.
+
+**ADRs relacionados:** ADR-047 (este ADR, ENMIENDA 1), ADR-051 (ubicacion por recurso + `scope=mio`), BUG-081 (fuga del `scope=mio` sin sesion), BUG-074.
+
 ---
 
 ## ADR-048: Esquema tripartito de orquestacion de agentes -- ruteo por riesgo (Standard/Pro, Free/Open-Source y Hybrid)
@@ -2598,3 +2613,107 @@ El patron de la tabla no versionada (BUG-021) manda conservar los id cuando de e
 - **Dependencia del frontend:** un cliente legacy que envie fotos sin `id_neon` cae al fallback por url unica; sin url valida -> 400 anti-perdida (comportamiento intencional).
 
 **ADRs relacionados:** ADR-030 (este mismo; premisa L822-823 enmendada por este addendum), ADR-003 (Cero Borrado Logico: no se borra el texto original del ADR-030), ADR-001 (presupuesto 8/8), ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-008 (esquema versionado e idempotente), ADR-034/ADR-046 (hero y galeria de la ficha), BUG-021 (patron de tabla no versionada), BUG-056, BUG-062, BUG-079.
+
+---
+
+## ADR-051: Ubicacion individual por recurso de `album_fotos` (pin por video/foto)
+
+**ID:** ADR-051
+**Fecha:** 2026-09-21
+**Estado:** **APROBADO** (2026-09-21). Implementado en working tree junto al release `api/interacciones.js` **v24** (SIN commitear; ADR-006 rige: verificar el archivo real `api/interacciones.js`, `mi-perfil.html`, `mymapa.js` y `map-picker.js`). Migracion `db/migrations/029_album_fotos_coords.sql` **APLICADA en Neon el 2026-09-21** (handoff verificado por el operador; sin backfill, `filas_con_coords_propias=0`). **PENDIENTE: deploy (commit/push + Vercel) del backend v24 y del frontend.**
+**Autor:** architect (AI-DOS); decision de producto confirmada por el operador.
+**Alcance:** `db/migrations/029_album_fotos_coords.sql` (`album_fotos.lat/lng`), `api/interacciones.js` v24 (`multimedia_mapa` + ramas GET/POST `?tipo=museo_recurso`), `mi-perfil.html` (prefill `lat_propia`, boton "Quitar ubicacion"), `map-picker.js` (pin del modal arrastrable). NO crea endpoints (8/8, ADR-001) ni toca el esquema de albumes mas alla de las coords de carpeta ya existentes.
+**Supersede:** la **opcion 5** de ADR-039 ("Coords por recurso como columnas `lat/lng` en `album_fotos`", descartada en 2026-09-18), su **decision (B)** (el payload `lat/lng` se persistia en `albumes.lat/lng` del album destino, "el recurso se georreferencia a traves de su carpeta") y la **resolucion 9** de la ENMIENDA 1 de ADR-039 ("`accion=editar` solo toca `caption`, `visible`, `album_id` y coords del album"). El texto original NO se borra (Cero Borrado Logico, ADR-003): queda como registro historico del estado previo.
+
+### Contexto
+
+El modelo URL-only del Museo (ADR-039) decidio georreferenciar todo recurso de `album_fotos` a traves de las coords de su carpeta (`albumes.lat/lng`), con un unico pin por album. Eso hace imposible ubicar un video o una foto en un punto distinto del de su carpeta, incluso cuando el recurso documenta un lugar concreto (p.ej. dos videos de la misma carpeta rodados en barrios distintos). La opcion 5 del ADR-039 habia descartado las coords por recurso por "duplicar la georreferencia del album y obligar a redisenar el UNION de `multimedia_mapa`"; el producto ahora necesita justamente ese pin individual. La migracion 029 es ADITIVA e idempotente (ADR-008) y no rompe el modelo de carpetas: el album conserva las suyas y el recurso puede sobrescribirlas.
+
+### Decision tomada
+
+1. **`album_fotos.lat/lng DOUBLE PRECISION NULL`** (migracion 029, idempotente ADR-008; CHECK `album_fotos_coords_chk` = ambos NULL o ambos no NULL; indice `idx_album_fotos_coords` para la capa del mapa, solo filas con coords propias). Sin backfill: lo existente queda `NULL` y hereda del album (comportamiento previo intacto).
+2. **Semantica de fallback (recurso -> album -> coordsFallbackAutor).** El pin efectivo de un recurso es `COALESCE(af.lat, a.lat)`; si ambos son NULL, `multimedia_mapa` conserva el fallback historico `coordsFallbackAutor()` (coords de la primera interaccion del autor, BUG-B/v12) y solo entonces descarta el item si sigue sin coords. `adelante` del album no se toca desde el recurso salvo que el payload lo pida explicitamente.
+3. **`multimedia_mapa` emite `COALESCE(af.lat, a.lat)` / `COALESCE(af.lng, a.lng)`** en la rama album del UNION (`api/interacciones.js` L4810), de modo que un recurso con coords propias se pinta en su punto y uno sin ellas en el de su carpeta.
+4. **`GET ?tipo=museo_recurso`** expone `lat_propia`/`lng_propia` (solo las del recurso), `coords_heredadas` (true si `af.lat IS NULL`) y `lat`/`lng` EFECTIVAS (`COALESCE`), para que el frontend sepa si el pin es propio o heredado (`api/interacciones.js` L3838-3873).
+5. **`POST ?tipo=museo_recurso`** (crear/editar):
+   - `accion=crear`: persiste `af.lat/lng` del recurso con `COALESCE` al sembrar (nunca sobrescribe un valor existente); acepta `album_lat/album_lng` para fijar las coords de la CARPETA en `albumes`.
+   - `accion=editar`: persiste `af.lat/lng` del recurso; `quitar_coords=true` vuelve a NULL (hereda del album). Si llegan `lat/lng` y `quitar_coords` juntos, GANA `quitar_coords` (documentado).
+   - Validacion de rango bloqueante (lat [-90,90], lng [-180,180]) y `album_lat`/`album_lng` siempre juntos (400).
+6. **Frontend:** `mi-perfil.html` precarga el pin SOLO desde `lat_propia`/`lng_propia` (H-5: no materializar las heredadas al editar) y ofrece "Quitar ubicacion" (`museoQuitarUbicacion()` -> `quitar_coords`); `map-picker.js` permite arrastrar el pin del modal (`dragend` -> inputs lat/lng).
+
+### Justificacion
+
+El pin por recurso es la unica forma de representar un lugar concreto por video/foto sin duplicar el modelo de carpetas: las coords del recurso son opcionales y aditivas, el album sigue siendo el fallback natural y el fallback por autor cubre los casos sin georreferencia. La migracion aditiva evita romper el UNION de `multimedia_mapa` (que ya usaba `a.lat/a.lng`) y no requiere backfill: `COALESCE` mantiene el comportamiento previo para todo lo existente. Separar `lat_propia` de `lat` efectiva en el GET permite una UI honesta (distinguir pin propio de heredado) sin logica client-side fragil.
+
+### Impacto
+
+- **DB:** `db/migrations/029_album_fotos_coords.sql` (NUEVA, aditiva/idempotente/ASCII-safe; `ADD COLUMN IF NOT EXISTS lat/lng`, CHECK + indice). **APLICADA en Neon el 2026-09-21.**
+- **`api/interacciones.js` v24:** rama album de `multimedia_mapa` con `COALESCE(af.lat,a.lat)` (L4810) y `coords_heredadas` (L4861); `GET museo_recurso` con `lat_propia/lng_propia/coords_heredadas` + `lat/lng` efectivas (L3838-3873); `POST museo_recurso` crear/editar con `lat/lng` del recurso, `album_lat/album_lng` y `quitar_coords` (L6573/L6588/L6675-6726/L6754-6759).
+- **Frontend:** `mi-perfil.html` (prefill `lat_propia` L2479-2483; "Quitar ubicacion" L818/L2449-2456), `map-picker.js` (pin arrastrable L164-165/L229-230).
+- **Presupuesto:** 8/8 intacto (ADR-001). Sin endpoints nuevos.
+- **Bugs relacionados:** el fix de seguridad de `scope=mio` viaja en el mismo release v24 (**BUG-081**, fuga de media privada de terceros).
+
+### Consecuencias positivas
+
+- Cada video/foto puede tener su propio pin sin duplicar el modelo de carpetas; la carpeta sigue siendo el fallback.
+- Lo existente no cambia: `COALESCE` reproduce el comportamiento previo cuando `af.lat IS NULL`.
+- `lat_propia` vs `lat` efectiva da una UI honesta (pin propio vs heredado).
+
+### Consecuencias negativas / riesgos residuales
+
+- **Doble fuente de coords:** recurso y carpeta pueden divergir; la UI debe dejar claro cual se usa (hint + `coords_heredadas`). El recurso NUNCA debe materializar las heredadas al editar (H-5).
+- **`quitar_coords` gana sobre `lat/lng`** si llegan juntos: contrato explicito pero contraintuitivo; documentado y cubierto por el frontend.
+- **`coordsFallbackAutor` sigue siendo el ultimo recurso** para recursos sin coords propias ni de carpeta; si tampoco hay, el item se descarta del mapa (comportamiento previo).
+- **Pendiente de deploy:** mientras v24 no se despliegue, el `COALESCE` y los campos nuevos no llegan a produccion.
+
+**ADRs relacionados:** ADR-039 (opcion 5, decision (B) y ENMIENDA 1 resolucion 9 SUPERSEDIDAS por este ADR; el modelo URL-only, la visibilidad por recurso y las carpetas=albumes siguen vigentes), ADR-047 (regla de propiedad del mapa: el pin por recurso NO cambia la pertenencia, que sigue por `origen_id`; ver ENMIENDA 2), ADR-031 (capa publica del mapa), ADR-032 (guardados), ADR-036 (media unificada), ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico), ADR-006 (baseline = archivo real), ADR-008 (SQL versionado/idempotente), BUG-081.
+
+---
+
+## ADR-052: Carpetas de guardados de media (organizacion privada)
+
+**ID:** ADR-052
+**Fecha:** 2026-09-21
+**Estado:** **APROBADO** (2026-09-21). Implementado en working tree junto al release `api/interacciones.js` **v24** (SIN commitear; ADR-006 rige: verificar el archivo real). Migracion `db/migrations/030_guardados_carpetas.sql` **APLICADA en Neon el 2026-09-21**. **PENDIENTE: deploy (commit/push + Vercel).**
+**Autor:** architect (AI-DOS); decision de producto confirmada por el operador.
+**Alcance:** `db/migrations/030_guardados_carpetas.sql` (tabla `guardados_carpetas` + `media_guardados.carpeta_id`), `api/interacciones.js` v24 (GET `mis_guardados_media` + nueva rama POST `?tipo=guardados_carpeta`), `mi-perfil.html` (chips de carpetas + modal). **NO toca el Museo ni `albumes`/`album_fotos`.** Sin endpoints nuevos (8/8, ADR-001).
+
+### Contexto
+
+El sistema de bookmarks de media (`media_guardados`, ADR-032) guarda una lista PLANA de referencias privadas del usuario a items de otros (fuente `album`/`album_foto`/`viajero_foto`). El operador pidio poder organizar esa lista en carpetas personales (privadas) con crear/renombrar/eliminar/mover, sin reutilizar el sistema de albumes del Museo: los albumes son PUBLICOS y modelan recursos propios (Museo, ADR-039), mientras que una carpeta de guardados es privada y agrupa bookmarks de terceros. Se necesita, ademas, que el contrato deje de degradar silenciosamente a `[]` cuando falta el esquema.
+
+### Decision tomada
+
+1. **Tabla `guardados_carpetas`** (migracion 030, aditiva/idempotente ADR-008): `id uuid PK DEFAULT gen_random_uuid()`, `usuario_id uuid NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE`, `nombre`, `orden`, `activo boolean NOT NULL DEFAULT true`, timestamps. Indice `idx_guardados_carpetas_usuario`. Es el gemelo PRIVADO del album: NO se reutiliza `albumes` (que es publico) ni se toca `album_fotos`.
+2. **`media_guardados.carpeta_id uuid NULL REFERENCES guardados_carpetas(id) ON DELETE SET NULL`** (columna aditiva en la misma migracion; idempotente via guard `information_schema`/`pg_constraint`): la carpeta es OPCIONAL; un bookmark sin carpeta queda `NULL` (filtro "Sin carpeta").
+3. **Nueva rama `POST ?tipo=guardados_carpeta`** con `accion=crear|renombrar|eliminar|mover` (`api/interacciones.js` L7171-7288), **`validarSesion` OBLIGATORIO** (ADR-025): el `usuario_id` se deriva de la sesion firmada, NUNCA del body (cierra spoofing/IDOR). `mover` acepta `carpeta_id` NULL para sacar de carpeta.
+4. **Soft-delete sin borrar bookmarks (ADR-003 / Regla de Oro 3):** `eliminar` hace `UPDATE guardados_carpetas SET activo=false` y reasigna `media_guardados.carpeta_id = NULL` de sus items (los bookmarks NO se borran, solo pierden la carpeta). `renombrar`/`mover` validan pertenencia.
+5. **`GET ?tipo=mis_guardados_media`** suma `carpeta_id`/`carpeta_nombre` por item (LEFT JOIN degradable con `conDegradacionMedia`) y expone `carpetas:[]` (L5027-5080). Si falta la migracion 030, YA NO degrada a `[]`: responde **503 `SCHEMA_NOT_MIGRATED`** tipado (nunca escritura/lectura silenciosa). El fallback a lista vacia de ADR-032 queda SUPERSEDIDO para esta rama.
+6. **Frontend:** `mi-perfil.html` reutiliza `mediaCardHTML()` y `window.MediaActions` para el espacio del recurso (ver/votar/quitar/guardar-en-carpeta) + chips de carpetas y modal (L1982-2199).
+
+### Justificacion
+
+Una tabla propia y privada es la minima abstraccion que resuelve organizacion sin contaminar el modelo publico del Museo: reutilizar `albumes` habria mezclado visibilidad publica con private bookmarks y roto la semantica de ADR-039. El `ON DELETE SET NULL` + soft-delete protege el dato del usuario: eliminar una carpeta nunca destruye un bookmark (ADR-003). Exigir `validarSesion` en la unica superficie de mutacion cierra la clase de IDOR ya vista (BUG-061/BUG-081). Sustituir la degradacion silenciosa por 503 `SCHEMA_NOT_MIGRATED` hace visible la falta de esquema en vez de simular "sin guardados" (deuda que ADR-032 habia dejado abierta).
+
+### Impacto
+
+- **DB:** `db/migrations/030_guardados_carpetas.sql` (NUEVA, aditiva/idempotente/ASCII-safe; tabla + columna + 3 indices). **APLICADA en Neon el 2026-09-21.**
+- **`api/interacciones.js` v24:** GET `mis_guardados_media` con `carpeta_id`/`carpeta_nombre` + `carpetas:[]` y 503 tipado (L5027-5080); nueva rama POST `guardados_carpeta` con `validarSesion` (L7169-7288).
+- **Frontend:** `mi-perfil.html` (chips, modal, `misCarpetasPost` L2089-2105, `guardarEnCarpeta` L2199+).
+- **Presupuesto:** 8/8 intacto (ADR-001). Sin migracion de datos (sin backfill).
+- **Relacion con ADR-032:** extiende `media_guardados` sin cambiar su PK `(usuario_id, fuente, item_id)`; el bookmark sigue siendo idempotente y reversible. **Relacion con ADR-036:** usa las mismas fuentes `album`/`album_foto`/`viajero_foto` y el patron `conDegradacionMedia`.
+
+### Consecuencias positivas
+
+- Los guardados se organizan en carpetas privadas sin tocar el Museo ni el modelo de albumes.
+- Eliminar/renombrar/mover es seguro: la sesion es obligatoria y el bookmark nunca se pierde.
+- El contrato deja de ocultar fallos de esquema: 503 `SCHEMA_NOT_MIGRATED` visible.
+
+### Consecuencias negativas / riesgos residuales
+
+- **Migracion 030 obligatoria antes del deploy:** sin ella, `mis_guardados_media` responde 503 y las mutaciones de carpeta tambien (comportamiento intencional, no degradado).
+- **`carpetas:[]` cambia el shape del GET:** clientes viejos que asumian degradacion a `[]` deben manejar el 503 (retrocompatibilidad parcial, documentada).
+- **Sin jerarquia:** carpetas planas (igual que albumes); no hay anidamiento.
+- **Pendiente de deploy:** v24 no esta en produccion; el gate es 029/030 en Neon (YA aplicadas) -> backend v24 -> frontend.
+
+**ADRs relacionados:** ADR-032 (media_guardados; su degradacion a `[]` queda supersedida en esta rama), ADR-036 (media unificada + fuentes), ADR-039 (Museo/albumes NO se tocan), ADR-025 (sesion firmada / `validarSesion`), ADR-003 (Cero Borrado Logico / soft-delete), ADR-008 (SQL versionado/idempotente), ADR-001 (8/8), ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), BUG-061, BUG-081.

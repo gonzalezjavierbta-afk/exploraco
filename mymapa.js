@@ -198,6 +198,9 @@
       if (!it || !it.media_url) return false;
       var k = claveGuardado(it);
       if (k && SET_GUARDADOS[k]) return true;
+      // Media propia de album (fetch scope=mio): siempre visible en el
+      // mapa personal, aunque filterMediaDefault la excluya por origen.
+      if (it.origen === 'album' && it._propia) return true;
       return !!(it.key != null && estrictos[it.key]);
     });
   }
@@ -227,8 +230,51 @@
   }
 
   // ---- Capa de media (multimedia_mapa) --------------------------------
-  // Un unico fetch cacheado; el modulo filtra con filterMisMapa (estricto
-  // por slug de destinos activos + media guardada por el usuario).
+  // Clave de dedupe identica a la que usa el motor (normalizeMedia de
+  // mapa-cultural.js: origen:origen_id:media_url). Reutiliza el helper
+  // exportado para no duplicar la regla; si no esta disponible cae al
+  // mismo formato local.
+  function mediaKey(it) {
+    if (window.MapaCultural && typeof window.MapaCultural.normalizeMedia === 'function') {
+      var n = window.MapaCultural.normalizeMedia(it);
+      if (n && n.key != null) return String(n.key);
+    }
+    return String(it.origen || '') + ':' + String(it.origen_id || '') + ':'
+      + String(it.media_url || '');
+  }
+
+  // Merge de la lista publica con la del scope=mio. Todo item que llega
+  // del fetch propio queda marcado _propia = true (tambien si ya existia
+  // en la publica) para que filterMisMapa/medirMediaActiva lo reconozcan.
+  function mergeMediaPropia(publicos, propios) {
+    var out = (publicos || []).filter(Boolean);
+    var vistos = {};
+    out.forEach(function (it) { vistos[mediaKey(it)] = it; });
+    (propios || []).forEach(function (it) {
+      if (!it) return;
+      it._propia = true;
+      var k = mediaKey(it);
+      if (vistos[k]) vistos[k]._propia = true;
+      else { vistos[k] = it; out.push(it); }
+    });
+    return out;
+  }
+
+  // Aplica la lista final al motor y libera el flag de carga en un solo
+  // sitio (exito, fallo propio o ausencia de sesion).
+  function aplicarMedia(lista) {
+    MEDIA_CARGANDO = false;
+    MEDIA_CACHE = lista || [];
+    var mm = ensureMC();
+    if (mm) mm.setMedia(MEDIA_CACHE);
+    medirMediaActiva();
+    if (mm && typeof mm.refresh === 'function') mm.refresh();
+  }
+
+  // Capa de media: fetch publico + (con sesion) fetch scope=mio firmado
+  // con Authorization: Bearer. scope=mio exige sesion (400
+  // SESION_REQUERIDA sin header) y el uuid del dueno se deriva de ella.
+  // Si el fetch propio falla, se conserva la lista publica sin romper.
   function recargarMedia() {
     var m = ensureMC();
     if (!m) return;
@@ -243,16 +289,28 @@
     fetch(api() + '/api/interacciones?tipo=multimedia_mapa')
       .then(leerJson)
       .then(function (d) {
-        MEDIA_CARGANDO = false;
-        MEDIA_CACHE = (d && d.ok && d.data) ? d.data : [];
-        var mm = ensureMC();
-        if (mm) mm.setMedia(MEDIA_CACHE);
-        medirMediaActiva();
-        if (mm && typeof mm.refresh === 'function') mm.refresh();
+        var publicos = (d && d.ok && d.data) ? d.data : [];
+        var u = usuario();
+        if (!u || !u.id) { aplicarMedia(publicos); return null; }
+        var headers = {};
+        if (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function') {
+          headers = window.ExploraCO.authHeaders() || {};
+        }
+        return fetch(api() + '/api/interacciones?tipo=multimedia_mapa&scope=mio',
+          { headers: headers })
+          .then(leerJson)
+          .then(function (p) {
+            var propios = (p && p.ok && p.data) ? p.data : [];
+            aplicarMedia(mergeMediaPropia(publicos, propios));
+          })
+          .catch(function (e) {
+            logWarn('media propia', e);
+            aplicarMedia(publicos);
+          });
       })
       .catch(function (e) {
-        MEDIA_CARGANDO = false;
         logWarn('media mapa', e);
+        MEDIA_CARGANDO = false;
       });
   }
 
@@ -268,7 +326,10 @@
       if (hay || !it) return;
       var k = claveGuardado(it);
       if (k && SET_GUARDADOS[k]) { hay = true; return; }
-      if (it.origen === 'album') return;
+      if (it.origen === 'album') {
+        if (it._propia) hay = true;
+        return;
+      }
       if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
     });
     // Fuerza el encendido maestro cuando hay media para el mapa activo,

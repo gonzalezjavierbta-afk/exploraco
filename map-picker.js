@@ -217,6 +217,25 @@
         });
     }
 
+    /* Sincroniza la coordenada interna, el pin del modal y el texto de
+       coords. El pin es arrastrable: dragend vuelve por aqui (mismo patron
+       que el mini-mapa, updateMiniMap). El listener de dragend se engancha
+       UNA sola vez, al crear el marker. */
+    function aplicarPickerLatLng(latlng) {
+      pickerLatLng = latlng;
+      if (pickerMarker) {
+        pickerMarker.setLatLng(latlng);
+      } else {
+        pickerMarker = root.L.marker(latlng, { draggable: true }).addTo(pickerMap);
+        pickerMarker.on('dragend', function (e) { aplicarPickerLatLng(e.target.getLatLng()); });
+      }
+      var coordsEl = document.getElementById(coordsDisplayId);
+      if (coordsEl) {
+        coordsEl.textContent = PIN + ' ' + latlng.lat.toFixed(precision)
+          + ', ' + latlng.lng.toFixed(precision);
+      }
+    }
+
     function openMapPicker() {
       if (!hasLeaflet()) return;
       var modal = document.getElementById(modalElId);
@@ -228,16 +247,7 @@
           var lng = parseFloat(inputValue(lngInputId)) || centerLng;
           pickerMap = root.L.map(pickerMapElId).setView([lat, lng], pickerZoom);
           root.L.tileLayer(tileUrl, { attribution: '&copy; CARTO', maxZoom: 19 }).addTo(pickerMap);
-          pickerMap.on('click', function (e) {
-            pickerLatLng = e.latlng;
-            if (pickerMarker) pickerMarker.setLatLng(e.latlng);
-            else pickerMarker = root.L.marker(e.latlng).addTo(pickerMap);
-            var coordsEl = document.getElementById(coordsDisplayId);
-            if (coordsEl) {
-              coordsEl.textContent = PIN + ' ' + e.latlng.lat.toFixed(precision)
-                + ', ' + e.latlng.lng.toFixed(precision);
-            }
-          });
+          pickerMap.on('click', function (e) { aplicarPickerLatLng(e.latlng); });
         }
         if (pickerMap) pickerMap.invalidateSize();
       }, 200);

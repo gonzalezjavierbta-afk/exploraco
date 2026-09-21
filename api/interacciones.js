@@ -1,3 +1,25 @@
+// api/interacciones.js  v24 (seguridad multimedia_mapa H-1/H-2 + ADR-052
+// carpetas de guardados):
+//   (1) H-1/H-2 (multimedia_mapa): scope=mio EXIGE sesion firmada
+//       (verificarSesion) y deriva el dueno del token; el query param
+//       usuario_id se ignora. La clausula af.visible solo se suprime con
+//       dueno autenticado (mmScopeMio && mmUsuarioId): no se puede leer
+//       media privada de terceros ni de todos sin Bearer.
+//   (2) ADR-052 (carpetas de guardados): helper normalizarNombreCarpeta;
+//       mis_guardados_media expone carpeta_id/carpeta_nombre + listado de
+//       carpetas (503 SCHEMA_NOT_MIGRATED tipado, sin degradar a []); nueva
+//       rama POST ?tipo=guardados_carpeta (crear|renombrar|eliminar|mover)
+//       con sesion firmada.
+//   (3) Feature A / ADR-051 (migracion 029): ubicacion individual por
+//       recurso de album. multimedia_mapa emite COALESCE(af.lat,a.lat)
+//       (fallback vivo recurso -> album -> autor); museo_recurso GET
+//       expone lat_propia/lng_propia + coords_heredadas y lat/lng
+//       efectivas; POST crear|editar persisten af.lat/lng del recurso,
+//       aceptan album_lat/album_lng hacia albumes (COALESCE al sembrar,
+//       nunca sobrescriben) y quitar_coords vuelve a heredar del album.
+//   REQUIERE las migraciones 029 (album_fotos.lat/lng) y 030
+//   (guardados_carpetas + media_guardados.carpeta_id) aplicadas en Neon
+//   ANTES del deploy (patron BUG-021/BUG-060).
 // api/interacciones.js  v23 (TSK-118/ADR-041 incremento sobre el release v22 ADR-039 + ADR-040 + T4.5):
 //   (1) Museo URL-only (ADR-039): ramas GET/POST tipo=museo_recurso
 //       (crear/editar/eliminar/listar) sobre album_fotos con visibilidad
@@ -2771,6 +2793,25 @@ function conDegradacionMedia(promesa, etiqueta, valor) {
   });
 }
 
+// v24 (ADR-052): true si el error indica esquema ausente (migracion
+// pendiente). Lo comparten los lectores/escritores de carpetas de guardados
+// para responder 503 SCHEMA_NOT_MIGRATED tipado en vez de degradar en
+// silencio o caer al 500 global.
+function esEsquemaFaltante(e) {
+  return !!(e && (e.code === '42P01' || e.code === '42703'));
+}
+
+// v24 (ADR-052): normaliza el nombre de una carpeta de guardados: trim,
+// colapso de espacios internos y corte a 80 (varchar(80) CHECK 1..80).
+// Devuelve '' si queda vacio; el caller responde 400. Sin duplicar el
+// saneamiento en las 4 acciones (Regla de No-Duplicidad).
+function normalizarNombreCarpeta(nombre) {
+  return String(nombre === undefined || nombre === null ? '' : nombre)
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 80);
+}
+
 // Progreso anti-spam (usuarios.progreso_album): lo comparten albumes,
 // comentarios y votos. Se movio del handler al modulo para reutilizarlo en
 // crearComentarioMedia sin duplicar el cuerpo.
@@ -3794,7 +3835,9 @@ module.exports = async function handler(req, res) {
         var mrOffIdx = mrParams.length;
         var mrRows = await sql(
           'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
-          + ' af.media_title, af.foto_type, a.lat, a.lng, a.ciudad, af.visible, af.creado_en'
+          + ' af.media_title, af.foto_type, af.lat AS lat_propia, af.lng AS lng_propia,'
+          + ' COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng,'
+          + ' a.ciudad, af.visible, af.creado_en'
           + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
           + mrWhere
           + ' ORDER BY af.creado_en DESC'
@@ -3817,10 +3860,17 @@ module.exports = async function handler(req, res) {
           });
         }
         var mrData = mrRows.map(function(r) {
+          // A2 (ADR-051): lat/lng son las EFECTIVAS (recurso o album);
+          // lat_propia/lng_propia solo la del recurso; coords_heredadas
+          // indica que el pin proviene de la carpeta (af.lat IS NULL).
           return {
             id: r.id, album_id: r.album_id, album_titulo: r.album_titulo,
             foto_url: r.foto_url, media_title: r.media_title,
-            tipo_media: r.foto_type, lat: r.lat, lng: r.lng, ciudad: r.ciudad,
+            tipo_media: r.foto_type,
+            lat_propia: (r.lat_propia === null || r.lat_propia === undefined) ? null : r.lat_propia,
+            lng_propia: (r.lng_propia === null || r.lng_propia === undefined) ? null : r.lng_propia,
+            coords_heredadas: (r.lat_propia === null || r.lat_propia === undefined),
+            lat: r.lat, lng: r.lng, ciudad: r.ciudad,
             visible: r.visible === true,
             votos: mrVotos[String(r.id)] || 0,
             creado_en: r.creado_en,
@@ -4674,7 +4724,8 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: crRows });
       }
 
-      // Mapa audiovisual: UNION de album_fotos (con lat/lng del album) + destinos_fotos.
+      // Mapa audiovisual: UNION de album_fotos (A1/ADR-051: lat/lng PROPIA
+      // del recurso con fallback a la del album via COALESCE) + destinos_fotos.
       // Nota: en un UNION, $N se comparte entre ambas ramas. Usamos $1/$2 fijos.
       if (tipo === 'multimedia_mapa') {
         // v10 (ADR-023): multi-seleccion endurecida. Los tokens se
@@ -4708,17 +4759,21 @@ module.exports = async function handler(req, res) {
         // filtro restrictivo H-1/ADR-021 solo se aplica con scope=mio
         // (toggle "Solo mio" del mapa). Default = contenido publico.
         var mmScopeMio = String(req.query.scope || '').toLowerCase() === 'mio';
-        // El usuario_id se valida como uuid ANTES de tocar el SQL: si no lo
-        // es, el filtro se ignora (nunca se manda texto no-uuid a un cast
-        // ::uuid, que reventaria con 22P02).
+        // v24 (H-1/H-2): scope=mio es un filtro de DUENO y exige sesion
+        // firmada. El usuario sale del token (verificarSesion), NUNCA del
+        // query param: pedir los privados de un tercero con
+        // ?scope=mio&usuario_id=... ya no es posible. Sin dueno autenticado
+        // no se puede suprimir af.visible (ver clausula del UNION).
         var mmUsuarioId = null;
-        var mmUsuarioRaw = req.query.usuario_id;
-        if (mmUsuarioRaw !== undefined && mmUsuarioRaw !== null) {
-          var mmUsuarioStr = String(mmUsuarioRaw).trim();
-          if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mmUsuarioStr))
-            mmUsuarioId = mmUsuarioStr;
+        if (mmScopeMio) {
+          var mmSes = verificarSesion(req);
+          if (!mmSes.ok)
+            return res.status(400).json({ ok: false, error: 'SESION_REQUERIDA' });
+          var mmSub = String(mmSes.sub || '').trim();
+          if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mmSub))
+            return res.status(400).json({ ok: false, error: 'SESION_INVALIDA' });
+          mmUsuarioId = mmSub;
         }
-        if (!mmScopeMio) mmUsuarioId = null;
         // TSK-111 (CAMBIO 8): destino_id OPCIONAL para el album oficial
         // del pin del mapa. Se valida con la MISMA regex uuid inline que
         // usuario_id: si no viene o no es uuid, se ignora y la respuesta
@@ -4751,7 +4806,8 @@ module.exports = async function handler(req, res) {
         var multimediaRows = await conDegradacionMedia(queryConAvatarFallback(sql,
           '('
           + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
-          + '  af.media_title, af.media_source, a.lat, a.lng, a.ciudad,'
+          + '  af.media_title, af.media_source,'
+          + '  COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng, a.ciudad,'
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
           + '  u.nombre AS usuario_nombre, __FOTO_URL__ AS usuario_avatar,'
           + '  af.autor_original_id::text AS usuario_id, a.id::text AS album_id,'
@@ -4762,10 +4818,10 @@ module.exports = async function handler(req, res) {
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE a.activo=true AND af.activo=true'
-          // ADR-039 (D.1): capa publica solo visible=true; scope=mio (dueno)
-          // conserva sin filtro para que vea sus privados. Clausula FIJA: no
-          // altera los indices $N compartidos por el UNION.
-          + (mmScopeMio ? '' : ' AND af.visible = true')
+          // ADR-039 (D.1) / v24 (H-1): capa publica solo visible=true. La
+          // clausula SOLO se suprime con dueno autenticado (mmScopeMio ya
+          // implica session valida); jamas sin mmUsuarioId.
+          + (mmScopeMio && mmUsuarioId ? '' : ' AND af.visible = true')
           + (mmIdxTipos ? ' AND af.foto_type = ANY($' + mmIdxTipos + '::text[])' : '')
           + (mmIdxCiudad ? ' AND a.ciudad = $' + mmIdxCiudad : '')
           + (mmIdxUsuario ? ' AND a.usuario_id = $' + mmIdxUsuario + '::uuid' : '')
@@ -4964,46 +5020,66 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: mfRows });
       }
 
-      // ADR-032 (v17): "Mis guardados" de media del museo (bookmarks de
-      // fotos y albumes de terceros). Si la migracion 019 (media_guardados)
-      // aun no esta aplicada, degrada a lista vacia en vez del 503 global.
+      // ADR-032 (v17) + ADR-052 (v24): "Mis guardados" de media del museo
+      // (bookmarks de fotos y albumes de terceros). Cada bookmark emite su
+      // carpeta (migracion 030) y la respuesta suma el listado de carpetas
+      // activas del usuario. Si la migracion 030 no esta aplicada
+      // (42P01/42703) se responde 503 SCHEMA_NOT_MIGRATED tipado: NUNCA se
+      // degrada a [] en silencio (hallazgo H-4) para no confundir "sin
+      // datos" con "esquema pendiente".
       if (tipo === 'mis_guardados_media') {
         var mgUsuario = usuarioId ? String(usuarioId).trim() : '';
         if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mgUsuario))
           return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
-        var mgRows = await sql(
-          'SELECT sub.* FROM ('
-          + ' SELECT \'album\' AS fuente, mg.item_id::text AS item_id, mg.creado_en,'
-          + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, \'album\' AS media_type,'
-          + '  a.ciudad AS ciudad, a.id::text AS album_id, NULL::text AS destino_slug'
-          + ' FROM media_guardados mg JOIN albumes a ON a.id::text = mg.item_id'
-          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true AND a.activo = true'
-          + ' UNION ALL'
-          + ' SELECT \'album_foto\', mg.item_id::text, mg.creado_en,'
-          + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, af.foto_type,'
-          + '  a.ciudad, a.id::text, NULL::text'
-          + ' FROM media_guardados mg JOIN album_fotos af ON af.id::text = mg.item_id'
-          + ' JOIN albumes a ON a.id = af.album_id'
-          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true AND af.activo = true'
-          + ' UNION ALL'
-          + ' SELECT \'viajero_foto\', mg.item_id::text, mg.creado_en,'
-          + '  d.nombre AS titulo, i.texto AS media_url, \'foto\' AS media_type,'
-          + '  d.ciudad, NULL::text, d.slug'
-          + ' FROM media_guardados mg JOIN interacciones i ON i.id::text = mg.item_id'
-          + ' JOIN destinos d ON d.id = i.destino_id'
-          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
-          + ' UNION ALL'
-          + ' SELECT \'curada\', mg.item_id::text, mg.creado_en,'
-          + '  d.nombre AS titulo, df.url AS media_url, \'foto\' AS media_type,'
-          + '  d.ciudad, NULL::text, d.slug'
-          + ' FROM media_guardados mg'
-          + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
-          + ' JOIN destinos d ON d.id = df.destino_id'
-          + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'curada\' AND mg.activo = true'
-          + ' ) sub ORDER BY sub.creado_en DESC LIMIT 200',
-          [mgUsuario]
-        ).catch(function(eMg){ console.warn('[interacciones] mis_guardados_media fallo: ' + (eMg && eMg.message ? eMg.message : eMg)); return []; });
-        return res.status(200).json({ ok: true, data: mgRows });
+        var mgRows, mgCarpetas;
+        try {
+          mgRows = await sql(
+            'SELECT sub.*, COALESCE(gc.nombre, \'\') AS carpeta_nombre FROM ('
+            + ' SELECT \'album\' AS fuente, mg.item_id::text AS item_id, mg.creado_en,'
+            + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, \'album\' AS media_type,'
+            + '  a.ciudad AS ciudad, a.id::text AS album_id, NULL::text AS destino_slug,'
+            + '  mg.carpeta_id::text AS carpeta_id'
+            + ' FROM media_guardados mg JOIN albumes a ON a.id::text = mg.item_id'
+            + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true AND a.activo = true'
+            + ' UNION ALL'
+            + ' SELECT \'album_foto\', mg.item_id::text, mg.creado_en,'
+            + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, af.foto_type,'
+            + '  a.ciudad, a.id::text, NULL::text, mg.carpeta_id::text'
+            + ' FROM media_guardados mg JOIN album_fotos af ON af.id::text = mg.item_id'
+            + ' JOIN albumes a ON a.id = af.album_id'
+            + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true AND af.activo = true'
+            + ' UNION ALL'
+            + ' SELECT \'viajero_foto\', mg.item_id::text, mg.creado_en,'
+            + '  d.nombre AS titulo, i.texto AS media_url, \'foto\' AS media_type,'
+            + '  d.ciudad, NULL::text, d.slug, mg.carpeta_id::text'
+            + ' FROM media_guardados mg JOIN interacciones i ON i.id::text = mg.item_id'
+            + ' JOIN destinos d ON d.id = i.destino_id'
+            + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
+            + ' UNION ALL'
+            + ' SELECT \'curada\', mg.item_id::text, mg.creado_en,'
+            + '  d.nombre AS titulo, df.url AS media_url, \'foto\' AS media_type,'
+            + '  d.ciudad, NULL::text, d.slug, mg.carpeta_id::text'
+            + ' FROM media_guardados mg'
+            + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
+            + ' JOIN destinos d ON d.id = df.destino_id'
+            + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'curada\' AND mg.activo = true'
+            + ' ) sub'
+            + ' LEFT JOIN guardados_carpetas gc ON gc.id = sub.carpeta_id::uuid AND gc.activo = true'
+            + ' ORDER BY sub.creado_en DESC LIMIT 200',
+            [mgUsuario]
+          );
+          mgCarpetas = await sql(
+            'SELECT id::text AS id, nombre, orden FROM guardados_carpetas'
+            + ' WHERE usuario_id = $1::uuid AND activo = true'
+            + ' ORDER BY orden ASC, creado_en ASC',
+            [mgUsuario]
+          );
+        } catch (eMg) {
+          if (!esEsquemaFaltante(eMg)) throw eMg;
+          console.error('[interacciones] mis_guardados_media sin migracion 030 (carpetas): ' + (eMg.message || eMg));
+          return res.status(503).json({ ok: false, error: 'SCHEMA_NOT_MIGRATED' });
+        }
+        return res.status(200).json({ ok: true, data: mgRows, carpetas: mgCarpetas });
       }
 
       // Top fotos para curacion de directorios (por coord match)
@@ -6493,9 +6569,11 @@ module.exports = async function handler(req, res) {
             mrAlbumId = mrMiMuseo[0].id;
           }
 
-          // Coords del payload: ambos o ninguno; se persisten en el album
-          // destino (el recurso hereda la ubicacion de su carpeta). La
-          // tabla albumes no tiene columna barrio: solo ciudad/region.
+          // A3 (ADR-051): body.lat/lng son coords DEL RECURSO (van a
+          // album_fotos); body.album_lat/album_lng son coords de la CARPETA
+          // (van a albumes). Si la carpeta no tiene coords y el recurso si,
+          // se siembra la carpeta con las del recurso SOLO si esta vacia:
+          // COALESCE(lat,$1) nunca sobrescribe coords ya existentes.
           var mrTraeLat = (body.lat !== undefined && body.lat !== null && String(body.lat).trim() !== '');
           var mrTraeLng = (body.lng !== undefined && body.lng !== null && String(body.lng).trim() !== '');
           if (mrTraeLat !== mrTraeLng)
@@ -6507,15 +6585,30 @@ module.exports = async function handler(req, res) {
             if (!isFinite(mrLat) || !isFinite(mrLng) || mrLat < -90 || mrLat > 90 || mrLng < -180 || mrLng > 180)
               return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
           }
+          var mrTraeAlbumLat = (body.album_lat !== undefined && body.album_lat !== null && String(body.album_lat).trim() !== '');
+          var mrTraeAlbumLng = (body.album_lng !== undefined && body.album_lng !== null && String(body.album_lng).trim() !== '');
+          if (mrTraeAlbumLat !== mrTraeAlbumLng)
+            return res.status(400).json({ ok: false, error: 'album_lat y album_lng deben venir juntos' });
+          var mrAlbumLat = null, mrAlbumLng = null;
+          if (mrTraeAlbumLat) {
+            mrAlbumLat = parseFloat(body.album_lat);
+            mrAlbumLng = parseFloat(body.album_lng);
+            if (!isFinite(mrAlbumLat) || !isFinite(mrAlbumLng) || mrAlbumLat < -90 || mrAlbumLat > 90 || mrAlbumLng < -180 || mrAlbumLng > 180)
+              return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+          }
+          // Sembrado de la carpeta: coords explicitas del album si llegan;
+          // si no, las del recurso (solo rellenan NULL por COALESCE).
+          var mrAlbumLatSeed = (mrAlbumLat !== null) ? mrAlbumLat : mrLat;
+          var mrAlbumLngSeed = (mrAlbumLng !== null) ? mrAlbumLng : mrLng;
           var mrCiudad = String(body.ciudad || '').trim().slice(0, 80) || null;
           var mrRegion = String(body.region || '').trim().slice(0, 80) || null;
-          if (mrLat !== null || mrCiudad || mrRegion) {
+          if (mrAlbumLatSeed !== null || mrCiudad || mrRegion) {
             await sql(
-              'UPDATE albumes SET lat = COALESCE($1, lat), lng = COALESCE($2, lng),'
+              'UPDATE albumes SET lat = COALESCE(lat, $1), lng = COALESCE(lng, $2),'
               + ' ciudad = COALESCE($3, ciudad), region = COALESCE($4, region),'
               + ' actualizado_en = NOW()'
               + ' WHERE id=$5::uuid AND usuario_id=$6::uuid AND activo=true',
-              [mrLat, mrLng, mrCiudad, mrRegion, mrAlbumId, mrUser]
+              [mrAlbumLatSeed, mrAlbumLngSeed, mrCiudad, mrRegion, mrAlbumId, mrUser]
             );
           }
 
@@ -6525,10 +6618,10 @@ module.exports = async function handler(req, res) {
             mrIns = await sql(
               'INSERT INTO album_fotos'
               + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
-              + '  media_title, media_source, visible, xp_otorgado_autor)'
-              + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7)'
+              + '  media_title, media_source, visible, xp_otorgado_autor, lat, lng)'
+              + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9)'
               + ' RETURNING id, album_id, visible',
-              [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp]
+              [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp, mrLat, mrLng]
             );
           } catch (mrInsErr) {
             // ADR-039 + migracion 025: el indice unico
@@ -6579,10 +6672,18 @@ module.exports = async function handler(req, res) {
           var mrTraeAlbum = (body.album_id !== undefined && body.album_id !== null && String(body.album_id).trim() !== '');
           var mrTraeLat2 = (body.lat !== undefined && body.lat !== null && String(body.lat).trim() !== '');
           var mrTraeLng2 = (body.lng !== undefined && body.lng !== null && String(body.lng).trim() !== '');
-          if (!mrTraeCaption && !mrTraeVisible && !mrTraeAlbum && !mrTraeLat2 && !mrTraeLng2)
+          // A4 (ADR-051): quitar_coords vuelve a heredar del album. Si llega
+          // junto con lat/lng, quitar_coords GANA (documentado): el frontend
+          // puede arrastrar campos residuales del formulario.
+          var mrQuitarCoords = (aBooleano(body.quitar_coords) === true);
+          var mrTraeAlbumLat2 = (body.album_lat !== undefined && body.album_lat !== null && String(body.album_lat).trim() !== '');
+          var mrTraeAlbumLng2 = (body.album_lng !== undefined && body.album_lng !== null && String(body.album_lng).trim() !== '');
+          if (!mrTraeCaption && !mrTraeVisible && !mrTraeAlbum && !mrTraeLat2 && !mrTraeLng2 && !mrQuitarCoords && !mrTraeAlbumLat2 && !mrTraeAlbumLng2)
             return res.status(400).json({ ok: false, error: 'sin campos editables' });
           if (mrTraeLat2 !== mrTraeLng2)
             return res.status(400).json({ ok: false, error: 'lat y lng deben venir juntos' });
+          if (mrTraeAlbumLat2 !== mrTraeAlbumLng2)
+            return res.status(400).json({ ok: false, error: 'album_lat y album_lng deben venir juntos' });
 
           var mrEditRows = await sql(
             'SELECT af.id, af.album_id, af.visible FROM album_fotos af'
@@ -6608,15 +6709,25 @@ module.exports = async function handler(req, res) {
               return res.status(400).json({ ok: false, error: 'album_id no pertenece al usuario' });
           }
 
-          if (mrTraeLat2) {
-            var mrLat2 = parseFloat(body.lat);
-            var mrLng2 = parseFloat(body.lng);
+          // A4: coords DEL RECURSO (body.lat/lng -> album_fotos). Se validan
+          // aqui para construir mrSets mas abajo; quitar_coords las anula.
+          // Coords de la CARPETA (body.album_lat/lng -> albumes).
+          var mrLat2 = null, mrLng2 = null;
+          if (!mrQuitarCoords && mrTraeLat2) {
+            mrLat2 = parseFloat(body.lat);
+            mrLng2 = parseFloat(body.lng);
             if (!isFinite(mrLat2) || !isFinite(mrLng2) || mrLat2 < -90 || mrLat2 > 90 || mrLng2 < -180 || mrLng2 > 180)
+              return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
+          }
+          if (mrTraeAlbumLat2) {
+            var mrALat2 = parseFloat(body.album_lat);
+            var mrALng2 = parseFloat(body.album_lng);
+            if (!isFinite(mrALat2) || !isFinite(mrALng2) || mrALat2 < -90 || mrALat2 > 90 || mrALng2 < -180 || mrALng2 > 180)
               return res.status(400).json({ ok: false, error: 'COORDENADAS_INVALIDAS' });
             await sql(
               'UPDATE albumes SET lat=$1, lng=$2, actualizado_en=NOW()'
               + ' WHERE id=$3::uuid AND usuario_id=$4::uuid AND activo=true',
-              [mrLat2, mrLng2, mrDestino, mrUser]
+              [mrALat2, mrALng2, mrDestino, mrUser]
             );
           }
 
@@ -6639,6 +6750,15 @@ module.exports = async function handler(req, res) {
           if (mrTraeAlbum) {
             mrParams.push(mrDestino);
             mrSets.push('album_id = $' + mrParams.length + '::uuid');
+          }
+          // A4: coords propias del recurso en album_fotos (quitar -> NULL).
+          if (mrQuitarCoords) {
+            mrSets.push('lat = NULL', 'lng = NULL');
+          } else if (mrTraeLat2) {
+            mrParams.push(mrLat2);
+            mrSets.push('lat = $' + mrParams.length);
+            mrParams.push(mrLng2);
+            mrSets.push('lng = $' + mrParams.length);
           }
           var mrEditUpd;
           if (mrSets.length) {
@@ -7040,6 +7160,132 @@ module.exports = async function handler(req, res) {
             return res.status(503).json({ ok: false, error: 'Guardados de media no disponibles (migracion 019/023 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
           }
           throw eGuardarMedia;
+        }
+      }
+
+      // ADR-052 (v24): carpetas PERSONALES de guardados (organizacion
+      // privada; no son albumes ni tocan el Museo). Auth SIEMPRE por sesion
+      // firmada (BUG-061): el dueno sale del token, nunca del body. Requiere
+      // la migracion 030; si falta (42P01/42703) -> 503 SCHEMA_NOT_MIGRATED
+      // tipado. Acciones: crear|renombrar|eliminar|mover.
+      if (tipo2 === 'guardados_carpeta') {
+        // El usuario de la sesion es la UNICA fuente de verdad. Si el body
+        // trae usuario_id se exige que coincida (validarSesion); si no,
+        // basta la sesion (verificarSesion).
+        var gcSes = usuarioId2 ? validarSesion(req, usuarioId2) : verificarSesion(req);
+        if (!gcSes.ok) return responderSesion(res, gcSes.razon);
+        var gcUsuario = usuarioId2 ? String(usuarioId2).trim() : String(gcSes.sub || '').trim();
+        var gcAccion = String(body.accion || '').toLowerCase();
+        if (['crear', 'renombrar', 'eliminar', 'mover'].indexOf(gcAccion) === -1)
+          return res.status(400).json({ ok: false, error: 'accion invalida (crear|renombrar|eliminar|mover)' });
+        var gcCarpetaId = String(body.carpeta_id || '').trim();
+        var GC_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+        try {
+          if (gcAccion === 'crear') {
+            var gcNombreNuevo = normalizarNombreCarpeta(body.nombre);
+            if (!gcNombreNuevo)
+              return res.status(400).json({ ok: false, error: 'NOMBRE_REQUERIDO' });
+            var gcOrdenNuevo = parseInt(body.orden, 10);
+            if (!isFinite(gcOrdenNuevo)) gcOrdenNuevo = 0;
+            // ON CONFLICT DO NOTHING + RETURNING (patron "Mi Museo"): si el
+            // indice unico parcial (usuario_id, lower(nombre)) WHERE activo
+            // choca, no hay fila nueva -> 409 CARPETA_DUPLICADA (no 500).
+            var gcIns = await sql(
+              'INSERT INTO guardados_carpetas (usuario_id, nombre, orden)'
+              + ' VALUES ($1::uuid, $2, $3) ON CONFLICT DO NOTHING'
+              + ' RETURNING id::text AS id',
+              [gcUsuario, gcNombreNuevo, gcOrdenNuevo]
+            );
+            if (!gcIns.length)
+              return res.status(409).json({ ok: false, error: 'CARPETA_DUPLICADA' });
+            var gcNueva = await sql(
+              'SELECT id::text AS id, nombre, orden FROM guardados_carpetas'
+              + ' WHERE id = $1::uuid AND activo = true LIMIT 1',
+              [gcIns[0].id]
+            );
+            return res.status(201).json({ ok: true, carpeta: gcNueva[0] || { id: gcIns[0].id, nombre: gcNombreNuevo, orden: gcOrdenNuevo } });
+          }
+
+          if (gcAccion === 'renombrar') {
+            if (!GC_UUID.test(gcCarpetaId))
+              return res.status(400).json({ ok: false, error: 'carpeta_id invalido' });
+            var gcNombreRen = normalizarNombreCarpeta(body.nombre);
+            if (!gcNombreRen)
+              return res.status(400).json({ ok: false, error: 'NOMBRE_REQUERIDO' });
+            var gcRen = await sql(
+              'UPDATE guardados_carpetas SET nombre = $1, actualizado_en = NOW()'
+              + ' WHERE id = $2::uuid AND usuario_id = $3::uuid AND activo = true'
+              + ' RETURNING id::text AS id, nombre, orden',
+              [gcNombreRen, gcCarpetaId, gcUsuario]
+            );
+            if (!gcRen.length)
+              return res.status(404).json({ ok: false, error: 'CARPETA_NO_ENCONTRADA' });
+            return res.status(200).json({ ok: true, carpeta: gcRen[0] });
+          }
+
+          if (gcAccion === 'eliminar') {
+            if (!GC_UUID.test(gcCarpetaId))
+              return res.status(400).json({ ok: false, error: 'carpeta_id invalido' });
+            // Cero Borrado Logico (ADR-003): la carpeta se desactiva y sus
+            // bookmarks NO se borran; se reasignan a NULL ("Sin carpeta").
+            var gcDel = await sql(
+              'UPDATE guardados_carpetas SET activo = false, actualizado_en = NOW()'
+              + ' WHERE id = $1::uuid AND usuario_id = $2::uuid AND activo = true'
+              + ' RETURNING id',
+              [gcCarpetaId, gcUsuario]
+            );
+            if (!gcDel.length)
+              return res.status(404).json({ ok: false, error: 'CARPETA_NO_ENCONTRADA' });
+            await sql(
+              'UPDATE media_guardados SET carpeta_id = NULL'
+              + ' WHERE usuario_id = $1::uuid AND carpeta_id = $2::uuid',
+              [gcUsuario, gcCarpetaId]
+            );
+            return res.status(200).json({ ok: true, eliminada: true });
+          }
+
+          // mover: carpeta_id puede ser NULL (sacar de carpeta).
+          var gcMoverFuente = String(body.fuente || '').toLowerCase();
+          if (['album', 'album_foto', 'viajero_foto', 'curada'].indexOf(gcMoverFuente) === -1)
+            return res.status(400).json({ ok: false, error: 'fuente invalida (album|album_foto|viajero_foto|curada)' });
+          var gcMoverItem = String(body.item_id || '').trim();
+          if (!MEDIA_ITEM_RE.test(gcMoverItem))
+            return res.status(400).json({ ok: false, error: 'item_id invalido' });
+          var gcMoverDestino = null;
+          var gcTraeCarpeta = (body.carpeta_id !== undefined && body.carpeta_id !== null && String(body.carpeta_id).trim() !== '');
+          if (gcTraeCarpeta) {
+            gcMoverDestino = String(body.carpeta_id).trim();
+            if (!GC_UUID.test(gcMoverDestino))
+              return res.status(400).json({ ok: false, error: 'carpeta_id invalido' });
+          }
+          // DOBLE pertenencia: la carpeta destino (si hay) debe ser del
+          // usuario; la fila media_guardados (PK usuario_id,fuente,item_id)
+          // tambien. Si el item no esta guardado activo -> 404.
+          if (gcMoverDestino) {
+            var gcOwn = await sql(
+              'SELECT id FROM guardados_carpetas'
+              + ' WHERE id = $1::uuid AND usuario_id = $2::uuid AND activo = true LIMIT 1',
+              [gcMoverDestino, gcUsuario]
+            );
+            if (!gcOwn.length)
+              return res.status(404).json({ ok: false, error: 'CARPETA_NO_ENCONTRADA' });
+          }
+          var gcUpd = await sql(
+            'UPDATE media_guardados SET carpeta_id = $1::uuid'
+            + ' WHERE usuario_id = $2::uuid AND fuente = $3 AND item_id = $4 AND activo = true'
+            + ' RETURNING item_id',
+            [gcMoverDestino, gcUsuario, gcMoverFuente, gcMoverItem]
+          );
+          if (!gcUpd.length)
+            return res.status(404).json({ ok: false, error: 'GUARDADO_NO_ENCONTRADO' });
+          return res.status(200).json({ ok: true, movida: true, carpeta_id: gcMoverDestino });
+        } catch (eGc) {
+          if (eGc && eGc.code === '23505')
+            return res.status(409).json({ ok: false, error: 'CARPETA_DUPLICADA' });
+          if (!esEsquemaFaltante(eGc)) throw eGc;
+          console.error('[interacciones] guardados_carpeta sin migracion 030: ' + (eGc.message || eGc));
+          return res.status(503).json({ ok: false, error: 'SCHEMA_NOT_MIGRATED' });
         }
       }
 

@@ -11,7 +11,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### Tareas no completadas / estado actual
 
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
-- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028) y TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080). Verificar commit/deploy real contra el archivo real (ADR-006).
+- **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028), TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080) y TSK-147 (ubicacion por recurso de album + carpetas de guardados + fix de seguridad `scope=mio`; ADR-051/ADR-052, migraciones 029/030 APLICADAS en Neon). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **PENDIENTE DE APROBACION del operador:** TSK-140 (documento de analisis AI-DOS v1.1 / Reglas de Oro v5; archivo COMPLETADO en disco).
 - **BLOQUEADA (historica, archivada):** TSK-044 (blog multi-tema); su bloqueo de deploy (TASK-011) figura COMPLETADA, revisar si aplica cierre.
 
@@ -33,6 +33,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad CAMPO ZONA (region natural) - 2026-09-20 (cierre express)](#prioridad-campo-zona-region-natural-en-el-admin-general---2026-09-20-cierre-express)
 - [Prioridad FIX DE VOTOS DE FOTOS CURADAS (BUG-079) - 2026-09-20 (cierre express)](#prioridad-fix-de-votos-de-fotos-curadas-bug-079---2026-09-20-cierre-express)
 - [Prioridad FIX DE RENDER DE MEDIA DEL MAPA CULTURAL + DIAGNOSTICO NEON - 2026-09-21 (BUG-080 / TSK-146)](#prioridad-fix-de-render-de-media-del-mapa-cultural--diagnostico-neon---2026-09-21-bug-080--tsk-146)
+- [Prioridad UBICACION POR RECURSO + CARPETAS DE GUARDADOS + FIX DE SEGURIDAD DEL MAPA - 2026-09-21 (ADR-051 / ADR-052 / BUG-081 / TSK-147)](#prioridad-ubicacion-por-recurso--carpetas-de-guardados--fix-de-seguridad-del-mapa---2026-09-21-adr-051--adr-052--bug-081--tsk-147)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3239,6 +3240,43 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Pendiente operativo (BLOQUEANTE para produccion):** **deploy del fix** (commit/push + Vercel) para que el cache `?v=7` llegue a produccion; ampliar `scripts/smoke_mapa_cultural.js` con los casos de regresion. Confirmar con el usuario el mapa de `comunidad.html`: el mapa personal "Mi Viaje" excluye la media de album por diseno (**ADR-047 Enmienda 1 / BUG-074**).
 - **Dependencia:** motor compartido `mapa-cultural.js` (ADR-045); `?tipo=multimedia_mapa` del backend (sin cambios).
 - **Fuera de alcance:** `api/*.js` NO se toco (**8/8 INTACTO**); sin migraciones; sin ADR nuevo; el valor de la credencial de Neon (`.env.local`) NUNCA se documenta (politica de secretos).
+
+## Prioridad UBICACION POR RECURSO + CARPETAS DE GUARDADOS + FIX DE SEGURIDAD DEL MAPA - 2026-09-21 (ADR-051 / ADR-052 / BUG-081 / TSK-147)
+
+> Cierre de una sesion con DOS features + un fix de SEGURIDAD sobre el mismo release
+> `api/interacciones.js` **v24**: (1) ubicacion individual por recurso de `album_fotos`
+> (pin por video/foto, migracion **029**) y (2) carpetas privadas de guardados de media
+> (tabla `guardados_carpetas` + `media_guardados.carpeta_id`, migracion **030**); mas el
+> cierre de una **fuga de media privada** en `multimedia_mapa` con `scope=mio` sin sesion
+> (**BUG-081**). Migraciones 029 y 030 **YA APLICADAS en Neon el 2026-09-21** (idempotentes;
+> sin backfill). NO crea funciones serverless (**8/8 INTACTO**, ADR-001/ADR-010).
+> Decisiones: **ADR-051** y **ADR-052** en DECISIONS.md (mas la **ENMIENDA 2 del ADR-047**).
+
+### TSK-147: Ubicacion por recurso de `album_fotos` (ADR-051) + carpetas de guardados (ADR-052) + fix de seguridad `scope=mio` (BUG-081) + migraciones 029/030 [COMPLETADA en codigo]
+
+- **Estado:** COMPLETADA EN CODIGO (2026-09-21; **working tree, SIN commitear**; deploy pendiente). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (2 features de producto + fix de seguridad ALTA/CRITICA).
+- **Fecha:** 2026-09-21
+- **Origen:** pedido del operador: (a) poder ubicar cada video/foto en su propio punto del mapa (no solo por su carpeta); (b) organizar los guardados de media en carpetas privadas; y cierre del hallazgo de seguridad en el toggle "Solo mio" del mapa.
+- **ADRs:** DECISIONS.md **ADR-051 (APROBADO)** y **ADR-052 (APROBADO)**; **ENMIENDA 2 al ADR-047** (el mapa personal ahora incluye la media de album propia del dueno via `_propia`; `filterMediaDefault` intacto).
+- **Responsable / agentes:** backend-dev/sql-security-free (`api/interacciones.js` v24), data-migration/sql-security-free (migraciones 029/030 + `scripts/apply_sql_file.js`), frontend-tpl/renderer-dev (`mi-perfil.html`, `mymapa.js`, `map-picker.js`, `index-api-connector.js`), qa-auditor (Escudo GOLD), docs-keeper (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **Feature A / ADR-051 (ubicacion por recurso, migracion 029):** `db/migrations/029_album_fotos_coords.sql` (NUEVA, aditiva/idempotente/ASCII-safe): `album_fotos.lat/lng DOUBLE PRECISION NULL` + CHECK `album_fotos_coords_chk` (ambos NULL o ambos no NULL) + idx `idx_album_fotos_coords`. Sin backfill (`filas_con_coords_propias=0`). `api/interacciones.js` v24: `multimedia_mapa` emite `COALESCE(af.lat,a.lat)` (L4810); `GET museo_recurso` expone `lat_propia/lng_propia/coords_heredadas` + `lat/lng` efectivas (L3838-3873); `POST museo_recurso` crear/editar persisten `af.lat/lng` del recurso, aceptan `album_lat/album_lng` (COALESCE al sembrar) y `quitar_coords` (L6573/L6588/L6675-6726/L6754-6759). Semantica de fallback: recurso -> album -> `coordsFallbackAutor`.
+  2. **Feature B / ADR-052 (carpetas de guardados, migracion 030):** `db/migrations/030_guardados_carpetas.sql` (NUEVA, aditiva/idempotente): tabla `guardados_carpetas` (+ `idx_guardados_carpetas_usuario`) + `media_guardados.carpeta_id uuid NULL REFERENCES guardados_carpetas(id) ON DELETE SET NULL` (+ `idx_media_guardados_carpeta`). `GET mis_guardados_media` suma `carpeta_id/carpeta_nombre` + `carpetas:[]` y YA NO degrada a `[]` (503 `SCHEMA_NOT_MIGRATED`); nueva rama `POST ?tipo=guardados_carpeta` (crear|renombrar|eliminar|mover) con `validarSesion` obligatorio; eliminar = soft-delete sin borrar bookmarks (`carpeta_id=NULL`, ADR-003). NO toca Museo/albumes.
+  3. **Fix de SEGURIDAD (BUG-081):** `multimedia_mapa scope=mio` ahora EXIGE sesion firmada (`400 SESION_REQUERIDA`), deriva el uuid del token e ignora el query param `usuario_id`; la clausula de visibilidad pasa a `(mmScopeMio && mmUsuarioId ? '' : ' AND af.visible = true')` (L4824), de modo que la fuga de privados de terceros queda cerrada. Antes: `mmScopeMio ? '' : ' AND af.visible=true'` sin auth.
+  4. **Frontend:** `mi-perfil.html` (prefill desde `lat_propia`, boton "Quitar ubicacion", espacio del recurso para guardados con ver/votar/quitar/guardar-en-carpeta + chips de carpetas, reutilizando `mediaCardHTML` y `window.MediaActions`); `mymapa.js` (merge de media propia `scope=mio` con Bearer + `_propia` en `filterMisMapa`/`medirMediaActiva`, ENMIENDA 2 ADR-047); `map-picker.js` (pin del modal arrastrable); `index-api-connector.js` (Bearer en el fetch `scope=mio`). Cache-bust: `mapa-cultural.js?v=7`, `mymapa.js?v=4`, `map-picker.js?v=2`, `index-api-connector.js?v=2`.
+  5. **Herramienta nueva:** `scripts/apply_sql_file.js` (aplicador de archivos `.sql` contra Neon, ASCII-safe).
+- **Evidencia (ADR-006):** migraciones 029 (`ADD COLUMN IF NOT EXISTS lat/lng` L84-85, CHECK `album_fotos_coords_chk` L97-100, idx L114) y 030 (`CREATE TABLE guardados_carpetas` L81-83, `carpeta_id` L125, indices L99/L136); `api/interacciones.js` v24 header L1-22, `SESION_REQUERIDA` L4771, clausula L4824, proyeccion GET L3838, POST `guardados_carpeta` L7171-7288; `mi-perfil.html` L818/L2449-2456/L2479-2483/L1982-2199; `mymapa.js` L203/L247-257/L319-330; `map-picker.js` L229-230; `index-api-connector.js` L358-361. `git diff --numstat`: `api/interacciones.js` +313/-67, `mi-perfil.html` +318/-17, `mymapa.js` +71/-10, `map-picker.js` +20/-10, `index-api-connector.js` +6/-1, `index.html`/`comunidad.html`/`admin.html` +1/-1 c/u (cache-bust).
+- **Smokes / verificacion:** Escudo GOLD + smokes nuevos de 029/030 **EN CURSO**. **PENDIENTE: documentar el resultado al correrlos** (aqui no se afirma un PASS no verificado).
+- **Relacion con bugs:** **BUG-081 NUEVO (CORREGIDO EN CODIGO)** en BUGS_HISTORICOS.md (fuga de media privada). Sin otros bugs nuevos; el fix del reset de `museoQuitarCoords` queda como pendiente.
+- **Handoff de migraciones:** **029 y 030 YA ESTAN APLICADAS en Neon (2026-09-21)**, idempotentes y sin backfill (`filas_con_coords_propias=0`). Por tanto el gate operativo no es "aplicar migraciones" sino **desplegar el backend v24 DESPUES de las migraciones (ya cumplido) y LUEGO el frontend**.
+- **Pendiente operativo (BLOQUEANTE para produccion):** deploy (commit/push + Vercel) en orden: 029/030 (YA aplicadas) -> backend (`interacciones.js` v24) -> frontend. Y el fix del reset de `museoQuitarCoords`.
+- **Deuda registrada (para NEXT.md):**
+  (a) fix del reset de `museoQuitarCoords` pendiente (si el usuario pulsa "Quitar ubicacion" y cierra el modal sin guardar, el flag puede quedar en un estado no deseado hasta reabrir el modal, que lo resetea a false en `museoAbrirModal` L2484; revisar `museoCerrarModal` L2509).
+  (b) smokes nuevos de 029/030 en curso (sin resultado documentado aun).
+  (c) `?tipo=mis_guardados_media` cambia de degradacion a `[]` (ADR-032) a 503 `SCHEMA_NOT_MIGRATED`; clientes viejos deben manejarlo.
+- **Dependencia:** migraciones 029/030 aplicadas en Neon (YA) y el resto del working tree 2026-09-20/21 para el deploy.
+- **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); NO toca el Museo ni `albumes`/`album_fotos` en la Feature B; la credencial de conexion a Neon (`.env.local`) NUNCA se documenta (politica de secretos).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -358,7 +358,12 @@
       mediaUrl += '&scope=mio&usuario_id=' + encodeURIComponent(uid);
     }
     mediaUrl += '&_t=' + Date.now();
-    fetch(mediaUrl)
+    // scope=mio exige Authorization: Bearer (el uuid del dueno se deriva
+    // de la sesion); la capa publica funciona con el objeto vacio.
+    var authHeaders = (window.ExploraCO && typeof window.ExploraCO.authHeaders === 'function')
+      ? (window.ExploraCO.authHeaders() || {})
+      : {};
+    fetch(mediaUrl, { headers: authHeaders })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok || !d.data) {
