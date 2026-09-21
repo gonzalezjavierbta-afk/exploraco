@@ -2489,11 +2489,17 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  if(rbstars)rbstars.innerHTML=[1,2,3,4,5].map(function(i){return \'<span class="rbst\'+(i<=Math.round(RV_AVG)?" on":"")+\'">*</span>\';}).join("");\n'
     + '}\n'
     + 'function submitRv(){\n'
+    + '  if(!window.ExploraCO){alert("Aun cargando, intenta de nuevo en un segundo");return;}\n'
+    // Con sesion el nombre es el de la cuenta (precargado y readonly por
+    // precargarEstado); el input solo se usa como respaldo anonimo. Sin
+    // sesion se conserva el aviso de nombre y publicarResena se encarga
+    // del login (ya no crea cuentas temporales).
+    + '  var u=window.ExploraCO.usuario;\n'
     + '  var nom=document.getElementById("rvn").value.trim();\n'
+    + '  if(u&&u.nombre)nom=String(u.nombre).trim();\n'
     + '  var txt=document.getElementById("rvt").value.trim();\n'
     + '  if(!rvScore){alert("Selecciona una puntuacion");return;}\n'
     + '  if(!nom){alert("Ingresa tu nombre");return;}\n'
-    + '  if(!window.ExploraCO){alert("Aun cargando, intenta de nuevo en un segundo");return;}\n'
     + '  var btn=document.querySelector(".wrsub");\n'
     + '  var scoreEnviado=rvScore, nomEnviado=nom, txtEnviado=txt, dimsEnviadas=Object.assign({},dimScores), travEnviado=travellerType;\n'
     + '  btn.disabled=true;btn.textContent="Publicando...";\n'
@@ -2502,10 +2508,10 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     // window.ExploraCO.publicarResena ya trae el usuario_id de la sesion
     // real y muestra sus propios mensajes de exito/error via toast.
     + '  window.ExploraCO.publicarResena(DID,rvScore,txt,nom,dimsEnviadas,travEnviado).then(function(ok){\n'
-    + '    if(ok){\n'
+    + '    if(ok===true){\n'
     + '      addRvOptimista(nomEnviado,scoreEnviado,txtEnviado,dimsEnviadas,travEnviado);\n'
     + '      document.getElementById("rvok").style.display="block";\n'
-    + '      document.getElementById("rvn").value="";\n'
+    + '      if(!u){var ni=document.getElementById("rvn");if(ni)ni.value="";}\n'
     + '      document.getElementById("rvt").value="";\n'
     + '      rvScore=0;\n'
     + '      dimScores={};\n'
@@ -2539,10 +2545,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '      if(rbstars)rbstars.innerHTML=[1,2,3,4,5].map(function(i){return \'<span class="rbst\'+(i<=Math.round(RV_AVG)?" on":"")+\'">*</span>\';}).join("");\n'
     + '    }else if(res.ya_votado){if(res.voto_previo&&res.voto_previo.rating){qrVotoActual=res.voto_previo.rating;pintarQR();qrBloquear();}}\n'
     + '  });\n'
-    + '}\n'
-    + 'function precargarMiVoto(){\n'
-    + '  if(!window.ExploraCO){return;}\n'
-    + '  window.ExploraCO.obtenerMiVoto(DID).then(function(r){if(r&&r.ok&&r.voto){qrVotoActual=r.voto.rating;pintarQR();qrBloquear();}});\n'
     + '}\n'
     + 'function toggleGuardar(btn){\n'
     + '  if(!window.ExploraCO){return;}\n'
@@ -2633,12 +2635,31 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '    if(ok)btn.classList.add("activo");\n'
     + '  }).catch(function(err){console.warn("[visitado]",err&&err.message);btn.disabled=false;btn.textContent=txt;});\n'
     + '}\n'
-    // Estado inicial del boton de guardar (si el visitante ya tiene
-    // sesion y ya habia guardado este destino antes). El boton de
-    // "Estuve aqui" no necesita este chequeo: el backend ya deduplica
-    // sin importar el estado visual (ver api/interacciones.js v3).
-    + 'if(window.ExploraCO){window.ExploraCO.estaGuardado(DID).then(function(g){if(g){var b=document.getElementById("btn-guardar");if(b)b.classList.add("activo");}});}\n'
-    + 'if(document.getElementById("qr-stars")){precargarMiVoto();}\n'
+    // Estado inicial con sesion (guardar / visitado / voto) + nombre de la
+    // cuenta en el formulario de resena. Este JS corre durante el parseo,
+    // ANTES de que usuario-session.js cargue la sesion (diferida a
+    // DOMContentLoaded), asi que precargarEstado es idempotente y se
+    // registra como hook window.onExploraCOUpdate: usuario-session.js lo
+    // dispara al terminar actualizarUI() (ver usuario-session.js L1457).
+    // El flag _estadoCargado evita repetir los GET si el hook se dispara
+    // varias veces; el respaldo DOMContentLoaded cubre el caso de que la
+    // sesion ya estuviera cargada antes de definir el hook.
+    + 'var _estadoCargado=false;\n'
+    + 'function precargarEstado(){\n'
+    + '  if(_estadoCargado)return;\n'
+    + '  if(!window.ExploraCO||!window.ExploraCO.estadoDestino||!window.ExploraCO.usuario)return;\n'
+    + '  _estadoCargado=true;\n'
+    + '  var nu=document.getElementById("rvn");\n'
+    + '  if(nu&&window.ExploraCO.usuario.nombre){nu.value=window.ExploraCO.usuario.nombre;nu.setAttribute("readonly","readonly");nu.style.opacity=".7";nu.style.cursor="default";}\n'
+    + '  window.ExploraCO.estadoDestino(DID).then(function(est){\n'
+    + '    if(!est)return;\n'
+    + '    if(est.guardado){var bg=document.getElementById("btn-guardar");if(bg)bg.classList.add("activo");}\n'
+    + '    if(est.visitado){var bv=document.getElementById("btn-visitado");if(bv)bv.classList.add("activo");}\n'
+    + '    if(est.voto&&est.voto.rating){qrVotoActual=est.voto.rating;pintarQR();qrBloquear();}\n'
+    + '  }).catch(function(e){console.warn("[estado]",e&&e.message);});\n'
+    + '}\n'
+    + 'window.onExploraCOUpdate=precargarEstado;\n'
+    + 'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",precargarEstado);}else{precargarEstado();}\n'
     // TSK-111 (CAMBIO 7A): modulo "Fotos de viajeros" RETIRADO de la ficha.
     // Se eliminaron galEsc/FP_URLS/fpCaps/loadFotos/subirFoto/votarFoto y el
     // popover Guardar-en-album (cerrarAlbumPopover/abrirAlbumPopover/

@@ -3532,7 +3532,12 @@ function _hidratarGuardadosDB() {
   ]).then(function(rs){
     var nSaved   = mezclarEn(mmSaved,   'mm_saved',   rs[0]);
     var nVisited = mezclarEn(mmVisited, 'mm_visited', rs[1]);
-    if(nSaved > 0 || nVisited > 0) renderMyMap();
+    if(nSaved > 0 || nVisited > 0) {
+      renderMyMap();
+      /* Re-render de la grilla del home para marcar con corazon los
+         guardados hidratados desde la DB (otro dispositivo/sesion). */
+      if(typeof renderDest === 'function') renderDest();
+    }
   }).catch(function(e){
     console.warn('[mi-mapa] hidratacion DB fallo:', e && e.message);
   });

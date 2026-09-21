@@ -3108,5 +3108,34 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Dependencia:** TSK-139/ADR-047 (regla de propiedad previa); ENMIENDA 1 del ADR-047 (decision vigente).
 - **Fuera de alcance:** `api/*.js` (8/8 INTACTO; el backend hoy NO emite `media_compartidos` por `?tipo=multimedia_mapa`); la via futura de mostrar video/audio en el drawer via `media_compartidos` (migracion 022: `fuente='album_foto'` + `destino_id`) requeriria cambio de backend; el docstring de cabecera de `mapa-cultural.js` (L31-32 del trabajado previo; corregido por ESTE mismo cambio, ver Evidencia (a)); NO se toco `DECISIONS.md` (la enmienda la escribio architect y fue revisada y aprobada por architect-review el 2026-09-20).
 
+## Prioridad ESTADO PERSISTENTE DEL USUARIO (directorios + ficha + resena con nombre) - 2026-09-20 (cierre express)
+
+> Cierre documental EXPRESS (skill `express-mode`: un solo pase, docs-only, ruta FREE,
+> sin tocar codigo) del cambio que deja PERSISTENTE el estado del usuario (guardados +
+> visitas) al reingresar en las paginas del directorio y en la ficha de destino, y que
+> hace que la resena use el NOMBRE DE LA CUENTA en vez del correo generico
+> `nombre@explorador.co`. TODO en working tree, SIN commitear. NO crea funciones
+> serverless (**8/8 INTACTO**, ADR-001/ADR-010) ni migraciones; `api/interacciones.js`
+> NO se toco (se reusan GET existentes).
+
+### TSK-144: Estado persistente del usuario en directorios + ficha (guardados/visitas) y resena con nombre de cuenta [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-20, cierre documental express; **working tree, SIN commitear**). Verificado contra archivo real (ADR-006).
+- **Prioridad:** Alta (UX de producto: los corazones/visitas del usuario se perdian al reingresar; la resena no se atribuia a la cuenta).
+- **Fecha:** 2026-09-20
+- **Origen:** los directorios hidrataban `mm_saved` (localStorage) con timing previo al refresco de sesion, usaban claves numericas legacy (colision entre destinos) y NUNCA persistian a BD; la ficha no pre-cargaba "estuve aqui"; `publicarResena` creaba `nombre@explorador.co`. BUG registrado: **BUGS_HISTORICOS.md BUG-078 (CERRADO)**.
+- **Responsable / agentes:** js-silo-dev/frontend-tpl (`usuario-session.js`, `api/pagina-destino.js`, `index.html`, NUEVO `directorio-session.js`, 5 directorios), qa-auditor (Escudo GOLD + smokes), docs-keeper-free (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **`usuario-session.js` (+54/-10):** NUEVAS `window.ExploraCO.estaVisitado(uuid)` (~L847-870; reusa GET `?tipo=mapa&usuario_id` -> `data.visitados`; sin sesion = false) y `estadoDestino(uuid)` (~L872-894; `Promise.all([estaGuardado, estaVisitado, obtenerMiVoto])` -> `{guardado, visitado, voto}`); `publicarResena` (~L719-729) AHORA EXIGE SESION: abre modal de login y responde `{ok:false, requiere_login:true}` (ya NO crea `nombre@explorador.co`; el POST se conserva con `usuario_id` real).
+  2. **`api/pagina-destino.js`:** `precargarEstado()` idempotente (~L2638-2662) enganchada en `window.onExploraCOUpdate` + respaldo DOMContentLoaded (marca `#btn-guardar`, `#btn-visitado`, pinta `#qr-stars`; corrige la causa raiz de timing de sesion); `#rvn` readonly con `usuario.nombre`; `submitRv` usa el nombre de la cuenta; callback de publicacion corregido a `if(ok===true)` (~L2511).
+  3. **`index.html` (~L3535-3540):** `_hidratarGuardadosDB()` ahora llama `renderDest()` con guardados/visitas nuevos (corazones en la grilla del home persistidos al reingresar).
+  4. **NUEVO `directorio-session.js` (234 lineas, ASCII-safe)** compartido por los 5 directorios: `mmSaved` migrado a SLUG; `tSave` persiste a BD (`guardarDestino`/`quitarGuardado`) con sesion; hidratacion DB via `cargarMiMapa()` + `renderDir()`; migracion re-ejecutable de `mm_saved` legacy numerico -> slug (catalogo embebido Y API connector). Editados `directorio.html`, `directorio-hostal.html`, `directorio-comida.html`, `directorio-sitio.html`, `directorio-evento.html`: se elimino el `tSave` local duplicado (Tripwire 5 lineas) y se agrego `usuario-session.js` a los 4 sub-directorios.
+- **Evidencia (ADR-006):** firmas verificadas en archivos reales HOY: `usuario-session.js` `estaVisitado` L850 / `estadoDestino` L875; `api/pagina-destino.js` `precargarEstado` L2648 + `window.onExploraCOUpdate=precargarEstado` L2661 + `if(ok===true)` L2511 + `#rvn` L2103; `index.html` `_hidratarGuardadosDB` L3491 -> `renderDest()` L3539; `directorio-session.js` `_mmSaved` L54, `tSave(slug,btn)` L165, hidratacion `cargarMiMapa()` L192-194, `window.tSave = tSave` L227.
+- **Smokes / verificacion:** `node --check` OK en 3 JS; ASCII 0 bytes >127; balance de divs diff 0 (index + 5 directorios); `scripts/smoke_auditoria_pagina_destino.js` **61/61 PASS**; `scripts/smoke_estado_sesion_destino.js` **14/14 PASS** (NUEVO); `scripts/smoke_directorio_session.js` **14/14 PASS** (NUEVO); `check_buildHTML_inline.js` OK; `smoke_mapa_cultural.js` 58 checks OK. QA (qa-auditor): **APTO CON OBSERVACIONES**.
+- **Relacion con bugs:** **BUG-078 NUEVO (CERRADO)** en BUGS_HISTORICOS.md; **BUG-002 sigue ABIERTO** (R3: doble escape `\u2605` L2473 de `api/pagina-destino.js`, deuda preexistente ajena a esta sesion).
+- **Pendiente operativo:** QA visual en navegador de los 5 directorios y de la ficha (corazones, "estuve aqui" y resena con el nombre de la cuenta en una sola sesion); commit/deploy del release (assets frontend + `api/pagina-destino.js`; los assets NO cuentan contra el presupuesto 8/8).
+- **Dependencia:** patron `usuario-session.js` existente (`refrescarSesion`, `cargarMiMapa`, `guardarDestino`/`quitarGuardado`); smokes previos de la ficha.
+- **Fuera de alcance:** `api/interacciones.js` NO se toco (8/8 INTACTO); backend/`media_compartidos`; legacy R2 (consumidores `.then(function(ok){ if(ok) })` de `publicarResena` en `Monserrate2.html`, `lacandelaria2.html`, `gen_body7.js`, `_lacandelaria2_body.html`, `_monserrate2_body.html`, `_check_monserrate2.js`, `_tmp_lac2.js` - fuera de flujo Vercel); DECISIONS.md (sin ADR nuevo: se reusan GET existentes).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

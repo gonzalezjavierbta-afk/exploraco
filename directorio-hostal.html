@@ -538,14 +538,14 @@ function renderDir(){
   if(!sl.length){grid.style.display='none';if(empty)empty.style.display='block';renderPg(0,0);return;}
   grid.style.display='grid';if(empty)empty.style.display='none';
   grid.innerHTML=sl.map(function(p){
-    var ph=PHOTOS[p.id]||'',isFeat=FEAT.indexOf(p.id)!==-1,isSaved=mmSaved.indexOf(p.id)!==-1;
+    var ph=PHOTOS[p.id]||'',isFeat=FEAT.indexOf(p.id)!==-1,isSaved=mmSaved.indexOf(p.slug)!==-1;
     var img=ph?'<img src="'+ph+'" alt="'+p.name+'" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">':'';
     return '<a class="dcard'+(isFeat?' is-featured':'')+(isSaved?' is-saved':'')+'" href="'+p.slug+'.html">'
       +'<div class="dcard-img" style="background:'+(p.hero_bg||'#111')+'">'+img
       +'<span class="dcard-emoji">'+(p.emoji||'📍')+'</span>'
       +'<div class="dcard-badge">Hospedaje</div>'
       +(isFeat?'<div class="dcard-feat-star">⭐ Destacado</div>':'')
-      +'<div class="dcard-save'+(isSaved?' saved':'')+'" onclick="event.preventDefault();tSave('+p.id+',this)">'+(isSaved?'♥':'♡')+'</div>'
+      +'<div class="dcard-save'+(isSaved?' saved':'')+'" onclick="event.preventDefault();tSave(\''+p.slug+'\',this)">'+(isSaved?'♥':'♡')+'</div>'
       +'</div>'
       +'<div class="dcard-body"><div class="dcard-name">'+p.name+'</div>'
       +'<div class="dcard-loc">📍 '+p.city+', '+(p.region||'Colombia')+'</div>'
@@ -600,47 +600,7 @@ function updateChips(){
   c.innerHTML=chips.map(function(ch,i){return '<div class="chip">'+ch.l+'<span class="chip-x" data-i="'+i+'">✕</span></div>';}).join('');
   c.querySelectorAll('.chip-x').forEach(function(x){var i=parseInt(x.dataset.i);x.onclick=chips[i].fn;});
 }
-/* ── tSave with XP ── */
-function tSave(id, btn) {
-  var idx = mmSaved.indexOf(id);
-  var isNew = idx === -1;
-  if(isNew) {
-    mmSaved.push(id);
-    btn.textContent = '♥';
-    btn.classList.add('saved');
-  } else {
-    mmSaved.splice(idx, 1);
-    btn.textContent = '♡';
-    btn.classList.remove('saved');
-  }
-  try { localStorage.setItem('mm_saved', JSON.stringify(mmSaved)); } catch(e) {}
-  // Award XP for new saves
-  if(isNew) {
-    try {
-      var pts = JSON.parse(localStorage.getItem('user_points')||'{}');
-      pts.xp = (pts.xp||0) + 5;
-      pts.saved = (pts.saved||0) + 1;
-      if(!pts.history) pts.history = [];
-      pts.history.unshift({action:'guardar',xp:5,label:'Lugar guardado en Mi Mapa',ts:Date.now()});
-      if(pts.history.length > 50) pts.history.length = 50;
-      localStorage.setItem('user_points', JSON.stringify(pts));
-    } catch(e) {}
-    // Show XP toast
-    var t = document.getElementById('xp-dir-toast');
-    if(!t) {
-      t = document.createElement('div');
-      t.id = 'xp-dir-toast';
-      t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none;opacity:0;transform:translateY(20px);transition:all .2s';
-      document.body.appendChild(t);
-    }
-    t.textContent = '+5 XP — Guardado en Mi Mapa ♥';
-    t.style.opacity = '1'; t.style.transform = 'translateY(0)';
-    clearTimeout(t._t);
-    t._t = setTimeout(function() {
-      t.style.opacity = '0'; t.style.transform = 'translateY(20px)';
-    }, 2500);
-  }
-}
+/* tSave vive en directorio-session.js (compartido) */
 function openMob(){
   var d=document.getElementById('mob-filt'),b=document.getElementById('mob-filt-body'),s=document.getElementById('filters-sidebar');
   if(b&&s)b.innerHTML=s.innerHTML;if(d)d.classList.add('open');
@@ -666,5 +626,7 @@ renderDir();
 <button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
   style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.3)">↑</button>
   <script src="directorio-api-connector.js"></script>
+  <script src="usuario-session.js"></script>
+  <script src="directorio-session.js"></script>
 </body>
 </html>

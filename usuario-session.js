@@ -720,17 +720,12 @@
   window.ExploraCO.publicarResena = async function (destinoUUID, rating, texto, nombre, dims, travellerType) {
     var usuario = window.ExploraCO.usuario;
 
-    // Si no hay sesión, crear una temporal con el nombre
-    if (!usuario && nombre) {
-      usuario = await window.ExploraCO.loginConEmail(
-        nombre.replace(/\s+/g, '.').toLowerCase() + '@explorador.co',
-        nombre
-      );
-    }
-
+    // Publicar resena exige sesion: la atribucion es siempre la cuenta.
+    // Sin sesion se abre el modal de login (ya NO se crea cuenta temporal
+    // con el nombre del input).
     if (!usuario) {
-      mostrarModalLogin('Inicia sesión para publicar tu reseña');
-      return false;
+      mostrarModalLogin('Inicia sesi\u00f3n para publicar tu rese\u00f1a');
+      return { ok: false, requiere_login: true };
     }
 
     try {
@@ -846,6 +841,55 @@
       return !!(data.ok && data.guardado);
     } catch (e) {
       return false;
+    }
+  };
+
+  // Consultar si el usuario actual ya marco "estuve aqui".
+  // Reutiliza el GET de mapa (?tipo=mapa) que ya devuelve
+  // data.visitados; no hay endpoint dedicado de visita.
+  window.ExploraCO.estaVisitado = async function (destinoUUID) {
+    var usuario = window.ExploraCO.usuario;
+    if (!usuario) return false;
+    try {
+      var res = await fetch(
+        API + '/api/interacciones?tipo=mapa&usuario_id=' + encodeURIComponent(usuario.id)
+      );
+      var data = await res.json();
+      var visitados = (data && data.ok && data.data && data.data.visitados) || [];
+      var objetivo = String(destinoUUID);
+      for (var i = 0; i < visitados.length; i++) {
+        var d = visitados[i] || {};
+        if (String(d.id) === objetivo) return true;
+        if (d.slug && String(d.slug) === objetivo) return true;
+      }
+      return false;
+    } catch (err) {
+      console.warn('[session] estaVisitado error:', err.message);
+      return false;
+    }
+  };
+
+  // Estado del destino para el usuario actual (precarga).
+  // Agrega guardado + visitado + voto en una sola llamada; con
+  // Promise.all los tres GET corren en paralelo.
+  window.ExploraCO.estadoDestino = async function (destinoUUID) {
+    if (!window.ExploraCO.usuario) {
+      return { guardado: false, visitado: false, voto: null };
+    }
+    try {
+      var r = await Promise.all([
+        window.ExploraCO.estaGuardado(destinoUUID),
+        window.ExploraCO.estaVisitado(destinoUUID),
+        window.ExploraCO.obtenerMiVoto(destinoUUID),
+      ]);
+      return {
+        guardado: !!r[0],
+        visitado: !!r[1],
+        voto: (r[2] && r[2].voto) || null,
+      };
+    } catch (err) {
+      console.warn('[session] estadoDestino error:', err.message);
+      return { guardado: false, visitado: false, voto: null };
     }
   };
 
