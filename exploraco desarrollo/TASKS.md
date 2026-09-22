@@ -37,6 +37,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad UBICACION POR RECURSO + CARPETAS DE GUARDADOS + FIX DE SEGURIDAD DEL MAPA - 2026-09-21 (ADR-051 / ADR-052 / BUG-081 / TSK-147)](#prioridad-ubicacion-por-recurso--carpetas-de-guardados--fix-de-seguridad-del-mapa---2026-09-21-adr-051--adr-052--bug-081--tsk-147)
 - [Prioridad GAMIFICACION v6 / ADR-053 - 2026-09-21 (TSK-148)](#prioridad-gamificacion-v6--adr-053---2026-09-21-tsk-148)
 - [Prioridad GUARDADOS DE MEDIA EN "MIS ALBUMES" - 2026-09-21 (ADR-054 / BUG-082 / TSK-149)](#prioridad-guardados-de-media-en-mis-albumes---2026-09-21-adr-054--bug-082--tsk-149)
+- [Prioridad EL TALLER DE LAS MOSCAS - 2026-09-21/22 (cierre express)](#prioridad-el-taller-de-las-moscas---cierre-express-2026-09-2122)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3360,6 +3361,39 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
   (f) **[DEUDA] runner `scripts/apply_sql_file.js` no relaya eventos NOTICE:** usa el driver HTTP `@neondatabase/serverless` (`neon(url)`), que no emite NOTICE, por lo que los `RAISE NOTICE` de salvaguarda de la 032 (conteos pre-DROP) se emitieron pero no se capturaron; mejora sugerida: usar `Pool`/`Client` con `client.on('notice', ...)` para capturarlos.
 - **Dependencia:** release desplegado (migracion 032 aplicada en Neon el 2026-09-21 + push `b4ad861` a `origin/main`).
 - **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); el DROP de `guardados_carpetas` es irreversible (perdida aceptada de la organizacion previa, ADR-054); la credencial de conexion a Neon (`.env.local`) NUNCA se documenta (politica de secretos).
+
+## Prioridad EL TALLER DE LAS MOSCAS - 2026-09-21/22 (cierre express)
+
+> Cierre documental EXPRESS (skill `express-mode`: un solo pase, docs-only, ruta FREE,
+> sin tocar codigo; la pagina ya fue cargada y verificada en produccion). Publicacion a
+> produccion de la pagina dinamica "El Taller de las Moscas" (slug `taller-de-las-moscas`,
+> categoria `sitio`/subcultura, Bogota/Chapinero). No nace ADR nuevo (se siguen patrones
+> existentes: seed+loader+smoke, ADR-009 rating en 0, BUG-022 fotos Wikimedia) ni bug
+> nuevo de ExploraCO (la observacion del QA sobre `validate_ficha.js` .json vs .md ya
+> esta registrada como BUG-034 y NO se duplica): DECISIONS.md y BUGS_HISTORICOS.md NO
+> se tocaron.
+
+### TSK-150: Pagina dinamica taller-de-las-moscas (sitio, Bogota/Chapinero) - "El Taller de las Moscas" [COMPLETADA]
+
+- **Estado:** COMPLETADA (2026-09-21/22, cierre documental express). Verificado contra archivo real (ADR-006) y contra produccion (URL HTTP 200 + sitemap.xml + API destinos).
+- **Prioridad:** Alta (contenido nuevo en produccion; no bloquea runtime ni deploy pendiente).
+- **Fecha:** 2026-09-21 (ejecucion/carga) - 2026-09-22 (verificacion en produccion y cierre documental).
+- **Slug / destino en produccion:** `taller-de-las-moscas` (categoria `sitio`, subcultura; ciudad Bogota, region Bogota D.C., barrio Chapinero Central); **id Neon `99938930-aa6d-48d9-b353-6f2016f8e7ea`**, `status=published`. URL viva: https://exploraco.vercel.app/taller-de-las-moscas.html (HTTP 200, ~81KB).
+- **Alcance REAL ejecutado (no el plan original si difiere, ADR-006):**
+  1. **Ficha curada** -> `ficha/taller de las moscas.json` (JSON valido, untracked). Datos verificados del espacio independiente de Chapinero: Cra. 19a #61b 81, horario Mie-Sab 2:00 PM - 8:00 PM, entrada libre, FAQ x5, tours autoguiado, Instagram @tallerdelasmoscas.
+  2. **Fotos resueltas en Wikimedia Commons** (compliance BUG-022): HOGRE street art, Melaka Art Gallery, Taller Nacional de Grafica y ZineDisplay; galeria en `destinos_fotos` verificada via `/api/interacciones?tipo=galeria_destino` (IDs 2201-2204+).
+  3. **3 scripts creados** siguiendo patrones existentes (TSK-066/068/069/077/142): `scripts/seed-taller-de-las-moscas.js` (upsert Neon), `scripts/load-taller-de-las-moscas-api.js` (loader API DELETE+POST), `scripts/smoke_test_taller-de-las-moscas.js` (fake_neon + buildHTML). Los 4 archivos quedan **untracked**.
+  4. **Verificacion local (Escudo GOLD):** `node --check` 3/3 OK; ASCII-safety 0/0/0; smoke **14/14 PASS**; divs 248/248 diff=0.
+  5. **CARGA A PRODUCCION ejecutada y verificada:** destino **id `99938930-aa6d-48d9-b353-6f2016f8e7ea`** `status=published` confirmado via `/api/destinos?categoria=sitio`. La URL https://exploraco.vercel.app/taller-de-las-moscas.html responde **HTTP 200** y renderiza completa (hero, sobre, dificultad, entradas, tours, que llevar, itinerario, FAQ, mapa, resenas, "Tambien te puede interesar", JSON-LD).
+  6. **Limpieza del huerfano `taller-delas-moscas-bogota-4qfn`:** eliminado por el DELETE previo del loader; ya NO aparece en sitemap.xml (verificado 2026-09-22) ni en admin-destinos. **Causa raiz:** el slug no se persistia en el formulario admin + foto vacia rompia `buildHTML` -> 404 del registro residual.
+  7. **Rating en 0:** sin resenas sembradas (ADR-009); la ficha muestra "0.0 (0 resenas)".
+- **Evidencia (ADR-006):** archivos reales verificados HOY: `ficha/taller de las moscas.json`, `scripts/seed-taller-de-las-moscas.js`, `scripts/load-taller-de-las-moscas-api.js`, `scripts/smoke_test_taller-de-las-moscas.js` (`git status` = `??` x4). En produccion: URL .html HTTP 200 con nombre + direccion; sitemap.xml incluye `taller-de-las-moscas.html` (lastmod 2026-09-22) y NO incluye `taller-delas-moscas-bogota-4qfn`; `/api/destinos?categoria=sitio` devuelve el registro `99938930-aa6d-48d9-b353-6f2016f8e7ea` `status=published`.
+- **Smokes / verificacion:** `smoke_test_taller-de-las-moscas.js` **14/14 PASS**; `node --check` 3/3; ASCII-safety 0/0/0; divs 248/248 diff=0.
+- **Relacion con bugs:** ninguno nuevo. **BUG-034** (drift documental de `scripts/validate_ficha.js` .json vs .md) sigue ABIERTO y ya registrado; NO se duplica. DECISIONS.md y BUGS_HISTORICOS.md NO se tocaron.
+- **Observacion menor del QA (deuda `[DEUDA-EXPRESS]`):** 2 `catch` vacios en `scripts/seed-taller-de-las-moscas.js` = deuda PREEXISTENTE del patron de seeds (~106 seeds); NO se toca este triplete para mantener paridad con los demas seeds.
+- **Pendiente operativo:** QA visual opcional en navegador (no bloqueante).
+- **Dependencia:** patron seed+loader+smoke validado (TSK-066/068/069/077/142); compliance BUG-022 en fotos; ADR-009 (rating en 0).
+- **Fuera de alcance:** tocar codigo del motor; DECISIONS.md ni BUGS_HISTORICOS.md; modificar los 4 archivos untracked (se dejan para commit del operador).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

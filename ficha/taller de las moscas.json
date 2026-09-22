@@ -1,0 +1,240 @@
+{
+  "BASE": {
+    "slug": "taller-de-las-moscas",
+    "nombre": "El Taller de las Moscas",
+    "categoria_slug": "sitio",
+    "lead": "Un espacio independiente de creaci\u00f3n, exposici\u00f3n e itinerancia art\u00edstica en el coraz\u00f3n de Chapinero, Bogot\u00e1.",
+    "descripcion": "El Taller de las Moscas es un laboratorio art\u00edstico y centro cultural independiente situado en la localidad de Chapinero, Bogot\u00e1.\n\nConcebido como un punto de encuentro para creadores contempor\u00e1neos, el espacio alberga exposiciones de arte pl\u00e1stico, talleres abiertos, publicaciones independientes y muestras interdisciplinarias que desaf\u00edan los circuitos galer\u00edsticos convencionales.\n\nSu ubicaci\u00f3n estrat\u00e9gica en Chapinero lo convierte en una parada esencial dentro del circuito cultural alternativo de la capital colombiana, ofreciendo a los visitantes una experiencia inmersiva en el proceso creativo contempor\u00e1neo bogotano.",
+    "highlight": "Laboratorio art\u00edstico \u00b7 Galer\u00eda independiente \u00b7 Chapinero",
+    "ciudad": "Bogot\u00e1",
+    "region": "Bogot\u00e1 D.C.",
+    "barrio": "Chapinero Central",
+    "lat": 4.6433,
+    "lng": -74.0628,
+    "whatsapp": "",
+    "telefono": "",
+    "email": "",
+    "web": "https://eventario.co/places/el-taller-de-las-moscas/",
+    "instagram": "@tallerdelasmoscas",
+    "precio_desde": "Entrada libre",
+    "horario": "Mi\u00e9-S\u00e1b 2:00 PM - 8:00 PM",
+    "emoji": "\ud83e\udeb2",
+    "hero_bg": "linear-gradient(135deg, #1f1f1f 0%, #3a3a3a 100%)",
+    "foto_hero": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Chapinero%2C_Bogot%C3%A1%2C_Bogota%2C_Colombia_-_panoramio_-_aalozadag_%2824%29.jpg/1280px-Chapinero%2C_Bogot%C3%A1%2C_Bogota%2C_Colombia_-_panoramio_-_aalozadag_%2824%29.jpg",
+    "tipo": "Centro Cultural \u00b7 Galer\u00eda de Arte \u00b7 Taller Creativo",
+    "capacidad": "50 personas",
+    "direccion": "Cra. 19a #61b 81, Chapinero, Bogot\u00e1",
+    "como_llegar": "Cra. 19a #61b 81, Chapinero. Acceso en TransMilenio por la estaci\u00f3n Calle 63 sobre la Av. Caracas, caminando 2 cuadras hacia el oriente hasta la Cra. 19a.",
+    "status": "published",
+    "destacado": true
+  },
+  "TAGS": {
+    "tipo_actividad": "Galer\u00eda de Arte y Taller Cultural",
+    "dificultad": "Facil",
+    "dificultad_desc": "Accesible para todo p\u00fablico en zona urbana de Chapinero",
+    "duracion": "1-2 horas",
+    "altitud": "2600",
+    "temporada": [
+      "Todo el a\u00f1o"
+    ],
+    "precio_entrada": "Entrada libre a exposiciones; talleres con costo variable",
+    "distancia": "Chapinero Central, Bogot\u00e1 D.C.",
+    "como_llegar": "Ubicado cerca a la Avenida Caracas y Calle 59 en Chapinero",
+    "permisos": "Sin permiso previo para visitar la galer\u00eda",
+    "temporada_nota": "Abierto todo el a\u00f1o seg\u00fan programaci\u00f3n de exposiciones",
+    "fauna_flora": [],
+    "secretos": [
+      {
+        "icono": "\u00f0\u009f\u00aa\u00b2",
+        "titulo": "Autogesti\u00f3n Creativa",
+        "texto": "Un espacio independiente donde puedes interactuar directamente con los artistas residentes.",
+        "tag": "Comunidad",
+        "tag_color": "gold"
+      },
+      {
+        "icono": "\u00f0\u009f\u008e\u00a8",
+        "titulo": "Arte Impreso y Fanzines",
+        "texto": "Cuenta con muestras de arte gr\u00e1fico, publicaciones independientes y fanzines locales.",
+        "tag": "Cultura",
+        "tag_color": "purple"
+      }
+    ],
+    "regulaciones": "Respetar las obras expuestas y mantener orden durante las visitas y talleres.",
+    "checklist_tip": "Revisa su cuenta de Instagram (@tallerdelasmoscas) para conocer los eventos y exposiciones vigentes.",
+    "entradas": [
+      {
+        "tipo": "Entrada General",
+        "precio": "Gratis",
+        "incluye": "Acceso a la galer\u00eda y exposiciones temporales",
+        "link": "https://eventario.co/places/el-taller-de-las-moscas/"
+      }
+    ],
+    "tours": [
+      {
+        "nombre": "Recorrido Autoguiado de Exposici\u00f3n",
+        "precio": "0",
+        "precio_sub": "Gratuito",
+        "duracion": "45 min",
+        "tipo_tour": "Autoguiado",
+        "idioma": "Espa\u00f1ol",
+        "max_personas": "15",
+        "rating": "",
+        "review_count": 0,
+        "descripcion": "Visita libre a la muestra de arte contempor\u00e1neo e instalaci\u00f3n vigente.",
+        "incluye": [
+          "Acceso a la sala principal",
+          "Folleto de sala / hoja de sala"
+        ],
+        "no_incluye": [
+          "Materiales de taller"
+        ],
+        "link_reserva": "https://eventario.co/places/el-taller-de-las-moscas/",
+        "featured": false
+      }
+    ],
+    "equipamiento": [
+      {
+        "item": "Mente abierta e inter\u00e9s por el arte independiente",
+        "prioridad": "Obligatorio"
+      },
+      {
+        "item": "C\u00e1mara o smartphone para fotograf\u00edas",
+        "prioridad": "Recomendado"
+      }
+    ],
+    "itinerario": [
+      {
+        "dia": "D\u00eda 1",
+        "hora": "15:00",
+        "titulo": "Llegada y Muestra de Arte",
+        "icono": "\u00f0\u009f\u008f\u00db\u00fe",
+        "detalle": "Ingreso a la galer\u00eda y recorrido por la obra expuesta.",
+        "tags": [
+          "Arte",
+          "Galer\u00eda"
+        ]
+      },
+      {
+        "dia": "D\u00eda 1",
+        "hora": "16:00",
+        "titulo": "Secci\u00f3n de Publicaciones Independientes",
+        "icono": "\u00f0\u009f\u0093\u0096",
+        "detalle": "Revisi\u00f3n de fanzines, grabados e impresos de artistas locales.",
+        "tags": [
+          "Fanzine",
+          "Dise\u00f1o"
+        ]
+      }
+    ],
+    "dificultad_tags": [
+      {
+        "texto": "Apto para familias y estudiantes",
+        "apto": true
+      },
+      {
+        "texto": "Accesible mediante transporte p\u00fablico",
+        "apto": true
+      }
+    ],
+    "temporada_matriz": {
+      "Ene": "ideal",
+      "Feb": "ideal",
+      "Mar": "ideal",
+      "Abr": "ideal",
+      "May": "ideal",
+      "Jun": "ideal",
+      "Jul": "ideal",
+      "Ago": "ideal",
+      "Sep": "ideal",
+      "Oct": "ideal",
+      "Nov": "ideal",
+      "Dic": "ideal"
+    }
+  },
+  "FAQS": [
+    {
+      "pregunta": "\u00bfD\u00f3nde queda ubicado El Taller de las Moscas?",
+      "respuesta": "En el sector cultural de Chapinero, Bogot\u00e1, cerca a la Calle 59 y Av. Caracas."
+    },
+    {
+      "pregunta": "\u00bfTiene costo ingresar a las exposiciones?",
+      "respuesta": "No, la entrada a las muestras y exposiciones de arte es gratuita."
+    },
+    {
+      "pregunta": "\u00bfSe dictan talleres en el lugar?",
+      "respuesta": "S\u00ed, ofrecen talleres de ilustraci\u00f3n, grabado y publicaciones independientes con inscripci\u00f3n previa."
+    },
+    {
+      "pregunta": "\u00bfD\u00f3nde puedo consultar la agenda actualizada?",
+      "respuesta": "En su Instagram oficial @tallerdelasmoscas o en la plataforma Eventario.co."
+    },
+    {
+      "pregunta": "\u00bfCu\u00e1l es la estaci\u00f3n de TransMilenio m\u00e1s cercana?",
+      "respuesta": "Las estaciones Calle 57 o Calle 63 sobre la Troncal Caracas."
+    }
+  ],
+  "FOTOS_SUGERIDAS": [
+    {
+      "tema": "Chapinero Bogota Art Gallery",
+      "caption": "Vista urbana del barrio Chapinero en Bogota (categoria oficial Chapinero + Cityscapes of Bogota). Contexto de barrio donde opera El Taller de las Moscas.",
+      "url_foto": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Chapinero%2C_Bogot%C3%A1%2C_Bogota%2C_Colombia_-_panoramio_-_aalozadag_%2824%29.jpg/1280px-Chapinero%2C_Bogot%C3%A1%2C_Bogota%2C_Colombia_-_panoramio_-_aalozadag_%2824%29.jpg",
+      "nombres_archivo_wikimedia": [
+        "File:Chapinero, Bogota, Bogota, Colombia - panoramio - aalozadag (24).jpg"
+      ],
+      "es_hero": true
+    },
+    {
+      "tema": "Street art Chapinero",
+      "caption": "Street art en Bogota fotografiado por el muralista HOGRE (2024). Arte urbano contemporaneo bogotano, misma escena subterranea que alimenta El Taller de las Moscas.",
+      "url_foto": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/HOGRE_street_art_Bogot%C3%A1.jpg/960px-HOGRE_street_art_Bogot%C3%A1.jpg",
+      "nombres_archivo_wikimedia": [
+        "File:HOGRE street art Bogota.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Art gallery exhibit",
+      "caption": "Salon de exhibicion de la Melaka Art Gallery (imagen ilustrativa de una galeria de arte con obras colgadas en sala; no es el local exacto).",
+      "url_foto": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Melaka_Art_Gallery_-_Exhibition_Hall.jpg/960px-Melaka_Art_Gallery_-_Exhibition_Hall.jpg",
+      "nombres_archivo_wikimedia": [
+        "File:Melaka Art Gallery - Exhibition Hall.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Printmaking workshop",
+      "caption": "Interior del Taller Nacional de Grafica en el Complejo Tres Centurias (Aguascalientes, Mexico): espacio real de taller de grabado con prensas y mesas, ilustra el taller que ofrece el lugar.",
+      "url_foto": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Interior_del_Taller_Nacional_de_Gr%C3%A1fica_en_el_Complejo_Tres_Centurias_04.jpg/960px-Interior_del_Taller_Nacional_de_Gr%C3%A1fica_en_el_Complejo_Tres_Centurias_04.jpg",
+      "nombres_archivo_wikimedia": [
+        "File:Interior del Taller Nacional de Grafica en el Complejo Tres Centurias 04.jpg"
+      ],
+      "es_hero": false
+    },
+    {
+      "tema": "Fanzine display",
+      "caption": "Fanzines en exhibicion (Zines by L. Maule on display, Wellington NZ, CC BY 4.0): publicaciones independientes expuestas, equivalente visual del display del Taller.",
+      "url_foto": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/ZineDisplayWGTN_01.jpg/960px-ZineDisplayWGTN_01.jpg",
+      "nombres_archivo_wikimedia": [
+        "File:ZineDisplayWGTN 01.jpg"
+      ],
+      "es_hero": false
+    }
+  ],
+  "FUENTES": [
+    {
+      "tipo": "otra",
+      "url": "https://eventario.co/places/el-taller-de-las-moscas/",
+      "que_respalda": "Nombre del lugar, sector Chapinero, ficha de directorio cultural"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.instagram.com/tallerdelasmoscas/",
+      "que_respalda": "Cuenta de Instagram, eventos, talleres de arte impreso y exposiciones"
+    },
+    {
+      "tipo": "oficial",
+      "url": "https://www.facebook.com/tallerdelasmoscas/?locale=es_LA",
+      "que_respalda": "Canal de Facebook, historia y difusi\u00f3n de actividades independientes"
+    }
+  ]
+}
