@@ -802,10 +802,10 @@ function capC(k) { var u = sesion(); return !!(u && u.capacidades && u.capacidad
    texto nuevo es ASCII-safe (emojis como \uXXXX). */
 var CHAT_PERKS = [
   {k:'chat',           nombre:'Unirse a salas',  nivel:3,  icono:'\uD83D\uDCAC'},
-  {k:'crear_chat',     nombre:'Crear sala',      nivel:3,  icono:'\uD83D\uDCE5'},
+  {k:'crear_chat',     nombre:'Crear sala',      nivel:5,  icono:'\uD83D\uDCE5'},
   {k:'emojis_premium', nombre:'Emojis premium',  nivel:7,  icono:'\u2728'},
   {k:'sello_sala',     nombre:'Sello de sala',   nivel:10, icono:'\uD83D\uDC8C'},
-  {k:'moderador_chat', nombre:'Moderar chat',    nivel:12, icono:'\uD83D\uDEE1\uFE0F'}
+  {k:'moderador_chat', nombre:'Moderar chat',    nivel:4, icono:'\uD83D\uDEE1\uFE0F'}
 ];
 
 function chatPerkNivel(k, def) {

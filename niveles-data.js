@@ -59,7 +59,7 @@
     {min:100000,nombre:'Mito Eterno ExploraCO',emoji:'\uD83C\uDFC6',era:'Mito'}
   ];
 
-  /* ---- CAPACIDADES_DETALLE: 13 capacidades desbloqueables por nivel ---- */
+  /* ---- CAPACIDADES_DETALLE: 40 capacidades desbloqueables por nivel ---- */
   /* Fuentes reales (ADR-006 / ADR-040):
    *   - 4 primeras: campo desbloquea del catalogo MISIONES
    *     (api/interacciones.js:1246/1253/1260/1267) con gate XP documentado
@@ -70,6 +70,12 @@
    * UNA sola vez en nivel 11 (CAPACIDADES_POR_NIVEL). La mision
    * mis_organizador_bogota (nivel 3) NO duplica la capacidad. */
   NivelesData.CAPACIDADES_DETALLE = [
+    {
+      clave: 'perfil_viajero',
+      nombre: 'Perfil de viajero',
+      howto: 'Completa tu perfil y empieza a explorar',
+      nivel: 1
+    },
     {
       clave: 'subir_fotos',
       nombre: 'Subir fotos',
@@ -107,6 +113,18 @@
       nivel: 7
     },
     {
+      clave: 'insignia_caminante',
+      nombre: 'Insignia Caminante',
+      howto: 'Tu perfil muestra la insignia de la era Caminante',
+      nivel: 8
+    },
+    {
+      clave: 'avatar_era',
+      nombre: 'Avatar de era',
+      howto: 'Elige un avatar con el sello de tu era actual',
+      nivel: 9
+    },
+    {
       clave: 'sello_sala',
       nombre: 'Sello de sala',
       howto: 'Fija un mensaje importante en la cabecera de la sala de chat',
@@ -117,6 +135,18 @@
       nombre: 'Organizar actividad',
       howto: 'Abre Comunidad > Planes y organiza una actividad grupal en tu ciudad',
       nivel: 11
+    },
+    {
+      clave: 'marco_bronce',
+      nombre: 'Marco de avatar Bronce',
+      howto: 'Decora tu avatar con el marco Bronce',
+      nivel: 12
+    },
+    {
+      clave: 'cromo_ciudad',
+      nombre: 'Cromo de ciudad',
+      howto: 'Consigue cromos al explorar nuevas ciudades',
+      nivel: 13
     },
     {
       clave: 'fundar_pandilla',
@@ -143,10 +173,142 @@
       nivel: 17
     },
     {
+      clave: 'tema_mapa',
+      nombre: 'Tema de mapa alterno',
+      howto: 'Cambia el estilo visual del mapa cultural',
+      nivel: 18
+    },
+    {
       clave: 'inmortal',
       nombre: 'Inmortal del Mapa',
       howto: 'Tu avatar lleva marco Neon Fuego y tienes acceso anticipado a funciones beta',
       nivel: 19
+    },
+    {
+      clave: 'insignia_explorador',
+      nombre: 'Insignia Explorador',
+      howto: 'Tu perfil muestra la insignia de la era Explorador',
+      nivel: 20
+    },
+    {
+      clave: 'editor_itinerarios',
+      nombre: 'Editor de itinerarios',
+      howto: 'Arma itinerarios de varios dias y compartelos',
+      nivel: 21
+    },
+    {
+      clave: 'plantillas_planes',
+      nombre: 'Plantillas de planes',
+      howto: 'Usa plantillas para crear planes de viaje mas rapido',
+      nivel: 22
+    },
+    {
+      clave: 'destacar_resena',
+      nombre: 'Destacar resena',
+      howto: 'Resalta tu mejor resena en tu perfil publico',
+      nivel: 23
+    },
+    {
+      clave: 'marco_plata',
+      nombre: 'Marco de avatar Plata',
+      howto: 'Decora tu avatar con el marco Plata',
+      nivel: 24
+    },
+    {
+      clave: 'colecciones_curadas',
+      nombre: 'Colecciones curadas',
+      howto: 'Crea colecciones tematicas de destinos',
+      nivel: 25
+    },
+    {
+      clave: 'eventos_propios',
+      nombre: 'Publicar eventos',
+      howto: 'Publica eventos culturales en la agenda',
+      nivel: 26
+    },
+    {
+      clave: 'resenas_verificadas',
+      nombre: 'Resenas verificadas',
+      howto: 'Tus resenas muestran el sello de viajero verificado',
+      nivel: 27
+    },
+    {
+      clave: 'insignia_cronista',
+      nombre: 'Insignia Cronista',
+      howto: 'Tu perfil muestra la insignia de la era Cronista',
+      nivel: 28
+    },
+    {
+      clave: 'cromo_temporada',
+      nombre: 'Cromo de temporada',
+      howto: 'Desbloquea cromos exclusivos de temporada',
+      nivel: 29
+    },
+    {
+      clave: 'tema_perfil',
+      nombre: 'Tema de perfil',
+      howto: 'Personaliza los colores de tu perfil publico',
+      nivel: 30
+    },
+    {
+      clave: 'impulso_xp',
+      nombre: 'Impulso de XP',
+      howto: 'Activa un impulso temporal de XP de temporada',
+      nivel: 31
+    },
+    {
+      clave: 'apadrinar_viajeros',
+      nombre: 'Apadrinar viajeros',
+      howto: 'Apadrina a nuevos viajeros y guia sus primeros pasos',
+      nivel: 32
+    },
+    {
+      clave: 'voto_plataforma',
+      nombre: 'Voto en la plataforma',
+      howto: 'Participa en decisiones de producto de ExploraCO',
+      nivel: 33
+    },
+    {
+      clave: 'marco_oro',
+      nombre: 'Marco de avatar Oro',
+      howto: 'Decora tu avatar con el marco Oro',
+      nivel: 34
+    },
+    {
+      clave: 'insignia_leyenda',
+      nombre: 'Insignia Leyenda',
+      howto: 'Tu perfil muestra la insignia de la era Leyenda',
+      nivel: 35
+    },
+    {
+      clave: 'marco_mitico',
+      nombre: 'Marco mitico',
+      howto: 'Decora tu avatar con el marco Mitico',
+      nivel: 36
+    },
+    {
+      clave: 'acceso_beta',
+      nombre: 'Acceso anticipado',
+      howto: 'Prueba funciones beta antes que el resto',
+      nivel: 37
+    },
+    {
+      clave: 'nombre_color',
+      nombre: 'Nombre con color',
+      howto: 'Tu nombre se muestra con un color personalizado',
+      nivel: 38
+    },
+    {
+      clave: 'insignia_ancestral',
+      nombre: 'Insignia ancestral',
+      howto: 'Tu perfil muestra la insignia ancestral',
+      nivel: 39
+    },
+    {
+      clave: 'titulo_mito',
+      nombre: 'Titulo Mito Eterno',
+      howto: 'Titulo exclusivo y marco legendario de fin de juego',
+      nivel: 40
     }
   ];
 

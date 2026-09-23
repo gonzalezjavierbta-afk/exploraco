@@ -170,15 +170,42 @@
   // Clave = nivel minimo, valor = nombre de la capacidad.
   // Una capacidad esta activa si nivelActual >= umbral.
   var CAPACIDADES_POR_NIVEL = {
+    1:  'perfil_viajero',
     6:  'crear_planes',
     7:  'emojis_premium',
+    8:  'insignia_caminante',
+    9:  'avatar_era',
     10: 'sello_sala',
     11: 'organizar_actividad',
+    12: 'marco_bronce',
+    13: 'cromo_ciudad',
     14: 'fundar_pandilla',
     15: 'moderar_galerias',
     16: 'cromo_dorado',
     17: 'mariscal_parche',
-    19: 'inmortal'
+    18: 'tema_mapa',
+    19: 'inmortal',
+    20: 'insignia_explorador',
+    21: 'editor_itinerarios',
+    22: 'plantillas_planes',
+    23: 'destacar_resena',
+    24: 'marco_plata',
+    25: 'colecciones_curadas',
+    26: 'eventos_propios',
+    27: 'resenas_verificadas',
+    28: 'insignia_cronista',
+    29: 'cromo_temporada',
+    30: 'tema_perfil',
+    31: 'impulso_xp',
+    32: 'apadrinar_viajeros',
+    33: 'voto_plataforma',
+    34: 'marco_oro',
+    35: 'insignia_leyenda',
+    36: 'marco_mitico',
+    37: 'acceso_beta',
+    38: 'nombre_color',
+    39: 'insignia_ancestral',
+    40: 'titulo_mito'
   };
 
   window.ExploraCO.CAPACIDADES_POR_NIVEL = CAPACIDADES_POR_NIVEL;
