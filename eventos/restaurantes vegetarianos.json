@@ -1,0 +1,423 @@
+[
+  {
+    "BASE": {
+      "slug": "de-raiz-restaurante-bogota",
+      "nombre": "De Ra\u00edz - Cocina a Base de Plantas",
+      "categoria_slug": "comida",
+      "lead": "Pionero de la alta cocina vegana e ingeniosa en Zona G, con platos creativos y ambiente sofisticado.",
+      "descripcion": "De Ra\u00edz redefini\u00f3 la propuesta vegetal en Bogot\u00e1 ofreciendo recetas confortables y contempor\u00e1neas 100% libres de ingredientes animales. Su propuesta abarca desde desayunos artesanales hasta cenas maridadas con vinos org\u00e1nicos.\n\nUbicado en una casona conservada de Quinta Camacho / Zona G, cuenta con espacios iluminados, terraza pet-friendly y un mercado de productos bot\u00e1nicos de productores locales.\n\nEntre sus platos insignia destacan sus quesos de frutos secos madurados en casa, pastas frescas artesanales y postres sin az\u00facar refinada.",
+      "highlight": "4.8/10 \u00b7 +1.200 rese\u00f1as \u00b7 100% Plant-Based",
+      "ciudad": "Bogot\u00e1",
+      "region": "Cundinamarca",
+      "barrio": "Zona G / Quinta Camacho",
+      "lat": 4.6531,
+      "lng": -74.0558,
+      "whatsapp": "573102345678",
+      "telefono": "+57 601 7458920",
+      "email": "contacto@deraiz.co",
+      "web": "https://deraiz.co",
+      "instagram": "@deraiz_restaurante",
+      "precio_desde": "Platos desde $28.000",
+      "horario": "Lun-S\u00e1b 8:00 AM - 10:00 PM \u00b7 Dom 8:00 AM - 5:00 PM",
+      "emoji": "\ud83c\udf31",
+      "hero_bg": "linear-gradient(135deg, #1b382b 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Restaurante \u00b7 Plant-Based \u00b7 Caf\u00e9",
+      "capacidad": "60 comensales",
+      "como_llegar": "TransMilenio Estaci\u00f3n Calle 72 o Flores. Calle 69 # 9-08",
+      "status": "published",
+      "destacado": true
+    },
+    "TAGS": {
+      "tipo_comida": "Vegana / Saludable Gourmet",
+      "cocina": "Internacional & Colombia Fusi\u00f3n",
+      "ambiente": "Moderno, acogedor, luminoso y pet-friendly",
+      "precio_promedio": "$45.000 - $70.000 por persona",
+      "terraza": "Si",
+      "reservas": "Si",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Hamburguesa de Girasol y Setas", "precio": "$34.000", "badge": "popular" },
+        { "nombre": "Bowl de Quinoa y Camote Asado", "precio": "$29.000", "badge": null },
+        { "nombre": "Tacos de Goulash de Setas al Pastor", "precio": "$32.000", "badge": "popular" },
+        { "nombre": "Cheesecake de Cashews y Frutos Rojos", "precio": "$18.000", "badge": null }
+      ],
+      "opciones_dieta": ["100% Vegano", "Opciones Sin Gluten", "Sin Az\u00facar Refinada"],
+      "horario_detallado": {
+        "Lunes": { "abre": "08:00", "cierra": "22:00" },
+        "Martes": { "abre": "08:00", "cierra": "22:00" },
+        "Miercoles": { "abre": "08:00", "cierra": "22:00" },
+        "Jueves": { "abre": "08:00", "cierra": "22:00" },
+        "Viernes": { "abre": "08:00", "cierra": "22:00" },
+        "Sabado": { "abre": "08:00", "cierra": "22:00" },
+        "Domingo": { "abre": "08:00", "cierra": "17:00" }
+      },
+      "domicilio_plataformas": ["Rappi", "Directo WhatsApp"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfAceptan mascotas?", "respuesta": "S\u00ed, la zona de terraza y primer piso es totalmente pet-friendly." },
+      { "pregunta": "\u00bfTienen opciones para cel\u00edacos?", "respuesta": "S\u00ed, m\u00e1s del 60% de la carta est\u00e1 marcada libre de gluten." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Vegan food gourmet plate",
+        "caption": "Plato gourmet vegetal en De Ra\u00edz",
+        "nombres_archivo_wikimedia": ["File:Vegan_gourmet_dish.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://deraiz.co", "que_respalda": "Men\u00fa, direcci\u00f3n y concepto" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "bioplaza-restaurante-organico-bogota",
+      "nombre": "BioPlaza Org\u00e1nico & Vegetariano",
+      "categoria_slug": "comida",
+      "lead": "El mercado y restaurante org\u00e1nico referente de Rosales con cosechas limpias y men\u00fas balansados.",
+      "descripcion": "BioPlaza pionero desde hace m\u00e1s de dos d\u00e9cadas en promover la alimentaci\u00f3n consciente en Bogot\u00e1. Integra en un solo lugar restaurante vegetariano/vegano y ecomercado especializado.\n\nSus platos se preparan con vegetales agroecol\u00f3gicos certificados provenientes de fincas campesinas cercanas a la Sabana de Bogot\u00e1.\n\nOfrece men\u00fas ejecutivos diarios, reposter\u00eda integral, caf\u00e9 org\u00e1nico y zumos prensados en fr\u00edo.",
+      "highlight": "4.7/10 \u00b7 Mercado & Bistro \u00b7 100% Org\u00e1nico",
+      "ciudad": "Bogot\u00e1",
+      "region": "Cundinamarca",
+      "barrio": "Rosales / El Nogal",
+      "lat": 4.6612,
+      "lng": -74.0531,
+      "whatsapp": "573159876543",
+      "telefono": "+57 601 3214567",
+      "email": "info@bioplaza.com.co",
+      "web": "https://www.bioplaza.com.co",
+      "instagram": "@bioplazaorganico",
+      "precio_desde": "Men\u00fa del d\u00eda desde $30.000",
+      "horario": "Lun-S\u00e1b 8:00 AM - 8:00 PM \u00b7 Dom 9:00 AM - 5:00 PM",
+      "emoji": "\ud83e\udd57",
+      "hero_bg": "linear-gradient(135deg, #2d5a27 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Restaurante \u00b7 Mercado Org\u00e1nico",
+      "capacidad": "45 comensales",
+      "como_llegar": "Carrera 7 con Calle 79B. Cl. 79B # 7-45",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Vegetariana / Org\u00e1nica",
+      "cocina": "Saludable / Consciente",
+      "ambiente": "R\u00fastico, fresco y m\u00e1s tradicional",
+      "precio_promedio": "$35.000 - $55.000 por persona",
+      "terraza": "Si",
+      "reservas": "No",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Men\u00fa del D\u00eda Agroecol\u00f3gico", "precio": "$32.000", "badge": "popular" },
+        { "nombre": "Lasa\u00f1a de Berenjena y Tofu", "precio": "$36.000", "badge": null },
+        { "nombre": "Sopa de Auyama y Curcuma", "precio": "$18.000", "badge": null },
+        { "nombre": "Muffin Integral de Ar\u00e1ndanos", "precio": "$10.000", "badge": null }
+      ],
+      "opciones_dieta": ["Vegetariano", "Vegano", "Sin Gluten", "Sin Lactosa"],
+      "horario_detallado": {
+        "Lunes": { "abre": "08:00", "cierra": "20:00" },
+        "Martes": { "abre": "08:00", "cierra": "20:00" },
+        "Miercoles": { "abre": "08:00", "cierra": "20:00" },
+        "Jueves": { "abre": "08:00", "cierra": "20:00" },
+        "Viernes": { "abre": "08:00", "cierra": "20:00" },
+        "Sabado": { "abre": "08:00", "cierra": "20:00" },
+        "Domingo": { "abre": "09:00", "cierra": "17:00" }
+      },
+      "domicilio_plataformas": ["Rappi", "Domicilios Propios"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfVenden insumos para cocinar en casa?", "respuesta": "S\u00ed, cuentan con ecomercado completo de granos, frutas y verduras." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Organic salad bowl",
+        "caption": "Bowl org\u00e1nico en BioPlaza",
+        "nombres_archivo_wikimedia": ["File:Organic_salad_bowl.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://www.bioplaza.com.co", "que_respalda": "Ubicaci\u00f3n y productos" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "quinoa-y-amaranto-la-candelaria",
+      "nombre": "Quinoa y Amaranto",
+      "categoria_slug": "comida",
+      "lead": "El secreto vegetariano m\u00e1s entra\u00f1able del centro hist\u00f3rico con saz\u00f3n casera e ingredientes andinos.",
+      "descripcion": "En pleno coraz\u00f3n colonial de La Candelaria, Quinoa y Amaranto destaca por sus almuerzos caseros preparados cada d\u00eda con productos locales frescos y superalimentos ancestrales.\n\nEs un espacio peque\u00f1o, c\u00e1lido y familiar que atiende principalmente a mediod\u00eda ofreciendo una sopa casera, plato fuerte equilibrado, jugo natural y postre tradicional.\n\nMuy popular entre viajeros internacionales y locales que buscan comida vegetariana nutritiva a un precio muy accesible.",
+      "highlight": "4.8/10 \u00b7 Saz\u00f3n Andina \u00b7 Centro Hist\u00f3rico",
+      "ciudad": "Bogot\u00e1",
+      "region": "Cundinamarca",
+      "barrio": "La Candelaria",
+      "lat": 4.5975,
+      "lng": -74.0702,
+      "whatsapp": "",
+      "telefono": "+57 601 2843210",
+      "email": "",
+      "web": "",
+      "instagram": "@quinoayamaranto",
+      "precio_desde": "Men\u00fa completo desde $22.000",
+      "horario": "Lun-S\u00e1b 12:00 PM - 4:00 PM \u00b7 Domingo cerrado",
+      "emoji": "\ud83c\udf3e",
+      "hero_bg": "linear-gradient(135deg, #8c6239 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Restaurante Casero \u00b7 Andino",
+      "capacidad": "25 comensales",
+      "como_llegar": "A dos cuadras de la Plaza de Bol\u00edvar. Calle 11 # 2-95",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Vegetariana Casera / Andina",
+      "cocina": "Colombiana Tradicional Vegetal",
+      "ambiente": "Hogare\u00f1o, art\u00edstico y tranquilo",
+      "precio_promedio": "$22.000 - $30.000 por persona",
+      "terraza": "No",
+      "reservas": "No",
+      "domicilio": "No",
+      "menu_destacado": [
+        { "nombre": "Men\u00fa del D\u00eda con Sopa de Quinoa", "precio": "$22.000", "badge": "popular" },
+        { "nombre": "Croquetas de Amaranto y Lenteja", "precio": "$18.000", "badge": null },
+        { "nombre": "Jugo Natural de Lulo con Maca", "precio": "$6.000", "badge": null },
+        { "nombre": "Dulce Casero de Papayuela", "precio": "$5.000", "badge": null }
+      ],
+      "opciones_dieta": ["Vegetariano", "Vegano"],
+      "horario_detallado": {
+        "Lunes": { "abre": "12:00", "cierra": "16:00" },
+        "Martes": { "abre": "12:00", "cierra": "16:00" },
+        "Miercoles": { "abre": "12:00", "cierra": "16:00" },
+        "Jueves": { "abre": "12:00", "cierra": "16:00" },
+        "Viernes": { "abre": "12:00", "cierra": "16:00" },
+        "Sabado": { "abre": "12:00", "cierra": "16:00" },
+        "Domingo": { "abre": "00:00", "cierra": "00:00" }
+      },
+      "domicilio_plataformas": []
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfAbren de noche?", "respuesta": "No, el restaurante solo presta servicio de almuerzo hasta las 4:00 PM." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Quinoa vegetarian soup dish",
+        "caption": "Sopa de quinoa casera en La Candelaria",
+        "nombres_archivo_wikimedia": ["File:Quinoa_soup_vegetable.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "tripadvisor", "url": "https://www.tripadvisor.co", "que_respalda": "Direcci\u00f3n y rese\u00f1as" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "herbivoro-vegano-chapinero",
+      "nombre": "Herb\u00edvoro - Cocina Vegana",
+      "categoria_slug": "comida",
+      "lead": "Cocina confort y comida r\u00e1pida artesanal 100% vegana en Chapinero Alto.",
+      "descripcion": "Herb\u00edvoro naci\u00f3 con la misi\u00f3n de demostrar que la comida vegana puede ser abundante, sabrosa y muy divertida. Especializados en burgers, pizzas artesanales de masa madre y tacos cargados de sabor.\n\nUbicado en la vibrante zona de Chapinero Alto, es el punto de encuentro preferido por la juventud alternativa de Bogot\u00e1.\n\nDestacan sus carnes vegetales elaboradas a base de seit\u00e1n y prote\u00edna de arveja con recetas secretas de la casa.",
+      "highlight": "4.7/10 \u00b7 Fast-Good Vegano \u00b7 Chapinero Alto",
+      "ciudad": "Bogot\u00e1",
+      "region": "Cundinamarca",
+      "barrio": "Chapinero Alto",
+      "lat": 4.6421,
+      "lng": -74.0612,
+      "whatsapp": "573124567890",
+      "telefono": "+57 601 5432109",
+      "email": "contacto@herbivoro.com",
+      "web": "https://herbivoro.com",
+      "instagram": "@herbivoro_cocinavegana",
+      "precio_desde": "Burgers desde $26.000",
+      "horario": "Mar-Dom 12:00 PM - 9:30 PM \u00b7 Lunes cerrado",
+      "emoji": "\ud83c\udf54",
+      "hero_bg": "linear-gradient(135deg, #78281f 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Comfort Food \u00b7 Vegano",
+      "capacidad": "35 comensales",
+      "como_llegar": "Transversal 6 # 56-35 (cerca a la Universidad de La Salle)",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Comida R\u00e1pida Artesanal Vegana",
+      "cocina": "Urbana / Comfort Food",
+      "ambiente": "Joven, alternativo y urbano",
+      "precio_promedio": "$35.000 - $50.000 por persona",
+      "terraza": "No",
+      "reservas": "No",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Burger Monstruo de Seit\u00e1n", "precio": "$31.000", "badge": "popular" },
+        { "nombre": "Pizza de Queso de Almendras y Champi\u00f1ones", "precio": "$35.000", "badge": null },
+        { "nombre": "Nachos Supremos con Guacamole y No-Queso", "precio": "$28.000", "badge": "popular" },
+        { "nombre": "Malteada de Galleta OREO y Leche de Avena", "precio": "$16.000", "badge": null }
+      ],
+      "opciones_dieta": ["100% Vegano", "Opciones Sin Gluten"],
+      "horario_detallado": {
+        "Lunes": { "abre": "00:00", "cierra": "00:00" },
+        "Martes": { "abre": "12:00", "cierra": "21:30" },
+        "Miercoles": { "abre": "12:00", "cierra": "21:30" },
+        "Jueves": { "abre": "12:00", "cierra": "21:30" },
+        "Viernes": { "abre": "12:00", "cierra": "22:00" },
+        "Sabado": { "abre": "12:00", "cierra": "22:00" },
+        "Domingo": { "abre": "12:00", "cierra": "20:00" }
+      },
+      "domicilio_plataformas": ["Rappi"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfHacen el seit\u00e1n en el restaurante?", "respuesta": "S\u00ed, todas las carnes vegetales son formuladas y elaboradas artesanalmente en su cocina." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Vegan burger craft",
+        "caption": "Hamburguesa artesanal vegana de Herb\u00edvoro",
+        "nombres_archivo_wikimedia": ["File:Vegan_burger_close_up.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "maps", "url": "https://www.happycow.net", "que_respalda": "Men\u00fa y opiniones" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "caballete-y-rezo-usaquen",
+      "nombre": "Caballete & Rezo - Veggie & Vegan Burger Bar",
+      "categoria_slug": "comida",
+      "lead": "El burger bar de culto para amantes de las hamburguesas plant-based en Usaqu\u00e9n.",
+      "descripcion": "Caballete & Rezo demostr\u00f3 que una hamburguesa vegana puede competirle de igual a igual a cualquier hamburguesa tradicional. Su local en Usaqu\u00e9n destaca por su est\u00e9tica r\u00fastica e industrial.\n\nCuentan con panader\u00eda propia, salsas artesanales y medallones a base de fr\u00edjol negro, lentejas, garbanzos o prote\u00edna vegetal texturizada.\n\nEs ideal para reuniones de amigos, cenas informales y maridajes con cerveza artesanal local.",
+      "highlight": "4.8/10 \u00b7 Burger Bar \u00b7 Usaqu\u00e9n",
+      "ciudad": "Bogot\u00e1",
+      "region": "Cundinamarca",
+      "barrio": "Usaqu\u00e9n",
+      "lat": 4.6982,
+      "lng": -74.0315,
+      "whatsapp": "573001234567",
+      "telefono": "+57 601 6209876",
+      "email": "hola@caballeteyrezo.com",
+      "web": "https://caballeteyrezo.com",
+      "instagram": "@caballeteyrezo",
+      "precio_desde": "Hamburguesas desde $28.000",
+      "horario": "Mar-Dom 12:00 PM - 10:00 PM \u00b7 Lunes cerrado",
+      "emoji": "\ud83c\udf7a",
+      "hero_bg": "linear-gradient(135deg, #4a235a 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Burger Bar \u00b7 Cervecer\u00eda Vegana",
+      "capacidad": "50 comensales",
+      "como_llegar": "A pocas cuadras del Parque Principal de Usaqu\u00e9n. Calle 120A # 6-25",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Hamburguesas & Cerveza Artesanal",
+      "cocina": "Norteamericana / Fusi\u00f3n Vegana",
+      "ambiente": "R\u00fastico, industrial y amigable",
+      "precio_promedio": "$40.000 - $60.000 por persona",
+      "terraza": "Si",
+      "reservas": "Si",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Hamburguesa La Santanera (Fr\u00edjol y Ma\u00edz)", "precio": "$29.000", "badge": "popular" },
+        { "nombre": "Hamburguesa BBQ Smoke & Bacon Vegano", "precio": "$33.000", "badge": "popular" },
+        { "nombre": "Papas Caseras Trufadas", "precio": "$16.000", "badge": null },
+        { "nombre": "Cerveza Artesanal BBC / Pint", "precio": "$14.000", "badge": null }
+      ],
+      "opciones_dieta": ["Vegano", "Vegetariano"],
+      "horario_detallado": {
+        "Lunes": { "abre": "00:00", "cierra": "00:00" },
+        "Martes": { "abre": "12:00", "cierra": "22:00" },
+        "Miercoles": { "abre": "12:00", "cierra": "22:00" },
+        "Jueves": { "abre": "12:00", "cierra": "22:00" },
+        "Viernes": { "abre": "12:00", "cierra": "23:00" },
+        "Sabado": { "abre": "12:00", "cierra": "23:00" },
+        "Domingo": { "abre": "12:00", "cierra": "20:00" }
+      },
+      "domicilio_plataformas": ["Rappi", "WhatsApp"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfTienen cerveza sin gluten?", "respuesta": "S\u00ed, cuentan con opciones de sidras y bebidas sin gluten en su carta." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Veggie burger with fries",
+        "caption": "Hamburguesa vegetal con papas en Caballete & Rezo",
+        "nombres_archivo_wikimedia": ["File:Veggie_burger_with_fries.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "oficial", "url": "https://caballeteyrezo.com", "que_respalda": "Men\u00fa y horarios" }
+    ]
+  },
+  {
+    "BASE": {
+      "slug": "nativo-bistro-la-macarena",
+      "nombre": "Nativo Bistro Plant-Based",
+      "categoria_slug": "comida",
+      "lead": "Cocina de autor y experiencia gastron\u00f3mica consciente en el barrio internacional La Macarena.",
+      "descripcion": "Nativo Bistro fusiona ingredientes biodiversos de Colombia con t\u00e9cnicas internacionales de cocina a base de plantas. Un rinc\u00f3n acogedor dentro del barrio gastron\u00f3mico La Macarena.\n\nSu carta rota peri\u00f3dicamente respetando los ciclos de cosecha de peque\u00f1os agricultores agroecol\u00f3gicos.\n\nResaltan sus platos inspirados en el Pac\u00edfico colombiano, ceviches de hongos tropicales y refrescantes infusiones de bot\u00e1nica nativa.",
+      "highlight": "4.9/10 \u00b7 Cocina de Autor \u00b7 La Macarena",
+      "ciudad": "Bogot\u00e1",
+      "region": "Cundinamarca",
+      "barrio": "La Macarena",
+      "lat": 4.6145,
+      "lng": -74.0658,
+      "whatsapp": "573187654321",
+      "telefono": "+57 601 2819087",
+      "email": "nativobistro.bogota@gmail.com",
+      "web": "",
+      "instagram": "@nativobistro",
+      "precio_desde": "Platos desde $26.000",
+      "horario": "Mi\u00e9-Dom 12:30 PM - 9:00 PM \u00b7 Lun-Mar cerrado",
+      "emoji": "\ud83c\udf3f",
+      "hero_bg": "linear-gradient(135deg, #196f3d 0%, #111111 100%)",
+      "foto_hero": "FOTO 1",
+      "tipo": "Bistro \u00b7 Cocina de Autor",
+      "capacidad": "30 comensales",
+      "como_llegar": "Carrera 4A # 26B-22 (a pocas cuadras del Museo Nacional)",
+      "status": "published",
+      "destacado": false
+    },
+    "TAGS": {
+      "tipo_comida": "Autora Vegana / Fusi\u00f3n Colombiana",
+      "cocina": "Contempor\u00e1nea Latinoamericana",
+      "ambiente": "Bohemio, \u00edntimo y rom\u00e1ntico",
+      "precio_promedio": "$45.000 - $65.000 por persona",
+      "terraza": "No",
+      "reservas": "Si",
+      "domicilio": "Si",
+      "menu_destacado": [
+        { "nombre": "Ceviche de Orellanas y Mango de Az\u00facar", "precio": "$27.000", "badge": "popular" },
+        { "nombre": "Encocado del Pac\u00edfico con Tofu Ahumado", "precio": "$35.000", "badge": "popular" },
+        { "nombre": "Risotton de Hongos Silvestres", "precio": "$34.000", "badge": null },
+        { "nombre": "Mousse de Cacao Chocoano y Maracuy\u00e1", "precio": "$15.000", "badge": null }
+      ],
+      "opciones_dieta": ["100% Vegano", "Sin Gluten"],
+      "horario_detallado": {
+        "Lunes": { "abre": "00:00", "cierra": "00:00" },
+        "Martes": { "abre": "00:00", "cierra": "00:00" },
+        "Miercoles": { "abre": "12:30", "cierra": "21:00" },
+        "Jueves": { "abre": "12:30", "cierra": "21:00" },
+        "Viernes": { "abre": "12:30", "cierra": "21:30" },
+        "Sabado": { "abre": "12:30", "cierra": "21:30" },
+        "Domingo": { "abre": "12:30", "cierra": "17:00" }
+      },
+      "domicilio_plataformas": ["Rappi"]
+    },
+    "FAQS": [
+      { "pregunta": "\u00bfSe requiere reserva previa?", "respuesta": "Se recomienda reservar los fines de semana debido a su aforo limitado." }
+    ],
+    "FOTOS_SUGERIDAS": [
+      {
+        "tema": "Gourmet vegan dish mushrooms",
+        "caption": "Encocado de hongos de autor en Nativo Bistro",
+        "nombres_archivo_wikimedia": ["File:Gourmet_mushroom_dish.jpg"],
+        "es_hero": true
+      }
+    ],
+    "FUENTES": [
+      { "tipo": "maps", "url": "https://www.google.com/maps", "que_respalda": "Ubicaci\u00f3n y horario" }
+    ]
+  }
+]

@@ -1,0 +1,31 @@
+const seed = require('./seed-herbivoro-vegano-chapinero.js');
+global.require_orig = require;
+const Module = require('module');
+const path = require('path');
+const origResolve = Module._resolveFilename;
+Module._resolveFilename = function(request, ...args) {
+  if (request === '@neondatabase/serverless') return path.join(__dirname, 'fake_neon.js');
+  return origResolve.call(this, request, ...args);
+};
+require('fs').writeFileSync(path.join(__dirname, 'fake_neon.js'), 'module.exports = { neon: function(){ return function(){ return []; }; } };');
+const fs = require('fs');
+const vm = require('vm');
+const src = fs.readFileSync(path.join(__dirname, '..', 'api', 'pagina-destino.js'), 'utf8');
+const sandbox = { module: { exports: {} }, require, console, process };
+sandbox.exports = sandbox.module.exports;
+vm.createContext(sandbox);
+const wrapped = src + '\nmodule.exports.buildHTML = buildHTML;';
+vm.runInContext(wrapped, sandbox, { filename: 'api/pagina-destino.js' });
+const d = Object.assign({}, seed.BASE, { fotos: [{ url: seed.HERO }], tags: seed.TAGS, rating: 0, total_resenas: 0, creado_en: new Date(), actualizado_en: new Date() });
+const html = sandbox.module.exports.buildHTML(d, {}, [], []);
+function check(label, cond) { console.log((cond ? 'PASS' : 'FAIL') + ' - ' + label); if (!cond) process.exitCode = 1; }
+check('renderiza sin error (len>5000)', typeof html === 'string' && html.length > 5000);
+check('Seccion cocina y ambiente', html.includes('id="perfil-comida"') && html.includes('Cocina y ambiente') && html.includes('Artesanal Vegana') && html.includes('Urbana / Comfort Food'));
+check('Seccion menu destacado', html.includes('id="menu"') && html.includes('Burger Monstruo de Seit') && html.includes('Queso de Almendras'));
+check('Lunes cerrado en horarios', html.includes('id="horarios"') && html.includes('Cerrado'));
+check('Seccion opciones y domicilio', html.includes('id="delivery"') && html.includes('Opciones dieteticas y domicilio') && html.includes('Opciones Sin Gluten'));
+check('Hero con nombre', html.includes('Cocina Vegana'));
+const opens = (html.match(/<div/g) || []).length;
+const closes = (html.match(/<\/div>/g) || []).length;
+console.log('divs open=' + opens + ' close=' + closes + ' diff=' + (opens - closes));
+check('balance de divs', opens === closes);
