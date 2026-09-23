@@ -788,6 +788,16 @@ function calcularEraLocal(nivel) {
   return 'Mito';
 }
 
+// Era canonica "ganada": GREATEST(nivel derivado de xp_total, nivel_max).
+// Espejo documentado de conNivel() en api/usuarios.js:160-170 (ADR-053).
+// El gate de consumibles por era SIEMPRE debe usar este helper: nunca el
+// nivel derivado del XP crudo (gastar XP baja el nivel economico, no la era).
+function calcularEraVisibleLocal(xpTotal, nivelMax) {
+  var n = calcularNivelLocal(xpTotal).nivel;
+  var nm = parseInt(nivelMax, 10) || 1;
+  return calcularEraLocal(Math.max(n, nm));
+}
+
 // ADR-040 (v22): nivel que desbloquea cada mision que abre capacidad.
 // Los valores son el nivel (1-based) cuyo umbral minimo vive en el mismo
 // catalogo NIVELES_LOCAL; nivelDeMisionServidor valida contra ESE catalogo
@@ -5857,12 +5867,14 @@ module.exports = async function handler(req, res) {
         var catalogoConsumibles = [];
         try {
           catalogoConsumibles = await sql(
-            'SELECT clave, nombre, descripcion, precio_xp, categoria FROM consumibles'
+            'SELECT clave, nombre, descripcion, precio_xp, categoria, era_exclusiva FROM consumibles'
             + ' WHERE activo = true AND ($1::text IS NULL OR categoria = $1::text)'
             + ' ORDER BY precio_xp ASC, clave ASC',
             [catCons || null]
           );
         } catch (eCatCons) {
+          // Degradacion (migracion 018 o 035 pendiente): catalogo completo
+          // sin categoria ni era_exclusiva; el contrato se uniforma abajo.
           console.warn('TRACE: GET consumibles sin categoria: ' + (eCatCons && eCatCons.message));
           catalogoConsumibles = await sql(
             'SELECT clave, nombre, descripcion, precio_xp FROM consumibles'
@@ -5870,12 +5882,28 @@ module.exports = async function handler(req, res) {
             []
           ).catch(function(){ return []; });
         }
+        // Era ganada del usuario (ADR-053/ADR-056): solo se calcula si viene
+        // usuario_id. Sin fila o sin columnas -> era_usuario null y sin gate.
+        var catEraUsuario = null;
+        if (usuarioId) {
+          var catUsrRows = await sql(
+            'SELECT xp_total, nivel_max FROM usuarios WHERE id=$1',
+            [usuarioId]
+          ).catch(function(){ return []; });
+          if (catUsrRows.length) {
+            catEraUsuario = calcularEraVisibleLocal(catUsrRows[0].xp_total, catUsrRows[0].nivel_max);
+          }
+        }
         // numeric(12,2) llega como string: normalizar el precio (ADR-035).
+        // era_exclusiva se uniforma a null cuando la columna no existe o el
+        // valor es vacio; bloqueado solo aplica con usuario_id presente.
         catalogoConsumibles = catalogoConsumibles.map(function(c) {
           c.precio_xp = red2(numXp(c.precio_xp));
+          c.era_exclusiva = c.era_exclusiva || null;
+          c.bloqueado = !!(c.era_exclusiva && catEraUsuario && c.era_exclusiva !== catEraUsuario);
           return c;
         });
-        return res.status(200).json({ ok: true, data: catalogoConsumibles });
+        return res.status(200).json({ ok: true, data: catalogoConsumibles, era_usuario: catEraUsuario });
       }
 
       // Inventario del usuario: consumibles como objeto clave ->
@@ -5884,7 +5912,7 @@ module.exports = async function handler(req, res) {
       // con shape { cantidad, nombre } (no solo la cantidad cruda).
       if (tipo === 'inventario' && usuarioId) {
         var invRows = await sql(
-          'SELECT capacidades, xp_total FROM usuarios WHERE id=$1',
+          'SELECT capacidades, xp_total, nivel_max FROM usuarios WHERE id=$1',
           [usuarioId]
         );
         if (!invRows.length)
@@ -5893,20 +5921,35 @@ module.exports = async function handler(req, res) {
         var capsInv = inv.capacidades || {};
         var invXp = red2(numXp(inv.xp_total));
         var invNivel = calcularNivelLocal(invXp);
-        var invEra = calcularEraLocal(invNivel.nivel);
+        // ADR-053/ADR-056: la era es la ganada (GREATEST derivado, nivel_max),
+        // no la derivada del XP crudo (gastar XP no baja la era).
+        var invEra = calcularEraVisibleLocal(inv.xp_total, inv.nivel_max);
         var invCrudo = capsInv.consumibles || {};
-        // Catalogo para resolver clave -> nombre publico.
+        // Catalogo para resolver clave -> nombre publico + era_exclusiva.
+        // Degradacion en dos niveles: sin 035 cae al SELECT sin era pero
+        // conserva los nombres publicos (nunca regresa a la clave cruda).
         var invCatalogo = await sql(
-          'SELECT clave, nombre FROM consumibles WHERE activo=true',
+          'SELECT clave, nombre, era_exclusiva FROM consumibles WHERE activo=true',
           []
-        ).catch(function(){ return []; });
+        ).catch(function(){ return null; });
+        if (!invCatalogo) {
+          invCatalogo = await sql(
+            'SELECT clave, nombre FROM consumibles WHERE activo=true',
+            []
+          ).catch(function(){ return []; });
+        }
         var invNombres = {};
-        invCatalogo.forEach(function(c) { invNombres[c.clave] = c.nombre; });
+        var invEras = {};
+        invCatalogo.forEach(function(c) {
+          invNombres[c.clave] = c.nombre;
+          invEras[c.clave] = c.era_exclusiva || null;
+        });
         var inventarioCons = {};
         Object.keys(invCrudo).forEach(function(clave) {
           inventarioCons[clave] = {
             cantidad: parseInt(invCrudo[clave], 10) || 0,
             nombre: invNombres[clave] || clave,
+            era_exclusiva: invEras[clave] || null,
           };
         });
         return res.status(200).json({
@@ -8733,7 +8776,7 @@ module.exports = async function handler(req, res) {
         if (!ccClave)
           return res.status(400).json({ ok: false, error: 'clave requerida' });
         var ccCons = await sql(
-          'SELECT id, clave, precio_xp, categoria FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
+          'SELECT id, clave, precio_xp, categoria, era_exclusiva FROM consumibles WHERE clave=$1 AND activo=true LIMIT 1',
           [ccClave]
         ).catch(function(){ return []; });
         if (!ccCons.length) {
@@ -8765,9 +8808,19 @@ module.exports = async function handler(req, res) {
         var ccPrecio = ccDescPct > 0
           ? red2(ccPrecioBase * (100 - ccDescPct) / 100)
           : ccPrecioBase;
-        var ccUsr = await sql('SELECT xp_total, capacidades FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
+        var ccUsr = await sql('SELECT xp_total, capacidades, nivel_max FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
         if (!ccUsr.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
+        // Gate de era (ADR-056): compra exclusiva por era. El item solo se
+        // compra si la era ganada del usuario coincide con era_exclusiva.
+        // NULL = sin gate (tienda base). Va antes del chequeo de XP, del
+        // anti-farming y del UPDATE.
+        var ccEraItem = ccCons[0].era_exclusiva || null;
+        if (ccEraItem) {
+          var ccEraUsuario = calcularEraVisibleLocal(ccUsr[0].xp_total, ccUsr[0].nivel_max);
+          if (ccEraUsuario !== ccEraItem)
+            return res.status(403).json({ ok: false, error: 'ERA_INSUFICIENTE', era_requerida: ccEraItem, era_actual: ccEraUsuario });
+        }
         var ccXp = numXp(ccUsr[0].xp_total);
         if (ccXp < ccPrecio)
           return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_total: red2(ccXp), precio: ccPrecio });
@@ -8840,9 +8893,18 @@ module.exports = async function handler(req, res) {
         var ucQty = parseInt(ucInv[ucClave], 10) || 0;
         if (ucQty < 1)
           return res.status(409).json({ ok: false, error: 'No tienes este consumible' });
-        // Validaciones anti-stacking (spec seccion 8)
-        if (ucClave === 'amuleto_x2' && (parseInt(ucCaps.multiplicador_x2_usos, 10) || 0) > 0)
-          return res.status(409).json({ ok: false, error: 'Ya tienes un amuleto x2 activo' });
+        // Validaciones anti-stacking (spec seccion 8). ADR-056: amuleto_x2 y
+        // las brujulas comparten el contador multiplicador_x2_usos, asi que
+        // ninguna se puede apilar sobre un x2 ya activo. Se conserva el texto
+        // historico para amuleto_x2 (contrato previo) y uno generico para
+        // las claves nuevas.
+        var UC_CLAVES_X2 = ['amuleto_x2', 'brujula_aprendiz', 'brujula_ruta'];
+        if (UC_CLAVES_X2.indexOf(ucClave) !== -1 && (parseInt(ucCaps.multiplicador_x2_usos, 10) || 0) > 0) {
+          var ucMsgX2 = ucClave === 'amuleto_x2'
+            ? 'Ya tienes un amuleto x2 activo'
+            : 'Ya tienes un multiplicador x2 activo';
+          return res.status(409).json({ ok: false, error: ucMsgX2 });
+        }
         if (ucClave === 'sala_efimera') {
           var ucSalas = Array.isArray(ucCaps.salas_efimeras) ? ucCaps.salas_efimeras : [];
           ucSalas = ucSalas.filter(function(s){ return s && s.hasta && new Date(s.hasta).getTime() > Date.now(); });
@@ -8991,6 +9053,65 @@ module.exports = async function handler(req, res) {
           ucEfecto = { destacados: ucDestacados };
           await actualizarCapacidad(sql, usuarioId2, 'perfil_vitrina_destacada', true);
           await mergePerfilConfig(sql, usuarioId2, { destacados: ucDestacados });
+        } else if (ucClave === 'brujula_aprendiz') {
+          // ADR-056 / migracion 035: 3 usos de x2 (mismo contador del amuleto).
+          ucEfecto = { multiplicador_x2_usos: 3 };
+          await actualizarCapacidad(sql, usuarioId2, 'multiplicador_x2_usos', 3);
+        } else if (ucClave === 'brujula_ruta') {
+          ucEfecto = { multiplicador_x2_usos: 6 };
+          await actualizarCapacidad(sql, usuarioId2, 'multiplicador_x2_usos', 6);
+        } else if (ucClave === 'cantimplora_anden') {
+          var ucMapC = parseInt(ucCaps.mapas_extra, 10) || 0;
+          ucEfecto = { mapas_extra: ucMapC + 1 };
+          await actualizarCapacidad(sql, usuarioId2, 'mapas_extra', ucMapC + 1);
+        } else if (ucClave === 'linterna_selva') {
+          var ucMapL = parseInt(ucCaps.mapas_extra, 10) || 0;
+          ucEfecto = { mapas_extra: ucMapL + 2 };
+          await actualizarCapacidad(sql, usuarioId2, 'mapas_extra', ucMapL + 2);
+        } else if (ucClave === 'mapa_carboncillo') {
+          var ucAlbC = parseInt(ucCaps.albums_extra, 10) || 0;
+          ucEfecto = { albums_extra: ucAlbC + 1 };
+          await actualizarCapacidad(sql, usuarioId2, 'albums_extra', ucAlbC + 1);
+        } else if (ucClave === 'libreta_campo') {
+          var ucAlbL = parseInt(ucCaps.albums_extra, 10) || 0;
+          ucEfecto = { albums_extra: ucAlbL + 2 };
+          await actualizarCapacidad(sql, usuarioId2, 'albums_extra', ucAlbL + 2);
+        } else if (ucClave === 'tintero_cronista') {
+          ucEfecto = { permiso_arte: true };
+          await actualizarCapacidad(sql, usuarioId2, 'permiso_arte', true);
+        } else if (ucClave === 'camara_antigua') {
+          var ucVitA = new Date(Date.now() + ucSieteDias).toISOString();
+          ucEfecto = { vitrina_estelar_hasta: ucVitA };
+          await actualizarCapacidad(sql, usuarioId2, 'vitrina_estelar_hasta', ucVitA);
+        } else if (ucClave === 'aura_mito') {
+          var ucVitB = new Date(Date.now() + ucSieteDias).toISOString();
+          ucEfecto = { vitrina_estelar_hasta: ucVitB };
+          await actualizarCapacidad(sql, usuarioId2, 'vitrina_estelar_hasta', ucVitB);
+        } else if (ucClave === 'sello_archivo') {
+          ucEfecto = { cromo_garantia: 'epico' };
+          await actualizarCapacidad(sql, usuarioId2, 'cromo_garantia', 'epico');
+        } else if (ucClave === 'estandarte_leyenda') {
+          var ucFamaEst = new Date(Date.now() + ucUnDia).toISOString();
+          ucEfecto = { fama_x2_hasta: ucFamaEst };
+          await actualizarCapacidad(sql, usuarioId2, 'fama_x2_hasta', ucFamaEst);
+        } else if (ucClave === 'capa_travesia') {
+          var ucPinCapa = new Date(Date.now() + ucSieteDias).toISOString();
+          ucEfecto = { pin_mapa_hasta: ucPinCapa };
+          await actualizarCapacidad(sql, usuarioId2, 'pin_mapa_hasta', ucPinCapa);
+        } else if (ucClave === 'corona_rutas') {
+          // Permanente: flag de capacidad + merge de perfil_config (ADR-003).
+          ucEfecto = { marco: 'dorado' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_corona_rutas', true);
+          await mergePerfilConfig(sql, usuarioId2, { marco: 'dorado' });
+        } else if (ucClave === 'reliquia_ancestral') {
+          ucEfecto = { tema: 'oscuro' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_reliquia_ancestral', true);
+          await mergePerfilConfig(sql, usuarioId2, { tema: 'oscuro' });
+        } else if (ucClave === 'nombre_eterno') {
+          // Titulo fijo; no requiere payload.
+          ucEfecto = { titulo: 'Mito Eterno' };
+          await actualizarCapacidad(sql, usuarioId2, 'perfil_nombre_eterno', true);
+          await mergePerfilConfig(sql, usuarioId2, { titulo: 'Mito Eterno' });
         }
         // Ledger de uso append-only
         await sql(

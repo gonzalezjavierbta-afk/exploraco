@@ -292,7 +292,9 @@ check('79. api/usuarios.js NIVELES bornes exactos del spec v6',
 
 // --- 12. Shape de operaciones documentadas (sin DB) ---
 // Verificar que consumibles GET retorna shape { ok, data: [...] }
-check('80. consumibles GET retorna { ok, data }', srcInt.indexOf("json({ ok: true, data: catalogoConsumibles })") !== -1);
+// ADR-056: el payload suma era_usuario al lado de data (data sigue siendo
+// el array del catalogo); la asercion acepta el campo aditivo.
+check('80. consumibles GET retorna { ok, data }', srcInt.indexOf("ok: true, data: catalogoConsumibles") !== -1);
 check('81. inventario GET retorna { ok, data: { consumibles, nivel, xp_total, era } }',
   srcInt.indexOf('consumibles: inventarioCons') !== -1
   && srcInt.indexOf('xp_total: invXp') !== -1

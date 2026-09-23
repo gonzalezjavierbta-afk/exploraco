@@ -3431,5 +3431,38 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Dependencia:** migracion 034 aplicada en Neon; ADR-055; ADR-028/ADR-018/ADR-038/ADR-041/ADR-053.
 - **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); no toca el arbol de RAMAS (reconciliacion en ADR-055 decision 9); no define RLS (aislamiento por DATOS).
 
+## Prioridad CONSUMIBLES CON GATE POR ERA - 2026-09-23 (ADR-056 / TSK-152)
+
+> Entrega "Consumibles con gate por era" (banda exclusiva de compra): la tienda
+> pasa de catalogo plano a tienda por era. Decision: **ADR-056** en DECISIONS.md
+> (spec/migracion/codigo ya ALINEADOS a ADR-056). NO crea funciones serverless
+> (**8/8 INTACTO**, ADR-001/ADR-010). Migracion NUEVA **035**
+> (aditiva/idempotente/ASCII-safe), **APLICADA en Neon el 2026-09-23** (5
+> sentencias OK; verificacion: 32 filas; NULL=8, Caminante=3, Explorador=3,
+> Cronista=6, Leyenda=7, Mito=5). Smoke
+> `scripts/smoke_test_consumibles_era.js` pasa **55/55** y esta **encadenado a
+> `npm test`** (script `smoke:consumibles`; suite VERDE, 0 FAIL).
+
+### TSK-152: Consumibles con gate por era (banda exclusiva de compra) -- `consumibles.era_exclusiva`, 15 nuevos (3 por era) + 9 premium backfilleados [APLICADO / VERIFICADO]
+
+- **Estado:** APLICADO / VERIFICADO (2026-09-23); verificado contra archivo real (ADR-006). Migracion 035 **APLICADA en Neon el 2026-09-23** (`node scripts/apply_sql_file.js db/migrations/035_consumibles_era.sql`, 5 sentencias OK, "todas OK"). Verificacion post-aplicacion: columna `consumibles.era_exclusiva` presente y **32** consumibles (NULL=8, Caminante=3, Explorador=3, Cronista=6, Leyenda=7, Mito=5). Queda pendiente el deploy del backend y del frontend.
+- **Prioridad:** Alta (migracion YA aplicada en Neon; el gate queda inactivo en produccion hasta desplegar el backend).
+- **Fecha:** 2026-09-23
+- **Origen:** decision de producto del operador: tienda de consumibles por era (banda exclusiva de compra).
+- **ADR:** DECISIONS.md **ADR-056** (IMPLEMENTADO Y MIGRACION 035 APLICADA EN NEON).
+- **Responsable / agentes:** architect (diseno + ADR), sql-security/data-migration (`db/migrations/035`), backend-dev (`api/interacciones.js` + `api/admin.js`), frontend-tpl/renderer-dev (`admin.html` + `mi-perfil.html`), docs-keeper (esta entrada de cierre).
+- **Alcance REAL ejecutado (no el plan original si difiere):**
+  1. **Migracion 035:** `db/migrations/035_consumibles_era.sql` (NUEVA, aditiva/idempotente ADR-008/ASCII-safe ADR-002): `consumibles.era_exclusiva varchar(20) NULL` (`ADD COLUMN IF NOT EXISTS`; `NULL` = tienda base; sin CHECK por ADR-028 ni indice); backfill idempotente de 9 premium (Cronista 3, Leyenda 4, Mito 2) por listas literales de claves; semilla de 15 consumibles nuevos (3 por era) que reutilizan tipos de efecto existentes (catalogo resultante en el estado real de Neon: **32** = 17 previos + 15 nuevos; la 034 NO esta aplicada, por eso sus 3 `prod_*` no existen; 35 si la 034 se aplica). **APLICADA en Neon el 2026-09-23** (`node scripts/apply_sql_file.js db/migrations/035_consumibles_era.sql`, 5 sentencias OK).
+  2. **Backend `api/interacciones.js`:** helper unico `calcularEraVisibleLocal(xpTotal, nivelMax)` (espejo documentado de `conNivel`, ADR-053); `GET ?tipo=consumibles` suma `era_exclusiva` y calcula `bloqueado` con `usuario_id` (degradacion sin la columna -> `null`); `POST ?tipo=comprar_consumible` responde `403 ERA_INSUFICIENTE` si `era_exclusiva` no coincide (chequeo antes del anti-farming y del UPDATE); `GET ?tipo=inventario` calcula la era sobre el nivel ganado (el uso NO se gatea). Sin bump de version (header sigue v28; hallazgo ADR-006).
+  3. **Backend `api/admin.js` (`?recurso=consumibles`):** `consumibles_lista` suma `era_exclusiva`; `consumibles_crear`/`consumibles_editar` la aceptan; normalizador `normalizarEraConsumible` ('' / null / 'ninguna' -> null; case-insensitive contra las 5 eras; invalido -> null). Sin bump de version (header sigue v5; hallazgo ADR-006).
+  4. **Frontend:** `admin.html` `<select>` de era (Sin gate + Caminante/Explorador/Cronista/Leyenda/Mito) en el form y el modal; `mi-perfil.html` card bloqueada con candado y texto "Disponible en era <era>" (el boton Usar sigue siempre activo).
+- **Evidencia (ADR-006):** `db/migrations/035_consumibles_era.sql`; `api/interacciones.js` (`calcularEraLocal` L783-789; `calcularEraVisibleLocal` L795-799; `consumibles` L5870+; `inventario` L5926-5952; `comprar_consumible` L8779-8822 con `ERA_INSUFICIENTE`); `api/admin.js` (`normalizarEraConsumible` L155-159); `admin.html`; `mi-perfil.html`. `git status`: la 035 y la spec estan untracked; `api/interacciones.js`, `api/admin.js`, `admin.html` y `mi-perfil.html` modificados.
+- **Smokes / verificacion:** `scripts/smoke_test_consumibles_era.js` (NUEVO, harness `vm` + fake neon, sin red ni BD) existe y pasa **55/55** (`node scripts/smoke_test_consumibles_era.js`): helper `calcularEraVisibleLocal`, `GET consumibles` con `era_usuario`/`bloqueado`, `403 ERA_INSUFICIENTE`, `409` por XP sin gate, uso `200` sin gate de era, checks de la migracion 035 (columna/15 claves/backfill/idempotencia/ASCII) y wiring en `api/interacciones.js`/`admin.html`/`mi-perfil.html`. **AHORA SI esta encadenado al script `test` de `package.json`** (script `smoke:consumibles`); `npm test` corre VERDE (0 FAIL en toda la suite; el smoke nuevo pasa 55/55). No se re-ejecuto el Escudo GOLD en este pase docs-only.
+- **Relacion con bugs:** ninguno nuevo. **BUG-021/BUG-060** (patron migracion-antes-de-deploy) aplican. **BUG-061** sigue ABIERTO (ajeno).
+- **Pendiente operativo:** (1) **HECHO:** `db/migrations/035_consumibles_era.sql` APLICADA en Neon el 2026-09-23 (32 filas verificadas); (2) deploy del backend (gate + admin) y del frontend (`admin.html`/`mi-perfil.html`; sin cache-bust). Orden: **035 en Neon (HECHO) -> backend -> frontend**.
+- **Deuda aceptada [DEUDA]:** (a) los items de eras pasadas no se pueden recomprar (banda exclusiva, aceptado); (b) no hay gate de uso (decision explicita); (c) **[CERRADA]** el smoke del gate pasa 55/55 y esta encadenado a `npm test`; (d) **[CERRADA]** numeracion alineada a ADR-056 en spec/migracion/codigo; (e) headers de version no bumpeados.
+- **Dependencia:** migracion 035 APLICADA en Neon (2026-09-23); ADR-053 (nivel ganado); ADR-028 (catalogo administrable); ADR-042 (columnas de la 027); ADR-055 (producibles `prod_*` sin gate).
+- **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); no toca el motor de efectos (los 15 nuevos reutilizan tipos existentes); no gatea el uso.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -2023,6 +2023,17 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <option value="coleccion">Colección</option>
           </select>
         </div>
+        <div style="flex:0 0 170px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Era</div>
+          <select class="form-input" id="consumible-era" style="width:100%">
+            <option value="" selected>Sin gate</option>
+            <option value="Caminante">Caminante (niv 1-10)</option>
+            <option value="Explorador">Explorador (11-20)</option>
+            <option value="Cronista">Cronista (21-30)</option>
+            <option value="Leyenda">Leyenda (31-35)</option>
+            <option value="Mito">Mito (36-40)</option>
+          </select>
+        </div>
         <button class="btn btn-gold" onclick="crearConsumible()" style="white-space:nowrap">＋ Crear</button>
       </div>
     </div>
@@ -2217,6 +2228,17 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <option value="impulso">Impulso</option>
           <option value="social">Social</option>
           <option value="coleccion">Colección</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Era</div>
+        <select class="form-input" id="consumible-edit-era" style="width:100%">
+          <option value="">Sin gate</option>
+          <option value="Caminante">Caminante (niv 1-10)</option>
+          <option value="Explorador">Explorador (11-20)</option>
+          <option value="Cronista">Cronista (21-30)</option>
+          <option value="Leyenda">Leyenda (31-35)</option>
+          <option value="Mito">Mito (36-40)</option>
         </select>
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.5">💡 Editar el precio no corrompe historial: el ledger compra_consumibles guarda xp_pagado como snapshot de cada compra.</div>
@@ -7276,6 +7298,10 @@ function _copySlug(slug) {
    api/admin.js (normalizarCategoriaConsumible); el `<select>` solo
    ofrece la lista conocida de la migracion 018. `consumibles_lista` ya
    devuelve `categoria`, por eso la precarga de edicion funciona.
+   ADR-056: campo `era_exclusiva` (Caminante|Explorador|Cronista|Leyenda|
+   Mito, o vacio = sin gate). Se envia como `era_exclusiva` (null si el
+   select queda vacio) en crear/editar; `consumibles_lista` lo devuelve
+   para precargar el modal y pintar el badge en la fila.
    La clave es identidad y NO se edita; el ledger compra_consumibles
    guarda xp_pagado como snapshot, así que editar precio_xp no
    corrompe historial. Cero Borrado Lógico: no hay DELETE, toggle
@@ -7325,6 +7351,9 @@ function renderConsumibles() {
       + '</div>'
       + '<div style="flex:0 0 100px;font-size:14px;font-weight:800;color:var(--gold)">' + fmtXp(c.precio_xp) + ' <span style="font-size:10px;color:var(--muted);font-weight:600">XP</span></div>'
       + '<div style="flex:0 0 110px"><span style="background:var(--bg2);color:var(--text2);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;text-transform:capitalize">' + escH(c.categoria || 'general') + '</span></div>'
+      + '<div style="flex:0 0 120px">' + (c.era_exclusiva
+        ? '<span style="background:var(--gold-l);color:var(--gold);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">' + escH(c.era_exclusiva) + '</span>'
+        : '<span style="font-size:11px;color:var(--muted)">Sin gate</span>') + '</div>'
       + '<div style="flex:0 0 90px">' + badge + '</div>'
       + '<div style="flex:0 0 auto;display:flex;gap:6px;margin-left:auto">'
       +   '<button class="btn btn-ghost btn-sm" onclick="abrirEditarConsumible(\'' + c.id + '\')">✏️ Editar</button>'
@@ -7346,6 +7375,7 @@ async function crearConsumible() {
   // envia el decimal tal cual (el backend redondea a 2 decimales).
   var precio = parseFloat(String(document.getElementById('consumible-precio').value || '').replace(',', '.'));
   var categoria = (document.getElementById('consumible-categoria') || {}).value || 'general';
+  var era = (document.getElementById('consumible-era') || {}).value || '';
 
   if (!clave || !nombre) { showAdminToast('Clave y nombre son obligatorios', 'error'); return; }
   if (!/^[a-z0-9_]+$/.test(clave)) { showAdminToast('Clave: solo minúsculas, números y guion bajo', 'error'); return; }
@@ -7355,7 +7385,7 @@ async function crearConsumible() {
     var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_crear', {
       method: 'POST',
       headers: _adminHeaders(),
-      body: JSON.stringify({ clave: clave, nombre: nombre, descripcion: descripcion, precio_xp: precio, categoria: categoria })
+      body: JSON.stringify({ clave: clave, nombre: nombre, descripcion: descripcion, precio_xp: precio, categoria: categoria, era_exclusiva: era ? era : null })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.error || 'No se pudo crear');
@@ -7364,6 +7394,7 @@ async function crearConsumible() {
     document.getElementById('consumible-descripcion').value = '';
     document.getElementById('consumible-precio').value = '';
     document.getElementById('consumible-categoria').value = 'general';
+    document.getElementById('consumible-era').value = '';
     showAdminToast('✅ ' + (data.mensaje || 'Consumible creado'), 'success');
     loadConsumibles();
   } catch (e) {
@@ -7380,6 +7411,7 @@ function abrirEditarConsumible(id) {
   document.getElementById('consumible-edit-descripcion').value = c.descripcion || '';
   document.getElementById('consumible-edit-precio').value = c.precio_xp != null ? c.precio_xp : '';
   document.getElementById('consumible-edit-categoria').value = c.categoria || 'general';
+  document.getElementById('consumible-edit-era').value = c.era_exclusiva || '';
   document.getElementById('consumible-modal').style.display = 'flex';
 }
 
@@ -7395,6 +7427,7 @@ async function guardarEdicionConsumible() {
   var descripcion = document.getElementById('consumible-edit-descripcion').value.trim();
   var precio = parseFloat(String(document.getElementById('consumible-edit-precio').value || '').replace(',', '.'));
   var categoria = (document.getElementById('consumible-edit-categoria') || {}).value || 'general';
+  var era = (document.getElementById('consumible-edit-era') || {}).value || '';
 
   if (!nombre) { showAdminToast('El nombre no puede quedar vacío', 'error'); return; }
   if (!isFinite(precio) || precio < 0) { showAdminToast('Precio debe ser un número mayor o igual a 0', 'error'); return; }
@@ -7404,7 +7437,7 @@ async function guardarEdicionConsumible() {
     var resp = await fetch('/api/admin?recurso=consumibles&tipo=consumibles_editar', {
       method: 'POST',
       headers: _adminHeaders(),
-      body: JSON.stringify({ id: _consumiblesEditId, nombre: nombre, descripcion: descripcion, precio_xp: precio, categoria: categoria })
+      body: JSON.stringify({ id: _consumiblesEditId, nombre: nombre, descripcion: descripcion, precio_xp: precio, categoria: categoria, era_exclusiva: era ? era : null })
     });
     var data = await resp.json();
     if (!data.ok) throw new Error(data.error || 'No se pudo actualizar');

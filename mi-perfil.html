@@ -196,11 +196,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .store-buy{width:100%;padding:7px 0;margin-top:8px;background:var(--gold);border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black);transition:opacity .15s}
 .store-buy:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);cursor:not-allowed}
 .store-buy:enabled:hover{opacity:.88}
+.store-era{display:inline-block;margin-top:6px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.3);border-radius:999px;padding:2px 8px}
+.store-card.locked{border-color:rgba(232,160,32,.25)}
 .inv-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:6px}
 .inv-qty{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold);min-width:28px;text-align:center}
 .inv-name{font-size:11px;font-weight:700;color:#fff;flex:1}
 .inv-use{padding:5px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.6px;transition:all .15s;font-family:'Outfit',sans-serif}
 .inv-use:hover{background:var(--gold);color:var(--black)}
+.inv-era{display:inline-block;margin-left:8px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gold);background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.3);border-radius:999px;padding:1px 7px}
 .cromo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px}
 .cromo-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;text-align:center}
 .cromo-card.rareza-comun{border-color:rgba(168,85,247,.35);background:rgba(168,85,247,.06)}
@@ -1626,6 +1629,7 @@ function cargarTienda(uid) {
   grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando tienda\u2026</div>';
   var url = '/api/interacciones?tipo=consumibles';
   if (PF_TIENDA_CAT !== 'todos') url += '&categoria=' + encodeURIComponent(PF_TIENDA_CAT);
+  if (uid) url += '&usuario_id=' + encodeURIComponent(uid);
   fetchConJwt(url)
     .then(function(res){
       var list = (res && res.data) || [];
@@ -1637,15 +1641,31 @@ function cargarTienda(uid) {
         return;
       }
       st = statsU();
+      var eraUsuario = (res && res.era_usuario) || null;
       grid.innerHTML = list.map(function(c){
+        var eraReq = c.era_exclusiva || null;
+        var bloqueado = c.bloqueado === true;
         var canBuy = st.xp >= c.precio_xp;
         var faltan = canBuy ? 0 : (c.precio_xp - st.xp);
-        var tipAttr = canBuy ? '' : ' title="Te faltan ' + fmtXp(faltan) + ' XP"';
-        return '<div class="store-card">'
+        var tag = '';
+        if (eraReq) {
+          var tagTitle = eraUsuario ? ' title="Tu era: ' + esc(eraUsuario) + '"' : '';
+          tag = '<div class="store-era"' + tagTitle + '>'
+            + (bloqueado ? '\uD83D\uDD12 ' : '') + 'Era ' + esc(eraReq) + '</div>';
+        }
+        var btn;
+        if (bloqueado) {
+          btn = '<button class="store-buy" disabled title="Disponible en era ' + esc(eraReq) + '">Disponible en era ' + esc(eraReq) + '</button>';
+        } else {
+          var tipAttr = canBuy ? '' : ' title="Te faltan ' + fmtXp(faltan) + ' XP"';
+          btn = '<button class="store-buy"' + (canBuy ? '' : ' disabled') + tipAttr + ' onclick="comprarConsumible(\'' + esc(c.clave) + '\',this)">Comprar</button>';
+        }
+        return '<div class="store-card' + (bloqueado ? ' locked' : '') + '">'
           + '<div class="store-name">' + esc(c.nombre) + '</div>'
           + '<div class="store-desc">' + esc(c.descripcion) + '</div>'
           + '<div class="store-price">' + fmtXp(c.precio_xp) + ' XP</div>'
-          + '<button class="store-buy"' + (canBuy ? '' : ' disabled') + tipAttr + ' onclick="comprarConsumible(\'' + esc(c.clave) + '\',this)">Comprar</button>'
+          + tag
+          + btn
           + '</div>';
       }).join('');
     })
@@ -1715,9 +1735,12 @@ function cargarInventario(uid) {
         var item = consumibles[k] || {};
         var qty = parseInt(item.cantidad, 10) || 0;
         var nombre = item.nombre || nombreConsumible(k);
+        var eraTag = item.era_exclusiva
+          ? '<span class="inv-era" title="Era exclusiva">Era ' + esc(item.era_exclusiva) + '</span>'
+          : '';
         return '<div class="inv-item">'
           + '<div class="inv-qty">x' + qty + '</div>'
-          + '<div class="inv-name">' + esc(nombre) + '</div>'
+          + '<div class="inv-name">' + esc(nombre) + eraTag + '</div>'
           + '<button class="inv-use" onclick="usarConsumible(\'' + esc(k) + '\',this)">Usar</button>'
           + '</div>';
       }).join('');

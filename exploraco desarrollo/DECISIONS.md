@@ -3202,3 +3202,57 @@ Negativas / **deuda aceptada:**
 - **Contrato de esquema CONGELADO:** no renombrar ni reordenar columnas de `mercado_config`/`mercado_ofertas`/`mercado_ventas` una vez aplicada la 034.
 
 **ADRs relacionados:** ADR-001 (8/8 endpoints; ramas `?tipo=`/`?recurso=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / MERGE JSONB del inventario), ADR-006 (baseline = esquema real auditado), ADR-008 (gobernanza e idempotencia de esquema), ADR-018 (moneda unica `xp_total`; de-nivel), ADR-028 (Casas condor/jaguar/delfin; Arbol de 16 ramas y su regla dura L916-921), ADR-035/ADR-053 (XP y consumibles `numeric(12,2)`; `xp_ledger` best-effort), ADR-038/ADR-041 (factor de nivelacion de Casa; `arancel_inter_casa`/`fee_mercado_interno` expuestos), ADR-042 (migracion 027; columnas de consumibles), ADR-025 (sesion firmada en mutaciones; leccion BUG-061), BUG-021/BUG-060 (patron migracion-antes-de-deploy), BUG-026 (emojis en SQL), BUG-083 (cabecera de migracion inconsistente con su cuerpo).
+
+---
+
+## ADR-056: Gate de consumibles por era (banda exclusiva de compra)
+
+**ID:** ADR-056
+**Fecha:** 2026-09-23
+**Estado:** **IMPLEMENTADO Y MIGRACION 035 APLICADA EN NEON (2026-09-23)** (migracion 035 + backend + admin + `mi-perfil.html`); verificado contra archivo real (ADR-006). La migracion `db/migrations/035_consumibles_era.sql` **FUE APLICADA en Neon el 2026-09-23** con `node scripts/apply_sql_file.js db/migrations/035_consumibles_era.sql` (5 sentencias OK, "todas OK"); verificacion post-aplicacion: columna `consumibles.era_exclusiva` presente y **32** consumibles en total (NULL=8, Caminante=3, Explorador=3, Cronista=6, Leyenda=7, Mito=5). **Hallazgos ADR-006:** (a) la numeracion ya esta ALINEADA: la spec, la migracion y los comentarios del codigo citan **ADR-056** (el siguiente real tras ADR-055); (b) el smoke `scripts/smoke_test_consumibles_era.js` pasa **55/55** verificaciones y AHORA SI esta encadenado al script `test` de `package.json` (mas el script `smoke:consumibles`); `npm test` corre VERDE (0 FAIL en toda la suite); (c) los headers de version de `api/interacciones.js` (v28) y `api/admin.js` (v5) **no fueron bumpeados** por esta entrega.
+**Autor:** architect (AI-DOS); decision de producto del operador.
+
+**Alcance:** `db/migrations/035_consumibles_era.sql` (NUEVA, aditiva/idempotente/ASCII-safe), `api/interacciones.js` (helper unico `calcularEraVisibleLocal` + gate en `GET ?tipo=consumibles`, `POST ?tipo=comprar_consumible` y fix de era en `GET ?tipo=inventario`), `api/admin.js` (`?recurso=consumibles` + normalizador `normalizarEraConsumible`), `admin.html` (`<select>` de era) y `mi-perfil.html` (candado + "Disponible en era <era>"). Sin endpoints nuevos (**8/8 intacto**, ADR-001/ADR-010).
+
+### Contexto
+
+- El catalogo real de consumibles es **PLANO** (17 filas antes de esta entrega, de las migraciones 010/015/018/027/031; los 3 producibles `prod_*` de la 034 NO existen porque esa migracion no esta aplicada): cualquier usuario con XP suficiente compra cualquier item. No existe una **tienda por era**.
+- El motor de eras v7 tiene **40 niveles / 5 eras** (fuente `api/usuarios.js` NIVELES v20; espejo `usuario-session.js`): `Caminante` (1-10), `Explorador` (11-20), `Cronista` (21-30), `Leyenda` (31-35), `Mito` (36-40). El helper local `calcularEraLocal` vive en `api/interacciones.js` (`:783-789`).
+- **ADR-053 (nivel ganado no decae):** la insignia se protege con `usuarios.nivel_max` y el "nivel ganado" es `GREATEST(calcularNivel(xp_total).nivel, nivel_max)`; gastar XP no baja la era. El gate debe evaluarse sobre ese valor (espejo `conNivel` de `api/usuarios.js`), **nunca** sobre el nivel derivado del XP crudo.
+- Restricciones vigentes: 8/8 endpoints (ADR-001), ASCII-safe (ADR-002), Cero Borrado Logico (ADR-003), gobernanza de esquema por SQL versionado e idempotente (ADR-008), catalogo administrable SIN CHECK (ADR-028), XP `numeric(12,2)` (ADR-035/ADR-053) y patron migracion-antes-de-deploy (BUG-021/BUG-060).
+
+### Opciones evaluadas (y por que se descartan)
+
+1. **Era minima acumulativa** (desbloquear todo el catalogo de las eras <= la era del usuario). Descartada: convierte la tienda en un embudo monotono (un `Mito` tendria todo el catalogo) y diluye el objetivo de producto, que es segmentar la economia por **banda** de era.
+2. **Gate por `nivel_min`/`nivel_max`** (rango intra-era por item). Descartada: acopla cada item a los umbrales de nivel (recalibrar la curva 42000 de ADR-053 exigiria editar item por item; deuda R-6) y no expresa la semantica de era; el operador quiere bandas de era, no rangos de nivel.
+3. **Gate tambien en el uso** (rechazar `usar_consumible` fuera de la era). Descartada: castigaria al usuario por gastar XP (el de-nivel de ADR-018 ya reduce el XP disponible) y volveria inutilizables items YA comprados; contradice el principio de ADR-053 de no castigar y de que el item ya es propiedad del usuario.
+4. **Columna `consumibles.era_exclusiva` con compra exclusiva por banda (ELEGIDA).**
+
+### Decision tomada
+
+1. **Modelo de datos:** `consumibles.era_exclusiva varchar(20) NULL` (migracion 035; `ADD COLUMN IF NOT EXISTS`). `NULL` = **tienda base** (sin gate). Sin `CHECK` (catalogo administrable, ADR-028) y sin indice (catalogo de decenas de filas).
+2. **Semantica del gate (compra exclusiva):** la compra se permite SOLO si `era_visible === era_exclusiva` (igualdad exacta). Fuera de la era (futura o pasada) el item queda bloqueado. Con `era_exclusiva = NULL` no hay gate.
+3. **Uso SIEMPRE permitido:** si el item esta en el inventario, se puede usar aunque la era se haya superado. `usar_consumible` **NO** aplica gate de era.
+4. **Valor de evaluacion = nivel ganado:** `era_visible = calcularEraLocal(GREATEST(calcularNivel(xp_total).nivel, nivel_max))`, via el helper unico `calcularEraVisibleLocal(xpTotal, nivelMax)` (`api/interacciones.js:795-799`), espejo documentado de `conNivel` (`api/usuarios.js`). Nunca se deriva del XP crudo.
+5. **`POST ?tipo=comprar_consumible`:** si `era_exclusiva` no es NULL y no coincide con `era_visible`, responde `403 { ok:false, error:'ERA_INSUFICIENTE', era_requerida, era_actual }`. El chequeo va **antes** del anti-farming y del UPDATE.
+6. **`GET ?tipo=consumibles`:** suma `era_exclusiva`; con `usuario_id` calcula `era_usuario` y devuelve `bloqueado` (`era_exclusiva` distinta de `era_usuario`; `NULL` -> false); sin `usuario_id`, `bloqueado=false`. **Degradacion:** si la columna no existe, reintenta sin `era_exclusiva` -> todos `null` (misma estrategia que el fallback de `categoria`).
+7. **`GET ?tipo=inventario` (fix):** pasa a calcular la era con `calcularEraVisibleLocal(xp_total, nivel_max)` (antes la derivaba del XP crudo) y puede incluir `era_exclusiva`; el boton Usar nunca se bloquea por era.
+8. **Admin (`api/admin.js`, recurso `consumibles`):** `consumibles_lista` suma `era_exclusiva`; `consumibles_crear`/`consumibles_editar` la aceptan; normalizador `normalizarEraConsumible(v)` (`''`/`null`/`'ninguna'` -> `null`; comparacion case-insensitive contra las 5 eras -> etiqueta canonica; invalido -> `null`).
+9. **Catalogo:** 15 consumibles nuevos (3 por era) que **reutilizan tipos de efecto existentes** (sin logica de efecto nueva) + backfill idempotente de **9 premium** existentes (Cronista 3, Leyenda 4, Mito 2). Catalogo resultante en el estado REAL de Neon: **32 filas** (17 previos + 15 nuevos; la 034 NO esta aplicada, por eso sus 3 `prod_*` no existen). Si la 034 se aplicara, el catalogo pasaria a **35** (3 `prod_*` mas).
+10. **Migracion 035** aditiva/idempotente (ADR-008)/ASCII-safe (ADR-002); **APLICADA en Neon el 2026-09-23** (`node scripts/apply_sql_file.js db/migrations/035_consumibles_era.sql`, 5 sentencias OK; verificacion: 32 filas). Queda pendiente el deploy del backend (sin la columna aplicada, crear/editar consumibles fallaria y la lista degradaria sin gate).
+
+### Justificacion
+
+Es el modelo que segmenta la tienda por era sin tocar el motor de efectos ni el flujo de uso: el gate vive en una sola puerta (la compra) y en un solo helper; preserva ADR-053 (no castiga el gasto de XP ni el de-nivel) y mantiene utilizable lo ya adquirido. Todo entra por ramas existentes, sin endpoints nuevos (8/8, ADR-001/ADR-010).
+
+### Consecuencias
+
+Positivas: tienda por era con bandas exclusivas; catalogo a 32 en el estado real de Neon (35 si la 034 se aplica) sin logica de efecto nueva; gate unico y auditable (helper unico + espejo documentado); los items ya comprados no se pierden (el uso no se gatea).
+Negativas / **deuda aceptada:**
+- **Los items de eras PASADAS no se pueden RECOMPRAR** (solo usar los ya adquiridos): un usuario que no compro en su momento no podra volver a comprarlos. Aceptado (banda exclusiva).
+- **No hay gate de uso** (decision explicita del punto 3).
+- **El gate ya esta habilitado por la 035 aplicada en Neon (2026-09-23):** queda pendiente el deploy del backend para que el gate entre en vigor en produccion; sin la columna, crear/editar consumibles fallaba y la lista degradaba (sin gate).
+- **Smoke encadenado (ADR-006):** `scripts/smoke_test_consumibles_era.js` pasa **55/55** verificaciones y esta encadenado al script `test` de `package.json` (script `smoke:consumibles`); `npm test` corre VERDE (0 FAIL). Deuda CERRADA.
+- **Numeracion (ADR-006):** la spec, la migracion y los comentarios del codigo citan **ADR-056** desde la renombracion (ya ALINEADOS); este ADR es el **056** (el siguiente real tras ADR-055).
+
+**ADRs relacionados:** ADR-001 (8/8 endpoints; ramas `?tipo=`/`?recurso=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / MERGE JSONB del inventario), ADR-006 (baseline = archivo real), ADR-008 (esquema versionado e idempotente), ADR-018 (economia de XP y de-nivel), ADR-028 (catalogo de consumibles administrable, sin CHECK), ADR-035/ADR-053 (XP `numeric(12,2)`; `nivel_max` y nivel ganado que no decae), ADR-041 (eras/titulos), ADR-042 (migracion 027: columnas de consumibles), ADR-055 (Mercado; producibles `prod_*` quedan sin gate). Bugs: BUG-021/BUG-060 (migracion-antes-de-deploy), BUG-026 (emojis en SQL).

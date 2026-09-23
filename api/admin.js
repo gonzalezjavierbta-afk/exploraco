@@ -148,6 +148,17 @@ function normalizarCategoriaConsumible(valor) {
   return s;
 }
 
+// == ERA EXCLUSIVA DE CONSUMIBLE (ADR-056) ================================
+// Catalogo administrable: era_exclusiva vacia/NULL => null (sin gate).
+// Comparacion case-insensitive contra las 5 eras del motor v7; cualquier
+// valor no reconocido cae a null (nunca se escribe basura en el gate).
+function normalizarEraConsumible(v) {
+  var s = String(v == null ? '' : v).trim().toLowerCase();
+  if (!s || s === 'ninguna' || s === 'null' || s === 'sin_gate') return null;
+  var eras = { caminante:'Caminante', explorador:'Explorador', cronista:'Cronista', leyenda:'Leyenda', mito:'Mito' };
+  return eras[s] || null;
+}
+
 // == REPARTO PIRAMIDAL (Entrega 016) ======================================
 // EXCEPCION CONTROLADA al tripwire de no-duplicidad (GSD 2.1): los
 // archivadores api/*.js se despliegan como funciones serverless
@@ -430,11 +441,24 @@ module.exports = async function handler(req, res) {
 
     // --- Lista: todos (activos e inactivos) ------------------------------
     if (tipo === 'consumibles_lista') {
+      // Degradacion (migracion 035 pendiente): sin era_exclusiva, pero la
+      // lista sigue completa. El catch de la primera consulta devuelve null
+      // solo ante error; un [] legitimo es truthy y no reintenta.
       var filasC = await sql(
-        'SELECT id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en '
+        'SELECT id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en '
         + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
-      );
-      filasC = filasC.map(function(c){ c.precio_xp = red2(numXp(c.precio_xp)); return c; });
+      ).catch(function(){ return null; });
+      if (!filasC) {
+        filasC = await sql(
+          'SELECT id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en '
+          + 'FROM consumibles ORDER BY activo DESC, precio_xp ASC, clave ASC'
+        );
+      }
+      filasC = filasC.map(function(c){
+        c.precio_xp = red2(numXp(c.precio_xp));
+        c.era_exclusiva = c.era_exclusiva || null;
+        return c;
+      });
       return res.status(200).json({ ok:true, data: filasC, total: filasC.length });
     }
 
@@ -459,15 +483,17 @@ module.exports = async function handler(req, res) {
         catN = normalizarCategoriaConsumible(body.categoria);
         if (!catN) return res.status(400).json({ ok:false, error:'CATEGORIA_INVALIDA' });
       }
+      // ADR-056: era_exclusiva opcional; vacio/desconocido -> null (sin gate).
+      var eraN = normalizarEraConsumible(body.era_exclusiva);
       var existC = await sql('SELECT 1 FROM consumibles WHERE clave=$1 LIMIT 1',[claveN]);
       if (existC.length) {
         return res.status(409).json({ ok:false, error:'Ya existe un consumible con esa clave' });
       }
       var insC = await sql(
-        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, categoria) '
-        + 'VALUES ($1,$2,$3,$4,$5) '
-        + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, activo, creado_en',
-        [claveN, nombreN, descN, precioN, catN]
+        'INSERT INTO consumibles (clave, nombre, descripcion, precio_xp, categoria, era_exclusiva) '
+        + 'VALUES ($1,$2,$3,$4,$5,$6) '
+        + 'RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo, creado_en',
+        [claveN, nombreN, descN, precioN, catN, eraN]
       );
       insC[0].precio_xp = red2(numXp(insC[0].precio_xp));
       return res.status(201).json({ ok:true, data: insC[0], mensaje:'Consumible creado' });
@@ -501,13 +527,19 @@ module.exports = async function handler(req, res) {
         if (!catE) return res.status(400).json({ ok:false, error:'CATEGORIA_INVALIDA' });
         setsC.push('categoria=$'+piC++); paramsC.push(catE);
       }
+      // ADR-056: era_exclusiva editable; vacio/desconocido -> null (quita
+      // el gate). Se distingue "no enviado" (no toca la columna) de null.
+      if ('era_exclusiva' in body) {
+        var eraE = normalizarEraConsumible(body.era_exclusiva);
+        setsC.push('era_exclusiva=$'+piC++); paramsC.push(eraE);
+      }
       if (!setsC.length) {
-        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp o categoria' });
+        return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, descripcion, precio_xp, categoria o era_exclusiva' });
       }
       paramsC.push(body.id);
       var updC = await sql(
         'UPDATE consumibles SET '+setsC.join(', ')+' WHERE id=$'+piC
-        + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, activo',
+        + ' RETURNING id, clave, nombre, descripcion, precio_xp, categoria, era_exclusiva, activo',
         paramsC
       );
       if (!updC.length) return res.status(404).json({ ok:false, error:'Consumible no encontrado' });
