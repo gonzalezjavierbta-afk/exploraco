@@ -511,12 +511,13 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
     <!-- MAPA AUDIOVISUAL -->
     <div class="cpanel" id="cpanel-mapa">
       <!-- Mis mapas personalizados (modulo compartido mymapa.js) -->
-      <div class="mmx-card"><div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">＋ Nuevo</button></div><div class="mmx-pills" id="mm-personal-pills"></div><div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div><div class="mmx-cats" id="mm-personal-cats"><button type="button" class="mmx-cbtn on" data-cat="all">Todos</button><button type="button" class="mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button><button type="button" class="mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button><button type="button" class="mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button><button type="button" class="mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button></div><div id="mm-personal-map" style="height:340px;border-radius:10px;overflow:hidden;background:#222"></div><div class="mmx-list" id="mm-personal-list"></div></div>
+      <div class="mmx-card"><div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">＋ Nuevo</button></div><div class="mmx-pills" id="mm-personal-pills"></div><div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div><div class="mmx-cats" id="mm-personal-cats"><button type="button" class="mmx-cbtn on" data-cat="all">Todos</button><button type="button" class="mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button><button type="button" class="mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button><button type="button" class="mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button><button type="button" class="mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button><button type="button" class="mmx-cbtn" data-cat="visitados">&#x2713; Visitados</button></div><div id="mm-personal-map" style="height:340px;border-radius:10px;overflow:hidden;background:#222"></div><div class="mmx-list" id="mm-personal-list"></div></div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
         <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>
         <button class="mapa-filtro" data-tipo="video" onclick="filtrarMapaAV(this,'video')">&#x25B6; Videos</button>
         <button class="mapa-filtro" data-tipo="audio" onclick="filtrarMapaAV(this,'audio')">&#x266B; Audio</button>
+        <button class="mapa-filtro" data-vista="albumes" onclick="toggleVistaAlbumes(this)">&#x1F4DA; Álbumes</button>
       </div>
       <div id="av-map-container" style="height:500px;width:100%;border-radius:12px;overflow:hidden;background:#2a2a2a"></div>
       <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:6px;text-align:center">
@@ -613,9 +614,9 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="mapa-cultural.js?v=8"></script>
+<script src="mapa-cultural.js?v=9"></script>
 <script src="media-actions.js"></script>
-<script src="mymapa.js?v=4"></script>
+<script src="mymapa.js?v=5"></script>
 <script src="mercado.js?v=1"></script>
 <script>
 /* =============================================================
@@ -1923,6 +1924,8 @@ var _avData = [];
    y el CSV se arma al llamar loadMultimediaMapa (tipo_media=foto,video).
    'todos' es un estado derivado: los 3 tipos activos. */
 var _avTiposActivos = { foto: true, video: true, audio: true };
+/* Vista del mapa AV: 'sueltos' (multimedia individual) o 'albumes' (grupos). */
+var _avVista = 'sueltos';
 
 function initAudiovisualMap() {
   if (_avMap) return;
@@ -1961,9 +1964,16 @@ function filtrarMapaAV(btn, tipo) {
   loadMultimediaMapa();
 }
 
+function toggleVistaAlbumes(btn) {
+  _avVista = (_avVista === 'albumes') ? 'sueltos' : 'albumes';
+  if (btn) btn.classList.toggle('active', _avVista === 'albumes');
+  loadMultimediaMapa();
+}
+
 function syncMapaFiltrosUI() {
   document.querySelectorAll('#cpanel-mapa .mapa-filtro').forEach(function(b){
     var t = b.getAttribute('data-tipo');
+    if (!t) return; // boton de vista (Sueltos/Albumes): su estado lo maneja toggleVistaAlbumes
     if (t === 'todos') {
       b.classList.toggle('active', _avTiposActivos.foto && _avTiposActivos.video && _avTiposActivos.audio);
     } else {
@@ -1976,14 +1986,18 @@ function loadMultimediaMapa() {
   // Sin tipos activos: no se dispara fetch con lista vacia; se deja la
   // capa visible y sin pines (mismo estado visual que un filtro sin
   // resultados del backend -- comportamiento heredado respetado).
-  if (!_avTiposActivos.foto && !_avTiposActivos.video && !_avTiposActivos.audio) {
+  if (_avVista !== 'albumes' && !_avTiposActivos.foto && !_avTiposActivos.video && !_avTiposActivos.audio) {
     _avData = [];
     if (_avMarkers) _avMarkers.clearLayers();
     return;
   }
-  var csv = ['foto','video','audio'].filter(function(t){ return _avTiposActivos[t]; }).join(',');
   var params = '/api/interacciones?tipo=multimedia_mapa';
-  if (csv) params += '&tipo_media=' + csv;
+  if (_avVista === 'albumes') {
+    params += '&vista=albumes';
+  } else {
+    var csv = ['foto','video','audio'].filter(function(t){ return _avTiposActivos[t]; }).join(',');
+    if (csv) params += '&tipo_media=' + csv;
+  }
   fetch(params)
     .then(function(r){ return r.json(); })
     .then(function(data) {
@@ -2031,7 +2045,12 @@ function renderAudiovisualMarkers() {
   _avMarkers.clearLayers();
   _avData.forEach(function(item) {
     if (!item.lat || !item.lng) return;
-    var icon = getMediaIcon(item.media_type);
+    var icon;
+    if (item.origen === 'album_grupo' || item.origen === 'destino_album') {
+      icon = getAlbumIcon();
+    } else {
+      icon = getMediaIcon(item.media_type);
+    }
     var autorNom = item.usuario_nombre || item.autor_nombre || '';
     var autorHTML = autorNom
       ? (item.usuario_id
@@ -2046,7 +2065,7 @@ function renderAudiovisualMarkers() {
       + (autorHTML ? '<span>por ' + autorHTML + '</span>' : '')
       + (item.votos > 0 ? '<span>&#x2B50; ' + item.votos + '</span>' : '')
       + '</div>';
-    if (item.origen === 'album') {
+    if (item.origen === 'album' || item.origen === 'album_grupo') {
       popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="#" onclick="abrirAlbumModal(\'' + esc(item.origen_id) + '\');return false">Ver album &#x2192;</a></div>';
     } else if (item.origen_id) {
       popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="/' + esc(item.origen_id) + '.html">Ver destino &#x2192;</a></div>';
@@ -2068,6 +2087,18 @@ function getMediaIcon(type) {
       + 'display:flex;align-items:center;justify-content:center;'
       + 'font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
       + (icons[type] || icons.foto) + '</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+}
+
+function getAlbumIcon() {
+  return L.divIcon({
+    className: 'av-marker-icon av-marker-album',
+    html: '<div style="background:#d97706;color:#fff;border-radius:6px;width:32px;height:32px;'
+      + 'display:flex;align-items:center;justify-content:center;'
+      + 'font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
+      + '\uD83D\uDCDA</div>',
     iconSize: [32, 32],
     iconAnchor: [16, 16]
   });

@@ -885,7 +885,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 </style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="agenda-shared.js"></script>
-<script src="mapa-cultural.js?v=8"></script>
+<script src="mapa-cultural.js?v=9"></script>
 </head><body>
 
 <nav class="hnav" id="hnav">
@@ -1097,6 +1097,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="mf-btn" data-cat="comida">🍽️ Comida</div>
       <div class="mf-btn" data-cat="sitio">🏔️ Naturaleza</div>
       <div class="mf-btn" data-cat="evento">🎉 Eventos</div>
+      <div class="mf-btn" data-cat="visitados">✓ Visitados</div>
       <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)">📍 Cerca de mí</div>
       <div class="mf-btn" onclick="resetMapaColombia()">🗺️ Colombia</div>
       <span class="mf-sep"></span>
@@ -1104,6 +1105,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <div class="mf-btn" data-media="foto">Fotos</div>
       <div class="mf-btn" data-media="video">Videos</div>
       <div class="mf-btn" data-media="audio">Audios</div>
+      <div class="mf-btn" id="mm-vista-albumes" onclick="setMapaMediaVista(this,'albumes')">&#x1F4DA; Álbumes</div>
       <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))">Solo mío</div>
     </div>
   </div>
@@ -2273,15 +2275,16 @@ var INDEX_MC_OPTS = {
   enableMediaOnAll: true,
   mediaEnabled: false,
   // Media del mapa cultural: se conservan las FOTOS de espacios creados
-  // de forma dinamica ('destino' curadas de la ficha y 'destino_album')
-  // y se ocultan las fotos sueltas de albumes de usuarios. Los VIDEOS y
-  // AUDIOS de la comunidad (origen 'album') SI se muestran: los espacios
-  // dinamicos no emiten video/audio propio y sin ellos desaparecia la
-  // capa audiovisual del mapa.
+  // de forma dinamica ('destino' curadas de la ficha y 'destino_album'),
+  // las fotos sueltas de albumes de usuarios ('album') y los grupos de
+  // album ('album_grupo'). Los VIDEOS y AUDIOS de la comunidad tambien
+  // se muestran (origen 'album'): los espacios dinamicos no emiten
+  // video/audio propio y sin ellos desaparecia la capa audiovisual.
   mediaFilter: function(items) {
     return (items || []).filter(function(it) {
       if (!it || !it.media_url) return false;
       if (it.origen === 'destino' || it.origen === 'destino_album') return true;
+      if (it.origen === 'album' || it.origen === 'album_grupo') return true;
       return it.media_type === 'video' || it.media_type === 'audio';
     });
   },
@@ -3577,6 +3580,10 @@ function _hidratarGuardadosDB() {
       /* Re-render de la grilla del home para marcar con corazon los
          guardados hidratados desde la DB (otro dispositivo/sesion). */
       if(typeof renderDest === 'function') renderDest();
+      /* Fase 1: refleja en el mapa cultural los visitados recien traidos
+         de Neon (borde verde + filtro "Visitados"). Re-marca MAPA_PLACES
+         porque se construyo antes de hidratar mmVisited. */
+      if(nVisited > 0) _refrescarVisitadosMapa();
     }
   }).catch(function(e){
     console.warn('[mi-mapa] hidratacion DB fallo:', e && e.message);
@@ -3607,6 +3614,17 @@ function toggleDestSave(id, btn) {
   }
 }
 
+/* Fase 1: re-marca MAPA_PLACES con el estado de visita actual (mmVisited)
+   y repinta el mapa cultural: borde verde + filtro "Visitados". */
+function _refrescarVisitadosMapa(){
+  try{
+    if(typeof MAPA_PLACES !== 'undefined' && typeof mmVisited !== 'undefined'){
+      MAPA_PLACES.forEach(function(p){ p.visitado = mmVisited.indexOf(p.slug) !== -1; });
+    }
+    if(typeof refreshMapaMarkers === 'function') refreshMapaMarkers();
+  }catch(e){ console.warn('[mapa-visitados] refresh fallo:', e && e.message); }
+}
+
 var _origMmToggleVisited = typeof mmToggleVisited !== 'undefined' ? mmToggleVisited : null;
 function mmToggleVisited(id) {
   var slug = _slugDeId(id);
@@ -3620,6 +3638,8 @@ function mmToggleVisited(id) {
     try{ localStorage.setItem('mm_saved',JSON.stringify(mmSaved)); }catch(e){}
     renderMyMap(); renderMMList();
   }
+  /* Fase 1: refleja el cambio de visita en el mapa cultural al instante. */
+  _refrescarVisitadosMapa();
   // Reactive con sesion: al marcar visita se persiste en Neon; al
   // desmarcar ('Desmarcar') se quita la fila de visita via
   // quitarVisita (backend quitar_visita).
@@ -4027,7 +4047,7 @@ function submitBlog() {
 <button id="btt-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba"
   style="position:fixed;bottom:24px;right:20px;width:42px;height:42px;border-radius:50%;background:var(--black);border:2px solid var(--gold);color:var(--gold);font-size:18px;cursor:pointer;z-index:200;display:none;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 16px rgba(0,0,0,.4)">↑</button>
 
-  <script src="index-api-connector.js?v=2"></script>
+  <script src="index-api-connector.js?v=3"></script>
   <script src="usuario-session.js"></script>
   <script src="album-comments.js?v=2"></script>
 </body>

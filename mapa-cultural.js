@@ -167,6 +167,7 @@
       rating: Number(raw.rating) || 0,
       emoji: raw.emoji || EMOJI_POR_CAT[cat] || PIN_DEFECTO,
       color: raw.color || PIN_COLORS[cat] || '#E8A020',
+      visitado: !!raw.visitado,
       heroBg: raw.hero_bg || '',
       foto: foto,
       fotos: fotos.slice(0, 8),
@@ -183,11 +184,12 @@
 
   /* ---------- capa de media: filtro default ---------- */
 
-  // Filtro default de la capa multimedia del mapa: SOLO items con
+  // Filtro default de la capa multimedia del mapa: items con
   // origen 'destino' o 'destino_album' cuyo origen_id (que el backend
-  // emite como SLUG) coincide con el slug de algun place activo.
-  // Se EXCLUYE SIEMPRE origen 'album' porque un album de usuario no
-  // tiene vinculo directo al destino activo (decision de producto).
+  // emite como SLUG) coincide con el slug de algun place activo, mas
+  // los albumes agrupados de comunidad ('album_grupo', ya con coords).
+  // Se EXCLUYE SIEMPRE origen 'album' (foto suelta sin vinculo al
+  // destino activo; decision de producto).
   function filterMediaDefault(items, places) {
     var slugs = {};
     (places || []).forEach(function (p) {
@@ -195,6 +197,7 @@
     });
     return (items || []).filter(function (it) {
       if (!it || !it.media_url) return false;
+      if (it.origen === 'album_grupo') return true;
       if (it.origen === 'album') return false;
       if (it.origen === 'destino' || it.origen === 'destino_album') {
         return !!(it.origen_id && slugs[it.origen_id]);
@@ -675,11 +678,17 @@
     function markerIcon(p) {
       var color = p.color || '#E8A020';
       var emoji = p.emoji || PIN_DEFECTO;
+      // Pin "visitado" (Fase 1): borde verde + halo, conservando el color
+      // de categoria en el relleno. No visitado: borde blanco actual.
+      var borde = p.visitado ? '3.5px solid #22C55E' : '2.5px solid #fff';
+      var sombra = p.visitado
+        ? 'box-shadow:0 0 0 3px rgba(34,197,94,.35),0 3px 10px rgba(0,0,0,.35)'
+        : 'box-shadow:0 3px 10px rgba(0,0,0,.35)';
       return L.divIcon({
         html: '<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;'
           + 'transform:rotate(-45deg);background:' + color + ';'
           + 'display:flex;align-items:center;justify-content:center;'
-          + 'box-shadow:0 3px 10px rgba(0,0,0,.35);border:2.5px solid #fff">'
+          + sombra + ';border:' + borde + '">'
           + '<span style="transform:rotate(45deg);font-size:12px;display:block">' + emoji + '</span>'
           + '</div>',
         iconSize: [30, 30], iconAnchor: [15, 30], className: ''
@@ -699,18 +708,20 @@
     function mediaIcon(item) {
       var tipo = item.media_type || 'foto';
       var esDestino = (item.origen === 'destino');
-      var esAlbumDestino = (item.origen === 'destino_album');
+      // Ambos albumes (curado del destino y agrupado de comunidad con
+      // coords) comparten el pin ambar cuadrado con icono de libros.
+      var esAlbum = (item.origen === 'destino_album' || item.origen === 'album_grupo');
       // Color base por tipo de media: video=rojo, audio=verde, fotos=morado.
-      // Los items individuales van en pin REDONDO; el album curado del
-      // destino (destino_album) conserva su ambar como contenedor y se pinta
-      // CUADRADO (clase mpa-media-pin-album) para distinguirse de los items.
+      // Los items individuales van en pin REDONDO; los albumes conservan su
+      // ambar como contenedor y se pintan CUADRADO (clase mpa-media-pin-album)
+      // para distinguirse de los items.
       var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#2ecc71' : '#8e44ad');
-      if (esAlbumDestino) color = '#d97706';
-      var ico = esAlbumDestino ? '\uD83D\uDCDA' : ((tipo === 'video') ? '\u25B6' : ((tipo === 'audio') ? '\u266B' : fotoIcon()));
+      if (esAlbum) color = '#d97706';
+      var ico = esAlbum ? '\uD83D\uDCDA' : ((tipo === 'video') ? '\u25B6' : ((tipo === 'audio') ? '\u266B' : fotoIcon()));
       var cls = 'mpa-media-pin'
         + (esDestino ? ' mpa-media-pin-dest' : '')
-        + (esAlbumDestino ? ' mpa-media-pin-album' : '')
-        + (!esAlbumDestino && !esDestino && tipo === 'video' ? ' mpa-media-pin-video' : '');
+        + (esAlbum ? ' mpa-media-pin-album' : '')
+        + (!esAlbum && !esDestino && tipo === 'video' ? ' mpa-media-pin-video' : '');
       return L.divIcon({
         html: '<div class="' + cls + '" style="background:' + color + '">' + ico + '</div>',
         iconSize: [34, 34], iconAnchor: [17, 17], className: ''
@@ -900,7 +911,9 @@
         el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:16px">Sin categoria seleccionada - activa una para ver destinos</div>';
         return;
       }
-      var arr = (cat === 'all') ? st.places.slice() : st.places.filter(function (p) { return p.cat === cat; });
+      var arr = (cat === 'all') ? st.places.slice()
+        : (cat === 'visitados') ? st.places.filter(function (p) { return !!p.visitado; })
+        : st.places.filter(function (p) { return p.cat === cat; });
       if (st.userPos) {
         arr.sort(function (a, b) {
           return ((a._dist != null) ? a._dist : 1e9) - ((b._dist != null) ? b._dist : 1e9);
@@ -939,6 +952,7 @@
       if (!st.map) return;
       if (cat === 'off') st.visible = [];
       else if (cat === 'all') st.visible = st.places.slice();
+      else if (cat === 'visitados') st.visible = st.places.filter(function (p) { return !!p.visitado; });
       else st.visible = st.places.filter(function (p) { return p.cat === cat; });
       recluster();
       renderList(cat);
@@ -1039,7 +1053,7 @@
         var lat = parseFloat(item.lat);
         var lng = parseFloat(item.lng);
         if (!lat || !lng) return;
-        var esAlbumDestino = (item.origen === 'destino_album');
+        var esAlbumDestino = (item.origen === 'destino_album' || item.origen === 'album_grupo');
         if (!esAlbumDestino && !st.mediaTypes[item.media_type]) return;
         if (!bounds.contains([lat, lng])) return;
         if (n >= TOPE_MEDIA_PINS) return;

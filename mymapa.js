@@ -46,6 +46,9 @@
   var MEDIA_CACHE = null;
   var MEDIA_CARGANDO = false;
   var MEDIA_USER_TOUCHED = false;
+  // Vista de la capa de media: 'sueltos' (fotos/videos/audio, actual) o
+  // 'albumes' (grupos: album_grupo propios y destino_album).
+  var MEDIA_VISTA = 'sueltos';
 
   // Set de media guardada por el usuario con claves "fuente:item_id"
   // (contrato del backend: fuente album_foto|curada y media_id). Lo puebla
@@ -217,6 +220,7 @@
       // Media propia de album (fetch scope=mio): siempre visible en el
       // mapa personal, aunque filterMediaDefault la excluya por origen.
       if (it.origen === 'album' && it._propia) return true;
+      if (it.origen === 'album_grupo' && it._propia) return true;
       return !!(it.key != null && estrictos[it.key]);
     });
   }
@@ -309,13 +313,14 @@
     }
     if (MEDIA_CARGANDO) return;
     MEDIA_CARGANDO = true;
-    fetch(api() + '/api/interacciones?tipo=multimedia_mapa')
+    var vistaQ = (MEDIA_VISTA === 'albumes') ? '&vista=albumes' : '';
+    fetch(api() + '/api/interacciones?tipo=multimedia_mapa' + vistaQ)
       .then(leerJson)
       .then(function (d) {
         var publicos = (d && d.ok && d.data) ? d.data : [];
         var u = usuario();
         if (!u || !u.id) { aplicarMedia(publicos); return null; }
-        return fetch(api() + '/api/interacciones?tipo=multimedia_mapa&scope=mio',
+        return fetch(api() + '/api/interacciones?tipo=multimedia_mapa&scope=mio' + vistaQ,
           { headers: authHeaders() })
           .then(leerJson)
           .then(function (p) {
@@ -345,7 +350,7 @@
       if (hay || !it) return;
       var k = claveGuardado(it);
       if (k && SET_GUARDADOS[k]) { hay = true; return; }
-      if (it.origen === 'album') {
+      if (it.origen === 'album' || it.origen === 'album_grupo') {
         if (it._propia) hay = true;
         return;
       }
@@ -375,10 +380,19 @@
       + '<button type="button" class="mmx-mbtn" data-media="all">Todo</button>'
       + '<button type="button" class="mmx-mbtn" data-media="foto">Fotos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="video">Videos</button>'
-      + '<button type="button" class="mmx-mbtn" data-media="audio">Audios</button>';
+      + '<button type="button" class="mmx-mbtn" data-media="audio">Audios</button>'
+      + '<button type="button" class="mmx-mbtn" data-vista="albumes">&#x1F4DA; Álbumes</button>';
     if (head && head.parentNode === card) card.insertBefore(box, head.nextSibling);
     else card.appendChild(box);
     box.addEventListener('click', function (e) {
+      var bv = (e.target && e.target.closest) ? e.target.closest('[data-vista]') : null;
+      if (bv) {
+        MEDIA_VISTA = (MEDIA_VISTA === 'albumes') ? 'sueltos' : 'albumes';
+        MEDIA_CACHE = null;
+        sincronizarToggleMedia();
+        recargarMedia();
+        return;
+      }
       var b = (e.target && e.target.closest) ? e.target.closest('[data-media]') : null;
       if (!b) return;
       var m = ensureMC();
@@ -408,6 +422,8 @@
       var on = (t === 'all') ? !!estado.mediaEnabled : !!(estado.mediaTypes && estado.mediaTypes[t]);
       btns[i].classList.toggle('on', on);
     }
+    var bv = box.querySelector('[data-vista]');
+    if (bv) bv.classList.toggle('on', MEDIA_VISTA === 'albumes');
   }
 
   /* ---------- render: pills / editbar / lista ---------- */
@@ -555,7 +571,27 @@
         renderPills(); renderList(msg); aplicarDestinos(); invalidarTamano();
         return;
       }
-      S.destinos = (esMiMapa ? (d.data && d.data.guardados) : (d.data && d.data.destinos)) || [];
+      if (esMiMapa) {
+        // Mi Mapa (Fase 1): fusiona guardados + visitados para poder ver y
+        // filtrar los lugares ya visitados. Dedup por slug/destino_id/id y
+        // marca visitado=true cuando el lugar esta en la lista de visitados.
+        var claves = {};
+        var fusion = [];
+        var pushUnico = function (p, esVisita) {
+          if (!p) return;
+          var k = String(p.slug || p.destino_id || p.id || '');
+          if (!k) return;
+          if (claves[k]) { if (esVisita) claves[k].visitado = true; return; }
+          p.visitado = !!esVisita;
+          claves[k] = p;
+          fusion.push(p);
+        };
+        ((d.data && d.data.guardados) || []).forEach(function (p) { pushUnico(p, false); });
+        ((d.data && d.data.visitados) || []).forEach(function (p) { pushUnico(p, true); });
+        S.destinos = fusion;
+      } else {
+        S.destinos = (d.data && d.data.destinos) || [];
+      }
       renderPills(); renderList(''); aplicarDestinos(); invalidarTamano();
     }).catch(function (e) {
       logWarn('loadDestinos', e);

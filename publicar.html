@@ -1045,6 +1045,25 @@ async function submitForm() {
     else if (cat.value === 'evento') subcatVal = v('evento_subcategoria');
   }
 
+  // Fase 2: JWT (si el usuario ya esta logueado) + geolocalizacion del
+  // dispositivo para el bono "publicado desde el lugar". Ambos son
+  // opcionales: si fallan, el lugar se envia igual sin XP.
+  var _jwt = null;
+  try {
+    var _rawSes = localStorage.getItem('exploraco_user');
+    if (_rawSes) { var _ses = JSON.parse(_rawSes); _jwt = (_ses && _ses.jwt) ? _ses.jwt : null; }
+  } catch(eJwt) { console.warn('[publicar] jwt no leido:', eJwt && eJwt.message); }
+
+  var _latU = null, _lngU = null;
+  try {
+    var _pos = await new Promise(function(resolve, reject) {
+      if (!navigator.geolocation) { reject(new Error('sin geolocalizacion')); return; }
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 6000, maximumAge: 120000 });
+    });
+    _latU = _pos.coords.latitude;
+    _lngU = _pos.coords.longitude;
+  } catch(eGeo) { console.warn('[publicar] geolocalizacion no disponible:', eGeo && eGeo.message); }
+
   var payload = {
     nombre: v('nombre'),
     categoria: cat ? cat.value : '',
@@ -1061,6 +1080,8 @@ async function submitForm() {
     checkin: v('checkin') || null,
     latitud: v('lat') ? parseFloat(v('lat')) : null,
     longitud: v('lng') ? parseFloat(v('lng')) : null,
+    lat_usuario: _latU,
+    lng_usuario: _lngU,
     whatsapp: v('whatsapp'),
     contacto_nombre: v('contacto_nombre') || null,
     instagram: v('instagram') || null,
@@ -1090,7 +1111,10 @@ async function submitForm() {
   try {
     var resp = await fetch('/api/publicar-lugar', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: Object.assign(
+        { 'Content-Type': 'application/json' },
+        _jwt ? { 'Authorization': 'Bearer ' + _jwt } : {}
+      ),
       body: JSON.stringify(payload)
     });
 

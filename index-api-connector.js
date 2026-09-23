@@ -263,6 +263,13 @@
         var idx = apiData.indexOf(item);
         return toMapPlace(item, idx);
       });
+    // Fase 1: marca los lugares visitados (borde verde + filtro en el mapa
+    // cultural). mmVisited es el set de slugs hidratado en index.html; se
+    // reaplica en cada applyData porque MAPA_PLACES se reconstruye.
+    var visitadosSlugs = (typeof window !== 'undefined' && window.mmVisited) ? window.mmVisited : [];
+    nuevoMapa.forEach(function (p) {
+      p.visitado = visitadosSlugs.indexOf(p.slug) !== -1;
+    });
     if (typeof MAPA_PLACES !== 'undefined') replArr(MAPA_PLACES, nuevoMapa);
 
     // 3b. MAPA_MEDIA[] - multimedia del mapa cultural del endpoint
@@ -347,12 +354,19 @@
   if (typeof window.MAPA_MEDIA_SOLO_MIO === 'undefined') {
     window.MAPA_MEDIA_SOLO_MIO = false;
   }
+  // Vista de la capa: 'sueltos' (fotos/videos/audio individuales, actual)
+  // o 'albumes' (grupos de album: album_grupo de usuarios y destino_album).
+  if (typeof window.MAPA_MEDIA_VISTA === 'undefined') {
+    window.MAPA_MEDIA_VISTA = 'sueltos';
+  }
 
   function cargarMapaMedia() {
     var soloMio = (window.MAPA_MEDIA_SOLO_MIO === true);
     var uid = (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
       ? String(window.ExploraCO.usuario.id) : null;
     var mediaUrl = '/api/interacciones?tipo=multimedia_mapa';
+    // Vista de albumes: pide las filas agrupadas (album_grupo/destino_album).
+    if (window.MAPA_MEDIA_VISTA === 'albumes') mediaUrl += '&vista=albumes';
     // Solo con el toggle activo Y sesion se restringe el scope.
     if (soloMio && uid) {
       mediaUrl += '&scope=mio&usuario_id=' + encodeURIComponent(uid);
@@ -422,6 +436,16 @@
     window.MAPA_MEDIA_SOLO_MIO = (valor === true || valor === 'true');
     cargarMapaMedia();
     return window.MAPA_MEDIA_SOLO_MIO;
+  };
+
+  // Conmutador de vista Sueltos/Albumes: invierte el estado global,
+  // sincroniza el boton y recarga la capa con el nuevo parametro.
+  window.setMapaMediaVista = function (btn, vista) {
+    var nueva = (window.MAPA_MEDIA_VISTA === 'albumes') ? 'sueltos' : 'albumes';
+    window.MAPA_MEDIA_VISTA = nueva;
+    if (btn && btn.classList) btn.classList.toggle('on', nueva === 'albumes');
+    cargarMapaMedia();
+    return window.MAPA_MEDIA_VISTA;
   };
 
   // Recarga manual de la capa con el scope actual.

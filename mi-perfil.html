@@ -666,7 +666,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <input type="text" id="album-ciudad" placeholder="Bogota" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
       </div>
       <div style="margin-bottom:12px;">
-        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Ubicacion en el mapa (opcional)</label>
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Ubicacion en el mapa (obligatorio)</label>
         <div style="display:flex;gap:8px;margin-bottom:6px;">
           <div style="flex:1;">
             <input type="number" step="0.000001" min="0" max="13" id="album-lat" placeholder="Latitud (opcional)" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
@@ -676,7 +676,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           </div>
         </div>
         <button onclick="usarMiUbicacionAlbum('album-lat','album-lng',this)" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x1F4CD; Usar mi ubicacion</button>
-        <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Sin latitud/longitud el album no aparecera en el mapa cultural.</p>
+        <button type="button" onclick="albumAbrirMapa()" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;margin-left:6px;">&#x1F5FA; Elegir en el mapa</button>
+        <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Obligatorio: fija el pin del album en el mapa para que aparezca.</p>
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">URL de portada (opcional)</label>
@@ -773,6 +774,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       </div>
       <div style="margin-bottom:12px;">
         <button onclick="usarMiUbicacionAlbum('edit-album-lat','edit-album-lng',this)" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x1F4CD; Usar mi ubicacion</button>
+        <button type="button" onclick="albumEditarAbrirMapa()" style="padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;margin-left:6px;">&#x1F5FA; Elegir en el mapa</button>
         <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Sin latitud/longitud el album no aparecera en el mapa cultural.</p>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -861,6 +863,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div id="mp-picker-coords" class="mp-picker-coords">Haz clic en el mapa para seleccionar</div>
         <button type="button" class="pf-museo-btn ghost" onclick="museoCerrarMapa()">Cancelar</button>
         <button type="button" class="pf-museo-btn" onclick="museoConfirmarMapa()">Confirmar pin</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Album: host del map-picker compartido (map-picker.js) -->
+  <div id="album-picker-modal" class="mp-picker-modal" onclick="if(event.target===this)albumCerrarMapa()">
+    <div class="mp-picker-box">
+      <div class="mp-picker-head">
+        <span>&#x1F4CD; Elige la ubicacion del album</span>
+        <button type="button" class="pf-museo-x" onclick="albumCerrarMapa()" aria-label="Cerrar">&times;</button>
+      </div>
+      <div id="album-picker-el" class="mp-picker-el"></div>
+      <div id="album-edit-picker-el" class="mp-picker-el" style="display:none"></div>
+      <div class="mp-picker-foot">
+        <div id="album-picker-coords" class="mp-picker-coords">Haz clic en el mapa para seleccionar</div>
+        <div id="album-edit-picker-coords" class="mp-picker-coords" style="display:none">Haz clic en el mapa para seleccionar</div>
+        <button type="button" class="pf-museo-btn ghost" onclick="albumCerrarMapa()">Cancelar</button>
+        <button type="button" class="pf-museo-btn" onclick="albumConfirmarMapa()">Confirmar pin</button>
       </div>
     </div>
   </div>
@@ -2343,6 +2363,11 @@ var museoRecursosCache = [];
 var museoAlbumesCache = [];
 var museoEditandoId = '';
 var _museoMP = null;
+/* Album: instancias del map-picker dedicado (crear usa album-*; editar usa
+   edit-album-*). _albumMPModo despacha cerrar/confirmar al picker activo. */
+var _albumMP = null;
+var _albumEditMP = null;
+var _albumMPModo = 'crear';
 /* ADR-051/H-5: pin propio del recurso vs heredado del album. */
 var museoCoordsOriginal = { lat: null, lng: null };
 var museoQuitarCoords = false;
@@ -2478,6 +2503,52 @@ function museoConfirmarMapa() {
   var lng = (document.getElementById('museo-f-lng').value || '').trim();
   if (lat && lng) { museoQuitarCoords = false; museoRefrescarCoordsHint(); }
 }
+
+/* Album: map-picker dedicado (host #album-picker-modal) para fijar el pin
+   del album al crearlo/editarlo. Cada instancia usa su propio contenedor
+   Leaflet (album-picker-el / album-edit-picker-el): map-picker.js no puede
+   inicializar dos mapas sobre el mismo contenedor. */
+function albumMapPicker() {
+  if (_albumMP) return _albumMP;
+  if (typeof initMapPicker !== 'function') return null;
+  _albumMP = initMapPicker({
+    latInput: 'album-lat', lngInput: 'album-lng',
+    cityInputs: ['album-ciudad'],
+    miniMapEl: 'album-mini-map', modalEl: 'album-picker-modal',
+    mapEl: 'album-picker-el', coordsEl: 'album-picker-coords',
+    precision: 6, showCityGeocoder: true, openClass: 'open',
+    toast: function(msg, type){ if (type === 'error') toastError(msg); else showToast(msg); }
+  });
+  return _albumMP;
+}
+function albumEditMapPicker() {
+  if (_albumEditMP) return _albumEditMP;
+  if (typeof initMapPicker !== 'function') return null;
+  _albumEditMP = initMapPicker({
+    latInput: 'edit-album-lat', lngInput: 'edit-album-lng',
+    cityInputs: ['edit-album-ciudad'],
+    miniMapEl: 'album-edit-mini-map', modalEl: 'album-picker-modal',
+    mapEl: 'album-edit-picker-el', coordsEl: 'album-edit-picker-coords',
+    precision: 6, showCityGeocoder: true, openClass: 'open',
+    toast: function(msg, type){ if (type === 'error') toastError(msg); else showToast(msg); }
+  });
+  return _albumEditMP;
+}
+/* Alterna el contenedor/coords visible del host segun el modo activo. */
+function albumPickerModo(modo) {
+  _albumMPModo = modo;
+  var crear = (modo === 'crear');
+  [['album-picker-el', crear], ['album-edit-picker-el', !crear],
+   ['album-picker-coords', crear], ['album-edit-picker-coords', !crear]].forEach(function(pair){
+    var el = document.getElementById(pair[0]);
+    if (el) el.style.display = pair[1] ? '' : 'none';
+  });
+}
+function albumPickerActivo() { return _albumMPModo === 'editar' ? albumEditMapPicker() : albumMapPicker(); }
+function albumAbrirMapa() { albumPickerModo('crear'); var mp = albumMapPicker(); if (mp) mp.openMapPicker(); }
+function albumEditarAbrirMapa() { albumPickerModo('editar'); var mp = albumEditMapPicker(); if (mp) mp.openMapPicker(); }
+function albumCerrarMapa() { var mp = albumPickerActivo(); if (mp) mp.closeMapPicker(); }
+function albumConfirmarMapa() { var mp = albumPickerActivo(); if (mp) mp.confirmMapPicker(); }
 
 function museoPreviewError(el) {
   if (el && el.parentNode) el.parentNode.innerHTML = '<div class="pf-museo-ph">No se pudo cargar el recurso. Revisa el link.</div>';
@@ -2771,6 +2842,7 @@ function crearAlbum() {
   var latNum = parseFloat(latRaw);
   var lngNum = parseFloat(lngRaw);
   var tieneCoords = isFinite(latNum) && isFinite(lngNum);
+  if (!tieneCoords) { alert('Marca la ubicacion del album en el mapa (obligatorio)'); return; }
   /* ADR-054: guardado en curso y filtro de chips, capturados antes del POST. */
   var pendiente = misEspacioItem;
   var filtroNuevo = misFiltroAlbumNuevo;

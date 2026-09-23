@@ -62,6 +62,32 @@ function normSintro(v) {
   return s ? s.slice(0, 200) : null;
 }
 
+function distanciaMetros(lat1, lng1, lat2, lng2) {
+  var R = 6371000, rad = Math.PI / 180;
+  var dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2)
+    + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Nivel de completitud de la publicacion (Fase 2). Mas campos = mas XP.
+function calcularTierPublicacion(b) {
+  var extras = 0;
+  if (b.descripcion_larga) extras++;
+  if (b.foto_principal) extras++;
+  if (b.precio_desde || b.horario) extras++;
+  if (b.sitio_web || b.instagram) extras++;
+  if (b.subcategoria) extras++;
+  if (Array.isArray(b.faqs) && b.faqs.length) extras++;
+  if (Array.isArray(b.amenidades) && b.amenidades.length) extras++;
+  if (b.sitio_tipo_actividad || b.sitio_como_llegar || b.sitio_horario) extras++;
+  var tieneCoords = !!(b.latitud && b.longitud);
+  var tieneGaleria = Array.isArray(b.fotos_galeria) && b.fotos_galeria.length > 0;
+  if (tieneCoords && tieneGaleria && extras >= 4) return 'completo';
+  if (extras >= 2) return 'intermedio';
+  return 'basico';
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -134,6 +160,39 @@ module.exports = async function handler(req, res) {
         tags.video_url = String(body.video_url).trim();
       }
     }
+
+    var tierPub = calcularTierPublicacion(body);
+    var geoPub = false;
+    var latU = parseFloat(body.lat_usuario), lngU = parseFloat(body.lng_usuario);
+    var latD = parseFloat(body.latitud), lngD = parseFloat(body.longitud);
+    if (isFinite(latU) && isFinite(lngU) && isFinite(latD) && isFinite(lngD)
+      && distanciaMetros(latU, lngU, latD, lngD) <= 300) geoPub = true;
+    var fotoPub = Array.isArray(body.fotos_galeria) && body.fotos_galeria.length > 0;
+
+    // Autor (Fase 2): solo si el usuario ya esta logueado (Bearer valido).
+    // publicar-lugar no verifica el JWT: lo reenvia a interacciones, que
+    // es el unico lugar con el motor de sesion.
+    var autorId = null;
+    var authPub = req.headers['authorization'] || req.headers['Authorization'] || '';
+    if (authPub) {
+      try {
+        var baseUrlPub = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app');
+        var rReg = await fetch(baseUrlPub + '/api/interacciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': authPub },
+          body: JSON.stringify({ tipo: 'publicar_lugar_registrar' })
+        });
+        var jReg = await rReg.json();
+        if (jReg && jReg.ok && jReg.data && jReg.data.autor_id) autorId = String(jReg.data.autor_id);
+      } catch (eReg) {
+        console.warn('[publicar-lugar] registrar autor fallo: ' + (eReg && eReg.message));
+      }
+    }
+    tags.autor_id = autorId;
+    tags.pub_tier = tierPub;
+    tags.pub_geo = geoPub;
+    tags.pub_foto = fotoPub;
+    tags.pub_xp_estado = autorId ? 'pendiente' : 'sin_autor';
 
     // Blog: el modal solo pide un resumen (descripcion_corta). Se usa
     // tambien como arranque del cuerpo completo (descripcion) para que

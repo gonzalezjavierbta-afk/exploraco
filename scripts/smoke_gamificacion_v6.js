@@ -136,13 +136,15 @@ async function run() {
 
   // ================= 5. XP_BASES ====================================
   var claves = Object.keys(XP_BASES);
-  check('5a: XP_BASES tiene exactamente 19 claves', claves.length === 19, claves.length);
+  check('5a: XP_BASES tiene exactamente 24 claves', claves.length === 24, claves.length);
   var basesEsperadas = {
-    visita: 30, visita_bono_rural: 25, resena_larga: 30, resena_corta: 10,
+    visita: 60, visita_bono_rural: 25, resena_larga: 30, resena_corta: 10,
     rating: 5, guardado: 3, chat_comentario: 6, foto_viajero: 30,
     album_crear: 25, album_foto: 20, album_foto_autor: 10, voto_media: 3,
     ao_votar: 5, ao_proponer: 30, ao_checkin: 20, plan_crear: 20,
-    plan_unirse: 6, spot_atributos: 10
+    plan_unirse: 6, spot_atributos: 10,
+    publicar_basico: 25, publicar_intermedio: 60, publicar_completo: 120,
+    publicar_bono_geo: 40, publicar_bono_foto: 30
   };
   var basesOk = Object.keys(basesEsperadas).every(function(k) {
     return XP_BASES[k] === basesEsperadas[k];

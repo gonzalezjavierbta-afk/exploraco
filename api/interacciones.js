@@ -336,7 +336,7 @@ var XP_NIVEL_CLASE = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5700, 7500]
 // +5): se cataloga para no dejar un literal suelto (ver desviaciones).
 // v27: recalibrado por esfuerzo (simples=3, comentario=6, visita/material=30).
 var XP_BASES = {
-  visita: 30,
+  visita: 60,
   visita_bono_rural: VISITA_BONO_RURAL,
   resena_larga: 30,
   resena_corta: 10,
@@ -354,7 +354,12 @@ var XP_BASES = {
   ao_checkin: 20,
   plan_crear: 20,
   plan_unirse: 6,
-  spot_atributos: 10
+  spot_atributos: 10,
+  publicar_basico: 25,
+  publicar_intermedio: 60,
+  publicar_completo: 120,
+  publicar_bono_geo: 40,
+  publicar_bono_foto: 30
 };
 
 // ADR-053 Decision 1/2 (v25): M_nivel lineal de x1.0 (N1) a x3.0 (N40) y
@@ -5393,6 +5398,12 @@ module.exports = async function handler(req, res) {
         }
         var mmCiudad = req.query.ciudad || null;
         var mmOrigen = req.query.origen || null;
+        // v27: vista=albumes devuelve SOLO pines agrupados (destino_album +
+        // album_grupo); el default 'sueltos' conserva el comportamiento
+        // historico (fotos individuales + destino_album). Cualquier otro
+        // valor degrada a 'sueltos'.
+        var mmVista = String(req.query.vista || 'sueltos').toLowerCase();
+        if (mmVista !== 'albumes') mmVista = 'sueltos';
         // v17 (ADR-031): la capa publica ya NO se restringe por sesion. El
         // filtro restrictivo H-1/ADR-021 solo se aplica con scope=mio
         // (toggle "Solo mio" del mapa). Default = contenido publico.
@@ -5441,7 +5452,12 @@ module.exports = async function handler(req, res) {
         // avatar usa queryConAvatarFallback para degradar 42703 cuando
         // usuarios.foto_url (migracion 004) aun no existe en Neon. Sin
         // este wrapper la capa audiovisual entera caia al 503 global.
-        var multimediaRows = await conDegradacionMedia(queryConAvatarFallback(sql,
+        // v27: con vista=albumes las ramas individuales (album_fotos /
+        // destinos_fotos) NO se ejecutan; multimediaRows arranca vacio y
+        // solo se pueblan los pines agrupados mas abajo.
+        var multimediaRows = [];
+        if (mmVista !== 'albumes')
+          multimediaRows = await conDegradacionMedia(queryConAvatarFallback(sql,
           '('
           + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
           + '  af.media_title, af.media_source,'
@@ -5510,7 +5526,7 @@ module.exports = async function handler(req, res) {
         // conteo. Asi el mapa muestra el album de la ficha de hostal r10
         // como un pin agrupado que abre su galeria, y no solo fotos sueltas.
         var mmDestinoAlbumOn = mmOrigen !== 'album'
-          && (!mmTipos || mmTipos.indexOf('foto') !== -1);
+          && (mmVista === 'albumes' || !mmTipos || mmTipos.indexOf('foto') !== -1);
         if (mmDestinoAlbumOn && !mmScopeMio) {
           var mmAlbumRows = await sql(
             'SELECT d.slug AS origen_id, d.nombre AS album_titulo, d.lat, d.lng, d.ciudad,'
@@ -5538,6 +5554,52 @@ module.exports = async function handler(req, res) {
               origen: 'destino_album', origen_id: a.origen_id,
               votos: 0, fotos_count: a.fotos_count
             });
+          });
+        }
+
+        // v27: vista=albumes agrega UNA fila por album de usuario
+        // (origen='album_grupo') con coords obligatorias (a.lat/a.lng),
+        // portada y conteo de fotos. Con scope=mio el dueno ve sus albums
+        // aunque las fotos no sean publicas; sin scope solo se exige
+        // af.visible=true. Las filas NO pasan por coordsFallbackAutor: sus
+        // coords ya son validas por WHERE. Si vista=sueltos este bloque no
+        // corre (cero regresion).
+        if (mmVista === 'albumes') {
+          var mgVis = function(alias) {
+            return (mmScopeMio && mmUsuarioId) ? '' : ' AND ' + alias + '.visible = true';
+          };
+          var mgParams = [];
+          var mgIdxCiudad = null;
+          var mgIdxUsuario = null;
+          if (mmCiudad) { mgParams.push(mmCiudad); mgIdxCiudad = mgParams.length; }
+          if (mmUsuarioId) { mgParams.push(mmUsuarioId); mgIdxUsuario = mgParams.length; }
+          var mgRows = await sql(
+            'SELECT'
+            + ' COALESCE(a.portada_url, (SELECT af2.foto_url FROM album_fotos af2'
+            + ' WHERE af2.album_id = a.id AND af2.activo = true' + mgVis('af2')
+            + ' ORDER BY af2.creado_en ASC LIMIT 1)) AS media_url,'
+            + ' \'album\' AS media_type, a.titulo AS media_title, \'\' AS media_source,'
+            + ' a.lat, a.lng, a.ciudad, a.usuario_id::text AS usuario_id,'
+            + ' a.id::text AS album_id, \'album_grupo\' AS origen,'
+            + ' a.id::text AS origen_id, a.id::text AS media_id,'
+            + ' (SELECT COUNT(*)::int FROM album_fotos af3'
+            + ' WHERE af3.album_id = a.id AND af3.activo = true' + mgVis('af3') + ') AS fotos_count'
+            + ' FROM albumes a'
+            + ' WHERE a.activo = true AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
+            + ' AND EXISTS (SELECT 1 FROM album_fotos af'
+            + ' WHERE af.album_id = a.id AND af.activo = true' + mgVis('af') + ')'
+            + (mgIdxCiudad ? ' AND a.ciudad = $' + mgIdxCiudad : '')
+            + (mgIdxUsuario ? ' AND a.usuario_id = $' + mgIdxUsuario + '::uuid' : '')
+            + ' ORDER BY fotos_count DESC LIMIT 200',
+            mgParams
+          ).catch(function(eGrp) {
+            console.warn('[multimedia_mapa] album_grupo fallo: ' + (eGrp && eGrp.message));
+            return [];
+          });
+          if (!Array.isArray(mgRows)) mgRows = [];
+          mgRows.forEach(function(g) {
+            if (!tieneCoordsValidas(g.lat, g.lng)) return;
+            multimediaRows.push(g);
           });
         }
 
@@ -7883,6 +7945,12 @@ module.exports = async function handler(req, res) {
         var alTipo = ['fotos','videos','audio','mixto'].includes(body.album_tipo) ? body.album_tipo : 'fotos';
         var alLat = body.lat ? parseFloat(body.lat) : null;
         var alLng = body.lng ? parseFloat(body.lng) : null;
+        // ADR-051/v27: la ubicacion del album es OBLIGATORIA; el pin del
+        // mapa agrupado (origen=album_grupo) depende de ella. OJO:
+        // isFinite(null) es true, por eso se chequea null explicito.
+        if (alLat === null || alLng === null || !isFinite(alLat) || !isFinite(alLng)
+          || alLat < -90 || alLat > 90 || alLng < -180 || alLng > 180)
+          return res.status(400).json({ ok: false, error: 'COORDENADAS_REQUERIDAS' });
         var alCiudad = String(body.ciudad || '').trim().slice(0, 80) || null;
         var alRegion = String(body.region || '').trim().slice(0, 80) || null;
         var alPortada = String(body.portada_url || '').trim().slice(0, 2000) || null;
@@ -7954,6 +8022,23 @@ module.exports = async function handler(req, res) {
         var afVisible = aBooleano(body.visible);
         if (afVisible === null) afVisible = true;
 
+        // ADR-051/v27: coords propias de la foto de album (OPCIONALES). Si
+        // falta una o no son validas, ambas quedan NULL y la foto hereda la
+        // ubicacion del album via COALESCE(af.lat,a.lat). Si llegan validas,
+        // siembran albumes.lat/lng con COALESCE (nunca sobrescriben).
+        var afLat = (body.lat !== undefined && body.lat !== null && body.lat !== '') ? parseFloat(body.lat) : null;
+        var afLng = (body.lng !== undefined && body.lng !== null && body.lng !== '') ? parseFloat(body.lng) : null;
+        if (afLat === null || !isFinite(afLat) || afLat < -90 || afLat > 90) afLat = null;
+        if (afLng === null || !isFinite(afLng) || afLng < -180 || afLng > 180) afLng = null;
+        if (afLat === null || afLng === null) { afLat = null; afLng = null; }
+        if (afLat !== null) {
+          await sql(
+            'UPDATE albumes SET lat = COALESCE(lat, $1), lng = COALESCE(lng, $2), actualizado_en = NOW()'
+            + ' WHERE id = $3 AND usuario_id = $4',
+            [afLat, afLng, afAlbumId, usuarioId2]
+          ).catch(function(eSeed) { console.warn('[album_foto] seed coords fallo: ' + (eSeed && eSeed.message)); });
+        }
+
         // Check dedup (025): un registro oculto o inactivo NO bloquea el
         // reintento; se republica reactivandolo, SIN re-otorgar XP.
         var afDedup = await sql(
@@ -7970,9 +8055,9 @@ module.exports = async function handler(req, res) {
         var afIns;
         try {
           afIns = await sql(
-            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor) '
-            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible, XP_BASES.album_foto]
+            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor, lat, lng) '
+            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible, XP_BASES.album_foto, afLat, afLng]
           );
         } catch (afInsErr) {
           // La FK autor_original_id -> usuarios.id (009) convierte un id
@@ -9979,6 +10064,71 @@ module.exports = async function handler(req, res) {
           ok: true, consumible: String(mrCons[0].clave), cantidad: mrCant,
           costo_xp: mrCosto, xp_total_nuevo: red2(numXp(mrUpd[0].xp_total))
         });
+      }
+
+      // Fase 2: registrar autor de una publicacion (verifica sesion del
+      // usuario y devuelve su id para que publicar-lugar.js lo guarde en
+      // tags.autor_id). No otorga XP aqui.
+      if (tipo2 === 'publicar_lugar_registrar') {
+        var sesReg = verificarSesion(req);
+        if (!sesReg || !sesReg.sub) return responderSesion(res, 'SESION_REQUERIDA');
+        return res.status(200).json({ ok: true, data: { autor_id: String(sesReg.sub) } });
+      }
+
+      // Fase 2: otorgar XP al autor cuando el admin APRUEBA el lugar
+      // (status='published'). Autorizado con ADMIN_SECRET (server-to-server
+      // desde admin.js). Idempotente via tags.pub_xp_estado.
+      if (tipo2 === 'publicar_lugar_otorgar') {
+        var admSecretPub = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
+        if (admSecretPub !== (process.env.ADMIN_SECRET || 'exploraco12345'))
+          return res.status(401).json({ ok: false, error: 'No autorizado' });
+        if (!destinoId2) return res.status(400).json({ ok: false, error: 'destino_id requerido' });
+        var filasPub = await sql('SELECT tags, nombre FROM destinos WHERE id=$1', [destinoId2]);
+        if (!filasPub.length) return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        var tagsPub = filasPub[0].tags || {};
+        var autorPub = tagsPub.autor_id;
+        if (!autorPub) return res.status(200).json({ ok: true, otorgado: false, motivo: 'sin_autor' });
+        if (tagsPub.pub_xp_estado === 'otorgado')
+          return res.status(200).json({ ok: true, otorgado: false, motivo: 'ya_otorgado' });
+        // Claim idempotente: solo el primero que cambia el estado otorga XP.
+        var claimPub = await sql(
+          'UPDATE destinos SET tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb '
+          + 'WHERE id=$1 AND COALESCE(tags->>\'pub_xp_estado\', \'\') <> \'otorgado\' RETURNING id',
+          [destinoId2, JSON.stringify({ pub_xp_estado: 'otorgado' })]
+        );
+        if (!claimPub.length) return res.status(200).json({ ok: true, otorgado: false, motivo: 'ya_otorgado' });
+        var tierPub = String(tagsPub.pub_tier || 'basico');
+        var baseKeyPub = 'publicar_' + tierPub;
+        if (XP_BASES[baseKeyPub] === undefined) baseKeyPub = 'publicar_basico';
+        var xpBasePub = numXp(XP_BASES[baseKeyPub]);
+        var bonoGeoPub = tagsPub.pub_geo ? numXp(XP_BASES.publicar_bono_geo) : 0;
+        var bonoFotoPub = tagsPub.pub_foto ? numXp(XP_BASES.publicar_bono_foto) : 0;
+        var ctxPub = await contextoXpE(sql, autorPub);
+        var resPub = await calcularXpAcreditado(sql, xpBasePub, ctxPub.nivel_clase,
+          ctxPub.clase_id, ctxPub.tag, { nivel_usuario: ctxPub.nivel_usuario });
+        var xpTotalPub = red2(resPub.xp_final + bonoGeoPub + bonoFotoPub);
+        // Acreditacion con rollback del claim: si algo falla, el estado
+        // vuelve a 'pendiente' para permitir reintento (idempotencia real).
+        try {
+          await sql('UPDATE usuarios SET xp_total=xp_total+$1 WHERE id=$2', [xpTotalPub, autorPub]);
+          await acreditarClaseYCofre(sql, autorPub, ctxPub, xpTotalPub);
+          await registrarXpLedger(sql, {
+            usuario_id: autorPub, accion: 'publicar_lugar', xp_base: xpBasePub,
+            mult_nivel: resPub.m_nivel, mult_stack: resPub.mult_stack,
+            mult_final: resPub.mult_global_c, cap_aplicado: resPub.cap_aplicado,
+            bonos_planos: red2(bonoGeoPub + bonoFotoPub), xp_final: xpTotalPub,
+            contexto: { destino_id: destinoId2, tier: tierPub, geo: !!tagsPub.pub_geo, foto: !!tagsPub.pub_foto }
+          });
+          await repartirXpReferidos(sql, autorPub, xpTotalPub);
+        } catch (eOtorgaXp) {
+          await sql(
+            'UPDATE destinos SET tags = COALESCE(tags, \'{}\'::jsonb) || $2::jsonb WHERE id=$1',
+            [destinoId2, JSON.stringify({ pub_xp_estado: 'pendiente' })]
+          ).catch(function(eRoll) { console.warn('[publicar_lugar] rollback estado fallo: ' + (eRoll && eRoll.message)); });
+          console.warn('[publicar_lugar] acreditacion fallo, estado revertido: ' + (eOtorgaXp && eOtorgaXp.message));
+          return res.status(500).json({ ok: false, error: 'XP no acreditado, reintentable' });
+        }
+        return res.status(200).json({ ok: true, otorgado: true, xp: xpTotalPub, autor_id: autorPub, tier: tierPub });
       }
 
       if (!tipo2 || !destinoId2)

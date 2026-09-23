@@ -208,19 +208,19 @@ async function run() {
   check('Dedup inactiva -> 200 reactivado con xp 0', r13.status === 200 && r13.body.ok === true && r13.body.reactivado === true && r13.body.xp === 0);
   if (!(r13.status === 200 && r13.body && r13.body.reactivado === true)) console.log('    detalle: ' + JSON.stringify(r13));
 
-  // 14) Camino feliz urbano: XP base 30 (XP_BASES.visita), sin bono.
+  // 14) Camino feliz urbano: XP base 60 (XP_BASES.visita), sin bono.
   var r14 = await invoke({ tipo: 'visita', destino_id: 'd1', usuario_id: 'u1', lat: U_LAT, lng: U_LNG }, M({ destino: [DEST_URBANO], vecinos: [{ n: 10 }] }));
-  check('Camino feliz urbano -> 200 xp 30', r14.status === 200 && r14.body.ok === true && r14.body.xp === 30 && r14.body.xp_detalle.base === 30 && r14.body.xp_detalle.bono_rural === 0 && r14.body.zona === 'urbana');
-  if (!(r14.status === 200 && r14.body && r14.body.xp === 30)) console.log('    detalle: ' + JSON.stringify(r14));
+  check('Camino feliz urbano -> 200 xp 60', r14.status === 200 && r14.body.ok === true && r14.body.xp === 60 && r14.body.xp_detalle.base === 60 && r14.body.xp_detalle.bono_rural === 0 && r14.body.zona === 'urbana');
+  if (!(r14.status === 200 && r14.body && r14.body.xp === 60)) console.log('    detalle: ' + JSON.stringify(r14));
 
-  // 15) Camino feliz rural (subcategoria naturaleza): XP 30 + bono plano
+  // 15) Camino feliz rural (subcategoria naturaleza): XP 60 + bono plano
   // 25 (VISITA_BONO_RURAL), sumado DESPUES del cap.
   var r15 = await invoke({ tipo: 'visita', destino_id: 'd2', usuario_id: 'u1', lat: U_LAT, lng: U_LNG }, M({ destino: [DEST_RURAL], vecinos: [{ n: 10 }] }));
-  check('Camino feliz rural -> 200 xp 55 (bono +25)',
-    r15.status === 200 && r15.body.ok === true && r15.body.xp === 55
-    && r15.body.xp_detalle.bono_rural === 25 && r15.body.xp_detalle.base === 30
+  check('Camino feliz rural -> 200 xp 85 (bono +25)',
+    r15.status === 200 && r15.body.ok === true && r15.body.xp === 85
+    && r15.body.xp_detalle.bono_rural === 25 && r15.body.xp_detalle.base === 60
     && r15.body.zona === 'rural');
-  if (!(r15.status === 200 && r15.body && r15.body.xp === 55)) console.log('    detalle: ' + JSON.stringify(r15));
+  if (!(r15.status === 200 && r15.body && r15.body.xp === 85)) console.log('    detalle: ' + JSON.stringify(r15));
 
   if (failed === 0) {
     console.log('RESULTADO: OK - ' + passed + ' verificaciones pasaron.');

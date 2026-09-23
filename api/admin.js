@@ -281,6 +281,21 @@ module.exports = async function handler(req, res) {
         [nuevo, Boolean(body.destacado||false), body.id]
       );
       if (!upd.length) return res.status(404).json({ ok:false, error:'No encontrado' });
+      if (nuevo === 'published') {
+        try {
+          var baseUrlAdm = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://exploraco.vercel.app');
+          await fetch(baseUrlAdm + '/api/interacciones', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + (process.env.ADMIN_SECRET || 'exploraco12345')
+            },
+            body: JSON.stringify({ tipo: 'publicar_lugar_otorgar', destino_id: body.id })
+          });
+        } catch (eOtorga) {
+          console.warn('[admin solicitudes] otorgar XP fallo: ' + (eOtorga && eOtorga.message));
+        }
+      }
       var msgs = { published:'\u2705 Publicado', archived:'\ud83d\uddc4\ufe0f Archivado', draft:'\u23f3 Borrador' };
       return res.status(200).json({
         ok:true, mensaje: msgs[nuevo],

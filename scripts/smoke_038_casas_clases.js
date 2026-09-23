@@ -598,11 +598,13 @@ async function run() {
   // delega en calcularXpFinal) en vez de llamar calcularXpFinal directo.
   // 20 = los 15 de v21 + ao_proponer, spot_atributos, plan_crear,
   // plan_unirse y album_foto_autor ruteado por catalogo (ADR-053 Dec 9).
-  var XP_CALLSITES_ESPERADOS = 20;
-  var XP_ACREDITADO_ESPERADOS = 20;
+  // 21 = +1 por publicar_lugar (Fase 2: XP de publicacion al aprobar).
+  var XP_CALLSITES_ESPERADOS = 21;
+  var XP_ACREDITADO_ESPERADOS = 21;
   // El +10 al autor original de album_agregar_foto queda EXENTO de
   // acreditarClaseYCofre (no tributa clase/cofre), pero SI usa el motor.
-  var ACREDITAR_CLASE_ESPERADOS = 19;
+  // 20 = 19 previos + publicar_lugar (Fase 2).
+  var ACREDITAR_CLASE_ESPERADOS = 20;
   var anclas = [];
   var posCtx = srcInt.indexOf('contextoXpE(');
   while (posCtx !== -1) {
