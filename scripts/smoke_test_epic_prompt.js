@@ -108,12 +108,12 @@ var NIVELES_LOCAL = sandboxInt.module.exports.NIVELES_LOCAL;
 
 // --- 6b. Constantes del epic -----------------------------------------
 check('NIVELES_ADMIN es alias de NIVELES_LOCAL', NIVELES_ADMIN === NIVELES_LOCAL);
-// ADR-053 Dec 11 (v25): umbrales NUEVOS v6 (techo 42000); NIVELES_ADMIN
-// aliasa NIVELES_LOCAL de api/interacciones.js.
-check('NIVELES_ADMIN: 20 bornes, ultimo 42000 (ADR-053 Dec 11)',
-  NIVELES_ADMIN.length === 20 && NIVELES_ADMIN[19] === 42000);
-check('NIVELES_ADMIN: bornes exactos del spec v6',
-  JSON.stringify(NIVELES_ADMIN) === JSON.stringify([0,100,250,450,700,1050,1500,2100,2900,3900,5200,6800,8800,11200,14200,17800,22200,27500,34000,42000]));
+// RELEASE 2026-09-23: umbrales reescalados a 40 niveles (techo 100000);
+// NIVELES_ADMIN aliasa NIVELES_LOCAL de api/interacciones.js.
+check('NIVELES_ADMIN: 40 bornes, ultimo 100000',
+  NIVELES_ADMIN.length === 40 && NIVELES_ADMIN[39] === 100000);
+check('NIVELES_ADMIN: bornes exactos del spec 40 niveles',
+  JSON.stringify(NIVELES_ADMIN) === JSON.stringify([0,150,500,1000,1650,2500,3450,4550,5800,7150,8650,10250,12000,13850,15800,17900,20100,22450,24850,27400,30050,32800,35700,38650,41750,44900,48200,51600,55050,58700,62400,66150,70050,74050,78150,82300,86600,90950,95450,100000]));
 check('VOCACIONES: 3 items con niveles 5/8/11',
   VOCACIONES.length === 3 && VOCACIONES[0].nivel === 5 && VOCACIONES[1].nivel === 8 && VOCACIONES[2].nivel === 11);
 
@@ -208,8 +208,8 @@ function runHandler() {
     return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1', nivel: 5 } },
       function(){ return Promise.resolve([filaU]); });
   }).then(function(r9) {
-    check('POST admin_xp nivel=5 con xp 0 -> xp_total 700',
-      r9.ok === true && r9.data && r9.data.usuario && r9.data.usuario.xp_total === 700);
+    check('POST admin_xp nivel=5 con xp 0 -> xp_total 1650 (umbral nivel 5)',
+      r9.ok === true && r9.data && r9.data.usuario && r9.data.usuario.xp_total === 1650);
     check('POST admin_xp nivel=5 con xp 0 -> nivel 5', r9.ok === true && r9.data.usuario.nivel === 5);
     var filaD = { id: 'u1', nombre: 'Ana', email: 'ana@x.co', xp_total: 0, badge_actual: '' };
     return invoke({ method: 'POST', headers: { authorization: 'Bearer exploraco12345' }, body: { tipo: 'admin_xp', usuario_id: 'u1', delta_xp: 150 } },

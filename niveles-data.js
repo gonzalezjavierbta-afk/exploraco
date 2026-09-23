@@ -8,34 +8,55 @@
 
   var NivelesData = {};
 
-  /* ---- XP_LEVELS: 20 rangos / 4 Eras ---- */
+  /* ---- XP_LEVELS: 40 rangos / 5 Eras ---- */
   /* Copia textual de mi-perfil.html:833-856 con los MISMOS umbrales.
    * El campo capacidades string se reemplaza por CAPACIDADES_DETALLE. */
-  /* ADR-053 T6: umbrales v6 (techo 42000) y grafia CORREGIDA del titulo 11
-   * ('Estratega Comunitario', no 'Estrat\u00e9ga'). Espejo de api/usuarios.js
-   * NIVELES; validado por scripts/smoke_niveles_espejos.js. Los titulos con
-   * tilde/ene usan escapes \uXXXX (ASCII-safe, ADR-002). */
+  /* Curva v7 (40 niveles / 5 Eras): Caminante 1-10, Explorador 11-20,
+   * Cronista 21-30, Leyenda 31-35, Mito 36-40. Espejo de la tabla
+   * canonica de 40 umbrales; validado por scripts/smoke_niveles_espejos.js.
+   * Los titulos con tilde/ene usan escapes \uXXXX (ASCII-safe, ADR-002).
+   * Emojis 1-20 reusados del catalogo previo (deduplicados); 21-40 nuevos. */
   NivelesData.XP_LEVELS = [
-    {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31',era:'Era 1 Mundana'},
-    {min:100,nombre:'Rastreador Local',emoji:'\uD83E\uDDED',era:'Era 1'},
-    {min:250,nombre:'Explorador Urbano',emoji:'\uD83E\uDDED',era:'Era 1'},
-    {min:450,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E',era:'Era 1'},
-    {min:700,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F',era:'Era 1'},
-    {min:1050,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F',era:'Era 2 Patrocinada'},
-    {min:1500,nombre:'Fot\u00f3grafo de Ruta',emoji:'\u2B50',era:'Era 2'},
-    {min:2100,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6',era:'Era 2'},
-    {min:2900,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0',era:'Era 2'},
-    {min:3900,nombre:'Gu\u00eda de Fronteras',emoji:'\uD83E\uDDED',era:'Era 2'},
-    {min:5200,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF',era:'Era 3'},
-    {min:6800,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC',era:'Era 3'},
-    {min:8800,nombre:'Se\u00f1or del Spot',emoji:'\uD83D\uDC51',era:'Era 3'},
-    {min:11200,nombre:'Cart\u00f3grafo de Cine',emoji:'\uD83C\uDF05',era:'Era 3'},
-    {min:14200,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F',era:'Era 3'},
-    {min:17800,nombre:'Curador de Colombia',emoji:'\uD83E\uD489',era:'Era 4 Leyenda'},
-    {min:22200,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Era 4'},
-    {min:27500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5',era:'Era 4'},
-    {min:34000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25',era:'Era 4'},
-    {min:42000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51',era:'Era 4'}
+    {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31',era:'Caminante'},
+    {min:150,nombre:'Rastreador Local',emoji:'\uD83E\uDDED',era:'Caminante'},
+    {min:500,nombre:'Explorador Urbano',emoji:'\uD83C\uDFD8\uFE0F',era:'Caminante'},
+    {min:1000,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E',era:'Caminante'},
+    {min:1650,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F',era:'Caminante'},
+    {min:2500,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F',era:'Caminante'},
+    {min:3450,nombre:'Fot\u00f3grafo de Ruta',emoji:'\u2B50',era:'Caminante'},
+    {min:4550,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6',era:'Caminante'},
+    {min:5800,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0',era:'Caminante'},
+    {min:7150,nombre:'Gu\u00eda de Fronteras',emoji:'\uD83E\uDDD7',era:'Caminante'},
+    {min:8650,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF',era:'Explorador'},
+    {min:10250,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC',era:'Explorador'},
+    {min:12000,nombre:'Se\u00f1or del Spot',emoji:'\uD83D\uDC51',era:'Explorador'},
+    {min:13850,nombre:'Cart\u00f3grafo de Cine',emoji:'\uD83C\uDF05',era:'Explorador'},
+    {min:15800,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F',era:'Explorador'},
+    {min:17900,nombre:'Curador de Colombia',emoji:'\uD83D\uDDBC\uFE0F',era:'Explorador'},
+    {min:20100,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Explorador'},
+    {min:22450,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5',era:'Explorador'},
+    {min:24850,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25',era:'Explorador'},
+    {min:27400,nombre:'Gran Maestro ExploraCO',emoji:'\uD83C\uDF96\uFE0F',era:'Explorador'},
+    {min:30050,nombre:'Tejedor de Rutas',emoji:'\uD83D\uDDFA\uFE0F',era:'Cronista'},
+    {min:32800,nombre:'Cronista de Regiones',emoji:'\uD83C\uDF0E',era:'Cronista'},
+    {min:35700,nombre:'Curador de Relatos',emoji:'\uD83D\uDCDC',era:'Cronista'},
+    {min:38650,nombre:'Guardi\u00e1n de Tradiciones',emoji:'\uD83C\uDFFA',era:'Cronista'},
+    {min:41750,nombre:'Arquitecto de Itinerarios',emoji:'\uD83E\uDDF1',era:'Cronista'},
+    {min:44900,nombre:'Maestro de Ceremonias',emoji:'\uD83C\uDFA9',era:'Cronista'},
+    {min:48200,nombre:'Cronista Mayor',emoji:'\uD83D\uDD8B\uFE0F',era:'Cronista'},
+    {min:51600,nombre:'Embajador Cultural',emoji:'\uD83E\uDD1D',era:'Cronista'},
+    {min:55050,nombre:'Historiador de Territorio',emoji:'\uD83D\uDDFF',era:'Cronista'},
+    {min:58700,nombre:'Sabio de los Caminos',emoji:'\uD83E\uDDE0',era:'Cronista'},
+    {min:62400,nombre:'Leyenda Emergente',emoji:'\uD83C\uDF1F',era:'Leyenda'},
+    {min:66150,nombre:'Forjador de Leyendas',emoji:'\uD83D\uDEE0\uFE0F',era:'Leyenda'},
+    {min:70050,nombre:'H\u00e9roe del Mapa',emoji:'\uD83E\uDDB8',era:'Leyenda'},
+    {min:74050,nombre:'Tit\u00e1n de las Rutas',emoji:'\uD83C\uDFD4\uFE0F',era:'Leyenda'},
+    {min:78150,nombre:'Leyenda Viva',emoji:'\uD83D\uDCAB',era:'Leyenda'},
+    {min:82300,nombre:'Mito Naciente',emoji:'\uD83C\uDF0C',era:'Mito'},
+    {min:86600,nombre:'Semidi\u00f3s del Viaje',emoji:'\u26A1',era:'Mito'},
+    {min:90950,nombre:'Guardi\u00e1n Ancestral',emoji:'\uD83E\uDDFF',era:'Mito'},
+    {min:95450,nombre:'Esp\u00edritu del Territorio',emoji:'\uD83C\uDFF5\uFE0F',era:'Mito'},
+    {min:100000,nombre:'Mito Eterno ExploraCO',emoji:'\uD83C\uDFC6',era:'Mito'}
   ];
 
   /* ---- CAPACIDADES_DETALLE: 13 capacidades desbloqueables por nivel ---- */

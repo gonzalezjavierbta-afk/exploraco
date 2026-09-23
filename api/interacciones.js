@@ -342,23 +342,24 @@ var XP_BASES = {
   spot_atributos: 10
 };
 
-// ADR-053 Decision 1/2 (v25): M_nivel lineal de x1.0 (N1) a x3.0 (N20) y
+// ADR-053 Decision 1/2 (v25): M_nivel lineal de x1.0 (N1) a x3.0 (N40) y
 // FALLBACK en codigo de los 3 parametros de gamificacion_config. Las
 // constantes son el fallback y el valor semilla, nunca una segunda fuente.
 var CAP_PROGRESION_DEFAULT = 5.0;
 var CAP_GLOBAL_DEFAULT = 10.0;
 var M_NIVEL_MAX_DEFAULT = 3.0;
 
-// M_nivel(N) = 1.0 + ((N-1)/19) * (m_nivel_max - 1.0). Con el default
-// m_nivel_max = 3.0 el paso es 2.0/19 (formula congelada del ADR-053).
-// n se acota a [1, 20]; mNivelMax permite recalibrar sin deploy.
+// M_nivel(N) = 1.0 + ((N-1)/39) * (m_nivel_max - 1.0). Con el default
+// m_nivel_max = 3.0 el paso es 2.0/39 (formula congelada del ADR-053,
+// reescalada a 40 niveles en el RELEASE 2026-09-23).
+// n se acota a [1, 40]; mNivelMax permite recalibrar sin deploy.
 function obtenerMultiplicadorNivel(nivel, mNivelMax) {
   var n = parseInt(nivel, 10);
   if (!isFinite(n) || n < 1) n = 1;
-  if (n > 20) n = 20;
+  if (n > 40) n = 40;
   var tope = numXp(mNivelMax);
   if (!isFinite(tope) || tope < 1) tope = M_NIVEL_MAX_DEFAULT;
-  return 1.0 + ((n - 1) / 19) * (tope - 1.0);
+  return 1.0 + ((n - 1) / 39) * (tope - 1.0);
 }
 
 function calcularNivelClase(xpClaseTotal) {
@@ -744,15 +745,17 @@ async function avanzarMisionesCasa(sql, usuarioId, metaTipo, delta) {
   }
 }
 
-// Bornes de los 20 niveles (espejo sincronizado de api/usuarios.js NIVELES;
+// Bornes de los 40 niveles (espejo sincronizado de api/usuarios.js NIVELES;
 // NO hay require cruzado entre funciones serverless: admin.js:56-59). La UI
-// sincroniza XP_LEVELS en index/mi-perfil/comunidad. ADR-053 Decision 11:
-// umbrales NUEVOS v6 (techo 42000), mismos para el nivel derivado de
+// sincroniza XP_LEVELS en index/mi-perfil/comunidad. RELEASE 2026-09-23:
+// umbrales NUEVOS (techo 100000), mismos para el nivel derivado de
 // M_nivel. Se usan para calcular nivel y era en GETs locales (inventario)
 // sin depender de api/usuarios.js.
 var NIVELES_LOCAL = [
-  0, 100, 250, 450, 700, 1050, 1500, 2100, 2900, 3900,
-  5200, 6800, 8800, 11200, 14200, 17800, 22200, 27500, 34000, 42000
+  0, 150, 500, 1000, 1650, 2500, 3450, 4550, 5800, 7150,
+  8650, 10250, 12000, 13850, 15800, 17900, 20100, 22450, 24850, 27400,
+  30050, 32800, 35700, 38650, 41750, 44900, 48200, 51600, 55050, 58700,
+  62400, 66150, 70050, 74050, 78150, 82300, 86600, 90950, 95450, 100000
 ];
 function calcularNivelLocal(xpTotal) {
   var xp = Number(xpTotal) || 0;
@@ -763,10 +766,11 @@ function calcularNivelLocal(xpTotal) {
   return { nivel: idx + 1, badge_actual: '' };
 }
 function calcularEraLocal(nivel) {
-  if (nivel <= 5) return 'Mundana';
-  if (nivel <= 10) return 'Patrocinada';
-  if (nivel <= 15) return 'Organizador';
-  return 'Leyenda';
+  if (nivel <= 10) return 'Caminante';
+  if (nivel <= 20) return 'Explorador';
+  if (nivel <= 30) return 'Cronista';
+  if (nivel <= 35) return 'Leyenda';
+  return 'Mito';
 }
 
 // ADR-040 (v22): nivel que desbloquea cada mision que abre capacidad.
@@ -802,7 +806,7 @@ function aBooleano(v) {
   return null;
 }
 
-// Nombres de los 20 niveles (misma tabla que api/usuarios.js NIVELES;
+// Nombres de los 40 niveles (misma tabla que api/usuarios.js NIVELES;
 // ASCII-safe: las tildes van como escapes \u00xx, nunca bytes > 127).
 var BADGES_LOCAL = [
   'Caminante Novato', 'Rastreador Local', 'Explorador Urbano',
@@ -811,11 +815,18 @@ var BADGES_LOCAL = [
   'Gu\u00eda de Fronteras', 'Estratega Comunitario', 'Documentalista Visual',
   'Se\u00f1or del Spot', 'Cart\u00f3grafo de Cine', 'Protector del Patrimonio',
   'Curador de Colombia', 'Mariscal de Parche', 'Cineasta de Territorio',
-  'Inmortal del Mapa', 'Gran Maestro ExploraCO'
+  'Inmortal del Mapa', 'Gran Maestro ExploraCO', 'Tejedor de Rutas',
+  'Cronista de Regiones', 'Curador de Relatos', 'Guardi\u00e1n de Tradiciones',
+  'Arquitecto de Itinerarios', 'Maestro de Ceremonias', 'Cronista Mayor',
+  'Embajador Cultural', 'Historiador de Territorio', 'Sabio de los Caminos',
+  'Leyenda Emergente', 'Forjador de Leyendas', 'H\u00e9roe del Mapa',
+  'Tit\u00e1n de las Rutas', 'Leyenda Viva', 'Mito Naciente',
+  'Semidi\u00f3s del Viaje', 'Guardi\u00e1n Ancestral', 'Esp\u00edritu del Territorio',
+  'Mito Eterno ExploraCO'
 ];
 
 // Alias para el epic v12 (admin_xp y vocaciones): NO se duplica la lista,
-// se reusa NIVELES_LOCAL (mismos 20 minimos que api/usuarios.js NIVELES)
+// se reusa NIVELES_LOCAL (mismos 40 minimos que api/usuarios.js NIVELES)
 // para que no existan dos catalogos que puedan desincronizarse.
 var NIVELES_ADMIN = NIVELES_LOCAL;
 
@@ -8031,8 +8042,8 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'nivel o delta_xp requerido' });
         if (axTieneNivel && axTieneDelta)
           return res.status(400).json({ ok: false, error: 'envia solo uno de nivel o delta_xp' });
-        if (axTieneNivel && (isNaN(axNivel) || axNivel < 1 || axNivel > 20))
-          return res.status(400).json({ ok: false, error: 'nivel debe estar entre 1 y 20' });
+        if (axTieneNivel && (isNaN(axNivel) || axNivel < 1 || axNivel > NIVELES_ADMIN.length))
+          return res.status(400).json({ ok: false, error: 'nivel debe estar entre 1 y ' + NIVELES_ADMIN.length });
         if (axTieneDelta && (isNaN(axDelta) || axDelta === 0))
           return res.status(400).json({ ok: false, error: 'delta_xp invalido' });
         var axUsr = await sql(

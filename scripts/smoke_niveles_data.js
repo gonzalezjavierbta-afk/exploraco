@@ -4,7 +4,7 @@
  * Uso: node scripts/smoke_niveles_data.js
  *
  * Fuentes de verdad (ADR-006, leidas en runtime, nunca hardcodeadas):
- *   - niveles-data.js         -> XP_LEVELS (20 umbrales/nombres/eras/emojis)
+ *   - niveles-data.js         -> XP_LEVELS (40 umbrales/nombres/eras/emojis)
  *   - mi-perfil.html          -> carga niveles-data.js y aliasa XP_LEVELS
  *                                (ADR-040 T1: ya no tiene tabla literal)
  *   - api/interacciones.js    -> catalogo MISIONES (IDs del fallback + gate_nivel)
@@ -67,7 +67,7 @@ if (!NivelesData) {
 
 /* -- 3. Fuente unica: mi-perfil.html carga niveles-data.js --------- */
 /* ADR-040 T1: mi-perfil.html ya no declara la tabla literal; toma
- * XP_LEVELS/GRUPO_NOMBRE de window.NivelesData. Los 20 umbrales se
+ * XP_LEVELS/GRUPO_NOMBRE de window.NivelesData. Los 40 umbrales se
  * validan leyendolos de niveles-data.js (fuente unica, ADR-006). */
 var html = fs.readFileSync(PERFIL, 'utf8');
 
@@ -85,10 +85,10 @@ ok(!/var\s+XP_LEVELS\s*=\s*\[/.test(html),
    'mi-perfil.html ya no declara la tabla literal de XP_LEVELS');
 
 var levels = NivelesData.XP_LEVELS;
-ok(Array.isArray(levels) && levels.length === 20,
-   'NivelesData.XP_LEVELS tiene 20 niveles (leidos: ' + (Array.isArray(levels) ? levels.length : 0) + ')');
+ok(Array.isArray(levels) && levels.length === 40,
+   'NivelesData.XP_LEVELS tiene 40 niveles (leidos: ' + (Array.isArray(levels) ? levels.length : 0) + ')');
 
-if (Array.isArray(levels) && levels.length === 20) {
+if (Array.isArray(levels) && levels.length === 40) {
   var problemas = [];
   if (levels[0].min !== 0) problemas.push('nivel 1 no arranca en min 0');
   var minsVistos = {};
@@ -103,7 +103,7 @@ if (Array.isArray(levels) && levels.length === 20) {
     if (!lv.emoji) problemas.push('nivel ' + (i + 1) + ' sin emoji');
   }
   ok(problemas.length === 0,
-     'los 20 umbrales son crecientes, unicos y con nombre/era/emoji' + (problemas.length ? ' -> ' + problemas.join('; ') : ''));
+     'los 40 umbrales son crecientes, unicos y con nombre/era/emoji' + (problemas.length ? ' -> ' + problemas.join('; ') : ''));
   console.log('        Umbrales leidos de la fuente (niveles-data.js): ' +
     levels.map(function(x) { return x.min; }).join(','));
 }
@@ -120,7 +120,7 @@ var vistas = {};
 if (Array.isArray(caps)) {
   caps.forEach(function(c) {
     if (!c.howto || String(c.howto).trim() === '') sinHowto.push(c.clave || '?');
-    if (typeof c.nivel !== 'number' || c.nivel < 1 || c.nivel > 20) fueraRango.push(c.clave + '=' + c.nivel);
+    if (typeof c.nivel !== 'number' || c.nivel < 1 || c.nivel > 40) fueraRango.push(c.clave + '=' + c.nivel);
     if (c.clave) {
       if (vistas[c.clave]) dups.push(c.clave);
       vistas[c.clave] = true;
@@ -130,7 +130,7 @@ if (Array.isArray(caps)) {
 ok(sinHowto.length === 0,
    'todas las capacidades tienen howto no vacio' + (sinHowto.length ? ' -> vacias: ' + sinHowto.join(', ') : ''));
 ok(fueraRango.length === 0,
-   'nivel de cada capacidad dentro de 1..20' + (fueraRango.length ? ' -> fuera: ' + fueraRango.join(', ') : ''));
+   'nivel de cada capacidad dentro de 1..40' + (fueraRango.length ? ' -> fuera: ' + fueraRango.join(', ') : ''));
 ok(dups.length === 0,
    'claves de capacidad unicas' + (dups.length ? ' -> duplicadas: ' + dups.join(', ') : ''));
 

@@ -110,37 +110,41 @@ var cromoKeys = Object.keys(CROMO);
 var rarezasMatch = rarezasValidas.every(function(r) { return cromoKeys.indexOf(r) !== -1; });
 check('23. CROMO_PROBABILIDADES rarezas match CHECK constraint', rarezasMatch);
 
-// --- 3. NIVELES v6: 20 niveles, bornes correctos ---
-// ADR-053 Decision 11 (v25): umbrales NUEVOS v6 (techo 42000). Reemplazan
-// los bornes v4 (0..30000). Espejo sincronizado con api/usuarios.js:NIVELES.
-var V6_BORNES = [0,100,250,450,700,1050,1500,2100,2900,3900,
-  5200,6800,8800,11200,14200,17800,22200,27500,34000,42000];
+// --- 3. NIVELES v6: 40 niveles (5 eras), bornes correctos ---
+// RELEASE 2026-09-23: escala reescalada a 40 niveles (techo 100000).
+// Espejo sincronizado con api/usuarios.js:NIVELES.
+var V6_BORNES = [0,150,500,1000,1650,2500,3450,4550,5800,7150,
+  8650,10250,12000,13850,15800,17900,20100,22450,24850,27400,
+  30050,32800,35700,38650,41750,44900,48200,51600,55050,58700,
+  62400,66150,70050,74050,78150,82300,86600,90950,95450,100000];
 var NIVELES_LOCAL = sandboxInt.module.exports.NIVELES_LOCAL;
-check('24. NIVELES_LOCAL tiene 20 bornes', NIVELES_LOCAL.length === 20);
+check('24. NIVELES_LOCAL tiene 40 bornes', NIVELES_LOCAL.length === 40);
 check('25. NIVELES_LOCAL bornes son monotonicos crecientes',
   NIVELES_LOCAL.every(function(v, i) { return i === 0 || v > NIVELES_LOCAL[i - 1]; }));
-check('26. NIVELES_LOCAL ultimo borne == 42000 (ADR-053 Dec 11)', NIVELES_LOCAL[19] === 42000);
+check('26. NIVELES_LOCAL ultimo borne == 100000', NIVELES_LOCAL[39] === 100000);
 check('27. NIVELES_LOCAL bornes exactos del spec v6',
   JSON.stringify(NIVELES_LOCAL) === JSON.stringify(V6_BORNES));
 
 // calcularNivelLocal
 var cn = sandboxInt.module.exports.calcularNivelLocal;
 check('28. calcularNivelLocal(0) -> nivel 1', cn(0).nivel === 1);
-check('29. calcularNivelLocal(42000) -> nivel 20', cn(42000).nivel === 20);
-check('30. calcularNivelLocal(11199) -> nivel 13 (11200 es nivel 14)', cn(11199).nivel === 13);
-check('31. calcularNivelLocal(11200) -> nivel 14 (Cartografo de Cine)', cn(11200).nivel === 14);
-check('32. calcularNivelLocal(41999) -> nivel 19 (Inmortal)', cn(41999).nivel === 19);
+check('29. calcularNivelLocal(42000) -> nivel 25 (41750<=42000<44900)', cn(42000).nivel === 25);
+check('30. calcularNivelLocal(11199) -> nivel 12', cn(11199).nivel === 12);
+check('31. calcularNivelLocal(11200) -> nivel 12', cn(11200).nivel === 12);
+check('32. calcularNivelLocal(41999) -> nivel 25 (41750<=41999<44900)', cn(41999).nivel === 25);
 
-// calcularEraLocal
+// calcularEraLocal (5 eras: cortes 10/20/30/35)
 var ce = sandboxInt.module.exports.calcularEraLocal;
-check('33. calcularEraLocal(1) -> Mundana', ce(1) === 'Mundana');
-check('34. calcularEraLocal(5) -> Mundana', ce(5) === 'Mundana');
-check('35. calcularEraLocal(6) -> Patrocinada', ce(6) === 'Patrocinada');
-check('36. calcularEraLocal(10) -> Patrocinada', ce(10) === 'Patrocinada');
-check('37. calcularEraLocal(11) -> Organizador', ce(11) === 'Organizador');
-check('38. calcularEraLocal(15) -> Organizador', ce(15) === 'Organizador');
-check('39. calcularEraLocal(16) -> Leyenda', ce(16) === 'Leyenda');
-check('40. calcularEraLocal(20) -> Leyenda', ce(20) === 'Leyenda');
+check('33. calcularEraLocal(1) -> Caminante', ce(1) === 'Caminante');
+check('34. calcularEraLocal(10) -> Caminante', ce(10) === 'Caminante');
+check('35. calcularEraLocal(11) -> Explorador', ce(11) === 'Explorador');
+check('36. calcularEraLocal(20) -> Explorador', ce(20) === 'Explorador');
+check('37. calcularEraLocal(21) -> Cronista', ce(21) === 'Cronista');
+check('38. calcularEraLocal(30) -> Cronista', ce(30) === 'Cronista');
+check('39. calcularEraLocal(31) -> Leyenda', ce(31) === 'Leyenda');
+check('40. calcularEraLocal(35) -> Leyenda', ce(35) === 'Leyenda');
+check('41. calcularEraLocal(36) -> Mito', ce(36) === 'Mito');
+check('42. calcularEraLocal(40) -> Mito', ce(40) === 'Mito');
 
 // --- 4. api/usuarios.js NIVELES (20) + BUG-1 merge check ---
 var srcUsu = fs.readFileSync(path.join(__dirname, '..', 'api', 'usuarios.js'), 'utf8');
@@ -153,8 +157,8 @@ vm.runInContext(srcUsu + '\nmodule.exports.NIVELES = NIVELES;'
   sandboxUsu, { filename: 'api/usuarios.js' });
 
 var NIVELES = sandboxUsu.module.exports.NIVELES;
-check('41. api/usuarios.js NIVELES tiene 20 elementos', NIVELES.length === 20);
-check('42. NIVELES ultimo nivel es 42000 (ADR-053 Dec 11)', NIVELES[19].min === 42000);
+check('41. api/usuarios.js NIVELES tiene 40 elementos', NIVELES.length === 40);
+check('42. NIVELES ultimo nivel es 100000', NIVELES[39].min === 100000);
 check('43. NIVELES[19] contiene Gran Maestro', NIVELES[19].nombre.indexOf('Maestro') !== -1);
 var umbrales = NIVELES.map(function(n) { return n.min; });
 check('44. NIVELES umbrales sincronizados con spec v6',
@@ -174,7 +178,7 @@ check('47. BUG-1: doc de usuarios.js menciona MERGE en conMisiones',
 // calcularNivel de usuarios.js
 var calcNivelUsu = sandboxUsu.module.exports.calcularNivel;
 check('48. calcularNivel(0) -> nivel 1', calcNivelUsu(0).nivel === 1);
-check('49. calcularNivel(11200) -> nivel 14 (ADR-053 Dec 11)', calcNivelUsu(11200).nivel === 14);
+check('49. calcularNivel(11200) -> nivel 12', calcNivelUsu(11200).nivel === 12);
 
 // --- 5. Helpers puros de interacciones.js (leerCapacidades, etc.) ---
 // leerCapacidades llama sql; solo verificamos que existe y es funcion
@@ -225,7 +229,7 @@ check('73. api/interacciones.js ASCII-safe (0 bytes > 127)', asciiSafe('api/inte
 check('74. api/usuarios.js ASCII-safe (0 bytes > 127)', asciiSafe('api/usuarios.js'));
 check('75. db/migrations/010_gamificacion_v4.sql ASCII-safe', asciiSafe('db/migrations/010_gamificacion_v4.sql'));
 
-// --- 10. XP_LEVELS en los 3 HTML (20 elementos cada uno) ---
+// --- 10. XP_LEVELS en los 3 HTML (40 elementos cada uno) ---
 function contarMinEnArray(full, marker) {
   var start = full.indexOf(marker);
   if (start === -1) return -1;
@@ -245,7 +249,7 @@ function contarMinEnArray(full, marker) {
 }
 // ADR-040: mi-perfil.html ya no declara la tabla literal; aliasa
 // XP_LEVELS desde la fuente unica niveles-data.js. El check sigue
-// validando que la pagina use 20 niveles (leyendo la fuente real).
+// validando que la pagina use 40 niveles (leyendo la fuente real).
 function countXpLevels(htmlPath) {
   var full = fs.readFileSync(path.join(__dirname, '..', htmlPath), 'utf8');
   if (full.indexOf('var XP_LEVELS = [') !== -1) {
@@ -261,11 +265,11 @@ function countXpLevels(htmlPath) {
 }
 
 var idxCount = countXpLevels('index.html');
-check('76. index.html XP_LEVELS tiene 20 elementos', idxCount === 20);
+check('76. index.html XP_LEVELS tiene 40 elementos', idxCount === 40);
 var perfCount = countXpLevels('mi-perfil.html');
-check('77. mi-perfil.html XP_LEVELS tiene 20 elementos', perfCount === 20);
+check('77. mi-perfil.html XP_LEVELS tiene 40 elementos', perfCount === 40);
 var comCount = countXpLevels('comunidad.html');
-check('78. comunidad.html XP_LEVELS tiene 20 elementos', comCount === 20);
+check('78. comunidad.html XP_LEVELS tiene 40 elementos', comCount === 40);
 
 // --- 11. Spec v4: NIVELES sincronizados con spec ---
 var specBornes = V6_BORNES; // ADR-053 Dec 11: spec v6 (techo 42000)

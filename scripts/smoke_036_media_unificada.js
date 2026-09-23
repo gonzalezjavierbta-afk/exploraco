@@ -121,13 +121,13 @@ async function run() {
   // ============ B. aplicarMediaVoto ============
   var mLike = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
-    { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 1 }] },
     { test: 'INSERT INTO media_votos', reply: [] },
     { test: 'UPDATE usuarios SET xp_total', reply: [] }
   ]);
   var rLike = await MOD.aplicarMediaVoto(mLike.fn, U, 'curada', 'f1', 'like');
-  check('B1: like nuevo xp 5', rLike.nuevo === true && rLike.xp === 5);
+  check('B1: like nuevo xp 3 (voto_media v27)', rLike.nuevo === true && rLike.xp === 3);
   check('B2: like nuevo votos 1', rLike.votos === 1);
   check('B3: like nuevo actualiza usuarios +5', mLike.alguna('UPDATE usuarios SET xp_total'));
 
@@ -149,7 +149,7 @@ async function run() {
 
   var mRe = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [{ activo: false }] },
-    { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: 'UPDATE media_votos SET activo=true', reply: [] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 3 }] }
   ]);
@@ -159,7 +159,7 @@ async function run() {
 
   var mTop = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
-    { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE usuario_id/, reply: [{ n: 20 }] }
+    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 20 }] }
   ]);
   var rTop = await MOD.aplicarMediaVoto(mTop.fn, U, 'curada', 'f1', 'like');
   check('B8: tope 20 votos/24h -> tope true sin insert', rTop.tope === true && !mTop.alguna('INSERT INTO media_votos'));
@@ -205,7 +205,7 @@ async function run() {
   var mPost = crearMock([
     { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
-    { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 1 }] },
     { test: 'INSERT INTO media_votos', reply: [] },
     { test: 'UPDATE usuarios SET xp_total', reply: [] }
@@ -231,7 +231,7 @@ async function run() {
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'curada', item_id: 'f1', accion: 'like' }, query: {}, headers: authHeaders(U) }, resPost);
   var bPost = resPost.body || {};
   check('F1: media_voto like -> 200', resPost.statusCode === 200);
-  check('F2: media_voto xp 5 votos 1', bPost.xp === 5 && bPost.votos === 1 && bPost.ya_votado === true);
+  check('F2: media_voto xp 3 votos 1', bPost.xp === 3 && bPost.votos === 1 && bPost.ya_votado === true);
 
   var mDup2 = crearMock([
     { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
@@ -279,7 +279,7 @@ async function run() {
   check('G1: media_comentar -> 201', resCom.statusCode === 201);
   check('G2: media_comentar shape comentario', !!(bCom.comentario && bCom.comentario.foto_id === 'f1'
     && bCom.comentario.texto === 'hola' && bCom.comentario.eliminado === false));
-  check('G3: media_comentar xp 2', bCom.xp === 2);
+  check('G3: media_comentar xp 6 (chat_comentario v27)', bCom.xp === 6);
 
   // ============ H. media_interacciones (GET) ============
   var mGet = crearMock([

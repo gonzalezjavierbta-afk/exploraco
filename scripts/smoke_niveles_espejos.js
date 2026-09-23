@@ -1,5 +1,5 @@
 // scripts/smoke_niveles_espejos.js
-// GATE de los 8 espejos de los 20 umbrales de nivel (ADR-053 Decision 11).
+// GATE de los 8 espejos de los 40 umbrales de nivel (ADR-053 Decision 11).
 //
 // Fuente servidor: api/usuarios.js -> NIVELES (la unica tabla autoritativa).
 // Espejos validados:
@@ -16,7 +16,7 @@
 //       serverless por fila; por eso debe replicar los mismos umbrales y el
 //       gate lo vigila.)
 //
-// Ademas valida los 20 TITULOS: NIVELES[].nombre vs BADGES_LOCAL y vs
+// Ademas valida los 40 TITULOS: NIVELES[].nombre vs BADGES_LOCAL y vs
 // NivelesData.XP_LEVELS[].nombre. Los titulos de api/usuarios.js usan
 // escapes \uXXXX, asi que se comparan RESUELTOS (se cargan en sandbox vm).
 //
@@ -94,8 +94,8 @@ var NIVELES = usr.NIVELES || [];
 var FUENTE_MINS = NIVELES.map(function(n) { return n.min; });
 var FUENTE_TITULOS = NIVELES.map(function(n) { return String(n.nombre); });
 
-if (NIVELES.length === 20) ok('fuente ' + FUENTE + ' NIVELES tiene 20 niveles');
-else ko('fuente ' + FUENTE + ' NIVELES tiene 20 niveles', 'tiene ' + NIVELES.length);
+if (NIVELES.length === 40) ok('fuente ' + FUENTE + ' NIVELES tiene 40 niveles');
+else ko('fuente ' + FUENTE + ' NIVELES tiene 40 niveles', 'tiene ' + NIVELES.length);
 
 // ---- 2. api/interacciones.js -> NIVELES_LOCAL + BADGES_LOCAL --------
 var inte = cargarApi('api/interacciones.js', ['NIVELES_LOCAL', 'BADGES_LOCAL']);
@@ -165,22 +165,24 @@ while ((mCase = reCase.exec(admApi)) !== null) {
   porNivel[parseInt(mCase[2], 10)] = parseInt(mCase[1], 10);
 }
 var ADM_SQL_MINS = [];
-for (var lvl = 1; lvl <= 20; lvl++) ADM_SQL_MINS.push(porNivel[lvl] === undefined ? 0 : porNivel[lvl]);
+// 40 bandas (39 WHEN + ELSE 1): las bandas cubren niveles 2..40 y el
+// nivel 1 (min 0) queda implicito en el ELSE 1.
+for (var lvl = 1; lvl <= 40; lvl++) ADM_SQL_MINS.push(porNivel[lvl] === undefined ? 0 : porNivel[lvl]);
 var admSqlOk = mismo(ADM_SQL_MINS, FUENTE_MINS) && admApi.indexOf('ELSE 1 END') !== -1;
 if (admSqlOk) ok('espejo api/admin.js NIVEL_DERIVADO_SQL == fuente');
 else ko('espejo api/admin.js NIVEL_DERIVADO_SQL == fuente',
   'api/admin.js:' + lineaDe(admApi, admApiIdx) + ' ' + JSON.stringify(ADM_SQL_MINS));
 
 // ---- TITULOS --------------------------------------------------------
-var titulosIntOk = INT_TITULOS.length === 20 && mismo(INT_TITULOS, FUENTE_TITULOS);
-if (titulosIntOk) ok('titulos api/interacciones.js BADGES_LOCAL == fuente (20)');
-else ko('titulos api/interacciones.js BADGES_LOCAL == fuente (20)',
+var titulosIntOk = INT_TITULOS.length === 40 && mismo(INT_TITULOS, FUENTE_TITULOS);
+if (titulosIntOk) ok('titulos api/interacciones.js BADGES_LOCAL == fuente (40)');
+else ko('titulos api/interacciones.js BADGES_LOCAL == fuente (40)',
   'api/interacciones.js:' + lineaDe(intSrc, intSrc.indexOf('var BADGES_LOCAL')) + ' n=' + INT_TITULOS.length);
 
 var ndTitulos = ND_LEVELS.map(function(n) { return String(n.nombre); });
-var titulosNdOk = ND_LEVELS.length === 20 && mismo(ndTitulos, FUENTE_TITULOS);
-if (titulosNdOk) ok('titulos niveles-data.js NivelesData.XP_LEVELS[].nombre == fuente (20)');
-else ko('titulos niveles-data.js NivelesData.XP_LEVELS[].nombre == fuente (20)',
+var titulosNdOk = ND_LEVELS.length === 40 && mismo(ndTitulos, FUENTE_TITULOS);
+if (titulosNdOk) ok('titulos niveles-data.js NivelesData.XP_LEVELS[].nombre == fuente (40)');
+else ko('titulos niveles-data.js NivelesData.XP_LEVELS[].nombre == fuente (40)',
   'niveles-data.js:' + lineaDe(ndSrc, ndIdx) + ' ' + JSON.stringify(ndTitulos));
 
 console.log('');

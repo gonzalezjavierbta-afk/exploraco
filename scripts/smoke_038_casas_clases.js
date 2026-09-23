@@ -465,7 +465,7 @@ async function run() {
   });
   check('A5c: recambio de Clase -> 200 con xp_total_nuevo/nivel y bajo_nivel',
     clCambioOk.status === 200 && clCambioOk.body.data.xp_total_nuevo === 200
-    && clCambioOk.body.data.nivel_anterior === 4 && clCambioOk.body.data.nivel_nuevo === 2
+    && clCambioOk.body.data.nivel_anterior === 3 && clCambioOk.body.data.nivel_nuevo === 2
     && clCambioOk.body.data.bajo_nivel === true);
   check('A5d: recambio descuenta 500 XP (ADR-053 Dec 10) con ventana de 30 dias',
     mCambio.log.some(function(q) {

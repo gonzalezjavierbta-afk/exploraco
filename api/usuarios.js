@@ -1,4 +1,9 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v20 (RELEASE 2026-09-23): NIVELES se expande de 20 a 40 umbrales (techo
+// 100000) con 40 titulos y 5 Eras (Caminante 1-10 / Explorador 11-20 /
+// Cronista 21-30 / Leyenda 31-35 / Mito 36-40); calcularEra con cortes
+// 10/20/30/35; M_nivel pasa a ((N-1)/39)*2; instrumenta los 3 debitos de XP
+// (faccion/casa/clase) en xp_ledger con registrarGastoXp (best-effort).
 // v19 (ADR-053 / Enmienda 1, 2026-09-21): NIVELES pasa a ser la fuente
 // SERVIDOR de los 20 umbrales nuevos (techo 42000) + campo mult (M_nivel);
 // conNivel expone nivel_visible = GREATEST(nivel derivado, nivel_max) y
@@ -12,45 +17,65 @@
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
-// FUENTE SERVIDOR de los 20 umbrales de nivel (ADR-053 Decision 3, techo
-// 42000). Los espejos cliente (index.html, comunidad.html, niveles-data.js,
+// FUENTE SERVIDOR de los 40 umbrales de nivel (RELEASE 2026-09-23, techo
+// 100000). Los espejos cliente (index.html, comunidad.html, niveles-data.js,
 // usuario-session.js y admin.html: _jugNiveles) y el espejo servidor
 // NIVELES_LOCAL de api/interacciones.js se validan con
 // scripts/smoke_niveles_espejos.js (no hay require cruzado entre funciones
-// serverless). 20 niveles en 4 Eras (Mundana/Patrocinada/Organizador/
-// Leyenda).
-// El campo mult es M_nivel(N) = 1 + ((N-1)/19)*2, redondeado a 3 decimales
-// (1.000 en N1 .. 3.000 en N20). Es la tabla INFORMATIVA del backend:
+// serverless). 40 niveles en 5 Eras (Caminante 1-10 / Explorador 11-20 /
+// Cronista 21-30 / Leyenda 31-35 / Mito 36-40).
+// El campo mult es M_nivel(N) = 1 + ((N-1)/39)*2, redondeado a 3 decimales
+// (1.000 en N1 .. 3.000 en N40). Es la tabla INFORMATIVA del backend:
 // usuarios.js solo expone niveles; el calculo de multiplicadores vive en el
 // punto unico de api/interacciones.js.
 // nivel/badge_actual existian como columnas en usuarios pero
 // interacciones.js nunca las escribia -- se calculan aqui en cada
 // lectura a partir de xp_total en vez de guardarse, para que nunca
 // puedan desincronizarse sin tener que coordinar una escritura extra en
-// cada uno de los 20+ puntos de api/interacciones.js que suman XP.
+// cada uno de los puntos de api/interacciones.js que suman XP.
 // ADR-053: el titulo 11 se corrigio de 'Estrat\u00e9ga' a 'Estratega'
 // (errata de la fuente original); los 8 espejos deben copiar esta grafia.
 const NIVELES = [
-  { min: 0,     mult: 1.000, nombre: 'Caminante Novato' },
-  { min: 100,   mult: 1.105, nombre: 'Rastreador Local' },
-  { min: 250,   mult: 1.211, nombre: 'Explorador Urbano' },
-  { min: 450,   mult: 1.316, nombre: 'Aventurero Regional' },
-  { min: 700,   mult: 1.421, nombre: 'Vanguardia Territorial' },
-  { min: 1050,  mult: 1.526, nombre: 'Embajador de Zona' },
-  { min: 1500,  mult: 1.632, nombre: 'Fot\u00f3grafo de Ruta' },
-  { min: 2100,  mult: 1.737, nombre: 'Cronista de Historias' },
-  { min: 2900,  mult: 1.842, nombre: 'Buscador de Leyendas' },
-  { min: 3900,  mult: 1.947, nombre: 'Gu\u00eda de Fronteras' },
-  { min: 5200,  mult: 2.053, nombre: 'Estratega Comunitario' },
-  { min: 6800,  mult: 2.158, nombre: 'Documentalista Visual' },
-  { min: 8800,  mult: 2.263, nombre: 'Se\u00f1or del Spot' },
-  { min: 11200, mult: 2.368, nombre: 'Cart\u00f3grafo de Cine' },
-  { min: 14200, mult: 2.474, nombre: 'Protector del Patrimonio' },
-  { min: 17800, mult: 2.579, nombre: 'Curador de Colombia' },
-  { min: 22200, mult: 2.684, nombre: 'Mariscal de Parche' },
-  { min: 27500, mult: 2.789, nombre: 'Cineasta de Territorio' },
-  { min: 34000, mult: 2.895, nombre: 'Inmortal del Mapa' },
-  { min: 42000, mult: 3.000, nombre: 'Gran Maestro ExploraCO' },
+  { min: 0,      mult: 1.000, nombre: 'Caminante Novato' },
+  { min: 150,    mult: 1.051, nombre: 'Rastreador Local' },
+  { min: 500,    mult: 1.103, nombre: 'Explorador Urbano' },
+  { min: 1000,   mult: 1.154, nombre: 'Aventurero Regional' },
+  { min: 1650,   mult: 1.205, nombre: 'Vanguardia Territorial' },
+  { min: 2500,   mult: 1.256, nombre: 'Embajador de Zona' },
+  { min: 3450,   mult: 1.308, nombre: 'Fot\u00f3grafo de Ruta' },
+  { min: 4550,   mult: 1.359, nombre: 'Cronista de Historias' },
+  { min: 5800,   mult: 1.410, nombre: 'Buscador de Leyendas' },
+  { min: 7150,   mult: 1.462, nombre: 'Gu\u00eda de Fronteras' },
+  { min: 8650,   mult: 1.513, nombre: 'Estratega Comunitario' },
+  { min: 10250,  mult: 1.564, nombre: 'Documentalista Visual' },
+  { min: 12000,  mult: 1.615, nombre: 'Se\u00f1or del Spot' },
+  { min: 13850,  mult: 1.667, nombre: 'Cart\u00f3grafo de Cine' },
+  { min: 15800,  mult: 1.718, nombre: 'Protector del Patrimonio' },
+  { min: 17900,  mult: 1.769, nombre: 'Curador de Colombia' },
+  { min: 20100,  mult: 1.821, nombre: 'Mariscal de Parche' },
+  { min: 22450,  mult: 1.872, nombre: 'Cineasta de Territorio' },
+  { min: 24850,  mult: 1.923, nombre: 'Inmortal del Mapa' },
+  { min: 27400,  mult: 1.974, nombre: 'Gran Maestro ExploraCO' },
+  { min: 30050,  mult: 2.026, nombre: 'Tejedor de Rutas' },
+  { min: 32800,  mult: 2.077, nombre: 'Cronista de Regiones' },
+  { min: 35700,  mult: 2.128, nombre: 'Curador de Relatos' },
+  { min: 38650,  mult: 2.179, nombre: 'Guardi\u00e1n de Tradiciones' },
+  { min: 41750,  mult: 2.231, nombre: 'Arquitecto de Itinerarios' },
+  { min: 44900,  mult: 2.282, nombre: 'Maestro de Ceremonias' },
+  { min: 48200,  mult: 2.333, nombre: 'Cronista Mayor' },
+  { min: 51600,  mult: 2.385, nombre: 'Embajador Cultural' },
+  { min: 55050,  mult: 2.436, nombre: 'Historiador de Territorio' },
+  { min: 58700,  mult: 2.487, nombre: 'Sabio de los Caminos' },
+  { min: 62400,  mult: 2.538, nombre: 'Leyenda Emergente' },
+  { min: 66150,  mult: 2.590, nombre: 'Forjador de Leyendas' },
+  { min: 70050,  mult: 2.641, nombre: 'H\u00e9roe del Mapa' },
+  { min: 74050,  mult: 2.692, nombre: 'Tit\u00e1n de las Rutas' },
+  { min: 78150,  mult: 2.744, nombre: 'Leyenda Viva' },
+  { min: 82300,  mult: 2.795, nombre: 'Mito Naciente' },
+  { min: 86600,  mult: 2.846, nombre: 'Semidi\u00f3s del Viaje' },
+  { min: 90950,  mult: 2.897, nombre: 'Guardi\u00e1n Ancestral' },
+  { min: 95450,  mult: 2.949, nombre: 'Esp\u00edritu del Territorio' },
+  { min: 100000, mult: 3.000, nombre: 'Mito Eterno ExploraCO' },
 ];
 
 // XP decimal (ADR-035): las columnas XP son numeric(12,2). Neon entrega
@@ -69,10 +94,21 @@ function calcularNivel(xpTotal) {
 }
 
 function calcularEra(nivel) {
-  if (nivel <= 5) return 'Mundana';
-  if (nivel <= 10) return 'Patrocinada';
-  if (nivel <= 15) return 'Organizador';
-  return 'Leyenda';
+  if (nivel <= 10) return 'Caminante';
+  if (nivel <= 20) return 'Explorador';
+  if (nivel <= 30) return 'Cronista';
+  if (nivel <= 35) return 'Leyenda';
+  return 'Mito';
+}
+
+// v20: instrumenta el gasto de XP en xp_ledger (best-effort) para el medidor
+// de "quemado" del dashboard. No debe romper si xp_ledger no existe (42P01).
+function registrarGastoXp(sqlFn, usuarioId, accion, monto) {
+  return sqlFn(
+    'INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack, mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, contexto) '
+    + "VALUES ($1,$2,$3,1,1,1,'ninguno',0,$4,true,$5::jsonb)",
+    [usuarioId, accion, monto, -monto, JSON.stringify({ origen: 'usuarios.js', monto: monto })]
+  ).catch(function(){});
 }
 
 // Insignia vs nivel economico (ADR-053 Decision 5 / Enmienda 1):
@@ -829,6 +865,7 @@ module.exports = async (req, res) => {
             return res.status(429).json({ ok: false, error: 'COOLDOWN_FACCION' });
           return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
         }
+        registrarGastoXp(sql, feId, 'gasto_faccion', COSTO_FACCION);
         return res.json({ ok: true, data: { faccion: feCambio[0].faccion, faccion_elegida_en: feCambio[0].faccion_elegida_en } });
       }
 
@@ -919,6 +956,7 @@ module.exports = async (req, res) => {
             return res.status(429).json({ ok: false, error: 'COOLDOWN_CASA' });
           return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
         }
+        registrarGastoXp(sql, ceId, 'gasto_casa', COSTO_CASA);
         // ADR-038: mismo refresco best-effort del cofre tras el recambio.
         try {
           await sql(
@@ -1006,6 +1044,7 @@ module.exports = async (req, res) => {
             return res.status(429).json({ ok: false, error: 'COOLDOWN_CLASE' });
           return res.status(402).json({ ok: false, error: 'PUNTOS_INSUFICIENTES' });
         }
+        registrarGastoXp(sql, clId, 'gasto_clase', COSTO_CLASE);
         var clXpNuevo = numXp(clCambio[0].xp_total);
         var clNivelNuevo = calcularNivel(clXpNuevo).nivel;
         return res.json({ ok: true, data: {

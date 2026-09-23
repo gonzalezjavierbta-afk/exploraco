@@ -34,16 +34,16 @@ vm.createContext(sandboxUsu);
 vm.runInContext(srcUsu + '\nmodule.exports.NIVELES = NIVELES; module.exports.calcularNivel = calcularNivel;', sandboxUsu, { filename: 'api/usuarios.js' });
 const NIVELES = sandboxUsu.module.exports.NIVELES;
 const calcularNivel = sandboxUsu.module.exports.calcularNivel;
-check('NIVELES: 20 rangos (4 Eras)', NIVELES.length === 20);
+check('NIVELES: 40 rangos (5 Eras)', NIVELES.length === 40);
 const umbrales = NIVELES.map(function(n){ return n.min; });
-// ADR-053 Dec 11 (v25): umbrales NUEVOS v6 (techo 42000); reemplazan los
-// bornes v4 (0..30000) que afirmaba este smoke.
-check('NIVELES: umbrales del spec v6 (ADR-053 Dec 11)',
-  JSON.stringify(umbrales) === JSON.stringify([0,100,250,450,700,1050,1500,2100,2900,3900,5200,6800,8800,11200,14200,17800,22200,27500,34000,42000]));
-check('NIVELES: Gran Maestro ExploraCO en 42000', NIVELES[19].nombre.indexOf('Maestro') !== -1);
+// RELEASE 2026-09-23: umbrales reescalados a 40 niveles (techo 100000).
+check('NIVELES: umbrales del spec 40 niveles',
+  JSON.stringify(umbrales) === JSON.stringify([0,150,500,1000,1650,2500,3450,4550,5800,7150,8650,10250,12000,13850,15800,17900,20100,22450,24850,27400,30050,32800,35700,38650,41750,44900,48200,51600,55050,58700,62400,66150,70050,74050,78150,82300,86600,90950,95450,100000]));
+check('NIVELES: Gran Maestro ExploraCO en el nivel 20', NIVELES[19].nombre.indexOf('Maestro') !== -1);
+check('NIVELES: techo 100000 en el nivel 40', NIVELES[39].min === 100000);
 check('NIVELES: calcularNivel(0) -> nivel 1', calcularNivel(0).nivel === 1);
-check('NIVELES: calcularNivel(14200) -> nivel 15 (ADR-053 Dec 11)', calcularNivel(14200).nivel === 15);
-check('NIVELES: calcularNivel(2100) -> nivel 8 (Cronista, 2100<=2100<2900)', calcularNivel(2100).nivel === 8);
+check('NIVELES: calcularNivel(14200) -> nivel 14', calcularNivel(14200).nivel === 14);
+check('NIVELES: calcularNivel(2100) -> nivel 5 (1650<=2100<2500)', calcularNivel(2100).nivel === 5);
 
 // ---- 2) GET tabla_destino (3 senderos + patrocinios) ---------------
 // Se evalua la logica de forma directa: el GET vive en el handler; aqui

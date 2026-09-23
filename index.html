@@ -2967,32 +2967,52 @@ renderMyMap = function() {
    coincidia con el XP real del leaderboard. Ver nota de entrega.
 ══════════════════════════════════════════════════════ */
 
-// 20 niveles en 4 Eras (Mundana/Patrocinada/Leyenda/Gran Maestro).
-// Mismos umbrales que api/usuarios.js NIVELES (v6, techo 42000, ADR-053).
+// 40 niveles en 5 Eras (Caminante/Explorador/Cronista/Leyenda/Mito).
+// Mismos umbrales que api/usuarios.js NIVELES (curva v7, techo 100000).
 // max se computa automaticamente a partir del min del siguiente nivel.
 // TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
 // (evita la copia; hoy se conserva por costo de red/carga).
 var XP_LEVELS = [
-  { min: 0,     nombre: 'Caminante Novato',      emoji: '\uD83C\uDF31', era: 'Era 1 Mundana',  capacidades: 'Guardar en Mi Viaje; Quick-Ratings; lectura de mapas' },
-  { min: 100,   nombre: 'Rastreador Local',      emoji: '\uD83E\uDDED', era: 'Era 1',          capacidades: 'Resenas simples; primera foto; Chat Publico' },
-  { min: 250,   nombre: 'Explorador Urbano',     emoji: '\uD83E\uDDED', era: 'Era 1',          capacidades: 'Mapas privados; Visitas confirmadas; unirse a Planes' },
-  { min: 450,   nombre: 'Aventurero Regional',   emoji: '\uD83E\uDD7E', era: 'Era 1',          capacidades: 'Re-pin de fotos; resenas con dimensiones' },
-  { min: 700,   nombre: 'Vanguardia Territorial',emoji: '\uD83C\uDFD9\uFE0F', era: 'Era 1',    capacidades: 'Mapas publicos; votos de utilidad (Own the Spot)' },
-  { min: 1050,  nombre: 'Embajador de Zona',     emoji: '\uD83C\uDFDB\uFE0F', era: 'Era 2 Patrocinada', capacidades: 'Crear Planes; acceso a tienda de canje' },
-  { min: 1500,  nombre: 'Fotografo de Ruta',     emoji: '\u2B50', era: 'Era 2',          capacidades: 'Albumes georreferenciados; fijar mensajes en salas' },
-  { min: 2100,  nombre: 'Cronista de Historias', emoji: '\uD83D\uDCD6', era: 'Era 2',          capacidades: 'Postular articulos (Inspirate); etiquetas en mapas' },
-  { min: 2900,  nombre: 'Buscador de Leyendas',  emoji: '\uD83E\uDDF0', era: 'Era 2',          capacidades: 'Ver rareza global; prioridad en moderacion' },
-  { min: 3900,  nombre: 'Guia de Fronteras',     emoji: '\uD83E\uDDED', era: 'Era 2',          capacidades: '50 mapas/200 guardados; desbloqueo cromos por ciudad' },
-  { min: 5200,  nombre: 'Estratega Comunitario', emoji: '\uD83C\uDFAF', era: 'Era 3',          capacidades: 'organizar_actividad; presidir salas regionales' },
-  { min: 6800,  nombre: 'Documentalista Visual', emoji: '\uD83C\uDFAC', era: 'Era 3',          capacidades: 'Video-Reels en fichas; galeria destacada en Blog' },
-  { min: 8800,  nombre: 'Senor del Spot',        emoji: '\uD83D\uDC51', era: 'Era 3',          capacidades: 'Disputa avanzada Own the Spot; x1.1 XP en esa ciudad' },
-  { min: 11200, nombre: 'Cartografo de Cine',    emoji: '\uD83C\uDF05', era: 'Era 3',          capacidades: 'Mapas de Cine; FUNDAR PARCHE' },
-  { min: 14200, nombre: 'Protector del Patrimonio', emoji: '\uD83D\uDEE1\uFE0F', era: 'Era 3', capacidades: 'Moderacion galerias/resenas; badge Plata Neon' },
-  { min: 17800, nombre: 'Curador de Colombia',   emoji: '\uD83E\uD489', era: 'Era 4 Leyenda',  capacidades: 'Cromos dorados; insignias legendarias (+100 XP)' },
-  { min: 22200, nombre: 'Mariscal de Parche',    emoji: '\uD83D\uDCA5', era: 'Era 4',          capacidades: 'x1.2 XP de Parche grupal; pases VIP' },
-  { min: 27500, nombre: 'Cineasta de Territorio', emoji: '\uD83C\uDFA5', era: 'Era 4',         capacidades: 'Videos en Hero; destacado permanente' },
-  { min: 34000, nombre: 'Inmortal del Mapa',     emoji: '\uD83D\uDD25', era: 'Era 4',          capacidades: 'Marco avatar Neon Fuego; acceso beta' },
-  { min: 42000, nombre: 'Gran Maestro ExploraCO', emoji: '\uD83D\uDC51', era: 'Era 4',          capacidades: 'Maximo prestigio; A2A Agent Card' },
+  { min: 0,      nombre: 'Caminante Novato',       emoji: '\uD83C\uDF31', era: 'Caminante',   capacidades: 'Guardar en Mi Viaje; Quick-Ratings; lectura de mapas' },
+  { min: 150,    nombre: 'Rastreador Local',       emoji: '\uD83E\uDDED', era: 'Caminante',   capacidades: 'Resenas simples; primera foto; Chat Publico' },
+  { min: 500,    nombre: 'Explorador Urbano',      emoji: '\uD83C\uDFD8\uFE0F', era: 'Caminante', capacidades: 'Mapas privados; Visitas confirmadas; unirse a Planes' },
+  { min: 1000,   nombre: 'Aventurero Regional',    emoji: '\uD83E\uDD7E', era: 'Caminante',   capacidades: 'Re-pin de fotos; resenas con dimensiones' },
+  { min: 1650,   nombre: 'Vanguardia Territorial', emoji: '\uD83C\uDFD9\uFE0F', era: 'Caminante', capacidades: 'Mapas publicos; votos de utilidad (Own the Spot)' },
+  { min: 2500,   nombre: 'Embajador de Zona',      emoji: '\uD83C\uDFDB\uFE0F', era: 'Caminante', capacidades: 'Crear Planes; acceso a tienda de canje' },
+  { min: 3450,   nombre: 'Fot\u00f3grafo de Ruta', emoji: '\u2B50', era: 'Caminante',   capacidades: 'Albumes georreferenciados; fijar mensajes en salas' },
+  { min: 4550,   nombre: 'Cronista de Historias',  emoji: '\uD83D\uDCD6', era: 'Caminante',   capacidades: 'Postular articulos (Inspirate); etiquetas en mapas' },
+  { min: 5800,   nombre: 'Buscador de Leyendas',   emoji: '\uD83E\uDDF0', era: 'Caminante',   capacidades: 'Ver rareza global; prioridad en moderacion' },
+  { min: 7150,   nombre: 'Gu\u00eda de Fronteras', emoji: '\uD83E\uDDD7', era: 'Caminante',   capacidades: '50 mapas/200 guardados; desbloqueo cromos por ciudad' },
+  { min: 8650,   nombre: 'Estratega Comunitario',  emoji: '\uD83C\uDFAF', era: 'Explorador',  capacidades: 'organizar_actividad; presidir salas regionales' },
+  { min: 10250,  nombre: 'Documentalista Visual',  emoji: '\uD83C\uDFAC', era: 'Explorador',  capacidades: 'Video-Reels en fichas; galeria destacada en Blog' },
+  { min: 12000,  nombre: 'Se\u00f1or del Spot',    emoji: '\uD83D\uDC51', era: 'Explorador',  capacidades: 'Disputa avanzada Own the Spot; x1.1 XP en esa ciudad' },
+  { min: 13850,  nombre: 'Cart\u00f3grafo de Cine', emoji: '\uD83C\uDF05', era: 'Explorador', capacidades: 'Mapas de Cine; FUNDAR PARCHE' },
+  { min: 15800,  nombre: 'Protector del Patrimonio', emoji: '\uD83D\uDEE1\uFE0F', era: 'Explorador', capacidades: 'Moderacion galerias/resenas; badge Plata Neon' },
+  { min: 17900,  nombre: 'Curador de Colombia',    emoji: '\uD83D\uDDBC\uFE0F', era: 'Explorador', capacidades: 'Cromos dorados; insignias legendarias (+100 XP)' },
+  { min: 20100,  nombre: 'Mariscal de Parche',     emoji: '\uD83D\uDCA5', era: 'Explorador',  capacidades: 'x1.2 XP de Parche grupal; pases VIP' },
+  { min: 22450,  nombre: 'Cineasta de Territorio', emoji: '\uD83C\uDFA5', era: 'Explorador',  capacidades: 'Videos en Hero; destacado permanente' },
+  { min: 24850,  nombre: 'Inmortal del Mapa',      emoji: '\uD83D\uDD25', era: 'Explorador',  capacidades: 'Marco avatar Neon Fuego; acceso beta' },
+  { min: 27400,  nombre: 'Gran Maestro ExploraCO', emoji: '\uD83C\uDF96\uFE0F', era: 'Explorador', capacidades: 'Maximo prestigio; A2A Agent Card' },
+  { min: 30050,  nombre: 'Tejedor de Rutas',       emoji: '\uD83D\uDDFA\uFE0F', era: 'Cronista', capacidades: 'Itinerarios multi-destino; rutas compartidas' },
+  { min: 32800,  nombre: 'Cronista de Regiones',   emoji: '\uD83C\uDF0E', era: 'Cronista',   capacidades: 'Resenas por region; mapas de temporada' },
+  { min: 35700,  nombre: 'Curador de Relatos',     emoji: '\uD83D\uDCDC', era: 'Cronista',   capacidades: 'Colecciones editoriales; destacados de ciudad' },
+  { min: 38650,  nombre: 'Guardi\u00e1n de Tradiciones', emoji: '\uD83C\uDFFA', era: 'Cronista', capacidades: 'Sellos culturales; misiones de patrimonio' },
+  { min: 41750,  nombre: 'Arquitecto de Itinerarios', emoji: '\uD83E\uDDF1', era: 'Cronista', capacidades: 'Itinerarios colaborativos; planes extendidos' },
+  { min: 44900,  nombre: 'Maestro de Ceremonias',  emoji: '\uD83C\uDFA9', era: 'Cronista',   capacidades: 'Eventos propios; invitaciones masivas' },
+  { min: 48200,  nombre: 'Cronista Mayor',         emoji: '\uD83D\uDD8B\uFE0F', era: 'Cronista', capacidades: 'Anuario de viajes; estadisticas avanzadas' },
+  { min: 51600,  nombre: 'Embajador Cultural',     emoji: '\uD83E\uDD1D', era: 'Cronista',   capacidades: 'Embajadas regionales; doble XP cultural' },
+  { min: 55050,  nombre: 'Historiador de Territorio', emoji: '\uD83D\uDDFF', era: 'Cronista', capacidades: 'Archivo historico; fichas curadas' },
+  { min: 58700,  nombre: 'Sabio de los Caminos',   emoji: '\uD83E\uDDE0', era: 'Cronista',   capacidades: 'Consejos destacados; mentor de novatos' },
+  { min: 62400,  nombre: 'Leyenda Emergente',      emoji: '\uD83C\uDF1F', era: 'Leyenda',    capacidades: 'Insignia Leyenda; x1.3 XP global' },
+  { min: 66150,  nombre: 'Forjador de Leyendas',   emoji: '\uD83D\uDEE0\uFE0F', era: 'Leyenda', capacidades: 'Crear retos de temporada; forjar Parches' },
+  { min: 70050,  nombre: 'H\u00e9roe del Mapa',    emoji: '\uD83E\uDDB8', era: 'Leyenda',    capacidades: 'Heroe destacado; mapa firmado' },
+  { min: 74050,  nombre: 'Tit\u00e1n de las Rutas', emoji: '\uD83C\uDFD4\uFE0F', era: 'Leyenda', capacidades: 'x1.5 XP en rutas propias; titulo vitalicio' },
+  { min: 78150,  nombre: 'Leyenda Viva',           emoji: '\uD83D\uDCAB', era: 'Leyenda',    capacidades: 'Acceso total a betas; consejo de leyendas' },
+  { min: 82300,  nombre: 'Mito Naciente',          emoji: '\uD83C\uDF0C', era: 'Mito',       capacidades: 'Marco Mito; XP nunca decae' },
+  { min: 86600,  nombre: 'Semidi\u00f3s del Viaje', emoji: '\u26A1', era: 'Mito',       capacidades: 'Voto en decisiones; prioridad maxima' },
+  { min: 90950,  nombre: 'Guardi\u00e1n Ancestral', emoji: '\uD83E\uDDFF', era: 'Mito',      capacidades: 'Guardian de comunidad; moderacion global' },
+  { min: 95450,  nombre: 'Esp\u00edritu del Territorio', emoji: '\uD83C\uDFF5\uFE0F', era: 'Mito', capacidades: 'Legado permanente; sello del territorio' },
+  { min: 100000, nombre: 'Mito Eterno ExploraCO',  emoji: '\uD83C\uDFC6', era: 'Mito',       capacidades: 'Maximo mito; A2A Agent Card legendaria' },
 ];
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;

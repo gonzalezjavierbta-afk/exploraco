@@ -54,7 +54,7 @@ function authInternal(req) {
 function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
 function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
 
-// Espejo de REPORTE de los 20 umbrales de api/usuarios.js:NIVELES (ADR-053
+// Espejo de REPORTE de los 40 umbrales de api/usuarios.js:NIVELES (ADR-053
 // Decision 3) para resolver el nivel DERIVADO de xp_total dentro de SQL puro
 // en la rama admin salud_red. NO hay require cruzado entre funciones
 // serverless (patron documentado arriba, admin.js:56-59): este CASE es solo
@@ -62,25 +62,45 @@ function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
 // ni escribe nada. Si los umbrales cambian en la fuente, este espejo debe
 // actualizarse (lo cubre el smoke de espejos de umbrales).
 var NIVEL_DERIVADO_SQL = 'CASE '
-  + 'WHEN xp_total >= 42000 THEN 20 '
-  + 'WHEN xp_total >= 34000 THEN 19 '
-  + 'WHEN xp_total >= 27500 THEN 18 '
-  + 'WHEN xp_total >= 22200 THEN 17 '
-  + 'WHEN xp_total >= 17800 THEN 16 '
-  + 'WHEN xp_total >= 14200 THEN 15 '
-  + 'WHEN xp_total >= 11200 THEN 14 '
-  + 'WHEN xp_total >= 8800 THEN 13 '
-  + 'WHEN xp_total >= 6800 THEN 12 '
-  + 'WHEN xp_total >= 5200 THEN 11 '
-  + 'WHEN xp_total >= 3900 THEN 10 '
-  + 'WHEN xp_total >= 2900 THEN 9 '
-  + 'WHEN xp_total >= 2100 THEN 8 '
-  + 'WHEN xp_total >= 1500 THEN 7 '
-  + 'WHEN xp_total >= 1050 THEN 6 '
-  + 'WHEN xp_total >= 700 THEN 5 '
-  + 'WHEN xp_total >= 450 THEN 4 '
-  + 'WHEN xp_total >= 250 THEN 3 '
-  + 'WHEN xp_total >= 100 THEN 2 '
+  + 'WHEN xp_total >= 100000 THEN 40 '
+  + 'WHEN xp_total >= 95450 THEN 39 '
+  + 'WHEN xp_total >= 90950 THEN 38 '
+  + 'WHEN xp_total >= 86600 THEN 37 '
+  + 'WHEN xp_total >= 82300 THEN 36 '
+  + 'WHEN xp_total >= 78150 THEN 35 '
+  + 'WHEN xp_total >= 74050 THEN 34 '
+  + 'WHEN xp_total >= 70050 THEN 33 '
+  + 'WHEN xp_total >= 66150 THEN 32 '
+  + 'WHEN xp_total >= 62400 THEN 31 '
+  + 'WHEN xp_total >= 58700 THEN 30 '
+  + 'WHEN xp_total >= 55050 THEN 29 '
+  + 'WHEN xp_total >= 51600 THEN 28 '
+  + 'WHEN xp_total >= 48200 THEN 27 '
+  + 'WHEN xp_total >= 44900 THEN 26 '
+  + 'WHEN xp_total >= 41750 THEN 25 '
+  + 'WHEN xp_total >= 38650 THEN 24 '
+  + 'WHEN xp_total >= 35700 THEN 23 '
+  + 'WHEN xp_total >= 32800 THEN 22 '
+  + 'WHEN xp_total >= 30050 THEN 21 '
+  + 'WHEN xp_total >= 27400 THEN 20 '
+  + 'WHEN xp_total >= 24850 THEN 19 '
+  + 'WHEN xp_total >= 22450 THEN 18 '
+  + 'WHEN xp_total >= 20100 THEN 17 '
+  + 'WHEN xp_total >= 17900 THEN 16 '
+  + 'WHEN xp_total >= 15800 THEN 15 '
+  + 'WHEN xp_total >= 13850 THEN 14 '
+  + 'WHEN xp_total >= 12000 THEN 13 '
+  + 'WHEN xp_total >= 10250 THEN 12 '
+  + 'WHEN xp_total >= 8650 THEN 11 '
+  + 'WHEN xp_total >= 7150 THEN 10 '
+  + 'WHEN xp_total >= 5800 THEN 9 '
+  + 'WHEN xp_total >= 4550 THEN 8 '
+  + 'WHEN xp_total >= 3450 THEN 7 '
+  + 'WHEN xp_total >= 2500 THEN 6 '
+  + 'WHEN xp_total >= 1650 THEN 5 '
+  + 'WHEN xp_total >= 1000 THEN 4 '
+  + 'WHEN xp_total >= 500 THEN 3 '
+  + 'WHEN xp_total >= 150 THEN 2 '
   + 'ELSE 1 END';
 
 // Errores de esquema ausente (migracion pendiente, patron BUG-021): tabla
@@ -581,6 +601,16 @@ module.exports = async function handler(req, res) {
     if (!isFinite(diasSR) || diasSR < 1) diasSR = 30;
     if (diasSR > 365) diasSR = 365;
 
+    // Economia XP -- XP en juego (circulante): SUM(usuarios.xp_total) de las
+    // cuentas activas. Depende SOLO de usuarios (siempre existe), por lo que
+    // se calcula antes del ledger para que viaje incluso en la degradacion
+    // 42P01 de xp_ledger.
+    var xpEnJuego = 0;
+    var juegoSR = await sql(
+      'SELECT COALESCE(SUM(xp_total), 0) AS xp FROM usuarios WHERE activo = true'
+    );
+    if (juegoSR.length) xpEnJuego = red2(numXp(juegoSR[0].xp));
+
     var ledgerSR;
     try {
       ledgerSR = await sql(
@@ -594,7 +624,10 @@ module.exports = async function handler(req, res) {
     } catch (eSR) {
       if (eSR && eSR.code === '42P01') {
         console.warn('[admin] salud_red degradado 42P01: xp_ledger no disponible (' + eSR.message + ')');
-        return res.status(200).json({ ok: true, degradado: true, motivo: 'xp_ledger no disponible' });
+        return res.status(200).json({
+          ok: true, degradado: true, motivo: 'xp_ledger no disponible',
+          data: { xp_producido: null, xp_quemado: null, xp_en_juego: xpEnJuego },
+        });
       }
       throw eSR;
     }
@@ -711,6 +744,26 @@ module.exports = async function handler(req, res) {
       [diasSR]
     );
 
+    // Economia XP -- XP producido (acunado) y XP quemado (gastado). Ambos
+    // leen xp_ledger: si la migracion 031 no corrio (42P01/42703) degradan a
+    // null sin romper el endpoint (patron esquemaAusente). xp_producido suma
+    // los eventos positivos; xp_quemado usa el valor ABSOLUTO de los negativos.
+    var xpProducido = null;
+    var xpQuemado = null;
+    try {
+      var prodSR = await sql(
+        'SELECT COALESCE(SUM(xp_final), 0) AS xp FROM xp_ledger WHERE xp_final > 0'
+      );
+      var quemSR = await sql(
+        'SELECT COALESCE(-SUM(xp_final), 0) AS xp FROM xp_ledger WHERE xp_final < 0'
+      );
+      xpProducido = prodSR.length ? red2(numXp(prodSR[0].xp)) : 0;
+      xpQuemado = quemSR.length ? red2(numXp(quemSR[0].xp)) : 0;
+    } catch (eEco) {
+      if (!esquemaAusente(eEco)) throw eEco;
+      console.warn('[admin] salud_red: economia xp degradada ' + eEco.code + ' (' + eEco.message + ')');
+    }
+
     // Normalizacion (numeric llega string; bigint tambien).
     var xpTotalEntregado = 0;
     var porDia = ledgerSR.map(function (d) {
@@ -767,6 +820,9 @@ module.exports = async function handler(req, res) {
       data: {
         ventana_dias: diasSR,
         xp_total_entregado: xpTotalEntregado,
+        xp_producido: xpProducido,
+        xp_quemado: xpQuemado,
+        xp_en_juego: xpEnJuego,
         por_dia: porDia,
         por_accion: porAccion,
         usuarios_activos: activosVentana.length ? (parseInt(activosVentana[0].n, 10) || 0) : 0,

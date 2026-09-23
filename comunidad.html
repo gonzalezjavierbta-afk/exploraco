@@ -576,32 +576,52 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
    La sesion real la maneja usuario-session.js (window.ExploraCO).
    ============================================================= */
 
-/* ---- POINTS CONFIG (20 rangos / 4 Eras) ---- */
-/* Espejo de api/usuarios.js NIVELES (v6, techo 42000, ADR-053); validado
+/* ---- POINTS CONFIG (40 rangos / 5 Eras) ---- */
+/* Espejo de api/usuarios.js NIVELES (curva v7, techo 100000); validado
    por scripts/smoke_niveles_espejos.js.
    TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
    (evita la copia; hoy se conserva por costo de red/carga). */
 var XP_LEVELS = [
   {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31'},
-  {min:100,nombre:'Rastreador Local',emoji:'\uD83E\uDDED'},
-  {min:250,nombre:'Explorador Urbano',emoji:'\uD83E\uDDED'},
-  {min:450,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E'},
-  {min:700,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F'},
-  {min:1050,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F'},
-  {min:1500,nombre:'Fotografo de Ruta',emoji:'\u2B50'},
-  {min:2100,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6'},
-  {min:2900,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0'},
-  {min:3900,nombre:'Guia de Fronteras',emoji:'\uD83E\uDDED'},
-  {min:5200,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF'},
-  {min:6800,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC'},
-  {min:8800,nombre:'Senor del Spot',emoji:'\uD83D\uDC51'},
-  {min:11200,nombre:'Cartografo de Cine',emoji:'\uD83C\uDF05'},
-  {min:14200,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F'},
-  {min:17800,nombre:'Curador de Colombia',emoji:'\uD83E\uD489'},
-  {min:22200,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5'},
-  {min:27500,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5'},
-  {min:34000,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25'},
-  {min:42000,nombre:'Gran Maestro ExploraCO',emoji:'\uD83D\uDC51'},
+  {min:150,nombre:'Rastreador Local',emoji:'\uD83E\uDDED'},
+  {min:500,nombre:'Explorador Urbano',emoji:'\uD83C\uDFD8\uFE0F'},
+  {min:1000,nombre:'Aventurero Regional',emoji:'\uD83E\uDD7E'},
+  {min:1650,nombre:'Vanguardia Territorial',emoji:'\uD83C\uDFD9\uFE0F'},
+  {min:2500,nombre:'Embajador de Zona',emoji:'\uD83C\uDFDB\uFE0F'},
+  {min:3450,nombre:'Fot\u00f3grafo de Ruta',emoji:'\u2B50'},
+  {min:4550,nombre:'Cronista de Historias',emoji:'\uD83D\uDCD6'},
+  {min:5800,nombre:'Buscador de Leyendas',emoji:'\uD83E\uDDF0'},
+  {min:7150,nombre:'Gu\u00eda de Fronteras',emoji:'\uD83E\uDDD7'},
+  {min:8650,nombre:'Estratega Comunitario',emoji:'\uD83C\uDFAF'},
+  {min:10250,nombre:'Documentalista Visual',emoji:'\uD83C\uDFAC'},
+  {min:12000,nombre:'Se\u00f1or del Spot',emoji:'\uD83D\uDC51'},
+  {min:13850,nombre:'Cart\u00f3grafo de Cine',emoji:'\uD83C\uDF05'},
+  {min:15800,nombre:'Protector del Patrimonio',emoji:'\uD83D\uDEE1\uFE0F'},
+  {min:17900,nombre:'Curador de Colombia',emoji:'\uD83D\uDDBC\uFE0F'},
+  {min:20100,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5'},
+  {min:22450,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5'},
+  {min:24850,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25'},
+  {min:27400,nombre:'Gran Maestro ExploraCO',emoji:'\uD83C\uDF96\uFE0F'},
+  {min:30050,nombre:'Tejedor de Rutas',emoji:'\uD83D\uDDFA\uFE0F'},
+  {min:32800,nombre:'Cronista de Regiones',emoji:'\uD83C\uDF0E'},
+  {min:35700,nombre:'Curador de Relatos',emoji:'\uD83D\uDCDC'},
+  {min:38650,nombre:'Guardi\u00e1n de Tradiciones',emoji:'\uD83C\uDFFA'},
+  {min:41750,nombre:'Arquitecto de Itinerarios',emoji:'\uD83E\uDDF1'},
+  {min:44900,nombre:'Maestro de Ceremonias',emoji:'\uD83C\uDFA9'},
+  {min:48200,nombre:'Cronista Mayor',emoji:'\uD83D\uDD8B\uFE0F'},
+  {min:51600,nombre:'Embajador Cultural',emoji:'\uD83E\uDD1D'},
+  {min:55050,nombre:'Historiador de Territorio',emoji:'\uD83D\uDDFF'},
+  {min:58700,nombre:'Sabio de los Caminos',emoji:'\uD83E\uDDE0'},
+  {min:62400,nombre:'Leyenda Emergente',emoji:'\uD83C\uDF1F'},
+  {min:66150,nombre:'Forjador de Leyendas',emoji:'\uD83D\uDEE0\uFE0F'},
+  {min:70050,nombre:'H\u00e9roe del Mapa',emoji:'\uD83E\uDDB8'},
+  {min:74050,nombre:'Tit\u00e1n de las Rutas',emoji:'\uD83C\uDFD4\uFE0F'},
+  {min:78150,nombre:'Leyenda Viva',emoji:'\uD83D\uDCAB'},
+  {min:82300,nombre:'Mito Naciente',emoji:'\uD83C\uDF0C'},
+  {min:86600,nombre:'Semidi\u00f3s del Viaje',emoji:'\u26A1'},
+  {min:90950,nombre:'Guardi\u00e1n Ancestral',emoji:'\uD83E\uDDFF'},
+  {min:95450,nombre:'Esp\u00edritu del Territorio',emoji:'\uD83C\uDFF5\uFE0F'},
+  {min:100000,nombre:'Mito Eterno ExploraCO',emoji:'\uD83C\uDFC6'},
 ];
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;

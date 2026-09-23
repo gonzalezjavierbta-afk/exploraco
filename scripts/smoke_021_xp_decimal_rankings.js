@@ -26,7 +26,7 @@ function contarMinObjetos(t) {
 }
 // ADR-040: index/comunidad conservan la tabla literal; mi-perfil la
 // aliasa desde niveles-data.js. Se valida el contrato nuevo completo
-// (carga de niveles-data.js + alias a window.NivelesData.XP_LEVELS + 20).
+// (carga de niveles-data.js + alias a window.NivelesData.XP_LEVELS + 40).
 function nivelesEnHtml(t) {
   if (t.indexOf('XP_LEVELS = [') !== -1) return contarMinObjetos(t);
   if (t.indexOf('niveles-data.js') === -1) return 0;
@@ -156,13 +156,13 @@ check('11a: usuario-session.js exporta window.ExploraCO.fmtXp', /window\.Explora
 check('11b: usuario-session.js exporta window.ExploraCO.redondearXp', /window\.ExploraCO\.redondearXp\s*=/.test(SESS));
 check('11c: redondearXp usa Number.EPSILON', extraerFn(SESS, 'redondearXp').indexOf('Number.EPSILON') !== -1);
 check('11d: fmtXp no usa parseInt', extraerFn(SESS, 'fmtXp').indexOf('parseInt(') === -1);
-check('11e: usuario-session.js conserva los 20 XP_LEVELS', contarNivelesArray(SESS) === 20);
+check('11e: usuario-session.js conserva los 40 XP_LEVELS', contarNivelesArray(SESS) === 40);
 
 HTMLS.forEach(function (f) {
   check('12: ' + f + ' formatea XP con fmtXp', HTML[f].indexOf('fmtXp') !== -1);
 });
 ['index.html', 'mi-perfil.html', 'comunidad.html'].forEach(function (f) {
-  check('13: ' + f + ' conserva los 20 XP_LEVELS', nivelesEnHtml(HTML[f]) === 20);
+  check('13: ' + f + ' conserva los 40 XP_LEVELS', nivelesEnHtml(HTML[f]) === 40);
 });
 
 var selfAscii = asciiSafe('scripts/smoke_021_xp_decimal_rankings.js');

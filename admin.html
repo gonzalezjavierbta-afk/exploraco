@@ -2098,7 +2098,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="ws-header">
     <div>
       <div class="ws-title">SALUD DE LA RED</div>
-      <div class="ws-subtitle">Metricas del ledger de XP (xp_ledger) y leaderboard de viajeros</div>
+      <div class="ws-subtitle">Economia de XP (producido / en juego / quemado), metricas del ledger (xp_ledger) y leaderboard de viajeros</div>
     </div>
     <div class="ws-actions">
       <select class="form-input" id="salud-dias" onchange="cargarSaludRed()" style="width:120px">
@@ -7395,11 +7395,12 @@ function fmtXp(n) {
    GET  /api/interacciones?tipo=vocaciones_usuario&usuario_id=ID
         -> { ok:true, data:{ activadas:[slugs], catalogo:[{slug,nombre,min_nivel}] } }
    Errores tipificados 400/401/403/404 -> { error: '...' } */
-/* Espejo #3 de los 8 de la tabla de 20 umbrales (ADR-053 Decision 11;
+/* Espejo #3 de los 8 de la tabla de umbrales (ADR-053 Decision 11;
    Enmienda 1 lo reintegro al conteo: antes estaba OMITIDO del smoke).
-   Sincronizado con la fuente servidor api/usuarios.js:NIVELES (techo 42000).
+   Expandido a 40 niveles (techo 100000). Sincronizado con la fuente
+   servidor api/usuarios.js:NIVELES.
    Gate: node scripts/smoke_niveles_espejos.js (debe pasar admin.html). */
-var _jugNiveles = [0,100,250,450,700,1050,1500,2100,2900,3900,5200,6800,8800,11200,14200,17800,22200,27500,34000,42000];
+var _jugNiveles = [0,150,500,1000,1650,2500,3450,4550,5800,7150,8650,10250,12000,13850,15800,17900,20100,22450,24850,27400,30050,32800,35700,38650,41750,44900,48200,51600,55050,58700,62400,66150,70050,74050,78150,82300,86600,90950,95450,100000];
 var _jugActivo = null;
 var _jugActivoData = null;
 var _jugActivoVocaciones = null;
@@ -7486,11 +7487,11 @@ function jugRender(u, conVocaciones) {
   var acciones = document.getElementById('jug-acciones');
   var xpActual = Number(p.xp_total) || 0;
   var lvl = Number(p.nivel) || 1;
-  /* Bandas de nivel 1..20 (ADR-053 Dec 11): _jugNiveles es 0-based (indice
-     lvl-1 = min del nivel actual); el techo del Nv20 se DERIVA del espejo
-     (_jugNiveles[19] = 42000), sin literales magicos sueltos. */
+  /* Bandas de nivel 1..40: _jugNiveles es 0-based (indice
+     lvl-1 = min del nivel actual); el techo del Nv40 se DERIVA del espejo
+     (_jugNiveles[39] = 100000), sin literales magicos sueltos. */
   var xpMin = _jugNiveles[lvl - 1] || 0;
-  var xpMax = (lvl < 20) ? _jugNiveles[lvl] : _jugNiveles[_jugNiveles.length - 1];
+  var xpMax = (lvl < _jugNiveles.length) ? _jugNiveles[lvl] : _jugNiveles[_jugNiveles.length - 1];
   var pct = Math.max(0, Math.min(100, Math.round(((xpActual - xpMin) / Math.max(1, xpMax - xpMin)) * 100)));
   var html = '';
   html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">';
@@ -7512,7 +7513,7 @@ function jugRender(u, conVocaciones) {
   html += '</div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted,#888);margin-top:4px">';
   html += '<span>Minimo nivel ' + lvl + ': ' + xpMin + ' XP</span>';
-  html += (lvl >= 20) ? '<span>Nivel maximo alcanzado</span>' : '<span>Nivel ' + (lvl + 1) + ': desde ' + xpMax + ' XP</span>';
+  html += (lvl >= _jugNiveles.length) ? '<span>Nivel maximo alcanzado</span>' : '<span>Nivel ' + (lvl + 1) + ': desde ' + xpMax + ' XP</span>';
   html += '</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">';
   html += '<div style="background:var(--bg,#F3EFE7);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600">&#127942; Logros: ' + (p.total_logros || 0) + '</div>';
@@ -7584,7 +7585,7 @@ function jugSubirNivel() {
   var sel = document.getElementById('jug-nivel');
   if (!sel) return;
   var nivel = parseInt(sel.value, 10);
-  if (!nivel || nivel < 1 || nivel > 20) { showAdminToast('Nivel invalido', 'error'); return; }
+  if (!nivel || nivel < 1 || nivel > _jugNiveles.length) { showAdminToast('Nivel invalido', 'error'); return; }
   if (!_jugActivo) { showAdminToast('Selecciona un jugador primero', 'error'); return; }
   jugAplicarXP({ usuario_id: _jugActivo, nivel: nivel }, 'nivel ' + nivel);
 }
@@ -7653,6 +7654,8 @@ function limpiarPanelJugadores() {
    sin duplicar headers). Cero endpoints nuevos (8/8, ADR-001).
    Shape verificado contra el archivo real (ADR-006):
      data = { ventana_dias, xp_total_entregado,
+              xp_producido, xp_en_juego, xp_quemado (economia; nullable
+              si el ledger aun no los calcula -> la UI muestra N/D),
               por_dia:[{dia,xp,eventos}],
               por_accion:[{accion,xp_entregado,eventos,cap_aplicado_top}],
               usuarios_activos,
@@ -7684,6 +7687,16 @@ function saludFmtInt(n) {
   var v = parseInt(n, 10);
   if (!isFinite(v)) v = 0;
   return String(v);
+}
+
+/* Formato de los totales de economia XP (xp_producido/xp_en_juego/
+   xp_quemado): si el backend aun no los emite (null/undefined) muestra
+   "N/D" sin romper el render (ledger ausente). */
+function saludFmtXpOD(n) {
+  if (n === null || n === undefined || n === '') return 'N/D';
+  var v = Number(n);
+  if (!isFinite(v)) return 'N/D';
+  return fmtXp(v);
 }
 
 function saludCard(titulo, inner) {
@@ -7818,7 +7831,10 @@ function saludRender(d, dias) {
   caps.forEach(function(x){ totalCaps += parseInt(x.n, 10) || 0; });
 
   stats.innerHTML =
-      saludStatCard(fmtXp(d.xp_total_entregado), 'XP entregado', 'ventana de ' + dias + ' d&iacute;as', 'var(--gold)')
+      saludStatCard(saludFmtXpOD(d.xp_producido), 'XP producido', 'economia total de la red', 'var(--gold)')
+    + saludStatCard(saludFmtXpOD(d.xp_en_juego), 'XP en juego', 'saldo activo de los usuarios', '#0ea5e9')
+    + saludStatCard(saludFmtXpOD(d.xp_quemado), 'XP quemado', 'gastado en consumibles y de-nivel', 'var(--red)')
+    + saludStatCard(fmtXp(d.xp_total_entregado), 'XP entregado', 'ventana de ' + dias + ' d&iacute;as', 'var(--gold)')
     + saludStatCard(saludFmtInt(totalEventos), 'Eventos', 'acreditaciones no exentas', 'var(--blue)')
     + saludStatCard(saludFmtInt(d.usuarios_activos), 'Usuarios activos', 'distintos en la ventana', '#8b5cf6')
     + saludStatCard(saludFmtInt(totalCaps), 'Caps aplicados', 'acciones recortadas', 'var(--red)');

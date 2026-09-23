@@ -16,18 +16,20 @@
   window.ExploraCO = window.ExploraCO || {};
   window.ExploraCO.usuario = null;
 
-  // ── Niveles XP (fuente de verdad, 20 niveles) ────────────
+  // ── Niveles XP (fuente de verdad, 40 niveles) ────────────
   // XP_LEVELS[i] = xp minimo para alcanzar el nivel (i+1).
-  // Nivel 1 = 0 XP, Nivel 20 = 42000 XP (techo v6, ADR-053).
+  // Nivel 1 = 0 XP, Nivel 40 = 100000 XP (curva v7, 5 Eras).
   // Espejo de api/usuarios.js NIVELES; validado por
   // scripts/smoke_niveles_espejos.js.
   // TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
   // (evita la copia; hoy se conserva por costo de red/carga).
   var XP_LEVELS = [
-    0, 100, 250, 450, 700, 1050, 1500, 2100, 2900, 3900,
-    5200, 6800, 8800, 11200, 14200, 17800, 22200, 27500, 34000, 42000
+    0, 150, 500, 1000, 1650, 2500, 3450, 4550, 5800, 7150,
+    8650, 10250, 12000, 13850, 15800, 17900, 20100, 22450, 24850, 27400,
+    30050, 32800, 35700, 38650, 41750, 44900, 48200, 51600, 55050, 58700,
+    62400, 66150, 70050, 74050, 78150, 82300, 86600, 90950, 95450, 100000
   ];
-  var MAX_NIVEL = XP_LEVELS.length; // 20
+  var MAX_NIVEL = 40; // 40
 
   // ── Calcular nivel a partir de XP total ───────────────────
   function calcularNivel(xpTotal) {
@@ -181,31 +183,41 @@
 
   window.ExploraCO.CAPACIDADES_POR_NIVEL = CAPACIDADES_POR_NIVEL;
 
-  // ---- Sistema de eras + titulos por nivel (v5) ----
+  // ---- Sistema de eras + titulos por nivel (v7: 40 niveles / 5 eras) ----
   // Catalogo local puro (sin BD). Los titulos con tilde o enie usan
   // escapes Unicode para mantener ASCII puro (ADR-002).
   var TITULOS_POR_NIVEL = {
-    1:'Viajero Novato', 2:'Explorador', 3:'Aventurero', 4:'Descubridor',
-    5:'Cart\u00f3grafo', 6:'Cronista', 7:'Gu\u00eda Local', 8:'Embajador',
-    9:'Maestro Viajero', 10:'Leyenda Urbana', 11:'Patriarca Cultural',
-    12:'Se\u00f1or del Territorio', 13:'Guardi\u00e1n de Rutas', 14:'Gran Explorador',
-    15:'Orquestador', 16:'Arquitecto Cultural', 17:'Inmortal Andino',
-    18:'Embajador Legendario', 19:'Maestro Supremo', 20:'Leyenda de Colombia'
+    1:'Caminante Novato', 2:'Rastreador Local', 3:'Explorador Urbano', 4:'Aventurero Regional',
+    5:'Vanguardia Territorial', 6:'Embajador de Zona', 7:'Fot\u00f3grafo de Ruta',
+    8:'Cronista de Historias', 9:'Buscador de Leyendas', 10:'Gu\u00eda de Fronteras',
+    11:'Estratega Comunitario', 12:'Documentalista Visual', 13:'Se\u00f1or del Spot',
+    14:'Cart\u00f3grafo de Cine', 15:'Protector del Patrimonio', 16:'Curador de Colombia',
+    17:'Mariscal de Parche', 18:'Cineasta de Territorio', 19:'Inmortal del Mapa',
+    20:'Gran Maestro ExploraCO', 21:'Tejedor de Rutas', 22:'Cronista de Regiones',
+    23:'Curador de Relatos', 24:'Guardi\u00e1n de Tradiciones', 25:'Arquitecto de Itinerarios',
+    26:'Maestro de Ceremonias', 27:'Cronista Mayor', 28:'Embajador Cultural',
+    29:'Historiador de Territorio', 30:'Sabio de los Caminos', 31:'Leyenda Emergente',
+    32:'Forjador de Leyendas', 33:'H\u00e9roe del Mapa', 34:'Tit\u00e1n de las Rutas',
+    35:'Leyenda Viva', 36:'Mito Naciente', 37:'Semidi\u00f3s del Viaje',
+    38:'Guardi\u00e1n Ancestral', 39:'Esp\u00edritu del Territorio', 40:'Mito Eterno ExploraCO'
   };
 
   var ERAS = [
-    { nombre:'Mundana', niveles:[1,5], emoji:'\uD83C\uDF0D', color:'#6B7280',
+    { nombre:'Caminante', niveles:[1,10], emoji:'\uD83E\uDDED', color:'#6B7280',
       beneficios:['XP por visitas y rese\u00f1as','Acceso al mapa y al chat b\u00e1sico','Creaci\u00f3n de perfil'],
       mecanicas:['Explorar puntos culturales','Registrar visitas con geocerca'] },
-    { nombre:'Patrocinada', niveles:[6,10], emoji:'\uD83C\uDFC6', color:'#E8A020',
+    { nombre:'Explorador', niveles:[11,20], emoji:'\uD83C\uDFC6', color:'#E8A020',
       beneficios:['Crear planes de viaje','Emojis premium en el chat','Sello de sala'],
       mecanicas:['Misiones de Casa','Bonos de XP por actividad grupal'] },
-    { nombre:'Organizador', niveles:[11,15], emoji:'\uD83D\uDE80', color:'#6366F1',
-      beneficios:['Organizar actividades','Fundar pandillas','Moderar galer\u00edas'],
+    { nombre:'Cronista', niveles:[21,30], emoji:'\uD83D\uDCD6', color:'#6366F1',
+      beneficios:['Organizar actividades','Fundar parches','Moderar galer\u00edas'],
       mecanicas:['Liderar Casas','Misiones colectivas de alto valor'] },
-    { nombre:'Leyenda', niveles:[16,20], emoji:'\uD83D\uDC51', color:'#EC4899',
-      beneficios:['Cromo dorado','Mariscal de parche','Inmortal: XP nunca decae'],
-      mecanicas:['Recompensas exclusivas de temporada','Voto en decisiones de la plataforma'] }
+    { nombre:'Leyenda', niveles:[31,35], emoji:'\uD83D\uDC51', color:'#EC4899',
+      beneficios:['Cromo dorado','Mariscal de parche','XP que nunca decae'],
+      mecanicas:['Recompensas exclusivas de temporada','Voto en decisiones de la plataforma'] },
+    { nombre:'Mito', niveles:[36,40], emoji:'\uD83C\uDF0C', color:'#8B5CF6',
+      beneficios:['Insignias miticas','Marco de avatar legendario','Acceso anticipado a betas'],
+      mecanicas:['Retos de temporada final','Legado permanente en el ranking global'] }
   ];
 
   function expEra_getEra(nivel) {
