@@ -3,7 +3,8 @@
 // v10 (ADR-035): el espejo cliente de xp_total al publicar/votar foto usa
 // Number (no parseInt) para no truncar los decimales del XP.
 // v11 (TSK-111): botonera del hero en 2 filas (CAMBIO 5); grid del hero
-// 1+3 y lightbox ampliado con abrirLightboxHero (CAMBIO 6A/6B); se elimina
+// 1+3; las fotos de la ficha y del hero abren el visor de /galeria.html por
+// deep-link (se elimino el lightbox overlay #lb); se elimina
 // "Que incluye el precio" del render de hostal (CAMBIO 3A) y el modulo
 // "Fotos de viajeros" de la ficha + su JS/CSS (CAMBIO 7A); guard de
 // edad_minima con trim (CAMBIO 2); CTA renombrado a "Ver todas las fotos"
@@ -208,7 +209,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 // Hero 1+3 (TSK-111 / CAMBIO 6A): la foto principal ocupa la fila completa
 // (3 columnas) y hasta 3 secundarias van abajo, una por columna (1/3 cada
 // una). Con menos de 3 secundarias, flex:1 reparte el ancho disponible.
-// Todas las imagenes del hero abren el lightbox (abrirLightboxHero).
+// Todas las imagenes del hero abren el visor de galeria por deep-link.
 +".hr{display:grid;grid-template-columns:1fr 1fr 1fr;grid-auto-rows:auto;gap:8px}"
 +".hr .psm{grid-column:1/-1}"
 +".psm{height:360px;min-height:0;border-radius:10px;overflow:hidden;position:relative;cursor:pointer;background-size:cover;background-position:center}"
@@ -864,11 +865,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   mediaRank.forEach(function(x){
     if (x.fuente === 'comunidad' && x.tipo === 'foto') addHeroThumb(x.url);
   });
-  // TSK-111 (CAMBIO 6B): cada miniatura del hero abre el lightbox
-  // compartido. Se pasa HERO_ALL[k] (array emitido en el script de la
-  // pagina) en vez de la URL cruda, para no inyectar datos en el onclick.
+  // TSK-111 (CAMBIO 6B): cada miniatura del hero abre el visor de
+  // /galeria.html por deep-link. Se pasa HERO_FOTOS[k] (array emitido en
+  // el script de la pagina) en vez de la URL cruda, para no inyectar datos
+  // en el onclick.
   var heroThumbs = heroThumbsList.map(function(u, i){
-    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightboxHero(HERO_ALL['+(i+1)+'])"></div>';
+    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')" onclick="irAFotoGaleria(HERO_FOTOS['+(i+1)+'])"></div>';
   }).join('');
 
   // -- HQI: chips de informacion rapida bajo el titulo (TSK-013 Hero) --
@@ -1614,13 +1616,13 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   }
 
   // Btn "Ver todas las fotos" (TSK-111 / CAMBIO 7B): navega a la subpagina
-  // dedicada /galeria.html?destino=<slug>. Fallback seguro al lightbox
-  // in-page si el destino no tiene slug (no romper miniaturas existentes).
+  // dedicada /galeria.html?destino=<slug>. Fallback a la galeria global
+  // (/galeria.html) si el destino no tiene slug (no romper miniaturas).
   // Apostrofes del onclick van como entidad HTML &#39; para no romper el JS
   // inline del HTML generado (patron BUG-031).
   var btnGaleriaAmpliada = d.slug
     ? '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html?destino=&#39;+encodeURIComponent(&#39;'+esc(d.slug)+'&#39;)">Ver todas las fotos</button>'
-    : '<button class="glbtn" onclick="abrirLightbox(0)">Ver todas las fotos</button>';
+    : '<button class="glbtn" onclick="window.location.href=&#39;/galeria.html&#39;">Ver todas las fotos</button>';
   // -- SECCION: Galeria de fotos (ranking unico mezclado) --------------
   // La seccion conserva la galeria de la ficha (1 grande + hasta 12
   // miniaturas) y su CTA a galeria.html. El modulo "Fotos de viajeros"
@@ -1638,9 +1640,8 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   //
   // Nota de gate: galAll SIEMPRE trae al menos el hero (fallback Unsplash
   // en buildHTML), por lo que "galAll.length > 0" es trivialmente
-  // verdadero. El bloque y el lightbox usan > 1 (gate historico), que
-  // cumple "solo si galAll.length > 0" y evita un #lb inerte cuando hay 0
-  // curadas.
+  // verdadero. El bloque usa > 1 (gate historico), que cumple "solo si
+  // galAll.length > 0" y evita una grilla con una sola foto.
   var GAL_THUMBS_MAX = 12;
   // ADR-036: el ranking unico por votos (curadas + comunidad, con la
   // precedencia de dedupe curada > comunidad) ya se calculo en mediaRank
@@ -1649,22 +1650,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var hayGaleriaCurada = galMerge.length > 1;
   var galBig = galMerge.length ? galMerge[0].url : '';
   var galThumbsList = galMerge.slice(1, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });
-  // GAL_ALL para el lightbox: la grande + las miniaturas en el MISMO orden
-  // que la grilla, para que los indices de abrirLightbox() sigan alineados.
+  // GAL_FOTOS (emitido en el script de la pagina): la grande + las
+  // miniaturas en el MISMO orden que la grilla, para que los indices del
+  // onclick sigan alineados. Alimenta el deep-link al visor de /galeria.html.
   var galLightbox = galMerge.slice(0, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });
-  // Votos por URL del ranking mezclado para el lightbox. Si una foto no
-  // tiene votos (> 0), su entrada queda null -> el lightbox OMITE el conteo
-  // en vez de mostrar 0. Nunca rompe si no hay datos.
-  var galVotosMap = {};
-  galMerge.forEach(function(x){ galVotosMap[x.url] = x.votos; });
-  var galLightboxVotos = galLightbox.map(function(u){ return (galVotosMap[u] > 0) ? galVotosMap[u] : null; });
-  // URL de los CTAs "Guardar en album"/"Agregar a album" del lightbox.
+  // URL base del visor de galeria para el deep-link de cada foto.
   var galeriaUrl = d.slug ? '/galeria.html?destino=' + encodeURIComponent(d.slug) : '/galeria.html';
-  // El lightbox se monta si hay galeria curada navegable o miniaturas de hero.
-  var hayLightbox = hayGaleriaCurada || (heroThumbsList && heroThumbsList.length > 0);
   var galCuradaHTML = hayGaleriaCurada
-    ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')" onclick="abrirLightbox(0)"></div>'
-      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="abrirLightbox('+(i+1)+')"></div>'; }).join('')+'</div>'
+    ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')" onclick="irAFotoGaleria(GAL_FOTOS[0])"></div>'
+      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="irAFotoGaleria(GAL_FOTOS['+(i+1)+'])"></div>'; }).join('')+'</div>'
       + btnGaleriaAmpliada
     : '';
   var secGaleria = '<section class="ssec bwarm" id="galeria">'
@@ -1677,28 +1671,9 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + galCuradaHTML
     + '</div></section>';
 
-  // -- LIGHTBOX (galeria ampliada + hero, TSK-111 / CAMBIO 6B) -------
-  // Overlay oculto montado al final del body, antes del script inline.
-  // Se monta si hay galeria curada navegable o miniaturas de hero
-  // (hayLightbox). Lo controla el JS inline: abrirLightbox (curada),
-  // abrirLightboxHero (hero), lbNav y lbClose. Ambos modos comparten el
-  // overlay/CSS/cierre (lbClose, Escape y click en #lb-bg).
-  var lbHTML = hayLightbox ? '<div id="lb" style="display:none">'
-    + '<div id="lb-bg"></div>'
-    + '<button id="lb-close" onclick="lbClose()">\u2715</button>'
-    + '<div id="lb-stage">'
-    + '<img id="lb-img" src="" alt="Foto">'
-    + '<div id="lb-cap"></div>'
-    + '<div id="lb-votes" style="display:none"></div>'
-    + '<div id="lb-comments">Comentarios disponibles en la galeria ampliada</div>'
-    + '<div id="lb-actions">'
-    + '<button class="cbtn gold" onclick="lbIrGaleria()">Guardar en album</button>'
-    + '<button class="cbtn dark" onclick="lbIrGaleria()">Agregar a album</button>'
-    + '</div>'
-    + '</div>'
-    + '<button id="lb-prev" class="lb-nav" onclick="lbNav(-1)">\u2039</button>'
-    + '<button id="lb-next" class="lb-nav" onclick="lbNav(1)">\u203A</button>'
-    + '</div>' : '';
+  // El overlay #lb y su JS inline se eliminaron: las fotos de la ficha y
+  // del hero ahora hacen deep-link al visor completo de /galeria.html.
+  // El CSS de #lb sigue en la hoja (deuda diferida, sin uso).
 
   // -- SECCION: Habitaciones / precios (solo hostal) ----------------
   var HAB_BADGE = {popular:'\u2605 Mas popular', female:'Solo mujeres', quiet:'Tranquila', premium:'Premium'};
@@ -2385,7 +2360,7 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + (hctarRow2.length ? '<div class="hctar-row">'+hctarRow2.join('')+'</div>' : '')
       + '</div>'
       + '</div>\n'
-      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'" onclick="abrirLightboxHero(HERO_ALL[0])">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
+      + '<div class="hr"><div class="psm" style="'+heroMainStyle+'" onclick="irAFotoGaleria(HERO_FOTOS[0])">'+(hero?'':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;'+grad+'"></div>')+'</div>'
       + (heroThumbs ? '<div class="prow">'+heroThumbs+'</div>' : '')
       + '</div>\n</div></section>\n\n')
 
@@ -2441,8 +2416,6 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>'
     + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
     + '<div class="fcopy"><a href="/index.html">Inicio</a> &middot; <a href="/'+esc(dir)+'">'+esc(label)+'</a></div></footer>\n\n'
-
-    + lbHTML + '\n'
 
     + '<script src="/usuario-session.js"><\/script>\n'
     + '<script src="/compartir.js"><\/script>\n'
@@ -2604,25 +2577,13 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '}\n'
     + 'function toggleTuMapa(cb){var btn=document.getElementById(\'btn-guardar\');if(window.ExploraCO)window.ExploraCO.toggleGuardado(DID,btn);setTimeout(function(){window.ExploraCO.estaGuardado(DID).then(function(g){cb.checked=!!g;});},400);}\n'
     + 'function toggleMapaDest(mapaId,checked){var u=window.ExploraCO&&window.ExploraCO.usuario;if(!u)return;fetch(\'/api/interacciones\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({tipo:checked?\'mapa_agregar_destino\':\'mapa_quitar_destino\',usuario_id:u.id,mapa_id:mapaId,destino_id:DID})}).then(function(r){return r.json();}).then(function(data){if(window.ExploraCO&&window.ExploraCO.mostrarToast){if(data&&data.ok)window.ExploraCO.mostrarToast(checked?\'Anadido al mapa\':\'Quitado del mapa\',\'#16a34a\');else window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');}}).catch(function(e){console.warn(\'[mapa] toggle\',e);if(window.ExploraCO&&window.ExploraCO.mostrarToast)window.ExploraCO.mostrarToast(\'No se pudo actualizar el mapa\',\'#dc2626\');});}\n'
-    // Lightbox compartido (galeria curada + hero, TSK-111 / CAMBIO 6B).
-    // GAL_ALL: fotos curadas navegables. HERO_ALL: [hero + miniaturas del
-    // hero]. LB_VOTOS: votos por indice de GAL_ALL (null si no hay dato).
-    // abrirLightbox(i) navega la curada; abrirLightboxHero(url) muestra una
-    // foto del hero sin duplicar overlay/CSS/cierre.
-    + 'var GAL_ALL='+JSON.stringify(galLightbox)+';\n'
-    + 'var HERO_ALL='+JSON.stringify([hero].concat(heroThumbsList))+';\n'
-    + 'var LB_VOTOS='+JSON.stringify(galLightboxVotos)+';\n'
+    // Deep-link al visor de galeria: al hacer clic en una foto del item se
+    // navega a /galeria.html?destino=<slug>#g-foto=<url codificada>, donde
+    // se abre el visor completo (voto/guardar/compartir/comentarios).
     + 'var LB_GAL_URL='+JSON.stringify(galeriaUrl)+';\n'
-    + 'var LB_MODE="curated";\n'
-    + 'var LB_I=0;\n'
-    + 'function lbIrGaleria(){window.location.href=LB_GAL_URL;}\n'
-    + 'function pintarLbVotos(i){var el=document.getElementById("lb-votes");if(!el)return;var v=(i>=0&&LB_VOTOS[i]!=null)?LB_VOTOS[i]:null;if(v==null){el.style.display="none";el.textContent="";}else{el.style.display="block";el.textContent=v+(v===1?" voto":" votos");}}\n'
-    + 'function abrirLightbox(i){if(!GAL_ALL.length)return;LB_I=(i+GAL_ALL.length)%GAL_ALL.length;LB_MODE="curated";var im=document.getElementById("lb-img");if(im){im.src=GAL_ALL[LB_I];var bg=document.getElementById("lb");if(bg)bg.style.display="flex";}var cap=document.getElementById("lb-cap");if(cap)cap.textContent=(LB_I+1)+" / "+GAL_ALL.length;var pv=document.getElementById("lb-prev");if(pv)pv.style.display="";var nx=document.getElementById("lb-next");if(nx)nx.style.display="";pintarLbVotos(LB_I);}\n'
-    + 'function abrirLightboxHero(url){if(!url)return;var im=document.getElementById("lb-img");if(!im)return;var idx=(typeof GAL_ALL!=="undefined")?GAL_ALL.indexOf(url):-1;LB_MODE="hero";LB_I=idx>=0?idx:0;im.src=url;var bg=document.getElementById("lb");if(bg)bg.style.display="flex";var cap=document.getElementById("lb-cap");if(cap)cap.textContent="Foto del lugar";var pv=document.getElementById("lb-prev");if(pv)pv.style.display="none";var nx=document.getElementById("lb-next");if(nx)nx.style.display="none";pintarLbVotos(idx);}\n'
-    + 'function lbNav(d){if(LB_MODE==="hero")return;abrirLightbox(LB_I+d);}\n'
-    + 'function lbClose(){var lb=document.getElementById(\'lb\');if(lb)lb.style.display=\'none\';}\n'
-    + 'var lbEl=document.getElementById(\'lb\');if(lbEl&&document.getElementById(\'lb-bg\')){document.getElementById(\'lb-bg\').addEventListener(\'click\',lbClose);}\n'
-    + 'document.addEventListener(\'keydown\',function(e){var lb=document.getElementById(\'lb\');if(!lb||lb.style.display==="none")return;if(e.key==="Escape")lbClose();if(e.key==="ArrowLeft")lbNav(-1);if(e.key==="ArrowRight")lbNav(1);});\n'
+    + 'var GAL_FOTOS='+JSON.stringify(galLightbox)+';\n'
+    + 'var HERO_FOTOS='+JSON.stringify([hero].concat(heroThumbsList))+';\n'
+    + 'function irAFotoGaleria(url){if(!url)return;window.location.href=LB_GAL_URL+"#g-foto="+encodeURIComponent(url);}\n'
     + 'function marcarVisitadoBtn(btn){\n'
     + '  if(!window.ExploraCO){return;}\n'
     + '  if(btn.disabled)return;\n'

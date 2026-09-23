@@ -140,7 +140,7 @@ inlines.forEach(function (it) {
 // ---- 5) ejecucion en sandbox con stubs + funciones criticas ----
 const FUNCS = [
   "abrirPopoverGuardar", "marcarVisitadoBtn", "toggleTuMapa", "toggleMapaDest",
-  "cerrarPopoverGuardar", "submitRv", "votarDID", "abrirLightbox"
+  "cerrarPopoverGuardar", "submitRv", "votarDID", "irAFotoGaleria"
 ];
 
 const contexto = {

@@ -246,7 +246,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 (function () {
   'use strict';
 
-  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false, ultimoUidCarga: null, media: null, galPagina: 1, galPorPagina: 12, galItems: [] };
+  var G = { usuarioId: null, destinoId: null, destinoSlug: null, feedOffset: 0, feedLoading: false, ultimoUidCarga: null, media: null, galPagina: 1, galPorPagina: 12, galItems: [], galTodos: [], hashAbierto: false };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -767,11 +767,29 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     });
   }
 
+  function gAutoAbrirHash() {
+    var m = String(window.location.hash || '').match(/^#g-foto=(.+)$/);
+    if (!m || G.hashAbierto) { return; }
+    var url = '';
+    try { url = decodeURIComponent(m[1]); } catch (e) { return; }
+    var items = G.galTodos || [];
+    for (var i = 0; i < items.length; i++) {
+      if (String(items[i].url) === url) {
+        G.hashAbierto = true;
+        gOpenMedia(items[i].id_origen, gItemToFoto(items[i]));
+        return;
+      }
+    }
+    // Sin coincidencia: no se abre nada; la galeria del destino queda visible.
+  }
+
   function gLoadDestino(slug) {
     var box = document.getElementById('g-dest-fotos');
     var count = document.getElementById('g-dest-count');
     var more = document.getElementById('g-more');
     var destSec = document.getElementById('g-sec-dest');
+    var slugAnterior = G.destinoSlug;
+    if (slugAnterior !== slug) { G.hashAbierto = false; }
     G.destinoSlug = slug;
     G.destinoId = null;
     G.ultimoUidCarga = gUsuarioId();
@@ -802,6 +820,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         document.getElementById('g-dest-title').textContent = d.nombre || 'Destino';
         document.getElementById('g-dest-sub').textContent = (d.ciudad ? d.ciudad + ' \u00b7 ' : '') + 'Fotos curadas y aportes de la comunidad.';
         var items = gDestinoItems(res);
+        G.galTodos = items;
         var albumes = gAlbumesDeItems(items);
         var curadaItems = gSortVotos(items.filter(function (it) { return it.origen === 'curada'; }));
         var comItems = gSortVotos(items.filter(function (it) { return it.origen !== 'curada'; }));
@@ -828,6 +847,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           if (albumes.length) { gFillGrid('g-dest-albumes', 'g-dest-alb-count', albumes, gAlbumCard, 'album', 'albumes'); }
         }
         gToggleShare();
+        gAutoAbrirHash();
         gLoadMapas(G.destinoId, slug);
       })
       .catch(function () {
