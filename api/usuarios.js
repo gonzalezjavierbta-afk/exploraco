@@ -1,4 +1,10 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v21 (2026-09-23): el perfil (GET ?id=) expone mercado_puntos (aditivo,
+// owner-aware y publico) y deriva mercado_nodo desde MERCADO_TIERS
+// (catalogo duplicado a proposito: prohibido el import entre funciones
+// serverless, misma escala de 5 tiers que el Arbol de Clases). Requiere la
+// migracion 034; sin ella mercado_puntos cae a 0 sin romper. NO toca tags ni
+// crea endpoints (8/8, ADR-001/ADR-010).
 // v20 (RELEASE 2026-09-23): NIVELES se expande de 20 a 40 umbrales (techo
 // 100000) con 40 titulos y 5 Eras (Caminante 1-10 / Explorador 11-20 /
 // Cronista 21-30 / Leyenda 31-35 / Mito 36-40); calcularEra con cortes
@@ -101,6 +107,37 @@ function calcularEra(nivel) {
   return 'Mito';
 }
 
+// Mercado de Emprendedores (migracion 034): espejo MINIMO del catalogo
+// MERCADO_TIERS/NODOS de api/interacciones.js. Prohibido el import entre
+// funciones serverless, asi que la escala se duplica a proposito (mismos 5
+// tiers que el Arbol de Clases). Solo se expone el NODO; el detalle de nodos
+// (slots/reduccion de impuesto) vive en api/interacciones.js.
+const MERCADO_TIERS = [0, 100, 250, 450, 700];
+// v21: nivel de jugador minimo de cada nodo del mercado (espejo del
+// nivel_jugador de MERCADO_NODOS en api/interacciones.js). El nodo EFECTIVO
+// es min(nodo por puntos, nodo por nivel de jugador): mismo gate doble que
+// mercado_mi/mercado_publicar, para que el perfil no lo muestre mas alto.
+const MERCADO_NIVELES = [2, 5, 10, 20, 30];
+function nodoMercadoPorNivelLocal(nivelJugador) {
+  const n = parseInt(nivelJugador, 10) || 1;
+  let idx = 0;
+  for (let i = 0; i < MERCADO_NIVELES.length; i++) {
+    if (n >= MERCADO_NIVELES[i]) idx = i;
+  }
+  return idx + 1;
+}
+function calcularMercadoLocal(puntos, nivelJugador) {
+  const p = Number(puntos) || 0;
+  let idx = 0;
+  for (let i = 0; i < MERCADO_TIERS.length; i++) {
+    if (p >= MERCADO_TIERS[i]) idx = i;
+  }
+  const porPuntos = idx + 1;
+  // Si no se informa el nivel, se asume sin tope (compatibilidad).
+  if (nivelJugador == null) return porPuntos;
+  return Math.min(porPuntos, nodoMercadoPorNivelLocal(nivelJugador));
+}
+
 // v20: instrumenta el gasto de XP en xp_ledger (best-effort) para el medidor
 // de "quemado" del dashboard. No debe romper si xp_ledger no existe (42P01).
 function registrarGastoXp(sqlFn, usuarioId, accion, monto) {
@@ -131,6 +168,10 @@ function conNivel(row) {
   row.nivel = idxVisible;
   row.badge_actual = NIVELES[idxVisible - 1].nombre;
   row.era = calcularEra(idxVisible);
+  // v21: saldo del Mercado de Emprendedores (aditivo). Si la migracion 034
+  // aun no corre, la columna no viene en el row y cae a 0 sin romper.
+  row.mercado_puntos = red2(numXp(row.mercado_puntos));
+  row.mercado_nodo = calcularMercadoLocal(row.mercado_puntos, calc.nivel);
   return row;
 }
 
@@ -801,6 +842,8 @@ module.exports = async (req, res) => {
             pais_base: pub.pais_base || null,
             creado_en: pub.creado_en,
             xp_total: red2(numXp(pub.xp_total)),
+            mercado_puntos: red2(numXp(pub.mercado_puntos)),
+            mercado_nodo: calcularMercadoLocal(pub.mercado_puntos, calcularNivel(red2(numXp(pub.xp_total))).nivel),
             faccion: pub.faccion || null,
             casa: pub.casa || null,
             perfil_publico: pub.perfil_publico !== false,

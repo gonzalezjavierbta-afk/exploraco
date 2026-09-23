@@ -12,7 +12,12 @@
 //     dia/accion (XP entregado, usuarios activos, caps, distribucion_nivel
 //     {derivado, visible}, exentos y nivel_max vs nivel derivado). GET;
 //     degrada 42P01 si la migracion 031 no corrio
-// Auth: Bearer exploraco12345 en todos los casos
+//   mercado      -> Mercado de Emprendedores (migracion 034): normas por Casa
+//     (mercado_config_lista / mercado_config_editar) y moderacion de ofertas
+//     (mercado_ofertas_lista / mercado_ofertas_moderar). La moderacion NO
+//     devuelve inventario (es sancion admin, no cancelacion del dueno).
+//     Degrada 503 SCHEMA_NOT_MIGRATED (42P01/42703) si la 034 no corrio.
+// Auth: Bearer exploraco12345 (o X-Internal-Secret) en todos los casos
 // v4 (ADR-053, 2026-09-21): en salud_red, distribucion_nivel pasa a exponer
 // las DOS vistas {derivado, visible} (economia vs insignia, Dec 5) y se
 // agrega el bloque exentos {xp_total_entregado, eventos, por_accion}
@@ -27,6 +32,11 @@
 // v2 (ADR-035, 2026-09-17): precio_xp acepta decimal (punto o coma) y el
 // reparto de referidos usa ROUND(...,2) con Number; las respuestas de
 // resenas/consumibles normalizan las columnas XP (numeric llega string).
+// v5 (Mercado de Emprendedores, migracion 034, 2026-09-23): rama NUEVA
+// ?recurso=mercado con 4 tipos (mercado_config_lista / mercado_config_editar
+// / mercado_ofertas_lista / mercado_ofertas_moderar). Reusa auth()/authInternal()
+// del archivo y esquemaAusente() para la degradacion 503 SCHEMA_NOT_MIGRATED.
+// No crea endpoints (8/8, ADR-001).
 
 const { neon } = require('@neondatabase/serverless');
 
@@ -53,6 +63,9 @@ function authInternal(req) {
 // entrega como STRING. red2 = half-up a 2 decimales; numXp = a Number.
 function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
 function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+// Porcentajes del mercado (mercado_config.*_pct son numeric(5,4)): half-up a
+// 4 decimales. No reusa red2 porque el impuesto/arancel viven en escala 0..1.
+function red4(v) { return Math.round((Number(v) || 0) * 10000) / 10000; }
 
 // Espejo de REPORTE de los 40 umbrales de api/usuarios.js:NIVELES (ADR-053
 // Decision 3) para resolver el nivel DERIVADO de xp_total dentro de SQL puro
@@ -108,6 +121,18 @@ var NIVEL_DERIVADO_SQL = 'CASE '
 // repetir el codigo en cada degradacion de salud_red (Regla de No-Duplicidad).
 function esquemaAusente(e) {
   return !!(e && (e.code === '42P01' || e.code === '42703'));
+}
+
+// Normaliza una fila de mercado_config para la respuesta JSON: los pct a 4
+// decimales y los precios a 2 (numeric de Neon llega como string). Unico
+// punto de normalizacion para las dos vias que devuelven config (lista y
+// editar) -- Regla de No-Duplicidad.
+function normalizarConfigMercado(r) {
+  r.impuesto_base_pct = red4(numXp(r.impuesto_base_pct));
+  r.arancel_inter_casa_pct = red4(numXp(r.arancel_inter_casa_pct));
+  r.precio_min = red2(numXp(r.precio_min));
+  r.precio_max = red2(numXp(r.precio_max));
+  return r;
 }
 
 // == CATEGORIA DE CONSUMIBLE (WP-6, TSK-103 / ADR-028) ====================
@@ -508,6 +533,173 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok:false, error:'tipo invalido para recurso consumibles' });
   }
 
+  // == MERCADO DE EMPRENDEDORES (migracion 034) ============================
+  // Router real por ?recurso=mercado (mismo patron que consumibles). No crea
+  // endpoints (8/8, ADR-001). Auth reusa auth()/authInternal() del archivo.
+  // Degradacion: si mercado_config / mercado_ofertas no existen (42P01) o les
+  // falta una columna (42703), responde 503 SCHEMA_NOT_MIGRATED (patron
+  // activos_ocultos) porque la 034 aun no corrio. Sin SELECT *: cada consulta
+  // lista sus columnas explicitamente.
+  // MODERACION vs CANCELACION DEL DUENO: mercado_ofertas_moderar SOLO marca
+  // estado='cancelada' (Cero Borrado Logico) y NO devuelve inventario al
+  // vendedor: es una sancion administrativa, no el desistimiento del dueno
+  // (que si reintegraria cantidad_restante al inventario del vendedor).
+  if (recurso === 'mercado') {
+    if (!auth(req) && !authInternal(req))
+      return res.status(401).json({ ok:false, error:'No autorizado' });
+
+    var tipoM = req.query.tipo || '';
+    var CASAS_MERCADO = ['condor','jaguar','delfin'];
+    var ESTADOS_MERCADO = ['activa','agotada','cancelada'];
+
+    try {
+      // --- Normas por Casa: lista (3 filas ordenadas por casa) ----------
+      if (tipoM === 'mercado_config_lista') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var filasMC = await sql(
+          'SELECT casa, impuesto_base_pct, arancel_inter_casa_pct, slots_base, '
+          + 'permite_cross_casa, permite_produccion, precio_min, precio_max, '
+          + 'duracion_oferta_horas, activo, actualizado_en '
+          + 'FROM mercado_config ORDER BY casa ASC'
+        );
+        filasMC = filasMC.map(normalizarConfigMercado);
+        return res.status(200).json({ ok:true, data: filasMC, total: filasMC.length });
+      }
+
+      // --- Normas por Casa: editar (valida casa y rangos) ---------------
+      if (tipoM === 'mercado_config_editar') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var casaM = String(body.casa == null ? '' : body.casa).trim().toLowerCase();
+        if (CASAS_MERCADO.indexOf(casaM) < 0)
+          return res.status(400).json({ ok:false, error:'CASA_INVALIDA' });
+
+        // ADR-035: numeric acepta punto o coma; se normaliza a punto.
+        var pctM  = parseFloat(String(body.impuesto_base_pct == null ? '' : body.impuesto_base_pct).replace(',', '.'));
+        var arrM  = parseFloat(String(body.arancel_inter_casa_pct == null ? '' : body.arancel_inter_casa_pct).replace(',', '.'));
+        var slotsM = parseInt(body.slots_base, 10);
+        var pminM = parseFloat(String(body.precio_min == null ? '' : body.precio_min).replace(',', '.'));
+        var pmaxM = parseFloat(String(body.precio_max == null ? '' : body.precio_max).replace(',', '.'));
+        var durM  = parseInt(body.duracion_oferta_horas, 10);
+
+        // Rangos del contrato: pct 0..0.15; slots 0..20; duracion 1..720;
+        // precio_min > 0 y precio_max >= precio_min.
+        if (!isFinite(pctM) || pctM < 0 || pctM > 0.15)
+          return res.status(400).json({ ok:false, error:'IMPUESTO_FUERA_DE_RANGO' });
+        if (!isFinite(arrM) || arrM < 0 || arrM > 0.15)
+          return res.status(400).json({ ok:false, error:'ARANCEL_FUERA_DE_RANGO' });
+        if (!isFinite(slotsM) || slotsM < 0 || slotsM > 20)
+          return res.status(400).json({ ok:false, error:'SLOTS_FUERA_DE_RANGO' });
+        if (!isFinite(durM) || durM < 1 || durM > 720)
+          return res.status(400).json({ ok:false, error:'DURACION_FUERA_DE_RANGO' });
+        if (!isFinite(pminM) || pminM <= 0)
+          return res.status(400).json({ ok:false, error:'PRECIO_MIN_INVALIDO' });
+        if (!isFinite(pmaxM) || pmaxM < pminM)
+          return res.status(400).json({ ok:false, error:'PRECIO_MAX_INVALIDO' });
+
+        var updMC = await sql(
+          'UPDATE mercado_config SET impuesto_base_pct=$1, '
+          + 'arancel_inter_casa_pct=$2, slots_base=$3, permite_cross_casa=$4, '
+          + 'permite_produccion=$5, precio_min=$6, precio_max=$7, '
+          + 'duracion_oferta_horas=$8, activo=$9, actualizado_en=NOW() '
+          + 'WHERE casa=$10 '
+          + 'RETURNING casa, impuesto_base_pct, arancel_inter_casa_pct, slots_base, '
+          + 'permite_cross_casa, permite_produccion, precio_min, precio_max, '
+          + 'duracion_oferta_horas, activo, actualizado_en',
+          [red4(pctM), red4(arrM), slotsM, Boolean(body.permite_cross_casa),
+           Boolean(body.permite_produccion), red2(pminM), red2(pmaxM), durM,
+           Boolean(body.activo), casaM]
+        );
+        if (!updMC.length)
+          return res.status(404).json({ ok:false, error:'CASA_NO_ENCONTRADA' });
+        return res.status(200).json({
+          ok:true, data: normalizarConfigMercado(updMC[0]),
+          mensaje:'Normas del mercado actualizadas',
+        });
+      }
+
+      // --- Ofertas: lista (JOIN consumibles + vendedor) -----------------
+      if (tipoM === 'mercado_ofertas_lista') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var casaF = String(req.query.casa == null ? '' : req.query.casa).trim().toLowerCase();
+        var estadoF = String(req.query.estado == null ? '' : req.query.estado).trim().toLowerCase();
+        var condM = []; var paramsM = []; var piM = 1;
+        if (casaF) {
+          if (CASAS_MERCADO.indexOf(casaF) < 0)
+            return res.status(400).json({ ok:false, error:'CASA_INVALIDA' });
+          condM.push('o.casa=$' + piM++); paramsM.push(casaF);
+        }
+        if (estadoF) {
+          if (ESTADOS_MERCADO.indexOf(estadoF) < 0)
+            return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO' });
+          condM.push('o.estado=$' + piM++); paramsM.push(estadoF);
+        }
+        var whereM = condM.length ? ('WHERE ' + condM.join(' AND ')) : '';
+        var filasOF = await sql(
+          'SELECT o.id, o.casa, o.cantidad, o.cantidad_restante, '
+          + 'o.precio_unitario, o.origen, o.estado, o.creado_en, o.expira_en, '
+          + 'c.clave AS consumible_clave, c.nombre AS consumible_nombre, '
+          + 'u.nombre AS vendedor_nombre, u.email AS vendedor_email '
+          + 'FROM mercado_ofertas o '
+          + 'LEFT JOIN consumibles c ON c.id = o.consumible_id '
+          + 'LEFT JOIN usuarios u ON u.id = o.vendedor_id '
+          + whereM + ' ORDER BY o.creado_en DESC LIMIT 200',
+          paramsM
+        );
+        filasOF = filasOF.map(function (o) {
+          o.precio_unitario = red2(numXp(o.precio_unitario));
+          return o;
+        });
+        return res.status(200).json({ ok:true, data: filasOF, total: filasOF.length });
+      }
+
+      // --- Ofertas: moderar (cancelacion admin, sin reintegro) ----------
+      if (tipoM === 'mercado_ofertas_moderar') {
+        if (req.method !== 'POST') return res.status(405).end();
+        if (!body.oferta_id)
+          return res.status(400).json({ ok:false, error:'oferta_id requerido' });
+        // Validar formato uuid ANTES del SQL: un id malformado produce 22P02
+        // (que caeria al catch como 500); aqui se responde 400 explicito.
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(body.oferta_id)))
+          return res.status(400).json({ ok:false, error:'oferta_id invalido' });
+        var motivoM = String(body.motivo == null ? '' : body.motivo).trim();
+
+        // Moderacion administrativa: SOLO estado='cancelada' (Cero Borrado
+        // Logico). A DIFERENCIA de la cancelacion por el dueno, esta via NO
+        // reintegra inventario al vendedor: devolver cantidad_restante seria
+        // neutralizar la sancion. No existe tabla de ledger de moderacion en
+        // la migracion 034, asi que la constancia va al log del servidor.
+        var modM = await sql(
+          'UPDATE mercado_ofertas SET estado=\'cancelada\' '
+          + 'WHERE id=$1 AND estado<>\'cancelada\' '
+          + 'RETURNING id, casa, consumible_id, vendedor_id',
+          [body.oferta_id]
+        );
+        if (!modM.length) {
+          // Distinguir "no existe" de "ya cancelada" (idempotencia).
+          var chkM = await sql(
+            'SELECT id, estado FROM mercado_ofertas WHERE id=$1 LIMIT 1',
+            [body.oferta_id]
+          );
+          if (!chkM.length)
+            return res.status(404).json({ ok:false, error:'OFERTA_NO_ENCONTRADA' });
+          return res.status(200).json({ ok:true, oferta_id: body.oferta_id, sin_cambios:true });
+        }
+        console.warn('[admin] mercado_ofertas_moderar: oferta ' + body.oferta_id
+          + ' cancelada por admin; motivo=' + (motivoM || '(sin motivo)'));
+        return res.status(200).json({ ok:true, oferta_id: body.oferta_id });
+      }
+
+      return res.status(400).json({ ok:false, error:'tipo invalido para recurso mercado' });
+    } catch (eM) {
+      if (esquemaAusente(eM))
+        return res.status(503).json({
+          ok:false, error:'SCHEMA_NOT_MIGRATED',
+          detalle:'Aplica db/migrations/034_mercado_emprendedores.sql en Neon antes de usar el mercado.',
+        });
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
+  }
+
   // == ACTIVOS OCULTOS (Wayfarer, moderacion admin - Entrega 016) ==========
   // Moderacion manual sobre las propuestas de la comunidad (migracion 016).
   // El quorum de votos (+/-3) ya resuelve el caso normal en
@@ -847,6 +1039,6 @@ module.exports = async function handler(req, res) {
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado',
   });
 };

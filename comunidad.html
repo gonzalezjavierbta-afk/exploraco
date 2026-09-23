@@ -318,6 +318,50 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 .mm-personal-btn{flex:1;padding:9px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;cursor:pointer}
 .mm-personal-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
 .mm-personal-btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
+/* MERCADO DE EMPRENDEDORES (asset compartido mercado.js, ADR-004 scoped) */
+#cpanel-mercado .mk-head{margin-bottom:12px}
+#cpanel-mercado .mk-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff}
+#cpanel-mercado .mk-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:2px}
+#cpanel-mercado .mk-casas{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+#cpanel-mercado .mk-casa{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.7);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer;transition:all .2s}
+#cpanel-mercado .mk-casa:hover{background:rgba(255,255,255,.08);color:#fff}
+#cpanel-mercado .mk-casa.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+#cpanel-mercado .mk-casa-ico{font-size:15px}
+#cpanel-mercado .mk-mia{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(232,160,32,.5);border-radius:999px;padding:1px 7px;color:var(--gold);margin-left:2px}
+#cpanel-mercado .mk-casa.on .mk-mia{border-color:rgba(0,0,0,.35);color:var(--black)}
+#cpanel-mercado .mk-norma{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+#cpanel-mercado .mk-norma-t{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:8px}
+#cpanel-mercado .mk-norma-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px 14px}
+#cpanel-mercado .mk-dato{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:rgba(255,255,255,.5)}
+#cpanel-mercado .mk-dato b{color:#fff;font-weight:700}
+#cpanel-mercado .mk-acciones{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+#cpanel-mercado .mk-puntos{margin-left:auto;font-size:11px;color:var(--gold);font-weight:700}
+#cpanel-mercado .mk-form{background:rgba(232,160,32,.05);border:1px solid rgba(232,160,32,.25);border-radius:8px;padding:14px;margin-bottom:12px}
+#cpanel-mercado .mk-form-t{font-size:12px;font-weight:700;color:#fff;margin-bottom:8px}
+#cpanel-mercado .mk-lbl{display:block;font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.6px;margin-bottom:4px}
+#cpanel-mercado .mk-inp{width:100%;flex:none;margin-bottom:8px}
+#cpanel-mercado .mk-row{display:flex;gap:8px}
+#cpanel-mercado .mk-row>div{flex:1}
+#cpanel-mercado .mk-form-actions{display:flex;gap:8px}
+#cpanel-mercado .mk-btn-ghost{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:10px 16px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer}
+#cpanel-mercado .mk-btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+#cpanel-mercado .mk-sec-t{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.7);margin:16px 0 10px}
+#cpanel-mercado .mk-msg{font-size:11px;color:rgba(255,255,255,.4);padding:10px 2px}
+#cpanel-mercado .mk-ofertas{display:flex;flex-direction:column;gap:8px}
+#cpanel-mercado .mk-oferta{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px 14px}
+#cpanel-mercado .mk-of-main{flex:1;min-width:0}
+#cpanel-mercado .mk-of-nombre{font-size:12px;font-weight:700;color:#fff}
+#cpanel-mercado .mk-of-meta{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px}
+#cpanel-mercado .mk-of-buy{display:flex;align-items:center;gap:6px;flex-shrink:0}
+#cpanel-mercado .mk-qty{width:64px;flex:none;padding:8px}
+#cpanel-mercado .mk-of-propia{font-size:10px;font-weight:700;color:#22C55E;text-transform:uppercase;letter-spacing:.6px}
+#cpanel-mercado .mk-gate{padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;background:rgba(232,160,32,.05)}
+#cpanel-mercado .mk-gate-t{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px}
+#cpanel-mercado .mk-gate-d{font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px}
+@media(max-width:540px){
+  #cpanel-mercado .mk-oferta{flex-wrap:wrap}
+  #cpanel-mercado .mk-of-buy{width:100%}
+}
 </style>
 </head>
 <body>
@@ -380,6 +424,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div class="ctab" onclick="showCommTab('pandillas')">👥 Parches</div>
       <div class="ctab" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
       <div class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
+      <div class="ctab" onclick="showCommTab('mercado')">&#x1F6D2; Mercado</div>
     </div>
     </div>
 
@@ -528,6 +573,11 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div id="ao-pendientes"></div>
     </div>
 
+    <!-- MERCADO DE EMPRENDEDORES (asset compartido mercado.js) -->
+    <div class="cpanel" id="cpanel-mercado">
+      <div id="mercado-cuerpo"></div>
+    </div>
+
   </div>
 </div>
 
@@ -566,6 +616,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 <script src="mapa-cultural.js?v=7"></script>
 <script src="media-actions.js"></script>
 <script src="mymapa.js?v=4"></script>
+<script src="mercado.js?v=1"></script>
 <script>
 /* =============================================================
    COMUNIDAD EXPLORACO — hub de interaccion social
@@ -2654,6 +2705,7 @@ function showCommTab(tab) {
     if(tab === 'av') initAudiovisual();
     if(tab === 'pandillas') renderPandillas();
     if(tab === 'wayfarer') initActivoOculto();
+    if(tab === 'mercado' && window.Mercado) Mercado.cargar();
   }
   if(tab !== 'chat') stopChatPoll();
 }
@@ -2669,8 +2721,14 @@ function showXPToastComm(msg){
 }
 
 /* ---- INIT ---- */
-window.onExploraCOUpdate = function() { checkGate(); };
+function abrirMercadoDesdeHash() {
+  try {
+    if (String(window.location.hash || '').replace('#','').toLowerCase() === 'mercado') showCommTab('mercado');
+  } catch (e) {}
+}
+window.onExploraCOUpdate = function() { checkGate(); abrirMercadoDesdeHash(); };
 checkGate();
+abrirMercadoDesdeHash();
 </script>
   <script src="usuario-session.js"></script>
   <script src="album-comments.js?v=2"></script>

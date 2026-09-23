@@ -501,6 +501,11 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('salud')" id="snav-salud">
     <span class="snav-icon">&#128147;</span>Salud de la Red
   </div>
+  <!-- Mercado de Emprendedores (migracion 034): item nuevo, patron .snav-item
+       + showScreen(name) del resto del panel. -->
+  <div class="snav-item" onclick="showScreen('mercado')" id="snav-mercado">
+    <span class="snav-icon">&#127978;</span>Mercado
+  </div>
 </nav>
 
 <!-- ─── WORKSPACE ───────────────────────────────── -->
@@ -2125,6 +2130,61 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   </div>
 </div>
 
+<!-- ==== MERCADO DE EMPRENDEDORES (migracion 034) ==== -->
+<div class="ws-screen" id="screen-mercado">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">MERCADO</div>
+      <div class="ws-subtitle">Mercado de Emprendedores: normas por Casa y moderacion de ofertas</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cargarMercado()">&#8635; Actualizar</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+
+    <!-- 1) Normas por Casa -->
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px">&#127978; Normas por Casa</div>
+      <div id="mercado-config-lista">
+        <div style="text-align:center;padding:32px 0;color:var(--muted)">
+          <div style="font-size:24px;margin-bottom:8px">&#9203;</div>
+          <div style="font-size:13px;font-weight:600">Cargando normas...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2) Moderar ofertas -->
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">&#9878; Moderar ofertas</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select class="form-input" id="mercado-filtro-casa" onchange="cargarMercadoOfertas()" style="width:160px">
+            <option value="">Todas las Casas</option>
+            <option value="condor">Condor</option>
+            <option value="jaguar">Jaguar</option>
+            <option value="delfin">Delfin</option>
+          </select>
+          <select class="form-input" id="mercado-filtro-estado" onchange="cargarMercadoOfertas()" style="width:160px">
+            <option value="activa" selected>Activas</option>
+            <option value="">Todas</option>
+            <option value="agotada">Agotadas</option>
+            <option value="cancelada">Canceladas</option>
+          </select>
+        </div>
+      </div>
+      <div id="mercado-ofertas-lista">
+        <div style="text-align:center;padding:32px 0;color:var(--muted)">
+          <div style="font-size:24px;margin-bottom:8px">&#9203;</div>
+          <div style="font-size:13px;font-weight:600">Cargando ofertas...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ════ MODAL: EDITAR CONSUMIBLE (ADR-018) ════ -->
 <div id="consumible-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;width:min(520px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
@@ -2373,6 +2433,7 @@ function showScreen(name) {
   }
   if(name === 'consumibles') loadConsumibles();
   if(name === 'salud') cargarSaludRed();
+  if(name === 'mercado') cargarMercado();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
     return;
@@ -7371,6 +7432,184 @@ async function toggleConsumible(id) {
   }
 }
 
+/* ===== MERCADO DE EMPRENDEDORES (migracion 034) =====
+   Contratos (api/admin.js ?recurso=mercado, ya implementado):
+   GET  mercado_config_lista  -> { ok, data:[3 filas de mercado_config] }
+   POST mercado_config_editar -> { ok, data:fila } (valida rangos server-side)
+   GET  mercado_ofertas_lista (casa|estado opcionales) -> { ok, data:[ofertas] }
+   POST mercado_ofertas_moderar {oferta_id,motivo} -> { ok, oferta_id }
+   La moderacion NO devuelve inventario: es sancion admin, no cancelacion
+   del dueno. Prefijo "Mercado" para evitar colisiones de nombres
+   (BUG-006/018/019). */
+var _mercadoConfigCache = [];
+var _mercadoOfertasCache = [];
+
+function cargarMercado() {
+  cargarMercadoConfig();
+  cargarMercadoOfertas();
+}
+
+async function cargarMercadoConfig() {
+  var cont = document.getElementById('mercado-config-lista');
+  if (!cont) return;
+  cont.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">&#9203;</div><div style="font-size:13px;font-weight:600">Cargando normas...</div></div>';
+  try {
+    var resp = await fetch('/api/admin?recurso=mercado&tipo=mercado_config_lista', { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _mercadoConfigCache = data.data || [];
+    renderMercadoConfig();
+  } catch (e) {
+    cont.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar normas</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function campoMercadoNum(casa, key, label, val) {
+  return '<div style="flex:0 0 128px">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">' + label + '</div>'
+    + '<input class="form-input" id="mercado-' + key + '-' + escH(casa) + '" type="number" step="any" value="' + escH(val == null ? '' : val) + '" style="width:100%">'
+    + '</div>';
+}
+
+function renderMercadoConfig() {
+  var cont = document.getElementById('mercado-config-lista');
+  if (!cont) return;
+  if (!_mercadoConfigCache.length) {
+    cont.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#127978;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Aun no hay normas de mercado</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Aplica la migracion 034 para sembrar las 3 Casas</div></div>';
+    return;
+  }
+  cont.innerHTML = _mercadoConfigCache.map(function(c) {
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+      +   '<div style="font-size:13px;font-weight:800;text-transform:capitalize">' + escH(c.casa) + '</div>'
+      +   '<label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted)">'
+      +     '<input type="checkbox" id="mercado-activo-' + escH(c.casa) + '"' + (c.activo ? ' checked' : '') + '> Activo'
+      +   '</label>'
+      + '</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+      +   campoMercadoNum(c.casa, 'impuesto', 'Impuesto (0-0.15)', c.impuesto_base_pct)
+      +   campoMercadoNum(c.casa, 'arancel', 'Arancel inter-casa', c.arancel_inter_casa_pct)
+      +   campoMercadoNum(c.casa, 'slots', 'Slots (0-20)', c.slots_base)
+      +   campoMercadoNum(c.casa, 'precio-min', 'Precio min', c.precio_min)
+      +   campoMercadoNum(c.casa, 'precio-max', 'Precio max', c.precio_max)
+      +   campoMercadoNum(c.casa, 'duracion', 'Duracion (h)', c.duracion_oferta_horas)
+      +   '<label style="flex:0 0 auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);padding-bottom:9px">'
+      +     '<input type="checkbox" id="mercado-cross-' + escH(c.casa) + '"' + (c.permite_cross_casa ? ' checked' : '') + '> Cross-casa'
+      +   '</label>'
+      +   '<label style="flex:0 0 auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);padding-bottom:9px">'
+      +     '<input type="checkbox" id="mercado-prod-' + escH(c.casa) + '"' + (c.permite_produccion ? ' checked' : '') + '> Produccion'
+      +   '</label>'
+      +   '<button class="btn btn-gold btn-sm" onclick="guardarMercadoConfig(\'' + escH(c.casa) + '\')">Guardar</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function guardarMercadoConfig(casa) {
+  var g = function(id){ var e = document.getElementById(id); return e ? e.value : ''; };
+  var chk = function(id){ var e = document.getElementById(id); return e ? !!e.checked : false; };
+  var payload = {
+    casa: casa,
+    impuesto_base_pct: parseFloat(String(g('mercado-impuesto-' + casa)).replace(',', '.')),
+    arancel_inter_casa_pct: parseFloat(String(g('mercado-arancel-' + casa)).replace(',', '.')),
+    slots_base: parseInt(g('mercado-slots-' + casa), 10),
+    permite_cross_casa: chk('mercado-cross-' + casa),
+    permite_produccion: chk('mercado-prod-' + casa),
+    precio_min: parseFloat(String(g('mercado-precio-min-' + casa)).replace(',', '.')),
+    precio_max: parseFloat(String(g('mercado-precio-max-' + casa)).replace(',', '.')),
+    duracion_oferta_horas: parseInt(g('mercado-duracion-' + casa), 10),
+    activo: chk('mercado-activo-' + casa)
+  };
+  try {
+    var resp = await fetch('/api/admin?recurso=mercado&tipo=mercado_config_editar', {
+      method: 'POST', headers: _adminHeaders(), body: JSON.stringify(payload)
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo guardar');
+    showAdminToast('Normas de ' + casa + ' actualizadas', 'success');
+    cargarMercadoConfig();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function cargarMercadoOfertas() {
+  var lista = document.getElementById('mercado-ofertas-lista');
+  if (!lista) return;
+  lista.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">&#9203;</div><div style="font-size:13px;font-weight:600">Cargando ofertas...</div></div>';
+  var casa = (document.getElementById('mercado-filtro-casa') || {}).value || '';
+  var estado = (document.getElementById('mercado-filtro-estado') || {}).value;
+  if (estado === undefined) estado = 'activa';
+  var url = '/api/admin?recurso=mercado&tipo=mercado_ofertas_lista';
+  if (casa) url += '&casa=' + encodeURIComponent(casa);
+  if (estado) url += '&estado=' + encodeURIComponent(estado);
+  try {
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _mercadoOfertasCache = data.data || [];
+    renderMercadoOfertas();
+  } catch (e) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar ofertas</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function renderMercadoOfertas() {
+  var lista = document.getElementById('mercado-ofertas-lista');
+  if (!lista) return;
+  if (!_mercadoOfertasCache.length) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9878;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Sin ofertas para este filtro</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Cuando un viajero publique una oferta aparecera aqui</div></div>';
+    return;
+  }
+  var filas = _mercadoOfertasCache.map(function(o) {
+    var badge = o.estado === 'activa'
+      ? '<span style="background:var(--green-l);color:var(--green);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">Activa</span>'
+      : (o.estado === 'agotada'
+        ? '<span style="background:var(--bg2);color:var(--text2);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">Agotada</span>'
+        : '<span style="background:var(--red-l);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">Cancelada</span>');
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+      + '<div style="flex:0 0 90px;font-size:12px;font-weight:800;text-transform:capitalize">' + escH(o.casa) + '</div>'
+      + '<div style="flex:1 1 220px;min-width:160px">'
+      +   '<div style="font-size:13px;font-weight:800">' + escH(o.consumible_nombre || o.consumible_clave || 'Consumible') + '</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(o.vendedor_nombre || o.vendedor_email || 'Vendedor') + ' &#183; ' + escH(o.origen || '') + '</div>'
+      + '</div>'
+      + '<div style="flex:0 0 150px;font-size:12px;font-weight:700">' + escH(String(o.cantidad_restante == null ? 0 : o.cantidad_restante)) + '/' + escH(String(o.cantidad == null ? 0 : o.cantidad)) + ' <span style="font-size:10px;color:var(--muted)">disp.</span></div>'
+      + '<div style="flex:0 0 120px;font-size:14px;font-weight:800;color:var(--gold)">' + fmtXp(o.precio_unitario) + ' <span style="font-size:10px;color:var(--muted);font-weight:600">XP</span></div>'
+      + '<div style="flex:0 0 90px">' + badge + '</div>'
+      + '<div style="flex:0 0 auto;margin-left:auto">'
+      +   (o.estado === 'cancelada'
+        ? '<span style="font-size:11px;color:var(--muted)">Sin acciones</span>'
+        : '<button class="btn btn-danger btn-sm" onclick="moderarOfertaMercado(\'' + o.id + '\')">Cancelar oferta</button>')
+      + '</div>'
+      + '</div>';
+  }).join('');
+  lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + filas + '</div>';
+}
+
+async function moderarOfertaMercado(id) {
+  var motivo = prompt('Motivo de la cancelacion (solo para el registro del admin):');
+  if (motivo === null) return;
+  try {
+    var resp = await fetch('/api/admin?recurso=mercado&tipo=mercado_ofertas_moderar', {
+      method: 'POST', headers: _adminHeaders(), body: JSON.stringify({ oferta_id: id, motivo: motivo })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo moderar');
+    showAdminToast('Oferta cancelada', 'success');
+    cargarMercadoOfertas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
 function escH(s) {
   if(!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -7937,7 +8176,7 @@ function cargarSaludRed() {
 
 // ── AUTO-DIAGNÓSTICO DE VERSIÓN ──────────────────────────────────
 (function checkVersion() {
-  var VERSION = 'admin-v10.20260921';
+  var VERSION = 'admin-v11.20260923';
   var checks = [
     ['f-tipo-actividad', !!document.getElementById('f-tipo-actividad'),   'Campo tipo actividad (sitio)'],
     ['f-distancia-sitio',!!document.getElementById('f-distancia-sitio'),  'Campo distancia (sitio)'],
@@ -7946,6 +8185,7 @@ function cargarSaludRed() {
     ['deletePlaceId-neon',typeof deletePlaceId === 'function',            'Borrar en Neon'],
     ['renderDashboard-async', typeof renderDashboard === 'function',      'Dashboard analítica'],
     ['cargarSaludRed', typeof cargarSaludRed === 'function',              'Panel Salud de la Red'],
+    ['cargarMercado', typeof cargarMercado === 'function',                'Panel Mercado de Emprendedores'],
   ];
   var allOk = checks.every(function(c){ return c[1]; });
   var icon = allOk ? '✅' : '⚠️';

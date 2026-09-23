@@ -1,3 +1,18 @@
+// api/interacciones.js  v28 (Mercado de Emprendedores, migracion 034):
+//   ramas GET ?tipo=mercado_config|mercado_ofertas|mercado_mi y POST
+//   ?tipo=mercado_publicar|mercado_comprar|mercado_cancelar|mercado_producir
+//   (sin endpoints nuevos, 8/8 ADR-010). Habilidad GLOBAL del usuario sobre
+//   usuarios.mercado_puntos (escala MERCADO_TIERS 0/100/250/450/700, 5 nodos
+//   con slots y reduccion de impuesto; piso 0.01). La compra es atomica en
+//   UNA sentencia con CTEs de modificacion (el driver neon HTTP no mantiene
+//   transacciones interactivas): descuenta XP del comprador, acredita neto al
+//   vendedor + mercado_puntos (neto/10), hace merge JSONB del inventario
+//   (ADR-003), baja cantidad_restante y registra mercado_ventas. Ledger
+//   xp_ledger: compra exenta negativa + venta exenta positiva. Requiere la
+//   migracion 034 aplicada en Neon ANTES del deploy; sin ella las ramas
+//   responden 503 con mensaje claro (42P01/42703), sin romper.
+//   OJO contrato real (ADR-006): mercado_ofertas/mercado_ventas.consumible_id
+//   es uuid -> consumibles(id), NO la clave; las ramas resuelven clave|uuid.
 // api/interacciones.js  v26 (ADR-054, guardados de media en Mis Albumes):
 //   (1) mis_guardados_media EXIGE sesion firmada (verificarSesion): el
 //       dueno sale del TOKEN y el usuario_id del query se IGNORA (leccion
@@ -1136,6 +1151,139 @@ var RAMAS = [
 // Indice id -> rama (lista blanca para validar rama_id del cliente).
 var RAMA_POR_ID = {};
 RAMAS.forEach(function(r) { RAMA_POR_ID[r.id] = r; });
+
+// -- Mercado de Emprendedores (migracion 034) -------------------------
+// Habilidad GLOBAL del usuario (aplica en las 3 Casas). El nodo se deriva
+// de usuarios.mercado_puntos con la MISMA escala de tiers del Arbol de
+// Clases (0/100/250/450/700) para no crear una segunda escala de progreso
+// (Regla de No-Duplicidad). El catalogo vive en codigo (patron RAMAS).
+// OJO: mercado_ofertas.consumible_id es uuid -> consumibles(id) segun el
+// contrato de la 034, NO la clave; las ramas resuelven clave o uuid a id.
+var MERCADO_CASAS = ['condor', 'jaguar', 'delfin'];
+var MERCADO_TIERS = [0, 100, 250, 450, 700];
+// IMPORTANTE (reconciliacion con la regla de RAMAS, L900-905):
+// (a) MERCADO_NODOS es un catalogo SEPARADO de RAMAS. La regla de L900-905
+//     (los nodos de RAMAS no conceden capacidades funcionales ni
+//     multiplicadores de XP) aplica al arbol de 16 ramas y NO a este.
+// (b) Los efectos del mercado estan ACOTADOS a la economia del mercado:
+//     slots de oferta, reduccion del impuesto de la Casa, y produccion de
+//     consumibles. NO crean multiplicadores de XP ni conceden privilegios
+//     globales.
+// (c) Su justificacion se documenta en el ADR de cierre (docs-keeper).
+var MERCADO_NODOS = [
+  { nodo: 1, nombre: 'Aprendiz de Mercado', nivel_jugador: 2,  slots_extra: 1, reduccion_impuesto: 0,    produce: false },
+  { nodo: 2, nombre: 'Tendero',             nivel_jugador: 5,  slots_extra: 2, reduccion_impuesto: 0.01, produce: false },
+  { nodo: 3, nombre: 'Productor',           nivel_jugador: 10, slots_extra: 3, reduccion_impuesto: 0.02, produce: true },
+  { nodo: 4, nombre: 'Distribuidor',        nivel_jugador: 20, slots_extra: 3, reduccion_impuesto: 0.03, produce: true },
+  { nodo: 5, nombre: 'Magnate',             nivel_jugador: 30, slots_extra: 4, reduccion_impuesto: 0.04, produce: true }
+];
+var MERCADO_UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+function calcularMercado(puntos) {
+  var p = numXp(puntos);
+  var idx = 0;
+  for (var i = 0; i < MERCADO_TIERS.length; i++) {
+    if (p >= MERCADO_TIERS[i]) idx = i;
+  }
+  return idx + 1;
+}
+function nodoMercado(nodo) {
+  var n = parseInt(nodo, 10);
+  if (!isFinite(n) || n < 1) n = 1;
+  if (n > MERCADO_NODOS.length) n = MERCADO_NODOS.length;
+  return MERCADO_NODOS[n - 1];
+}
+// Gate por nivel de jugador: ademas de los puntos, el catalogo
+// MERCADO_NODOS[].nivel_jugador impone un TECHO al nodo alcanzable. El
+// nodo EFECTIVO es el MENOR entre el alcanzado por mercado_puntos y el
+// alcanzado por el nivel de jugador (derivado de xp_total, NUNCA
+// inventado). Asi un usuario con muchos puntos pero nivel bajo no salta
+// el gate de produccion/impuesto.
+function nodoMercadoPorNivel(nivelJugador) {
+  var n = parseInt(nivelJugador, 10) || 1;
+  var idx = 0;
+  for (var i = 0; i < MERCADO_NODOS.length; i++) {
+    if (n >= MERCADO_NODOS[i].nivel_jugador) idx = i;
+  }
+  return idx + 1;
+}
+function calcularMercadoEfectivo(puntos, nivelJugador) {
+  var porPuntos = calcularMercado(puntos);
+  var porNivel = nodoMercadoPorNivel(nivelJugador);
+  return Math.min(porPuntos, porNivel);
+}
+// Impuesto efectivo = max(0, impuesto_base_pct - reduccion del nodo).
+// Piso 0: el impuesto puede llegar a 0 (Casa delfin, base 0.00), segun la
+// norma aprobada "Delfin 0%/5%". El piso es 0, no 0.01.
+function impuestoEfectivoMercado(impuestoBasePct, nodo) {
+  var pct = numXp(impuestoBasePct) - nodoMercado(nodo).reduccion_impuesto;
+  return Math.max(0, red2(pct));
+}
+// Slots totales de una Casa = slots_base de mercado_config + slots_extra
+// del nodo alcanzado.
+function slotsMercado(slotsBase, nodo) {
+  var base = parseInt(slotsBase, 10);
+  if (!isFinite(base) || base < 0) base = 0;
+  return base + nodoMercado(nodo).slots_extra;
+}
+
+// v28 (mercado): usuario de la sesion firmada. El body.usuario_id NUNCA se
+// confia (leccion BUG-061). Devuelve {ok:true, usuario_id} o {ok:false, razon}.
+function usuarioDeSesion(req) {
+  var s = verificarSesion(req);
+  if (!s.ok) return { ok: false, razon: s.razon };
+  return { ok: true, usuario_id: String(s.sub) };
+}
+
+// v28 (mercado): 503 tipado con mensaje claro si falta el esquema de la 034.
+function responderMercadoAusente(res, e, etiqueta) {
+  console.warn('[mercado] ' + etiqueta + ' ausente (migracion 034 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Mercado no disponible (migracion 034 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// v28 (mercado): normas de una Casa. Devuelve la fila o null.
+function cargarConfigMercado(sql, casa) {
+  return sql(
+    'SELECT casa, impuesto_base_pct, arancel_inter_casa_pct, slots_base,'
+    + ' permite_cross_casa, permite_produccion, precio_min, precio_max,'
+    + ' duracion_oferta_horas, activo FROM mercado_config WHERE casa=$1 LIMIT 1',
+    [casa]
+  ).then(function(rows) { return rows[0] || null; });
+}
+
+// v28 (mercado): fragmento SQL UNICO del merge JSONB del inventario
+// (ADR-003). signo es '+' o '-' y lo fija el codigo, nunca el cliente.
+function sqlMergeInventario(signo) {
+  return 'capacidades = COALESCE(capacidades,\'{}\'::jsonb)'
+    + ' || jsonb_build_object(\'consumibles\', COALESCE(capacidades->\'consumibles\',\'{}\'::jsonb)'
+    + ' || jsonb_build_object($2::text, COALESCE((capacidades->\'consumibles\'->>$2::text)::int, 0) '
+    + signo + ' $3::int))';
+}
+
+// v28 (mercado): descuenta unidades del inventario de forma atomica.
+// Devuelve true solo si alcanzaba (el WHERE lo garantiza).
+function descontarInventario(sql, usuarioId, clave, cantidad) {
+  return sql(
+    'UPDATE usuarios SET ' + sqlMergeInventario('-')
+    + ' WHERE id=$1::uuid'
+    + ' AND COALESCE((capacidades->\'consumibles\'->>$2::text)::int, 0) >= $3::int'
+    + ' RETURNING id',
+    [usuarioId, clave, cantidad]
+  ).then(function(rows) { return rows.length > 0; });
+}
+
+// v28 (mercado): suma unidades al inventario (merge JSONB, ADR-003).
+function acreditarInventario(sql, usuarioId, clave, cantidad) {
+  return sql(
+    'UPDATE usuarios SET ' + sqlMergeInventario('+')
+    + ' WHERE id=$1::uuid',
+    [usuarioId, clave, cantidad]
+  );
+}
 
 // Mapeo art_* <-> vocacion: las 4 ramas de artista ESPEJAN
 // usuarios.vocaciones (fuente unica, ADR-026). No se escribe ramas_activas
@@ -5936,6 +6084,184 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: misionesCasaRows });
       }
 
+      // ==========================================================
+      // v28 Mercado de Emprendedores (migracion 034). Ramas GET del
+      // catalogo del mercado. Degradacion: si faltan las tablas/columnas
+      // (42P01/42703) se responde 503 con mensaje claro, sin romper.
+      // ==========================================================
+
+      // Normas de las 3 Casas (mercado_config).
+      if (tipo === 'mercado_config') {
+        var mcCfgRows;
+        try {
+          mcCfgRows = await sql(
+            'SELECT casa, impuesto_base_pct, arancel_inter_casa_pct, slots_base,'
+            + ' permite_cross_casa, permite_produccion, precio_min, precio_max,'
+            + ' duracion_oferta_horas, activo, actualizado_en'
+            + ' FROM mercado_config ORDER BY casa ASC',
+            []
+          );
+        } catch (eMcCfg) {
+          if (!esEsquemaFaltante(eMcCfg)) throw eMcCfg;
+          return responderMercadoAusente(res, eMcCfg, 'mercado_config');
+        }
+        mcCfgRows = mcCfgRows.map(function(c) {
+          c.impuesto_base_pct = numXp(c.impuesto_base_pct);
+          c.arancel_inter_casa_pct = numXp(c.arancel_inter_casa_pct);
+          c.precio_min = red2(numXp(c.precio_min));
+          c.precio_max = red2(numXp(c.precio_max));
+          c.slots_base = parseInt(c.slots_base, 10) || 0;
+          c.duracion_oferta_horas = parseInt(c.duracion_oferta_horas, 10) || 0;
+          return c;
+        });
+        return res.status(200).json({ ok: true, data: mcCfgRows });
+      }
+
+      // Ofertas activas y no expiradas de una Casa. Default: la Casa del
+      // usuario si llega usuario_id. precio_referencia = precio_xp_base *
+      // clamp(1 + (ventas_24h - ofertas_activas) * 0.02, 0.5, 3.0).
+      if (tipo === 'mercado_ofertas') {
+        var moCasa = String(req.query.casa || '').trim().toLowerCase();
+        if (!moCasa && usuarioId) {
+          var moUCasa = await sql(
+            'SELECT casa FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [usuarioId]
+          ).catch(function(eMoU) {
+            if (esEsquemaFaltante(eMoU)) return [];
+            console.warn('[mercado] casa del usuario no resuelta: ' + (eMoU && eMoU.message));
+            return [];
+          });
+          if (moUCasa.length) moCasa = String(moUCasa[0].casa || '').toLowerCase();
+        }
+        if (MERCADO_CASAS.indexOf(moCasa) === -1)
+          return res.status(400).json({ ok: false, error: 'casa invalida' });
+        var moRows;
+        try {
+          moRows = await sql(
+            'SELECT o.id, o.vendedor_id, o.casa, o.consumible_id, o.cantidad,'
+            + ' o.cantidad_restante, o.precio_unitario, o.origen, o.estado,'
+            + ' o.creado_en, o.expira_en, c.clave, c.nombre, c.precio_xp_base,'
+            + ' (SELECT COUNT(*)::int FROM mercado_ventas v'
+            + '   WHERE v.consumible_id = o.consumible_id AND v.casa = o.casa'
+            + '   AND v.creado_en > NOW() - INTERVAL \'24 hours\') AS ventas_24h,'
+            + ' (SELECT COUNT(*)::int FROM mercado_ofertas o2'
+            + '   WHERE o2.consumible_id = o.consumible_id AND o2.casa = o.casa'
+            + '   AND o2.estado = \'activa\' AND o2.expira_en > NOW()) AS ofertas_activas'
+            + ' FROM mercado_ofertas o'
+            + ' LEFT JOIN consumibles c ON c.id = o.consumible_id'
+            + ' WHERE o.casa = $1 AND o.estado = \'activa\' AND o.expira_en > NOW()'
+            + ' ORDER BY o.precio_unitario ASC, o.creado_en DESC LIMIT 100',
+            [moCasa]
+          );
+        } catch (eMoO) {
+          if (!esEsquemaFaltante(eMoO)) throw eMoO;
+          return responderMercadoAusente(res, eMoO, 'mercado_ofertas');
+        }
+        moRows = moRows.map(function(o) {
+          var base = numXp(o.precio_xp_base);
+          var factor = 1 + ((Number(o.ventas_24h) || 0) - (Number(o.ofertas_activas) || 0)) * 0.02;
+          if (factor < 0.5) factor = 0.5;
+          if (factor > 3.0) factor = 3.0;
+          o.precio_unitario = red2(numXp(o.precio_unitario));
+          o.precio_xp_base = red2(base);
+          o.precio_referencia = red2(base * factor);
+          o.ventas_24h = Number(o.ventas_24h) || 0;
+          o.ofertas_activas = Number(o.ofertas_activas) || 0;
+          return o;
+        });
+        return res.status(200).json({ ok: true, casa: moCasa, data: moRows });
+      }
+
+      // Panel "mi mercado": saldo, nodo alcanzado, mis ofertas activas y
+      // las normas efectivas (slots e impuesto) de las 3 Casas.
+      if (tipo === 'mercado_mi') {
+        // v28 (mercado): owner-only. El usuario se deriva de la sesion
+        // firmada; req.query.usuario_id NUNCA se confia (leccion BUG-061).
+        var mmSes = usuarioDeSesion(req);
+        if (!mmSes.ok) return responderSesion(res, mmSes.razon);
+        var mmUid = mmSes.usuario_id;
+        var mmUsr, mmCfg, mmOfertas;
+        try {
+          mmUsr = await sql(
+            'SELECT mercado_puntos, xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [mmUid]
+          );
+          mmCfg = await sql(
+            'SELECT casa, impuesto_base_pct, arancel_inter_casa_pct, slots_base,'
+            + ' permite_cross_casa, permite_produccion, precio_min, precio_max,'
+            + ' duracion_oferta_horas, activo FROM mercado_config',
+            []
+          );
+          mmOfertas = await sql(
+            'SELECT o.id, o.casa, o.consumible_id, o.cantidad, o.cantidad_restante,'
+            + ' o.precio_unitario, o.origen, o.estado, o.creado_en, o.expira_en,'
+            + ' c.clave, c.nombre, c.precio_xp_base'
+            + ' FROM mercado_ofertas o'
+            + ' LEFT JOIN consumibles c ON c.id = o.consumible_id'
+            + ' WHERE o.vendedor_id = $1::uuid AND o.estado = \'activa\''
+            + ' AND o.expira_en > NOW() ORDER BY o.creado_en DESC LIMIT 100',
+            [mmUid]
+          );
+        } catch (eMm) {
+          if (!esEsquemaFaltante(eMm)) throw eMm;
+          return responderMercadoAusente(res, eMm, 'mercado_mi');
+        }
+        if (!mmUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var mmPuntos = numXp(mmUsr[0].mercado_puntos);
+        var mmNivel = calcularNivelLocal(numXp(mmUsr[0].xp_total)).nivel;
+        var mmNodoPorPuntos = calcularMercado(mmPuntos);
+        var mmNodoPorNivel = nodoMercadoPorNivel(mmNivel);
+        var mmNodo = calcularMercadoEfectivo(mmPuntos, mmNivel);
+        var mmNodoInfo = nodoMercado(mmNodo);
+        var mmCasas = MERCADO_CASAS.map(function(casa) {
+          var cfg = null;
+          for (var ci = 0; ci < mmCfg.length; ci++) {
+            if (String(mmCfg[ci].casa) === casa) { cfg = mmCfg[ci]; break; }
+          }
+          cfg = cfg || {};
+          var usados = 0;
+          for (var oi = 0; oi < mmOfertas.length; oi++) {
+            if (String(mmOfertas[oi].casa) === casa) usados++;
+          }
+          var totales = slotsMercado(cfg.slots_base, mmNodo);
+          return {
+            casa: casa,
+            activo: cfg.activo === true,
+            slots_totales: totales,
+            slots_usados: usados,
+            slots_libres: Math.max(0, totales - usados),
+            impuesto_efectivo_pct: impuestoEfectivoMercado(cfg.impuesto_base_pct, mmNodo),
+            arancel_inter_casa_pct: numXp(cfg.arancel_inter_casa_pct),
+            permite_cross_casa: cfg.permite_cross_casa === true,
+            permite_produccion: cfg.permite_produccion === true,
+            precio_min: red2(numXp(cfg.precio_min)),
+            precio_max: red2(numXp(cfg.precio_max)),
+            duracion_oferta_horas: parseInt(cfg.duracion_oferta_horas, 10) || 0
+          };
+        });
+        mmOfertas = mmOfertas.map(function(o) {
+          o.precio_unitario = red2(numXp(o.precio_unitario));
+          o.precio_xp_base = red2(numXp(o.precio_xp_base));
+          return o;
+        });
+        return res.status(200).json({
+          ok: true,
+          data: {
+            usuario_id: mmUid,
+            mercado_puntos: red2(mmPuntos),
+            mercado_nodo: mmNodo,
+            nodo_por_puntos: mmNodoPorPuntos,
+            nodo_por_nivel: mmNodoPorNivel,
+            mercado_nodo_nombre: mmNodoInfo.nombre,
+            slots_extra: mmNodoInfo.slots_extra,
+            produce: mmNodoInfo.produce,
+            ofertas: mmOfertas,
+            casas: mmCasas
+          }
+        });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -9128,6 +9454,409 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           ok: true, xp: xpSpotFinal, xp_detalle: armarXpDetalle(XP_BASES.spot_atributos, resSpot, 0),
           misiones: spMisiones, logros: spLogros
+        });
+      }
+
+      // ============ v28 MERCADO DE EMPRENDEDORES (migracion 034) ============
+      // Todas las ramas exigen sesion firmada y derivan el usuario del token
+      // (nunca de body.usuario_id, leccion BUG-061).
+
+      // Publicar una oferta en el mercado de la Casa del vendedor.
+      if (tipo2 === 'mercado_publicar') {
+        var mpSes = usuarioDeSesion(req);
+        if (!mpSes.ok) return responderSesion(res, mpSes.razon);
+        var mpUid = mpSes.usuario_id;
+        var mpOrigen = String(body.origen || 'inventario').trim().toLowerCase();
+        if (mpOrigen !== 'inventario' && mpOrigen !== 'produccion')
+          return res.status(400).json({ ok: false, error: 'origen invalido' });
+        var mpRef = String(body.consumible_id || body.clave || '').trim();
+        if (!mpRef)
+          return res.status(400).json({ ok: false, error: 'consumible_id requerido' });
+        var mpCant = parseInt(body.cantidad, 10);
+        if (!isFinite(mpCant) || mpCant < 1) mpCant = 1;
+        if (mpCant > 999) mpCant = 999;
+        var mpPrecio = numXp(body.precio_unitario);
+        if (!(mpPrecio > 0))
+          return res.status(400).json({ ok: false, error: 'precio_unitario requerido' });
+
+        var mpUsr, mpCons, mpCfg;
+        try {
+          mpUsr = await sql(
+            'SELECT casa, xp_total, mercado_puntos FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [mpUid]
+          );
+          mpCons = await sql(
+            'SELECT id, clave, nombre, tipo_canje FROM consumibles'
+            + ' WHERE (clave=$1 OR id::text=$1) AND activo=true LIMIT 1',
+            [mpRef]
+          );
+          mpCfg = await cargarConfigMercado(sql, String((mpUsr[0] || {}).casa || '').toLowerCase());
+        } catch (eMp) {
+          if (!esEsquemaFaltante(eMp)) throw eMp;
+          return responderMercadoAusente(res, eMp, 'mercado_publicar');
+        }
+        if (!mpUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var mpNivel = calcularNivelLocal(numXp(mpUsr[0].xp_total)).nivel;
+        if (mpNivel < 2)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE' });
+        var mpCasa = String(mpUsr[0].casa || '').toLowerCase();
+        if (MERCADO_CASAS.indexOf(mpCasa) === -1)
+          return res.status(403).json({ ok: false, error: 'CASA_REQUERIDA' });
+        if (!mpCons.length)
+          return res.status(404).json({ ok: false, error: 'Consumible no encontrado' });
+        if (!mpCfg || mpCfg.activo !== true)
+          return res.status(403).json({ ok: false, error: 'MERCADO_INACTIVO' });
+        var mpPmin = numXp(mpCfg.precio_min);
+        var mpPmax = numXp(mpCfg.precio_max);
+        if (mpPrecio < mpPmin || mpPrecio > mpPmax)
+          return res.status(400).json({ ok: false, error: 'PRECIO_FUERA_DE_RANGO', precio_min: mpPmin, precio_max: mpPmax });
+
+        var mpNodo = calcularMercadoEfectivo(numXp(mpUsr[0].mercado_puntos), mpNivel);
+        var mpNodoInfo = nodoMercado(mpNodo);
+        if (mpOrigen === 'produccion') {
+          if (!mpNodoInfo.produce)
+            return res.status(403).json({ ok: false, error: 'NODO_INSUFICIENTE' });
+          if (mpCfg.permite_produccion !== true)
+            return res.status(403).json({ ok: false, error: 'PRODUCCION_DESHABILITADA' });
+          if (String(mpCons[0].tipo_canje || '') !== 'producir')
+            return res.status(400).json({ ok: false, error: 'CONSUMIBLE_NO_PRODUCIBLE' });
+        }
+
+        // Slots libres en la Casa del vendedor.
+        var mpSlots;
+        try {
+          mpSlots = await sql(
+            'SELECT COUNT(*)::int AS n FROM mercado_ofertas'
+            + ' WHERE vendedor_id=$1::uuid AND casa=$2 AND estado=\'activa\''
+            + ' AND expira_en > NOW()',
+            [mpUid, mpCasa]
+          );
+        } catch (eMpS) {
+          if (!esEsquemaFaltante(eMpS)) throw eMpS;
+          return responderMercadoAusente(res, eMpS, 'mercado_ofertas');
+        }
+        var mpUsados = (mpSlots[0] && Number(mpSlots[0].n)) || 0;
+        var mpTotales = slotsMercado(mpCfg.slots_base, mpNodo);
+        if (mpUsados >= mpTotales)
+          return res.status(409).json({ ok: false, error: 'SIN_SLOTS', slots_totales: mpTotales, slots_usados: mpUsados });
+
+        // Descuento atomico del inventario (409 si no alcanza). Aplica a
+        // ambos origenes: la produccion tambien deposita en el inventario
+        // (mercado_producir), asi que ofertarla lo descuenta (anti-dupe).
+        var mpOkInv = await descontarInventario(sql, mpUid, String(mpCons[0].clave), mpCant);
+        if (!mpOkInv)
+          return res.status(409).json({ ok: false, error: 'INVENTARIO_INSUFICIENTE' });
+
+        var mpHoras = parseInt(mpCfg.duracion_oferta_horas, 10);
+        if (!isFinite(mpHoras) || mpHoras < 1) mpHoras = 24;
+        var mpOf;
+        try {
+          mpOf = await sql(
+            'INSERT INTO mercado_ofertas (vendedor_id, casa, consumible_id, cantidad,'
+            + ' cantidad_restante, precio_unitario, origen, estado, expira_en)'
+            + ' VALUES ($1::uuid,$2,$3::uuid,$4::int,$4::int,$5::numeric,$6,\'activa\','
+            + ' NOW() + ($7::int * INTERVAL \'1 hour\'))'
+            + ' RETURNING id, expira_en',
+            [mpUid, mpCasa, mpCons[0].id, mpCant, mpPrecio, mpOrigen, mpHoras]
+          );
+        } catch (eMpI) {
+          // Si el INSERT falla, devolver las unidades ya descontadas.
+          await acreditarInventario(sql, mpUid, String(mpCons[0].clave), mpCant)
+            .catch(function(eRev) { console.warn('[mercado] reversion de inventario fallida: ' + (eRev && eRev.message)); });
+          if (esEsquemaFaltante(eMpI)) return responderMercadoAusente(res, eMpI, 'mercado_ofertas');
+          if (eMpI && (eMpI.code === '23503' || eMpI.code === '23514' || eMpI.code === '22P02'))
+            return res.status(400).json({ ok: false, error: 'OFERTA_INVALIDA' });
+          throw eMpI;
+        }
+        return res.status(200).json({
+          ok: true, oferta_id: mpOf[0].id, expira_en: mpOf[0].expira_en,
+          origen: mpOrigen, cantidad: mpCant, precio_unitario: red2(mpPrecio)
+        });
+      }
+
+      // Comprar una oferta: operacion atomica en UNA sentencia con CTEs de
+      // modificacion (el driver neon HTTP no mantiene transacciones
+      // interactivas; un solo statement es atomico). Descuenta XP del
+      // comprador, acredita neto al vendedor + mercado_puntos, hace merge
+      // del inventario (ADR-003), baja cantidad_restante y registra la venta.
+      if (tipo2 === 'mercado_comprar') {
+        var mqSes = usuarioDeSesion(req);
+        if (!mqSes.ok) return responderSesion(res, mqSes.razon);
+        var mqUid = mqSes.usuario_id;
+        var mqId = String(body.oferta_id || '').trim();
+        if (!mqId)
+          return res.status(400).json({ ok: false, error: 'oferta_id requerido' });
+        if (!MERCADO_UUID_RE.test(mqId))
+          return res.status(400).json({ ok: false, error: 'oferta_id invalido' });
+        var mqCant = parseInt(body.cantidad, 10);
+        if (!isFinite(mqCant) || mqCant < 1) mqCant = 1;
+        if (mqCant > 999) mqCant = 999;
+
+        var mqOf, mqUsr, mqVend, mqCfg;
+        try {
+          mqOf = await sql(
+            'SELECT o.id, o.vendedor_id, o.casa, o.consumible_id, o.cantidad_restante,'
+            + ' o.precio_unitario, o.estado, o.expira_en, c.clave'
+            + ' FROM mercado_ofertas o'
+            + ' LEFT JOIN consumibles c ON c.id = o.consumible_id'
+            + ' WHERE o.id=$1::uuid LIMIT 1',
+            [mqId]
+          );
+          if (!mqOf.length)
+            return res.status(404).json({ ok: false, error: 'OFERTA_NO_ENCONTRADA' });
+          if (String(mqOf[0].vendedor_id) === mqUid)
+            return res.status(403).json({ ok: false, error: 'AUTOCOMPRA_PROHIBIDA' });
+          if (mqOf[0].estado !== 'activa' || !mqOf[0].expira_en
+              || new Date(mqOf[0].expira_en).getTime() <= Date.now())
+            return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
+          if (numXp(mqOf[0].cantidad_restante) < mqCant)
+            return res.status(409).json({ ok: false, error: 'CANTIDAD_INSUFICIENTE' });
+          // Anti-farming: tope de 20 compras por comprador en 24h.
+          var mqCount = await sql(
+            "SELECT COUNT(*)::int AS n FROM mercado_ventas WHERE comprador_id=$1::uuid"
+            + " AND creado_en > NOW() - INTERVAL '24 hours'",
+            [mqUid]
+          );
+          if ((mqCount[0] && Number(mqCount[0].n)) >= 20)
+            return res.status(429).json({ ok: false, error: 'LIMITE_COMPRAS_24H' });
+          mqUsr = await sql(
+            'SELECT casa, xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [mqUid]
+          );
+          mqVend = await sql(
+            'SELECT mercado_puntos, xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [mqOf[0].vendedor_id]
+          );
+          mqCfg = await cargarConfigMercado(sql, String(mqOf[0].casa || '').toLowerCase());
+        } catch (eMq) {
+          if (!esEsquemaFaltante(eMq)) throw eMq;
+          return responderMercadoAusente(res, eMq, 'mercado_comprar');
+        }
+        if (!mqUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        if (!mqVend.length)
+          return res.status(404).json({ ok: false, error: 'Vendedor no encontrado' });
+        if (!mqCfg)
+          return responderMercadoAusente(res, { message: 'mercado_config sin fila' }, 'mercado_config');
+
+        var mqCasa = String(mqOf[0].casa || '').toLowerCase();
+        var mqCross = String(mqUsr[0].casa || '').toLowerCase() !== mqCasa;
+        if (mqCross && mqCfg.permite_cross_casa !== true)
+          return res.status(403).json({ ok: false, error: 'CROSS_CASA_NO_PERMITIDO' });
+
+        var mqNodoVend = calcularMercadoEfectivo(
+          numXp(mqVend[0].mercado_puntos),
+          calcularNivelLocal(numXp(mqVend[0].xp_total)).nivel
+        );
+        var mqImpPct = impuestoEfectivoMercado(mqCfg.impuesto_base_pct, mqNodoVend);
+        var mqAraPct = mqCross ? numXp(mqCfg.arancel_inter_casa_pct) : 0;
+        var mqPrecio = numXp(mqOf[0].precio_unitario);
+        var mqSubtotal = red2(mqPrecio * mqCant);
+        var mqImpXp = red2(mqSubtotal * mqImpPct);
+        var mqAraXp = red2(mqSubtotal * mqAraPct);
+        var mqNeto = red2(Math.max(0, mqSubtotal - mqImpXp - mqAraXp));
+        var mqPuntosVend = red2(mqNeto / 10);
+        var mqClave = String(mqOf[0].clave || '');
+
+        var mqRes;
+        try {
+          mqRes = await sql(
+            'WITH ok_oferta AS ('
+            + ' SELECT id FROM mercado_ofertas WHERE id=$1::uuid AND estado=\'activa\''
+            + ' AND expira_en > NOW() AND cantidad_restante >= $2::int'
+            + '), ok_xp AS ('
+            + ' SELECT id FROM usuarios WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '), debit AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total - $4::numeric,'
+            + ' capacidades = COALESCE(capacidades,\'{}\'::jsonb)'
+            + '  || jsonb_build_object(\'consumibles\', COALESCE(capacidades->\'consumibles\',\'{}\'::jsonb)'
+            + '  || jsonb_build_object($5::text, COALESCE((capacidades->\'consumibles\'->>$5::text)::int,0) + $2::int))'
+            + ' WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '  AND EXISTS(SELECT 1 FROM ok_oferta) RETURNING xp_total'
+            + '), dec AS ('
+            + ' UPDATE mercado_ofertas SET cantidad_restante = cantidad_restante - $2::int,'
+            + '  estado = CASE WHEN cantidad_restante - $2::int <= 0 THEN \'agotada\' ELSE estado END'
+            + ' WHERE id=$1::uuid AND EXISTS(SELECT 1 FROM debit) RETURNING cantidad_restante'
+            + '), cred AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total + $6::numeric,'
+            + '  mercado_puntos = COALESCE(mercado_puntos,0) + $7::numeric'
+            + ' WHERE id=$8::uuid AND EXISTS(SELECT 1 FROM debit) RETURNING id'
+            + '), venta AS ('
+            + ' INSERT INTO mercado_ventas (oferta_id, comprador_id, vendedor_id,'
+            + '  consumible_id, casa, es_cross_casa, cantidad, precio_unitario, subtotal_xp,'
+            + '  impuesto_pct, impuesto_xp, arancel_pct, arancel_xp, neto_vendedor_xp, creado_en)'
+            + ' SELECT $1::uuid, $3::uuid, $8::uuid, $9::uuid, $10::text, $11::boolean,'
+            + '  $2::int, $12::numeric, $4::numeric, $13::numeric, $14::numeric,'
+            + '  $15::numeric, $16::numeric, $6::numeric, NOW()'
+            + ' FROM ok_oferta WHERE EXISTS(SELECT 1 FROM debit) RETURNING id'
+            + ')'
+            + ' SELECT EXISTS(SELECT 1 FROM ok_oferta) AS oferta_ok,'
+            + ' EXISTS(SELECT 1 FROM ok_xp) AS xp_ok,'
+            + ' (SELECT xp_total FROM debit) AS comprador_xp,'
+            + ' (SELECT cantidad_restante FROM dec) AS cantidad_restante,'
+            + ' (SELECT id::text FROM venta) AS venta_id',
+            [mqId, mqCant, mqUid, mqSubtotal, mqClave, mqNeto, mqPuntosVend,
+             mqOf[0].vendedor_id, mqOf[0].consumible_id, mqCasa, mqCross,
+             mqPrecio, mqImpPct, mqImpXp, mqAraPct, mqAraXp]
+          );
+        } catch (eMqX) {
+          if (eMqX && eMqX.code === '23514') return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
+          if (!esEsquemaFaltante(eMqX)) throw eMqX;
+          return responderMercadoAusente(res, eMqX, 'mercado_ventas');
+        }
+        var mqR = mqRes[0] || {};
+        if (mqR.oferta_ok !== true)
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
+        if (mqR.xp_ok !== true)
+          return res.status(409).json({ ok: false, error: 'XP_INSUFICIENTE', subtotal_xp: mqSubtotal });
+
+        // Ledger best-effort: gasto del comprador (negativo, exento) y
+        // acreditacion del vendedor (positivo, exento).
+        await registrarXpLedger(sql, {
+          usuario_id: mqUid, accion: 'mercado_compra', xp_base: mqSubtotal,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(-mqSubtotal), es_exento: true,
+          contexto: { oferta_id: mqId, vendedor_id: mqOf[0].vendedor_id, consumible: mqClave, cantidad: mqCant }
+        });
+        await registrarXpLedger(sql, {
+          usuario_id: mqOf[0].vendedor_id, accion: 'mercado_venta', xp_base: mqSubtotal,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: mqNeto, es_exento: true,
+          contexto: { oferta_id: mqId, comprador_id: mqUid, consumible: mqClave, cantidad: mqCant }
+        });
+
+        return res.status(200).json({
+          ok: true,
+          venta_id: mqR.venta_id,
+          cantidad: mqCant,
+          subtotal_xp: mqSubtotal,
+          impuesto_pct: mqImpPct,
+          impuesto_xp: mqImpXp,
+          arancel_pct: mqAraPct,
+          arancel_xp: mqAraXp,
+          neto_vendedor_xp: mqNeto,
+          mercado_puntos_vendedor: mqPuntosVend,
+          es_cross_casa: mqCross,
+          cantidad_restante: Number(mqR.cantidad_restante),
+          xp_total_nuevo: red2(numXp(mqR.comprador_xp))
+        });
+      }
+
+      // Cancelar una oferta propia; si era de inventario y quedaba stock,
+      // se devuelve al inventario del vendedor (Cero Borrado Logico).
+      if (tipo2 === 'mercado_cancelar') {
+        var mzSes = usuarioDeSesion(req);
+        if (!mzSes.ok) return responderSesion(res, mzSes.razon);
+        var mzUid = mzSes.usuario_id;
+        var mzId = String(body.oferta_id || '').trim();
+        if (!mzId)
+          return res.status(400).json({ ok: false, error: 'oferta_id requerido' });
+        if (!MERCADO_UUID_RE.test(mzId))
+          return res.status(400).json({ ok: false, error: 'oferta_id invalido' });
+        var mzRows;
+        try {
+          mzRows = await sql(
+            'SELECT o.id, o.vendedor_id, o.origen, o.cantidad_restante, o.estado, c.clave'
+            + ' FROM mercado_ofertas o'
+            + ' LEFT JOIN consumibles c ON c.id = o.consumible_id'
+            + ' WHERE o.id=$1::uuid LIMIT 1',
+            [mzId]
+          );
+        } catch (eMz) {
+          if (!esEsquemaFaltante(eMz)) throw eMz;
+          return responderMercadoAusente(res, eMz, 'mercado_ofertas');
+        }
+        if (!mzRows.length)
+          return res.status(404).json({ ok: false, error: 'OFERTA_NO_ENCONTRADA' });
+        if (String(mzRows[0].vendedor_id) !== mzUid)
+          return res.status(403).json({ ok: false, error: 'NO_ES_TU_OFERTA' });
+        if (mzRows[0].estado !== 'activa')
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_ACTIVA' });
+        var mzUpd = await sql(
+          'UPDATE mercado_ofertas SET estado=\'cancelada\''
+          + ' WHERE id=$1::uuid AND vendedor_id=$2::uuid AND estado=\'activa\' RETURNING id',
+          [mzId, mzUid]
+        );
+        if (!mzUpd.length)
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_ACTIVA' });
+        var mzDevueltas = 0;
+        if (String(mzRows[0].origen) === 'inventario') {
+          mzDevueltas = parseInt(mzRows[0].cantidad_restante, 10) || 0;
+          if (mzDevueltas > 0) {
+            await acreditarInventario(sql, mzUid, String(mzRows[0].clave || ''), mzDevueltas)
+              .catch(function(eMzR) { console.warn('[mercado] devolucion de inventario fallida: ' + (eMzR && eMzR.message)); });
+          }
+        }
+        return res.status(200).json({ ok: true, oferta_id: mzId, devueltas: mzDevueltas });
+      }
+
+      // Producir un consumible producible: consume XP (precio_xp_base x
+      // cantidad) y deposita las unidades en el inventario. Exige nodo >= 3.
+      if (tipo2 === 'mercado_producir') {
+        var mrSes = usuarioDeSesion(req);
+        if (!mrSes.ok) return responderSesion(res, mrSes.razon);
+        var mrUid = mrSes.usuario_id;
+        var mrRef = String(body.consumible_id || body.clave || '').trim();
+        if (!mrRef)
+          return res.status(400).json({ ok: false, error: 'consumible_id requerido' });
+        var mrCant = parseInt(body.cantidad, 10);
+        if (!isFinite(mrCant) || mrCant < 1) mrCant = 1;
+        if (mrCant > 10) mrCant = 10;
+
+        var mrUsr, mrCons, mrCfg;
+        try {
+          mrUsr = await sql(
+            'SELECT casa, xp_total, mercado_puntos FROM usuarios WHERE id=$1::uuid LIMIT 1',
+            [mrUid]
+          );
+          mrCfg = await cargarConfigMercado(sql, String((mrUsr[0] || {}).casa || '').toLowerCase());
+          mrCons = await sql(
+            'SELECT id, clave, nombre, precio_xp_base FROM consumibles'
+            + ' WHERE (clave=$1 OR id::text=$1) AND activo=true'
+            + ' AND tipo_canje=\'producir\' LIMIT 1',
+            [mrRef]
+          );
+        } catch (eMr) {
+          if (!esEsquemaFaltante(eMr)) throw eMr;
+          return responderMercadoAusente(res, eMr, 'mercado_producir');
+        }
+        if (!mrUsr.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var mrCasa = String(mrUsr[0].casa || '').toLowerCase();
+        if (MERCADO_CASAS.indexOf(mrCasa) === -1)
+          return res.status(403).json({ ok: false, error: 'CASA_REQUERIDA' });
+        var mrNodo = calcularMercadoEfectivo(
+          numXp(mrUsr[0].mercado_puntos),
+          calcularNivelLocal(numXp(mrUsr[0].xp_total)).nivel
+        );
+        if (!nodoMercado(mrNodo).produce)
+          return res.status(403).json({ ok: false, error: 'NODO_INSUFICIENTE' });
+        if (!mrCfg || mrCfg.activo !== true)
+          return res.status(403).json({ ok: false, error: 'MERCADO_INACTIVO' });
+        if (mrCfg.permite_produccion !== true)
+          return res.status(403).json({ ok: false, error: 'PRODUCCION_DESHABILITADA' });
+        if (!mrCons.length)
+          return res.status(404).json({ ok: false, error: 'CONSUMIBLE_NO_PRODUCIBLE' });
+
+        var mrCosto = red2(numXp(mrCons[0].precio_xp_base) * mrCant);
+        var mrUpd = await sql(
+          'UPDATE usuarios SET xp_total = xp_total - $1::numeric'
+          + ' WHERE id=$2::uuid AND xp_total >= $1::numeric RETURNING xp_total',
+          [mrCosto, mrUid]
+        );
+        if (!mrUpd.length)
+          return res.status(409).json({ ok: false, error: 'XP_INSUFICIENTE', costo_xp: mrCosto });
+        await acreditarInventario(sql, mrUid, String(mrCons[0].clave), mrCant);
+        await registrarXpLedger(sql, {
+          usuario_id: mrUid, accion: 'mercado_producir', xp_base: mrCosto,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(-mrCosto), es_exento: true,
+          contexto: { consumible: String(mrCons[0].clave), cantidad: mrCant }
+        });
+        return res.status(200).json({
+          ok: true, consumible: String(mrCons[0].clave), cantidad: mrCant,
+          costo_xp: mrCosto, xp_total_nuevo: red2(numXp(mrUpd[0].xp_total))
         });
       }
 
