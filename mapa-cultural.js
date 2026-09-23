@@ -197,7 +197,14 @@
     });
     return (items || []).filter(function (it) {
       if (!it || !it.media_url) return false;
-      if (it.origen === 'album_grupo') return true;
+      if (it.origen === 'album_grupo') {
+        // v28: el album personal "Mi Museo" nunca se pinta en el mapa
+        // publico (el backend ya lo excluye; defensa espejo en cliente).
+        // Match tolerante a acentos (Mí Museo) via NFD.
+        var t = String(it.album_titulo || it.media_title || '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+        return t !== 'mi museo';
+      }
       if (it.origen === 'album') return false;
       if (it.origen === 'destino' || it.origen === 'destino_album') {
         return !!(it.origen_id && slugs[it.origen_id]);

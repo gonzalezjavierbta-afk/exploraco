@@ -3464,5 +3464,39 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Dependencia:** migracion 035 APLICADA en Neon (2026-09-23); ADR-053 (nivel ganado); ADR-028 (catalogo administrable); ADR-042 (columnas de la 027); ADR-055 (producibles `prod_*` sin gate).
 - **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); no toca el motor de efectos (los 15 nuevos reutilizan tipos existentes); no gatea el uso.
 
+## Prioridad GUARDAR ALBUM + MUSEO PERSONAL FUERA DEL MAPA - 2026-09-23 (ADR-057 / TSK-153)
+
+> Entrega: guardar un album personal desde su visor (con XP dual ejecutor +
+> dueno), excluir el album auto "Mi Museo" del mapa publico y confirmar que el
+> album guardado sale en "mi museo". Modo **express** (skill `express-mode`).
+> Decision: **ADR-057** en DECISIONS.md. NO crea funciones serverless
+> (**8/8 INTACTO**, ADR-001/ADR-010) y **NO requiere migracion** (reusa
+> `media_guardados` de la 019/032 y `xp_ledger` de la 031, cuyo `accion` es
+> `text` sin CHECK).
+
+### TSK-153: Guardar album (XP dual 5/10) + album personal fuera del mapa publico + guardados en mi museo [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE (2026-09-23); verificado contra archivo real (ADR-006). Commit/deploy pendiente.
+- **Prioridad:** Media-Alta.
+- **Fecha:** 2026-09-23.
+- **Origen:** pedido del operador: los albumes de "mi museo" son personales y no deben salir en mapas publicos; al entrar a un album debe poder guardarse y eso debe salir en "mi museo"; la accion da puntos a quien la ejecuta y al dueno; la escala de XP crece con la complejidad.
+- **ADR:** DECISIONS.md **ADR-057**.
+- **Responsable / agentes:** backend-dev (`api/interacciones.js`), frontend-tpl (`galeria.html`/`comunidad.html`), js-silo-dev (`mapa-cultural.js`), qa-auditor/docs-keeper (verificacion y cierre).
+- **Alcance REAL ejecutado:**
+  1. **Backend `api/interacciones.js`:**
+     - `XP_BASES` suma `album_guardado: 5` y `album_guardado_autor: 10` (catalogo unico, Regla de No-Duplicidad).
+     - `GET ?tipo=album_detalle` devuelve `ya_guardado_album` (bookmark fuente='album' del usuario del query) y `es_propio` (usuario del query == dueno del album).
+     - `POST ?tipo=guardar_media` rama `fuente='album'`: detecta el alta (`gmYaActivo`), acredita **5 XP al ejecutor** y **10 XP al dueno** (solo si es distinto del ejecutor, anti self-farm) con el pipeline canonico (`contextoXpE` -> `calcularXpAcreditado` -> `registrarXpLedger` -> `acreditarClaseYCofre` -> `repartirXpReferidos`); reactivar NO re-paga.
+     - `GET ?tipo=multimedia_mapa` rama `album_grupo`: excluye el album auto "Mi Museo" con match **tolerante a acentos** via `translate(lower(...), chr(...), 'aaeeiioouuun')` (sin bytes no-ASCII en el fuente, ADR-002).
+     - `GET ?tipo=albumes` con `excluir_museo` usa el MISMO match tolerante a acentos.
+  2. **Frontend:** `galeria.html` (`gOpenAlbum` envia `usuario_id`; el boton Guardar del modal usa `ya_guardado_album` y se oculta si `es_propio`); `comunidad.html` (`abrirAlbumModal` agrega boton Guardar del album, alineado a la derecha con `.av-album-head` flex, oculto si `es_propio`); `mapa-cultural.js` (`filterMediaDefault` descarta `album_grupo` "Mi Museo" con match tolerante a acentos via NFD). `mi-perfil.html` **SIN cambios**: `mis_guardados_media` ya pinta los albumes guardados en la grilla de "Mis guardados" (requisito "que salga en mi museo").
+- **Evidencia (ADR-006):** `api/interacciones.js` (`XP_BASES` L351-352; `album_detalle` L5012-5025 y respuesta L5076; `guardar_media` L8333-8399; `album_grupo` L5606; `albumes` L4906); `galeria.html` (L559-568, L644-645, L661-663); `comunidad.html` (L185-186, L2125-2135); `mapa-cultural.js` (L200-205).
+- **Smokes / verificacion:** `node --check` OK (`api/interacciones.js`, `mapa-cultural.js`); ASCII-safety `api/interacciones.js` 0 bytes >127 y 0 backticks; balance de divs `galeria.html` 84/84 y `comunidad.html` 325/325; **`npm test` VERDE (exit 0)** tras actualizar dos contratos de smoke que fijaban el catalogo/call-sites: `smoke_gamificacion_v6.js` (24 -> **26** claves de `XP_BASES`) y `smoke_038_casas_clases.js` (call-sites de XP **21 -> 23** y `acreditarClaseYCofre` **20 -> 22**).
+- **Relacion con bugs:** ninguno nuevo. **BUG-061** (guardar_media legacy sin validar sesion en ramas de destino) sigue ABIERTO y ajeno; esta entrega NO lo empeora (la rama exige sesion firmada desde ADR-054).
+- **Pendiente operativo:** commit + push (Vercel despliega al push); QA runtime en produccion (guardar album ajeno -> +5 ejecutor / +10 dueno solo la primera vez; "Mi Museo" ausente del mapa).
+- **Deuda aceptada [DEUDA-EXPRESS]:** (a) el badge `albumes.fotos_count` no cuenta los guardados publicados (arrastre de ADR-054); (b) la lectura por `usuario_id` de `album_detalle` permite observar `ya_guardado_album`/`es_propio` de un tercero sin sesion (deuda D-11 heredada); (c) la curaduria de MODIFICACION de fichas (proponer/votar cambios) queda DIFERIDA a Fase 2 con ADR propio.
+- **Dependencia:** migraciones 019/023/032 ya aplicadas en Neon; `xp_ledger` (031) sin CHECK en `accion`.
+- **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); sin migracion; NO mueve las fotos individuales (siguen rigiendose por `album_fotos.visible`); NO implementa la curaduria de modificacion (Fase 2).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -3256,3 +3256,42 @@ Negativas / **deuda aceptada:**
 - **Numeracion (ADR-006):** la spec, la migracion y los comentarios del codigo citan **ADR-056** desde la renombracion (ya ALINEADOS); este ADR es el **056** (el siguiente real tras ADR-055).
 
 **ADRs relacionados:** ADR-001 (8/8 endpoints; ramas `?tipo=`/`?recurso=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico / MERGE JSONB del inventario), ADR-006 (baseline = archivo real), ADR-008 (esquema versionado e idempotente), ADR-018 (economia de XP y de-nivel), ADR-028 (catalogo de consumibles administrable, sin CHECK), ADR-035/ADR-053 (XP `numeric(12,2)`; `nivel_max` y nivel ganado que no decae), ADR-041 (eras/titulos), ADR-042 (migracion 027: columnas de consumibles), ADR-055 (Mercado; producibles `prod_*` quedan sin gate). Bugs: BUG-021/BUG-060 (migracion-antes-de-deploy), BUG-026 (emojis en SQL).
+
+---
+
+## ADR-057: Guardar album (bookmark fuente='album') con XP dual + album personal "Mi Museo" fuera del mapa publico
+
+**Fecha:** 2026-09-23
+**Estado:** IMPLEMENTADO EN WORKING TREE (sin commitear)
+**Decisores:** operador + backend-dev + frontend-tpl + js-silo-dev; cierre documental por docs-keeper.
+
+**Problema:** El operador reporto tres carencias alrededor de los albumes personales de "mi museo": (1) los albumes personales NO deben aparecer en los mapas publicos; (2) al entrar a un album debe poder GUARDARSE (bookmark) y ese guardado debe salir en "mi museo"; (3) la accion de guardar debe dar puntos a quien la ejecuta y al dueno del album, dentro de una escala de XP que crece con la complejidad del aporte (guardar < resena < subir un espacio completo). El backend ya soportaba el bookmark `fuente='album'` en `guardar_media` (ADR-054) y `mis_guardados_media` ya pintaba la rama `fuente='album'` en "Mis guardados" (`mi-perfil.html`), pero: no existia boton en el visor del album, guardar no daba XP, y el pin de `album_grupo` de "Mi Museo" SI se emitia en `multimedia_mapa` (el filtro `excluir_museo` solo aplicaba a `GET albumes`).
+
+**Decision:**
+1. **Guardar album = bookmark `media_guardados` con `fuente='album'`** (reusa el contrato ADR-054; sin tabla nueva). El visor del album (`galeria.html` `gOpenAlbum`, `comunidad.html` `abrirAlbumModal`) emite un boton `data-ma-save data-ma-fuente="album" data-ma-item="<album_id>"` bindeado con `window.MediaActions` (Regla de No-Duplicidad, AGENTS.md 2.1).
+2. **XP dual al guardar un album (una sola vez):** **+5 al ejecutor** (`album_guardado`) y **+10 al dueno** (`album_guardado_autor`, solo si el dueno es distinto del ejecutor, anti self-farm). Se acredita con el pipeline canonico (`contextoXpE` -> `calcularXpAcreditado` -> `registrarXpLedger` -> `acreditarClaseYCofre` -> `repartirXpReferidos`). **Reactivar NO re-paga** (dedup por `gmYaActivo`, espejo de `guardado`). Se ubica en la escala de complejidad por encima del guardado simple (3) y del voto de media (3), por debajo de una resena corta (10).
+3. **Album auto "Mi Museo" fuera del mapa publico:** `multimedia_mapa` rama `album_grupo` agrega `AND translate(lower(a.titulo), chr(...), 'aaeeiioouuun') <> 'mi museo'` (match **tolerante a acentos** — "Mi Museo"/"Mí Museo" — sin bytes no-ASCII en el fuente, ADR-002). `excluir_museo` de `GET albumes` usa el MISMO criterio. Defensa espejo en `mapa-cultural.js` `filterMediaDefault` via normalizacion NFD. Las **fotos** individuales NO se tocan: siguen rigiendose por `album_fotos.visible` (ADR-039).
+4. **Estado del boton:** `GET ?tipo=album_detalle` devuelve `ya_guardado_album` (bookmark del usuario del query) y `es_propio` (usuario del query == dueno); el boton nace en estado correcto y se OCULTA en el album propio.
+5. **Sin migracion:** `xp_ledger.accion` es `text` sin CHECK (migracion 031), por lo que las acciones nuevas se registran sin tocar esquema. **8/8 INTACTO** (ADR-001/ADR-010).
+
+**Alternativas consideradas:**
+1. **Migracion con flag `albumes.personal boolean` (RECHAZADA en esta entrega):** mas robusta para distinguir cualquier album personal, pero sale de express (esquema) y el operador eligio el criterio del titulo auto "Mi Museo" (mismo patron que `excluir_museo`).
+2. **Ocultar tambien las fotos de albumes personales (RECHAZADA):** el operador eligio ocultar SOLO el pin de album; las fotos ya son privadas por defecto (`album_fotos.visible`, ADR-039).
+3. **XP solo al ejecutor (RECHAZADA):** el pedido explicito es premiar tambien al dueno por tener contenido que otros guardan (fomenta curaduria de calidad).
+4. **Re-pagar XP al re-guardar (RECHAZADA):** permitiria farming; se alinea con el dedup de `guardado`.
+5. **Curaduria de MODIFICACION de fichas en esta entrega (DIFERIDA a Fase 2):** el operador confirmo diferirla; requerira ADR propio (patron Activos Ocultos: proponer/votar/moderar).
+
+**Impacto:**
+- **`api/interacciones.js`:** `XP_BASES` +2 claves (`album_guardado:5`, `album_guardado_autor:10`); `album_detalle` (+`ya_guardado_album`/`es_propio`, L5012-5025 y L5076); `guardar_media` (XP dual en el alta, L8333-8399); `multimedia_mapa` `album_grupo` (L5606) y `albumes` (L4906) con match tolerante a acentos. Sin endpoints nuevos.
+- **`galeria.html`** (L559-568, L644-645, L661-663); **`comunidad.html`** (L185-186, L2125-2135, boton a la derecha con `.av-album-head` flex); **`mapa-cultural.js`** (L200-205). `mi-perfil.html` SIN cambios (ya pintaba `fuente='album'`).
+- **Smokes:** `smoke_gamificacion_v6.js` (24 -> 26 claves de `XP_BASES`) y `smoke_038_casas_clases.js` (call-sites 21 -> 23; `acreditarClaseYCofre` 20 -> 22).
+
+**Consecuencias:**
+Positivas: cierra el circuito de curaduria por guardado (aportar/guardar contenido de calidad da XP a ambos lados); reusa el contrato ADR-054 sin esquema nuevo; el mapa publico deja de exponer el album personal auto; la escala de XP queda coherente con la complejidad.
+Negativas / **deuda aceptada:**
+- El badge `albumes.fotos_count` NO cuenta los guardados publicados (arrastre de ADR-054).
+- La lectura por `usuario_id` de `album_detalle` permite observar `ya_guardado_album`/`es_propio` de un tercero sin sesion (deuda D-11 heredada).
+- **Curaduria de MODIFICACION diferida a Fase 2** (ADR propio).
+- La exclusion por titulo auto "Mi Museo" no cubre albumes personales con otro nombre (si se quiere, requiere el flag de la alternativa 1).
+
+**ADRs relacionados:** ADR-001/ADR-010 (8/8; ramas `?tipo=`), ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-017 (albumes), ADR-039 (Museo URL-only; `album_fotos.visible`), ADR-044 (`media-actions.js`; `data-ma-*`), ADR-053 (motor de XP: `M_nivel`, `xp_ledger`), ADR-054 (guardados de media en albumes; fuente='album'). Bugs: BUG-061 (guardar_media legacy sin validar sesion en ramas de destino; ajeno, no empeorado).

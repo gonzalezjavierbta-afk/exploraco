@@ -348,6 +348,8 @@ var XP_BASES = {
   album_crear: 25,
   album_foto: 20,
   album_foto_autor: 10,
+  album_guardado: 5,
+  album_guardado_autor: 10,
   voto_media: 3,
   ao_votar: 5,
   ao_proponer: 30,
@@ -4901,7 +4903,10 @@ module.exports = async function handler(req, res) {
         var albumParams = [];
         var np = 0;
         var albumWhere = ' WHERE a.activo = true';
-        if (albumExcluirMuseo) albumWhere += " AND LOWER(a.titulo) <> 'mi museo'";
+        // v28: match tolerante a acentos (Mi con acento en la i) via
+        // translate(chr()) sin bytes no-ASCII en el fuente (ADR-002). chr: a=225/224, e=233/232,
+        // i=237/236, o=243/242, u=250/249/252, n=241.
+        if (albumExcluirMuseo) albumWhere += " AND translate(lower(a.titulo), chr(225)||chr(224)||chr(233)||chr(232)||chr(237)||chr(236)||chr(243)||chr(242)||chr(250)||chr(249)||chr(252)||chr(241), 'aaeeiioouuun') <> 'mi museo'";
         if (albumUsuarioId) { np++; albumWhere += ' AND a.usuario_id = $' + np; albumParams.push(albumUsuarioId); }
         if (albumCiudad) { np++; albumWhere += ' AND a.ciudad = $' + np; albumParams.push(albumCiudad); }
         if (albumTipo) { np++; albumWhere += ' AND a.tipo = $' + np; albumParams.push(albumTipo); }
@@ -5007,6 +5012,21 @@ module.exports = async function handler(req, res) {
         var adEsDueno = !!(adSes.ok && albumDetRows[0].usuario_id
           && String(adSes.sub) === String(albumDetRows[0].usuario_id));
 
+        // v28: bookmark del ALBUM por el usuario consultado (fuente='album').
+        // Se lee con el usuarioId del query (mismo patron que ya_votado/
+        // ya_guardado por foto) para que el boton nazca en estado correcto
+        // en galeria.html y comunidad.html. Degrada a false sin la 019/032.
+        var adYaGuardadoAlbum = false;
+        if (usuarioId) {
+          var adMgAlbum = await conDegradacionMedia(sql(
+            'SELECT 1 FROM media_guardados WHERE usuario_id=$1 AND fuente=\'album\' AND item_id=$2 AND activo=true LIMIT 1',
+            [usuarioId, String(albumId)]
+          ), 'media_guardados', []);
+          adYaGuardadoAlbum = adMgAlbum.length > 0;
+        }
+        var adEsPropioAlbum = !!(usuarioId && albumDetRows[0].usuario_id
+          && String(usuarioId) === String(albumDetRows[0].usuario_id));
+
         var adGuardados = await conDegradacionMedia(sql(
           'SELECT sub.* FROM ('
           + ' SELECT mg.item_id::text AS id, af.foto_url, af.foto_type, af.media_title,'
@@ -5056,7 +5076,7 @@ module.exports = async function handler(req, res) {
           [albumId, adEsDueno]
         ), 'media_guardados', []);
 
-        return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows, guardados: adGuardados, albumes_guardados: adAlbumesGuardados });
+        return res.status(200).json({ ok: true, album: albumDetRows[0], fotos: fotosDetRows, guardados: adGuardados, albumes_guardados: adAlbumesGuardados, ya_guardado_album: adYaGuardadoAlbum, es_propio: adEsPropioAlbum });
       }
 
       // Galeria de un destino (ficha publica): fotos curadas de
@@ -5586,6 +5606,7 @@ module.exports = async function handler(req, res) {
             + ' WHERE af3.album_id = a.id AND af3.activo = true' + mgVis('af3') + ') AS fotos_count'
             + ' FROM albumes a'
             + ' WHERE a.activo = true AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
+            + ' AND translate(lower(a.titulo), chr(225)||chr(224)||chr(233)||chr(232)||chr(237)||chr(236)||chr(243)||chr(242)||chr(250)||chr(249)||chr(252)||chr(241), \'aaeeiioouuun\') <> \'mi museo\''
             + ' AND EXISTS (SELECT 1 FROM album_fotos af'
             + ' WHERE af.album_id = a.id AND af.activo = true' + mgVis('af') + ')'
             + (mgIdxCiudad ? ' AND a.ciudad = $' + mgIdxCiudad : '')
@@ -8313,15 +8334,24 @@ module.exports = async function handler(req, res) {
           }
 
           var gmExiste = false;
+          var gmAlbumDueno = null;
           if (gmFuente === 'album') {
-            var gmAl = await sql('SELECT id FROM albumes WHERE id::text=$1 AND activo=true', [gmItem]).catch(function(){ return []; });
+            var gmAl = await sql('SELECT id, usuario_id FROM albumes WHERE id::text=$1 AND activo=true', [gmItem]).catch(function(){ return []; });
             gmExiste = gmAl.length > 0;
+            if (gmExiste) gmAlbumDueno = String(gmAl[0].usuario_id);
           } else {
             var gmTarget = await resolverMediaItem(sql, gmFuente, gmItem);
             gmExiste = gmTarget.ok;
           }
           if (!gmExiste)
             return res.status(404).json({ ok: false, error: 'Media no encontrada' });
+
+          // v28: estado previo del bookmark para no re-pagar XP al reactivar.
+          var gmPrev = await sql(
+            'SELECT activo FROM media_guardados WHERE usuario_id = $1 AND fuente = $2 AND item_id = $3',
+            [gmUsuario, gmFuente, gmItem]
+          ).catch(function(){ return []; });
+          var gmYaActivo = !!(gmPrev.length && gmPrev[0].activo);
 
           await sql(
             'INSERT INTO media_guardados (usuario_id, fuente, item_id, activo, creado_en)'
@@ -8330,6 +8360,45 @@ module.exports = async function handler(req, res) {
             + ' DO UPDATE SET activo = true, creado_en = NOW()',
             [gmUsuario, gmFuente, gmItem]
           );
+
+          // v28: XP dual al guardar un ALBUM (ejecutor 5 / dueno 10), solo en
+          // el alta; reactivar no re-paga. Espejo del patron album_foto_autor.
+          if (gmFuente === 'album' && !gmYaActivo) {
+            try {
+              var ctxGm = await contextoXpE(sql, gmUsuario);
+              var resGm = await calcularXpAcreditado(sql, XP_BASES.album_guardado,
+                ctxGm.nivel_clase, ctxGm.clase_id, ctxGm.tag,
+                { nivel_usuario: ctxGm.nivel_usuario });
+              var xpGmFinal = resGm.xp_final;
+              await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpGmFinal, gmUsuario]).catch(function(eU){ console.warn('[interacciones] guardar_media xp ejecutor no acreditado: ' + (eU && eU.message)); });
+              await acreditarClaseYCofre(sql, gmUsuario, ctxGm, xpGmFinal);
+              await repartirXpReferidos(sql, gmUsuario, xpGmFinal);
+              await registrarXpLedger(sql, {
+                usuario_id: gmUsuario, accion: 'album_guardado', xp_base: XP_BASES.album_guardado,
+                mult_nivel: resGm.m_nivel, mult_stack: resGm.mult_stack,
+                mult_final: resGm.mult_global_c, cap_aplicado: resGm.cap_aplicado,
+                xp_final: xpGmFinal, contexto: { album_id: gmItem, canal: 'guardar_media' }
+              });
+              if (gmAlbumDueno && gmAlbumDueno !== String(gmUsuario)) {
+                var ctxGmA = await contextoXpE(sql, gmAlbumDueno);
+                var resGmA = await calcularXpAcreditado(sql, XP_BASES.album_guardado_autor,
+                  ctxGmA.nivel_clase, ctxGmA.clase_id, ctxGmA.tag,
+                  { nivel_usuario: ctxGmA.nivel_usuario });
+                var xpGmAFinal = resGmA.xp_final;
+                await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpGmAFinal, gmAlbumDueno]).catch(function(eD){ console.warn('[interacciones] guardar_media xp dueno no acreditado: ' + (eD && eD.message)); });
+                await acreditarClaseYCofre(sql, gmAlbumDueno, ctxGmA, xpGmAFinal);
+                await repartirXpReferidos(sql, gmAlbumDueno, xpGmAFinal);
+                await registrarXpLedger(sql, {
+                  usuario_id: gmAlbumDueno, accion: 'album_guardado_autor', xp_base: XP_BASES.album_guardado_autor,
+                  mult_nivel: resGmA.m_nivel, mult_stack: resGmA.mult_stack,
+                  mult_final: resGmA.mult_global_c, cap_aplicado: resGmA.cap_aplicado,
+                  xp_final: xpGmAFinal, contexto: { album_id: gmItem, guardador_id: gmUsuario }
+                });
+              }
+            } catch (eGmXp) {
+              console.warn('[interacciones] guardar_media XP no acreditado: ' + (eGmXp && eGmXp.message));
+            }
+          }
           return res.status(200).json({ ok: true, guardado: true });
         } catch (eGuardarMedia) {
           if (eGuardarMedia && (eGuardarMedia.code === '42P01' || eGuardarMedia.code === '42703' || eGuardarMedia.code === '22P02')) {

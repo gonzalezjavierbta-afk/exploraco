@@ -22,7 +22,7 @@
 //      - calcularXpFinal (110 / 143 / 93.5 + red2) y calcularNivelClase.
 //      - acreditarClaseYCofre (50% clase + 10% cofre, sin clase/casa y
 //        best-effort ante sql que falla).
-//      - whitelist de 15 puntos con contextoXpE + calcularXpFinal +
+//      - whitelist de 23 puntos con contextoXpE + calcularXpFinal +
 //        acreditarClaseYCofre, y EXCLUIDOS sin el helper.
 //      - contadores total_resenas/total_guardados/total_visitas; +10 al
 //        autor original fuera del helper; bono rural plano.
@@ -599,12 +599,15 @@ async function run() {
   // 20 = los 15 de v21 + ao_proponer, spot_atributos, plan_crear,
   // plan_unirse y album_foto_autor ruteado por catalogo (ADR-053 Dec 9).
   // 21 = +1 por publicar_lugar (Fase 2: XP de publicacion al aprobar).
-  var XP_CALLSITES_ESPERADOS = 21;
-  var XP_ACREDITADO_ESPERADOS = 21;
+  // 23 = +2 por guardar_media (v28: XP dual al guardar album, ejecutor +
+  // dueno; cada uno con su propio contextoXpE/calcularXpAcreditado).
+  var XP_CALLSITES_ESPERADOS = 23;
+  var XP_ACREDITADO_ESPERADOS = 23;
   // El +10 al autor original de album_agregar_foto queda EXENTO de
   // acreditarClaseYCofre (no tributa clase/cofre), pero SI usa el motor.
   // 20 = 19 previos + publicar_lugar (Fase 2).
-  var ACREDITAR_CLASE_ESPERADOS = 20;
+  // 22 = +2 por guardar_media (v28: ejecutor y dueno tributan clase/cofre).
+  var ACREDITAR_CLASE_ESPERADOS = 22;
   var anclas = [];
   var posCtx = srcInt.indexOf('contextoXpE(');
   while (posCtx !== -1) {

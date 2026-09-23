@@ -6,7 +6,7 @@
 //   2. Caso tope: doble cap secuencial (5.0 / 10.0).
 //   3. Caso sin recorte (cap_aplicado 'ninguno').
 //   4. Sin piso 1.0 (Casa dominante preserva x0.85).
-//   5. Catalogo unico XP_BASES (19 claves, bases del contrato v2.1).
+//   5. Catalogo unico XP_BASES (26 claves, bases del contrato v2.1).
 //   6. leerConfigGamificacion degrada 42P01 a constantes con warn.
 //   7. completitudSpotAtributos por categoria (ADR-016 / ADR-053 Dec 9).
 //   8. registrarXpLedger es best-effort (no propaga excepcion, warn).
@@ -136,11 +136,12 @@ async function run() {
 
   // ================= 5. XP_BASES ====================================
   var claves = Object.keys(XP_BASES);
-  check('5a: XP_BASES tiene exactamente 24 claves', claves.length === 24, claves.length);
+  check('5a: XP_BASES tiene exactamente 26 claves', claves.length === 26, claves.length);
   var basesEsperadas = {
     visita: 60, visita_bono_rural: 25, resena_larga: 30, resena_corta: 10,
     rating: 5, guardado: 3, chat_comentario: 6, foto_viajero: 30,
-    album_crear: 25, album_foto: 20, album_foto_autor: 10, voto_media: 3,
+    album_crear: 25, album_foto: 20, album_foto_autor: 10,
+    album_guardado: 5, album_guardado_autor: 10, voto_media: 3,
     ao_votar: 5, ao_proponer: 30, ao_checkin: 20, plan_crear: 20,
     plan_unirse: 6, spot_atributos: 10,
     publicar_basico: 25, publicar_intermedio: 60, publicar_completo: 120,

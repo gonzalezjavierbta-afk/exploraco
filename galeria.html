@@ -556,12 +556,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         + (st.es_propia ? ' disabled' : '')
         + '>\u2B50 <span id="g-act-vote-n" data-ma-count>' + (parseInt(st.votos, 10) || 0) + '</span></button>';
     }
-    h += '<button type="button" class="g-act' + (st.ya_guardado ? ' on' : '') + '" id="g-act-save"'
-      + ' data-ma-save data-ma-fuente="' + esc(st.saveFuente || 'album_foto') + '"'
-      + ' data-ma-item="' + esc(String(st.saveItem == null ? '' : st.saveItem)) + '"'
-      + ' data-ma-ya-guardado="' + (st.ya_guardado ? '1' : '0') + '">'
-      + (st.ya_guardado ? 'Guardado' : 'Guardar') + '</button>'
-      + '<button type="button" class="g-act" id="g-modal-share">Compartir</button>'
+    if (!(st.saveFuente === 'album' && st.es_propio_album)) {
+      h += '<button type="button" class="g-act' + (st.ya_guardado ? ' on' : '') + '" id="g-act-save"'
+        + ' data-ma-save data-ma-fuente="' + esc(st.saveFuente || 'album_foto') + '"'
+        + ' data-ma-item="' + esc(String(st.saveItem == null ? '' : st.saveItem)) + '"'
+        + ' data-ma-ya-guardado="' + (st.ya_guardado ? '1' : '0') + '">'
+        + (st.ya_guardado ? 'Guardado' : 'Guardar') + '</button>';
+    }
+    h += '<button type="button" class="g-act" id="g-modal-share">Compartir</button>'
       + '</div>';
     return h;
   }
@@ -639,7 +641,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     document.body.style.overflow = 'hidden';
     document.getElementById('g-modal-title').textContent = 'Album';
     box.innerHTML = gLoadingHTML('Cargando album...');
-    gFetchJson('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId))
+    gFetchJson('/api/interacciones?tipo=album_detalle&album_id=' + encodeURIComponent(albumId)
+      + (gUsuarioId() ? '&usuario_id=' + encodeURIComponent(gUsuarioId()) : ''))
       .then(function (res) {
         if (!res.ok || !res.album) {
           box.innerHTML = gErrorHTML(gErrMsg(res));
@@ -655,7 +658,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           shareFuente: 'album_foto', shareItem: portada ? String(portada.id) : '',
           votos: portada ? (parseInt(portada.votos, 10) || 0) : 0,
           ya_votado: portada ? !!portada.ya_votado : false,
-          ya_guardado: false, es_propia: false,
+          ya_guardado: !!album.ya_guardado_album,
+          es_propia: false,
+          es_propio_album: !!album.es_propio,
           caption: album.titulo || 'Album'
         };
         var html = '<div class="g-detail-title">' + esc(album.titulo || 'Album') + '</div>'
