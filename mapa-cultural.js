@@ -700,7 +700,11 @@
       var tipo = item.media_type || 'foto';
       var esDestino = (item.origen === 'destino');
       var esAlbumDestino = (item.origen === 'destino_album');
-      var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#9b59b6' : (esDestino ? '#1f8a70' : '#E8A020'));
+      // Color base por tipo de media: video=rojo, audio=verde, fotos=morado.
+      // Los items individuales van en pin REDONDO; el album curado del
+      // destino (destino_album) conserva su ambar como contenedor y se pinta
+      // CUADRADO (clase mpa-media-pin-album) para distinguirse de los items.
+      var color = (tipo === 'video') ? '#e74c3c' : ((tipo === 'audio') ? '#2ecc71' : '#8e44ad');
       if (esAlbumDestino) color = '#d97706';
       var ico = esAlbumDestino ? '\uD83D\uDCDA' : ((tipo === 'video') ? '\u25B6' : ((tipo === 'audio') ? '\u266B' : fotoIcon()));
       var cls = 'mpa-media-pin'
