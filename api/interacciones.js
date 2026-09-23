@@ -4297,7 +4297,10 @@ module.exports = async function handler(req, res) {
         var mpId = String(req.query.usuario_id || req.query.id || '');
         // Migracion 004 pendiente: si usuarios.foto_url aun no existe en
         // Neon (42703), el museo publico reintenta por query con
-        // avatar_url AS foto_url y responde 200 en vez del 503 global.
+        // avatar_url (la plantilla YA aporta el "AS foto_url") y responde
+        // 200 en vez del 503 global. El reemplazo NO debe incluir "AS":
+        // incluirlo genera "avatar_url AS foto_url AS foto_url" (syntax
+        // error 42601 -> 500; BUG-060 variante AS duplicado).
         // El resto de la rama (incluido el 403 PERFIL_PRIVADO) no cambia.
         var mpRows = await queryConAvatarFallback(
           sql,
@@ -4306,7 +4309,7 @@ module.exports = async function handler(req, res) {
           + ' perfil_config'
           + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
           [mpId],
-          ['foto_url', 'avatar_url AS foto_url']
+          ['foto_url', 'avatar_url']
         );
         if (!mpRows.length)
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
