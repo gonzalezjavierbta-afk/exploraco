@@ -364,6 +364,12 @@ var XP_BASES = {
   publicar_bono_foto: 30
 };
 
+// Regalias pasivas (migracion 037): porcentaje ADICIONAL de XP que se
+// "mintea" al autor de un medio/espacio cada vez que OTRO usuario
+// interactua con el. Es un saldo derivado (no una moneda nueva, ADR-018)
+// que al reclamarse se acredita a usuarios.xp_total. Tunable en codigo.
+var REGALIA_PCT = 0.20;
+
 // ADR-053 Decision 1/2 (v25): M_nivel lineal de x1.0 (N1) a x3.0 (N40) y
 // FALLBACK en codigo de los 3 parametros de gamificacion_config. Las
 // constantes son el fallback y el valor semilla, nunca una segunda fuente.
@@ -1300,6 +1306,83 @@ function acreditarInventario(sql, usuarioId, clave, cantidad) {
     + ' WHERE id=$1::uuid',
     [usuarioId, clave, cantidad]
   );
+}
+
+// Regalias pasivas (migracion 037): resuelve el autor de un recurso de
+// media/espacio. Devuelve un uuid en texto o null. Best-effort total:
+// cualquier fallo degrada a null registrando el motivo (nunca lanza,
+// nunca bloquea la interaccion principal).
+function resolverAutorMedia(sql, fuente, itemId) {
+  var f = String(fuente || '').toLowerCase();
+  var id = String(itemId || '').trim();
+  if (!id) return Promise.resolve(null);
+  var q;
+  if (f === 'album_foto') {
+    q = sql('SELECT COALESCE(autor_original_id, agregador_id) AS autor_id FROM album_fotos WHERE id=$1::uuid', [id]);
+  } else if (f === 'viajero_foto') {
+    q = sql('SELECT usuario_id AS autor_id FROM interacciones WHERE id=$1::uuid', [id]);
+  } else if (f === 'destino') {
+    q = sql("SELECT CASE WHEN (tags->>'autor_id') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (tags->>'autor_id')::uuid END AS autor_id FROM destinos WHERE id=$1::uuid", [id]);
+  } else {
+    // 'curada' no tiene autor propio; el resto de fuentes tampoco.
+    return Promise.resolve(null);
+  }
+  return q.then(function(r){ return (r[0] && r[0].autor_id) ? String(r[0].autor_id) : null; })
+    .catch(function(eAu) {
+      console.warn('[regalias] autor no resuelto (' + f + '/' + id + '): ' + (eAu && eAu.message));
+      return null;
+    });
+}
+
+// Regalias pasivas (037): acumula al autor un porcentaje (REGALIA_PCT) del
+// XP base que genero la interaccion de OTRO usuario. UPSERT por
+// (fuente, item_id); NUNCA paga auto-regalias (actor === autor). Best-effort:
+// si la 037 no corrio degrada registrando el motivo, sin bloquear.
+function acumularRegalia(sql, fuente, itemId, xpBaseInteraccion, actorId) {
+  var monto = red2((Number(xpBaseInteraccion) || 0) * REGALIA_PCT);
+  if (monto <= 0 || !itemId) return Promise.resolve();
+  return resolverAutorMedia(sql, fuente, itemId).then(function(autorId) {
+    if (!autorId || (actorId && String(autorId) === String(actorId))) return;
+    return sql(
+      'INSERT INTO regalias (fuente, item_id, autor_id, xp_acumulado, actualizado_en)'
+      + ' VALUES ($1,$2,$3::uuid,$4,NOW())'
+      + ' ON CONFLICT (fuente, item_id) DO UPDATE SET'
+      + ' xp_acumulado = regalias.xp_acumulado + EXCLUDED.xp_acumulado,'
+      + ' reclamado_en = NULL,'
+      + ' actualizado_en = NOW()',
+      [String(fuente || '').toLowerCase(), String(itemId), autorId, monto]
+    ).catch(function(eReg) {
+      console.warn('[regalias] acumulacion no registrada (037 pendiente): ' + (eReg && eReg.message));
+    });
+  }).catch(function(eRegOut) {
+    console.warn('[regalias] acumularRegalia fallo: ' + (eRegOut && eRegOut.message));
+  });
+}
+
+// Regalias pasivas (037): titulo legible del item para "Mis regalias".
+// Degrada a 'Media'/'Espacio'/'Foto' si la fila o columna no existe.
+function resolverTituloRegalia(sql, fuente, itemId) {
+  var f = String(fuente || '').toLowerCase();
+  var id = String(itemId || '').trim();
+  var fallback = (f === 'destino') ? 'Espacio' : 'Media';
+  if (!id) return Promise.resolve(fallback);
+  var q;
+  if (f === 'album_foto') {
+    q = sql('SELECT media_title FROM album_fotos WHERE id=$1::uuid', [id])
+      .then(function(r){ return (r[0] && r[0].media_title) ? String(r[0].media_title) : fallback; });
+  } else if (f === 'destino') {
+    q = sql('SELECT nombre FROM destinos WHERE id=$1::uuid', [id])
+      .then(function(r){ return (r[0] && r[0].nombre) ? String(r[0].nombre) : fallback; });
+  } else if (f === 'viajero_foto') {
+    q = sql("SELECT dims->>'media_title' AS media_title FROM interacciones WHERE id=$1::uuid", [id])
+      .then(function(r){ return (r[0] && r[0].media_title) ? String(r[0].media_title) : 'Foto'; });
+  } else {
+    return Promise.resolve(fallback);
+  }
+  return q.catch(function(eTit) {
+    console.warn('[regalias] titulo no resuelto (' + f + '/' + id + '): ' + (eTit && eTit.message));
+    return fallback;
+  });
 }
 
 // Mapeo art_* <-> vocacion: las 4 ramas de artista ESPEJAN
@@ -2644,6 +2727,12 @@ function aplicarAmuletoX2(sql, usuarioId, xpBase) {
   var base = red2(xpBase);
   if (!usuarioId) return Promise.resolve({ xp: base, doubled: false });
   return leerCapacidades(sql, usuarioId).then(function(caps) {
+    // Bono de bienvenida (036): multiplicador x2 TEMPORAL por fecha
+    // (capacidades.multiplicador_xp_hasta). Si la fecha es futura se honra
+    // SIN consumir usos; convive con el contador clasico de abajo.
+    var hasta = caps.multiplicador_xp_hasta;
+    if (hasta && new Date(hasta).getTime() > Date.now())
+      return { xp: base, doubled: true };
     var usos = parseInt(caps.multiplicador_x2_usos, 10) || 0;
     if (usos <= 0) return { xp: base, doubled: false };
     return actualizarCapacidad(sql, usuarioId, 'multiplicador_x2_usos', usos - 1)
@@ -3475,6 +3564,8 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion) {
             mult_final: resVoto.mult_global_c, cap_aplicado: resVoto.cap_aplicado,
             xp_final: xpVotoFinal, contexto: { fuente: f, item_id: id, carga: carga }
           });
+          // Regalias pasivas (037): parte del XP base al autor de la media.
+          await acumularRegalia(sqlFn, f, id, XP_BASES.voto_media, usuarioId);
           return base({ nuevo: true, xp: xpVotoFinal, xp_detalle: armarXpDetalle(xpBaseVoto, resVoto, 0) });
         });
     });
@@ -5977,6 +6068,13 @@ module.exports = async function handler(req, res) {
             catEraUsuario = calcularEraVisibleLocal(catUsrRows[0].xp_total, catUsrRows[0].nivel_max);
           }
         }
+        // Bono de bienvenida (036): los 3 consumibles bienvenida_* son
+        // regalo del flujo de referidos, NO comprables; se excluyen de la
+        // tienda. El filtro va en JS para cubrir tambien la ruta de
+        // degradacion (columna categoria/era ausente).
+        catalogoConsumibles = catalogoConsumibles.filter(function(c) {
+          return String((c && c.clave) || '').indexOf('bienvenida_') !== 0;
+        });
         // numeric(12,2) llega como string: normalizar el precio (ADR-035).
         // era_exclusiva se uniforma a null cuando la columna no existe o el
         // valor es vacio; bloqueado solo aplica con usuario_id presente.
@@ -5987,6 +6085,85 @@ module.exports = async function handler(req, res) {
           return c;
         });
         return res.status(200).json({ ok: true, data: catalogoConsumibles, era_usuario: catEraUsuario });
+      }
+
+      // Bono de bienvenida por referido (036): estado del reclamo + catalogo
+      // de las 3 opciones. pendiente=true solo si el usuario fue referido y
+      // aun no reclamo; sin usuario_id devuelve pendiente=false igual con
+      // las opciones. Degrada a un respaldo literal si la 036 no corrio.
+      if (tipo === 'bonus_referido') {
+        var brOpciones = [];
+        try {
+          brOpciones = await sql(
+            'SELECT clave, nombre, descripcion FROM consumibles'
+            + ' WHERE clave IN (\'bienvenida_x2_24h\',\'bienvenida_ascenso\',\'bienvenida_fundador\')'
+            + ' AND activo=true'
+            + ' ORDER BY CASE clave'
+            + ' WHEN \'bienvenida_x2_24h\' THEN 1'
+            + ' WHEN \'bienvenida_ascenso\' THEN 2 ELSE 3 END',
+            []
+          );
+        } catch (eBrCat) {
+          console.warn('TRACE: GET bonus_referido sin catalogo: ' + (eBrCat && eBrCat.message));
+          brOpciones = [
+            { clave: 'bienvenida_x2_24h', nombre: 'Doble XP 24h', descripcion: 'Activa el multiplicador x2 de XP durante 24 horas.' },
+            { clave: 'bienvenida_ascenso', nombre: 'Ascenso al Nivel 6', descripcion: 'Asciende tu nivel ganado al 6 al instante.' },
+            { clave: 'bienvenida_fundador', nombre: 'Bendicion del Fundador', descripcion: 'Otorga un mapa extra, un album extra y vitrina destacada por 7 dias.' }
+          ];
+        }
+        var brPendiente = false;
+        var brReclamado = null;
+        if (usuarioId) {
+          var brRows = await sql(
+            'SELECT referido_por, capacidades FROM usuarios WHERE id=$1::uuid',
+            [usuarioId]
+          ).catch(function(eBrUsr){
+            console.warn('[interacciones] GET bonus_referido usuario no leido: ' + (eBrUsr && eBrUsr.message));
+            return [];
+          });
+          if (brRows.length) {
+            var brCaps = brRows[0].capacidades || {};
+            brReclamado = brCaps.bonus_referido_clave || null;
+            brPendiente = !!(brRows[0].referido_por && !brCaps.bonus_referido_reclamado);
+          }
+        }
+        return res.status(200).json({
+          ok: true, pendiente: brPendiente,
+          reclamado_clave: brReclamado, opciones: brOpciones
+        });
+      }
+
+      // Regalias pasivas (037): saldo pendiente + historico de items del
+      // autor. Sin usuario_id devuelve total 0 e items vacios. Si la tabla
+      // no existe degrada a items [] registrando el motivo.
+      if (tipo === 'mis_regalias') {
+        var mrItems = [];
+        if (usuarioId) {
+          mrItems = await sql(
+            'SELECT fuente, item_id, xp_acumulado, reclamado_en FROM regalias'
+            + ' WHERE autor_id=$1::uuid ORDER BY actualizado_en DESC LIMIT 50',
+            [usuarioId]
+          ).catch(function(eMr){
+            console.warn('[interacciones] GET mis_regalias no disponible (037 pendiente): ' + (eMr && eMr.message));
+            return [];
+          });
+        }
+        var mrTotal = 0;
+        var mrOut = [];
+        for (var mrI = 0; mrI < mrItems.length; mrI++) {
+          var mrIt = mrItems[mrI];
+          var mrXpSaldo = red2(numXp(mrIt.xp_acumulado));
+          var mrReclamado = mrIt.reclamado_en != null;
+          if (!mrReclamado) mrTotal = red2(mrTotal + mrXpSaldo);
+          mrOut.push({
+            fuente: mrIt.fuente,
+            item_id: mrIt.item_id,
+            titulo: await resolverTituloRegalia(sql, mrIt.fuente, mrIt.item_id),
+            xp_acumulado: mrXpSaldo,
+            reclamado: mrReclamado
+          });
+        }
+        return res.status(200).json({ ok: true, total_pendiente: mrTotal, items: mrOut });
       }
 
       // Inventario del usuario: consumibles como objeto clave ->
@@ -8361,6 +8538,10 @@ module.exports = async function handler(req, res) {
             [gmUsuario, gmFuente, gmItem]
           );
 
+          // Regalias pasivas (037): parte del XP base al autor de la media
+          // guardada (no aplica a 'album', sin autor unico).
+          await acumularRegalia(sql, gmFuente, gmItem, XP_BASES.guardado, gmUsuario);
+
           // v28: XP dual al guardar un ALBUM (ejecutor 5 / dueno 10), solo en
           // el alta; reactivar no re-paga. Espejo del patron album_foto_autor.
           if (gmFuente === 'album' && !gmYaActivo) {
@@ -9052,8 +9233,13 @@ module.exports = async function handler(req, res) {
         // ninguna se puede apilar sobre un x2 ya activo. Se conserva el texto
         // historico para amuleto_x2 (contrato previo) y uno generico para
         // las claves nuevas.
-        var UC_CLAVES_X2 = ['amuleto_x2', 'brujula_aprendiz', 'brujula_ruta'];
-        if (UC_CLAVES_X2.indexOf(ucClave) !== -1 && (parseInt(ucCaps.multiplicador_x2_usos, 10) || 0) > 0) {
+        var UC_CLAVES_X2 = ['amuleto_x2', 'brujula_aprendiz', 'brujula_ruta', 'bienvenida_x2_24h'];
+        // El bloqueo cubre el contador clasico Y el x2 TEMPORAL por fecha
+        // del bono de bienvenida (036): no se apilan dos x2 de ningun tipo.
+        var ucXp2HastaActivo = !!(ucCaps.multiplicador_xp_hasta
+          && new Date(ucCaps.multiplicador_xp_hasta).getTime() > Date.now());
+        if (UC_CLAVES_X2.indexOf(ucClave) !== -1
+          && ((parseInt(ucCaps.multiplicador_x2_usos, 10) || 0) > 0 || ucXp2HastaActivo)) {
           var ucMsgX2 = ucClave === 'amuleto_x2'
             ? 'Ya tienes un amuleto x2 activo'
             : 'Ya tienes un multiplicador x2 activo';
@@ -9266,6 +9452,36 @@ module.exports = async function handler(req, res) {
           ucEfecto = { titulo: 'Mito Eterno' };
           await actualizarCapacidad(sql, usuarioId2, 'perfil_nombre_eterno', true);
           await mergePerfilConfig(sql, usuarioId2, { titulo: 'Mito Eterno' });
+        } else if (ucClave === 'bienvenida_x2_24h') {
+          // Bono referido (036): x2 TEMPORAL por 24h guardado como fecha
+          // (multiplicador_xp_hasta); NO consume el contador clasico.
+          var ucX2Hasta = new Date(Date.now() + ucUnDia).toISOString();
+          ucEfecto = { multiplicador_xp_hasta: ucX2Hasta };
+          await actualizarCapacidad(sql, usuarioId2, 'multiplicador_xp_hasta', ucX2Hasta);
+        } else if (ucClave === 'bienvenida_ascenso') {
+          // Bono referido (036): ASCIENDE al nivel 6 (no +1). Monotono:
+          // GREATEST nunca baja la insignia ya ganada. Best-effort.
+          ucEfecto = { nivel_max: 6 };
+          await sql(
+            'UPDATE usuarios SET nivel_max = GREATEST(COALESCE(nivel_max,1), 6) WHERE id=$1::uuid',
+            [usuarioId2]
+          ).catch(function(eNv){
+            console.warn('[interacciones] bienvenida_ascenso nivel_max no actualizado: ' + (eNv && eNv.message));
+          });
+        } else if (ucClave === 'bienvenida_fundador') {
+          // Bono referido (036): 1 mapa extra + 1 album extra + vitrina
+          // estelar por 7 dias, aplicados con merge JSONB (ADR-003).
+          var ucFundMapas = parseInt(ucCaps.mapas_extra, 10) || 0;
+          var ucFundAlbums = parseInt(ucCaps.albums_extra, 10) || 0;
+          var ucFundVitrina = new Date(Date.now() + ucSieteDias).toISOString();
+          ucEfecto = {
+            mapas_extra: ucFundMapas + 1,
+            albums_extra: ucFundAlbums + 1,
+            vitrina_estelar_hasta: ucFundVitrina
+          };
+          await actualizarCapacidad(sql, usuarioId2, 'mapas_extra', ucFundMapas + 1);
+          await actualizarCapacidad(sql, usuarioId2, 'albums_extra', ucFundAlbums + 1);
+          await actualizarCapacidad(sql, usuarioId2, 'vitrina_estelar_hasta', ucFundVitrina);
         }
         // Ledger de uso append-only
         await sql(
@@ -9274,6 +9490,80 @@ module.exports = async function handler(req, res) {
           [usuarioId2, ucCons[0].id, JSON.stringify(ucEfecto)]
         ).catch(function(){});
         return res.status(200).json({ ok: true, efecto: ucEfecto });
+      }
+
+      // Bono de bienvenida por referido (036): reclama UNA sola vez el
+      // regalo que corresponde al usuario referido. Whitelist de las 3
+      // claves de regalo; acredita en inventario y marca
+      // capacidades.bonus_referido_reclamado (idempotente).
+      if (tipo2 === 'reclamar_bonus_referido') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var rbClave = String(body.clave || '').trim();
+        var RB_CLAVES = ['bienvenida_x2_24h', 'bienvenida_ascenso', 'bienvenida_fundador'];
+        if (RB_CLAVES.indexOf(rbClave) === -1)
+          return res.status(400).json({ ok: false, error: 'CLAVE_INVALIDA' });
+        var rbRows = await sql(
+          'SELECT referido_por, capacidades FROM usuarios WHERE id=$1::uuid',
+          [usuarioId2]
+        ).catch(function(eRb){
+          console.warn('[interacciones] reclamar_bonus_referido lectura fallida: ' + (eRb && eRb.message));
+          return [];
+        });
+        if (!rbRows.length)
+          return res.status(404).json({ ok: false, error: 'No encontrado' });
+        if (!rbRows[0].referido_por)
+          return res.status(403).json({ ok: false, error: 'SIN_REFERIDO' });
+        var rbCaps = rbRows[0].capacidades || {};
+        if (rbCaps.bonus_referido_reclamado)
+          return res.status(409).json({ ok: false, error: 'BONO_YA_RECLAMADO' });
+        await acreditarInventario(sql, usuarioId2, rbClave, 1);
+        await actualizarCapacidad(sql, usuarioId2, 'bonus_referido_reclamado', true);
+        await actualizarCapacidad(sql, usuarioId2, 'bonus_referido_clave', rbClave);
+        return res.status(200).json({ ok: true, clave: rbClave });
+      }
+
+      // Regalias pasivas (037): liquida TODO el saldo pendiente del autor en
+      // un solo pago. Degrada a xp_otorgado=0 si la tabla no existe (037
+      // pendiente), sin romper la accion.
+      if (tipo2 === 'reclamar_regalias') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        // Atribucion ATOMICA (data-modifying CTE): reclama y paga en una sola
+        // sentencia. El CTE pago solo corre si marcar afecto filas, de modo
+        // que dos reclamos concurrentes no duplican el credito; base calcula
+        // el monto y marcar lo consume (xp_acumulado=0). acumularRegalia
+        // reabre la fila (reclamado_en=NULL) en la siguiente interaccion.
+        var rrRes = await sql(
+          'WITH base AS ('
+          + ' SELECT COALESCE(SUM(xp_acumulado),0) AS total FROM regalias'
+          + ' WHERE autor_id=$1::uuid AND reclamado_en IS NULL'
+          + '), marcar AS ('
+          + ' UPDATE regalias SET reclamado_en = NOW(), xp_acumulado = 0'
+          + ' WHERE autor_id=$1::uuid AND reclamado_en IS NULL'
+          + ' RETURNING 1'
+          + '), pago AS ('
+          + ' UPDATE usuarios SET xp_total = xp_total + (SELECT total FROM base)'
+          + ' WHERE id=$1::uuid AND (SELECT COUNT(*) FROM marcar) > 0'
+          + ' AND (SELECT total FROM base) > 0'
+          + ' RETURNING 1'
+          + ') SELECT (CASE WHEN (SELECT COUNT(*) FROM marcar) > 0'
+          + ' THEN (SELECT total FROM base) ELSE 0 END) AS total',
+          [usuarioId2]
+        ).catch(function(eRr){
+          console.warn('[interacciones] reclamar_regalias no disponible (037 pendiente): ' + (eRr && eRr.message));
+          return null;
+        });
+        if (!rrRes) return res.status(200).json({ ok: true, xp_otorgado: 0 });
+        var rrTotal = red2(numXp(rrRes[0] && rrRes[0].total));
+        if (rrTotal > 0) {
+          await registrarXpLedger(sql, {
+            usuario_id: usuarioId2, accion: 'reclamar_regalias',
+            xp_base: rrTotal, xp_final: rrTotal, es_exento: true,
+            contexto: { origen: 'regalias' }
+          });
+        }
+        return res.status(200).json({ ok: true, xp_otorgado: rrTotal });
       }
 
       // Disparo manual de cromo (probabilidad 15% + CROMO_PROBABILIDADES).
@@ -9626,6 +9916,8 @@ module.exports = async function handler(req, res) {
             await repartirXpReferidos(sql, usuarioId2, cpXpFinal);
           }
         }
+        // Regalias pasivas (037): parte del XP base de compartir al autor.
+        await acumularRegalia(sql, cpFuente, cpItem, cpBase, usuarioId2);
         await registrarXpLedger(sql, {
           usuario_id: usuarioId2, accion: 'compartir', xp_base: cpBase,
           mult_nivel: cpResult ? cpResult.m_nivel : 1,
@@ -10652,6 +10944,9 @@ module.exports = async function handler(req, res) {
           'UPDATE usuarios SET xp_total=xp_total+$1, total_visitas=total_visitas+1 WHERE id=$2',
           [xpTotalVisita, usuarioId2]
         ).catch(function(){});
+        // Regalias pasivas (037): parte del XP base de la visita al autor
+        // del espacio (destinos.tags->>'autor_id'; null si no lo declara).
+        await acumularRegalia(sql, 'destino', destinoId2, XP_BASES.visita, usuarioId2);
         await acreditarClaseYCofre(sql, usuarioId2, ctxVisita, xpTotalVisita);
         await avanzarMisionesCasa(sql, usuarioId2, 'visitas', 1);
         await registrarXpLedger(sql, {
@@ -10771,6 +11066,8 @@ module.exports = async function handler(req, res) {
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
           [xpRatingFinal, usuarioId2]
         ).catch(function(){});
+        // Regalias pasivas (037): parte del XP base del rating al autor.
+        await acumularRegalia(sql, 'destino', destinoId2, XP_BASES.rating, usuarioId2);
         await acreditarClaseYCofre(sql, usuarioId2, ctxRating, xpRatingFinal);
         await registrarXpLedger(sql, {
           usuario_id: usuarioId2, accion: 'rating', xp_base: XP_BASES.rating,

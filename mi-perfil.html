@@ -204,6 +204,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .inv-use{padding:5px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.6px;transition:all .15s;font-family:'Outfit',sans-serif}
 .inv-use:hover{background:var(--gold);color:var(--black)}
 .inv-era{display:inline-block;margin-left:8px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gold);background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.3);border-radius:999px;padding:1px 7px}
+/* BONO DE BIENVENIDA POR REFERIDO (referidos) */
+.pf-bono{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(232,160,32,.14),rgba(232,160,32,.04));border:1px solid rgba(232,160,32,.35);border-radius:10px;padding:14px;margin-bottom:14px}
+.pf-bono-ico{font-size:24px;line-height:1}
+.pf-bono-txt{flex:1;min-width:0}
+.pf-bono-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
+.pf-bono-desc{font-size:11px;color:rgba(255,255,255,.55);line-height:1.4;margin-top:2px}
+.pf-bono-btn{padding:9px 16px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+.pf-bono-btn:hover{opacity:.88}
+/* MIS REGALIAS (regalias pasivas) */
+.pf-reg-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:6px}
+.pf-reg-item.reclamado{opacity:.55}
+.pf-reg-fuente{font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.3);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.pf-reg-titulo{flex:1;min-width:0;font-size:11px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-reg-xp{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--gold);white-space:nowrap}
+.pf-reg-btn{width:100%;padding:9px 0;margin-top:4px;background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;transition:opacity .15s}
+.pf-reg-btn:hover{opacity:.88}
+.pf-reg-btn:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);cursor:not-allowed}
+.pf-reg-vacio{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:16px}
 .cromo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px}
 .cromo-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;text-align:center}
 .cromo-card.rareza-comun{border-color:rgba(168,85,247,.35);background:rgba(168,85,247,.06)}
@@ -594,12 +612,21 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <!-- TIENDA DE CONSUMIBLES (Gamificacion v4) -->
   <div class="pf-section-title" data-tab="inventario">&#x1F6D2; Tienda de Consumibles</div>
   <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP disponibles</div>
+  <!-- Bono de bienvenida por referido (tarjeta destacada, oculta por defecto) -->
+  <div class="pf-bono" id="pf-bono" data-tab="inventario" style="display:none"></div>
   <div class="tienda-chips" id="pf-tienda-chips" data-tab="inventario"></div>
   <div class="store-grid" id="pf-tienda" data-tab="inventario"></div>
 
   <!-- MI INVENTARIO (Gamificacion v4) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F392; Mi Inventario</div>
   <div id="pf-inventario" data-tab="inventario"></div>
+
+  <!-- MIS REGALIAS (regalias pasivas del autor) -->
+  <section id="pf-regalias" data-tab="inventario" style="margin-top:20px">
+    <div class="pf-section-title">&#x1F381; Mis regalias</div>
+    <div class="pf-counter" id="pf-regalias-total">0 XP por reclamar</div>
+    <div id="pf-regalias-lista"></div>
+  </section>
 
   <!-- MIS CROMOS (Gamificacion v4) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F3AB; Mis Cromos</div>
@@ -1166,6 +1193,8 @@ function renderPerfil() {
   cargarTienda(u.id);
   cargarInventario(u.id);
   cargarCromos(u.id);
+  cargarBonoReferido(u.id);
+  cargarMisRegalias(u.id);
   if (window.Mercado) Mercado.cargarMi();
 
   /* mis albumes (ADR-017) */
@@ -1767,6 +1796,134 @@ function cargarInventario(uid) {
     })
     .catch(function(){
       el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar el inventario.</div>';
+    });
+}
+
+/* ---- BONO DE BIENVENIDA POR REFERIDO (feature referidos) ----
+   GET tipo=bonus_referido. Solo muestra la tarjeta cuando hay bono
+   pendiente y aun sin reclamar. El selector de opciones NO se
+   reimplementa aqui: lo provee usuario-session.js via
+   window.ExploraCO.mostrarSelectorBonoReferido. Degrada en silencio
+   (tarjeta oculta) si el endpoint falla o la funcion no existe. */
+function cargarBonoReferido(uid) {
+  var box = document.getElementById('pf-bono');
+  if (!box || !uid) return;
+  try {
+    fetchConJwt('/api/interacciones?tipo=bonus_referido&usuario_id=' + encodeURIComponent(uid))
+      .then(function(res){
+        try {
+          if (!(res && res.ok && res.pendiente === true && !res.reclamado_clave)) {
+            box.style.display = 'none';
+            return;
+          }
+          box.innerHTML = '<div class="pf-bono-ico">\uD83C\uDF81</div>'
+            + '<div class="pf-bono-txt">'
+            + '<div class="pf-bono-title">Tienes un bono de bienvenida</div>'
+            + '<div class="pf-bono-desc">Elige uno de los regalos por haber llegado con un referido. Solo puedes reclamarlo una vez.</div>'
+            + '</div>'
+            + '<button type="button" class="pf-bono-btn" onclick="pfElegirBono()">Elegir mi bono</button>';
+          box.style.display = 'flex';
+        } catch (eIn) {
+          console.warn('[mi-perfil] bono_referido render fallo: ' + (eIn && eIn.message));
+          box.style.display = 'none';
+        }
+      })
+      .catch(function(e){
+        console.warn('[mi-perfil] bono_referido no disponible: ' + (e && e.message));
+        box.style.display = 'none';
+      });
+  } catch (e) {
+    console.warn('[mi-perfil] bono_referido error: ' + (e && e.message));
+    box.style.display = 'none';
+  }
+}
+function pfElegirBono() {
+  var u = sesion();
+  if (!u || !u.id) return;
+  if (window.ExploraCO && typeof window.ExploraCO.mostrarSelectorBonoReferido === 'function') {
+    window.ExploraCO.mostrarSelectorBonoReferido({ id: u.id });
+  } else {
+    showToast('El selector de bono aun no esta disponible.', '#ef4444');
+  }
+}
+
+/* ---- MIS REGALIAS (regalias pasivas del autor) ----
+   GET tipo=mis_regalias: filas por item + saldo total pendiente.
+   Estados vacios discretos (nunca un error crudo). El boton Reclamar
+   solo aparece con saldo > 0 y liquida TODO el pendiente en un POST. */
+var PF_REG_FUENTE = { album_foto: 'Media', destino: 'Espacio', viajero_foto: 'Foto' };
+function pfRegFuente(f) {
+  var k = String(f || '').toLowerCase();
+  return PF_REG_FUENTE[k] || (k ? k.replace(/_/g, ' ') : 'Regalia');
+}
+function cargarMisRegalias(uid) {
+  var lista = document.getElementById('pf-regalias-lista');
+  var totalEl = document.getElementById('pf-regalias-total');
+  if (!lista || !uid) return;
+  lista.innerHTML = '<div class="pf-reg-vacio">Cargando regalias\u2026</div>';
+  try {
+    fetchConJwt('/api/interacciones?tipo=mis_regalias&usuario_id=' + encodeURIComponent(uid))
+      .then(function(res){
+        try {
+          var items = (res && res.ok && Array.isArray(res.items)) ? res.items : [];
+          var total = Number(res && res.total_pendiente) || 0;
+          if (totalEl) totalEl.textContent = fmtXp(total) + ' XP por reclamar';
+          if (!items.length) {
+            lista.innerHTML = '<div class="pf-reg-vacio">Aun no tienes regalias acumuladas.</div>';
+            return;
+          }
+          var filas = items.map(function(it){
+            var xp = Number(it.xp_acumulado) || 0;
+            var rec = it.reclamado === true;
+            return '<div class="pf-reg-item' + (rec ? ' reclamado' : '') + '">'
+              + '<span class="pf-reg-fuente">' + esc(pfRegFuente(it.fuente)) + '</span>'
+              + '<span class="pf-reg-titulo">' + esc(it.titulo || 'Sin titulo') + '</span>'
+              + '<span class="pf-reg-xp">' + (rec ? 'Reclamado' : fmtXp(xp) + ' XP') + '</span>'
+              + '</div>';
+          });
+          var btn = total > 0
+            ? '<button type="button" class="pf-reg-btn" id="pf-reg-btn" onclick="reclamarRegalias()">Reclamar ' + fmtXp(total) + ' XP</button>'
+            : '';
+          lista.innerHTML = filas.join('') + btn;
+        } catch (eIn) {
+          console.warn('[mi-perfil] mis_regalias render fallo: ' + (eIn && eIn.message));
+          lista.innerHTML = '<div class="pf-reg-vacio">Aun no tienes regalias acumuladas.</div>';
+        }
+      })
+      .catch(function(e){
+        console.warn('[mi-perfil] mis_regalias no disponible: ' + (e && e.message));
+        lista.innerHTML = '<div class="pf-reg-vacio">Aun no tienes regalias acumuladas.</div>';
+      });
+  } catch (e) {
+    console.warn('[mi-perfil] mis_regalias error: ' + (e && e.message));
+    lista.innerHTML = '<div class="pf-reg-vacio">Aun no tienes regalias acumuladas.</div>';
+  }
+}
+function reclamarRegalias() {
+  var u = sesion();
+  if (!u || !u.id) return;
+  var btn = document.getElementById('pf-reg-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reclamando\u2026'; }
+  fetchConJwt('/api/interacciones', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'reclamar_regalias', usuario_id: u.id })
+  })
+    .then(function(res){
+      if (res && res.ok) {
+        showToast('Reclamaste ' + fmtXp(Number(res.xp_otorgado) || 0) + ' XP de regalias');
+        cargarMisRegalias(u.id);
+        cargarBonoReferido(u.id);
+        if (typeof cargarSaldoXp === 'function') cargarSaldoXp();
+        else if (typeof cargarPerfil === 'function') cargarPerfil();
+        else if (typeof refrescarSesion === 'function') refrescarSesion();
+      } else {
+        showToast((res && res.error) || 'No se pudieron reclamar las regalias', '#ef4444');
+        if (btn) { btn.disabled = false; btn.textContent = 'Reclamar'; }
+      }
+    })
+    .catch(function(){
+      showToast('Error de conexion', '#ef4444');
+      if (btn) { btn.disabled = false; btn.textContent = 'Reclamar'; }
     });
 }
 
@@ -4349,7 +4506,7 @@ function pfTab(tab) {
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); if (window.Mercado) Mercado.cargarMi(); }
+  if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
   try { if (('#' + tab) !== window.location.hash) history.replaceState(null, '', '#' + tab); }

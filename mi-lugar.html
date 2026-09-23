@@ -176,6 +176,12 @@ a{color:var(--gd);text-decoration:none}
       <div id="resenas-panel"></div>
     </div>
 
+    <!-- REGALÍAS DEL ESPACIO (best-effort: solo con sesión de usuario) -->
+    <div class="section" id="regalias-espacio" style="display:none">
+      <div class="section-title">🎁 Regalías del espacio</div>
+      <div id="regalias-espacio-lista"></div>
+    </div>
+
   </div>
 
   <div id="error-state" style="display:none;text-align:center;padding:3rem 1rem;color:var(--muted)">
@@ -236,6 +242,9 @@ async function init() {
 
     document.getElementById('loading-state').style.display = 'none';
     document.getElementById('content').style.display = 'block';
+
+    // Regalías del espacio (best-effort: se oculta sin sesión)
+    renderRegaliasEspacio();
 
   } catch(err) {
     showError(err.message);
@@ -338,6 +347,83 @@ async function renderResenas(slug) {
   } catch(err) {
     panel.innerHTML = '<p style="color:var(--muted);font-size:.875rem">Error cargando reseñas.</p>';
   }
+}
+
+/* ---- Regalías del espacio (best-effort) ----
+   Reutiliza GET mis_regalias y filtra en cliente los items cuyo origen
+   es un recurso de espacio (fuente === 'destino'). Solo se muestra si
+   hay sesión de usuario disponible; si no, la sección queda oculta sin
+   romper la página. La liquidación usa el POST reclamar_regalias. */
+function regaliasSesion() {
+  return (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
+    ? window.ExploraCO.usuario : null;
+}
+function renderRegaliasEspacio() {
+  var sec = document.getElementById('regalias-espacio');
+  var lista = document.getElementById('regalias-espacio-lista');
+  if (!sec || !lista) return;
+  var u = regaliasSesion();
+  if (!u) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  lista.innerHTML = '<div class="skeleton" style="height:60px"></div>';
+  try {
+    fetch(API+'/api/interacciones?tipo=mis_regalias&usuario_id='+encodeURIComponent(u.id))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        try {
+          var items = (res && res.ok && Array.isArray(res.items)) ? res.items : [];
+          var propios = items.filter(function(it){ return String(it.fuente) === 'destino'; });
+          if (!propios.length) { sec.style.display = 'none'; return; }
+          var total = propios.reduce(function(s, it){
+            return s + (it.reclamado === true ? 0 : (Number(it.xp_acumulado) || 0));
+          }, 0);
+          var filas = propios.map(function(it){
+            var xp = Number(it.xp_acumulado) || 0;
+            var rec = it.reclamado === true;
+            return '<div class="rv-card" style="display:flex;align-items:center;justify-content:space-between;gap:.75rem">'
+              + '<span style="font-weight:600;font-size:.875rem">'+(it.titulo || 'Tu espacio')+'</span>'
+              + '<span style="font-weight:900;color:var(--gold)">'+(rec ? 'Reclamado' : xp.toFixed(2)+' XP')+'</span>'
+              + '</div>';
+          });
+          var btn = total > 0
+            ? '<button type="button" id="regalias-espacio-btn" class="plan-btn" style="background:var(--gold);margin-top:.5rem" onclick="reclamarRegaliasEspacio()">Reclamar '+total.toFixed(2)+' XP</button>'
+            : '';
+          lista.innerHTML = filas.join('') + btn;
+        } catch (eIn) {
+          console.warn('[mi-lugar] regalias render fallo: ' + (eIn && eIn.message));
+          sec.style.display = 'none';
+        }
+      })
+      .catch(function(e){
+        console.warn('[mi-lugar] regalias no disponible: ' + (e && e.message));
+        sec.style.display = 'none';
+      });
+  } catch (e) {
+    console.warn('[mi-lugar] regalias error: ' + (e && e.message));
+    sec.style.display = 'none';
+  }
+}
+function reclamarRegaliasEspacio() {
+  var u = regaliasSesion();
+  if (!u) return;
+  var btn = document.getElementById('regalias-espacio-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reclamando…'; }
+  fetch(API+'/api/interacciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo: 'reclamar_regalias', usuario_id: u.id })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res && res.ok) {
+        alert('Reclamaste ' + (Number(res.xp_otorgado) || 0).toFixed(2) + ' XP de regalías.');
+        renderRegaliasEspacio();
+      } else if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Reclamar';
+      }
+    })
+    .catch(function(){ if (btn) { btn.disabled = false; btn.textContent = 'Reclamar'; } });
 }
 
 function showError(msg) {

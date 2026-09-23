@@ -716,6 +716,14 @@
         }
         guardarSesion(perfil);
         actualizarUI();
+        // Bono de bienvenida por referido: solo en el alta NUEVA que uso
+        // un codigo de referido (perfil.bonus_referido === true). Se
+        // difiere para que la sesion y la UI ya esten listas.
+        if (perfil.bonus_referido === true) {
+          setTimeout(function () {
+            window.ExploraCO.mostrarSelectorBonoReferido(perfil);
+          }, 400);
+        }
         mostrarToast('¡Bienvenido, ' + perfil.nombre + '! +XP por explorar', '#16a34a');
         // Sincronizar guardados locales con DB
         sincronizarGuardados();
@@ -1404,6 +1412,159 @@
   }
 
   window.ExploraCO.mostrarToast = mostrarToast;
+
+  // ── Bono de bienvenida por referido ────────────────────────
+  // El backend expone las opciones (GET tipo=bonus_referido) y aplica
+  // la elegida (POST tipo=reclamar_bonus_referido). Se muestra solo a
+  // registros NUEVOS que llegaron con un codigo de referido
+  // (perfil.bonus_referido === true en la respuesta de login).
+  window.ExploraCO.mostrarSelectorBonoReferido = async function (perfil) {
+    if (!perfil || !perfil.id) return;
+
+    // Evitar duplicados: si ya hay un modal, se retira el previo.
+    var previo = document.getElementById('ec-bono-ref');
+    if (previo && previo.parentNode) previo.parentNode.removeChild(previo);
+
+    var opciones = [];
+    try {
+      var res = await fetch(API + '/api/interacciones?tipo=bonus_referido&usuario_id=' + encodeURIComponent(perfil.id));
+      var data = await res.json();
+      opciones = (data && data.opciones) || [];
+    } catch (err) {
+      console.warn('[bono-ref] no se pudieron cargar las opciones:', err && err.message);
+      return;
+    }
+    if (!opciones.length) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'ec-bono-ref';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.style.cssText = [
+      'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10002;',
+      'display:flex;align-items:center;justify-content:center;',
+      'background:rgba(0,0,0,.75);padding:20px;font-family:inherit;'
+    ].join('');
+
+    var card = document.createElement('div');
+    card.style.cssText = [
+      'max-width:440px;width:100%;',
+      'background:linear-gradient(160deg,#111827,#0d1117);',
+      'border:1px solid rgba(232,160,32,.55);border-radius:18px;',
+      'padding:24px 20px;color:#F9FAFB;max-height:88vh;overflow:auto;',
+      'box-shadow:0 24px 60px rgba(0,0,0,.55);'
+    ].join('');
+
+    var titulo = document.createElement('div');
+    titulo.textContent = 'Elige tu bono de bienvenida';
+    titulo.style.cssText = 'font-size:20px;font-weight:800;margin-bottom:6px;';
+    card.appendChild(titulo);
+
+    var sub = document.createElement('div');
+    sub.textContent = 'Llegaste con un enlace de referido. Escoge uno de estos bonos para empezar:';
+    sub.style.cssText = 'font-size:13px;color:#9CA3AF;margin-bottom:16px;line-height:1.4;';
+    card.appendChild(sub);
+
+    function cerrarBonoRef() {
+      var el = document.getElementById('ec-bono-ref');
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }
+
+    opciones.forEach(function (opcion) {
+      var item = document.createElement('div');
+      item.style.cssText = [
+        'border:1px solid rgba(255,255,255,.12);border-radius:12px;',
+        'padding:12px 14px;margin-bottom:10px;',
+        'display:flex;align-items:center;justify-content:space-between;gap:12px;'
+      ].join('');
+
+      var info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;';
+
+      var nom = document.createElement('div');
+      nom.textContent = opcion.nombre || opcion.clave || '';
+      nom.style.cssText = 'font-size:15px;font-weight:700;margin-bottom:2px;';
+      info.appendChild(nom);
+
+      if (opcion.descripcion) {
+        var desc = document.createElement('div');
+        desc.textContent = opcion.descripcion;
+        desc.style.cssText = 'font-size:12.5px;color:#9CA3AF;line-height:1.35;';
+        info.appendChild(desc);
+      }
+      item.appendChild(info);
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Elegir';
+      btn.style.cssText = [
+        'flex:0 0 auto;padding:9px 14px;border-radius:10px;border:0;',
+        'background:#E8A020;color:#0d1117;font-weight:700;font-size:13px;',
+        'cursor:pointer;font-family:inherit;'
+      ].join('');
+      btn.onclick = function () {
+        btn.disabled = true;
+        btn.style.opacity = '.6';
+        fetch(API + '/api/interacciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: 'reclamar_bonus_referido',
+            usuario_id: perfil.id,
+            clave: opcion.clave,
+          }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d && d.ok) {
+              mostrarToast('Bono activado: ' + (opcion.nombre || opcion.clave), '#16a34a');
+              cerrarBonoRef();
+              ['cargarInventario', 'cargarTienda'].forEach(function (fn) {
+                if (typeof window[fn] === 'function') {
+                  try { window[fn](); } catch (e) {}
+                }
+              });
+              if (window.ExploraCO && typeof window.ExploraCO.cargarInventario === 'function') {
+                try { window.ExploraCO.cargarInventario(); } catch (e) {}
+              }
+            } else {
+              mostrarToast('No se pudo activar el bono', '#ef4444');
+              btn.disabled = false;
+              btn.style.opacity = '1';
+            }
+          })
+          .catch(function (err) {
+            console.warn('[bono-ref] no se pudo reclamar:', err && err.message);
+            mostrarToast('No se pudo activar el bono', '#ef4444');
+            btn.disabled = false;
+            btn.style.opacity = '1';
+          });
+      };
+      item.appendChild(btn);
+
+      card.appendChild(item);
+    });
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  };
+
+  // Consulta si el usuario en sesion tiene un bono por referido
+  // pendiente y, de ser asi, abre el selector. No se llama en init()
+  // para no molestar; la exponen paginas como mi-perfil.html.
+  window.ExploraCO.verificarBonoReferidoPendiente = async function () {
+    var u = window.ExploraCO.usuario;
+    if (!u || !u.id) return;
+    try {
+      var res = await fetch(API + '/api/interacciones?tipo=bonus_referido&usuario_id=' + encodeURIComponent(u.id));
+      var data = await res.json();
+      if (data && data.pendiente === true && !data.reclamado_clave) {
+        window.ExploraCO.mostrarSelectorBonoReferido(u);
+      }
+    } catch (err) {
+      console.warn('[bono-ref] verificacion de pendiente fallo:', err && err.message);
+    }
+  };
 
   // ── Misiones (Fase 3) ───────────────────────────────────────
   // Las respuestas de /api/interacciones ahora pueden traer un array

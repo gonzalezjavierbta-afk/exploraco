@@ -1506,6 +1506,9 @@ module.exports = async (req, res) => {
       }
 
       var usuarioResp = conLogros(conMisiones(conNivel(fila)));
+      // Bono de bienvenida (036): solo el alta REAL con referido valido
+      // puede reclamar el regalo (es_insert = xmax=0, refId en scope).
+      usuarioResp.bonus_referido = (fila.es_insert === true && !!refId);
       // Sesion firmada JWT (ADR-025) para el cliente: se anhade al nodo
       // data plano (shape real consumido por usuario-session.js, ADR-006)
       // sin romper data.id/data.nombre de los clientes actuales.
