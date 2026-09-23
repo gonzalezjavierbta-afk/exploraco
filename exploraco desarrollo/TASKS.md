@@ -15,6 +15,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
 - **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028), TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080), TSK-147 (ubicacion por recurso de album + carpetas de guardados + fix de seguridad `scope=mio`; ADR-051/ADR-052, migraciones 029/030 APLICADAS en Neon) y TSK-148 (Gamificacion v6 / ADR-053: `M_nivel` x1.0-x3.0 con doble cap 5.0/10.0, 20 umbrales techo 42000, `xp_ledger`, `gamificacion_config`, `usuarios.nivel_max`, repricing y `?recurso=salud_red`; migracion 031 APLICADA en Neon; backend+smokes COMMITEADOS en `9efbfc7`, frontend/8 espejos en working tree). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **DESPLEGADO (2026-09-21, push a `origin/main`):** TSK-149 (guardados de media en "Mis Albumes" / ADR-054: migracion 032 APLICADA en Neon el 2026-09-21 (idempotencia verificada por segunda corrida) + `api/interacciones.js` v26 + `api/pagina-destino.js` fix BUG-082 + frontend + smokes; commit `b4ad861` = HEAD = `origin/main`). Pendiente solo **QA runtime en produccion**.
+- **DESPLEGADO (2026-09-23, push a `origin/main`):** TSK-154 - cierre del Museo publico: **BUG-060 CERRADO** (migracion 004 APLICADA en Neon con `node scripts/apply_004_foto_url.js`) y **BUG-084 NUEVO CERRADO** (fallback con `AS` duplicado -> `avatar_url AS foto_url AS foto_url` -> SQLSTATE 42601 -> HTTP 500 en `?tipo=museo_publico`, incluso para UUID inexistentes; fix `['foto_url','avatar_url']` en commit `1302f7c`, pusheado a `origin/main`). Verificacion en vivo: **200** con UUID real / **404** con UUID inexistente; Escudo GOLD PASS; smoke `017` 67/73 IDENTICO al baseline. **8/8 INTACTO**; sin ADR nuevo. Deuda: `perfil.html:979` fetch sin JWT; BUG-061 sigue ABIERTO.
 - **PENDIENTE DE APROBACION del operador:** TSK-140 (documento de analisis AI-DOS v1.1 / Reglas de Oro v5; archivo COMPLETADO en disco).
 - **BLOQUEADA (historica, archivada):** TSK-044 (blog multi-tema); su bloqueo de deploy (TASK-011) figura COMPLETADA, revisar si aplica cierre.
 
@@ -41,6 +42,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad GUARDADOS DE MEDIA EN "MIS ALBUMES" - 2026-09-21 (ADR-054 / BUG-082 / TSK-149)](#prioridad-guardados-de-media-en-mis-albumes---2026-09-21-adr-054--bug-082--tsk-149)
 - [Prioridad EL TALLER DE LAS MOSCAS - 2026-09-21/22 (cierre express)](#prioridad-el-taller-de-las-moscas---cierre-express-2026-09-2122)
 - [Prioridad MERCADO DE EMPRENDEDORES - 2026-09-23 (ADR-055 / TSK-151)](#prioridad-mercado-de-emprendedores---2026-09-23-adr-055--tsk-151)
+- [Prioridad MUSEO PUBLICO (BUG-060 + BUG-084) - 2026-09-23 (TSK-154)](#prioridad-museo-publico-bug-060--bug-084---2026-09-23-tsk-154)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3497,6 +3499,33 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Deuda aceptada [DEUDA-EXPRESS]:** (a) el badge `albumes.fotos_count` no cuenta los guardados publicados (arrastre de ADR-054); (b) la lectura por `usuario_id` de `album_detalle` permite observar `ya_guardado_album`/`es_propio` de un tercero sin sesion (deuda D-11 heredada); (c) la curaduria de MODIFICACION de fichas (proponer/votar cambios) queda DIFERIDA a Fase 2 con ADR propio.
 - **Dependencia:** migraciones 019/023/032 ya aplicadas en Neon; `xp_ledger` (031) sin CHECK en `accion`.
 - **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); sin migracion; NO mueve las fotos individuales (siguen rigiendose por `album_fotos.visible`); NO implementa la curaduria de modificacion (Fase 2).
+
+## Prioridad MUSEO PUBLICO (BUG-060 + BUG-084) - 2026-09-23 (TSK-154)
+
+> Cierre del bug "el museo publico no se visualiza": causa raiz DOBLE (datos +
+> codigo). NO toca el motor ni crea funciones serverless (**8/8 INTACTO**,
+> ADR-001/ADR-010). Sin ADR nuevo. Registro de bugs en BUGS_HISTORICOS.md
+> (BUG-060 CERRADO + BUG-084 NUEVO CERRADO).
+
+### TSK-154: Museo publico no se visualiza -- migracion 004 aplicada (BUG-060) + fix del fallback `AS` duplicado (BUG-084) [CERRADA / DESPLEGADA]
+
+- **Estado:** CERRADA / DESPLEGADA (2026-09-23). Verificado contra archivo real (ADR-006) y contra produccion en vivo.
+- **Prioridad:** ALTA (el Museo de viajero no abria).
+- **Fecha:** 2026-09-23.
+- **Origen:** reporte del usuario: `perfil.html?id=<uuid>` (Museo de viajero) no abria; el frontend mostraba `pfError` ("No se pudo abrir el museo").
+- **Responsable / agentes:** backend-dev (fix de codigo) + operador (aplicar la migracion en Neon) + qa-auditor/docs-keeper (verificacion y cierre).
+- **Alcance REAL ejecutado:**
+  1. **Fix de DATOS (BUG-060):** se aplico `db/migrations/004_usuarios_blog_autor.sql` en Neon con `node scripts/apply_004_foto_url.js` (idempotente, ADR-008). Confirmado en vivo durante la aplicacion: `[1] Antes: foto_url=AUSENTE ciudad_base=EXISTE`; resultado: `foto_url` text y `ciudad_base` character varying existen; "VEREDICTO: OK - esquema migrado". Con la columna presente, `queryConAvatarFallback` deja de activarse por `42703`.
+  2. **Fix de CODIGO (BUG-084):** en `api/interacciones.js` (rama `museo_publico`) el reemplazo de `queryConAvatarFallback` paso de `['foto_url', 'avatar_url AS foto_url']` a `['foto_url', 'avatar_url']` (hoy L4312), con comentario explicativo (L4298-4304). La plantilla YA aporta `__FOTO_URL__ AS foto_url`; incluir `AS` en el reemplazo generaba `avatar_url AS foto_url AS foto_url` -> **SQLSTATE 42601** -> **HTTP 500**, incluso para UUID inexistentes (devolvia 500 en vez de 404). Commit **`1302f7c`** ("museo publico: fix fallback avatar_url AS duplicado (BUG-060)"), pusheado a `origin/main` (rango `016d0b3..1302f7c`); Vercel despliega al push.
+- **Evidencia (ADR-006):**
+  - Codigo: `git show 1302f7c` = `api/interacciones.js` +5/-2 (2 hunks: comentario + reemplazo); `node --check api/interacciones.js` OK; ASCII bytes>127 = 0 (delta 0 vs HEAD); cero cambios colaterales. Auditoria: **GOLD PASS**.
+  - Barrido: los **9 call sites** de `queryConAvatarFallback` auditados; NINGUN otro tiene el `AS` duplicado (los demas usan el reemplazo por defecto sin `AS`).
+  - En vivo (produccion `https://exploraco.vercel.app`, 2026-09-23): `GET /api/interacciones?tipo=museo_publico&id=3b78efad-e9f6-49a7-bbd1-af836f528348` -> **HTTP 200** con payload completo (usuario, vitrina, logros, cromos, albumes, mapa, arbol, parche, stats); antes 500. `GET ...&id=<uuid inexistente>` -> **HTTP 404**; antes 500. `GET ?tipo=museo_recurso&usuario_id=...` -> 200 y `GET ?tipo=mis_fotos&usuario_id=...` -> 200 (ya funcionaban).
+  - Smoke: `scripts/smoke_017_perfil_arbol_casas.js` = **67/73 PASS**, IDENTICO al baseline en HEAD (mismos 6 fallos preexistentes: B5, C1a, C1b, C1c, C2a, C2b, por el gate DM nivel<3 y el calculo nivel/badge/era); cero regresiones nuevas.
+- **Relacion con bugs:** **BUG-060 CERRADO** (migracion 004 aplicada; antes "MITIGADO... PENDIENTE") y **BUG-084 NUEVO CERRADO** (variante del fallback con `AS` duplicado). **BUG-061** (spoofing `usuario_id` en `tipo='foto'`) sigue ABIERTO y ajeno.
+- **Deuda / pendiente (fuera de alcance, NO corregido):** (a) `perfil.html:979` hace el fetch de `museo_publico` SIN JWT, por lo que el dueno de un perfil privado (`perfil_publico=false`) veria "Museo privado" en vez de su propio museo; (b) los mensajes de error del frontend son genericos; (c) BUG-061 sigue ABIERTO.
+- **Fuera de alcance:** NO crea funciones serverless (**8/8 INTACTO**); sin ADR nuevo; no se toca el motor de gamificacion.
+- **Dependencia:** migracion 004 (ya aplicada en Neon el 2026-09-23).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

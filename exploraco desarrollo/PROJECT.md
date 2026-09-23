@@ -53,7 +53,7 @@ Ademas, la seccion Inspirate (blog) tiene **6 entradas reales en produccion** (v
 | la-candelaria-recorrido-por-el-centro | La Candelaria a pie: del Chorro de Quevedo a la Plaza de Bolivar | cultura, tips | ~2.830 |
 | parques-y-espacios-verdes-de-bogota | El pulmon de Bogota: Simon Bolivar, Jardin Botanico, El Virrey, El Tunal y los cerros orientales | naturaleza, tips | ~2.758 |
 
-Todas usan `categoria_slug='blog'`, `status='published'`, `destacado=true`, sin FAQs, sin video (excepto Theatron que tiene un short de YouTube), sin autor (migracion 004 pendiente). Las 5 ultimas (~2.800 palabras, cuerpo en `descripcion` TEXT, parrafos por `\n\n`, marcadores `[foto:URL|texto]` que renderiza `parseBlogBody()` como figure.bfig) siguen el patron de Theatron. Se verificaron con smoke tests locales (`buildHTML()`) antes de desplegar via loaders idempotentes DELETE+POST. `/blog.html` muestra las 6 entradas con buscador client-side, chips multi-tema y grid sin estrellas.
+Todas usan `categoria_slug='blog'`, `status='published'`, `destacado=true`, sin FAQs, sin video (excepto Theatron que tiene un short de YouTube), sin autor (la migracion 004 ya esta APLICADA en Neon desde el 2026-09-23, BUG-060 CERRADO; la asignacion de autor a cada post sigue pendiente, TSK-013). Las 5 ultimas (~2.800 palabras, cuerpo en `descripcion` TEXT, parrafos por `\n\n`, marcadores `[foto:URL|texto]` que renderiza `parseBlogBody()` como figure.bfig) siguen el patron de Theatron. Se verificaron con smoke tests locales (`buildHTML()`) antes de desplegar via loaders idempotentes DELETE+POST. `/blog.html` muestra las 6 entradas con buscador client-side, chips multi-tema y grid sin estrellas.
 
 | Categoria | Admin (formulario) | Pagina publica | Estado |
 |---|---|---|---|
