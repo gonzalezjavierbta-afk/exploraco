@@ -7938,10 +7938,18 @@ function limpiarPanelJugadores() {
                                   visible:[{nivel,usuarios}]},
               exentos:{xp_total_entregado,eventos,
                        por_accion:[{accion,xp_entregado,eventos}]},
-              nivel_max_vs_derivado:{total,protegidos,brecha_max},
-              alertas:[{tipo,detalle}] }
-   Degradacion backend: 200 {ok:true,degradado:true,motivo} si falta
-   xp_ledger (migracion 031); la UI avisa, nunca muestra NaN. */
+               nivel_max_vs_derivado:{total,protegidos,brecha_max},
+               alertas:[{tipo,detalle}],
+               distribucion_origen:[{tier,eventos,xp}],
+               mult_origen_stats:{filas,promedio,minimo,maximo,
+                 con_bonificacion,top_outliers:[{usuario_id,nombre,email,
+                 pais_base,ciudad_base,xp,mult_max,tier,dias_cuenta,eventos}]},
+               config_origen:[{clave,valor,descripcion}],
+               alertas_origen:[{tipo,detalle,usuario_id?}] }
+    Degradacion backend: 200 {ok:true,degradado:true,motivo} si falta
+    xp_ledger (migracion 031); la UI avisa, nunca muestra NaN. Los 4 campos
+    de origen (ADR-058 / migracion 038) son ADITIVOS y degradan a vacio si
+    la 038 no corrio. */
 
 function saludDias() {
   var sel = document.getElementById('salud-dias');
@@ -8034,6 +8042,200 @@ function saludSubtabla(etiqueta, rows) {
   });
   t += '</tbody></table>';
   return t;
+}
+
+/* ===== ORIGEN Y LEJANIA (ADR-058, migracion 038) =====
+   Bloques aditivos de salud_red. Si la 038 no corrio, el backend los
+   devuelve vacios/neutros y estas tarjetas lo informan sin romper.
+   Prefijo "salud"/"saludOrigen" para evitar colisiones (BUG-006/018/019). */
+var SALUD_ORIGEN_OUTLIER_MULT = 1.2;
+
+function saludOrigenTierLabel(tier) {
+  var t = String(tier == null ? '' : tier).toLowerCase();
+  if (t === 'local') return 'Local';
+  if (t === 'nomada') return 'Nomada';
+  if (t === 'extranjero') return 'Extranjero';
+  return 'Sin tier';
+}
+
+function saludOrigenCard(d) {
+  var dist = Array.isArray(d.distribucion_origen) ? d.distribucion_origen : [];
+  var st = d.mult_origen_stats || {};
+  var maxXp = 0;
+  dist.forEach(function(x){ var v = Number(x.xp) || 0; if (v > maxXp) maxXp = v; });
+  var bars = '';
+  if (dist.length) {
+    dist.forEach(function(x){
+      var v = Number(x.xp) || 0;
+      var pct = maxXp > 0 ? Math.max(0, Math.min(100, Math.round(v / maxXp * 100))) : 0;
+      bars += '<div class="slud-bar-row">'
+        + '<span style="width:96px;flex:none;color:var(--muted)">' + _esc(saludOrigenTierLabel(x.tier)) + '</span>'
+        + '<span class="slud-bar-track"><span class="slud-bar-fill" style="width:' + pct + '%;background:var(--gold)"></span></span>'
+        + '<span style="width:96px;flex:none;text-align:right;font-weight:700">' + fmtXp(v) + '</span>'
+        + '</div>';
+    });
+  } else {
+    bars = '<div class="slud-note">Sin datos de origen en la ventana (la migracion 038 aun no corre o no hay puntos geograficos resolubles).</div>';
+  }
+  var resumen = '<div class="stat-sub" style="margin-bottom:10px">'
+    + 'Filas con origen: <b>' + saludFmtInt(st.filas) + '</b> &#183; '
+    + 'bonificadas (&gt;1.00): <b>' + saludFmtInt(st.con_bonificacion) + '</b> &#183; '
+    + 'mult_origen prom/min/max: <b>' + Number(st.promedio || 0).toFixed(3) + ' / '
+    + Number(st.minimo || 0).toFixed(3) + ' / ' + Number(st.maximo || 0).toFixed(3) + '</b>'
+    + '</div>';
+  var filas = dist.map(function(x){
+    return [_esc(saludOrigenTierLabel(x.tier)), saludFmtInt(x.eventos), fmtXp(x.xp)];
+  });
+  return resumen + bars
+    + saludTabla(['Tier', 'Eventos', 'XP entregado'], filas,
+        [null, 'text-align:right', 'text-align:right'],
+        'Distribucion por origen_tier en la ventana (filas no exentas). "Sin tier" = accion sin punto resoluble o usuario no elegible: factor 1.00.');
+}
+
+/* Lista blanca de las 7 claves de la curva de origen con su rango valido.
+   Espejo del contrato de validacion del endpoint POST
+   ?recurso=gamificacion_config (api/admin.js v7). El cliente valida con los
+   MISMOS rangos antes de enviar (defensa en profundidad; el backend revalida).
+   Prefijo "salud" para evitar colisiones (BUG-006/018/019). */
+var SALUD_ORIGEN_CONFIG_SPEC = [
+  { clave: 'factor_origen_local',          label: 'Factor Local',            min: 1.0, max: 1.5,   def: 1.0,  step: 0.01 },
+  { clave: 'factor_origen_nomada_max',     label: 'Factor Nomada (max)',     min: 1.0, max: 1.8,   def: 1.2,  step: 0.01 },
+  { clave: 'factor_origen_extranjero_max', label: 'Factor Extranjero (max)', min: 1.0, max: 2.0,   def: 1.4,  step: 0.01 },
+  { clave: 'origen_km_nomada',             label: 'Km Nomada',               min: 1,   max: 20000, def: 1000, step: 1 },
+  { clave: 'origen_km_extranjero',         label: 'Km Extranjero',           min: 1,   max: 30000, def: 3000, step: 1 },
+  { clave: 'origen_km_local',              label: 'Km Local',                min: 0,   max: 500,   def: 25,   step: 1 },
+  { clave: 'origen_min_dias_cuenta',       label: 'Min dias de cuenta',      min: 0,   max: 365,   def: 7,    step: 1 }
+];
+
+function saludConfigOrigenCard(cfg) {
+  var list = Array.isArray(cfg) ? cfg : [];
+  var porClave = {};
+  list.forEach(function(k){ if (k && k.clave) porClave[k.clave] = k; });
+
+  var html = '<div class="stat-sub" style="margin-bottom:10px">'
+    + 'Edita los 7 parametros de la curva de origen (ADR-058). Rangos validos: '
+    + 'Local [1.0-1.5], Nomada max [1.0-1.8], Extranjero max [1.0-2.0]; '
+    + 'km Nomada [1-20000], km Extranjero [1-30000], km Local [0-500]; '
+    + 'min dias [0-365]. Coherencia: Local &le; Nomada &le; Extranjero.</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 16px">';
+  SALUD_ORIGEN_CONFIG_SPEC.forEach(function(s){
+    var k = porClave[s.clave];
+    var val = (k && isFinite(Number(k.valor))) ? Number(k.valor) : s.def;
+    var desc = (k && k.descripcion) ? k.descripcion : '';
+    html += '<div>'
+      + '<label for="salud-cfg-' + s.clave + '" style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">' + _esc(s.label) + '</label>'
+      + '<input class="form-input" type="number" id="salud-cfg-' + s.clave + '" '
+      + 'min="' + s.min + '" max="' + s.max + '" step="' + s.step + '" value="' + val + '" '
+      + 'style="width:100%" title="' + _esc(s.clave + (desc ? ' - ' + desc : '')) + '">'
+      + '</div>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">'
+    + '<button class="btn btn-gold btn-sm" id="salud-cfg-guardar" onclick="saludGuardarConfigOrigen()">Guardar config de origen</button>'
+    + '<span id="salud-cfg-msg" style="font-size:11px;color:var(--muted)"></span>'
+    + '</div>';
+  if (!list.length) {
+    html += '<div class="slud-note">No se leyeron filas de gamificacion_config (la migracion 038 no corrio o la tabla esta vacia). Al guardar se hace INSERT/UPDATE idempotente sobre las 7 claves.</div>';
+  }
+  return html;
+}
+
+/* Valida en el cliente los 7 inputs con los MISMOS rangos del backend y la
+   coherencia Local <= Nomada <= Extranjero. Devuelve {ok:true, valores} o
+   {ok:false, error} (mensaje claro, sin lanzar). */
+function saludValidarConfigOrigen() {
+  var valores = {};
+  var err = null;
+  SALUD_ORIGEN_CONFIG_SPEC.forEach(function(s){
+    if (err) return;
+    var el = document.getElementById('salud-cfg-' + s.clave);
+    var raw = el ? String(el.value).replace(',', '.').trim() : '';
+    var v = parseFloat(raw);
+    if (raw === '' || !isFinite(v)) { err = 'Valor invalido para ' + s.clave + '.'; return; }
+    if (v < s.min || v > s.max) {
+      err = s.clave + ' fuera de rango [' + s.min + ', ' + s.max + '].';
+      return;
+    }
+    valores[s.clave] = v;
+  });
+  if (err) return { ok:false, error: err };
+  if (valores.factor_origen_local > valores.factor_origen_nomada_max
+    || valores.factor_origen_nomada_max > valores.factor_origen_extranjero_max) {
+    return { ok:false, error: 'Coherencia: Local <= Nomada <= Extranjero.' };
+  }
+  return { ok:true, valores: valores };
+}
+
+/* Re-render de SOLO la tarjeta de config (contenedor
+   #salud-config-origen-wrap) con la respuesta del backend, sin recargar todo
+   el panel. */
+function saludRenderConfigOrigen(cfg) {
+  var wrap = document.getElementById('salud-config-origen-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = saludCard('Config de origen (gamificacion_config)', saludConfigOrigenCard(cfg));
+}
+
+/* POST ?recurso=gamificacion_config (api/admin.js v7): guarda las 7 claves.
+   Valida en cliente, muestra exito/error en #salud-cfg-msg + toast y refresca
+   la tarjeta con la config devuelta. */
+function saludGuardarConfigOrigen() {
+  var msg = document.getElementById('salud-cfg-msg');
+  var btn = document.getElementById('salud-cfg-guardar');
+  var v = saludValidarConfigOrigen();
+  if (!v.ok) {
+    if (msg) { msg.style.color = 'var(--red)'; msg.textContent = v.error; }
+    showAdminToast(v.error, 'error');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (msg) { msg.style.color = 'var(--muted)'; msg.textContent = 'Guardando...'; }
+  fetch('/api/admin?recurso=gamificacion_config', {
+    method: 'POST',
+    headers: _adminHeaders(),
+    body: JSON.stringify(v.valores)
+  })
+    .then(function(r){ return r.json().then(function(res){ return { status:r.status, res:res }; }); })
+    .then(function(br){
+      var res = br.res || {};
+      if (br.status >= 400 || !res.ok) {
+        var det = (res.error || ('HTTP ' + br.status)) + (res.detalle ? ' - ' + res.detalle : '');
+        if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + det; }
+        showAdminToast('No se pudo guardar la config de origen', 'error');
+        return;
+      }
+      if (msg) { msg.style.color = '#15803d'; msg.textContent = res.mensaje || 'Config de origen actualizada.'; }
+      showAdminToast(res.mensaje || 'Config de origen actualizada');
+      saludRenderConfigOrigen(res.data || []);
+    })
+    .catch(function(err){
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Error de red' + (err && err.message ? ': ' + _esc(err.message) : '') + '.'; }
+      showAdminToast('Error de red al guardar la config de origen', 'error');
+    })
+    .then(function(){ if (btn) btn.disabled = false; });
+}
+
+function saludAlertasOrigenCard(d) {
+  var arr = Array.isArray(d.alertas_origen) ? d.alertas_origen : [];
+  var st = d.mult_origen_stats || {};
+  var outs = Array.isArray(st.top_outliers) ? st.top_outliers : [];
+  var html = '';
+  if (arr.length) {
+    html += arr.map(function(a){
+      return '<div class="slud-aviso" style="margin-bottom:8px"><b>' + _esc(a.tipo || 'alerta') + '</b>: ' + _esc(a.detalle || '') + '</div>';
+    }).join('');
+  } else {
+    html += '<div class="slud-note" style="margin-bottom:10px">Sin alertas de origen: no hay concentracion anomala ni cuentas extranjeras nuevas con factor alto.</div>';
+  }
+  html += '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Outliers (mult_origen &gt; ' + Number(SALUD_ORIGEN_OUTLIER_MULT).toFixed(2) + ')</div>';
+  var filas = outs.map(function(o){
+    return [_esc(o.nombre || '(sin nombre)'), _esc(saludOrigenTierLabel(o.tier)),
+      Number(o.mult_max || 0).toFixed(3),
+      _esc((o.ciudad_base || '?') + ' / ' + (o.pais_base || '?')),
+      saludFmtInt(o.dias_cuenta), fmtXp(o.xp)];
+  });
+  html += saludTabla(['Usuario', 'Tier', 'mult_origen', 'Pais / Ciudad', 'Dias', 'XP'], filas,
+    [null, null, 'text-align:right', null, 'text-align:right', 'text-align:right'], '');
+  return html;
 }
 
 function saludRenderAviso(msgHtml) {
@@ -8158,6 +8360,17 @@ function saludRender(d, dias) {
     + saludTabla(['Acci&oacute;n', 'XP entregado', 'Eventos'], filasEx, [null, 'text-align:right', 'text-align:right'],
       'Misiones, logros, referidos y admin_xp NO pasan por M_nivel ni por caps: se reportan aparte.'));
 
+  html += saludCard('Origen y lejania (ADR-058)',
+    saludOrigenCard(d));
+
+  html += '<div id="salud-config-origen-wrap">'
+    + saludCard('Config de origen (gamificacion_config)',
+      saludConfigOrigenCard(d.config_origen))
+    + '</div>';
+
+  html += saludCard('Alertas anti-gaming de origen',
+    saludAlertasOrigenCard(d));
+
   html += saludCard('Leaderboard &mdash; top viajeros por XP',
     '<div id="salud-leaderboard"><div class="slud-note">Cargando leaderboard...</div></div>');
 
@@ -8209,7 +8422,7 @@ function cargarSaludRed() {
 
 // ── AUTO-DIAGNÓSTICO DE VERSIÓN ──────────────────────────────────
 (function checkVersion() {
-  var VERSION = 'admin-v11.20260923';
+  var VERSION = 'admin-v13.20260924';
   var checks = [
     ['f-tipo-actividad', !!document.getElementById('f-tipo-actividad'),   'Campo tipo actividad (sitio)'],
     ['f-distancia-sitio',!!document.getElementById('f-distancia-sitio'),  'Campo distancia (sitio)'],
@@ -8218,6 +8431,8 @@ function cargarSaludRed() {
     ['deletePlaceId-neon',typeof deletePlaceId === 'function',            'Borrar en Neon'],
     ['renderDashboard-async', typeof renderDashboard === 'function',      'Dashboard analítica'],
     ['cargarSaludRed', typeof cargarSaludRed === 'function',              'Panel Salud de la Red'],
+    ['saludOrigenCard', typeof saludOrigenCard === 'function',            'Panel Origen y lejania (ADR-058)'],
+    ['saludGuardarConfigOrigen', typeof saludGuardarConfigOrigen === 'function', 'Editor config de origen (ADR-058)'],
     ['cargarMercado', typeof cargarMercado === 'function',                'Panel Mercado de Emprendedores'],
   ];
   var allOk = checks.every(function(c){ return c[1]; });

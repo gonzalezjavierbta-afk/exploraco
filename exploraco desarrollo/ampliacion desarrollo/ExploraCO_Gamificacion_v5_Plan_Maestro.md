@@ -338,6 +338,23 @@ Rango de precios: **250–1.500 XP** (cumple el hecho canónico). Efectos al usa
 
 **Tablas de ledger:** `consumibles`, `compra_consumibles`, `consumo_consumibles` (append-only), `cromo_intercambios` (migración 010:16-207).
 
+### 6.4 Multiplicador de Origen por lejanía (ADR-058 / TSK-155, migración 038)
+
+Capa nueva de la economía de XP (2026-09-24): el XP por acciones físicas crece con la **distancia real (haversine)** del usuario al punto geográfico de la acción, con curva escalonada por perfil de viajero. Decision: **ADR-058** en DECISIONS.md; migración **038 APLICADA en Neon el 2026-09-24** + seed geo cargado (1.122 ciudades / 245 países). NO crea endpoints (**8/8 INTACTO**). Detalle en `api/interacciones.js` v29/v30, `api/usuarios.js` v22 y `api/admin.js` v6.
+
+- **Curva (canónica en JS `calcularFactorOrigen`, con espejo SQL validado por `smoke_origen_factor_parity.js` 111/111):**
+  - **Local** (ciudad_base en Colombia, distancia ≤ `origen_km_local` 25 km): **x1.00** (piso, nunca castiga).
+  - **Nomada** (con ciudad/pais en Colombia pero lejos, con `origen_declarado_en ≥ 7 días`): `1.00 + 0.20·min(km/1000, 1)` → tope **x1.20 a 1000 km**.
+  - **Extranjero** (pais_base ≠ CO; exige email verificado + cuenta ≥ 7 días + origen declarado ≥ 7 días): `1.20 + 0.20·min(km/3000, 1)` → tope **x1.40 a 3000 km**.
+  - **Sin tier elegible o sin punto geográfico resoluble:** **x1.00** (degradación implícita).
+- **Motor de XP (v29):** `xp_final = base · min( min(M_nivel·mult_clase·factor_casa, cap_progresion) · mult_origen · stack_temp, cap_global )` — `mult_origen` es **hermano de `stack_temp`** (se multiplica fuera del cap de progresión pero dentro del cap global). **ELIMINA el bono plano x1.2 del ADR-028/WP-5.**
+- **Arbol de Clases unificado (v30):** cada rama evalúa su propio punto con `sqlFactorFila` (espejo PER-ROW); **nerf M-4:** usuarios sin ciudad_base/punto pasan de x1.2 a x1.00 (aceptado).
+- **Anti-teleport (v22):** cambiar `ciudad_base`/`pais_base` fija `origen_declarado_en=NOW()`; elegibilidad con antigüedad (7 días) + email verificado para extranjeros.
+- **Datos (038):** `geo_ciudades` (1.122 filas DIVIPOLA, PK `cod_mpio`, `es_capital` para desempatar homónimos), `geo_paises` (245, centroides ISO-3166-1), `usuarios.origen_declarado_en`, `xp_ledger.mult_origen numeric(10,6)` + `origen_tier`, 7 claves en `gamificacion_config` (curva parametrizable sin deploy).
+- **Monitoreo:** `salud_red` (v6) agrega `distribucion_origen`/`mult_origen_stats`/`config_origen`/`alertas_origen` (cuentas extranjeras nuevas con factor alto = revisión manual).
+- **Smokes:** `smoke_058_origen_clasificador` **90/90** (sin BD, en `npm test`) + `smoke_origen_factor_parity` **111/111** (Neon, gate `npm run smoke:origen`).
+- **Riesgos / deuda:** cap_global puede absorber el premio en stacks altos; curva duplicada JS/SQL (parity = red de seguridad); sin verificación documental de nacionalidad (monitoreo en `alertas_origen`); seed DIVIPOLA sin auto-update; drift heredado 20→40 niveles (ADR-053).
+
 ---
 
 ## 7. Coleccionables (Cromos) y Vitrina

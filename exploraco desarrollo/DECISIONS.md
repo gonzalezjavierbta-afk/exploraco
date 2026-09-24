@@ -3295,3 +3295,63 @@ Negativas / **deuda aceptada:**
 - La exclusion por titulo auto "Mi Museo" no cubre albumes personales con otro nombre (si se quiere, requiere el flag de la alternativa 1).
 
 **ADRs relacionados:** ADR-001/ADR-010 (8/8; ramas `?tipo=`), ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-017 (albumes), ADR-039 (Museo URL-only; `album_fotos.visible`), ADR-044 (`media-actions.js`; `data-ma-*`), ADR-053 (motor de XP: `M_nivel`, `xp_ledger`), ADR-054 (guardados de media en albumes; fuente='album'). Bugs: BUG-061 (guardar_media legacy sin validar sesion en ramas de destino; ajeno, no empeorado).
+
+---
+
+## ADR-058: Multiplicador de Origen por lejania (Local / Nomada / Extranjero) - curva escalonada por distancia real, migracion 038
+
+**Fecha:** 2026-09-24
+**Estado:** IMPLEMENTADO EN WORKING TREE / AUDITADO APTO PARA DEPLOY (migracion 038 APLICADA en Neon + seed geo 1.122/245 cargado). Commit/deploy PENDIENTE.
+**Decisores:** architect (diseno + ADR), backend-dev (`api/interacciones.js` v29/v30 + `api/usuarios.js` v22), sql-security/data-migration (migracion 038 + `scripts/seed_geo.js`), frontend-tpl (`index.html`/`usuario-session.js` badge origen + `mi-perfil.html` "Tu origen"), qa-auditor (`scripts/smoke_058_origen_clasificador.js` + `scripts/smoke_origen_factor_parity.js`), docs-keeper (cierre documental).
+
+**Problema:** La gamificacion premia igual a todos los jugadores sin importar su origen geografico: un viajero que visita desde fuera de Colombia recibe el mismo XP que un local. El ADR-028 (WP-5 / rota D_R del Arbol de Clases) habia definido un bono origen plano **x1.2** aplicado cuando el usuario tenia `ciudad_base`/`pais_base` declarados: era binario (en ON/OFF), no distinguia lejania y era facil de explotar (una cuenta podia declarar cualquier origen sin ninguna verificacion ni antiguedad). Ademas, el Arbol de Clases y el motor de XP de ADR-053 usaban criterios distintos de origen, rompiendo la coherencia interna de la economia.
+
+**Decision:**
+1. **Curva del factor por tier de origen (`calcularFactorOrigen`, UNICA canonica en JS; ADR-058 N-5):**
+   - **Local** (cuenta con `ciudad_base` en Colombia, distancia al punto de la accion `<= origen_km_local` (25 km)): `mult_origen = 1.00` (sin premio; el base ya es el piso).
+   - **Nomada** (con `ciudad_base`/`pais_base` en Colombia pero fuera de los 25 km, o sin ciudad resoluble, y `origen_declarado_en >= 7 dias`): `1.00 + 0.20 * min(dist_km / origen_km_nomada(1000), 1)`, tope **1.20 a 1000 km**.
+   - **Extranjero** (`pais_base != 'CO'`; exige `email_verified` + cuenta `>= origen_min_dias_cuenta` (7 dias) + `origen_declarado_en >= 7 dias`): `1.20 + 0.20 * min(dist_km / origen_km_extranjero(3000), 1)`, tope **1.40 a 3000 km**.
+   - **Sin tier elegible o sin punto geografico resoluble:** `mult_origen = 1.00` (degradacion implicita; un Local jamas pierde XP).
+2. **Ubicacion en el motor de XP (`calcularXpFinal`, v29):** `mult_origen` entra como **HERMANO de `stack_temp`**, ambos acotados por `cap_global`: `xp_final = base * min( min(M_nivel * mult_clase * factor_casa, cap_progresion) * mult_origen * stack_temp, cap_global )`. **ELIMINA el bono plano x1.2 del ADR-028 (Enmienda):** el origen pasa a ser un multiplicador escalonado de la misma naturaleza que el stack temporal.
+3. **Resolucion SERVER-SIDE del origen (una vez por request):** `resolverOrigenUsuario(sql, usuarioId, cfg)` (ADR-058 N-4) resuelve el tier y la distancia via las tablas geo (`geo_ciudades`/`geo_paises`, migracion 038) con normalizacion **`normGeo` + espejo SQL obligatorio `sqlNormGeo`** (cubre a/e/i/o/u con tilde, u con dieresis y enie en ambas formas; B-1). El ledger persiste `mult_origen numeric(10,6)` + `origen_tier` + `contexto.origen`.
+4. **El Arbol de Clases usa el MISMO factor escalonado (v30, seccion 8.3 / M-2):** se ELIMINA `BONO_ORIGEN` x1.2 del Arbol y cada fila evalua su propio punto geografico (coords propias o su texto `ciudad` via lookup `geo_ciudades`) con el espejo **`sqlFactorFila`** (PER-ROW). Nerf documentado (M-4): los usuarios sin `ciudad_base`/punto que antes cobraban x1.2 pasan a **1.00**.
+5. **Anti-teleport (v22 de `api/usuarios.js`):** cuando `ciudad_base` o `pais_base` CAMBIAN respecto al valor previo (comparacion normalizada con trim; un no-op NO lo toca), el mismo UPDATE fija `origen_declarado_en = NOW()`. Elegibilidad: Nomada exige `origen_declarado_en >= 7 dias`; Extranjero exige `email_verified` + cuenta `>= 7 dias` + `origen_declarado_en >= 7 dias`.
+6. **Config en `gamificacion_config` (7 claves nuevas, seed `ON CONFLICT DO NOTHING`):** `factor_origen_local=1.0000`, `factor_origen_nomada_max=1.2000`, `factor_origen_extranjero_max=1.4000`, `origen_km_local=25`, `origen_km_nomada=1000`, `origen_km_extranjero=3000`, `origen_min_dias_cuenta=7`. Fallback en codigo si faltan.
+7. **Migracion 038 (`db/migrations/038_origen_lejania.sql`, aditiva/idempotente/ASCII-safe, ADR-008):**
+   - `geo_ciudades`: municipios de Colombia con columnas EXACTAS del seed real (`db/seeds/geo_ciudades_seed.json`; **1.122 filas DIVIPOLA: 1.103 Municipio + 18 Area no municipalizada + 1 Isla**), PK natural `cod_mpio` (idempotencia del loader), `es_capital` DERIVADA (`cod_mpio` termina en '001') persistida para desempatar homonimos (`ORDER BY es_capital DESC, cod_mpio ASC`), indice por nombre normalizado.
+   - `geo_paises`: centroides por ISO-3166-1 alfa-2 (columnas del seed real; **245 filas**).
+   - `usuarios.origen_declarado_en` + BACKFILL UNICO para usuarios que ya declararon `ciudad_base`/`pais_base` (no sobrescribe no nulos).
+   - `xp_ledger.mult_origen numeric(10,6) NOT NULL DEFAULT 1` + `xp_ledger.origen_tier text NULL` con CHECK idempotente.
+   - Seed de las 7 claves de config.
+   - **PREFLIGHT ADR-006 en la cabecera:** verificacion read-only del esquema real via `scripts/neon_select.js` (usuarios/xp_ledger/gamificacion_config existen; geo_* ausentes antes) documentada como "HALLAZGO DEL ESQUEMA REAL". Sin DELETE/DROP/TRUNCATE (ADR-003). **APLICADA en Neon el 2026-09-24; la 038 NO incluye el seed geo** (se carga por separado con `scripts/seed_geo.js`).
+8. **Seed geo (`db/seeds/`):** `scripts/seed_geo.js` (NUEVO) puebla `geo_ciudades`/`geo_paises` desde `geo_ciudades_raw.csv` (DANE DIVIPOLA 2025, xlsx de referencia incluido), `geo_ciudades_seed.json`, `geo_paises_seed.json` y `geo_paises_raw.csv`. Mientras el seed no corra, el motor degrada a 1.00 (no rompe).
+9. **Sin endpoints nuevos (8/8 INTACTO):** todo entra por ramas `?tipo=`/`?recurso=` existentes. `api/usuarios.js` v22 expone el objeto aditivo `origen` en el perfil (elegible/tier_base/`es_extranjero_verificado`/`dias_origen_declarado`/`min_dias_cuenta`, owner-aware y publico).
+10. **Monitoreo admin (v6 de `api/admin.js` + `admin.html`):** `?recurso=salud_red` agrega 4 bloques ADITIVOS (degradan 42703 si la 038 no corrio): `distribucion_origen` (conteo y XP por tier en la ventana), `mult_origen_stats` (prom/min/max + top outliers), `config_origen` (las 7 claves) y `alertas_origen` (concentracion de XP bonificado + cuentas extranjeras nuevas con `mult_origen` alto -> revision manual).
+
+**Alternativas consideradas:**
+1. **Bono plano por origen (status quo ADR-028 / WP-5; RECHAZADA):** binario ON/OFF, no distingue lejania, explotable sin verificacion ni antiguedad.
+2. **Verificacion documental de nacionalidad (subir pasaporte/cedula; RECHAZADA en v1):** friccion alta de onboarding; se mitiga con `email_verified` + antiguedad + alertas admin; queda como deuda documentada.
+3. **Derivar el origen del GPS/dispositivo (RECHAZADA):** mezclaria presencia fisica (ADR-024) con identidad; el origen es DECLARADO + antiguedad, no derivado de geocerca.
+4. **Curva unica sin tiers (RECHAZADA):** un extranjero recorre distancias significativas distintas a un nomada nacional; los tiers reflejan perfiles de viajero reales.
+5. **Un solo runtime sin espejo SQL (RECHAZADA por restriccion serverless):** la curva canonica vive en JS (`calcularFactorOrigen`) y su espejo SQL (`sqlCurvaFactorOrigen`) se valida con el gate `scripts/smoke_origen_factor_parity.js`.
+
+**Impacto:**
+- **`api/interacciones.js` v29/v30**: `normGeo`/`sqlNormGeo`/`normGeoAlias`/`sqlAliasCiudad` (L314-381); `calcularFactorOrigen` (L613); `buscarCoordsCiudad` (L625); `resolverOrigenUsuario` (L692); `mult_origen` en `calcularXpFinal` (L819-853); `registrarXpLedger` con las columnas 038 (L959-975); `sqlFactorOrigen`/`sqlFactorFila` (L1922-1948) y per-row en el Arbol (L1989-2101).
+- **`api/usuarios.js` v22**: objeto `origen` (GET `?id=` y `perfil_actualizar`/`perfil_editar`) + ANTI-TELEPORT (UPDATE fija `origen_declarado_en=NOW()` al cambiar `ciudad_base`/`pais_base`).
+- **`api/admin.js` v6 + `admin.html`**: 4 bloques de origen en `salud_red` (degrada 42703 si la 038 no corrio).
+- **Frontend:** `index.html`/`usuario-session.js` (badge origen en sesion), `mi-perfil.html` (seccion "Tu origen").
+- **Estructura de datos:** migracion **038** + seeds de geo (tablas `geo_ciudades`/`geo_paises`, `usuarios.origen_declarado_en`, columnas `xp_ledger.mult_origen`/`origen_tier`, 7 claves de config). **APLICADA en Neon el 2026-09-24; seed cargado (1.122 ciudades / 245 paises).**
+- **Smokes:** `scripts/smoke_058_origen_clasificador.js` (**90/90 PASS**, sin BD, ENCADENADO a `npm test`) y `scripts/smoke_origen_factor_parity.js` (**111/111** contra Neon REAL, gate manual `npm run smoke:origen`); `npm test` VERDE (14 smokes).
+- **Enmiendas:** ADR-028 (WP-5): se elimina el bono plano x1.2 y el origen binario; ADR-053: `mult_stack` deja de asumir "todo el stack excepto `M_nivel`" (el `mult_origen` es hermano de `stack_temp`).
+
+**Consecuencias:**
+Positivas: el XP por acciones fisicas crece con la lejania real al punto de la accion (Logica de viajero); el Arbol de Clases y el motor de XP quedan COHERENTES con la misma curva; anti-farming de origen (email + antiguedad + anti-teleport); monitoreo en `salud_red`; curva parametrizable sin deploy (7 claves).
+Negativas / **deuda aceptada:**
+- `cap_global` puede absorber el premio de origen en stacks altos (el factor se multiplica DENTRO del cap global; se acepta para no desbordar la economia de ADR-053).
+- La curva vive duplicada JS/SQL por restriccion serverless; el gate `smoke_origen_factor_parity.js` (111/111) es la red de seguridad (M-3).
+- **NERF documentado (M-4):** usuarios sin `ciudad_base`/punto que antes cobraban x1.2 pasan a 1.00 (cambio de comportamiento consciente, aceptado por el operador).
+- Sin verificacion documental de nacionalidad (monitoreo admin en `alertas_origen` como mitigacion; queda como deuda).
+- El seed geo no tiene actualizacion automatica (DANE DIVIPOLA se actualiza manualmente cuando el operador lo decida).
+- Drift heredado de ADR-053: 20 -> 40 niveles de insignia (arrastre).
+
+**ADRs relacionados:** ADR-001/ADR-010 (8/8; ramas `?tipo=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico: la 038 es aditiva), ADR-006 (baseline = esquema real auditado; PREFLIGHT read-only), ADR-008 (migraciones versionadas/idempotentes), ADR-018/ADR-053 (economia de XP: `numeric(12,2)`, caps, `M_nivel`), ADR-024 (geocerca; las coords geo NO se usan para presencia fisica), ADR-028 (WP-5 ENMENDADO: bono x1.2 eliminado), ADR-035 (XP numeric), ADR-036 (multiplicadores `numeric(10,6)`), ADR-057 (motor de XP). Bugs: BUG-021/BUG-060 (patron: aplicar la **038 + seed ANTES del deploy** del backend v29/v30), BUG-026 (emojis en SQL).

@@ -5,6 +5,14 @@
 // serverless, misma escala de 5 tiers que el Arbol de Clases). Requiere la
 // migracion 034; sin ella mercado_puntos cae a 0 sin romper. NO toca tags ni
 // crea endpoints (8/8, ADR-001/ADR-010).
+// v22 (2026-09-24): ADR-058 (Multiplicador de Origen por lejania). El perfil
+// (GET ?id= y POST perfil_actualizar/perfil_editar) expone un objeto aditivo
+// 'origen' (ciudad_base/pais_base/origen_declarado_en/elegible/tier_base/
+// es_extranjero_verificado/dias_origen_declarado/min_dias_cuenta). ANTI-
+// TELEPORT: cuando ciudad_base o pais_base CAMBIAN respecto al valor previo,
+// el mismo UPDATE fija origen_declarado_en=NOW() (comparacion normalizada con
+// trim; un no-op NO lo toca). Requiere la migracion 038; la lectura de
+// gamificacion_config degrada con warn. NO toca tags ni crea endpoints.
 // v20 (RELEASE 2026-09-23): NIVELES se expande de 20 a 40 umbrales (techo
 // 100000) con 40 titulos y 5 Eras (Caminante 1-10 / Explorador 11-20 /
 // Cronista 21-30 / Leyenda 31-35 / Mito 36-40); calcularEra con cortes
@@ -89,6 +97,72 @@ const NIVELES = [
 // borde y se redondea half-up a 2 decimales con un unico helper.
 function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
 function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+
+// ADR-058 (Multiplicador de Origen por lejania): el perfil expone un objeto
+// aditivo 'origen' con la BASE de elegibilidad. NO calcula el multiplicador
+// concreto (depende del punto geografico y vive en api/interacciones.js).
+// Esta funcion es PURA: recibe la fila del usuario y el minimo de dias leido
+// de gamificacion_config.
+//   elegible: tiene ciudad_base o pais_base declarados (no vacios).
+//   tier_base: 'extranjero' (pais_base != 'CO') | 'co' (pais vacio/CO CON
+//     ciudad_base) | null (no elegible o solo pais 'CO' sin ciudad).
+//   es_extranjero_verificado: pais_base != 'CO' AND email_verificado.
+//   dias_origen_declarado: dias completos desde origen_declarado_en (null sin
+//     declaracion).
+function normTrimOrigen(v) {
+  if (v == null) return '';
+  return String(v).trim();
+}
+function construirOrigenUsuario(row, minDiasCuenta) {
+  var minDias = numXp(minDiasCuenta);
+  if (!isFinite(minDias) || minDias < 0) minDias = 7;
+  var ciudad = normTrimOrigen(row && row.ciudad_base);
+  var pais = normTrimOrigen(row && row.pais_base).toUpperCase();
+  var origenEn = (row && row.origen_declarado_en) ? row.origen_declarado_en : null;
+  ciudad = ciudad || null;
+  pais = pais || null;
+  var elegible = !!(ciudad || pais);
+  var esExtranjero = !!(pais && pais !== 'CO');
+  var tierBase = null;
+  if (elegible) {
+    if (esExtranjero) tierBase = 'extranjero';
+    else if (ciudad) tierBase = 'co';
+  }
+  var diasDecl = null;
+  if (origenEn) {
+    var msDecl = (origenEn instanceof Date) ? origenEn.getTime() : Date.parse(String(origenEn));
+    if (isFinite(msDecl)) {
+      var difDias = (Date.now() - msDecl) / 86400000;
+      diasDecl = difDias > 0 ? Math.floor(difDias) : 0;
+    }
+  }
+  return {
+    ciudad_base: ciudad,
+    pais_base: pais,
+    origen_declarado_en: origenEn,
+    elegible: elegible,
+    tier_base: tierBase,
+    es_extranjero_verificado: !!(esExtranjero && row && row.email_verificado === true),
+    dias_origen_declarado: diasDecl,
+    min_dias_cuenta: minDias
+  };
+}
+
+// ADR-058: lee origen_min_dias_cuenta de gamificacion_config con fallback 7.
+// DEGRADA sin lanzar si la tabla/clave no existe (patron BUG-021): warn y
+// fallback; el perfil NUNCA se cae por esta lectura. Espejo del fallback de
+// api/interacciones.js (no hay require cruzado entre funciones serverless).
+async function leerMinDiasOrigen(sql) {
+  try {
+    var rows = await sql("SELECT valor FROM gamificacion_config WHERE clave='origen_min_dias_cuenta' LIMIT 1");
+    var v = (rows && rows.length) ? numXp(rows[0].valor) : 0;
+    if (isFinite(v) && v > 0) return v;
+  } catch (eCfgOrigen) {
+    var code = eCfgOrigen && eCfgOrigen.code;
+    console.warn('[origen] gamificacion_config no leida (' + code + '): min_dias_cuenta por defecto 7');
+  }
+  return 7;
+}
 
 function calcularNivel(xpTotal) {
   const xp = Number(xpTotal) || 0;
@@ -817,9 +891,17 @@ module.exports = async (req, res) => {
         // reciben el dueno (sesion firmada, ADR-025) o el admin (Bearer
         // ADMIN_SECRET / X-Internal-Secret). Los demas reciben un
         // subconjunto publico que nunca incluye esos campos.
+        // ADR-058: min_dias_cuenta se lee UNA vez para el objeto 'origen'
+        // (lectura tolerante; degrada a 7 con warn si gamificacion_config no
+        // existe). Requiere la migracion 038 (origen_declarado_en llega por
+        // SELECT *); sin ella, los demas campos siguen igual y origen degrada.
+        var minDiasOrigen = await leerMinDiasOrigen(sql);
         var esAutorizado = esAdminUsuario(req) || validarSesionUsuario(req, String(rows[0].id)).ok;
         if (esAutorizado) {
-          return res.json({ ok: true, data: conLogros(conMisiones(conNivel(rows[0]))) });
+          var perfilData = conLogros(conMisiones(conNivel(rows[0])));
+          // ADR-058 (aditivo): origen en la respuesta del perfil propio/admin.
+          perfilData.origen = construirOrigenUsuario(rows[0], minDiasOrigen);
+          return res.json({ ok: true, data: perfilData });
         }
         // Perfil privado (migracion 017): 403 con el minimo.
         if (rows[0].perfil_publico === false) {
@@ -847,6 +929,10 @@ module.exports = async (req, res) => {
             faccion: pub.faccion || null,
             casa: pub.casa || null,
             perfil_publico: pub.perfil_publico !== false,
+            // ADR-058 (aditivo): base de elegibilidad de origen. NO expone
+            // email_verificado; el booleano derivado es_extranjero_verificado
+            // ya lo resume.
+            origen: construirOrigenUsuario(pub, minDiasOrigen),
           },
         });
       }
@@ -1165,26 +1251,41 @@ module.exports = async (req, res) => {
           puSets.push('bio = ' + puPh(puBio || null));
         }
 
+        // ADR-058 (anti-teleport): se registran los valores entrantes de
+        // ciudad_base/pais_base para compararlos con el valor PREVIO en el
+        // mismo UPDATE (comparacion normalizada con trim) y decidir si hay
+        // que fijar origen_declarado_en=NOW(). false = campo no enviado.
+        var puCiudadEnviada = false;
+        var puCiudadNueva = null;
+        var puPaisEnviado = false;
+        var puPaisNuevo = null;
+
         // ciudad_base (opcional, 1..80 chars o null para limpiarla)
         if (c.ciudad_base !== undefined) {
+          puCiudadEnviada = true;
           if (c.ciudad_base === null || c.ciudad_base === '') {
+            puCiudadNueva = null;
             puSets.push('ciudad_base = ' + puPh(null));
           } else {
             var puCiudad = (typeof c.ciudad_base === 'string') ? c.ciudad_base.trim() : '';
             if (!puCiudad || puCiudad.length > 80)
               return res.status(400).json({ ok: false, error: 'CIUDAD_INVALIDA' });
+            puCiudadNueva = puCiudad;
             puSets.push('ciudad_base = ' + puPh(puCiudad));
           }
         }
 
         // pais_base (ISO-3166-1 alfa-2: exactamente 2 letras, a MAYUSCULAS)
         if (c.pais_base !== undefined) {
+          puPaisEnviado = true;
           if (c.pais_base === null || c.pais_base === '') {
+            puPaisNuevo = null;
             puSets.push('pais_base = ' + puPh(null));
           } else {
             var puPais = String(c.pais_base).trim().toUpperCase();
             if (!/^[A-Za-z]{2}$/.test(puPais))
               return res.status(400).json({ ok: false, error: 'PAIS_INVALIDO' });
+            puPaisNuevo = puPais;
             puSets.push('pais_base = ' + puPh(puPais));
           }
         }
@@ -1224,6 +1325,27 @@ module.exports = async (req, res) => {
             + puPh(JSON.stringify(puConf)) + '::jsonb');
         }
 
+        // ADR-058 (anti-teleport, B-4): si ciudad_base o pais_base CAMBIAN
+        // respecto al valor previo del usuario, se fija
+        // origen_declarado_en = NOW() en el MISMO UPDATE. La comparacion es
+        // normalizada con trim (y mayusculas en pais: columna ISO-2). Un no-op
+        // (mismo valor) NO toca origen_declarado_en, de modo que editar otros
+        // campos jamas reinicia la elegibilidad a Extranjero. Los valores
+        // previos se traen con un SELECT acotado al propio usuario.
+        if (puCiudadEnviada || puPaisEnviado) {
+          var puPrev = await sql('SELECT ciudad_base, pais_base FROM usuarios WHERE id=$1', [puId]);
+          if (!puPrev.length)
+            return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+          var puPrevCiudad = normTrimOrigen(puPrev[0].ciudad_base);
+          var puPrevPais = normTrimOrigen(puPrev[0].pais_base).toUpperCase();
+          var puAhoraCiudad = puCiudadEnviada ? normTrimOrigen(puCiudadNueva) : puPrevCiudad;
+          var puAhoraPais = puPaisEnviado ? normTrimOrigen(puPaisNuevo).toUpperCase() : puPrevPais;
+          if ((puCiudadEnviada && puAhoraCiudad !== puPrevCiudad)
+              || (puPaisEnviado && puAhoraPais !== puPrevPais)) {
+            puSets.push('origen_declarado_en = NOW()');
+          }
+        }
+
         if (!puSets.length)
           return res.status(400).json({ ok: false, error: 'NADA_QUE_ACTUALIZAR' });
 
@@ -1246,6 +1368,9 @@ module.exports = async (req, res) => {
         // Esta rama nunca debita xp_total: el aviso de de-nivel de la UI
         // (mi-perfil.html pfGuardarPerfil) queda siempre en falso.
         puData.bajo_nivel = false;
+        // ADR-058 (aditivo): mismo objeto 'origen' que el GET, para que la UI
+        // refresque origen_declarado_en/tier_base sin una segunda peticion.
+        puData.origen = construirOrigenUsuario(puUpd[0], await leerMinDiasOrigen(sql));
         return res.json({ ok: true, data: puData });
       }
 

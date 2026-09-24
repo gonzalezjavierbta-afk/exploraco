@@ -24,6 +24,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .nav-label{font-size:11px;color:rgba(255,255,255,.5)}
 .nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
 .nav-back:hover{border-color:var(--gold);color:var(--gold)}
+/* ADR-058: badge de categoria de origen (Local/Nomada/Extranjero). El
+   color lo fija usuario-session.js (renderOrigenBadge); el borde usa
+   currentColor. Base compartida + ajuste por contexto. */
+.origen-badge{display:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:1px 7px;border:1px solid currentColor;border-radius:10px;line-height:1.6;vertical-align:middle}
+.perfil-origen{margin-left:6px}
 /* ── GATE (shown when not registered) ── */
 #gate{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--black)}
 .gate-inner{max-width:540px;width:100%;text-align:center}
@@ -401,6 +406,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div class="comm-info" onclick="irMiPerfil()" style="cursor:pointer">
         <div class="comm-name" id="comm-name">Viajero</div>
         <div class="comm-level" id="comm-level">🌱 Viajero Novato · 0 XP</div>
+        <span id="perfil-origen" class="origen-badge perfil-origen" role="status"></span>
         <div class="comm-xp-bar"><div class="comm-xp-fill" id="comm-xp-fill" style="width:0%"></div></div>
       </div>
       <button onclick="irMiPerfil()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:6px 12px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='rgba(255,255,255,.6)'">👤 Mi Perfil</button>
@@ -2767,7 +2773,17 @@ function abrirMercadoDesdeHash() {
     if (String(window.location.hash || '').replace('#','').toLowerCase() === 'mercado') showCommTab('mercado');
   } catch (e) {}
 }
-window.onExploraCOUpdate = function() { checkGate(); abrirMercadoDesdeHash(); };
+window.onExploraCOUpdate = function() {
+  checkGate(); abrirMercadoDesdeHash();
+  /* ADR-058: pinta el badge de categoria de origen en la zona de perfil.
+     La logica vive en usuario-session.js; aqui solo se aporta el
+     contenedor #perfil-origen (esta pagina no tiene #btn-perfil-viajero,
+     asi que actualizarUI no lo rellena por si solo). */
+  var oEl = document.getElementById('perfil-origen');
+  if (oEl && window.ExploraCO && window.ExploraCO.renderOrigenBadge) {
+    window.ExploraCO.renderOrigenBadge(oEl, window.ExploraCO.usuario && window.ExploraCO.usuario.origen);
+  }
+};
 checkGate();
 abrirMercadoDesdeHash();
 </script>

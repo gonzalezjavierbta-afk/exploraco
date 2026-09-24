@@ -809,6 +809,12 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* Barra de XP del chip de perfil en el navbar (ADR-053 Dec 13) */
 .perfil-xp-bar{width:56px;height:4px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;flex-shrink:0}
 .perfil-xp-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#E8A020,#FFD700);transition:width .4s}
+/* ADR-058: badge de categoria de origen (navbar y modal de level-up). El
+   color lo fija usuario-session.js (renderOrigenBadge); el borde usa
+   currentColor. Base compartida + ajuste por contexto. */
+.origen-badge{display:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:1px 7px;border:1px solid currentColor;border-radius:10px;line-height:1.6;vertical-align:middle}
+.perfil-origen{margin-left:6px}
+.lu-origen{margin:0 0 14px;font-size:10px;padding:2px 9px}
 #badges-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
 /* Logros / trofeos (estilo consola + Upland) */
 .logros-progress{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 12px 4px}
@@ -913,6 +919,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
       <span id="perfil-nombre" style="font-weight:700;color:#fff"></span>
       <span id="perfil-xp" style="color:#E8A020;margin-left:4px"></span>
       <span id="perfil-badge" style="color:rgba(255,255,255,.45);margin-left:4px"></span>
+      <span id="perfil-origen" class="origen-badge perfil-origen" role="status"></span>
     </div>
     <div class="perfil-xp-bar" aria-hidden="true"><div class="perfil-xp-fill" id="perfil-xp-fill"></div></div>
   </div><div class="hna">
@@ -3142,6 +3149,12 @@ function showLevelUpModal(level, xpActual) {
   if(em) em.textContent = level.emoji;
   if(nm) nm.textContent = level.nombre;
   if(xm) xm.textContent = fmtXp(xpActual) + ' XP';
+  // ADR-058: badge de categoria de origen en el modal (logica unica en
+  // usuario-session.js; aqui solo se aporta el contenedor #lu-origen).
+  var oEl = document.getElementById('lu-origen');
+  if(oEl && window.ExploraCO && window.ExploraCO.renderOrigenBadge) {
+    window.ExploraCO.renderOrigenBadge(oEl, window.ExploraCO.usuario && window.ExploraCO.usuario.origen);
+  }
   m.style.display = 'flex';
   setTimeout(function() { m.style.opacity = '1'; }, 10);
 }
@@ -3859,6 +3872,7 @@ function submitBlog() {
     <div class="lu-title">¡Subiste de nivel!</div>
     <div class="lu-name"></div>
     <div class="lu-xp"></div>
+    <div class="lu-origen origen-badge" id="lu-origen" role="status"></div>
     <button class="lu-btn" onclick="closeLevelUp()">¡Genial!</button>
   </div>
 </div>

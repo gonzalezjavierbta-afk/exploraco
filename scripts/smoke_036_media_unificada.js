@@ -95,11 +95,12 @@ var U = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 async function run() {
 
   // ============ A. resolverMediaItem ============
-  var mCu = crearMock([{ test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] }]);
+  var mCu = crearMock([{ test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] }]);
   var rCu = await MOD.resolverMediaItem(mCu.fn, 'curada', 'f1');
   check('A1: curada ok con destinoId', rCu.ok === true && rCu.destinoId === 'd1' && rCu.autorId === null);
+  check('A1b: curada sin coords -> punto null', rCu.punto === null);
 
-  var mVj = crearMock([{ test: 'FROM interacciones WHERE id::text', reply: [{ id: 'v1', autor_id: 'a1', destino_id: 'd1' }] }]);
+  var mVj = crearMock([{ test: 'FROM interacciones i', reply: [{ id: 'v1', autor_id: 'a1', destino_id: 'd1' }] }]);
   var rVj = await MOD.resolverMediaItem(mVj.fn, 'viajero_foto', 'v1');
   check('A2: viajero_foto ok con autorId', rVj.ok === true && rVj.autorId === 'a1');
 
@@ -107,7 +108,18 @@ async function run() {
   var rAl = await MOD.resolverMediaItem(mAl.fn, 'album_foto', 'p1');
   check('A3: album_foto ok con albumDuenoId', rAl.ok === true && rAl.albumDuenoId === 'u8');
 
-  var mNo = crearMock([{ test: 'FROM destinos_fotos WHERE id::text', reply: [] }]);
+  // ADR-058: resolverMediaItem expone el punto del media (fallback
+  // destino -> album/foto -> texto ciudad -> null).
+  var mCuPt = crearMock([{ test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1', d_lat: 4.71, d_lng: -74.07, d_ciudad: 'Bogota' }] }]);
+  var rCuPt = await MOD.resolverMediaItem(mCuPt.fn, 'curada', 'f1');
+  check('A1c: curada con destinos.lat/lng -> punto', !!rCuPt.punto
+    && rCuPt.punto.lat === 4.71 && rCuPt.punto.lng === -74.07 && rCuPt.puntoFuente === 'destino');
+  var mAlPt = crearMock([{ test: 'FROM album_fotos af JOIN albumes a', reply: [{ id: 'p1', autor_id: 'u9', album_dueno_id: 'u8', af_lat: null, af_lng: null, al_lat: 6.24, al_lng: -75.58, al_ciudad: 'Medellin' }] }]);
+  var rAlPt = await MOD.resolverMediaItem(mAlPt.fn, 'album_foto', 'p1');
+  check('A1d: album_foto hereda albumes.lat/lng -> punto', !!rAlPt.punto
+    && rAlPt.punto.lat === 6.24 && rAlPt.puntoFuente === 'album');
+
+  var mNo = crearMock([{ test: 'FROM destinos_fotos df', reply: [] }]);
   var rNo = await MOD.resolverMediaItem(mNo.fn, 'curada', 'f1');
   check('A4: item inexistente -> ok false', rNo.ok === false);
 
@@ -203,7 +215,7 @@ async function run() {
 
   // ============ F. media_voto (handler real) ============
   var mPost = crearMock([
-    { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
+    { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
     { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 1 }] },
@@ -234,7 +246,7 @@ async function run() {
   check('F2: media_voto xp 3 votos 1', bPost.xp === 3 && bPost.votos === 1 && bPost.ya_votado === true);
 
   var mDup2 = crearMock([
-    { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
+    { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [{ activo: true }] }
   ]);
   global.__MOCKSQL__ = mDup2.fn;
@@ -242,13 +254,13 @@ async function run() {
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'curada', item_id: 'f1', accion: 'like' }, query: {}, headers: authHeaders(U) }, resDup);
   check('F3: media_voto duplicado -> 409', resDup.statusCode === 409);
 
-  var m404 = crearMock([{ test: 'FROM destinos_fotos WHERE id::text', reply: [] }]);
+  var m404 = crearMock([{ test: 'FROM destinos_fotos df', reply: [] }]);
   global.__MOCKSQL__ = m404.fn;
   var res404 = makeRes();
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'curada', item_id: 'nope', accion: 'like' }, query: {}, headers: authHeaders(U) }, res404);
   check('F4: media_voto item inexistente -> 404', res404.statusCode === 404);
 
-  var mSelf = crearMock([{ test: 'FROM interacciones WHERE id::text', reply: [{ id: 'v1', autor_id: U, destino_id: 'd1' }] }]);
+  var mSelf = crearMock([{ test: 'FROM interacciones i', reply: [{ id: 'v1', autor_id: U, destino_id: 'd1' }] }]);
   global.__MOCKSQL__ = mSelf.fn;
   var resSelf = makeRes();
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'viajero_foto', item_id: 'v1', accion: 'like' }, query: {}, headers: authHeaders(U) }, resSelf);
@@ -256,7 +268,7 @@ async function run() {
 
   // ============ G. media_comentar (handler real) ============
   var mCom = crearMock([
-    { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
+    { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'FROM usuarios WHERE id=$1 LIMIT 1', reply: [{ id: U, nombre: 'Yo', avatar: '' }] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_comentarios WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: 'INSERT INTO media_comentarios', reply: [{ id: 'm1', usuario_id: U, fuente: 'curada', item_id: 'f1', parent_id: null, texto: 'hola', activo: true, creado_en: 't1' }] },
@@ -283,7 +295,7 @@ async function run() {
 
   // ============ H. media_interacciones (GET) ============
   var mGet = crearMock([
-    { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
+    { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: /FROM media_votos WHERE fuente/, reply: [{ n: 4 }] },
     { test: /FROM media_comentarios WHERE fuente/, reply: [{ n: 2 }] },
     { test: 'FROM media_votos WHERE usuario_id', reply: [{ uno: 1 }] },
@@ -299,7 +311,7 @@ async function run() {
 
   // ============ I. media_comentarios (GET) ============
   var mArbolGet = crearMock([
-    { test: 'FROM destinos_fotos WHERE id::text', reply: [{ id: 'f1', destino_id: 'd1' }] },
+    { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'FROM media_comentarios mc', reply: [
       { id: 'c1', foto_id: 'f1', parent_id: null, usuario_id: 'u1', activo: true, texto: 'a', creado_en: 't1', likes: 1, ya_like: false, autor_nombre: 'A', autor_avatar: '' },
       { id: 'c2', foto_id: 'f1', parent_id: 'c1', usuario_id: 'u2', activo: true, texto: 'b', creado_en: 't2', likes: 0, ya_like: false, autor_nombre: 'B', autor_avatar: '' }

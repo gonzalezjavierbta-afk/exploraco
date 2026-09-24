@@ -420,6 +420,34 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-completa .pf-comp-btn{background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:5px 11px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0}
 .pf-completa .pf-comp-btn:hover{background:var(--gold);color:var(--black)}
 .pf-completa .pf-comp-feliz{margin-top:12px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#22C55E}
+/* Tu origen (ADR-058: Multiplicador de Origen por lejania).
+   Silo atomico .pf-origen (Regla de Oro 4 / ADR-004). Solo informa:
+   el factor real lo aplica el backend segun el punto geografico. */
+.pf-origen{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
+.pf-origen .pf-org-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.pf-origen .pf-org-place{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pf-origen .pf-org-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.45)}
+.pf-origen .pf-org-city{font-size:15px;font-weight:700;color:#fff;word-break:break-word}
+.pf-origen .pf-org-chip{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;border-radius:999px;padding:5px 12px;border:1px solid rgba(255,255,255,.18);color:#fff;white-space:nowrap}
+.pf-origen .pf-org-chip.co{border-color:rgba(232,160,32,.5);color:var(--gold)}
+.pf-origen .pf-org-chip.ext{border-color:rgba(59,130,246,.55);color:#7eb8f0}
+.pf-origen .pf-org-chip.pend{border-color:rgba(245,158,11,.55);color:#f59e0b}
+.pf-origen .pf-org-chip.none{border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.5)}
+.pf-origen .pf-org-rows{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.pf-origen .pf-org-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;flex-wrap:wrap}
+.pf-origen .pf-org-row-name{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#fff;min-width:92px}
+.pf-origen .pf-org-row-desc{flex:1;min-width:140px;font-size:12px;color:rgba(255,255,255,.6);line-height:1.4}
+.pf-origen .pf-org-row-fx{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:12px;color:var(--gold);white-space:nowrap}
+.pf-origen .pf-org-note{font-size:12px;line-height:1.5;padding:9px 12px;border-radius:8px;margin-bottom:8px}
+.pf-origen .pf-org-note.pend{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#f5c065}
+.pf-origen .pf-org-note.wait{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);color:#9ecbff}
+.pf-origen .pf-org-foot{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;margin-top:4px}
+.pf-origen .pf-org-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pf-origen .pf-org-btn{background:var(--gold);border:none;border-radius:6px;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;padding:9px 16px;cursor:pointer}
+.pf-origen .pf-org-btn:hover{opacity:.88}
+.pf-origen .pf-org-btn.ghost{background:transparent;border:1px solid rgba(232,160,32,.5);color:var(--gold)}
+.pf-origen .pf-org-btn.ghost:hover{background:rgba(232,160,32,.12)}
+@media (max-width:600px){.pf-origen .pf-org-row-name{min-width:0}.pf-origen .pf-org-actions .pf-org-btn{flex:1}}
 /* Mi Casa (CLASE) */
 .pf-casa{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-bottom:12px}
 .pf-casa .pf-casa-cabeza{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -587,6 +615,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <!-- WP-5 (TSK-103 / ADR-028): datos personales + completitud del perfil -->
   <div class="pf-section-title" data-tab="perfil">&#x1F9F3; Mis datos</div>
   <div class="pf-datos" id="pf-datos" data-tab="perfil"></div>
+
+  <!-- ADR-058: Multiplicador de Origen por lejania (Local / Nomada / Extranjero) -->
+  <div class="pf-section-title" data-tab="perfil">&#x1F30E; Tu origen</div>
+  <div class="pf-origen" id="pf-origen" data-tab="perfil" aria-label="Multiplicador de origen por lejania" aria-live="polite"></div>
 
   <div class="pf-section-title" data-tab="perfil">&#x1F4CB; Completa tu perfil</div>
   <div class="pf-completa" id="pf-completa" data-tab="perfil"></div>
@@ -1224,6 +1256,7 @@ function renderPerfil() {
   /* WP-5 (TSK-103 / ADR-028): pestanas, completitud, Casa y museo publico */
   pfAplicarTab();
   renderDatosPerfil();
+  renderOrigen();
   renderCuentaPanel();
   cargarCompletitudPerfil(u.id);
   cargarCasas(u.id);
@@ -4502,6 +4535,7 @@ function pfTab(tab) {
   pfAplicarTab();
   var u = sesion();
   if (tab === 'perfil' && u && u.id) renderDatosPerfil();
+  if (tab === 'perfil' && u && u.id) renderOrigen();
   if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
@@ -4626,6 +4660,110 @@ function renderDatosPerfil() {
     + pfDato('Ciudad y pais', lugar, 'ciudad')
     + pfDato('Intereses', pfInteresesTexto(u.intereses), 'intereses');
 }
+
+/* ---- Tu origen (ADR-058: Multiplicador de Origen por lejania) ----
+   Tarjeta SOLO informativa. El multiplicador real (x1.0 .. x1.4) depende del
+   punto geografico del destino y lo resuelve el backend; aqui se muestra la
+   base declarada y la categoria del usuario a partir del objeto aditivo
+   u.origen (GET/POST de api/usuarios.js). Nunca calcula ni promete el factor
+   exacto: tier_base='co' agrupa Local y Nomada porque el desempate exige la
+   ciudad del punto, que no vive en el perfil. */
+function pfOrigenDesdeSesion(u) {
+  if (u && u.origen && typeof u.origen === 'object') return u.origen;
+  /* Fallback: la sesion cacheada aun no trae el objeto (GET en vuelo o
+     proyeccion publica). Derivacion minima desde los campos planos. */
+  var ciudad = (u && u.ciudad_base) ? String(u.ciudad_base).trim() : '';
+  var pais = (u && u.pais_base) ? String(u.pais_base).trim().toUpperCase() : '';
+  var elegible = !!(ciudad || pais);
+  var esExt = !!(pais && pais !== 'CO');
+  return {
+    ciudad_base: ciudad || null,
+    pais_base: pais || null,
+    origen_declarado_en: null,
+    elegible: elegible,
+    tier_base: elegible ? (esExt ? 'extranjero' : (ciudad ? 'co' : null)) : null,
+    es_extranjero_verificado: !!(esExt && u && u.email_verificado === true),
+    dias_origen_declarado: null,
+    min_dias_cuenta: 7
+  };
+}
+function pfOrigenMinDias(o) {
+  var n = Number(o && o.min_dias_cuenta);
+  return (isFinite(n) && n > 0) ? Math.round(n) : 7;
+}
+function pfOrigenRow(nombre, desc, factor) {
+  return '<div class="pf-org-row">'
+    + '<span class="pf-org-row-name">' + esc(nombre) + '</span>'
+    + '<span class="pf-org-row-desc">' + esc(desc) + '</span>'
+    + '<span class="pf-org-row-fx">' + esc(factor) + '</span>'
+    + '</div>';
+}
+function renderOrigen() {
+  var box = document.getElementById('pf-origen');
+  var u = sesion();
+  if (!box || !u) return;
+  var o = pfOrigenDesdeSesion(u);
+  var minDias = pfOrigenMinDias(o);
+  var lugar = o.ciudad_base || 'Sin ciudad';
+  if (o.pais_base) lugar += (o.ciudad_base ? ' \u00b7 ' : '') + o.pais_base;
+
+  /* Categoria derivada de tier_base + es_extranjero_verificado. */
+  var cat, catClass, factor;
+  if (o.tier_base === 'extranjero') {
+    if (o.es_extranjero_verificado) { cat = 'Extranjero'; catClass = 'ext'; factor = 'x1.2 \u2013 x1.4'; }
+    else { cat = 'Extranjero sin verificar'; catClass = 'pend'; factor = 'x1.2 \u2013 x1.4'; }
+  } else if (o.tier_base === 'co') {
+    cat = 'Local / Nomada'; catClass = 'co'; factor = 'x1.0 \u2013 x1.2';
+  } else {
+    cat = 'Sin categoria'; catClass = 'none'; factor = 'x1.0';
+  }
+
+  var html = '<div class="pf-org-head">'
+    + '<div class="pf-org-place"><span class="pf-org-lbl">Tu ubicacion declarada</span>'
+    + '<span class="pf-org-city">' + (o.elegible ? esc(lugar) : 'Sin declarar') + '</span></div>'
+    + '<span class="pf-org-chip ' + catClass + '">' + esc(cat) + ' \u00b7 ' + factor + '</span>'
+    + '</div>';
+
+  /* Explicacion de como funciona el multiplicador (3 categorias). */
+  html += '<div class="pf-org-rows">'
+    + pfOrigenRow('Local', 'Misma ciudad que el punto: XP base', 'x1.0')
+    + pfOrigenRow('Nomada', 'Otra ciudad de Colombia: hasta x1.2 segun la distancia al punto', 'hasta x1.2')
+    + pfOrigenRow('Extranjero', 'Pais distinto a Colombia: hasta x1.4 segun la distancia al punto', 'hasta x1.4')
+    + '</div>';
+
+  /* Estado de elegibilidad (avisos no bloqueantes). tier_base=null (p. ej.
+     solo pais 'CO' sin ciudad) tampoco alcanza ninguna categoria -> guia. */
+  if (!o.elegible || !o.tier_base) {
+    html += '<div class="pf-org-note pend">Declara tu ciudad y pais para activar el multiplicador de origen.</div>';
+  } else {
+    if (o.tier_base === 'extranjero' && !o.es_extranjero_verificado) {
+      html += '<div class="pf-org-note pend">Verifica tu email para activar el multiplicador de extranjero.</div>';
+    }
+    var dias = o.dias_origen_declarado;
+    if (dias !== null && dias !== undefined && Number(dias) < minDias) {
+      var falta = Math.max(0, minDias - Math.round(Number(dias)));
+      html += '<div class="pf-org-note wait">Tu multiplicador de origen se activa ' + minDias
+        + ' dias despues de declarar tu ubicacion (te faltan ' + falta + ').</div>';
+    }
+  }
+
+  /* Anti-teleport informativo: al cambiar ciudad/pais el contador se reinicia. */
+  html += '<div class="pf-org-foot">Si cambias tu ciudad o pais, el multiplicador se reactiva '
+    + minDias + ' dias despues de declarar la nueva ubicacion.</div>';
+
+  /* Acciones: reutiliza el flujo de edicion existente (pfEditarCampo). */
+  var tieneCat = !!(o.elegible && o.tier_base);
+  html += '<div class="pf-org-actions">'
+    + '<button type="button" class="pf-org-btn" onclick="pfEditarCampo(\'ciudad\')" aria-label="'
+    + (tieneCat ? 'Editar tu ciudad y pais' : 'Declarar tu ciudad y pais') + '">'
+    + (tieneCat ? 'Editar ubicacion' : 'Declarar ubicacion') + '</button>';
+  if (o.elegible && o.tier_base === 'extranjero' && !o.es_extranjero_verificado) {
+    html += '<button type="button" class="pf-org-btn ghost" onclick="pfIr(\'cuenta\',\'pf-cuenta\')" aria-label="Verificar tu email">Verificar email</button>';
+  }
+  html += '</div>';
+
+  box.innerHTML = html;
+}
 function pfEditarCampo(campo) {
   var u = sesion();
   if (!u) return;
@@ -4674,9 +4812,20 @@ function pfGuardarPerfil(cambios) {
   fetchConJwt('/api/usuarios', { method: 'POST', body: JSON.stringify(body) }).then(function(res){
     if (res && res.ok) {
       for (var k2 in cambios) if (cambios.hasOwnProperty(k2)) u[k2] = cambios[k2];
+      /* ADR-058: el POST devuelve el objeto 'origen' refrescado; se fusiona
+         para no pedir una segunda vez y para que la tarjeta refleje el
+         posible reinicio de origen_declarado_en (anti-teleport). */
+      if (res.data && res.data.origen) u.origen = res.data.origen;
       try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
       pfRefrescarPerfilPaneles();
-      showToast('Perfil actualizado');
+      var tocadoOrigen = (cambios.ciudad_base !== undefined || cambios.pais_base !== undefined);
+      if (tocadoOrigen && u.origen && u.origen.elegible
+          && Number(u.origen.dias_origen_declarado) === 0) {
+        showToast('Ubicacion declarada: el multiplicador de origen se activa en '
+          + pfOrigenMinDias(u.origen) + ' dias');
+      } else {
+        showToast('Perfil actualizado');
+      }
       if (res.data && res.data.bajo_nivel) showToast('Ojo: bajaste de nivel', '#ef4444');
       return;
     }
@@ -4685,6 +4834,7 @@ function pfGuardarPerfil(cambios) {
 }
 function pfRefrescarPerfilPaneles() {
   renderDatosPerfil();
+  renderOrigen();
   renderCuentaPanel();
   var u = sesion();
   if (u && u.id) cargarCompletitudPerfil(u.id);

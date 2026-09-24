@@ -1,3 +1,21 @@
+// api/interacciones.js  v30 (Unificacion del Arbol de Clases, ADR-058
+//   seccion 8.3 / M-2): se ELIMINA el bono plano x1.2 del Arbol y el Arbol
+//   pasa a usar el MISMO factor escalonado del motor de XP
+//   (calcularFactorOrigen), evaluado PER-ROW via su espejo SQL
+//   sqlFactorOrigen + sqlHaversineKm. El origen se resuelve UNA vez por
+//   request con resolverOrigenUsuario; cada fila aporta su punto
+//   (lat/lng propias, o su texto ciudad via lookup geo_ciudades con
+//   normGeo). Nerf documentado (M-4): los usuarios sin ciudad_base/punto
+//   que antes cobraban x1.2 pasan a 1.00. Cero endpoints nuevos (8/8).
+// api/interacciones.js  v29 (Multiplicador de Origen por lejania, ADR-058):
+//   el motor calcularXpFinal gana el factor mult_origen (HERMANO de
+//   stack_temp) en [1.00, 1.40] segun Local/Nomada/Extranjero y la
+//   distancia real (haversine) del usuario al punto geografico de la accion.
+//   Resolucion SERVER-SIDE via geo_ciudades/geo_paises (normGeo + su espejo
+//   SQL sqlNormGeo), con config en gamificacion_config (7 claves nuevas;
+//   fallback en codigo). El ledger persiste mult_origen/origen_tier +
+//   contexto.origen. Requiere la migracion 038; sin ella el factor degrada
+//   a 1.00 y el ledger reintenta sin las columnas nuevas.
 // api/interacciones.js  v28 (Mercado de Emprendedores, migracion 034):
 //   ramas GET ?tipo=mercado_config|mercado_ofertas|mercado_mi y POST
 //   ?tipo=mercado_publicar|mercado_comprar|mercado_cancelar|mercado_producir
@@ -225,7 +243,7 @@ var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 
 //
 // v18 (ADR-035, 2026-09-17): el XP pasa a numeric(12,2). Helpers red2
 // (half-up a 2 decimales) y numXp (normaliza el string de Neon a Number).
-// calcularNivelLocal/ent/D_R, sqlBonoFila, reparto de referidos, fama de
+// calcularNivelLocal/ent/D_R, factor de origen, reparto de referidos, fama de
 // Parche, amuletos, visitas, compra de consumibles, admin_xp y xp_bono de
 // retos pasan a half-up 2. La guarda de fama (famaBase < 1) pasa a <= 0.
 // El gate de album_crear usa calcularNivelLocal (antes Math.floor/100+1).
@@ -284,6 +302,111 @@ function haversineMetros(lat1, lng1, lat2, lng2) {
     + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return TIERRA_RADIO_M * c;
+}
+
+// ADR-058 (B-1): UNICA normalizacion canonica de texto geografico
+// (Regla de No-Duplicidad). Debe producir EXACTAMENTE lo mismo que el seed
+// geo (geo_ciudades.nombre_normalizado / geo_paises.nombre_normalizado):
+// NFD + strip de diacriticos + lowercase + [^a-z0-9 ]->espacio + colapsar
+// espacios + trim. Ej: 'Bogota D.C.' -> 'bogota d c'; 'Medellin' ->
+// 'medellin'; 'Narino' -> 'narino'. ASCII-safe (los diacriticos se
+// referencian por rango Unicode, nunca como bytes > 127).
+function normGeo(s) {
+  var v = String(s == null ? '' : s);
+  v = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  v = v.toLowerCase();
+  v = v.replace(/[^a-z0-9 ]/g, ' ');
+  v = v.replace(/ +/g, ' ').trim();
+  return v;
+}
+
+// ADR-058 (B-1): espejo SQL OBLIGATORIO de normGeo SIN depender de
+// unaccent (extension no garantizada). Su fidelidad con el JS se valida en
+// un smoke de paridad (scripts/smoke_origen_factor_parity.js). El lower()
+// va ANTES del translate/regexp para que las mayusculas SIN tilde
+// ('Bogota') tambien sobrevivan al filtro [^a-z0-9 ] (mismo resultado que
+// normGeo). Cubre a/e/i/o/u con tilde, u con dieresis y enie (ambas
+// cajas); las tildes van como escapes \u00xx (ASCII-safe, ADR-002).
+function sqlNormGeo(expr) {
+  var e = String(expr);
+  var tildes = '\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1'
+    + '\u00c1\u00c9\u00cd\u00d3\u00da\u00dc\u00d1';
+  var planas = 'aeiouunaeiouun';
+  return "btrim(regexp_replace(regexp_replace(translate(lower(COALESCE(" + e
+    + ",'')), '" + tildes + "', '" + planas + "'), '[^a-z0-9 ]', ' ', 'g'),"
+    + " ' +', ' ', 'g'))";
+}
+
+// ADR-058 (N-4): alias minimo del matcher de ciudades. Claves y valores en
+// formato normGeo ([a-z0-9 ]). Se aplica ANTES del lookup y se replica en
+// SQL (sqlAliasCiudad) para que buscarCoordsCiudad (JS) y su espejo
+// sqlCoordsCiudadSub (SQL) coincidan.
+var ALIAS_CIUDAD = {
+  'b quilla': 'barranquilla',
+  'bquilla': 'barranquilla',
+  'sta marta': 'santa marta',
+  'bogota d c': 'bogota'
+};
+
+// Alias canonico de un nombre YA normalizado (JS, espejo de sqlAliasCiudad).
+function normGeoAlias(nc) {
+  var v = String(nc == null ? '' : nc);
+  return Object.prototype.hasOwnProperty.call(ALIAS_CIUDAD, v) ? ALIAS_CIUDAD[v] : v;
+}
+
+// ADR-058 (N-4): espejo SQL del alias (CASE sobre el nombre normalizado).
+function sqlAliasCiudad(exprNorm) {
+  var partes = ['CASE ' + exprNorm];
+  Object.keys(ALIAS_CIUDAD).forEach(function(k) {
+    partes.push(" WHEN '" + k + "' THEN '" + ALIAS_CIUDAD[k] + "'");
+  });
+  partes.push(' ELSE ' + exprNorm + ' END');
+  return '(' + partes.join('') + ')';
+}
+
+// ADR-058 (M-2/N-4): coords de una ciudad por su TEXTO, como subconsulta
+// escalar. Precedencia determinista e IDENTICA a buscarCoordsCiudad (JS):
+//   1) igualdad exacta del nombre normalizado (con alias aplicado);
+//   2) match CONTENIDO: el candidato esta DENTRO del texto de la ciudad
+//      (ej. 'cucuta' en 'san jose de cucuta', 'cali' en 'santiago de cali');
+//   3) match INVERSO (N-4): el texto de la ciudad CONTIENE el nombre del
+//      candidato (ej. 'medellin antioquia' -> 'medellin', 'santa marta
+//      magdalena' -> 'santa marta'); se evalua DESPUES de exacto y contenido.
+//   4) DESEMPATE de homonimos: exacto DESC, contenido DESC, es_capital DESC,
+//      cod_mpio ASC.
+// Guard n <> '' y g.nombre_normalizado <> '': evita que un texto vacio
+// produzca LIKE '%%' (que casaria cualquier fila). Sin match (o sin
+// geo_ciudades) la subconsulta es NULL y sqlFactorOrigen degrada a 1.00.
+function sqlCoordsCiudadSub(exprCiudad, col) {
+  var n = sqlAliasCiudad(sqlNormGeo(exprCiudad));
+  return "(SELECT g." + col + " FROM geo_ciudades g"
+    + " WHERE g.activo=true AND " + n + " <> ''"
+    + " AND g.nombre_normalizado <> ''"
+    + " AND (g.nombre_normalizado = " + n
+    + " OR g.nombre_normalizado LIKE '%' || " + n + " || '%'"
+    + " OR " + n + " LIKE '%' || g.nombre_normalizado || '%')"
+    + " ORDER BY (g.nombre_normalizado = " + n + ") DESC,"
+    + " (g.nombre_normalizado LIKE '%' || " + n + " || '%') DESC,"
+    + " g.es_capital DESC, g.cod_mpio ASC LIMIT 1)";
+}
+
+// ADR-058: coords del punto geografico de un destino (best-effort). Se usa
+// SOLO cuando el caller NO tiene ya las coords en scope (p. ej. resena/
+// guardado/rating/foto por destino_id). Nunca lanza: degrada a null (sin
+// punto -> factor de origen 1.00).
+function coordsDestino(sqlFn, destinoId) {
+  if (!destinoId) return Promise.resolve(null);
+  return sqlFn('SELECT lat, lng FROM destinos WHERE id=$1::uuid LIMIT 1', [destinoId])
+    .then(function(r) {
+      var row = (r && r[0]) || {};
+      var lat = typeof row.lat === 'number' ? row.lat : parseFloat(row.lat);
+      var lng = typeof row.lng === 'number' ? row.lng : parseFloat(row.lng);
+      return tieneCoordsValidas(lat, lng) ? { lat: lat, lng: lng } : null;
+    })
+    .catch(function(eCd) {
+      console.warn('[origen] coords de destino no resueltas: ' + (eCd && eCd.message));
+      return null;
+    });
 }
 
 // ADR-033 (v17): el admin puede fijar un radio explicito en metros por
@@ -377,6 +500,18 @@ var CAP_PROGRESION_DEFAULT = 5.0;
 var CAP_GLOBAL_DEFAULT = 10.0;
 var M_NIVEL_MAX_DEFAULT = 3.0;
 
+// ADR-058 (Multiplicador de Origen por lejania): FALLBACK en codigo de las
+// 7 claves NUEVAS de gamificacion_config (migracion 038). Mismas reglas que
+// los caps: son el fallback y el valor semilla, nunca una segunda fuente
+// divergente. Si la 038 no esta aplicada, el motor degrada a estos valores.
+var FACTOR_ORIGEN_LOCAL_DEFAULT = 1.0;
+var FACTOR_ORIGEN_NOMADA_MAX_DEFAULT = 1.2;
+var FACTOR_ORIGEN_EXTRAJERO_MAX_DEFAULT = 1.4;
+var ORIGEN_KM_NOMADA_DEFAULT = 1000;
+var ORIGEN_KM_EXTRAJERO_DEFAULT = 3000;
+var ORIGEN_KM_LOCAL_DEFAULT = 25;
+var ORIGEN_MIN_DIAS_CUENTA_DEFAULT = 7;
+
 // M_nivel(N) = 1.0 + ((N-1)/39) * (m_nivel_max - 1.0). Con el default
 // m_nivel_max = 3.0 el paso es 2.0/39 (formula congelada del ADR-053,
 // reescalada a 40 niveles en el RELEASE 2026-09-23).
@@ -409,7 +544,16 @@ async function leerConfigGamificacion(sql) {
   var cfg = {
     capProgresion: CAP_PROGRESION_DEFAULT,
     capGlobal: CAP_GLOBAL_DEFAULT,
-    mNivelMax: M_NIVEL_MAX_DEFAULT
+    mNivelMax: M_NIVEL_MAX_DEFAULT,
+    // ADR-058: 7 claves NUEVAS del multiplicador de origen. Fallback a las
+    // constantes en codigo si la 038 no esta aplicada o la clave falta.
+    factorOrigenLocal: FACTOR_ORIGEN_LOCAL_DEFAULT,
+    factorOrigenNomadaMax: FACTOR_ORIGEN_NOMADA_MAX_DEFAULT,
+    factorOrigenExtranjeroMax: FACTOR_ORIGEN_EXTRAJERO_MAX_DEFAULT,
+    origenKmNomada: ORIGEN_KM_NOMADA_DEFAULT,
+    origenKmExtranjero: ORIGEN_KM_EXTRAJERO_DEFAULT,
+    origenKmLocal: ORIGEN_KM_LOCAL_DEFAULT,
+    origenMinDiasCuenta: ORIGEN_MIN_DIAS_CUENTA_DEFAULT
   };
   try {
     var rows = await sql('SELECT clave, valor FROM gamificacion_config');
@@ -418,6 +562,14 @@ async function leerConfigGamificacion(sql) {
       if (r.clave === 'cap_progresion' && v > 0) cfg.capProgresion = v;
       else if (r.clave === 'cap_global' && v > 0) cfg.capGlobal = v;
       else if (r.clave === 'm_nivel_max' && v >= 1) cfg.mNivelMax = v;
+      // ADR-058: claves del multiplicador de origen.
+      else if (r.clave === 'factor_origen_local' && v > 0) cfg.factorOrigenLocal = v;
+      else if (r.clave === 'factor_origen_nomada_max' && v > 0) cfg.factorOrigenNomadaMax = v;
+      else if (r.clave === 'factor_origen_extranjero_max' && v > 0) cfg.factorOrigenExtranjeroMax = v;
+      else if (r.clave === 'origen_km_nomada' && v > 0) cfg.origenKmNomada = v;
+      else if (r.clave === 'origen_km_extranjero' && v > 0) cfg.origenKmExtranjero = v;
+      else if (r.clave === 'origen_km_local' && v > 0) cfg.origenKmLocal = v;
+      else if (r.clave === 'origen_min_dias_cuenta' && v > 0) cfg.origenMinDiasCuenta = v;
     });
   } catch (eCfg) {
     if (eCfg && (eCfg.code === '42P01' || eCfg.code === '42703')) {
@@ -427,6 +579,197 @@ async function leerConfigGamificacion(sql) {
     }
   }
   return cfg;
+}
+
+// ADR-058: normaliza las claves de la curva con los MISMOS fallbacks en JS y
+// en su espejo SQL (Regla de No-Duplicidad: una sola fuente de config).
+function normalizarCfgOrigen(cfg) {
+  var c = cfg || {};
+  var o = {};
+  o.fLocal = numXp(c.factorOrigenLocal);
+  if (!isFinite(o.fLocal) || o.fLocal <= 0) o.fLocal = FACTOR_ORIGEN_LOCAL_DEFAULT;
+  o.fNom = numXp(c.factorOrigenNomadaMax);
+  if (!isFinite(o.fNom) || o.fNom <= 0) o.fNom = FACTOR_ORIGEN_NOMADA_MAX_DEFAULT;
+  o.fExt = numXp(c.factorOrigenExtranjeroMax);
+  if (!isFinite(o.fExt) || o.fExt <= 0) o.fExt = FACTOR_ORIGEN_EXTRAJERO_MAX_DEFAULT;
+  o.kmNom = numXp(c.origenKmNomada);
+  if (!isFinite(o.kmNom) || o.kmNom <= 0) o.kmNom = ORIGEN_KM_NOMADA_DEFAULT;
+  o.kmExt = numXp(c.origenKmExtranjero);
+  if (!isFinite(o.kmExt) || o.kmExt <= 0) o.kmExt = ORIGEN_KM_EXTRAJERO_DEFAULT;
+  o.kmLocal = numXp(c.origenKmLocal);
+  if (!isFinite(o.kmLocal) || o.kmLocal < 0) o.kmLocal = ORIGEN_KM_LOCAL_DEFAULT;
+  return o;
+}
+
+// ADR-058 (N-5): nombre calcularFactorOrigen para NO colisionar con la
+// columna xp_ledger.mult_origen. UNICA curva canonica (Regla de
+// No-Duplicidad); TODOS los parametros salen de cfg, jamas literales.
+//   local      -> factorOrigenLocal                            (1.00)
+//   nomada     -> local + (nomadaMax-local)*min(D/kmNomada,1)  (1.00..1.20)
+//   extranjero -> nomadaMax + (extMax-nomadaMax)*min(D/kmExt,1)(1.20..1.40)
+//   null/sin punto -> 1.00 (neutro)
+// Redondeo a 6 decimales (coherente con numeric(10,6) del ledger). La curva
+// es continua: nomada(kmNomada) == nomadaMax == extranjero(0).
+function calcularFactorOrigen(tier, distKm, cfg) {
+  var o = normalizarCfgOrigen(cfg);
+  var d = numXp(distKm);
+  if (!isFinite(d) || d < 0) d = 0;
+  var factor;
+  if (tier === 'local') factor = o.fLocal;
+  else if (tier === 'nomada') factor = o.fLocal + (o.fNom - o.fLocal) * Math.min(d / o.kmNom, 1);
+  else if (tier === 'extranjero') factor = o.fNom + (o.fExt - o.fNom) * Math.min(d / o.kmExt, 1);
+  else factor = 1.0;
+  return Math.round(factor * 1000000) / 1000000;
+}
+
+// ADR-058 (N-4): lookup de coords por ciudad normalizada (normGeo -> alias ->
+// parametro) contra geo_ciudades.nombre_normalizado del seed. Precedencia
+// determinista e IDENTICA al espejo SQL sqlCoordsCiudadSub:
+//   1) igualdad exacta (con alias aplicado);
+//   2) match CONTENIDO: el candidato esta DENTRO del texto de la ciudad
+//      (ej. 'cucuta' en 'san jose de cucuta', 'cali' en 'santiago de cali');
+//   3) match INVERSO (N-4): el texto de la ciudad CONTIENE el nombre del
+//      candidato (ej. 'medellin antioquia' -> 'medellin', 'santa marta
+//      magdalena' -> 'santa marta'); se evalua DESPUES de exacto y contenido.
+//   4) desempate de homonimos: exacto DESC, contenido DESC, es_capital DESC,
+//      cod_mpio ASC.
+// Degrada a null con warn (BUG-021).
+async function buscarCoordsCiudad(sql, ciudadBase) {
+  var nc = normGeoAlias(normGeo(ciudadBase));
+  if (!nc) return null;
+  try {
+    var rows = await sql(
+      "SELECT lat, lng FROM geo_ciudades WHERE activo=true AND $1 <> ''"
+      + " AND nombre_normalizado <> ''"
+      + " AND (nombre_normalizado=$1 OR nombre_normalizado LIKE '%' || $1 || '%'"
+      + " OR $1 LIKE '%' || nombre_normalizado || '%')"
+      + " ORDER BY (nombre_normalizado=$1) DESC,"
+      + " (nombre_normalizado LIKE '%' || $1 || '%') DESC,"
+      + " es_capital DESC, cod_mpio ASC LIMIT 1",
+      [nc]
+    );
+    var row = (rows && rows[0]) || null;
+    if (!row) return null;
+    var lat = typeof row.lat === 'number' ? row.lat : parseFloat(row.lat);
+    var lng = typeof row.lng === 'number' ? row.lng : parseFloat(row.lng);
+    return tieneCoordsValidas(lat, lng) ? { lat: lat, lng: lng } : null;
+  } catch (eGC) {
+    console.warn('[origen] geo_ciudades no disponible (' + (eGC && eGC.code) + '): factor 1.00');
+    return null;
+  }
+}
+
+// ADR-058: lookup del centroide por iso2 (pais_base en mayusculas). Degrada
+// a null con warn si geo_paises no existe o no hay match (BUG-021).
+async function buscarCoordsPais(sql, iso2) {
+  var iso = String(iso2 || '').trim().toUpperCase();
+  if (!iso) return null;
+  try {
+    var rows = await sql(
+      'SELECT lat, lng FROM geo_paises WHERE iso2=$1 AND activo=true LIMIT 1',
+      [iso]
+    );
+    var row = (rows && rows[0]) || null;
+    if (!row) return null;
+    var lat = typeof row.lat === 'number' ? row.lat : parseFloat(row.lat);
+    var lng = typeof row.lng === 'number' ? row.lng : parseFloat(row.lng);
+    return tieneCoordsValidas(lat, lng) ? { lat: lat, lng: lng } : null;
+  } catch (eGP) {
+    console.warn('[origen] geo_paises no disponible (' + (eGP && eGP.code) + '): factor 1.00');
+    return null;
+  }
+}
+
+// ADR-058: resolucion SERVER-SIDE del origen (JAMAS input del cliente).
+// 1 SELECT a usuarios + 1 lookup geo (ciudades o paises). Devuelve
+// { tier, coords, elegible, motivo }, donde 'tier' es la categoria BASE:
+// 'extranjero' | 'co' | null. El tier FINAL (local/nomada) lo decide
+// calcularXpFinal contra la distancia al punto (B-4). Degrada SIN lanzar
+// (patron BUG-021): cualquier fallo -> { elegible:false } -> factor 1.00.
+// Elegibilidad (seccion 7): cuenta >= origenMinDiasCuenta; Extranjero exige
+// ademas email_verificado=true, pais_base != 'CO' y origen_declarado_en
+// >= origenMinDiasCuenta (decision N-7: aplica a Nomada Y Extranjero).
+async function resolverOrigenUsuario(sql, usuarioId, cfg) {
+  var out = { tier: null, coords: null, elegible: false, motivo: 'sin_datos' };
+  if (!usuarioId) return out;
+  var c = cfg || {};
+  var minDias = numXp(c.origenMinDiasCuenta);
+  if (!isFinite(minDias) || minDias < 0) minDias = ORIGEN_MIN_DIAS_CUENTA_DEFAULT;
+  var u = null;
+  try {
+    var rows = await sql(
+      'SELECT pais_base, ciudad_base, email_verificado, creado_en, origen_declarado_en'
+      + ' FROM usuarios WHERE id=$1::uuid LIMIT 1',
+      [usuarioId]
+    );
+    u = (rows && rows[0]) || null;
+  } catch (eU) {
+    if (eU && eU.code === '42703') {
+      // 038 pendiente (origen_declarado_en ausente): reintento minimo.
+      try {
+        var rows2 = await sql(
+          'SELECT pais_base, ciudad_base, email_verificado, creado_en'
+          + ' FROM usuarios WHERE id=$1::uuid LIMIT 1',
+          [usuarioId]
+        );
+        u = (rows2 && rows2[0]) || null;
+      } catch (eU2) {
+        console.warn('[origen] usuario no leido: ' + (eU2 && eU2.message));
+        return out;
+      }
+    } else {
+      console.warn('[origen] usuario no leido: ' + (eU && eU.message));
+      return out;
+    }
+  }
+  if (!u) return out;
+  var pais = (u.pais_base == null) ? '' : String(u.pais_base).trim().toUpperCase();
+  var ciudad = (u.ciudad_base == null) ? '' : String(u.ciudad_base).trim();
+  if (!pais && !ciudad) { out.motivo = 'sin_ciudad_ni_pais'; return out; }
+  var now = Date.now();
+  var creadoMs = u.creado_en ? Date.parse(u.creado_en) : NaN;
+  var diasCuenta = isFinite(creadoMs) ? (now - creadoMs) / 86400000 : 0;
+  var declaradoMs = u.origen_declarado_en ? Date.parse(u.origen_declarado_en) : NaN;
+  var diasDeclarado = isFinite(declaradoMs) ? (now - declaradoMs) / 86400000 : null;
+  var esExtranjero = (pais !== '' && pais !== 'CO');
+  if (esExtranjero) {
+    if (!(u.email_verificado === true)) { out.motivo = 'extranjero_sin_email'; return out; }
+    if (diasCuenta < minDias) { out.motivo = 'cuenta_nueva'; return out; }
+    if (diasDeclarado === null || diasDeclarado < minDias) { out.motivo = 'origen_reciente'; return out; }
+    var coordsPais = await buscarCoordsPais(sql, pais);
+    if (!coordsPais) { out.motivo = 'pais_sin_coords'; return out; }
+    out.tier = 'extranjero';
+    out.coords = coordsPais;
+    out.elegible = true;
+    out.motivo = 'ok_extranjero';
+    return out;
+  }
+  // Residencia colombiana (pais_base vacio se trata como CO).
+  if (!ciudad) { out.motivo = 'sin_ciudad'; return out; }
+  if (diasCuenta < minDias) { out.motivo = 'cuenta_nueva'; return out; }
+  var coordsCiudad = await buscarCoordsCiudad(sql, ciudad);
+  if (!coordsCiudad) { out.motivo = 'ciudad_sin_coords'; return out; }
+  out.tier = 'co';
+  out.coords = coordsCiudad;
+  out.elegible = true;
+  out.motivo = 'ok_co';
+  return out;
+}
+
+// ADR-058: contexto de origen para el ledger a partir del resultado del
+// motor (mult_origen/origen_tier/origen_dist_km) y la fuente del punto.
+// Reduce el ruido en los ~20 call-sites (Regla de No-Duplicidad).
+function origenLedger(res, fuente, punto) {
+  var r = res || {};
+  return {
+    mult_origen: (r.mult_origen === undefined ? 1 : r.mult_origen),
+    origen: {
+      tier: r.origen_tier || null,
+      dist_km: (r.origen_dist_km === undefined ? null : r.origen_dist_km),
+      fuente: fuente || 'sin_punto',
+      punto: punto || null
+    }
+  };
 }
 
 // ADR-053 Decision 2 (v25): UNICO calculo de XP final. Firma retrocompatible
@@ -469,7 +812,30 @@ function calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag, ctx) {
   var mult_progresion_c = capProgAplicado ? capProgresion : mult_progresion;
   var stackTemp = (c.amuleto ? 2.0 : 1.0) * (c.lider ? 1.1 : 1.0);
   var mult_stack = mult_clase * factor_casa * stackTemp;
-  var mult_global = mult_progresion_c * stackTemp;
+  // ADR-058: factor de origen como HERMANO de stack_temp (seccion 4.1). Solo
+  // se calcula con un punto resoluble Y un origen elegible ya resuelto; sin
+  // punto -> neutro 1.00. La distancia es haversine(origen, punto)/1000. NO
+  // altera la definicion de mult_stack ni de mult_progresion.
+  var mult_origen = 1.0;
+  var origen_tier = null;
+  var origen_dist_km = null;
+  var punto = c.punto;
+  var origen = c.origen;
+  if (punto && tieneCoordsValidas(punto.lat, punto.lng)
+      && origen && origen.elegible
+      && origen.coords && tieneCoordsValidas(origen.coords.lat, origen.coords.lng)) {
+    var distKm = haversineMetros(
+      origen.coords.lat, origen.coords.lng, punto.lat, punto.lng) / 1000;
+    var kmLocal = numXp(c.origenKmLocal);
+    if (!isFinite(kmLocal) || kmLocal < 0) kmLocal = ORIGEN_KM_LOCAL_DEFAULT;
+    var tierFinal;
+    if (origen.tier === 'extranjero') tierFinal = 'extranjero';
+    else tierFinal = (distKm <= kmLocal) ? 'local' : 'nomada';
+    mult_origen = calcularFactorOrigen(tierFinal, distKm, c);
+    origen_tier = tierFinal;
+    origen_dist_km = Math.round(distKm * 100) / 100;
+  }
+  var mult_global = mult_progresion_c * mult_origen * stackTemp;
   var capGlobAplicado = mult_global > capGlobal;
   var mult_global_c = capGlobAplicado ? capGlobal : mult_global;
   var cap_aplicado = capGlobAplicado ? 'global'
@@ -483,6 +849,9 @@ function calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag, ctx) {
     mult_progresion_c: mult_progresion_c,
     cap_progresion: capProgresion,
     mult_stack: mult_stack,
+    mult_origen: mult_origen,
+    origen_tier: origen_tier,
+    origen_dist_km: origen_dist_km,
     mult_global: mult_global,
     mult_global_c: mult_global_c,
     cap_global: capGlobal,
@@ -499,6 +868,29 @@ async function calcularXpAcreditado(sql, xp_base, nivel_clase, clase_id, casa_ta
   c.capProgresion = cfg.capProgresion;
   c.capGlobal = cfg.capGlobal;
   c.mNivelMax = cfg.mNivelMax;
+  // ADR-058: se PROPAGA la config de origen al motor de la curva.
+  c.factorOrigenLocal = cfg.factorOrigenLocal;
+  c.factorOrigenNomadaMax = cfg.factorOrigenNomadaMax;
+  c.factorOrigenExtranjeroMax = cfg.factorOrigenExtranjeroMax;
+  c.origenKmNomada = cfg.origenKmNomada;
+  c.origenKmExtranjero = cfg.origenKmExtranjero;
+  c.origenKmLocal = cfg.origenKmLocal;
+  c.origenMinDiasCuenta = cfg.origenMinDiasCuenta;
+  // ADR-058: si el call-site aporto un punto con coords y NO trajo ya el
+  // origen resuelto, se resuelve AQUI (1 lectura extra; R-5). Sin punto ->
+  // mult_origen 1.00 sin consultar. El usuario sale de ctx (nunca del body).
+  var punto = c.punto;
+  if (!c.origen && punto && tieneCoordsValidas(punto.lat, punto.lng)) {
+    var uid = c.usuario_id || c.usuarioId;
+    if (uid) {
+      try {
+        c.origen = await resolverOrigenUsuario(sql, uid, cfg);
+      } catch (eOr) {
+        console.warn('[origen] resolucion fallo (factor 1.00): ' + (eOr && eOr.message));
+        c.origen = { tier: null, coords: null, elegible: false, motivo: 'error' };
+      }
+    }
+  }
   return calcularXpFinal(xp_base, nivel_clase, clase_id, casa_tag, c);
 }
 
@@ -517,6 +909,10 @@ function armarXpDetalle(base, res, bonosPlanos, totalReal, capAplicadoReal) {
     mult_progresion: r.mult_progresion_c,
     cap_progresion: r.cap_progresion,
     mult_stack: r.mult_stack,
+    // ADR-058 (spec 10.1, aditivo): factor de origen y su tier/distancia.
+    mult_origen: (r.mult_origen === undefined ? 1 : r.mult_origen),
+    origen_tier: r.origen_tier || null,
+    origen_dist_km: (r.origen_dist_km === undefined ? null : r.origen_dist_km),
     mult_global: r.mult_global_c,
     cap_global: r.cap_global,
     cap_aplicado: capAplicadoReal || r.cap_aplicado,
@@ -535,21 +931,56 @@ function armarXpDetalle(base, res, bonosPlanos, totalReal, capAplicadoReal) {
 // vacio (AGENTS.md 2.2): todo catch registra el motivo.
 async function registrarXpLedger(sql, datos) {
   var d = datos || {};
+  var cap = (d.cap_aplicado === 'progresion' || d.cap_aplicado === 'global'
+    || d.cap_aplicado === 'accion') ? d.cap_aplicado : 'ninguno';
+  // ADR-058: factor de origen efectivo (columna mult_origen, 038) y
+  // contexto.origen = { tier, dist_km, fuente, punto }.
+  var origen = d.origen || null;
+  var multOrigen = numXp(d.mult_origen);
+  if (!isFinite(multOrigen) || multOrigen <= 0) multOrigen = 1;
+  var origenTier = (origen && origen.tier) ? String(origen.tier)
+    : (d.origen_tier ? String(d.origen_tier) : null);
+  var contexto = d.contexto ? Object.assign({}, d.contexto) : {};
+  if (origen) {
+    contexto.origen = {
+      tier: origen.tier || null,
+      dist_km: (origen.dist_km === undefined ? null : origen.dist_km),
+      fuente: origen.fuente || 'sin_punto',
+      punto: origen.punto || null
+    };
+  }
+  var ctxJson = Object.keys(contexto).length ? JSON.stringify(contexto) : null;
+  var valoresBase = [d.usuario_id, String(d.accion || 'desconocida'), red2(d.xp_base),
+    numXp(d.mult_nivel) || 1, numXp(d.mult_stack) || 1, numXp(d.mult_final) || 1,
+    cap, red2(d.bonos_planos), red2(d.xp_final), d.es_exento === true];
   try {
-    var cap = (d.cap_aplicado === 'progresion' || d.cap_aplicado === 'global'
-      || d.cap_aplicado === 'accion') ? d.cap_aplicado : 'ninguno';
     await sql(
       'INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
-      + ' mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, contexto)'
-      + ' VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)',
-      [d.usuario_id, String(d.accion || 'desconocida'), red2(d.xp_base),
-       numXp(d.mult_nivel) || 1, numXp(d.mult_stack) || 1, numXp(d.mult_final) || 1,
-       cap, red2(d.bonos_planos), red2(d.xp_final), d.es_exento === true,
-       d.contexto ? JSON.stringify(d.contexto) : null]
+      + ' mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, mult_origen,'
+      + ' origen_tier, contexto)'
+      + ' VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)',
+      valoresBase.concat([multOrigen, origenTier, ctxJson])
     );
   } catch (eLed) {
-    console.warn('[xp_ledger] fila no registrada ('
-      + (eLed && eLed.code ? eLed.code + ' ' : '') + (eLed && eLed.message) + ')');
+    if (eLed && eLed.code === '42703') {
+      // Migracion 038 pendiente (columnas mult_origen/origen_tier ausentes):
+      // se reintenta la fila SIN ellas para no perder el ledger (BUG-021).
+      try {
+        await sql(
+          'INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
+          + ' mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, contexto)'
+          + ' VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)',
+          valoresBase.concat([ctxJson])
+        );
+        console.warn('[xp_ledger] 038 pendiente: fila registrada sin mult_origen/origen_tier');
+      } catch (eLed2) {
+        console.warn('[xp_ledger] fila no registrada ('
+          + (eLed2 && eLed2.code ? eLed2.code + ' ' : '') + (eLed2 && eLed2.message) + ')');
+      }
+    } else {
+      console.warn('[xp_ledger] fila no registrada ('
+        + (eLed && eLed.code ? eLed.code + ' ' : '') + (eLed && eLed.message) + ')');
+    }
   }
   if (d.nivel !== undefined && d.nivel !== null) {
     var lvl = parseInt(d.nivel, 10);
@@ -1442,100 +1873,131 @@ function descuentoArbolParaCategoria(ramas, categoria) {
   return pct;
 }
 
-// -- Origen derivado + bono x1.2 (WP-5, TSK-103 / ADR-028) ------------
-// El Origen no se persiste como identidad: se recalcula por request desde
-// usuarios.pais_base/ciudad_base y se compara, fila a fila, con la ciudad
-// del destino. Se pasa al SQL como $2 (ciudad_base cruda, '' si NULL) y
-// $3 (boolean extranjero) para que cada consulta decida el bono por FILA.
-// La normalizacion replica TRANSLATE_CIUDAD de los logros (tildes ->
-// vocal simple) para tolerar 'Bogota' y 'Bogot\u00e1' (ADR-012 / BUGS:63).
-// ASCII-safe: la lista de tildes va como escapes \u00xx, nunca como bytes.
-function sqlNormCiudad(expr) {
-  return "LOWER(TRANSLATE(COALESCE(" + expr + ",''),'"
-    + '\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc' + "','aeiouu'))";
+// -- ADR-058: espejo SQL del factor de origen del Arbol (M-2/M-3) --------
+// El Arbol agrega en SQL y el motor de XP vive en JS, asi que la curva se
+// expresa en dos runtimes. La FUENTE CANONICA es calcularFactorOrigen (JS);
+// aqui vive su espejo obligatorio (Regla de No-Duplicidad), validado por
+// scripts/smoke_origen_factor_parity.js (tolerancia 1e-6). Ya NO existe el
+// bono plano x1.2 del Arbol: cada fila aporta su PUNTO (lat/lng propias o su
+// texto ciudad via geo_ciudades) y el factor se calcula PER-ROW. Los
+// usuarios sin ciudad_base/punto que antes cobraban x1.2 pasan a 1.00 (nerf
+// documentado, ADR-058 M-4).
+//
+// Espejo SQL de haversineMetros/1000 con el MISMO radio (TIERRA_RADIO_M),
+// critico para que la paridad JS/SQL se mantenga dentro de 1e-6. NULL-safe:
+// si cualquier coordenada es NULL el resultado es NULL (la aritmetica SQL
+// propaga NULL); el consumidor decide el neutro 1.00.
+function sqlHaversineKm(exprLat1, exprLng1, exprLat2, exprLng2) {
+  var sLat = "sin(radians((" + exprLat2 + ") - (" + exprLat1 + ")) / 2)";
+  var sLng = "sin(radians((" + exprLng2 + ") - (" + exprLng1 + ")) / 2)";
+  var a = "(" + sLat + " * " + sLat
+    + " + cos(radians(" + exprLat1 + ")) * cos(radians(" + exprLat2 + "))"
+    + " * " + sLng + " * " + sLng + ")";
+  return "(" + (TIERRA_RADIO_M / 1000)
+    + " * 2 * atan2(sqrt(" + a + "), sqrt(1 - (" + a + "))))";
 }
-// local = misma ciudad que el destino y no extranjero.
-function sqlOrigenLocal(exprCiudad) {
-  var nc = sqlNormCiudad(exprCiudad);
-  var nb = sqlNormCiudad('$2');
-  return "(NOT $3::boolean AND " + nb + " <> '' AND "
-    + nc + " <> '' AND " + nc + " = " + nb + ")";
+
+// Curva SQL identica a calcularFactorOrigen para una distancia ya calculada.
+// distExpr es una expresion SQL en km. ROUND((...)::numeric,6) es el espejo
+// del Math.round(factor*1e6)/1e6 del JS (el cast evita el round(double,int)
+// inexistente en PostgreSQL).
+function sqlCurvaFactorOrigen(tier, distExpr, cfg) {
+  var o = normalizarCfgOrigen(cfg);
+  if (tier === 'local') return "ROUND((" + o.fLocal + ")::numeric, 6)";
+  if (tier === 'nomada') {
+    return "ROUND((" + o.fLocal + " + (" + o.fNom + " - " + o.fLocal + ")"
+      + " * LEAST(((" + distExpr + ")::double precision) / " + o.kmNom + ", 1))::numeric, 6)";
+  }
+  if (tier === 'extranjero') {
+    return "ROUND((" + o.fNom + " + (" + o.fExt + " - " + o.fNom + ")"
+      + " * LEAST(((" + distExpr + ")::double precision) / " + o.kmExt + ", 1))::numeric, 6)";
+  }
+  return '1.0';
 }
-// nacional = no extranjero y ciudad distinta a la del destino (incluye
-// pais_base NULL o ciudad_base NULL, siempre que el destino tenga ciudad).
-function sqlOrigenNacional(exprCiudad) {
-  var nc = sqlNormCiudad(exprCiudad);
-  var nb = sqlNormCiudad('$2');
-  return "(NOT $3::boolean AND " + nc + " <> '' AND ("
-    + nb + " = '' OR " + nc + " <> " + nb + "))";
+
+// Factor de una fila con PUNTO (lat/lng) ya resoluble. Espejo de la decision
+// de tier de calcularXpFinal: extranjero -> curva extranjero; CO -> local si
+// la distancia <= origen_km_local, si no nomada. Origen no elegible o punto
+// con coords NULL -> 1.00 (neutro).
+function sqlFactorOrigen(exprLatPunto, exprLngPunto, origen, cfg) {
+  if (!origen || !origen.elegible || !origen.coords) return '1.0';
+  var latO = Number(origen.coords.lat);
+  var lngO = Number(origen.coords.lng);
+  if (!isFinite(latO) || !isFinite(lngO)) return '1.0';
+  var o = normalizarCfgOrigen(cfg);
+  var d = sqlHaversineKm(String(latO), String(lngO), exprLatPunto, exprLngPunto);
+  var puntoNull = "((" + exprLatPunto + ") IS NULL OR (" + exprLngPunto + ") IS NULL)";
+  if (origen.tier === 'extranjero') {
+    return "(CASE WHEN " + puntoNull + " THEN 1.0 ELSE "
+      + sqlCurvaFactorOrigen('extranjero', d, cfg) + " END)";
+  }
+  return "(CASE WHEN " + puntoNull + " THEN 1.0"
+    + " WHEN (" + d + ") <= " + o.kmLocal + " THEN " + sqlCurvaFactorOrigen('local', d, cfg)
+    + " ELSE " + sqlCurvaFactorOrigen('nomada', d, cfg) + " END)";
 }
-// Origen propio del usuario para ramas sin ciudad de destino: local =
-// residente con ciudad_base declarada y no extranjero.
-function sqlOrigenLocalPropio() {
-  return "(NOT $3::boolean AND " + sqlNormCiudad('$2') + " <> '')";
-}
-// Multiplicador x1.2 con ROUND half-up a 2 decimales por fila/unidad
-// (mismo criterio que la piramide de referidos, ADR-035). exprPuntos es
-// un literal o una expresion SQL.
-var BONO_ORIGEN = 1.2;
-function sqlBonoFila(exprPuntos, cond) {
-  return "CASE WHEN " + cond + " THEN ROUND((" + exprPuntos + ") * "
-    + BONO_ORIGEN + ", 2) ELSE (" + exprPuntos + ") END";
+
+// Factor PER-ROW del Arbol: usa lat/lng propias de la fila si existen y son
+// validas (IS NOT NULL y <> 0), si no cae al texto ciudad via geo_ciudades
+// (sqlCoordsCiudadSub). Sin punto resoluble sqlFactorOrigen devuelve 1.00.
+// Si el origen NO es elegible se evita el lookup por fila (neutro directo).
+function sqlFactorFila(latExpr, lngExpr, ciudadExpr, origen, cfg) {
+  if (!origen || !origen.elegible || !origen.coords) return '1.0';
+  return "CASE WHEN (" + latExpr + ") IS NOT NULL AND (" + lngExpr + ") IS NOT NULL"
+    + " AND (" + latExpr + ") <> 0 AND (" + lngExpr + ") <> 0"
+    + " THEN " + sqlFactorOrigen(latExpr, lngExpr, origen, cfg)
+    + " ELSE " + sqlFactorOrigen(sqlCoordsCiudadSub(ciudadExpr, 'lat'),
+      sqlCoordsCiudadSub(ciudadExpr, 'lng'), origen, cfg) + " END";
 }
 
 // Calcula los puntos DERIVADOS (D_R) de las 16 ramas. NUNCA lee
 // progreso_arbol. Cada consulta degrada a 0 en catch (tabla/columna
 // ausente por migracion pendiente). Agrupa las agregaciones en pocas
 // round-trips por dominio.
-function calcularDerivadosArbol(sql, usuarioId, vocaciones) {
+async function calcularDerivadosArbol(sql, usuarioId, vocaciones) {
   var v = vocaciones || {};
   var out = {};
   RAMAS.forEach(function(r) { out[r.id] = 0; });
   function ent(x) { return red2(parseFloat(x) || 0); }
 
-  // Contexto de Origen (WP-5, ADR-028): UNA sola lectura de
-  // pais_base/ciudad_base; nunca se persiste y nunca menciona
-  // progreso_arbol (invariante anti-doble-conteo). Degrada a
-  // {ciudad:'', extranjero:false} si la migracion 017 no esta aplicada.
-  return sql(
-    'SELECT pais_base, ciudad_base FROM usuarios WHERE id=$1',
-    [usuarioId]
-  ).catch(function() { return []; }).then(function(rows) {
-    var u = rows[0] || {};
-    var orgPais = (u.pais_base == null) ? '' : String(u.pais_base);
-    var org = {
-      ciudad: (u.ciudad_base == null) ? '' : String(u.ciudad_base),
-      extranjero: (orgPais !== '' && orgPais.toUpperCase() !== 'CO'),
-    };
-    return derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org);
-  });
+  // ADR-058 (M-2): UNICA resolucion de origen server-side del Arbol;
+  // reutiliza resolverOrigenUsuario (la MISMA del motor de XP; Regla de
+  // No-Duplicidad). 1 lectura de config (leerConfigGamificacion) + 1
+  // resolucion de origen por request. El factor se evalua PER-ROW en SQL
+  // (sqlFactorFila). Sin origen elegible (sin ciudad/pais/geo, cuenta nueva
+  // o extranjero no elegible) -> 1.00. Degrada SIN lanzar (BUG-021).
+  var cfg = await leerConfigGamificacion(sql);
+  var org;
+  try {
+    org = await resolverOrigenUsuario(sql, usuarioId, cfg);
+  } catch (eOr) {
+    console.warn('[origen] Arbol: resolucion fallo (factor 1.00): ' + (eOr && eOr.message));
+    org = { tier: null, coords: null, elegible: false, motivo: 'error' };
+  }
+  return derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org, cfg);
 }
 
 // Cuerpo de D_R con el contexto de Origen ya resuelto. Solo lo llama
-// calcularDerivadosArbol. $2 = ciudad_base cruda del usuario y $3 =
-// boolean extranjero (ver sqlOrigenLocal/sqlOrigenNacional).
-function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
-  var orgCiudad = org.ciudad;
-  var orgExtranjero = org.extranjero;
-  // Origen propio del usuario (ramas sin ciudad de destino): local =
-  // residente con ciudad_base declarada y no extranjero.
-  var localPropio = (!orgExtranjero && orgCiudad !== '');
-  var pOrg = [usuarioId, orgCiudad, orgExtranjero];
-
+// calcularDerivadosArbol. org = salida de resolverOrigenUsuario ({tier:
+// 'co'|'extranjero'|null, coords, elegible}); cfg = config de origen.
+// TODAS las consultas usan unicamente $1 = usuario_id; el origen viaja como
+// literal inyectado desde JS (coords + tier) en sqlFactorFila.
+function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org, cfg) {
   // Exploradores: rutas, ciudades y naturaleza (interacciones/destinos).
   var qExp = sql(
     "SELECT"
-    + " COALESCE(ROUND(SUM(" + sqlBonoFila('i.xp_ganado', sqlOrigenNacional('d.ciudad'))
+    + " COALESCE(ROUND(SUM(i.xp_ganado * "
+    + sqlFactorFila('d.lat', 'd.lng', 'd.ciudad', org, cfg)
     + ") FILTER (WHERE i.tipo IN ('guardado','visita') AND i.activo=true), 2), 0) AS exp_rutas,"
     + " COALESCE(ROUND(SUM(i.xp_ganado) FILTER (WHERE i.tipo='visita' AND i.activo=true), 2), 0) AS natura_xp,"
     + " (SELECT COUNT(*)::int FROM interacciones i2 JOIN destinos d2 ON d2.id=i2.destino_id"
     + "   WHERE i2.usuario_id=$1 AND i2.tipo='visita' AND i2.activo=true"
     + "   AND (i2.dims->'geo'->>'zona'='rural' OR d2.tags->>'subcategoria' IN ('naturaleza','aventura','parque'))) AS natura_rural,"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('40', sqlOrigenNacional('dc.ciudad')) + "), 2), 0) FROM ("
-    + "   SELECT DISTINCT d3.ciudad FROM interacciones i3 JOIN destinos d3 ON d3.id=i3.destino_id"
+    + " (SELECT COALESCE(ROUND(SUM(40 * "
+    + sqlFactorFila('dc.lat', 'dc.lng', 'dc.ciudad', org, cfg) + "), 2), 0) FROM ("
+    + "   SELECT DISTINCT d3.ciudad, d3.lat, d3.lng FROM interacciones i3 JOIN destinos d3 ON d3.id=i3.destino_id"
     + "   WHERE i3.usuario_id=$1 AND i3.tipo='visita' AND i3.activo=true AND COALESCE(d3.ciudad,'') <> '') dc) AS exp_ciudades"
     + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
-    pOrg
+    [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
     out.exp_rutas = ent(q.exp_rutas);
@@ -1543,52 +2005,54 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
     out.exp_naturaleza = ent(q.natura_xp) + ent(q.natura_rural) * 20;
   }).catch(function(){});
 
-  // Exploradores: Activo Oculto (migracion 016). Bono de Origen local
-  // por PROPUESTA de la ciudad del usuario (ao.ciudad); los checkins de
-  // presencia no llevan bono de origen (no son propuestas).
+  // Exploradores: Activo Oculto (migracion 016). El factor se evalua por
+  // PROPUESTA (ao.lat/lng, o su ciudad via lookup); los checkins de
+  // presencia no llevan factor de origen (no son propuestas).
   // FIX O1 (WP-6): aprobados y pendientes exigen ao.activo=true, para no
   // contar propuestas soft-deleted al derivar exp_ocultos.
   var qOcultos = sql(
     "SELECT"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('60', sqlOrigenLocal('ao.ciudad')) + "), 2), 0)"
+    + " (SELECT COALESCE(ROUND(SUM(60 * "
+    + sqlFactorFila('ao.lat', 'ao.lng', 'ao.ciudad', org, cfg) + "), 2), 0)"
     + "   FROM activos_ocultos ao WHERE ao.propuesto_por=$1 AND ao.activo=true"
     + "   AND (ao.votos_favor - ao.votos_contra) >= 3) AS aprobados,"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('10', sqlOrigenLocal('ao2.ciudad')) + "), 2), 0)"
+    + " (SELECT COALESCE(ROUND(SUM(10 * "
+    + sqlFactorFila('ao2.lat', 'ao2.lng', 'ao2.ciudad', org, cfg) + "), 2), 0)"
     + "   FROM activos_ocultos ao2 WHERE ao2.propuesto_por=$1 AND ao2.activo=true AND ao2.estado='pendiente'"
     + "   AND (ao2.votos_favor - ao2.votos_contra) < 3 AND (ao2.votos_favor - ao2.votos_contra) > -3) AS pendientes,"
     + " (SELECT COUNT(*)::int FROM activos_ocultos_checkins WHERE usuario_id=$1 AND activo=true) AS checkins",
-    pOrg
+    [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
     out.exp_ocultos = ent(q.aprobados) + ent(q.pendientes) + ent(q.checkins) * 25;
   }).catch(function(){});
 
-  // Curadores: critico (resenas/ratings + votos utiles). Bono de Origen
-  // local O extranjero por FILA (xp + votos_utiles*10 de esa resena). Si
-  // votos_utiles no existe (migracion 007 pendiente), reintenta solo con
-  // el XP de la fila.
+  // Curadores: critico (resenas/ratings + votos utiles). El factor de origen
+  // se evalua por FILA con el punto del destino (d.lat/lng o d.ciudad). Si
+  // votos_utiles no existe (migracion 007 pendiente), reintenta solo con el
+  // XP de la fila.
   var qCritico = sql(
-    "SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('i.xp_ganado + COALESCE(i.votos_utiles,0)*10',
-      '(' + sqlOrigenLocal('d.ciudad') + ' OR $3::boolean)')
+    "SELECT COALESCE(ROUND(SUM((i.xp_ganado + COALESCE(i.votos_utiles,0)*10) * "
+    + sqlFactorFila('d.lat', 'd.lng', 'd.ciudad', org, cfg)
     + ") FILTER (WHERE i.tipo IN ('resena','rating')), 2), 0) AS xp"
     + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
-    pOrg
+    [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
     out.cur_critico = ent(q.xp);
   }).catch(function() {
     return sql(
-      "SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('i.xp_ganado',
-        '(' + sqlOrigenLocal('d.ciudad') + ' OR $3::boolean)')
+      "SELECT COALESCE(ROUND(SUM(i.xp_ganado * "
+      + sqlFactorFila('d.lat', 'd.lng', 'd.ciudad', org, cfg)
       + ") FILTER (WHERE i.tipo IN ('resena','rating')), 2), 0) AS xp"
       + " FROM interacciones i LEFT JOIN destinos d ON d.id=i.destino_id WHERE i.usuario_id=$1",
-      pOrg
+      [usuarioId]
     ).then(function(rows) { out.cur_critico = ent((rows[0] || {}).xp); }).catch(function(){});
   });
 
-  // Curadores: colecciones de cromos (migracion 010). Los cromos no
-  // guardan ciudad: SIMPLIFICACION documentada -> bono local con el
-  // origen PROPIO del usuario (no hay destino con el que comparar).
+  // Curadores: colecciones de cromos (migracion 010). Los cromos no guardan
+  // ciudad ni coords: fila SIN punto resoluble -> factor NEUTRO 1.00
+  // (ADR-058 M-2; antes cobraba x1.2 por origen propio, ahora nerf a 1.00).
   var qColec = sql(
     "SELECT COALESCE(SUM(uc.cantidad),0)::int AS n_cromos,"
     + " COALESCE(SUM(uc.cantidad) FILTER (WHERE cc.rareza='dorado'),0)::int AS n_dorados"
@@ -1597,49 +2061,48 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
     [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
-    var uCromo = localPropio ? red2(15 * BONO_ORIGEN) : 15;
-    var uDorado = localPropio ? red2(50 * BONO_ORIGEN) : 50;
-    out.cur_colecciones = ent(q.n_cromos) * uCromo + ent(q.n_dorados) * uDorado;
+    out.cur_colecciones = ent(q.n_cromos) * 15 + ent(q.n_dorados) * 50;
   }).catch(function(){});
 
   // Curadores: datos (votos de Activo Oculto 016, votos de resena 007,
-  // comentarios de media 013). Bono de Origen local por UNIDAD: la ciudad
-  // sale de la propuesta votada / del destino de la resena votada / del
-  // album del comentario. Degrada completo si falta cualquiera.
+  // comentarios de media 013). El factor se evalua por UNIDAD con el punto de
+  // la fila: ao.lat/lng, el destino de la resena (d.lat/lng) o el album del
+  // comentario (alb.lat/lng); si faltan coords cae a su texto ciudad.
   var qDatos = sql(
     "SELECT"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('8', sqlOrigenLocal('ao.ciudad')) + "), 2), 0)"
+    + " (SELECT COALESCE(ROUND(SUM(8 * "
+    + sqlFactorFila('ao.lat', 'ao.lng', 'ao.ciudad', org, cfg) + "), 2), 0)"
     + "   FROM activos_ocultos_votos av JOIN activos_ocultos ao ON ao.id=av.activo_id"
     + "   WHERE av.usuario_id=$1) AS n_votos_activo,"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "), 2), 0)"
+    + " (SELECT COALESCE(ROUND(SUM(5 * "
+    + sqlFactorFila('d.lat', 'd.lng', 'd.ciudad', org, cfg) + "), 2), 0)"
     + "   FROM resena_votos rv JOIN interacciones i ON i.id=rv.resena_id"
     + "   LEFT JOIN destinos d ON d.id=i.destino_id"
     + "   WHERE rv.usuario_id=$1) AS n_review_voto,"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('5', sqlOrigenLocal('alb.ciudad')) + "), 2), 0)"
+    + " (SELECT COALESCE(ROUND(SUM(5 * "
+    + sqlFactorFila('alb.lat', 'alb.lng', 'alb.ciudad', org, cfg) + "), 2), 0)"
     + "   FROM media_comentarios mc JOIN album_fotos af ON af.id::text=mc.item_id"
     + "   JOIN albumes alb ON alb.id=af.album_id"
     + "   WHERE mc.usuario_id=$1 AND mc.activo=true AND mc.fuente='album_foto') AS n_comentarios",
-    pOrg
+    [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
     out.cur_datos = ent(q.n_votos_activo) + ent(q.n_review_voto) + ent(q.n_comentarios);
   }).catch(function(){});
 
-  // Curadores: guia (mapas 006 + planes unidos 008). Bono de Origen local
-  // por UNIDAD: los destinos mapeados traen su ciudad; los mapas y planes
-  // no tienen ciudad -> origen PROPIO del usuario (simplificacion
-  // documentada). $3 no se usa en las dos primeras subconsultas, pero
-  // sqlOrigenLocalPropio lo referencia, asi que pOrg se mantiene.
+  // Curadores: guia (mapas 006 + planes unidos 008). El factor se evalua por
+  // UNIDAD: los destinos mapeados (n_mapa_destinos, N-2) traen su punto
+  // (d.lat/lng o d.ciudad); los mapas y planes no tienen punto -> NEUTRO
+  // 1.00 (filas sin punto resoluble, ADR-058 M-2).
   var qGuia = sql(
     "SELECT"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('40', sqlOrigenLocalPropio()) + "), 2), 0)"
-    + "   FROM mapas WHERE usuario_id=$1 AND publico=true) AS n_mapas_publicos,"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('5', sqlOrigenLocal('d.ciudad')) + "), 2), 0) FROM mapa_destinos md"
+    + " (SELECT COUNT(*)::int FROM mapas WHERE usuario_id=$1 AND publico=true) * 40 AS n_mapas_publicos,"
+    + " (SELECT COALESCE(ROUND(SUM(5 * "
+    + sqlFactorFila('d.lat', 'd.lng', 'd.ciudad', org, cfg) + "), 2), 0) FROM mapa_destinos md"
     + "   JOIN mapas m ON m.id=md.mapa_id LEFT JOIN destinos d ON d.id=md.destino_id"
     + "   WHERE m.usuario_id=$1) AS n_mapa_destinos,"
-    + " (SELECT COALESCE(ROUND(SUM(" + sqlBonoFila('15', sqlOrigenLocalPropio()) + "), 2), 0)"
-    + "   FROM planes_miembros WHERE usuario_id=$1) AS n_planes",
-    pOrg
+    + " (SELECT COUNT(*)::int FROM planes_miembros WHERE usuario_id=$1) * 15 AS n_planes",
+    [usuarioId]
   ).then(function(rows) {
     var q = rows[0] || {};
     out.cur_guia = ent(q.n_mapas_publicos) + ent(q.n_mapa_destinos) + ent(q.n_planes);
@@ -1711,12 +2174,10 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org) {
     out.art_musica = (v.musico ? 50 : 0) + ent(q.n_audio) * 15;
     out.art_cine = (v.cine ? 50 : 0) + ent(q.n_video) * 15;
     out.art_grafica = (v.artista_grafico ? 50 : 0) + ent(q.n_votos) * 10;
-    // Bono de Origen extranjero por resena larga (art_literatura). La
-    // vocacion escritor*50 es un desbloqueo, no una fila de accion: solo
-    // se bonifica la contribucion de las resenas largas. SIMPLIFICACION:
-    // art_literatura no tiene destino, se usa el origen propio del usuario.
-    out.art_literatura = (v.escritor ? 50 : 0)
-      + ent(q.n_largas) * (orgExtranjero ? red2(15 * BONO_ORIGEN) : 15);
+    // art_literatura: las resenas largas no tienen un punto por fila
+    // resoluble en esta rama (SIMPLIFICACION) -> factor NEUTRO 1.00
+    // (ADR-058 M-2; antes cobraba x1.2 a extranjeros, ahora nerf a 1.00).
+    out.art_literatura = (v.escritor ? 50 : 0) + ent(q.n_largas) * 15;
   }).catch(function(){});
 
   return Promise.all([qExp, qOcultos, qCritico, qColec, qDatos, qGuia,
@@ -3449,38 +3910,101 @@ function updProgresoAlbum(sqlFn, uid, obj) {
 }
 function hoy() { return new Date().toISOString().slice(0, 10); }
 
-// Resuelve existencia y autor de un item de media canonico. item_id se
-// compara como text (id::text=$1) para no asumir uuid/text en tablas no
-// versionadas (patron BUG-021). Devuelve
-// {ok, fuente, itemId, autorId, albumDuenoId, destinoId} o {ok:false}.
+// Resuelve existencia, autor y PUNTO GEOGRAFICO de un item de media canonico.
+// item_id se compara como text (id::text=$1) para no asumir uuid/text en
+// tablas no versionadas (patron BUG-021). Devuelve
+// {ok, fuente, itemId, autorId, albumDuenoId, destinoId, punto, ciudad,
+//  puntoFuente} o {ok:false}. ADR-058: 'punto' = {lat,lng} con este orden de
+// fallback: (1) coords del destino del media (destinos.lat/lng); (2) coords
+// propias del album/foto (COALESCE(album_fotos.lat, albumes.lat), semantica
+// ADR-051: la del recurso manda, la del album es el fallback); (3) texto
+// 'ciudad' (del destino o del album) para que el caller lo resuelva via
+// buscarCoordsCiudad; (4) null (el motor deja el factor de origen en 1.00).
 function resolverMediaItem(sqlFn, fuente, itemId) {
   var f = String(fuente || '').toLowerCase();
   var id = String(itemId || '').trim();
   if (MEDIA_FUENTES.indexOf(f) === -1 || !MEDIA_ITEM_RE.test(id))
     return Promise.resolve({ ok: false });
-  var base = function(autorId, albumDuenoId, destinoId) {
-    return { ok: true, fuente: f, itemId: id, autorId: autorId || null, albumDuenoId: albumDuenoId || null, destinoId: destinoId || null };
+  var num = function(v) {
+    if (v === null || v === undefined || v === '') return NaN;
+    return typeof v === 'number' ? v : parseFloat(v);
+  };
+  var puntoDe = function(la, ln) {
+    var a = num(la), b = num(ln);
+    return tieneCoordsValidas(a, b) ? { lat: a, lng: b } : null;
+  };
+  var base = function(autorId, albumDuenoId, destinoId, punto, ciudad, puntoFuente) {
+    return {
+      ok: true, fuente: f, itemId: id,
+      autorId: autorId || null, albumDuenoId: albumDuenoId || null,
+      destinoId: destinoId || null,
+      punto: punto || null, ciudad: ciudad || null,
+      puntoFuente: puntoFuente || 'sin_punto'
+    };
   };
   var q;
   if (f === 'curada') {
-    q = sqlFn('SELECT id, destino_id FROM destinos_fotos WHERE id::text=$1 LIMIT 1', [id])
-      .then(function(r){ return r.length ? base(null, null, r[0].destino_id) : { ok: false }; });
+    q = sqlFn(
+      'SELECT df.id, df.destino_id, d.lat AS d_lat, d.lng AS d_lng, d.ciudad AS d_ciudad'
+      + ' FROM destinos_fotos df LEFT JOIN destinos d ON d.id = df.destino_id'
+      + ' WHERE df.id::text=$1 LIMIT 1',
+      [id]
+    ).then(function(r) {
+      if (!r.length) return { ok: false };
+      var row = r[0];
+      var pt = puntoDe(row.d_lat, row.d_lng);
+      var fp = pt ? 'destino' : (row.d_ciudad ? 'ciudad' : 'sin_punto');
+      return base(null, null, row.destino_id, pt, row.d_ciudad, fp);
+    });
   } else if (f === 'viajero_foto') {
     q = sqlFn(
-      'SELECT id, usuario_id AS autor_id, destino_id FROM interacciones'
-      + ' WHERE id::text=$1 AND tipo=\'foto\' AND activo=true'
-      + ' AND (dims IS NULL OR NOT (dims ? \'voto_foto_id\')) LIMIT 1',
+      'SELECT i.id, i.usuario_id AS autor_id, i.destino_id,'
+      + ' d.lat AS d_lat, d.lng AS d_lng, d.ciudad AS d_ciudad'
+      + ' FROM interacciones i LEFT JOIN destinos d ON d.id = i.destino_id'
+      + ' WHERE i.id::text=$1 AND i.tipo=\'foto\' AND i.activo=true'
+      + ' AND (i.dims IS NULL OR NOT (i.dims ? \'voto_foto_id\')) LIMIT 1',
       [id]
-    ).then(function(r){ return r.length ? base(r[0].autor_id, null, r[0].destino_id) : { ok: false }; });
+    ).then(function(r) {
+      if (!r.length) return { ok: false };
+      var row = r[0];
+      var pt = puntoDe(row.d_lat, row.d_lng);
+      var fp = pt ? 'destino' : (row.d_ciudad ? 'ciudad' : 'sin_punto');
+      return base(row.autor_id, null, row.destino_id, pt, row.d_ciudad, fp);
+    });
   } else {
     q = sqlFn(
-      'SELECT af.id, af.autor_original_id AS autor_id, a.usuario_id AS album_dueno_id'
+      'SELECT af.id, af.autor_original_id AS autor_id, a.usuario_id AS album_dueno_id,'
+      + ' af.lat AS af_lat, af.lng AS af_lng, a.lat AS al_lat, a.lng AS al_lng,'
+      + ' a.ciudad AS al_ciudad'
       + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
       + ' WHERE af.id::text=$1 AND af.activo=true AND a.activo=true LIMIT 1',
       [id]
-    ).then(function(r){ return r.length ? base(r[0].autor_id, r[0].album_dueno_id, null) : { ok: false }; });
+    ).then(function(r) {
+      if (!r.length) return { ok: false };
+      var row = r[0];
+      var pt = puntoDe(row.af_lat, row.af_lng);
+      var fp = pt ? 'album_foto' : 'sin_punto';
+      if (!pt) {
+        pt = puntoDe(row.al_lat, row.al_lng);
+        if (pt) fp = 'album';
+      }
+      if (!pt && row.al_ciudad) fp = 'ciudad';
+      return base(row.autor_id, row.album_dueno_id, null, pt, row.al_ciudad, fp);
+    });
   }
   return conDegradacionMedia(q, 'resolverMediaItem/' + f, { ok: false });
+}
+
+// ADR-058: coords del punto asociado a un item de media ya resuelto por
+// resolverMediaItem. Prioriza las coords del propio item; si solo trae texto
+// 'ciudad', lo resuelve via geo_ciudades (buscarCoordsCiudad). Sin punto
+// resoluble devuelve null -> el motor deja el factor de origen en 1.00.
+function puntoDeMedia(sqlFn, target) {
+  if (!target) return Promise.resolve(null);
+  if (target.punto && tieneCoordsValidas(target.punto.lat, target.punto.lng))
+    return Promise.resolve(target.punto);
+  if (target.ciudad) return buscarCoordsCiudad(sqlFn, target.ciudad);
+  return Promise.resolve(null);
 }
 
 // Nucleo de voto (like/unlike) sobre media_votos con soft-delete. Devuelve
@@ -3489,7 +4013,7 @@ function resolverMediaItem(sqlFn, fuente, itemId) {
 // 409). Reactivar tras un unlike NO re-paga XP. Tope unificado de 20
 // votos/24h. v27: XP decreciente con la carga reciente (se recarga a full a
 // las 24h) y cooldown creciente con la carga.
-function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion) {
+function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
   var f = String(fuente || '').toLowerCase();
   var id = String(itemId || '').trim();
   function contar() {
@@ -3552,18 +4076,21 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion) {
       return sqlFn('INSERT INTO media_votos (usuario_id, fuente, item_id, xp_ganado, activo) VALUES ($1,$2,$3,$4,true)', [usuarioId, f, id, xpBaseVoto])
         .then(async function() {
           var ctxVoto = await contextoXpE(sqlFn, usuarioId);
+          // ADR-058: punto geografico del media (destino/album/foto). Sin
+          // punto resoluble el motor deja mult_origen en 1.00.
+          var puntoVoto = await puntoDeMedia(sqlFn, target);
           var resVoto = await calcularXpAcreditado(sqlFn, xpBaseVoto,
             ctxVoto.nivel_clase, ctxVoto.clase_id, ctxVoto.tag,
-            { nivel_usuario: ctxVoto.nivel_usuario });
+            { nivel_usuario: ctxVoto.nivel_usuario, usuario_id: usuarioId, punto: puntoVoto });
           var xpVotoFinal = resVoto.xp_final;
           await sqlFn('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpVotoFinal, usuarioId]).catch(function(){});
           await acreditarClaseYCofre(sqlFn, usuarioId, ctxVoto, xpVotoFinal);
-          await registrarXpLedger(sqlFn, {
+          await registrarXpLedger(sqlFn, Object.assign({
             usuario_id: usuarioId, accion: 'voto_media', xp_base: xpBaseVoto,
             mult_nivel: resVoto.m_nivel, mult_stack: resVoto.mult_stack,
             mult_final: resVoto.mult_global_c, cap_aplicado: resVoto.cap_aplicado,
             xp_final: xpVotoFinal, contexto: { fuente: f, item_id: id, carga: carga }
-          });
+          }, origenLedger(resVoto, (target && target.puntoFuente) || 'media', puntoVoto)));
           // Regalias pasivas (037): parte del XP base al autor de la media.
           await acumularRegalia(sqlFn, f, id, XP_BASES.voto_media, usuarioId);
           return base({ nuevo: true, xp: xpVotoFinal, xp_detalle: armarXpDetalle(xpBaseVoto, resVoto, 0) });
@@ -3626,7 +4153,7 @@ function registrarVotoMedia(sqlFn, usuarioId, fuente, itemId, noEncontrada) {
     if (!target.ok) return { status: 404, error: noEncontrada || 'Media no encontrada' };
     if (target.autorId && String(target.autorId) === String(usuarioId))
       return { status: 403, error: 'No puedes votar tu propia foto' };
-    return aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, 'like').then(function(r) {
+    return aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, 'like', target).then(function(r) {
       if (r.tope) return { status: 429, error: 'Limite de 20 votos por dia alcanzado' };
       if (r.cooldown) return { status: 429, error: 'Espera ' + r.faltan + 's para tu proximo voto' };
       if (r.duplicado) return { status: 409, error: 'Ya votaste esta foto', ya_votado: true };
@@ -3720,7 +4247,7 @@ function construirArbolComentarios(rows, usuarioId) {
 // Crea un comentario/respuesta sobre media unificada. Devuelve
 // {ok:true, comentario, xp, misiones, logros} o {ok:false, status, error}.
 // El caller resuelve antes la existencia de la media con resolverMediaItem.
-function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId) {
+function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId, target) {
   var f = String(fuente || '').toLowerCase();
   var id = String(itemId || '').trim();
   return queryConAvatarFallback(sqlFn,
@@ -3784,21 +4311,23 @@ function crearComentarioMedia(sqlFn, usuarioId, fuente, itemId, texto, parentId)
               // denominado en XP; xp_final es lo realmente acreditado).
               var aplicar = xp > 0
                 ? contextoXpE(sqlFn, usuarioId).then(async function(ctxComentario) {
+                    // ADR-058: punto geografico del media (destino/album/foto).
+                    var puntoCom = await puntoDeMedia(sqlFn, target);
                     var resCom = await calcularXpAcreditado(sqlFn, XP_BASES.chat_comentario,
                       ctxComentario.nivel_clase, ctxComentario.clase_id, ctxComentario.tag,
-                      { nivel_usuario: ctxComentario.nivel_usuario });
+                      { nivel_usuario: ctxComentario.nivel_usuario, usuario_id: usuarioId, punto: puntoCom });
                     xpComentarioEntregado = resCom.xp_final;
                     detalleComentario = armarXpDetalle(XP_BASES.chat_comentario, resCom, 0, xpComentarioEntregado, 'accion');
                     await sqlFn('UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2', [xpComentarioEntregado, usuarioId]).catch(function(){});
                     await acreditarClaseYCofre(sqlFn, usuarioId, ctxComentario, xpComentarioEntregado);
                     await repartirXpReferidos(sqlFn, usuarioId, xpComentarioEntregado);
                     await updProgresoAlbum(sqlFn, usuarioId, { comentarios_dia: dia + 1, comentarios_dia_fecha: h });
-                    await registrarXpLedger(sqlFn, {
+                    await registrarXpLedger(sqlFn, Object.assign({
                       usuario_id: usuarioId, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
                       mult_nivel: resCom.m_nivel, mult_stack: resCom.mult_stack,
                       mult_final: resCom.mult_global_c, cap_aplicado: 'accion',
                       xp_final: xpComentarioEntregado, contexto: { fuente: f, item_id: id, canal: 'comentario_media' }
-                    });
+                    }, origenLedger(resCom, (target && target.puntoFuente) || 'media', puntoCom)));
                   })
                 : Promise.resolve();
               return aplicar.then(function() {
@@ -6636,7 +7165,8 @@ module.exports = async function handler(req, res) {
         if (aoPropN <= 3) {
           var resAoProp = await calcularXpAcreditado(sql, XP_BASES.ao_proponer,
             aoPropCtx.nivel_clase, aoPropCtx.clase_id, aoPropCtx.tag,
-            { nivel_usuario: aoPropCtx.nivel_usuario });
+            { nivel_usuario: aoPropCtx.nivel_usuario, usuario_id: usuarioId2,
+              punto: { lat: aoLat, lng: aoLng } });
           aoPropXpFinal = resAoProp.xp_final;
           aoPropDetalle = armarXpDetalle(XP_BASES.ao_proponer, resAoProp, 0);
           await sql(
@@ -6645,12 +7175,12 @@ module.exports = async function handler(req, res) {
           ).catch(function(eAop) { console.warn('[ao_proponer] xp no acreditado: ' + (eAop && eAop.message)); });
           await acreditarClaseYCofre(sql, usuarioId2, aoPropCtx, aoPropXpFinal);
           await repartirXpReferidos(sql, usuarioId2, aoPropXpFinal);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: usuarioId2, accion: 'ao_proponer', xp_base: XP_BASES.ao_proponer,
             mult_nivel: resAoProp.m_nivel, mult_stack: resAoProp.mult_stack,
             mult_final: resAoProp.mult_global_c, cap_aplicado: resAoProp.cap_aplicado,
             xp_final: aoPropXpFinal, contexto: { activo_id: aoIns[0].id }
-          });
+          }, origenLedger(resAoProp, 'activo_oculto', { lat: aoLat, lng: aoLng })));
         } else {
           await registrarXpLedger(sql, {
             usuario_id: usuarioId2, accion: 'ao_proponer', xp_base: XP_BASES.ao_proponer,
@@ -6690,11 +7220,16 @@ module.exports = async function handler(req, res) {
         if (!aoActivoId)
           return res.status(400).json({ ok: false, error: 'activo_id requerido' });
         var aoTarget = await sql(
-          'SELECT propuesto_por FROM activos_ocultos WHERE id=$1',
+          'SELECT propuesto_por, lat, lng FROM activos_ocultos WHERE id=$1',
           [aoActivoId]
         ).catch(function(){ return []; });
         if (!aoTarget.length)
           return res.status(404).json({ ok: false, error: 'ACTIVO_NO_ENCONTRADO' });
+        // ADR-058: el activo votado es el punto geografico de la accion.
+        var aoVotoLat = typeof aoTarget[0].lat === 'number' ? aoTarget[0].lat : parseFloat(aoTarget[0].lat);
+        var aoVotoLng = typeof aoTarget[0].lng === 'number' ? aoTarget[0].lng : parseFloat(aoTarget[0].lng);
+        var aoVotoPunto = tieneCoordsValidas(aoVotoLat, aoVotoLng)
+          ? { lat: aoVotoLat, lng: aoVotoLng } : null;
         if (String(aoTarget[0].propuesto_por) === String(usuarioId2))
           return res.status(409).json({ ok: false, error: 'VOTO_PROPIO' });
         var aoVoto = String(body.voto || '');
@@ -6742,7 +7277,8 @@ module.exports = async function handler(req, res) {
           var ctxAoVoto = await contextoXpE(sql, usuarioId2);
           var resAoVoto = await calcularXpAcreditado(sql, XP_BASES.ao_votar,
             ctxAoVoto.nivel_clase, ctxAoVoto.clase_id, ctxAoVoto.tag,
-            { nivel_usuario: ctxAoVoto.nivel_usuario });
+            { nivel_usuario: ctxAoVoto.nivel_usuario, usuario_id: usuarioId2,
+              punto: aoVotoPunto });
           var xpAoVotoFinal = resAoVoto.xp_final;
           aoVotoDetalle = armarXpDetalle(XP_BASES.ao_votar, resAoVoto, 0);
           await sql(
@@ -6751,12 +7287,12 @@ module.exports = async function handler(req, res) {
           ).catch(function(e){ console.warn('gaming016 xp_voto no acreditado', e && e.code); });
           await acreditarClaseYCofre(sql, usuarioId2, ctxAoVoto, xpAoVotoFinal);
           await repartirXpReferidos(sql, usuarioId2, xpAoVotoFinal);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: usuarioId2, accion: 'ao_votar', xp_base: XP_BASES.ao_votar,
             mult_nivel: resAoVoto.m_nivel, mult_stack: resAoVoto.mult_stack,
             mult_final: resAoVoto.mult_global_c, cap_aplicado: resAoVoto.cap_aplicado,
             xp_final: xpAoVotoFinal, contexto: { activo_id: aoActivoId, voto: aoVoto }
-          });
+          }, origenLedger(resAoVoto, 'activo_oculto', aoVotoPunto)));
         } else {
           return res.status(200).json({ ok: true, ya_votado: false, xp_otorgado: false });
         }
@@ -6858,7 +7394,8 @@ module.exports = async function handler(req, res) {
         var ctxCheckin = await contextoXpE(sql, usuarioId2);
         var resCheckin = await calcularXpAcreditado(sql, XP_BASES.ao_checkin,
           ctxCheckin.nivel_clase, ctxCheckin.clase_id, ctxCheckin.tag,
-          { nivel_usuario: ctxCheckin.nivel_usuario });
+          { nivel_usuario: ctxCheckin.nivel_usuario, usuario_id: usuarioId2,
+            punto: { lat: acLatDest, lng: acLngDest } });
         var xpCheckinFinal = resCheckin.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
@@ -6866,12 +7403,12 @@ module.exports = async function handler(req, res) {
         ).catch(function(e){ console.warn('gaming016 xp_checkin no acreditado', e && e.code); });
         await acreditarClaseYCofre(sql, usuarioId2, ctxCheckin, xpCheckinFinal);
         await repartirXpReferidos(sql, usuarioId2, xpCheckinFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'ao_checkin', xp_base: XP_BASES.ao_checkin,
           mult_nivel: resCheckin.m_nivel, mult_stack: resCheckin.mult_stack,
           mult_final: resCheckin.mult_global_c, cap_aplicado: resCheckin.cap_aplicado,
           xp_final: xpCheckinFinal, contexto: { activo_id: aoCheckId }
-        });
+        }, origenLedger(resCheckin, 'activo_oculto', { lat: acLatDest, lng: acLngDest })));
         var acMis = await evaluarMisiones(sql, usuarioId2);
         var acLog = await evaluarLogros(sql, usuarioId2);
         return res.json({ ok: true, data: { checkin_id: acIns[0].id, xp: xpCheckinFinal, xp_detalle: armarXpDetalle(XP_BASES.ao_checkin, resCheckin, 0), misiones: acMis, logros: acLog } });
@@ -7062,14 +7599,14 @@ module.exports = async function handler(req, res) {
         var salaValida;
         try {
           salaValida = await sql(
-            'SELECT id, tipo, es_oficial FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+            'SELECT id, nombre, tipo, es_oficial FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
             [msgSala]
           );
         } catch (salaErr) {
           if (salaErr && salaErr.code === '42703') {
             console.warn('[chat_msg] es_oficial ausente (026 pendiente): fallback sin es_oficial');
             salaValida = await sql(
-              'SELECT id, tipo, false AS es_oficial FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
+              'SELECT id, nombre, tipo, false AS es_oficial FROM chat_salas WHERE id=$1 AND activo=true LIMIT 1',
               [msgSala]
             );
           } else {
@@ -7112,9 +7649,14 @@ module.exports = async function handler(req, res) {
         if (dispChat.disponible) {
           xpChat = dispChat.xp;
           var ctxChat = await contextoXpE(sql, usuarioId2);
+          // ADR-058: una sala de CIUDAD esta anclada a su ciudad (sala.nombre)
+          // resuelta via geo_ciudades; el chat general/viajeros no tiene punto
+          // -> el motor deja el factor de origen en 1.00.
+          var puntoChat = (salaValida[0].tipo === 'ciudad')
+            ? await buscarCoordsCiudad(sql, salaValida[0].nombre) : null;
           var resChat = await calcularXpAcreditado(sql, XP_BASES.chat_comentario,
             ctxChat.nivel_clase, ctxChat.clase_id, ctxChat.tag,
-            { nivel_usuario: ctxChat.nivel_usuario });
+            { nivel_usuario: ctxChat.nivel_usuario, usuario_id: usuarioId2, punto: puntoChat });
           var xpChatFinal = resChat.xp_final;
           // ADR-053 Dec 7 (v25): cupo de chat = 10 XP/dia -> la fila del
           // ledger va con cap_aplicado 'accion' y xp_final real.
@@ -7128,12 +7670,12 @@ module.exports = async function handler(req, res) {
           // v13: reparto multinivel del XP ganado (piramide de
           // referidos, no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpChatFinal);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
             mult_nivel: resChat.m_nivel, mult_stack: resChat.mult_stack,
             mult_final: resChat.mult_global_c, cap_aplicado: 'accion',
             xp_final: xpChatFinal, contexto: { sala_id: msgSala, canal: 'chat' }
-          });
+          }, origenLedger(resChat, puntoChat ? 'ciudad' : 'sin_punto', puntoChat)));
           xpChat = xpChatFinal;
         }
         misionesChat = await evaluarMisiones(sql, usuarioId2);
@@ -7447,7 +7989,7 @@ module.exports = async function handler(req, res) {
         if (pcmTexto.length > 500)
           return res.status(400).json({ ok: false, error: 'mensaje maximo 500 caracteres' });
         var pcmPlan = await sql(
-          'SELECT id, creador_id, sala_id FROM planes_viaje WHERE id=$1 AND activo=true LIMIT 1',
+          'SELECT id, creador_id, sala_id, destino FROM planes_viaje WHERE id=$1 AND activo=true LIMIT 1',
           [pcmPlanId]
         ).catch(function(){ return []; });
         if (!pcmPlan.length)
@@ -7479,9 +8021,13 @@ module.exports = async function handler(req, res) {
         if (dispPcm.disponible) {
           xpPcm = dispPcm.xp;
           var ctxPcm = await contextoXpE(sql, usuarioId2);
+          // ADR-058: el chat privado de un plan esta anclado al destino del
+          // plan (planes_viaje.destino, texto) resuelto via geo_ciudades.
+          // Sin match -> el motor deja el factor de origen en 1.00.
+          var puntoPcm = await buscarCoordsCiudad(sql, pcmPlan[0].destino);
           var resPcm = await calcularXpAcreditado(sql, XP_BASES.chat_comentario,
             ctxPcm.nivel_clase, ctxPcm.clase_id, ctxPcm.tag,
-            { nivel_usuario: ctxPcm.nivel_usuario });
+            { nivel_usuario: ctxPcm.nivel_usuario, usuario_id: usuarioId2, punto: puntoPcm });
           var xpPcmFinal = resPcm.xp_final;
           detallePcm = armarXpDetalle(XP_BASES.chat_comentario, resPcm, 0, xpPcmFinal, 'accion');
           await sql(
@@ -7492,12 +8038,12 @@ module.exports = async function handler(req, res) {
           await registrarChatXp(sql, usuarioId2, dispPcm.hoy, dispPcm.n);
           // v13: reparto multinivel del XP ganado (no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpPcmFinal);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: usuarioId2, accion: 'chat_comentario', xp_base: XP_BASES.chat_comentario,
             mult_nivel: resPcm.m_nivel, mult_stack: resPcm.mult_stack,
             mult_final: resPcm.mult_global_c, cap_aplicado: 'accion',
             xp_final: xpPcmFinal, contexto: { plan_id: pcmPlanId, canal: 'plan_chat' }
-          });
+          }, origenLedger(resPcm, puntoPcm ? 'ciudad' : 'sin_punto', puntoPcm)));
           xpPcm = xpPcmFinal;
         }
         misionesPcm = await evaluarMisiones(sql, usuarioId2);
@@ -7769,22 +8315,24 @@ module.exports = async function handler(req, res) {
           [destinoId2, usuarioId2, fotoUrl, XP_BASES.foto_viajero]
         );
         var misionesFoto = [], logrosFoto = [];
+        // ADR-058: punto del destino (1 lectura; el caller no traia coords).
+        var fotoPunto = await coordsDestino(sql, destinoId2);
         var ctxFoto = await contextoXpE(sql, usuarioId2);
         var resFoto = await calcularXpAcreditado(sql, XP_BASES.foto_viajero,
           ctxFoto.nivel_clase, ctxFoto.clase_id, ctxFoto.tag,
-          { nivel_usuario: ctxFoto.nivel_usuario });
+          { nivel_usuario: ctxFoto.nivel_usuario, usuario_id: usuarioId2, punto: fotoPunto });
         var xpFotoFinal = resFoto.xp_final;
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpFotoFinal, usuarioId2]).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxFoto, xpFotoFinal);
         await avanzarMisionesCasa(sql, usuarioId2, 'fotos', 1);
         // v13: reparto multinivel del XP ganado (no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpFotoFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'foto_viajero', xp_base: XP_BASES.foto_viajero,
           mult_nivel: resFoto.m_nivel, mult_stack: resFoto.mult_stack,
           mult_final: resFoto.mult_global_c, cap_aplicado: resFoto.cap_aplicado,
           xp_final: xpFotoFinal, contexto: { destino_id: destinoId2, tipo: 'foto' }
-        });
+        }, origenLedger(resFoto, 'destino', fotoPunto)));
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
         logrosFoto = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, xp_detalle: armarXpDetalle(XP_BASES.foto_viajero, resFoto, 0), misiones: misionesFoto, logros: logrosFoto });
@@ -7955,18 +8503,19 @@ module.exports = async function handler(req, res) {
           }
 
           var mrCtx = await contextoXpE(sql, mrUser);
+          var mrPunto = (mrLat !== null && mrLng !== null) ? { lat: mrLat, lng: mrLng } : null;
           var mrRes = await calcularXpAcreditado(sql, mrXp, mrCtx.nivel_clase, mrCtx.clase_id, mrCtx.tag,
-            { nivel_usuario: mrCtx.nivel_usuario });
+            { nivel_usuario: mrCtx.nivel_usuario, usuario_id: mrUser, punto: mrPunto });
           var mrXpFinal = mrRes.xp_final;
           await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2::uuid', [mrXpFinal, mrUser]).catch(function(e){ console.warn('TRACE: museo_recurso xp no acreditado', e && e.code); });
           await acreditarClaseYCofre(sql, mrUser, mrCtx, mrXpFinal);
           await repartirXpReferidos(sql, mrUser, mrXpFinal);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: mrUser, accion: 'album_foto', xp_base: mrXp,
             mult_nivel: mrRes.m_nivel, mult_stack: mrRes.mult_stack,
             mult_final: mrRes.mult_global_c, cap_aplicado: mrRes.cap_aplicado,
             xp_final: mrXpFinal, contexto: { recurso_id: mrIns[0].id, canal: 'museo_recurso' }
-          });
+          }, origenLedger(mrRes, 'album', mrPunto)));
           var mrMisiones = await evaluarMisiones(sql, mrUser);
           var mrLogros = await evaluarLogros(sql, mrUser);
           return res.status(200).json({
@@ -8166,18 +8715,19 @@ module.exports = async function handler(req, res) {
         var ctxAlbum = await contextoXpE(sql, alUsuario);
         var resAlbum = await calcularXpAcreditado(sql, XP_BASES.album_crear,
           ctxAlbum.nivel_clase, ctxAlbum.clase_id, ctxAlbum.tag,
-          { nivel_usuario: ctxAlbum.nivel_usuario });
+          { nivel_usuario: ctxAlbum.nivel_usuario, usuario_id: alUsuario,
+            punto: { lat: alLat, lng: alLng } });
         var xpAlbumFinal = resAlbum.xp_final;
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFinal, alUsuario]).catch(function(){});
         await acreditarClaseYCofre(sql, alUsuario, ctxAlbum, xpAlbumFinal);
         // v13: reparto multinivel sobre el XP REAL entregado (+20).
         await repartirXpReferidos(sql, alUsuario, xpAlbumFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: alUsuario, accion: 'album_crear', xp_base: XP_BASES.album_crear,
           mult_nivel: resAlbum.m_nivel, mult_stack: resAlbum.mult_stack,
           mult_final: resAlbum.mult_global_c, cap_aplicado: resAlbum.cap_aplicado,
           xp_final: xpAlbumFinal, contexto: { album_id: albumIns[0].id }
-        });
+        }, origenLedger(resAlbum, 'album', { lat: alLat, lng: alLng })));
 
         // Actualizar progreso_album
         var nuevoAlbumesMes = ((pa.albumes_mes_fecha || '').slice(0, 7) === mesActual) ? (pa.albumes_mes || 0) + 1 : 1;
@@ -8271,21 +8821,22 @@ module.exports = async function handler(req, res) {
 
         // XP +15 al agregador
         var ctxAlbumFoto = await contextoXpE(sql, usuarioId2);
+        var afPunto = (afLat !== null && afLng !== null) ? { lat: afLat, lng: afLng } : null;
         var resAlbumFoto = await calcularXpAcreditado(sql, XP_BASES.album_foto,
           ctxAlbumFoto.nivel_clase, ctxAlbumFoto.clase_id, ctxAlbumFoto.tag,
-          { nivel_usuario: ctxAlbumFoto.nivel_usuario });
+          { nivel_usuario: ctxAlbumFoto.nivel_usuario, usuario_id: usuarioId2, punto: afPunto });
         var xpAlbumFotoFinal = resAlbumFoto.xp_final;
         await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAlbumFotoFinal, usuarioId2]).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxAlbumFoto, xpAlbumFotoFinal);
         // v13: reparto multinivel del XP ganado por el agregador (no
         // bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpAlbumFotoFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'album_foto', xp_base: XP_BASES.album_foto,
           mult_nivel: resAlbumFoto.m_nivel, mult_stack: resAlbumFoto.mult_stack,
           mult_final: resAlbumFoto.mult_global_c, cap_aplicado: resAlbumFoto.cap_aplicado,
           xp_final: xpAlbumFotoFinal, contexto: { foto_id: afIns[0].id, canal: 'album_agregar_foto' }
-        });
+        }, origenLedger(resAlbumFoto, 'album', afPunto)));
 
         // XP al autor original si es foto de otro. ADR-053 Dec 8.5 (v25):
         // album_foto_autor se rutea por el catalogo unico (antes eran 4
@@ -8300,17 +8851,17 @@ module.exports = async function handler(req, res) {
             var ctxAutor = await contextoXpE(sql, afAutorOriginal);
             var resAutor = await calcularXpAcreditado(sql, XP_BASES.album_foto_autor,
               ctxAutor.nivel_clase, ctxAutor.clase_id, ctxAutor.tag,
-              { nivel_usuario: ctxAutor.nivel_usuario });
+              { nivel_usuario: ctxAutor.nivel_usuario, usuario_id: afAutorOriginal, punto: afPunto });
             var xpAutorFinal = resAutor.xp_final;
             await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpAutorFinal, afAutorOriginal]).catch(function(){});
             // v13: reparto multinivel para el autor original (no bloquea).
             await repartirXpReferidos(sql, afAutorOriginal, xpAutorFinal);
-            await registrarXpLedger(sql, {
+            await registrarXpLedger(sql, Object.assign({
               usuario_id: afAutorOriginal, accion: 'album_foto_autor', xp_base: XP_BASES.album_foto_autor,
               mult_nivel: resAutor.m_nivel, mult_stack: resAutor.mult_stack,
               mult_final: resAutor.mult_global_c, cap_aplicado: resAutor.cap_aplicado,
               xp_final: xpAutorFinal, contexto: { foto_id: afIns[0].id, agregador_id: usuarioId2 }
-            });
+            }, origenLedger(resAutor, 'album', afPunto)));
             var nuevoXpAutor = ((pa3.xp_autor_fecha || '') === hoy())
               ? red2((pa3.xp_autor_dia || 0) + xpAutorFinal) : red2(xpAutorFinal);
             await updProgresoAlbum(sql, afAutorOriginal, { xp_autor_dia: nuevoXpAutor, xp_autor_fecha: hoy() });
@@ -8370,7 +8921,7 @@ module.exports = async function handler(req, res) {
         if (mvAccion === 'like' && mvTarget.autorId && String(mvTarget.autorId) === String(usuarioId2))
           return res.status(403).json({ ok: false, error: 'No puedes votar tu propia foto' });
 
-        var mvRes = await aplicarMediaVoto(sql, usuarioId2, mvFuente, mvItem, mvAccion);
+        var mvRes = await aplicarMediaVoto(sql, usuarioId2, mvFuente, mvItem, mvAccion, mvTarget);
         if (mvRes.tope)
           return res.status(429).json({ ok: false, error: 'Limite de 20 votos por dia alcanzado' });
         if (mvAccion === 'like' && mvRes.duplicado)
@@ -8406,7 +8957,7 @@ module.exports = async function handler(req, res) {
         var mcTarget = await resolverMediaItem(sql, mcFuente, mcItem);
         if (!mcTarget.ok)
           return res.status(404).json({ ok: false, error: 'Media no encontrada' });
-        var mcRes = await crearComentarioMedia(sql, usuarioId2, mcFuente, mcItem, body.texto, body.parent_id || null);
+        var mcRes = await crearComentarioMedia(sql, usuarioId2, mcFuente, mcItem, body.texto, body.parent_id || null, mcTarget);
         if (!mcRes.ok)
           return res.status(mcRes.status).json({ ok: false, error: mcRes.error });
         return res.status(201).json({ ok: true, comentario: mcRes.comentario, xp: mcRes.xp, misiones: mcRes.misiones, logros: mcRes.logros });
@@ -8515,10 +9066,17 @@ module.exports = async function handler(req, res) {
 
           var gmExiste = false;
           var gmAlbumDueno = null;
+          var gmPunto = null;
           if (gmFuente === 'album') {
-            var gmAl = await sql('SELECT id, usuario_id FROM albumes WHERE id::text=$1 AND activo=true', [gmItem]).catch(function(){ return []; });
+            var gmAl = await sql('SELECT id, usuario_id, lat, lng FROM albumes WHERE id::text=$1 AND activo=true', [gmItem]).catch(function(){ return []; });
             gmExiste = gmAl.length > 0;
-            if (gmExiste) gmAlbumDueno = String(gmAl[0].usuario_id);
+            if (gmExiste) {
+              gmAlbumDueno = String(gmAl[0].usuario_id);
+              // ADR-058: el album guardado es el punto geografico de la accion.
+              var gmLat = typeof gmAl[0].lat === 'number' ? gmAl[0].lat : parseFloat(gmAl[0].lat);
+              var gmLng = typeof gmAl[0].lng === 'number' ? gmAl[0].lng : parseFloat(gmAl[0].lng);
+              if (tieneCoordsValidas(gmLat, gmLng)) gmPunto = { lat: gmLat, lng: gmLng };
+            }
           } else {
             var gmTarget = await resolverMediaItem(sql, gmFuente, gmItem);
             gmExiste = gmTarget.ok;
@@ -8552,32 +9110,32 @@ module.exports = async function handler(req, res) {
               var ctxGm = await contextoXpE(sql, gmUsuario);
               var resGm = await calcularXpAcreditado(sql, XP_BASES.album_guardado,
                 ctxGm.nivel_clase, ctxGm.clase_id, ctxGm.tag,
-                { nivel_usuario: ctxGm.nivel_usuario });
+                { nivel_usuario: ctxGm.nivel_usuario, usuario_id: gmUsuario, punto: gmPunto });
               var xpGmFinal = resGm.xp_final;
               await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpGmFinal, gmUsuario]).catch(function(eU){ console.warn('[interacciones] guardar_media xp ejecutor no acreditado: ' + (eU && eU.message)); });
               await acreditarClaseYCofre(sql, gmUsuario, ctxGm, xpGmFinal);
               await repartirXpReferidos(sql, gmUsuario, xpGmFinal);
-              await registrarXpLedger(sql, {
+              await registrarXpLedger(sql, Object.assign({
                 usuario_id: gmUsuario, accion: 'album_guardado', xp_base: XP_BASES.album_guardado,
                 mult_nivel: resGm.m_nivel, mult_stack: resGm.mult_stack,
                 mult_final: resGm.mult_global_c, cap_aplicado: resGm.cap_aplicado,
                 xp_final: xpGmFinal, contexto: { album_id: gmItem, canal: 'guardar_media' }
-              });
+              }, origenLedger(resGm, 'album', gmPunto)));
               if (gmAlbumDueno && gmAlbumDueno !== String(gmUsuario)) {
                 var ctxGmA = await contextoXpE(sql, gmAlbumDueno);
                 var resGmA = await calcularXpAcreditado(sql, XP_BASES.album_guardado_autor,
                   ctxGmA.nivel_clase, ctxGmA.clase_id, ctxGmA.tag,
-                  { nivel_usuario: ctxGmA.nivel_usuario });
+                  { nivel_usuario: ctxGmA.nivel_usuario, usuario_id: gmAlbumDueno, punto: gmPunto });
                 var xpGmAFinal = resGmA.xp_final;
                 await sql('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpGmAFinal, gmAlbumDueno]).catch(function(eD){ console.warn('[interacciones] guardar_media xp dueno no acreditado: ' + (eD && eD.message)); });
                 await acreditarClaseYCofre(sql, gmAlbumDueno, ctxGmA, xpGmAFinal);
                 await repartirXpReferidos(sql, gmAlbumDueno, xpGmAFinal);
-                await registrarXpLedger(sql, {
+                await registrarXpLedger(sql, Object.assign({
                   usuario_id: gmAlbumDueno, accion: 'album_guardado_autor', xp_base: XP_BASES.album_guardado_autor,
                   mult_nivel: resGmA.m_nivel, mult_stack: resGmA.mult_stack,
                   mult_final: resGmA.mult_global_c, cap_aplicado: resGmA.cap_aplicado,
                   xp_final: xpGmAFinal, contexto: { album_id: gmItem, guardador_id: gmUsuario }
-                });
+                }, origenLedger(resGmA, 'album', gmPunto)));
               }
             } catch (eGmXp) {
               console.warn('[interacciones] guardar_media XP no acreditado: ' + (eGmXp && eGmXp.message));
@@ -8956,7 +9514,7 @@ module.exports = async function handler(req, res) {
         if (!cfcTarget.ok)
           return res.status(404).json({ ok: false, error: 'Media no encontrada' });
 
-        var cfcRes = await crearComentarioMedia(sql, usuarioId2, 'album_foto', String(cfcFotoId), body.texto, body.parent_id || null);
+        var cfcRes = await crearComentarioMedia(sql, usuarioId2, 'album_foto', String(cfcFotoId), body.texto, body.parent_id || null, cfcTarget);
         if (!cfcRes.ok) {
           if (cfcRes.status === 403)
             return res.status(403).json({ ok: false, error: 'Usuario no registrado' });
@@ -9898,13 +10456,17 @@ module.exports = async function handler(req, res) {
         var cpResult = null;
         var cpXpFinal = 0;
         var cpCapLedger = 'accion';
+        // ADR-058: punto del destino compartido (si lo hay; compartir media
+        // sin destino -> sin punto -> 1.00).
+        var cpPunto = await coordsDestino(sql, cpDestinoId);
         if (cpBaseCap > 0) {
           var ctxCompartir = await contextoXpE(sql, usuarioId2);
           cpAmuleto = await aplicarAmuletoX2(sql, usuarioId2, cpBaseCap);
           var cpLider = await esLiderDestino(sql, usuarioId2, cpDestinoId);
           cpResult = await calcularXpAcreditado(sql, cpBaseCap, ctxCompartir.nivel_clase,
             ctxCompartir.clase_id, ctxCompartir.tag,
-            { nivel_usuario: ctxCompartir.nivel_usuario, amuleto: cpAmuleto.doubled, lider: cpLider });
+            { nivel_usuario: ctxCompartir.nivel_usuario, amuleto: cpAmuleto.doubled,
+              lider: cpLider, usuario_id: usuarioId2, punto: cpPunto });
           // ADR-038/ADR-036: el ledger media_compartidos.xp_ganado y el
           // tope rodante de 50 XP/24h cuentan sobre el xp_final; el recorte
           // por cupo (cap denominado en XP) se registra como 'accion'
@@ -9921,14 +10483,14 @@ module.exports = async function handler(req, res) {
         }
         // Regalias pasivas (037): parte del XP base de compartir al autor.
         await acumularRegalia(sql, cpFuente, cpItem, cpBase, usuarioId2);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'compartir', xp_base: cpBase,
           mult_nivel: cpResult ? cpResult.m_nivel : 1,
           mult_stack: cpResult ? cpResult.mult_stack : 1,
           mult_final: cpResult ? cpResult.mult_global_c : 1,
           cap_aplicado: cpCapLedger, bonos_planos: 0, xp_final: cpXpFinal,
           contexto: { fuente: cpFuente, item_id: cpItem, canal: cpCanal, destino_id: cpDestinoId, primero: cpPrimero }
-        });
+        }, origenLedger(cpResult, 'destino', cpPunto)));
         var cpMisiones = await evaluarMisiones(sql, usuarioId2);
         var cpLogros = await evaluarLogros(sql, usuarioId2);
         var cpReto = await progresarPandillaRetos(sql, usuarioId2, 'compartir');
@@ -9968,7 +10530,7 @@ module.exports = async function handler(req, res) {
         if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(spDestino))
           return res.status(400).json({ ok: false, error: 'destino_id invalido' });
         var spD = await sql(
-          'SELECT id, categoria_slug, ciudad, address, barrio, telefono, precio_desde, tags '
+          'SELECT id, categoria_slug, ciudad, address, barrio, telefono, precio_desde, tags, lat, lng '
           + 'FROM destinos WHERE id=$1::uuid LIMIT 1',
           [spDestino]
         ).catch(function(eSp) {
@@ -9982,6 +10544,10 @@ module.exports = async function handler(req, res) {
         if (!spD.length)
           return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
         var spRow = spD[0];
+        // ADR-058: punto del destino completado.
+        var spLat = typeof spRow.lat === 'number' ? spRow.lat : parseFloat(spRow.lat);
+        var spLng = typeof spRow.lng === 'number' ? spRow.lng : parseFloat(spRow.lng);
+        var spPunto = tieneCoordsValidas(spLat, spLng) ? { lat: spLat, lng: spLng } : null;
         // Dedup contra el ledger: 1 sola vez por (usuario, destino).
         var spYa = false;
         try {
@@ -10005,7 +10571,7 @@ module.exports = async function handler(req, res) {
         var spCtx = await contextoXpE(sql, usuarioId2);
         var resSpot = await calcularXpAcreditado(sql, XP_BASES.spot_atributos,
           spCtx.nivel_clase, spCtx.clase_id, spCtx.tag,
-          { nivel_usuario: spCtx.nivel_usuario });
+          { nivel_usuario: spCtx.nivel_usuario, usuario_id: usuarioId2, punto: spPunto });
         var xpSpotFinal = resSpot.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total = xp_total + $1, ultimo_acceso = NOW() WHERE id=$2',
@@ -10013,12 +10579,12 @@ module.exports = async function handler(req, res) {
         ).catch(function(eSpXp) { console.warn('[spot_atributos] xp no acreditado: ' + (eSpXp && eSpXp.message)); });
         await acreditarClaseYCofre(sql, usuarioId2, spCtx, xpSpotFinal);
         await repartirXpReferidos(sql, usuarioId2, xpSpotFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'spot_atributos', xp_base: XP_BASES.spot_atributos,
           mult_nivel: resSpot.m_nivel, mult_stack: resSpot.mult_stack,
           mult_final: resSpot.mult_global_c, cap_aplicado: resSpot.cap_aplicado,
           xp_final: xpSpotFinal, contexto: { destino_id: spDestino }
-        });
+        }, origenLedger(resSpot, 'destino', spPunto)));
         var spMisiones = await evaluarMisiones(sql, usuarioId2);
         var spLogros = await evaluarLogros(sql, usuarioId2);
         return res.status(200).json({
@@ -10447,8 +11013,12 @@ module.exports = async function handler(req, res) {
         if (admSecretPub !== (process.env.ADMIN_SECRET || 'exploraco12345'))
           return res.status(401).json({ ok: false, error: 'No autorizado' });
         if (!destinoId2) return res.status(400).json({ ok: false, error: 'destino_id requerido' });
-        var filasPub = await sql('SELECT tags, nombre FROM destinos WHERE id=$1', [destinoId2]);
+        var filasPub = await sql('SELECT tags, nombre, lat, lng FROM destinos WHERE id=$1', [destinoId2]);
         if (!filasPub.length) return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        // ADR-058: punto del lugar publicado.
+        var pubLat = typeof filasPub[0].lat === 'number' ? filasPub[0].lat : parseFloat(filasPub[0].lat);
+        var pubLng = typeof filasPub[0].lng === 'number' ? filasPub[0].lng : parseFloat(filasPub[0].lng);
+        var pubPunto = tieneCoordsValidas(pubLat, pubLng) ? { lat: pubLat, lng: pubLng } : null;
         var tagsPub = filasPub[0].tags || {};
         var autorPub = tagsPub.autor_id;
         if (!autorPub) return res.status(200).json({ ok: true, otorgado: false, motivo: 'sin_autor' });
@@ -10469,20 +11039,21 @@ module.exports = async function handler(req, res) {
         var bonoFotoPub = tagsPub.pub_foto ? numXp(XP_BASES.publicar_bono_foto) : 0;
         var ctxPub = await contextoXpE(sql, autorPub);
         var resPub = await calcularXpAcreditado(sql, xpBasePub, ctxPub.nivel_clase,
-          ctxPub.clase_id, ctxPub.tag, { nivel_usuario: ctxPub.nivel_usuario });
+          ctxPub.clase_id, ctxPub.tag,
+          { nivel_usuario: ctxPub.nivel_usuario, usuario_id: autorPub, punto: pubPunto });
         var xpTotalPub = red2(resPub.xp_final + bonoGeoPub + bonoFotoPub);
         // Acreditacion con rollback del claim: si algo falla, el estado
         // vuelve a 'pendiente' para permitir reintento (idempotencia real).
         try {
           await sql('UPDATE usuarios SET xp_total=xp_total+$1 WHERE id=$2', [xpTotalPub, autorPub]);
           await acreditarClaseYCofre(sql, autorPub, ctxPub, xpTotalPub);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: autorPub, accion: 'publicar_lugar', xp_base: xpBasePub,
             mult_nivel: resPub.m_nivel, mult_stack: resPub.mult_stack,
             mult_final: resPub.mult_global_c, cap_aplicado: resPub.cap_aplicado,
             bonos_planos: red2(bonoGeoPub + bonoFotoPub), xp_final: xpTotalPub,
             contexto: { destino_id: destinoId2, tier: tierPub, geo: !!tagsPub.pub_geo, foto: !!tagsPub.pub_foto }
-          });
+          }, origenLedger(resPub, 'destino', pubPunto)));
           await repartirXpReferidos(sql, autorPub, xpTotalPub);
         } catch (eOtorgaXp) {
           await sql(
@@ -10594,6 +11165,8 @@ module.exports = async function handler(req, res) {
         var detalleResena = null;
         var cromoResena = null;
         if (usuarioId2) {
+          // ADR-058: punto del destino resenado (1 lectura).
+          var puntoResena = await coordsDestino(sql, destinoId2);
           var ctxResena = await contextoXpE(sql, usuarioId2);
           // ADR-018: amuleto_x2 y lider de ciudad entran al STACK del punto
           // unico (no multiplican por fuera). La fila de interacciones
@@ -10603,7 +11176,8 @@ module.exports = async function handler(req, res) {
           var liderResena = await esLiderDestino(sql, usuarioId2, destinoId2);
           resResena = await calcularXpAcreditado(sql, xpGanado, ctxResena.nivel_clase,
             ctxResena.clase_id, ctxResena.tag,
-            { nivel_usuario: ctxResena.nivel_usuario, amuleto: amuletoResena.doubled, lider: liderResena });
+            { nivel_usuario: ctxResena.nivel_usuario, amuleto: amuletoResena.doubled,
+              lider: liderResena, usuario_id: usuarioId2, punto: puntoResena });
           xpResenaEntregado = resResena.xp_final;
           detalleResena = armarXpDetalle(xpGanado, resResena, 0);
           await sql(
@@ -10616,13 +11190,13 @@ module.exports = async function handler(req, res) {
           ).catch(function(){});
           await acreditarClaseYCofre(sql, usuarioId2, ctxResena, xpResenaEntregado);
           await avanzarMisionesCasa(sql, usuarioId2, 'resenas', 1);
-          await registrarXpLedger(sql, {
+          await registrarXpLedger(sql, Object.assign({
             usuario_id: usuarioId2,
             accion: xpGanado === XP_BASES.resena_larga ? 'resena_larga' : 'resena_corta',
             xp_base: xpGanado, mult_nivel: resResena.m_nivel, mult_stack: resResena.mult_stack,
             mult_final: resResena.mult_global_c, cap_aplicado: resResena.cap_aplicado,
             xp_final: xpResenaEntregado, contexto: { destino_id: destinoId2 }
-          });
+          }, origenLedger(resResena, 'destino', puntoResena)));
           misionesNuevas = await evaluarMisiones(sql, usuarioId2);
           logrosNuevas = await evaluarLogros(sql, usuarioId2);
           // v9 (ADR-018): chance de cromo (15%) y aporte de fama a la
@@ -10709,6 +11283,8 @@ module.exports = async function handler(req, res) {
         // local en index.html (userPoints.saved via Math.max()). Sirve
         // como base fiable para futuras insignias/misiones ("guardaste
         // 5 lugares alguna vez"), sin depender del estado activo actual.
+        // ADR-058: punto del destino guardado (1 lectura).
+        var puntoGuardado = await coordsDestino(sql, destinoId2);
         var ctxGuardado = await contextoXpE(sql, usuarioId2);
         // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
         // punto unico (no multiplican por fuera).
@@ -10716,19 +11292,20 @@ module.exports = async function handler(req, res) {
         var liderGuardado = await esLiderDestino(sql, usuarioId2, destinoId2);
         var resGuardado = await calcularXpAcreditado(sql, xpGuardado, ctxGuardado.nivel_clase,
           ctxGuardado.clase_id, ctxGuardado.tag,
-          { nivel_usuario: ctxGuardado.nivel_usuario, amuleto: amuletoGuardado.doubled, lider: liderGuardado });
+          { nivel_usuario: ctxGuardado.nivel_usuario, amuleto: amuletoGuardado.doubled,
+            lider: liderGuardado, usuario_id: usuarioId2, punto: puntoGuardado });
         var xpGuardadoFinal = resGuardado.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
           [xpGuardadoFinal, usuarioId2]
         ).catch(function(){});
         await acreditarClaseYCofre(sql, usuarioId2, ctxGuardado, xpGuardadoFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'guardado', xp_base: xpGuardado,
           mult_nivel: resGuardado.m_nivel, mult_stack: resGuardado.mult_stack,
           mult_final: resGuardado.mult_global_c, cap_aplicado: resGuardado.cap_aplicado,
           xp_final: xpGuardadoFinal, contexto: { destino_id: destinoId2 }
-        });
+        }, origenLedger(resGuardado, 'destino', puntoGuardado)));
 
         var misionesGuardado = await evaluarMisiones(sql, usuarioId2);
         var logrosGuardado = await evaluarLogros(sql, usuarioId2);
@@ -10933,12 +11510,15 @@ module.exports = async function handler(req, res) {
         }
         // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
         // punto unico. v25 (ADR-053): la visita usa M_nivel DERIVADO.
+        // ADR-058: punto del destino visitado (ya resuelto en la geocerca).
+        var puntoVisita = destConCoords ? { lat: dLatV, lng: dLngV } : null;
         var ctxVisita = await contextoXpE(sql, usuarioId2);
         var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpBaseVisita);
         var liderVisita = await esLiderDestino(sql, usuarioId2, destinoId2);
         var resVisita = await calcularXpAcreditado(sql, xpBaseVisita, ctxVisita.nivel_clase,
           ctxVisita.clase_id, ctxVisita.tag,
-          { nivel_usuario: ctxVisita.nivel_usuario, amuleto: amuletoVisita.doubled, lider: liderVisita });
+          { nivel_usuario: ctxVisita.nivel_usuario, amuleto: amuletoVisita.doubled,
+            lider: liderVisita, usuario_id: usuarioId2, punto: puntoVisita });
         // El bono rural sigue siendo PLANO: se suma DESPUES del cap, sin
         // factor ni amuleto. Se unifica fama y cofre al valor POST-CAP +
         // bonos (xp_acreditable) - cambio deliberado Decision 8.3.
@@ -10952,13 +11532,13 @@ module.exports = async function handler(req, res) {
         await acumularRegalia(sql, 'destino', destinoId2, XP_BASES.visita, usuarioId2);
         await acreditarClaseYCofre(sql, usuarioId2, ctxVisita, xpTotalVisita);
         await avanzarMisionesCasa(sql, usuarioId2, 'visitas', 1);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'visita', xp_base: xpBaseVisita,
           mult_nivel: resVisita.m_nivel, mult_stack: resVisita.mult_stack,
           mult_final: resVisita.mult_global_c, cap_aplicado: resVisita.cap_aplicado,
           bonos_planos: bonoRuralVisita, xp_final: xpTotalVisita,
           contexto: { destino_id: destinoId2, zona: zonaVisita }
-        });
+        }, origenLedger(resVisita, 'destino', puntoVisita)));
 
         var misionesVisita = await evaluarMisiones(sql, usuarioId2);
         var logrosVisita = await evaluarLogros(sql, usuarioId2);
@@ -11056,6 +11636,8 @@ module.exports = async function handler(req, res) {
         // Sumar XP al usuario logueado y evaluar misiones + logros.
         var misionesRating = [];
         var logrosRating = [];
+        // ADR-058: punto del destino calificado (1 lectura).
+        var puntoRating = await coordsDestino(sql, destinoId2);
         var ctxRating = await contextoXpE(sql, usuarioId2);
         // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
         // punto unico (v25 / ADR-053: no multiplican por fuera).
@@ -11063,7 +11645,8 @@ module.exports = async function handler(req, res) {
         var liderRating = await esLiderDestino(sql, usuarioId2, destinoId2);
         var resRating = await calcularXpAcreditado(sql, XP_BASES.rating, ctxRating.nivel_clase,
           ctxRating.clase_id, ctxRating.tag,
-          { nivel_usuario: ctxRating.nivel_usuario, amuleto: amuletoRating.doubled, lider: liderRating });
+          { nivel_usuario: ctxRating.nivel_usuario, amuleto: amuletoRating.doubled,
+            lider: liderRating, usuario_id: usuarioId2, punto: puntoRating });
         var xpRatingFinal = resRating.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
@@ -11072,12 +11655,12 @@ module.exports = async function handler(req, res) {
         // Regalias pasivas (037): parte del XP base del rating al autor.
         await acumularRegalia(sql, 'destino', destinoId2, XP_BASES.rating, usuarioId2);
         await acreditarClaseYCofre(sql, usuarioId2, ctxRating, xpRatingFinal);
-        await registrarXpLedger(sql, {
+        await registrarXpLedger(sql, Object.assign({
           usuario_id: usuarioId2, accion: 'rating', xp_base: XP_BASES.rating,
           mult_nivel: resRating.m_nivel, mult_stack: resRating.mult_stack,
           mult_final: resRating.mult_global_c, cap_aplicado: resRating.cap_aplicado,
           xp_final: xpRatingFinal, contexto: { destino_id: destinoId2 }
-        });
+        }, origenLedger(resRating, 'destino', puntoRating)));
         misionesRating = await evaluarMisiones(sql, usuarioId2);
         logrosRating = await evaluarLogros(sql, usuarioId2);
         // v9 (ADR-018): chance de cromo + aporte de fama a la pandilla.

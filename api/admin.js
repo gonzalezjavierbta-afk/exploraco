@@ -11,7 +11,9 @@
 //   salud_red    -> panel "Salud de la Red" (ADR-053): agrega xp_ledger por
 //     dia/accion (XP entregado, usuarios activos, caps, distribucion_nivel
 //     {derivado, visible}, exentos y nivel_max vs nivel derivado). GET;
-//     degrada 42P01 si la migracion 031 no corrio
+//     degrada 42P01 si la migracion 031 no corrio. Desde v6 (ADR-058)
+//     agrega de forma ADITIVA distribucion_origen, mult_origen_stats,
+//     config_origen y alertas_origen (degrada 42703 si la 038 no corrio)
 //   mercado      -> Mercado de Emprendedores (migracion 034): normas por Casa
 //     (mercado_config_lista / mercado_config_editar) y moderacion de ofertas
 //     (mercado_ofertas_lista / mercado_ofertas_moderar). La moderacion NO
@@ -37,6 +39,21 @@
 // / mercado_ofertas_lista / mercado_ofertas_moderar). Reusa auth()/authInternal()
 // del archivo y esquemaAusente() para la degradacion 503 SCHEMA_NOT_MIGRATED.
 // No crea endpoints (8/8, ADR-001).
+// v6 (ADR-058, 2026-09-24): salud_red gana 4 bloques ADITIVOS de origen y
+// lejania (migracion 038): distribucion_origen (conteo y XP por origen_tier
+// en la ventana), mult_origen_stats (prom/min/max + top outliers), config_origen
+// (las 7 claves de gamificacion_config) y alertas_origen (concentracion de XP
+// bonificado y cuentas extranjeras nuevas con factor alto). Cada consulta
+// degrada con esquemaAusente()/console.warn si la 038 no corrio (patron
+// BUG-021); el payload actual de salud_red queda intacto. No crea endpoints.
+// v7 (ADR-058 editor, 2026-09-24): rama NUEVA POST ?recurso=gamificacion_config
+// (gate auth()) que edita de forma idempotente las 7 claves de la curva de
+// origen con validacion estricta de rango + coherencia (Local <= Nomada <=
+// Extranjero); degrada 503 SCHEMA_NOT_MIGRATED si gamificacion_config no
+// existe (patron BUG-021). Ademas sube los umbrales anti-gaming de
+// concentracion de origen a 85% / 500 XP y exige >= 3 cuentas distintas con
+// mult_origen > 1.2 en la ventana para disparar la alerta. No crea endpoints
+// (8/8, ADR-001).
 
 const { neon } = require('@neondatabase/serverless');
 
@@ -158,6 +175,48 @@ function normalizarEraConsumible(v) {
   var eras = { caminante:'Caminante', explorador:'Explorador', cronista:'Cronista', leyenda:'Leyenda', mito:'Mito' };
   return eras[s] || null;
 }
+
+// == ORIGEN / LEJANIA (ADR-058, migracion 038) ============================
+// Umbrales de las alertas anti-gaming del panel "Salud de la Red". Fijos y
+// documentados: NO se leen de gamificacion_config (esa tabla parametriza la
+// curva de origen, no estos umbrales de alerta; se reevalua administrarlos).
+//   - ORIGEN_OUTLIER_MULT: mult_origen por encima del tope Nomada (1.20)
+//     marca la fila como bonificada por lejania (Nomada/Extranjero) y entra
+//     al top de outliers de revision manual.
+//   - ORIGEN_CONCENTRACION_PCT: si un mismo origen (pais/ciudad) concentra
+//     mas de este % del XP bonificado por origen en la ventana, se alerta.
+//     AJUSTADO a 85 (era 60): con la base pequena actual, una concentracion
+//     moderada era un falso positivo recurrente.
+//   - ORIGEN_CONCENTRACION_MIN_XP: piso de XP bonificado para no alertar con
+//     volumenes minimos (ruido de pocos eventos). AJUSTADO a 500 (era 100).
+//   - ORIGEN_CONCENTRACION_MIN_CUENTAS: piso de CUENTAS distintas con
+//     mult_origen > ORIGEN_OUTLIER_MULT (1.2) en la ventana. La alerta de
+//     concentracion solo dispara con >= 3 cuentas: con 1-2 usuarios el
+//     "origen concentrado" es esperable y no es senal de gaming.
+//   - ORIGEN_CUENTA_NUEVA_DIAS: antiguedad de cuenta por debajo de la cual una
+//     cuenta extranjera con mult_origen alto se considera de revision manual.
+var ORIGEN_OUTLIER_MULT = 1.2;
+var ORIGEN_CONCENTRACION_PCT = 85;
+var ORIGEN_CONCENTRACION_MIN_XP = 500;
+var ORIGEN_CONCENTRACION_MIN_CUENTAS = 3;
+var ORIGEN_CUENTA_NUEVA_DIAS = 30;
+// Las 7 claves de la curva de origen sembradas por la 038 (ADR-058 6.4).
+var ORIGEN_CONFIG_CLAVES = ['factor_origen_local', 'factor_origen_nomada_max',
+  'factor_origen_extranjero_max', 'origen_km_nomada', 'origen_km_extranjero',
+  'origen_km_local', 'origen_min_dias_cuenta'];
+// Contrato de ESCRITURA del editor admin (v7): lista blanca UNICA de las 7
+// claves con su rango valido. El endpoint POST ?recurso=gamificacion_config
+// deriva de aqui que claves acepta (whitelist anti-inyeccion) y como las
+// valida; las claves espejan ORIGEN_CONFIG_CLAVES (lectura de salud_red).
+var ORIGEN_CONFIG_SPEC = [
+  { clave: 'factor_origen_local',          min: 1.0, max: 1.5,   tipo: 'factor' },
+  { clave: 'factor_origen_nomada_max',     min: 1.0, max: 1.8,   tipo: 'factor' },
+  { clave: 'factor_origen_extranjero_max', min: 1.0, max: 2.0,   tipo: 'factor' },
+  { clave: 'origen_km_nomada',             min: 1,   max: 20000, tipo: 'km' },
+  { clave: 'origen_km_extranjero',         min: 1,   max: 30000, tipo: 'km' },
+  { clave: 'origen_km_local',              min: 0,   max: 500,   tipo: 'km' },
+  { clave: 'origen_min_dias_cuenta',       min: 0,   max: 365,   tipo: 'dias' }
+];
 
 // == REPARTO PIRAMIDAL (Entrega 016) ======================================
 // EXCEPCION CONTROLADA al tripwire de no-duplicidad (GSD 2.1): los
@@ -1054,6 +1113,190 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // == ORIGEN Y LEJANIA (ADR-058, migracion 038) =======================
+    // Bloque ADITIVO. Todas las consultas dependen de xp_ledger.mult_origen/
+    // origen_tier (038); si la 038 no corrio, cada una degrada a valor vacio
+    // con console.warn (patron BUG-021) y el resto del payload queda intacto.
+    // Sin SELECT *: cada consulta lista sus columnas explicitamente.
+    var distribucionOrigen = [];
+    var multOrigenStats = {
+      filas: 0, promedio: 0, minimo: 0, maximo: 0,
+      con_bonificacion: 0, top_outliers: [],
+    };
+    var configOrigen = [];
+    var alertasOrigen = [];
+
+    // (1) Distribucion por tier en la ventana: filas y XP entregado.
+    try {
+      var distOrigenSR = await sql(
+        'SELECT COALESCE(origen_tier, \'sin_tier\') AS tier, '
+        + 'COUNT(*)::int AS eventos, COALESCE(SUM(xp_final), 0) AS xp '
+        + 'FROM xp_ledger WHERE es_exento = false '
+        + 'AND creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+        + 'GROUP BY 1 ORDER BY 3 DESC',
+        [diasSR]
+      );
+      distribucionOrigen = distOrigenSR.map(function (o) {
+        return {
+          tier: o.tier || 'sin_tier',
+          eventos: parseInt(o.eventos, 10) || 0,
+          xp: red2(numXp(o.xp)),
+        };
+      });
+    } catch (eDO) {
+      if (!esquemaAusente(eDO)) throw eDO;
+      console.warn('[admin] salud_red: distribucion_origen degradada ' + eDO.code + ' (' + eDO.message + ')');
+    }
+
+    // (2) Estadistica de mult_origen + top outliers (XP con mult > 1.2).
+    try {
+      var multSR = await sql(
+        'SELECT COUNT(*)::int AS filas, '
+        + 'COALESCE(AVG(mult_origen), 0) AS promedio, '
+        + 'COALESCE(MIN(mult_origen), 0) AS minimo, '
+        + 'COALESCE(MAX(mult_origen), 0) AS maximo, '
+        + 'COUNT(*) FILTER (WHERE mult_origen > 1)::int AS con_bonificacion '
+        + 'FROM xp_ledger WHERE es_exento = false '
+        + 'AND creado_en >= NOW() - ($1::int * INTERVAL \'1 day\')',
+        [diasSR]
+      );
+      var mSR = multSR.length ? multSR[0] : {};
+      multOrigenStats = {
+        filas: parseInt(mSR.filas, 10) || 0,
+        promedio: Math.round(numXp(mSR.promedio) * 1000000) / 1000000,
+        minimo: Math.round(numXp(mSR.minimo) * 1000000) / 1000000,
+        maximo: Math.round(numXp(mSR.maximo) * 1000000) / 1000000,
+        con_bonificacion: parseInt(mSR.con_bonificacion, 10) || 0,
+        top_outliers: [],
+      };
+      var outSR = await sql(
+        'SELECT l.usuario_id, u.nombre, u.email, u.pais_base, u.ciudad_base, '
+        + 'COALESCE(SUM(l.xp_final), 0) AS xp, '
+        + 'COALESCE(MAX(l.mult_origen), 0) AS mult_max, '
+        + 'MAX(l.origen_tier) AS tier, '
+        + 'ROUND(EXTRACT(EPOCH FROM (NOW() - u.creado_en)) / 86400)::int AS dias_cuenta, '
+        + 'COUNT(*)::int AS eventos '
+        + 'FROM xp_ledger l LEFT JOIN usuarios u ON u.id = l.usuario_id '
+        + 'WHERE l.es_exento = false AND l.mult_origen > $2::numeric '
+        + 'AND l.creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+        + 'GROUP BY 1, 2, 3, 4, 5, u.creado_en ORDER BY 6 DESC LIMIT 20',
+        [diasSR, ORIGEN_OUTLIER_MULT]
+      );
+      multOrigenStats.top_outliers = outSR.map(function (o) {
+        return {
+          usuario_id: o.usuario_id,
+          nombre: o.nombre || '(sin nombre)',
+          email: o.email || '',
+          pais_base: o.pais_base || null,
+          ciudad_base: o.ciudad_base || null,
+          xp: red2(numXp(o.xp)),
+          mult_max: Math.round(numXp(o.mult_max) * 1000000) / 1000000,
+          tier: o.tier || null,
+          dias_cuenta: parseInt(o.dias_cuenta, 10) || 0,
+          eventos: parseInt(o.eventos, 10) || 0,
+        };
+      });
+    } catch (eMO) {
+      if (!esquemaAusente(eMO)) throw eMO;
+      console.warn('[admin] salud_red: mult_origen_stats degradada ' + eMO.code + ' (' + eMO.message + ')');
+    }
+
+    // (3) Config de origen: las 7 claves de gamificacion_config (038). Solo
+    // lectura (el panel aun no edita gamificacion_config). Si la 038 no corrio,
+    // la tabla 031 existe pero las claves faltan -> lista vacia (sin error).
+    try {
+      var cfgOrSR = await sql(
+        'SELECT clave, valor, descripcion FROM gamificacion_config '
+        + 'WHERE clave = ANY($1::text[]) ORDER BY clave',
+        [ORIGEN_CONFIG_CLAVES]
+      );
+      configOrigen = cfgOrSR.map(function (k) {
+        return {
+          clave: k.clave,
+          valor: numXp(k.valor),
+          descripcion: k.descripcion || '',
+        };
+      });
+    } catch (eCO) {
+      if (!esquemaAusente(eCO)) throw eCO;
+      console.warn('[admin] salud_red: config_origen degradada ' + eCO.code + ' (' + eCO.message + ')');
+    }
+
+    // (4) Alertas anti-gaming de origen.
+    // (4.a) Concentracion anomala de XP bonificado en un mismo origen.
+    try {
+      var concSR = await sql(
+        'SELECT COALESCE(NULLIF(TRIM(u.ciudad_base), \'\'), \'?\') AS ciudad, '
+        + 'COALESCE(NULLIF(TRIM(u.pais_base), \'\'), \'?\') AS pais, '
+        + 'COALESCE(SUM(l.xp_final), 0) AS xp '
+        + 'FROM xp_ledger l JOIN usuarios u ON u.id = l.usuario_id '
+        + 'WHERE l.es_exento = false AND l.mult_origen > 1 '
+        + 'AND l.creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+        + 'GROUP BY 1, 2 ORDER BY 3 DESC',
+        [diasSR]
+      );
+      // Piso de CUENTAS (v7): cuenta las cuentas distintas con mult_origen >
+      // ORIGEN_OUTLIER_MULT (1.2) en la ventana. Con menos de
+      // ORIGEN_CONCENTRACION_MIN_CUENTAS (3) NO se alerta: una concentracion
+      // alta con 1-2 usuarios es el caso normal, no gaming.
+      var cuentasOrSR = await sql(
+        'SELECT COUNT(DISTINCT usuario_id)::int AS n FROM xp_ledger '
+        + 'WHERE es_exento = false AND mult_origen > $2::numeric '
+        + 'AND creado_en >= NOW() - ($1::int * INTERVAL \'1 day\')',
+        [diasSR, ORIGEN_OUTLIER_MULT]
+      );
+      var cuentasBon = cuentasOrSR.length ? (parseInt(cuentasOrSR[0].n, 10) || 0) : 0;
+      var totalBon = 0;
+      concSR.forEach(function (r) { totalBon += numXp(r.xp); });
+      totalBon = red2(totalBon);
+      if (totalBon >= ORIGEN_CONCENTRACION_MIN_XP && concSR.length
+        && cuentasBon >= ORIGEN_CONCENTRACION_MIN_CUENTAS) {
+        var topOr = concSR[0];
+        var topOrXp = red2(numXp(topOr.xp));
+        var pctOr = totalBon > 0 ? Math.round(topOrXp / totalBon * 1000) / 10 : 0;
+        if (pctOr >= ORIGEN_CONCENTRACION_PCT) {
+          alertasOrigen.push({
+            tipo: 'origen_concentrado',
+            detalle: 'El origen ' + (topOr.ciudad || '?') + ' / ' + (topOr.pais || '?')
+              + ' concentra ' + pctOr + '% del XP bonificado por origen ('
+              + topOrXp + ' de ' + totalBon + ' XP, ' + cuentasBon + ' cuentas) en la ventana.',
+          });
+        }
+      }
+    } catch (eAO1) {
+      if (!esquemaAusente(eAO1)) throw eAO1;
+      console.warn('[admin] salud_red: alerta concentracion origen degradada ' + eAO1.code + ' (' + eAO1.message + ')');
+    }
+
+    // (4.b) Cuentas extranjeras nuevas con mult_origen alto (revision manual).
+    try {
+      var extSR = await sql(
+        'SELECT l.usuario_id, u.nombre, u.pais_base, u.ciudad_base, '
+        + 'COALESCE(MAX(l.mult_origen), 0) AS mult_max, '
+        + 'COALESCE(SUM(l.xp_final), 0) AS xp, '
+        + 'ROUND(EXTRACT(EPOCH FROM (NOW() - u.creado_en)) / 86400)::int AS dias_cuenta '
+        + 'FROM xp_ledger l JOIN usuarios u ON u.id = l.usuario_id '
+        + 'WHERE l.es_exento = false AND l.mult_origen > $2::numeric '
+        + 'AND u.pais_base IS NOT NULL AND UPPER(TRIM(u.pais_base)) <> \'CO\' '
+        + 'AND u.creado_en >= NOW() - ($3::int * INTERVAL \'1 day\') '
+        + 'AND l.creado_en >= NOW() - ($1::int * INTERVAL \'1 day\') '
+        + 'GROUP BY 1, 2, 3, 4, u.creado_en ORDER BY 5 DESC LIMIT 20',
+        [diasSR, ORIGEN_OUTLIER_MULT, ORIGEN_CUENTA_NUEVA_DIAS]
+      );
+      extSR.forEach(function (r) {
+        alertasOrigen.push({
+          tipo: 'extranjero_nuevo',
+          usuario_id: r.usuario_id,
+          detalle: (r.nombre || '(sin nombre)') + ' (' + (r.pais_base || '?') + ')'
+            + ' tiene mult_origen ' + (Math.round(numXp(r.mult_max) * 1000) / 1000)
+            + ' con ' + (parseInt(r.dias_cuenta, 10) || 0) + ' dias de cuenta.',
+        });
+      });
+    } catch (eAO2) {
+      if (!esquemaAusente(eAO2)) throw eAO2;
+      console.warn('[admin] salud_red: alerta extranjero nuevo degradada ' + eAO2.code + ' (' + eAO2.message + ')');
+    }
+
     return res.status(200).json({
       ok: true,
       data: {
@@ -1079,13 +1322,123 @@ module.exports = async function handler(req, res) {
         },
         nivel_max_vs_derivado: nivelMaxSR,
         alertas: alertas,
+        // ADR-058 (migracion 038): bloques ADITIVOS de origen y lejania.
+        distribucion_origen: distribucionOrigen,
+        mult_origen_stats: multOrigenStats,
+        config_origen: configOrigen,
+        alertas_origen: alertasOrigen,
       },
     });
+  }
+
+  // == GAMIFICACION_CONFIG (editor admin de la curva de origen - ADR-058) ==
+  // Rama NUEVA POST ?recurso=gamificacion_config (v7). Reusa auth() del
+  // archivo (mismo gate Bearer que salud_red); NO inventa un mecanismo de
+  // auth nuevo. Escritura idempotente sobre la tabla clave/valor de la 031:
+  //   INSERT ... ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor
+  // (re-ejecutar con el mismo body es no-op funcional). Solo se escriben las
+  // 7 claves de ORIGEN_CONFIG_SPEC (whitelist): cualquier clave extra del body
+  // se ignora y los valores van SIEMPRE parametrizados ($n), nunca
+  // interpolados (anti-inyeccion). Validacion estricta de rango + coherencia
+  // Local <= Nomada <= Extranjero -> 400 con mensaje claro. Degradacion
+  // controlada 503 SCHEMA_NOT_MIGRATED si gamificacion_config no existe
+  // (42P01) o le falta una columna (42703); nunca 500 ciego ni catch vacio
+  // (patron BUG-021). Sin SELECT *: se listan las columnas.
+  if (recurso === 'gamificacion_config') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    if (req.method !== 'POST') return res.status(405).end();
+
+    try {
+      // 1) Whitelist + validacion de rango. Se exigen las 7 claves.
+      var valoresGC = {};
+      var faltanGC = [];
+      for (var iGC = 0; iGC < ORIGEN_CONFIG_SPEC.length; iGC++) {
+        var specGC = ORIGEN_CONFIG_SPEC[iGC];
+        var rawGC = body[specGC.clave];
+        if (rawGC === undefined || rawGC === null || String(rawGC).trim() === '') {
+          faltanGC.push(specGC.clave);
+          continue;
+        }
+        // numeric acepta punto o coma (ADR-035); se normaliza a punto.
+        var vGC = parseFloat(String(rawGC).replace(',', '.'));
+        if (!isFinite(vGC)) {
+          return res.status(400).json({ ok:false, error:'VALOR_INVALIDO',
+            detalle:'La clave ' + specGC.clave + ' debe ser numerica.' });
+        }
+        if (vGC < specGC.min || vGC > specGC.max) {
+          return res.status(400).json({ ok:false, error:'FUERA_DE_RANGO',
+            detalle:specGC.clave + ' debe estar entre ' + specGC.min + ' y ' + specGC.max + '.' });
+        }
+        valoresGC[specGC.clave] = vGC;
+      }
+      if (faltanGC.length) {
+        return res.status(400).json({ ok:false, error:'FALTAN_CLAVES',
+          detalle:'Faltan claves obligatorias: ' + faltanGC.join(', ') + '.' });
+      }
+      if (valoresGC.factor_origen_local > valoresGC.factor_origen_nomada_max
+        || valoresGC.factor_origen_nomada_max > valoresGC.factor_origen_extranjero_max) {
+        return res.status(400).json({ ok:false, error:'COHERENCIA_INVALIDA',
+          detalle:'Debe cumplirse factor_origen_local <= factor_origen_nomada_max <= factor_origen_extranjero_max.' });
+      }
+
+      // 2) Upsert idempotente del VALOR en UNA sentencia (7 filas
+      // parametrizadas): INSERT ... ON CONFLICT (clave) DO UPDATE SET
+      // valor=EXCLUDED.valor. En una fila NUEVA, descripcion toma el DEFAULT ''
+      // de la columna; en una fila EXISTENTE no se toca aqui (la descripcion
+      // solo se actualiza si el body la trae, paso 3).
+      var valsGC = []; var paramsGC = []; var piGC = 1;
+      ORIGEN_CONFIG_SPEC.forEach(function (spec) {
+        valsGC.push('($' + piGC++ + ', $' + piGC++ + ')');
+        paramsGC.push(spec.clave, red4(valoresGC[spec.clave]));
+      });
+      await sql(
+        'INSERT INTO gamificacion_config (clave, valor) VALUES '
+        + valsGC.join(', ')
+        + ' ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, '
+        + 'actualizado_en = NOW()',
+        paramsGC
+      );
+
+      // 3) Descripcion OPCIONAL por clave: body.descripciones = {clave: texto}.
+      // Solo se actualiza la descripcion de las claves que el body traiga; el
+      // resto conserva la suya.
+      var descGC = (body.descripciones && typeof body.descripciones === 'object') ? body.descripciones : {};
+      for (var iD = 0; iD < ORIGEN_CONFIG_SPEC.length; iD++) {
+        var claveD = ORIGEN_CONFIG_SPEC[iD].clave;
+        if (claveD in descGC) {
+          await sql(
+            'UPDATE gamificacion_config SET descripcion=$1, actualizado_en=NOW() WHERE clave=$2',
+            [String(descGC[claveD] == null ? '' : descGC[claveD]).trim(), claveD]
+          );
+        }
+      }
+
+      // 4) Devolver la config actualizada (mismo shape que config_origen).
+      var rowsGC = await sql(
+        'SELECT clave, valor, descripcion FROM gamificacion_config '
+        + 'WHERE clave = ANY($1::text[]) ORDER BY clave',
+        [ORIGEN_CONFIG_CLAVES]
+      );
+      var dataGC = rowsGC.map(function (k) {
+        return { clave: k.clave, valor: numXp(k.valor), descripcion: k.descripcion || '' };
+      });
+      return res.status(200).json({ ok:true, data:dataGC, mensaje:'Config de origen actualizada' });
+    } catch (eGC) {
+      if (esquemaAusente(eGC)) {
+        console.warn('[admin] gamificacion_config: esquema ausente ' + eGC.code + ' (' + eGC.message + ')');
+        return res.status(503).json({
+          ok:false, error:'SCHEMA_NOT_MIGRATED',
+          detalle:'Aplica db/migrations/031_gamificacion_v6_nivel_scaling.sql en Neon antes de editar la config de origen.',
+        });
+      }
+      console.warn('[admin] gamificacion_config: error al guardar (' + (eGC && eGC.code) + '): ' + (eGC && eGC.message));
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
   }
 
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado|gamificacion_config',
   });
 };

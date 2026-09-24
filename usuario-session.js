@@ -65,10 +65,20 @@
   window.ExploraCO.redondearXp = redondearXp;
   window.ExploraCO.fmtXp = fmtXp;
 
+  // ---- Etiquetas de tier de origen (ADR-058) ----
+  // Se usan en el desglose del toast y en el badge de categoria. Los
+  // acentos van con escapes Unicode (estilo del archivo, ASCII puro).
+  var ORIGEN_TIER_LABEL = {
+    local: 'Local',
+    nomada: 'N\u00f3mada',
+    extranjero: 'Extranjero'
+  };
+
   // ---- Desglose de XP (ADR-053 Decision 13): fuente unica del toast ----
   // Recibe el xp_detalle del servidor (shape de armarXpDetalle en
   // api/interacciones.js) y devuelve una linea breve y legible:
   //   +32.60 XP  (base 20.00 x 1.63) [ + bono 25.00] [ . cap aplicado]
+  //   [ . Origen x1.30 (Extranjero) . 1.850 km]
   // Reusa fmtXp (helper unico de formato, ADR-035): NO crea otro
   // formateador (Regla de No-Duplicidad). El multiplicador efectivo es
   // mult_global (post-cap); si el backend marco un recorte
@@ -89,9 +99,34 @@
     if (detalle.cap_aplicado && detalle.cap_aplicado !== 'ninguno') {
       txt += ' \u00b7 cap aplicado';
     }
+    // ADR-058: linea de Origen SOLO cuando el factor por lejania premia
+    // (mult_origen > 1.00). La UI informa; el backend es la verdad.
+    var lineaOrigen = fmtOrigenDetalle(detalle);
+    if (lineaOrigen) txt += ' \u00b7 ' + lineaOrigen;
     return txt;
   }
   window.ExploraCO.fmtXpDetalle = fmtXpDetalle;
+
+  // ---- Linea de origen del desglose (ADR-058) ----
+  // Devuelve "Origen x1.30 (Extranjero) . 1.850 km" a partir del
+  // xp_detalle del servidor (mult_origen/origen_tier/origen_dist_km).
+  // Devuelve '' si no hay premio de origen (mult_origen <= 1.00): el tier
+  // 'local' tambien es x1.00 y por eso no ensucia el toast. La distancia
+  // solo se anexa cuando viene (numero > 0).
+  function fmtOrigenDetalle(detalle) {
+    if (!detalle || typeof detalle !== 'object') return '';
+    var mult = Number(detalle.mult_origen);
+    if (!isFinite(mult) || mult <= 1.0001) return '';
+    var txt = 'Origen x' + mult.toFixed(2);
+    var etiqueta = ORIGEN_TIER_LABEL[detalle.origen_tier];
+    if (etiqueta) txt += ' (' + etiqueta + ')';
+    var km = Number(detalle.origen_dist_km);
+    if (isFinite(km) && km > 0) {
+      txt += ' \u00b7 ' + Math.round(km).toLocaleString('es-CO') + ' km';
+    }
+    return txt;
+  }
+  window.ExploraCO.fmtOrigenDetalle = fmtOrigenDetalle;
 
   // ---- Progreso al siguiente nivel (ADR-053 Decision 13) ----
   // Umbrales SIEMPRE desde window.NivelesData.XP_LEVELS (fuente unica
@@ -165,6 +200,99 @@
   }
   window.ExploraCO.fmtEstadoCupo = fmtEstadoCupo;
   window.ExploraCO.mostrarEstadoCupo = mostrarEstadoCupo;
+
+  // ---- Badge de categoria de origen por lejania (ADR-058) ----
+  // Deriva la categoria del objeto `origen` del perfil (GET ?id= /
+  // POST perfil_actualizar) y, cuando tier_base es 'co' (local o nomada,
+  // indistinguible sin el punto reportado), del tier del ultimo
+  // xp_detalle visto (window.ExploraCO.ultimoOrigenTier). Devuelve null
+  // si no hay objeto `origen` (p. ej. la respuesta de login/upsert aun no
+  // lo trae): en ese caso NO se pinta badge (no se asume "sin origen").
+  // La UI SOLO informa; nunca promete un valor fijo (el factor real
+  // depende del punto): usa "hasta x1.2 / x1.4".
+  function origenCategoria(origen, tierUltimo) {
+    if (!origen || typeof origen !== 'object') return null;
+    if (origen.elegible !== true) {
+      return {
+        id: 'sin_origen',
+        label: 'Sin origen declarado',
+        desc: 'Declara tu ciudad o pais en tu perfil para ganar XP extra por lejania.',
+        color: '#9CA3AF',
+        cta: true
+      };
+    }
+    if (origen.tier_base === 'extranjero') {
+      return {
+        id: 'extranjero',
+        label: 'Extranjero',
+        desc: 'Ganas hasta x1.4 por aportar desde el extranjero.',
+        color: '#8B5CF6',
+        cta: false
+      };
+    }
+    // tier_base 'co': local o nomada segun la distancia al punto.
+    if (tierUltimo === 'local') {
+      return {
+        id: 'local',
+        label: 'Local',
+        desc: 'Ganas XP base por aportar en tu ciudad.',
+        color: '#6B7280',
+        cta: false
+      };
+    }
+    if (tierUltimo === 'nomada') {
+      return {
+        id: 'nomada',
+        label: 'N\u00f3mada',
+        desc: 'Ganas hasta x1.2 por aportar lejos de tu ciudad.',
+        color: '#E8A020',
+        cta: false
+      };
+    }
+    return {
+      id: 'co',
+      label: 'Local / N\u00f3mada',
+      desc: 'Segun la distancia al punto reportado: XP base en tu ciudad o hasta x1.2 por aportar lejos.',
+      color: '#E8A020',
+      cta: false
+    };
+  }
+
+  // Pinta el badge en un contenedor (navbar o modal). El color se aplica
+  // como `color` y el borde usa currentColor (definido en CSS). Sin
+  // `origen` oculta el badge; con CTA (sin origen declarado) navega al
+  // perfil para declararlo. aria-label + title siempre presentes.
+  function renderOrigenBadge(el, origen) {
+    if (!el) return null;
+    var cat = origenCategoria(origen, window.ExploraCO.ultimoOrigenTier);
+    if (!cat) {
+      el.style.display = 'none';
+      el.textContent = '';
+      el.removeAttribute('aria-label');
+      el.removeAttribute('title');
+      el.onclick = null;
+      return null;
+    }
+    el.style.display = 'inline-block';
+    el.textContent = cat.label;
+    el.style.color = cat.color;
+    el.setAttribute('aria-label', 'Categoria de origen: ' + cat.label + '. ' + cat.desc);
+    el.title = cat.desc;
+    if (cat.cta) {
+      el.style.cursor = 'pointer';
+      el.onclick = function (ev) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        window.location.href = 'mi-perfil.html';
+      };
+    } else {
+      el.style.cursor = 'default';
+      el.onclick = null;
+    }
+    return cat;
+  }
+
+  window.ExploraCO.origenCategoria = origenCategoria;
+  window.ExploraCO.renderOrigenBadge = renderOrigenBadge;
 
   // ── Mapa de capacidades por umbral de nivel ───────────────
   // Clave = nivel minimo, valor = nombre de la capacidad.
@@ -316,6 +444,25 @@
     tituloEl.textContent = titulo;
     tituloEl.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:14px;';
     card.appendChild(tituloEl);
+
+    // ADR-058: badge de categoria de origen (si el perfil ya la trae).
+    var catOrigen = origenCategoria(
+      window.ExploraCO.usuario && window.ExploraCO.usuario.origen,
+      window.ExploraCO.ultimoOrigenTier
+    );
+    if (catOrigen) {
+      var ob = document.createElement('div');
+      ob.textContent = catOrigen.label;
+      ob.setAttribute('aria-label', 'Categoria de origen: ' + catOrigen.label + '. ' + catOrigen.desc);
+      ob.title = catOrigen.desc;
+      ob.style.cssText = [
+        'display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;',
+        'letter-spacing:1px;color:' + catOrigen.color + ';',
+        'border:1px solid ' + catOrigen.color + ';border-radius:10px;',
+        'padding:2px 9px;margin:0 0 14px;'
+      ].join('');
+      card.appendChild(ob);
+    }
 
     if (desbloqueadas.length) {
       var capTitle = document.createElement('div');
@@ -716,6 +863,11 @@
         }
         guardarSesion(perfil);
         actualizarUI();
+        // ADR-058: la respuesta de login/upsert no incluye el objeto
+        // 'origen' (solo GET ?id= y POST perfil_actualizar lo traen). Se
+        // refresca en segundo plano para que el badge de origen aparezca
+        // sin recargar. refrescarSesion preserva el JWT vigente.
+        refrescarSesion();
         // Bono de bienvenida por referido: solo en el alta NUEVA que uso
         // un codigo de referido (perfil.bonus_referido === true). Se
         // difiere para que la sesion y la UI ya esten listas.
@@ -1621,6 +1773,12 @@
   // misiones/logros reusan las funciones ya existentes.
   function aplicarResultadoXp(data) {
     if (!data || !data.ok) return 0;
+    // ADR-058: recordar el tier de origen del ultimo xp_detalle para que
+    // el badge resuelva Local/Nomada cuando el perfil solo trae tier_base
+    // 'co' (sin el punto no se distingue). Se guarda ANTES de actualizarUI.
+    if (data.xp_detalle && data.xp_detalle.origen_tier) {
+      window.ExploraCO.ultimoOrigenTier = data.xp_detalle.origen_tier;
+    }
     var misionesXp = sumaMisionesXp(data.misiones);
     var logrosXp = sumaLogrosXp(data.logros);
     var total = redondearXp((Number(data.xp) || 0) + misionesXp + logrosXp);
@@ -1778,6 +1936,11 @@
         if (nameEl) nameEl.textContent = usuario.nombre;
         if (xpEl)   xpEl.textContent   = fmtXp(usuario.xp_total) + ' XP';
         if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
+        // ADR-058: badge de categoria de origen en el navbar (si la
+        // pagina provee el contenedor #perfil-origen). La logica vive
+        // aqui (fuente unica); index.html solo aporta el elemento.
+        var origenEl = document.getElementById('perfil-origen');
+        if (origenEl) renderOrigenBadge(origenEl, usuario.origen);
         // Barra de progreso del navbar (ADR-053 Decision 13): umbrales
         // desde nivelesFuente() (window.NivelesData con fallback), nunca
         // escritos en la UI.
@@ -1791,6 +1954,9 @@
     } else {
       if (loginBtn) loginBtn.style.display = '';
       if (perfilBtn) perfilBtn.style.display = 'none';
+      // ADR-058: sin sesion no hay origen que mostrar.
+      var origenElOut = document.getElementById('perfil-origen');
+      if (origenElOut) origenElOut.style.display = 'none';
     }
 
     // Actualizar botones de guardar que tengan data-uuid
