@@ -1,0 +1,117 @@
+1. Textos Exactos y Estructura de Pantallas
+Pantalla 1: Mensaje de Bienvenida General
+Objetivo: Mensaje corto y claro. Prioriza que Exploraco es una guía de turismo interactivo y comunidad de viajes, reduce la sección de gamificación a 3 tips esenciales y finaliza con el botón directo a la web.
+
+Pill Top / Badge superior:
+GUÍA INTERACTIVA DE TURISMO
+
+Título Principal:
+Únete a nuestra comunidad de viajeros
+
+Subtítulo Explicativo:
+Descubre Colombia con una guía turística interactiva. Explora los mejores destinos, conecta con otros viajeros y vive experiencias únicas.
+
+Sección Gamificación (3 Tips esenciales):
+
+Explora e Interactúa: Descubre destinos en la guía, guarda tus lugares favoritos y conecta con viajeros en tiempo real.
+
+Acumula XP: Suma puntos por cada reseña, recomendación compartida y lugar visitado.
+
+Desbloquea Premios: Convierte tus trofeos y logros en beneficios reales para tus próximos viajes.
+
+Botón Acción Principal (CTA):
+EXPLORAR LA WEB
+
+Texto Secundario (Acceso demo / directo):
+Entrar sin sesión · modo demo
+
+Pantalla 2: Mensaje de Bienvenida por Referido / Registro
+Objetivo: Registro personalizado y selectivo. Explica con mayor detalle la plataforma y la dinámica de gamificación, muestra quién hizo la invitación (sin código explícito) y ofrece la selección de 3 premios iniciales a elegir.
+
+Pill Top / Credencial:
+CREDENCIAL DE EXPLORADOR
+
+Título Principal:
+¡[Nombre del Invitado], bienvenido a Exploraco!
+
+Banner / Mensaje de Invitación:
+[Nombre del Anfitrión] te ha invitado a unirte a la comunidad de turismo interactivo de Colombia.
+
+Texto Informativo & Gamificación (Explicación extendida):
+Exploraco es tu guía turística interactiva para descubrir Colombia. Guarda tus destinos, comparte recomendaciones con la comunidad y acumula experiencia (XP) por cada aventura.
+
+Sección de Recompensa de Bienvenida:
+
+Encabezado: Elige tu premio de bienvenida:
+
+Opciones de Selección (3 Premios):
+
+⚪ Bono Descuento: 10% OFF en tu primer hospedaje o tour aliado.
+
+⚪ Multiplicador de Experiencia: Doble XP (2x) durante tu primer mes.
+
+⚪ Insignia Exclusiva: Medal de "Pionero Explorador" para tu perfil.
+
+Campos del Formulario:
+
+NOMBRE: ¿Cómo te llamamos?
+
+EMAIL: tu@correo.com
+
+Botón Acción Principal (CTA):
+CREAN MI CUENTA Y RECLAMAR PREMIO
+
+Pie de Formulario:
+Sin contraseña: tu email es tu llave. Si ya tienes cuenta, entras directo a tu perfil conservando tu XP.
+
+2. Prompt para Open Code / Cursor AI
+Copia y pega el siguiente prompt en tu entorno de desarrollo para generar o refactorizar el código de la UI:
+
+Plaintext
+Actúa como un desarrollador Frontend Senior especializado en React, Tailwind CSS y componentes UI modernos. 
+
+Necesito actualizar las dos pantallas de entrada de la plataforma "Exploraco" basándote en las imágenes de diseño adjuntas y los siguientes requerimientos de UX/UI y contenido:
+
+---
+### REQUERIMIENTOS GENERALES DE DISEÑO
+- **Estilo:** Dark theme elegante con toques dorados/amarillo Exploraco (`#E5A21A` o `#F3B32A`), bordes redondeados, tarjetas con gradientes oscuros o bordes sutiles (`border-gray-800`).
+- **Prioridad de mensaje:** La propuesta de valor principal es "Guía de turismo interactivo y comunidad de viajeros". La gamificación (XP, trofeos) es un complemento motivacional, no el foco primario.
+
+---
+### PANTALLA 1: BIENVENIDA GENERAL (`/welcome`)
+1. **Badge Superior:** "GUÍA INTERACTIVA DE TURISMO"
+2. **Título Principal (H1):** "Únete a nuestra comunidad de viajeros"
+3. **Subtítulo:** "Descubre Colombia con una guía turística interactiva. Explora los mejores destinos, conecta con otros viajeros y vive experiencias únicas."
+4. **Grid de Gamificación (Exactamente 3 Cards/Tips, formato 1 col en mobile, 3 cols en desktop):**
+   - **Tip 1 (Icono Brújula/Mapa):** 
+     - Título: "Explora e Interactúa"
+     - Desc: "Descubre destinos en la guía, guarda tus lugares favoritos y conecta con viajeros en tiempo real."
+   - **Tip 2 (Icono Rayo/XP):** 
+     - Título: "Acumula XP"
+     - Desc: "Suma puntos por cada reseña, recomendación compartida y lugar visitado."
+   - **Tip 3 (Icono Trofeo/Regalo):** 
+     - Título: "Desbloquea Premios"
+     - Desc: "Convierte tus trofeos y logros en beneficios reales para tus próximos viajes."
+5. **Botón Principal:** "EXPLORAR LA WEB" (Botón amarillo/dorado full width).
+6. **Enlace Secundario:** "Entrar sin sesión · modo demo".
+
+---
+### PANTALLA 2: REGISTRO / REFERIDO (`/register` o `/welcome-referred`)
+1. **Credencial / Card Estilo Ticket:** Fondo claro o tarjeta destacada estilo credencial.
+2. **Encabezado Credencial:** "CREDENCIAL DE EXPLORADOR"
+3. **Título Dinámico:** "¡[Nombre del Invitado], bienvenido a Exploraco!"
+4. **Banner de Invitante:** Mostrar mensaje limpio sin códigos visibles: "[Nombre del Anfitrión] te ha invitado a unirte a la comunidad de turismo interactivo de Colombia."
+5. **Explicación Extendida:** "Exploraco es tu guía turística interactiva para descubrir Colombia. Guarda tus destinos, comparte recomendaciones con la comunidad y acumula experiencia (XP) por cada aventura."
+6. **Selector de Premio Inicial (3 Radio Cards/Buttons):**
+   - Título sección: "Elige tu premio de bienvenida:"
+   - Opción A: "10% OFF en tu primer hospedaje o tour aliado."
+   - Opción B: "Doble XP (2x) durante tu primer mes."
+   - Opción C: "Insignia exclusiva de 'Pionero Explorador'."
+7. **Formulario:**
+   - Input Nombre: "NOMBRE" -> Placeholder: "¿Cómo te llamamos?"
+   - Input Email: "EMAIL" -> Placeholder: "tu@correo.com"
+8. **Botón Principal:** "CREAR MI CUENTA Y RECLAMAR PREMIO"
+9. **Nota de Pie:** "Sin contraseña: tu email es tu llave. Si ya tienes cuenta, entras directo a tu perfil conservando tu XP."
+
+---
+Por favor implementa los componentes con código limpio, modular, completamente responsive y accesible.
