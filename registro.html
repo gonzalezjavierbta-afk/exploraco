@@ -29,14 +29,12 @@ body{background:#0d1117}
 .reg-silo .reg-pill{display:inline-flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#E8A020;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);border-radius:999px;padding:5px 12px;margin-bottom:12px}
 .reg-silo .reg-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:#E8A020}
 .reg-silo .reg-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(30px,7vw,42px);font-weight:900;line-height:.98;letter-spacing:.2px;text-transform:uppercase;margin-bottom:10px}
-.reg-silo .reg-sub{font-size:13.5px;line-height:1.55;color:#9CA3AF;margin-bottom:18px;max-width:38ch}
-.reg-silo .reg-chip{display:flex;align-items:flex-start;gap:10px;background:linear-gradient(135deg,rgba(232,160,32,.16),rgba(232,160,32,.04));border:1px solid rgba(232,160,32,.4);border-radius:12px;padding:12px 14px;margin-bottom:14px;animation:reg-in .35s ease both}
+.reg-silo .reg-sub{font-size:13.5px;line-height:1.55;color:#9CA3AF;margin-bottom:8px;max-width:42ch}
+.reg-silo .reg-sub2{font-size:12.5px;line-height:1.5;color:#8B93A1;margin-bottom:18px;max-width:42ch}
+.reg-silo .reg-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.4);border-radius:999px;padding:5px 12px;margin-bottom:14px;animation:reg-in .35s ease both}
 .reg-silo .reg-chip[hidden]{display:none}
-.reg-silo .reg-chip-ico{width:18px;height:18px;flex:0 0 18px;margin-top:2px;color:#E8A020}
-.reg-silo .reg-chip-copy{min-width:0}
-.reg-silo .reg-chip-txt{display:block;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#9CA3AF}
-.reg-silo .reg-chip-code{display:block;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:.4px;color:#E8A020;line-height:1.15}
-.reg-silo .reg-chip-desc{display:block;font-size:11.5px;line-height:1.45;color:#9CA3AF;margin-top:4px}
+.reg-silo .reg-chip-txt{font-size:12px;font-weight:600;color:#9CA3AF}
+.reg-silo .reg-chip-code{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.4px;color:#E8A020}
 .reg-silo .reg-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-left:4px solid #EF4444;border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:#FCA5A5}
 .reg-silo .reg-alert[hidden]{display:none}
 .reg-silo .reg-alert-btn{background:#E8A020;color:#0d1117;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
@@ -49,6 +47,7 @@ body{background:#0d1117}
 .reg-silo .reg-input:-webkit-autofill{-webkit-text-fill-color:#F9FAFB;-webkit-box-shadow:0 0 0 40px #0d1117 inset;transition:background-color 9999s ease-in-out 0s}
 .reg-silo .reg-bonos{border:0;margin:0 0 16px;padding:0;min-width:0}
 .reg-silo .reg-bonos[hidden]{display:none}
+.reg-silo .reg-bonos-intro{font-size:12px;line-height:1.45;color:#9CA3AF;margin:0 0 10px}
 .reg-silo .reg-bonos-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .reg-silo .reg-bono-card{display:block;position:relative;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 14px 12px 40px;cursor:pointer;transition:border-color .15s,background .15s}
 .reg-silo .reg-bono-card input{position:absolute;left:14px;top:15px;width:18px;height:18px;margin:0;accent-color:#E8A020;cursor:pointer}
@@ -89,18 +88,12 @@ body{background:#0d1117}
     <section class="reg-card" aria-labelledby="reg-title">
       <p class="reg-pill">Guía interactiva de turismo</p>
       <h1 class="reg-title" id="reg-title">Bienvenido a Exploraco!</h1>
-      <p class="reg-sub">Exploraco es tu guía turística interactiva para descubrir Colombia. Guarda tus destinos, comparte recomendaciones con la comunidad y acumula experiencia (XP) por cada aventura.</p>
+      <p class="reg-sub">Exploraco es tu guía turística interactiva para descubrir Colombia. Guarda tus destinos, comparte recomendaciones con la comunidad y vive cada viaje.</p>
+      <p class="reg-sub2">Suma experiencia (XP) con cada reseña, foto o visita, desbloquea trofeos y cambia tus logros por beneficios reales.</p>
 
       <div class="reg-chip" id="reg-ref-chip" hidden>
-        <svg class="reg-chip-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9"></circle>
-          <path d="M15.5 8.5l-2 5.5-5.5 2 2-5.5z"></path>
-        </svg>
-        <div class="reg-chip-copy">
-          <span class="reg-chip-txt">Te invita</span>
-          <strong class="reg-chip-code" id="reg-ref-code"></strong>
-          <span class="reg-chip-desc">Únete a la comunidad de turismo interactivo de Colombia.</span>
-        </div>
+        <span class="reg-chip-txt">Invitación de</span>
+        <strong class="reg-chip-code" id="reg-ref-code"></strong>
       </div>
 
       <div class="reg-alert" id="reg-error" role="alert" aria-live="polite" hidden>
@@ -110,6 +103,7 @@ body{background:#0d1117}
 
       <fieldset class="reg-bonos" id="reg-bonos" hidden>
         <legend class="reg-lbl">Elige tu premio de bienvenida:</legend>
+        <p class="reg-bonos-intro">Al unirte por invitación eliges uno de estos bonos de bienvenida:</p>
         <div class="reg-bonos-grid" id="reg-bonos-opts"></div>
       </fieldset>
 

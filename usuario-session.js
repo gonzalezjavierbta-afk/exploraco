@@ -879,6 +879,10 @@
         mostrarToast('¡Bienvenido, ' + perfil.nombre + '! +XP por explorar', '#16a34a');
         // Sincronizar guardados locales con DB
         sincronizarGuardados();
+        // XP demo (sin sesion) -> cuenta: el XP real entra por el replay de
+        // guardados de sincronizarGuardados(); aqui se limpia el contador
+        // local para no dejar XP de demostracion colgado.
+        reclamarXpDemo();
         return perfil;
       }
     } catch (err) {
@@ -942,6 +946,25 @@
       if (synced > 0) mostrarToast('✓ ' + synced + ' lugares sincronizados con tu cuenta', '#16a34a');
     } catch (err) {
       console.warn('[session] Sync error:', err.message);
+    }
+  }
+
+  // -- Reclamar XP demo (visitante sin sesion) ----------------
+  // directorio-session.js acumula XP de demostracion en localStorage
+  // bajo 'user_points' mientras NO hay sesion. El XP real entra por el
+  // replay de guardados de sincronizarGuardados() al crear/entrar la
+  // cuenta; aqui solo se limpia el contador demo y se avisa al usuario.
+  // Nunca lanza: si localStorage falla, el login continua normal.
+  function reclamarXpDemo() {
+    try {
+      var raw = localStorage.getItem('user_points');
+      if (!raw) return;
+      var pts = JSON.parse(raw);
+      if (!pts || !(Number(pts.xp) > 0)) return;
+      localStorage.removeItem('user_points');
+      mostrarToast('Tus puntos de exploraci\u00f3n se sumaron a tu cuenta', '#16a34a');
+    } catch (e) {
+      // localStorage/JSON no disponible: no romper el login.
     }
   }
 

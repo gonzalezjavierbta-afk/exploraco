@@ -3381,3 +3381,28 @@ Negativas / **deuda aceptada:**
   - **Sin migraciones**, **8/8 INTACTO** (ADR-001/ADR-010).
 - **Estado de verificacion:** QA APTO CON OBSERVACIONES (Escudo GOLD: sintaxis 4/4, ASCII 0 en api/*.js y JS nuevo, divs 5/5 y 390/390; smokes `smoke_regalias_bono.js` 63/63 + `smoke_016_multinivel_crowdsourcing.js` 52/52 + `smoke_ref_info.js` 26/26). Tarea: TASKS.md **TSK-156**. Deuda etiquetada (NO bug nuevo): IDOR preexistente en `reclamar_bonus_referido` (codigo 036; escalado a la futura sesion `sql-security`). Nota ADR-006 (corregida en este pase): `scripts/smoke_ref_info.js` **EXISTE** en el working tree (untracked, 26 checks, 26/26 PASS) y `package.json` (M) ya lo encadena a `npm test` como primer smoke; falta solo incluirlos en el commit del lote.
 - **ADRs relacionados:** ADR-001/ADR-010 (8/8; budget serverless), ADR-002 (ASCII-safe en codigo nuevo), ADR-003 (Cero Borrado Logico: la 038/ADR-058 siguen registrados), ADR-006 (baseline = archivo real verificado), ADR-018/ADR-053/ADR-058 (economia de XP intacta; el catalogo alternativo futuro requerira su propio ADR), ADR-024 (sin geocerca involucrada).
+
+---
+
+## Nota de producto / decision (NO es un ADR): Puente de XP demo -> cuenta al crear/entrar sesion (TSK-156 refinamiento, 2026-09-24)
+
+- **ID:** 2026-09-24 / Puente de XP demo -> cuenta (no aplica numeracion de ADR; ruta de decision de producto, sin cambio estructural con ADR propio).
+- **Fecha:** 2026-09-24.
+- **Autor:** docs-keeper (cierre documental de la sesion express de refinamiento; la implementacion corrió a cargo de lead-frontend / qa-auditor).
+- **Estado:** APPROVED (vigente; registro de producto, no decision de arquitectura). Alcance: REFINAMIENTO 2026-09-24 sobre TSK-156 (`usuario-session.js`, `index.html`, `registro.html`; working tree SIN commitear).
+- **Problema:** el visitante SIN sesion acumula XP de DEMOSTRACION en `localStorage.user_points` (via `directorio-session.js`, +5 por guardado). Al crear/entrar la cuenta, ese contador local no tenia destino: quedaba colgado (XP local visible que no correspondia a la cuenta) mientras el XP real se reconstruye server-side por el replay de guardados. Se debia decidir como puentear/seleccionar ese XP demo a la cuenta.
+- **Opciones:**
+  1. Endpoint que reclame un monto de XP DECLARADO por el cliente (`{xp: N}`) al crear/entrar la cuenta.
+  2. Sin backend: dejar que el replay de guardados existente (`sincronizarGuardados()`) reconstruya el XP real y LIMPIAR el contador `user_points` al loguear, avisando al usuario.
+  3. No hacer nada: dejar el XP demo en `localStorage` sin limpiar ni avisar.
+- **Decision:**
+  - **Opcion elegida: 2.** Se implementa `reclamarXpDemo()` en `usuario-session.js` (L958-969), llamada dentro de `loginConEmail` tras `sincronizarGuardados()` (L885): si `user_points.xp > 0`, elimina `localStorage.user_points` y muestra el toast "Tus puntos de exploración se sumaron a tu cuenta". El XP que de verdad entra a la cuenta es el que ya reconstruye el replay de guardados de `sincronizarGuardados()` (server-side, fuente de verdad).
+  - **Opcion 1 DESCARTADA por ahora:** un endpoint de reclamo de XP declarado por el cliente abre la puerta a farming/Sybil (el monto lo elige el cliente); en linea con ADR-024/ADR-025 (anti-spoofing/anti-Sybil) no se expone superficie publica de reclamo.
+- **Justificacion:** el replay de guardados ya acredita el XP real de forma autoritativa; un endpoint de reclamo declarado seria redundante y una superficie de fraude. La limpieza del contador demo evita que la UI muestre XP local que no corresponde a la cuenta, sin exigir cambios de backend ni migracion.
+- **Impacto:**
+  - **`usuario-session.js`:** NUEVA funcion `reclamarXpDemo()` + llamada en `loginConEmail` (cubre AMBOS flujos: `registro.html` y el modal del navbar "Mi cuenta", pues ambos pasan por `loginConEmail`).
+  - **Funcion:** ejecuta sobre `localStorage.user_points` (sin tocar servidor); el XP real entra por `sincronizarGuardados()`.
+  - **Sin migraciones**, **8/8 INTACTO** (ADR-001/ADR-010).
+- **Deuda aceptada:** (a) el XP de acciones NO replayables (p.ej. visitas *legacy* cacheadas sin coordenadas, que ADR-024 no migra) NO se acredita al puentear — solo el XP reconstruible por el replay de guardados; (b) ningun smoke cubre `reclamarXpDemo()` (hueco de cobertura, propio de express).
+- **Estado de verificacion:** QA APTO CON OBSERVACIONES. Evidencia (ADR-006): `reclamarXpDemo` definida 1 vez (L958) / llamada 1 vez (L885); delta ASCII 0 (23 lineas agregadas: 0 bytes>127 / 0 backticks); `node --check` OK; smokes `smoke_directorio_session.js` 14/14 + `smoke_ref_info.js` 26/26. Ancla de tarea: TASKS.md **TSK-156** > "Refinamiento 2026-09-24 (modo express)".
+- **ADRs relacionados:** ADR-001/ADR-010 (8/8; sin endpoint nuevo), ADR-006 (baseline = archivo real verificado), ADR-018/ADR-053 (economia de XP: `user_points` demo no es XP de cuenta), ADR-024/ADR-025 (anti-spoofing/anti-Sybil: motivo del rechazo de la opcion 1), ADR-036 (`sincronizarGuardados`/replay de guardados como acreditador real), ADR-053 (economia de XP vigente).

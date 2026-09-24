@@ -909,8 +909,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .wl-cta{display:block;width:100%;background:#E8A020;color:#111;border:none;border-radius:12px;padding:15px 20px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:2px;text-transform:uppercase;cursor:pointer;box-shadow:0 8px 24px rgba(232,160,32,.25);transition:opacity .15s,transform .15s}
 .wl-cta:hover{opacity:.88;transform:translateY(-1px)}
 .wl-cta:focus-visible{outline:2px solid #E8A020;outline-offset:2px}
-.wl-entrar{display:block;margin:14px auto 0;padding:6px 12px;background:none;border:none;color:#6B7280;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;transition:color .15s}
-.wl-entrar:hover{color:#9CA3AF}
+.wl-registro{display:block;margin:14px auto 0;padding:6px 12px;color:#6B7280;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;transition:color .15s}
+.wl-registro:hover{color:#9CA3AF}
+.wl-registro:focus-visible{outline:2px solid #E8A020;outline-offset:2px}
 @keyframes wlFade{from{opacity:0}to{opacity:1}}
 </style>
 </head><body>
@@ -4110,21 +4111,21 @@ function submitBlog() {
       + '<div class="wl-tip">'
       + '<div class="wl-tip-ico">\uD83E\uDDED</div>'
       + '<div class="wl-tip-tit">Explora e Interact\u00faa</div>'
-      + '<div class="wl-tip-desc">Descubre destinos en la gu\u00eda, guarda tus lugares favoritos y conecta con viajeros en tiempo real.</div>'
+      + '<div class="wl-tip-desc">Descubre destinos y guarda tus favoritos.</div>'
       + '</div>'
       + '<div class="wl-tip">'
       + '<div class="wl-tip-ico">\u26A1\uFE0F</div>'
       + '<div class="wl-tip-tit">Acumula XP</div>'
-      + '<div class="wl-tip-desc">Suma puntos por cada rese\u00f1a, recomendaci\u00f3n compartida y lugar visitado.</div>'
+      + '<div class="wl-tip-desc">Suma puntos por cada rese\u00f1a y visita.</div>'
       + '</div>'
       + '<div class="wl-tip">'
       + '<div class="wl-tip-ico">\uD83C\uDF81</div>'
       + '<div class="wl-tip-tit">Desbloquea Premios</div>'
-      + '<div class="wl-tip-desc">Convierte tus trofeos y logros en beneficios reales para tus pr\u00f3ximos viajes.</div>'
+      + '<div class="wl-tip-desc">Cambia tus logros por beneficios reales.</div>'
       + '</div>'
       + '</div>'
-      + '<button type="button" class="wl-cta" id="wl-cta">EXPLORAR LA WEB</button>'
-      + '<button type="button" class="wl-entrar" id="wl-entrar">Entrar</button>'
+      + '<button type="button" class="wl-cta" id="wl-cta">ENTRAR</button>'
+      + '<a class="wl-registro" id="wl-registro" href="/registro.html">Crea tu cuenta gratis con tu nombre y correo para comenzar</a>'
       + '</div>';
     document.body.appendChild(ov);
     document.body.style.overflow = 'hidden';
@@ -4150,7 +4151,7 @@ function submitBlog() {
     }
 
     document.getElementById('wl-cta').addEventListener('click', function () { cerrar(true); });
-    document.getElementById('wl-entrar').addEventListener('click', function () { cerrar(false); });
+    document.getElementById('wl-registro').addEventListener('click', function () { marcarVisto(); });
     document.addEventListener('keydown', onKey);
     var ctaEl = document.getElementById('wl-cta');
     if (ctaEl) ctaEl.focus();
