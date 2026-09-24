@@ -3355,3 +3355,29 @@ Negativas / **deuda aceptada:**
 - Drift heredado de ADR-053: 20 -> 40 niveles de insignia (arrastre).
 
 **ADRs relacionados:** ADR-001/ADR-010 (8/8; ramas `?tipo=`), ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico: la 038 es aditiva), ADR-006 (baseline = esquema real auditado; PREFLIGHT read-only), ADR-008 (migraciones versionadas/idempotentes), ADR-018/ADR-053 (economia de XP: `numeric(12,2)`, caps, `M_nivel`), ADR-024 (geocerca; las coords geo NO se usan para presencia fisica), ADR-028 (WP-5 ENMENDADO: bono x1.2 eliminado), ADR-035 (XP numeric), ADR-036 (multiplicadores `numeric(10,6)`), ADR-057 (motor de XP). Bugs: BUG-021/BUG-060 (patron: aplicar la **038 + seed ANTES del deploy** del backend v29/v30), BUG-026 (emojis en SQL).
+
+---
+
+## Nota de producto / decision (NO es un ADR): Pantallas de entrada y catalogo de premios por referido (TSK-156, 2026-09-24)
+
+- **ID:** 2026-09-24 / Pantallas de entrada (no aplica numeracion de ADR; ruta de decision de producto, sin cambio estructural con ADR propio).
+- **Fecha:** 2026-09-24.
+- **Autor:** docs-keeper (cierre documental de la sesion de desarrollo; la implementacion del lote corrió a cargo de backend-dev / lead-frontend / qa-auditor).
+- **Estado:** APPROVED (vigente; registro de producto, no decision de arquitectura).
+- **Problema:** el `prompt mensaje.txt` propone dos "pantallas de entrada" (bienvenida `/welcome` y registro/referido `/welcome-referred`) y un catalogo ALTERNATIVO de premios por referido (10% OFF hospedaje/tour, doble XP primer mes, insignia "Pionero Explorador"). La sesion debia decidir: (a) como adaptar las pantallas de bienvenida/registro a la arquitectura existente (progresivo, sin cambiar el motor), (b) si aplicar o no el nuevo catalogo de premios alternativo, y (c) que expone la consulta publica de un codigo de referido.
+- **Opciones:**
+  1. Aplicar el catalogo alternativo del prompt (10% OFF / doble XP / insignia) a `bonus_referido`.
+  2. Rechazar el catalogo alternativo y mantener el catalogo REAL existente (`bienvenida_x2_24h` / `bienvenida_ascenso` / `bienvenida_fundador`).
+  3. Exponer en `ref_info` todos los datos del anfitrion del codigo (incl. email/avatar/XP) para el banner de invitacion.
+  4. Exponer solo el minimo (`anfitrion_nombre`) en `ref_info` (consulta publica SIN JWT).
+- **Decision:**
+  - **Opcion elegida: 2 + 4.** Las pantallas de entrada se implementan como adaptacion PROGRESIVA: overlay de bienvenida en `index.html` (Pantalla 1) + `registro.html` rediseñado dark dorado (Pantalla 2) que SÍ consume el catalogo EXISTENTE de `bonus_referido` (selector `#reg-bonos` + reclamo post-alta `reclamar_bonus_referido`); el catalogo alternativo del prompt (10% OFF, doble XP, insignia) se conserva SOLO como anotacion-comentario en `api/interacciones.js` (L6627-6631, propuesta opcional FUTURA, NO aplicada). La rama publica `api/usuarios.js` v23 `?tipo=ref_info` expone unicamente `anfitrion_nombre` (trim + slice(0,80)) y responde HTTP 200 con `REFERIDO_INVALIDO` ante codigos no encontrados (consulta suave, sin JWT, sin error duro).
+- **Justificacion:** (2) no rompe la economia de XP de ADR-018/ADR-053/ADR-058 ni exige migracion/seed nueva; el contraste A/B del catalogo alternativo queda documentado cerca del punto de decision (`bonus_referido`) para una propuesta futura con su propio ADR. (4) minimiza la superficie de datos expuesta por una rama publica sin autenticacion (privacidad, en linea con ADR-006/ADR-010) y evita acoplar el banner al objeto `origen` del ADR-058.
+- **Impacto:**
+  - **`api/usuarios.js` v23:** `?tipo=ref_info` publico suave (L666-680), 200 `REFERIDO_INVALIDO`, sin JWT, solo `anfitrion_nombre`.
+  - **`api/interacciones.js`:** SOLO comentario-anotacion (L6627-6631); catalogo `bienvenida_*` INTACTO.
+  - **`registro.html`:** rediseño `.reg-silo` dark dorado, banner con NOMBRE del anfitrion, `#reg-bonos`, `#reg-skip-ref`, CTA "CREAR MI CUENTA Y RECLAMAR PREMIO", `?nombre=` en el h1.
+  - **`index.html`:** overlay `.wl-*` con `ec_welcome_visto`, `window.ExploraCO.abrirBienvenida`, z-index 10000.
+  - **Sin migraciones**, **8/8 INTACTO** (ADR-001/ADR-010).
+- **Estado de verificacion:** QA APTO CON OBSERVACIONES (Escudo GOLD: sintaxis 4/4, ASCII 0 en api/*.js y JS nuevo, divs 5/5 y 390/390; smokes `smoke_regalias_bono.js` 63/63 + `smoke_016_multinivel_crowdsourcing.js` 52/52 + `smoke_ref_info.js` 26/26). Tarea: TASKS.md **TSK-156**. Deuda etiquetada (NO bug nuevo): IDOR preexistente en `reclamar_bonus_referido` (codigo 036; escalado a la futura sesion `sql-security`). Nota ADR-006 (corregida en este pase): `scripts/smoke_ref_info.js` **EXISTE** en el working tree (untracked, 26 checks, 26/26 PASS) y `package.json` (M) ya lo encadena a `npm test` como primer smoke; falta solo incluirlos en el commit del lote.
+- **ADRs relacionados:** ADR-001/ADR-010 (8/8; budget serverless), ADR-002 (ASCII-safe en codigo nuevo), ADR-003 (Cero Borrado Logico: la 038/ADR-058 siguen registrados), ADR-006 (baseline = archivo real verificado), ADR-018/ADR-053/ADR-058 (economia de XP intacta; el catalogo alternativo futuro requerira su propio ADR), ADR-024 (sin geocerca involucrada).

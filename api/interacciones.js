@@ -6623,6 +6623,12 @@ module.exports = async function handler(req, res) {
       // de las 3 opciones. pendiente=true solo si el usuario fue referido y
       // aun no reclamo; sin usuario_id devuelve pendiente=false igual con
       // las opciones. Degrada a un respaldo literal si la 036 no corrio.
+      // ANOTACION DE PRODUCTO (2026-09-24): las opciones del prompt
+      // alternativo (10% OFF primer hospedaje/tour aliado, doble XP primer
+      // mes, insignia "Pionero Explorador") quedan SOLO como propuesta
+      // opcional FUTURA y NO se aplican. Se mantiene el catalogo existente
+      // (bienvenida_x2_24h / bienvenida_ascenso / bienvenida_fundador):
+      // NO renombrar el catalogo, NO nombrar claves nuevas, sin migraciones.
       if (tipo === 'bonus_referido') {
         var brOpciones = [];
         try {

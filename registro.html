@@ -11,45 +11,69 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-/* ---- SILO registro.html (ADR-004): todo el CSS vive bajo .reg-silo ---- */
-body{background:#FBF8F2}
+/* ---- SILO registro.html (ADR-004): todo el CSS vive bajo .reg-silo ----
+   Tema: dark elegante con dorado (fondo #111827/#0d1117, dorado #E8A020,
+   acento claro #F0AD35, textos #F9FAFB/#9CA3AF). Misma paleta del modal
+   de bono de referencia de usuario-session.js para coherencia visual. */
+body{background:#0d1117}
 .reg-silo *{box-sizing:border-box;margin:0;padding:0}
-.reg-silo{min-height:100vh;background:#FBF8F2;color:#111;font-family:'Outfit',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;padding:22px 16px 40px}
-.reg-silo .reg-top{width:100%;max-width:460px;margin:0 auto 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.reg-silo .reg-wordmark{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:3.5px;color:#111;text-decoration:none}
+.reg-silo{position:relative;min-height:100vh;background:linear-gradient(160deg,#111827,#0d1117);color:#F9FAFB;font-family:'Outfit',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;padding:22px 16px 40px;overflow:hidden}
+.reg-silo::before{content:'';position:absolute;top:-140px;left:50%;transform:translateX(-50%);width:560px;height:320px;background:radial-gradient(closest-side,rgba(232,160,32,.2),transparent 70%);pointer-events:none}
+.reg-silo .reg-top{position:relative;width:100%;max-width:460px;margin:0 auto 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.reg-silo .reg-wordmark{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:3.5px;color:#F9FAFB;text-decoration:none}
 .reg-silo .reg-wordmark em{font-style:normal;color:#E8A020}
-.reg-silo .reg-flag{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#8a8072;border:1px solid #E5E0D4;border-radius:999px;padding:4px 10px;white-space:nowrap}
-.reg-silo .reg-wrap{flex:1;width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;justify-content:center}
-.reg-silo .reg-card{position:relative;background:#fff;border:1px solid #ECE7DC;border-radius:16px;padding:30px 22px 24px;box-shadow:0 20px 44px -30px rgba(17,17,17,.45);overflow:hidden}
+.reg-silo .reg-flag{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#9CA3AF;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.reg-silo .reg-wrap{position:relative;flex:1;width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;justify-content:center}
+.reg-silo .reg-card{position:relative;background:linear-gradient(170deg,#141B2A,#0d1117);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:30px 22px 24px;box-shadow:0 24px 60px -28px rgba(0,0,0,.85);overflow:hidden}
 .reg-silo .reg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:repeating-linear-gradient(90deg,#E8A020 0 16px,transparent 16px 28px)}
-.reg-silo .reg-eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2.4px;text-transform:uppercase;color:#C8860A;margin-bottom:8px}
+.reg-silo .reg-pill{display:inline-flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#E8A020;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);border-radius:999px;padding:5px 12px;margin-bottom:12px}
+.reg-silo .reg-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:#E8A020}
 .reg-silo .reg-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(30px,7vw,42px);font-weight:900;line-height:.98;letter-spacing:.2px;text-transform:uppercase;margin-bottom:10px}
-.reg-silo .reg-sub{font-size:13.5px;line-height:1.55;color:#6b6257;margin-bottom:18px;max-width:34ch}
-.reg-silo .reg-chip{display:flex;align-items:center;gap:10px;background:#111;border-radius:12px;padding:11px 14px;margin-bottom:18px;animation:reg-in .35s ease both}
+.reg-silo .reg-sub{font-size:13.5px;line-height:1.55;color:#9CA3AF;margin-bottom:18px;max-width:38ch}
+.reg-silo .reg-chip{display:flex;align-items:flex-start;gap:10px;background:linear-gradient(135deg,rgba(232,160,32,.16),rgba(232,160,32,.04));border:1px solid rgba(232,160,32,.4);border-radius:12px;padding:12px 14px;margin-bottom:14px;animation:reg-in .35s ease both}
 .reg-silo .reg-chip[hidden]{display:none}
-.reg-silo .reg-chip-ico{width:18px;height:18px;flex:0 0 18px;color:#E8A020}
-.reg-silo .reg-chip-txt{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.62)}
-.reg-silo .reg-chip-code{margin-left:auto;font-family:'Geist','Outfit',sans-serif;font-weight:900;font-size:15px;letter-spacing:2px;color:#E8A020;word-break:break-all;user-select:all;-webkit-user-select:all}
-.reg-silo .reg-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #EF4444;border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:#991B1B}
+.reg-silo .reg-chip-ico{width:18px;height:18px;flex:0 0 18px;margin-top:2px;color:#E8A020}
+.reg-silo .reg-chip-copy{min-width:0}
+.reg-silo .reg-chip-txt{display:block;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#9CA3AF}
+.reg-silo .reg-chip-code{display:block;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:.4px;color:#E8A020;line-height:1.15}
+.reg-silo .reg-chip-desc{display:block;font-size:11.5px;line-height:1.45;color:#9CA3AF;margin-top:4px}
+.reg-silo .reg-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-left:4px solid #EF4444;border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:#FCA5A5}
 .reg-silo .reg-alert[hidden]{display:none}
-.reg-silo .reg-alert-btn{background:#111;color:#fff;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
+.reg-silo .reg-alert-btn{background:#E8A020;color:#0d1117;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
 .reg-silo .reg-alert-btn[hidden]{display:none}
-.reg-silo .reg-alert-btn:hover{background:#C8860A}
-.reg-silo .reg-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#6b6257;margin-bottom:6px}
-.reg-silo .reg-input{width:100%;font-family:inherit;font-size:16px;color:#111;background:#FBF8F2;border:1px solid #E5E0D4;border-radius:10px;padding:13px 14px;margin-bottom:16px;transition:border-color .15s,box-shadow .15s}
-.reg-silo .reg-input::placeholder{color:#A9A190}
+.reg-silo .reg-alert-btn:hover{background:#F0AD35}
+.reg-silo .reg-lbl{display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px}
+.reg-silo .reg-input{width:100%;font-family:inherit;font-size:16px;color:#F9FAFB;background:#0d1117;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:13px 14px;margin-bottom:16px;transition:border-color .15s,box-shadow .15s;caret-color:#E8A020}
+.reg-silo .reg-input::placeholder{color:#6B7280}
 .reg-silo .reg-input:focus{outline:none;border-color:#E8A020;box-shadow:0 0 0 3px rgba(232,160,32,.18)}
-.reg-silo .reg-submit{width:100%;border:none;border-radius:10px;background:#E8A020;color:#111;cursor:pointer;padding:15px 18px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;transition:background .15s,transform .1s}
+.reg-silo .reg-input:-webkit-autofill{-webkit-text-fill-color:#F9FAFB;-webkit-box-shadow:0 0 0 40px #0d1117 inset;transition:background-color 9999s ease-in-out 0s}
+.reg-silo .reg-bonos{border:0;margin:0 0 16px;padding:0;min-width:0}
+.reg-silo .reg-bonos[hidden]{display:none}
+.reg-silo .reg-bonos-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.reg-silo .reg-bono-card{display:block;position:relative;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 14px 12px 40px;cursor:pointer;transition:border-color .15s,background .15s}
+.reg-silo .reg-bono-card input{position:absolute;left:14px;top:15px;width:18px;height:18px;margin:0;accent-color:#E8A020;cursor:pointer}
+.reg-silo .reg-bono-card:hover{border-color:rgba(232,160,32,.5);background:rgba(232,160,32,.07)}
+.reg-silo .reg-bono-card.reg-bono-on{border-color:rgba(232,160,32,.75);background:rgba(232,160,32,.12)}
+.reg-silo .reg-bono-card.reg-bono-on .reg-bono-nombre{color:#F0AD35}
+.reg-silo .reg-bono-nombre{display:block;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:.4px;text-transform:uppercase;color:#F9FAFB}
+.reg-silo .reg-bono-desc{display:block;font-size:12px;line-height:1.4;color:#9CA3AF;margin-top:2px}
+.reg-silo .reg-submit{width:100%;border:none;border-radius:10px;background:#E8A020;color:#0d1117;cursor:pointer;padding:15px 18px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;transition:background .15s,transform .1s}
 .reg-silo .reg-submit:hover{background:#F0AD35}
 .reg-silo .reg-submit:active{transform:translateY(1px)}
 .reg-silo .reg-submit:disabled{opacity:.6;cursor:progress}
-.reg-silo .reg-note{font-size:11.5px;line-height:1.5;color:#8a8072;margin-top:14px;text-align:center}
-.reg-silo .reg-back{display:inline-flex;align-items:center;gap:7px;margin:18px auto 0;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#8a8072;text-decoration:none;transition:color .15s}
-.reg-silo .reg-back:hover{color:#111}
+.reg-silo .reg-note{font-size:11.5px;line-height:1.5;color:#9CA3AF;margin-top:14px;text-align:center}
+.reg-silo .reg-back{display:inline-flex;align-items:center;gap:7px;margin:18px auto 0;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9CA3AF;text-decoration:none;transition:color .15s}
+.reg-silo .reg-back:hover{color:#E8A020}
 .reg-silo .reg-back-ico{width:14px;height:14px}
-.reg-silo :focus-visible{outline:2px solid #C8860A;outline-offset:2px}
+.reg-silo :focus-visible{outline:2px solid #E8A020;outline-offset:2px}
 @keyframes reg-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-@media (min-width:560px){.reg-silo .reg-card{padding:36px 30px 28px}}
+@media (min-width:560px){
+  .reg-silo .reg-card{padding:36px 30px 28px}
+  .reg-silo .reg-bonos-grid{grid-template-columns:repeat(3,1fr)}
+  .reg-silo .reg-bono-card{padding:40px 10px 12px;text-align:center}
+  .reg-silo .reg-bono-card input{left:50%;transform:translateX(-50%);top:11px}
+  .reg-silo .reg-bono-nombre{font-size:14px}
+}
 @media (prefers-reduced-motion:reduce){.reg-silo .reg-chip{animation:none}.reg-silo .reg-submit:active{transform:none}}
 </style>
 </head>
@@ -63,23 +87,31 @@ body{background:#FBF8F2}
 
   <main class="reg-wrap">
     <section class="reg-card" aria-labelledby="reg-title">
-      <p class="reg-eyebrow">Credencial de explorador</p>
-      <h1 class="reg-title" id="reg-title">Tu próximo destino empieza aquí</h1>
-      <p class="reg-sub">Sin contraseña: tu email es tu llave. Guarda lugares, gana XP y arma tu red de viajeros.</p>
+      <p class="reg-pill">Guía interactiva de turismo</p>
+      <h1 class="reg-title" id="reg-title">Bienvenido a Exploraco!</h1>
+      <p class="reg-sub">Exploraco es tu guía turística interactiva para descubrir Colombia. Guarda tus destinos, comparte recomendaciones con la comunidad y acumula experiencia (XP) por cada aventura.</p>
 
       <div class="reg-chip" id="reg-ref-chip" hidden>
         <svg class="reg-chip-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="9"></circle>
           <path d="M15.5 8.5l-2 5.5-5.5 2 2-5.5z"></path>
         </svg>
-        <span class="reg-chip-txt">Te invito</span>
-        <span class="reg-chip-code" id="reg-ref-code"></span>
+        <div class="reg-chip-copy">
+          <span class="reg-chip-txt">Te invita</span>
+          <strong class="reg-chip-code" id="reg-ref-code"></strong>
+          <span class="reg-chip-desc">Únete a la comunidad de turismo interactivo de Colombia.</span>
+        </div>
       </div>
 
       <div class="reg-alert" id="reg-error" role="alert" aria-live="polite" hidden>
         <span id="reg-error-msg"></span>
         <button type="button" class="reg-alert-btn" id="reg-skip-ref" hidden>Continuar sin invitación</button>
       </div>
+
+      <fieldset class="reg-bonos" id="reg-bonos" hidden>
+        <legend class="reg-lbl">Elige tu premio de bienvenida:</legend>
+        <div class="reg-bonos-grid" id="reg-bonos-opts"></div>
+      </fieldset>
 
       <form id="reg-form" novalidate>
         <label class="reg-lbl" for="reg-nombre">Nombre</label>
@@ -88,10 +120,10 @@ body{background:#FBF8F2}
         <label class="reg-lbl" for="reg-email">Email</label>
         <input class="reg-input" id="reg-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="tu@correo.com" required>
 
-        <button class="reg-submit" id="reg-submit" type="submit">Crear mi cuenta / Entrar</button>
+        <button class="reg-submit" id="reg-submit" type="submit">Crear mi cuenta y reclamar premio</button>
       </form>
 
-      <p class="reg-note">Si ya te registraste con este email, entras directo a tu perfil y conservas tu XP.</p>
+      <p class="reg-note">Sin contraseña: tu email es tu llave. Si ya tienes cuenta, entras directo a tu perfil conservando tu XP.</p>
     </section>
 
     <a class="reg-back" href="/index.html">
@@ -106,9 +138,14 @@ body{background:#FBF8F2}
 
 <script src="usuario-session.js"></script>
 <script>
-/* registro.html — alta/entrada minima con captura de ?ref= (BUG-035).
-   Depende de usuario-session.js (window.ExploraCO.loginConEmail / mostrarToast).
-   No toca api/*.js: el backend ya acepta codigo_referido (api/usuarios.js). */
+/* registro.html - alta/entrada con captura de ?ref= (BUG-035) + bono de
+   bienvenida. Depende de usuario-session.js (window.ExploraCO.loginConEmail
+   / mostrarToast / limpiarRefPendiente). El banner de invitacion muestra el
+   NOMBRE del anfitrion via GET /api/usuarios?tipo=ref_info&ref=<codigo>
+   (nunca el codigo crudo); el selector de premios usa GET
+   /api/interacciones?tipo=bonus_referido y el reclamo, condicional al alta
+   nueva con perfil.bonus_referido===true, usa POST /api/interacciones con
+   tipo=reclamar_bonus_referido. JS ASCII-safe (ADR-002), sin backticks. */
 (function () {
   'use strict';
 
@@ -120,23 +157,38 @@ body{background:#FBF8F2}
   var errMsg = document.getElementById('reg-error-msg');
   var skipBtn = document.getElementById('reg-skip-ref');
   var chip = document.getElementById('reg-ref-chip');
-  var chipCode = document.getElementById('reg-ref-code');
+  var chipNombre = document.getElementById('reg-ref-code');
+  var tituloEl = document.getElementById('reg-title');
+  var bonosField = document.getElementById('reg-bonos');
+  var bonosCont = document.getElementById('reg-bonos-opts');
 
-  /* Codigo de invitacion de la URL (?ref=). Vacio = alta normal. */
+  var BTN_TXT = 'Crear mi cuenta y reclamar premio';
+  var BSY_TXT = 'Creando tu cuenta...';
   var REF_CODE = '';
+  var REF_NOMBRE = '';
+  var OPCIONES = [];
+
+  /* Nombre sugerido por la URL (?nombre=) para el titulo de bienvenida. */
+  var NOMBRE_URL = '';
   try {
     var params = new URLSearchParams(window.location.search || '');
     REF_CODE = (params.get('ref') || '').trim();
+    NOMBRE_URL = (params.get('nombre') || '').trim();
   } catch (e) {
-    console.warn('registro: no se pudo leer ?ref=', e && e.message);
+    console.warn('registro: no se pudo leer la URL', e && e.message);
   }
-  if (REF_CODE) {
-    chipCode.textContent = REF_CODE;
-    chip.hidden = false;
+  if (NOMBRE_URL) {
+    tituloEl.textContent = '\u00A1' + NOMBRE_URL + ', bienvenido a Exploraco!';
   }
 
-  var BTN_TXT = 'Crear mi cuenta / Entrar';
-
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
   function mostrarError(msg, permiteContinuar) {
     errMsg.textContent = msg;
     errBox.hidden = false;
@@ -155,14 +207,82 @@ body{background:#FBF8F2}
       window.ExploraCO.mostrarToast(msg, color);
     }
   }
-  function mensajeDeError(codigo, ref) {
+  function mensajeDeError(codigo) {
     if (codigo === 'REFERIDO_INVALIDO') {
-      return 'El código de invitación "' + ref + '" no existe o expiró. Revísalo, o continúa sin invitación.';
+      return 'El enlace de invitaci\u00f3n que usaste no existe o ya expir\u00f3. Puedes continuar sin invitaci\u00f3n.';
     }
     if (codigo === 'AUTO_REFERIDO') {
-      return 'Ese código es tuyo: no puedes invitarte a ti mismo. Continúa sin invitación para entrar a tu cuenta.';
+      return 'Ese enlace es tuyo: no puedes invitarte a ti mismo. Contin\u00faa sin invitaci\u00f3n.';
     }
-    return 'No pudimos crear tu cuenta. Revisa tu conexión e inténtalo otra vez.';
+    return 'No pudimos crear tu cuenta. Revisa tu conexi\u00f3n e int\u00e9ntalo otra vez.';
+  }
+
+  /* --- Referido: resolver el NOMBRE del anfitrion (nunca el codigo) --- */
+  function resolverRef(codigo) {
+    return fetch('/api/usuarios?tipo=ref_info&ref=' + encodeURIComponent(codigo))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok && data.anfitrion_nombre) {
+          return { valido: true, nombre: String(data.anfitrion_nombre) };
+        }
+        return { valido: false, error: (data && data.error) || 'REFERIDO_INVALIDO' };
+      })
+      .catch(function (e) {
+        console.warn('registro: no se pudo verificar el referido', e && e.message);
+        return { valido: false, error: 'RED' };
+      });
+  }
+
+  /* --- Premios de bienvenida: catalogo real desde la API (GET publico) --- */
+  function cargarPremios() {
+    return fetch('/api/interacciones?tipo=bonus_referido')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var ops = (data && Array.isArray(data.opciones)) ? data.opciones : [];
+        return ops.filter(function (o) { return o && o.clave; });
+      })
+      .catch(function (e) {
+        console.warn('registro: no se pudieron cargar los premios', e && e.message);
+        return [];
+      });
+  }
+  function pintarPremios(opciones) {
+    if (!bonosField || !bonosCont || !opciones.length) return;
+    OPCIONES = opciones;
+    var html = '';
+    for (var i = 0; i < opciones.length; i++) {
+      var op = opciones[i];
+      html += '<label class="reg-bono-card">'
+        + '<input type="radio" name="reg-premio" value="' + esc(op.clave) + '">'
+        + '<span class="reg-bono-nombre">' + esc(op.nombre || op.clave) + '</span>'
+        + '<span class="reg-bono-desc">' + esc(op.descripcion || '') + '</span>'
+        + '</label>';
+    }
+    bonosCont.innerHTML = html;
+    bonosField.hidden = false;
+    bonosCont.addEventListener('change', function (ev) {
+      var target = ev && ev.target;
+      if (!target || target.type !== 'radio') return;
+      var cards = bonosCont.querySelectorAll('.reg-bono-card');
+      for (var c = 0; c < cards.length; c++) {
+        cards[c].classList.toggle('reg-bono-on', !!cards[c].querySelector('input:checked'));
+      }
+    });
+  }
+  function ocultarPremios() {
+    if (bonosField) bonosField.hidden = true;
+    if (bonosCont) bonosCont.innerHTML = '';
+    OPCIONES = [];
+  }
+  function premioElegido() {
+    var sel = bonosCont ? bonosCont.querySelector('input[name="reg-premio"]:checked') : null;
+    return sel ? sel.value : '';
+  }
+  function nombreDeClave(clave) {
+    for (var i = 0; i < OPCIONES.length; i++) {
+      if (OPCIONES[i].clave === clave) return String(OPCIONES[i].nombre || clave);
+    }
+    return clave;
   }
 
   /* loginConEmail() (usuario-session.js) devuelve null sin exponer el
@@ -207,28 +327,66 @@ body{background:#FBF8F2}
       });
   }
 
+  /* Reclama el premio elegido SOLO si el alta fue nueva con referido
+     aplicado (perfil.bonus_referido === true). Cualquier fallo del reclamo
+     no bloquea el ingreso: la redireccion siempre continua. */
+  function reclamarPremio(perfil, clave) {
+    if (!clave || !perfil || perfil.bonus_referido !== true) {
+      return Promise.resolve();
+    }
+    return fetch('/api/interacciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tipo: 'reclamar_bonus_referido',
+        usuario_id: perfil.id,
+        clave: clave
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok) {
+          toast('Bono activado: ' + nombreDeClave(clave), '#16a34a');
+        } else {
+          toast('No se pudo activar el bono', '#ef4444');
+        }
+      })
+      .catch(function (e) {
+        console.warn('registro: no se pudo reclamar el premio', e && e.message);
+        toast('No se pudo activar el bono', '#ef4444');
+      });
+  }
+
+  /* usuario-session.js abre el selector overlay ~400ms despues de un alta
+     nueva. Si el premio ya se reclamo desde el formulario, se retira ese
+     overlay para no duplicar el pedido justo antes de la redireccion. */
+  function retirarOverlayBono() {
+    var el = document.getElementById('ec-bono-ref');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
   async function enviar(ref) {
     var nombre = (nombreEl.value || '').trim();
     var email = (emailEl.value || '').trim();
     limpiarError();
 
     if (!window.ExploraCO || typeof window.ExploraCO.loginConEmail !== 'function') {
-      mostrarError('No pudimos cargar el sistema de cuentas. Recarga la página e inténtalo de nuevo.', false);
+      mostrarError('No pudimos cargar el sistema de cuentas. Recarga la p\u00e1gina e int\u00e9ntalo de nuevo.', false);
       return;
     }
     if (nombre.length < 2) {
-      mostrarError('Escribe tu nombre (mínimo 2 letras).', false);
+      mostrarError('Escribe tu nombre (m\u00ednimo 2 letras).', false);
       nombreEl.focus();
       return;
     }
     if (!emailValido(email)) {
-      mostrarError('Ese email no parece válido. Ejemplo: nombre@correo.com', false);
+      mostrarError('Ese email no parece v\u00e1lido. Ejemplo: nombre@correo.com', false);
       emailEl.focus();
       return;
     }
 
     submitEl.disabled = true;
-    submitEl.textContent = 'Creando tu cuenta…';
+    submitEl.textContent = BSY_TXT;
     var r;
     try {
       r = await loginConDetalle(email, nombre, ref);
@@ -236,18 +394,40 @@ body{background:#FBF8F2}
       console.warn('registro: alta interrumpida', e && e.message);
       r = { perfil: null, error: 'ERROR_RED' };
     }
-    submitEl.disabled = false;
-    submitEl.textContent = BTN_TXT;
 
     if (r.perfil) {
+      var elegida = premioElegido();
+      await reclamarPremio(r.perfil, elegida);
+      retirarOverlayBono();
       toast('Bienvenido, ' + (r.perfil.nombre || nombre), '#16a34a');
-      window.location.href = ref ? '/mi-perfil.html' : '/index.html';
+      window.location.href = REF_CODE ? '/mi-perfil.html' : '/index.html';
       return;
     }
 
+    submitEl.disabled = false;
+    submitEl.textContent = BTN_TXT;
     var fallaPorRef = (r.error === 'REFERIDO_INVALIDO' || r.error === 'AUTO_REFERIDO');
-    mostrarError(mensajeDeError(r.error, ref), fallaPorRef);
+    mostrarError(mensajeDeError(r.error), fallaPorRef);
     toast('No pudimos crear tu cuenta', '#ef4444');
+  }
+
+  /* Inicio con referido: si el codigo es valido se muestra el banner con el
+     nombre del anfitrion y se cargan los premios. Si el codigo ya es
+     invalido se avisa con el boton "Continuar sin invitacion". Si la red
+     falla aqui, se guarda silencio y el submit validara contra el backend. */
+  function initRef() {
+    if (!REF_CODE) return;
+    resolverRef(REF_CODE).then(function (estado) {
+      if (estado.valido) {
+        REF_NOMBRE = estado.nombre;
+        chipNombre.textContent = REF_NOMBRE;
+        chip.hidden = false;
+        return cargarPremios().then(pintarPremios);
+      }
+      if (estado.error === 'REFERIDO_INVALIDO') {
+        mostrarError(mensajeDeError('REFERIDO_INVALIDO'), true);
+      }
+    });
   }
 
   form.addEventListener('submit', function (ev) {
@@ -262,9 +442,16 @@ body{background:#FBF8F2}
       window.ExploraCO.limpiarRefPendiente();
     }
     REF_CODE = '';
+    REF_NOMBRE = '';
+    ocultarPremios();
     chip.hidden = true;
-    enviar(undefined);
+    limpiarError();
+    var tieneDatos = (nombreEl.value || '').trim().length >= 2
+      && emailValido((emailEl.value || '').trim());
+    if (tieneDatos && !submitEl.disabled) enviar(undefined);
   });
+
+  initRef();
 })();
 </script>
 </body>

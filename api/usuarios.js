@@ -13,6 +13,13 @@
 // el mismo UPDATE fija origen_declarado_en=NOW() (comparacion normalizada con
 // trim; un no-op NO lo toca). Requiere la migracion 038; la lectura de
 // gamificacion_config degrada con warn. NO toca tags ni crea endpoints.
+// v23 (2026-09-24): rama GET ?tipo=ref_info - consulta publica suave (sin
+// JWT ni sesion) que dado un codigo de referido (?ref= o ?codigo=) devuelve
+// SOLO el nombre publico del anfitrion (SELECT nombre FROM usuarios WHERE
+// codigo_referido=$1 LIMIT 1, trim + slice(0,80)); sin email, sin avatar,
+// sin XP ni ids internos. Codigo inexistente o vacio -> 200 con
+// REFERIDO_INVALIDO (consulta publica suave, no 404). No es endpoint nuevo
+// (8/8, ADR-001/ADR-010) y no toca tags ni persistencias.
 // v20 (RELEASE 2026-09-23): NIVELES se expande de 20 a 40 umbrales (techo
 // 100000) con 40 titulos y 5 Eras (Caminante 1-10 / Explorador 11-20 /
 // Cronista 21-30 / Leyenda 31-35 / Mito 36-40); calcularEra con cortes
@@ -650,6 +657,26 @@ module.exports = async (req, res) => {
             referidos_dia_actual: rcHoy.length ? rcHoy[0].n : 0,
           }
         });
+      }
+
+      // Consulta publica suave por codigo de referido (sin JWT ni sesion):
+      // devuelve SOLO el nombre publico del anfitrion. No expone email,
+      // avatar, XP ni ids internos. Si el codigo no existe o esta vacio
+      // responde 200 con REFERIDO_INVALIDO (consulta publica suave).
+      if (tipo === 'ref_info') {
+        var riCode = String(req.query.ref || req.query.codigo || '').trim();
+        if (!riCode) {
+          return res.status(200).json({ ok: false, error: 'REFERIDO_INVALIDO' });
+        }
+        var riRows = await sql(
+          'SELECT nombre FROM usuarios WHERE codigo_referido=$1 LIMIT 1',
+          [riCode]
+        );
+        var riNombre = (riRows.length ? String(riRows[0].nombre || '') : '').trim().slice(0, 80);
+        if (!riNombre) {
+          return res.status(200).json({ ok: false, error: 'REFERIDO_INVALIDO' });
+        }
+        return res.status(200).json({ ok: true, anfitrion_nombre: riNombre });
       }
 
       // Piramide multinivel de lectura: CTE recursiva hasta 5 niveles

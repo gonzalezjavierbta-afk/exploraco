@@ -3,7 +3,7 @@ description: QA Specialist / Auditor de ExploraCO. Ejecuta el Escudo GOLD (node 
 mode: subagent
 model: opencode/big-pickle
 permission:
-  edit: ask
+  edit: allow
   bash: allow
   webfetch: allow
 ---
