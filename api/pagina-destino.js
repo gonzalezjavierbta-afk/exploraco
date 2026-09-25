@@ -2060,12 +2060,20 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
       + '</div></div>';
   }
 
+  // FASE 3 (T5.4 / L1 multi-media, ADR-065): contenedor del bloque
+  // "Dueno del Spot" (dueno general + duenos por tipo de medio). Se pinta
+  // en CLIENTE con un fetch publico a ?tipo=spot_duenos y degrada OCULTO
+  // (display:none) si el endpoint falla o no hay duenos; nunca rompe
+  // buildHTML(). No aplica a blog (un articulo no tiene "spot").
+  var spotDuenosSlot = esBlogRes ? '' : '<div id="spot-duenos" style="display:none"></div>';
+
   secResenas = '<section class="ssec bwhite" id="resenas"><div class="sin">'
     + '<div class="strow"><div class="sgl"></div><h2 class="stitle bc">'+tituloResenas+'</h2><div class="stnum">'+nextNum()+'</div></div>'
     + '<div class="rblock" id="rblock" style="'+(nRes>0?'':'display:none')+'"><div><div class="rbavg" id="rbavg">'+rat.toFixed(1)+'</div><div class="rbstars" id="rbstars">'+[1,2,3,4,5].map(function(i){return '<span class="rbst'+(i<=Math.round(rat)?' on':'')+'">*</span>';}).join('')+'</div><div class="rbcnt" id="rbcnt">'+textoRbcnt+'</div></div>'
     + (scoreBars||'')
     + '</div>'
     + (spotLiderHtml||'')
+    + spotDuenosSlot
     + '<div class="rvlist" id="rvlist">'+rvHtml+'</div>'
     + '<p class="stext" id="rvempty" style="'+(nRes>0?'display:none':'')+'">'+textoRvEmpty+'</p>'
     + '<div class="wr"><div class="wrtitle">'+textoWrTitle+'</div>'
@@ -2621,6 +2629,48 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '}\n'
     + 'window.onExploraCOUpdate=precargarEstado;\n'
     + 'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",precargarEstado);}else{precargarEstado();}\n'
+    // FASE 3 (T5.4 / L1 multi-media, ADR-065): "Dueno del Spot" multi-media.
+    // Fetch publico a ?tipo=spot_duenos (dueno general + por tipo de medio).
+    // Los nombres se resuelven best-effort con artista_cv (endpoint publico,
+    // SIN PII). Si el fetch falla o no hay duenos, #spot-duenos permanece
+    // con display:none (bloque oculto, sin error visible). El x1.1 por SPOT
+    // se aplica server-side en api/interacciones.js; aqui es solo vitrina.
+    + 'function sdEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}\n'
+    + 'function sdFila(emoji,label,o,nom){\n'
+    + '  var uid=String(o.usuario_id||"");\n'
+    + '  var nm=nom[uid]||"Viajero";\n'
+    + '  var votos=parseInt(o.votos,10)||0;\n'
+    + '  return \'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid rgba(232,195,106,.45)">\''
+    + '   +\'<span style="font-size:17px;line-height:1;flex-shrink:0">\'+emoji+\'</span>\''
+    + '   +\'<span style="font-size:9px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#b8860b;min-width:84px;flex-shrink:0">\'+label+\'</span>\''
+    + '   +\'<a href="/perfil.html?id=\'+encodeURIComponent(uid)+\'" style="font-size:13px;font-weight:800;color:#4a3410;text-decoration:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\'+sdEsc(nm)+\'</a>\''
+    + '   +\'<span style="margin-left:auto;font-size:11px;font-weight:600;color:#8a6d1f;flex-shrink:0">\'+votos+\' voto\'+(votos===1?"":"s")+\'</span>\''
+    + '   +\'</div>\';\n'
+    + '}\n'
+    + 'function initSpotDuenos(){\n'
+    + '  var host=document.getElementById("spot-duenos");\n'
+    + '  if(!host)return;\n'
+    + '  fetch("/api/interacciones?tipo=spot_duenos&destino_id="+encodeURIComponent(DID)).then(function(r){return r.json().catch(function(){return null;});}).then(function(res){\n'
+    + '    if(!res||!res.ok||!res.data)return;\n'
+    + '    var dd=res.data, gen=dd.general||null, pt=dd.por_tipo||{};\n'
+    + '    var tipos=[["foto","\uD83D\uDCF7","Foto"],["video","\uD83C\uDFA5","Video"],["audio","\uD83C\uDFB5","Audio"],["escrito","\u270D\uFE0F","Escrito"]];\n'
+    + '    var ids=[];\n'
+    + '    if(gen&&gen.usuario_id&&ids.indexOf(String(gen.usuario_id))<0)ids.push(String(gen.usuario_id));\n'
+    + '    tipos.forEach(function(t){var o=pt[t[0]];if(o&&o.usuario_id&&ids.indexOf(String(o.usuario_id))<0)ids.push(String(o.usuario_id));});\n'
+    + '    if(!ids.length)return;\n'
+    + '    Promise.all(ids.map(function(uid){return fetch("/api/usuarios?tipo=artista_cv&usuario_id="+encodeURIComponent(uid)).then(function(r){return r.json().catch(function(){return null;});}).then(function(j){return (j&&j.ok&&j.data&&j.data.artista&&j.data.artista.nombre)?j.data.artista.nombre:"";}).catch(function(){return "";});})).then(function(names){\n'
+    + '      var nom={};ids.forEach(function(uid,i){nom[uid]=names[i]||"";});\n'
+    + '      var hay=false;\n'
+    + '      var h=\'<div style="border:1px solid #e8c36a;border-radius:8px;background:linear-gradient(135deg,#fff7e6,#fdf1d7);padding:14px 16px;margin-bottom:18px;box-shadow:0 2px 8px rgba(232,160,32,.12)">\''
+    + '        +\'<div style="font-size:10px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:#b8860b">Dueno del Spot</div>\';\n'
+    + '      if(gen){h+=sdFila("\uD83D\uDC51","General",gen,nom);hay=true;}\n'
+    + '      tipos.forEach(function(t){var o=pt[t[0]];if(o&&o.usuario_id){h+=sdFila(t[1],t[2],o,nom);hay=true;}});\n'
+    + '      h+=\'</div>\';\n'
+    + '      if(hay){host.innerHTML=h;host.style.display="";}\n'
+    + '    });\n'
+    + '  }).catch(function(e){console.warn("[spot_duenos]",e&&e.message);});\n'
+    + '}\n'
+    + 'initSpotDuenos();\n'
     // TSK-111 (CAMBIO 7A): modulo "Fotos de viajeros" RETIRADO de la ficha.
     // Se eliminaron galEsc/FP_URLS/fpCaps/loadFotos/subirFoto/votarFoto y el
     // popover Guardar-en-album (cerrarAlbumPopover/abrirAlbumPopover/

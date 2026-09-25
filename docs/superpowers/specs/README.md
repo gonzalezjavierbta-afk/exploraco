@@ -4,7 +4,7 @@
 de una entrega o feature; la fuente de verdad sigue siendo el archivo real del
 repositorio (ADR-006).
 
-**Total:** 14 specs.
+**Total:** 19 specs.
 
 | Fecha | Spec | Tema | Estado |
 |---|---|---|---|
@@ -21,7 +21,12 @@ repositorio (ADR-006).
 | 2026-09-12 | [2026-09-12-presencia-fisica-gamificacion-v4-design.md](2026-09-12-presencia-fisica-gamificacion-v4-design.md) | Presencia física + presencia espacial: geocerca de visitas (ADR-024) | Implementado en working tree (migración 014 aplicada en Neon) |
 | 2026-09-13 | [2026-09-13-epic-prompt-vocaciones-chat-perfil-design.md](2026-09-13-epic-prompt-vocaciones-chat-perfil-design.md) | Epic prompt.txt: museo de trofeos, vocaciones, chat por niveles y fixes multimedia (ADR-026) | Aprobado por Javier (implementado en working tree) |
 | 2026-09-14 | [2026-09-14-gaming-v5-referidos-wayfarer-facciones-design.md](2026-09-14-gaming-v5-referidos-wayfarer-facciones-design.md) | Entrega 016 "ExploraCO Gaming v5.0": referidos multinivel, Wayfarer (Activo Oculto), 4 facciones y mundo artistas (ADR-025/027) | IMPLEMENTADO en working tree (pendiente migración 016 en Neon + env en Vercel + deploy) |
+| 2026-09-15 | [2026-09-15-galeria-unificada-destino-design.md](2026-09-15-galeria-unificada-destino-design.md) | Galeria unificada de la ficha de destino (curadas + viajeros + albumes) | Aprobado |
+| 2026-09-17 | [2026-09-17-xp-decimal-rankings-comunidad-design.md](2026-09-17-xp-decimal-rankings-comunidad-design.md) | XP decimal numeric(12,2) + rankings de comunidad (ADR-035) | Implementado |
+| 2026-09-21 | [2026-09-21-gamificacion-nivel-scaling-v6-design.md](2026-09-21-gamificacion-nivel-scaling-v6-design.md) | Gamificacion v6: M_nivel, doble cap secuencial y reescalado de umbrales (ADR-053, ENMIENDA 1) | Diseno congelado; implementado y desplegado (migracion 031 aplicada en Neon) |
 | 2026-09-23 | [2026-09-23-consumibles-por-era-design.md](2026-09-23-consumibles-por-era-design.md) | Consumibles con gate por era: `consumibles.era_exclusiva` (banda exclusiva de compra), 15 nuevos (3 por era) + 9 premium backfilleados (catálogo 32 en el estado real de Neon: 17 previos + 15 nuevos; 35 si la 034 se aplica), migración 035 aplicada en Neon el 2026-09-23 (ADR-056) | Implementado (migración 035 APLICADA en Neon el 2026-09-23; numeración alineada a ADR-056) |
+| 2026-09-24 | [2026-09-24-multiplicador-origen-lejania-design.md](2026-09-24-multiplicador-origen-lejania-design.md) | Multiplicador de Origen por lejania Local/Nomada/Extranjero (ADR-058) | Implementado (migracion 038 aplicada en Neon el 2026-09-24) |
+| 2026-09-24 | [2026-09-24-gaming-v6.1-early-mid-late-design.md](2026-09-24-gaming-v6.1-early-mid-late-design.md) | Gaming v6.1 + Early/Middle/Late Game: gates de eleccion, referidos 10%, cartas-gate, moneda secundaria, gobernanza 3 capas, own-spot multi-media y Gig Economy P2P (ADR-059..066) | PROPUESTO / Fase 0 (SOLO documentacion) |
 
 ## Notas
 

@@ -190,10 +190,10 @@ async function run() {
     updateIdx !== -1 && !!cte && updateIdx > cte.close);
 
   check('A4a: la cadena contiene ROUND half-up (ADR-035)', queryRef.indexOf('ROUND') !== -1);
-  check('A4b: porcentajes 10/5/3/2/1 (0.10/0.05/0.03/0.02/0.01)',
-    queryRef.indexOf('0.10') !== -1 && queryRef.indexOf('0.05') !== -1
-    && queryRef.indexOf('0.03') !== -1 && queryRef.indexOf('0.02') !== -1
-    && queryRef.indexOf('0.01') !== -1);
+  check('A4b: porcentajes 5/2.5/1.5/0.5/0.5 (0.05/0.025/0.015/0.005/0.005, total 10% ADR-060)',
+    queryRef.indexOf('0.05') !== -1 && queryRef.indexOf('0.025') !== -1
+    && queryRef.indexOf('0.015') !== -1 && queryRef.indexOf('0.005') !== -1
+    && queryRef.indexOf('0.10') === -1);
   check('A4c: tope referidos_directos_contados < 500',
     queryRef.indexOf('referidos_directos_contados < 500') !== -1);
 

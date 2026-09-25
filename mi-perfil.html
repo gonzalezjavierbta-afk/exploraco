@@ -555,6 +555,51 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mp-picker-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mp-picker-coords{font-family:monospace;font-size:11px;color:var(--muted);flex:1;min-width:160px}
 @media (max-width:600px){.pf-museo-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.mp-picker-el{height:280px}}
+/* ---- Gaming v6.1 (Fase 4): cartas, moneda, contratos, hoja de vida ----
+   Silo atomico: todo cuelga de .pf-v61 (ADR-004). */
+.pf-v61 .v61-note{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;margin:-4px 0 10px}
+.pf-v61 .v61-empty{font-size:12px;color:rgba(255,255,255,.35);padding:10px 0}
+.pf-v61 .v61-err{font-size:11px;color:#fca5a5;padding:8px 0}
+.pf-v61 .v61-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pf-v61 .v61-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.pf-v61 .v61-card.r-comun{border-top:3px solid #9CA3AF}
+.pf-v61 .v61-card.r-raro{border-top:3px solid #3B82F6}
+.pf-v61 .v61-card.r-epico{border-top:3px solid #A855F7}
+.pf-v61 .v61-card.r-dorado{border-top:3px solid var(--gold)}
+.pf-v61 .v61-card-n{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#fff}
+.pf-v61 .v61-meta{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px}
+.pf-v61 .v61-rareza{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.3);border-radius:999px;padding:1px 7px;align-self:flex-start}
+.pf-v61 .v61-qty{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold)}
+.pf-v61 .v61-btn{width:100%;padding:6px 8px;border-radius:6px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;background:transparent;border:1px solid rgba(232,160,32,.4);color:var(--gold);transition:background .15s}
+.pf-v61 .v61-btn:hover{background:var(--gold);color:var(--black)}
+.pf-v61 .v61-btn.ghost{opacity:.75}
+.pf-v61 .v61-gates{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.pf-v61 .v61-gate{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px;text-align:center}
+.pf-v61 .v61-gate.on{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.08)}
+.pf-v61 .v61-gate-l{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6)}
+.pf-v61 .v61-gate-v{font-size:15px;font-weight:900;color:var(--gold)}
+.pf-v61 .v61-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+.pf-v61 .v61-row-n{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:.4px;color:#fff}
+.pf-v61 .v61-row-d{font-size:10px;color:rgba(255,255,255,.5);flex:1 1 100%}
+.pf-v61 .v61-row-x{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--gold);white-space:nowrap}
+.pf-v61 .v61-inp{width:100%;box-sizing:border-box;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:9px 11px;color:#fff;font-family:'Outfit',sans-serif;font-size:12px;margin-bottom:8px}
+.pf-v61 .v61-inp:focus{outline:none;border-color:rgba(232,160,32,.55)}
+.pf-v61 .v61-form{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:12px}
+.pf-v61 .v61-form .v61-inp{background:rgba(0,0,0,.35)}
+.pf-v61 .v61-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pf-v61 .v61-actions .v61-btn{width:auto;flex:1;min-width:120px}
+.pf-v61 .v61-saldo{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:var(--gold);line-height:1}
+.pf-v61 .v61-saldo-l{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.6px}
+.pf-v61 .v61-chip{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-radius:999px;padding:2px 8px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7)}
+.pf-v61 .v61-chip.abierto{border-color:rgba(232,160,32,.5);color:var(--gold)}
+.pf-v61 .v61-chip.en_proceso{border-color:rgba(59,130,246,.5);color:#93C5FD}
+.pf-v61 .v61-chip.completado{border-color:rgba(34,197,94,.5);color:#86efac}
+.pf-v61 .v61-chip.cancelado{opacity:.6}
+.pf-v61 .v61-cv-obra{font-size:11px;color:rgba(255,255,255,.65);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.pf-v61 .v61-gate-info{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.3);border-radius:10px;padding:11px 12px;margin-bottom:12px}
+.pf-v61 .v61-gate-info-t{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);margin-bottom:6px}
+.pf-v61 .v61-gate-info p{font-size:11px;color:rgba(255,255,255,.72);line-height:1.5;margin:0}
+@media (max-width:600px){.pf-v61 .v61-gates{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -587,6 +632,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <button type="button" class="pf-tab" role="tab" data-tab="museo" aria-selected="false" onclick="pfTab('museo')">&#x1F3DB;&#xFE0F; Museo</button>
     <button type="button" class="pf-tab" role="tab" data-tab="inventario" aria-selected="false" onclick="pfTab('inventario')">&#x1F392; Inventario</button>
     <button type="button" class="pf-tab" role="tab" data-tab="mensajes" aria-selected="false" onclick="pfTab('mensajes')">&#x1F4E8; Mensajes</button>
+    <button type="button" class="pf-tab" role="tab" data-tab="contratos" aria-selected="false" onclick="pfTab('contratos')">&#x1F4DC; Contratos</button>
     <button type="button" class="pf-tab" role="tab" data-tab="cuenta" aria-selected="false" onclick="pfTab('cuenta')">&#x2699;&#xFE0F; Cuenta</button>
   </nav>
 
@@ -631,6 +677,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" data-tab="perfil">🎖️ Badges</div>
   <div class="badges-grid" id="pf-badges" data-tab="perfil"></div>
 
+  <!-- GAMING v6.1 (Fase 4 / T9): hoja de vida del artista (artista_cv) -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="perfil">&#x1F3A8; Hoja de Vida</div>
+  <div class="pf-v61" id="pf-cv" data-tab="perfil">
+    <div class="v61-empty">Cargando tu hoja de vida&#8230;</div>
+  </div>
+
   <!-- MISIONES -->
   <div class="pf-section-title" data-tab="perfil">🎯 Misiones</div>
   <div class="pf-counter" id="pf-misiones-count" data-tab="perfil">0 / 10</div>
@@ -668,6 +720,23 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <!-- EMPRENDEDOR (Mercado, asset compartido mercado.js) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6D2; Emprendedor</div>
   <div class="pf-mercado" id="pf-mercado" data-tab="inventario"></div>
+
+  <!-- GAMING v6.1 (Fase 4 / T7): cartas coleccionables y su mercado -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F0CF; Mis Cartas</div>
+  <div class="pf-v61" id="pf-cartas" data-tab="inventario">
+    <div class="v61-empty">Cargando cartas&#8230;</div>
+  </div>
+
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F6D2; Mercado de Cartas</div>
+  <div class="pf-v61" id="pf-cartas-mercado" data-tab="inventario">
+    <div class="v61-empty">Cargando ofertas&#8230;</div>
+  </div>
+
+  <!-- GAMING v6.1 (Fase 4 / T8): moneda secundaria "Condor" (CDR) -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1FA99; Mi Moneda (Condor CDR)</div>
+  <div class="pf-v61" id="pf-moneda" data-tab="inventario">
+    <div class="v61-empty">Cargando tu moneda&#8230;</div>
+  </div>
 
   <!-- MIS ALBUMES (ADR-017) -->
   <div class="pf-section-title" data-tab="museo">&#x1F5BC; Mis Albumes</div>
@@ -1002,11 +1071,29 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       <div class="arbol-cargando">Abriendo tu Arbol de Clases&#8230;</div>
     </div>
   </div>
+  <!-- GAMING v6.1 (Fase 4 / E1-E2): guia de XP y gates de eleccion -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="clase">&#x1F4A1; Como ganar XP</div>
+  <div class="pf-v61" data-tab="clase">
+    <div class="v61-gate-info">
+      <div class="v61-gate-info-t">Gates de eleccion</div>
+      <p>Clase: nivel 3 &middot; Casa: nivel 5 &middot; Marca: nivel 6. Los costos de recambio los informa el servidor al momento de elegir.</p>
+    </div>
+    <div class="v61-actions">
+      <button type="button" class="v61-btn" onclick="if(window.ExploraCO&amp;&amp;window.ExploraCO.abrirGuiaXP)window.ExploraCO.abrirGuiaXP()">Abrir guia: Como ganar XP</button>
+    </div>
+  </div>
+
   <!-- GAMING v5.0 / ADR-028: MENSAJES DIRECTOS (DM) -->
   <div class="pf-section-title" style="margin-top:28px" data-tab="mensajes">&#x1F4E8; Mensajes</div>
   <div data-tab="mensajes" style="color:rgba(255,255,255,.35);font-size:10px;margin-bottom:4px;">Conversaciones privadas: abrir un hilo nuevo cuesta 20 XP; responder dentro de un hilo abierto es gratis.</div>
   <div class="dm-bandeja" id="dm-bandeja" data-tab="mensajes">
     <div class="dm-cargando">Cargando tus conversaciones&#8230;</div>
+  </div>
+
+  <!-- GAMING v6.1 (Fase 4 / T11): contratos P2P (Gig Economy) -->
+  <div class="pf-section-title" style="margin-top:28px" data-tab="contratos">&#x1F4DC; Contratos P2P</div>
+  <div class="pf-v61" id="pf-contratos" data-tab="contratos">
+    <div class="v61-empty">Cargando contratos&#8230;</div>
   </div>
 
   <!-- SIGUIENTES PASOS -->
@@ -4508,7 +4595,7 @@ function showToast(msg,color){
    pfAplicarTab recuerda el display original de cada bloque y lo alterna.
    La pestana activa vive en el hash (#clase, #museo...) y por defecto
    es PERFIL. */
-var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','cuenta'];
+var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta'];
 var PF_TAB_ACTIVO = 'perfil';
 function pfTabDesdeHash() {
   var h = '';
@@ -4537,11 +4624,13 @@ function pfTab(tab) {
   if (tab === 'perfil' && u && u.id) renderDatosPerfil();
   if (tab === 'perfil' && u && u.id) renderOrigen();
   if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
+  if (tab === 'perfil' && u && u.id) cargarHojaDeVida(u.id);
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); }
+  if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
+  if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
   try { if (('#' + tab) !== window.location.hash) history.replaceState(null, '', '#' + tab); }
   catch (e) { window.location.hash = tab; }
@@ -4870,7 +4959,7 @@ function renderCuentaPanel() {
 }
 
 /* ---- Mi Casa (identidad de equipo) ----
-   Primera eleccion gratis desde nivel 2; cambio: 500 XP + cooldown 30 dias
+   Primera eleccion gratis desde nivel 5 (gate v6.1); cambio: 500 XP + cooldown 30 dias
    (costo unico ADR-053 Dec 10: era 300; se reutiliza COSTO_CASA para no
    duplicar el literal, Regla de No-Duplicidad).
    Sesion firmada JWT obligatoria. La confirmacion del costo y del posible
@@ -4910,9 +4999,9 @@ function cargarCasas(uid) {
     html += '<div class="pf-casa-cabeza"><span class="facc-current">Tu Casa: ' + esc(pfCasaNombre(actual)) + '</span>'
       + '<span class="pf-casa-meta">' + (dias > 0 ? 'Cambio disponible en ' + dias + ' dias (' + COSTO_CASA + ' XP)' : 'Puedes cambiar de Casa (' + COSTO_CASA + ' XP)') + '</span></div>';
   } else {
-    html += '<div class="pf-casa-nota">Primera eleccion gratis (nivel 2 en adelante). Cambiarla cuesta ' + COSTO_CASA + ' XP y 30 dias de espera.</div>';
+    html += '<div class="pf-casa-nota">Primera eleccion gratis (nivel 5 en adelante). Cambiarla cuesta ' + COSTO_CASA + ' XP y 30 dias de espera.</div>';
   }
-  if (!actual && nivel < 2) html += '<div class="pf-casa-nota">Necesitas nivel 2 para elegir tu Casa.</div>';
+  if (!actual && nivel < 5) html += '<div class="pf-casa-nota">Necesitas nivel 5 para elegir tu Casa.</div>';
   html += '<div class="facc-grid">';
   CASAS_META.forEach(function(casa){
     var es = casa.id === actual;
@@ -4956,7 +5045,7 @@ function casaErrorMsg(err, u) {
     var d = casaDiasRestantes(u);
     return d > 0 ? ('Debes esperar ' + d + ' dias para cambiar de Casa') : 'Tu Casa sigue en periodo de espera';
   }
-  if (err === 'NIVEL_INSUFICIENTE') return 'Necesitas nivel 2 para elegir tu Casa';
+  if (err === 'NIVEL_INSUFICIENTE') return 'Necesitas nivel 5 para elegir tu Casa';
   if (err === 'EMAIL_SIN_VERIFICAR') return 'Verifica tu email antes de elegir tu Casa';
   if (err === 'CASA_YA_ELEGIDA') return 'Tu Casa ya fue elegida desde otra pestana';
   if (err === 'CASA_INVALIDA') return 'Casa invalida';
@@ -5067,6 +5156,453 @@ function cargarMuseoPreview(uid) {
         + '<button type="button" class="pf-mp-btn" onclick="pfVerPerfilPublico()">Ver mi perfil publico</button></div>';
     })
     .catch(function(){ box.innerHTML = '<div class="pf-mp-vacio">No se pudo abrir la vista previa de tu museo.</div>'; });
+}
+
+/* ---- GAMING v6.1 (Fase 4): cartas, moneda, contratos y hoja de vida ----
+   Consume las ramas nuevas (catalogo_xp, cartas_*, moneda_*, contratos_*,
+   artista_cv). Toda escritura usa sesion firmada via fetchConJwt (Bearer)
+   o los helpers de usuario-session.js. Degrada tipado con SCHEMA_NOT_MIGRATED
+   sin romper la pagina. ASCII-safe (ADR-002). */
+function v61Helper(name) {
+  return (window.ExploraCO && typeof window.ExploraCO[name] === 'function') ? window.ExploraCO[name] : null;
+}
+function v61Fetch(url, opts) {
+  return fetchConJwt(url, opts).then(function (res) {
+    res = res || {};
+    if (res.ok) return { ok: true, data: res.data, raw: res };
+    var code = res.code || res.error || 'ERROR';
+    var msg = (code === 'SCHEMA_NOT_MIGRATED') ? 'Modulo en preparacion' : (res.error || 'No disponible');
+    return { ok: false, error: code, mensaje: msg, raw: res };
+  }).catch(function () { return { ok: false, error: 'CONEXION', mensaje: 'Error de conexion' }; });
+}
+function v61Get(url) { return v61Fetch(url); }
+function v61Post(body) { return v61Fetch('/api/interacciones', { method: 'POST', body: JSON.stringify(body) }); }
+function v61Msg(res) {
+  if (!res) return 'No disponible';
+  if (typeof res === 'string') return res;
+  return res.mensaje || res.error || 'No disponible';
+}
+
+/* ---- Mis Cartas (GET cartas_mias + POST cartas_gate) ---- */
+function v61RarezaClase(r) {
+  r = String(r || '').toLowerCase();
+  if (r === 'raro') return 'r-raro';
+  if (r === 'epico') return 'r-epico';
+  if (r === 'dorado') return 'r-dorado';
+  return 'r-comun';
+}
+function v61GatesSet(gates) {
+  var set = {};
+  (gates || []).forEach(function (g) { if (g && g.nivel_gate != null) set[String(g.nivel_gate)] = true; });
+  return set;
+}
+function cargarCartas(uid) {
+  var box = document.getElementById('pf-cartas');
+  if (!box || !uid) return;
+  var fn = v61Helper('misCartas');
+  if (!fn) { box.innerHTML = '<div class="v61-empty">Cartas no disponibles.</div>'; return; }
+  box.innerHTML = '<div class="v61-empty">Cargando cartas\u2026</div>';
+  fn(uid).then(function (res) {
+    if (!res || !res.ok) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
+    var d = res.data || {};
+    var cartas = d.cartas || [];
+    var gates = v61GatesSet(d.gates);
+    var requisitos = d.requisitos || [];
+    var html = '';
+    if (requisitos.length) {
+      html += '<div class="v61-gates">';
+      requisitos.forEach(function (r) {
+        var nivel = Number(r.nivel_gate);
+        var obt = Number(r.obtenidas) || 0;
+        var tot = Number(r.total) || 0;
+        var on = obt >= tot;
+        html += '<div class="v61-gate' + (on ? ' on' : '') + '">'
+          + '<div class="v61-gate-l">Nivel ' + nivel + '</div>'
+          + '<div class="v61-gate-v">' + obt + '/' + tot + '</div>';
+        if (gates[String(nivel)]) html += '<div class="v61-meta">Activo</div>';
+        else if (on) html += '<button type="button" class="v61-btn" onclick="v61ConsumirGate(' + nivel + ')">Activar gate</button>';
+        else html += '<div class="v61-meta">Faltan cartas</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    var propias = cartas.filter(function (c) { return (parseInt(c.cantidad, 10) || 0) > 0; });
+    if (!propias.length) {
+      html += '<div class="v61-empty">Aun no tienes cartas. Consiguelas en el mercado o por drop.</div>';
+      box.innerHTML = html; return;
+    }
+    html += '<div class="v61-grid">';
+    propias.forEach(function (c) {
+      var id = c.id || '';
+      var rareza = c.rareza || 'comun';
+      var cant = parseInt(c.cantidad, 10) || 0;
+      var esGate = (c.nivel_gate != null);
+      var esEvento = c.es_evento === true;
+      html += '<div class="v61-card ' + v61RarezaClase(rareza) + '">'
+        + '<div class="v61-card-n">' + esc(c.nombre || id) + '</div>'
+        + '<span class="v61-rareza">' + esc(rareza) + (esGate ? (' \u00b7 gate ' + esc(c.nivel_gate)) : '') + '</span>'
+        + '<div class="v61-meta">Tienes <b class="v61-qty">' + cant + '</b></div>'
+        + '<button type="button" class="v61-btn" onclick="v61PublicarCarta(\'' + esc(id) + '\',' + cant + ')">Publicar en venta</button>';
+      if (esEvento) html += '<button type="button" class="v61-btn ghost" onclick="v61UsarCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
+      if (!esGate || esEvento) html += '<button type="button" class="v61-btn ghost" onclick="v61IntercambiarCarta(\'' + esc(id) + '\')">Intercambiar (P2P)</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    box.innerHTML = html;
+  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudieron cargar tus cartas.</div>'; });
+}
+function v61ConsumirGate(nivel) {
+  var u = sesion();
+  var fn = v61Helper('cartasGate');
+  if (!u || !fn) return;
+  fn(u.id, nivel).then(function (res) {
+    if (res && res.ok) { showToast('Gate nivel ' + nivel + ' activado'); cargarCartas(u.id); return; }
+    var m = 'No se pudo activar el gate';
+    if (res && res.error === 'SET_INCOMPLETO') m = 'Te faltan cartas del set nivel ' + nivel;
+    else if (res && res.error === 'NIVEL_INSUFICIENTE') m = 'Aun no alcanzas el nivel ' + nivel;
+    else if (res && res.error === 'GATE_NO_ALCANZABLE') m = 'Aun no alcanzas ningun gate';
+    else if (res) m = v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function v61PublicarCarta(cartaId, cantMax) {
+  var precio = prompt('Precio por carta en XP:', '');
+  if (precio === null) return;
+  var p = parseFloat(precio);
+  if (!isFinite(p) || p <= 0) { showToast('Precio invalido', '#ef4444'); return; }
+  var cant = prompt('Cantidad a vender (tienes ' + (cantMax || 1) + '):', '1');
+  if (cant === null) return;
+  var c = parseInt(cant, 10);
+  if (!isFinite(c) || c < 1) { showToast('Cantidad invalida', '#ef4444'); return; }
+  v61Post({ tipo: 'carta_publicar', carta_id: cartaId, cantidad: c, precio_xp: p }).then(function (res) {
+    if (res && res.ok) {
+      showToast('Carta publicada en venta');
+      var u = sesion();
+      if (u) { cargarCartas(u.id); cargarMercadoCartas(); }
+      return;
+    }
+    showToast(v61Msg(res), '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function v61UsarCartaEvento(cartaId) {
+  if (!window.confirm('Usar una carta de evento? Se consumira una copia.')) return;
+  v61Post({ tipo: 'carta_evento_usar', carta_id: cartaId }).then(function (res) {
+    if (res && res.ok) {
+      showToast('Carta de evento usada: entrada habilitada');
+      var u = sesion(); if (u) cargarCartas(u.id);
+      return;
+    }
+    var m = (res && res.error === 'SIN_CARTA') ? 'No tienes copias de esa carta' : v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function v61IntercambiarCarta(cartaId) {
+  var receptor = prompt('ID (UUID) del viajero que recibe la carta:', '');
+  if (!receptor || !receptor.trim()) return;
+  v61Post({ tipo: 'carta_intercambiar', carta_id: cartaId, receptor_id: receptor.trim() }).then(function (res) {
+    if (res && res.ok) {
+      showToast('Intercambio realizado');
+      var u = sesion(); if (u) cargarCartas(u.id);
+      return;
+    }
+    var m = 'No se pudo intercambiar';
+    if (res && res.error === 'AUTOINTERCAMBIO_PROHIBIDO') m = 'No puedes intercambiarte contigo mismo';
+    else if (res && res.error === 'LIMITE_INTERCAMBIOS_DIARIO') m = 'Alcanzaste el limite diario de intercambios';
+    else if (res && res.error === 'CARTA_DE_GATE_NO_INTERCAMBIABLE') m = 'Las cartas de gate no se intercambian';
+    else if (res && res.error === 'SIN_COPIA') m = 'No tienes copias de esa carta';
+    else if (res && res.error === 'RECEPTOR_NO_ENCONTRADO') m = 'No encontramos a ese viajero';
+    else if (res) m = v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+
+/* ---- Mercado de Cartas (GET cartas_ofertas + POST carta_*) ---- */
+function cargarMercadoCartas() {
+  var box = document.getElementById('pf-cartas-mercado');
+  if (!box) return;
+  box.innerHTML = '<div class="v61-empty">Cargando ofertas\u2026</div>';
+  var u = sesion();
+  var uid = u ? String(u.id) : '';
+  v61Get('/api/interacciones?tipo=cartas_ofertas').then(function (res) {
+    if (!res.ok) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
+    var ofertas = res.data || [];
+    if (!ofertas.length) { box.innerHTML = '<div class="v61-empty">No hay ofertas de cartas por ahora.</div>'; return; }
+    var html = '';
+    ofertas.forEach(function (o) {
+      var mia = uid && String(o.vendedor_id) === uid;
+      var rest = parseInt(o.cantidad_restante, 10) || 0;
+      html += '<div class="v61-row">'
+        + '<div class="v61-row-n">' + esc(o.carta_nombre || o.carta_id) + ' <span class="v61-rareza">' + esc(o.rareza || '') + '</span></div>'
+        + '<div class="v61-row-d">' + esc(o.vendedor_nombre || 'Viajero') + (mia ? ' (tu oferta)' : '') + '</div>'
+        + '<div class="v61-row-x">' + fmtXp(o.precio_xp) + ' XP \u00b7 ' + rest + ' disp.</div>';
+      if (mia) html += '<button type="button" class="v61-btn ghost" onclick="v61CancelarOferta(\'' + esc(o.id) + '\')">Cancelar oferta</button>';
+      else html += '<button type="button" class="v61-btn" onclick="v61ComprarCarta(\'' + esc(o.id) + '\',' + rest + ')">Comprar</button>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudo cargar el mercado.</div>'; });
+}
+function v61ComprarCarta(ofertaId, max) {
+  var cant = prompt('Cuantas cartas quieres comprar? (disponibles ' + (max || 1) + ')', '1');
+  if (cant === null) return;
+  var c = parseInt(cant, 10);
+  if (!isFinite(c) || c < 1) { showToast('Cantidad invalida', '#ef4444'); return; }
+  v61Post({ tipo: 'carta_comprar', oferta_id: ofertaId, cantidad: c }).then(function (res) {
+    if (res && res.ok) {
+      showToast('Compra realizada');
+      var u = sesion();
+      if (u && res.data && res.data.xp_total_nuevo != null) {
+        u.xp_total = res.data.xp_total_nuevo;
+        try { localStorage.setItem('exploraco_user', JSON.stringify(u)); } catch (e) {}
+      }
+      if (u) { cargarCartas(u.id); cargarMoneda(u.id); }
+      cargarMercadoCartas();
+      if (typeof refrescarSesion === 'function') refrescarSesion();
+      return;
+    }
+    var m = 'No se pudo comprar';
+    if (res && res.error === 'PUNTOS_INSUFICIENTES') m = 'XP insuficiente';
+    else if (res && res.error === 'OFERTA_NO_DISPONIBLE') m = 'La oferta ya no esta disponible';
+    else if (res && res.error === 'CANTIDAD_INSUFICIENTE') m = 'No hay tantas cartas disponibles';
+    else if (res && res.error === 'AUTOCOMPRA_PROHIBIDA') m = 'No puedes comprar tu propia oferta';
+    else if (res) m = v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function v61CancelarOferta(ofertaId) {
+  if (!window.confirm('Cancelar esta oferta? Las cartas vuelven a tu inventario.')) return;
+  v61Post({ tipo: 'carta_cancelar', oferta_id: ofertaId }).then(function (res) {
+    if (res && res.ok) {
+      showToast('Oferta cancelada');
+      var u = sesion(); if (u) cargarCartas(u.id);
+      cargarMercadoCartas();
+      return;
+    }
+    showToast(v61Msg(res), '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+
+/* ---- Mi Moneda Condor (GET moneda_saldo/moneda_mercado + POST moneda_orden) ---- */
+function cargarMoneda(uid) {
+  var box = document.getElementById('pf-moneda');
+  if (!box || !uid) return;
+  var fn = v61Helper('monedaSaldo');
+  if (!fn) { box.innerHTML = '<div class="v61-empty">Moneda no disponible.</div>'; return; }
+  box.innerHTML = '<div class="v61-empty">Cargando tu moneda\u2026</div>';
+  fn(uid).then(function (res) {
+    var html = '';
+    if (res && res.ok && res.data) {
+      var d = res.data;
+      html += '<div class="v61-form"><div class="v61-saldo-l">Saldo ' + esc(d.moneda || 'CDR') + '</div>'
+        + '<div class="v61-saldo">' + fmtXp(d.saldo) + '</div>'
+        + (d.cuadra === false ? '<div class="v61-meta">Verificando saldo\u2026</div>' : '')
+        + '</div>';
+    } else {
+      html += '<div class="v61-err">' + esc(v61Msg(res)) + '</div>';
+    }
+    html += '<div class="v61-form">'
+      + '<div class="v61-card-n">Nueva orden</div>'
+      + '<div class="v61-meta">Vender entrega CDR en custodia; comprar inmoviliza XP hasta el cruce.</div>'
+      + '<select id="v61-moo-tipo" class="v61-inp"><option value="venta">Vender CDR por XP</option><option value="compra">Comprar CDR con XP</option></select>'
+      + '<input id="v61-moo-cant" type="number" min="0.01" step="0.01" class="v61-inp" placeholder="Cantidad de CDR">'
+      + '<input id="v61-moo-precio" type="number" min="0.01" step="0.01" class="v61-inp" placeholder="Precio XP por CDR">'
+      + '<div class="v61-actions"><button type="button" class="v61-btn" onclick="v61CrearOrdenMoneda()">Crear orden</button></div>'
+      + '</div>';
+    html += '<div class="v61-card-n" style="margin-top:6px">Libro de ordenes</div>';
+    html += '<div id="v61-moo-libro"><div class="v61-empty">Cargando libro\u2026</div></div>';
+    box.innerHTML = html;
+    v61CargarLibroMoneda();
+  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudo cargar tu moneda.</div>'; });
+}
+function v61CargarLibroMoneda() {
+  var cont = document.getElementById('v61-moo-libro');
+  if (!cont) return;
+  v61Get('/api/interacciones?tipo=moneda_mercado').then(function (res) {
+    if (!res.ok) { cont.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
+    var libro = res.data || [];
+    if (!libro.length) { cont.innerHTML = '<div class="v61-empty">No hay ordenes abiertas.</div>'; return; }
+    var html = '';
+    libro.forEach(function (o) {
+      var venta = o.tipo_orden === 'venta';
+      html += '<div class="v61-row">'
+        + '<div class="v61-row-n">' + (venta ? 'Venta' : 'Compra') + ' \u00b7 ' + esc(o.titular_nombre || 'Viajero') + '</div>'
+        + '<div class="v61-row-x">' + fmtXp(o.cantidad_restante) + ' CDR @ ' + fmtXp(o.precio_xp) + ' XP</div>'
+        + '</div>';
+    });
+    cont.innerHTML = html;
+  }).catch(function () { cont.innerHTML = '<div class="v61-err">No se pudo cargar el libro.</div>'; });
+}
+function v61CrearOrdenMoneda() {
+  var tipo = (document.getElementById('v61-moo-tipo') || {}).value || 'venta';
+  var cant = parseFloat((document.getElementById('v61-moo-cant') || {}).value);
+  var precio = parseFloat((document.getElementById('v61-moo-precio') || {}).value);
+  if (!isFinite(cant) || cant <= 0) { showToast('Cantidad invalida', '#ef4444'); return; }
+  if (!isFinite(precio) || precio <= 0) { showToast('Precio invalido', '#ef4444'); return; }
+  v61Post({ tipo: 'moneda_orden', tipo_orden: tipo, cantidad: cant, precio_xp: precio }).then(function (res) {
+    if (res && res.ok) {
+      var cruzada = !!(res.raw && res.raw.match);
+      showToast(cruzada ? 'Orden creada y cruzada con una orden existente' : 'Orden creada');
+      var u = sesion(); if (u) cargarMoneda(u.id);
+      if (typeof refrescarSesion === 'function') refrescarSesion();
+      return;
+    }
+    var m = 'No se pudo crear la orden';
+    if (res && res.error === 'SALDO_CDR_INSUFICIENTE') m = 'Saldo CDR insuficiente';
+    else if (res && res.error === 'XP_INSUFICIENTE') m = 'XP insuficiente';
+    else if (res) m = v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+
+/* ---- Hoja de Vida del artista (GET artista_cv + POST artista_cv_editar) ---- */
+function cargarHojaDeVida(uid) {
+  var box = document.getElementById('pf-cv');
+  if (!box || !uid) return;
+  var fn = v61Helper('miHojaDeVida');
+  if (!fn) { box.innerHTML = '<div class="v61-empty">Hoja de vida no disponible.</div>'; return; }
+  box.innerHTML = '<div class="v61-empty">Cargando tu hoja de vida\u2026</div>';
+  fn(uid).then(function (res) {
+    if (!res || !res.ok || !res.data) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
+    var d = res.data;
+    var meta = d.metadatos || {};
+    var tot = d.totales || {};
+    var artista = d.artista || {};
+    var esArtista = (Number(tot.vocaciones) || 0) > 0 || (Number(tot.obras) || 0) > 0;
+    var html = '';
+    html += '<div class="v61-form">'
+      + '<div class="v61-card-n">' + esc(artista.nombre || 'Tu hoja de vida') + '</div>'
+      + '<div class="v61-meta">Nivel ' + (parseInt(artista.nivel_visible, 10) || 1) + ' \u00b7 ' + esc(artista.era || '') + ' \u00b7 ' + fmtXp(artista.xp_total) + ' XP</div>'
+      + '<div class="v61-meta">' + (Number(tot.obras) || 0) + ' obras \u00b7 ' + (Number(tot.resenas) || 0) + ' resenas \u00b7 ' + (Number(tot.contratos) || 0) + ' contratos \u00b7 ' + (Number(tot.patrocinios) || 0) + ' patrocinios</div>'
+      + '</div>';
+    html += '<div class="v61-form">'
+      + '<div class="v61-card-n">Editar hoja de vida</div>'
+      + '<textarea id="v61-cv-bio" class="v61-inp" rows="3" maxlength="600" placeholder="Tu bio de artista">' + esc(meta.bio || '') + '</textarea>'
+      + '<input id="v61-cv-ciudad" class="v61-inp" maxlength="80" placeholder="Ciudad" value="' + esc(meta.ciudad || '') + '">'
+      + '<label class="v61-meta"><input type="checkbox" id="v61-cv-destacado"' + (meta.destacado ? ' checked' : '') + '> Marcar como destacado</label>'
+      + '<div class="v61-actions"><button type="button" class="v61-btn" onclick="v61GuardarHojaDeVida()">Guardar hoja de vida</button></div>'
+      + '</div>';
+    if ((d.vocaciones || []).length) html += '<div class="v61-meta">Vocaciones: ' + esc((d.vocaciones || []).join(', ')) + '</div>';
+    if ((d.obras || []).length) {
+      html += '<div class="v61-card-n" style="margin-top:8px">Obras</div>';
+      (d.obras || []).slice(0, 20).forEach(function (o) {
+        html += '<div class="v61-cv-obra">' + esc(o.media_title || o.foto_type || 'Recurso') + ' \u00b7 ' + esc(o.foto_type || '') + '</div>';
+      });
+    } else if (!esArtista) {
+      html += '<div class="v61-empty">Aun no hay obras publicas. Publica fotos, videos o audio en tu Museo.</div>';
+    }
+    box.innerHTML = html;
+  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudo cargar tu hoja de vida.</div>'; });
+}
+function v61GuardarHojaDeVida() {
+  var u = sesion();
+  if (!u) return;
+  var datos = {
+    bio: String((document.getElementById('v61-cv-bio') || {}).value || '').trim(),
+    ciudad: String((document.getElementById('v61-cv-ciudad') || {}).value || '').trim(),
+    destacado: !!(document.getElementById('v61-cv-destacado') || {}).checked
+  };
+  var fn = v61Helper('guardarHojaDeVida');
+  if (!fn) { showToast('Hoja de vida no disponible', '#ef4444'); return; }
+  fn(datos).then(function (res) {
+    if (res && res.ok) { showToast('Hoja de vida actualizada'); cargarHojaDeVida(u.id); return; }
+    showToast(v61Msg(res), '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+
+/* ---- Contratos P2P (GET contratos_mios + POST contrato_*) ---- */
+var V61_ENCARGOS = [
+  { id: 'auditoria_wayfarer', nombre: 'Auditoria Wayfarer' },
+  { id: 'curaduria_multimedia', nombre: 'Curaduria multimedia' },
+  { id: 'resena_zona', nombre: 'Resena de zona' }
+];
+function v61EncargoNombre(id) {
+  for (var i = 0; i < V61_ENCARGOS.length; i++) if (V61_ENCARGOS[i].id === id) return V61_ENCARGOS[i].nombre;
+  return id || 'Contrato';
+}
+function cargarContratos(uid) {
+  var box = document.getElementById('pf-contratos');
+  if (!box || !uid) return;
+  var fn = v61Helper('misContratos');
+  if (!fn) { box.innerHTML = '<div class="v61-empty">Contratos no disponibles.</div>'; return; }
+  box.innerHTML = '<div class="v61-empty">Cargando contratos\u2026</div>';
+  fn(uid).then(function (res) {
+    if (!res || !res.ok) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
+    var lista = res.data || [];
+    var html = '';
+    var opts = V61_ENCARGOS.map(function (e) { return '<option value="' + e.id + '">' + e.nombre + '</option>'; }).join('');
+    html += '<div class="v61-form"><div class="v61-card-n">Crear contrato</div>'
+      + '<div class="v61-meta">Requiere nivel 25. La recompensa queda en custodia hasta completar.</div>'
+      + '<select id="v61-ct-tipo" class="v61-inp">' + opts + '</select>'
+      + '<input id="v61-ct-rec" type="number" min="0.01" step="0.01" class="v61-inp" placeholder="Recompensa XP">'
+      + '<input id="v61-ct-destino" class="v61-inp" placeholder="ID de destino (opcional, UUID)">'
+      + '<textarea id="v61-ct-desc" class="v61-inp" rows="2" maxlength="1000" placeholder="Descripcion del encargo"></textarea>'
+      + '<div class="v61-actions"><button type="button" class="v61-btn" onclick="v61CrearContrato()">Crear contrato</button></div>'
+      + '</div>';
+    html += '<div class="v61-card-n" style="margin-top:6px">Mis contratos</div>';
+    if (!lista.length) {
+      html += '<div class="v61-empty">Aun no tienes contratos.</div>';
+    } else {
+      lista.forEach(function (c) {
+        var estado = String(c.estado || '');
+        var rol = c.es_empleador ? 'Empleador' : 'Contratado';
+        html += '<div class="v61-row">'
+          + '<div class="v61-row-n">' + esc(v61EncargoNombre(c.tipo_encargo)) + ' <span class="v61-chip ' + esc(estado) + '">' + esc(estado) + '</span></div>'
+          + '<div class="v61-row-d">' + esc(c.descripcion || '') + '</div>'
+          + '<div class="v61-row-x">' + fmtXp(c.recompensa_xp) + ' XP \u00b7 ' + esc(rol) + '</div>';
+        if (estado === 'abierto' && !c.es_empleador) {
+          html += '<button type="button" class="v61-btn" onclick="v61AccionContrato(\'contrato_aceptar\',\'' + esc(c.id) + '\')">Aceptar</button>';
+        }
+        if (c.es_empleador && (estado === 'abierto' || estado === 'en_proceso')) {
+          if (estado === 'en_proceso') html += '<button type="button" class="v61-btn" onclick="v61AccionContrato(\'contrato_completar\',\'' + esc(c.id) + '\')">Completar</button>';
+          html += '<button type="button" class="v61-btn ghost" onclick="v61AccionContrato(\'contrato_cancelar\',\'' + esc(c.id) + '\')">Cancelar</button>';
+        }
+        html += '</div>';
+      });
+    }
+    box.innerHTML = html;
+  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudieron cargar los contratos.</div>'; });
+}
+function v61CrearContrato() {
+  var tipo = (document.getElementById('v61-ct-tipo') || {}).value || '';
+  var rec = parseFloat((document.getElementById('v61-ct-rec') || {}).value);
+  var desc = String((document.getElementById('v61-ct-desc') || {}).value || '').trim();
+  var destino = String((document.getElementById('v61-ct-destino') || {}).value || '').trim();
+  if (!isFinite(rec) || rec <= 0) { showToast('Recompensa invalida', '#ef4444'); return; }
+  if (!desc) { showToast('Escribe una descripcion', '#ef4444'); return; }
+  var body = { tipo: 'contrato_crear', tipo_encargo: tipo, recompensa_xp: rec, descripcion: desc };
+  if (destino) body.destino_id = destino;
+  v61Post(body).then(function (res) {
+    if (res && res.ok) {
+      showToast('Contrato creado');
+      var u = sesion(); if (u) cargarContratos(u.id);
+      if (typeof refrescarSesion === 'function') refrescarSesion();
+      return;
+    }
+    var m = 'No se pudo crear el contrato';
+    if (res && res.error === 'NIVEL_INSUFICIENTE') m = 'Necesitas nivel 25 para crear contratos';
+    else if (res && res.error === 'PUNTOS_INSUFICIENTES') m = 'XP insuficiente para la recompensa';
+    else if (res && res.error === 'TIPO_ENCARGO_INVALIDO') m = 'Tipo de encargo invalido';
+    else if (res) m = v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function v61AccionContrato(accion, contratoId) {
+  var labels = { contrato_aceptar: 'aceptar', contrato_completar: 'completar', contrato_cancelar: 'cancelar' };
+  if (!window.confirm('Seguro que quieres ' + (labels[accion] || 'continuar') + ' este contrato?')) return;
+  v61Post({ tipo: accion, contrato_id: contratoId }).then(function (res) {
+    if (res && res.ok) {
+      showToast('Contrato actualizado');
+      var u = sesion(); if (u) cargarContratos(u.id);
+      if (typeof refrescarSesion === 'function') refrescarSesion();
+      return;
+    }
+    var m = 'No se pudo actualizar el contrato';
+    if (res && res.error === 'TRANSICION_INVALIDA') m = 'Ese contrato ya cambio de estado';
+    else if (res && res.error === 'AUTOACEPTACION_PROHIBIDA') m = 'No puedes aceptar tu propio contrato';
+    else if (res && res.error === 'SOLO_EMPLEADOR') m = 'Solo el empleador puede hacerlo';
+    else if (res) m = v61Msg(res);
+    showToast(m, '#ef4444');
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
 }
 
 /* ---- INIT ---- */

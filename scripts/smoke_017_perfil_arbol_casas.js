@@ -231,7 +231,7 @@ function mockCasa(cfg) {
       return Promise.resolve(cfg.fila ? [cfg.fila] : []);
     if (q.indexOf('casa IS NULL') !== -1 && q.indexOf('casa_elegida_en=NOW()') !== -1)
       return Promise.resolve(cfg.prim || []);
-    if (q.indexOf('xp_total = xp_total - 300') !== -1)
+    if (q.indexOf('xp_total = xp_total - 500') !== -1)
       return Promise.resolve(cfg.cambio || []);
     return Promise.resolve([]);
   };
@@ -331,7 +331,7 @@ async function run() {
   var perfilPublico = {
     id: 'u-pub', nombre: 'Ana Viajera', foto_url: 'https://x/f.jpg',
     avatar_url: null, bio: 'Viajera de corazon', ciudad_base: 'Bogota',
-    pais_base: 'CO', creado_en: '2026-01-01T00:00:00Z', xp_total: 320,
+    pais_base: 'CO',     creado_en: '2026-01-01T00:00:00Z', xp_total: 520,
     faccion: 'exploradores', casa: 'condor',
     capacidades: { perfil_marco_dorado: true, consumibles: { perfil_tema_oscuro: 1 } },
     progreso_logros: { logr_primer_voto: { estado: 'completada', en: '2026-02-01' } },
@@ -398,15 +398,15 @@ async function run() {
     body: { tipo: 'dm_enviar', usuario_id: 'u1', receptor_id: 'u2', texto: 'hola' },
     headers: { authorization: 'Bearer ' + tokenU1 },
     mock: mockDm({
-      emisor: { id: 'u1', nombre: 'Ana', xp_total: 260, email_verificado: true },
+      emisor: { id: 'u1', nombre: 'Ana', xp_total: 505, email_verificado: true },
       receptor: { id: 'u2', nombre: 'Beto', dm_abierto: true },
-      salaPrev: [], cte: [{ sala_id: 'sala-nueva', xp_total: 240 }]
+      salaPrev: [], cte: [{ sala_id: 'sala-nueva', xp_total: 485 }]
     })
   });
   check('C1a: dm_enviar hilo NUEVO -> 200 con xp_cobrado 20',
     dmNew.status === 200 && dmNew.body.ok === true && dmNew.body.xp_cobrado === 20);
   check('C1b: hilo nuevo devuelve xp_total_nuevo y bajo_nivel por debito de 20 XP',
-    dmNew.body.xp_total_nuevo === 240 && dmNew.body.xp_cobrado === 20);
+    dmNew.body.xp_total_nuevo === 485 && dmNew.body.xp_cobrado === 20);
   check('C1c: hilo nuevo devuelve nivel_anterior/nivel_nuevo/bajo_nivel',
     dmNew.body.nivel_anterior === 3 && dmNew.body.nivel_nuevo === 2
     && dmNew.body.bajo_nivel === true);
@@ -416,7 +416,7 @@ async function run() {
     body: { tipo: 'dm_enviar', usuario_id: 'u1', receptor_id: 'u2', texto: 'hola de nuevo' },
     headers: { authorization: 'Bearer ' + tokenU1 },
     mock: mockDm({
-      emisor: { id: 'u1', nombre: 'Ana', xp_total: 300, email_verificado: true },
+      emisor: { id: 'u1', nombre: 'Ana', xp_total: 520, email_verificado: true },
       receptor: { id: 'u2', nombre: 'Beto', dm_abierto: true },
       salaPrev: [{ id: 'sala-exist' }]
     })
@@ -425,7 +425,7 @@ async function run() {
     dmExist.status === 200 && dmExist.body.xp_cobrado === 0
     && dmExist.body.sala_id === 'sala-exist');
   check('C2b: responder un hilo abierto no altera xp_total ni nivel',
-    dmExist.body.xp_total_nuevo === 300 && dmExist.body.nivel_anterior === 3
+    dmExist.body.xp_total_nuevo === 520 && dmExist.body.nivel_anterior === 3
     && dmExist.body.nivel_nuevo === 3 && dmExist.body.bajo_nivel === false);
 
   var dmLow = await invoke(handlerInt, {
@@ -540,7 +540,7 @@ async function run() {
     method: 'POST',
     body: { tipo: 'casa_elegir', usuario_id: 'u-casa', casa: 'jaguar' },
     headers: { authorization: 'Bearer ' + tokenCasa },
-    mock: mockCasa({ fila: { id: 'u-casa', casa: 'condor', casa_elegida_en: reciente, xp_total: 400, email_verificado: true }, cambio: [] })
+    mock: mockCasa({ fila: { id: 'u-casa', casa: 'condor', casa_elegida_en: reciente, xp_total: 2000, email_verificado: true }, cambio: [] })
   });
   check('E3: cambio de Casa en cooldown 30d -> 429 COOLDOWN_CASA',
     e3.status === 429 && e3.body.error === 'COOLDOWN_CASA');
@@ -549,7 +549,7 @@ async function run() {
     method: 'POST',
     body: { tipo: 'casa_elegir', usuario_id: 'u-casa', casa: 'jaguar' },
     headers: { authorization: 'Bearer ' + tokenCasa },
-    mock: mockCasa({ fila: { id: 'u-casa', casa: 'condor', casa_elegida_en: vieja, xp_total: 200, email_verificado: true }, cambio: [] })
+    mock: mockCasa({ fila: { id: 'u-casa', casa: 'condor', casa_elegida_en: vieja, xp_total: 2000, email_verificado: true }, cambio: [] })
   });
   check('E4: cambio de Casa con xp<300 -> 402 PUNTOS_INSUFICIENTES',
     e4.status === 402 && e4.body.error === 'PUNTOS_INSUFICIENTES');
@@ -559,15 +559,15 @@ async function run() {
     body: { tipo: 'casa_elegir', usuario_id: 'u-casa', casa: 'jaguar' },
     headers: { authorization: 'Bearer ' + tokenCasa },
     mock: mockCasa({
-      fila: { id: 'u-casa', casa: null, casa_elegida_en: sinFecha, xp_total: 150, email_verificado: true },
-      prim: [{ casa: 'jaguar', casa_elegida_en: '2026-09-15T00:00:00.000Z', xp_total: 150 }]
+      fila: { id: 'u-casa', casa: null, casa_elegida_en: sinFecha, xp_total: 1650, email_verificado: true },
+      prim: [{ casa: 'jaguar', casa_elegida_en: '2026-09-15T00:00:00.000Z', xp_total: 1650 }]
     })
   });
   check('E5a: primera eleccion de Casa -> 200 gratis',
     e5.status === 200 && e5.body.ok === true && e5.body.data.casa === 'jaguar'
-    && e5.body.data.xp_total_nuevo === 150);
+    && e5.body.data.xp_total_nuevo === 1650);
   check('E5b: primera eleccion devuelve nivel_anterior/nivel_nuevo/bajo_nivel',
-    e5.body.data.nivel_anterior === 2 && e5.body.data.nivel_nuevo === 2
+    e5.body.data.nivel_anterior === 5 && e5.body.data.nivel_nuevo === 5
     && e5.body.data.bajo_nivel === false);
 
   var e6 = await invoke(handlerUsu, {

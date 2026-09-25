@@ -1941,6 +1941,280 @@
 
   window.ExploraCO.gastarXp = gastarXp;
 
+  // ============================================================
+  // Gaming v6.1 (Fase 4) - cartas, moneda, contratos y hoja de vida
+  // ------------------------------------------------------------
+  // Un unico cliente JSON con JWT (Regla de No-Duplicidad) que usan
+  // todas las ramas nuevas. Devuelve SIEMPRE { ok, data, error }:
+  // el caller nunca asume exito (degradacion 503 SCHEMA_NOT_MIGRATED).
+  // ASCII-safe (ADR-002): sin acentos directos ni backticks.
+  // ============================================================
+  function ecEsc(s) {
+    return s == null ? '' : String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function ecJson(path, opciones) {
+    var opt = opciones || {};
+    var headers = window.ExploraCO.authHeaders();
+    var init = { headers: headers };
+    if (opt.method) init.method = opt.method;
+    if (opt.body) {
+      headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opt.body);
+    }
+    return fetch(API + path, init).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        body = body || {};
+        if (body.ok) return { ok: true, data: body.data, raw: body, status: r.status };
+        var err = body.code || body.error || ('HTTP_' + r.status);
+        return { ok: false, error: err, mensaje: ecErrorMsg(err), raw: body, status: r.status };
+      });
+    }).catch(function (err) {
+      return { ok: false, error: 'CONEXION', mensaje: 'Error de conexion', detalle: err && err.message };
+    });
+  }
+
+  // Mensaje discreto unico: 503 SCHEMA_NOT_MIGRATED no rompe la pagina.
+  function ecErrorMsg(err) {
+    if (err === 'SCHEMA_NOT_MIGRATED') return 'Modulo en preparacion';
+    if (err === 'SESION_REQUERIDA' || err === 'SESION_EXPIRADA' || err === 'SESION_INVALIDA') return 'Inicia sesion de nuevo';
+    return err ? String(err) : '';
+  }
+  window.ExploraCO.errorModulo = ecErrorMsg;
+
+  function ecUid(uid) {
+    if (uid) return String(uid);
+    var u = window.ExploraCO.usuario;
+    return (u && u.id) ? String(u.id) : '';
+  }
+
+  window.ExploraCO.catalogoXp = function () {
+    return ecJson('/api/interacciones?tipo=catalogo_xp');
+  };
+  window.ExploraCO.misCartas = function (usuarioId) {
+    return ecJson('/api/usuarios?tipo=cartas_mias&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
+  };
+  window.ExploraCO.cartasGate = function (usuarioId, nivelGate) {
+    var body = { tipo: 'cartas_gate', usuario_id: ecUid(usuarioId) };
+    if (nivelGate != null) body.nivel_gate = nivelGate;
+    return ecJson('/api/usuarios', { method: 'POST', body: body });
+  };
+  window.ExploraCO.monedaSaldo = function (usuarioId) {
+    return ecJson('/api/usuarios?tipo=moneda_saldo&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
+  };
+  window.ExploraCO.miHojaDeVida = function (usuarioId) {
+    return ecJson('/api/usuarios?tipo=artista_cv&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
+  };
+  window.ExploraCO.guardarHojaDeVida = function (datos) {
+    var body = { tipo: 'artista_cv_editar', usuario_id: ecUid() };
+    if (datos && typeof datos === 'object') {
+      if (datos.bio !== undefined) body.bio = datos.bio;
+      if (datos.ciudad !== undefined) body.ciudad = datos.ciudad;
+      if (datos.destacado !== undefined) body.destacado = datos.destacado;
+    }
+    return ecJson('/api/usuarios', { method: 'POST', body: body });
+  };
+  window.ExploraCO.misContratos = function (usuarioId) {
+    return ecJson('/api/interacciones?tipo=contratos_mios&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
+  };
+
+  // -- E1: guia "Como ganar XP" (modal reutilizable) -----------
+  // Consume GET ?tipo=catalogo_xp (publico) y muestra fuentes, caps y
+  // multiplicadores SIN inventar numeros: solo pinta lo que el motor
+  // devuelve. Abrible con ExploraCO.abrirGuiaXP() desde cualquier pagina.
+  // Estilos inline (no inyecta CSS global; respeta ADR-004).
+  var EC_GUIA_STYLE = {
+    block: 'margin-bottom:14px;',
+    h: 'font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#E8A020;margin-bottom:6px;',
+    row: 'display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08);',
+    rowN: 'font-weight:600;color:#F9FAFB;',
+    rowD: 'color:#9CA3AF;text-align:right;flex:0 0 auto;max-width:55%;'
+  };
+
+  function ecGuiaXpItem(it) {
+    if (!it || typeof it !== 'object') return null;
+    var nombre = it.nombre || it.accion || it.clave || it.tipo || it.id || '';
+    var base = (it.xp_base != null) ? it.xp_base : ((it.base != null) ? it.base : null);
+    var cap = (it.cap != null) ? it.cap : ((it.tope != null) ? it.tope : ((it.cap_xp != null) ? it.cap_xp : null));
+    var mult = (it.mult != null) ? it.mult : ((it.multiplicador != null) ? it.multiplicador : null);
+    var desc = it.descripcion || it.detalle || '';
+    var partes = [];
+    if (base != null) partes.push('+' + fmtXp(base) + ' XP base');
+    if (cap != null) partes.push('tope ' + fmtXp(cap) + ' XP');
+    if (mult != null && isFinite(Number(mult))) partes.push('x' + Number(mult).toFixed(2));
+    if (!nombre && !partes.length && !desc) return null;
+    return { nombre: nombre, detalle: partes.join(' / '), desc: desc };
+  }
+
+  function ecGuiaXpLista(titulo, arr) {
+    if (!Array.isArray(arr) || !arr.length) return '';
+    var filas = '';
+    arr.forEach(function (it) {
+      var row = ecGuiaXpItem(it);
+      if (!row) return;
+      var det = row.detalle || '';
+      if (row.desc) det += (det ? ' - ' : '') + row.desc;
+      filas += '<div style="' + EC_GUIA_STYLE.row + '">'
+        + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(row.nombre) + '</div>'
+        + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(det) + '</div>'
+        + '</div>';
+    });
+    if (!filas) return '';
+    return '<div style="' + EC_GUIA_STYLE.block + '">'
+      + '<div style="' + EC_GUIA_STYLE.h + '">' + ecEsc(titulo) + '</div>' + filas + '</div>';
+  }
+
+  function ecGuiaXpParams(titulo, obj) {
+    if (!obj) return '';
+    var filas = '';
+    if (Array.isArray(obj)) {
+      obj.forEach(function (it) {
+        var row = ecGuiaXpItem(it);
+        if (!row) return;
+        filas += '<div style="' + EC_GUIA_STYLE.row + '">'
+          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(row.nombre) + '</div>'
+          + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(row.detalle) + '</div></div>';
+      });
+    } else if (typeof obj === 'object') {
+      Object.keys(obj).forEach(function (k) {
+        var v = obj[k];
+        if (v == null) return;
+        var txt = (typeof v === 'object') ? JSON.stringify(v) : v;
+        filas += '<div style="' + EC_GUIA_STYLE.row + '">'
+          + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(k.replace(/_/g, ' ')) + '</div>'
+          + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(txt) + '</div></div>';
+      });
+    }
+    if (!filas) return '';
+    return '<div style="' + EC_GUIA_STYLE.block + '">'
+      + '<div style="' + EC_GUIA_STYLE.h + '">' + ecEsc(titulo) + '</div>' + filas + '</div>';
+  }
+
+  // Topes por accion: [{accion, tope, unidad}] -> "accion: N unidad".
+  function ecGuiaTopes(arr) {
+    if (!Array.isArray(arr) || !arr.length) return '';
+    var filas = '';
+    arr.forEach(function (t) {
+      if (!t || typeof t !== 'object') return;
+      var nombre = t.accion || t.nombre || '';
+      var valor = (t.tope != null) ? t.tope : t.valor;
+      if (nombre === '' && valor == null) return;
+      var txt = (valor != null ? fmtXp(valor) : '') + (t.unidad ? (' ' + t.unidad) : '');
+      filas += '<div style="' + EC_GUIA_STYLE.row + '">'
+        + '<div style="' + EC_GUIA_STYLE.rowN + '">' + ecEsc(nombre) + '</div>'
+        + '<div style="' + EC_GUIA_STYLE.rowD + '">' + ecEsc(txt) + '</div></div>';
+    });
+    if (!filas) return '';
+    return '<div style="' + EC_GUIA_STYLE.block + '">'
+      + '<div style="' + EC_GUIA_STYLE.h + '">Topes</div>' + filas + '</div>';
+  }
+
+  function ecGuiaXpHtml(d) {
+    if (!d || typeof d !== 'object') return ecEsc('La guia aun no esta disponible.');
+    var esArray = Array.isArray(d);
+    var fuentes = esArray ? d : (d.fuentes || d.catalogo || d.items || d.bases || null);
+    var html = ecGuiaXpLista('Fuentes de XP', fuentes);
+    if (!esArray) {
+      html += ecGuiaTopes(d.topes);
+      html += ecGuiaXpParams('Topes de multiplicador', d.caps);
+      html += ecGuiaXpParams('Multiplicadores', d.multiplicadores || d.mult);
+    }
+    return html || ecEsc('La guia aun no esta disponible.');
+  }
+
+  window.ExploraCO.abrirGuiaXP = function () {
+    var previo = document.getElementById('ec-guia-xp');
+    if (previo && previo.parentNode) previo.parentNode.removeChild(previo);
+
+    var overlay = document.createElement('div');
+    overlay.id = 'ec-guia-xp';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Como ganar XP');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10003;'
+      + 'display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.78);padding:18px;font-family:inherit;';
+
+    var card = document.createElement('div');
+    card.style.cssText = 'max-width:520px;width:100%;background:linear-gradient(160deg,#111827,#0d1117);'
+      + 'border:1px solid rgba(232,160,32,.55);border-radius:18px;padding:22px 20px;color:#F9FAFB;'
+      + 'max-height:88vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.55);';
+
+    function cerrarGuiaXP() {
+      var el = document.getElementById('ec-guia-xp');
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }
+
+    var head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;';
+    var title = document.createElement('div');
+    title.textContent = 'Como ganar XP';
+    title.style.cssText = 'font-size:20px;font-weight:800;';
+    head.appendChild(title);
+    var btnX = document.createElement('button');
+    btnX.type = 'button';
+    btnX.textContent = '\u00d7';
+    btnX.setAttribute('aria-label', 'Cerrar');
+    btnX.style.cssText = 'background:none;border:none;color:#9CA3AF;font-size:22px;line-height:1;cursor:pointer;';
+    btnX.onclick = cerrarGuiaXP;
+    head.appendChild(btnX);
+    card.appendChild(head);
+
+    var bodyEl = document.createElement('div');
+    bodyEl.id = 'ec-guia-xp-body';
+    bodyEl.style.cssText = 'font-size:13px;line-height:1.5;';
+    bodyEl.textContent = 'Cargando fuentes de XP\u2026';
+    card.appendChild(bodyEl);
+
+    overlay.appendChild(card);
+    overlay.onclick = function (ev) { if (ev.target === overlay) cerrarGuiaXP(); };
+    document.body.appendChild(overlay);
+
+    window.ExploraCO.catalogoXp().then(function (res) {
+      var b = document.getElementById('ec-guia-xp-body');
+      if (!b) return;
+      if (!res || !res.ok) {
+        b.innerHTML = ecEsc((res && res.mensaje) || 'No se pudo cargar la guia');
+        return;
+      }
+      b.innerHTML = ecGuiaXpHtml(res.data);
+    });
+  };
+
+  // -- Chip de saldo CDR (Condor) en la barra de perfil --------
+  // Tolerante a fallo: si la rama no existe (503) o falla, el chip
+  // queda oculto y la barra sigue funcionando igual.
+  var _cdrPidiendo = false;
+  function cdrChipEl() {
+    var el = document.getElementById('perfil-cdr');
+    if (el) return el;
+    var perfilBtn = document.getElementById('btn-perfil-viajero');
+    if (!perfilBtn) return null;
+    el = document.createElement('span');
+    el.id = 'perfil-cdr';
+    el.style.cssText = 'display:none;margin-left:8px;padding:2px 8px;border-radius:999px;'
+      + 'background:rgba(232,160,32,.18);border:1px solid rgba(232,160,32,.4);'
+      + 'color:#E8A020;font-size:11px;font-weight:700;white-space:nowrap;';
+    perfilBtn.appendChild(el);
+    return el;
+  }
+  function actualizarCdrChip(usuarioId) {
+    var el = cdrChipEl();
+    if (!el || !usuarioId || _cdrPidiendo) return;
+    _cdrPidiendo = true;
+    window.ExploraCO.monedaSaldo(usuarioId).then(function (res) {
+      _cdrPidiendo = false;
+      if (!res || !res.ok || res.data == null) { el.style.display = 'none'; return; }
+      var d = res.data;
+      var saldo = (d && typeof d === 'object') ? (d.saldo != null ? d.saldo : d.moneda) : d;
+      var n = Number(saldo);
+      if (!isFinite(n)) { el.style.display = 'none'; return; }
+      el.textContent = fmtXp(n) + ' CDR';
+      el.style.display = '';
+    });
+  }
+
   // ── Actualizar UI según estado de sesión ───────────────────
   function actualizarUI() {
     var usuario = window.ExploraCO.usuario;
@@ -1959,6 +2233,8 @@
         if (nameEl) nameEl.textContent = usuario.nombre;
         if (xpEl)   xpEl.textContent   = fmtXp(usuario.xp_total) + ' XP';
         if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
+        // Gaming v6.1: saldo CDR (Condor) como chip junto al XP.
+        actualizarCdrChip(usuario.id);
         // ADR-058: badge de categoria de origen en el navbar (si la
         // pagina provee el contenedor #perfil-origen). La logica vive
         // aqui (fuente unica); index.html solo aporta el elemento.
@@ -1980,6 +2256,9 @@
       // ADR-058: sin sesion no hay origen que mostrar.
       var origenElOut = document.getElementById('perfil-origen');
       if (origenElOut) origenElOut.style.display = 'none';
+      // Gaming v6.1: sin sesion no hay saldo CDR que mostrar.
+      var cdrElOut = document.getElementById('perfil-cdr');
+      if (cdrElOut) cdrElOut.style.display = 'none';
     }
 
     // Actualizar botones de guardar que tengan data-uuid

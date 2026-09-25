@@ -207,6 +207,12 @@ function nodoMercadoPorNivelLocal(nivelJugador) {
   }
   return idx + 1;
 }
+// ADR-059 / ADR-064 (M-6 CERRADO): umbral de CREACION de Marca. La columna
+// marcas.nivel_requerido (migracion 027) es la fuente; este valor es el
+// fallback ASCII cuando la fila/columna aun no expone el dato (default
+// acordado 6). El grandfathering de EDICION vive en la rama marca_activar.
+var MARCA_NIVEL_REQUERIDO_DEFAULT = 6;
+
 function calcularMercadoLocal(puntos, nivelJugador) {
   const p = Number(puntos) || 0;
   let idx = 0;
@@ -254,6 +260,54 @@ function conNivel(row) {
   row.mercado_puntos = red2(numXp(row.mercado_puntos));
   row.mercado_nodo = calcularMercadoLocal(row.mercado_puntos, calc.nivel);
   return row;
+}
+
+// ADR-062 (Fase 2C, T7): niveles-gate del set COMPLETO de cartas. Espejo del
+// CHECK nivel_gate IN (10,14,20,25) de la migracion 040 (Regla de No
+// Duplicidad: un unico catalogo en el backend).
+var CARTAS_GATES_NIVELES = [10, 14, 20, 25];
+
+// ADR-053 / ADR-062 (A-1 CERRADO): nivel_visible = GREATEST(nivel derivado de
+// xp_total, COALESCE(nivel_max,1)). Es el nivel que gobierna el grandfathering
+// de cartas-gate: quien llego al nivel y luego gasto XP NO se bloquea.
+function nivelVisibleDe(row) {
+  var derivado = calcularNivel(row && row.xp_total).nivel;
+  var nivelMax = Number(row && row.nivel_max) || 1;
+  return Math.max(derivado, nivelMax);
+}
+
+// ADR-061/ADR-062 (Fase 2C): 503 tipado si falta el esquema de la 040
+// (cartas_*/moneda_*). Nunca catch vacio.
+function responderSchemaPendiente(res, etiqueta, e) {
+  console.warn('[usuarios] ' + etiqueta + ' ausente (migracion 040 pendiente): '
+    + (e && e.code ? e.code + ' ' : '') + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Recurso no disponible (migracion 040 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// ADR-064 (Fase 2C, T9): metadatos de la hoja de vida del artista. Limites
+// acotados de longitud (merge JSONB, ADR-003). Devuelve un objeto con solo
+// las claves VALIDAS enviadas (no muta el body).
+function construirMetaArtista(body) {
+  var meta = {};
+  if (body.bio !== undefined) {
+    var bio = (typeof body.bio === 'string') ? body.bio.trim() : '';
+    if (bio.length > 280) return { error: 'BIO_LARGA' };
+    meta.bio = bio;
+  }
+  if (body.ciudad !== undefined) {
+    var ciudad = (typeof body.ciudad === 'string') ? body.ciudad.trim() : '';
+    if (ciudad.length > 80) return { error: 'CIUDAD_LARGA' };
+    meta.ciudad = ciudad;
+  }
+  if (body.destacado !== undefined) {
+    if (typeof body.destacado !== 'boolean') return { error: 'DESTACADO_INVALIDO' };
+    meta.destacado = body.destacado;
+  }
+  return { meta: meta };
 }
 
 // Misiones que desbloquean capacidades de UI (Fase 3, ver
@@ -499,8 +553,221 @@ module.exports = async (req, res) => {
           + 'FROM marcas m WHERE m.usuario_id=$1 LIMIT 1',
           [mmId]
         );
-        return res.json({ ok: true, data: mmRows.length ? mmRows[0] : null });
+        // ADR-059 / ADR-064 (M-6): se expone de forma ADITIVA el umbral de
+        // Marca desde marcas.nivel_requerido (fallback 6 si NULL/ausente),
+        // para que la UI no anuncie un gate distinto al real. Sin fila de
+        // marca se responde data=null con el umbral a nivel raiz.
+        if (mmRows.length) {
+          var mmNr = parseInt(mmRows[0].nivel_requerido, 10);
+          mmRows[0].nivel_requerido = (isFinite(mmNr) && mmNr >= 1)
+            ? mmNr : MARCA_NIVEL_REQUERIDO_DEFAULT;
+          return res.json({ ok: true, data: mmRows[0] });
+        }
+        return res.json({ ok: true, data: null, nivel_requerido: MARCA_NIVEL_REQUERIDO_DEFAULT });
       }
+
+      // ---- GET: mis cartas (Fase 2C, T7.1 / ADR-062) ---------------
+      // Coleccion del usuario (?usuario_id) + estado de los gates de
+      // grandfathering (cartas_gates) + el requisito por nivel-gate
+      // (set completo de cartas_catalogo con nivel_gate IN 10/14/20/25).
+      // Requiere la migracion 040; sin ella responde 503 tipado.
+      if (tipo === 'cartas_mias') {
+        var cmId = String(req.query.usuario_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cmId))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var cmUsr, cmCartas, cmGates, cmReq;
+        try {
+          cmUsr = await sql('SELECT xp_total, nivel_max FROM usuarios WHERE id=$1 LIMIT 1', [cmId]);
+          if (!cmUsr.length)
+            return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+          cmCartas = await sql(
+            'SELECT c.id, c.nombre, c.set_slug, c.rareza, c.nivel_gate, c.es_evento,'
+            + ' c.imagen_url, COALESCE(uc.cantidad, 0)::int AS cantidad,'
+            + ' COALESCE(uc.activo, false) AS activa'
+            + ' FROM cartas_catalogo c'
+            + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
+            + ' WHERE c.activo = true'
+            + ' ORDER BY c.set_slug ASC, c.nivel_gate ASC NULLS LAST, c.id ASC',
+            [cmId]
+          );
+          cmGates = await sql(
+            'SELECT nivel_gate, set_slug, consumido_en FROM cartas_gates'
+            + ' WHERE usuario_id = $1 ORDER BY nivel_gate ASC',
+            [cmId]
+          );
+          cmReq = await sql(
+            'SELECT c.set_slug, c.nivel_gate, COUNT(*)::int AS total,'
+            + ' COUNT(*) FILTER (WHERE uc.activo = true AND uc.cantidad >= 1)::int AS obtenidas'
+            + ' FROM cartas_catalogo c'
+            + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
+            + ' WHERE c.activo = true AND c.nivel_gate IN (10,14,20,25)'
+            + ' GROUP BY c.set_slug, c.nivel_gate ORDER BY c.nivel_gate ASC',
+            [cmId]
+          );
+        } catch (eCm) {
+          if (!eCm || (eCm.code !== '42P01' && eCm.code !== '42703')) throw eCm;
+          return responderSchemaPendiente(res, 'cartas_mias', eCm);
+        }
+        cmReq = cmReq.map(function (r) {
+          r.total = Number(r.total) || 0;
+          r.obtenidas = Number(r.obtenidas) || 0;
+          r.completo = r.obtenidas >= r.total;
+          return r;
+        });
+        return res.json({
+          ok: true,
+          data: {
+            usuario_id: cmId,
+            nivel_visible: nivelVisibleDe(cmUsr[0]),
+            cartas: cmCartas,
+            gates: cmGates,
+            requisitos: cmReq
+          }
+        });
+      }
+
+      // ---- GET: saldo de la moneda secundaria (Fase 2C, T8.1 / ADR-061) --
+      // Saldo derivado del ledger "Condor" (CDR): se expone el saldo cacheado
+      // de moneda_cuentas y la verificacion defensiva contra SUM(delta) del
+      // ledger (cuadra = ambos coinciden). Sin PII. Requiere la 040.
+      if (tipo === 'moneda_saldo') {
+        var mslId = String(req.query.usuario_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mslId))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var mslRows;
+        try {
+          mslRows = await sql(
+            'SELECT COALESCE((SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1), 0) AS saldo,'
+            + ' COALESCE((SELECT SUM(delta) FROM moneda_ledger WHERE usuario_id=$1), 0) AS ledger_sum',
+            [mslId]
+          );
+        } catch (eMsl) {
+          if (!eMsl || (eMsl.code !== '42P01' && eMsl.code !== '42703')) throw eMsl;
+          return responderSchemaPendiente(res, 'moneda_saldo', eMsl);
+        }
+        var mslSaldo = red2(numXp(mslRows.length ? mslRows[0].saldo : 0));
+        var mslLedger = red2(numXp(mslRows.length ? mslRows[0].ledger_sum : 0));
+        return res.json({
+          ok: true,
+          data: {
+            usuario_id: mslId,
+            moneda: 'CDR',
+            saldo: mslSaldo,
+            ledger_sum: mslLedger,
+            cuadra: mslSaldo === mslLedger
+          }
+        });
+      }
+
+      // ---- GET: hoja de vida del artista (Fase 2C, T9.1 / ADR-064) --
+      // Vista publica DERIVADA (solo lectura): vocaciones, obras (album_fotos
+      // visible=true de tipo foto/video/audio), resenas largas, logros
+      // (usuarios.progreso_logros), contratos P2P completados y patrocinios
+      // recibidos, + metadatos usuarios.artista_cv. NO persiste scores y NO
+      // expone PII (ni email ni auth_id). Cada seccion degrada a [] si su
+      // tabla falta (nunca rompe la lectura del perfil).
+      if (tipo === 'artista_cv') {
+        var acvId = String(req.query.usuario_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(acvId))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var acvUsr = await sql(
+          'SELECT id, nombre, avatar_url, foto_url, bio, ciudad_base, pais_base,'
+          + ' xp_total, nivel_max, vocaciones, progreso_logros, artista_cv'
+          + ' FROM usuarios WHERE id=$1 AND activo=true LIMIT 1',
+          [acvId]
+        );
+        if (!acvUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var acvU = acvUsr[0];
+        var acvObras = await sql(
+          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.creado_en'
+          + ' FROM album_fotos af'
+          + ' WHERE af.agregador_id=$1 AND af.foto_type IN (\'foto\',\'video\',\'audio\')'
+          + ' AND af.visible=true AND af.activo=true'
+          + ' ORDER BY af.creado_en DESC LIMIT 100',
+          [acvId]
+        ).catch(function (eO) {
+          console.warn('[artista_cv] obras no leidas: ' + (eO && eO.message));
+          return [];
+        });
+        var acvResenas = await sql(
+          'SELECT i.id, i.destino_id, i.rating, i.texto, i.creado_en,'
+          + ' d.nombre AS destino_nombre, d.slug AS destino_slug'
+          + ' FROM interacciones i'
+          + ' LEFT JOIN destinos d ON d.id = i.destino_id'
+          + ' WHERE i.usuario_id=$1 AND i.tipo=\'resena\' AND i.activo=true'
+          + ' AND LENGTH(TRIM(COALESCE(i.texto, \'\'))) > 50'
+          + ' ORDER BY i.creado_en DESC LIMIT 50',
+          [acvId]
+        ).catch(function (eR) {
+          console.warn('[artista_cv] resenas no leidas: ' + (eR && eR.message));
+          return [];
+        });
+        var acvContratos = await sql(
+          'SELECT id, tipo_encargo, recompensa_xp, estado, creado_en, actualizado_en'
+          + ' FROM contratos_p2p'
+          + ' WHERE estado=\'completado\' AND (contratado_id=$1 OR empleador_id=$1)'
+          + ' ORDER BY actualizado_en DESC LIMIT 50',
+          [acvId]
+        ).catch(function (eC) {
+          console.warn('[artista_cv] contratos no leidos: ' + (eC && eC.message));
+          return [];
+        });
+        var acvPatrocinios = await sql(
+          'SELECT p.id, p.marca_id, m.nombre AS marca_nombre, m.logo_url AS marca_logo,'
+          + ' p.xp_aportada, p.fama_bonus, p.creado_en'
+          + ' FROM patrocinios p JOIN marcas m ON m.id = p.marca_id'
+          + ' WHERE p.activo=true AND p.tipo_objetivo=\'artista\' AND p.objetivo_id=$1'
+          + ' ORDER BY p.creado_en DESC LIMIT 50',
+          [acvId]
+        ).catch(function (eP) {
+          console.warn('[artista_cv] patrocinios no leidos: ' + (eP && eP.message));
+          return [];
+        });
+        var acvVoc = acvU.vocaciones || {};
+        var acvLogrosProg = acvU.progreso_logros || {};
+        var acvMeta = acvU.artista_cv || {};
+        return res.json({
+          ok: true,
+          data: {
+            artista: {
+              id: acvU.id,
+              nombre: acvU.nombre,
+              avatar_url: acvU.avatar_url || null,
+              foto_url: acvU.foto_url || null,
+              bio: acvU.bio || null,
+              ciudad_base: acvU.ciudad_base || null,
+              pais_base: acvU.pais_base || null,
+              xp_total: red2(numXp(acvU.xp_total)),
+              nivel_visible: nivelVisibleDe(acvU),
+              era: calcularEra(nivelVisibleDe(acvU))
+            },
+            metadatos: {
+              bio: (acvMeta.bio !== undefined ? acvMeta.bio : ''),
+              ciudad: (acvMeta.ciudad !== undefined ? acvMeta.ciudad : ''),
+              destacado: (acvMeta.destacado === true)
+            },
+            vocaciones: Object.keys(acvVoc),
+            obras: acvObras,
+            resenas: acvResenas,
+            logros: Object.keys(acvLogrosProg).map(function (k) {
+              var v = acvLogrosProg[k];
+              return { id: k, obtenido: (v && typeof v === 'object') ? (v.obtenido || null) : null };
+            }),
+            contratos: acvContratos,
+            patrocinios: acvPatrocinios,
+            totales: {
+              obras: acvObras.length,
+              resenas: acvResenas.length,
+              logros: Object.keys(acvLogrosProg).length,
+              contratos: acvContratos.length,
+              patrocinios: acvPatrocinios.length,
+              vocaciones: Object.keys(acvVoc).length
+            }
+          }
+        });
+      }
+
       if (tipo === 'leaderboard') {
         const rows = await sql(
           'SELECT id, nombre, avatar_url, perfil_tipo, xp_total, nivel, '
@@ -1030,7 +1297,8 @@ module.exports = async (req, res) => {
       // mismos UPDATE condicionales para resolver carreras), con dos
       // diferencias deliberadas: (1) exige sesion firmada del propio
       // usuario (ADR-025), porque casa_elegida_en es dato de su cuenta;
-      // (2) la primera eleccion exige nivel >= 2. Primera eleccion:
+      // (2) la primera eleccion exige nivel DERIVADO >= 5 (ADR-059; antes 2).
+      // Primera eleccion:
       // gratis (WHERE casa IS NULL). Cambio: cuesta COSTO_CASA (500)
       // xp_total (debito atomico con WHERE xp_total >= COSTO_CASA, patron de
       // comprar_consumible; precio ADR-053 Decision 10)
@@ -1057,8 +1325,10 @@ module.exports = async (req, res) => {
           return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
         var ceXp = numXp(ceFila[0].xp_total);
         var ceNivelAnt = calcularNivel(ceXp).nivel;
-        if (ceNivelAnt < 2)
-          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: ceNivelAnt, nivel_requerido: 2 });
+        // ADR-059: Casa @nivel 5 (sube de 2 a 5). Se evalua sobre el nivel
+        // DERIVADO de xp_total (calcularNivel), nunca sobre usuarios.nivel.
+        if (ceNivelAnt < 5)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: ceNivelAnt, nivel_requerido: 5 });
         if (!ceFila[0].casa) {
           // Primera eleccion: el WHERE casa IS NULL protege la carrera y
           // el 409 si otro request gano la eleccion primero.
@@ -1139,8 +1409,10 @@ module.exports = async (req, res) => {
       // ---- Rama: elegir o cambiar Clase Rising Star (TSK-112 / ADR-038) --
       // Espejo de casa_elegir (sesion firmada ADR-025, email verificado,
       // primera eleccion gratis y recambio con coste de COSTO_CLASE (500)
-      // XP + cooldown de 30 dias via clase_elegida_en (ADR-053 Decision 10),
-      // SIN gate de nivel. NO toca el
+      // XP + cooldown de 30 dias via clase_elegida_en (ADR-053 Decision 10).
+      // ADR-059: la PRIMERA eleccion de Clase exige nivel DERIVADO >= 3
+      // (primera gratis, WHERE clase_id IS NULL); el RECAMBIO no lleva gate
+      // adicional. NO toca el
       // Arbol de Clases de 16 ramas (usuarios.progreso_arbol): la Clase es
       // una capa nueva que COEXISTE con el arbol (ADR-038). Al recambiar,
       // nivel_clase vuelve a 1 y xp_clase a 0: la nueva profesion empieza
@@ -1165,6 +1437,10 @@ module.exports = async (req, res) => {
           return res.status(403).json({ ok: false, error: 'EMAIL_SIN_VERIFICAR' });
         var clXp = numXp(clFila[0].xp_total);
         var clNivelAnt = calcularNivel(clXp).nivel;
+        // ADR-059 (E2): gate SOLO para la PRIMERA eleccion (clase_id IS NULL).
+        // Quien ya tiene Clase (recambio) mantiene el flujo actual sin gate.
+        if (!clFila[0].clase_id && clNivelAnt < 3)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: clNivelAnt, nivel_requerido: 3 });
         if (!clFila[0].clase_id) {
           // Primera eleccion: el WHERE clase_id IS NULL protege la carrera
           // y el 409 si otro request gano la eleccion primero.
@@ -1473,8 +1749,11 @@ module.exports = async (req, res) => {
       // ---- Rama: activar / actualizar Marca del usuario (TSK-120) ---
       // POST { tipo:'marca_activar', usuario_id, nombre, logo_url?,
       //        banner_url?, descripcion?, areas_influencia?, enlaces? }
-      // Requiere JWT valido del propio usuario. Nivel minimo: 5.
-      // MERGE JSONB: cero reemplazo total (ADR-003).
+      // Requiere JWT valido del propio usuario. Nivel minimo: el que fije
+      // marcas.nivel_requerido (ADR-059/ADR-064 M-6; default 6 si NULL).
+      // GRANDFATHERING de EDICION: una marca ya creada se puede editar/
+      // reactivar aunque el dueno haya bajado de nivel (el gate aplica a la
+      // CREACION). MERGE JSONB: cero reemplazo total (ADR-003).
       if (c.tipo === 'marca_activar') {
         var maUid = String(c.usuario_id || '');
         if (!maUid) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
@@ -1482,11 +1761,25 @@ module.exports = async (req, res) => {
         if (!maJwt || !maJwt.ok) return res.status(401).json({ ok: false, error: 'No autorizado' });
         var maNombre = String(c.nombre || '').trim().slice(0, 120);
         if (!maNombre) return res.status(400).json({ ok: false, error: 'nombre requerido' });
-        // Nivel minimo 5. usuarios.nivel esta STALE: se recalcula en
-        // lectura con calcularNivel(xp_total) (misma funcion que conNivel).
-        var maUser = await sql('SELECT xp_total FROM usuarios WHERE id=$1 LIMIT 1', [maUid]);
-        if (!maUser.length || calcularNivel(maUser[0].xp_total).nivel < 5)
-          return res.status(403).json({ ok: false, error: 'Nivel m\u00ednimo 5 requerido para activar una Marca' });
+        // ADR-059/ADR-064 (M-6): el gate de CREACION se lee de la columna
+        // marcas.nivel_requerido (fallback 6 si NULL/ausente); usuarios.nivel
+        // esta STALE y el nivel se DERIVA de xp_total con calcularNivel.
+        // GRANDFATHERING de EDICION: si el usuario YA tiene fila en marcas
+        // (marca_id no NULL), se permite el UPDATE aunque su nivel derivado
+        // sea menor al requerido (el gate solo aplica a la CREACION).
+        var maUser = await sql(
+          'SELECT u.xp_total, m.id AS marca_id, m.nivel_requerido AS marca_nivel_requerido '
+          + 'FROM usuarios u LEFT JOIN marcas m ON m.usuario_id = u.id '
+          + 'WHERE u.id=$1 LIMIT 1',
+          [maUid]
+        );
+        if (!maUser.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var maNivelReq = parseInt(maUser[0].marca_nivel_requerido, 10);
+        if (!isFinite(maNivelReq) || maNivelReq < 1) maNivelReq = MARCA_NIVEL_REQUERIDO_DEFAULT;
+        var maNivel = calcularNivel(maUser[0].xp_total).nivel;
+        if (!maUser[0].marca_id && maNivel < maNivelReq)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: maNivel, nivel_requerido: maNivelReq });
         var maAreas  = c.areas_influencia ? JSON.stringify(c.areas_influencia) : null;
         var maLinks  = c.enlaces          ? JSON.stringify(c.enlaces)           : null;
         var maFila = await sql(
@@ -1525,7 +1818,9 @@ module.exports = async (req, res) => {
         var mpObjId = String(c.objetivo_id || '');
         if (!mpTipo || !mpObjId)
           return res.status(400).json({ ok: false, error: 'tipo_objetivo y objetivo_id requeridos' });
-        var TIPOS_VALIDOS = ['evento','artista','parche','mision'];
+        // ADR-064: la marca puede patrocinar/capturar un SPOT (presencia de
+        // marca verificada); tipo_objetivo='spot' (sin CHECK en la 027/040).
+        var TIPOS_VALIDOS = ['evento','artista','parche','mision','spot'];
         if (TIPOS_VALIDOS.indexOf(mpTipo) === -1)
           return res.status(400).json({ ok: false, error: 'tipo_objetivo inv\u00e1lido' });
         // Verificar que la marca es del usuario y esta activa
@@ -1544,6 +1839,143 @@ module.exports = async (req, res) => {
           [mpMarca[0].id, mpTipo, mpObjId, mpXp, mpFama, mpBrand]
         );
         return res.json({ ok: true, patrocinio_id: mpFila[0].id });
+      }
+
+      // ---- POST: registrar el gate de cartas (Fase 2C, T7.2 / ADR-062) --
+      // POST { tipo:'cartas_gate', usuario_id, nivel_gate? }
+      // El gate alcanzable se determina sobre nivel_visible (A-1 CERRADO).
+      // Si el set COMPLETO del set_slug esta en usuarios_cartas (activo=true,
+      // cantidad>=1) y no hay fila previa, inserta cartas_gates
+      // (grandfathering). Si falta el set -> 403 con la lista de faltantes.
+      // Las cartas de gate NO se consumen (solo activan el flag).
+      if (c.tipo === 'cartas_gate') {
+        var cgUid = String(c.usuario_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cgUid))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var cgSes = validarSesionUsuario(req, cgUid);
+        if (!cgSes.ok)
+          return res.status(401).json({ ok: false, error: cgSes.razon });
+        var cgUsr, cgSet, cgPrev, cgFalt;
+        try {
+          cgUsr = await sql('SELECT xp_total, nivel_max FROM usuarios WHERE id=$1 LIMIT 1', [cgUid]);
+          if (!cgUsr.length)
+            return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        } catch (eCgU) {
+          if (!eCgU || (eCgU.code !== '42P01' && eCgU.code !== '42703')) throw eCgU;
+          return responderSchemaPendiente(res, 'cartas_gate', eCgU);
+        }
+        var cgNivelVisible = nivelVisibleDe(cgUsr[0]);
+        var cgGate = null;
+        if (c.nivel_gate !== undefined && c.nivel_gate !== null && String(c.nivel_gate).trim() !== '') {
+          var cgGatePedido = parseInt(c.nivel_gate, 10);
+          if (CARTAS_GATES_NIVELES.indexOf(cgGatePedido) === -1)
+            return res.status(400).json({ ok: false, error: 'nivel_gate invalido (10|14|20|25)' });
+          cgGate = cgGatePedido;
+        } else {
+          // Gate alcanzable mas alto con nivel_visible.
+          for (var cgI = 0; cgI < CARTAS_GATES_NIVELES.length; cgI++) {
+            if (cgNivelVisible >= CARTAS_GATES_NIVELES[cgI]) cgGate = CARTAS_GATES_NIVELES[cgI];
+          }
+        }
+        if (cgGate === null)
+          return res.status(403).json({
+            ok: false, error: 'GATE_NO_ALCANZABLE',
+            nivel_visible: cgNivelVisible, nivel_gate: null
+          });
+        // El gate solicitado solo es registrable si nivel_visible ya lo
+        // alcanzo (grandfathering A-1: quien llego y gasto XP sigue cubierto).
+        if (cgNivelVisible < cgGate)
+          return res.status(403).json({
+            ok: false, error: 'NIVEL_INSUFICIENTE',
+            nivel_visible: cgNivelVisible, nivel_gate: cgGate, nivel_requerido: cgGate
+          });
+        try {
+          cgSet = await sql(
+            'SELECT DISTINCT set_slug FROM cartas_catalogo'
+            + ' WHERE activo=true AND nivel_gate=$1 ORDER BY set_slug LIMIT 1',
+            [cgGate]
+          );
+          if (!cgSet.length)
+            return res.status(404).json({ ok: false, error: 'SET_NO_ENCONTRADO', nivel_gate: cgGate });
+          var cgSetSlug = String(cgSet[0].set_slug);
+          cgPrev = await sql(
+            'SELECT nivel_gate FROM cartas_gates WHERE usuario_id=$1 AND nivel_gate=$2 LIMIT 1',
+            [cgUid, cgGate]
+          );
+          if (cgPrev.length)
+            return res.json({
+              ok: true, ya_registrado: true, nivel_gate: cgGate,
+              set_slug: cgSetSlug, nivel_visible: cgNivelVisible
+            });
+          cgFalt = await sql(
+            'SELECT c.id FROM cartas_catalogo c'
+            + ' LEFT JOIN usuarios_cartas uc ON uc.carta_id = c.id AND uc.usuario_id = $1'
+            + ' WHERE c.activo=true AND c.nivel_gate=$2'
+            + ' AND (uc.activo IS NOT TRUE OR uc.cantidad < 1)'
+            + ' ORDER BY c.id ASC',
+            [cgUid, cgGate]
+          );
+          if (cgFalt.length) {
+            var cgFaltantes = cgFalt.map(function (f) { return String(f.id); });
+            return res.status(403).json({
+              ok: false, error: 'SET_INCOMPLETO',
+              nivel_gate: cgGate, set_slug: cgSetSlug, faltantes: cgFaltantes
+            });
+          }
+          var cgIns = await sql(
+            'INSERT INTO cartas_gates (usuario_id, nivel_gate, set_slug, consumido_en)'
+            + ' VALUES ($1, $2, $3, NOW())'
+            + ' ON CONFLICT (usuario_id, nivel_gate) DO NOTHING'
+            + ' RETURNING nivel_gate, set_slug, consumido_en',
+            [cgUid, cgGate, cgSetSlug]
+          );
+          if (!cgIns.length)
+            return res.json({
+              ok: true, ya_registrado: true, nivel_gate: cgGate,
+              set_slug: cgSetSlug, nivel_visible: cgNivelVisible
+            });
+          return res.json({
+            ok: true, registrado: true, nivel_gate: cgGate,
+            set_slug: cgSetSlug, consumido_en: cgIns[0].consumido_en,
+            nivel_visible: cgNivelVisible
+          });
+        } catch (eCg) {
+          if (!eCg || (eCg.code !== '42P01' && eCg.code !== '42703')) throw eCg;
+          return responderSchemaPendiente(res, 'cartas_gate', eCg);
+        }
+      }
+
+      // ---- POST: editar la hoja de vida del artista (T9.2 / ADR-064) ----
+      // POST { tipo:'artista_cv_editar', usuario_id, bio?, ciudad?, destacado? }
+      // Merge JSONB (ADR-003): COALESCE(artista_cv,'{}'::jsonb) || $N::jsonb.
+      // Nunca reemplazo total; longitudes acotadas; sesion firmada.
+      if (c.tipo === 'artista_cv_editar') {
+        var acvEditUid = String(c.usuario_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(acvEditUid))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var acvEditSes = validarSesionUsuario(req, acvEditUid);
+        if (!acvEditSes.ok)
+          return res.status(401).json({ ok: false, error: acvEditSes.razon });
+        var acvMetaRes = construirMetaArtista(c);
+        if (acvMetaRes.error)
+          return res.status(400).json({ ok: false, error: acvMetaRes.error });
+        var acvMetaNueva = acvMetaRes.meta;
+        if (!Object.keys(acvMetaNueva).length)
+          return res.status(400).json({ ok: false, error: 'NADA_QUE_ACTUALIZAR' });
+        var acvEditUpd;
+        try {
+          acvEditUpd = await sql(
+            'UPDATE usuarios SET artista_cv = COALESCE(artista_cv, \'{}\'::jsonb) || $1::jsonb'
+            + ' WHERE id=$2 RETURNING artista_cv',
+            [JSON.stringify(acvMetaNueva), acvEditUid]
+          );
+        } catch (eAcvE) {
+          if (!eAcvE || (eAcvE.code !== '42P01' && eAcvE.code !== '42703')) throw eAcvE;
+          return responderSchemaPendiente(res, 'artista_cv_editar', eAcvE);
+        }
+        if (!acvEditUpd.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        return res.json({ ok: true, data: { artista_cv: acvEditUpd[0].artista_cv || {} } });
       }
 
       // ---- Upsert de registro (login con email / google) ------------

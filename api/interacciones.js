@@ -772,6 +772,584 @@ function origenLedger(res, fuente, punto) {
   };
 }
 
+// =====================================================================
+// FASE 2B (ADR-065 / ADR-063): Own the Spot multi-media + Gobernanza.
+// Todo es ADITIVO sobre las ramas existentes (cero endpoints nuevos,
+// 8/8 ADR-001). Todo helper degrada 42P01/42703 (migracion 040 pendiente)
+// con console.warn (nunca catch vacio); el resto de errores se re-lanza.
+// =====================================================================
+
+// Limite LEGAL del tope agregado por interaccion (A-2 CERRADO): regalias
+// (037, 20%) + dividendo (10%) no pueden superar el 50% del XP base. El
+// CHECK real de spot_dividendos es monto_descontado <= xp_bruto_base * 0.50
+// sobre numeric EXACTO; el redondeo half-up del JS puede dar un valor
+// nominalmente igual en double pero > en numeric (p. ej. base 0.05 ->
+// 0.001 (25%) que redondea a 0.05 = 100%). Estos dos helpers aplican el
+// techo matematico real y una ULTIMA correccion de borde antes de escribir.
+var DIVIDENDO_SPOT_PCT = 0.10;
+var DIVIDENDO_SPOT_TOPE_PCT = 0.50;
+
+function techoLegalDividendoSpin(xpBrutoBase) {
+  var base = numXp(xpBrutoBase);
+  if (!(base > 0)) return 0;
+  return Math.max(0, red2((base * DIVIDENDO_SPOT_TOPE_PCT) - 0.01));
+}
+
+function red2ConTopeSpin(monto, xpBrutoBase) {
+  var m = red2(monto);
+  var base = numXp(xpBrutoBase);
+  if (!(base > 0)) return 0;
+  for (var i = 0; i < 10 && m > 0 && base * DIVIDENDO_SPOT_TOPE_PCT < m; i++) {
+    m = red2(m - 0.01);
+  }
+  return Math.max(0, m);
+}
+
+// FASE 2B (T5.1 / ADR-065): resolver de DUENOS de un spot BAJO DEMANDA
+// (patron ADR-014; NO se persiste como verdad). Reutiliza las tablas reales
+// de votos verificadas en Neon (ADR-006):
+//   - escrito: interacciones tipo='resena' activas (votos_utiles). El
+//     contrato permitia leer resena_votos si votos_utiles faltara; en el
+//     archivo real votos_utiles EXISTE y es la fuente canonica del voto
+//     util (resena_votos solo deduplica), asi que la resena se agrega por
+//     el autor de la resena con mas votos_utiles del destino.
+//   - foto/video/audio: album_fotos (foto_type) x media_votos
+//     (fuente='album_foto') x interacciones tipo='foto' x media_votos
+//     (fuente='viajero_foto'). El destino de un album_foto se DERIVA
+//     cruzando album_fotos.foto_url con destinos_fotos.url del destino
+//     (album_fotos NO tiene destino_id). La fuente 'curada' NO se usa: no
+//     tiene autor propio (resolverAutorMedia la trata como anonima).
+//   - texto es alias legacy de escrito (misma fuente; el CHECK de
+//     spot_duenos admite ambos valores).
+//   - general: suma de TODOS los votos anteriores; desempate estable por
+//     usuario_id y luego por creado_en mas antiguo (primero en llegar).
+// Devuelve { general, por_tipo, votos_total } y hace best-effort de cache
+// en spot_duenos (activo=true, calculado_en=NOW()); si el cache falla la
+// LECTURA nunca falla (solo warn).
+async function resolverDuenosSpot(sql, destinoId) {
+  var vacio = {
+    general: null,
+    por_tipo: { general: null, foto: null, video: null, audio: null, escrito: null },
+    votos_total: 0,
+    fuente_error: null
+  };
+  var did = String(destinoId || '').trim();
+  if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(did))
+    return vacio;
+
+  try {
+    // 1) Resenas: dueno 'escrito' por autor con mas votos_utiles.
+    var escrito = null;
+    try {
+      var rEsc = await sql(
+        'SELECT i.usuario_id, SUM(i.votos_utiles)::int AS votos, MIN(i.creado_en) AS creado_en'
+        + ' FROM interacciones i'
+        + ' WHERE i.destino_id = $1::uuid AND i.tipo = \'resena\''
+        + '   AND i.activo = true AND i.votos_utiles > 0 AND i.usuario_id IS NOT NULL'
+        + ' GROUP BY i.usuario_id'
+        + ' ORDER BY votos DESC, i.usuario_id ASC, creado_en ASC'
+        + ' LIMIT 1',
+        [did]
+      );
+      if (rEsc.length) {
+        escrito = { usuario_id: String(rEsc[0].usuario_id), votos: parseInt(rEsc[0].votos, 10) || 0 };
+      }
+    } catch (eEsc) {
+      if (!esEsquemaFaltante(eEsc)) throw eEsc;
+      console.warn('[spot_duenos] resenas no leidas (007 pendiente?): ' + (eEsc && eEsc.message));
+    }
+
+    // 2) Media: duenos foto/video/audio por autor con mas votos. La subquery
+    // media_duenos normaliza media_votos a (autor_id, tipo_medio, votos,
+    // item) cruzando las 2 fuentes reales de media con destino.
+    var porTipo = { foto: null, video: null, audio: null, escrito: escrito };
+    try {
+      var rMed = await sql(
+        'SELECT tipo_medio, autor_id, votos, creado_en FROM ('
+        + ' SELECT tipo_medio, autor_id, SUM(v)::int AS votos, MIN(creado_en) AS creado_en,'
+        + '   ROW_NUMBER() OVER (PARTITION BY tipo_medio'
+        + '     ORDER BY SUM(v) DESC, autor_id ASC, MIN(creado_en) ASC) AS rn'
+        + ' FROM ('
+        + '   SELECT af.foto_type AS tipo_medio,'
+        + '     COALESCE(af.autor_original_id, af.agregador_id) AS autor_id,'
+        + '     COUNT(*) AS v, MIN(af.creado_en) AS creado_en'
+        + '   FROM media_votos mv'
+        + '   JOIN album_fotos af ON af.id::text = mv.item_id'
+        + '   JOIN destinos_fotos df ON df.url = af.foto_url AND df.destino_id = $1::uuid'
+        + '   WHERE mv.fuente = \'album_foto\' AND mv.activo = true'
+        + '     AND af.activo = true'
+        + '     AND af.foto_type IN (\'foto\',\'video\',\'audio\')'
+        + '     AND COALESCE(af.autor_original_id, af.agregador_id) IS NOT NULL'
+        + '   GROUP BY af.foto_type, COALESCE(af.autor_original_id, af.agregador_id)'
+        + '   UNION ALL'
+        + '   SELECT \'foto\' AS tipo_medio, i.usuario_id AS autor_id,'
+        + '     COUNT(*) AS v, MIN(i.creado_en) AS creado_en'
+        + '   FROM media_votos mv'
+        + '   JOIN interacciones i ON i.id::text = mv.item_id'
+        + '   WHERE mv.fuente = \'viajero_foto\' AND mv.activo = true'
+        + '     AND i.tipo = \'foto\' AND i.activo = true AND i.destino_id = $1::uuid'
+        + '     AND i.usuario_id IS NOT NULL'
+        + '   GROUP BY i.usuario_id'
+        + ' ) t GROUP BY tipo_medio, autor_id'
+        + ') ranked WHERE rn = 1',
+        [did]
+      );
+      (rMed || []).forEach(function(row) {
+        var tm = String(row.tipo_medio || '').toLowerCase();
+        if (tm !== 'foto' && tm !== 'video' && tm !== 'audio') return;
+        porTipo[tm] = {
+          usuario_id: String(row.autor_id),
+          votos: parseInt(row.votos, 10) || 0,
+          tipo_medio: tm
+        };
+      });
+    } catch (eMed) {
+      if (!esEsquemaFaltante(eMed)) throw eMed;
+      console.warn('[spot_duenos] media no leida (009/023 pendientes?): ' + (eMed && eMed.message));
+    }
+
+    // 3) General: suma de TODOS los tipos por autor (una sola query sobre
+    // las mismas fuentes). Desempate estable por usuario_id/creado_en.
+    var general = null;
+    try {
+      var rGen = await sql(
+        'SELECT autor_id, SUM(v)::int AS votos, MIN(creado_en) AS creado_en FROM ('
+        + ' SELECT COALESCE(af.autor_original_id, af.agregador_id) AS autor_id,'
+        + '   COUNT(*) AS v, MIN(af.creado_en) AS creado_en'
+        + ' FROM media_votos mv'
+        + ' JOIN album_fotos af ON af.id::text = mv.item_id'
+        + ' JOIN destinos_fotos df ON df.url = af.foto_url AND df.destino_id = $1::uuid'
+        + ' WHERE mv.fuente = \'album_foto\' AND mv.activo = true AND af.activo = true'
+        + '   AND COALESCE(af.autor_original_id, af.agregador_id) IS NOT NULL'
+        + ' GROUP BY COALESCE(af.autor_original_id, af.agregador_id)'
+        + ' UNION ALL'
+        + ' SELECT i.usuario_id, COUNT(*), MIN(i.creado_en)'
+        + ' FROM media_votos mv JOIN interacciones i ON i.id::text = mv.item_id'
+        + ' WHERE mv.fuente = \'viajero_foto\' AND mv.activo = true'
+        + '   AND i.tipo = \'foto\' AND i.activo = true AND i.destino_id = $1::uuid'
+        + '   AND i.usuario_id IS NOT NULL'
+        + ' GROUP BY i.usuario_id'
+        + ' UNION ALL'
+        + ' SELECT i.usuario_id, SUM(i.votos_utiles), MIN(i.creado_en)'
+        + ' FROM interacciones i'
+        + ' WHERE i.destino_id = $1::uuid AND i.tipo = \'resena\''
+        + '   AND i.activo = true AND i.votos_utiles > 0 AND i.usuario_id IS NOT NULL'
+        + ' GROUP BY i.usuario_id'
+        + ' ) u GROUP BY autor_id'
+        + ' ORDER BY votos DESC, autor_id ASC, MIN(creado_en) ASC LIMIT 1',
+        [did]
+      );
+      if (rGen.length) {
+        general = {
+          usuario_id: String(rGen[0].autor_id),
+          votos: parseInt(rGen[0].votos, 10) || 0,
+          tipo_medio: 'general'
+        };
+      }
+    } catch (eGen) {
+      if (!esEsquemaFaltante(eGen)) throw eGen;
+      console.warn('[spot_duenos] general no resuelto: ' + (eGen && eGen.message));
+    }
+
+    var res = {
+      general: general,
+      por_tipo: porTipo,
+      votos_total: general ? general.votos : 0,
+      fuente_error: null
+    };
+
+    // 4) Cache best-effort en spot_duenos (migracion 040). Nunca rompe la
+    // lectura: si la tabla falta o el upsert falla, solo warn.
+    await cachearDuenosSpot(sql, did, res);
+
+    return res;
+  } catch (eRes) {
+    console.warn('[spot_duenos] resolucion fallo: ' + (eRes && eRes.message));
+    vacio.fuente_error = 'resolucion';
+    return vacio;
+  }
+}
+
+// Upsert best-effort de la cache spot_duenos (PK destino_id,tipo_medio).
+// activo=true y calculado_en=NOW(); el dueno calculado es autoritativo, la
+// fila solo acelera lecturas futuras. Si algun tipo cambia de dueno, se
+// reescribe la fila (ON CONFLICT DO UPDATE).
+function cachearDuenosSpot(sql, destinoId, duenos) {
+  var d = duenos || {};
+  var filas = [];
+  if (d.general && d.general.usuario_id)
+    filas.push({ tipo: 'general', uid: String(d.general.usuario_id), votos: parseInt(d.general.votos, 10) || 0 });
+  ['foto', 'video', 'audio', 'escrito'].forEach(function(tm) {
+    var o = d.por_tipo ? d.por_tipo[tm] : null;
+    if (o && o.usuario_id)
+      filas.push({ tipo: tm, uid: String(o.usuario_id), votos: parseInt(o.votos, 10) || 0 });
+  });
+  if (!filas.length) return Promise.resolve(false);
+  var trabajo = filas.map(function(f) {
+    return sql(
+      'INSERT INTO spot_duenos (destino_id, tipo_medio, usuario_id, votos, calculado_en, activo)'
+      + ' VALUES ($1::uuid, $2, $3::uuid, $4::int, NOW(), true)'
+      + ' ON CONFLICT (destino_id, tipo_medio) DO UPDATE SET'
+      + ' usuario_id = EXCLUDED.usuario_id, votos = EXCLUDED.votos,'
+      + ' calculado_en = NOW(), activo = true',
+      [destinoId, f.tipo, f.uid, f.votos]
+    );
+  });
+  return Promise.all(trabajo).then(function(){ return true; }).catch(function(eCache) {
+    if (!esEsquemaFaltante(eCache))
+      console.warn('[spot_duenos] cache no escrita: ' + (eCache && eCache.message));
+    else
+      console.warn('[spot_duenos] cache no escrita (040 pendiente): ' + (eCache && eCache.code));
+    return false;
+  });
+}
+
+// FASE 2B (T5.3 / M-3 CERRADO): x1.1 POR SPOT. Antes el x1.1 lo daba
+// esLiderDeCiudad (por ciudad); ahora lo da el DUENO GENERAL del destino.
+// El x1.1 es MUTUAMENTE EXCLUYENTE con el dividendo en la misma accion: si
+// el autor recibe/paga dividendo, NO se aplica x1.1 (la decision de cual
+// aplica la toma el caller, espejo del kernel producto aplicarDividendoSpot).
+// Retrocompatible: si el destino no tiene dueno general resoluble -> false.
+function esDuenoGeneralSpot(sql, usuarioId, destinoId) {
+  if (!usuarioId || !destinoId) return Promise.resolve(false);
+  return resolverDuenosSpot(sql, destinoId).then(function(d) {
+    if (!(d && d.general && d.general.usuario_id)) return false;
+    return String(d.general.usuario_id) === String(usuarioId);
+  }).catch(function(eD) {
+    console.warn('[spot] dueno general no resuelto: ' + (eD && eD.message));
+    return false;
+  });
+}
+
+// FASE 2B (T5.3): el x1.1 por SPOT reemplaza al x1.1 por CIUDAD de
+// esLiderDeCiudad (M-3 CERRADO). Retrocompatible: si el destino no tiene
+// dueno general resoluble (spot_duenos vacio o sin votos), se CONSERVA el
+// comportamiento previo (esLiderDeCiudad) para no quitar el x1.1 a quien ya
+// lo tenia. Preferencia: dueno general del spot; fallback: lider de ciudad.
+function esLiderDestinoSpot(sql, usuarioId, destinoId) {
+  if (!usuarioId || !destinoId) return Promise.resolve(false);
+  return esDuenoGeneralSpot(sql, usuarioId, destinoId).then(function(es) {
+    if (es) return true;
+    // Sin dueno por spot: buscar el dueno general del spot (aunque no sea el
+    // usuario) para decidir si ya se migro el modelo. Si NO existe dueno
+    // general, se cae al criterio legacy (lider de ciudad).
+    return resolverDuenosSpot(sql, destinoId).then(function(d) {
+      if (d && d.general && d.general.usuario_id) return false;
+      return sql('SELECT ciudad FROM destinos WHERE id=$1 LIMIT 1', [destinoId])
+        .then(function(r) {
+          var ciudad = r[0] ? r[0].ciudad : '';
+          if (!ciudad) return false;
+          return esLiderDeCiudad(sql, usuarioId, ciudad);
+        });
+    });
+  }).catch(function(eL) {
+    console.warn('[spot] lider de spot no resuelto: ' + (eL && eL.message));
+    return false;
+  });
+}
+
+// FASE 2B (T5.4 / A-2 CERRADO): dividendo del spot por DESCUENTO (nunca
+// mint). ctx = { accion, usuario_id_autor, destino_id, fuente_interaccion_id,
+// xp_bruto_base, tipo_medio? }.
+//   - Solo si el autor NO es el beneficiario.
+//   - Beneficiario = dueno general si nivel(beneficiario) >= 25; si no,
+//     dueno por tipo (tipo_medio o 'escrito') si nivel >= 20.
+//   - monto = ROUND(xp_bruto_base * 0.10, 2); tope agregado <= 50% del
+//     xp_bruto_base (regalias 20% + dividendo 10%).
+//   - DESCUENTO: resta del XP del AUTOR y suma al beneficiario; registra
+//     spot_dividendos + 2 filas xp_ledger
+//     (spot_dividendo_debito/credito, es_exento=true).
+//   - Idempotente por (fuente_interaccion_id, tipo_medio); tolerante a
+//     fuente_interaccion_id null (dedup por dia+usuario+destino).
+//   - Degrada tipado (warn) si spot_dividendos/spot_duenos no existen.
+// NUNCA lanza: cualquier fallo degrada con warn y deja la accion intacta.
+async function aplicarDividendoSpot(sql, ctx) {
+  var c = ctx || {};
+  var autorId = c.usuario_id_autor ? String(c.usuario_id_autor) : null;
+  var destinoId = c.destino_id ? String(c.destino_id).trim() : null;
+  var xpBrutoBase = numXp(c.xp_bruto_base);
+  var fuenteId = (c.fuente_interaccion_id === undefined || c.fuente_interaccion_id === null)
+    ? null : String(c.fuente_interaccion_id).trim();
+  var tipoMedio = String(c.tipo_medio || 'escrito').toLowerCase();
+  if (['foto', 'video', 'audio', 'escrito', 'texto', 'general'].indexOf(tipoMedio) === -1)
+    tipoMedio = 'escrito';
+  var motivo = 'inactivo';
+  var base = { aplicado: false, motivo: motivo, monto: 0, monto_descontado: 0 };
+  if (!autorId || !(xpBrutoBase > 0)) return base;
+
+  try {
+    // Destino: si el caller no lo trae (media de album sin destino_id), se
+    // resuelve cruzando album_fotos.foto_url con destinos_fotos.url (misma
+    // relacion que usa resolverDuenosSpot). Sin destino resoluble -> no-op.
+    if (!destinoId && c.origen_media_id) {
+      var rDest = await sql(
+        'SELECT df.destino_id FROM album_fotos af'
+        + ' JOIN destinos_fotos df ON df.url = af.foto_url'
+        + ' WHERE af.id = $1::uuid LIMIT 1',
+        [String(c.origen_media_id)]
+      );
+      if (rDest.length) destinoId = String(rDest[0].destino_id);
+    }
+    if (!destinoId) return { aplicado: false, motivo: 'sin_destino', monto: 0, monto_descontado: 0 };
+
+    // 1) Duenos + nivel del beneficiario (1 SELECT de xp_total).
+    var d = await resolverDuenosSpot(sql, destinoId);
+    var general = d && d.general ? d.general : null;
+    var porTipo = d && d.por_tipo ? d.por_tipo : null;
+    var tipoDueno = (porTipo && porTipo[tipoMedio]) ? porTipo[tipoMedio] : null;
+    var candId = general && general.usuario_id ? String(general.usuario_id) : null;
+    var candTipo = 'general';
+    if (!candId && tipoDueno && tipoDueno.usuario_id) {
+      candId = String(tipoDueno.usuario_id);
+      candTipo = tipoMedio;
+    }
+    if (!candId) return { aplicado: false, motivo: 'sin_dueno', monto: 0, monto_descontado: 0 };
+    if (candId === autorId) return { aplicado: false, motivo: 'autor_es_dueno', monto: 0, monto_descontado: 0 };
+
+    var uRows = await sql('SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [candId]);
+    if (!uRows.length) return { aplicado: false, motivo: 'beneficiario_ausente', monto: 0, monto_descontado: 0 };
+    var nivelBen = calcularNivelLocal(numXp(uRows[0].xp_total)).nivel;
+
+    // 2) Elegibilidad por nivel (GENERAL >= 25; POR TIPO >= 20).
+    var beneficiarioId = null;
+    var tipoPago = null;
+    if (candTipo === 'general') {
+      if (nivelBen >= 25) { beneficiarioId = candId; tipoPago = 'general'; }
+      else if (tipoDueno && tipoDueno.usuario_id
+          && String(tipoDueno.usuario_id) !== autorId
+          && nivelBen >= 20) {
+        // Fallback: el dueno por tipo puede ser distinto del general; se
+        // relee su nivel (1 SELECT) y se exige pertenencia ACTIVA al spot.
+        var u2 = await sql('SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [String(tipoDueno.usuario_id)]);
+        if (u2.length && calcularNivelLocal(numXp(u2[0].xp_total)).nivel >= 20) {
+          beneficiarioId = String(tipoDueno.usuario_id);
+          tipoPago = tipoMedio;
+        }
+      }
+    } else if (nivelBen >= 20) {
+      beneficiarioId = candId;
+      tipoPago = candTipo;
+    }
+    if (!beneficiarioId)
+      return { aplicado: false, motivo: 'nivel_insuficiente', nivel_beneficiario: nivelBen, monto: 0, monto_descontado: 0 };
+
+    // 3) Monto (10%) con tope agregado <= 50% del xp_bruto_base.
+    var monto = red2ConTopeSpin(xpBrutoBase * DIVIDENDO_SPOT_PCT, xpBrutoBase);
+    if (!(monto > 0)) return { aplicado: false, motivo: 'monto_cero', monto: 0, monto_descontado: 0 };
+
+    // 4) Idempotencia: por (fuente_interaccion_id, tipo_medio) cuando hay
+    // fuente; si es NULL, dedup por dia+usuario+destino+tipo.
+    var ya = false;
+    if (fuenteId) {
+      var ex = await sql(
+        'SELECT 1 AS uno FROM spot_dividendos'
+        + ' WHERE fuente_interaccion_id=$1::bigint AND tipo_medio=$2 LIMIT 1',
+        [fuenteId, tipoPago]
+      );
+      ya = ex.length > 0;
+    } else {
+      var exN = await sql(
+        'SELECT 1 AS uno FROM spot_dividendos'
+        + ' WHERE fuente_interaccion_id IS NULL AND beneficiario_id=$1::uuid'
+        + ' AND destino_id=$2::uuid AND tipo_medio=$3'
+        + ' AND (creado_en AT TIME ZONE \'UTC\')::date = (NOW() AT TIME ZONE \'UTC\')::date'
+        + ' LIMIT 1',
+        [beneficiarioId, destinoId, tipoPago]
+      );
+      ya = exN.length > 0;
+    }
+    if (ya) return { aplicado: false, motivo: 'idempotente', monto: 0, monto_descontado: 0 };
+
+    // 5) Escritura ATOMICA (UNA CTE con CTE-DML). El orden es claim ->
+    // debito -> credito: el INSERT de spot_dividendos (idempotente por el
+    // indice unico) es el CLAIM; el debito (con guarda xp_total >= monto y
+    // RETURNING) solo corre si el claim gano; el credito solo si el debito
+    // afecto una fila. Resultado: si el autor NO tiene saldo (saldo_ok=0) NO
+    // se inserta spot_dividendos, NO se debita, NO se acredita y NO se toca
+    // el ledger -> sin inyeccion/doble pago. (A-2 QA: la version previa
+    // dejaba el saldo en negativo porque el UPDATE no exigia saldo.)
+    // Residual documentado: si el saldo cambia entre el claim y el debito
+    // (debito concurrente), el claim puede quedar sin pago; es inevitable
+    // sin DELETE/transaccion interactiva y preferible a un doble cobro.
+    var divConflict = fuenteId
+      ? ' ON CONFLICT (fuente_interaccion_id, beneficiario_id, tipo_medio)'
+        + ' WHERE fuente_interaccion_id IS NOT NULL DO NOTHING'
+      : ' ON CONFLICT DO NOTHING';
+    var divRes = await sql(
+      'WITH ok_saldo AS ('
+      + ' SELECT id FROM usuarios WHERE id=$1::uuid AND xp_total >= $7::numeric'
+      + '), ins AS ('
+      + ' INSERT INTO spot_dividendos (destino_id, beneficiario_id, tipo_medio,'
+      + '  fuente_interaccion_id, xp_bruto_base, monto, monto_descontado)'
+      + ' SELECT $3::uuid, $2::uuid, $4, $5::bigint, $6::numeric, $7::numeric, $7::numeric'
+      + ' FROM ok_saldo' + divConflict + ' RETURNING id'
+      + '), debit AS ('
+      + ' UPDATE usuarios SET xp_total = xp_total - $7::numeric'
+      + ' WHERE id=$1::uuid AND xp_total >= $7::numeric AND EXISTS (SELECT 1 FROM ins)'
+      + ' RETURNING xp_total'
+      + '), cred AS ('
+      + ' UPDATE usuarios SET xp_total = xp_total + $7::numeric'
+      + ' WHERE id=$2::uuid AND EXISTS (SELECT 1 FROM debit) RETURNING id'
+      + ')'
+      + ' SELECT (SELECT COUNT(*)::int FROM ok_saldo) AS saldo_ok,'
+      + ' (SELECT id FROM ins) AS div_id,'
+      + ' (SELECT id::text FROM cred) AS cred_id,'
+      + ' (SELECT xp_total FROM debit) AS autor_xp',
+      [autorId, beneficiarioId, destinoId, tipoPago,
+        fuenteId === null ? null : fuenteId, red2(xpBrutoBase), red2(monto)]
+    );
+    var divR = divRes[0] || {};
+    if (Number(divR.saldo_ok) !== 1) {
+      console.warn('[spot] dividendo NO pagado: autor ' + autorId
+        + ' sin saldo suficiente para monto=' + red2(monto));
+      return { aplicado: false, motivo: 'saldo_insuficiente', monto: 0, monto_descontado: 0 };
+    }
+    if (divR.div_id === null || divR.div_id === undefined)
+      return { aplicado: false, motivo: 'idempotente', monto: 0, monto_descontado: 0 };
+    if (divR.cred_id === null || divR.cred_id === undefined) {
+      console.warn('[spot] dividendo NO pagado: debito sin efecto para autor ' + autorId);
+      return { aplicado: false, motivo: 'saldo_insuficiente', monto: 0, monto_descontado: 0 };
+    }
+
+    // 6) 2 filas de xp_ledger SOLO tras debito/credito EXITOSO (exentas; el
+    // debito es negativo). Best-effort: registrarXpLedger aisla fallos.
+    await registrarXpLedger(sql, {
+      usuario_id: autorId, accion: 'spot_dividendo_debito',
+      xp_base: red2(monto), mult_nivel: 1, mult_stack: 1, mult_final: 1,
+      cap_aplicado: 'ninguno', bonos_planos: 0, xp_final: red2(-monto), es_exento: true,
+      contexto: { destino_id: destinoId, beneficiario_id: beneficiarioId,
+        tipo_medio: tipoPago, fuente_interaccion_id: fuenteId,
+        fuente_ref: c.fuente_ref || null, accion_origen: c.accion || null }
+    });
+    await registrarXpLedger(sql, {
+      usuario_id: beneficiarioId, accion: 'spot_dividendo_credito',
+      xp_base: red2(monto), mult_nivel: 1, mult_stack: 1, mult_final: 1,
+      cap_aplicado: 'ninguno', bonos_planos: 0, xp_final: red2(monto), es_exento: true,
+      contexto: { destino_id: destinoId, autor_id: autorId,
+        tipo_medio: tipoPago, fuente_interaccion_id: fuenteId,
+        fuente_ref: c.fuente_ref || null, accion_origen: c.accion || null }
+    });
+
+    return {
+      aplicado: true, motivo: 'ok', beneficiario_id: beneficiarioId,
+      tipo_medio: tipoPago, monto: red2(monto), monto_descontado: red2(monto)
+    };
+  } catch (eDiv) {
+    if (esEsquemaFaltante(eDiv)) {
+      console.warn('[spot] dividendo no aplicado (040 pendiente): '
+        + (eDiv && eDiv.code) + ' ' + (eDiv && eDiv.message));
+      return { aplicado: false, motivo: 'schema', monto: 0, monto_descontado: 0 };
+    }
+    console.warn('[spot] dividendo no aplicado: ' + (eDiv && eDiv.message));
+    return { aplicado: false, motivo: 'error', monto: 0, monto_descontado: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------
+// FASE 2B (T6 / ADR-063): Gobernanza de 3 capas.
+// ---------------------------------------------------------------------
+
+var GOB_CAPAS = ['ecosistema', 'parche', 'faccion', 'marca'];
+var GOB_VOTOS = ['favor', 'contra', 'abstencion'];
+var GOB_NIVEL_ECOSISTEMA = 33;
+
+// Gate por capa (compartido por proponer y votar). Devuelve
+// { ok:true, capa, capa_id } o { ok:false, status, error, ... }.
+//   ecosistema: nivel DERIVADO >= 33 (suelo real de Era Mito).
+//   parche:     pertenencia ACTIVA a pandillas_miembros y capa_id = pandilla;
+//               propone solo el fundador o rol habilitado ('fundador'/'oficial').
+//   faccion:    usuarios.faccion no nula; capa_id = faccion.
+//   marca:      marca ACTIVA del usuario; capa_id = marca_id.
+// 'exigirRol' solo aplica a proponer (votar no exige rol).
+async function validarGateGobernanza(sql, usuarioId, capa, capaId, exigirRol) {
+  var c = String(capa || '').toLowerCase();
+  if (GOB_CAPAS.indexOf(c) === -1)
+    return { ok: false, status: 400, error: 'capa invalida (ecosistema|parche|faccion|marca)' };
+  try {
+    var rows = await sql(
+      'SELECT xp_total, faccion FROM usuarios WHERE id=$1::uuid LIMIT 1',
+      [usuarioId]
+    );
+    if (!rows.length) return { ok: false, status: 404, error: 'Usuario no encontrado' };
+    var nivel = calcularNivelLocal(numXp(rows[0].xp_total)).nivel;
+
+    if (c === 'ecosistema') {
+      if (nivel < GOB_NIVEL_ECOSISTEMA)
+        return { ok: false, status: 403, error: 'NIVEL_INSUFICIENTE', nivel: nivel, nivel_requerido: GOB_NIVEL_ECOSISTEMA };
+      return { ok: true, capa: c, capa_id: capaId || null };
+    }
+
+    if (c === 'faccion') {
+      var fac = rows[0].faccion ? String(rows[0].faccion) : null;
+      if (!fac) return { ok: false, status: 403, error: 'FACCION_REQUERIDA' };
+      return { ok: true, capa: c, capa_id: fac };
+    }
+
+    if (c === 'marca') {
+      var m = await sql(
+        'SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1',
+        [usuarioId]
+      );
+      if (!m.length) return { ok: false, status: 403, error: 'MARCA_INACTIVA' };
+      return { ok: true, capa: c, capa_id: String(m[0].id) };
+    }
+
+    // capa parche: capa_id obligatorio = id de la pandilla.
+    var pid = String(capaId || '').trim();
+    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(pid))
+      return { ok: false, status: 400, error: 'CAPA_ID_REQUERIDO' };
+    var mi = await sql(
+      'SELECT rol FROM pandillas_miembros'
+      + ' WHERE pandilla_id=$1::uuid AND usuario_id=$2::uuid AND activo=true LIMIT 1',
+      [pid, usuarioId]
+    );
+    if (!mi.length) return { ok: false, status: 403, error: 'PARCHE_REQUERIDO' };
+    if (exigirRol) {
+      var rol = String(mi[0].rol || '');
+      if (rol !== 'fundador' && rol !== 'oficial')
+        return { ok: false, status: 403, error: 'ROL_INSUFICIENTE', rol: rol };
+    }
+    return { ok: true, capa: c, capa_id: pid };
+  } catch (eG) {
+    if (esEsquemaFaltante(eG)) {
+      console.warn('[gobernanza] gate no evaluado (010/027/040 pendientes): '
+        + (eG && eG.code) + ' ' + (eG && eG.message));
+      return { ok: false, status: 503, error: 'SCHEMA_NOT_MIGRATED' };
+    }
+    console.warn('[gobernanza] gate fallo: ' + (eG && eG.message));
+    return { ok: false, status: 400, error: 'GATE_INVALIDO' };
+  }
+}
+
+// Cierre de quorum: al alcanzar quorum, decide aprobada/rechazada en una
+// sola sentencia (patron de update atomico). BEST-EFFORT: nunca lanza.
+// Regla: favor > contra -> aprobada; contra >= favor y votos >= quorum ->
+// rechazada.
+function cerrarGobernanzaPorQuorum(sql, propuestaId) {
+  return sql(
+    'UPDATE gobernanza_propuestas p SET'
+    + ' estado = CASE WHEN v.favor > v.contra THEN \'aprobada\' ELSE \'rechazada\' END,'
+    + ' resuelto_en = NOW()'
+    + ' FROM ('
+    + '   SELECT propuesta_id,'
+    + '     COUNT(*) FILTER (WHERE voto = \'favor\') AS favor,'
+    + '     COUNT(*) FILTER (WHERE voto = \'contra\') AS contra,'
+    + '     COUNT(*) AS total'
+    + '   FROM gobernanza_votos WHERE propuesta_id=$1::uuid AND activo=true'
+    + '   GROUP BY propuesta_id'
+    + ' ) v'
+    + ' WHERE p.id = v.propuesta_id AND p.estado = \'abierta\''
+    + '   AND v.total >= p.quorum AND (v.favor > v.contra OR v.contra >= v.favor)'
+    + ' RETURNING p.id, p.estado, p.resuelto_en',
+    [propuestaId]
+  ).then(function(r) {
+    return r.length ? { resuelta: true, estado: r[0].estado, resuelto_en: r[0].resuelto_en } : { resuelta: false };
+  }).catch(function(eQ) {
+    console.warn('[gobernanza] cierre de quorum no aplicado: ' + (eQ && eQ.message));
+    return { resuelta: false };
+  });
+}
+
 // ADR-053 Decision 2 (v25): UNICO calculo de XP final. Firma retrocompatible
 // (xp_base, nivel_clase, clase_id, casa_tag, ctx). ctx =
 // { nivel_usuario, amuleto, lider, capProgresion, capGlobal, mNivelMax };
@@ -1632,6 +2210,48 @@ var MERCADO_NODOS = [
   { nodo: 5, nombre: 'Magnate',             nivel_jugador: 30, slots_extra: 4, reduccion_impuesto: 0.04, produce: true }
 ];
 var MERCADO_UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// ADR-066 (Fase 2A, P2): catalogos y umbral de la Gig Economy P2P. Espejo
+// del CHECK de la migracion 039 (tipo_encargo) y de los estados activos.
+// Prohibido el literal suelto en las ramas contrato_*.
+var CONTRATO_ENCARGOS = ['auditoria_wayfarer', 'curaduria_multimedia', 'resena_zona'];
+var CONTRATO_ESTADOS = ['abierto', 'en_proceso', 'completado', 'cancelado', 'disputa'];
+var CONTRATO_ESTADOS_ACTIVOS = ['abierto', 'en_proceso'];
+var CONTRATO_NIVEL_MIN = 25;
+
+// ADR-062 (Fase 2C, T7): cartas-gate y cartas de evento. CARTA_GATES espeja
+// el CHECK nivel_gate IN (10,14,20,25) de la migracion 040 y el limite diario
+// anti-farming de intercambios (M-4 CERRADO). Los sets de gate NO se
+// consumen: activan el flag de grandfathering en cartas_gates.
+var CARTA_GATES = [10, 14, 20, 25];
+var CARTA_INTERCAMBIO_LIMITE_DIA = 3;
+
+// ADR-062 (Fase 2D, T11): mercado de cartas (migracion 041). Estados del
+// catalogo de ofertas, ventana por defecto y tope de lectura del libro.
+// Los estados se espejan del CHECK de cartas_ofertas
+// ('abierta','parcial','cerrada','cancelada').
+var CARTA_OFERTA_ESTADOS_ACTIVOS = ['abierta', 'parcial'];
+var CARTA_OFERTA_HORAS_DEFAULT = 168;
+var CARTA_OFERTA_LIMITE = 200;
+
+// ADR-066 (Fase 2D, T12): Tithe de Parche (0..10 %, migracion 041). El
+// porcentaje lo fija el fundador/oficial en pandillas.tithe_pct.
+var PARCHE_TITHE_MAX = 10;
+
+// ADR-061 (Fase 2C, T8): moneda secundaria "Condor" (CDR), ledger interno
+// SIN cripto, SIN on-chain y PROHIBIDA la conversion a dinero real. La orden
+// del libro moneda_mercado vive MONEDA_MERCADO_DIAS por defecto; el cruce es
+// "match simple" (mismo precio_xp, tipo_orden opuesto). La emision NO ocurre
+// aqui: solo moneda_emisiones la crea (no inflacionario).
+var MONEDA_MERCADO_DIAS = 7;
+var MONEDA_MERCADO_LIMITE = 200;
+
+// ADR-064 / ADR-066 (Fase 2C, T10): presencia de marca en un spot (estados
+// 'pendiente'|'verificada'|'rechazada' segun el CHECK de la 040) y upgrades
+// territoriales de un Parche. PARCHE_UPGRADE_TIPOS espeja el CHECK de la 039.
+var PARCHE_UPGRADE_TIPOS = ['buff_xp_zona', 'descuento_comercial', 'aura_neon', 'escudo_territorial'];
+var PARCHE_UPGRADE_HORAS_DEFAULT = 168;
+
 function calcularMercado(puntos) {
   var p = numXp(puntos);
   var idx = 0;
@@ -1696,6 +2316,82 @@ function responderMercadoAusente(res, e, etiqueta) {
     ok: false,
     error: 'Mercado no disponible (migracion 034 pendiente)',
     code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// ADR-066 (Fase 2A): 503 tipado si falta el esquema de la migracion 039
+// (contratos_p2p). Nunca catch vacio: registra el motivo y responde claro.
+function responderContratoAusente(res, e, etiqueta) {
+  console.warn('[contratos] ' + etiqueta + ' ausente (migracion 039 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Contratos P2P no disponibles (migracion 039 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// FASE 2C (T8 / ADR-061): 503 tipado si falta el esquema de la migracion 040
+// (moneda_*). Nunca catch vacio: registra el motivo y responde claro.
+function responderMonedaAusente(res, e, etiqueta) {
+  console.warn('[moneda] ' + etiqueta + ' ausente (migracion 040 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Moneda no disponible (migracion 040 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// FASE 2C (T7 / ADR-062): 503 tipado si falta el esquema de cartas (040).
+function responderCartasAusente(res, e, etiqueta) {
+  console.warn('[cartas] ' + etiqueta + ' ausente (migracion 040 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Cartas no disponibles (migracion 040 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// FASE 2C (T10.3 / ADR-066): 503 tipado si falta el esquema de Parche (039).
+function responderParcheAusente(res, e, etiqueta) {
+  console.warn('[parche] ' + etiqueta + ' ausente (migracion 039 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Parche no disponible (migracion 039 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// FASE 2D (T11 / ADR-062): 503 tipado si falta el esquema del mercado de
+// cartas (migracion 041: cartas_ofertas/cartas_ventas).
+function responderCartasMercadoAusente(res, e, etiqueta) {
+  console.warn('[cartas] ' + etiqueta + ' ausente (migracion 041 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Mercado de cartas no disponible (migracion 041 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// FASE 2C (T8 / ADR-061): escribe una fila de moneda_ledger (append-only,
+// fuente de verdad del saldo CDR). BEST-EFFORT: nunca lanza; el saldo de
+// moneda_cuentas ya quedo aplicado en la CTE atomica del handler. saldo es la
+// foto del saldo DESPUES del movimiento (NOT NULL en el esquema).
+function registrarMonedaLedger(sql, datos) {
+  var d = datos || {};
+  return sql(
+    'INSERT INTO moneda_ledger (usuario_id, delta, saldo, motivo, ref_tipo, ref_id, creado_en)'
+    + ' VALUES ($1::uuid, $2::numeric, $3::numeric, $4, $5, $6, NOW())',
+    [d.usuario_id, red2(d.delta), red2(d.saldo), String(d.motivo || 'ajuste'),
+     d.ref_tipo ? String(d.ref_tipo) : null,
+     (d.ref_id === undefined || d.ref_id === null) ? null : String(d.ref_id)]
+  ).catch(function(eMl) {
+    console.warn('[moneda] ledger no registrado ('
+      + (eMl && eMl.code ? eMl.code + ' ' : '') + (eMl && eMl.message) + ')');
   });
 }
 
@@ -3256,6 +3952,11 @@ function intentarObtenerCromo(sql, usuarioId, destinoId) {
 // Aporte de fama a la pandilla activa del usuario: 10% del XP ganado
 // (ROUND), duplicado si capacidades->fama_x2_hasta es futuro (consumible
 // trompeta_fama). Nunca lanza: sin pandilla activa no hace nada.
+// FASE 2D (T12 / ADR-066): este es el UNICO punto de enganche del Tithe de
+// Parche (aplicarTitheParche), aplicado al MISMO XP no exento de progreso
+// que alimenta la fama: compartir / resena / guardado / visita / rating.
+// NO aplica a XP exento (misiones, logros, referidos, admin_xp) ni a
+// contratos/mercado, porque esos flujos no llaman a este helper.
 function aplicarFamaPandilla(sql, usuarioId, xpGanado) {
   xpGanado = numXp(xpGanado);
   if (!usuarioId || xpGanado <= 0) return Promise.resolve(false);
@@ -3268,16 +3969,75 @@ function aplicarFamaPandilla(sql, usuarioId, xpGanado) {
     if (!rows.length) return false;
     var pandillaId = rows[0].pandilla_id;
     var famaBase = red2(xpGanado * 0.10);
-    if (famaBase <= 0) return false;
-    return leerCapacidades(sql, usuarioId).then(function(caps) {
-      var fama = famaBase;
-      if (caps.fama_x2_hasta && new Date(String(caps.fama_x2_hasta)) > new Date()) {
-        fama = red2(famaBase * 2);
-      }
-      return sql('UPDATE pandillas SET fama_total = fama_total + $1 WHERE id=$2', [fama, pandillaId])
-        .then(function(){ return true; });
+    var cadenaFama;
+    if (famaBase <= 0) {
+      cadenaFama = Promise.resolve(false);
+    } else {
+      cadenaFama = leerCapacidades(sql, usuarioId).then(function(caps) {
+        var fama = famaBase;
+        if (caps.fama_x2_hasta && new Date(String(caps.fama_x2_hasta)) > new Date()) {
+          fama = red2(famaBase * 2);
+        }
+        return sql('UPDATE pandillas SET fama_total = fama_total + $1 WHERE id=$2', [fama, pandillaId])
+          .then(function(){ return true; });
+      });
+    }
+    // Tithe best-effort: se ejecuta SIEMPRE (aunque famaBase <= 0) y jamas
+    // altera el resultado de la fama ni bloquea la accion principal.
+    return cadenaFama.then(function(okFama) {
+      return aplicarTitheParche(sql, usuarioId, xpGanado)
+        .then(function(){ return okFama; });
     });
   }).catch(function(){ return false; });
+}
+
+// FASE 2D (T12 / ADR-066, spec 5.5): Tithe de Parche. Descuenta
+// ROUND(xpFinal * tithe_pct/100, 2) del XP del miembro y lo suma a la
+// tesoreria del Parche (pandillas.fama_total), dejando una fila xp_ledger
+// accion='tithe_parche' es_exento=true. BEST-EFFORT TOTAL: nunca lanza ni
+// bloquea; si la 041 no esta aplicada (tithe_pct ausente) degrada con warn.
+// No emite moneda nueva: es un flujo sobre XP ya acreditado (ADR-018/5.5).
+function aplicarTitheParche(sql, usuarioId, xpFinal) {
+  var xp = numXp(xpFinal);
+  if (!usuarioId || !(xp > 0)) return Promise.resolve(false);
+  return sql(
+    'SELECT pm.pandilla_id, p.tithe_pct FROM pandillas_miembros pm'
+    + ' JOIN pandillas p ON p.id = pm.pandilla_id'
+    + ' WHERE pm.usuario_id=$1 AND pm.activo=true AND p.activo=true LIMIT 1',
+    [usuarioId]
+  ).then(function(rows) {
+    if (!rows.length) return false;
+    var pct = numXp(rows[0].tithe_pct);
+    if (!isFinite(pct) || pct <= 0) return false;
+    if (pct > PARCHE_TITHE_MAX) pct = PARCHE_TITHE_MAX;
+    var monto = red2(xp * pct / 100);
+    if (!(monto > 0)) return false;
+    var pandillaId = rows[0].pandilla_id;
+    return sql(
+      'WITH d AS ('
+      + ' UPDATE usuarios SET xp_total = GREATEST(0, xp_total - $1::numeric)'
+      + ' WHERE id=$2::uuid RETURNING xp_total'
+      + '), t AS ('
+      + ' UPDATE pandillas SET fama_total = fama_total + $1::numeric'
+      + ' WHERE id=$3::uuid RETURNING id'
+      + ')'
+      + ' SELECT (SELECT xp_total FROM d) AS xp_post,'
+      + ' (SELECT id::text FROM t) AS pandilla_id',
+      [monto, usuarioId, pandillaId]
+    ).then(function(r) {
+      var aplicado = !!(r && r[0] && r[0].pandilla_id);
+      if (!aplicado) return false;
+      return registrarXpLedger(sql, {
+        usuario_id: usuarioId, accion: 'tithe_parche', xp_base: monto,
+        mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+        bonos_planos: 0, xp_final: red2(-monto), es_exento: true,
+        contexto: { pandilla_id: pandillaId, tithe_pct: pct }
+      }).then(function(){ return true; });
+    });
+  }).catch(function(eTithe) {
+    console.warn('[tithe] no aplicado (041 pendiente?): ' + (eTithe && eTithe.message));
+    return false;
+  });
 }
 
 // Progreso de retos de parche (contrato final punto 8): suma +1 a los
@@ -3403,9 +4163,11 @@ function consumirNonce(sql, nonce, usuarioId) {
 }
 
 // Reparto multinivel de la piramide de referidos (Entrega 016): del XP
-// ganado por el usuario, sus ancestros hasta 5 niveles reciben 10/5/3/2/1
-// % (ROUND half-up a 2 decimales, ADR-035) sobre xp_ref_total, solo si el
-// ancestro no supero el tope de 500 referidos directos. REGLA Postgres
+// ganado por el usuario (xp_final capado, base congelada en ADR-060 M-2),
+// sus ancestros hasta 5 niveles reciben un reparto total 10% (5/2.5/1.5/
+// 0.5/0.5) con ROUND half-up a 2 decimales (ADR-035) sobre xp_ref_total,
+// solo si el ancestro no supero el tope de 500 referidos directos. Aplica
+// a eventos NUEVOS; el historico NO se recalcula (ADR-003). REGLA Postgres
 // (0A000): el UPDATE es la sentencia PRINCIPAL con FROM cadena - jamas un
 // UPDATE dentro del WITH RECURSIVE. Nunca lanza: degrada a false.
 function repartirXpReferidos(sql, usuarioId, xpGanado) {
@@ -3421,9 +4183,9 @@ function repartirXpReferidos(sql, usuarioId, xpGanado) {
     + 'WHERE cadena.nivel < 5 AND u2.referido_por IS NOT NULL'
     + ') '
     + 'UPDATE usuarios a '
-    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + ROUND($2 * ('
-    + 'CASE c.nivel WHEN 1 THEN 0.10 WHEN 2 THEN 0.05 '
-    + 'WHEN 3 THEN 0.03 WHEN 4 THEN 0.02 ELSE 0.01 END), 2) '
+    + 'SET xp_ref_total = COALESCE(xp_ref_total, 0) + ROUND($2::numeric * ('
+    + 'CASE c.nivel WHEN 1 THEN 0.05 WHEN 2 THEN 0.025 '
+    + 'WHEN 3 THEN 0.015 WHEN 4 THEN 0.005 ELSE 0.005 END), 2) '
     + 'FROM cadena c WHERE a.id = c.ancestro_id '
     + 'AND a.referidos_directos_contados < 500',
     [usuarioId, xpGan]
@@ -4440,6 +5202,209 @@ module.exports = async function handler(req, res) {
         );
         aoPend.forEach(function(x) { x.estado = x.estado_leido; });
         return res.json({ ok: true, data: aoPend });
+      }
+
+      // FASE 2B (T5.2 / ADR-065): GET publico ?tipo=spot_duenos con el shape
+      // del helper resolverDuenosSpot (dueno general + por tipo). El calculo
+      // canonico es bajo demanda (ADR-014); spot_duenos es solo cache.
+      if (tipo === 'spot_duenos') {
+        var sdDestino = String(destinoId || '').trim();
+        if (!sdDestino)
+          return res.status(400).json({ ok: false, error: 'destino_id requerido' });
+        var sdRow = await sql('SELECT id FROM destinos WHERE id=$1::uuid LIMIT 1', [sdDestino]);
+        if (!sdRow.length)
+          return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+        var sdRes = await resolverDuenosSpot(sql, sdDestino);
+        return res.json({
+          ok: true,
+          data: {
+            destino_id: sdDestino,
+            general: sdRes.general,
+            por_tipo: sdRes.por_tipo,
+            votos_total: sdRes.votos_total
+          }
+        });
+      }
+
+      // FASE 2B (T6.3 / ADR-063): GET publico ?tipo=gobernanza_propuestas.
+      // Filtros ?capa=, ?capa_id= y ?estado=; agrega conteo de votos
+      // (favor/contra/abstencion) y mi_voto si se pasa usuario_id.
+      if (tipo === 'gobernanza_propuestas') {
+        var gpCapa = req.query.capa ? String(req.query.capa).toLowerCase() : null;
+        var gpCapaId = req.query.capa_id ? String(req.query.capa_id) : null;
+        var gpEstado = req.query.estado ? String(req.query.estado).toLowerCase() : null;
+        var gpUsuario = usuarioId ? String(usuarioId) : null;
+        var gpWhere = ['p.activo = true'];
+        var gpParams = [];
+        if (gpCapa) {
+          if (GOB_CAPAS.indexOf(gpCapa) === -1)
+            return res.status(400).json({ ok: false, error: 'capa invalida' });
+          gpParams.push(gpCapa);
+          gpWhere.push('p.capa = $' + gpParams.length);
+        }
+        if (gpCapaId) {
+          gpParams.push(gpCapaId);
+          gpWhere.push('p.capa_id = $' + gpParams.length);
+        }
+        if (gpEstado) {
+          gpParams.push(gpEstado);
+          gpWhere.push('p.estado = $' + gpParams.length);
+        }
+        var gpParamsVoto = gpParams.slice();
+        if (gpUsuario) gpParamsVoto.push(gpUsuario);
+        var gpVotoSel = gpUsuario
+          ? ', (SELECT v2.voto FROM gobernanza_votos v2'
+            + ' WHERE v2.propuesta_id = p.id AND v2.usuario_id = $' + gpParamsVoto.length + '::uuid LIMIT 1) AS mi_voto'
+          : ', NULL AS mi_voto';
+        var gpRows = await sql(
+          'SELECT p.id, p.capa, p.capa_id, p.autor_id, p.titulo, p.descripcion,'
+          + ' p.estado, p.quorum, p.creado_en, p.cierra_en, p.resuelto_en,'
+          + ' u.nombre AS autor_nombre,'
+          + ' COUNT(*) FILTER (WHERE v.activo = true AND v.voto = \'favor\')::int AS votos_favor,'
+          + ' COUNT(*) FILTER (WHERE v.activo = true AND v.voto = \'contra\')::int AS votos_contra,'
+          + ' COUNT(*) FILTER (WHERE v.activo = true AND v.voto = \'abstencion\')::int AS votos_abstencion,'
+          + ' COUNT(v.activo) FILTER (WHERE v.activo = true)::int AS votos_total'
+          + gpVotoSel
+          + ' FROM gobernanza_propuestas p'
+          + ' LEFT JOIN usuarios u ON u.id = p.autor_id'
+          + ' LEFT JOIN gobernanza_votos v ON v.propuesta_id = p.id'
+          + ' WHERE ' + gpWhere.join(' AND ')
+          + ' GROUP BY p.id, u.nombre'
+          + ' ORDER BY p.creado_en DESC LIMIT 100',
+          gpParamsVoto
+        ).catch(function(eGp) {
+          if (esEsquemaFaltante(eGp)) {
+            console.warn('[gobernanza] propuestas no leidas (040 pendiente): ' + (eGp && eGp.code));
+            return null;
+          }
+          throw eGp;
+        });
+        if (gpRows === null)
+          return res.status(503).json({ ok: false, error: 'Gobernanza no disponible (migracion 040 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
+        return res.json({ ok: true, data: gpRows, total: gpRows.length });
+      }
+
+      // FASE 2C (T8.2 / ADR-061): GET publico ?tipo=moneda_mercado con el
+      // libro de ordenes internas abiertas de la moneda secundaria "Condor"
+      // (CDR). Filtro opcional ?tipo_orden=venta|compra y ?limit. NO expone
+      // PII: solo el id y el nombre publico del titular de la orden.
+      if (tipo === 'moneda_mercado') {
+        var moTipoFiltro = req.query.tipo_orden ? String(req.query.tipo_orden).toLowerCase() : null;
+        if (moTipoFiltro && moTipoFiltro !== 'compra' && moTipoFiltro !== 'venta')
+          return res.status(400).json({ ok: false, error: 'tipo_orden invalido (compra|venta)' });
+        var moLimit = parseInt(req.query.limit, 10);
+        if (!isFinite(moLimit) || moLimit < 1) moLimit = 50;
+        if (moLimit > MONEDA_MERCADO_LIMITE) moLimit = MONEDA_MERCADO_LIMITE;
+        var moParams = [];
+        var moWhere = ['o.estado = \'abierta\'', 'o.activo = true', 'o.cantidad_restante > 0'];
+        if (moTipoFiltro) { moParams.push(moTipoFiltro); moWhere.push('o.tipo_orden = $' + moParams.length); }
+        moParams.push(moLimit);
+        var moLibro;
+        try {
+          moLibro = await sql(
+            'SELECT o.id, o.tipo_orden, o.cantidad, o.cantidad_restante, o.precio_xp,'
+            + ' o.estado, o.creado_en, o.expira_en, o.vendedor_id,'
+            + ' u.nombre AS titular_nombre'
+            + ' FROM moneda_mercado o'
+            + ' LEFT JOIN usuarios u ON u.id = o.vendedor_id'
+            + ' WHERE ' + moWhere.join(' AND ')
+            + ' ORDER BY o.precio_xp ASC, o.creado_en ASC LIMIT $' + moParams.length,
+            moParams
+          );
+        } catch (eMoM) {
+          if (!esEsquemaFaltante(eMoM)) throw eMoM;
+          return responderMonedaAusente(res, eMoM, 'moneda_mercado');
+        }
+        moLibro = moLibro.map(function(o) {
+          o.cantidad = red2(numXp(o.cantidad));
+          o.cantidad_restante = red2(numXp(o.cantidad_restante));
+          o.precio_xp = red2(numXp(o.precio_xp));
+          o.subtotal_xp = red2(o.cantidad_restante * o.precio_xp);
+          return o;
+        });
+        return res.json({ ok: true, moneda: 'CDR', data: moLibro, total: moLibro.length });
+      }
+
+      // FASE 2C (T10.1 / ADR-064): GET ?tipo=marcas_spots (destino_id
+      // opcional). Lista la presencia de marca (pendiente|verificada|
+      // rechazada) sin PII: solo nombre y logo de la marca.
+      if (tipo === 'marcas_spots') {
+        var msDestino = destinoId ? String(destinoId).trim() : null;
+        var msParams = [];
+        var msWhere = ['sp.activo = true'];
+        if (msDestino) {
+          if (!MERCADO_UUID_RE.test(msDestino))
+            return res.status(400).json({ ok: false, error: 'destino_id invalido' });
+          msParams.push(msDestino);
+          msWhere.push('sp.destino_id = $' + msParams.length + '::uuid');
+        }
+        var msRows;
+        try {
+          msRows = await sql(
+            'SELECT sp.id, sp.destino_id, sp.estado, sp.creado_en,'
+            + ' m.id AS marca_id, m.nombre AS marca_nombre, m.logo_url AS marca_logo,'
+            + ' m.verificada AS marca_verificada'
+            + ' FROM spot_presencia sp'
+            + ' JOIN marcas m ON m.id = sp.marca_id'
+            + ' WHERE ' + msWhere.join(' AND ')
+            + ' ORDER BY sp.creado_en DESC LIMIT 200',
+            msParams
+          );
+        } catch (eMs) {
+          if (!esEsquemaFaltante(eMs)) throw eMs;
+          console.warn('[marcas] presencia no leida (027/040 pendientes): '
+            + (eMs && eMs.code) + ' ' + (eMs && eMs.message));
+          return res.status(503).json({
+            ok: false,
+            error: 'Presencia de marca no disponible (migracion 040 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+        return res.json({ ok: true, data: msRows, total: msRows.length });
+      }
+
+      // FASE 2D (T11 / ADR-062): GET publico ?tipo=cartas_ofertas con el
+      // libro de ofertas activas ('abierta'/'parcial') de cartas. Sin PII:
+      // solo el nombre publico del vendedor + catalogo (nombre/rareza/
+      // imagen). Filtro opcional ?carta_id=. Requiere la migracion 041.
+      if (tipo === 'cartas_ofertas') {
+        var coParams = [];
+        var coWhere = [
+          'o.activo = true',
+          'o.estado IN (\'abierta\',\'parcial\')',
+          'o.cantidad_restante > 0',
+          '(o.expira_en IS NULL OR o.expira_en > NOW())'
+        ];
+        var coCarta = req.query.carta_id ? String(req.query.carta_id).trim() : null;
+        if (coCarta) { coParams.push(coCarta); coWhere.push('o.carta_id = $' + coParams.length); }
+        coParams.push(CARTA_OFERTA_LIMITE);
+        var coRows;
+        try {
+          coRows = await sql(
+            'SELECT o.id, o.carta_id, o.cantidad, o.cantidad_restante, o.precio_xp,'
+            + ' o.estado, o.creado_en, o.expira_en, o.vendedor_id,'
+            + ' u.nombre AS vendedor_nombre,'
+            + ' c.nombre AS carta_nombre, c.rareza, c.imagen_url, c.set_slug,'
+            + ' c.nivel_gate, c.es_evento'
+            + ' FROM cartas_ofertas o'
+            + ' JOIN cartas_catalogo c ON c.id = o.carta_id'
+            + ' LEFT JOIN usuarios u ON u.id = o.vendedor_id'
+            + ' WHERE ' + coWhere.join(' AND ')
+            + ' ORDER BY o.precio_xp ASC, o.creado_en ASC LIMIT $' + coParams.length,
+            coParams
+          );
+        } catch (eCo) {
+          if (!esEsquemaFaltante(eCo)) throw eCo;
+          return responderCartasMercadoAusente(res, eCo, 'cartas_ofertas');
+        }
+        coRows = coRows.map(function(o) {
+          o.cantidad = Number(o.cantidad) || 0;
+          o.cantidad_restante = Number(o.cantidad_restante) || 0;
+          o.precio_xp = red2(numXp(o.precio_xp));
+          o.subtotal_xp = red2(o.cantidad_restante * o.precio_xp);
+          return o;
+        });
+        return res.json({ ok: true, data: coRows, total: coRows.length });
       }
 
       // Resenas de un destino
@@ -7103,6 +8068,91 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // ADR-066 (Fase 2A): contratos P2P del usuario (empleador o
+      // contratado), con filtro OPCIONAL por estado. Lectura publica sin
+      // sesion (mismo patron que mis_cromos). Degrada tipado si falta la 039.
+      if (tipo === 'contratos_mios') {
+        if (!usuarioId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        if (!MERCADO_UUID_RE.test(String(usuarioId)))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var cmEstado = req.query.estado ? String(req.query.estado).trim() : '';
+        if (cmEstado && CONTRATO_ESTADOS.indexOf(cmEstado) === -1)
+          return res.status(400).json({ ok: false, error: 'estado invalido' });
+        var cmSql = 'SELECT id, empleador_id, contratado_id, destino_id, tipo_encargo,'
+          + ' recompensa_xp, descripcion, estado, expira_en, creado_en, actualizado_en'
+          + ' FROM contratos_p2p'
+          + ' WHERE (empleador_id=$1::uuid OR contratado_id=$1::uuid)';
+        var cmParams = [usuarioId];
+        if (cmEstado) {
+          cmSql += ' AND estado=$2';
+          cmParams.push(cmEstado);
+        }
+        cmSql += ' ORDER BY creado_en DESC LIMIT 100';
+        var cmRows;
+        try {
+          cmRows = await sql(cmSql, cmParams);
+        } catch (eCm) {
+          if (!esEsquemaFaltante(eCm)) throw eCm;
+          return responderContratoAusente(res, eCm, 'contratos_mios');
+        }
+        cmRows = cmRows.map(function(c) {
+          c.recompensa_xp = red2(numXp(c.recompensa_xp));
+          c.es_empleador = (String(c.empleador_id) === String(usuarioId));
+          return c;
+        });
+        return res.status(200).json({ ok: true, data: cmRows });
+      }
+
+      // ADR-053/ADR-059 (E1 Early Game): catalogo de XP DERIVADO del motor
+      // real, sin sesion. Expone las bases (XP_BASES), los caps efectivos
+      // (gamificacion_config con fallback en codigo) y los multiplicadores.
+      // No inventa numeros: reusa las constantes y el motor de calculo. Los
+      // topes que hoy viven como const (VISITAS_DIA_MAX, VOTOS_DIA_MAX) se
+      // exponen; los demas (chat 20XP, compartir 50XP, etc.) siguen como
+      // literales en sus handlers y NO se duplican aqui.
+      if (tipo === 'catalogo_xp') {
+        var cxCfg = await leerConfigGamificacion(sql);
+        var cxBases = [];
+        Object.keys(XP_BASES).forEach(function(k) {
+          var v = XP_BASES[k];
+          var esCompuesto = !!(v && typeof v === 'object');
+          cxBases.push({
+            accion: k,
+            base: esCompuesto ? null : numXp(v),
+            detalle: esCompuesto ? v : null,
+            aplica_m_nivel: true
+          });
+        });
+        return res.status(200).json({
+          ok: true,
+          data: {
+            bases: cxBases,
+            caps: {
+              progresion: cxCfg.capProgresion,
+              global: cxCfg.capGlobal,
+              m_nivel_max: cxCfg.mNivelMax
+            },
+            multiplicadores: {
+              clase: BONUS_CLASE,
+              casa: { rezagada: 1.30, equilibrada: 1.0, dominante: 0.85 },
+              origen: {
+                local: cxCfg.factorOrigenLocal,
+                nomada_max: cxCfg.factorOrigenNomadaMax,
+                extranjero_max: cxCfg.factorOrigenExtranjeroMax
+              },
+              amuleto: { amuleto_x2: 2.0 },
+              lider: 1.1
+            },
+            topes: [
+              { accion: 'visita', tope: VISITAS_DIA_MAX, unidad: 'acciones_dia' },
+              { accion: 'voto_media', tope: VOTOS_DIA_MAX, unidad: 'acciones_dia' },
+              { accion: 'referidos_directos', tope: 500, unidad: 'acumulado' }
+            ]
+          }
+        });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -8341,6 +9391,13 @@ module.exports = async function handler(req, res) {
         }, origenLedger(resFoto, 'destino', fotoPunto)));
         misionesFoto = await evaluarMisiones(sql, usuarioId2);
         logrosFoto = await evaluarLogros(sql, usuarioId2);
+        // FASE 2B (T5.4 / ADR-065): el dueno del spot puede llevarse el 10%
+        // por descuento (la foto de viajero es un dueno de tipo 'foto').
+        await aplicarDividendoSpot(sql, {
+          accion: 'foto', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+          fuente_interaccion_id: fotoIns[0] ? fotoIns[0].id : null,
+          xp_bruto_base: XP_BASES.foto_viajero, tipo_medio: 'foto'
+        });
         return res.status(200).json({ ok: true, id: fotoIns[0].id, xp: xpFotoFinal, xp_detalle: armarXpDetalle(XP_BASES.foto_viajero, resFoto, 0), misiones: misionesFoto, logros: logrosFoto });
       }
 
@@ -8524,6 +9581,13 @@ module.exports = async function handler(req, res) {
           }, origenLedger(mrRes, 'album', mrPunto)));
           var mrMisiones = await evaluarMisiones(sql, mrUser);
           var mrLogros = await evaluarLogros(sql, mrUser);
+          // FASE 2B (T5.4 / ADR-065): dividendo del dueno de media del spot
+          // (destino se resuelve via album_fotos.foto_url -> destinos_fotos.url).
+          await aplicarDividendoSpot(sql, {
+            accion: 'album_foto', usuario_id_autor: mrUser,
+            origen_media_id: mrIns[0].id, fuente_interaccion_id: null,
+            xp_bruto_base: mrXp, tipo_medio: mrTipo
+          });
           return res.status(200).json({
             ok: true,
             recurso: { id: mrIns[0].id, album_id: mrIns[0].album_id, visible: mrIns[0].visible },
@@ -8843,6 +9907,14 @@ module.exports = async function handler(req, res) {
           mult_final: resAlbumFoto.mult_global_c, cap_aplicado: resAlbumFoto.cap_aplicado,
           xp_final: xpAlbumFotoFinal, contexto: { foto_id: afIns[0].id, canal: 'album_agregar_foto' }
         }, origenLedger(resAlbumFoto, 'album', afPunto)));
+
+        // FASE 2B (T5.4 / ADR-065): dividendo del dueno de media del spot
+        // (destino via album_fotos.foto_url -> destinos_fotos.url).
+        await aplicarDividendoSpot(sql, {
+          accion: 'album_foto', usuario_id_autor: usuarioId2,
+          origen_media_id: afIns[0].id, fuente_interaccion_id: null,
+          xp_bruto_base: XP_BASES.album_foto, tipo_medio: afFotoType
+        });
 
         // XP al autor original si es foto de otro. ADR-053 Dec 8.5 (v25):
         // album_foto_autor se rutea por el catalogo unico (antes eran 4
@@ -10468,7 +11540,7 @@ module.exports = async function handler(req, res) {
         if (cpBaseCap > 0) {
           var ctxCompartir = await contextoXpE(sql, usuarioId2);
           cpAmuleto = await aplicarAmuletoX2(sql, usuarioId2, cpBaseCap);
-          var cpLider = await esLiderDestino(sql, usuarioId2, cpDestinoId);
+          var cpLider = await esLiderDestinoSpot(sql, usuarioId2, cpDestinoId);
           cpResult = await calcularXpAcreditado(sql, cpBaseCap, ctxCompartir.nivel_clase,
             ctxCompartir.clase_id, ctxCompartir.tag,
             { nivel_usuario: ctxCompartir.nivel_usuario, amuleto: cpAmuleto.doubled,
@@ -10596,6 +11668,982 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           ok: true, xp: xpSpotFinal, xp_detalle: armarXpDetalle(XP_BASES.spot_atributos, resSpot, 0),
           misiones: spMisiones, logros: spLogros
+        });
+      }
+
+      // FASE 2B (T5.5 / ADR-065) + HOTFIX A-2 (QA): POST
+      // ?tipo=spot_dividendo. Registro manual/idempotente del dividendo para
+      // casos NO cableados por los handlers de XP.
+      // SEGURIDAD: rama SOLO ADMIN (Bearer ADMIN_SECRET o X-Internal-Secret,
+      // patron de admin_xp). Antes aceptaba xp_bruto_base del cliente con
+      // sesion de usuario -> inyeccion/drenaje de XP. Ahora la base SIEMPRE
+      // se DERIVA del servidor desde la interaccion fuente
+      // (interacciones.xp_ganado); el body no puede fijar el monto.
+      if (tipo2 === 'spot_dividendo') {
+        var sdHdr = req.headers.authorization || '';
+        var sdSecret = process.env.ADMIN_SECRET || 'exploraco12345';
+        var sdTraeCred = (sdHdr.indexOf('Bearer ') === 0)
+          || (req.headers['x-internal-secret'] !== undefined);
+        var sdEsAdmin = (sdHdr.indexOf('Bearer ') === 0 && sdHdr.slice(7) === sdSecret)
+          || (req.headers['x-internal-secret'] === sdSecret);
+        if (!sdEsAdmin)
+          return res.status(sdTraeCred ? 403 : 401)
+            .json({ ok: false, error: sdTraeCred ? 'Solo admin' : 'Token requerido' });
+
+        // La fuente es OBLIGATORIA: sin ella no hay base server-side.
+        var sdFuenteId = String(body.fuente_interaccion_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(sdFuenteId))
+          return res.status(400).json({ ok: false, error: 'fuente_interaccion_id (uuid) requerido' });
+
+        var sdRow;
+        try {
+          sdRow = await sql(
+            'SELECT xp_ganado, usuario_id::text AS usuario_id, destino_id::text AS destino_id'
+            + ' FROM interacciones WHERE id=$1::uuid LIMIT 1',
+            [sdFuenteId]
+          );
+        } catch (eSd) {
+          if (!esEsquemaFaltante(eSd)) throw eSd;
+          return res.status(503).json({ ok: false, error: 'Interacciones no disponibles', code: 'SCHEMA_NOT_MIGRATED' });
+        }
+        if (!sdRow.length)
+          return res.status(404).json({ ok: false, error: 'INTERACCION_NO_ENCONTRADA' });
+
+        // Autor: el declarado debe coincidir con el de la interaccion fuente.
+        var sdAutor = sdRow[0].usuario_id ? String(sdRow[0].usuario_id) : null;
+        if (!sdAutor)
+          return res.status(400).json({ ok: false, error: 'INTERACCION_SIN_AUTOR' });
+        if (body.usuario_id !== undefined && body.usuario_id !== null
+            && String(body.usuario_id).trim() !== ''
+            && String(body.usuario_id).trim() !== sdAutor)
+          return res.status(400).json({ ok: false, error: 'AUTOR_NO_COINCIDE' });
+
+        // Destino: si el cliente lo declara, debe coincidir con el de la
+        // fuente; si no, se toma el de la fuente.
+        var sdDest = sdRow[0].destino_id ? String(sdRow[0].destino_id) : null;
+        var sdDestBody = body.destino_id ? String(body.destino_id).trim() : null;
+        if (sdDestBody && sdDest && sdDestBody !== sdDest)
+          return res.status(400).json({ ok: false, error: 'DESTINO_NO_COINCIDE' });
+        if (!sdDest) sdDest = sdDestBody;
+        if (!sdDest)
+          return res.status(400).json({ ok: false, error: 'DESTINO_REQUERIDO' });
+
+        // Base SIEMPRE del servidor; body.xp_bruto_base se ignora por completo.
+        var sdBase = numXp(sdRow[0].xp_ganado);
+        if (!(sdBase > 0))
+          return res.status(400).json({ ok: false, error: 'BASE_NO_DISPONIBLE', xp_ganado: sdBase });
+        var sdTipo = body.tipo_medio ? String(body.tipo_medio).toLowerCase() : 'escrito';
+
+        var sdRes = await aplicarDividendoSpot(sql, {
+          accion: 'spot_dividendo_manual',
+          usuario_id_autor: sdAutor,
+          destino_id: sdDest,
+          // spot_dividendos.fuente_interaccion_id es bigint (migracion 040)
+          // e interacciones.id es uuid: no se puede enlazar el uuid ahi. Se
+          // mantiene la dedup diaria del helper y el uuid viaja en
+          // fuente_ref (solo trazas/ledger). Deuda reportada.
+          fuente_interaccion_id: null,
+          fuente_ref: sdFuenteId,
+          xp_bruto_base: sdBase,
+          tipo_medio: sdTipo
+        });
+        if (sdRes.motivo === 'schema')
+          return res.status(503).json({ ok: false, error: 'Own the Spot no disponible (migracion 040 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
+        // Aborta tipado si el autor no tiene saldo para cubrir el dividendo:
+        // NO se pago nada (ver la guarda atomica del helper).
+        if (sdRes.motivo === 'saldo_insuficiente')
+          return res.status(400).json({
+            ok: false, error: 'SALDO_INSUFICIENTE',
+            usuario_id: sdAutor, xp_bruto_base: red2(sdBase)
+          });
+        return res.status(200).json({
+          ok: true,
+          data: sdRes,
+          derivado: {
+            fuente_interaccion_id: sdFuenteId,
+            usuario_id: sdAutor,
+            destino_id: sdDest,
+            xp_bruto_base: red2(sdBase)
+          }
+        });
+      }
+
+      // FASE 2B (T6.1 / ADR-063): POST ?tipo=gobernanza_proponer.
+      // Gate por capa (ver validarGateGobernanza). quorum default 3;
+      // cierra_en default NOW()+7 dias. El ledger NO aplica (sin XP).
+      if (tipo2 === 'gobernanza_proponer') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var gprSes = validarSesion(req, usuarioId2);
+        if (!gprSes.ok) return responderSesion(res, gprSes.razon);
+        var gprCapa = String(body.capa || '').toLowerCase();
+        var gprTitulo = String(body.titulo || '').trim();
+        var gprDesc = String(body.descripcion || '').trim();
+        if (!gprTitulo) return res.status(400).json({ ok: false, error: 'titulo requerido' });
+        if (gprTitulo.length > 200) return res.status(400).json({ ok: false, error: 'titulo maximo 200 caracteres' });
+        if (!gprDesc) return res.status(400).json({ ok: false, error: 'descripcion requerida' });
+        if (gprDesc.length > 4000) return res.status(400).json({ ok: false, error: 'descripcion maximo 4000 caracteres' });
+        var gprQuorum = parseInt(body.quorum, 10);
+        if (!isFinite(gprQuorum) || gprQuorum < 1) gprQuorum = 3;
+        if (gprQuorum > 100) gprQuorum = 100;
+
+        var gprGate = await validarGateGobernanza(sql, usuarioId2, gprCapa, body.capa_id, true);
+        if (!gprGate.ok)
+          return res.status(gprGate.status).json({ ok: false, error: gprGate.error, nivel: gprGate.nivel, nivel_requerido: gprGate.nivel_requerido, rol: gprGate.rol });
+
+        try {
+          var gprIns = await sql(
+            'INSERT INTO gobernanza_propuestas (capa, capa_id, autor_id, titulo, descripcion,'
+            + ' estado, quorum, activo, creado_en, cierra_en)'
+            + ' VALUES ($1, $2, $3::uuid, $4, $5, \'abierta\', $6::int, true, NOW(), NOW() + INTERVAL \'7 days\')'
+            + ' RETURNING id, capa, capa_id, estado, quorum, creado_en, cierra_en',
+            [gprGate.capa, gprGate.capa_id, usuarioId2, gprTitulo, gprDesc, gprQuorum]
+          );
+          return res.status(201).json({ ok: true, propuesta: gprIns[0] });
+        } catch (eGpr) {
+          if (esEsquemaFaltante(eGpr))
+            return res.status(503).json({ ok: false, error: 'Gobernanza no disponible (migracion 040 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
+          if (eGpr && eGpr.code === '23514')
+            return res.status(400).json({ ok: false, error: 'CAPA_INVALIDA' });
+          throw eGpr;
+        }
+      }
+
+      // FASE 2B (T6.2 / ADR-063): POST ?tipo=gobernanza_votar.
+      // Gate por capa igual que proponer (sin exigir rol). PK
+      // (propuesta_id, usuario_id) -> 409 duplicado. peso=1 para todos
+      // (ponderado queda para un ADR posterior). Cierra por quorum.
+      if (tipo2 === 'gobernanza_votar') {
+        if (!usuarioId2)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        var gvoSes = validarSesion(req, usuarioId2);
+        if (!gvoSes.ok) return responderSesion(res, gvoSes.razon);
+        var gvoProp = String(body.propuesta_id || '').trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(gvoProp))
+          return res.status(400).json({ ok: false, error: 'propuesta_id requerido' });
+        var gvoVoto = String(body.voto || '').toLowerCase();
+        if (GOB_VOTOS.indexOf(gvoVoto) === -1)
+          return res.status(400).json({ ok: false, error: 'voto invalido (favor|contra|abstencion)' });
+
+        var gvoP = await sql(
+          'SELECT id, capa, capa_id, estado FROM gobernanza_propuestas WHERE id=$1::uuid AND activo=true LIMIT 1',
+          [gvoProp]
+        ).catch(function(eGvoP) {
+          if (esEsquemaFaltante(eGvoP)) return null;
+          throw eGvoP;
+        });
+        if (gvoP === null)
+          return res.status(503).json({ ok: false, error: 'Gobernanza no disponible (migracion 040 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
+        if (!gvoP.length)
+          return res.status(404).json({ ok: false, error: 'Propuesta no encontrada' });
+        if (gvoP[0].estado !== 'abierta')
+          return res.status(409).json({ ok: false, error: 'PROPUESTA_CERRADA', estado: gvoP[0].estado });
+
+        var gvoGate = await validarGateGobernanza(sql, usuarioId2, gvoP[0].capa, gvoP[0].capa_id, false);
+        if (!gvoGate.ok)
+          return res.status(gvoGate.status).json({ ok: false, error: gvoGate.error, nivel: gvoGate.nivel, nivel_requerido: gvoGate.nivel_requerido });
+
+        try {
+          await sql(
+            'INSERT INTO gobernanza_votos (propuesta_id, usuario_id, voto, peso, activo, creado_en)'
+            + ' VALUES ($1::uuid, $2::uuid, $3, 1, true, NOW())',
+            [gvoProp, usuarioId2, gvoVoto]
+          );
+        } catch (eGvoVoto) {
+          if (eGvoVoto && eGvoVoto.code === '23505')
+            return res.status(409).json({ ok: false, error: 'Ya votaste esta propuesta', duplicado: true });
+          if (esEsquemaFaltante(eGvoVoto))
+            return res.status(503).json({ ok: false, error: 'Gobernanza no disponible (migracion 040 pendiente)', code: 'SCHEMA_NOT_MIGRATED' });
+          throw eGvoVoto;
+        }
+
+        var gvoCierre = await cerrarGobernanzaPorQuorum(sql, gvoProp);
+        return res.status(200).json({ ok: true, voto: gvoVoto, peso: 1, resuelta: gvoCierre.resuelta, estado: gvoCierre.estado || 'abierta' });
+      }
+
+      // ============ FASE 2C (ADR-062 / ADR-061 / ADR-064 / ADR-066) ============
+      // Cartas (intercambio + evento), moneda "Condor" (CDR), presencia de
+      // marca en spots y upgrades de Parche. Todas exigen sesion firmada
+      // cuando escriben (ADR-025) y degradan tipado si falta el esquema.
+
+      // T7.3 (ADR-062): consumir UNA carta de evento (es_evento=true) para
+      // habilitar la entrada a un evento. CERO DELETE fisico: cantidad-1 y
+      // activo=false al llegar a 0. El usuario sale del token (BUG-061).
+      if (tipo2 === 'carta_evento_usar') {
+        var cevSes = usuarioDeSesion(req);
+        if (!cevSes.ok) return responderSesion(res, cevSes.razon);
+        var cevUid = cevSes.usuario_id;
+        var cevCarta = String(body.carta_id || '').trim();
+        if (!cevCarta) return res.status(400).json({ ok: false, error: 'carta_id requerido' });
+        var cevRes;
+        try {
+          cevRes = await sql(
+            'WITH ok_carta AS ('
+            + ' SELECT id FROM cartas_catalogo'
+            + ' WHERE id=$2 AND activo=true AND es_evento=true LIMIT 1'
+            + '), upd AS ('
+            + ' UPDATE usuarios_cartas SET cantidad = cantidad - 1,'
+            + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= 1'
+            + '  AND EXISTS (SELECT 1 FROM ok_carta)'
+            + ' RETURNING cantidad, activo'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM ok_carta) AS carta_ok,'
+            + ' (SELECT cantidad FROM upd) AS cantidad,'
+            + ' (SELECT activo FROM upd) AS activa',
+            [cevUid, cevCarta]
+          );
+        } catch (eCev) {
+          if (!esEsquemaFaltante(eCev)) throw eCev;
+          return responderCartasAusente(res, eCev, 'carta_evento_usar');
+        }
+        var cevR = cevRes[0] || {};
+        if (Number(cevR.carta_ok) !== 1)
+          return res.status(404).json({ ok: false, error: 'CARTA_EVENTO_NO_ENCONTRADA' });
+        if (cevR.cantidad === null || cevR.cantidad === undefined)
+          return res.status(409).json({ ok: false, error: 'SIN_CARTA' });
+        // Registro del uso en el ledger (marca el evento, es_exento, sin XP).
+        await registrarXpLedger(sql, {
+          usuario_id: cevUid, accion: 'carta_evento', xp_base: 0,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: 0, es_exento: true,
+          contexto: { carta_id: cevCarta }
+        });
+        return res.status(200).json({
+          ok: true, evento_habilitado: true, carta_id: cevCarta,
+          cantidad_restante: Number(cevR.cantidad),
+          carta_activa: cevR.activa === true
+        });
+      }
+
+      // T7.4 (ADR-062): intercambio P2P de UNA copia de una carta NO-gate
+      // (es_evento=true o nivel_gate NULL). Emisor = token; receptor =
+      // body.receptor_id. Limite diario anti-farming (M-4). CERO DELETE:
+      // emisor -1 (activo=false al 0) y receptor +1 con UPSERT merge.
+      if (tipo2 === 'carta_intercambiar') {
+        var cixSes = usuarioDeSesion(req);
+        if (!cixSes.ok) return responderSesion(res, cixSes.razon);
+        var cixUid = cixSes.usuario_id;
+        var cixReceptor = String(body.receptor_id || '').trim();
+        if (!MERCADO_UUID_RE.test(cixReceptor))
+          return res.status(400).json({ ok: false, error: 'receptor_id invalido' });
+        if (cixReceptor === cixUid)
+          return res.status(400).json({ ok: false, error: 'AUTOINTERCAMBIO_PROHIBIDO' });
+        var cixCarta = String(body.carta_id || '').trim();
+        if (!cixCarta) return res.status(400).json({ ok: false, error: 'carta_id requerido' });
+        try {
+          var cixCartaRow = await sql(
+            'SELECT id, es_evento, nivel_gate FROM cartas_catalogo'
+            + ' WHERE id=$1 AND activo=true LIMIT 1',
+            [cixCarta]
+          );
+          if (!cixCartaRow.length)
+            return res.status(404).json({ ok: false, error: 'CARTA_NO_ENCONTRADA' });
+          var cixEsGate = (cixCartaRow[0].nivel_gate !== null && cixCartaRow[0].nivel_gate !== undefined);
+          if (cixCartaRow[0].es_evento !== true && cixEsGate)
+            return res.status(400).json({ ok: false, error: 'CARTA_DE_GATE_NO_INTERCAMBIABLE' });
+          // Anti-farming: participacion (emisor O receptor) en 24 h.
+          var cixDia = await sql(
+            'SELECT COUNT(*)::int AS n FROM cartas_intercambios'
+            + ' WHERE activo=true AND creado_en > NOW() - INTERVAL \'1 day\''
+            + ' AND (emisor_id=$1::uuid OR receptor_id=$1::uuid)',
+            [cixUid]
+          );
+          if ((cixDia[0] && Number(cixDia[0].n)) >= CARTA_INTERCAMBIO_LIMITE_DIA)
+            return res.status(429).json({
+              ok: false, error: 'LIMITE_INTERCAMBIOS_DIARIO',
+              limite: CARTA_INTERCAMBIO_LIMITE_DIA
+            });
+        } catch (eCixP) {
+          if (!esEsquemaFaltante(eCixP)) throw eCixP;
+          return responderCartasAusente(res, eCixP, 'carta_intercambiar');
+        }
+        var cixRes;
+        try {
+          cixRes = await sql(
+            'WITH bumi AS ('
+            + ' SELECT usuario_id FROM usuarios_cartas'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= 1'
+            + '), dec AS ('
+            + ' UPDATE usuarios_cartas SET cantidad = cantidad - 1,'
+            + '  activo = CASE WHEN cantidad - 1 <= 0 THEN false ELSE activo END'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= 1'
+            + '  AND EXISTS (SELECT 1 FROM bumi)'
+            + ' RETURNING cantidad, activo'
+            + '), up AS ('
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, cantidad, activo, obtenida_en)'
+            + ' SELECT $3::uuid, $2, 1, true, NOW() FROM dec'
+            + ' ON CONFLICT (usuario_id, carta_id) DO UPDATE SET'
+            + '  cantidad = usuarios_cartas.cantidad + 1, activo=true, obtenida_en=NOW()'
+            + ' RETURNING cantidad'
+            + '), log AS ('
+            + ' INSERT INTO cartas_intercambios (emisor_id, receptor_id, carta_id, activo, creado_en)'
+            + ' SELECT $1::uuid, $3::uuid, $2, true, NOW() FROM dec'
+            + ' RETURNING id'
+            + ')'
+            + ' SELECT (SELECT cantidad FROM dec) AS emisor_cantidad,'
+            + ' (SELECT activo FROM dec) AS emisor_activo,'
+            + ' (SELECT cantidad FROM up) AS receptor_cantidad,'
+            + ' (SELECT id FROM log) AS intercambio_id',
+            [cixUid, cixCarta, cixReceptor]
+          );
+        } catch (eCix) {
+          if (esEsquemaFaltante(eCix)) return responderCartasAusente(res, eCix, 'carta_intercambiar');
+          if (eCix && eCix.code === '23503')
+            return res.status(404).json({ ok: false, error: 'RECEPTOR_NO_ENCONTRADO' });
+          throw eCix;
+        }
+        var cixR = cixRes[0] || {};
+        if (cixR.emisor_cantidad === null || cixR.emisor_cantidad === undefined)
+          return res.status(409).json({ ok: false, error: 'SIN_COPIA' });
+        return res.status(200).json({
+          ok: true, carta_id: cixCarta, receptor_id: cixReceptor,
+          emisor_cantidad: Number(cixR.emisor_cantidad),
+          emisor_activo: cixR.emisor_activo === true,
+          receptor_cantidad: Number(cixR.receptor_cantidad),
+          intercambio_id: cixR.intercambio_id
+        });
+      }
+
+      // FASE 2D (T11 / ADR-062): mercado de cartas (migracion 041). Sustituye
+      // los 501 de la Fase 2C. Tabla propia cartas_ofertas/cartas_ventas
+      // porque mercado_ofertas.consumible_id es uuid FK a consumibles y su
+      // CHECK origen solo admite ('inventario','produccion').
+
+      // T11.1: publicar una oferta con ESCROW de cartas. CERO DELETE: la
+      // carta se descuenta de usuarios_cartas (activo=false al llegar a 0)
+      // dentro de la MISMA CTE que inserta la oferta (patron mercado_publicar).
+      if (tipo2 === 'carta_publicar') {
+        var cpSes = usuarioDeSesion(req);
+        if (!cpSes.ok) return responderSesion(res, cpSes.razon);
+        var cpUid = cpSes.usuario_id;
+        var cpCarta = String(body.carta_id || '').trim();
+        if (!cpCarta) return res.status(400).json({ ok: false, error: 'carta_id requerido' });
+        var cpCant = parseInt(body.cantidad, 10);
+        if (!isFinite(cpCant) || cpCant < 1)
+          return res.status(400).json({ ok: false, error: 'cantidad invalida (>0)' });
+        if (cpCant > 999) cpCant = 999;
+        var cpPrecio = red2(parseFloat(body.precio_xp));
+        if (!isFinite(cpPrecio) || cpPrecio <= 0)
+          return res.status(400).json({ ok: false, error: 'precio_xp requerido (>0)' });
+        var cpHoras = parseInt(body.horas, 10);
+        if (!isFinite(cpHoras) || cpHoras < 1) cpHoras = CARTA_OFERTA_HORAS_DEFAULT;
+        if (cpHoras > 8760) cpHoras = 8760;
+
+        var cpRes;
+        try {
+          cpRes = await sql(
+            'WITH ok_carta AS ('
+            + ' SELECT id FROM cartas_catalogo WHERE id=$2 AND activo=true LIMIT 1'
+            + '), escrow AS ('
+            + ' UPDATE usuarios_cartas SET cantidad = cantidad - $3::int,'
+            + '  activo = CASE WHEN cantidad - $3::int <= 0 THEN false ELSE activo END'
+            + ' WHERE usuario_id=$1::uuid AND carta_id=$2 AND activo=true AND cantidad >= $3::int'
+            + '  AND EXISTS (SELECT 1 FROM ok_carta)'
+            + ' RETURNING cantidad, activo'
+            + '), oferta AS ('
+            + ' INSERT INTO cartas_ofertas (vendedor_id, carta_id, cantidad,'
+            + '  cantidad_restante, precio_xp, estado, activo, expira_en)'
+            + ' SELECT $1::uuid, $2, $3::int, $3::int, $4::numeric, \'abierta\', true,'
+            + '  NOW() + ($5::int * INTERVAL \'1 hour\')'
+            + ' FROM escrow'
+            + ' RETURNING id, estado, expira_en'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM ok_carta) AS carta_ok,'
+            + ' (SELECT cantidad FROM escrow) AS vendedor_cantidad,'
+            + ' (SELECT activo FROM escrow) AS vendedor_activo,'
+            + ' (SELECT id::text FROM oferta) AS oferta_id,'
+            + ' (SELECT estado FROM oferta) AS estado,'
+            + ' (SELECT expira_en FROM oferta) AS expira_en',
+            [cpUid, cpCarta, cpCant, cpPrecio, cpHoras]
+          );
+        } catch (eCp) {
+          if (esEsquemaFaltante(eCp)) return responderCartasMercadoAusente(res, eCp, 'carta_publicar');
+          if (eCp && (eCp.code === '23503' || eCp.code === '23514' || eCp.code === '22P02'))
+            return res.status(400).json({ ok: false, error: 'OFERTA_INVALIDA' });
+          throw eCp;
+        }
+        var cpR = cpRes[0] || {};
+        if (Number(cpR.carta_ok) !== 1)
+          return res.status(404).json({ ok: false, error: 'CARTA_NO_ENCONTRADA' });
+        if (!cpR.oferta_id)
+          return res.status(400).json({
+            ok: false, error: 'CARTA_INSUFICIENTE',
+            carta_id: cpCarta, cantidad_solicitada: cpCant
+          });
+        return res.status(201).json({
+          ok: true, oferta_id: cpR.oferta_id, carta_id: cpCarta,
+          cantidad: cpCant, cantidad_restante: cpCant,
+          precio_xp: cpPrecio, estado: cpR.estado || 'abierta',
+          expira_en: cpR.expira_en,
+          vendedor_cantidad: (cpR.vendedor_cantidad === null || cpR.vendedor_cantidad === undefined)
+            ? null : Number(cpR.vendedor_cantidad),
+          vendedor_carta_activa: cpR.vendedor_activo === true
+        });
+      }
+
+      // T11.2: comprar una oferta de carta. Atomico en UNA CTE: debita XP del
+      // comprador, acredita XP al vendedor, descuenta cantidad_restante
+      // ('cerrada' al llegar a 0, 'parcial' si no), transfiere las cartas al
+      // comprador (UPSERT merge), inserta cartas_ventas y las 2 filas de
+      // xp_ledger (carta_venta_debito / carta_venta_credito, exentas).
+      if (tipo2 === 'carta_comprar') {
+        var cbcSes = usuarioDeSesion(req);
+        if (!cbcSes.ok) return responderSesion(res, cbcSes.razon);
+        var cbcUid = cbcSes.usuario_id;
+        var cbcId = String(body.oferta_id || '').trim();
+        if (!MERCADO_UUID_RE.test(cbcId))
+          return res.status(400).json({ ok: false, error: 'oferta_id invalido' });
+        var cbcCant = parseInt(body.cantidad, 10);
+        if (!isFinite(cbcCant) || cbcCant < 1)
+          return res.status(400).json({ ok: false, error: 'cantidad invalida (>0)' });
+        if (cbcCant > 999) cbcCant = 999;
+
+        var cbcOf, cbcUsr;
+        try {
+          cbcOf = await sql(
+            'SELECT o.id, o.vendedor_id, o.carta_id, o.cantidad_restante,'
+            + ' o.precio_xp, o.estado, o.expira_en'
+            + ' FROM cartas_ofertas o WHERE o.id=$1::uuid LIMIT 1',
+            [cbcId]
+          );
+          if (!cbcOf.length)
+            return res.status(404).json({ ok: false, error: 'OFERTA_NO_ENCONTRADA' });
+          if (String(cbcOf[0].vendedor_id) === cbcUid)
+            return res.status(403).json({ ok: false, error: 'AUTOCOMPRA_PROHIBIDA' });
+          if (CARTA_OFERTA_ESTADOS_ACTIVOS.indexOf(String(cbcOf[0].estado)) === -1
+              || (cbcOf[0].expira_en && new Date(cbcOf[0].expira_en).getTime() <= Date.now()))
+            return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE', estado: cbcOf[0].estado });
+          if (Number(cbcOf[0].cantidad_restante) < cbcCant)
+            return res.status(409).json({ ok: false, error: 'CANTIDAD_INSUFICIENTE' });
+          cbcUsr = await sql('SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [cbcUid]);
+        } catch (eCbcP) {
+          if (!esEsquemaFaltante(eCbcP)) throw eCbcP;
+          return responderCartasMercadoAusente(res, eCbcP, 'carta_comprar');
+        }
+        if (!cbcUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var cbcPrecio = red2(numXp(cbcOf[0].precio_xp));
+        var cbcSubtotal = red2(cbcPrecio * cbcCant);
+        if (numXp(cbcUsr[0].xp_total) < cbcSubtotal)
+          return res.status(400).json({
+            ok: false, error: 'PUNTOS_INSUFICIENTES',
+            requerido: cbcSubtotal, xp_actual: red2(numXp(cbcUsr[0].xp_total))
+          });
+
+        var cbcRes;
+        try {
+          cbcRes = await sql(
+            'WITH ok_oferta AS ('
+            + ' SELECT id, vendedor_id, carta_id, precio_xp FROM cartas_ofertas'
+            + ' WHERE id=$1::uuid AND activo=true AND estado IN (\'abierta\',\'parcial\')'
+            + '  AND cantidad_restante >= $2::int AND vendedor_id <> $3::uuid'
+            + '  AND (expira_en IS NULL OR expira_en > NOW())'
+            + '), ok_xp AS ('
+            + ' SELECT id FROM usuarios WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '), debit AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total - $4::numeric'
+            + ' WHERE id=$3::uuid AND xp_total >= $4::numeric AND EXISTS (SELECT 1 FROM ok_oferta)'
+            + ' RETURNING xp_total'
+            + '), dec AS ('
+            + ' UPDATE cartas_ofertas SET cantidad_restante = cantidad_restante - $2::int,'
+            + '  estado = CASE WHEN cantidad_restante - $2::int <= 0 THEN \'cerrada\' ELSE \'parcial\' END,'
+            + '  ejecutada_en = NOW()'
+            + ' WHERE id=$1::uuid AND EXISTS (SELECT 1 FROM debit)'
+            + ' RETURNING cantidad_restante, estado'
+            + '), cred AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total + $4::numeric'
+            + ' WHERE id=(SELECT vendedor_id FROM ok_oferta) AND EXISTS (SELECT 1 FROM debit)'
+            + ' RETURNING id'
+            + '), cartas AS ('
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, cantidad, activo, obtenida_en)'
+            + ' SELECT $3::uuid, (SELECT carta_id FROM ok_oferta), $2::int, true, NOW()'
+            + ' FROM debit'
+            + ' ON CONFLICT (usuario_id, carta_id) DO UPDATE SET'
+            + '  cantidad = usuarios_cartas.cantidad + EXCLUDED.cantidad,'
+            + '  activo = true, obtenida_en = NOW()'
+            + ' RETURNING cantidad'
+            + '), venta AS ('
+            + ' INSERT INTO cartas_ventas (oferta_id, vendedor_id, comprador_id, carta_id,'
+            + '  cantidad, precio_unitario, subtotal, creado_en)'
+            + ' SELECT $1::uuid, (SELECT vendedor_id FROM ok_oferta), $3::uuid,'
+            + '  (SELECT carta_id FROM ok_oferta), $2::int, $5::numeric, $4::numeric, NOW()'
+            + ' FROM debit RETURNING id'
+            + '), led_d AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT $3::uuid, \'carta_venta_debito\', $4::numeric, (-$4::numeric), true,'
+            + '  jsonb_build_object(\'oferta_id\', $1::text, \'cantidad\', $2::int)'
+            + ' FROM debit RETURNING id'
+            + '), led_c AS ('
+            + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, xp_final, es_exento, contexto)'
+            + ' SELECT (SELECT vendedor_id FROM ok_oferta), \'carta_venta_credito\', $4::numeric,'
+            + '  $4::numeric, true,'
+            + '  jsonb_build_object(\'oferta_id\', $1::text, \'cantidad\', $2::int, \'comprador_id\', $3::text)'
+            + ' FROM debit RETURNING id'
+            + ')'
+            + ' SELECT EXISTS(SELECT 1 FROM ok_oferta) AS oferta_ok,'
+            + ' EXISTS(SELECT 1 FROM ok_xp) AS xp_ok,'
+            + ' (SELECT xp_total FROM debit) AS comprador_xp,'
+            + ' (SELECT cantidad_restante FROM dec) AS cantidad_restante,'
+            + ' (SELECT estado FROM dec) AS estado,'
+            + ' (SELECT id::text FROM venta) AS venta_id',
+            [cbcId, cbcCant, cbcUid, cbcSubtotal, cbcPrecio]
+          );
+        } catch (eCbc) {
+          if (esEsquemaFaltante(eCbc)) return responderCartasMercadoAusente(res, eCbc, 'carta_comprar');
+          if (eCbc && eCbc.code === '23514')
+            return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
+          throw eCbc;
+        }
+        var cbcR = cbcRes[0] || {};
+        if (cbcR.oferta_ok !== true)
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE' });
+        if (cbcR.xp_ok !== true)
+          return res.status(400).json({ ok: false, error: 'PUNTOS_INSUFICIENTES', requerido: cbcSubtotal });
+        return res.status(200).json({
+          ok: true, venta_id: cbcR.venta_id, oferta_id: cbcId,
+          carta_id: String(cbcOf[0].carta_id), cantidad: cbcCant,
+          precio_unitario: cbcPrecio, subtotal_xp: cbcSubtotal,
+          estado_oferta: cbcR.estado, cantidad_restante: Number(cbcR.cantidad_restante),
+          xp_total_nuevo: red2(numXp(cbcR.comprador_xp))
+        });
+      }
+
+      // T11.3: cancelar una oferta propia; devuelve cantidad_restante al
+      // vendedor (UPSERT) y marca estado='cancelada', activo=false (CERO
+      // DELETE). Atomico en UNA CTE.
+      if (tipo2 === 'carta_cancelar') {
+        var czSes = usuarioDeSesion(req);
+        if (!czSes.ok) return responderSesion(res, czSes.razon);
+        var czUid = czSes.usuario_id;
+        var czId = String(body.oferta_id || '').trim();
+        if (!MERCADO_UUID_RE.test(czId))
+          return res.status(400).json({ ok: false, error: 'oferta_id invalido' });
+        var czRes;
+        try {
+          czRes = await sql(
+            'WITH of AS ('
+            + ' SELECT id FROM cartas_ofertas WHERE id=$1::uuid AND vendedor_id=$2::uuid'
+            + '  AND activo=true AND estado IN (\'abierta\',\'parcial\')'
+            + '), upd AS ('
+            + ' UPDATE cartas_ofertas SET estado=\'cancelada\', activo=false'
+            + ' WHERE id=$1::uuid AND vendedor_id=$2::uuid AND activo=true'
+            + '  AND estado IN (\'abierta\',\'parcial\')'
+            + ' RETURNING carta_id, cantidad_restante'
+            + '), dev AS ('
+            + ' INSERT INTO usuarios_cartas (usuario_id, carta_id, cantidad, activo, obtenida_en)'
+            + ' SELECT $2::uuid, (SELECT carta_id FROM upd), (SELECT cantidad_restante FROM upd), true, NOW()'
+            + ' WHERE (SELECT cantidad_restante FROM upd) > 0'
+            + ' ON CONFLICT (usuario_id, carta_id) DO UPDATE SET'
+            + '  cantidad = usuarios_cartas.cantidad + EXCLUDED.cantidad,'
+            + '  activo = true, obtenida_en = NOW()'
+            + ' RETURNING cantidad'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM of) AS oferta_ok,'
+            + ' (SELECT COUNT(*)::int FROM upd) AS cancelada,'
+            + ' (SELECT cantidad_restante FROM upd) AS devueltas,'
+            + ' (SELECT cantidad FROM dev) AS vendedor_cantidad',
+            [czId, czUid]
+          );
+        } catch (eCz) {
+          if (esEsquemaFaltante(eCz)) return responderCartasMercadoAusente(res, eCz, 'carta_cancelar');
+          throw eCz;
+        }
+        var czR = czRes[0] || {};
+        if (Number(czR.oferta_ok) !== 1)
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_CANCELABLE' });
+        if (Number(czR.cancelada) !== 1)
+          return res.status(409).json({ ok: false, error: 'OFERTA_NO_CANCELABLE' });
+        return res.status(200).json({
+          ok: true, oferta_id: czId, estado: 'cancelada',
+          devueltas: Number(czR.devueltas) || 0,
+          vendedor_cantidad: (czR.vendedor_cantidad === null || czR.vendedor_cantidad === undefined)
+            ? null : Number(czR.vendedor_cantidad)
+        });
+      }
+
+      // T8.3 (ADR-061): crear una orden de venta/compra de CDR con escrow y,
+      // si existe una orden contraria compatible (mismo precio_xp), ejecutar
+      // el cruce CDR<->XP en una sola CTE. SIN cripto, SIN on-chain, SIN
+      // conversion a dinero real. La emision NO ocurre aqui (moneda_emisiones).
+      if (tipo2 === 'moneda_orden') {
+        var mooSes = usuarioDeSesion(req);
+        if (!mooSes.ok) return responderSesion(res, mooSes.razon);
+        var mooUid = mooSes.usuario_id;
+        var mooTipo = String(body.tipo_orden || '').toLowerCase();
+        if (mooTipo !== 'venta' && mooTipo !== 'compra')
+          return res.status(400).json({ ok: false, error: 'tipo_orden invalido (venta|compra)' });
+        var mooCant = red2(parseFloat(body.cantidad));
+        if (!isFinite(mooCant) || mooCant <= 0)
+          return res.status(400).json({ ok: false, error: 'cantidad requerida (>0)' });
+        var mooPrecio = red2(parseFloat(body.precio_xp));
+        if (!isFinite(mooPrecio) || mooPrecio <= 0)
+          return res.status(400).json({ ok: false, error: 'precio_xp requerido (>0)' });
+        var mooTotal = red2(mooCant * mooPrecio);
+
+        // Paso 1: escrow + alta de la orden en UNA CTE (atomico).
+        var mooIns;
+        try {
+          if (mooTipo === 'venta') {
+            mooIns = await sql(
+              'WITH debito AS ('
+              + ' UPDATE moneda_cuentas SET saldo = saldo - $2::numeric, actualizado_en = NOW()'
+              + ' WHERE usuario_id=$1::uuid AND saldo >= $2::numeric'
+              + ' RETURNING saldo'
+              + '), ins AS ('
+              + ' INSERT INTO moneda_mercado (vendedor_id, tipo_orden, cantidad,'
+              + '  cantidad_restante, precio_xp, estado, activo, expira_en)'
+              + ' SELECT $1::uuid, \'venta\', $2::numeric, $2::numeric, $3::numeric,'
+              + '  \'abierta\', true, NOW() + ($4::int * INTERVAL \'1 day\')'
+              + ' FROM debito'
+              + ' RETURNING id, cantidad_restante, expira_en'
+              + ')'
+              + ' SELECT (SELECT saldo FROM debito) AS saldo_post,'
+              + ' (SELECT id::text FROM ins) AS orden_id,'
+              + ' (SELECT cantidad_restante FROM ins) AS cantidad_restante,'
+              + ' (SELECT expira_en FROM ins) AS expira_en',
+              [mooUid, mooCant, mooPrecio, MONEDA_MERCADO_DIAS]
+            );
+          } else {
+            mooIns = await sql(
+              'WITH debito AS ('
+              + ' UPDATE usuarios SET xp_total = xp_total - $3::numeric'
+              + ' WHERE id=$1::uuid AND xp_total >= $3::numeric'
+              + ' RETURNING xp_total'
+              + '), ins AS ('
+              + ' INSERT INTO moneda_mercado (vendedor_id, tipo_orden, cantidad,'
+              + '  cantidad_restante, precio_xp, estado, activo, expira_en)'
+              + ' SELECT $1::uuid, \'compra\', $2::numeric, $2::numeric, $4::numeric,'
+              + '  \'abierta\', true, NOW() + ($5::int * INTERVAL \'1 day\')'
+              + ' FROM debito'
+              + ' RETURNING id, cantidad_restante, expira_en'
+              + ')'
+              + ' SELECT (SELECT xp_total FROM debito) AS xp_post,'
+              + ' (SELECT id::text FROM ins) AS orden_id,'
+              + ' (SELECT cantidad_restante FROM ins) AS cantidad_restante,'
+              + ' (SELECT expira_en FROM ins) AS expira_en',
+              [mooUid, mooCant, mooTotal, mooPrecio, MONEDA_MERCADO_DIAS]
+            );
+          }
+        } catch (eMooIns) {
+          if (!esEsquemaFaltante(eMooIns)) throw eMooIns;
+          return responderMonedaAusente(res, eMooIns, 'moneda_mercado');
+        }
+        var mooR = mooIns[0] || {};
+        if (!mooR.orden_id)
+          return res.status(409).json({
+            ok: false,
+            error: mooTipo === 'venta' ? 'SALDO_CDR_INSUFICIENTE' : 'XP_INSUFICIENTE',
+            requerido: mooTipo === 'venta' ? mooCant : mooTotal
+          });
+
+        // Ledger del escrow (best-effort; el saldo ya quedo aplicado).
+        if (mooTipo === 'venta') {
+          await registrarMonedaLedger(sql, {
+            usuario_id: mooUid, delta: red2(-mooCant), saldo: numXp(mooR.saldo_post),
+            motivo: 'orden_venta_escrow', ref_tipo: 'moneda_mercado', ref_id: mooR.orden_id
+          });
+        } else {
+          await registrarXpLedger(sql, {
+            usuario_id: mooUid, accion: 'orden_compra_escrow', xp_base: mooTotal,
+            mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+            bonos_planos: 0, xp_final: red2(-mooTotal), es_exento: true,
+            contexto: { orden_id: mooR.orden_id, cantidad: mooCant, precio_xp: mooPrecio }
+          });
+        }
+
+        // Paso 2: match simple contra una orden contraria abierta (mismo
+        // precio_xp). Todo el cruce en UNA CTE; los creditos solo se aplican
+        // si AMBOS updates de cantidad_restante tuvieron exito (integridad).
+        // BEST-EFFORT: un fallo del match no revierte la orden ya escrowed.
+        var mooMatch = null;
+        try {
+          var mooMatchRes = await sql(
+            'WITH nuevo AS ('
+            + ' SELECT id, vendedor_id, tipo_orden, cantidad_restante, precio_xp'
+            + ' FROM moneda_mercado WHERE id=$1::uuid AND activo=true'
+            + '  AND estado IN (\'abierta\',\'parcial\') AND cantidad_restante > 0'
+            + '  AND (expira_en IS NULL OR expira_en > NOW())'
+            + '), op AS ('
+            + ' SELECT o.id, o.vendedor_id, o.cantidad_restante, o.precio_xp'
+            + ' FROM moneda_mercado o, nuevo n'
+            + ' WHERE o.id <> n.id AND o.activo = true'
+            + '  AND o.estado IN (\'abierta\',\'parcial\')'
+            + '  AND o.tipo_orden <> n.tipo_orden'
+            + '  AND o.vendedor_id <> $2::uuid'
+            + '  AND o.precio_xp = n.precio_xp'
+            + '  AND o.cantidad_restante > 0'
+            + '  AND (o.expira_en IS NULL OR o.expira_en > NOW())'
+            + ' ORDER BY o.creado_en ASC LIMIT 1'
+            + '), m AS ('
+            + ' SELECT n.id AS n_id, n.vendedor_id AS n_uid, n.tipo_orden AS n_tipo,'
+            + '  n.cantidad_restante AS n_rest, n.precio_xp AS precio,'
+            + '  o.id AS o_id, o.vendedor_id AS o_uid, o.cantidad_restante AS o_rest,'
+            + '  LEAST(n.cantidad_restante, o.cantidad_restante) AS qty'
+            + ' FROM nuevo n JOIN op o ON true'
+            + '), upd_n AS ('
+            + ' UPDATE moneda_mercado t SET'
+            + '  cantidad_restante = t.cantidad_restante - m.qty,'
+            + '  estado = CASE WHEN t.cantidad_restante - m.qty <= 0 THEN \'ejecutada\' ELSE \'parcial\' END,'
+            + '  ejecutada_en = CASE WHEN t.cantidad_restante - m.qty <= 0 THEN NOW() ELSE t.ejecutada_en END,'
+            + '  comprador_id = m.o_uid'
+            + ' FROM m WHERE t.id = m.n_id AND t.activo = true AND t.cantidad_restante >= m.qty'
+            + ' RETURNING t.id, t.cantidad_restante'
+            + '), upd_o AS ('
+            + ' UPDATE moneda_mercado t SET'
+            + '  cantidad_restante = t.cantidad_restante - m.qty,'
+            + '  estado = CASE WHEN t.cantidad_restante - m.qty <= 0 THEN \'ejecutada\' ELSE \'parcial\' END,'
+            + '  ejecutada_en = CASE WHEN t.cantidad_restante - m.qty <= 0 THEN NOW() ELSE t.ejecutada_en END,'
+            + '  comprador_id = m.n_uid'
+            + ' FROM m WHERE t.id = m.o_id AND t.activo = true AND t.cantidad_restante >= m.qty'
+            + ' RETURNING t.id, t.cantidad_restante'
+            + '), cred_buyer AS ('
+            + ' INSERT INTO moneda_cuentas (usuario_id, saldo, actualizado_en)'
+            + ' SELECT CASE WHEN m.n_tipo = \'compra\' THEN m.n_uid ELSE m.o_uid END, m.qty, NOW()'
+            + ' FROM m'
+            + ' WHERE (SELECT COUNT(*) FROM upd_n) = 1 AND (SELECT COUNT(*) FROM upd_o) = 1'
+            + ' ON CONFLICT (usuario_id) DO UPDATE SET'
+            + '  saldo = moneda_cuentas.saldo + EXCLUDED.saldo, actualizado_en = NOW()'
+            + ' RETURNING usuario_id, saldo'
+            + '), cred_seller AS ('
+            + ' UPDATE usuarios u SET xp_total = xp_total + (m.qty * m.precio)'
+            + ' FROM m'
+            + ' WHERE u.id = CASE WHEN m.n_tipo = \'venta\' THEN m.n_uid ELSE m.o_uid END'
+            + '  AND (SELECT COUNT(*) FROM upd_n) = 1 AND (SELECT COUNT(*) FROM upd_o) = 1'
+            + ' RETURNING u.id, u.xp_total'
+            + ')'
+            + ' SELECT (SELECT o_id::text FROM m) AS o_id,'
+            + ' (SELECT n_tipo FROM m) AS n_tipo,'
+            + ' (SELECT qty FROM m) AS qty,'
+            + ' (SELECT precio FROM m) AS precio,'
+            + ' (SELECT cantidad_restante FROM upd_n) AS n_rest_new,'
+            + ' (SELECT usuario_id::text FROM cred_buyer) AS buyer_id,'
+            + ' (SELECT saldo FROM cred_buyer) AS buyer_saldo,'
+            + ' (SELECT id::text FROM cred_seller) AS seller_id',
+            [mooR.orden_id, mooUid]
+          );
+          var mooMr = mooMatchRes[0] || {};
+          if (mooMr.qty !== null && mooMr.qty !== undefined && Number(mooMr.qty) > 0
+              && mooMr.buyer_id && mooMr.seller_id) {
+            mooMatch = mooMr;
+          }
+        } catch (eMooM) {
+          if (esEsquemaFaltante(eMooM)) return responderMonedaAusente(res, eMooM, 'moneda_mercado');
+          console.warn('[moneda] match no aplicado (orden ' + mooR.orden_id + '): '
+            + (eMooM && eMooM.message));
+        }
+
+        if (mooMatch) {
+          var mooQty = red2(numXp(mooMatch.qty));
+          var mooPrecioMatch = red2(numXp(mooMatch.precio));
+          await registrarMonedaLedger(sql, {
+            usuario_id: mooMatch.buyer_id, delta: mooQty, saldo: numXp(mooMatch.buyer_saldo),
+            motivo: 'orden_match_cdr', ref_tipo: 'moneda_mercado', ref_id: mooMatch.o_id
+          });
+          await registrarXpLedger(sql, {
+            usuario_id: mooMatch.seller_id, accion: 'orden_match_venta',
+            xp_base: red2(mooQty * mooPrecioMatch),
+            mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+            bonos_planos: 0, xp_final: red2(mooQty * mooPrecioMatch), es_exento: true,
+            contexto: { orden_id: mooR.orden_id, contraparte_orden: mooMatch.o_id }
+          });
+        }
+
+        var mooRestFinal = mooMatch
+          ? red2(numXp(mooMatch.n_rest_new))
+          : red2(numXp(mooR.cantidad_restante));
+        var mooEstado = mooRestFinal <= 0 ? 'ejecutada' : (mooMatch ? 'parcial' : 'abierta');
+        return res.status(201).json({
+          ok: true,
+          moneda: 'CDR',
+          orden_id: mooR.orden_id,
+          tipo_orden: mooTipo,
+          cantidad: mooCant,
+          precio_xp: mooPrecio,
+          cantidad_restante: mooRestFinal,
+          estado: mooEstado,
+          expira_en: mooR.expira_en,
+          escrow: mooTipo === 'venta'
+            ? { cdr: mooCant, saldo_cdr: red2(numXp(mooR.saldo_post)) }
+            : { xp: mooTotal, xp_total: red2(numXp(mooR.xp_post)) },
+          match: mooMatch
+            ? { orden_id: mooMatch.o_id, cantidad: red2(numXp(mooMatch.qty)), precio_xp: red2(numXp(mooMatch.precio)) }
+            : null
+        });
+      }
+
+      // T10.2 (ADR-064): la marca activa del usuario captura un spot con
+      // estado 'pendiente' (la verificacion sera admin, fase admin). UPSERT
+      // por (marca_id, destino_id) con el indice parcial activo=true.
+      if (tipo2 === 'marca_presencia') {
+        var mprSes = usuarioDeSesion(req);
+        if (!mprSes.ok) return responderSesion(res, mprSes.razon);
+        var mprUid = mprSes.usuario_id;
+        var mprDest = String(body.destino_id || destinoId2 || '').trim();
+        if (!MERCADO_UUID_RE.test(mprDest))
+          return res.status(400).json({ ok: false, error: 'destino_id invalido' });
+        var mprRes;
+        try {
+          mprRes = await sql(
+            'WITH marca AS ('
+            + ' SELECT id FROM marcas WHERE usuario_id=$1::uuid AND activa=true LIMIT 1'
+            + '), dest AS ('
+            + ' SELECT id FROM destinos WHERE id=$2::uuid LIMIT 1'
+            + '), ins AS ('
+            + ' INSERT INTO spot_presencia (marca_id, destino_id, estado, activo, creado_en)'
+            + ' SELECT marca.id, dest.id, \'pendiente\', true, NOW() FROM marca, dest'
+            + ' ON CONFLICT (marca_id, destino_id) WHERE activo = true'
+            + ' DO UPDATE SET estado = \'pendiente\''
+            + ' RETURNING id, estado'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM marca) AS marca_ok,'
+            + ' (SELECT COUNT(*)::int FROM dest) AS dest_ok,'
+            + ' (SELECT id::text FROM ins) AS presencia_id,'
+            + ' (SELECT estado FROM ins) AS estado',
+            [mprUid, mprDest]
+          );
+        } catch (eMpr) {
+          if (!esEsquemaFaltante(eMpr)) throw eMpr;
+          console.warn('[marcas] presencia no registrada (027/040 pendientes): '
+            + (eMpr && eMpr.code) + ' ' + (eMpr && eMpr.message));
+          return res.status(503).json({
+            ok: false,
+            error: 'Presencia de marca no disponible (migracion 040 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+        var mprR = mprRes[0] || {};
+        if (Number(mprR.marca_ok) !== 1)
+          return res.status(403).json({ ok: false, error: 'MARCA_INACTIVA' });
+        if (Number(mprR.dest_ok) !== 1)
+          return res.status(404).json({ ok: false, error: 'DESTINO_NO_ENCONTRADO' });
+        return res.status(200).json({
+          ok: true, presencia_id: mprR.presencia_id, destino_id: mprDest,
+          estado: mprR.estado || 'pendiente'
+        });
+      }
+
+      // T12.1 (ADR-066 / spec 5.5): configurar el Tithe de un Parche.
+      // Exige ser FUNDADOR (pandillas.fundador_id) o rol 'oficial' activo en
+      // pandillas_miembros. tithe_pct en [0,10]. Escribe pandillas.tithe_pct
+      // (migracion 041). Degrada 503 si falta la columna 041.
+      if (tipo2 === 'parche_tithe_config') {
+        var ptcSes = usuarioDeSesion(req);
+        if (!ptcSes.ok) return responderSesion(res, ptcSes.razon);
+        var ptcUid = ptcSes.usuario_id;
+        var ptcParche = String(body.parche_id || '').trim();
+        if (!MERCADO_UUID_RE.test(ptcParche))
+          return res.status(400).json({ ok: false, error: 'parche_id invalido' });
+        var ptcPct = numXp(body.tithe_pct);
+        if (!isFinite(ptcPct) || ptcPct < 0 || ptcPct > PARCHE_TITHE_MAX)
+          return res.status(400).json({
+            ok: false, error: 'TITHE_PCT_INVALIDO',
+            min: 0, max: PARCHE_TITHE_MAX
+          });
+        var ptcGate, ptcUpd;
+        try {
+          ptcGate = await sql(
+            'SELECT p.id, p.fundador_id::text AS fundador_id,'
+            + ' (SELECT pm.rol FROM pandillas_miembros pm'
+            + '  WHERE pm.pandilla_id=p.id AND pm.usuario_id=$2::uuid AND pm.activo=true LIMIT 1) AS rol,'
+            + ' p.tithe_pct'
+            + ' FROM pandillas p WHERE p.id=$1::uuid LIMIT 1',
+            [ptcParche, ptcUid]
+          );
+          if (!ptcGate.length)
+            return res.status(404).json({ ok: false, error: 'PARCHE_NO_ENCONTRADO' });
+          var ptcAutorizado = (ptcGate[0].fundador_id === ptcUid)
+            || (String(ptcGate[0].rol || '') === 'oficial');
+          if (!ptcAutorizado)
+            return res.status(403).json({ ok: false, error: 'FUNDADOR_U_OFICIAL_REQUERIDO' });
+          ptcUpd = await sql(
+            'UPDATE pandillas SET tithe_pct=$1::numeric WHERE id=$2::uuid'
+            + ' RETURNING id::text AS parche_id, tithe_pct',
+            [red2(ptcPct), ptcParche]
+          );
+        } catch (ePtc) {
+          if (!esEsquemaFaltante(ePtc)) throw ePtc;
+          return res.status(503).json({
+            ok: false,
+            error: 'Tithe no disponible (migracion 041 pendiente)',
+            code: 'SCHEMA_NOT_MIGRATED'
+          });
+        }
+        if (!ptcUpd.length)
+          return res.status(404).json({ ok: false, error: 'PARCHE_NO_ENCONTRADO' });
+        return res.json({
+          ok: true, parche_id: ptcUpd[0].parche_id,
+          tithe_pct: red2(numXp(ptcUpd[0].tithe_pct))
+        });
+      }
+
+      // T10.3 (ADR-066): invertir la tesoreria de un Parche en un upgrade
+      // territorial. Exige ser fundador/miembro ACTIVO; debita
+      // pandillas.fama_total (>= puntos, atomico) e inserta parche_upgrades
+      // con activo_hasta = NOW() + horas (default 168). Degrada si falta 039.
+      if (tipo2 === 'parche_upgrade_invertir') {
+        var puiSes = usuarioDeSesion(req);
+        if (!puiSes.ok) return responderSesion(res, puiSes.razon);
+        var puiUid = puiSes.usuario_id;
+        var puiCiudad = String(body.ciudad_slug || '').trim();
+        if (!puiCiudad) return res.status(400).json({ ok: false, error: 'ciudad_slug requerido' });
+        if (puiCiudad.length > 100)
+          return res.status(400).json({ ok: false, error: 'ciudad_slug maximo 100 caracteres' });
+        var puiTipo = String(body.tipo_upgrade || '').trim();
+        if (PARCHE_UPGRADE_TIPOS.indexOf(puiTipo) === -1)
+          return res.status(400).json({ ok: false, error: 'tipo_upgrade invalido' });
+        var puiPuntos = red2(parseFloat(body.puntos));
+        if (!isFinite(puiPuntos) || puiPuntos <= 0)
+          return res.status(400).json({ ok: false, error: 'puntos requeridos (>0)' });
+        var puiHoras = parseInt(body.horas, 10);
+        if (!isFinite(puiHoras) || puiHoras < 1) puiHoras = PARCHE_UPGRADE_HORAS_DEFAULT;
+        if (puiHoras > 8760) puiHoras = 8760;
+        var puiRes;
+        try {
+          puiRes = await sql(
+            'WITH miembro AS ('
+            + ' SELECT p.id AS parche_id, p.fama_total FROM pandillas p'
+            + ' JOIN pandillas_miembros pm ON pm.pandilla_id = p.id'
+            + ' WHERE pm.usuario_id=$1::uuid AND pm.activo=true AND p.activo=true'
+            + ' ORDER BY (pm.rol = \'fundador\') DESC, p.creado_en ASC LIMIT 1'
+            + '), debito AS ('
+            + ' UPDATE pandillas SET fama_total = fama_total - $2::numeric'
+            + ' WHERE id=(SELECT parche_id FROM miembro) AND fama_total >= $2::numeric'
+            + ' RETURNING id, fama_total'
+            + '), ins AS ('
+            + ' INSERT INTO parche_upgrades (parche_id, ciudad_slug, tipo_upgrade,'
+            + '  puntos_invertidos, activo_hasta, creado_en)'
+            + ' SELECT (SELECT id FROM debito), $3, $4, $2::numeric,'
+            + '  NOW() + ($5::int * INTERVAL \'1 hour\'), NOW()'
+            + ' FROM debito'
+            + ' RETURNING id, activo_hasta'
+            + ')'
+            + ' SELECT (SELECT COUNT(*)::int FROM miembro) AS miembro_ok,'
+            + ' (SELECT parche_id::text FROM miembro) AS parche_id,'
+            + ' (SELECT fama_total FROM miembro) AS fama_actual,'
+            + ' (SELECT fama_total FROM debito) AS fama_restante,'
+            + ' (SELECT id::text FROM ins) AS upgrade_id,'
+            + ' (SELECT activo_hasta FROM ins) AS activo_hasta',
+            [puiUid, puiPuntos, puiCiudad, puiTipo, puiHoras]
+          );
+        } catch (ePui) {
+          if (!esEsquemaFaltante(ePui)) throw ePui;
+          return responderParcheAusente(res, ePui, 'parche_upgrade_invertir');
+        }
+        var puiR = puiRes[0] || {};
+        if (Number(puiR.miembro_ok) !== 1)
+          return res.status(403).json({ ok: false, error: 'PARCHE_REQUERIDO' });
+        if (puiR.upgrade_id === null || puiR.upgrade_id === undefined)
+          return res.status(400).json({
+            ok: false, error: 'FAMA_INSUFICIENTE',
+            fama_actual: red2(numXp(puiR.fama_actual)), puntos: puiPuntos
+          });
+        return res.status(201).json({
+          ok: true, upgrade_id: puiR.upgrade_id, parche_id: puiR.parche_id,
+          tipo_upgrade: puiTipo, ciudad_slug: puiCiudad,
+          puntos_invertidos: puiPuntos,
+          fama_restante: red2(numXp(puiR.fama_restante)),
+          activo_hasta: puiR.activo_hasta
         });
       }
 
@@ -11002,6 +13050,265 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // ============ FASE 2A (ADR-066 / P2): CONTRATOS P2P ============
+      // Escrow de XP del empleador. Todo contrato exige JWT (usuarioDeSesion:
+      // el body.usuario_id NUNCA se confia, leccion BUG-061) y la migracion
+      // 039; sin ella responde 503 SCHEMA_NOT_MIGRATED (42P01/42703) con warn.
+      // Cero DELETE fisico: las transiciones solo cambian estado (ADR-003).
+
+      // crear: inmoviliza la recompensa del empleador y abre el contrato.
+      if (tipo2 === 'contrato_crear') {
+        var cfSes = usuarioDeSesion(req);
+        if (!cfSes.ok) return responderSesion(res, cfSes.razon);
+        var cfUid = cfSes.usuario_id;
+        var cfTipo = String(body.tipo_encargo || '').trim();
+        if (CONTRATO_ENCARGOS.indexOf(cfTipo) === -1)
+          return res.status(400).json({ ok: false, error: 'TIPO_ENCARGO_INVALIDO' });
+        var cfRecompensa = red2(parseFloat(body.recompensa_xp));
+        if (!isFinite(cfRecompensa) || cfRecompensa <= 0)
+          return res.status(400).json({ ok: false, error: 'RECOMPENSA_INVALIDA' });
+        var cfDesc = String(body.descripcion || '').trim().slice(0, 1000);
+        if (!cfDesc)
+          return res.status(400).json({ ok: false, error: 'descripcion requerida' });
+        var cfDestino = body.destino_id ? String(body.destino_id).trim() : null;
+        if (cfDestino && !MERCADO_UUID_RE.test(cfDestino))
+          return res.status(400).json({ ok: false, error: 'destino_id invalido' });
+        var cfExpira = body.expira_en ? String(body.expira_en).trim() : null;
+        var cfUsr;
+        try {
+          cfUsr = await sql(
+            'SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [cfUid]
+          );
+        } catch (eCfU) {
+          console.warn('[contratos] usuario no leido: ' + (eCfU && eCfU.message));
+          return res.status(500).json({ ok: false, error: 'USUARIO_NO_LEIDO' });
+        }
+        if (!cfUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var cfNivel = calcularNivelLocal(numXp(cfUsr[0].xp_total)).nivel;
+        if (cfNivel < CONTRATO_NIVEL_MIN)
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE', nivel: cfNivel, nivel_requerido: CONTRATO_NIVEL_MIN });
+        var cfRes;
+        try {
+          cfRes = await sql(
+            'WITH ok_xp AS ('
+            + ' SELECT id FROM usuarios WHERE id=$1::uuid AND xp_total >= $2::numeric'
+            + '), debit AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total - $2::numeric'
+            + ' WHERE id=$1::uuid AND xp_total >= $2::numeric RETURNING xp_total'
+            + '), contrato AS ('
+            + ' INSERT INTO contratos_p2p (empleador_id, tipo_encargo, recompensa_xp,'
+            + ' descripcion, destino_id, expira_en)'
+            + ' SELECT $1::uuid, $3, $2::numeric, $4, $5::uuid,'
+            + ' COALESCE($6::timestamptz, NOW() + INTERVAL \'7 days\')'
+            + ' FROM ok_xp RETURNING id, estado, expira_en'
+            + ')'
+            + ' SELECT (SELECT xp_total FROM debit) AS xp_total,'
+            + ' (SELECT id::text FROM contrato) AS contrato_id,'
+            + ' (SELECT estado FROM contrato) AS estado,'
+            + ' (SELECT expira_en FROM contrato) AS expira_en',
+            [cfUid, cfRecompensa, cfTipo, cfDesc, cfDestino, cfExpira]
+          );
+        } catch (eCf) {
+          if (eCf && eCf.code === '23503')
+            return res.status(400).json({ ok: false, error: 'destino_id invalido' });
+          if (!esEsquemaFaltante(eCf)) throw eCf;
+          return responderContratoAusente(res, eCf, 'contrato_crear');
+        }
+        var cfR = cfRes[0] || {};
+        if (!cfR.contrato_id)
+          return res.status(400).json({ ok: false, error: 'PUNTOS_INSUFICIENTES', recompensa_xp: cfRecompensa });
+        await registrarXpLedger(sql, {
+          usuario_id: cfUid, accion: 'contrato_escrow', xp_base: cfRecompensa,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(-cfRecompensa), es_exento: true,
+          contexto: { contrato_id: cfR.contrato_id, tipo_encargo: cfTipo }
+        });
+        return res.status(200).json({
+          ok: true,
+          contrato_id: cfR.contrato_id,
+          estado: cfR.estado,
+          expira_en: cfR.expira_en,
+          recompensa_xp: cfRecompensa,
+          xp_total_nuevo: red2(numXp(cfR.xp_total))
+        });
+      }
+
+      // aceptar: abierto -> en_proceso (el empleador no puede auto-aceptar).
+      if (tipo2 === 'contrato_aceptar') {
+        var caSes = usuarioDeSesion(req);
+        if (!caSes.ok) return responderSesion(res, caSes.razon);
+        var caUid = caSes.usuario_id;
+        var caId = String(body.contrato_id || '').trim();
+        if (!MERCADO_UUID_RE.test(caId))
+          return res.status(400).json({ ok: false, error: 'contrato_id invalido' });
+        var caRow;
+        try {
+          caRow = await sql(
+            'SELECT id, empleador_id::text AS empleador_id, estado'
+            + ' FROM contratos_p2p WHERE id=$1::uuid LIMIT 1',
+            [caId]
+          );
+        } catch (eCa) {
+          if (!esEsquemaFaltante(eCa)) throw eCa;
+          return responderContratoAusente(res, eCa, 'contrato_aceptar');
+        }
+        if (!caRow.length)
+          return res.status(404).json({ ok: false, error: 'CONTRATO_NO_ENCONTRADO' });
+        if (caRow[0].empleador_id === caUid)
+          return res.status(403).json({ ok: false, error: 'AUTOACEPTACION_PROHIBIDA' });
+        if (caRow[0].estado !== 'abierto')
+          return res.status(409).json({ ok: false, error: 'TRANSICION_INVALIDA', estado: caRow[0].estado });
+        var caUpd;
+        try {
+          caUpd = await sql(
+            'UPDATE contratos_p2p SET contratado_id=$2::uuid, estado=\'en_proceso\','
+            + ' actualizado_en=NOW()'
+            + ' WHERE id=$1::uuid AND estado=\'abierto\' AND empleador_id <> $2::uuid'
+            + ' RETURNING id, estado, contratado_id::text AS contratado_id',
+            [caId, caUid]
+          );
+        } catch (eCaU) {
+          if (!esEsquemaFaltante(eCaU)) throw eCaU;
+          return responderContratoAusente(res, eCaU, 'contrato_aceptar');
+        }
+        if (!caUpd.length)
+          return res.status(409).json({ ok: false, error: 'TRANSICION_INVALIDA' });
+        return res.status(200).json({
+          ok: true, contrato_id: caUpd[0].id, estado: caUpd[0].estado,
+          contratado_id: caUpd[0].contratado_id
+        });
+      }
+
+      // completar: en_proceso -> completado (solo el empleador); libera el
+      // escrow acreditando la recompensa al contratado.
+      if (tipo2 === 'contrato_completar') {
+        var ccoSes = usuarioDeSesion(req);
+        if (!ccoSes.ok) return responderSesion(res, ccoSes.razon);
+        var ccoUid = ccoSes.usuario_id;
+        var ccoId = String(body.contrato_id || '').trim();
+        if (!MERCADO_UUID_RE.test(ccoId))
+          return res.status(400).json({ ok: false, error: 'contrato_id invalido' });
+        var ccoRow;
+        try {
+          ccoRow = await sql(
+            'SELECT id, empleador_id::text AS empleador_id, contratado_id::text AS contratado_id,'
+            + ' recompensa_xp, estado FROM contratos_p2p WHERE id=$1::uuid LIMIT 1',
+            [ccoId]
+          );
+        } catch (eCco) {
+          if (!esEsquemaFaltante(eCco)) throw eCco;
+          return responderContratoAusente(res, eCco, 'contrato_completar');
+        }
+        if (!ccoRow.length)
+          return res.status(404).json({ ok: false, error: 'CONTRATO_NO_ENCONTRADO' });
+        if (ccoRow[0].empleador_id !== ccoUid)
+          return res.status(403).json({ ok: false, error: 'SOLO_EMPLEADOR' });
+        if (ccoRow[0].estado !== 'en_proceso' || !ccoRow[0].contratado_id)
+          return res.status(409).json({ ok: false, error: 'TRANSICION_INVALIDA', estado: ccoRow[0].estado });
+        var ccoRecompensa = numXp(ccoRow[0].recompensa_xp);
+        var ccoRes;
+        try {
+          ccoRes = await sql(
+            'WITH c AS ('
+            + ' SELECT id, contratado_id, recompensa_xp FROM contratos_p2p'
+            + ' WHERE id=$1::uuid AND estado=\'en_proceso\' AND empleador_id=$2::uuid'
+            + ' AND contratado_id IS NOT NULL'
+            + '), upd AS ('
+            + ' UPDATE contratos_p2p SET estado=\'completado\', actualizado_en=NOW()'
+            + ' WHERE id=$1::uuid AND EXISTS(SELECT 1 FROM c) RETURNING id'
+            + '), cred AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total + (SELECT recompensa_xp FROM c)'
+            + ' WHERE id=(SELECT contratado_id FROM c) AND EXISTS(SELECT 1 FROM upd)'
+            + ' RETURNING xp_total'
+            + ')'
+            + ' SELECT (SELECT contratado_id::text FROM c) AS contratado_id,'
+            + ' (SELECT xp_total FROM cred) AS contratado_xp',
+            [ccoId, ccoUid]
+          );
+        } catch (eCcoU) {
+          if (!esEsquemaFaltante(eCcoU)) throw eCcoU;
+          return responderContratoAusente(res, eCcoU, 'contrato_completar');
+        }
+        var ccoR = ccoRes[0] || {};
+        if (!ccoR.contratado_id || ccoR.contratado_xp === null || ccoR.contratado_xp === undefined)
+          return res.status(409).json({ ok: false, error: 'TRANSICION_INVALIDA' });
+        await registrarXpLedger(sql, {
+          usuario_id: ccoR.contratado_id, accion: 'contrato_pago', xp_base: ccoRecompensa,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(ccoRecompensa), es_exento: true,
+          contexto: { contrato_id: ccoId, empleador_id: ccoUid }
+        });
+        return res.status(200).json({
+          ok: true, contrato_id: ccoId, estado: 'completado',
+          contratado_id: ccoR.contratado_id,
+          contratado_xp_total: red2(numXp(ccoR.contratado_xp))
+        });
+      }
+
+      // cancelar: abierto/en_proceso -> cancelado (solo el empleador);
+      // devuelve el escrow al empleador.
+      if (tipo2 === 'contrato_cancelar') {
+        var ccaSes = usuarioDeSesion(req);
+        if (!ccaSes.ok) return responderSesion(res, ccaSes.razon);
+        var ccaUid = ccaSes.usuario_id;
+        var ccaId = String(body.contrato_id || '').trim();
+        if (!MERCADO_UUID_RE.test(ccaId))
+          return res.status(400).json({ ok: false, error: 'contrato_id invalido' });
+        var ccaRow;
+        try {
+          ccaRow = await sql(
+            'SELECT id, empleador_id::text AS empleador_id, recompensa_xp, estado'
+            + ' FROM contratos_p2p WHERE id=$1::uuid LIMIT 1',
+            [ccaId]
+          );
+        } catch (eCca) {
+          if (!esEsquemaFaltante(eCca)) throw eCca;
+          return responderContratoAusente(res, eCca, 'contrato_cancelar');
+        }
+        if (!ccaRow.length)
+          return res.status(404).json({ ok: false, error: 'CONTRATO_NO_ENCONTRADO' });
+        if (ccaRow[0].empleador_id !== ccaUid)
+          return res.status(403).json({ ok: false, error: 'SOLO_EMPLEADOR' });
+        if (CONTRATO_ESTADOS_ACTIVOS.indexOf(String(ccaRow[0].estado)) === -1)
+          return res.status(409).json({ ok: false, error: 'TRANSICION_INVALIDA', estado: ccaRow[0].estado });
+        var ccaRecompensa = numXp(ccaRow[0].recompensa_xp);
+        var ccaRes;
+        try {
+          ccaRes = await sql(
+            'WITH c AS ('
+            + ' SELECT id, empleador_id, recompensa_xp FROM contratos_p2p'
+            + ' WHERE id=$1::uuid AND empleador_id=$2::uuid'
+            + ' AND estado IN (\'abierto\',\'en_proceso\')'
+            + '), upd AS ('
+            + ' UPDATE contratos_p2p SET estado=\'cancelado\', actualizado_en=NOW()'
+            + ' WHERE id=$1::uuid AND EXISTS(SELECT 1 FROM c) RETURNING id'
+            + '), dev AS ('
+            + ' UPDATE usuarios SET xp_total = xp_total + (SELECT recompensa_xp FROM c)'
+            + ' WHERE id=$2::uuid AND EXISTS(SELECT 1 FROM upd) RETURNING xp_total'
+            + ')'
+            + ' SELECT (SELECT xp_total FROM dev) AS xp_total',
+            [ccaId, ccaUid]
+          );
+        } catch (eCcaU) {
+          if (!esEsquemaFaltante(eCcaU)) throw eCcaU;
+          return responderContratoAusente(res, eCcaU, 'contrato_cancelar');
+        }
+        var ccaR = ccaRes[0] || {};
+        if (ccaR.xp_total === null || ccaR.xp_total === undefined)
+          return res.status(409).json({ ok: false, error: 'TRANSICION_INVALIDA' });
+        await registrarXpLedger(sql, {
+          usuario_id: ccaUid, accion: 'contrato_devolucion', xp_base: ccaRecompensa,
+          mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
+          bonos_planos: 0, xp_final: red2(ccaRecompensa), es_exento: true,
+          contexto: { contrato_id: ccaId }
+        });
+        return res.status(200).json({
+          ok: true, contrato_id: ccaId, estado: 'cancelado',
+          xp_total_nuevo: red2(numXp(ccaR.xp_total))
+        });
+      }
+
       // Fase 2: registrar autor de una publicacion (verifica sesion del
       // usuario y devuelve su id para que publicar-lugar.js lo guarde en
       // tags.autor_id). No otorga XP aqui.
@@ -11174,16 +13481,17 @@ module.exports = async function handler(req, res) {
           // ADR-058: punto del destino resenado (1 lectura).
           var puntoResena = await coordsDestino(sql, destinoId2);
           var ctxResena = await contextoXpE(sql, usuarioId2);
-          // ADR-018: amuleto_x2 y lider de ciudad entran al STACK del punto
-          // unico (no multiplican por fuera). La fila de interacciones
-          // conserva la BASE (xpGanado) para no romper mis_primera_resena
-          // (xp_ganado >= 25 con resena_larga = 30).
+          // ADR-018: amuleto_x2 entra al STACK del punto unico. El x1.1 por
+          // SPOT (M-3) se aplica DESPUES, como monto plano diferido, porque
+          // es mutuamente excluyente con el dividendo: por eso aqui va
+          // lider:false. La fila de interacciones conserva la BASE (xpGanado)
+          // para no romper mis_primera_resena (xp_ganado >= 25 con 30).
           amuletoResena = await aplicarAmuletoX2(sql, usuarioId2, xpGanado);
-          var liderResena = await esLiderDestino(sql, usuarioId2, destinoId2);
+          var liderResena = await esLiderDestinoSpot(sql, usuarioId2, destinoId2);
           resResena = await calcularXpAcreditado(sql, xpGanado, ctxResena.nivel_clase,
             ctxResena.clase_id, ctxResena.tag,
             { nivel_usuario: ctxResena.nivel_usuario, amuleto: amuletoResena.doubled,
-              lider: liderResena, usuario_id: usuarioId2, punto: puntoResena });
+              lider: false, usuario_id: usuarioId2, punto: puntoResena });
           xpResenaEntregado = resResena.xp_final;
           detalleResena = armarXpDetalle(xpGanado, resResena, 0);
           await sql(
@@ -11211,6 +13519,25 @@ module.exports = async function handler(req, res) {
           await aplicarFamaPandilla(sql, usuarioId2, xpResenaEntregado);
           // v13: reparto multinivel del XP ganado (no bloquea).
           await repartirXpReferidos(sql, usuarioId2, xpResenaEntregado);
+          // FASE 2B (M-3 / ADR-065): el x1.1 (por SPOT) y el dividendo son
+          // MUTUAMENTE EXCLUYENTES en la misma accion. Si el autor es el
+          // dueno GENERAL y de el saldria el dividendo, NO se aplica x1.1;
+          // el dividendo se paga best-effort (nunca rompe la accion).
+          if (liderResena) {
+            var divResena = await aplicarDividendoSpot(sql, {
+              accion: 'resena', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+              fuente_interaccion_id: result[0].id, xp_bruto_base: xpGanado, tipo_medio: 'escrito'
+            });
+            if (!divResena.aplicado) {
+              await sql('UPDATE usuarios SET xp_total = xp_total + $1 WHERE id = $2',
+                [red2(xpResenaEntregado * 0.1), usuarioId2]).catch(function(eL){ console.warn('[spot] x1.1 resena no acreditado: ' + (eL && eL.message)); });
+            }
+          } else {
+            await aplicarDividendoSpot(sql, {
+              accion: 'resena', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+              fuente_interaccion_id: result[0].id, xp_bruto_base: xpGanado, tipo_medio: 'escrito'
+            });
+          }
           // v9 contrato final (punto 8): progreso de retos de parche.
           var retoResena = await progresarPandillaRetos(sql, usuarioId2, 'resena');
         } else {
@@ -11279,8 +13606,8 @@ module.exports = async function handler(req, res) {
         }
 
         var xpGuardado = XP_BASES.guardado;
-        await sql(
-          'INSERT INTO interacciones (destino_id, usuario_id, tipo, xp_ganado, creado_en) VALUES ($1, $2, \'guardado\', $3, NOW())',
+        var guardadoIns = await sql(
+          'INSERT INTO interacciones (destino_id, usuario_id, tipo, xp_ganado, creado_en) VALUES ($1, $2, \'guardado\', $3, NOW()) RETURNING id',
           [destinoId2, usuarioId2, xpGuardado]
         );
 
@@ -11292,14 +13619,14 @@ module.exports = async function handler(req, res) {
         // ADR-058: punto del destino guardado (1 lectura).
         var puntoGuardado = await coordsDestino(sql, destinoId2);
         var ctxGuardado = await contextoXpE(sql, usuarioId2);
-        // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
-        // punto unico (no multiplican por fuera).
+        // v9 (ADR-018) / FASE 2B (M-3): amuleto_x2 al STACK; el x1.1 por SPOT
+        // se difiere (lider:false) por ser excluyente con el dividendo.
         var amuletoGuardado = await aplicarAmuletoX2(sql, usuarioId2, xpGuardado);
-        var liderGuardado = await esLiderDestino(sql, usuarioId2, destinoId2);
+        var liderGuardado = await esLiderDestinoSpot(sql, usuarioId2, destinoId2);
         var resGuardado = await calcularXpAcreditado(sql, xpGuardado, ctxGuardado.nivel_clase,
           ctxGuardado.clase_id, ctxGuardado.tag,
           { nivel_usuario: ctxGuardado.nivel_usuario, amuleto: amuletoGuardado.doubled,
-            lider: liderGuardado, usuario_id: usuarioId2, punto: puntoGuardado });
+            lider: false, usuario_id: usuarioId2, punto: puntoGuardado });
         var xpGuardadoFinal = resGuardado.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, total_guardados=total_guardados+1 WHERE id=$2',
@@ -11320,6 +13647,23 @@ module.exports = async function handler(req, res) {
         await aplicarFamaPandilla(sql, usuarioId2, xpGuardadoFinal);
         // v13: reparto multinivel del XP ganado (no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpGuardadoFinal);
+        // FASE 2B (M-3 / ADR-065): x1.1 por SPOT y dividendo son excluyentes.
+        if (liderGuardado) {
+          var divGuardado = await aplicarDividendoSpot(sql, {
+            accion: 'guardado', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+            fuente_interaccion_id: guardadoIns && guardadoIns.length ? guardadoIns[0].id : null,
+            xp_bruto_base: xpGuardado, tipo_medio: 'escrito'
+          });
+          if (!divGuardado.aplicado)
+            await sql('UPDATE usuarios SET xp_total = xp_total + $1 WHERE id = $2',
+              [red2(xpGuardadoFinal * 0.1), usuarioId2]).catch(function(eL){ console.warn('[spot] x1.1 guardado no acreditado: ' + (eL && eL.message)); });
+        } else {
+          await aplicarDividendoSpot(sql, {
+            accion: 'guardado', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+            fuente_interaccion_id: guardadoIns && guardadoIns.length ? guardadoIns[0].id : null,
+            xp_bruto_base: xpGuardado, tipo_medio: 'escrito'
+          });
+        }
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoGuardado = await progresarPandillaRetos(sql, usuarioId2, 'guardado');
         return res.status(200).json({ ok: true, xp: xpGuardadoFinal, xp_detalle: armarXpDetalle(xpGuardado, resGuardado, 0), misiones: misionesGuardado, logros: logrosGuardado, cromo: cromoGuardado || undefined, amuleto_x2: amuletoGuardado.doubled || undefined, reto_completado: retoGuardado || null });
@@ -11504,9 +13848,10 @@ module.exports = async function handler(req, res) {
           v_mps: vMpsVisita,
           ts_cliente: body.ts !== undefined && body.ts !== null ? body.ts : null
         };
+        var visitaIns = null;
         try {
-          await sql(
-            'INSERT INTO interacciones (destino_id, usuario_id, tipo, dims, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', $3::jsonb, $4, NOW())',
+          visitaIns = await sql(
+            'INSERT INTO interacciones (destino_id, usuario_id, tipo, dims, xp_ganado, creado_en) VALUES ($1, $2, \'visita\', $3::jsonb, $4, NOW()) RETURNING id',
             [destinoId2, usuarioId2, JSON.stringify({ geo: dimsVisitaGeo }), xpBaseVisita]
           );
         } catch (eVisitaIns) {
@@ -11514,17 +13859,18 @@ module.exports = async function handler(req, res) {
             return res.status(200).json({ ok: true, ya_visitado: true, xp: 0, misiones: [], logros: [] });
           throw eVisitaIns;
         }
-        // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
-        // punto unico. v25 (ADR-053): la visita usa M_nivel DERIVADO.
-        // ADR-058: punto del destino visitado (ya resuelto en la geocerca).
+        // v9 (ADR-018) / FASE 2B (M-3): amuleto_x2 al STACK; el x1.1 por
+        // SPOT se difiere (lider:false). v25 (ADR-053): la visita usa
+        // M_nivel DERIVADO. ADR-058: punto del destino visitado (ya resuelto
+        // en la geocerca).
         var puntoVisita = destConCoords ? { lat: dLatV, lng: dLngV } : null;
         var ctxVisita = await contextoXpE(sql, usuarioId2);
         var amuletoVisita = await aplicarAmuletoX2(sql, usuarioId2, xpBaseVisita);
-        var liderVisita = await esLiderDestino(sql, usuarioId2, destinoId2);
+        var liderVisita = await esLiderDestinoSpot(sql, usuarioId2, destinoId2);
         var resVisita = await calcularXpAcreditado(sql, xpBaseVisita, ctxVisita.nivel_clase,
           ctxVisita.clase_id, ctxVisita.tag,
           { nivel_usuario: ctxVisita.nivel_usuario, amuleto: amuletoVisita.doubled,
-            lider: liderVisita, usuario_id: usuarioId2, punto: puntoVisita });
+            lider: false, usuario_id: usuarioId2, punto: puntoVisita });
         // El bono rural sigue siendo PLANO: se suma DESPUES del cap, sin
         // factor ni amuleto. Se unifica fama y cofre al valor POST-CAP +
         // bonos (xp_acreditable) - cambio deliberado Decision 8.3.
@@ -11556,6 +13902,22 @@ module.exports = async function handler(req, res) {
         // v13: reparto multinivel del XP TOTAL ganado en la visita
         // (incluye bono rural, no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpTotalVisita);
+        // FASE 2B (M-3 / ADR-065): x1.1 por SPOT y dividendo excluyentes.
+        var fuenteVisita = visitaIns && visitaIns.length ? visitaIns[0].id : null;
+        if (liderVisita) {
+          var divVisita = await aplicarDividendoSpot(sql, {
+            accion: 'visita', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+            fuente_interaccion_id: fuenteVisita, xp_bruto_base: xpBaseVisita, tipo_medio: 'escrito'
+          });
+          if (!divVisita.aplicado)
+            await sql('UPDATE usuarios SET xp_total = xp_total + $1 WHERE id = $2',
+              [red2(xpTotalVisita * 0.1), usuarioId2]).catch(function(eL){ console.warn('[spot] x1.1 visita no acreditado: ' + (eL && eL.message)); });
+        } else {
+          await aplicarDividendoSpot(sql, {
+            accion: 'visita', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+            fuente_interaccion_id: fuenteVisita, xp_bruto_base: xpBaseVisita, tipo_medio: 'escrito'
+          });
+        }
         // v9 contrato final (punto 8): progreso de retos de parche.
         var retoVisita = await progresarPandillaRetos(sql, usuarioId2, 'visita');
         return res.status(200).json({
@@ -11620,9 +13982,9 @@ module.exports = async function handler(req, res) {
             voto_previo: { rating: yaVoto[0].rating, tipo: yaVoto[0].tipo }
           });
 
-        await sql(
+        var ratingIns = await sql(
           'INSERT INTO interacciones (destino_id, usuario_id, tipo, rating, xp_ganado, creado_en) '
-          + 'VALUES ($1, $2, \'rating\', $3, $4, NOW())',
+          + 'VALUES ($1, $2, \'rating\', $3, $4, NOW()) RETURNING id',
           [destinoId2, usuarioId2, rVal, XP_BASES.rating]
         );
 
@@ -11645,14 +14007,14 @@ module.exports = async function handler(req, res) {
         // ADR-058: punto del destino calificado (1 lectura).
         var puntoRating = await coordsDestino(sql, destinoId2);
         var ctxRating = await contextoXpE(sql, usuarioId2);
-        // v9 (ADR-018): amuleto_x2 y lider de ciudad entran al STACK del
-        // punto unico (v25 / ADR-053: no multiplican por fuera).
+        // v9 (ADR-018) / FASE 2B (M-3): amuleto_x2 al STACK (v25 / ADR-053:
+        // no multiplican por fuera); el x1.1 por SPOT se difiere (lider:false).
         var amuletoRating = await aplicarAmuletoX2(sql, usuarioId2, XP_BASES.rating);
-        var liderRating = await esLiderDestino(sql, usuarioId2, destinoId2);
+        var liderRating = await esLiderDestinoSpot(sql, usuarioId2, destinoId2);
         var resRating = await calcularXpAcreditado(sql, XP_BASES.rating, ctxRating.nivel_clase,
           ctxRating.clase_id, ctxRating.tag,
           { nivel_usuario: ctxRating.nivel_usuario, amuleto: amuletoRating.doubled,
-            lider: liderRating, usuario_id: usuarioId2, punto: puntoRating });
+            lider: false, usuario_id: usuarioId2, punto: puntoRating });
         var xpRatingFinal = resRating.xp_final;
         await sql(
           'UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2',
@@ -11674,6 +14036,22 @@ module.exports = async function handler(req, res) {
         await aplicarFamaPandilla(sql, usuarioId2, xpRatingFinal);
         // v13: reparto multinivel del XP ganado (no bloquea).
         await repartirXpReferidos(sql, usuarioId2, xpRatingFinal);
+        // FASE 2B (M-3 / ADR-065): x1.1 por SPOT y dividendo excluyentes.
+        var fuenteRating = ratingIns && ratingIns.length ? ratingIns[0].id : null;
+        if (liderRating) {
+          var divRating = await aplicarDividendoSpot(sql, {
+            accion: 'rating', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+            fuente_interaccion_id: fuenteRating, xp_bruto_base: XP_BASES.rating, tipo_medio: 'escrito'
+          });
+          if (!divRating.aplicado)
+            await sql('UPDATE usuarios SET xp_total = xp_total + $1 WHERE id = $2',
+              [red2(xpRatingFinal * 0.1), usuarioId2]).catch(function(eL){ console.warn('[spot] x1.1 rating no acreditado: ' + (eL && eL.message)); });
+        } else {
+          await aplicarDividendoSpot(sql, {
+            accion: 'rating', usuario_id_autor: usuarioId2, destino_id: destinoId2,
+            fuente_interaccion_id: fuenteRating, xp_bruto_base: XP_BASES.rating, tipo_medio: 'escrito'
+          });
+        }
         // v9 contrato final (punto 8): rating cuenta como 'visita' en
         // los retos de parche (regla del contrato).
         var retoRating = await progresarPandillaRetos(sql, usuarioId2, 'visita');

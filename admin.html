@@ -506,6 +506,16 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div class="snav-item" onclick="showScreen('mercado')" id="snav-mercado">
     <span class="snav-icon">&#127978;</span>Mercado
   </div>
+  <!-- Gaming v6.1 (ADR-062/063/064): Cartas, Gobernanza y Marcas y Spots. -->
+  <div class="snav-item" onclick="showScreen('cartas')" id="snav-cartas">
+    <span class="snav-icon">&#127183;</span>Cartas
+  </div>
+  <div class="snav-item" onclick="showScreen('gobernanza')" id="snav-gobernanza">
+    <span class="snav-icon">&#128220;</span>Gobernanza
+  </div>
+  <div class="snav-item" onclick="showScreen('marcas')" id="snav-marcas">
+    <span class="snav-icon">&#127991;</span>Marcas y Spots
+  </div>
 </nav>
 
 <!-- ─── WORKSPACE ───────────────────────────────── -->
@@ -2197,6 +2207,203 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 </div>
 
 <!-- ════ MODAL: EDITAR CONSUMIBLE (ADR-018) ════ -->
+<!-- ==== CARTAS DE TERRITORIO (Gaming v6.1 / ADR-062) ==== -->
+<div class="ws-screen" id="screen-cartas">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">CARTAS</div>
+      <div class="ws-subtitle">Catalogo de Cartas de Territorio: gate de avance (niveles 10/14/20/25) y cartas de evento</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="loadCartas()">&#8635; Actualizar</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+
+    <!-- Nueva carta -->
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px">&#10133; Nueva carta</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1 1 160px;min-width:140px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">ID (slug, no editable)</div>
+          <input class="form-input" id="carta-id" placeholder="territorio_mundana_01" style="width:100%">
+        </div>
+        <div style="flex:1 1 180px;min-width:150px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nombre</div>
+          <input class="form-input" id="carta-nombre" placeholder="Frontera Mundana" style="width:100%">
+        </div>
+        <div style="flex:1 1 150px;min-width:130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Set (slug)</div>
+          <input class="form-input" id="carta-set" placeholder="mundana" style="width:100%">
+        </div>
+        <div style="flex:0 0 130px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Rareza</div>
+          <select class="form-input" id="carta-rareza" style="width:100%">
+            <option value="comun" selected>Comun</option>
+            <option value="raro">Raro</option>
+            <option value="epico">Epico</option>
+            <option value="dorado">Dorado</option>
+          </select>
+        </div>
+        <div style="flex:0 0 120px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nivel gate</div>
+          <input class="form-input" id="carta-nivel" type="number" min="1" step="1" placeholder="10" style="width:100%">
+        </div>
+        <div style="flex:0 0 110px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Evento</div>
+          <select class="form-input" id="carta-evento" style="width:100%">
+            <option value="0" selected>No</option>
+            <option value="1">Si</option>
+          </select>
+        </div>
+        <div style="flex:2 1 220px;min-width:180px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Imagen URL</div>
+          <input class="form-input" id="carta-imagen" placeholder="https://..." style="width:100%">
+        </div>
+        <button class="btn btn-gold" onclick="crearCarta()" style="white-space:nowrap">&#10133; Crear</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">El ID es identidad (slug ASCII) y no se puede editar despues de crear. El nivel gate es opcional (vacio = carta sin gate).</div>
+    </div>
+
+    <!-- Lista -->
+    <div id="cartas-lista">
+      <div style="text-align:center;padding:48px 0;color:var(--muted)">
+        <div style="font-size:26px;margin-bottom:10px">&#127183;</div>
+        <div style="font-size:13px;font-weight:600">Cargando cartas...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==== MODAL: EDITAR CARTA (Gaming v6.1 / ADR-062) ==== -->
+<div id="carta-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;width:min(520px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:14px 18px;background:var(--black);display:flex;align-items:center;justify-content:space-between">
+      <div style="color:#fff;font-weight:700;font-size:13px">&#9999; Editar carta</div>
+      <button onclick="cerrarCartaModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">ID (identidad, no editable)</div>
+        <input class="form-input" id="carta-edit-id" readonly style="width:100%;background:var(--bg2)">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nombre</div>
+        <input class="form-input" id="carta-edit-nombre" placeholder="Frontera Mundana" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Set (slug)</div>
+        <input class="form-input" id="carta-edit-set" placeholder="mundana" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Rareza</div>
+        <select class="form-input" id="carta-edit-rareza" style="width:100%">
+          <option value="comun">Comun</option>
+          <option value="raro">Raro</option>
+          <option value="epico">Epico</option>
+          <option value="dorado">Dorado</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Nivel gate (vacio = sin gate)</div>
+        <input class="form-input" id="carta-edit-nivel" type="number" min="1" step="1" placeholder="10" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Evento</div>
+        <select class="form-input" id="carta-edit-evento" style="width:100%">
+          <option value="0">No</option>
+          <option value="1">Si</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Imagen URL</div>
+        <input class="form-input" id="carta-edit-imagen" placeholder="https://..." style="width:100%">
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">El ID es identidad y no se edita. Cero Borrado Logico: desactivar una carta no la borra del catalogo.</div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
+      <button onclick="cerrarCartaModal()" class="btn btn-ghost btn-sm">Cancelar</button>
+      <button onclick="guardarEdicionCarta()" class="btn btn-gold btn-sm">&#10003; Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==== GOBERNANZA (Gaming v6.1 / ADR-063) ==== -->
+<div class="ws-screen" id="screen-gobernanza">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">GOBERNANZA</div>
+      <div class="ws-subtitle">Moderacion de propuestas por capa (ecosistema, parche, faccion, marca)</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cargarGobernanza()">&#8635; Actualizar</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">&#128220; Propuestas</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select class="form-input" id="gob-filtro-capa" onchange="cargarGobernanza()" style="width:170px">
+            <option value="">Todas las capas</option>
+            <option value="ecosistema">Ecosistema (N33+)</option>
+            <option value="parche">Parche</option>
+            <option value="faccion">Faccion</option>
+            <option value="marca">Marca</option>
+          </select>
+          <select class="form-input" id="gob-filtro-estado" onchange="cargarGobernanza()" style="width:160px">
+            <option value="abierta" selected>Abiertas</option>
+            <option value="">Todas</option>
+            <option value="aprobada">Aprobadas</option>
+            <option value="rechazada">Rechazadas</option>
+            <option value="archivada">Archivadas</option>
+          </select>
+        </div>
+      </div>
+      <div id="gobernanza-lista">
+        <div style="text-align:center;padding:32px 0;color:var(--muted)">
+          <div style="font-size:24px;margin-bottom:8px">&#9203;</div>
+          <div style="font-size:13px;font-weight:600">Cargando propuestas...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==== MARCAS Y SPOTS (Gaming v6.1 / ADR-064) ==== -->
+<div class="ws-screen" id="screen-marcas">
+  <div class="ws-header">
+    <div>
+      <div class="ws-title">MARCAS Y SPOTS</div>
+      <div class="ws-subtitle">Presencia de marca en spots: verificar o rechazar. Gates de eleccion: Clase@3 / Casa@5 / Marca@6</div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn btn-ghost btn-sm" onclick="cargarMarcasSpots()">&#8635; Actualizar</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:16px">
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">&#127991; Presencia de marca</div>
+        <select class="form-input" id="marcas-filtro-estado" onchange="cargarMarcasSpots()" style="width:160px">
+          <option value="pendiente" selected>Pendientes</option>
+          <option value="">Todas</option>
+          <option value="verificada">Verificadas</option>
+          <option value="rechazada">Rechazadas</option>
+        </select>
+      </div>
+      <div id="marcas-lista">
+        <div style="text-align:center;padding:32px 0;color:var(--muted)">
+          <div style="font-size:24px;margin-bottom:8px">&#9203;</div>
+          <div style="font-size:13px;font-weight:600">Cargando presencia de marca...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div id="consumible-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;width:min(520px,95vw);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="padding:14px 18px;background:var(--black);display:flex;align-items:center;justify-content:space-between">
@@ -2456,6 +2663,9 @@ function showScreen(name) {
   if(name === 'consumibles') loadConsumibles();
   if(name === 'salud') cargarSaludRed();
   if(name === 'mercado') cargarMercado();
+  if(name === 'cartas') loadCartas();
+  if(name === 'gobernanza') cargarGobernanza();
+  if(name === 'marcas') cargarMarcasSpots();
   if(name === 'editor-nuevo') {
     currentId = null; newPlace(); showScreen_inner('editor');
     return;
@@ -8371,6 +8581,8 @@ function saludRender(d, dias) {
   html += saludCard('Alertas anti-gaming de origen',
     saludAlertasOrigenCard(d));
 
+  html += saludGamingCard(d);
+
   html += saludCard('Leaderboard &mdash; top viajeros por XP',
     '<div id="salud-leaderboard"><div class="slud-note">Cargando leaderboard...</div></div>');
 
@@ -8421,8 +8633,390 @@ function cargarSaludRed() {
 
 
 // ── AUTO-DIAGNÓSTICO DE VERSIÓN ──────────────────────────────────
+/* ===== CARTAS DE TERRITORIO (Gaming v6.1 / ADR-062) =====
+   CRUD contra /api/admin?recurso=cartas&tipo=cartas_*.
+   GET  cartas_lista  -> { ok, data:[{id,nombre,set_slug,rareza,nivel_gate,
+        es_evento,imagen_url,activo,creado_en}] }
+   POST cartas_crear  {id,nombre,set_slug,rareza,nivel_gate,es_evento,imagen_url}
+   POST cartas_editar {id, nombre|set_slug|rareza|nivel_gate|es_evento|imagen_url}
+   POST cartas_toggle {id, activo?}
+   El id es identidad (slug ASCII) y NO se edita. Cero Borrado Logico:
+   toggle alterna activo. Degradacion 503 SCHEMA_NOT_MIGRATED si la 040 no
+   corrio: se muestra aviso, no rompe. Prefijo "carta"/"cartas" para evitar
+   colisiones (BUG-006/018/019). */
+
+var _cartasCache = [];
+var _cartasEditId = null;
+
+async function loadCartas() {
+  var lista = document.getElementById('cartas-lista');
+  if (!lista) return;
+  lista.innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:26px;margin-bottom:10px">&#127183;</div><div style="font-size:13px;font-weight:600">Cargando cartas...</div></div>';
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_lista', { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _cartasCache = data.data || [];
+    renderCartas();
+  } catch (e) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar cartas</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function renderCartas() {
+  var lista = document.getElementById('cartas-lista');
+  if (!lista) return;
+  if (!_cartasCache.length) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#127183;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Aun no hay cartas</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Crea la primera con el formulario de arriba</div></div>';
+    return;
+  }
+  var filas = _cartasCache.map(function(c) {
+    var badge = c.activo
+      ? '<span style="background:var(--green-l);color:var(--green);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; Activa</span>'
+      : '<span style="background:var(--red-l);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px">&#9679; Inactiva</span>';
+    var gate = (c.nivel_gate == null) ? 'Sin gate' : ('Nv ' + saludFmtInt(c.nivel_gate));
+    var evt = c.es_evento ? 'Si' : 'No';
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+      + '<div style="flex:0 0 170px;font-family:monospace;font-size:12px;color:var(--text2)">' + escH(c.id) + '</div>'
+      + '<div style="flex:1 1 200px;min-width:150px">'
+      +   '<div style="font-size:13px;font-weight:800">' + escH(c.nombre) + '</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px">set: ' + escH(c.set_slug) + '</div>'
+      + '</div>'
+      + '<div style="flex:0 0 90px"><span style="background:var(--bg2);color:var(--text2);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;text-transform:capitalize">' + escH(c.rareza || '') + '</span></div>'
+      + '<div style="flex:0 0 80px;font-size:12px;font-weight:700">' + gate + '</div>'
+      + '<div style="flex:0 0 90px;font-size:11px;color:var(--muted)">Evento: ' + evt + '</div>'
+      + '<div style="flex:0 0 90px">' + badge + '</div>'
+      + '<div style="flex:0 0 auto;display:flex;gap:6px;margin-left:auto">'
+      +   '<button class="btn btn-ghost btn-sm" onclick="abrirEditarCarta(\'' + escH(c.id) + '\')">Editar</button>'
+      +   (c.activo
+      ?     '<button class="btn btn-danger btn-sm" onclick="toggleCarta(\'' + escH(c.id) + '\')">Desactivar</button>'
+      :     '<button class="btn btn-gold btn-sm" onclick="toggleCarta(\'' + escH(c.id) + '\')">Activar</button>')
+      + '</div>'
+      + '</div>';
+  }).join('');
+  lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + filas + '</div>';
+}
+
+async function crearCarta() {
+  var id = document.getElementById('carta-id').value.trim().toLowerCase();
+  var nombre = document.getElementById('carta-nombre').value.trim();
+  var set_slug = document.getElementById('carta-set').value.trim().toLowerCase();
+  var rareza = (document.getElementById('carta-rareza') || {}).value || 'comun';
+  var nivelRaw = document.getElementById('carta-nivel').value.trim();
+  var es_evento = (document.getElementById('carta-evento') || {}).value === '1';
+  var imagen_url = document.getElementById('carta-imagen').value.trim();
+  if (!id || !nombre || !set_slug) { showAdminToast('ID, nombre y set son obligatorios', 'error'); return; }
+  if (!/^[a-z0-9_-]+$/.test(id)) { showAdminToast('ID: solo minusculas, numeros, guion y guion bajo', 'error'); return; }
+  if (!/^[a-z0-9_-]+$/.test(set_slug)) { showAdminToast('Set: solo minusculas, numeros, guion y guion bajo', 'error'); return; }
+  var nivel_gate = null;
+  if (nivelRaw !== '') {
+    var n = parseInt(nivelRaw, 10);
+    if (!isFinite(n) || n < 1) { showAdminToast('Nivel gate invalido', 'error'); return; }
+    nivel_gate = n;
+  }
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_crear', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: id, nombre: nombre, set_slug: set_slug, rareza: rareza, nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo crear');
+    document.getElementById('carta-id').value = '';
+    document.getElementById('carta-nombre').value = '';
+    document.getElementById('carta-set').value = '';
+    document.getElementById('carta-nivel').value = '';
+    document.getElementById('carta-imagen').value = '';
+    showAdminToast(data.mensaje || 'Carta creada', 'success');
+    loadCartas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+function abrirEditarCarta(id) {
+  var c = _cartasCache.filter(function(x){ return x.id === id; })[0];
+  if (!c) return;
+  _cartasEditId = id;
+  document.getElementById('carta-edit-id').value = c.id || '';
+  document.getElementById('carta-edit-nombre').value = c.nombre || '';
+  document.getElementById('carta-edit-set').value = c.set_slug || '';
+  document.getElementById('carta-edit-rareza').value = c.rareza || 'comun';
+  document.getElementById('carta-edit-nivel').value = (c.nivel_gate == null) ? '' : c.nivel_gate;
+  document.getElementById('carta-edit-evento').value = c.es_evento ? '1' : '0';
+  document.getElementById('carta-edit-imagen').value = c.imagen_url || '';
+  document.getElementById('carta-modal').style.display = 'flex';
+}
+
+function cerrarCartaModal() {
+  var modal = document.getElementById('carta-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function guardarEdicionCarta() {
+  if (!_cartasEditId) return;
+  var nombre = document.getElementById('carta-edit-nombre').value.trim();
+  var set_slug = document.getElementById('carta-edit-set').value.trim().toLowerCase();
+  var rareza = (document.getElementById('carta-edit-rareza') || {}).value || 'comun';
+  var nivelRaw = document.getElementById('carta-edit-nivel').value.trim();
+  var es_evento = (document.getElementById('carta-edit-evento') || {}).value === '1';
+  var imagen_url = document.getElementById('carta-edit-imagen').value.trim();
+  if (!nombre) { showAdminToast('El nombre no puede quedar vacio', 'error'); return; }
+  if (!/^[a-z0-9_-]+$/.test(set_slug)) { showAdminToast('Set: solo minusculas, numeros, guion y guion bajo', 'error'); return; }
+  var nivel_gate = null;
+  if (nivelRaw !== '') {
+    var n = parseInt(nivelRaw, 10);
+    if (!isFinite(n) || n < 1) { showAdminToast('Nivel gate invalido', 'error'); return; }
+    nivel_gate = n;
+  }
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_editar', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: _cartasEditId, nombre: nombre, set_slug: set_slug, rareza: rareza, nivel_gate: nivel_gate, es_evento: es_evento, imagen_url: imagen_url })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo actualizar');
+    cerrarCartaModal();
+    showAdminToast(data.mensaje || 'Carta actualizada', 'success');
+    loadCartas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function toggleCarta(id) {
+  try {
+    var resp = await fetch('/api/admin?recurso=cartas&tipo=cartas_toggle', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ id: id })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo alternar');
+    showAdminToast(data.mensaje || 'Estado actualizado', 'success');
+    loadCartas();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ===== GOBERNANZA (Gaming v6.1 / ADR-063) =====
+   GET  /api/admin?recurso=gobernanza&tipo=gobernanza_lista&capa=&estado=
+        -> { ok, data:[{id,capa,capa_id,titulo,descripcion,estado,quorum,
+             creado_en,autor_nombre,autor_email,votos_total,votos_favor,
+             votos_contra,votos_abstencion}] }
+   POST /api/admin?recurso=gobernanza&tipo=gobernanza_moderar
+        {propuesta_id, estado: aprobada|rechazada|archivada}
+   Cero Borrado Logico: la moderacion cambia estado, nunca borra.
+   Prefijo "gob"/"gobernanza" para evitar colisiones (BUG-006/018/019). */
+
+var _gobernanzaCache = [];
+
+async function cargarGobernanza() {
+  var lista = document.getElementById('gobernanza-lista');
+  if (!lista) return;
+  var capa = (document.getElementById('gob-filtro-capa') || {}).value || '';
+  var estado = (document.getElementById('gob-filtro-estado') || {}).value || '';
+  lista.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">&#9203;</div><div style="font-size:13px;font-weight:600">Cargando propuestas...</div></div>';
+  var url = '/api/admin?recurso=gobernanza&tipo=gobernanza_lista';
+  if (capa) url += '&capa=' + encodeURIComponent(capa);
+  if (estado) url += '&estado=' + encodeURIComponent(estado);
+  try {
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _gobernanzaCache = data.data || [];
+    renderGobernanza();
+  } catch (e) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar propuestas</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function renderGobernanza() {
+  var lista = document.getElementById('gobernanza-lista');
+  if (!lista) return;
+  if (!_gobernanzaCache.length) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#128220;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Sin propuestas para este filtro</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Cambia capa o estado, o espera nuevas propuestas</div></div>';
+    return;
+  }
+  var filas = _gobernanzaCache.map(function(p) {
+    var abierta = (p.estado === 'abierta');
+    var botones = abierta
+      ? '<button class="btn btn-gold btn-sm" onclick="moderarPropuesta(\'' + escH(p.id) + '\',\'aprobada\')">Aprobar</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="moderarPropuesta(\'' + escH(p.id) + '\',\'rechazada\')">Rechazar</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="moderarPropuesta(\'' + escH(p.id) + '\',\'archivada\')">Archivar</button>'
+      : '<span style="font-size:11px;color:var(--muted)">Resuelta: ' + escH(p.estado) + '</span>';
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;flex-direction:column;gap:8px">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +   '<span style="background:var(--bg2);color:var(--text2);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;text-transform:uppercase">' + escH(p.capa) + '</span>'
+      +   '<span style="font-size:13px;font-weight:800;flex:1 1 220px">' + escH(p.titulo) + '</span>'
+      +   '<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;background:var(--gold-l);color:var(--gold)">' + escH(p.estado) + '</span>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Autor: ' + escH(p.autor_nombre || p.autor_email || '?') + ' &#183; quorum ' + saludFmtInt(p.quorum) + '</div>'
+      + '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;font-weight:700">'
+      +   '<span style="color:var(--green)">A favor: ' + saludFmtInt(p.votos_favor) + '</span>'
+      +   '<span style="color:var(--red)">En contra: ' + saludFmtInt(p.votos_contra) + '</span>'
+      +   '<span style="color:var(--muted)">Abstencion: ' + saludFmtInt(p.votos_abstencion) + '</span>'
+      +   '<span style="color:var(--muted)">Total: ' + saludFmtInt(p.votos_total) + '</span>'
+      + '</div>'
+      + (p.descripcion ? '<div style="font-size:12px;color:var(--text2);line-height:1.5">' + escH(p.descripcion) + '</div>' : '')
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + botones + '</div>'
+      + '</div>';
+  }).join('');
+  lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px">' + filas + '</div>';
+}
+
+async function moderarPropuesta(id, estado) {
+  if (!id) return;
+  try {
+    var resp = await fetch('/api/admin?recurso=gobernanza&tipo=gobernanza_moderar', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ propuesta_id: id, estado: estado })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo moderar');
+    showAdminToast('Propuesta ' + estado, 'success');
+    cargarGobernanza();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ===== MARCAS CAPTURAN SPOTS (Gaming v6.1 / ADR-064) =====
+   GET  /api/admin?recurso=marcas_spots&tipo=spot_presencia_lista&estado=
+        -> { ok, data:[{id,marca_id,destino_id,patrocinio_id,estado,activo,
+             creado_en,marca_nombre,marca_verificada,destino_nombre,
+             destino_slug,destino_ciudad}] }
+   POST /api/admin?recurso=marcas_spots&tipo=spot_presencia_moderar
+        {presencia_id, estado: verificada|rechazada}
+   Al RECHAZAR el backend hace activo=false (Cero Borrado Logico, ADR-003).
+   Prefijo "marcas"/"presencia" para evitar colisiones (BUG-006/018/019). */
+
+var _marcasCache = [];
+
+async function cargarMarcasSpots() {
+  var lista = document.getElementById('marcas-lista');
+  if (!lista) return;
+  var estado = (document.getElementById('marcas-filtro-estado') || {}).value || '';
+  lista.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">&#9203;</div><div style="font-size:13px;font-weight:600">Cargando presencia de marca...</div></div>';
+  var url = '/api/admin?recurso=marcas_spots&tipo=spot_presencia_lista';
+  if (estado) url += '&estado=' + encodeURIComponent(estado);
+  try {
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar');
+    _marcasCache = data.data || [];
+    renderMarcasSpots();
+  } catch (e) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#9888;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Error al cargar presencia de marca</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + escH(e.message || '') + '</div></div>';
+  }
+}
+
+function renderMarcasSpots() {
+  var lista = document.getElementById('marcas-lista');
+  if (!lista) return;
+  if (!_marcasCache.length) {
+    lista.innerHTML = '<div class="mod-empty"><div class="mod-empty-icon">&#127991;</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Sin presencia de marca para este filtro</div>'
+      + '<div style="font-size:11px;color:var(--muted)">Las marcas capturan spots desde el juego; aqui se verifica o rechaza</div></div>';
+    return;
+  }
+  var filas = _marcasCache.map(function(s) {
+    var verif = s.marca_verificada ? ' (marca verificada)' : '';
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+      + '<div style="flex:1 1 180px;min-width:140px">'
+      +   '<div style="font-size:13px;font-weight:800">' + escH(s.marca_nombre || '(marca)') + verif + '</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(s.destino_nombre || '(spot)') + (s.destino_ciudad ? ' &#183; ' + escH(s.destino_ciudad) : '') + '</div>'
+      + '</div>'
+      + '<div style="flex:0 0 110px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text2)">' + escH(s.estado) + '</div>'
+      + '<div style="flex:0 0 90px;font-size:11px;color:var(--muted)">' + (s.activo ? 'Activa' : 'Inactiva') + '</div>'
+      + '<div style="flex:0 0 auto;display:flex;gap:6px;margin-left:auto">'
+      +   '<button class="btn btn-gold btn-sm" onclick="moderarPresencia(\'' + escH(s.id) + '\',\'verificada\')">Verificar</button>'
+      +   '<button class="btn btn-danger btn-sm" onclick="moderarPresencia(\'' + escH(s.id) + '\',\'rechazada\')">Rechazar</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+  lista.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + filas + '</div>';
+}
+
+async function moderarPresencia(id, estado) {
+  if (!id) return;
+  try {
+    var resp = await fetch('/api/admin?recurso=marcas_spots&tipo=spot_presencia_moderar', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify({ presencia_id: id, estado: estado })
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo moderar');
+    showAdminToast('Presencia ' + estado, 'success');
+    cargarMarcasSpots();
+  } catch (e) {
+    showAdminToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ===== SALUD DE LA RED: bloques ADITIVOS Gaming v6.1 (ADR-062..065) =====
+   cartas, moneda, gobernanza y own_spot pueden FALTAR si su migracion no
+   corrio; en ese caso el backend los omite y esta tarjeta no se pinta
+   (patron BUG-021: degradar, nunca romper). Prefijo "salud" para evitar
+   colisiones (BUG-006/018/019). */
+
+function saludGamingCard(d) {
+  if (!d) return '';
+  var cartas = d.cartas;
+  var moneda = d.moneda;
+  var gob = d.gobernanza;
+  var spot = d.own_spot;
+  if (!cartas && !moneda && !gob && !spot) return '';
+  var html = '';
+
+  if (cartas) {
+    var filasGates = (Array.isArray(cartas.gates_por_nivel) ? cartas.gates_por_nivel : []).map(function(g){
+      return ['Nv ' + saludFmtInt(g.nivel_gate), saludFmtInt(g.usuarios)];
+    });
+    html += '<div class="stat-sub" style="margin-bottom:6px">Cartas en circulacion: <b>' + saludFmtInt(cartas.cartas_en_circulacion) + '</b> &#183; ofertas abiertas: <b>' + saludFmtInt(cartas.ofertas_abiertas) + '</b></div>'
+      + saludSubtabla('Gates consumidos por nivel', filasGates);
+  }
+
+  if (moneda) {
+    html += '<div class="stat-sub" style="margin:12px 0 6px">Moneda Condor (CDR): emision <b>' + saludFmtXpOD(moneda.emision_total) + '</b> &#183; circulacion <b>' + saludFmtXpOD(moneda.circulacion) + '</b> &#183; ordenes abiertas <b>' + saludFmtInt(moneda.ordenes_abiertas) + '</b></div>';
+  }
+
+  if (gob) {
+    var filasGob = (Array.isArray(gob.propuestas_por_capa_estado) ? gob.propuestas_por_capa_estado : []).map(function(g){
+      return [_esc(g.capa), _esc(g.estado), saludFmtInt(g.n)];
+    });
+    html += '<div class="stat-sub" style="margin:12px 0 6px">Votos vigentes: <b>' + saludFmtInt(gob.votos_totales) + '</b></div>'
+      + saludTabla(['Capa', 'Estado', 'Propuestas'], filasGob, [null, null, 'text-align:right'], '');
+  }
+
+  if (spot) {
+    var filasSpot = (Array.isArray(spot.duenos_por_tipo) ? spot.duenos_por_tipo : []).map(function(s){
+      return [_esc(s.tipo_medio), saludFmtInt(s.duenos)];
+    });
+    html += '<div class="stat-sub" style="margin:12px 0 6px">Dividendos Own the Spot pagados: <b>' + saludFmtXpOD(spot.dividendos_pagados) + ' XP</b></div>'
+      + saludTabla(['Tipo de medio', 'Duenos'], filasSpot, [null, 'text-align:right'], '');
+  }
+
+  return saludCard('Gaming v6.1 (cartas, moneda, gobernanza, Own the Spot)', html);
+}
+
+
 (function checkVersion() {
-  var VERSION = 'admin-v13.20260924';
+  var VERSION = 'admin-v14.20260924';
   var checks = [
     ['f-tipo-actividad', !!document.getElementById('f-tipo-actividad'),   'Campo tipo actividad (sitio)'],
     ['f-distancia-sitio',!!document.getElementById('f-distancia-sitio'),  'Campo distancia (sitio)'],
@@ -8434,6 +9028,10 @@ function cargarSaludRed() {
     ['saludOrigenCard', typeof saludOrigenCard === 'function',            'Panel Origen y lejania (ADR-058)'],
     ['saludGuardarConfigOrigen', typeof saludGuardarConfigOrigen === 'function', 'Editor config de origen (ADR-058)'],
     ['cargarMercado', typeof cargarMercado === 'function',                'Panel Mercado de Emprendedores'],
+    ['loadCartas', typeof loadCartas === 'function',                      'Panel Cartas (Gaming v6.1)'],
+    ['cargarGobernanza', typeof cargarGobernanza === 'function',          'Panel Gobernanza (Gaming v6.1)'],
+    ['cargarMarcasSpots', typeof cargarMarcasSpots === 'function',        'Panel Marcas y Spots (Gaming v6.1)'],
+    ['saludGamingCard', typeof saludGamingCard === 'function',            'Bloques Gaming v6.1 en Salud de la Red'],
   ];
   var allOk = checks.every(function(c){ return c[1]; });
   var icon = allOk ? '✅' : '⚠️';

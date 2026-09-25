@@ -231,11 +231,11 @@ function mockCasaCofreRota() {
     if (q.indexOf('SELECT id, casa, casa_elegida_en, xp_total, email_verificado FROM usuarios') !== -1)
       return Promise.resolve([{
         id: 'u-casa', casa: null, casa_elegida_en: null,
-        xp_total: '150', email_verificado: true
+        xp_total: '1650', email_verificado: true
       }]);
     if (q.indexOf('casa IS NULL') !== -1 && q.indexOf('casa_elegida_en=NOW()') !== -1)
       return Promise.resolve([{
-        casa: 'jaguar', casa_elegida_en: '2026-09-15T00:00:00.000Z', xp_total: '150'
+        casa: 'jaguar', casa_elegida_en: '2026-09-15T00:00:00.000Z', xp_total: '1650'
       }]);
     if (q.indexOf('UPDATE casas_cofre SET poblacion_activa') !== -1) {
       var e = new Error('relation casas_cofre does not exist');

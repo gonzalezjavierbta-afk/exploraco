@@ -368,6 +368,64 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
   #cpanel-mercado .mk-oferta{flex-wrap:wrap}
   #cpanel-mercado .mk-of-buy{width:100%}
 }
+/* ---- Gaming v6.1 (Fase 4): gobernanza, contratos, cartas, moneda, marcas ----
+   Silo atomico: todo cuelga de .cm-v61 (ADR-004). */
+.cm-v61 .cv-note{font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:10px}
+.cm-v61 .cv-empty{font-size:11px;color:rgba(255,255,255,.35);padding:12px 2px}
+.cm-v61 .cv-err{font-size:11px;color:#fca5a5;padding:8px 2px}
+.cm-v61 .cv-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.cm-v61 .cv-chip{padding:7px 13px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.7);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;transition:all .18s}
+.cm-v61 .cv-chip:hover{background:rgba(255,255,255,.08);color:#fff}
+.cm-v61 .cv-chip.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.cm-v61 .cv-sec-t{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.7);margin:16px 0 10px}
+.cm-v61 .cv-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:10px}
+.cm-v61 .cv-card-n{font-size:12px;font-weight:700;color:#fff}
+.cm-v61 .cv-meta{font-size:10px;color:rgba(255,255,255,.5);margin-top:3px;line-height:1.5}
+.cm-v61 .cv-desc{font-size:11px;color:rgba(255,255,255,.65);line-height:1.55;margin:8px 0}
+.cm-v61 .cv-votos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.cm-v61 .cv-voto{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:2px 9px;color:rgba(255,255,255,.7)}
+.cm-v61 .cv-voto.favor{border-color:rgba(34,197,94,.5);color:#86efac}
+.cm-v61 .cv-voto.contra{border-color:rgba(239,68,68,.5);color:#fca5a5}
+.cm-v61 .cv-voto.abstencion{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.55)}
+.cm-v61 .cv-chipst{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-radius:999px;padding:2px 8px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7)}
+.cm-v61 .cv-chipst.abierta,.cm-v61 .cv-chipst.abierto{border-color:rgba(232,160,32,.5);color:var(--gold)}
+.cm-v61 .cv-chipst.en_proceso{border-color:rgba(59,130,246,.5);color:#93C5FD}
+.cm-v61 .cv-chipst.completado,.cm-v61 .cv-chipst.aprobada,.cm-v61 .cv-chipst.verificada{border-color:rgba(34,197,94,.5);color:#86efac}
+.cm-v61 .cv-chipst.cancelado,.cm-v61 .cv-chipst.rechazada{opacity:.6}
+.cm-v61 .cv-form{background:rgba(232,160,32,.05);border:1px solid rgba(232,160,32,.25);border-radius:8px;padding:14px;margin-bottom:12px}
+.cm-v61 .cv-lbl{display:block;font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px}
+.cm-v61 .cv-inp{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:9px 11px;font-size:12px;color:#fff;font-family:'Outfit',sans-serif;outline:none;margin-bottom:8px;transition:border-color .15s}
+.cm-v61 .cv-inp:focus{border-color:var(--gold)}
+.cm-v61 select.cv-inp{cursor:pointer}
+.cm-v61 .cv-actions{display:flex;gap:8px;flex-wrap:wrap}
+.cm-v61 .cv-btn{padding:8px 14px;background:var(--gold);border:1px solid var(--gold);border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;cursor:pointer;color:var(--black)}
+.cm-v61 .cv-btn:hover{opacity:.88}
+.cm-v61 .cv-btn.ghost{background:transparent;border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.7)}
+.cm-v61 .cv-btn.ghost:hover{border-color:var(--gold);color:var(--gold);opacity:1}
+.cm-v61 .cv-btn:disabled{opacity:.4;cursor:not-allowed}
+.cm-v61 .cv-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+.cm-v61 .cv-row-n{font-size:12px;font-weight:700;color:#fff}
+.cm-v61 .cv-row-d{font-size:10px;color:rgba(255,255,255,.5);flex:1 1 100%}
+.cm-v61 .cv-row-x{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--gold);white-space:nowrap}
+.cm-v61 .cv-saldo{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:var(--gold);line-height:1}
+.cm-v61 .cv-saldo-l{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.6px}
+.cm-v61 .cv-gate{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.cm-v61 .cv-gate-t{font-size:11px;font-weight:700;color:rgba(255,255,255,.75);margin-bottom:6px}
+.cm-v61 .cv-gate-ok{color:#86efac;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.cm-v61 .cv-gate-no{color:#fca5a5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+/* Modal simple reutilizable (silo propio; reemplaza prompt/confirm) */
+#cm-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:1400;align-items:center;justify-content:center;padding:16px}
+#cm-modal.on{display:flex}
+#cm-modal .cm-modal-box{background:#141414;border:1px solid rgba(232,160,32,.4);border-radius:14px;padding:16px;width:100%;max-width:420px;box-sizing:border-box}
+#cm-modal .cm-modal-t{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:var(--gold);margin-bottom:10px}
+#cm-modal .cm-modal-msg{font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:12px}
+#cm-modal .cm-modal-inp{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:9px 11px;font-size:12px;color:#fff;font-family:'Outfit',sans-serif;outline:none;margin-bottom:8px}
+#cm-modal .cm-modal-inp:focus{border-color:var(--gold)}
+#cm-modal .cm-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+#cm-modal .cm-modal-actions button{padding:8px 14px;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;cursor:pointer}
+#cm-modal .cm-modal-actions .ok{background:var(--gold);border:1px solid var(--gold);color:var(--black)}
+#cm-modal .cm-modal-actions .ghost{background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.7)}
+#cm-modal .cm-modal-actions .ghost:hover{border-color:var(--gold);color:var(--gold)}
 </style>
 </head>
 <body>
@@ -422,6 +480,11 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div style="font-size:11px;color:rgba(255,255,255,.7)">🗺️ Rutas y listas temáticas de otros viajeros</div>
       <a href="mapas.html" style="font-size:10px;font-weight:700;color:var(--gold);text-decoration:none;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0">Explorar mapas →</a>
     </div>
+    <!-- GAMING v6.1 (E1): acceso a la guia de XP del hub de comunidad -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;background:rgba(232,160,32,.07);border:1px solid rgba(232,160,32,.25);border-radius:8px">
+      <div style="font-size:11px;color:rgba(255,255,255,.7)">Aprende a ganar XP: fuentes, topes y multiplicadores</div>
+      <button type="button" onclick="if(window.ExploraCO&amp;&amp;window.ExploraCO.abrirGuiaXP)window.ExploraCO.abrirGuiaXP()" style="font-size:10px;font-weight:700;color:var(--black);background:var(--gold);border:none;border-radius:5px;padding:8px 14px;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;flex-shrink:0">Como ganar XP</button>
+    </div>
     <!-- Tabs -->
         <div class="comm-tabs">
       <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
@@ -432,6 +495,9 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div class="ctab" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
       <div class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
       <div class="ctab" onclick="showCommTab('mercado')">&#x1F6D2; Mercado</div>
+      <div class="ctab" onclick="showCommTab('gobernanza')">&#x1F3DB; Gobernanza</div>
+      <div class="ctab" onclick="showCommTab('contratos')">&#x1F4DC; Contratos</div>
+      <div class="ctab" onclick="showCommTab('marcas')">&#x1F3F7; Marcas</div>
     </div>
     </div>
 
@@ -543,6 +609,8 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div id="pandilla-fundar"></div>
       <div id="pandillas-unirse"></div>
       <div id="pandilla-retos"></div>
+      <!-- GAMING v6.1 (Fase 4 / T12): tesoreria del Parche (upgrades + Tithe) -->
+      <div class="cm-v61" id="cm-parche-tesoreria"></div>
     </div>
 
     <!-- AUDIOVISUAL (albumes + feed de media, ADR-017) -->
@@ -581,9 +649,34 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div id="ao-pendientes"></div>
     </div>
 
-    <!-- MERCADO DE EMPRENDEDORES (asset compartido mercado.js) -->
+    <!-- MERCADO DE EMPRENDEDORES (asset compartido mercado.js) + cartas/moneda v6.1 -->
     <div class="cpanel" id="cpanel-mercado">
       <div id="mercado-cuerpo"></div>
+
+      <!-- GAMING v6.1 (Fase 4 / T7): mercado de cartas -->
+      <div class="cm-v61">
+        <div class="cv-sec-t">&#x1F0CF; Mercado de Cartas</div>
+        <div id="cm-cartas"></div>
+
+        <!-- GAMING v6.1 (Fase 4 / T8): moneda secundaria Condor (CDR) -->
+        <div class="cv-sec-t">&#x1FA99; Moneda Condor (CDR)</div>
+        <div id="cm-moneda"></div>
+      </div>
+    </div>
+
+    <!-- GOBERNANZA (Fase 2B / ADR-063) -->
+    <div class="cpanel" id="cpanel-gobernanza">
+      <div class="cm-v61" id="cm-gobernanza"></div>
+    </div>
+
+    <!-- CONTRATOS P2P (Gig Economy / ADR-066) -->
+    <div class="cpanel" id="cpanel-contratos">
+      <div class="cm-v61" id="cm-contratos"></div>
+    </div>
+
+    <!-- MARCAS Y SPOTS (ADR-064) -->
+    <div class="cpanel" id="cpanel-marcas">
+      <div class="cm-v61" id="cm-marcas"></div>
     </div>
 
   </div>
@@ -616,6 +709,19 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
         <input class="chat-inp" id="plan-chat-inp" type="text" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')enviarPlanChat()">
         <button class="chat-send" onclick="enviarPlanChat()">Enviar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SIMPLE reutilizable (Gaming v6.1; reemplaza prompt/confirm, silo propio) -->
+<div id="cm-modal" onclick="if(event.target===this)cmCerrarModal()">
+  <div class="cm-modal-box">
+    <div class="cm-modal-t" id="cm-modal-t">Confirmar</div>
+    <div class="cm-modal-msg" id="cm-modal-msg"></div>
+    <div id="cm-modal-fields"></div>
+    <div class="cm-modal-actions">
+      <button type="button" class="ghost" onclick="cmCerrarModal()">Cancelar</button>
+      <button type="button" class="ok" id="cm-modal-ok" onclick="cmModalOk()">Aceptar</button>
     </div>
   </div>
 </div>
@@ -2750,9 +2856,12 @@ function showCommTab(tab) {
     if(tab === 'planes') renderPlanes();
     if(tab === 'mapa') onTabMapaAV();
     if(tab === 'av') initAudiovisual();
-    if(tab === 'pandillas') renderPandillas();
+    if(tab === 'pandillas'){ renderPandillas(); cargarParcheTesoreria(); }
     if(tab === 'wayfarer') initActivoOculto();
-    if(tab === 'mercado' && window.Mercado) Mercado.cargar();
+    if(tab === 'mercado'){ if(window.Mercado) Mercado.cargar(); cargarCartasComm(); cargarMonedaComm(); }
+    if(tab === 'gobernanza') cargarGobernanza();
+    if(tab === 'contratos') cargarContratosComm();
+    if(tab === 'marcas') cargarMarcas();
   }
   if(tab !== 'chat') stopChatPoll();
 }
@@ -2765,6 +2874,587 @@ function showXPToastComm(msg){
   t.style.transform='translateY(0)'; t.style.opacity='1';
   clearTimeout(t._t);
   t._t=setTimeout(function(){ t.style.transform='translateY(40px)'; t.style.opacity='0'; }, 2800);
+}
+
+/* ---- GAMING v6.1 (Fase 4): gobernanza, contratos, cartas, moneda, marcas ----
+   Consume las ramas nuevas (gobernanza_*, contrato_*, carta_*, moneda_*,
+   marcas_spots, marca_presencia, parche_*). Toda escritura usa
+   postComAPIJWT (Bearer + refresh). Degrada tipado con SCHEMA_NOT_MIGRATED.
+   ASCII-safe (ADR-002). Reemplaza prompt/confirm por cmAbrirModal. */
+function cmHelper(name) {
+  return (window.ExploraCO && typeof window.ExploraCO[name] === 'function') ? window.ExploraCO[name] : null;
+}
+function cmVal(id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; }
+function cmPost(body) {
+  return postComAPIJWT(body).then(function(res){
+    res = res || {};
+    if (res.ok) return { ok: true, data: res.data, raw: res };
+    var code = res.code || res.error || 'ERROR';
+    var msg = (code === 'SCHEMA_NOT_MIGRATED') ? 'Modulo en preparacion' : (res.error || 'No disponible');
+    return { ok: false, error: code, mensaje: msg, raw: res };
+  }).catch(function(){ return { ok: false, error: 'CONEXION', mensaje: 'Error de conexion' }; });
+}
+function cmGet(url) {
+  var jwt = obtenerJwtExploraco();
+  var headers = {};
+  if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+  return fetch(url, { headers: headers }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(res){
+      res = res || {};
+      if (res.ok) return { ok: true, data: res.data, raw: res };
+      var code = res.code || res.error || 'ERROR';
+      var msg = (code === 'SCHEMA_NOT_MIGRATED') ? 'Modulo en preparacion' : (res.error || 'No disponible');
+      return { ok: false, error: code, mensaje: msg, raw: res };
+    });
+  }).catch(function(){ return { ok: false, error: 'CONEXION', mensaje: 'Error de conexion' }; });
+}
+function cmMsg(res) {
+  if (!res) return 'No disponible';
+  if (typeof res === 'string') return res;
+  return res.mensaje || res.error || 'No disponible';
+}
+function cmNivelActual() { var lvl = getLevel(statsU().xp); return XP_LEVELS.indexOf(lvl) + 1; }
+
+/* ---- Modal simple reutilizable (precio/cantidad/descripcion) ---- */
+var CM_MODAL = { onOk: null };
+function cmAbrirModal(opts) {
+  opts = opts || {};
+  document.getElementById('cm-modal-t').textContent = opts.titulo || 'Confirmar';
+  document.getElementById('cm-modal-msg').textContent = opts.msg || '';
+  var fields = document.getElementById('cm-modal-fields');
+  fields.innerHTML = '';
+  (opts.fields || []).forEach(function(f){
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:block;font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px';
+    lbl.textContent = f.label || '';
+    fields.appendChild(lbl);
+    var inp;
+    if (f.type === 'textarea') { inp = document.createElement('textarea'); inp.rows = f.rows || 2; }
+    else if (f.type === 'select') {
+      inp = document.createElement('select');
+      (f.options || []).forEach(function(o){ var op = document.createElement('option'); op.value = o.value; op.textContent = o.label; inp.appendChild(op); });
+    } else {
+      inp = document.createElement('input'); inp.type = f.type || 'text';
+      if (f.min != null) inp.min = f.min;
+      if (f.max != null) inp.max = f.max;
+      if (f.step != null) inp.step = f.step;
+    }
+    inp.className = 'cm-modal-inp';
+    inp.id = 'cm-mf-' + f.id;
+    if (f.value != null) inp.value = f.value;
+    if (f.placeholder) inp.placeholder = f.placeholder;
+    fields.appendChild(inp);
+  });
+  CM_MODAL.onOk = opts.onOk || null;
+  document.getElementById('cm-modal-ok').textContent = opts.okLabel || 'Aceptar';
+  document.getElementById('cm-modal').classList.add('on');
+}
+function cmCerrarModal() { document.getElementById('cm-modal').classList.remove('on'); CM_MODAL.onOk = null; }
+function cmModalVal(id) { var e = document.getElementById('cm-mf-' + id); return e ? String(e.value || '').trim() : ''; }
+function cmModalOk() {
+  var fn = CM_MODAL.onOk;
+  if (typeof fn === 'function') { if (fn() === false) return; }
+  cmCerrarModal();
+}
+
+/* ---- GOBERNANZA (GET gobernanza_propuestas + POST proponer/votar) ---- */
+var CM_GOV = { capa: 'ecosistema', ctx: { nivel: 1, faccion: '', parcheId: '', marca: null } };
+var CM_GOV_CAPAS = [
+  { id: 'ecosistema', label: 'Ecosistema (N33+)' },
+  { id: 'parche', label: 'Parche' },
+  { id: 'faccion', label: 'Faccion' },
+  { id: 'marca', label: 'Marca' }
+];
+function cmGovCapaLabel(capa) { for (var i = 0; i < CM_GOV_CAPAS.length; i++) if (CM_GOV_CAPAS[i].id === capa) return CM_GOV_CAPAS[i].label; return capa; }
+function cmGovGateCapa(capa) {
+  var ctx = CM_GOV.ctx;
+  if (capa === 'ecosistema') return { ok: ctx.nivel >= 33, txt: 'Requiere nivel 33 (tu nivel ' + ctx.nivel + ')' };
+  if (capa === 'parche') return { ok: !!ctx.parcheId, txt: ctx.parcheId ? 'Tu Parche' : 'Requiere pertenecer a un Parche' };
+  if (capa === 'faccion') return { ok: !!ctx.faccion, txt: ctx.faccion ? ('Faccion ' + ctx.faccion) : 'Requiere elegir una faccion' };
+  if (capa === 'marca') return { ok: !!(ctx.marca && ctx.marca.activa), txt: (ctx.marca && ctx.marca.activa) ? ('Marca ' + (ctx.marca.nombre || '')) : 'Requiere una Marca activa' };
+  return { ok: false, txt: '' };
+}
+function cargarGobernanza() {
+  var box = document.getElementById('cm-gobernanza');
+  if (!box) return;
+  var u = sesion();
+  if (!u) {
+    box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para participar en la gobernanza.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>';
+    return;
+  }
+  box.innerHTML = '<div class="cv-empty">Cargando gobernanza\u2026</div>';
+  CM_GOV.ctx.nivel = cmNivelActual();
+  CM_GOV.ctx.faccion = u.faccion || '';
+  cmGet('/api/usuarios?tipo=mi_marca&usuario_id=' + encodeURIComponent(u.id)).then(function(mres){
+    CM_GOV.ctx.marca = (mres && mres.ok && mres.data) ? mres.data : null;
+    /* Carrera: si el contexto ya se pinto y la capa activa es 'marca',
+       refresca el gate con el estado real de la Marca. */
+    if (CM_GOV.capa === 'marca' && document.getElementById('cm-gov-lista')) cmGovRender();
+  });
+  fetch('/api/interacciones?tipo=pandilla_detalle&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); }).catch(function(){ return {}; })
+    .then(function(pres){
+      var p = pres && pres.data && pres.data.pandilla;
+      CM_GOV.ctx.parcheId = (p && p.id) ? String(p.id) : '';
+      cmGovRender();
+    });
+}
+function cmGovRender() {
+  var box = document.getElementById('cm-gobernanza');
+  if (!box) return;
+  var html = '<div class="cv-note">Gobernanza de 3 capas: ecosistema (nivel 33+), Parche, faccion y Marca. Un voto por viajero por propuesta.</div>';
+  html += '<div class="cv-chips">';
+  CM_GOV_CAPAS.forEach(function(c){
+    html += '<button type="button" class="cv-chip' + (CM_GOV.capa === c.id ? ' on' : '') + '" onclick="cmGovCapa(\'' + c.id + '\')">' + esc(c.label) + '</button>';
+  });
+  html += '</div>';
+  var g = cmGovGateCapa(CM_GOV.capa);
+  html += '<div class="cv-gate"><div class="cv-gate-t">' + esc(cmGovCapaLabel(CM_GOV.capa)) + '</div>'
+    + '<span class="' + (g.ok ? 'cv-gate-ok' : 'cv-gate-no') + '">' + (g.ok ? 'Habilitado' : 'Bloqueado') + '</span>'
+    + '<div class="cv-meta">' + esc(g.txt) + '</div></div>';
+  html += '<div class="cv-form"><div class="cv-sec-t" style="margin-top:0">Proponer</div>'
+    + '<label class="cv-lbl">Titulo</label><input class="cv-inp" id="cm-gov-titulo" maxlength="200" placeholder="Titulo de la propuesta">'
+    + '<label class="cv-lbl">Descripcion</label><textarea class="cv-inp" id="cm-gov-desc" rows="3" maxlength="4000" placeholder="Describe tu propuesta"></textarea>'
+    + '<div class="cv-actions"><button type="button" class="cv-btn"' + (g.ok ? '' : ' disabled') + ' onclick="cmGovProponer()">Publicar propuesta</button></div></div>';
+  html += '<div class="cv-sec-t">Propuestas</div><div id="cm-gov-lista"><div class="cv-empty">Cargando propuestas\u2026</div></div>';
+  box.innerHTML = html;
+  cmGovListar();
+}
+function cmGovCapa(capa) { CM_GOV.capa = capa; cmGovRender(); }
+function cmGovListar() {
+  var cont = document.getElementById('cm-gov-lista');
+  if (!cont) return;
+  var u = sesion();
+  var url = '/api/interacciones?tipo=gobernanza_propuestas&capa=' + encodeURIComponent(CM_GOV.capa);
+  if (u && u.id) url += '&usuario_id=' + encodeURIComponent(u.id);
+  cmGet(url).then(function(res){
+    if (!res.ok) { cont.innerHTML = '<div class="cv-err">' + esc(cmMsg(res)) + '</div>'; return; }
+    var list = res.data || [];
+    if (!list.length) { cont.innerHTML = '<div class="cv-empty">No hay propuestas en esta capa.</div>'; return; }
+    var html = '';
+    list.forEach(function(p){
+      var estado = String(p.estado || '');
+      html += '<div class="cv-card">'
+        + '<div class="cv-card-n">' + esc(p.titulo || '') + ' <span class="cv-chipst ' + esc(estado) + '">' + esc(estado) + '</span></div>'
+        + '<div class="cv-meta">Por ' + esc(p.autor_nombre || 'Viajero') + ' \u00b7 quorum ' + (parseInt(p.quorum, 10) || 3) + '</div>'
+        + '<div class="cv-desc">' + esc(p.descripcion || '') + '</div>'
+        + '<div class="cv-votos">'
+        + '<span class="cv-voto favor">Favor ' + (parseInt(p.votos_favor, 10) || 0) + '</span>'
+        + '<span class="cv-voto contra">Contra ' + (parseInt(p.votos_contra, 10) || 0) + '</span>'
+        + '<span class="cv-voto abstencion">Abst. ' + (parseInt(p.votos_abstencion, 10) || 0) + '</span>'
+        + (p.mi_voto ? '<span class="cv-voto">Tu voto: ' + esc(p.mi_voto) + '</span>' : '')
+        + '</div>';
+      if (estado === 'abierta' && !p.mi_voto) {
+        html += '<div class="cv-actions">'
+          + '<button type="button" class="cv-btn" onclick="cmGovVotar(\'' + esc(p.id) + '\',\'favor\')">Favor</button>'
+          + '<button type="button" class="cv-btn ghost" onclick="cmGovVotar(\'' + esc(p.id) + '\',\'contra\')">Contra</button>'
+          + '<button type="button" class="cv-btn ghost" onclick="cmGovVotar(\'' + esc(p.id) + '\',\'abstencion\')">Abstencion</button>'
+          + '</div>';
+      }
+      html += '</div>';
+    });
+    cont.innerHTML = html;
+  }).catch(function(){ cont.innerHTML = '<div class="cv-err">No se pudieron cargar las propuestas.</div>'; });
+}
+function cmGovProponer() {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  var titulo = cmVal('cm-gov-titulo'), desc = cmVal('cm-gov-desc');
+  if (!titulo) { showXPToastComm('Escribe un titulo'); return; }
+  if (!desc) { showXPToastComm('Escribe una descripcion'); return; }
+  var body = { tipo: 'gobernanza_proponer', usuario_id: String(u.id), capa: CM_GOV.capa, titulo: titulo, descripcion: desc };
+  if (CM_GOV.capa === 'parche' && CM_GOV.ctx.parcheId) body.capa_id = CM_GOV.ctx.parcheId;
+  cmPost(body).then(function(res){
+    if (res.ok) { showXPToastComm('Propuesta publicada'); cmGovListar(); return; }
+    var m = 'No se pudo publicar';
+    if (res.error === 'NIVEL_INSUFICIENTE') m = 'Requiere nivel ' + ((res.raw && res.raw.nivel_requerido) || 33);
+    else if (res.error === 'FACCION_REQUERIDA') m = 'Elige una faccion primero';
+    else if (res.error === 'MARCA_INACTIVA') m = 'Necesitas una Marca activa';
+    else if (res.error === 'PARCHE_REQUERIDO') m = 'Debes pertenecer a un Parche';
+    else if (res.error === 'ROL_INSUFICIENTE') m = 'Solo fundador u oficial del Parche pueden proponer';
+    else if (res.error === 'CAPA_ID_REQUERIDO') m = 'Falta el identificador de la capa';
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
+}
+function cmGovVotar(id, voto) {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  cmPost({ tipo: 'gobernanza_votar', usuario_id: String(u.id), propuesta_id: id, voto: voto }).then(function(res){
+    if (res.ok) { showXPToastComm('Voto registrado'); cmGovListar(); return; }
+    var m = 'No se pudo votar';
+    if (res.error === 'PROPUESTA_CERRADA') m = 'La propuesta ya cerro';
+    else if (res.error === 'Ya votaste esta propuesta') m = 'Ya votaste esta propuesta';
+    else if (res.error === 'NIVEL_INSUFICIENTE') m = 'Requiere nivel ' + ((res.raw && res.raw.nivel_requerido) || 33);
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
+}
+
+/* ---- CONTRATOS P2P (GET contratos_mios + POST contrato_*) ---- */
+var CM_ENCARGOS = [
+  { id: 'auditoria_wayfarer', nombre: 'Auditoria Wayfarer' },
+  { id: 'curaduria_multimedia', nombre: 'Curaduria multimedia' },
+  { id: 'resena_zona', nombre: 'Resena de zona' }
+];
+function cmEncargoNombre(id) { for (var i = 0; i < CM_ENCARGOS.length; i++) if (CM_ENCARGOS[i].id === id) return CM_ENCARGOS[i].nombre; return id || 'Contrato'; }
+function cargarContratosComm() {
+  var box = document.getElementById('cm-contratos');
+  if (!box) return;
+  var u = sesion();
+  if (!u) { box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para ver tus contratos.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>'; return; }
+  var fn = cmHelper('misContratos');
+  if (!fn) { box.innerHTML = '<div class="cv-empty">Contratos no disponibles.</div>'; return; }
+  box.innerHTML = '<div class="cv-empty">Cargando contratos\u2026</div>';
+  fn(u.id).then(function(res){
+    if (!res || !res.ok) { box.innerHTML = '<div class="cv-err">' + esc(cmMsg(res)) + '</div>'; return; }
+    var lista = res.data || [];
+    var nivel = cmNivelActual();
+    var opts = CM_ENCARGOS.map(function(e){ return '<option value="' + e.id + '">' + e.nombre + '</option>'; }).join('');
+    var html = '';
+    html += '<div class="cv-form"><div class="cv-sec-t" style="margin-top:0">Crear contrato</div>'
+      + '<div class="cv-meta">Requiere nivel 25' + (nivel >= 25 ? ' (cumples)' : (' (tu nivel ' + nivel + ')')) + '. La recompensa queda en custodia hasta completar.</div>'
+      + '<label class="cv-lbl">Tipo de encargo</label><select class="cv-inp" id="cm-ct-tipo">' + opts + '</select>'
+      + '<label class="cv-lbl">Recompensa XP</label><input class="cv-inp" id="cm-ct-rec" type="number" min="0.01" step="0.01" placeholder="Ej: 300">'
+      + '<label class="cv-lbl">Destino (UUID, opcional)</label><input class="cv-inp" id="cm-ct-destino" placeholder="00000000-0000-0000-0000-000000000000">'
+      + '<label class="cv-lbl">Descripcion</label><textarea class="cv-inp" id="cm-ct-desc" rows="2" maxlength="1000" placeholder="Describe el encargo"></textarea>'
+      + '<div class="cv-actions"><button type="button" class="cv-btn" onclick="cmCrearContrato()">Crear contrato</button></div></div>';
+    html += '<div class="cv-sec-t">Mis contratos</div>';
+    if (!lista.length) html += '<div class="cv-empty">Aun no tienes contratos.</div>';
+    else {
+      lista.forEach(function(c){
+        var estado = String(c.estado || '');
+        var rol = c.es_empleador ? 'Empleador' : 'Contratado';
+        html += '<div class="cv-row">'
+          + '<div class="cv-row-n">' + esc(cmEncargoNombre(c.tipo_encargo)) + ' <span class="cv-chipst ' + esc(estado) + '">' + esc(estado) + '</span></div>'
+          + '<div class="cv-row-d">' + esc(c.descripcion || '') + '</div>'
+          + '<div class="cv-row-x">' + fmtXp(c.recompensa_xp) + ' XP \u00b7 ' + esc(rol) + '</div>';
+        if (estado === 'abierto' && !c.es_empleador) html += '<button type="button" class="cv-btn" onclick="cmAccionContrato(\'contrato_aceptar\',\'' + esc(c.id) + '\')">Aceptar</button>';
+        if (c.es_empleador && (estado === 'abierto' || estado === 'en_proceso')) {
+          if (estado === 'en_proceso') html += '<button type="button" class="cv-btn" onclick="cmAccionContrato(\'contrato_completar\',\'' + esc(c.id) + '\')">Completar</button>';
+          html += '<button type="button" class="cv-btn ghost" onclick="cmAccionContrato(\'contrato_cancelar\',\'' + esc(c.id) + '\')">Cancelar</button>';
+        }
+        html += '</div>';
+      });
+    }
+    box.innerHTML = html;
+  }).catch(function(){ box.innerHTML = '<div class="cv-err">No se pudieron cargar los contratos.</div>'; });
+}
+function cmCrearContrato() {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  var tipo = cmVal('cm-ct-tipo'), rec = parseFloat(cmVal('cm-ct-rec')), desc = cmVal('cm-ct-desc'), destino = cmVal('cm-ct-destino');
+  if (!isFinite(rec) || rec <= 0) { showXPToastComm('Recompensa invalida'); return; }
+  if (!desc) { showXPToastComm('Escribe una descripcion'); return; }
+  var body = { tipo: 'contrato_crear', usuario_id: String(u.id), tipo_encargo: tipo, recompensa_xp: rec, descripcion: desc };
+  if (destino) body.destino_id = destino;
+  cmPost(body).then(function(res){
+    if (res.ok) { showXPToastComm('Contrato creado'); cargarContratosComm(); if (window.ExploraCO && window.ExploraCO.refreshJwt) window.ExploraCO.refreshJwt(); return; }
+    var m = 'No se pudo crear el contrato';
+    if (res.error === 'NIVEL_INSUFICIENTE') m = 'Necesitas nivel ' + ((res.raw && res.raw.nivel_requerido) || 25) + ' para crear contratos';
+    else if (res.error === 'PUNTOS_INSUFICIENTES') m = 'XP insuficiente para la recompensa';
+    else if (res.error === 'TIPO_ENCARGO_INVALIDO') m = 'Tipo de encargo invalido';
+    else if (res.error === 'RECOMPENSA_INVALIDA') m = 'Recompensa invalida';
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
+}
+function cmAccionContrato(accion, id) {
+  var labels = { contrato_aceptar: 'aceptar', contrato_completar: 'completar', contrato_cancelar: 'cancelar' };
+  cmAbrirModal({ titulo: 'Contrato', msg: 'Seguro que quieres ' + (labels[accion] || 'continuar') + ' este contrato?', fields: [], okLabel: 'Si', onOk: function(){
+    cmPost({ tipo: accion, contrato_id: id }).then(function(res){
+      if (res.ok) { showXPToastComm('Contrato actualizado'); cargarContratosComm(); return; }
+      var m = 'No se pudo actualizar';
+      if (res.error === 'TRANSICION_INVALIDA') m = 'Ese contrato ya cambio de estado';
+      else if (res.error === 'AUTOACEPTACION_PROHIBIDA') m = 'No puedes aceptar tu propio contrato';
+      else if (res.error === 'SOLO_EMPLEADOR') m = 'Solo el empleador puede hacerlo';
+      else m = cmMsg(res);
+      showXPToastComm(m);
+    });
+    return true;
+  }});
+}
+
+/* ---- MERCADO DE CARTAS + moneda (dentro del tab Mercado) ---- */
+function cargarCartasComm() {
+  var box = document.getElementById('cm-cartas');
+  if (!box) return;
+  var u = sesion();
+  if (!u) { box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para el mercado de cartas.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>'; return; }
+  box.innerHTML = '<div class="cv-empty">Cargando cartas\u2026</div>';
+  var fnMis = cmHelper('misCartas');
+  var pMis = fnMis ? fnMis(u.id) : Promise.resolve({ ok: false, error: 'NO_HELPER' });
+  Promise.all([pMis, cmGet('/api/interacciones?tipo=cartas_ofertas')]).then(function(arr){
+    var mis = arr[0], ofertas = arr[1];
+    var html = '<div class="cv-sec-t" style="margin-top:0">Mis cartas</div>';
+    if (!mis || !mis.ok) html += '<div class="cv-err">' + esc(cmMsg(mis)) + '</div>';
+    else {
+      var cartas = (mis.data && mis.data.cartas) || [];
+      var propias = cartas.filter(function(c){ return (parseInt(c.cantidad, 10) || 0) > 0; });
+      if (!propias.length) html += '<div class="cv-empty">Aun no tienes cartas. Compra en el mercado o consiguelas por drop.</div>';
+      else propias.forEach(function(c){
+        var id = c.id || '', esGate = (c.nivel_gate != null), esEvento = c.es_evento === true;
+        var cant = parseInt(c.cantidad, 10) || 0;
+        html += '<div class="cv-row">'
+          + '<div class="cv-row-n">' + esc(c.nombre || id) + ' <span class="cv-chipst">' + esc(c.rareza || '') + '</span></div>'
+          + '<div class="cv-row-x">x' + cant + '</div>'
+          + '<button type="button" class="cv-btn" onclick="cmCartaPublicar(\'' + esc(id) + '\',' + cant + ')">Publicar</button>';
+        if (!esGate || esEvento) html += '<button type="button" class="cv-btn ghost" onclick="cmCartaIntercambiar(\'' + esc(id) + '\')">Intercambiar</button>';
+        if (esEvento) html += '<button type="button" class="cv-btn ghost" onclick="cmCartaEvento(\'' + esc(id) + '\')">Usar en evento</button>';
+        html += '</div>';
+      });
+    }
+    html += '<div class="cv-sec-t">Ofertas en venta</div>';
+    if (!ofertas.ok) html += '<div class="cv-err">' + esc(cmMsg(ofertas)) + '</div>';
+    else {
+      var list = ofertas.data || [];
+      if (!list.length) html += '<div class="cv-empty">No hay ofertas por ahora.</div>';
+      else list.forEach(function(o){
+        var mia = String(o.vendedor_id) === String(u.id);
+        var rest = parseInt(o.cantidad_restante, 10) || 0;
+        html += '<div class="cv-row">'
+          + '<div class="cv-row-n">' + esc(o.carta_nombre || o.carta_id) + ' <span class="cv-chipst">' + esc(o.rareza || '') + '</span></div>'
+          + '<div class="cv-row-d">' + esc(o.vendedor_nombre || 'Viajero') + (mia ? ' (tu oferta)' : '') + '</div>'
+          + '<div class="cv-row-x">' + fmtXp(o.precio_xp) + ' XP \u00b7 ' + rest + ' disp.</div>';
+        if (mia) html += '<button type="button" class="cv-btn ghost" onclick="cmCartaCancelar(\'' + esc(o.id) + '\')">Cancelar oferta</button>';
+        else html += '<button type="button" class="cv-btn" onclick="cmCartaComprar(\'' + esc(o.id) + '\',' + rest + ')">Comprar</button>';
+        html += '</div>';
+      });
+    }
+    box.innerHTML = html;
+  }).catch(function(){ box.innerHTML = '<div class="cv-err">No se pudo cargar el mercado de cartas.</div>'; });
+}
+function cmCartaPublicar(cartaId, cantMax) {
+  cmAbrirModal({ titulo: 'Publicar carta', msg: 'Define precio (XP por carta) y cantidad.', okLabel: 'Publicar', fields: [
+    { id: 'precio', label: 'Precio XP por carta', type: 'number', min: '0.01', step: '0.01', placeholder: 'Ej: 150' },
+    { id: 'cant', label: 'Cantidad (tienes ' + (cantMax || 1) + ')', type: 'number', min: '1', step: '1', value: '1' }
+  ], onOk: function(){
+    var p = parseFloat(cmModalVal('precio')), c = parseInt(cmModalVal('cant'), 10);
+    if (!isFinite(p) || p <= 0) { showXPToastComm('Precio invalido'); return false; }
+    if (!isFinite(c) || c < 1) { showXPToastComm('Cantidad invalida'); return false; }
+    cmPost({ tipo: 'carta_publicar', carta_id: cartaId, cantidad: c, precio_xp: p }).then(function(res){
+      if (res.ok) { showXPToastComm('Carta publicada'); cargarCartasComm(); return; }
+      showXPToastComm(cmMsg(res));
+    });
+    return true;
+  }});
+}
+function cmCartaComprar(ofertaId, max) {
+  cmAbrirModal({ titulo: 'Comprar cartas', msg: 'Disponibles: ' + (max || 1) + '.', okLabel: 'Comprar', fields: [
+    { id: 'cant', label: 'Cantidad', type: 'number', min: '1', step: '1', value: '1' }
+  ], onOk: function(){
+    var c = parseInt(cmModalVal('cant'), 10);
+    if (!isFinite(c) || c < 1) { showXPToastComm('Cantidad invalida'); return false; }
+    cmPost({ tipo: 'carta_comprar', oferta_id: ofertaId, cantidad: c }).then(function(res){
+      if (res.ok) { showXPToastComm('Compra realizada'); cargarCartasComm(); if (window.ExploraCO && window.ExploraCO.refreshJwt) window.ExploraCO.refreshJwt(); return; }
+      var m = 'No se pudo comprar';
+      if (res.error === 'PUNTOS_INSUFICIENTES') m = 'XP insuficiente';
+      else if (res.error === 'OFERTA_NO_DISPONIBLE') m = 'La oferta ya no esta disponible';
+      else if (res.error === 'CANTIDAD_INSUFICIENTE') m = 'No hay tantas cartas disponibles';
+      else if (res.error === 'AUTOCOMPRA_PROHIBIDA') m = 'No puedes comprar tu propia oferta';
+      else m = cmMsg(res);
+      showXPToastComm(m);
+    });
+    return true;
+  }});
+}
+function cmCartaCancelar(ofertaId) {
+  cmAbrirModal({ titulo: 'Cancelar oferta', msg: 'Las cartas vuelven a tu inventario.', okLabel: 'Cancelar oferta', onOk: function(){
+    cmPost({ tipo: 'carta_cancelar', oferta_id: ofertaId }).then(function(res){
+      if (res.ok) { showXPToastComm('Oferta cancelada'); cargarCartasComm(); return; }
+      showXPToastComm(cmMsg(res));
+    });
+    return true;
+  }});
+}
+function cmCartaIntercambiar(cartaId) {
+  cmAbrirModal({ titulo: 'Intercambiar carta', msg: 'Identifica al receptor por su UUID (perfil publico).', okLabel: 'Intercambiar', fields: [
+    { id: 'receptor', label: 'UUID del receptor', type: 'text', placeholder: '00000000-0000-0000-0000-000000000000' }
+  ], onOk: function(){
+    var r = cmModalVal('receptor');
+    if (!r) { showXPToastComm('Escribe el UUID del receptor'); return false; }
+    cmPost({ tipo: 'carta_intercambiar', carta_id: cartaId, receptor_id: r }).then(function(res){
+      if (res.ok) { showXPToastComm('Intercambio realizado'); cargarCartasComm(); return; }
+      var m = 'No se pudo intercambiar';
+      if (res.error === 'AUTOINTERCAMBIO_PROHIBIDO') m = 'No puedes intercambiarte contigo mismo';
+      else if (res.error === 'LIMITE_INTERCAMBIOS_DIARIO') m = 'Alcanzaste el limite diario';
+      else if (res.error === 'CARTA_DE_GATE_NO_INTERCAMBIABLE') m = 'Las cartas de gate no se intercambian';
+      else if (res.error === 'SIN_COPIA') m = 'No tienes copias de esa carta';
+      else if (res.error === 'RECEPTOR_NO_ENCONTRADO') m = 'No encontramos a ese viajero';
+      else m = cmMsg(res);
+      showXPToastComm(m);
+    });
+    return true;
+  }});
+}
+function cmCartaEvento(cartaId) {
+  cmAbrirModal({ titulo: 'Usar carta de evento', msg: 'Se consumira una copia y habilitara la entrada.', okLabel: 'Usar', onOk: function(){
+    cmPost({ tipo: 'carta_evento_usar', carta_id: cartaId }).then(function(res){
+      if (res.ok) { showXPToastComm('Entrada habilitada'); cargarCartasComm(); return; }
+      var m = (res.error === 'SIN_CARTA') ? 'No tienes copias de esa carta' : cmMsg(res);
+      showXPToastComm(m);
+    });
+    return true;
+  }});
+}
+function cargarMonedaComm() {
+  var box = document.getElementById('cm-moneda');
+  if (!box) return;
+  var u = sesion();
+  if (!u) { box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para ver tu moneda.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>'; return; }
+  var fn = cmHelper('monedaSaldo');
+  box.innerHTML = '<div class="cv-empty">Cargando moneda\u2026</div>';
+  var pSaldo = fn ? fn(u.id) : Promise.resolve({ ok: false, error: 'NO_HELPER' });
+  Promise.all([pSaldo, cmGet('/api/interacciones?tipo=moneda_mercado')]).then(function(arr){
+    var saldo = arr[0], libro = arr[1];
+    var html = '';
+    if (saldo && saldo.ok && saldo.data) html += '<div class="cv-form"><div class="cv-saldo-l">Saldo ' + esc(saldo.data.moneda || 'CDR') + '</div><div class="cv-saldo">' + fmtXp(saldo.data.saldo) + '</div></div>';
+    else html += '<div class="cv-err">' + esc(cmMsg(saldo)) + '</div>';
+    html += '<div class="cv-form"><div class="cv-sec-t" style="margin-top:0">Nueva orden</div>'
+      + '<label class="cv-lbl">Orden</label><select class="cv-inp" id="cm-mo-tipo"><option value="venta">Vender CDR por XP</option><option value="compra">Comprar CDR con XP</option></select>'
+      + '<label class="cv-lbl">Cantidad CDR</label><input class="cv-inp" id="cm-mo-cant" type="number" min="0.01" step="0.01">'
+      + '<label class="cv-lbl">Precio XP por CDR</label><input class="cv-inp" id="cm-mo-precio" type="number" min="0.01" step="0.01">'
+      + '<div class="cv-actions"><button type="button" class="cv-btn" onclick="cmMonedaCrear()">Crear orden</button></div></div>';
+    html += '<div class="cv-sec-t">Libro de ordenes</div>';
+    if (!libro.ok) html += '<div class="cv-err">' + esc(cmMsg(libro)) + '</div>';
+    else {
+      var l = libro.data || [];
+      if (!l.length) html += '<div class="cv-empty">No hay ordenes abiertas.</div>';
+      else l.forEach(function(o){
+        var venta = o.tipo_orden === 'venta';
+        html += '<div class="cv-row"><div class="cv-row-n">' + (venta ? 'Venta' : 'Compra') + ' \u00b7 ' + esc(o.titular_nombre || 'Viajero') + '</div>'
+          + '<div class="cv-row-x">' + fmtXp(o.cantidad_restante) + ' CDR @ ' + fmtXp(o.precio_xp) + ' XP</div></div>';
+      });
+    }
+    box.innerHTML = html;
+  }).catch(function(){ box.innerHTML = '<div class="cv-err">No se pudo cargar la moneda.</div>'; });
+}
+function cmMonedaCrear() {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  var tipo = cmVal('cm-mo-tipo'), cant = parseFloat(cmVal('cm-mo-cant')), precio = parseFloat(cmVal('cm-mo-precio'));
+  if (!isFinite(cant) || cant <= 0) { showXPToastComm('Cantidad invalida'); return; }
+  if (!isFinite(precio) || precio <= 0) { showXPToastComm('Precio invalido'); return; }
+  cmPost({ tipo: 'moneda_orden', tipo_orden: tipo, cantidad: cant, precio_xp: precio }).then(function(res){
+    if (res.ok) { var cruzada = !!(res.raw && res.raw.match); showXPToastComm(cruzada ? 'Orden cruzada con una existente' : 'Orden creada'); cargarMonedaComm(); if (window.ExploraCO && window.ExploraCO.refreshJwt) window.ExploraCO.refreshJwt(); return; }
+    var m = 'No se pudo crear la orden';
+    if (res.error === 'SALDO_CDR_INSUFICIENTE') m = 'Saldo CDR insuficiente';
+    else if (res.error === 'XP_INSUFICIENTE') m = 'XP insuficiente';
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
+}
+
+/* ---- MARCAS Y SPOTS (GET marcas_spots + POST marca_presencia) ---- */
+function cargarMarcas() {
+  var box = document.getElementById('cm-marcas');
+  if (!box) return;
+  var u = sesion();
+  if (!u) { box.innerHTML = '<div class="cv-gate"><div class="cv-gate-t">Inicia sesion para ver las marcas.</div><button type="button" class="cv-btn" onclick="loginGate()">Iniciar sesion</button></div>'; return; }
+  box.innerHTML = '<div class="cv-empty">Cargando marcas\u2026</div>';
+  Promise.all([cmGet('/api/interacciones?tipo=marcas_spots'), cmGet('/api/usuarios?tipo=mi_marca&usuario_id=' + encodeURIComponent(u.id))]).then(function(arr){
+    var spots = arr[0], marca = arr[1];
+    var html = '<div class="cv-note">Presencia de marcas en spots (solo nombre y logo, sin PII).</div>';
+    var mia = (marca && marca.ok && marca.data) ? marca.data : null;
+    if (mia && mia.activa) {
+      html += '<div class="cv-form"><div class="cv-sec-t" style="margin-top:0">Registrar presencia de tu marca</div>'
+        + '<div class="cv-meta">Marca: ' + esc(mia.nombre || '') + '</div>'
+        + '<label class="cv-lbl">UUID del destino (spot)</label><input class="cv-inp" id="cm-marca-destino" placeholder="00000000-0000-0000-0000-000000000000">'
+        + '<div class="cv-actions"><button type="button" class="cv-btn" onclick="cmMarcaPresencia()">Registrar presencia</button></div></div>';
+    } else {
+      html += '<div class="cv-gate"><div class="cv-gate-t">Sin Marca activa</div><div class="cv-meta">Activa tu Marca en Mi Perfil para capturar spots.</div></div>';
+    }
+    html += '<div class="cv-sec-t">Presencia de marcas en spots</div>';
+    if (!spots.ok) html += '<div class="cv-err">' + esc(cmMsg(spots)) + '</div>';
+    else {
+      var list = spots.data || [];
+      if (!list.length) html += '<div class="cv-empty">Aun no hay presencia de marca registrada.</div>';
+      else list.forEach(function(s){
+        html += '<div class="cv-row"><div class="cv-row-n">' + esc(s.marca_nombre || 'Marca') + ' <span class="cv-chipst ' + esc(s.estado || '') + '">' + esc(s.estado || '') + '</span></div>'
+          + '<div class="cv-row-d">Destino ' + esc(s.destino_id || '') + '</div></div>';
+      });
+    }
+    box.innerHTML = html;
+  }).catch(function(){ box.innerHTML = '<div class="cv-err">No se pudieron cargar las marcas.</div>'; });
+}
+function cmMarcaPresencia() {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  var d = cmVal('cm-marca-destino');
+  if (!d) { showXPToastComm('Escribe el UUID del destino'); return; }
+  cmPost({ tipo: 'marca_presencia', destino_id: d }).then(function(res){
+    if (res.ok) { showXPToastComm('Presencia registrada (pendiente de verificacion)'); cargarMarcas(); return; }
+    var m = 'No se pudo registrar';
+    if (res.error === 'MARCA_INACTIVA') m = 'Necesitas una Marca activa';
+    else if (res.error === 'DESTINO_NO_ENCONTRADO') m = 'No encontramos ese destino';
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
+}
+
+/* ---- TESORERIA DEL PARCHE (POST parche_upgrade_invertir / parche_tithe_config) ---- */
+var CM_UPGRADES = [
+  { id: 'buff_xp_zona', nombre: 'Buff XP de zona' },
+  { id: 'descuento_comercial', nombre: 'Descuento comercial' },
+  { id: 'aura_neon', nombre: 'Aura neon' },
+  { id: 'escudo_territorial', nombre: 'Escudo territorial' }
+];
+var CM_PARCHE_ID = '';
+function cargarParcheTesoreria() {
+  var box = document.getElementById('cm-parche-tesoreria');
+  if (!box) return;
+  var u = sesion();
+  if (!u) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="cv-empty">Cargando tesoreria del Parche\u2026</div>';
+  fetch('/api/interacciones?tipo=pandilla_detalle&usuario_id=' + encodeURIComponent(u.id))
+    .then(function(r){ return r.json(); }).catch(function(){ return {}; })
+    .then(function(res){
+      var p = res && res.data && res.data.pandilla;
+      if (!p) { box.innerHTML = '<div class="cv-note">Pertenece a un Parche para gestionar su tesoreria.</div>'; CM_PARCHE_ID = ''; return; }
+      CM_PARCHE_ID = String(p.id || '');
+      var esLider = (p.mi_rol === 'fundador' || p.mi_rol === 'oficial');
+      var opts = CM_UPGRADES.map(function(x){ return '<option value="' + x.id + '">' + x.nombre + '</option>'; }).join('');
+      var html = '<div class="cv-sec-t">Tesoreria del Parche</div>'
+        + '<div class="cv-note">Fama disponible: <b class="cv-row-x">' + fmtXp(p.fama_total || 0) + '</b></div>';
+      html += '<div class="cv-form"><div class="cv-sec-t" style="margin-top:0">Invertir en upgrade</div>'
+        + '<label class="cv-lbl">Ciudad (slug)</label><input class="cv-inp" id="cm-pu-ciudad" maxlength="100" placeholder="Ej: bogota">'
+        + '<label class="cv-lbl">Upgrade</label><select class="cv-inp" id="cm-pu-tipo">' + opts + '</select>'
+        + '<label class="cv-lbl">Puntos a invertir</label><input class="cv-inp" id="cm-pu-puntos" type="number" min="0.01" step="0.01">'
+        + '<label class="cv-lbl">Horas activo (opcional)</label><input class="cv-inp" id="cm-pu-horas" type="number" min="1" step="1" placeholder="168">'
+        + '<div class="cv-actions"><button type="button" class="cv-btn" onclick="cmParcheInvertir()">Invertir</button></div></div>';
+      html += '<div class="cv-form"><div class="cv-sec-t" style="margin-top:0">Tithe del Parche</div>'
+        + '<div class="cv-meta">Porcentaje (0-10). ' + (esLider ? 'Eres fundador u oficial.' : 'Solo fundador u oficial pueden cambiarlo.') + '</div>'
+        + '<label class="cv-lbl">Tithe %</label><input class="cv-inp" id="cm-pu-tithe" type="number" min="0" max="10" step="0.5" value="' + (p.tithe_pct != null ? p.tithe_pct : 0) + '"' + (esLider ? '' : ' disabled') + '>'
+        + '<div class="cv-actions"><button type="button" class="cv-btn"' + (esLider ? '' : ' disabled') + ' onclick="cmParcheTithe()">Guardar Tithe</button></div></div>';
+      box.innerHTML = html;
+    })
+    .catch(function(){ box.innerHTML = '<div class="cv-err">No se pudo cargar la tesoreria.</div>'; });
+}
+function cmParcheInvertir() {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  var ciudad = cmVal('cm-pu-ciudad'), tipo = cmVal('cm-pu-tipo'), puntos = parseFloat(cmVal('cm-pu-puntos')), horas = parseInt(cmVal('cm-pu-horas'), 10);
+  if (!ciudad) { showXPToastComm('Escribe la ciudad'); return; }
+  if (!isFinite(puntos) || puntos <= 0) { showXPToastComm('Puntos invalidos'); return; }
+  var body = { tipo: 'parche_upgrade_invertir', ciudad_slug: ciudad, tipo_upgrade: tipo, puntos: puntos };
+  if (isFinite(horas) && horas >= 1) body.horas = horas;
+  cmPost(body).then(function(res){
+    if (res.ok) { showXPToastComm('Upgrade activado'); cargarParcheTesoreria(); return; }
+    var m = 'No se pudo invertir';
+    if (res.error === 'PARCHE_REQUERIDO') m = 'Debes pertenecer a un Parche';
+    else if (res.error === 'FAMA_INSUFICIENTE') m = 'Fama insuficiente';
+    else if (res.error === 'tipo_upgrade invalido') m = 'Upgrade invalido';
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
+}
+function cmParcheTithe() {
+  var u = sesion(); if (!u) { loginGate(); return; }
+  var pct = parseFloat(cmVal('cm-pu-tithe'));
+  if (!isFinite(pct) || pct < 0 || pct > 10) { showXPToastComm('Tithe entre 0 y 10'); return; }
+  if (!CM_PARCHE_ID) { showXPToastComm('No se encontro tu Parche'); return; }
+  cmPost({ tipo: 'parche_tithe_config', parche_id: CM_PARCHE_ID, tithe_pct: pct }).then(function(res){
+    if (res.ok) { showXPToastComm('Tithe actualizado'); cargarParcheTesoreria(); return; }
+    var m = 'No se pudo guardar el Tithe';
+    if (res.error === 'FUNDADOR_U_OFICIAL_REQUERIDO') m = 'Solo fundador u oficial pueden cambiarlo';
+    else if (res.error === 'TITHE_PCT_INVALIDO') m = 'Tithe entre 0 y 10';
+    else m = cmMsg(res);
+    showXPToastComm(m);
+  });
 }
 
 /* ---- INIT ---- */

@@ -54,6 +54,15 @@
 // concentracion de origen a 85% / 500 XP y exige >= 3 cuentas distintas con
 // mult_origen > 1.2 en la ventana para disparar la alerta. No crea endpoints
 // (8/8, ADR-001).
+// v8 (Gaming v6.1, ADR-062/063/064/065; 2026-09-24): salud_red gana 4
+// bloques ADITIVOS (migraciones 040/041) -- cartas (gates consumidos,
+// circulacion, ofertas abiertas), moneda (emision/circulacion/ordenes),
+// gobernanza (propuestas por capa/estado + votos) y own_spot (dividendos
+// pagados + duenos por tipo). Cada bloque degrada con console.warn y se
+// omite si su tabla falta, sin tumbar salud_red. Ademas ramas NUEVAS:
+// ?recurso=cartas (CRUD cartas_catalogo), ?recurso=gobernanza (moderacion
+// de propuestas) y ?recurso=marcas_spots (moderacion de spot_presencia).
+// Cero DELETE fisico; no crea endpoints (8/8, ADR-001).
 
 const { neon } = require('@neondatabase/serverless');
 
@@ -174,6 +183,29 @@ function normalizarEraConsumible(v) {
   if (!s || s === 'ninguna' || s === 'null' || s === 'sin_gate') return null;
   var eras = { caminante:'Caminante', explorador:'Explorador', cronista:'Cronista', leyenda:'Leyenda', mito:'Mito' };
   return eras[s] || null;
+}
+
+// == CARTAS DE TERRITORIO (ADR-062, migraciones 040/041) ==================
+// Catalogo administrable cartas_catalogo. El vocabulario de rareza es el
+// mismo de cromos_catalogo y el CHECK de la tabla lo fija: comun|raro|
+// epico|dorado. id y set_slug son slugs ASCII estables (authored); el id es
+// identidad y NO se edita (igual que consumibles.clave). nivel_gate NULL =
+// carta sin gate (familia es_evento); un valor no vacio debe ser un entero
+// 1..100. normalizarNivelGateCarta devuelve null (valido, sin gate) o
+// undefined (invalido), para distinguir "sin gate" de "valor basura".
+var RAREZAS_CARTA = ['comun','raro','epico','dorado'];
+function normalizarSlugCarta(valor, maxLen) {
+  var s = String(valor == null ? '' : valor).trim().toLowerCase();
+  var tope = maxLen || 60;
+  if (!s || s.length > tope) return null;
+  if (!/^[a-z0-9_-]+$/.test(s)) return null;
+  return s;
+}
+function normalizarNivelGateCarta(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  var n = parseInt(valor, 10);
+  if (!isFinite(n) || n < 1 || n > 100) return undefined;
+  return n;
 }
 
 // == ORIGEN / LEJANIA (ADR-058, migracion 038) ============================
@@ -639,6 +671,135 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ ok:false, error:'tipo invalido para recurso consumibles' });
   }
 
+  // == CARTAS DE TERRITORIO (ADR-062, migraciones 040/041) =================
+  // CRUD del catalogo cartas_catalogo con el mismo patron que consumibles:
+  // router real por ?recurso=cartas y ?tipo=cartas_lista|cartas_crear|
+  // cartas_editar|cartas_toggle. El id es identidad y NUNCA se edita (igual
+  // que consumibles.clave). CERO BORRADO FISICO: no hay DELETE; la baja es
+  // cartas_toggle (activo = NOT activo, o body.activo explicito). Degradacion
+  // 503 SCHEMA_NOT_MIGRATED (42P01/42703) si la 040 no corrio (patron
+  // BUG-021). No crea endpoints (8/8, ADR-001).
+  if (recurso === 'cartas') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    var tipoCa = req.query.tipo || 'cartas_lista';
+
+    try {
+      // --- Lista: todas (activas e inactivas) ---------------------------
+      if (tipoCa === 'cartas_lista') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var filasCa = await sql(
+          'SELECT id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en '
+          + 'FROM cartas_catalogo '
+          + 'ORDER BY activo DESC, set_slug ASC, nivel_gate ASC NULLS FIRST, id ASC'
+        );
+        return res.status(200).json({ ok:true, data: filasCa, total: filasCa.length });
+      }
+
+      // --- Crear: id unico (slug ASCII), set y rareza validos -----------
+      if (tipoCa === 'cartas_crear') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var idCa = normalizarSlugCarta(body.id, 60);
+        var nomCa = String(body.nombre || '').trim();
+        var setCa = normalizarSlugCarta(body.set_slug, 60);
+        var rarCa = String(body.rareza || '').trim().toLowerCase();
+        if (!idCa) return res.status(400).json({ ok:false, error:'ID_INVALIDO' });
+        if (!nomCa) return res.status(400).json({ ok:false, error:'nombre requerido' });
+        if (!setCa) return res.status(400).json({ ok:false, error:'SET_SLUG_INVALIDO' });
+        if (RAREZAS_CARTA.indexOf(rarCa) < 0)
+          return res.status(400).json({ ok:false, error:'RAREZA_INVALIDA' });
+        var nivCa = normalizarNivelGateCarta(body.nivel_gate);
+        if (nivCa === undefined)
+          return res.status(400).json({ ok:false, error:'NIVEL_GATE_INVALIDO' });
+        var evCa = Boolean(body.es_evento);
+        var imgCa = String(body.imagen_url == null ? '' : body.imagen_url).trim() || null;
+        if (imgCa && imgCa.length > 500)
+          return res.status(400).json({ ok:false, error:'IMAGEN_URL_INVALIDA' });
+        var existCa = await sql('SELECT 1 FROM cartas_catalogo WHERE id=$1 LIMIT 1',[idCa]);
+        if (existCa.length)
+          return res.status(409).json({ ok:false, error:'Ya existe una carta con ese id' });
+        var insCa = await sql(
+          'INSERT INTO cartas_catalogo (id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url) '
+          + 'VALUES ($1,$2,$3,$4,$5,$6,$7) '
+          + 'RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo, creado_en',
+          [idCa, nomCa, setCa, rarCa, nivCa, evCa, imgCa]
+        );
+        return res.status(201).json({ ok:true, data: insCa[0], mensaje:'Carta creada' });
+      }
+
+      // --- Editar: campos de contenido (NUNCA el id) --------------------
+      if (tipoCa === 'cartas_editar') {
+        if (req.method !== 'POST') return res.status(405).end();
+        if (!body.id) return res.status(400).json({ ok:false, error:'id requerido' });
+        var setsCa = []; var paramsCa = []; var piCa = 1;
+        if ('nombre' in body) {
+          var nomE2 = String(body.nombre || '').trim();
+          if (!nomE2) return res.status(400).json({ ok:false, error:'nombre no puede quedar vacio' });
+          setsCa.push('nombre=$' + piCa++); paramsCa.push(nomE2);
+        }
+        if ('set_slug' in body) {
+          var setE2 = normalizarSlugCarta(body.set_slug, 60);
+          if (!setE2) return res.status(400).json({ ok:false, error:'SET_SLUG_INVALIDO' });
+          setsCa.push('set_slug=$' + piCa++); paramsCa.push(setE2);
+        }
+        if ('rareza' in body) {
+          var rarE2 = String(body.rareza || '').trim().toLowerCase();
+          if (RAREZAS_CARTA.indexOf(rarE2) < 0)
+            return res.status(400).json({ ok:false, error:'RAREZA_INVALIDA' });
+          setsCa.push('rareza=$' + piCa++); paramsCa.push(rarE2);
+        }
+        if ('nivel_gate' in body) {
+          var nivE2 = normalizarNivelGateCarta(body.nivel_gate);
+          if (nivE2 === undefined)
+            return res.status(400).json({ ok:false, error:'NIVEL_GATE_INVALIDO' });
+          setsCa.push('nivel_gate=$' + piCa++); paramsCa.push(nivE2);
+        }
+        if ('es_evento' in body) {
+          setsCa.push('es_evento=$' + piCa++); paramsCa.push(Boolean(body.es_evento));
+        }
+        if ('imagen_url' in body) {
+          var imgE2 = String(body.imagen_url == null ? '' : body.imagen_url).trim() || null;
+          if (imgE2 && imgE2.length > 500)
+            return res.status(400).json({ ok:false, error:'IMAGEN_URL_INVALIDA' });
+          setsCa.push('imagen_url=$' + piCa++); paramsCa.push(imgE2);
+        }
+        if (!setsCa.length)
+          return res.status(400).json({ ok:false, error:'nada que editar: envia nombre, set_slug, rareza, nivel_gate, es_evento o imagen_url' });
+        paramsCa.push(body.id);
+        var updCa = await sql(
+          'UPDATE cartas_catalogo SET ' + setsCa.join(', ') + ' WHERE id=$' + piCa
+          + ' RETURNING id, nombre, set_slug, rareza, nivel_gate, es_evento, imagen_url, activo',
+          paramsCa
+        );
+        if (!updCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
+        return res.status(200).json({ ok:true, data: updCa[0], mensaje:'Carta actualizada' });
+      }
+
+      // --- Toggle: Cero Borrado Logico (activo = NOT activo) ------------
+      if (tipoCa === 'cartas_toggle') {
+        if (req.method !== 'POST') return res.status(405).end();
+        if (!body.id) return res.status(400).json({ ok:false, error:'id requerido' });
+        var filaCa = await sql('SELECT activo FROM cartas_catalogo WHERE id=$1 LIMIT 1',[body.id]);
+        if (!filaCa.length) return res.status(404).json({ ok:false, error:'Carta no encontrada' });
+        var nuevoCa = (typeof body.activo === 'boolean') ? body.activo : !filaCa[0].activo;
+        await sql('UPDATE cartas_catalogo SET activo=$1 WHERE id=$2',[nuevoCa, body.id]);
+        return res.status(200).json({
+          ok:true, activo:nuevoCa,
+          mensaje: nuevoCa ? 'Carta activada' : 'Carta desactivada',
+        });
+      }
+
+      return res.status(400).json({ ok:false, error:'tipo invalido para recurso cartas' });
+    } catch (eCa) {
+      if (esquemaAusente(eCa))
+        return res.status(503).json({
+          ok:false, error:'SCHEMA_NOT_MIGRATED',
+          detalle:'Aplica db/migrations/040_gobernanza_cartas_moneda.sql en Neon antes de usar cartas.',
+        });
+      console.warn('[admin cartas] error: ' + (eCa && eCa.code) + ' ' + (eCa && eCa.message));
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
+  }
+
   // == MERCADO DE EMPRENDEDORES (migracion 034) ============================
   // Router real por ?recurso=mercado (mismo patron que consumibles). No crea
   // endpoints (8/8, ADR-001). Auth reusa auth()/authInternal() del archivo.
@@ -878,6 +1039,160 @@ module.exports = async function handler(req, res) {
     }
 
     return res.status(400).json({ ok:false, error:'tipo invalido para recurso activos_ocultos' });
+  }
+
+  // == GOBERNANZA (ADR-063, migracion 040) =================================
+  // Router real por ?recurso=gobernanza y ?tipo=gobernanza_lista|
+  // gobernanza_moderar. GET lista propuestas con conteo de votos (favor/
+  // contra/abstencion) y filtros opcionales por capa/estado. POST moderar
+  // cambia el estado a aprobada|rechazada|archivada y setea resuelto_en=NOW();
+  // CERO BORRADO FISICO (no DELETE). Degradacion 503 SCHEMA_NOT_MIGRATED
+  // (42P01/42703) si la 040 no corrio (patron BUG-021). No crea endpoints.
+  if (recurso === 'gobernanza') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    var tipoGo = req.query.tipo || 'gobernanza_lista';
+
+    try {
+      // --- Lista con conteo de votos ------------------------------------
+      if (tipoGo === 'gobernanza_lista') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var CAPAS_GOB = ['ecosistema','parche','faccion','marca'];
+        var ESTADOS_GOB = ['abierta','aprobada','rechazada','archivada'];
+        var capaGo = String(req.query.capa == null ? '' : req.query.capa).trim().toLowerCase();
+        var estadoGo = String(req.query.estado == null ? '' : req.query.estado).trim().toLowerCase();
+        var condGo = []; var paramsGo = []; var piGo = 1;
+        if (capaGo) {
+          if (CAPAS_GOB.indexOf(capaGo) < 0)
+            return res.status(400).json({ ok:false, error:'CAPA_INVALIDA' });
+          condGo.push('p.capa=$' + piGo++); paramsGo.push(capaGo);
+        }
+        if (estadoGo) {
+          if (ESTADOS_GOB.indexOf(estadoGo) < 0)
+            return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO' });
+          condGo.push('p.estado=$' + piGo++); paramsGo.push(estadoGo);
+        }
+        var whereGo = condGo.length ? ('WHERE ' + condGo.join(' AND ')) : '';
+        var filasGo = await sql(
+          'SELECT p.id, p.capa, p.capa_id, p.titulo, p.descripcion, p.estado, p.quorum, '
+          + 'p.activo, p.creado_en, p.cierra_en, p.resuelto_en, '
+          + 'u.nombre AS autor_nombre, u.email AS autor_email, '
+          + 'COUNT(v.usuario_id)::int AS votos_total, '
+          + 'COUNT(*) FILTER (WHERE v.voto = \'favor\')::int AS votos_favor, '
+          + 'COUNT(*) FILTER (WHERE v.voto = \'contra\')::int AS votos_contra, '
+          + 'COUNT(*) FILTER (WHERE v.voto = \'abstencion\')::int AS votos_abstencion '
+          + 'FROM gobernanza_propuestas p '
+          + 'LEFT JOIN usuarios u ON u.id = p.autor_id '
+          + 'LEFT JOIN gobernanza_votos v ON v.propuesta_id = p.id AND v.activo = true '
+          + whereGo + ' GROUP BY p.id, u.nombre, u.email ORDER BY p.creado_en DESC LIMIT 200',
+          paramsGo
+        );
+        return res.status(200).json({ ok:true, data: filasGo, total: filasGo.length });
+      }
+
+      // --- Moderar: cambiar estado + resuelto_en (sin DELETE) -----------
+      if (tipoGo === 'gobernanza_moderar') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var propGo = body.propuesta_id || body.id;
+        if (!propGo) return res.status(400).json({ ok:false, error:'propuesta_id requerido' });
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(propGo)))
+          return res.status(400).json({ ok:false, error:'propuesta_id invalido' });
+        var estGo = String(body.estado == null ? '' : body.estado).trim().toLowerCase();
+        if (estGo !== 'aprobada' && estGo !== 'rechazada' && estGo !== 'archivada')
+          return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO' });
+        var updGo = await sql(
+          'UPDATE gobernanza_propuestas SET estado=$1, resuelto_en=NOW() '
+          + 'WHERE id=$2 AND estado<>$1 '
+          + 'RETURNING id, capa, capa_id, estado, resuelto_en',
+          [estGo, propGo]
+        );
+        if (!updGo.length) {
+          var chkGo = await sql('SELECT id, estado FROM gobernanza_propuestas WHERE id=$1 LIMIT 1',[propGo]);
+          if (!chkGo.length)
+            return res.status(404).json({ ok:false, error:'PROPUESTA_NO_ENCONTRADA' });
+          return res.status(200).json({ ok:true, propuesta_id: propGo, estado: chkGo[0].estado, sin_cambios:true });
+        }
+        return res.status(200).json({ ok:true, data: updGo[0] });
+      }
+
+      return res.status(400).json({ ok:false, error:'tipo invalido para recurso gobernanza' });
+    } catch (eGo) {
+      if (esquemaAusente(eGo))
+        return res.status(503).json({
+          ok:false, error:'SCHEMA_NOT_MIGRATED',
+          detalle:'Aplica db/migrations/040_gobernanza_cartas_moneda.sql en Neon antes de usar gobernanza.',
+        });
+      console.warn('[admin gobernanza] error: ' + (eGo && eGo.code) + ' ' + (eGo && eGo.message));
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
+  }
+
+  // == MARCAS CAPTURAN SPOTS (ADR-064, migracion 040) =======================
+  // Router real por ?recurso=marcas_spots y ?tipo=spot_presencia_lista|
+  // spot_presencia_moderar. GET lista spot_presencia con marca/destino. POST
+  // moderar: estado verificada|rechazada; al RECHAZAR se hace activo=false
+  // (Cero Borrado Logico, ADR-003). NO existe DELETE. Degradacion 503
+  // SCHEMA_NOT_MIGRATED (42P01/42703) si la 040/027 no corrio. No crea
+  // endpoints (8/8, ADR-001).
+  if (recurso === 'marcas_spots') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+    var tipoMs = req.query.tipo || 'spot_presencia_lista';
+
+    try {
+      // --- Lista con marca y destino ------------------------------------
+      if (tipoMs === 'spot_presencia_lista') {
+        if (req.method !== 'GET') return res.status(405).end();
+        var ESTADOS_MS = ['pendiente','verificada','rechazada'];
+        var estadoMs = String(req.query.estado == null ? '' : req.query.estado).trim().toLowerCase();
+        var condMs = []; var paramsMs = []; var piMs = 1;
+        if (estadoMs) {
+          if (ESTADOS_MS.indexOf(estadoMs) < 0)
+            return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO' });
+          condMs.push('s.estado=$' + piMs++); paramsMs.push(estadoMs);
+        }
+        var whereMs = condMs.length ? ('WHERE ' + condMs.join(' AND ')) : '';
+        var filasMs = await sql(
+          'SELECT s.id, s.marca_id, s.destino_id, s.patrocinio_id, s.estado, s.activo, s.creado_en, '
+          + 'm.nombre AS marca_nombre, m.verificada AS marca_verificada, '
+          + 'd.nombre AS destino_nombre, d.slug AS destino_slug, d.ciudad AS destino_ciudad '
+          + 'FROM spot_presencia s '
+          + 'LEFT JOIN marcas m ON m.id = s.marca_id '
+          + 'LEFT JOIN destinos d ON d.id = s.destino_id '
+          + whereMs + ' ORDER BY s.creado_en DESC LIMIT 200',
+          paramsMs
+        );
+        return res.status(200).json({ ok:true, data: filasMs, total: filasMs.length });
+      }
+
+      // --- Moderar: verificada|rechazada (rechazo -> activo=false) ------
+      if (tipoMs === 'spot_presencia_moderar') {
+        if (req.method !== 'POST') return res.status(405).end();
+        var presMs = body.presencia_id || body.id;
+        if (!presMs) return res.status(400).json({ ok:false, error:'presencia_id requerido' });
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(presMs)))
+          return res.status(400).json({ ok:false, error:'presencia_id invalido' });
+        var estMs = String(body.estado == null ? '' : body.estado).trim().toLowerCase();
+        if (estMs !== 'verificada' && estMs !== 'rechazada')
+          return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO' });
+        var actMs = (estMs === 'verificada');
+        var updMs = await sql(
+          'UPDATE spot_presencia SET estado=$1, activo=$2 WHERE id=$3 '
+          + 'RETURNING id, marca_id, destino_id, estado, activo',
+          [estMs, actMs, presMs]
+        );
+        if (!updMs.length) return res.status(404).json({ ok:false, error:'PRESENCIA_NO_ENCONTRADA' });
+        return res.status(200).json({ ok:true, data: updMs[0] });
+      }
+
+      return res.status(400).json({ ok:false, error:'tipo invalido para recurso marcas_spots' });
+    } catch (eMs) {
+      if (esquemaAusente(eMs))
+        return res.status(503).json({
+          ok:false, error:'SCHEMA_NOT_MIGRATED',
+          detalle:'Aplica db/migrations/040_gobernanza_cartas_moneda.sql (y 027) en Neon antes de usar marcas_spots.',
+        });
+      console.warn('[admin marcas_spots] error: ' + (eMs && eMs.code) + ' ' + (eMs && eMs.message));
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
   }
 
   // == SALUD DE LA RED (gamificacion v6 / ADR-053 Decision 13.3) ==========
@@ -1297,6 +1612,94 @@ module.exports = async function handler(req, res) {
       console.warn('[admin] salud_red: alerta extranjero nuevo degradada ' + eAO2.code + ' (' + eAO2.message + ')');
     }
 
+    // == v8 (Gaming v6.1, ADR-062/063/064/065; migraciones 040/041) ======
+    // Bloques ADITIVOS de cartas, moneda, gobernanza y Own the Spot. Cada
+    // bloque se calcula en su propio try/catch: si su tabla/columna no
+    // existe (42P01/42703) o cualquier consulta falla, se registra un
+    // console.warn y el bloque se OMITE del payload (queda undefined y JSON
+    // lo descarta). El payload historico y los bloques de ADR-058 quedan
+    // INTACTOS (patron BUG-021: degradar, nunca tumbar salud_red). Sin
+    // SELECT *: cada consulta lista sus columnas explicitamente.
+    var bloquesGaming = {};
+
+    // (1) CARTAS: gates consumidos por nivel, circulacion y ofertas vivas.
+    try {
+      var gatesCartas = await sql(
+        'SELECT nivel_gate, COUNT(*)::int AS usuarios FROM cartas_gates '
+        + 'GROUP BY 1 ORDER BY 1'
+      );
+      var circulaCartas = await sql(
+        'SELECT COALESCE(SUM(cantidad), 0)::int AS n FROM usuarios_cartas WHERE activo = true'
+      );
+      var ofertasCartas = await sql(
+        'SELECT COUNT(*)::int AS n FROM cartas_ofertas '
+        + 'WHERE activo = true AND estado IN (\'abierta\',\'parcial\')'
+      );
+      bloquesGaming.cartas = {
+        gates_por_nivel: gatesCartas.map(function (g) {
+          return { nivel_gate: parseInt(g.nivel_gate, 10) || 0, usuarios: parseInt(g.usuarios, 10) || 0 };
+        }),
+        cartas_en_circulacion: circulaCartas.length ? (parseInt(circulaCartas[0].n, 10) || 0) : 0,
+        ofertas_abiertas: ofertasCartas.length ? (parseInt(ofertasCartas[0].n, 10) || 0) : 0,
+      };
+    } catch (eCartas) {
+      console.warn('[admin] salud_red: bloque cartas omitido ' + (eCartas && eCartas.code) + ' (' + (eCartas && eCartas.message) + ')');
+    }
+
+    // (2) MONEDA "Condor" (CDR): emision total, circulacion y ordenes vivas.
+    // circulacion = SUM(delta) del ledger append-only (fuente de verdad del
+    // saldo, ADR-061); emision_total acota los lotes no inflacionarios.
+    try {
+      var emisionMon = await sql('SELECT COALESCE(SUM(cantidad), 0) AS n FROM moneda_emisiones');
+      var circulaMon = await sql('SELECT COALESCE(SUM(delta), 0) AS n FROM moneda_ledger');
+      var ordenesMon = await sql(
+        'SELECT COUNT(*)::int AS n FROM moneda_mercado '
+        + 'WHERE activo = true AND estado IN (\'abierta\',\'parcial\')'
+      );
+      bloquesGaming.moneda = {
+        emision_total: emisionMon.length ? red2(numXp(emisionMon[0].n)) : 0,
+        circulacion: circulaMon.length ? red2(numXp(circulaMon[0].n)) : 0,
+        ordenes_abiertas: ordenesMon.length ? (parseInt(ordenesMon[0].n, 10) || 0) : 0,
+      };
+    } catch (eMoneda) {
+      console.warn('[admin] salud_red: bloque moneda omitido ' + (eMoneda && eMoneda.code) + ' (' + (eMoneda && eMoneda.message) + ')');
+    }
+
+    // (3) GOBERNANZA: propuestas por capa/estado + votos vigentes.
+    try {
+      var propGob = await sql(
+        'SELECT capa, estado, COUNT(*)::int AS n FROM gobernanza_propuestas '
+        + 'GROUP BY 1, 2 ORDER BY 1, 2'
+      );
+      var votosGob = await sql('SELECT COUNT(*)::int AS n FROM gobernanza_votos WHERE activo = true');
+      bloquesGaming.gobernanza = {
+        propuestas_por_capa_estado: propGob.map(function (g) {
+          return { capa: g.capa, estado: g.estado, n: parseInt(g.n, 10) || 0 };
+        }),
+        votos_totales: votosGob.length ? (parseInt(votosGob[0].n, 10) || 0) : 0,
+      };
+    } catch (eGob) {
+      console.warn('[admin] salud_red: bloque gobernanza omitido ' + (eGob && eGob.code) + ' (' + (eGob && eGob.message) + ')');
+    }
+
+    // (4) OWN THE SPOT: dividendos pagados (monto_descontado) y duenos por
+    // tipo de medio (spot_duenos.activo = cache vigente, ADR-065).
+    try {
+      var divSpot = await sql('SELECT COALESCE(SUM(monto_descontado), 0) AS n FROM spot_dividendos');
+      var duenosSpot = await sql(
+        'SELECT tipo_medio, COUNT(*)::int AS duenos FROM spot_duenos '
+        + 'WHERE activo = true GROUP BY 1 ORDER BY 2 DESC'
+      );
+      bloquesGaming.own_spot = {
+        dividendos_pagados: divSpot.length ? red2(numXp(divSpot[0].n)) : 0,
+        duenos_por_tipo: duenosSpot.map(function (g) {
+          return { tipo_medio: g.tipo_medio, duenos: parseInt(g.duenos, 10) || 0 };
+        }),
+      };
+    } catch (eSpot) {
+      console.warn('[admin] salud_red: bloque own_spot omitido ' + (eSpot && eSpot.code) + ' (' + (eSpot && eSpot.message) + ')');
+    }
+
     return res.status(200).json({
       ok: true,
       data: {
@@ -1327,6 +1730,11 @@ module.exports = async function handler(req, res) {
         mult_origen_stats: multOrigenStats,
         config_origen: configOrigen,
         alertas_origen: alertasOrigen,
+        // v8 (Gaming v6.1): ADITIVOS; presentes solo si su tabla existe.
+        cartas: bloquesGaming.cartas,
+        moneda: bloquesGaming.moneda,
+        gobernanza: bloquesGaming.gobernanza,
+        own_spot: bloquesGaming.own_spot,
       },
     });
   }
@@ -1439,6 +1847,6 @@ module.exports = async function handler(req, res) {
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado|gamificacion_config',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado|gamificacion_config|cartas|gobernanza|marcas_spots',
   });
 };

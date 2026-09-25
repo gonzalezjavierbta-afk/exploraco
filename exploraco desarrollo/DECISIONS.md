@@ -3406,3 +3406,209 @@ Negativas / **deuda aceptada:**
 - **Deuda aceptada:** (a) el XP de acciones NO replayables (p.ej. visitas *legacy* cacheadas sin coordenadas, que ADR-024 no migra) NO se acredita al puentear — solo el XP reconstruible por el replay de guardados; (b) ningun smoke cubre `reclamarXpDemo()` (hueco de cobertura, propio de express).
 - **Estado de verificacion:** QA APTO CON OBSERVACIONES. Evidencia (ADR-006): `reclamarXpDemo` definida 1 vez (L958) / llamada 1 vez (L885); delta ASCII 0 (23 lineas agregadas: 0 bytes>127 / 0 backticks); `node --check` OK; smokes `smoke_directorio_session.js` 14/14 + `smoke_ref_info.js` 26/26. Ancla de tarea: TASKS.md **TSK-156** > "Refinamiento 2026-09-24 (modo express)".
 - **ADRs relacionados:** ADR-001/ADR-010 (8/8; sin endpoint nuevo), ADR-006 (baseline = archivo real verificado), ADR-018/ADR-053 (economia de XP: `user_points` demo no es XP de cuenta), ADR-024/ADR-025 (anti-spoofing/anti-Sybil: motivo del rechazo de la opcion 1), ADR-036 (`sincronizarGuardados`/replay de guardados como acreditador real), ADR-053 (economia de XP vigente).
+
+---
+
+## ADR-059: Gates de eleccion por nivel derivado (Clase @3, Casa @5, Marca @6) con grandfathering
+
+**ID:** ADR-059
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game". Decisiones de producto cerradas por el operador.
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** Los gates de eleccion estan inconsistentes y NO responden a una curva de Early Game. Verificado contra archivo real (ADR-006): `clase_elegir` NO tiene gate de nivel (`api/usuarios.js:1148-1214`); `casa_elegir` exige nivel 2 (`api/usuarios.js:1060-1061`, `nivel_requerido: 2`); `marca_activar` exige nivel 5 (`api/usuarios.js:1488-1489`). El operador cerro: Clase @3, Casa @5, Marca @6. Ademas, subir un gate podria bloquear usuarios que YA eligieron cuando no habia gate (retroactividad injusta).
+
+**Opciones evaluadas:**
+1. Cambiar los umbrales sin proteccion retroactiva: quien ya eligio conserva su eleccion, pero los gates aplican a nuevas elecciones y recambios. Simple, pero no define que pasa con quien esta "a mitad" de la curva.
+2. Cambiar los umbrales Y agregar grandfathering explicito: el gate aplica SOLO al cruzar hacia arriba; quien ya esta en el nivel o lo supero no se bloquea (preserva "el nivel se deriva de `xp_total`" y evita de-bloqueos retroactivos). ELEGIDA.
+
+**Decision tomada:** Clase @nivel 3, Casa @nivel 5, Marca @nivel 6. El gate se evalua SIEMPRE sobre el nivel DERIVADO de `xp_total` via `calcularNivel` (`api/usuarios.js:174-181`), NUNCA sobre `usuarios.nivel`/`nivel_max` (ADR-053 Enmienda 1). Se aplica grandfathering: los flags de nivel alcanzado (`usuarios.cartas_gates` y el estado de eleccion existente) impiden que un usuario con nivel >= gate quede bloqueado por el cambio.
+
+**Justificacion:** Alinea los gates con una progresion Early coherente (Clase como primer compromiso, Casa como segundo, Marca ya en la Era Patrocinada). El nivel derivado es la unica fuente de verdad (ADR-053) y el grandfathering cierra el riesgo de regresion de capacidad sin persistir un nivel paralelo (respeta ADR-018: el nivel es derivado, no almacenado).
+
+**Impacto:** `api/usuarios.js` (`clase_elegir` gana gate 3; `casa_elegir` pasa de 2 a 5; `marca_activar` pasa de 5 a 6; mensajes con `nivel_requerido`). Frontend: textos de gate en `mi-perfil.html`/`admin.html`. Sin endpoints nuevos (8/8, ADR-001). La migracion 040 documenta los flags de grandfathering.
+
+**ADRs relacionados:** ADR-001/ADR-010 (8/8), ADR-006 (baseline de verdad), ADR-018 (nivel derivado, de-nivel), ADR-053 (nivel derivado vs `nivel_max`), ADR-062 (cartas-gate usan el mismo principio).
+
+**Enmienda 2 (2026-09-24):** El gate de ENTRADA (crear/elegir) se evalua sobre el **nivel derivado** (`calcularNivel(xp_total).nivel`). El **GRANDFATHERING** de quien ya alcanzo el gate usa **`nivel_visible = GREATEST(derivado, COALESCE(nivel_max,1))`**, para no bloquear a quien llego al gate y luego gasto XP (A-1, ver ADR-062). El gate de Marca @6 lee su umbral desde la columna **`marcas.nivel_requerido`** (default 6), no de un literal (M-6, ver ADR-064).
+
+---
+
+## ADR-060: Red de referidos con reparto total 10% (5 / 2.5 / 1.5 / 0.5 / 0.5) sobre nuevos eventos
+
+**ID:** ADR-060
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** El reparto multinivel actual suma 21% del XP del referido: `repartirXpReferidos` usa 0.10/0.05/0.03/0.02/0.01 (`api/interacciones.js:3425-3426`, funcion `:3411-3431`). El operador cerro que el total debe ser 10%.
+
+**Opciones evaluadas:**
+1. Recalcular retroactivamente `xp_ref_total` de todos los ancestros para descontar el excedente. Descartada: rompe Cero Borrado Logico / inmutabilidad del XP ya acreditado (ADR-003) y complica la auditoria.
+2. Aplicar la nueva tabla de porcentajes SOLO a eventos NUEVOS; no recalcular historico. ELEGIDA.
+
+**Decision tomada:** La distribucion pasa a **5 / 2.5 / 1.5 / 0.5 / 0.5** (L1..L5 = 0.05/0.025/0.015/0.005/0.005), total 10%. Aplica a eventos nuevos; NO se recalcula historico. Se conserva la CTE recursiva de max 5 niveles y el tope `referidos_directos_contados < 500` (`api/interacciones.js:3415-3429`).
+
+**Justificacion:** Bajar el total de 21% a 10% corrige la inflacion de la piramide de referidos sin reescribir el pasado. El reparto beneficiario sigue premiando el nivel 1 (5%) y decae; los niveles profundos se reducen a 0.5% para cortar el farming de red.
+
+**Impacto:** `api/interacciones.js` (`repartirXpReferidos`, `:3425-3426`). Sin migracion (los porcentajes viven en codigo). Sin endpoints nuevos (8/8). Deuda: capa cripto/Hive fuera de alcance.
+
+**ADRs relacionados:** ADR-003 (Cero Borrado Logico / sin recalculo historico), ADR-006, ADR-016 (migracion 016 de referidos), ADR-053 (economia de XP).
+
+**Enmienda 2 (2026-09-24, M-2 CERRADO):** la base del reparto es el **`xp_final` capado** (el valor que el codigo ya pasa a `repartirXpReferidos`), NO el XP bruto. Se congela aqui y se verifica con smoke (suma de porcentajes = 0.10 sobre `xp_final`).
+
+---
+
+## ADR-061: Moneda secundaria de ledger interno especulativo (excepcion acotada a ADR-018)
+
+**ID:** ADR-061
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** ADR-018 fijo la moneda UNICA del juego (`xp_total`). El operador pidio una moneda secundaria especulable en el Late Game, sin cripto. Introducirla colisiona con ADR-018 salvo que se acote explicitamente.
+
+**Opciones evaluadas:**
+1. Reutilizar `mercado_puntos` como moneda. Descartada: `api/usuarios.js:196` (`MERCADO_TIERS`) y ADR-055 lo fijan como metrica de progreso, no moneda (M-7: `api/interacciones.js:492` es el comentario de REGALIAS 037, no de `mercado_puntos`); convertirlo mezclaria metrica de progreso con economia.
+2. Crear un **ledger interno** (`moneda_ledger` append-only), con `moneda_emisiones` no inflacionaria, operado SOLO dentro de `moneda_mercado`. ELEGIDA.
+3. Capa on-chain / Hive. Descartada en esta fase (requiere revision legal en Colombia; riesgo regulatorio).
+
+**Decision tomada:** Se adopta la opcion 2. El saldo se DERIVA del ledger (`saldo = SUM(delta)`, patron de `xp_ledger` ADR-053); la emision es acotada por lote (`moneda_emisiones`) y NO inflacionaria; la moneda es transferible SOLO dentro del mercado del juego y PROHIBIDO su conversion a dinero real. Nombre/simbolo propuestos (a confirmar): "Condor" (`CDR`).
+
+**Justificacion:** Un ledger append-only da trazabilidad y permite la especulacion interna sin crear dinero de la nada ni exponer al proyecto a riesgo financiero. Acotar la excepcion a ADR-018 mantiene `xp_total` como fuente de XP/progreso y reserva la moneda nueva a la capa especulativa.
+
+**Impacto:** Migracion 040 (`moneda_ledger`, `moneda_emisiones`); ramas `moneda_saldo` (GET), `moneda_mercado` (GET) y `moneda_orden` (POST) en `api/interacciones.js`/`api/usuarios.js`; bloque aditivo en `?recurso=salud_red`. Sin endpoints nuevos (8/8, ADR-001).
+
+**ADRs relacionados:** ADR-001/ADR-010 (8/8), ADR-018 (moneda unica: excepcion acotada), ADR-053 (patron de ledger), ADR-055 (`mercado_puntos` es metrica, no moneda), ADR-003 (Cero Borrado Logico).
+
+**Enmienda 2 (2026-09-24, M-5 CERRADO):** `moneda_*` **NO reemplaza** `mercado_*` ni `mercado_puntos`. `moneda_mercado` es un **libro de ordenes propio** (distinto del mercado de Emprendedores ADR-055), limitado a la moneda secundaria. `mercado_puntos` sigue siendo metrica de progreso. Nombre/simbolo **CERRADOS**: "Condor" (`CDR`). (M-7: la evidencia de "no es moneda" es `api/usuarios.js:196` + ADR-055, no `api/interacciones.js:492`.)
+
+---
+
+## ADR-062: Cartas coleccionables como gate de avance (10/14/20/25) y activo de mercado
+
+**ID:** ADR-062
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** Los cromos existen (drop/rareza/garantia, `api/interacciones.js:6765`, `:10137`, `:10147`) pero NO son un gate de avance ni requisito de eventos. El operador pidio que las cartas sean necesarias para avanzar en niveles clave 10/14/20/25 y para algunos eventos, manteniendo "el nivel se deriva de `xp_total`".
+
+**Opciones evaluadas:**
+1. Convertir las cartas en requisito de subida de nivel (modificar `calcularNivel`). Descartada: rompe ADR-018/ADR-053 (el nivel debe ser puro derivado de `xp_total`).
+2. Cartas como **gate de capacidad** en niveles clave, con grandfathering: el nivel sube igual con `xp_total`, pero la capacidad/hito asociado al nivel-gate requiere el set completo; quien ya lo supero no se bloquea. ELEGIDA.
+
+**Decision tomada:** Se crean `cartas_catalogo`, `usuarios_cartas` y `cartas_gates` (migracion 040). El gate se evalua en 10/14/20/25; el set COMPLETO habilita la capacidad/hito y el paso a eventos; consumir el set escribe `cartas_gates` (grandfathering) y NO altera `xp_total`. Las cartas se intercambian/venden en el mercado existente (reusa el patron de `cromo_intercambio:10147` y `mercado_*:10607+`). Hay ademas una familia "Carta de Evento" (`es_evento=true`) que se consume al habilitar un evento.
+
+**Justificacion:** Preserva el principio de nivel derivado (la carta no sube ni bloquea el nivel, gatea la capacidad) y reutiliza dos mecanismos ya probados (usuarios_cromos y el mercado) sin crear endpoints. El grandfathering evita estanques.
+
+**Impacto:** Migracion 040; ramas `cartas_mias`/`cartas_gate` (GET/POST en `api/usuarios.js`), `carta_evento_usar` (POST en `api/interacciones.js`), `?recurso=cartas` (admin). Frontend: "Mis Cartas" en `mi-perfil.html`, tab de mercado. Sin endpoints nuevos (8/8).
+
+**ADRs relacionados:** ADR-001/ADR-010, ADR-018/ADR-053 (nivel derivado), ADR-059 (mismo principio de grandfathering), ADR-055 (mercado), ADR-003 (merge JSONB / sin borrado).
+
+**Enmienda 2 (2026-09-24):**
+- **A-1 CERRADO (grandfathering):** la siembra/uso de `cartas_gates` se hace sobre **`nivel_visible = GREATEST(calcularNivel(xp_total).nivel, COALESCE(nivel_max,1))`** (A-1), NO sobre el nivel derivado crudo; quien llego al nivel-gate y luego gasto XP NO se bloquea.
+- **M-4 CERRADO (anti-farming y frontera vs cromos):** se autoriza la tabla dedicada **`cartas_intercambios`** (espejo de `cromo_intercambios`) con limite diario, y la regla de **cero DELETE fisico** (`activo=false`, ADR-003). Los cromos existentes SE MANTIENEN; "Cartas de Territorio" son el nuevo sistema de gate/mercado y **NO se fusionan** con los cromos. El `DELETE FROM usuarios_cromos` de `cromo_intercambio` (`api/interacciones.js:10189`) NO se replica en cartas.
+
+---
+
+## ADR-063: Gobernanza de toma de decisiones en 3 capas (ecosistema, Parche/Faccion, marcas)
+
+**ID:** ADR-063
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** No existe una linea formal de gobernanza. Hay quorum para Activos Ocultos (migracion 016) y moderacion admin (`api/admin.js`), pero no una estructura de propuestas/votos por capa. El operador pidio "toda una linea de gobernanza de toma de decisiones".
+
+**Opciones evaluadas:**
+1. Una sola capa global de propuestas. Descartada: mezcla decisiones de ecosistema con las internas de Parche y con las comerciales de marca.
+2. Tres capas con gates distintos: (a) ecosistema N33+ (Era Mito), (b) Parche/Faccion, (c) marcas/patrocinios. ELEGIDA.
+
+**Decision tomada:** Se crean `gobernanza_propuestas` (con `capa IN ('ecosistema','parche','marca')`) y `gobernanza_votos` (PK `(propuesta_id, usuario_id)`, voto favor/contra/abstencion). Gates: capa (a) exige nivel >= 33 (segun el suelo real de Era Mito, `api/usuarios.js:183-189`); capa (b) exige pertenencia a un Parche; capa (c) exige Marca activa (`api/usuarios.js:1492-1505`). Quorum configurable; 1 voto por usuario por propuesta (409 duplicado).
+
+**Justificacion:** Separa las decisiones de producto del ecosistema de las internas de clan y de las comerciales, sin crear un cuarto endpoint. Reutiliza el patron de votos de Activos Ocultos (PK compuesta, estado derivado).
+
+**Impacto:** Migracion 040; ramas `gobernanza_proponer`/`gobernanza_votar` (POST) y `gobernanza_propuestas` (GET); moderacion `?recurso=gobernanza` en `api/admin.js`. Frontend: tab Gobernanza en `comunidad.html`. Sin endpoints nuevos (8/8).
+
+**ADRs relacionados:** ADR-001/ADR-010, ADR-027 (Wayfarer/quorum), ADR-042 (marcas/patrocinios), ADR-053 (nivel derivado), ADR-066 (Parche/tesoreria).
+
+**Enmienda 2 (2026-09-24, A-3):** `marcas`/`patrocinios`/`zonas_geograficas`/`ranking_zonas` EXISTEN en Neon (migracion 027 APLICADA), por lo que la capa (c) de gobernanza queda OPERATIVA; no depende de una migracion pendiente.
+
+---
+
+## ADR-064: Marcas capturan spots (presencia verificada + patrocinio) y hoja de vida publica del artista
+
+**ID:** ADR-064
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** El modulo de marcas existe en codigo (`marca_activar`/`marca_patrocinar`, `api/usuarios.js:1478-1547`; `mi_marca:493-503`) pero `TIPOS_VALIDOS` de patrocinio (`:1528`) NO incluye `spot`, y no hay una "hoja de vida" del artista. El operador pidio que las marcas capturen spots y que exista dinamica con los artistas y su hoja de vida.
+
+**Opciones evaluadas:**
+1. Marca como control territorial (tipo Parche). Descartada: confunde soberania geografica (Parche) con presencia comercial, y no encaja con el modelo de patrocinio existente.
+2. Marca como **presencia verificada + patrocinio pagado** sobre un spot (badge), y hoja de vida como **perfil publico derivado**. ELEGIDA.
+
+**Decision tomada:** `patrocinios.tipo_objetivo` gana el valor `spot`; la marca "captura" un spot con un badge de presencia verificada/patrocinada (no control territorial). La "hoja de vida del artista" es una vista DERIVADA en `perfil.html` (obras de `album_fotos`, resenas, vocaciones, logros `artista`, contratos P2P completados, patrocinios) + metadatos editables en `usuarios.artista_cv` (bio/ciudad/destacado) por merge JSONB. NO se persiste un score de reputacion.
+
+**Justificacion:** Reutiliza el modelo de patrocinio ya existente (minimo cambio estructural), reserva el control territorial a Parche/Faccion (coherencia con ADR-042 y la migracion 016) y evita una tabla de reputacion redundante con lo que ya se deriva (principio ADR-018/ADR-053).
+
+**Impacto:** `api/usuarios.js` (`TIPOS_VALIDOS` de `marca_patrocinar` + ramas `artista_cv`/`artista_cv_editar`); `perfil.html` (seccion hoja de vida); `mi-perfil.html` (edicion). Depende de la migracion 027 (`marcas`/`patrocinios`) aplicada. Sin endpoints nuevos (8/8).
+
+**ADRs relacionados:** ADR-001/ADR-010, ADR-042 (marcas/patrocinios; migracion 027 APLICADA en Neon, A-3), ADR-016 (Wayfarer; control territorial de Parche), ADR-019 (campo gestionado, patron), ADR-053 (nivel derivado), ADR-055 (mercado). (B-2 corregido: se elimina la autorreferencia a ADR-064 y la cita ajena a ADR-060 de referidos.)
+
+**Enmienda 2 (2026-09-24, M-6 CERRADO):** el gate de Marca lee **`marcas.nivel_requerido`** (la columna manda; la migracion la setea con default **6**), NO un literal en `api/usuarios.js:1488`. **Grandfathering de EDICION:** una marca ya creada se puede editar/reactivar aunque el dueno haya bajado a nivel 5 (el gate aplica a la CREACION, no a la edicion de una marca existente). `marca_activar` NO esta roto por la 027 (migracion APLICADA, A-3).
+
+---
+
+## ADR-065: Own the Spot multi-media (dueno GENERAL + dueno por tipo de medio, dividendo 10%)
+
+**ID:** ADR-065
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** "Own the Spot" hoy deriva el lider SOLO de la resena mas votada: `esLiderDeCiudad` (`api/interacciones.js:3129-3142`) busca `interacciones.tipo='resena'` con `MAX(votos_utiles)` y otorga x1.1. El operador pidio extenderlo a varios medios (video, foto, escrito, audio) y formalizar un dividendo (SPEC v6.1: 10% de XP sobre interacciones ajenas, `documento_maestro_gamificacion_v6_2.md:545-547`), hoy NO implementado.
+
+**Opciones evaluadas:**
+1. Un solo dueno (el de mas votos, cualquier medio). Descartada: no reconoce la especializacion por medio que pide el operador.
+2. **Dueno GENERAL** (cualquier medio, el de mas votos) **+ un dueno POR TIPO** (foto/video/audio/escrito). ELEGIDA.
+
+**Decision tomada:** Se calculan, bajo demanda (patron ADR-014, igual que el lider actual), un dueno `general` y un dueno por cada `tipo_medio` en `('foto','video','audio','escrito')`. El calculo reutiliza los votos de media (`media_votos`) y de resenas (`resenas.votos_utiles`) segun el tipo. El dividendo es 10% de XP sobre interacciones AJENAS en el spot, registrado en `spot_dividendos` (ledger append-only, idempotente por interaccion). Tabla de cache opcional `spot_duenos` (migracion 040).
+
+**Justificacion:** Generaliza un mecanismo existente (calculo bajo demanda) sin scheduler ni endpoint nuevo, y reconoce que un spot puede tener mejores autores por medio. El ledger de dividendos mantiene trazabilidad y evita dobles pagos.
+
+**Impacto:** `api/interacciones.js` (`esLiderDeCiudad` generalizado + `spot_duenos` GET + `spot_dividendo` POST); `api/pagina-destino.js` (bloque "Dueno del Spot" multi-media); migracion 040. Sin endpoints nuevos (8/8). Deuda: el nivel del dueno GENERAL queda como pregunta abierta (spec secciones 12 y 14).
+
+**ADRs relacionados:** ADR-001/ADR-010, ADR-014 (Own the Spot bajo demanda), ADR-030 (galeria unificada), ADR-037 (regalias), ADR-062 (cartas), ADR-058 (economia de XP).
+
+**Enmienda 2 (2026-09-24):**
+- **A-2 CERRADO (descuento, no mint):** el dividendo del 10% se **DESCUENTA de la bolsa de XP ya existente** (se descuenta del XP del AUTOR de la interaccion); **NO se emite XP nuevo**. Se fija un **tope agregado por interaccion <= 50% del XP base** de la accion, para que regalias (037, 20%) + dividendo (10%) no superen el 100% del XP base; el tope es documentado y verificable por smoke.
+- **M-3 CERRADO (colision del x1.1):** el `x1.1` de `esLiderDeCiudad` pasa a ser **por SPOT** (no por ciudad) y **NO es acumulable** con el dividendo en la misma accion; el dividendo y el x1.1 son mutuamente excluyentes por interaccion.
+- **B-4 CERRADO:** dividendo del dueno GENERAL **desde N25**; dueno POR TIPO de medio **desde N20** (anclado al nivel NUMERICO real, drift de Eras documentado en la spec 13.2).
+
+---
+
+## ADR-066: Gig Economy P2P (contratos_p2p + parche_upgrades, migracion 039) y Tithe de Parche
+
+**ID:** ADR-066
+**Fecha:** 2026-09-24
+**Autor:** Chief Architect (AI-DOS), Fase 0 del epic "Gaming v6.1 + Early/Middle/Late Game".
+**Estado:** APROBADO / Fase 0 (SOLO documentacion; cierres de la Enmienda 2 de la spec 2026-09-24 aplicados; sin codigo ni SQL).
+
+**Problema:** La Gig Economy del brief (`promptgamming.md:20-25`, `documento_maestro_gamificacion_v6_2.md:494-529`; B-3 corregido) no existe en el repo: 0 coincidencias de `contratos_p2p`/`parche_upgrades` en `db/migrations/*.sql`; los handlers `contrato_crear`/`contrato_completar` NO existen. El brief pedia "migracion 016/017", pero esos numeros estan OCUPADOS (016 y 017 ya creadas).
+
+**Opciones evaluadas:**
+1. Usar 016/017 como pide el brief. Rechazada: ambas estan ocupadas; sobrescribir rompe ADR-008.
+2. Crear la **migracion 039** con `contratos_p2p` y `parche_upgrades`. ELEGIDA.
+
+**Decision tomada:** Migracion 039 con `contratos_p2p` (escrow de recompensa; estados abierto/en_proceso/completado/cancelado/disputa) y `parche_upgrades` (upgrades territoriales con `activo_hasta`). Conexion: toggle `parche_tithe_config` (1%-10%) y `parche_upgrade_invertir`. El Tithe se registra en `xp_ledger` (`accion='tithe_parche'`, `es_exento=true`), NO crea moneda. El Control Territorial se calcula bajo demanda (sin tabla de dueno de ciudad).
+
+**Justificacion:** 039 preserva la numeracion consecutiva (ADR-008) y desbloquea la Gig Economy sin endpoints nuevos. El escrow resuelve el pago P2P de forma atomica con el patron de CTEs del mercado (ADR-055). "No persistir dueno de ciudad" mantiene la coherencia con la migracion 016.
+
+**Impacto:** `db/migrations/039_gig_economy_p2p.sql` (nuevo); ramas `contrato_crear/aceptar/completar/cancelar` y `parche_upgrade_invertir`/`parche_tithe_config` en `api/interacciones.js`; tab Contratos P2P y tesoreria en `comunidad.html`. Sin endpoints nuevos (8/8).
+
+**ADRs relacionados:** ADR-001/ADR-010, ADR-008 (gobernanza SQL / numeracion), ADR-016 (migracion 016: control territorial), ADR-055 (patron de compra atomica por CTEs), ADR-063 (gobernanza capa Parche), ADR-060 (economia).
+
+**Enmienda 2 (2026-09-24, M-1 CERRADO):** `contratos_p2p.recompensa` y `parche_upgrades.puntos_invertidos` son **`numeric(12,2)`** (XP decimal, ADR-035 / migracion 021), NO `int`: el escrow se deduce del XP del empleador, que es decimal. Contrato actualizado: `recompensa_xp numeric(12,2)` y `puntos_invertidos numeric(12,2)`. (B-3: la cita del bloque real de tablas es `documento_maestro_gamificacion_v6_2.md:494-529`.)

@@ -216,6 +216,21 @@ body{background:#FBF8F2}
 @keyframes pfclasepulso{0%,100%{opacity:.22}50%{opacity:.85}}
 @media (max-width:720px){.pf-clases-ramas{grid-template-columns:repeat(2,1fr)}}
 
+/* Hoja de Vida (Sala VII, L4 / ADR-064) */
+.pf-hv-bio{background:var(--m-panel);border:1px solid var(--m-line);border-radius:12px;padding:16px;box-shadow:var(--m-shadow)}
+.pf-hv-bio-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-bottom:9px}
+.pf-hv-bio .pf-bio{max-width:none}
+.pf-hv-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--m-gold-d);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
+.pf-museo--oscuro .pf-hv-badge{color:var(--m-gold)}
+.pf-hv-sec{margin-top:20px}
+.pf-hv-h{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:var(--m-muted);margin-bottom:10px}
+.pf-hv-list{display:flex;flex-direction:column;gap:10px}
+.pf-hv-item{background:var(--m-panel);border:1px solid var(--m-line);border-radius:11px;padding:12px 14px;box-shadow:var(--m-shadow)}
+.pf-hv-item-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.pf-hv-item-name{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;text-decoration:none}
+.pf-hv-item-meta{margin-left:auto;font-size:11px;color:var(--m-muted)}
+.pf-hv-text{font-size:13px;color:var(--m-muted);line-height:1.6;margin-top:6px}
+
 /* Acciones */
 .pf-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
 .pf-actions--center{justify-content:center}
@@ -648,6 +663,135 @@ body{background:#FBF8F2}
       });
   }
 
+  /* ---- Sala VII: Hoja de Vida (L4 / ADR-064) ----
+     Vista publica DERIVADA de solo lectura: GET /api/usuarios?tipo=artista_cv.
+     Consume bio/ciudad/destacado, vocaciones, obras (foto/video/audio),
+     resenas largas, logros, contratos P2P completados y patrocinios
+     recibidos. SIN PII. Carga async sobre el contenedor de la sala; si el
+     endpoint falla o viene vacio, pinta un estado vacio discreto. */
+  var PF_HV_VOC = {
+    musico: { n: 'Musico', e: '\uD83C\uDFB5' },
+    cine: { n: 'Cine', e: '\uD83C\uDFAC' },
+    artista_grafico: { n: 'Artista Grafico', e: '\uD83C\uDFA8' },
+    escritor: { n: 'Escritor', e: '\u270D\uFE0F' }
+  };
+  function pfHojaVida() {
+    return pfSala('VII', 'Hoja de Vida', null, '<div id="pf-hv-body">'
+      + pfEmpty('Abriendo la hoja de vida', 'El portafolio publico de este viajero cargara en un momento.')
+      + '</div>');
+  }
+  function pfHvObra(o) {
+    var url = o.foto_url || '';
+    var titulo = o.media_title || 'Obra';
+    var tipo = String(o.foto_type || '').toLowerCase();
+    var inner = (url ? '<img src="' + esc(url) + '" alt="' + esc(titulo) + '" loading="lazy" onerror="this.remove()">' : '')
+      + '<span class="pf-foto-ph">' + pfIcon(tipo === 'audio' ? 'music' : 'camera') + '</span>'
+      + '<span class="pf-foto-tag"><b>' + esc(titulo) + '</b><span>' + esc(pfCap(tipo)) + '</span></span>';
+    return '<div class="pf-foto">' + inner + '</div>';
+  }
+  function pfHvResena(r) {
+    var txt = String(r.texto || '').trim();
+    if (txt.length > 260) txt = txt.slice(0, 260) + '\u2026';
+    var dest = r.destino_nombre || 'Destino';
+    var href = r.destino_slug ? '/' + encodeURIComponent(r.destino_slug) + '.html' : '';
+    var nombre = href
+      ? '<a class="pf-hv-item-name" href="' + esc(href) + '">' + esc(dest) + '</a>'
+      : '<span class="pf-hv-item-name">' + esc(dest) + '</span>';
+    var meta = r.rating ? pfNum(r.rating) + ' / 5' : pfFecha(r.creado_en);
+    return '<div class="pf-hv-item"><div class="pf-hv-item-top">' + nombre
+      + (meta ? '<span class="pf-hv-item-meta">' + esc(meta) + '</span>' : '') + '</div>'
+      + '<p class="pf-hv-text">' + esc(txt) + '</p></div>';
+  }
+  function pfHvLogro(l) {
+    var nombre = pfCap(String(l.id || 'Logro').replace(/[_-]+/g, ' '));
+    return '<div class="pf-hv-item"><div class="pf-hv-item-top"><span class="pf-hv-item-name">'
+      + esc(nombre) + '</span>'
+      + (l.obtenido ? '<span class="pf-hv-item-meta">' + esc(pfFecha(l.obtenido)) + '</span>' : '')
+      + '</div></div>';
+  }
+  function pfHvContrato(c) {
+    var tipo = pfCap(String(c.tipo_encargo || 'Encargo').replace(/[_-]+/g, ' '));
+    return '<div class="pf-hv-item"><div class="pf-hv-item-top"><span class="pf-hv-item-name">'
+      + esc(tipo) + '</span><span class="pf-hv-item-meta">+' + pfXp(c.recompensa_xp) + ' XP</span></div>'
+      + '<p class="pf-hv-text">Contrato completado'
+      + (c.actualizado_en ? ' \u00B7 ' + esc(pfFecha(c.actualizado_en)) : '') + '</p></div>';
+  }
+  function pfHvPatrocinio(p) {
+    return '<div class="pf-hv-item"><div class="pf-hv-item-top"><span class="pf-hv-item-name">'
+      + esc(p.marca_nombre || 'Marca') + '</span>'
+      + '<span class="pf-hv-item-meta">+' + pfXp(p.xp_aportada) + ' XP</span></div>'
+      + '<p class="pf-hv-text">Patrocinio recibido'
+      + (p.creado_en ? ' \u00B7 ' + esc(pfFecha(p.creado_en)) : '') + '</p></div>';
+  }
+  function pfCargarHojaVida(uid) {
+    var host = document.getElementById('pf-hv-body');
+    if (!host || !uid) return;
+    fetch('/api/usuarios?tipo=artista_cv&usuario_id=' + encodeURIComponent(uid))
+      .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
+      .then(function (res) {
+        if (!host) return;
+        var d = (res && res.ok && res.data) ? res.data : null;
+        if (!d) {
+          host.innerHTML = pfEmpty('Hoja de vida no disponible', 'Aun no hay un portafolio publico para mostrar.');
+          return;
+        }
+        var art = d.artista || {}, meta = d.metadatos || {};
+        var voc = Array.isArray(d.vocaciones) ? d.vocaciones : [];
+        var obras = Array.isArray(d.obras) ? d.obras : [];
+        var resenas = Array.isArray(d.resenas) ? d.resenas : [];
+        var logros = Array.isArray(d.logros) ? d.logros : [];
+        var contratos = Array.isArray(d.contratos) ? d.contratos : [];
+        var patrocinios = Array.isArray(d.patrocinios) ? d.patrocinios : [];
+        var bio = String(meta.bio || art.bio || '').trim();
+        var ciudad = String(meta.ciudad || art.ciudad_base || '').trim();
+        var total = obras.length + resenas.length + logros.length + contratos.length + patrocinios.length + voc.length;
+        if (!total && !bio && !ciudad) {
+          host.innerHTML = pfEmpty('Hoja de vida en blanco', 'Este viajero aun no ha publicado su portafolio de artista.');
+          return;
+        }
+        var h = '';
+        var cab = [];
+        if (ciudad) cab.push('<span>' + pfIcon('pin') + esc(ciudad) + '</span>');
+        if (meta.destacado) cab.push('<span class="pf-hv-badge">' + pfIcon('star') + 'Artista destacado</span>');
+        if (art.era) cab.push('<span>' + pfIcon('chart') + esc(art.era) + '</span>');
+        h += '<div class="pf-hv-bio">';
+        if (cab.length) h += '<div class="pf-hv-bio-top">' + cab.join('') + '</div>';
+        h += '<p class="pf-bio">' + (bio ? esc(bio) : 'Este viajero aun no ha escrito su biografia.') + '</p></div>';
+        if (voc.length) {
+          h += '<div class="pf-hv-sec"><div class="pf-hv-h">Vocaciones</div><div class="pf-chips">';
+          voc.forEach(function (k) {
+            var v = PF_HV_VOC[k] || { n: pfCap(String(k).replace(/[_-]+/g, ' ')), e: '' };
+            h += '<span class="pf-chip pf-chip--artistas">' + (v.e ? v.e + ' ' : '') + esc(v.n) + '</span>';
+          });
+          h += '</div></div>';
+        }
+        if (obras.length) {
+          h += '<div class="pf-hv-sec"><div class="pf-hv-h">Obras (' + pfNum(obras.length) + ')</div>'
+            + '<div class="pf-grid pf-grid--foto">' + obras.map(pfHvObra).join('') + '</div></div>';
+        }
+        if (resenas.length) {
+          h += '<div class="pf-hv-sec"><div class="pf-hv-h">Resenas destacadas (' + pfNum(resenas.length) + ')</div>'
+            + '<div class="pf-hv-list">' + resenas.map(pfHvResena).join('') + '</div></div>';
+        }
+        if (logros.length) {
+          h += '<div class="pf-hv-sec"><div class="pf-hv-h">Logros (' + pfNum(logros.length) + ')</div>'
+            + '<div class="pf-hv-list">' + logros.map(pfHvLogro).join('') + '</div></div>';
+        }
+        if (contratos.length) {
+          h += '<div class="pf-hv-sec"><div class="pf-hv-h">Contratos completados (' + pfNum(contratos.length) + ')</div>'
+            + '<div class="pf-hv-list">' + contratos.map(pfHvContrato).join('') + '</div></div>';
+        }
+        if (patrocinios.length) {
+          h += '<div class="pf-hv-sec"><div class="pf-hv-h">Patrocinios (' + pfNum(patrocinios.length) + ')</div>'
+            + '<div class="pf-hv-list">' + patrocinios.map(pfHvPatrocinio).join('') + '</div></div>';
+        }
+        host.innerHTML = h;
+      })
+      .catch(function () {
+        if (host) host.innerHTML = pfEmpty('Sin conexion', 'No se pudo cargar la hoja de vida de este viajero.');
+      });
+  }
+
   /* ---- Sala VI: Clases (arbol de clases en solo lectura, ADR-028 / WP-4) ----
      Consume data.arbol = {faccion, ramas:[{rama_id|id, faccion, nombre, puntos,
      tier|nivel_nodo, nodos_desbloqueados}]}. Normaliza rama_id/id y tier/nivel_nodo.
@@ -772,12 +916,14 @@ body{background:#FBF8F2}
       pfHall(d) + pfStats(d.stats || {})
       + pfTrofeos(d) + pfCromos(d) + pfMapas(d) + pfAlbumes(d) + pfFotos(d)
       + pfSala('VI', 'Clases', null, '<div id="pf-clases-body"></div>')
+      + pfHojaVida()
       + pfActions(d)
       + '<div class="pf-foot">Museo de ' + esc(u.nombre || 'un viajero') + ' \u00B7 ExploraCO</div>'
     );
     pfInitMap(d.mapa);
     pfMuseoRenderClases(d.arbol);
     pfCargarFotos(u.id);
+    pfCargarHojaVida(u.id);
     document.title = (u.nombre || 'Perfil') + ' \u00B7 ExploraCO';
     pfSyncDM(d);
   }
