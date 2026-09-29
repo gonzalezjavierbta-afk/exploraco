@@ -436,6 +436,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-subida-txt strong{font-size:15px;color:#fff}
 .pf-subida-txt span{font-size:12.5px;color:rgba(255,255,255,.65)}
 .pf-subida-btn{flex:0 0 auto;background:var(--gold);color:#111;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:Outfit,sans-serif}
+.pf-subida-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pf-subida-btn.ghost{background:transparent;border:1px solid rgba(232,160,32,.45);color:var(--gold)}
 /* Completa tu perfil (PERFIL) */
 .pf-completa{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
 .pf-completa .pf-comp-cargando,.pf-completa .pf-comp-vacio{text-align:center;color:rgba(255,255,255,.35);font-size:11px;padding:14px}
@@ -691,10 +693,16 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
-  <!-- Fase C: bloque de subida above-the-fold (movil) -->
+  <!-- Fase C + modulo unificado: bloque de subida above-the-fold (movil).
+       Un solo modulo para: fotos de perfil, recursos del Museo y fotos
+       etiquetadas a un lugar o evento. -->
   <div class="pf-subida" data-tab="perfil">
-    <div class="pf-subida-txt"><strong>Sube tus fotos</strong><span>Agrega hasta 10 fotos a tu perfil y llena tu galeria.</span></div>
-    <button type="button" class="pf-subida-btn" onclick="pfFotoAgregar()">&#x2B06; Subir foto</button>
+    <div class="pf-subida-txt"><strong>Sube tu material</strong><span>Fotos de perfil (hasta 10), recursos para tu Museo o fotos etiquetadas a un lugar u evento.</span></div>
+    <div class="pf-subida-acts">
+      <button type="button" class="pf-subida-btn" onclick="subidaAbrir('perfil')">&#x1F464; Foto de perfil</button>
+      <button type="button" class="pf-subida-btn ghost" onclick="subidaAbrir('museo')">&#x1F3DB; Museo</button>
+      <button type="button" class="pf-subida-btn ghost" onclick="subidaAbrir('lugar')">&#x1F4CD; Lugar/Evento</button>
+    </div>
   </div>
 
   <!-- STATS -->
@@ -806,7 +814,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F3AF; Gestion del Museo</div>
   <div class="pf-museo" data-tab="museo">
     <div class="pf-museo-toolbar">
-      <button type="button" id="btn-museo-subir" class="pf-museo-btn" onclick="museoAbrirModal()">&#x2795; Subir recurso</button>
+      <span class="pf-museo-hint" style="margin:0;align-self:center;">Sube material desde la pestana Perfil.</span>
       <button type="button" class="pf-museo-btn ghost" onclick="museoRefrescar()">&#x21BB; Refrescar</button>
       <span class="pf-museo-cont" id="museo-cont">0 recursos</span>
     </div>
@@ -984,13 +992,23 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <button type="button" class="pf-museo-x" onclick="museoCerrarModal()" aria-label="Cerrar">&times;</button>
       </div>
       <input type="hidden" id="museo-f-id" value="">
+      <!-- Modulo unificado: destino del material (perfil / museo / lugar-evento) -->
+      <div class="pf-museo-field" id="museo-publicar-wrap">
+        <label class="pf-museo-lbl" for="museo-f-publicar">Publicar en</label>
+        <select id="museo-f-publicar" class="pf-museo-input" onchange="museoModoPublicacion(this.value)">
+          <option value="perfil">&#x1F464; Foto de perfil</option>
+          <option value="museo">&#x1F3DB; Museo (recurso general)</option>
+          <option value="lugar">&#x1F4CD; Lugar o evento</option>
+        </select>
+        <div class="pf-museo-hint" id="museo-publicar-hint"></div>
+      </div>
       <div class="pf-museo-field" id="museo-upload-wrap">
         <label class="pf-museo-lbl">Subir archivo (foto, audio o video)</label>
         <div class="pf-museo-drop" id="museo-drop"
-          onclick="muElegirArchivo('museo-f-url','museo',null,museoTrasSubir)"
+          onclick="museoElegirArchivo()"
           ondragover="event.preventDefault();this.classList.add('drag')"
           ondragleave="this.classList.remove('drag')"
-          ondrop="muDrop(event,'museo-f-url','museo',null,museoTrasSubir)">Elige un archivo o arrastralo aqui (foto 5 MB / audio 15 MB / video 30 MB)</div>
+          ondrop="museoDrop(event)">Elige un archivo o arrastralo aqui (foto 5 MB / audio 15 MB / video 30 MB)</div>
       </div>
       <div class="pf-museo-field">
         <label class="pf-museo-lbl" for="museo-f-url">Link del recurso (https://...) *</label>
@@ -998,7 +1016,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div class="pf-museo-hint" id="museo-f-url-msg"></div>
       </div>
       <div class="pf-museo-row">
-        <div class="pf-museo-field">
+        <div class="pf-museo-field" id="museo-tipo-wrap">
           <label class="pf-museo-lbl" for="museo-f-tipo">Tipo de medio</label>
           <select id="museo-f-tipo" class="pf-museo-input" onchange="museoActualizarPreview()">
             <option value="foto">&#x1F4F7; Foto</option>
@@ -1011,11 +1029,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <input type="text" id="museo-f-caption" class="pf-museo-input" maxlength="200" placeholder="Titulo del recurso">
         </div>
       </div>
+      <div class="pf-museo-field" id="museo-destino-wrap" style="display:none">
+        <label class="pf-museo-lbl" for="museo-f-destino-q">Etiquetar en un lugar o evento</label>
+        <input type="text" id="museo-f-destino-q" class="pf-museo-input" maxlength="60" placeholder="Busca un lugar o evento por nombre..." oninput="buscarDestinoMuseo(this.value)" autocomplete="off">
+        <input type="hidden" id="museo-f-destino-id" value="">
+        <div id="museo-f-destino-res" style="margin-top:6px;"></div>
+        <div class="pf-museo-hint">Con un lugar o evento vinculado, la foto aparece en su galeria (y en el mapa si tiene coordenadas).</div>
+      </div>
       <div class="pf-museo-field">
         <label class="pf-museo-lbl">Vista previa</label>
         <div class="pf-museo-preview" id="museo-f-preview"></div>
       </div>
-      <div class="pf-museo-row">
+      <div class="pf-museo-row" id="museo-album-wrap">
         <div class="pf-museo-field">
           <label class="pf-museo-lbl" for="museo-f-album">Carpeta</label>
           <select id="museo-f-album" class="pf-museo-input"></select>
@@ -1027,7 +1052,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <div class="pf-museo-hint">Por defecto queda privado: solo tu lo ves.</div>
         </div>
       </div>
-      <div class="pf-museo-field">
+      <div class="pf-museo-field" id="museo-ubicacion-wrap">
         <label class="pf-museo-lbl">Ubicacion (por recurso; puedes heredar la de la carpeta)</label>
         <div class="pf-museo-row">
           <input type="text" id="museo-f-ciudad" class="pf-museo-input" maxlength="80" placeholder="Ciudad">
@@ -2716,6 +2741,8 @@ function misBindGridGuardados() {
 var museoRecursosCache = [];
 var museoAlbumesCache = [];
 var museoEditandoId = '';
+/* Modulo unificado de subida: destino del material (perfil|museo|lugar). */
+var museoModoPub = 'museo';
 var _museoMP = null;
 /* Album: instancias del map-picker dedicado (crear usa album-*; editar usa
    edit-album-*). _albumMPModo despacha cerrar/confirmar al picker activo. */
@@ -3001,7 +3028,7 @@ function museoQuitarUbicacion() {
   museoActualizarMiniMapa();
 }
 
-function museoAbrirModal(id) {
+function museoAbrirModal(id, modo) {
   var modal = document.getElementById('modal-museo-recurso');
   if (!modal) return;
   museoEditandoId = id ? String(id) : '';
@@ -3013,12 +3040,18 @@ function museoAbrirModal(id) {
       museoAlbumesCache.push({ id: rec.album_id, titulo: rec.album_titulo || 'Carpeta actual' });
     }
   }
+  /* Editar siempre vive en "museo"; al crear, el modo lo dicta el boton. */
+  var modoPub = museoEditandoId ? 'museo' : ((modo === 'perfil' || modo === 'lugar') ? modo : 'museo');
   museoSetText('museo-modal-title', museoEditandoId ? 'Editar recurso' : 'Subir recurso');
   museoSet('museo-f-id', museoEditandoId);
   museoSet('museo-f-url', rec ? (rec.foto_url || '') : '');
   museoSet('museo-f-tipo', rec ? (rec.tipo_media || 'foto') : 'foto');
   museoSet('museo-f-caption', rec ? (rec.media_title || '') : '');
   museoSet('museo-f-ciudad', rec ? (rec.ciudad || '') : '');
+  museoSet('museo-f-destino-id', rec ? (rec.destino_id || '') : '');
+  museoSet('museo-f-destino-q', '');
+  var dres = document.getElementById('museo-f-destino-res');
+  if (dres) dres.innerHTML = '';
   /* A2 (ADR-051): precargar SOLO el pin propio; si es null se dejan los
      campos vacios y el hint avisa que hereda la ubicacion de la carpeta
      (H-5: no materializar coords heredadas al editar). */
@@ -3046,10 +3079,63 @@ function museoAbrirModal(id) {
   }
   var fmsg = document.getElementById('museo-f-msg');
   if (fmsg) { fmsg.style.display = 'none'; fmsg.textContent = ''; }
+  var pubSel = document.getElementById('museo-f-publicar');
+  if (pubSel) { pubSel.value = modoPub; pubSel.disabled = !!museoEditandoId; }
+  museoModoPublicacion(modoPub);
   modal.classList.add('open');
   museoActualizarPreview();
   var mp = museoMapPicker();
   if (mp) setTimeout(function(){ mp.updateMiniMap(); }, 80);
+}
+
+/* Modulo unificado: alterna los campos segun el destino del material.
+   perfil -> solo archivo/titulo; museo -> flujo actual; lugar -> + buscador. */
+function subidaAbrir(modo) {
+  museoAbrirModal(null, modo || 'perfil');
+}
+
+function museoContextoSubida() {
+  return museoModoPub === 'perfil' ? 'perfil' : 'museo';
+}
+
+function museoElegirArchivo() {
+  muElegirArchivo('museo-f-url', museoContextoSubida(), null, museoTrasSubir);
+}
+
+function museoDrop(ev) {
+  muDrop(ev, 'museo-f-url', museoContextoSubida(), null, museoTrasSubir);
+}
+
+function museoModoPublicacion(modo) {
+  modo = (modo === 'perfil' || modo === 'lugar') ? modo : 'museo';
+  museoModoPub = modo;
+  var esPerfil = (modo === 'perfil');
+  var esLugar = (modo === 'lugar');
+  var tipoWrap = document.getElementById('museo-tipo-wrap');
+  if (tipoWrap) tipoWrap.style.display = esPerfil ? 'none' : '';
+  var albumWrap = document.getElementById('museo-album-wrap');
+  if (albumWrap) albumWrap.style.display = esPerfil ? 'none' : '';
+  var ubiWrap = document.getElementById('museo-ubicacion-wrap');
+  if (ubiWrap) ubiWrap.style.display = esPerfil ? 'none' : '';
+  var destWrap = document.getElementById('museo-destino-wrap');
+  if (destWrap) destWrap.style.display = esLugar ? '' : 'none';
+  if (esPerfil) { var t = document.getElementById('museo-f-tipo'); if (t) t.value = 'foto'; }
+  var drop = document.getElementById('museo-drop');
+  if (drop) {
+    drop.textContent = esPerfil
+      ? 'Elige una foto o arrastrala aqui (max 5 MB)'
+      : 'Elige un archivo o arrastralo aqui (foto 5 MB / audio 15 MB / video 30 MB)';
+  }
+  var hint = document.getElementById('museo-publicar-hint');
+  if (hint) {
+    hint.textContent = esPerfil
+      ? 'Se agrega a "Mis fotos de perfil" (maximo 10).'
+      : (esLugar ? 'Se guarda en tu Museo y se vincula al lugar o evento elegido.' : 'Se guarda en tu Museo como recurso general.');
+  }
+  var title = document.getElementById('museo-modal-title');
+  if (title && !museoEditandoId) {
+    title.textContent = esPerfil ? 'Subir foto de perfil' : (esLugar ? 'Etiquetar en un lugar o evento' : 'Subir recurso');
+  }
 }
 
 function museoCerrarModal() {
@@ -3087,6 +3173,16 @@ function museoGuardar() {
   var tipo = (document.getElementById('museo-f-tipo').value || 'foto');
   var caption = (document.getElementById('museo-f-caption').value || '').trim();
   if (caption.length > 200) { toastError('El titulo admite maximo 200 caracteres'); return; }
+  /* Modo Perfil: la foto va al perfil (/api/usuarios tipo=foto_agregar). */
+  if (!esEdicion && museoModoPub === 'perfil') {
+    if (tipo !== 'foto') { toastError('El perfil solo admite fotos'); return; }
+    var btnP = document.getElementById('museo-btn-guardar');
+    if (btnP) { btnP.disabled = true; btnP.textContent = 'Guardando...'; }
+    pfFotoSubirUrl(url);
+    museoCerrarModal();
+    if (btnP) { btnP.disabled = false; btnP.textContent = 'Guardar'; }
+    return;
+  }
   var albumSel = document.getElementById('museo-f-album');
   var albumId = albumSel ? (albumSel.value || '') : '';
   var visible = document.getElementById('museo-f-visible').checked === true;
@@ -3109,6 +3205,11 @@ function museoGuardar() {
   if (museoQuitarCoords) body.quitar_coords = true;
   else if (traeLat && (!esEdicion || usuarioFijoCoords)) { body.lat = lat; body.lng = lng; }
   if (!esEdicion && ciudad) body.ciudad = ciudad;
+  /* Modo Lugar/Evento: vincula el recurso al destino elegido. */
+  if (!esEdicion && museoModoPub === 'lugar') {
+    var dId = (document.getElementById('museo-f-destino-id') || {}).value || '';
+    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(dId)) body.destino_id = dId;
+  }
   var btn = document.getElementById('museo-btn-guardar');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   museoFormMsg('', true);
@@ -3507,20 +3608,23 @@ function confirmarEliminarAlbum() {
   });
 }
 
-/* ---- Vincular ubicacion (C4): buscador de destinos publicados ---- */
-var _albumDestinoTimer = null;
-function buscarDestinoAlbum(q) {
-  var res = document.getElementById('album-nueva-foto-destino-res');
-  var hid = document.getElementById('album-nueva-foto-destino-id');
+/* ---- Vincular ubicacion (C4): buscador de destinos publicados ----
+   Helper unico reutilizado por el album (album-nueva-foto-*) y por el
+   modulo unificado de subida (museo-f-destino-*). Los eventos son destinos
+   con categoria 'evento', por lo que el mismo buscador sirve para ambos. */
+var _destinoBuscarTimer = null;
+function buscarDestinoEn(q, campoId, qId, resId) {
+  var res = document.getElementById(resId);
+  var hid = document.getElementById(campoId);
   if (!res) return;
   q = String(q || '').trim();
   if (q.length < 3) {
     res.innerHTML = '';
-    if (hid && document.activeElement && document.activeElement.id === 'album-nueva-foto-destino-q') hid.value = '';
+    if (hid && document.activeElement && document.activeElement.id === qId) hid.value = '';
     return;
   }
-  if (_albumDestinoTimer) clearTimeout(_albumDestinoTimer);
-  _albumDestinoTimer = setTimeout(function () {
+  if (_destinoBuscarTimer) clearTimeout(_destinoBuscarTimer);
+  _destinoBuscarTimer = setTimeout(function () {
     fetch('/api/destinos?q=' + encodeURIComponent(q) + '&limit=8')
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -3530,21 +3634,32 @@ function buscarDestinoAlbum(q) {
           var id = d.id || d.uuid || d._uuid || '';
           var nom = d.nombre || d.name || 'Destino';
           var ciu = d.ciudad || d.city || '';
+          var cat = d.cat || d.categoria_slug || '';
           return '<button type="button" data-id="' + esc(String(id)) + '" data-nombre="' + esc(String(nom)) + '"'
-            + ' onclick="elegirDestinoAlbum(this)" style="display:block;width:100%;text-align:left;margin-bottom:4px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12.5px;cursor:pointer;font-family:Outfit,sans-serif;">'
-            + esc(String(nom)) + (ciu ? ' <span style="color:rgba(255,255,255,.4)">\u00b7 ' + esc(String(ciu)) + '</span>' : '') + '</button>';
+            + ' onclick="elegirDestinoEn(this,\'' + campoId + '\',\'' + qId + '\',\'' + resId + '\',\'Destino vinculado.\')" style="display:block;width:100%;text-align:left;margin-bottom:4px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12.5px;cursor:pointer;font-family:Outfit,sans-serif;">'
+            + esc(String(nom)) + (ciu ? ' <span style="color:rgba(255,255,255,.4)">\u00b7 ' + esc(String(ciu)) + '</span>' : '')
+            + (cat ? ' <span style="color:rgba(232,160,32,.7);font-size:10px;text-transform:uppercase">[' + esc(String(cat)) + ']</span>' : '') + '</button>';
         }).join('');
       })
       .catch(function () { res.innerHTML = ''; });
   }, 280);
 }
-function elegirDestinoAlbum(btn) {
-  var hid = document.getElementById('album-nueva-foto-destino-id');
-  var res = document.getElementById('album-nueva-foto-destino-res');
-  var q = document.getElementById('album-nueva-foto-destino-q');
+function elegirDestinoEn(btn, campoId, qId, resId, msg) {
+  var hid = document.getElementById(campoId);
+  var res = document.getElementById(resId);
+  var q = document.getElementById(qId);
   if (hid) hid.value = (btn && btn.getAttribute('data-id')) || '';
   if (q) q.value = (btn && btn.getAttribute('data-nombre')) || '';
-  if (res) res.innerHTML = '<div style="font-size:12px;color:#4ade80">Destino vinculado.</div>';
+  if (res) res.innerHTML = '<div style="font-size:12px;color:#4ade80">' + esc(msg || 'Vinculado.') + '</div>';
+}
+function buscarDestinoAlbum(q) {
+  buscarDestinoEn(q, 'album-nueva-foto-destino-id', 'album-nueva-foto-destino-q', 'album-nueva-foto-destino-res');
+}
+function elegirDestinoAlbum(btn) {
+  elegirDestinoEn(btn, 'album-nueva-foto-destino-id', 'album-nueva-foto-destino-q', 'album-nueva-foto-destino-res', 'Destino vinculado.');
+}
+function buscarDestinoMuseo(q) {
+  buscarDestinoEn(q, 'museo-f-destino-id', 'museo-f-destino-q', 'museo-f-destino-res');
 }
 
 /* ---- AGREGAR FOTO AL ALBUM (POST album_agregar_foto) ---- */

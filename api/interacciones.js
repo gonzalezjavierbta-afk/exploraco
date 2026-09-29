@@ -6037,17 +6037,29 @@ module.exports = async function handler(req, res) {
         var mrLimIdx = mrParams.length;
         mrParams.push(mrOffset);
         var mrOffIdx = mrParams.length;
-        var mrRows = await sql(
-          'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
+        var mrSelectCols = 'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
           + ' af.media_title, af.foto_type, af.lat AS lat_propia, af.lng AS lng_propia,'
           + ' COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng,'
-          + ' a.ciudad, af.visible, af.creado_en'
-          + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
+          + ' af.destino_id, a.ciudad, af.visible, af.creado_en';
+        var mrSelectColsNoTag = 'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
+          + ' af.media_title, af.foto_type, af.lat AS lat_propia, af.lng AS lng_propia,'
+          + ' COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng,'
+          + ' NULL AS destino_id, a.ciudad, af.visible, af.creado_en';
+        var mrFrom = ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
           + mrWhere
           + ' ORDER BY af.creado_en DESC'
-          + ' LIMIT $' + mrLimIdx + ' OFFSET $' + mrOffIdx,
-          mrParams
-        );
+          + ' LIMIT $' + mrLimIdx + ' OFFSET $' + mrOffIdx;
+        var mrRows;
+        try {
+          mrRows = await sql(mrSelectCols + mrFrom, mrParams);
+        } catch (mrTagErr) {
+          if (mrTagErr && mrTagErr.code === '42703') {
+            // Migracion 042 sin aplicar: se lista sin la etiqueta.
+            mrRows = await sql(mrSelectColsNoTag + mrFrom, mrParams);
+          } else {
+            throw mrTagErr;
+          }
+        }
         // Votos unificados (ADR-036): query aparte degradable a 0 si la
         // migracion 023 no esta aplicada.
         var mrVotos = {};
@@ -6075,6 +6087,7 @@ module.exports = async function handler(req, res) {
             lng_propia: (r.lng_propia === null || r.lng_propia === undefined) ? null : r.lng_propia,
             coords_heredadas: (r.lat_propia === null || r.lat_propia === undefined),
             lat: r.lat, lng: r.lng, ciudad: r.ciudad,
+            destino_id: r.destino_id || null,
             visible: r.visible === true,
             votos: mrVotos[String(r.id)] || 0,
             creado_en: r.creado_en,
@@ -6788,9 +6801,11 @@ module.exports = async function handler(req, res) {
         // tumbar el GET.
         // v16: el 42703 de usuarios.foto_url (migracion 004) degrada por
         // query con queryConAvatarFallback en vez del 503 global.
-        var gdUsuarios = await queryConAvatarFallback(
-          sql,
-          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+        // v28 (modulo unificado): la galeria del destino incluye sus fotos
+        // etiquetadas (album_fotos.destino_id, migracion 042) ademas de las
+        // de albums cercanos por coordenadas. Sin 042 se degrada a solo
+        // cercania (42703).
+        var gdUsuariosCols = 'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
           + ' af.creado_en, af.autor_original_id,'
           + ' a.id AS album_id, a.titulo AS album_titulo, a.ciudad,'
           + ' u.nombre AS autor_nombre, u.id AS autor_id,'
@@ -6798,13 +6813,28 @@ module.exports = async function handler(req, res) {
           + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
-          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
-          + ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
+          + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id';
+        var gdUsuariosWhereTag = ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
+          + ' AND (af.destino_id = $3::uuid'
+          + '   OR (a.lat IS NOT NULL AND a.lng IS NOT NULL'
+          + '       AND ABS(a.lat - $1) < 0.01 AND ABS(a.lng - $2) < 0.01))'
+          + ' ORDER BY votos DESC LIMIT 100';
+        var gdUsuariosWhereNoTag = ' WHERE af.activo = true AND af.visible = true AND a.activo = true'
           + ' AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
           + ' AND ABS(a.lat - $1) < 0.01 AND ABS(a.lng - $2) < 0.01'
-          + ' ORDER BY votos DESC LIMIT 100',
-          [gdDestino.lat, gdDestino.lng]
-        );
+          + ' ORDER BY votos DESC LIMIT 100';
+        var gdUsuarios;
+        try {
+          gdUsuarios = await queryConAvatarFallback(sql, gdUsuariosCols + gdUsuariosWhereTag,
+            [gdDestino.lat, gdDestino.lng, gdDestino.id]);
+        } catch (gdTagErr) {
+          if (gdTagErr && gdTagErr.code === '42703') {
+            gdUsuarios = await queryConAvatarFallback(sql, gdUsuariosCols + gdUsuariosWhereNoTag,
+              [gdDestino.lat, gdDestino.lng]);
+          } else {
+            throw gdTagErr;
+          }
+        }
         await Promise.all(gdUsuarios.map(function(f) {
           return contarComentarioSafe(sql, f.id).then(function(n) { f.comentarios = n; });
         }));
@@ -9559,23 +9589,37 @@ module.exports = async function handler(req, res) {
           }
 
           var mrXp = XP_BASES.album_foto;
+          // Modulo unificado de subida: etiqueta OPCIONAL del recurso a un
+          // lugar o evento (destinos.id). La columna album_fotos.destino_id
+          // llega con la migracion 042; sin ella se reintenta sin la columna.
+          var mrDestinoId = MR_UUID.test(String(body.destino_id || '')) ? String(body.destino_id) : null;
           var mrIns;
           try {
             mrIns = await sql(
               'INSERT INTO album_fotos'
               + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
-              + '  media_title, media_source, visible, xp_otorgado_autor, lat, lng)'
-              + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9)'
+              + '  media_title, media_source, visible, xp_otorgado_autor, lat, lng, destino_id)'
+              + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9, $10::uuid)'
               + ' RETURNING id, album_id, visible',
-              [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp, mrLat, mrLng]
+              [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp, mrLat, mrLng, mrDestinoId]
             );
           } catch (mrInsErr) {
-            // ADR-039 + migracion 025: el indice unico
-            // idx_album_fotos_dedup (album_id, foto_url, autor_original_id)
-            // choca con recursos nacidos ocultos (visible=false). Reintento
-            // idempotente: reactiva el registro existente en vez de
-            // bloquear. NO se otorga XP porque el recurso ya existia.
-            if (mrInsErr && mrInsErr.code === '23505') {
+            if (mrInsErr && mrInsErr.code === '42703') {
+              // Migracion 042 sin aplicar: se guarda sin la etiqueta.
+              mrIns = await sql(
+                'INSERT INTO album_fotos'
+                + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
+                + '  media_title, media_source, visible, xp_otorgado_autor, lat, lng)'
+                + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9)'
+                + ' RETURNING id, album_id, visible',
+                [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp, mrLat, mrLng]
+              );
+            } else if (mrInsErr && mrInsErr.code === '23505') {
+              // ADR-039 + migracion 025: el indice unico
+              // idx_album_fotos_dedup (album_id, foto_url, autor_original_id)
+              // choca con recursos nacidos ocultos (visible=false). Reintento
+              // idempotente: reactiva el registro existente en vez de
+              // bloquear. NO se otorga XP porque el recurso ya existia.
               var mrDup = await sql(
                 'SELECT id, album_id, visible, activo FROM album_fotos'
                 + ' WHERE album_id=$1::uuid AND foto_url=$2 AND autor_original_id=$3::uuid LIMIT 1',
@@ -9591,8 +9635,10 @@ module.exports = async function handler(req, res) {
                 );
                 return res.status(200).json({ ok:true, reactivado:true, recurso:{ id: mrRep[0].id, album_id: mrRep[0].album_id, visible: mrRep[0].visible } });
               }
+              throw mrInsErr;
+            } else {
+              throw mrInsErr;
             }
-            throw mrInsErr;
           }
 
           var mrCtx = await contextoXpE(sql, mrUser);

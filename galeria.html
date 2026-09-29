@@ -219,11 +219,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div class="g-sec-title">Comparte tu foto</div>
       </div>
       <div class="g-share" id="g-share">
-        <div class="g-share-text" id="g-share-aviso">&iquest;Tienes fotograf&iacute;as de tu viaje? Comparte el enlace de tu imagen para sumarla a la comunidad.</div>
+        <div class="g-share-text" id="g-share-aviso">&iquest;Tienes fotograf&iacute;as de tu viaje? Sube un archivo desde tu dispositivo o pega el enlace de tu imagen para sumarla a la comunidad.</div>
         <div class="g-share-row">
           <input type="url" id="g-share-url" class="g-share-input" placeholder="https://..." autocomplete="off">
+          <button type="button" id="g-share-file-btn" class="g-share-btn" style="background:rgba(255,255,255,.08);color:#fff">&#x2B06; Subir archivo</button>
+          <input type="file" id="g-share-file" accept="image/*" style="display:none">
           <button type="button" id="g-share-btn" class="g-share-btn">Compartir foto</button>
         </div>
+        <div class="g-share-msg" id="g-share-up-msg" role="status" aria-live="polite"></div>
         <div class="g-share-msg" id="g-share-msg" role="status" aria-live="polite"></div>
       </div>
     </section>
@@ -244,6 +247,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="/compartir.js"></script>
 <script src="album-comments.js?v=2"></script>
 <script src="media-actions.js"></script>
+<script src="media-upload.js"></script>
 <script>
 /* ExploraCO - galeria.html (subpagina de galeria ampliada) */
 /* Modo global: feed top + albumes populares. Modo destino: ?destino=<slug>. */
@@ -930,7 +934,52 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     msg.className = 'g-share-msg' + (texto ? ' on' : '') + (esError ? ' err' : ' ok');
   }
 
-  function gShareFoto() {
+  /* Subida directa desde el dispositivo (modulo unificado). El archivo se
+     sube a Vercel Blob (contexto 'destino') y luego se publica con el mismo
+     flujo de gShareFoto(). El link pegado a mano sigue funcionando. */
+  function gShareUpMsg(texto, esError) {
+    var msg = document.getElementById('g-share-up-msg');
+    if (!msg) { return; }
+    msg.textContent = texto || '';
+    msg.className = 'g-share-msg' + (texto ? ' on' : '') + (esError ? ' err' : ' ok');
+  }
+
+  function gShareArchivo() {
+    var uid = gUsuarioId() || G.usuarioId;
+    if (!uid) { gShareMsg('Inicia sesion para compartir tu foto con la comunidad.', true); return; }
+    if (!G.destinoId) { gShareMsg('No se pudo identificar el destino. Recarga la pagina.', true); return; }
+    if (!window.MediaUpload) { gShareUpMsg('Subida no disponible.', true); return; }
+    var inp = document.getElementById('g-share-file');
+    if (!inp) { return; }
+    inp.value = '';
+    inp.click();
+  }
+
+  function gShareArchivoElegido(file) {
+    if (!file) { return; }
+    var v = window.MediaUpload.validar(file, 'foto');
+    if (!v.ok) { gShareUpMsg(v.error, true); return; }
+    var btnF = document.getElementById('g-share-file-btn');
+    var btnS = document.getElementById('g-share-btn');
+    if (btnF) { btnF.disabled = true; }
+    if (btnS) { btnS.disabled = true; }
+    gShareUpMsg('Subiendo archivo...', false);
+    window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'destino' })
+      .then(function (r) {
+        if (btnF) { btnF.disabled = false; }
+        gShareUpMsg('Archivo subido. Publicando...', false);
+        var input = document.getElementById('g-share-url');
+        if (input) { input.value = r.url; }
+        gShareFoto(r.url);
+      })
+      .catch(function (e) {
+        if (btnF) { btnF.disabled = false; }
+        if (btnS) { btnS.disabled = false; }
+        gShareUpMsg((e && e.message) ? e.message : 'No se pudo subir el archivo', true);
+      });
+  }
+
+  function gShareFoto(urlOverride) {
     var input = document.getElementById('g-share-url');
     var btn = document.getElementById('g-share-btn');
     if (!input || !btn) { return; }
@@ -943,7 +992,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       gShareMsg('No se pudo identificar el destino. Recarga la pagina.', true);
       return;
     }
-    var url = String(input.value || '').trim();
+    var url = (urlOverride != null ? String(urlOverride) : String(input.value || '')).trim();
     if (!/^https?:\/\//i.test(url)) {
       gShareMsg('Escribe un enlace valido que empiece por http:// o https://', true);
       return;
@@ -958,6 +1007,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       btn.disabled = false;
       if (res.ok) {
         input.value = '';
+        gShareUpMsg('', false);
         gShareMsg('Foto compartida. Gracias por aportar a la comunidad.', false);
         if (window.ExploraCO && window.ExploraCO.mostrarToast) {
           window.ExploraCO.mostrarToast('Foto compartida \u00b7 +' + (res.xp || 0) + ' XP', '#16a34a');
@@ -1013,7 +1063,17 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     if (G.destinoSlug && G.galItems.length) { gGalLoadMore(); } else { gLoadFeed(false); }
   }); }
   var btnShare = document.getElementById('g-share-btn');
-  if (btnShare) { btnShare.addEventListener('click', gShareFoto); }
+  if (btnShare) { btnShare.addEventListener('click', function () { gShareFoto(); }); }
+  var btnShareFile = document.getElementById('g-share-file-btn');
+  if (btnShareFile) { btnShareFile.addEventListener('click', gShareArchivo); }
+  var shareFile = document.getElementById('g-share-file');
+  if (shareFile) {
+    shareFile.addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      this.value = '';
+      gShareArchivoElegido(f);
+    });
+  }
   var shareInput = document.getElementById('g-share-url');
   if (shareInput) {
     shareInput.addEventListener('keydown', function (e) {

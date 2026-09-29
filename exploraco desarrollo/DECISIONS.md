@@ -3821,3 +3821,29 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Riesgos / deuda [DEUDA-EXPRESS]:** canje/QR y legal diferidos; blob huerfano al reemplazar la foto de perfil no se borra (Cero Borrado no cubre blobs); verificacion de edad declarativa (edad minima 13 solo por fecha declarada); `test_logros_catalogo.js` estaba desalineado (BUG-090).
 
 **ADRs relacionados:** ADR-002, ADR-003, ADR-006, ADR-008, ADR-010, ADR-018, ADR-028, ADR-039, ADR-042, ADR-051, ADR-053, ADR-061, ADR-068, TSK-159.
+
+---
+
+## ADR-070: Modulo unificado de subida (perfil + museo + etiqueta lugar/evento) y `destino_id` en `museo_recurso`
+
+**ID:** ADR-070
+**Fecha:** Septiembre 2026
+**Autor:** Chief Architect (AI-DOS)
+**Problema:** El perfil tenia dos entradas de subida separadas: "Sube tus fotos" (tab Perfil, galeria personal de 10) y "Subir recurso" (tab Museo, `museo_recurso`). El usuario pidio fusionarlas en un solo modulo en el tab Perfil capaz de: (a) subir fotos personales de perfil, (b) subir recursos generales al Museo, y (c) subir fotos etiquetadas a un lugar o evento. Ademas, la seccion "Comparte tu foto" de `galeria.html` (modo `?destino=<slug>`) solo aceptaba pegar un link, no subir archivo.
+
+**Opciones evaluadas:**
+1. Mantener ambos modulos separados y solo anadir un tercer flujo de etiquetado.
+2. Un solo modal con selector "Publicar en" (perfil | museo | lugar/evento) que reutiliza el modal del Museo y las funciones de subida existentes.
+3. Crear un modulo nuevo desde cero.
+
+**Decision tomada:** Opcion 2. El bloque `.pf-subida` del tab Perfil se convierte en un modulo unificado con un selector `#museo-f-publicar`. El modal `#modal-museo-recurso` se reutiliza: en modo `perfil` enruta a `pfFotoSubirUrl()` (`/api/usuarios tipo=foto_agregar`); en modo `museo` conserva `museo_recurso`; en modo `lugar` anade `destino_id` al `museo_recurso`. La gestion (grilla editar/mover/borrar/visibilidad) permanece en el tab Museo. En `galeria.html`, la seccion "Comparte tu foto" gana subida directa via `media-upload.js` (contexto `destino`) ademas del link.
+
+**Justificacion:** Reutiliza el modal y las funciones ya probadas (`muElegirArchivo`, `museoGuardar`, `pfFotoSubirUrl`, `MediaUpload`), sin duplicar logica (Regla de No-Duplicidad), y sin agregar endpoints (presupuesto 8/8 intacto, ADR-010).
+
+**Decision de contrato:** `museo_recurso` (crear) acepta `destino_id` opcional y lo persiste en `album_fotos.destino_id` (migracion 042), con reintento 42703 si la migracion no esta aplicada. `GET ?tipo=museo_recurso` expone `destino_id` (con degradacion 42703). `galeria_destino` incluye las fotos etiquetadas (`af.destino_id = <destino>`) ademas de las de albums cercanos por coordenadas, con degradacion a solo cercania si falta la 042.
+
+**Impacto:** `mi-perfil.html` (tarjeta unificada + modal con selector de destino + buscador generico `buscarDestinoEn`/`elegirDestinoEn` + `museoModoPublicacion`; se retira `#btn-museo-subir`), `api/interacciones.js` (crear/GET `museo_recurso` + `galeria_destino`), `galeria.html` (incluye `media-upload.js`; `gShareArchivo`/`gShareArchivoElegido`; `gShareFoto(urlOverride)`). **8/8 endpoints intacto**; sin migraciones nuevas (usa la columna 042 ya existente).
+
+**Riesgos / deuda [DEUDA-EXPRESS]:** el contrato `editar` de `museo_recurso` NO acepta `destino_id` (la etiqueta se fija al crear); la grilla del Museo no muestra la etiqueta; `#mu-file` no restringe el tipo por modo (se valida en `museoGuardar`); la subida de galeria es solo imagen (`tipo:'foto'`).
+
+**ADRs relacionados:** ADR-002, ADR-006, ADR-010, ADR-016, ADR-039, ADR-051, ADR-053, ADR-068, ADR-069, TSK-160.
