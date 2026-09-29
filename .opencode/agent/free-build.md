@@ -2,7 +2,7 @@
 name: free-build
 description: Coordina la implementacion en ExploraCO delegando a subagentes *-free por dominio y verifica antes de cerrar.
 mode: primary
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

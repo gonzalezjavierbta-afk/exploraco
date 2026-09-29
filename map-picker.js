@@ -88,7 +88,7 @@
     var showCityGeocoder = opts.showCityGeocoder !== false;
     var onPick = (typeof opts.onPick === 'function') ? opts.onPick : null;
     var toast = (typeof opts.toast === 'function') ? opts.toast : null;
-    var tileUrl = opts.tileUrl || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    var tileUrl = opts.tileUrl || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     var miniMap = null;
     var miniMarker = null;
@@ -162,7 +162,7 @@
           if (root.MapaTiles && typeof root.MapaTiles.aplicar === 'function') {
             root.MapaTiles.aplicar(miniMap, { url: tileUrl, maxZoom: 19 });
           } else {
-            root.L.tileLayer(tileUrl, { attribution: '', maxZoom: 19 }).addTo(miniMap);
+            root.L.tileLayer(tileUrl, { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(miniMap);
           }
           miniMarker = root.L.marker([lat, lng], { draggable: true }).addTo(miniMap);
           /* Al arrastrar el marker, actualizar los inputs */
@@ -253,7 +253,7 @@
           if (root.MapaTiles && typeof root.MapaTiles.aplicar === 'function') {
             root.MapaTiles.aplicar(pickerMap, { url: tileUrl, maxZoom: 19 });
           } else {
-            root.L.tileLayer(tileUrl, { attribution: '&copy; CARTO', maxZoom: 19 }).addTo(pickerMap);
+            root.L.tileLayer(tileUrl, { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(pickerMap);
           }
           pickerMap.on('click', function (e) { aplicarPickerLatLng(e.latlng); });
         }

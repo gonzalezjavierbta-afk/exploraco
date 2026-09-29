@@ -2,7 +2,7 @@
 name: sql-security-free
 description: Persistencia SQL de bajo riesgo en Neon PostgreSQL: consultas, seeds y migraciones de datos no criticas.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

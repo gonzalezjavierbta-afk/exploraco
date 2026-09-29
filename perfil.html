@@ -563,8 +563,8 @@ body{background:#FBF8F2}
     if (!el || typeof L === 'undefined' || !puntos || !puntos.length) return;
     try {
       pfMap = L.map(el, { scrollWheelZoom: false, attributionControl: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '\u00A9 OpenStreetMap \u00A9 CARTO', maxZoom: 19
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '\u00A9 OpenStreetMap', maxZoom: 19
       }).addTo(pfMap);
       var bounds = [];
       puntos.forEach(function (p) {

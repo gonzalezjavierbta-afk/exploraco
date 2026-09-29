@@ -2,7 +2,7 @@
 name: free-plan
 description: Produce un plan de tareas por dominio sin implementar; solo invoca subagentes de solo lectura para reunir contexto.
 mode: primary
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

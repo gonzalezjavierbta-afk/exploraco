@@ -391,6 +391,6 @@ check('A3: index carga leaflet.css 1.9.4', /leaflet@1\.9\.4\/dist\/leaflet\.css/
 check('A3: comunidad enlaza mapa-cultural.css', /mapa-cultural\.css/.test(comunidadHtml));
 check('A3: mapa-tiles.js cargado en comunidad', /mapa-tiles\.js\?v=1/.test(comunidadHtml));
 check('A3: mapa-tiles.js cargado en index', /mapa-tiles\.js\?v=1/.test(indexHtml));
-check('A3: comunidad ya no usa tiles OSM directo', comunidadHtml.indexOf('tile.openstreetmap.org') === -1);
+check('A3: comunidad usa el helper MapaTiles sin proveedor hardcodeado', /MapaTiles\.aplicar/.test(comunidadHtml) && comunidadHtml.indexOf('cartocdn') === -1 && comunidadHtml.indexOf('basemaps') === -1);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

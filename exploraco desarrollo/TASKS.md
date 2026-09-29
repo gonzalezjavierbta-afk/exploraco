@@ -10,6 +10,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ### Tareas no completadas / estado actual
 
+- **CERRADA / EN WORKING TREE (2026-09-29; commit/deploy PENDIENTE):** **TSK-161 / ADR-071 / BUG-091 - Mapa base CARTO -> OSM + cadena de respaldo de 3 proveedores (`osm` -> `osm-hot` -> `esri-imagery`).** Causa raiz: CARTO sirve HTTP 200 con un PNG placeholder "API KEY REQUIRED" y el fallback por `tileerror` nunca se disparaba. Archivos: `mapa-tiles.js` (L21-25), `mapa-cultural.js` (L71/L73), `index.html` (L1732/1734/1741/2291), `mapas.html` (L301/303-306), `comunidad.html` (L2043-2052). Verificacion: `npm test` EXIT 0 (13 smokes); `smoke_mapa_tiles.js` 24/24; `smoke_mapa_cultural.js` 98/98; Escudo GOLD APROBADO. Deuda: id legado `carto-voyager` (`mapa-cultural.js:359`, `mymapa.js:152`); hallazgo ADR-006 en `map-picker.js:91` (pasa CARTO como `custom` primero); ~90 `.html` estaticos con `cartocdn` inline fuera de alcance. Detalle en TASKS.md TSK-161.
+- **CERRADA (2026-09-29; requiere REINICIAR OpenCode):** **TSK-162 / BUG-092 / BUG-CONFIG-5 - Fix del modelo de subagentes (free tier de `opencode`).** Sintoma: todo subagente fallaba con "OpenCode's free tier can only be used from within OpenCode". Causa: los 19 agentes de `.opencode/agent/*.md` declaraban `opencode/big-pickle` (free tier NO admite invocacion como subagente) y `opencode.json` tenia `small_model: opencode/big-pickle`. Fix: 18 agentes -> `opencode-go/deepseek-v4.1-flash` + `media-reader-free.md` -> `opencode-go/mimo-v2.6-pro` (vision); `small_model` -> `opencode-go/deepseek-v4-flash`. Detalle en TASKS.md TSK-162.
 - **IMPLEMENTADO EN WORKING TREE / ESCUDO GOLD VERDE (2026-09-29; commit/deploy PENDIENTE; express ampliado):** **TSK-160 / ADR-070 - Modulo unificado de subida + subir en la galeria del directorio.** (A) `mi-perfil.html`: la tarjeta `.pf-subida` del tab Perfil pasa a modulo unificado con 3 acciones (`subidaAbrir('perfil'|'museo'|'lugar')`) y el modal `#modal-museo-recurso` gana el selector `#museo-f-publicar` + campo destino (`museo-f-destino-*`); `museoModoPublicacion()` alterna campos; `museoGuardar()` enruta perfil -> `pfFotoSubirUrl()` y lugar -> `museo_recurso` con `destino_id`; el buscador de destinos se generaliza a `buscarDestinoEn`/`elegirDestinoEn` (wrappers `buscarDestinoAlbum`/`elegirDestinoAlbum` + `buscarDestinoMuseo`); se retira `#btn-museo-subir` (la grilla de gestion queda en el tab Museo). (B) `api/interacciones.js`: `museo_recurso` crear persiste `album_fotos.destino_id` (fallback 42703); GET `museo_recurso` expone `destino_id` (select con fallback 42703); `galeria_destino` incluye fotos etiquetadas por `af.destino_id` ademas de la cercania por coords (fallback 42703). (C) `galeria.html` (modo `?destino=slug`): la seccion "Comparte tu foto" permite subir archivo via `media-upload.js` (contexto `destino`) ademas del link (`gShareArchivo`/`gShareArchivoElegido`, `gShareFoto(urlOverride)`). Verificacion: `node scripts/express_check.js mi-perfil.html galeria.html api/interacciones.js` PASS 4/4 (divs 593/593 y 85/85, sintaxis + ASCII interacciones); JS inline de ambos HTML compila (`new Function`); smokes `smoke_042` 28/28, `smoke_036` 93/93, `smoke_032` 45/45. **8/8 endpoints intacto**; sin migraciones nuevas (usa `album_fotos.destino_id` de la 042). Deuda `[DEUDA-EXPRESS]`: `editar` de `museo_recurso` no acepta `destino_id`; la grilla del Museo no muestra la etiqueta; subida de galeria solo imagen; QA runtime pendiente.
 - **IMPLEMENTADO EN WORKING TREE / QA APTO CON OBSERVACIONES (2026-09-24; commit/deploy PENDIENTE):** Pantallas de entrada (TSK-156 / adaptacion de `prompt mensaje.txt`): overlay de bienvenida en `index.html` (`ec_welcome_visto` 1 sola vez, `window.ExploraCO.abrirBienvenida`, z-index 10000) + `registro.html` REDISEÑADO dark dorado (banner con NOMBRE del anfitrion via `ref_info`, selector de premios `#reg-bonos` desde `GET tipo=bonus_referido`, reclamo post-alta `POST reclamar_bonus_referido`, "Continuar sin invitacion" `#reg-skip-ref`) + `api/usuarios.js` v23 (rama publica GET `?tipo=ref_info` suave sin JWT: solo `anfitrion_nombre` trim+slice(0,80), 200 `REFERIDO_INVALIDO`). `api/interacciones.js`: SOLO anotacion (premios del prompt = propuesta FUTURA; se mantiene catalogo `bienvenida_x2_24h`/`bienvenida_ascenso`/`bienvenida_fundador`). ADR-006: 4 archivos del lote + `scripts/smoke_ref_info.js` (NUEVO, untracked, **26/26 PASS**) + `package.json` (M, encadena el smoke al INICIO de `npm test`) SIN commitear. Escudo GOLD: sintaxis 4/4, ASCII 0 en api/*.js y JS nuevo, divs 5/5 y 390/390; smokes `smoke_regalias_bono.js` 63/63 + `smoke_016_multinivel_crowdsourcing.js` 52/52 + `smoke_ref_info.js` 26/26. **8/8 INTACTO**; sin migraciones; sin ADR nuevo (nota de producto en DECISIONS.md). Deuda etiquetada: IDOR preexistente en `reclamar_bonus_referido` (codigo 036, escalado a `sql-security`).
 - **IMPLEMENTADO EN WORKING TREE / AUDITADO APTO PARA DEPLOY (2026-09-24; commit/deploy PENDIENTE):** Multiplicador de Origen por lejania (ADR-058 / TSK-155): el XP por acciones fisicas crece con la distancia REAL (haversine) al punto de la accion segun tier de origen (Local x1.00; Nomada 1.00 + 0.20*min(km/1000,1) top 1.20; Extranjero 1.20 + 0.20*min(km/3000,1) top 1.40); `mult_origen` como HERMANO de `stack_temp` dentro de `calcularXpFinal`; ELIMINA el bono plano x1.2 del ADR-028 (WP-5), el Arbol de Clases usa el MISMO factor escalonado (v30). Migracion NUEVA **038** (geo_ciudades 1.122 / geo_paises 245 / `usuarios.origen_declarado_en` + backfill / `xp_ledger.mult_origen`+`origen_tier` / 7 claves de config) **APLICADA en Neon el 2026-09-24** + seed `scripts/seed_geo.js` cargado. Archivos: `api/interacciones.js` v29/v30, `api/usuarios.js` v22 (objeto `origen` + anti-teleport), `api/admin.js` v6 (`salud_red` 4 bloques de origen), `index.html`/`usuario-session.js` (badge origen), `mi-perfil.html` ("Tu origen"). Smokes: `smoke_058_origen_clasificador` 90/90 (en `npm test`) + `smoke_origen_factor_parity` 111/111 (Neon, gate `npm run smoke:origen`). **8/8 INTACTO**. Cierra hallazgo G-1 de gobernanza (drift documental). Deuda `[DEUDA]`: cap_global puede absorber el premio; curva duplicada JS/SQL (parity = red); nerf M-4 x1.2->1.00 sin ciudad_base; sin verificacion documental; seed geo sin auto-update.
@@ -3673,6 +3675,47 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Evidencia (ADR-006):** `node --check` 6/6; ASCII 0 en `api/*.js` (utilidades.js: 3 `\\u` PREEXISTENTES en regex, no tocado); divs 0 en los 6 HTML; **`npm test` VERDE** (16 smokes) + `smoke_mapa_tiles.js` (21) + `smoke_042_pasaporte_billetera.js` (28). **8/8 endpoints intacto.**
 - **Deuda [DEUDA-EXPRESS]:** canje/QR de billetera diferido (ADR-069); blob huerfano al reemplazar foto de perfil no se borra; `test_logros_catalogo.js` estaba desalineado (30 vs 33 reales) -> **BUG-090**; verificacion de edad 13 solo declarativa (monitoreo pendiente).
 - **Fuera de alcance:** sin nuevos endpoints (8/8); QR de referidos (`api.qrserver.com`) NO se toco.
+
+## Prioridad MAPA BASE (CARTO -> OSM) + TOOLING DE SUBAGENTES - 2026-09-29 (ADR-071 / BUG-091 / BUG-092 / TSK-161 / TSK-162)
+
+> Cierre de dos incidentes del 2026-09-29: (A) los basemaps de CARTO devuelven
+> HTTP 200 con un PNG placeholder y el mapa queda solo con pines (BUG-091); (B) los
+> subagentes fallaban por el free tier de `opencode` (BUG-092). El fix de mapa no
+> toca `api/*` (**8/8 INTACTO**); sin migraciones.
+
+### TSK-161: Migracion del mapa base de CARTO a OSM + cadena de respaldo de 3 proveedores [CERRADA]
+
+- **Estado:** CERRADA / CORREGIDO en working tree (2026-09-29); commit/deploy pendientes.
+- **Prioridad:** Alta (incidente visible en produccion).
+- **Fecha:** 2026-09-29.
+- **Origen:** reporte del operador "el mapa cultural y los otros mapas no muestran la textura, solo los pines".
+- **ADR:** DECISIONS.md ADR-071.
+- **Bug:** BUGS_HISTORICOS.md BUG-091.
+- **Alcance REAL ejecutado:**
+  1. `mapa-tiles.js` L21-25: nueva cadena `osm` -> `osm-hot` -> `esri-imagery`; `UMBRAL_ERRORES` = 5; fallback por `tileerror` y aviso con boton Reintentar intactos.
+  2. `mapa-cultural.js`: L71 `TILE_VOYAGER` -> OSM, L73 `ATTR_VOYAGER` -> OSM, comentario L1681.
+  3. `index.html`: L1732, L1734, L1741 y L2291 `tiles: 'carto-voyager'` -> `'osm'`.
+  4. `mapas.html`: L301 y L303-306.
+  5. `comunidad.html`: L2043-2052.
+- **Archivos tocados:** `mapa-tiles.js`, `mapa-cultural.js`, `index.html`, `mapas.html`, `comunidad.html`.
+- **Evidencia (ADR-006):** `npm run test` **EXIT CODE 0** (13 smokes OK, 0 FAILs reales); `scripts/smoke_mapa_tiles.js` **24/24 PASS**; `scripts/smoke_mapa_cultural.js` **98/98 PASS** (assert A3 reescrito); Escudo GOLD APROBADO (`node --check` OK, 0 bytes >127 / 0 backticks en `mapa-tiles.js`, divs identicos a HEAD: index 388/388, mapas 58/58, comunidad 449/449; 0 `cartocdn` en los archivos tocados).
+- **Deuda [DEUDA]:** (a) id legado `tiles: 'carto-voyager'` en `mapa-cultural.js:359` y `mymapa.js:152` (solo nombre, resuelve a `TILE_VOYAGER` = OSM); (b) **hallazgo ADR-006 no citado en el brief:** `map-picker.js:91` conserva la URL CARTO por defecto y la pasa como `custom` primero a `MapaTiles.aplicar` (L163/L254), por lo que el fallback no actua en el map-picker de `admin.html`/`mi-perfil.html`; (c) ~90 `.html` estaticos con `cartocdn` inline (p.ej. `casa-vieja-popayan.html`) fuera de alcance.
+- **Fuera de alcance:** paginas de destino (`api/pagina-destino.js` usa iframe de Google Maps, no CARTO); `api/*` (8/8 INTACTO).
+- **Dependencia:** ninguna.
+
+### TSK-162: Fix del modelo de subagentes (free tier de `opencode`) [CERRADA]
+
+- **Estado:** CERRADA (2026-09-29); requiere REINICIAR OpenCode para recargar los agentes.
+- **Prioridad:** Alta (bloqueaba la orquestacion: ningun subagente respondia).
+- **Fecha:** 2026-09-29.
+- **Origen:** incidente de tooling del mismo dia.
+- **Bug:** BUGS_HISTORICOS.md BUG-092 / BUG-CONFIG-5.
+- **Alcance REAL ejecutado:**
+  1. `.opencode/agent/*.md` (19 archivos): 18 pasaron a `opencode-go/deepseek-v4.1-flash`; `media-reader-free.md` paso a `opencode-go/mimo-v2.6-pro` (capacidad de vision).
+  2. `opencode.json`: `small_model` paso de `opencode/big-pickle` a `opencode-go/deepseek-v4-flash`.
+- **Archivos tocados:** `.opencode/agent/*.md` (19), `opencode.json`.
+- **Evidencia (ADR-006):** recuento = 19 agentes, 18 x `deepseek-v4.1-flash` + 1 x `mimo-v2.6-pro`; `opencode.json` con `model: opencode-go/deepseek-v4.1-flash` y `small_model: opencode-go/deepseek-v4-flash`. Verificado tras reiniciar: los subagentes responden.
+- **Nota:** proveedores autenticados en la maquina: solo `opencode-go` y `google`.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

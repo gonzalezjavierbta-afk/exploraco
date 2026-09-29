@@ -298,11 +298,11 @@ function initDetMap(dest){
   var m=L.map(el,{zoomControl:false,scrollWheelZoom:false});
   detMap=m;
   if(window.MapaTiles&&typeof window.MapaTiles.aplicar==='function'){
-    window.MapaTiles.aplicar(m,{url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',subdomains:'abcd',maxZoom:19,attribution:'&copy; CARTO &middot; &copy; OpenStreetMap'});
+    window.MapaTiles.aplicar(m,{maxZoom:19});
   } else {
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-      subdomains:'abcd',maxZoom:19,
-      attribution:'© CARTO · © OpenStreetMap'
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:19,
+      attribution:'&copy; OpenStreetMap'
     }).addTo(m);
   }
   var marks=[];

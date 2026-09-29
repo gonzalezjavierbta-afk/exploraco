@@ -2,7 +2,7 @@
 name: data-migration-free
 description: Ejecuta migraciones de esquema, limpieza de datos y seeds masivos en Neon PostgreSQL con idempotencia y trazabilidad.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

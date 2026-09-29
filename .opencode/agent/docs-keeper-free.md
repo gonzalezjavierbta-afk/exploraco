@@ -2,7 +2,7 @@
 name: docs-keeper-free
 description: Mantiene los docs del AI-DOS Core (PROJECT, NEXT, TASKS, BLUEPRINT, DECISIONS, BUGS) y cierra tareas, handoffs y ADRs.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

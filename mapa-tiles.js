@@ -19,9 +19,9 @@
   'use strict';
 
   var PROVEEDORES = [
-    { id: 'carto-voyager',  url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',   attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19 },
-    { id: 'carto-positron', url: 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png',  attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19 },
-    { id: 'osm',            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',                              attribution: '&copy; OpenStreetMap',              subdomains: 'abc',  maxZoom: 19 }
+    { id: 'osm',          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',                                                               attribution: '&copy; OpenStreetMap',        subdomains: 'abc', maxZoom: 19 },
+    { id: 'osm-hot',      url: 'https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',                                                            attribution: '&copy; OpenStreetMap France', subdomains: 'abc', maxZoom: 19 },
+    { id: 'esri-imagery', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',                 attribution: '&copy; Esri',                 subdomains: 'abc', maxZoom: 19 }
   ];
 
   var UMBRAL_ERRORES = 5;

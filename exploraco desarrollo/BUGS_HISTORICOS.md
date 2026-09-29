@@ -1623,3 +1623,33 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Evidencia (ADR-006):** salida del test `EXIT 0` tras el ajuste; `package.json` script `test:logros`.
 **Estado:** CERRADO / CORREGIDO en working tree (2026-09-29).
 
+## BUG-091: los basemaps de CARTO devuelven HTTP 200 con un PNG placeholder "API KEY REQUIRED" y el fallback por `tileerror` nunca se dispara
+
+**Severidad:** ALTA (incidente de produccion; todos los mapas Leaflet mostraban pines/clusters pero SIN capa base).
+**Contexto:** reporte del operador 2026-09-29 ("el mapa cultural y los otros mapas no muestran la textura, solo los pines"); captura aportada: `exploraco desarrollo/ampliacion desarrollo/mapa.jpg` (860x332). Detectado tras la entrega A3 de TSK-159, que creo `mapa-tiles.js` con fallback CARTO voyager/positron -> OSM por evento `tileerror`.
+**Sintoma:** el mapa carga los pines y el cluster correctamente, pero el fondo (teselas) aparece como un mosaico repetido del texto "API KEY REQUIRED" / "carto.com/basemaps/apikey".
+**Causa raiz:** CARTO dejo de servir basemaps gratuitos sin API key; todos sus dominios (`a/b/c/d.basemaps.cartocdn.com`, `cartodb-basemaps-a.global.ssl.fastly.net`) responden **HTTP 200 con un PNG FIJO** de watermark. Evidencia cuantitativa (misma zona de Bogota 4.711,-74.072):
+  - CARTO voyager: **2049 bytes IDENTICOS** en z6, z10 y z14 (promedio #F8F8F6).
+  - CARTO light_all: **2049 bytes identicos** en z6/z10/z14.
+  - CARTO dark_all: **2513 bytes identicos** en z6/z10/z14.
+  - OpenStreetMap (control): **24923 B** (z6), **28000 B** (z10), **40168 B** (z14) -> varia correctamente con el zoom.
+  - Lectura visual de la captura del operador: mosaico repetido de "API KEY REQUIRED"; pines y cluster (123) correctos y distribuidos -> el fallo estaba aislado a la capa de teselas.
+**Por que el fallback existente NO actuo:** `mapa-tiles.js` solo conmutaba de proveedor al recibir el evento `tileerror`, que requiere un fallo HTTP. Como CARTO responde 200 con una imagen valida, el evento nunca se disparo: la cadena nunca avanzo y OSM (que si funcionaba) nunca se alcanzo.
+**Correccion aplicada (gratuita, sin API key, sin secretos):** nueva cadena en `mapa-tiles.js` L21-25, en este orden: (1) `osm` = `https://tile.openstreetmap.org/{z}/{x}/{y}.png` (`&copy; OpenStreetMap`); (2) `osm-hot` = `https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png` (`&copy; OpenStreetMap France`); (3) `esri-imagery` = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}` (`&copy; Esri`). `UMBRAL_ERRORES` sigue valiendo 5; la logica de fallback por `tileerror` y el aviso con boton Reintentar se conservan intactos.
+**Archivos modificados:** `mapa-tiles.js` (L21-25); `mapa-cultural.js` (L71 `TILE_VOYAGER` -> OSM, L73 `ATTR_VOYAGER` -> OSM, comentario L1681); `index.html` (L1732, L1734, L1741, L2291 `tiles: 'carto-voyager'` -> `'osm'`); `mapas.html` (L301, L303-306); `comunidad.html` (L2043-2052).
+**Alcance NO afectado (ADR-006):** `api/pagina-destino.js` NO usa CARTO (la ficha de destino usa un **iframe de Google Maps**, L1928): las paginas de destino no estaban afectadas. `index.html:1746`, `comunidad.html:2330`, `map-picker.js:182` y `map-picker.js:260` YA tenian `invalidateSize()`: no fue necesario anadir nada.
+**Evidencia / verificacion:** `npm run test` **EXIT CODE 0** (13 smokes OK, 0 FAILs reales); `scripts/smoke_mapa_tiles.js` **24/24 PASS** (asserts: proveedores: primero OSM / ninguno usa CARTO / ultimo es Esri / 3 proveedores); `scripts/smoke_mapa_cultural.js` **98/98 PASS** (assert A3 obsoleto reescrito a "comunidad usa el helper MapaTiles sin proveedor hardcodeado"); **Escudo GOLD APROBADO**: `node --check` OK en `mapa-tiles.js` y `mapa-cultural.js`, `mapa-tiles.js` con 0 bytes >127 y 0 backticks, balance de divs identico a HEAD en `index.html` (388/388), `mapas.html` (58/58) y `comunidad.html` (449/449), **0 referencias a `cartocdn` en los archivos tocados**.
+**Deuda / residual [DEUDA]:** (a) `mapa-cultural.js:359` y `mymapa.js:152` conservan el identificador legado `tiles: 'carto-voyager'` (es solo un id sin marca de URL: resuelve a `TILE_VOYAGER`, que ahora es OSM); renombrarlo queda como limpieza posterior. (b) **Hallazgo ADR-006 (verificado contra archivo real, NO citado en el brief):** `map-picker.js:91` conserva `tileUrl` por defecto `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png` y lo pasa como `{url: tileUrl}` a `MapaTiles.aplicar` (L163 y L254); como MapaTiles antepone esa URL como proveedor `custom` y CARTO responde 200 con placeholder, el fallback por `tileerror` tampoco actua en el map-picker de `admin.html:2556` y `mi-perfil.html` (mini-mapa/modal). (c) los `.html` estaticos versionados (p.ej. `casa-vieja-popayan.html`; ~90 HTML con URLs `cartocdn` inline en un script de mapa embebido) quedaron FUERA de alcance por decision de alcance minimo.
+**Estado:** CERRADO / CORREGIDO en working tree (2026-09-29); commit/deploy pendientes. Ver `TASKS.md` TSK-161 y `DECISIONS.md` ADR-071.
+
+## BUG-092 / BUG-CONFIG-5: cualquier subagente fallaba con "OpenCode's free tier can only be used from within OpenCode"
+
+**Severidad:** ALTA (bloqueaba la orquestacion: ningun subagente podia ejecutarse).
+**Contexto:** incidente de tooling del 2026-09-29 (mismo dia que BUG-091), detectado al lanzar cualquier subagente.
+**Sintoma:** todo subagente fallaba con `Error from provider (Console): OpenCode's free tier can only be used from within OpenCode`.
+**Causa raiz:** los 19 agentes de `.opencode/agent/*.md` declaraban `model: opencode/big-pickle` (`media-reader-free.md` usaba `opencode/mimo-v2.5-free`). El free tier del proveedor `opencode` NO admite invocacion como subagente, solo como modelo de sesion principal. Ademas `opencode.json` tenia `small_model: opencode/big-pickle`, que fallaba igual en la generacion de titulos.
+**Resolucion aplicada:** los 19 agentes pasaron a `opencode-go/deepseek-v4.1-flash` (18) y `media-reader-free.md` paso a `opencode-go/mimo-v2.6-pro` por su capacidad de vision; `small_model` paso a `opencode-go/deepseek-v4-flash`. Los proveedores autenticados en la maquina son solo `opencode-go` y `google`.
+**Evidencia (ADR-006):** recuento sobre `.opencode/agent/*.md` = 19 archivos, 18 x `opencode-go/deepseek-v4.1-flash` + 1 x `opencode-go/mimo-v2.6-pro`; `opencode.json` = `"model": "opencode-go/deepseek-v4.1-flash"`, `"small_model": "opencode-go/deepseek-v4-flash"`. Verificado tras el reinicio: los subagentes responden.
+**Blindaje / requisito operativo:** requiere REINICIAR OpenCode para recargar los agentes (el servidor los cachea al arrancar; ver BUG-086 / BUG-CONFIG-2).
+**Estado:** CERRADO (2026-09-29). Ver `TASKS.md` TSK-162.
+

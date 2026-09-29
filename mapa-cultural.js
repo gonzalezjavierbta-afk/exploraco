@@ -68,9 +68,9 @@
   var CAMARA = '\uD83D\uDCF7';
   var TOPE_MEDIA_PINS = 300;
 
-  var TILE_VOYAGER = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  var TILE_VOYAGER = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var TILE_OSM = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  var ATTR_VOYAGER = '&copy; OpenStreetMap &copy; CARTO';
+  var ATTR_VOYAGER = '&copy; OpenStreetMap';
   var ATTR_OSM = 'OSM';
 
   var GRAD_POR_DEFECTO = 'linear-gradient(135deg,#1a3a5c,#2a4a7c)';
@@ -1678,7 +1678,7 @@
           scrollWheelZoom: true, tap: false, maxZoom: o.maxZoom
         });
         // A3: si el helper compartido de tiles esta cargado, la capa base
-        // hereda el fallback entre proveedores (tileerror -> CARTO/OSM) y
+        // hereda el fallback entre proveedores (tileerror -> respaldo OSM) y
         // el aviso con reintento. Si no, se conserva la capa directa.
         if (window.MapaTiles && typeof window.MapaTiles.aplicar === 'function') {
           try {

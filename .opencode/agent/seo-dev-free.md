@@ -2,7 +2,7 @@
 name: seo-dev-free
 description: Configura sitemap.xml, meta tags, Open Graph, robots.txt y redirects en index.html y api/utilidades.js.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

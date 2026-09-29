@@ -23,8 +23,10 @@ check('API: reintentar', MT && typeof MT.reintentar === 'function');
 check('API: estado', MT && typeof MT.estado === 'function');
 check('API: listaPara', MT && typeof MT.listaPara === 'function');
 check('proveedores: >= 2', MT && Array.isArray(MT.PROVEEDORES) && MT.PROVEEDORES.length >= 2);
-check('proveedores: primero CARTO (no OSM)', MT && MT.PROVEEDORES[0].url.indexOf('cartocdn.com') !== -1);
-check('proveedores: ultimo OSM', MT && MT.PROVEEDORES[MT.PROVEEDORES.length - 1].url.indexOf('openstreetmap') !== -1);
+check('proveedores: primero OSM', MT && MT.PROVEEDORES[0].url.indexOf('openstreetmap') !== -1);
+check('proveedores: ninguno usa CARTO', MT && MT.PROVEEDORES.every(function(p){ return p.url.indexOf('cartocdn') === -1; }));
+check('proveedores: ultimo es Esri', MT && MT.PROVEEDORES[MT.PROVEEDORES.length - 1].url.indexOf('arcgisonline') !== -1);
+check('proveedores: 3 proveedores', MT && MT.PROVEEDORES.length === 3);
 check('proveedores: todos con maxZoom', MT && MT.PROVEEDORES.every(function (p) { return !!p.maxZoom; }));
 
 check('porcentajeDe: 50/100 = 50', MT.porcentajeDe(50, 100) === 50);

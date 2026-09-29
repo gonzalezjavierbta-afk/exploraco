@@ -1729,16 +1729,16 @@ function initMMLeaflet() {
     });
 
     if (window.MapaTiles && typeof window.MapaTiles.aplicar === 'function') {
-      window.MapaTiles.aplicar(mmMap, { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', maxZoom: 18 });
+      window.MapaTiles.aplicar(mmMap, { maxZoom: 18 });
     } else {
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 18
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18, attribution: '&copy; OpenStreetMap'
       }).addTo(mmMap);
     }
 
     // Attribution small
     L.control.attribution({prefix: false}).addTo(mmMap);
-    mmMap.attributionControl.addAttribution('© OpenStreetMap © CARTO');
+    mmMap.attributionControl.addAttribution('© OpenStreetMap');
   }
 
   // Invalidate size after CSS settles
@@ -2288,7 +2288,7 @@ var mcMapa = null;
 
 var INDEX_MC_OPTS = {
   map: 'leaflet-map',
-  tiles: 'carto-voyager',
+  tiles: 'osm',
   center: [4.711, -74.072],
   zoom: 14,
   maxZoom: 19,

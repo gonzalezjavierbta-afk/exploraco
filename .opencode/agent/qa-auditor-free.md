@@ -2,7 +2,7 @@
 name: qa-auditor-free
 description: Audita con el Escudo GOLD (node --check, ASCII-safety, balance de divs) y smoke tests de buildHTML(); solo reporta.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

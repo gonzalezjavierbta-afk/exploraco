@@ -2,7 +2,7 @@
 name: architect-review-free
 description: Revisa disenos y ADRs con segunda opinion tecnica; emite veredicto APRUEBA, SOLICITA CAMBIOS o RECHAZA.
 mode: subagent
-model: opencode/big-pickle
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

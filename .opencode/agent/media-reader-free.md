@@ -2,7 +2,7 @@
 name: media-reader-free
 description: Lee y analiza imagenes, audio, video y PDFs, y devuelve informes estructurados para verificar contenido multimedia.
 mode: subagent
-model: opencode/mimo-v2.5-free
+model: opencode-go/mimo-v2.6-pro
 permission:
   edit: allow
   bash: allow

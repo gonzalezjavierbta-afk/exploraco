@@ -3847,3 +3847,36 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Riesgos / deuda [DEUDA-EXPRESS]:** el contrato `editar` de `museo_recurso` NO acepta `destino_id` (la etiqueta se fija al crear); la grilla del Museo no muestra la etiqueta; `#mu-file` no restringe el tipo por modo (se valida en `museoGuardar`); la subida de galeria es solo imagen (`tipo:'foto'`).
 
 **ADRs relacionados:** ADR-002, ADR-006, ADR-010, ADR-016, ADR-039, ADR-051, ADR-053, ADR-068, ADR-069, TSK-160.
+
+---
+
+## ADR-071: Migracion del mapa base a OpenStreetMap (sin API key) y cadena de respaldo de 3 proveedores de teselas
+
+**ID:** ADR-071
+**Fecha:** Septiembre 2026 (2026-09-29)
+**Autor:** Chief Architect (AI-DOS) / decision aprobada por el operador
+**Problema:** CARTO dejo de servir basemaps gratuitos sin API key: todos sus dominios responden **HTTP 200 con un PNG FIJO** de watermark "API KEY REQUIRED" / "carto.com/basemaps/apikey" (2049 B identicos en z6/z10/z14 en la zona de Bogota 4.711,-74.072; dark_all 2513 B). El fallback existente de `mapa-tiles.js`, que conmutaba por el evento `tileerror`, NO actuaba porque un 200 con imagen valida nunca dispara ese evento. Resultado: todos los mapas Leaflet del sitio quedaron sin capa base (solo pines/clusters). Ver `BUGS_HISTORICOS.md` BUG-091.
+
+**Opciones evaluadas (tamano de una tesela medido en la misma zona, Bogota 4.711,-74.072):**
+1. **CARTO** (voyager/positron/dark_all): descartada -- sirve placeholder "API KEY REQUIRED"; ya no hay tier gratuito utilizable sin API key.
+2. **`osm`** (`tile.openstreetmap.org`): control que SI varia con el zoom (24923 B z6 / 28000 B z10 / 40168 B z14). **Elegida como proveedor primario.**
+3. **`osm-hot`** (`tile.openstreetmap.fr/hot`): 22196 B. Elegida como 2do respaldo.
+4. **`esri-imagery`** (`server.arcgisonline.com/.../World_Imagery`): 16646 B. Elegida como 3er respaldo.
+5. **`esri-light-gray`**: 5182 B (muy liviana, pierde detalle frente a imagery). Descartada de la cadena.
+6. **`opentopo`**: 53264 B (la mas pesada). Descartada de la cadena.
+
+**Decision tomada:**
+1. Migrar el mapa base publico a **OpenStreetMap** (gratuito, sin API key, sin secretos) con una **cadena de respaldo de 3 proveedores** en este orden: `osm` -> `osm-hot` -> `esri-imagery`.
+2. `UMBRAL_ERRORES` se mantiene en 5; la logica de fallback por `tileerror` y el aviso con boton Reintentar se conservan intactos (solo cambia la lista de proveedores).
+
+**Justificacion:** el operador prohibio cualquier proveedor de pago y acepto perder el estilo oscuro. OSM es gratuito, sin API key y con control de variacion de teselas ya verificado; `osm-hot` aporta un segundo origen independiente y `esri-imagery` un tercero (ArcGIS World Imagery) sin coste. La cadena mantiene la resiliencia ante la caida de un proveedor y evita puntos unicos de falla sin introducir secretos en el cliente.
+
+**Consecuencias / impacto:**
+- **Perdida del tema oscuro:** se pierde el estilo `dark_all` de CARTO; los mapas publicos usan el estilo claro de OSM.
+- **Dependencia de la politica de uso de OSM:** queda sujeta a la tile usage policy de OpenStreetMap (uso razonable, sin scraping masivo). Si el trafico crece, se evaluara Esri de forma dedicada o un proveedor de pago.
+- **Alcance:** `mapa-tiles.js` L21-25, `mapa-cultural.js` L71/L73, `index.html`, `mapas.html`, `comunidad.html`. **8/8 endpoints intacto** (sin endpoints nuevos); sin migraciones; sin API keys.
+- **Deuda asociada:** el map-picker (`map-picker.js:91`) aun pasa la URL de CARTO como proveedor `custom` primero (hallazgo ADR-006 en BUG-091); ids legado `tiles: 'carto-voyager'` en `mapa-cultural.js:359` y `mymapa.js:152`; ~90 `.html` estaticos con `cartocdn` inline fuera de alcance.
+
+**Estado:** APROBADO (2026-09-29); implementado en working tree; commit/deploy pendientes.
+
+**ADRs relacionados:** ADR-006, ADR-069, ADR-070; TSK-159, TSK-161; `BUGS_HISTORICOS.md` BUG-091.
