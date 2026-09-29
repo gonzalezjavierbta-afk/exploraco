@@ -449,6 +449,7 @@
           <input type="url" placeholder="URL foto 3 (opcional)" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">
         </div>
       </div>
+      <button class="btn-add" onclick="subirFotoGaleria()">⬆️ Subir foto a la galería</button>
       <button class="btn-add" onclick="addGaleriaRow()">+ Añadir otra foto</button>
     </div>
 
@@ -720,6 +721,7 @@
   </div>
 </div>
 
+<script src="media-upload.js"></script>
 <script>
 // ============================================================
 // ESTADO GLOBAL
@@ -867,14 +869,44 @@ document.querySelectorAll('.am-chip').forEach(function(chip) {
 function handleFotoFile(input) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { alert('La foto debe ser menor a 5MB'); return; }
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    state.foto_principal_base64 = e.target.result;
-    state.foto_principal_url = null;
-    showFotoPreview(e.target.result);
+  if (!window.MediaUpload) { alert('Subida no disponible'); return; }
+  var v = window.MediaUpload.validar(file, 'foto');
+  if (!v.ok) { alert(v.error); return; }
+  var drop = document.getElementById('foto-drop');
+  var txt = drop ? drop.querySelector('p') : null;
+  if (txt) txt.textContent = 'Subiendo...';
+  window.MediaUpload.subir({
+    file: file, tipo: 'foto', contexto: 'destino',
+    onProgress: function (pr) {
+      if (txt) txt.textContent = 'Subiendo... ' + Math.round(pr.percentage || 0) + '%';
+    }
+  }).then(function (r) {
+    state.foto_principal_url = r.url;
+    state.foto_principal_base64 = null;
+    showFotoPreview(r.url);
+  }).catch(function (e) {
+    if (txt) txt.textContent = 'Toca para subir foto principal';
+    alert((e && e.message) ? e.message : 'No se pudo subir la foto');
+  });
+}
+
+function subirFotoGaleria() {
+  if (!window.MediaUpload) { alert('Subida no disponible'); return; }
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.style.display = 'none';
+  inp.onchange = function () {
+    var file = inp.files && inp.files[0];
+    if (!file) return;
+    var v = window.MediaUpload.validar(file, 'foto');
+    if (!v.ok) { alert(v.error); return; }
+    window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'destino' })
+      .then(function (r) { addGaleriaRow(r.url); })
+      .catch(function (e) { alert((e && e.message) ? e.message : 'No se pudo subir la foto'); });
   };
-  reader.readAsDataURL(file);
+  document.body.appendChild(inp);
+  inp.click();
 }
 
 function previewFromUrl(url) {
@@ -904,13 +936,14 @@ function toggleFotoUrl() {
   w.style.display = w.style.display === 'none' ? 'block' : 'none';
 }
 
-function addGaleriaRow() {
+function addGaleriaRow(url) {
   var rows = document.querySelectorAll('.galeria-url-row');
   if (rows.length >= 8) { alert('Máximo 8 fotos en galería'); return; }
   var n = rows.length + 2;
   var div = document.createElement('div');
   div.className = 'field galeria-url-row';
   div.innerHTML = '<input type="url" placeholder="URL foto ' + n + '" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">';
+  if (url) { div.querySelector('input').value = url; }
   document.getElementById('galeria-urls').appendChild(div);
 }
 

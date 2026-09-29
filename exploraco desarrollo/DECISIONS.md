@@ -3777,3 +3777,24 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Estado de la Nota:** CERRADA. La cifra real de Capa 0 + Capa 0b existe (arriba) y el ADR-067 puede darse por cerrado; la unica verificacion abierta (R3 en runtime) no bloquea el cierre documental y se arrastra como deuda en TASKS.md TSK-157.
 
 **ADRs relacionados:** ADR-002 (ASCII-safe de este documento), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8 de funciones serverless), ADR-048 (ruta Hybrid Pro/Free: superado en su parte de roster por este ADR), BUG-022 (verificacion HEAD 200 de fotos de Wikimedia Commons), TSK-132 (skill `express-mode`), skill `.opencode/skills/gemini-research/SKILL.md`, script `scripts/ejecucion/informe-cuota.js`.
+
+## ADR-068: Subida de medios con Vercel Blob (client upload) dentro de api/utilidades.js
+
+**ID:** ADR-068. **Fecha:** 2026-09-29. **Estado:** IMPLEMENTADO EN WORKING TREE (modo express).
+
+**Contexto:** Hasta ahora todo el contenido multimedia se guardaba como URL pegada a mano (`album_fotos.foto_url`, `destinos_fotos.url`, `albumes.portada_url`, `usuarios.foto_url`); no existia subida real de archivos. Se pide que los usuarios puedan subir imagenes, audio y video desde el sitio.
+
+**Decision:** Implementar subidas con **Vercel Blob en modo client upload** (el navegador sube el archivo DIRECTO al store; la funcion serverless solo emite el token firmado). El endpoint de tokens vive como nueva rama `?tipo=blob_upload` dentro de `api/utilidades.js` (no se crea archivo nuevo en `/api`). Cliente compartido `media-upload.js` que carga `@vercel/blob/client` desde `esm.sh` con version fija (2.8.0, sin bundler). Limites: foto 5 MB / audio 15 MB / video 30 MB. Autorizacion en 3 modos: Admin (`Bearer ADMIN_SECRET` -> prefijo `admin/`), Usuario (JWT HMAC en `clientPayload` -> prefijo `usuarios/<sub>/`), Publico (solo contexto `destino` + foto -> prefijo `publico/destino/`).
+
+**Opciones evaluadas y descartadas:**
+1. `put()` server-side desde una funcion. Descartado: el body serverless topa ~4.5 MB, insuficiente para audio/video.
+2. Endpoint nuevo `api/blob-upload.js`. Descartado: rompe el presupuesto 8/8 de funciones (ADR-010).
+3. Bundle vendorizado del cliente (esbuild). Descartado por express: agrega build/dependencia; se usa CDN con version fija (consistente con Leaflet via unpkg).
+
+**Justificacion:** El client upload es la unica via que soporta video sin el tope de body; plegarlo en `utilidades.js` respeta ADR-010; el limite por tipo y el prefijo obligatorio por usuario/admin acotan el abuso y el aislamiento de rutas.
+
+**Impacto:** `package.json` (+`@vercel/blob@2.8.0`); `api/utilidades.js` (rama `blob_upload` + helpers, sin tocar el resto del handler); NUEVO `media-upload.js`; `mi-perfil.html`, `publicar.html`, `admin.html` (controles de subida en Museo, album, portadas, foto de perfil, destino, hero/galeria/cartas del admin); `.env.example` (`BLOB_READ_WRITE_TOKEN`). **8/8 endpoints intacto**; sin migraciones de esquema.
+
+**Riesgos / deuda aceptada [DEUDA-EXPRESS]:** (a) la subida anonima se limita a la foto principal de destinos (5 MB) pero SIN rate-limit propio, apoyada en el cap del store; (b) `blobVerificarJwt()` duplica el verificador de `api/interacciones.js` en vez de un helper compartido; (c) dependencia de CDN externo (`esm.sh`) en runtime del navegador; (d) los marcadores `[foto:]/[video:]` del editor de blog del admin siguen por URL (no se les puso boton de subida).
+
+**ADRs relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8 de funciones serverless), ADR-016 (contratos de album/media), ADR-051 (coords), ADR-053 (sesion/JWT), TSK-158.

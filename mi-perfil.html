@@ -535,6 +535,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-museo-input.good{border-color:#22C55E}
 .pf-museo-hint{font-size:10px;color:rgba(255,255,255,.35);margin-top:4px;line-height:1.5}
 .pf-museo-hint.bad{color:#fca5a5}
+.pf-museo-drop{border:1.5px dashed rgba(232,160,32,.45);border-radius:10px;padding:14px;text-align:center;cursor:pointer;color:rgba(255,255,255,.6);font-size:12px;font-family:'Outfit',sans-serif;transition:background .15s,border-color .15s}
+.pf-museo-drop:hover,.pf-museo-drop.drag{background:rgba(232,160,32,.1);border-color:var(--gold);color:var(--gold)}
+.pf-museo-progress{height:6px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px}
+.pf-museo-progress i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.pf-museo-up-row{display:flex;gap:8px;align-items:center;margin-top:8px}
 .pf-museo-hint.good{color:#86efac}
 .pf-museo-check{display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(255,255,255,.7);cursor:pointer}
 .pf-museo-check input{accent-color:#E8A020}
@@ -808,8 +813,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Obligatorio: fija el pin del album en el mapa para que aparezca.</p>
       </div>
       <div style="margin-bottom:12px;">
-        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">URL de portada (opcional)</label>
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Portada (sube una imagen o pega una URL)</label>
         <input type="url" id="album-portada" placeholder="https://..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        <button type="button" onclick="muElegirArchivo('album-portada','album','foto')" style="margin-top:6px;padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x2B06; Subir imagen</button>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
         <button onclick="cerrarModalCrearAlbum()" style="padding:8px 16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.7);font-family:Outfit,sans-serif;">Cancelar</button>
@@ -832,7 +838,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       </div>
       <div id="album-det-add-foto" style="display:none;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;margin-bottom:12px;">
         <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px;">+ Agregar foto al &aacute;lbum</div>
-        <input type="url" id="album-nueva-foto-url" maxlength="2000" placeholder="URL de la foto (https://...)" style="width:100%;padding:7px 10px;margin-bottom:6px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        <input type="url" id="album-nueva-foto-url" maxlength="2000" placeholder="URL del recurso (https://...) o sube un archivo" style="width:100%;padding:7px 10px;margin-bottom:6px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        <button type="button" onclick="muElegirArchivo('album-nueva-foto-url','album',null,albumTrasSubir)" style="margin-bottom:6px;padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x2B06; Subir archivo (foto, audio o video)</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <select id="album-nueva-foto-tipo" style="flex:1;min-width:90px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
             <option value="foto">&#x1F4F7; Foto</option>
@@ -879,8 +886,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <textarea id="edit-album-descripcion" maxlength="1000" rows="3" style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;"></textarea>
       </div>
       <div style="margin-bottom:12px;">
-        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">URL de portada (opcional)</label>
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Portada (sube una imagen o pega una URL)</label>
         <input type="url" id="edit-album-portada" maxlength="2000" placeholder="https://..." style="width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:14px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+        <button type="button" onclick="muElegirArchivo('edit-album-portada','album','foto')" style="margin-top:6px;padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x2B06; Subir imagen</button>
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.7);">Ciudad</label>
@@ -920,6 +928,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <button type="button" class="pf-museo-x" onclick="museoCerrarModal()" aria-label="Cerrar">&times;</button>
       </div>
       <input type="hidden" id="museo-f-id" value="">
+      <div class="pf-museo-field" id="museo-upload-wrap">
+        <label class="pf-museo-lbl">Subir archivo (foto, audio o video)</label>
+        <div class="pf-museo-drop" id="museo-drop"
+          onclick="muElegirArchivo('museo-f-url','museo',null,museoTrasSubir)"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="muDrop(event,'museo-f-url','museo',null,museoTrasSubir)">Elige un archivo o arrastralo aqui (foto 5 MB / audio 15 MB / video 30 MB)</div>
+      </div>
       <div class="pf-museo-field">
         <label class="pf-museo-lbl" for="museo-f-url">Link del recurso (https://...) *</label>
         <input type="url" id="museo-f-url" class="pf-museo-input" maxlength="2000" placeholder="https://..." oninput="museoValidarUrl();museoActualizarPreview()">
@@ -971,6 +987,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div class="pf-museo-hint" id="museo-f-coords-msg">Opcional: fija lat/lng para darle un pin propio a este recurso.</div>
         <div class="pf-museo-hint">Sin coords propias, el recurso hereda el pin de su carpeta. La ciudad solo se registra al crear.</div>
       </div>
+      <input type="file" id="mu-file" accept="image/*,audio/*,video/*" style="display:none" onchange="muFileChange(this)">
+      <div class="pf-museo-progress" id="mu-progress" style="display:none"><i id="mu-progress-bar"></i></div>
       <div id="museo-f-msg" class="pf-museo-form-msg" style="display:none"></div>
       <div class="pf-museo-actions">
         <button type="button" class="pf-museo-btn ghost" onclick="museoCerrarModal()">Cancelar</button>
@@ -1123,6 +1141,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="map-picker.js?v=2"></script>
 <!-- ADR-052: media-actions.js (voto/guardado compartido) antes del inline -->
 <script src="media-actions.js"></script>
+<script src="media-upload.js"></script>
 <script src="mercado.js?v=1"></script>
 <script>
 /* mi-perfil.html -- Rev 2026-09-18c: acordeon de niveles (ADR-040 T1) */
@@ -4865,6 +4884,10 @@ function pfEditarCampo(campo) {
     if (bio.length < 40) { showToast('La bio necesita al menos 40 caracteres', '#ef4444'); return; }
     cambios = { bio: bio };
   } else if (campo === 'foto_url') {
+    if (window.MediaUpload) {
+      muElegirArchivo(null, 'perfil', 'foto', function (r) { pfGuardarPerfil({ foto_url: r.url || '' }); });
+      return;
+    }
     var foto = prompt('URL de tu foto (https://...):', u.foto_url || u.avatar_url || '');
     if (foto === null) return;
     cambios = { foto_url: foto.trim() };
@@ -5603,6 +5626,68 @@ function v61AccionContrato(accion, contratoId) {
     else if (res) m = v61Msg(res);
     showToast(m, '#ef4444');
   }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+
+/* ---- SUBIDA DE MEDIOS (Vercel Blob) ----
+   Flujo unico reutilizado por Museo, album, portada y foto de perfil.
+   muElegirArchivo() abre el picker; muDrop() atiende arrastrar y soltar;
+   muSubirArchivo() valida y sube; el resultado se escribe en el campo
+   destino (campoId) y luego corre onDone. */
+var MU_CTX = null;
+function muElegirArchivo(campoId, contexto, tipo, onDone) {
+  MU_CTX = { campoId: campoId || null, contexto: contexto || 'museo', tipo: tipo || null, onDone: (typeof onDone === 'function') ? onDone : null };
+  var inp = document.getElementById('mu-file');
+  if (inp) inp.click();
+}
+function muFileChange(input) {
+  var f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  var ctx = MU_CTX || { campoId: null, contexto: 'museo', tipo: null, onDone: null };
+  MU_CTX = null;
+  muSubirArchivo(f, ctx.campoId, ctx.contexto, ctx.tipo, ctx.onDone);
+}
+function muDrop(ev, campoId, contexto, tipo, onDone) {
+  ev.preventDefault();
+  if (ev.currentTarget && ev.currentTarget.classList) ev.currentTarget.classList.remove('drag');
+  var dt = ev.dataTransfer;
+  var f = (dt && dt.files) ? dt.files[0] : null;
+  if (f) muSubirArchivo(f, campoId, contexto, tipo, onDone);
+}
+function muSubirArchivo(file, campoId, contexto, tipo, onDone) {
+  if (!window.MediaUpload) { showToast('Subida no disponible', '#ef4444'); return; }
+  var v = window.MediaUpload.validar(file, tipo);
+  if (!v.ok) { showToast(v.error, '#ef4444'); return; }
+  muProgreso(0, true);
+  showToast('Subiendo archivo...');
+  window.MediaUpload.subir({
+    file: file, tipo: v.tipo, contexto: contexto || 'museo',
+    onProgress: function (p) { muProgreso(p.percentage || 0, true); }
+  }).then(function (r) {
+    muProgreso(100, false);
+    if (campoId) { var el = document.getElementById(campoId); if (el) el.value = r.url; }
+    showToast('Archivo subido');
+    if (typeof onDone === 'function') onDone(r);
+  }).catch(function (e) {
+    muProgreso(0, false);
+    showToast((e && e.message) ? e.message : 'No se pudo subir el archivo', '#ef4444');
+  });
+}
+function muProgreso(pct, visible) {
+  var wrap = document.getElementById('mu-progress');
+  if (wrap) wrap.style.display = visible ? 'block' : 'none';
+  var bar = document.getElementById('mu-progress-bar');
+  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+function museoTrasSubir(r) {
+  var sel = document.getElementById('museo-f-tipo');
+  if (sel && r && r.tipo) sel.value = r.tipo;
+  if (typeof museoValidarUrl === 'function') museoValidarUrl();
+  if (typeof museoActualizarPreview === 'function') museoActualizarPreview();
+}
+function albumTrasSubir(r) {
+  var sel = document.getElementById('album-nueva-foto-tipo');
+  if (sel && r && r.tipo) sel.value = r.tipo;
 }
 
 /* ---- INIT ---- */

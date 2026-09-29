@@ -3633,5 +3633,26 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Fuera de alcance:** NO toca `api/*` (**8/8 INTACTO**); sin migraciones; no modifica `.opencode/**` desde este pase (solo lo documenta).
 - **Dependencia:** ninguna (arranca en frio re-ejecutando `node scripts/ejecucion/informe-cuota.js --overhead`).
 
+### TSK-158: Subida de medios con Vercel Blob (client upload) en todas las superficies [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE / verificado local (2026-09-29, modo express); pendiente commit + prueba manual en produccion.
+- **Prioridad:** Alta (bloquea la subida real de archivos).
+- **Fecha:** 2026-09-29.
+- **Origen:** peticion del usuario (subir imagenes, audio y video).
+- **ADR:** DECISIONS.md ADR-068.
+- **Alcance REAL ejecutado:**
+  1. `package.json`: +`@vercel/blob@2.8.0`.
+  2. `api/utilidades.js`: rama `?tipo=blob_upload` (client upload tokens); helpers `blobVerificarJwt`/`blobUpload`; 3 modos (admin/user/publico-destino); prefijo obligatorio; limites foto 5 / audio 15 / video 30 MB. **8/8 endpoints intacto.**
+  3. NUEVO `media-upload.js`: `window.MediaUpload.{LIMITES,tipoDeArchivo,validar,subir}`; carga `@vercel/blob/client` desde `esm.sh@2.8.0`.
+  4. `mi-perfil.html`: drop + picker en Museo, boton en +Agregar foto, portadas de album (crear/editar) y foto de perfil.
+  5. `publicar.html`: foto principal (reemplaza base64/FileReader) + boton de subida a galeria.
+  6. `admin.html`: botones de subida en hero, galeria y cartas (imagen).
+  7. `.env.example`: `BLOB_READ_WRITE_TOKEN`.
+- **Evidencia (ADR-006):** `node --check` 2/2; ASCII 0 bytes>127 en los 2 `.js`; divs mi-perfil 551/551, publicar 140/140, admin 1077/1077; inline scripts parsean (vm.Script); prueba local 7/7; smoke 036 media 93/93.
+- **Deuda aceptada [DEUDA-EXPRESS]:** (a) subida anonima sin rate-limit propio (solo foto de destino, 5 MB); (b) `blobVerificarJwt()` duplicado; (c) CDN `esm.sh` en runtime; (d) marcadores de blog del admin siguen por URL.
+- **Relacion con bugs:** ninguno nuevo.
+- **Fuera de alcance:** sin migraciones de esquema (se reusa `foto_url`/`url`); sin tocar el resto de rutas de `utilidades.js`.
+- **Dependencia:** store Blob conectado al proyecto en Vercel (`BLOB_READ_WRITE_TOKEN`).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

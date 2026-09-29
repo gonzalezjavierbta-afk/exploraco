@@ -4,8 +4,11 @@
 // ?tipo=diagnostico -> info sistema (auth)
 // ?tipo=fotos       -> CRUD galeria destinos_fotos (GET sin auth, resto con auth)
 // ?tipo=buscar      -> pagina SSR de resultados indexable (GET sin auth, TASK-008)
+// ?tipo=blob_upload -> emite tokens de Vercel Blob (client upload de medios)
 
 const { neon } = require('@neondatabase/serverless');
+const { handleUpload } = require('@vercel/blob/client');
+const crypto = require('crypto');
 
 var BASE = 'https://exploraco.co';
 var STATIC_PAGES = [
@@ -31,6 +34,107 @@ function xe(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// == BLOB (subida de medios) =======================================
+// ?tipo=blob_upload -> emite tokens de Vercel Blob (client upload). El
+// navegador sube el archivo DIRECTO al store; aqui solo se valida permiso y
+// limites (evita el tope de ~4.5 MB del body serverless).
+// Autorizacion: Admin (Bearer ADMIN_SECRET) | Usuario (JWT en clientPayload)
+// | Publico (solo contexto 'destino' + foto). Limites: foto 5 MB / audio
+// 15 MB / video 30 MB (espejo de media-upload.js).
+// [DEUDA-EXPRESS] blobVerificarJwt() duplica el verificador de
+// api/interacciones.js (verificarSesion) para no refactorizar el monolito.
+var BLOB_LIMITES = { foto: 5*1024*1024, audio: 15*1024*1024, video: 30*1024*1024 };
+var BLOB_TIPOS = {
+  foto:  ['image/jpeg','image/png','image/webp','image/gif','image/avif'],
+  audio: ['audio/mpeg','audio/mp4','audio/aac','audio/wav','audio/ogg','audio/webm','audio/x-m4a'],
+  video: ['video/mp4','video/webm','video/quicktime','video/ogg'],
+};
+
+function blobVerificarJwt(token) {
+  if (!token || typeof token !== 'string') return null;
+  var punto = token.indexOf('.');
+  if (punto <= 0 || punto === token.length - 1) return null;
+  var payloadB64 = token.slice(0, punto);
+  var firma = token.slice(punto + 1);
+  var firmaEsperada = crypto
+    .createHmac('sha256', process.env.SESSION_JWT_SECRET || 'dev_secret')
+    .update(payloadB64)
+    .digest('base64url');
+  var fa = Buffer.from(firma, 'utf8');
+  var fb = Buffer.from(firmaEsperada, 'utf8');
+  if (fa.length !== fb.length) return null;
+  if (!crypto.timingSafeEqual(fa, fb)) return null;
+  var payload = null;
+  try { payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8')); } catch (e) { return null; }
+  if (!payload || !payload.exp || !payload.sub) return null;
+  if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
+  return payload;
+}
+
+function blobErrorDe(msg) {
+  var e = new Error(msg);
+  e.__blob = msg;
+  return e;
+}
+
+async function blobUpload(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'METODO_NO_PERMITIDO' });
+  if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.VERCEL_OIDC_TOKEN) {
+    return res.status(503).json({ ok:false, error:'ALMACENAMIENTO_NO_CONFIGURADO' });
+  }
+  var body = req.body || {};
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+  var authHeader = String(req.headers.authorization || '');
+  var adminSecret = process.env.ADMIN_SECRET || 'exploraco12345';
+  var esAdmin = (authHeader === ('Bearer ' + adminSecret));
+  try {
+    var resultado = await handleUpload({
+      body: body,
+      request: req,
+      onBeforeGenerateToken: function (pathname, clientPayload) {
+        var pl = {};
+        try { pl = clientPayload ? JSON.parse(clientPayload) : {}; } catch (e) { pl = {}; }
+        var tipo = String(pl.tipo || 'foto').toLowerCase();
+        if (!BLOB_TIPOS[tipo]) tipo = 'foto';
+        var prefijo = null;
+        var tokenPayload = null;
+        if (esAdmin) {
+          prefijo = 'admin/';
+          tokenPayload = JSON.stringify({ modo:'admin', tipo:tipo });
+        } else {
+          var sesion = blobVerificarJwt(pl.jwt);
+          if (sesion) {
+            if (pl.usuario_id && String(pl.usuario_id) !== String(sesion.sub)) throw blobErrorDe('SESION_INVALIDA');
+            prefijo = 'usuarios/' + sesion.sub + '/';
+            tokenPayload = JSON.stringify({ modo:'usuario', usuario_id:String(sesion.sub), tipo:tipo });
+          } else {
+            if (tipo !== 'foto' || String(pl.contexto || '') !== 'destino') throw blobErrorDe('SESION_REQUERIDA');
+            prefijo = 'publico/destino/';
+            tokenPayload = JSON.stringify({ modo:'publico', tipo:tipo });
+          }
+        }
+        var base = String(pathname || '').split('/').pop() || '';
+        var limpio = base.replace(/[^A-Za-z0-9._-]/g, '');
+        if (!limpio) throw blobErrorDe('PATHNAME_INVALIDO');
+        if (String(pathname).indexOf(prefijo + tipo + '/') !== 0) throw blobErrorDe('PATHNAME_NO_AUTORIZADO');
+        return {
+          allowedContentTypes: BLOB_TIPOS[tipo],
+          maximumSizeInBytes: BLOB_LIMITES[tipo],
+          addRandomSuffix: true,
+          tokenPayload: tokenPayload,
+        };
+      },
+    });
+    return res.status(200).json(resultado);
+  } catch (err) {
+    var msg = (err && err.message) ? err.message : 'ERROR_SUBIDA';
+    var codigo = 400;
+    if (msg === 'SESION_REQUERIDA') codigo = 401;
+    else if (msg === 'PATHNAME_NO_AUTORIZADO' || msg === 'PATHNAME_INVALIDO' || msg === 'SESION_INVALIDA') codigo = 403;
+    return res.status(codigo).json({ ok:false, error:msg });
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -38,6 +142,12 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   var tipo = req.query.tipo || '';
+
+  // == BLOB (subida de medios, sin BD) ==============================
+  if (tipo === 'blob_upload') {
+    return blobUpload(req, res);
+  }
+
   var sql  = neon(process.env.DATABASE_URL);
 
   // == SITEMAP ======================================================

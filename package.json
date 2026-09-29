@@ -12,6 +12,7 @@
     "smoke:mercado": "node scripts/smoke_mercado.js"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.9.0"
+    "@neondatabase/serverless": "^0.9.0",
+    "@vercel/blob": "^2.8.0"
   }
 }

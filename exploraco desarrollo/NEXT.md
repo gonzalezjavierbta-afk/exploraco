@@ -1905,4 +1905,46 @@ archivos, +649/-167.
   estable futura (no `destinos_fotos.id`).
 
 
+## Sesion 2026-09-29 (modo express) - Subida de medios con Vercel Blob
+
+**Que se estaba haciendo:** instalar subida real de archivos (imagenes, audio y
+video) con Vercel Blob en TODAS las superficies de carga del sitio, en un solo
+pase express.
+
+**Alcance real ejecutado:**
+- `package.json`: dependencia `@vercel/blob@2.8.0`.
+- `api/utilidades.js`: nueva rama `?tipo=blob_upload` (client upload tokens via
+  `handleUpload`), con 3 modos de autorizacion (admin/user/publico-destino),
+  prefijo obligatorio de pathname y limites foto 5 / audio 15 / video 30 MB.
+  **8/8 endpoints intacto** (no se creo archivo nuevo en /api; ADR-068).
+- NUEVO `media-upload.js`: cliente compartido (`window.MediaUpload.subir`) que
+  carga `@vercel/blob/client` desde `esm.sh@2.8.0` y valida tipo/tamano.
+- Cableado de subida en: `mi-perfil.html` (Museo, +Agregar foto a album,
+  portada de album crear/editar, foto de perfil), `publicar.html` (foto
+  principal + galeria), `admin.html` (hero, galeria, cartas).
+- `.env.example`: documenta `BLOB_READ_WRITE_TOKEN`.
+
+**Evidencia (ADR-006):** `node --check` OK en `api/utilidades.js` y
+`media-upload.js`; ASCII 0 bytes>127 en ambos; divs balanceados (mi-perfil
+551/551, publicar 140/140, admin 1077/1077); bloques inline parsean (vm.Script);
+prueba local del handler 7/7 (503 sin token, 401 anonimo museo/video, 200
+admin y anonimo-destino, 403 pathname ajeno, 405 GET); smoke 036 media 93/93.
+
+**Que sigue:**
+1. Commit + push + deploy. En Vercel, confirmar el store Blob conectado al
+   proyecto (inyecta `BLOB_READ_WRITE_TOKEN`) y para local `vercel env pull`.
+2. Prueba manual end-to-end en produccion: subir foto/audio/video en cada
+   superficie; verificar 401 sin sesion, rechazo por tipo/tamano y render en
+   galeria/comunidad/mapa; confirmar que el archivo aparece en el dashboard de
+   Blob.
+3. Opcional: boton de subida para los marcadores `[foto:]/[video:]` del editor
+   de blog del admin.
+
+**Riesgos activos:**
+- `[DEUDA-EXPRESS]` subida anonima (solo foto de destino) sin rate-limit
+  propio; `blobVerificarJwt()` duplica el verificador de `interacciones.js`;
+  dependencia de CDN `esm.sh` en runtime; marcadores de blog siguen por URL.
+- El store debe permanecer **publico** (`access:'public'`): las galerias
+  renderizan la URL directa del blob.
+
 > **Historico: sesiones del 2026-09-15 y anteriores (TSK-104 y previas, mas hotfixes), incluidos los bloques 2026-09-12..15, las Fases 6-9 y los bloques de Sprint 2-7, movidas a NEXT_ARCHIVO.md.**

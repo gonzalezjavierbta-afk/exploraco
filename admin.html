@@ -421,6 +421,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="map-picker.js?v=2"></script>
+<script src="media-upload.js"></script>
 </head>
 
 <body>
@@ -857,8 +858,9 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               placeholder="https://images.unsplash.com/photo-...?w=900&q=80"
               oninput="previewHero(this.value)">
             <button class="btn btn-ghost btn-sm" onclick="pickUnsplash('hero')">Unsplash</button>
+            <button class="btn btn-ghost btn-sm" onclick="adminSubirImagen('f-photo-hero', previewHero)">&#x2B06; Subir</button>
           </div>
-          <div class="form-hint">URL de imagen para el hero. Usar Unsplash, Cloudinary u otro CDN de imagenes.</div>
+          <div class="form-hint">URL de imagen para el hero, o sube una desde tu equipo (Vercel Blob).</div>
           <div id="hero-preview" style="margin-top:8px;display:none">
             <img id="hero-preview-img" style="width:100%;height:160px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border)" alt="Hero preview">
           </div>
@@ -893,6 +895,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
           <div class="photo-list" id="photo-list"></div>
           <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="addPhotoField()">+ URL manual</button>
+            <button class="btn btn-ghost btn-sm" onclick="adminSubirImagen(null, addPhotoFieldWithUrl)">&#x2B06; Subir foto</button>
             <button class="btn btn-ghost btn-sm" onclick="pickUnsplash('gallery')">Unsplash</button>
             <button class="btn btn-ghost btn-sm" onclick="showPhotoGrid()">Ver galeria</button>
           </div>
@@ -2260,6 +2263,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         <div style="flex:2 1 220px;min-width:180px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Imagen URL</div>
           <input class="form-input" id="carta-imagen" placeholder="https://..." style="width:100%">
+          <button class="btn btn-ghost btn-sm" type="button" style="margin-top:6px" onclick="adminSubirImagen('carta-imagen')">&#x2B06; Subir imagen</button>
         </div>
         <button class="btn btn-gold" onclick="crearCarta()" style="white-space:nowrap">&#10133; Crear</button>
       </div>
@@ -2319,6 +2323,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px">Imagen URL</div>
         <input class="form-input" id="carta-edit-imagen" placeholder="https://..." style="width:100%">
+        <button class="btn btn-ghost btn-sm" type="button" style="margin-top:6px" onclick="adminSubirImagen('carta-edit-imagen')">&#x2B06; Subir imagen</button>
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.5">El ID es identidad y no se edita. Cero Borrado Logico: desactivar una carta no la borra del catalogo.</div>
     </div>
@@ -9044,6 +9049,35 @@ function saludGamingCard(d) {
   }
   console.groupEnd();
 })();
+
+/* ---- SUBIDA DE IMAGENES (Vercel Blob, admin) ----
+   adminSubirImagen(campoId, onDone): abre el picker, sube con la sesion
+   admin (Authorization: Bearer <admin_secret>) y escribe la URL resultante
+   en campoId (si se indica) o la pasa a onDone(url). */
+function adminSubirImagen(campoId, onDone) {
+  if (!window.MediaUpload) { showAdminToast('Subida no disponible', 'error'); return; }
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.style.display = 'none';
+  inp.onchange = function () {
+    var file = inp.files && inp.files[0];
+    if (!file) return;
+    var v = window.MediaUpload.validar(file, 'foto');
+    if (!v.ok) { showAdminToast(v.error, 'error'); return; }
+    showAdminToast('Subiendo imagen...');
+    var secret = localStorage.getItem('admin_secret') || 'exploraco12345';
+    window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'admin', adminToken: secret })
+      .then(function (r) {
+        showAdminToast('Imagen subida', 'success');
+        if (campoId) { var el = document.getElementById(campoId); if (el) el.value = r.url; }
+        if (typeof onDone === 'function') onDone(r.url);
+      })
+      .catch(function (e) { showAdminToast((e && e.message) ? e.message : 'No se pudo subir la imagen', 'error'); });
+  };
+  document.body.appendChild(inp);
+  inp.click();
+}
 </script>
 </div>
 </body>
