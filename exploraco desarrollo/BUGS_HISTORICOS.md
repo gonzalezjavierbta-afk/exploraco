@@ -1562,3 +1562,43 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Prevencion:** el reemplazo que se pasa a `queryConAvatarFallback` debe aportar SOLO la expresion de la columna (sin alias), porque la plantilla ya aporta el `AS <alias>`; incluir `AS` en el reemplazo duplica el alias. Regla general: al sustituir por token en una plantilla SQL, NO incluir el alias/`AS` en el valor de reemplazo, y revisar los call sites cuando se agregue una plantilla nueva con token.
 **Estado:** CERRADO (2026-09-23). Commit `1302f7c` desplegado por push a `origin/main` (Vercel despliega al push) y verificacion en vivo 200/404 confirmada. BUG-060 (causa raiz de datos) tambien CERRADO en la misma sesion. Ver TASKS.md TSK-154.
 
+## BUG-085 / BUG-CONFIG-1: R3 no aplicado -- T5 borro las entradas `webfetch:`/`websearch:` del frontmatter en vez de ponerlas en `deny`
+
+**Severidad:** ALTA (gobernanza/seguridad de coste: un subagente de ejecucion pudo salir a la web pese a la regla R3, gastando cuota y rompiendo el aislamiento de la capa).
+**Contexto:** detectado en la tanda de coste ADR-067 (T5/T6/T7, 2026-09-28). R3 del ADR-067 manda que la investigacion web NO la hagan los subagentes (solo Google Gemini). T5, al normalizar el frontmatter de los agentes, ELIMINO las lineas `webfetch:`/`websearch:` en vez de fijarlas en `deny`; el resultado real fue una regresion de permisos.
+**Problema:** tras la tanda T5, un subagente (`exp-pickle`) pudo invocar `webfetch`/`websearch` con exito, pese a la intencion de R3 y al `deny` global declarado en `opencode.json`.
+**Causa raiz:** T5 elimino las entradas `webfetch:`/`websearch:` del frontmatter en vez de ponerlas en `deny`. En el modelo de permisos de opencode, la AUSENCIA de regla equivale a PERMITIDO por defecto; borrar la linea no deniega nada. El `deny` global de `opencode.json` NO basto para cubrir el caso medido en la sesion viva (ver BUG-086: la config se carga al iniciar).
+**Blindaje:** `webfetch: deny` + `websearch: deny` EXPLICITOS en 18 de los 19 agentes; solo `research-agent-free` los conserva en `allow` (es el unico agente autorizado a web por diseno). Se mantiene ademas el `deny` global en `opencode.json` como defensa en profundidad.
+**Verificacion:** `git grep -n "webfetch: allow" -- .opencode/agent/` -> solo `research-agent-free.md`; `git grep -c "webfetch: deny" -- .opencode/agent/` -> 18. Correrlos tras cualquier cambio de frontmatter.
+**Estado:** CERRADO el blindaje estatico (2026-09-28); la verificacion en RUNTIME queda PENDIENTE (BUG-086 / TASKS.md TSK-157). Ver DECISIONS.md ADR-067.
+
+## BUG-086 / BUG-CONFIG-2: la config de agentes/permisos se carga al INICIAR la sesion de opencode
+
+**Severidad:** MEDIA (falso veredicto de QA: una prueba de runtime puede no reflejar el estado final del disco).
+**Contexto:** detectado en la misma tanda ADR-067 (T7, 2026-09-28) al intentar probar R3 en la sesion en curso.
+**Problema:** los cambios de `permission`/agentes NO surten efecto en la sesion en curso; la prueba de runtime de T7 no refleja el estado final del disco (la sesion habia arrancado con la config previa).
+**Causa raiz:** opencode carga agentes y permisos al ARRANCAR la sesion; los cambios en `.opencode/agent/**` y `opencode.json` no se aplican a la sesion viva. Por eso una prueba de `webfetch` dentro de la misma sesion en que se edito la config es invalida como evidencia.
+**Blindaje:** tras cambiar agentes/permisos hay que REINICIAR opencode antes de validar; documentado en `docs/orquestacion/REFERENCIA-RUTEO.md`.
+**Verificacion (PENDIENTE):** reiniciar opencode y lanzar un subagente (p.ej. `js-silo-dev-free`) que intente `webfetch` -> debe ser denegado. Registrado como pendiente en TASKS.md TSK-157.
+**Estado:** ABIERTO como verificacion (2026-09-28); no es un defecto del codigo sino una restriccion del runtime. Ver DECISIONS.md ADR-067 y TASKS.md TSK-157.
+
+## BUG-087 / BUG-CONFIG-3: Wikimedia Commons rechaza anchos de thumbnail arbitrarios (HTTP 400)
+
+**Severidad:** MEDIA (URLs de imagen rotas embebidas en HTML/JS que BUG-022 no detecta).
+**Contexto:** hallazgo de la tanda ADR-067 (T7, 2026-09-28), verificado con `curl -I`.
+**Problema:** `curl -I` contra URLs de Wikimedia del tipo `/thumb/.../800px-...` y `/1200px-...` devuelve HTTP 400 con el mensaje `Use thumbnail sizes listed on https://w.wiki/GHai`. Hay URLs de 800px/1200px YA embebidas en HTML/JS del repo que por tanto estan rotas, y BUG-022 no las detecta (la verificacion HEAD 200 de BUG-022 solo corre en el pipeline NUEVO de fichas, no barre el HTML/JS historico).
+**Causa raiz:** Wikimedia cambio su politica y ya no sirve cualquier ancho de thumbnail; solo los que produce la API (`iiurlwidth`) o tamanos estandar.
+**Blindaje:** NO construir a mano la URL de thumbnail; obtener el `thumburl` de la API (`action=query&prop=imageinfo&iiurlwidth=960`) y verificar con `curl -I -L` esperando HTTP 200 en el destino FINAL (BUG-022).
+**Verificacion:** HEAD a 800px -> 400; HEAD del `thumburl` devuelto por la API con `iiurlwidth=960` -> 200; HEAD de un archivo inexistente -> 404 (discrimina bien).
+**Estado:** ABIERTO como deuda de barrido (2026-09-28): hay que barrer y regenerar las URLs 800px/1200px embebidas en HTML/JS. Ver TASKS.md TSK-157 (g) y BUG-022.
+
+## BUG-088 / BUG-CONFIG-4: referencias a `AGENTS.md`, archivo inexistente
+
+**Severidad:** BAJA (enlaces rotos de ruteo; no rompe runtime, confunde al orquestador).
+**Contexto:** hallazgo de la tanda ADR-067 (T7, 2026-09-28), verificado con `git grep`.
+**Problema:** 4 referencias en `.opencode/agent/**` + 1 en `.opencode/skills/express-mode/SKILL.md` apuntaban a `AGENTS.md`, que NO existe -> enlaces rotos de ruteo.
+**Causa raiz:** el archivo se referenciaba por nombre en prompts/agentes pero nunca se creo.
+**Blindaje:** toda referencia apunta ahora a `docs/orquestacion/REFERENCIA-RUTEO.md` (ruta canonica real).
+**Verificacion:** `git grep -n "AGENTS\.md" -- .opencode/` -> 0.
+**Estado:** CERRADO (2026-09-28). Ver DECISIONS.md ADR-067 y `docs/orquestacion/REFERENCIA-RUTEO.md`.
+

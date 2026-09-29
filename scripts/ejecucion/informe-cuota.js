@@ -1,14 +1,28 @@
-// scripts/informe-cuota.js
+// scripts/ejecucion/informe-cuota.js
 // Genera informes de consumo de cuota (costo y tokens) de opencode para el
 // proyecto ExploraCO, leyendo la base local opencode.db en modo read-only.
 // No modifica la base del proceso en ejecucion.
 //
 // Uso:
-//   node scripts/informe-cuota.js --5h            ultimas 5 horas (rodante)
-//   node scripts/informe-cuota.js --dia           dia natural de hoy (local)
-//   node scripts/informe-cuota.js --desde=2026-09-01   desde una fecha
-//   node scripts/informe-cuota.js --hist5h=3      ultimos 3 bloques de 5h (fijos UTC)
-//   node scripts/informe-cuota.js --schema        inspecciona el esquema de la
+//   node scripts/ejecucion/informe-cuota.js --5h            ultimas 5 horas (rodante)
+//   node scripts/ejecucion/informe-cuota.js --dia           dia natural de hoy (local)
+//   node scripts/ejecucion/informe-cuota.js --desde=2026-09-01   desde una fecha
+//   node scripts/ejecucion/informe-cuota.js --hist5h=3      ultimos 3 bloques de 5h (fijos UTC)
+//   node scripts/ejecucion/informe-cuota.js --task[=<marca>]  delta de la tanda actual desde
+//                                                  una marca. <marca> puede ser un
+//                                                  ID de sesion (prefijo suficiente)
+//                                                  o un timestamp ISO
+//                                                  (2026-09-28T14:30:00). Sin marca
+//                                                  usa la sesion mas reciente no
+//                                                  archivada del directorio.
+//   node scripts/ejecucion/informe-cuota.js --overhead      estima el overhead de contexto
+//                                                  (Capa 0 + 0b) leyendo
+//                                                  .opencode/agent/*.md,
+//                                                  .opencode/skills/*/SKILL.md y
+//                                                  opencode.json. Son ESTIMACIONES
+//                                                  con la heuristica chars/3.5, NO
+//                                                  mediciones de la DB.
+//   node scripts/ejecucion/informe-cuota.js --schema        inspecciona el esquema de la
 //                                                  base (tablas, columnas y las
 //                                                  claves JSON reales dentro de
 //                                                  message.data). No genera
@@ -21,6 +35,10 @@
 //     --out=...           carpeta de salida (default: exploraco desarrollo/informes-cuota)
 //     --topn=N            cuantos mensajes de alto consumo listar en el
 //                          desglose de tareas (default: 10)
+//     --max-sessions=N    limita el escaneo a las N sesiones mas recientes
+//                          (entero >= 1). Aplica a --task y a los modos de
+//                          ventana; no aplica a --schema ni a --overhead.
+//                          Default: sin limite.
 //
 // Salida: imprime cada informe en consola y lo guarda en <out>/cuota-*.md
 // Incluye secciones por sesion (session), por subagente x modelo (message),
@@ -55,6 +73,13 @@ var OUT_DIR = argValue('--out=') ||
 var TOP_N = parseInt(argValue('--topn='), 10) || 10;
 
 var now = Date.now();
+
+// --overhead no toca la DB (solo lee archivos de configuracion/agentes/skills),
+// por eso se despacha antes de comprobar la existencia de opencode.db.
+if (hasFlag('--overhead')) {
+  runOverhead();
+  return;
+}
 
 if (!fs.existsSync(DB_PATH)) {
   console.error('ERROR: no se encontro la base opencode.db en: ' + DB_PATH);
@@ -122,6 +147,16 @@ function runSchemaInspection() {
 
 if (hasFlag('--schema')) {
   runSchemaInspection();
+  return;
+}
+
+// --max-sessions=N: valida y define el limite de sesiones procesadas. Se parsea
+// despues de --schema/--overhead porque en esos modos no aplica.
+var MAX_SESSIONS = parseMaxSessionsArg();
+if (MAX_SESSIONS === undefined) return;
+
+if (hasFlag('--task') || hasPrefix('--task=')) {
+  runTask();
   return;
 }
 
@@ -224,11 +259,14 @@ function normalizeTitle(t) {
 // Informe para una ventana
 function buildReport(w) {
   // Sesiones del proyecto en la ventana
-  var rows = query(
-    "SELECT id, title, directory, model, agent, cost, tokens_input, tokens_output, " +
+  var allowed = recentSessionIds();
+  var sc = inClause(allowed, 'id');
+  var rows = query.apply(null,
+    ["SELECT id, title, directory, model, agent, cost, tokens_input, tokens_output, " +
     "tokens_reasoning, tokens_cache_read, tokens_cache_write, time_created, time_updated " +
-    "FROM session WHERE directory LIKE ? AND time_updated >= ? AND time_updated < ? ORDER BY cost DESC",
-    '%' + DIR_FILTER + '%', w.from, w.to
+    "FROM session WHERE directory LIKE ? AND time_updated >= ? AND time_updated < ?" + sc.sql +
+    " ORDER BY cost DESC",
+    '%' + DIR_FILTER + '%', w.from, w.to].concat(sc.params)
   );
 
   var totCost = 0, totIn = 0, totOut = 0, totRea = 0, totCR = 0, totCW = 0;
@@ -268,11 +306,12 @@ function buildReport(w) {
   // Mensajes del proyecto en la ventana (subagente x modelo), con el titulo
   // de la sesion a la que pertenecen para poder listar los prompts de mayor
   // consumo con su contexto.
-  var msgs = query(
-    "SELECT m.data, s.title as session_title, s.id as session_id FROM message m " +
+  var mc = inClause(allowed, 'm.session_id');
+  var msgs = query.apply(null,
+    ["SELECT m.data, s.title as session_title, s.id as session_id FROM message m " +
     "JOIN session s ON s.id = m.session_id " +
-    "WHERE s.directory LIKE ? AND m.time_created >= ? AND m.time_created < ?",
-    '%' + DIR_FILTER + '%', w.from, w.to
+    "WHERE s.directory LIKE ? AND m.time_created >= ? AND m.time_created < ?" + mc.sql,
+    '%' + DIR_FILTER + '%', w.from, w.to].concat(mc.params)
   );
 
   var sa = {};        // por agente
@@ -316,7 +355,9 @@ function buildReport(w) {
   md += '- Ventana: ' + w.label + ' (desde ' + fmtDate(w.from) + ' hasta ' + fmtDate(w.to) + ')\n';
   md += '- Origen: ' + DB_PATH + ' (tablas session y message)\n';
   md += '- Proyecto (filtro dir): *' + DIR_FILTER + '*\n';
-  md += '- Sesiones en ventana: ' + rows.length + ' | Mensajes con costo: ' + msgs.length + '\n\n';
+  md += '- Sesiones en ventana: ' + rows.length + ' | Mensajes con costo: ' + msgs.length + '\n';
+  if (MAX_SESSIONS) md += '- Limite --max-sessions: ' + MAX_SESSIONS + ' sesiones mas recientes\n';
+  md += '\n';
 
   md += '## Resumen (sesiones)\n\n';
   md += '| Metrica | Valor |\n';
@@ -382,7 +423,7 @@ function buildReport(w) {
   if (!anyDescriptionFound) {
     md += '**Nota:** no se encontro ningun campo de descripcion reconocible en message.data ';
     md += 'para esta base (se probaron: summary, title, task, description, intent, prompt, ';
-    md += 'parts, content). Ejecuta `node scripts/informe-cuota.js --schema` para ver las ';
+    md += 'parts, content). Ejecuta `node scripts/ejecucion/informe-cuota.js --schema` para ver las ';
     md += 'claves reales disponibles y, si corresponde, amplia extractTaskDescription() en ';
     md += 'el script con el nombre de campo correcto. Mientras tanto se muestra el resto del ';
     md += 'contexto disponible (sesion, agente, modelo, costo, tokens).\n\n';
@@ -396,6 +437,316 @@ function buildReport(w) {
   });
 
   return md;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers de --max-sessions (T4.3)
+// --max-sessions=N limita el escaneo a las N sesiones mas recientes del
+// directorio (por time_updated). N debe ser un entero >= 1. Devuelve:
+//   null      -> sin limite (flag ausente)
+//   entero    -> limite valido
+//   undefined -> valor invalido (ya se emitio error legible)
+// ---------------------------------------------------------------------------
+function parseMaxSessionsArg() {
+  var idx = -1;
+  for (var i = 0; i < ARGS.length; i++) {
+    if (ARGS[i] === '--max-sessions' || ARGS[i].indexOf('--max-sessions=') === 0) { idx = i; break; }
+  }
+  if (idx === -1) return null;
+  var raw;
+  if (ARGS[idx].indexOf('--max-sessions=') === 0) {
+    raw = ARGS[idx].slice('--max-sessions='.length);
+  } else {
+    raw = (ARGS[idx + 1] !== undefined && ARGS[idx + 1].indexOf('--') !== 0) ? ARGS[idx + 1] : '';
+  }
+  if (!/^[0-9]+$/.test(raw) || parseInt(raw, 10) < 1) {
+    console.error('ERROR: --max-sessions requiere un entero >= 1 (recibido: "' + raw + '").');
+    process.exitCode = 1;
+    return undefined;
+  }
+  return parseInt(raw, 10);
+}
+
+// IDs de las N sesiones mas recientes del directorio, o null si no hay limite.
+function recentSessionIds() {
+  if (!MAX_SESSIONS) return null;
+  return query(
+    "SELECT id FROM session WHERE directory LIKE ? ORDER BY time_updated DESC LIMIT ?",
+    '%' + DIR_FILTER + '%', MAX_SESSIONS
+  ).map(function (r) { return r.id; });
+}
+
+// Fragmento SQL " AND <col> IN (?,?,...)" para acotar una consulta a un
+// conjunto de sesiones. ids=null -> sin restriccion; ids=[] -> sin filas.
+function inClause(ids, col) {
+  if (!ids) return { sql: '', params: [] };
+  if (ids.length === 0) return { sql: ' AND 1=0', params: [] };
+  var ph = ids.map(function () { return '?'; }).join(',');
+  return { sql: ' AND ' + col + ' IN (' + ph + ')', params: ids.slice() };
+}
+
+// ---------------------------------------------------------------------------
+// Modo --task (T4.1): delta de la tanda actual desde una marca.
+// La marca es un ID de sesion (prefijo suficiente) o un timestamp ISO. Sin
+// marca intenta resolver la sesion mas reciente no archivada del directorio.
+// Los tokens por agente salen de message.data.tokens, que en esta base tiene
+// las subclaves reales: input, output, reasoning y cache.{read,write}.
+// ---------------------------------------------------------------------------
+function parseMarkTime(raw) {
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?)?/.test(raw)) return null;
+  var t = Date.parse(raw);
+  return isNaN(t) ? null : t;
+}
+
+function resolveTaskMark() {
+  var raw = argValue('--task=');
+  if (raw === null || raw === '') {
+    var cand = query(
+      "SELECT id, time_created FROM session WHERE directory LIKE ? AND time_archived IS NULL " +
+      "ORDER BY time_updated DESC LIMIT 1",
+      '%' + DIR_FILTER + '%'
+    );
+    if (!cand.length) {
+      cand = query(
+        "SELECT id, time_created FROM session WHERE directory LIKE ? ORDER BY time_updated DESC LIMIT 1",
+        '%' + DIR_FILTER + '%'
+      );
+    }
+    if (!cand.length) {
+      console.error('AVISO: no se pudo resolver la marca automatica de --task para el directorio "' +
+        DIR_FILTER + '". Ejecuta --task=<marca> con un ID de sesion o un timestamp ISO, por');
+      console.error('ejemplo: --task=ses_abc123  o  --task=2026-09-28T14:30:00');
+      process.exitCode = 1;
+      return null;
+    }
+    return { sessionId: cand[0].id, from: cand[0].time_created, kind: 'auto', label: cand[0].id + ' (auto)' };
+  }
+  var t = parseMarkTime(raw);
+  if (t !== null) {
+    return { sessionId: null, from: t, kind: 'timestamp', label: raw + ' (timestamp)' };
+  }
+  var s = query(
+    "SELECT id, time_created FROM session WHERE directory LIKE ? AND id LIKE ? ORDER BY time_updated DESC LIMIT 1",
+    '%' + DIR_FILTER + '%', raw + '%'
+  );
+  if (s.length) {
+    return { sessionId: s[0].id, from: s[0].time_created, kind: 'session', label: s[0].id + ' (id)' };
+  }
+  console.error('ERROR: --task=<marca> no resuelto: "' + raw + '" no es un timestamp ISO valido');
+  console.error('(YYYY-MM-DDTHH:MM[:SS]) ni el prefijo de ninguna sesion del directorio "' + DIR_FILTER + '".');
+  process.exitCode = 1;
+  return null;
+}
+
+function runTask() {
+  var mark = resolveTaskMark();
+  if (!mark) return;
+
+  var allowed = recentSessionIds();
+  var mc = inClause(allowed, 'm.session_id');
+  var sql = "SELECT m.data, m.session_id, s.title as session_title FROM message m " +
+    "JOIN session s ON s.id = m.session_id " +
+    "WHERE s.directory LIKE ? AND m.time_created >= ?";
+  var params = ['%' + DIR_FILTER + '%', mark.from];
+  if (mark.sessionId) { sql += " AND m.session_id = ?"; params.push(mark.sessionId); }
+  sql += mc.sql;
+  params = params.concat(mc.params);
+  var msgs = query.apply(null, [sql].concat(params));
+
+  function emptyAgg() { return { in: 0, out: 0, rea: 0, cr: 0, cw: 0, cost: 0, sess: {} }; }
+  function totalOf(a) { return a.in + a.out + a.rea + a.cr + a.cw; }
+  var tot = emptyAgg();
+  var byAgent = {};
+  var sessSet = {};
+  var seen = { reasoning: false, cache_read: false, cache_write: false };
+  msgs.forEach(function (r) {
+    var d;
+    try { d = JSON.parse(r.data); } catch (e) { return; }
+    var t = d.tokens || {};
+    var hasRea = Object.prototype.hasOwnProperty.call(t, 'reasoning');
+    var cache = t.cache || {};
+    var hasCR = Object.prototype.hasOwnProperty.call(cache, 'read');
+    var hasCW = Object.prototype.hasOwnProperty.call(cache, 'write');
+    if (hasRea) seen.reasoning = true;
+    if (hasCR) seen.cache_read = true;
+    if (hasCW) seen.cache_write = true;
+    var tin = t.input || 0, tout = t.output || 0;
+    var trea = hasRea ? (t.reasoning || 0) : 0;
+    var tcr = hasCR ? (cache.read || 0) : 0;
+    var tcw = hasCW ? (cache.write || 0) : 0;
+    var cost = d.cost || 0;
+    var agent = d.agent || '(principal)';
+    sessSet[r.session_id] = true;
+    tot.in += tin; tot.out += tout; tot.rea += trea; tot.cr += tcr; tot.cw += tcw; tot.cost += cost;
+    if (!byAgent[agent]) byAgent[agent] = emptyAgg();
+    var g = byAgent[agent];
+    g.in += tin; g.out += tout; g.rea += trea; g.cr += tcr; g.cw += tcw; g.cost += cost; g.sess[r.session_id] = true;
+  });
+
+  function cell(v, present) { return present ? fmtTok(v) : 'n/d'; }
+  function rowCells(a, sessCount) {
+    return '| ' + cell(a.in, true) + ' | ' + cell(a.out, true) + ' | ' + cell(a.rea, seen.reasoning) +
+      ' | ' + cell(a.cr, seen.cache_read) + ' | ' + cell(a.cw, seen.cache_write) +
+      ' | ' + fmtTok(totalOf(a)) + ' | ' + fmtUSD(a.cost) + ' | ' + sessCount + ' |';
+  }
+
+  var md = '';
+  md += '# Informe de delta de cuota - ExploraCO (--task)\n\n';
+  md += '- Generado: ' + fmtDate(now) + '\n';
+  md += '- Marca: ' + mark.label + '\n';
+  md += '- Ventana: desde ' + fmtDate(mark.from) + ' hasta ' + fmtDate(now) + '\n';
+  md += '- Origen: ' + DB_PATH + ' (tablas session y message)\n';
+  md += '- Proyecto (filtro dir): *' + DIR_FILTER + '*\n';
+  md += '- Sesiones en la ventana: ' + Object.keys(sessSet).length + ' | Mensajes: ' + msgs.length + '\n';
+  if (MAX_SESSIONS) md += '- Limite --max-sessions: ' + MAX_SESSIONS + ' sesiones mas recientes\n';
+  md += '\n';
+
+  md += '## Delta de la tanda actual\n\n';
+  md += '| input | output | reasoning | cache_read | cache_write | total | costo USD | num sesiones |\n';
+  md += '|---:|---:|---:|---:|---:|---:|---:|---:|\n';
+  md += rowCells(tot, Object.keys(sessSet).length) + '\n\n';
+
+  md += '## Top ' + TOP_N + ' agentes por total (delta)\n\n';
+  md += '| Agente | input | output | reasoning | cache_read | cache_write | total | costo USD | num sesiones |\n';
+  md += '|---|---:|---:|---:|---:|---:|---:|---:|---:|\n';
+  var agentRows = Object.keys(byAgent).map(function (k) {
+    return { key: k, agg: byAgent[k], total: totalOf(byAgent[k]), n: Object.keys(byAgent[k].sess).length };
+  }).sort(function (a, b) { return b.total - a.total; });
+  if (agentRows.length === 0) {
+    md += '| (sin mensajes en la ventana) | 0 | 0 | 0 | 0 | 0 | 0 | $0.0000 | 0 |\n';
+  } else {
+    agentRows.slice(0, TOP_N).forEach(function (r) {
+      md += '| ' + esc(r.key) + ' ' + rowCells(r.agg, r.n) + '\n';
+    });
+  }
+  md += '\n';
+
+  md += 'Campos leidos del esquema: tokens.input, tokens.output';
+  md += (seen.reasoning ? ', tokens.reasoning' : ' (reasoning: n/d)');
+  md += (seen.cache_read ? ', tokens.cache.read' : ' (cache_read: n/d)');
+  md += (seen.cache_write ? ', tokens.cache.write' : ' (cache_write: n/d)');
+  md += '.\n';
+  if (!seen.reasoning || !seen.cache_read || !seen.cache_write) {
+    md += 'Nota: los campos marcados n/d no aparecieron en message.data.tokens de la ventana; ';
+    md += 'no se inventan ni se cuentan como 0 medido (ver --schema para el esquema real).\n';
+  }
+  md += 'total = input + output + reasoning + cache_read + cache_write.\n';
+
+  console.log(md);
+}
+
+// ---------------------------------------------------------------------------
+// Modo --overhead (T4.2): estima el overhead de contexto (Capa 0 y 0b) leyendo
+// .opencode/agent/*.md, .opencode/skills/*/SKILL.md, opencode.json y, si
+// existe, docs/orquestacion/REFERENCIA-RUTEO.md. Son ESTIMACIONES con la
+// heuristica chars/3.5; NO son mediciones de la DB.
+//   Capa 0  = lo que se inyecta siempre: descripciones de agentes y skills +
+//             opencode.json.
+//   Capa 0b = payload al invocar: cuerpo (sin frontmatter) de agentes y skills.
+// ---------------------------------------------------------------------------
+function splitFrontmatter(txt) {
+  var m = /^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/.exec(txt);
+  if (!m) return { fm: '', body: txt };
+  return { fm: m[1], body: txt.slice(m[0].length) };
+}
+function fmDescription(fm) {
+  var m = /(^|\r?\n)description:[ \t]*(.+)/.exec(fm);
+  return m ? m[2].trim() : '';
+}
+function estTok(chars) { return chars / 3.5; }
+function fmtTok1(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+function fmtCalc(label, chars, tokens) {
+  return '- ' + label + ': ' + chars + ' chars / 3.5 = ' + fmtTok1(tokens) + ' tokens\n';
+}
+
+function runOverhead() {
+  var root = process.cwd();
+  var agentDir = path.join(root, '.opencode', 'agent');
+  var skillsDir = path.join(root, '.opencode', 'skills');
+  var configPath = null;
+  var rootCfg = path.join(root, 'opencode.json');
+  var cfgDir = path.join(root, 'config', 'opencode.json');
+  if (fs.existsSync(rootCfg)) configPath = rootCfg;
+  else if (fs.existsSync(cfgDir)) configPath = cfgDir;
+
+  var agentFiles = [];
+  try {
+    agentFiles = fs.readdirSync(agentDir).filter(function (f) { return /\.md$/.test(f); });
+  } catch (e) { agentFiles = []; }
+
+  var skillFiles = [];
+  try {
+    fs.readdirSync(skillsDir, { withFileTypes: true }).forEach(function (ent) {
+      if (!ent.isDirectory()) return;
+      var p = path.join(skillsDir, ent.name, 'SKILL.md');
+      if (fs.existsSync(p)) skillFiles.push(p);
+    });
+  } catch (e) { skillFiles = []; }
+
+  var agentDesc = 0, agentBody = 0, skillDesc = 0, skillBody = 0;
+  agentFiles.forEach(function (f) {
+    var sp = splitFrontmatter(fs.readFileSync(path.join(agentDir, f), 'utf8'));
+    agentDesc += fmDescription(sp.fm).length;
+    agentBody += sp.body.length;
+  });
+  skillFiles.forEach(function (p) {
+    var sp = splitFrontmatter(fs.readFileSync(p, 'utf8'));
+    skillDesc += fmDescription(sp.fm).length;
+    skillBody += sp.body.length;
+  });
+
+  var configChars = configPath ? fs.readFileSync(configPath, 'utf8').length : 0;
+
+  var refPath = path.join(root, 'docs', 'orquestacion', 'REFERENCIA-RUTEO.md');
+  var refExists = fs.existsSync(refPath);
+  var refChars = refExists ? fs.readFileSync(refPath, 'utf8').length : 0;
+
+  var capa0 = agentDesc + skillDesc + configChars;
+  var capa0b = agentBody + skillBody;
+  var total = capa0 + capa0b;
+
+  var md = '';
+  md += '# Informe de overhead de contexto - ExploraCO (--overhead)\n\n';
+  md += '- Generado: ' + fmtDate(now) + '\n';
+  md += '- Raiz: ' + root + '\n';
+  md += '- Config usado: ' + (configPath || '(no encontrado)') + '\n';
+  md += '- Agentes: ' + agentFiles.length + ' | Skills: ' + skillFiles.length + '\n';
+  md += '- Estimador: chars / 3.5 (ESTIMACION, no medicion de la DB)\n\n';
+
+  md += '## Estimacion por fuente\n\n';
+  md += '| Fuente | Archivos | chars | tokens estimados |\n';
+  md += '|---|---:|---:|---:|\n';
+  md += '| Descripciones de agentes (Capa 0) | ' + agentFiles.length + ' | ' + agentDesc + ' | ' + fmtTok1(estTok(agentDesc)) + ' |\n';
+  md += '| Descripciones de skills (Capa 0) | ' + skillFiles.length + ' | ' + skillDesc + ' | ' + fmtTok1(estTok(skillDesc)) + ' |\n';
+  md += '| opencode.json (Capa 0) | ' + (configPath ? 1 : 0) + ' | ' + configChars + ' | ' + fmtTok1(estTok(configChars)) + ' |\n';
+  md += '| Cuerpos de agentes (Capa 0b) | ' + agentFiles.length + ' | ' + agentBody + ' | ' + fmtTok1(estTok(agentBody)) + ' |\n';
+  md += '| Cuerpos de skills (Capa 0b) | ' + skillFiles.length + ' | ' + skillBody + ' | ' + fmtTok1(estTok(skillBody)) + ' |\n';
+  if (refExists) {
+    md += '| REFERENCIA-RUTEO.md (capa adicional) | 1 | ' + refChars + ' | ' + fmtTok1(estTok(refChars)) + ' |\n';
+  }
+  md += '\n';
+
+  md += '## Desglose por capa\n\n';
+  md += '| Capa | chars | tokens estimados |\n';
+  md += '|---|---:|---:|\n';
+  md += '| Capa 0 (siempre inyectado) | ' + capa0 + ' | ' + fmtTok1(estTok(capa0)) + ' |\n';
+  md += '| Capa 0b (payload al invocar) | ' + capa0b + ' | ' + fmtTok1(estTok(capa0b)) + ' |\n';
+  md += '| Total (Capa 0 + Capa 0b) | ' + total + ' | ' + fmtTok1(estTok(total)) + ' |\n';
+  if (refExists) {
+    md += '| REFERENCIA-RUTEO.md (capa adicional) | ' + refChars + ' | ' + fmtTok1(estTok(refChars)) + ' |\n';
+    md += '| Total + capa adicional | ' + (total + refChars) + ' | ' + fmtTok1(estTok(total + refChars)) + ' |\n';
+  }
+  md += '\n';
+
+  md += '## Calculo explicito del estimador (chars / 3.5 = tokens)\n\n';
+  md += fmtCalc('Capa 0', capa0, estTok(capa0));
+  md += fmtCalc('Capa 0b', capa0b, estTok(capa0b));
+  md += fmtCalc('Total', total, estTok(total));
+  if (refExists) md += fmtCalc('REFERENCIA-RUTEO.md', refChars, estTok(refChars));
+  md += '\n';
+  md += 'Nota: --overhead son estimaciones con la heuristica chars/3.5, no mediciones de la DB.\n';
+
+  console.log(md);
 }
 
 // Generar y guardar

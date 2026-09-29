@@ -3612,3 +3612,168 @@ Negativas / **deuda aceptada:**
 **ADRs relacionados:** ADR-001/ADR-010, ADR-008 (gobernanza SQL / numeracion), ADR-016 (migracion 016: control territorial), ADR-055 (patron de compra atomica por CTEs), ADR-063 (gobernanza capa Parche), ADR-060 (economia).
 
 **Enmienda 2 (2026-09-24, M-1 CERRADO):** `contratos_p2p.recompensa` y `parche_upgrades.puntos_invertidos` son **`numeric(12,2)`** (XP decimal, ADR-035 / migracion 021), NO `int`: el escrow se deduce del XP del empleador, que es decimal. Contrato actualizado: `recompensa_xp numeric(12,2)` y `puntos_invertidos numeric(12,2)`. (B-3: la cita del bloque real de tablas es `documento_maestro_gamificacion_v6_2.md:494-529`.)
+
+---
+
+## ADR-067: Modelo de 3 capas con presupuesto (Capa 0 orquestador, Capa 0b ejecucion, Capa 1 apoyo), roster 40 -> 19 y rechazo del override de modelo en runtime
+
+**ID:** ADR-067
+**Fecha:** 2026-09-28
+**Autor:** Chief Architect (AI-DOS).
+**Estado:** APROBADO / T1 de la tanda de coste. Es SOLO gobernanza de orquestacion (`.opencode/agent/*.md`, `opencode.json`, convenciones de `description` en agentes y skills). No toca `api/*.js`, ni esquema de BD, ni el presupuesto 8/8 de funciones serverless de Vercel Hobby (ADR-010).
+**Alcance y baseline verificado (ADR-006, archivo real, 2026-09-28):** 40 ficheros en `.opencode/agent/` (`git ls-files .opencode/agent/`): 19 con modelo gratuito (17 `*-free.md` mas `free-build.md` y `free-plan.md`) y 21 de pago (17 duplicados PRO con par `-free` mas los 4 "primary" de entrada `build`, `plan`, `hybrid-build`, `hybrid-plan`). `opencode.json` real: `model: opencode-go/deepseek-v4.1-flash`, `small_model: opencode/big-pickle`, `default_agent: free-build`, `subagent_depth: 2`, `permission: {edit: allow, bash: allow}`.
+
+### Contexto
+
+El gasto se mide hoy por paquetes consumidos y no por objetivo. La tool `task` NO admite selector de modelo por llamada: el modelo se resuelve desde la definicion del agente (`next.model`) o se hereda del mensaje padre. Por tanto las unicas palancas de coste son (a) que modelo declara cada agente y (b) cuantos agentes existen. De ahi que la decision sea de TOPOLOGIA y de FRONTMATTER, no de parametrizacion por llamada.
+
+Evidencia de campo medida con `scripts/ejecucion/informe-cuota.js` (ventana movil de 5 h leida el 2026-09-28): 7 sesiones, 148 mensajes con costo, 442,218 tokens input, 81,529 output, 31,925 reasoning, 6,811,658 de cache read, costo total $0.0000. Los 148 mensajes con costo salen de 5 agentes, TODOS gratuitos: `explore-free` 73, `research-agent-free` 31, `free-build` 26, `free-plan` 11, `architect-free` 7. Invocaciones de agentes de pago en esa ventana: 0.
+
+### Decision - Modelo de 3 capas con presupuesto
+
+Se adopta una topologia de 3 capas con presupuesto explicito por capa. "Presupuesto" aqui significa limite ESTRUCTURAL (que agente existe, que modelo declara, que puede invocar a que y a que profundidad), no un techo de dolares: los techos se miden con `scripts/ejecucion/informe-cuota.js` (ver Metricas de seguimiento).
+
+| Capa | Quien es | Quien decide el modelo | Modelo | Presupuesto / limite estructural |
+|---|---|---|---|---|
+| Capa 0 | Sesion del operador (orquestador) | `opencode.json` | `opencode-go/deepseek-v4.1-flash` (model) + `opencode/big-pickle` (small_model) | 1 sesion. Decide, delega y cierra. Es la capa mas cara por entrada: paga el system prompt, las `description` de los agentes y skills disponibles, y el historial. |
+| Capa 0b | Subagentes de ejecucion | frontmatter `model:` de `.opencode/agent/*.md` | `opencode/big-pickle` (excepcion real ya presente: `media-reader-free` declara `opencode/mimo-v2.5-free`) | Una tarea atomica por invocacion. Recibe SOLO el brief (R1). No escribe docs (R2) ni investiga web (R3). |
+| Capa 1 | Subagentes de apoyo (sub-subagentes) | frontmatter `model:` del sub-subagente | mismo criterio que Capa 0b (gratuitos) | Solo lectura y verificacion. `subagent_depth: 2` (decision propia mas abajo). `task` y `todowrite` quedan denegadas por defecto al subagente que no las declare en su `permission`. |
+
+El presupuesto de cada capa SE MIDE con `scripts/ejecucion/informe-cuota.js`. El script tenia 9 flags originales (`--dia`, `--5h`, `--desde=`, `--hist5h=`, `--schema`, `--db=`, `--dir=`, `--out=` y `--topn=`) y en la T4 de esta MISMA tanda se le anadieron 3 modos nuevos, ya IMPLEMENTADOS: `--task` (desglose por tarea/objetivo en vez de por agente), `--overhead` (estimacion de Capa 0 + Capa 0b a partir de chars/3.5) y `--max-sessions` (limite de sesiones escaneadas). El script paso de 413 a 764 lineas. Los tres modos ya corren; no dependen de un ADR posterior.
+
+### Decision - Las 4 reglas de orquestacion
+
+**R1 Carga diferida.** Los subagentes NO heredan el contexto de la sesion: cada uno recibe un brief autonomo (objetivo, ficheros exactos, criterio de aceptacion, formato de salida). Efecto: baja la Capa 0b, porque lo que se paga es el brief y no la sesion. Regla practica: si el brief necesita "como vimos antes", el brief esta mal escrito.
+
+**R2 Docs solo al cierre.** La documentacion (`exploraco desarrollo/*.md`) se escribe en UN pase de cierre de tanda, no tarea por tarea. Hoy el modo express (`.opencode/skills/express-mode/SKILL.md`, skill condicional registrada en TSK-132 y en la nota practica de orquestacion de este mismo archivo) difiere la documentacion de forma condicional; aqui se hace TRANSVERSAL: la regla aplica siempre, no solo cuando el operador pide express.
+
+**R3 Web solo por Gemini.** La investigacion web NO la hacen los subagentes. Flujo: (1) el agente entrega en el chat el prompt COMPLETO listo para pegar en Google Gemini; (2) Gemini devuelve la ficha `.md`; (3) el agente valida la ficha con el validador del repo y verifica cada foto con `curl -I` esperando HEAD 200 (BUG-022: thumbnail de 1200 px con hash de archivo incorrecto en Wikimedia Commons). Sin API key, sin script de scrapeo, sin bucles de `webfetch` para investigar. Base documental: `.opencode/skills/gemini-research/SKILL.md` y `.opencode/skills/gemini-research/prompts/GEMINI_MASTER_PROMPT.md`.
+
+**R4 Resumen de gasto obligatorio.** Al cerrar cada tanda se ejecuta `node scripts/ejecucion/informe-cuota.js --task` y la tabla se pega en el chat. Sin tabla pegada, la tanda NO esta cerrada. Convierte el gasto en un artefacto de la entrega y no en un informe de fin de mes.
+
+### Decision - Convencion de `description:` (agentes y skills)
+
+En `.opencode/agent/*.md` y `.opencode/skills/*/SKILL.md`, el frontmatter debe llevar `name:` y `description:` en espanol plano, en UNA linea, con tope de 140 caracteres (150 en `SKILL.md`), SIN la palabra "GRATUITO", SIN la palabra "open-source", SIN nombre de modelo, SIN escapes del tipo `\u00XX` y SIN block scalars (`>` o `|`).
+
+Justificacion (cada byte se paga en Capa 0): la `description` de cada agente y de cada skill se inyecta en el system prompt del orquestador en cada invocacion. No es texto decorativo: es prompt permanente de Capa 0. Medicion sobre el archivo real: los 40 agentes suman 13,484 caracteres de `description` (media 337 por agente); los 21 que este ADR retira suman 6,602 caracteres (media 314); los 19 supervivientes se quedan en 6,882. Traducido con la regla chars/3.5 (estimacion manual por conteo de caracteres, NO es salida del script): el system prompt baja de ~3,853 tokens a ~1,966 tokens solo por `description`.
+
+Estado actual frente a la convencion (verificado, no estimado): 6 de 40 agentes usan block scalar (`description: >`: `content-loader` y `-free`, `data-migration` y `-free`, `research-agent` y `-free`) y 21 de 40 contienen el literal "GRATUITO". Corolario operativo: la `description` dice QUE hace el agente, nunca QUE modelo lo ejecuta. El modelo es un dato de coste; la descripcion es un dato de seleccion.
+
+### Decision - Roster 40 -> 19
+
+Se retiran 21 agentes. Los 19 supervivientes son sus pares `-free` mas `free-build` y `free-plan`.
+
+| Agente retirado | Motivo |
+|---|---|
+| `build` | Primary de entrada PRO; su par funcional es `free-build`, que ya es `default_agent`. |
+| `plan` | Primary de entrada PRO; su par funcional es `free-plan`. |
+| `hybrid-build` | Primary de entrada PRO (ADR-048); el ruteo por riesgo lo absorbe el operador en Capa 0. |
+| `hybrid-plan` | Primary de entrada PRO (ADR-048); idem. |
+| `admin-dev` | Duplicado PRO de `admin-dev-free` (mismo prompt; `description` 349 vs 406). |
+| `architect` | Duplicado PRO de `architect-free` (386 vs 443). |
+| `architect-review` | Duplicado PRO de `architect-review-free` (290 vs 339). |
+| `backend-dev` | Duplicado PRO de `backend-dev-free` (364 vs 423). |
+| `content-loader` | Duplicado PRO de `content-loader-free`; ambos en block scalar, misma tarea. |
+| `data-migration` | Duplicado PRO de `data-migration-free`; ambos en block scalar, misma tarea. |
+| `docs-keeper` | Duplicado PRO de `docs-keeper-free` (340 vs 399). |
+| `exp-pickle` | Duplicado PRO de `exp-pickle-free` (92 vs 297). |
+| `explore` | Duplicado PRO de `explore-free` (305 vs 341). |
+| `frontend-tpl` | Duplicado PRO de `frontend-tpl-free` (290 vs 330). |
+| `js-silo-dev` | Duplicado PRO de `js-silo-dev-free` (280 vs 327). |
+| `media-reader` | Duplicado PRO de `media-reader-free` (317 vs 347). |
+| `qa-auditor` | Duplicado PRO de `qa-auditor-free` (356 vs 356: `description` IDENTICA, peor caso de eleccion). |
+| `renderer-dev` | Duplicado PRO de `renderer-dev-free` (314 vs 374). |
+| `research-agent` | Duplicado PRO de `research-agent-free`; ambos en block scalar, misma tarea. |
+| `seo-dev` | Duplicado PRO de `seo-dev-free` (290 vs 345). |
+| `sql-security` | Duplicado PRO de `sql-security-free` (284 vs 347). La prohibicion que porta NO se retira: cambia de dueno (ver seccion de escalada). |
+
+Justificacion de la poda (medida sobre el archivo real, ADR-006): los 21 ficheros retirados ocupan 59,580 bytes de cuerpo (media 2.8 KB por fichero, no 1.2 KB: la cifra de 1.2 KB del brief de la tanda era una estimacion y el archivo real manda). Ademas, los pares free/pro son near-duplicates cuyas `description` de una sola linea difieren entre 0 y 63 caracteres (14 parejas medidas; `qa-auditor` es identica): mismo prompt, dos veces, confuso de elegir y doble coste de decision en Capa 0. Y el dato decisivo: 0 invocaciones de agentes de pago en la ventana medida (los 148 mensajes con costo salieron de agentes gratuitos).
+
+### Decision - `subagent_depth: 2` consciente
+
+Se mantiene explicitamente y se documenta como decision CONSCIENTE, no como valor por defecto que nadie ha mirado. Habilita UN nivel de sub-subagentes (Capa 1 <- Capa 0b <- Capa 0) sin permitir recursion ilimitada. Ademas, la tool `task` DENIEGA por defecto `task` y `todowrite` al subagente que no las declare en su `permission` (mecanismo `childToolDenies` del upstream `packages/opencode/src/tool/task.ts`): esa es la garantia real de que Capa 1 no se ramifica por su cuenta, y por eso el limite de profundidad se puede mantener en 2 sin abrir una rama infinita. Subirlo a 3 es tentador (mas paralelismo) pero multiplica el gasto de Capa 0b (cada sub-subagente paga su prompt ademas del de su padre) sin benefit medido hasta la fecha.
+
+### Decision - Escalada de RLS/claves al operador humano
+
+`sql-security` (Pro) portaba una prohibicion explicita: no delegar RLS, autenticacion, claves, migraciones de esquema ni integridad critica a agentes gratuitos. ESA FRONTERA NO SE NEGOCIA. Al retirar el fichero Pro la prohibicion no desaparece: cambia de dueno. Cualquier tarea que toque RLS, claves, autenticacion o migracion de esquema en Neon escala al OPERADOR HUMANO, no a un agente de ningun tier. Justificacion: es la unica capa donde un error NO se detecta con `node --check` ni con el Escudo GOLD, que certifican sintaxis, ASCII-safety y balance de divs, pero no permisos de fila en Postgres ni secretos. La calidad de esa capa se compra con revision humana, no con un modelo mas caro. Explicitamente: retirar el tier PRO NO es una autorizacion para que un agente gratuito escriba migraciones.
+
+### Decision - Rechazo de "modelo en runtime"
+
+Opcion evaluada y RECHAZADA: elegir el modelo del subagente en el momento de la llamada (`subagent_type` + `model`). Motivo: la API de `task` no soporta ese parametro (los campos base de la tool exponen solo `description`, `prompt`, `subagent_type`, `task_id` y `command`; lineas 44-52 del upstream `packages/opencode/src/tool/task.ts`, rama dev) y la resolucion es `const model = next.model ?? { modelID: msg.info.modelID, providerID: msg.info.providerID }` (linea 181): el modelo sale de la definicion del AGENTE o se hereda del mensaje padre. No existe override en runtime. Cualquier "modelo en runtime" seria en realidad mutar el fichero del agente antes de invocarlo, lo cual (i) introduce escritura en disco por invocacion, (ii) rompe la trazabilidad de que modelo ejecuto que tarea, y (iii) NO reduce tokens, porque el mismo prompt se paga igual. Consecuencia aceptada: la palanca de coste es ESTATICA (frontmatter del agente) mas TOPOLOGICA (cuantos agentes existen), nunca dinamica.
+
+### Consecuencias
+
+**Positivas:**
+- La Capa 0 deja de cargar 6,602 caracteres de `description` y ~58 KB de cuerpo de agentes que nunca se invocan. Estimacion manual chars/3.5: ~1,886 tokens de system prompt retirados.
+- Una sola ruta de ejecucion elimina la ambiguedad free/pro. El dato medido (0 invocaciones de pago en la ventana de 5 h) indica que esa ambiguedad nunca se pago, solo se cobro como decision.
+- 19 agentes con `description` de una linea y <=140 chars: system prompt mas pequeno y mas facil de razonar y de auditar.
+- R4 convierte el gasto en un artefacto de la entrega, no en un informe diferido.
+- El roster se vuelve explicable: 19 agentes = 17 dominios + 2 entradas, sin paridades ambiguas.
+
+**Negativas / coste de la poda:**
+- 21 workflows PRO dejan de existir como artefacto. Hay que asumir explicitamente que la capa PRO no se usaba; lo sostiene la medicion (0 invocaciones de pago en la ventana medida). Si el operador confirma que si los usaba, este ADR se revierte.
+- ADR-048 (ruta Hybrid) queda SUPERADO en su parte de roster: la matriz de ruteo Pro/Free de `orquestacion agentes.md` v1.1 pasa a ser historica y hay que actualizarla (tarea documental, no de codigo).
+- Al desaparecer `sql-security.md` como fichero, la frontera de RLS/claves queda en manos del operador y sin recordatorio automatico en el prompt de ningun agente. Mitigacion: esta seccion y la convencion de `description` son la memoria del proceso.
+- Se pierde la ilusion de "subir calidad solo para esta tarea": al no existir override en runtime, la calidad nunca fue una palanca por tarea (tampoco en la practica) y ahora queda explicito.
+- Riesgo de sobre-centralizacion: si el operador no hace la escalada manual de la capa critica, la calidad de RLS/claves depende de una sola persona y no de un proceso.
+
+### Alternativas descartadas
+
+(a) **Modelo en runtime.** Rechazada: la API de `task` no lo soporta y la aproximacion por mutacion del fichero no ahorra tokens, introduce escritura en disco por invocacion y rompe la trazabilidad (ver seccion anterior).
+(b) **Mantener los 40 agentes y pagar la Capa 0.** Rechazada: son 6,602 caracteres de `description` y ~58 KB de cuerpo para un tier con 0 invocaciones medidas, mas el coste de decision duplicado de tener el mismo prompt en dos ficheros.
+(c) **Un unico agente "generalista" multi-dominio.** Rechazada: pierde las tools por dominio, pierde el Escudo GOLD por rol (cada rol tiene su checklist) y concentra todo el riesgo en una sola sesion larga.
+
+### Metricas de seguimiento
+
+Con el `--task` de la T4 (aun no implementado; lo anade un ADR posterior):
+- Mensajes y tokens por TAREA/objetivo en vez de por agente: es la unidad que sustituye al "paquete" como unidad de medida del gasto.
+- Proporcion de subagentes gratuitos sobre el total de subagentes de la tanda: con el roster de 19 debe ser 100% (0 subagentes de pago); cualquier valor distinto significa que un agente retirado sigue en uso o que se ha anadido uno nuevo sin registrar.
+- Tokens de `input` por subagente: detector de briefs que incumplen R1. Un subagente que consume mucho input suele estar leyendo contexto de sesion en vez del brief.
+- Invocaciones de Capa 1 sobre el total de subagentes: si superan ~30%, `subagent_depth: 2` se esta usando como orquestacion paralela y hay que revisarlo.
+
+Con el `--overhead` (chars/3.5):
+- Tokens estimados de Capa 0 (system prompt + `description` de los 19 agentes + `description` de las skills) y de Capa 0b (suma de briefs). Es la cifra que convierte la topologia en presupuesto.
+- Ratio overhead sobre tokens utiles: si el overhead crece y el trabajo util no, el problema es R1/R2 (briefs y documentacion), no el modelo.
+
+### Nota de revision (R-067)
+
+**Fecha:** 2026-09-28. **Autor:** Documentation Specialist (cierre del ADR-067 en UN SOLO pase documental, regla R2).
+
+**Cifras reales de `--overhead`** (estimacion chars/3.5; salida de `node scripts/ejecucion/informe-cuota.js --overhead`).
+
+ANTES (arbol de `HEAD`, 40 agentes, 11 skills):
+
+| Capa | chars | tokens estimados |
+|---|---:|---:|
+| Capa 0 (siempre inyectado) | 12.752 | 3.643,4 |
+| Capa 0b (payload al invocar) | 132.864 | 37.961,1 |
+| Total (Capa 0 + Capa 0b) | 145.616 | 41.604,6 |
+
+DESPUES (working tree, 19 agentes, 11 skills; corrida de este cierre, post-T9):
+
+| Capa | chars | tokens estimados |
+|---|---:|---:|
+| Capa 0 (siempre inyectado) | 4.134 | 1.181,1 |
+| Capa 0b (payload al invocar) | 81.750 | 23.357,1 |
+| Total (Capa 0 + Capa 0b) | 85.884 | 24.538,3 |
+
+El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.767 chars / 1.362,0 tokens), que NO forma parte del system prompt permanente inyectado en cada invocacion; el "Total + capa adicional" es 90.651 chars / 25.900,3 tokens. Se reporta aparte para no mezclarla con Capa 0 + Capa 0b.
+
+**Delta y porcentaje:**
+
+| Metrica | ANTES | DESPUES | Delta | % |
+|---|---:|---:|---:|---:|
+| Capa 0 (chars) | 12.752 | 4.134 | -8.618 | -67,6% |
+| Capa 0 (tokens) | 3.643,4 | 1.181,1 | -2.462,3 | -67,6% |
+| Capa 0b (chars) | 132.864 | 81.750 | -51.114 | -38,5% |
+| Capa 0b (tokens) | 37.961,1 | 23.357,1 | -14.604,0 | -38,5% |
+| Total (chars) | 145.616 | 85.884 | -59.732 | -41,0% |
+| Total (tokens) | 41.604,6 | 24.538,3 | -17.066,3 | -41,0% |
+
+**Veredicto de la auditoria (T6):** **APTO CON OBSERVACIONES.** T6 midio, con el estado previo a T9, Capa 0 -66,6% y Total -41,0%; recalculado con las cifras FINALES post-T9 de arriba, Capa 0 queda en **-67,6%** y el Total se mantiene en **-41,0%**. Los gaps detectados por T6 quedaron cerrados en T9 (descripciones y permisos vueltos a tocar), de ahi el leve corrimiento de Capa 0 a favor. El ahorro de Capa 0 proviene en su mayoria del retiro de 21 agentes; el de Capa 0b es menor porque los 19 supervivientes conservan su cuerpo.
+
+**Verificacion de runtime PENDIENTE (R3):** opencode carga agentes y permisos al INICIAR la sesion; los cambios de esta tanda NO aplican a la sesion viva. Queda pendiente reiniciar opencode y lanzar un subagente (p.ej. `js-silo-dev-free`) que intente `webfetch`: debe ser DENEGADO por el `webfetch: deny` explicito (ver BUGS_HISTORICOS.md BUG-CONFIG-2 / BUG-086). Registrado como deuda en TASKS.md TSK-157 y en `docs/orquestacion/REFERENCIA-RUTEO.md`.
+
+**Estado de la Nota:** CERRADA. La cifra real de Capa 0 + Capa 0b existe (arriba) y el ADR-067 puede darse por cerrado; la unica verificacion abierta (R3 en runtime) no bloquea el cierre documental y se arrastra como deuda en TASKS.md TSK-157.
+
+**ADRs relacionados:** ADR-002 (ASCII-safe de este documento), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8 de funciones serverless), ADR-048 (ruta Hybrid Pro/Free: superado en su parte de roster por este ADR), BUG-022 (verificacion HEAD 200 de fotos de Wikimedia Commons), TSK-132 (skill `express-mode`), skill `.opencode/skills/gemini-research/SKILL.md`, script `scripts/ejecucion/informe-cuota.js`.

@@ -45,6 +45,25 @@
   window.ExploraCO.XP_LEVELS = XP_LEVELS;
   window.ExploraCO.MAX_NIVEL = MAX_NIVEL;
 
+  // ---- Modo compacto del widget de perfil (navbar de todo el sitio) ----
+  // El widget de sesion muestra SOLO nombre + XP. Activo por defecto en
+  // todo el sitio; una pagina puede volver al widget completo con
+  //   <body data-perfil="completo">
+  // o fijando window.ExploraCO.perfilCompacto = false antes de init().
+  // NO elimina la logica de niveles: solo deja de pintarla en el navbar.
+  window.ExploraCO.perfilCompacto = true;
+
+  function perfilModoCompacto() {
+    if (window.ExploraCO.perfilCompacto === false) return false;
+    try {
+      var b = document.body;
+      if (b && b.getAttribute && b.getAttribute('data-perfil') === 'completo') {
+        return false;
+      }
+    } catch (e) {}
+    return true;
+  }
+
   // ---- Helpers canonicos de XP (ADR-035: numeric(12,2)) ----
   // Fuente unica del cliente. redondearXp se usa en la ACREDITACION
   // (nunca al leer) y fmtXp en TODA superficie que muestre XP, con 2
@@ -2218,6 +2237,7 @@
   // ── Actualizar UI según estado de sesión ───────────────────
   function actualizarUI() {
     var usuario = window.ExploraCO.usuario;
+    var compacto = perfilModoCompacto();
 
     // Botón de login/perfil en el header
     var loginBtn = document.getElementById('btn-login-viajero');
@@ -2229,26 +2249,34 @@
         perfilBtn.style.display = 'flex';
         var nameEl = document.getElementById('perfil-nombre');
         var xpEl   = document.getElementById('perfil-xp');
-        var badge  = document.getElementById('perfil-badge');
         if (nameEl) nameEl.textContent = usuario.nombre;
         if (xpEl)   xpEl.textContent   = fmtXp(usuario.xp_total) + ' XP';
-        if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
-        // Gaming v6.1: saldo CDR (Condor) como chip junto al XP.
-        actualizarCdrChip(usuario.id);
-        // ADR-058: badge de categoria de origen en el navbar (si la
-        // pagina provee el contenedor #perfil-origen). La logica vive
-        // aqui (fuente unica); index.html solo aporta el elemento.
-        var origenEl = document.getElementById('perfil-origen');
-        if (origenEl) renderOrigenBadge(origenEl, usuario.origen);
-        // Barra de progreso del navbar (ADR-053 Decision 13): umbrales
-        // desde nivelesFuente() (window.NivelesData con fallback), nunca
-        // escritos en la UI.
-        var prg = progresoNivel(usuario.xp_total);
-        var xpFill = document.getElementById('perfil-xp-fill');
-        if (xpFill) xpFill.style.width = prg.pct + '%';
-        perfilBtn.title = prg.minSiguiente
-          ? ('Nivel ' + prg.nivel + ' \u00b7 faltan ' + fmtXp(prg.minSiguiente - (Number(usuario.xp_total) || 0)) + ' XP para el siguiente')
-          : ('Nivel ' + prg.nivel + ' \u00b7 nivel maximo');
+        if (compacto) {
+          // Widget compacto (navbar de todo el sitio): SOLO nombre + XP.
+          // Se omiten badge de era, badge de origen, barra de nivel y el
+          // chip CDR. El boton sigue llevando a mi-perfil.html.
+          perfilBtn.title = 'Ver mi perfil';
+          perfilBtn.setAttribute('aria-label', 'Ver mi perfil');
+        } else {
+          var badge  = document.getElementById('perfil-badge');
+          if (badge)  badge.textContent   = usuario.badge_actual || 'Viajero Novato';
+          // Gaming v6.1: saldo CDR (Condor) como chip junto al XP.
+          actualizarCdrChip(usuario.id);
+          // ADR-058: badge de categoria de origen en el navbar (si la
+          // pagina provee el contenedor #perfil-origen). La logica vive
+          // aqui (fuente unica); la pagina solo aporta el elemento.
+          var origenEl = document.getElementById('perfil-origen');
+          if (origenEl) renderOrigenBadge(origenEl, usuario.origen);
+          // Barra de progreso del navbar (ADR-053 Decision 13): umbrales
+          // desde nivelesFuente() (window.NivelesData con fallback), nunca
+          // escritos en la UI.
+          var prg = progresoNivel(usuario.xp_total);
+          var xpFill = document.getElementById('perfil-xp-fill');
+          if (xpFill) xpFill.style.width = prg.pct + '%';
+          perfilBtn.title = prg.minSiguiente
+            ? ('Nivel ' + prg.nivel + ' \u00b7 faltan ' + fmtXp(prg.minSiguiente - (Number(usuario.xp_total) || 0)) + ' XP para el siguiente')
+            : ('Nivel ' + prg.nivel + ' \u00b7 nivel maximo');
+        }
       }
     } else {
       if (loginBtn) loginBtn.style.display = '';

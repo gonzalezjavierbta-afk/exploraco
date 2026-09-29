@@ -1,11 +1,6 @@
 ---
 name: ingest-eventos
-description: >
-  Sube eventos a la agenda cultural de ExploraCO de forma automatizada:
-  investigacion en Gemini (GEMINI_EVENTOS_PROMPT.md) que entrega el lote
-  eventos/eventos.json, validacion (validate_eventos.js), carga a
-  produccion via API (upload-eventos.js) con seed versionado, y docs.
-  Usalo cuando el usuario pida agregar uno o varios eventos a la agenda.
+description: Sube eventos a la agenda de ExploraCO: investigacion en Gemini, validacion (validate_eventos.js) y carga con seed versionado.
 ---
 
 # Ingest Eventos
@@ -50,7 +45,9 @@ todos los dias/meses vigentes) y categoria auto-detectada.
 
 1. Pedir al usuario el lote: cantidad N, ciudad(es), rango de fechas, tipos
    y observaciones.
-2. Pasar `prompts/GEMINI_EVENTOS_PROMPT.md` del skill `gemini-research` para
+2. Entregar EN EL CHAT el prompt `GEMINI_EVENTOS_PROMPT.md` del skill
+   `gemini-research` (ruta canonica
+   `.opencode/skills/gemini-research/prompts/GEMINI_EVENTOS_PROMPT.md`) para
    que el usuario lo pegue en Gemini (o copiarle la seccion `## 2. Lote a
    investigar` con los datos).
 3. Gemini devuelve UN MENSAJE con un unico bloque ```json ``` (array de N
@@ -123,7 +120,7 @@ gradiente). Para anadir fotos verificadas a un evento (BUG-022):
 ```
 Usuario: "Agrega estos 3 conciertos a la agenda: ..."
 -> ingest-eventos:
-   A. Prompts/GEMINI_EVENTOS_PROMPT.md -> Gemini -> JSON en eventos/eventos.json
+   A. .opencode/skills/gemini-research/prompts/GEMINI_EVENTOS_PROMPT.md -> Gemini -> JSON en eventos/eventos.json
    B. (Opcional) resolver fotos_sugeridas por evento
    C. validate_eventos.js --prod -> upload-eventos.js --seed
    D. Verificar /api/destinos?cat=evento + agenda -> TASKS.md / NEXT.md

@@ -1,126 +1,95 @@
 ---
 name: research-destination
-description: >
-  Investiga un destino turístico de Colombia en múltiples fuentes
-  web y genera una ficha .md estructurada con datos verificados.
-  Úsalo cuando necesites recopilar datos de un nuevo destino para
-  crear su página dinámica.
+description: Valida la ficha .md que devuelve Gemini para un destino: contrato con validate_ficha.js, coordenadas reales y fotos con curl -I (HEAD 200).
 ---
 
-# Research Destination
+# Research Destination (VALIDADOR de ficha, no investigador)
 
-Investiga un destino turístico de Colombia y genera ficha verificada.
+Skill de **validacion** de la ficha .md que Gemini devuelve para un destino.
+NO investiga en la web: bajo R3 (ADR-067), la investigacion web la hace
+**Google Gemini** a partir del prompt que el agente entrega en el chat.
+Este skill valida y verifica el resultado antes del handoff.
+
+## Rol y limites (R3)
+
+- **NO busca por su cuenta** en webs, TripAdvisor, Booking, Hostelworld,
+  Google Maps ni redes sociales. Eso ya lo hizo Gemini.
+- **NO usa `webfetch` para investigar.** El unico acceso web permitido es la
+  **verificacion puntual de UN hecho con `curl -I`** (foto) o, si hay duda de
+  coordenadas, una consulta puntual de geocodificacion. Nada de bucles.
+- **NO llama a ninguna API de Gemini** ni ejecuta scripts con API key.
 
 ## Flujo
 
-### 1. Fuentes primarias
-Investigar en este orden:
-1. **Web oficial** del destino (si existe)
-2. **TripAdvisor** - rating, reviews, fotos
-3. **Booking/Hostelworld** - precios, disponibilidad (hostales)
-4. **Google Maps** - horarios, coordenadas exactas, fotos
-5. **Fuentes gubernamentales** - datos oficiales (museos, parques)
-6. **Wikimedia Commons** - fotos libres verificables
+### 1. Recibir la ficha
+La ficha llega en `exploraco desarrollo/ficha-<slug>.md` (la produce Gemini,
+ver skill `gemini-research`).
 
-### 2. Verificación de datos
-- **Coordenadas:** verificar con Nominatim/OSM (nunca usar 0,0)
-- **Fotos:** buscar en Wikimedia Commons, verificar HEAD 200 antes de usar
-- **Datos cruzados:** mínimo 2 fuentes para información clave
-- **Horarios/precios:** verificar vigencia 2026
-
-### 3. Estructura por categoría
-
-#### Sitio turístico
+### 2. Validar el contrato JSON
 ```
-entradas[]     → {nombre, precio, horario}
-tours[]        → {nombre, duracion, precio}
-checklist[]    → items obligatorios/recomendados
-itinerario[]   → plan sugerido por dia
-fauna[]        → especies avistables
-secretos[]     → datos curiosos
-regulaciones[] → reglas del lugar
+node .opencode/skills/gemini-research/scripts/validate_ficha.js "exploraco desarrollo/ficha-<slug>.md"
 ```
+Debe salir `PASS`. Si `FAIL`, devolver cada error a correccion sobre la ficha
+(no inventar datos). El validador exige: claves `BASE`, `TAGS`, `FAQS`,
+`FOTOS_SUGERIDAS`, `FUENTES`; minimo 5 FAQs; minimo 5 fotos sugeridas con
+exactamente 1 `es_hero`; coordenadas distintas de 0,0; sin campo `rating`.
 
-#### Hostal
-```
-habitaciones[]    → {tipo, precio, capacidad, badge}
-amenidades[]      → servicios incluidos
-actividades[]     → que hacer
-transporte[]      → como llegar
-eventos_hostal[]  → agenda semanal
-```
+### 3. Verificar las fotos (BUG-022)
+Para cada bloque de `FOTOS_SUGERIDAS`:
 
-#### Comida
-```
-menu_destacado[]   → platos principales
-horario_detallado  → horarios por dia
-opciones_dieta[]   → vegano, sin gluten, etc.
-domicilio          → servicio a domicilio: si/no/app
-```
+1. Resolver la URL real de thumbnail de Wikimedia Commons con la API:
+   `https://commons.wikimedia.org/w/api.php?action=query&titles=<File:...>&prop=imageinfo&iiprop=url&iiurlwidth=960&format=json`
+2. Verificar con `curl -I` (HEAD) siguiendo redirecciones (`-L`) y exigir
+   **HTTP 200 en el destino final**:
+   ```
+   curl -I -L -s -o NUL -w "%{http_code} %{url_effective}\n" "<thumburl>"
+   ```
+   Un `404` o una redireccion que no termine en `200` NO sirven; probar el
+   siguiente `nombres_archivo_wikimedia`. Si todos fallan, descartar la foto
+   (nunca sembrar URL rota).
+3. La foto con `es_hero=true` se mapea a `foto_hero`.
 
-#### Evento
-```
-fecha_inicio       → YYYY-MM-DD
-fecha_fin          → YYYY-MM-DD
-edicion            → numero de edicion
-sede               → lugar del evento
-lineup[]           → artistas/ponentes
-agenda[]           → cronograma por dia
-categorias_entrada[] → tipos de boleta
-que_llevar[]       → que llevar
-prohibido[]        → que no permitir
-```
+### 4. Verificacion puntual de UN hecho (opcional)
+- **Coordenadas:** confirmar que no son 0,0. Si hay duda, UN solo `curl -I`
+  contra Nominatim para el nombre+ciudad.
+- **Fuentes:** comprobar que cada entrada de `FUENTES` trae `url` y
+  `que_respalda`. No abrir todas las URLs: es una verificacion de forma, no
+  una re-investigacion.
 
-### 4. Generar ficha .md
-Crear archivo en `exploraco desarrollo/ficha-<slug>.md` con:
-- Datos verificados (citar fuentes)
-- 5 fotos (URLs Wikimedia verificadas HEAD 200)
-- 5 FAQs (preguntas frecuentes reales)
-- Coordenadas verificadas en Nominatim
+### 5. Handoff
+Entregar la ficha validada a `create-dynamic-page` (seed + loader + smoke +
+Escudo GOLD). La validacion no reescribe datos: solo aprueba o devuelve a
+correccion.
 
-### 5. Entregar a content-loader
-- Datos estructurados en formato JSON
-- Ficha .md como referencia
-- Fuentes citadas para trazabilidad
+## Estructura TAGS por categoria (lo que Gemini debe haber llenado)
 
-## Ejemplo de entrega
+| Categoria | TAGS esperados |
+|---|---|
+| sitio | entradas[], tours[], checklist, itinerario[], fauna_flora[], secretos[], regulaciones, temporada_matriz |
+| hostal | habitaciones[], amenidades[], actividades[], transporte[], que_incluye[], barrio_descripcion |
+| comida | menu_destacado[], horario_detallado, opciones_dieta[], domicilio, precio_promedio |
+| evento | fecha_inicio, fecha_fin, edicion, sede, lineup[], agenda[], categorias_entrada[], que_llevar[], prohibido[] |
 
-```json
-{
-  "slug": "museo-nacional",
-  "categoria": "sitio",
-  "nombre": "Museo Nacional de Colombia",
-  "ciudad": "Bogota",
-  "departamento": "Cundinamarca",
-  "lat": 4.6158,
-  "lng": -74.0703,
-  "descripcion": "...",
-  "tags": {
-    "entradas": [...],
-    "tours": [...],
-    "checklist": [...],
-    "itinerario": [...],
-    "secretos": [...],
-    "regulaciones": [...]
-  },
-  "fotos": ["url1", "url2", "url3", "url4", "url5"],
-  "faqs": [...]
-}
-```
+El contrato exacto lo define
+`.opencode/skills/gemini-research/prompts/GEMINI_MASTER_PROMPT.md` (seccion 6)
+y lo comprueba `.opencode/skills/gemini-research/scripts/validate_ficha.js`.
 
-## Reglas críticas
+## Reglas criticas
 
-- **Fotos verificadas (BUG-022):** HEAD 200 antes de incluir URL
-- **Coordenadas reales:** nunca usar 0,0 o coordenadas genéricas
-- **ASCII-safe:** escapar tildes en JSON con \uXXXX
-- **Rating 0 (ADR-009):** no inventar ratings, dejar en 0
-- **Fuentes citadas:** cada dato clave debe tener fuente
+- **Fotos verificadas (BUG-022):** `curl -I` con HEAD 200 en el destino final
+  antes de aprobar una URL.
+- **Coordenadas reales:** nunca 0,0.
+- **Sin rating inventado (ADR-009):** el bloque JSON no lleva rating; si
+  aparece, es FAIL.
+- **ASCII-safe en el seed (ADR-002):** la ficha puede tener UTF-8 limpio; el
+  escape `\uXXXX` aplica solo a los JS del seed.
+- **Cero investigacion web propia (R3):** solo validacion y verificacion
+  puntual con `curl -I`.
 
 ## Uso
 
-Invocado automáticamente desde `create-dynamic-page` cuando no existe ficha.
-
-O invocado directamente:
+Invocado desde `create-dynamic-page` (paso 2) cuando ya existe una ficha de
+Gemini, o directamente:
 ```
 /research-destination "Museo Nacional de Colombia" Bogota sitio
 ```

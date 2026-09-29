@@ -806,14 +806,9 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .xpc-fill{height:100%;background:var(--gold);border-radius:4px;transition:width .4s;width:0%}
 .badges-head{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin:2px 0 2px}
 .badges-head span{color:var(--gold)}
-/* Barra de XP del chip de perfil en el navbar (ADR-053 Dec 13) */
-.perfil-xp-bar{width:56px;height:4px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;flex-shrink:0}
-.perfil-xp-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#E8A020,#FFD700);transition:width .4s}
-/* ADR-058: badge de categoria de origen (navbar y modal de level-up). El
-   color lo fija usuario-session.js (renderOrigenBadge); el borde usa
-   currentColor. Base compartida + ajuste por contexto. */
+/* ADR-058: badge de categoria de origen (modal de level-up). El color lo
+   fija usuario-session.js; el borde usa currentColor. */
 .origen-badge{display:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:1px 7px;border:1px solid currentColor;border-radius:10px;line-height:1.6;vertical-align:middle}
-.perfil-origen{margin-left:6px}
 .lu-origen{margin:0 0 14px;font-size:10px;padding:2px 9px}
 #badges-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}
 /* Logros / trofeos (estilo consola + Upland) */
@@ -940,10 +935,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <div style="font-size:11px;color:rgba(255,255,255,.7)">
       <span id="perfil-nombre" style="font-weight:700;color:#fff"></span>
       <span id="perfil-xp" style="color:#E8A020;margin-left:4px"></span>
-      <span id="perfil-badge" style="color:rgba(255,255,255,.45);margin-left:4px"></span>
-      <span id="perfil-origen" class="origen-badge perfil-origen" role="status"></span>
     </div>
-    <div class="perfil-xp-bar" aria-hidden="true"><div class="perfil-xp-fill" id="perfil-xp-fill"></div></div>
   </div><div class="hna">
     <div class="hnsb" onclick="document.getElementById('sinp').focus();window.scrollTo({top:0,behavior:'smooth'})">🔍 Buscar…</div>
     <button class="hncta" onclick="window.location.href='publicar.html'">Publicar lugar</button>
@@ -3218,9 +3210,9 @@ var _ultimoNivelVisto = null;
    NOTA ADR-053 Dec 13 (huerfanos): los contenedores legacy #pts-xp,
    #pts-level, #pts-bar, #badges-grid, #logros-grid y #mm-level-* YA NO
    existen en el DOM (comunidad unificada). Cada acceso va con guarda
-   `if(el)` y las funciones salen sin error; el unico display activo es
-   #perfil-xp/#perfil-badge (+ #perfil-xp-fill) del navbar, que actualiza
-   usuario-session.js. El modal #levelup-modal si existe y se conserva. */
+   `if(el)` y las funciones salen sin error; el navbar muestra solo
+   nombre + XP (#perfil-xp), que actualiza usuario-session.js en modo
+   compacto. El modal #levelup-modal si existe y se conserva. */
 function updatePointsUI() {
   var pu  = puntosUsuarioActual();
   var lvl = getLevel(pu.xp);
@@ -3249,9 +3241,6 @@ function updatePointsUI() {
     pBtn.textContent = usr ? 'Mi perfil' : 'Iniciar sesión';
     pBtn.className = 'mm-profile-btn' + (usr ? ' outline' : '');
   }
-
-  var navXP = document.getElementById('nav-xp-badge');
-  if(navXP) navXP.textContent = fmtXp(pu.xp) + ' XP';
 
   var savedN   = document.getElementById('soc-saved-n');
   var visitedN = document.getElementById('soc-visited-n');

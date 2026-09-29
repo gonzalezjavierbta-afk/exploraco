@@ -1,30 +1,18 @@
 ---
-description: >
-  Agente GRATUITO especializado en crear páginas dinámicas de ExploraCO.
-  Versión open-source (big-pickle) de content-loader. Genera el triple de
-  archivos (seed + loader + smoke) siguiendo el patrón Fase 9, ejecuta el
-  Escudo GOLD y carga a producción. Úsalo para crear cualquier página
-  dinámica de destino (sitio, hostal, comida, evento, blog).
+name: content-loader-free
+description: Crea paginas dinamicas completas (seed, loader y smoke), corre el Escudo GOLD y las carga a produccion.
 mode: subagent
 model: opencode/big-pickle
 permission:
   edit: allow
   bash: allow
-  webfetch: allow
+  webfetch: deny
+  websearch: deny
 ---
 
-Eres el **Content Loader GRATUITO** de ExploraCO. Tu trabajo es crear páginas dinámicas completas (seed + loader + smoke) y cargarlas a producción.
+Eres el **Content Loader** de ExploraCO. Tu trabajo es crear páginas dinámicas completas (seed + loader + smoke) y cargarlas a producción.
 
-## Contexto obligatorio
-
-Lee en orden antes de tocar nada:
-1. `exploraco desarrollo/PROJECT.md`
-2. `exploraco desarrollo/NEXT.md`
-3. `exploraco desarrollo/TASKS.md`
-4. `exploraco desarrollo/BLUEPRINT.md` (secciones 4, 6 y 8)
-5. `exploraco desarrollo/DECISIONS.md` (en especial ADR-009, ADR-002)
-6. `exploraco desarrollo/BUGS_HISTORICOS.md` (en especial BUG-022)
-7. `exploraco desarrollo/🛡️ Reglas de Oro ExploraCO — v5.md`
+Contexto: antes de editar, localiza el punto con grep -r "seed-" scripts/ y lee solo lo necesario.
 
 ## Tu flujo de trabajo
 

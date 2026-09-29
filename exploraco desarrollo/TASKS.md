@@ -15,6 +15,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **IMPLEMENTADO EN WORKING TREE (2026-09-23; migracion 034 PENDIENTE de aplicar en Neon + deploy pendiente):** Mercado de Emprendedores (ADR-055 / TSK-151): 3 mercados INDEPENDIENTES por Casa con normas propias (`mercado_config`; condor 2%/25%, jaguar 5%/10%, delfin 0%/5%), habilidad global "Emprendedor" sobre `usuarios.mercado_puntos` (METRICA DE PROGRESO, NO moneda; no viola ADR-018), compra atomica por CTEs con `23514`->409, produccion de consumibles y admin `?recurso=mercado`. Archivos: `api/interacciones.js` v28, `api/usuarios.js` v21, `api/admin.js` v5, `mercado.js` (NUEVO), tab Mercado en `comunidad.html`, card Emprendedor en `mi-perfil.html`, pantalla Mercado en `admin.html`, `db/migrations/034_mercado_emprendedores.sql` (NUEVA), `scripts/smoke_mercado.js` (NUEVO, en `npm test`). `npm test` VERDE + `smoke_mercado` 38/38 (gate doble de nivel verificado: nodo efectivo = `min(puntos, nivel)`); Escudo GOLD verde; **8/8 INTACTO**. BUG-083 CERRADO. Deuda `[DEUDA-EXPRESS]`: validar `mercado_mi` con sesion real en Neon; contrato de oferta/demanda con datos reales; `mercado_puntos` sin ledger por evento.
 - **IMPLEMENTADO EN WORKING TREE (2026-09-22, sesion express; commit/deploy pendiente):** v27 "Rising Star Decay" del voto de media (XP decreciente con carga ponderada que se recarga a full a las 24h + cooldown creciente `min(600, carga*30)` s; tope 20/24h intacto) + recalibracion de `XP_BASES` + galeria unificada desde la ficha (deep-link `#g-foto`, se elimina el lightbox `#lb`). Archivos: `api/interacciones.js` (`XP_BASES` + `aplicarMediaVoto` + `registrarVotoMedia`), `api/pagina-destino.js` (elimina `#lb`, navega a `/galeria.html?destino=<slug>#g-foto=<url>`), `galeria.html` (`gAutoAbrirHash`), `scripts/check_buildHTML_inline.js` (guard). Deuda `[DEUDA-EXPRESS]`: ADR nuevo que revierta ADR-053 (Decay); `publicar_lugar` XP sin wiring; espejos locales de XP (`directorio-session.js` + fichas estaticas); CSS huerfano `#lb`.
 - **PENDIENTE:** TSK-016 (Widget "Quien va este mes"), TASK-004 (dominio exploraco.co), TASK-005 (Search Console + sitemap), TASK-006 (RESEND_API_KEY), TASK-009 (pagos Wompi/PSE), TASK-010 (WhatsApp al aprobar lugar), TASK-013 (asignar autor al post de blog), TASK-014 (push de la sesion blog/multi-tema), TSK-135 (QA visual del mapa cultural migrado).
+- **DEUDA / PENDIENTE (2026-09-28; SOLO gobernanza de orquestacion, NO toca `api/*`):** orquestacion ADR-067 (TSK-157): (a) verificar R3 en runtime (reiniciar opencode + `webfetch` desde un subagente; BUG-CONFIG-2 / BUG-086); (b) versionar `docs/orquestacion/REFERENCIA-RUTEO.md` (untracked); (c) revisar `explore-free` (`edit: deny` / `bash: deny`); (d) residual de ruta en `scripts/informes-cuota/cuota-2026-09-11-desde-2026-09-06.md:199` (cita `scripts/informe-cuota.js`); (e) `.agents/skills/brainstorming/SKILL.md` (fuera de `.opencode/`) con `description` en ingles; (f) `.opencode/skills/batch-create/SKILL.md` con nombre de modelo; (g) URLs 800px/1200px rotas (HTTP 400; BUG-CONFIG-3 / BUG-087) sembradas en HTML/JS. Detalle en la seccion "Prioridad ORQUESTACION / ADR-067".
 - **IMPLEMENTADO EN WORKING TREE (deploy pendiente segun el archivo):** TSK-112 (Casas/Clases), TSK-114..TSK-123 (Museo URL-only, acordeon, map-picker, Casas/Canales, zonas/marcas, Comunidad > Audiovisual), TSK-130 (starvation de multimedia_mapa), TSK-131 (votos de viajero en la ficha), TSK-143 (drawer del mapa cultural solo por vinculo explicito; ENMIENDA 1 del ADR-047), TSK-144 (estado persistente del usuario en directorios + ficha), TSK-145 (campo zona, migracion 028), TSK-146 (render de media del mapa cultural + diagnostico Neon; BUG-080), TSK-147 (ubicacion por recurso de album + carpetas de guardados + fix de seguridad `scope=mio`; ADR-051/ADR-052, migraciones 029/030 APLICADAS en Neon) y TSK-148 (Gamificacion v6 / ADR-053: `M_nivel` x1.0-x3.0 con doble cap 5.0/10.0, 20 umbrales techo 42000, `xp_ledger`, `gamificacion_config`, `usuarios.nivel_max`, repricing y `?recurso=salud_red`; migracion 031 APLICADA en Neon; backend+smokes COMMITEADOS en `9efbfc7`, frontend/8 espejos en working tree). Verificar commit/deploy real contra el archivo real (ADR-006).
 - **DESPLEGADO (2026-09-21, push a `origin/main`):** TSK-149 (guardados de media en "Mis Albumes" / ADR-054: migracion 032 APLICADA en Neon el 2026-09-21 (idempotencia verificada por segunda corrida) + `api/interacciones.js` v26 + `api/pagina-destino.js` fix BUG-082 + frontend + smokes; commit `b4ad861` = HEAD = `origin/main`). Pendiente solo **QA runtime en produccion**.
 - **DESPLEGADO (2026-09-23, push a `origin/main`):** TSK-154 - cierre del Museo publico: **BUG-060 CERRADO** (migracion 004 APLICADA en Neon con `node scripts/apply_004_foto_url.js`) y **BUG-084 NUEVO CERRADO** (fallback con `AS` duplicado -> `avatar_url AS foto_url AS foto_url` -> SQLSTATE 42601 -> HTTP 500 en `?tipo=museo_publico`, incluso para UUID inexistentes; fix `['foto_url','avatar_url']` en commit `1302f7c`, pusheado a `origin/main`). Verificacion en vivo: **200** con UUID real / **404** con UUID inexistente; Escudo GOLD PASS; smoke `017` 67/73 IDENTICO al baseline. **8/8 INTACTO**; sin ADR nuevo. Deuda: `perfil.html:979` fetch sin JWT; BUG-061 sigue ABIERTO.
@@ -47,6 +48,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad MUSEO PUBLICO (BUG-060 + BUG-084) - 2026-09-23 (TSK-154)](#prioridad-museo-publico-bug-060--bug-084---2026-09-23-tsk-154)
 - [Prioridad MULTIPLICADOR DE ORIGEN POR LEJANIA - 2026-09-24 (ADR-058 / TSK-155)](#prioridad-multiplicador-de-origen-por-lejania---2026-09-24-adr-058--tsk-155)
 - [Prioridad PANTALLAS DE ENTRADA - 2026-09-24 (TSK-156)](#prioridad-pantallas-de-entrada---2026-09-24-tsk-156)
+- [Prioridad ORQUESTACION / ADR-067 - 2026-09-28 (deuda post tanda de coste)](#prioridad-orquestacion--adr-067---2026-09-28-deuda-post-tanda-de-coste)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3600,6 +3602,36 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Deuda aceptada [DEUDA-EXPRESS]:** (1) SIN smoke que cubra `reclamarXpDemo()`/overlay; (2) `<link>` a Geist SIN USAR en `registro.html:12` (carga de fuente muerta); (3) cache-bust de `usuario-session.js` (BUG-073) SI aplica al deploy.
 - **Relacion con bugs:** ninguno nuevo. La deuda IDOR preexistente en `reclamar_bonus_referido` (codigo 036) sigue vigente (ajena a este refinamiento).
 - **Fuera de alcance:** NO toca `api/*.js` en el refinamiento (**8/8 INTACTO**); sin migraciones; sin ADR nuevo.
+
+## Prioridad ORQUESTACION / ADR-067 - 2026-09-28 (deuda post tanda de coste)
+
+> Cierre documental de la tanda ADR-067 (modelo de 3 capas con presupuesto:
+> roster 40 -> 19, reglas R1-R4, convencion `description:`, `REFERENCIA-RUTEO.md`,
+> 3 modos nuevos de `informe-cuota.js` y R3 forzado por `deny` explicito).
+> SOLO gobernanza de orquestacion (`.opencode/**`, `opencode.json`,
+> `scripts/ejecucion/informe-cuota.js`): NO toca `api/*` (**8/8 INTACTO**,
+> ADR-001/ADR-010); sin migraciones. Bugs de configuracion: BUGS_HISTORICOS.md
+> **BUG-085..BUG-088** (BUG-CONFIG-1..4).
+
+### TSK-157: Deuda y verificaciones abiertas de la tanda ADR-067 [PENDIENTE]
+
+- **Estado:** PENDIENTE (deuda registrada en el pase documental de cierre, 2026-09-28).
+- **Prioridad:** Media (gobernanza de orquestacion; no bloquea produccion web).
+- **Fecha:** 2026-09-28.
+- **Origen:** cierre documental (R2) de la tanda ADR-067.
+- **ADR:** DECISIONS.md ADR-067 (Nota de revision R-067).
+- **Alcance (deuda concreta):**
+  1. **(a) Verificar R3 en runtime [BUG-CONFIG-2 / BUG-086]:** reiniciar opencode y lanzar un subagente (p.ej. `js-silo-dev-free`) que intente `webfetch`; debe ser DENEGADO. La config de agentes/permisos se carga al INICIAR la sesion; la prueba de runtime no refleja el estado final del disco hasta reiniciar.
+  2. **(b) Versionar `docs/orquestacion/REFERENCIA-RUTEO.md`:** esta untracked (matriz de dominios, R1-R4, anclas, politica de escalada).
+  3. **(c) Revisar `explore-free`:** quedo con `edit: deny` y `bash: deny` (decision de menor privilegio); decidir si necesita `bash` read-only.
+  4. **(d) Residual de ruta:** `scripts/informes-cuota/cuota-2026-09-11-desde-2026-09-06.md:199` cita la ruta vieja `scripts/informe-cuota.js`.
+  5. **(e) Convencion ADR-067 fuera de `.opencode/`:** `.agents/skills/brainstorming/SKILL.md` tiene `description` en ingles y posiblemente >150 chars: decidir si entra en la convencion.
+  6. **(f) `batch-create/SKILL.md`:** contiene el nombre de modelo "DeepSeek V4 Flash"; la convencion ADR-067 prohibe nombres de modelo en skills.
+  7. **(g) URLs de thumbnail rotas [BUG-CONFIG-3 / BUG-087]:** URLs de 800px/1200px devuelven HTTP 400 y ya estan sembradas en HTML/JS; barrer y regenerar desde la API (`iiurlwidth`).
+- **Evidencia (ADR-006):** `git grep -n "webfetch: allow" -- .opencode/agent/` -> solo `research-agent-free.md`; `git grep -c "webfetch: deny" -- .opencode/agent/` -> 18; `git grep -n "AGENTS\.md" -- .opencode/` -> 0; `git status --short` -> `docs/orquestacion/` untracked; salida de `node scripts/ejecucion/informe-cuota.js --overhead` (Capa 0 12.752 -> 4.134 chars; Total 145.616 -> 85.884 chars).
+- **Relacion con bugs:** BUG-085..BUG-088 (BUG-CONFIG-1..4).
+- **Fuera de alcance:** NO toca `api/*` (**8/8 INTACTO**); sin migraciones; no modifica `.opencode/**` desde este pase (solo lo documenta).
+- **Dependencia:** ninguna (arranca en frio re-ejecutando `node scripts/ejecucion/informe-cuota.js --overhead`).
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -1,9 +1,9 @@
-// scripts/validate_ficha.js
+// .opencode/skills/gemini-research/scripts/validate_ficha.js
 // Valida el bloque JSON de entrega de una ficha generada con el skill
 // gemini-research (prompts/ficha_template.md).
 //
 // Uso:
-//   node scripts/validate_ficha.js <ruta-ficha.md>
+//   node .opencode/skills/gemini-research/scripts/validate_ficha.js <ruta-ficha.md>
 //
 // Exit code 0 = PASS, 1 = FAIL. Solo lectura; no modifica archivos.
 // ASCII-safe (no se emiten tildes ni caracteres especiales).

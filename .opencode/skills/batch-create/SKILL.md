@@ -1,10 +1,6 @@
 ---
 name: batch-create
-description: >
-  Ejecuta operaciones en lote: múltiples páginas dinámicas,
-  verificaciones masivas o seeds grupales. Úsalo cuando necesites
-  crear varias páginas dinámicas a la vez para optimizar el uso
-  de la cuota.
+description: Ejecuta operaciones en lote: paginas dinamicas, verificaciones masivas o seeds grupales, para crear varias a la vez y optimizar la cuota.
 ---
 
 # Batch Create
@@ -23,7 +19,7 @@ Ejecuta operaciones en lote para optimizar el uso de la cuota del plan Go.
 
 ### 2. Ejecución paralela
 Para cada destino en el lote:
-1. Invocar `research-destination` para generar ficha
+1. Obtener la ficha (R3: prompt de Gemini) y validarla con `research-destination`
 2. Invocar `create-dynamic-page` para crear y cargar
 3. Monitorear progreso (éxito/fallo por destino)
 4. Manejar errores:
@@ -40,7 +36,7 @@ Para cada destino en el lote:
 ```
 Usuario: "Crear los 10 mejores hostales de Medellín"
 → batch-create invoca:
-  1. research-destination × 10 (paralelo)
+  1. gemini-research + research-destination x 10 (prompt + validacion)
   2. create-dynamic-page × 10 (secuencial)
   3. Reporte consolidado
 ```

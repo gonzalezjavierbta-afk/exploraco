@@ -1,10 +1,6 @@
 ---
 name: create-dynamic-page
-description: >
-  Orquesta el flujo completo de creación de una página dinámica de
-  ExploraCO: validación, ficha, seed, loader, smoke, Escudo GOLD,
-  carga a producción y actualización de docs. Úsalo cuando el usuario
-  pida crear una nueva página dinámica de destino.
+description: Orquesta la creacion de una pagina dinamica de ExploraCO: validacion, ficha, seed, loader, smoke, Escudo GOLD y produccion. Usalo por pagina nueva.
 ---
 
 # Create Dynamic Page
@@ -20,8 +16,9 @@ Skill que orquesta el flujo completo de creación de páginas dinámicas de Expl
 
 ### 2. Ficha
 - Priorizar ficha de `gemini-research` si existe (`ficha-<slug>.md` con bloque
-  JSON final, validada con `scripts/validate_ficha.js`)
-- Si no existe, invocar `research-destination` para generarla
+  JSON final, validada con `.opencode/skills/gemini-research/scripts/validate_ficha.js`)
+- Si no existe, aplicar R3: entregar el prompt de Gemini y validar la ficha con
+  `research-destination`
 - Verificar que tenga: datos verificados, 5 fotos (HEAD 200), 5 FAQs, coordenadas
 
 ### 3. Seed

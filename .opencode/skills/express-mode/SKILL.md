@@ -1,15 +1,22 @@
 ---
 name: express-mode
-description: >
-  Ejecuta cambios de ExploraCO en "modo express/xpress": prioriza el cambio
-  funcional, delega briefs quirurgicos por dominio, usa verificacion minima
-  proporcional al riesgo y difiere la documentacion al cierre de sesion.
-  Usalo cuando el usuario pida express/xpress/rapido.
+description: Ejecuta cambios en modo express: prioriza el cambio funcional y verifica segun el riesgo. No permite saltarse R2 (docs en un pase de cierre).
 ---
 
 # Express Mode
 
 Modo de trabajo **rapido, dirigido y proporcional al riesgo** para ExploraCO: se prioriza el cambio funcional, se verifican solo los puntos que pueden romperse y se difiere todo lo no critico (documentacion, refactors, pruebas end-to-end, backfill de datos) al cierre de sesion.
+
+## R2 transversal (SIEMPRE, aplique o no express)
+
+**R2 (docs solo al cierre) es una regla transversal de todo ExploraCO, no una caracteristica del modo express.** Aplica a cualquier tarea, en modo normal o en modo express:
+
+- La documentacion (`TASKS.md`, `NEXT.md`, `DECISIONS.md`, ADR, `BUGS_HISTORICOS.md`) NO se escribe tarea por tarea. Se escribe en UN solo pase de cierre de la tanda.
+- Esta skill NO autoriza a saltarse R2. El modo express solo cambia **CUANDO** se documenta (al cierre), nunca **SI** se documenta.
+- **Unica excepcion:** que la tarea sea, precisamente, el cierre documental. Solo entonces se permite editar docs dentro de la tarea.
+- Sin pase de cierre, la tanda NO esta cerrada: quedan pendientes el pase documental y el resumen de gasto (R4, `informe-cuota.js --task`).
+
+> Consecuencia: ni la urgencia ni el modo express eximen a nadie de documentar. Lo unico que R2 difiere es el momento, no la obligacion.
 
 ## Cuando usar
 
@@ -30,13 +37,13 @@ Modo de trabajo **rapido, dirigido y proporcional al riesgo** para ExploraCO: se
 ## Flujo express paso a paso
 
 1. **Spec inline minima.** Una linea: que se cambia, en que archivo y criterio de exito.
-2. **Lectura dirigida.** `grep` del ancla + `read` con `offset`/`limit`. `@explore` solo si es imprescindible (p. ej. contar consumidores de un ancla).
+2. **Lectura dirigida.** `grep` del ancla + `read` con `offset`/`limit`. `@explore-free` solo si es imprescindible (p. ej. contar consumidores de un ancla).
 3. **Brief quirurgico de delegacion.** Un subagente por dominio con rutas + numeros de linea + bloque `old`/`new` exacto (ver plantilla).
 4. **Ejecutar cambios minimos**, de bajo riesgo primero. Reusar componentes/helpers; extraer modulo compartido en vez de duplicar.
 5. **Paralelizar** solo tareas independientes (varios `task` en un mismo mensaje); respetar dependencias.
 6. **Verificacion local minima** (checklist de 6 puntos). QA runtime obligatorio si se anidan contenedores dinamicos.
 7. **Registrar deuda** con etiquetas en `NEXT.md` / items en `TASKS.md` (no arreglarla durante express).
-8. **Cierre documental en un solo pase** al final.
+8. **Cierre documental (R2, transversal): un solo pase** al final de la tanda. No documentar tarea por tarea; la excepcion es que la tarea sea el propio cierre documental.
 
 ## Plantilla de "brief express"
 
@@ -48,7 +55,7 @@ OLD (bloque exacto a reemplazar):
 <...>
 NEW (bloque exacto de reemplazo):
 <...>
-Restricciones: no duplicar bloques > 5 lineas (AGENTS.md), no catch vacios,
+Restricciones: no duplicar bloques > 5 lineas (docs/orquestacion/REFERENCIA-RUTEO.md), no catch vacios,
   ASCII-safe en api/*.js (cero bytes > 127, cero backticks, cero doble escape).
 Verificacion esperada: node --check + ASCII-safety + balance de divs + grep de residuos.
 Dependencias: <ninguna | que otro cambio debe ir primero>.
@@ -67,14 +74,14 @@ Dependencias: <ninguna | que otro cambio debe ir primero>.
 
 ## Que se difiere
 
-- Documentacion (`TASKS.md`, `NEXT.md`, `DECISIONS.md`, ADR, `BUGS_HISTORICOS.md`).
+- Documentacion (`TASKS.md`, `NEXT.md`, `DECISIONS.md`, ADR, `BUGS_HISTORICOS.md`). R2 es transversal: se difiere el **momento** (al cierre), nunca la obligacion.
 - Refactors de deuda colateral y limpieza de codigo muerto (JS muerto, backups con anclas).
 - Pruebas end-to-end reales contra Neon/produccion (las corre el operador; no hay `DATABASE_URL` local).
 - Backfill/lectura de datos: se entrega `scripts/diagnose_*.js` read-only + `db/cleanups/NNN_*.sql` idempotente.
 
-## Cierre documental (un solo pase)
+## Cierre documental (un solo pase, R2 transversal)
 
-Al terminar la ultima tarea:
+Al terminar la ultima tarea (o antes de dar la tanda por cerrada):
 
 1. `TASKS.md`: actualizar **Estado** + nota de cierre con el **alcance real ejecutado**.
 2. `NEXT.md`: entrada de relevo ("Que se estaba haciendo" + "Que sigue" + "Riesgos activos").

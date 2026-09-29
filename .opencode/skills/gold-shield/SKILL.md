@@ -1,10 +1,6 @@
 ---
 name: gold-shield
-description: >
-  Ejecuta el Escudo GOLD de ExploraCO: verificación de sintaxis
-  (node --check), ASCII-safety y balance de divs. Úsalo antes de
-  desplegar cualquier cambio en api/*.js, admin.html, pagina-destino.js
-  o index.html.
+description: Ejecuta el Escudo GOLD: sintaxis (node --check), ASCII-safety y balance de divs. Usalo al desplegar api/*.js, admin.html o pagina-destino.js.
 ---
 
 # Gold Shield
