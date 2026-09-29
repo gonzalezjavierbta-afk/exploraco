@@ -3498,6 +3498,17 @@ var CIUDADES_COLECCION = [
 // Logros generales (voto rapido, blogs y conteos de progreso).
 var LOGROS = [
   {
+    // Migracion 042 / ADR nuevo: insignia del Pasaporte completo. NO tiene
+    // prerrequisitos (es un logro-identidad). XP 200 tier plata via el ledger
+    // canonico de badges (registrarXpLedger, es_exento) + reparto de referidos
+    // por el helper canonico repartirXpReferidos.
+    id: 'logr_pasaporte_completo', grupo: 'general', requiere: [],
+    nombre: 'Pasaporte completo',
+    desc: 'Completa los 6 datos de tu Pasaporte de viajero',
+    emoji: '\uD83D\uDEE1', tier: 'plata', xp: 200,
+    check: function(ctx) { return ctx.pasaporteCompleto().then(function(n){ return n >= 1; }); },
+  },
+  {
     id: 'logr_primer_voto', grupo: 'general', requiere: [],
     nombre: 'Primera calificaci\u00f3n',
     desc: 'Califica por primera vez un lugar con el voto r\u00e1pido de 1 a 5 estrellas',
@@ -4522,6 +4533,21 @@ function evaluarLogros(sql, usuarioId) {
           'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true',
           [usuarioId]);
       },
+      // Pasaporte completo (migracion 042): checklist server-side de 6 datos.
+      // Degrada a 0 si la 042 no esta aplicada (fecha_nacimiento / usuario_fotos
+      // ausentes -> memo captura y devuelve 0).
+      pasaporteCompleto: function() {
+        return memo('pasaporte',
+          'SELECT (CASE WHEN COALESCE(TRIM(nombre), \'\') <> \'\''
+          + ' AND fecha_nacimiento IS NOT NULL'
+          + ' AND (COALESCE(foto_url, \'\') <> \'\' OR EXISTS (SELECT 1 FROM usuario_fotos uf WHERE uf.usuario_id = usuarios.id AND uf.activo = true))'
+          + ' AND COALESCE(TRIM(ciudad_base), \'\') <> \'\''
+          + ' AND COALESCE(TRIM(pais_base), \'\') <> \'\''
+          + ' AND email_verificado = true'
+          + ' AND EXISTS (SELECT 1 FROM usuario_fotos uf2 WHERE uf2.usuario_id = usuarios.id AND uf2.activo = true)'
+          + ' THEN 1 ELSE 0 END) AS n FROM usuarios WHERE id=$1',
+          [usuarioId]);
+      },
       guardadosCiudad: function(ciudad) {
         var key = 'ciudad_' + ciudad;
         return memo(key,
@@ -4579,6 +4605,10 @@ function evaluarLogros(sql, usuarioId) {
           nivel: calcularNivelLocal(numXp(u.xp_total) + xpBonus).nivel,
           contexto: { logros: nuevos.map(function(l){ return l.id; }) }
         });
+      }).then(function() {
+        // Canonico (respuesta B4): el XP del badge tambien reparte a los
+        // referidos por el helper unico; best-effort, nunca lanza.
+        return repartirXpReferidos(sql, usuarioId, xpBonus);
       }).then(function() { return nuevos; });
     });
   }).catch(function(err) {
@@ -9873,12 +9903,13 @@ module.exports = async function handler(req, res) {
           return res.status(200).json({ ok: true, reactivado: true, foto: afRep[0] });
         }
 
+        var afDestinoId = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(body.destino_id || '')) ? String(body.destino_id) : null;
         var afIns;
         try {
           afIns = await sql(
-            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor, lat, lng) '
-            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible, XP_BASES.album_foto, afLat, afLng]
+            'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor, lat, lng, destino_id) '
+            + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+            [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible, XP_BASES.album_foto, afLat, afLng, afDestinoId]
           );
         } catch (afInsErr) {
           // La FK autor_original_id -> usuarios.id (009) convierte un id
@@ -9886,7 +9917,16 @@ module.exports = async function handler(req, res) {
           // generico del catch global. Cualquier otro error se re-lanza.
           if (afInsErr && afInsErr.code === '23503')
             return res.status(400).json({ ok: false, error: 'AUTOR_ORIGINAL_INVALIDO' });
-          throw afInsErr;
+          // 042 sin aplicar (destino_id ausente): reintenta sin la columna.
+          if (afInsErr && afInsErr.code === '42703') {
+            afIns = await sql(
+              'INSERT INTO album_fotos (album_id, agregador_id, autor_original_id, foto_url, foto_type, media_title, media_source, visible, xp_otorgado_autor, lat, lng) '
+              + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+              [afAlbumId, usuarioId2, afAutorOriginal, afFotoUrl, afFotoType, afMediaTitle, afMediaSource, afVisible, XP_BASES.album_foto, afLat, afLng]
+            );
+          } else {
+            throw afInsErr;
+          }
         }
 
         // XP +15 al agregador

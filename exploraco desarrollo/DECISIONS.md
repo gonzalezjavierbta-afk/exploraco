@@ -3798,3 +3798,26 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Riesgos / deuda aceptada [DEUDA-EXPRESS]:** (a) la subida anonima se limita a la foto principal de destinos (5 MB) pero SIN rate-limit propio, apoyada en el cap del store; (b) `blobVerificarJwt()` duplica el verificador de `api/interacciones.js` en vez de un helper compartido; (c) dependencia de CDN externo (`esm.sh`) en runtime del navegador; (d) los marcadores `[foto:]/[video:]` del editor de blog del admin siguen por URL (no se les puso boton de subida).
 
 **ADRs relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8 de funciones serverless), ADR-016 (contratos de album/media), ADR-051 (coords), ADR-053 (sesion/JWT), TSK-158.
+
+## ADR-069: Pasaporte de viajero, billetera agregadora y fotos de perfil (migracion 042); QR/canje diferido
+
+**Estado:** APROBADO (2026-09-29). **Contexto:** el prompt de la sesion pidio (a) corregir bugs de UI/subida/mapa, (b) un "Pasaporte" de perfil con insignia, (c) una billetera digital con canje QR, y (d) mejoras de subida. El operador acoto el alcance: la billetera de esta fase solo AGREGA (xp + monedas + consumibles); el QR/canje se documenta aqui y se implementa despues.
+
+**Decisiones:**
+1. **Pasaporte** = checklist server-side de 6 datos (`nombre`, `fecha_nacimiento`, `foto`/galeria, `ciudad_base`+`pais_base`, `email_verificado`, >=1 foto en galeria). Se calcula SOLO en servidor (`calcularPasaporte`); el cliente no puede autoconcederlo.
+2. **`usuarios.fecha_nacimiento`** es PII (ADR-028): se sirve unicamente al dueno/admin y NUNCA en `perfil_publico`/`museo_publico`/rankings. Editable UNA sola vez (guard `WHERE fecha_nacimiento IS NULL`); edad 13..120 validada en servidor.
+3. **`usuario_fotos`**: galeria de perfil con tope de **10 activas**, forzado de forma atomica en el backend (`INSERT ... SELECT ... WHERE count < 10`), una sola principal activa (indice unico parcial) y baja por `activo=false` (ADR-003). `usuarios.foto_url` se mantiene como espejo de compatibilidad.
+4. **`billeteras`**: identidad (una por usuario, `codigo_publico` unico) que se crea de forma **idempotente** al completar el Pasaporte. Es un **agregador de lectura**: `xp_total` (moneda unica, ADR-018) + saldo CDR (`moneda_cuentas`/`moneda_ledger`, ADR-061) + consumibles (`usuarios.capacidades->'consumibles'`). NO crea saldo ni moneda.
+5. **QR/canje DIFERIDO:** el token QR firmado, el endpoint de canje de un solo uso y el modelo de productos canjeables (reusando `consumibles`/`marcas` de ADR-042) NO se implementan en esta fase. Encuadre legal: solo aliados, sin dinero real; revision legal antes de produccion.
+6. **Insignia `logr_pasaporte_completo`**: tier plata, +200 XP por el ledger canonico de badges (`registrarXpLedger`, `es_exento=true`) mas `repartirXpReferidos` (helper canonico) sobre el XP del badge.
+7. **Ubicacion de recursos (C4):** `album_fotos.destino_id` nullable (FK a `destinos`, ON DELETE SET NULL) para vincular un recurso a un destino publicado. Es OPCIONAL; sin el, el recurso conserva su ubicacion por lat/lng o la heredada del album (ADR-039/ADR-051).
+8. **Mapa base resiliente (A3):** `mapa-tiles.js` con proveedores de respaldo (CARTO voyager/positron -> OSM) y aviso con reintento; se usa en todas las superficies con Leaflet.
+9. **Subida v2:** la optimizacion de imagen vive SOLO en `media-upload.js` (canvas -> WebP q0.8 con fallback JPEG; 800 px perfil / 1600 px resto; EXIF `from-image`; elimina GPS; nunca amplia; GIF/SVG intactos). Confirmacion no tecnica sin URL en flujos de usuario final.
+
+**Alternativas descartadas:** (a) canje QR ahora (excede el alcance autorizado y requiere encuadre legal); (b) tabla de billetera con saldo propio (violaria ADR-018: moneda unica); (c) optimizacion en servidor (no hay ffmpeg/sharp en el presupuesto 8/8).
+
+**Impacto:** migracion NUEVA **042** (`db/migrations/042_pasaporte_billetera_fotos.sql`, aditiva/idempotente/ASCII-safe) **PENDIENTE de aplicar en Neon**; `api/usuarios.js` **v24**; `api/interacciones.js` (logro + `album_fotos.destino_id` con fallback 42703); `media-upload.js`; `mapa-tiles.js` (NUEVO); `mapa-cultural.js` v1.1.1; `map-picker.js`; `index.html`; `comunidad.html`; `mapas.html`; `mi-perfil.html`; `publicar.html`; `admin.html`; `scripts/verify_042_precheck.js` (NUEVO); `scripts/smoke_mapa_tiles.js` (NUEVO); `scripts/smoke_042_pasaporte_billetera.js` (NUEVO); `scripts/test_logros_catalogo.js` (34). **8/8 endpoints intacto** (sin endpoints nuevos).
+
+**Riesgos / deuda [DEUDA-EXPRESS]:** canje/QR y legal diferidos; blob huerfano al reemplazar la foto de perfil no se borra (Cero Borrado no cubre blobs); verificacion de edad declarativa (edad minima 13 solo por fecha declarada); `test_logros_catalogo.js` estaba desalineado (BUG-090).
+
+**ADRs relacionados:** ADR-002, ADR-003, ADR-006, ADR-008, ADR-010, ADR-018, ADR-028, ADR-039, ADR-042, ADR-051, ADR-053, ADR-061, ADR-068, TSK-159.

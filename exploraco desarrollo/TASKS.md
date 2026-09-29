@@ -3654,5 +3654,24 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Fuera de alcance:** sin migraciones de esquema (se reusa `foto_url`/`url`); sin tocar el resto de rutas de `utilidades.js`.
 - **Dependencia:** store Blob conectado al proyecto en Vercel (`BLOB_READ_WRITE_TOKEN`).
 
+### TSK-159: Bugs A1-A3 + Pasaporte/Billetera (042) + Subida v2 [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE / `npm test` verde (2026-09-29); pendiente aplicar la migracion 042 en Neon + commit/deploy.
+- **Prioridad:** Alta.
+- **Fecha:** 2026-09-29.
+- **Origen:** `prompt.md` de la sesion (4 fases: bugs, pasaporte/billetera, subida v2, cierre).
+- **ADR:** DECISIONS.md ADR-069.
+- **Alcance REAL ejecutado:**
+  - **Fase A (bugs):**
+    1. **A1** subida sin URL cruda: `media-upload.js` expone `confirmacion()` (miniatura + check SVG + peso, sin URL); `mi-perfil.html` reemplaza el texto de la URL en la foto de perfil por `pfDatoFoto` (miniatura) y usa la confirmacion; `publicar.html` (foto principal y galeria) y `admin.html` (admin conserva la URL + confirmacion).
+    2. **A2** hidratacion de "Estuve aqui": causa raiz = `usuario-session.js estaVisitado()` comparaba `d.id`/`d.slug` contra el UUID, pero `?tipo=mapa` devuelve `d.id AS destino_id` (api/interacciones.js). Se normalizan las 3 claves. **BUG-089.**
+    3. **A3** mapa base: NUEVO `mapa-tiles.js` (`window.MapaTiles.aplicar`, fallback CARTO voyager/positron -> OSM por `tileerror` + aviso con reintento); integrado en `mapa-cultural.js` (v1.1.1), `map-picker.js`, `index.html`, `comunidad.html` (OSM directo -> CARTO), `mapas.html`.
+  - **Fase B (migracion 042):** `usuarios.fecha_nacimiento` (PII owner-only, editable 1 vez), `usuario_fotos` (tope 10 atomico), `billeteras` (identidad + agregador), `album_fotos.destino_id`. Backend `api/usuarios.js` **v24** (`perfil_actualizar` + `fecha_nacimiento`; `foto_agregar`/`foto_principal`/`foto_quitar`; GET `billetera_mia`). `api/interacciones.js`: logro `logr_pasaporte_completo` (tier plata, +200 XP via ledger canonico + `repartirXpReferidos`). UI `mi-perfil.html` (Pasaporte, billetera, galeria N/10, fecha). NUEVO `scripts/verify_042_precheck.js`.
+  - **Fase C (subida v2):** `media-upload.js` optimiza en el navegador (canvas -> WebP q0.8, fallback JPEG; perfil 800 / resto 1600; EXIF `from-image`; elimina GPS; no amplia; GIF/SVG intactos). Bloque de subida above-the-fold en `mi-perfil.html`. Buscador de ubicacion (C4) en `mi-perfil.html` (`buscarDestinoAlbum` -> `/api/destinos?q=`) y `album_fotos.destino_id` en el INSERT de `album_agregar_foto` con fallback 42703.
+  - **Fase D:** ADR-069, este TSK, BUG-089, NEXT/PROJECT/BLUEPRINT y `docs/DEPLOY_042.md`.
+- **Evidencia (ADR-006):** `node --check` 6/6; ASCII 0 en `api/*.js` (utilidades.js: 3 `\\u` PREEXISTENTES en regex, no tocado); divs 0 en los 6 HTML; **`npm test` VERDE** (16 smokes) + `smoke_mapa_tiles.js` (21) + `smoke_042_pasaporte_billetera.js` (28). **8/8 endpoints intacto.**
+- **Deuda [DEUDA-EXPRESS]:** canje/QR de billetera diferido (ADR-069); blob huerfano al reemplazar foto de perfil no se borra; `test_logros_catalogo.js` estaba desalineado (30 vs 33 reales) -> **BUG-090**; verificacion de edad 13 solo declarativa (monitoreo pendiente).
+- **Fuera de alcance:** sin nuevos endpoints (8/8); QR de referidos (`api.qrserver.com`) NO se toco.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

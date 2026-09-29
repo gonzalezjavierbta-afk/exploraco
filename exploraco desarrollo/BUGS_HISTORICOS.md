@@ -1602,3 +1602,24 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Verificacion:** `git grep -n "AGENTS\.md" -- .opencode/` -> 0.
 **Estado:** CERRADO (2026-09-28). Ver DECISIONS.md ADR-067 y `docs/orquestacion/REFERENCIA-RUTEO.md`.
 
+## BUG-089: el boton "Estuve aqui" no se hidrataba en la ficha -- `estaVisitado()` comparaba `d.id`/`d.slug` contra el UUID, pero `?tipo=mapa` devuelve `d.id AS destino_id`
+
+**Severidad:** MEDIA (estado de UI incorrecto: un lugar ya visitado volvia a verse como no visitado al recargar la ficha).
+**Contexto:** Fase A2 del prompt de la sesion (2026-09-29).
+**Sintoma:** al abrir `/api/pagina-destino?slug=...` de un destino ya visitado, `#btn-visitado` NO recibia la clase `.activo`.
+**Causa raiz:** `usuario-session.js` `window.ExploraCO.estaVisitado(destinoUUID)` recorria `data.data.visitados` y comparaba `String(d.id) === objetivo` y `d.slug === objetivo`. El endpoint `GET /api/interacciones?tipo=mapa` proyecta cada destino con el alias SQL `d.id AS destino_id` (api/interacciones.js), por lo que `d.id` es `undefined` y `d.slug` (slug) nunca coincide con el UUID. Resultado: siempre `false`.
+**Resolucion aplicada:** normalizar las 3 claves posibles (`d.destino_id`, `d.id`, `d.slug`) contra el objetivo. Con `.activo` ya existente en `api/pagina-destino.js` (`.hobtn.activo`), el boton se hidrata via `precargarEstado`/`onExploraCOUpdate`.
+**Evidencia (ADR-006):** `usuario-session.js` (`estaVisitado`), `api/interacciones.js:5510` (`d.id AS destino_id`), `api/pagina-destino.js` (`precargarEstado` + CSS `.hobtn.activo`).
+**Prevencion:** al comparar filas de un endpoint, usar EXACTAMENTE el alias proyectado (no asumir `id`).
+**Estado:** CERRADO / CORREGIDO en working tree (2026-09-29). Sin smoke nuevo (logica de red); cubierto por inspeccion.
+
+## BUG-090: `scripts/test_logros_catalogo.js` estaba desalineado con el catalogo LOGROS (esperaba 30, habia 33)
+
+**Severidad:** BAJA (test rojo preexistente; no rompe runtime porque NO esta encadenado a `npm test`).
+**Contexto:** Fase B de la sesion (2026-09-29) al actualizar el conteo por el nuevo logro `logr_pasaporte_completo`.
+**Sintoma:** el test fallaba en el check de conteo (30 != real).
+**Causa raiz:** el catalogo crecio (33 logros) sin actualizar el literal del test.
+**Resolucion aplicada:** actualizar el conteo a **34** (33 reales + `logr_pasaporte_completo`) y anadir `pasaporteCompleto` a la lista de ctx methods validados; nuevo script `npm run test:logros`.
+**Evidencia (ADR-006):** salida del test `EXIT 0` tras el ajuste; `package.json` script `test:logros`.
+**Estado:** CERRADO / CORREGIDO en working tree (2026-09-29).
+

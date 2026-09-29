@@ -20,7 +20,7 @@ vm.runInContext(src, sandbox, { filename: 'mapa-cultural.js' });
 
 const MC = sandbox.window.MapaCultural;
 check('API: window.MapaCultural expuesto', !!MC);
-check('API: version 1.1.0', MC && MC.version === '1.1.0');
+check('API: version 1.1.1', MC && MC.version === '1.1.1');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
@@ -251,8 +251,9 @@ function mkMarker() {
 }
 var L2 = {
   _markers: [],
+  _tileCalls: 0,
   map: function () { return mkMapStub(); },
-  tileLayer: function () { return { addTo: function () { return this; } }; },
+  tileLayer: function () { L2._tileCalls++; return { addTo: function () { return this; } }; },
   layerGroup: function () { var g = layerStub(); groups.push(g); return g; },
   marker: function () { var m = mkMarker(); L2._markers.push(m); return m; },
   divIcon: function () { return {}; }
@@ -278,6 +279,7 @@ var MC2 = sandbox2.window.MapaCultural;
 
 var inst2 = MC2.create({ map: 'mm-personal-map', categories: '#mm-personal-cats' });
 check('bindCategories: init con document/L -> initialized', inst2.getState().initialized === true);
+check('A3: el motor registra la capa base (L.tileLayer)', L2._tileCalls >= 1);
 check('bindCategories: engancha click en el root de categorias', typeof catsRoot.__handlers.click === 'function');
 var clickCat = catsRoot.__handlers.click;
 clickCat({ target: btnHostal });
@@ -380,5 +382,15 @@ allSt = allInst.getState();
 check('regresion Todo: clic data-cat=all -> capa media habilitada', allSt.mediaEnabled === true);
 check('regresion Todo: clic data-cat=all -> 3 tipos activos', allSt.mediaTypes.foto === true && allSt.mediaTypes.video === true && allSt.mediaTypes.audio === true);
 check('regresion Todo: clic data-cat=all -> renderMedia pinta el pin', allLayer.__added.length === 1);
+
+// ---- (10) A3: CSS de Leaflet + capa base en los consumidores --------
+const comunidadHtml = fs.readFileSync(path.join(__dirname, '..', 'comunidad.html'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+check('A3: comunidad carga leaflet.css 1.9.4', /leaflet@1\.9\.4\/dist\/leaflet\.css/.test(comunidadHtml));
+check('A3: index carga leaflet.css 1.9.4', /leaflet@1\.9\.4\/dist\/leaflet\.css/.test(indexHtml));
+check('A3: comunidad enlaza mapa-cultural.css', /mapa-cultural\.css/.test(comunidadHtml));
+check('A3: mapa-tiles.js cargado en comunidad', /mapa-tiles\.js\?v=1/.test(comunidadHtml));
+check('A3: mapa-tiles.js cargado en index', /mapa-tiles\.js\?v=1/.test(indexHtml));
+check('A3: comunidad ya no usa tiles OSM directo', comunidadHtml.indexOf('tile.openstreetmap.org') === -1);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

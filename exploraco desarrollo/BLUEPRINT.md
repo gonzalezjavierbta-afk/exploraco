@@ -456,3 +456,8 @@ print(f'evento: balance={z.count("<div")-z.count("</div>")}')  # debe ser 0
    `grep -P '[^\x00-\x7f]' api/*.js` (Debe devolver 0 resultados) [1, 2].
 3. **Balance de DIVs:**
    Verificar manualmente o con script Python que el conteo de `<div` sea igual al de `</div>` en cada secci\u00f3n de `admin.html` [1, 2].
+
+
+## Registro 2026-09-29 (TSK-159 / ADR-069): pasaporte, billetera agregadora, fotos de perfil y mapa base resiliente
+
+Migracion NUEVA 042 (usuarios.fecha_nacimiento, usuario_fotos, billeteras, album_fotos.destino_id). api/usuarios.js v24 (Pasaporte + billetera + galeria). api/interacciones.js: logro logr_pasaporte_completo y destino_id con fallback 42703. media-upload.js: optimizacion WebP/EXIF en navegador + confirmacion sin URL. NUEVO mapa-tiles.js (fallback CARTO -> OSM). Mapa integrado en mapa-cultural.js v1.1.1, map-picker.js, index.html, comunidad.html, mapas.html. 8/8 endpoints intacto. Smokes nuevos encadenados a npm test. Deuda: canje/QR diferido, blob huerfano, edad 13 declarativa.

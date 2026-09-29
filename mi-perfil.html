@@ -400,6 +400,42 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-datos .pf-dato.vacio .pf-dato-val{color:rgba(255,255,255,.35);font-style:italic}
 .pf-datos .pf-dato-btn{align-self:flex-start;margin-top:6px;background:transparent;border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}
 .pf-datos .pf-dato-btn:hover{background:rgba(232,160,32,.12)}
+/* Fase B (042): Pasaporte, billetera y fotos de perfil */
+.pf-pasaporte{margin-bottom:28px}
+.pf-pas-ok{color:#4ade80;font-size:13px;font-weight:600;margin-bottom:8px}
+.pf-pas-pend{color:rgba(255,255,255,.7);font-size:13px;margin-bottom:8px}
+.pf-pas-bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:12px}
+.pf-pas-bar i{display:block;height:100%;background:linear-gradient(90deg,#E8A020,#f4c66a)}
+.pf-pas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.pf-pas-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 11px;font-size:12.5px;color:rgba(255,255,255,.75)}
+.pf-pas-item.ok{border-color:rgba(74,222,128,.4);color:#fff}
+.pf-pas-ico{flex:0 0 auto}
+.pf-billetera{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
+.pf-bil-card{flex:1;min-width:140px;background:linear-gradient(150deg,rgba(232,160,32,.14),rgba(255,255,255,.03));border:1px solid rgba(232,160,32,.35);border-radius:12px;padding:14px}
+.pf-bil-wide{flex-basis:100%}
+.pf-bil-k{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.pf-bil-v{font-size:24px;font-weight:900;color:#fff;margin-top:4px}
+.pf-bil-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pf-bil-chip{background:rgba(255,255,255,.08);border-radius:999px;padding:4px 10px;font-size:11.5px;color:#fff}
+.pf-bil-vacio{color:rgba(255,255,255,.4);font-size:12.5px}
+.pf-bil-cod{font-size:11.5px;color:var(--gold);letter-spacing:1px}
+.pf-galeria{margin-bottom:36px}
+.pf-gal-head{font-size:12px;color:rgba(255,255,255,.55);margin-bottom:8px}
+.pf-gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:10px}
+.pf-gal-item{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1)}
+.pf-gal-item.principal{border-color:var(--gold)}
+.pf-gal-item img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-gal-star{position:absolute;top:6px;left:6px;background:rgba(232,160,32,.92);color:#111;font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border-radius:999px;padding:2px 7px}
+.pf-gal-acts{position:absolute;left:0;right:0;bottom:0;display:flex;gap:4px;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.8))}
+.pf-gal-btn{flex:1;border:none;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;font-size:10px;font-weight:700;padding:5px 4px;cursor:pointer}
+.pf-gal-btn.danger{background:rgba(239,68,68,.85)}
+.pf-gal-add{border:1px dashed rgba(232,160,32,.5);background:rgba(232,160,32,.1);color:var(--gold);border-radius:10px;padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer}
+.pf-gal-vacio{color:rgba(255,255,255,.4);font-size:12.5px}
+.pf-subida{display:flex;align-items:center;gap:12px;justify-content:space-between;background:linear-gradient(135deg,rgba(232,160,32,.16),rgba(255,255,255,.03));border:1px solid rgba(232,160,32,.4);border-radius:14px;padding:14px 16px;margin-bottom:18px}
+.pf-subida-txt{display:flex;flex-direction:column;gap:2px}
+.pf-subida-txt strong{font-size:15px;color:#fff}
+.pf-subida-txt span{font-size:12.5px;color:rgba(255,255,255,.65)}
+.pf-subida-btn{flex:0 0 auto;background:var(--gold);color:#111;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:Outfit,sans-serif}
 /* Completa tu perfil (PERFIL) */
 .pf-completa{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:28px}
 .pf-completa .pf-comp-cargando,.pf-completa .pf-comp-vacio{text-align:center;color:rgba(255,255,255,.35);font-size:11px;padding:14px}
@@ -655,6 +691,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
+  <!-- Fase C: bloque de subida above-the-fold (movil) -->
+  <div class="pf-subida" data-tab="perfil">
+    <div class="pf-subida-txt"><strong>Sube tus fotos</strong><span>Agrega hasta 10 fotos a tu perfil y llena tu galeria.</span></div>
+    <button type="button" class="pf-subida-btn" onclick="pfFotoAgregar()">&#x2B06; Subir foto</button>
+  </div>
+
   <!-- STATS -->
   <div class="pf-stats" data-tab="perfil">
     <div class="pf-stat"><div class="pf-stat-n" id="pf-xp-n">0</div><div class="pf-stat-l">XP total</div></div>
@@ -673,6 +715,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
   <div class="pf-section-title" data-tab="perfil">&#x1F4CB; Completa tu perfil</div>
   <div class="pf-completa" id="pf-completa" data-tab="perfil"></div>
+
+  <!-- Fase B (migracion 042): Pasaporte + billetera + fotos de perfil -->
+  <div class="pf-section-title" data-tab="perfil">&#x1F6E1; Tu Pasaporte</div>
+  <div class="pf-pasaporte" id="pf-pasaporte" data-tab="perfil" aria-live="polite"></div>
+  <div class="pf-section-title" data-tab="perfil">&#x1F4B3; Mi billetera</div>
+  <div class="pf-billetera" id="pf-billetera" data-tab="perfil" aria-live="polite"></div>
+  <div class="pf-section-title" data-tab="perfil">&#x1F4F7; Mis fotos de perfil</div>
+  <div class="pf-galeria" id="pf-galeria" data-tab="perfil" aria-live="polite"></div>
 
   <!-- NIVELES -->
   <div class="pf-section-title" data-tab="perfil">🏅 Niveles</div>
@@ -855,6 +905,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <button onclick="usarMiUbicacionAlbum('album-nueva-foto-lat','album-nueva-foto-lng',this)" type="button" style="flex:0 0 auto;padding:6px 12px;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x1F4CD; Usar mi ubicacion</button>
         </div>
         <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.35);">Con coordenadas, la foto aparece en el mapa cultural.</p>
+        <div style="margin-top:8px;">
+          <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Vincular a un destino (opcional)</label>
+          <input type="hidden" id="album-nueva-foto-destino-id" value="">
+          <input type="text" id="album-nueva-foto-destino-q" maxlength="60" placeholder="Busca un destino publicado por nombre..." oninput="buscarDestinoAlbum(this.value)" style="width:100%;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;font-size:13px;box-sizing:border-box;background:rgba(255,255,255,.06);color:#fff;font-family:Outfit,sans-serif;">
+          <div id="album-nueva-foto-destino-res" style="margin-top:6px;"></div>
+        </div>
         <button id="album-nueva-foto-btn" onclick="agregarFotoAlbum()" style="margin-top:8px;padding:7px 14px;background:var(--gold);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">+ Agregar foto</button>
       </div>
       <div id="album-det-fotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
@@ -1138,6 +1194,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="niveles-data.js"></script>
 <!-- T7 (ADR-039): orden CDN Leaflet 1.9.4 -> map-picker.js -> script inline -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="mapa-tiles.js?v=1"></script>
 <script src="map-picker.js?v=2"></script>
 <!-- ADR-052: media-actions.js (voto/guardado compartido) antes del inline -->
 <script src="media-actions.js"></script>
@@ -1365,6 +1422,7 @@ function renderPerfil() {
   renderOrigen();
   renderCuentaPanel();
   cargarCompletitudPerfil(u.id);
+  cargarBilletera();
   cargarCasas(u.id);
   cargarMuseoPreview(u.id);
 }
@@ -3449,6 +3507,46 @@ function confirmarEliminarAlbum() {
   });
 }
 
+/* ---- Vincular ubicacion (C4): buscador de destinos publicados ---- */
+var _albumDestinoTimer = null;
+function buscarDestinoAlbum(q) {
+  var res = document.getElementById('album-nueva-foto-destino-res');
+  var hid = document.getElementById('album-nueva-foto-destino-id');
+  if (!res) return;
+  q = String(q || '').trim();
+  if (q.length < 3) {
+    res.innerHTML = '';
+    if (hid && document.activeElement && document.activeElement.id === 'album-nueva-foto-destino-q') hid.value = '';
+    return;
+  }
+  if (_albumDestinoTimer) clearTimeout(_albumDestinoTimer);
+  _albumDestinoTimer = setTimeout(function () {
+    fetch('/api/destinos?q=' + encodeURIComponent(q) + '&limit=8')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var items = (data && data.data) || [];
+        if (!items.length) { res.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,.4)">Sin resultados</div>'; return; }
+        res.innerHTML = items.map(function (d) {
+          var id = d.id || d.uuid || d._uuid || '';
+          var nom = d.nombre || d.name || 'Destino';
+          var ciu = d.ciudad || d.city || '';
+          return '<button type="button" data-id="' + esc(String(id)) + '" data-nombre="' + esc(String(nom)) + '"'
+            + ' onclick="elegirDestinoAlbum(this)" style="display:block;width:100%;text-align:left;margin-bottom:4px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12.5px;cursor:pointer;font-family:Outfit,sans-serif;">'
+            + esc(String(nom)) + (ciu ? ' <span style="color:rgba(255,255,255,.4)">\u00b7 ' + esc(String(ciu)) + '</span>' : '') + '</button>';
+        }).join('');
+      })
+      .catch(function () { res.innerHTML = ''; });
+  }, 280);
+}
+function elegirDestinoAlbum(btn) {
+  var hid = document.getElementById('album-nueva-foto-destino-id');
+  var res = document.getElementById('album-nueva-foto-destino-res');
+  var q = document.getElementById('album-nueva-foto-destino-q');
+  if (hid) hid.value = (btn && btn.getAttribute('data-id')) || '';
+  if (q) q.value = (btn && btn.getAttribute('data-nombre')) || '';
+  if (res) res.innerHTML = '<div style="font-size:12px;color:#4ade80">Destino vinculado.</div>';
+}
+
 /* ---- AGREGAR FOTO AL ALBUM (POST album_agregar_foto) ---- */
 function agregarFotoAlbum() {
   var album = window._albumDetalleActual;
@@ -3482,6 +3580,10 @@ function agregarFotoAlbum() {
     body.lat = fLat;
     body.lng = fLng;
   }
+  var fDest = (document.getElementById('album-nueva-foto-destino-id') || {}).value || '';
+  if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(fDest)) {
+    body.destino_id = fDest;
+  }
   fetch('/api/interacciones?tipo=album_agregar_foto', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3493,6 +3595,9 @@ function agregarFotoAlbum() {
       document.getElementById('album-nueva-foto-url').value = '';
       document.getElementById('album-nueva-foto-titulo').value = '';
       document.getElementById('album-nueva-foto-fuente').value = '';
+      var dq = document.getElementById('album-nueva-foto-destino-q'); if (dq) dq.value = '';
+      var dh = document.getElementById('album-nueva-foto-destino-id'); if (dh) dh.value = '';
+      var dr = document.getElementById('album-nueva-foto-destino-res'); if (dr) dr.innerHTML = '';
       showToast('Foto agregada (+' + fmtXp(res.xp || 15) + ' XP)');
       if (res.misiones && res.misiones.length) {
         res.misiones.forEach(function(m){ showToast('Mision completada: ' + m.nombre); });
@@ -4643,6 +4748,7 @@ function pfTab(tab) {
   if (tab === 'perfil' && u && u.id) renderDatosPerfil();
   if (tab === 'perfil' && u && u.id) renderOrigen();
   if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
+  if (tab === 'perfil' && u && u.id) cargarBilletera();
   if (tab === 'perfil' && u && u.id) cargarHojaDeVida(u.id);
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
@@ -4756,17 +4862,143 @@ function pfDato(label, valor, campo) {
     + '<button type="button" class="pf-dato-btn" onclick="pfEditarCampo(\'' + campo + '\')">' + (tiene ? 'Editar' : 'Agregar') + '</button>'
     + '</div>';
 }
+/* A1: la foto de perfil NUNCA muestra su URL al usuario (solo confirmacion
+   visual con miniatura). La URL vive en el estado de sesion (u.foto_url). */
+function pfDatoFoto(valor) {
+  var tiene = valor !== null && valor !== undefined && String(valor).trim() !== '';
+  var thumb = tiene
+    ? '<span role="img" aria-label="Foto de perfil" style="display:inline-block;width:42px;height:42px;border-radius:50%;background-size:cover;background-position:center;vertical-align:middle;margin-right:8px;background-image:url(' + esc(valor) + ')"></span>'
+    : '';
+  return '<div class="pf-dato' + (tiene ? '' : ' vacio') + '">'
+    + '<div class="pf-dato-lbl">Foto de perfil</div>'
+    + '<div class="pf-dato-val">' + thumb + (tiene ? 'Foto actualizada' : 'Sin configurar') + '</div>'
+    + '<button type="button" class="pf-dato-btn" onclick="pfEditarCampo(\'foto_url\')">' + (tiene ? 'Editar' : 'Agregar') + '</button>'
+    + '</div>';
+}
 function renderDatosPerfil() {
   var box = document.getElementById('pf-datos');
   var u = sesion();
   if (!box || !u) return;
   var lugar = (u.ciudad_base || '') + (u.pais_base ? ((u.ciudad_base ? ' (' : '') + u.pais_base + (u.ciudad_base ? ')' : '')) : '');
   box.innerHTML =
-      pfDato('Foto de perfil', u.foto_url || u.avatar_url || '', 'foto_url')
+      pfDatoFoto(u.foto_url || u.avatar_url || '')
     + pfDato('Nombre', u.nombre || '', 'nombre')
     + pfDato('Bio', u.bio || '', 'bio')
     + pfDato('Ciudad y pais', lugar, 'ciudad')
+    + pfDato('Fecha de nacimiento', u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0, 10) : '', 'fecha_nacimiento')
     + pfDato('Intereses', pfInteresesTexto(u.intereses), 'intereses');
+}
+
+/* ---- Fase B (migracion 042): Pasaporte, billetera y fotos de perfil ---- */
+function pfPasaporteItem(c) {
+  var ico = c.ok ? '&#x2705;' : '&#x2B1C;';
+  return '<div class="pf-pas-item' + (c.ok ? ' ok' : '') + '"><span class="pf-pas-ico">' + ico
+    + '</span><span>' + esc(c.label) + '</span></div>';
+}
+function renderPasaporte(p) {
+  var box = document.getElementById('pf-pasaporte');
+  if (!box) return;
+  if (!p) { box.innerHTML = ''; return; }
+  var total = p.total || 0;
+  var hechos = total - (p.faltan || 0);
+  var pct = total ? Math.round((hechos / total) * 100) : 0;
+  var head = p.completo
+    ? '<div class="pf-pas-ok">Pasaporte completo: tu insignia y tu billetera estan activas.</div>'
+    : '<div class="pf-pas-pend">Te faltan ' + (p.faltan || 0) + ' de ' + total + ' datos.</div>';
+  box.innerHTML = head
+    + '<div class="pf-pas-bar" role="progressbar" aria-valuenow="' + hechos + '" aria-valuemin="0" aria-valuemax="' + total + '"><i style="width:' + pct + '%"></i></div>'
+    + '<div class="pf-pas-grid">' + (p.campos || []).map(pfPasaporteItem).join('') + '</div>';
+}
+function renderBilletera(d) {
+  var box = document.getElementById('pf-billetera');
+  if (!box) return;
+  if (!d) { box.innerHTML = ''; return; }
+  var cons = d.consumibles || [];
+  var consHtml = cons.length
+    ? cons.map(function (x) { return '<span class="pf-bil-chip">' + esc(x.slug) + ' x' + esc(String(x.cantidad)) + '</span>'; }).join('')
+    : '<span class="pf-bil-vacio">Sin consumibles todavia</span>';
+  box.innerHTML =
+      '<div class="pf-bil-card"><div class="pf-bil-k">XP total</div><div class="pf-bil-v">' + esc(String(d.xp_total != null ? d.xp_total : 0)) + '</div></div>'
+    + '<div class="pf-bil-card"><div class="pf-bil-k">Monedas CDR</div><div class="pf-bil-v">' + esc(String(d.cdr_saldo != null ? d.cdr_saldo : 0)) + '</div></div>'
+    + '<div class="pf-bil-card pf-bil-wide"><div class="pf-bil-k">Consumibles</div><div class="pf-bil-chips">' + consHtml + '</div></div>'
+    + (d.billetera
+      ? '<div class="pf-bil-cod">Billetera ' + esc(d.billetera.codigo_publico) + '</div>'
+      : '<div class="pf-bil-vacio">Completa tu Pasaporte para activar tu billetera.</div>');
+}
+function renderGaleriaPerfil(fotos) {
+  var box = document.getElementById('pf-galeria');
+  if (!box) return;
+  fotos = fotos || [];
+  var items = fotos.map(function (f) {
+    var pid = f.id ? String(f.id) : '';
+    var acciones = pid
+      ? '<button type="button" class="pf-gal-btn" onclick="pfFotoPrincipal(\'' + pid + '\')">Hacer principal</button>'
+        + '<button type="button" class="pf-gal-btn danger" onclick="pfFotoQuitar(\'' + pid + '\')">Quitar</button>'
+      : '';
+    return '<div class="pf-gal-item' + (f.es_principal ? ' principal' : '') + '">'
+      + '<img src="' + esc(f.url) + '" alt="Foto de perfil" loading="lazy" onerror="this.style.opacity=.3">'
+      + (f.es_principal ? '<span class="pf-gal-star">Principal</span>' : '')
+      + '<div class="pf-gal-acts">' + acciones + '</div></div>';
+  }).join('');
+  var addBtn = fotos.length < 10
+    ? '<button type="button" class="pf-gal-add" onclick="pfFotoAgregar()">+ Subir foto</button>'
+    : '<div class="pf-gal-vacio">Llegaste al maximo de 10 fotos.</div>';
+  box.innerHTML = '<div class="pf-gal-head">' + fotos.length + '/10 fotos de perfil</div>'
+    + '<div class="pf-gal-grid">' + items + '</div>' + addBtn;
+}
+function cargarBilletera() {
+  var u = sesion();
+  if (!u || !u.id) return;
+  fetchConJwt('/api/usuarios?tipo=billetera_mia&usuario_id=' + encodeURIComponent(u.id))
+    .then(function (res) {
+      if (res && res.ok && res.data) {
+        renderPasaporte(res.data.pasaporte);
+        renderBilletera(res.data);
+        renderGaleriaPerfil(res.data.fotos);
+      }
+    })
+    .catch(function () {});
+}
+function pfFotoAgregar() {
+  if (window.MediaUpload && typeof muElegirArchivo === 'function') {
+    muElegirArchivo(null, 'perfil', 'foto', function (r) { pfFotoSubirUrl((r && r.url) || ''); });
+  } else {
+    showToast('Subida no disponible', '#ef4444');
+  }
+}
+function pfFotoSubirUrl(url) {
+  var u = sesion();
+  if (!u || !url) return;
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'foto_agregar', usuario_id: String(u.id), url: url, es_principal: false })
+  }).then(function (res) {
+    if (res && res.ok) { showToast('Foto agregada a tu perfil'); cargarBilletera(); }
+    else { showToast(pfErrorPerfil(res && res.error), '#ef4444'); }
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function pfFotoPrincipal(id) {
+  var u = sesion();
+  if (!u || !id) return;
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'foto_principal', usuario_id: String(u.id), foto_id: String(id) })
+  }).then(function (res) {
+    if (res && res.ok) { showToast('Foto principal actualizada'); cargarBilletera(); }
+    else { showToast(pfErrorPerfil(res && res.error), '#ef4444'); }
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
+}
+function pfFotoQuitar(id) {
+  var u = sesion();
+  if (!u || !id) return;
+  if (!confirm('Quitar esta foto de tu perfil?')) return;
+  fetchConJwt('/api/usuarios', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'foto_quitar', usuario_id: String(u.id), foto_id: String(id) })
+  }).then(function (res) {
+    if (res && res.ok) { showToast('Foto quitada'); cargarBilletera(); }
+    else { showToast(pfErrorPerfil(res && res.error), '#ef4444'); }
+  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
 }
 
 /* ---- Tu origen (ADR-058: Multiplicador de Origen por lejania) ----
@@ -4891,6 +5123,10 @@ function pfEditarCampo(campo) {
     var foto = prompt('URL de tu foto (https://...):', u.foto_url || u.avatar_url || '');
     if (foto === null) return;
     cambios = { foto_url: foto.trim() };
+  } else if (campo === 'fecha_nacimiento') {
+    var fnac = prompt('Tu fecha de nacimiento (AAAA-MM-DD). Solo se puede cambiar una vez:', u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0, 10) : '');
+    if (fnac === null) return;
+    cambios = { fecha_nacimiento: fnac.trim() };
   } else if (campo === 'ciudad') {
     var ciudad = prompt('Tu ciudad base:', u.ciudad_base || '');
     if (ciudad === null) return;
@@ -4950,6 +5186,7 @@ function pfRefrescarPerfilPaneles() {
   renderCuentaPanel();
   var u = sesion();
   if (u && u.id) cargarCompletitudPerfil(u.id);
+  cargarBilletera();
 }
 
 /* ---- Mi Cuenta (CUENTA): email, verificacion y privacidad ---- */
@@ -5666,7 +5903,12 @@ function muSubirArchivo(file, campoId, contexto, tipo, onDone) {
   }).then(function (r) {
     muProgreso(100, false);
     if (campoId) { var el = document.getElementById(campoId); if (el) el.value = r.url; }
-    showToast('Archivo subido');
+    var msgSubida = (contexto === 'perfil') ? 'Foto de perfil actualizada' : 'Archivo subido';
+    if (window.MediaUpload && typeof window.MediaUpload.confirmacion === 'function') {
+      window.MediaUpload.confirmacion(r, { mensaje: msgSubida });
+    } else {
+      showToast(msgSubida);
+    }
     if (typeof onDone === 'function') onDone(r);
   }).catch(function (e) {
     muProgreso(0, false);

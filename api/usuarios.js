@@ -1,4 +1,13 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v24 (2026-09-29): Pasaporte + billetera + fotos de perfil (migracion 042).
+//   POST perfil_actualizar acepta fecha_nacimiento (PII owner-only; editable
+//   UNA sola vez; validacion server-side de fecha real y edad 13..120).
+//   Ramas nuevas foto_agregar/foto_principal/foto_quitar (tope 10 activas
+//   atomico; URL atada al prefijo de blob del usuario, ADR-068; activo=false
+//   ADR-003) y GET ?tipo=billetera_mia (agregador xp_total + CDR +
+//   consumibles + checklist de Pasaporte; crea billetera idempotente).
+//   Requiere la 042; sin ella cada rama degrada con responderSchemaPendiente.
+//   NO toca tags ni crea endpoints (8/8, ADR-001/ADR-010).
 // v21 (2026-09-23): el perfil (GET ?id=) expone mercado_puntos (aditivo,
 // owner-aware y publico) y deriva mercado_nodo desde MERCADO_TIERS
 // (catalogo duplicado a proposito: prohibido el import entre funciones
@@ -486,6 +495,68 @@ var COSTO_FACCION = 800;
 var COSTO_CASA = 500;
 var COSTO_CLASE = 500;
 
+// ===== Pasaporte / fecha de nacimiento / billetera (migracion 042) =====
+// ADR-018: la billetera NO crea moneda; agrega xp_total + CDR (moneda_ledger)
+// + consumibles (usuarios.capacidades). ADR-028: fecha_nacimiento es PII y
+// solo se sirve al dueno.
+var EDAD_MINIMA = 13;
+var EDAD_MAXIMA = 120;
+var MAX_FOTOS_PERFIL = 10;
+
+// Valida una fecha YYYY-MM-DD (real, no futura, edad 13..120).
+// Devuelve {ok:true, iso, edad} o {ok:false, error:<CODIGO>}.
+function parseFechaNacimiento(raw) {
+  if (typeof raw !== 'string') return { ok: false, error: 'FECHA_NACIMIENTO_INVALIDA' };
+  var s = raw.trim();
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return { ok: false, error: 'FECHA_NACIMIENTO_INVALIDA' };
+  var p = s.split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10), d = parseInt(p[2], 10);
+  var dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    return { ok: false, error: 'FECHA_NACIMIENTO_INVALIDA' };
+  }
+  var hoy = new Date();
+  var hoyUTC = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
+  if (dt.getTime() > hoyUTC) return { ok: false, error: 'FECHA_NACIMIENTO_FUTURA' };
+  var edad = Math.floor((hoyUTC - dt.getTime()) / (365.25 * 86400000));
+  if (edad < EDAD_MINIMA) return { ok: false, error: 'EDAD_MINIMA_NO_CUMPLIDA' };
+  if (edad > EDAD_MAXIMA) return { ok: false, error: 'EDAD_MAXIMA_EXCEDIDA' };
+  return { ok: true, iso: s, edad: edad };
+}
+
+// Pasaporte = checklist de completitud del perfil. Calculado SIEMPRE en
+// servidor (el cliente no se lo puede autoconceder).
+function calcularPasaporte(u, nFotos) {
+  var campos = [];
+  function add(id, label, ok) { campos.push({ id: id, label: label, ok: !!ok }); }
+  add('alias', 'Nombre o alias', u && u.nombre && String(u.nombre).trim());
+  add('nacimiento', 'Fecha de nacimiento', u && u.fecha_nacimiento);
+  add('foto', 'Foto de perfil',
+    (u && u.foto_url && String(u.foto_url).trim()) || (nFotos > 0));
+  add('origen', 'Ciudad y pais base',
+    (u && u.ciudad_base && String(u.ciudad_base).trim()) &&
+    (u && u.pais_base && String(u.pais_base).trim()));
+  add('email', 'Email verificado', u && u.email_verificado === true);
+  add('galeria', 'Al menos una foto en tu galeria', nFotos > 0);
+  var faltan = campos.filter(function (c) { return !c.ok; });
+  return { completo: faltan.length === 0, campos: campos, faltan: faltan.length, total: campos.length };
+}
+
+function generarCodigoBilletera() {
+  return 'BL' + crypto.randomBytes(8).toString('hex').toUpperCase();
+}
+
+// La URL de un recurso del usuario debe pertenecer a SU prefijo de blob
+// (ADR-068: usuarios/<uid>/...). Admin puede registrar cualquiera.
+function urlPerteneceAlUsuario(url, usuarioId, esAdmin) {
+  if (esAdmin) return true;
+  var u = String(url || '');
+  if (!/^https?:\/\/\S+$/i.test(u) || u.length > 700) return false;
+  var uid = String(usuarioId || '');
+  if (!uid) return false;
+  return u.indexOf('/usuarios/' + uid + '/') !== -1;
+}
+
 // TSK-118: el refresco del lider de Casa se ejecuta como maximo una vez
 // cada 60 s por instancia (evita amplificacion de escritura en un GET
 // publico). Es cache de proceso, no estado persistente.
@@ -655,6 +726,105 @@ module.exports = async (req, res) => {
             saldo: mslSaldo,
             ledger_sum: mslLedger,
             cuadra: mslSaldo === mslLedger
+          }
+        });
+      }
+
+      // ---- GET: mi billetera (migracion 042) ----------------------
+      // Agregador de LECTURA (no crea moneda, ADR-018): xp_total + saldo CDR
+      // (moneda_ledger) + consumibles (usuarios.capacidades->'consumibles') +
+      // el checklist del Pasaporte. Owner-only (sesion firmada). Al completar
+      // el Pasaporte crea la billetera de forma IDEMPOTENTE (ON CONFLICT).
+      if (tipo === 'billetera_mia') {
+        var bmId = String(req.query.usuario_id || '').trim();
+        if (!bmId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        if (!validarSesionUsuario(req, bmId).ok)
+          return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA' });
+
+        var bmUsr = await sql(
+          'SELECT id, nombre, foto_url, fecha_nacimiento, ciudad_base, pais_base,'
+          + ' email_verificado, xp_total, capacidades FROM usuarios WHERE id=$1 LIMIT 1',
+          [bmId]
+        );
+        if (!bmUsr.length) return res.status(404).json({ ok: false, error: 'No encontrado' });
+        var bmU = bmUsr[0];
+
+        var bmFotosList = [];
+        try {
+          bmFotosList = await sql(
+            'SELECT id, url, es_principal, orden FROM usuario_fotos'
+            + ' WHERE usuario_id=$1 AND activo=true ORDER BY es_principal DESC, orden ASC, creado_en ASC',
+            [bmId]
+          );
+        } catch (eFotos) {
+          if (!eFotos || (eFotos.code !== '42P01' && eFotos.code !== '42703')) throw eFotos;
+          bmFotosList = bmU.foto_url ? [{ id: null, url: bmU.foto_url, es_principal: true, orden: 0 }] : [];
+        }
+        var bmFotos = bmFotosList.length;
+
+        var bmPasaporte = calcularPasaporte(bmU, bmFotos);
+
+        var bmCdr = 0;
+        try {
+          var bmCdrRows = await sql(
+            'SELECT COALESCE((SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1), 0) AS saldo',
+            [bmId]
+          );
+          bmCdr = red2(numXp(bmCdrRows.length ? bmCdrRows[0].saldo : 0));
+        } catch (eCdr) {
+          if (!eCdr || (eCdr.code !== '42P01' && eCdr.code !== '42703')) throw eCdr;
+          bmCdr = 0;
+        }
+
+        var bmConsumibles = [];
+        try {
+          var cap = bmU.capacidades;
+          if (typeof cap === 'string') { try { cap = JSON.parse(cap); } catch (eCap) { cap = null; } }
+          var inv = cap && cap.consumibles && typeof cap.consumibles === 'object' ? cap.consumibles : null;
+          if (inv) {
+            Object.keys(inv).forEach(function (k) {
+              var n = parseInt(inv[k], 10);
+              if (isFinite(n) && n > 0) bmConsumibles.push({ slug: k, cantidad: n });
+            });
+          }
+        } catch (eInv) { bmConsumibles = []; }
+
+        var bmBilletera = null;
+        if (bmPasaporte.completo) {
+          try {
+            var bmIns = await sql(
+              'INSERT INTO billeteras (usuario_id, codigo_publico)'
+              + ' VALUES ($1, $2) ON CONFLICT (usuario_id) DO NOTHING'
+              + ' RETURNING id, codigo_publico, estado, creada_en',
+              [bmId, generarCodigoBilletera()]
+            );
+            if (bmIns.length) {
+              bmBilletera = bmIns[0];
+            } else {
+              var bmSel = await sql(
+                'SELECT id, codigo_publico, estado, creada_en FROM billeteras WHERE usuario_id=$1 LIMIT 1',
+                [bmId]
+              );
+              bmBilletera = bmSel.length ? bmSel[0] : null;
+            }
+          } catch (eBil) {
+            if (!eBil || (eBil.code !== '42P01' && eBil.code !== '42703')) throw eBil;
+            bmBilletera = null;
+          }
+        }
+
+        return res.json({
+          ok: true,
+          data: {
+            usuario_id: bmId,
+            xp_total: red2(numXp(bmU.xp_total)),
+            moneda: 'CDR',
+            cdr_saldo: bmCdr,
+            consumibles: bmConsumibles,
+            fotos: bmFotosList,
+            pasaporte: bmPasaporte,
+            billetera: bmBilletera
           }
         });
       }
@@ -1521,6 +1691,7 @@ module.exports = async (req, res) => {
 
         var puParams = [];
         var puSets = [];
+        var puFechaSeteada = false;
         var puPh = function (valor) {
           puParams.push(valor);
           return '$' + puParams.length;
@@ -1593,6 +1764,20 @@ module.exports = async (req, res) => {
           }
         }
 
+        // fecha_nacimiento (migracion 042; PII, editable UNA sola vez)
+        if (c.fecha_nacimiento !== undefined) {
+          var puFechaPrev = await sql('SELECT fecha_nacimiento FROM usuarios WHERE id=$1', [puId]);
+          if (!puFechaPrev.length)
+            return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+          if (puFechaPrev[0].fecha_nacimiento)
+            return res.status(409).json({ ok: false, error: 'FECHA_NACIMIENTO_BLOQUEADA' });
+          var puFecha = parseFechaNacimiento(c.fecha_nacimiento);
+          if (!puFecha.ok)
+            return res.status(400).json({ ok: false, error: puFecha.error });
+          puFechaSeteada = true;
+          puSets.push('fecha_nacimiento = ' + puPh(puFecha.iso) + '::date');
+        }
+
         // intereses (array de slugs ASCII, max 10; REEMPLAZO deliberado)
         if (c.intereses !== undefined) {
           if (!Array.isArray(c.intereses) || c.intereses.length > 10)
@@ -1655,11 +1840,16 @@ module.exports = async (req, res) => {
         puParams.push(puId);
         var puUpd = await sql(
           'UPDATE usuarios SET ' + puSets.join(', ')
-          + ' WHERE id=$' + puParams.length + ' RETURNING *',
+          + ' WHERE id=$' + puParams.length
+          + (puFechaSeteada ? ' AND fecha_nacimiento IS NULL' : '')
+          + ' RETURNING *',
           puParams
         );
-        if (!puUpd.length)
+        if (!puUpd.length) {
+          if (puFechaSeteada)
+            return res.status(409).json({ ok: false, error: 'FECHA_NACIMIENTO_BLOQUEADA' });
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        }
 
         // Misma hidratacion que el upsert de registro. Se retiran del
         // payload los campos secretos que trae el RETURNING *: nunca se
@@ -1675,6 +1865,99 @@ module.exports = async (req, res) => {
         // refresque origen_declarado_en/tier_base sin una segunda peticion.
         puData.origen = construirOrigenUsuario(puUpd[0], await leerMinDiasOrigen(sql));
         return res.json({ ok: true, data: puData });
+      }
+
+      // ---- Rama: galeria de fotos de perfil (migracion 042) --------
+      // Tope 10 ACTIVAS forzado de forma atomica (INSERT ... SELECT ... WHERE
+      // count<10). La URL debe pertenecer al prefijo de blob del usuario
+      // (ADR-068), salvo admin. Toda baja es activo=false (ADR-003).
+      if (c.tipo === 'foto_agregar') {
+        var faId = String(c.usuario_id || '');
+        if (!faId) return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        if (!validarSesionUsuario(req, faId).ok)
+          return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA' });
+        var faEsAdmin = esAdminUsuario(req);
+        var faUrl = (typeof c.url === 'string') ? c.url.trim() : '';
+        if (!urlPerteneceAlUsuario(faUrl, faId, faEsAdmin))
+          return res.status(400).json({ ok: false, error: 'URL_NO_AUTORIZADA' });
+        var faPrincipal = c.es_principal === true;
+        var faPeso = (c.peso_bytes !== undefined && isFinite(parseInt(c.peso_bytes, 10)))
+          ? parseInt(c.peso_bytes, 10) : null;
+        try {
+          if (faPrincipal) {
+            await sql('UPDATE usuario_fotos SET es_principal=false WHERE usuario_id=$1 AND activo=true AND es_principal=true', [faId]);
+          }
+          var faIns = await sql(
+            'INSERT INTO usuario_fotos (usuario_id, url, orden, es_principal, peso_bytes)'
+            + ' SELECT $1, $2, COALESCE((SELECT MAX(orden)+1 FROM usuario_fotos WHERE usuario_id=$1 AND activo=true), 0), $3, $4'
+            + ' WHERE (SELECT COUNT(*) FROM usuario_fotos WHERE usuario_id=$1 AND activo=true) < ' + MAX_FOTOS_PERFIL
+            + ' RETURNING id, url, es_principal, orden, creado_en',
+            [faId, faUrl, faPrincipal, faPeso]
+          );
+          if (!faIns.length)
+            return res.status(409).json({ ok: false, error: 'LIMITE_FOTOS_PERFIL' });
+          if (faPrincipal) {
+            await sql('UPDATE usuarios SET foto_url=$1 WHERE id=$2', [faUrl, faId]);
+          }
+          return res.json({ ok: true, data: faIns[0] });
+        } catch (eFa) {
+          if (!eFa || (eFa.code !== '42P01' && eFa.code !== '42703')) throw eFa;
+          return responderSchemaPendiente(res, 'foto_agregar', eFa);
+        }
+      }
+
+      if (c.tipo === 'foto_principal') {
+        var fpId = String(c.usuario_id || '');
+        var fpFoto = String(c.foto_id || '');
+        if (!fpId || !fpFoto)
+          return res.status(400).json({ ok: false, error: 'usuario_id y foto_id requeridos' });
+        if (!validarSesionUsuario(req, fpId).ok)
+          return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA' });
+        try {
+          await sql('UPDATE usuario_fotos SET es_principal=false WHERE usuario_id=$1 AND activo=true AND es_principal=true', [fpId]);
+          var fpUpd = await sql(
+            'UPDATE usuario_fotos SET es_principal=true WHERE id=$1 AND usuario_id=$2 AND activo=true RETURNING url',
+            [fpFoto, fpId]
+          );
+          if (!fpUpd.length) return res.status(404).json({ ok: false, error: 'FOTO_NO_ENCONTRADA' });
+          await sql('UPDATE usuarios SET foto_url=$1 WHERE id=$2', [fpUpd[0].url, fpId]);
+          return res.json({ ok: true, data: { foto_id: fpFoto, foto_url: fpUpd[0].url } });
+        } catch (eFp) {
+          if (!eFp || (eFp.code !== '42P01' && eFp.code !== '42703')) throw eFp;
+          return responderSchemaPendiente(res, 'foto_principal', eFp);
+        }
+      }
+
+      if (c.tipo === 'foto_quitar') {
+        var fqId = String(c.usuario_id || '');
+        var fqFoto = String(c.foto_id || '');
+        if (!fqId || !fqFoto)
+          return res.status(400).json({ ok: false, error: 'usuario_id y foto_id requeridos' });
+        if (!validarSesionUsuario(req, fqId).ok)
+          return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA' });
+        try {
+          var fqUpd = await sql(
+            'UPDATE usuario_fotos SET activo=false, es_principal=false'
+            + ' WHERE id=$1 AND usuario_id=$2 AND activo=true RETURNING es_principal',
+            [fqFoto, fqId]
+          );
+          if (!fqUpd.length) return res.status(404).json({ ok: false, error: 'FOTO_NO_ENCONTRADA' });
+          var fqSig = await sql(
+            'SELECT id, url FROM usuario_fotos WHERE usuario_id=$1 AND activo=true'
+            + ' ORDER BY es_principal DESC, orden ASC, creado_en ASC LIMIT 1',
+            [fqId]
+          );
+          if (fqSig.length) {
+            await sql('UPDATE usuario_fotos SET es_principal=true WHERE id=$1', [fqSig[0].id]);
+            await sql('UPDATE usuarios SET foto_url=$1 WHERE id=$2', [fqSig[0].url, fqId]);
+          } else {
+            await sql('UPDATE usuarios SET foto_url=NULL WHERE id=$1', [fqId]);
+          }
+          return res.json({ ok: true, data: { foto_id: fqFoto, activo: false } });
+        } catch (eFq) {
+          if (!eFq || (eFq.code !== '42P01' && eFq.code !== '42703')) throw eFq;
+          return responderSchemaPendiente(res, 'foto_quitar', eFq);
+        }
       }
 
       // ---- Rama: solicitar verificacion de email (Gaming v5.0) ------

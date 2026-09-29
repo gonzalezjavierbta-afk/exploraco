@@ -420,6 +420,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="mapa-tiles.js?v=1"></script>
 <script src="map-picker.js?v=2"></script>
 <script src="media-upload.js"></script>
 </head>
@@ -9070,6 +9071,7 @@ function adminSubirImagen(campoId, onDone) {
     window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'admin', adminToken: secret })
       .then(function (r) {
         showAdminToast('Imagen subida', 'success');
+        if (window.MediaUpload && typeof window.MediaUpload.confirmacion === 'function') { window.MediaUpload.confirmacion(r, { mensaje: 'Imagen subida' }); }
         if (campoId) { var el = document.getElementById(campoId); if (el) el.value = r.url; }
         if (typeof onDone === 'function') onDone(r.url);
       })

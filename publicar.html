@@ -884,6 +884,9 @@ function handleFotoFile(input) {
     state.foto_principal_url = r.url;
     state.foto_principal_base64 = null;
     showFotoPreview(r.url);
+    if (window.MediaUpload && typeof window.MediaUpload.confirmacion === 'function') {
+      window.MediaUpload.confirmacion(r, { mensaje: 'Foto principal lista' });
+    }
   }).catch(function (e) {
     if (txt) txt.textContent = 'Toca para subir foto principal';
     alert((e && e.message) ? e.message : 'No se pudo subir la foto');
@@ -902,7 +905,12 @@ function subirFotoGaleria() {
     var v = window.MediaUpload.validar(file, 'foto');
     if (!v.ok) { alert(v.error); return; }
     window.MediaUpload.subir({ file: file, tipo: 'foto', contexto: 'destino' })
-      .then(function (r) { addGaleriaRow(r.url); })
+      .then(function (r) {
+        addGaleriaRow(r.url);
+        if (window.MediaUpload && typeof window.MediaUpload.confirmacion === 'function') {
+          window.MediaUpload.confirmacion(r, { mensaje: 'Foto agregada a la galeria' });
+        }
+      })
       .catch(function (e) { alert((e && e.message) ? e.message : 'No se pudo subir la foto'); });
   };
   document.body.appendChild(inp);
@@ -942,8 +950,29 @@ function addGaleriaRow(url) {
   var n = rows.length + 2;
   var div = document.createElement('div');
   div.className = 'field galeria-url-row';
-  div.innerHTML = '<input type="url" placeholder="URL foto ' + n + '" class="galeria-url" style="padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem">';
-  if (url) { div.querySelector('input').value = url; }
+  var inp = document.createElement('input');
+  inp.className = 'galeria-url';
+  inp.style.cssText = 'padding:.625rem .75rem;border:1.5px solid #ddd;border-radius:10px;font-size:.875rem;width:100%;margin-bottom:.5rem';
+  if (url) {
+    inp.type = 'hidden';
+    inp.value = url;
+    var chip = document.createElement('div');
+    chip.style.cssText = 'display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem';
+    var thumb = document.createElement('img');
+    thumb.src = url;
+    thumb.alt = '';
+    thumb.style.cssText = 'width:42px;height:42px;object-fit:cover;border-radius:10px;flex:0 0 auto';
+    var lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:.8125rem;color:#166534;font-weight:600';
+    lbl.textContent = 'Foto subida';
+    chip.appendChild(thumb);
+    chip.appendChild(lbl);
+    div.appendChild(chip);
+  } else {
+    inp.type = 'url';
+    inp.placeholder = 'URL foto ' + n;
+  }
+  div.appendChild(inp);
   document.getElementById('galeria-urls').appendChild(div);
 }
 

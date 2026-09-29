@@ -159,7 +159,11 @@
             dragging: true,
             tap: false
           }).setView([lat, lng], miniZoom);
-          root.L.tileLayer(tileUrl, { attribution: '', maxZoom: 19 }).addTo(miniMap);
+          if (root.MapaTiles && typeof root.MapaTiles.aplicar === 'function') {
+            root.MapaTiles.aplicar(miniMap, { url: tileUrl, maxZoom: 19 });
+          } else {
+            root.L.tileLayer(tileUrl, { attribution: '', maxZoom: 19 }).addTo(miniMap);
+          }
           miniMarker = root.L.marker([lat, lng], { draggable: true }).addTo(miniMap);
           /* Al arrastrar el marker, actualizar los inputs */
           miniMarker.on('dragend', function (e) {
@@ -246,7 +250,11 @@
           var lat = parseFloat(inputValue(latInputId)) || centerLat;
           var lng = parseFloat(inputValue(lngInputId)) || centerLng;
           pickerMap = root.L.map(pickerMapElId).setView([lat, lng], pickerZoom);
-          root.L.tileLayer(tileUrl, { attribution: '&copy; CARTO', maxZoom: 19 }).addTo(pickerMap);
+          if (root.MapaTiles && typeof root.MapaTiles.aplicar === 'function') {
+            root.MapaTiles.aplicar(pickerMap, { url: tileUrl, maxZoom: 19 });
+          } else {
+            root.L.tileLayer(tileUrl, { attribution: '&copy; CARTO', maxZoom: 19 }).addTo(pickerMap);
+          }
           pickerMap.on('click', function (e) { aplicarPickerLatLng(e.latlng); });
         }
         if (pickerMap) pickerMap.invalidateSize();

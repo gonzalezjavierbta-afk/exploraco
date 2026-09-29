@@ -47,3 +47,10 @@ Para garantizar una integración sin errores de lógica ni sintaxis:
 
 * **Regla:** Todo prompt o paquete de instrucciones entregado a Claude debe cerrar obligatoriamente con la instrucción: **"hacer las preguntas necesarias para completar la tarea de la mejor forma posible"** \[340, 388, Conversación previa\].
 
+
+**11. Protocolo de Cierre de Sesion (INFORME + RETROALIMENTACION) - NUEVA**
+Obligatorio al terminar CADA sesion de trabajo:
+
+* **Informe de consumo de tokens:** desglose por agente/subagente y por tarea (entrada, salida, total) y total agregado de la sesion.
+* **Retroalimentacion del trabajo:** que salio bien, que se puede optimizar, riesgos y recomendaciones para la siguiente sesion.
+* Si el usuario no lo pide, la IA debe entregarlo de todos modos al cierre (no es opcional).

@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural ExploraCO
-   Version 1.1.0. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.1.1. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -44,7 +44,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.1.1';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -1677,10 +1677,23 @@
           center: o.center, zoom: o.zoom,
           scrollWheelZoom: true, tap: false, maxZoom: o.maxZoom
         });
-        L.tileLayer(o.tiles === 'osm' ? TILE_OSM : TILE_VOYAGER, {
-          attribution: (o.tiles === 'osm' ? ATTR_OSM : ATTR_VOYAGER),
-          maxZoom: o.maxZoom
-        }).addTo(st.map);
+        // A3: si el helper compartido de tiles esta cargado, la capa base
+        // hereda el fallback entre proveedores (tileerror -> CARTO/OSM) y
+        // el aviso con reintento. Si no, se conserva la capa directa.
+        if (window.MapaTiles && typeof window.MapaTiles.aplicar === 'function') {
+          try {
+            window.MapaTiles.aplicar(st.map, {
+              url: (o.tiles === 'osm' ? TILE_OSM : TILE_VOYAGER),
+              attribution: (o.tiles === 'osm' ? ATTR_OSM : ATTR_VOYAGER),
+              maxZoom: o.maxZoom
+            });
+          } catch (e) { log('mapa-tiles aplicar', e); }
+        } else {
+          L.tileLayer(o.tiles === 'osm' ? TILE_OSM : TILE_VOYAGER, {
+            attribution: (o.tiles === 'osm' ? ATTR_OSM : ATTR_VOYAGER),
+            maxZoom: o.maxZoom
+          }).addTo(st.map);
+        }
         st.clusterLayer = L.layerGroup().addTo(st.map);
         // Estado inicial de la capa media pedido por opcion (index arranca
         // APAGADA). Solo se aplica al construir el mapa, no en re-init.

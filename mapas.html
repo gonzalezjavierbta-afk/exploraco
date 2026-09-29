@@ -167,6 +167,7 @@ main{flex:1}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="mapa-tiles.js?v=1"></script>
 <script>
 // ── Mapas publicos / detalle (spec mapas publicos/privados 2026-09-05) ──
 var BASE='';
@@ -296,10 +297,14 @@ function initDetMap(dest){
   if(!window.L) return;
   var m=L.map(el,{zoomControl:false,scrollWheelZoom:false});
   detMap=m;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    subdomains:'abcd',maxZoom:19,
-    attribution:'© CARTO · © OpenStreetMap'
-  }).addTo(m);
+  if(window.MapaTiles&&typeof window.MapaTiles.aplicar==='function'){
+    window.MapaTiles.aplicar(m,{url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',subdomains:'abcd',maxZoom:19,attribution:'&copy; CARTO &middot; &copy; OpenStreetMap'});
+  } else {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+      subdomains:'abcd',maxZoom:19,
+      attribution:'© CARTO · © OpenStreetMap'
+    }).addTo(m);
+  }
   var marks=[];
   dest.forEach(function(x){
     var lat=Number(x.lat), lng=Number(x.lng);

@@ -721,7 +721,8 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="mapa-cultural.js?v=9"></script>
+<script src="mapa-tiles.js?v=1"></script>
+  <script src="mapa-cultural.js?v=10"></script>
 <script src="media-actions.js"></script>
 <script src="mymapa.js?v=5"></script>
 <script src="mercado.js?v=1"></script>
@@ -2038,10 +2039,18 @@ function initAudiovisualMap() {
     return;
   }
   _avMap = L.map('av-map-container').setView([4.6, -74.1], 6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'OSM',
-    maxZoom: 18
-  }).addTo(_avMap);
+  if (window.MapaTiles && typeof window.MapaTiles.aplicar === 'function') {
+    window.MapaTiles.aplicar(_avMap, {
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 18
+    });
+  } else {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 18
+    }).addTo(_avMap);
+  }
   if (typeof L.markerClusterGroup === 'function') {
     _avMarkers = L.markerClusterGroup();
     _avMap.addLayer(_avMarkers);

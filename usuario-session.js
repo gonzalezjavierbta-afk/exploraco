@@ -1166,6 +1166,11 @@
   // Consultar si el usuario actual ya marco "estuve aqui".
   // Reutiliza el GET de mapa (?tipo=mapa) que ya devuelve
   // data.visitados; no hay endpoint dedicado de visita.
+  // A2 (BUG-): el endpoint tipo=mapa devuelve cada destino con el alias
+  // SQL `d.id AS destino_id` (api/interacciones.js), NO `id`. La version
+  // previa comparaba `d.id`/`d.slug` contra el UUID y nunca matcheaba, por
+  // lo que `estadoDestino().visitado` era siempre false y el boton
+  // "Estuve aqui" no se hidrataba. Se normalizan las 3 claves posibles.
   window.ExploraCO.estaVisitado = async function (destinoUUID) {
     var usuario = window.ExploraCO.usuario;
     if (!usuario) return false;
@@ -1178,7 +1183,8 @@
       var objetivo = String(destinoUUID);
       for (var i = 0; i < visitados.length; i++) {
         var d = visitados[i] || {};
-        if (String(d.id) === objetivo) return true;
+        if (d.destino_id != null && String(d.destino_id) === objetivo) return true;
+        if (d.id != null && String(d.id) === objetivo) return true;
         if (d.slug && String(d.slug) === objetivo) return true;
       }
       return false;

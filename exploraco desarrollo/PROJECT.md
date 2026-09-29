@@ -237,6 +237,10 @@ Consolidar ExploraCO como el directorio digital de referencia para explorar Colo
 - Blindaje operativo estricto ante las restricciones de Vercel Hobby (ASCII-safe, limite de 8 funciones - ADR-002).
 - Escalabilidad progresiva: cada categoria nueva sigue el mismo patron de 7 pasos documentado en BLUEPRINT.md, sin romper visualmente las categorias existentes (Aislamiento Atomico - ADR-004).
 
+### Pasaporte de viajero + billetera agregadora + fotos de perfil (TSK-159 / ADR-069, 2026-09-29)
+
+Working tree, `npm test` verde; migracion **042 PENDIENTE de aplicar en Neon** + deploy pendiente. Agrega el **Pasaporte** (checklist server-side de 6 datos; insignia `logr_pasaporte_completo`, tier plata, +200 XP), la **billetera agregadora** (`billeteras`: identidad + lectura de `xp_total` ADR-018 + saldo CDR ADR-061 + consumibles `capacidades`; **NO crea moneda**), la **galeria de fotos de perfil** (`usuario_fotos`, tope 10 activas atomico, 1 principal) y el **vinculo de ubicacion** de recursos (`album_fotos.destino_id`). Cambios: migracion 042; `api/usuarios.js` v24; `api/interacciones.js` (logro + destino_id con fallback 42703); `media-upload.js` (optimizacion WebP/EXIF en navegador + confirmacion sin URL); NUEVO `mapa-tiles.js` (fallback de tiles CARTO->OSM); `mapa-cultural.js` v1.1.1; `map-picker.js`; `index.html`; `comunidad.html`; `mapas.html`; `mi-perfil.html`; `publicar.html`; `admin.html`. **8/8 endpoints intacto.** QR/canje de billetera y legal DIFERIDOS (ADR-069). Bug A2 corregido (**BUG-089**); test de logros realineado (**BUG-090**).
+
 ## 7. Referencia de verdad (Protocolo de entrega)
 
 Antes de proponer cualquier cambio, la IA debe solicitar el archivo mas reciente del repositorio de Javier. El historial de una conversacion de chat NUNCA se considera fuente de verdad (Reglas de Oro ExploraCO v5, punto 8 - Protocolo de Entrega).
