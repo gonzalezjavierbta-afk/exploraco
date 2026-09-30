@@ -255,15 +255,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .hdot.on{background:var(--gold);width:22px;border-radius:3px}
 .hcap{position:absolute;bottom:28px;left:4%;z-index:4;font-size:10px;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:5px;font-family:'Outfit',sans-serif}
 .hcap::before{content:'📍'}
-/* ── BANDS ── */
-.bands{display:flex;background:#fff;border-bottom:1px solid var(--border)}
-.band{flex:1;display:flex;flex-direction:column;align-items:center;padding:17px 8px 14px;gap:6px;border-right:1px solid var(--border);cursor:pointer;transition:background .15s;position:relative}
-.band:last-child{border-right:none}.band:hover{background:#FAFAF8}
-.band.on::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold)}
-.band-icon{font-size:22px}
-.band-name{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#888}
-.band.on .band-name{color:var(--text)}
-.band-count{font-size:9px;color:#CCC}.band.on .band-count{color:var(--gold)}
+/* ── BANDS: modulo retirado (redundante con los filtros del hero, el mapa y Destacados) ── */
 /* ── SECTIONS ── */
 .hsect{padding:36px 4%}
 .hsect.bwhite{background:#fff}.hsect.bwarm{background:var(--warm)}
@@ -356,7 +348,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .cicnt{font-size:9px;color:#BBB;margin-left:2px;font-family:'Outfit',sans-serif;font-weight:400}
 .citag.feat .cicnt{color:rgba(255,255,255,.35)}
 @media(max-width:900px){.recs-grid{grid-template-columns:repeat(2,1fr)}.rvgrid{grid-template-columns:repeat(2,1fr)}.egrid{grid-template-columns:repeat(2,1fr)}.mteaser{grid-template-columns:1fr}.ftop{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.recs-grid{grid-template-columns:1fr}.bands{flex-wrap:wrap}.band{flex:0 0 50%;border-bottom:1px solid var(--border)}}
+@media(max-width:600px){.recs-grid{grid-template-columns:1fr}}
 
 
 /* ═══ VIDEO 360° ═══ */
@@ -438,8 +430,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
 @media(max-width:580px){.planes-grid{grid-template-columns:1fr}}
 
 /* ═══ BAND NEW BADGE ═══ */
-.band-new{position:relative}
-.band-new::before{content:'NEW';position:absolute;top:5px;right:7px;background:var(--gold);color:#fff;font-size:6px;font-weight:900;padding:1px 4px;border-radius:2px;letter-spacing:.5px}
 
 
 /* ══ MAPA INTERACTIVO ══ */
@@ -1044,13 +1034,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
   <div class="hcap" id="hcap"></div>
 </section>
 
-<div class="bands" id="bands">
-  <div class="band on" data-cat="hostal"><div class="band-icon">🏨</div><div class="band-name">Hospedajes</div><div class="band-count">3 lugares</div></div>
-  <div class="band" data-cat="comida"><div class="band-icon">🍽️</div><div class="band-name">Comida</div><div class="band-count">2 lugares</div></div>
-  <div class="band" data-cat="sitio"><div class="band-icon">🏔️</div><div class="band-name">Lugares</div><div class="band-count">3 sitios</div></div>
-  <div class="band" data-cat="evento"><div class="band-icon">🎉</div><div class="band-name">Eventos</div><div class="band-count">2 eventos</div></div>
-</div>
-
 
 
 <!-- ════ MAPA INTERACTIVO ════ -->
@@ -1522,10 +1505,6 @@ function syncAll(cat) {
   document.querySelectorAll('.hcat').forEach(function(b){
     b.classList.toggle('on', b.dataset.cat === cat);
   });
-  // band row
-  document.querySelectorAll('.band').forEach(function(b){
-    if(b.dataset.cat !== 'mapa') b.classList.toggle('on', b.dataset.cat === cat);
-  });
   // dest-section filter buttons
   document.querySelectorAll('.dc-btn').forEach(function(b){
     b.classList.toggle('on', b.dataset.cat === cat);
@@ -1535,18 +1514,6 @@ function syncAll(cat) {
 
 // Hero filter pills
 document.querySelectorAll('.hcat').forEach(function(btn){
-  btn.addEventListener('click', function(){
-    if(btn.dataset.cat === 'mapa'){
-      window.location.href='mi-perfil.html'; return;
-    }
-    syncAll(btn.dataset.cat);
-    var recs=document.getElementById('recs');
-    if(recs) recs.scrollIntoView({behavior:'smooth'});
-  });
-});
-
-// Band row
-document.querySelectorAll('.band').forEach(function(btn){
   btn.addEventListener('click', function(){
     if(btn.dataset.cat === 'mapa'){
       window.location.href='mi-perfil.html'; return;
