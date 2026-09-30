@@ -329,6 +329,13 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .ctasub{font-size:11px;color:rgba(255,255,255,.75)}
 .ctabtn{background:#fff;color:var(--gold);padding:11px 24px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;border-radius:3px;cursor:pointer;white-space:nowrap;border:none;flex-shrink:0}
 .ctabtn:hover{background:#f0ece4}
+/* CTA publicar en celular: mas delgado, info arriba y boton abajo a lo ancho. */
+@media(max-width:760px){
+  .ctab{flex-direction:column;align-items:stretch;gap:10px;padding:14px 5%}
+  .ctatitle{font-size:18px;margin-bottom:2px}
+  .ctasub{font-size:10px}
+  .ctabtn{width:100%;text-align:center;padding:10px 12px}
+}
 /* reviews */
 .rvgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .rvcard{background:var(--warm);border:1px solid #E5E7EB;border-radius:10px;padding:14px 15px}
@@ -1119,6 +1126,12 @@ textarea.wrinp{resize:vertical;min-height:88px}
 
 
 
+<!-- ════ CTA PUBLICAR MI LUGAR ════ -->
+<div class="ctab">
+  <div><div class="ctatitle bc">¿Tienes un hostal, restaurante o sitio turístico?</div><div class="ctasub">Publica gratis y llega a miles de viajeros cada mes.</div></div>
+  <button class="ctabtn" onclick="window.location.href='publicar.html'">Publicar mi lugar →</button>
+</div>
+
 <!-- ════ MAPA INTERACTIVO ════ -->
 <div class="mapa-full-section" id="mapa-section">
   <div class="mapa-topbar">
@@ -1143,25 +1156,22 @@ textarea.wrinp{resize:vertical;min-height:88px}
   </div>
   <div class="mapa-body-grid">
     <div class="mapa-list-panel"><div class="mapa-list-inner" id="mapa-list-inner"></div></div>
-    <div class="mapa-map-container" id="mapa-map-container"><div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div></div>
-  </div>
-  <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
+    <div class="mapa-map-container" id="mapa-map-container">
+      <div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div>
+      <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
     <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
     <aside class="md-panel" role="dialog" aria-label="Detalle del lugar">
       <button class="md-close" onclick="closeMapaDrawer()" aria-label="Cerrar">&times;</button>
       <div id="md-mapa-destino-titulo" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)"></div>
       <div class="md-content" id="md-content"><!-- render dinamico --></div>
     </aside>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- ════ AGENDA CULTURAL ════ -->
 
-
-<div class="ctab">
-  <div><div class="ctatitle bc">¿Tienes un hostal, restaurante o sitio turístico?</div><div class="ctasub">Publica gratis y llega a miles de viajeros cada mes.</div></div>
-  <button class="ctabtn" onclick="window.location.href='publicar.html'">Publicar mi lugar →</button>
-</div>
 
 <!-- ════ INSPÍRATE ════ -->
 <section class="inspirate-section" id="inspirate-section">
