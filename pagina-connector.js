@@ -1,5 +1,5 @@
 /**
- * ExploraCO — Página Individual Connector (Paso 10)
+ * LATAWEL — Página Individual Connector (Paso 10)
  * Conecta páginas de hostal/lugar con datos dinámicos de Neon:
  *   - Rating en vivo (actualizado tras cada reseña)
  *   - Botón Guardar conectado a DB (+5 XP)
@@ -234,7 +234,7 @@
           var detalleG = !!data.xp_detalle;
           var xpG = Number(data.xp) || 0;
           if (detalleG || xpG > 0) {
-            mostrarXpToast('♥ Guardado permanentemente' + (!detalleG && xpG > 0 ? ' · +' + xpG + ' XP' : ''), '#E8A020');
+            mostrarXpToast('♥ Guardado permanentemente' + (!detalleG && xpG > 0 ? ' · +' + xpG + ' XP' : ''), '#FF4A00');
           }
           if (window.ExploraCO && typeof window.ExploraCO.aplicarResultadoXp === 'function') {
             window.ExploraCO.aplicarResultadoXp(data);

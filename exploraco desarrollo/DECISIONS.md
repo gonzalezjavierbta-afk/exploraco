@@ -3957,3 +3957,58 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Impacto:** (de UI/producto) `mi-perfil.html` (panel unico `pf-pasaporte`; se retiran `#pf-datos`, `#pf-origen`, `#pf-completa` y el titulo "Tu Pasaporte"; `renderPasaporte` reescrito; `pfEditarCampo` separa ciudad/pais); sin endpoints nuevos (**8/8 intacto**, ADR-001/ADR-010); sin migracion nueva. El detalle tecnico del mismo cambio vive en ADR-069 ENMIENDA 1 (TSK-163); este ADR-072 deja constancia de la DECISION DE PRODUCTO de UI (panel unico + ocultamiento del multiplicador), sin duplicar el contrato de backend.
 
 **ADRs relacionados:** ADR-069 (Pasaporte y billetera; ENMIENDA 1 = pasaporte combinado de 10 datos), ADR-058 (multiplicador de origen, oculto solo en UI), ADR-028 (perfil publico / misiones de perfil), ADR-004 (aislamiento atomico de estilos / CSS scoped de los paneles). TSK-163.
+
+---
+
+## ADR-073: Migracion de identidad de ExploraCO a LATAWEL (marca, paleta, tipografia, activos y dominio)
+
+**ID:** ADR-073
+**Fecha:** 2026-09-30
+**Autor:** Chief Architect (AI-DOS) / decision de producto del operador (PO)
+**Estado:** ACEPTADO E IMPLEMENTADO EN WORKING TREE (2026-09-30); commit/deploy pendientes.
+**Fuente consolidada:** `logos/ADR-LATAWEL.md` (documento fuente redactado en `logos/` por la restriccion R2; este ADR-073 es su consolidacion oficial en el AI-DOS Core). Manual de identidad: `logos/07-MANUAL.md` v1.0.
+**Nota de numeracion:** el mayor ADR registrado en este documento era ADR-072 (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 073 es el siguiente consecutivo real. El archivo fuente `logos/ADR-LATAWEL.md` ya proponia ADR-073; su consolidacion se realiza aqui.
+
+**Contexto / Problema:** El sitio operaba con una identidad de marca (nombre ExploraCO, paleta dorada, tipografia y activos) que ya no correspondia a la marca vigente. El operador aprobo la migracion a la marca **LATAWEL** con su manual de identidad y entrego 4 PNG en `logos/` (no existe SVG maestro). El problema era **cambiar la identidad visible sin tocar la estructura ni la logica del producto**: no se redisenan las 20 pantallas del prompt de rediseno; el alcance es SOLO identidad sobre la estructura actual. Restricciones duras: no crear endpoints nuevos (presupuesto 8/8, ADR-001/ADR-010), no crear migraciones de esquema, no tocar identificadores tecnicos (`window.ExploraCO`, token, style id, nombres de archivo `.html`, endpoints `/api/*`, esquema DB y `tags` JSONB).
+
+**Opciones evaluadas:**
+1. Rediseno completo (incluidas las 20 pantallas del prompt) con la nueva identidad.
+2. Migracion de identidad por capa sobre la estructura actual: re-mapeo de tokens de diseno + texto visible y meta tags + activos derivados, preservando identificadores y estructura.
+3. Mantener la identidad anterior y solo anadir el logo nuevo.
+
+**Decision tomada (opcion 2):** Migracion de identidad por capa, aprobada por el PO.
+1. **Alcance:** SOLO cambio de identidad sobre la estructura actual. NO se redisenaron las 20 pantallas; las pantallas no pulidas quedan como deuda visual aceptada.
+2. **Marca:** nombre oficial **LATAWEL** (mayusculas sostenidas, una sola palabra, sin espacios ni guiones). Tagline **"What to do?"**; descriptor **"plataforma de turismo interactivo"**.
+3. **Dominio:** **`https://latawel.com` es el dominio VIVO** (resuelve y sirve el sitio en Vercel; verificado). El dominio antiguo **`exploraco.co` ya NO resuelve**. En el codigo `BASE = process.env.SITE_BASE_URL || 'https://latawel.com'`; canonical, `og:url`, `og:image` absoluta, `sitemap.xml` y `FROM_EMAIL` migran a `latawel.com`.
+4. **Paleta:** reemplazada en TODO el sitio: `#E8A020`->`#FF4A00`, `#C8860A`->`#FFB84D`, `#FDF3E0`->`#E5E7EB`, `#ffb400`->`#FF4A00`, `rgba(232,160,32)`->`rgba(255,74,0)`, `#111`->`#0F1419`, `#0A1628`->`#0F1419`. Los tokens legacy (`--gold`, `--gold-dark`, `--gold-light`, `--black`, `--bg`, `--warm`, `--border`) se re-mapean a los valores LATAWEL.
+5. **Tipografia:** **Poppins SOLO** para marca/logo y tagline; en el texto se CONSERVAN **Barlow Condensed + Outfit**. El wordmark NO se reconstruye tipograficamente.
+6. **Assets:** derivados en `assets/brand/` a partir de los 4 PNG de `logos/` (contrato cerrado). Script reproducible: `scripts/assets/build-brand-assets.ps1`.
+7. **Codemod:** reemplazo textual controlado con **denylist de identificadores** y verificacion ASCII-safe en `api/*.js`. El logo pasa a ser **IMAGEN** (no texto CSS): el header oscuro usa la variante blanca.
+8. **Backend:** **0 endpoints nuevos** (8/8 intacto), **0 migraciones**, **0 cambios de esquema**; `tags` JSONB intacto (Cero Borrado Logico / ADR-003).
+
+**Superficies y ejecucion real (verificado contra archivo real, ADR-006):**
+- **Codemod:** `scripts/rebrand/codemod-latawel.js` (dry-run/`--apply`) aplicado a **122 HTML de la raiz** (118 publicos + 4 fragmentos); auditoria en `scripts/rebrand/audit-latawel.js`.
+- **Assets en `assets/brand/`:** `latawel-logo-horizontal.png` (240x80), `latawel-logo-horizontal@2x.png` (480x160), `latawel-logo-horizontal-white.png` (240x80, variante fondo oscuro, recolor limpio), `latawel-logo-vertical.png` (240x288) + `@2x`, `latawel-simbolo.png` (1277x1232), `latawel-lockup.png` (2172x724), `favicon/favicon-16/32/180.png` + `favicon.ico` (multi 16/32/48), `og/latawel-og-1200x630.png` (1200x630).
+- **Head:** favicons LATAWEL + `og:image` por defecto `https://latawel.com/assets/brand/og/latawel-og-1200x630.png`; canonical/`og:url` a `latawel.com`; `theme-color` `#FF4A00`.
+- **Backend:** `api/pagina-destino.js` (motor primario por rewrite; `BASE` + OG), `api/utilidades.js` (sitemap/`BASE`/OG), `api/usuarios.js` (niveles "Gran Maestro LATAWEL"/"Mito Eterno LATAWEL"; `FROM_EMAIL 'LATAWEL <noreply@latawel.com>'`), `api/admin.js` (`FROM_EMAIL` + `ADMIN_EMAIL` fallback `admin@latawel.com`), `api/interacciones.js`. Tambien `pagina-destino.js` legacy (codigo muerto), conectores JS (`usuario-session.js`, `compartir.js`, etc.), `_motor.css`, `_premium.css`, `mapa-cultural.css`, `manifest.json` y `robots.txt` (sitemap -> `latawel.com`).
+- **PRESERVADOS intactos:** `window.ExploraCO`, `window.onExploraCOUpdate`, `'exploraco12345'`, `'exploraco-share-style'`, `exploraco.vercel.app`, nombres de archivo `.html`, endpoints `/api/*`, esquema DB y tags JSONB. **0 endpoints nuevos, 0 migraciones.**
+
+**Justificacion:** El re-mapeo de tokens concentra el cambio de color en pocos puntos y evita ~3000 sustituciones literales; preservar los identificadores tecnicos mantiene sesion, compartir, auth y contrato de datos sin riesgo. La separacion identidad-visual vs identificadores-tecnicos permite un rollback visual (un solo commit) y un corte de dominio reversible en un paso (variable con fallback). El alcance acotado a identidad evita el rediseno estructural no solicitado.
+
+**Impacto / verificacion (ADR-006):** `npm test` = **896 PASS / 0 FAIL (exit 0)**; `node --check` OK en 24 archivos; **0 regresiones de balance de divs** en 123 HTML; balance de llaves CSS 0. `grep` de la paleta legacy (`#E8A020`, `#C8860A`, `#FDF3E0`, `#ffb400`, `rgba(232,160,32`) = **0 restos en produccion**. Superficie total: **154 archivos modificados** (git status de la pasada).
+
+**Consecuencias (positivas):** identidad unificada (marca, tagline, paleta, tipografia y activos) sin rediseno ni deuda estructural; riesgo backend ~0; corte de dominio reversible.
+
+**Consecuencias (negativas / aceptadas):** deuda visual de pantallas no pulidas (aceptada por el PO); sin SVG maestro (los derivados son raster); acentos dorados funcionales residuales en algunas paginas.
+
+**Deuda / riesgos [DEUDA]:**
+- (a) Sin SVG maestro -> favicon/OG son raster; a 16px el isotipo puede perder detalle.
+- (b) `manifest.json` declara `latawel-simbolo.png` como `192x192` y `512x512` cuando el archivo real mide 1277x1232 (no cuadrado): **BUG-093** (ver `BUGS_HISTORICOS.md`).
+- (c) Acentos dorados funcionales fuera de la paleta en algunas paginas (`#FDE68A`, `#F59E0B`, `#FFD980`, `#FFD700`, etc.) como deuda de pulido.
+- (d) Filas historicas en `chat_mensajes` con nombre "ExploraCO Oficial" se CONSERVAN (Cero Borrado Logico).
+- (e) `scripts/test-fase1.js` duplicado en `scripts/` con `console.log` viejo.
+- (f) Los scripts `scripts/seed-*.js` y helpers conservan la cadena `exploraco.co` (User-Agents/prints); el codemod solo cubrio HTML de la raiz.
+
+**Pendientes operativos / acciones abiertas:** (1) corregir `SITE_BASE_URL` en Vercel si existe con el valor viejo (el codigo tiene fallback a `latawel.com`, pero una variable stale gana); (2) re-scrape manual de OG tras el deploy (cache social); (3) Google Search Console con el sitemap nuevo (`https://latawel.com/sitemap.xml`); (4) reemplazo futuro de los raster por SVG maestro cuando el proveedor de marca lo entregue; (5) corregir el `manifest.json` (BUG-093).
+
+**ADRs relacionados:** ADR-001 (prohibicion de frameworks / presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-004 (scoped CSS), ADR-006 (baseline de verdad), ADR-010 (presupuesto 8/8), ADR-071 (mapa base OSM, tocado por la pasada de identidad). TSK-164. Bugs: BUG-093.

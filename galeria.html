@@ -3,31 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Galeria de la comunidad - ExploraCO</title>
-<meta name="description" content="Explora las fotos mas votadas y los albumes populares de la comunidad de viajeros de ExploraCO. Fotos, videos y audio de Colombia con comentarios y votos.">
+<title>Galeria de la comunidad | LATAWEL</title>
+<meta name="description" content="Explora las fotos mas votadas y los albumes populares de la comunidad de viajeros de LATAWEL. Fotos, videos y audio de Colombia con comentarios y votos.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://exploraco.co/galeria.html">
+<link rel="canonical" href="https://latawel.com/galeria.html">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="ExploraCO">
-<meta property="og:title" content="Galeria de la comunidad - ExploraCO">
-<meta property="og:description" content="Explora las fotos mas votadas y los albumes populares de la comunidad de viajeros de ExploraCO. Fotos, videos y audio de Colombia con comentarios y votos.">
-<meta property="og:url" content="https://exploraco.co/galeria.html">
-<meta property="og:image" content="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80">
+<meta property="og:site_name" content="LATAWEL">
+<meta property="og:title" content="Galeria de la comunidad | LATAWEL">
+<meta property="og:description" content="Explora las fotos mas votadas y los albumes populares de la comunidad de viajeros de LATAWEL. Fotos, videos y audio de Colombia con comentarios y votos.">
+<meta property="og:url" content="https://latawel.com/galeria.html">
+<meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#E8A020">
+<meta name="theme-color" content="#FF4A00">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
+:root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
 body{font-family:'Outfit',sans-serif;background:var(--black);color:#fff;min-height:100vh;display:flex;flex-direction:column}
 /* NAV (coherente con comunidad.html) */
 nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px;flex-shrink:0}
 .tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
-.tl em{color:var(--gold);font-style:normal}
+.tl img{display:block;height:30px;width:auto}
 .tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
 .nav-label{font-size:11px;color:rgba(255,255,255,.5)}
 .nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
@@ -39,7 +39,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* LAYOUT */
 .g-wrap{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:28px 4% 64px}
 .g-head{margin-bottom:26px}
-.g-eyebrow{display:inline-block;background:rgba(232,160,32,.14);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;padding:4px 12px;border-radius:20px;margin-bottom:10px}
+.g-eyebrow{display:inline-block;background:rgba(255,74,0,.14);border:1px solid rgba(255,74,0,.3);color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;padding:4px 12px;border-radius:20px;margin-bottom:10px}
 .g-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;line-height:.95;color:#fff;letter-spacing:.5px}
 .g-title em{color:var(--gold);font-style:normal}
 .g-sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.7;max-width:640px;margin-top:8px}
@@ -57,7 +57,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 @media (max-width:420px){.g-masonry{column-count:1}}
 /* CARDS */
 .g-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s,background .15s}
-.g-card:hover{border-color:rgba(232,160,32,.4);background:rgba(232,160,32,.05);transform:translateY(-2px)}
+.g-card:hover{border-color:rgba(255,74,0,.4);background:rgba(255,74,0,.05);transform:translateY(-2px)}
 .g-media{width:100%;min-height:60px;background:#181818;display:block;overflow:hidden}
 .g-media img{width:100%;height:auto;display:block}
 .g-media video{width:100%;display:block;background:#000}
@@ -71,7 +71,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* ALBUMS */
 .g-albums{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
 .g-album{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
-.g-album:hover{border-color:rgba(232,160,32,.4);background:rgba(232,160,32,.05)}
+.g-album:hover{border-color:rgba(255,74,0,.4);background:rgba(255,74,0,.05)}
 .g-album-img{width:100%;aspect-ratio:16/10;object-fit:cover;background:#181818;display:block}
 .g-album-ph{width:100%;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.3);font-size:11px;background:#181818}
 .g-album-body{padding:11px 13px;display:flex;flex-direction:column;gap:4px;flex:1}
@@ -81,13 +81,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* MAPAS CON ESTE DESTINO (modo destino, seccion 4) */
 .g-album[href]{text-decoration:none}
 .g-map-ph{width:100%;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;background:#181818;font-size:38px;line-height:1}
-.g-map-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;background:rgba(232,160,32,.16);border:1px solid rgba(232,160,32,.35);color:var(--gold);vertical-align:middle}
+.g-map-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;background:rgba(255,74,0,.16);border:1px solid rgba(255,74,0,.35);color:var(--gold);vertical-align:middle}
 /* BOTON CARGAR MAS */
-.g-more{display:block;margin:20px auto 0;padding:11px 26px;background:transparent;border:1px solid rgba(232,160,32,.4);border-radius:6px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s}
+.g-more{display:block;margin:20px auto 0;padding:11px 26px;background:transparent;border:1px solid rgba(255,74,0,.4);border-radius:6px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s}
 .g-more:hover{background:var(--gold);color:var(--black)}
 .g-more:disabled{opacity:.5;cursor:default}
 /* COMPARTIR FOTO (modo destino) */
-.g-share{background:rgba(255,255,255,.04);border:1px solid rgba(232,160,32,.25);border-radius:12px;padding:16px 18px;margin-bottom:22px}
+.g-share{background:rgba(255,255,255,.04);border:1px solid rgba(255,74,0,.25);border-radius:12px;padding:16px 18px;margin-bottom:22px}
 .g-share-text{font-size:13px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:12px}
 .g-share-row{display:flex;gap:10px;flex-wrap:wrap}
 .g-share-input{flex:1;min-width:220px;padding:11px 13px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:8px;color:#fff;font-family:inherit;font-size:13px}
@@ -108,7 +108,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* MODAL */
 .g-modal{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:400;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto}
 .g-modal.on{display:flex}
-.g-modal-box{background:var(--black);border:1px solid rgba(232,160,32,.28);border-radius:16px;width:100%;max-width:760px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden;margin:auto}
+.g-modal-box{background:var(--black);border:1px solid rgba(255,74,0,.28);border-radius:16px;width:100%;max-width:760px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden;margin:auto}
 .g-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);position:sticky;top:0;z-index:2}
 .g-modal-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.2px;color:var(--gold)}
 .g-modal-close{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:6px;width:32px;height:32px;color:rgba(255,255,255,.7);font-size:18px;line-height:1;cursor:pointer;transition:all .15s;font-family:inherit}
@@ -132,11 +132,16 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .g-album-photo-body{padding:12px 14px}
 @media (max-width:600px){.g-modal{padding:8px}.g-modal-body{padding:12px}}
 </style>
+
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
 </head>
 <body>
 
 <nav>
-  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <a href="index.html" class="tl"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
   <div class="tsep"></div>
   <span class="nav-label">Galeria de la comunidad</span>
   <a href="comunidad.html" class="nav-back">Volver</a>
@@ -144,7 +149,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 
 <main class="g-wrap">
   <div class="g-head" id="g-head-global">
-    <div class="g-eyebrow">ExploraCO</div>
+    <div class="g-eyebrow">LATAWEL</div>
     <h1 class="g-title">Galeria de la <em>comunidad</em></h1>
     <p class="g-sub">Fotos, videos y audio compartidos por viajeros. Vota tus favoritas y comenta en cada publicacion.</p>
   </div>
@@ -249,7 +254,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="media-actions.js"></script>
 <script src="media-upload.js"></script>
 <script>
-/* ExploraCO - galeria.html (subpagina de galeria ampliada) */
+/* LATAWEL - galeria.html (subpagina de galeria ampliada) */
 /* Modo global: feed top + albumes populares. Modo destino: ?destino=<slug>. */
 (function () {
   'use strict';
@@ -324,7 +329,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   }
 
   function gPedirLogin(msg) {
-    gToast(msg, '#E8A020');
+    gToast(msg, '#FF4A00');
     if (window.ExploraCO && typeof window.ExploraCO.mostrarLogin === 'function') {
       window.ExploraCO.mostrarLogin();
     }
@@ -430,7 +435,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     var card = document.createElement('div');
     card.className = 'g-card';
     var titulo = it.caption || '';
-    var meta = it.autor_nombre || (it.origen === 'curada' ? 'Selecci\u00f3n ExploraCO' : 'Viajero');
+    var meta = it.autor_nombre || (it.origen === 'curada' ? 'Selecci\u00f3n LATAWEL' : 'Viajero');
     var votable = (it.tipo_voto === 'media' || !!it.fuente);
     var html = '<div class="g-media">' + gMediaHTML({ media_url: it.url, media_type: it.foto_type || 'foto', media_title: titulo }) + '</div>'
       + '<div class="g-card-body">'
@@ -591,8 +596,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         itemId: (G.media && G.media.shareItem) || '',
         destinoId: G.destinoId || '',
         url: gItemUrl((G.media && G.media.shareItem) || ''),
-        titulo: (G.media && G.media.caption) || 'Galeria ExploraCO',
-        texto: 'Mira esta publicacion en ExploraCO'
+        titulo: (G.media && G.media.caption) || 'Galeria LATAWEL',
+        texto: 'Mira esta publicacion en LATAWEL'
       });
     } else {
       btnShare.style.display = 'none';

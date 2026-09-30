@@ -1,5 +1,5 @@
 /**
- * ExploraCO - Sesion de guardado compartida del directorio (ASCII-safe).
+ * LATAWEL - Sesion de guardado compartida del directorio (ASCII-safe).
  * Centraliza para los 5 listados (directorio, hostal, comida, sitio,
  * evento) el toggle de guardado (localStorage + DB) y la hidratacion de
  * guardados desde Neon.
@@ -161,7 +161,7 @@
     if (!t) {
       t = document.createElement('div');
       t.id = 'xp-dir-toast';
-      t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none;opacity:0;transform:translateY(20px);transition:all .2s';
+      t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#0F1419;color:#FF4A00;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(255,74,0,.3);pointer-events:none;opacity:0;transform:translateY(20px);transition:all .2s';
       document.body.appendChild(t);
     }
     t.textContent = '+5 XP \u2014 Guardado en Mi Mapa \u2665';

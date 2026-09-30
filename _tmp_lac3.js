@@ -7,7 +7,7 @@ function renderLB(){
   if(m.type==='photo'&&m.src){
     el.innerHTML='<img src="'+m.src+'" alt="'+m.cap+'" onerror="this.style.display=\'none\'">';
   }else{
-    el.innerHTML='<div class="lbmp" style="background:#111">▶️</div>';
+    el.innerHTML='<div class="lbmp" style="background:#0F1419">▶️</div>';
   }
   document.getElementById('lbcp').textContent=(lbIdx+1)+'/'+MEDIA.length+' · '+m.cap;
 }
@@ -18,7 +18,7 @@ document.getElementById('lb').addEventListener('click',function(e){if(e.target==
 // Map
 var map=L.map('mapel',{zoomControl:true,scrollWheelZoom:false}).setView([4.7120,-74.0680],14);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:19}).addTo(map);
-var ico=L.divIcon({html:'<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#E8A020;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:16px">🏛️</span></div>',iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-40],className:''});
+var ico=L.divIcon({html:'<div style="width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#FF4A00;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35);border:2.5px solid #fff"><span style="transform:rotate(45deg);font-size:16px">🏛️</span></div>',iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-40],className:''});
 L.marker([4.7120,-74.0680],{icon:ico}).addTo(map).bindPopup('<b style="font-size:13px">La Candelaria</b><br><span style="font-size:11px;color:#666">📍 Bogotá, Cundinamarca</span>',{maxWidth:220}).openPopup();
 
 // Stars

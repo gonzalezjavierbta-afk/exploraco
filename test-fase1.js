@@ -19,7 +19,7 @@ async function test(nombre, fn) {
 }
 
 async function run() {
-  console.log('\n🧪 ExploraCO — Test Fase 1\n');
+  console.log('\n🧪 LATAWEL — Test Fase 1\n');
   let ok = 0, total = 0;
 
   // ── 1. publicar-lugar ─────────────────────────────────────────

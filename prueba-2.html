@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Prueba 2 - ExploraCO</title>
+<title>Prueba 2 | LATAWEL</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A}
+:root{--gold:#FF4A00;--gold-dark:#FFB84D;--gold-light:#E5E7EB;--black:#0F1419;--white:#fff;--warm:#E5E7EB;--border:#E5E7EB;--muted:#888;--text:#1A1A1A}
 html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}
 .bc{font-family:'Barlow Condensed',sans-serif}
 .topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}
 .tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none;flex-shrink:0}
-.tl em{color:var(--gold);font-style:normal}
+.tl img{display:block;height:30px;width:auto}
 .tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}
 .tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}
 .tbc a{color:rgba(255,255,255,.4);text-decoration:none}.tbc a:hover{color:var(--gold)}
@@ -27,7 +27,7 @@ html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(
 .hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
 .hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:420px}
 .hl{display:flex;flex-direction:column;justify-content:center;gap:18px}
-.hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}
+.hew{display:inline-flex;align-items:center;gap:8px;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}
 .htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,6vw,72px);font-weight:900;color:#fff;line-height:.9;letter-spacing:.5px}
 .htitle em{color:var(--gold);font-style:italic;display:block}
 .hsub{font-size:13px;color:rgba(255,255,255,.42);line-height:1.8;max-width:480px}
@@ -53,7 +53,7 @@ html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(
 .pvpl{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
 .pvic{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:13px}
 .pmore::after{content:attr(data-more);position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:'Barlow Condensed',sans-serif}
-.gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}
+.gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(255,74,0,.3)}
 .gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}
 .gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}
 .gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}
@@ -146,7 +146,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .footer{background:var(--black);border-top:3px solid var(--gold);padding:36px 4% 20px}
 .ftop{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:4%;margin-bottom:28px}
 .flogo{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:10px;text-decoration:none;display:inline-block}
-.flogo em{color:var(--gold);font-style:normal}
+.flogo img{display:block;height:34px;width:auto}
 .fdesc{font-size:11px;color:rgba(255,255,255,.28);line-height:1.8;margin-bottom:14px}
 .fctl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.22);margin-bottom:12px}
 .flinks{display:flex;flex-direction:column;gap:7px}
@@ -172,8 +172,8 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* ── GUARDAR EN MI MAPA ── */
 .save-fab{position:fixed;bottom:24px;right:24px;z-index:500;display:flex;align-items:center;gap:8px;padding:12px 20px;border-radius:50px;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:all .2s}
 .save-fab.unsaved{background:#fff;color:var(--black);border:2px solid rgba(0,0,0,.12)}
-.save-fab.unsaved:hover{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
-.save-fab.saved{background:var(--gold);color:#fff;border:2px solid var(--gold);box-shadow:0 6px 24px rgba(232,160,32,.35)}
+.save-fab.unsaved:hover{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 6px 24px rgba(255,74,0,.35)}
+.save-fab.saved{background:var(--gold);color:#fff;border:2px solid var(--gold);box-shadow:0 6px 24px rgba(255,74,0,.35)}
 .save-fab.saved:hover{background:var(--gold-dark);border-color:var(--gold-dark)}
 .save-fab-icon{font-size:16px;transition:transform .2s}
 .save-fab.saved .save-fab-icon{transform:scale(1.15)}
@@ -186,7 +186,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
    Score multidim · Rooms table · Vibe · Amenities grid
    Plataformas · Quién va · FAQ · Comparar · Eventos
 ══════════════════════════════════════════════════════════════ */
-:root{--gold:#E8A020;--gold-d:#C8860A;--gold-l:rgba(232,160,32,.1);--black:#111;--sky:#0A1628;--sand:#F5E6D0;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--green:#22C55E;--blue:#3B82F6;--red:#EF4444}
+:root{--gold:#FF4A00;--gold-d:#FFB84D;--gold-l:rgba(255,74,0,.1);--black:#0F1419;--sky:#0F1419;--sand:#E5E7EB;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--green:#22C55E;--blue:#3B82F6;--red:#EF4444}
 
 /* ── VIBE BADGE ── */
 .vibe-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-right:6px;margin-bottom:6px}
@@ -336,14 +336,14 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .rv-dim{display:flex;flex-direction:column;gap:3px}
 .rv-dim-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
 .rv-stars-row{display:flex;gap:2px}
-.rv-star{font-size:18px;color:#E5E3DD;cursor:pointer;transition:color .1s;line-height:1}
+.rv-star{font-size:18px;color:#E5E7EB;cursor:pointer;transition:color .1s;line-height:1}
 .rv-star.on,.rv-star:hover{color:var(--gold)}
 .rv-traveller-type{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .rv-type-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--border);font-size:10px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--white)}
 .rv-type-btn.on{background:var(--black);border-color:var(--black);color:var(--white)}
 
 /* ── SECTION NUMBERS UPDATE ── */
-.section-new-badge{background:var(--gold-l);border:1px solid rgba(232,160,32,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+.section-new-badge{background:var(--gold-l);border:1px solid rgba(255,74,0,.25);color:var(--gold-d);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
 
 
 /* ── MOBILE NAV DETAIL PAGES ── */
@@ -356,11 +356,11 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mobile-drawer.open{transform:translateX(0)}
 .md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
 .md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
-.md-logo em{color:var(--gold);font-style:normal}
+.md-logo img{display:block;height:30px;width:auto}
 .md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
 .md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
 .md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
-.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link:hover{color:var(--gold);background:rgba(255,74,0,.06)}
 .md-link-icon{font-size:18px;width:24px;text-align:center}
 .md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
 .md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
@@ -389,16 +389,23 @@ textarea.wrinp{resize:vertical;min-height:88px}
 /* ── SHARE BUTTON ── */
 .tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;text-transform:uppercase}
 .tshare:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
-.tshare-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#111;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px;min-width:180px;z-index:400;display:none;flex-direction:column;gap:2px}
+.tshare-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#0F1419;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px;min-width:180px;z-index:400;display:none;flex-direction:column;gap:2px}
 .tshare-dropdown.open{display:flex}
 .tsd-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.8);cursor:pointer;transition:background .1s;text-decoration:none}
 .tsd-item:hover{background:rgba(255,255,255,.08);color:#fff}
 .tshare-wrap{position:relative}
 
 </style>
+
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
+
+<meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
 </head>
 <body>
-<nav class="topbar"><a href="index.html" class="tl">EXPLORA<em>CO</em></a></nav>
+<nav class="topbar"><a href="index.html" class="tl"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a></nav>
 <div class="sec-nav" id="sec-nav"><div class="sec-nav-inner"><a class="sn-link" href="#descripcion">Sobre</a><a class="sn-link" href="#galeria">Fotos</a><a class="sn-link" href="#reservar">Reservar</a><a class="sn-link" href="#mapa">Mapa</a><a class="sn-link" href="#faq">FAQ</a><a class="sn-link" href="#resenas">Resenas</a></div></div>
 <div class="hero" style="background:linear-gradient(135deg,#1a3a5c,#2a4a7c)"><div class="hi"><div class="hl"><h1 class="htitle bc">Prueba 2</h1><p class="hsub"></p><div class="hctar"><a href="https://wa.me/573213254100" class="hbtn" target="_blank">Reservar por WhatsApp</a></div></div><div class="hr"><img src="https://m.media-amazon.com/images/S/pv-target-images/2e1283b5e72963b3755029f2f618c7495d32c091dd01e74cbbf8a281379176b4._SX1080_FMjpg_.jpg" alt="Prueba 2" style="width:100%;height:100%;object-fit:cover"></div></div></div>
 <section class="ssec bwarm" id="descripcion"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Sobre este lugar</h2><div class="stnum">1</div></div><p class="stext"></p></div></section><section class="ssec bwhite" id="galeria"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Galeria</h2><div class="stnum">2</div></div><div class="gal-grid"><div class="gal-item" onclick="openLB(0)"><img src="https://m.media-amazon.com/images/S/pv-target-images/2e1283b5e72963b3755029f2f618c7495d32c091dd01e74cbbf8a281379176b4._SX1080_FMjpg_.jpg" alt="" loading="eager"></div></div><div id="lb" class="lb"><div class="lbx" onclick="closeLB()">x</div><div class="lbm-wrap"><button class="lbn" onclick="lbNav(-1)">&#8249;</button><div class="lbm" id="lbm"></div><button class="lbn" onclick="lbNav(1)">&#8250;</button></div></div></div></section><section class="ssec bwhite" id="reservar"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Reservar<span class="section-new-badge">Nuevo</span></h2><div class="stnum">4</div></div><div class="booking-section"><div class="booking-platforms"><a class="bk-btn bk-direct" href="https://wa.me/573213254100" target="_blank"><div class="bk-name">WhatsApp</div></a></div></div></div></section><section class="ssec bwhite" id="servicios"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Servicios<span class="section-new-badge">Nuevo</span></h2><div class="stnum">6</div></div><div class="amenity-section"><div class="amenity-section-title">Conectividad</div><div class="amenity-grid"><div class="amenity-item no"><span class="amenity-label">WiFi gratis</span></div><div class="amenity-item no"><span class="amenity-label">WiFi 100Mbps</span></div><div class="amenity-item no"><span class="amenity-label">Area coworking</span></div><div class="amenity-item no"><span class="amenity-label">Enchufes por cama</span></div></div></div><div class="amenity-section"><div class="amenity-section-title">Cocina</div><div class="amenity-grid"><div class="amenity-item no"><span class="amenity-label">Cocina equipada</span></div><div class="amenity-item no"><span class="amenity-label">Desayuno incluido</span></div><div class="amenity-item no"><span class="amenity-label">Nevera comunitaria</span></div><div class="amenity-item no"><span class="amenity-label">Restaurante propio</span></div><div class="amenity-item no"><span class="amenity-label">Bar Cafe</span></div></div></div><div class="amenity-section"><div class="amenity-section-title">Habitaciones</div><div class="amenity-grid"><div class="amenity-item no"><span class="amenity-label">Lockers individuales</span></div><div class="amenity-item no"><span class="amenity-label">Aire acondicionado</span></div><div class="amenity-item no"><span class="amenity-label">Agua caliente 24h</span></div><div class="amenity-item no"><span class="amenity-label">Ropa de cama incluida</span></div><div class="amenity-item no"><span class="amenity-label">Limpieza diaria</span></div></div></div><div class="amenity-section"><div class="amenity-section-title">Social</div><div class="amenity-grid"><div class="amenity-item no"><span class="amenity-label">Bar en terraza</span></div><div class="amenity-item no"><span class="amenity-label">Tours organizados</span></div><div class="amenity-item no"><span class="amenity-label">Piscina</span></div><div class="amenity-item no"><span class="amenity-label">Eventos sociales</span></div></div></div><div class="amenity-section"><div class="amenity-section-title">Seguridad</div><div class="amenity-grid"><div class="amenity-item no"><span class="amenity-label">Recepcion 24h</span></div><div class="amenity-item no"><span class="amenity-label">CCTV</span></div><div class="amenity-item no"><span class="amenity-label">Parqueadero</span></div><div class="amenity-item no"><span class="amenity-label">Guarda equipaje</span></div><div class="amenity-item no"><span class="amenity-label">Accesible</span></div></div></div></div></section><section class="ssec bwhite" id="mapa"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Mapa</h2><div class="stnum">7</div></div><div id="mapel" style="height:320px;border-radius:8px;border:1px solid #ddd;margin-bottom:14px"></div><div class="mapacts"><a class="mabtn gold" href="https://www.google.com/maps/dir/?api=1&destination=4.619887,-74.082012" target="_blank">Google Maps</a><a class="mabtn green" href="https://wa.me/573213254100" target="_blank">WhatsApp</a></div></div></section><section class="ssec bwhite" id="faq"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">FAQ<span class="section-new-badge">Nuevo</span></h2><div class="stnum">11</div></div><div class="faq-list"><div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Cuál es la política de cancelación?</div><div class="faq-a">Cancelación gratuita hasta 48h antes. Después se cobra 50% de la primera noche.</div></div><div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Hay check-in tardío después de las 10pm?</div><div class="faq-a">Sí, tenemos recepción 24h. Avisa con anticipación por WhatsApp.</div></div><div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿El desayuno está incluido?</div><div class="faq-a">Incluido en habitaciones privadas. En dormitorios tiene costo adicional.</div></div><div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">¿Aceptan mascotas?</div><div class="faq-a">No admitimos mascotas en áreas comunes ni dormitorios.</div></div></div></div></section><section class="ssec bwarm" id="resenas"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Resenas</h2><div class="stnum">13</div></div><div id="rvlist"></div><div class="wrvbox"><div class="wrv-title">Escribir una resena</div><div class="rv-stars"><span class="spk" onclick="spS(1)">★</span><span class="spk" onclick="spS(2)">★</span><span class="spk" onclick="spS(3)">★</span><span class="spk" onclick="spS(4)">★</span><span class="spk" onclick="spS(5)">★</span></div><input id="wrn" class="rv-inp" placeholder="Tu nombre"><textarea id="wrt" class="rv-ta" placeholder="Tu experiencia..."></textarea><button class="rv-submit" onclick="subRv()">Publicar</button></div></div></section><section class="ssec bwhite" id="contact"><div class="sin"><div class="strow"><div class="sgl"></div><h2 class="stitle bc">Contacto</h2><div class="stnum">14</div></div><div class="cgrid"><a class="cbtn gold" href="https://www.google.com/maps/dir/?api=1&destination=4.619887,-74.082012" target="_blank">Google Maps</a><a class="cbtn green" href="https://wa.me/573213254100" target="_blank">WhatsApp</a></div></div></section><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -410,7 +417,7 @@ function renderLB(){
   if(m.type==='photo'&&m.src){
     el.innerHTML=`<img src="${m.src}" alt="${m.cap}" onerror="this.style.display='none'">`;
   }else{
-    el.innerHTML=`<div class="lbmp" style="background:${m.bg||'#111'}">${m.emoji||'▶️'}</div>`;
+    el.innerHTML=`<div class="lbmp" style="background:${m.bg||'#0F1419'}">${m.emoji||'▶️'}</div>`;
   }
   document.getElementById('lbcp').textContent=`${lbIdx+1}/${MEDIA.length} · ${m.cap}`;
 }
@@ -712,7 +719,7 @@ document.addEventListener('keydown',function(e){
         } catch(e) {}
         // Show mini toast
         var t = document.createElement('div');
-        t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(232,160,32,.3);pointer-events:none';
+        t.style.cssText = 'position:fixed;bottom:24px;right:20px;background:#0F1419;color:#FF4A00;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:9999;border:1px solid rgba(255,74,0,.3);pointer-events:none';
         t.textContent = '+25 XP — ¡Reseña publicada!';
         document.body.appendChild(t);
         setTimeout(function(){ t.remove(); }, 3000);
@@ -732,7 +739,7 @@ document.addEventListener('keydown',function(e){
         pts.xp = (pts.xp||0) + 8;
         pts.shares = (pts.shares||0) + 1;
         if(!pts.history) pts.history = [];
-        var pname = document.title.replace(' – ExploraCO','').replace(' - ExploraCO','');
+        var pname = document.title.replace(' | LATAWEL','').replace(' | LATAWEL','');
         pts.history.unshift({action:'compartir',xp:8,label:'Lugar compartido',ts:Date.now(),meta:{name:pname}});
         if(pts.history.length > 50) pts.history.length = 50;
         localStorage.setItem('user_points', JSON.stringify(pts));

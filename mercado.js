@@ -1,4 +1,4 @@
-/* mercado.js - ExploraCO
+/* mercado.js - LATAWEL
  * Mercado de Emprendedores (backend api/interacciones.js v28 / migracion 034).
  *
  * Asset compartido (mismo patron que mapa-cultural.js / media-actions.js):

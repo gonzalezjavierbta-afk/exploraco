@@ -1,4 +1,4 @@
-/* media-actions.js - ExploraCO
+/* media-actions.js - LATAWEL
  * Abstraccion compartida de acciones de media (voto + guardado).
  * Sustituye la logica duplicada de galeria.html (Regla de No-Duplicidad).
  *
@@ -59,7 +59,7 @@
 
   function pedirLogin(msg) {
     if (OPT && typeof OPT.pedirLogin === 'function') { OPT.pedirLogin(msg); return; }
-    toast(msg, '#E8A020');
+    toast(msg, '#FF4A00');
     if (window.ExploraCO && typeof window.ExploraCO.mostrarLogin === 'function') {
       window.ExploraCO.mostrarLogin();
     }
@@ -164,7 +164,7 @@
     if (!c.itemId) { return Promise.resolve(null); }
     var uid = usuarioId();
     if (!uid) { pedirLogin('Inicia sesi\u00f3n para votar esta foto.'); return Promise.resolve(null); }
-    if (c.esPropia) { toast('No puedes votar tu propia foto.', '#E8A020'); return Promise.resolve(null); }
+    if (c.esPropia) { toast('No puedes votar tu propia foto.', '#FF4A00'); return Promise.resolve(null); }
     var accion = c.yaVotado ? 'unlike' : 'like';
     btn.disabled = true;
     return postJson({ tipo: 'media_voto', usuario_id: uid, fuente: c.fuente, item_id: c.itemId, accion: accion }, true)
@@ -195,7 +195,7 @@
           if (window.ExploraCO && typeof window.ExploraCO.mostrarEstadoCupo === 'function') {
             window.ExploraCO.mostrarEstadoCupo({ tipo: 'cupo', mensaje: res.error || '' });
           } else {
-            toast(res.error || 'Limite de votos por dia alcanzado', '#E8A020');
+            toast(res.error || 'Limite de votos por dia alcanzado', '#FF4A00');
           }
           return res;
         }
@@ -222,14 +222,14 @@
       .then(function (res) {
         btn.disabled = false;
         if (!res.ok) {
-          if (res.__status === 503) { toast('Los guardados no estan disponibles todavia', '#E8A020'); return res; }
+          if (res.__status === 503) { toast('Los guardados no estan disponibles todavia', '#FF4A00'); return res; }
           if (res.__status === 400 || res.__status === 401) { pedirLogin('Inicia sesi\u00f3n para guardar esta foto.'); return res; }
           toast(res.error || 'No se pudo guardar', '#ef4444');
           return res;
         }
         c.yaGuardado = (res.guardado === undefined) ? !c.yaGuardado : !!res.guardado;
         pintarSave(btn, c);
-        toast(c.yaGuardado ? 'Guardado en Tu Mapa' : 'Quitado de tus guardados', c.yaGuardado ? '#E8A020' : '#888');
+        toast(c.yaGuardado ? 'Guardado en Tu Mapa' : 'Quitado de tus guardados', c.yaGuardado ? '#FF4A00' : '#888');
         return res;
       })
       .catch(function (e) {

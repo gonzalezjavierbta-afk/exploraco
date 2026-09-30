@@ -1,6 +1,6 @@
 /* =============================================================
    mymapa.js -- Modulo compartido "Mis mapas personalizados"
-   ExploraCO. Expone window.MyMap (IIFE, ASCII-safe, sin backticks).
+   LATAWEL. Expone window.MyMap (IIFE, ASCII-safe, sin backticks).
 
    Canonico para la gestion de mapas tematicos. index.html y
    comunidad.html lo consumen; no duplicar esta logica en las paginas.
@@ -82,7 +82,7 @@
 
   function toast(msg, color) {
     if (window.ExploraCO && window.ExploraCO.mostrarToast) {
-      window.ExploraCO.mostrarToast(msg, color || '#E8A020');
+      window.ExploraCO.mostrarToast(msg, color || '#FF4A00');
     }
   }
 
@@ -627,7 +627,7 @@
   function compartir(id) {
     var m = findMapa(id);
     if (!m) { toast('Mapa no encontrado', '#ef4444'); return; }
-    if (!m.publico) { toast('Primero haz el mapa publico para compartirlo', '#E8A020'); return; }
+    if (!m.publico) { toast('Primero haz el mapa publico para compartirlo', '#FF4A00'); return; }
     var url = (window.location.origin || 'https://exploraco.vercel.app')
       + '/mapas.html?id=' + encodeURIComponent(id);
     if (navigator.clipboard && navigator.clipboard.writeText) {

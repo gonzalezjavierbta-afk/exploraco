@@ -1862,14 +1862,14 @@ var BADGES_LOCAL = [
   'Gu\u00eda de Fronteras', 'Estratega Comunitario', 'Documentalista Visual',
   'Se\u00f1or del Spot', 'Cart\u00f3grafo de Cine', 'Protector del Patrimonio',
   'Curador de Colombia', 'Mariscal de Parche', 'Cineasta de Territorio',
-  'Inmortal del Mapa', 'Gran Maestro ExploraCO', 'Tejedor de Rutas',
+  'Inmortal del Mapa', 'Gran Maestro LATAWEL', 'Tejedor de Rutas',
   'Cronista de Regiones', 'Curador de Relatos', 'Guardi\u00e1n de Tradiciones',
   'Arquitecto de Itinerarios', 'Maestro de Ceremonias', 'Cronista Mayor',
   'Embajador Cultural', 'Historiador de Territorio', 'Sabio de los Caminos',
   'Leyenda Emergente', 'Forjador de Leyendas', 'H\u00e9roe del Mapa',
   'Tit\u00e1n de las Rutas', 'Leyenda Viva', 'Mito Naciente',
   'Semidi\u00f3s del Viaje', 'Guardi\u00e1n Ancestral', 'Esp\u00edritu del Territorio',
-  'Mito Eterno ExploraCO'
+  'Mito Eterno LATAWEL'
 ];
 
 // Alias para el epic v12 (admin_xp y vocaciones): NO se duplica la lista,
@@ -8833,7 +8833,7 @@ module.exports = async function handler(req, res) {
         var anunUsuario = usuarioId2 || null;
         var anunIns = await sql(
           'INSERT INTO chat_mensajes (sala_id, usuario_id, nombre, texto) '
-          + 'VALUES ($1, $2, \'ExploraCO Oficial\', $3) RETURNING id, creado_en',
+          + 'VALUES ($1, $2, \'LATAWEL Oficial\', $3) RETURNING id, creado_en',
           [anunSala[0].id, anunUsuario, anunTexto]
         );
         return res.status(200).json({ ok: true, data: { id: anunIns[0].id, creado_en: anunIns[0].creado_en } });

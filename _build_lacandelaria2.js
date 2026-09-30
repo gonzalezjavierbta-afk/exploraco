@@ -11,7 +11,7 @@ const schema = {
   '@type': 'TouristAttraction',
   name: 'La Candelaria',
   description: lead,
-  url: 'https://exploraco.co/lacandelaria2.html',
+  url: 'https://latawel.com/lacandelaria2.html',
   image: hero,
   address: { '@type': 'PostalAddress', addressLocality: 'Bogotá', addressCountry: 'CO' },
   geo: { '@type': 'GeoCoordinates', latitude: 4.7120, longitude: -74.0680 },
@@ -23,14 +23,14 @@ const ld = '<script type="application/ld+json">\n' + JSON.stringify(schema, null
 const head =
   '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
   + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
-  + '<title>La Candelaria  ExploraCO</title>\n'
+  + '<title>La Candelaria  LATAWEL</title>\n'
   + '<meta name="description" content="' + lead + '">\n'
-  + '<meta property="og:title" content="La Candelaria  ExploraCO">\n'
+  + '<meta property="og:title" content="La Candelaria  LATAWEL">\n'
   + '<meta property="og:description" content="' + lead + '">\n'
   + '<meta property="og:image" content="' + hero + '">\n'
   + '<meta property="og:type" content="place">\n'
-  + '<meta name="theme-color" content="#E8A020">\n'
-  + '<link rel="canonical" href="https://exploraco.co/lacandelaria2.html">\n'
+  + '<meta name="theme-color" content="#FF4A00">\n'
+  + '<link rel="canonical" href="https://latawel.com/lacandelaria2.html">\n'
   + ld + '\n'
   + '<style>' + css + '</style>\n</head>\n<body>\n\n'
   + body

@@ -1,5 +1,5 @@
 /**
- * ExploraCO - Boton Compartir (asset estatico, NO funcion serverless).
+ * LATAWEL - Boton Compartir (asset estatico, NO funcion serverless).
  *
  * Expone window.ExploraCompartir = { VERSION, init, compartir }.
  * Reusa la sesion y el toast de usuario-session.js (window.ExploraCO):
@@ -16,7 +16,7 @@
   'use strict';
 
   var VERSION = '1';
-  var BASE_URL = 'https://exploraco.co/';
+  var BASE_URL = 'https://latawel.com/';
   var POP_CLASS = 'share-pop';
   var STYLE_ID = 'exploraco-share-style';
 
@@ -53,7 +53,7 @@
   }
 
   function textoPorDefecto(titulo) {
-    return titulo ? ('Mira ' + titulo + ' en ExploraCO') : 'Descubre este destino en ExploraCO';
+    return titulo ? ('Mira ' + titulo + ' en LATAWEL') : 'Descubre este destino en LATAWEL';
   }
 
   // -- Normalizacion del contexto -----------------------------
@@ -74,7 +74,7 @@
   // -- Registro de XP (best effort; nunca rompe el compartir) --
   function registrarXp(c, canal) {
     if (!c.usuarioId) {
-      aviso('Inicia sesi\u00f3n para ganar XP', '#E8A020');
+      aviso('Inicia sesi\u00f3n para ganar XP', '#FF4A00');
       return;
     }
     var headers = { 'Content-Type': 'application/json' };
@@ -99,7 +99,7 @@
       })
       .then(function (res) {
         var data = (res && res.data) ? res.data : {};
-        if (res && res.status === 401) { aviso('Inicia sesi\u00f3n para ganar XP', '#E8A020'); return; }
+        if (res && res.status === 401) { aviso('Inicia sesi\u00f3n para ganar XP', '#FF4A00'); return; }
         if (!data.ok) return;
         // ADR-053 Dec 13.2: el estado de cupo se informa con el helper
         // unico de usuario-session.js (no se copia el mensaje por accion).
@@ -107,7 +107,7 @@
           if (window.ExploraCO && typeof window.ExploraCO.mostrarEstadoCupo === 'function') {
             window.ExploraCO.mostrarEstadoCupo({ tipo: 'cupo' });
           } else {
-            aviso('Cupo diario de XP alcanzado', '#E8A020');
+            aviso('Cupo diario de XP alcanzado', '#FF4A00');
           }
           return;
         }
@@ -170,9 +170,9 @@
   function inyectarEstilos() {
     if (document.getElementById(STYLE_ID)) return;
     var css = '.share-pop{position:fixed;z-index:9999;left:50%;bottom:32px;transform:translateX(-50%);'
-      + 'background:#fff;border:1px solid #EDE8E0;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.18);'
+      + 'background:#fff;border:1px solid #E5E7EB;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.18);'
       + 'padding:10px;display:flex;gap:8px;align-items:center}'
-      + '.share-pop-btn{background:#111;color:#fff;border:none;border-radius:4px;padding:9px 16px;'
+      + '.share-pop-btn{background:#0F1419;color:#fff;border:none;border-radius:4px;padding:9px 16px;'
       + 'font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;letter-spacing:.6px;'
       + 'text-transform:uppercase;cursor:pointer}'
       + '.share-pop-btn:hover{background:#333}'
@@ -245,7 +245,7 @@
     return new Promise(function (resolve) {
       var c = normalizarCtx(ctx);
       if (navigator && typeof navigator.share === 'function') {
-        navigator.share({ title: c.titulo || 'ExploraCO', text: c.texto || '', url: c.url || '' }).then(
+        navigator.share({ title: c.titulo || 'LATAWEL', text: c.texto || '', url: c.url || '' }).then(
           function () {
             registrarXp(c, 'web_share');
             resolve({ canal: 'web_share' });

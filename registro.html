@@ -3,68 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Crear mi cuenta · ExploraCO</title>
-<meta name="description" content="Crea tu cuenta de explorador en ExploraCO y empieza a sumar XP por Colombia. Sin contraseña: tu email es tu llave.">
-<meta name="theme-color" content="#E8A020">
+<title>Crear mi cuenta · LATAWEL</title>
+<meta name="description" content="Crea tu cuenta de explorador en LATAWEL y empieza a sumar XP por Colombia. Sin contraseña: tu email es tu llave.">
+<meta name="theme-color" content="#FF4A00">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 /* ---- SILO registro.html (ADR-004): todo el CSS vive bajo .reg-silo ----
-   Tema: dark elegante con dorado (fondo #111827/#0d1117, dorado #E8A020,
+   Tema: dark elegante con dorado (fondo #111827/#0d1117, dorado #FF4A00,
    acento claro #F0AD35, textos #F9FAFB/#9CA3AF). Misma paleta del modal
    de bono de referencia de usuario-session.js para coherencia visual. */
 body{background:#0d1117}
 .reg-silo *{box-sizing:border-box;margin:0;padding:0}
 .reg-silo{position:relative;min-height:100vh;background:linear-gradient(160deg,#111827,#0d1117);color:#F9FAFB;font-family:'Outfit',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;padding:22px 16px 40px;overflow:hidden}
-.reg-silo::before{content:'';position:absolute;top:-140px;left:50%;transform:translateX(-50%);width:560px;height:320px;background:radial-gradient(closest-side,rgba(232,160,32,.2),transparent 70%);pointer-events:none}
+.reg-silo::before{content:'';position:absolute;top:-140px;left:50%;transform:translateX(-50%);width:560px;height:320px;background:radial-gradient(closest-side,rgba(255,74,0,.2),transparent 70%);pointer-events:none}
 .reg-silo .reg-top{position:relative;width:100%;max-width:460px;margin:0 auto 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .reg-silo .reg-wordmark{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:3.5px;color:#F9FAFB;text-decoration:none}
-.reg-silo .reg-wordmark em{font-style:normal;color:#E8A020}
+.reg-silo .reg-wordmark em{font-style:normal;color:#FF4A00}
 .reg-silo .reg-flag{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#9CA3AF;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;white-space:nowrap}
 .reg-silo .reg-wrap{position:relative;flex:1;width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;justify-content:center}
 .reg-silo .reg-card{position:relative;background:linear-gradient(170deg,#141B2A,#0d1117);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:30px 22px 24px;box-shadow:0 24px 60px -28px rgba(0,0,0,.85);overflow:hidden}
-.reg-silo .reg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:repeating-linear-gradient(90deg,#E8A020 0 16px,transparent 16px 28px)}
-.reg-silo .reg-pill{display:inline-flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#E8A020;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);border-radius:999px;padding:5px 12px;margin-bottom:12px}
-.reg-silo .reg-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:#E8A020}
+.reg-silo .reg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:repeating-linear-gradient(90deg,#FF4A00 0 16px,transparent 16px 28px)}
+.reg-silo .reg-pill{display:inline-flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#FF4A00;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.4);border-radius:999px;padding:5px 12px;margin-bottom:12px}
+.reg-silo .reg-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:#FF4A00}
 .reg-silo .reg-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(30px,7vw,42px);font-weight:900;line-height:.98;letter-spacing:.2px;text-transform:uppercase;margin-bottom:10px}
 .reg-silo .reg-sub{font-size:13.5px;line-height:1.55;color:#9CA3AF;margin-bottom:8px;max-width:42ch}
 .reg-silo .reg-sub2{font-size:12.5px;line-height:1.5;color:#8B93A1;margin-bottom:18px;max-width:42ch}
-.reg-silo .reg-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.4);border-radius:999px;padding:5px 12px;margin-bottom:14px;animation:reg-in .35s ease both}
+.reg-silo .reg-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,74,0,.1);border:1px solid rgba(255,74,0,.4);border-radius:999px;padding:5px 12px;margin-bottom:14px;animation:reg-in .35s ease both}
 .reg-silo .reg-chip[hidden]{display:none}
 .reg-silo .reg-chip-txt{font-size:12px;font-weight:600;color:#9CA3AF}
-.reg-silo .reg-chip-code{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.4px;color:#E8A020}
+.reg-silo .reg-chip-code{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.4px;color:#FF4A00}
 .reg-silo .reg-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-left:4px solid #EF4444;border-radius:10px;padding:11px 13px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:#FCA5A5}
 .reg-silo .reg-alert[hidden]{display:none}
-.reg-silo .reg-alert-btn{background:#E8A020;color:#0d1117;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
+.reg-silo .reg-alert-btn{background:#FF4A00;color:#0d1117;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
 .reg-silo .reg-alert-btn[hidden]{display:none}
 .reg-silo .reg-alert-btn:hover{background:#F0AD35}
 .reg-silo .reg-lbl{display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px}
-.reg-silo .reg-input{width:100%;font-family:inherit;font-size:16px;color:#F9FAFB;background:#0d1117;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:13px 14px;margin-bottom:16px;transition:border-color .15s,box-shadow .15s;caret-color:#E8A020}
+.reg-silo .reg-input{width:100%;font-family:inherit;font-size:16px;color:#F9FAFB;background:#0d1117;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:13px 14px;margin-bottom:16px;transition:border-color .15s,box-shadow .15s;caret-color:#FF4A00}
 .reg-silo .reg-input::placeholder{color:#6B7280}
-.reg-silo .reg-input:focus{outline:none;border-color:#E8A020;box-shadow:0 0 0 3px rgba(232,160,32,.18)}
+.reg-silo .reg-input:focus{outline:none;border-color:#FF4A00;box-shadow:0 0 0 3px rgba(255,74,0,.18)}
 .reg-silo .reg-input:-webkit-autofill{-webkit-text-fill-color:#F9FAFB;-webkit-box-shadow:0 0 0 40px #0d1117 inset;transition:background-color 9999s ease-in-out 0s}
 .reg-silo .reg-bonos{border:0;margin:0 0 16px;padding:0;min-width:0}
 .reg-silo .reg-bonos[hidden]{display:none}
 .reg-silo .reg-bonos-intro{font-size:12px;line-height:1.45;color:#9CA3AF;margin:0 0 10px}
 .reg-silo .reg-bonos-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .reg-silo .reg-bono-card{display:block;position:relative;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 14px 12px 40px;cursor:pointer;transition:border-color .15s,background .15s}
-.reg-silo .reg-bono-card input{position:absolute;left:14px;top:15px;width:18px;height:18px;margin:0;accent-color:#E8A020;cursor:pointer}
-.reg-silo .reg-bono-card:hover{border-color:rgba(232,160,32,.5);background:rgba(232,160,32,.07)}
-.reg-silo .reg-bono-card.reg-bono-on{border-color:rgba(232,160,32,.75);background:rgba(232,160,32,.12)}
+.reg-silo .reg-bono-card input{position:absolute;left:14px;top:15px;width:18px;height:18px;margin:0;accent-color:#FF4A00;cursor:pointer}
+.reg-silo .reg-bono-card:hover{border-color:rgba(255,74,0,.5);background:rgba(255,74,0,.07)}
+.reg-silo .reg-bono-card.reg-bono-on{border-color:rgba(255,74,0,.75);background:rgba(255,74,0,.12)}
 .reg-silo .reg-bono-card.reg-bono-on .reg-bono-nombre{color:#F0AD35}
 .reg-silo .reg-bono-nombre{display:block;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:.4px;text-transform:uppercase;color:#F9FAFB}
 .reg-silo .reg-bono-desc{display:block;font-size:12px;line-height:1.4;color:#9CA3AF;margin-top:2px}
-.reg-silo .reg-submit{width:100%;border:none;border-radius:10px;background:#E8A020;color:#0d1117;cursor:pointer;padding:15px 18px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;transition:background .15s,transform .1s}
+.reg-silo .reg-submit{width:100%;border:none;border-radius:10px;background:#FF4A00;color:#0d1117;cursor:pointer;padding:15px 18px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;transition:background .15s,transform .1s}
 .reg-silo .reg-submit:hover{background:#F0AD35}
 .reg-silo .reg-submit:active{transform:translateY(1px)}
 .reg-silo .reg-submit:disabled{opacity:.6;cursor:progress}
 .reg-silo .reg-note{font-size:11.5px;line-height:1.5;color:#9CA3AF;margin-top:14px;text-align:center}
 .reg-silo .reg-back{display:inline-flex;align-items:center;gap:7px;margin:18px auto 0;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9CA3AF;text-decoration:none;transition:color .15s}
-.reg-silo .reg-back:hover{color:#E8A020}
+.reg-silo .reg-back:hover{color:#FF4A00}
 .reg-silo .reg-back-ico{width:14px;height:14px}
-.reg-silo :focus-visible{outline:2px solid #E8A020;outline-offset:2px}
+.reg-silo :focus-visible{outline:2px solid #FF4A00;outline-offset:2px}
 @keyframes reg-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (min-width:560px){
   .reg-silo .reg-card{padding:36px 30px 28px}
@@ -75,12 +75,19 @@ body{background:#0d1117}
 }
 @media (prefers-reduced-motion:reduce){.reg-silo .reg-chip{animation:none}.reg-silo .reg-submit:active{transform:none}}
 </style>
+
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
+
+<meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
 </head>
 <body>
 <div class="reg-silo">
 
   <header class="reg-top">
-    <a class="reg-wordmark" href="/index.html">EXPLORA<em>CO</em></a>
+    <a class="reg-wordmark" href="/index.html"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
     <span class="reg-flag">Colombia por descubrir</span>
   </header>
 

@@ -7,7 +7,7 @@
 
 const { neon } = require('@neondatabase/serverless');
 
-var BASE = 'https://exploraco.co';
+var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
 var CAT_LABEL = { hostal:'Hospedaje', comida:'Comida & Restaurantes', sitio:'Lugares & Sitios', evento:'Eventos' };
 var CAT_DIR   = { hostal:'directorio-hostal.html', comida:'directorio-comida.html', sitio:'directorio-sitio.html', evento:'directorio-evento.html' };
 var CAT_GRAD  = { hostal:'linear-gradient(135deg,#1a3a5c,#2a4a7c)', comida:'linear-gradient(135deg,#3a1a0a,#4a2a1a)', sitio:'linear-gradient(135deg,#0a2a1a,#1a3a2a)', evento:'linear-gradient(135deg,#1a051a,#3a1a3a)' };
@@ -44,24 +44,24 @@ function schemaLD(d, cat) {
   return '<script type="application/ld+json">\n'+JSON.stringify(schema,null,2)+'\n<\/script>';
 }
 
-var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');"
+var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=Outfit:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap');"
 +"*{box-sizing:border-box;margin:0;padding:0}"
-+":root{--gold:#E8A020;--gold-dark:#C8860A;--gold-light:#FDF3E0;--black:#111;--white:#fff;--warm:#FBF8F2;--border:#EDE8E0;--muted:#888;--text:#1A1A1A;--green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;--bg:#F8F7F3;--red:#EF4444;--blue:#3B82F6}"
++":root{--gold:#FF4A00;--gold-dark:#FFB84D;--gold-ink:#FF4A00;--gold-light:#E5E7EB;--black:#0F1419;--white:#FFFFFF;--warm:#E5E7EB;--border:#E5E7EB;--muted:#888;--text:#1A1A1A;--green:#22C55E;--green-l:rgba(34,197,94,.08);--green-d:#16A34A;--bg:#FFFFFF;--red:#EF4444;--blue:#3B82F6}"
 +"html{scroll-behavior:smooth}body{font-family:'Outfit',sans-serif;background:var(--warm);color:var(--text);overflow-x:hidden}"
 +".bc{font-family:'Barlow Condensed',sans-serif}"
 +"a{color:inherit;text-decoration:none}img{display:block;max-width:100%}"
 +".topbar{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;gap:14px;position:sticky;top:0;z-index:300}"
-+".tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;flex-shrink:0}.tl em{color:var(--gold);font-style:normal}"
++".tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;flex-shrink:0}.tl img{height:30px;width:auto;display:block}"
 +".tsep{width:1px;height:18px;background:rgba(255,255,255,.15);flex-shrink:0}"
 +".tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px}"
-+".tbc a{color:rgba(255,255,255,.4)}.tbc a:hover{color:var(--gold)}.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}"
++".tbc a{color:rgba(255,255,255,.4)}.tbc a:hover{color:var(--gold-ink)}.tbc span{color:rgba(255,255,255,.18)}.tbc em{color:rgba(255,255,255,.65);font-style:normal}"
 +".tra{display:flex;gap:8px;align-items:center;margin-left:auto}"
 +".tshare{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:3px;padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6)}"
 +".hero{background:var(--black);position:relative;overflow:hidden}"
 +".hi{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:4%;padding:5% 4% 4%;min-height:380px}"
 +"@media(max-width:760px){.hi{grid-template-columns:1fr;min-height:auto;padding:8% 5%}}"
 +".hl{display:flex;flex-direction:column;justify-content:center;gap:16px}"
-+".hew{display:inline-flex;align-items:center;gap:8px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.28);color:var(--gold);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}"
++".hew{display:inline-flex;align-items:center;gap:8px;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.28);color:var(--gold-ink);padding:5px 14px;border-radius:2px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;width:fit-content}"
 +".htitle{font-family:'Barlow Condensed',sans-serif;font-size:clamp(34px,6vw,62px);font-weight:900;color:#fff;line-height:.95;letter-spacing:.5px}"
 +".hsub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.8;max-width:480px}"
 +".hqi-row{display:flex;flex-wrap:wrap;gap:8px 18px}.hqi{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.5)}"
@@ -75,13 +75,13 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".prow{display:flex;gap:8px;height:88px}"
 +".pth{flex:1;border-radius:6px;overflow:hidden;background:#1a1a2e;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}"
 +".pth img{width:100%;height:100%;object-fit:cover}"
-+".gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(232,160,32,.3)}"
++".gstrip{background:var(--gold);position:sticky;top:52px;z-index:250;padding:12px 4%;display:flex;align-items:center;gap:3%;flex-wrap:wrap;box-shadow:0 4px 20px rgba(255,74,0,.3)}"
 +".gsavg{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:#fff;line-height:1}"
 +".gstars{display:flex;gap:2px}.gstar{font-size:13px;color:rgba(255,255,255,.4)}.gstar.on{color:#fff}"
 +".gsrv{font-size:10px;color:rgba(255,255,255,.75);margin-top:1px}"
 +".gsdiv{width:1px;height:30px;background:rgba(255,255,255,.25);flex-shrink:0}"
 +".gsprice{color:#fff}.gspl{font-size:8px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:1.2px}.gspv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}"
-+".gscta{margin-left:auto;background:#fff;color:var(--gold);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
++".gscta{margin-left:auto;background:#fff;color:var(--gold-ink);border:none;border-radius:3px;padding:10px 22px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0}"
 +".ssec{padding:40px 4%}.ssec.bwarm{background:var(--warm)}.ssec.bwhite{background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}"
 +".sin{max-width:860px;margin:0 auto}"
 +".strow{display:flex;align-items:center;gap:14px;margin-bottom:22px}"
@@ -91,7 +91,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".slead{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:14px;font-style:italic}"
 +".stext{font-size:14px;line-height:1.9;color:#444;margin-bottom:18px;white-space:pre-line}"
 +".hbox{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:0 6px 6px 0;padding:16px 20px;margin:20px 0;display:flex;align-items:flex-start;gap:12px}"
-+".hbico{font-size:20px;flex-shrink:0;margin-top:2px}.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-dark);margin-bottom:4px}"
++".hbico{font-size:20px;flex-shrink:0;margin-top:2px}.hblbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:var(--gold-ink);margin-bottom:4px}"
 +".hbtx{font-size:13px;color:#7A5200;line-height:1.6;font-weight:500}"
 +".tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}"
 +".tpill{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:#F0FDF4;color:#14532d}"
@@ -111,16 +111,16 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".tc-badge-eco{background:#ECFDF5;color:#065F46}"
 +".tc-badge-pers{background:#FFFBEB;color:#92400E}"
 +".tc-info{flex:1;min-width:0}"
-+".tc-name{font-size:13px;font-weight:700;color:#111;margin-bottom:3px}"
++".tc-name{font-size:13px;font-weight:700;color:#0F1419;margin-bottom:3px}"
 +".tc-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted)}"
-+".tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#111;text-align:right;flex-shrink:0}"
++".tc-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#0F1419;text-align:right;flex-shrink:0}"
 +".tc-price-sub{font-size:9px;color:var(--muted);text-align:right}"
 +".tc-body{padding:10px 14px}"
 +".tc-incl-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:10px}"
 +".tc-incl{font-size:10px;color:var(--muted);display:flex;align-items:flex-start;gap:5px;line-height:1.5}"
 +".tc-incl.yes{color:#166534}"
 +".tc-incl.no{color:#B91C1C}"
-+".tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#111;color:#fff;border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s;cursor:pointer}"
++".tc-book-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#0F1419;color:#fff;border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .15s;cursor:pointer}"
 +".tc-book-btn:hover{background:#333}"
 +".tc-desc{font-size:11px;color:#555;line-height:1.6;margin-bottom:10px}"
 +".checklist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}"
@@ -142,7 +142,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".entradas-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--border)}"
 +".entradas-table th{background:var(--black);color:#fff;padding:10px 14px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:1px}"
 +".entradas-table td{padding:12px 14px;border-bottom:1px solid var(--border)}"
-+".entrada-tipo{font-weight:700}.entrada-precio{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold-dark)}"
++".entrada-tipo{font-weight:700}.entrada-precio{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold-ink)}"
 +".entrada-link{color:#25D366;font-weight:700;font-size:11px}"
 +"#mapel iframe{width:100%;height:300px;border-radius:8px;border:1px solid var(--border)}"
 +".mapacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}"
@@ -150,22 +150,22 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".mabtn.gold{background:var(--gold);color:#fff;border-color:var(--gold)}.mabtn.dark{background:var(--black);color:#fff;border-color:var(--black)}"
 +".mabtn.green{background:#fff;color:#25D366;border-color:#25D366}.mabtn.outline{background:#fff;color:var(--text);border-color:var(--border)}"
 +".rblock{display:flex;gap:24px;align-items:center;padding:22px;background:var(--warm);border-radius:8px;border:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}"
-+".rbavg{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:var(--gold);line-height:1;text-align:center}"
-+".rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}.rbst{font-size:16px;color:#DDD}.rbst.on{color:var(--gold)}"
++".rbavg{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:var(--gold-ink);line-height:1;text-align:center}"
++".rbstars{display:flex;gap:3px;justify-content:center;margin:4px 0}.rbst{font-size:16px;color:#DDD}.rbst.on{color:var(--gold-ink)}"
 +".rbcnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center}"
 +".rvlist{display:flex;flex-direction:column;gap:14px}"
 +".rvitem{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px}"
 +".rvhead{display:flex;align-items:center;gap:9px;margin-bottom:9px}"
 +".rvav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;flex-shrink:0;background:var(--gold);color:#fff}"
 +".rvname{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--text)}"
-+".rvstars{display:flex;gap:1px;margin-left:auto}.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold)}"
++".rvstars{display:flex;gap:1px;margin-left:auto}.rvst{font-size:11px;color:#DDD}.rvst.on{color:var(--gold-ink)}"
 +".rvtx{font-size:13px;color:#444;line-height:1.7}"
 +".wr{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:20px;margin-top:20px}"
 +".wrtitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);margin-bottom:14px}"
 +".wrlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px}"
 +".wrinp{width:100%;border:1.5px solid var(--border);border-radius:5px;padding:10px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;margin-bottom:12px}"
 +".wrinp:focus{border-color:var(--gold)}textarea.wrinp{resize:vertical;min-height:88px}"
-+".sprow{display:flex;gap:5px;margin-bottom:12px}.spk{font-size:26px;cursor:pointer;color:#DDD;user-select:none}.spk.on{color:var(--gold)}"
++".sprow{display:flex;gap:5px;margin-bottom:12px}.spk{font-size:26px;cursor:pointer;color:#DDD;user-select:none}.spk.on{color:var(--gold-ink)}"
 +".wrsub{background:var(--black);color:#fff;border:none;border-radius:4px;padding:11px 22px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:100%}"
 +".wrsub:disabled{background:#ccc;cursor:not-allowed}"
 +".wrok{text-align:center;padding:12px;font-size:13px;color:#166534;font-weight:600;display:none;background:#F0FDF4;border-radius:5px;margin-top:10px}"
@@ -200,7 +200,7 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".itin-desc{font-size:11px;color:var(--muted);line-height:1.6}"
 +".itin-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}"
 +".itin-tag{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}.tips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.tip-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:10px;transition:border-color .15s}.tip-card:hover{border-color:#ccc}.tip-icon{font-size:22px;flex-shrink:0;line-height:1}.tip-body{flex:1;min-width:0}.tip-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.tip-text{font-size:11px;color:var(--muted);line-height:1.6}.tip-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;display:inline-block;margin-top:4px}.tip-gold{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}.tip-green{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}.tip-blue{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}.tip-red{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}.fauna-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}.fauna-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;transition:border-color .15s}.fauna-card:hover{border-color:#ccc}.fauna-emoji{font-size:32px;margin-bottom:6px;display:block}.fauna-name{font-size:11px;font-weight:700;color:var(--black);margin-bottom:2px}.fauna-sci{font-size:9px;color:var(--muted);font-style:italic;margin-bottom:4px}.fauna-fact{font-size:10px;color:var(--muted);line-height:1.5}.permiso-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}.permiso-item{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px}.permiso-item.requerido{border-left:3px solid var(--red)}.permiso-item.recomendado{border-left:3px solid var(--gold)}.permiso-item.info{border-left:3px solid var(--blue)}.permiso-icon{font-size:20px;flex-shrink:0}.permiso-body{flex:1;min-width:0}.permiso-title{font-size:12px;font-weight:700;color:var(--black);margin-bottom:3px}.permiso-desc{font-size:11px;color:var(--muted);line-height:1.6}.permiso-link{display:inline-block;margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);text-decoration:none}.permiso-link:hover{text-decoration:underline}.permiso-time{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:#FEF2F2;color:#DC2626;flex-shrink:0;white-space:nowrap;align-self:flex-start}.footer{background:var(--black);border-top:3px solid var(--gold);padding:30px 4% 20px;text-align:center}"
-+".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo em{color:var(--gold);font-style:normal}"
++".flogo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:8px}.flogo img{height:34px;width:auto;display:block;margin:0 auto 8px}.ftag{font-family:'Poppins',sans-serif;font-weight:600;letter-spacing:.3px}"
 +".fcopy{color:rgba(255,255,255,.35);font-size:10px;margin-top:14px}"
 +".fcopy a{color:rgba(255,255,255,.45)}";
 
@@ -665,24 +665,39 @@ function buildHTML(d, det, fotos, resenas) {
     + '<div class="cgrid">'+ctBtns.join('')+'</div></div></section>' : '';
 
   // -- ENSAMBLAR ----------------------------------------------------
+  // Rebranding LATAWEL: og:image absoluta. Si el destino tiene hero propio se
+  // respeta (absolutizandolo contra BASE); si no, se usa la imagen OG oficial.
+  var heroPropio = d.foto_hero || d.foto || '';
+  var ogHeroAbs = heroPropio ? (String(heroPropio).indexOf('http') === 0 ? String(heroPropio) : BASE + (String(heroPropio).charAt(0) === '/' ? '' : '/') + String(heroPropio)) : '';
+  var ogImage = ogHeroAbs || 'https://latawel.com/assets/brand/og/latawel-og-1200x630.png';
   return '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
     + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
-    + '<title>'+esc(d.nombre)+'  ExploraCO</title>\n'
+    + '<title>'+esc(d.nombre)+'  LATAWEL</title>\n'
     + '<meta name="description" content="'+esc(d.lead||d.nombre)+'">\n'
-    + '<meta property="og:title" content="'+esc(d.nombre)+'  ExploraCO">\n'
+    + '<link rel="icon" href="/assets/brand/favicon/favicon.ico">\n'
+    + '<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">\n'
+    + '<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">\n'
+    + '<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">\n'
+    + '<meta property="og:site_name" content="LATAWEL">\n'
+    + '<meta property="og:title" content="'+esc(d.nombre)+'  LATAWEL">\n'
     + '<meta property="og:description" content="'+esc(d.lead||'')+'">\n'
-    + (hero ? '<meta property="og:image" content="'+esc(hero)+'">\n' : '')
+    + '<meta property="og:url" content="'+BASE+'/'+esc(d.slug)+'.html">\n'
+    + '<meta property="og:image" content="'+esc(ogImage)+'">\n'
     + '<meta property="og:type" content="place">\n'
-    + '<meta name="theme-color" content="#E8A020">\n'
+    + '<meta name="twitter:card" content="summary_large_image">\n'
+    + '<meta name="twitter:title" content="'+esc(d.nombre)+'  LATAWEL">\n'
+    + '<meta name="twitter:description" content="'+esc(d.lead||'')+'">\n'
+    + '<meta name="twitter:image" content="'+esc(ogImage)+'">\n'
+    + '<meta name="theme-color" content="#FF4A00">\n'
     + '<link rel="canonical" href="'+BASE+'/'+esc(d.slug)+'.html">\n'
     + schemaLD(d, cat) + '\n'
     + '<style>'+CSS+'</style>\n</head>\n<body>\n\n'
 
-    + '<div class="topbar"><a class="tl" href="/index.html">EXPLORA<em>CO</em></a><div class="tsep"></div>'
+    + '<div class="topbar"><a class="tl" href="/index.html"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL"></a><div class="tsep"></div>'
     + '<div class="tbc"><a href="/index.html">Inicio</a><span>/</span><a href="/'+esc(dir)+'">'+esc(label)+'</a><span>/</span><em>'+esc(d.nombre)+'</em></div>'
     + '<div class="tra"><a class="tshare" href="/'+esc(dir)+'"><- '+esc(label)+'</a></div></div>\n\n'
 
-    + (d.status==='draft' ? '<div class="pbanner">(reloj) Este lugar esta pendiente de revision por el equipo de ExploraCO.</div>\n' : '')
+    + (d.status==='draft' ? '<div class="pbanner">(reloj) Este lugar esta pendiente de revision por el equipo de LATAWEL.</div>\n' : '')
 
     + '<section class="hero"><div class="hi">\n'
     + '<div class="hl"><div class="hew">'+esc(label)+'</div>'
@@ -714,8 +729,8 @@ function buildHTML(d, det, fotos, resenas) {
     + secResenas + '\n'
     + secContact + '\n\n'
 
-    + '<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>'
-    + '<p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>'
+    + '<footer class="footer"><div class="flogo"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL"></div>'
+    + '<p class="ftag" style="color:rgba(255,255,255,.5);font-size:11px">What to do? \u00b7 plataforma de turismo interactivo</p>'
     + '<div class="fcopy"><a href="/index.html">Inicio</a> &middot; <a href="/'+esc(dir)+'">'+esc(label)+'</a></div></footer>\n\n'
 
     + '<script>\n'
@@ -748,7 +763,7 @@ module.exports = async function handler(req, res) {
   var slug = (req.query.slug || '').trim().replace(/\.html$/, '');
 
   if (!slug || slug.length < 3 || /^[0-9]+$/.test(slug)) {
-    return res.status(404).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>No encontrado \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:3rem;margin-bottom:1rem">404</h1><p>P\u00e1gina no encontrada.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
+    return res.status(404).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>No encontrado \u2013 LATAWEL</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#FF4A00}</style></head><body><h1 style="font-size:3rem;margin-bottom:1rem">404</h1><p>P\u00e1gina no encontrada.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
   }
 
   try {
@@ -756,7 +771,7 @@ module.exports = async function handler(req, res) {
     var rows = await sql('SELECT d.* FROM destinos d WHERE d.slug = $1 LIMIT 1', [slug]);
 
     if (!rows.length) {
-      return res.status(404).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>No encontrado \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:3rem;margin-bottom:1rem">404</h1><p>El lugar <b>'+esc(slug)+'</b> no existe o fue eliminado.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
+      return res.status(404).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>No encontrado \u2013 LATAWEL</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#FF4A00}</style></head><body><h1 style="font-size:3rem;margin-bottom:1rem">404</h1><p>El lugar <b>'+esc(slug)+'</b> no existe o fue eliminado.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
     }
 
     var d = rows[0];
@@ -791,6 +806,6 @@ module.exports = async function handler(req, res) {
 
   } catch (err) {
     console.error('[pagina-destino]', err.message);
-    return res.status(500).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error \u2013 ExploraCO</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#E8A020}</style></head><body><h1 style="font-size:2rem;margin-bottom:1rem">\u26a0\ufe0f Error temporal</h1><p>No pudimos cargar esta p\u00e1gina. Por favor intenta de nuevo.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
+    return res.status(500).send('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error \u2013 LATAWEL</title><style>body{font-family:sans-serif;text-align:center;padding:4rem 1rem;background:#FBF8F2}a{color:#FF4A00}</style></head><body><h1 style="font-size:2rem;margin-bottom:1rem">\u26a0\ufe0f Error temporal</h1><p>No pudimos cargar esta p\u00e1gina. Por favor intenta de nuevo.</p><p style="margin-top:1.5rem"><a href="/index.html">\u2190 Volver al inicio</a></p></body></html>');
   }
 };

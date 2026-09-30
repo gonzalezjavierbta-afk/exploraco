@@ -36,7 +36,7 @@
     {min:20100,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5',era:'Explorador'},
     {min:22450,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5',era:'Explorador'},
     {min:24850,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25',era:'Explorador'},
-    {min:27400,nombre:'Gran Maestro ExploraCO',emoji:'\uD83C\uDF96\uFE0F',era:'Explorador'},
+    {min:27400,nombre:'Gran Maestro LATAWEL',emoji:'\uD83C\uDF96\uFE0F',era:'Explorador'},
     {min:30050,nombre:'Tejedor de Rutas',emoji:'\uD83D\uDDFA\uFE0F',era:'Cronista'},
     {min:32800,nombre:'Cronista de Regiones',emoji:'\uD83C\uDF0E',era:'Cronista'},
     {min:35700,nombre:'Curador de Relatos',emoji:'\uD83D\uDCDC',era:'Cronista'},
@@ -56,7 +56,7 @@
     {min:86600,nombre:'Semidi\u00f3s del Viaje',emoji:'\u26A1',era:'Mito'},
     {min:90950,nombre:'Guardi\u00e1n Ancestral',emoji:'\uD83E\uDDFF',era:'Mito'},
     {min:95450,nombre:'Esp\u00edritu del Territorio',emoji:'\uD83C\uDFF5\uFE0F',era:'Mito'},
-    {min:100000,nombre:'Mito Eterno ExploraCO',emoji:'\uD83C\uDFC6',era:'Mito'}
+    {min:100000,nombre:'Mito Eterno LATAWEL',emoji:'\uD83C\uDFC6',era:'Mito'}
   ];
 
   /* ---- CAPACIDADES_DETALLE: 40 capacidades desbloqueables por nivel ---- */
@@ -265,7 +265,7 @@
     {
       clave: 'voto_plataforma',
       nombre: 'Voto en la plataforma',
-      howto: 'Participa en decisiones de producto de ExploraCO',
+      howto: 'Participa en decisiones de producto de LATAWEL',
       nivel: 33
     },
     {

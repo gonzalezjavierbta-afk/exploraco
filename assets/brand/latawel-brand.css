@@ -1,0 +1,21 @@
+:root{
+  --ltw-orange:#FF4A00;
+  --ltw-navy:#0F1419;
+  --ltw-white:#FFFFFF;
+  --ltw-gray-ui:#E5E7EB;
+  --ltw-orange-light:#FFB84D;
+  --ltw-font-brand:'Poppins',sans-serif;
+  --ltw-font-display:'Barlow Condensed',sans-serif;
+  --ltw-font-body:'Outfit',sans-serif;
+  --ltw-radius:12px;
+  --ltw-radius-card:16px;
+  --ltw-radius-chip:999px;
+  --ltw-space-1:4px; --ltw-space-2:8px; --ltw-space-3:12px; --ltw-space-4:16px;
+  --ltw-space-6:24px; --ltw-space-8:32px; --ltw-space-12:48px;
+  --ltw-shadow-card:0 4px 16px rgba(0,0,0,.08);
+}
+
+.latawel-logo{display:block;height:30px;width:auto}
+.latawel-logo--sm{height:24px}
+.latawel-logo--lg{height:40px}
+.latawel-tagline{font-family:var(--ltw-font-brand);font-weight:600;color:inherit}

@@ -1,31 +1,1823 @@
-Prompt 0 → @explore-free:
-AUDITORÍA DE SOLO LECTURA del roster de agentes de ExploraCO. Necesito el peso real de la carga de contexto, medido contra el archivo real (ADR-006).
-1) Lista TODOS los archivos de .opencode/agent/*.md. Por cada uno reporta: nombre, bytes, líneas, description: literal con su largo en caracteres, model:, mode:, permisos, temperature:. Calcula: total de bytes del directorio, total de caracteres de todas las description:, promedio por description:, y cuál es la más larga.
-2) Para cada par pro/free reporta cuántos caracteres de description: son espejo casi idéntico; clasifica cada par en "espejo puro" / "espejo parcial" / "texto propio".
-3) Reporta bytes y líneas de AGENTS.md y qué secciones repiten información ya presente en las skills.
-4) Reporta bytes y líneas de AGENTS.md; identifica qué secciones son redundantes con skills bajo demanda.
-5) Lista .opencode/skills/ con bytes y líneas; total de la carpeta.
-6) Copia literal opencode.json si es < 100 líneas. Reporta default_agent, model, subagent_depth, permission, si hay agent inline o plugins, y cualquier cosa que inyecte contexto.
-7) Busca en los docs del proyecto (DECISIONS.md, PROJECT.md) ADRs sobre roster, tokens de agentes o cache_read. Solo número y título.
-8) Si existe scripts/usage_report.js, reporta qué mide y qué NO mide.
-No edites nada. Tablas, números exactos, di "NO EXISTE" cuando aplique.
-Prompt 0b → @research-agent-free (en paralelo):
-Investiga en el código de OpenCode (github.com/anomalyco/opencode) y docs oficiales: (1) ¿cómo construye el system prompt del agente principal? ¿lee los .md de agentes completos o solo el frontmatter? ¿la lista de description: se inyecta en el orquestador? ¿el cuerpo de los subagentes entra al contexto del orquestador o solo al del subagente invocado? Cita rutas de archivo y líneas. (2) ¿existe forma de cambiar el model: de un subagente en runtime vía la tool task? ¿La API de servidor acepta model por request? (3) ¿hay claves de config para filtrar/deshabilitar agentes del catálogo (disable, permission.task, globs)? Lista las claves relevantes de opencode.json. Distingue HECHO VERIFICADO (con fuente) de INFERENCIA.
-FASE 1 · Decisión de arquitectura (antes de tocar nada)
-Prompt 1 → @architect (PRO):
-Redacta y añade un ADR en DECISIONS.md (número = siguiente disponible, verificado con grep). Documenta la reestructuración del roster con estas decisiones ya tomadas: (1) convención v2 de description: ≤175 chars, scalar plano de un renglon, sin mención de modelo, con campo name:; (2) regla global de desambiguación PRO/FREE escrita UNA sola vez en AGENTS.md; (3) se mantiene la ruta PRO; (4) se retira el agente duplicado X; (5) subagent_depth: 2→1; (6) limpieza de opencode.json; (7) instrumentación obligatoria con usage_report.js --overhead; (8) regla de lectura por rango >200 KB. Incluye en "Opciones evaluadas" el rechazo de "el agente decide su modelo en runtime", verificando en el código de OpenCode que la tool task no expone model. Sigue el formato de los ADRs vecinos. Anade una "Nota de revisión (R-XXX)" al final cuando la ejecución se complete, con cifras reales reconciliadas contra el archivo.
-FASE 2 · Ejecución paralela (4 frentes, sin colisión de archivos)
-Prompt 2 → @js-silo-dev-free (fronthmatters + config + limpieza):
-Reescribe el frontmatter de TODOS los archivos de .opencode/agent/*.md con esta convención: campo name: explícito (nombre del archivo sin extensión) como primera clave; description: en scalar plano de un solo renglón (NUNCA > folded ni | literal — un folded > es lo que hace que la descripción llegue vacía al catálogo); máximo 175 caracteres; formato <Rol> de ExploraCO. <Territorio: archivos concretos>. <Criterio: cuándo usarlo>.; PROHIBIDO incluir "GRATUITO", "Versión open-source", nombres de modelo, "Excepción intencional" — la regla PRO/FREE vive UNA vez en AGENTS.md. Conserva intactos mode:, model:, temperature: y permission:. Elimina escapes Unicode literales \u00XX. Diagnostica y corrige cualquier description: que llegue vacía al parseo. Edita opencode.json: elimina la clave model: global si está anulada por default_agent, baja subagent_depth a 1. Retira el agente duplicado que corresponda. Crea un script temporal que verifique por archivo: name: presente y correcto, description: ≤175, sin \u00, sin palabras prohibidas, mode/model/permission presentes. Debe dar 0 incumplimientos. Bórralo al terminar.
-Prompt 3 → @docs-keeper-free (AGENTS.md + skill del roster):
-Poda AGENTS.md al ~50% de su tamaño sin perder gobernanza. Elimina: el árbol/ASCII de flujo de delegación (redundante con la matriz), la duplicación interna de la lista de agentes, y las secciones que duplican skills bajo demanda (reduce a 1-2 líneas que remiten a la skill). CONSERVA: la matriz de enrutamiento por dominio, las reglas transversales críticas, el índice de skills, la regla de escalado de seguridad. AÑADE dos reglas: (1) "Regla de desambiguación PRO/FREE" escrita UNA sola vez — la variante sin sufijo es la ruta PRO (criterio, riesgo, seguridad) y la -free es la ruta gratuita (mecánico, repetitivo, bajo riesgo); la elección es por riesgo, nunca por preferencia; ninguna description: de agente la reitera. (2) "Lectura por rango": prohibido leer completos archivos >200 KB; usar grep + Read con offset/limit, porque un read completo envenena el cache_read de los turnos siguientes. Luego poda la skill del roster: elimina la matriz de enrutamiento y las tablas de N filas que ya viven en los frontmatters de los agentes y en AGENTS.md (si la skill las repite, es 65% redundante). Conserva propósito, decisiones de reconciliación y fuentes. Corrige además el conteo de agentes para que se derive de ls .opencode/agent/ y no de una cifra escrita. Reporta bytes antes/después.
-Prompt 4 → @backend-dev (PRO — instrumento de medición):
-En scripts/usage_report.js añade: (1) un modo --overhead que mida, desde disco, el overhead fijo del system prompt: AGENTS.md en bytes/líneas/tokens, el número de archivos .opencode/agent/*.md y la suma de caracteres de sus description: (con el estimador chars/3.5), el número de skills y sus description: frontmatter, un TOTAL por turno, y ese total multiplicado por los turnos del período. Implemente un extractor de description: que soporte valor en línea Y block scalar >. (2) Un fix de rendimiento si --since 0 no termina: la DB se abre readOnly (sin poder crear índices), así que aplica un cap de sesiones por defecto (--max-sessions N) y mueve el conteo de part.data a solo las sesiones mostradas. NO rompas el contrato congelado de los modos existentes (--summary/--sessions/--tree/--json/--csv, sus columnas, sus filtros). ASCII-safety estricto en el .js (ADR-002): cero bytes >127, cero backticks, cero dobles escapes. node --check obligatorio. Ejecuta y pega --overhead y los modos existentes.
-FASE 3 · Verificación independiente y cierre
-Prompt 5 → @qa-auditor-free (auditoría, no corrijas):
-AUDITORÍA DE SOLO LECTURA. Verifica contra el archivo real (no confíes en reportes previos). Lista .opencode/agent/*.md y por cada uno: name: presente y correcto, description: scalar plano ≤175, sin \u00 ni palabras prohibidas, y que conserve mode/model/permission. Confirma que ningún archivo use description: >/|. Valida opencode.json. Corre node --check y Escudo GOLD (bytes>127, backticks, dobles escapes) sobre cualquier .js tocado, y confirma que los modos de usage_report.js siguen intactos. CRÍTICO: busca referencias activas a agentes o archivos RETIRADOS (grep en .opencode/agent/, .opencode/skills/, opencode.json) y clasifica cada coincidencia como ACTIVA/ROTA (hay que arreglar) vs HISTÓRICA en docs (se conservan). Verifica que todo path citado en una description: exista realmente en disco. Reporta por sección con evidencia literal. Cierra con veredicto APTO / APTO CON OBSERVACIONES / NO APTO.
-Prompt 6 → @docs-keeper-free (cierre documental):
-Cierra documentalmente el ciclo. (1) En DECISIONS.md, añade una "Nota de revisión (R-XXX) — cierre de ejecución" al final del ADR correspondiente, SIN reescribir su cuerpo, reconciliando las cifras optimistas con las reales medidas: número final de agentes, bytes finales de AGENTS.md y de la skill (con la razón si no se llegó a la cifra objetivo), cuántos agentes/archivos se retiraron de verdad, y la medición real de --overhead (tokens/turno y total acumulado). (2) Actualiza las referencias activas que quedaron obsoletas en la skill del roster (ej. si una carpeta legada fue retirada, márcala RETIRADA con fecha y ADR, no vigente). (3) En NEXT.md registra el hito con: qué se hizo, estado, qué se entregó, deuda y qué sigue. (4) En TASKS.md crea la tarea de la deuda pendiente más valiosa que salió de la auditoría, siguiendo la numeración existente. (5) En ERRORES_HISTORICOS.md registra los bugs de configuración corregidos (formato Problema/Causa raíz/Blindaje/Verificación), verificando las cifras contra el archivo (ADR-006). Todo en UTF-8 limpio con acentos, sin perder historial (Mandato 12).
-FASE 4 · Pase quirúrgico de referencias rotas (opcional pero recomendado)
-Prompt 7 → @js-silo-dev-free (mecánico):
-Corrige referencias a archivos/agentes que NO existen, detectadas por la auditoría. Antes de cada corrección verifica la realidad con git ls-files. (1) Referencias a un agente retirado @X en archivos de agente activos → mapea a su reemplazo funcional. (2) description: que citen un archivo inexistente o con nombre antiguo (BUGS_HISTORICOS.md vs el real) → corrige al nombre real, manteniendo ≤175 chars. (3) Si no puedes determinar el archivo real de un dominio, NO inventes: deja la description: genérica sin citar archivo y reporta la incertidumbre. (4) Rutas relativas inconsistentes dentro de un mismo archivo → unifica a la ruta completa. (5) Limpia carpetas de legado vacías en disco tras git rm. Verifica con grep que las coincidencias activas quedan en 0 y con un script que las description: editadas siguen cumpliendo la convención. Aísla: solo los archivos que edites, sin tocar AGENTS.md/docs/scripts.
+# PROYECTO: REDISEÑO COMPLETO DE LATAWEL
+# ROL: OPENCode — Frontend Engineer + UI Engineer + Design System Implementer
+
+Construye el rediseño completo de latawel.com utilizando el branding oficial de LATAWEL proporcionado por el proyecto.
+
+NO crear una estética nueva independiente.
+NO improvisar una nueva identidad.
+NO reemplazar el sistema visual.
+NO rediseñar el logo.
+
+El objetivo es transformar la experiencia actual en una plataforma digital moderna, urbana, energética, accesible y orientada al descubrimiento.
+
+============================================================
+01. IDENTIDAD OFICIAL
+============================================================
+
+MARCA:
+
+LATAWEL
+
+WEB:
+
+latawel.com
+
+CATEGORÍA:
+
+Plataforma digital de turismo interactivo.
+
+SLOGAN PRINCIPAL:
+
+Tus eventos, tus entradas.
+
+DESCRIPTOR:
+
+Plataforma de turismo interactivo.
+
+CONCEPTO:
+
+LATAWEL conecta personas con:
+
+- eventos
+- lugares
+- experiencias
+- actividades
+- comida
+- cultura
+- naturaleza
+- turismo urbano
+
+La marca debe sentirse como:
+
+UNA PUERTA DE ENTRADA DIGITAL A LO QUE ESTÁ PASANDO EN UNA CIUDAD.
+
+LATAWEL NO debe sentirse como:
+
+- una agencia de viajes tradicional
+- una empresa turística corporativa
+- una aplicación financiera
+- una empresa tecnológica fría
+- una plataforma infantil
+- una plataforma genérica de venta de entradas
+- una marca turística institucional
+
+Debe sentirse:
+
+- activa
+- curiosa
+- conectada
+- digital
+- urbana
+- accesible
+- exploradora
+- comunitaria
+
+La identidad oficial establece como conceptos centrales:
+
+UBICACIÓN
++
+CONEXIÓN
++
+DESCUBRIMIENTO
++
+EXPERIENCIA
+
+La secuencia conceptual de la marca es:
+
+LOCALIZAR → DESCUBRIR → EXPLORAR → CONECTAR → VIVIR
+
+============================================================
+02. LOGOTIPO OFICIAL
+============================================================
+
+Utilizar exclusivamente los archivos oficiales proporcionados:
+
+- logo horizontal LATAWEL
+- logo vertical LATAWEL
+- isotipo LATAWEL
+
+El isotipo está compuesto por:
+
+PIN DE UBICACIÓN
++
+ONDAS DE CONECTIVIDAD / SEÑAL
+
+El símbolo comunica:
+
+- ubicación
+- conectividad
+- tecnología
+- descubrimiento
+- turismo
+
+REGLAS ABSOLUTAS:
+
+NO redibujar el logo.
+
+NO modificar proporciones.
+
+NO cambiar geometría.
+
+NO inclinar.
+
+NO deformar.
+
+NO añadir sombras.
+
+NO añadir 3D.
+
+NO modificar el grosor.
+
+NO aplicar degradados arbitrarios.
+
+NO cambiar la tipografía del wordmark.
+
+NO reconstruir el logo con CSS.
+
+Utilizar siempre el archivo oficial.
+
+El logo horizontal debe ser la versión principal del header desktop.
+
+El isotipo puede utilizarse:
+
+- favicon
+- app icon
+- botones pequeños
+- navegación móvil
+- marcadores
+- elementos auxiliares
+- loading
+- avatar de marca
+
+============================================================
+03. PALETA OFICIAL
+============================================================
+
+COLOR PRINCIPAL:
+
+LATAWEL ORANGE
+
+HEX:
+#FF4A00
+
+RGB:
+255, 74, 0
+
+Uso:
+
+- CTA principales
+- botones
+- links activos
+- indicadores
+- pins
+- highlights
+- estados activos
+- elementos de navegación
+- detalles gráficos
+
+Este debe ser el color protagonista.
+
+------------------------------------------------------------
+
+NEGRO AZULADO:
+
+HEX:
+#0F1419
+
+Uso:
+
+- header
+- footer
+- fondos oscuros
+- títulos
+- textos principales
+- navegación
+- componentes estructurales
+- overlays
+
+------------------------------------------------------------
+
+BLANCO:
+
+HEX:
+#FFFFFF
+
+Uso:
+
+- fondo principal
+- tarjetas
+- texto sobre fondos oscuros
+- espacios negativos
+- contraste
+- interfaces
+
+------------------------------------------------------------
+
+GRIS:
+
+HEX:
+#E5E7EB
+
+Uso:
+
+- bordes
+- divisores
+- fondos secundarios
+- inputs
+- estados auxiliares
+- elementos de UI
+
+------------------------------------------------------------
+
+NARANJA CLARO:
+
+HEX:
+#FFB84D
+
+Uso:
+
+- hover secundarios
+- highlights
+- ilustraciones
+- estados especiales
+- elementos secundarios
+
+NO utilizar #FFB84D como sustituto del #FF4A00.
+
+------------------------------------------------------------
+
+REGLA DE COLOR:
+
+La combinación principal debe ser:
+
+#FF4A00
++
+#0F1419
++
+#FFFFFF
+
+El gris y naranja claro son secundarios.
+
+============================================================
+04. TIPOGRAFÍA
+============================================================
+
+TIPOGRAFÍA OFICIAL:
+
+POPPINS
+
+Utilizar Google Font:
+
+Poppins
+
+Pesos:
+
+300
+400
+500
+600
+700
+800
+
+------------------------------------------------------------
+
+H1:
+
+Poppins ExtraBold / Bold
+
+Peso:
+700–800
+
+------------------------------------------------------------
+
+H2:
+
+Poppins Bold
+
+700
+
+------------------------------------------------------------
+
+H3:
+
+Poppins SemiBold
+
+600
+
+------------------------------------------------------------
+
+Body:
+
+Poppins Regular
+
+400
+
+------------------------------------------------------------
+
+Labels / UI:
+
+Poppins Medium
+
+500
+
+------------------------------------------------------------
+
+Botones:
+
+Poppins SemiBold
+
+600
+
+La tipografía debe sentirse:
+
+- digital
+- geométrica
+- contemporánea
+- amigable
+- accesible
+
+NO utilizar:
+
+- serif
+- script
+- gothic
+- display futurista
+- tipografías excesivamente condensadas
+
+============================================================
+05. DIRECCIÓN ARTÍSTICA
+============================================================
+
+LATAWEL combina:
+
+TECNOLOGÍA
++
+TURISMO
++
+CIUDAD
++
+DESCUBRIMIENTO
+
+Lenguaje visual:
+
+- limpio
+- energético
+- urbano
+- digital
+- contemporáneo
+- accesible
+- fotográfico
+- dinámico
+
+Utilizar recursos visuales inspirados en:
+
+- mapas
+- rutas
+- coordenadas
+- pines
+- ubicación
+- entradas
+- tickets
+- eventos
+- smartphones
+- ciudades
+- señalización
+- flechas
+- recorridos
+- movimiento
+
+Estos recursos deben complementar la interfaz.
+
+Nunca competir con el logo.
+
+============================================================
+06. FOTOGRAFÍA
+============================================================
+
+Las fotografías deben sentirse reales.
+
+Priorizar:
+
+- personas viviendo experiencias
+- conciertos
+- eventos
+- gastronomía
+- cultura
+- naturaleza
+- turismo urbano
+- calles
+- destinos
+- experiencias locales
+- vida nocturna
+- vida diurna
+
+Evitar:
+
+- fotografías corporativas
+- fotografías genéricas de stock
+- personas posando artificialmente
+- turismo de lujo genérico
+- imágenes excesivamente perfectas
+
+La sensación debe ser:
+
+"ESTO ESTÁ PASANDO Y TÚ PUEDES VIVIRLO."
+
+Las imágenes deben tener protagonismo en las tarjetas.
+
+Utilizar:
+
+- imágenes grandes
+- aspect ratios consistentes
+- bordes redondeados
+- overlays cuando sea necesario
+- gradientes negros muy sutiles solamente para legibilidad
+
+============================================================
+07. SISTEMA DE UI
+============================================================
+
+Crear un Design System basado en:
+
+Border radius principal:
+
+12px
+
+Cards:
+
+12–16px
+
+Inputs:
+
+12px
+
+Buttons:
+
+10–12px
+
+Chips:
+
+999px
+
+Espaciado:
+
+sistema basado en múltiplos de 4px.
+
+Ejemplo:
+
+4
+8
+12
+16
+20
+24
+32
+40
+48
+64
+80
+
+------------------------------------------------------------
+
+SOMBRAS
+
+Utilizar sombras suaves.
+
+No utilizar:
+
+- sombras negras duras
+- glow excesivo
+- neumorfismo
+- 3D
+
+------------------------------------------------------------
+
+BORDERS
+
+Usar:
+
+#E5E7EB
+
+principalmente 1px.
+
+============================================================
+08. BOTONES
+============================================================
+
+PRIMARY:
+
+background:
+#FF4A00
+
+text:
+#FFFFFF
+
+hover:
+#E84000
+
+radius:
+10–12px
+
+------------------------------------------------------------
+
+SECONDARY:
+
+background:
+#FFFFFF
+
+border:
+#0F1419
+
+text:
+#0F1419
+
+------------------------------------------------------------
+
+DARK:
+
+background:
+#0F1419
+
+text:
+#FFFFFF
+
+------------------------------------------------------------
+
+GHOST:
+
+transparent
+
+texto:
+#0F1419
+
+------------------------------------------------------------
+
+CTA PRINCIPAL DE MARCA:
+
+"Descubrir eventos"
+
+Otros CTA:
+
+"Explorar ahora"
+
+"Ver eventos"
+
+"Ver lugares"
+
+"Ver mapa"
+
+"Comprar entradas"
+
+"Cómo llegar"
+
+"Guardar"
+
+"Compartir"
+
+"Publicar mi lugar"
+
+============================================================
+09. HEADER DESKTOP
+============================================================
+
+Crear header premium, limpio y compacto.
+
+Fondo:
+
+#0F1419
+
+Estructura:
+
+[LOGO LATAWEL]
+
+Explorar
+Agenda
+Mapa
+Inspírate
+Mi Viaje
+Comunidad
+
+                         Buscar
+                         Iniciar sesión
+
+El logo debe utilizar el archivo oficial.
+
+El header debe ser:
+
+- sticky
+- responsive
+- compacto
+- fácil de navegar
+
+En desktop:
+
+max-width aproximado:
+1440px
+
+padding horizontal:
+32–48px
+
+============================================================
+10. HEADER MOBILE
+============================================================
+
+Utilizar:
+
+logo/isotipo oficial
+
+botón búsqueda
+
+hamburger menu
+
+No saturar la pantalla.
+
+Navegación inferior móvil:
+
+Explorar
+Mapa
+Guardados
+Perfil
+
+Utilizar iconografía lineal.
+
+============================================================
+11. HOME PAGE
+============================================================
+
+La Home debe convertirse en la principal puerta de entrada a LATAWEL.
+
+ESTRUCTURA:
+
+--------------------------------------------------
+HEADER
+--------------------------------------------------
+
+--------------------------------------------------
+HERO
+--------------------------------------------------
+
+Hero visual grande.
+
+Utilizar fotografía real de ciudad/evento.
+
+Copy principal:
+
+"Tus eventos,
+tus entradas."
+
+Subcopy:
+
+"Descubre qué está pasando en tu ciudad
+y vive experiencias únicas."
+
+CTA:
+
+"Explorar eventos"
+
+SEARCH:
+
+"Busca eventos, lugares o ciudades..."
+
+Categorías:
+
+Eventos
+Lugares
+Comida
+Cultura
+Naturaleza
+
+El hero debe transmitir inmediatamente:
+
+EVENTOS + CIUDAD + DESCUBRIMIENTO
+
+--------------------------------------------------
+SECCIÓN:
+DESTACADOS ESTA SEMANA
+--------------------------------------------------
+
+Grid de cards.
+
+Cada card puede mostrar:
+
+imagen
+fecha
+categoría
+nombre
+ubicación
+precio
+guardar
+
+Ejemplo:
+
+Festival de Música
+Sala Centro · Bogotá
+Desde $35.000
+
+--------------------------------------------------
+SECCIÓN:
+EXPLORA EN EL MAPA
+--------------------------------------------------
+
+Mostrar preview del mapa.
+
+Pins LATAWEL.
+
+CTA:
+
+"Explorar mapa"
+
+--------------------------------------------------
+SECCIÓN:
+AGENDA CULTURAL
+--------------------------------------------------
+
+Categorías:
+
+Todos
+Festivales
+Música
+Comida
+Naturaleza
+Cultura
+
+Cards horizontales.
+
+--------------------------------------------------
+SECCIÓN:
+LUGARES CERCA DE TI
+--------------------------------------------------
+
+Cards:
+
+Hostales
+Restaurantes
+Lugares
+Experiencias
+
+--------------------------------------------------
+SECCIÓN:
+INSPÍRATE
+--------------------------------------------------
+
+Contenido generado por viajeros.
+
+Categorías:
+
+Aventura
+Gastronomía
+Cultura
+Naturaleza
+Tips
+
+--------------------------------------------------
+SECCIÓN:
+RESEÑAS DE VIAJEROS
+--------------------------------------------------
+
+Mostrar:
+
+avatar
+nombre
+fecha
+estrellas
+lugar
+comentario
+
+--------------------------------------------------
+SECCIÓN:
+PUBLICA TU LUGAR
+--------------------------------------------------
+
+CTA para negocios.
+
+Headline:
+
+"¿Tienes un lugar que vale la pena descubrir?"
+
+Subcopy:
+
+"Publica tu hostal, restaurante, lugar o experiencia."
+
+CTA:
+
+"Publicar mi lugar"
+
+--------------------------------------------------
+FOOTER
+--------------------------------------------------
+
+Logo
+
+Explorar
+Agenda
+Mapa
+Inspírate
+Mi Viaje
+Comunidad
+
+Publicar lugar
+
+Términos
+Privacidad
+Contacto
+
+latawel.com
+
+============================================================
+12. PANTALLA EXPLORAR
+============================================================
+
+Crear una página de descubrimiento completa.
+
+Header.
+
+Search bar grande.
+
+Filtros:
+
+Todos
+Eventos
+Lugares
+Comida
+Hospedaje
+Cultura
+Naturaleza
+
+Filtros secundarios:
+
+Cerca de mí
+Hoy
+Este fin de semana
+Precio
+Distancia
+
+Grid de resultados.
+
+Cada card:
+
+imagen
+categoría
+nombre
+rating
+ubicación
+precio
+favorito
+
+============================================================
+13. PANTALLA AGENDA
+============================================================
+
+Título:
+
+"Agenda cultural"
+
+Subtexto:
+
+"Encuentra lo que está pasando."
+
+Filtros:
+
+Ciudad
+Fecha
+Categoría
+Precio
+
+Categorías:
+
+Festivales
+Música
+Comida
+Naturaleza
+Cultura
+
+Crear:
+
+- vista cards
+- vista calendario opcional
+- vista móvil optimizada
+
+============================================================
+14. PANTALLA MAPA
+============================================================
+
+Esta es una de las experiencias centrales de LATAWEL.
+
+Pantalla desktop:
+
+MAPA GRANDE
+
+Panel lateral de resultados.
+
+Pins naranja:
+
+#FF4A00
+
+Filtros:
+
+Todos
+Hospedaje
+Comida
+Lugares
+Eventos
+
+Estados:
+
+✓ Visitados
+📍 Cerca de mí
+
+Controles:
+
+Fotos
+Videos
+Audios
+Álbumes
+
+Modo:
+
+"Solo mío"
+
+Cada pin debe abrir una mini ficha.
+
+============================================================
+15. DETALLE DE EVENTO
+============================================================
+
+Hero fotográfico.
+
+Categoría.
+
+Título:
+
+Festival de Música
+
+Ubicación.
+
+Fecha.
+
+Hora.
+
+Precio.
+
+CTA principal:
+
+"Comprar entradas"
+
+CTAs secundarios:
+
+Guardar
+Compartir
+
+Tabs:
+
+Descripción
+Ubicación
+Artistas
+Reseñas
+
+Mostrar mapa.
+
+Mostrar reseñas.
+
+Mostrar contenido relacionado.
+
+============================================================
+16. DETALLE DE LUGAR
+============================================================
+
+Hero image.
+
+Galería.
+
+Categoría.
+
+Nombre.
+
+Rating.
+
+Ubicación.
+
+Descripción.
+
+Servicios.
+
+Información práctica.
+
+CTA:
+
+"Cómo llegar"
+
+CTA:
+
+"Contactar"
+
+Si aplica:
+
+WhatsApp.
+
+Mostrar:
+
+- mapa
+- fotos
+- reseñas
+- experiencias
+- lugares similares
+
+============================================================
+17. PERFIL DE USUARIO
+============================================================
+
+Crear perfil visual tipo viajero.
+
+Elementos:
+
+Avatar
+
+Nombre
+
+Nivel
+
+"LATAWEL Explorer"
+
+Estadísticas:
+
+Lugares
+Eventos
+Reseñas
+Guardados
+
+Secciones:
+
+Mi mapa
+Mis entradas
+Favoritos
+Mis reseñas
+Experiencias
+
+Gamificación sutil.
+
+No convertir la interfaz en un videojuego.
+
+============================================================
+18. MI VIAJE
+============================================================
+
+Crear experiencia personal.
+
+Título:
+
+"Mi viaje"
+
+Mapa personalizado.
+
+Mostrar:
+
+Visitados
+Guardados
+Experiencias
+Eventos
+
+Estadísticas:
+
+lugares visitados
+ciudades
+eventos
+reseñas
+
+La idea:
+
+"Tu mapa de experiencias."
+
+============================================================
+19. COMUNIDAD
+============================================================
+
+Página de comunidad.
+
+Mostrar:
+
+- experiencias
+- reseñas
+- viajeros
+- lugares recomendados
+
+Cards de viajeros.
+
+Mostrar contenido real.
+
+CTA:
+
+"Comparte tu experiencia"
+
+============================================================
+20. INSPÍRATE
+============================================================
+
+Blog visual.
+
+Hero editorial.
+
+Cards.
+
+Categorías:
+
+Aventura
+Gastronomía
+Cultura
+Naturaleza
+Tips
+
+Cada artículo:
+
+imagen
+categoría
+título
+extracto
+autor
+fecha
+
+============================================================
+21. PUBLICAR UN LUGAR
+============================================================
+
+Mantener flujo de 3 pasos existente.
+
+Paso 1:
+
+Información básica
+
+Paso 2:
+
+Datos de contacto
+
+Paso 3:
+
+Confirmación
+
+Categorías:
+
+Hospedaje
+Comida
+Lugar
+Experiencia
+
+CTA:
+
+"Enviar solicitud"
+
+Diseñar el formulario siguiendo el branding LATAWEL.
+
+El producto actual comunica:
+
+- listado básico gratuito
+- contacto por WhatsApp
+- publicación en aproximadamente 48h
+
+No modificar la lógica funcional existente sin necesidad.
+
+============================================================
+22. ICONOGRAFÍA
+============================================================
+
+Usar iconos:
+
+lineales
+geométricos
+simples
+contemporáneos
+
+Categorías:
+
+Eventos
+Lugares
+Entradas
+Comunidad
+Buscar
+Favoritos
+Mapa
+QR
+Notificaciones
+Perfil
+Ubicación
+
+No mezclar estilos de iconos.
+
+============================================================
+23. RESPONSIVE
+============================================================
+
+Diseñar explícitamente:
+
+Desktop:
+1440px
+
+Laptop:
+1280px
+
+Tablet:
+768px
+
+Mobile:
+390px
+375px
+
+No limitarse a hacer shrink del desktop.
+
+Mobile debe ser una experiencia diseñada específicamente.
+
+============================================================
+24. ANIMACIONES
+============================================================
+
+Animaciones sutiles.
+
+Utilizar:
+
+fade
+slide
+scale pequeño
+hover
+microinteracciones
+
+Duración aproximada:
+
+150–300ms
+
+No utilizar:
+
+- animaciones excesivas
+- parallax agresivo
+- efectos 3D
+- scroll hijacking
+- elementos que distraigan
+
+El movimiento debe reforzar:
+
+DESCUBRIMIENTO
++
+NAVEGACIÓN
++
+UBICACIÓN
+
+============================================================
+25. MAPA / ELEMENTOS GEOGRÁFICOS
+============================================================
+
+Los mapas deben respetar la identidad.
+
+Pins:
+
+#FF4A00
+
+Estados activos:
+
+#FF4A00
+
+Estados secundarios:
+
+#0F1419
+
+El mapa debe sentirse integrado al producto.
+
+No utilizar un mapa visualmente dominante que opaque las tarjetas.
+
+============================================================
+26. ACCESIBILIDAD
+============================================================
+
+Cumplir WCAG AA donde sea posible.
+
+Especial atención:
+
+- contraste
+- tamaño de fuente
+- focus states
+- navegación teclado
+- labels
+- aria-label
+- botones
+- formularios
+
+Combinaciones principales:
+
+#FFFFFF sobre #0F1419
+
+#FFFFFF sobre #FF4A00
+
+#0F1419 sobre #FFFFFF
+
+No utilizar gris claro para texto importante.
+
+============================================================
+27. SEO
+============================================================
+
+Mantener y mejorar:
+
+- title
+- meta description
+- Open Graph
+- semantic HTML
+- headings
+- alt text
+- structured data cuando corresponda
+
+Marca:
+
+LATAWEL
+
+Dominio:
+
+latawel.com
+
+No utilizar:
+
+ExploraCO
+
+en ningún elemento visible del nuevo producto.
+
+============================================================
+28. MIGRACIÓN DE IDENTIDAD
+============================================================
+
+IMPORTANTE:
+
+El sitio actual todavía contiene referencias a EXPLORACO.
+
+Realizar una búsqueda global en el proyecto.
+
+Buscar:
+
+ExploraCO
+EXPLORACO
+exploraco
+ExploraCО
+
+y reemplazar las referencias visibles de marca por:
+
+LATAWEL
+
+No realizar reemplazos ciegos que puedan romper:
+
+- URLs
+- API
+- nombres de archivos
+- variables
+- endpoints
+- base de datos
+- integraciones
+
+Primero identificar cada referencia.
+
+Separar:
+
+IDENTIDAD VISUAL
+
+de
+
+IDENTIFICADORES TÉCNICOS
+
+No romper funcionalidades existentes.
+
+============================================================
+29. PRODUCTO EXISTENTE
+============================================================
+
+NO eliminar funcionalidades que ya existen.
+
+El sitio actual contiene:
+
+- exploración
+- agenda cultural
+- mapa interactivo
+- filtros
+- lugares
+- eventos
+- reseñas
+- comunidad
+- perfiles
+- mapa personal
+- Inspírate
+- publicación gratuita de lugares
+
+El rediseño debe preservar la lógica funcional.
+
+Primero:
+
+AUDITAR
+
+Después:
+
+REDISEÑAR
+
+Después:
+
+IMPLEMENTAR
+
+Después:
+
+VERIFICAR
+
+============================================================
+30. COMPONENTES REUTILIZABLES
+============================================================
+
+Crear componentes reutilizables.
+
+Ejemplo:
+
+Header
+MobileHeader
+BottomNav
+Hero
+SearchBar
+CategoryChip
+EventCard
+PlaceCard
+ReviewCard
+ArticleCard
+MapPreview
+MapMarker
+FilterBar
+ProfileCard
+Rating
+Price
+Location
+CTA
+Modal
+Drawer
+FormInput
+FormSelect
+Tabs
+Footer
+
+No duplicar componentes innecesariamente.
+
+============================================================
+31. DESIGN TOKENS
+============================================================
+
+Crear variables centralizadas.
+
+Ejemplo conceptual:
+
+--color-primary: #FF4A00;
+--color-primary-hover: #E84000;
+--color-dark: #0F1419;
+--color-white: #FFFFFF;
+--color-gray: #E5E7EB;
+--color-accent: #FFB84D;
+
+--font-family: 'Poppins', sans-serif;
+
+--radius-sm: 8px;
+--radius-md: 12px;
+--radius-lg: 16px;
+--radius-pill: 999px;
+
+No hardcodear colores repetidamente.
+
+============================================================
+32. REGLAS DE BRANDING INNEGOCIABLES
+============================================================
+
+1. El naranja #FF4A00 es el color principal.
+
+2. #0F1419 es el color estructural oscuro.
+
+3. Poppins es la tipografía oficial.
+
+4. El logo oficial no se modifica.
+
+5. El isotipo no se redibuja.
+
+6. El sistema visual debe ser urbano + digital + explorador.
+
+7. El diseño debe priorizar claridad.
+
+8. Las fotografías deben sentirse reales.
+
+9. Los mapas son parte importante del lenguaje de marca.
+
+10. Las tarjetas son un componente fundamental.
+
+11. Las interfaces deben ser accesibles.
+
+12. Mobile debe recibir diseño específico.
+
+13. No crear estética de lujo.
+
+14. No crear estética corporativa fría.
+
+15. No crear estética infantil.
+
+16. No convertir LATAWEL en una simple ticketera.
+
+17. LATAWEL debe comunicar descubrimiento de ciudad.
+
+============================================================
+33. REFERENCIA VISUAL DEL REDISEÑO
+============================================================
+
+La dirección visual deseada combina:
+
+- header oscuro
+- naranja LATAWEL
+- grandes fotografías
+- cards blancas
+- tipografía Poppins pesada
+- mapas
+- pines
+- chips
+- botones naranjas
+- interfaces limpias
+- bordes redondeados
+- fotografías de experiencias reales
+- composición editorial moderna
+
+El resultado debe sentirse como:
+
+UNA PLATAFORMA DIGITAL DE DESCUBRIMIENTO URBANO.
+
+No como:
+
+UN SIMPLE SITIO WEB TURÍSTICO.
+
+============================================================
+34. PANTALLAS QUE DEBES IMPLEMENTAR
+============================================================
+
+MÍNIMO:
+
+01. Home desktop
+02. Home mobile
+03. Explorar desktop
+04. Explorar mobile
+05. Agenda desktop
+06. Agenda mobile
+07. Mapa desktop
+08. Mapa mobile
+09. Detalle de evento
+10. Detalle de lugar
+11. Perfil
+12. Mi viaje
+13. Comunidad
+14. Inspírate
+15. Detalle de artículo
+16. Publicar lugar
+17. Login / registro
+18. Estados vacíos
+19. 404
+20. Footer / navegación completa
+
+============================================================
+35. ESTADOS DE UI
+============================================================
+
+Diseñar también:
+
+Loading
+
+Skeleton
+
+Empty state
+
+No resultados
+
+Error
+
+Success
+
+Hover
+
+Focus
+
+Active
+
+Disabled
+
+Saved
+
+Visited
+
+Logged in
+
+Logged out
+
+============================================================
+36. CRITERIO DE CALIDAD
+============================================================
+
+Antes de finalizar:
+
+verificar visualmente cada pantalla.
+
+Comprobar:
+
+LOGO
+✓ correcto
+
+COLOR
+✓ #FF4A00 dominante
+
+TIPOGRAFÍA
+✓ Poppins
+
+CONTRASTE
+✓ correcto
+
+RESPONSIVE
+✓ desktop/tablet/mobile
+
+COMPONENTES
+✓ consistentes
+
+MAPA
+✓ integrado
+
+CARDS
+✓ consistentes
+
+BOTONES
+✓ consistentes
+
+ICONOS
+✓ mismo lenguaje
+
+FOTOGRAFÍA
+✓ real / experiencial
+
+NAVIGATION
+✓ clara
+
+CTA
+✓ visible
+
+============================================================
+37. PRIORIDAD DE IMPLEMENTACIÓN
+============================================================
+
+FASE 1
+
+Audit del proyecto actual.
+
+No modificar todavía.
+
+Identificar:
+
+- framework
+- rutas
+- componentes
+- assets
+- APIs
+- base de datos
+- autenticación
+- mapa
+- formularios
+- variables
+- estilos actuales
+
+Entregar un resumen del audit.
+
+------------------------------------------------------------
+
+FASE 2
+
+Crear Design System LATAWEL.
+
+Implementar:
+
+colors
+typography
+spacing
+buttons
+cards
+inputs
+chips
+icons
+header
+footer
+
+------------------------------------------------------------
+
+FASE 3
+
+Rediseñar:
+
+Home
+
+------------------------------------------------------------
+
+FASE 4
+
+Rediseñar:
+
+Explorar
+Agenda
+Mapa
+
+------------------------------------------------------------
+
+FASE 5
+
+Rediseñar:
+
+Detalle evento
+Detalle lugar
+
+------------------------------------------------------------
+
+FASE 6
+
+Rediseñar:
+
+Perfil
+Mi viaje
+Comunidad
+Inspírate
+
+------------------------------------------------------------
+
+FASE 7
+
+Rediseñar:
+
+Publicar lugar
+Login
+Estados
+
+------------------------------------------------------------
+
+FASE 8
+
+Responsive.
+
+------------------------------------------------------------
+
+FASE 9
+
+QA.
+
+============================================================
+38. REGLA FUNDAMENTAL
+============================================================
+
+NO romper funcionalidad existente para conseguir el nuevo diseño.
+
+El objetivo es:
+
+MISMO PRODUCTO
++
+MEJOR EXPERIENCIA
++
+NUEVA IDENTIDAD LATAWEL
++
+SISTEMA VISUAL CONSISTENTE
+
+============================================================
+39. RESULTADO FINAL ESPERADO
+============================================================
+
+Cuando el proyecto esté terminado, latawel.com debe sentirse como:
+
+"LATAWEL — Tus eventos, tus entradas."
+
+Una plataforma urbana y digital donde una persona puede:
+
+ENCONTRAR
+↓
+EXPLORAR
+↓
+GUARDAR
+↓
+VIVIR
+↓
+COMPARTIR
+
+eventos, lugares y experiencias.
+
+La interfaz debe ser reconocible inmediatamente como LATAWEL.
+
+============================================================
+40. NO TOMAR DECISIONES DE MARCA POR CUENTA PROPIA
+============================================================
+
+Si una decisión visual contradice el branding proporcionado:
+
+NO improvisar.
+
+Utilizar primero:
+
+1. Logo oficial
+2. Paleta oficial
+3. Poppins
+4. Sistema visual
+5. Reglas del branding
+6. Estructura funcional existente
+
+Si existe una ambigüedad real:
+
+detener esa decisión concreta,
+explicarla,
+y solicitar aprobación.
+
+No modificar la identidad por iniciativa propia.

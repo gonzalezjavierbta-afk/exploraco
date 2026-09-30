@@ -1,4 +1,4 @@
-/* mapa-tiles.js - ExploraCO
+/* mapa-tiles.js - LATAWEL
  * Capa base de Leaflet con proveedores de respaldo (A3).
  * El sintoma "se ven pines pero no el mapa base" ocurre cuando el proveedor
  * de tiles falla (red, adblock, bloqueo del CDN). Este helper monta la capa
@@ -71,13 +71,13 @@
     var aviso = document.createElement('div');
     aviso.className = 'mt-aviso';
     aviso.setAttribute('role', 'status');
-    aviso.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:800;max-width:260px;padding:14px 16px;background:rgba(15,23,42,.94);border:1px solid rgba(232,160,32,.5);border-radius:12px;color:#fff;font-family:Outfit,sans-serif;font-size:13px;text-align:center';
+    aviso.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:800;max-width:260px;padding:14px 16px;background:rgba(15,23,42,.94);border:1px solid rgba(255,74,0,.5);border-radius:12px;color:#fff;font-family:Outfit,sans-serif;font-size:13px;text-align:center';
     var msj = document.createElement('div');
     msj.textContent = 'No pudimos cargar el mapa base.';
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = 'Reintentar';
-    btn.style.cssText = 'margin-top:10px;padding:7px 14px;background:#E8A020;color:#111;border:none;border-radius:8px;font-weight:700;cursor:pointer';
+    btn.style.cssText = 'margin-top:10px;padding:7px 14px;background:#FF4A00;color:#0F1419;border:none;border-radius:8px;font-weight:700;cursor:pointer';
     btn.onclick = function () { if (typeof onRetry === 'function') { onRetry(); } };
     aviso.appendChild(msj);
     aviso.appendChild(btn);

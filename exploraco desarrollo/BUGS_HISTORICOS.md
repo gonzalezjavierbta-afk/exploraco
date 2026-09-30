@@ -1653,3 +1653,13 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Blindaje / requisito operativo:** requiere REINICIAR OpenCode para recargar los agentes (el servidor los cachea al arrancar; ver BUG-086 / BUG-CONFIG-2).
 **Estado:** CERRADO (2026-09-29). Ver `TASKS.md` TSK-162.
 
+## BUG-093: `manifest.json` declara `latawel-simbolo.png` como 192x192 y 512x512 cuando el archivo real mide 1277x1232
+
+**Severidad:** BAJA / MEDIA (deuda de identidad PWA: iconos de instalacion declarados con tamanos que no coinciden con el raster real; no rompe runtime web).
+**Contexto:** detectado en el pase de cierre del rebranding LATAWEL (2026-09-30, ADR-073 / TSK-164) al auditar los assets contra el archivo real (ADR-006). La generacion de assets acepto como deuda la falta de SVG maestro (`scripts/assets/build-brand-assets.ps1`).
+**Sintoma:** el `manifest.json` de LATAWEL apunta a `/assets/brand/latawel-simbolo.png` para dos entradas `icons` con `sizes: "192x192"` y `sizes: "512x512"`, pero es el MISMO archivo en ambas y su dimension real no coincide con ninguna de las dos declaradas. Los navegadores/PWA pueden descargar un raster de 1277x1232 etiquetado como 512x512 (desperdicio de bytes y proporcion ligeramente no cuadrada, 1277 vs 1232 = ~3,6% de diferencia) o rechazar el icono por mismatch de tamano.
+**Causa raiz:** no existe un asset de isotipo cuadrado (SVG maestro ni PNG cuadrado 512x512/192x192); se publico el simbolo disponible (1277x1232, no cuadrado) y se declaro en el manifest con dos tamanos arbitrarios en lugar de generar derivados a los tamanos exactos.
+**Evidencia (ADR-006):** lectura de los PNG sobre el archivo real: `latawel-simbolo.png` = **1277x1232**; `favicon-32.png` = 32x32; `favicon-180.png` = 180x180; `favicon-16.png` = 16x16; `og/latawel-og-1200x630.png` = 1200x630. `manifest.json` declara el simbolo como `192x192` y `512x512` (dos entradas, mismo `src`).
+**Correccion pendiente:** generar PNG cuadrados 192x192 y 512x512 (idealmente desde el SVG maestro cuando exista) y apuntar cada entrada del manifest a su archivo con el tamano real declarado; alternativamente, una sola entrada con el tamano real del archivo.
+**Estado:** ABIERTO (2026-09-30). Registrado en la deuda de TSK-164 / ADR-073; no bloquea el deploy de identidad.
+

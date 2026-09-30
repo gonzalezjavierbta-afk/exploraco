@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#E8A020">
+  <meta name="theme-color" content="#FF4A00">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Agenda Cultural Colombia 2025–2026 – ExploraCO</title>
+<title>Agenda Cultural Colombia 2025–2026 | LATAWEL</title>
 <meta name="description" content="Calendario completo de festivales, eventos culturales, gastronómicos y de naturaleza en Colombia.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--black:#111;--sky:#0A1628;--sand:#F5E6D0;--bg:#F8F7F3;--border:#E5E3DD;--muted:#888}
+:root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--black:#0F1419;--sky:#0F1419;--sand:#E5E7EB;--bg:#E5E7EB;--border:#E5E7EB;--muted:#888}
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-height:100vh}
 
 /* NAV */
 .topbar{background:var(--black);border-bottom:3px solid var(--gold);padding:0 4%;display:flex;align-items:center;height:52px;gap:0;position:sticky;top:0;z-index:100}
 .tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:4px;color:#fff;text-decoration:none}
-.tl em{color:var(--gold);font-style:normal}
+.tl img{display:block;height:30px;width:auto}
 .tsep{width:1px;height:18px;background:rgba(255,255,255,.15);margin:0 16px}
 .tbc{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px}
 .tbc a{color:rgba(255,255,255,.4);text-decoration:none}
@@ -80,7 +80,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 .ev-body{padding:8px 14px 12px;flex:1}
 .ev-details{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .ev-detail{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px}
-.ev-featured-badge{display:inline-block;background:var(--gold-l);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.ev-featured-badge{display:inline-block;background:var(--gold-l);border:1px solid rgba(255,74,0,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
 .ev-cta{display:inline-block;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;margin:0 14px 12px;transition:transform .15s}
 .ev-card:hover .ev-cta{transform:translateX(3px)}
 .ev-cta.external{color:var(--muted);font-size:9px;font-weight:700}
@@ -107,7 +107,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 .ds-nav{border:1.5px solid var(--border);background:#fff;border-radius:3px;width:28px;height:28px;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;flex-shrink:0}
 .ds-nav:hover{border-color:var(--gold);color:var(--gold)}
 .ev-range{font-size:10px;color:var(--gold);font-weight:700}
-.ev-curso{display:inline-block;background:var(--gold-l);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-left:6px}
+.ev-curso{display:inline-block;background:var(--gold-l);border:1px solid rgba(255,74,0,.3);color:var(--gold);font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-left:6px}
 
 @media(max-width:600px){.ah-title{font-size:32px}.month-events{grid-template-columns:1fr}.filters-bar{flex-direction:column;align-items:flex-start}.search-wrap{margin-left:0;width:100%}.search-inp{width:100%}}
 
@@ -121,11 +121,11 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 .mobile-drawer.open{transform:translateX(0)}
 .md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
 .md-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff}
-.md-logo em{color:var(--gold);font-style:normal}
+.md-logo img{display:block;height:30px;width:auto}
 .md-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:4px;line-height:1}
 .md-links{display:flex;flex-direction:column;padding:12px 0;flex:1;overflow-y:auto}
 .md-link{display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:15px;font-weight:500;color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.04);transition:color .12s,background .12s}
-.md-link:hover{color:var(--gold);background:rgba(232,160,32,.06)}
+.md-link:hover{color:var(--gold);background:rgba(255,74,0,.06)}
 .md-link-icon{font-size:18px;width:24px;text-align:center}
 .md-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06)}
 .md-back-btn{display:block;text-align:center;padding:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;text-decoration:none}
@@ -151,11 +151,18 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 }
 
 </style>
+
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
+
+<meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
 </head>
 <body>
 
 <nav class="topbar">
-  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <a href="index.html" class="tl"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
   <div class="tsep"></div>
   <div class="tbc">
     <a href="index.html">Inicio</a><span>›</span><span>Agenda Cultural</span>
@@ -176,7 +183,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:#1a1a1a;min-heig
 <!-- Mobile drawer -->
 <div class="mobile-drawer" id="mobile-drawer">
   <div class="md-header">
-    <div class="md-logo">EXPLORA<em>CO</em></div>
+    <div class="md-logo"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></div>
     <button class="md-close" onclick="toggleDrawer()">✕</button>
   </div>
   <div class="md-links">
@@ -306,7 +313,7 @@ function catStyle(cat) {
     naturaleza:{bg:'#F0FDF4',color:'#15803d'},
     cultura:  {bg:'#FDF2F8',color:'#BE185D'},
   };
-  return styles[cat] || {bg:'#F8F7F3',color:'#555'};
+  return styles[cat] || {bg:'#E5E7EB',color:'#555'};
 }
 
 function render() {

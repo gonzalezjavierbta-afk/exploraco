@@ -1,4 +1,4 @@
-/* map-picker.js - Modulo compartido de mapa Leaflet para ExploraCO
+/* map-picker.js - Modulo compartido de mapa Leaflet para LATAWEL
  *
  * Encapsula la logica que antes vivia inline en admin.html:
  *   - mini-mapa con pin draggable sincronizado a inputs lat/lng
@@ -197,7 +197,7 @@
       var query = ciudad + ', Colombia';
       root.fetch('https://nominatim.openstreetmap.org/search?format=json&q='
         + encodeURIComponent(query) + '&limit=1', {
-          headers: { 'Accept-Language': 'es', 'User-Agent': 'ExploraCO/1.0' }
+          headers: { 'Accept-Language': 'es', 'User-Agent': 'LATAWEL/1.0' }
         })
         .then(function (r) { return r.json(); })
         .then(function (results) {

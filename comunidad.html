@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Comunidad de viajeros – ExploraCO</title>
-<meta name="description" content="Únete a la comunidad de viajeros de ExploraCO. Chat, feed, planes colectivos y matching con otros viajeros. Gana puntos y desbloquea badges.">
+<title>Comunidad de viajeros | LATAWEL</title>
+<meta name="description" content="Únete a la comunidad de viajeros de LATAWEL. Chat, feed, planes colectivos y matching con otros viajeros. Gana puntos y desbloquea badges.">
 <meta name="robots" content="index, follow">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#E8A020">
+<meta name="theme-color" content="#FF4A00">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="mapa-cultural.css?v=8">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#E8A020;--gold-l:rgba(232,160,32,.1);--gold-d:#C8860A;--black:#111;--bg:#F8F7F3;--white:#fff;--border:#E5E3DD;--muted:#777;--text:#1a1a1a;--sand:#F5E6D0}
+:root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
 body{font-family:'Outfit',sans-serif;background:var(--black);color:#fff;min-height:100vh;display:flex;flex-direction:column}
 /* ── NAV ── */
 nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;padding:0 4%;position:sticky;top:0;z-index:300;gap:14px;flex-shrink:0}
 .tl{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
-.tl em{color:var(--gold);font-style:normal}
+.tl img{display:block;height:30px;width:auto}
 .tsep{width:1px;height:24px;background:rgba(255,255,255,.15)}
 .nav-label{font-size:11px;color:rgba(255,255,255,.5)}
 .nav-back{margin-left:auto;padding:6px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.6);font-size:10px;font-weight:700;text-decoration:none;text-transform:uppercase;letter-spacing:.8px;transition:all .15s}
@@ -31,8 +31,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #gate{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--black)}
 .gate-inner{max-width:540px;width:100%;text-align:center}
 .gate-logo{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;letter-spacing:4px;color:#fff;margin-bottom:6px}
-.gate-logo em{color:var(--gold);font-style:normal}
-.gate-badge{display:inline-block;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.3);color:var(--gold);font-size:10px;font-weight:700;padding:4px 14px;border-radius:20px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:18px}
+.gate-logo img{display:block;height:30px;width:auto}
+.gate-badge{display:inline-block;background:rgba(255,74,0,.15);border:1px solid rgba(255,74,0,.3);color:var(--gold);font-size:10px;font-weight:700;padding:4px 14px;border-radius:20px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:18px}
 .gate-title{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:900;line-height:1.05;color:#fff;margin-bottom:10px}
 .gate-title em{color:var(--gold);font-style:normal}
 .gate-sub{font-size:14px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:28px;max-width:420px;margin-left:auto;margin-right:auto}
@@ -42,7 +42,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .gp-icon{font-size:24px;flex-shrink:0}
 .gp-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
 .gp-desc{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5}
-.gp-xp{display:inline-block;background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.2);color:var(--gold);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.gp-xp{display:inline-block;background:rgba(255,74,0,.15);border:1px solid rgba(255,74,0,.2);color:var(--gold);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
 /* Levels preview */
 .gate-levels{display:flex;gap:6px;justify-content:center;margin-bottom:24px;flex-wrap:wrap}
 .gate-level{display:flex;align-items:center;gap:5px;padding:5px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;font-size:11px;color:rgba(255,255,255,.6)}
@@ -82,7 +82,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* Chat */
 .chat-rooms{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .chat-room{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px}
-.chat-room:hover,.chat-room.on{background:rgba(232,160,32,.08);border-color:rgba(232,160,32,.2)}
+.chat-room:hover,.chat-room.on{background:rgba(255,74,0,.08);border-color:rgba(255,74,0,.2)}
 .cr-icon{font-size:20px;flex-shrink:0}
 .cr-info{flex:1;min-width:0}
 .cr-name{font-size:12px;font-weight:700;color:#fff}
@@ -95,7 +95,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .chat-msg.own{flex-direction:row-reverse}
 .msg-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;flex-shrink:0}
 .msg-bubble{max-width:70%;padding:8px 12px;border-radius:10px;font-size:11px;line-height:1.5;color:#fff;background:rgba(255,255,255,.08)}
-.chat-msg.own .msg-bubble{background:rgba(232,160,32,.2);border:1px solid rgba(232,160,32,.2)}
+.chat-msg.own .msg-bubble{background:rgba(255,74,0,.2);border:1px solid rgba(255,74,0,.2)}
 .msg-time{font-size:9px;color:rgba(255,255,255,.25);margin-top:3px;text-align:right}
 .chat-input-row{display:flex;gap:8px}
 .chat-inp{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:10px 12px;font-size:12px;color:#fff;font-family:'Outfit',sans-serif;outline:none;transition:border-color .15s}
@@ -109,14 +109,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* Planes */
 .planes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .plan-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;cursor:pointer;transition:all .15s}
-.plan-card:hover{border-color:rgba(232,160,32,.3);background:rgba(232,160,32,.04)}
+.plan-card:hover{border-color:rgba(255,74,0,.3);background:rgba(255,74,0,.04)}
 .plan-dest{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px}
 .plan-dates{font-size:10px;color:var(--gold);margin-bottom:8px}
 .plan-members{display:flex;gap:-6px;margin-bottom:8px}
 .plan-av{width:24px;height:24px;border-radius:50%;border:2px solid var(--black);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;margin-left:-6px;first:margin-left:0}
 .plan-av:first-child{margin-left:0}
 .plan-meta{font-size:10px;color:rgba(255,255,255,.35)}
-.plan-join-btn{width:100%;padding:8px;background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;margin-top:10px;transition:all .15s;font-family:'Outfit',sans-serif}
+.plan-join-btn{width:100%;padding:8px;background:transparent;border:1px solid rgba(255,74,0,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;margin-top:10px;transition:all .15s;font-family:'Outfit',sans-serif}
 .plan-join-btn:hover,.plan-join-btn.joined{background:var(--gold);border-color:var(--gold);color:var(--black)}
 /* Ranking / leaderboard */
 .lb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -141,7 +141,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* Badges */
 .badges-grid-comm{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .bgc-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
-.bgc-card.earned{border-color:rgba(232,160,32,.3);background:rgba(232,160,32,.06)}
+.bgc-card.earned{border-color:rgba(255,74,0,.3);background:rgba(255,74,0,.06)}
 .bgc-emoji{font-size:28px;margin-bottom:6px}
 .bgc-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
 .bgc-desc{font-size:9px;color:rgba(255,255,255,.35);line-height:1.4}
@@ -151,7 +151,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .xph-label{flex:1;font-size:11px;color:rgba(255,255,255,.7)}
 .xph-xp{font-size:13px;font-weight:900;color:var(--gold);flex-shrink:0}
 /* XP toast */
-#xp-toast-comm{position:fixed;bottom:20px;right:20px;background:#111;color:#E8A020;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(232,160,32,.3)}
+#xp-toast-comm{position:fixed;bottom:20px;right:20px;background:#0F1419;color:#FF4A00;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(255,74,0,.3)}
 /* ── MAPA AUDIOVISUAL (ADR-004 scoped) ── */
 /* Chip base compartido: filtros del mapa y chips de orden del tab AV
    (un solo bloque, sin duplicar estilos) */
@@ -177,7 +177,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* MODAL ÁLBUM MAPA AV (FIX 4, ADR-004 scoped) */
 .av-album-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
 .av-album-modal.on{display:flex}
-.av-album-box{background:var(--black);border:1px solid rgba(232,160,32,.3);border-radius:14px;width:100%;max-width:780px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.av-album-box{background:var(--black);border:1px solid rgba(255,74,0,.3);border-radius:14px;width:100%;max-width:780px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .av-album-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);flex-shrink:0}
 .av-album-bar-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
 .av-album-close{background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;width:32px;height:32px;color:rgba(255,255,255,.7);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit;line-height:1}
@@ -194,14 +194,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .av-album-photo-title{font-size:11px;font-weight:700;color:#fff;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .av-album-photo-author{font-size:10px;color:rgba(255,255,255,.45)}
 .av-album-photo-votos{font-size:10px;color:var(--gold);font-weight:700;margin-top:2px}
-.av-album-com-btn{background:rgba(232,160,32,.08);border:1px solid rgba(232,160,32,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center}
-.av-album-com-btn:hover{background:rgba(232,160,32,.18)}
+.av-album-com-btn{background:rgba(255,74,0,.08);border:1px solid rgba(255,74,0,.25);color:var(--gold);border-radius:6px;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;transition:background .15s;text-align:center}
+.av-album-com-btn:hover{background:rgba(255,74,0,.18)}
 .av-album-comments{width:100%}
 @media (max-width:540px){.av-album-modal{padding:8px}.av-album-grid{grid-template-columns:repeat(2,1fr);gap:8px}}
 /* TAB AUDIOVISUAL (albumes + feed de media, ADR-017) */
 .av-sec-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 10px}
 .av-album-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;overflow:hidden;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
-.av-album-card:hover{border-color:rgba(232,160,32,.35);background:rgba(232,160,32,.04)}
+.av-album-card:hover{border-color:rgba(255,74,0,.35);background:rgba(255,74,0,.04)}
 .av-album-card img{width:100%;aspect-ratio:16/10;object-fit:cover;background:#222;display:block}
 .av-album-card-body{padding:10px 12px;display:flex;flex-direction:column;gap:4px;flex:1}
 .av-album-card-title{font-size:12px;font-weight:700;color:#fff;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -222,9 +222,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
    estilos coherentes con la paleta del tab (var(--gold), Barlow Condensed). */
 .av-feed-actions{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;width:100%;margin-top:2px}
 .av-act{background:transparent;border:1px solid rgba(255,255,255,.14);border-radius:6px;color:rgba(255,255,255,.62);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 9px;transition:all .15s;display:inline-flex;align-items:center;gap:4px;line-height:1}
-.av-act:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
+.av-act:hover{border-color:rgba(255,74,0,.45);color:var(--gold)}
 .av-act:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.av-act.on{background:rgba(232,160,32,.14);border-color:rgba(232,160,32,.5);color:var(--gold)}
+.av-act.on{background:rgba(255,74,0,.14);border-color:rgba(255,74,0,.5);color:var(--gold)}
 .av-act:disabled{opacity:.55;cursor:default}
 .av-act-save.on{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.45);color:#22C55E}
 .av-feed-comments{width:100%;margin-top:4px}
@@ -234,10 +234,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pand-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;margin-bottom:12px}
 .pand-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:#fff;margin-bottom:4px}
 .pand-meta{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px}
-.pand-fama{display:inline-flex;align-items:center;gap:4px;background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.2);border-radius:4px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px}
+.pand-fama{display:inline-flex;align-items:center;gap:4px;background:rgba(255,74,0,.1);border:1px solid rgba(255,74,0,.2);border-radius:4px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px}
 .pand-miembro{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
 .pand-rol{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:2px 6px;border-radius:3px}
-.pand-rol.fundador{background:rgba(232,160,32,.15);color:var(--gold)}
+.pand-rol.fundador{background:rgba(255,74,0,.15);color:var(--gold)}
 .pand-rol.oficial{background:rgba(59,130,246,.15);color:#3B82F6}
 .pand-rol.miembro{background:rgba(255,255,255,.06);color:rgba(255,255,255,.5)}
 .pand-reto{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;margin-bottom:8px}
@@ -248,43 +248,43 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pand-reto-done{font-size:10px;font-weight:700;color:#22C55E}
 .pand-btn{padding:8px 16px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black);transition:opacity .15s}
 .pand-btn:hover{opacity:.88}
-.pand-btn-outline{background:transparent;border:1px solid rgba(232,160,32,.3);color:var(--gold)}
+.pand-btn-outline{background:transparent;border:1px solid rgba(255,74,0,.3);color:var(--gold)}
 .pand-btn-outline:hover{background:var(--gold);color:var(--black)}
 .pand-btn-danger{background:transparent;border:1px solid rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
 .pand-btn-danger:hover{border-color:#ef4444;color:#ef4444}
 /* ACTIVO OCULTO (Wayfarer, Entrega 016) */
 .ao-podium{display:flex;gap:8px;justify-content:center;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap}
 .ao-pod-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;text-align:center;min-width:110px;flex:1;max-width:180px}
-.ao-pod-item.first{border-color:rgba(232,160,32,.4);background:linear-gradient(135deg,rgba(232,160,32,.1),rgba(255,255,255,.04))}
-.ao-voto{background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 10px;transition:all .15s;font-family:'Outfit',sans-serif}
+.ao-pod-item.first{border-color:rgba(255,74,0,.4);background:linear-gradient(135deg,rgba(255,74,0,.1),rgba(255,255,255,.04))}
+.ao-voto{background:transparent;border:1px solid rgba(255,74,0,.3);border-radius:4px;color:var(--gold);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 10px;transition:all .15s;font-family:'Outfit',sans-serif}
 .ao-voto:hover{background:var(--gold);border-color:var(--gold);color:var(--black)}
 .ao-voto.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
 .ao-voto-contra{background:transparent;border:1px solid rgba(239,68,68,.3);border-radius:4px;color:#ef4444;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;padding:5px 10px;transition:all .15s;font-family:'Outfit',sans-serif}
 .ao-voto-contra:hover{background:#ef4444;border-color:#ef4444;color:#fff}
 /* MIS MAPAS PERSONALIZADOS (modulo compartido mymapa.js) */
-.mmx-card{background:rgba(255,255,255,.03);border:1px solid rgba(232,160,32,.18);border-radius:12px;padding:14px;margin-bottom:18px}
+.mmx-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,74,0,.18);border-radius:12px;padding:14px;margin-bottom:18px}
 .mmx-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .mmx-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#fff}
 .mmx-new{background:var(--gold);border:none;border-radius:5px;padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black);transition:opacity .15s}
 .mmx-new:hover{opacity:.88}
 .mmx-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .mmx-pill{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:6px 12px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
-.mmx-pill:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
-.mmx-pill.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
+.mmx-pill:hover{border-color:rgba(255,74,0,.45);color:var(--gold)}
+.mmx-pill.on{background:rgba(255,74,0,.15);border-color:var(--gold);color:var(--gold)}
 .mmx-pill-n{background:rgba(255,255,255,.12);border-radius:10px;padding:0 6px;font-size:10px;font-weight:700}
 /* Toggle de media del mapa personal (mymapa.js): .mmx-media / .mmx-mbtn.
    Consistente con los .mmx-pill y el tema oscuro de comunidad. */
 .mmx-media{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
 .mmx-media-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.45);margin-right:2px}
 .mmx-mbtn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;transition:all .15s}
-.mmx-mbtn:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
-.mmx-mbtn.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
+.mmx-mbtn:hover{border-color:rgba(255,74,0,.45);color:var(--gold)}
+.mmx-mbtn.on{background:rgba(255,74,0,.15);border-color:var(--gold);color:var(--gold)}
 /* Filtros por categoria del mapa personal (.mmx-cats / .mmx-cbtn).
    Reutiliza el look de .mmx-mbtn y el tema oscuro de comunidad. */
 .mmx-cats{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
 .mmx-cbtn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;color:rgba(255,255,255,.75);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;transition:all .15s}
-.mmx-cbtn:hover{border-color:rgba(232,160,32,.45);color:var(--gold)}
-.mmx-cbtn.on{background:rgba(232,160,32,.15);border-color:var(--gold);color:var(--gold)}
+.mmx-cbtn:hover{border-color:rgba(255,74,0,.45);color:var(--gold)}
+.mmx-cbtn.on{background:rgba(255,74,0,.15);border-color:var(--gold);color:var(--gold)}
 /* Caso "sin media": el modulo puede ocultarlo ([hidden] o display:none)
    o deshabilitar sus botones si no hay pines multimedia. */
 .mmx-media[hidden]{display:none}
@@ -297,17 +297,17 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mmx-editbar{flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 .mmx-eb-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold);letter-spacing:.5px;margin-right:4px}
 .mmx-ebtn{background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:5px;color:rgba(255,255,255,.72);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:5px 10px;cursor:pointer;transition:all .15s}
-.mmx-ebtn:hover{border-color:rgba(232,160,32,.5);color:var(--gold)}
+.mmx-ebtn:hover{border-color:rgba(255,74,0,.5);color:var(--gold)}
 .mmx-ebtn-danger:hover{border-color:rgba(239,68,68,.6);color:#ef4444}
-.mmx-list{margin-top:10px;max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;scrollbar-width:thin;scrollbar-color:rgba(232,160,32,.25) transparent}
+.mmx-list{margin-top:10px;max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;scrollbar-width:thin;scrollbar-color:rgba(255,74,0,.25) transparent}
 .mmx-list-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.45);margin-bottom:2px}
 .mmx-item{display:block;padding:7px 10px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.82);font-size:12px;text-decoration:none;transition:all .15s}
-a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
+a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 .mmx-li-city{color:rgba(255,255,255,.4);font-size:10px}
 .mmx-empty{font-size:11px;color:rgba(255,255,255,.4);padding:8px 2px}
 .mmx-login{background:var(--gold);border:none;border-radius:5px;padding:5px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black)}
 .mmx-pop-link{color:var(--gold);text-decoration:none;font-weight:600}
-.mmx-pop-title{font-weight:700;color:#111;font-size:13px}
+.mmx-pop-title{font-weight:700;color:#0F1419;font-size:13px}
 .mmx-pop-meta{font-size:11px;color:#666;margin-top:1px}
 .mm-personal-modal{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);padding:16px}
 .mm-personal-box{background:#0F172A;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:20px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.5)}
@@ -329,7 +329,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 #cpanel-mercado .mk-casa:hover{background:rgba(255,255,255,.08);color:#fff}
 #cpanel-mercado .mk-casa.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
 #cpanel-mercado .mk-casa-ico{font-size:15px}
-#cpanel-mercado .mk-mia{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(232,160,32,.5);border-radius:999px;padding:1px 7px;color:var(--gold);margin-left:2px}
+#cpanel-mercado .mk-mia{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;border:1px solid rgba(255,74,0,.5);border-radius:999px;padding:1px 7px;color:var(--gold);margin-left:2px}
 #cpanel-mercado .mk-casa.on .mk-mia{border-color:rgba(0,0,0,.35);color:var(--black)}
 #cpanel-mercado .mk-norma{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;margin-bottom:12px}
 #cpanel-mercado .mk-norma-t{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:8px}
@@ -338,7 +338,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 #cpanel-mercado .mk-dato b{color:#fff;font-weight:700}
 #cpanel-mercado .mk-acciones{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 #cpanel-mercado .mk-puntos{margin-left:auto;font-size:11px;color:var(--gold);font-weight:700}
-#cpanel-mercado .mk-form{background:rgba(232,160,32,.05);border:1px solid rgba(232,160,32,.25);border-radius:8px;padding:14px;margin-bottom:12px}
+#cpanel-mercado .mk-form{background:rgba(255,74,0,.05);border:1px solid rgba(255,74,0,.25);border-radius:8px;padding:14px;margin-bottom:12px}
 #cpanel-mercado .mk-form-t{font-size:12px;font-weight:700;color:#fff;margin-bottom:8px}
 #cpanel-mercado .mk-lbl{display:block;font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.6px;margin-bottom:4px}
 #cpanel-mercado .mk-inp{width:100%;flex:none;margin-bottom:8px}
@@ -357,7 +357,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 #cpanel-mercado .mk-of-buy{display:flex;align-items:center;gap:6px;flex-shrink:0}
 #cpanel-mercado .mk-qty{width:64px;flex:none;padding:8px}
 #cpanel-mercado .mk-of-propia{font-size:10px;font-weight:700;color:#22C55E;text-transform:uppercase;letter-spacing:.6px}
-#cpanel-mercado .mk-gate{padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;background:rgba(232,160,32,.05)}
+#cpanel-mercado .mk-gate{padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;background:rgba(255,74,0,.05)}
 #cpanel-mercado .mk-gate-t{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px}
 #cpanel-mercado .mk-gate-d{font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px}
 @media(max-width:540px){
@@ -384,11 +384,11 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 .cm-v61 .cv-voto.contra{border-color:rgba(239,68,68,.5);color:#fca5a5}
 .cm-v61 .cv-voto.abstencion{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.55)}
 .cm-v61 .cv-chipst{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-radius:999px;padding:2px 8px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7)}
-.cm-v61 .cv-chipst.abierta,.cm-v61 .cv-chipst.abierto{border-color:rgba(232,160,32,.5);color:var(--gold)}
+.cm-v61 .cv-chipst.abierta,.cm-v61 .cv-chipst.abierto{border-color:rgba(255,74,0,.5);color:var(--gold)}
 .cm-v61 .cv-chipst.en_proceso{border-color:rgba(59,130,246,.5);color:#93C5FD}
 .cm-v61 .cv-chipst.completado,.cm-v61 .cv-chipst.aprobada,.cm-v61 .cv-chipst.verificada{border-color:rgba(34,197,94,.5);color:#86efac}
 .cm-v61 .cv-chipst.cancelado,.cm-v61 .cv-chipst.rechazada{opacity:.6}
-.cm-v61 .cv-form{background:rgba(232,160,32,.05);border:1px solid rgba(232,160,32,.25);border-radius:8px;padding:14px;margin-bottom:12px}
+.cm-v61 .cv-form{background:rgba(255,74,0,.05);border:1px solid rgba(255,74,0,.25);border-radius:8px;padding:14px;margin-bottom:12px}
 .cm-v61 .cv-lbl{display:block;font-size:9px;color:rgba(255,255,255,.5);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px}
 .cm-v61 .cv-inp{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:9px 11px;font-size:12px;color:#fff;font-family:'Outfit',sans-serif;outline:none;margin-bottom:8px;transition:border-color .15s}
 .cm-v61 .cv-inp:focus{border-color:var(--gold)}
@@ -412,7 +412,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 /* Modal simple reutilizable (silo propio; reemplaza prompt/confirm) */
 #cm-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:1400;align-items:center;justify-content:center;padding:16px}
 #cm-modal.on{display:flex}
-#cm-modal .cm-modal-box{background:#141414;border:1px solid rgba(232,160,32,.4);border-radius:14px;padding:16px;width:100%;max-width:420px;box-sizing:border-box}
+#cm-modal .cm-modal-box{background:#141414;border:1px solid rgba(255,74,0,.4);border-radius:14px;padding:16px;width:100%;max-width:420px;box-sizing:border-box}
 #cm-modal .cm-modal-t{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:var(--gold);margin-bottom:10px}
 #cm-modal .cm-modal-msg{font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:12px}
 #cm-modal .cm-modal-inp{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:9px 11px;font-size:12px;color:#fff;font-family:'Outfit',sans-serif;outline:none;margin-bottom:8px}
@@ -423,11 +423,18 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 #cm-modal .cm-modal-actions .ghost{background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.7)}
 #cm-modal .cm-modal-actions .ghost:hover{border-color:var(--gold);color:var(--gold)}
 </style>
+
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
+
+<meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
 </head>
 <body>
 
 <nav>
-  <a href="index.html" class="tl">EXPLORA<em>CO</em></a>
+  <a href="index.html" class="tl"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
   <div class="tsep"></div>
   <span class="nav-label">👥 Comunidad de viajeros</span>
   <a href="index.html" class="nav-back">← Inicio</a>
@@ -436,7 +443,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 <!-- ─── GATE (login CTA) ─── -->
 <div id="gate">
   <div class="gate-inner">
-    <div class="gate-logo">EXPLORA<em>CO</em></div>
+    <div class="gate-logo"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></div>
     <div class="gate-badge">👥 Comunidad de viajeros</div>
     <h1 class="gate-title">Úñete a la comunidad<br><em>de viajeros</em></h1>
     <p class="gate-sub">Conecta con otros viajeros, gana puntos, desbloquea trofeos y comparte tu Colombia.</p>
@@ -456,7 +463,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
   <!-- User bar -->
   <div class="comm-header">
     <div class="comm-user-bar">
-      <div class="comm-av" id="comm-av" onclick="irMiPerfil()" style="cursor:pointer;background:#1a2e4a;color:#7eb8f0">TÚ</div>
+      <div class="comm-av" id="comm-av" onclick="irMiPerfil()" style="cursor:pointer;background:#0F1419;color:#7eb8f0">TÚ</div>
       <div class="comm-info" onclick="irMiPerfil()" style="cursor:pointer">
         <div class="comm-name" id="comm-name">Viajero</div>
         <div class="comm-level" id="comm-level">0 XP</div>
@@ -470,12 +477,12 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
       <div class="comm-stat"><div class="comm-stat-n" id="comm-visited-n">0</div><div class="comm-stat-l">Visitados</div></div>
     </div>
     <!-- CTA mapas de la comunidad -->
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;background:rgba(232,160,32,.07);border:1px solid rgba(232,160,32,.25);border-radius:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;background:rgba(255,74,0,.07);border:1px solid rgba(255,74,0,.25);border-radius:8px">
       <div style="font-size:11px;color:rgba(255,255,255,.7)">🗺️ Rutas y listas temáticas de otros viajeros</div>
       <a href="mapas.html" style="font-size:10px;font-weight:700;color:var(--gold);text-decoration:none;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0">Explorar mapas →</a>
     </div>
     <!-- GAMING v6.1 (E1): acceso a la guia de XP del hub de comunidad -->
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;background:rgba(232,160,32,.07);border:1px solid rgba(232,160,32,.25);border-radius:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;background:rgba(255,74,0,.07);border:1px solid rgba(255,74,0,.25);border-radius:8px">
       <div style="font-size:11px;color:rgba(255,255,255,.7)">Aprende a ganar XP: fuentes, topes y multiplicadores</div>
       <button type="button" onclick="if(window.ExploraCO&amp;&amp;window.ExploraCO.abrirGuiaXP)window.ExploraCO.abrirGuiaXP()" style="font-size:10px;font-weight:700;color:var(--black);background:var(--gold);border:none;border-radius:5px;padding:8px 14px;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;flex-shrink:0">Como ganar XP</button>
     </div>
@@ -500,7 +507,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 
     <!-- CHAT -->
     <div class="cpanel on" id="cpanel-chat">
-      <div id="chat-lock" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+      <div id="chat-lock" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6">Desbloquea el chat en el nivel <b id="chat-lock-nivel" style="color:var(--gold)">3</b> (<span id="chat-lock-xp">250</span> XP). A medida que avanzas desbloqueas crear salas y moderar el chat.</div>
       </div>
@@ -508,7 +515,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
         <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:8px">Niveles de chat</div>
         <div id="chat-perks-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px"></div>
       </div>
-      <div id="chat-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+      <div id="chat-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Chat bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte a las salas de viajeros.</div>
         <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
@@ -522,7 +529,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <button onclick="closeChatRoom()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:5px 10px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">← Volver</button>
           <div style="font-size:13px;font-weight:700;color:#fff" id="chat-room-title">Chat</div>
-          <button id="chat-mod-hint" style="display:none;margin-left:auto;background:transparent;border:1px solid rgba(232,160,32,.3);border-radius:4px;padding:3px 8px;color:var(--gold);font-size:9px;cursor:default">🛡️ Moderador</button>
+          <button id="chat-mod-hint" style="display:none;margin-left:auto;background:transparent;border:1px solid rgba(255,74,0,.3);border-radius:4px;padding:3px 8px;color:var(--gold);font-size:9px;cursor:default">🛡️ Moderador</button>
         </div>
         <div class="chat-window" id="chat-window"></div>
         <div class="chat-input-row">
@@ -534,7 +541,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 
     <!-- PLANES -->
     <div class="cpanel" id="cpanel-planes">
-      <div id="planes-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+      <div id="planes-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Planes bloqueados</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para crear y unirte a planes de viaje colectivos.</div>
         <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
@@ -543,7 +550,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
         <div style="font-size:12px;color:rgba(255,255,255,.4)">Planes de viaje colectivos</div>
         <button id="plan-create-btn" onclick="createPlan()" style="padding:7px 14px;background:var(--gold);border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:var(--black);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.8px">+ Crear plan</button>
       </div>
-      <div id="plan-form" style="display:none;background:rgba(255,255,255,.04);border:1px solid rgba(232,160,32,.25);border-radius:8px;padding:14px;margin-bottom:12px">
+      <div id="plan-form" style="display:none;background:rgba(255,255,255,.04);border:1px solid rgba(255,74,0,.25);border-radius:8px;padding:14px;margin-bottom:12px">
         <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px">Nuevo plan de viaje</div>
         <input class="chat-inp" id="plan-f-dest" placeholder="Destino (ej: Trek Ciudad Perdida)" style="margin-bottom:8px">
         <input class="chat-inp" id="plan-f-fechas" placeholder="Fechas (ej: 15–18 Mar 2026)" style="margin-bottom:8px">
@@ -594,7 +601,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 
     <!-- PANDILLAS (Gamificacion v4) -->
     <div class="cpanel" id="cpanel-pandillas">
-      <div id="pandillas-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+      <div id="pandillas-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🔒 Parches bloqueados</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para unirte o fundar un parche.</div>
         <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
@@ -627,7 +634,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 
     <!-- ACTIVO OCULTO (Wayfarer, Entrega 016) -->
     <div class="cpanel" id="cpanel-wayfarer">
-      <div id="ao-guest" style="display:none;padding:18px;border:1px dashed rgba(232,160,32,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(232,160,32,.05)">
+      <div id="ao-guest" style="display:none;padding:18px;border:1px dashed rgba(255,74,0,.4);border-radius:8px;text-align:center;margin-bottom:14px;background:rgba(255,74,0,.05)">
         <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px">🕵️ Activo Oculto bloqueado</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:10px">Inicia sesión para proponer, votar y descubrir puntos secretos.</div>
         <button onclick="loginGate()" style="padding:10px 20px;background:var(--gold);border:none;border-radius:5px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;color:var(--black)">🔑 Iniciar sesión</button>
@@ -728,7 +735,7 @@ a.mmx-item:hover{border-color:rgba(232,160,32,.4);color:var(--gold)}
 <script src="mercado.js?v=1"></script>
 <script>
 /* =============================================================
-   COMUNIDAD EXPLORACO — hub de interaccion social
+   COMUNIDAD LATAWEL — hub de interaccion social
    1. Chat (demo local)
    2. Planes (demo local)
    3. Ranking de viajeros (api/usuarios?tipo=leaderboard, con fallback demo)
@@ -761,7 +768,7 @@ var XP_LEVELS = [
   {min:20100,nombre:'Mariscal de Parche',emoji:'\uD83D\uDCA5'},
   {min:22450,nombre:'Cineasta de Territorio',emoji:'\uD83C\uDFA5'},
   {min:24850,nombre:'Inmortal del Mapa',emoji:'\uD83D\uDD25'},
-  {min:27400,nombre:'Gran Maestro ExploraCO',emoji:'\uD83C\uDF96\uFE0F'},
+  {min:27400,nombre:'Gran Maestro LATAWEL',emoji:'\uD83C\uDF96\uFE0F'},
   {min:30050,nombre:'Tejedor de Rutas',emoji:'\uD83D\uDDFA\uFE0F'},
   {min:32800,nombre:'Cronista de Regiones',emoji:'\uD83C\uDF0E'},
   {min:35700,nombre:'Curador de Relatos',emoji:'\uD83D\uDCDC'},
@@ -781,7 +788,7 @@ var XP_LEVELS = [
   {min:86600,nombre:'Semidi\u00f3s del Viaje',emoji:'\u26A1'},
   {min:90950,nombre:'Guardi\u00e1n Ancestral',emoji:'\uD83E\uDDFF'},
   {min:95450,nombre:'Esp\u00edritu del Territorio',emoji:'\uD83C\uDFF5\uFE0F'},
-  {min:100000,nombre:'Mito Eterno ExploraCO',emoji:'\uD83C\uDFC6'},
+  {min:100000,nombre:'Mito Eterno LATAWEL',emoji:'\uD83C\uDFC6'},
 ];
 for(var _li=0;_li<XP_LEVELS.length-1;_li++) XP_LEVELS[_li].max=XP_LEVELS[_li+1].min-1;
 XP_LEVELS[XP_LEVELS.length-1].max=99999;
@@ -992,7 +999,7 @@ function renderChatPerks() {
     var nivelReq = chatPerkNivel(p.k, p.nivel);
     var abierto = capC(p.k);
     var th = XP_LEVELS[nivelReq-1] ? XP_LEVELS[nivelReq-1].min : 0;
-    return '<div style="background:rgba(255,255,255,' + (abierto ? '.06' : '.03') + ');border:1px solid ' + (abierto ? 'rgba(232,160,32,.35)' : 'rgba(255,255,255,.08)') + ';border-radius:8px;padding:10px;text-align:center" title="' + (abierto ? p.nombre + ' \u2713' : 'Requiere nivel ' + nivelReq + ' \u00b7 tu nivel: ' + nivelActual) + '">'
+    return '<div style="background:rgba(255,255,255,' + (abierto ? '.06' : '.03') + ');border:1px solid ' + (abierto ? 'rgba(255,74,0,.35)' : 'rgba(255,255,255,.08)') + ';border-radius:8px;padding:10px;text-align:center" title="' + (abierto ? p.nombre + ' \u2713' : 'Requiere nivel ' + nivelReq + ' \u00b7 tu nivel: ' + nivelActual) + '">'
       + '<div style="font-size:20px;margin-bottom:4px">' + p.icono + '</div>'
       + '<div style="font-size:10px;font-weight:700;color:' + (abierto ? '#fff' : 'rgba(255,255,255,.5)') + '">' + p.nombre + '</div>'
       + '<div style="font-size:9px;margin-top:5px;color:' + (abierto ? '#22C55E' : 'rgba(255,255,255,.4)') + '">'
@@ -1058,11 +1065,11 @@ function renderChatRooms() {
           + '<div class="cr-last">' + esc(lastInfo) + '</div></div>'
           + '<div class="cr-online"></div>';
         if (s.es_oficial) {
-          div.style.borderLeft = '3px solid #E8A020';
-          div.style.background = 'rgba(232,160,32,.08)';
+          div.style.borderLeft = '3px solid #FF4A00';
+          div.style.background = 'rgba(255,74,0,.08)';
           var badge = document.createElement('span');
           badge.textContent = 'OFICIAL';
-          badge.style.cssText = 'font-size:8px;font-weight:800;background:#E8A020;color:#000;padding:1px 5px;border-radius:3px;margin-left:auto;letter-spacing:.5px;flex-shrink:0;';
+          badge.style.cssText = 'font-size:8px;font-weight:800;background:#FF4A00;color:#000;padding:1px 5px;border-radius:3px;margin-left:auto;letter-spacing:.5px;flex-shrink:0;';
           div.appendChild(badge);
         }
         div.onclick = (function(rid){ return function(){ openChatRoom(rid); }; })(s.id);
@@ -1700,7 +1707,7 @@ function retoCardHtml(r) {
 }
 
 function retoFormHtml(pandilla) {
-  return '<div class="pand-card" style="border-color:rgba(232,160,32,.25)">'
+  return '<div class="pand-card" style="border-color:rgba(255,74,0,.25)">'
     + '<div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:8px">⚔️ Crear reto de parche</div>'
     + '<input class="chat-inp" id="reto-titulo" maxlength="150" placeholder="Titulo del reto" style="margin-bottom:8px">'
     + '<select class="chat-inp" id="reto-tipo" style="margin-bottom:8px">'
@@ -1888,10 +1895,10 @@ function rkTopHtml(top, metaMap, iconDef) {
 var RANGO_CASAS_META = {
   condor: { nombre:'Casa Condor', emoji:'\uD83E\uDD85', color:'#3B82F6' },
   jaguar: { nombre:'Casa Jaguar', emoji:'\uD83D\uDC06', color:'#22C55E' },
-  delfin: { nombre:'Casa Delfin', emoji:'\uD83D\uDC2C', color:'#E8A020' }
+  delfin: { nombre:'Casa Delfin', emoji:'\uD83D\uDC2C', color:'#FF4A00' }
 };
 function rkCasaMeta(id) {
-  return RANGO_CASAS_META[String(id || '').toLowerCase()] || { nombre:(id || 'Casa'), emoji:'\uD83C\uDFE0', color:'#E8A020' };
+  return RANGO_CASAS_META[String(id || '').toLowerCase()] || { nombre:(id || 'Casa'), emoji:'\uD83C\uDFE0', color:'#FF4A00' };
 }
 /* TSK-112 / ADR-038: tag de nivelacion runtime por Casa (dominante rojo,
    equilibrada indigo, rezagada verde). No altera los ids de las Casas. */
@@ -2189,7 +2196,7 @@ function renderAudiovisualMarkers() {
 }
 
 function getMediaIcon(type) {
-  var colors = { foto: '#E8A020', video: '#e74c3c', audio: '#9b59b6' };
+  var colors = { foto: '#FF4A00', video: '#e74c3c', audio: '#9b59b6' };
   var icons = { foto: '\uD83D\uDCF7', video: '\u25B6', audio: '\u266B' };
   return L.divIcon({
     className: 'av-marker-icon',

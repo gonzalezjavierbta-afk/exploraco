@@ -10,7 +10,8 @@ const { neon } = require('@neondatabase/serverless');
 const { handleUpload } = require('@vercel/blob/client');
 const crypto = require('crypto');
 
-var BASE = 'https://exploraco.co';
+var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
+var OG_IMAGE = process.env.OG_IMAGE_URL || (BASE + '/assets/brand/og/latawel-og-1200x630.png');
 var STATIC_PAGES = [
   { loc:'/',                        priority:'1.0', freq:'daily'   },
   { loc:'/directorio-hostal.html',  priority:'0.9', freq:'daily'   },
@@ -459,7 +460,7 @@ module.exports = async function handler(req, res) {
         if (br.region && br.region !== br.ciudad) bLoc.push(br.region);
         bLoc.push('Colombia');
         cards += '<a class="dcard" href="/' + bxe(br.slug) + '.html">'
-          + '<div class="dimg" style="background:' + (br.hero_bg || '#223344') + '">'
+          + '<div class="dimg" style="background:' + (br.hero_bg || '#0F1419') + '">'
           + bImg
           + '<span class="dico">' + (br.emoji || bc.emoji) + '</span>'
           + '<span class="dbadge" style="background:' + bc.tbg + ';color:' + bc.tc + '">' + bc.label + '</span>'
@@ -473,8 +474,8 @@ module.exports = async function handler(req, res) {
           + '</div></a>';
       }
       var qEsc = bxe(qRaw);
-      var ogTitle = qRaw ? 'Buscar: ' + qEsc + ' | ExploraCO' : 'ExploraCO - Buscar';
-      var hTitulo = qRaw ? 'Resultados para "' + qEsc + '"' : 'Buscar en ExploraCO';
+      var ogTitle = qRaw ? 'Buscar: ' + qEsc + ' | LATAWEL' : 'Buscar | LATAWEL';
+      var hTitulo = qRaw ? 'Resultados para "' + qEsc + '"' : 'Buscar en LATAWEL';
       var hSub = qRaw
         ? (bRows.length ? bRows.length + ' resultado(s)' : 'Sin resultados')
         : 'Escribe una ciudad, un nombre, una region o una actividad.';
@@ -486,26 +487,32 @@ module.exports = async function handler(req, res) {
       var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
         + '<meta charset="UTF-8">\n'
         + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        + '<link rel="icon" href="/assets/brand/favicon/favicon.ico" sizes="any">\n'
+        + '<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">\n'
+        + '<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">\n'
+        + '<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">\n'
         + '<title>' + ogTitle + '</title>\n'
         + '<meta name="description" content="' + bxe(hSub) + '">\n'
+        + '<meta property="og:site_name" content="LATAWEL">\n'
         + '<meta property="og:title" content="' + ogTitle + '">\n'
         + '<meta property="og:type" content="website">\n'
         + '<meta property="og:url" content="' + BASE + '/buscar?q=' + encodeURIComponent(qRaw) + '">\n'
+        + '<meta property="og:image" content="' + OG_IMAGE + '">\n'
         + '<meta name="robots" content="index, follow">\n'
         + '<link rel="canonical" href="' + BASE + '/buscar?q=' + encodeURIComponent(qRaw) + '">\n'
         + '<style>'
-        + 'body{font-family:\'Outfit\',Arial,sans-serif;margin:0;background:#fbf7f1;color:#111}'
-        + '.btop{background:#101623;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}'
+        + 'body{font-family:\'Outfit\',Arial,sans-serif;margin:0;background:#E5E7EB;color:#0F1419}'
+        + '.btop{background:#0F1419;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}'
         + '.btop a{color:#fff;text-decoration:none;font-weight:800;font-size:20px;letter-spacing:1px}'
-        + '.btop a em{color:#ffb400;font-style:normal}'
+        + '.btop a img{display:block;height:30px;width:auto}'
         + '.bsearch{display:flex;flex:1;min-width:220px}'
-        + '.bsearch input{flex:1;padding:9px 12px;border:1px solid #eee;border-right:0;font-size:14px;outline:none}'
-        + '.bsearch button{background:#ffb400;border:0;color:#101623;font-weight:800;padding:9px 16px;cursor:pointer}'
+        + '.bsearch input{flex:1;padding:9px 12px;border:1px solid #E5E7EB;border-right:0;font-size:14px;outline:none}'
+        + '.bsearch button{background:#FF4A00;border:0;color:#0F1419;font-weight:800;padding:9px 16px;cursor:pointer}'
         + '.bmain{max-width:1060px;margin:0 auto;padding:30px 18px 60px}'
         + '.bh1{font-size:22px;font-weight:800;margin:0 0 6px}'
         + '.bsub{color:#666;font-size:13px;margin-bottom:22px}'
         + '.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:16px}'
-        + '.dcard{display:block;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;transition:transform .15s}'
+        + '.dcard{display:block;background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;transition:transform .15s}'
         + '.dcard:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.08)}'
         + '.dimg{height:150px;position:relative;display:flex;align-items:center;justify-content:center;font-size:40px}'
         + '.dimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}'
@@ -515,16 +522,16 @@ module.exports = async function handler(req, res) {
         + '.dname{font-weight:800;font-size:15px;line-height:1.25}'
         + '.dloc{font-size:12px;color:#777;margin:4px 0 6px}'
         + '.dstars{color:#ddd;font-size:13px;letter-spacing:1px}'
-        + '.dstars .on{color:#ffb400}'
+        + '.dstars .on{color:#FF4A00}'
         + '.dn{color:#999;font-size:11px;margin-left:6px}'
         + '.dprice{font-size:12px;color:#1e7d3c;font-weight:700;margin-top:6px}'
-        + '.bempty{background:#fff;border:1px solid #eee;border-radius:12px;padding:36px 20px;text-align:center;color:#777;font-size:14px}'
-        + '.bempty a{color:#c98a00;font-weight:700}'
-        + '.bfoot{background:#101623;color:#fff;padding:18px 20px;text-align:center;font-size:13px}'
-        + '.bfoot a{color:#ffb400;text-decoration:none;margin:0 8px}'
+        + '.bempty{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:36px 20px;text-align:center;color:#777;font-size:14px}'
+        + '.bempty a{color:#FF4A00;font-weight:700}'
+        + '.bfoot{background:#0F1419;color:#fff;padding:18px 20px;text-align:center;font-size:13px}'
+        + '.bfoot a{color:#FF4A00;text-decoration:none;margin:0 8px}'
         + '@media(max-width:560px){.bh1{font-size:18px}}'
         + '</style>\n</head>\n<body>\n'
-        + '<div class="btop"><a href="/">EXPLORA<em>CO</em></a>'
+        + '<div class="btop"><a href="/"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" style="height:30px;width:auto;display:block"></a>'
         + '<form class="bsearch" action="/buscar" method="get">'
         + '<input type="text" name="q" value="' + qEsc + '" placeholder="Ciudad Perdida, hostal en Cartagena..." aria-label="Buscar">'
         + '<button type="submit">Buscar</button></form></div>\n'
@@ -533,7 +540,7 @@ module.exports = async function handler(req, res) {
         + '<div class="bsub">' + bxe(hSub) + '</div>'
         + hBody
         + '</main>\n'
-        + '<footer class="bfoot">ExploraCO <a href="/sitemap.xml">Sitemap</a></footer>\n'
+        + '<footer class="bfoot">LATAWEL - What to do? <a href="/sitemap.xml">Sitemap</a></footer>\n'
         + '</body>\n</html>\n';
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=3600');
@@ -604,7 +611,7 @@ if (tipo === 'blog-lista') {
         var fecha= bFecha(br.actualizado_en);
         var loc  = [br.ciudad, br.region].filter(Boolean).join(', ');
         var excerpt = bExcerpt(br.lead, br.descripcion);
-        var grad = br.hero_bg || 'linear-gradient(135deg,#3a0a1a,#4a1a2a)';
+        var grad = br.hero_bg || 'linear-gradient(135deg,#0F1419,#FF4A00)';
         var img  = br.foto_hero
           ? '<img src="'+bxe(br.foto_hero)+'" alt="'+bxe(br.nombre)+'" loading="lazy">'
           : '';
@@ -649,49 +656,55 @@ if (tipo === 'blog-lista') {
       var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
         + '<meta charset="UTF-8">\n'
         + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        + '<title>Inspirate | Blog de viajes por Colombia - ExploraCO</title>\n'
+        + '<link rel="icon" href="/assets/brand/favicon/favicon.ico" sizes="any">\n'
+        + '<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">\n'
+        + '<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">\n'
+        + '<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">\n'
+        + '<title>Inspirate | Blog de viajes por Colombia | LATAWEL</title>\n'
         + '<meta name="description" content="Guias de viaje por Colombia escritas por viajeros reales: rutas, consejos y secretos de cada destino. Busca por tema o palabra clave.">\n'
-        + '<meta property="og:title" content="Inspirate | Blog de viajes por Colombia - ExploraCO">\n'
+        + '<meta property="og:site_name" content="LATAWEL">\n'
+        + '<meta property="og:title" content="Inspirate | Blog de viajes por Colombia | LATAWEL">\n'
         + '<meta property="og:type" content="website">\n'
         + '<meta property="og:url" content="'+BASE+'/blog.html">\n'
+        + '<meta property="og:image" content="'+OG_IMAGE+'">\n'
         + '<meta name="robots" content="index, follow">\n'
         + '<link rel="canonical" href="'+BASE+'/blog.html">\n'
         + '<style>'
-        + 'body{font-family:\'Outfit\',Arial,sans-serif;margin:0;background:#fbf7f1;color:#111}'
-        + '.bltop{background:#101623;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}'
+        + 'body{font-family:\'Outfit\',Arial,sans-serif;margin:0;background:#E5E7EB;color:#0F1419}'
+        + '.bltop{background:#0F1419;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}'
         + '.bltop a.logo{color:#fff;text-decoration:none;font-weight:800;font-size:20px;letter-spacing:1px}'
-        + '.bltop a.logo em{color:#ffb400;font-style:normal}'
+        + '.bltop a.logo img{display:block;height:30px;width:auto}'
         + '.blwrap{max-width:1060px;margin:0 auto;padding:34px 18px 60px}'
         + '.blhead h1{font-size:26px;font-weight:800;margin:0 0 4px}'
         + '.blhead p{color:#666;font-size:13px;margin:0 0 18px}'
         + '.blsearch{display:flex;max-width:480px;margin-bottom:16px}'
-        + '.blsearch input{flex:1;padding:10px 14px;border:1.5px solid #e2d9cc;border-right:0;border-radius:8px 0 0 8px;font-size:14px;outline:none;background:#fff}'
-        + '.blsearch input:focus{border-color:#ffb400}'
-        + '.blsearch button{background:#ffb400;border:0;color:#101623;font-weight:800;padding:10px 18px;border-radius:0 8px 8px 0;cursor:pointer;font-size:13px}'
+        + '.blsearch input{flex:1;padding:10px 14px;border:1.5px solid #E5E7EB;border-right:0;border-radius:8px 0 0 8px;font-size:14px;outline:none;background:#fff}'
+        + '.blsearch input:focus{border-color:#FF4A00}'
+        + '.blsearch button{background:#FF4A00;border:0;color:#0F1419;font-weight:800;padding:10px 18px;border-radius:0 8px 8px 0;cursor:pointer;font-size:13px}'
         + '.blchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}'
-        + '.blchip{border:1.5px solid #e2d9cc;background:#fff;color:#111;border-radius:30px;padding:7px 15px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}'
-        + '.blchip.on{background:#101623;border-color:#101623;color:#ffb400}'
+        + '.blchip{border:1.5px solid #E5E7EB;background:#fff;color:#0F1419;border-radius:30px;padding:7px 15px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}'
+        + '.blchip.on{background:#0F1419;border-color:#0F1419;color:#FF4A00}'
         + '.blcount{font-size:12px;color:#999;margin-bottom:14px}'
         + '.blgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px}'
-        + '.blcard{display:block;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s}'
+        + '.blcard{display:block;background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s}'
         + '.blcard:hover{transform:translateY(-3px);box-shadow:0 8px 22px rgba(0,0,0,.08)}'
         + '.blthumb{height:170px;position:relative;display:flex;align-items:center;justify-content:center;font-size:42px}'
         + '.blthumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}'
-        + '.blbadge{position:absolute;top:10px;left:10px;z-index:2;background:#ffb400;color:#101623;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;padding:3px 9px;border-radius:20px}'
-        + '.blcat{position:absolute;bottom:10px;left:10px;z-index:2;background:rgba(16,22,35,.82);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}'
+        + '.blbadge{position:absolute;top:10px;left:10px;z-index:2;background:#FF4A00;color:#0F1419;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;padding:3px 9px;border-radius:20px}'
+        + '.blcat{position:absolute;bottom:10px;left:10px;z-index:2;background:rgba(15,20,25,.82);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}'
         + '.blbody{padding:13px 15px 15px}'
         + '.bltitle{font-weight:800;font-size:15px;line-height:1.3;margin:0 0 5px}'
         + '.blead{font-size:12.5px;color:#777;line-height:1.5;margin:0 0 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
         + '.blmeta{font-size:11px;color:#aaa;display:flex;gap:12px;flex-wrap:wrap}'
-        + '.blloc{color:#c98a00;font-weight:700}'
-        + '.blmeta-rate{color:#c98a00;font-weight:700}'
-        + '.bempty{background:#fff;border:1px solid #eee;border-radius:12px;padding:38px 20px;text-align:center;color:#777;font-size:14px}'
-        + '.bempty a{color:#c98a00;font-weight:700}'
-        + '.blfoot{background:#101623;color:#fff;padding:18px 20px;text-align:center;font-size:13px}'
-        + '.blfoot a{color:#ffb400;text-decoration:none;margin:0 8px}'
+        + '.blloc{color:#FF4A00;font-weight:700}'
+        + '.blmeta-rate{color:#FF4A00;font-weight:700}'
+        + '.bempty{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:38px 20px;text-align:center;color:#777;font-size:14px}'
+        + '.bempty a{color:#FF4A00;font-weight:700}'
+        + '.blfoot{background:#0F1419;color:#fff;padding:18px 20px;text-align:center;font-size:13px}'
+        + '.blfoot a{color:#FF4A00;text-decoration:none;margin:0 8px}'
         + '@media(max-width:560px){.blhead h1{font-size:21px}.blgrid{grid-template-columns:1fr}}'
         + '</style>\n</head>\n<body>\n'
-        + '<div class="bltop"><a class="logo" href="/">EXPLORA<em>CO</em></a>'
+        + '<div class="bltop"><a class="logo" href="/"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" style="height:30px;width:auto;display:block"></a>'
         + '<span style="font-size:12px;color:#9aa3b2">Inspirate - Blog de viajes</span></div>\n'
         + '<main class="blwrap">'
         + '<div class="blhead"><h1>Inspirate</h1>'
@@ -742,7 +755,7 @@ if (tipo === 'blog-lista') {
         + '  });});'
         + '});'
         + '</script>\n'
-        + '<footer class="blfoot">ExploraCO <a href="/sitemap.xml">Sitemap</a> <a href="/">Inicio</a></footer>\n'
+        + '<footer class="blfoot">LATAWEL - What to do? <a href="/sitemap.xml">Sitemap</a> <a href="/">Inicio</a></footer>\n'
         + '</body>\n</html>\n';
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

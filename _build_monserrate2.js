@@ -11,7 +11,7 @@ const schema = {
   '@type': 'TouristAttraction',
   name: 'Monserrate',
   description: lead,
-  url: 'https://exploraco.co/monserrate2.html',
+  url: 'https://latawel.com/monserrate2.html',
   image: hero,
   address: { '@type': 'PostalAddress', addressLocality: 'Bogotá', addressCountry: 'CO' },
   geo: { '@type': 'GeoCoordinates', latitude: 4.605833, longitude: -74.056389 },
@@ -23,14 +23,14 @@ const ld = '<script type="application/ld+json">\n' + JSON.stringify(schema, null
 const head =
   '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
   + '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
-  + '<title>Monserrate  ExploraCO</title>\n'
+  + '<title>Monserrate  LATAWEL</title>\n'
   + '<meta name="description" content="' + lead + '">\n'
-  + '<meta property="og:title" content="Monserrate  ExploraCO">\n'
+  + '<meta property="og:title" content="Monserrate  LATAWEL">\n'
   + '<meta property="og:description" content="' + lead + '">\n'
   + '<meta property="og:image" content="' + hero + '">\n'
   + '<meta property="og:type" content="place">\n'
-  + '<meta name="theme-color" content="#E8A020">\n'
-  + '<link rel="canonical" href="https://exploraco.co/monserrate2.html">\n'
+  + '<meta name="theme-color" content="#FF4A00">\n'
+  + '<link rel="canonical" href="https://latawel.com/monserrate2.html">\n'
   + ld + '\n'
   + '<style>' + css + '</style>\n</head>\n<body>\n\n'
   + body

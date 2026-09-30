@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Museo de viajero · ExploraCO</title>
-<meta name="description" content="Museo publico de un viajero de ExploraCO: trofeos, cromos, mapas y albumes en una sola sala.">
+<title>Museo de viajero · LATAWEL</title>
+<meta name="description" content="Museo publico de un viajero de LATAWEL: trofeos, cromos, mapas y albumes en una sola sala.">
 <meta name="robots" content="noindex,follow">
 <meta name="theme-color" content="#111111">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,12 +19,12 @@
    raiz (nunca sobre body).
    ============================================================ */
 html,body{margin:0;padding:0}
-body{background:#FBF8F2}
+body{background:#E5E7EB}
 
 .pf-museo *{box-sizing:border-box;margin:0;padding:0}
 .pf-museo{
-  --m-bg:#FBF8F2;--m-panel:#FFFFFF;--m-panel2:#F5F0E6;--m-line:#E7E0D3;
-  --m-ink:#111111;--m-muted:#6E6559;--m-gold:#E8A020;--m-gold-d:#C8860A;
+  --m-bg:#E5E7EB;--m-panel:#FFFFFF;--m-panel2:#F5F0E6;--m-line:#E7E0D3;
+  --m-ink:#111111;--m-muted:#6E6559;--m-gold:#FF4A00;--m-gold-d:#FFB84D;
   --m-shadow:0 1px 2px rgba(17,17,17,.04),0 10px 34px rgba(17,17,17,.07);
   background:var(--m-bg);color:var(--m-ink);
   font-family:'Outfit',sans-serif;font-size:15px;line-height:1.5;
@@ -33,7 +33,7 @@ body{background:#FBF8F2}
 }
 .pf-museo.pf-museo--oscuro{
   --m-bg:#0E0E0E;--m-panel:#171717;--m-panel2:#201E1A;--m-line:#2C2B27;
-  --m-ink:#FBF8F2;--m-muted:#A79E90;
+  --m-ink:#E5E7EB;--m-muted:#A79E90;
   --m-shadow:0 1px 2px rgba(0,0,0,.5),0 12px 40px rgba(0,0,0,.55);
 }
 .pf-museo h1,.pf-museo h2,.pf-museo h3{font-family:'Barlow Condensed',sans-serif;font-weight:900;line-height:1;letter-spacing:.3px}
@@ -42,7 +42,7 @@ body{background:#FBF8F2}
 .pf-museo :focus-visible{outline:2px solid var(--m-gold);outline-offset:2px}
 
 /* ---- Nav (silo propio dentro del museo) ---- */
-.pf-nav{position:sticky;top:0;z-index:60;background:#111;border-bottom:3px solid var(--m-gold);height:52px;display:flex;align-items:center;gap:14px;padding:0 4%;flex-shrink:0}
+.pf-nav{position:sticky;top:0;z-index:60;background:#0F1419;border-bottom:3px solid var(--m-gold);height:52px;display:flex;align-items:center;gap:14px;padding:0 4%;flex-shrink:0}
 .pf-logo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
 .pf-logo em{color:var(--m-gold);font-style:normal}
 .pf-nav-tag{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.42)}
@@ -57,7 +57,7 @@ body{background:#FBF8F2}
 @keyframes pfspin{to{transform:rotate(360deg)}}
 
 .pf-priv{max-width:560px;margin:46px auto;text-align:center;background:var(--m-panel);border:1px solid var(--m-line);border-radius:16px;padding:42px 28px;box-shadow:var(--m-shadow)}
-.pf-priv-ico{width:64px;height:64px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(232,160,32,.12);color:var(--m-gold)}
+.pf-priv-ico{width:64px;height:64px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,74,0,.12);color:var(--m-gold)}
 .pf-priv-ico svg{width:30px;height:30px}
 .pf-priv .pf-name{font-size:clamp(30px,5vw,44px)}
 .pf-priv-msg{color:var(--m-muted);font-size:14px;margin:12px auto 0;max-width:40ch}
@@ -69,14 +69,14 @@ body{background:#FBF8F2}
 .pf-av{position:relative;width:108px;height:108px;border-radius:50%;background:var(--m-panel2);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .pf-av-ini{font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:900;color:var(--m-gold);line-height:1}
 .pf-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.pf-frame--oro{border:4px solid var(--m-gold);box-shadow:0 0 0 5px rgba(232,160,32,.14),0 12px 32px rgba(232,160,32,.22)}
+.pf-frame--oro{border:4px solid var(--m-gold);box-shadow:0 0 0 5px rgba(255,74,0,.14),0 12px 32px rgba(255,74,0,.22)}
 .pf-frame--plata{border:4px solid #A6AFB8;box-shadow:0 0 0 5px rgba(166,175,184,.16),0 12px 32px rgba(166,175,184,.22)}
 .pf-frame--base{border:4px solid var(--m-line)}
-.pf-lvl{position:absolute;right:-4px;bottom:-4px;min-width:34px;height:34px;padding:0 7px;border-radius:999px;background:#111;color:#fff;border:2px solid var(--m-gold);display:inline-flex;align-items:center;justify-content:center;gap:3px;font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:14px}
+.pf-lvl{position:absolute;right:-4px;bottom:-4px;min-width:34px;height:34px;padding:0 7px;border-radius:999px;background:#0F1419;color:#fff;border:2px solid var(--m-gold);display:inline-flex;align-items:center;justify-content:center;gap:3px;font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:14px}
 .pf-lvl svg{width:13px;height:13px;color:var(--m-gold)}
 .pf-hall-main{min-width:0;flex:1;display:flex;flex-direction:column;gap:9px}
 .pf-name{font-size:clamp(32px,5.2vw,50px);line-height:.94}
-.pf-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.35);color:var(--m-gold-d);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
+.pf-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.35);color:var(--m-gold-d);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
 .pf-museo--oscuro .pf-badge{color:var(--m-gold)}
 .pf-badge svg{width:14px;height:14px}
 .pf-chips{display:flex;flex-wrap:wrap;gap:7px}
@@ -85,7 +85,7 @@ body{background:#FBF8F2}
 .pf-chip--exploradores{border-color:rgba(34,197,94,.4);color:#16a34a}
 .pf-chip--curadores{border-color:rgba(59,130,246,.4);color:#2563eb}
 .pf-chip--creadores{border-color:rgba(168,85,247,.4);color:#9333ea}
-.pf-chip--artistas{border-color:rgba(232,160,32,.5);color:var(--m-gold-d)}
+.pf-chip--artistas{border-color:rgba(255,74,0,.5);color:var(--m-gold-d)}
 .pf-museo--oscuro .pf-chip--exploradores{color:#4ade80}
 .pf-museo--oscuro .pf-chip--curadores{color:#60a5fa}
 .pf-museo--oscuro .pf-chip--creadores{color:#c084fc}
@@ -120,7 +120,7 @@ body{background:#FBF8F2}
 .pf-trofeo{position:relative;background:var(--m-panel);border:1px solid var(--m-line);border-radius:11px;padding:15px 14px 13px;display:flex;flex-direction:column;gap:7px;overflow:hidden;box-shadow:var(--m-shadow)}
 .pf-tier--bronce{--tier:#B87333}
 .pf-tier--plata{--tier:#9AA3AD}
-.pf-tier--oro{--tier:#E8A020}
+.pf-tier--oro{--tier:#FF4A00}
 .pf-tier--platino{--tier:#5FD3D0}
 .pf-trofeo::before{content:"";position:absolute;top:0;bottom:0;left:0;width:4px;background:var(--tier,#B87333)}
 .pf-trofeo-ico{color:var(--tier,#B87333)}
@@ -135,12 +135,12 @@ body{background:#FBF8F2}
 
 /* Cromos */
 .pf-cromo{display:flex;align-items:center;gap:11px;background:var(--m-panel);border:1px solid var(--m-line);border-radius:11px;padding:12px;box-shadow:var(--m-shadow)}
-.pf-cromo-thumb{width:42px;height:52px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(150deg,var(--cue,#8B8B8B),#111);border:1px solid rgba(0,0,0,.15)}
+.pf-cromo-thumb{width:42px;height:52px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(150deg,var(--cue,#8B8B8B),#0F1419);border:1px solid rgba(0,0,0,.15)}
 .pf-cromo-thumb svg{width:20px;height:20px}
 .pf-cromo-r-comun{--cue:#8B8B8B}
 .pf-cromo-r-rara{--cue:#2563EB}
 .pf-cromo-r-epica{--cue:#9333EA}
-.pf-cromo-r-legendaria{--cue:#E8A020}
+.pf-cromo-r-legendaria{--cue:#FF4A00}
 .pf-cromo-info{min-width:0}
 .pf-cromo-name{font-size:15px;text-transform:uppercase;line-height:1.05}
 .pf-cromo-meta{display:flex;align-items:center;gap:9px;margin-top:4px;font-size:11px;color:var(--m-muted)}
@@ -153,8 +153,8 @@ body{background:#FBF8F2}
 .pf-map-meta span{display:inline-flex;align-items:center;gap:6px}
 .pf-map-meta svg{width:14px;height:14px;color:var(--m-gold)}
 .pf-map-meta b{color:var(--m-ink);font-size:15px}
-.pf-pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--m-gold);border:2px solid #111;box-shadow:0 3px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
-.pf-pin span{transform:rotate(45deg);display:flex;color:#111}
+.pf-pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--m-gold);border:2px solid #0F1419;box-shadow:0 3px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
+.pf-pin span{transform:rotate(45deg);display:flex;color:#0F1419}
 .pf-pin svg{width:14px;height:14px}
 .pf-museo .leaflet-popup-content-wrapper{border-radius:10px}
 .pf-museo .leaflet-popup-content{margin:11px 13px;font-family:'Outfit',sans-serif;font-size:13px}
@@ -207,11 +207,11 @@ body{background:#FBF8F2}
 .pf-clases-linea{stroke:var(--m-line);stroke-width:2.5}
 .pf-clases-linea.on{stroke:var(--m-gold)}
 .pf-clases-nodo{fill:var(--m-panel2);stroke:var(--m-line);stroke-width:1.6}
-.pf-clases-nodo.disp{fill:rgba(232,160,32,.12);stroke:var(--m-gold);stroke-width:2.5}
+.pf-clases-nodo.disp{fill:rgba(255,74,0,.12);stroke:var(--m-gold);stroke-width:2.5}
 .pf-clases-nodo.on{fill:var(--m-gold);stroke:var(--m-gold)}
 .pf-clases-halo{fill:none;stroke:var(--m-gold);stroke-width:2;animation:pfclasepulso 1.7s ease-in-out infinite}
 .pf-clases-lock{fill:none;stroke:var(--m-muted);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-.pf-clases-check{fill:none;stroke:#111;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.pf-clases-check{fill:none;stroke:#0F1419;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .pf-clases-prog{font-size:11px;color:var(--m-muted);text-align:center;letter-spacing:-.3px}
 @keyframes pfclasepulso{0%,100%{opacity:.22}50%{opacity:.85}}
 @media (max-width:720px){.pf-clases-ramas{grid-template-columns:repeat(2,1fr)}}
@@ -220,7 +220,7 @@ body{background:#FBF8F2}
 .pf-hv-bio{background:var(--m-panel);border:1px solid var(--m-line);border-radius:12px;padding:16px;box-shadow:var(--m-shadow)}
 .pf-hv-bio-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-bottom:9px}
 .pf-hv-bio .pf-bio{max-width:none}
-.pf-hv-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--m-gold-d);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
+.pf-hv-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.4);color:var(--m-gold-d);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
 .pf-museo--oscuro .pf-hv-badge{color:var(--m-gold)}
 .pf-hv-sec{margin-top:20px}
 .pf-hv-h{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:var(--m-muted);margin-bottom:10px}
@@ -236,14 +236,14 @@ body{background:#FBF8F2}
 .pf-actions--center{justify-content:center}
 .pf-btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:6px;border:1px solid var(--m-line);background:var(--m-panel);color:var(--m-ink);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:.9px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:background .15s,border-color .15s,color .15s}
 .pf-btn:hover{border-color:var(--m-gold);color:var(--m-gold-d)}
-.pf-btn--gold{background:var(--m-gold);border-color:var(--m-gold);color:#111}
-.pf-btn--gold:hover{background:var(--m-gold-d);border-color:var(--m-gold-d);color:#111}
+.pf-btn--gold{background:var(--m-gold);border-color:var(--m-gold);color:#0F1419}
+.pf-btn--gold:hover{background:var(--m-gold-d);border-color:var(--m-gold-d);color:#0F1419}
 .pf-btn--ghost{background:transparent}
 .pf-btn:disabled{opacity:.45;cursor:not-allowed}
 .pf-foot{margin-top:46px;padding-top:16px;border-top:1px solid var(--m-line);font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--m-muted);font-family:'Barlow Condensed',sans-serif;font-weight:700}
 
 /* ---- Boton flotante de mensaje ---- */
-.pf-dm-fab{position:fixed;right:22px;bottom:22px;z-index:200;display:inline-flex;align-items:center;gap:9px;padding:13px 21px;border-radius:999px;border:none;background:var(--m-gold);color:#111;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;box-shadow:0 8px 26px rgba(232,160,32,.42);transition:transform .15s,opacity .15s}
+.pf-dm-fab{position:fixed;right:22px;bottom:22px;z-index:200;display:inline-flex;align-items:center;gap:9px;padding:13px 21px;border-radius:999px;border:none;background:var(--m-gold);color:#0F1419;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;box-shadow:0 8px 26px rgba(255,74,0,.42);transition:transform .15s,opacity .15s}
 .pf-dm-fab:hover{transform:translateY(-2px)}
 .pf-dm-fab svg{width:17px;height:17px}
 .pf-dm-fab--off{background:var(--m-panel);color:var(--m-muted);border:1px solid var(--m-line);box-shadow:none;cursor:not-allowed}
@@ -260,7 +260,7 @@ body{background:#FBF8F2}
 .pf-ta{width:100%;min-height:116px;resize:vertical;border:1px solid var(--m-line);border-radius:10px;background:var(--m-bg);color:var(--m-ink);font-family:'Outfit',sans-serif;font-size:14px;line-height:1.55;padding:12px 13px;outline:none}
 .pf-ta:focus{border-color:var(--m-gold)}
 .pf-ta-foot{display:flex;justify-content:flex-end;margin:5px 0 12px;font-size:11px;color:var(--m-muted)}
-.pf-cost{background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.38);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55}
+.pf-cost{background:rgba(255,74,0,.1);border:1px solid rgba(255,74,0,.38);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55}
 .pf-cost b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:var(--m-gold-d)}
 .pf-museo--oscuro .pf-cost b{color:var(--m-gold)}
 .pf-cost span{display:block;margin-top:3px;color:var(--m-muted)}
@@ -285,12 +285,19 @@ body{background:#FBF8F2}
   .pf-museo *{transition:none!important;animation:none!important}
 }
 </style>
+
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
+
+<meta property="og:image" content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
 </head>
 <body>
 <main id="pf-museo" class="pf-museo">
 
   <nav class="pf-nav">
-    <a class="pf-logo" href="/index.html">EXPLORA<em>CO</em></a>
+    <a class="pf-logo" href="/index.html"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
     <span class="pf-nav-tag">Museo de viajero</span>
     <a class="pf-navlink" href="/directorio.html">Directorio</a>
   </nav>
@@ -918,13 +925,13 @@ body{background:#FBF8F2}
       + pfSala('VI', 'Clases', null, '<div id="pf-clases-body"></div>')
       + pfHojaVida()
       + pfActions(d)
-      + '<div class="pf-foot">Museo de ' + esc(u.nombre || 'un viajero') + ' \u00B7 ExploraCO</div>'
+      + '<div class="pf-foot">Museo de ' + esc(u.nombre || 'un viajero') + ' \u00B7 LATAWEL</div>'
     );
     pfInitMap(d.mapa);
     pfMuseoRenderClases(d.arbol);
     pfCargarFotos(u.id);
     pfCargarHojaVida(u.id);
-    document.title = (u.nombre || 'Perfil') + ' \u00B7 ExploraCO';
+    document.title = (u.nombre || 'Perfil') + ' \u00B7 LATAWEL';
     pfSyncDM(d);
   }
 
@@ -970,9 +977,9 @@ body{background:#FBF8F2}
         ta.select();
         var ok = document.execCommand('copy');
         document.body.removeChild(ta);
-        if (ok) hecho(); else pfToast('Copia manualmente: ' + url, '#E8A020');
+        if (ok) hecho(); else pfToast('Copia manualmente: ' + url, '#FF4A00');
       } catch (e) {
-        pfToast('Copia manualmente: ' + url, '#E8A020');
+        pfToast('Copia manualmente: ' + url, '#FF4A00');
       }
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1066,7 +1073,7 @@ body{background:#FBF8F2}
         if (res && res.ok) {
           var bajo = res.bajo_nivel === true || (res.data && res.data.bajo_nivel === true);
           pfCloseDM();
-          pfToast('Mensaje enviado' + (bajo ? ' \u00B7 El costo te bajo de nivel' : ''), bajo ? '#E8A020' : '#16a34a');
+          pfToast('Mensaje enviado' + (bajo ? ' \u00B7 El costo te bajo de nivel' : ''), bajo ? '#FF4A00' : '#16a34a');
           return;
         }
         pfSetErr('pf-dm-err', pfDmMensaje(res && res.error, res && res.__status));
@@ -1082,7 +1089,7 @@ body{background:#FBF8F2}
       var ses = window.ExploraCO && window.ExploraCO.usuario;
       if (!ses) {
         if (window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin('Inicia sesion para enviar un mensaje');
-        else pfToast('Inicia sesion para enviar un mensaje', '#E8A020');
+        else pfToast('Inicia sesion para enviar un mensaje', '#FF4A00');
         return;
       }
       var u = perfil && perfil.usuario ? perfil.usuario : {};

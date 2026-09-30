@@ -86,7 +86,7 @@ const NIVELES = [
   { min: 20100,  mult: 1.821, nombre: 'Mariscal de Parche' },
   { min: 22450,  mult: 1.872, nombre: 'Cineasta de Territorio' },
   { min: 24850,  mult: 1.923, nombre: 'Inmortal del Mapa' },
-  { min: 27400,  mult: 1.974, nombre: 'Gran Maestro ExploraCO' },
+  { min: 27400,  mult: 1.974, nombre: 'Gran Maestro LATAWEL' },
   { min: 30050,  mult: 2.026, nombre: 'Tejedor de Rutas' },
   { min: 32800,  mult: 2.077, nombre: 'Cronista de Regiones' },
   { min: 35700,  mult: 2.128, nombre: 'Curador de Relatos' },
@@ -106,7 +106,7 @@ const NIVELES = [
   { min: 86600,  mult: 2.846, nombre: 'Semidi\u00f3s del Viaje' },
   { min: 90950,  mult: 2.897, nombre: 'Guardi\u00e1n Ancestral' },
   { min: 95450,  mult: 2.949, nombre: 'Esp\u00edritu del Territorio' },
-  { min: 100000, mult: 3.000, nombre: 'Mito Eterno ExploraCO' },
+  { min: 100000, mult: 3.000, nombre: 'Mito Eterno LATAWEL' },
 ];
 
 // XP decimal (ADR-035): las columnas XP son numeric(12,2). Neon entrega
@@ -581,7 +581,7 @@ var crLiderUltimoRefresco = 0;
 // transporte. Patron identico a admin.js:31-44 (fetch con Bearer
 // RESEND_API_KEY).
 var RESEND_API_URL = 'https://api.resend.com/emails';
-var FROM_EMAIL = 'ExploraCO <noreply@exploraco.co>';
+var FROM_EMAIL = 'LATAWEL <noreply@latawel.com>';
 async function sendEmail(to, subject, html) {
   var key = process.env.RESEND_API_KEY;
   if (!key) return { ok: false, reason: 'no_api_key' };
@@ -1996,10 +1996,10 @@ module.exports = async (req, res) => {
           + '&usuario_id=' + encodeURIComponent(evId)
           + '&token=' + encodeURIComponent(evToken);
         var evHtml = '<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:2rem">'
-          + '<h2 style="color:#E8A020">Verifica tu correo en ExploraCO</h2>'
+          + '<h2 style="color:#FF4A00">Verifica tu correo en LATAWEL</h2>'
           + '<p>Hola,</p>'
           + '<p>Para desbloquear la piramide de referidos y las facciones necesitas confirmar tu correo:</p>'
-          + '<p><a href="' + evEnlace + '" style="background:#E8A020;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Verificar correo</a></p>'
+          + '<p><a href="' + evEnlace + '" style="background:#FF4A00;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Verificar correo</a></p>'
           + '<p>Si no pediste este correo, ignoralo.</p>'
           + '</div>';
         if (!process.env.RESEND_API_KEY) {
@@ -2010,7 +2010,7 @@ module.exports = async (req, res) => {
             return res.json({ ok: false, error: 'EMAIL_NO_CONFIGURADO', debug_token: evToken });
           return res.status(503).json({ ok: false, error: 'EMAIL_NO_CONFIGURADO' });
         }
-        var evEnvio = await sendEmail(evUpd[0].email, 'Verifica tu correo en ExploraCO', evHtml);
+        var evEnvio = await sendEmail(evUpd[0].email, 'Verifica tu correo en LATAWEL', evHtml);
         if (!evEnvio.ok)
           return res.status(502).json({ ok: false, error: 'EMAIL_NO_ENVIADO' });
         return res.json({ ok: true, data: { enviado: true } });

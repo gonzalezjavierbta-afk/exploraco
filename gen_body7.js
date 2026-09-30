@@ -18,7 +18,7 @@ const chunk = `
 <a class="rcard" href="/quebrada-la-vieja-bogota.html"><div class="rcimg" style="background-image:url('https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80')"></div><div class="rcbody"><span class="rcbadge">Lugares &amp; Sitios</span><div class="rctitle">Quebrada La Vieja</div><div class="rcmeta">Bogotá - Cundinamarca</div><div class="rcrate"><span class="rcstars"><span class="rcst on">*</span><span class="rcst on">*</span><span class="rcst on">*</span><span class="rcst on">*</span><span class="rcst">*</span></span><span class="rcn">4.7 (540)</span></div></div></a>
 </div></div></section>
 
-<footer class="footer"><div class="flogo">EXPLORA<em>CO</em></div>
+<footer class="footer"><div class="flogo">LATA<em>WEL</em></div>
 <p style="color:rgba(255,255,255,.5);font-size:11px">El directorio turistico mas completo de Colombia</p>
 <div class="fcopy"><a href="/index.html">Inicio</a> &middot; <a href="/directorio-sitio.html">Lugares &amp; Sitios</a></div></footer>
 

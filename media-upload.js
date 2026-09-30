@@ -1,4 +1,4 @@
-/* media-upload.js - ExploraCO
+/* media-upload.js - LATAWEL
  * Cliente compartido de subida de medios a Vercel Blob.
  * Sube el archivo DIRECTO al store (client upload); el backend solo emite un
  * token firmado via /api/utilidades?tipo=blob_upload.

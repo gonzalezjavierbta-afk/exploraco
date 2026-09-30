@@ -1,5 +1,5 @@
 /**
- * ExploraCO — Sistema de Sesión de Viajeros
+ * LATAWEL — Sistema de Sesión de Viajeros
  * Identificación simple por email — sin contraseña
  * Incluir en index.html y en cada página de hostal ANTES del </body>
  *
@@ -214,7 +214,7 @@
   // Unico punto que muestra el estado de cupo (no se copia por accion).
   function mostrarEstadoCupo(estado, color) {
     var txt = fmtEstadoCupo(estado);
-    if (txt) mostrarToast(txt, color || '#E8A020');
+    if (txt) mostrarToast(txt, color || '#FF4A00');
     return txt;
   }
   window.ExploraCO.fmtEstadoCupo = fmtEstadoCupo;
@@ -264,7 +264,7 @@
         id: 'nomada',
         label: 'N\u00f3mada',
         desc: 'Ganas hasta x1.2 por aportar lejos de tu ciudad.',
-        color: '#E8A020',
+        color: '#FF4A00',
         cta: false
       };
     }
@@ -272,7 +272,7 @@
       id: 'co',
       label: 'Local / N\u00f3mada',
       desc: 'Segun la distancia al punto reportado: XP base en tu ciudad o hasta x1.2 por aportar lejos.',
-      color: '#E8A020',
+      color: '#FF4A00',
       cta: false
     };
   }
@@ -367,20 +367,20 @@
     11:'Estratega Comunitario', 12:'Documentalista Visual', 13:'Se\u00f1or del Spot',
     14:'Cart\u00f3grafo de Cine', 15:'Protector del Patrimonio', 16:'Curador de Colombia',
     17:'Mariscal de Parche', 18:'Cineasta de Territorio', 19:'Inmortal del Mapa',
-    20:'Gran Maestro ExploraCO', 21:'Tejedor de Rutas', 22:'Cronista de Regiones',
+    20:'Gran Maestro LATAWEL', 21:'Tejedor de Rutas', 22:'Cronista de Regiones',
     23:'Curador de Relatos', 24:'Guardi\u00e1n de Tradiciones', 25:'Arquitecto de Itinerarios',
     26:'Maestro de Ceremonias', 27:'Cronista Mayor', 28:'Embajador Cultural',
     29:'Historiador de Territorio', 30:'Sabio de los Caminos', 31:'Leyenda Emergente',
     32:'Forjador de Leyendas', 33:'H\u00e9roe del Mapa', 34:'Tit\u00e1n de las Rutas',
     35:'Leyenda Viva', 36:'Mito Naciente', 37:'Semidi\u00f3s del Viaje',
-    38:'Guardi\u00e1n Ancestral', 39:'Esp\u00edritu del Territorio', 40:'Mito Eterno ExploraCO'
+    38:'Guardi\u00e1n Ancestral', 39:'Esp\u00edritu del Territorio', 40:'Mito Eterno LATAWEL'
   };
 
   var ERAS = [
     { nombre:'Caminante', niveles:[1,10], emoji:'\uD83E\uDDED', color:'#6B7280',
       beneficios:['XP por visitas y rese\u00f1as','Acceso al mapa y al chat b\u00e1sico','Creaci\u00f3n de perfil'],
       mecanicas:['Explorar puntos culturales','Registrar visitas con geocerca'] },
-    { nombre:'Explorador', niveles:[11,20], emoji:'\uD83C\uDFC6', color:'#E8A020',
+    { nombre:'Explorador', niveles:[11,20], emoji:'\uD83C\uDFC6', color:'#FF4A00',
       beneficios:['Crear planes de viaje','Emojis premium en el chat','Sello de sala'],
       mecanicas:['Misiones de Casa','Bonos de XP por actividad grupal'] },
     { nombre:'Cronista', niveles:[21,30], emoji:'\uD83D\uDCD6', color:'#6366F1',
@@ -439,7 +439,7 @@
     card.style.cssText = [
       'max-width:420px;width:100%;text-align:center;',
       'background:linear-gradient(160deg,#111827,#0d1117);',
-      'border:1px solid rgba(232,160,32,.55);border-radius:18px;',
+      'border:1px solid rgba(255,74,0,.55);border-radius:18px;',
       'padding:26px 22px;color:#F9FAFB;',
       'box-shadow:0 24px 60px rgba(0,0,0,.55);'
     ].join('');
@@ -451,7 +451,7 @@
 
     var kicker = document.createElement('div');
     kicker.textContent = 'Nivel alcanzado';
-    kicker.style.cssText = 'font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#E8A020;font-weight:700;';
+    kicker.style.cssText = 'font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#FF4A00;font-weight:700;';
     card.appendChild(kicker);
 
     var numero = document.createElement('div');
@@ -517,7 +517,7 @@
     btnCerrar.textContent = 'Cerrar';
     btnCerrar.style.cssText = [
       'width:100%;padding:11px 16px;border-radius:10px;border:0;',
-      'background:#E8A020;color:#0d1117;font-weight:700;font-size:14px;',
+      'background:#FF4A00;color:#0d1117;font-weight:700;font-size:14px;',
       'cursor:pointer;font-family:inherit;'
     ].join('');
     btnCerrar.onclick = function () { expNvl_cerrarModal(); };
@@ -528,7 +528,7 @@
       btnInfo.textContent = 'Ampliar info';
       btnInfo.style.cssText = [
         'width:100%;padding:10px 16px;border-radius:10px;margin-top:8px;',
-        'background:transparent;color:#E8A020;border:1px solid rgba(232,160,32,.55);',
+        'background:transparent;color:#FF4A00;border:1px solid rgba(255,74,0,.55);',
         'font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;'
       ].join('');
       btnInfo.onclick = function () {
@@ -548,7 +548,7 @@
     var previo = document.getElementById('expEra-modal-overlay');
     if (previo && previo.parentNode) previo.parentNode.removeChild(previo);
 
-    var color = eraNueva.color || '#E8A020';
+    var color = eraNueva.color || '#FF4A00';
     var overlay = document.createElement('div');
     overlay.id = 'expEra-modal-overlay';
     overlay.style.cssText = [
@@ -1043,7 +1043,7 @@
         // devuelve el campo como 'xp'. ADR-053 Dec 13.1: un unico helper
         // encadena la acreditacion y deduplica el toast local (sin numero
         // si el servidor manda xp_detalle).
-        toastAccionXp(data, '\u2665 Guardado', '#E8A020');
+        toastAccionXp(data, '\u2665 Guardado', '#FF4A00');
       }
       return data.ok;
     } catch (err) {
@@ -1130,9 +1130,9 @@
 
       if (ahoraGuardado) {
         if (data.xp > 0 || data.xp_detalle) {
-          toastAccionXp(data, '\u2665 Guardado', '#E8A020');
+          toastAccionXp(data, '\u2665 Guardado', '#FF4A00');
         } else {
-          mostrarToast('\u2665 Guardado de nuevo en Tu Mapa', '#E8A020');
+          mostrarToast('\u2665 Guardado de nuevo en Tu Mapa', '#FF4A00');
         }
       } else {
         mostrarToast('Quitado de Tu Mapa', '#888');
@@ -1544,7 +1544,7 @@
         '    width:100%;padding:10px 12px;border:1px solid #e5e0d8;border-radius:6px;',
         '    font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:16px">',
         '  <button id="login-submit" style="',
-        '    width:100%;padding:11px;background:#E8A020;color:#000;border:none;',
+        '    width:100%;padding:11px;background:#FF4A00;color:#000;border:none;',
         '    border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit',
         '  ">Continuar →</button>',
         '  <div style="text-align:center;margin-top:12px">',
@@ -1650,7 +1650,7 @@
     card.style.cssText = [
       'max-width:440px;width:100%;',
       'background:linear-gradient(160deg,#111827,#0d1117);',
-      'border:1px solid rgba(232,160,32,.55);border-radius:18px;',
+      'border:1px solid rgba(255,74,0,.55);border-radius:18px;',
       'padding:24px 20px;color:#F9FAFB;max-height:88vh;overflow:auto;',
       'box-shadow:0 24px 60px rgba(0,0,0,.55);'
     ].join('');
@@ -1699,7 +1699,7 @@
       btn.textContent = 'Elegir';
       btn.style.cssText = [
         'flex:0 0 auto;padding:9px 14px;border-radius:10px;border:0;',
-        'background:#E8A020;color:#0d1117;font-weight:700;font-size:13px;',
+        'background:#FF4A00;color:#0d1117;font-weight:700;font-size:13px;',
         'cursor:pointer;font-family:inherit;'
       ].join('');
       btn.onclick = function () {
@@ -1787,7 +1787,7 @@
     var base = Number(offsetMs) || 0;
     misiones.forEach(function (m, i) {
       setTimeout(function () {
-        mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + fmtXp(m.xp) + ' XP', '#E8A020');
+        mostrarToast('🏆 Misión completada: ' + m.nombre + ' · +' + fmtXp(m.xp) + ' XP', '#FF4A00');
       }, base + i * 1600);
     });
   }
@@ -1807,7 +1807,7 @@
     var base = Number(offsetMs) || 0;
     logros.forEach(function (l, i) {
       setTimeout(function () {
-        mostrarToast((l.emoji || '🏆') + ' Trofeo desbloqueado: ' + l.nombre + ' · +' + fmtXp(l.xp) + ' XP', '#E8A020');
+        mostrarToast((l.emoji || '🏆') + ' Trofeo desbloqueado: ' + l.nombre + ' · +' + fmtXp(l.xp) + ' XP', '#FF4A00');
       }, base + i * 1600 + 900);
     });
   }
@@ -1853,7 +1853,7 @@
     // callers locales DEBEN suprimir su toast propio (dedup, NEXT.md:246).
     if (data.xp_detalle) {
       var txtXp = fmtXpDetalle(data.xp_detalle);
-      if (txtXp) mostrarToast(txtXp, '#E8A020');
+      if (txtXp) mostrarToast(txtXp, '#FF4A00');
     }
     // Si hubo desglose de XP, se retrasan misiones/logros para no pisar
     // el toast de XP en el mismo instante.
@@ -2052,7 +2052,7 @@
   // Estilos inline (no inyecta CSS global; respeta ADR-004).
   var EC_GUIA_STYLE = {
     block: 'margin-bottom:14px;',
-    h: 'font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#E8A020;margin-bottom:6px;',
+    h: 'font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#FF4A00;margin-bottom:6px;',
     row: 'display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08);',
     rowN: 'font-weight:600;color:#F9FAFB;',
     rowD: 'color:#9CA3AF;text-align:right;flex:0 0 auto;max-width:55%;'
@@ -2163,7 +2163,7 @@
 
     var card = document.createElement('div');
     card.style.cssText = 'max-width:520px;width:100%;background:linear-gradient(160deg,#111827,#0d1117);'
-      + 'border:1px solid rgba(232,160,32,.55);border-radius:18px;padding:22px 20px;color:#F9FAFB;'
+      + 'border:1px solid rgba(255,74,0,.55);border-radius:18px;padding:22px 20px;color:#F9FAFB;'
       + 'max-height:88vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.55);';
 
     function cerrarGuiaXP() {
@@ -2219,8 +2219,8 @@
     el = document.createElement('span');
     el.id = 'perfil-cdr';
     el.style.cssText = 'display:none;margin-left:8px;padding:2px 8px;border-radius:999px;'
-      + 'background:rgba(232,160,32,.18);border:1px solid rgba(232,160,32,.4);'
-      + 'color:#E8A020;font-size:11px;font-weight:700;white-space:nowrap;';
+      + 'background:rgba(255,74,0,.18);border:1px solid rgba(255,74,0,.4);'
+      + 'color:#FF4A00;font-size:11px;font-weight:700;white-space:nowrap;';
     perfilBtn.appendChild(el);
     return el;
   }

@@ -67,8 +67,8 @@
 const { neon } = require('@neondatabase/serverless');
 
 var RESEND_API  = 'https://api.resend.com/emails';
-var FROM_EMAIL  = 'ExploraCO <noreply@exploraco.co>';
-var ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@exploraco.co';
+var FROM_EMAIL  = 'LATAWEL <noreply@latawel.com>';
+var ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@latawel.com';
 
 var PLANES = {
   mensual:    { precio: 49000,  dias: 30,  label: 'Mensual'    },
@@ -302,11 +302,11 @@ async function sendEmail(to, subject, html) {
 function emailResena(b) {
   var s = '\u2605'.repeat(Math.round(b.rating||0))+'\u2606'.repeat(5-Math.round(b.rating||0));
   return '<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:2rem">'
-    + '<h2 style="color:#E8A020">\u2b50 Nueva rese\u00f1a \u2014 ' + (b.destino_nombre||'') + '</h2>'
+    + '<h2 style="color:#FF4A00">\u2b50 Nueva rese\u00f1a \u2014 ' + (b.destino_nombre||'') + '</h2>'
     + '<p><strong>Por:</strong> ' + (b.usuario_nombre||'Visitante') + '</p>'
     + '<p><strong>Rating:</strong> ' + s + '</p>'
     + '<p><strong>Texto:</strong> ' + (b.texto||'(sin texto)') + '</p>'
-    + '<p><a href="https://exploraco.vercel.app/admin.html" style="background:#E8A020;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none">Ver en admin \u2192</a></p>'
+    + '<p><a href="https://exploraco.vercel.app/admin.html" style="background:#FF4A00;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none">Ver en admin \u2192</a></p>'
     + '</div>';
 }
 function emailSolicitud(b) {
@@ -316,7 +316,7 @@ function emailSolicitud(b) {
     + '<p><strong>Categor\u00eda:</strong> ' + (b.categoria||'') + '</p>'
     + '<p><strong>WhatsApp:</strong> <a href="https://wa.me/' + b.whatsapp + '">' + b.whatsapp + '</a></p>'
     + '<p><strong>Descripci\u00f3n:</strong> ' + (b.descripcion_corta||'') + '</p>'
-    + '<p><a href="https://exploraco.vercel.app/admin.html" style="background:#E8A020;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none">Revisar en admin \u2192</a></p>'
+    + '<p><a href="https://exploraco.vercel.app/admin.html" style="background:#FF4A00;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none">Revisar en admin \u2192</a></p>'
     + '</div>';
 }
 

@@ -3,17 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Admin — ExploraCO</title>
+<title>Admin | LATAWEL</title>
+<link rel="icon" href="/assets/brand/favicon/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/favicon/favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@300;400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 <style>/* ══════════════════════════════════════════════════
-   ExploraCO Admin Panel V2
+   LATAWEL Admin Panel V2
    Refined editorial — dark nav, white workspace
 ══════════════════════════════════════════════════ */
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --gold:#E8A020;--gold-d:#C8860A;--gold-l:rgba(232,160,32,.1);
-  --black:#111;--navy:#0A1628;--sky:#1a2e4a;
+  --gold:#FF4A00;--gold-d:#FFB84D;--gold-l:rgba(255,74,0,.1);
+  --black:#0F1419;--navy:#0F1419;--sky:#0F1419;
   --white:#fff;--bg:#F4F3EF;--bg2:#FAFAF8;
   --border:#E2E0D8;--border2:#CECBBF;
   --muted:#888;--muted2:#AAA;
@@ -34,9 +36,9 @@
 
 /* ── TOP HEADER ── */
 .topbar{height:var(--header-h);background:var(--navy);display:flex;align-items:center;padding:0 16px 0 0;gap:0;flex-shrink:0;border-bottom:2px solid var(--gold)}
-.tb-brand{width:var(--nav-w);flex-shrink:0;padding:0 20px;display:flex;align-items:center;gap:8px}
-.tb-logo{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:3px;color:#fff;text-decoration:none}
-.tb-logo em{color:var(--gold);font-style:normal}
+.tb-brand{width:var(--nav-w);flex-shrink:0;padding:0 20px;display:flex;align-items:center;gap:8px;font-family:'Poppins',sans-serif}
+.tb-logo{display:flex;align-items:center;text-decoration:none;line-height:0}
+.tb-logo img{height:28px;width:auto;max-width:150px;object-fit:contain;display:block}
 .tb-sep{width:1px;height:24px;background:rgba(255,255,255,.12);flex-shrink:0}
 .tb-right{display:flex;align-items:center;gap:10px;margin-left:auto}
 .tb-preview-btn{display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border:1px solid rgba(255,255,255,.2);border-radius:var(--r);color:rgba(255,255,255,.6);font-size:11px;font-weight:600;text-decoration:none;transition:all .15s;cursor:pointer}
@@ -48,10 +50,10 @@
 .snav-section{padding:16px 16px 6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.25)}
 .snav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:12px;font-weight:500;color:rgba(255,255,255,.55);cursor:pointer;transition:all .12s;border-left:3px solid transparent;text-decoration:none}
 .snav-item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.85)}
-.snav-item.active{background:rgba(232,160,32,.12);color:var(--gold);border-left-color:var(--gold)}
+.snav-item.active{background:rgba(255,74,0,.12);color:var(--gold);border-left-color:var(--gold)}
 .snav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
 .snav-count{margin-left:auto;background:rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px}
-.snav-item.active .snav-count{background:rgba(232,160,32,.2);color:var(--gold)}
+.snav-item.active .snav-count{background:rgba(255,74,0,.2);color:var(--gold)}
 .snav-divider{height:1px;background:rgba(255,255,255,.06);margin:8px 16px}
 
 /* ── WORKSPACE ── */
@@ -130,7 +132,7 @@
 .data-table th{text-align:left;padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border);background:var(--bg2);white-space:nowrap}
 .data-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle}
 .data-table tr:hover td{background:#FAFAF8}
-.data-table tr.selected td{background:rgba(232,160,32,.06)}
+.data-table tr.selected td{background:rgba(255,74,0,.06)}
 .dt-name{font-weight:600;color:var(--text)}
 .dt-slug{font-size:10px;color:var(--muted);font-family:monospace}
 .dt-actions{display:flex;gap:4px;opacity:0;transition:opacity .12s}
@@ -236,7 +238,7 @@
 .esb-mini-map{width:100%;height:150px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
 .esb-meta-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:3px 0}
 .esb-meta-row b{color:var(--text);font-weight:600}
-.esb-preview-link{display:flex;align-items:center;gap:5px;padding:8px 10px;background:var(--gold-l);border:1px solid rgba(232,160,32,.3);border-radius:var(--r);font-size:11px;font-weight:700;color:var(--gold-d);text-decoration:none;transition:all .15s}
+.esb-preview-link{display:flex;align-items:center;gap:5px;padding:8px 10px;background:var(--gold-l);border:1px solid rgba(255,74,0,.3);border-radius:var(--r);font-size:11px;font-weight:700;color:var(--gold-d);text-decoration:none;transition:all .15s}
 .esb-preview-link:hover{background:var(--gold);color:var(--black)}
 
 /* ── IMPORT / EXPORT ── */
@@ -303,7 +305,7 @@
 .place-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
 .place-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;border-left:3px solid transparent}
 .place-item:hover{background:rgba(255,255,255,.04)}
-.place-item.active{background:rgba(232,160,32,.08);border-left-color:var(--gold)}
+.place-item.active{background:rgba(255,74,0,.08);border-left-color:var(--gold)}
 .pi-emoji{font-size:16px;flex-shrink:0;width:20px;text-align:center}
 .pi-
 .pi-name{font-size:11px;font-weight:600;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -311,8 +313,8 @@
 .pi-status{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .pi-status.pub{background:#22C55E}
 .pi-status.draft{background:#F59E0B}
-.sidebar-new-btn{margin:8px;padding:9px;background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.3);border-radius:5px;color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;transition:all .15s}
-.sidebar-new-btn:hover{background:rgba(232,160,32,.2)}
+.sidebar-new-btn{margin:8px;padding:9px;background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:5px;color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;transition:all .15s}
+.sidebar-new-btn:hover{background:rgba(255,74,0,.2)}
 /* ── EDITOR MAIN (flex-1 scrollable) ── */
 
 
@@ -334,7 +336,7 @@
 .status-pill.on { background: var(--black); color: #fff; border-color: var(--black); }
 /* ── IMPORT DROP ZONE ── */
 .import-drop-zone { border: 2px dashed var(--border); border-radius: var(--r); padding: 40px 20px; text-align: center; cursor: pointer; background: var(--bg); transition: all .15s; }
-.import-drop-zone:hover, .import-drop-zone.drag-over { border-color: var(--gold); background: #FDF3E0; }
+.import-drop-zone:hover, .import-drop-zone.drag-over { border-color: var(--gold); background: #E5E7EB; }
 /* ── WS BODY ── */
 .ws-
 /* ── MAP PICKER MODAL OPEN ── */
@@ -430,7 +432,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 <!-- ─── TOP HEADER ─────────────────────────────── -->
 <header class="topbar">
   <div class="tb-brand">
-    <a href="index.html" class="tb-logo" target="_blank">EXPLORA<em>CO</em></a>
+    <a href="index.html" class="tb-logo" target="_blank"><img src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL"></a>
     <span class="tb-badge">Admin</span>
   </div>
   <div class="tb-sep"></div>
@@ -838,7 +840,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
             <label class="form-label">Verificacion manual admin</label>
             <label class="srv-check" style="font-size:12px">
               <input type="checkbox" id="f-verificado">
-              <span>Marcar como VERIFICADO por el equipo de ExploraCO</span>
+              <span>Marcar como VERIFICADO por el equipo de LATAWEL</span>
             </label>
           </div>
         </div>
@@ -904,29 +906,29 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         </div>
         <!-- Foto Top del Destino (ADR-017) -->
         <div id="admin-foto-top-section" style="margin-top:16px;display:none;">
-          <h4 style="color:var(--gold,#E8A020);margin-bottom:8px;">Foto Top del Destino</h4>
+          <h4 style="color:var(--gold,#FF4A00);margin-bottom:8px;">Foto Top del Destino</h4>
           <p style="font-size:12px;color:#888;margin-bottom:8px;">Selecciona una foto de la galeria como destacada del directorio.</p>
           <div id="admin-foto-top-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
             <!-- Se llena dinamicamente con las fotos del destino -->
           </div>
-          <button onclick="seleccionarFotoTop()" id="btn-seleccionar-foto-top" style="display:none;margin-top:8px;padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Seleccionar como top</button>
+          <button onclick="seleccionarFotoTop()" id="btn-seleccionar-foto-top" style="display:none;margin-top:8px;padding:8px 16px;background:var(--gold,#FF4A00);color:#fff;border:none;border-radius:8px;cursor:pointer;">Seleccionar como top</button>
         </div>
         <!-- Moderacion de fotos de album (ADR-017) -->
         <div id="admin-fotos-album-section" style="margin-top:16px">
-          <h4 style="color:var(--gold,#E8A020);margin-bottom:8px;">Moderacion de fotos de album</h4>
+          <h4 style="color:var(--gold,#FF4A00);margin-bottom:8px;">Moderacion de fotos de album</h4>
           <p style="font-size:12px;color:#888;margin-bottom:8px;">Carga el feed reciente de fotos de albumes y retira las que no cumplan las normas. La accion ejecuta un soft-delete (activo=false) y refresca la lista.</p>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <button onclick="adminCargarFeedFotos()" id="btn-cargar-feed-fotos" style="padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Cargar fotos de album</button>
+            <button onclick="adminCargarFeedFotos()" id="btn-cargar-feed-fotos" style="padding:8px 16px;background:var(--gold,#FF4A00);color:#fff;border:none;border-radius:8px;cursor:pointer;">Cargar fotos de album</button>
             <span id="admin-fotos-album-status" style="font-size:12px;color:#888"></span>
           </div>
           <div id="admin-fotos-album-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:10px"></div>
         </div>
         <!-- Moderacion de comentarios de album (ADR-023) -->
         <div id="admin-comentarios-section" style="margin-top:16px">
-          <h4 style="color:var(--gold,#E8A020);margin-bottom:8px;">Moderacion de comentarios</h4>
+          <h4 style="color:var(--gold,#FF4A00);margin-bottom:8px;">Moderacion de comentarios</h4>
           <p style="font-size:12px;color:#888;margin-bottom:8px;">Carga los comentarios recientes sobre media de albumes y oculta los que no cumplan las normas. "Ocultar con respuestas" desactiva el subarbol completo (cascada, solo admin).</p>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <button onclick="adminCargarComentarios()" id="btn-cargar-comentarios" style="padding:8px 16px;background:var(--gold,#E8A020);color:#fff;border:none;border-radius:8px;cursor:pointer;">Cargar comentarios</button>
+            <button onclick="adminCargarComentarios()" id="btn-cargar-comentarios" style="padding:8px 16px;background:var(--gold,#FF4A00);color:#fff;border:none;border-radius:8px;cursor:pointer;">Cargar comentarios</button>
             <span id="admin-comentarios-status" style="font-size:12px;color:#888"></span>
           </div>
           <div id="admin-comentarios-grid" style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px"></div>
@@ -1712,7 +1714,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
                firma del articulo es el mismo perfil con el que la
                persona ya se registro, ver DECISIONS.md). -->
           <div class="cat-panel" id="cat-blog-autor" style="display:none">
-            <div class="form-hint">Busca por nombre o email entre los usuarios ya registrados en ExploraCO. La firma del artículo usa ese mismo perfil (nombre, bio y foto).</div>
+            <div class="form-hint">Busca por nombre o email entre los usuarios ya registrados en LATAWEL. La firma del artículo usa ese mismo perfil (nombre, bio y foto).</div>
             <div class="form-group">
               <label class="form-label">Buscar autor</label>
               <input class="form-input" id="f-blog-autor-buscar" type="text" placeholder="Nombre o email…" oninput="blogBuscarAutor(this.value)" autocomplete="off">
@@ -1897,7 +1899,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
         style="font-family:monospace;font-size:10px;min-height:120px;resize:vertical"
         readonly placeholder="Haz clic en Regenerar →"></textarea>
     </div>
-    <div style="margin-top:18px;background:#FDF3E0;border:1px solid #F5D28A;border-radius:var(--r);padding:14px">
+    <div style="margin-top:18px;background:#E5E7EB;border:1px solid #F5D28A;border-radius:var(--r);padding:14px">
       <div style="font-weight:700;font-size:11px;color:#7A5200;margin-bottom:8px">📖 Instrucciones</div>
       <ol style="font-size:11px;color:#7A5200;padding-left:16px;line-height:2">
         <li>Clic en <strong>Regenerar</strong></li>
@@ -2539,7 +2541,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
 
 
 // ═══════════════════════════════════════════════════════════
-//  ExploraCO Admin V2 — Complete CMS
+//  LATAWEL Admin V2 — Complete CMS
 // ═══════════════════════════════════════════════════════════
 
 /* ── STATE ── */
@@ -2892,7 +2894,7 @@ function renderTabla() {
       +'<td><div class="dt-actions">'
       +'<button class="btn btn-ghost btn-icon btn-sm" onclick="editPlace('+p.id+')" title="Editar">✏️</button>'
       +'<a class="btn btn-ghost btn-icon btn-sm" href="'+(p.slug||'#')+'.html" target="_blank" title="Ver página">↗</a>'
-      +'<button class="btn-feat btn-ghost btn-icon btn-sm" onclick="toggleDestacadoId('+p.id+')" title="'+(p.destacado?'Quitar destacado':'Destacar este lugar')+'" style="'+(p.destacado?'color:#E8A020':'')+'">'+(p.destacado?'⭐':'☆')+'</button>'
+      +'<button class="btn-feat btn-ghost btn-icon btn-sm" onclick="toggleDestacadoId('+p.id+')" title="'+(p.destacado?'Quitar destacado':'Destacar este lugar')+'" style="'+(p.destacado?'color:#FF4A00':'')+'">'+(p.destacado?'⭐':'☆')+'</button>'
       +'<button class="btn btn-ghost btn-icon btn-sm" onclick="duplicatePlaceId('+p.id+')" title="Duplicar">⎘</button>'
       +'<button class="btn btn-danger btn-icon btn-sm" onclick="deletePlaceId('+p.id+')" title="Eliminar">✕</button>'
       +'</div></td>'
@@ -4937,7 +4939,7 @@ function blogAbrirPreview() {
     + '</style>';
   bodyEl.innerHTML = cssPrev
     + '<div class="bpw">'
-    + '<div class="bpkicker">\ud83d\udcdd Blog \u00b7 ExploraCO</div>'
+    + '<div class="bpkicker">\ud83d\udcdd Blog \u00b7 LATAWEL</div>'
     + '<div class="bptitle">'+_esc(nombre)+'</div>'
     + (lead ? '<div class="bplead">'+_esc(lead)+'</div>' : '')
     + '<div class="bpmeta">'
@@ -5191,7 +5193,7 @@ function adm_actualizarCirculoRango() {
     if (!isFinite(lat) || !isFinite(lng) || !isFinite(radio) || radio <= 0) return;
     if (typeof L === 'undefined') return;
     window._adminRangoCircle = L.circle([lat, lng], {
-      radius: radio, color: '#E8A020', fillColor: '#E8A020', fillOpacity: 0.12, weight: 2
+      radius: radio, color: '#FF4A00', fillColor: '#FF4A00', fillOpacity: 0.12, weight: 2
     }).addTo(pmap);
   } catch (e) {
     console.error('[adm_actualizarCirculoRango] ' + (e && e.message));
@@ -5506,7 +5508,7 @@ function generateExportCode() {
       +',"highlight":"'+esc(p.highlight)+'"'
       +',"price":"'+esc(p.price)+'"'
       +',"emoji":"'+esc(p.emoji||'📍')+'"'
-      +',"hero_bg":"'+esc(p.hero_bg||'linear-gradient(135deg,#111,#222)')+'"'
+      +',"hero_bg":"'+esc(p.hero_bg||'linear-gradient(135deg,#0F1419,#222)')+'"'
       +',"rating":'+(p.rating||4.8)
       +',"rev":'+(p.reviews||p.rev||0)
       +',"horario":"'+esc(p.horario)+'"'
@@ -5793,7 +5795,7 @@ async function renderReviews() {
     var st = data.stats || {};
     var statsBanner = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
       + _rvStatChip('Total', st.total || 0, 'var(--text)')
-      + _rvStatChip('Promedio', st.rating_promedio ? Number(st.rating_promedio).toFixed(1)+'⭐' : '—', '#E8A020')
+      + _rvStatChip('Promedio', st.rating_promedio ? Number(st.rating_promedio).toFixed(1)+'⭐' : '—', '#FF4A00')
       + _rvStatChip('Positivas ≥4★', st.positivas || 0, 'var(--green)')
       + _rvStatChip('Negativas ≤2★', st.negativas || 0, 'var(--red)')
       + '</div>';
@@ -6170,7 +6172,7 @@ function buildPlCode() {
       +',"highlight":"'+esc(p.highlight)+'"'
       +',"price":"'+esc(p.price)+'"'
       +',"emoji":"'+esc(p.emoji||'📍')+'"'
-      +',"hero_bg":"'+esc(p.hero_bg||'linear-gradient(135deg,#111,#222)')+'"'
+      +',"hero_bg":"'+esc(p.hero_bg||'linear-gradient(135deg,#0F1419,#222)')+'"'
       +',"rating":'+(p.rating||4.8)
       +',"rev":'+(p.reviews||p.rev||0)
       +',"whatsapp":"'+esc(p.whatsapp)+'"'
@@ -6225,7 +6227,7 @@ function buildDirPL(cat) {
       +',"rev":'+(p.reviews||p.rev||0)
       +',"price":"'+esc(p.price||'')+'"'
       +',"emoji":"'+esc(p.emoji||'📍')+'"'
-      +',"hero_bg":"'+esc(p.hero_bg||'linear-gradient(135deg,#111,#222)')+'"'
+      +',"hero_bg":"'+esc(p.hero_bg||'linear-gradient(135deg,#0F1419,#222)')+'"'
       +',"photos":['+((p.photos||[]).slice(0,1).map(function(ph){var u=typeof ph==='string'?ph:(ph.url||'');return '{"type":"photo","url":"'+u.replace(/"/g,'\\"')+'","cap":""}';}).join(','))+']'
       +'}';
   }).join(',\n  ');
@@ -6343,7 +6345,7 @@ function blogBuscarAutor(query) {
         if (!resultsEl) return;
         if (!items.length) {
           resultsEl.style.display = 'block';
-          resultsEl.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted,#888)">Sin resultados. La persona debe estar registrada en ExploraCO.</div>';
+          resultsEl.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted,#888)">Sin resultados. La persona debe estar registrada en LATAWEL.</div>';
           return;
         }
         resultsEl.style.display = 'block';
@@ -6372,7 +6374,7 @@ function blogSeleccionarAutor(id, nombre, bio, fotoUrl) {
   var sel = document.getElementById('blog-autor-seleccionado');
   if (sel) {
     sel.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--bg,#FBF8F2);border:1px solid var(--border,#EDE8E0);border-radius:8px;padding:10px;margin-top:10px';
-    sel.innerHTML = (fotoUrl ? '<img src="'+_esc(fotoUrl)+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--gold-light,#FDF3E0);display:flex;align-items:center;justify-content:center;font-weight:800">'+_esc((nombre||'?').charAt(0).toUpperCase())+'</div>')
+    sel.innerHTML = (fotoUrl ? '<img src="'+_esc(fotoUrl)+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--gold-light,#E5E7EB);display:flex;align-items:center;justify-content:center;font-weight:800">'+_esc((nombre||'?').charAt(0).toUpperCase())+'</div>')
       + '<div style="flex:1"><div style="font-weight:700">'+_esc(nombre)+'</div>'+(bio?'<div style="font-size:11px;color:var(--muted,#888)">'+_esc(bio)+'</div>':'')+'</div>'
       + '<button class="btn btn-ghost btn-icon btn-sm" onclick="blogLimpiarAutor()" title="Quitar autor">✕</button>';
   }
@@ -6667,7 +6669,7 @@ function mostrarFotoTopSection() {
           + '<div style="font-size:10px;padding:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _esc(f.caption || '') + '</div>';
         div.onclick = function() {
           grid.querySelectorAll('div').forEach(function(d){ d.style.borderColor = 'transparent'; });
-          div.style.borderColor = 'var(--gold,#E8A020)';
+          div.style.borderColor = 'var(--gold,#FF4A00)';
           _adminFotoTopSelected = f.url;
           if (btn) btn.style.display = 'block';
         };
@@ -9041,7 +9043,7 @@ function saludGamingCard(d) {
   ];
   var allOk = checks.every(function(c){ return c[1]; });
   var icon = allOk ? '✅' : '⚠️';
-  console.groupCollapsed(icon + ' ExploraCO Admin ' + VERSION + (allOk ? ' — todo OK' : ' — revisar checks'));
+  console.groupCollapsed(icon + ' LATAWEL Admin ' + VERSION + (allOk ? ' — todo OK' : ' — revisar checks'));
   checks.forEach(function(c){
     console.log((c[1] ? '  ✅' : '  ❌') + ' ' + c[2] + ' [' + c[0] + ']');
   });

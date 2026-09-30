@@ -1,5 +1,5 @@
 /* =============================================================
-   mapa-cultural.js -- Motor compartido del Mapa Cultural ExploraCO
+   mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
    Version 1.1.1. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
@@ -166,7 +166,7 @@
       // Importante: las filas tipo=mapa NO traen rating; default 0.
       rating: Number(raw.rating) || 0,
       emoji: raw.emoji || EMOJI_POR_CAT[cat] || PIN_DEFECTO,
-      color: raw.color || PIN_COLORS[cat] || '#E8A020',
+      color: raw.color || PIN_COLORS[cat] || '#FF4A00',
       visitado: !!raw.visitado,
       heroBg: raw.hero_bg || '',
       foto: foto,
@@ -434,7 +434,7 @@
     function toast(msg, color) {
       var f = st.options.mostrarToast;
       if (typeof f !== 'function' && typeof window !== 'undefined' && window.ExploraCO) f = window.ExploraCO.mostrarToast;
-      if (typeof f === 'function') f(msg, color || '#E8A020');
+      if (typeof f === 'function') f(msg, color || '#FF4A00');
     }
 
     function pedirLogin(msg) {
@@ -683,7 +683,7 @@
     }
 
     function markerIcon(p) {
-      var color = p.color || '#E8A020';
+      var color = p.color || '#FF4A00';
       var emoji = p.emoji || PIN_DEFECTO;
       // Pin "visitado" (Fase 1): borde verde + halo, conservando el color
       // de categoria en el relleno. No visitado: borde blanco actual.
@@ -1262,7 +1262,7 @@
           var itVotos = parseInt(it.votos, 10) || 0;
           var votoCtrl;
           if (it.id && it.fuente) {
-            votoCtrl = '<button type="button" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:var(--gold);border:1px solid rgba(232,160,32,.35);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer;line-height:1.4"'
+            votoCtrl = '<button type="button" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:var(--gold);border:1px solid rgba(255,74,0,.35);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer;line-height:1.4"'
               + ' data-mc-votar="' + esc(String(it.id)) + '" data-mc-fuente="' + esc(String(it.fuente)) + '">\u2B50 ' + itVotos + '</button>';
           } else {
             votoCtrl = '<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.7);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.4">\u2B50 ' + itVotos + '</span>';
@@ -1534,7 +1534,7 @@
             if (btn) btn.textContent = '\u2B50 ' + (d.votos != null ? d.votos : '');
             toast('Voto registrado', '#16a34a');
           } else if (d && d.error) {
-            toast(d.error, '#E8A020');
+            toast(d.error, '#FF4A00');
           }
         })
         .catch(function (e) { if (btn) btn.disabled = false; log('votarMedia', e); });

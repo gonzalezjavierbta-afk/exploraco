@@ -1,5 +1,5 @@
 /**
- * ExploraCO — Reseñas Connector
+ * LATAWEL — Reseñas Connector
  * Conecta el formulario subRv() de páginas individuales con Neon DB
  * Incluir en cada página de hostal/lugar ANTES del </body>:
  * <script src="../resenas-connector.js"></script>
@@ -36,7 +36,7 @@
         div.className = 'rv-item';
         div.innerHTML = [
           '<div class="rv-header">',
-          '  <div class="rv-avatar" style="background:#E8A020;width:36px;height:36px;border-radius:50%;',
+          '  <div class="rv-avatar" style="background:#FF4A00;width:36px;height:36px;border-radius:50%;',
           '    display:flex;align-items:center;justify-content:center;color:#000;font-weight:700;font-size:14px;flex-shrink:0">',
           '    ' + (rv.usuario_nombre || 'V')[0].toUpperCase(),
           '  </div>',
@@ -44,7 +44,7 @@
           '    <div class="rv-name" style="font-weight:700;font-size:13px">' + (rv.usuario_nombre || 'Viajero') + '</div>',
           '    <div style="font-size:10px;color:#aaa">' + (rv.usuario_badge || 'Viajero Novato') + ' · ' + fecha + '</div>',
           '  </div>',
-          '  <div class="rv-stars" style="margin-left:auto;color:#E8A020;font-size:14px">' + stars + '</div>',
+          '  <div class="rv-stars" style="margin-left:auto;color:#FF4A00;font-size:14px">' + stars + '</div>',
           '</div>',
           rv.texto ? '<div class="rv-text" style="font-size:13px;color:#555;line-height:1.6;margin-top:8px">' + rv.texto + '</div>' : '',
         ].join('');
