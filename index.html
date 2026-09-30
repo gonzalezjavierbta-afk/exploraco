@@ -444,16 +444,20 @@ textarea.wrinp{resize:vertical;min-height:88px}
 
 /* ══ MAPA INTERACTIVO ══ */
 .mapa-full-section{background:var(--black)}
-.mapa-topbar{display:flex;align-items:center;gap:14px;padding:16px 4% 14px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.06)}
+.mapa-topbar{display:flex;align-items:center;gap:14px;padding:12px 4% 10px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.06)}
 .mapa-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#fff;white-space:nowrap;margin-right:6px}
-.mapa-filters{display:flex;gap:6px;flex:1;flex-wrap:wrap}
-.mf-btn{padding:5px 13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;cursor:pointer;border-radius:3px;transition:all .15s;white-space:nowrap}
-.mf-btn:hover,.mf-btn.on{border-color:var(--gold);color:var(--gold);background:rgba(255,74,0,.1)}
+.mapa-filters{position:absolute;top:10px;left:52px;right:58px;z-index:900;display:flex;gap:7px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding:0 0 5px;scrollbar-width:none;-ms-overflow-style:none}
+.mapa-filters::-webkit-scrollbar{display:none}
+.mf-btn{flex:0 0 auto;padding:7px 14px;border:1px solid rgba(255,255,255,.18);background:rgba(15,20,25,.85);font-size:11px;font-weight:700;color:#fff;letter-spacing:.2px;cursor:pointer;border-radius:999px;transition:all .15s;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.mf-btn:hover,.mf-btn.on{border-color:var(--gold);color:#fff;background:var(--gold)}
 .mapa-body-grid{display:grid;grid-template-columns:260px 1fr;height:380px}
 .mapa-list-panel{background:#0D1520;border-right:1px solid rgba(255,255,255,.06);overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
 .mapa-list-panel::-webkit-scrollbar{width:4px}
 .mapa-list-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
 .mapa-list-inner{display:flex;flex-direction:column}
+.mapa-list-toggle{display:none;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:13px 14px;background:transparent;border:none;color:#E5E7EB;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;cursor:pointer;text-align:left}
+.mlt-ico{color:var(--gold);transition:transform .2s;font-size:11px}
+.mapa-list-panel.open .mlt-ico{transform:rotate(180deg)}
 .mapa-list-item{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .12s;border-left:3px solid transparent;text-decoration:none}
 .mapa-list-item:hover,.mapa-list-item.active{background:rgba(255,74,0,.07);border-left-color:var(--gold)}
 .mapa-li-ico{width:30px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
@@ -476,18 +480,27 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .lp-li-go:hover{text-decoration:underline}
 .lp-li-save{flex-shrink:0;background:transparent;border:1px solid rgba(0,0,0,.15);border-radius:4px;width:24px;height:24px;font-size:12px;cursor:pointer;color:#999;transition:all .15s;line-height:1}
 .lp-li-save:hover,.lp-li-save.saved{border-color:var(--gold);color:var(--gold)}
-.mapa-filters .mf-loc{margin-left:auto;border-color:rgba(255,74,0,.45);color:var(--gold);background:rgba(255,74,0,.08)}
-.mapa-filters .mf-loc:hover{border-color:var(--gold);background:rgba(255,74,0,.16)}
+.mapa-filters .mf-loc{margin-left:0;border-color:rgba(255,255,255,.3);color:#fff;background:rgba(255,74,0,.6)}
+.mapa-filters .mf-loc:hover{border-color:var(--gold);background:var(--gold)}
 .mapa-cluster{position:relative;border-radius:50%;background:rgba(16,24,40,.97);border:2px solid var(--gold);box-shadow:0 3px 14px rgba(0,0,0,.5),inset 0 0 0 2px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s}
 .mapa-cluster:hover{transform:scale(1.08)}
 .mapa-cl-emoji{font-size:13px;line-height:1}
 .mapa-cl-num{font-size:13px;font-weight:900;color:#fff;font-family:'Barlow Condensed',sans-serif;line-height:1;margin-top:1px}
 .mapa-note{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(8px);background:rgba(10,16,32,.97);border:1px solid var(--gold);color:#E5E7EB;font-size:11px;font-family:'Outfit',sans-serif;padding:8px 14px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:900;max-width:80%;text-align:center}
 .mapa-note.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(max-width:860px){.mapa-body-grid{grid-template-columns:1fr;height:auto}.mapa-list-panel{height:180px}.mapa-map-container{height:280px}}
+@media(max-width:860px){
+  .mapa-body-grid{grid-template-columns:1fr;height:auto}
+  .mapa-map-container{order:1;height:300px}
+  .mapa-list-panel{order:2;height:auto;border-right:none;border-top:1px solid rgba(255,255,255,.06);overflow:visible}
+  .mapa-list-toggle{display:flex}
+  .mapa-list-inner{display:none}
+  .mapa-list-panel.open .mapa-list-inner{display:flex;max-height:340px;overflow-y:auto}
+  .mapa-filters{left:52px;right:64px}
+  .mapa-topbar{padding:10px 4% 8px}
+}
 
 /* -- MAPA | MEDIA (pines multimedia) -- */
-.mf-sep{width:1px;height:20px;background:rgba(255,255,255,.16);margin:0 3px;flex-shrink:0}
+.mf-sep{width:1px;height:22px;background:rgba(255,255,255,.25);margin:0 3px;flex-shrink:0;align-self:center}
 .mpa-media-pin{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(0,0,0,.45);border:2.5px solid #fff;cursor:pointer;transition:transform .14s}
 .mpa-media-pin:hover{transform:scale(1.15);z-index:1000}
 /* TSK-106: los pines de fotos curadas del destino (origen='destino') usan
@@ -1040,6 +1053,47 @@ textarea.wrinp{resize:vertical;min-height:88px}
 
 
 
+<!-- ════ MAPA INTERACTIVO ════ -->
+<div class="mapa-full-section" id="mapa-section">
+  <div class="mapa-topbar">
+    <h2 class="mapa-title bc">🗺️ Mapa cultural de Colombia</h2>
+  </div>
+  <div class="mapa-body-grid">
+    <div class="mapa-list-panel">
+      <button type="button" class="mapa-list-toggle" onclick="toggleMapaLista(this)" aria-expanded="false"><span>Explorar lugares</span><span class="mlt-ico">&#9662;</span></button>
+      <div class="mapa-list-inner" id="mapa-list-inner"></div>
+    </div>
+    <div class="mapa-map-container" id="mapa-map-container">
+      <div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div>
+      <div class="mapa-filters">
+      <div class="mf-btn on" data-cat="all">Todo</div>
+      <div class="mf-btn" data-cat="hostal">🏨 Hospedaje</div>
+      <div class="mf-btn" data-cat="comida">🍽️ Comida</div>
+      <div class="mf-btn" data-cat="sitio">🏔️ Naturaleza</div>
+      <div class="mf-btn" data-cat="evento">🎉 Eventos</div>
+      <div class="mf-btn" data-cat="visitados">✓ Visitados</div>
+      <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)">📍 Cerca de mí</div>
+      <div class="mf-btn" onclick="resetMapaColombia()">🗺️ Colombia</div>
+      <span class="mf-sep"></span>
+      <div class="mf-btn" data-media="all">📸 Media</div>
+      <div class="mf-btn" data-media="foto">Fotos</div>
+      <div class="mf-btn" data-media="video">Videos</div>
+      <div class="mf-btn" data-media="audio">Audios</div>
+      <div class="mf-btn" id="mm-vista-albumes" onclick="setMapaMediaVista(this,'albumes')">&#x1F4DA; Álbumes</div>
+      <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))">Solo mío</div>
+      </div>
+      <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
+    <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
+    <aside class="md-panel" role="dialog" aria-label="Detalle del lugar">
+      <button class="md-close" onclick="closeMapaDrawer()" aria-label="Cerrar">&times;</button>
+      <div id="md-mapa-destino-titulo" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)"></div>
+      <div class="md-content" id="md-content"><!-- render dinamico --></div>
+    </aside>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ════ DESTACADOS (12 lugares) ════ -->
 <section class="dest-section" id="recs">
   <div class="dest-inner">
@@ -1130,44 +1184,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <div class="ctab">
   <div><div class="ctatitle bc">¿Tienes un hostal, restaurante o sitio turístico?</div><div class="ctasub">Publica gratis y llega a miles de viajeros cada mes.</div></div>
   <button class="ctabtn" onclick="window.location.href='publicar.html'">Publicar mi lugar →</button>
-</div>
-
-<!-- ════ MAPA INTERACTIVO ════ -->
-<div class="mapa-full-section" id="mapa-section">
-  <div class="mapa-topbar">
-    <h2 class="mapa-title bc">🗺️ Mapa cultural de Colombia</h2>
-    <div class="mapa-filters">
-      <div class="mf-btn on" data-cat="all">Todo</div>
-      <div class="mf-btn" data-cat="hostal">🏨 Hospedaje</div>
-      <div class="mf-btn" data-cat="comida">🍽️ Comida</div>
-      <div class="mf-btn" data-cat="sitio">🏔️ Naturaleza</div>
-      <div class="mf-btn" data-cat="evento">🎉 Eventos</div>
-      <div class="mf-btn" data-cat="visitados">✓ Visitados</div>
-      <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)">📍 Cerca de mí</div>
-      <div class="mf-btn" onclick="resetMapaColombia()">🗺️ Colombia</div>
-      <span class="mf-sep"></span>
-      <div class="mf-btn" data-media="all">📸 Media</div>
-      <div class="mf-btn" data-media="foto">Fotos</div>
-      <div class="mf-btn" data-media="video">Videos</div>
-      <div class="mf-btn" data-media="audio">Audios</div>
-      <div class="mf-btn" id="mm-vista-albumes" onclick="setMapaMediaVista(this,'albumes')">&#x1F4DA; Álbumes</div>
-      <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))">Solo mío</div>
-    </div>
-  </div>
-  <div class="mapa-body-grid">
-    <div class="mapa-list-panel"><div class="mapa-list-inner" id="mapa-list-inner"></div></div>
-    <div class="mapa-map-container" id="mapa-map-container">
-      <div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div>
-      <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
-    <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
-    <aside class="md-panel" role="dialog" aria-label="Detalle del lugar">
-      <button class="md-close" onclick="closeMapaDrawer()" aria-label="Cerrar">&times;</button>
-      <div id="md-mapa-destino-titulo" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)"></div>
-      <div class="md-content" id="md-content"><!-- render dinamico --></div>
-    </aside>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- ════ AGENDA CULTURAL ════ -->
@@ -2392,6 +2408,14 @@ function initMapaFullscreen() {
     getMap: function() { return mcMapa ? mcMapa.getMap() : null; },
     label: 'Pantalla completa del mapa'
   });
+}
+
+// Mobile: la lista de lugares se muestra bajo el mapa como menu desplegable.
+function toggleMapaLista(btn) {
+  var panel = btn && btn.parentNode;
+  if(!panel) return;
+  var open = panel.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 function closeMapaDrawer() {
