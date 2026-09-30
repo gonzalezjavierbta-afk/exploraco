@@ -1674,3 +1674,25 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Relacion con BUG-092:** BUG-092 **permanece CERRADO** en su sintoma (los subagentes volvieron a responder; ese fix siguio siendo correcto para desbloquear el tooling). Lo que queda SUPERSEDIDO es su **"Resolucion aplicada"** (mover todo el roster a `opencode-go`), porque su premisa era incompleta. **NO se reabre BUG-092**: su registro historico se conserva intacto (Cero Borrado Logico). Ver `DECISIONS.md` ADR-074 y `TASKS.md` TSK-165.
 **Estado:** CERRADO (2026-09-30) -- registrado como BUG de gobernanza de coste y resuelto por ADR-074. Ver `TASKS.md` TSK-165.
 
+## BUG-095: el modal del map-picker no podia abrirse (al div le faltaba la clase `map-picker-modal`)
+
+**Severidad:** MEDIA / ALTA (rompia el flujo del admin: el boton "Seleccionar ubicacion" no abria nada).
+**Contexto:** detectado durante la limpieza de CSS muerto de `admin.html` en la tanda TSK-169 (2026-09-30); se buscaba un parche muerto (`#map-picker-modal[style*="flex"]`) y resulto que el modal NUNCA podia abrir.
+**Sintoma:** al pulsar el boton de seleccion de ubicacion, el modal del selector de mapa no se mostraba.
+**Causa raiz:** el div tenia `id="map-picker-modal"` pero **NO la clase** `map-picker-modal`. `map-picker.js` abre el modal con `classList.add('open')` (no con un `display:flex` inline), de modo que ni el selector `.map-picker-modal.open` ni el parche `#map-picker-modal[style*="flex"]` podian coincidir jamas (el parche era codigo muerto).
+**Fix:** se agrego `class="map-picker-modal"` al div, se quito el `display:none` inline para que la clase gobierne la visibilidad, y se elimino el parche muerto `#map-picker-modal[style*="flex"]`. Esto repara de paso el boton "Seleccionar ubicacion" del admin.
+**Verificacion (ADR-006):** lectura del archivo real: `admin.html` con `class="map-picker-modal"` (L2470) y el CSS `.map-picker-modal{display:none}` / `.map-picker-modal.open{display:flex}` (L266-267); `map-picker.js:79` (`modalElId = opts.modalEl || 'map-picker-modal'`) abre por `classList.add('open')`. `npm test` EXIT 0; `express_check admin.html` divs 1082/1082.
+**Archivos:** `admin.html`.
+**Estado:** CERRADO (2026-09-30) en la misma tanda. Ver `TASKS.md` TSK-169.
+
+## BUG-096: el drawer del mapa no se veia en pantalla completa (era hermano del elemento en fullscreen)
+
+**Severidad:** MEDIA (rompia la lectura del mapa en pantalla completa: el motor abria el drawer pero este no aparecia).
+**Contexto:** detectado al probar el NUEVO control de pantalla completa (`mapa-fullscreen.js`) en el mapa del home, en la tanda TSK-169 (2026-09-30).
+**Sintoma:** al entrar a pantalla completa en el mapa y abrir el drawer de un pin, el drawer no se veia.
+**Causa raiz:** `.mapa-drawer` era HERMANO de `.mapa-map-container`. En Fullscreen API nativa solo se renderiza el subarbol del elemento en pantalla completa, asi que el drawer (que el motor SI abria) quedaba fuera del arbol visible. En el fallback CSS `.mfs-pseudo` pasaba lo mismo invertido: el contenedor subia a `z-index:10000` y tapaba el drawer (`z-index:1200`).
+**Fix:** `#mapa-drawer` se movio DENTRO de `.mapa-map-container`. Verificado en `mapa-cultural.js:681-707` (`resolveDrawer`) que el motor REUTILIZA el elemento del HTML cuando la opcion `drawer` es un string (y `INDEX_MC_OPTS` pasa `'mapa-drawer'`); `resolveDrawer` solo crea un drawer propio cuando la opcion vale `true` (en ese caso, el nodo seguiria dentro del contenedor en fullscreen).
+**Verificacion (ADR-006):** lectura del archivo real de `resolveDrawer` (`mapa-cultural.js:681-707`) y de `INDEX_MC_OPTS` (`drawer: 'mapa-drawer'`); `npm test` EXIT 0 (incluye `smoke_mapa_cultural`, que no se rompe porque el drawer reutilizado sigue siendo referenciado por id).
+**Archivos:** `index.html`.
+**Estado:** CERRADO (2026-09-30) en la misma tanda. Ver `TASKS.md` TSK-169 y `DECISIONS.md` ADR-075.
+

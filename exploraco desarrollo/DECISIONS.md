@@ -4068,3 +4068,40 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Nota sobre BUG-092:** BUG-092 **permanece CERRADO** en su sintoma (los subagentes volvieron a responder); lo que queda SUPERSEDIDO es su "Resolucion aplicada" (mover todo el roster a `opencode-go`), porque su premisa (no hay modelo gratuito utilizable como subagente) era incompleta. El registro historico de BUG-092 NO se reabre ni se borra (Cero Borrado Logico); la constancia renovada vive en `BUGS_HISTORICOS.md` BUG-094.
 
 **ADRs relacionados:** ADR-067 (modelo de 3 capas con presupuesto; este ADR lo hace real y verificable), ADR-048 (esquema tripartito de orquestacion), ADR-001/ADR-010 (presupuesto 8/8; este ADR no toca `api/*`). TSK-165 (seguimiento TSK-166/167/168). Bugs: BUGS_HISTORICOS.md BUG-092 (premisa incompleta) y BUG-094 (nuevo).
+
+---
+
+## ADR-075: Control compartido de pantalla completa FUERA de los motores de mapa (`mapa-fullscreen.js`)
+
+**ID:** ADR-075
+**Fecha:** 2026-09-30
+**Autor:** Chief Architect (AI-DOS) / implementacion de frontend de la tanda TSK-169
+**Estado:** ACEPTADO E IMPLEMENTADO (2026-09-30); commiteado y pusheado (`d4ab733` = `origin/main`).
+**Nota de numeracion:** el mayor ADR registrado en este documento era ADR-074 (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 075 es el siguiente consecutivo real.
+
+**Contexto / Problema:** se necesitaba un control de pantalla completa en los mapas Leaflet del sitio (home/`index.html` y los dos mapas de `admin.html`: mini-mapa y selector). Los dos mapas se construyen sobre motores compartidos: `mapa-cultural.js` (el motor del mapa cultural, que el index instancia via `INDEX_MC_OPTS`) y `map-picker.js` (el selector de coordenadas del admin). El candidato "obvio" era meter el control dentro de esos motores, para que todo consumidor lo heredara sin tocar cada pagina.
+
+**Opciones evaluadas:**
+1. **Meter el control dentro de los motores compartidos** (`mapa-cultural.js` y `map-picker.js`): maxima reutilizacion, cero codigo en las paginas.
+2. **Helper aparte** (`mapa-fullscreen.js`) que cada consumidor engancha explicitamente pasando `target`/`mapEl`/`getMap`.
+3. **Implementar el control inline y por duplicado** en `index.html` y `admin.html`.
+
+**Decision tomada (opcion 2):** crear `mapa-fullscreen.js` como helper aparte en la raiz, con contrato `attach({target, mapEl, getMap, label})`:
+1. **NO se toca `mapa-cultural.js` ni `map-picker.js`.** Motivo duro (verificado, ADR-006): meter el control en `mapa-cultural.js` rompe **8 asserts de `smoke_mapa_cultural.js`** -- el stub de `L` no tiene `L.control` y el stub de elemento no tiene `insertAdjacentHTML`; el `TypeError` resultante lo traga el `catch` de `mapa-cultural.js:1919-1921` (patron de `catch` vacios), lo que se SALTA `bindCategories`/`bindList`/`renderMarkers`. El motor es compartido y esta blindado por smoke; no se ensucia por una capa de UI de una pagina.
+2. **Fallback CSS (`.mfs-pseudo`):** se usa la Fullscreen API nativa (`requestFullscreen`/`document.fullscreenElement`) y, cuando NO existe (iPhone Safari), se degrada a una clase CSS que fija el contenedor al viewport (`position:fixed;inset:0;z-index:10000`). El control arranca en todas las superficies, no solo en las que soportan la API.
+3. **`map.invalidateSize()` es OBLIGATORIO al entrar y al salir** de pantalla completa, porque **el motor del mapa NO observa el tamano del contenedor** (no usa ResizeObserver/matchMedia/invalidateSize). Sin la llamada, Leaflet conserva el tamano previo y las teselas quedan desalineadas.
+4. **El boton debe vivir DENTRO del elemento que se pone en pantalla completa.** Es la regla que hace que los overlays del motor (p.ej. el drawer) sigan siendo visibles: en Fullscreen API nativa solo se renderiza el subarbol del elemento en fullscreen, y en el fallback CSS el contenedor sube a `z-index:10000`; cualquier overlay que sea HERMANO del contenedor queda fuera del arbol visible o tapado. De ahi que `#mapa-drawer` se moviera DENTRO de `.mapa-map-container` (ver BUG-096) y que `.mapa-filters` pasara a overlay DENTRO del contenedor.
+
+**Justificacion:** el control es una capa de UI de pagina, no una responsabilidad del motor de mapa. El smoke de `mapa-cultural.js` es la red que prohibe meterlo ahi (romperia render real, no solo el test). Un helper aparte es testeable aislado, no altera el contrato de los motores y permite el fallback CSS sin condicionar el motor. La regla "boton dentro del elemento en fullscreen" evita por diseno la clase de bug del drawer invisible.
+
+**Impacto / superficies:** NUEVO `mapa-fullscreen.js` (271 lineas, ASCII puro, IIFE ES5); `index.html` (`<script ?v=1>`, `id="mapa-map-container"`, `initMapaFullscreen()`); `admin.html` (script `?v=1`, control en `esb-mini-map-wrap` y `map-picker-el`, mini-mapa envuelto en wrapper `position:relative` porque `map-picker.js` limpia el `innerHTML` al (re)inicializar). `mapa-cultural.js` y `map-picker.js` **NO se tocaron**.
+
+**Evidencia (ADR-006):** `node --check mapa-fullscreen.js` OK; **0 bytes > 127 y 0 backticks** (ASCII-safe); `npm test` **EXIT 0** con `smoke_mapa_cultural` y `smoke_mapa_tiles` incluidos; `express_check index.html` divs **371/371**. Documentacion: TASKS.md TSK-169.
+
+**Consecuencias (positivas):** los motores compartidos quedan intactos (menor riesgo de regresion de render); el control es reusable en cualquier mapa que exponga un `getMap()`; el fallback CSS cubre navegadores sin Fullscreen API.
+
+**Consecuencias (negativas / aceptadas):** sin smoke automatizado para `mapa-fullscreen.js` ni para el drawer-en-fullscreen (verificado a mano); requiere enganche explicito por consumidor (no es automatico via motor); el cache-bust `?v=1` debe bumperse si se edita el archivo (patron BUG-073).
+
+**Deuda / riesgos [DEUDA-EXPRESS]:** (a) sin smoke de `mapa-fullscreen.js`/drawer-en-fullscreen; (b) el titulo del `.mapa-topbar` no se ve en pantalla completa (esta fuera del contenedor): intencional (estilo Google Maps), anotado; (c) la barra de chips `.mapa-filters` captura el toque en la franja superior del mapa (~38px), puede molestar al arrastrar en mobile; (d) revisar contraste de los chips sobre tiles claros si cambia el tema del mapa.
+
+**ADRs relacionados:** ADR-001 (prohibicion de frameworks), ADR-002 (ASCII-safe), ADR-004 (scoped CSS), ADR-006 (baseline de verdad), ADR-010 (presupuesto 8/8; este ADR no toca `api/*`). TSK-169. Bugs: BUGS_HISTORICOS.md BUG-095 y BUG-096.
