@@ -892,6 +892,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
 <script src="mapa-cultural.js?v=11"></script>
+<script src="mapa-fullscreen.js?v=1"></script>
 <style>
 /* ec-welcome overlay: onboarding de primer acceso. Prefijo wl- exclusivo. */
 .wl-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;background:rgba(5,8,16,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-family:'Outfit',sans-serif;color:#F9FAFB;animation:wlFade .22s ease}
@@ -1142,7 +1143,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
   </div>
   <div class="mapa-body-grid">
     <div class="mapa-list-panel"><div class="mapa-list-inner" id="mapa-list-inner"></div></div>
-    <div class="mapa-map-container"><div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div></div>
+    <div class="mapa-map-container" id="mapa-map-container"><div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div></div>
   </div>
   <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
     <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
@@ -2331,6 +2332,7 @@ var INDEX_MC_OPTS = {
 };
 
 function initMapaSection() {
+  initMapaFullscreen();
   if(typeof window.MapaCultural === 'undefined') return null;
   if(!mcMapa) {
     mcMapa = window.MapaCultural.init(INDEX_MC_OPTS);
@@ -2366,6 +2368,20 @@ function geolocateMapa(b) {
 
 function resetMapaColombia() {
   if(mcMapa) mcMapa.resetColombia();
+}
+
+// Pantalla completa del mapa cultural (control compartido mapa-fullscreen.js).
+// El boton se inyecta arriba-derecha del contenedor; el motor del mapa NO
+// observa el tamano del contenedor, por eso el control llama invalidateSize()
+// al entrar y salir (si no, el mapa queda en blanco/desplazado).
+function initMapaFullscreen() {
+  if(!window.MapaFullscreen) return null;
+  return window.MapaFullscreen.attach({
+    target: 'mapa-map-container',
+    mapEl: 'leaflet-map',
+    getMap: function() { return mcMapa ? mcMapa.getMap() : null; },
+    label: 'Pantalla completa del mapa'
+  });
 }
 
 function closeMapaDrawer() {
