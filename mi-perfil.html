@@ -592,6 +592,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-museo-preview{min-height:110px;border:1px dashed rgba(255,255,255,.15);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(0,0,0,.25)}
 .pf-museo-preview img,.pf-museo-preview video{max-width:100%;max-height:220px;display:block}
 .pf-museo-preview audio{width:100%;padding:8px}
+/* El iframe de Spotify (reproductor oficial) es el unico medio que no lleva
+   etiqueta multimedia propia: se alinea como bloque y respeta el ancho. */
+.pf-museo-preview iframe.pf-museo-spotify{display:block;width:100%;max-width:660px;margin:0 auto;border-radius:10px}
 .pf-museo-preview .pf-museo-ph{font-size:11px;color:rgba(255,255,255,.35);padding:18px;text-align:center}
 .pf-museo-minimap{height:150px;border-radius:var(--r);overflow:hidden;margin:8px 0;background:var(--bg2)}
 .pf-museo-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
@@ -1034,6 +1037,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <input type="text" id="museo-f-caption" class="pf-museo-input" maxlength="200" placeholder="Titulo del recurso">
         </div>
       </div>
+      <div class="pf-museo-field" id="museo-miniatura-wrap" style="display:none">
+        <label class="pf-museo-lbl" for="museo-f-miniatura">Imagen de muestra del video/audio (obligatoria, salvo Spotify)</label>
+        <input type="url" id="museo-f-miniatura" class="pf-museo-input" maxlength="2000" placeholder="https://... o sube una imagen" oninput="museoActualizarPreview()">
+        <button type="button" onclick="museoElegirMiniatura()" style="margin-top:6px;padding:6px 12px;background:rgba(255,74,0,.15);border:1px solid rgba(255,74,0,.4);border-radius:6px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">&#x2B06; Subir imagen</button>
+        <div class="pf-museo-hint" id="museo-f-miniatura-msg"></div>
+      </div>
       <div class="pf-museo-field" id="museo-destino-wrap" style="display:none">
         <label class="pf-museo-lbl" for="museo-f-destino-q">Etiquetar en un lugar o evento</label>
         <input type="text" id="museo-f-destino-q" class="pf-museo-input" maxlength="60" placeholder="Busca un lugar o evento por nombre..." oninput="buscarDestinoMuseo(this.value)" autocomplete="off">
@@ -1228,6 +1237,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="map-picker.js?v=2"></script>
 <!-- ADR-052: media-actions.js (voto/guardado compartido) antes del inline -->
 <script src="media-actions.js"></script>
+<script src="media-embed.js?v=1"></script>
 <script src="media-upload.js"></script>
 <script src="mercado.js?v=1"></script>
 <script>
@@ -2380,6 +2390,212 @@ function cargarMisAlbumes() {
    de baja de bookmark (quitar_guardado_media). Las tarjetas comparten el
    helper mediaCardHTML() para no duplicar el markup de miniatura. Los
    guardados son privados por decision de producto: solo se pintan aqui. */
+/* ---- PORTADAS DE AUDIO/VIDEO (caratulas) ----
+   BUG que cierra esto: para foto_type video/audio la URL del recurso es un
+   .mp3/.mp4 o un link de Spotify y se estaba metiendo en un <img src>. El
+   navegador intentaba decodificarla como imagen, fallaba y el onerror la
+   ocultaba, dejando un hueco vacio de 140px. Regla critica e inviolable: un
+   <img src> NUNCA apunta a un archivo de audio/video ni a una URL de Spotify.
+   Prioridad de render en mpPortadaHTML():
+     1. miniatura de la columna (mpMiniaturaDe)
+     2. si no hay, placeholder con icono (mismo lenguaje que la vista de dueno)
+     3. si la URL es de Spotify, el navegador la resuelve por oEmbed y la
+        portada MEJORA en sitio cuando llega la respuesta
+   En los tres casos hay siempre una imagen o un placeholder: nunca un hueco. */
+
+/* El backend expone la columna album_fotos.miniatura_url (migracion 043) con
+   el alias que elija su lector: miniatura_url, media_miniatura o poster_url.
+   Se aceptan todos para que el render no se rompa si el nombre no coincide. */
+function mpMiniaturaDe(m) {
+  if (!m) return '';
+  return m.miniatura_url || m.media_miniatura || m.poster_url || m.poster || '';
+}
+
+/* true solo para audio/video: los unicos tipos con caratula propia. */
+function mpEsAudioVideo(tipo) {
+  return tipo === 'audio' || tipo === 'video';
+}
+
+/* URL que NO es una imagen. Si da true, jamas puede ir en un <img src>.
+   Cubre las extensiones de medios y los dominios que sirven media/embed. */
+function mpEsUrlRecurso(url) {
+  var s = String(url || '').trim();
+  if (!s) return false;
+  var sinQuery = s.split('?')[0].split('#')[0].toLowerCase();
+  if (/\.(mp3|mp4|m4a|m4b|aac|wav|webm|mov|ogg|oga|ogv|opus|flac|3gp)$/.test(sinQuery)) return true;
+  if (/^spotify:/i.test(s)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*spotify\.(com|us|int|co|com\.br)\//i.test(s)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*youtube\.com\//i.test(s)) return true;
+  if (/^https?:\/\/youtu\.be\//i.test(s)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*vimeo\.com\//i.test(s)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*(facebook|fb|instagram|cdninstagram)\.com\//i.test(s)) return true;
+  return false;
+}
+
+/* Placeholder de foto: mismo bloque que usaba el else original. */
+function mpPhFotoHtml(alto) {
+  return '<div style="width:100%;height:' + alto + 'px;display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F4F7;</div>';
+}
+
+/* Placeholder de audio/video. Replica el lenguaje visual de la vista de
+   dueno del album: audio en morado #9b59b6 con nota musical, video en fondo
+   oscuro con el icono de play. El alto se parametriza porque la vista de
+   dueno usa 120px y mediaCardHTML 140px. */
+function mpPhHtml(tipo, alto, extra) {
+  var esAudio = (tipo === 'audio');
+  var fondo = esAudio ? 'background:rgba(155,89,182,.3);' : 'background:rgba(255,255,255,.08);';
+  return '<div' + (extra ? ' ' + extra : '') + ' data-mp-tipo="' + esc(tipo) + '"'
+    + ' style="width:100%;height:' + alto + 'px;display:flex;align-items:center;justify-content:center;'
+    + fondo + 'color:#fff;font-size:24px;">' + (esAudio ? '&#x266B;' : '&#x25B6;') + '</div>';
+}
+
+/* El <img> de portada fallo: se queda el PLACEHOLDER, no un hueco vacio.
+   Sustituye el img roto por el placeholder equivalente a su tipo. */
+function mpCoverError(img, alto) {
+  if (!img || !img.parentNode) return;
+  var h = alto || 140;
+  var tipo = img.getAttribute('data-mp-tipo') || 'foto';
+  var html = mpEsAudioVideo(tipo) ? mpPhHtml(tipo, h, '') : mpPhFotoHtml(h);
+  var tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  var fr = document.createDocumentFragment();
+  while (tmp.firstChild) fr.appendChild(tmp.firstChild);
+  img.parentNode.replaceChild(fr, img);
+}
+
+/* Capa de caratula: va ENCIMA del placeholder, que ya esta pintado debajo.
+   opacity 0 -> 1 en onload, asi no hay parpadeo; si falla, mpCoverError. */
+function mpCoverImgHTML(src, titulo, alto, tipo) {
+  return '<img src="' + esc(src) + '" alt="' + esc(titulo || '') + '" data-mp-tipo="' + esc(tipo) + '"'
+    + ' style="position:absolute;top:0;left:0;width:100%;height:' + alto + 'px;object-fit:cover;display:block;opacity:0;transition:opacity .15s ease;"'
+    + ' onload="if(this.style.opacity!==\'1\')this.style.opacity=1"'
+    + ' onerror="mpCoverError(this,' + alto + ')">';
+}
+
+/* Decision de portada. Devuelve el HTML para meter dentro de un contenedor
+   position:relative de alto "alto" px (el contenedor ya lo pone el llamante). */
+var mpSeq = 0;
+function mpPortadaHTML(url, tipo, alto, cover, titulo) {
+  /* Foto: la URL es una imagen. Si por datos sucios fuera un medio, cae al
+     placeholder en vez de romper la imagen. */
+  if (!mpEsAudioVideo(tipo)) {
+    if (url && !mpEsUrlRecurso(url)) {
+      return '<img src="' + esc(url) + '" alt="' + esc(titulo || '') + '" data-mp-tipo="foto"'
+        + ' style="width:100%;height:' + alto + 'px;object-fit:cover;display:block;" loading="lazy"'
+        + ' onerror="mpCoverError(this,' + alto + ')">';
+    }
+    return mpPhFotoHtml(alto);
+  }
+  /* Audio/video: la URL del recurso queda fuera del <img> para siempre. */
+  var c = (cover && !mpEsUrlRecurso(cover)) ? cover : '';
+  var cid = '';
+  if (!c && mpEsUrlSpotify(url)) cid = 'mpc' + (++mpSeq);
+  var html = mpPhHtml(tipo, alto, (cid ? 'data-mp-c="' + cid + '"' : ''));
+  if (c) html += mpCoverImgHTML(c, titulo, alto, tipo);
+  else if (cid) mpPedirCoverSpotify(cid, url);
+  return html;
+}
+
+/* URL del endpoint publico oEmbed de Spotify. Si el modulo compartido
+   (media-embed.js) ya esta cargado se delega en el; si no, se usa un
+   fallback local minimo que saca el id de track con un regex y arma la URL.
+   El fallback es temporal: media-embed.js lo resuelve. */
+function mpOembedSpotifyUrl(url) {
+  var M = window.ExploraMediaEmbed;
+  if (M && typeof M.spotifyOembedUrl === 'function') {
+    try { var u = M.spotifyOembedUrl(url); if (u) return u; } catch (e) { /* cae al local */ }
+  }
+  var s = String(url || '').trim();
+  var m = s.match(/^spotify:track:([A-Za-z0-9]{22})/i)
+    || s.match(/^https?:\/\/open\.spotify\.(?:com|us)\/(?:intl-[A-Za-z]{2,5}\/)?track\/([A-Za-z0-9]{22})/i);
+  if (!m) return '';
+  return 'https://open.spotify.com/oembed?url=' + encodeURIComponent('https://open.spotify.com/track/' + m[1]);
+}
+
+function mpEsUrlSpotify(url) {
+  var M = window.ExploraMediaEmbed;
+  if (M && typeof M.spotifyTrackId === 'function') {
+    try { if (M.spotifyTrackId(url)) return true; } catch (e) { /* cae al local */ }
+  }
+  /* Solo "track", igual que el modulo compartido: oEmbed no se usa para
+     album/playlist/show, asi que esos recursos siguen con su placeholder. */
+  var s = String(url || '').trim();
+  return /^spotify:track:/i.test(s)
+    || /^https?:\/\/([a-z0-9-]+\.)*open\.spotify\.(?:com|us)\/(?:intl-[A-Za-z]{2,5}\/)?track\//i.test(s);
+}
+
+/* true si la URL es un track de Spotify VALIDO para la regla de la imagen de
+   muestra. Mismo criterio EXACTO que el espejo servidor esUrlTrackSpotify
+   (api/interacciones.js) y que API.spotifyTrackId (media-embed.js): solo el
+   tipo "track" (episode, album, playlist y show NO cuentan), id de
+   exactamente 22 caracteres base62, y se aceptan el prefijo de locale
+   /intl-xx/ y el host open.spotify.com y open.spotify.us.
+   Se separa de mpEsUrlSpotify porque aquella solo mira la RUTA /track/ y no
+   la longitud del id: un id corto NO es un track valido y el backend si lo
+   rechaza, asi que el formulario tiene que rechazarlo igual. */
+function museoEsTrackSpotify(url) {
+  var M = window.ExploraMediaEmbed;
+  if (M && typeof M.spotifyTrackId === 'function') {
+    try { if (M.spotifyTrackId(url)) return true; } catch (e) { /* cae al local */ }
+  }
+  var s = String(url == null ? '' : url).trim();
+  if (!s) return false;
+  var m = /^https?:\/\/open\.spotify\.(?:com|us)\/(?:intl-[A-Za-z]{2,5}\/)?track\/([A-Za-z0-9]{22})(?:[?#].*)?$/i.exec(s)
+    || /^spotify:track:([A-Za-z0-9]{22})(?:[?#].*)?$/i.exec(s);
+  return !!(m && /^[A-Za-z0-9]{22}$/.test(m[1]));
+}
+
+/* oEmbed es asincrono: se pinta el placeholder y la portada MEJORA cuando
+   llega la respuesta. Si oEmbed no responde, se queda el placeholder. */
+var mpOembedCache = {};
+function mpPedirCoverSpotify(cid, url) {
+  var endpoint = mpOembedSpotifyUrl(url);
+  if (!cid || !endpoint || typeof fetch !== 'function') return;
+  var e = mpOembedCache[endpoint];
+  /* Ya resuelta antes: se reutiliza sin volver a pegarle a oEmbed. */
+  if (e && e.src) { mpPonerCover(cid, e.src, url); return; }
+  /* Primera vez (o peticion en vuelo): se registra el cid y se espera. */
+  if (!e) { e = mpOembedCache[endpoint] = { src: '', cids: [] }; mpResolverOembed(endpoint, e); }
+  e.cids.push(cid);
+}
+
+/* Una sola peticion por track: cuando responde, MEJORA todas las tarjetas
+   que estaban esperando (la rejilla repite el mismo track varias veces). */
+function mpResolverOembed(endpoint, e) {
+  try {
+    fetch(endpoint)
+      .then(function (r) { return (r && r.ok) ? r.json() : null; })
+      .then(function (j) { e.src = (j && j.thumbnail_url) ? j.thumbnail_url : ''; })
+      .catch(function () { e.src = ''; })
+      .then(function () {
+        if (!e.src) return;
+        e.cids.forEach(function (c) { mpPonerCover(c, e.src); });
+        e.cids = [];
+      });
+  } catch (err) { e.src = ''; }
+}
+
+/* Inserta la caratula de Spotify sobre el placeholder ya pintado. Si la
+   tarjeta se re-rendizo mientras tanto, el cid ya no existe y no hace nada. */
+function mpPonerCover(cid, src, urlRecurso) {
+  if (!cid || !src || mpEsUrlRecurso(src)) return;
+  var ph = document.querySelector('[data-mp-c="' + cid + '"]');
+  if (!ph || !ph.parentNode) return;
+  if (ph.parentNode.querySelector('img')) return;
+  var alto = parseInt(ph.style.height, 10) || 140;
+  var tipo = ph.getAttribute('data-mp-tipo') || 'video';
+  var img = document.createElement('img');
+  img.alt = '';
+  img.setAttribute('data-mp-tipo', tipo);
+  img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:' + alto + 'px;object-fit:cover;display:block;opacity:0;transition:opacity .15s ease;';
+  img.onload = function () { this.style.opacity = '1'; };
+  img.onerror = function () { mpCoverError(this, alto); };
+  img.src = src;
+  /* Blindaje: la URL del recurso nunca llega al src, solo la caratula. */
+  if (urlRecurso && mpEsUrlRecurso(img.src) && img.src !== src) img.src = '';
+  ph.parentNode.insertBefore(img, ph.nextSibling);
+}
+
 function mediaCardHTML(m, opts) {
   opts = opts || {};
   var esViajeroFoto = m.fuente === 'viajero_foto';
@@ -2398,10 +2614,10 @@ function mediaCardHTML(m, opts) {
   var thumb;
   if (esViajeroFoto) {
     thumb = '<div style="width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:28px;">&#x1F5FA;</div>';
-  } else if (url) {
-    thumb = '<img src="' + esc(url) + '" alt="' + esc(titulo) + '" style="width:100%;height:140px;object-fit:cover;display:block;" loading="lazy" onerror="this.style.display=\'none\'">';
   } else {
-    thumb = '<div style="width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F4F7;</div>';
+    /* mpPortadaHTML decide: foto -> <img>; audio/video -> caratula si hay
+       miniatura, placeholder si no. La URL del recurso nunca llega al <img>. */
+    thumb = mpPortadaHTML(url, tipoMedia, 140, mpMiniaturaDe(m), titulo);
   }
   var btn = opts.quitar
     ? '<button onclick="quitarGuardadoMedia(\'' + esc(m.fuente) + '\',\'' + esc(m.item_id) + '\')" style="margin-top:8px;width:100%;padding:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:6px;color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;">Quitar</button>'
@@ -2599,7 +2815,7 @@ function misEspacioSync(m) {
 function misEspacioPreview(m) {
   var url = m.media_url || m.foto_url || '';
   if (!url) return '<div class="pf-museo-ph">Este recurso no tiene vista previa.</div>';
-  return mediaPreviewHTML(url, m.media_type || m.foto_type || 'foto');
+  return mediaPreviewHTML(url, m.media_type || m.foto_type || 'foto', mpMiniaturaDe(m));
 }
 
 function misAbrirEspacio(fuente, itemId) {
@@ -2938,11 +3154,32 @@ function museoPreviewError(el) {
 }
 
 /* Vista previa de media reutilizada por el Museo y por el espacio del
-   recurso guardado (Regla de No-Duplicidad). */
-function mediaPreviewHTML(url, tipo) {
+   recurso guardado (Regla de No-Duplicidad). El 3er parametro (miniatura) es
+   opcional: si no se pasa, el comportamiento es el de siempre. */
+function mediaPreviewHTML(url, tipo, miniatura) {
+  /* Spotify ANTES que audio/video: un <audio src="https://open.spotify.com/track/...">
+     NO reproduce nada (esa URL devuelve una pagina HTML, no un stream), asi que
+     el recurso se abre con el iframe oficial. Criterio VALIDO: se delega en
+     media-embed.js (kind === 'spotify'), que exige tipo track y 22 chars base62.
+     No se usa mpEsUrlSpotify porque esa solo mira la RUTA /track/. Si el modulo
+     no esta cargado, se degrada al comportamiento de siempre sin lanzar error. */
+  var ME = window.ExploraMediaEmbed;
+  if (ME && typeof ME.kind === 'function' && typeof ME.spotifyEmbedIframe === 'function') {
+    var esTrack = false;
+    try { esTrack = ME.kind(url) === 'spotify'; } catch (e) { esTrack = false; }
+    if (esTrack) {
+      var ifr = ME.spotifyEmbedIframe(url, ME.ALTURA_SPOTIFY_ANCHA, 'pf-museo-spotify');
+      if (ifr) return ifr;
+    }
+  }
   var sUrl = esc(url);
+  /* El poster solo puede venir de la columna de miniatura, nunca del recurso. */
+  var poster = (miniatura && !mpEsUrlRecurso(miniatura)) ? ' poster="' + esc(miniatura) + '"' : '';
   if (tipo === 'audio') return '<audio controls preload="none" src="' + sUrl + '" onerror="museoPreviewError(this)"></audio>';
-  if (tipo === 'video') return '<video controls preload="none" src="' + sUrl + '" onerror="museoPreviewError(this)"></video>';
+  if (tipo === 'video') return '<video controls preload="none" src="' + sUrl + '"' + poster + ' onerror="museoPreviewError(this)"></video>';
+  /* Foto: si la URL no es una imagen (un .mp4 mal tipado, por ejemplo) no se
+     pinta un <img> roto: se avisa con el placeholder. */
+  if (mpEsUrlRecurso(url)) return mpPhFotoHtml(120);
   return '<img src="' + sUrl + '" alt="" onerror="museoPreviewError(this)">';
 }
 
@@ -2953,8 +3190,15 @@ function museoActualizarPreview() {
   var tipoEl = document.getElementById('museo-f-tipo');
   var url = urlEl ? (urlEl.value || '').trim() : '';
   var tipo = tipoEl ? (tipoEl.value || 'foto') : 'foto';
+  var minEl = document.getElementById('museo-f-miniatura');
+  var miniatura = minEl ? (minEl.value || '').trim() : '';
+  /* El campo de caratula solo aplica a audio/video y la URL de Spotify se
+     autocompleta. Se llama desde aqui porque el preview se refresca en cada
+     cambio de URL, de tipo y de caratula. */
+  museoToggleCampoMiniatura();
+  if (url) museoAutoCoverSpotify(url);
   if (!url) { prev.innerHTML = '<div class="pf-museo-ph">Pega un link para ver la vista previa.</div>'; return; }
-  prev.innerHTML = mediaPreviewHTML(url, tipo);
+  prev.innerHTML = mediaPreviewHTML(url, tipo, miniatura);
 }
 
 function museoUrlValida(url) { return /^https?:\/\//i.test(url) && url.length <= 2000; }
@@ -3049,6 +3293,10 @@ function museoAbrirModal(id, modo) {
   museoSet('museo-f-url', rec ? (rec.foto_url || '') : '');
   museoSet('museo-f-tipo', rec ? (rec.tipo_media || 'foto') : 'foto');
   museoSet('museo-f-caption', rec ? (rec.media_title || '') : '');
+  /* Caratula existente (alias del backend). Si no hay, el campo queda vacio
+     y el aviso discreto aparece al pintar el preview: no se bloquea la
+     edicion de un recurso antiguo. */
+  museoSet('museo-f-miniatura', rec ? mpMiniaturaDe(rec) : '');
   museoSet('museo-f-ciudad', rec ? (rec.ciudad || '') : '');
   museoSet('museo-f-destino-id', rec ? (rec.destino_id || '') : '');
   museoSet('museo-f-destino-q', '');
@@ -3106,6 +3354,87 @@ function museoElegirArchivo() {
 
 function museoDrop(ev) {
   muDrop(ev, 'museo-f-url', museoContextoSubida(), null, museoTrasSubir);
+}
+
+/* ---- CARATULA DEL RECURSO (miniatura_url) ----
+   Una foto ya es su propia portada, asi que el campo solo aparece para
+   video/audio. Es OPCIONAL: sin caratula se ve el icono del tipo, nunca un
+   hueco ni una imagen rota. */
+
+/* Sube una imagen de muestra con el flujo compartido de medios
+   (muElegirArchivo de media-upload.js / mi-perfil.html, sin tocarlo). */
+function museoElegirMiniatura() {
+  muElegirArchivo('museo-f-miniatura', museoContextoSubida(), 'foto', function () {
+    museoActualizarPreview();
+  });
+}
+
+/* Muestra u oculta el campo segun el tipo, y da el aviso de la caratula.
+   Nunca un error que bloquee: en EDICION un recurso antiguo sin caratula se
+   sigue editando (el backend tampoco lo exige en editar). */
+function museoToggleCampoMiniatura() {
+  var wrap = document.getElementById('museo-miniatura-wrap');
+  if (!wrap) return;
+  var tipoEl = document.getElementById('museo-f-tipo');
+  var tipo = tipoEl ? (tipoEl.value || 'foto') : 'foto';
+  var aplica = mpEsAudioVideo(tipo);
+  wrap.style.display = aplica ? '' : 'none';
+  var msg = document.getElementById('museo-f-miniatura-msg');
+  var inp = document.getElementById('museo-f-miniatura');
+  if (!msg || !inp || !aplica) return;
+  var val = (inp.value || '').trim();
+  if (val) {
+    var okUrl = /^https?:\/\//i.test(val) && val.length <= 2000;
+    msg.textContent = okUrl
+      ? 'Imagen de muestra lista.'
+      : 'El link debe empezar por http:// o https:// y medir maximo 2000 caracteres.';
+    msg.className = 'pf-museo-hint ' + (okUrl ? 'good' : 'bad');
+    return;
+  }
+  /* Sin caratula: en un ALTA es obligatoria para video/audio (la exige el
+     backend al crear), SALVO que la URL sea un track de Spotify valido: su
+     caratula es publica y el navegador la trae solo por oEmbed, asi que si
+     esa consulta falla se queda el placeholder y no se bloquea el alta. Al
+     EDITAR es solo un aviso discreto (el backend tampoco lo exige). El texto
+     se lee del propio campo de URL para no mentir sobre lo que hay escrito. */
+  var urlEl = document.getElementById('museo-f-url');
+  var esTrack = urlEl ? museoEsTrackSpotify(urlEl.value) : false;
+  if (esTrack) {
+    msg.textContent = 'Un track de Spotify trae su propia caratula: se rellena sola y no es obligatorio anadirla.';
+    msg.className = 'pf-museo-hint';
+    return;
+  }
+  msg.textContent = museoEditandoId
+    ? 'Este recurso no tiene imagen de muestra. Puedes anadirla o guardar igual.'
+    : 'Obligatoria al agregar un video o un audio: sube una imagen o pega un link.';
+  msg.className = 'pf-museo-hint' + (museoEditandoId ? '' : ' bad');
+}
+
+/* Ultima URL de Spotify consultada por oEmbed. El preview se refresca en
+   cada tecla pulsada, asi que se cachea para no pedir la misma URL dos veces. */
+var museoOembedUrl = '';
+
+/* Al pegar un link de Spotify la caratula se resuelve sola por el endpoint
+   publico oEmbed. Solo rellena el campo si esta vacio: nunca pisa lo que el
+   usuario escribio a mano. Si oEmbed falla, el placeholder hace su trabajo. */
+function museoAutoCoverSpotify(url) {
+  if (!mpEsUrlSpotify(url)) { museoOembedUrl = ''; return; }
+  if (url === museoOembedUrl) return;
+  var endpoint = mpOembedSpotifyUrl(url);
+  if (!endpoint || typeof fetch !== 'function') return;
+  museoOembedUrl = url;
+  try {
+    fetch(endpoint)
+      .then(function (r) { return (r && r.ok) ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.thumbnail_url) return;
+        var inp = document.getElementById('museo-f-miniatura');
+        if (!inp) return;
+        if (!(inp.value || '').trim()) inp.value = j.thumbnail_url;
+        museoActualizarPreview();
+      })
+      .catch(function () { /* sin caratula automatica: el usuario puede ponerla */ });
+  } catch (e) { /* idem */ }
 }
 
 function museoModoPublicacion(modo) {
@@ -3174,6 +3503,8 @@ function museoGuardar() {
   var url = (document.getElementById('museo-f-url').value || '').trim();
   var tipo = (document.getElementById('museo-f-tipo').value || 'foto');
   var caption = (document.getElementById('museo-f-caption').value || '').trim();
+  var minEl = document.getElementById('museo-f-miniatura');
+  var miniatura = minEl ? (minEl.value || '').trim() : '';
   if (caption.length > 200) { toastError('El titulo admite maximo 200 caracteres'); return; }
   /* Modo Perfil: la foto va al perfil (/api/usuarios tipo=foto_agregar). */
   if (!esEdicion && museoModoPub === 'perfil') {
@@ -3203,6 +3534,31 @@ function museoGuardar() {
   var body = esEdicion
     ? { accion: 'editar', id: museoEditandoId, caption: caption, visible: visible }
     : { accion: 'crear', url: url, tipo_media: tipo, caption: caption, visible: visible };
+  /* La imagen de muestra es OBLIGATORIA al CREAR un video o un audio: lo
+     exige api/interacciones.js (rama crear) y devuelve 400 sin ella. Se
+     valida aqui para avisar en el formulario y no con un error tras el POST.
+     EXCEPCION Spotify (misma regla que el backend): si la URL es un track
+     de Spotify valido NO se bloquea el alta, porque su caratula es publica y
+     este mismo form la trae por oEmbed (museoAutoCoverSpotify); si oEmbed no
+     responde, la columna queda en NULL y el placeholder del preview cubre el
+     hueco. Cualquier otro medio (un .mp4 o un .mp3) sigue bloqueado.
+     En EDICION no se exige, ni aqui ni en el backend: un recurso antiguo sin
+     caratula se puede seguir editando, y este es el sitio natural para
+     anadirla. */
+  if (!esEdicion && mpEsAudioVideo(tipo) && !miniatura && !museoEsTrackSpotify(url)) {
+    museoFormMsg('Agrega una imagen de muestra para el video o el audio.', false);
+    toastError('Los recursos de video y audio requieren imagen de muestra');
+    return;
+  }
+  if (miniatura && (!/^https?:\/\//i.test(miniatura) || miniatura.length > 2000)) {
+    museoFormMsg('La imagen de muestra debe ser un link http o https.', false);
+    toastError('Imagen de muestra invalida');
+    return;
+  }
+  /* miniatura_url: solo se envia con valor. Asi, al editar un recurso antiguo
+     SIN caratula, la clave no viaja y el backend no pisa lo que ya tenia; si
+     el usuario anade una, se envia y se guarda. */
+  if (miniatura) body.miniatura_url = miniatura;
   if (albumId) body.album_id = albumId;
   if (museoQuitarCoords) body.quitar_coords = true;
   else if (traeLat && (!esEdicion || usuarioFijoCoords)) { body.lat = lat; body.lng = lng; }
@@ -3394,6 +3750,8 @@ function renderDetalleGuardados(lista) {
       fuente: g.origen_fuente, item_id: g.id,
       foto_url: g.foto_url, foto_type: g.foto_type,
       media_url: g.foto_url, media_type: g.foto_type,
+      /* La miniatura viaja con el alias que exponga el backend. */
+      miniatura_url: mpMiniaturaDe(g),
       media_title: g.media_title, titulo: g.media_title, votos: g.votos
     }, { clickable: true, badgeHtml: badge });
   }).join('');
@@ -3463,12 +3821,13 @@ function verDetalleAlbum(albumId) {
         cell.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
         var card = document.createElement('div');
         card.style.cssText = 'border-radius:8px;overflow:hidden;background:rgba(255,255,255,.04);position:relative;';
-        if (f.foto_type === 'video') {
-          card.innerHTML = '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);color:#fff;font-size:24px;">&#x25B6;</div>';
-        } else if (f.foto_type === 'audio') {
-          card.innerHTML = '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:rgba(155,89,182,.3);color:#fff;font-size:24px;">&#x266B;</div>';
+        /* Audio/video: caratula si la hay, y si no el placeholder de siempre
+           (icono + fondo). Este bloque ya era correcto y mpPortadaHTML lo
+           replica tal cual; solo anade la capa de caratula. */
+        if (f.foto_type === 'video' || f.foto_type === 'audio') {
+          card.innerHTML = mpPortadaHTML(f.foto_url, f.foto_type, 120, mpMiniaturaDe(f), f.media_title || '');
         } else {
-          card.innerHTML = '<img src="' + esc(f.foto_url) + '" style="width:100%;height:120px;object-fit:cover;" loading="lazy" onerror="this.style.display=\'none\'">';
+          card.innerHTML = mpPortadaHTML(f.foto_url, 'foto', 120, '', f.media_title || '');
         }
         var puedeQuitar = esCreador || (uid && String(f.agregador_id) === String(uid));
         var btnQuitar = puedeQuitar

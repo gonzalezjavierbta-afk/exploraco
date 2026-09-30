@@ -210,6 +210,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .av-feed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .av-feed-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:center;cursor:pointer}
 .av-feed-card img,.av-feed-card video,.av-feed-card audio{max-width:100%}
+/* CAPA DE CARATULA DE AUDIO: el <audio> nativo no tiene atributo poster, asi
+   que la imagen va absolute ENCIMA del placeholder (ya pintado debajo). */
+.av-cover{position:relative;width:100%;overflow:hidden;background:#181818;border-radius:8px}
+.av-cover-ph{position:absolute;inset:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(255,255,255,.3)}
+.av-cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .15s ease}
 /* Detalle de media en pop up (reusa #av-album-modal al hacer click en una tarjeta del feed) */
 .av-media-detail{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
 .av-media-detail img,.av-media-detail video{max-width:100%;border-radius:10px;background:#000;display:block}
@@ -729,7 +734,8 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
-  <script src="mapa-cultural.js?v=10"></script>
+<script src="media-embed.js?v=1"></script>
+<script src="mapa-cultural.js?v=11"></script>
 <script src="media-actions.js"></script>
 <script src="mymapa.js?v=5"></script>
 <script src="mercado.js?v=1"></script>
@@ -2126,24 +2132,71 @@ function loadMultimediaMapa() {
     .catch(function(e) { console.error('[mapa-audio]', e); });
 }
 
+/* avEmbedUrl: wrapper FINO. Toda la logica de embed vive en
+   window.ExploraMediaEmbed (media-embed.js) para no duplicarla. */
 function avEmbedUrl(url) {
-  if (!url) return null;
-  var m = url.match(/youtube\.com\/watch\?v=([\w-]{6,})/);
-  if (m) return 'https://www.youtube.com/embed/' + m[1];
-  m = url.match(/youtu\.be\/([\w-]{6,})/);
-  if (m) return 'https://www.youtube.com/embed/' + m[1];
-  m = url.match(/vimeo\.com\/(\d+)/);
-  if (m) return 'https://player.vimeo.com/video/' + m[1];
-  return null;
+  if (!window.ExploraMediaEmbed) return null;
+  return window.ExploraMediaEmbed.embedUrl(url);
+}
+/* avMediaKind: clasificador compartido (youtube | vimeo | spotify | directo). */
+function avMediaKind(url) {
+  if (!window.ExploraMediaEmbed) return null;
+  return window.ExploraMediaEmbed.kind(url);
+}
+/* avMediaDe: delega en el helper NORMALIZADO del modulo compartido
+   (media-embed.js), que es el UNICO sitio donde vive el criterio de alias de
+   la miniatura (album_fotos.miniatura_url | media_miniatura). Aqui no se
+   reimplementa: si el asset no llego, el fallback degrada a vacio (se pierde
+   la miniatura, nunca se rompe el render). */
+function avMediaDe(item) {
+  var M = window.ExploraMediaEmbed;
+  if (M && typeof M.mediaDe === 'function') return M.mediaDe(item);
+  return { url: '', tipo: '', kind: null, esMedio: false, miniatura: '', caratula: '' };
+}
+/* avItemMedio: arma el objeto que consume avMediaHTML a partir del item CRUDO
+   del backend (mi_feed_fotos, multimedia_mapa). REGLA: al reconstruir este
+   objeto NO se descarta la miniatura; se lee con avMediaDe. */
+function avItemMedio(src, titulo) {
+  var m = avMediaDe(src);
+  return {
+    media_url: m.url,
+    media_type: m.tipo,
+    media_title: titulo || (src && src.media_title) || '',
+    miniatura_url: m.miniatura
+  };
+}
+/* Capa de caratula de un audio. El <audio> nativo NO tiene atributo poster
+   (a diferencia de <video>), asi que la imagen va en una capa absolute
+   ENCIMA de un placeholder ya pintado: opacidad 0 -> 1 en onload para que no
+   haya parpadeo, y si la imagen falla se oculta y queda el placeholder debajo.
+   Mismo patron que usa mi-perfil.html con mpPortadaHTML, pero aqui la URL sale
+   de avMediaDe().caratula, que ya garantiza que NO es un medio: un <img>
+   nunca apunta a un .mp3/.mp4 (invariante de media-embed.js). */
+function avCoverHTML(m, alto) {
+  var ph = '<div class="av-cover-ph">&#9835;</div>';
+  if (!m.caratula) return '<div class="av-cover" style="height:' + alto + 'px">' + ph + '</div>';
+  return '<div class="av-cover" style="height:' + alto + 'px">' + ph
+    + '<img class="av-cover-img" src="' + esc(m.caratula) + '" alt="' + esc(m.titulo || '') + '" loading="lazy"'
+    + ' onload="this.style.opacity=1" onerror="this.style.display=\'none\'"></div>';
 }
 function avMediaHTML(item, large) {
-  var url = esc(item.media_url || '');
-  var type = item.media_type;
+  var m = avMediaDe(item);
+  m.titulo = (item && item.media_title) || '';
+  var url = esc(m.url);
+  var type = m.tipo;
+  /* Spotify: solo tipo track. Iframe oficial, con altura ancha si large
+     y compacta si no. Va primero porque una URL de Spotify nunca es una imagen. */
+  if (m.kind === 'spotify') {
+    var M = window.ExploraMediaEmbed;
+    return '<div style="width:100%;max-width:' + (large ? '100%' : '340px') + ';background:#000;border-radius:10px;overflow:hidden;margin:0 auto">'
+      + M.spotifyEmbedIframe(m.url, large ? M.ALTURA_SPOTIFY_ANCHA : M.ALTURA_SPOTIFY_COMPACTA)
+      + '</div>';
+  }
   if (type === 'foto') {
     return '<img src="' + url + '" style="' + (large ? 'max-width:100%;max-height:60vh' : 'max-width:200px;max-height:150px') + ';border-radius:8px" loading="lazy" onerror="this.style.display=\'none\'">';
   }
   if (type === 'video') {
-    var embed = avEmbedUrl(item.media_url);
+    var embed = avEmbedUrl(m.url);
     if (embed) {
       var wrapStyle = large
         ? 'position:relative;width:100%;max-width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000'
@@ -2151,10 +2204,15 @@ function avMediaHTML(item, large) {
       return '<div style="' + wrapStyle + '">'
         + '<iframe src="' + esc(embed) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media" allowfullscreen></iframe></div>';
     }
-    return '<video controls src="' + url + '" style="' + (large ? 'max-width:100%' : 'max-width:200px;max-height:150px') + ';border-radius:8px;background:#000;display:block" preload="metadata"></video>';
+    /* Video directo: poster con la miniatura del backend. avMediaDe ya la
+       garantiza utilizable (si fuera un medio, caratula queda vacia). */
+    return '<video controls src="' + url + '"'
+      + (m.caratula ? ' poster="' + esc(m.caratula) + '"' : '')
+      + ' style="' + (large ? 'max-width:100%' : 'max-width:200px;max-height:150px') + ';border-radius:8px;background:#000;display:block" preload="metadata"></video>';
   }
   if (type === 'audio') {
-    return '<audio controls src="' + url + '" style="width:100%;' + (large ? 'max-width:100%' : 'max-width:200px') + ';display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
+    return avCoverHTML(m, large ? 220 : 150)
+      + '<audio controls src="' + url + '" style="width:100%;' + (large ? 'max-width:100%' : 'max-width:200px') + ';display:block;margin:0 auto" preload="none">Tu navegador no soporta audio.</audio>';
   }
   return '<div style="font-size:10px;color:#999;padding:6px">Tipo no soportado</div>';
 }
@@ -2176,7 +2234,7 @@ function renderAudiovisualMarkers() {
           : esc(autorNom))
       : '';
     var popupHtml = '<div class="av-popup">'
-      + avMediaHTML(item)
+      + avMediaHTML(avItemMedio(item))
       + '<div class="av-popup-title">' + esc(item.media_title || item.album_titulo || '') + '</div>'
       + '<div class="av-popup-meta">'
       + '<span class="av-popup-type">' + esc(item.media_type) + '</span>'
@@ -2296,7 +2354,7 @@ function abrirMediaModal(f) {
   modal.classList.add('on');
   var t = document.getElementById('av-album-bar-title');
   if (t) t.textContent = 'Publicaci\u00f3n';
-  var item = { media_url: f.foto_url, media_type: f.foto_type, media_title: f.media_title };
+  var item = avItemMedio(f);
   body.innerHTML = '<div class="av-media-detail">'
     + avMediaHTML(item, true)
     + (f.media_title ? '<div class="av-feed-title">' + esc(f.media_title) + '</div>' : '')
@@ -2488,7 +2546,7 @@ function cargarFeedAV() {
 function feedCardAV(f) {
   var card = document.createElement('div');
   card.className = 'av-feed-card';
-  var item = { media_url: f.foto_url, media_type: f.foto_type, media_title: f.media_title };
+  var item = avItemMedio(f);
   card.innerHTML = avMediaHTML(item)
     + (f.media_title ? '<div class="av-feed-title">' + esc(f.media_title) + '</div>' : '')
     + '<div class="av-feed-meta">' + esc(f.autor_nombre || 'Viajero')

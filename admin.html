@@ -1705,6 +1705,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
               <div class="form-group">
                 <label class="form-label">Video (YouTube o Vimeo)</label>
                 <input class="form-input" id="f-blog-video" type="url" placeholder="https://www.youtube.com/watch?v=…">
+                <div class="form-hint">Solo YouTube y Vimeo tienen preview y se reproducen en la pagina. El backend admite tambien URLs de Spotify, pero no tienen embed: se guardan y ni aqui ni en la pagina publica se pueden reproducir.</div>
               </div>
             </div>
           </div>
@@ -4948,7 +4949,9 @@ function blogAbrirPreview() {
     + cuerpoHtml
     + (vidEmbed
         ? '<div class="bvid"><iframe src="'+_esc(vidEmbed)+'" title="Video principal del articulo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>'
-        : '')
+        : (v('f-blog-video') || '').trim()
+            ? '<div style="font-size:11px;color:#b45309;margin:10px 0;padding:8px 10px;border:1px solid #fcd34d;border-radius:6px;background:#fffbeb">&#x26A0;&#xFE0F; Esta URL de video no tiene embed (solo YouTube y Vimeo). Se guardara igual, pero ni en esta vista previa ni en la pagina publica se podra reproducir.</div>'
+            : '')
     + '</div>';
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -6665,7 +6668,13 @@ function mostrarFotoTopSection() {
       data.data.forEach(function(f) {
         var div = document.createElement('div');
         div.style.cssText = 'border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;position:relative;';
-        div.innerHTML = '<img src="' + _esc(f.url) + '" style="width:100%;height:90px;object-fit:cover;" loading="lazy" onerror="this.parentElement.style.display=\'none\'">'
+        /* Misma invariante que las portadas de album: si la foto de la
+           galeria fuera un medio (.mp4/.mp3/YouTube/Spotify) NUNCA va a
+           un <img>, se pinta el placeholder. Una foto normal conserva el
+           marcado de antes, sin cambios. */
+        div.innerHTML = (_adminMediaEsUrlRecurso(f.url)
+            ? _adminMediaPortadaHTML(f, 90)
+            : '<img src="' + _esc(f.url) + '" style="width:100%;height:90px;object-fit:cover;" loading="lazy" onerror="this.parentElement.style.display=\'none\'">')
           + '<div style="font-size:10px;padding:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _esc(f.caption || '') + '</div>';
         div.onclick = function() {
           grid.querySelectorAll('div').forEach(function(d){ d.style.borderColor = 'transparent'; });
@@ -6740,10 +6749,138 @@ function adminCargarFeedFotos() {
     });
 }
 
+/* ---- PORTADAS DE MEDIA EN EL ADMIN (caratulas de video/audio) ----
+   BUG que cierra esto: para foto_type video/audio la URL del recurso es el
+   PROPIO medio (.mp3/.mp4, un link de Spotify...) y no se puede decodificar
+   dentro de un <img src>. Meterla ahi era lo que dejaba un hueco vacio de
+   140px, 70px o 160px en el panel de moderacion.
+   INVARIANTE (no negociable): un <img src> NUNCA apunta a un medio, y
+   siempre hay una imagen O un placeholder: nunca un hueco. La imagen de
+   muestra se lee a la defensiva de los 4 alias porque el nombre depende del
+   lector (album_fotos.miniatura_url, migracion 043). */
+
+/* Tipo deducido por extension. Necesario porque hay readers que NO
+   proyectan foto_type (activos_ocultos solo trae foto_url) pero guardan ahi
+   la URL de un medio: sin tipo declarado, la extension es la unica senal. */
+function _adminMediaTipoPorExtension(url) {
+  var s = String(url == null ? '' : url).split('?')[0].split('#')[0].toLowerCase();
+  if (!s) return '';
+  if (/\.(mp4|m4v|webm|mov|ogv|3gp)$/.test(s)) return 'video';
+  if (/\.(mp3|m4a|m4b|aac|wav|ogg|oga|opus|flac)$/.test(s)) return 'audio';
+  return '';
+}
+
+/* true si la URL NO es una imagen utilizable dentro de un <img>: extension
+   de medio o host que sirve medio/embed. Si da true, jamas puede pintarse
+   como imagen. */
+function _adminMediaEsUrlRecurso(url) {
+  var s = String(url == null ? '' : url).trim();
+  if (!s) return false;
+  if (_adminMediaTipoPorExtension(s)) return true;
+  if (/^spotify:/i.test(s)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*(open|play)\.spotify\.[a-z.]+\//i.test(s)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be|vimeo\.com)\//i.test(s)) return true;
+  return false;
+}
+
+/* true solo para audio/video: los unicos tipos con caratula propia. */
+function _adminMediaEsVideoAudio(tipo) {
+  return tipo === 'video' || tipo === 'audio';
+}
+
+/* Imagen de muestra del recurso, leida a la defensiva de los 4 alias que
+   usan los readers del backend (miniatura_url crudo, media_miniatura del
+   multimedia_mapa, poster_url, poster). */
+function _adminMediaMiniaturaDe(f) {
+  if (!f) return '';
+  return f.miniatura_url || f.media_miniatura || f.poster_url || f.poster || '';
+}
+
+/* Placeholder: fondo oscuro con icono de play para video, fondo morado con
+   nota musical para audio, camara para una foto sin URL o con URL rota. */
+function _adminMediaPhHtml(tipo, alto) {
+  var esAudio = (tipo === 'audio');
+  var esVideo = (tipo === 'video');
+  var fondo = esAudio ? 'background:rgba(155,89,182,.3);' : (esVideo ? 'background:rgba(0,0,0,.55);' : 'background:rgba(0,0,0,.35);');
+  var icono = esAudio ? '&#x266B;' : (esVideo ? '&#x25B6;' : '&#x1F4F7;');
+  return '<div style="width:100%;height:' + alto + 'px;display:flex;align-items:center;justify-content:center;'
+    + fondo + 'color:#fff;font-size:24px;">' + icono + '</div>';
+}
+
+/* El <img> de portada fallo (o la caratula no carga): se queda el PLACEHOLDER
+   de su tipo, no un hueco vacio. Para audio/video el placeholder equivalente
+   ya esta debajo, asi que el resultado visual es el mismo. */
+function _adminMediaPortadaError(img, alto) {
+  if (!img || !img.parentNode) return;
+  var tipo = img.getAttribute('data-adm-tipo') || 'foto';
+  var tmp = document.createElement('div');
+  tmp.innerHTML = _adminMediaPhHtml(tipo, alto || 140);
+  var fr = document.createDocumentFragment();
+  while (tmp.firstChild) fr.appendChild(tmp.firstChild);
+  img.parentNode.replaceChild(fr, img);
+}
+
+/* Unica funcion de render de la portada de un recurso en el admin.
+   f    objeto de la fila (se leen foto_url|media_url|url, foto_type|
+         media_type y los 4 alias de la miniatura)
+   alto alto en px del hueco
+   opts { wrap, wrapExtra, phHtml }
+     wrap      emite un contenedor position:relative de ese alto (lo necesitan
+               los grids flex donde el <img> era hijo directo del card)
+     wrapExtra CSS extra del contenedor (ancho, radio, flex-shrink)
+     phHtml    HTML del placeholder cuando no hay nada que pintar; si viene,
+               una foto valida se pinta ENCIMA de el (si el <img> falla se ve
+               este, no un hueco) y una foto sin URL se queda con el. */
+function _adminMediaPortadaHTML(f, alto, opts) {
+  var o = opts || {};
+  var obj = f || {};
+  var url = String(obj.foto_url || obj.media_url || obj.url || '');
+  var tipo = String(obj.foto_type || obj.media_type || '').toLowerCase();
+  /* Sin foto_type declarado, o con foto_type='foto' pero URL de medio, manda
+     la URL: es el caso patologico que produjo el bug reportado. */
+  if (!_adminMediaEsVideoAudio(tipo)) {
+    var inferido = _adminMediaTipoPorExtension(url);
+    if (inferido) tipo = inferido;
+  }
+  /* El wrap solo pone width:100% si el wrapExtra del llamante no trae un
+     width propio: el sitio de comentarios usa 70px fijos. */
+  var wrapStyle = 'position:relative;overflow:hidden;height:' + alto + 'px;'
+    + (/\bwidth\s*:/.test(o.wrapExtra || '') ? '' : 'width:100%;')
+    + (o.wrapExtra || '');
+  var wrap = o.wrap ? '<div style="' + wrapStyle + '">' : '';
+  var out = '';
+  if (_adminMediaEsVideoAudio(tipo)) {
+    /* La URL del recurso NUNCA llega al <img>. Solo la imagen de muestra. */
+    var cover = _adminMediaMiniaturaDe(obj);
+    if (_adminMediaEsUrlRecurso(cover)) cover = '';
+    out = _adminMediaPhHtml(tipo, alto);
+    if (cover) {
+      out += '<img src="' + _esc(cover) + '" alt="" data-adm-tipo="' + _esc(tipo) + '"'
+        + ' style="position:absolute;top:0;left:0;width:100%;height:' + alto + 'px;object-fit:cover;display:block;opacity:0;transition:opacity .15s ease;"'
+        + ' loading="lazy" onload="if(this.style.opacity!==\'1\')this.style.opacity=1"'
+        + ' onerror="_adminMediaPortadaError(this,' + alto + ')">';
+    }
+  } else if (url && !_adminMediaEsUrlRecurso(url)) {
+    if (o.phHtml) {
+      out = o.phHtml
+        + '<img src="' + _esc(url) + '" alt="" data-adm-tipo="foto"'
+        + ' style="position:absolute;top:0;left:0;width:100%;height:' + alto + 'px;object-fit:cover;display:block;"'
+        + ' loading="lazy" onerror="this.style.display=\'none\'">';
+    } else {
+      out = '<img src="' + _esc(url) + '" alt="" data-adm-tipo="foto"'
+        + ' style="width:100%;height:' + alto + 'px;object-fit:cover;display:block;background:#222"'
+        + ' loading="lazy" onerror="_adminMediaPortadaError(this,' + alto + ')">';
+    }
+  } else {
+    out = o.phHtml || _adminMediaPhHtml('foto', alto);
+  }
+  return wrap + out + (o.wrap ? '</div>' : '');
+}
+
 function _adminFotoAlbumCard(f) {
   var card = document.createElement('div');
   card.style.cssText = 'border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card,#fff);display:flex;flex-direction:column;';
-  var fotoUrl = _esc(f.foto_url || '');
+  var portadaHtml = _adminMediaPortadaHTML(f, 140);
   var autor = _esc(f.autor_nombre || 'Anonimo');
   var album = _esc(f.album_titulo || '');
   var ciudad = _esc(f.ciudad || '');
@@ -6752,7 +6889,7 @@ function _adminFotoAlbumCard(f) {
   var fid = _esc(String(f.id));
   card.innerHTML =
     '<div style="position:relative">'
-    + '<img src="' + fotoUrl + '" alt="" style="width:100%;height:140px;object-fit:cover;display:block;background:#222" loading="lazy" onerror="this.style.display=\'none\'">'
+    + portadaHtml
     + '<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;">' + tipo + '</span>'
     + '</div>'
     + '<div style="padding:8px;font-size:12px;line-height:1.4">'
@@ -6820,7 +6957,7 @@ function adminCargarComentarios() {
 function _adminComentarioCard(c) {
   var card = document.createElement('div');
   card.style.cssText = 'border:1px solid var(--border);border-radius:8px;background:var(--card,#fff);padding:10px;display:flex;gap:10px;align-items:flex-start;';
-  var fotoUrl = _esc(c.foto_url || '');
+  var portadaHtml = _adminMediaPortadaHTML(c, 70, { wrap: true, wrapExtra: 'width:70px;border-radius:6px;flex-shrink:0;' });
   var autor = _esc(c.autor_nombre || 'Anonimo');
   var texto = _esc(c.texto || '');
   var album = _esc(c.album_titulo || '');
@@ -6830,8 +6967,7 @@ function _adminComentarioCard(c) {
   var creado = _esc(c.creado_en ? String(c.creado_en).slice(0, 19).replace('T', ' ') : '');
   var colorEstado = activo ? '#16a34a' : '#b91c1c';
   var lblEstado = activo ? 'ACTIVO' : 'OCULTO';
-  var html =
-    '<img src="' + fotoUrl + '" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#222" loading="lazy" onerror="this.style.display=\'none\'">'
+  var html = portadaHtml
     + '<div style="flex:1;min-width:0">'
     + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
     + '<strong style="font-size:13px">' + autor + '</strong>'
@@ -7233,7 +7369,10 @@ function _renderModCard(item) {
   var statusCls = {draft:'mod-st-pending', published:'mod-st-published', archived:'mod-st-rejected'};
 
   var foto = item.foto_principal || '';
-  var imgHtml = foto
+  /* Un <img> NUNCA a un medio: si foto_principal fuese un .mp4/.mp3 o un
+     link de YouTube/Vimeo/Spotify se va al placeholder del icono, que ya
+     existe en el else de abajo, en vez de romper la imagen. */
+  var imgHtml = (foto && !_adminMediaEsUrlRecurso(foto))
     ? '<img class="mod-card-img" src="'+escH(foto)+'" alt="" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">'
       +'<div class="mod-card-img-ph" style="display:none">'+icon+'</div>'
     : '<div class="mod-card-img-ph">'+icon+'</div>';
@@ -7424,15 +7563,15 @@ function _adminActivoOcultoCard(a) {
   var propuestoPor = _esc(a.propuesto_por_nombre || '');
   var estado = _esc(a.estado || 'pendiente');
   var fecha = a.creado_en ? new Date(a.creado_en).toLocaleDateString('es-CO', {day:'2-digit', month:'short', year:'numeric'}) : '';
-  var fotoUrl = _esc(a.foto_url || '');
   var activoId = _esc(String(a.id));
 
   var catIcons = {hostal:'\uD83C\uDFE8',comida:'\uD83C\uDF7D\uFE0F',sitio:'\u26F0\uFE0F',evento:'\uD83C\uDF89',blog:'\uD83D\uDCDD'};
   var catIcon = catIcons[cat] || '\uD83D\uDCCD';
 
-  var fotoHtml = fotoUrl
-    ? '<img src="' + fotoUrl + '" style="width:100%;height:160px;object-fit:cover;display:block;background:#222" loading="lazy" onerror="this.style.display=\'none\'">'
-    : '<div style="width:100%;height:160px;background:linear-gradient(135deg,var(--bg),var(--border));display:flex;align-items:center;justify-content:center;font-size:48px">' + catIcon + '</div>';
+  /* phHtml: si la fotoUrl no es pintable (medio, o vacia) se queda el
+     placeholder de siempre; si es una foto valida se pinta ENCIMA de el,
+     de modo que un <img> roto deja ver el placeholder y no un hueco. */
+  var fotoHtml = _adminMediaPortadaHTML(a, 160, { phHtml: '<div style="width:100%;height:160px;background:linear-gradient(135deg,var(--bg),var(--border));display:flex;align-items:center;justify-content:center;font-size:48px">' + catIcon + '</div>' });
 
   var votosHtml = '';
   if (votosFavor > 0 || votosContra > 0) {

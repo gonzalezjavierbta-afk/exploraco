@@ -4348,6 +4348,122 @@ function queryConAvatarFallback(sqlFn, plantilla, params, reemplazos) {
   });
 }
 
+// Helper generico (migracion 043): imagen de muestra del recurso, columna
+// album_fotos.miniatura_url. Misma mecanica que queryConAvatarFallback pero
+// para la columna de la miniatura: la plantilla lleva la marca
+// __MINIATURA__ (una o varias veces) donde debe ir la columna y, si esa
+// columna aun NO existe en Neon, el 42703 degrada reintentando la MISMA
+// consulta con NULL::text en su lugar. Degradar y no tirar el 503 importa:
+// los lectores de media envuelven la consulta en conDegradacionMedia, que
+// tambien se come el 42703, asi que sin este helper una 043 pendiente
+// devolveria la galeria VACIA en vez de las fotos con miniatura en null.
+// NULL es justo el contrato de la migracion ("NULL = el renderizador usa
+// su fallback"), asi que la degradacion es invisible para el cliente.
+// El alias lo escribe la propia plantilla (__MINIATURA__ AS <alias>), de
+// modo que el numero de columnas y el nombre del UNION no cambian al
+// degradar. Nunca silencia otro codigo de error: solo el 42703 activa el
+// reintento, y el error del reintento se propaga.
+function queryConMiniaturaFallback(sqlFn, plantilla, params) {
+  var conMini = plantilla.split('__MINIATURA__').join('af.miniatura_url');
+  var sinMini = plantilla.split('__MINIATURA__').join('NULL::text');
+  return sqlFn(conMini, params).catch(function(e) {
+    if (!e || e.code !== '42703') throw e;
+    console.error('[interacciones] album_fotos.miniatura_url ausente (migracion 043): ' + e.message);
+    return sqlFn(sinMini, params);
+  });
+}
+
+// Los DOS degradables a la vez: usuarios.foto_url (migracion 004) y
+// album_fotos.miniatura_url (migracion 043). Existe porque NO se pueden
+// componer entre si: queryConAvatarFallback(sqlFn, plantilla, params)
+// necesita la plantilla para sustituir su propia marca, asi que al
+// envolverlo con queryConMiniaturaFallback el helper de fuera recibia
+// undefined como plantilla y reventaba con "cannot read properties of
+// undefined (reading 'split')", con 500 en la galeria y en el mapa.
+// Aqui cada marca se sustituye una sola vez y hay 4 estados, probados en
+// orden de probabilidad de estar pendiente: la 043 (nueva) cae antes que
+// la 004 (que lleva countless deploys aplicada). Sustituciones identicas
+// a las de los dos helpers individuales para no cambiar su comportamiento.
+function queryConMediaFallback(sqlFn, plantilla, params) {
+  var FOTO = 'COALESCE(u.foto_url, u.avatar_url, \'\')';
+  var FOTO_NO = 'COALESCE(u.avatar_url, \'\')';
+  var arma = function (foto, mini) {
+    return plantilla
+      .split('__FOTO_URL__').join(foto)
+      .split('__MINIATURA__').join(mini);
+  };
+  var estados = [
+    { q: arma(FOTO, 'af.miniatura_url'), eti: 'miniatura_url (043)' },
+    { q: arma(FOTO, 'NULL::text'), eti: 'miniatura_url (043) -> degradado' },
+    { q: arma(FOTO_NO, 'af.miniatura_url'), eti: 'usuarios.foto_url (004) -> degradado' },
+    { q: arma(FOTO_NO, 'NULL::text'), eti: 'ambas columnas -> degradadas' },
+  ];
+  var i = 0;
+  function intentar() {
+    return sqlFn(estados[i].q, params).catch(function (e) {
+      if (!e || e.code !== '42703' || i >= estados.length - 1) throw e;
+      console.error('[interacciones] query degradada 42703: ' + e.message);
+      i++;
+      return intentar();
+    });
+  }
+  return intentar();
+}
+
+// ESPEJO EN SERVIDOR de API.spotifyTrackId (media-embed.js).
+// POR QUE SE DUPLICA EL REGEX Y NO SE REUSA EL DEL CLIENTE: el servidor es
+// quien decide la obligatoriedad de miniatura_url, y no puede require() el
+// asset de cliente (media-embed.js vive en el navegador, no en el bundle de
+// Vercel). Los dos deben mantenerse EXACTAMENTE en la misma forma: si uno
+// acepta mas que el otro, el frontend bloquea altas que el backend acepta o
+// el backend acepta altas que la UIadvertia como invalidas.
+// Criterio (identico al del cliente): solo el tipo "track" (episode, album,
+// playlist y show NO cuentan), id de exactamente 22 caracteres base62
+// [A-Za-z0-9], se aceptan el prefijo de locale /intl-xx/ y el host
+// open.spotify.com y open.spotify.us. Si el id no cumple, NO es un track
+// valido y la obligatoriedad se aplica normal.
+var RE_SPOTIFY_TRACK_WEB = /^https?:\/\/open\.spotify\.(?:com|us)\/(?:intl-[A-Za-z]{2,5}\/)?track\/([A-Za-z0-9]{22})(?:[?#].*)?$/i;
+var RE_SPOTIFY_TRACK_URI = /^spotify:track:([A-Za-z0-9]{22})(?:[?#].*)?$/i;
+var RE_SPOTIFY_TRACK_ID = /^[A-Za-z0-9]{22}$/;
+function esUrlTrackSpotify(url) {
+  if (url === null || url === undefined) return false;
+  var s = String(url).trim();
+  if (!s) return false;
+  var m = RE_SPOTIFY_TRACK_WEB.exec(s);
+  if (!m) m = RE_SPOTIFY_TRACK_URI.exec(s);
+  return !!(m && RE_SPOTIFY_TRACK_ID.test(m[1]));
+}
+
+// Arma el INSERT de un recurso del Museo sobre album_fotos con las columnas
+// OPCIONALES bajo demanda: destino_id (migracion 042) y miniatura_url
+// (migracion 043). Se omiten (y no se mandan como NULL) cuando el dato no
+// viene o cuando la cascada de degradacion ha decidido que esa columna aun
+// no existe en Neon. El indice de cada placeholder es args.length + 1
+// (args aun NO incluye el valor: por eso el +1; sin el, el placeholder
+// apuntaria a la columna anterior y la escribiria dos veces). Las columnas
+// base y el RETURNING son identicos a los del INSERT anterior: esto es
+// estrictamente aditivo.
+function armarInsertRecursoMuseo(d) {
+  var cols = ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
+    + ' media_title, media_source, visible, xp_otorgado_autor, lat, lng';
+  var vals = ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9';
+  var args = [d.album_id, d.usuario_id, d.url, d.tipo, d.caption, d.visible, d.xp, d.lat, d.lng];
+  if (d.destino_id) {
+    cols += ', destino_id';
+    vals += ', $' + (args.length + 1) + '::uuid';
+    args.push(d.destino_id);
+  }
+  if (d.miniatura_url) {
+    cols += ', miniatura_url';
+    vals += ', $' + (args.length + 1);
+    args.push(d.miniatura_url);
+  }
+  return {
+    texto: 'INSERT INTO album_fotos' + cols + ')' + vals + ') RETURNING id, album_id, visible',
+    params: args,
+  };
+}
+
 // Coordenadas de respaldo para albumes sin geolocalizacion (BUG-B):
 // hereda lat/lng/ciudad de la primera interaccion (visita/guardado) del
 // autor con un destino georreferenciado. Devuelve null si no hay una.
@@ -6040,13 +6156,23 @@ module.exports = async function handler(req, res) {
         var mrLimIdx = mrParams.length;
         mrParams.push(mrOffset);
         var mrOffIdx = mrParams.length;
+        // ALIAS DE LA MINIATURA EN ESTE LECTOR: miniatura_url (crudo, sin
+        // renombrar). Motivo: este lector ya proyecta af.foto_url SIN alias,
+        // asi que la clave que el cliente ya consume para la URL del recurso
+        // es "foto_url" y la pareja coherente es la misma columna cruda de
+        // album_fotos. Renombrarla a media_miniatura aqui seria inventar un
+        // segundo criterio de nombres en el mismo payload. Se envuelve con
+        // __MINIATURA__ para que la 043 pendiente degrade a null (ver
+        // queryConMiniaturaFallback) en vez de vaciar el listado.
         var mrSelectCols = 'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
           + ' af.media_title, af.foto_type, af.lat AS lat_propia, af.lng AS lng_propia,'
           + ' COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng,'
+          + ' __MINIATURA__,'
           + ' af.destino_id, a.ciudad, af.visible, af.creado_en';
         var mrSelectColsNoTag = 'SELECT af.id, af.album_id, a.titulo AS album_titulo, af.foto_url,'
           + ' af.media_title, af.foto_type, af.lat AS lat_propia, af.lng AS lng_propia,'
           + ' COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng,'
+          + ' __MINIATURA__,'
           + ' NULL AS destino_id, a.ciudad, af.visible, af.creado_en';
         var mrFrom = ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
           + mrWhere
@@ -6054,11 +6180,13 @@ module.exports = async function handler(req, res) {
           + ' LIMIT $' + mrLimIdx + ' OFFSET $' + mrOffIdx;
         var mrRows;
         try {
-          mrRows = await sql(mrSelectCols + mrFrom, mrParams);
+          mrRows = await queryConMiniaturaFallback(sql, mrSelectCols + mrFrom, mrParams);
         } catch (mrTagErr) {
           if (mrTagErr && mrTagErr.code === '42703') {
-            // Migracion 042 sin aplicar: se lista sin la etiqueta.
-            mrRows = await sql(mrSelectColsNoTag + mrFrom, mrParams);
+            // Migracion 042 sin aplicar: se lista sin la etiqueta. El
+            // helper de miniatura va DENTRO del reintento, asi que cada
+            // variante degrada su propia columna de forma independiente.
+            mrRows = await queryConMiniaturaFallback(sql, mrSelectColsNoTag + mrFrom, mrParams);
           } else {
             throw mrTagErr;
           }
@@ -6085,6 +6213,12 @@ module.exports = async function handler(req, res) {
           return {
             id: r.id, album_id: r.album_id, album_titulo: r.album_titulo,
             foto_url: r.foto_url, media_title: r.media_title,
+            // Imagen de muestra (migracion 043). Sale cruda, sin alias
+            // extra, para que el renderizador la lea con el mismo criterio
+            // con el que lee foto_url justo arriba. null = el recurso no
+            // declara miniatura (foto, o video/audio antiguo previo a la
+            // 043) y el cliente usa su fallback.
+            miniatura_url: r.miniatura_url || null,
             tipo_media: r.foto_type,
             lat_propia: (r.lat_propia === null || r.lat_propia === undefined) ? null : r.lat_propia,
             lng_propia: (r.lng_propia === null || r.lng_propia === undefined) ? null : r.lng_propia,
@@ -6586,9 +6720,12 @@ module.exports = async function handler(req, res) {
         if (!albumDetRows.length)
           return res.status(404).json({ ok: false, error: 'Album no encontrado' });
 
-        var fotosDetRows = await conDegradacionMedia(queryConAvatarFallback(
-          sql,
-          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+        // ALIAS DE LA MINIATURA EN ESTE LECTOR: miniatura_url (crudo). Este
+        // SELECT ya proyecta af.foto_url sin renombrar, asi que la clave
+        // "foto_url" es la que el cliente ya consume y la miniatura viaja con
+        // el nombre de su propia columna, sin inventar un segundo criterio.
+        var fotosDetRows = await conDegradacionMedia(queryConMediaFallback(sql,
+          'SELECT af.id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title, af.media_source,'
           + ' af.autor_original_id, af.agregador_id, af.creado_en,'
           + ' u.nombre AS autor_nombre, __FOTO_URL__ AS autor_avatar, u.id AS usuario_id,'
           + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
@@ -6661,9 +6798,13 @@ module.exports = async function handler(req, res) {
         var adEsPropioAlbum = !!(usuarioId && albumDetRows[0].usuario_id
           && String(usuarioId) === String(albumDetRows[0].usuario_id));
 
-        var adGuardados = await conDegradacionMedia(sql(
+        // ALIAS: miniatura_url (crudo), igual que en fotosDetRows. Es un
+        // UNION ALL de 3 ramas y el nombre de columna lo pone la PRIMERA
+        // (la de album_fotos), asi que la marca va ahi y las otras dos
+        // aportan NULL::text para no romper el conteo de columnas.
+        var adGuardados = await conDegradacionMedia(queryConMiniaturaFallback(sql,
           'SELECT sub.* FROM ('
-          + ' SELECT mg.item_id::text AS id, af.foto_url, af.foto_type, af.media_title,'
+          + ' SELECT mg.item_id::text AS id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title,'
           + '  af.creado_en, COALESCE(u.nombre, \'\') AS autor_nombre,'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = mg.item_id AND mv.activo = true) AS votos,'
           + '  \'album_foto\' AS origen_fuente, mg.visible'
@@ -6674,7 +6815,7 @@ module.exports = async function handler(req, res) {
           + ' WHERE mg.album_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true'
           + '  AND ($2::boolean OR (mg.visible AND af.activo AND af.visible AND a.activo))'
           + ' UNION ALL'
-          + ' SELECT mg.item_id::text, i.texto, \'foto\' AS foto_type, \'\' AS media_title,'
+          + ' SELECT mg.item_id::text, i.texto, NULL::text, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  i.creado_en, COALESCE(u.nombre, \'\'),'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'viajero_foto\' AND mv.item_id = mg.item_id AND mv.activo = true),'
           + '  \'viajero_foto\', mg.visible'
@@ -6684,7 +6825,7 @@ module.exports = async function handler(req, res) {
           + ' WHERE mg.album_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
           + '  AND ($2::boolean OR (mg.visible AND i.activo))'
           + ' UNION ALL'
-          + ' SELECT mg.item_id::text, df.url, \'foto\' AS foto_type, \'\' AS media_title,'
+          + ' SELECT mg.item_id::text, df.url, NULL::text, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  df.creado_en, \'\' AS autor_nombre,'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'curada\' AND mv.item_id = mg.item_id AND mv.activo = true),'
           + '  \'curada\', mg.visible'
@@ -6808,7 +6949,9 @@ module.exports = async function handler(req, res) {
         // etiquetadas (album_fotos.destino_id, migracion 042) ademas de las
         // de albums cercanos por coordenadas. Sin 042 se degrada a solo
         // cercania (42703).
-        var gdUsuariosCols = 'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+        // ALIAS DE LA MINIATURA EN ESTE LECTOR: miniatura_url (crudo), como
+        // en el resto de lectores que proyectan af.foto_url sin renombrar.
+        var gdUsuariosCols = 'SELECT af.id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title, af.media_source,'
           + ' af.creado_en, af.autor_original_id,'
           + ' a.id AS album_id, a.titulo AS album_titulo, a.ciudad,'
           + ' u.nombre AS autor_nombre, u.id AS autor_id,'
@@ -6828,11 +6971,14 @@ module.exports = async function handler(req, res) {
           + ' ORDER BY votos DESC LIMIT 100';
         var gdUsuarios;
         try {
-          gdUsuarios = await queryConAvatarFallback(sql, gdUsuariosCols + gdUsuariosWhereTag,
+          // El helper combinado (004 + 043) va por dentro del de destino_id
+          // (042), que resuelve por fuera. Asi ninguna combinacion de
+          // migraciones pendientes tumba la galeria.
+          gdUsuarios = await queryConMediaFallback(sql, gdUsuariosCols + gdUsuariosWhereTag,
             [gdDestino.lat, gdDestino.lng, gdDestino.id]);
         } catch (gdTagErr) {
           if (gdTagErr && gdTagErr.code === '42703') {
-            gdUsuarios = await queryConAvatarFallback(sql, gdUsuariosCols + gdUsuariosWhereNoTag,
+            gdUsuarios = await queryConMediaFallback(sql, gdUsuariosCols + gdUsuariosWhereNoTag,
               [gdDestino.lat, gdDestino.lng]);
           } else {
             throw gdTagErr;
@@ -7128,9 +7274,18 @@ module.exports = async function handler(req, res) {
         // solo se pueblan los pines agrupados mas abajo.
         var multimediaRows = [];
         if (mmVista !== 'albumes')
-          multimediaRows = await conDegradacionMedia(queryConAvatarFallback(sql,
+          multimediaRows = await conDegradacionMedia(queryConMediaFallback(sql,
           '('
-          + ' SELECT af.foto_url AS media_url, af.foto_type AS media_type,'
+          // ALIAS DE LA MINIATURA EN ESTE LECTOR: media_miniatura. Motivo:
+          // la rama de album_fotos de este UNION ya renombra la URL del
+          // recurso a media_url (foto_url AS media_url), asi que la clave
+          // que consumen mapa-cultural.js y el resto de clientes del mapa es
+          // media_*. La pareja coherente es media_miniatura, NO
+          // miniatura_url (que seria el unico nombre suelto en todo el
+          // payload del mapa). Union de 2 ramas: el nombre lo pone la
+          // primera y la segunda aporta NULL::text para no descuadrar el
+          // conteo de columnas.
+          + ' SELECT af.foto_url AS media_url, __MINIATURA__ AS media_miniatura, af.foto_type AS media_type,'
           + '  af.media_title, af.media_source,'
           + '  COALESCE(af.lat, a.lat) AS lat, COALESCE(af.lng, a.lng) AS lng, a.ciudad,'
           + '  a.titulo AS album_titulo, u.nombre AS autor_nombre,'
@@ -7151,7 +7306,7 @@ module.exports = async function handler(req, res) {
           + (mmIdxCiudad ? ' AND a.ciudad = $' + mmIdxCiudad : '')
           + (mmIdxUsuario ? ' AND a.usuario_id = $' + mmIdxUsuario + '::uuid' : '')
           + ' ORDER BY votos DESC LIMIT 300) UNION ALL ('
-          + ' SELECT df.url AS media_url, \'foto\' AS media_type,'
+          + ' SELECT df.url AS media_url, NULL::text AS media_miniatura, \'foto\' AS media_type,'
           + '  df.caption AS media_title, \'\' AS media_source, d.lat, d.lng, d.ciudad,'
           + '  d.nombre AS album_titulo, \'\' AS autor_nombre,'
           + '  \'\' AS usuario_nombre, \'\' AS usuario_avatar, NULL::text AS usuario_id, NULL::text AS album_id,'
@@ -7215,6 +7370,12 @@ module.exports = async function handler(req, res) {
             if (!tieneCoordsValidas(a.lat, a.lng)) return;
             multimediaRows.push({
               media_url: a.media_url,
+              // Estas filas agregadas son SIEMPRE fotos (destinos_fotos), y
+              // la foto es su propia portada: media_miniatura va en null
+              // para que la clave exista en TODAS las filas del array y el
+              // renderizador pueda leer r.media_miniatura sin comprobar
+              // primero de que origen es el pin.
+              media_miniatura: null,
               media_type: 'album',
               media_title: a.album_titulo,
               media_source: '',
@@ -7247,8 +7408,18 @@ module.exports = async function handler(req, res) {
           var mgRows = await sql(
             'SELECT'
             + ' COALESCE(a.portada_url, (SELECT af2.foto_url FROM album_fotos af2'
-            + ' WHERE af2.album_id = a.id AND af2.activo = true' + mgVis('af2')
+            + ' WHERE af2.album_id = a.id AND af2.activo = true AND af2.foto_type = \'foto\'' + mgVis('af2')
             + ' ORDER BY af2.creado_en ASC LIMIT 1)) AS media_url,'
+            // Portada de album: es una FOTO. El subselect filtra
+            // foto_type='foto' porque, sin ese filtro, el primer recurso del
+            // album puede ser un video o un audio: media_url acaba siendo el
+            // .mp4 o el .mp3 y el motor lo pinta en un <img>, donde el
+            // navegador no puede decodificarlo como imagen y queda un hueco
+            // vacio. Con el filtro la portada es siempre una foto, asi que si
+            // es su propia miniatura (NULL) es cierto. La clave existe igual
+            // para que todas las filas de multimediaRows tengan la misma
+            // forma.
+            + ' NULL::text AS media_miniatura,'
             + ' \'album\' AS media_type, a.titulo AS media_title, \'\' AS media_source,'
             + ' a.lat, a.lng, a.ciudad, a.usuario_id::text AS usuario_id,'
             + ' a.id::text AS album_id, \'album_grupo\' AS origen,'
@@ -7316,8 +7487,12 @@ module.exports = async function handler(req, res) {
         // resolverMediaItem('album_foto') para que es_propia coincida con el
         // 403 de registrarVotoMedia. media_votos ya se usaba aqui; si falta,
         // conDegradacionMedia degrada el feed entero a [].
-        var feedRows = await conDegradacionMedia(sql(
-          'SELECT af.id, af.foto_url, af.foto_type, af.media_title, af.media_source,'
+        // ALIAS DE LA MINIATURA EN ESTE LECTOR: miniatura_url (crudo). Este
+        // SELECT ya proyecta af.foto_url sin renombrar, asi que la miniatura
+        // viaja con el nombre de su columna para que comunidad.html la lea
+        // igual que lee foto_url.
+        var feedRows = await conDegradacionMedia(queryConMiniaturaFallback(sql,
+          'SELECT af.id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title, af.media_source,'
           + ' a.titulo AS album_titulo, a.ciudad, a.id AS album_id,'
           + ' u.nombre AS autor_nombre, af.autor_original_id AS autor_id,'
           + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos,'
@@ -7369,9 +7544,13 @@ module.exports = async function handler(req, res) {
         var mfUsuario = usuarioId ? String(usuarioId).trim() : '';
         if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(mfUsuario))
           return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
-        var mfRows = await conDegradacionMedia(sql(
+        // ALIAS DE LA MINIATURA EN ESTE LECTOR: miniatura_url (crudo). Union
+        // ALL de 2 ramas: el nombre de columna lo pone la primera (la de
+        // album_fotos) y la segunda, que son fotos de viajero sin columna de
+        // miniatura, aporta NULL::text en la misma posicion.
+        var mfRows = await conDegradacionMedia(queryConMiniaturaFallback(sql,
           'SELECT sub.* FROM ('
-          + ' SELECT af.id::text AS id, af.foto_url, af.foto_type, af.media_title,'
+          + ' SELECT af.id::text AS id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title,'
           + '  a.id::text AS album_id, a.titulo AS album_titulo, a.ciudad AS ciudad,'
           + '  \'album_foto\' AS fuente, NULL::text AS destino_slug, NULL::text AS destino_nombre,'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos,'
@@ -7379,7 +7558,7 @@ module.exports = async function handler(req, res) {
           + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
           + ' WHERE af.agregador_id = $1::uuid AND af.activo = true AND af.visible = true AND a.activo = true'
           + ' UNION ALL'
-          + ' SELECT i.id::text, i.texto, \'foto\' AS foto_type, \'\' AS media_title,'
+          + ' SELECT i.id::text, i.texto, NULL::text, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  NULL::text, NULL::text, d.ciudad,'
           + '  \'viajero_foto\', d.slug, d.nombre,'
           + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'viajero_foto\' AND mv.item_id = i.id::text AND mv.activo = true), i.creado_en'
@@ -7405,31 +7584,39 @@ module.exports = async function handler(req, res) {
         var mgUsuario = String(mgSes.sub || '').trim();
         var mgRows, mgAlbumes;
         try {
-          mgRows = await sql(
+          // ALIAS DE LA MINIATURA EN ESTE LECTOR: media_miniatura. Motivo:
+          // este lector ya renombra la URL a media_url (COALESCE(...,
+          // a.portada_url) AS media_url y af.foto_url), asi que la clave que
+          // consume el cliente es media_*. Union ALL de 4 ramas: el nombre
+          // lo pone la PRIMERA (la de albumes), que declara la clave con
+          // NULL::text AS media_miniatura para fijarla; la rama de
+          // album_fotos lleva la marca __MINIATURA__ en esa misma posicion
+          // y las otras dos aportan NULL::text.
+          mgRows = await queryConMiniaturaFallback(sql,
             'SELECT sub.*, COALESCE(ga.titulo, \'\') AS mi_album_titulo FROM ('
             + ' SELECT \'album\' AS fuente, mg.item_id::text AS item_id, mg.creado_en,'
-            + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, \'album\' AS media_type,'
+            + '  a.titulo AS titulo, COALESCE(a.portada_url, \'\') AS media_url, NULL::text AS media_miniatura, \'album\' AS media_type,'
             + '  a.ciudad AS ciudad, a.id::text AS album_id, NULL::text AS destino_slug,'
             + '  mg.album_id::text AS mi_album_id, mg.visible'
             + ' FROM media_guardados mg JOIN albumes a ON a.id::text = mg.item_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album\' AND mg.activo = true AND a.activo = true'
             + ' UNION ALL'
             + ' SELECT \'album_foto\', mg.item_id::text, mg.creado_en,'
-            + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, af.foto_type,'
+            + '  COALESCE(NULLIF(af.media_title, \'\'), a.titulo) AS titulo, af.foto_url, __MINIATURA__, af.foto_type,'
             + '  a.ciudad, a.id::text, NULL::text, mg.album_id::text, mg.visible'
             + ' FROM media_guardados mg JOIN album_fotos af ON af.id::text = mg.item_id'
             + ' JOIN albumes a ON a.id = af.album_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'album_foto\' AND mg.activo = true AND af.activo = true'
             + ' UNION ALL'
             + ' SELECT \'viajero_foto\', mg.item_id::text, mg.creado_en,'
-            + '  d.nombre AS titulo, i.texto AS media_url, \'foto\' AS media_type,'
+            + '  d.nombre AS titulo, i.texto AS media_url, NULL::text, \'foto\' AS media_type,'
             + '  d.ciudad, NULL::text, d.slug, mg.album_id::text, mg.visible'
             + ' FROM media_guardados mg JOIN interacciones i ON i.id::text = mg.item_id'
             + ' JOIN destinos d ON d.id = i.destino_id'
             + ' WHERE mg.usuario_id = $1::uuid AND mg.fuente = \'viajero_foto\' AND mg.activo = true'
             + ' UNION ALL'
             + ' SELECT \'curada\', mg.item_id::text, mg.creado_en,'
-            + '  d.nombre AS titulo, df.url AS media_url, \'foto\' AS media_type,'
+            + '  d.nombre AS titulo, df.url AS media_url, NULL::text, \'foto\' AS media_type,'
             + '  d.ciudad, NULL::text, d.slug, mg.album_id::text, mg.visible'
             + ' FROM media_guardados mg'
             + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
@@ -9502,6 +9689,55 @@ module.exports = async function handler(req, res) {
           var mrTipo = String(body.tipo_media || '').toLowerCase();
           if (mrTipo !== 'foto' && mrTipo !== 'video' && mrTipo !== 'audio')
             return res.status(400).json({ ok: false, error: 'tipo_media invalido' });
+          // Imagen de muestra del recurso (album_fotos.miniatura_url,
+          // migracion 043). Es la UNICA fuente de la portada de un video o
+          // un audio: foto_url es la URL del propio medio y no se puede
+          // pintar en un <img>. Se valida con la MISMA politica que la URL
+          // del recurso (esquema http/https y tope de 2000 caracteres) para
+          // que no exista un criterio mas permisivo que el de la URL del
+          // propio recurso.
+          // Vacio / null / undefined -> null (el recurso no declara
+          // miniatura y el renderizador conserva su fallback).
+          var mrMiniatura = null;
+          if (body.miniatura_url !== undefined && body.miniatura_url !== null) {
+            var mrMiniRaw = String(body.miniatura_url).trim();
+            if (mrMiniRaw !== '') {
+              if (!/^https?:\/\//i.test(mrMiniRaw) || mrMiniRaw.length > 2000)
+                return res.status(400).json({ ok: false, error: 'URL de miniatura invalida' });
+              mrMiniatura = mrMiniRaw;
+            }
+          }
+          // OBLIGATORIEDAD SOLO EN ALTAS NUEVAS (video y audio).
+          // POR QUE ESTA EN LA CAPA DE APLICACION Y NO COMO NOT NULL:
+          // YA existen filas persistidas con foto_type IN ('video','audio')
+          // en album_fotos, asi que un NOT NULL sin DEFAULT haria fallar el
+          // ALTER de la migracion 043 y un NOT NULL con DEFAULT seria un
+          // backfill destructivo (inventaria una miniatura falsa para cada
+          // recurso ya guardado). La columna queda NULL y la regla de
+          // producto vive aqui, donde puede evolucionar sin un ALTER sobre
+          // produccion. Ver el bloque "POR QUE NULL Y NO NOT NULL" de
+          // db/migrations/043_album_fotos_miniatura.sql.
+          // NO se replica en accion=editar: un recurso antiguo sin
+          // miniatura debe poder editarse (caption, coords, visibilidad)
+          // sin quedar bloqueado por un campo que no es editable todavia.
+          // tipo_media=foto NO la exige: la foto ES su propia miniatura.
+          //
+          // EXCEPCION SPOTIFY (unico hueco de la regla): un track de
+          // Spotify SI tiene caratula publica y el frontend la resuelve
+          // sola por HTTP contra el endpoint publico oEmbed
+          // (https://open.spotify.com/oembed?url=...), que NO necesita
+          // clave ni registro y responde JSON con thumbnail_url. Exigirla
+          // en el POST seria un error de diseno: dejaria al usuario sin
+          // poder publicar un track. Con la excepcion, si no llega
+          // miniatura se acepta y la columna queda NULL (el renderizador
+          // pinta su placeholder o su caratula por oEmbed). El resto de
+          // medios NO exponen caratula automatica (un .mp4 o un .mp3
+          // subido a un host no la tienen), asi que siguen exigiendola.
+          // Si la URL no cumple la forma del track, la obligatoriedad se
+          // aplica normal (ver esUrlTrackSpotify).
+          var mrEsTrackSpotify = esUrlTrackSpotify(mrUrl);
+          if ((mrTipo === 'video' || mrTipo === 'audio') && mrMiniatura === null && !mrEsTrackSpotify)
+            return res.status(400).json({ ok: false, error: 'Los recursos de video y audio requieren imagen de muestra (miniatura_url)' });
           var mrCaption = '';
           if (body.caption !== undefined && body.caption !== null) {
             mrCaption = String(body.caption).trim();
@@ -9596,28 +9832,41 @@ module.exports = async function handler(req, res) {
           // lugar o evento (destinos.id). La columna album_fotos.destino_id
           // llega con la migracion 042; sin ella se reintenta sin la columna.
           var mrDestinoId = MR_UUID.test(String(body.destino_id || '')) ? String(body.destino_id) : null;
-          var mrIns;
-          try {
-            mrIns = await sql(
-              'INSERT INTO album_fotos'
-              + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
-              + '  media_title, media_source, visible, xp_otorgado_autor, lat, lng, destino_id)'
-              + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9, $10::uuid)'
-              + ' RETURNING id, album_id, visible',
-              [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp, mrLat, mrLng, mrDestinoId]
-            );
-          } catch (mrInsErr) {
-            if (mrInsErr && mrInsErr.code === '42703') {
-              // Migracion 042 sin aplicar: se guarda sin la etiqueta.
-              mrIns = await sql(
-                'INSERT INTO album_fotos'
-                + ' (album_id, agregador_id, autor_original_id, foto_url, foto_type,'
-                + '  media_title, media_source, visible, xp_otorgado_autor, lat, lng)'
-                + ' VALUES ($1::uuid, $2::uuid, $2::uuid, $3, $4, $5, \'\', $6, $7, $8, $9)'
-                + ' RETURNING id, album_id, visible',
-                [mrAlbumId, mrUser, mrUrl, mrTipo, mrCaption, mrVisible, mrXp, mrLat, mrLng]
-              );
-            } else if (mrInsErr && mrInsErr.code === '23505') {
+          // miniatura_url (migracion 043) se apila en el mismo INSERT que
+          // destino_id, NO en el INSERT ... ON CONFLICT del album "Mi Museo"
+          // (esa sentencia es sobre albumes y esa tabla no tiene la columna).
+          // Ambas columnas opcionales se degradan en cascada ante un 42703
+          // (migracion pendiente): primero fuera destino_id, luego fuera
+          // miniatura_url. El recurso NO se pierde nunca; se guarda sin la
+          // columna opcional y el renderizador usa su fallback.
+          var mrUsaDestino = (mrDestinoId !== null);
+          var mrUsaMiniatura = (mrMiniatura !== null);
+          var mrIns = null, mrInsErr = null, mrIntento = 0;
+          while (mrIntento < 4) {
+            var mrArmado = armarInsertRecursoMuseo({
+              album_id: mrAlbumId, usuario_id: mrUser, url: mrUrl, tipo: mrTipo,
+              caption: mrCaption, visible: mrVisible, xp: mrXp, lat: mrLat, lng: mrLng,
+              destino_id: mrUsaDestino ? mrDestinoId : null,
+              miniatura_url: mrUsaMiniatura ? mrMiniatura : null,
+            });
+            try {
+              mrIns = await sql(mrArmado.texto, mrArmado.params);
+              mrInsErr = null;
+              break;
+            } catch (mrTryErr) {
+              if (mrTryErr && mrTryErr.code === '42703') {
+                // Orden de degradacion: destino_id (042) y luego
+                // miniatura_url (043). Si el 42703 no es de ninguna de las
+                // dos columnas opcionales, se propaga al 500 global.
+                if (mrUsaDestino) { mrUsaDestino = false; mrIntento++; continue; }
+                if (mrUsaMiniatura) { mrUsaMiniatura = false; mrIntento++; continue; }
+              }
+              mrInsErr = mrTryErr;
+              break;
+            }
+          }
+          if (mrInsErr) {
+            if (mrInsErr && mrInsErr.code === '23505') {
               // ADR-039 + migracion 025: el indice unico
               // idx_album_fotos_dedup (album_id, foto_url, autor_original_id)
               // choca con recursos nacidos ocultos (visible=false). Reintento
@@ -9643,6 +9892,10 @@ module.exports = async function handler(req, res) {
               throw mrInsErr;
             }
           }
+          // Guarda del invariante del bucle: si se agotaron los intentos de
+          // degradacion sin excepcion y sin fila, es un fallo de forma
+          // inesperada y conviene un error explicito, no un TypeError.
+          if (!mrIns) throw new Error('museo_recurso: el INSERT del recurso no devolvio filas');
 
           var mrCtx = await contextoXpE(sql, mrUser);
           var mrPunto = (mrLat !== null && mrLng !== null) ? { lat: mrLat, lng: mrLng } : null;
@@ -9683,13 +9936,32 @@ module.exports = async function handler(req, res) {
           var mrTraeAlbum = (body.album_id !== undefined && body.album_id !== null && String(body.album_id).trim() !== '');
           var mrTraeLat2 = (body.lat !== undefined && body.lat !== null && String(body.lat).trim() !== '');
           var mrTraeLng2 = (body.lng !== undefined && body.lng !== null && String(body.lng).trim() !== '');
+          // Imagen de muestra (album_fotos.miniatura_url, migracion 043).
+          // NOTA DE PRODUCTO IMPORTANTE: aqui NO hay obligatoriedad, ni
+          // siquiera para video/audio. Es deliberado y es lo unico correcto:
+          // ya existen recursos de video/audio guardados SIN miniatura (la
+          // columna es nueva) y bloquear la edicion de un recurso antiguo
+          // solo porque no tiene un campo que la app todavia no pedia
+          // dejaria al usuario sin poder corregir su caption, sus coords o
+          // su visibilidad. Editar es, ademas, la via natural para
+          // ANADIR la miniatura despues. Vacio / null / undefined se
+          // guardan como NULL (quitar la miniatura es una operacion
+          // valida y explicita, no un borrado de fila).
+          var mrTraeMiniatura = (body.miniatura_url !== undefined && body.miniatura_url !== null);
+          var mrMini2 = null;
+          if (mrTraeMiniatura) {
+            mrMini2 = String(body.miniatura_url).trim();
+            if (mrMini2 === '') mrMini2 = null;
+            if (mrMini2 !== null && (!/^https?:\/\//i.test(mrMini2) || mrMini2.length > 2000))
+              return res.status(400).json({ ok: false, error: 'URL de miniatura invalida' });
+          }
           // A4 (ADR-051): quitar_coords vuelve a heredar del album. Si llega
           // junto con lat/lng, quitar_coords GANA (documentado): el frontend
           // puede arrastrar campos residuales del formulario.
           var mrQuitarCoords = (aBooleano(body.quitar_coords) === true);
           var mrTraeAlbumLat2 = (body.album_lat !== undefined && body.album_lat !== null && String(body.album_lat).trim() !== '');
           var mrTraeAlbumLng2 = (body.album_lng !== undefined && body.album_lng !== null && String(body.album_lng).trim() !== '');
-          if (!mrTraeCaption && !mrTraeVisible && !mrTraeAlbum && !mrTraeLat2 && !mrTraeLng2 && !mrQuitarCoords && !mrTraeAlbumLat2 && !mrTraeAlbumLng2)
+          if (!mrTraeCaption && !mrTraeVisible && !mrTraeAlbum && !mrTraeLat2 && !mrTraeLng2 && !mrQuitarCoords && !mrTraeAlbumLat2 && !mrTraeAlbumLng2 && !mrTraeMiniatura)
             return res.status(400).json({ ok: false, error: 'sin campos editables' });
           if (mrTraeLat2 !== mrTraeLng2)
             return res.status(400).json({ ok: false, error: 'lat y lng deben venir juntos' });
@@ -9771,15 +10043,47 @@ module.exports = async function handler(req, res) {
             mrParams.push(mrLng2);
             mrSets.push('lng = $' + mrParams.length);
           }
+          // Imagen de muestra (migracion 043). Va la ULTIMA para que el
+          // indice de $N no dependa de si viene o no (los indices de las
+          // columnas anteriores ya estan fijados). Sin obligatoriedad: ver
+          // el bloque de mrTraeMiniatura mas arriba. Si llega vacia se
+          // escribe NULL de forma explicita (quitar la miniatura).
+          if (mrTraeMiniatura) {
+            mrParams.push(mrMini2);
+            mrSets.push('miniatura_url = $' + mrParams.length);
+          }
           var mrEditUpd;
           if (mrSets.length) {
-            mrEditUpd = await sql(
-              'UPDATE album_fotos SET ' + mrSets.join(', ')
-              + ' WHERE id=$1::uuid AND activo=true'
-              + '   AND agregador_id=$2::uuid'
-              + ' RETURNING id, album_id, visible',
-              mrParams
-            );
+            try {
+              mrEditUpd = await sql(
+                'UPDATE album_fotos SET ' + mrSets.join(', ')
+                + ' WHERE id=$1::uuid AND activo=true'
+                + '   AND agregador_id=$2::uuid'
+                + ' RETURNING id, album_id, visible',
+                mrParams
+              );
+            } catch (mrUpdErr) {
+              // Migracion 043 sin aplicar: se reintenta sin la columna de
+              // miniatura para no perder el resto de la edicion (caption,
+              // coords, visibilidad). Si la miniatura era el UNICO campo
+              // pedido no queda nada que ejecutar y el error se propaga:
+              // no se responde 200 por un cambio que no se hizo.
+              if (!(mrUpdErr && mrUpdErr.code === '42703' && mrTraeMiniatura)) throw mrUpdErr;
+              console.error('[interacciones] miniatura_url ausente (migracion 043); edicion sin miniatura');
+              // El SET de la miniatura se apilo SIEMPRE el ultimo, asi que
+              // recortar el ultimo elemento de cada array deja los $N ya
+              // correctos: no hace falta reindexar nada.
+              var mrSetsSinMini = mrSets.slice(0, mrSets.length - 1);
+              var mrParamsSinMini = mrParams.slice(0, mrParams.length - 1);
+              if (!mrSetsSinMini.length) throw mrUpdErr;
+              mrEditUpd = await sql(
+                'UPDATE album_fotos SET ' + mrSetsSinMini.join(', ')
+                + ' WHERE id=$1::uuid AND activo=true'
+                + '   AND agregador_id=$2::uuid'
+                + ' RETURNING id, album_id, visible',
+                mrParamsSinMini
+              );
+            }
             if (!mrEditUpd.length)
               return res.status(404).json({ ok: false, error: 'Recurso no encontrado' });
           } else {

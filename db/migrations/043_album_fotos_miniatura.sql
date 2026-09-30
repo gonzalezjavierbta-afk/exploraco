@@ -1,0 +1,131 @@
+-- ============================================================================
+-- Migration 043: Miniatura (imagen de muestra) de recursos de album_fotos
+-- Fecha: 2026-09-30
+-- Referencias: ADR-002 (ASCII-safe), ADR-003 (cero borrado logico), ADR-006
+--   (validar el esquema real antes de escribir), ADR-008 (gobernanza e
+--   idempotencia de esquema / numeracion consecutiva), ADR-039 (Museo URL-only:
+--   visibilidad por recurso), ADR-051 (coords por recurso),
+--   BUG-021/BUG-060 (patron: migracion COMPLETA antes del deploy del backend),
+--   BUG-026 (nunca bytes UTF-8 directos de emojis).
+-- Requiere: 009 (albumes + album_fotos), 025 (album_fotos.visible) y 042
+--   (album_fotos.destino_id) y el resto de 003-041 aplicado.
+--
+-- QUE HACE
+--   1. album_fotos.miniatura_url text NULL: URL de la IMAGEN DE MUESTRA del
+--      recurso. Es la UNICA fuente de verdad de la imagen que representa a un
+--      video o un audio: foto_url no puede servir para eso, porque es la URL
+--      del propio medio y no se puede pintar como portada en un <img>.
+--      NULL = el recurso no declara miniatura y los renderizadores conservan su
+--      fallback actual (sin cambios de comportamiento para lo ya existente).
+--
+-- POR QUE NULL Y NO NOT NULL (decision consciente)
+--   La columna arranca vacia a proposito. YA existen filas persistidas con
+--   foto_type IN ('video','audio'), asi que un NOT NULL sin DEFAULT haria
+--   fallar el ALTER sobre esas filas; y un NOT NULL con DEFAULT seria un
+--   backfill destructivo (inventaria una miniatura falsa para cada recurso ya
+--   guardado). La obligatoriedad se valida en la CAPA DE APLICACION
+--   (api/interacciones.js, rama POST ?tipo=museo_recurso), no con una
+--   constraint: asi el esquema no rompe datos historicos y la regla de producto
+--   puede evolucionar sin necesitar un ALTER sobre produccion.
+--
+-- CARACTER DE LA MIGRACION
+--   ADITIVA: SOLO ALTER TABLE album_fotos ADD COLUMN. Nada de DROP, nada de
+--   ALTER COLUMN, nada de RENAME, nada de SET NOT NULL, nada de backfill. No
+--   toca objetos de 003-042.
+--   IDEMPOTENTE (ADR-008): ADD COLUMN IF NOT EXISTS. Re-ejecutar el archivo
+--   COMPLETO es no-op funcional: la unica sentencia DDL ya no hace nada en la
+--   segunda corrida y no hay DROP, constraint ni UPDATE que puedan fallar.
+--   ASCII-SAFE (ADR-002): cero bytes > 127, cero tildes, cero ene, cero
+--   emojis, cero escapes unicode, cero backticks.
+--   CERO BORRADO FISICO (ADR-003): no hay DELETE / DROP / TRUNCATE.
+--
+-- SIN INDICE (decision consciente, NO anadir uno)
+--   Una columna de URL opcional y de baja cardinalidad no se indexa en este
+--   proyecto: foto_url tampoco tiene indice, y miniatura_url solo se lee en
+--   proyeccion (SELECT) para pintar la portada. Crear un indice aqui seria
+--   costo de escritura en cada INSERT de recurso sin ningun plan de consulta
+--   que lo aproveche. Es comentario, no accion: esta migracion no crea indices.
+--
+-- QUIEN CONSUME LA COLUMNA
+--   1. Escritura: el POST ?tipo=museo_recurso de api/interacciones.js valida
+--      miniatura_url (esquema http/https) y la persiste en el INSERT.
+--   2. Lectura / render: galeria.html, comunidad.html y mi-perfil.html la leen
+--      para mostrar la imagen de muestra de videos y audios.
+--
+-- ORDEN DE APLICACION (IMPORTANTE, NO INVERTIR)
+--   PRIMERO: correr este archivo COMPLETO en el editor SQL de Neon.
+--   LUEGO: desplegar el backend (api/interacciones.js).
+--   Si el backend se despliega antes, el POST ?tipo=museo_recurso puede intentar
+--   escribir una columna que todavia no existe en Neon y el INSERT revienta.
+--   Patron BUG-021/BUG-060: archivo completo en una sola corrida.
+--   La aplica el OPERADOR HUMANO en el editor SQL de Neon, no un script.
+--
+-- ROLLBACK (emergencia, LOSSY si ya se guardaron miniaturas)
+--   ALTER TABLE album_fotos DROP COLUMN IF EXISTS miniatura_url;
+--   Sin esta migracion no habria nada que revertir: la columna no existia.
+-- ============================================================================
+
+-- ============================================================================
+-- 0. PREFLIGHT (SOLO LECTURA; NO forma parte del DDL; NO se ejecuta solo).
+--    Copiar y correr sentencia por sentencia ANTES de aplicar la 043.
+-- ============================================================================
+-- (0.a) Confirmar que album_fotos existe y que miniatura_url aun NO existe.
+--       Esperado antes de aplicar: 0 filas.
+--       Despues de aplicar: 1 fila (text, is_nullable = YES).
+-- SELECT column_name, data_type, is_nullable
+--   FROM information_schema.columns
+--   WHERE table_schema = 'public' AND table_name = 'album_fotos'
+--     AND column_name = 'miniatura_url';
+--
+-- (0.b) Foto de la situacion actual: cuantos recursos ya persistidos quedan
+--       sin miniatura (todos, porque la columna es nueva). Sirve para tener el
+--       numero de filas afectadas por el backfill LOGICO que hara el backend.
+-- SELECT foto_type, COUNT(*) AS filas
+--   FROM album_fotos
+--   WHERE activo = true
+--   GROUP BY foto_type
+--   ORDER BY foto_type;
+
+-- ============================================================================
+-- 1. COLUMNA miniatura_url (imagen de muestra del recurso)
+-- ============================================================================
+
+ALTER TABLE album_fotos
+  ADD COLUMN IF NOT EXISTS miniatura_url text NULL;
+
+-- Documentacion del contrato en el propio esquema. NO es un COMMENT de
+-- constraint y no declara ninguna: re-ejecutarla solo reescribe el mismo texto
+-- con el mismo valor, asi que tampoco rompe la idempotencia.
+COMMENT ON COLUMN album_fotos.miniatura_url IS
+  'URL de la imagen de muestra de un video o audio. NULL = el renderizador usa su fallback.';
+
+-- ============================================================================
+-- VERIFICACION POST-APLICACION (solo lectura; NO modifica nada). Copiar y
+-- correr sentencia por sentencia en el editor de Neon.
+-- ============================================================================
+-- (a) Columna presente, de tipo text y nullable (esperada 1 fila con
+--     data_type = text e is_nullable = YES):
+-- SELECT column_name, data_type, is_nullable
+--   FROM information_schema.columns
+--   WHERE table_schema = 'public' AND table_name = 'album_fotos'
+--     AND column_name = 'miniatura_url';
+--
+-- (b) Sin backfill en esquema: 0 filas con miniatura. La columna arranca vacia
+--     a proposito; se llena desde la capa de aplicacion, no por UPDATE.
+-- SELECT COUNT(*) AS filas_con_miniatura
+--   FROM album_fotos
+--   WHERE miniatura_url IS NOT NULL;
+--
+-- (c) Ninguna fila de audio/video rota: el conteo total de album_fotos debe
+--     ser EXACTAMENTE el mismo que antes de aplicar (solo se anadio una
+--     columna; no se toco ni se borro ninguna fila).
+-- SELECT foto_type, COUNT(*) AS filas
+--   FROM album_fotos
+--   GROUP BY foto_type
+--   ORDER BY foto_type;
+--
+-- (d) Idempotencia global: re-ejecutar TODO el archivo y volver a correr
+--     (a)-(c); los resultados deben ser IDENTICOS (no-op).
+--
+-- ROLLBACK (comentado; solo emergencia, LOSSY si ya se guardaron miniaturas):
+-- ALTER TABLE album_fotos DROP COLUMN IF EXISTS miniatura_url;

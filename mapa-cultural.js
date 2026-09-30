@@ -332,19 +332,216 @@
     return fallback;
   }
 
+  /* Modulo compartido de resolucion de embeds (media-embed.js).
+     Este archivo es un asset compartido y no tiene bloque de <script> propio:
+     lo carga la pagina anfitriona. Si la pagina ya lo declaro (comunidad.html
+     lo hace antes que este archivo), se usa de inmediato. Si no, se inyecta
+     una sola vez, con guard, siguiendo el mismo patron que las demas
+     dependencias con guard de este motor. Mientras no este disponible se
+     degrada al comportamiento previo (<video> directo). */
+  function mdMediaEmbed() {
+    if (window.ExploraMediaEmbed) { return window.ExploraMediaEmbed; }
+    if (typeof document === 'undefined') { return null; }
+    if (!document.getElementById('explora-media-embed')) {
+      var tag = document.createElement('script');
+      tag.id = 'explora-media-embed';
+      tag.src = 'media-embed.js?v=1';
+      tag.async = false;
+      (document.head || document.documentElement).appendChild(tag);
+    }
+    return window.ExploraMediaEmbed || null;
+  }
+
   function mdVideoEmbedHTML(url) {
     if (!url) return '';
-    var yt = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/.exec(url);
-    if (yt && yt[1]) {
-      return '<iframe class="md-lb-media" src="https://www.youtube.com/embed/' + yt[1]
-        + '" frameborder="0" allowfullscreen></iframe>';
-    }
-    var vm = /vimeo\.com\/(\d+)/.exec(url);
-    if (vm && vm[1]) {
-      return '<iframe class="md-lb-media" src="https://player.vimeo.com/video/' + vm[1]
-        + '" frameborder="0" allowfullscreen></iframe>';
+    var M = mdMediaEmbed();
+    if (M) {
+      /* Spotify: solo tipo track. Iframe oficial con la clase del lightbox. */
+      if (M.kind(url) === 'spotify') {
+        var sp = M.spotifyEmbedIframe(url, M.ALTURA_SPOTIFY_COMPACTA, 'md-lb-media');
+        if (sp) { return sp; }
+      }
+      /* YouTube / Vimeo: delegan en el modulo, sin logica propia. */
+      var embed = M.embedUrl(url);
+      if (embed) {
+        return '<iframe class="md-lb-media" src="' + esc(embed)
+          + '" frameborder="0" allow="autoplay;encrypted-media;fullscreen"'
+          + ' allowfullscreen loading="lazy"></iframe>';
+      }
     }
     return '<video class="md-lb-media" controls src="' + esc(url) + '"></video>';
+  }
+
+  /* ---------- caratulas de audio/video: portada sin <img> del recurso ----------
+     BUG que cierra este bloque: album_fotos.foto_type admite 'foto', 'video' y
+     'audio', y el motor metia f.foto_url tal cual en un <img src>. Con un
+     .mp3 o un .mp4 (o con un link de Spotify) el navegador no puede
+     decodificarlo como imagen, la imagen falla y queda un hueco vacio: es el
+     sintoma reportado. Regla inviolable: un <img src> NUNCA apunta a un
+     archivo de audio/video ni a una URL de Spotify, y nunca se deja un hueco:
+     si no hay caratula, se pinta el placeholder.
+     Prioridad de render, un solo criterio para toda la superficie del motor
+     (el mismo orden que aplica mpPortadaHTML en mi-perfil.html):
+       1. tipo foto -> se pinta su URL como imagen: comportamiento previo, sin
+          cambios.
+       2. tipo video/audio -> se pinta el placeholder (audio en morado
+          #9b59b6 con la nota musical, video en fondo oscuro con el icono de
+          play) y ENCIMA la caratula que trae el backend.
+       3. si esa caratula resulta ser en realidad un medio, se ignora y se
+          queda el placeholder.
+       4. si el recurso es de Spotify, la caratula se pide por oEmbed desde el
+          navegador y la portada MEJORA en sitio cuando llega.
+     El contenedor (md-thumb, md-album-photo) lo pone el llamante: este helper
+     devuelve solo el contenido. Los dos contenedores ya traen
+     position:relative, aspect-ratio y overflow:hidden, asi que el placeholder
+     y la caratula se apilan en posicion absoluta, uno detras del otro por
+     orden de DOM, sin tocar el CSS. */
+
+  /* Intentos y espera del arranque perezoso de la caratula por oEmbed. */
+  var MD_OC_INTENTOS = 4;
+  var MD_OC_ESPERA_MS = 250;
+
+  /* Extension servible (audio o video): jamas una imagen. */
+  var MD_RE_RECURSO = /\.(mp3|mp4|m4a|m4b|aac|wav|webm|mov|m4v|ogg|oga|ogv|opus|flac|3gp)$/i;
+
+  /* Imagen de muestra del recurso. El backend la publica con dos alias
+     distintos segun el lector: miniatura_url (album_detalle, galeria del
+     destino) y media_miniatura (multimedia_mapa). Se aceptan los dos. */
+  function mdCoverDe(item) {
+    if (!item || typeof item !== 'object') return '';
+    var c = item.miniatura_url || item.media_miniatura || '';
+    return (typeof c === 'string') ? c.replace(/^\s+|\s+$/g, '') : '';
+  }
+
+  /* true solo para audio/video: los unicos tipos con caratula propia. */
+  function mdEsAudioVideo(tipo) {
+    return tipo === 'audio' || tipo === 'video';
+  }
+
+  /* URL que NO es una imagen. Si da true, jamas puede ir en un <img src>.
+     El criterio vive en media-embed.js (isDirectMedia + kind) y se consulta
+     primero por el modulo compartido; el regex local es solo el arranque,
+     para cuando el modulo todavia no se ha descargado. */
+  function mdEsUrlRecurso(url) {
+    var s = (url == null) ? '' : String(url).replace(/^\s+|\s+$/g, '');
+    if (!s) return false;
+    var M = mdMediaEmbed();
+    if (M) {
+      try {
+        if (typeof M.isDirectMedia === 'function' && M.isDirectMedia(s)) return true;
+        if (typeof M.kind === 'function') {
+          var k = M.kind(s);
+          if (k === 'spotify' || k === 'youtube' || k === 'vimeo') return true;
+        }
+      } catch (e) { /* el modulo manda: si falla, decide el regex local */ }
+    }
+    var base = s.split('?')[0].split('#')[0];
+    if (MD_RE_RECURSO.test(base)) return true;
+    if (/^spotify:/i.test(s)) return true;
+    if (/^https?:\/\/([a-z0-9-]+\.)*spotify\.(com|us|int|co)\//i.test(s)) return true;
+    if (/^https?:\/\/([a-z0-9-]+\.)*youtube\.com\//i.test(s)) return true;
+    if (/^https?:\/\/youtu\.be\//i.test(s)) return true;
+    if (/^https?:\/\/([a-z0-9-]+\.)*vimeo\.com\//i.test(s)) return true;
+    return false;
+  }
+
+  /* Placeholder de audio/video. Replica el lenguaje visual que ya usa el
+     repo: audio en morado #9b59b6 con la nota musical, video en fondo oscuro
+     con el icono de play. Es absoluto para quedar DEBAJO de la caratula, que
+     se pinta encima como capa. */
+  function mdCoverPhHTML(tipo, extra) {
+    var esAudio = (tipo === 'audio');
+    var fondo = esAudio ? '#9b59b6' : '#1b2230';
+    var ico = esAudio ? '\u266B' : '\u25B6';
+    return '<div' + (extra ? ' ' + extra : '') + ' data-md-ph="' + (esAudio ? 'audio' : 'video') + '"'
+      + ' style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;'
+      + 'align-items:center;justify-content:center;background:' + fondo
+      + ';color:#fff;font-size:26px;line-height:1;opacity:.9">' + ico + '</div>';
+  }
+
+  /* Capa de caratula: va ENCIMA del placeholder, que ya esta pintado debajo.
+     opacity 0 -> 1 en onload para que no haya parpadeo; si la imagen no
+     carga, se apaga la capa y solo queda el placeholder: nunca un hueco y
+     nunca un <img> roto. */
+  function mdCoverImgHTML(src, alt, tipo) {
+    return '<img src="' + esc(src) + '" alt="' + esc(alt || '') + '" data-md-cover="'
+      + ((tipo === 'audio') ? 'audio' : 'video') + '"'
+      + ' style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;'
+      + 'object-fit:cover;display:block;opacity:0;transition:opacity .15s ease"'
+      + ' onload="if(this.style.opacity!==\'1\')this.style.opacity=1"'
+      + ' onerror="this.style.display=\'none\'">';
+  }
+
+  /* Contenido de la portada o del thumb de un recurso. Es el UNICO punto de
+     decision de los tres render del motor que pintan media: el thumb de la
+     ficha (tabHtml), la galeria del destino (openAlbumDestino) y el modal de
+     album (openAlbumModal). Prioridad: cabecera de este bloque.
+     Un item sin foto_type (undefined) se trata como foto y, aun asi, su URL
+     pasa por mdEsUrlRecurso: un dato sucio tampoco puede romper la imagen. */
+  function mdPortadaHTML(item, alt) {
+    var it = (item && typeof item === 'object') ? item : {};
+    var tipo = it.foto_type || it.media_type || 'foto';
+    var url = it.foto_url || it.media_url || it.url || '';
+    var cap = alt || it.media_title || it.caption || it.cap || '';
+    if (!mdEsAudioVideo(tipo)) {
+      /* Foto (o album con portada): la URL es una imagen. */
+      if (url && !mdEsUrlRecurso(url)) {
+        return '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">';
+      }
+      return photoPlaceholderHTML(CAMARA, '');
+    }
+    /* Audio/video: la URL del recurso queda fuera del <img> para siempre. */
+    var cover = mdCoverDe(it);
+    if (cover && !mdEsUrlRecurso(cover)) {
+      return mdCoverPhHTML(tipo, '') + mdCoverImgHTML(cover, cap, tipo);
+    }
+    /* Sin caratula utilizable: placeholder. Se marca la URL del recurso para
+       que mdMEjoraCovers pueda pedir la caratula por oEmbed si resulta ser de
+       Spotify: el modulo compartido es el unico que sabe sacarle el id de
+       track, asi que si no es de Spotify no se llega a hacer el fetch. */
+    if (url) {
+      return mdCoverPhHTML(tipo, 'data-md-sp="' + esc(url) + '" data-md-cap="' + esc(cap) + '"');
+    }
+    return mdCoverPhHTML(tipo, '');
+  }
+
+  /* Mejora en sitio las portadas de Spotify que quedaron como placeholder:
+     pide la caratula por oEmbed al navegador y la pinta como capa encima
+     cuando llega. Degradacion segura en los cinco fallos posibles: el modulo
+     compartido aun no esta (se carga de forma perezosa, se reintenta un par
+     de veces), no hay fetch, la red o el JSON fallan, la respuesta no trae
+     thumbnail_url, o el placeholder ya no esta en el DOM. En todos los
+     casos el placeholder ya pintado se queda. La caratula se revalida con
+     mdEsUrlRecurso: si el oEmbed devolviera un medio, no se pinta. */
+  function mdMEjoraCovers(root, intentos) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    var pend = root.querySelectorAll('[data-md-sp]');
+    if (!pend || !pend.length) return;
+    var n = (typeof intentos === 'number') ? intentos : MD_OC_INTENTOS;
+    var M = mdMediaEmbed();
+    if (!M || typeof M.spotifyOembedUrl !== 'function') {
+      if (n > 0 && typeof setTimeout === 'function') {
+        setTimeout(function () { mdMEjoraCovers(root, n - 1); }, MD_OC_ESPERA_MS);
+      }
+      return;
+    }
+    if (typeof fetch !== 'function') return;
+    for (var i = 0; i < pend.length; i++) {
+      (function (ph) {
+        var url = ph.getAttribute('data-md-sp') || '';
+        var endpoint = null;
+        try { endpoint = M.spotifyOembedUrl(url); } catch (e) { endpoint = null; }
+        if (!endpoint) return;
+        var cap = ph.getAttribute('data-md-cap') || '';
+        var tipo = ph.getAttribute('data-md-ph') || 'audio';
+        fetch(endpoint).then(function (r) { return r.json(); }).then(function (d) {
+          var t = (d && d.thumbnail_url) ? String(d.thumbnail_url) : '';
+          if (!t || mdEsUrlRecurso(t)) return;
+          if (!ph.parentNode) return;
+          ph.parentNode.insertAdjacentHTML('beforeend', mdCoverImgHTML(t, cap, tipo));
+        }).catch(function (e) { log('caratula spotify', e); });
+      }(pend[i]));
+    }
   }
 
   /* =============================================================
@@ -650,6 +847,11 @@
     }
 
     function fotoLightbox(url, cap) {
+      /* El thumb y la celda de album llevan data-url de cualquier tipo: si
+         apuntan a un medio (o a Spotify) un <img> no los puede pintar y
+         dejaria el mismo hueco que arregla mdPortadaHTML. Se delega en el
+         embed, que ya distingue YouTube, Vimeo y Spotify. */
+      if (url && mdEsUrlRecurso(url)) { videoLightbox(url, cap); return; }
       openLightbox('<img class="md-lb-media" src="' + esc(url) + '" alt="' + esc(cap || '') + '">', cap);
     }
 
@@ -1268,7 +1470,7 @@
             votoCtrl = '<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.7);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.4">\u2B50 ' + itVotos + '</span>';
           }
           html += '<div class="md-thumb" data-url="' + esc(it.media_url) + '" data-cap="' + esc(mdCapMedia(it.media_title, it.autor_nombre, it.votos)) + '">'
-            + '<img src="' + esc(it.media_url) + '" alt="' + esc(it.media_title || '') + '" loading="lazy">'
+            + mdPortadaHTML(it, it.media_title || '')
             + '<span class="md-thb-ico">' + fotoIcon() + '</span>' + votoCtrl + '</div>';
         });
       }
@@ -1329,6 +1531,7 @@
       html += '</div>';
       html += tabHtml(p);
       st.contentEl.innerHTML = html;
+      mdMEjoraCovers(st.contentEl);
       openPanel();
     }
 
@@ -1459,7 +1662,7 @@
               var cap = f.caption || f.media_title || titulo;
               html += '<div class="md-album-cell">'
                 + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '">'
-                + '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy">'
+                + mdPortadaHTML(f, cap)
                 + '</div></div>';
             }
             html += '</div>';
@@ -1468,6 +1671,7 @@
             + '<button type="button" class="md-link" data-mc-albumficha="' + esc(slug) + '">Ver ficha</button>'
             + '</div>';
           wrap.innerHTML = html;
+          mdMEjoraCovers(wrap);
         })
         .catch(function (e) {
           log('galeria destino', e);
@@ -1567,12 +1771,13 @@
             html += '<div class="md-album-grid">';
             for (var i = 0; i < fotos.length; i++) {
               var f = fotos[i];
-              var url = (typeof f === 'string') ? f : (f.foto_url || f.url || f.media_url || '');
+              var item = (typeof f === 'string') ? { foto_url: f } : (f || {});
+              var url = item.foto_url || item.url || item.media_url || '';
               var cap = (typeof f === 'string') ? (al.titulo || '') : (f.cap || f.media_title || al.titulo || '');
               if (!url) continue;
               html += '<div class="md-album-cell">'
                 + '<div class="md-album-photo" data-url="' + esc(url) + '" data-cap="' + esc(cap) + '">'
-                + '<img src="' + esc(url) + '" alt="' + esc(cap) + '" loading="lazy"></div>';
+                + mdPortadaHTML(item, cap) + '</div>';
               if (typeof f !== 'string' && f.id) {
                 html += '<button type="button" class="md-album-com-btn" data-comments-for="' + esc(String(f.id)) + '"'
                 + ' data-comments-fuente="album_foto" data-mc-comments="' + esc(String(f.id)) + '" data-mc-comments-fuente="album_foto">\uD83D\uDCAC Comentarios'
@@ -1593,6 +1798,7 @@
               + '</div>';
           }
           wrap.innerHTML = html;
+          mdMEjoraCovers(wrap);
         })
         .catch(function (e) {
           log('album modal', e);

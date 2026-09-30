@@ -35,11 +35,52 @@ const SUBCAT_LISTA = {
 // Dominios permitidos para video_url -- solo se persiste si el host
 // coincide (defensa adicional; el saneo real hacia <iframe> ocurre en
 // pagina-destino.js al momento de renderizar).
-const VIDEO_HOSTS = ['youtube.com', 'www.youtube.com', 'youtu.be', 'vimeo.com', 'www.vimeo.com'];
+//
+// SPOTIFY: se admiten los hosts de escucha de un track, que antes eran
+// rechazados y por tanto no se podian ni guardar.
+//
+// POR QUE LA LISTA ES DE HOSTS EXACTOS Y NO DE DOMINIOS BASE:
+// un matching por sufijo ingenuo (endsWith('spotify.com')) es
+// INSEGURO, deja pasar:
+//   - 'evilspotify.com'      (coincide el sufijo, el dominio es otro)
+//   - 'spotify.com.attacker.net' (el atacante registra ese dominio y
+//     su cadena TERMINA en 'spotify.com')
+// y abrir el host raiz con la regla del punto literal
+// (host === d || host.endsWith('.' + d)) dejaria pasar cualquier
+// subdominio, incluido 'notopen.spotify.com'. Por eso NO se anade
+// 'spotify.com' a secas ni un comodin '*.spotify.com': la whitelist
+// queda cerrada a hosts concretos y el match es exacto (indexOf).
+//
+// ESQUEMAS: aqui SOLO se aceptan URLs http/https. El URI 'spotify:' no
+// tiene jerarquia de autoridad, asi que new URL() lo parsea con host
+// vacio y se rechaza solo (no hace falta un caso especial). Decision de
+// producto, documentada a proposito: en lugares el campo video_url es
+// siempre una URL http/https. Si alguna vez se admite el URI
+// 'spotify:track:ID', hay que NORMALIZARLO en el cliente a
+// https://open.spotify.com/track/ID, no abrir el backend a otro esquema.
+const VIDEO_HOSTS = [
+  'youtube.com', 'www.youtube.com', 'youtu.be', 'vimeo.com', 'www.vimeo.com',
+  'open.spotify.com', 'play.spotify.com',
+];
+
+// Invariante de la whitelist: toda entrada debe ser un HOST concreto
+// (contiene al menos un punto y no empieza por punto). Falla ruidoso al
+// cargar el modulo si alguien anade un dominio raiz, que combinado con
+// un futuro matching por sufijo volveria a abrir la puerta a
+// subdominios arbitrarios. No es validacion de entrada del usuario: es
+// una guarda de codigo sobre una constante del propio modulo.
+VIDEO_HOSTS.forEach(function (h) {
+  if (h.indexOf('.') === -1 || h.charAt(0) === '.')
+    throw new Error('VIDEO_HOSTS: entrada no permitida, debe ser un host exacto: ' + h);
+});
 
 function esVideoUrlSegura(u) {
   try {
+    // new URL() exige esquema absoluto: 'spotify:...' cae al catch (host
+    // vacio) y las rutas relativas se rechazan tambien.
     var host = new URL(String(u)).hostname.toLowerCase();
+    // Match EXACTO y case-insensitive (hostname ya viene normalizado).
+    // A proposito NO se usa endsWith: ver la nota de seguridad arriba.
     return VIDEO_HOSTS.indexOf(host) !== -1;
   } catch (e) { return false; }
 }

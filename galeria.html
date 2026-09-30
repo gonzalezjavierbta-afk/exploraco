@@ -63,6 +63,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .g-media video{width:100%;display:block;background:#000}
 .g-media audio{width:100%;display:block;padding:10px}
 .g-media-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.3);font-size:11px;text-align:center}
+/* CAPA DE CARATULA DE AUDIO: el <audio> nativo no tiene atributo poster, asi
+   que la imagen va absolute ENCIMA del placeholder (ya pintado debajo). */
+.g-cover{position:relative;width:100%;overflow:hidden;background:#181818}
+.g-cover>.g-media-ph{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto}
+.g-cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .15s ease}
 .g-card-body{padding:10px 12px 12px}
 .g-card-title{font-size:12px;font-weight:600;color:#fff;line-height:1.35;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .g-card-meta{font-size:10px;color:rgba(255,255,255,.42);line-height:1.5}
@@ -253,6 +258,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="album-comments.js?v=2"></script>
 <script src="media-actions.js"></script>
 <script src="media-upload.js"></script>
+<script src="media-embed.js?v=1"></script>
 <script>
 /* LATAWEL - galeria.html (subpagina de galeria ampliada) */
 /* Modo global: feed top + albumes populares. Modo destino: ?destino=<slug>. */
@@ -366,41 +372,101 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     if (count) { count.textContent = items.length + ' ' + (items.length === 1 ? unidadSing : unidadPlural); }
   }
 
+  /* gEmbedUrl: wrapper FINO. Toda la logica de embed vive en
+     window.ExploraMediaEmbed (media-embed.js) para no duplicarla.
+     Se mantiene el nombre porque hay varias llamadas en este archivo. */
   function gEmbedUrl(url) {
-    if (!url) { return null; }
-    var m = url.match(/youtube\.com\/watch\?v=([\w-]{6,})/);
-    if (m) { return 'https://www.youtube.com/embed/' + m[1]; }
-    m = url.match(/youtu\.be\/([\w-]{6,})/);
-    if (m) { return 'https://www.youtube.com/embed/' + m[1]; }
-    m = url.match(/vimeo\.com\/(\d+)/);
-    if (m) { return 'https://player.vimeo.com/video/' + m[1]; }
-    return null;
+    if (!window.ExploraMediaEmbed) { return null; }
+    return window.ExploraMediaEmbed.embedUrl(url);
+  }
+
+  /* gMediaKind: clasificador compartido (youtube | vimeo | spotify | directo). */
+  function gMediaKind(url) {
+    if (!window.ExploraMediaEmbed) { return null; }
+    return window.ExploraMediaEmbed.kind(url);
+  }
+
+  /* gMediaDe: delega en el helper NORMALIZADO del modulo compartido
+     (media-embed.js), que es el UNICO sitio donde vive el criterio de alias
+     de la miniatura (album_fotos.miniatura_url | media_miniatura). Aqui no se
+     reimplementa ese criterio: si el asset no llego, el fallback degrada a
+     vacio (se pierde la miniatura, nunca se rompe el render). */
+  function gMediaDe(item) {
+    var M = window.ExploraMediaEmbed;
+    if (M && typeof M.mediaDe === 'function') { return M.mediaDe(item); }
+    return { url: '', tipo: '', kind: null, esMedio: false, miniatura: '', caratula: '' };
+  }
+
+  /* Capa de caratula de un audio. El <audio> nativo NO tiene atributo poster
+     (a diferencia de <video>), asi que la imagen va en una capa absolute
+     ENCIMA de un placeholder ya pintado: opacidad 0 -> 1 en onload para que
+     no haya parpadeo, y si la imagen falla se oculta y queda el placeholder
+     debajo. Mismo patron que usa mi-perfil.html con mpPortadaHTML, pero aqui
+     la URL sale de gMediaDe().caratula, que ya garantiza que NO es un medio:
+     un <img> nunca apunta a un .mp3/.mp4 (invariante de media-embed.js). */
+  function gCoverHTML(m, alto) {
+    var ph = '<div class="g-media-ph">Audio</div>';
+    if (!m.caratula) { return '<div class="g-cover" style="height:' + alto + 'px">' + ph + '</div>'; }
+    return '<div class="g-cover" style="height:' + alto + 'px">' + ph
+      + '<img class="g-cover-img" src="' + esc(m.caratula) + '" alt="' + esc(m.titulo || '') + '" loading="lazy"'
+      + ' onload="this.style.opacity=1" onerror="this.style.display=\'none\'"></div>';
   }
 
   function gMediaHTML(item) {
-    var url = esc(item.media_url || '');
-    var type = item.media_type;
-    if (type === 'foto' || !type) {
-      return '<img src="' + url + '" alt="' + esc(item.media_title || '') + '" loading="lazy" onerror="this.style.display=\'none\'">';
+    var m = gMediaDe(item);
+    m.titulo = (item && item.media_title) || '';
+    var url = esc(m.url);
+    var type = m.tipo;
+    /* Spotify: solo tipo track. Se renderiza el iframe oficial en vez de
+       un <img> o un <video> (que no pueden reproducir una URL de Spotify).
+       Va primero porque una URL de Spotify nunca es una imagen. */
+    if (m.kind === 'spotify') {
+      return '<div style="width:100%;background:#000;border-radius:8px;overflow:hidden">'
+        + window.ExploraMediaEmbed.spotifyEmbedIframe(m.url, window.ExploraMediaEmbed.ALTURA_SPOTIFY_COMPACTA)
+        + '</div>';
+    }
+    if (type === 'foto') {
+      return '<img src="' + url + '" alt="' + esc(m.titulo) + '" loading="lazy" onerror="this.style.display=\'none\'">';
     }
     if (type === 'video') {
-      var embed = gEmbedUrl(item.media_url);
+      var embed = gEmbedUrl(m.url);
       if (embed) {
         return '<div style="position:relative;width:100%;padding-top:56.25%;background:#000">'
           + '<iframe src="' + esc(embed) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen loading="lazy"></iframe></div>';
       }
-      return '<video controls src="' + url + '" preload="metadata"></video>';
+      /* Video directo: poster con la miniatura del backend. gMediaDe ya la
+         garantiza utilizable (si fuera un medio, caratula queda vacia). */
+      return '<video controls src="' + url + '"'
+        + (m.caratula ? ' poster="' + esc(m.caratula) + '"' : '')
+        + ' preload="metadata"></video>';
     }
     if (type === 'audio') {
-      return '<audio controls src="' + url + '" preload="none">Tu navegador no soporta audio.</audio>';
+      return gCoverHTML(m, 140)
+        + '<audio controls src="' + url + '" preload="none">Tu navegador no soporta audio.</audio>';
     }
     return '<div class="g-media-ph">Tipo no soportado</div>';
+  }
+
+  /* gItemMedio: arma el objeto que consume gMediaHTML a partir del item CRUDO
+     del backend (mi_feed_fotos, galeria_destino, album_detalle).
+     REGLA: al reconstruir este objeto NO se descarta la miniatura; se lee con
+     gMediaDe, que es el UNICO sitio donde vive el criterio de alias
+     (miniatura_url | media_miniatura). El titulo se puede forzar desde el
+     llamante cuando el item normalizado lo guarda en otro campo (caption). */
+  function gItemMedio(src, titulo) {
+    var m = gMediaDe(src);
+    return {
+      media_url: m.url,
+      media_type: m.tipo,
+      media_title: titulo || (src && src.media_title) || '',
+      miniatura_url: m.miniatura
+    };
   }
 
   function gUserCard(f) {
     var card = document.createElement('div');
     card.className = 'g-card';
-    card.innerHTML = '<div class="g-media">' + gMediaHTML({ media_url: f.foto_url, media_type: f.foto_type }) + '</div>'
+    card.innerHTML = '<div class="g-media">' + gMediaHTML(gItemMedio(f)) + '</div>'
       + '<div class="g-card-body">'
       + (f.media_title ? '<div class="g-card-title">' + esc(f.media_title) + '</div>' : '')
       + '<div class="g-card-meta">' + esc(f.autor_nombre || 'Viajero')
@@ -417,6 +483,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     return {
       foto_url: it.url,
       foto_type: it.foto_type || 'foto',
+      /* La miniatura viaja con el objeto: sin esta linea, gOpenMedia la
+         perderia al re-mapear y el video/audio saldria sin poster/caratula. */
+      miniatura_url: it.miniatura_url || '',
       media_title: it.caption || '',
       autor_nombre: it.autor_nombre || '',
       album_titulo: it.album_titulo || '',
@@ -437,7 +506,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     var titulo = it.caption || '';
     var meta = it.autor_nombre || (it.origen === 'curada' ? 'Selecci\u00f3n LATAWEL' : 'Viajero');
     var votable = (it.tipo_voto === 'media' || !!it.fuente);
-    var html = '<div class="g-media">' + gMediaHTML({ media_url: it.url, media_type: it.foto_type || 'foto', media_title: titulo }) + '</div>'
+    var html = '<div class="g-media">' + gMediaHTML(gItemMedio(it, titulo)) + '</div>'
       + '<div class="g-card-body">'
       + (titulo ? '<div class="g-card-title">' + esc(titulo) + '</div>' : '')
       + '<div class="g-card-meta">' + esc(meta) + (it.album_titulo ? ' \u00b7 ' + esc(it.album_titulo) : '') + '</div>';
@@ -465,7 +534,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         caption: f.caption || '', votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: false,
         autor_id: null, autor_nombre: null, album_id: null, album_titulo: null,
-        foto_type: 'foto'
+        foto_type: 'foto',
+        miniatura_url: gMediaDe(f).miniatura
       });
     });
     (res.viajeros || []).forEach(function (f) {
@@ -477,7 +547,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: !!f.es_propia,
         autor_id: f.autor_id || null, autor_nombre: f.autor_nombre || null,
         album_id: null, album_titulo: null,
-        foto_type: f.foto_type || 'foto'
+        foto_type: f.foto_type || 'foto',
+        miniatura_url: gMediaDe(f).miniatura
       });
     });
     (res.usuarios || []).forEach(function (f) {
@@ -487,7 +558,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: !!f.es_propia,
         autor_id: f.autor_id || null, autor_nombre: f.autor_nombre || null,
         album_id: f.album_id || null, album_titulo: f.album_titulo || null,
-        foto_type: f.foto_type || 'foto'
+        foto_type: f.foto_type || 'foto',
+        miniatura_url: gMediaDe(f).miniatura
       });
     });
     return out;
@@ -633,7 +705,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     modal.classList.add('on');
     document.body.style.overflow = 'hidden';
     document.getElementById('g-modal-title').textContent = 'Publicacion';
-    box.innerHTML = '<div class="g-detail-media">' + gMediaHTML({ media_url: f.foto_url, media_type: f.foto_type }) + '</div>'
+    box.innerHTML = '<div class="g-detail-media">' + gMediaHTML(gItemMedio(f)) + '</div>'
       + (f.media_title ? '<div class="g-detail-title">' + esc(f.media_title) + '</div>' : '')
       + '<div class="g-detail-meta">' + esc(f.autor_nombre || 'Viajero')
       + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '')
@@ -689,7 +761,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         } else {
           html += '<div class="g-album-photos">';
           fotos.forEach(function (f) {
-            html += '<div class="g-album-photo"><div class="g-media">' + gMediaHTML({ media_url: f.foto_url, media_type: f.foto_type }) + '</div>'
+            html += '<div class="g-album-photo"><div class="g-media">' + gMediaHTML(gItemMedio(f)) + '</div>'
               + '<div class="g-album-photo-body">'
               + (f.media_title ? '<div class="g-card-title">' + esc(f.media_title) + '</div>' : '')
               + '<div class="g-card-meta">' + esc(f.autor_nombre || 'Viajero') + '</div>'
