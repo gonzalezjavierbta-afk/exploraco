@@ -2,7 +2,6 @@
 name: explore-free
 description: Explora el repo en solo lectura: busca archivos, hace greps y responde preguntas del codebase con pocos tokens.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: deny

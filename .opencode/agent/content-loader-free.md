@@ -2,7 +2,6 @@
 name: content-loader-free
 description: Crea paginas dinamicas completas (seed, loader y smoke), corre el Escudo GOLD y las carga a produccion.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

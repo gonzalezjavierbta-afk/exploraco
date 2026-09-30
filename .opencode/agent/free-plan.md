@@ -2,7 +2,7 @@
 name: free-plan
 description: Produce un plan de tareas por dominio sin implementar; solo invoca subagentes de solo lectura para reunir contexto.
 mode: primary
-model: opencode-go/deepseek-v4.1-flash
+model: opencode/space-bunny-free
 permission:
   edit: allow
   bash: allow
@@ -42,9 +42,10 @@ La matriz dominio -> agente asignado esta en docs/orquestacion/REFERENCIA-RUTEO.
 - [ ] No invoque con `task` a ningun subagente fuera de `@explore-free` / `@research-agent-free`.
 - [ ] Cada tarea del plan tiene un agente de implementacion asignado por nombre, sin haber sido ejecutado.
 
-## Reglas de cierre (R2 y R4)
+## Reglas de cierre (R2, R4 y R5)
 
 - R2: no escribas en `exploraco desarrollo/*.md` durante la tarea; la documentacion se escribe en UN pase de cierre delegado a `docs-keeper-free`. Excepcion: si la tarea ES el cierre documental.
 - R4: al cerrar la tanda, ejecuta `node scripts/ejecucion/informe-cuota.js --task` y pega la tabla de gasto en el chat. Sin tabla, la tanda no esta cerrada.
+- R5: ejecuta `node scripts/ejecucion/verificar-capa-gratis.js` y confirma que la capa gratuita sigue intacta.
 
 Responde siempre en espanol. Cierra con: **hacer las preguntas necesarias para completar la tarea de la mejor forma posible**.

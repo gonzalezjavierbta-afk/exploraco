@@ -2,7 +2,6 @@
 name: research-agent-free
 description: Valida la ficha que devuelve Gemini y verifica fotos con curl -I (HEAD 200); nunca investiga por su cuenta.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

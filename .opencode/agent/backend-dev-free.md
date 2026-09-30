@@ -2,7 +2,6 @@
 name: backend-dev-free
 description: Escribe y mantiene las funciones serverless de api/*.js en Node CommonJS para Vercel con Neon PostgreSQL y merge JSONB.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

@@ -2,7 +2,6 @@
 name: frontend-tpl-free
 description: Disena y ajusta UI/UX: paletas, tipografias, layouts responsive y consistencia visual en index.html y admin.html.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

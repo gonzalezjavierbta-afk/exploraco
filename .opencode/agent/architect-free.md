@@ -2,7 +2,6 @@
 name: architect-free
 description: Disena el modelo de tags JSONB, evalua opciones y redacta o valida ADRs en DECISIONS.md antes de implementar.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

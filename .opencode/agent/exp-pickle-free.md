@@ -2,7 +2,6 @@
 name: exp-pickle-free
 description: Chequeos mecanicos de bajo riesgo: linter, conteos ASCII/divs/bytes, node --check y smoke tests simples.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 temperature: 0.3
 permission:
   edit: allow

@@ -10,6 +10,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ### Tareas no completadas / estado actual
 
+- **IMPLEMENTADO EN WORKING TREE / VERIFICADO (2026-09-30; commit/deploy PENDIENTES; requiere REINICIAR OpenCode):** **TSK-165 / ADR-074 - Restauracion de la capa gratuita de agentes (modelo de 3 capas: free / hibrido / pago).** `opencode.json` `model`/`small_model` -> `opencode/space-bunny-free`; 17 `*-free` sin `model:` (heredan del primario); `free-build`/`free-plan` y `hybrid-build`/`hybrid-plan` -> `opencode/space-bunny-free`; NUEVOS `paid-build`/`paid-plan` y 4 pines `-pro` (`opencode-go/deepseek-v4.1-flash`). Roster **19 -> 27** (21 gratis, 6 de pago). NUEVO guard `scripts/ejecucion/verificar-capa-gratis.js` (primer paso de `npm test`; `npm run coste:gratis`) + `npm run cuota:tanda`. Verificacion: conteo real 27 agentes; `npm test` **VERDE (exit 0)**; `opencode run --agent hybrid-build` delego a `@exp-pickle-free` con `cost=0.000000`. Bug de gobernanza: **BUG-094** (premisa incompleta de BUG-092; BUG-092 sigue CERRADO). Seguimiento: **TSK-166** (calidad de `space-bunny-free`), **TSK-167** (revisar allowlist FREE), **TSK-168** (evaluar pines `-pro` SEO/admin). **8/8 endpoints intacto**; sin migraciones. Detalle en TASKS.md TSK-165..TSK-168.
 - **IMPLEMENTADO EN WORKING TREE / VERIFICADO (2026-09-30; commit/deploy PENDIENTES):** **TSK-164 / ADR-073 - Migracion de identidad ExploraCO -> LATAWEL.** Alcance: SOLO cambio de identidad sobre la estructura actual (NO se redisenaron las 20 pantallas). Marca LATAWEL (tagline "What to do?"; descriptor "plataforma de turismo interactivo"); dominio https://latawel.com VIVO (el antiguo exploraco.co no resuelve); paleta reemplazada en todo el sitio (0 restos); Poppins solo marca/tagline; assets en `assets/brand/`; codemod sobre 122 HTML; backend `api/*.js` con `BASE`/`FROM_EMAIL`/niveles LATAWEL. PRESERVADOS: `window.ExploraCO`, token, style id, `.html`, `/api/*`, esquema DB, `exploraco.vercel.app`. **0 endpoints nuevos; 0 migraciones.** Verificacion: `npm test` 896 PASS / 0 FAIL (exit 0); `node --check` 24 archivos; 0 regresiones de divs en 123 HTML; 154 archivos modificados. Bug: **BUG-093** (manifest). Pendientes: config de `SITE_BASE_URL` en Vercel, re-scrape de OG, GSC con sitemap nuevo, reemplazo por SVG maestro. Detalle en TASKS.md TSK-164.
 - **CERRADA / EN WORKING TREE (2026-09-29; commit/deploy PENDIENTE):** **TSK-161 / ADR-071 / BUG-091 - Mapa base CARTO -> OSM + cadena de respaldo de 3 proveedores (`osm` -> `osm-hot` -> `esri-imagery`).** Causa raiz: CARTO sirve HTTP 200 con un PNG placeholder "API KEY REQUIRED" y el fallback por `tileerror` nunca se disparaba. Archivos: `mapa-tiles.js` (L21-25), `mapa-cultural.js` (L71/L73), `index.html` (L1732/1734/1741/2291), `mapas.html` (L301/303-306), `comunidad.html` (L2043-2052). Verificacion: `npm test` EXIT 0 (13 smokes); `smoke_mapa_tiles.js` 24/24; `smoke_mapa_cultural.js` 98/98; Escudo GOLD APROBADO. Deuda: id legado `carto-voyager` (`mapa-cultural.js:359`, `mymapa.js:152`); hallazgo ADR-006 en `map-picker.js:91` (pasa CARTO como `custom` primero); ~90 `.html` estaticos con `cartocdn` inline fuera de alcance. Detalle en TASKS.md TSK-161.
 - **CERRADA (2026-09-29; requiere REINICIAR OpenCode):** **TSK-162 / BUG-092 / BUG-CONFIG-5 - Fix del modelo de subagentes (free tier de `opencode`).** Sintoma: todo subagente fallaba con "OpenCode's free tier can only be used from within OpenCode". Causa: los 19 agentes de `.opencode/agent/*.md` declaraban `opencode/big-pickle` (free tier NO admite invocacion como subagente) y `opencode.json` tenia `small_model: opencode/big-pickle`. Fix: 18 agentes -> `opencode-go/deepseek-v4.1-flash` + `media-reader-free.md` -> `opencode-go/mimo-v2.6-pro` (vision); `small_model` -> `opencode-go/deepseek-v4-flash`. Detalle en TASKS.md TSK-162.
@@ -53,6 +54,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad MULTIPLICADOR DE ORIGEN POR LEJANIA - 2026-09-24 (ADR-058 / TSK-155)](#prioridad-multiplicador-de-origen-por-lejania---2026-09-24-adr-058--tsk-155)
 - [Prioridad PANTALLAS DE ENTRADA - 2026-09-24 (TSK-156)](#prioridad-pantallas-de-entrada---2026-09-24-tsk-156)
 - [Prioridad ORQUESTACION / ADR-067 - 2026-09-28 (deuda post tanda de coste)](#prioridad-orquestacion--adr-067---2026-09-28-deuda-post-tanda-de-coste)
+- [Prioridad RESTAURACION DE LA CAPA GRATUITA - 2026-09-30 (ADR-074 / TSK-165)](#restauracion-de-la-capa-gratuita-de-agentes---2026-09-30-adr-074--tsk-165)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -3775,6 +3777,69 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Acciones pendientes:** (1) config de `SITE_BASE_URL` en Vercel si existe con el valor viejo; (2) re-scrape manual de OG tras el deploy; (3) Google Search Console con el sitemap nuevo (`https://latawel.com/sitemap.xml`); (4) reemplazo futuro de los raster por SVG maestro; (5) corregir `manifest.json` (BUG-093).
 - **Fuera de alcance:** rediseno de las 20 pantallas del prompt (deuda visual aceptada); renombrado de identificadores tecnicos/codename `exploraco`; endpoints nuevos; migraciones.
 - **Dependencia:** ninguna.
+
+## Restauracion de la capa gratuita de agentes - 2026-09-30 (ADR-074 / TSK-165)
+
+> Gobernanza de coste de orquestacion (`.opencode/agent/*.md`, `opencode.json`,
+> `scripts/ejecucion/verificar-capa-gratis.js`, `package.json`). NO toca `api/*`
+> (**8/8 INTACTO**, ADR-001/ADR-010); sin migraciones. Bug de gobernanza:
+> BUGS_HISTORICOS.md **BUG-094** (premisa incompleta de BUG-092).
+
+### TSK-165: Restaurar la capa gratuita de agentes -- modelo de 3 capas y guard de coste [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE / verificado (2026-09-30); commit/deploy PENDIENTES; requiere REINICIAR OpenCode para recargar los agentes.
+- **Prioridad:** Alta (gobernanza de coste: la capa gratuita estaba vacia y todo el roster corria a pago).
+- **Fecha:** 2026-09-30.
+- **Origen:** hallazgo al medir modelos free como subagente (la premisa de BUG-092 era incompleta).
+- **ADR:** DECISIONS.md ADR-074 (el guard y el brief lo rotulan "ADR-072"; el consecutivo real es 074 porque 072 y 073 ya existen).
+- **Bug:** BUGS_HISTORICOS.md BUG-094 (BUG-092 permanece CERRADO; su resolucion queda supersedida).
+- **Precedente:** ADR-067 (modelo de 3 capas con presupuesto, roster 40 -> 19); BUG-092 (el incidente de tooling que lo vacio).
+- **Alcance REAL ejecutado:**
+  1. `opencode.json`: `"model"` y `"small_model"` de `opencode-go/deepseek-v4.1-flash` / `opencode-go/deepseek-v4-flash` a `opencode/space-bunny-free`.
+  2. 17 subagentes `*-free`: se QUITA la linea `model:` del frontmatter (heredan el modelo de su primario).
+  3. `free-build`/`free-plan`: `model:` -> `opencode/space-bunny-free` + bloque "Capa de coste (ADR-074)" + regla R5.
+  4. NUEVOS primarios `paid-build`/`paid-plan` (`opencode-go/deepseek-v4.1-flash`); `hybrid-build`/`hybrid-plan` (`opencode/space-bunny-free`; `hybrid-build` es el UNICO que puede proponer un `-pro` y NUNCA lo invoca sin OK explicito del operador, bloque `ESCALADO PROPUESTO`).
+  5. NUEVOS 4 pines `-pro`: `backend-dev-pro`, `architect-pro`, `renderer-dev-pro`, `data-migration-pro` (todos `opencode-go/deepseek-v4.1-flash`).
+  6. NUEVO guard `scripts/ejecucion/verificar-capa-gratis.js`: exit 1 si un `*-free` queda en modelo de pago; si `opencode.json` no esta en la allowlist FREE; si un `-pro` no declara `model:`; o si alguien usa un modelo de la lista ROTOS.
+  7. `package.json`: `test` empieza por el guard; nuevos scripts `coste:gratis` (el guard) y `cuota:tanda` (`informe-cuota.js --task`).
+- **Roster:** 19 -> **27** agentes (21 gratis, 6 de pago).
+- **Evidencia (ADR-006):** conteo real = 27 agentes (17 `*-free` sin `model:` + `free-build`/`free-plan`/`hybrid-build`/`hybrid-plan` x `opencode/space-bunny-free` + `paid-build`/`paid-plan` y los 4 `-pro` x `opencode-go/deepseek-v4.1-flash`); `opencode.json` con `model`/`small_model` = `opencode/space-bunny-free`; `npm test` **VERDE (exit 0)** con el guard como primer paso; `opencode run --agent hybrid-build` delego a `@exp-pickle-free` y la DB registro ambos en `opencode/space-bunny-free` con `cost=0.000000`; guard forzado a `seo-dev-free` en pago -> **exit 1** correcto (revertido).
+- **Deuda [DEUDA]:** (a) allowlist FREE / lista ROTOS dependen del proveedor (re-verificar, TSK-167); (b) los comentarios del guard citan "ADR-072" (renombrar, fuera de este pase); (c) sin medicion de calidad de los modelos free en dominios duros (TSK-166).
+- **Fuera de alcance:** `docs/orquestacion/REFERENCIA-RUTEO.md` (ya actualizado por la tanda); `api/*` (8/8 INTACTO); sin migraciones.
+- **Dependencia:** ninguna (arranca en frio re-ejecutando `npm run coste:gratis`).
+
+### TSK-166: Medir la calidad real de `opencode/space-bunny-free` en dominios duros [PENDIENTE]
+
+- **Estado:** PENDIENTE.
+- **Prioridad:** Media (valida que el ahorro no cueste mas reintentos).
+- **Fecha:** 2026-09-30.
+- **Origen:** seguimiento de TSK-165 / ADR-074.
+- **ADR:** DECISIONS.md ADR-074.
+- **Alcance:** tras ~2 semanas de uso del modelo free, comparar calidad y coste free vs pago en los dominios duros (backend, frontend, renderer) sobre `opencode.db`: numero de reintentos, smokes en verde a la primera y coste por tarea completada. Criterio de decision: si el free multiplica los reintentos hasta anular el ahorro, escalar esos dominios a un pin `-pro` de forma selectiva (enlaza con TSK-168).
+- **Evidencia (ADR-006):** baseline de economia por mensaje en ADR-074 (frontend-tpl 106x, qa-auditor 16x, backend-dev 12x, explore 7x).
+- **Fuera de alcance:** no cambia agentes por si sola; solo mide y decide.
+
+### TSK-167: Revisar la allowlist FREE / lista ROTOS ante cambios del proveedor [PENDIENTE]
+
+- **Estado:** PENDIENTE.
+- **Prioridad:** Media (la capa gratuita depende de una allowlist medida que el proveedor puede cambiar).
+- **Fecha:** 2026-09-30.
+- **Origen:** seguimiento de TSK-165 / ADR-074.
+- **ADR:** DECISIONS.md ADR-074.
+- **Alcance:** cuando aparezcan modelos free nuevos (o cambie el free tier de `opencode`/`opencode-go`), re-sondearlos como subagente y anadir a la allowlist FREE los que registren `cost=0.000000`; retirar de la allowlist los que dejen de funcionar. Actualizar la allowlist/lista ROTOS del guard `scripts/ejecucion/verificar-capa-gratis.js`.
+- **Evidencia (ADR-006):** sondeo inicial en ADR-074 (3 FREE / 7 ROTOS).
+- **Fuera de alcance:** `google/*` NO entra (key con billing: `gemini-3.5-flash-lite`/`gemini-flash-lite-latest` cobran; `gemini-2.5-flash-lite` retirado).
+
+### TSK-168: Evaluar si conviene un pin `-pro` para los dominios SEO y admin [PENDIENTE]
+
+- **Estado:** PENDIENTE.
+- **Prioridad:** Baja (decision de coste/calidad; no bloquea).
+- **Fecha:** 2026-09-30.
+- **Origen:** seguimiento de TSK-165 / ADR-074 (hoy solo hay pins `-pro` para backend, architect, renderer y data-migration).
+- **ADR:** DECISIONS.md ADR-074.
+- **Alcance:** evaluar, con los datos de TSK-166, si el dominio SEO (`seo-dev-free`) o el admin (`admin-dev-free`) justifica un pin `-pro` de pago; en caso afirmativo crear `seo-dev-pro`/`admin-dev-pro` con `opencode-go/deepseek-v4.1-flash` y declarar el pin. Decidir si se anaden mas pines `-pro` o se conservan solo los 4 actuales.
+- **Evidencia (ADR-006):** pines `-pro` actuales = `backend-dev-pro`, `architect-pro`, `renderer-dev-pro`, `data-migration-pro`.
+- **Fuera de alcance:** no crea pines por si sola sin la decision del operador.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

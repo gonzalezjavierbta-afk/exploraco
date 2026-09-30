@@ -4012,3 +4012,59 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Pendientes operativos / acciones abiertas:** (1) corregir `SITE_BASE_URL` en Vercel si existe con el valor viejo (el codigo tiene fallback a `latawel.com`, pero una variable stale gana); (2) re-scrape manual de OG tras el deploy (cache social); (3) Google Search Console con el sitemap nuevo (`https://latawel.com/sitemap.xml`); (4) reemplazo futuro de los raster por SVG maestro cuando el proveedor de marca lo entregue; (5) corregir el `manifest.json` (BUG-093).
 
 **ADRs relacionados:** ADR-001 (prohibicion de frameworks / presupuesto 8/8), ADR-002 (ASCII-safe), ADR-003 (merge JSONB / Cero Borrado Logico), ADR-004 (scoped CSS), ADR-006 (baseline de verdad), ADR-010 (presupuesto 8/8), ADR-071 (mapa base OSM, tocado por la pasada de identidad). TSK-164. Bugs: BUG-093.
+
+---
+
+## ADR-074: Restauracion de la capa gratuita de agentes -- modelo de 3 capas de coste (free / hibrido / pago), allowlist FREE verificada y supersesion de la resolucion de BUG-092
+
+**ID:** ADR-074
+**Fecha:** 2026-09-30
+**Autor:** Chief Architect (AI-DOS) / decision de gobernanza de coste del operador (PO)
+**Estado:** ACEPTADO E IMPLEMENTADO EN WORKING TREE (2026-09-30); commit/deploy pendientes.
+**Nota de numeracion:** el mayor ADR registrado en este documento era ADR-073 (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 074 es el siguiente consecutivo real. La spec, el guard `scripts/ejecucion/verificar-capa-gratis.js` y el brief de la sesion rotulan esta decision como "ADR-072", pero ese numero YA estaba ocupado (ADR-072 = Panel unico de perfil; ADR-073 = rebranding LATAWEL), por lo que se registra como 074. **PENDIENTE:** renombrar la referencia "ADR-072" -> "ADR-074" en los comentarios del guard (codigo, fuera de este pase documental).
+
+**Contexto / Problema:** Tras BUG-092 (2026-09-29, commit `7aa48eb`), los 19 agentes habian quedado pineados a `opencode-go/deepseek-v4.1-flash` (modelo DE PAGO), igual que `opencode.json`, mientras ADR-067 seguia declarando un modelo de 3 capas con capa gratuita. El resultado fue una capa gratuita VACIA y una factura que solo crecia. La premisa de la resolucion de BUG-092 ("el free tier de `opencode` no admite invocacion como subagente") era CIERTA para `opencode/big-pickle` pero INCOMPLETA: otros modelos free SI funcionan como subagente y registran $0.000000. El par free/paid por dominio ya habia existido del 2026-09-09 al 2026-09-18 (commit `20ac822`: 19 free + 21 de pago = 40 agentes) y BUG-092 lo elimino el 2026-09-29 (roster 40 -> 19).
+
+**Opciones consideradas:**
+1. Mantener los 19 agentes en `opencode-go` (de pago) y no tocar nada: la capa gratuita seguiria siendo una promesa documental sin respaldo real.
+2. Restaurar SOLO el par free/paid por dominio (rollback estilo `20ac822`): recupera la capa gratuita pero reintroduce `opencode/big-pickle` como default, que FALLA como subagente.
+3. Modelo de 3 capas (free / hibrido / pago) con una allowlist FREE verificada, default en un modelo free que SI soporta subagentes, y un guard que convierta la promesa en verificacion automatica.
+
+**Decision tomada (opcion 3):**
+1. **Default de sesion:** `opencode.json` `"model"` y `"small_model"` pasan a `opencode/space-bunny-free` (el MISMO modelo que `big-pickle` -- Space Bunny -- pero por la via que SI soporta subagentes: `big-pickle` funciona como modelo de SESION pero NUNCA como subagente).
+2. **Los 17 subagentes `*-free` heredan el modelo de su primario:** se les QUITA la linea `model:` del frontmatter; el primario decide la capa y el subagente la sigue.
+3. **Allowlist FREE (unica fuente de verdad, verificada):** `opencode/space-bunny-free`, `opencode-go/space-bunny-free` y `opencode-go/longcat-2.5-preview-free` (los 3 con vision y con costo $0.000000 como subagente).
+4. **Lista ROTOS (prohibida en agentes):** `opencode/big-pickle`, `opencode/ling-3.0-flash-fin-free`, `opencode/longcat-2.5-preview-free`, `opencode/mimo-v2.6-flash-free`, `opencode/muse-spark-1.3-contributor-free`, `opencode/nemotron-3-ultra-free`, `opencode/nemotron-3.5-lightning-free` (parecen gratis por el nombre pero el proveedor los rechaza como subagente).
+5. **Roster a 27 agentes (21 gratis, 6 de pago):** 17 `*-free` (heredan) + `free-build`/`free-plan` (`opencode/space-bunny-free`) + `hybrid-build`/`hybrid-plan` (`opencode/space-bunny-free`) + `paid-build`/`paid-plan` (`opencode-go/deepseek-v4.1-flash`) + 4 pines `-pro` (`backend-dev-pro`, `architect-pro`, `renderer-dev-pro`, `data-migration-pro`; todos `opencode-go/deepseek-v4.1-flash`).
+6. **Hibrido con escalada explicita:** `hybrid-build`/`hybrid-plan` son los UNICOS que pueden PROPONER un pin `-pro`; NUNCA lo invocan sin OK explicito del operador (bloque `ESCALADO PROPUESTO`).
+7. **Guard `scripts/ejecucion/verificar-capa-gratis.js`:** encadenado como PRIMER paso de `npm test` (y disponible como `npm run coste:gratis`); falla con exit 1 si un `*-free` queda pineado a un modelo de pago, si `opencode.json` no esta en la allowlist FREE, si un `-pro` no declara `model:`, o si alguien usa un modelo de la lista ROTOS. Nuevo `npm run cuota:tanda` (`informe-cuota.js --task`).
+8. **`google/*` NO es opcion gratuita:** esta autenticado pero la key TIENE BILLING (`gemini-3.5-flash-lite` y `gemini-flash-lite-latest` cobraron $0.0025 por llamada corta; `gemini-2.5-flash-lite` ya esta retirado por el proveedor).
+
+**Justificacion:** La palanca economica es el MODELO, no la cantidad de agentes. Medido sobre `opencode.db`, a igual tarea el modelo de pago cuesta entre 7x y 106x mas (frontend-tpl 106x; qa-auditor 16x; backend-dev 12x; explore 7x) y el gasto historico total del proyecto es $50.53, casi todo en variantes de pago. Al mismo tiempo, el overhead estatico del roster (19 agentes + 11 skills = 1.184 tokens inyectados siempre y 23.360 al invocar) muestra que recortar agentes NO economiza: restaurar el par free/paid por dominio y poner el default en un modelo free que SI funciona como subagente captura el ahorro sin perder especializacion. Heredar el modelo del primario elimina la duplicacion de pines y hace imposible que un subagente quede en una capa distinta a la de su primario. El guard convierte la promesa de ADR-067 en un hecho verificable en cada `npm test`.
+
+**Consecuencias (positivas):**
+- La capa gratuita vuelve a ser REAL y VERIFICABLE: 21 de 27 agentes corren a $0.000000 como subagente.
+- `opencode.json` arranca en un modelo free que soporta subagentes (todo lo que hereda queda gratis).
+- El guard detecta en `npm test` cualquier regresion de coste (probado forzando `seo-dev-free` a pago -> exit 1).
+- Se restaura la especializacion por dominio (pines `-pro` para los dominios duros) sin hilos de pago en la ruta rutinaria.
+
+**Consecuencias (negativas / aceptadas):**
+- La allowlist FREE y la lista ROTOS dependen del proveedor: si `opencode` cambia su free tier, deben re-verificarse (deuda).
+- Los comentarios del guard y el brief citan "ADR-072"; queda la discrepancia de numeracion hasta renombrar el codigo (fuera de este pase).
+- Requiere REINICIAR OpenCode para que los agentes recarguen (el servidor los cachea al arrancar; ver BUG-086 / BUG-CONFIG-2).
+
+**Evidencia (ADR-006, dato medido, no re-investigado):**
+- **Sondas de modelo (2026-09-30):** allowlist FREE con $0.000000 y vision = `opencode/space-bunny-free`, `opencode-go/space-bunny-free`, `opencode-go/longcat-2.5-preview-free`. ROTOS con `Error from provider (Console): OpenCode's free tier can only be used from within OpenCode` = los 7 de la lista (incluido `opencode/big-pickle`, que SI sirve como modelo de sesion pero NO como subagente).
+- **Economia por mensaje (`opencode.db`, misma tarea free vs pago):** frontend-tpl $0.00267 vs $0.0000251 (106x); qa-auditor $0.00140 vs $0.0000874 (16x); backend-dev $0.00137 vs $0.000111 (12x); explore $0.00140 vs $0.000196 (7x). Gasto historico total del proyecto: $50.53. Overhead estatico (19 agentes + 11 skills): 1.184 tokens siempre / 23.360 al invocar -> reducir el roster NO economiza.
+- **Verificacion end-to-end:** `opencode run --agent hybrid-build` delego a `@exp-pickle-free`; `opencode.db` registro ambos en `opencode/space-bunny-free` con `cost=0.000000`. `npm test` completo **VERDE (exit 0)** con el guard como primer paso. El guard se provoco a proposito (pinear `seo-dev-free` a un modelo de pago) y devolvio **exit 1** con el mensaje correcto; luego se revirtio.
+- **Estado real del roster (conteo sobre `.opencode/agent/*.md`):** 27 archivos = 17 `*-free` sin `model:` (heredan) + `free-build`/`free-plan`/`hybrid-build`/`hybrid-plan` (`opencode/space-bunny-free`) + `paid-build`/`paid-plan` y los 4 `-pro` (`opencode-go/deepseek-v4.1-flash`). `opencode.json` = `"model"` y `"small_model"` = `opencode/space-bunny-free`; `package.json` encadena el guard al inicio de `test` y agrega `coste:gratis`/`cuota:tanda`.
+
+**Deuda / riesgos [DEUDA]:**
+- (a) La allowlist FREE y la lista ROTOS son datos medidos que el proveedor puede cambiar; re-verificar periodicamente (ver TSK-167).
+- (b) El guard y el brief citan "ADR-072"; renombrar los comentarios del guard a "ADR-074" (codigo, fuera de este pase documental).
+- (c) Sin medicion de calidad real de los modelos free en dominios duros; el ahorro podria venir con mas reintentos (ver TSK-166).
+- (d) `hybrid-build` puede proponer un `-pro`, pero la politica de coste depende de que el operador responda al `ESCALADO PROPUESTO` (disciplina operativa, no guard).
+
+**Nota sobre BUG-092:** BUG-092 **permanece CERRADO** en su sintoma (los subagentes volvieron a responder); lo que queda SUPERSEDIDO es su "Resolucion aplicada" (mover todo el roster a `opencode-go`), porque su premisa (no hay modelo gratuito utilizable como subagente) era incompleta. El registro historico de BUG-092 NO se reabre ni se borra (Cero Borrado Logico); la constancia renovada vive en `BUGS_HISTORICOS.md` BUG-094.
+
+**ADRs relacionados:** ADR-067 (modelo de 3 capas con presupuesto; este ADR lo hace real y verificable), ADR-048 (esquema tripartito de orquestacion), ADR-001/ADR-010 (presupuesto 8/8; este ADR no toca `api/*`). TSK-165 (seguimiento TSK-166/167/168). Bugs: BUGS_HISTORICOS.md BUG-092 (premisa incompleta) y BUG-094 (nuevo).

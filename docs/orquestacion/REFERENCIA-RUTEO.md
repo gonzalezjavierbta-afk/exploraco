@@ -26,6 +26,18 @@ archivo real del repositorio (ADR-006). ASCII-safe (ADR-002).
 Nota: la especificacion habla de "13 dominios" pero enumera 14 etiquetas; esta
 tabla cubre las 14.
 
+Todos los agentes de esta tabla son GRATIS: heredan el modelo de su primario
+(seccion 4). Los 4 dominios de riesgo alto tienen ademas un pin de PAGO:
+
+| Dominio | Agente FREE (default) | Pin de PAGO (solo con OK del operador) |
+|---|---|---|
+| backend api | backend-dev-free | backend-dev-pro |
+| motor de render | renderer-dev-free | renderer-dev-pro |
+| arquitectura/ADR | architect-free, architect-review-free | architect-pro |
+| migraciones/seeds | data-migration-free | data-migration-pro |
+
+Los otros 10 dominios NO tienen pin de pago: se resuelven siempre en gratis.
+
 ## 2. Anclas por dominio (como localizarlo)
 
 | Dominio | Fichero ancla | Como localizarlo (grep) |
@@ -65,17 +77,95 @@ R4 Resumen de gasto obligatorio. Al cerrar cada tanda se ejecuta
 `node scripts/ejecucion/informe-cuota.js --task` y la tabla se pega en el chat.
 Sin tabla pegada, la tanda NO esta cerrada.
 
-## 4. Politica de escalada
+R5 Guard de la capa gratuita. Antes de cerrar se ejecuta
+`node scripts/ejecucion/verificar-capa-gratis.js` (o `npm run coste:gratis`).
+Si sale con codigo 1, algum agente `*-free` quedo pineado a un modelo de pago:
+eso se corrige ANTES de cobrar. El guard ya corre como primer paso de
+`npm run test`, asi que un fallo de coste rompe la suite.
+
+## 4. Capas de coste (ADR-074)
+
+Hay tres capas. La capa la decide el agente PRIMARIO con el que abres la sesion;
+los subagentes `*-free` NO declaran modelo y heredan el de su primario, asi que
+cambiar de primario cambia las 21 capas de golpe.
+
+| Capa | Agentes | Modelo | Coste |
+|---|---|---|---|
+| FREE | `free-build`, `free-plan`, `hybrid-build`, `hybrid-plan` | `opencode/space-bunny-free` | $0 |
+| FREE (heredan) | los 17 subagentes `*-free` | heredan del primario | $0 |
+| PAID | `paid-build`, `paid-plan` | `opencode-go/deepseek-v4.1-flash` | pago |
+| PAID (pines) | `backend-dev-pro`, `architect-pro`, `renderer-dev-pro`, `data-migration-pro` | `opencode-go/deepseek-v4.1-flash` | pago |
+
+### Allowlist FREE (los unicos 3 verificados)
+
+| Modelo | Verificacion |
+|---|---|
+| `opencode/space-bunny-free` | subagente OK, $0.000000, con vision |
+| `opencode-go/space-bunny-free` | subagente OK, $0.000000, con vision |
+| `opencode-go/longcat-2.5-preview-free` | subagente OK, $0.000000, con vision |
+
+### Modelos que PARECEN gratis y NO lo son
+
+No usarlos en `.opencode/agent/*.md`. El proveedor los rechaza como subagente
+con `OpenCode's free tier can only be used from within OpenCode` (BUG-092):
+
+`opencode/big-pickle`, `opencode/ling-3.0-flash-fin-free`,
+`opencode/longcat-2.5-preview-free`, `opencode/mimo-v2.6-flash-free`,
+`opencode/muse-spark-1.3-contributor-free`, `opencode/nemotron-3-ultra-free`,
+`opencode/nemotron-3.5-lightning-free`.
+
+`opencode/big-pickle` solo funciona como modelo de SESION en la app, nunca como
+subagente. Si el primario fuera big-pickle, los subagentes que heredan fallarian.
+Por eso el default es `space-bunny-free`, que es el mismo modelo (Space Bunny)
+por la via que si soporta subagentes.
+
+### Modelos que sirven pero cuestan dinero
+
+`google/*` esta autenticado pero la key TIENE BILLING: `gemini-3.5-flash-lite` y
+`gemini-flash-lite-latest` responden bien y cobraron $0.0025 por llamada corta.
+No son opcion para la capa gratuita. (`gemini-2.5-flash-lite` ya esta retirado.)
+
+### Como seleccionar free o pago
+
+| Quiero | Hago esto |
+|---|---|
+| Todo gratis (default) | abro con `@free-build` o `@hybrid-build` |
+| Todo de pago | abro con `@paid-build` o `@paid-plan` |
+| Pagar solo 1 tarea | `@hybrid-build` y el agorta lo que el pro de esa fila |
+
+Con `opencode.json` en `opencode/space-bunny-free`, el agente por defecto
+(`free-build`) y el resto de subagentes son gratis. Cambiar de primario es el
+unico interruptor que hace falta; no se edita ningun archivo para cambiar de capa.
+
+## 5. Politica de escalada
+
+### Escalada de coste (dentro del codigo)
+
+Solo `hybrid-build` y `hybrid-plan` pueden proponer un `-pro`, y NUNCA lo invocan
+sin respuesta afirmativa del operador. Deben presentar el bloque `ESCALADO
+PROPUESTO` con dominio, motivo concreto, agente, costo estimado y alternativa
+gratuita. Un pin `-pro` invocado por otro agente es un bug de orquestacion.
+
+El patron free/paid por dominio que se aplico del 2026-09-09 al 2026-09-18
+(commit `20ac822`) y que BUG-092 elimino queda restaurado como capa opcional, no
+como default: hoy el default es gratis y el pago es excepcion autorizada.
+
+### Escalada al operador humano
 
 RLS, claves privadas, autenticacion y migraciones de esquema en Neon se escalan
 al OPERADOR HUMANO. sql-security-free no gestiona RLS, autenticacion, claves ni
 integridad critica: solo consultas, seeds y migraciones de datos de bajo riesgo.
 El Escudo GOLD certifica sintaxis, ASCII-safety y balance de divs, pero no
 permisos de fila en Postgres ni secretos; por eso esa capa se cierra con revision
-humana, no con un modelo mas caro.
+humana, no con un modelo mas caro. Un `-pro` NO reemplaza esa revision.
 
-## 5. Referencia
+## 6. Referencia
 
 - ADR-067 en `exploraco desarrollo/DECISIONS.md`: modelo de 3 capas con
   presupuesto (Capa 0 orquestador, Capa 0b ejecucion, Capa 1 apoyo), roster
   40 -> 19 y convencion de `description:`.
+- ADR-074 en `exploraco desarrollo/DECISIONS.md`: restauracion de la capa
+  gratuita con `opencode/space-bunny-free`, herencia de modelo en los subagentes,
+  4 pines `-pro` de pago y el guard `verificar-capa-gratis.js`. Roster 19 -> 27.
+- BUG-092 en `exploraco desarrollo/BUGS_HISTORICOS.md`: por que los 19 agentes
+  pasaron a `opencode-go` el 2026-09-29 y por que eso ya no aplica.

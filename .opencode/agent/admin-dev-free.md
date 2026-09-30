@@ -2,7 +2,6 @@
 name: admin-dev-free
 description: Corrige sub-tabs, campos y loadForm() en admin.html y publicar-lugar.js; mantiene el motor generico de tags y el balance de divs.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow

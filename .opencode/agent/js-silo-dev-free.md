@@ -2,7 +2,6 @@
 name: js-silo-dev-free
 description: Desarrollo JS/TS rutinario: logica simple, refactor menor, ajustes de scripts y correcciones de bugs puntuales.
 mode: subagent
-model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: allow
   bash: allow
