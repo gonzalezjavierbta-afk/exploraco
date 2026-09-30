@@ -76,10 +76,12 @@ function Save-Png {
 
 # Recolor dark neutral pixels (wordmark + separator) to pure white #FFFFFF,
 # keep saturated orange symbol untouched. Alpha preserved (this is straight
-# ARGB, not premultiplied). Threshold chosen from real histogram of the
-# horizontal artwork: only two opaque families exist (neutral black / orange).
+# ARGB, not premultiplied). MaxLuma defaults to 130 (horizontal artwork, one
+# neutral black family); the vertical artwork carries a gray elliptical shadow
+# (luma ~160) plus a soft antialias skirt, so it uses MaxLuma 90 to whiten the
+# wordmark only and leave the shadow untouched.
 function Convert-DarkToWhite {
-    param([System.Drawing.Bitmap]$Bmp)
+    param([System.Drawing.Bitmap]$Bmp, [int]$MaxLuma = 130)
     $w = $Bmp.Width; $h = $Bmp.Height
     $rect = New-Object System.Drawing.Rectangle 0, 0, $w, $h
     $data = $Bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadWrite, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
@@ -96,7 +98,7 @@ function Convert-DarkToWhite {
             $mx = [Math]::Max($r, [Math]::Max($g, $b))
             $mn = [Math]::Min($r, [Math]::Min($g, $b))
             $sat = $mx - $mn
-            if (($sat -lt 40) -and ($mx -lt 130)) {
+            if (($sat -lt 40) -and ($mx -lt $MaxLuma)) {
                 $bytes[$i] = 255; $bytes[$i + 1] = 255; $bytes[$i + 2] = 255
             }
         }
@@ -198,6 +200,16 @@ $white1x = Resize-Progressive -Source $white -Width 240 -Height ([int][Math]::Ro
 Save-Png $white1x (Join-Path $brandDir 'latawel-logo-horizontal-white.png')
 $white1x.Dispose(); $white.Dispose()
 
+# Vertical lockup dark variant: orange symbol + gray shadow stay as-is, only
+# the dark wordmark turns white. MaxLuma 90 keeps the shadow (luma ~160).
+$vwhite = Load-Argb (Join-Path $logosDir 'Logo vertical.png')
+Convert-DarkToWhite $vwhite -MaxLuma 90
+$vwhite2x = Resize-Progressive -Source $vwhite -Width 480 -Height ([int][Math]::Round(480 * $vwhite.Height / $vwhite.Width))
+$vwhite1x = Resize-Progressive -Source $vwhite -Width 240 -Height ([int][Math]::Round(240 * $vwhite.Height / $vwhite.Width))
+Save-Png $vwhite2x (Join-Path $brandDir 'latawel-logo-vertical-white@2x.png')
+Save-Png $vwhite1x (Join-Path $brandDir 'latawel-logo-vertical-white.png')
+$vwhite2x.Dispose(); $vwhite1x.Dispose(); $vwhite.Dispose()
+
 # ---- 4. favicon set (square pad first, never distort the circle) ---------
 $sym = Load-Argb (Join-Path $brandDir 'latawel-simbolo.png')
 $side = [Math]::Max($sym.Width, $sym.Height)
@@ -255,6 +267,8 @@ $targets = @(
     'latawel-logo-vertical.png',
     'latawel-logo-vertical@2x.png',
     'latawel-logo-horizontal-white.png',
+    'latawel-logo-vertical-white.png',
+    'latawel-logo-vertical-white@2x.png',
     'latawel-simbolo.png',
     'latawel-lockup.png',
     'favicon\favicon-16.png',
