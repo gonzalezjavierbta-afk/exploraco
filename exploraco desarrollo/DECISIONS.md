@@ -3799,28 +3799,58 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 
 **ADRs relacionados:** ADR-002 (ASCII-safe), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8 de funciones serverless), ADR-016 (contratos de album/media), ADR-051 (coords), ADR-053 (sesion/JWT), TSK-158.
 
-## ADR-069: Pasaporte de viajero, billetera agregadora y fotos de perfil (migracion 042); QR/canje diferido
+## ADR-069: Pasaporte de viajero, billetera agregadora y fotos de perfil (migracion 042); QR/canje diferido [ENMENDADO 2026-09-29: Pasaporte combinado de 10 datos y panel unico; ver ENMIENDA 1 al final]
 
 **Estado:** APROBADO (2026-09-29). **Contexto:** el prompt de la sesion pidio (a) corregir bugs de UI/subida/mapa, (b) un "Pasaporte" de perfil con insignia, (c) una billetera digital con canje QR, y (d) mejoras de subida. El operador acoto el alcance: la billetera de esta fase solo AGREGA (xp + monedas + consumibles); el QR/canje se documenta aqui y se implementa despues.
 
 **Decisiones:**
-1. **Pasaporte** = checklist server-side de 6 datos (`nombre`, `fecha_nacimiento`, `foto`/galeria, `ciudad_base`+`pais_base`, `email_verificado`, >=1 foto en galeria). Se calcula SOLO en servidor (`calcularPasaporte`); el cliente no puede autoconcederlo.
+1. **Pasaporte** = checklist server-side (fuente unica del progreso). **ENMENDADO 2026-09-29: 10 datos COMBINADOS** (`foto`, `nombre`, `nacimiento`=`fecha_nacimiento`, `ciudad`=`ciudad_base`, `pais`=`pais_base`, `bio` (>=40), `intereses` (>=3), `email`=`email_verificado`, `casa`, `faccion`), union del checklist 042 con las misiones de perfil, con total unico de 10 (antes 6: `nombre`, `fecha_nacimiento`, `foto`, `ciudad_base`+`pais_base`, `email_verificado`, >=1 foto). Se calcula SOLO en servidor (`calcularPasaporte`); el cliente no puede autoconcederlo.
 2. **`usuarios.fecha_nacimiento`** es PII (ADR-028): se sirve unicamente al dueno/admin y NUNCA en `perfil_publico`/`museo_publico`/rankings. Editable UNA sola vez (guard `WHERE fecha_nacimiento IS NULL`); edad 13..120 validada en servidor.
 3. **`usuario_fotos`**: galeria de perfil con tope de **10 activas**, forzado de forma atomica en el backend (`INSERT ... SELECT ... WHERE count < 10`), una sola principal activa (indice unico parcial) y baja por `activo=false` (ADR-003). `usuarios.foto_url` se mantiene como espejo de compatibilidad.
 4. **`billeteras`**: identidad (una por usuario, `codigo_publico` unico) que se crea de forma **idempotente** al completar el Pasaporte. Es un **agregador de lectura**: `xp_total` (moneda unica, ADR-018) + saldo CDR (`moneda_cuentas`/`moneda_ledger`, ADR-061) + consumibles (`usuarios.capacidades->'consumibles'`). NO crea saldo ni moneda.
 5. **QR/canje DIFERIDO:** el token QR firmado, el endpoint de canje de un solo uso y el modelo de productos canjeables (reusando `consumibles`/`marcas` de ADR-042) NO se implementan en esta fase. Encuadre legal: solo aliados, sin dinero real; revision legal antes de produccion.
-6. **Insignia `logr_pasaporte_completo`**: tier plata, +200 XP por el ledger canonico de badges (`registrarXpLedger`, `es_exento=true`) mas `repartirXpReferidos` (helper canonico) sobre el XP del badge.
+6. **Insignia `logr_pasaporte_completo`**: tier plata, +200 XP por el ledger canonico de badges (`registrarXpLedger`, `es_exento=true`) mas `repartirXpReferidos` (helper canonico) sobre el XP del badge. **ENMENDADO 2026-09-29:** su `desc` pasa de "6 datos" a "10 datos" y su `ctx.pasaporteCompleto()` evalua los 10 criterios, para que insignia y pasaporte no se contradigan.
 7. **Ubicacion de recursos (C4):** `album_fotos.destino_id` nullable (FK a `destinos`, ON DELETE SET NULL) para vincular un recurso a un destino publicado. Es OPCIONAL; sin el, el recurso conserva su ubicacion por lat/lng o la heredada del album (ADR-039/ADR-051).
 8. **Mapa base resiliente (A3):** `mapa-tiles.js` con proveedores de respaldo (CARTO voyager/positron -> OSM) y aviso con reintento; se usa en todas las superficies con Leaflet.
 9. **Subida v2:** la optimizacion de imagen vive SOLO en `media-upload.js` (canvas -> WebP q0.8 con fallback JPEG; 800 px perfil / 1600 px resto; EXIF `from-image`; elimina GPS; nunca amplia; GIF/SVG intactos). Confirmacion no tecnica sin URL en flujos de usuario final.
 
 **Alternativas descartadas:** (a) canje QR ahora (excede el alcance autorizado y requiere encuadre legal); (b) tabla de billetera con saldo propio (violaria ADR-018: moneda unica); (c) optimizacion en servidor (no hay ffmpeg/sharp en el presupuesto 8/8).
 
-**Impacto:** migracion NUEVA **042** (`db/migrations/042_pasaporte_billetera_fotos.sql`, aditiva/idempotente/ASCII-safe) **PENDIENTE de aplicar en Neon**; `api/usuarios.js` **v24**; `api/interacciones.js` (logro + `album_fotos.destino_id` con fallback 42703); `media-upload.js`; `mapa-tiles.js` (NUEVO); `mapa-cultural.js` v1.1.1; `map-picker.js`; `index.html`; `comunidad.html`; `mapas.html`; `mi-perfil.html`; `publicar.html`; `admin.html`; `scripts/verify_042_precheck.js` (NUEVO); `scripts/smoke_mapa_tiles.js` (NUEVO); `scripts/smoke_042_pasaporte_billetera.js` (NUEVO); `scripts/test_logros_catalogo.js` (34). **8/8 endpoints intacto** (sin endpoints nuevos).
+**Impacto:** migracion NUEVA **042** (`db/migrations/042_pasaporte_billetera_fotos.sql`, aditiva/idempotente/ASCII-safe) **PENDIENTE de aplicar en Neon**; `api/usuarios.js` **v24 -> v25** (v25: `calcularPasaporte` = 10 datos combinados; SELECT de GET `billetera_mia` ampliado con `avatar_url`/`bio`/`intereses`/`casa`/`faccion`); `api/interacciones.js` (logro `logr_pasaporte_completo` alineado a 10 datos + `album_fotos.destino_id` con fallback 42703); `media-upload.js`; `mapa-tiles.js` (NUEVO); `mapa-cultural.js` v1.1.1; `map-picker.js`; `index.html`; `comunidad.html`; `mapas.html`; `mi-perfil.html`; `publicar.html`; `admin.html`; `scripts/verify_042_precheck.js` (NUEVO); `scripts/smoke_mapa_tiles.js` (NUEVO); `scripts/smoke_042_pasaporte_billetera.js` (NUEVO); `scripts/test_logros_catalogo.js` (34). **8/8 endpoints intacto** (sin endpoints nuevos).
 
-**Riesgos / deuda [DEUDA-EXPRESS]:** canje/QR y legal diferidos; blob huerfano al reemplazar la foto de perfil no se borra (Cero Borrado no cubre blobs); verificacion de edad declarativa (edad minima 13 solo por fecha declarada); `test_logros_catalogo.js` estaba desalineado (BUG-090).
+**Riesgos / deuda [DEUDA-EXPRESS]:** canje/QR y legal diferidos; blob huerfano al reemplazar la foto de perfil no se borra (Cero Borrado no cubre blobs); verificacion de edad declarativa (edad minima 13 solo por fecha declarada); `test_logros_catalogo.js` estaba desalineado (BUG-090). Tras la ENMIENDA 1 (2026-09-29) se suman: CSS huerfano `.pf-datos`/`.pf-completa`/`.pf-origen`; `pfPasItem` con `|| {}`; GET `billetera_mia` sin fallback 42703/42P01; `pfPasValor` dependiente de localStorage.
 
-**ADRs relacionados:** ADR-002, ADR-003, ADR-006, ADR-008, ADR-010, ADR-018, ADR-028, ADR-039, ADR-042, ADR-051, ADR-053, ADR-061, ADR-068, TSK-159.
+---
+
+**ENMIENDA 1 (2026-09-29): Pasaporte combinado de 10 datos, panel unico y ocultamiento del puntaje de origen en el perfil**
+
+**Problema:** el Pasaporte original (ADR-069) definia un checklist de 6 datos que se solapaba parcialmente con las misiones de perfil y convivia en la UI con tres bloques de datos separados ("Mis datos", "Tu origen", "Completa tu perfil"), generando dos fuentes de progreso y contradicciones (p.ej. la insignia `logr_pasaporte_completo` hablaba de "6 datos" mientras la mision de completitud usaba otros criterios).
+
+**Opciones evaluadas:**
+1. Mantener dos progresos separados (checklist 042 y misiones de perfil) y tres paneles de datos en el perfil.
+2. Unificar en UN solo panel de datos (`#pf-pasaporte`) y en UNA sola fuente de progreso = union combinada de ambos conjuntos.
+3. Fusionar totalmente el checklist y las misiones en una sola tabla/entidad nueva.
+
+**Decision tomada (opcion 2), por indicacion del operador:**
+1. **Union combinada de 10 datos, total unico = 10:** el progreso del Pasaporte es la UNION de los datos del checklist 042 y las misiones de perfil: `foto`, `nombre`, `nacimiento`, `ciudad`, `pais`, `bio` (>=40), `intereses` (>=3), `email`, `casa`, `faccion`. `calcularPasaporte(u, nFotos)` devuelve los 10 items en ese orden (server-side).
+2. **Un solo panel:** se eliminan de `mi-perfil.html` los hosts `#pf-datos`, `#pf-origen` y `#pf-completa` y el titulo "Tu Pasaporte"; queda el host unico `#pf-pasaporte` titulado "Tu pasaporte de viajero" (se conservan `#pf-billetera` y `#pf-galeria`). Se retiran las funciones JS `renderDatosPerfil`/`pfDato`/`pfDatoFoto`/`renderOrigen`/`pfOrigenDesdeSesion`/`pfOrigenRow`/`PF_MISION_DESTINO`/`PF_MISION_ORDEN`/`cargarCompletitudPerfil`.
+3. **Ciudad y pais por separado:** `pfEditarCampo` trata 'ciudad' (solo `ciudad_base`) y 'pais' (solo `pais_base`) como campos independientes.
+4. **Puntaje de origen oculto SOLO en el perfil:** se omite la visualizacion del puntaje por Local/Nomada/Extranjero; el multiplicador de ADR-058 SIGUE VIGENTE en backend (no hay cambio de economia). Se conserva `pfOrigenMinDias` (aviso anti-teleport).
+
+**Alineacion del logro:** `logr_pasaporte_completo` (api/interacciones.js) actualiza su `desc` de "6 datos" a "10 datos" y su `ctx.pasaporteCompleto()` evalua 10 criterios, para que insignia y pasaporte no se contradigan.
+
+**Justificacion:** una sola fuente de progreso elimina la contradiccion insignia/pasaporte, reduce la UI duplicada y simplifica el gate de billetera. La union se resuelve en el servidor (autoridad unica, ADR-006), no en el cliente.
+
+**Consecuencias / impacto:**
+- **Gate de creacion de billetera endurecido:** `bmPasaporte.completo` exige ahora los 10 datos (antes 6). **Las billeteras ya creadas PERSISTEN** (`INSERT ... ON CONFLICT DO NOTHING`); no se revoca ninguna.
+- `api/usuarios.js` **v25**; `api/interacciones.js` (desc y ctx del logro); `mi-perfil.html` (panel unico + `renderPasaporte` reescrito con `PF_PAS_ACCION`/`pfPasValor`/`pfPasItem`); `scripts/smoke_042_pasaporte_billetera.js` (v25). Sin endpoints nuevos (**8/8 intacto**, ADR-001/ADR-010); sin migracion nueva (la 042 sigue siendo la unica, PENDIENTE de aplicar en Neon).
+- **Verificacion:** `npm test` completo OK (042 y 058 incluidos); `node --check` de `api/usuarios.js`/`api/interacciones.js` OK; divs `mi-perfil.html` 560/560; `api/*.js` ASCII-safe 0/0; QA estatico (vm) 10/10 + `esc()` + call-sites.
+
+**Riesgos / deuda [DEUDA-EXPRESS]:** CSS huerfano `.pf-datos`/`.pf-completa`/`.pf-origen` (~110 lineas) y comentario de cabecera; `pfPasItem` cae a `|| {}` (boton "undefined" ante id desconocido); GET `billetera_mia` sin fallback 42703/42P01 (pre-existente desde v24); `pfPasValor` lee de localStorage (campo no hidratado puede verse vacio).
+
+**ADRs relacionados de la enmienda:** ADR-003 (soft-delete), ADR-006 (archivo real), ADR-018 (moneda unica), ADR-058 (multiplicador de origen, oculto solo en UI), ADR-061 (CDR), TSK-159, TSK-163.
+
+**ADRs relacionados:** ADR-002, ADR-003, ADR-006, ADR-008, ADR-010, ADR-018, ADR-028, ADR-039, ADR-042, ADR-051, ADR-053, ADR-058, ADR-061, ADR-068, TSK-159, TSK-163 (ENMIENDA 1).
 
 ---
 
@@ -3880,3 +3910,50 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **Estado:** APROBADO (2026-09-29); implementado en working tree; commit/deploy pendientes.
 
 **ADRs relacionados:** ADR-006, ADR-069, ADR-070; TSK-159, TSK-161; `BUGS_HISTORICOS.md` BUG-091.
+
+---
+
+## ADR-072: Panel unico de perfil, Pasaporte de viajero unificado y ocultamiento del multiplicador de origen en la UI
+
+**ID:** ADR-072
+**Fecha:** 2026-09-29
+**Autor:** Chief Architect (AI-DOS) / decision de producto del operador (PO)
+**Estado:** APROBADO (2026-09-29); reflejado en working tree junto a ADR-069 ENMIENDA 1 (TSK-163).
+**Nota de numeracion:** el 072 es el consecutivo real tras ADR-071 (mayor registrado en este documento, verificado con grep `^## ADR-` sobre el archivo real, ADR-006). Los numeros 070 y 071 YA existen (ADR-070 modulo unificado de subida; ADR-071 mapa base OSM), por lo que 072 es el siguiente realmente libre. No estaba reservado en ninguna spec.
+
+**Contexto / Problema:** El tab "perfil" de `mi-perfil.html` presentaba CUATRO bloques separados de datos del viajero ("Mis datos", "Tu origen", "Completa tu perfil" y "Tu Pasaporte") y DOS fuentes de progreso, ademas de una tarjeta informativa del multiplicador de origen (Local/Nomada/Extranjero, factor x1.0..x1.4, ADR-058). Esta separacion generaba duplicacion visual, contradicciones entre insignia y pasaporte (ver ADR-069 ENMIENDA 1) y exponia en la UI un factor economico que es una regla interna de backend. El PO pidio dejar constancia EXPLICITA, como DECISION DE PRODUCTO de UI, de la unificacion en un panel y del ocultamiento del multiplicador.
+
+**Opciones consideradas:**
+1. Mantener los cuatro bloques separados y solo alinear el progreso del pasaporte.
+2. Unificar los bloques de datos en UN SOLO panel ("Tu pasaporte de viajero") con progreso combinado de 10 datos y ocultar la tarjeta del multiplicador de origen SOLO en la UI (logica de backend intacta).
+3. Fusionar el pasaporte con la billetera en un unico componente.
+
+**Decision tomada (opcion 2), decision de producto del PO:**
+1. **Panel unico:** en la pestana "perfil" de `mi-perfil.html` se unifican en UN SOLO panel (host id `pf-pasaporte`, titulo "Tu pasaporte de viajero") las secciones que estaban separadas: "Mis datos", "Tu origen", "Completa tu perfil" y "Tu Pasaporte". Se conservan "Mi billetera" (host `pf-billetera`) y "Mis fotos de perfil" (host `pf-galeria`).
+2. **Progreso = UNION COMBINADA de 10 datos:** el progreso del pasaporte es la union combinada de los datos del pasaporte (migracion 042) mas las misiones de perfil, con un total UNICO de 10 datos: foto, nombre, nacimiento, ciudad, pais, bio, intereses, email, casa, faccion. La autoridad de calculo es server-side (`calcularPasaporte`); el cliente no autoconcede progreso.
+3. **Ciudad y pais por separado:** se muestran y se editan de forma independiente (`ciudad_base` vs `pais_base`), sin chip combinado.
+4. **Ocultamiento del multiplicador de origen en la UI:** el multiplicador de origen (ADR-058, Local/Nomada/Extranjero, factor x1.0..x1.4) DEJA de visualizarse en el perfil; su logica de backend PERMANECE INTACTA y SIGUE APLICANDOSE al XP. Solo se elimina la tarjeta informativa de la UI (NO hay cambio de economia).
+5. **Alineacion del logro:** el logro `logr_pasaporte_completo` se alinea a los mismos 10 criterios (via ADR-069 ENMIENDA 1), para evitar la contradiccion insignia-vs-pasaporte.
+
+**Justificacion:** Una sola fuente de progreso elimina la contradiccion insignia-vs-pasaporte y el doble conteo; un solo panel reduce la UI duplicada sin cambiar el contrato de datos (los mismos campos siguen editandose). Ocultar la tarjeta del multiplicador no altera la regla economica (ADR-058 vigente en backend) y evita que el usuario perciba un factor interno como una promesa de producto. La decision es de UI/producto: no crea endpoints, no cambia el esquema y no toca la economia.
+
+**Consecuencias (positivas):**
+- UN panel "Tu pasaporte de viajero" con 10 filas y accion por campo; menor duplicacion visual.
+- Progreso unico y autoritativo en servidor: insignia y pasaporte comparten los mismos 10 criterios.
+- El multiplicador de origen sigue aplicandose al XP sin exponerse como tarjeta.
+
+**Consecuencias (negativas):**
+- El usuario deja de ver la explicacion de por que su XP crece distinto segun Local/Nomada/Extranjero (se pierde transparencia informativa; aceptado por el PO).
+- El gate de creacion de billetera (`bmPasaporte.completo`) pasa a exigir 10 datos (antes 6); las billeteras ya creadas PERSISTEN (`INSERT ... ON CONFLICT DO NOTHING`).
+- Queda CSS huerfano de los hosts retirados mientras no se limpie.
+
+**Deuda / riesgos [DEUDA-EXPRESS]:**
+- CSS huerfano `.pf-datos`/`.pf-completa`/`.pf-origen` (~110 lineas) y el comentario de cabecera que los menciona.
+- `pfPasItem` cae a `PF_PAS_ACCION[id] || {}`; ante un id de backend sin accion pintaria un boton "undefined".
+- GET `billetera_mia` sin fallback 42703/42P01 (pre-existente desde v24).
+- `pfPasValor` lee de localStorage; un campo no hidratado puede verse vacio aunque el servidor marque "Listo".
+- La migracion 042 sigue PENDIENTE de aplicar en Neon; QA runtime pendiente.
+
+**Impacto:** (de UI/producto) `mi-perfil.html` (panel unico `pf-pasaporte`; se retiran `#pf-datos`, `#pf-origen`, `#pf-completa` y el titulo "Tu Pasaporte"; `renderPasaporte` reescrito; `pfEditarCampo` separa ciudad/pais); sin endpoints nuevos (**8/8 intacto**, ADR-001/ADR-010); sin migracion nueva. El detalle tecnico del mismo cambio vive en ADR-069 ENMIENDA 1 (TSK-163); este ADR-072 deja constancia de la DECISION DE PRODUCTO de UI (panel unico + ocultamiento del multiplicador), sin duplicar el contrato de backend.
+
+**ADRs relacionados:** ADR-069 (Pasaporte y billetera; ENMIENDA 1 = pasaporte combinado de 10 datos), ADR-058 (multiplicador de origen, oculto solo en UI), ADR-028 (perfil publico / misiones de perfil), ADR-004 (aislamiento atomico de estilos / CSS scoped de los paneles). TSK-163.

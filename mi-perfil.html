@@ -391,6 +391,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-tab:hover{border-color:rgba(232,160,32,.4);color:#fff}
 .pf-tab.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
 .pf-tab:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* [DEUDA-EXPRESS] CSS huerfano tras unificar el pasaporte en un solo panel */
 /* Mis datos (PERFIL) */
 .pf-datos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:28px}
 .pf-datos .pf-dato{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px}
@@ -407,9 +408,16 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-pas-bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:12px}
 .pf-pas-bar i{display:block;height:100%;background:linear-gradient(90deg,#E8A020,#f4c66a)}
 .pf-pas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
-.pf-pas-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 11px;font-size:12.5px;color:rgba(255,255,255,.75)}
+.pf-pas-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 11px;font-size:12.5px;color:rgba(255,255,255,.75)}
 .pf-pas-item.ok{border-color:rgba(74,222,128,.4);color:#fff}
 .pf-pas-ico{flex:0 0 auto}
+/* Pasaporte unificado: filas accionables (etiqueta + valor + boton/estado) */
+.pf-pas-lbl{flex:1;min-width:0;font-size:12px;font-weight:700;color:#fff}
+.pf-pas-val{font-size:11.5px;color:rgba(255,255,255,.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42%}
+.pf-pas-btn{background:rgba(232,160,32,.12);border:1px solid rgba(232,160,32,.4);color:var(--gold);border-radius:6px;padding:5px 11px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0}
+.pf-pas-btn:hover{background:var(--gold);color:var(--black)}
+.pf-pas-ok-txt{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:#22C55E;flex-shrink:0}
+@media (max-width:600px){.pf-pas-val{max-width:100%}}
 .pf-billetera{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
 .pf-bil-card{flex:1;min-width:140px;background:linear-gradient(150deg,rgba(232,160,32,.14),rgba(255,255,255,.03));border:1px solid rgba(232,160,32,.35);border-radius:12px;padding:14px}
 .pf-bil-wide{flex-basis:100%}
@@ -713,19 +721,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <div class="pf-stat"><div class="pf-stat-n" id="pf-reviews-n">0</div><div class="pf-stat-l">Reseñas</div></div>
   </div>
 
-  <!-- WP-5 (TSK-103 / ADR-028): datos personales + completitud del perfil -->
-  <div class="pf-section-title" data-tab="perfil">&#x1F9F3; Mis datos</div>
-  <div class="pf-datos" id="pf-datos" data-tab="perfil"></div>
-
-  <!-- ADR-058: Multiplicador de Origen por lejania (Local / Nomada / Extranjero) -->
-  <div class="pf-section-title" data-tab="perfil">&#x1F30E; Tu origen</div>
-  <div class="pf-origen" id="pf-origen" data-tab="perfil" aria-label="Multiplicador de origen por lejania" aria-live="polite"></div>
-
-  <div class="pf-section-title" data-tab="perfil">&#x1F4CB; Completa tu perfil</div>
-  <div class="pf-completa" id="pf-completa" data-tab="perfil"></div>
-
-  <!-- Fase B (migracion 042): Pasaporte + billetera + fotos de perfil -->
-  <div class="pf-section-title" data-tab="perfil">&#x1F6E1; Tu Pasaporte</div>
+  <!-- Pasaporte unificado: un solo panel que fusiona Mis datos + Tu origen +
+       Completa tu perfil + Tu Pasaporte (los datos para completar el pasaporte). -->
+  <div class="pf-section-title" data-tab="perfil">&#x1F6C2; Tu pasaporte de viajero</div>
   <div class="pf-pasaporte" id="pf-pasaporte" data-tab="perfil" aria-live="polite"></div>
   <div class="pf-section-title" data-tab="perfil">&#x1F4B3; Mi billetera</div>
   <div class="pf-billetera" id="pf-billetera" data-tab="perfil" aria-live="polite"></div>
@@ -1443,10 +1441,7 @@ function renderPerfil() {
 
   /* WP-5 (TSK-103 / ADR-028): pestanas, completitud, Casa y museo publico */
   pfAplicarTab();
-  renderDatosPerfil();
-  renderOrigen();
   renderCuentaPanel();
-  cargarCompletitudPerfil(u.id);
   cargarBilletera();
   cargarCasas(u.id);
   cargarMuseoPreview(u.id);
@@ -4860,9 +4855,6 @@ function pfTab(tab) {
   PF_TAB_ACTIVO = tab;
   pfAplicarTab();
   var u = sesion();
-  if (tab === 'perfil' && u && u.id) renderDatosPerfil();
-  if (tab === 'perfil' && u && u.id) renderOrigen();
-  if (tab === 'perfil' && u && u.id) cargarCompletitudPerfil(u.id);
   if (tab === 'perfil' && u && u.id) cargarBilletera();
   if (tab === 'perfil' && u && u.id) cargarHojaDeVida(u.id);
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
@@ -4883,67 +4875,7 @@ function pfIr(tab, targetId) {
   if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/* ---- Completitud del perfil (misiones grupo 'perfil') ----
-   Lee GET tipo=misiones con fetchConJwt y filtra grupo==='perfil'; no
-   hardcodea estados: el 100% se alcanza cuando las 8 misiones quedan
-   'completada' en el servidor. Cada pendiente enlaza al campo que falta. */
-var PF_MISION_DESTINO = {
-  mis_perfil_foto:      { tab:'perfil', target:'pf-datos',     cta:'Poner foto' },
-  mis_perfil_bio:       { tab:'perfil', target:'pf-datos',     cta:'Escribir bio' },
-  mis_perfil_ciudad:    { tab:'perfil', target:'pf-datos',     cta:'Definir ciudad' },
-  mis_perfil_intereses: { tab:'perfil', target:'pf-datos',     cta:'Elegir intereses' },
-  mis_perfil_email:     { tab:'cuenta', target:'pf-cuenta',    cta:'Verificar email' },
-  mis_perfil_casa:      { tab:'clase',  target:'pf-casa',      cta:'Elegir Casa' },
-  mis_perfil_faccion:   { tab:'clase',  target:'pf-facciones', cta:'Elegir faccion' },
-  mis_perfil_completo:  { tab:'perfil', target:'pf-datos',     cta:'Completar todo' }
-};
-var PF_MISION_ORDEN = ['mis_perfil_foto','mis_perfil_bio','mis_perfil_ciudad',
-  'mis_perfil_intereses','mis_perfil_email','mis_perfil_casa',
-  'mis_perfil_faccion','mis_perfil_completo'];
-function cargarCompletitudPerfil(uid) {
-  var box = document.getElementById('pf-completa');
-  if (!box || !uid) return;
-  box.innerHTML = '<div class="pf-comp-cargando">Calculando tu avance\u2026</div>';
-  fetchConJwt('/api/interacciones?tipo=misiones&usuario_id=' + encodeURIComponent(uid))
-    .then(function(res){
-      var todas = (res && res.data) || [];
-      var perfil = todas.filter(function(m){ return (m.grupo || '') === 'perfil'; });
-      if (!perfil.length) {
-        box.innerHTML = '<div class="pf-comp-vacio">Aun no hay misiones de perfil disponibles.</div>';
-        return;
-      }
-      var porId = {};
-      perfil.forEach(function(m){ porId[m.id] = m; });
-      var orden = PF_MISION_ORDEN.filter(function(id){ return porId[id]; });
-      var total = orden.length;
-      var hechas = orden.filter(function(id){ return porId[id].estado === 'completada'; }).length;
-      var pct = total ? Math.round(hechas * 100 / total) : 0;
-      var html = '<div class="pf-comp-head">'
-        + '<div class="pf-comp-pct">' + pct + '%</div>'
-        + '<div><div class="pf-comp-titulo">Tu pasaporte de viajero</div>'
-        + '<div class="pf-comp-sub">' + hechas + ' de ' + total + ' misiones de perfil completadas</div></div>'
-        + '</div>'
-        + '<div class="pf-comp-bar"><i style="width:' + pct + '%"></i></div>'
-        + '<div class="pf-comp-list">';
-      orden.forEach(function(id){
-        var m = porId[id] || {};
-        var done = m.estado === 'completada';
-        var dest = PF_MISION_DESTINO[id] || { tab:'perfil', target:'pf-datos', cta:'Ir' };
-        html += '<div class="pf-comp-item' + (done ? ' done' : '') + '">'
-          + '<span class="pf-comp-tick">' + (done ? '\u2713' : '\u25CB') + '</span>'
-          + '<span class="pf-comp-nombre">' + esc(m.nombre || id) + '</span>'
-          + '<span class="pf-comp-xp">+' + fmtXp(m.xp) + ' XP</span>'
-          + (done
-              ? '<span class="pf-comp-ok">Listo</span>'
-              : '<button type="button" class="pf-comp-btn" onclick="pfIr(\'' + dest.tab + '\',\'' + dest.target + '\')">' + dest.cta + '</button>')
-          + '</div>';
-      });
-      html += '</div>';
-      if (pct === 100) html += '<div class="pf-comp-feliz">\uD83C\uDF89 Pasaporte sellado: completaste tu perfil al 100%.</div>';
-      box.innerHTML = html;
-    })
-    .catch(function(){ box.innerHTML = '<div class="pf-comp-vacio">No se pudo cargar tu avance. Intenta de nuevo.</div>'; });
-}
+/* Pasaporte unificado: el checklist de datos vive en renderPasaporte (billetera_mia). */
 
 /* ---- Mis datos (PERFIL) ----
    Los campos viven en usuarios.* (migracion 017). El guardado usa la rama
@@ -4969,46 +4901,45 @@ function pfInteresesTexto(list) {
     return f ? f.label : s;
   }).join(', ');
 }
-function pfDato(label, valor, campo) {
-  var tiene = valor !== null && valor !== undefined && String(valor).trim() !== '';
-  return '<div class="pf-dato' + (tiene ? '' : ' vacio') + '">'
-    + '<div class="pf-dato-lbl">' + label + '</div>'
-    + '<div class="pf-dato-val">' + (tiene ? esc(valor) : 'Sin configurar') + '</div>'
-    + '<button type="button" class="pf-dato-btn" onclick="pfEditarCampo(\'' + campo + '\')">' + (tiene ? 'Editar' : 'Agregar') + '</button>'
-    + '</div>';
-}
-/* A1: la foto de perfil NUNCA muestra su URL al usuario (solo confirmacion
-   visual con miniatura). La URL vive en el estado de sesion (u.foto_url). */
-function pfDatoFoto(valor) {
-  var tiene = valor !== null && valor !== undefined && String(valor).trim() !== '';
-  var thumb = tiene
-    ? '<span role="img" aria-label="Foto de perfil" style="display:inline-block;width:42px;height:42px;border-radius:50%;background-size:cover;background-position:center;vertical-align:middle;margin-right:8px;background-image:url(' + esc(valor) + ')"></span>'
-    : '';
-  return '<div class="pf-dato' + (tiene ? '' : ' vacio') + '">'
-    + '<div class="pf-dato-lbl">Foto de perfil</div>'
-    + '<div class="pf-dato-val">' + thumb + (tiene ? 'Foto actualizada' : 'Sin configurar') + '</div>'
-    + '<button type="button" class="pf-dato-btn" onclick="pfEditarCampo(\'foto_url\')">' + (tiene ? 'Editar' : 'Agregar') + '</button>'
-    + '</div>';
-}
-function renderDatosPerfil() {
-  var box = document.getElementById('pf-datos');
-  var u = sesion();
-  if (!box || !u) return;
-  var lugar = (u.ciudad_base || '') + (u.pais_base ? ((u.ciudad_base ? ' (' : '') + u.pais_base + (u.ciudad_base ? ')' : '')) : '');
-  box.innerHTML =
-      pfDatoFoto(u.foto_url || u.avatar_url || '')
-    + pfDato('Nombre', u.nombre || '', 'nombre')
-    + pfDato('Bio', u.bio || '', 'bio')
-    + pfDato('Ciudad y pais', lugar, 'ciudad')
-    + pfDato('Fecha de nacimiento', u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0, 10) : '', 'fecha_nacimiento')
-    + pfDato('Intereses', pfInteresesTexto(u.intereses), 'intereses');
-}
-
 /* ---- Fase B (migracion 042): Pasaporte, billetera y fotos de perfil ---- */
-function pfPasaporteItem(c) {
-  var ico = c.ok ? '&#x2705;' : '&#x2B1C;';
-  return '<div class="pf-pas-item' + (c.ok ? ' ok' : '') + '"><span class="pf-pas-ico">' + ico
-    + '</span><span>' + esc(c.label) + '</span></div>';
+var PF_PAS_ACCION = {
+  foto:       { campo:'foto_url',         cta:'Poner foto' },
+  nombre:     { campo:'nombre',           cta:'Poner nombre' },
+  nacimiento: { campo:'fecha_nacimiento', cta:'Poner fecha' },
+  ciudad:     { campo:'ciudad',           cta:'Definir ciudad' },
+  pais:       { campo:'pais',             cta:'Definir pais' },
+  bio:        { campo:'bio',              cta:'Escribir bio' },
+  intereses:  { campo:'intereses',        cta:'Elegir intereses' },
+  email:      { tab:'cuenta', target:'pf-cuenta',      cta:'Verificar email' },
+  casa:       { tab:'clase',  target:'pf-casa',        cta:'Elegir Casa' },
+  faccion:    { tab:'clase',  target:'pf-facciones',   cta:'Elegir oficio' }
+};
+function pfPasValor(id, u) {
+  if (!u) return '';
+  if (id === 'nombre') return u.nombre || '';
+  if (id === 'nacimiento') return u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0, 10) : '';
+  if (id === 'ciudad') return u.ciudad_base || '';
+  if (id === 'pais') return u.pais_base || '';
+  if (id === 'bio') { var b = u.bio || ''; return b.length > 60 ? b.slice(0, 60) + '\u2026' : b; }
+  if (id === 'intereses') return pfInteresesTexto(u.intereses);
+  if (id === 'email') return u.email || '';
+  if (id === 'casa') return u.casa || '';
+  if (id === 'faccion') return u.faccion || '';
+  return '';
+}
+function pfPasItem(c, u) {
+  var acc = PF_PAS_ACCION[c.id] || {};
+  var val = pfPasValor(c.id, u);
+  var valHtml = val ? '<span class="pf-pas-val">' + esc(val) + '</span>' : '';
+  var accHtml = c.ok
+    ? '<span class="pf-pas-ok-txt">Listo</span>'
+    : (acc.campo
+        ? '<button type="button" class="pf-pas-btn" onclick="pfEditarCampo(\'' + acc.campo + '\')">' + acc.cta + '</button>'
+        : '<button type="button" class="pf-pas-btn" onclick="pfIr(\'' + acc.tab + '\',\'' + acc.target + '\')">' + acc.cta + '</button>');
+  return '<div class="pf-pas-item' + (c.ok ? ' ok' : '') + '">'
+    + '<span class="pf-pas-ico">' + (c.ok ? '&#x2705;' : '&#x2B1C;') + '</span>'
+    + '<span class="pf-pas-lbl">' + esc(c.label) + '</span>'
+    + valHtml + accHtml + '</div>';
 }
 function renderPasaporte(p) {
   var box = document.getElementById('pf-pasaporte');
@@ -5019,10 +4950,10 @@ function renderPasaporte(p) {
   var pct = total ? Math.round((hechos / total) * 100) : 0;
   var head = p.completo
     ? '<div class="pf-pas-ok">Pasaporte completo: tu insignia y tu billetera estan activas.</div>'
-    : '<div class="pf-pas-pend">Te faltan ' + (p.faltan || 0) + ' de ' + total + ' datos.</div>';
+    : '<div class="pf-pas-pend">Te faltan ' + (p.faltan || 0) + ' de ' + total + ' datos para sellar tu pasaporte.</div>';
   box.innerHTML = head
     + '<div class="pf-pas-bar" role="progressbar" aria-valuenow="' + hechos + '" aria-valuemin="0" aria-valuemax="' + total + '"><i style="width:' + pct + '%"></i></div>'
-    + '<div class="pf-pas-grid">' + (p.campos || []).map(pfPasaporteItem).join('') + '</div>';
+    + '<div class="pf-pas-grid">' + (p.campos || []).map(function(c){ return pfPasItem(c, sesion()); }).join('') + '</div>';
 }
 function renderBilletera(d) {
   var box = document.getElementById('pf-billetera');
@@ -5116,108 +5047,10 @@ function pfFotoQuitar(id) {
   }).catch(function () { showToast('Error de conexion', '#ef4444'); });
 }
 
-/* ---- Tu origen (ADR-058: Multiplicador de Origen por lejania) ----
-   Tarjeta SOLO informativa. El multiplicador real (x1.0 .. x1.4) depende del
-   punto geografico del destino y lo resuelve el backend; aqui se muestra la
-   base declarada y la categoria del usuario a partir del objeto aditivo
-   u.origen (GET/POST de api/usuarios.js). Nunca calcula ni promete el factor
-   exacto: tier_base='co' agrupa Local y Nomada porque el desempate exige la
-   ciudad del punto, que no vive en el perfil. */
-function pfOrigenDesdeSesion(u) {
-  if (u && u.origen && typeof u.origen === 'object') return u.origen;
-  /* Fallback: la sesion cacheada aun no trae el objeto (GET en vuelo o
-     proyeccion publica). Derivacion minima desde los campos planos. */
-  var ciudad = (u && u.ciudad_base) ? String(u.ciudad_base).trim() : '';
-  var pais = (u && u.pais_base) ? String(u.pais_base).trim().toUpperCase() : '';
-  var elegible = !!(ciudad || pais);
-  var esExt = !!(pais && pais !== 'CO');
-  return {
-    ciudad_base: ciudad || null,
-    pais_base: pais || null,
-    origen_declarado_en: null,
-    elegible: elegible,
-    tier_base: elegible ? (esExt ? 'extranjero' : (ciudad ? 'co' : null)) : null,
-    es_extranjero_verificado: !!(esExt && u && u.email_verificado === true),
-    dias_origen_declarado: null,
-    min_dias_cuenta: 7
-  };
-}
+/* ADR-058: helper del aviso anti-teleport; lo usa pfGuardarPerfil. */
 function pfOrigenMinDias(o) {
   var n = Number(o && o.min_dias_cuenta);
   return (isFinite(n) && n > 0) ? Math.round(n) : 7;
-}
-function pfOrigenRow(nombre, desc, factor) {
-  return '<div class="pf-org-row">'
-    + '<span class="pf-org-row-name">' + esc(nombre) + '</span>'
-    + '<span class="pf-org-row-desc">' + esc(desc) + '</span>'
-    + '<span class="pf-org-row-fx">' + esc(factor) + '</span>'
-    + '</div>';
-}
-function renderOrigen() {
-  var box = document.getElementById('pf-origen');
-  var u = sesion();
-  if (!box || !u) return;
-  var o = pfOrigenDesdeSesion(u);
-  var minDias = pfOrigenMinDias(o);
-  var lugar = o.ciudad_base || 'Sin ciudad';
-  if (o.pais_base) lugar += (o.ciudad_base ? ' \u00b7 ' : '') + o.pais_base;
-
-  /* Categoria derivada de tier_base + es_extranjero_verificado. */
-  var cat, catClass, factor;
-  if (o.tier_base === 'extranjero') {
-    if (o.es_extranjero_verificado) { cat = 'Extranjero'; catClass = 'ext'; factor = 'x1.2 \u2013 x1.4'; }
-    else { cat = 'Extranjero sin verificar'; catClass = 'pend'; factor = 'x1.2 \u2013 x1.4'; }
-  } else if (o.tier_base === 'co') {
-    cat = 'Local / Nomada'; catClass = 'co'; factor = 'x1.0 \u2013 x1.2';
-  } else {
-    cat = 'Sin categoria'; catClass = 'none'; factor = 'x1.0';
-  }
-
-  var html = '<div class="pf-org-head">'
-    + '<div class="pf-org-place"><span class="pf-org-lbl">Tu ubicacion declarada</span>'
-    + '<span class="pf-org-city">' + (o.elegible ? esc(lugar) : 'Sin declarar') + '</span></div>'
-    + '<span class="pf-org-chip ' + catClass + '">' + esc(cat) + ' \u00b7 ' + factor + '</span>'
-    + '</div>';
-
-  /* Explicacion de como funciona el multiplicador (3 categorias). */
-  html += '<div class="pf-org-rows">'
-    + pfOrigenRow('Local', 'Misma ciudad que el punto: XP base', 'x1.0')
-    + pfOrigenRow('Nomada', 'Otra ciudad de Colombia: hasta x1.2 segun la distancia al punto', 'hasta x1.2')
-    + pfOrigenRow('Extranjero', 'Pais distinto a Colombia: hasta x1.4 segun la distancia al punto', 'hasta x1.4')
-    + '</div>';
-
-  /* Estado de elegibilidad (avisos no bloqueantes). tier_base=null (p. ej.
-     solo pais 'CO' sin ciudad) tampoco alcanza ninguna categoria -> guia. */
-  if (!o.elegible || !o.tier_base) {
-    html += '<div class="pf-org-note pend">Declara tu ciudad y pais para activar el multiplicador de origen.</div>';
-  } else {
-    if (o.tier_base === 'extranjero' && !o.es_extranjero_verificado) {
-      html += '<div class="pf-org-note pend">Verifica tu email para activar el multiplicador de extranjero.</div>';
-    }
-    var dias = o.dias_origen_declarado;
-    if (dias !== null && dias !== undefined && Number(dias) < minDias) {
-      var falta = Math.max(0, minDias - Math.round(Number(dias)));
-      html += '<div class="pf-org-note wait">Tu multiplicador de origen se activa ' + minDias
-        + ' dias despues de declarar tu ubicacion (te faltan ' + falta + ').</div>';
-    }
-  }
-
-  /* Anti-teleport informativo: al cambiar ciudad/pais el contador se reinicia. */
-  html += '<div class="pf-org-foot">Si cambias tu ciudad o pais, el multiplicador se reactiva '
-    + minDias + ' dias despues de declarar la nueva ubicacion.</div>';
-
-  /* Acciones: reutiliza el flujo de edicion existente (pfEditarCampo). */
-  var tieneCat = !!(o.elegible && o.tier_base);
-  html += '<div class="pf-org-actions">'
-    + '<button type="button" class="pf-org-btn" onclick="pfEditarCampo(\'ciudad\')" aria-label="'
-    + (tieneCat ? 'Editar tu ciudad y pais' : 'Declarar tu ciudad y pais') + '">'
-    + (tieneCat ? 'Editar ubicacion' : 'Declarar ubicacion') + '</button>';
-  if (o.elegible && o.tier_base === 'extranjero' && !o.es_extranjero_verificado) {
-    html += '<button type="button" class="pf-org-btn ghost" onclick="pfIr(\'cuenta\',\'pf-cuenta\')" aria-label="Verificar tu email">Verificar email</button>';
-  }
-  html += '</div>';
-
-  box.innerHTML = html;
 }
 function pfEditarCampo(campo) {
   var u = sesion();
@@ -5245,9 +5078,11 @@ function pfEditarCampo(campo) {
   } else if (campo === 'ciudad') {
     var ciudad = prompt('Tu ciudad base:', u.ciudad_base || '');
     if (ciudad === null) return;
+    cambios = { ciudad_base: ciudad.trim() };
+  } else if (campo === 'pais') {
     var pais = prompt('Pais (ISO de 2 letras, CO para Colombia):', u.pais_base || 'CO');
     if (pais === null) return;
-    cambios = { ciudad_base: ciudad.trim(), pais_base: pais.trim().toUpperCase().slice(0, 2) };
+    cambios = { pais_base: pais.trim().toUpperCase().slice(0, 2) };
   } else if (campo === 'intereses') {
     var opciones = PF_INTERESES_CATALOGO.map(function(x){ return x.slug; }).join(', ');
     var actual = pfInteresesLista(u.intereses).join(', ');
@@ -5296,11 +5131,7 @@ function pfGuardarPerfil(cambios) {
   }).catch(function(){ showToast('Error de conexion', '#ef4444'); });
 }
 function pfRefrescarPerfilPaneles() {
-  renderDatosPerfil();
-  renderOrigen();
   renderCuentaPanel();
-  var u = sesion();
-  if (u && u.id) cargarCompletitudPerfil(u.id);
   cargarBilletera();
 }
 
@@ -5451,7 +5282,7 @@ function elegirCasa(casa, btn) {
       if (res.data.bajo_nivel) showToast('Ojo: con este cambio bajaste de nivel', '#ef4444');
       refrescarSesion();
       cargarCasas(u.id);
-      cargarCompletitudPerfil(u.id);
+      cargarBilletera();
       return;
     }
     if (btn) { btn.disabled = false; btn.textContent = etiqueta || 'Elegir'; }

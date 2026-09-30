@@ -1,4 +1,5 @@
 // api/usuarios.js -- Vercel Serverless Function (ASCII-safe: 0 backticks, 0 no-ASCII)
+// v25 (2026-09-29): Pasaporte combinado = 10 datos (union de checklist 042 + misiones de perfil); billetera_mia amplia columnas para calcularlo.
 // v24 (2026-09-29): Pasaporte + billetera + fotos de perfil (migracion 042).
 //   POST perfil_actualizar acepta fecha_nacimiento (PII owner-only; editable
 //   UNA sola vez; validacion server-side de fecha real y edad 13..120).
@@ -524,20 +525,31 @@ function parseFechaNacimiento(raw) {
   return { ok: true, iso: s, edad: edad };
 }
 
-// Pasaporte = checklist de completitud del perfil. Calculado SIEMPRE en
+// Pasaporte = checklist COMBINADO de completitud del perfil (10 datos:
+// union del checklist 042 + misiones de perfil). Calculado SIEMPRE en
 // servidor (el cliente no se lo puede autoconceder).
+function contarIntereses(v) {
+  var lista = v;
+  if (typeof lista === 'string') { try { lista = JSON.parse(lista); } catch (e) { lista = null; } }
+  return Array.isArray(lista) ? lista.length : 0;
+}
 function calcularPasaporte(u, nFotos) {
   var campos = [];
   function add(id, label, ok) { campos.push({ id: id, label: label, ok: !!ok }); }
-  add('alias', 'Nombre o alias', u && u.nombre && String(u.nombre).trim());
-  add('nacimiento', 'Fecha de nacimiento', u && u.fecha_nacimiento);
+  var uu = u || {};
   add('foto', 'Foto de perfil',
-    (u && u.foto_url && String(u.foto_url).trim()) || (nFotos > 0));
-  add('origen', 'Ciudad y pais base',
-    (u && u.ciudad_base && String(u.ciudad_base).trim()) &&
-    (u && u.pais_base && String(u.pais_base).trim()));
-  add('email', 'Email verificado', u && u.email_verificado === true);
-  add('galeria', 'Al menos una foto en tu galeria', nFotos > 0);
+    (uu.foto_url && String(uu.foto_url).trim()) ||
+    (uu.avatar_url && String(uu.avatar_url).trim()) || (nFotos > 0));
+  add('nombre', 'Nombre o alias', uu.nombre && String(uu.nombre).trim());
+  add('nacimiento', 'Fecha de nacimiento', uu.fecha_nacimiento != null);
+  add('ciudad', 'Ciudad base', uu.ciudad_base && String(uu.ciudad_base).trim());
+  add('pais', 'Pais base', uu.pais_base && String(uu.pais_base).trim());
+  add('bio', 'Bio (minimo 40 caracteres)',
+    typeof uu.bio === 'string' && uu.bio.trim().length >= 40);
+  add('intereses', 'Intereses (minimo 3)', contarIntereses(uu.intereses) >= 3);
+  add('email', 'Email verificado', uu.email_verificado === true);
+  add('casa', 'Casa', uu.casa && String(uu.casa).trim());
+  add('faccion', 'Faccion', uu.faccion && String(uu.faccion).trim());
   var faltan = campos.filter(function (c) { return !c.ok; });
   return { completo: faltan.length === 0, campos: campos, faltan: faltan.length, total: campos.length };
 }
@@ -743,8 +755,9 @@ module.exports = async (req, res) => {
           return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA' });
 
         var bmUsr = await sql(
-          'SELECT id, nombre, foto_url, fecha_nacimiento, ciudad_base, pais_base,'
-          + ' email_verificado, xp_total, capacidades FROM usuarios WHERE id=$1 LIMIT 1',
+          'SELECT id, nombre, foto_url, avatar_url, bio, intereses, fecha_nacimiento,'
+          + ' ciudad_base, pais_base, casa, faccion, email_verificado, xp_total, capacidades'
+          + ' FROM usuarios WHERE id=$1 LIMIT 1',
           [bmId]
         );
         if (!bmUsr.length) return res.status(404).json({ ok: false, error: 'No encontrado' });

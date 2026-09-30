@@ -3504,7 +3504,7 @@ var LOGROS = [
     // por el helper canonico repartirXpReferidos.
     id: 'logr_pasaporte_completo', grupo: 'general', requiere: [],
     nombre: 'Pasaporte completo',
-    desc: 'Completa los 6 datos de tu Pasaporte de viajero',
+    desc: 'Completa los 10 datos de tu Pasaporte de viajero',
     emoji: '\uD83D\uDEE1', tier: 'plata', xp: 200,
     check: function(ctx) { return ctx.pasaporteCompleto().then(function(n){ return n >= 1; }); },
   },
@@ -4533,18 +4533,21 @@ function evaluarLogros(sql, usuarioId) {
           'SELECT COUNT(*)::int AS n FROM interacciones WHERE usuario_id=$1 AND tipo=\'visita\' AND activo=true',
           [usuarioId]);
       },
-      // Pasaporte completo (migracion 042): checklist server-side de 6 datos.
+      // Pasaporte completo (migracion 042): checklist server-side de 10 datos (union del pasaporte 042 + misiones de perfil).
       // Degrada a 0 si la 042 no esta aplicada (fecha_nacimiento / usuario_fotos
       // ausentes -> memo captura y devuelve 0).
       pasaporteCompleto: function() {
         return memo('pasaporte',
           'SELECT (CASE WHEN COALESCE(TRIM(nombre), \'\') <> \'\''
           + ' AND fecha_nacimiento IS NOT NULL'
-          + ' AND (COALESCE(foto_url, \'\') <> \'\' OR EXISTS (SELECT 1 FROM usuario_fotos uf WHERE uf.usuario_id = usuarios.id AND uf.activo = true))'
+          + ' AND (COALESCE(foto_url, \'\') <> \'\' OR COALESCE(avatar_url, \'\') <> \'\' OR EXISTS (SELECT 1 FROM usuario_fotos uf WHERE uf.usuario_id = usuarios.id AND uf.activo = true))'
           + ' AND COALESCE(TRIM(ciudad_base), \'\') <> \'\''
           + ' AND COALESCE(TRIM(pais_base), \'\') <> \'\''
+          + ' AND LENGTH(COALESCE(bio, \'\')) >= 40'
+          + ' AND jsonb_array_length(COALESCE(intereses, \'[]\'::jsonb)) >= 3'
           + ' AND email_verificado = true'
-          + ' AND EXISTS (SELECT 1 FROM usuario_fotos uf2 WHERE uf2.usuario_id = usuarios.id AND uf2.activo = true)'
+          + ' AND casa IS NOT NULL'
+          + ' AND faccion IS NOT NULL'
           + ' THEN 1 ELSE 0 END) AS n FROM usuarios WHERE id=$1',
           [usuarioId]);
       },

@@ -3717,5 +3717,32 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Evidencia (ADR-006):** recuento = 19 agentes, 18 x `deepseek-v4.1-flash` + 1 x `mimo-v2.6-pro`; `opencode.json` con `model: opencode-go/deepseek-v4.1-flash` y `small_model: opencode-go/deepseek-v4-flash`. Verificado tras reiniciar: los subagentes responden.
 - **Nota:** proveedores autenticados en la maquina: solo `opencode-go` y `google`.
 
+## Unificacion del panel de perfil (Pasaporte combinado de 10 datos) - 2026-09-29 (ADR-069 ENMIENDA 1 / TSK-163)
+
+> Refinamiento de producto sobre TSK-159. Working tree (sin commit ni deploy);
+> viaja con el release de la migracion 042, aun PENDIENTE de aplicar en Neon.
+> No crea endpoints (**8/8 INTACTO**); sin migracion nueva.
+
+### TSK-163: Unificar en un solo panel las secciones de datos del perfil (Pasaporte combinado de 10 datos) [IMPLEMENTADO EN WORKING TREE]
+
+- **Estado:** IMPLEMENTADO EN WORKING TREE / verificacion verde (2026-09-29); commit/deploy PENDIENTES.
+- **Prioridad:** Alta (producto: un solo panel de datos y una sola fuente de progreso del pasaporte).
+- **Fecha:** 2026-09-29.
+- **Origen:** refinamiento de producto sobre TSK-159 ("Unificar en un solo panel las secciones de datos del perfil").
+- **ADR:** DECISIONS.md ADR-069 (ENMIENDA 1).
+- **Precedente:** continua a TSK-159 (Pasaporte/Billetera, migracion 042).
+- **Alcance REAL ejecutado:**
+  - `mi-perfil.html` (tab perfil): se ELIMINAN los bloques `#pf-datos` ("Mis datos"), `#pf-origen` ("Tu origen"), `#pf-completa` ("Completa tu perfil"/"Tu pasaporte de viajero") y el titulo "Tu Pasaporte". Queda UN solo panel host id `pf-pasaporte` titulado "Tu pasaporte de viajero"; se conservan `#pf-billetera` y `#pf-galeria`.
+  - JS de `mi-perfil.html`: se ELIMINAN `renderDatosPerfil`, `pfDato`, `pfDatoFoto`, `renderOrigen`, `pfOrigenDesdeSesion`, `pfOrigenRow`, `PF_MISION_DESTINO`, `PF_MISION_ORDEN` y `cargarCompletitudPerfil`. `renderPasaporte(p)` se REESCRIBE (con `PF_PAS_ACCION`, `pfPasValor`, `pfPasItem`) para pintar las 10 filas con accion por campo. `pfEditarCampo` separa 'ciudad' (solo `ciudad_base`) y 'pais' (solo `pais_base`). Se conserva `pfOrigenMinDias` (aviso anti-teleport). Init, `pfTab('perfil')`, `pfRefrescarPerfilPaneles` y el guardado de Casa ahora llaman `cargarBilletera()`.
+  - `api/usuarios.js` **v25** (antes v24): `calcularPasaporte(u, nFotos)` devuelve **10 items combinados** en este orden: foto, nombre, nacimiento, ciudad, pais, bio (>=40), intereses (>=3), email, casa, faccion. El SELECT de GET `billetera_mia` se amplia con `avatar_url`, `bio`, `intereses`, `casa`, `faccion`.
+  - `api/interacciones.js`: el logro `logr_pasaporte_completo` se alinea a los 10 datos (desc de "6 datos" a "10 datos" y `ctx.pasaporteCompleto()` con 10 criterios), para que insignia y pasaporte no se contradigan.
+  - `scripts/smoke_042_pasaporte_billetera.js`: linea de version actualizada a v25.
+- **Decisiones de producto del operador:** (a) el progreso del pasaporte es la UNION COMBINADA de los datos del pasaporte 042 + las misiones de perfil, con total unico de **10**; (b) un solo panel; (c) ciudad y pais se muestran/editan por separado y se OMITE del perfil la visualizacion del puntaje por Local/Nomada/Extranjero (el multiplicador ADR-058 sigue vigente en backend; solo se oculto su tarjeta).
+- **Consecuencia de negocio:** el gate de creacion de billetera (`bmPasaporte.completo`) ahora exige los 10 datos (antes 6). Las billeteras ya creadas PERSISTEN (`INSERT ... ON CONFLICT DO NOTHING`).
+- **Evidencia (ADR-006):** `npm test` completo OK (todos los smokes, incluidos 042 y 058); `node --check` de `api/usuarios.js` y `api/interacciones.js` OK; balance de `<div>` en `mi-perfil.html` 560/560 (diff 0); `api/*.js` ASCII-safe (0 bytes>127, 0 backticks); QA estatico (sandbox vm) confirmo mapeo 10/10, uso de `esc()` (sin XSS) y call-sites cableados. Cabecera real `api/usuarios.js` v25; `calcularPasaporte` devuelve 10 items; `logr_pasaporte_completo` desc "10 datos".
+- **Deuda [DEUDA-EXPRESS]:** (1) CSS huerfano `.pf-datos`/`.pf-completa`/`.pf-origen` en `mi-perfil.html` (~110 lineas) tras eliminar sus hosts, mas el comentario de cabecera que los menciona; (2) `pfPasItem` cae a `PF_PAS_ACCION[id] || {}` y, ante un id de backend sin accion, pintaria un boton "undefined" (robustez defensiva pendiente); (3) GET `billetera_mia` no envuelve su SELECT en el fallback 42703/42P01 que si usan las consultas vecinas (pre-existente desde v24, agravado mientras la migracion 042 siga PENDIENTE de aplicar en Neon); (4) cosmetico: `pfPasValor` lee nombres/valores desde la sesion (localStorage); si un campo no esta hidratado puede verse vacio aunque el servidor marque "Listo".
+- **Fuera de alcance:** sin endpoints nuevos (8/8 intacto); sin migracion nueva; no se toca el multiplicador de origen en backend (ADR-058).
+- **Relacion con bugs:** ninguno nuevo (no se observo falla; los hallazgos quedan como deuda).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

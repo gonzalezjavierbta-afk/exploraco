@@ -30,7 +30,7 @@ check('042: ASCII-safe', (function () {
 })());
 
 // api/usuarios.js
-check('usuarios: version v24 en cabecera', usr.indexOf('// v24 (2026-09-29)') !== -1);
+check('usuarios: version v25 en cabecera', usr.indexOf('// v25 (2026-09-29)') !== -1);
 check('usuarios: rama foto_agregar', usr.indexOf("c.tipo === 'foto_agregar'") !== -1);
 check('usuarios: rama foto_principal', usr.indexOf("c.tipo === 'foto_principal'") !== -1);
 check('usuarios: rama foto_quitar', usr.indexOf("c.tipo === 'foto_quitar'") !== -1);
