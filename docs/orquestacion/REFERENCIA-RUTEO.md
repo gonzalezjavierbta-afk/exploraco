@@ -1,44 +1,51 @@
 # REFERENCIA DE RUTEO (ExploraCO)
 
-Documento de apoyo a la orquestacion de agentes. Sustituye las referencias al
-inexistente AGENTS.md dentro de `.opencode/agent/**`. Anclas verificadas contra el
-archivo real del repositorio (ADR-006). ASCII-safe (ADR-002).
+Documento de apoyo a la orquestacion de agentes. Complementa el `AGENTS.md` de
+la raiz (norma vigente) con las anclas de archivo y los comandos de
+localizacion. Anclas verificadas contra el archivo real del repositorio
+(ADR-006). ASCII-safe (ADR-002).
 
-## 1. Matriz de dominios -> agente(s) -> ancla real
+## 1. Matriz de dominios -> agente -> ancla real
 
-| Dominio | Agente(s) | Fichero(s) ancla real |
+Roster unico de 20 agentes (ADR-076): un unico agente por dominio, sin pares
+`-free`/`-pro` y sin ruta hibrida.
+
+| Dominio | Agente | Fichero(s) ancla real |
 |---|---|---|
-| backend api | backend-dev-free | api/destinos.js, api/usuarios.js, api/interacciones.js, api/admin-destinos.js, api/publicar-lugar.js, api/pagina-destino.js, api/admin.js, api/utilidades.js |
-| motor de render | renderer-dev-free | api/pagina-destino.js, pagina-destino.js, vercel.json |
-| panel admin | admin-dev-free | admin.html, api/publicar-lugar.js |
-| UI/estetica | frontend-tpl-free | index.html, admin.html |
-| paginas dinamicas | content-loader-free | scripts/ (seed-<slug>.js, load-<slug>-api.js, smoke_test_<slug>.js) |
-| JS/TS rutinario | js-silo-dev-free, exp-pickle-free | scripts/, index-api-connector.js |
-| SQL/RLS | sql-security-free | db/migrations/, api/*.js (solo datos de bajo riesgo) |
-| migraciones/seeds | data-migration-free | db/migrations/, db/cleanups/, scripts/ |
-| SEO | seo-dev-free | api/utilidades.js, index.html, vercel.json, robots.txt, _redirects, _headers |
-| arquitectura/ADR | architect-free, architect-review-free | exploraco desarrollo/DECISIONS.md, exploraco desarrollo/BLUEPRINT.md |
-| imagenes/audio/video/PDF | media-reader-free | entrada externa; fichas en exploraco desarrollo/ |
-| auditoria/Escudo GOLD | qa-auditor-free | scripts/, api/, admin.html |
-| documentacion | docs-keeper-free | exploraco desarrollo/ (PROJECT.md, NEXT.md, TASKS.md, BLUEPRINT.md, DECISIONS.md, BUGS_HISTORICOS.md) |
-| exploracion | explore-free, research-agent-free | raiz del repo (glob/grep), exploraco desarrollo/ficha-<slug>.md |
+| backend api | `backend-dev` | api/destinos.js, api/usuarios.js, api/interacciones.js, api/admin-destinos.js, api/publicar-lugar.js, api/admin.js, api/utilidades.js |
+| motor de render | `renderer-dev` | api/pagina-destino.js, vercel.json |
+| panel admin | `admin-dev` | admin.html, api/publicar-lugar.js |
+| UI/estetica | `frontend-tpl` | index.html, admin.html |
+| paginas dinamicas | `content-loader` | scripts/ (seed-<slug>.js, load-<slug>-api.js, smoke_test_<slug>.js) |
+| JS/TS rutinario | `js-silo-dev` | scripts/, index-api-connector.js |
+| SQL/RLS | `sql-security` | db/migrations/, api/*.js (solo datos de bajo riesgo) |
+| migraciones/seeds | `data-migration` | db/migrations/, db/cleanups/, scripts/ |
+| SEO | `seo-dev` | api/utilidades.js, index.html, vercel.json, robots.txt, _redirects, _headers |
+| arquitectura/ADR | `architect` | exploraco desarrollo/DECISIONS.md, BLUEPRINT.md |
+| revision de arquitectura/ADR | `architect-review` | exploraco desarrollo/DECISIONS.md |
+| imagenes/audio/video/PDF | `media-reader` | entrada externa; fichas en exploraco desarrollo/ |
+| auditoria/Escudo GOLD | `qa-auditor` | scripts/, api/, admin.html |
+| documentacion | `docs-keeper` | exploraco desarrollo/ (PROJECT.md, NEXT.md, TASKS.md, BLUEPRINT.md, DECISIONS.md, BUGS_HISTORICOS.md) |
+| exploracion | `explore` | raiz del repo (glob/grep) |
+| research de destinos | `research-agent` | exploraco desarrollo/ficha-<slug>.md |
 
-Nota: la especificacion habla de "13 dominios" pero enumera 14 etiquetas; esta
-tabla cubre las 14.
+**Todos los agentes del roster son GRATIS** ydeclaran `model:
+opencode/space-bunny-free`. No existe ningun pin de pago en el roster.
 
-Todos los agentes de esta tabla son GRATIS: heredan el modelo de su primario
-(seccion 4). Los 4 dominios de riesgo alto tienen ademas un pin de PAGO:
+## 2. Dominios con gate de confirmacion
 
-| Dominio | Agente FREE (default) | Pin de PAGO (solo con OK del operador) |
-|---|---|---|
-| backend api | backend-dev-free | backend-dev-pro |
-| motor de render | renderer-dev-free | renderer-dev-pro |
-| arquitectura/ADR | architect-free, architect-review-free | architect-pro |
-| migraciones/seeds | data-migration-free | data-migration-pro |
+Estos exigen CONFIRMACION EXPLICITA del usuario antes de ejecutarse, incluso en
+ruta FREE (`AGENTS.md` §2):
 
-Los otros 10 dominios NO tienen pin de pago: se resuelven siempre en gratis.
+| Gate | Agente |
+|---|---|
+| SQL / RLS / esquema | `sql-security` |
+| migraciones / seeds masivos | `data-migration` |
+| motor de render (`buildHTML`) | `renderer-dev` |
+| arquitectura / ADR | `architect` |
+| revision de arquitectura / ADR | `architect-review` |
 
-## 2. Anclas por dominio (como localizarlo)
+## 3. Anclas por dominio (como localizarlo)
 
 | Dominio | Fichero ancla | Como localizarlo (grep) |
 |---|---|---|
@@ -57,7 +64,13 @@ Los otros 10 dominios NO tienen pin de pago: se resuelven siempre en gratis.
 | documentacion | exploraco desarrollo/TASKS.md | grep -r "Estado" "exploraco desarrollo/TASKS.md" |
 | exploracion | raiz del repo | git grep -n "<patron>" |
 
-## 3. Reglas de orquestacion (ADR-067)
+**Regla de lectura (obligatoria):** prohibido leer completos archivos > 150 KB
+(`api/interacciones.js`, `admin.html`, `mi-perfil.html`, `DECISIONS.md`,
+`TASKS.md`, `NEXT.md`, `BUGS_HISTORICOS.md`). Usar `grep` con ruta concreta y
+`Read` con `offset`/`limit`: un read completo envenena el `cache_read` de los
+turnos siguientes.
+
+## 4. Reglas de orquestacion (ADR-067 / ADR-076)
 
 R1 Carga diferida. Los subagentes NO heredan el contexto de la sesion: cada uno
 recibe un brief autonomo (objetivo, ficheros exactos, criterio de aceptacion,
@@ -66,35 +79,38 @@ brief esta mal escrito.
 
 R2 Docs solo al cierre. La documentacion (`exploraco desarrollo/*.md`) se escribe
 en UN pase de cierre de tanda, no tarea por tarea. Excepcion: si la tarea ES el
-cierre documental. La ejecuta docs-keeper-free.
+cierre documental. La ejecuta `docs-keeper`.
 
 R3 Web solo por Gemini. La investigacion web NO la hacen los subagentes: el
-agente entrega el prompt COMPLETO listo para pegar en Google Gemini, Gemini
-devuelve la ficha .md, y el agente la valida y verifica cada foto con curl -I
-esperando HEAD 200 (BUG-022). Sin API key, sin scrapeo y sin bucles de webfetch.
+agente entrega el prompt COMPLETO listo para pegar en Google Gemini (base en
+`.opencode/prompts/GEMINI_MASTER_PROMPT.md`), Gemini devuelve la ficha .md, y el
+agente la valida con `scripts/validate_ficha.js` y verifica cada foto con
+`curl -I` esperando HEAD 200 (BUG-022). Sin API key, sin scrapeo y sin bucles de
+webfetch.
 
 R4 Resumen de gasto obligatorio. Al cerrar cada tanda se ejecuta
-`node scripts/ejecucion/informe-cuota.js --task` y la tabla se pega en el chat.
-Sin tabla pegada, la tanda NO esta cerrada.
+`node scripts/usage_report.js --summary` y `node scripts/ejecucion/informe-cuota.js
+--task`, y la tabla se pega en el chat. Sin tabla pegada, la tanda NO esta
+cerrada. Para conciliacion estimado vs real: `node scripts/session_close.js`.
 
 R5 Guard de la capa gratuita. Antes de cerrar se ejecuta
 `node scripts/ejecucion/verificar-capa-gratis.js` (o `npm run coste:gratis`).
-Si sale con codigo 1, algum agente `*-free` quedo pineado a un modelo de pago:
-eso se corrige ANTES de cobrar. El guard ya corre como primer paso de
-`npm run test`, asi que un fallo de coste rompe la suite.
+Debe reportar `20 | gratis: 20 | de pago: 0`. Si sale con codigo 1, algun agente
+quedo pineado a un modelo de pago: eso se corrige ANTES de cobrar. El guard
+corre como primer paso de `npm run test`, asi que un fallo de coste rompe la
+suite.
 
-## 4. Capas de coste (ADR-074)
+## 5. Capa de coste (ADR-074)
 
-Hay tres capas. La capa la decide el agente PRIMARIO con el que abres la sesion;
-los subagentes `*-free` NO declaran modelo y heredan el de su primario, asi que
-cambiar de primario cambia las 21 capas de golpe.
+Todo el roster es FREE. La capa la decide el primario con el que abres la sesion;
+los especialistas declaran su propio `model:` para que la capa sea auditable
+sin depender de quien los invoco.
 
 | Capa | Agentes | Modelo | Coste |
 |---|---|---|---|
-| FREE | `free-build`, `free-plan`, `hybrid-build`, `hybrid-plan` | `opencode/space-bunny-free` | $0 |
-| FREE (heredan) | los 17 subagentes `*-free` | heredan del primario | $0 |
-| PAID | `paid-build`, `paid-plan` | `opencode-go/deepseek-v4.1-flash` | pago |
-| PAID (pines) | `backend-dev-pro`, `architect-pro`, `renderer-dev-pro`, `data-migration-pro` | `opencode-go/deepseek-v4.1-flash` | pago |
+| FREE (primarios) | `free-build`, `free-plan` | `opencode/space-bunny-free` | $0 |
+| FREE (primarios, heredan) | `plan`, `build` | heredan de `opencode.json` | $0 |
+| FREE (especialistas) | los 16 subagentes | `opencode/space-bunny-free` | $0 |
 
 ### Allowlist FREE (los unicos 3 verificados)
 
@@ -115,9 +131,8 @@ con `OpenCode's free tier can only be used from within OpenCode` (BUG-092):
 `opencode/nemotron-3.5-lightning-free`.
 
 `opencode/big-pickle` solo funciona como modelo de SESION en la app, nunca como
-subagente. Si el primario fuera big-pickle, los subagentes que heredan fallarian.
-Por eso el default es `space-bunny-free`, que es el mismo modelo (Space Bunny)
-por la via que si soporta subagentes.
+subagente. Por eso el default es `space-bunny-free`, que es el mismo modelo
+(Space Bunny) por la via que si soporta subagentes.
 
 ### Modelos que sirven pero cuestan dinero
 
@@ -125,47 +140,47 @@ por la via que si soporta subagentes.
 `gemini-flash-lite-latest` responden bien y cobraron $0.0025 por llamada corta.
 No son opcion para la capa gratuita. (`gemini-2.5-flash-lite` ya esta retirado.)
 
-### Como seleccionar free o pago
+### Como se cambia de capa
 
-| Quiero | Hago esto |
-|---|---|
-| Todo gratis (default) | abro con `@free-build` o `@hybrid-build` |
-| Todo de pago | abro con `@paid-build` o `@paid-plan` |
-| Pagar solo 1 tarea | `@hybrid-build` y el agorta lo que el pro de esa fila |
+No hay interruptor por agente: `opencode.json` fija `model: opencode/space-bunny-free`
+y `default_agent: free-build`. Para usar un modelo de pago habria que crear el
+agente y fijar su `model:` explicitamente, previa confirmacion del usuario
+(`AGENTS.md` §0).
 
-Con `opencode.json` en `opencode/space-bunny-free`, el agente por defecto
-(`free-build`) y el resto de subagentes son gratis. Cambiar de primario es el
-unico interruptor que hace falta; no se edita ningun archivo para cambiar de capa.
+## 6. Politica de escalada
 
-## 5. Politica de escalada
-
-### Escalada de coste (dentro del codigo)
-
-Solo `hybrid-build` y `hybrid-plan` pueden proponer un `-pro`, y NUNCA lo invocan
-sin respuesta afirmativa del operador. Deben presentar el bloque `ESCALADO
-PROPUESTO` con dominio, motivo concreto, agente, costo estimado y alternativa
-gratuita. Un pin `-pro` invocado por otro agente es un bug de orquestacion.
-
-El patron free/paid por dominio que se aplico del 2026-09-09 al 2026-09-18
-(commit `20ac822`) y que BUG-092 elimino queda restaurado como capa opcional, no
-como default: hoy el default es gratis y el pago es excepcion autorizada.
-
-### Escalada al operador humano
+No hay escalada de coste dentro del codigo: no existe agente de pago. Si una
+tarea de riesgo alto (`api/*.js` con logica nueva, `buildHTML()` anidado,
+migracion de esquema) no se resuelve en FREE, **no se fuerza**: se entrega como
+bloque y se pregunta al usuario.
 
 RLS, claves privadas, autenticacion y migraciones de esquema en Neon se escalan
-al OPERADOR HUMANO. sql-security-free no gestiona RLS, autenticacion, claves ni
+al OPERADOR HUMANO. `sql-security` no gestiona RLS, autenticacion, claves ni
 integridad critica: solo consultas, seeds y migraciones de datos de bajo riesgo.
 El Escudo GOLD certifica sintaxis, ASCII-safety y balance de divs, pero no
-permisos de fila en Postgres ni secretos; por eso esa capa se cierra con revision
-humana, no con un modelo mas caro. Un `-pro` NO reemplaza esa revision.
+permisos de fila en Postgres ni secretos; por eso esa capa se cierra con
+revision humana, no con un modelo mas caro.
 
-## 6. Referencia
+## 7. Skills
 
-- ADR-067 en `exploraco desarrollo/DECISIONS.md`: modelo de 3 capas con
-  presupuesto (Capa 0 orquestador, Capa 0b ejecucion, Capa 1 apoyo), roster
-  40 -> 19 y convencion de `description:`.
+Skills reales en `.opencode/skills/` (11): `anti-absorcion`,
+`create-dynamic-page`, `eficiencia-recursos`, `express-mode`, `frontend-design`,
+`gold-shield`, `grill-me`, `improve-codebase-architecture`, `research-destination`,
+`templates`, `web-design-guidelines`.
+
+Despublicadas (2026-10-01): `batch-create`, `gemini-research`, `ingest-eventos`.
+Sus prompts se conservaron en `.opencode/prompts/` y el validador de fichas
+quedo canonico en `scripts/validate_ficha.js` (cierra BUG-034).
+
+## 8. Referencia
+
+- ADR-067 en `exploraco desarrollo/DECISIONS.md`: modelo de capas con
+  presupuesto y convencion de `description:`.
 - ADR-074 en `exploraco desarrollo/DECISIONS.md`: restauracion de la capa
-  gratuita con `opencode/space-bunny-free`, herencia de modelo en los subagentes,
-  4 pines `-pro` de pago y el guard `verificar-capa-gratis.js`. Roster 19 -> 27.
-- BUG-092 en `exploraco desarrollo/BUGS_HISTORICOS.md`: por que los 19 agentes
-  pasaron a `opencode-go` el 2026-09-29 y por que eso ya no aplica.
+  gratuita con `opencode/space-bunny-free` y el guard `verificar-capa-gratis.js`.
+- ADR-076: roster unico de 20 agentes sin pares `-free`/`-pro`, retiro de la
+  ruta hibrida y de los pines de pago; `AGENTS.md` creado en la raiz.
+- BUG-034: drift de la ruta del validador de fichas (resuelto: canonico en
+  `scripts/validate_ficha.js`).
+- BUG-092: por que los agentes pasaron a modelos de pago el 2026-09-29 y por que
+  eso ya no aplica.

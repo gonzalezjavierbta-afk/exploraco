@@ -15,8 +15,8 @@ Skill que orquesta el flujo completo de creación de páginas dinámicas de Expl
 - Validar datos mínimos según BLUEPRINT.md sección 4
 
 ### 2. Ficha
-- Priorizar ficha de `gemini-research` si existe (`ficha-<slug>.md` con bloque
-  JSON final, validada con `.opencode/skills/gemini-research/scripts/validate_ficha.js`)
+- Priorizar ficha de research si existe (`ficha-<slug>.md` con bloque
+  JSON final, validada con `scripts/validate_ficha.js`)
 - Si no existe, aplicar R3: entregar el prompt de Gemini y validar la ficha con
   `research-destination`
 - Verificar que tenga: datos verificados, 5 fotos (HEAD 200), 5 FAQs, coordenadas

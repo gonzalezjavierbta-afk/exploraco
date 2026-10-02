@@ -3,18 +3,22 @@
 // Lee .opencode/agent/*.md y opencode.json y FALLA (exit 1) si la capa
 // gratuita se rompe, para que el gasto no se dispare en silencio.
 //
-// Por que existe: BUG-092 movio los 19 agentes a opencode-go (de pago) cuando
+// Por que existe: BUG-092 movio los agentes a opencode-go (de pago) cuando
 // el free tier dejo de funcionar como subagente, y el ADR-067 siguio
 // afirmando que eran gratuitos. Este guard convierte esa promesa en un hecho
-// verificable: si alguien pinea un agente *-free a un modelo de pago, el
-// guard lo detecta antes de que se cobre la factura.
+// verificable: si alguien pinea un agente a un modelo de pago, el guard lo
+// detecta antes de que se cobre la factura.
+//
+// Roster unico de 20 agentes (ADR-076): sin pares -free/-pro y sin ruta
+// hibrida. Regla vigente: TODO agente del roster es FREE. Un agente sin
+// `model:` hereda del primario, que hoy es FREE -> sigue siendo FREE.
 //
 // Uso:
 //   node scripts/ejecucion/verificar-capa-gratis.js           verifica y tabla
 //   node scripts/ejecucion/verificar-capa-gratis.js --json    salida JSON
 //
-// Salida: tabla con las 3 capas (FREE / PAID / HIBRIDO) y codigo de salida
-// 0 si todo cumple, 1 si hay alguna violacion.
+// Salida: tabla de capas (PRIMARIO / ESPECIALISTA / PAID / ROTO) y codigo
+// de salida 0 si todo cumple, 1 si hay alguna violacion.
 // ASCII-safe (no emite tildes).
 
 'use strict';
@@ -81,13 +85,14 @@ function leerConfig(p) {
 
 // --- Capa de un agente -------------------------------------------------------
 
-// Un agente *-free hereda el modelo de su primario si no declara `model:`.
-// Heredar es lo correcto: el primario decide la capa y el subagente la sigue.
+// Capa segun el modo declarado: los 4 primarios orquestan, los 16
+// especialistas ejecutan. Ya no hay pares -free/-pro que clasificar por
+// nombre: la capa la determina el MODELO, no el sufijo (ADR-076).
 function capaDe(a) {
-  if (/-pro$/.test(a.name)) return 'PAID';
-  if (/-free$/.test(a.name)) return 'FREE';
-  if (/^(free|paid|hybrid)-(build|plan)$/.test(a.name)) return 'PRIMARIO';
-  return 'PRIMARIO';
+  const modo = modoDe(a);
+  if (modo === 'pago') return 'PAID';
+  if (modo === 'ROTO') return 'ROTO';
+  return a.mode === 'primary' ? 'PRIMARIO' : 'ESPECIALISTA';
 }
 
 function modoDe(a) {
@@ -115,11 +120,12 @@ function verificar(root) {
   agentes.forEach((a) => {
     const modo = modoDe(a);
 
-    // 1. Ningun agente *-free puede quedar pineado a un modelo de pago.
-    if (/-free$/.test(a.name) && modo === 'pago') {
+// 1. Ningun agente del roster puede quedar pineado a un modelo de pago
+    //    (roster FREE integro, ADR-076).
+    if (modo === 'pago') {
       fallas.push(
-        a.name + ' (FREE) esta pineado a un modelo de PAGO: ' + a.model +
-        ' -> quitale la linea model: para que herede del primario, o ponelo en la allowlist FREE'
+        a.name + ' esta pineado a un modelo de PAGO: ' + a.model +
+        ' -> quitale la linea model: para que herede del primario FREE, o ponelo en la allowlist FREE'
       );
     }
 
@@ -131,11 +137,12 @@ function verificar(root) {
       );
     }
 
-    // 3. Ningun subagente de pago puede quedar sin pinear (seria un -pro gratis).
-    if (/-pro$/.test(a.name) && !a.model) {
+    // 3. Cada especialista debe declarar `model:` explicito: heredar del
+    //    primario es correcto, pero un pin explicito hace la capa auditable
+    //    sin depender de quien invoco al subagente.
+    if (a.mode === 'subagent' && !a.model) {
       fallas.push(
-        a.name + ' es un pin de PAGO pero no declara model: -> quedaria heredando ' +
-        'y no seria un pin de pago'
+        a.name + ' es especialista y no declara model: -> anade model: ' + FREE[0]
       );
     }
   });
@@ -210,7 +217,7 @@ function main() {
   if (argv.indexOf('--json') >= 0) {
     const t = tabla(res.agentes);
     console.log(JSON.stringify({
-      ok: res.faldas.length === 0,
+      ok: res.fallas.length === 0,
       allowlist_free: FREE,
       free: t.libres,
       pago: t.dePago,

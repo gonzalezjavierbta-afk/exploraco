@@ -3,10 +3,11 @@
   "model": "opencode/space-bunny-free",
   "small_model": "opencode/space-bunny-free",
   "default_agent": "free-build",
-  "subagent_depth": 2,
+  "subagent_depth": 1,
   "permission": {
     "edit": "allow",
     "bash": "allow",
+    "question": "allow",
     "webfetch": "deny",
     "websearch": "deny"
   },

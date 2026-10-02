@@ -34,15 +34,29 @@ Modo de trabajo **rapido, dirigido y proporcional al riesgo** para ExploraCO: se
 
 > Regla: si el cambio puede romper runtime de forma silenciosa o toca datos/seguridad, no es express.
 
+## Gates de riesgo que NO se saltan en express
+
+Estos dominios exigen **CONFIRMACION EXPLICITA del usuario antes de ejecutar**, aunque la sesion sea express (`AGENTS.md` §2):
+
+| Gate | Agente |
+| :--- | :--- |
+| SQL / RLS / esquema | `@sql-security` |
+| Migraciones / seeds masivos | `@data-migration` |
+| Motor de render (`buildHTML`) | `@renderer-dev` |
+| Arquitectura / ADR | `@architect` |
+| Revision de arquitectura / ADR | `@architect-review` |
+
+El modo express cambia el **orden** y la **profundidad** de los controles, nunca su existencia: el Escudo GOLD (`node --check`, ASCII-safety, balance de divs) sigue siendo obligatorio en `api/*.js`, `admin.html`, `index.html` y `pagina-destino.js`.
+
 ## Flujo express paso a paso
 
 1. **Spec inline minima.** Una linea: que se cambia, en que archivo y criterio de exito.
-2. **Lectura dirigida.** `grep` del ancla + `read` con `offset`/`limit`. `@explore-free` solo si es imprescindible (p. ej. contar consumidores de un ancla).
+2. **Lectura dirigida.** `grep` del ancla + `read` con `offset`/`limit`. Prohibido leer completos archivos > 150 KB (`api/interacciones.js`, `admin.html`, `mi-perfil.html`, `DECISIONS.md`, `TASKS.md`, `NEXT.md`, `BUGS_HISTORICOS.md`). `@explore` solo si es imprescindible (p. ej. contar consumidores de un ancla).
 3. **Brief quirurgico de delegacion.** Un subagente por dominio con rutas + numeros de linea + bloque `old`/`new` exacto (ver plantilla).
 4. **Ejecutar cambios minimos**, de bajo riesgo primero. Reusar componentes/helpers; extraer modulo compartido en vez de duplicar.
 5. **Paralelizar** solo tareas independientes (varios `task` en un mismo mensaje); respetar dependencias.
 6. **Verificacion local minima** (checklist de 6 puntos). QA runtime obligatorio si se anidan contenedores dinamicos.
-7. **Registrar deuda** con etiquetas en `NEXT.md` / items en `TASKS.md` (no arreglarla durante express).
+7. **Registrar deuda** con etiquetas en `exploraco desarrollo/NEXT.md` / items en `TASKS.md` (no arreglarla durante express).
 8. **Cierre documental (R2, transversal): un solo pase** al final de la tanda. No documentar tarea por tarea; la excepcion es que la tarea sea el propio cierre documental.
 
 ## Plantilla de "brief express"
@@ -87,6 +101,6 @@ Al terminar la ultima tarea (o antes de dar la tanda por cerrada):
 2. `NEXT.md`: entrada de relevo ("Que se estaba haciendo" + "Que sigue" + "Riesgos activos").
 3. `DECISIONS.md`: nuevo ADR solo si hubo una decision de arquitectura.
 4. `BUGS_HISTORICOS.md`: registrar la falla **antes** de cerrar, si aparecio una.
-5. Dejar la deuda etiquetada en `NEXT.md` (por ejemplo `[DEUDA-EXPRESS]`).
+5. Dejar la deuda etiquetada en `exploraco desarrollo/NEXT.md` (por ejemplo `[DEUDA-EXPRESS]`).
 
 Manual ampliado: `exploraco desarrollo/ampliacion desarrollo/MODO_EXPRESS_ANALISIS.md`.

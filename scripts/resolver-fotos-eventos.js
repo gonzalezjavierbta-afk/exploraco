@@ -1,5 +1,7 @@
 // scripts/resolver-fotos-eventos.js
-// FASE B del skill ingest-eventos: resuelve las `fotos_sugeridas` de
+// FASE B de la ingesta de eventos (skill ingest-eventos despublicada el
+// 2026-10-01; prompt canonico en .opencode/prompts/GEMINI_EVENTOS_PROMPT.md):
+// resuelve las `fotos_sugeridas` de
 // eventos/eventos.json a URLs reales de Wikimedia Commons (thumb 960px,
 // HEAD 200, BUG-022) y las escribe en `foto_hero` / `fotos_galeria`.
 //

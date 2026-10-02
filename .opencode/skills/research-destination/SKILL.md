@@ -23,11 +23,11 @@ Este skill valida y verifica el resultado antes del handoff.
 
 ### 1. Recibir la ficha
 La ficha llega en `exploraco desarrollo/ficha-<slug>.md` (la produce Gemini,
-ver skill `gemini-research`).
+prompt base en `.opencode/prompts/GEMINI_MASTER_PROMPT.md`).
 
 ### 2. Validar el contrato JSON
 ```
-node .opencode/skills/gemini-research/scripts/validate_ficha.js "exploraco desarrollo/ficha-<slug>.md"
+node scripts/validate_ficha.js "exploraco desarrollo/ficha-<slug>.md"
 ```
 Debe salir `PASS`. Si `FAIL`, devolver cada error a correccion sobre la ficha
 (no inventar datos). El validador exige: claves `BASE`, `TAGS`, `FAQS`,
@@ -71,8 +71,8 @@ correccion.
 | evento | fecha_inicio, fecha_fin, edicion, sede, lineup[], agenda[], categorias_entrada[], que_llevar[], prohibido[] |
 
 El contrato exacto lo define
-`.opencode/skills/gemini-research/prompts/GEMINI_MASTER_PROMPT.md` (seccion 6)
-y lo comprueba `.opencode/skills/gemini-research/scripts/validate_ficha.js`.
+`.opencode/prompts/GEMINI_MASTER_PROMPT.md` (seccion 6)
+y lo comprueba `scripts/validate_ficha.js`.
 
 ## Reglas criticas
 
