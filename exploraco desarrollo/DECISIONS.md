@@ -4166,3 +4166,112 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 - (e) La fusion de `exp-pickle-free` en `js-silo-dev` concentra ese dominio en un unico agente: revisar si la carga lo vuelve cuello de botella.
 
 **ADRs relacionados:** ADR-067 (modelo de 3 capas con presupuesto, la ruta hibrida que este ADR retira), ADR-074 (restauracion de la capa gratuita y allowlist verificada, cuyo guard se reescribe aqui), ADR-006 (baseline = archivo real; base de toda la evidencia de este ADR), ADR-002 (ASCII-safe), ADR-048 (esquema tripartito de orquestacion, superado por la ruta unica), ADR-001/ADR-010 (este ADR no toca `api/*`). Tanda: TASKS.md TSK-170. Bugs: BUGS_HISTORICOS.md BUG-034 (CERRADO: canonico en `scripts/validate_ficha.js`), BUG-088 (CERRADO: `AGENTS.md` creado en la raiz el 2026-10-01), BUG-092 (referenciado: su premisa incompleta ya quedo anotada en ADR-074 / BUG-094).
+
+---
+
+## ADR-077: Invariante de composicion con `pfAplicarTab()` -- los wrappers plegables van SIEMPRE dentro del grid y NUNCA llevan `data-tab`
+
+**ID:** ADR-077
+**Fecha:** 2026-10-02
+**Autor:** Documentacion Specialist (AI-DOS), al cerrar documentalmente la tanda de agrupacion de "Mi perfil"
+**Estado:** ACEPTADO E IMPLEMENTADO EN WORKING TREE (2026-10-02); commit PENDIENTE.
+**Nota de numeracion:** el mayor ADR registrado en este documento era ADR-076 (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 077 es el siguiente consecutivo real.
+
+**Problema / Contexto:** ADR-028 introdujo el panel unico de perfil con pestanas, gobernadas por `PF_TABS` + `pfAplicarTab()` en `mi-perfil.html`. Esa funcion **cachea el `display` original de cada bloque UNA sola vez**:
+
+```js
+if (typeof el._pfDisp === 'undefined') el._pfDisp = el.style.display || '';
+el.style.display = on ? el._pfDisp : 'none';
+```
+
+(verificado en el archivo real: `mi-perfil.html:5456` `pfAplicarTab()`, cache en `:5463-5464`; `PF_TABS` en `:5449`). El cache es correcto **para la pestana** (cada bloque `data-tab` tiene su `display` de autor) pero se vuelve **incorrecto en cuanto algo externo escribe `display` en ese subarbol**: si un collapsible con `display:none` queda dentro de un bloque `data-tab` cuando la pestana se activa por primera vez, `_pfDisp` cachea `''` en lugar del valor real, y el bloque reaparece visible al cambiar de pestana. En la tanda de agrupacion plegable (TSK-171) esto no fue teorico: los wrappers `.pf-grupo` con `display:grid|none` alternado inline se cruzaban de lleno con ese cache.
+
+**Opciones evaluadas:**
+1. **Arreglar `pfAplicarTab()`** para que releyera el `display` en cada activacion (o para que ignorara el cache en subarboles con `display` inline). Es el arreglo de raiz, pero cambia el comportamiento de las 8 pestanas de un panel ya en produccion (ADR-028) y obliga a re-auditar `PF_TABS` entero.
+2. **Usar `data-tab` en los wrappers** para que el propio gestor de pestanas los alternara. Descartada: mezcla dos ejes ortogonales (pestana y plegado) en un atributo que ya significa "a que pestana pertenece".
+3. **Acotar la composicion**: no tocar `pfAplicarTab()`, y hacer que **ningun elemento con `display` alternado por JS cuelgue directamente de un bloque `data-tab`**. Adopta la opcion 3.
+
+**Decision tomada (opcion 3) -- regla normativa:**
+1. **`pfAplicarTab()` / `PF_TABS` NO se tocan.** Su cache `_pfDisp` se considera correcto para su proposito y cualquier fallo que produzca debe resolverse **en el consumidor**, no reescribiendo el gestor de pestanas.
+2. **Todo wrapper plegable va SIEMPRE DENTRO del contenedor que reparte los items** (`.pf-museo-grid`, `#mis-guardados-media-grid`, `#pf-niveles`, `#mis-albumes-grid`), nunca como hijo directo de `#profile` ni de un bloque `data-tab`.
+3. **Ningun wrapper plegable lleva `data-tab`.** El atributo queda reservado para los bloques de pestana de primer nivel.
+4. **El `display` del cuerpo plegable se alterna inline** (`grid | none`), no con una clase de CSS que fije `display`. Motivo: (a) el `.pf-grupo-body` necesita ser un grid de `auto-fill` que se recalcula segun `--pf-grupo-col`, y el estado alternado inline es el que el patron ya establecido (`toggleTrofeosBloqueados()`) escribe; (b) mientras el wrapper cuelgue del grid (punto 2), ninguna de las dos formas es cacheable por `_pfDisp`, asi que el inline **no es** lo que evita el fallo -- lo que lo evita es el punto 2. Se deja explicito para que nadie "simplifique" hacia un `display:none` en CSS creyendo que es equivalente.
+5. **Precedente de la regla:** `toggleTrofeosBloqueados()` (`mi-perfil.html:1756`, boton en `:1792`), que ya alternaba `display` inline de tarjetas dentro de un grid. El helper `pfGruposRender()` / `pfGruposToggle()` (`mi-perfil.html:3125-3185`) se construyo sobre ese patron en vez de inventar uno nuevo (sin `details/summary`, sin librerias, ADR-001).
+
+**Justificacion:** la opcion 1 es el arreglo correcto a largo plazo pero es un cambio de comportamiento en la superficie mas usada del perfil (8 pestanas, panel en produccion) a cambio de un sintoma que la composicion correcta evita por construccion. La opcion 3 es la que hace imposible el fallo: mientras el elemento con `display` alternado cuelgue del grid y no del bloque de pestana, el cache de `_pfDisp` sigue viendo el `display` de autor del bloque y no hay nada que colisione. Ademas deja la regla **escribible y verificable** (se comprueba con un grep: ningun `.pf-grupo` con `data-tab` y ningun `.pf-grupo` hijo directo de `#profile`), que es lo que la hace util a cualquier IA futura en lugar de depender de que alguien recuerde el incidente.
+
+**Impacto / superficies:**
+- **`mi-perfil.html`:** silo CSS atomico bajo `#profile` con `.pf-grupo`, `.pf-grupo-abierto`, `.pf-grupo-btn`, `.pf-grupo-flecha`, `.pf-grupo-nombre`, `.pf-grupo-count`, `.pf-grupo-body` (`:611-652`, Regla de Oro 4 / ADR-004). La custom property `--pf-grupo-col` se declara **solo bajo `#profile`** (`:623-625` + media query `:611`) como fuente unica de verdad del ancho de tarjeta, heredada por `.pf-grupo-body`. Helper generico `_pfGruposAbiertos` / `pfGruposToggle()` / `pfGruposRender()` (`:3125-3185`) reutilizado por **4 superficies**: Museo (`:3298-3327`), Guardados (`:2801-2826`), Niveles (`:1582-1671`) y Mis Albumes, que no se agrupa y usa "ver mas" (`:2450-2511`) porque un album no tiene `media_type`. El estado de plegado vive **FUERA del DOM** (indexado `gridId + '|' + clave`) para que los re-renders conserven el grupo abierto; los items ocultos permanecen en el DOM con `display:none` (ADR-003).
+- **`pfAplicarTab()` / `PF_TABS`:** **SIN CAMBIOS** (`:5449`, `:5456-5465`).
+- **`api/*`:** **NO se toca** (8/8 funciones serverless intactas, ADR-001/ADR-010); sin migraciones de BD; sin cambios en produccion. Unico fichero de codigo modificado: `mi-perfil.html`.
+
+**Evidencia (ADR-006, verificada contra el archivo real en este pase):**
+- `mi-perfil.html:5463-5464` -> el cache `if (typeof el._pfDisp === 'undefined') el._pfDisp = el.style.display || '';` y `el.style.display = on ? el._pfDisp : 'none';` existe exactamente como se cita.
+- Ningun wrapper `.pf-grupo` lleva `data-tab`: el markup se emite en `pfGruposRender()` (`:3168-3178`) y solo produce `class="pf-grupo"`, `id="<grid>-grp-<clave>"`, `.pf-grupo-btn` y `.pf-grupo-body`; `PF_TABS` (`:5449`) sigue siendo la lista de 8 pestanas de primer nivel.
+- `node scripts/express_check.js mi-perfil.html` -> **PASS**, divs **563=563**; `smoke_016_multinivel_crowdsourcing.js` **52/52** (D15a: divs de `mi-perfil.html` balanceados, diff 0); `smoke_test_gamificacion_v4.js` **97/97**; `smoke_niveles_data.js` **31/31**; `smoke_042_pasaporte_billetera.js` **OK**.
+- Auditoria `@qa-auditor`: **APTO CON OBSERVACIONES**, 86 aserciones sobre el codigo real en `vm`, **sin perdida de items** (Museo 200/200, Guardados 25/25, Niveles 40/40, Albumes 25/25 con 24 visibles + boton).
+- ASCII (ADR-002): las 308 lineas anadidas tienen **0 bytes > 127 y 0 backticks**; el residuo de 200 bytes > 127 y 4 backticks del fichero completo es preexistente (446/4 en HEAD).
+
+**Consecuencias (positivas):** una regla corta y comprobable con grep que impide una regresion invisible (el sintoma -- un bloque reappearing al cambiar de pestana -- no se ve ni en el smoke ni en la auditoria de sintaxis); no se toca el panel de pestanas mas usado del producto; el helper reutilizable deja el comportamiento de plegado **verificable por asercion en `vm`** sin depender de la UI.
+
+**Consecuencias (negativas / aceptadas):** el sintoma raiz (el cache `_pfDisp` no distingue el `display` de autor del bloque del `display` de un descendiente) **sigue latente**: cualquier futuro collapsible colgado directamente de un bloque `data-tab` lo reproduciria. Dejar la opcion 1 (arreglar `pfAplicarTab()`) anotada como deuda de fondo, pendiente de una auditoria dedicada de las 8 pestanas.
+
+**Deuda / riesgos [DEUDA]:**
+- (a) El cache `_pfDisp` no se corrige; la correccion de raiz queda sin hacer. Si alguna vez se toca `pfAplicarTab()`, hay que re-auditar las 4 superficies de este ADR.
+- (b) Ningun smoke cubre el **cambio de pestana** con un grupo plegado (el fallo que motiva el ADR): la verificacion actual es por codigo (`vm`) + lectura, no end-to-end de UI.
+- (c) El commit esta pendiente; si se edita `mi-perfil.html` hay que revisar que los wrappers sigan dentro del grid (la regla se comprueba con grep, no con un test).
+
+**ADRs relacionados:** ADR-028 (panel unico de perfil con `pfAplicarTab()`/`PF_TABS`, el sistema que este ADR acota), ADR-043 (patron anti-regresion de UI anidada, mismo genero: una trampa de composicion de UI elevada a norma), ADR-004 / Regla de Oro 4 (aislamiento atomico del silo `.pf-grupo` bajo `#profile`), ADR-003 / Regla de Oro 3 (los items ocultos permanecen en el DOM), ADR-001 (vanilla JS, sin `details/summary` ni librerias), ADR-002 (ASCII-safe en todo lo nuevo), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8; este ADR no toca `api/*`). Tanda: TASKS.md TSK-171.
+
+## ADR-078: Permiso total de operacion (`opencode.json` + los 20 agentes) -- la friccion de autorizacion se elimina por configuracion, no por disciplina
+
+**ID:** ADR-078
+**Fecha:** 2026-10-02
+**Autor:** Documentacion Specialist (AI-DOS), al cerrar documentalmente la tanda de optimizacion de agentes y permisos
+**Estado:** ACEPTADO E IMPLEMENTADO EN WORKING TREE (2026-10-02); commit PENDIENTE; **requiere REINICIAR OpenCode para que rija** (punto 5 de la decision).
+**Nota de numeracion:** el mayor ADR registrado en este documento era ADR-077 (verificado con grep `^## ADR-07` sobre el archivo real, ADR-006, linea 4172); 078 es el siguiente consecutivo real. `AGENTS.md` §3 regla 19 **ya citaba "ADR-078" antes de que el ADR existiera**: la regla apuntaba a un hueco. Este ADR le da el contenido al que la regla ya apuntaba.
+
+**Problema / Contexto:** la sesion del 2026-10-02 (TSK-171) consumio **18.028.203 tokens** y el operador tuvo que autorizar, una y otra vez, acciones de rutina del propio flujo (leer un fichero, buscar en la config, trabajar con rutas de `%TEMP%`). La peticion explicita fue: *"no me tenga que pedir permisos de nada"*. El problema no era de seguridad sino de **friccion**: cada autorizacion interrumpe el turno, y el modo `ask` (no `deny`) es el peor de los dos, porque ademas espera una respuesta.
+
+**Causa raiz (verificada en el archivo real, no inferida):** el bloque `permission` de `opencode.json` declaraba **5 claves** y **faltaba `external_directory`**. Esa es exactamente la clave que hace que el runtime pida autorizacion para trabajar con archivos **fuera del repo**, que es donde vive un arnes de QA (`%TEMP%`). En paralelo, **`webfetch` y `websearch` estaban en `deny`** y **19 de los 20** agentes declaraban `webfetch: deny` / `websearch: deny` en su frontmatter, y `free-plan` / `plan` declaraban `bash: ask`. O sea: la friccion no era "el sistema es estricto", era **un hueco de configuracion** mas una capa de `deny` heredada de ADR-067 (que los ponia como defensa en profundidad para forzar que la investigacion web la hiciera Gemini).
+
+**Opciones evaluadas:**
+1. **Dejar la configuracion como estaba y confiar en la disciplina del operador.** Descartada: el permiso es un dialogo por turno; la disciplina no lo elimina, lo retrasa. Ademas el diagnostico de esta tanda demostro que el gasto no era de trabajo sino de turnos repetidos: 8.07M tokens (45%) en un solo subagente.
+2. **Permiso total en todo, incluidos los agentes de solo lectura** (`@explore`, `@plan`, `@free-plan` con `edit: allow`). Descartada por pérdida de gobernanza: `edit: deny` **no pregunta, bloquea**, asi que no genera ni un solo dialogo. Darle `allow` no elimina friccion, elimina un control.
+3. **Permiso total por defecto, y `deny` conservado unicamente donde la restriction bloquea y cumple una funcion de gobernanza.** Adopta la opcion 3.
+
+**Decision tomada (opcion 3) -- regla normativa:**
+1. **`opencode.json` opera con permiso total:** el bloque `permission` pasa de 5 a **14 claves, todas en `allow`** (`read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `question`, `webfetch`, `websearch`, `lsp`, `skill`). Se elimina la friccion de autorizacion en la raiz.
+2. **Los 20 agentes pasan a `webfetch: allow` y `websearch: allow`**; `bash` pasa de `ask` a `allow` en `free-plan` y `plan`. El `deny` web de ADR-067 se levanta: hoy la investigacion web la puede hacer cualquier agente, y la regla que obliga a delegarla en `@research-agent` es una regla de **prompt**, no un permiso.
+3. **Excepcion deliberada, con su motivo escrito:** se conservan **`edit: deny` en `@explore`, `@plan` y `@free-plan`** y **`bash: deny` en `@explore`** (verificado: `explore.md:7-8`, `plan.md:7`, `free-plan.md:7`). El criterio que decide es **"bloquea vs pregunta"**: `deny` no genera dialogo, y en estos tres agentes la restricion ES la separacion de roles de ADR-006/ADR-074 (el que explora informa, el que planifica no escribe, el planificador no implementa). Quitarlas seria perder gobernanza a cambio de nada. Se hace explicito para que una futura tanda de "permiso total, sin excepciones" no las borre sin entender que no sobran.
+4. **El permiso NO es el sitio donde vive la disciplina de no romper cosas.** Con `bash: allow` **sin patrones**, cualquier comando se ejecuta sin confirmar, incluidos los destructivos (`rm`, `git reset --hard`, push). Esto se acepta como **riesgo asumido por peticion explicita del operador**; la mitigacion es que la prohibicion de commit/push sin orden explicita vive en las reglas (`AGENTS.md` §3 y la seccion de cierre de R2 de cada primario), no en el permiso. Si alguna vez se quiere recuperar el freno sin volver al dialogo, el sitio correcto es un **patron de `bash` restrictivo**, no volver a `ask`.
+5. **Friccion operativa que hay que escribir porque no se deduce: opencode carga la configuracion UNA vez al arrancar y NO hace hot-reload.** Los cambios de permisos y de agentes **no rigen hasta reiniciar opencode**. Este es el motivo mas probable del sintoma "lo cambie y sigue pidiendo permiso": el fichero esta bien y el proceso es viejo. Consecuencia de gobernanza: un `AGENTS.md` que documenta permisos debe marcar siempre "requiere REINICIAR OpenCode".
+
+**Justificacion:** el coste de un permiso no es el riesgo que cubre, es el numero de turnos que cuesta. La medida de la tanda lo demuestra: el 91,7% del gasto fue `cache_read` (contexto re-leido), no trabajo nuevo, y el subagente mas caro fue el de verificacion profunda, no el de implementacion. Un dialogo de autorizacion por turno es exactamente el tipo de friccion que convierte una tarea de 15 turnos en una de 102. La opcion 3 elimina los dialogos sin tocar los controles que de verdad separan roles, porque el criterio "bloquea vs pregunta" distingue las dos cosas sin ambigüedad: `ask` siempre es fricción; `deny` es gobernanza.
+
+**Impacto / superficies:**
+- **`opencode.json`:** bloque `permission` en `:7-22`, 14 claves todas en `allow`; `bash: allow` en `:13`, `external_directory: allow` en `:15`, `webfetch`/`websearch` en `:18-19`, `skill` en `:21`. Sin cambios en `model`, `small_model`, `default_agent`, `subagent_depth` ni `compaction`.
+- **`.opencode/agent/` (19 de 20 ficheros):** `webfetch: deny` -> `allow`, `websearch: deny` -> `allow`, `bash: ask` -> `allow` (en `free-plan` y `plan`). **`research-agent.md` NO se modifico** (ya estaba en `allow`): por eso 19 y no 20. Las excepciones del punto 3 quedan dentro de esos 19.
+- **`.opencode/agent/qa-auditor.md`:** nueva seccion **"Presupuesto de turnos (OBLIGATORIO)"** (`:17-31`) con 7 reglas duras y la evidencia medida. **`edit: allow` se mantiene de forma deliberada:** la opcion de ponerlo en `deny` se descarto porque el agente necesita escribir su arnes en `%TEMP%` y con `deny` volveria a pedir autorizacion -- es decir, `deny` aqui si habria generada friccion. La restriccion ("NO corriges codigo") es de prompt, no de permiso.
+- **`AGENTS.md`:** §3 regla 19 (permisos, este ADR), regla 12 (formula de estimacion medida), reglas 17 (presupuesto por dominio) y 18 (higiene de consumo en tools). Corregido el tamano real de `mi-perfil.html` en la regla 10: ~379 KB (decia ~230 KB).
+- **`api/*`:** **NO se toca** (8/8 funciones serverless intactas, ADR-001/ADR-010); sin migraciones de BD; sin cambios en produccion. La tanda es 100% gobernanza de orquestacion + 1 script de test.
+
+**Evidencia (ADR-006, verificada contra los archivos reales en este pase):**
+- `opencode.json:7-22` -> bloque `permission` con **14 claves, todas `allow`**; `external_directory` **existe** (`:15`) y `webfetch`/`websearch` **ya no estan en `deny`**.
+- `.opencode/agent/*.md` = **20** ficheros; conteo real: `webfetch: allow` = **20/20**, `websearch: allow` = **20/20**, `bash: allow` = **19**, `bash: ask` = **0**, `bash: deny` = **1** (solo `explore`), `edit: deny` = **3** (`explore`, `plan`, `free-plan`), `webfetch: deny` = **0**.
+- `git status --porcelain` -> **19** ficheros `.opencode/agent/*.md` modificados (los 19 del punto 2); `research-agent.md` **no aparece**, confirmando que ya estaba en `allow`. `git diff -U0` sobre `.opencode/agent/` -> **19** lineas `- webfetch: deny`, **19** `- websearch: deny`, **19** `+ webfetch: allow` y **2** `- bash: ask` (exactamente `free-plan` y `plan`).
+- `AGENTS.md:71` -> la regla 19 cita `ADR-078`; `AGENTS.md:64` -> regla 12 con la formula (`cache_read` 91,7%, salida de herramientas 0,55%, ~50.000 tokens por turno); `AGENTS.md:69-70` -> reglas 17 y 18; `AGENTS.md:62` -> `mi-perfil.html` a **~379 KB** (medido: 379,2 KB).
+- `qa-auditor.md:7` -> `edit: allow` conservado; `:17-31` -> seccion de presupuesto con las 7 reglas; `:19` -> la evidencia medida (102 turnos x ~70k de contexto acumulado = 8,07M tokens, 45% de la tanda).
+- Tanda previa: **18.028.203 tokens** consumidos por TSK-171/ADR-077; `qa-auditor` **8.066.501** (45%) en **102 turnos**.
+
+**Consecuencias (positivas):** ninguna tarea vuelve a detenerse en un dialogo de autorizacion; el harness de QA puede vivir en `%TEMP%` sin friccion, que es lo que permite convertir la instrumentacion efimera en un script permanente; el reparto `deny`/`allow` queda justificado por un criterio (`bloquea` vs `pregunta`) y no por inercia, asi que es defendible ante cualquier revision.
+
+**Consecuencias (negativas / aceptadas):** (a) **cualquier comando se ejecuta sin confirmar, incluidos los destructivos**; la unica red es la disciplina escrita en las reglas, y una disciplina se puede incumplir en silencio. (b) La proteccion que ADR-067 deposito en `webfetch/websearch: deny` desaparece como defensa en profundidad: la regla "la investigacion web la hace Gemini / `@research-agent`" pasa a depender del prompt. (c) Si `bash: allow` sin patrones mas adelante resulta demasiado abierto, la via de endurecimiento es un **patron restrictivo**, no `ask`: reintroducir `ask` seria devolver la friccion que este ADR elimina.
+
+**Deuda / riesgos [DEUDA]:**
+- (a) **El commit esta pendiente y el reinicio es obligatorio.** Sin reiniciar, los permisos y los agentes nuevos **no rigen** y el sintoma sera "lo cambie y sigue pidiendo permiso". Verificar con `npm run coste:gratis` (`20 | gratis: 20 | de pago: 0`) despues de reiniciar.
+- (b) **No hay patron de `bash` restrictivo.** El endurecimiento futuro, si hiciera falta, es por patron (ver la consecuencia negativa c).
+- (c) **La disciplina de no commit/push sin orden explicita no es verificable por maquina:** vive en el prompt. Si se quiere red mecanica, el sitio es un hook o un script de `pre-push`, no el permiso (que ya esta en `allow` por decision).
+- (d) **No hay forma de hot-reload.** Cada cambio de permisos/agentes exige reiniciar; es el limite operativo asumido.
+
+**ADRs relacionados:** ADR-006 (baseline = archivo real: base de toda la evidencia de este ADR, y la separacion de roles que las excepciones del punto 3 protegen), ADR-074 / ADR-076 (capa gratuita y roster unico, cuyo `AGENTS.md` es donde aterriza la regla 19), ADR-067 (el modelo de 3 capas que **deposito** `webfetch/websearch: deny` como defensa en profundidad; este ADR levanta esa capa), ADR-013 (regla 10 del umbral de lectura, cuyo dato de `mi-perfil.html` se corrige aqui), ADR-010 (presupuesto 8/8; este ADR no toca `api/*`), ADR-002 (ASCII-safe). Tanda: TASKS.md TSK-172.

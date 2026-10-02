@@ -552,7 +552,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-museo-btn.ghost:hover{border-color:var(--gold);color:var(--gold);opacity:1}
 .pf-museo-btn:disabled{opacity:.45;cursor:not-allowed}
 .pf-museo-cont{margin-left:auto;font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.5)}
-.pf-museo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:28px}
+.pf-museo-grid{display:grid;grid-template-columns:repeat(auto-fill,var(--pf-grupo-col,minmax(160px,1fr)));gap:12px;margin-bottom:28px}
 .pf-museo-msg{grid-column:1/-1;color:rgba(255,255,255,.35);font-size:12px;line-height:1.6;text-align:center;padding:18px}
 .pf-museo-badge{position:absolute;top:6px;left:6px;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .pf-museo-badge.pub{background:rgba(34,197,94,.9);color:#052}
@@ -608,7 +608,48 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .mp-picker-el{height:360px;border-radius:var(--r);overflow:hidden}
 .mp-picker-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mp-picker-coords{font-family:monospace;font-size:11px;color:var(--muted);flex:1;min-width:160px}
-@media (max-width:600px){.pf-museo-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.mp-picker-el{height:280px}}
+@media (max-width:600px){#profile .pf-museo-grid{--pf-grupo-col:minmax(130px,1fr)}.mp-picker-el{height:280px}}
+/* ---- T8/T9 (ADR-039 / ADR-040): CABECERAS DE GRUPO (pfGruposRender) -------
+   Silos atomicos: #profile + .pf-grupo (Regla de Oro 4 / ADR-004).
+   Los tres anfitriones (.pf-museo-grid, #mis-guardados-media-grid y
+   #pf-niveles) ya no reparten tarjetas: sus hijos directos son wrappers
+   .pf-grupo. Por eso .pf-grupo se estira a todo el ancho (grid-column dentro
+   de los grids, width dentro del flex column de #pf-niveles) y el reparto en
+   columnas pasa a .pf-grupo-body, que hereda de su anfitrion el ancho de
+   tarjeta en --pf-grupo-col: una unica fuente de verdad y el ritmo entre
+   grupos lo sigue gobernando el gap del anfitrion. NO se declara display en
+   .pf-grupo-body: lo alterna inline pfGruposToggle() (grid | none). */
+#profile .pf-grupo{width:100%;min-width:0;grid-column:1/-1;margin:0}
+#profile .pf-museo-grid{--pf-grupo-col:minmax(160px,1fr)}
+#profile #mis-guardados-media-grid{--pf-grupo-col:minmax(140px,1fr)}
+#profile #pf-niveles{--pf-grupo-col:1fr}
+/* Ganchos JS de "ver mas" en Albumes: el peso visual vive en estilos inline
+   (patron de toggleTrofeosBloqueados) y el inline gana, asi que el silo solo
+   aporta lo que el inline no puede dar: anillo de foco por teclado y cursor. */
+#profile .pf-ver-mas:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#profile .pf-album-card{cursor:pointer}
+#profile .pf-album-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#profile .pf-grupo-btn{display:flex;align-items:center;gap:9px;width:100%;min-height:34px;padding:8px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-left:3px solid transparent;border-radius:8px;color:rgba(255,255,255,.7);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.9px;line-height:1.2;text-align:left;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+/* El hover no toca border-color: el borde izquierdo es el canal del estado
+   abierto y hover no debe apagarlo (misma especificidad, gana el posterior). */
+#profile .pf-grupo-btn:hover{background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,74,0,.3);color:#fff}
+#profile .pf-grupo-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#profile .pf-grupo-flecha{flex-shrink:0;font-size:10px;line-height:1;color:rgba(255,255,255,.45);transition:color .2s}
+#profile .pf-grupo-nombre{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#profile .pf-grupo-count{flex-shrink:0;font-family:'Outfit',sans-serif;font-size:10px;font-weight:600;letter-spacing:0;color:rgba(255,255,255,.35)}
+/* Estado abierto que no depende del color: el glifo ya lo reescribe el JS,
+   aqui sumamos rail dorado, fondo tintado y flecha en color de marca. */
+#profile .pf-grupo-abierto>.pf-grupo-btn{background:rgba(255,74,0,.08);border-color:rgba(255,74,0,.28);border-left-color:var(--gold);color:#fff}
+#profile .pf-grupo-abierto .pf-grupo-flecha{color:var(--gold)}
+#profile .pf-grupo-abierto .pf-grupo-count{color:rgba(255,255,255,.6)}
+/* Giro de apertura: corre una sola vez al abrir y aterriza en 0 grados, que es
+   el glifo que escribe pfGruposToggle(). Girar de forma permanente partiria el
+   estado cerrado y abierto. */
+#profile .pf-grupo-abierto>.pf-grupo-btn .pf-grupo-flecha{animation:pfGrupoGiro .18s ease-out}
+@keyframes pfGrupoGiro{from{transform:rotate(-90deg)}to{transform:rotate(0)}}
+#profile .pf-grupo-body{grid-template-columns:repeat(auto-fill,var(--pf-grupo-col,minmax(160px,1fr)));gap:12px;margin-top:8px}
+#profile #pf-niveles .pf-grupo-body{gap:6px}
+@media (prefers-reduced-motion:reduce){#profile .pf-grupo-flecha{transition:none}#profile .pf-grupo-abierto>.pf-grupo-btn .pf-grupo-flecha{animation:none}}
 /* ---- Gaming v6.1 (Fase 4): cartas, moneda, contratos, hoja de vida ----
    Silo atomico: todo cuelga de .pf-v61 (ADR-004). */
 .pf-v61 .v61-note{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;margin:-4px 0 10px}
@@ -1534,6 +1575,83 @@ function nivelHeadKey(ev, n) {
   }
 }
 
+/* AGRUPACION POR ERA (misma convencion que MUSEO_GRUPOS y GUARDADOS_GRUPOS:
+   orden fijo declarado + reuso del helper generico pfGruposRender, que ya
+   aporta markup, flecha y estado en _pfGruposAbiertos). El orden va de menor a
+   mayor progreso porque el recorrido del usuario es lineal. */
+var NIVELES_ERAS = [
+  { clave: 'Caminante', etiqueta: 'Caminantes' },
+  { clave: 'Explorador', etiqueta: 'Exploradores' },
+  { clave: 'Cronista', etiqueta: 'Cronistas' },
+  { clave: 'Leyenda', etiqueta: 'Leyendas' },
+  { clave: 'Mito', etiqueta: 'Mitos' }
+];
+
+/* Clave de grupo de un nivel: su era. Sin era, o con una era que no esta en
+   NIVELES_ERAS, cae en 'Caminante' (mismo criterio que guardadosGrupoClave:
+   peor un nivel en el primer grupo que un nivel invisible). */
+function nivelesGrupoClave(l) {
+  var e = String((l && l.era) || '');
+  var existe = NIVELES_ERAS.some(function(g){ return g.clave === e; });
+  return existe ? e : 'Caminante';
+}
+
+function nivelItemHTML(l, cur, curIdx) {
+  var idx = XP_LEVELS.indexOf(l);
+  var n = idx + 1;
+  var actual = l.min === cur.min;
+  var desbloqueado = idx < curIdx;
+  var bloqueado = idx > curIdx;
+  var cls = actual ? ' actual' : (bloqueado ? ' bloqueado' : ' desbloqueado');
+  var estado = actual ? 'actual' : (bloqueado ? 'bloqueado' : 'desbloqueado');
+  var badgeHtml = '';
+  if(actual) badgeHtml = '<span class="nivel-badge">NIVEL ACTUAL</span>';
+  else if(desbloqueado) badgeHtml = '<span class="nivel-badge unlocked">\u2713</span>';
+  else badgeHtml = '<span class="nivel-badge locked">\uD83D\uDD12</span>';
+  var abierto = _nivelesAbiertos.hasOwnProperty(n) ? _nivelesAbiertos[n] : actual;
+  var rangeMax = l.max >= 99999 ? '\u221E' : fmtXp(l.max);
+  return '<div class="nivel-item' + cls + (abierto ? ' expanded' : '') + '" data-nivel="' + n + '">'
+    + '<div class="nivel-head" role="button" tabindex="0" aria-expanded="' + (abierto ? 'true' : 'false') + '"'
+      + ' aria-controls="nivel-detail-' + n + '"'
+      + ' onclick="toggleNivelDetalle(' + n + ')"'
+      + ' onkeydown="nivelHeadKey(event,' + n + ')">'
+      + '<span class="nivel-num">' + n + '</span>'
+      + '<span class="nivel-emoji">' + l.emoji + '</span>'
+      + '<div class="nivel-body">'
+        + '<div class="nivel-nombre">' + l.nombre + '</div>'
+        + '<div class="nivel-era">' + (l.era || '') + '</div>'
+        + '<div class="nivel-meta">Umbral: ' + fmtXp(l.min) + ' \u2013 ' + rangeMax + ' XP</div>'
+      + '</div>'
+      + badgeHtml
+      + '<span class="nivel-caret" aria-hidden="true">\u25BE</span>'
+    + '</div>'
+    + '<div class="nivel-detail" id="nivel-detail-' + n + '" role="region" aria-label="Detalle del nivel ' + n + '">'
+      + nivelDetalleHTML(n, l, estado)
+    + '</div>'
+    + '</div>';
+}
+
+/* --- AUTO-APERTURA DEL GRUPO DEL NIVEL ACTUAL (correccion QA) ---
+   Antes de agrupar por era, el nivel actual ya aparecia expandido (.expanded
+   en nivelItemHTML). Con los grupos plegados por defecto quedaba escondido
+   tras 5 cabeceras cerradas: regresion de producto. Aqui se abre el grupo del
+   nivel actual en el PRIMER render, y otra vez solo si el nivel actual entra
+   en otra era (subio de nivel). El veto es explicito del usuario: si pulso
+   esa cabecera, pfGruposToggle deja un booleano en _pfGruposAbiertos y un
+   re-render ya no lo sobreescribe. No se toca _nivelesAbiertos, asi que abrir
+   el grupo NO fuerza a expandir los demas niveles del acordeon. */
+var _pfNivelesGrupoAuto = '';
+function pfNivelesAutoAbrirGrupo(cur, curIdx) {
+  if (!cur || curIdx < 0) return;              // sin nivel actual detectable: no abrir nada
+  var clave = nivelesGrupoClave(cur);          // misma clave que usa el agrupamiento
+  if (clave === _pfNivelesGrupoAuto) return;   // ya se auto-abrio: manda el estado del usuario
+  _pfNivelesGrupoAuto = clave;
+  var k = 'pf-niveles|' + clave;
+  var est = _pfGruposAbiertos[k];
+  if (est === true || est === false) return;  // el usuario ya decidio sobre esa era
+  _pfGruposAbiertos[k] = true;
+}
+
 function renderNiveles(st) {
   var el = document.getElementById('pf-niveles');
   if(!el) return;
@@ -1541,39 +1659,15 @@ function renderNiveles(st) {
   var cur = getLevel(st.xp);
   var curIdx = XP_LEVELS.indexOf(cur);
   setText('pf-level-num', 'Nivel ' + (curIdx+1) + ' de ' + XP_LEVELS.length);
-  el.innerHTML = XP_LEVELS.map(function(l, idx){
-    var n = idx + 1;
-    var actual = l.min === cur.min;
-    var desbloqueado = idx < curIdx;
-    var bloqueado = idx > curIdx;
-    var cls = actual ? ' actual' : (bloqueado ? ' bloqueado' : ' desbloqueado');
-    var estado = actual ? 'actual' : (bloqueado ? 'bloqueado' : 'desbloqueado');
-    var badgeHtml = '';
-    if(actual) badgeHtml = '<span class="nivel-badge">NIVEL ACTUAL</span>';
-    else if(desbloqueado) badgeHtml = '<span class="nivel-badge unlocked">\u2713</span>';
-    else badgeHtml = '<span class="nivel-badge locked">\uD83D\uDD12</span>';
-    var abierto = _nivelesAbiertos.hasOwnProperty(n) ? _nivelesAbiertos[n] : actual;
-    var rangeMax = l.max >= 99999 ? '\u221E' : fmtXp(l.max);
-    return '<div class="nivel-item' + cls + (abierto ? ' expanded' : '') + '" data-nivel="' + n + '">'
-      + '<div class="nivel-head" role="button" tabindex="0" aria-expanded="' + (abierto ? 'true' : 'false') + '"'
-        + ' aria-controls="nivel-detail-' + n + '"'
-        + ' onclick="toggleNivelDetalle(' + n + ')"'
-        + ' onkeydown="nivelHeadKey(event,' + n + ')">'
-        + '<span class="nivel-num">' + n + '</span>'
-        + '<span class="nivel-emoji">' + l.emoji + '</span>'
-        + '<div class="nivel-body">'
-          + '<div class="nivel-nombre">' + l.nombre + '</div>'
-          + '<div class="nivel-era">' + (l.era || '') + '</div>'
-          + '<div class="nivel-meta">Umbral: ' + fmtXp(l.min) + ' \u2013 ' + rangeMax + ' XP</div>'
-        + '</div>'
-        + badgeHtml
-        + '<span class="nivel-caret" aria-hidden="true">\u25BE</span>'
-      + '</div>'
-      + '<div class="nivel-detail" id="nivel-detail-' + n + '" role="region" aria-label="Detalle del nivel ' + n + '">'
-        + nivelDetalleHTML(n, l, estado)
-      + '</div>'
-      + '</div>';
-  }).join('');
+  /* Los grupos envuelven el acordeon por nivel, no lo sustituyen: abrir un
+     grupo solo muestra sus .nivel-item, y cada nivel sigue plegado hasta que
+     el usuario pulse su cabecera (toggleNivelDetalle). El estado de cada nivel
+     vive en _nivelesAbiertos y el de cada grupo en _pfGruposAbiertos, asi que
+     un re-render (p.ej. al cargar misiones) conserva ambos. */
+  pfNivelesAutoAbrirGrupo(cur, curIdx);
+  el.innerHTML = pfGruposRender('pf-niveles', XP_LEVELS, nivelesGrupoClave, NIVELES_ERAS, function(l){
+    return nivelItemHTML(l, cur, curIdx);
+  });
 }
 
 /* ---- BADGES ---- */
@@ -2347,6 +2441,75 @@ function cargarCromos(uid) {
 }
 
 /* ---- MIS ALBUMES (ADR-017) ---- */
+/* "Ver mas": solo se pintan los primeros MIS_ALBUMES_VER_MAS albums y el resto
+   queda oculto tras un boton, replicando el patron de
+   toggleTrofeosBloqueados(). El estado vive FUERA del DOM a proposito: crear
+   o borrar un album vuelve a llamar cargarMisAlbumes() y, si el estado
+   estuviera en el marcado, cada recarga le devolveria al usuario los 24
+   primeros. Con 24 o menos no se pinta el boton. */
+var MIS_ALBUMES_VER_MAS = 24;
+var misAlbumesVerMas = { expandido: false };
+
+function misAlbumesBoton(total) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'mis-albumes-ver-mas';
+  b.className = 'pf-ver-mas';
+  b.style.cssText = 'grid-column:1/-1;margin-top:10px;padding:8px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.55);font-size:11px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;text-transform:uppercase;letter-spacing:.6px;';
+  b.textContent = misAlbumesVerMas.expandido
+    ? 'Ver menos \u00E1lbumes'
+    : 'Ver m\u00E1s \u00E1lbumes (+' + (total - MIS_ALBUMES_VER_MAS) + ')';
+  b.onclick = misAlbumesToggleVerMas;
+  return b;
+}
+
+function misAlbumesToggleVerMas() {
+  var grid = document.getElementById('mis-albumes-grid');
+  if (!grid) return;
+  misAlbumesVerMas.expandido = !misAlbumesVerMas.expandido;
+  var cards = grid.getElementsByClassName('pf-album-card');
+  for (var i = MIS_ALBUMES_VER_MAS; i < cards.length; i++) {
+    cards[i].style.display = misAlbumesVerMas.expandido ? '' : 'none';
+  }
+  var btn = document.getElementById('mis-albumes-ver-mas');
+  if (btn) {
+    btn.textContent = misAlbumesVerMas.expandido
+      ? 'Ver menos \u00E1lbumes'
+      : 'Ver m\u00E1s \u00E1lbumes (+' + (cards.length - MIS_ALBUMES_VER_MAS) + ')';
+  }
+}
+
+function misAlbumesPintar(lista) {
+  var grid = document.getElementById('mis-albumes-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  var ocultos = lista.length - MIS_ALBUMES_VER_MAS;
+  if (ocultos <= 0) misAlbumesVerMas.expandido = false;
+  lista.forEach(function(a, i) {
+    var card = document.createElement('div');
+    card.className = 'pf-album-card';
+    card.style.cssText = 'border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:transform .2s;';
+    /* Sin borrar tarjetas: las que exceden el corte quedan en el DOM con
+       display:none (ADR-003) para que el toggle solo tenga que mostrar u
+       ocultar. */
+    if (i >= MIS_ALBUMES_VER_MAS && !misAlbumesVerMas.expandido) card.style.display = 'none';
+    card.onmouseenter = function(){ card.style.transform = 'translateY(-2px)'; };
+    card.onmouseleave = function(){ card.style.transform = 'none'; };
+    var portada = a.portada_url
+      ? '<img src="' + esc(a.portada_url) + '" style="width:100%;height:140px;object-fit:cover;" loading="lazy" onerror="this.style.background=\'rgba(255,255,255,.06)\';this.style.display=\'none\'">'
+      : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#FF4A00,#D4790E);display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F5BC;</div>';
+    card.innerHTML = portada
+      + (a.lat && a.lng ? '' : '<div style="margin:8px 8px 0;display:inline-block;padding:5px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px dashed rgba(245,158,11,.35);color:#F59E0B;font-size:10px;font-weight:600;">&#x26A0; Sin mapa</div>')
+      + '<div style="padding:10px;">'
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#fff;">' + esc(a.titulo) + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.4);">' + (a.fotos_count || 0) + ' fotos &#x2022; ' + (a.votos_count || 0) + ' &#x2B50;</div>'
+      + '</div>';
+    card.onclick = function(){ verDetalleAlbum(a.id); };
+    grid.appendChild(card);
+  });
+  if (ocultos > 0) grid.appendChild(misAlbumesBoton(lista.length));
+}
+
 function cargarMisAlbumes() {
   if (!window.ExploraCO || !window.ExploraCO.usuario) return;
   var uid = window.ExploraCO.usuario.id;
@@ -2361,24 +2524,7 @@ function cargarMisAlbumes() {
         grid.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px;grid-column:1/-1;">Aun no tienes albumes. Crea uno para empezar a coleccionar!</p>';
         return;
       }
-      grid.innerHTML = '';
-      data.data.forEach(function(a) {
-        var card = document.createElement('div');
-        card.style.cssText = 'border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:transform .2s;';
-        card.onmouseenter = function(){ card.style.transform = 'translateY(-2px)'; };
-        card.onmouseleave = function(){ card.style.transform = 'none'; };
-        var portada = a.portada_url
-          ? '<img src="' + esc(a.portada_url) + '" style="width:100%;height:140px;object-fit:cover;" loading="lazy" onerror="this.style.background=\'rgba(255,255,255,.06)\';this.style.display=\'none\'">'
-          : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#FF4A00,#D4790E);display:flex;align-items:center;justify-content:center;font-size:32px;">&#x1F5BC;</div>';
-        card.innerHTML = portada
-          + (a.lat && a.lng ? '' : '<div style="margin:8px 8px 0;display:inline-block;padding:5px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px dashed rgba(245,158,11,.35);color:#F59E0B;font-size:10px;font-weight:600;">&#x26A0; Sin mapa</div>')
-          + '<div style="padding:10px;">'
-          + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#fff;">' + esc(a.titulo) + '</div>'
-          + '<div style="font-size:12px;color:rgba(255,255,255,.4);">' + (a.fotos_count || 0) + ' fotos &#x2022; ' + (a.votos_count || 0) + ' &#x2B50;</div>'
-          + '</div>';
-        card.onclick = function(){ verDetalleAlbum(a.id); };
-        grid.appendChild(card);
-      });
+      misAlbumesPintar(data.data);
     })
     .catch(function() {
       grid.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px;">No se pudieron cargar los albumes.</p>';
@@ -2651,7 +2797,33 @@ var misFiltroAlbumNuevo = false;
 
 /* Una sola tarjeta de guardado (Regla de No-Duplicidad). */
 function misGuardadoCard(m) { return mediaCardHTML(m, { quitar: true, clickable: true }); }
-function misRenderListaGuardados(lista) { return lista.map(misGuardadoCard).join(''); }
+
+/* Orden fijo de grupos de Guardados (misma convencion que MUSEO_GRUPOS y
+   mismo helper generico pfGruposRender: mismo markup y mismo estado en
+   _pfGruposAbiertos). El helper solo pinta los grupos con items. */
+var GUARDADOS_GRUPOS = [
+  { clave: 'album', etiqueta: '\u00C1lbumes guardados' },
+  { clave: 'album_foto', etiqueta: 'Fotos de tus \u00E1lbumes' },
+  { clave: 'viajero_foto', etiqueta: 'Fotos de viajeros' },
+  { clave: 'curada', etiqueta: 'Galeria oficial' }
+];
+
+/* Clave de grupo de un guardado: su fuente canonica. Lo desconocido cae a
+   'curada' (mismo criterio que museoGrupoClave: peor un grupo generico que
+   un item invisible). */
+function guardadosGrupoClave(m) {
+  var f = String((m && m.fuente) || '');
+  var existe = GUARDADOS_GRUPOS.some(function(g){ return g.clave === f; });
+  return existe ? f : 'curada';
+}
+
+/* Agrupa por fuente DESPUES de filtrar por chip: el filtro (cfg.filtro de
+   cargarMediaGrid y misSetFiltroGuardados) no sabe de grupos, asi que al
+   cambiar de chip la agrupacion se repinta con los items ya filtrados y los
+   grupos que se quedan vacios ni siquiera se crean. */
+function misRenderListaGuardados(lista) {
+  return pfGruposRender('mis-guardados-media-grid', lista, guardadosGrupoClave, GUARDADOS_GRUPOS, misGuardadoCard);
+}
 function misFiltrarGuardados(lista) {
   if (!misGuardadosFiltro) return lista;
   if (misGuardadosFiltro === '__sin__') return lista.filter(function(m){ return !m.mi_album_id; });
@@ -2950,6 +3122,68 @@ function misBindGridGuardados() {
   });
 }
 
+/* --- GRUPOS PLEGABLES (helper generico reutilizable) ---
+   Agrupa una lista de items en wrappers con cabecera-boton y guarda el
+   plegado en _pfGruposAbiertos, indexado por grid+clave. El estado vive FUERA
+   del DOM a proposito: los re-renders (publicar, mover, eliminar) repintan el
+   grid y deben reaplicar los mismos grupos abiertos, o el usuario pierde el
+   grupo que estaba leyendo y su scroll. Todo arranca plegado.
+   Uso: pfGruposRender(gridId, items, claveDe, grupos, itemHTML). */
+var _pfGruposAbiertos = {};
+
+function pfGruposToggle(gridId, clave) {
+  var wrap = document.getElementById(gridId + '-grp-' + clave);
+  if (!wrap) return;
+  var abierto = !wrap.classList.contains('pf-grupo-abierto');
+  wrap.classList.toggle('pf-grupo-abierto', abierto);
+  _pfGruposAbiertos[gridId + '|' + clave] = abierto;
+  var btn = wrap.querySelector('.pf-grupo-btn');
+  if (btn) btn.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+  var flecha = wrap.querySelector('.pf-grupo-flecha');
+  if (flecha) flecha.textContent = abierto ? '\u25BE' : '\u25B8';
+  var body = wrap.querySelector('.pf-grupo-body');
+  if (body) body.style.display = abierto ? 'grid' : 'none';
+}
+
+function pfGruposRender(gridId, items, claveDe, grupos, itemHTML) {
+  var grid = document.getElementById(gridId);
+  if (!grid) return '';
+  items = items || [];
+  itemHTML = itemHTML || function(it){ return ''; };
+  /* Copia del orden declarado + las claves no previstas al final: si el
+     llamador olvida un tipo, sus items se agrupan igual y no se pierden. */
+  var orden = (grupos || []).slice(0);
+  items.forEach(function(it){
+    var k = claveDe(it);
+    var yaEsta = orden.some(function(g){ return g.clave === k; });
+    if (!yaEsta) orden.push({ clave: k, etiqueta: k });
+  });
+  var html = '';
+  orden.forEach(function(g){
+    var sub = items.filter(function(it){ return claveDe(it) === g.clave; });
+    if (!sub.length) return;
+    var wrapId = gridId + '-grp-' + g.clave;
+    var bodyId = gridId + '-body-' + g.clave;
+    var abierto = _pfGruposAbiertos[gridId + '|' + g.clave] === true;
+    html += '<div class="pf-grupo' + (abierto ? ' pf-grupo-abierto' : '') + '" id="' + wrapId + '">'
+      + '<button type="button" class="pf-grupo-btn" aria-expanded="' + (abierto ? 'true' : 'false') + '"'
+      + ' aria-controls="' + bodyId + '"'
+      + ' onclick="pfGruposToggle(\'' + esc(gridId) + '\',\'' + esc(g.clave) + '\')">'
+      + '<span class="pf-grupo-flecha" aria-hidden="true">' + (abierto ? '\u25BE' : '\u25B8') + '</span>'
+      + '<span class="pf-grupo-nombre">' + esc(g.etiqueta) + '</span>'
+      + '<span class="pf-grupo-count">\u00B7 ' + sub.length + '</span>'
+      + '</button>'
+      + '<div class="pf-grupo-body" id="' + bodyId + '" style="display:' + (abierto ? 'grid' : 'none') + '">'
+      + sub.map(itemHTML).join('')
+      + '</div></div>';
+  });
+  /* UNA sola fuente de verdad: el helper DEVUELVE el html y no toca el DOM,
+     porque sus 3 llamadores lo pintan y Guardados necesita el string para el
+     caso vacio del filtro de chips. Escribir aqui ademas duplicaba el
+     innerHTML en cada render. */
+  return html;
+}
+
 /* ==== T5/T7 (ADR-039): GESTION DEL MUSEO MULTIMEDIA =====================
    Vista de dueno: GET tipo=museo_recurso con JWT (incluye privados) y POST
    tipo=museo_recurso (crear/editar/eliminar). Reutiliza mediaCardHTML
@@ -3061,6 +3295,23 @@ function museoAccionesHTML(m) {
     + '</div></div>';
 }
 
+/* Orden fijo de grupos del Museo; el helper solo pinta los que tienen items. */
+var MUSEO_GRUPOS = [
+  { clave: 'foto', etiqueta: 'Fotos' },
+  { clave: 'video', etiqueta: 'Videos' },
+  { clave: 'audio', etiqueta: 'Audios' }
+];
+
+/* Clave de grupo de un recurso: el backend escribe el tipo en distintos
+   campos segun la version, asi que se lee cualquiera de los tres y todo lo
+   desconocido cae a 'foto' (mejor un grupo generico que item invisible). */
+function museoGrupoClave(m) {
+  var t = String(m.media_type || m.foto_type || m.tipo_media || '').toLowerCase();
+  if (t.indexOf('video') !== -1) return 'video';
+  if (t.indexOf('audio') !== -1) return 'audio';
+  return 'foto';
+}
+
 function museoRenderRecursos(items) {
   var grid = document.getElementById('museo-recursos-grid');
   if (!grid) return;
@@ -3068,12 +3319,12 @@ function museoRenderRecursos(items) {
     museoGridMensaje('Aun no tienes recursos. Usa "Subir recurso" con un link https://.');
     return;
   }
-  grid.innerHTML = items.map(function(m){
+  grid.innerHTML = pfGruposRender('museo-recursos-grid', items, museoGrupoClave, MUSEO_GRUPOS, function(m){
     var badge = (m.visible === true)
       ? '<span class="pf-museo-badge pub">Publico</span>'
       : '<span class="pf-museo-badge priv">Privado</span>';
     return mediaCardHTML(m, { badgeHtml: badge, accionesHtml: museoAccionesHTML(m) });
-  }).join('');
+  });
 }
 
 /* --- Localizacion (T7): map-picker.js compartido --- */
