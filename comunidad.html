@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="mapa-cultural.css?v=8">
+<link rel="stylesheet" href="mapa-cultural.css?v=9">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -587,21 +587,30 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
       <div id="lb-list"></div>
     </div>
 
-    <!-- MAPA AUDIOVISUAL -->
+    <!-- MAPA UNIFICADO (T3) -->
+    <!-- Un SOLO mapa y UNA SOLO instancia Leaflet en esta pestana: la crea el
+         motor compartido mapa-cultural.js desde mymapa.js sobre
+         #av-map-container (data-cm-mapa="1"). Los destinos del mapa personal
+         y la media audiovisual se pintan en esa misma capa, con iconos
+         distintos por fuente. Los chips de categoria filtran solo los
+         destinos; los botones de media filtran solo la multimedia. -->
     <div class="cpanel" id="cpanel-mapa">
-      <!-- Mis mapas personalizados (modulo compartido mymapa.js) -->
-      <div class="mmx-card"><div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">＋ Nuevo</button></div><div class="mmx-pills" id="mm-personal-pills"></div><div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div><div class="mmx-cats" id="mm-personal-cats"><button type="button" class="mmx-cbtn on" data-cat="all">Todos</button><button type="button" class="mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button><button type="button" class="mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button><button type="button" class="mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button><button type="button" class="mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button><button type="button" class="mmx-cbtn" data-cat="visitados">&#x2713; Visitados</button></div><div id="mm-personal-map" style="height:340px;border-radius:10px;overflow:hidden;background:#222"></div><div class="mmx-list" id="mm-personal-list"></div></div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
-        <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>
-        <button class="mapa-filtro" data-tipo="video" onclick="filtrarMapaAV(this,'video')">&#x25B6; Videos</button>
-        <button class="mapa-filtro" data-tipo="audio" onclick="filtrarMapaAV(this,'audio')">&#x266B; Audio</button>
-        <button class="mapa-filtro" data-vista="albumes" onclick="toggleVistaAlbumes(this)">&#x1F4DA; Álbumes</button>
+      <div class="mmx-card">
+        <div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">&#xFF0B; Nuevo</button></div>
+        <div class="mmx-pills" id="mm-personal-pills"></div>
+        <div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div>
+        <div class="mmx-cats" id="mm-personal-cats"><button type="button" class="mmx-cbtn on" data-cat="all">Todos</button><button type="button" class="mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button><button type="button" class="mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button><button type="button" class="mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button><button type="button" class="mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button><button type="button" class="mmx-cbtn" data-cat="visitados">&#x2713; Visitados</button></div>
+        <div class="cmx-filtros">
+          <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
+          <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>
+          <button class="mapa-filtro" data-tipo="video" onclick="filtrarMapaAV(this,'video')">&#x25B6; Videos</button>
+          <button class="mapa-filtro" data-tipo="audio" onclick="filtrarMapaAV(this,'audio')">&#x266B; Audio</button>
+          <button class="mapa-filtro" data-vista="albumes" onclick="toggleVistaAlbumes(this)">&#x1F4DA; &#xC1;lbumes</button>
+        </div>
+        <div id="av-map-container" class="cmx-mapa" data-cm-mapa="1"></div>
+        <p class="cmx-pie">Gota de color = destino de tu mapa personal &#xB7; Circulo = multimedia de la comunidad en ese punto</p>
+        <div class="mmx-list" id="mm-personal-list"></div>
       </div>
-      <div id="av-map-container" style="height:500px;width:100%;border-radius:12px;overflow:hidden;background:#2a2a2a"></div>
-      <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:6px;text-align:center">
-        Multimedia compartida por la comunidad en puntos del mapa
-      </p>
     </div>
 
     <!-- PANDILLAS (Gamificacion v4) -->
@@ -735,10 +744,10 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
-<script src="mapa-cultural.js?v=11"></script>
+<script src="mapa-cultural.js?v=12"></script>
 <script src="media-actions.js"></script>
-<script src="mymapa.js?v=5"></script>
-<script src="mercado.js?v=1"></script>
+<script src="mymapa.js?v=7"></script>
+<script src="mercado.js?v=2"></script>
 <script>
 /* =============================================================
    COMUNIDAD LATAWEL — hub de interaccion social
@@ -2047,8 +2056,38 @@ var _avVista = 'sueltos';
 
 function initAudiovisualMap() {
   if (_avMap) return;
+  /* T3 (mapa unificado): la UNICA instancia Leaflet de esta pestana la crea
+     el motor compartido (mapa-cultural.js) desde mymapa.js sobre
+     #av-map-container, que ahora es data-cm-mapa. Aqui solo se engancha el
+     estado heredado _avMap para poder invalidateSize(); NO se crea un segundo
+     mapa ni una segunda capa de tiles. */
+  if (window.MyMap && typeof window.MyMap.getMap === 'function' && window.MyMap.getMap()) {
+    _avMap = window.MyMap.getMap();
+    return;
+  }
+  /* MyMap todavia no esta listo (init asincrono o pestana diferida): se
+     reintenta un numero acotado de veces ANTES de degradar, porque el unico
+     mapa de esta pestana es el suyo y no se puede robarle el contenedor. */
+  var intentos = initAudiovisualMap.intentos || 0;
+  if (window.MyMap && intentos < 10) {
+    initAudiovisualMap.intentos = intentos + 1;
+    setTimeout(initAudiovisualMap, 120);
+    return;
+  }
+  var avCont = document.getElementById('av-map-container');
+  if (!avCont) return;
+  /* Degradacion real: solo si NADIE inicializo el contenedor. La guarda
+     _leaflet_id es la proteccion estandar de Leaflet contra doble init y es
+     la unica que hace cumplir el invariante "un solo mapa": si ya hay una
+     instancia viva se abandona esta rama en vez de crear una segunda. */
+  if (avCont._leaflet_id) {
+    var yaVivo = (window.MyMap && typeof window.MyMap.getMap === 'function')
+      ? window.MyMap.getMap() : null;
+    if (yaVivo) _avMap = yaVivo; // nunca se sobreescribe _avMap aqui
+    return;
+  }
   if (typeof L === 'undefined') {
-    document.getElementById('av-map-container').innerHTML = '<p style="padding:40px;text-align:center;color:rgba(255,255,255,.3)">Cargando mapa\u2026</p>';
+    avCont.innerHTML = '<p style="padding:40px;text-align:center;color:rgba(255,255,255,.3)">Cargando mapa\u2026</p>';
     return;
   }
   _avMap = L.map('av-map-container').setView([4.6, -74.1], 6);
@@ -2085,12 +2124,23 @@ function filtrarMapaAV(btn, tipo) {
     _avTiposActivos[tipo] = !_avTiposActivos[tipo];
   }
   syncMapaFiltrosUI();
+  /* T3: con mapa unificado la capa multimedia vive en el motor compartido y
+     mymapa.js es su unico escritor. El filtro por tipo se aplica sobre ESA
+     capa; los pines del mapa personal no se tocan. */
+  if (window.MyMap && typeof window.MyMap.setMediaTipos === 'function' && window.MyMap.getMap()) {
+    window.MyMap.setMediaTipos(_avTiposActivos);
+    return;
+  }
   loadMultimediaMapa();
 }
 
 function toggleVistaAlbumes(btn) {
   _avVista = (_avVista === 'albumes') ? 'sueltos' : 'albumes';
   if (btn) btn.classList.toggle('active', _avVista === 'albumes');
+  if (window.MyMap && typeof window.MyMap.setMediaVista === 'function' && window.MyMap.getMap()) {
+    window.MyMap.setMediaVista(_avVista);
+    return;
+  }
   loadMultimediaMapa();
 }
 
@@ -2107,6 +2157,15 @@ function syncMapaFiltrosUI() {
 }
 
 function loadMultimediaMapa() {
+  /* T3: con el mapa unificado NO hay segundo fetch ni segunda capa de pines.
+     mymapa.js carga la MISMA fuente (/api/interacciones?tipo=multimedia_mapa,
+     con scope=mio si hay sesion) y la pinta en la capa del motor
+     compartido; este fetch queda solo como degradacion si el modulo no
+     esta disponible. */
+  if (window.MyMap && typeof window.MyMap.refrescarMedia === 'function' && window.MyMap.getMap()) {
+    window.MyMap.refrescarMedia();
+    return;
+  }
   // Sin tipos activos: no se dispara fetch con lista vacia; se deja la
   // capa visible y sin pines (mismo estado visual que un filtro sin
   // resultados del backend -- comportamiento heredado respetado).
@@ -2376,11 +2435,13 @@ function abrirMediaModal(f) {
 
 var _avMapInitialized = false;
 function onTabMapaAV() {
-  /* Mis mapas personalizados: modulo compartido mymapa.js.
-     init es idempotente (__mmBound); no afecta al mapa de comunidad. */
+  /* Mis mapas personalizados: modulo compartido mymapa.js. T3: el contenedor
+     es el mapa UNICO de la pestana (#av-map-container / data-cm-mapa), de modo
+     que este modulo crea la unica instancia de Leaflet y la capa multimedia
+     se pinta en ella. init es idempotente (__mmBound). */
   if (window.MyMap && window.MyMap.init) {
     window.MyMap.init({
-      contenedor: 'mm-personal-map',
+      contenedor: 'av-map-container',
       pills: 'mm-personal-pills',
       editbar: 'mm-personal-editbar',
       lista: 'mm-personal-list'

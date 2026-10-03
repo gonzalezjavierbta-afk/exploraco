@@ -108,14 +108,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .bg-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:2px}
 .bg-desc{font-size:9px;color:rgba(255,255,255,.35);line-height:1.4}
 /* MISIONES */
-#pf-misiones{display:flex;flex-direction:column;gap:6px;margin-bottom:28px}
-.mis-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px}
-.mis-card.done{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
-.mis-emoji{font-size:18px;flex-shrink:0}
-.mis-body{flex:1;min-width:0}
-.mis-nombre{font-size:11px;font-weight:700;color:#fff}
-.mis-meta{font-size:9px;color:rgba(255,255,255,.4);margin-top:2px;line-height:1.4}
-.mis-xp{font-size:11px;font-weight:700;color:var(--gold);flex-shrink:0}
+#pf-misiones{display:flex;flex-direction:column;gap:4px;margin-bottom:28px}
+#pf-misiones .mis-card{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px}
+#pf-misiones .mis-card.done{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
+#pf-misiones .mis-emoji{font-size:13px;line-height:1;flex-shrink:0}
+#pf-misiones .mis-body{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden}
+#pf-misiones .mis-nombre{flex:1 1 auto;min-width:0;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pf-misiones .mis-meta{flex:0 0 auto;max-width:46%;min-width:0;font-size:9px;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pf-misiones .mis-lock{flex-shrink:0;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;color:rgba(255,255,255,.42)}
+#pf-misiones .mis-xp{flex-shrink:0;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap}
 /* TROFEOS / LOGROS */
 .trofeo-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
 .trofeo-card.earned{border-color:rgba(255,74,0,.3);background:rgba(255,74,0,.06)}
@@ -128,12 +129,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* QUICK ACTIONS */
 .qa-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer}
 .qa-card:hover{border-color:rgba(255,74,0,.2)}
-/* MIS LUGARES */
-.lugar-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;margin-bottom:6px;text-decoration:none;color:#fff;transition:border-color .15s}
-.lugar-item:hover{border-color:rgba(255,74,0,.3)}
-.lugar-emoji{font-size:20px;flex-shrink:0}
-.lugar-nombre{font-size:12px;font-weight:700;color:#fff}
-.lugar-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px}
+/* ---- MIS LUGARES: la misma card que un recurso del Museo (ADR-004) ------
+   Silo atomico #pf-lugares (los .lugar-* eran globales: se retiran). La
+   tarjeta la emite lugarCardHTML() delegando en el helper canonico
+   mediaCardHTML(), asi que aqui solo vive lo que ese helper no puede dar:
+   el anfitrion de rejilla (mismo --pf-grupo-col y mismo gap que el Museo),
+   el enlace que envuelve la card, el badge de estado y la linea de accion.
+   El texto largo lo trunca el propio helper (nowrap + ellipsis), igual que
+   en un recurso. Sin reglas sueltas en :root ni en body. */
+#pf-lugares{--pf-grupo-col:minmax(160px,1fr)}
+#pf-lugares .pf-lugares-grid{display:grid;gap:12px;margin-bottom:4px}
+#pf-lugares .pf-lugar-card{display:block;min-width:0;text-decoration:none;color:inherit}
+#pf-lugares .pf-lugar-card:hover{box-shadow:inset 0 0 0 1px rgba(255,74,0,.3)}
+#pf-lugares .pf-lugar-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#pf-lugares .pf-lugar-badge{position:absolute;top:6px;left:6px;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+#pf-lugares .pf-lugar-badge.guardado{background:rgba(255,74,0,.9);color:#000}
+#pf-lugares .pf-lugar-badge.visitado{background:rgba(34,197,94,.9);color:#052}
+#pf-lugares .pf-lugar-accion{display:inline-block;margin-top:4px;font-size:11px;color:var(--gold)}
+#pf-lugares .pf-lugar-msg{grid-column:1/-1;color:rgba(255,255,255,.35);font-size:12px;line-height:1.6;text-align:center;padding:18px 0}
 /* ACTION BUTTONS */
 .pf-actions{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
 .pf-btn{flex:1;min-width:120px;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.7);font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif;text-align:center;transition:all .15s}
@@ -142,12 +155,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-btn-gold:hover{opacity:.88}
 .pf-btn-danger{border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.7)}
 .pf-btn-danger:hover{border-color:#ef4444;color:#ef4444}
-/* TIENDA DE CONSUMIBLES: CHIPS DE CATEGORIA (WP-6 / ADR-028) */
-.tienda-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-.tienda-chips .tienda-chip{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 14px;cursor:pointer;transition:all .15s}
-.tienda-chips .tienda-chip:hover{border-color:rgba(255,74,0,.45);color:var(--gold)}
-.tienda-chips .tienda-chip.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
-.tienda-chips .tienda-chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 /* MODAL DE DATOS DE CONSUMIBLES perfil_* (WP-6 / ADR-028) */
 .pf-uso-ov{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.72);z-index:1200;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
 .pf-uso-box{width:100%;max-width:440px;background:#141414;border:1px solid rgba(255,74,0,.28);border-radius:14px;padding:18px}
@@ -187,17 +194,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #pf-av{position:relative}
 /* TOAST */
 #xp-toast{position:fixed;bottom:20px;right:20px;background:#0F1419;color:#FF4A00;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(255,74,0,.3)}
-/* TIENDA / INVENTARIO / CROMOS */
-.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:12px}
-.store-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px;text-align:left}
-.store-name{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
-.store-desc{font-size:10px;color:rgba(255,255,255,.4);line-height:1.4;margin-bottom:6px}
-.store-price{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold)}
-.store-buy{width:100%;padding:7px 0;margin-top:8px;background:var(--gold);border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;color:var(--black);transition:opacity .15s}
-.store-buy:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);cursor:not-allowed}
-.store-buy:enabled:hover{opacity:.88}
-.store-era{display:inline-block;margin-top:6px;font-family:'Outfit',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);background:rgba(255,74,0,.12);border:1px solid rgba(255,74,0,.3);border-radius:999px;padding:2px 8px}
-.store-card.locked{border-color:rgba(255,74,0,.25)}
+/* INVENTARIO / CROMOS */
 .inv-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:6px}
 .inv-qty{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;color:var(--gold);min-width:28px;text-align:center}
 .inv-name{font-size:11px;font-weight:700;color:#fff;flex:1}
@@ -690,7 +687,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-v61 .v61-chip.en_proceso{border-color:rgba(59,130,246,.5);color:#93C5FD}
 .pf-v61 .v61-chip.completado{border-color:rgba(34,197,94,.5);color:#86efac}
 .pf-v61 .v61-chip.cancelado{opacity:.6}
-.pf-v61 .v61-cv-obra{font-size:11px;color:rgba(255,255,255,.65);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)}
 .pf-v61 .v61-gate-info{background:rgba(255,74,0,.08);border:1px solid rgba(255,74,0,.3);border-radius:10px;padding:11px 12px;margin-bottom:12px}
 .pf-v61 .v61-gate-info-t{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);margin-bottom:6px}
 .pf-v61 .v61-gate-info p{font-size:11px;color:rgba(255,255,255,.72);line-height:1.5;margin:0}
@@ -789,11 +785,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" data-tab="perfil">🎖️ Badges</div>
   <div class="badges-grid" id="pf-badges" data-tab="perfil"></div>
 
-  <!-- GAMING v6.1 (Fase 4 / T9): hoja de vida del artista (artista_cv) -->
-  <div class="pf-section-title" style="margin-top:20px" data-tab="perfil">&#x1F3A8; Hoja de Vida</div>
-  <div class="pf-v61" id="pf-cv" data-tab="perfil">
-    <div class="v61-empty">Cargando tu hoja de vida&#8230;</div>
-  </div>
+  <!-- WP-5 (T2): la vista previa de tu Museo publico vive en la pestana PERFIL -->
+  <div class="pf-section-title" style="margin-top:20px" data-tab="perfil">&#x1F3DB;&#xFE0F; Mi Museo publico</div>
+  <div class="pf-museo-preview" id="pf-museo-preview" data-tab="perfil"></div>
 
   <!-- MISIONES -->
   <div class="pf-section-title" data-tab="perfil">🎯 Misiones</div>
@@ -805,13 +799,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-counter" id="pf-trofeos-count" data-tab="museo">0 / 19</div>
   <div class="trofeo-grid" id="pf-trofeos" data-tab="museo"></div>
 
-  <!-- TIENDA DE CONSUMIBLES (Gamificacion v4) -->
-  <div class="pf-section-title" data-tab="inventario">&#x1F6D2; Tienda de Consumibles</div>
+  <!-- XP DISPONIBLE + BONO DE REFERIDO (Gamificacion v4). El catalogo de la
+       tienda se retiro en T5: la pestana Inventario lista solo lo poseido. -->
   <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP disponibles</div>
   <!-- Bono de bienvenida por referido (tarjeta destacada, oculta por defecto) -->
   <div class="pf-bono" id="pf-bono" data-tab="inventario" style="display:none"></div>
-  <div class="tienda-chips" id="pf-tienda-chips" data-tab="inventario"></div>
-  <div class="store-grid" id="pf-tienda" data-tab="inventario"></div>
 
   <!-- MI INVENTARIO (Gamificacion v4) -->
   <div class="pf-section-title" style="margin-top:20px" data-tab="inventario">&#x1F392; Mi Inventario</div>
@@ -1199,15 +1191,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     </div>
   </div>
 
-  <!-- WP-5: vista previa de lo que ven otros en tu perfil publico -->
-  <div class="pf-section-title" data-tab="museo">&#x1F3DB;&#xFE0F; Mi Museo publico</div>
-  <div class="pf-museo-preview" id="pf-museo-preview" data-tab="museo"></div>
-
-  <!-- MIS LUGARES -->
-  <div class="pf-section-title" data-tab="museo">&#x1F4CD; Mis lugares guardados</div>
-  <div id="pf-guardados" data-tab="museo"></div>
-  <div class="pf-section-title" style="margin-top:20px" data-tab="museo">✅ Lugares visitados</div>
-  <div id="pf-visitados" data-tab="museo"></div>
+  <!-- MIS LUGARES: bloque unico con data-tab. pfAplicarTab() solo_cachea
+       los hijos DIRECTOS de #profile, asi que el atributo vive aqui y los
+       dos anfitriones de rejilla cuelgan dentro (ADR-077). -->
+  <div id="pf-lugares" data-tab="museo">
+    <div class="pf-section-title">&#x1F4CD; Mis lugares guardados</div>
+    <div id="pf-guardados" class="pf-lugares-grid" aria-live="polite"></div>
+    <div class="pf-section-title" style="margin-top:20px">&#x2705; Lugares visitados</div>
+    <div id="pf-visitados" class="pf-lugares-grid" aria-live="polite"></div>
+  </div>
 
   <!-- GAMING V5.0: MI RED DE REFERIDOS -->
   <div class="pf-section-title" style="margin-top:28px" data-tab="red">&#x1F517; Mi Red de Referidos</div>
@@ -1280,7 +1272,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 <script src="media-actions.js"></script>
 <script src="media-embed.js?v=1"></script>
 <script src="media-upload.js"></script>
-<script src="mercado.js?v=1"></script>
+<script src="mercado.js?v=2"></script>
 <script>
 /* mi-perfil.html -- Rev 2026-09-18c: acordeon de niveles (ADR-040 T1) */
 /* =============================================================
@@ -1465,8 +1457,8 @@ function renderPerfil() {
   /* museo-line: barra de museo en el hero (sync con backfill) */
   syncMuseoLine(u.id, true);
 
-  /* tienda/inventario/cromos (Gamificacion v4) */
-  cargarTienda(u.id);
+  /* inventario/cromos (Gamificacion v4): la pestana Inventario lista SOLO
+     lo que el usuario posee; el catalogo de la tienda se retiro (T5). */
   cargarInventario(u.id);
   cargarCromos(u.id);
   cargarBonoReferido(u.id);
@@ -1719,13 +1711,24 @@ function cargarMisiones(uid) {
         var bloqueada = !done && reqsPend.length > 0;
         var icono = done ? '✅' : (bloqueada ? '🔒' : '⏳');
         var estadoTxt = done ? 'Completada' : (bloqueada ? 'Bloqueada' : 'Disponible');
-        var reqsTxt = (m.requiere||[]).length ? 'Requiere: ' + (m.requiere||[]).join(', ') : '';
+        var reqsTxt = '';
+        if(reqsPend.length){
+          /* Compacto: nombre legible del 1er requisito pendiente + contador.
+             Nunca se vuelca la lista cruda de IDs. */
+          var pend = reqsPend.map(function(r){ return _misNombres[r] || r; });
+          var lockLbl = pend.length > 1 ? pend[0] + ' +' + (pend.length - 1) : pend[0];
+          if(lockLbl.length > 30) lockLbl = lockLbl.slice(0,29) + '\u2026';
+          reqsTxt = '<div class="mis-lock" title="'+esc(pend.join(', '))+'">\uD83D\uDD12 '+esc(lockLbl)+'</div>';
+        }
+        var metaTxt = grupoNombre(m.grupo) + ' \u00B7 ' + estadoTxt;
+        var nombreTxt = m.nombre || m.id || '';
         return '<div class="mis-card'+(done?' done':'')+'">'
           +'<div class="mis-emoji">'+icono+'</div>'
           +'<div class="mis-body">'
-          +'<div class="mis-nombre">'+m.nombre+'</div>'
-          +'<div class="mis-meta">'+grupoNombre(m.grupo)+' · '+estadoTxt+(reqsTxt?' · '+reqsTxt:'')+'</div>'
+          +'<div class="mis-nombre" title="'+esc(nombreTxt)+'">'+esc(nombreTxt)+'</div>'
+          +'<div class="mis-meta">'+esc(metaTxt)+'</div>'
           +'</div>'
+          +reqsTxt
           +'<div class="mis-xp">+'+fmtXp(m.xp)+' XP</div>'
           +'</div>';
       }).join('');
@@ -1816,38 +1819,127 @@ function cargarMisLugares(uid) {
     });
 }
 
+/* ---- Tarjeta de lugar: el MISMO contrato visual que un recurso del Museo --
+   tipo=mapa devuelve una fila de DESTINO (nombre, slug, foto_hero, ciudad,
+   categoria_slug, subcategoria), no un recurso de media. lugarCardHTML()
+   mapea cada campo al contrato que lee mediaCardHTML() y pone un fallback
+   explicito en los que un destino puede no traer, para que la paridad con
+   el Museo no dependa de campos que aqui no existen. Los helpers canonicos
+   (mediaCardHTML, pfGruposRender) no se tocan: se delegan. */
+function lugarCardHTML(d, opts) {
+  opts = opts || {};
+  d = d || {};
+  var slug = String(d.slug || '');
+  var ciudad = String(d.ciudad || '');
+  var region = String(d.region || d.subcategoria || '');
+  var m = {
+    fuente: 'lugar',
+    item_id: String(d.destino_id != null ? d.destino_id : slug),
+    media_title: String(d.nombre || 'Destino'),
+    /* nota: sublinea ya resuelta (respaldo local sin ciudad). Si no viene,
+       se compone con ciudad y region como hacia el item de antes. */
+    album_titulo: String(d.nota || (ciudad ? (region ? ciudad + ', ' + region : ciudad)
+      : (region || d.categoria_slug || ''))),
+    foto_url: String(d.foto_hero || d.imagen || ''),
+    media_type: 'foto',
+    votos: 0
+  };
+  var card = mediaCardHTML(m, { badgeHtml: opts.badgeHtml || '', accionesHtml: opts.accionesHtml || '' });
+  /* mpPortadaHTML() ya emite la portada con loading="lazy" y onerror
+     (ADR-008). Solo falta decoding="async" y la card de lugar lleva un
+     unico <img> (la portada), asi que el primero es el suyo; sin foto no
+     hay <img> y el replace no hace nada: queda el placeholder canonico. */
+  card = card.replace(/<img /, '<img decoding="async" ');
+  /* Toda la card es el enlace, igual que el item de antes. Sin slug no hay
+     pagina que abrir: se pinta sin enlace en vez de dejar un href muerto. */
+  return slug
+    ? '<a class="pf-lugar-card" href="' + esc(slug) + '.html">' + card + '</a>'
+    : '<div class="pf-lugar-card">' + card + '</div>';
+}
+
+/* Badge de estado: los dos estados de un lugar con el lenguaje del badge del
+   Museo, no con el de los items viejos. */
+function lugarBadgeHTML(tipo) {
+  return tipo === 'visitado'
+    ? '<span class="pf-lugar-badge visitado">Visitado</span>'
+    : '<span class="pf-lugar-badge guardado">Guardado</span>';
+}
+
+/* Linea de accion: el "Ver destino" de un recurso. Es un <span> porque la
+   card entera ya es el enlace y un enlace no puede anidar otro interactivo. */
+function lugarAccionesHTML(d) {
+  return (d && d.slug) ? '<span class="pf-lugar-accion">Ver destino &#x2192;</span>' : '';
+}
+
+/* Clave de grupo estable para el id del wrapper y para el estado de plegado:
+   sin acentos ni espacios. La etiqueta legible la pone lugarGruposDe(). */
+function lugarClaveId(s) {
+  var t = String(s == null ? '' : s);
+  if (t.normalize) t = t.normalize('NFD');
+  return t.replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/* Region del lugar (el endpoint la manda en subcategoria). Lo que no la
+   traiga cae a 'sin-region' para que el lugar siga siendo visible: mismo
+   criterio que museoGrupoClave. La nota local NO agrupa. */
+function lugarGrupoClave(d) {
+  var r = String((d && (d.region || d.subcategoria)) || '').trim();
+  return r ? (lugarClaveId(r) || 'sin-region') : 'sin-region';
+}
+
+/* Grupos de Mis lugares: por region y con 'Sin region' al final. A diferencia
+   de MUSEO_GRUPOS (orden fijo), aqui las regiones son dato, asi que el array
+   se arma con las que trae la lista; pfGruposRender() acepta el array ya
+   resuelto y anade al final cualquier clave que se le escapara. */
+function lugarGruposDe(items) {
+  var visto = {};
+  var lista = [];
+  (items || []).forEach(function(d){
+    var r = String((d && (d.region || d.subcategoria)) || '').trim();
+    var k = lugarClaveId(r);
+    if (!k || visto[k]) return;
+    visto[k] = true;
+    lista.push({ clave: k, etiqueta: r });
+  });
+  lista.sort(function(a, b){ return a.etiqueta.localeCompare(b.etiqueta); });
+  lista.push({ clave: 'sin-region', etiqueta: 'Sin region' });
+  return lista;
+}
+
+/* Un solo aviso por contenedor (lista vacia o respaldo sin red): se conserva
+   la distincion entre guardados y visitados. */
+function lugarMsgHtml(tipo) {
+  return '<div class="pf-lugar-msg">' + (tipo === 'guardado'
+    ? 'A\u00FAn no guardas lugares. Presiona el coraz\u00F3n en cualquier destino.'
+    : 'A\u00FAn no marcas lugares como visitados.') + '</div>';
+}
+
 function renderLugares(containerId, list, tipo) {
   var el = document.getElementById(containerId);
   if(!el) return;
-  if(!list.length) {
-    el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:8px 0">'+(tipo==='guardado'?'Aún no guardas lugares. Presiona el corazón en cualquier destino.':'Aún no marcas lugares como visitados.')+'</div>';
-    return;
-  }
-  el.innerHTML = list.map(function(d){
-    var emoji = d.emoji || '📍';
-    var nombre = d.nombre || 'Destino';
-    var sub = d.ciudad ? d.ciudad + (d.region?', '+d.region:'') : '';
-    var href = d.slug ? d.slug+'.html' : '#';
-    return '<a class="lugar-item" href="'+href+'">'
-      +'<div class="lugar-emoji">'+emoji+'</div>'
-      +'<div><div class="lugar-nombre">'+nombre+'</div>'
-      +'<div class="lugar-sub">'+sub+'</div></div></a>';
-  }).join('');
+  list = list || [];
+  if(!list.length) { el.innerHTML = lugarMsgHtml(tipo); return; }
+  el.innerHTML = pfGruposRender(containerId, list, lugarGrupoClave, lugarGruposDe(list), function(d){
+    return lugarCardHTML(d, { badgeHtml: lugarBadgeHTML(tipo), accionesHtml: lugarAccionesHTML(d) });
+  });
 }
 
+/* Respaldo sin red: el marcador local solo guarda slugs, asi que se fabrican
+   filas con el MISMO shape y se pintan con el MISMO helper (mismo aspecto);
+   lo que aun no se sabe (foto, ciudad) cae a su fallback. */
 function renderLugaresFallback() {
-  var gc = document.getElementById('pf-guardados');
-  var vc = document.getElementById('pf-visitados');
-  if(gc && mmSaved.length) {
-    gc.innerHTML = mmSaved.map(function(slug){
-      return '<a class="lugar-item" href="'+slug+'.html"><div class="lugar-emoji">📍</div><div><div class="lugar-nombre">'+slug.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})+'</div><div class="lugar-sub">Guardado local</div></div></a>';
-    }).join('');
-  }
-  if(vc && mmVisited.length) {
-    vc.innerHTML = mmVisited.map(function(slug){
-      return '<a class="lugar-item" href="'+slug+'.html"><div class="lugar-emoji">✅</div><div><div class="lugar-nombre">'+slug.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})+'</div><div class="lugar-sub">Visitado</div></div></a>';
-    }).join('');
-  }
+  renderLugares('pf-guardados', lugarDesdeSlugs(mmSaved, 'Guardado local'), 'guardado');
+  renderLugares('pf-visitados', lugarDesdeSlugs(mmVisited, 'Visitado local'), 'visitado');
+}
+
+function lugarDesdeSlugs(slugs, nota) {
+  return (slugs || []).map(function(slug){
+    return {
+      slug: slug,
+      nombre: String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }),
+      nota: nota
+    };
+  });
 }
 
 /* ---- QUICK ACTIONS ---- */
@@ -1953,104 +2045,10 @@ function activarVocacion(vocId, btn) {
     });
 }
 
-/* Categorias de la tienda (WP-6 / ADR-028, migracion 018). El valor del
-   servidor (item.categoria) tiene prioridad; el mapa local es el respaldo
-   para que los chips funcionen aunque el endpoint aun no devuelva la columna. */
-var PF_TIENDA_CATS = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'perfil', label: 'Perfil' },
-  { id: 'impulso', label: 'Impulso' },
-  { id: 'social', label: 'Social' },
-  { id: 'coleccion', label: 'Coleccion' },
-  { id: 'general', label: 'General' }
-];
-var PF_TIENDA_CAT = 'todos';
-var PF_CAT_CONSUMIBLE = {
-  perfil_marco_dorado: 'perfil', perfil_tema_oscuro: 'perfil', perfil_banda_artista: 'perfil',
-  perfil_marco_plata: 'perfil', perfil_vitrina_destacada: 'perfil',
-  perfil_titulo_custom: 'perfil', perfil_fondo_paisaje: 'perfil',
-  amuleto_x2: 'impulso', trompeta_fama: 'impulso', imantador_cromos: 'impulso',
-  sala_efimera: 'social', vitrina_estelar: 'social', pin_cromado: 'social', pase_vip: 'social',
-  cuaderno_expedicion: 'coleccion', pergamino_mapa: 'coleccion',
-  pluma_inspirada: 'general'
-};
-function categoriaConsumible(c) {
-  if (c && c.categoria) return String(c.categoria).toLowerCase();
-  var clave = String((c && c.clave) || '');
-  if (PF_CAT_CONSUMIBLE[clave]) return PF_CAT_CONSUMIBLE[clave];
-  return clave.indexOf('perfil_') === 0 ? 'perfil' : 'general';
-}
-function renderTiendaChips() {
-  var box = document.getElementById('pf-tienda-chips');
-  if (!box) return;
-  box.innerHTML = PF_TIENDA_CATS.map(function(cat){
-    var on = (cat.id === PF_TIENDA_CAT);
-    return '<button type="button" class="tienda-chip' + (on ? ' on' : '') + '"'
-      + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
-      + ' onclick="setTiendaFiltro(\'' + cat.id + '\')">' + cat.label + '</button>';
-  }).join('');
-}
-function setTiendaFiltro(cat) {
-  PF_TIENDA_CAT = cat || 'todos';
-  renderTiendaChips();
-  var u = sesion();
-  if (u) cargarTienda(u.id);
-}
-function cargarTienda(uid) {
-  var grid = document.getElementById('pf-tienda');
-  var balance = document.getElementById('pf-xp-balance');
-  if(!grid) return;
-  renderTiendaChips();
-  var st = statsU();
-  if(balance) balance.textContent = fmtXp(st.xp) + ' XP disponibles';
-  grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Cargando tienda\u2026</div>';
-  var url = '/api/interacciones?tipo=consumibles';
-  if (PF_TIENDA_CAT !== 'todos') url += '&categoria=' + encodeURIComponent(PF_TIENDA_CAT);
-  if (uid) url += '&usuario_id=' + encodeURIComponent(uid);
-  fetchConJwt(url)
-    .then(function(res){
-      var list = (res && res.data) || [];
-      if (PF_TIENDA_CAT !== 'todos') {
-        list = list.filter(function(c){ return categoriaConsumible(c) === PF_TIENDA_CAT; });
-      }
-      if(!list.length) {
-        grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No hay consumibles en esta categoria.</div>';
-        return;
-      }
-      st = statsU();
-      var eraUsuario = (res && res.era_usuario) || null;
-      grid.innerHTML = list.map(function(c){
-        var eraReq = c.era_exclusiva || null;
-        var bloqueado = c.bloqueado === true;
-        var canBuy = st.xp >= c.precio_xp;
-        var faltan = canBuy ? 0 : (c.precio_xp - st.xp);
-        var tag = '';
-        if (eraReq) {
-          var tagTitle = eraUsuario ? ' title="Tu era: ' + esc(eraUsuario) + '"' : '';
-          tag = '<div class="store-era"' + tagTitle + '>'
-            + (bloqueado ? '\uD83D\uDD12 ' : '') + 'Era ' + esc(eraReq) + '</div>';
-        }
-        var btn;
-        if (bloqueado) {
-          btn = '<button class="store-buy" disabled title="Disponible en era ' + esc(eraReq) + '">Disponible en era ' + esc(eraReq) + '</button>';
-        } else {
-          var tipAttr = canBuy ? '' : ' title="Te faltan ' + fmtXp(faltan) + ' XP"';
-          btn = '<button class="store-buy"' + (canBuy ? '' : ' disabled') + tipAttr + ' onclick="comprarConsumible(\'' + esc(c.clave) + '\',this)">Comprar</button>';
-        }
-        return '<div class="store-card' + (bloqueado ? ' locked' : '') + '">'
-          + '<div class="store-name">' + esc(c.nombre) + '</div>'
-          + '<div class="store-desc">' + esc(c.descripcion) + '</div>'
-          + '<div class="store-price">' + fmtXp(c.precio_xp) + ' XP</div>'
-          + tag
-          + btn
-          + '</div>';
-      }).join('');
-    })
-    .catch(function(){
-      grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudo cargar la tienda.</div>';
-    });
-}
-
+/* ---- COMPRA DE CONSUMIBLE (POST comprar_consumible) ----
+   El catalogo de la tienda se retiro en T5, asi que esta pagina ya no
+   invoca comprarConsumible: queda como helper de compra disponible para
+   flujos que lo enganchen (mercado.js, referredos). NO borrar sin grep. */
 function comprarConsumible(clave, btn) {
   var u = sesion();
   if(!u) return;
@@ -2105,7 +2103,7 @@ function cargarInventario(uid) {
         return (parseInt(item.cantidad, 10) || 0) > 0;
       });
       if(!claves.length) {
-        el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Tu inventario esta vacio. Compra consumibles en la tienda.</div>';
+        el.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Tu inventario esta vacio. A\u00fan no tienes consumibles.</div>';
         return;
       }
       el.innerHTML = claves.map(function(k){
@@ -5473,11 +5471,11 @@ function pfTab(tab) {
   pfAplicarTab();
   var u = sesion();
   if (tab === 'perfil' && u && u.id) cargarBilletera();
-  if (tab === 'perfil' && u && u.id) cargarHojaDeVida(u.id);
+  if (tab === 'perfil' && u && u.id) cargarMuseoPreview(u.id);
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarTienda(u.id); cargarInventario(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
+  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
@@ -6274,61 +6272,6 @@ function v61CrearOrdenMoneda() {
     else if (res && res.error === 'XP_INSUFICIENTE') m = 'XP insuficiente';
     else if (res) m = v61Msg(res);
     showToast(m, '#ef4444');
-  }).catch(function () { showToast('Error de conexion', '#ef4444'); });
-}
-
-/* ---- Hoja de Vida del artista (GET artista_cv + POST artista_cv_editar) ---- */
-function cargarHojaDeVida(uid) {
-  var box = document.getElementById('pf-cv');
-  if (!box || !uid) return;
-  var fn = v61Helper('miHojaDeVida');
-  if (!fn) { box.innerHTML = '<div class="v61-empty">Hoja de vida no disponible.</div>'; return; }
-  box.innerHTML = '<div class="v61-empty">Cargando tu hoja de vida\u2026</div>';
-  fn(uid).then(function (res) {
-    if (!res || !res.ok || !res.data) { box.innerHTML = '<div class="v61-err">' + esc(v61Msg(res)) + '</div>'; return; }
-    var d = res.data;
-    var meta = d.metadatos || {};
-    var tot = d.totales || {};
-    var artista = d.artista || {};
-    var esArtista = (Number(tot.vocaciones) || 0) > 0 || (Number(tot.obras) || 0) > 0;
-    var html = '';
-    html += '<div class="v61-form">'
-      + '<div class="v61-card-n">' + esc(artista.nombre || 'Tu hoja de vida') + '</div>'
-      + '<div class="v61-meta">Nivel ' + (parseInt(artista.nivel_visible, 10) || 1) + ' \u00b7 ' + esc(artista.era || '') + ' \u00b7 ' + fmtXp(artista.xp_total) + ' XP</div>'
-      + '<div class="v61-meta">' + (Number(tot.obras) || 0) + ' obras \u00b7 ' + (Number(tot.resenas) || 0) + ' resenas \u00b7 ' + (Number(tot.contratos) || 0) + ' contratos \u00b7 ' + (Number(tot.patrocinios) || 0) + ' patrocinios</div>'
-      + '</div>';
-    html += '<div class="v61-form">'
-      + '<div class="v61-card-n">Editar hoja de vida</div>'
-      + '<textarea id="v61-cv-bio" class="v61-inp" rows="3" maxlength="600" placeholder="Tu bio de artista">' + esc(meta.bio || '') + '</textarea>'
-      + '<input id="v61-cv-ciudad" class="v61-inp" maxlength="80" placeholder="Ciudad" value="' + esc(meta.ciudad || '') + '">'
-      + '<label class="v61-meta"><input type="checkbox" id="v61-cv-destacado"' + (meta.destacado ? ' checked' : '') + '> Marcar como destacado</label>'
-      + '<div class="v61-actions"><button type="button" class="v61-btn" onclick="v61GuardarHojaDeVida()">Guardar hoja de vida</button></div>'
-      + '</div>';
-    if ((d.vocaciones || []).length) html += '<div class="v61-meta">Vocaciones: ' + esc((d.vocaciones || []).join(', ')) + '</div>';
-    if ((d.obras || []).length) {
-      html += '<div class="v61-card-n" style="margin-top:8px">Obras</div>';
-      (d.obras || []).slice(0, 20).forEach(function (o) {
-        html += '<div class="v61-cv-obra">' + esc(o.media_title || o.foto_type || 'Recurso') + ' \u00b7 ' + esc(o.foto_type || '') + '</div>';
-      });
-    } else if (!esArtista) {
-      html += '<div class="v61-empty">Aun no hay obras publicas. Publica fotos, videos o audio en tu Museo.</div>';
-    }
-    box.innerHTML = html;
-  }).catch(function () { box.innerHTML = '<div class="v61-err">No se pudo cargar tu hoja de vida.</div>'; });
-}
-function v61GuardarHojaDeVida() {
-  var u = sesion();
-  if (!u) return;
-  var datos = {
-    bio: String((document.getElementById('v61-cv-bio') || {}).value || '').trim(),
-    ciudad: String((document.getElementById('v61-cv-ciudad') || {}).value || '').trim(),
-    destacado: !!(document.getElementById('v61-cv-destacado') || {}).checked
-  };
-  var fn = v61Helper('guardarHojaDeVida');
-  if (!fn) { showToast('Hoja de vida no disponible', '#ef4444'); return; }
-  fn(datos).then(function (res) {
-    if (res && res.ok) { showToast('Hoja de vida actualizada'); cargarHojaDeVida(u.id); return; }
-    showToast(v61Msg(res), '#ef4444');
   }).catch(function () { showToast('Error de conexion', '#ef4444'); });
 }
 

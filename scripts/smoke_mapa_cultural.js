@@ -20,7 +20,10 @@ vm.runInContext(src, sandbox, { filename: 'mapa-cultural.js' });
 
 const MC = sandbox.window.MapaCultural;
 check('API: window.MapaCultural expuesto', !!MC);
-check('API: version 1.1.1', MC && MC.version === '1.1.1');
+// Version explicita (no comodin): 1.2.0 unifico los mapas de Comunidad en
+// una sola instancia Leaflet. Si el motor vuelve a 1.1.1 o sube de 1.2.0,
+// el smoke debe seguir detectando la regresion de version.
+check('API: version 1.2.0', MC && MC.version === '1.2.0');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
@@ -392,5 +395,17 @@ check('A3: comunidad enlaza mapa-cultural.css', /mapa-cultural\.css/.test(comuni
 check('A3: mapa-tiles.js cargado en comunidad', /mapa-tiles\.js\?v=1/.test(comunidadHtml));
 check('A3: mapa-tiles.js cargado en index', /mapa-tiles\.js\?v=1/.test(indexHtml));
 check('A3: comunidad usa el helper MapaTiles sin proveedor hardcodeado', /MapaTiles\.aplicar/.test(comunidadHtml) && comunidadHtml.indexOf('cartocdn') === -1 && comunidadHtml.indexOf('basemaps') === -1);
+
+// ---- (11) 1.2.0: los mapas de Comunidad se unificaron en UNA instancia --
+// El invariante unico de la unificacion es que el motor no monta un segundo
+// Leaflet: init() es idempotente (DEF se crea una vez y se reutiliza), y el
+// consumidor (comunidad.html) delega en MyMap.getMap() con la guarda
+// _leaflet_id en vez de inicializar su propio mapa.
+const def1 = MC.init();
+const def2 = MC.init({ mediaFilter: false });
+check('1.2.0 init: dos llamadas devuelven la MISMA instancia', def1 === def2);
+check('1.2.0 init: la instancia default expone el contrato', !!def1 && typeof def1.getState === 'function' && typeof def1.getMap === 'function');
+check('1.2.0 comunidad.html delega el mapa en MyMap (sin 2o Leaflet)', /window\.MyMap\.init/.test(comunidadHtml) && /window\.MyMap\.getMap/.test(comunidadHtml));
+check('1.2.0 comunidad.html guarda doble init con _leaflet_id', /_leaflet_id/.test(comunidadHtml));
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

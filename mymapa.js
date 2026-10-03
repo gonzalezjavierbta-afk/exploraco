@@ -17,16 +17,31 @@
    Dependencias externas permitidas: Leaflet (window.L), el motor
    compartido window.MapaCultural (mapa-cultural.js) y las utilidades
    de sesion en window.ExploraCO (mostrarLogin/mostrarToast).
+
+   T3 -- MAPA UNIFICADO: si el contenedor resuelto lleva el atributo
+   data-cm-mapa="1", la pagina declara que ese div es el UNICO mapa de
+   la pestana. Este modulo crea ahi la unica instancia de
+   window.MapaCultural (una sola carga de tiles) y deja que la media
+   audiovisual se pinte en esa misma capa, en vez de crear un segundo
+   mapa. En ese modo los botones de media del panel (filtrarMapaAV /
+   toggleVistaAlbumes) son la unica superficie de control de la capa
+   multimedia y llegan aqui por MyMap.setMediaTipos / setMediaVista.
    ============================================================= */
 (function () {
   'use strict';
 
   var DEFAULTS = {
-    contenedor: 'mm-personal-map',
+    contenedor: 'av-map-container',
     pills: 'mm-personal-pills',
     editbar: 'mm-personal-editbar',
     lista: 'mm-personal-list'
   };
+
+  // Vista inicial del mapa unificado (pais completo): la media de la
+  // comunidad y los destinos personales estan repartidos por todo el
+  // territorio, no en un solo destino.
+  var UNIFICADO_CENTRO = [4.6, -74.1];
+  var UNIFICADO_ZOOM = 6;
 
   // Estado interno del modulo (una sola instancia por pagina).
   var S = {
@@ -34,7 +49,8 @@
     mapas: [],       // mapas tematicos del usuario
     sel: null,       // id del mapa activo (null = "Mi Mapa")
     destinos: [],    // destinos del mapa activo (para pines y lista)
-    modo: null       // id en edicion dentro del modal (null = crear)
+    modo: null,      // id en edicion dentro del modal (null = crear)
+    unificado: false // el contenedor es el mapa unico de la pagina
   };
 
   // Motor del mapa: instancia perezosa del modulo compartido
@@ -139,6 +155,25 @@
   }
 
   /* ---------- mapa compartido (mapa-cultural.js) ---------- */
+  // Resuelve el id del contenedor del mapa. Prioridad:
+  //   1) el id que pasa la pagina, si existe en el DOM;
+  //   2) el contenedor unico declarado con data-cm-mapa (mapa unificado);
+  //   3) el id por defecto (modulo en pagina con su propio mapa).
+  function resolverContenedor(id) {
+    if (id && document.getElementById(id)) return id;
+    var uni = document.querySelector('[data-cm-mapa]');
+    if (uni && uni.id) return uni.id;
+    return id || DEFAULTS.contenedor;
+  }
+
+  // Marca S.unificado leyendo el DOM (no el motor): el mapa unico lo crea
+  // este modulo, asi que la bandera debe estar lista ANTES de ensureMC().
+  function detectarUnificado() {
+    var nodo = el(S.opts.contenedor);
+    S.unificado = !!(nodo && nodo.getAttribute && nodo.getAttribute('data-cm-mapa') === '1');
+    return S.unificado;
+  }
+
   // Crea (una sola vez) la instancia del Mapa Cultural sobre el
   // contenedor de MyMap. list:null porque MyMap conserva su lista
   // textual; drawer:true porque el modulo crea su propio panel.
@@ -147,13 +182,13 @@
     if (typeof window.MapaCultural === 'undefined') return null;
     var cont = el(S.opts.contenedor);
     if (!cont) return null;
-    mc = window.MapaCultural.create({
+    var o = {
       map: S.opts.contenedor,
       tiles: 'carto-voyager',
       list: null,
       drawer: true,
       apiBase: api(),
-      mediaFilter: filterMisMapa,
+      mediaFilter: S.unificado ? false : filterMisMapa,
       // Barra de categorias que aporta comunidad.html. Se pasa el ELEMENTO
       // (no un string) para no depender del parseo de selector: el motor
       // engancha los clicks de [data-cat] y permite filtrar/ocultar pines.
@@ -169,7 +204,17 @@
           }
         }, 120);
       }
-    });
+    };
+    if (S.unificado) {
+      // Mapa unico de la pestana: arranca en vista pais y con la capa
+      // multimedia encendida (paridad con el mapa audiovisual), y sin el
+      // agrupado de un pin por destino que usa index.html.
+      o.center = UNIFICADO_CENTRO;
+      o.zoom = UNIFICADO_ZOOM;
+      o.mediaEnabled = true;
+      o.mediaOnePinPerDestino = false;
+    }
+    mc = window.MapaCultural.create(o);
     return mc;
   }
 
@@ -343,19 +388,27 @@
   function medirMediaActiva() {
     var m = ensureMC();
     if (!m) return;
-    var slugs = {};
-    S.destinos.forEach(function (d) { if (d && d.slug) slugs[d.slug] = true; });
     var hay = false;
-    (MEDIA_CACHE || []).forEach(function (it) {
-      if (hay || !it) return;
-      var k = claveGuardado(it);
-      if (k && SET_GUARDADOS[k]) { hay = true; return; }
-      if (it.origen === 'album' || it.origen === 'album_grupo') {
-        if (it._propia) hay = true;
-        return;
-      }
-      if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
-    });
+    if (S.unificado) {
+      // Mapa unificado: la capa multimedia ES la de la comunidad (misma
+      // fuente que el mapa AV). Si hay items se enciende para que ambos
+      // origenes se vean a la vez; el filtro por tipo lo gobiernan los
+      // botones del panel, no este modulo.
+      hay = !!(MEDIA_CACHE && MEDIA_CACHE.length);
+    } else {
+      var slugs = {};
+      S.destinos.forEach(function (d) { if (d && d.slug) slugs[d.slug] = true; });
+      (MEDIA_CACHE || []).forEach(function (it) {
+        if (hay || !it) return;
+        var k = claveGuardado(it);
+        if (k && SET_GUARDADOS[k]) { hay = true; return; }
+        if (it.origen === 'album' || it.origen === 'album_grupo') {
+          if (it._propia) hay = true;
+          return;
+        }
+        if ((it.origen === 'destino' || it.origen === 'destino_album') && it.origen_id && slugs[it.origen_id]) hay = true;
+      });
+    }
     // Fuerza el encendido maestro cuando hay media para el mapa activo,
     // sin importar el estado previo: setMediaEnabled(true) rellena los
     // tipos (foto/video/audio) si estan en cero y vuelve a renderizar,
@@ -368,6 +421,12 @@
   }
 
   function asegurarToggleMedia() {
+    // Mapa unificado: los controles de media son los botones del panel
+    // (filtrarMapaAV / toggleVistaAlbumes), que escriben aqui por
+    // setMediaTipos / setMediaVista. No se crea el toggle duplicado
+    // .mmx-media para no tener dos superficies de estado sobre la misma
+    // capa. En modo clasico se conserva tal cual.
+    if (S.unificado) return;
     var existente = document.getElementById('mm-personal-media');
     if (existente) { existente.style.display = ''; return; }
     var card = document.querySelector('.mmx-card');
@@ -381,7 +440,7 @@
       + '<button type="button" class="mmx-mbtn" data-media="foto">Fotos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="video">Videos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="audio">Audios</button>'
-      + '<button type="button" class="mmx-mbtn" data-vista="albumes">&#x1F4DA; Álbumes</button>';
+      + '<button type="button" class="mmx-mbtn" data-vista="albumes">&#x1F4DA; &#xC1;lbumes</button>';
     if (head && head.parentNode === card) card.insertBefore(box, head.nextSibling);
     else card.appendChild(box);
     box.addEventListener('click', function (e) {
@@ -508,6 +567,20 @@
     var lista = el(S.opts.lista);
     if (lista) lista.innerHTML = '';
     var m = ensureMC();
+    if (S.unificado) {
+      // Mapa unificado: el invitado no tiene mapa personal, pero la media
+      // audiovisual sigue siendo PUBLICA y debe seguir viendo en el
+      // mismo mapa. Se limpian solo los lugares y se recarga la capa con
+      // el fetch publico (sin scope=mio: recargarMedia lo omite si no hay
+      // sesion). No se tocan los tipos ni el maestro de la capa: los gobiernan
+      // los botones del panel y medirMediaActiva respeta la ultima eleccion.
+      if (m) m.setPlaces([]);
+      recargarMedia();
+      var catsU = document.getElementById('mm-personal-cats');
+      if (catsU) catsU.style.display = 'none';
+      invalidarTamano();
+      return;
+    }
     if (m) { m.setPlaces([]); m.setMedia([]); }
     var map = (m && m.getMap) ? m.getMap() : null;
     if (map) map.setView([4.5, -74.0], 5);
@@ -785,7 +858,7 @@
   function init(opts) {
     opts = opts || {};
     S.opts = {
-      contenedor: opts.contenedor || DEFAULTS.contenedor,
+      contenedor: resolverContenedor(opts.contenedor || DEFAULTS.contenedor),
       pills: opts.pills || DEFAULTS.pills,
       editbar: opts.editbar || DEFAULTS.editbar,
       lista: opts.lista || DEFAULTS.lista
@@ -796,13 +869,71 @@
       cont.__mmBound = true;
       bind();
     }
+    // La bandera va antes del motor: decide filtro de media, toggle
+    // duplicado y punto de vista inicial.
+    detectarUnificado();
     asegurarToggleMedia();
+    // Crea el mapa aqui (y no de forma perezosa) para que la pagina pueda
+    // engancharse a la MISMA instancia con MyMap.getMap() el mismo ciclo:
+    // asi no se inicializa un segundo Leaflet sobre el mismo contenedor.
+    ensureMC();
     refresh();
+  }
+
+  /* ---------- puente con la pagina (mapa unificado) ---------- */
+
+  // Instancia Leaflet del mapa (null si la pagina no tiene el modulo).
+  function getMap() {
+    return (mc && mc.getMap) ? mc.getMap() : null;
+  }
+
+  // true si este modulo esta a cargo del mapa unico de la pagina.
+  function esUnificado() {
+    return !!S.unificado;
+  }
+
+  // Filtro por tipo de la capa multimedia (fotos/videos/audio). Lo usan los
+  // botones del panel: el estado vive en el motor compartido para que los
+  // pines personales nunca se mezclen con el filtro de media.
+  function setMediaTipos(obj) {
+    var m = ensureMC();
+    if (!m || !obj) return false;
+    MEDIA_USER_TOUCHED = true;
+    m.setMediaTypes(obj);
+    sincronizarToggleMedia();
+    return true;
+  }
+
+  // Vista de la capa: 'sueltos' (media individual) o 'albumes' (grupos).
+  // Cambia la query del endpoint existente, de modo que recarga la capa.
+  function setMediaVista(vista) {
+    MEDIA_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
+    MEDIA_CACHE = null;
+    MEDIA_USER_TOUCHED = true;
+    sincronizarToggleMedia();
+    recargarMedia();
+    return MEDIA_VISTA;
+  }
+
+  // Relanza la carga de la capa multimedia (misma fuente que usa el mapa).
+  function refrescarMedia() {
+    if (!ensureMC()) return false;
+    if (MEDIA_VISTA === 'albumes' && MEDIA_CACHE) {
+      // La vista de albumes cambia la query: no se sirve la cache de sueltos.
+      MEDIA_CACHE = null;
+    }
+    recargarMedia();
+    return true;
   }
 
   window.MyMap = {
     init: init,
     refresh: refresh,
-    openNuevo: openNuevo
+    openNuevo: openNuevo,
+    getMap: getMap,
+    esUnificado: esUnificado,
+    setMediaTipos: setMediaTipos,
+    setMediaVista: setMediaVista,
+    refrescarMedia: refrescarMedia
   };
 })();

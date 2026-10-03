@@ -137,6 +137,19 @@
 .mc-root .md-lb-wrap iframe,.mc-root .md-lb-wrap video{width:100%;max-width:92vw}
 .mc-root .md-lb-cap{font-size:12px;color:rgba(255,255,255,.6);max-width:80%;text-align:center;line-height:1.5}
 
+/* ---- Contenedor del mapa unificado (silo #cpanel-mapa) ----------
+   T3: la pestana Mapa de comunidad.html tiene UN SOLO mapa (el motor
+   compartido lo crea desde mymapa.js sobre #av-map-container), asi que
+   aqui va la altura unica. Sustituye los 340px del mapa personal + los
+   500px del mapa audiovisual, que ya no existen como mapas separados. */
+#cpanel-mapa .cmx-mapa{position:relative;width:100%;height:440px;border-radius:12px;overflow:hidden;background:#2a2a2a;border:1px solid rgba(255,255,255,.12)}
+#cpanel-mapa .cmx-filtros{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+#cpanel-mapa .cmx-pie{font-size:11px;color:rgba(255,255,255,.3);margin:6px 0 0;text-align:center;line-height:1.5}
+@media(max-width:768px){
+  #cpanel-mapa .cmx-mapa{height:360px}
+  #cpanel-mapa .cmx-pie{font-size:10px}
+}
+
 /* ---- Responsive del drawer ------------------------------------ */
 @media(max-width:768px){
   .mc-root.mapa-drawer .md-panel{width:100%;height:100%;box-shadow:none;transform:translateY(105%)}

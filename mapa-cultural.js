@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.1.1. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.2.0. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -35,8 +35,11 @@
        origen_id === slug/uuid); sin cercania geografica.
      clusterLinksNavigate (false): true deja que "Ver" del popup de
        cluster navegue por href (index); false abre el drawer (comunidad).
-     list: si se define, los items de la lista delegan en setActive
-       (pan + drawer) como el index.
+mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
+        capa multimedia (index); false dibuja un pin por item de media
+        (mapa unificado de comunidad.html, mymapa.js).
+      list: si se define, los items de la lista delegan en setActive
+        (pan + drawer) como el index.
 
    Dependencias externas permitidas: Leaflet (window.L) y, con
    guard, las utilidades de sesion de window.ExploraCO.
@@ -44,7 +47,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.1';
+  var VERSION = '1.2.0';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -579,7 +582,12 @@
       authHeaders: null,
       safeMode: true,
       apiBase: '',
-      fitOnPlaces: false
+      fitOnPlaces: false,
+      // true (default): la capa multimedia dibuja UN pin por destino
+      // (agrupa las fotos curadas de un mismo destino). false: un pin por
+      // item de media, que es lo que muestra el mapa unificado de
+      // comunidad.html.
+      mediaOnePinPerDestino: true
     };
   }
 
@@ -1266,7 +1274,7 @@
         if (!esAlbumDestino && !st.mediaTypes[item.media_type]) return;
         if (!bounds.contains([lat, lng])) return;
         if (n >= TOPE_MEDIA_PINS) return;
-        if (item.origen === 'destino' && item.origen_id) {
+        if (st.options.mediaOnePinPerDestino !== false && item.origen === 'destino' && item.origen_id) {
           if (destinosVistos[item.origen_id]) return;
           destinosVistos[item.origen_id] = true;
         }
@@ -1902,8 +1910,15 @@
         }
         st.clusterLayer = L.layerGroup().addTo(st.map);
         // Estado inicial de la capa media pedido por opcion (index arranca
-        // APAGADA). Solo se aplica al construir el mapa, no en re-init.
+        // APAGADA). Si arranca ENCENDIDA se rellenan los tipos, igual que
+        // hace setMediaEnabled(true): sin esto renderMedia los descartaria
+        // porque mediaTypes nacen en false.
         st.mediaEnabled = !!o.mediaEnabled;
+        if (st.mediaEnabled && mediaTiposActivos() === 0) {
+          st.mediaTypes.foto = true;
+          st.mediaTypes.video = true;
+          st.mediaTypes.audio = true;
+        }
         st.mediaLayer = L.layerGroup();
         if (st.mediaEnabled) st.mediaLayer.addTo(st.map);
         st.map.on('moveend', onMoved);

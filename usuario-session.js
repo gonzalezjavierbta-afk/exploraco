@@ -1719,7 +1719,7 @@
             if (d && d.ok) {
               mostrarToast('Bono activado: ' + (opcion.nombre || opcion.clave), '#16a34a');
               cerrarBonoRef();
-              ['cargarInventario', 'cargarTienda'].forEach(function (fn) {
+              ['cargarInventario'].forEach(function (fn) {
                 if (typeof window[fn] === 'function') {
                   try { window[fn](); } catch (e) {}
                 }
@@ -2028,18 +2028,6 @@
   };
   window.ExploraCO.monedaSaldo = function (usuarioId) {
     return ecJson('/api/usuarios?tipo=moneda_saldo&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
-  };
-  window.ExploraCO.miHojaDeVida = function (usuarioId) {
-    return ecJson('/api/usuarios?tipo=artista_cv&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));
-  };
-  window.ExploraCO.guardarHojaDeVida = function (datos) {
-    var body = { tipo: 'artista_cv_editar', usuario_id: ecUid() };
-    if (datos && typeof datos === 'object') {
-      if (datos.bio !== undefined) body.bio = datos.bio;
-      if (datos.ciudad !== undefined) body.ciudad = datos.ciudad;
-      if (datos.destacado !== undefined) body.destacado = datos.destacado;
-    }
-    return ecJson('/api/usuarios', { method: 'POST', body: body });
   };
   window.ExploraCO.misContratos = function (usuarioId) {
     return ecJson('/api/interacciones?tipo=contratos_mios&usuario_id=' + encodeURIComponent(ecUid(usuarioId)));

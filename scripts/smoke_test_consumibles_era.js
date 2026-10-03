@@ -282,7 +282,19 @@ async function run() {
   var perfilSrc = fs.readFileSync(path.join(ROOT, 'mi-perfil.html'), 'utf8');
   check('4e: mi-perfil.html contiene era_exclusiva', perfilSrc.indexOf('era_exclusiva') !== -1);
   check('4f: mi-perfil.html contiene bloqueado', perfilSrc.indexOf('bloqueado') !== -1);
-  check('4g: mi-perfil.html contiene era_usuario', perfilSrc.indexOf('era_usuario') !== -1);
+  // 4g: la asercion sobre era_usuario ya no aplica. El catalogo de la tienda
+  // de consumibles se retiro de la pestana Inventario (T5: cargarTienda,
+  // renderTiendaChips, setTiendaFiltro, categoriaConsumible, PF_TIENDA_CATS,
+  // PF_TIENDA_CAT, PF_CAT_CONSUMIBLE y el CSS .store-*), por eso mi-perfil.html
+  // ya no tiene era_usuario ni consulta GET tipo=consumibles. El gate de era
+  // sigue vivo en el servidor (2a-2 lo cubre sobre el handler real) y en el
+  // cliente lo unica superficie restante es el badge .inv-era que
+  // cargarInventario pinta sobre cada consumible poseido. Por eso 4g verifica
+  // esa superficie en vez de la variable retirada.
+  check('4g-1: mi-perfil.html pinta la era en el inventario (.inv-era)',
+    perfilSrc.indexOf('inv-era') !== -1);
+  check('4g-2: mi-perfil.html ya no consulta el catalogo (tipo=consumibles)',
+    perfilSrc.indexOf('tipo=consumibles') === -1);
 
   console.log('');
   if (fails === 0) {

@@ -168,6 +168,34 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### Saneado de UI del perfil y unificacion del mapa de Comunidad (6 cambios) - relevo 2026-10-02
+
+Tanda de **6 cambios de UI** sobre `mi-perfil.html`, `comunidad.html` y `mercado.js`, decididos por el operador. Pase documental **unico (R2)**, modo express, **solo** docs de gobernanza: **NO se toco codigo en este pase**. Working tree, verificado contra los archivos reales (ADR-006); **commit PENDIENTE**. Decisiones: **DECISIONS.md ADR-080** y **ADR-081**. Tarea: **TASKS.md TSK-174**. No toca `api/*` (**8/8 INTACTO**, ADR-001/ADR-010); sin migraciones; sin cambios en produccion.
+
+- **Que se estaba haciendo:** limpiar tres superficies del perfil que estorban (misiones infladas, Hoja de Vida redundante con el Museo, catalogo de tienda que no es inventario) y **convertir dos mapas de Comunidad en uno solo**; en el camino, unificar el render de los lugares del Museo y ampliar la vista de Comunidad del Mercado para que se vea todo el producto a la venta.
+- **T1 - Cards de mision acortadas.** `#pf-misiones` renderiza una sola linea por mision con truncado y `title`; se elimino el volcado crudo de IDs de requisito que inflaba la tarjeta. Helper de render dentro de `cargarMisiones`; CSS en el silo `#pf-misiones`. Medido: `pf-misiones` = **13**.
+- **T2 - Se RETIRA el modulo Hoja de Vida del Artista (`#pf-cv`, `cargarHojaDeVida`, `v61GuardarHojaDeVida`, `.pf-v61 .v61-cv-obra`) y los helpers `ExploraCO.miHojaDeVida` / `ExploraCO.guardarHojaDeVida`.** En su lugar, `pf-museo-preview` pasa de la pestana `museo` a la `perfil` (el contenedor lleva `data-tab="perfil"`). **El hallazgo que condiciona la decision:** `artista_cv` **no es una tabla**, es la **columna** `usuarios.artista_cv` (`040_gobernanza_cartas_moneda.sql:441`), y **sigue en uso por `api/usuarios.js` y `api/pagina-destino.js`**. Por eso la retirada es **solo de UI** y el backend queda intacto. Decision: **ADR-080**.
+- **T3 - La pestana Mapa pasa de DOS mapas Leaflet a UNO SOLO.** `mymapa.js` crea la instancia unica `MapaCultural` sobre `#av-map-container` (`data-cm-mapa="1"`) y ya no contiene ningun `L.map` (**0 coincidencias**); desaparece `mm-personal-map`; `initAudiovisualMap` (que vive en `comunidad.html`, no en `mapa-cultural.js`) adopta la instancia viva via `window.MyMap.getMap()`. Mapas personales y media audiovisual conviven con los filtros y los chips de categoria operando sobre el conjunto. Decision: **ADR-081**.
+- **T4 - Lugares del tab Museo con render canonico.** "Mis lugares guardados" y "Lugares visitados" dejan de emitir HTML crudo y pasan por el helper **NUEVO `lugarCardHTML`** enrutado por `pfGruposRender`; el CSS global `.lugar-*` se sustituye por el silo atomico `#pf-lugares` (ADR-004).
+- **T5 - El tab Inventario deja de mostrar el catalogo de tienda.** Fuera el titulo de tienda, `#pf-tienda-chips`, `#pf-tienda`, `cargarTienda`, `renderTiendaChips`, `setTiendaFiltro`, `categoriaConsumible`, `PF_TIENDA_CATS`, `PF_TIENDA_CAT`, `PF_CAT_CONSUMIBLE` y el CSS `.store-*` / `.tienda-chip*` (todo con **0 coincidencias** tras el cambio). **Se conserva `cargarInventario` con su filtro `cantidad > 0`**, que ya era correcto.
+- **T6 - Mercado de Comunidad: se ve todo el producto a la venta.** Las ofertas se agrupan por **TODAS** las Casas (`cargarOfertasTodas`, `_ofertasPorCasa`) en vez de solo la Casa seleccionada, mas catalogo completo con filtros "todos / Lo tienes / Disponible" y buscador. La **validacion de propiedad al publicar no se relaja**: se refuerza en cliente con `maxPublicable` / `invCant` (VER mas ya no habilita PUBLICAR mas) y **la garantia real sigue en el servidor**. Cache-busting a `mercado.js?v=2` en `comunidad.html` y `mi-perfil.html`.
+- **Alcance:** **7** ficheros de codigo, los **7** en `M` sin commit (`git status --porcelain`).
+
+**Que sigue:**
+1. **Commit del lote** (7 ficheros de codigo + los 3 documentos de gobernanza). Es el pendiente que arrastra la tanda; ninguno de los 6 cambios esta commiteado.
+2. **Ejecutar `npm test`** con los 7 ficheros: los smokes de `smoke_grupos_perfil.js` cubren el `pfGruposRender` que T4 reutiliza, y es la comprobacion que mas puede mover la aguja tras tocar `mi-perfil.html` a fondo.
+3. **Decidir el residuo de `mymapa.js:34`** (`DEFAULTS.contenedor: 'mm-personal-map'`, elemento que ya no existe): reorientarlo a `#av-map-container` o borrarlo.
+4. **Revisar si `pf-v61` (48 ocurrencias) tiene consumidor vivo** tras retirar `.v61-cv-obra` en T2.
+5. **Smoke de unicidad del mapa** (deuda (b) de ADR-081): hoy nada comprueba que la pestana Mapa monte **una** instancia de Leaflet.
+
+**Riesgos activos:**
+- (a) **El invariante "un solo mapa" es convencional, no forzado:** `initAudiovisualMap` conserva una rama de respaldo que crea su propio `L.map` si `MyMap.getMap()` no responde. Es red de seguridad, pero significa que el fallo del modulo compartido degrada a dos mapas en silencio.
+- (b) **`artista_cv` queda sin editor en cliente:** tras T2 el campo solo se actualiza por la via de `api/usuarios.js` / `pagina-destino.js`. Capacidad viva sin superficie; decision de producto futura.
+- (c) **El refuerzo de T6 es de cortesia, no de garantia:** `maxPublicable`/`invCant` solo evitan que la UI ofrezca una accion invalida; si alguien manipula el DOM, la validacion real sigue siendo la del servidor.
+- (d) **Sin commit, las dos retiradas "duenas" pueden leerse como borrado de capacidad:** quien lea el diff sin ADR-080/ADR-081 puede asumir que el dato y el mapa tambien se eliminaron. Por eso los dos ADR van en el mismo lote.
+
+**Deuda [DEUDA]:** (a) residuo `mymapa.js:34`; (b) sin smoke de unicidad de la instancia Leaflet; (c) rama de respaldo de `initAudiovisualMap` sin cobertura; (d) `pf-v61` posiblemente huerfano; (e) `artista_cv` sin editor en cliente; (f) sin commit.
+
 ### Permisos totales + economia de turnos + smoke permanente de los grupos - relevo 2026-10-02
 
 Tanda de **optimizacion de agentes y permisos** que cierra el ciclo de TSK-171 (18.028.203 tokens) atacando las dos causas que lo hicieron caro: la **friccion de permisos** (el operador autorizando, turno a turno, cosas de rutina) y el **gasto de contexto** (turnos multiplicando `cache_read`). Working tree, verificado contra los archivos reales (ADR-006); **commit PENDIENTE**; **REINICIAR OpenCode obligatorio**. Decision: **DECISIONS.md ADR-078**. Tarea: **TASKS.md TSK-172**. Bug: **BUGS_HISTORICOS.md BUG-098 / BUG-CONFIG-7**. No toca `api/*` (**8/8 INTACTO**, ADR-001/ADR-010); sin migraciones; sin cambios en produccion.

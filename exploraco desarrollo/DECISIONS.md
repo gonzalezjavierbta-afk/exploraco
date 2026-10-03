@@ -4345,3 +4345,99 @@ el.style.display = on ? el._pfDisp : 'none';
 - (e) **Sin tarea de frontend asociada**, por decisión del operador: la incoherencia "el decay baja el valor y no se explica" es una decisión registrada, no un olvido.
 
 **ADRs relacionados:** **ADR-053** (parcialmente revocado: se ratifa el decay y la postura "informar en vez de castigar" + caps; se deroga el cooldown -- ver la sección de relación), ADR-003 (Cero Borrado Lógico: el decay no reescribe históricos, por eso es compatible con la postura de ADR-053), ADR-006 (baseline = archivo real: base de toda la evidencia de este ADR), ADR-010 (presupuesto de 8/8 funciones: este ADR no crea endpoint, extiende comportamiento en uno existente), ADR-002 (el cambio es en `api/*.js`, luego sí exige ASCII-safety; este `.md` es documento de gobernanza y va en UTF-8 normal).
+
+## ADR-080: Supresión del módulo "Hoja de Vida del Artista" en el perfil -- la retirada es de UI y `usuarios.artista_cv` se conserva INTACTA
+
+**ID:** ADR-080
+**Fecha:** 2026-10-02
+**Autor:** Chief Architect (`@architect`), por decisión expresa del operador en la tanda T1..T6
+**Estado:** ACEPTADO -- **implementado en working tree** (`mi-perfil.html`, `usuario-session.js`); **commit PENDIENTE**. Sin migración, sin tocar endpoint, sin rollback de datos.
+**Nota de numeración:** el mayor ADR registrado en este documento era **ADR-079** (verificado con grep `^## ADR-` sobre el archivo real, ADR-006, línea 4281); 080 es el siguiente consecutivo real.
+
+**Problema / Contexto:** el perfil del artista (`mi-perfil.html`) acumulaba dos superficies redundantes de portfolio personal: el **Museo** (recursos de media, ya agrupados bajo cabeceras plegables por ADR-077/TSK-171) y el módulo **"Hoja de Vida del Artista"** (`pf-cv`), un bloque de texto libre sobre el propio usuario. En la UI medida ambas compiten por el mismo espacio perceptual y la segunda no aporta una función que el Museo no cubriera. El operador decidió retirarla del perfil por **claridad de producto**, no por fallo técnico.
+
+**El hallazgo que condiciona toda la decisión (ADR-006, verificado en los archivos reales):** `artista_cv` **no es una tabla ni un módulo de backend**: es una **columna** `usuarios.artista_cv jsonb NOT NULL DEFAULT '{}'::jsonb`, creada por `db/migrations/040_gobernanza_cartas_moneda.sql:441` (con su `DROP COLUMN` de rollback en `:66`). Sigue **leída y escrita en producción** por `api/usuarios.js:849,852,858` y `api/pagina-destino.js:2650,2677`. Por tanto **la retirada es exclusivamente de cliente** y el contrato de datos **no se toca**.
+
+**Opciones evaluadas:**
+1. **Retirar solo el contenedor `#pf-cv` y dejar las funciones huérfanas.** Descartada: deja código muerto en el fichero más grande del producto (~379 KB) y contradice la higiene de no arrastrar superficies sin consumidor.
+2. **Retirar la UI y además hacer `DROP COLUMN usuarios.artista_cv`.** Descartada: **destruye datos en producción** y deja a las fichas y al perfil público sin un campo que hoy se escribe; convierte además una decisión de UI en una pérdida de dato irrecuperable.
+3. **Retirar la UI completa (contenedor + funciones + regla CSS) y conservar intacto el contrato `artista_cv`.** Adopta la opción 3.
+4. **Sustituir el módulo por la vista previa del Museo dentro del perfil.** Rechazada como decisión propia: `pf-museo-preview` se movió de la pestaña `museo` a la pestaña `perfil` para que el perfil conserve una superficie de portfolio visible, pero el Museo **no** se sustituye y permanece íntegro en su pestaña. El traslado es **complemento, no reemplazo**.
+
+**Decisión tomada (opción 3):**
+1. **Se elimina de `mi-perfil.html` el módulo en las tres capas que lo componían:** el contenedor `#pf-cv`, las funciones `cargarHojaDeVida()` y `v61GuardarHojaDeVida()`, y la regla CSS `.pf-v61 .v61-cv-obra`.
+2. **Se elimina de `usuario-session.js` los dos helpers cliente que solo existían para ese módulo:** `ExploraCO.miHojaDeVida` y `ExploraCO.guardarHojaDeVida`.
+3. **`usuarios.artista_cv`, `api/usuarios.js` y `api/pagina-destino.js` quedan INTACTOS.** El contrato de datos y su comportamiento en servidor no se tocan; la capacidad existe y sigue disponible para cualquier consumidor futuro.
+4. **La reversión es de un solo commit y sin coste de datos:** restaurar contenedor, las dos funciones, la regla CSS y los dos helpers.
+
+**Por qué (justificación):** la retirada es **de superficie, no de capacidad**. Cuando una UI se retira por claridad de producto y **no** por fallo técnico, lo correcto es separar ambas cosas de forma explícita: lo borrado es código de cliente sin comportamiento observable, y lo conservado es el único punto donde el dato vive y se usa de verdad. El riesgo de esta operación no es técnico (borrar HTML es trivial) sino **de alcance**: el error fácil era arrastrar el borrado desde el contenedor hasta la columna y desde ahí hasta la ficha del destino, y ese error habría costado datos reales y una reversión con backfill. Dejar escrito que la retirada **no** llega al backend elimina esa ambigüedad para el siguiente que lea el diff.
+
+**Impacto / superficies:**
+- **Archivos tocados (2, ambos cliente):** `mi-perfil.html` (`#pf-cv`, `cargarHojaDeVida()`, `v61GuardarHojaDeVida()`, `.pf-v61 .v61-cv-obra`) y `usuario-session.js` (`ExploraCO.miHojaDeVida`, `ExploraCO.guardarHojaDeVida`).
+- **NO se toca:** `api/usuarios.js`, `api/pagina-destino.js`, ningún `.sql`, ningún endpoint (**8/8 INTACTO**, ADR-010), ni el módulo Museo.
+- **Efecto lateral de producto:** `#pf-museo-preview` pasa a la pestaña `perfil` (`data-tab="perfil"`), de modo que el perfil conserva una superficie de portfolio visible tras la retirada.
+- **Ganancia de espacio:** se quitan del fichero más grande del producto un bloque de UI y dos funciones, en la dirección que exige el criterio de no crecimiento de `mi-perfil.html` (AGENTS.md regla 10).
+
+**Evidencia (ADR-006, verificada contra los archivos reales en este pase, no contra NEXT.md/TASKS.md):**
+- `mi-perfil.html`: `pf-cv` = **0**; `cargarHojaDeVida` = **0**; `v61GuardarHojaDeVida` = **0**; `pf-museo-preview` = **28** (CSS + el contenedor `#pf-museo-preview` con `data-tab="perfil"`).
+- `usuario-session.js`: `miHojaDeVida` = **0**; `guardarHojaDeVida` = **0**.
+- `db/migrations/040_gobernanza_cartas_moneda.sql:441` -> `ADD COLUMN IF NOT EXISTS artista_cv jsonb NOT NULL DEFAULT '{}'::jsonb;`; `:66` -> el `ALTER TABLE usuarios DROP COLUMN IF EXISTS artista_cv;` de rollback, que este ADR **no** ejecuta.
+- `api/usuarios.js:849,852,858` y `api/pagina-destino.js:2650,2677` -> consumidores reales de `artista_cv` **intactos**.
+
+**Consecuencias (positivas):** (1) el perfil deja de mostrar dos salidas de portfolio que compiten; (2) el fichero más grande del producto se aligera; (3) queda constancia de que el dato y la capacidad sobreviven, con reversión de un commit.
+
+**Consecuencias (negativas / aceptadas):** (a) **quien edite su perfil desde la UI ya no puede rellenar `artista_cv`**: el dato solo se actualizará por la vía de `api/usuarios.js`/`pagina-destino.js`; si el campo vuelve a necesitarse como editable hay que reconstruir la UI o delegar en el perfil público. (b) No queda rastro visible en la UI que explique a dónde fue la superficie retirada; se acepta por tratarse de una retirada de producto, no de un fallo. (c) El patrón "retirar UI conservando backend" queda establecido aquí, lo que **obliga a los siguientes a anunciar el alcance** en lugar de asumirlo.
+
+**Deuda / riesgos [DEUDA]:**
+- (a) **`pf-v61` sigue existiendo** en `mi-perfil.html` (48 ocurrencias) aunque se retiró su sub-regla `.v61-cv-obra`: hay que confirmar si el resto del bloque tiene consumidor vivo o es residuo del mismo módulo retirado. Se registra como revisión pendiente, no como fallo.
+- (b) **`artista_cv` queda sin editor en cliente**: capacidad viva sin superficie. Decisión de producto futura, no un bug.
+- (c) **Sin commit**: el ADR y su implementación viajan juntos en el working tree; quien despliegue el código sin leer este ADR pierde la constancia de que el backend sigue vivo a propósito.
+
+**ADRs relacionados:** ADR-003 (Cero Borrado Lógico: por qué el borrado se detiene en la UI y no llega a la columna), ADR-006 (baseline = archivo real: la evidencia de este ADR es el grep sobre los ficheros, no la intención del operador), ADR-010 (presupuesto 8/8: este ADR no crea ni toca endpoint), ADR-077 (agrupación plegable del Museo: el Museo es la superficie que sobrevive y ahora gana el lugar del módulo retirado), ADR-002 (los `.md` de gobernanza admiten UTF-8; el JS cliente retirado ya cumplía ASCII-safety).
+
+## ADR-081: Unificación de los DOS mapas de la pestaña Mapa de Comunidad en UNA sola instancia Leaflet -- `mymapa.js` crea el mapa y el mapa audiovisual lo adopta
+
+**ID:** ADR-081
+**Fecha:** 2026-10-02
+**Autor:** Chief Architect (`@architect`), por decisión expresa del operador en la tanda T1..T6
+**Estado:** ACEPTADO -- **implementado en working tree** (`mymapa.js`, `mapa-cultural.js`, `mapa-cultural.css`, `comunidad.html`); **commit PENDIENTE**. Sin migración, sin tocar endpoint, sin datos afectados.
+**Nota de numeración:** el mayor ADR registrado en este documento era **ADR-080** (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 081 es el siguiente consecutivo real.
+
+**Problema / Contexto:** la pestaña Mapa de `comunidad.html` mantenía **DOS instancias de Leaflet en paralelo**: la del módulo "Mis Mapas" (`mymapa.js`) y la de media audiovisual (`initAudiovisualMap`). Dos instancias significa dos capas de teselas, dos controles de zoom, dosdimensionado y dos ciclos de `invalidateSize()`, y -- lo que más se nota -- **dos mapas que el usuario no puede leer como uno solo**: los datos de una fuente no se ven en el contexto de la otra. El operador pidió una sola instancia con ambas fuentes conviviendo.
+
+**Opciones evaluadas:**
+1. **Conservar los dos mapas y sincronizarlos con `sync()` / eventos de movimiento.** Descartada: el problema de negocio no es la vista, es que **son dos superficies cognitivas para un mismo territorio**; además esta opción ya estaba anotada como deuda en TSK-161/ADR-071 y no aporta el resultado pedido.
+2. **Unificar en el motor compartido (`mapa-cultural.js` / `MapaCultural`) y dejar `mymapa.js` como simple fachada.** Parcialmente cierta, pero es la que más se le acerca a la inversa de lo implementado: obligaría a que el mapa deMis Mapas pasara a depender del motor cultural, que es un motor de destinos.
+3. **Que `mymapa.js` cree la instancia única sobre `#av-map-container` (marcado `data-cm-mapa="1"`) y que la capa audiovisual se enganche a esa misma instancia en lugar de crear la suya.** Adopta la opción 3.
+4. **Un solo mapa nuevo, reescribiendo los dos módulos sobre una tercera base.** Descartada por coste: LDAP-045/046 ya fijaron `mapa-cultural.js` como motor compartido; reescribirlo no aporta nada a este objetivo.
+
+**Decisión tomada (opción 3):**
+1. **`mymapa.js` es el creador único.** Construye la instancia sobre `#av-map-container` (senalizado con `data-cm-mapa="1"`) a traves del motor compartido `MapaCultural`; su configuracion declara que la capa multimedia y sus controles viajan por el mismo mapa (`MyMap.setMediaTipos` / `setMediaVista`). En `mymapa.js` **quedan 0 apariciones de `L.map`**: el modulo ya no inicializa Leaflet.
+2. **El contenedor `mm-personal-map` desaparece.** La pestaña Mapa tiene un unico contenedor de mapa.
+3. **`initAudiovisualMap` deja de crear su propio mapa en el camino normal**: adopta la instancia ya viva vía `window.MyMap.getMap()` y retorna, dejando el estado heredado `_avMap` disponible solo para `invalidateSize()`. **Se conserva la rama de respaldo** que crea un mapa propio si el motor compartido no esta listo (`L` ausente o `MyMap.getMap()` falsy), de modo que la pestaña nunca queda sin mapa aunque el modulo compartido falle; esa rama queda **degradacion, no camino normal**, y esta anotada aqui para que no se lea como una violacion de este ADR.
+4. **Ambas fuentes conviven en el mismo conjunto:** los filtros de tipo de media y los chips de categoria operan sobre el conjunto unico, no sobre dos listas separadas.
+
+**Por qué (justificación):** la unificacion no es una mejora estetica: es una correccion de **modelo mental**. Un mapa con dos fuentes que se ven en un mismo lienzo es informationally distinto de dos mapas que se ven por separado; el segundo obliga al usuario a decidir en que mapa mirar, y con frecuencia no sabe. Al centralizar la instancia en el modulo que ya era el contenedor de "Mis Mapas" se conserva la responsabilidad de cada capa (filtros de media, chips de categoria) sin duplicar la infraestructura de Leaflet, que es la parte que mas falla (dimensionado, teselas, controles). El reparto de responsabilidades queda explicito: **`mymapa.js` crea**, **`mapa-cultural.js` renderiza** y **`initAudiovisualMap` se engancha**.
+
+**Impacto / superficies:**
+- **Archivos tocados (4, todos cliente):** `mymapa.js` (crea la instancia unica, 0 `L.map`, 9 referencias a `MapaCultural`, 4 a `data-cm-mapa`), `mapa-cultural.js` (integracion; sus 2 `L.map` restantes estan en la fabrica `MapaCultural` misma, en el teardown/inicio de la instancia, que es donde deben estar), `mapa-cultural.css` (estilos del lienzo unico), `comunidad.html` (un solo contenedor, `<div id="av-map-container" class="cmx-mapa" data-cm-mapa="1">`).
+- **NO se toca:** `api/*` (**8/8 INTACTO**, ADR-010), ninguna migracion, ninguna tabla, ningun otro mapa del producto (ficha, home, admin).
+- **Efecto de rendimiento esperado:** una sola capa de teselas y un solo ciclo de `invalidateSize()` por pestana. No medido en este pase: queda como verificacion pendiente, no como afirmacion.
+
+**Evidencia (ADR-006, verificada contra los archivos reales en este pase, no contra NEXT.md/TASKS.md):**
+- `mymapa.js`: `L.map` = **0**; `initAudiovisualMap` = **0**; `MapaCultural` = **9**; `data-cm-mapa` = **4**.
+- `comunidad.html`: contenedor **unico** `<div id="av-map-container" class="cmx-mapa" data-cm-mapa="1"></div>` (`L610`); `initAudiovisualMap` esta en `L2057`; su camino de adopcion es `L2064-2067` (`window.MyMap.getMap()` + `return` temprano), y la rama de respaldo que crea mapa propio queda en `L2072` (`L.map('av-map-container')`); el comentario que documenta la unificacion esta en `L2059-2063` y `L2418`.
+- `mapa-cultural.js`: `initAudiovisualMap` = **0** (esa funcion vive en `comunidad.html`); sus unicas 2 apariciones de `L.map` estan en `L1887` (teardown de la instancia previa) y `L1890` (arranque de la instancia) dentro de la fabrica compartida.
+- `mi-perfil.html` y `mapa-cultural.css`: sin cambios de contrato con este ADR.
+
+**Consecuencias (positivas):** (1) una sola superficie de mapa con dos fuentes que se leen juntas; (2) una sola capa de teselas, un solo control de zoom, un solo `invalidateSize()`; (3) el reparto creador/renderizador/enganche queda explicito y escrito, que es lo que evita que un cuarto modulo vuelva a crear un mapa.
+
+**Consecuencias (negativas / aceptadas):** (a) **queda una rama de respaldo** en `initAudiovisualMap` que crea una segunda instancia si el modulo compartido no esta listo: es una red de seguridad, pero significa que el invariante "una sola instancia" depende de que `MyMap.getMap()` responda, y no de un mecanismo que lo impida. (b) **La dependencia es unidireccional en el codigo y la esta documentada aqui**, no rota: si `mymapa.js` falla, la pestaña puede mostrar dos mapas; conviene que el smoke futuro compruebe la unicidad en el camino normal, no solo en el degradado. (c) Los filtros de media y los chips de categoria **pasan a operar sobre el conjunto**: cualquier ajuste futuro de rendimiento debe hacerse ahi, no por fuente.
+
+**Deuda / riesgos [DEUDA]:**
+- (a) **Residuo de identificador:** `mymapa.js:34` conserva `DEFAULTS.contenedor: 'mm-personal-map'`, valor por defecto cuyo elemento **ya no existe** en el documento tras la unificacion. No rompe nada (el contenedor real se senaliza con `data-cm-mapa="1"`), pero es una cadena muerta que conviene limpiar o reorientar a `#av-map-container`.
+- (b) **Sin smoke de unicidad:** no hay ningun script que compruebe que la pestana Mapa monta **una** instancia de Leaflet. Es el gap natural de este ADR y el candidato mas obvio a `scripts/smoke_*` cuando se quiera cerrar.
+- (c) **La rama de respaldo no esta cubierta por pruebas**; si el modulo compartido cambia su contrato (`MyMap.getMap`), esa rama es la que se rompe primero y en silencio.
+- (d) **Sin commit**: implementacion y ADR viajan juntos en el working tree.
+
+**ADRs relacionados:** ADR-045 y ADR-046 (mapa cultural compartido y Mis Mapas: este ADR no los deroga, los une), ADR-071 (mapa base OSM con cadena de respaldo: la instancia unica hereda el mismo fallback de teselas), ADR-006 (baseline = archivo real: la evidencia es el grep sobre `mymapa.js`/`comunidad.html`/`mapa-cultural.js`), ADR-010 (presupuesto 8/8: este ADR no toca `api/*`), ADR-080 (misma tanda T1..T6; su decision de retirar UI conservando el backend aplica aqui por simetria: este ADR consolida UI y **no** toca ningun contrato de datos), ADR-002 (los `.md` de gobernanza admiten UTF-8; el JS cliente implicado ya cumplia ASCII-safety).
