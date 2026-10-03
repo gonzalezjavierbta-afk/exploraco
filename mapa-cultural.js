@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.2.0. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.3.0. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -9,19 +9,22 @@
 
    API PUBLICA (window.MapaCultural):
      version
-     create(opts)  -> instancia (multi-instancia por pagina)
-     init(opts)    -> instancia default; idempotente
-     refresh, setPlaces, setMedia, setMediaEnabled, setMediaTypes,
-     getMap, openDrawer, closeDrawer,
-     normalizePlace, normalizeMedia, esc, starHtml,
-     photoPlaceholderHTML, haversineKm
-     (extras de apoyo a pruebas: clusterize, filterMediaDefault,
-      filterMediaPropios)
+create(opts)  -> instancia (multi-instancia por pagina)
+      init(opts)    -> instancia default; idempotente
+      refresh, setPlaces, setMedia, setMediaEnabled, setMediaTypes,
+      setRatingMin, getRatingMin, setMediaVista, getMediaVista,
+      getMap, openDrawer, closeDrawer,
+      normalizePlace, normalizeMedia, esc, starHtml,
+      photoPlaceholderHTML, haversineKm
+      (extras de apoyo a pruebas: clusterize, filterMediaDefault,
+       filterMediaPropios)
 
    Instancia:
-     { init, refresh, destroy, setPlaces, setMedia, setMediaEnabled,
-       setMediaTypes, getMap, getState, openDrawer, closeDrawer,
-       geolocate, resetColombia, fitBounds }
+      { init, refresh, destroy, setPlaces, setMedia, setMediaEnabled,
+        setMediaTypes, setRatingMin, getRatingMin, setMediaVista,
+        getMediaVista, onFilterChange, getState, getMap, openDrawer,
+        closeDrawer, geolocate, resetColombia, fitBounds }
+
 
    Opciones index-compatibles (default = comportamiento comunidad):
      enableMediaOnAll (false): al seleccionar la categoria 'all' por clic
@@ -40,6 +43,16 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         (mapa unificado de comunidad.html, mymapa.js).
       list: si se define, los items de la lista delegan en setActive
         (pan + drawer) como el index.
+      mediaBtnSelector ('.mf-btn[data-media]'): selector de los botones de
+        media RESUELTO DENTRO de la raiz mediaControls. Se parametriza para
+        que un anfitrion con otra clase (p.ej. .mmx-mbtn) no dependa del
+        marcado del motor; si no se pasa, conserva el selector historico.
+      filterRoot (null): raiz extra donde buscar las etiquetas del
+        desplegable de filtros ([data-mf-label=...] y [data-mf-rating-out]),
+        por si el anfitrion las reparte en varios contenedores.
+      onMediaVistaChange (null): cb(vista) al cambiar la vista de la capa de
+        media entre 'sueltos' y 'albumes'. El anfitrion usa el endpoint
+        existente con el parametro vista=albumes y vuelve a setMedia.
 
    Dependencias externas permitidas: Leaflet (window.L) y, con
    guard, las utilidades de sesion de window.ExploraCO.
@@ -47,7 +60,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 (function () {
   'use strict';
 
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -203,7 +216,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       if (it.origen === 'album_grupo') {
         // v28: el album personal "Mi Museo" nunca se pinta en el mapa
         // publico (el backend ya lo excluye; defensa espejo en cliente).
-        // Match tolerante a acentos (Mí Museo) via NFD.
+        // Match tolerante a acentos (Mi Museo) via NFD.
         var t = String(it.album_titulo || it.media_title || '')
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
         return t !== 'mi museo';
@@ -566,6 +579,13 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       note: null,
       categories: null,
       mediaControls: null,
+      // Selector de los botones de media, RESUELTO DENTRO de mediaControls.
+      // H2: antes estaba hardcodeado '.mf-btn[data-media]' y cualquier
+      // anfitrion con otra clase (comunidad usa .mmx-mbtn) quedaba sin
+      // sincronizar. El default conserva el comportamiento historico.
+      mediaBtnSelector: '.mf-btn[data-media]',
+      filterRoot: null,
+      onMediaVistaChange: null,
       onMapReady: null,
       onPlaceClick: null,
       isSaved: null,
@@ -613,6 +633,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       userPos: null,
       activeId: null,
       activeCat: 'all',
+      // Filtro de puntaje minimo (0-5, paso 0.5). 0 = sin filtro; por encima
+      // de 0 los destinos sin resenas (rating 0) quedan ocultos.
+      ratingMin: 0,
+      // Vista de la capa de media: 'sueltos' (foto/video/audio) o 'albumes'
+      // (grupos destino_album / album_grupo). La vista 'albumes' se enciende
+      // con data-media="albumes" en la raiz mediaControls.
+      mediaVista: 'sueltos',
+      filterCbs: [],
       initialized: false,
       drawerEl: null,
       contentEl: null,
@@ -1120,6 +1148,30 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
     /* ---------- lista / activacion / notas ---------- */
 
+    // Rating numerico de un destino. null / undefined / no numerico / negativo
+    // se tratan como 0 (destino sin resenas), nunca como NaN.
+    function placeRating(p) {
+      var r = Number(p && p.rating);
+      if (!isFinite(r) || r < 0) return 0;
+      return r;
+    }
+
+    // UN SOLO computo del arbol de categorias (cierra H4): lo comparten
+    // filterPins (pines) y renderList (lista), sin duplicar el arbol.
+    // 'visitados' es EXCLUSIVO: manda el estado visitado y el filtro de
+    // puntaje NO se le aplica. En el resto, puntaje + categoria (AND).
+    function placesForCat(cat) {
+      var min = st.ratingMin;
+      if (cat === 'off') return [];
+      if (cat === 'all') {
+        if (!(min > 0)) return st.places.slice();
+        return st.places.filter(function (p) { return placeRating(p) >= min; });
+      }
+      if (cat === 'visitados') return st.places.filter(function (p) { return !!p.visitado; });
+      if (!(min > 0)) return st.places.filter(function (p) { return p.cat === cat; });
+      return st.places.filter(function (p) { return p.cat === cat && placeRating(p) >= min; });
+    }
+
     function renderList(cat) {
       if (!st.options.list || typeof document === 'undefined') return;
       var el = document.getElementById(st.options.list);
@@ -1128,9 +1180,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         el.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:16px">Sin categoria seleccionada - activa una para ver destinos</div>';
         return;
       }
-      var arr = (cat === 'all') ? st.places.slice()
-        : (cat === 'visitados') ? st.places.filter(function (p) { return !!p.visitado; })
-        : st.places.filter(function (p) { return p.cat === cat; });
+      var arr = placesForCat(cat);
       if (st.userPos) {
         arr.sort(function (a, b) {
           return ((a._dist != null) ? a._dist : 1e9) - ((b._dist != null) ? b._dist : 1e9);
@@ -1167,12 +1217,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     function filterPins(cat, fromUser) {
       st.activeCat = cat;
       if (!st.map) return;
-      if (cat === 'off') st.visible = [];
-      else if (cat === 'all') st.visible = st.places.slice();
-      else if (cat === 'visitados') st.visible = st.places.filter(function (p) { return !!p.visitado; });
-      else st.visible = st.places.filter(function (p) { return p.cat === cat; });
+      st.visible = placesForCat(cat);
       recluster();
       renderList(cat);
+      syncFiltroLabels();
+      fireFilterChange();
       // Index-compat: al seleccionar "Todo" con clic de usuario se enciende
       // la capa media (equivalente a index L2309-2318). Se delega en
       // setMediaEnabled(true), que ademas rellena los tipos foto/video/audio
@@ -1184,6 +1233,149 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         else renderMedia();
       }
     }
+
+    /* ---------- etiquetas de filtro, ratingMin y vista de albumes ---------- */
+
+    var CAT_LABEL_FILTRO = { all: 'Todos', off: 'Ninguna', visitados: 'Visitados' };
+
+    function filtroCatLabel() {
+      var c = st.activeCat;
+      if (!c || c === 'all') return CAT_LABEL_FILTRO.all;
+      if (c === 'off') return CAT_LABEL_FILTRO.off;
+      if (c === 'visitados') return CAT_LABEL_FILTRO.visitados;
+      return mdCatLabel(c);
+    }
+
+    function filtroMediaLabel() {
+      if (st.mediaVista === 'albumes') return '\u00c1lbumes';
+      if (!st.mediaEnabled) return 'Todos';
+      if (mediaTiposActivos() !== 1) return 'Todo';
+      if (st.mediaTypes.foto) return 'Fotos';
+      if (st.mediaTypes.video) return 'Videos';
+      return 'Audios';
+    }
+
+    // 0 = "Todos" (sin filtro); por encima de 0, el valor con estrella ASCII.
+    function filtroPuntajeLabel() {
+      if (!(st.ratingMin > 0)) return 'Todos';
+      return st.ratingMin + '\u2605';
+    }
+
+    // Raices que entrega el anfitrion donde pueden vivir las etiquetas.
+    function filtroRoots() {
+      var out = [];
+      function push(r) { if (r && r.querySelectorAll && out.indexOf(r) === -1) out.push(r); }
+      push(st.catRoot);
+      push(st.mediaRoot);
+      var fr = st.options.filterRoot;
+      if (typeof fr === 'string' && typeof document !== 'undefined') {
+        fr = document.querySelector(fr);
+      }
+      push(fr);
+      return out;
+    }
+
+    function setText(el, txt) {
+      if (!el) return;
+      try {
+        if (typeof el.textContent === 'string') { el.textContent = txt; return; }
+        if (typeof el.innerText === 'string') el.innerText = txt;
+      } catch (e) { log('setText filtro', e); }
+    }
+
+    // H3: el motor mantiene el texto de las etiquetas del desplegable de
+    // filtros si el anfitrion las trae en el DOM. Si no existen, no falla.
+    function syncFiltroLabels() {
+      var roots = filtroRoots();
+      if (!roots.length) return;
+      var textos = { dir: filtroCatLabel(), med: filtroMediaLabel(), punt: filtroPuntajeLabel() };
+      for (var i = 0; i < roots.length; i++) {
+        var r = roots[i];
+        for (var k in textos) {
+          if (!has(textos, k)) continue;
+          var els = r.querySelectorAll('[data-mf-label="' + k + '"]');
+          for (var j = 0; j < els.length; j++) setText(els[j], textos[k]);
+        }
+        var outs = r.querySelectorAll('[data-mf-rating-out]');
+        for (var m = 0; m < outs.length; m++) setText(outs[m], textos.punt);
+      }
+    }
+
+    function filtroSnapshot() {
+      return {
+        activeCat: st.activeCat,
+        ratingMin: st.ratingMin,
+        mediaEnabled: st.mediaEnabled,
+        mediaTypes: {
+          foto: st.mediaTypes.foto, video: st.mediaTypes.video, audio: st.mediaTypes.audio
+        },
+        mediaVista: st.mediaVista
+      };
+    }
+
+    // Hook para que el anfitrion reaccione a cualquier cambio de filtro.
+    function fireFilterChange() {
+      if (!st.filterCbs.length) return;
+      var snap = filtroSnapshot();
+      for (var i = 0; i < st.filterCbs.length; i++) {
+        try { st.filterCbs[i](snap); } catch (e) { log('onFilterChange', e); }
+      }
+    }
+
+    function onFilterChange(cb) {
+      if (typeof cb === 'function') st.filterCbs.push(cb);
+      return inst;
+    }
+
+    // Recalcula pines + lista + capa de media tras un cambio de filtro.
+    function applyFilters() {
+      if (st.map) {
+        st.visible = placesForCat(st.activeCat);
+        recluster();
+      }
+      renderList(st.activeCat);
+      renderMedia();
+      syncFiltroLabels();
+      fireFilterChange();
+    }
+
+    // Filtro de puntaje: 0-5, paso 0.5. Acepta number, string o el propio
+    // input del anfitrion (si trae .value, ademas dispara el filtrado).
+    function setRatingMin(v) {
+      if (v && typeof v === 'object' && 'value' in v) v = v.value;
+      var n = parseFloat(v);
+      if (isNaN(n) || !isFinite(n)) n = 0;
+      if (n < 0) n = 0;
+      if (n > 5) n = 5;
+      st.ratingMin = Math.round(n * 2) / 2;
+      applyFilters();
+      return st.ratingMin;
+    }
+
+    function getRatingMin() { return st.ratingMin; }
+
+    // Vista de la capa de media: 'albumes' enciende la vista de albumes
+    // (migracion de toggleVistaAlbumes de mymapa.js); cualquier otro valor la
+    // apaga. El anfitrion recarga la capa por onMediaVistaChange.
+    function setMediaVista(v) {
+      var nv = (v === 'albumes') ? 'albumes' : 'sueltos';
+      var cambio = (nv !== st.mediaVista);
+      st.mediaVista = nv;
+      if (nv === 'albumes' && st.mediaLayer) {
+        st.mediaEnabled = true;
+        addMediaLayer();
+      }
+      renderMedia();
+      syncMediaBtns();
+      syncFiltroLabels();
+      if (cambio && typeof st.options.onMediaVistaChange === 'function') {
+        try { st.options.onMediaVistaChange(nv); } catch (e) { log('onMediaVistaChange', e); }
+      }
+      fireFilterChange();
+      return st.mediaVista;
+    }
+
+    function getMediaVista() { return st.mediaVista; }
 
     function showNote(msg) {
       if (!st.options.note || typeof document === 'undefined') return;
@@ -1256,6 +1448,33 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       return n;
     }
 
+    // Indice de referencia (slug / uuid / key) -> destino, para resolver el
+    // rating del destino de un item de media sin consultar la red.
+    function refIndexPlaces() {
+      var m = {};
+      for (var i = 0; i < st.places.length; i++) {
+        var p = st.places[i];
+        if (!p) continue;
+        if (p.slug) m[String(p.slug)] = p;
+        if (p.uuid) m[String(p.uuid)] = p;
+        if (p.key != null) m[String(p.key)] = p;
+      }
+      return m;
+    }
+
+    // El filtro de puntaje alcanza tambien a la CAPA multimedia: la media con
+    // vinculo explicito a un destino por debajo del minimo no se pinta. Sin
+    // vinculo a destino (album_grupo propio) no hay rating que comparar y se
+    // conserva; con 'visitados' activo manda el estado visitado (exclusivo).
+    function mediaPasaRating(item, refIdx) {
+      if (!(st.ratingMin > 0)) return true;
+      if (st.activeCat === 'visitados') return true;
+      if (item.origen !== 'destino' && item.origen !== 'destino_album') return true;
+      var ref = refIdx[String(item.origen_id || '')];
+      if (!ref) return true;
+      return placeRating(ref) >= st.ratingMin;
+    }
+
     function renderMedia() {
       if (!st.initialized || !st.mediaLayer || typeof L === 'undefined') return;
       st.mediaLayer.clearLayers();
@@ -1266,11 +1485,15 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       var n = 0;
       var destinosVistos = {};
       var albumesVistos = {};
+      var soloAlbumes = (st.mediaVista === 'albumes');
+      var refIdx = (st.ratingMin > 0 && st.activeCat !== 'visitados') ? refIndexPlaces() : null;
       items.forEach(function (item) {
         var lat = parseFloat(item.lat);
         var lng = parseFloat(item.lng);
         if (!lat || !lng) return;
         var esAlbumDestino = (item.origen === 'destino_album' || item.origen === 'album_grupo');
+        if (soloAlbumes && !esAlbumDestino) return;
+        if (refIdx && !mediaPasaRating(item, refIdx)) return;
         if (!esAlbumDestino && !st.mediaTypes[item.media_type]) return;
         if (!bounds.contains([lat, lng])) return;
         if (n >= TOPE_MEDIA_PINS) return;
@@ -1296,14 +1519,29 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       });
     }
 
+    // H2: los botones se resuelven DENTRO de la raiz de medios que pasa el
+    // anfitrion (opcion mediaControls) con el selector parametrizado
+    // mediaBtnSelector. Sin opcion se conserva el '.mf-btn[data-media]'
+    // historico.
+    function mediaBtns(root) {
+      var r = root || st.mediaRoot;
+      if (!r || !r.querySelectorAll) return [];
+      var sel = st.options.mediaBtnSelector || '.mf-btn[data-media]';
+      return r.querySelectorAll(sel);
+    }
+
     function syncMediaBtns() {
       if (!st.mediaRoot) return;
       var btnAll = st.mediaRoot.querySelector('[data-media="all"]');
       if (btnAll) btnAll.classList.toggle('on', st.mediaEnabled);
-      var btns = st.mediaRoot.querySelectorAll('.mf-btn[data-media]');
+      var btns = mediaBtns();
       for (var i = 0; i < btns.length; i++) {
         var t = btns[i].getAttribute('data-media');
         if (t === 'all') continue;
+        if (t === 'albumes') {
+          btns[i].classList.toggle('on', st.mediaVista === 'albumes');
+          continue;
+        }
         btns[i].classList.toggle('on', st.mediaTypes[t] === true);
       }
     }
@@ -1326,6 +1564,8 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       if (st.mediaEnabled) addMediaLayer(); else removeMediaLayer();
       syncMediaBtns();
       renderMedia();
+      syncFiltroLabels();
+      fireFilterChange();
     }
 
     function setMediaTypes(obj) {
@@ -1341,6 +1581,8 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       }
       syncMediaBtns();
       renderMedia();
+      syncFiltroLabels();
+      fireFilterChange();
     }
 
     function setMediaItems(items) {
@@ -1362,7 +1604,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       root.addEventListener('click', function (e) {
         var b = (e.target && e.target.closest) ? e.target.closest('[data-media]') : null;
         if (!b) return;
+        if (typeof root.contains === 'function' && !root.contains(b)) return;
         var tipo = b.getAttribute('data-media');
+        if (tipo === 'albumes') {
+          // Vista de albumes: cualquier otro valor la apaga.
+          setMediaVista(st.mediaVista === 'albumes' ? 'sueltos' : 'albumes');
+          return;
+        }
+        setMediaVista('sueltos');
         if (tipo === 'all') {
           setMediaEnabled(!st.mediaEnabled);
         } else {
@@ -1373,6 +1622,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         syncMediaBtns();
       });
       syncMediaBtns();
+      syncFiltroLabels();
     }
 
     function bindCategories() {
@@ -1824,14 +2074,17 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         if (p) out.push(p);
       });
       st.places = out;
-      if (st.initialized) renderMarkers();
+      if (st.map) st.visible = placesForCat(st.activeCat);
+      if (st.initialized) { renderMarkers(); renderMedia(); }
       return inst;
     }
 
     function refresh() {
       if (!st.initialized) return inst;
+      if (st.map) st.visible = placesForCat(st.activeCat);
       renderMarkers();
       renderMedia();
+      syncFiltroLabels();
       return inst;
     }
 
@@ -1864,6 +2117,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         mediaFiltered: mediaItems(),
         activeId: st.activeId,
         activeCat: st.activeCat,
+        ratingMin: st.ratingMin,
+        mediaVista: st.mediaVista,
+        visible: st.visible.slice(),
         map: st.map,
         clusterPx: st.options.clusterPx
       };
@@ -1931,6 +2187,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         bindList();
         renderMarkers();
         renderMedia();
+        syncFiltroLabels();
       } catch (e) {
         log('init error', e);
       }
@@ -1945,6 +2202,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       setMedia: setMediaItems,
       setMediaEnabled: setMediaEnabled,
       setMediaTypes: setMediaTypes,
+      setRatingMin: setRatingMin,
+      getRatingMin: getRatingMin,
+      setMediaVista: setMediaVista,
+      getMediaVista: getMediaVista,
+      onFilterChange: onFilterChange,
       getMap: function () { return st.map; },
       getState: getState,
       openDrawer: openDrawer,
@@ -1977,6 +2239,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     setMedia: function (a) { return defaultInst().setMedia(a); },
     setMediaEnabled: function (v) { return defaultInst().setMediaEnabled(v); },
     setMediaTypes: function (o) { return defaultInst().setMediaTypes(o); },
+    setRatingMin: function (v) { return defaultInst().setRatingMin(v); },
+    getRatingMin: function () { return defaultInst().getRatingMin(); },
+    setMediaVista: function (v) { return defaultInst().setMediaVista(v); },
+    getMediaVista: function () { return defaultInst().getMediaVista(); },
+    onFilterChange: function (cb) { return defaultInst().onFilterChange(cb); },
     getMap: function () { return defaultInst().getMap(); },
     openDrawer: function (p) { return defaultInst().openDrawer(p); },
     closeDrawer: function () { return defaultInst().closeDrawer(); },

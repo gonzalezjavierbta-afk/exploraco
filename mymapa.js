@@ -23,9 +23,10 @@
    la pestana. Este modulo crea ahi la unica instancia de
    window.MapaCultural (una sola carga de tiles) y deja que la media
    audiovisual se pinte en esa misma capa, en vez de crear un segundo
-   mapa. En ese modo los botones de media del panel (filtrarMapaAV /
-   toggleVistaAlbumes) son la unica superficie de control de la capa
-   multimedia y llegan aqui por MyMap.setMediaTipos / setMediaVista.
+   mapa. En ese modo la superficie de control de la capa multimedia es el
+   desplegable "Medios" de la pagina (#mm-personal-media): el motor
+   engancha sus items [data-media] (incluida la vista de albumes) y este
+   modulo solo aporta los datos, avisado por onMediaVistaChange.
    ============================================================= */
 (function () {
   'use strict';
@@ -193,6 +194,26 @@
       // (no un string) para no depender del parseo de selector: el motor
       // engancha los clicks de [data-cat] y permite filtrar/ocultar pines.
       categories: document.getElementById('mm-personal-cats'),
+      // Controles de medios: el desplegable "Medios" de la barra .mapa-filters
+      // (ELEMENTO, igual que categories). El motor engancha sus clicks,
+      // alterna los tipos foto/video/audio y lleva la vista de albumes.
+      mediaControls: document.getElementById('mm-personal-media'),
+      // Los items de medios del panel son .mf-item (NO .mf-btn, que es la
+      // pildora de los botones libres): sin este selector el motor no los
+      // encuentra y la vista de albumes queda sin reflejar.
+      mediaBtnSelector: '.mf-item[data-media]',
+      // La barra completa: aqui viven la etiqueta y el <output> de
+      // Puntaje, que no estan dentro de las raices de categorias ni medios.
+      filterRoot: document.querySelector('#cpanel-mapa .mapa-filters'),
+      // El motor decide la vista (item [data-media="albumes"]) y aqui cambia
+      // la query del fetch de esta pagina, que sigue siendo su unico
+      // escritor de la capa multimedia.
+      onMediaVistaChange: function (vista) {
+        MEDIA_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
+        MEDIA_CACHE = null;
+        sincronizarToggleMedia();
+        recargarMedia();
+      },
       // onMapReady llega sincrono antes de que mc quede asignado:
       // por eso se usa el mapa recibido, no mc.getMap(). Tras
       // invalidateSize(), fuera del ciclo sincrono, mc ya esta asignado.
@@ -421,11 +442,11 @@
   }
 
   function asegurarToggleMedia() {
-    // Mapa unificado: los controles de media son los botones del panel
-    // (filtrarMapaAV / toggleVistaAlbumes), que escriben aqui por
-    // setMediaTipos / setMediaVista. No se crea el toggle duplicado
-    // .mmx-media para no tener dos superficies de estado sobre la misma
-    // capa. En modo clasico se conserva tal cual.
+    // Mapa unificado: los controles de media son los items [data-media] del
+    // desplegable que trae la pagina (#mm-personal-media), y los engancha
+    // el motor con mediaControls. No se crea el toggle duplicado .mmx-media
+    // para no tener dos superficies de estado sobre la misma capa. En modo
+    // clasico se conserva tal cual.
     if (S.unificado) return;
     var existente = document.getElementById('mm-personal-media');
     if (existente) { existente.style.display = ''; return; }
@@ -887,6 +908,14 @@
     return (mc && mc.getMap) ? mc.getMap() : null;
   }
 
+  // Instancia del motor compartido creada aqui. La pagina se engancha a
+  // ESTA instancia (onFilterChange / setRatingMin): usar la facade estatica
+  // window.MapaCultural crearia una instancia por defecto distinta, con otro
+  // mapa. Devuelve null hasta que init() haya corrido.
+  function getMC() {
+    return mc;
+  }
+
   // true si este modulo esta a cargo del mapa unico de la pagina.
   function esUnificado() {
     return !!S.unificado;
@@ -905,12 +934,15 @@
   }
 
   // Vista de la capa: 'sueltos' (media individual) o 'albumes' (grupos).
-  // Cambia la query del endpoint existente, de modo que recarga la capa.
+  // El estado lo lleva el motor compartido (item [data-media="albumes"] del
+  // panel); aqui solo se delega y el reload de la capa llega solo por
+  // onMediaVistaChange. La query del endpoint existente sigue cambiando
+  // aqui, que es lo unico que este modulo hace con la vista.
   function setMediaVista(vista) {
+    var m = ensureMC();
+    if (m && typeof m.setMediaVista === 'function') return m.setMediaVista(vista);
     MEDIA_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
     MEDIA_CACHE = null;
-    MEDIA_USER_TOUCHED = true;
-    sincronizarToggleMedia();
     recargarMedia();
     return MEDIA_VISTA;
   }
@@ -931,6 +963,7 @@
     refresh: refresh,
     openNuevo: openNuevo,
     getMap: getMap,
+    getMC: getMC,
     esUnificado: esUnificado,
     setMediaTipos: setMediaTipos,
     setMediaVista: setMediaVista,

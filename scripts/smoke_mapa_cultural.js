@@ -20,10 +20,10 @@ vm.runInContext(src, sandbox, { filename: 'mapa-cultural.js' });
 
 const MC = sandbox.window.MapaCultural;
 check('API: window.MapaCultural expuesto', !!MC);
-// Version explicita (no comodin): 1.2.0 unifico los mapas de Comunidad en
-// una sola instancia Leaflet. Si el motor vuelve a 1.1.1 o sube de 1.2.0,
-// el smoke debe seguir detectando la regresion de version.
-check('API: version 1.2.0', MC && MC.version === '1.2.0');
+// Version explicita (no comodin): 1.3.0 sumo ratingMin (filtro de puntaje
+// de pines y capa multimedia) y el selector parametrizado de medios. Si el
+// motor vuelve a 1.2.0 o sube de 1.3.0, el smoke debe detectar la regresion.
+check('API: version 1.3.0', MC && MC.version === '1.3.0');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
@@ -407,5 +407,221 @@ check('1.2.0 init: dos llamadas devuelven la MISMA instancia', def1 === def2);
 check('1.2.0 init: la instancia default expone el contrato', !!def1 && typeof def1.getState === 'function' && typeof def1.getMap === 'function');
 check('1.2.0 comunidad.html delega el mapa en MyMap (sin 2o Leaflet)', /window\.MyMap\.init/.test(comunidadHtml) && /window\.MyMap\.getMap/.test(comunidadHtml));
 check('1.2.0 comunidad.html guarda doble init con _leaflet_id', /_leaflet_id/.test(comunidadHtml));
+
+// ---- (12) ratingMin: contrato (default, cuantizacion, clamp) --------
+// El motor expone setRatingMin/getRatingMin; el estado nace en 0 y el
+// valor se redondea a pasos de 0.5 con clamp a [0, 5]. Acepta number,
+// string o el propio input .value del anfitrion.
+groups.length = 0;
+var rateA = MC2.create({ map: 'mm-personal-map', mediaFilter: false });
+check('ratingMin: default 0', rateA.getRatingMin() === 0);
+check('ratingMin: cuantiza 3.3 -> 3.5', rateA.setRatingMin(3.3) === 3.5);
+check('ratingMin: cuantiza string 2.4 -> 2.5', rateA.setRatingMin('2.4') === 2.5);
+check('ratingMin: clamp inferior -1 -> 0', rateA.setRatingMin(-1) === 0);
+check('ratingMin: clamp superior 9 -> 5', rateA.setRatingMin(9) === 5);
+check('ratingMin: acepta input.value 4.4 -> 4.5', rateA.setRatingMin({ value: '4.4' }) === 4.5);
+check('ratingMin: no numerico -> 0', rateA.setRatingMin('abc') === 0);
+
+// ---- (13) ratingMin filtra PINES; rating 0/null ocultos -------------
+// Con ratingMin > 0 un destino sin resenas (rating 0 o no numerico, que
+// normalizePlace/placeRating tratan como 0) queda OCULTO. Volver a 0 lo
+// restaura: el umbral es el unico motivo de la desaparicion.
+var ratePlaces = [
+  MC.normalizePlace({ slug: 'alta', cat: 'hostal', nombre: 'Alta', lat: 4.6, lng: -74.1, rating: 4.5 }),
+  MC.normalizePlace({ slug: 'cero', cat: 'hostal', nombre: 'Cero', lat: 4.7, lng: -74.2, rating: 0 }),
+  MC.normalizePlace({ slug: 'nula', cat: 'hostal', nombre: 'Nula', lat: 4.8, lng: -74.3, rating: null })
+];
+groups.length = 0;
+var rateB = MC2.create({ map: 'mm-personal-map', mediaFilter: false });
+rateB.setPlaces(ratePlaces);
+check('ratingMin pines: sin umbral los 3 visibles', rateB.getState().visible.length === 3);
+rateB.setRatingMin(0.5);
+var visB = rateB.getState().visible;
+check('ratingMin pines: rating 0/null ocultos, >=0.5 visible', visB.length === 1 && visB[0].slug === 'alta');
+check('ratingMin pines: no numerico cuenta como 0 (oculto)', visB.every(function (p) { return p.slug !== 'nula' && p.slug !== 'cero'; }));
+rateB.setRatingMin(0);
+check('ratingMin pines: volver a 0 restaura los 3', rateB.getState().visible.length === 3);
+
+// ---- (14) ratingMin filtra la CAPA multimedia -----------------------
+// El mismo umbral que oculta pines oculta la media con vinculo explicito
+// a un destino por debajo del minimo; no es un filtro solo de pines.
+groups.length = 0;
+var rateC = MC2.create({ map: 'mm-personal-map', mediaFilter: false });
+rateC.setPlaces([
+  MC.normalizePlace({ slug: 'alta', cat: 'hostal', lat: 4.6, lng: -74.1, rating: 4.5 }),
+  MC.normalizePlace({ slug: 'cero', cat: 'hostal', lat: 4.7, lng: -74.2, rating: 0 })
+]);
+rateC.setMedia([
+  { origen: 'destino', origen_id: 'alta', media_url: 'mA', media_type: 'foto', lat: 4.6, lng: -74.1 },
+  { origen: 'destino', origen_id: 'cero', media_url: 'mC', media_type: 'foto', lat: 4.7, lng: -74.2 }
+]);
+var mediaLayerC = groups[groups.length - 1];
+rateC.setMediaEnabled(true);
+check('ratingMin media: sin umbral pinta los 2 pines de media', mediaLayerC.__added.length === 2);
+rateC.setRatingMin(1);
+check('ratingMin media: umbral oculta el pin de media con rating 0', mediaLayerC.__added.length === 1);
+
+// ---- (15) ratingMin es interseccion con la categoria (AND) ----------
+// Con categoria activa y ratingMin > 0 el resultado es cat Y rating.
+groups.length = 0;
+var rateD = MC2.create({ map: 'mm-personal-map', categories: '#mm-personal-cats', mediaFilter: false });
+rateD.setPlaces([
+  MC.normalizePlace({ slug: 'hostal-alta', cat: 'hostal', lat: 4.6, lng: -74.1, rating: 4.5 }),
+  MC.normalizePlace({ slug: 'hostal-cero', cat: 'hostal', lat: 4.61, lng: -74.11, rating: 0 }),
+  MC.normalizePlace({ slug: 'comida-alta', cat: 'comida', lat: 4.7, lng: -74.2, rating: 4.5 }),
+  MC.normalizePlace({ slug: 'comida-cero', cat: 'comida', lat: 4.71, lng: -74.21, rating: 0 })
+]);
+var clickD = catsRoot.__handlers.click;
+clickD({ target: btnHostal });
+rateD.setRatingMin(1);
+var visD = rateD.getState().visible;
+check('ratingMin + categoria: interseccion (solo hostal-alta)', visD.length === 1 && visD[0].slug === 'hostal-alta' && visD[0].cat === 'hostal');
+
+// ---- (16) VISITADOS sigue EXCLUYENTE frente a ratingMin -------------
+// Con 'visitados' activo manda el estado visitado: el filtro de puntaje
+// NO se le aplica. Un lugar visitado con rating 0 debe seguir visible.
+var btnVisitados = mkEl('');
+btnVisitados.getAttribute = function (n) { return (n === 'data-cat') ? 'visitados' : null; };
+btnVisitados.closest = function (s) { return (s === '[data-cat]') ? this : null; };
+catsRoot._on.push(btnVisitados);
+groups.length = 0;
+var rateE = MC2.create({ map: 'mm-personal-map', categories: '#mm-personal-cats', mediaFilter: false });
+rateE.setPlaces([
+  MC.normalizePlace({ slug: 'vis', cat: 'hostal', visitado: true, rating: 0, lat: 4.6, lng: -74.1 }),
+  MC.normalizePlace({ slug: 'novis', cat: 'hostal', visitado: false, rating: 5, lat: 4.7, lng: -74.2 })
+]);
+var clickE = catsRoot.__handlers.click;
+clickE({ target: btnVisitados });
+rateE.setRatingMin(2);
+var visE = rateE.getState().visible;
+check('visitados excluyente: ratingMin no se aplica (visita rating 0 visible)', visE.length === 1 && visE[0].slug === 'vis');
+
+// ---- (17) sincronizacion de ETIQUETAS del filtro --------------------
+// H3: si el anfitrion trae [data-mf-label] / [data-mf-rating-out] en su
+// raiz (filterRoot), el motor actualiza su texto al cambiar el filtro.
+// Si esas etiquetas no existen, no revienta.
+var lblDir = { textContent: '', getAttribute: function (n) { return (n === 'data-mf-label') ? 'dir' : null; } };
+var lblMed = { textContent: '', getAttribute: function (n) { return (n === 'data-mf-label') ? 'med' : null; } };
+var lblPunt = { textContent: '', getAttribute: function (n) { return (n === 'data-mf-label') ? 'punt' : null; } };
+var outPunt = { textContent: '' };
+var filterRoot = {
+  querySelectorAll: function (sel) {
+    if (sel === '[data-mf-label="dir"]') return [lblDir];
+    if (sel === '[data-mf-label="med"]') return [lblMed];
+    if (sel === '[data-mf-label="punt"]') return [lblPunt];
+    if (sel === '[data-mf-rating-out]') return [outPunt];
+    return [];
+  }
+};
+groups.length = 0;
+var lblInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false, filterRoot: filterRoot });
+lblInst.setRatingMin(2);
+check('labels: [data-mf-label="punt"] refleja el umbral', lblPunt.textContent === '2\u2605');
+check('labels: [data-mf-rating-out] refleja el umbral', outPunt.textContent === '2\u2605');
+check('labels: [data-mf-label="dir"] refleja la categoria', lblDir.textContent === 'Todos');
+var emptyRoot = { querySelectorAll: function () { return []; } };
+var noLblThrow = true;
+try {
+  var noLblInst = MC2.create({ map: 'mm-personal-map', mediaFilter: false, filterRoot: emptyRoot });
+  noLblInst.setRatingMin(3);
+} catch (e) { noLblThrow = false; }
+check('labels: raiz sin etiquetas no revienta', noLblThrow);
+
+// ---- (18) mediaBtnSelector parametrizado ----------------------------
+// H2: el motor engancha los items [data-media] DENTRO de la raiz del
+// anfitrion con el selector que este pase, no con '.mf-btn' hardcodeado.
+var seenSelectors = [];
+var mediaRoot = {
+  addEventListener: function (t, fn) { this.__handlers = this.__handlers || {}; this.__handlers[t] = fn; },
+  querySelector: function (sel) {
+    if (sel === '[data-media="all"]') return { classList: { toggle: function () {} } };
+    return null;
+  },
+  querySelectorAll: function (sel) {
+    seenSelectors.push(sel);
+    if (sel === '.custom-mbtn[data-media]') {
+      return [{ getAttribute: function (n) { return (n === 'data-media') ? 'foto' : null; }, classList: { toggle: function () {} } }];
+    }
+    return [];
+  },
+  contains: function () { return true; }
+};
+groups.length = 0;
+MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaControls: mediaRoot, mediaBtnSelector: '.custom-mbtn[data-media]' });
+check('mediaBtnSelector: el motor consulta el selector pasado', seenSelectors.indexOf('.custom-mbtn[data-media]') !== -1);
+check('mediaBtnSelector: no usa el hardcode .mf-btn[data-media]', seenSelectors.indexOf('.mf-btn[data-media]') === -1);
+
+// ---- (19) contrato de markup de los DESPLEGABLES (3 paginas) --------
+// Parseo estatico de los HTML reales, sin simulacion.
+function countRe(re, s) { var m = s.match(re); return m ? m.length : 0; }
+
+function mfToggles(html) { return countRe(/data-mf-toggle="(dir|med|punt)"/g, html); }
+function mfPanels(html) { return countRe(/data-mf-panel="(dir|med|punt)"/g, html); }
+function mfPanelsHidden(html) { return countRe(/data-mf-panel="(dir|med|punt)"[^>]*\shidden\b/g, html); }
+function mfLabels(html) { return countRe(/class="mf-drop-label" data-mf-label="(dir|med|punt)"/g, html); }
+function mfMediaItems(html) { return countRe(/data-media="[^"]+"/g, html); }
+function mfFreeButtons(html) { return countRe(/class="mf-btn(?=["\s])/g, html); }
+
+// Paneles reales por conteo de <div>/</div> anidados. Devuelve true si el
+// indice de la aguja cae dentro de algun [data-mf-panel].
+function insideMfPanel(html, needle) {
+  var idx = html.indexOf(needle);
+  if (idx === -1) return false;
+  var panelRe = /<div[^>]*data-mf-panel="[^"]*"[^>]*>/g;
+  var tagRe = /<div\b[^>]*>|<\/div>/g;
+  var m;
+  while ((m = panelRe.exec(html))) {
+    tagRe.lastIndex = m.index;
+    var depth = 0, end = -1, t;
+    while ((t = tagRe.exec(html))) {
+      if (t[0].substr(0, 2) === '</') depth--; else depth++;
+      if (depth === 0) { end = tagRe.lastIndex; break; }
+    }
+    if (end !== -1 && idx >= m.index && idx < end) return true;
+  }
+  return false;
+}
+
+function a11yToggles(html) {
+  var ctl = true, lbl = true;
+  ['dir', 'med', 'punt'].forEach(function (k) {
+    var m = html.match(new RegExp('<button[^>]*data-mf-toggle="' + k + '"[^>]*>'));
+    if (!m) { ctl = false; lbl = false; return; }
+    var tag = m[0];
+    var cm = tag.match(/aria-controls="([^"]+)"/);
+    if (!cm || html.indexOf('id="' + cm[1] + '"') === -1) ctl = false;
+    if (!/aria-label="[^"]+"/.test(tag)) lbl = false;
+  });
+  return { ctl: ctl, lbl: lbl };
+}
+
+var pages = [
+  { nombre: 'index', html: indexHtml },
+  { nombre: 'comunidad', html: comunidadHtml }
+];
+pages.forEach(function (pg) {
+  var h = pg.html, n = pg.nombre;
+  check('markup ' + n + ': 3 data-mf-toggle (dir/med/punt)', mfToggles(h) === 3);
+  check('markup ' + n + ': 3 data-mf-panel con hidden', mfPanels(h) === 3 && mfPanelsHidden(h) === 3);
+  check('markup ' + n + ': 3 data-mf-label', mfLabels(h) === 3);
+  check('markup ' + n + ': 5 items [data-media] con albumes', mfMediaItems(h) === 5 && /data-media="albumes"/.test(h));
+  check('markup ' + n + ': 1 solo #mf-rating con min/max/step', countRe(/id="mf-rating"/g, h) === 1 && /id="mf-rating"[^>]*min="0"[^>]*max="5"[^>]*step="0\.5"/.test(h));
+  check('markup ' + n + ': 1 [data-mf-rating-out] de markup', countRe(/data-mf-rating-out[>\s]/g, h) === 1);
+  check('markup ' + n + ': exactamente 1 [data-cat="visitados"]', countRe(/data-cat="visitados"/g, h) === 1);
+  check('markup ' + n + ': 0 [data-cat="visitados"] dentro de .mf-panel', insideMfPanel(h, 'data-cat="visitados"') === false);
+  var a = a11yToggles(h);
+  check('markup ' + n + ': aria-controls apunta a panel existente', a.ctl);
+  check('markup ' + n + ': cada toggle tiene aria-label', a.lbl);
+});
+check('markup index: 4 botones libres (visitados/locate/colombia/solo mio)', mfFreeButtons(indexHtml) === 4);
+check('markup comunidad: boton libre Visitados presente', mfFreeButtons(comunidadHtml) === 1);
+check('markup comunidad: 0 boton Solo mio', comunidadHtml.indexOf('mm-solo-mio') === -1 && comunidadHtml.indexOf('Solo mio') === -1);
+
+// ---- (20) migracion: toggleVistaAlbumes / filtrarMapaAV retirados ---
+var mymapaJs = fs.readFileSync(path.join(__dirname, '..', 'mymapa.js'), 'utf8');
+check('migracion: mymapa.js sin toggleVistaAlbumes', mymapaJs.indexOf('toggleVistaAlbumes') === -1);
+check('migracion: mymapa.js sin filtrarMapaAV', mymapaJs.indexOf('filtrarMapaAV') === -1);
+check('migracion: comunidad.html sin toggleVistaAlbumes', comunidadHtml.indexOf('toggleVistaAlbumes') === -1);
+check('migracion: comunidad.html sin filtrarMapaAV', comunidadHtml.indexOf('filtrarMapaAV') === -1);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

@@ -436,10 +436,39 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .mapa-full-section{background:var(--black)}
 .mapa-topbar{display:flex;align-items:center;gap:14px;padding:12px 4% 10px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.06)}
 .mapa-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#fff;white-space:nowrap;margin-right:6px}
-.mapa-filters{position:absolute;top:10px;left:52px;right:58px;z-index:900;display:flex;gap:7px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding:0 0 5px;scrollbar-width:none;-ms-overflow-style:none}
+.mapa-filters{position:absolute;top:10px;left:52px;right:58px;z-index:900;display:flex;align-items:flex-start;gap:7px;flex-wrap:wrap;overflow:visible;padding:0 0 5px;scrollbar-width:none;-ms-overflow-style:none}
 .mapa-filters::-webkit-scrollbar{display:none}
 .mf-btn{flex:0 0 auto;padding:7px 14px;border:1px solid rgba(255,255,255,.18);background:rgba(15,20,25,.85);font-size:11px;font-weight:700;color:#fff;letter-spacing:.2px;cursor:pointer;border-radius:999px;transition:all .15s;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .mf-btn:hover,.mf-btn.on{border-color:var(--gold);color:#fff;background:var(--gold)}
+/* -- MAPA FILTROS | desplegables (silo .mapa-filters, ADR-004) -- */
+.mapa-filters .mf-drop{position:relative;flex:0 0 auto}
+.mapa-filters .mf-drop-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid rgba(255,255,255,.18);background:rgba(15,20,25,.85);font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:#fff;letter-spacing:.2px;cursor:pointer;border-radius:999px;transition:all .15s;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.mapa-filters .mf-drop-btn:hover{border-color:var(--gold);background:rgba(255,74,0,.32)}
+.mapa-filters .mf-drop-btn[aria-expanded="true"]{border-color:var(--gold);background:var(--gold)}
+.mapa-filters .mf-drop-ic{font-size:12px;line-height:1}
+.mapa-filters .mf-drop-label{line-height:1}
+.mapa-filters .mf-caret{font-size:9px;line-height:1;opacity:.7;transition:transform .18s}
+.mapa-filters .mf-drop-btn[aria-expanded="true"] .mf-caret{transform:rotate(180deg)}
+.mapa-filters .mf-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:950;min-width:158px;max-height:190px;overflow-y:auto;padding:6px;background:rgba(10,16,26,.97);border:1px solid rgba(255,255,255,.15);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.55);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.mapa-filters .mf-panel[hidden]{display:none}
+.mapa-filters .mf-panel::-webkit-scrollbar{width:4px}
+.mapa-filters .mf-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:2px}
+.mapa-filters .mf-item{display:block;width:100%;text-align:left;padding:7px 10px;margin:0 0 2px;border:1px solid transparent;border-radius:6px;background:transparent;font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;letter-spacing:.2px;color:rgba(255,255,255,.85);cursor:pointer;transition:all .12s;white-space:nowrap}
+.mapa-filters .mf-item:hover{background:rgba(255,74,0,.14);border-color:rgba(255,74,0,.32);color:#fff}
+.mapa-filters .mf-item.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:700}
+/* -- MAPA FILTROS | puntaje vertical (rotacion CSS pura, sin JS ni librerias) -- */
+.mapa-filters .mf-range-wrap{display:flex;flex-direction:column;gap:8px;padding:2px 6px 4px;min-width:136px}
+.mapa-filters .mf-range-out{display:block;text-align:center;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--gold)}
+.mapa-filters .mf-range-track{position:relative;height:126px;width:100%}
+.mapa-filters .mf-tick{position:absolute;left:2px;font-size:9px;font-weight:700;line-height:1;color:rgba(255,255,255,.45)}
+.mapa-filters .mf-tick-top{top:0}
+.mapa-filters .mf-tick-bot{bottom:0}
+.mapa-filters .mf-range{position:absolute;top:50%;left:50%;width:112px;height:22px;margin:-11px 0 0 -56px;background:transparent;transform:rotate(-90deg);cursor:pointer;-webkit-appearance:none;appearance:none}
+.mapa-filters .mf-range::-webkit-slider-runnable-track{width:100%;height:4px;border-radius:999px;background:rgba(255,255,255,.2)}
+.mapa-filters .mf-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border-radius:50%;background:var(--gold);border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.55)}
+.mapa-filters .mf-range::-moz-range-track{width:100%;height:4px;border-radius:999px;background:rgba(255,255,255,.2)}
+.mapa-filters .mf-range::-moz-range-progress{height:4px;border-radius:999px;background:var(--gold)}
+.mapa-filters .mf-range::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--gold);border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.55)}
 .mapa-body-grid{display:grid;grid-template-columns:260px 1fr;height:380px}
 .mapa-list-panel{background:#0D1520;border-right:1px solid rgba(255,255,255,.06);overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
 .mapa-list-panel::-webkit-scrollbar{width:4px}
@@ -486,7 +515,23 @@ textarea.wrinp{resize:vertical;min-height:88px}
   .mapa-list-inner{display:none}
   .mapa-list-panel.open .mapa-list-inner{display:flex;max-height:340px;overflow-y:auto}
   .mapa-filters{left:52px;right:64px}
+  .mapa-filters .mf-panel{max-height:150px}
   .mapa-topbar{padding:10px 4% 8px}
+}
+@media(max-width:480px){
+  .mapa-filters{gap:5px;padding:0 0 4px}
+  .mapa-filters .mf-drop-btn{padding:7px 10px}
+  .mapa-filters .mf-drop-label,.mapa-filters .mf-btn-label{display:none}
+  .mapa-filters .mf-caret{font-size:8px}
+  .mapa-filters .mf-btn{padding:7px 10px}
+  .mapa-filters .mf-panel{min-width:142px;max-height:142px}
+  .mapa-filters .mf-item{padding:6px 8px}
+  .mapa-filters .mf-range-track{height:104px}
+}
+@media(max-width:360px){
+  .mapa-filters{gap:4px}
+  .mapa-filters .mf-drop-btn{padding:6px 8px;gap:4px}
+  .mapa-filters .mf-btn{padding:6px 8px}
 }
 
 /* -- MAPA | MEDIA (pines multimedia) -- */
@@ -901,7 +946,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <script src="agenda-shared.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
-<script src="mapa-cultural.js?v=11"></script>
+<script src="mapa-cultural.js?v=13"></script>
 <script src="mapa-fullscreen.js?v=1"></script>
 <style>
 /* ec-welcome overlay: onboarding de primer acceso. Prefijo wl- exclusivo. */
@@ -1049,21 +1094,44 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <div class="mapa-map-container" id="mapa-map-container">
       <div id="leaflet-map"></div><div class="mapa-note" id="mapa-note"></div>
       <div class="mapa-filters">
-      <div class="mf-btn on" data-cat="all">Todo</div>
-      <div class="mf-btn" data-cat="hostal">🏨 Hospedaje</div>
-      <div class="mf-btn" data-cat="comida">🍽️ Comida</div>
-      <div class="mf-btn" data-cat="sitio">🏔️ Naturaleza</div>
-      <div class="mf-btn" data-cat="evento">🎉 Eventos</div>
-      <div class="mf-btn" data-cat="visitados">✓ Visitados</div>
-      <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)">📍 Cerca de mí</div>
-      <div class="mf-btn" onclick="resetMapaColombia()">🗺️ Colombia</div>
-      <span class="mf-sep"></span>
-      <div class="mf-btn" data-media="all">📸 Media</div>
-      <div class="mf-btn" data-media="foto">Fotos</div>
-      <div class="mf-btn" data-media="video">Videos</div>
-      <div class="mf-btn" data-media="audio">Audios</div>
-      <div class="mf-btn" id="mm-vista-albumes" onclick="setMapaMediaVista(this,'albumes')">&#x1F4DA; Álbumes</div>
-      <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))">Solo mío</div>
+        <div class="mf-drop">
+          <button type="button" class="mf-drop-btn" data-mf-toggle="dir" aria-expanded="false" aria-controls="mf-panel-dir" aria-label="Directorio"><span class="mf-drop-ic" aria-hidden="true">&#x1F5FA;&#xFE0F;</span><span class="mf-drop-label" data-mf-label="dir">Directorio</span><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
+          <div class="mf-panel" id="mf-panel-dir" data-mf-panel="dir" hidden>
+            <button type="button" class="mf-item" data-cat="all">Todos</button>
+            <button type="button" class="mf-item" data-cat="hostal">&#x1F3E8; Hospedaje</button>
+            <button type="button" class="mf-item" data-cat="comida">&#x1F37D;&#xFE0F; Comida</button>
+            <button type="button" class="mf-item" data-cat="sitio">&#x1F3D4;&#xFE0F; Naturaleza</button>
+            <button type="button" class="mf-item" data-cat="evento">&#x1F389; Eventos</button>
+          </div>
+        </div>
+        <div class="mf-drop">
+          <button type="button" class="mf-drop-btn" data-mf-toggle="med" aria-expanded="false" aria-controls="mf-panel-med" aria-label="Medios"><span class="mf-drop-ic" aria-hidden="true">&#x1F4F8;</span><span class="mf-drop-label" data-mf-label="med">Medios</span><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
+          <div class="mf-panel" id="mf-panel-med" data-mf-panel="med" hidden>
+            <button type="button" class="mf-item" data-media="all">&#x1F4F8; Media</button>
+            <button type="button" class="mf-item" data-media="foto">&#x1F4F7; Fotos</button>
+            <button type="button" class="mf-item" data-media="video">&#x1F4FC; Videos</button>
+            <button type="button" class="mf-item" data-media="audio">&#x1F3A7; Audios</button>
+            <button type="button" class="mf-item" data-media="albumes">&#x1F4DA; Albumes</button>
+          </div>
+        </div>
+        <div class="mf-drop">
+          <button type="button" class="mf-drop-btn" data-mf-toggle="punt" aria-expanded="false" aria-controls="mf-panel-punt" aria-label="Puntaje"><span class="mf-drop-ic" aria-hidden="true">&#x2B50;</span><span class="mf-drop-label" data-mf-label="punt">Puntaje</span><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
+          <div class="mf-panel" id="mf-panel-punt" data-mf-panel="punt" hidden>
+            <div class="mf-range-wrap">
+              <output class="mf-range-out" data-mf-rating-out>Todos</output>
+              <div class="mf-range-track">
+                <span class="mf-tick mf-tick-top">5</span>
+                <input type="range" id="mf-rating" class="mf-range" min="0" max="5" step="0.5" value="0" orient="vertical">
+                <span class="mf-tick mf-tick-bot">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="mf-sep"></span>
+        <div class="mf-btn" data-cat="visitados" aria-label="Visitados"><span aria-hidden="true">&#10003;</span> <span class="mf-btn-label">Visitados</span></div>
+        <div class="mf-btn mf-loc" id="mf-locate" onclick="geolocateMapa(this)" aria-label="Cerca de mi"><span aria-hidden="true">&#x1F4CD;</span> <span class="mf-btn-label">Cerca de mi</span></div>
+        <div class="mf-btn" onclick="resetMapaColombia()" aria-label="Colombia"><span aria-hidden="true">&#x1F5FA;&#xFE0F;</span> <span class="mf-btn-label">Colombia</span></div>
+        <div class="mf-btn" id="mm-solo-mio" onclick="setMapaMediaSoloMio(this.classList.toggle('on'))" aria-label="Solo mio"><span aria-hidden="true">&#x1F464;</span> <span class="mf-btn-label">Solo mio</span></div>
       </div>
       <div class="mapa-drawer" id="mapa-drawer" aria-hidden="true">
     <div class="md-backdrop" id="md-backdrop" onclick="closeMapaDrawer()"></div>
@@ -2301,6 +2369,10 @@ var INDEX_MC_OPTS = {
   note: 'mapa-note',
   categories: '.mapa-filters',
   mediaControls: '.mapa-filters',
+  // Los items de medios son .mf-item (no .mf-btn) dentro del panel med.
+  mediaBtnSelector: '.mf-item[data-media]',
+  // Raiz extra donde el motor busca [data-mf-label] y [data-mf-rating-out].
+  filterRoot: '.mapa-filters',
   enableMediaOnAll: true,
   mediaEnabled: false,
   // Media del mapa cultural: se conservan las FOTOS de espacios creados
@@ -2339,6 +2411,15 @@ function initMapaSection() {
   // refreshMapaMarkers() (ya con MAPA_PLACES/MAPA_MEDIA poblados por
   // el connector). Se replica siempre que el mapa exista.
   if(mcMapa && mcMapa.getMap()) refreshMapaMarkers();
+  if(mcMapa) {
+    // Las etiquetas del desplegable siguen al filtro del motor (una sola vez).
+    bindMapaFiltroLabels(mcMapa);
+    // El deslizador pudo moverse antes de que existiera el motor.
+    var mfR = document.getElementById('mf-rating');
+    if(mfR && typeof mcMapa.setRatingMin === 'function' && parseFloat(mfR.value) > 0){
+      mcMapa.setRatingMin(mfR.value);
+    }
+  }
   return mcMapa;
 }
 
@@ -2383,6 +2464,159 @@ function toggleMapaLista(btn) {
   if(!panel) return;
   var open = panel.classList.toggle('open');
   btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+/* -- FILTROS DEL MAPA: 3 desplegables + deslizador de puntaje (host) --
+   Los desplegables (.mf-drop-btn / .mf-panel) son markup estatico de la
+   barra .mapa-filters: aqui solo se alterna aria-expanded y el atributo
+   hidden del panel que indica aria-controls (ADR-003: nunca se borra un
+   nodo del DOM). Los VALORES de filtro son del motor mapa-cultural.js;
+   las etiquetas solo se inicializan si el motor todavia no las escribio
+   (mfWriteText no pisa un texto ya sincronizado). */
+var MF_STAR = '\u2605';
+var mfDropsBound = false;
+var mfFiltroCbBound = false;
+
+function mfDropBtns() {
+  var bar = document.querySelector('.mapa-filters');
+  if(!bar) return [];
+  return bar.querySelectorAll('.mf-drop-btn');
+}
+
+// Abre/cierra un desplegable: aria-expanded + hidden del panel.
+function mfSetDrop(btn, open) {
+  if(!btn) return;
+  var id = btn.getAttribute('aria-controls');
+  var panel = id ? document.getElementById(id) : null;
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if(!panel) return;
+  if(open) panel.removeAttribute('hidden');
+  else panel.setAttribute('hidden', '');
+}
+
+// Uno a la vez: cierra todos menos el indicado (null = cerrar todos).
+function mfCloseDrops(keep) {
+  var btns = mfDropBtns();
+  for(var i = 0; i < btns.length; i++){
+    if(btns[i] !== keep) mfSetDrop(btns[i], false);
+  }
+}
+
+function mfAnyDropOpen() {
+  var btns = mfDropBtns();
+  for(var i = 0; i < btns.length; i++){
+    if(btns[i].getAttribute('aria-expanded') === 'true') return true;
+  }
+  return false;
+}
+
+// 0 = "Todos"; por encima de 0, el valor con estrella (escape \u2605).
+function mfRatingText(v) {
+  var n = parseFloat(v);
+  if(isNaN(n) || !isFinite(n) || n <= 0) return 'Todos';
+  return n + ' ' + MF_STAR;
+}
+
+// Escribe solo si el texto difiere. Tolera el formato del motor (que
+// pega la estrella sin espacio) para que host y motor no se peleen.
+function mfWriteText(sel, txt) {
+  var els = document.querySelectorAll(sel);
+  if(!els.length) return;
+  txt = String(txt);
+  var sinEspacio = txt.replace(/ /g, '');
+  for(var i = 0; i < els.length; i++){
+    var cur = els[i].textContent;
+    if(cur === txt || cur === sinEspacio) continue;
+    try { els[i].textContent = txt; } catch(e){}
+  }
+}
+
+// Estado (snapshot del motor o null = estado inicial) -> texto de etiquetas.
+function mfSyncLabels(snap) {
+  var s = snap || {};
+  var cat = s.activeCat || 'all';
+  var dir = 'Todos';
+  if(cat === 'off') dir = 'Ninguna';
+  else if(cat === 'visitados') dir = 'Visitados';
+  else if(cat !== 'all' && window.MapaCultural) {
+    try { dir = window.MapaCultural.mdCatLabel(cat) || cat; } catch(e){ dir = cat; }
+  }
+  var med = 'Todos';
+  if(s.mediaVista === 'albumes') med = '\u00c1lbumes';
+  else if(s.mediaEnabled) {
+    var t = s.mediaTypes || {};
+    var n = (t.foto?1:0) + (t.video?1:0) + (t.audio?1:0);
+    med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
+  }
+  var punt = mfRatingText(s.ratingMin || 0);
+  mfWriteText('[data-mf-label="dir"]', dir);
+  mfWriteText('[data-mf-label="med"]', med);
+  mfWriteText('[data-mf-label="punt"]', punt);
+  mfWriteText('[data-mf-rating-out]', punt);
+}
+
+// Deslizador de puntaje -> setRatingMin del motor (0 = Todos).
+function mfApplyRating() {
+  var input = document.getElementById('mf-rating');
+  if(!input) return;
+  var v = input.value;
+  if(mcMapa && typeof mcMapa.setRatingMin === 'function') mcMapa.setRatingMin(v);
+  mfSyncLabels({ ratingMin: parseFloat(v) || 0 });
+}
+
+// El motor mantiene el valor de los filtros: el host solo sigue el texto.
+function bindMapaFiltroLabels(inst) {
+  if(mfFiltroCbBound) return;
+  if(!inst || typeof inst.onFilterChange !== 'function') return;
+  mfFiltroCbBound = true;
+  inst.onFilterChange(function(snap) { mfSyncLabels(snap); });
+}
+
+function initMapaFiltros() {
+  var bar = document.querySelector('.mapa-filters');
+  if(!bar) return;
+  var btns = bar.querySelectorAll('.mf-drop-btn');
+  // Arranque en cerrado: los 3 paneles empiezan colapsados.
+  for(var i = 0; i < btns.length; i++) mfSetDrop(btns[i], false);
+  mfSyncLabels(null);
+
+  var input = document.getElementById('mf-rating');
+  if(input && !input.__mfBound) {
+    input.__mfBound = true;
+    input.addEventListener('input', mfApplyRating);
+    input.addEventListener('change', mfApplyRating);
+  }
+
+  // Un unico set de listeners por pagina (idempotente).
+  if(mfDropsBound) return;
+  mfDropsBound = true;
+
+  bar.addEventListener('click', function(e) {
+    var b = (e.target && e.target.closest) ? e.target.closest('.mf-drop-btn') : null;
+    if(!b || !bar.contains(b)) return;
+    var wasOpen = b.getAttribute('aria-expanded') === 'true';
+    mfCloseDrops(b);
+    mfSetDrop(b, !wasOpen);
+  });
+
+  document.addEventListener('click', function(e) {
+    if(!mfAnyDropOpen()) return;
+    if(bar.contains(e.target)) return;
+    mfCloseDrops(null);
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if(!e || e.key !== 'Escape') return;
+    if(!mfAnyDropOpen()) return;
+    mfCloseDrops(null);
+  });
+}
+
+initMapaFiltros();
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initMapaFiltros);
+} else {
+  initMapaFiltros();
 }
 
 function closeMapaDrawer() {

@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="mapa-cultural.css?v=9">
+<link rel="stylesheet" href="mapa-cultural.css?v=10">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#FF4A00;--gold-l:rgba(255,74,0,.1);--gold-d:#FFB84D;--black:#0F1419;--bg:#E5E7EB;--white:#fff;--border:#E5E7EB;--muted:#777;--text:#1a1a1a;--sand:#E5E7EB}
@@ -153,15 +153,13 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 /* XP toast */
 #xp-toast-comm{position:fixed;bottom:20px;right:20px;background:#0F1419;color:#FF4A00;padding:8px 16px;border-radius:5px;font-size:12px;font-weight:700;z-index:999;transform:translateY(40px);opacity:0;transition:all .25s;pointer-events:none;border:1px solid rgba(255,74,0,.3)}
 /* ── MAPA AUDIOVISUAL (ADR-004 scoped) ── */
-/* Chip base compartido: filtros del mapa y chips de orden del tab AV
-   (un solo bloque, sin duplicar estilos) */
-#cpanel-mapa .mapa-filtro,
+/* Chip base compartido: chips de orden del tab AV y del ranking (un solo
+   bloque, sin duplicar estilos). Los items del mapa ya tienen su lenguaje
+   propio bajo el silo .mapa-filters (mf-item / mf-btn). */
 #cpanel-av .av-chip,
 #cpanel-ranking .rk-chip{padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);cursor:pointer;font-size:13px;color:rgba(255,255,255,.6);transition:all .2s;font-family:'Outfit',sans-serif}
-#cpanel-mapa .mapa-filtro.active,
 #cpanel-av .av-chip.on,
 #cpanel-ranking .rk-chip.on{background:var(--gold);color:var(--black);border-color:var(--gold)}
-#cpanel-mapa .mapa-filtro:hover:not(.active),
 #cpanel-av .av-chip:hover:not(.on),
 #cpanel-ranking .rk-chip:hover:not(.on){background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
 .av-popup{text-align:center;font-family:'Outfit',sans-serif}
@@ -298,6 +296,62 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   .mmx-media-lbl{width:100%;margin-bottom:2px}
   .mmx-mbtn{flex:1 1 auto;text-align:center}
   .mmx-cbtn{flex:1 1 auto;text-align:center}
+}
+/* == BARRA DE FILTROS DEL MAPA PERSONAL (ADR-004) ==
+   Paridad con el mapa cultural del home: 3 desplegables (Directorio, Medios,
+   Puntaje) + botones libres siempre visibles. Todo el CSS nuevo vive bajo el
+   selector padre .mapa-filters (silo unico) y se apoya en #cpanel-mapa solo
+   para ganarle en especificidad a los chips heredados de la pagina. El estado
+   activo lo pone el motor compartido mapa-cultural.js con la clase .on (a
+   diferencia del mapa del home, aqui los items son .mf-item, no .mf-btn:
+   .mf-btn es la pildora de los botones libres). */
+#cpanel-mapa .mapa-filters{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px}
+#cpanel-mapa .mapa-filters .mf-drop{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+/* Alinea .mmx-cats al lenguaje visual del home: fila de pildoras, 11px. */
+#cpanel-mapa .mapa-filters .mmx-cats{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px}
+/* Boton del desplegable: pildora oscura, borde claro, --gold al abrir. */
+#cpanel-mapa .mapa-filters .mf-drop-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(15,20,25,.85);color:#fff;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;letter-spacing:.2px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);transition:border-color .15s,background .15s,color .15s}
+#cpanel-mapa .mapa-filters .mf-drop-btn:hover{border-color:var(--gold);color:var(--gold)}
+#cpanel-mapa .mapa-filters .mf-drop-btn[aria-expanded="true"]{border-color:var(--gold);background:rgba(255,74,0,.22);color:var(--gold)}
+#cpanel-mapa .mapa-filters .mf-drop-ic{font-size:12px;line-height:1}
+/* Panel colapsable: nunca se elimina del DOM, solo se oculta (ADR-003). */
+#cpanel-mapa .mapa-filters .mf-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:900;display:flex;flex-direction:column;gap:4px;min-width:174px;padding:6px;border-radius:12px;background:rgba(10,16,25,.97);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 26px rgba(0,0,0,.5)}
+#cpanel-mapa .mapa-filters .mf-panel[hidden]{display:none}
+/* Items de categoria y de medios: 11px, pildora rectangular, --gold al activo. */
+#cpanel-mapa .mapa-filters .mf-panel .mf-item{display:flex;align-items:center;gap:7px;flex:0 0 auto;width:100%;padding:7px 11px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.78);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+#cpanel-mapa .mapa-filters .mf-panel .mf-item:hover{border-color:var(--gold);color:var(--gold)}
+#cpanel-mapa .mapa-filters .mf-panel .mf-item.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+#cpanel-mapa .mapa-filters .mf-panel .mf-item.on:hover{color:var(--black)}
+/* Alinea .mmx-cbtn al mismo lenguaje (pildora, --gold en .on). */
+#cpanel-mapa .mapa-filters .mmx-cbtn{display:flex;align-items:center;gap:7px;padding:6px 11px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);font-size:11px}
+#cpanel-mapa .mapa-filters .mmx-cbtn.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+/* Botones libres: siempre visibles, misma pildora que el home. */
+#cpanel-mapa .mapa-filters .mf-btn{flex:0 0 auto;padding:6px 13px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(15,20,25,.85);color:#fff;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);transition:border-color .15s,background .15s,color .15s}
+#cpanel-mapa .mapa-filters .mf-btn:hover{border-color:var(--gold);color:var(--gold)}
+#cpanel-mapa .mapa-filters .mf-btn.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+/* Panel de Puntaje: colapsado por defecto, se abre al click. */
+#cpanel-mapa .mapa-filters .mf-panel-punt{align-items:stretch;gap:9px;min-width:150px;padding:13px 15px}
+#cpanel-mapa .mapa-filters .mf-range-wrap{display:flex;align-items:stretch;justify-content:center;gap:7px}
+#cpanel-mapa .mapa-filters .mf-range-out{font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--gold);text-align:center}
+#cpanel-mapa .mapa-filters .mf-range-scale{display:flex;flex-direction:column;justify-content:space-between;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-align:right}
+/* Deslizador VERTICAL 0-5 (solo CSS: sin librerias, sin JS).
+   writing-mode vertical-lr + direction rtl => minimo abajo, maximo arriba. */
+#cpanel-mapa .mapa-filters .mf-range{-webkit-appearance:none;appearance:none;-webkit-writing-mode:vertical-lr;writing-mode:vertical-lr;direction:rtl;width:24px;height:112px;margin:0;padding:0;background:transparent;cursor:pointer;touch-action:none}
+#cpanel-mapa .mapa-filters .mf-range:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
+#cpanel-mapa .mapa-filters .mf-range::-webkit-slider-runnable-track{width:6px;height:100%;border:1px solid rgba(255,255,255,.2);border-radius:3px;background:rgba(255,255,255,.14)}
+#cpanel-mapa .mapa-filters .mf-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;margin-left:-6px;border:2px solid #0F1419;border-radius:50%;background:var(--gold);box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#cpanel-mapa .mapa-filters .mf-range::-moz-range-track{width:6px;height:100%;border:1px solid rgba(255,255,255,.2);border-radius:3px;background:rgba(255,255,255,.14)}
+#cpanel-mapa .mapa-filters .mf-range::-moz-range-progress{width:6px;height:100%;border-radius:3px;background:var(--gold)}
+#cpanel-mapa .mapa-filters .mf-range::-moz-range-thumb{width:15px;height:15px;border:2px solid #0F1419;border-radius:50%;background:var(--gold);box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#cpanel-mapa .mapa-filters .mf-range::-moz-range-orient{vertical}
+#cpanel-mapa .mapa-filters .mf-range::-moz-focus-outer{border:0}
+/* Movil: desplegables compactos (solo icono) y la barra sin scroll horizontal. */
+@media(max-width:360px){
+  #cpanel-mapa .mapa-filters{gap:6px}
+  #cpanel-mapa .mapa-filters .mf-drop-btn{padding:6px 9px}
+  #cpanel-mapa .mapa-filters .mf-drop-label{display:none}
+  #cpanel-mapa .mapa-filters .mf-btn{padding:6px 10px}
+  #cpanel-mapa .mapa-filters .mf-panel{min-width:156px}
 }
 .mmx-editbar{flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 .mmx-eb-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;color:var(--gold);letter-spacing:.5px;margin-right:4px}
@@ -599,13 +653,35 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
         <div class="mmx-head"><div class="mmx-title">Mis mapas personales</div><button type="button" class="mmx-new" onclick="MyMap.openNuevo()">&#xFF0B; Nuevo</button></div>
         <div class="mmx-pills" id="mm-personal-pills"></div>
         <div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div>
-        <div class="mmx-cats" id="mm-personal-cats"><button type="button" class="mmx-cbtn on" data-cat="all">Todos</button><button type="button" class="mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button><button type="button" class="mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button><button type="button" class="mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button><button type="button" class="mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button><button type="button" class="mmx-cbtn" data-cat="visitados">&#x2713; Visitados</button></div>
-        <div class="cmx-filtros">
-          <button class="mapa-filtro active" data-tipo="todos" onclick="filtrarMapaAV(this,'todos')">Todos</button>
-          <button class="mapa-filtro" data-tipo="foto" onclick="filtrarMapaAV(this,'foto')">&#x1F4F7; Fotos</button>
-          <button class="mapa-filtro" data-tipo="video" onclick="filtrarMapaAV(this,'video')">&#x25B6; Videos</button>
-          <button class="mapa-filtro" data-tipo="audio" onclick="filtrarMapaAV(this,'audio')">&#x266B; Audio</button>
-          <button class="mapa-filtro" data-vista="albumes" onclick="toggleVistaAlbumes(this)">&#x1F4DA; &#xC1;lbumes</button>
+        <div class="mapa-filters">
+          <div class="mmx-cats mf-drop" id="mm-personal-cats">
+            <button type="button" class="mf-drop-btn" data-mf-toggle="dir" aria-expanded="false" aria-controls="mf-panel-dir" aria-label="Directorio: filtrar por categoria"><span class="mf-drop-ic" aria-hidden="true">&#x1F4C1;</span><span class="mf-drop-label" data-mf-label="dir">Directorio</span></button>
+            <div class="mf-panel" id="mf-panel-dir" data-mf-panel="dir" hidden>
+              <button type="button" class="mf-item mmx-cbtn on" data-cat="all">Todos</button>
+              <button type="button" class="mf-item mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button>
+              <button type="button" class="mf-item mmx-cbtn" data-cat="comida">&#x1F37D; Comida</button>
+              <button type="button" class="mf-item mmx-cbtn" data-cat="sitio">&#x1F5FA; Lugares</button>
+              <button type="button" class="mf-item mmx-cbtn" data-cat="evento">&#x1F389; Eventos</button>
+            </div>
+            <button type="button" class="mf-btn mf-free mmx-cbtn" data-cat="visitados" aria-label="Solo destinos visitados">&#x2713; Visitados</button>
+          </div>
+          <div class="mf-drop" id="mm-personal-media">
+            <button type="button" class="mf-drop-btn" data-mf-toggle="med" aria-expanded="false" aria-controls="mf-panel-med" aria-label="Medios: filtrar fotos, videos, audio y albumes"><span class="mf-drop-ic" aria-hidden="true">&#x1F4F7;</span><span class="mf-drop-label" data-mf-label="med">Medios</span></button>
+            <div class="mf-panel" id="mf-panel-med" data-mf-panel="med" hidden>
+              <button type="button" class="mf-item" data-media="all">Todos</button>
+              <button type="button" class="mf-item" data-media="foto">&#x1F4F7; Fotos</button>
+              <button type="button" class="mf-item" data-media="video">&#x25B6; Videos</button>
+              <button type="button" class="mf-item" data-media="audio">&#x266B; Audio</button>
+              <button type="button" class="mf-item" data-media="albumes">&#x1F4DA; &#xC1;lbumes</button>
+            </div>
+          </div>
+          <div class="mf-drop mf-drop-punt">
+            <button type="button" class="mf-drop-btn" data-mf-toggle="punt" aria-expanded="false" aria-controls="mf-panel-punt" aria-label="Puntaje: filtrar por calificacion"><span class="mf-drop-ic" aria-hidden="true">&#x2B50;</span><span class="mf-drop-label" data-mf-label="punt">Puntaje</span></button>
+            <div class="mf-panel mf-panel-punt" id="mf-panel-punt" data-mf-panel="punt" hidden>
+              <div class="mf-range-wrap"><input type="range" id="mf-rating" class="mf-range" min="0" max="5" step="0.5" value="0" orient="vertical" aria-label="Puntaje minimo del lugar"><span class="mf-range-scale" aria-hidden="true"><span>5</span><span>0</span></span></div>
+              <output class="mf-range-out" data-mf-rating-out>Todos</output>
+            </div>
+          </div>
         </div>
         <div id="av-map-container" class="cmx-mapa" data-cm-mapa="1"></div>
         <p class="cmx-pie">Gota de color = destino de tu mapa personal &#xB7; Circulo = multimedia de la comunidad en ese punto</p>
@@ -744,7 +820,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
-<script src="mapa-cultural.js?v=12"></script>
+<script src="mapa-cultural.js?v=14"></script>
 <script src="media-actions.js"></script>
 <script src="mymapa.js?v=7"></script>
 <script src="mercado.js?v=2"></script>
@@ -2047,9 +2123,10 @@ function setRankingVista(v) {
 var _avMap = null;
 var _avMarkers = null;
 var _avData = [];
-/* Multi-seleccion de tipos de media: cada tipo hace toggle independiente
-   y el CSV se arma al llamar loadMultimediaMapa (tipo_media=foto,video).
-   'todos' es un estado derivado: los 3 tipos activos. */
+/* Estado heredado del fetch de degradacion (loadMultimediaMapa): con el
+   mapa unificado el filtro por tipo y la vista de albumes los lleva el
+   motor compartido (items [data-media] del panel), asi que aqui solo
+   queda el estado inicial que usa el camino de reserva. */
 var _avTiposActivos = { foto: true, video: true, audio: true };
 /* Vista del mapa AV: 'sueltos' (multimedia individual) o 'albumes' (grupos). */
 var _avVista = 'sueltos';
@@ -2111,49 +2188,167 @@ function initAudiovisualMap() {
   loadMultimediaMapa();
 }
 
-function filtrarMapaAV(btn, tipo) {
-  if (tipo === 'todos') {
-    // Toggle global: si los 3 estan activos los apaga; si alguno esta
-    // apagado, los enciende todos.
-    if (_avTiposActivos.foto && _avTiposActivos.video && _avTiposActivos.audio) {
-      _avTiposActivos.foto = _avTiposActivos.video = _avTiposActivos.audio = false;
-    } else {
-      _avTiposActivos.foto = _avTiposActivos.video = _avTiposActivos.audio = true;
-    }
-  } else {
-    _avTiposActivos[tipo] = !_avTiposActivos[tipo];
-  }
-  syncMapaFiltrosUI();
-  /* T3: con mapa unificado la capa multimedia vive en el motor compartido y
-     mymapa.js es su unico escritor. El filtro por tipo se aplica sobre ESA
-     capa; los pines del mapa personal no se tocan. */
-  if (window.MyMap && typeof window.MyMap.setMediaTipos === 'function' && window.MyMap.getMap()) {
-    window.MyMap.setMediaTipos(_avTiposActivos);
-    return;
-  }
-  loadMultimediaMapa();
+/* ---- FILTROS DEL MAPA PERSONAL: 3 desplegables + deslizador de puntaje --
+   Paridad con index.html. Los desplegables (.mf-drop-btn / .mf-panel) son
+   markup estatico de la barra .mapa-filters: aqui solo se alterna
+   aria-expanded y el atributo hidden del panel que indica aria-controls
+   (ADR-003: nunca se borra un nodo). Los VALORES de filtro y el texto de
+   las etiquetas son del motor mapa-cultural.js; este host los sigue. */
+var MF_STAR = '\u2605';
+var mmFiltrosDropsBound = false;
+var mmFiltrosCbBound = false;
+
+function mmFiltrosBar() {
+  return document.querySelector('#cpanel-mapa .mapa-filters');
 }
 
-function toggleVistaAlbumes(btn) {
-  _avVista = (_avVista === 'albumes') ? 'sueltos' : 'albumes';
-  if (btn) btn.classList.toggle('active', _avVista === 'albumes');
-  if (window.MyMap && typeof window.MyMap.setMediaVista === 'function' && window.MyMap.getMap()) {
-    window.MyMap.setMediaVista(_avVista);
-    return;
-  }
-  loadMultimediaMapa();
+function mmDropBtns() {
+  var bar = mmFiltrosBar();
+  if (!bar) return [];
+  return bar.querySelectorAll('.mf-drop-btn');
 }
 
-function syncMapaFiltrosUI() {
-  document.querySelectorAll('#cpanel-mapa .mapa-filtro').forEach(function(b){
-    var t = b.getAttribute('data-tipo');
-    if (!t) return; // boton de vista (Sueltos/Albumes): su estado lo maneja toggleVistaAlbumes
-    if (t === 'todos') {
-      b.classList.toggle('active', _avTiposActivos.foto && _avTiposActivos.video && _avTiposActivos.audio);
-    } else {
-      b.classList.toggle('active', !!_avTiposActivos[t]);
-    }
+// Abre/cierra un desplegable: aria-expanded + hidden del panel.
+function mmSetDrop(btn, open) {
+  if (!btn) return;
+  var id = btn.getAttribute('aria-controls');
+  var panel = id ? document.getElementById(id) : null;
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!panel) return;
+  if (open) panel.removeAttribute('hidden');
+  else panel.setAttribute('hidden', '');
+}
+
+// Uno a la vez: cierra todos menos el indicado (null = cerrar todos).
+function mmCloseDrops(keep) {
+  var btns = mmDropBtns();
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i] !== keep) mmSetDrop(btns[i], false);
+  }
+}
+
+function mmAnyDropOpen() {
+  var btns = mmDropBtns();
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].getAttribute('aria-expanded') === 'true') return true;
+  }
+  return false;
+}
+
+// 0 = "Todos"; por encima de 0, el valor con estrella (escape \u2605).
+function mmRatingText(v) {
+  var n = parseFloat(v);
+  if (isNaN(n) || !isFinite(n) || n <= 0) return 'Todos';
+  return n + ' ' + MF_STAR;
+}
+
+// Escribe solo si el texto difiere. Tolera el formato del motor (que pega
+// la estrella sin espacio) para que host y motor no se peleen.
+function mmWriteText(sel, txt) {
+  var els = document.querySelectorAll(sel);
+  if (!els.length) return;
+  txt = String(txt);
+  var sinEspacio = txt.replace(/ /g, '');
+  for (var i = 0; i < els.length; i++) {
+    var cur = els[i].textContent;
+    if (cur === txt || cur === sinEspacio) continue;
+    try { els[i].textContent = txt; } catch (e) {}
+  }
+}
+
+// Estado (snapshot del motor o null = estado inicial) -> texto de etiquetas.
+function mmSyncLabels(snap) {
+  var s = snap || {};
+  var cat = s.activeCat || 'all';
+  var dir = 'Todos';
+  if (cat === 'off') dir = 'Ninguna';
+  else if (cat === 'visitados') dir = 'Visitados';
+  else if (cat !== 'all' && window.MapaCultural) {
+    try { dir = window.MapaCultural.mdCatLabel(cat) || cat; } catch (e) { dir = cat; }
+  }
+  var med = 'Todos';
+  if (s.mediaVista === 'albumes') med = '\u00c1lbumes';
+  else if (s.mediaEnabled) {
+    var t = s.mediaTypes || {};
+    var n = (t.foto ? 1 : 0) + (t.video ? 1 : 0) + (t.audio ? 1 : 0);
+    med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
+  }
+  var punt = mmRatingText(s.ratingMin || 0);
+  mmWriteText('#cpanel-mapa [data-mf-label="dir"]', dir);
+  mmWriteText('#cpanel-mapa [data-mf-label="med"]', med);
+  mmWriteText('#cpanel-mapa [data-mf-label="punt"]', punt);
+  mmWriteText('#cpanel-mapa [data-mf-rating-out]', punt);
+}
+
+// Deslizador de puntaje -> setRatingMin de la INSTANCIA del motor (0 = Todos).
+function mmApplyRating() {
+  var input = document.getElementById('mf-rating');
+  if (!input) return;
+  var inst = window.MyMap && typeof window.MyMap.getMC === 'function' ? window.MyMap.getMC() : null;
+  if (inst && typeof inst.setRatingMin === 'function') inst.setRatingMin(input.value);
+  mmSyncLabels({ ratingMin: parseFloat(input.value) || 0 });
+}
+
+// El motor mantiene los valores: el host solo sigue el texto. Se engancha a
+// la INSTANCIA que creo MyMap (MyMap.getMC), nunca a la facade estatica de
+// MapaCultural: esa crearia una instancia por defecto con otro mapa.
+function mmBindFiltrosInstancia() {
+  var inst = window.MyMap && typeof window.MyMap.getMC === 'function' ? window.MyMap.getMC() : null;
+  if (!inst) return false;
+  mmSyncLabels(typeof inst.getState === 'function' ? inst.getState() : null);
+  if (mmFiltrosCbBound) return true;
+  if (typeof inst.onFilterChange !== 'function') return true;
+  mmFiltrosCbBound = true;
+  inst.onFilterChange(function (snap) { mmSyncLabels(snap); });
+  return true;
+}
+
+function initMapaFiltrosMapa() {
+  var bar = mmFiltrosBar();
+  if (!bar) return;
+  var btns = bar.querySelectorAll('.mf-drop-btn');
+  // Arranque en cerrado: los 3 paneles empiezan colapsados (Puntaje incluido).
+  for (var i = 0; i < btns.length; i++) mmSetDrop(btns[i], false);
+  mmSyncLabels(null);
+  mmBindFiltrosInstancia();
+
+  var input = document.getElementById('mf-rating');
+  if (input && !input.__mmFiltroBound) {
+    input.__mmFiltroBound = true;
+    input.addEventListener('input', mmApplyRating);
+    input.addEventListener('change', mmApplyRating);
+  }
+
+  // Un unico set de listeners por pagina (idempotente).
+  if (mmFiltrosDropsBound) return;
+  mmFiltrosDropsBound = true;
+
+  bar.addEventListener('click', function (e) {
+    var b = (e.target && e.target.closest) ? e.target.closest('.mf-drop-btn') : null;
+    if (!b || !bar.contains(b)) return;
+    var wasOpen = b.getAttribute('aria-expanded') === 'true';
+    mmCloseDrops(b);
+    mmSetDrop(b, !wasOpen);
   });
+
+  document.addEventListener('click', function (e) {
+    if (!mmAnyDropOpen()) return;
+    if (bar.contains(e.target)) return;
+    mmCloseDrops(null);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (!e || e.key !== 'Escape') return;
+    if (!mmAnyDropOpen()) return;
+    mmCloseDrops(null);
+  });
+}
+
+initMapaFiltrosMapa();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initMapaFiltrosMapa);
+} else {
+  initMapaFiltrosMapa();
 }
 
 function loadMultimediaMapa() {
@@ -2446,6 +2641,10 @@ function onTabMapaAV() {
       editbar: 'mm-personal-editbar',
       lista: 'mm-personal-list'
     });
+    /* MyMap.init crea el motor de forma sincrona: aqui ya existe la
+       instancia, asi que las etiquetas de la barra se enganchan a ELLA
+       (idempotente: solo se registra el callback una vez). */
+    if (typeof mmBindFiltrosInstancia === 'function') mmBindFiltrosInstancia();
   }
   if (!_avMapInitialized) {
     _avMapInitialized = true;
