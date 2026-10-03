@@ -275,12 +275,10 @@ var VECINOS_RURAL_MAX = 3;
 var VECINOS_BBOX_DEG = 0.02;
 var VISITA_BONO_RURAL = 25;
 // v27 (Rising Star Decay autorizado): el XP por voto de media decrece con la
-// carga reciente y se recarga solo al pasar 24h sin votar. El cooldown entre
-// votos crece con la carga. El tope duro diario sigue intacto.
+// carga reciente y se recarga solo al pasar 24h sin votar. El tope duro diario
+// sigue intacto.
 var VOTOS_DIA_MAX = 20;
 var VOTO_DECAY_DIV = 20;
-var VOTO_COOLDOWN_FACTOR = 30;
-var VOTO_COOLDOWN_MAX_SEG = 600;
 // ADR-033 (v17): escalado de XP segun la amplitud del area de verificacion
 // del lugar. Areas extensas (ciudades, parques metropolitanos) debilitan la
 // presencia fisica, asi que rinden menos XP. La visita SIEMPRE se registra
@@ -4919,11 +4917,11 @@ function puntoDeMedia(sqlFn, target) {
 }
 
 // Nucleo de voto (like/unlike) sobre media_votos con soft-delete. Devuelve
-// {nuevo, reactivado, duplicado, tope, cooldown, faltan, xp, votos}.
+// {nuevo, reactivado, duplicado, tope, xp, votos}.
 // duplicado=true solo cuando ya existia un voto ACTIVO (el caller responde
 // 409). Reactivar tras un unlike NO re-paga XP. Tope unificado de 20
 // votos/24h. v27: XP decreciente con la carga reciente (se recarga a full a
-// las 24h) y cooldown creciente con la carga.
+// las 24h). ADR-079: el voto siempre se registra, sin espera previa.
 function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
   var f = String(fuente || '').toLowerCase();
   var id = String(itemId || '').trim();
@@ -4954,8 +4952,7 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
     if (prev.length && prev[0].activo) return base({ duplicado: true });
     return conDegradacionMedia(
       sqlFn("SELECT COUNT(*)::int AS n, "
-        + "COALESCE(SUM(GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - creado_en)) / 86400.0)), 0) AS carga, "
-        + "MAX(creado_en) AS ult "
+        + "COALESCE(SUM(GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - creado_en)) / 86400.0)), 0) AS carga "
         + "FROM media_votos WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'", [usuarioId]),
       'media_votos', [{ n: 0 }]
     ).then(function(cnt) {
@@ -4967,16 +4964,6 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
       var carga = Number(filaVoto.carga);
       if (!isFinite(carga) || carga < 0) carga = 0;
       if (carga > VOTOS_DIA_MAX) carga = VOTOS_DIA_MAX;
-      var cooldownSeg = Math.min(VOTO_COOLDOWN_MAX_SEG, Math.round(carga * VOTO_COOLDOWN_FACTOR));
-      if (cooldownSeg > 0 && filaVoto.ult) {
-        var ultMs = new Date(filaVoto.ult).getTime();
-        if (isFinite(ultMs)) {
-          var transcurridoSeg = (Date.now() - ultMs) / 1000;
-          if (transcurridoSeg < cooldownSeg) {
-            return base({ cooldown: true, faltan: Math.max(1, Math.ceil(cooldownSeg - transcurridoSeg)) });
-          }
-        }
-      }
       var factorVoto = 1 - (carga / VOTO_DECAY_DIV);
       if (factorVoto < 0) factorVoto = 0;
       var xpBaseVoto = Math.round(XP_BASES.voto_media * factorVoto * 100) / 100;
@@ -5066,7 +5053,6 @@ function registrarVotoMedia(sqlFn, usuarioId, fuente, itemId, noEncontrada) {
       return { status: 403, error: 'No puedes votar tu propia foto' };
     return aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, 'like', target).then(function(r) {
       if (r.tope) return { status: 429, error: 'Limite de 20 votos por dia alcanzado' };
-      if (r.cooldown) return { status: 429, error: 'Espera ' + r.faltan + 's para tu proximo voto' };
       if (r.duplicado) return { status: 409, error: 'Ya votaste esta foto', ya_votado: true };
       return { status: 200, xp: r.xp, votos: r.votos, ya_votado: true, reactivado: r.reactivado, xp_detalle: r.xp_detalle || undefined };
     });

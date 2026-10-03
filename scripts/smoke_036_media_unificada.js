@@ -133,7 +133,7 @@ async function run() {
   // ============ B. aplicarMediaVoto ============
   var mLike = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
-    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 1 }] },
     { test: 'INSERT INTO media_votos', reply: [] },
     { test: 'UPDATE usuarios SET xp_total', reply: [] }
@@ -161,7 +161,7 @@ async function run() {
 
   var mRe = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [{ activo: false }] },
-    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: 'UPDATE media_votos SET activo=true', reply: [] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 3 }] }
   ]);
@@ -171,7 +171,7 @@ async function run() {
 
   var mTop = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
-    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 20 }] }
+    { test: /AS carga FROM media_votos WHERE usuario_id/, reply: [{ n: 20 }] }
   ]);
   var rTop = await MOD.aplicarMediaVoto(mTop.fn, U, 'curada', 'f1', 'like');
   check('B8: tope 20 votos/24h -> tope true sin insert', rTop.tope === true && !mTop.alguna('INSERT INTO media_votos'));
@@ -217,7 +217,7 @@ async function run() {
   var mPost = crearMock([
     { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
-    { test: /AS carga, MAX\(creado_en\) AS ult FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
+    { test: /AS carga FROM media_votos WHERE usuario_id/, reply: [{ n: 0 }] },
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 1 }] },
     { test: 'INSERT INTO media_votos', reply: [] },
     { test: 'UPDATE usuarios SET xp_total', reply: [] }
