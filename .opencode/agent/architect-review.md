@@ -2,7 +2,7 @@
 name: architect-review
 description: Revisa disenos y ADRs con segunda opinion tecnica; emite veredicto APRUEBA, SOLICITA CAMBIOS o RECHAZA.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

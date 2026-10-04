@@ -2,7 +2,7 @@
 name: sql-security
 description: Persistencia SQL de bajo riesgo en Neon PostgreSQL: consultas, seeds y migraciones de datos no criticas.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

@@ -2,7 +2,7 @@
 name: media-reader
 description: Lee y analiza imagenes, audio, video y PDFs, y devuelve informes estructurados para verificar contenido multimedia.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

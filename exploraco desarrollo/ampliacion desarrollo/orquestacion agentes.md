@@ -1,6 +1,12 @@
 # ORQUESTACIÓN DE AGENTES, SUBAGENTES Y SKILLS — EXPLORACO (AI-DOS)
 
 ## Estado
+> **[OBSOLETO 2026-10-04 — ADR-082 / ADR-076 / ADR-067] Este documento se conserva como REGISTRO HISTÓRICO, no como fuente de verdad.** Su §2 (esquemas A/B/C), su §3 (6 primarios: `build`, `plan`, `free-build`, `free-plan`, `hybrid-build`, `hybrid-plan`), su §4 (subagentes `-free` y pares gemelo) y su `default_agent: hybrid-build` **ya no existen en el repositorio**: la ruta híbrida se retiró en ADR-067/ADR-076 y ADR-082 la sustituyó por el sistema dual por herencia de modelo. NO usarlo para decidir ruteo ni modelo.
+> - **Roster vigente:** **18 agentes** = **2 primarios de rol** (`@plan`, `@build`) + 16 subagentes, **uno por dominio, sin pares `-free`** (ADR-076). **Los 18 van SIN `model:`** y con `coste: heredado`: heredan el **modelo activo del turno** (ADR-083; `@free-plan`/`@free-build` fueron **borrados**, roster **20 -> 18**). Ver `AGENTS.md` §0-§2, `DECISIONS.md` **ADR-083** y la skill `cascada-tier`.
+> - **ADR-083 (2026-10-04, supera lo que ADR-082 afirmaba):** el tier **NO lo fija la sesión ni el primario**: lo fija el **modelo activo de cada turno**, cambiable en el selector (la selección explícita de modelo **pisa** el pin del agente, PROBADO en carga real). El invariante de coste pasó de **prohibición** a **atribución** por `message.data.modelID`, con detector de **escalada tardía** (~35x más caro si se escala tarde). La §3 de este documento y su `default_agent: hybrid-build` son **historia**: no ejecutarlos como recipe.
+> - **Also muerto:** `opencode/big-pickle` como modelo FREE de los primarios está en **ROTOS** (falla como subagente) y `.opencode/agents/*.md` (con `s`) nunca fue la ruta real: es `.opencode/agent/*.md`.
+> - **Lo que sí sobrevive de este documento:** el contexto conceptual (desacoplamiento de modelos, contexto mínimo, aislamiento de permisos) y la v1.1 como evidencia de la matriz Hybrid que ADR-048 aprobó y ADR-076 derogó.
+
 - **Versión**: v1.1 (Esquema Tripartito con ruteo por riesgo - datos de consumo opencode.db sep 2026)
 - **Referencia del Sistema**: Framework de Gobernanza AI-DOS Core & OpenCode Orchestration Architecture
 - **Ubicación de Configuración Global**: `opencode.json` / `.opencode/agents/*.md`

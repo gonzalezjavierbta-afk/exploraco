@@ -2,7 +2,7 @@
 name: seo-dev
 description: Configura sitemap.xml, meta tags, Open Graph, robots.txt y redirects en index.html y api/utilidades.js.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

@@ -2,7 +2,7 @@
 name: qa-auditor
 description: Audita con el Escudo GOLD (node --check, ASCII-safety, balance de divs) y smoke tests de buildHTML(); solo reporta.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

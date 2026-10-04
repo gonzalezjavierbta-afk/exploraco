@@ -2,7 +2,7 @@
 name: data-migration
 description: Ejecuta migraciones de esquema, limpieza de datos y seeds masivos en Neon PostgreSQL con idempotencia y trazabilidad.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

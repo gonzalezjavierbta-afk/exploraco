@@ -2,7 +2,7 @@
 name: explore
 description: Explora el repo en solo lectura: busca archivos, hace greps y responde preguntas del codebase con pocos tokens.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: deny
   bash: deny

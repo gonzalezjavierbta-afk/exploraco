@@ -2,7 +2,7 @@
 name: js-silo-dev
 description: Desarrollo JS/TS rutinario: logica simple, refactor menor, ajustes de scripts y correcciones de bugs puntuales.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

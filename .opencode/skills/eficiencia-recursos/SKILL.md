@@ -42,9 +42,11 @@ El costo de una sesión crece de forma aproximadamente cuadrática con sus turno
 *   El orquestador que supere **20-25 llamadas directas** (`read`/`grep`/`glob`) se DETIENE y delega a `@explore`.
 *   El reconocimiento masivo siempre va a `@explore`, con brief de salida acotado (que devuelva `archivo:línea`, no el contenido).
 
-## Free-only (todo el roster es FREE, ADR-074)
+## Coste por herencia (ADR-082): el precio vive en el modelo activo
 
-*   Todo el roster de 20 agentes es FREE (`opencode/space-bunny-free`, `$0`): no existe ruta PAGO ni subagente de pago (ADR-074). Un `task` nunca cuesta dinero.
+*   El roster son **18 agentes** = **2 primarios** (`@plan`, `@build`) + **16 subagentes heredados** que no declaran `model:` y toman el del turno en que se invocan (`coste: heredado`). **Ningún agente lleva pin**: el precio lo pone el **modelo activo de cada turno**, que el operador cambia en el selector.
+*   Un `task` no cuesta dinero por sí mismo: cuesta lo que cuesta el modelo activo de ese turno. Medido: `$0.003331` por una tanda de 4 turnos / 43.360 tokens (~`$0.0008` por turno) con el modelo de pago, y `$0` con el FREE. No afirmes jamás un coste absoluto ni `$0.000000`.
+*   **La escalada tardía es el riesgo real**: cambiar de FREE a PAGO a mitad de sesión no es un error de configuración, es un multiplicador de precio por el contexto acumulado. Turno 2 (~20.000 tokens) ~`$0.001` por subagente; turno 25 (~700.000) ~`$0.05`: **~35x por el mismo trabajo**. Antes de cambiar de modelo con contexto grande, ejecuta `node scripts/ejecucion/verificar-capa-gratis.js --preflight`.
 *   Si un subagente falla, devuelve `partial`/`blocked` o no pasa la verificación, NO se re-despacha el mismo perfil: se cambia de estrategia (otro agente del dominio, un script o un brief mínimo) y se registra el incidente.
 *   Los dominios con gate de riesgo (`sql-security`, `data-migration`, `renderer-dev`, `architect`, `architect-review`) exigen confirmación explícita del usuario ANTES de ejecutarse.
 *   Nunca desdoblar dos agentes sobre el mismo archivo en paralelo (sesiones vacías = reloj puro).

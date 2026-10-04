@@ -2,7 +2,7 @@
 name: architect
 description: Disena el modelo de tags JSONB, evalua opciones y redacta o valida ADRs en DECISIONS.md antes de implementar.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

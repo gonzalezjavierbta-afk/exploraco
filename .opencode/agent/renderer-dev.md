@@ -2,7 +2,7 @@
 name: renderer-dev
 description: Implementa secciones condicionales y helpers en api/pagina-destino.js (buildHTML) con degradacion condicional.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

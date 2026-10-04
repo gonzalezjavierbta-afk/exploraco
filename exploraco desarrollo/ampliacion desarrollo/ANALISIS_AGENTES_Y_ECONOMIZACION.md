@@ -3,11 +3,12 @@
 ## Estado del documento
 
 - **Fecha:** 2026-09-23
-- **Estado:** Analisis / propuesta
+- **Estado:** Analisis / propuesta — **§2 (inventario de agentes) y §2.4 (skills) OBSOLETOS desde 2026-10-04, ver nota de obsolescencia al final del §2**
 - **Autor:** docs-keeper (Documentation Specialist AI-DOS)
 - **Alcance:** analisis del trabajo real de los agentes, deteccion de tareas migrables a agentes mas rapidos o economicamente eficientes, y cuantificacion del ahorro.
 - **Nota critica:** este informe es de **analisis / propuesta**. **NO se aplico ningun cambio de ruteo, de modelo, ni de configuracion** como consecuencia de este documento. Toda recomendacion queda sujeta a decision del operador y, cuando corresponda, a ADR.
-- **Baseline de verdad (ADR-006):** las cifras de costo provienen del informe de cuota generado sobre la base real `opencode.db`; el inventario de agentes proviene de los 40 archivos reales `.opencode/agent/*.md`; el historial de chat NO es fuente de verdad (Regla de Oro 8).
+- **Baseline de verdad (ADR-006):** las cifras de costo provienen del informe de cuota generado sobre la base real `opencode.db`; el inventario de agentes proviene de los 40 archivos reales `.opencode/agent/*.md` **vigentes a 2026-09-23**; el historial de chat NO es fuente de verdad (Regla de Oro 8).
+- **[OBSOLETO 2026-10-04 — ADR-082] El §3 (radiografia de consumo) sigue siendo VALIDO como registro historico de gasto, pero su lectura mecanica esta mal: las cifras se atribuyen hoy a agentes que ya no corren en el modelo que las gasto.** El roster paso de 40 agentes (6 primary + 34 subagents, con pares `-free`) a **20 (4 primarios + 16 subagentes)** en ADR-076, y de "20 pineados en FREE" a **coste por herencia de modelo** en ADR-082. La conclusion economica central del informe (el 24.8% del gasto en trabajo rutinario migrable a free) quedo **superada por la cascada**: ya no hay dos capas que rutear, hay un solo pin por sesion.
 
 ---
 
@@ -26,7 +27,7 @@
 | `informes-cuota/cuota-2026-09-23-desde-2026-09-01.md` | Informe de cuota fresco. Ventana 2026-09-01 a 2026-09-23 09:42:50Z. 680 sesiones, 19,700 mensajes con costo, costo total $32.2634. |
 | `informes-cuota/cuota-2026-09-14-dia.md` | Informe historico (contexto de tendencia). |
 | `scripts/informes-cuota/cuota-2026-09-11-desde-2026-09-06.md` | Informe historico (contexto de tendencia). |
-| `.opencode/agent/*.md` | Archivos reales de configuracion: 40 agentes (6 primary + 34 subagents). |
+| `.opencode/agent/*.md` | Archivos reales de configuracion: 40 agentes (6 primary + 34 subagents) **[OBSOLETO: el roster vigente son 20 = 4 primarios + 16 subagentes]** |
 | `exploraco desarrollo/ampliacion desarrollo/orquestacion agentes.md` | Documento de orquestacion v1.1 (esquema tripartito, ruteo por riesgo). |
 | `exploraco desarrollo/DECISIONS.md` | ADR-048 (esquema Hybrid y ruteo por riesgo). |
 
@@ -37,6 +38,13 @@ El desglose por tarea o por prompt **no esta disponible** en la base: no existe 
 ---
 
 ## 2. Inventario de agentes (40 archivos reales)
+
+> **[OBSOLETO 2026-10-04 — ADR-076 y ADR-082] Este inventario NO se usa mas.** Conserva la foto del 2026-09-23 (6 primarios, 17 subagentes PRO, 17 subagentes FREE), que ya no existe.
+> - **Roster vigente: 18 agentes = 2 primarios + 16 subagentes**, un agente por dominio, **sin pares `-free` ni gemelos** (ADR-076). Primarios: `@plan` y `@build`, ambos **SIN `model:`** (ADR-083 D1; `@free-plan`/`@free-build` fueron **borrados**, roster **20 -> 18**).
+> - **ADR-082 (2026-10-04):** los **16 subagentes NO llevan `model:`**, declaran `coste: heredado` y toman el del **modelo activo del turno** (herencia medida en T2.5). Por eso las columnas "Modelo" de las §2.2/§2.3 **ya no aplican** a ningun subagente, y la **matriz PRO/FREE de este documento quedo derogada**: el tier lo fija el **modelo activo de cada turno** (selector de la sesion), no el dominio ni el primario.
+> - **ADR-083 (2026-10-04, HISTORICO/SUPERADO lo anterior):** deroga de ADR-082 **solo la premisa** de que "el tier es la sesion entera, lo fija el primario invocado". El **modelo activo del turno** pisa el pin del agente (PROBADO), el invariante de coste pasa de prohibicion a **atribucion** por `message.data.modelID`, y aparece el detector de **escalada tardia** (el mismo cambio cuesta ~35x mas tarde: turno 2 ~$0.0015 vs turno 25 ~$0.0538). Fuente vigente: `AGENTS.md` §0/§2 y `DECISIONS.md` ADR-083.
+> - `exp-pickle`, `exp-pickle-free` y `opencode/big-pickle` como modelo FREE estan **muertos**: `big-pickle` esta en **ROTOS** (`Error from provider (Console): OpenCode's free tier can only be used from within OpenCode`).
+> - **Fuente de verdad actual:** `AGENTS.md` §0-§2 y la skill `cascada-tier`.
 
 Inventario verificado contra `.opencode/agent/`: 40 archivos reales. Reparto: **6 PRIMARY + 17 SUBAGENTES PRO + 17 SUBAGENTES FREE**.
 
@@ -100,6 +108,7 @@ Modelo de todos: `opencode/big-pickle`, **excepto** `media-reader-free` que usa 
 | `exp-pickle-free` | `opencode/big-pickle` | allow | allow |
 
 ### 2.4 Skills (11)
+> **[OBSOLETO 2026-10-04]** Este listado ya no refleja `.opencode/skills/`: **12 skills reales**, con `cascada-tier` anadida y **`batch-create`, `gemini-research` e `ingest-eventos` despublicadas** (2026-10-01; sus recursos quedaron en `.opencode/prompts/`). Indice vigente: `AGENTS.md` §4.
 
 `batch-create`, `create-dynamic-page`, `express-mode`, `frontend-design`, `gemini-research`, `gold-shield`, `grill-me`, `improve-codebase-architecture`, `ingest-eventos`, `research-destination`, `web-design-guidelines`.
 
@@ -319,6 +328,8 @@ Ahorro = costo mensual actual del agente.
 | 5 | Instrumentar el desglose por tarea en `informe-cuota.js` | permite atacar el 31.7% de build+plan | backend-dev + data-migration |
 
 Nota: ninguna de estas acciones fue ejecutada. Son propuestas sujetas a aprobacion.
+
+> **[OBSOLETO 2026-10-04 -- ADR-082, y ADEMAS superado por ADR-083] Roadmap superado, NO ejecutar tal cual.** Las acciones 1, 2 y 3 (migrar rutinarios a gemelos FREE, reasignar `frontend-tpl` a un premium, bumpear `default_agent` a `hybrid-build`) **ya no aplican**: no hay gemelos FREE que enrutar (ADR-076) y `hybrid-build` **no existe** (ADR-067/ADR-076). La accion 4 **si se cumplio**: `AGENTS.md` existe y es la fuente de verdad. **El equivalente vigente de la accion 1 NO es elegir un primario con nombre de tier** (esa variante `@free-build`/`@build` **esta RETIRADA**: ambos primarios estan SIN `model:` desde ADR-083): es **elegir el modelo en el selector de la sesion**, porque el tier lo fija el modelo activo de cada turno y se cambia en caliente. La accion 5 sigue vigente.
 
 ---
 

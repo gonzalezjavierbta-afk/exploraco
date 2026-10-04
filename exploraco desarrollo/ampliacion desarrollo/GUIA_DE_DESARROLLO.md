@@ -222,7 +222,7 @@ seed/loader/smoke viven en `scripts/` (nunca en `api/`), por eso son ilimitados.
 | `db/cleanups/` | SQL de limpieza de datos de prueba versionado. |
 | `docs/superpowers/specs/` | Design specs por feature (**13 + README**): mapa-cultural-clustering, logros-trofeos-voto-blog, ruta-salsera-bogota, mapas-publicos-privados, comunidad-unificada, milestones-v2-gaming, comunidad-chat-planes-backend, albumes-fotograficos, gamificacion-v4, multimedia-mapa-cultural-drawer, presencia-fisica-gamificacion-v4, epic-prompt-vocaciones-chat-perfil y **2026-09-14-gaming-v5-referidos-wayfarer-facciones** (Entrega 016). El prompt de producto original es `promptgamming.md` (ver `docs/DEPLOY_016.md:7`). |
 | `exploraco desarrollo/` | AI-DOS Core: PROJECT, BLUEPRINT, DECISIONS, TASKS, NEXT, BUGS_HISTORICOS, Reglas de Oro, fichas de destinos (ficha-*.md), referentes-agenda. |
-| `.opencode/skills/` | Skills de opencode: create-dynamic-page, gold-shield, batch-create, research-destination, etc. |
+| `.opencode/skills/` | Skills de opencode (**12 reales**): anti-absorcion, cascada-tier, create-dynamic-page, eficiencia-recursos, express-mode, frontend-design, gold-shield, grill-me, improve-codebase-architecture, research-destination, templates, web-design-guidelines. **Despublicadas 2026-10-01, NO invocar:** `batch-create`, `gemini-research`, `ingest-eventos` (sus recursos siguen en `.opencode/prompts/`; el validador de fichas en `scripts/validate_ficha.js`). |
 | `.agents/skills/`, `.superpowers/` | Otros skills/plugins. |
 
 ---
@@ -1377,7 +1377,7 @@ Cuando el usuario pide trabajar "express", "xpress" o "rapido", el skill `expres
 | `create-dynamic-page` | Orquesta el flujo completo de una pagina dinamica nueva (validacion, ficha, seed, loader, smoke, Escudo GOLD, produccion, docs). |
 | `gold-shield` | Ejecuta el Escudo GOLD (sintaxis, ASCII-safety, balance de divs). |
 | `express-mode` | Modo express/xpress: prioriza el cambio funcional, briefs quirurgicos, verificacion proporcional y documentacion diferida al cierre. |
-| `batch-create` | Crea varias paginas dinamicas a la vez para optimizar cuota. |
+| `batch-create` | **[DESPUBLICADA 2026-10-01 — NO invocar]** Crea varias paginas dinamicas a la vez. Sustituir por `create-dynamic-page` (una pagina por invocacion); su prompt maestro quedo en `.opencode/prompts/`. |
 | `research-destination` | Investiga un destino en multiples fuentes y genera la ficha .md. |
 | `brainstorming` / `grill-me` | Afinar requerimientos y diseno antes de implementar. |
 | `qa-auditor` (agente) | Auditoria y reporte (no corrige) de api/admin/pagina-destino/index. |

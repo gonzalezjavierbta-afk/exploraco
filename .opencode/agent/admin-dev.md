@@ -2,7 +2,7 @@
 name: admin-dev
 description: Corrige sub-tabs, campos y loadForm() en admin.html y publicar-lugar.js; mantiene el motor generico de tags y el balance de divs.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

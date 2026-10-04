@@ -2,7 +2,7 @@
 name: frontend-tpl
 description: Disena y ajusta UI/UX: paletas, tipografias, layouts responsive y consistencia visual en index.html y admin.html.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

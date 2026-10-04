@@ -2,7 +2,7 @@
 name: docs-keeper
 description: Mantiene los docs del AI-DOS Core (PROJECT, NEXT, TASKS, BLUEPRINT, DECISIONS, BUGS) y cierra tareas, handoffs y ADRs.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

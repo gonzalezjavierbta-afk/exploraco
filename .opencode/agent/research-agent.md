@@ -2,7 +2,7 @@
 name: research-agent
 description: Valida la ficha que devuelve Gemini y verifica fotos con curl -I (HEAD 200); nunca investiga por su cuenta.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow

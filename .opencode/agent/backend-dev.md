@@ -2,7 +2,7 @@
 name: backend-dev
 description: Escribe y mantiene las funciones serverless de api/*.js en Node CommonJS para Vercel con Neon PostgreSQL y merge JSONB.
 mode: subagent
-model: opencode/space-bunny-free
+coste: heredado
 permission:
   edit: allow
   bash: allow
