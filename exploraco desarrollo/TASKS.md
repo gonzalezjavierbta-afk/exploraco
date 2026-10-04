@@ -10,6 +10,8 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ### Tareas no completadas / estado actual
 
+- **CERRADA / EN WORKING TREE (2026-10-04; pase documental unico R2; commit PENDIENTE):** **TSK-176 - Realineacion del hero y del posicionamiento de la HOME (`index.html`; copy + CSS; sin ADR).** (1) Eyebrow `.hsey`: "Directorio turistico oficial de Colombia" -> "**Plataforma de turismo interactivo**" (se conservan la bandera y los `span` decorativos). (2) Tira de categorias `.htag` ("Hospedajes / Comida / Lugares / Eventos culturales") **ELIMINADA**: se borro el HTML y su regla CSS muerta; ocupaba el hueco entre el logo y la barra de busqueda. (3) Typo corregido: la pastilla de comida decia "Comidanomia", ahora dice "**Comida**". (4) Las **4 pastillas de categoria del hero (`.hcat`) ya no se encienden en `--gold`**: cada una usa el color que su item ya tiene en el directorio (Hospedajes `#3B82F6`, Comida `#EF4444`, Lugares `#22C55E`, Eventos `#A855F7`); el `:hover` tambien toma su color de categoria y el estado encendido suma un fondo translucido del mismo color; **la regla generica unica se sustituyo por 8 reglas por categoria**. Los botones de "Destacados" (`.dc-btn`) **se dejan en gold por decision del operador**; el JS de filtros no se toco. (5) **Meta/OG/Twitter y footer de la HOME realineados** con el nuevo posicionamiento: `meta description`, `og:title`, `og:description`, `twitter:title`, `twitter:description` y el `.fdesc` del footer; **intactos** `canonical`, `og:url`, `og:image`, `og:type`, `og:site_name` y el `<title>`. **Un solo archivo** (`index.html`; 16 inserciones / 11 borrados), **8/8 endpoints INTACTO** (ADR-010), sin migraciones, `index_pre_full.html` sin tocar (backup). **SIN ADR nuevo**: es copy y CSS, no arquitectura. Verificacion: copy nuevo **7/7**; `htag` **0**; `Comidanom` **0**; "oficial de Colombia" **0** en `index.html`; balance de divs **368/368**; bloques `<script>` **11/11** (el 12 es un comentario HTML preexistente); cascada correcta porque `.hcat[data-cat="x"].on` gana a `.hcat`. Pendientes que quedan abiertos: rebrand global, eyebrow de "Destacados" y la deuda tecnica de los hex de `.hcat`. Detalle en la seccion "Realineacion del hero y del posicionamiento de la HOME".
+
 - **CERRADA / EN WORKING TREE (2026-10-04; pase documental unico R2; commit PENDIENTE):** **TSK-175 / ADR-083 - El tier lo fija el MODELO ACTIVO de cada turno: 2 primarios sin `model:` (roster 20 -> 18) + invariante de coste de prohibicion a atribucion.** Ver detalle en la seccion "Prioridad TIER POR MODELO ACTIVO + ATRIBUCION DE COSTE".
 
 - **CERRADA / EN WORKING TREE (2026-10-02; commit PENDIENTE):** **TSK-174 / ADR-080 / ADR-081 - Tanda de 6 cambios de UI en `mi-perfil.html`, `comunidad.html` y `mercado.js`.** (T1) Las cards de mision (`pf-misiones`) se muestran acortadas a una linea con truncado y `title`: se elimino el volcado crudo de IDs de requisito que inflaba la tarjeta; helper de render dentro de `cargarMisiones`, CSS en el silo `#pf-misiones`. (T2) **Se RETIRA del perfil el modulo Hoja de Vida del Artista** (`#pf-cv`, `cargarHojaDeVida`, `v61GuardarHojaDeVida`, regla `.pf-v61 .v61-cv-obra`) y se borran los helpers cliente `ExploraCO.miHojaDeVida`/`ExploraCO.guardarHojaDeVida` de `usuario-session.js`; en su lugar `pf-museo-preview` pasa de la pestana `museo` a la `perfil`. **El backend `artista_cv` y su tabla quedan INTACTOS**: la retirada es solo de UI (**ADR-080**). (T3) **La pestana Mapa de Comunidad pasa de DOS mapas Leaflet a UNO SOLO**: `mymapa.js` crea la instancia unica sobre `#av-map-container` (`data-cm-mapa="1"`), desaparece `mm-personal-map` e `initAudiovisualMap` se engancha a esa instancia en vez de crear la suya (**ADR-081**); ambas fuentes (mapas personales y media audiovisual) conviven con los filtros y chips operando sobre el conjunto. (T4) "Mis lugares guardados" y "Lugares visitados" del tab Museo dejan de renderizar HTML crudo y pasan por el helper canonico **NUEVO `lugarCardHTML`** enrutado por `pfGruposRender`, con paridad visual; el CSS global `.lugar-*` se sustituye por el silo atomico `#pf-lugares`. (T5) El tab Inventario **deja de mostrar el catalogo de tienda**: se eliminan el titulo de tienda, `#pf-tienda-chips`, `#pf-tienda`, `cargarTienda`, `renderTiendaChips`, `setTiendaFiltro`, `categoriaConsumible`, `PF_TIENDA_CATS`, `PF_TIENDA_CAT`, `PF_CAT_CONSUMIBLE` y el CSS `.store-*` / `.tienda-chip*`; se conserva `cargarInventario` con su filtro `cantidad > 0`, que ya era correcto. (T6) En la vista de **COMUNIDAD** del Mercado ahora se ve todo el producto a la venta: las ofertas se agrupan por **TODAS** las Casas (`cargarOfertasTodas`, `_ofertasPorCasa`) en vez de solo la Casa seleccionada, mas catalogo completo con filtros "todos / Lo tienes / Disponible" y buscador; cache-busting a `mercado.js?v=2` en `comunidad.html` y `mi-perfil.html`. La validacion de propiedad al publicar **se mantiene y se refuerza en cliente** con `maxPublicable`/`invCant` (VER mas ya no habilita PUBLICAR mas; la validacion real sigue en el servidor). **8/8 endpoints INTACTO**; sin migraciones; sin cambios de `api/*`. Detalle en TASKS.md TSK-174 y DECISIONS.md ADR-080/ADR-081.
@@ -67,6 +69,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - [Prioridad INVENTARIO Y PLAN DE LOS 26 FAIL DE EXPRESS_CHECK - 2026-10-02 (TSK-173)](#inventario-y-plan-de-saneado-de-los-26-fail-de-express_checkjs---2026-10-02-tsk-173)
 - [Prioridad SANEADO DE UI DEL PERFIL Y DE COMUNIDAD - 2026-10-02 (TSK-174 / ADR-080 / ADR-081)](#prioridad-saneado-de-ui-del-perfil-y-de-comunidad---2026-10-02-tsk-174--adr-080--adr-081)
 - [Prioridad TIER POR MODELO ACTIVO + ATRIBUCION DE COSTE - 2026-10-04 (ADR-083 / TSK-175)](#prioridad-tier-por-modelo-activo--atribucion-de-coste---2026-10-04-adr-083--tsk-175)
+- [Realineacion del hero y del posicionamiento de la HOME - 2026-10-04 (TSK-176)](#realineacion-del-hero-y-del-posicionamiento-de-la-home---2026-10-04-tsk-176)
 - [Regla de actualizacion](#regla-de-actualizacion)
 - [Historico de paginas dinamicas (TSK-018..TSK-065) - ver TASKS_ARCHIVO.md](TASKS_ARCHIVO.md)
 
@@ -4178,6 +4181,42 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - (d) **El mensaje del guard sigue diciendo `RESULTADO: OK. Cascada vigente (ADR-082).`** cuando la cascada vigente es la de ADR-083. Es **codigo** (`scripts/`), no documento: no se toco en este pase. Correccion de una linea, sin riesgo, cuando `@js-silo-dev` pase por ahi.
 - (e) **Sin commit:** ADR-083, el codigo de D1/D2/D5 y este cierre documental viajan juntos en el working tree.
 - (f) **Supuesto S-1 sin verificar**, con criterio de rollback declarado (arriba).
+
+## Realineacion del hero y del posicionamiento de la HOME - 2026-10-04 (TSK-176)
+
+**Estado:** CERRADA (2026-10-04). **Commit PENDIENTE.**
+**Origen:** decision del operador sobre copy y color. **NO es una decision de arquitectura, asi que NO se creo ADR** en `DECISIONS.md` (mandato explicito del encargo). Este es su pase documental de cierre (R2), en un unico pase y **sin tocar codigo**.
+**Alcance:** **un solo archivo, `index.html`** (16 inserciones / 11 borrados). **No toca `api/*` (8/8 INTACTO, ADR-010)**, ni migraciones, ni `index_pre_full.html` (backup). **El JS de filtros NO se toco.**
+
+### Que se implemento de verdad, verificado contra el archivo real (ADR-006)
+
+1. **Copy del hero.** La eyebrow `.hsey` paso de "Directorio turistico oficial de Colombia" a "**Plataforma de turismo interactivo**". Se conservan la bandera y los `span` decorativos.
+2. **Tira de categorias `.htag` ELIMINADA** ("Hospedajes / Comida / Lugares / Eventos culturales"): se borro el HTML **y** su regla CSS muerta. Ocupaba el hueco entre el logo y la barra de busqueda.
+3. **Typo corregido:** la pastilla de comida decia "Comidanomia"; ahora dice "**Comida**".
+4. **Las 4 pastillas de categoria del hero (`.hcat`) ya no se encienden en `--gold`.** Cada una usa el color que su item ya tiene en el directorio: Hospedajes `#3B82F6`, Comida `#EF4444`, Lugares `#22C55E`, Eventos `#A855F7`. El `:hover` tambien toma su color de categoria y el estado encendido suma un fondo translucido del mismo color. **La regla generica unica se sustituyo por 8 reglas por categoria.** Los botones de "Destacados" (`.dc-btn`) **se dejan en gold por decision del operador**. El JS de filtros no se toco.
+5. **Meta/OG/Twitter y footer de la HOME realineados** con el nuevo posicionamiento: `meta description`, `og:title`, `og:description`, `twitter:title`, `twitter:description` y el `.fdesc` del footer. **NO se tocaron** `canonical`, `og:url`, `og:image`, `og:type`, `og:site_name` ni el `<title>`.
+
+### Verificacion (ADR-006: hechos medidos, no afirmaciones)
+
+| Que | Resultado |
+|---|---|
+| Copy nuevo presente | "Plataforma de turismo interactivo" = **7/7** ocurrencias |
+| Tira `.htag` fuera | `htag` = **0** |
+| Typo fuera | `Comidanom` = **0** |
+| Copy viejo fuera de la home | "oficial de Colombia" = **0** en `index.html` |
+| Balance de divs | **368/368** |
+| Bloques `<script>` | **11/11** (el 12 es un comentario HTML preexistente) |
+| Cascada CSS | correcta: `.hcat[data-cat="x"].on` gana a `.hcat` |
+
+### Pendientes que esta tarea NO resuelve (seguimiento en NEXT.md)
+
+- **Rebrand global PENDIENTE** por decision del operador: ~40 paginas mas y `404.html` siguen diciendo "El directorio turistico mas completo de Colombia". **Solo se alineo la home.**
+- **Eyebrow de "Destacados destacados"** (cerca de la linea 1153 de `index.html`) sigue diciendo "Directorio / 80 lugares". **Se dejo a proposito.**
+- **`index_pre_full.html` conserva el texto viejo** y es un backup: no se toco, **no es un bug**.
+
+### Deuda [DEUDA]
+
+- **Los 4 hex de `.hcat` son una COPIA MANUAL del mapa `CATS` de `index.html`** (~linea 1361). Si alguien reordena o cambia ese mapa, los colores del hero quedan desincronizados y **nada lo detecta: no hay ningun assert que los enlace**. Es deuda tecnica abierta, no un defecto del cambio.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

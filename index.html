@@ -5,22 +5,22 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#FF4A00">
   <!-- SEO + Open Graph -->
-  <meta name="description" content="El directorio turístico más completo de Colombia. Hostales, gastronomía, lugares naturales y eventos en una sola plataforma.">
+  <meta name="description" content="Plataforma de turismo interactivo de Colombia: explora hostales, gastronomía, lugares naturales y eventos culturales en 32 ciudades. Filtra y planea tu viaje.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://latawel.com/index.html">
   <!-- Open Graph -->
   <meta property="og:type"        content="website">
   <meta property="og:site_name"   content="LATAWEL">
-  <meta property="og:title"       content="LATAWEL — Directorio turístico de Colombia">
-  <meta property="og:description" content="80 hostales, restaurantes, lugares naturales y eventos. El mejor directorio para planear tu viaje por Colombia.">
+  <meta property="og:title"       content="LATAWEL — Plataforma de turismo interactivo">
+  <meta property="og:description" content="Plataforma de turismo interactivo de Colombia: 80 hostales, restaurantes, lugares naturales y eventos culturales. Filtra por categoría y planifica tu viaje.">
   <meta property="og:image"       content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
   <meta property="og:image:width"  content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url"         content="https://latawel.com/">
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary_large_image">
-  <meta name="twitter:title"       content="LATAWEL — Directorio turístico de Colombia">
-  <meta name="twitter:description" content="80 hostales, restaurantes, lugares naturales y eventos en Colombia.">
+  <meta name="twitter:title"       content="LATAWEL — Plataforma de turismo interactivo">
+  <meta name="twitter:description" content="Plataforma de turismo interactivo de Colombia: 80 hostales, restaurantes, lugares naturales y eventos culturales en un solo mapa.">
   <meta name="twitter:image"       content="https://latawel.com/assets/brand/og/latawel-og-1200x630.png">
   <!-- Font preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -226,7 +226,6 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .hlogo2 .ltw-hero-h{height:clamp(94px,13vw,172px)}
 .hlogo2 .ltw-hero-v{display:none;height:clamp(192px,54vw,288px)}
 @media(max-width:768px){.hlogo2 .ltw-hero-h{display:none}.hlogo2 .ltw-hero-v{display:block}}
-.htag{font-size:11px;color:rgba(255,255,255,.75);letter-spacing:4px;text-transform:uppercase;font-family:'Outfit',sans-serif;text-shadow:0 1px 10px rgba(0,0,0,.6)}
 .swrap{width:100%;max-width:660px;position:relative}
 .sbox{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.42);border:1.5px solid rgba(255,255,255,.28);border-radius:4px;padding:12px 18px;transition:border-color .2s,background .2s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .sbox:focus-within{background:rgba(255,255,255,.13);border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,74,0,.14)}
@@ -245,7 +244,14 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .ddt{width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
 .hcats{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
 .hcat{display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.35);font-size:9px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.hcat:hover,.hcat.on{border-color:var(--gold);color:var(--gold);background:rgba(255,74,0,.1)}
+.hcat[data-cat="hostal"]:hover,.hcat[data-cat="hostal"].on{border-color:#3B82F6;color:#3B82F6}
+.hcat[data-cat="hostal"].on{background:rgba(59,130,246,.16)}
+.hcat[data-cat="comida"]:hover,.hcat[data-cat="comida"].on{border-color:#EF4444;color:#EF4444}
+.hcat[data-cat="comida"].on{background:rgba(239,68,68,.16)}
+.hcat[data-cat="sitio"]:hover,.hcat[data-cat="sitio"].on{border-color:#22C55E;color:#22C55E}
+.hcat[data-cat="sitio"].on{background:rgba(34,197,94,.16)}
+.hcat[data-cat="evento"]:hover,.hcat[data-cat="evento"].on{border-color:#A855F7;color:#A855F7}
+.hcat[data-cat="evento"].on{background:rgba(168,85,247,.16)}
 .hstats{display:flex;gap:22px;align-items:center}
 .hstn{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:#fff;line-height:1;text-align:center;text-shadow:0 2px 12px rgba(0,0,0,.6)}
 .hstl{font-size:8px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;margin-top:2px;text-align:center;text-shadow:0 1px 6px rgba(0,0,0,.5)}
@@ -1041,9 +1047,8 @@ textarea.wrinp{resize:vertical;min-height:88px}
   <div class="hvig"></div>
   <div class="scat" id="scat"><span class="scatdot" id="scatdot"></span><span id="scatlbl"></span></div>
   <div class="hstrip">
-    <div class="hsey"><span></span>🇨🇴 Directorio turístico oficial de Colombia<span></span></div>
+    <div class="hsey"><span></span>🇨🇴 Plataforma de turismo interactivo<span></span></div>
     <div class="hlogo2 bc"><img class="latawel-logo ltw-hero-h" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="120"><img class="latawel-logo ltw-hero-v" src="/assets/brand/latawel-logo-vertical-white.png" alt="LATAWEL" height="160"></div>
-    <div class="htag">Hospedajes · Comida · Lugares · Eventos culturales</div>
     <div class="swrap">
       <div class="sbox">
         <span class="sico">🔍</span>
@@ -1055,7 +1060,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
     </div>
     <div class="hcats" id="hcats">
       <div class="hcat" data-cat="hostal">🏨 Hospedajes</div>
-      <div class="hcat" data-cat="comida">🍽️ Comidanomía</div>
+      <div class="hcat" data-cat="comida">🍽️ Comida</div>
       <div class="hcat" data-cat="sitio">🏔️ Lugares</div>
       <div class="hcat" data-cat="evento">🎉 Eventos</div>
     </div>
@@ -4158,7 +4163,7 @@ function submitBlog() {
 <div class="ftop">
   <div>
     <a href="index.html" class="flogo"><img class="latawel-logo" src="/assets/brand/latawel-logo-horizontal-white.png" alt="LATAWEL" height="30"></a>
-    <p class="fdesc">El directorio turístico más completo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
+    <p class="fdesc">Plataforma de turismo interactivo de Colombia. Hostales, gastronomía, sitios únicos y eventos culturales en 32 ciudades.</p>
   </div>
   <div><div class="fctl">Explorar</div><div class="flinks"><a class="flink" href="directorio-hostal.html">Hospedajes</a><a class="flink" href="directorio-comida.html">Comida</a><a class="flink" href="directorio-sitio.html">Lugares</a><a class="flink" href="directorio-evento.html">Eventos</a><a class="flink" href="directorio.html">Directorio</a></div></div>
   <div><div class="fctl">Destinos</div><div class="flinks"><a class="flink" href="hostal-casa-medina.html">Bogotá</a><a class="flink" href="el-cielo-restaurante.html">Medellín</a><a class="flink" href="ciudad-perdida.html">Sierra Nevada</a><a class="flink" href="feria-de-las-flores.html">Medellín</a><a class="flink" href="hostal-walled-city.html">Cartagena</a></div></div>
