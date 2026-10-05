@@ -4349,7 +4349,13 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ## Parches de precondicion B1-B5 para la multi-moneda + escritor de la rampa de 30 dias - 2026-10-05 (TSK-183 / ADR-086)
 
-**Estado:** PENDIENTE. **0 de los 5 puntos implementados.** Puntos **localizados y verificados contra los archivos reales** en esta sesion (ADR-006).
+**Estado:** CERRADA (2026-10-05). **5 de 5 puntos implementados, aplicados y DESPLEGADOS** (commit `7fe1e9f`). Verificado contra los archivos reales (ADR-006); el argumento vive **una sola vez** en `DECISIONS.md` **ADR-086** (tabla B1-B5 de §3, ya corregida de 4 a 5 filas, + **addendum A**), aqui solo el estado.
+
+**Alcance REAL ejecutado (no el plan original):** los 5 parches quedaron como un **puente de doble camino** con `soportaMoneda()` (`api/interacciones.js:2287-2321`, `api/usuarios.js:139-186`), que gatea por la **PK compuesta** (`pg_constraint.conkey = [usuario_id, moneda]`) y ramifica en cada sitio. Con esquema de 1 moneda emite SQL **byte-identico a HEAD**; con 3, el nuevo. **TTL de 60 s** sobre el **booleano resuelto** (no sobre la Promise) y **fail-closed** intacto (si la deteccion falla, se asume 1 moneda). La numeracion canonica es la de este bloque: **B1** `registrarMonedaLedger` (`interacciones.js:2458-2473`), **B2** `ON CONFLICT (usuario_id, moneda)` (`interacciones.js:12948`), **B3** debito con `AND moneda` (`interacciones.js:12720`), **B4** subconsulta escalar (`usuarios.js:806`/`:875`), **B5** `ledger_sum` (`usuarios.js:808`).
+
+**Lo que cambia respecto a lo planificado:** la exigencia de "mismo commit" **dejo de ser la garantia**. El codigo parcheado hace que **no exista fase intermedia**, luego **el orden migracion/codigo dejo de importar** y el orden ejecutable es **migracion primero, redeploy despues** (fallo ruidoso sobre fallo silencioso). **La migracion de economia es la `046`, no la `045`** (el 045 quedo ocupado por la tabla de control, TSK-186), y **queda APLICADA** (ver TSK-188). La linea de "Orden" de este bloque queda **superada** por el addendum del ADR.
+
+**Deuda que queda abierta (no se resuelve aqui):** ventana de **60 s** por el TTL de `soportaMoneda()` -- documentada y aceptada (`BUGS_HISTORICOS.md` **BUG-110**). **Verificacion:** `npm test` **109/109 FAIL 0** antes y despues; ASCII **0/0** en los 3 ficheros; `planes` **HTTP 200** en produccion.
 
 **Por que son precondicion y no detalle:** la Enmienda 3 a ADR-061 hace que `moneda_cuentas` passe de 1 moneda por usuario a **3**. Cada punto de ruptura siguiente leeria una moneda **arbitraria o implicita** en cuanto `moneda_cuentas` sea multi-moneda, y varios **fallan en silencio** devolviendo `0` en vez de error:
 
@@ -4427,7 +4433,17 @@ Con ese dato, la salida deja de ser `NO_CONFIRMADO` y pasa a `OK` o a `FALLIDO_4
 
 ## Migracion 046 del Sistema Economico Integral - 2026-10-05 (TSK-188 / ADR-086)
 
-**Estado:** PENDIENTE. Numero **046**, no 045: el **045 quedo ocupado por la tabla de control de migraciones** (ver **TSK-186**). La economia **sigue sin implementarse: 0 lineas de codigo**.
+**Estado:** CERRADA (2026-10-05). **APLICADA EN PRODUCCION** en Neon: **16/16** sentencias, **exit 0**, `resultado='aplicada'`, **1673 ms**, registrada en `schema_migrations` (**3 aplicadas, 0 fallidas**). Numero **046**, no 045: el **045 quedo ocupado por la tabla de control de migraciones** (ver **TSK-186**). **La economia sigue sin ejercitarse** -- el esquema esta, los 4 XP sinks **no cobran**. El argumento vive **una sola vez** en `DECISIONS.md` **ADR-086** (+ **addendum A**), aqui solo el estado.
+
+**Alcance REAL ejecutado (ADR-006, verificado contra el archivo real y contra produccion):**
+- **Precondicion cumplida:** los **5 parches B1-B5** de **TSK-183** aplicados y **desplegados** (commit `7fe1e9f`) **antes** de aplicar esta migracion. Orden ejecutable: **migracion primero, redeploy despues**.
+- **Esquema verificado tras aplicar:** PK de `moneda_cuentas` = **`usuario_id+moneda`** (la re-clave, presupuesto de los `ON CONFLICT (usuario_id, moneda)`); **5 `ADD COLUMN` de moneda**; `sink_acciones` = **4 filas**; `sink_slots` = **0**; semillas `ranking%` = **3**; **8** indices.
+- **Defecto de la propia 046 corregido antes de aplicar:** se **elimino la seccion `EXCEPTION`** y el `IF EXISTS` se cerro con `ELSE -> RAISE EXCEPTION` (P0001, `046:116-128`). Con el texto viejo, el escenario `23505` se tragaba el error, imprimia `NOTICE "NO se reclava"` y **registraba la migracion como aplicada** -> `42P10` permanente. Ahora **aborta en 6/16**. Ver **BUG-108**.
+- **Canonico `delfin`, no `dlf`:** los **4 `CHECK`** de la 046 usan `delfin` (**0 apariciones de `dlf`**); `DLF` es **etiqueta de render**, no valor de columna.
+- **Estado de los datos:** las tablas de mercado siguen **vacias en Neon** (`moneda_cuentas=0`, `moneda_ledger=0`, `moneda_mercado=0`, `usuarios=10`).
+- **NO verificable por HTTP:** `scripts/verificar_migraciones_prod.js` sale con *"Ningun endpoint declarado consulta esa tabla"* y **exit 1**. **Es correcto y no es un FAIL**: la 046 crea tablas nuevas y re-clava una tabla vacia, luego su efecto no es observable desde un endpoint. No se maquilla como OK.
+
+**Nota de nombre:** TSK-182 (creada en el primer pase de esta sesion) describia esta misma migracion con el numero `045`. Este bloque **la sustituye** para que no queden dos tareas con migraciones distintas; TSK-182 queda como antecedente con premisa superada.
 
 **Alcance:** **contenido identico al que ya declara ADR-086 para TSK-182**, solo cambia el numero de migracion. El diseno completo vive en `DECISIONS.md` **ADR-086**; aqui solo el pendiente:
 - Generalizacion de `moneda_ledger` de 1 moneda a **3** (CDR/JAG/DLF) y la re-clave de `moneda_cuentas` (Enmienda 3 a ADR-061).

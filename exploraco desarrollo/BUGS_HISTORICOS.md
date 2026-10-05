@@ -1868,3 +1868,51 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 
 **Estado:** **CERRADO como premisa (2026-10-05).** El hueco de verificacion que deja abierto queda como **TSK-187**.
 
+## BUG-108: la seccion `EXCEPTION` de la `046` se **tragaba** el error de la re-clave y dejaba la migracion **registrada como aplicada** -- `42P10` permanente en produccion
+
+**Severidad:** ALTA. **No rompio produccion porque se detecto antes de aplicar**, pero su ausencia habria sido un fallo **silencioso y permanente**: la migracion constaba aplicada y el mercado de moneda habria fallado en cada `ON CONFLICT`.
+
+**Contexto:** detectado el 2026-10-05 al revisar `db/migrations/046_market_multimoneda_sinks.sql` antes de aplicarla en Neon. Tanda: `TASKS.md` **TSK-188** / **TSK-183**, `DECISIONS.md` **ADR-086** addendum A.
+
+**Sintoma exacto (medido por ejecucion, no por revision):** con el texto viejo, el escenario de violacion de unicidad **`23505`** daba **`error=NINGUNO`**, emitia un `NOTICE "NO se reclava"`, **no abortaba**, y la migracion quedaba **registrada en `schema_migrations` como `aplicada`**. Consecuencia: la PK de `moneda_cuentas` se quedaba en `(usuario_id)` y el primer `ON CONFLICT (usuario_id, moneda)` de la aplicacion lanzaba **`42P10` (no existe la restriccion unica)**, de forma **permanente**, con el ledger de migraciones afirmando lo contrario.
+
+**Causa raiz -- y por que los handlers eran INALCANZABLES:** el bloque declaraba `EXCEPTION WHEN duplicate_table` (**42P07**) y `WHEN unique_violation` (**23505**). Ninguno podia dispararse: (a) el bloque **no crea ninguna tabla** (solo `ALTER`/`ADD CONSTRAINT`), luego `42P07` no tiene emisor; (b) `moneda_cuentas` con PK `(usuario_id)` **ya implica** unicidad de `(usuario_id, moneda)`, luego `23505` solo podria venir de la propia re-clave, que es justo lo que el `IF EXISTS` ya decidia. El `EXCEPTION` no anadia robustez: **anadia una salida silenciosa** donde debia haber un aborto.
+
+**Resolucion aplicada:** **se elimino la seccion `EXCEPTION` entera** y el `IF EXISTS` se cerro con `ELSE -> RAISE EXCEPTION` (**P0001**, `046:116-128`). Sin seccion `EXCEPTION` el error **se propaga y aborta el fichero entero**, porque el `DO $$` es **una sola sentencia**; el `RAISE` da **lo mismo con codigo muerto**. **Verificado por ejecucion:** ahora **aborta en 6/16** y **no ejecuta 7-16**.
+
+**Leccion transversal:** *capturar una excepcion en un bloque que se supone idempotente convierte un fallo ruidoso en una mentira registrada.* Si el proposito del bloque es **garantizar un estado**, el fallo debe **abortar el fichero**, no avisar y continuar. Y un handler que **ningun camino puede alcanzar** no es defensa: es una puerta que parece cerrada y no lo esta.
+
+**Estado:** **CERRADO (2026-10-05)**, corregido en el fichero **antes** de aplicar la `046` en produccion. Decision relacionada: `DECISIONS.md` **ADR-086** addendum A, punto **A5**.
+
+## BUG-109: `DECISIONS.md` **ADR-086 §4** prescribia filtrar por `moneda_cuentas.activo`, **columna que no existe** -- confusion con `moneda_mercado.activo`
+
+**Severidad:** MEDIA como **defecto de especificacion**. No rompio codigo (nadie cableo esa clausula), pero **habria roto la implementacion del ranking compuesto** en cuanto alguien la hubiera escrito tal cual, y habria exigido **anadir una columna** por el camino equivocado.
+
+**Contexto:** detectado el 2026-10-05 al verificar la `046` ya aplicada contra la migracion `040` y contra Neon. Tanda: `DECISIONS.md` **ADR-086** §4.
+
+**El defecto:** la formula del saldo del ranking compuesto prescribia `SUM(m.saldo) ... WHERE m.usuario_id = u.id AND m.activo = true`. **`moneda_cuentas.activo` NO EXISTE**, medido en `db/migrations/040` (su `CREATE TABLE` declara solo `usuario_id uuid PRIMARY KEY`, `saldo numeric(12,2)`, `actualizado_en timestamptz`) y confirmado en Neon. **Causa raiz:** confusion con **`moneda_mercado.activo`, que si existe** (`046:138`).
+
+**Por que NO se anade la columna (dictamen, y es la parte importante del cierre):** (a) crearia un **segundo estado durmiente** que el filtro de saldo **no cubre** -- una cuenta desactivada seguiria sumando en el ranking, o sea **deriva silenciosa**, la clase de fallo que el propio ADR-086 busca eliminar; (b) es **redundante**: con la PK re-claveada a `(usuario_id, moneda)` hay **exactamente una fila por par**, luego `SUM(saldo)` **ya es** el saldo activo. **La conclusion del ADR no se debilita aunque la tabla tenga filas**: el `DEFAULT 'condor'` de las columnas anadidas mete a todos los usuarios existentes en una moneda, y `(usuario_id,'condor')` **no puede duplicar** bajo una PK compuesta.
+
+**Resolucion aplicada:** la clausula `AND m.activo = true` **se borra** de la formula de §4 y **no se anade ninguna columna**. Correccion registrada en `DECISIONS.md` **ADR-086** §4 con su justificacion.
+
+**Estado:** **CERRADO por el ADR (2026-10-05).** Sin cambios en esquema: la `046` aplicada **no** tiene `moneda_cuentas.activo` y no lo necesita.
+
+## BUG-110: `soportaMoneda()` cachea el booleano de esquema con **TTL de 60 s** -- una instancia viva no ve un cambio de PK hasta 60 s (deuda ACEPTADA, no resuelta)
+
+**Severidad:** BAJA, y **deliberada**. Se registra como **deuda documentada y aceptada**, no como fallo.
+
+**Contexto:** introducido el 2026-10-05 con los parches B1-B5 (`TSK-183`, commit `7fe1e9f`). Tanda: `DECISIONS.md` **ADR-086** addendum A, punto **A3**.
+
+**El comportamiento y su ventana:** `soportaMoneda()` resuelve el booleano "el esquema es multi-moneda" y lo cachea **60 s** (`MONEDA_TTL_MS = 60000`, `api/interacciones.js:2287`, `api/usuarios.js:154`). Una instancia **ya arrancada** que resuelva `false` **no ve** un cambio posterior de la PK durante ese minuto, y en esa ventana emite el **SQL legacy**.
+
+**Por que se acepta:** el TTL acota el peor retraso del sistema a **60 s**. Sin el, el booleano quedaria congelado **hasta el proximo redeploy**, que es un plazo **indefinido**. Ademas, en esta tanda la ventana **es inaplicable** por el orden de despliegue: **migracion primero, redeploy despues**, luego **ninguna instancia** puede haber resuelto `false` antes de que la PK sea compuesta.
+
+**El riesgo residual, escrito para que no se olvide:** si alguna vez se aplica un **cambio de esquema que altere la PK de `moneda_cuentas`** y se hace **sin** un redeploy posterior, las instancias **durante el TTL** pueden **mixear** SQL de 1 moneda y de 3 durante **hasta 60 s**. Con una ventana de 60 s y datos de mercado, eso **no** es un saldo falso silencioso mientras el TTL no expire; con el TTL expirando, el **orden** vuelve a ser lo unico que protege.
+
+**Mitigaciones ya presentes (no son el fix, son por que el riesgo es bajo):** cachea el **booleano resuelto**, no la Promise (una Promise rechazada cacheada se relee rechazada **para siempre**); **fail-closed**: si la deteccion falla se asume **1 moneda**, la rama que no puede corromper.
+
+**Deuda:** [ABIERTA, ACEPTADA]. No se resuelve en esta tanda. Si alguna vez se necesita **cero** ventana, la palanca es **reinicio de instancias** al cambiar el esquema, no acortar el TTL.
+
+**Estado:** **ABIERTA como deuda (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-086** addendum A, puntos **A3** y **A4**.
+
