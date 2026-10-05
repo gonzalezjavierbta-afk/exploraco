@@ -1,5 +1,10 @@
 // Smoke 042 (Fase B): valida de forma estatica el Pasaporte + billetera +
 // fotos de perfil (migracion 042) en el working tree. No toca red ni BD.
+//
+// Nota: las fotos de perfil ya no son un modulo del cuerpo de la pagina.
+// Viven dentro del modal de subida (modo "perfil"), en #museo-perfil-fotos.
+// Este smoke sigue validando la MIGRACION 042 (lo unico que se movio de sitio
+// es el destino del render); el resto de la migracion no se toca.
 const fs = require('fs');
 const path = require('path');
 
@@ -48,8 +53,47 @@ check('interacciones: reparte XP a referidos en logros', int.indexOf('repartirXp
 // mi-perfil.html
 check('mi-perfil: host pf-pasaporte', perfil.indexOf('id="pf-pasaporte"') !== -1);
 check('mi-perfil: host pf-billetera', perfil.indexOf('id="pf-billetera"') !== -1);
-check('mi-perfil: host pf-galeria', perfil.indexOf('id="pf-galeria"') !== -1);
 check('mi-perfil: cargarBilletera definida', perfil.indexOf('function cargarBilletera()') !== -1);
+check('mi-perfil: cargarBilletera sigue trayendo fotos', perfil.indexOf('res.data.fotos || []') !== -1);
+
+// Fotos de perfil: la superficie ahora vive DENTRO del modal de subida.
+check('mi-perfil: wrap de fotos en el modal', perfil.indexOf('id="museo-perfil-fotos-wrap"') !== -1);
+check('mi-perfil: grid de fotos en el modal', perfil.indexOf('id="museo-perfil-fotos"') !== -1);
+check('mi-perfil: cabecera de fotos en el modal', perfil.indexOf('id="museo-perfil-fotos-head"') !== -1);
+// El wrap se muestra SOLO en modo perfil: no basta con que exista el
+// getElementById. Se comprueba el COMPORTAMIENTO: toda asignacion de
+// display de pfWrap debe ser un ternario condicionado por esPerfil con la
+// rama perfil visible ('' o 'block') y la otra rama oculta ('none').
+// Si se deja en valor fijo ('block', '' o 'none') o se borra, falla.
+check('mi-perfil: el wrap se muestra solo en modo perfil', (function () {
+  var re = /pfWrap\.style\.display\s*=\s*([^;\n]+)/g;
+  var m, n = 0, ok = true;
+  while ((m = re.exec(perfil)) !== null) {
+    n++;
+    if (!/^esPerfil\s*\?\s*(''|'block'|"block")\s*:\s*'none'\s*$/.test(m[1].trim())) ok = false;
+  }
+  return n > 0 && ok;
+})());
+check('mi-perfil: pfPintarFotosModal definida', perfil.indexOf('function pfPintarFotosModal(') !== -1);
+check('mi-perfil: cache de fotos del modal', perfil.indexOf('var pfFotosCache = null;') !== -1);
+check('mi-perfil: cargarBilletera alimenta la cache', perfil.indexOf('pfFotosCache = res.data.fotos || [];') !== -1);
+
+// El modulo salio del cuerpo de la pagina: su host y sus dos renderizadores
+// tienen que seguir SIN existir (regresion si alguien los reintroduce).
+check('mi-perfil: ya NO existe el host pf-galeria', perfil.indexOf('id="pf-galeria"') === -1);
+check('mi-perfil: ya NO esta renderGaleriaPerfil', perfil.indexOf('function renderGaleriaPerfil') === -1);
+check('mi-perfil: ya NO esta pfFotoAgregar', perfil.indexOf('function pfFotoAgregar') === -1);
+
+// Las acciones sobreviven al traslado.
+check('mi-perfil: accion pfFotoSubirUrl', perfil.indexOf('function pfFotoSubirUrl(') !== -1);
+check('mi-perfil: accion pfFotoPrincipal', perfil.indexOf('function pfFotoPrincipal(') !== -1);
+check('mi-perfil: accion pfFotoQuitar', perfil.indexOf('function pfFotoQuitar(') !== -1);
+// Las acciones se cablean desde las miniaturas del MODAL, no desde un boton
+// de la pagina (que ya no existe): se comprueba el onclick tal cual se emite.
+check('mi-perfil: boton Principal en las miniaturas del modal',
+  perfil.indexOf('class="pf-gal-btn" onclick="pfFotoPrincipal(') !== -1);
+check('mi-perfil: boton Quitar en las miniaturas del modal',
+  perfil.indexOf('class="pf-gal-btn danger" onclick="pfFotoQuitar(') !== -1);
 check('mi-perfil: campo fecha de nacimiento', perfil.indexOf("campo === 'fecha_nacimiento'") !== -1);
 
 // Fase C: C4 ubicacion + optimizacion de media

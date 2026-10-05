@@ -4,11 +4,12 @@
  * smoke_grupos_perfil.js
  * Smoke permanente (y barato) de la agrupacion plegable de "Mi perfil".
  *
- * Cubre los 4 modulos que usan el helper generico pfGruposRender():
+ * Cubre los 5 modulos que usan el helper generico pfGruposRender():
  *   1. Museo         -> #museo-recursos-grid      (foto | video | audio)
  *   2. Guardados     -> #mis-guardados-media-grid (fuente)
  *   3. Niveles       -> #pf-niveles               (era) + auto-apertura
  *   4. Mis Albumes  -> #mis-albumes-grid          (tope, sin agrupar)
+ *   5. Misiones     -> #pf-misiones               (por estado) + auto-apertura
  *
  * Que comprueba y por que:
  *   - Sintaxis y ASCII no se comprueban aqui (los hace express_check.js).
@@ -516,7 +517,38 @@ var SRC_RESET = [
   'function __pfReset(){',
   '  _pfGruposAbiertos = {};',
   '  _pfNivelesGrupoAuto = \'\';',
+  '  _pfMisionesGrupoAuto = \'\';',
   '  misAlbumesVerMas.expandido = false;',
+  '}'
+].join('\n');
+
+/* Stubs minimos que misionEstado / misionCardHTML necesitan del contexto de la
+   pagina (grupoNombre, fmtXp) y los dos diccionarios que cargaMisiones
+   rellena antes de pintar. No se extraen del HTML a proposito: este smoke
+   prueba el AGRUPAMIENTO, no la estetica de la tarjeta. */
+var SRC_MISIONES_STUBS = [
+  'var _misDone = {};',
+  'var _misNombres = {};',
+  'function grupoNombre(g){ return g || \'\'; }',
+  'function fmtXp(n){ return String(n == null ? 0 : n); }'
+].join('\n');
+
+/* Reproduce el bloque de cargarMisiones() que pinta el acordeon: _misDone se
+   deriva del propio lote (regla de la pagina) y la auto-apertura se invoca
+   ANTES del render, igual que en el codigo real. */
+var SRC_MISIONES = [
+  'function __pfMisiones(list){',
+  '  _misDone = {};',
+  '  _misNombres = {};',
+  '  for(var i = 0; i < list.length; i++){',
+  '    var m = list[i];',
+  '    _misNombres[m.id] = m.nombre || m.id;',
+  '    if(m.estado === \'completada\') _misDone[m.id] = true;',
+  '  }',
+  '  pfMisionesAutoAbrirGrupo(list);',
+  '  var grid = document.getElementById(\'pf-misiones\');',
+  '  grid.innerHTML = pfGruposRender(\'pf-misiones\', list, misionGrupoClave, MISIONES_GRUPOS, misionCardHTML);',
+  '  return grid;',
   '}'
 ].join('\n');
 
@@ -574,6 +606,18 @@ var CASOS = [
     gruposVar: 'NIVELES_ERAS',
     claveFn: 'nivelesGrupoClave',
     reparto: { Caminante: 10, Explorador: 10, Cronista: 10, Leyenda: 5, Mito: 5 }
+  },
+  {
+    /* 5.a superficie. El reparto son los TRES estados de misionEstado(): la
+       clave de agrupado no se lee de un campo, se deriva de la terna
+       done / bloqueada / disponible, asi que el reparto se genera
+       obligatoriamente a traves de generarMisiones() (ver mas abajo). */
+    id: 'misiones',
+    titulo: 'Misiones',
+    grid: 'pf-misiones',
+    gruposVar: 'MISIONES_GRUPOS',
+    claveFn: 'misionGrupoClave',
+    reparto: { disponible: 6, completada: 4, bloqueada: 3 }
   }
 ];
 
@@ -602,6 +646,9 @@ function itemCaso(caso, clave, i) {
 }
 
 function generarItems(caso) {
+  /* Misiones no se puede repartir por "copiar N veces la misma clave": su
+     estado se DERIVA de esta misma terna que consume misionEstado(). */
+  if (caso.id === 'misiones') return generarMisiones(caso);
   var items = [];
   var claves = Object.keys(caso.reparto);
   var n = 0;
@@ -613,6 +660,75 @@ function generarItems(caso) {
     }
   }
   return items;
+}
+
+/* ---- generadores de la 5.a superficie (Misiones) ----
+   El reparto sale de una cadena REAL de requisitos, no de etiquetas, pero se
+   construye de forma que NO dependa de _misDone (misionEstado lo consulta):
+     - completada: estado 'completada' -> completada, sea cual sea _misDone;
+     - disponible: sin requisitos pendientes -> disponible siempre;
+     - bloqueada: requiere una DISPONIBLE, que por definicion nunca esta
+       cumplida, luego siempre queda con requisitos pendientes.
+   Asi el reparto es el mismo lo pinte quien lo pinte (bucle generico, que no
+   reconstruye _misDone, o __pfMisiones, que si lo hace). La rama que SI
+   depende de _misDone se comprueba aparte, con la cadena c-1 -> c-2 -> c-3. */
+function misionCaso(id, estado, requiere) {
+  return { id: id, estado: estado, requiere: requiere, grupo: 'pais', nombre: 'Mision ' + id, xp: 25 };
+}
+
+function generarMisiones(caso) {
+  var rep = caso.reparto;
+  var items = [];
+  var disponibles = [];
+  var i = 0;
+  for (i = 0; i < (rep.completada || 0); i++) {
+    items.push(misionCaso(caso.id + '-completada-' + i, 'completada', []));
+  }
+  for (i = 0; i < (rep.disponible || 0); i++) {
+    var idD = caso.id + '-disponible-' + i;
+    items.push(misionCaso(idD, 'pendiente', []));
+    disponibles.push(idD);
+  }
+  for (i = 0; i < (rep.bloqueada || 0); i++) {
+    var req = disponibles.length
+      ? [disponibles[i % disponibles.length]]
+      : ['mision-inexistente-' + i];
+    items.push(misionCaso(caso.id + '-bloqueada-' + i, 'pendiente', req));
+  }
+  return items;
+}
+
+/* _misDone tal como lo arma la pagina: solo las misiones del lote que vienen
+   con estado 'completada'. */
+function misionesDone(items) {
+  var done = {};
+  for (var i = 0; i < items.length; i++) {
+    if (items[i] && items[i].estado === 'completada') done[items[i].id] = true;
+  }
+  return done;
+}
+
+/* Reimplementacion INDEPENDIENTE de la terna de misionEstado(). Si las dos
+   piezas dejasen de coincidir, esta asercion cae: es el calculo a mano que
+   el reparto renderizado tiene que reproducing. */
+function misionClaveEsperada(m, done) {
+  if (m.estado === 'completada') return 'completada';
+  var reqs = m.requiere || [];
+  var pendientes = 0;
+  for (var i = 0; i < reqs.length; i++) if (!done[reqs[i]]) pendientes += 1;
+  return pendientes > 0 ? 'bloqueada' : 'disponible';
+}
+
+/* Primera clave del catalogo DECLARADO que tiene items, en el orden del
+   catalogo. Es el criterio que aplica pfMisionesAutoAbrirGrupo(): un grupo
+   declarado pero vacio no se abre. */
+function primerGrupoConItems(grupos, items, done) {
+  for (var g = 0; g < grupos.length; g++) {
+    for (var i = 0; i < items.length; i++) {
+      if (misionClaveEsperada(items[i], done) === grupos[g].clave) return grupos[g].clave;
+    }
+  }
+  return '';
 }
 
 function generarAlbumes(total) {
@@ -688,6 +804,7 @@ function correr() {
     seccion('2. Extraccion del helper generico desde ' + HTML_REL);
     var nombres = ['pfGruposToggle', 'pfGruposRender', 'museoGrupoClave',
       'guardadosGrupoClave', 'nivelesGrupoClave', 'pfNivelesAutoAbrirGrupo',
+      'misionEstado', 'misionGrupoClave', 'misionCardHTML', 'pfMisionesAutoAbrirGrupo',
       'misAlbumesBoton', 'misAlbumesToggleVerMas', 'misAlbumesPintar'];
     var faltan = [];
     var chunks = [];
@@ -696,8 +813,9 @@ function correr() {
       if (!fx) faltan.push(nombres[nf]);
       else chunks.push(fx);
     }
-    var vars = ['_pfGruposAbiertos', '_pfNivelesGrupoAuto', 'misAlbumesVerMas',
-      'MIS_ALBUMES_VER_MAS', 'MUSEO_GRUPOS', 'GUARDADOS_GRUPOS', 'NIVELES_ERAS'];
+    var vars = ['_pfGruposAbiertos', '_pfNivelesGrupoAuto', '_pfMisionesGrupoAuto',
+      'misAlbumesVerMas', 'MIS_ALBUMES_VER_MAS', 'MUSEO_GRUPOS', 'GUARDADOS_GRUPOS',
+      'NIVELES_ERAS', 'MISIONES_GRUPOS'];
     var faltanVars = [];
     for (var nv = 0; nv < vars.length; nv++) {
       var vx = extraerVar(html, vars[nv]);
@@ -731,7 +849,8 @@ function correr() {
     }
     grids.push('mis-albumes-grid');
 
-    var fuenteSandbox = [chunks.join('\n'), SRC_ITEM, SRC_RENDER, SRC_NIVELES, SRC_RESET].join('\n');
+    var fuenteSandbox = [chunks.join('\n'), SRC_ITEM, SRC_RENDER, SRC_NIVELES,
+      SRC_MISIONES_STUBS, SRC_MISIONES, SRC_RESET].join('\n');
     var ctx = null;
     var errSandbox = '';
     try {
@@ -1082,6 +1201,196 @@ function correr() {
     igual('items-sin-clave-no-se-pierden',
       gridLimpio.getElementsByClassName('pf-item').length, ctxWin.sinTipo.length,
       'items sin media_type/fuente caen al grupo de fallback');
+
+    /* ---------------- 8. Misiones: 5.a superficie agrupada por ESTADO ------- *
+     * Lo de arriba ya le paso el bucle generico a Misiones (integridad del
+     * reparto, contadores, plegado). Aqui se comprueba lo que el cambio
+     * introduce y que no existia en ninguna otra superficie:
+     *   - el catalogo de 3 grupos y su ORDEN fijo;
+     *   - el reparto renderizado contra el reparto calculado A MANO con una
+     *     reimplementacion independiente de la terna de misionEstado();
+     *   - la auto-apertura del PRIMER grupo con items (saltandose los vacios);
+     *   - el veto del usuario: si cerro ese grupo, ningun re-render lo reabre;
+     *   - los wrappers emitidos sin data-tab (ADR-077).
+     * Se usa el itemHTML REAL (misionCardHTML), no el stub: por eso aqui se
+     * mira el estado de los grupos y no el conteo de .pf-item. */
+    seccion('8. Misiones: grupos por estado, reparto, auto-apertura y veto');
+    var casoMs = casosDefs[3];
+    igual('misiones-es-la-5a-superficie', casoMs && casoMs.grid, 'pf-misiones',
+      'una quinta superficie del helper generico');
+
+    var gruposMs = ctx[casoMs.gruposVar];
+    var etiquetasCatalogo = [];
+    var clavesCatalogo = [];
+    for (var gm = 0; gm < gruposMs.length; gm++) {
+      etiquetasCatalogo.push(gruposMs[gm].etiqueta);
+      clavesCatalogo.push(gruposMs[gm].clave);
+    }
+    igual('misiones-catalogo-de-grupos', etiquetasCatalogo.join(','),
+      'Disponibles,Completadas,Bloqueadas', 'orden fijo del catalogo');
+    igual('misiones-claves-de-grupo', clavesCatalogo.join(','),
+      'disponible,completada,bloqueada', 'las 3 claves de la terna de misionEstado()');
+
+    /* --- reparto renderizado contra el reparto calculado a mano --- */
+    var itemsMs = generarItems(casoMs);
+    var doneMs = misionesDone(itemsMs);
+    ctx.__pfReset();
+    var gridMs = ctx.__pfRender(casoMs.grid, itemsMs, ctx[casoMs.claveFn], gruposMs);
+    var gsMs = gruposDe(gridMs);
+    igual('misiones-grupos-emitidos', gsMs.length, 3, 'grupos con items en el reparto');
+    var ordenEmitido = [];
+    for (var om = 0; om < gsMs.length; om++) ordenEmitido.push(gsMs[om].etiqueta);
+    igual('misiones-orden-emitido', ordenEmitido.join(','),
+      'Disponibles,Completadas,Bloqueadas', 'el orden del catalogo se respeta al pintar');
+
+    var esperadoMs = {};
+    for (var em = 0; em < itemsMs.length; em++) {
+      var kEsp = misionClaveEsperada(itemsMs[em], doneMs);
+      esperadoMs[kEsp] = (esperadoMs[kEsp] || 0) + 1;
+    }
+    var desviadasMs = [];
+    for (var gm2 = 0; gm2 < gsMs.length; gm2++) {
+      var sufijoMs = gsMs[gm2].id.slice((casoMs.grid + '-grp-').length);
+      var realMs = gsMs[gm2].items.length;
+      if (realMs !== esperadoMs[sufijoMs]) {
+        desviadasMs.push(sufijoMs + ': render=' + realMs + ' esperado=' + esperadoMs[sufijoMs]);
+      }
+    }
+    ok('misiones-reparto-cuadra-con-la-terna', desviadasMs.length === 0,
+      desviadasMs.length ? desviadasMs.join(' | ') : JSON.stringify(esperadoMs));
+
+    /* Estado NO reconocido: no es completada ni bloqueada, asi que disponible,
+       y en ningun caso se pierde (misionEstado solo mira === 'completada'). */
+    var rarosMs = [
+      { id: 'm-r1', estado: 'pendiente', requiere: [], grupo: 'pais', nombre: 'R1', xp: 5 },
+      { id: 'm-r2', requiere: [], grupo: 'pais', nombre: 'R2', xp: 5 },
+      { id: 'm-r3', estado: 'COMPLETADA', requiere: [], grupo: 'pais', nombre: 'R3', xp: 5 }
+    ];
+    ctx.__pfReset();
+    var gridRaros = ctx.__pfRender(casoMs.grid, rarosMs, ctx[casoMs.claveFn], gruposMs);
+    var gsRaros = gruposDe(gridRaros);
+    igual('misiones-estado-desconocido-no-se-pierde',
+      gridRaros.getElementsByClassName('pf-item').length, rarosMs.length,
+      '3 estados no reconocidos, 3 items en el DOM');
+    igual('misiones-estado-desconocido-un-solo-grupo', gsRaros.length, 1,
+      'los 3 caen en el mismo grupo');
+    igual('misiones-estado-desconocido-es-disponible', gsRaros[0].id,
+      casoMs.grid + '-grp-disponible', 'sin estado reconocible no es completada');
+
+    /* ADR-077: los wrappers de grupo no pueden llevar data-tab. Aqui se
+       comprueba sobre el DOM emitido, no sobre el texto del helper. */
+    var conDataTab = 0;
+    for (var dt = 0; dt < gsMs.length; dt++) {
+      if (gsMs[dt].wrap.getAttribute('data-tab') !== null) conDataTab += 1;
+    }
+    igual('misiones-grupo-sin-data-tab', conDataTab, 0,
+      'ningun wrapper .pf-grupo lleva data-tab (ADR-077)');
+
+    /* --- auto-apertura: arranca plegada y abre SOLO el primer grupo con items --- */
+    var primeraMs = primerGrupoConItems(gruposMs, itemsMs, doneMs);
+    ctx.__pfReset();
+    var gridAuto = ctx.__pfMisiones(itemsMs);
+    var gsAuto = gruposDe(gridAuto);
+    var abiertosAuto = abiertosDe(gsAuto);
+    igual('misiones-auto-abre-una-sola-vez', abiertosAuto.length, 1,
+      abiertosAuto.length ? abiertosAuto[0] : 'ninguno abierto');
+    igual('misiones-auto-abre-el-primer-grupo-con-items', abiertosAuto.join(','),
+      casoMs.grid + '-grp-' + primeraMs, 'primer grupo con items=' + primeraMs);
+    var plegadosAuto = 0;
+    for (var pa = 0; pa < gsAuto.length; pa++) {
+      if (!gsAuto[pa].abierto && gsAuto[pa].aria === 'false' && gsAuto[pa].display === 'none') plegadosAuto += 1;
+    }
+    igual('misiones-auto-deja-los-demas-plegados', plegadosAuto, gsAuto.length - 1,
+      (gsAuto.length - 1) + ' grupos siguen plegados');
+
+    /* --- veto del usuario: si cerro ese grupo, un re-render NO lo reabre --- */
+    ctx.pfGruposToggle(casoMs.grid, primeraMs);
+    ctx.__pfMisiones(itemsMs);
+    igual('misiones-veto-cierre-del-usuario',
+      estadoDe(gruposDe(gridAuto), casoMs.grid + '-grp-' + primeraMs), 'cerrado',
+      'el usuario cerro el grupo auto-abierto: la auto-apertura no lo reabre');
+
+    /* El usuario abre OTRO grupo a mano: sobrevive al re-render y la
+       auto-apertura no lo pisa ni reabre el cerrado. */
+    var otraMs = '';
+    for (var om2 = 0; om2 < gruposMs.length; om2++) {
+      if (gruposMs[om2].clave !== primeraMs && esperadoMs[gruposMs[om2].clave]) {
+        otraMs = gruposMs[om2].clave;
+        break;
+      }
+    }
+    ok('misiones-hay-otro-grupo-para-la-prueba-manual', otraMs !== '', 'clave=' + otraMs);
+    if (otraMs) {
+      ctx.pfGruposToggle(casoMs.grid, otraMs);
+      ctx.__pfMisiones(itemsMs);
+      var gsMs2 = gruposDe(gridAuto);
+      igual('misiones-respeta-apertura-manual',
+        estadoDe(gsMs2, casoMs.grid + '-grp-' + otraMs), 'abierto',
+        'el usuario abrio ' + otraMs + ' a mano');
+      igual('misiones-auto-no-reabre-la-cerrada',
+        estadoDe(gsMs2, casoMs.grid + '-grp-' + primeraMs), 'cerrado',
+        'la cerrada por el usuario sigue cerrada');
+      igual('misiones-auto-no-impone-tras-toggle', abiertosDe(gsMs2).length, 1,
+        'solo queda abierto el grupo que el usuario abrio a mano');
+    }
+
+    /* Con una decision del usuario, ningun re-render vuelve a imponer nada. */
+    ctx.__pfReset();
+    ctx.__pfMisiones(itemsMs);
+    ctx.pfGruposToggle(casoMs.grid, primeraMs);
+    ctx.pfGruposToggle(casoMs.grid, primeraMs);
+    ctx.pfGruposToggle(casoMs.grid, primeraMs);
+    ctx.__pfMisiones(itemsMs);
+    igual('misiones-auto-solo-en-primer-render', abiertosDe(gruposDe(gridAuto)).length, 0,
+      'tras decidir el usuario, ningun re-render vuelve a imponer nada');
+
+    /* Criterio "primer grupo CON items": si el primer grupo DECLARado esta
+       vacio, la auto-apertura tiene que saltarselo (no abrir por posicion). */
+    ctx.__pfReset();
+    var soloCompletadas = generarMisiones({
+      id: 'misiones', reparto: { disponible: 0, completada: 3, bloqueada: 0 }
+    });
+    var gridSoloComp = ctx.__pfMisiones(soloCompletadas);
+    var gsSoloComp = gruposDe(gridSoloComp);
+    igual('misiones-auto-salta-grupos-declarados-vacios', gsSoloComp.length, 1,
+      'solo hay un grupo con items');
+    igual('misiones-auto-abre-el-primero-no-vacio',
+      abiertosDe(gsSoloComp).join(','), casoMs.grid + '-grp-completada',
+      'Disponibles esta vacio: se abre Completadas, no el primero declarado');
+
+    /* Y sin ningun item, la auto-apertura no abre nada ni inventa grupos. */
+    ctx.__pfReset();
+    var gridMsVacia = ctx.__pfMisiones([]);
+    igual('misiones-lista-vacia-no-abre-grupos',
+      abiertosDe(gruposDe(gridMsVacia)).length, 0, 'sin items no hay nada que abrir');
+    igual('misiones-lista-vacia-sin-grupos',
+      gruposDe(gridMsVacia).length, 0, 'ningun grupo vacio se pinta');
+
+    /* --- la rama que SI depende de _misDone: un requisito cumplido desbloquea --- */
+    ctx.__pfReset();
+    var cadena = [
+      { id: 'c-1', estado: 'completada', requiere: [], grupo: 'pais', nombre: 'C1', xp: 10 },
+      { id: 'c-2', estado: 'pendiente', requiere: ['c-1'], grupo: 'pais', nombre: 'C2', xp: 10 },
+      { id: 'c-3', estado: 'pendiente', requiere: ['c-2'], grupo: 'pais', nombre: 'C3', xp: 10 }
+    ];
+    var gridCadena = ctx.__pfMisiones(cadena);
+    var gsCadena = gruposDe(gridCadena);
+    igual('misiones-cadena-de-requerimientos', gsCadena.length, 3, 'c-1, c-2 y c-3 en 3 grupos');
+    igual('misiones-requisito-cumplido-desbloquea', gsCadena[0].id,
+      casoMs.grid + '-grp-disponible', 'c-2 requiere c-1 (completada) -> disponible');
+    igual('misiones-requisito-pendiente-bloquea', gsCadena[2].id,
+      casoMs.grid + '-grp-bloqueada', 'c-3 requiere c-2 (sin cumplir) -> bloqueada');
+
+    /* Contrato de orden de llamadas, equivalente al de Niveles pero sobre
+       cargarMisiones(): la auto-apertura va ANTES del agrupamiento. */
+    var fxCargar = extraerFuncion(html, 'cargarMisiones');
+    var iAutoMs = fxCargar ? fxCargar.indexOf('pfMisionesAutoAbrirGrupo') : -1;
+    var iRenMs = fxCargar ? fxCargar.indexOf('pfGruposRender') : -1;
+    ok('misiones-auto-antes-de-render', iAutoMs !== -1 && iRenMs !== -1 && iAutoMs < iRenMs,
+      'cargarMisiones auto-abre y despues agrupa');
+    ok('misiones-conserva-contador-pf-misiones-count',
+      html.indexOf('id="pf-misiones-count"') !== -1,
+      'el contador global de misiones sigue en la pagina');
   } finally {
     if (tmpDir) {
       try {

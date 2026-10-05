@@ -424,8 +424,9 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-bil-chip{background:rgba(255,255,255,.08);border-radius:999px;padding:4px 10px;font-size:11.5px;color:#fff}
 .pf-bil-vacio{color:rgba(255,255,255,.4);font-size:12.5px}
 .pf-bil-cod{font-size:11.5px;color:var(--gold);letter-spacing:1px}
-.pf-galeria{margin-bottom:36px}
-.pf-gal-head{font-size:12px;color:rgba(255,255,255,.55);margin-bottom:8px}
+/* Fotos de perfil: la grilla vive dentro del modal de subida (modo "perfil").
+   El contador y el boton de agregar ya no viven aqui (los lleva el modal), asi
+   que solo sobreviven las reglas de la ficha y sus dos acciones. */
 .pf-gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:10px}
 .pf-gal-item{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1)}
 .pf-gal-item.principal{border-color:var(--gold)}
@@ -434,7 +435,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-gal-acts{position:absolute;left:0;right:0;bottom:0;display:flex;gap:4px;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.8))}
 .pf-gal-btn{flex:1;border:none;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;font-size:10px;font-weight:700;padding:5px 4px;cursor:pointer}
 .pf-gal-btn.danger{background:rgba(239,68,68,.85)}
-.pf-gal-add{border:1px dashed rgba(255,74,0,.5);background:rgba(255,74,0,.1);color:var(--gold);border-radius:10px;padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer}
 .pf-gal-vacio{color:rgba(255,255,255,.4);font-size:12.5px}
 .pf-subida{display:flex;align-items:center;gap:12px;justify-content:space-between;background:linear-gradient(135deg,rgba(255,74,0,.16),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.4);border-radius:14px;padding:14px 16px;margin-bottom:18px}
 .pf-subida-txt{display:flex;flex-direction:column;gap:2px}
@@ -646,6 +646,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 @keyframes pfGrupoGiro{from{transform:rotate(-90deg)}to{transform:rotate(0)}}
 #profile .pf-grupo-body{grid-template-columns:repeat(auto-fill,var(--pf-grupo-col,minmax(160px,1fr)));gap:12px;margin-top:8px}
 #profile #pf-niveles .pf-grupo-body{gap:6px}
+/* Misiones: el anfitrion es flex-column de FILAS, asi que el auto-fill de
+   columnas por defecto partira cada .mis-card en una columna estrecha. Se
+   fuerza 1 columna y el mismo gap del anfitrion (.pf-misiones{gap:4px}). */
+#profile #pf-misiones .pf-grupo-body{grid-template-columns:1fr;gap:4px}
 @media (prefers-reduced-motion:reduce){#profile .pf-grupo-flecha{transition:none}#profile .pf-grupo-abierto>.pf-grupo-btn .pf-grupo-flecha{animation:none}}
 /* ---- Gaming v6.1 (Fase 4): cartas, moneda, contratos, hoja de vida ----
    Silo atomico: todo cuelga de .pf-v61 (ADR-004). */
@@ -774,8 +778,6 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-pasaporte" id="pf-pasaporte" data-tab="perfil" aria-live="polite"></div>
   <div class="pf-section-title" data-tab="perfil">&#x1F4B3; Mi billetera</div>
   <div class="pf-billetera" id="pf-billetera" data-tab="perfil" aria-live="polite"></div>
-  <div class="pf-section-title" data-tab="perfil">&#x1F4F7; Mis fotos de perfil</div>
-  <div class="pf-galeria" id="pf-galeria" data-tab="perfil" aria-live="polite"></div>
 
   <!-- NIVELES -->
   <div class="pf-section-title" data-tab="perfil">🏅 Niveles</div>
@@ -855,7 +857,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-section-title" style="margin-top:20px" data-tab="museo">&#x1F3AF; Gestion del Museo</div>
   <div class="pf-museo" data-tab="museo">
     <div class="pf-museo-toolbar">
-      <span class="pf-museo-hint" style="margin:0;align-self:center;">Sube material desde la pestana Perfil.</span>
+      <span class="pf-museo-hint" style="margin:0;align-self:center;">A&#x00F1;ade material a tu colecci&#x00F3;n y publ&#x00ED;calo aqu&#x00ED;.</span>
+      <button type="button" class="pf-museo-btn" onclick="subidaAbrir('museo')">&#x2795; Subir material</button>
       <button type="button" class="pf-museo-btn ghost" onclick="museoRefrescar()">&#x21BB; Refrescar</button>
       <span class="pf-museo-cont" id="museo-cont">0 recursos</span>
     </div>
@@ -1042,6 +1045,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           <option value="lugar">&#x1F4CD; Lugar o evento</option>
         </select>
         <div class="pf-museo-hint" id="museo-publicar-hint"></div>
+      </div>
+      <!-- Gestion de las fotos de perfil: se ven, se marca la principal y se
+           quitan desde aqui. Solo visible en modo "perfil". El dato es el mismo
+           que pinta cargarBilletera(): un unico fetch, cero fuentes de verdad. -->
+      <div class="pf-museo-field" id="museo-perfil-fotos-wrap" style="display:none">
+        <label class="pf-museo-lbl">Tus fotos de perfil</label>
+        <div class="pf-museo-hint" id="museo-perfil-fotos-head"></div>
+        <div id="museo-perfil-fotos"></div>
       </div>
       <div class="pf-museo-field" id="museo-upload-wrap">
         <label class="pf-museo-lbl">Subir archivo (foto, audio o video)</label>
@@ -1682,6 +1693,80 @@ function renderBadges(st) {
 /* ADR-040 T1: catalogo completo de los 6 grupos reales desde el modulo. */
 var GRUPO_NOMBRE = window.NivelesData.GRUPO_NOMBRE;
 function grupoNombre(g) { return GRUPO_NOMBRE[g] || g || ''; }
+
+/* ---- MISIONES: listado desplegable agrupado por ESTADO (ADR-077).
+   Mismo patron que Museo / Guardados / Niveles: pfGruposRender solo devuelve
+   el string y el llamador lo pinta; el estado de plegado vive en
+   _pfGruposAbiertos, asi que un re-render conserva los grupos abiertos y los
+   items plegados siguen en el DOM (ADR-003). Orden fijo: Disponibles,
+   Completadas, Bloqueadas. */
+var MISIONES_GRUPOS = [
+  { clave: 'disponible', etiqueta: 'Disponibles' },
+  { clave: 'completada', etiqueta: 'Completadas' },
+  { clave: 'bloqueada', etiqueta: 'Bloqueadas' }
+];
+
+/* Fuente UNICA del estado de una mision: la consumen TANTO la clave de
+   agrupacion como la tarjeta, para que agrupar y pintar nunca discrepen. Es
+   la terna done / bloqueada / disponible que ya vivia dentro del render, sin
+   reescribirla en ningun otro sitio. */
+function misionEstado(m) {
+  var done = m.estado === 'completada';
+  var reqsPend = done ? [] : (m.requiere || []).filter(function(r){ return !_misDone[r]; });
+  var bloqueada = !done && reqsPend.length > 0;
+  return {
+    done: done, bloqueada: bloqueada, reqsPend: reqsPend,
+    clave: done ? 'completada' : (bloqueada ? 'bloqueada' : 'disponible'),
+    icono: done ? '\u2705' : (bloqueada ? '\uD83D\uDD12' : '\u23F3'),
+    txt: done ? 'Completada' : (bloqueada ? 'Bloqueada' : 'Disponible')
+  };
+}
+function misionGrupoClave(m) { return misionEstado(m).clave; }
+
+function misionCardHTML(m) {
+  var e = misionEstado(m);
+  var reqsTxt = '';
+  if(e.reqsPend.length){
+    /* Compacto: nombre legible del 1er requisito pendiente + contador.
+       Nunca se vuelca la lista cruda de IDs. */
+    var pend = e.reqsPend.map(function(r){ return _misNombres[r] || r; });
+    var lockLbl = pend.length > 1 ? pend[0] + ' +' + (pend.length - 1) : pend[0];
+    if(lockLbl.length > 30) lockLbl = lockLbl.slice(0,29) + '\u2026';
+    reqsTxt = '<div class="mis-lock" title="'+esc(pend.join(', '))+'">\uD83D\uDD12 '+esc(lockLbl)+'</div>';
+  }
+  /* Agrupar por estado NO borra el grupo legible: sigue en la meta. */
+  var metaTxt = grupoNombre(m.grupo) + ' \u00B7 ' + e.txt;
+  var nombreTxt = m.nombre || m.id || '';
+  return '<div class="mis-card'+(e.done?' done':'')+'">'
+    +'<div class="mis-emoji">'+e.icono+'</div>'
+    +'<div class="mis-body">'
+    +'<div class="mis-nombre" title="'+esc(nombreTxt)+'">'+esc(nombreTxt)+'</div>'
+    +'<div class="mis-meta">'+esc(metaTxt)+'</div>'
+    +'</div>'
+    +reqsTxt
+    +'<div class="mis-xp">+'+fmtXp(m.xp)+' XP</div>'
+    +'</div>';
+}
+
+/* Auto-apertura del PRIMER grupo con items, solo en el primer render, con el
+   mismo veto que pfNivelesAutoAbrirGrupo: si el usuario cerro ese grupo, un
+   re-render posterior ya no lo reabre (sentinela + booleano ya decidido). */
+var _pfMisionesGrupoAuto = '';
+function pfMisionesAutoAbrirGrupo(list) {
+  if(_pfMisionesGrupoAuto) return;               // ya se auto-abrio: manda el usuario
+  var g = null;
+  for(var i = 0; i < MISIONES_GRUPOS.length; i++){
+    var clave = MISIONES_GRUPOS[i].clave;
+    if(list.some(function(m){ return misionGrupoClave(m) === clave; })){ g = MISIONES_GRUPOS[i]; break; }
+  }
+  if(!g) return;
+  _pfMisionesGrupoAuto = g.clave;
+  var k = 'pf-misiones|' + g.clave;
+  var est = _pfGruposAbiertos[k];
+  if(est === true || est === false) return;     // el usuario ya decidio sobre ese grupo
+  _pfGruposAbiertos[k] = true;
+}
+
 function cargarMisiones(uid) {
   var grid = document.getElementById('pf-misiones');
   var cnt = document.getElementById('pf-misiones-count');
@@ -1705,33 +1790,10 @@ function cargarMisiones(uid) {
         grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">Aún no hay misiones disponibles.</div>';
         return;
       }
-      grid.innerHTML = list.map(function(m){
-        var done = m.estado === 'completada';
-        var reqsPend = (m.requiere||[]).filter(function(r){ return !_misDone[r]; });
-        var bloqueada = !done && reqsPend.length > 0;
-        var icono = done ? '✅' : (bloqueada ? '🔒' : '⏳');
-        var estadoTxt = done ? 'Completada' : (bloqueada ? 'Bloqueada' : 'Disponible');
-        var reqsTxt = '';
-        if(reqsPend.length){
-          /* Compacto: nombre legible del 1er requisito pendiente + contador.
-             Nunca se vuelca la lista cruda de IDs. */
-          var pend = reqsPend.map(function(r){ return _misNombres[r] || r; });
-          var lockLbl = pend.length > 1 ? pend[0] + ' +' + (pend.length - 1) : pend[0];
-          if(lockLbl.length > 30) lockLbl = lockLbl.slice(0,29) + '\u2026';
-          reqsTxt = '<div class="mis-lock" title="'+esc(pend.join(', '))+'">\uD83D\uDD12 '+esc(lockLbl)+'</div>';
-        }
-        var metaTxt = grupoNombre(m.grupo) + ' \u00B7 ' + estadoTxt;
-        var nombreTxt = m.nombre || m.id || '';
-        return '<div class="mis-card'+(done?' done':'')+'">'
-          +'<div class="mis-emoji">'+icono+'</div>'
-          +'<div class="mis-body">'
-          +'<div class="mis-nombre" title="'+esc(nombreTxt)+'">'+esc(nombreTxt)+'</div>'
-          +'<div class="mis-meta">'+esc(metaTxt)+'</div>'
-          +'</div>'
-          +reqsTxt
-          +'<div class="mis-xp">+'+fmtXp(m.xp)+' XP</div>'
-          +'</div>';
-      }).join('');
+      /* ADR-077: agrupado por estado. El conteo de arriba (#pf-misiones-count)
+         no cambia y grupoNombre(m.grupo) sigue en cada tarjeta. */
+      pfMisionesAutoAbrirGrupo(list);
+      grid.innerHTML = pfGruposRender('pf-misiones', list, misionGrupoClave, MISIONES_GRUPOS, misionCardHTML);
     })
     .catch(function(){
       grid.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:20px">No se pudieron cargar las misiones. Intenta de nuevo más tarde.</div>';
@@ -3699,6 +3761,12 @@ function museoModoPublicacion(modo) {
   if (ubiWrap) ubiWrap.style.display = esPerfil ? 'none' : '';
   var destWrap = document.getElementById('museo-destino-wrap');
   if (destWrap) destWrap.style.display = esLugar ? '' : 'none';
+  /* La gestion de las fotos de perfil solo existe en este modo; se pinta con el
+     ultimo lote conocido para que abrir el modal o cambiar el modo sin recargar
+     muestren el estado real (ADR-003: se oculta, no se borra del DOM). */
+  var pfWrap = document.getElementById('museo-perfil-fotos-wrap');
+  if (pfWrap) pfWrap.style.display = esPerfil ? '' : 'none';
+  if (esPerfil) pfPintarFotosModal(pfFotosCache);
   if (esPerfil) { var t = document.getElementById('museo-f-tipo'); if (t) t.value = 'foto'; }
   var drop = document.getElementById('museo-drop');
   if (drop) {
@@ -3709,7 +3777,7 @@ function museoModoPublicacion(modo) {
   var hint = document.getElementById('museo-publicar-hint');
   if (hint) {
     hint.textContent = esPerfil
-      ? 'Se agrega a "Mis fotos de perfil" (maximo 10).'
+      ? 'Se agrega a tus fotos de perfil (maximo 10).'
       : (esLugar ? 'Se guarda en tu Museo y se vincula al lugar o evento elegido.' : 'Se guarda en tu Museo como recurso general.');
   }
   var title = document.getElementById('museo-modal-title');
@@ -5586,14 +5654,30 @@ function renderBilletera(d) {
       ? '<div class="pf-bil-cod">Billetera ' + esc(d.billetera.codigo_publico) + '</div>'
       : '<div class="pf-bil-vacio">Completa tu Pasaporte para activar tu billetera.</div>');
 }
-function renderGaleriaPerfil(fotos) {
-  var box = document.getElementById('pf-galeria');
+/* Ultimo lote de fotos de perfil recibido. No es una segunda fuente de verdad:
+   es la copia del mismo fetch de cargarBilletera(), para poder pintar el modal
+   al abrirlo sin una segunda peticion al endpoint. */
+var pfFotosCache = null;
+
+/* Las fotos de perfil ya no son un modulo del cuerpo de la pagina: viven en el
+   modal de subida (modo "perfil"). Se reutilizan las mismas clases .pf-gal-*.
+   Refrescan pfFotoPrincipal/pfFotoQuitar llamando a cargarBilletera(), asi que
+   el estado real llega siempre por ahi. */
+function pfPintarFotosModal(fotos) {
+  var box = document.getElementById('museo-perfil-fotos');
   if (!box) return;
-  fotos = fotos || [];
+  var head = document.getElementById('museo-perfil-fotos-head');
+  /* Sin lote recibido todavia no se afirma que no tengas fotos. */
+  if (!Array.isArray(fotos)) {
+    if (head) head.textContent = 'Cargando tus fotos...';
+    box.innerHTML = '';
+    return;
+  }
   var items = fotos.map(function (f) {
+    f = f || {};
     var pid = f.id ? String(f.id) : '';
     var acciones = pid
-      ? '<button type="button" class="pf-gal-btn" onclick="pfFotoPrincipal(\'' + pid + '\')">Hacer principal</button>'
+      ? '<button type="button" class="pf-gal-btn" onclick="pfFotoPrincipal(\'' + pid + '\')">Principal</button>'
         + '<button type="button" class="pf-gal-btn danger" onclick="pfFotoQuitar(\'' + pid + '\')">Quitar</button>'
       : '';
     return '<div class="pf-gal-item' + (f.es_principal ? ' principal' : '') + '">'
@@ -5601,11 +5685,11 @@ function renderGaleriaPerfil(fotos) {
       + (f.es_principal ? '<span class="pf-gal-star">Principal</span>' : '')
       + '<div class="pf-gal-acts">' + acciones + '</div></div>';
   }).join('');
-  var addBtn = fotos.length < 10
-    ? '<button type="button" class="pf-gal-add" onclick="pfFotoAgregar()">+ Subir foto</button>'
-    : '<div class="pf-gal-vacio">Llegaste al maximo de 10 fotos.</div>';
-  box.innerHTML = '<div class="pf-gal-head">' + fotos.length + '/10 fotos de perfil</div>'
-    + '<div class="pf-gal-grid">' + items + '</div>' + addBtn;
+  if (head) head.textContent = fotos.length + '/10 fotos de perfil';
+  var pie = !fotos.length
+    ? '<div class="pf-gal-vacio">Todavia no tienes fotos de perfil.</div>'
+    : (fotos.length >= 10 ? '<div class="pf-gal-vacio">Llegaste al maximo de 10 fotos.</div>' : '');
+  box.innerHTML = '<div class="pf-gal-grid">' + items + '</div>' + pie;
 }
 function cargarBilletera() {
   var u = sesion();
@@ -5615,17 +5699,11 @@ function cargarBilletera() {
       if (res && res.ok && res.data) {
         renderPasaporte(res.data.pasaporte);
         renderBilletera(res.data);
-        renderGaleriaPerfil(res.data.fotos);
+        pfFotosCache = res.data.fotos || [];
+        pfPintarFotosModal(pfFotosCache);
       }
     })
     .catch(function () {});
-}
-function pfFotoAgregar() {
-  if (window.MediaUpload && typeof muElegirArchivo === 'function') {
-    muElegirArchivo(null, 'perfil', 'foto', function (r) { pfFotoSubirUrl((r && r.url) || ''); });
-  } else {
-    showToast('Subida no disponible', '#ef4444');
-  }
 }
 function pfFotoSubirUrl(url) {
   var u = sesion();
