@@ -404,6 +404,18 @@ Para que el dise\u00f1o de una categoria no interfiera con otra, todo CSS de una
 - Frontend: 0 frameworks (ver ADR-001). Interactividad via atributo `onclick` inyectado fisicamente en el HTML generado por el servidor (Reglas de Oro v5, punto 5).
 - Iconografia: SVG integro; prohibidas las fuentes de iconos externas (Reglas de Oro v5, punto 7).
 
+### Tabla de control de migraciones (`schema_migrations`) y su portero - 2026-10-05 (TSK-186)
+
+**Que cambio de verdad en la estructura del sistema:** antes, un fichero `.sql` en `db/migrations/` **no dejaba rastro de si se aplico**. La 044 llego commiteada y nunca aplicada (BUG-103). Ahora hay **dos piezas**:
+
+1. **La tabla** `schema_migrations` (migracion `045`, **6 sentencias**): una fila por fichero, con `checksum` sha256, `estado` (`aplicada` / `historico_no_verificado` / `fallida`), `duracion_ms`, `aplicada_en` y `notas`. **6 CHECK** nombrados que hacen coherentes numero-nombre, estado-`aplicada_en` y formato de checksum. **RLS desactivado de forma consciente**: sin `FORCE` el RLS no aplica al propietario (que es el rol del runner), o sea que activarlo daria **seguridad falsa**; con `FORCE` bloquearia a los unicos clientes legitimos; y no hay endpoint no confiable porque el presupuesto de Vercel esta en **8/8**.
+
+2. **El portero** `scripts/apply_sql_file.js`: dentro de `db/migrations/` el contrato es **obligatorio y sin flag para saltarselo** -- registro por fichero, **rechazo si falta el predecesor**, deteccion de deriva que **nunca sobrescribe el checksum** de una fila existente, `notas` saneadas (credenciales fuera) y fila `failida` + **exit != 0** ante fallo a medias. **La regla de predecesor mira los ficheros EN DISCO, no un rango inventado**, por eso 001/002 ausentes no invalidan el historico. Fuera de `db/migrations/` no hay ledger ni puerta: se ejecuta como antes, avisando, y el informe declara `es_migracion: false`.
+
+**Complemento de verificacion:** `scripts/verificar_migraciones_prod.js` comprueba produccion sin intervention humana. Detecta el `42703` por sus **tres firmas** (porque `api/interacciones.js:14501` lo mapea a HTTP 503), distingue `SIN_VERIFICAR` (red caida) de fallo real, y trata el **401** de `?tipo=diagnostico` como plataforma viva con auth.
+
+**Limites conocidos, documentados:** el driver HTTP de Neon **no acepta lotes multi-sentencia** (SQLSTATE 42601), asi que el dry-run con `ROLLBACK` **solo** es posible via `Client`; `?tipo=diagnostico` exige `ADMIN_SECRET`, asi que **sin credencial no hay introspection**; y el verificador sale hoy **`NO_CONFIRMADO`** porque un 200 con array vacio **no distingue** codigo nuevo desplegado de codigo viejo (pendiente: consultar Neon). Decisiones pendientes de ADR (**ADR-087, no redactado**). **Ninguna linea de la economia (046) implementada.**
+
 ### Scripts de verificacion de referencia
 
 Verificar ASCII-safety de un archivo serverless:

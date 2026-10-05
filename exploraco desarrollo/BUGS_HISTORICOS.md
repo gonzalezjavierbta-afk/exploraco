@@ -1815,3 +1815,56 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Archivos:** `api/usuarios.js` (`casa_ranking` `:1228-1276`).
 **Estado:** **CERRADO (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-086** Decision D (el score se calcula **EN QUERY**, sin cache, y la agregacion se hace antes de cualquier JOIN 1:N).
 
+## BUG-105: el driver HTTP de Neon **no acepta lotes multi-sentencia** -- `sql('BEGIN; ...; ROLLBACK;')` devuelve SQLSTATE **42601** y hace el **dry-run con ROLLBACK imposible por HTTP**
+
+**Severidad:** ALTA como **limite de plataforma**, no como fallo de nuestro codigo. No rompio nada en produccion; **impuso un metodo de trabajo distinto** al que se asumia.
+
+**Contexto:** detectado el 2026-10-05 al intentar validar de verdad la migracion `045` antes de aplicarla. Tanda: `TASKS.md` **TSK-186**.
+
+**Sintoma exacto:** enviar un lote por el driver HTTP (`sql('BEGIN; ...; ROLLBACK;')`) devuelve **SQLSTATE 42601**, *"cannot insert multiple commands into a prepared statement"*. La causa es que el endpoint `/sql` de Neon usa **protocolo extendido**, que solo admite **una** sentencia por statement preparado.
+
+**Por que importa y no es un detalle menor:** **sin multi-sentencia no se puede escribir un dry-run transaccional por HTTP**, o sea que la validacion previa "aplico en transaccion y hago rollback" era **imposible por la via obvia**. Un agente que no lo sepa puede: (a) publicar la migracion sin validar, o (b) intentar el rollback, no entender el 42601 y concluir que la migracion es invalida.
+
+**Resolucion (metodo, no parche):** usar **`Client`** (extiende `pg.Client`, sobre **WebSocket nativo**), donde `BEGIN`/`ROLLBACK` **si son transaccion real**. Con el se hizo el dry-run de verdad de las 6 sentencias, y se **comprobo con `information_schema` que la tabla NO existia tras el rollback** -- que es la prueba que da valor al dry-run.
+
+**Hallazgo adjunto:** **`sql.transaction()` existe** (atomicidad), pero **no da ROLLBACK**. O sea que cubre el "se aplica entero o nada", **no** el "pruebo y lo deshago". Son dos cosas distintas y confundirlas dejaria la migracion validada a medias.
+
+**Estado:** **CERRADO por metodo alternativo (2026-10-05).** No es codigo nuestro, asi que **no hay fix que aplicar**: lo que queda es el conocimiento, que se documenta ademas en el ADR-087 pendiente (**TSK-189**).
+
+## BUG-106: el script "compuesto" `005_seed` moria con una *assertion* de libuv al forzar `process.exit()` en Windows -- **exit code mentiroso** aunque los datos fueran correctos
+
+**Severidad:** MEDIA. **No corrupto datos**, pero **si miente sobre el resultado**, que es la clase de fallo mas dana en un script de seed.
+
+**Contexto:** detectado el 2026-10-05 al ejecutar `db/cleanups/005_seed_schema_migrations.js` (361 lineas, 43 filas). Tanda: `TASKS.md` **TSK-186**.
+
+**Sintoma:** el script terminaba con una **assertion de libuv** originada en el `process.exit()` forzado al final, en vez de salir limpiamente con el codigo previsto.
+
+**Por que es peligroso mas alla del ruido:** el **exit code era mentiroso**. Un `exit != 0` en un seed significa "no se aplico", y lo correcto era **si se aplico, y habia que saber distinguirlo**. Con el codigo de salida falso, un pipeline o un agente podia leer **fallo** donde hubo **exito**, o al reves: reintentar un seed ya aplicado. Este tipo de fallo **no lo detecta ningun smoke**, porque los datos quedan bien y el problema esta en como se anuncia el desenlace.
+
+**Resolucion:** **drenar el bucle de eventos en vez de forzar la salida**, de modo que el proceso termina solo con el codigo real. Con eso el seed **exito con exit 0** y su idempotencia quedo probada: **dos pasadas seguidas, 43 omitidas por conflicto, exit 0**.
+
+**Estado:** **CERRADO (2026-10-05).** LECCION TRANSVERSAL, candidata a norma: **en Windows, `process.exit()` forzado puede producir una assertion de libuv y falsear el exit code**; un script que informa su resultado debe **drenar el bucle de eventos**, no matar el proceso. Aplica a cualquier script de `scripts/` y de `db/cleanups/`.
+
+## BUG-107: premisa falsa -- `api/interacciones.js` se dio por **no desplegado** y casi costo una ventana de despliegue innecesaria para arreglar un bug de **base de datos**
+
+**Severidad:** ALTA como **fallo de proceso**, nula como fallo de producto. Lo que casi costo es **la ventana de despliegue y el gate de `@backend-dev`**.
+
+**Contexto:** `TASKS.md` **TSK-181** arrastraba el bloqueante "desplegar `api/interacciones.js`", con el razonamiento de que el `42703` venia del **codigo sin desplegar**. La sesion anterior lo dio por sentado. Tanda: **TSK-181**, **TSK-186**.
+
+**La premisa y por que era falsa:** si el codigo viejo (sin el filtro 044) estuviera desplegado, `GET /api/interacciones?tipo=planes` devolveria **1 fila** (el plan activo). Devuelve **0**. Con el filtro aplicado y **1 plan activo** en Neon que queda **oculto**, la unica explicacion es que **el codigo nuevo ya estaba desplegado**.
+
+**Medicion que desmiente:**
+- `GET /api/interacciones?tipo=planes` -> **HTTP 200 con 0 filas**.
+- Neon: **1 plan activo**, **0 visibles** con el filtro 044, **1 oculto** por el.
+- Codigo viejo desplegado habria dado **1 fila**. Dio **0**.
+
+**Causa raiz real:** el `42703` lo causaba **la migracion sin aplicar**, no el codigo sin desplegar. **Aplicar la 044 fue lo que arreglo la funcion.** **No habia nada que desplegar.**
+
+**Por que la premisa era tan creible -- y por que esto es lo importante:** el sintoma (`42703`) es **indistinguible** entre "columna no existe" y "codigo que la consulta sin ella", y el filtro 044 ya venia escrito desde **TSK-179**. Un razonamiento plausible, bien escrito y no verificado. **Un 200 con array vacio no distingue las dos hipotesis**; solo las distingue un dato del otro lado (cuantos planes activos hay en Neon).
+
+**Resolucion:** premisa desmentida con medicion, **tarea reescrita y cerrada sin despliegue**, y **la ambiguedad convertida en trabajo pendiente**: `scripts/verificar_migraciones_prod.js` **hereda exactamente este problema** (sale `NO_CONFIRMADO` por la misma razon) y por eso su primer pendiente es **consultar Neon y cerrar la ambiguedad** (**TSK-187**).
+
+**Verificacion de que no era regresion:** post-push, `casa_ranking` **200** (`{"casas":[{"casa":"jaguar","miembros":1,...}]}`), `faccion_ranking` **200**, `planes` **200 `[]`**, `pandilla_ranking` **400** (exige auth, **no es regresion**).
+
+**Estado:** **CERRADO como premisa (2026-10-05).** El hueco de verificacion que deja abierto queda como **TSK-187**.
+

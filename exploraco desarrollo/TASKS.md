@@ -4310,11 +4310,20 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ## Despliegue de `api/interacciones.js` y verificacion en produccion del listado de planes - 2026-10-05 (TSK-181)
 
-**Estado:** PENDIENTE **DEL OPERADOR** (paso manual). Nada escrito en esta sesion; es el **primer** paso del relevo.
+**Estado:** CERRADA (2026-10-05) **por desmentir su propia premisa**. Su bloqueante --"desplegar `api/interacciones.js`"-- **era falso**: el codigo **ya estaba desplegado**. No hubo despliegue. Ver el bloque de correccion de premisa mas abajo.
 
-**Alcance:** desplegar `api/interacciones.js` (filtro de vigencia de planes) y **verificar en produccion** que el listado de planes ya **no** devuelve **42703**. El filtro esta escrito desde TSK-179 y **solo ahora puede funcionar**: hasta ahora fallaba unicamente porque la columna no existia en Neon, y la 044 ya esta aplicada.
+**Alcance original:** desplegar `api/interacciones.js` (filtro de vigencia de planes) y **verificar en produccion** que el listado de planes ya **no** devuelve **42703**.
 
-**BLOQUEANTE DE HERRAMIENTAS [verificado en esta sesion]:** el despliegue **NO se pudo ejecutar** porque **no hay script de despliegue en `scripts/`**, **ni script de npm** (`package.json` sin ninguna entrada `deploy`) y **ni `vercel` CLI en el PATH**. Es **paso manual del operador**. Gate de `@backend-dev` (ADR-082/AGENTS.md seccion 2).
+**HALLAZGO QUE DESMIENTE LA PREMISA [medido, el punto mas importante de la sesion]:**
+- `GET /api/interacciones?tipo=planes` devuelve **HTTP 200 con 0 filas**.
+- En Neon: **1 plan activo**, **0 visibles** con el filtro 044, **1 oculto** por el.
+- Si el codigo **viejo** estuviera desplegado, el endpoint devolveria **1 fila**. Devuelve **0** -> **el filtro 044 ya estaba vivo en produccion**.
+- Por tanto el `42703` lo causaba **la migracion sin aplicar**, no el codigo sin desplegar. **Aplicar la 044 fue lo que arreglo la funcion.** No habia nada que desplegar.
+- Consecuencia de proceso: la sesion anterior casi consumio una **ventana de despliegue innecesaria** (y su gate de `@backend-dev`) para arreglar algo que era **base de datos**. Ver **BUG-107**.
+
+**BLOQUEANTE DE HERRAMIENTAS [sigue siendo cierto, pero resulto irrelevante]:** el despliegue **NO se puede ejecutar** porque no hay script de despliegue en `scripts/`, ni entrada `deploy` en `package.json`, ni `vercel` CLI en el PATH. **No se toco**: ya no hace falta para esta tarea.
+
+**Verificacion post-push en produccion:** `casa_ranking` **200** (`{"casas":[{"casa":"jaguar","miembros":1,...}]}`), `faccion_ranking` **200**, `planes` **200 `[]`**, `pandilla_ranking` **400** (exige auth; **no es regresion**). El listado vacio es el **efecto correcto** pedido (el plan vencido deja de mostrarse), no un fallo del filtro.
 
 **Efecto esperado y correcto:** con `--ddmm-aaaa` el unico plan activo ("Tour de salsa centro de Bogota", `fechas = "12-09-2026"`) quedo con `fecha_inicio = 2026-09-12`, **fecha ya pasada**, y por tanto **deja de mostrarse**.
 - Es el comportamiento pedido ("cuando un plan pasa su fecha limite, debe salir de ahi"), pero **en produccion el listado de planes se vera vacio y eso es lo correcto**, no un fallo del filtro.
@@ -4374,6 +4383,91 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 **Alcance:** los **11 puntos** donde el clamp del XP disponible se gasta y **todavia no esta cableado** a la regla unica del ADR. Cada uno es un **punto de ruptura silencioso** si se cablea la regla nueva a medias: el clamp queda en un valor por defecto y el gasto **no se ve en ningun sitio**.
 
 **Por que no se cierra dentro de TSK-184:** comparten el mismo ADR pero **no el mismo riesgo**. Si la regla nueva se cablea a 6 de 11 puntos, el clamp queda **parcialmente endurecido**, que es peor que no endurecerlo porque **parece** rotos por la regla nueva. El criterio de cierre es **11 de 11** o ninguno.
+
+## Tabla de control de migraciones: 045 aplicada + seed del historico + runner portero - 2026-10-05 (TSK-186)
+
+**Estado:** CERRADA en codigo y en base de datos (2026-10-05). **Pendiente solo lo documental** (ver **TSK-189**).
+
+**Por que existia:** "commiteada != aplicada" ya habia costado una vez (la 044 llego commiteada y nunca aplicada; **BUG-103**). Sin registro, una migracion en disco **no distingue** la que se aplico de la que se escribio.
+
+**Alcance REAL ejecutado (ADR-006, verificado contra los archivos):**
+- `db/migrations/045_schema_migrations.sql` (**405 lineas, 6 sentencias**), **aplicada en Neon** y verificada **constraint por constraint**: **6/6 CHECK** nombrados (`_nombre_chk` regex `^[0-9]{3}_[a-z0-9_]+\.sql$`, `_numero_chk` coherencia `numero = substring(nombre,1,3)::smallint`, `_resultado_chk` IN aplicada/historico_no_verificado/fallida, `_checksum_chk` sha256 o NULL, `_duracion_chk`, `_estado_chk` coherencia estado<->`aplicada_en`); **PRIMARY KEY (nombre) 1/1**; **3/3 indices**; **RLS desactivado** (`relrowsecurity=false`, `relforcerowsecurity=false`), decision argumentada (sin `FORCE` el RLS no aplica al propietario, que es el rol del runner, asi que activarlo daria **seguridad falsa**; con `FORCE` bloquearia a los unicos clientes legitimos; sin endpoint nuevo --8/8 agotadas-- no hay cliente no confiable, y el contenido no es sensible). **0 `DROP`/`DELETE`/`TRUNCATE`/`UPDATE` ejecutables** en el fichero. **Reejecucion idempotente** probada.
+- `db/cleanups/005_seed_schema_migrations.js` (**361 lineas**): **43 filas**, `INSERT ... ON CONFLICT DO NOTHING`, `--apply` obligatorio en el modo real. **43/43 ficheros casan el regex** de la 045. Reparto verificado en Neon: **`historico_no_verificado`=41**, **`aplicada`+`verificada_en`=1 (la 044, confianza ALTA)**, **`aplicada` sin verificar=1 (la 045, confianza MEDIA)**. **Las 41 filas NO afirman nada sobre Neon**: su estado real sigue **desconocido**, y eso es **deliberado**. **Idempotencia probada** (dos pasadas, 43 omitidas por conflicto, exit 0).
+- `scripts/apply_sql_file.js` **reescrito** -- es el **portero**: sin el, la tabla es un adorno. Contrato (a)-(e) **obligatorio para todo fichero dentro de `db/migrations/`**, **sin flag para saltarselo**: registro por fichero, rechazo por predecesor ausente, deteccion de deriva que **nunca sobrescribe el `checksum`** de una fila existente, `notas` saneadas, y fila `failida` + **exit != 0** ante fallo a medias. Regla de predecesor **basada en los ficheros EN DISCO**, no en rango inventado: por eso **001/002 ausentes no invalidan** el historico. Interfaz `--dry-run`, `--json`, `--notas`, `-h`; exit **0** ok / **1** no completado (SQL, deriva, puerta) / **2** uso incorrecto. **Compatibilidad atrasada intacta**: fuera de `db/migrations/` no hay ledger ni puerta, se ejecuta como antes **avisando**, y el informe declara `es_migracion: false`. Caso limite de BD sin la 045 resuelto con `to_regclass()` en vez de `42P01`.
+- `scripts/verificar_migraciones_prod.js` **NUEVO** (**386 lineas**): lo que le permite a una IA **verificar produccion sola**. Descubre el endpoint **estaticamente** (`api/interacciones.js` unico fichero que consulta `planes_viaje`; `tipo=planes` rama 6353 / select 6363) con un mapa **explicito y comentado**, no magico. Detecta el `42703` por sus **tres firmas** (codigo Postgres, `SCHEMA_NOT_MIGRATED`, texto de columna inexistente), porque `api/interacciones.js:14501` lo mapea a **HTTP 503**. Estados distintos: `OK`, `FALLIDO_42703`, `ERROR_5XX/4XX`, `SIN_VERIFICAR` (red caida, **distinto de fallo real**). **Un array vacio no es fallo** (el plan vencido). Salud de plataforma via `api/utilidades.js?tipo=diagnostico` (`:769`): **401 se trata como VIVA_CON_AUTH**, no como fallo.
+
+**Verificacion:**
+- 045: 6/6 CHECK + PK + 3/3 indices presentes en Neon; reejecucion idempotente; estructura identica.
+- Previa y **de verdad**: dry-run de las 6 sentencias contra el motor real en transaccion con **ROLLBACK**, y se **comprobo con `information_schema` que la tabla NO existia tras el rollback**. El autor original **declaro que no pudo verificar la sintaxis** (no hay `psql`, ni docker, ni parser en `node_modules`); el dry-run lo sustituyo.
+- Runner: dry-run del **046 ACEPTADO** (43 predecesores, 43 con fila, N-1 ok); dry-run del **047 RECHAZADO** con **exit 1** y `sin_fila: ["046_probe_ledger.sql"]`. **Deriva: 0 de las 43 fichas casan con el disco** (correcto). Provada en positivo insertando una fila con checksum `0000...`: la detecta, reporta disco vs tabla, **bloquea con exit 1** y el checksum almacenado **siguio intacto**. `notas` saneadas probadas con `--notas` portando URL de Postgres y `token=`: URL -> `[CREDENCIAL-ELIMINADA]`, `token=`/`clave=`/`password=` -> `[ELIMINADO]`, valor real de `DATABASE_URL` eliminado, bytes >127 -> `?`, una linea, tope 900. Regresion de compatibilidad: `--dry-run db/cleanups/001_limpieza_datos_prueba.sql` -> 6 sentencias, **exit 0**.
+- Verificador de produccion: **salida hoy `NO_CONFIRMADO`, exit 1**, por una razon **honesta** que se documenta en **TSK-187**.
+
+**LO QUE NO SE HIZO [explicito]:**
+- **No se aplico la 046** ni ninguna migracion de economia. **La economia sigue sin implementarse: 0 lineas.** La `045` que se aplico es **la tabla de control**, no la economia.
+- **No hay ruta no autenticada** que distinga "codigo nuevo desplegado" de "codigo viejo". Ver **TSK-187**.
+- **No se redacto el ADR-087** del registro de migraciones. Ver **TSK-189**.
+
+## Cerrojo de autonomia del verificador de produccion - 2026-10-05 (TSK-187)
+
+**Estado:** PENDIENTE. **Primer paso del relevo.**
+
+**Que sigue:** `scripts/verificar_migraciones_prod.js` sigue dando **`NO_CONFIRMADO`, exit 1**, y la razon es un **hueco real**, no un fallo del script.
+
+**El problema exacto:** un **200** por si solo **no prueba despliegue**, porque es compatible con **dos** hipotesis: (a) codigo nuevo + columna existente + 0 planes, y (b) codigo viejo + 0 planes activos. Ahora sabemos que **(b) es falsa** -- hay **1 plan activo** en Neon -- pero **el script no lo sabe, porque no consulta Neon**. Esa es exactamente la ambiguedad a cerrar.
+
+**Alcance:** enseñarle al verificador a **consultar Neon** y reportar el contraste explicito:
+- cuantos planes **activos** hay (y, si se puede, cuantos **visibles** con el filtro 044);
+- si "0 filas visibles" es coherente con "N activos ocultos por el filtro" o signals un despliegue roto.
+
+Con ese dato, la salida deja de ser `NO_CONFIRMADO` y pasa a `OK` o a `FALLIDO_42703` **con la ambiguedad resuelta**, no por defecto.
+
+**Restriccion dura:** **8/8 funciones serverless agotadas** (presupuesto Vercel Hobby). **Prohibido crear un endpoint nuevo.** El contraste se hace **desde el verificador** (que ya tiene credencial de Neon por entorno), no desde `api/`.
+
+**Defecto real ya identificado, del script y no del proyecto:** `?tipo=diagnostico` **exige `ADMIN_SECRET`**, asi que sin credencial **no hay introspection**. El script acepta `ADMIN_TOKEN` **solo por variable de entorno**, **nunca lo imprime** y **nunca es obligatorio**. Consecuencia honesta: **hoy no existe ninguna ruta no autenticada que distinga (a) de (b)**.
+
+## Migracion 046 del Sistema Economico Integral - 2026-10-05 (TSK-188 / ADR-086)
+
+**Estado:** PENDIENTE. Numero **046**, no 045: el **045 quedo ocupado por la tabla de control de migraciones** (ver **TSK-186**). La economia **sigue sin implementarse: 0 lineas de codigo**.
+
+**Alcance:** **contenido identico al que ya declara ADR-086 para TSK-182**, solo cambia el numero de migracion. El diseno completo vive en `DECISIONS.md` **ADR-086**; aqui solo el pendiente:
+- Generalizacion de `moneda_ledger` de 1 moneda a **3** (CDR/JAG/DLF) y la re-clave de `moneda_cuentas` (Enmienda 3 a ADR-061).
+- Los **4 XP sinks**: `Costo_Base` 320/560/640/800, `alpha=0.20`, `gamma=2.0`, precio congelado por fila.
+- `xp_gastado_sinks` como campo **distinto** de `xp_total`, porque **`xp_total` no se toca** (ADR-018).
+- El **doble tope** (`k` historico; `slot_max_activos` 25/12/10/3), `SALDO_TOPE = 2000` global, y el multiplicador de la **rampa suave de 30 dias**.
+- Los indices de los que dependen las ramas de codigo de **TSK-184**.
+
+**Decisiones ya tomadas, no reabrir (ADR-086):** el score se calcula **EN QUERY** y **`score_cache` NO se crea**; los sinks **debitan `xp_gastado_sinks`** y mueven saldo, **nunca `xp_total`**; `es_exento = true` en los gastos de XP (un gasto no es una emision, ADR-066); slot dado de baja con `activo=false` y **sin devolver el XP** (ADR-003).
+
+**Precondicion y orden:** los **5 parches B1-B5** de **TSK-183** van **en el mismo commit**, **forward-only, sin rollback** (ventana cero). Con el ledger ya registrado, la 046 debe **pasar la puerta del runner** (`scripts/apply_sql_file.js`), lo cual es intencionado: si el predecesor no esta, el runner **rechaza**.
+
+**Nota de nombre:** TSK-182 (creada en el primer pase de esta sesion) describia esta misma migracion con el numero `045`. Este bloque **la sustituye** para que no queden dos tareas con migraciones distintas; TSK-182 queda como antecedente con premisa superada.
+
+## ADR-087 -- registro de migraciones (RLS, predecesor por disco, niveles de confianza, deriva) - 2026-10-05 (TSK-189)
+
+**Estado:** PENDIENTE. **NO redactado. NO lo redacta `@docs-keeper`** (R2: los docs no inventan argumentos de arquitectura). Ruta: **`@architect`**, y opcionalmente `@architect-review`.
+
+**Por que hace falta:** las cuatro decisiones del registro de migraciones **viven hoy solo en comentarios de `db/migrations/045_schema_migrations.sql`** y en el runner:
+1. **RLS desactivado** y por que activarlo sin `FORCE` daria seguridad falsa (el RLS no aplica al propietario, que es el rol del runner) y con `FORCE` bloquearia a los unicos clientes legitimos.
+2. **Regla de predecesor basada en los ficheros EN DISCO**, no en rango inventado -- por eso **001/002 ausentes no invalidan el historico**.
+3. **Niveles de confianza** del seed: `historico_no_verificado` (41 filas que **no afirman nada** sobre Neon), `aplicada`+`verificada_en` (confianza ALTA) y `aplicada` sin verificar (MEDIA, porque el runner no puede verificarse en el instante en que se inscribe).
+4. **Deteccion de deriva**: el checksum **nunca se sobrescribe** en una fila existente, y la deriva **bloquea**.
+
+**Por que es normativa, no cosmetica:** **ADR-084 D1** exige que el argumento de una decision **viva una vez**, en su ADR. Hoy el argumento vive **repartido en comentarios de codigo**, que es exactamente lo que ADR-084 D1 viene a corregir. Las tareas apuntan al ADR-086; **este registro de migraciones no tiene ADR**.
+
+**Cuando se escriba, ademas debe recoger:** (a) que el **driver HTTP de Neon no acepta lotes multi-sentencia** (BUG-105), o sea que **el unico modo de dry-run con ROLLBACK es via `Client`**, no via `/sql`; (b) que `sql.transaction()` existe pero **no da ROLLBACK**; (c) la ratificacion del **exit code 2** de `apply_sql_file.js` (ver deuda abierta).
+
+## Deuda abierta y rutas NO verificadas de la tanda 045 - 2026-10-05 (TSK-190)
+
+**Estado:** PENDIENTE. **Se registra, no se resuelve.** Cerrar sin verificar es peor que dejar escrito.
+
+**(a) Exit code 2 para "fichero no existe" [@js-silo-dev]:** el codigo paso de **1 a 2** porque es **uso incorrecto**, no fallo. **No hay llamadas programaticas al script**, asi que **no rompe a nadie** hoy, pero **es un cambio de contrato** y **deberia ratificarse** (idealmente en el ADR-087).
+
+**(b) Typo en Neon:** la `notas` de la fila `044` dice **"APlicada"** en vez de "Aplicada". El seed ya lo dice bien. **NO se hizo UPDATE** porque la tabla tiene la **regla de no mutar filas registradas**. **Deuda consciente**, no descuido.
+
+**(c) Rutas NO verificadas en ejecucion [el agente las declaro, no las disimulo]:**
+- **(i)** El camino de **fallo a medias (e)** contra un SQL que falle de verdad: **no se provoco** porque habria dejado una fila `failida` **en produccion**. Verificado **por revision**, no en ejecucion.
+- **(ii)** Los **dos caminos "sin ledger"** (fichero `<= 45` y `> 45` en una BD sin la 045): **no se provaron** por no haber una segunda BD sin la 045. El mecanismo `to_regclass` **si se verifico** contra el motor.
+- **(iii)** El **`UPDATE` de una fila que estaba en `failida`**: **no se ejecuto**, por coherencia con la regla de no mutar filas registradas.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
