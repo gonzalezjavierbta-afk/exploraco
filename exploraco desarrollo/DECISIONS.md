@@ -4729,3 +4729,187 @@ Estado real verificado en este turno, que es la linea de partida de la implement
 - **Cierre:** `node scripts/usage_report.js --summary` y `scripts/session_close.js` (no ejecutados en este turno: este ADR no toco codigo).
 
 **ADRs relacionados:** **ADR-082 (DEROGADO SOLO EN SU PREMISA por este; se conservan integros: los 16 subagentes sin `model:`, la herencia discriminante verificada por T2.5, las dos allowlists medidas, la lista ROTOS, el `permission.task` como control de radio y los gates 9+7 por rol)**, ADR-078 (permiso total: `edit: deny` se conserva en `plan` y el resto no cambia), ADR-076 (roster unico sin pares gemelo: el marco que admite 18 sin ruta hibrida), ADR-074 (allowlist FREE y lista ROTOS sobreviven; su guard es el que se reescribe en D2), ADR-067 (rechazo del override de modelo en runtime como practica: se mantiene, y por eso el `-m` explicito del selector es la via correcta), ADR-006 (baseline = archivo real: la evidencia es `git status`, `Get-ChildItem`, `Select-String` y la salida del guard, no la intencion declarada), ADR-010 (presupuesto 8/8: este ADR no toca `api/*` ni crea endpoint), ADR-069 **de hostalterraza (EXTERNO: `cascada-tier/SKILL.md`)** -- mecanismo de herencia que se conserva; en Exploraco ADR-069 esta ocupado y se cita siempre como fuente externa. Plan de ejecucion: `.opencode/plans/adaptacion-cascada-tier-ADR-069.md`. Sondas: `scripts/ejecucion/sondas/sonda-modelos.md`.
+
+## ADR-084: Fuente unica del relato documental -- el argumento vive UNA vez en `DECISIONS.md`, `TASKS.md` queda en 6 lineas de estado, `NEXT.md` en 8 de relevo, y la salida de herramienta tiene techo normativo [ENMIENDA R2 EN SU ALCANCE; NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-084
+**Fecha:** 2026-10-04
+**Autor:** Chief Architect (`@architect`), por **confirmacion explicita del operador** ("ejecutar") emitida tras la advertencia de gate de arquitectura de esta sesion.
+**Estado:** **ACEPTADO (2026-10-04).** D1, D2, D3 y D5 son **norma vigente desde este ADR**. **D4 es norma con dependencia declarada**: el script del que se pega el brief **no existe todavia** (verificado en el archivo real, ver "Baseline verificado").
+**Numeracion:** verificada con `Select-String -Pattern "^## ADR-0"` sobre `DECISIONS.md` real (ADR-006): el mayor ADR registrado es **ADR-083** (linea 4583) y 084 es el siguiente consecutivo libre. `DECISIONS.md` medido hoy: **741,5 KB / 4.731 lineas**.
+**Alcance:** este ADR **no toca** `TASKS.md`, `NEXT.md` ni `scripts/`. Enmienda **`AGENTS.md` 10 y `AGENTS.md` 18** en el MISMO paso. **NO ejecuta la Opcion 5** (mover bloques a ficheros `_ARCHIVO`): es otra tanda, con su propio gate.
+
+### Enmienda o ADR nuevo -- por que es ADR nuevo
+
+Es un **ADR nuevo**, no una enmienda, por un criterio unico y comprobable: **una enmienda deriva de la premisa de un ADR anterior**, y aqui no hay ninguna premisa que corregir.
+
+La regla que este ADR transforma (el mandato documental R2 de `AGENTS.md` 3.9) **no procede de ningun ADR**: es costumbre de gobernanza, y por eso no se puede "derogar" ni "corregir" un ADR anterior -- no hay ninguno que la haya emitido.
+
+Lo que este ADR hace es **fijar un invariante nuevo** (fuente unica del relato + techo de salida de herramienta) sostenido en un coste medido, y **enmendar R2 en su alcance**: el pase documental sigue siendo **UNO** (R2 no se relaja en nada), y lo que se anade es que el argumento **no se replica** y que el brief **se pega de salida de maquina**.
+
+Si en el futuro se quisiera cambiar el numero de pases o el soporte (los `_ARCHIVO`), eso si seria enmienda de este ADR.
+
+### Problema / Contexto
+
+El pase documental de **TSK-177** costo **5.245,0k tokens en 77 turnos y 92 tool calls**, el **33% de los 15,9M** de la sesion, y violo el watchdog **por partida triple** (limites vigentes: 15 turnos, 500.000 tokens, 50.000 tokens por turno).
+
+No fue un exceso de narracion: fue **relectura**. La descomposicion del coste lo dice sin ambiguedad -- **salida de herramientas re-leida 38%**, texto propio del subagente 31%, base fija de prompt 21%, **brief 3%**. El encargo estaba bien escrito; lo caro fue **leer y releer**.
+
+El mecanismo es el area bajo la curva de contexto: el contexto subio de **17k a 112k** con solo **+1,3k tokens por turno**, porque cada turno arrastraba la salida del anterior.
+
+**187 KB de salida de herramientas se releyeron unas 38 veces cada uno**, y **2 sola lecturas (25,9 KB y 21,8 KB) fueron el 25% de toda la salida de la sesion**. Y al otro lado del mismo pase, **108 lineas escritas por ~15 hechos**: el mismo relato vivia **3 veces** (TASKS 52, NEXT 32, DECISIONS 27).
+
+Las dos caras son el mismo defecto: **el relato se copiaba y los documentos se releian enteros**. Este ADR ataca las dos, y por eso D1 (una sola copia) y D3 (techo de salida) son la misma decision vista desde el consumo y desde la produccion.
+
+### Numeros medidos del pase TSK-177 (los declara el operador; **no re-medidos en este turno**, ver "Verificacion")
+
+| Dato | Valor |
+|---|---|
+| Pase documental | **5.245,0k tokens**, 77 turnos, 92 tool calls |
+| Peso en la sesion | **33% de 15,9M** de tokens |
+| Watchdog | violado **x3** (15 turnos / 500.000 tokens / 50.000 tokens por turno) |
+| Descomposicion del coste | salida de herramientas re-leida **38%**; texto propio **31%**; base fija de prompt **21%**; brief **3%** |
+| Curva de contexto | **17k -> 112k**, **+1,3k tokens/turno** |
+| Relectura | **187 KB** de salida re-leidos **~38 veces** cada uno |
+| Concentracion | 2 lecturas (**25,9 KB** y **21,8 KB**) = **25%** de la salida de la sesion |
+| Redaccion | **108 lineas por ~15 hechos**: TASKS **52**, NEXT **32**, DECISIONS **27** |
+
+Lectura de estos numeros, que es la que sostiene la decision: **el brief no era el problema (3%)** y sin embargo fue la fuente de los hechos, porque un brief se escribe de memoria (D4).
+
+Y **el 38% era salida re-leida**, no lectura util: releer un documento entero para "ver donde estamos" no cuesta tokens de precio, costa tokens de **contexto acumulado**, que es lo que se paga en los 30 turnos siguientes.
+
+Regla 12 de `AGENTS.md` (coste = turnos x contexto) ya lo predijo; este ADR le pone el techo correspondiente.
+
+### Baseline verificado en este turno (ADR-006: archivo real, no memoria)
+
+| Fichero | Bytes | KB | Lineas | Cited en `AGENTS.md` 10 | Desfase real |
+|---|---|---|---|---|---|
+| `exploraco desarrollo/DECISIONS.md` | 759.252 | **741,5** | **4.731** | ~400 KB | **1,85x** |
+| `exploraco desarrollo/TASKS.md` | 603.204 | **589,1** | **4.272** | ~400 KB | **1,47x** |
+| `exploraco desarrollo/NEXT.md` | 414.311 | **404,6** | **2.311** | ~330 KB | **1,23x** |
+| `exploraco desarrollo/BUGS_HISTORICOS.md` | 232.157 | **226,7** | -- | ~155 KB | **1,46x** |
+| `exploraco desarrollo/BLUEPRINT.md` | 80.931 | **79,0** | -- | (no listado) | -- |
+| `exploraco desarrollo/PROJECT.md` | 56.524 | **55,2** | -- | (no listado) | -- |
+| `api/interacciones.js` | 765.061 | **747,1** | -- | ~560 KB | **1,33x** |
+| `admin.html` | 532.536 | **520,1** | -- | ~340 KB | **1,53x** |
+| `mi-perfil.html` | 388.298 | **379,2** | -- | ~379 KB | **1,00x** (era el unico exacto) |
+
+**Correccion al encargo:** el desfase de `AGENTS.md` 10 no esta "entre 1,6x y 1,9x"; medido esta **entre 1,23x y 1,85x**, y `mi-perfil.html` era el **unico** que seguia siendo correcto. Se escribe la cifra medida (ADR-006), no la redondeada del brief.
+
+Otros tres hechos del baseline, los tres determinantes:
+
+- **`DECISIONS.md` NO tiene fichero `_ARCHIVO`**: `DECISIONS_ARCHIVO.md` **no existe** (verificado). Si existe el de TASKS y el de NEXT, el mas grande de los tres es el unico sin sumidero.
+- **`TASKS_ARCHIVO.md` (51.203 B) y `NEXT_ARCHIVO.md` (196.325 B) estan CONGELADOS desde 2026-09-19** (`LastWriteTime` 19/09/2026): 15 dias sin recibir un byte. **No son un sumidero activo**, son un archivo muerto con nombre de archivo.
+- **`scripts/docs-evidencia.js` NO EXISTE** (`Test-Path` = False). D4 no tiene todavia el mecanismo que la respalde; queda como dependencia declarada (deuda (a)).
+
+### Megalineas medidas (las dos que menciona el encargo, confirmadas)
+
+- `TASKS.md:13` -- **UNA linea de 3.759 caracteres** (3.760 con el salto de linea).
+- `NEXT.md:61` -- **UNA linea de 7.222 caracteres** (7.223 con el salto de linea).
+
+### Opciones evaluadas
+
+1. **No cambiar nada: el coste del pase documental es el precio de la trazabilidad.** Descartada: el 33% de la sesion se pago por un relato que vivia 3 veces no es trazabilidad, es **replicacion**. Y el pase documental es el unico tipo de `task` con escritura libre, luego es el unico donde el volumen de salida es un riesgo real.
+2. **Bajar el umbral de lectura por rango (150 KB -> otro) sin tocar el relato.** Descartada: ataca el sintoma, no la causa. Con `DECISIONS.md` en 741,5 KB, cualquier umbral obliga igual a re-leer **los tres** ficheros donde el relato esta replicado. Sin D1, D3 solo hace mas lento el mismo gasto.
+3. **Imponer al pase documental un limite de turnos mas estrecho que 15 (p.ej. 8).** Descartada: el limite de turnos no ataca el 38% de salida re-leida, solo desplaza el punto en que el watchdog avisa. Ademas penaliza al redactor por el defecto del lector.
+4. **ADOPTADA -- fuente unica (D1) + criterio de megalineas (D2) + techo de salida (D3) + brief de maquina (D4) + enmienda de `AGENTS.md` 10/18 (D5).**
+5. **Mover bloques de `TASKS.md`/`NEXT.md` a ficheros `_ARCHIVO` y dejar los tres ficheros cortos de verdad. Valida, pero APLAZADA.** Es la unica opcion que baja el **tamano en bytes** de `TASKS.md` (589,1 KB) y `NEXT.md` (404,6 KB), y por eso queda **deuda (c)**. No se ejecuta aqui por tres razones:
+   - (i) exige una **politica de sumidero y un criterio de corte** que no estan decididos;
+   - (ii) los dos `_ARCHIVO` que ya existen llevan **15 dias congelados**, luego no hay precedente vivo de como se mantiene uno;
+   - (iii) es una mudanza de contenido, no una norma, y por tanto **otra tanda con su propio gate**.
+   - **D2 se limita a items cortos**, que captura la mayor parte del beneficio sin tocar un solo sumidero.
+
+### Decision tomada
+
+**D1 -- El argumento vive UNA vez, en `DECISIONS.md`.**
+
+- **`DECISIONS.md` es la fuente unica del relato**: problema, opciones, decision, justificacion, impacto, deuda. Si un argumento esta ahi, no se repite en ningun otro sitio.
+- **`TASKS.md`: 6 lineas por tarea** -- estado + commit + alcance en una frase + puntero al ADR. Nada mas.
+- **`NEXT.md`: 8 lineas por relevo** -- que sigue + riesgos + puntero al ADR. Nada mas.
+- **Todo lo demas es puntero**: "ver ADR-0XX". Prohibida la recapitulacion, incluida la recapitulacion "para que se entienda sin abrir el ADR".
+- **Criterio de las 6/8 lineas, escrito para que no sea subjetivo:** si un item de `TASKS.md` o `NEXT.md` **no cabe** en 6 u 8 lineas sin perder un hecho, el diagnostico es **"falta un ADR"** (o sobra un hecho), nunca "el presupuesto es corto". Subir el presupuesto para que quepa es exactamente el defecto que este ADR corrige.
+
+**D2 -- Megalineas: prohibicion con criterio escrito.**
+
+- **Prohibido** que una linea de `TASKS.md` o `NEXT.md` supere **400 caracteres** (hoy: 3.759 y 7.222, es decir 9x y 18x el techo).
+- **Por que 400 y no "corto":** el motivo es mecanico, no estetico. Una linea de 7.223 caracteres no cabe en una lectura de 60 lineas ni en un `grep -m 2`, luego **obliga a volver con rango**, y volver con rango es exactamente el 38% de salida re-leida que D3 elimina. El criterio de longitud es una **proxy de larestriction de lectura**, y por eso es verificable.
+- **Como se parte:** en **items cortos** (uno por hecho, con su propio puntero) o en **tabla** (columnas = estado / commit / puntero). **No** se admite un item largo "porque el contexto lo necesita": el contexto se escribe en el ADR y el item apunta.
+- **Excepcion unica:** una URL o un hash de commit (40-64 caracteres) **no** se parte, porque partirlo lo vuelve ilegible y no cuesta lectura.
+
+**D3 -- El techo de salida de herramienta es NORMA, no consejo.**
+
+- `Read` con `offset`/`limit` de **<= 60 lineas** en `DECISIONS.md`, `TASKS.md`, `NEXT.md`, `BUGS_HISTORICOS.md` y en cualquier fichero > 150 KB.
+- `grep` / `rg` / `Select-String` contra esos 4 ficheros con **`-m 2`** (baja el `-m 3` que fija hoy `AGENTS.md` 18).
+- **Prohibido volcar un fichero entero** para "ver donde estamos": el ultimo ADR se localiza con `Select-String -Pattern "^## ADR-0"` y se lee **su seccion**, no el fichero. Lo mismo con `TASKS.md` y `NEXT.md`.
+- El techo es por **salida de herramientas**, no por tokens de respuesta: releer `DECISIONS.md` entero puede ser barato en precio (esta en `cache_read`) y **caro en contexto acumulado**, que es lo que se paga en los 30 turnos siguientes. Por eso el limite se pone en la herramienta, no en el modelo.
+- **Excepcion unica y medible:** la **verificacion de conteo** (`Select-String` con `-Pattern` sobre el fichero entero, que devuelve solo las coincidencias) no es una lectura y no la acota este techo. Lo acotado es la lectura de *contenido*.
+
+**D4 -- El brief documental se pega de la salida de `scripts/docs-evidencia.js`, jamas de memoria.**
+
+- **Precedente:** en TSK-177 el brief **llevo 3 cifras que no eran las del repositorio** (reportado por el operador; **no hay registro en el repositorio**, ADR-006, y este ADR **no las reescribe ni las inventa**). La descomposicion explica por que un brief tan barato --3%-- puede ser la fuente de un error: **un brief se escribe de memoria; una salida de maquina no**.
+- **Norma:** una cifra en un ADR **sin el comando que la produjo no es admisible**. Se pega la salida y se cita el comando.
+- **Degradacion segura, mientras el script no exista (hoy no existe):** si no hay salida de maquina, el brief **no cita cifras** -- describe lo cualitativo y la comprobacion se hace **en el turno, con el comando ahi delante**, no en el encargo. Es peor el brief y mejor el ADR.
+- **Propietario de la pieza que falta:** `scripts/docs-evidencia.js` es trabajo de `@js-silo-dev` (logica de `scripts/`) con verificacion de `@qa-auditor`. **Este ADR no lo escribe.**
+
+**D5 -- `AGENTS.md` 10 y `AGENTS.md` 18 se enmiendan en el MISMO paso que este ADR.**
+
+- **18 (higiene de consumo):** anade el **techo de salida de herramienta** de D3 y baja `-m 3` a `-m 2`.
+- **10 (lectura por rango):** **corrige los tamanos** con los reales de la tabla de baseline, y anade los dos hechos que hoy no estan en ningun sitio: **`DECISIONS.md` NO tiene `_ARCHIVO`**, y **`TASKS_ARCHIVO.md` / `NEXT_ARCHIVO.md` estan congelados desde 2026-09-19** (no son un sumidero activo).
+- El numero de reglas transversales **sigue siendo 19**: se enriquecen dos, no se anaden.
+
+### Impacto / superficies (declarado; este turno NO las ejecuta salvo `AGENTS.md`)
+
+- **`exploraco desarrollo/DECISIONS.md`:** **+1 seccion** (este ADR), al final. **Ningun ADR anterior se modifica, no se mueve y no se borra nada** (Cero Borrado Logico documental, ADR-003).
+- **`AGENTS.md`:** **10** y **18** reenriquecidas en este mismo turno. Sin tocar el resto.
+- **`TASKS.md` y `NEXT.md`: NO se tocan en este turno.** Los aplica `@docs-keeper` en el paso siguiente, con D1 y D2 como contrato (R2: el cierre documental es **un** pase, no uno por fichero).
+- **`scripts/`: NO se toca.** `docs-evidencia.js` es D4 y es otro encargo.
+- **NO toca:** `api/*` (**8/8 INTACTO**, ADR-010), migraciones, tablas, ningun HTML del producto, `BLUEPRINT.md`, Reglas de Oro, ningun `_ARCHIVO`. Es gobernanza de coste documental, no de producto.
+- **Opcion 5 NO ejecutada** (deuda (c)).
+
+### Consecuencias
+
+**Positivas:**
+
+- (1) el coste del pase documental deja de crecer con el relato: **108 lineas por 15 hechos** pasa a **15 hechos x 1 linea** en `DECISIONS.md` + 6/8 lineas de puntero, y el argumento se lee **una** vez;
+- (2) D3 ataca la partida **mayor** del coste (38%), no la menor (brief, 3%) -- que es donde estaban la arquitectura y el criterio;
+- (3) las cifras de un ADR dejan de depender de la memoria del redactor, con el precedente de TSK-177 como justificacion ya pagada;
+- (4) `AGENTS.md` 10 deja de citar tamanos falsos que hoyinducian a subagentes a leer enteros ficheros que ya no son los que eran;
+- (5) el umbral de 400 caracteres y el de 6/8 lineas son **verificables por un comando**, asi que la norma se puede auditar en lugar de resil.
+
+**Negativas / aceptadas:**
+
+- (a) **`DECISIONS.md` crece** (ya es el mas grande, 741,5 KB) y su coste de lectura sube con el tiempo: la mitigacion es **D3**, no el volumen, y ese coste es real;
+- (b) **D1 reduce la autonomia de lectura de `TASKS.md` y `NEXT.md`**: quien los lea sin seguir el puntero no encuentra el argumento. Es un coste consciente -- el argumento estaba **duplicado**, no centralizado, y duplicarlo era el defecto;
+- (c) **400 caracteres y 6/8 lineas son umbrales, no verdades**: estan elegidos por mecanica (D2) y por autoproteccion del turno, y habra que revisarlos cuando `@docs-keeper` los aplique y devuelva el numero real;
+- (d) **mientras `docs-evidencia.js` no exista, D4 obliga a menos cifras en los briefs**, lo que baja la precision del encargo y sube la de la verificacion -- intercambio conscious;
+- (e) **prohibir volcar ficheros enteros rompe el habito de "leer el ADR anterior para copiar su estilo"**: el estilo se toma con un `read` de 60 lineas sobre la seccion de formato o se le pide al subagente; mas lento al primer uso, mas barato al siguiente.
+
+### Deuda / riesgos [DEUDA]
+
+- (a) **`scripts/docs-evidencia.js` NO EXISTE** (verificado hoy). D4 es norma **sin mecanismo**: hasta que exista, el brief no cita cifras. **El modo de fallo sigue abierto** -- un subagente puede citar de memoria y el ADR lo fija -- y este ADR **solo crea la norma, no la defense**. Es la deuda mas importante porque es exactamente el precedente de TSK-177 sin cerrar.
+- (b) **El precedente de las 3 cifras falsas no esta en el repositorio.** Se cita como reportado y **no se reescribe**: si aparece el registro de TSK-177, el precedente se precisa **sin cambiar D4**.
+- (c) **La Opcion 5 sigue abierta** y es la unica que baja el **tamano en bytes** de `TASKS.md` (589,1 KB) y `NEXT.md` (404,6 KB). Sin ella, **D1 baja el relato pero no los bytes**: 400 caracteres x miles de items sigue siendo mucho fichero. Exige su propia tanda y su propio gate.
+- (d) **Los `_ARCHIVO` congelados desde 2026-09-19 son un sumidero sin politica.** Si alguien los reabre sin decidir criterio, **D1 se cumple en la superficie y no en el tamano**. Y `DECISIONS.md`, el mas grande, **no tiene sumidero**: cada ADR lo hace mas grande (declarado, no oculto).
+- (e) **El techo de 60 lineas no esta medido como optimum**: sale de la disciplina aplicada en este turno, no de un experimento. Si `@docs-keeper` devuelve que 60 es corto para editar un ADR, **el umbral sube**; lo que no se admite es "sin limite".
+- (f) **Convive con la regla transversal 11/12 de `AGENTS.md`**, que prohibe medir por salida de herramientas ("infraestima 45-70x"). **No hay contradiccion**: 11/12 mide **precio**, y D3 mide **volumen**.
+  - En un `task`, la salida re-leida es un termino de coste real (38% medido), y por eso tiene techo; en el cierre de sesion, el precio se sigue atribuuyendo por `message.data.modelID` como fijo ADR-083. **Cada norma manda en su terreno y ninguna deroga a la otra.**
+
+### Verificacion de este ADR
+
+- **Numero:** `Select-String -LiteralPath "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-084"` -> **1 coincidencia** (sigue al ADR-083, linea 4583, que era el mayor real).
+- **ASCII:** lo anadido en `DECISIONS.md` y en `AGENTS.md` es **ASCII puro**, **0 bytes > 127**.
+- **D2 aplicado a si mismo (medido, no declarado):** la region de este ADR paso de **9** lineas de mas de 400 caracteres a **0**. El criterio es el que D2 escribe -- **items cortos, uno por hecho** -- y no una excepcion: se partieron la prosa larga, la lista de razones (i/ii/iii), las 5 positivas, las 5 negativas y la linea de ADRs relacionados. Ningun ADR relacionado se perdio al partirla.
+- **`AGENTS.md`:** las dos enmiendas (10 y 18) presentes, con los tamanos reales de la tabla de baseline y los dos hechos de `_ARCHIVO`.
+- **Baseline (ADR-006) verificado contra el archivo real en este turno:** los 9 tamanos y los 3 recuentos de linea, `TASKS.md:13` = 3.759 caracteres, `NEXT.md:61` = 7.222, inexistencia de `DECISIONS_ARCHIVO.md`, `LastWriteTime` 2026-09-19 de los dos `_ARCHIVO`, e inexistencia de `scripts/docs-evidencia.js`.
+- **NO verificado en este turno (declarado, no medido):** las 9 cifras de coste de TSK-177 (5.245,0k / 77 turnos / 92 tool calls / 33% de 15,9M / 38-31-21-3 / 17k->112k / +1,3k / 187 KB x 38 / 25% de 2 lecturas / 108 lineas) y las **3 cifras falsas** del brief. Vienen del brief del operador y no hay en el repositorio el log de esa sesion: se citan **como medidas y declaradas**.
+- **Cierre:** no se ejecuta `npm test` ni nada en `scripts/` (este ADR no toca codigo).
+
+**ADRs relacionados:**
+
+- **ADR-083** (tier por modelo activo del turno: este ADR es la aplicacion de su coste-por-atribucion a un caso que la cascada no cubria -- **el pase documental**, que es el unico `task` con escritura libre y sin preflight de modelo; sus D2/D3/D5 siguen pendientes y este ADR no los toca)
+- **ADR-078** (permiso total y `edit: deny`: sin cambios)
+- **ADR-006** (baseline = archivo real: es la regla que obliga a **corregir** los tamanos de `AGENTS.md` 10 en vez de heredarlos, y la que obliga a declarar que `docs-evidencia.js` no existe)
+- **ADR-003** (Cero Borrado Logico: por eso la Opcion 5 esta aplazada y este ADR **no mueve ni borra** nada de `TASKS.md`/`NEXT.md`)
+- **ADR-010** (presupuesto 8/8: este ADR no toca `api/*` ni crea endpoint)
+
+R2 (mandato documental) vive en **`AGENTS.md` 3.9**, no en un ADR, y por eso este ADR **no deroga ningun ADR previo**: lo reforma en su alcance.

@@ -18,7 +18,8 @@
     "smoke:origen": "node scripts/smoke_origen_factor_parity.js",
     "smoke:origen:sinbd": "node scripts/smoke_058_origen_clasificador.js",
     "smoke:consumibles": "node scripts/smoke_test_consumibles_era.js",
-    "smoke:mercado": "node scripts/smoke_mercado.js"
+    "smoke:mercado": "node scripts/smoke_mercado.js",
+    "docs:evidencia": "node scripts/docs-evidencia.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",
