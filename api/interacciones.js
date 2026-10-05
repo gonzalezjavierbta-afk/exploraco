@@ -192,6 +192,19 @@
 const { neon } = require('@neondatabase/serverless');
 var crypto = require('crypto');
 
+// ADR-086: motor COMPARTIDO del score compuesto. Vive en lib/score.js, fuera
+// de api/ a proposito (8/8 funciones serverless, cero endpoints nuevos), y lo
+// consumen los CUATRO rankings: leaderboard, faccion_ranking y casa_ranking en
+// api/usuarios.js, y pandilla_ranking aqui. Una sola aritmetica de score: si
+// esta rama calculara su propio score, dejaria de ser comparable con los otros
+// tres. Ver lib/score.js para la aritmetica, el DISTINCT ON y la atribucion
+// del termino de parche al inversor.
+var MOTOR_SCORE = require('../lib/score');
+var scoreCteSql = MOTOR_SCORE.scoreCteSql;
+var SCORE_ORDEN = MOTOR_SCORE.SCORE_ORDEN;
+var sqlConDegradacion = MOTOR_SCORE.sqlConDegradacion;
+var esFalloEsquemaScore = MOTOR_SCORE.esFalloEsquema;
+
 // v9 Gamificacion v4.0: probabilidades de cromos por rareza (ADR-018)
 var CROMO_PROBABILIDADES = { comun: 0.45, raro: 0.30, epico: 0.18, dorado: 0.07 };
 
@@ -8220,12 +8233,34 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, data: cromosRows });
       }
 
-      // Ranking global de Parches por fama acumulada (ADR-035, lectura
-      // publica sin sesion). miembros_activos = miembros vigentes (30
-      // dias): pm.activo=true + u.activo=true + ultimo_acceso reciente.
-      // Si usuarios.activo/ultimo_acceso no existen (42703), se
-      // reintenta la MISMA consulta sin la condicion de actividad y se
-      // devuelve miembros_activos=0 (nunca catch vacio).
+      // Ranking global de Parches (ADR-035 + ADR-086). Lectura publica sin
+      // sesion. miembros_activos = miembros vigentes (30 dias): pm.activo=true
+      // + u.activo=true + ultimo_acceso reciente.
+      //
+      // CABLEADO AL MOTOR COMPARTIDO de lib/score.js: la lista de parches se
+      // ordena por el MAXIMO del score compuesto entre sus miembros, y la
+      // clave nueva 'top' expone el top 3 POR PARCHE con UNA FILA POR USUARIO
+      // (misma forma que faccion_ranking.top y casa_ranking.top, y el mismo
+      // motor: leaderboard, faccion_ranking, casa_ranking y pandilla_ranking
+      // leen el MISMO scoreCteSql).
+      //
+      // UNA FILA POR USUARIO ANTES DEL PARTITION BY (la proteccion medida):
+      // la CTE 'score' lleva DISTINCT ON (u.id) y cada agregado lleva
+      // GROUP BY usuario_id, luego el PARTITION BY por parche no puede
+      // numerar dos veces al mismo usuario. El maximo por parche se agrega
+      // DESPUES, con GROUP BY pandilla_id sobre esa CTE ya colapsada, luego
+      // tampoco multiplica la fila del parche.
+      //
+      // Degradacion en 3 escalones (sqlConDegradacion), nunca un catch vacio:
+      //   1) score compuesto + actividad de 30 dias
+      //   2) sin score: si el motor de score o la 047 no estan en Neon
+      //      (42P01/42703). La lista vuelve a fama_total, como antes de
+      //      ADR-086: la rama responde, no se tumba.
+      //   3) sin score y sin actividad: si usuarios.activo/ultimo_acceso no
+      //      existen (42703), miembros_activos sale 0.
+      // Con gamma = 0.0000 el termino ya no pesa y el orden queda en el
+      // maximo de xp_total de la pandilla: el score degrada a XP puro. NO se
+      // toca gamma aqui; la rampa la mueve el admin (gamificacion_config).
       if (tipo === 'pandilla_ranking') {
         var prkLimit = parseInt(req.query.limit, 10);
         if (!isFinite(prkLimit) || prkLimit <= 0) prkLimit = 50;
@@ -8235,33 +8270,108 @@ module.exports = async function handler(req, res) {
         // nombres de columna controlados, ninguno viene del cliente.
         var prkCond = 'pm.activo = true AND u.activo = true'
           + ' AND u.ultimo_acceso > NOW() - INTERVAL \'30 days\'';
-        var prkSql = function (condAct) {
-          return 'SELECT p.id, p.nombre, p.ciudad_base, p.descripcion, p.fama_total,'
+        // Proyeccion EXPLICITA del motor: empieza por 'id', que es la clave
+        // del DISTINCT ON. Nunca u.* (arrastraria email: PII).
+        var prkCols = 'id, nombre, avatar_url, xp_total';
+        // SELECT de la lista de parches, identico en los 3 escalones: lo unico
+        // que cambia es si se le engancha el maximo de score.
+        var prkListaSelect = function (cola) {
+          return (cola.score ? scoreCteSql(prkCols) : '')
+            + 'SELECT p.id, p.nombre, p.ciudad_base, p.descripcion,'
+            + ' p.fama_total,'
             + ' (SELECT COUNT(*)::int FROM pandillas_miembros pm'
             + '   WHERE pm.pandilla_id = p.id AND pm.activo = true) AS miembros,'
             + ' (SELECT COUNT(*)::int FROM pandillas_miembros pm'
             + '   JOIN usuarios u ON u.id = pm.usuario_id'
-            + '   WHERE pm.pandilla_id = p.id AND ' + condAct + ') AS miembros_activos'
-            + ' FROM pandillas p WHERE p.activo = true'
-            + ' ORDER BY p.fama_total DESC NULLS LAST, p.creado_en ASC LIMIT $1';
+            + '   WHERE pm.pandilla_id = p.id AND ' + cola.condAct + ')'
+            + '   AS miembros_activos,'
+            + (cola.score
+              ? ' COALESCE(ms.score_max, 0) AS score_max'
+              : ' 0::numeric AS score_max')
+            + ' FROM pandillas p'
+            + (cola.score
+              ? // LEFT JOIN a proposito: un parche SIN miembros activos se
+                // lista con score_max 0 en vez de desaparecer del ranking.
+                ' LEFT JOIN (SELECT pm.pandilla_id,'
+              + '   MAX(s.score_ranking) AS score_max FROM scored s'
+              + '   JOIN pandillas_miembros pm ON pm.usuario_id = s.id'
+              + '   WHERE pm.activo = true GROUP BY pm.pandilla_id) ms'
+              + '   ON ms.pandilla_id = p.id'
+              : '')
+            + ' WHERE p.activo = true'
+            + ' ORDER BY ' + (cola.score
+              ? 'COALESCE(ms.score_max, 0) DESC'
+              : 'p.fama_total DESC NULLS LAST')
+            + ', p.fama_total DESC NULLS LAST, p.creado_en ASC LIMIT $1';
         };
-        var prkParches;
-        try {
-          prkParches = await sql(prkSql(prkCond), [prkLimit]);
-        } catch (prkErr) {
-          if (!prkErr || prkErr.code !== '42703') throw prkErr;
-          console.warn('[interacciones] pandilla_ranking degradado 42703: ' + prkErr.message);
-          prkParches = await sql(prkSql('pm.activo = true'), [prkLimit]);
-        }
+        // Top 3 por parche. El ORDER BY de la ventana es SCORE_ORDEN, el MISMO
+        // string que los otros tres rankings, y corre SOBRE la salida ya
+        // colapsada a 1 fila por usuario (nivel 1), nunca antes.
+        var prkTopSql = function (usarScore) {
+          return (usarScore ? scoreCteSql(prkCols) : '')
+            + ' SELECT id, nombre, avatar_url, xp_total, rol, pandilla_id,'
+            + (usarScore ? ' score_ranking,' : '')
+            + ' pos FROM (SELECT m.pandilla_id, m.rol, m.id, m.nombre,'
+            + ' m.avatar_url, m.xp_total,'
+            + (usarScore ? ' m.score_ranking,' : '')
+            + ' ROW_NUMBER() OVER (PARTITION BY m.pandilla_id ORDER BY '
+            + (usarScore ? SCORE_ORDEN : 'm.xp_total DESC, m.id ASC')
+            + ') AS pos FROM ('
+            + (usarScore
+              ? 'SELECT s.id AS id, s.nombre AS nombre,'
+              + ' s.avatar_url AS avatar_url, s.xp_total AS xp_total,'
+              + ' s.score_ranking AS score_ranking,'
+              + ' pm.rol AS rol, pm.pandilla_id AS pandilla_id'
+              + ' FROM scored s'
+              : 'SELECT u.id AS id, u.nombre AS nombre,'
+              + ' u.avatar_url AS avatar_url, u.xp_total AS xp_total,'
+              + ' pm.rol AS rol, pm.pandilla_id AS pandilla_id'
+              + ' FROM usuarios u')
+            + ' JOIN pandillas_miembros pm ON pm.usuario_id ='
+            + (usarScore ? ' s.id' : ' u.id') + ' AND pm.activo = true) m) t'
+            + ' WHERE t.pos <= 3 ORDER BY t.pandilla_id, t.pos LIMIT $1';
+        };
+        var prkParches = await sqlConDegradacion(sql, 'pandilla_ranking', [
+          { sql: prkListaSelect({ score: true, condAct: prkCond }),
+            params: [prkLimit], nota: 'lista por fama_total (sin score)' },
+          { sql: prkListaSelect({ score: false, condAct: prkCond }),
+            params: [prkLimit], nota: 'lista por fama_total sin actividad' },
+          { sql: prkListaSelect({ score: false, condAct: 'pm.activo = true' }),
+            params: [prkLimit], nota: 'lista por fama_total sin score' }
+        ]);
         prkParches = prkParches.map(function (p) {
           p.fama_total = red2(numXp(p.fama_total));
           p.miembros = Number(p.miembros) || 0;
           p.miembros_activos = Number(p.miembros_activos) || 0;
+          p.score_max = red2(numXp(p.score_max));
           return p;
+        });
+        // 'top' es ADITIVO: si el motor no puede resolverlo (membresia vacia o
+        // esquema sin migrar), la lista de parches sigue saliendo y 'top'
+        // degrada a []. Nunca al reves.
+        var prkTop = [];
+        try {
+          prkTop = await sqlConDegradacion(sql, 'pandilla_ranking/top', [
+            { sql: prkTopSql(true), params: [prkLimit],
+              nota: 'top por xp_total (sin score)' },
+            { sql: prkTopSql(false), params: [prkLimit],
+              nota: 'top por xp_total sin score' }
+          ]);
+        } catch (prkTopErr) {
+          if (!esFalloEsquemaScore(prkTopErr)) throw prkTopErr;
+          console.warn('[interacciones] pandilla_ranking/top sin top ('
+            + (prkTopErr.code || 'sin-codigo') + '): ' + (prkTopErr.message || ''));
+          prkTop = [];
+        }
+        prkTop = prkTop.map(function (r) {
+          r.xp_total = red2(numXp(r.xp_total));
+          r.score_ranking = red2(numXp(r.score_ranking));
+          r.pos = Number(r.pos) || 0;
+          return r;
         });
         return res.status(200).json({
           ok: true,
-          data: { parches: prkParches, total: prkParches.length },
+          data: { parches: prkParches, top: prkTop, total: prkParches.length },
         });
       }
 
@@ -13485,9 +13595,19 @@ module.exports = async function handler(req, res) {
             + ' WHERE id=(SELECT parche_id FROM miembro) AND fama_total >= $2::numeric'
             + ' RETURNING id, fama_total'
             + '), ins AS ('
-            + ' INSERT INTO parche_upgrades (parche_id, ciudad_slug, tipo_upgrade,'
-            + '  puntos_invertidos, activo_hasta, creado_en)'
-            + ' SELECT (SELECT id FROM debito), $3, $4, $2::numeric,'
+            // usuario_id = $1 (el inversor de la sesion) cierra la ATRIBUCION
+            // (migracion 047): hasta aqui la fila de parche_upgrades no
+            // guardaba QUIEN invirtio, luego el conductor del score no tenia
+            // de quien leerlo. La firma de la funcion no cambia: $1 ya era el
+            // usuario de la sesion (pm.usuario_id=$1::uuid mas arriba), luego
+            // esto es una columna y un placeholder mas. Efecto medido en el
+            // score: el termino de parche pasa de "N miembros x N veces"
+            // (inflacion de una SUM, que el DISTINCT ON NO detecta) a "1 vez,
+            // al inversor", y se enciende idx_parche_upgrades_usuario_id,
+            // que estaba muerto.
+            + ' INSERT INTO parche_upgrades (usuario_id, parche_id, ciudad_slug,'
+            + '  tipo_upgrade, puntos_invertidos, activo_hasta, creado_en)'
+            + ' SELECT $1::uuid, (SELECT id FROM debito), $3, $4, $2::numeric,'
             + '  NOW() + ($5::int * INTERVAL \'1 hour\'), NOW()'
             + ' FROM debito'
             + ' RETURNING id, activo_hasta'
