@@ -1,0 +1,130 @@
+-- ============================================================================
+-- Migration 047: parche_upgrades.usuario_id -- atribucion del inversor
+-- Fecha: 2026-10-05
+-- Referencias: ADR-002 (ASCII-safe), ADR-003 (Cero Borrado Logico, cero
+--   DELETE), ADR-006 (el baseline es el esquema REAL medido antes de
+--   escribir), ADR-008 (gobernanza e idempotencia de esquema), BUG-026
+--   (emojis en SQL nunca como bytes UTF-8 directos).
+--
+-- POR QUE ES LA 047
+--   Medido en disco el 2026-10-05: db/migrations/ va de 003 a 046 sin
+--   huecos, con 046_market_multimoneda_sinks.sql como ultima, y no existe
+--   ninguna 047. Medido en Neon el mismo dia: schema_migrations tiene
+--   numero = 46 / resultado = 'aplicada'. La 046 es ademas FORWARD-ONLY
+--   (ADR-086 seccion 3), luego la 047 es el numero siguiente libre y no
+--   colisiona con ella.
+--
+-- QUE ARREGLA
+--   parche_upgrades tiene FK parche_id -> pandillas(id) y NO tenia columna
+--   usuario_id: la fila de inversion no era atribuible a ningun inversor.
+--   El motor de ranking acreditaba el TOTAL del parche a CADA miembro de
+--   la pandilla. Con 50 miembros eso es el mismo termino de fama 50 veces:
+--   no es multiplicacion de filas (eso lo arregla DISTINCT ON), es
+--   INFLACION de una SUMA dentro del propio SUM. La columna nueva es lo
+--   que permite resolver por inversor y repartir solo lo que le
+--   corresponde. Este fichero SOLO anade la columna y los indices: el
+--   cambio de api/ que la puebla y el que la lee son encargos aparte.
+--
+-- POR QUE usuario_id ES NULLABLE A PROPOSITO
+--   NO es NOT NULL a proposito. Declararla NOT NULL haria que esta
+--   migracion dependiera de que api/interacciones.js ya escriba la
+--   columna, y ese fichero esta siendo editado en paralelo: si se aplica
+--   antes, el INSERT que no la menciona reventaria con 23502 (not_null_violation).
+--   Nullable hace que las dos partes sean INDEPENDIENTES y que el orden
+--   migracion -> codigo sea seguro, que es justamente lo contrario de la
+--   VENTANA CERO de la 046. Sin DEFAULT tampoco: no hay nada que rellenar
+--   y un DEFAULT sobre uuid no tendria sentido.
+--
+-- POR QUE NO HAY BACKFILL, Y NO ES UNA OMISION
+--   Un backfill es una TRANSFORMACION sobre filas historicas. Medido en
+--   Neon el 2026-10-05: SELECT count(*) FROM parche_upgrades = 0. El
+--   conjunto a transformar es VACIO, luego no hay backfill que hacer; no
+--   es "se omitio", es que no hay entrada que transformar.
+--   Y esto no es casual ni accidental: la tabla "nunca ha tenido filas" por
+--   construccion, asi que cualquier compra futura escribe la columna desde
+--   el INSERT.
+--   En el caso contrario, "hubiera tenido filas historicas", ahi si
+--   exigiria backfill -- y ademas seria IRRECUPERABLE desde la propia fila
+--   (un NULL no deja testigo de a que inversor correspondia), habria que
+--   reconstruirlo desde xp_ledger. Se deja escrito aqui para que el
+--   proximo que mire la tabla no reinvente la pregunta.
+--
+-- REGLA DE LECTURA DE NULL (la parte que hay que respetar al escribir el SQL)
+--   usuario_id IS NULL significa "inversion NO atribuida" (fila historica,
+--   o compra anterior a esta migracion). NO significa "el usuario 0", ni
+--   "repartir a medias", ni "sumar al total de la pandilla". La regla es:
+--   las filas NULL se EXCLUYEN del termino de fama del inversor. No se
+--   redistribuyen entre los miembros, porque redistribuir sin testigo es
+--   inventar un dato. Por eso el indice es PARCIAL sobre las filas
+--   atribuidas.
+--
+-- IDEMPOTENCIA (ADR-008) -- POR QUE NO HAY DO $$ ... EXCEPTION
+--   Re-ejecutar este fichero COMPLETO es no-op funcional (N veces):
+--   ADD COLUMN IF NOT EXISTS y CREATE INDEX IF NOT EXISTS.
+--   NO se usa el bloque DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN
+--   NULL ... END $$; porque el patron VIGENTE del repo lo descarto a
+--   proposito, y copiarlo aqui seria retroceder:
+--     - 037_regalias.sql cabecera: "Se usa el patron de DO block con IF
+--       to_regclass(...) IS NULL THEN RETURN, ya establecido en
+--       023/030/031/032, y NO el EXCEPTION WHEN undefined_table/
+--       undefined_column: es explicito, deja un NOTICE trazable y evita
+--       capturar errores ajenos al guard."
+--     - 046 seccion (2) elimino su EXCEPTION por el mismo motivo y lo
+--       documento: al capturar, PL/pgSQL hace ROLLBACK de la SUBTRANSACCION
+--       y el bloque TERMINA CON EXITO, luego el runner marcaba la
+--       migracion como 'aplicada' con el cambio a medias. Un fallo
+--       silencioso que se presenta como exito es peor que un fallo ruidoso.
+--   Ahi el IF NOT EXISTS no captura nada: si la columna o el indice ya
+--   estan, la sentencia no hace nada y NO propaga error. La unica
+--   sentencia que puede fallar de verdad es el primer ALTER TABLE
+--   ADD COLUMN, y si falla tiene que ABORTAR a la vista.
+--
+-- CARACTER DE LA MIGRACION
+--   ADITIVA: solo ADD COLUMN / CREATE INDEX. No elimina, no renombra, no
+--   toca objetos previos. SIN DELETE, SIN DROP, SIN TRUNCATE (ADR-003).
+--   ASCII-SAFE (ADR-002): cero bytes > 127, cero tildes, cero emojis, cero
+--   escapes unicode, cero backticks (BUG-026).
+--
+-- MEDICIONES QUE SUSTENTAN ESTE FICHERO (Neon, 2026-10-05, solo lectura)
+--   - information_schema.columns, parche_upgrades = 7 columnas, y
+--     usuario_id = 0: la columna NO existe todavia (esta migracion la crea).
+--   - parche_upgrades_usuario_id_fkey: no existe (la unica FK de la tabla
+--     es parche_upgrades_parche_id_fkey, FOREIGN KEY (parche_id)
+--     REFERENCES pandillas(id), lo que confirma el diagnostico).
+--   - count(*) FROM parche_upgrades = 0 (justifica el "sin backfill").
+--   - Indices previos en la tabla = 2: parche_upgrades_pkey (UNIQUE, id) e
+--     idx_parche_upgrades_ciudad_vigencia (ciudad_slug, activo_hasta).
+--     NINGUNO cubre parche_id, luego el indice del punto 3 no duplica nada.
+--   - La tabla referenciada es public.usuarios y existe, con id uuid
+--     (PRIMARY KEY). Coincide con el nombre pedido: usuarios, no otro.
+--
+-- Ejecutar con: node scripts/apply_sql_file.js db/migrations/047_parche_upgrades_usuario_inversor.sql
+-- Puerta del predecesor: la 046 esta aplicada (schema_migrations.numero = 46,
+-- resultado = 'aplicada', verificada el 2026-10-05).
+-- ============================================================================
+
+-- (1) La columna del inversor. NULLABLE a proposito (ver cabecera): para no
+--     atar esta migracion al INSERT de api/interacciones.js, que se esta
+--     editando en paralelo. Sin DEFAULT: la tabla tiene 0 filas y un
+--     DEFAULT sobre uuid no tendria sentido.
+ALTER TABLE public.parche_upgrades
+  ADD COLUMN IF NOT EXISTS usuario_id uuid NULL REFERENCES public.usuarios(id);
+
+-- (2) Indice PARCIAL de las inversiones atribuidas. El agregado de fama
+--     resuelve por pu.usuario_id con WHERE usuario_id IS NOT NULL, luego el
+--     indice solo tiene que cubrir las filas que aportan al termino: las
+--     NULL se EXCLUYEN del calculo y no se redistribuyen (regla de lectura
+--     de NULL, en cabecera). Un indice total seria mas grande sin
+--     servir ninguna consulta adicional.
+CREATE INDEX IF NOT EXISTS idx_parche_upgrades_usuario_id
+  ON public.parche_upgrades (usuario_id)
+  WHERE usuario_id IS NOT NULL;
+
+-- (3) Indice de la FK parche_id, MEDIDO como ausente: la tabla solo tenia
+--     parche_upgrades_pkey (id) e idx_parche_upgrades_ciudad_vigencia
+--     (ciudad_slug, activo_hasta). El join del motor de ranking
+--     (pu.parche_id = pm.pandilla_id) iba sin indice sobre el lado de la
+--     FK. PostgreSQL no crea indice automatico para una FK: solo lo crea si
+--     se pide explicitamente, luego el fallo era real y no una suposicion.
+CREATE INDEX IF NOT EXISTS idx_parche_upgrades_parche_id
+  ON public.parche_upgrades (parche_id);

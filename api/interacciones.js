@@ -1160,8 +1160,8 @@ async function aplicarDividendoSpot(sql, ctx) {
 
     // 5) Escritura ATOMICA (UNA CTE con CTE-DML). El orden es claim ->
     // debito -> credito: el INSERT de spot_dividendos (idempotente por el
-    // indice unico) es el CLAIM; el debito (con guarda xp_total >= monto y
-    // RETURNING) solo corre si el claim gano; el credito solo si el debito
+    // indice unico) es el CLAIM; el debito (con guarda de DISPONIBLE acotado a 0
+    // y RETURNING) solo corre si el claim gano; el credito solo si el debito
     // afecto una fila. Resultado: si el autor NO tiene saldo (saldo_ok=0) NO
     // se inserta spot_dividendos, NO se debita, NO se acredita y NO se toca
     // el ledger -> sin inyeccion/doble pago. (A-2 QA: la version previa
@@ -1173,9 +1173,18 @@ async function aplicarDividendoSpot(sql, ctx) {
       ? ' ON CONFLICT (fuente_interaccion_id, beneficiario_id, tipo_medio)'
         + ' WHERE fuente_interaccion_id IS NOT NULL DO NOTHING'
       : ' ON CONFLICT DO NOTHING';
+    // TSK-185 / ADR-086: cada uno de los dos guards de este bloque (ok_saldo y
+    // debit) lleva los DOS invariantes: (1) el literal de siempre
+    // xp_total >= $7, que protege la columna del XP ganado (ADR-018) de la
+    // resta, y (2) el disponible acotado a 0 con lo comprometido en
+    // sumideros descontado, que es el saldo real. (2) implica (1); (1) se
+    // mantiene explicito porque es invariante propio y lo aserta S4.
+    // El clamp NO abre la compra con 0 porque se compara contra $7 (> 0):
+    // disponible 0 cae igual que uno negativo -> saldo_insuficiente.
     var divRes = await sql(
       'WITH ok_saldo AS ('
       + ' SELECT id FROM usuarios WHERE id=$1::uuid AND xp_total >= $7::numeric'
+      + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $7::numeric'
       + '), ins AS ('
       + ' INSERT INTO spot_dividendos (destino_id, beneficiario_id, tipo_medio,'
       + '  fuente_interaccion_id, xp_bruto_base, monto, monto_descontado)'
@@ -1183,7 +1192,9 @@ async function aplicarDividendoSpot(sql, ctx) {
       + ' FROM ok_saldo' + divConflict + ' RETURNING id'
       + '), debit AS ('
       + ' UPDATE usuarios SET xp_total = xp_total - $7::numeric'
-      + ' WHERE id=$1::uuid AND xp_total >= $7::numeric AND EXISTS (SELECT 1 FROM ins)'
+      + ' WHERE id=$1::uuid AND xp_total >= $7::numeric'
+      + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $7::numeric'
+      + '  AND EXISTS (SELECT 1 FROM ins)'
       + ' RETURNING xp_total'
       + '), cred AS ('
       + ' UPDATE usuarios SET xp_total = xp_total + $7::numeric'
@@ -2249,6 +2260,117 @@ var MONEDA_MERCADO_LIMITE = 200;
 // escrita, luego usarlo como filtro no cambia ni un solo numero con el
 // esquema de 1 moneda. Punto unico de cambio cuando el mercado sea multi.
 var MONEDA_ACTUAL = 'condor';
+
+// ADR-086 / TSK-184: la curva de los 4 XP sinks. alpha y gamma NO son
+// columnas de sink_acciones (MEDIDO en Neon: sus columnas son clave,
+// etiqueta, costo_base_xp, slot_max, slot_max_activos, activo, creado_en),
+// luego son CONSTANTES de codigo y viajan como parametros de la CTE. Es lo
+// que el ADR pide literalmente: "la curva se congela con tres numeros, no con
+// un parametro libre". Leerlos de una tabla seria crear una columna mas que
+// puede desincronizarse de la fila comprada, que es justo lo que ADR-086
+// seccion 1 prohibe ("esos dos numeros no pueden separarse por construccion").
+var SINK_ALPHA = 0.20;
+var SINK_GAMMA = 2.00;
+var SINK_DIAS_RAMPA = 30;
+
+// Las 4 claves validas. allow-list explicita en codigo: la compra NUNCA
+// interpola la clave del cliente en el nombre de tabla ni en un fragmento de
+// SQL; viaja solo como parametro $2 contra la FK de sink_acciones. La lista es
+// una segunda barrera, no la primera.
+var SINK_CLAVES = ['foto_galeria', 'destacar_evento', 'album_slot', 'portada_destino'];
+
+// 503 tipado si falta el esquema de sinks/ranking (046 pendiente). Nunca catch
+// vacio: registra el motivo y responde claro, igual que los otros respondedores.
+function responderSinkAusente(res, e, etiqueta) {
+  console.warn('[sinks] ' + etiqueta + ' ausente (migracion 046 pendiente): '
+    + (e && e.message));
+  return res.status(503).json({
+    ok: false,
+    error: 'Sumideros de XP no disponibles (migracion 046 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+
+// El precio del proximo slot: curva de ADR-086 seccion 1 congelada en tres
+// numeros. alpha y gamma entran como PARAMETROS ($3, $4), no como columnas
+// leidas de sink_acciones: la tabla no las tiene (medido en Neon) y el ADR las
+// declara constantes. El ROUND a 2 decimales es el que hace que el precio
+// COBRADO y el precio MOSTRADO sean el mismo numero: sin el, la curva
+// devolveria 460.7999999999999 y el recibo congelado no cuadraria con el
+// catalogo, que es exactamente la desincronizacion que la derivacion en
+// lectura prohibe.
+function sinkPrecioCte() {
+  return 'WITH acc AS ('
+    + ' SELECT costo_base_xp, slot_max, slot_max_activos'
+    + ' FROM sink_acciones WHERE clave = $2 AND activo = true'
+    + '), k AS ('
+    + ' SELECT COUNT(*)::int AS k_actual FROM sink_slots'
+    + ' WHERE usuario_id = $1::uuid AND clave_accion = $2'
+    + '), ka AS ('
+    + ' SELECT COUNT(*)::int AS k_activos FROM sink_slots'
+    + ' WHERE usuario_id = $1::uuid AND clave_accion = $2 AND activo = true'
+    + '), precio AS ('
+    + ' SELECT ROUND(a.costo_base_xp'
+    + '   * POWER(1 + $3::numeric * k.k_actual, $4::numeric), 2) AS costo,'
+    + '  k.k_actual, ka.k_activos, a.slot_max, a.slot_max_activos'
+    + ' FROM acc a CROSS JOIN k CROSS JOIN ka'
+    + ')';
+}
+
+// Que topes bloquean una compra que no se puede hacer. Es una LECTURA
+// posterior al rechazo, nunca parte de la sentencia atomica: la garantia y el
+// gasto son la misma sentencia, y el diagnostico va aparte para poder nombrar
+// el tope concreto en vez de un 409 generico.
+function sinkDiagnosticar(sql, usuarioId, clave) {
+  return sql(
+    'WITH acc AS ('
+    + ' SELECT costo_base_xp, slot_max, slot_max_activos, activo'
+    + ' FROM sink_acciones WHERE clave = $2'
+    + '), k AS ('
+    + ' SELECT COUNT(*)::int AS k_actual FROM sink_slots'
+    + ' WHERE usuario_id = $1::uuid AND clave_accion = $2'
+    + '), ka AS ('
+    + ' SELECT COUNT(*)::int AS k_activos FROM sink_slots'
+    + ' WHERE usuario_id = $1::uuid AND clave_accion = $2 AND activo = true'
+    + ')'
+    + ' SELECT (SELECT COUNT(*)::int FROM acc) AS accion_rows,'
+    + '  (SELECT activo FROM acc) AS accion_activa,'
+    + '  COALESCE((SELECT k_actual FROM k), 0) AS k_historico,'
+    + '  COALESCE((SELECT k_activos FROM ka), 0) AS k_activos,'
+    + '  (SELECT slot_max FROM acc) AS slot_max,'
+    + '  (SELECT slot_max_activos FROM acc) AS slot_max_activos,'
+    + '  COALESCE((SELECT ROUND(costo_base_xp'
+    + '     * POWER(1 + $3::numeric * COALESCE((SELECT k_actual FROM k), 0),'
+    + '       $4::numeric), 2) FROM acc), 0) AS costo,'
+    + '  (SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) FROM usuarios'
+    + '    WHERE id = $1::uuid)'
+    + '    AS disponible',
+    [usuarioId, clave, SINK_ALPHA, SINK_GAMMA]
+  ).then(function(r) { return r[0] || {}; }).catch(function(eD) {
+    console.warn('[sinks] diagnostico no leido: ' + (eD && eD.message));
+    return {};
+  });
+}
+
+// Traduce el diagnostico al primer motivo que bloquea, en el orden en que se
+// evaluan los tres topes dentro de la CTE. Los tres se devuelven TODOS en
+// topes_bloqueados para que el cliente pueda explicar el muro entero y no
+// solo el primer sintoma.
+function sinkMotivos(d) {
+  var mot = [];
+  var kHist = Number(d.k_historico) || 0;
+  var kAct  = Number(d.k_activos) || 0;
+  var sMax  = d.slot_max === null || d.slot_max === undefined ? null : Number(d.slot_max);
+  var sMaxA = d.slot_max_activos === null || d.slot_max_activos === undefined
+    ? null : Number(d.slot_max_activos);
+  var disp  = d.disponible === null || d.disponible === undefined ? null : numXp(d.disponible);
+  if (Number(d.accion_rows) === 0) mot.push('SINK_INEXISTENTE');
+  else if (d.accion_activa !== true) mot.push('SINK_INACTIVO');
+  if (sMax !== null && kHist >= sMax) mot.push('TOPE_HISTORICO');
+  if (sMaxA !== null && kAct >= sMaxA) mot.push('TOPE_ACTIVOS');
+  if (disp !== null && Number(d.costo) > disp) mot.push('XP_INSUFICIENTE');
+  return mot.length ? mot : ['MOTIVO_DESCONOCIDO'];
+}
 
 // ADR-086 / TSK-183 (B1-B5): detector del esquema multi-moneda. Se resuelve
 // UNA vez por instancia y se cachea la PROMESA, luego no hay carrera entre
@@ -8511,6 +8633,188 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // ADR-086 / TSK-184: catalogo de los 4 sumideros. Solo LECTURA: precio
+      // base, curva y topes por accion, mas el precio REAL del proximo slot
+      // del usuario si hay usuario_id (k historico incluido). No cobra nada.
+      if (tipo === 'slot_catalogo') {
+        var scCols = 'a.clave, a.etiqueta, a.costo_base_xp, a.slot_max,'
+          + ' a.slot_max_activos, a.activo';
+        if (usuarioId) {
+          if (!MERCADO_UUID_RE.test(usuarioId))
+            return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+          scCols += ', COALESCE(k.n,0) AS k_historico, COALESCE(ka.n,0) AS k_activos';
+        }
+        var scSql;
+        var scParams = [];
+        if (usuarioId) {
+          scSql = 'SELECT ' + scCols
+            + ' FROM sink_acciones a'
+            + ' LEFT JOIN LATERAL (SELECT COUNT(*)::int AS n FROM sink_slots s'
+            + '   WHERE s.usuario_id = $1::uuid AND s.clave_accion = a.clave) k ON true'
+            + ' LEFT JOIN LATERAL (SELECT COUNT(*)::int AS n FROM sink_slots s'
+            + '   WHERE s.usuario_id = $1::uuid AND s.clave_accion = a.clave'
+            + '     AND s.activo = true) ka ON true'
+            + ' WHERE a.activo = true ORDER BY a.costo_base_xp';
+          scParams = [usuarioId];
+        } else {
+          scSql = 'SELECT ' + scCols
+            + ' FROM sink_acciones a WHERE a.activo = true ORDER BY a.costo_base_xp';
+        }
+        var scRows;
+        try {
+          scRows = await sql(scSql, scParams);
+        } catch (eSc) {
+          if (!esEsquemaFaltante(eSc)) throw eSc;
+          return responderSinkAusente(res, eSc, 'slot_catalogo');
+        }
+        var scSaldo = null;
+        if (usuarioId) {
+          var scU = await sql(
+            'SELECT (xp_total - xp_gastado_sinks) AS disponible FROM usuarios'
+            + ' WHERE id = $1::uuid',
+            [usuarioId]
+          );
+          scSaldo = scU.length ? red2(numXp(scU[0].disponible)) : null;
+        }
+        return res.status(200).json({
+          ok: true,
+          curva: {
+            alpha: SINK_ALPHA,
+            gamma: SINK_GAMMA,
+            formula: 'costo(k) = costo_base_xp * (1 + alpha * k) ^ gamma',
+            k: 'historico (COUNT(*) de slots comprados, activos o no)',
+            congelado: 'el precio pagado se congela en la fila comprada'
+          },
+          disponible_xp: scSaldo,
+          data: scRows.map(function(a) {
+            var o = {
+              clave: a.clave,
+              etiqueta: a.etiqueta,
+              costo_base_xp: red2(numXp(a.costo_base_xp)),
+              slot_max: Number(a.slot_max),
+              slot_max_activos: Number(a.slot_max_activos),
+              alpha: SINK_ALPHA,
+              gamma: SINK_GAMMA
+            };
+            if (usuarioId) {
+              var k = Number(a.k_historico) || 0;
+              var ka2 = Number(a.k_activos) || 0;
+              o.k_historico = k;
+              o.k_activos = ka2;
+              o.costo_proximo = red2(numXp(a.costo_base_xp)
+                * Math.pow(1 + SINK_ALPHA * k, SINK_GAMMA));
+              o.slot_index_proximo = k;
+              o.puede_comprar = k < o.slot_max && ka2 < o.slot_max_activos
+                && scSaldo !== null && scSaldo >= o.costo_proximo;
+            }
+            return o;
+          })
+        });
+      }
+
+      // ADR-086 / TSK-184: estado de slots del usuario (historico + capacidad).
+      // Solo LECTURA. solo_activos=1 filtra la vista de capacidad.
+      if (tipo === 'slot_mios') {
+        if (!usuarioId)
+          return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
+        if (!MERCADO_UUID_RE.test(usuarioId))
+          return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
+        var smSolo = String(req.query.solo_activos || '') === '1';
+        var smRows;
+        try {
+          smRows = await sql(
+            sinkPrecioCte()
+            + ' , sl AS ('
+            + '  SELECT s.id, s.clave_accion, s.ref_id, s.costo_pagado,'
+            + '   s.alpha_aplicado, s.gamma_aplicado, s.slot_index, s.activo,'
+            + '   s.creado_en'
+            + '  FROM sink_slots s'
+            + '  WHERE s.usuario_id = $1::uuid AND s.clave_accion = $2'
+            + (smSolo ? ' AND s.activo = true' : '')
+            + ' )'
+            + ' SELECT sl.id, sl.clave_accion, sl.ref_id, sl.costo_pagado,'
+            + '  sl.alpha_aplicado, sl.gamma_aplicado, sl.slot_index, sl.activo,'
+            + '  sl.creado_en, p.k_actual, p.k_activos, p.slot_max, p.slot_max_activos,'
+            + '  p.costo AS costo_siguiente'
+            + ' FROM sl, precio p ORDER BY sl.creado_en DESC LIMIT 200',
+            [usuarioId, String(req.query.clave || 'foto_galeria'), SINK_ALPHA, SINK_GAMMA]
+          );
+        } catch (eSm) {
+          if (!esEsquemaFaltante(eSm)) throw eSm;
+          return responderSinkAusente(res, eSm, 'slot_mios');
+        }
+        var smSaldo = await sql(
+          'SELECT (xp_total - xp_gastado_sinks) AS disponible FROM usuarios'
+          + ' WHERE id = $1::uuid',
+          [usuarioId]
+        );
+        return res.status(200).json({
+          ok: true,
+          usuario_id: usuarioId,
+          clave: String(req.query.clave || 'foto_galeria'),
+          solo_activos: smSolo,
+          disponible_xp: smSaldo.length ? red2(numXp(smSaldo[0].disponible)) : null,
+          data: smRows.map(function(r) {
+            return {
+              id: r.id,
+              clave: r.clave_accion,
+              ref_id: r.ref_id,
+              costo_pagado: red2(numXp(r.costo_pagado)),
+              alpha_aplicado: numXp(r.alpha_aplicado),
+              gamma_aplicado: numXp(r.gamma_aplicado),
+              slot_index: Number(r.slot_index),
+              activo: r.activo === true,
+              creado_en: r.creado_en,
+              k_historico: Number(r.k_actual) || 0,
+              k_activos: Number(r.k_activos) || 0,
+              slot_max: r.slot_max === null ? null : Number(r.slot_max),
+              slot_max_activos: r.slot_max_activos === null ? null : Number(r.slot_max_activos),
+              costo_siguiente: r.costo_siguiente === null
+                ? null : red2(numXp(r.costo_siguiente))
+            };
+          })
+        });
+      }
+
+      // ADR-086 / TSK-184: estado de la RAMPA de 30 dias del ranking compuesto.
+      // Solo LECTURA. El reloj es actualizado_en de la fila del CONTADOR
+      // (unico campo de fecha disponible), y el escritor idempotente que lo
+      // avanza vive en POST tipo=slot_rampa (fuera del camino caliente).
+      if (tipo === 'slot_rampa') {
+        var srCfg;
+        try {
+          srCfg = await sql(
+            'SELECT clave, valor, actualizado_en FROM gamificacion_config'
+            + ' WHERE clave IN (\'ranking_score_gamma\',\'ranking_score_gamma_inicio\','
+            + '  \'ranking_saldo_tope\')'
+          );
+        } catch (eSr) {
+          if (!esEsquemaFaltante(eSr)) throw eSr;
+          return responderSinkAusente(res, eSr, 'slot_rampa');
+        }
+        var srMap = {};
+        srCfg.forEach(function(r) { srMap[r.clave] = r; });
+        var srIni = srMap.ranking_score_gamma_inicio;
+        var srPeso = srMap.ranking_score_gamma;
+        var srTope = srMap.ranking_saldo_tope;
+        var srDias = 0;
+        if (srIni) {
+          var srDelta = Math.floor((Date.now() - new Date(srIni.actualizado_en).getTime())
+            / 86400000);
+          srDias = Math.max(0, Math.min(SINK_DIAS_RAMPA, srDelta));
+        }
+        return res.status(200).json({
+          ok: true,
+          dias_rampa: SINK_DIAS_RAMPA,
+          dias_transcurridos: srDias,
+          dias_en_config: srIni ? numXp(srIni.valor) : null,
+          peso_configurado: srPeso ? numXp(srPeso.valor) : null,
+          saldo_tope: srTope ? numXp(srTope.valor) : null,
+          encendida: !!(srPeso && numXp(srPeso.valor) >= 1),
+          reloj: srIni ? srIni.actualizado_en : null
+        });
+      }
+
       return res.status(400).json({ ok: false, error: 'Par\u00e1metros insuficientes' });
     }
 
@@ -9495,7 +9799,7 @@ module.exports = async function handler(req, res) {
       // Enviar un DM. Gate P-4: remitente nivel >= 3, email verificado,
       // receptor distinto, texto 1..500. Bloqueo en CUALQUIER direccion
       // (usuario_bloqueos) -> 403. Hilo nuevo: cobra 20 XP al emisor con
-      // el patron atomico de comprar_consumible (WHERE xp_total >= 20) y
+      // el patron atomico de comprar_consumible (WHERE de disponible >= 20) y
       // devuelve nivel_anterior/nivel_nuevo/bajo_nivel; si el receptor
       // tiene dm_abierto=false y NO hay hilo previo -> 403 DM_CERRADO.
       // Tope 5 hilos nuevos/dia. Responder en un hilo abierto es gratis.
@@ -9563,20 +9867,28 @@ module.exports = async function handler(req, res) {
             return res.status(429).json({ ok: false, error: 'DM_LIMITE_DIARIO' });
           var dmNombre = 'DM ' + String(dmEmisor.nombre || 'Viajero').slice(0, 30);
           // Alta + cobro atomicos (patron comprar_consumible): el INSERT
-          // solo ocurre si xp_total >= 20 (CTE puede); el UPDATE de cobro
-          // REPITE el guard xp_total >= 20 (cierra la carrera de dos hilos
+          // solo ocurre si el disponible >= 20 (CTE puede); el UPDATE de cobro
+          // REPITE el guard de disponible >= 20 (cierra la carrera de dos hilos
           // nuevos concurrentes con 20-39 XP: el segundo UPDATE relee la
           // fila ya descontada y no deja xp negativo), solo si el INSERT
           // creo fila (CTE cobro con EXISTS nueva) y devuelve el xp_total
           // real para no recalcularlo en JS (dmXpAntes - 20).
+          // TSK-185 / ADR-086: los dos guards (puede y cobro) llevan los dos
+          // invariantes: el literal de siempre xp_total >= 20 (protege la
+          // columna del XP ganado, ADR-018) y el disponible acotado a 0
+          // (el saldo real, TSK-185). No abre la compra con 0: ambas
+          // comparan contra 20 (> 0), luego disponible 0 -> sin cobro -> 402.
           var dmNueva = await sql(
-            'WITH puede AS (SELECT id FROM usuarios WHERE id=$4 AND xp_total >= 20),'
+            'WITH puede AS (SELECT id FROM usuarios WHERE id=$4 AND xp_total >= 20'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= 20),'
             + ' nueva AS (INSERT INTO chat_salas (nombre, icono, descripcion, tipo, orden, creador_id, clave_dm)'
             + '   SELECT $1,$2,$3,\'dm\',0,$4,$5 FROM puede'
             + '   ON CONFLICT (clave_dm) WHERE tipo=\'dm\' AND clave_dm IS NOT NULL DO NOTHING'
             + '   RETURNING id),'
             + ' cobro AS (UPDATE usuarios SET xp_total = xp_total - 20'
-            + '   WHERE id=$4 AND xp_total >= 20 AND EXISTS (SELECT 1 FROM nueva) RETURNING xp_total)'
+            + '   WHERE id=$4 AND xp_total >= 20'
+            + '   AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= 20'
+            + '   AND EXISTS (SELECT 1 FROM nueva) RETURNING xp_total)'
             + ' SELECT (SELECT id FROM nueva) AS sala_id, (SELECT xp_total FROM cobro) AS xp_total',
             [dmNombre, '\uD83D\uDCAC', 'Mensajeria directa', usuarioId2, dmClave]
           );
@@ -11300,7 +11612,7 @@ module.exports = async function handler(req, res) {
         var ccPrecio = ccDescPct > 0
           ? red2(ccPrecioBase * (100 - ccDescPct) / 100)
           : ccPrecioBase;
-        var ccUsr = await sql('SELECT xp_total, capacidades, nivel_max FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
+        var ccUsr = await sql('SELECT xp_total, COALESCE(xp_gastado_sinks, 0) AS xp_gastado_sinks, capacidades, nivel_max FROM usuarios WHERE id=$1', [usuarioId2]).catch(function(){ return []; });
         if (!ccUsr.length)
           return res.status(404).json({ ok: false, error: 'No encontrado' });
         // Gate de era (ADR-056): compra exclusiva por era. El item solo se
@@ -11313,9 +11625,15 @@ module.exports = async function handler(req, res) {
           if (ccEraUsuario !== ccEraItem)
             return res.status(403).json({ ok: false, error: 'ERA_INSUFICIENTE', era_requerida: ccEraItem, era_actual: ccEraUsuario });
         }
+        // ccXp es el XP GANADO (almacen): alimenta el nivel, que se deriva de
+        // xp_total y jamas de lo gastado (ADR-018). ccDisp es el DISPONIBLE
+        // (display + predicado, TSK-185 / ADR-086): acotado a 0 y con el
+        // gasto de sumidero ya descontado. El clamp no habilita la compra
+        // con 0 porque la comparacion es contra ccPrecio.
         var ccXp = numXp(ccUsr[0].xp_total);
-        if (ccXp < ccPrecio)
-          return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_total: red2(ccXp), precio: ccPrecio });
+        var ccDisp = Math.max(ccXp - numXp(ccUsr[0].xp_gastado_sinks), 0);
+        if (ccDisp < ccPrecio)
+          return res.status(409).json({ ok: false, error: 'XP insuficiente', xp_disponible: red2(ccDisp), xp_total: red2(ccXp), precio: ccPrecio });
         // Anti-farming: max 5 compras por dia por usuario
         var ccCount = await sql(
           "SELECT COUNT(*)::int AS n FROM compra_consumibles WHERE usuario_id=$1 AND creado_en > NOW() - INTERVAL '1 day'",
@@ -11329,13 +11647,14 @@ module.exports = async function handler(req, res) {
           return res.status(409).json({ ok: false, error: 'Ya tienes un amuleto x2 activo' });
         var ccNivelAnt = calcularNivelLocal(ccXp).nivel;
         // Resta atomica + merge del inventario (nunca deja xp negativo:
-        // el WHERE xp_total >= $1 protege la escritura)
+        // el WHERE de disponible >= $1 protege la escritura)
         var ccUpd = await sql(
           'UPDATE usuarios SET xp_total = xp_total - $1,'
           + " capacidades = COALESCE(capacidades,'{}'::jsonb)"
           + " || jsonb_build_object('consumibles', COALESCE(capacidades->'consumibles','{}'::jsonb)"
           + ' || jsonb_build_object($2, COALESCE((capacidades->\'consumibles\'->>$2)::int, 0) + 1))'
-          + ' WHERE id=$3 AND xp_total >= $1 RETURNING xp_total',
+          + ' WHERE id=$3 AND xp_total >= $1'
+          + ' AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $1 RETURNING xp_total',
           [ccPrecio, ccClave, usuarioId2]
         ).catch(function(){ return []; });
         if (!ccUpd.length)
@@ -12634,7 +12953,7 @@ module.exports = async function handler(req, res) {
             return res.status(409).json({ ok: false, error: 'OFERTA_NO_DISPONIBLE', estado: cbcOf[0].estado });
           if (Number(cbcOf[0].cantidad_restante) < cbcCant)
             return res.status(409).json({ ok: false, error: 'CANTIDAD_INSUFICIENTE' });
-          cbcUsr = await sql('SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [cbcUid]);
+          cbcUsr = await sql('SELECT xp_total, COALESCE(xp_gastado_sinks, 0) AS xp_gastado_sinks FROM usuarios WHERE id=$1::uuid LIMIT 1', [cbcUid]);
         } catch (eCbcP) {
           if (!esEsquemaFaltante(eCbcP)) throw eCbcP;
           return responderCartasMercadoAusente(res, eCbcP, 'carta_comprar');
@@ -12643,10 +12962,17 @@ module.exports = async function handler(req, res) {
           return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
         var cbcPrecio = red2(numXp(cbcOf[0].precio_xp));
         var cbcSubtotal = red2(cbcPrecio * cbcCant);
-        if (numXp(cbcUsr[0].xp_total) < cbcSubtotal)
+        // TSK-185 / ADR-086: el predicado y su display usan el DISPONIBLE acotado a
+        // 0 (xp_total menos lo comprometido en sumideros). 0 >= cbcSubtotal
+        // es falso para cualquier subtotal > 0, luego el borde exacto en 0
+        // rechaza igual que un disponible negativo. xp_total se sigue
+        // reportando aparte porque es el XP ganado (ADR-018).
+        var cbcDisp = Math.max(numXp(cbcUsr[0].xp_total) - numXp(cbcUsr[0].xp_gastado_sinks), 0);
+        if (cbcDisp < cbcSubtotal)
           return res.status(400).json({
             ok: false, error: 'PUNTOS_INSUFICIENTES',
-            requerido: cbcSubtotal, xp_actual: red2(numXp(cbcUsr[0].xp_total))
+            requerido: cbcSubtotal, xp_actual: red2(cbcDisp),
+            xp_total: red2(numXp(cbcUsr[0].xp_total))
           });
 
         var cbcRes;
@@ -12659,9 +12985,12 @@ module.exports = async function handler(req, res) {
             + '  AND (expira_en IS NULL OR expira_en > NOW())'
             + '), ok_xp AS ('
             + ' SELECT id FROM usuarios WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $4::numeric'
             + '), debit AS ('
             + ' UPDATE usuarios SET xp_total = xp_total - $4::numeric'
-            + ' WHERE id=$3::uuid AND xp_total >= $4::numeric AND EXISTS (SELECT 1 FROM ok_oferta)'
+            + ' WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $4::numeric'
+            + '  AND EXISTS (SELECT 1 FROM ok_oferta)'
             + ' RETURNING xp_total'
             + '), dec AS ('
             + ' UPDATE cartas_ofertas SET cantidad_restante = cantidad_restante - $2::int,'
@@ -12835,6 +13164,7 @@ module.exports = async function handler(req, res) {
               'WITH debito AS ('
               + ' UPDATE usuarios SET xp_total = xp_total - $3::numeric'
               + ' WHERE id=$1::uuid AND xp_total >= $3::numeric'
+              + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $3::numeric'
               + ' RETURNING xp_total'
               + '), ins AS ('
               + ' INSERT INTO moneda_mercado (vendedor_id, tipo_orden, cantidad,'
@@ -13401,12 +13731,14 @@ module.exports = async function handler(req, res) {
             + ' AND expira_en > NOW() AND cantidad_restante >= $2::int'
             + '), ok_xp AS ('
             + ' SELECT id FROM usuarios WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $4::numeric'
             + '), debit AS ('
             + ' UPDATE usuarios SET xp_total = xp_total - $4::numeric,'
             + ' capacidades = COALESCE(capacidades,\'{}\'::jsonb)'
             + '  || jsonb_build_object(\'consumibles\', COALESCE(capacidades->\'consumibles\',\'{}\'::jsonb)'
             + '  || jsonb_build_object($5::text, COALESCE((capacidades->\'consumibles\'->>$5::text)::int,0) + $2::int))'
             + ' WHERE id=$3::uuid AND xp_total >= $4::numeric'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $4::numeric'
             + '  AND EXISTS(SELECT 1 FROM ok_oferta) RETURNING xp_total'
             + '), dec AS ('
             + ' UPDATE mercado_ofertas SET cantidad_restante = cantidad_restante - $2::int,'
@@ -13576,7 +13908,9 @@ module.exports = async function handler(req, res) {
         var mrCosto = red2(numXp(mrCons[0].precio_xp_base) * mrCant);
         var mrUpd = await sql(
           'UPDATE usuarios SET xp_total = xp_total - $1::numeric'
-          + ' WHERE id=$2::uuid AND xp_total >= $1::numeric RETURNING xp_total',
+          + ' WHERE id=$2::uuid AND xp_total >= $1::numeric'
+          + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $1::numeric'
+          + ' RETURNING xp_total',
           [mrCosto, mrUid]
         );
         if (!mrUpd.length)
@@ -13637,9 +13971,12 @@ module.exports = async function handler(req, res) {
           cfRes = await sql(
             'WITH ok_xp AS ('
             + ' SELECT id FROM usuarios WHERE id=$1::uuid AND xp_total >= $2::numeric'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $2::numeric'
             + '), debit AS ('
             + ' UPDATE usuarios SET xp_total = xp_total - $2::numeric'
-            + ' WHERE id=$1::uuid AND xp_total >= $2::numeric RETURNING xp_total'
+            + ' WHERE id=$1::uuid AND xp_total >= $2::numeric'
+            + '  AND GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= $2::numeric'
+            + ' RETURNING xp_total'
             + '), contrato AS ('
             + ' INSERT INTO contratos_p2p (empleador_id, tipo_encargo, recompensa_xp,'
             + ' descripcion, destino_id, expira_en)'
@@ -14601,6 +14938,277 @@ module.exports = async function handler(req, res) {
         var retoRating = await progresarPandillaRetos(sql, usuarioId2, 'visita');
 
         return res.status(200).json({ ok: true, xp: xpRatingFinal, xp_detalle: armarXpDetalle(XP_BASES.rating, resRating, 0), misiones: misionesRating, logros: logrosRating, cromo: cromoRating || undefined, amuleto_x2: amuletoRating.doubled || undefined, reto_completado: retoRating || null });
+      }
+
+      // =====================================================================
+      // ADR-086 / TSK-184: los 4 XP sinks. Compra atomica (ADR-055), sin
+      // tocar xp_total (ADR-018), con el precio congelado en la fila comprada.
+      // =====================================================================
+
+      // COMPRAR UN SLOT. UNA sola sentencia con CTE (ADR-055): si el UPDATE de
+      // usuarios no califica (cualquiera de los 3 topes), no hay debit, luego
+      // el INSERT de sink_slots y el INSERT de xp_ledger -- que ambos leen
+      // FROM debit -- no reciben filas y NO ocurre nada. Es al reves del
+      // patron dangerous: aqui la garantia y el gasto son la misma sentencia.
+      //
+      // TRES TOPES, todos en el MISMO WHERE (no hay ventana en que uno pase y
+      // otro no, ADR-086 seccion 1-bis.3):
+      //   (1) TOPE_HISTORICO: k = COUNT(*) < slot_max (precio y drenaje)
+      //   (2) TOPE_ACTIVOS:   k_activos = COUNT(*) WHERE activo < slot_max_activos
+      //   (3) XP_INSUFICIENTE: (xp_total - xp_gastado_sinks) >= costo
+      //
+      // ADR-018 INVARIANTE: se debita xp_gastado_sinks, NUNCA xp_total. El
+      // nivel es MONOTONO y el disponible es NO CRECIENTE.
+      if (tipo2 === 'slot_comprar') {
+        var slSes = usuarioDeSesion(req);
+        if (!slSes.ok) return responderSesion(res, slSes.razon);
+        var slUid = slSes.usuario_id;
+        var slClave = String(body.clave || '').trim();
+        if (SINK_CLAVES.indexOf(slClave) === -1)
+          return res.status(400).json({
+            ok: false, error: 'clave invalida',
+            claves_validas: SINK_CLAVES
+          });
+        var slRef = body.ref_id === undefined || body.ref_id === null
+          ? null : String(body.ref_id).trim().slice(0, 200) || null;
+        var slSql;
+        var slParams;
+        try {
+          slSql = sinkPrecioCte()
+            + ', debit AS ('
+            // B1: se debita xp_gastado_sinks, NUNCA xp_total. El nivel NO se
+            // mueve. La fila de usuarios que se toca es la MISMA de antes:
+            // coste marginal 0.
+            + ' UPDATE usuarios u'
+            + '  SET xp_gastado_sinks = u.xp_gastado_sinks + p.costo'
+            + ' FROM precio p'
+            + ' WHERE u.id = $1::uuid'
+            + '  AND p.k_actual  < p.slot_max'
+            + '  AND p.k_activos < p.slot_max_activos'
+            + '  AND (u.xp_total - u.xp_gastado_sinks) >= p.costo'
+            + ' RETURNING (u.xp_total - u.xp_gastado_sinks) AS disponible_restante,'
+            + '  u.xp_total AS xp_total, u.xp_gastado_sinks, p.costo,'
+            + '  p.k_actual, p.k_activos, p.slot_max, p.slot_max_activos'
+            + '), ins AS ('
+            // slot_index es el k HISTORICO congelado (no el activo): es el
+            // precio que se esta cobrando en ESTA fila.
+            + ' INSERT INTO sink_slots'
+            + '  (usuario_id, clave_accion, ref_id, costo_pagado,'
+            + '   alpha_aplicado, gamma_aplicado, slot_index)'
+            + ' SELECT $1::uuid, $2, $5, d.costo, $3::numeric, $4::numeric, d.k_actual'
+            + ' FROM debit d'
+            + ' RETURNING id, slot_index, costo_pagado'
+            + '), led AS ('
+            // es_exento = true EXPLICITO: un sink no EMITE XP, lo MUEVE. Sin
+            // esto heredaria false y se contaria como XP ganado en el
+            // agregado canonico de emision (SUM(xp_final) WHERE es_exento=false).
+            // mult_origen = 1.0 explicito: es NOT NULL y el ADR lista las 12
+            // columnas a mano en vez de apoyarse en DEFAULTs.
+            + ' INSERT INTO xp_ledger'
+            + '  (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
+            + '   mult_final, cap_aplicado, bonos_planos, xp_final, es_exento,'
+            + '   mult_origen, origen_tier, contexto, creado_en)'
+            + ' SELECT $1::uuid, \'sink_\' || $2, -d.costo, 1.0, 1.0, 1.0,'
+            + '  \'accion\', 0, -d.costo, true, 1.0, NULL,'
+            + '  jsonb_build_object(\'slot\', d.k_actual,'
+            + '    \'slot_activo\', d.k_activos, \'ref_id\', $5,'
+            + '    \'costo_base_pagado\', d.costo,'
+            + '    \'disponible_restante\', d.disponible_restante),'
+            + '  NOW()'
+            + ' FROM debit d'
+            + ' RETURNING id'
+            + ')'
+            + ' SELECT (SELECT disponible_restante FROM debit) AS disponible_restante,'
+            + '  (SELECT xp_total FROM debit) AS xp_total,'
+            + '  (SELECT xp_gastado_sinks FROM debit) AS xp_gastado_sinks,'
+            + '  (SELECT costo FROM debit) AS costo,'
+            + '  (SELECT k_actual FROM debit) AS k_actual,'
+            + '  (SELECT k_activos FROM debit) AS k_activos,'
+            + '  (SELECT slot_max FROM debit) AS slot_max,'
+            + '  (SELECT slot_max_activos FROM debit) AS slot_max_activos,'
+            + '  (SELECT id::text FROM ins) AS slot_id,'
+            + '  (SELECT slot_index FROM ins) AS slot_index,'
+            + '  (SELECT costo_pagado FROM ins) AS costo_congelado,'
+            + '  (SELECT id FROM led) AS ledger_id';
+          slParams = [slUid, slClave, SINK_ALPHA, SINK_GAMMA, slRef];
+          var slRes = await sql(slSql, slParams);
+        } catch (eSl) {
+          if (!esEsquemaFaltante(eSl)) throw eSl;
+          return responderSinkAusente(res, eSl, 'slot_comprar');
+        }
+        var slR = slRes[0] || {};
+        if (!slR.slot_id) {
+          // Rechazo. El motivo se NOMBRA con una lectura posterior, para no
+          // meterla dentro de la sentencia atomica.
+          var slD = await sinkDiagnosticar(sql, slUid, slClave);
+          var slMot = sinkMotivos(slD);
+          var slSt = slMot.indexOf('XP_INSUFICIENTE') !== -1 ? 402 : 409;
+          return res.status(slSt).json({
+            ok: false,
+            error: slMot[0],
+            topes_bloqueados: slMot,
+            clave: slClave,
+            costo_requerido: red2(numXp(slD.costo)),
+            disponible_xp: slD.disponible === null
+              ? null : red2(numXp(slD.disponible)),
+            k_historico: Number(slD.k_historico) || 0,
+            k_activos: Number(slD.k_activos) || 0,
+            slot_max: slD.slot_max === null ? null : Number(slD.slot_max),
+            slot_max_activos: slD.slot_max_activos === null
+              ? null : Number(slD.slot_max_activos)
+          });
+        }
+        return res.status(200).json({
+          ok: true,
+          slot_id: slR.slot_id,
+          clave: slClave,
+          ref_id: slRef,
+          // PRECIO CONGELADO: lo que se pago, no lo que costaria manana.
+          costo_pagado: red2(numXp(slR.costo_congelado)),
+          slot_index: Number(slR.slot_index),
+          alpha_aplicado: SINK_ALPHA,
+          gamma_aplicado: SINK_GAMMA,
+          k_historico: Number(slR.k_actual) || 0,
+          k_activos: Number(slR.k_activos) || 0,
+          slot_max: slR.slot_max === null ? null : Number(slR.slot_max),
+          slot_max_activos: slR.slot_max_activos === null ? null : Number(slR.slot_max_activos),
+          // INVARIANTE ADR-018: xp_total NO se movio. Se devuelve para que el
+          // cliente pueda assertarlo sin una segunda consulta.
+          xp_total: red2(numXp(slR.xp_total)),
+          xp_gastado_sinks: red2(numXp(slR.xp_gastado_sinks)),
+          disponible_restante: red2(numXp(slR.disponible_restante)),
+          nivel_movido: false,
+          ledger_id: slR.ledger_id === null ? null : Number(slR.ledger_id)
+        });
+      }
+
+      // DAR DE BAJA UN SLOT (ADR-003). UPDATE activo=false y NADA MAS: no
+      // DELETE, y NO se devuelve XP (ADR-086 seccion 1-bis.2: un sink que
+      // devuelve es un banco). El XP gastado se queda gastado, el disponible no
+      // baja y el nivel no se pierde. La capacidad SI se recupera, que es lo
+      // que distingue este tope del historico.
+      if (tipo2 === 'slot_baja') {
+        var sbSes = usuarioDeSesion(req);
+        if (!sbSes.ok) return responderSesion(res, sbSes.razon);
+        var sbUid = sbSes.usuario_id;
+        var sbId = String(body.slot_id || '').trim();
+        if (!MERCADO_UUID_RE.test(sbId))
+          return res.status(400).json({ ok: false, error: 'slot_id invalido' });
+        var sbRes;
+        try {
+          sbRes = await sql(
+            'UPDATE sink_slots SET activo = false'
+            + ' WHERE id = $1::uuid AND usuario_id = $2::uuid AND activo = true'
+            + ' RETURNING id, clave_accion, slot_index, costo_pagado',
+            [sbId, sbUid]
+          );
+        } catch (eSb) {
+          if (!esEsquemaFaltante(eSb)) throw eSb;
+          return responderSinkAusente(res, eSb, 'slot_baja');
+        }
+        if (!sbRes.length) {
+          var sbChk = await sql(
+            'SELECT id, activo FROM sink_slots WHERE id = $1::uuid AND usuario_id = $2::uuid',
+            [sbId, sbUid]
+          ).catch(function() { return []; });
+          if (!sbChk.length)
+            return res.status(404).json({ ok: false, error: 'SLOT_NO_ENCONTRADO' });
+          return res.status(409).json({ ok: false, error: 'SLOT_YA_DADO_DE_BAJA' });
+        }
+        return res.status(200).json({
+          ok: true,
+          slot_id: sbRes[0].id,
+          clave: sbRes[0].clave_accion,
+          slot_index: Number(sbRes[0].slot_index),
+          activo: false,
+          // Traza explicita de la decision economica: el XP NO vuelve.
+          costo_pagado: red2(numXp(sbRes[0].costo_pagado)),
+          xp_devuelto: 0,
+          capacidad_recuperada: true,
+          nota: 'dar de baja un slot no devuelve XP (ADR-086 1-bis.2)'
+        });
+      }
+
+      // ESCRITOR DE LA RAMPA DE 30 DIAS (ADR-086 seccion 4). Idempotente POR
+      // CONSTRUCCION: el valor destino es GREATEST(estado, reloj) acotado a 30,
+      // una funcion MONOTONA NO DECRECIENTE, luego N ejecuciones concurrentes
+      // convergen al mismo valor. NO es un +=: un 'valor + dias' aplicado N
+      // veces avanza la rampa N veces mas rapido.
+      //
+      // FUERA DEL CAMINO CALIENTE a proposito: esto NO se llama desde
+      // ?tipo=slot_rampa (que es solo lectura) ni desde el ranking. Se llama
+      // desde el script de mantenimiento del despliegue. Cablearlo en el
+      // UPDATE que lee la config en cada peticion de ranking seria una
+      // ESCRITURA en una ruta de solo lectura del endpoint mas caliente, y
+      // su peor modo de fallo es que deje de correr y la rampa se quede a
+      // medias sin que nadie se entere.
+      //
+      // El reloj es actualizado_en de la PROPIA fila del contador y este
+      // UPDATE NO la toca (deliberado): si se actualizara, el contador se
+      // congelaria en el dia de la escritura. Y no se usa una fecha semilla
+      // del deploy porque entonces "dias transcurridos" seria funcion del
+      // numero de despliegues.
+      if (tipo2 === 'slot_rampa_avanzar') {
+        var sraBearer = (req.headers.authorization || '').slice(7).trim();
+        var sraAdmin = sraBearer
+          && sraBearer === (process.env.ADMIN_SECRET || 'exploraco12345');
+        if (!sraAdmin) {
+          return res.status(403).json({
+            ok: false,
+            error: 'SOLO_ADMIN',
+            nota: 'el escritor de la rampa es una operacion de mantenimiento'
+          });
+        }
+        var sraRes;
+        try {
+          sraRes = await sql(
+            // (1) CONTADOR: GREATEST(estado, reloj), acotado a 30.
+            //     actualizado_en NO se toca (ver nota del bloque).
+            'WITH c AS ('
+            + ' UPDATE gamificacion_config'
+            + '  SET valor = LEAST('
+            + '    ' + SINK_DIAS_RAMPA + ','
+            + '    GREATEST('
+            + '      COALESCE(valor, 0),'
+            + '      GREATEST(0, CURRENT_DATE - COALESCE(actualizado_en::date, CURRENT_DATE))'
+            + '    )'
+            + '  )'
+            + ' WHERE clave = \'ranking_score_gamma_inicio\''
+            + ' RETURNING valor'
+            + '), w AS ('
+            // (2) PESO: 1.0000 una vez alcanzado el tope. Fila explicita que
+            //     dice "ya termino", no el paso del tiempo.
+            + ' UPDATE gamificacion_config'
+            + '  SET valor = 1.0000, actualizado_en = NOW()'
+            + ' WHERE clave = \'ranking_score_gamma\''
+            + '  AND COALESCE((SELECT valor FROM gamificacion_config'
+            + '    WHERE clave = \'ranking_score_gamma_inicio\'), 0) >= '
+            + SINK_DIAS_RAMPA
+            + ' RETURNING valor'
+            + ')'
+            + ' SELECT (SELECT valor FROM c) AS dias_contador,'
+            + '  (SELECT valor FROM w) AS peso_activado,'
+            + '  (SELECT valor FROM gamificacion_config'
+            + '    WHERE clave = \'ranking_score_gamma\') AS peso,'
+            + '  (SELECT valor FROM gamificacion_config'
+            + '    WHERE clave = \'ranking_score_gamma_inicio\') AS dias',
+            []
+          );
+        } catch (eSra) {
+          if (!esEsquemaFaltante(eSra)) throw eSra;
+          return responderSinkAusente(res, eSra, 'slot_rampa_avanzar');
+        }
+        var sraR = sraRes[0] || {};
+        return res.status(200).json({
+          ok: true,
+          dias_rampa_max: SINK_DIAS_RAMPA,
+          dias_contador: sraR.dias_contador === null
+            ? null : red2(numXp(sraR.dias_contador)),
+          dias: sraR.dias === null ? null : red2(numXp(sraR.dias)),
+          peso: sraR.peso === null ? null : red2(numXp(sraR.peso)),
+          peso_activado_hoy: sraR.peso_activado !== null,
+          idempotente: true
+        });
       }
 
       return res.status(400).json({ ok: false, error: 'tipo no implementado: ' + tipo2 });
