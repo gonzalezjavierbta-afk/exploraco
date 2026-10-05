@@ -6129,3 +6129,212 @@ Y el tercer elemento del pedido: **notificar al usuario de que se ha desbloquead
 - **ADR-084** (el argumento de esta parte vive **una sola vez aqui**; `TASKS.md`, `NEXT.md`, `BLUEPRINT.md` y el cuerpo de ADR-061 **solo apuntaban**)
 
 ---
+
+## ADR-087: El registro de migraciones (`schema_migrations`) es un contrato de 6 decisiones, no un fichero de housekeeping -- RLS desactivado, predecesor por ficheros EN DISCO, niveles de confianza y deriva resuelta por el script; y el limite de plataforma que hizo IMPOSIBLE el dry-run por HTTP
+
+**ID:** ADR-087
+**Fecha:** 2026-10-05
+**Autor:** Chief Architect (`@architect`), por **aprobacion explicita del operador** ("continuar") emitida tras el aviso de gate de arquitectura, presentado como **TSK-189**.
+**Estado:** **ACEPTADO (2026-10-05).** Describe un estado **ya ejecutado y verificado en Neon**; este ADR **no programa** trabajo, **documenta** el que ya se hizo. D1-D4 son norma vigente; D5 (limite de plataforma) es norma para todo script que hable con Neon; D6 fija un contrato de exit codes.
+**Numeracion:** verificada con `Select-String -Pattern "^## ADR-0"` sobre el archivo real (ADR-006): el mayor ADR registrado es **ADR-086** (linea **5.121**) y **087** es el siguiente consecutivo libre. Comprobado ademas que **no hay saltos ni duplicados**: los titulos covers 001..087 salvo el 005, que nunca existio. `DECISIONS.md` medido hoy: **946.117 bytes / 923,9 KB / 6.131 lineas**, **40 fences** (par, verificado antes de escribir).
+**Alcance:** este ADR toca **un solo fichero**, `exploraco desarrollo/DECISIONS.md` (+1 seccion al final). **NO** edita `db/migrations/045_schema_migrations.sql`, **NO** edita `scripts/apply_sql_file.js`, **NO** edita `scripts/verificar_migraciones_prod.js`, **NO** crea ficheros, **NO** aplica SQL. La razon de no borrar el argumento del `.sql` esta en "Pendiente que argument queda en el SQL".
+**Fuente unica (ADR-084 D1):** el argumento de las **6 decisiones** de este ADR vive **una sola vez, aqui**. Los ficheros que las implementan son **implementacion**: describen **que hacen**, no **por que**.
+
+### Por que este ADR llega tarde, y por que eso no lo invalida
+
+La `045` esta **aplicada y verificada en Neon** desde antes de que existiera este ADR. Es un incumplimiento de proceso, no un error de diseno: el argumento se escribio en el sitio equivocado (**comentarios del `.sql`**) y por eso **nadie mas puede auditarlo sin abrir el SQL**.
+
+La consecuencia practica de la copia ilegal, medida: las 6 decisiones son **argumento de arquitectura** (por que RLS apagado y por que eso no es una garantia; por que la regla de predecesor no puede vivir en la base de datos; por que 41 filas dicen "no se"). Un argumento de arquitectura en un comentario de `.sql` no tiene autor, ni fecha, ni estado, ni veredicto de revision, y **no aparece en ninguna busqueda de decisiones**. Se paga en auditoria, no en ejecucion.
+
+**Este ADR no reescribe el `.sql` y por dos razones**, ambas estructurales:
+- **ADR-003 (Cero Borrado Logico).** Borrar un argumento ya escrito y publicado es exactamente el borrado que esa regla prohibe, aunque el "borrado" sea de texto.
+- **El `.sql` es un artefacto versionado y su contenido es parte de su checksum.** Un cambio de texto cambia `checksum` y crearia una **deriva** (D4) sobre un fichero ya aplicado.
+
+### Baseline verificado (ADR-006) -- medido en este turno contra el archivo real
+
+| Hecho | Valor medido | Como |
+|---|---|---|
+| Ficheros `.sql` en `db/migrations/` | **43** (`003`..`045`) | `Get-ChildItem db\migrations -Filter *.sql` |
+| Numeros ausentes en `1..45` | **1, 2** | comparacion de conjunto |
+| Contiguidad | **NO es contigua** (faltan 001 y 002) | idem |
+| `045_schema_migrations.sql` | **24.945 bytes**, **0** bytes > 127, **0** backticks | lectura byte a byte (ADR-002) |
+| `scripts/apply_sql_file.js` | **840 lineas**; contrato de exit codes en `:58-63` | lectura por rango |
+| Runner: ejecucion | sentencia a sentencia con `await sql(s)`, `for` en `:345-348` | lectura por rango |
+| Runner: dry-run | **rechazado** por la puerta del predecesor, exit **1** | `:58-61` |
+| Tabla `schema_migrations` en Neon | **43 filas**; `aplicada`+`verificada_en` = **1** (044); `aplicada` sin verificar = **1** (045); `historico_no_verificado` = **41**; `failida` = **0** | estado declarado por el operador tras la aplicacion |
+| Derivaciones detectadas | **0** de 43 filas; probada en positivo con un checksum `0000...`: detectada, reportada, **exit 1**, checksum almacenado **intacto** | idem |
+| Puertas del predecesor | **046 aceptado** (43 predecesores, 43 con fila); **047 rechazado** con `exit 1` nombrando `sin_fila: ["046_probe_ledger.sql"]` | idem |
+| Restricciones de la tabla | **6/6 CHECK** (`_nombre_chk`, `_numero_chk`, `_resultado_chk`, `_checksum_chk`, `_duracion_chk`, `_estado_chk`), **PRIMARY KEY (nombre)**, **3/3 indices** | idem |
+| `DROP`/`DELETE`/`TRUNCATE`/`UPDATE` ejecutables en el fichero | **0** | lectura por rango |
+| RLS en la tabla | `relrowsecurity=false`, `relforcerowsecurity=false` | idem |
+| Llamadas programaticas a `apply_sql_file.js` | **0** (9 coincidencias, todas comentario o uso documentado) | `Select-String` en `scripts/*.js`, `api/*.js`, `*.html`, `*.json` |
+
+### Decision D1 -- RLS DESACTIVADO, y es una decision **revocable**
+
+**Decision:** `045` deja `relrowsecurity=false` **de forma explicita y visible en el esquema** (`ALTER TABLE ... DISABLE ROW LEVEL SECURITY`, idempotente por naturaleza). **No hay politica, no hay `FORCE`, y no se anade ninguna.**
+
+Tres razones, y las tres son necesarias -- con dos la decision seria incorrecta:
+
+1. **La tecnica: sin `FORCE`, el RLS no aplica al propietario de la tabla, que es el rol con el que entra el runner.** Activar RLS aqui, sin `FORCE`, **no habria protegido nada** y habria creado la sensacion de proteccion: un `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` que parece cerrar la puerta y no la cierra. **Eso es seguridad falsa**, y es peor que no hacer nada porque alguien dejara de mirar.
+2. **Con `FORCE`, bloquearia a los unicos clientes legitimos de la tabla**, que son los scripts de mantenimiento (conectan con `DATABASE_URL`). `FORCE` es la unica forma de que el RLS aplique al propietario, luego `FORCE` y "los scripts pueden leer" son incompatibles por construccion.
+3. **La de superficie: no hay cliente no confiable al que excluir.** El presupuesto de Vercel esta en **8/8 funciones serverless agotadas**: esta tabla **no puede exponerse** por endpoint nuevo y **ningun `api/*.js` la lee** (verificado sobre el archivo real). Sin lector no confiable, no hay a quien proteger.
+
+**Por que el contenido no es sensible:** lo que la tabla guarda es un **nombre de fichero**, un **sha256**, **dos timestamps**, un **entero de duracion** y un campo de texto. **No hay credenciales, ni PII, ni datos de negocio.**
+
+**Contrato adicional, vinculante:** el campo `notas` **NO** debe recibir jamas la `DATABASE_URL`, ni tokens, ni contenido de filas. Un agente que lea una nota no debe tener acceso a datos que la tabla no tiene por que conocer.
+
+**Revocabilidad (declarada, no teorica):** esta decision esta **atada al supuesto "ningun endpoint lee la tabla"**. Si algun dia se abre una rama `?tipo=` que la consulte, **esta decision se revoca en el mismo cambio** y la revocacion es **obligatoria**, no opcional: hay que activar RLS **junto a una politica** (activar RLS sin politica es el fallo de la razon 1). El `ALTER ... DISABLE ROW LEVEL SECURITY` queda en el esquema precisamente para que la decision sea **durable y visible en Neon**, y no una nota que se pierde al apagar la sesion.
+
+### Decision D2 -- La regla de predecesor se apoya en los FICHEROS EN DISCO, no en un rango inventado
+
+**Decision (en una linea):** antes de aplicar la N, **todo `.sql` con numero menor que N que exista en disco** debe tener fila con resultado `aplicada` o `historico_no_verificado`, **y** el numero N-1 debe existir. `'fallida'` **no** cuenta como prueba: una migracion a medias es un hueco de verdad, del mismo tipo que no tener fila.
+
+**El hecho medido que obliga a esta forma:** `db/migrations/` tiene **43 ficheros** y **NO es contigua: faltan `001` y `002`**. Una regla de serie contigua desde 1 **invalidaria el historico entero** y obligaria a fabricar dos migraciones que no existen. La unidad de comparacion es **el fichero que esta en disco**, no un rango numerico: `001` y `002` no estan en disco, luego no son predecesores de nadie y su ausencia **no invalida `003`**.
+
+**Por que vive en el SCRIPT y no en la base de datos -- y esta es la parte que hay que entender, no memorizar:**
+
+- Un **`CHECK`** solo puede mirar **la fila que se inserta**, nunca las vecinas. Una constraint de precedencia es **estructuralmente inexpresable** en un `CHECK`.
+- Un **trigger** si podria mirar otras filas, y por eso es la opcion que parece disponible. Se descarta por un motivo concreto: **es DDL que puede fallar a medias**, que es exactamente el fallo que esta tabla existe para evitar (una migracion de varias sentencias no es atomica; si la sentencia 3 de 7 falla, las 2 primeras ya quedaron aplicadas).
+
+**Comprobado en los dos sentidos, que es lo que hace la regla creible y no declarativa:** el **046 se acepta** (43 predecesores en disco, 43 con fila) y el **047 se rechaza con `exit 1` nombrando `sin_fila: ["046_probe_ledger.sql"]`**. Una puerta que solo se ha probado bloqueando no esta probada.
+
+**Deuda de escala asumida:** el numero sale del **prefijo de tres caracteres del nombre**, con cero a la izquierda, asi que `numero = substring(nombre, 1, 3)::smallint` y no hay que adivinar nada. Ese parsing **degrada al llegar a 1000 migraciones** (el prefijo dejaria de ser de tres digitos). No es un problema real hoy -- con **43** ficheros, el techo de tres digitos esta a **957 migraciones** de incumplirse.
+
+### Decision D3 -- Niveles de confianza: `verificada_en` separa lo **afirmado** de lo **verificado**
+
+**Decision:** la columna `verificada_en` es la que separa "se ejecuto" de "se ejecuto **y alguien lo comprobo**". Sin ella, `aplicada` seria una palabra vacia. Cuatro niveles, de mas a menos confianza:
+
+| Nivel | Condicion | Que se puede leer |
+|---|---|---|
+| **ALTA** | `resultado='aplicada'` **y** `verificada_en IS NOT NULL` | La unica fila que se puede leer como "**esta en Neon**" |
+| **MEDIA** | `resultado='aplicada'` y `verificada_en IS NULL` | Testimonio del runner. **No** un hecho verificado |
+| **CERO** | `resultado='historico_no_verificado'` | El estado real en Neon es **DESCONOCIDO**. No afirma nada |
+| **NULA** | `resultado='failida'` | La fila es un **incidente**, no un estado: hay que mirar el SQLSTATE |
+
+**El caso interesante es esta misma migracion:** la `045` **se autoregistra**, y nace con fila propia de confianza **MEDIA** (`aplicada`, `verificada_en NULL`) porque **el runner no puede verificarse en el instante en que se inscribe**. Solo sube a ALTA cuando alguien ejecuta la verificacion posterior. Es la demostracion de que el umbral funciona: **la fila mas reciente y mas auto-confiada de la tabla sigue sin estar verificada.**
+
+**Por que las 41 filas historicas quedaron en CERO a proposito:** su estado real en Neon **sigue siendo desconocido**, y **afirmar lo contrario seria mentir**. El estado CERO no es un dato provisional que haya que arreglar: es **el dato honesto**. Un ledger que declara aplicada la 017 sin haberla comprobado es peor que no tener ledger, porque **se leeria como cobertura**.
+
+### Decision D4 -- La deriva la detecta el SCRIPT, y el checksum almacenado NUNCA se sobrescribe
+
+**El hecho que obliga a que sea el script:** el `.sql` vive en el repo, **NO en la base de datos**. El `checksum` guardado es un sha256 de unos bytes que la tabla **no tiene**. La tabla guarda un hash de algo que no puede ver, luego **estructuralmente no puede saber si eso cambio**. **Cualquier constraint de este fichero taparia ese vacio.**
+
+La regla, en el script:
+1. Calcular sha256 de los bytes del `.sql` **tal como esta en disco**.
+2. Si hay fila y el checksum **no** coincide: es **DERIVA**. Reportarla, salir con codigo distinto de 0, y **NO aplicar** el fichero.
+3. **NUNCA** hacer `UPDATE` del `checksum` almacenado para que cuadre. Eso **borraria la unica evidencia de que el cambio existe**, y es precisamente el borrado logico que **ADR-003** prohibe.
+4. La correccion de una deriva es **una migracion nueva y numerada**, no editar la vieja. Reeditar `043` y volver a aplicarla **no es una operacion valida en ningun caso**.
+
+**Medido en los dos sentidos:** las **43 filas casan con el disco, 0 derivas**; y en positivo, con un checksum `0000...`, la deriva **se detecto, reporto disco contra tabla, bloqueo con `exit 1`, y el checksum almacenado sigue intacto**. Una deteccion que nunca se ha visto fallar no esta probada, y este caso existe precisamente para eso.
+
+**Lo que si garantiza la tabla:** como el checksum nunca se sobrescribe, **el valor con el que se aplico es recuperable para siempre**.
+
+### Decision D5 -- El driver HTTP de Neon NO acepta lotes multi-sentencia: un dry-run con ROLLBACK es IMPOSIBLE por HTTP
+
+**Este es un limite de la PLATAFORMA, no un error del `.sql`, y volvera a aparecer. Se escribe como regla.**
+
+**El hecho medido:** el endpoint `/sql` de Neon usa **protocolo extendido**, luego **no admite lotes multi-sentencia**. `sql('BEGIN; ...; ROLLBACK;')` falla con **SQLSTATE `42601`**, *"cannot insert multiple commands into a prepared statement"*.
+
+**La consecuencia que obliga a cambiar de herramienta:** **un dry-run con `ROLLBACK` es IMPOSIBLE por HTTP.** No es que sea dificil de montar: no se puede escribir. **Toda validacion previa por lotes esta vedada en esta plataforma**, y por eso el dry-run del runner **no es "aplicar y rezar"**: es **rechazar por la puerta del predecesor**, con exit **1**, sin tocar la base de datos.
+
+**Como se resolvio, y el matiz que hace que no sea una anecdote:** con **`Client`**, que extiende `pg.Client` sobre **WebSocket nativo**, donde `BEGIN`/`ROLLBACK` **si son transaccion real de sesion**. **Y el bonifico medido que evita una conclusion equivocada:** `sql.transaction()` **existe** (atomicidad) pero **NO da `ROLLBACK`**. O sea: la via curta da atomicidad sin poder deshacer, y la via larga (`Client`) da la transaccion completa. **Confundir las dos produce un dry-run que "pasa" sin haber podido deshacer nada.**
+
+**Norma para todo script futuro que hable con Neon:** antes de prometer un dry-run, comprobar **como** se va a abrir la transaccion. Atomicidad y reversibilidad son dos capacidades distintas y estan en drivers distintos.
+
+### Decision D6 -- Contrato de exit codes: 0 / 1 / 2, con el **criterio** por encima de la tabla
+
+**Dictamen sobre el cambio sin ratificar:** `@js-silo-dev` cambio el exit code de "fichero no existe" de **1** a **2**, por considerarlo uso incorrecto y no fallo de aplicacion. **Verificado que no hay llamadas programaticas al script** (0 coincidencias como invocacion; las 9 son comentario, uso documentado o `prompt.md`), luego el cambio **no rompe a nadie**.
+
+**SE RATIFICA.** Y se ratifica **por el criterio, no por el numero**:
+
+> **El exit code responde a "que debe hacer quien llama", no a "que fallo dentro del script".** Si el codigo de error no cambia la **accion** del que llama, no merece un codigo.
+
+**Por que un verificador para agentes necesita exit codes distinguibles y no un unico "error":** un verificador lo consume **un agente**, y un agente **no lee el texto de error con garantias** -- lo resume, lo pierde, o lo lee tarde. La distincion que el agente necesita no es "hubo un error" sino **"puedo reintentar igual o tengo que cambiar algo antes"**, y eso es una **decision distinta con una respuesta distinta**. Con un unico "error": (a) reintentar un fichero inexistente es un **bucle infinito** disfrazado de reintento; (b) un exit **1** por puerta del predecesor **no es recuperable reintentando**, y un agente que lo trate como transitorio puede aplicar la 047 **saltandose la 045** -- que es justo el fallo que el registro existe para hacer visible; (c) un `--help` que falla con 1 **no es distinguible** de un fallo real, y rompe el contrato de "un 2 indica que me invocaste mal".
+
+**Tabla definitiva y completa.** El criterio de arriba **manda sobre la tabla**, y la tabla se deriva de el:
+
+| Codigo | Significado | Casos concretos | Accion de quien llama |
+|---|---|---|---|
+| **0** | La operacion se completo | apply correcto; `--dry-run` que **pasa** la puerta; `--help`; inspeccion OK | Continuar |
+| **1** | La operacion **se intento y NO se completo**: fallo de SQL, **deriva**, o **puerta del predecesor** -- incluido el rechazo de un `--dry-run` que no pasa la puerta | `42703`/`SCHEMA_NOT_MIGRATED`; checksum que no cuadra; predecesor sin fila (hueco `sin_fila`, N-1 inexistente); fila registrada como `failida` | **No reintentar igual.** Corregir la causa; si fue un predecesor, aplicar primero lo que falta |
+| **2** | **Uso incorrecto**: el que llama se equivoco. **Ninguna sentencia se ejecuto** | falta la ruta, sobran rutas, **el fichero no existe**, opcion no existe, opcion invalida | Corregir la invocacion. **Reintentar igual es un bucle** |
+
+**Reglas de cierre, para que la tabla no crezca por sorpresa:**
+- **No hay codigo 3.** Cualquier fallo nuevo **mapea a 1 o 2** segun el criterio. Si un dia hace falta un tercero, es un ADR nuevo, no un `codigoSalida(3)` improvisado.
+- **Ningun `api/*.js` consume estos codigos** y **ningun endpoint los propaga**: el contrato es de `scripts/` a terminal, no de la API. 8/8 serverless intactos.
+- **Un exit code no es un contrato de API.** Por eso cambiarlo no es un cambio incompatible: no hay cliente al que romper, y por eso ratificarlo es barato **ahora** y caro si se deja sin dictar.
+- **Verificacion de la ratificacion** (archivo real, `scripts/verificar_migraciones_prod.js`): `:58-63` documenta los tres codigos; `:131` `--help` -> **0**; `:132` uso incorrecto -> **2**; `:138-142` fichero inexistente -> **2** con `SUM.errores` poblado; `:244` del verificador, mapeo estatico ausente -> **1**; `:282` N-1 sin fila -> bloquea con **1**. El contrato **ya coincide con la tabla**.
+
+### Impacto / superficies
+
+- **`exploraco desarrollo/DECISIONS.md`:** **+1 seccion, al final** (este ADR). **Ningun ADR anterior se modifica, no se mueve y no se borra nada** (ADR-003).
+- **Presupuesto de Vercel:** **8/8 intacto**. **0 endpoints nuevos.** La tabla la consultan **unicamente scripts de mantenimiento**, que no consumen funcion serverless.
+- **`db/migrations/045_schema_migrations.sql`:** **sin cambios en este turno.** Sigue siendo la implementacion y el registro durable de D1 (el `ALTER ... DISABLE ROW LEVEL SECURITY`).
+- **`scripts/apply_sql_file.js`:** **sin cambios.** Su exit code 2 en fichero inexistente **queda ratificado** (D6).
+
+### Consecuencias
+
+**Positivas:**
+- Las **6 decisiones** son auditables **sin abrir el SQL**, que era el defecto.
+- El ledger **no miente**: 41 filas en CERO declaran lo que no se sabe, y 1 en ALTA declara lo unico que se comprobo.
+- La deriva tiene una regla que **conserva la evidencia** (ADR-003) y una prueba en positivo que la demuestra.
+- La puerta del predecesor esta probada **en los dos sentidos** y no depende de una convencion de numeracion fragile.
+
+**Negativas / deuda aceptada y cuantificada:**
+- **El `.sql` conserva una copia del argumento** (ver "Pendiente"), y `DECISIONS.md` **crece**: ya son **923,9 KB / 6.131 lineas** y **no tiene sumidero** (`DECISIONS_ARCHIVO.md` **no existe**). Es deuda que ADR-084 ya.bufferio (su punto (d) y su Opcion 5) y que este ADR no resuelve ni empeora.
+- **El parsing del numero degrada a 1.000 migraciones.** Hoy, a 957 de distancia.
+- **Una migracion de varias sentencias NO es atomica por el runner** (sentencia a sentencia, `:345-348`). El ledger registra `fallida` en la sentencia k, pero las k-1 anteriores **quedaron aplicadas**: el registro es honesto y **el estado de la base puede no ser coherente**. El SQLSTATE del fallo y el ojo humano siguen siendo los que lo detectan.
+- **El dry-run no puede deshacer** (D5). El unico dry-run posible es "no aplicar por la puerta".
+- **RLS apagado es una decision revocable atada a un supuesto.** El supuesto esta verificado hoy; **la puerta de salida es obligatoria si cambia**, no opcional.
+
+**Fuera de alcance explicitamente (y por que):**
+- **Politica de backups de Neon: NO se declara.** **No se ha investigado si existe, cual es su retencion ni si hay PITR.** **PREGUNTA ABIERTA, sin responder aqui.** Afirmar una politica de backup sin haberla verificado seria el mismo defecto que las 41 filas CERO: presentar como hecho lo que es suposicion.
+- **La economia (TODO de sinks / `046_probe_ledger`):** es la `046`, y es **OTRO trabajo con su propio ADR**. Este ADR **no la panea ni la prejuzga**.
+- **No se declara que las 41 migraciones historicas esten aplicadas.** **No se sabe**, y el nivel CERO (D3) existe precisamente para que esa ignorancia quede escrita en el esquema.
+
+### Pregunta abierta que este ADR NO cierra
+
+1. **Que hay en el ledger mas alla de la 045.** El `045` es la primera migracion que **no depende de otra** y la primera que **no se aplica por el runner sin ledger**. Las 43 anteriores se aplicaron sin registro. El estado de esas 43 en Neon **sigue sin verificarse** y este ADR **no cambia eso**: lo convierte en un dato escrito (CERO) en vez de un dato ignorado.
+
+### ADRs relacionados (este ADR **anade** a tres, **no reescribe** ninguno)
+
+- **ADR-008** (todo cambio de esquema vive en el repo como `.sql` versionado): `schema_migrations` es el registro que le **faltaba** a ADR-008. No lo contradice: **lo completa**.
+- **ADR-003** (Cero Borrado Logico): **es la razon de D4** (no sobrescribir el `checksum`), y **la razon de no borrar el argumento del `.sql`**.
+- **ADR-006** (baseline = archivo real): la tabla de "Baseline verificado" es D4 de ADR-084 aplicado; **sin ella, las cifras de este ADR serian una cita de memoria**.
+- **ADR-002** (ASCII-safe): verificado a nivel de bytes sobre el `.sql`: **24.945 bytes, 0 bytes > 127, 0 backticks**. Este ADR se escribe tambien en ASCII plano, con el mismo motivo.
+- **ADR-001 / ADR-010** (8/8 serverless): **presupuesto intacto, 0 endpoints nuevos**.
+- **ADR-084** (fuente unica del relato): **relacion explicitada en "Relacion con ADR-084"**.
+- **ADR-055** (compra atomica por CTE): **relacion explicitada en "Relacion con ADR-055"**.
+
+### Relacion con ADR-084 -- **ENDURECE**, y su limite real
+
+**Lo que dice ADR-084:** linea **4.824** ("**D1 -- El argumento vive UNA vez, en `DECISIONS.md`**"), con el cuerpo en **4.826-4.829**: el argumento vive una vez; `TASKS.md` en 6 lineas; `NEXT.md` en 8; **"Todo lo demas es puntero: 'ver ADR-0XX'. Prohibida la recapitulacion, incluida la recapitulacion 'para que se entienda sin abrir el ADR'"** (linea **4.829**).
+
+**Veredicto: ENDURECE. No anade una regla nueva: EXTENDE el alcance de D1 a un tipo de fichero que D1 no nombro.**
+
+D1 acoto la higiene documental **entre documentos de gobernanza** (`TASKS.md`, `NEXT.md`, `BLUEPRINT.md`, cuerpos de ADR anteriores). **No dijo nada de los `.sql` de `db/migrations/`**, y ahi es donde se violaba. Este ADR hace tres cosas:
+
+1. **Nombra el alcance que faltaba:** D1 aplica tambien a los **comentarios de los `.sql`**. Un `.sql` es un artefacto de gobernanza con prosa argumental, no solo codigo.
+2. **Fija el limite que hace la regla aplicable sin imposible:** **el `.sql` conserva el "que" y pierde el "por que"**. La cabecera puede -- y debe -- seguir describiendo columnas, CHECK e idempotencia; **el argumento (por que RLS apagado, por que la puerta vive en el script) sale de ahi y vive aqui**. No es "borrar el fichero": es **reasignar el argumento al sitio del argumento**.
+3. **Cierra la via de evasion:** la regla de D6 ("el codigo de error responde a la accion del que llama") y la prohibicion de "borrar el argumento porque ya se ejecuto" **refuerzan D1 contra su propio riesgo**, que es el de justificarse como "esto ya esta hecho, no hace falta documentarlo". **Justo lo que paso con la 045.**
+
+**Lo que NO hace:** **no contradice ninguna premisa de ADR-084**, no modifica sus 6/8 lineas, no abre la Opcion 5 (los sumideros `_ARCHIVO`, que siguen congelados desde 2026-09-19), y no vuelve a tocar `AGENTS.md` 10/18 (D5 de ADR-084 ya esta aplicado).
+
+**Deuda que este ADR deja visible:** el `.sql` **conserva** hoy su prosa argumental, luego **D1 sigue incumplida en `045`** hasta que ese texto se reduzca. **Este ADR no la repara y no puede repararla en el mismo paso** (D4: editar el `.sql` genera deriva; ADR-003: borrar argumental ya publicado es borrado logico). Es la **unica** tension real que este ADR deja abierta, y es **tension a proposito**: la **preferencia es no mentir** (mantener el texto) sobre **no duplicar** (borrarlo). La reparacion correcta es una pasada dedicada, con su propio ADR, y **no este**.
+
+### Relacion con ADR-055 -- **NO lo toca**, y el motivo por el que no lo toca es la propia conclusion de ADR-055
+
+**Lo que dice ADR-055:** linea **3.164** (cabecera), **decision 6** en linea **3.187** ("**Compra atomica en UNA sentencia con CTEs** (NO `FOR UPDATE`): **el driver neon HTTP no mantiene transacciones interactivas**"), **justificacion** en linea **3.194** ("La compra en un unico statement con CTEs resuelve la atomicidad impuesta por el driver HTTP sin `FOR UPDATE` interactivo"), y **deuda aceptada** en linea **3.201** ("el aislamiento por Casa es de DATOS, no de RLS (la 034 no crea policies ni funciones)").
+
+**Veredicto: NO ANADE, NO ENDURECE, NO CONTRADICE.** Ni una de las tres. Y conviene decirlo con la misma claridad que las otras dos, porque aqui la conclusion es "no hay nada que hacer" y eso tambien es un veredicto.
+
+**Por que no lo toca, en cuatro puntos:**
+
+1. **Misma causa, distinta consecuencia.** ADR-055 se apoya en que el driver HTTP no mantiene transacciones interactivas; **D5 describe ese mismo limite con su mecanismo y su SQLSTATE**. Son **la misma premisa**, no dos premisas en conflicto: `42601` es la letra con la que el limite se manifiesta. **Documentar el limite no revierte la conclusion que se drew de el.**
+2. **La conclusion de ADR-055 sigue siendo correcta, y este ADR la confirma.** Si el limite de D5 es real -- y esta medido con codigo de error --, entonces la compra atomica por CTE de ADR-055 es **la unica via disponible**, no una preferencia estilistica. **D5 refuerza ADR-055 sin tocarlo.**
+3. **El `FOR UPDATE` sigue descartado.** `Client` (WebSocket) abre transacciones de sesion reales, luego **tecnicamente** seria posible un `SELECT ... FOR UPDATE`; **pero no se propone**, porque (a) ADR-055 resolvio el problema **sin** ese mecanismo y (b) `sql.transaction()` no da `ROLLBACK` (D5), luego abrir un camino con `FOR UPDATE` **degradaria la reversibilidad** que hoy no se necesita. **D5 no habilita `FOR UPDATE`; lo mantiene descartado por una razon nueva.**
+4. **El "no RLS" de ADR-055 y el "no RLS" de D1 son el mismo item, no una contradiccion.** Linea **3.201** de ADR-055: "el aislamiento por Casa es de DATOS, no de RLS (la 034 no crea policies ni funciones)". D1 apaga RLS en `schema_migrations` **con el mismo fundamento de superficie**: sin cliente no confiable, no hay a quien proteger. **Dos tablas distintas, una sola politica, y ADR-055 ya la aplicaba sin llamarla politica.** Si alguien citara "ADR-055 dice no RLS" contra "D1 dice no RLS", **estaria citando la misma decision dos veces.**
+
+**Lo que este ADR declara expresamente:** **no reabre la decision 6 de ADR-055.** Si alguna vez se quisiera `FOR UPDATE` o una transaccion explicita para compra atomica, es **un ADR nuevo** (y habria que resolver antes el limite de `sql.transaction()` de D5).
+
+---
