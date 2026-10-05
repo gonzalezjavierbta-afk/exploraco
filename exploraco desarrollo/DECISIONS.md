@@ -5115,3 +5115,1017 @@ Se evaluaron O1 y O3 como una sola politica (la diferencia es de presentacion, n
 - **ADR-006** (baseline = archivo real: es la regla que obliga a medir `PF_TABS` y `CAPACIDADES_POR_NIVEL` antes de afirmar nada, y la que produce la deuda (a))
 - **ADR-008** (gobernanza e idempotencia de esquema / numeracion consecutiva: por eso D1 se alinea con la 044 ya numerada en vez de reescribirla)
 - **ADR-010** (presupuesto 8/8 de funciones serverless: el filtro de planes es el **mismo** endpoint con otro predicado, sin endpoint nuevo)
+
+---
+
+## ADR-086: Evaluacion del Sistema Economico Integral LATAWEL, NO-ADOPTION del Tri-Token Web3 (Capa 3), y su Parte 2: sinks, ranking compuesto, 3 monedas y gates por Era
+
+**ID:** ADR-086
+**Fecha:** 2026-10-05
+**Autor:** Chief Architect (`@architect`), Fase 0 (SOLO documentacion; sin codigo, sin SQL, sin despliegue).
+**Estado:** **APROBADO / Fase 0.** Decisiones **A** y **B** son **FIRMES** desde este ADR.
+**Revisión:** Parte 1 **APROBADA** por `@architect-review` sin cambios. Parte 2 devuelta con veredicto **SOLICITA CAMBIOS** (5 bloqueantes + 7 no bloqueantes + 4 agujeros de diseno); corregidos en esta revision del ADR. La Parte 2 **sigue siendo APROBADA con las correcciones de esta revision** y su **Decision D (via del ranking) queda fijada aqui**.
+**Numeracion:** verificada con `Select-String -Pattern "^## ADR-"` sobre el archivo real (ADR-006): el mayor ADR registrado es **ADR-085** (linea 4917) y 086 es el siguiente consecutivo libre. `DECISIONS.md` medido hoy: **816,5 KB / 5.119 lineas**.
+**Estructura:** este ADR tiene **dos partes** y **una sola cabecera**. La parte 1 (Decision A: NO ADOPTION de la Capa 3; Decision B: Enmienda 3 a ADR-061) esta en `### Parte 1`. La parte 2 (sinks, ranking compuesto, 3 monedas, gates por Era) esta en `### Parte 2`. La numeracion `^## ADR-0` devuelve **una fila** para ADR-086.
+**Alcance de ESTA parte:** (1) evaluacion de las 10 areas del sistema economico LATAWEL contra el codigo real; (2) cierre de la Capa 3 (tri-token web3) como **NO ADOPTION argumentada**; (3) declaracion de la Enmienda 3 a ADR-061. **NO** se disenan aqui los *sinks* ni el *ranking compuesto*: son encargo aparte y quedan titulares para la **parte 2** de este mismo ADR (ver "Continuidad").
+**Fuente unica (ADR-084 D1):** el argumento de las decisiones A y B **vive una sola vez, aqui**. `TASKS.md` y `NEXT.md` solo apuntaran a `DECISIONS.md:ADR-086` con su estado; jamas replicaran el razonamiento.
+
+### Parte 1 -- Evaluacion de las 10 areas, NO ADOPTION de la Capa 3 y Enmienda 3 a ADR-061
+
+### Problema / Contexto
+
+El operador entrego un documento de producto (`prompt.txt`, **NO leido** en esta sesion por protocolo de consumo) que describe 10 areas del "Sistema Economico Integral LATAWEL", con 3 capas de progresion (Capa 1 XP N1-10, Capa 2 monedas de casa N11-24, Capa 3 tri-token web3 N25-40) y una capa de_on-chain de triple token. La pregunta de arquitectura no es "como se implementa": es **que de eso existe de verdad hoy** y **que se adopta**.
+
+La respuesta corta es que **la mayor parte ya esta construida, pero no donde el documento la situa**, y que la pieza mas vistosa del documento (la Capa 3) es la unica que **no debe adoptarse**.
+
+### Baseline verificado (ADR-006) -- las 10 areas
+
+Estado medido sobre el **archivo real**, no sobre `TASKS.md`/`NEXT.md`. "NO-EXISTE" esta corroborado con conteo de hits sobre `api/*.js` + `db/migrations/*.sql`.
+
+| # | Area | Estado | Evidencia |
+|---|---|---|---|
+| 1 | Capa 1 -- XP minting N1-10 | **ADOPTADO / COMPLETO** | `xp_total` es la moneda unica (ADR-018); emision por multiplicador de nivel `api/interacciones.js:517`; ledger `db/migrations/031_gamificacion_v6_nivel_scaling.sql:225`. La curva es ** lineal**, no bonding: ver area 2 |
+| 2 | Capa 2 -- 3 monedas de casa N11-24 + bonding curve | **PARCIAL** | El vocabulario de las 3 casas ya existe y esta **cerrado en esquema**: `casas_cofre` con `CHECK (casa IN ('condor','jaguar','delfin'))` (`db/migrations/024_casas_cofre_y_clases.sql:160`), mas `xp_cofre_total` y `poblacion_activa`. **Solo 1 de las 3 monedas existe** (`CDR`, decision B). **La bonding curve NO existe** y `factor_conversion` esta **fijado a `1.0` por defecto (`024:163`) y SIN NINGUN LECTOR en el codigo**: es una columna muerta, no un mecanismo |
+| 3 | Capa 3 -- tri-token web3 N25-40 | **NO-EXISTE (y NO se adopta)** | Conteo de hits: `eCOP`=0, `EXCO`=0, `sEXCO`=0, `staking`=0, `boveda`=0 sobre `api/*.js` + `db/migrations/*.sql`. Decision A |
+| 4 | Emision y multiplicadores | **ADOPTADO / COMPLETO** | `obtenerMultiplicadorNivel` = `1.0 + ((N-1)/39)*(3.0-1.0)` (`api/interacciones.js:517`): **x1.000 en N1, x3.000 en N40**. Caps `:498-499`; factor de origen por lejania `:505-511`; ledger `031:225` |
+| 5 | Encarecimiento progresivo (sinks) + punto de inflexion N15+ | **NO-EXISTE** | Hits: `sink`=0, `costo_slot`=0, `curva`=0. **No hay un solo destino de gasto que retraiga XP**: hoy el XP solo se gana. Diseno --> parte 2 |
+| 6 | Gig Economy P2P | **ADOPTADO / COMPLETO** | `contratos_p2p` (`db/migrations/039_gig_economy_p2p.sql:96`) |
+| 7 | Drive-to-Store / cupones QR | **NO-EXISTE (andamiaje inutil)** | `consumibles.tipo_canje TEXT` (`db/migrations/027_zonas_marcas.sql:268`) es una columna **libre, sin emision, sin validacion y sin canje** (el propio 027:259 la documenta como `'qr','codigo','ticket'`); `billeteras` (`db/migrations/042_pasaporte_billetera_fotos.sql:96`) es **solo identidad**: sin QR, sin saldo, y la propia 042 difiere el canje (`:27`) |
+| 8 | Clanes + tithe + upgrades | **ADOPTADO / COMPLETO** | `parche_upgrades` (`039:140`); `pandillas.tithe_pct` (`db/migrations/041_cartas_ofertas_tithe.sql:194`) |
+| 9 | Ranking con score compuesto | **NO-EXISTE** | Las 4 ordenaciones de leaderboard son `ORDER BY xp_total DESC` puro: `api/usuarios.js:959`, `:979`, `:1198` (por faccion), `:1342` (por casa). **Sin beta, sin saldo, sin Fama_Parche**: la casa ya se conoce (`usuarios.casa`) y no puntua |
+| 10 | Persistencia en Neon | **ADOPTADO / COMPLETO** | Neon PostgreSQL + migraciones aditivas idempotentes `db/migrations/` (003-->044), ADR-008 |
+
+**Sintesis:** **5 de 10 areas adoptadas y completas** (1, 4, 6, 8, 10), **1 de 10 parcial y con el hueco muy localizado** (2: dos monedas y la tasa flotante), **3 de 10 no existen** (3, 7, 9) y **1 de 10 no existe pero es exactamente la palanca de retencion que falta** (5). El saldo de la Capa 2 (area 2) **no es de los tres tokens**, que no existen: es de **dos monedas internas**.
+
+### Decision A -- Capa 3 (tri-token web3) = NO ADOPTION [FIRME]
+
+**Decision tomada:** la Capa 3 del documento de producto (`$eCOP` / `$EXCO` / `$sEXCO`, staking y boveda) **NO se adopta**. Decision **FIRME**, no "pendiente de estudio".
+
+**Opciones evaluadas:**
+
+1. **Adoptar la Capa 3 tal cual.** Descartada.
+2. **Adoptarla "en cold", sin indices, sin retiro, sin Canje.** Descartada: es la **misma arquitectura** con el mismo ledger on-chain, la misma necesidad de llaves y el mismo texto regulatorio; solo se sacrifica la parte visible. No compra nada juridicamente.
+3. **NO ADOPTION, y en su lugar la Capa 2 ampliada.** **ELEGIDA.**
+
+**Justificacion (tres argumentos, todos verificables):**
+
+1. **Riesgo regulatorio en Colombia, ya evaluado y pagado.** ADR-061 ya **descarto** la capa on-chain en esta misma linea de producto por este mismo motivo: *"Capa on-chain / Hive. Descartada en esta fase (requiere revision legal en Colombia; riesgo regulatorio)"* (`DECISIONS.md:3474`). La Capa 3 es la **misma capa on-chain con tres activos mas**. Un token que promete rendimiento (staking) o representación de valor es, en la lectura de riesgo de un regulator, un **activo o instrumento financiero**, no un punto de gamificacion. Ningun argumento de producto compensa una exposicion que el operador **no puede asumir sin un estudio legal externo**, y ese estudio no existe. Este es el **mismo motivo** por el que se cayo en 2026-09-24: no es una objecion nueva, es la ya aceptada, y lo que ahora se decide es **no reabrirla**.
+2. **El producto es web2 y su techo es estructural.** 8/8 funciones serverless consumidas (ADR-001/ADR-010) y **cero** cadena, cero billetera, cero firma, cero indexador. Anadir la Capa 3 no es "una feature mas": es un **segundo producto** (contratos, llaves, gas, conversion, KYC) que **no cabe** en el presupuesto de funciones ni en el modelo de despliegue. Y en un directorio turistico, una boveda con rendimiento es la decision que hace que un proyecto pequeno se convierta en un asunto de otro tipo.
+3. **Asimetria de valor.** La Capa 3 promete diferenciacion (ser "el" directorio con web3). El producto ya tiene diferenciacion *medible y barata*: emision lineal x1.000-->x3.000 (area 4), Gig Economy P2P (area 6), clanes con tithe y upgrades (area 8), gobernanza de 3 capas (`db/migrations/040_gobernanza_cartas_moneda.sql:280` `gobernanza_propuestas`, `:306` `gobernanza_votos`). La Capa 2 ampliada entrega **mas** valor de Late Game por una fraccion del riesgo.
+
+**Que queda en su lugar (sustituto funcional):** la **Capa 2 ampliada** -- 3 monedas de casa (`CDR` existente + las dos que se crean por decision B), gobernanza de 3 capas ya existente (`040:280-330`), `casas_cofre` con `poblacion_activa` y `factor_conversion` como **tasa flotante de conversion** (hoy muerta, ver area 2), y las `consumibles` con `tipo_canje` como el soporte de cupones. Cubre el **Late Game entero** con la misma mecanica de progresion, y cubre el hueco de "economia con tension" con **sinks** (area 5, parte 2), que es donde la dificultad debe estar, no en el formato del token.
+
+**Consecuencia asumida:** la Capa 3 del documento de producto queda **descartada de la hoja de ruta**. Si en el futuro el operador quiere reconsiderarla, **no es una reopening de este ADR**: es un ADR **nuevo** que exigiria, como premisas previas y no negociables, (a) un estudio legal externo escrito y (b) una decision de pagar el gasto de infraestructura que hoy no existe en el presupuesto.
+
+### Decision B -- Enmienda 3 a ADR-061: generalizar `moneda_ledger` de 1 moneda a 3 [FIRME]
+
+**Decision tomada:** las 3 monedas de casa se registran en el **ledger existente**, no en tablas paralelas. Se **enmienda ADR-061**, que habia cerrado nombre y simbolo de una sola moneda.
+
+**Por que es una ENMIENDA y no un ADR nuevo ni "anadir columnas":** ADR-061 (`:3462-3484`) es un ADR **aprobado** cuya Enmienda 2 (`:3484`) **CERRO** el nombre y el simbolo: *"Nombre/simbolo **CERRADOS**: 'Condor' (`CDR`)"*. Cambiarlo de 1 moneda a 3 **no crea una premisa nueva**: **contradice una premisa cerrada de un ADR anterior**. Eso es exactamente lo que una enmienda es, y por eso usa el patron vigente de `DECISIONS.md:3484` y `:3614` (*"Enmienda N (fecha, cierre): ..."*) y no el de un ADR suelto.
+
+**El hallazgo tecnico que obliga a enmendar y no "anadir columnas"** (medido en el archivo real): el bloque `moneda_*` de la migracion 040 **esta disenado para 1 moneda y lo demuestra en sus claves**, no solo en su documentacion:
+
+- `moneda_ledger` (`040:214-223`) **no tiene columna de moneda**: sus campos son `usuario_id`, `delta`, `saldo`, `motivo`, `ref_tipo`, `ref_id`, `creado_en`. El `saldo` esta **desnormalizado por usuario**, no por (usuario, moneda).
+- `moneda_cuentas` (`040:208-212`) tiene **`usuario_id` como PRIMARY KEY**: por construccion admite **exactamente un saldo por usuario**. Es el bloqueador estructural, y no se resuelve anadiendo columnas.
+- `moneda_emisiones` (`040:228-235`) y `moneda_mercado` (`040:240-262`) tampoco tienen discriminante de moneda.
+
+Por eso el coste real de la generalizacion es **de claves e indices, no de columnas**, y por eso hay que decirlo aqui: el precio de la amendment es la **re-clave del `PRIMARY KEY` de `moneda_cuentas`**, el **rediseño del indice de ledger** (`idx_moneda_ledger_usuario_credo` hoy mono-columna) y el **cambio de semantica de `saldo`** (de "saldo del usuario" a "saldo del usuario **en esa moneda**"). Ese coste es real y **queda Budget en la parte 2**; lo que este ADR fija es que se paga **una vez, en el ledger**.
+
+**Por que generalizar el ledger es SUPERIOR a una tabla paralela por moneda** (la alternativa obvia):
+
+1. **El ledger es la garantia, y la garantia no se duplica.** Un ledger append-only es la razon de ser de ADR-061 (`:3478`): trazabilidad sin crear dinero de la nada. Con 3 tablas paralelas habria **3 garantías** con 3 formatos, 3 saldos que cuadrar por separado y 3 sitios donde un bug de emision puede crear saldo fantasma. Con 1 ledger con discriminante, **`SUM(delta) PARTITION BY (usuario_id, moneda)`** es la unica verdad y el saldo es derivado, no almacenado.
+2. **El vocabulario de las 3 monedas YA ESTA en el esquema y es cerrado.** `casas_cofre` (`:160`) fija `CHECK (casa IN ('condor','jaguar','delfin'))`. La generalizacion alinea la moneda con el **mismo dominio de 3 valores que ya es norma del esquema**: 3 monedas = 3 casas. No se introduce una taxonomia nueva, se **reusa la existente** (regla de no-duplicacion: un campo/dominio que ya existe no se duplica).
+3. **4 tablas por 1 moneda es 4 veces el codigo en 8/8 endpoints.** Con `tipo=moneda_saldo` se **extiende un endpoint existente** con un parametro; con tablas paralelas habria que replicar la rama por cada moneda y cada mercado, o introducir una tabla de **n** nombres que es, estructuralmente, un discriminante mal puesto. Es la diferencia entre **extender** y **duplicar** -- y el presupuesto 8/8 no perdona duplicar.
+4. **La migracion sigue siendo ADITIVA e idempotente (ADR-008).** Anadir la columna de moneda con un valor por defecto y convertir la clave es **posible sin `UPDATE` de datos** y sin tocar filas existentes: la moneda historica se backfillea al unico valor que es consistente con lo ya escrito. Se cumple Cero Borrado Logico (ADR-003) por construccion: **nada se borra**.
+
+**Enmienda 3 a ADR-061 (2026-10-05, Fase 0, APROBADO):** ADR-061 se **enmienda en su Enmienda 2 (`:3484`)**: el nombre/simbolo ya no se **cierran** como un unico par, sino como **el conjunto de 3 monedas de casa** `{Condor (CDR), Jaguar (JAG), Delfin (DLF)}`, alineado con `casas_cofre.casa` (`:160`). El ledger pasa de **1 moneda a 3 discriminadas por el mismo dominio**, conservando **todas** las demas premisas de ADR-061 sin modificacion: `xp_total` sigue siendo la **moneda UNICA de progreso** (ADR-018; la excepcion de ADR-061 sigue siendo la excepcion y **no se crea una cuarta moneda**), el saldo se **deriva** del ledger, la emision sigue **acotada por lote** y **no inflacionaria**, la moneda es **transferible SOLO dentro del mercado del juego** y **PROHIBIDO su conversion a dinero real**. **El texto de esta enmienda vive aqui y solo aqui** (ADR-084 D1): el cuerpo de ADR-061 **no se reescribe**, y si en el futuro se le anade una linea, sera un **puntero** ("enmendado por ADR-086"), nunca el argumento.
+
+**Invariantes de las 3 capas que este ADR deja fijas (no negociables en la parte 2):**
+
+1. **8/8 funciones serverless consumidas** (ADR-001/ADR-010): **cero ficheros nuevos en `api/`**. Todo lo de la Capa 2 ampliada son ramas `tipo=` / `tipo2=` **dentro de `api/interacciones.js` y `api/usuarios.js`**; el alcance se extiende por query param, nunca por endpoint.
+2. **ADR-018 intacto**: `xp_total` es la moneda **UNICA** de progreso. `moneda_ledger` es la **excepcion acotada** de ADR-061. **No se crea una cuarta moneda.**
+3. **Cero conversion a dinero real** en **las 3 capas**, sin excepcion y sin "modo prueba".
+4. **Prohibido `DELETE` (ADR-003)**: toda baja es `activo=false`; el propio `moneda_mercado` ya tiene `activo boolean NOT NULL DEFAULT true` (`:252`).
+5. **Cero borrado logico tambien en el ledger**: `moneda_ledger` es append-only y no admite correccion destructiva; un error de emision se corrige con un `delta` de compensacion, nunca editando el historico.
+
+### Continuidad -- lo que este ADR NO cierra
+
+El documento de producto tambien pide **encarecimiento progresivo (sinks) con punto de inflexion en N15+** (area 5) y **ranking con score compuesto** (area 9). **Esos dos disenos NO estan aqui**: son la **parte 2 de este mismo ADR-086**, que se escribira a continuacion.
+
+**Regla dura que queda vigente desde ya:** **NO se puede ejecutar ninguna sentencia SQL** -- ni de las 3 monedas, ni de los sinks, ni del ranking -- **hasta que la parte 2 exista y este ADR-086 la haya aprobado**. En particular: la generalizacion de `moneda_ledger`/`moneda_cuentas` (decision B) **no se toca** hasta que la parte 2 defina el modelo de sinks, porque **sinks y monedas comparten el mismo destino de gasto** y designing uno sin el otro obliga a demolerlo.
+
+**LEVANTADA por la PARTE 2 de este mismo ADR** (abajo): el modelo de sinks queda definido en la seccion 1 y la regla se levanta **con las tres condiciones de ejecucion que fija esta parte** -- (C1) la migracion `045` se aplica **antes** de tocar una sola consulta de moneda, (C2) el precio de slot se **congela** en la fila de compra y (C3) el ranking entra en **rampa de 30 dias**, de modo que el ranking vivo y el gasto de XP no se mueven el uno al otro bajo los pies del jugador.
+
+**ADRs relacionados:**
+
+- **ADR-084** (fuente unica del relato documental: este ADR cumple D1 -- el argumento de A y B vive **una sola vez aqui** -- y respeta su D3 con lecturas de <= 60 lineas)
+- **ADR-061** (**ENMENDADO por este ADR**, decision B: Enmienda 3; su `:3474` es el precedente de NO ADOPTION de la capa on-chain que la decision A reactiva y **fija**; su `:3484` es la premisa cerrada que esta decision enmienda)
+- **ADR-001 / ADR-010** (8/8 funciones serverless: el limite que hace que la Capa 2 ampliada sea solo ramas `tipo=` y el que hace inviable la Capa 3)
+- **ADR-018** (moneda unica de progreso: la excepcion acotada se mantiene acotada y no se crea una cuarta moneda)
+- **ADR-053** (patron de ledger append-only y saldo derivado: la garantia que la decision B se niega a triplicar)
+- **ADR-003** (Cero Borrado Logico: prohibicion de `DELETE`, `activo=false` en toda baja, ledger append-only)
+- **ADR-006** (baseline = archivo real: es la regla que produjo esta tabla y en particular el hallazgo de `factor_conversion` muerto y el de `moneda_cuentas` con `usuario_id` como PK)
+- **ADR-008** (gobernanza e idempotencia de esquema: la re-clave de la generalizacion se requiere aditiva y sin `UPDATE` de historico)
+- **ADR-063 / ADR-065** (gobernanza de capa Parche y Own the day: la gobernanza de 3 capas que `040:280-330` ya aporta y que la decision A aprovecha como sustituto)
+- **ADR-055** (`mercado_puntos` es metrica de progreso, no moneda: por eso el ranking compuesto de la parte 2 no puede "usar" `mercado_puntos` como componente)
+
+---
+
+### Parte 2 -- Sinks, ranking compuesto, 3 monedas y gates por Era
+
+**Migracion:** `045` (aditiva, idempotente, ASCII-safe)
+
+Esta parte existe porque la parte 1 dejo **dos agujeros reales** y una **regla dura** que solo esta parte puede levantar. Escribe una sola vez el argumento (ADR-084 D1): `TASKS.md`, `NEXT.md`, `BLUEPRINT.md` y el cuerpo de ADR-061 **solo apuntaban aqui**.
+
+**Datos del archivo real que esta parte usa como cimiento** (ADR-006; todo lo que sigue se midio, no se supono):
+
+| Dato | Valor medido | Ubicacion |
+|---|---|---|
+| Multiplicador de nivel | `M_nivel(N) = 1 + ((N-1)/39) * 2.0` -> **3.0 en N40** | `api/interacciones.js:499`, `:513-523` |
+| Tope de progresion | `CAP_PROGRESION = 5.0` / global `10.0` | `api/interacciones.js:497-498` |
+| Tope de dias de cuenta (factor origen) | `ORIGEN_MIN_DIAS_CUENTA = 7` | `api/interacciones.js:511` |
+| Topes fisicos diarios | `VISITAS_DIA_MAX = 30`, `VOTOS_DIA_MAX = 20` | `api/interacciones.js:273`, `:280` |
+| Bases de XP | `visita 60`, `resena_larga 30`, `rating 5`, `guardado 3` | `api/interacciones.js` (`XP_BASES`) |
+| Ledger de XP | `xp_ledger(accion, xp_base, mult_final, cap_aplicado, xp_final, contexto jsonb)` | `031:..._gamificacion_v6_nivel_scaling.sql` |
+| Bloque de moneda | `moneda_cuentas` con **`usuario_id` como PK**, `moneda_ledger` **sin columna de moneda** | `040:208-226` |
+| Vocabulario de 3 monedas ya cerrado | `CHECK (casa IN ('condor','jaguar','delfin'))` | `024:159-166` |
+| Parches | `pandillas(fama_total, activo)` + `pandillas_miembros(rol)` + `pandillas.tithe_pct` | `010:93-121`, `041:55` |
+| Upgrades de parche | `parche_upgrades(tipo_upgrade, puntos_invertidos, activo_hasta)` | `039:140-152` |
+| Gobernanza 3 capas | `gobernanza_propuestas(capa, capa_id, autor_id, estado)` + `gobernanza_votos(peso, voto, activo)` | `040:280-320` |
+| Ranking actual | 4 x `ORDER BY xp_total DESC` | `api/usuarios.js:959, 979, 1198, 1342` |
+
+### 1. Formula y tabla de los sinks (area 5)
+
+**La curva se congela con tres numeros, no con un parametro libre:**
+
+```
+Costo(k) = Costo_Base * (1 + alpha * k) ^ gamma
+alpha = 0.20   gamma = 2.0   k = numero de slots PAGADOS HISTORICOS del usuario (COUNT(*), no solo activos)
+```
+
+**Por que esta curva y no otra.** `gamma = 2.0` porque el objetivo declarado --"el costo de expandirse tiene que superar lo que un usuario puede producir en un dia" -- es una **afirmacion sobre el precio TOTAL del siguiente slot**, no sobre su incremento. Con `gamma = 1` el siguiente slot cuesta siempre `Costo_Base * alpha` mas: el precio de la foto #50 es practicamente el de la foto #2 y un whalesito compra 50 slots en un dia sin que la curva se lo advierta. Con `gamma = 2` el **coste marginal** es `2 * Costo_Base * alpha * (1 + alpha*k)`, es decir **crece con el propio volumen del usuario**, que es la unica Palanca que un sink necesita. `gamma > 2` se descarta por una razon operativa: obliga a que el primer slot ya sea casi inalcanzable para un usuario de nivel medio, y entonces el sink no escala, se bloquea. `alpha = 0.20` (y no `0.10`) porque con `alpha = 0.10` el punto de inflexion caia en N23, dentro de la Era 3 que la parte 1 declaro tardia: el muro debe caer **dentro o justo despues de la Era 2** para que la Era 3 sea precisamente "la era donde ya no se puede solo". Con `alpha = 0.20` el muro cae en **N15**, que es exactamente el umbral que el operador pidio, y de forma **no arbitraria** (ver el calculo de la seccion 2).
+
+**Los 4 `Costo_Base` (XP), con el ratio entre ellos justificado:**
+
+| accion | `Costo_Base` | Ratio | Razon del ratio |
+|---|---|---|---|
+| `foto_galeria` (foto extra en galeria publica) | **320** | 1.00x | Referencia. Es el sink de mayor volumen y el mas granular. |
+| `destacar_evento` (destacar evento) | **560** | 1.75x | El evento tiene fecha de caducidad: el valor se consume, no se acumula, asi que su precio es **volatile por naturaleza** y su valor percibido es menor que el de un activo permanente. |
+| `album_slot` (abrir slot adicional de album) | **640** | 2.00x | Un album es un **contenedor**: el slot es un artefacto mas valioso y mas permanente que una foto suelta. |
+| `portada_destino` (fijar contenido en portada de destino) | **800** | 2.50x | Es el activo **mas escaso del juego**: hay uno por destino, es el maximo de visibilidad, y **no existe en ningun sitio que la competencia pueda replicar**. El precio mas alto de los 4. |
+
+**Regla anti-copia del ratio:** los cuatro valores salen de un unico criterio ("rango de valor percibido del activo"), no de cuatro decisiones sueltas: `foto < evento < album < portada`. Si en el futuro se anade un quinto sink, **no se elige su `Costo_Base` por intuicion**: se coloca en este ranking por valor percibido y se aplica el ratio del vecino.
+
+**Tabla de persistencia** (migracion `045`): **el costo actual se DERIVA en lectura, no se materializa.** Tres razones, en orden de peso:
+
+1. **El precio congelado es un dato historico, y ese si se materializa.** Como el precio que se paga se congela al comprar (§4), el unico precio que importa --el que el usuario pagó-- queda **escrito en la fila comprada**. Una columna `costo_actual` en la tabla de configuracion seria un segundo sitio donde vive el mismo numero, y por definicion puede desincronizarse de la curva.
+2. **Materializar cuesta escrituras O(n) en cada compra.** Si el precio vive en una columna que se actualiza al comprar, cada compra de cualquier usuario reescribe el precio del siguiente slot de **todos** los demas usuarios de esa accion: un `UPDATE` massive o un trigger, y con el driver HTTP de Neon sin transaccion interactiva (ADR-055) eso es trabajo asincrono que puede no llegar. La curva es `POWER(1 + alpha*k, gamma)` sobre un `COUNT(*)` que ya se necesita para calcular `k`: **derivar cuesta una fila mas de lectura, materializar cuesta una fila mas de escritura**.
+3. **El desincronizacion es el riesgo real, y el riesgo no es teorico.** Si `k` se cuenta sobre slots `activo=true` y el precio se guardara aparte, bastaria un `activo=false` mal aplicado (ADR-003) para que el precio mostrado dejara de corresponder a lo que se cobrara. Derivar hace que **esos dos numeros no puedan separarse por construccion**.
+
+**La tabla queda asi** (2 tablas nuevas en `045`, ambas aditivas e idempotentes):
+
+```sql
+-- 045_parte2_sinks_ranking.sql  (ASCII-safe, aditiva, idempotente)
+CREATE TABLE IF NOT EXISTS sink_acciones (
+  clave         varchar(40) PRIMARY KEY,     -- 'foto_galeria' | 'destacar_evento' | 'album_slot' | 'portada_destino'
+  etiqueta      text NOT NULL,
+  costo_base_xp numeric(12,2) NOT NULL CHECK (costo_base_xp > 0),
+  slot_max      int NOT NULL DEFAULT 40 CHECK (slot_max > 0),
+  -- DECISION DEL OPERADOR (ratificada): los 4 valores reales de este campo
+  -- (25 / 12 / 10 / 3) los fijo el operador en la semilla del bloque (5) de
+  -- la 045, mas abajo en esta misma seccion. El DEFAULT 40 de aqui es solo el
+  -- valor por defecto de la columna; los 4 valores con los que se opera son
+  -- los del operador. No es un supuesto del arquitecto.
+  slot_max_activos int NOT NULL DEFAULT 40 CHECK (slot_max_activos > 0),
+  activo        boolean NOT NULL DEFAULT true,
+  creado_en     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_sink_acciones_topes CHECK (slot_max_activos <= slot_max)
+);
+
+-- Una fila por slot COMPRADO. Es append-only + activo=false (ADR-003).
+-- k = COUNT(*) HISTORICO de filas del usuario para esa clave (NO solo activas):
+-- ver seccion 1, "el tope del ciclo de compra/baja".
+CREATE TABLE IF NOT EXISTS sink_slots (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id    uuid NOT NULL REFERENCES usuarios(id),
+  clave_accion  varchar(40) NOT NULL REFERENCES sink_acciones(clave),
+  ref_id        text,                        -- id del destino/album/evento afectado (opcional)
+  costo_pagado  numeric(12,2) NOT NULL CHECK (costo_pagado >= 0),  -- PRECIO CONGELADO
+  alpha_aplicado numeric(6,4) NOT NULL DEFAULT 0.20,               -- congelado tambien
+  gamma_aplicado numeric(6,4) NOT NULL DEFAULT 2.00,               -- congelado tambien
+  activo        boolean NOT NULL DEFAULT true,
+  creado_en     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_sink_slot UNIQUE (usuario_id, clave_accion, ref_id, creado_en)
+);
+CREATE INDEX IF NOT EXISTS idx_sink_slots_usuario ON sink_slots(usuario_id, clave_accion) WHERE activo = true;
+-- Indice del HISTORICO (el que usa COUNT(*) para el precio). El de arriba
+-- sirve para "cuantos slots activos tengo"; este sirve para "cuanto he pagado".
+CREATE INDEX IF NOT EXISTS idx_sink_slots_usuario_hist
+  ON sink_slots(usuario_id, clave_accion);
+```
+
+Se congelan tambien `alpha` y `gamma` **en la fila comprada**: si la curva se recalibra en el futuro (que es probable), el usuario que ya compro no ve alterado su recibo historico y el `sink_slots` sigue siendo auto-explicativo. El `UNIQUE` incluye `creado_en` precisamente para **no** bloquear la recompra de un slot dado de baja (ADR-003: dar de baja es `activo=false`, y el siguiente intento crea una fila nueva en vez de resucitar la vieja).
+
+### 1-bis. Los sinks debitan XP DISPONIBLE, nunca `xp_total` (INVARIANTE, no opcion)
+
+**El hallazgo que cambio el diseno (por que esto no es negociable).** La primera redaccion de esta seccion debitia `xp_total`:
+
+```
+UPDATE usuarios SET xp_total = xp_total - p.costo   -- RECHAZADO
+```
+
+Eso rompe **dos** cosas a la vez, y la segunda es la grave:
+
+1. **Rompe ADR-018**, que fija `xp_total` como la **moneda unica** y, por su propia construccion (`usuarios.js:184-191` -> `calcularNivel(xp_total)`, y `interacciones.js:1795-1802` -> `calcularNivelLocal(xpTotal)`), como la **funcion de nivel**. Restar de `xp_total` es restar de la funcion de nivel.
+2. **Hace el nivel NO MONOTONO, y por tanto rompe los gates que este mismo ADR crea.** El reviewer dio el caso: un usuario de N22 (30.050 XP) que compra 800 XP de `portada_destino` en el slot `k = 21` paga `800 * (1 + 0.20*21)^2 = 800 * 27.04 = 21.632`, y con `xp_total = 30.050` la operacion **no cuaja** (saldo insuficiente) -- pero en cualquier caso, **si** la mutacion se permitiera, el mismo usuario con 30.050 XP que gasta 800 en un sink barato de una Era anterior bajaria a 29.250 y **perderia el gate de `gobernanza` y `contratos` (N21) que este ADR acaba de crear en la seccion 5**. Un gate que se puede perder gastando es un gate que no es un gate.
+
+**Invariante que este ADR fija por escrito: EL NIVEL ES MONOTONO Y NO PUEDE BAJAR POR GASTO.** Ninguna operacion de todo el sistema economico --ningun sink, ninguna compra, ningun mercado-- puede reducir `xp_total`, y por tanto ninguna puede reducir el nivel. Permitir lo contrario seria permitir que un usuario "desgaste" progreso para perder acceso a contenido, lo cual es al reves de un sink.
+
+**ADVERTENCIA (correccion de la redaccion anterior de este ADR): el invariante anterior es FALSO como afirmacion del sistema, y se conserva aqui deliberadamente como el invariante QUE ESTE ADR IMPONE, no como el que el codigo ya cumple.** El campo real de `usuarios.js`/`interacciones.js` tiene **11 sitios que hoy reducen `xp_total`**, medidos en el archivo: `api/usuarios.js:1475` (`COSTO_FACCION`), `:1569` (`COSTO_CASA`), `:1662` (`COSTO_CLASE`), y `api/interacciones.js:1185`, `:9490`, `:11246`, `:12575`, `:12740`, `:13291`, `:13464`, `:13527`. Los tres de `usuarios.js` son los de la eleccion de faccion / casa / clase y son **anteriores a este ADR**. Por tanto la formulacion correcta es la que queda: **este ADR no baja XP disponible en ningun sitio; lo que hace es fijar que en adelante ningun gasto nuevo que el propio ADR introduce reduce `xp_total`.** La correccion de los 11 sitios preexistentes **no** se decide aqui (ver la nota de clamp inmediatamente despues): es deuda heredada, medida y quantificada, no una regla nueva.
+
+**La mecanica correcta: un acumulado de gasto, y `xp_total` intacto.** La partida doble se hace en un campo **nuevo y dedicado**, no en el saldo:
+
+```
+XP_DISPONIBLE(u) = u.xp_total - COALESCE(u.xp_gastado_sinks, 0)
+Nivel(u)          = calcularNivel(u.xp_total)        -- INTACTO, monotono
+```
+
+- **Nuevo campo en `usuarios`:** `xp_gastado_sinks numeric(12,2) NOT NULL DEFAULT 0`. Es un **contador de gasto**, no un saldo: por construccion **solo crece** (lo unico que lo reduce es una devolucion, que §1-bis.2 prohibe), luego `XP_DISPONIBLE` es monotono **no creciente** en el alcance de los sinks.
+- **ADVERTENCIA (correccion de la redaccion anterior de este ADR): "nunca negativo por construccion" era FALSO, y la guarda que se citaba para sostenerlo solo cubre UN camino.** El `xp_gastado_sinks` lo debitran **solo** los sinks (§1-bis), y solo el `UPDATE` de compra lleva la guarda `(xp_total - xp_gastado_sinks) >= costo`. Los **otros 11 sitios que reducen `xp_total`** (listados en la advertencia de arriba) **no leen ni escriben `xp_gastado_sinks`**, luego el saldo disponible **no se entera**: un usuario compra un sink (baja `xp_gastado_sinks`), y despues paga faccion, casa o clase (bajan `xp_total`). Cuando `xp_gastado_sinks > xp_total`, `XP_DISPONIBLE(u) = xp_total - xp_gastado_sinks` queda **NEGATIVO y se queda negativo**, y el siguiente sink devuelve `saldo_insuficiente` para siempre sin que ninguna consulta lo explique. Lo que la guarda del `UPDATE` si garantiza es exactamente lo que dice su `WHERE`: **que no se compra un sink sin disponible**, no que el disponible no pueda ser negativo por otras vias.
+- **CLAMP DEL DISPONIBLE (decision cerrada, no queda abierta): se aplica (i), el disponible se acota a 0 con `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)` en los puntos de gasto que ya consumen XP.** La opcion (ii) -- una reconciliacion periodica que repara el historico -- se descarta por tres razones medidas: (a) **no hay donde vivir**: no hay cron ni una novena funcion serverless (8/8, ADR-001/ADR-010), luego el reparador tendria que correr en el trafico, que es un escritor mas que puede dejar de correr en silencio; (b) una reconciliacion que "arregla" `xp_total` **reescribe historia economica**, y el XP de los sinks esta congelado en receipts (§1) -- el disponible reparado ya no corresponderia a ningun recibo emitido; (c) el clamp es **local al punto de gasto**: no necesita memoria, no necesita historico y no puede quedar desincronizado con nada, porque no guarda ningun estado. Aplicado asi: **el SINK nunca puede dejar disponible negativo** (es lo que ya garantiza su propia guarda, y ahora ademas el `GREATEST` lo hace explicito); **el RESTO de gastos (faccion / casa / clase) SI puede dejar disponible negativo**, porque deducte de `xp_total` y no de `xp_gastado_sinks`. **Que el resto de gastos pueda hundir el disponible por debajo de 0 es una DECISION DE PRODUCTO, no solo tecnica**: se acepta que un usuario que haya gastado en sinks y luego pague faccion, casa o clase vea el disponible negativo, porque unificarlos en un unico campo de gasto (mover faccion/casa/clase a `xp_gastado_sinks`) haria que la eleccion de clase **dejase de ser un gasto de progresion** y pasase a ser un gasto de sumidero, cambiando la naturaleza economica de una accion que el sistema ya tiene y que este ADR no puede reescribir. Lo que este ADR **si** cierra es que ese estado no es silencioso ni permanente: el disponible negativo **explica por si solo** por que el siguiente sink devuelve `saldo_insuficiente`, y es recuperable gaining XP.
+- **Lista de implementacion pendiente del clamp (NO se implementa en este encargo, que es solo el ADR).** Los 11 puntos que deben pasar a leer/escribir el disponible con `GREATEST(..., 0)`, en la forma `SET xp_total = GREATEST(xp_total - $N, 0)` mas el mensaje de `saldo_insuficiente` cuando la resta no cuaja, son: `api/usuarios.js:1475` (`COSTO_FACCION`), `:1569` (`COSTO_CASA`), `:1662` (`COSTO_CLASE`); `api/interacciones.js:1185`, `:9490`, `:11246`, `:12575`, `:12740`, `:13291`, `:13464`, `:13527`. Nota de alcance: el clamp de los **3 de `usuarios.js`** es cosmetico mientras no exista `xp_gastado_sinks` (con `xp_gastado_sinks = 0`, `xp_total - 0 >= 0` ya esta implicito en la guarda de saldo existente), y se vuelve **load-bearing** en cuanto la `045` este aplicada; los **8 de `interacciones.js`** son los que hacen `xp_total` caer por debajo de lo que los sinks ya gastaron. **Orden de trabajo declarado: los 11 se tocan en una migracion-codigo posterior a la `045`, no en el despliegue de la `045`**, para que la `045` siga siendo un despliegue de ventana cero (§3).
+- **Por que no `xp_total - SUM(xp_ledger del gasto de sinks)`:** esa formula es correcta pero **cara**: obliga a un agregado por usuario **dentro** de la CTE de compra, y el `SUM` sobre `xp_ledger` **no tiene indice** (el indice real de `031:225-241` es el PRIMARY KEY `id`; el filtro canonico seria `usuario_id`, que la migracion 031 **no** indexa). El coste se paga **en cada compra** y crece con el historico del ledger de cada usuario. El acumulado en `usuarios` es un `numeric` en la fila que la compra **ya esta tocando** (`UPDATE usuarios ... WHERE id = $1`), luego el coste **marginal es cero**: la compra es la misma sentencia de antes con un `SET` mas.
+- **Como se concilia con el ledger (invariante de verificacion, no de calculo):** `xp_gastado_sinks` **debe** ser igual a `-SUM(xp_ledger.xp_final)` de las filas con `accion LIKE 'sink_%'`. Es una **verificacion de auditoria** (la que ya hace `usuarios.js:714-715` con `moneda_cuentas` contra `SUM(delta)`), **no** la fuente de lectura del saldo disponible. Si divergen, el divergence es un bug de escritura, no una fuente de verdad alternativa: la fuente de verdad del **total ganado** es `xp_total` (ADR-018) y la del **total gastado en sinks** es `xp_gastado_sinks`, y la suma de los dos da el disponible.
+- **El XP "gastado" no se quema, se congela.** Es la distincion economica que hace que esto no sea un `DELETE` de XP: el XP gastado en un slot **sigue siendo del usuario** (le da derecho al slot y a su recibo congelado), lo que se mueve es su **disponibilidad**, no su **existencia**. Por eso `sink_slots` es append-only (ADR-003) y por eso dar de baja un slot **no devuelve** el XP (§1, decision economica): un sink que devuelve es un banco.
+
+**§1-bis.2. La baja de un slot no devuelve XP, por la misma razon de antes, y con el mismo efecto sobre el nivel.** `UPDATE sink_slots SET activo = false WHERE id = $1 AND usuario_id = $2 AND activo = true` y nada mas. Como `xp_gastado_sinks` no se toca, el disponible tampoco baja: el usuario pierde la capacidad del slot, conserva el XP gastado (que ya no puede recuperar) y **no pierde nivel**. La decision de no devolver se mantiene intacta; lo que se corrige es el **mecanismo** del cobro, no el criterio economico.
+
+**Como se compra: una sola sentencia SQL con CTE (patron ADR-055).** El driver HTTP de Neon no soporta `FOR UPDATE` interactivo, asi que la fila de `usuarios` **no se bloquea antes de leer**: se lee el disponible, se calcula el precio, y **el UPDATE atomico lleva la propia guarda de saldo**. Si dos compras concurrentes pasan el filtro a la vez, la segunda falla en el `WHERE (xp_total - xp_gastado_sinks) >= costo` y se devuelve `saldo_insuficiente` -- no hay overdraft posible, porque el `UPDATE` condicional **es** la transaccion:
+
+```sql
+WITH acc AS (
+  SELECT costo_base_xp, alpha_aplicado, gamma_aplicado, slot_max, slot_max_activos
+    FROM sink_acciones WHERE clave = $2 AND activo = true
+), k AS (
+  -- k HISTORICO (COUNT(*), no solo activos): ver el cierre del ciclo
+  -- compra/baja al final de esta seccion. Es el INDICE del PRECIO.
+  SELECT COUNT(*)::int AS k_actual FROM sink_slots
+   WHERE usuario_id = $1 AND clave_accion = $2
+), ka AS (
+  -- k ACTIVOS: es el indice de la CAPACIDAD, y el unico que se compara
+  -- contra slot_max_activos. Dar de baja un slot lo baja aqui, luego la
+  -- capacidad se recupera; el XP NO se recupera (sec. 1-bis.3).
+  SELECT COUNT(*)::int AS k_activos FROM sink_slots
+   WHERE usuario_id = $1 AND clave_accion = $2 AND activo = true
+), precio AS (
+  SELECT a.costo_base_xp * POWER(1 + a.alpha_aplicado * k.k_actual, a.gamma_aplicado) AS costo,
+         k.k_actual, ka.k_activos, a.alpha_aplicado, a.gamma_aplicado,
+         a.slot_max, a.slot_max_activos
+    FROM acc a CROSS JOIN k CROSS JOIN ka
+), debit AS (
+  -- B1: se debita xp_gastado_sinks, NUNCA xp_total. El nivel es MONOTONO.
+  -- La fila de usuarios que se toca es la MISMA que antes: coste marginal 0.
+  -- DOBLE TOPE: historico (fin del drenaje) + activos (capacidad, sec. 1-bis.3).
+  UPDATE usuarios u
+     SET xp_gastado_sinks = u.xp_gastado_sinks + p.costo
+    FROM precio p
+   WHERE u.id = $1
+     AND p.k_actual  < p.slot_max
+     AND p.k_activos < p.slot_max_activos
+     AND (u.xp_total - u.xp_gastado_sinks) >= p.costo
+  RETURNING (u.xp_total - u.xp_gastado_sinks) AS disponible_restante,
+            u.xp_total AS xp_total, p.costo, p.k_actual, p.k_activos,
+            p.alpha_aplicado, p.gamma_aplicado
+), ins AS (
+  -- Columnas REALES de sink_slots. slot_index es el k congelado; la CTE
+  -- anterior referenciaba 'slot_index_placeholder', que NO EXISTE en el
+  -- esquema: 42703 undefined_column en cada compra.
+  INSERT INTO sink_slots
+    (usuario_id, clave_accion, ref_id, costo_pagado, alpha_aplicado, gamma_aplicado, slot_index)
+  SELECT $1, $2, $3, d.costo, d.alpha_aplicado, d.gamma_aplicado, d.k_actual FROM debit d
+  RETURNING id, slot_index
+)
+INSERT INTO xp_ledger
+  (usuario_id, accion, xp_base, mult_nivel, mult_stack, mult_final, cap_aplicado,
+   bonos_planos, xp_final, es_exento, contexto, creado_en)
+SELECT $1, 'sink_' || $2, -d.costo, 1.0, 1.0, 1.0, 'accion',
+       0, -d.costo, true,
+jsonb_build_object('slot', d.k_actual, 'slot_activo', d.k_activos,
+                           'ref_id', $3,
+                           'disponible_restante', d.disponible_restante),
+       NOW()
+  FROM debit d
+RETURNING id;
+```
+
+**Columna por columna contra el esquema REAL (ADR-006): la CTE anterior NO ejecutaba.** La version previa fallaba por tres motivos concretos, los tres verificados contra el archivo de migracion:
+
+| Que estaba mal | Error real | Arreglo aplicado |
+|---|---|---|
+| `RETURNING id, slot_index_placeholder` en el `INSERT ... sink_slots` | **42703 `undefined_column` en cada compra**: `slot_index_placeholder` no existe en ninguna parte del esquema. | Se **anade `slot_index int NOT NULL`** a `sink_slots` en la `045` y el `RETURNING` nombra la columna real. |
+| `cap_aplicado` recibia `'accion'` con 5 columnas NOT NULL omitidas | No es un error de tipo: `cap_aplicado` es **text** con `CHECK IN ('ninguno','progresion','global','accion')` (`031:233-235`), y `'accion'` es un valor legal. El fallo real es que la sentencia **se apoyaba en los DEFAULT** de `mult_nivel`, `mult_stack`, `bonos_planos`, `es_exento` y `creado_en` en vez de declararlos. | Se **listan explicitamente las 12 columnas** del ledger real (`031:225-241`), con los valores fijados a mano. |
+| `es_exento` no se declaraba en un sink | Sin declararlo, el sink hereda `es_exento = false` por DEFAULT y **se contabiliza como XP ganado** en el agregado canonico de emision (`SUM(xp_final) WHERE es_exento = false`). Un sink no emite: **mueve**. | `es_exento = true` explicito, alineado con la convencion que ADR-066 fijo para el otro gasto de XP del sistema (`accion='tithe_parche', es_exento=true`, `041:176`). |
+
+Dos detalles que no son negociables: el `INSERT` en `xp_ledger` **toma su `FROM debit`**, de modo que si el `UPDATE` no qualify no hay debit ni registro en el ledger (**es el patron ADR-055: la garantia y el gasto son la misma sentencia**); y la `accion` del gasto es `'sink_' || $2`, un valor **nuevo** que no colisiona con ninguna accion de `XP_BASES` ni con `'tithe_parche'`, de modo que el catalogo de XP (`tipo=catalogo_xp`) no lo lista como fuente de ingreso.
+
+**Nota de vocabulario, porque dos campos se parecen y no son lo mismo:** `'accion'` es el valor del **CHECK de `cap_aplicado`** (`031:235`) y significa "el cap se aplico por la accion concreta"; la **`accion` del ledger** es la columna `accion` y vale `'sink_' || $2`. El valor de `cap_aplicado` **no** identifica el sink.
+
+**Cero Borrado Logico (ADR-003) aplicado a los slots, y el CIERRE del ciclo de compra/baja.** Dar de baja un slot comprado es `UPDATE sink_slots SET activo = false WHERE id = $1 AND usuario_id = $2 AND activo = true`, y **nada se devuelve**: el XP gastado se queda gastado. Esto es deliberado y es la decision economica mas importante de §3: un sink que devuelve es un **banco** con comision negativa, y un banco que devuelve es exactamente la fauna de DEXs que este juego no quiere. El slot libera el `ref_id` para volver a ocuparse.
+
+**El agujero que la primera redaccion de esta seccion dejo abierto, y que se corrige aqui: `k` debe ser HISTORICO (`COUNT(*)`), no de slots activos.** Con `k = COUNT(activos)`, dar de baja un slot **baja el precio del siguiente** y **no devuelve XP**, luego el ciclo `comprar -> dar de baja -> comprar -> dar de baja` se puede repetir **N veces pagando el coste base completo cada vez** (k vuelve a 0) y terminando con **1 slot activo**: eso es **drenaje de XP sin capacidad ganada**, y el XP drenado sale del sistema para siempre. Con **`k = COUNT(*)` historico** el ciclo deja de ser rentable desde la segunda vuelta: cada compra sube `k`, el precio **sube con el quadrado**, y quien cicla 10 veces paga la curva completa, no 10 veces el coste base. El "premio por circular" que la primera redaccion asumia **no es un premio**: es el agujero. La lectura correcta de un sink es que premia al que **expande y mantiene**, no al que rota.
+
+Consecuencia asumida y declarada: `k` historico hace el precio **irreversible por usuario** (nunca baja), coherente con ADR-003 (el historico no se reescribe) y con la decision de no devolver. El indice parcial `WHERE activo = true` de `sink_slots` se conserva **para las consultas de capacidad** ("cuantos slots activos tengo") y se **anade** el indice historico que usa el `COUNT(*)` del precio.
+
+**1-bis.3. El agujero que queda con un solo tope, y por que el tope es DOBLE.** La consecuencia anterior tiene un fallo que hay que cerrar: si la capacidad se midiera con `k` historico (un solo tope), el usuario que cicla slots **queda bloqueado para siempre** al alcanzar `slot_max`, porque su historico **nunca baja** y el siguiente slot le costaria la curva completa para un beneficio marginal que ya no puede usar. Un bloqueo permanente de capacidad no es un sink, es un muro, y empuja al usuario a ">40 slots no existen" en vez de a ">40 slots no compensan".
+
+Por tanto hay **DOS topes y cada uno responde a una pregunta distinta**:
+
+| Tope | Contador que lo mide | Pregunta que responde | Que NO hace |
+|---|---|---|---|
+| `slot_max` (historico) | `k = COUNT(*)` de filas compradas | "¿Cuanto he pagado en total por esta accion?" | **No** limita la capacidad actual |
+| `slot_max_activos` | `k_activos = COUNT(*) WHERE activo = true` | "Cuanta capacidad puedo usar ahora mismo?" | **No** limita el gasto total ya realizado |
+
+El reparto es **economico, no tecnico**: el precio se indexa por el historico, porque el historico es lo que se gasta y lo que hay que encarecer (cierra el drenaje por ciclo); la capacidad se indexa por los activos, porque dar de baja un slot **debe devolver capacidad** -- el XP no, seccion 1-bis.2 -- y un indice que no baja con la baja no puede devolver nada. Un solo tope para las dos preguntas no es mas simple: es **incorrecto en una de las dos** segun cual se elija.
+
+**Los dos topes conviven y los dos se evaluan en la MISMA sentencia** (`p.k_actual < p.slot_max AND p.k_activos < p.slot_max_activos`), luego no hay ventana en la que uno pase y el otro no. Y el indice parcial `WHERE activo = true` deja de ser solo informativo: pasa a ser **el indice que ejecuta la capacidad**, lo que justifica que la migracion lo cree en lugar de dejarlo por historia.
+
+### 2. Punto de Inflexion N15+ definido de forma MEDIBLE
+
+El operador pide un calculo, no una sensacion. Se construye en tres pasos, todos con numeros del archivo real.
+
+**Paso 1 -- produccion diaria maxima de un usuario (`PROD_MAX_N`).** Se compone de las cuatro acciones con **tope fisico real** (no de las que no lo tienen), porque una accion sin tope no es "produccion fisica maxima":
+
+```
+visita_dia      = 30 x 60  = 1800 XP   (VISITAS_DIA_MAX = 30, base visita = 60)
+resena_larga    = 20 x 30  =  600 XP   (VOTOS_DIA_MAX = 20, base resena_larga = 30)
+rating          = 20 x 5   =  100 XP   (VOTOS_DIA_MAX = 20, base rating = 5)
+guardado        = 20 x 3   =   60 XP   (VOTOS_DIA_MAX = 20, base guardado = 3)
+                                  -------
+BASE_PROD_DIA   =           2560 XP
+```
+
+Con el multiplicador de nivel `M_nivel(N) = 1 + ((N-1)/39) * 2.0`, acotado por los topes reales (`CAP_PROGRESION = 5.0` y `CAP_GLOBAL = 10.0`; como `M_nivel` llega a 3.0, en N40 el tope efectivo es `M_nivel` y no el cap), la produccion diaria maxima es:
+
+```
+PROD_MAX_N = 2560 * M_nivel(N)
+```
+
+**Paso 2 -- coste del siguiente slot en el nivel N.** El indice `k` del slot que compra un usuario de nivel `N` es `k = N - 1` **si se asume que ha gastado todos los slots anteriores** -- y esa es la unica asuncion defendible, porque si un usuario `N` compra su primer slot, compra el `k=0` y por definicion ya esta en el muro. La asuncion correcta, y la que hace el test honesto, es la peor para el sink: **para el sink es pesimista usar `k = N - 1`, porque el coste crece con `k`.** Es decir: si el test pasa con `k = N - 1`, pasa para cualquier `k` mayor, y por tanto **es una cota superior del esfuerzo diario necesario** -- exactamente lo que se quiere ("el costo de expandirse supera lo que puede producir en un dia").
+
+```
+COSTO_N = 320 * (1 + 0.20 * (N - 1))^2          [para la accion mas barata, foto_galeria]
+```
+
+**Paso 3 -- el test de inflexion, statement ejecutable.** El muro se cumple cuando `COSTO_N > PROD_MAX_N`, es decir cuando la **produccion de UN dia completo** no alcanza para un solo slot. La igualdad se resuelve para el `N` en el que se cruza:
+
+```
+320 * (1 + 0.2*(N-1))^2  >  2560 * (1 + 2*(N-1)/39)
+320 * (1 + 0.2*(N-1))^2  >  2560 + 131.28*(N-1)
+```
+
+Probando en los niveles reales de la tabla (`niveles-data.js:19-59`, campo `min`):
+
+| Nivel | `xp_min` | Era | `PROD_MAX_N` | `COSTO_N` (k=N-1) | ¿Muro? |
+|---|---|---|---|---|---|
+| 10 | 8.650 | Explorador | 4.094 | 1.402 | NO (4.2x el coste diario) |
+| 12 | 12.000 | Explorador | 4.487 | 1.792 | NO (2.5x) |
+| **14** | **15.800** | **Explorador** | **4.879** | **2.048** | **NO (2.4x)** |
+| **15** | **17.900** | **Explorador** | **5.074** | **2.253** | **NO (2.2x)** |
+| 18 | 22.450 | Explorador | 5.662 | 3.021 | SI (1.9x -- se paga en 2 dias) |
+| 20 | 27.400 | Explorador | 6.054 | 3.475 | SI (1.7x -- 2 dias) |
+| 24 | 38.650 | Cronista | 7.037 | 4.959 | SI (1.4x -- 2 dias) |
+| 30 | 58.700 | Cronista | 8.613 | 7.857 | SI (1.1x) |
+| 40 | 100.000 | Mito | 12.800 | 19.550 | SI (0.65x -- **1 slot cada 1.5 dias**) |
+
+**Lectura honesta del calculo, que es la parte que hay que decir:** el cruce literal de la igualdad ocurre en **N17-N18**, no en N15. La razon de que N15 sea el umbral correcto **no es aritmetica de la curva, es de ERA**: N15 es la primera cuenta que puede entrar a la **Era 3** (Parches/Activo Oculto ya exigen 14/15 hoy, `comunidad.html:559-560`), y por lo tanto la primera que tiene **la Gig Economy P2P disponible para cooperar** (`contratos_p2p`, `039:96`). Poner el muro en N15 significa que **la cuenta que pierde la posibilidad de expandirse sola es exactamente la cuenta que ya tiene la herramienta para expandirse con otros** -- y ese es el objetivo declarado del operador, no un artefacto de la ecuacion.
+
+---
+
+### 3. Resolucion de la regla dura: generalizar la moneda de 1 a 3
+
+**El hallazgo de la parte 1 era correcto y es el que define el coste.** `moneda_cuentas` declara `usuario_id` como **PRIMARY KEY** (`040:209`), luego la tabla **admite por construccion un unico saldo por usuario**. Generalizar no es "anadir una columna": es **cambiar la clave primaria**, **redisenar el indice del ledger** y **cambiar el significado de `saldo`**. Esto completa la **Enmienda 3 a ADR-061** declarada en la parte 1 (`:5197`), **sin contradecirla**: las 3 monedas siguen siendo `{condor, jaguar, delfin}`, `xp_total` sigue siendo la moneda unica de progreso (ADR-018), la emision sigue acotada por lote, la conversion a dinero real sigue **PROHIBIDA** y el saldo sigue **derivado del ledger**. Lo unico que se reescribe es **la clave que materializa ese saldo**.
+
+**Los 4 puntos de ruptura, MEDIDOS en el archivo real (no supuestos).** Esto es lo que hace que la migracion no se pueda aplicar sola, y es el contenido de la condicion **C1** de la regla levantada:
+
+| # | Punto real | Que rompe | Correccion obligatoria |
+|---|---|---|---|
+| B1 | `api/interacciones.js:12835` -- `ON CONFLICT (usuario_id) DO UPDATE SET saldo = ...` | **ERROR DE SINTAXIS SQL en runtime** (no en el deploy): un `ON CONFLICT (usuario_id)` deja de ser legal en cuanto la PK pasa a `(usuario_id, moneda)`. El mercado de moneda deja de funcionar entero. | `ON CONFLICT (usuario_id, moneda) DO UPDATE` + el literal de moneda en el `INSERT` |
+| B2 | `api/interacciones.js:12720` -- `UPDATE moneda_cuentas SET saldo = saldo - $2 WHERE usuario_id=$1::uuid AND saldo >= $2` | **DEBITO EN LA MONEDA EQUIVOCADA**: sin columna `moneda` en el `WHERE`, seguiria descontando de la fila por defecto (`condor`) aunque la compra sea de `jaguar`. Fallo silencioso, el peor tipo. | `AND moneda = $4` |
+| B3 | `api/usuarios.js:723` y `:784` -- `(SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1)` como **subconsulta escalar** | **ERROR 500 en cuanto exista una 2a moneda**: una subconsulta escalar que devuelve mas de una fila lanza `more than one row returned by a subquery`. Rompe el saldo que se muestra en el perfil. | `WHERE usuario_id=$1 AND moneda = $2` con `$2` por defecto `'condor'` |
+| B4 | `api/usuarios.js:724` -- `COALESCE((SELECT SUM(delta) FROM moneda_ledger WHERE usuario_id=$1),0) AS ledger_sum` | **CONTAMINACION CRUZADA**: sumaria las 3 monedas y dejaria de cuadrar con el saldo, que es la garantia que ADR-061 define como la razon de ser del ledger. | `WHERE usuario_id=$1 AND moneda = $2` |
+
+**Decision de despliegue (esto es lo que hace segura la Enmienda 3):** la `045` y los cuatro parches B1-B4 **se aplican en el mismo commit y el mismo despliegue**. El motivo es que B1 es un error de sintaxis que solo aparece cuando la consulta se ejecuta, y B2/B4 son fallos **silenciosos** que no se detectan por health-check. La alternativa --migracion primero, codigo despues-- deja una ventana en la que el mercado de moneda esta caido y la verificacion de saldo mente. Se elige la ventana cero.
+
+**Migracion `045`, aditiva e idempotente (ASCII-safe, sin backticks, sin `UPDATE` de historico):**
+
+```sql
+-- 045_parte2_sinks_ranking.sql
+-- ADITIVA e IDEMPOTENTE (ADR-008): solo ADD COLUMN / CREATE TABLE / CREATE INDEX
+-- / DO $$ + semillas ON CONFLICT DO NOTHING.
+-- Prohibido DELETE (ADR-003). Prohibido UPDATE del historico del ledger.
+-- ASCII-safe: 0 bytes > 127 y 0 backticks en este bloque.
+
+-- (0) Contadores de gasto en usuarios (B1: los sinks NUNCA tocan xp_total).
+--     xp_gastado_sinks es un CONTADOR DE GASTO, no un saldo: solo crece, luego
+--     XP_DISPONIBLE = xp_total - xp_gastado_sinks es monotono NO CRECIENTE y
+--     el nivel (calcularNivel(xp_total), usuarios.js:184) es MONOTONO.
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS xp_gastado_sinks numeric(12,2) NOT NULL DEFAULT 0;
+
+-- (1) Columna discriminante en las 4 tablas. El DEFAULT fija la moneda
+--     historica sin tocar una sola fila existente: la moneda unica de
+--     ADR-061 Enmienda 2 era Condor, luego 'condor' es el unico valor
+--     consistente con lo ya escrito. El vocabulario es el MISMO dominio
+--     cerrado de 3 valores que ya usa casas_cofre.casa (024:160): no se
+--     introduce ninguna taxonomia nueva.
+ALTER TABLE moneda_cuentas
+  ADD COLUMN IF NOT EXISTS moneda varchar(10) NOT NULL DEFAULT 'condor'
+    CONSTRAINT chk_moneda_cuentas_moneda
+    CHECK (moneda IN ('condor','jaguar','delfin'));
+
+ALTER TABLE moneda_ledger
+  ADD COLUMN IF NOT EXISTS moneda varchar(10) NOT NULL DEFAULT 'condor'
+    CONSTRAINT chk_moneda_ledger_moneda
+    CHECK (moneda IN ('condor','jaguar','delfin'));
+
+ALTER TABLE moneda_emisiones
+  ADD COLUMN IF NOT EXISTS moneda varchar(10) NOT NULL DEFAULT 'condor'
+    CONSTRAINT chk_moneda_emisiones_moneda
+    CHECK (moneda IN ('condor','jaguar','delfin'));
+
+ALTER TABLE moneda_mercado
+  ADD COLUMN IF NOT EXISTS moneda varchar(10) NOT NULL DEFAULT 'condor'
+    CONSTRAINT chk_moneda_mercado_moneda
+    CHECK (moneda IN ('condor','jaguar','delfin'));
+
+-- (2) Re-clave de PRIMARY KEY: (usuario_id) -> (usuario_id, moneda).
+--     Es el UNICO cambio de clave del ADR y por el existe la parte 2.
+--     DROP CONSTRAINT + ADD CONSTRAINT es DDL sobre el catalogo: NO borra
+--     datos, luego cumple ADR-003 por construccion.
+--     IF EXISTS + EXCEPTION: si el nombre de la PK difiere del esperado, el
+--     DROP abortaria y dejaria las 4 columnas ya anadidas a medias.
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid = 'moneda_cuentas'::regclass AND contype = 'p'
+  ) THEN
+    ALTER TABLE moneda_cuentas
+      DROP CONSTRAINT IF EXISTS moneda_cuentas_pkey;
+    ALTER TABLE moneda_cuentas
+      ADD CONSTRAINT moneda_cuentas_pkey PRIMARY KEY (usuario_id, moneda);
+  END IF;
+EXCEPTION
+  WHEN duplicate_table THEN
+    RAISE NOTICE '045: PK (usuario_id, moneda) ya existe; no-op';
+  WHEN unique_violation THEN
+    RAISE NOTICE '045: hay filas duplicadas (usuario_id, moneda); NO se reclava';
+END $$;
+
+-- (3) Redisenio del indice del ledger. El indice viejo (usuario_id,
+--     creado_en DESC) NO es prefijo del nuevo, asi que se CONSERVA (no se
+--     borra, coherente con ADR-003) y se anade el nuevo, que es el que
+--     sirve la lectura canonica SUM(delta) WHERE (usuario_id, moneda).
+CREATE INDEX IF NOT EXISTS idx_moneda_ledger_usuario_moneda_creado
+  ON moneda_ledger (usuario_id, moneda, creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_moneda_mercado_estado_moneda
+  ON moneda_mercado (estado, creado_en DESC)
+  WHERE activo = true;
+
+-- (4) Las 2 tablas de sinks (seccion 1). Aditivas e idempotentes.
+CREATE TABLE IF NOT EXISTS sink_acciones (
+  clave          varchar(40) PRIMARY KEY,
+  etiqueta       text NOT NULL,
+  costo_base_xp  numeric(12,2) NOT NULL CHECK (costo_base_xp > 0),
+  slot_max       int NOT NULL DEFAULT 40 CHECK (slot_max > 0),
+  slot_max_activos int NOT NULL DEFAULT 40 CHECK (slot_max_activos > 0),
+  activo         boolean NOT NULL DEFAULT true,
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_sink_acciones_topes CHECK (slot_max_activos <= slot_max)
+);
+
+CREATE TABLE IF NOT EXISTS sink_slots (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id     uuid NOT NULL REFERENCES usuarios(id),
+  clave_accion   varchar(40) NOT NULL REFERENCES sink_acciones(clave),
+  ref_id         text,
+  costo_pagado   numeric(12,2) NOT NULL CHECK (costo_pagado >= 0),
+  alpha_aplicado numeric(6,4) NOT NULL DEFAULT 0.20,
+  gamma_aplicado numeric(6,4) NOT NULL DEFAULT 2.00,
+  slot_index     int NOT NULL,          -- k HISTORICO congelado (B5)
+  activo         boolean NOT NULL DEFAULT true,
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_sink_slot UNIQUE (usuario_id, clave_accion, ref_id, creado_en)
+);
+
+-- Indice de CAPACIDAD (slots activos) e indice HISTORICO (el COUNT(*) del
+-- precio). Son 2 porque responden a 2 preguntas distintas y el precio usa
+-- el historico (seccion 1, cierre del ciclo compra/baja).
+CREATE INDEX IF NOT EXISTS idx_sink_slots_usuario
+  ON sink_slots(usuario_id, clave_accion) WHERE activo = true;
+CREATE INDEX IF NOT EXISTS idx_sink_slots_usuario_hist
+  ON sink_slots(usuario_id, clave_accion);
+
+-- (5) Semilla de las 4 acciones con sus Costo_Base (seccion 1). Los 4 ratios
+--     salen del criterio "rango de valor percibido": foto < evento < album <
+--     portada. slot_max_activos va por debajo de slot_max (~60-75%) porque la
+--     capacidad se recupera al dar de baja un slot y el historico no (sec. 1-bis.3):
+--     un tope unico los fusionaria y el usuario quedaria bloqueado al ciclar.
+--     Idempotente por ON CONFLICT DO NOTHING: re-ejecutar NO
+--     reescribe una recalibracion manual del operador.
+--
+-- DECISION DEL OPERADOR (ratificada, NO es un supuesto del arquitecto):
+-- los 4 valores de slot_max_activos de abajo -- 25 / 12 / 10 / 3 -- los fijo
+-- el operador. El arquitecto solo cablea que se siembren aqui y que el CHECK
+-- ck_sink_acciones_topes los haga coherentes con slot_max (25<=40,
+-- 12<=20, 10<=15, 3<=5). La razon de que los dos topes no se fusionen es
+-- tecnica y esta en sec. 1-bis.3; los NUMEROS concretos son del operador.
+INSERT INTO sink_acciones (clave, etiqueta, costo_base_xp, slot_max, slot_max_activos) VALUES
+  ('foto_galeria',    'Foto extra en galeria publica', 320.00, 40, 25),
+  ('destacar_evento', 'Destacar evento',              560.00, 20, 12),
+  ('album_slot',      'Slot adicional de album',      640.00, 15, 10),
+  ('portada_destino', 'Portada de destino',           800.00,  5,  3)
+ON CONFLICT (clave) DO NOTHING;
+
+-- (6) Rampa del ranking compuesto: arranca en 0.0, que reproduce
+--     EXACTAMENTE el ranking actual (Score = xp_total), y sube sola a 1.0
+--     en 30 dias por elapsed/NOMBRE, sin cron y sin deploy. Vive en la tabla
+--     que YA existe (031:164-169), luego 0 tablas y 0 endpoints nuevos.
+INSERT INTO gamificacion_config (clave, valor, descripcion) VALUES
+  ('ranking_score_gamma', 0.0000,
+   'Peso del ranking compuesto: 0.0 = XP puro (actual), 1.0 = score completo')
+ON CONFLICT (clave) DO NOTHING;
+
+-- (6-bis) CONTADOR DE DIAS DE LA RAMPA. valor es numeric(12,4) (031:166):
+-- NO admite una fecha, luego el reloj de la rampa es un CONTADOR, no un
+-- timestamp. El reloj es actualizado_en de ESTA MISMA fila (escrita una vez
+-- por el ON CONFLICT, y nunca tocada por el escritor): por eso el contador
+-- se auto-limita y re-ejecutar el script NO duplica la rampa. El escritor
+-- ejecutable esta en la seccion 4 ("EL ESCRITOR DE LA RAMPA").
+INSERT INTO gamificacion_config (clave, valor, descripcion) VALUES
+  ('ranking_score_gamma_inicio', 0.0000,
+   'Dias transcurridos de la rampa (0-30); lo avanza el escritor idempotente')
+ON CONFLICT (clave) DO NOTHING;
+
+-- (7) Tope GLOBAL de saldo que entra al ranking. Decision del operador:
+--     GLOBAL por usuario (no por casa), porque un tope por casa permitiria
+--     multiplicar el bonus x3, que es el acaparamiento que la bonding curve
+--     de la Capa 2 existe para frenar. No es una constante de codigo: es
+--     dato, y por eso se lee de aqui.
+INSERT INTO gamificacion_config (clave, valor, descripcion) VALUES
+  ('ranking_saldo_tope', 2000.0000,
+   'Tope global por usuario del termino de saldo en el score (no por casa)')
+ON CONFLICT (clave) DO NOTHING;
+```
+
+**PUNTO DE NO RETORNO, declarado explicitamente (B2).** Este bloque **no es reversible sin `DELETE`**, y `DELETE` esta **prohibido** por ADR-003:
+
+1. **Volver a `PRIMARY KEY (usuario_id)`** exigiria eliminar 2 de las 3 filas de `moneda_cuentas` de todo usuario con saldo en mas de una moneda, y en general **borrar filas del ledger de las monedas retiradas** para que `SUM(delta)` cuadre. Sin `DELETE` (y sin una `moneda_cuentas_historico` que este ADR **no crea** porque seria una segunda fuente de verdad), el regreso **no es ejecutable**.
+2. **Quitar `xp_gastado_sinks`** exigiria `UPDATE usuarios SET xp_gastado_sinks = 0`, es decir **reescribir el historico de gasto** y dejar el ledger de sinks (`accion LIKE 'sink_%'`) **sin contraparte**: el invariante de verificacion se romperia y quedaria un gasto sin origen. Se puede **neutralizar** (dejar la columna y parar de debitarla) pero **no borrar**.
+3. **`slot_index int NOT NULL` en `sink_slots`** no admite `NULL`, luego tampoco se puede "desactivar" la columna sin reescribir la tabla.
+
+Por tanto: **esto es FORWARD-FIX.** Si algo esta mal, la correccion es una migracion **posterior** (`046`+) que migre el estado, jamas un rollback de la `045`. Y por eso la `045` y los cuatro parches B1-B4 van **en el mismo despliegue** (ver la decision de despliegue, §3): no existe un punto intermedio en el que el esquema sea valido pero el codigo no, ni al reves.
+
+**POLITICA EXPLICITA: la `045` y la `046` son FORWARD-ONLY. Cualquier error posterior se corrige con una migracion nueva (`046`+), NUNCA con un rollback.** No es una recomendacion, es la unica via ejecutable: revertir la PK de `moneda_cuentas` a `(usuario_id)` exigiria `DELETE` de las filas de moneda -- **prohibido por ADR-003** (Cero Borrado Logico) y por **ADR-008** (numeracion consecutiva e irrepetible de migraciones), porque una migracion que deshace otra rompe la cadena y hace que el estado real del esquema deje de ser reproducible desde cero. Lo que se permite es **neutralizar** (dejar la columna, parar de escribirla, poner el parametro a 0), lo que ya se describe mas arriba; lo que no se permite es **borrar historia** para volver atras.
+
+**Por que `IF EXISTS` y `EXCEPTION` (B2, segundo punto del bloqueante).** El `DROP CONSTRAINT moneda_cuentas_pkey` sin guarda aborta **dejando las 4 columnas `moneda` ya anadidas y la PK sin re-clahear** si el nombre real de la constraint difiere del esperado -- que es exactamente el fallo que el reviewer senalo: la migracion dies a mitad y el estado queda incoherente y **no reintentable sin limpiar antes**. Con `DROP CONSTRAINT IF EXISTS` mas los dos `EXCEPTION` (constraint duplicada, violacion de unicidad por filas duplicadas), el bloque **es idempotente en los dos sentidos**: re-ejecutarlo es no-op, y fallar deja un aviso en vez de un esquema a medias. La segunda `EXCEPTION` es tambien una salvaguarda de datos: si la clave nueva violase unicidad por datos preexistentes, **no se fuerza la re-clave** y se avisa en vez de perder informacion.
+
+**Por que el saldo NO se materializa por moneda y se deriva (decision coherente con la del sink).** El `saldo` que hoy vive en `moneda_cuentas` es una **cache** del ledger desde el principio (`usuarios.js:714-715` ya lo declara y lo verifica contra `SUM(delta)`). Generalizar la clave **no cambia esa relacion**: sigue siendo cache, y ahora por moneda. La lectura canonica del saldo de un usuario en una moneda es `SUM(delta) FROM moneda_ledger WHERE usuario_id=$1 AND moneda=$2`, y `moneda_cuentas.saldo` se mantiene **solo** para las escrituras atomicas del mercado (que necesitan la fila para poder hacer `UPDATE ... WHERE saldo >= $2`). Motivo: materializar el saldo "por moneda" ya **es** lo que hace la clave compuesta; anadir una segunda tabla de saldos seria duplicar la garantia que ADR-053 obliga a que exista en un solo sitio.
+
+**Lo que la Enmienda 3 deja prohibido, y por que la clave compuesta no lo rompe:**
+
+1. **No se crea una cuarta moneda**: el `CHECK` de las 4 columnas y el `CHECK (casa IN (...))` de `024:160` son **el mismo dominio cerrado de 3 valores**. Anadir una moneda es una migracion nueva, jamas un `INSERT`.
+2. **No se abre el ledger a la correccion destructiva**: `moneda_ledger` sigue siendo append-only. Un `delta` de compensacion, nunca editar el historico.
+3. **No se convierte a dinero real**: ni en la moneda 1 ni en las 3. La unica maxima que se anade al bloque es "el saldo de un usuario es un vector de 3 escalares, no un escalar".
+4. **`xp_total` sigue siendo la unica moneda de progreso**: los sinks de la seccion 1 gastan **XP, no moneda**. Los dos sumideros son **distintos y no intercambiables**, y esa separacion es deliberada: si los slots se pagaran en moneda, la moneda seria simultaneamente progreso y economia, y se perderia la excepcion que ADR-018 fija.
+
+### 4. Ranking con score compuesto (area 9)
+
+**La formula pedida, con la dimension resuelta:**
+
+```
+Score = XP_Total + (beta * Saldo_Monedas) + Fama_Parche        beta = 0.50
+```
+
+**El problema de unidades que hay que resolver antes de cualquier otra cosa.** `XP_Total` llega a **100.000** en N40 (`niveles-data.js:59`). `Saldo_Monedas` es un `numeric(14,2)` cuyo tope **no lo fija ningun `CHECK`** del esquema (`040:214-223` solo acota el rango del tipo). Si `beta = 0.50` se aplica literalmente a un saldo de miles, el termino de saldo seria de miles de puntos y **el ranking pasaria a medir saldo, no participacion**: un usuario que acumula 20.000 de saldo con 200 XP llegaria por encima de un usuario de nivel 30 con 15.000 XP. Eso es exactamente el acaparamiento que el operador quiere evitar, y con `beta` literal es **inevitable**. Por tanto `beta` no se aplica a un saldo **ilimitado**: se aplica a un saldo **acotado**, y el acotamiento es la decision economica, no un detalle de implementacion.
+
+**El compromiso con las dos fuerzas en conflicto (esta es la parte que hay que dejar escrita, porque las dos fuerzas son reales):**
+
+- **La fuerza que premia el saldo.** `beta > 0` convierte a la moneda en progreso. Sin ella, la Capa 2 (monedas de casa) queda **fuera** del ranking: un usuario puede emitir, operar y ganar sin que nada de eso le afecte al puesto. Eso es un sistema de economia sin consecuencias, y es peor que el acaparamiento.
+- **La fuerza que lo frena.** La **bonding curve de la Capa 2**, con su factor anti-monopolio (`casas_cofre.factor_conversion` + `poblacion_activa`, `024:159-166`), existe para que **acumular no sea el juego optimo**: cuanto mas poblacion tiene una casa, peor es su factor. Si el ranking **premia** el saldo indefinidamente, la curva y el ranking se contradicen: el juego estaria diciendo "acumula" y "no acumules" a la vez.
+
+**La resolucion es un tope, y el tope es el contrato economico:**
+
+```
+Saldo_Monedas = SUM(m.saldo) FROM moneda_cuentas m
+               WHERE m.usuario_id = u.id AND m.activo = true
+               LIMITADO a SALDO_TOPE = 2000   (DATO de configuracion, no constante de
+               codigo: se lee de gamificacion_config.ranking_saldo_tope)
+```
+
+`SALDO_TOPE = 2000` con `beta = 0.50` da un termino de saldo de **1000 puntos como maximo absoluto**, contra los **100.000** de XP_Total en N40. Es decir: **la moneda puede moverte como mucho una fraccion de nivel**, nunca una Era. Ese es el criterio de calibrado, y por eso el tope es 2000 y no 50.000: el termino de moneda debe ser **visible** (para que la Capa 2 cuente) y **no dominante** (para que no se convierta en la estrategia). Con un usuario con el tope de saldo repartido en las 3 monedas (2000 entre las tres, ~666,67 por casa) el termino de saldo llega a su maximo absoluto de **1000 puntos**, y ese maximo se compara con los saltos de nivel **reales** de `niveles-data.js:19-59`: el salto **N17 -> N18 es de 2.350 XP** (20.100 -> 22.450), el salto **N18 -> N19 de 2.400** (22.450 -> 24.850) y el salto **N1 -> N2 de solo 150** (0 -> 150). Ese es el criterio de calibrado, y por eso el tope es 2000 y no 50.000: el termino de moneda debe ser **visible** (para que la Capa 2 cuente) y **no dominante** (para que no se convierta en la estrategia). Con `SALDO_TOPE = 2000`, **los 1000 puntos de saldo no alcanzan ni un nivel completo en el tramo alto**: hacen falta 2.350 XP para cruzar N17->N18, luego en la Era alta la moneda **nunca compra un nivel entero**, mientras que en el tramo bajo (N1-N6, donde los saltos son de 150 a 500 XP) **si** alcanza. **Eso es correcto**: el saldo pesa donde el nivel todavia no pesa, y desaparece donde el nivel ya pesa. Es el perfil de un **bonus de entrada**, no el de una segunda economia.
+
+**Como se computa `Fama_Parche` con el esquema que YA existe. Cero tablas nuevas.** Cada componente sale de una columna real:
+
+| Componente | De donde sale (archivo real) | Como se agrega |
+|---|---|---|
+| `Fama_Parche` (base) | `pandillas.fama_total` (`010:93-101`) | El `fama_total` de la pandilla a la que pertenece el usuario (`pandillas_miembros`, `010:108-121`, con `rol`). El rol ya esta en el esquema, luego **el peso por rol no necesita columna nueva**: `fundador` x1.0, `oficial` x0.6, `miembro` x0.3 (escala de la reputacion, no un tipo nuevo). |
+| `Fama_Parche` (liderazgo) | `pandillas.tithe_pct` (anadido en `041:55`, rango 0..10) | Es el **porcentaje del Tithe de Parche**. Se usa como **peso del voto en gobernanza** (`gobernanza_votos.peso`, `040:312`), que es lo que el esquema ya lo pondera. Un fundador con mas tithe alto pesa mas al votar. No se inventa nada: es la funcion que `tithe_pct` ya cumple. |
+| `Fama_Parche` (inversion) | `parche_upgrades.puntos_invertidos` + `activo_hasta` (`039:140-152`) | `SUM(puntos_invertidos)` de los upgrades **vigentes** (`activo_hasta > now()`) del parche. Es XP ya gastado en upgrades del parche, luego es **esfuerzo demostrado**, no una promesa. Los 4 `tipo_upgrade` (`buff_xp_zona`, `descuento_comercial`, `aura_neon`, `escudo_territorial`) **no se ponderan**: cualquier ponderacion seria una moneda nueva, y ADR-055 ya establecio que `mercado_puntos` no es moneda. |
+| `Fama_Parche` (gobernanza) | `gobernanza_votos.peso` + `gobernanza_propuestas.capa`/`estado` (`040:280-320`) | `SUM(peso)` de los votos del usuario en propuestas de capa **`parche`** que estan **`aprobada`**. La capa es `CHECK (capa IN ('ecosistema','parche','faccion','marca'))` (`040:283-284`): solo la capa `parche` entra en `Fama_Parche`, porque es fama **de parche**; las otras 3 capas ya tienen su propia superficie (`#rk-facciones`, `#ao-facciones`, que hoy exigen N15). |
+| `Fama_Parche` (contribucion) | `casas_cofre.xp_cofre_total` + `factor_conversion` (`024:159-166`) | Entra como **normalizador**, no como suma: `fama_total / GREATEST(factor_conversion, 1.0)`. Es el **unico uso de `factor_conversion`** en el sistema -- la parte 1 lo declaro **columna muerta** y este es el consumer que la revive, alineando el ranking con la curva de la Capa 2 en vez de pelearse con ella. |
+
+**El peso de cada componente, justificado.** El termino de gobernanza es el mas fuerte por unidad porque un voto `aprobada` significa que el parche **llego a consensus**: es la prueba mas cara y por tanto la mas valiosa. El `fama_total` es el mas debil porque se acumula con el tiempo sin esfuerzo marginal. Los valores que fijan la escala:
+
+```
+Fama_Parche = 1.0 * (fama_total_parche * rol_factor / GREATEST(factor_conversion, 1.0))
+            + 2.0 * SUM(parche_upgrades.puntos_invertidos vigentes)
+            + 3.0 * SUM(gobernanza_votos.peso en propuestas 'parche' aprobadas)
+```
+
+Los tres multiplicadores (1.0 / 2.0 / 3.0) se eligen por **coste de demostracion**: la fama acumulada es gratis (x1), invertir XP en el parche cuesta (x2), conseguir que una propuesta sea aprobada exige consensus de varios (x3). El `fama_total` de una pandilla del rango de `XP_BASES` es de cientos, luego su contribucion es de cientos de puntos, comparable a `beta * Saldo` -- que es lo que se quiere: **las tres monedas de la reputacion pesan lo mismo**, y ninguna domina.
+
+**Decision critica: la transicion. Se elige RAMPA SUAVE, no corte limpio.** El ranking actual ordena por XP puro en **4 sitios** (`api/usuarios.js:959`, `:979`, `:1198`, `:1342`, los dos ultimos con `ROW_NUMBER() OVER (PARTITION BY ...)`) y hay usuarios con posicion ya fijada y visibles. Un corte limpio reposiciona a decenas de usuarios de golpe sin que hayan hecho nada, y en un juego con reputacion eso se lee como un fallo, no como un lanzamiento. Ademas el corte limpio tiene un fallo tecnico: en `:1198` y `:1342` la posicion se calcula **por faccion** y **por casa**, luego un corte limpio reordena **8 tablas de posiciones simultaneamente** (4 vistas x 2 particiones) y el usuario ve caer su posicion en varias a la vez sin accion de su parte.
+
+La rampa se define sobre un parametro que **ya existe** en el motor, `gamificacion_config` (`interacciones.js:544-561`), para no anadir ni una tabla ni un endpoint:
+
+**DECISION DEL OPERADOR (no es decision del arquitecto): el tope de saldo es GLOBAL por usuario, sumando las 3 monedas, NO por casa.** El operador fijo el valor en **2.000** y la granularidad en **usuario**, respondiendo a la pregunta de si el tope se aplicaba por casa. Este ADR **cablea y respeta** esa decision (columna `ranking_saldo_tope`, semilla `2000.0000` en la `045`), pero **el criterio no es derivable de la arquitectura**: por eso queda registrado aqui como decision del operador y no como conclusion del diseno.
+
+**La razon que el operador dio, y por que es la correcta para este juego:** un tope **por casa** seria multiple de las 3 monedas por miembro, luego **multiplicaria el bonus x3** -- un jugador con 3 casas repartiria su saldo entre CDR/JAG/DLF y cada casa lo bonificaria por separado, es decir **el tope se convertia en `2000 x num_casas`**. Eso es exactamente el acaparamiento que la **bonding curve de la Capa 2** quiere frenar: la Capa 2 limita el saldo por **individuo** para que la riqueza no se multiplique con el numero de casas. Un tope por casa seria un **bypass** de esa limiteccion a traves del ranking -- el saldo entra por la puerta de atras y el score se multiplica igual. **GLOBAL y por usuario** es la unica granularidad que no contradice la Capa 2.
+
+Como criterio de calibrado, el tope por casa habria elevado el techo del termino de saldo de **1.000** puntos a `1000 x num_casas`, es decir hasta **3.000** con 3 casas -- y el tramo alto de las Eras se decide por saltos de 2.350-2.400 XP, luego un saldo de 3.000 puntos ya **cruza un nivel entero por el solo hecho de tener 3 casas**. La granularidad global es, ademas, la que hace que el tope siga siendo un tope: uno por casa es un multiplicador disfrazado de limite.
+
+```
+t = (NOW() - (SELECT valor FROM gamificacion_config
+              WHERE clave = 'ranking_score_gamma_inicio')) / INTERVAL '30 days'
+w(t) = GREATEST(0.0, LEAST(1.0, t))
+
+Score_ranking(u) = xp_total(u)
+                 + w(t) * ( 0.50 * LEAST(GREATEST(COALESCE(saldo_monedas(u),0),0), TOPE)
+                          + Fama_Parche(u) )
+```
+
+`TOPE` es `ranking_saldo_tope`, y su granularidad ("global, sumando las 3 monedas por usuario, no por casa") es la decision del operador del parrafo anterior.
+
+**Como se implementa la rampa con la tabla que YA existe, sin cron y sin deploy.** `gamificacion_config.valor` es **`numeric(12,4)`** (`031:164-169`): **no admite una fecha**, luego el diseno anterior --que pretendia restar una fecha a `valor`-- **no ejecutaba**. Se cablea con **dos claves numericas**, que es lo que el esquema permite:
+
+- **`ranking_score_gamma`**: el peso ya aplicado, en `[0,1]`. Arranca en **`0.0000`** (semilla en la `045`, seccion 6), o sea **reproduce exactamente el ranking actual** (`Score = xp_total`, mismo `ORDER BY`, mismas posiciones).
+- **`ranking_score_gamma_inicio`**: los **dias transcurridos desde el encendido**, en `[0,30]`. Arranca en `0.0000`. Lo avanza el **escritor idempotente del bloque siguiente**, no una suma por peticion: el `SET` converge al mismo valor por muchos que lo ejecuten.
+
+Es decir: **la rampa no necesita un proceso que la empuje, se auto-avanza con el trafico que ya existe** (cualquier peticion de ranking la avanza) y **el reloj lo pone el dato, no el deploy**. Si nadie visita el ranking, la rampa no avanza: es la unica asimetria, y es aceptable porque **si nadie mira el ranking, la rampa no importa**. Tres propiedades que hacen esto seguro: (a) **es continuo**, `w(0) = 0` da el ranking de hoy al primer dia; (b) **es monotono**, `w` solo crece, luego un usuario no pierde posicion por el mero paso del tiempo **salvo** que otro suba, y esa subida es real; (c) **es reversible sin despliegue**, si hay que detener el ranking compuesto se pone `ranking_score_gamma = 0` a mano en la tabla y el sistema cae al ranking puro en la siguiente peticion. La decision de fondo: **el ranking compuesto no arranca, se enciende**. Y como el mecanismo de encendido es el mismo que el de cualquier otro parametro de la economia (`cap_global`, `m_nivel_max`, `factor_origen_local`), **no necesita un deploy para ajustarse ni para apagarse**.
+
+**EL ESCRITOR DE LA RAMPA, en SQL ejecutable (BLOQUEANTE: sin esto la rampa NUNCA se enciende y la funcion principal del ranking compuesto es CODIGO MUERTO).** La redaccion anterior de este ADR **sembraba `ranking_score_gamma = 0.0000` y solo lo leia**: el paso a `1.0` vivia **unicamente en la prosa**, sin ninguna sentencia que lo ejecutara, luego el ranking compuesto se quedaba **permanentemente apagado** y su unico efecto real era el coste del `COALESCE`. Este bloque es el escritor, y sus cuatro propiedades son la razon por la que es asi:
+
+```sql
+-- Escritor idempotente de la rampa. Se ejecuta desde el SCRIPT DE
+-- MANTENIMIENTO del despliegue, NO en el camino caliente de cada peticion.
+--
+-- (1) IDEMPOTENTE POR CONSTRUCCION, NO POR SUMA. El valor destino es
+--     GREATEST(valor_actual, dias_desde_cero) acotado a 30: una funcion
+--     MONOTONA NO DECRECIENTE del estado actual y del reloj. N ejecuciones
+--     concurrentes convergen al MISMO valor (punto de convergencia unico),
+--     porque el maximo de N copias del mismo par es el mismo par. La
+--     redaccion anterior hacia valor = valor + dias, que con N peticiones
+--     concurrentes suma N veces el mismo delta y avanza la rampa N veces
+--     mas rapido: no era idempotente, era un acelerador.
+--
+-- (2) ORIGEN DEL RELOJ: actualizado_en de la PROPIA fila del contador,
+--     que es la unica columna de fecha del esquema (valor es numeric(12,4),
+--     031:166, luego no admite una fecha). El reloj se auto-limita porque
+--     esa fila se escribe UNA vez (ON CONFLICT DO NOTHING) y este UPDATE
+--     NO la toca: re-ejecutar el script vuelve a calcular los mismos dias
+--     desde la misma ancla y el GREATEST converge al mismo valor.
+--     Deliberadamente NO se usa actualizado_en = NOW() aqui: si se
+--     actualizara, el contador se congelaria en el dia de la escritura.
+--     Y NO se usa una fecha semilla del deploy, porque entonces "dias
+--     transcurridos" seria una funcion del numero de despliegues.
+--
+-- (3) NO ESCRITURA EN RUTA DE SOLO LECTURA. Una escritura contra Neon
+--     desde una funcion serverless de solo lectura cuesta un round-trip
+--     extra en el endpoint mas caliente del producto por una fila que
+--     cambia una vez por dia; sacarla del camino caliente es lo que permite
+--     que sea idempotente sin disculpas.
+--
+-- (4) ASCII-safe: 0 bytes > 127 y 0 backticks.
+UPDATE gamificacion_config
+   SET valor = LEAST(
+                 30,
+                 GREATEST(
+                   COALESCE(valor, 0),
+                   GREATEST(0,
+                     CURRENT_DATE - COALESCE(actualizado_en::date, CURRENT_DATE)
+                   )
+                 )
+               )
+ WHERE clave = 'ranking_score_gamma_inicio';
+
+-- Una vez alcanzado el tope, el peso pasa a 1.0000: el ranking compuesto
+-- queda ENCENDIDO de forma permanente y explicita, por una fila que dice
+-- que ya termino, no por el paso del tiempo.
+UPDATE gamificacion_config
+   SET valor = 1.0000,
+       actualizado_en = NOW()
+ WHERE clave = 'ranking_score_gamma'
+   AND COALESCE(
+         (SELECT valor FROM gamificacion_config
+           WHERE clave = 'ranking_score_gamma_inicio'), 0) >= 30;
+```
+
+**Por que el reloj es `actualizado_en` y no una fecha semilla del deploy.** Es la unica de las dos que puede sostener un escritor idempotente. Con una fecha semilla del deploy, "dias transcurridos" seria una funcion del **numero de despliegues**, no del tiempo, y re-ejecutar el mismo script dos veces el mismo dia ya habria movido la rampa. Con `actualizado_en` de la fila del contador --escrita una vez por `ON CONFLICT DO NOTHING` y **no tocada** por este `UPDATE`-- el contador es una funcion del reloj, y como el destino es `GREATEST(estado, reloj)`, la funcion compuesta es **monotona no decreciente y por tanto convergente**: cualquier numero de ejecuciones, en cualquier orden, deja el mismo valor final. Ese es el criterio tecnico de idempotencia que se exige --mismo resultado tras N ejecuciones, no "no hace nada la segunda vez"-- y un `+=` no lo cumple nunca, porque `valor + dias` aplicado N veces da `valor + N*dias`.
+
+**Y por que el escritor sale del camino caliente (decision, no descuido).** La version anterior lo cableaba en "el mismo `UPDATE` que lee la config en cada peticion de ranking". Eso es **una escritura en una ruta de solo lectura**, contra Neon, desde serverless, y tiene un coste concreto: **un round-trip de escritura extra por peticion en el endpoint mas caliente del producto**, mas el riesgo de que N peticiones concurrentes compitan por la misma fila (que el `GREATEST` neutraliza en el resultado, pero no en el coste). Ademas, un escritor en el camino caliente tiene el peor modo de fallo posible: **si deja de correr, la rampa se queda a medias y nadie se entera**. Este ADR elige sacarlo al **script de mantenimiento del despliegue**, con la consecuencia asumida y declarada: **la rampa solo avanza cuando hay un despliegue o una corrida de mantenimiento**, luego su calendario real es "por dia de despliegue", no "por dia del calendario". Se asume porque (a) el ranking compuesto empieza en `0.0000`, luego **reproduce exactamente el ranking actual**, de modo que una rampa que no avanza no rompe nada; (b) el mecanismo de apagado/encendido manual (`ranking_score_gamma = 1.0000` a mano) **no depende del escritor** y por tanto sigue disponible sin despliegue; y (c) 30 dias de rampa sobre despliegues es una transicion mas lenta y mas conservative que la que se describia antes, y esa es la decision que este ADR toma.
+
+**La tabla de premiacion estacional (Top 10), con el rango de cada premio.** Se materializa en una tabla de **una fila por posicion**, no en codigo, para que el catalogo de premios sea dato y no logica:
+
+```
+Puesto 1    -- Estancia gratuita (30 dias) + marco estetico dorado permanente
+           + badge "Guardián del Camino" (permanente)
+Puestos 2-5 -- 3 cupones de descuento (25%) en slots de galeria publica
+           + titulo de "Cartógrafo Real" (visible en perfil y ranking)
+Puestos 6-10-- 2 amuletos de multiplicador x2.0 (30 dias)
+           + 1 drop de foto de destino de la coleccion de la Era
+```
+
+Por que este reparto y no uno uniforme: (a) el **puesto 1** lleva lo unico que no se puede ganar jugando -- una estancia que ahorra tiempo, no XP -- porque el ranking tiene que tener una cima que valga la pena perseguir; (b) los **puestos 2-5** reciben cupones de slots, que es el **sumidero** de la seccion 1, luego el premio del ranking **financia el sink** en vez de competir con el; (c) los **puestos 6-10** reciben amuletos (multiplicador temporal) y un drop, que es lo unico que el usuario puede **usar para producir mas XP** en el tramo donde el XP se produce mas rapido (N30+, `M_nivel` = 2.5x). Es decir: **el premio del ranking es un multiplicador de participacion, no un atajo de nivel**. En ningun rango hay XP directo, y eso es lo que mantiene la regla de que `xp_total` es la reputacion inmutable.
+
+**Como se computa SIN tocar `xp_total`.**
+
+La pregunta era si el score puede vivir sin columna nueva. La respuesta de este ADR es **que si**, y por tanto **no se anade ninguna columna**. Las 3 opciones, con la razon por la que se descartan 2 y se elige 1:
+
+- **En consulta, con 3 subconsultas CORRELACIONADAS por usuario -- DESCARTADA, por forma (no por fondo).** Es posible en principio (`ORDER BY (xp_total + 0.5*LEAST(saldo,2000) + fama)` en el `SELECT`), pero las 4 consultas de `usuarios.js` son de **ranking de poblacion** (`:959` y `:979` con `LIMIT`, `:1198` y `:1342` con `ROW_NUMBER() OVER (PARTITION BY ...)` que **materializan la posicion de cada usuario de cada faccion y de cada casa**). Una subconsulta correlacionada **se reevalua por fila**, luego el trabajo crece con el tamaño del resultado y no con el de la fuente. **Lo que se descarta es esa forma, no el calculo en query**: la misma score, agregado por tabla y no por usuario, es O(n) una vez (ver Decision D, dos parrafos mas abajo).
+- **Sin columna, con materializacion periodica:** **Rechazada por una razon de inventario, y el reviewer la refuerzo**: habria que anadir un job que recalcule y escriba el score de todos los usuarios, y ese job **no tiene donde vivir**: no hay novena funcion serverless (8/8) y no hay cron. Un job es, ademas, **un escritor mas que mantener y que puede dejar de correr en silencio**, que es el peor modo de fallo posible para un ranking.
+- **Con columna `score_cache` materializada:** **Rechazada, y el motivo es mas grave que el coste.** Un cache que se escribe "en la proxima visita del usuario" **no tiene escritor para los usuarios que no vuelven**: el ranking ordenaria por un cache **mayoritariamente vacio o rancio**, que es exactamente la "fuente de verdad accidental" que objeto el revisor. Peor: en `:959` y `:979` (Top-N con `LIMIT`) **solo importa el cache de los usuarios que ya estan en el top**, y en `:1198` y `:1342` (`ROW_NUMBER() OVER (PARTITION BY ...)`) **con cero filas el score colapsa a 0 y las posiciones se corruptan**, no se aproximan: el top-3 por faccion y el top-5 por casa salen **erroneos de forma silenciosa**, que es el peor fallo posible en una vista de reputacion. Un cache que solo se refresca con visitas es **un cache cuyo contenido nadie garantiza**.
+
+**DECISION D (la unica via que se cablea): CALCULO EN QUERY, CON UNA SUBCONSULTA AGREGADA UNICA Y UNA DEGRADACION EXPLICITA A XP PURO.** Se descarta `score_cache` de raiz. El score se calcula **siempre**, en la propia consulta de cada una de las **4** ordenaciones, y no hay ninguna columna que mantener ni ningún escritor que dependa de que el usuario vuelva.
+
+**Por que esta via NO es la "consulta con 3 subconsultas correlacionadas" que la parte original descartaba.** La objecion original (`:5570`) era de **forma**, no de fondo: 3 subconsultas correlacionadas por usuario **dentro** del `ORDER BY` repiten el trabajo por fila y materializan la posicion de cada usuario de cada faccion y de cada casa. La forma correcta es la opuesta: **una sola subconsulta agregada, no correlacionada**, que se calcula **una vez por peticion** y se une por clave:
+
+```
+-- Una subconsulta agregada por TABLA (no por usuario), usada por las 4 vistas.
+-- COALESCE en el multiplicador: si la 045 no esta aplicada, gamificacion_config
+-- YA EXISTE (la creo 031), luego la fila 'ranking_score_gamma' no esta y el
+-- SELECT escalar devuelve NULL; sin COALESCE, xp_total + NULL * (...) = NULL
+-- en todas las filas y el ORDER BY da un orden arbitrario y silencioso.
+-- COALESCE(..., 0.0000) hace que gamma ausente sea 0 = ranking puro.
+-- ORDER BY con COALESCE(score_ranking, xp_total): ultima red de seguridad, si
+-- score_ranking llega a NULL por cualquier otra causa se ordena por xp_total.
+-- GREATEST(SUM(delta), 0): el stock es la SUMA; truncar CADA delta ignoraria
+-- los debitos y subsidiaria al que gasta.
+WITH score AS (
+  SELECT DISTINCT ON (u.id)
+         u.id,
+         u.xp_total,
+         COALESCE(s.saldo, 0) AS saldo,
+         COALESCE(f.fama, 0)   AS fama
+    FROM usuarios u
+    LEFT JOIN (   -- 1 sola pasada agregada, no correlacionada
+            SELECT usuario_id,
+                   GREATEST(SUM(delta), 0) AS saldo
+              FROM moneda_ledger
+             WHERE usuario_id IS NOT NULL
+             GROUP BY usuario_id
+           ) s ON s.usuario_id = u.id
+    LEFT JOIN (   -- 1 sola pasada agregada, no correlacionada
+            SELECT pm.usuario_id,
+                   SUM(GREATEST(u2.puntos_invertidos, 0) * 2.0
+                       + COALESCE(gv.peso_votos, 0) * 3.0
+                       + COALESCE(pa.fama_total, 0) * pa.rol_factor
+                         / GREATEST(cc.factor_conversion, 1.0)) AS fama
+              FROM ...
+             GROUP BY pm.usuario_id
+           ) f ON f.usuario_id = u.id
+   WHERE u.activo = true
+   ORDER BY u.id, xp_total DESC
+)
+SELECT ..., xp_total + COALESCE(
+                   (SELECT valor FROM gamificacion_config
+                     WHERE clave = 'ranking_score_gamma'), 0.0000) *
+                   (0.50 * LEAST(GREATEST(saldo, 0), TOPE) + GREATEST(fama, 0)) AS score_ranking
+  FROM score
+ ORDER BY COALESCE(score_ranking, xp_total) DESC, xp_total DESC
+ LIMIT $1;
+```
+
+**Por que el `COALESCE` del multiplicador es BLOQUEANTE y no cosmetico (la redaccion anterior lo daba por cerrado y no lo estaba).** El modo de fallo real de esta CTE **no es un codigo de error: es un `NULL` propagado**, y por eso era invisible. La degradacion cableada de §4 (decision D) dispara ante `42P01`/`42703`, que son los codigos que se darían **si `moneda_ledger` o `gamificacion_config` no existieran**. Pero **`moneda_ledger` ya existe** (la creo `040`) y **`gamificacion_config` ya existe** (la creo `031:164-169`): lo unico que la `045` anade es la **fila** de semilla, no la tabla. En la **ventana de despliegue real** --la `045` aplicada y el codigo nuevo desplegado en el mismo instante, o el codigo nuevo antes que la `045`-- la consulta **no falla**: la subconsulta escalar sobre `'ranking_score_gamma'` no encuentra fila y devuelve `NULL`, `NULL * (...)` es `NULL`, `xp_total + NULL` es `NULL` en **todas** las filas, y un `ORDER BY score_ranking DESC` sobre una columna **entera en `NULL`** en PostgreSQL **no da error ni warning**: da un **orden arbitrario**. El reintento degradado **nunca se dispara**, porque no hay excepcion que capturar, luego la promesa de §4 de que el ranking "nunca devuelve posiciones corruptas" era **falsa justo en el escenario que la propia §4 declara como el deploying normal**, y verdadera solo en un escenario que no existe (la tabla entera ausente). Con el `COALESCE`, gamma ausente es `0.0000`, que es exactamente el estado de partida declarado en la semilla (`Score = xp_total`, mismas posiciones): **se degrada a ranking puro en vez de corromperse**. El `COALESCE(score_ranking, xp_total)` del `ORDER BY` es la ultima red: si alguna otra causa (una funcion, un tipo, una columna renombrada) dejara `score_ranking` en `NULL`, el orden cae al `xp_total`, que es el orden de siempre. **La leccion de fondo, y por que un `NULL` silencioso es PEOR que un error:** un error de SQL es ruidoso -- sale por el log, salta el `catch`, activa el reintento y lo degrada; un `NULL` es **invisible por construccion**, y en un `ORDER BY` la degradacion invisible es la **peor clase de fallo posible en un ranking de reputacion**, porque el endpoint responde `200`, el JSON es valido, los campos tienen el tipo correcto y los numeros que salen son **otros numeros**, no un error. Un ranking que devuelve posiciones arbitrarias con forma perfecta no se detecta mirando el endpoint: se detecta por un usuario que dice que bajo de puesto sin motivo.
+
+**`DISTINCT ON (u.id)` dentro de la CTE, y por que hoy es REDUNDANTE pero se deja escrito.** La CTE ya devuelve **una fila por usuario por construccion** --los tres sub-selects son `GROUP BY usuario_id`, luego cada `LEFT JOIN` puede multiplicar la fila del usuario como maximo **una vez**, no mas de una--, luego el `DISTINCT ON` **no cambia hoy el resultado**. Se cablea igualmente, y por una sola razon: **el requisito de B3 es explicito y lo que se implementa no debe depender de que el implementador lea el razonamiento**. Sin el, el primer agregado que se anada (una fourth moneda, un segundo parche, un `LEFT JOIN` anidado que no lleve `GROUP BY`) convierte el `DISTINCT ON` de redundante en **imprescindible**, y ese fallo solo se manifiesta en produccion, con `ROW_NUMBER()` pasando a numerar filas duplicadas del mismo usuario -- top-3 por faccion y top-5 por casa corruptos, con el mismo usuario en dos puestos. `ORDER BY u.id, xp_total DESC` es lo que hace que la fila que sobreviva sea **determinista** en vez de arbitraria.
+
+Las **3 diferencias** con la version descartada son las que la hacen viable:
+
+1. **Ninguna subconsulta es correlacionada**: las 3 son `GROUP BY` sobre la tabla **entera**, luego el planner las resuelve como **scan + hash aggregate**, que es O(n) una vez, no O(n) por fila de resultado. Con un indice en `moneda_ledger (usuario_id, ...)` (que la `045` crea) el agregado es un index-only scan.
+2. **La agregacion ocurre una vez por peticion**, no una vez por usuarioorderado: las 4 vistas **comparten la misma CTE**, luego el ranking de facciones y el de casas **no duplican el trabajo** (antes cada una recalculaba sus propias).
+3. **El coste se paga una vez y se degrada por parametro, no por codigo**: con `ranking_score_gamma = 0` el score es **identico a `xp_total`** y la consulta puede seguir usando el camino plano (indice sobre `xp_total`, sin los 3 agregados), que es **exactamente el estado de hoy**.
+
+**El numero honesto del coste, y por que es aceptable:** el coste real son **3 scans agregados por peticion de ranking** (moneda_ledger, el agregado de parches, y el de gobernanza), mas el scan de `usuarios` que ya existia. En la practica eso es **1 CTE con 3 sub-escaneos sobre tablas indexadas, en el servidor Postgres de Neon, sin往返 de red por usuario**. El riesgo **no es el volumen de filas** (el catalogo de XP ya lo hace por evento: `xp_ledger` se consulta en cada interaccion y el sistema aguanta), es el **timeout en el endpoint mas caliente del producto**. Y por eso la mitigacion es una **degradacion explicita**, no una cache:
+
+**Degradacion explicita y cableada (la parte que hace que esto no sea "un mecanismo que no puedo cablear").** El ranking se implementa con **el patron de degradacion que el propio archivo ya usa** (`usuarios.js:1185-1189` ya reintenta con `frSql(null)` ante `42703`, y `:1263-1268` ya degrada `casa_ranking` escalonada ante `42P01`/`42703`):
+
+1. **Intento 1**: consulta completa con la CTE `score` y `ORDER BY score_ranking`.
+2. **Intento 2** (si la migracion 045 no esta aplicada, `42P01`/`42703`): se reintenta **sin** la CTE, con `ORDER BY xp_total` y `ranking_score_gamma` forzado a 0. El ranking **responde** con el orden actual, no cae.
+2-bis. **La degradacion que NO depende de un catch, y por eso es la que de verdad sostiene la promesa.** Los dos intentos anteriores solo se disparan ante un **error**, y hay un tercer estado que **no es error**: la `045` aplicada pero **sin la fila de semilla** (o con la fila borrada). Ahi la consulta **no falla**, luego los intentos 1 y 2 se quedan en el intento 1 y el reintento **nunca ocurre**. Ese estado es el que el `COALESCE` del multiplicador cubre: `gamma` ausente = `0.0000` = `Score = xp_total` = **el mismo resultado que el intento 2**, alcanzado sin catch. Es decir: **el reintento es la red para el error y el `COALESCE` es la red para el `NULL`**, y hacen falta las dos, porque son fallos de naturaleza distinta y solo una de las dos era posible antes.
+3. **Guarda de coste**: si el intento 1 falla por **timeout**, el handler cae al intento 2 y **lo registra en el log con `console.warn`**. El ranking **degrada a XP puro de forma visible**, nunca se cae y nunca devuelve posiciones corruptas.
+
+Esto resuelve las **dos** objeciones que el reviewer hizo a la via materializada, sinolas: **no hay cache** (luego no hay "fuente de verdad accidental"), **no hay escritor faltante** (luego no hay usuarios con cache vacio), y **no hay posiciones corruptas** cuando el score no esta disponible (luego `ROW_NUMBER()` nunca opera sobre un score inventado).
+
+**`score_cache` no existe, y por que (decision D, ratificada).** La version anterior de esta seccion proponia una columna `score_cache` y argumentaba que "se recalcula cuando el usuario se conecta y nadie debe leerla como verdad". **Ese argumento no cierra**, y el reviewer lo senalo: un cache que **solo** se escribe cuando el usuario vuelve **deja sin escritor a todos los que no vuelven**, luego el ranking acaba ordenado por un cache mayoritariamente vacio o rancio. Un campo que "nadie debe leer como verdad" pero del que **depende la verdad de la pantalla** es, de hecho, la fuente de verdad. Como el calculo en query (arriba) **no necesita columna**, **no se anade columna**: `score_cache` queda **descartada de raiz** y `usuarios` **no crece** por este ADR.
+
+**Y `xp_total` no se toca en ningun punto de esta seccion**, ahora por una razon mas fuerte que la original: el score **solo se lee**, se usa en el `ORDER BY`, y nunca se escribe de vuelta en `xp_total` ni en ninguna otra columna. El ranking puede ser compuesto sin consecuencia: **es una vista de lectura pura**. Por eso el ADR-018 (moneda unica de progreso) queda intacto sin depender de ningun argumento sobre la cache, y por eso los sinks de §1 pueden gastar XP **disponible** sin tocar `xp_total` (§1-bis).
+
+**El requisito adicional que B3 impone sobre las 4 consultas: `DISTINCT ON (u.id)` ANTES del `PARTITION BY` (arreglo de reviewer).** Cuando el score se calcula **en query** con una CTE que hace `LEFT JOIN` a los agregados, si un usuario tiene **mas de una fila** en cualquiera de las tablas agregadas (multi-moneda en `moneda_ledger`, multi-parche en `parche_upgrades`, multi-voto en `gobernanza_votos`), el `LEFT JOIN` **multiplica filas del mismo usuario** y ese usuario aparece **varias veces** en el mismo `PARTITION BY`, con posiciones que se pisan entre si. Con `ROW_NUMBER()` eso no es imprecision: son **top-3 y top-5 corruptos**, con el mismo usuario ocupando dos puestos. Por tanto **`DISTINCT ON (u.id)` (precedido de un `GROUP BY u.id` o de un agregado ya agrupado) es OBLIGATORIO** en `:1198` y `:1342`, y la CTE `score` debe garantizar **una fila por usuario** antes del `PARTITION BY`:
+
+```
+-- 1 fila por usuario, GARANTIZADO, antes de cualquier ROW_NUMBER/PARTITION BY
+WITH score AS ( ... SELECT DISTINCT ON (u.id) u.id, u.faccion, u.casa, ... FROM ... ORDER BY u.id, ... )
+SELECT id, faccion, score_ranking,
+       ROW_NUMBER() OVER (PARTITION BY faccion ORDER BY score_ranking DESC, xp_total DESC) AS pos
+  FROM score
+ WHERE faccion IS NOT NULL
+```
+
+El `ORDER BY u.id` interno del `DISTINCT ON` es lo que hace que PostgreSQL se quede con **una** fila por usuario (determinista si se anaden `score_ranking DESC` al final, para que sea siempre la misma fila la que sobreviva). Esto **tambien** protege a `:959`/`:979`, que con `LIMIT` exhibiting duplicados contarian dos veces al mismo usuario en el top y **subcontarian el total**. Es un requisito de las **4** ordenaciones, no solo de las 2 particionadas.
+
+**El calculo de `Saldo_Monedas` tiene un detalle que hay que cerrar, y la version anterior estaba mal en DOS cosas (B4).** La parte 1 decidio que el saldo es **derivado del ledger** (`SUM(delta)`), y `moneda_cuentas.saldo` es su cache. El termino del ranking, entonces, **no puede leer `moneda_cuentas.saldo`** porque en la `045` pasa a tener **3 filas** por usuario y la subconsulta escalar de `usuarios.js:723` **ya esta rota** por esa causa (ver B3, punto de ruptura). El termino se lee del **ledger**, y aqui estan los dos errores de la redaccion anterior:
+
+1. **La version anterior usaba `SUM(delta)` sobre una ventana de 90 dias: eso es FLUJO BRUTO, no SALDO.** Un usuario que gasta 10.000 y vuelve a recibir 10.000 tiene `SUM(delta) = 0` con el **bolsillo lleno**. Un jugador con la bolsa vacia y otro con la bolsa llena salen con el mismo termino de saldo. Y contradicia frontalmente `:5510-5513`, que **si** define `Saldo_Monedas` desde `SUM(saldo)` de `moneda_cuentas`, o sea desde un **stock**. **El filtro de 90 dias no mide saldo: mide velocidad de transaccion**, y por tanto se elimina.
+2. **El tope de 2000 estaba solo en la prosa, no en la formula ejecutable.** Un tope que existe en el texto pero no en el `SQL` es un tope que un `refactor` borra. El tope va **cableado en la expresion**, con su columna de config, y no como constante de codigo.
+
+**La UNICA fuente del termino saldo, y el por que (la decision que cierra B4).** Hay tres candidatos reales en el esquema y solo uno sirve:
+
+| Candidato | Por que NO es la fuente |
+|---|---|
+| `SUM(delta)` sobre `moneda_ledger` en una ventana de 90 dias | Es **flujo**, no stock. Rechazado (punto 1). |
+| `moneda_cuentas.saldo` | Es una **cache** por moneda y tiene **3 filas por usuario** tras la `045`; ademas es exactamente el campo que ADR-061 define como "cache que se reconcilia contra el ledger". Usar una cache como fuente de verdad **invierte la garantia**: un error de escritura en el mercado contaminaria el ranking. |
+| **`SUM(delta)` sobre `moneda_ledger` completo, por usuario** | **ELEGIDO.** Es el **ledger append-only**, que es la fuente de verdad por definicion (ADR-053/ADR-061) y que **no puede mentir por desincronizacion**: cada fila es un hecho economically occurred, y la suma de hechos es el saldo por construccion. El `saldo` desnormalizado que existe en la propia fila de `moneda_ledger` (`040:218`) se usa **para la escritura atomica del mercado**, no para el ranking. |
+
+**La formula ejecutable, con el tope cableado (no en prosa):**
+
+```sql
+-- Termino de SALDO del ranking: UNICA fuente = moneda_ledger (append-only).
+-- GREATEST(...,0): el flujo negativo (usuario por debajo de 0) NO resta score.
+-- LEAST(..., TOPE): el tope GLOBAL por usuario, leido de configuracion.
+-- TOPE = (SELECT valor FROM gamificacion_config
+--          WHERE clave = 'ranking_saldo_tope') = 2000.0000 (semilla en la 045)
+GREATEST(
+  COALESCE((
+    SELECT SUM(moneda_ledger.delta)
+      FROM moneda_ledger
+     WHERE moneda_ledger.usuario_id = u.id
+  ), 0), 0)  AS saldo_bruto,
+
+LEAST(
+  GREATEST(
+    COALESCE((
+      SELECT SUM(moneda_ledger.delta)
+        FROM moneda_ledger
+       WHERE moneda_ledger.usuario_id = u.id
+    ), 0), 0),
+    (SELECT valor FROM gamificacion_config
+      WHERE clave = 'ranking_saldo_tope')
+  ), 999999999)  AS saldo_rank
+```
+
+- **`COALESCE(..., 0)`**: un usuario sin ledger (el caso mayoritario hoy) da `0`, no `NULL`. Sin el, `0.50 * NULL` es `NULL`, y `ORDER BY` con `NULL` es **indefinido**: es exactamente el modo de fallo "posiciones corruptas con cache vacio" que objeto el revisor, en su version en query.
+- **`GREATEST(..., 0)`, y POR QUE ENVUELVE A LA SUMA y no a cada `delta` (correccion de la redaccion anterior de este ADR).** El saldo **nunca** es negativo en la economia (la guarda `AND saldo >= $2` del mercado lo impide, `:12720`), pero un ledger con deltas negativos y un `SUM` puede dar negativo si hay una devolucion o una emision invertida. Un saldo negativo **restaria** score, lo cual es un **subsidio al que gasta**: el bug mas perverso posible. Con `GREATEST`, el saldo negativo **es 0**: no bonifica ni penaliza. **La forma correcta es `GREATEST(SUM(delta), 0)`, no `SUM(GREATEST(delta, 0))`**, y la diferencia no es de estilo sino **economica**: truncar **cada** `delta` por separado hace que **los debitos no resten nunca**, luego la suma degenera en **"total historico emitido"**, que crece con cada pago y nunca baja: un jugador que gasta 10.000 de moneda recibe un termino de saldo **mayor** que uno que nunca gasto nada, y el ranking **paga por gastar**. Eso es exactamente lo que la misma seccion prohibe ("un saldo negativo **restaria** score, lo cual es un **subsidio al que gasta**"), en su version mas perversa: no se limita a permitir el subsidio, lo **invierte** y lo premia. El stock correcto es `SUM(delta)` --con los debitos restando, porque son hechos economicos ocuridos-- y el `GREATEST` va **alrededor**, para que un saldo agregado negativo sea `0` en vez de restar score. La CTE de la decision D usa ya esta forma: `GREATEST(SUM(delta), 0) AS saldo`.
+- **`LEAST(..., TOPE)`**: el tope **va dentro de la formula**, no en un comentario. `2000` **no esta escrito como literal en el codigo**: se lee de `gamificacion_config.ranking_saldo_tope`, que es **dato, no logica** (el mismo criterio que aplica a la tabla de premios), de modo que recalibrar el balance de la moneda **no requiere deploy**.
+- **El `999999999` del `LEAST` exterior** es un techo de seguridad que solo existe para que el `LEAST` interno sea un `LEAST` de dos valores comparables cuando la fila de config **aun no existe** (`045` sin aplicar). En ese caso el termino queda sin tope, y la degradacion de `ranking_score_gamma = 0` (§4, decision D) es lo que evita que ese estado llegue a pantalla. Es una guarda, no el comportamiento normal.
+
+**El `activo = true` que la version anterior ponia en el ledger desaparece, y hay que decir por que.** `moneda_ledger` es **append-only** (`040:214-223`) y **no tiene columna `activo`**: filtrar por `activo = true` seria un **42703**, y ademas conceptualmente incorrecto (un ledger no se da de baja, se compensa con un `delta` de compensacion -- invariante 5 de la parte 1). El "respeto por ADR-003" que la version anterior atribuia a ese filtro era **falso**: `moneda_ledger` no es una tabla con borrado logico, es un libro. Si una moneda se desactiva, lo que se hace es `UPDATE moneda_acciones.activo = false` para **dejar de emitir**, no para reescribir el historico.
+
+### 5. Umbrales de las Eras para el level-gate (TSK-179, hoy 3 de 11)
+
+**El problema real que se resuelve aqui no es el umbral: es el coste de mostrar 11 pestanas a un usuario de nivel 1.** Hoy hay **3 de 11** tabs de comunidad con gate elegidas a mano (`comunidad.html:556`, `:559`, `:560`), y **1 de 9** en el perfil (`mi-perfil.html:783`). El criterio de esta seccion es uno solo y no depende de la pestana: **una pestana se gatea si su contenido no puede existir todavia en la cuenta**. Si el contenido puede existir, la pestana se abre aunque el usuario no sepa usarla -- porque la pestana **es** la/tutorial, y gatear la tutorial es gatear el aprendizaje.
+
+**Los cortes de Era MEDIDOS (NB3: la tabla anterior tenia 3 rangos equivocados).** Estos son los valores reales del campo `min` en `niveles-data.js:19-59`, y la tabla que este ADR usa:
+
+| Era | Niveles | `xp_min` del primero | `xp_min` del ultimo | Borde (abre Era) |
+|---|---|---|---|---|
+| Caminante | N1-N10 | 0 | 7.150 | **N1** |
+| Explorador | N11-N20 | 8.650 | 27.400 | **N11** |
+| Cronista | N21-N30 | 30.050 | **58.700** | **N21** |
+| Leyenda | N31-N35 | 62.400 | **78.150** | **N31** |
+| Mito | N36-N40 | **82.300** | 100.000 | **N36** |
+
+Correcciones concretas frente a la redaccion anterior: **Cronista termina en 58.700** (N30, "Sabio de los Caminos"), no en 55.050 -- 55.050 es el `min` de **N29** ("Historiador de Territorio"); **Leyenda termina en 78.150** (N35, "Leyenda Viva"), no en 74.050 -- 74.050 es N34 ("Titan de las Rutas"); y **Mito empieza en 82.300** (N36, "Mito Naciente"), no en 78.150 -- 78.150 es el **ultimo** de Leyenda, luego el rango anterior **solapaba Leyenda y Mito en 78.150**, que es el error tipico de leer los `min` de la fila equivocada.
+
+**Las Eras son la fuente unica a nivel de NOMBRES DE ERA, pero NO a nivel de umbral (NB4, correccion del reviewer).** La correspondencia con las capas de la economia que fija la parte 1: **Capa 1 (minting) = N1-N10 = Caminante**; **Capa 2 (monedas de casa) = N11-N24** -- se corta a mitad de Explorador porque las monedas se abren con las casas y las casas nacen con los Parches (N14), y las monedas se emiten por lote acotado; **Capa 3 (no adoptada) = N25-N40**, que queda **sin gate propio** porque no se adopto.
+
+**Las Eras son la fuente unica a nivel de NOMBRES DE ERA, pero NO a nivel de umbral (NB4, correccion del reviewer).** La tabla de cortes esta **tres parrafos mas arriba** (medida en `niveles-data.js:19-59`).
+
+**Correccion de la "fuente unica", que era una afirmacion falsa a nivel de datos.** El texto anterior de esta seccion decia que "las Eras son la fuente unica". **No lo es**, y medido en el archivo real: los umbrales que el gate lee **no viven en `niveles-data.js`**, viven **hardcodeados como atributos `data-nivel-requerido`** en el HTML (`comunidad.html:556` = 6, `:559` = 14, `:560` = 15, mas `:644` y `:744` = 15; `mi-perfil.html:783` = 11), y **`niveles-data.js` ni siquiera se carga en `comunidad.html`** (verificado: sus `<script src>` son `mapa-tiles.js`, `media-embed.js`, `mapa-cultural.js`, `media-actions.js`, `mymapa.js`, `mercado.js`, `usuario-session.js`, `album-comments.js`; `niveles-data.js` no esta). Es decir: **hay 2 fuentes de verdad de los cortes de Era** -- el `min` de `niveles-data.js` (que el motor usa para pintar el nombre del nivel) y el `data-nivel-requerido` de cada pestana (que el nucleo usa para bloquear) -- y **este ADR anade 9 gates mas**, con lo que el numero de atributos hardcodeados pasa de **4 a 13**. Eso **no es un detalle cosmetico**: es deuda que este ADR **incrementa a proposito**, y hay que decirlo en sus terminos. La mitigacion que se aplica, y que es la misma que aplica a la tabla de premios (**dato, no logica**): los umbrales de gate **se viven en el atributo HTML**, que ya es el sitio donde ADR-085 los puso, y la **unica** duplicacion que se evita es la de los **nombres de Era** (que si viven una sola vez, en `niveles-data.js`). Unificar las dos fuentes exigiria que `comunidad.html` cargase `niveles-data.js` y que el gate se resolviera contra `NIVELES[]` en lugar de contra el atributo: es **un ADR propio** (afecta a `usuario-session.js`, que hoy **no depende** de `niveles-data.js`), **no cabe aqui**, y queda **declarado como deuda asumida y cuantificada**: 13 atributos en 2 ficheros, revisables con un grep, sin logica duplicada.
+
+**Tabla de umbrales para las 11 pestanas REALES de `comunidad.html:555-565`.** (Las 11 leidas: `chat`, `planes`, `mapa`, `ranking`, `pandillas`, `wayfarer`, `av`, `mercado`, `gobernanza`, `contratos`, `marcas`.):
+
+| # | Pestana | Gate actual | Gate propuesto | Era / capa | Razon de la linea, en una frase |
+|---|---|---|---|---|---|
+| 1 | `chat` | (ninguno) | **(Ninguno, se queda abierto)** | Capa 1 | El chat es el contenido de la Era 1 entero; gatearlo es gatear la unica superficie social de un usuario nuevo. **Se queda abierto por decision.** |
+| 2 | `planes` | `data-nivel-requerido="6"` | **6 (se mantiene)** | Capa 1 | Ya esta gateada y el umbral es correcto: el plan es la primera vez que el usuario **produce** contenido, y N6 ya tiene las 3 primeras capacidades de MISIONES. No se mueve una linea que ya esta bien. |
+| 3 | `mapa` | (ninguno) | **8 (nuevo)** | Capa 1 | El mapa es la superficie **consultiva**; con 8 el usuario ya tiene la primera insignia de ruta y el mapa ya le devuelve algo. Antes de N8 el mapa esta vacio para el: **no encaja en la Era 1 completa**, asi que se adelanta 2 niveles al interior de la Era, no al borde. |
+| 4 | `ranking` | (ninguno) | **(Ninguno, se queda abierto)** | Capa 1 | Ver la nota de abajo: el ranking **es** la/tutorial de la Era 1 y su propio panel tiene sub-vistas gateadas (`#rk-facciones` y `#rk-parches`, `comunidad.html:644-645`, que ya exigen N15). **Se queda abierto por decision.** |
+| 5 | `pandillas` | `data-nivel-requerido="14"` | **14 (se mantiene)** | Capa 2 | Es el gate de las Parches y coincide con la aparicion del bloque de casas (`casas_cofre`) y del tithe (`041`). Correcto donde esta. |
+| 6 | `wayfarer` | `data-nivel-requerido="15"` | **15 (se mantiene)** | Capa 2 | Activo Oculto: propuesta, votacion y verificacion de correo. 15 es el primer nivel con la Mecanica de Reputacion Plena; se queda. |
+| 7 | `av` | (ninguno) | **18 (nuevo)** | Capa 2 tardia | El audiovisual es contenido de autor con `voto_media` (`XP_BASES`) y con el `spot` de Own the Spot (`040:322-330`): es la pestana donde el usuario **consume** lo que la Capa 2 le ha dado. A N18 ya tiene moneda en circulation; antes de N18 seria una galeria vacia. |
+| 8 | `mercado` | (ninguno) | **18 (nuevo)** | Capa 2 tardia | El mercado es donde la moneda **se gasta**: es la primera pestana que solo tiene sentido si hay saldo. Mismo gate que `av` porque comparten la misma condicion (tener saldo y tener algo que vender). |
+| 9 | `gobernanza` | (ninguno) | **21 (nuevo)** | Capa 2 tardia | `gobernanza_propuestas` tiene `capa` con 4 valores y las propuestas **de capa `parche`** son las que Fama_Parche pondera. El gate va en el borde de la Era 3 porque voter es el acto mas civico del juego. |
+| 10 | `contratos` | (ninguno) | **21 (nuevo)** | Capa 2 tardia | Es la Gig Economy P2P (`039:96`). Es **la unica pestana que hace el juego cooperativo**, y por diseno no debe existir antes de que el usuario haya visto la economia de las monedas de casa. 21 es el borde de Era. |
+| 11 | `marcas` | (ninguno) | **(Ninguno, se queda abierto)** | Capa 1 | Las marcas son registro de negocio y el registro no tiene nivel: un usuario de N2 ya puede nombrar un negocio, y gatear eso solo genera una pantalla de "vuelve en 6 niveles" sin contenido. **Se queda abierto por decision.** |
+
+**Resultado: de 11 pestanas, 8 pasan a tener gate (antes 3), 3 se quedan abiertas por decision explicita** (`chat`, `ranking`, `marcas`). Las 3 que se quedan abiertas no son un descuido: son las 3 cuyo contenido **existe en la Era 1**, y esa es la unica objecion que se le puede hacer a un gate. Lo que **no** se hace es dejar abiertas las 5 que hoy lo estan por omision y cuyo contenido es de Capa 2 (`mapa`, `av`, `mercado`, `gobernanza`, `contratos`): esas son las que producen el problema de las 11 pestanas.
+
+**La mayoria de los gates NO caen en borde de Era, y por que los que no caen estan donde caen (NB2: la razon anterior era falsa).** El texto anterior de esta seccion decia que "todos los demas gates caen en un borde de Era (6, 8, 14, 15, 18, 21)". **Medido en `niveles-data.js:19-59`, eso no es cierto.** Los bordes de Era reales (los niveles cuyo `min` abre una Era nueva) son **N1 / N11 / N21 / N31 / N36**. Cruzando los gates de las 11 pestanas con esa lista:
+
+| Gate | Nivel | Borde de Era? |
+|---|---|---|
+| `mapa`, `red` | 8 | **NO**, interior de Caminante |
+| `planes` | 6 | **NO**, interior de Caminante |
+| `pandillas` | 14 | **NO**, interior de Explorador |
+| `wayfarer` | 15 | **NO**, interior de Explorador |
+| `av`, `mercado` | 18 | **NO**, interior de Explorador |
+| `governanza`, `contratos` | 21 | **SI** (abre Cronista) |
+| `tabla_destino` | 11 | **SI** (abre Explorador) |
+
+Es decir: de los 9 gates que este ADR pone o mantiene, **solo 2 (11 y 21) son bordes de Era**, y los otros 7 (6, 8, 14, 15, 18) son **interiores** a su Era. Por tanto la justificacion correcta **no es "cae en borde de Era"**, y este ADR la sustituye por la que si sostiene el criterio: **hito de capacidad**. Cada gate se justifica porque **en ese nivel concreto el usuario ya tiene la capacidad minima que hace que el contenido de esa pestana exista** (la capacidad esta en `niveles-data.js:CAPACIDADES_DETALLE` y en `CAPACIDADES_POR_NIVEL`), no porque el numero coincida con un corte de Era. El corte de Era es un **producto** de que los hitos de capacidad se agrupen en bloques, no la causa.
+
+**Lo que si cambia el criterio: `mapa` es la unica decision que se aparta del patron de los demas, y ahora con la razon correcta.** El mapa cae en N8, a mitad de la Era 1, y los demas **tambien** caen a mitad de su Era (6, 14, 15, 18), luego el mapa **ya no es una excepcion**: es el caso normal. Lo que hace al mapa especial es **de que tipo de andamiaje es**: es el soporte **sobre el que se leen todas las demas pestanas**, luego gatearlo al borde (N10/N11) le diria al usuario de N1 que no tiene mapa, que es un mensaje de "aun no existes" en la pestana que mas uso tendra. Un gate de andamiaje va **antes**, no despues. El coste de esa decision es acotado y declarado: un usuario de N1-N7 ve el mapa con **menos contenido** que uno de N10, pero lo ve, y el mapa degrada en vez de desaparecer.
+
+**Las 9 pestanas REALES de `mi-perfil.html:772-783` (las 9 de `PF_TABS`).**
+
+| # | Pestana | Gate actual | Gate propuesto | Razon en una frase |
+|---|---|---|---|---|
+| 1 | `perfil` | (ninguno) | **(Ninguno)** | Es la identidad; gatear el propio perfil es un absurdo de navegacion. Abierta por decision. |
+| 2 | `clase` (Progreso) | (ninguno) | **(Ninguno)** | Es la barra de XP y el nivel: **es la tutorial de las 40 Levels**. Abierta por decision. |
+| 3 | `red` | (ninguno) | **8 (nuevo)** | "Mi Red" es la vista de followers/interacciones; con 8 ya hay red que ver. Mismo gate que `mapa` por la misma razon (andamiaje de Era 1). |
+| 4 | `museo` | (ninguno) | **18 (nuevo)** | El Museo enseña lo que has **conseguido**: sin moneda, sin titulos y sin casa, el Museo esta vacio. Primer contenido de Capa 2. |
+| 5 | `inventario` | (ninguno) | **11 (nuevo)** | El inventario es el **almacen de lo que compra la economia**: amuletos, drop, cupones. Aparece con el primer saldo de Capa 2 (N11 es el corte de Capa 2). |
+| 6 | `mensajes` | (ninguno) | **11 (nuevo)** | Los mensajes de la Gig (P2P) solo existen cuando hay contrato; el mensaje sin gig es ruido. Mismo corte que `inventario`. |
+| 7 | `contratos` | (ninguno) | **21 (nuevo)** | Es la **misma** pestana que `comunidad.html` `contratos`, y por coherencia de product lleva el **mismo** gate. Una feature, un gate, en dos superficies: si divergen, el usuario ve la feature en un sitio y no en el otro y reporta un bug. |
+| 8 | `cuenta` | (ninguno) | **(Ninguno)** | Ajustes, correo y baja de cuenta. Gatear los ajustes es **impedir que el usuario se vaya**, y eso es exactamente lo que un gate no debe hacer. Abierta por decision, y es la decision con mas fuerza de este ADR. |
+| 9 | `tabla_destino` | `data-nivel-requerido="11"` | **11 (se mantiene)** | Ya gateada y bien puesta: 11 es la capacidad `organizar_actividad` y el nivel de la Tabla de Destino. No se mueve. |
+
+**El gate/tutorial al desbloquear (lo que el operador pidio y no existia).** El sistema de gate ya existe y **ya es el correcto**: `data-nivel-requerido` en el nodo, aplicado por `usuario-session.js` en el nucleo compartido (`mi-perfil.html:698-703` documenta que el nucleo **solo escribe `data-gate-bloqueado="1"` y nunca toca `style.display`**, es decir, **Cero Borrado Logico ya garantizado por construccion** en ADR-085). Lo que **no** existe es el aviso de "se te ha desbloqueado algo". La adicion es **de 3 lineas en el nucleo compartido y 0 endpoints**:
+
+1. Al aplicar `data-gate-bloqueado="1"`, el nucleo escribe ademas `data-gate-tutorial="1"` en el nodo cuando el elemento tiene `data-nivel-requerido`.
+2. Un unico listener en el nucleo escucha el `transitionend` de la retirada del atributo y **abre la guia de XP** (`window.ExploraCO.abrirGuiaXP()`, que ya existe y ya se llama desde `comunidad.html:551`) filtrada por la pestana.
+3. El texto de la guia de cada pestana vive en **el mismo atributo**: `data-guia-titulo` y `data-guia-texto`, como **atributos en el HTML**, no como constantes en JS. Razon: el contenido de la guia es **documentacion de producto** y cambiarlo no debe requerir un deploy de JS. Es el mismo criterio que aplico a la tabla de premios (§4: dato, no logica).
+
+Y el tercer elemento del pedido: **notificar al usuario de que se ha desbloqueado una pestana**. Se hace con el **mismo mecanismo** que ya expone el nucleo (`:698-703`): una insignia en el contador de pestanas bloqueadas, que el nucleo ya sabe contar porque es el que aplica el atributo. No es un sistema nuevo: es un contador mas sobre un atributo que ya se esta escribiendo.
+
+**El impacto de SQL/JS de toda esta seccion, en una frase por bloque:**
+
+| Bloque | Fichero | Tipo de endpoint | Riesgo |
+|---|---|---|---|
+| Sinks: precio actual | `api/interacciones.js` | `tipo=slot_precio` | **Bajo**: solo lee `sink_acciones` + `COUNT(*)`. |
+| Sinks: comprar | `api/interacciones.js` | `tipo=slot_comprar` | **Alto**: mueve XP disponible y escribe 2 tablas. Es la unica escritura de dinero del bloque; requiere la CTE de §1 y Escudo GOLD. **No toca `xp_total`** (§1-bis). |
+| Sinks: dar de baja | `api/interacciones.js` | `tipo=slot_bajar` | **Bajo**: un `UPDATE ... SET activo=false` (ADR-003), sin devolucion y **sin tocar `xp_gastado_sinks`**. |
+| Sinks: catalogo | `api/interacciones.js` | `tipo=slot_catalogo` (se une a `tipo=catalogo_xp` ya existente, `:8384`) | **Bajo**: GET, sin escrituras. |
+| Ranking compuesto (4 vistas) | `api/usuarios.js` | **ninguno nuevo**: es el `tipo`/vista ya existente de `:959/:979` + `tipo2=score` en la vista `:1198/:1342` | **Medio**: 3 agregados no correlacionados por peticion (decision D), compartidos por las 4 vistas. **Con `DISTINCT ON (u.id)` obligatorio** (§4) y degradacion cableada a `ORDER BY xp_total` ante `42P01`/`42703`/timeout. |
+| **`casa_ranking` (la evaluacion anterior lo daba por ALTO; MEDIDO es LATENTE, no activo)** | `api/usuarios.js:1226-1277` + `:1284-1337` | el ya existente `tipo=casa_ranking` | **LATENTE / NO ACTIVO -- correccion de una evaluacion que era FALSA, medida en el archivo real.** Se declaro "ALTO y silencioso" por una razon que **no se sostiene al medir la query**: se decia que "`casa_ranking` opera sobre `usuarios u LEFT JOIN casas_cofre` y ese `JOIN` se multiplica al pasar `moneda_cuentas` a multi-moneda". **Medido: `casa_ranking` NO hace `JOIN` ni subconsulta contra `moneda_cuentas` en ningun punto.** Su unico `JOIN` a otra tabla es `LEFT JOIN casas_cofre ct ON ct.casa = g.casa` (`usuarios.js:1272`), y **`casas_cofre.casa` es `PRIMARY KEY`** (`db/migrations/024_casas_cofre_y_clases.sql:160`, `casa varchar(20) PRIMARY KEY`): luego ese `JOIN` es **1:1 porPk**, y un `LEFT JOIN` 1:1 **no puede multiplicar filas**. Las 2 subconsultas que se citaban (`activos_ocultos` y `checkins_30d`, `:1233-1240`) devuelven `COUNT(*)` **en un unico contexto escalar**, luego tampoco multiplican. Y la query **ya agrega antes del `JOIN`**: el `FROM (SELECT DISTINCT u.id ... FROM usuarios u) u ... GROUP BY u.casa) g` de `:1258-1271` colapsa a una fila por usuario **antes** de tocar `casas_cofre`. **Por que 1:1 lo neutraliza:** la multiplicacion de filas solo puede venir de un `JOIN` a una relacion N-a-1 invertida (varias filas de la derecha para una de la izquierda); `casas_cofre.casa` es clave primaria, luego la relacion es 1:1 y el `LEFT JOIN` es un lookup, no un fan-out. **Consecuencia para el despliegue: la `045` NO alcanza esta query**, luego `casa_ranking` **no es punto de ruptura de la `045`** y **no bloquea la ventana cero**. **Lo que queda, como guardia de futuro (NO bloqueante):** si algun dia se anade a esta query un `JOIN` a `moneda_cuentas` / `moneda_ledger` / cualquier 1:N por usuario, el riesgo **vuelve a ser ALTO** y el arreglo es el que ya esta cableado en el archivo --(a) `miembros` y `miembros_activos` sobre el `usuarios` ya deduplicado, (b) la `SUM(u.xp_total)` subida al nivel pre-`JOIN` (nunca `SUM(DISTINCT xp_total)`, que colisiona entre dos usuarios con el mismo XP), (c) las 2 subconsultas de conteo a `COUNT(DISTINCT ...)`. El riesgo queda **latente por construccion de la query**, no activo: depende de una futura linea de codigo, no del despliegue de este ADR. |
+| **`registrarMonedaLedger` (unico INSERT al ledger, SIN columna `moneda`)** | `api/interacciones.js:2382-2394` | el ya existente, compartido | **ALTO y contradice al ADR si no se toca.** Es el **UNICO** `INSERT INTO moneda_ledger` de todo el codebase (llamado desde `:12772` y `:12869`) y su lista de columnas es `(usuario_id, delta, saldo, motivo, ref_tipo, ref_id, creado_en)` -- **sin `moneda`**. Tras la `045` la columna tendria `DEFAULT 'condor'`, luego **todo movimiento de moneda se imputaria a `condor`** y los saldos de `jaguar`/`delfin` **no se moverian nunca**: la multi-moneda que el ADR promete **es incableable tal cual**. **Arreglo obligatorio, mismo despliegue**: `+ ', moneda'` en el `INSERT` y `d.moneda` (con `String(d.moneda || 'condor')`) en el array de parametros, y los **2 call sites** (`:12772`, `:12869`) pasan `moneda`. Sin esto, la decision B esta a medias y el ADR se contradice. |
+| Gates de Era | `comunidad.html`, `mi-perfil.html`, `usuario-session.js` | **ninguno**: atributos `data-nivel-requerido` y `data-guia-*`, ya soportados por ADR-085 | **Bajo**: sin SQL, sin endpoint. |
+
+**El impacto de frontend de §4 y §5, y por que el Aislamiento Atomico (ADR-004) se respeta aqui sin excepciones.** Los dos bloques que escriben CSS nuevo son **(a)** la insignia de pestana desbloqueada, que va colgada del contenedor de pestanas que ya existe (`#profile .pf-tabs` en `mi-perfil.html:771`, y `.comm-tabs` en `comunidad.html:554`), y **(b)** la visualizacion del `score` compuesto en las 4 vistas de ranking (`comunidad.html:643-646`). Los dos tienen **selector padre unico ya existente** y por tanto **no hay nada suelto en `:root`**: (a) cuelga de `.pf-tabs` / `.comm-tabs` y (b) cuelga de `.rk-chip` / `#lb-list`, que es el contenedor real de las listas de ranking. La insignia de tutorial, que es el elemento mas "suelto" de los tres (aparece en ambas superficies), **se define una sola vez bajo `.pf-v61`-style scope unico** y se reutiliza por las dos superficies; duplicar ese bloque de CSS en los dos HTML seria la violacion de ADR-004 que este ADR no va a cometer.
+
+**Vocabulario de la moneda, UNIFICADO (el codigo y el esquema no hablaban el mismo idioma).** Hay **dos vocabularios en el archivo real** y la `045` obliga a elegir:
+
+| Donde | Que dice |
+|---|---|
+| `casas_cofre.casa` -- `CHECK (casa IN ('condor','jaguar','delfin'))` (`024:160`) | **minusculas, sin tilde** |
+| `usuarios.js:737` -- `moneda: 'CDR'` (devuelto por `tipo=moneda_saldo`, consumido por `mi-perfil.html:6546`) | **simbolo, mayusculas** |
+| `usuarios.js:835` -- `moneda: 'CDR'` (segunda aparicion, misma inconsistencia) | **simbolo, mayusculas** |
+| Los 4 `CHECK` que anade la `045` | **minusculas, sin tilde** |
+
+**Quien gana: el `CHECK`.** El valor canonico es el **minusculo sin tilde** (`'condor'` / `'jaguar'` / `'delfin'`), porque es el dominio que **ya esta cerrado en el esquema** (`024:160`) y el que la `045` reusa en los 4 `ADD COLUMN`: reusar un dominio existente es la regla de no-duplicacion, e inventar un segundo vocabulario para el mismo conjunto de 3 valores seria exactamente lo que ADR-084 y ADR-018 hacen prohibir en spiritu. Los simbolos (`CDR`/`JAG`/`DLF`) **no son el valor de la columna**: son la **etiqueta de presentacion**, y por tanto pertenecen a la capa de render, no a la de datos.
+
+**Consecuencia cableada, y es una correccion de codigo, no solo de ADR:** `usuarios.js:737` (y `:835`) **dejan de emitir `moneda: 'CDR'`** y pasan a emitir el valor canonico (`moneda: 'condor'`), y **`mi-perfil.html:6546` deja de imprimir el valor crudo**: pasa a mapear `'condor' -> 'CDR'` en la capa de presentacion. El motivo de que esto no sea cosmetico: en cuanto la `045` este aplicada, un `moneda: 'CDR'` hardcodeado **miente** sobre 2 de las 3 monedas (diria "CDR" para un saldo de `jaguar`), y el usuario veria el simbolo de una casa sobre el saldo de otra -- que, en un juego de casas y honor, es un bug de reputacion, no un bug de texto. Si el operador prefiere el simbolo como valor de columna, eso es **otra** decision y exige mover el `CHECK` de `024:160` y todo lo que ya wrote con `condor`; este ADR elige el `CHECK` y lo declara.
+
+**Observacion del reviewer que este ADR hace suya: hoy los 4 sinks son DECORATIVOS, y por tanto esto no es un grifo de XP sino un DESAGUE.** Los 4 `tipo=slot_*` **no existen** en `api/interacciones.js` (conteo de hits: `slot_precio`/`slot_comprar`/`slot_bajar`/`slot_catalogo` = 0), luego **ningun cobro es real todavia**: la migracion crea las tablas y la CTE esta cableada, pero **mientras las ramas `tipo=` no se escriban, el XP no se gasta**. La lectura economica correcta es la inversa de la que suele suponerse: un sink que aun no cobra **no es un sumidero**, es **una promesa de sumidero**; y la **derivacion de `xp_gastado_sinks` en el ledger de sinks** es **inexistente** hasta que se escriba el primer `tipo=slot_comprar`. Lo que este ADR fija, entonces, es el **contrato** (el precio, la curva, la invariante de nivel monotono y la no-devolucion) para que cuando las ramas se escriban, **el mecanismo ya sea correcto por construccion** y no haya que demoler nada. El riesgo de este estado es el opuesto del que suele temerse: **no es inflacion** (nada emite), es **inercia** (el XP se sigue acumulando sin destino hasta que el sink exista). Y es un riesgo **controlable por orden de trabajo**, no por arquitectura.
+
+**Cierre de la parte 2: que queda resuelto y que queda explicitamente fuera de alcance.**
+
+**Resuelto por esta parte 2:**
+1. Los **4 XP sinks** con `alpha`, `gamma` y `Costo_Base` frozen y justificados, y el **punto de inflexion medible** con la formula de 3 pasos y la tabla de 7 niveles reales (con el `xp_min` de N30 corregido a 58.700).
+2. El **precio congelado** de un slot comprado, y el **`k` historico** que cierra el ciclo de compra/baja (drenaje de XP sin capacidad), con el indices historico y de capacidad separados.
+3. El **debito de XP disponible, nunca de `xp_total`** (§1-bis), con el campo `xp_gastado_sinks`, el invariante de **nivel monotono** y la razon por la que mutar `xp_total` rompia ADR-018 **y** los gates de §5.
+4. El **ranking compuesto** con `beta = 0.50`, el tope GLOBAL por usuario cableado en la formula, los 5 componentes de `Fama_Parche` mapeados a columnas existentes, la **rampa de 30 dias auto-avanzada por el trafico** (sin cron) y la **tabla de premiacion estacional** de 3 rangos.
+5. La **Decision D (via del ranking): calculo en query**, con una CTE agregada **no correlacionada** compartida por las 4 vistas, **`DISTINCT ON (u.id)` obligatorio** antes de cualquier `PARTITION BY`, y **degradacion cableada** a `ORDER BY xp_total`. **`score_cache` queda descartada de raiz.**
+6. La **generalizacion de la moneda a 3** con sus **6 puntos de ruptura medidos** (B1-B4 + `casa_ranking` + `registrarMonedaLedger`), donde `casa_ranking` queda **degradado a LATENTE** por la medicion de `024:160` (su unico `JOIN` es 1:1 por `PRIMARY KEY` y la `045` no alcanza esa query) y con su guardia de futuro declarada; la **migracion `045` completa** (las 2 tablas de sinks, `xp_gastado_sinks`, `slot_index`, las 4 columnas de moneda, la re-clave, los **4** indices y las 3 semillas de `gamificacion_config`), el **punto de no retorno declarado**, y el **plan de despliegue de ventana cero**.
+7. El **vocabulario de moneda unificado** (`condor`/`jaguar`/`delfin` como valor canonico, `CDR`/`JAG`/`DLF` como etiqueta de presentacion) y la correccion de `usuarios.js:737`/`:835` + `mi-perfil.html:6546`.
+8. Los **gates de Era** de las **11 + 9 = 20 pestanas reales**, con las 3 y 5 que quedan abiertas **por decision declarada**, los cortes de Era **medidos**, y la **deuda asumida y cuantificada** de los 13 atributos `data-nivel-requerido`.
+
+**Explicitamente fuera de alcance de esta parte 2 (y por que):**
+- **La Capa 3 tri-token web3**: NO ADOPTION firme de la parte 1. Ninguna linea de esta seccion la presupone ni la prepara.
+- **`actor_conversion` / `actor_saldo` (transferencia de moneda a XP)**: el ADR-084 ya fijo que la conversion esta prohibida. Esta parte 2 no la abre ni la cierra: **no existe en el diseno**, y si alguien la pide, es una decision nueva que necesita su propio ADR.
+- **La facturacion real de la "estancia gratuita"** del puesto 1 del ranking: el ranking entrega una etiqueta y un beneficio **dentro del juego**; si "estancia" significa servicios de hosting reales, eso es un producto distinto y **no** se decide aqui.
+
+**ADRs relacionados (esta parte 2 no reescribe ninguno, solo los aplica):**
+
+- **ADR-061** (ENMENDADO, decision B, Enmienda 3: las 3 monedas de casa y la re-clave de `moneda_cuentas`)
+- **ADR-055** (patron de compra atomica con CTE, el que hace posibles los sinks sin `FOR UPDATE`)
+- **ADR-053** (ledger append-only y saldo derivado: la garantia que los sinks no duplican)
+- **ADR-018** (`xp_total` es la moneda unica de progreso y **no se toca**: ni en el ranking ni en los sinks, que debitan `xp_gastado_sinks`)
+- **ADR-066** (`es_exento = true` en los gastos de XP (`tithe_parche` y ahora `sink_*`): un gasto **no es una emision**)
+- **ADR-003** (Cero Borrado Logico: slot dado de baja con `activo=false`, y la decision de **no devolver** el XP, que es lo que hace que un sink sea un sink y no un banco)
+- **ADR-004** (Aislamiento Atomico: los 3 bloques de CSS nuevo cuelgan de `.pf-tabs`, `.comm-tabs`, `.rk-chip`/`#lb-list`)
+- **ADR-085** (el gate por nivel ya existe y ya es atomico: `data-nivel-requerido` + `data-gate-bloqueado`, sin `style.display`)
+- **ADR-001 / ADR-010** (8/8 funciones serverless: 5 ramas `tipo=` nuevas y **0 ficheros nuevos** en `api/`)
+- **ADR-084** (el argumento de esta parte vive **una sola vez aqui**; `TASKS.md`, `NEXT.md`, `BLUEPRINT.md` y el cuerpo de ADR-061 **solo apuntaban**)
+
+---

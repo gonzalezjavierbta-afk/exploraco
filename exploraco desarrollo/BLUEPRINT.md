@@ -225,6 +225,10 @@ La Entrega TSK-149 reorganiza los guardados de media dentro de "Mis Albumes" y N
 - **Fix colateral:** `api/pagina-destino.js` agrega `AND af.visible=true` a la consulta de fotos de album por cercania (**BUG-082**, violacion de ADR-039 D.1).
 - **Paso manual obligatorio (BLOQUEANTE):** aplicar la 032 en Neon ANTES del deploy del backend v26 (patron BUG-021/BUG-060); el DROP abre una ventana de 503 para el backend v24/v25 vivo. Orden obligatorio: 032 -> backend v26 -> frontend.
 
+### Nota ADR-086 (2026-10-05) -- Sistema Economico Integral: Capa 3 NO ADOPTADA, Capa 2 ampliada solo DISENADA
+
+**La economia de XP de este documento NO cambio.** Lo que hay es una **decision de alcance** y un **diseno sin codigo**: la **Capa 3 (tri-token web3) quedo descartada por NO-ADOPTION FIRME** (riesgo regulatorio colombiano), y la **Capa 2 ampliada** (3 monedas CDR/JAG/DLF, 4 XP sinks, ranking compuesto calculado EN QUERY sin `score_cache`, `SALDO_TOPE = 2000`) esta **especificada y revisada, con 0 lineas implementadas**: la migracion `045` **no esta escrita**, y las ramas de sinks, el leaderboard compuesto y su UI **no existen**. No hay nada que anadir a la tabla de endpoints (`api/` intacto, 8/8, ADR-010). Argumento y detalle: `DECISIONS.md` **ADR-086**; pendientes: `TASKS.md` **TSK-182** a **TSK-185**.
+
 ### Nota ADR-058 (TSK-155, migracion 038) -- Multiplicador de Origen por lejania: `geo_ciudades`, `geo_paises`, `usuarios.origen_declarado_en` y columnas de origen del ledger
 
 La Entrega TSK-155 agrega la capa de origen geografico a la economia de XP (Local / Nomada / Extranjero) y NO crea archivos en `api/` (8/8 intacto, ADR-001/ADR-010): todo entra por ramas `?tipo=`/`?recurso=` existentes (`api/interacciones.js` v29/v30, `api/usuarios.js` v22, `api/admin.js` v6). Migracion **`db/migrations/038_origen_lejania.sql`** (391 lineas, aditiva/idempotente/ASCII-safe, con PREFLIGHT read-only ADR-006 en la cabecera) **APLICADA en Neon el 2026-09-24** + seed geo cargado (`scripts/seed_geo.js`, 1.122 ciudades / 245 paises).

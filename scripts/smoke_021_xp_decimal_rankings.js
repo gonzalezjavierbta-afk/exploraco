@@ -128,7 +128,45 @@ var bloqueFac = bloque(USA, "tipo === 'faccion_ranking'", "tipo === 'casa_rankin
 var bloqueCasa = bloque(USA, "tipo === 'casa_ranking'", "tipo === 'email_verificar_confirmar'");
 check('8a: faccion_ranking incluye miembros_activos', bloqueFac.indexOf('miembros_activos') !== -1);
 check('8b: casa_ranking incluye miembros_activos', bloqueCasa.indexOf('miembros_activos') !== -1);
-check('8c: casa_ranking ordena por xp_total DESC', /ORDER BY[^;]{0,80}SUM\(u\.xp_total\), 2\), 0\) DESC/.test(colapsar(bloqueCasa)));
+// ADR-035 invariante de casa_ranking: ordenar por el XP TOTAL agregado, nunca
+// por el promedio. La asercion vieja de 8c era un PATRON TEXTUAL que exigia la
+// forma "ORDER BY ... COALESCE(ROUND(SUM(u.xp_total), 2), 0) DESC". El
+// restructure de api/usuarios.js por ADR-086 movio la expresion agregada a una
+// tabla derivada g sin cambiar el comportamiento (8d sigue verde), asi que ese
+// patron senalaba un falso positivo. Se reescribio de "patron textual" a
+// "invariante": basta con que la clave PRIMARIA del ORDER BY principal sea el
+// total agregado en DESC, tanto en linea como por alias de la derivacion (el
+// alias puede cambiar). Se ancla en el PRIMER ORDER BY del bloque porque ese es
+// el que cierra la consulta de ranking; los siguientes son las subconsultas de
+// lider/cofre ("ORDER BY t.casa, t.xp_total DESC"), que tambien mencionan
+// xp_total y no deben confundirse con el. Sigue fallando con ORDER BY 1 DESC,
+// con ASC, sin ORDER BY, y con el promedio por alias o en linea.
+function clavesOrden(o) {
+  var out = [], buf = '', depth = 0;
+  for (var i = 0; i < o.length; i++) {
+    var ch = o[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')' && depth > 0) depth -= 1;
+    if (ch === ',' && depth === 0) { out.push(buf); buf = ''; } else { buf += ch; }
+  }
+  out.push(buf);
+  return out;
+}
+function casaOrdenaPorTotalDesc(bloque) {
+  var n = colapsar(bloque);
+  var m = /ORDER\s+BY\s+/i.exec(n);
+  if (!m) return false;
+  var ini = m.index + m[0].length;
+  var fin = n.indexOf(';', ini);
+  if (fin < 0) fin = Math.min(n.length, ini + 300);
+  var clave = clavesOrden(n.slice(ini, fin))[0];
+  if (/\bxp_promedio\b/.test(clave)) return false;
+  if (/\//.test(clave) || /AVG\s*\(/i.test(clave)) return false;
+  if (!/\bDESC\b/.test(clave)) return false;
+  if (!/\bxp_total\b/.test(clave)) return false;
+  return true;
+}
+check('8c: casa_ranking ordena por xp_total DESC', casaOrdenaPorTotalDesc(bloqueCasa));
 check('8d: casa_ranking ya no ordena por xp_promedio', colapsar(bloqueCasa).indexOf('ORDER BY xp_promedio DESC') === -1);
 
 check('9a: interacciones.js elimino Math.floor(xp_total / 100) + 1', INT.indexOf('Math.floor(xp_total / 100)') === -1 && !/xp_total\s*\/\s*100/.test(INT));

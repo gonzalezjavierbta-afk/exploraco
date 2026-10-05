@@ -92,16 +92,37 @@
 --   3. Sintaxis: este repo NO tiene validador de SQL ni psql/docker local
 --      (verificado por busqueda en scripts/), asi que la sintaxis de este
 --      archivo esta VERIFICADA POR REVISION y por el patron exacto ya aplicado
---      en 015_epic_prompt.sql, NO contra un motor. Quien lo aplique en el
---      editor SQL de Neon corre el bloque PREFLIGHT de mas abajo primero.
+--      en 015_epic_prompt.sql, NO contra un motor. Camino canonico de aplicacion
+--      en la seccion ORDEN DE APLICACION de mas abajo.
 --
 -- ORDEN DE APLICACION (NO INVERTIR)
---   PRIMERO: correr este archivo COMPLETO en el editor SQL de Neon.
+--   PRIMERO: aplicar este archivo COMPLETO con el runner versionado:
+--     node scripts/apply_sql_file.js db/migrations/044_planes_viaje_fecha_inicio.sql
+--   Ese es el CAMINO CANONICO (ADR-008): lee el .sql de disco, ejecuta sus 2
+--   sentencias en orden y ABORTA al primer error (patron BUG-021/BUG-060, el
+--   archivo completo en una corrida). El runner descarta las lineas de
+--   comentario, asi que el bloque PREFLIGHT de mas abajo NO se ejecuta con el.
+--   El editor SQL de Neon es el CAMINO ALTERNATIVO, no el canonico: es manual,
+--   no deja traza y es propenso a ejecutar solo un fragmento del archivo.
 --   LUEGO: desplegar el backend (api/interacciones.js) para que empiece a
 --   leer y escribir fecha_inicio.
 --   Si el backend se despliega antes, la consulta de planes puede pedir una
 --   columna que todavia no existe en Neon y la lectura revienta.
---   La aplica el OPERADOR HUMANO en el editor SQL de Neon, no un script.
+--   Si alguien usa el camino alternativo, tiene que correr antes el bloque
+--   PREFLIGHT de mas abajo, sentencia por sentencia.
+--   El DDL lo ejecuta el runner; la CONFIRMACION de aplicar un cambio de esquema
+--   en Neon sigue siendo del OPERADOR HUMANO (gate de @data-migration, AGENTS.md
+--   seccion 2). El runner no salta ese gate: solo cambia como se entrega el SQL.
+--
+-- ESTADO (2026-10-05)
+--   APLICADA en Neon con el camino canonico: apply_sql_file.js reporto
+--   "Sentencias detectadas: 2" y OK en el ALTER y en el CREATE INDEX. Verificado
+--   por sonda de solo lectura: fecha_inicio existe como date (is_nullable = YES)
+--   e idx_planes_viaje_activo_fecha esta presente.
+--   El backfill ya NO esta pendiente: lo aplico
+--   db/cleanups/004_backfill_planes_viaje_fecha_inicio.js con --apply
+--   --ddmm-aaaa y la 2a pasada fue no-op (0 filas). Detalle y evidencia en
+--   TASKS.md (pase documental) y en el propio script de backfill.
 --
 -- ROLLBACK (emergencia; reversible salvo datos ya escritos en fecha_inicio)
 --   DROP INDEX IF EXISTS idx_planes_viaje_activo_fecha;

@@ -4257,9 +4257,11 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ## Vigencia de planes de viaje (`fecha_inicio`) + gate de pestanas por nivel - 2026-10-05 (TSK-179 / ADR-085)
 
-**Estado:** CERRADA EN WORKING TREE (2026-10-05); **commit PENDIENTE** (ultimo commit `cb4944c`). `git diff --stat`: `usuario-session.js` +275, `mi-perfil.html` +262, `comunidad.html` +148, `api/interacciones.js` +59, `DECISIONS.md` +218; mas **3 ficheros NUEVOS** (044, 004 y su test). Un solo `api/*` y **sin endpoint nuevo**: **8/8 INTACTO** (ADR-010).
+**Estado:** CERRADA y **COMMITEADA** (2026-10-05) en **`427be74`**. [Evidencia FALSA corregida en este pase documental: decia "commit PENDIENTE, ultimo commit `cb4944c`"; verificado con `git log` contra el repo real (ADR-006) que la 044, el backfill `004` y su test **ya estan commiteados** en `427be74`.] Un solo `api/*` y **sin endpoint nuevo**: **8/8 INTACTO** (ADR-010).
 
-**Alcance:** dos ejes sobre 4 superficies de producto. (1) **Vigencia de planes**: `fecha_inicio date` derivada del texto libre `fechas` y filtro en las **2** ramas de listado. (2) **Gate de pestanas por nivel** en Comunidad y Mi perfil, con `nivelActual()` + `actualizarPestanasDisponibles()` como rutina compartida. Anade 1 migracion y 1 backfill **entregados y NO ejecutados**.
+**Estado REAL verificado en Neon (2026-10-05, posterior al cierre de arriba):** la 044 **YA ESTA APLICADA** por el camino canonico (`node scripts/apply_sql_file.js db/migrations/044_planes_viaje_fecha_inicio.sql`, "Sentencias detectadas: 2") y el backfill **YA SE EJECUTO** (`--apply --ddmm-aaaa`, 1 fila escrita, 2a pasada no-op con 0 filas). Lo que **queda abierto** de esta tarea es **solo el despliegue** de `api/interacciones.js`.
+
+**Alcance:** dos ejes sobre 4 superficies de producto. (1) **Vigencia de planes**: `fecha_inicio date` derivada del texto libre `fechas` y filtro en las **2** ramas de listado. (2) **Gate de pestanas por nivel** en Comunidad y Mi perfil, con `nivelActual()` + `actualizarPestanasDisponibles()` como rutina compartida. Anade 1 migracion y 1 backfill, **entregados, commiteados y YA EJECUTADOS** en Neon (antes decia "NO ejecutados": era cierto en el momento del cierre y **ya no lo es**).
 
 **Decision (fuente unica del argumento):** `DECISIONS.md` **ADR-085** (`:4917-5117`), D1 a D5. Por ADR-084 D1 el argumento vive alli una sola vez; aqui solo estado y medidas.
 
@@ -4274,7 +4276,104 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 **DESVIACION DE NORMA [DEUDA]:** ADR-002 (ASCII-safety) **NO se cumple hoy** en los 4 ficheros del encargo: hay bytes > 127 **legitimos** (emojis UTF-8 reales), asi que la verificacion mide **delta de codigo nuevo = 0**, no cero absoluto. Decidido **NO normalizar** (fuera de alcance, riesgo alto). Relevo en `NEXT.md`.
 
-**BLOQUEANTE [PENDIENTE DEL OPERADOR]:** la 044 **NO esta aplicada en Neon**; sin ella las **2** ramas de listado fallan **42703** y **no hay fallback degradado**. Orden obligatorio (no se invierte) y caso de la fila actual, en `NEXT.md` "Que sigue 1" y "Que sigue 2".
+**BLOQUEANTE [PARCIALMENTE RESUELTO]:** la 044 **YA esta aplicada en Neon** y el backfill **YA se ejecuto**, asi que el **42703** de las **2** ramas de listado **esta resuelto en la base de datos**. Orden obligatorio (no se invierte) y caso de la fila actual, en `NEXT.md` "Que sigue 1" y "Que sigue 2". **LO QUE QUEDA:** desplegar `api/interacciones.js` (paso **manual** del operador: no hay script de despliegue en `scripts/`, ni script de npm, ni `vercel` CLI en el PATH, verificado en esta sesion). Reevaluado como **TSK-181**.
+
+## Diseno del Sistema Economico Integral LATAWEL + NO-ADOPTION del Tri-Token Web3 (Capa 3) - 2026-10-05 (TSK-180 / ADR-086)
+
+**Estado:** CERRADA **EN DISENO, SIN IMPLEMENTAR**. Una sesion, **1 solo cambio de codigo** (`api/usuarios.js`), **0 lineas de economia nueva**. La migracion `045` esta **especificada en el ADR pero NO escrita ni aplicada**. `api/*` sin endpoint nuevo: **8/8 INTACTO** (ADR-010).
+
+**Decision (fuente unica del argumento):** `DECISIONS.md` **ADR-086** (`:5121-6131`, una sola cabecera, ~1.010 lineas; Partes 1 y 2). Por ADR-084 D1 el argumento vive alli una sola vez; aqui solo estado, medidas y referencias.
+
+**Que quedo DECIDIDO** (resumen de una linea cada uno; el porque, en el ADR):
+- **Decision A:** **Capa 3 tri-token web3 = NO-ADOPTION FIRME** por riesgo regulatorio colombiano, coherente con ADR-061 (`:3474`); sustituida por la **Capa 2 ampliada**.
+- **Enmienda 3 a ADR-061:** `moneda_ledger` pasa de 1 moneda a **3** (CDR/JAG/DLF).
+- **Decision D:** el score compuesto se calcula **EN QUERY** (CTE agregada no correlacionada) y **`score_cache` se descarta de raiz**, porque `usuarios` no crece.
+- **Los 4 XP sinks:** `alpha=0.20`, `gamma=2.0`, `Costo_Base` 320/560/640/800, precio congelado por fila y **doble tope** (`k` historico para precio; `slot_max_activos` 25/12/10/3 para capacidad), ratificado por el operador.
+- **Ranking compuesto:** `Score = XP_Total + (0.50 * Saldo) + Fama_Parche`, con `SALDO_TOPE = 2000` **global** (decision del operador) y transicion por **rampa suave de 30 dias**.
+
+**Revision de arquitectura: DOS rondas de `@architect-review`, los 8 bloqueantes CERRADOS.**
+- **Ronda 1 (SOLICITA CAMBIOS, 5 bloqueantes):** los sinks mutaban `xp_total` y degradaban el nivel; la 045 estaba incompleta; el ranking no era calculable; el termino beta no media saldo; la CTE de compra no ejecutaba.
+- **Ronda 2 (SOLICITA CAMBIOS, 3 bloqueantes mas):** faltaba `COALESCE` y devolvia posiciones arbitrarias en silencio; no habia escritor del multiplicador, o sea la rampa nunca se encendia; el ADR afirmaba invariantes falsos.
+
+**Alcance REAL ejecutado en codigo (ADR-006):** `api/usuarios.js:1228-1276`, `casa_ranking` reestructurado. Los agregados se calculan en una derivacion que **solo toca `usuarios`** y colapsa a **una fila por `usuarios.id`**, y `casas_cofre` entra **despues**, ya agregado.
+- **Motivo:** que ningun JOIN 1:N pueda multiplicar `miembros`, `miembros_activos` ni `xp_total`, ni por cascada `pct`/`multiplicador_xp`/`fee_mercado_interno`, cuando `moneda_cuentas` pase a multi-moneda.
+- **Por que no `SUM(DISTINCT xp_total)`:** colapsaria dos usuarios distintos con el mismo XP.
+- **Verificado:** `node --check` PASS; **ASCII-safe** (0 bytes > 127, 0 backticks); **no-op numerico** con el estado actual (condor 4/2/2300.5 y jaguar 2/1/1077.25, identico antes y despues).
+
+**CORRECCION DE UNA PREMISA FALSA [importante]:** el riesgo de `casa_ranking` se evaluo como ALTO y **se midio**: era **latente, no activo**. `casa_ranking` **no hace JOIN a `moneda_cuentas`**; su unico JOIN es `casas_cofre`, que es **1:1 por PRIMARY KEY** (`casa`). El ADR-086 ya refleja esta correccion. BUG-104.
+
+**LO QUE NO SE HIZO [explicito, no insinuado]:**
+- Migracion **045 NO escrita y NO aplicada**. Ramas de **ranking compuesto** y de **sinks NO escritas**: **0 lineas de codigo de economia nueva**.
+- **UI de sinks**, **leaderboard compuesto** y **gate de 20 pestanas NO hechos**.
+- Los **11 puntos de gasto del clamp del XP disponible declarados en el ADR pero SIN implementar**.
+- El **escritor de la rampa de 30 dias** quedo **promovido a script de mantenimiento**, no cableado.
+
+## Despliegue de `api/interacciones.js` y verificacion en produccion del listado de planes - 2026-10-05 (TSK-181)
+
+**Estado:** PENDIENTE **DEL OPERADOR** (paso manual). Nada escrito en esta sesion; es el **primer** paso del relevo.
+
+**Alcance:** desplegar `api/interacciones.js` (filtro de vigencia de planes) y **verificar en produccion** que el listado de planes ya **no** devuelve **42703**. El filtro esta escrito desde TSK-179 y **solo ahora puede funcionar**: hasta ahora fallaba unicamente porque la columna no existia en Neon, y la 044 ya esta aplicada.
+
+**BLOQUEANTE DE HERRAMIENTAS [verificado en esta sesion]:** el despliegue **NO se pudo ejecutar** porque **no hay script de despliegue en `scripts/`**, **ni script de npm** (`package.json` sin ninguna entrada `deploy`) y **ni `vercel` CLI en el PATH**. Es **paso manual del operador**. Gate de `@backend-dev` (ADR-082/AGENTS.md seccion 2).
+
+**Efecto esperado y correcto:** con `--ddmm-aaaa` el unico plan activo ("Tour de salsa centro de Bogota", `fechas = "12-09-2026"`) quedo con `fecha_inicio = 2026-09-12`, **fecha ya pasada**, y por tanto **deja de mostrarse**.
+- Es el comportamiento pedido ("cuando un plan pasa su fecha limite, debe salir de ahi"), pero **en produccion el listado de planes se vera vacio y eso es lo correcto**, no un fallo del filtro.
+- Decision consciente del operador.
+
+**Verificacion de cierre:** listado de planes en produccion sin **42703** y con el plan vencido **efectivamente ausente**. Si aparece **vacio**, es el resultado esperado. Evidencia y Decision en `DECISIONS.md` **ADR-085** / **ADR-086**.
+
+## Migracion `045` del Sistema Economico Integral - 2026-10-05 (TSK-182 / ADR-086)
+
+**Estado:** PENDIENTE. **NO escrita y NO aplicada.** El diseno **completo y aprobado** vive en `DECISIONS.md` **ADR-086**; aqui solo el alcance pendiente.
+
+**Alcance:** escribir y **aplicar** la migracion `045` con el esquema que el ADR ya especifica:
+- Generalizacion de `moneda_ledger` de 1 moneda a **3** (CDR/JAG/DLF) y la re-clave de `moneda_cuentas` (Enmienda 3 a ADR-061).
+- Los **4 XP sinks**: `Costo_Base` 320/560/640/800, `alpha=0.20`, `gamma=2.0` y **precio congelado por fila**.
+- El `xp_gastado_sinks` como campo **distinto de `xp_total`**, porque **`xp_total` no se toca** (ADR-018).
+- El **doble tope** (`k` historico para precio; `slot_max_activos` 25/12/10/3 para capacidad); `SALDO_TOPE = 2000` **global**; el multiplicador de la **rampa suave de 30 dias**.
+- Los indices de los que dependen las ramas de codigo de **TSK-184**.
+
+**Decisiones de arquitectura ya tomadas (no reabrir):** el score compuesto se calcula **EN QUERY** y **`score_cache` NO se crea**; los sinks **debitan `xp_gastado_sinks`** y **mueven saldo**, nunca `xp_total`; `es_exento = true` en los gastos de XP (un gasto no es una emision, ADR-066); slot dado de baja con `activo=false` y **sin devolver el XP** (ADR-003).
+- Faltan por cablear **2 parches de precondicion** antes de aplicar: ver **TSK-183**.
+
+**Orden:** `045` y los parches B1-B5 de **TSK-183** van en el **mismo commit**, **forward-only, sin rollback** (ventana cero). Numero de migracion libre: **`045`**. Migraciones vigentes: la ultima aplicada es la `044`.
+
+## Parches de precondicion B1-B5 para la multi-moneda + escritor de la rampa de 30 dias - 2026-10-05 (TSK-183 / ADR-086)
+
+**Estado:** PENDIENTE. **0 de los 5 puntos implementados.** Puntos **localizados y verificados contra los archivos reales** en esta sesion (ADR-006).
+
+**Por que son precondicion y no detalle:** la Enmienda 3 a ADR-061 hace que `moneda_cuentas` passe de 1 moneda por usuario a **3**. Cada punto de ruptura siguiente leeria una moneda **arbitraria o implicita** en cuanto `moneda_cuentas` sea multi-moneda, y varios **fallan en silencio** devolviendo `0` en vez de error:
+
+- **B1** -- `api/interacciones.js:2382-2394`, `registrarMonedaLedger`: el `INSERT` de `moneda_ledger` **no tiene columna `moneda`**. Con 3 monedas escribe un movimiento **sin moneda asignable**, o sea el ledger deja de ser interpretable.
+- **B2** -- `api/interacciones.js:12835`, `ON CONFLICT (usuario_id)`: el upsert resuelve el conflicto por **`usuario_id`**, que ya **no es clave** cuando hay 3 cuentas por usuario; sin `moneda` en la clave puede **pisar la fila de otra moneda**.
+- **B3** -- `api/interacciones.js:12720`, `UPDATE moneda_cuentas SET saldo = saldo - $2` en la CTE de compra: el debito **no fija moneda**, asi que descontaria de una cuenta **elegida por el planificador**.
+- **B4** -- `api/usuarios.js:723` y `api/usuarios.js:784`, subconsulta escalar `SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1`: con 3 filas por usuario devuelve **una sola, arbitraria**, y `COALESCE(..., 0)` la convierte en un saldo **falso** en lugar de un error.
+- **B5** -- `api/usuarios.js:724`, `SUM(delta) FROM moneda_ledger WHERE usuario_id=$1`: **sin filtro de moneda**, mezcla las 3 monedas en un unico numero y **degrada en silencio**.
+
+**Ademas, pendiente:** el **escritor de la rampa suave de 30 dias**. Se acordo que quede **promovido a script de mantenimiento**, **no cableado** en el backend; sin el, el multiplicador nunca se enciende y la transicion se queda en el diseno. Tambien pendiente: los **2 parches de precondicion** que la propia 045 declara y que este mismo bloque cubre.
+
+**Orden:** **mismo commit** que **TSK-182** (la `045`), **forward-only, sin rollback**. Ventana cero: entre la 045 aplicada y estos parches, el ledger y los saldos **no son interpretables**. Justificacion y detalle por punto, en `DECISIONS.md` **ADR-086**.
+
+## Ranking compuesto y los 4 XP sinks en codigo + UI de sinks y leaderboard - 2026-10-05 (TSK-184 / ADR-086)
+
+**Estado:** PENDIENTE. **0 lineas de codigo de economia escritas en esta sesion.** El diseno esta **completo y aprobado** en `DECISIONS.md` **ADR-086**; aqui solo el alcance pendiente.
+
+**Alcance (3 bloques de trabajo reales):**
+- **(1) Ranking compuesto en query:** `Score = XP_Total + (0.50 * Saldo) + Fama_Parche`, con `SALDO_TOPE = 2000` **global** y el score calculado **EN QUERY** (CTE agregada **no correlacionada**, con `COALESCE` explicito: sin el devolvia posiciones arbitrarias en silencio, uno de los bloqueantes de la ronda 2). **No se crea `score_cache`.**
+- **(2) Las 4 ramas de los XP sinks:** compra atomica con CTE (patron de ADR-055, el que hace posibles los sinks **sin `FOR UPDATE`**), debito de `xp_gastado_sinks` con `es_exento = true`, slots con **doble tope** y precio congelado por fila.
+- **(3) UI:** leaderboard compuesto, superficie de los 4 sinks y el **gate de 20 pestanas**.
+
+**Invariante que no se negocia:** **`xp_total` no se toca** en el ranking ni en los sinks (ADR-018). Por eso los sinks **debitan `xp_gastado_sinks`**, no `xp_total`: los sinks mutaban `xp_total` y **degradaban el nivel** del usuario, que fue el bloqueante 1 de la ronda 1 de revision. Cualquier rama que escriba `xp_total` es un **regresion**, no una variante.
+
+**Depende de:** **TSK-182** (esquema) y **TSK-183** (parches) aplicados y desplegados. Los 11 puntos de gasto del clamp del XP disponible estan **declarados en el ADR pero sin implementar** y se cierran aqui. Los bloques CSS nuevos van bajo Aislamiento Atomico (ADR-004).
+
+## 11 puntos de gasto del clamp del XP disponible - 2026-10-05 (TSK-185 / ADR-086)
+
+**Estado:** PENDIENTE. **Declarados y DISENADOS en el ADR, NO implementados** (0 lineas). Se separan de **TSK-184** porque son un bloque **distinto**: endurecer el **gasto** de XP ya existente, no construir la economia nueva.
+
+**Alcance:** los **11 puntos** donde el clamp del XP disponible se gasta y **todavia no esta cableado** a la regla unica del ADR. Cada uno es un **punto de ruptura silencioso** si se cablea la regla nueva a medias: el clamp queda en un valor por defecto y el gasto **no se ve en ningun sitio**.
+
+**Por que no se cierra dentro de TSK-184:** comparten el mismo ADR pero **no el mismo riesgo**. Si la regla nueva se cablea a 6 de 11 puntos, el clamp queda **parcialmente endurecido**, que es peor que no endurecerlo porque **parece** rotos por la regla nueva. El criterio de cierre es **11 de 11** o ninguno.
 
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

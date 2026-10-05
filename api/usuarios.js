@@ -1225,23 +1225,18 @@ module.exports = async (req, res) => {
         // expone lider_user_id y tributo_pct (default NULL / 10).
         var crSql = function (filtroAct, conCofre, conLider) {
           if (conLider === undefined) conLider = true;
-          return 'SELECT u.casa,'
-            + ' COUNT(*)::int AS miembros,'
-            + (filtroAct
-                ? ' COUNT(*) FILTER (WHERE ' + filtroAct + ')::int AS miembros_activos,'
-                : ' 0::int AS miembros_activos,')
-            + ' COALESCE(ROUND(SUM(u.xp_total), 2), 0) AS xp_total,'
-            + ' COALESCE(ROUND(SUM(u.xp_total) / GREATEST(COUNT(*), 1), 2), 0) AS xp_promedio,'
+          return 'SELECT g.casa, g.miembros, g.miembros_activos,'
+            + ' g.xp_total, g.xp_promedio,'
             // FIX O1 (WP-6): el conteo de aprobados exige ao.activo=true
             // ademas del quorum (+3), para no contar propuestas
             // soft-deleted en el ranking de Casas.
             + ' (SELECT COUNT(*)::int FROM activos_ocultos ao'
             + '   WHERE (ao.votos_favor - ao.votos_contra) >= 3'
             + '   AND ao.activo = true'
-            + '   AND ao.propuesto_por IN (SELECT id FROM usuarios WHERE casa=u.casa)) AS activos_ocultos_aprobados,'
+            + '   AND ao.propuesto_por IN (SELECT id FROM usuarios WHERE casa=g.casa)) AS activos_ocultos_aprobados,'
             + ' (SELECT COUNT(*)::int FROM activos_ocultos_checkins aoc'
             + '   JOIN usuarios u2 ON u2.id = aoc.usuario_id'
-            + '   WHERE u2.casa = u.casa AND aoc.activo = true'
+            + '   WHERE u2.casa = g.casa AND aoc.activo = true'
             + '   AND aoc.creado_en > NOW() - INTERVAL \'30 days\') AS checkins_30d,'
             + (conCofre
                 ? ' COALESCE(ct.xp_cofre_total, 0) AS xp_cofre_total,'
@@ -1252,13 +1247,33 @@ module.exports = async (req, res) => {
                       : ' NULL AS lider_user_id, 10 AS tributo_pct')
                 : ' 0 AS xp_cofre_total, 1 AS factor_conversion,'
                   + ' NULL AS lider_user_id, 10 AS tributo_pct')
-            + ' FROM usuarios u'
-            + (conCofre ? ' LEFT JOIN casas_cofre ct ON ct.casa = u.casa' : '')
+            // ADR-086 (moneda_cuentas pasa a 1..N por usuario): los agregados se
+            // calculan en una derivacion que SOLO toca usuarios y colapsa a
+            // una fila por usuarios.id; el cofre (1:1 por PRIMARY KEY casa)
+            // entra DESPUES, ya agregado. Asi ningun JOIN 1:N puede
+            // multiplicar miembros, miembros_activos ni xp_total, ni por
+            // cascada pct, multiplicador_xp y fee_mercado_interno. Nota: no
+            // se usa SUM(DISTINCT xp_total) porque colapsaria dos usuarios
+            // distintos con el mismo XP.
+            + ' FROM (SELECT u.casa,'
+            + ' COUNT(*)::int AS miembros,'
+            + (filtroAct
+                ? ' COUNT(*) FILTER (WHERE u.activo_30d)::int AS miembros_activos,'
+                : ' 0::int AS miembros_activos,')
+            + ' COALESCE(ROUND(SUM(u.xp_total), 2), 0) AS xp_total,'
+            + ' COALESCE(ROUND(SUM(u.xp_total) / GREATEST(COUNT(*), 1), 2), 0) AS xp_promedio'
+            + ' FROM (SELECT DISTINCT u.id AS id, u.casa AS casa, u.xp_total AS xp_total,'
+            + (filtroAct
+                ? ' (' + filtroAct + ') AS activo_30d'
+                : ' true AS activo_30d')
+            + ' FROM usuarios u) u'
             + ' WHERE u.casa IS NOT NULL'
-            + ' GROUP BY u.casa'
+            + ' GROUP BY u.casa) g'
+            + (conCofre ? ' LEFT JOIN casas_cofre ct ON ct.casa = g.casa' : '')
+            + ' GROUP BY g.casa, g.miembros, g.miembros_activos, g.xp_total, g.xp_promedio'
             + (conCofre ? ', ct.xp_cofre_total, ct.factor_conversion' : '')
             + (conCofre && conLider ? ', ct.lider_user_id, ct.tributo_pct' : '')
-            + ' ORDER BY COALESCE(ROUND(SUM(u.xp_total), 2), 0) DESC';
+            + ' ORDER BY g.xp_total DESC';
         };
         // Degradacion escalonada (nunca catch vacio; siempre se registra el
         // motivo con warn y se propaga si no aplica):

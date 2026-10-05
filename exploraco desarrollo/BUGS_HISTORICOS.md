@@ -1760,3 +1760,58 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Archivos:** `mi-perfil.html` (`pfNivelActual` `:5589`).
 **Estado:** **CERRADO (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-085** D3/D4 (el nucleo es la verdad y el cliente solo visibilidad). Tanda: `TASKS.md` **TSK-179**.
 
+## BUG-102: `004_backfill_planes_viaje_fecha_inicio.js` reportaba `filas_escritas: 0` **aunque escribia de verdad** -- la instrumentacion miente sobre el resultado real de un `--apply`
+
+**Severidad:** BAJA en producto (el dato de la escritura llego bien al servidor), ALTA en confianza: un `--apply` que se autodeclara "0 filas escritas" **invita a re-ejecutar un backfill ya aplicado** y a desconfiar del propio script.
+
+**Contexto:** detectado durante la ejecucion real del backfill de **TSK-179**, 2026-10-05. **Instrumentacion, no producto:** la fila se escribio y el dato quedo persistido.
+
+**Sintoma:** el campo `filas_escritas` del `--json` devuelve **0** en la primera pasada, que es la que **si** escribe. Una segunda pasada identica tambien devuelve 0, asi que **el numero es el mismo en el caso que escribe y en el que no hace nada**.
+
+**Causa raiz:** el script lee `res.rowCount` para accounting. En un **UPDATE** el driver de Neon **no devuelve `rowCount` util**: devuelve un **array de filas**, y el conteo se pierde. No hay bug en la escritura; el bug esta en **leer el numero del sitio equivocado**.
+
+**Resolucion aplicada:** la verdad del backfill **no** es `filas_escritas`, es el **delta de `con_fecha`** medido por el propio script (0 -> 1 en la 1a pasada) y confirmado por **sonda de solo lectura** posterior a la 044. La idempotencia quedo probada por esa via, no por `filas_escritas`: la 2a pasada dio **0 filas y `sin_fecha = 0`**.
+
+**Deuda [ABIERTA]:** el script **no se corrige**; se documento el contrato real en `NEXT.md` y en la nota de instrumentacion. Corregirlo exige que el conteo se derive del `delta`, no de `rowCount`.
+
+**Archivos:** `db/cleanups/004_backfill_planes_viaje_fecha_inicio.js` (campo `filas_escritas` del `--json`).
+**Estado:** **MITIGADO (2026-10-05).** Decidido no tocar el script en esta sesion (fuera de alcance). Tanda: `TASKS.md` **TSK-179**. Decision relacionada: `DECISIONS.md` **ADR-086** (misma sesion, por el precedente de "medir antes de afirmar").
+
+## BUG-103: la migracion `044` **llego commiteada pero nunca aplicada** en produccion -- las **2** ramas de listado de planes fallaban `42703` **sin fallback**
+
+**Severidad:** ALTA. **Bloqueante abierto de TSK-179**: la funcionalidad no era "neutra", era **peor que el estado previo**, porque el filtro se escribio leyendo una columna que en produccion no existia.
+
+**Contexto:** TSK-179 cerro **con la 044 sin aplicar**, y asi se documento correctamente en su momento. El hallazgo de esta sesion es que la tarea **quedo cerrada** con un bloqueante vivo **sin_owner ni relevo explicito**. Tanda: **TSK-179 / ADR-085**.
+
+**Sintoma:** las **2** ramas de listado de planes fallan con `42703` (columna inexistente) y **no hay fallback degradado**: la funcionalidad esta **empeorada** respecto a no tener el filtro.
+
+**Causa raiz:** no es un fallo de codigo, es un fallo de **proceso**: una migracion se entrego y se commiteo (`427be74`) como parte de un codigo que ya la requiere, y la aplicacion en Neon quedo como paso manual **fuera del radio del cierre**. El entregable "044 + 004 + sus tests" se leyo como "todo entregado" cuando **la parte que la hace funcionar es una accion, no un fichero**.
+
+**Resolucion aplicada (2026-10-05):** 044 **aplicada en Neon** por el camino canonico (`node scripts/apply_sql_file.js db/migrations/044_planes_viaje_fecha_inicio.sql`, "Sentencias detectadas: 2"), verificada por sonda de solo lectura (`fecha_inicio` existe, tipo `date`, `idx_planes_viaje_activo_fecha` presente). Backfill **ejecutado** (`--apply --ddmm-aaaa`): 1 fila escrita, 2a pasada no-op.
+
+**Deuda [ABIERTA]:** el codigo **sigue sin desplegar** (`api/interacciones.js` NO desplegado), asi que la funcionalidad **aun no es visible en produccion**. Ademas, la 044 **se aplico por codigo**, no por un archivo de migraciones con estado registrado: no hay ninguna tabla que diga que la 044 esta aplicada, y una 046 aplicada a mano **sin** la 044 seria un fallo silencioso.
+
+**Archivos:** `db/migrations/044_planes_viaje_fecha_inicio.sql`; `api/interacciones.js` (las 2 ramas con el filtro D1).
+**Estado:** **CERRADO en base de datos (2026-10-05); PENDIENTE el despliegue.** Reevaluado como `TASKS.md` **TSK-181**.
+
+## BUG-104: `casa_ranking` era **estructuralmente fragil** ante multi-moneda -- los agregados se multiplicaban si `moneda_cuentas` pasaba a 1:N (riesgo LATENTE, no activo)
+
+**Severidad:** ALTA **si** se dispara; **nula hoy**. Riesgo **latente**, no un fallo de produccion. Se documenta porque la premisa se evaluo ALTO y **al medirla resulto latente**: escribir "vulnerable" sin medir habria sido correcto por la forma y falso por el fondo.
+
+**Contexto:** detectado al preparar la Enmienda 3 a **ADR-061** (multi-moneda, 3 monedas CDR/JAG/DLF) el 2026-10-05. **Preexistente**: el patron es anterior a esta sesion. Tanda: `TASKS.md` **TSK-180 / ADR-086**.
+
+**Sintoma (latente):** si `casa_ranking` hiciera JOIN a `moneda_cuentas` (que pasaria a **3 filas por usuario** con la Enmienda 3), cada JOIN 1:N **multiplicaria** los agregados: `miembros`, `miembros_activos` y `xp_total` se inflarian **una vez por cada fila de la tabla hija**, y en cascada tambien `pct`, `multiplicador_xp` y `fee_mercado_interno`.
+
+**Causa raiz del riesgo latente:** el `SUM` de `xp_total` se calculaba en el mismo nivel de agrupacion que las **subconsultas escalares** de `activos_ocultos`, de modo que el patron **dependia de que ninguna relacion 1:N entrara en la multiplicacion**. Es una estructura correcta por construccion accidental, no por invariante.
+
+**CORRECCION DE PREMISA [verificada contra el archivo real, ADR-006]:** `casa_ranking` **NO hace JOIN a `moneda_cuentas`**. Su unico JOIN es `casas_cofre`, que es **1:1 por PRIMARY KEY (`casa`)**, o sea que **no puede multiplicar**. Por eso el riesgo era **latente y no activo**: hoy el resultado es correcto, y lo seguira **aunque** `moneda_cuentas` se vuelva multi-moneda.
+
+**Resolucion aplicada:** `api/usuarios.js:1228-1276`, `casa_ranking` reestructurado. Los agregados se calculan en una **derivacion que solo toca `usuarios`** y colapsa a **una fila por `usuarios.id`**; `casas_cofre` entra **despues**, ya agregado. La invariante pasa de "correcto por construccion accidental" a **"correcto por construccion explicita"**.
+
+**Por que no `SUM(DISTINCT xp_total)`:** colapsaria **dos usuarios distintos con el mismo XP**, que es un caso legitimo. La deduplicacion se hace por `id` **antes** de agregar, no sobre el valor agregado.
+
+**Verificacion (ADR-006):** `node --check` PASS; ASCII-safe (0 bytes > 127, 0 backticks); y **no-op numerico** con el estado actual: condor 4/2/2300.5 y jaguar 2/1/1077.25, **identico antes y despues**. El no-op es la prueba de que se elimino la fragilidad **sin cambiar un solo numero**.
+
+**Archivos:** `api/usuarios.js` (`casa_ranking` `:1228-1276`).
+**Estado:** **CERRADO (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-086** Decision D (el score se calcula **EN QUERY**, sin cache, y la agregacion se hace antes de cualquier JOIN 1:N).
+
