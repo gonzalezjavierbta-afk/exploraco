@@ -2244,6 +2244,82 @@ var PARCHE_TITHE_MAX = 10;
 var MONEDA_MERCADO_DIAS = 7;
 var MONEDA_MERCADO_LIMITE = 200;
 
+// ADR-086 / TSK-183 (B1-B5): la moneda vigente del mercado. Es el MISMO valor
+// que el DEFAULT 'condor' de la migracion 045 materializa en cada fila ya
+// escrita, luego usarlo como filtro no cambia ni un solo numero con el
+// esquema de 1 moneda. Punto unico de cambio cuando el mercado sea multi.
+var MONEDA_ACTUAL = 'condor';
+
+// ADR-086 / TSK-183 (B1-B5): detector del esquema multi-moneda. Se resuelve
+// UNA vez por instancia y se cachea la PROMESA, luego no hay carrera entre
+// peticiones concurrentes y el coste es 1 query de solo lectura en todo el
+// proceso. FAIL-CLOSED a false: si la deteccion falla se asume el esquema de
+// 1 moneda, luego el peor caso es el SQL legacy que hoy funciona, nunca un
+// SQL que menciona una columna inexistente.
+// GATE POR LA PK COMPUESTA, NO POR LA COLUMNA (correccion de @sql-security):
+// el runner aplica sentencia por sentencia con una transaccion implicita
+// cada una, luego hay un estado intermedio REAL en el que la columna moneda
+// ya existe (046:53-70) pero la PK sigue siendo (usuario_id) (046:86). Si el
+// gate mirase la columna, en esa ventana devolveria true, el codigo emitiria
+// ON CONFLICT (usuario_id, moneda) y PostgreSQL responderia 42P10: el mercado
+// caido y congelado por la cache. La PK es el ULTIMO paso de la 046, luego
+// gatear por ella implica que las 4 columnas ya estan anadidas.
+// Por que NO es un simple DEFAULT: con 3 filas por usuario,
+// (a) un UPDATE sin filtro de moneda descuenta de las 3 cuentas a la vez,
+// (b) ON CONFLICT (usuario_id) deja de ser legal al dejar de ser clave.
+// Ninguno de los dos es un fallo de esquema detectable por 42P01/42703.
+// TTL DE 60 s (TSK-183). Sin el, el resultado se congela por el tiempo de
+// vida de la instancia de Vercel, que son minutos u horas: una instancia que
+// resuelve false antes de la 046 seguiria emitiendo SQL legacy DESPUES de que
+// la PK pasa a (usuario_id, moneda), y el UPDATE de debito sin filtro de
+// moneda (interacciones.js:12786) descuenta de las 3 cuentas a la vez, en
+// silencio. Con el TTL el peor retraso del sistema es 60 s y no "hasta el
+// proximo redeploy": cualquier cambio futuro de esquema se absorbe solo.
+// SE CACHEA EL BOOLEANO RESUELTO, NO LA PROMESA, porque una promesa rechazada
+// cacheada se relee rechazada para siempre y el TTL no la salva: el .catch de
+// abajo convierte el fallo en false y la promesa se libera en el .then final.
+// La promesa EN VUELTO si se conserva (y es lo unico que se conserva mientras
+// vuela) para que N peticiones concurrentes en una instancia fria lancen 1 sola
+// consulta: el thundering herd se paga en segundos de Neon.
+// FAIL-CLOSED INALTERADO: si la deteccion falla se asume 1 moneda. Fallar
+// hacia multi-moneda daria 42703 inmediato y visible; fallar hacia legacy da
+// corrupcion silenciosa de saldos, luego false es la decision correcta.
+var MONEDA_TTL_MS = 60000;
+var _multiMonedaCache = null;     // promesa EN VUELO (anti thundering herd)
+var _multiMonedaCacheVal = null;  // booleano RESUELTO (null = sin cache)
+var _multiMonedaCacheAt = 0;      // Date.now() en el instante de resolver
+function soportaMoneda(sql) {
+  var edad = Date.now() - _multiMonedaCacheAt;
+  if (_multiMonedaCacheVal !== null && edad >= 0 && edad < MONEDA_TTL_MS) {
+    return Promise.resolve(_multiMonedaCacheVal);
+  }
+  if (_multiMonedaCache === null) {
+    _multiMonedaCache = sql(
+      'SELECT 1 AS ok FROM pg_constraint c'
+      + ' WHERE c.conrelid = \'moneda_cuentas\'::regclass'
+      + '  AND c.contype = \'p\''
+      + '  AND c.conkey = ARRAY['
+      + '   (SELECT attnum FROM pg_attribute'
+      + '     WHERE attrelid = \'moneda_cuentas\'::regclass AND attname = \'usuario_id\'),'
+      + '   (SELECT attnum FROM pg_attribute'
+      + '     WHERE attrelid = \'moneda_cuentas\'::regclass AND attname = \'moneda\')]'
+      + ' LIMIT 1', []
+    ).then(function(r) {
+      return !!(r && r.length);
+    }).catch(function(eSm) {
+      console.warn('[moneda] deteccion multi-moneda fallo ('
+        + (eSm && eSm.message) + '); se asume esquema de 1 moneda');
+      return false;
+    }).then(function(vMulti) {
+      _multiMonedaCacheVal = vMulti;
+      _multiMonedaCacheAt = Date.now();
+      _multiMonedaCache = null;   // ya no se relee: el valor resuelto manda
+      return vMulti;
+    });
+  }
+  return _multiMonedaCache;
+}
+
 // ADR-064 / ADR-066 (Fase 2C, T10): presencia de marca en un spot (estados
 // 'pendiente'|'verificada'|'rechazada' segun el CHECK de la 040) y upgrades
 // territoriales de un Parche. PARCHE_UPGRADE_TIPOS espeja el CHECK de la 039.
@@ -2381,13 +2457,25 @@ function responderCartasMercadoAusente(res, e, etiqueta) {
 // foto del saldo DESPUES del movimiento (NOT NULL en el esquema).
 function registrarMonedaLedger(sql, datos) {
   var d = datos || {};
-  return sql(
-    'INSERT INTO moneda_ledger (usuario_id, delta, saldo, motivo, ref_tipo, ref_id, creado_en)'
-    + ' VALUES ($1::uuid, $2::numeric, $3::numeric, $4, $5, $6, NOW())',
-    [d.usuario_id, red2(d.delta), red2(d.saldo), String(d.motivo || 'ajuste'),
-     d.ref_tipo ? String(d.ref_tipo) : null,
-     (d.ref_id === undefined || d.ref_id === null) ? null : String(d.ref_id)]
-  ).catch(function(eMl) {
+  // ADR-086 / TSK-183 (B1): con 3 monedas el INSERT DEBE declarar la moneda,
+  // o el movimiento queda sin moneda asignable y el ledger deja de ser
+  // interpretable (la razon de ser del ledger segun ADR-061). El valor por
+  // defecto es MONEDA_ACTUAL, que es el DEFAULT de la 045, luego el
+  // bookkeeping historico sigue siendo 'condor'. Con esquema de 1 moneda la
+  // columna no se menciona y el INSERT es byte-identico al previo.
+  return soportaMoneda(sql).then(function(multi) {
+    var cols = 'usuario_id, delta, saldo, motivo, ref_tipo, ref_id, creado_en';
+    var vals = '$1::uuid, $2::numeric, $3::numeric, $4, $5, $6, NOW()';
+    if (multi) {
+      cols = 'usuario_id, moneda, delta, saldo, motivo, ref_tipo, ref_id, creado_en';
+      vals = '$1::uuid, $7, $2::numeric, $3::numeric, $4, $5, $6, NOW()';
+    }
+    return sql('INSERT INTO moneda_ledger (' + cols + ') VALUES (' + vals + ')',
+      [d.usuario_id, red2(d.delta), red2(d.saldo), String(d.motivo || 'ajuste'),
+       d.ref_tipo ? String(d.ref_tipo) : null,
+       (d.ref_id === undefined || d.ref_id === null) ? null : String(d.ref_id),
+       String(d.moneda || MONEDA_ACTUAL)]);
+  }).catch(function(eMl) {
     console.warn('[moneda] ledger no registrado ('
       + (eMl && eMl.code ? eMl.code + ' ' : '') + (eMl && eMl.message) + ')');
   });
@@ -12715,10 +12803,17 @@ module.exports = async function handler(req, res) {
         var mooIns;
         try {
           if (mooTipo === 'venta') {
+            // ADR-086 / TSK-183 (B3): el debito DEBE fijar la moneda. Sin el
+            // filtro, con 3 filas por usuario el UPDATE alcanza a las 3
+            // cuentas (no elige una: las actualiza todas), luego descuenta de
+            // las 3. El filtro conserva la atomicidad: sigue siendo la misma
+            // CTE de una sola sentencia, un UPDATE mas WHERE.
+            var mooMulti = await soportaMoneda(sql);
             mooIns = await sql(
               'WITH debito AS ('
               + ' UPDATE moneda_cuentas SET saldo = saldo - $2::numeric, actualizado_en = NOW()'
               + ' WHERE usuario_id=$1::uuid AND saldo >= $2::numeric'
+              + (mooMulti ? ' AND moneda = $5' : '')
               + ' RETURNING saldo'
               + '), ins AS ('
               + ' INSERT INTO moneda_mercado (vendedor_id, tipo_orden, cantidad,'
@@ -12733,6 +12828,7 @@ module.exports = async function handler(req, res) {
               + ' (SELECT cantidad_restante FROM ins) AS cantidad_restante,'
               + ' (SELECT expira_en FROM ins) AS expira_en',
               [mooUid, mooCant, mooPrecio, MONEDA_MERCADO_DIAS]
+                .concat(mooMulti ? [MONEDA_ACTUAL] : [])
             );
           } else {
             mooIns = await sql(
@@ -12788,20 +12884,31 @@ module.exports = async function handler(req, res) {
         // BEST-EFFORT: un fallo del match no revierte la orden ya escrowed.
         var mooMatch = null;
         try {
+          // ADR-086 / TSK-183 (B2): con 3 monedas el cruce debe declarar la
+          // moneda de la orden (columna que la 045 anade con DEFAULT 'condor',
+          // luego toda orden ya escrita sigue siendo 'condor' y el
+          // emparejamiento NO cambia) y el upsert debe resolver el conflicto
+          // por la clave REAL, (usuario_id, moneda). Con esquema de 1 moneda
+          // ninguna de las dos cosas se menciona y el SQL es identico al
+          // previo. Atomicidad intacta: sigue siendo UNA sola sentencia CTE.
+          var mooMMulti = await soportaMoneda(sql);
           var mooMatchRes = await sql(
             'WITH nuevo AS ('
             + ' SELECT id, vendedor_id, tipo_orden, cantidad_restante, precio_xp'
+            + (mooMMulti ? ', moneda' : '')
             + ' FROM moneda_mercado WHERE id=$1::uuid AND activo=true'
             + '  AND estado IN (\'abierta\',\'parcial\') AND cantidad_restante > 0'
             + '  AND (expira_en IS NULL OR expira_en > NOW())'
             + '), op AS ('
             + ' SELECT o.id, o.vendedor_id, o.cantidad_restante, o.precio_xp'
+            + (mooMMulti ? ', o.moneda' : '')
             + ' FROM moneda_mercado o, nuevo n'
             + ' WHERE o.id <> n.id AND o.activo = true'
             + '  AND o.estado IN (\'abierta\',\'parcial\')'
             + '  AND o.tipo_orden <> n.tipo_orden'
             + '  AND o.vendedor_id <> $2::uuid'
             + '  AND o.precio_xp = n.precio_xp'
+            + (mooMMulti ? '  AND o.moneda = n.moneda' : '')
             + '  AND o.cantidad_restante > 0'
             + '  AND (o.expira_en IS NULL OR o.expira_en > NOW())'
             + ' ORDER BY o.creado_en ASC LIMIT 1'
@@ -12810,6 +12917,7 @@ module.exports = async function handler(req, res) {
             + '  n.cantidad_restante AS n_rest, n.precio_xp AS precio,'
             + '  o.id AS o_id, o.vendedor_id AS o_uid, o.cantidad_restante AS o_rest,'
             + '  LEAST(n.cantidad_restante, o.cantidad_restante) AS qty'
+            + (mooMMulti ? ', n.moneda AS moneda' : '')
             + ' FROM nuevo n JOIN op o ON true'
             + '), upd_n AS ('
             + ' UPDATE moneda_mercado t SET'
@@ -12828,11 +12936,17 @@ module.exports = async function handler(req, res) {
             + ' FROM m WHERE t.id = m.o_id AND t.activo = true AND t.cantidad_restante >= m.qty'
             + ' RETURNING t.id, t.cantidad_restante'
             + '), cred_buyer AS ('
-            + ' INSERT INTO moneda_cuentas (usuario_id, saldo, actualizado_en)'
-            + ' SELECT CASE WHEN m.n_tipo = \'compra\' THEN m.n_uid ELSE m.o_uid END, m.qty, NOW()'
+            + ' INSERT INTO moneda_cuentas (usuario_id'
+            + (mooMMulti ? ', moneda' : '')
+            + ', saldo, actualizado_en)'
+            + ' SELECT CASE WHEN m.n_tipo = \'compra\' THEN m.n_uid ELSE m.o_uid END,'
+            + (mooMMulti ? ' m.moneda,' : '')
+            + ' m.qty, NOW()'
             + ' FROM m'
             + ' WHERE (SELECT COUNT(*) FROM upd_n) = 1 AND (SELECT COUNT(*) FROM upd_o) = 1'
-            + ' ON CONFLICT (usuario_id) DO UPDATE SET'
+            + (mooMMulti
+                ? ' ON CONFLICT (usuario_id, moneda) DO UPDATE SET'
+                : ' ON CONFLICT (usuario_id) DO UPDATE SET')
             + '  saldo = moneda_cuentas.saldo + EXCLUDED.saldo, actualizado_en = NOW()'
             + ' RETURNING usuario_id, saldo'
             + '), cred_seller AS ('

@@ -115,6 +115,78 @@ const NIVELES = [
 function red2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
 function numXp(v) { var n = Number(v); return isFinite(n) ? n : 0; }
 
+// ADR-086 / TSK-183 (B4-B5): la moneda vigente del mercado. Mismo valor que
+// el DEFAULT 'condor' de la migracion 045, luego con el esquema de 1 moneda
+// el filtro no cambia ni un solo numero. Punto unico de cambio.
+const MONEDA_ACTUAL = 'condor';
+
+// ADR-086 / TSK-183 (B4-B5): detector del esquema multi-moneda. Se cachea la
+// PROMESA, luego sin carrera entre peticiones concurrentes y con 1 query de
+// solo lectura en todo el proceso. FAIL-CLOSED a false: si falla la deteccion
+// se asume 1 moneda, luego el peor caso es el SQL legacy que hoy funciona.
+// GATE POR LA PK COMPUESTA, NO POR LA COLUMNA (correccion de @sql-security):
+// el runner aplica sentencia por sentencia, luego hay un estado intermedio
+// real con la columna ya puesta y la PK aun (usuario_id); gatear por la
+// columna emitiria en esa ventana un ON CONFLICT compuesto -> 42P10. La PK
+// es el ULTIMO paso de la 046, luego gatear por ella implica que las columnas
+// ya estan. Motivo de NO resolverlo con el DEFAULT de la 046: (a) una
+// subconsulta escalar sobre una tabla con 3 filas por usuario lanza
+// "more than one row returned by a subquery" -> 500, y (b) SUM(delta) sin
+// filtro de moneda mezcla las 3 monedas y degrada en silencio. Ninguno de los
+// dos es un 42P01/42703, luego la degradacion cableada NO los alcanza.
+// Duplicado de api/interacciones.js a proposito: los ficheros serverless son
+// autocontenidos y no pueden require entre si sin arrastrar todo el modulo.
+// TTL DE 60 s (TSK-183). Sin el, el resultado se congela por el tiempo de vida
+// de la instancia de Vercel (minutos u horas): una instancia que resuelve false
+// antes de la 046 sigue emitiendo SQL legacy DESPUES de que la PK pasa a
+// (usuario_id, moneda), y entonces usuarios.js:778 lee un saldo arbitrario.
+// Con el TTL el peor retraso del sistema es 60 s y no "hasta el proximo
+// redeploy": cualquier cambio futuro de esquema se absorbe solo.
+// SE CACHEA EL BOOLEANO RESUELTO, NO LA PROMESA, porque una promesa rechazada
+// cacheada se relee rechazada para siempre y el TTL no la salva: el .catch de
+// abajo convierte el fallo en false y la promesa se libera en el .then final.
+// La promesa EN VUELTO si se conserva (y es lo unico que se conserva mientras
+// vuela) para que N peticiones concurrentes en una instancia fria lanzen 1 sola
+// consulta de solo lectura.
+// FAIL-CLOSED INALTERADO: si falla la deteccion se asume 1 moneda. Fallar hacia
+// multi-moneda daria 42703 visible; fallar hacia legacy da corrupcion silenciosa
+// de saldos, luego false es la decision correcta y no se toca.
+let MONEDA_TTL_MS = 60000;
+let _multiMonedaCache = null;     // promesa EN VUELO (anti thundering herd)
+let _multiMonedaCacheVal = null;  // booleano RESUELTO (null = sin cache)
+let _multiMonedaCacheAt = 0;      // Date.now() en el instante de resolver
+function soportaMoneda(sql) {
+  const edad = Date.now() - _multiMonedaCacheAt;
+  if (_multiMonedaCacheVal !== null && edad >= 0 && edad < MONEDA_TTL_MS) {
+    return Promise.resolve(_multiMonedaCacheVal);
+  }
+  if (_multiMonedaCache === null) {
+    _multiMonedaCache = sql(
+      'SELECT 1 AS ok FROM pg_constraint c'
+      + ' WHERE c.conrelid = \'moneda_cuentas\'::regclass'
+      + '  AND c.contype = \'p\''
+      + '  AND c.conkey = ARRAY['
+      + '   (SELECT attnum FROM pg_attribute'
+      + '     WHERE attrelid = \'moneda_cuentas\'::regclass AND attname = \'usuario_id\'),'
+      + '   (SELECT attnum FROM pg_attribute'
+      + '     WHERE attrelid = \'moneda_cuentas\'::regclass AND attname = \'moneda\')]'
+      + ' LIMIT 1', []
+    ).then(function(r) {
+      return !!(r && r.length);
+    }).catch(function(eSm) {
+      console.warn('[moneda] deteccion multi-moneda fallo ('
+        + (eSm && eSm.message) + '); se asume esquema de 1 moneda');
+      return false;
+    }).then(function(vMulti) {
+      _multiMonedaCacheVal = vMulti;
+      _multiMonedaCacheAt = Date.now();
+      _multiMonedaCache = null;   // ya no se relee: el valor resuelto manda
+      return vMulti;
+    });
+  }
+  return _multiMonedaCache;
+}
+
 // ADR-058 (Multiplicador de Origen por lejania): el perfil expone un objeto
 // aditivo 'origen' con la BASE de elegibilidad. NO calcula el multiplicador
 // concreto (depende del punto geografico y vive en api/interacciones.js).
@@ -719,10 +791,22 @@ module.exports = async (req, res) => {
           return res.status(400).json({ ok: false, error: 'usuario_id invalido' });
         var mslRows;
         try {
+          // ADR-086 / TSK-183 (B4, B5): las DOS subconsultas escalares fijan
+          // moneda. Sin el filtro, (SELECT saldo FROM moneda_cuentas WHERE
+          // usuario_id=$1) devuelve mas de una fila en cuanto haya 3 monedas
+          // y PostgreSQL lanza "more than one row returned by a subquery"
+          // -> 500 en el perfil; y SUM(delta) sin filtro suma las 3 monedas
+          // en un numero que no cuadra con nada, degrada en silencio. El
+          // filtro por la moneda vigente conserva la garantia de ADR-061
+          // (saldo == SUM(delta) DE ESA MONEDA). Con esquema de 1 moneda el
+          // SQL es identico al previo.
+          var mslMulti = await soportaMoneda(sql);
           mslRows = await sql(
-            'SELECT COALESCE((SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1), 0) AS saldo,'
-            + ' COALESCE((SELECT SUM(delta) FROM moneda_ledger WHERE usuario_id=$1), 0) AS ledger_sum',
-            [mslId]
+            'SELECT COALESCE((SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1'
+            + (mslMulti ? ' AND moneda = $2' : '') + '), 0) AS saldo,'
+            + ' COALESCE((SELECT SUM(delta) FROM moneda_ledger WHERE usuario_id=$1'
+            + (mslMulti ? ' AND moneda = $2' : '') + '), 0) AS ledger_sum',
+            mslMulti ? [mslId, MONEDA_ACTUAL] : [mslId]
           );
         } catch (eMsl) {
           if (!eMsl || (eMsl.code !== '42P01' && eMsl.code !== '42703')) throw eMsl;
@@ -780,9 +864,16 @@ module.exports = async (req, res) => {
 
         var bmCdr = 0;
         try {
+          // ADR-086 / TSK-183 (B4): segunda subconsulta escalar del mismo
+          // fallo. Sin filtro de moneda devuelve una fila arbitraria de las
+          // 3, y COALESCE(...,0) la convierte en un saldo mostrado que no
+          // cuadra con nada. Lectura pura: no escribe ni toca xp_total
+          // (ADR-018).
+          var bmMulti = await soportaMoneda(sql);
           var bmCdrRows = await sql(
-            'SELECT COALESCE((SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1), 0) AS saldo',
-            [bmId]
+            'SELECT COALESCE((SELECT saldo FROM moneda_cuentas WHERE usuario_id=$1'
+            + (bmMulti ? ' AND moneda = $2' : '') + '), 0) AS saldo',
+            bmMulti ? [bmId, MONEDA_ACTUAL] : [bmId]
           );
           bmCdr = red2(numXp(bmCdrRows.length ? bmCdrRows[0].saldo : 0));
         } catch (eCdr) {
