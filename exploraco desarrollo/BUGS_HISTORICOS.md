@@ -1738,3 +1738,25 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 **Por que no se corrige aqui:** alinear el documento con el codigo es lo barato, pero la pregunta real es cual de los dos valores es el correcto (3 de la recalibracion v27 o el 5 documentado). Fijarlo sin decision de producto congelaria una escala de XP por accidente (Cero Borrado Logico aplicado a la economy: no se tocan valores ya entregados).
 **Siguiente paso propuesto:** decidir con el operador el valor canonico de `voto_media`, alinear `DECISIONS.md` **o** el codigo segun la decision, y propagar a los espejos locales de XP.
 
+## BUG-100: `cmNivelActual()` comparaba un array de objetos con `indexOf` y devolvía nivel 0 siempre -- un gate construido sobre ella habría ocultado la comunidad entera
+
+**Severidad:** ALTA (riesgo de **ocultamiento masivo**: la función era la fuente de nivel de 3 call sites de `comunidad.html`, y cualquier gate nuevo construido sobre ella recibe 0 en vez del nivel real).
+**Contexto:** detectada y corregida de paso durante la entrega de **ADR-085 / TSK-179** (2026-10-05), que anadía el gate de pestanas por nivel. **Preexistente**: la función ya estaba en `comunidad.html` mucho antes de esta entrega y solo became inutilizable cuando alguien la uso como base de un gate.
+**Síntoma (potencial, no observado en produccion):** con `nivel = 0`, todo umbral `nivel < X` se cumple, luego **todas** las pestanas con gate se ocultan a **todos** los usuarios, incluidos los de nivel alto y los que no tienen sesión. La comunidad se renderiza vacia.
+**Causa raíz (ADR-040, antipatron del `indexOf` por identidad):** `XP_LEVELS.indexOf(getLevel(statsU().xp)) + 1`. `indexOf` usa **igualdad referencial** (`===`), no structural: sobre un array de **objetos** el elemento buscado nunca es el mismo objeto, luego devuelve `-1` y el `+1` lo convierte en **0**. La funcion parecia correcta porque `getLevel()` sí existe y devuelve un valor plausible.
+**Resolución aplicada:** `cmNivelActual()` (`comunidad.html:3350`) **delega en la fuente unica** (`window.ExploraCO.nivelActual()`) y degrada al indice real del espejo local si el nucleo no responde. El porque queda escrito en el propio archivo (`comunidad.html:3346-3349`) para que nadie lo "simplifique" reintroduciendo el `indexOf`.
+**Verificación (ADR-006):** Escudo GOLD limpio y `node --check` PASS en `comunidad.html`; los 3 call sites siguen resolviendo contra el nucleo; QA no reporta call site que devuelva 0 con sesion valida. Los **3** `indexOf` por identidad **que siguen vivos** estan registrados como deuda en `NEXT.md` (que sigue 4), no como parte de este cierre.
+**Archivos:** `comunidad.html` (`cmNivelActual` `:3350`, comment `:3346-3349`).
+**Estado:** **CERRADO (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-085** D3 (fuente unica de nivel: `niveles-data.js`); ADR-040 (el antipatron que lo causo). Tanda: `TASKS.md` **TSK-179**.
+
+## BUG-101: `pfNivelActual()` degradaba el `-1` sin sesion a `1` -- boton visible sin señal de bloqueo, clic que no cambia de panel y un toast que accuse falta de nivel a un visitante anónimo
+
+**Severidad:** MEDIA (UI enganosa, sin perdida de datos: el gate no cede, pero la interfaz **miente** sobre el motivo y confunde a un visitante legitimo).
+**Contexto:** detectada y corregida de paso durante la entrega de **ADR-085 / TSK-179** (2026-10-05). **Preexistente.** La correccion es el contrato opuesto de D1: aqui el `NULL`/desconocido **no se rellena con un valor por defecto**, se propaga.
+**Síntoma:** un visitante **sin sesion** ve el boton de la pestana con nivel **visible**, sin candado ni aviso de bloqueo. Al pulsarlo el panel **no cambia**, y el toast acusa **falta de nivel** a alguien que no tiene nivel porque **no esta registrado**: el mensaje senala la causa equivocada.
+**Causa raíz:** `pfNivelActual()` (`mi-perfil.html:5589`) hacia `parseInt(core.nivelActual(), 10)` y luego **normalizaba a `1`** cualquier valor no positivo. El nucleo devuelve **`-1` sin sesion** como sentinel deliberado, y ese `-1` **significa "no hay usuario"**, no "nivel 1". La degradacion converts un sentinel en un dato: cualquier umbral `>= 1` se cumplia y el gate se abria para un anonimo.
+**Resolución aplicada:** el `-1` (sin sesion) y el `0` (sesion sin datos de nivel) **se propagan tal cual**, alineados con el nucleo, que en ese caso no aplica `data-gate-bloqueado`. El porque queda escrito en el propio archivo (`mi-perfil.html:5594-5597`).
+**Verificación (ADR-006):** `node --check` PASS; smoke del perfil **27/27**; el caso se reprodujo antes del arreglo (**30/34**) y pasa despues (**34/34**).
+**Archivos:** `mi-perfil.html` (`pfNivelActual` `:5589`).
+**Estado:** **CERRADO (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-085** D3/D4 (el nucleo es la verdad y el cliente solo visibilidad). Tanda: `TASKS.md` **TSK-179**.
+

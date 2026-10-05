@@ -117,6 +117,7 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 - [Completado reciente](#completado-reciente)
 - [Que se estaba haciendo](#que-se-estaba-haciendo)
+- [Sesion 2026-10-05 - Vigencia de planes de viaje + gate de pestanas por nivel (TSK-179 / ADR-085)](#vigencia-de-planes-de-viaje--gate-de-pestanas-por-nivel---relevo-2026-10-05)
 - [Sesion 2026-10-04 - Gobernanza del pase documental: fuente unica, sin megalineas y brief de maquina (TSK-178 / ADR-084)](#gobernanza-del-pase-documental-fuente-unica-sin-megalineas-y-brief-de-maquina---relevo-2026-10-04)
 - [Sesion 2026-10-04 - Misiones desplegables por estado + galeria en el modal + Subir material (TSK-177 / ADR-077 ENMIENDA 1)](#misiones-desplegables-por-estado--galeria-de-perfil-en-el-modal--subir-material-en-gestion-del-museo---relevo-2026-10-04)
 - [Sesion 2026-10-04 - Tier por modelo activo + atribucion de coste (ADR-083 / TSK-175)](#tier-por-modelo-activo--atribucion-de-coste---relevo-2026-10-04)
@@ -226,6 +227,23 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### Vigencia de planes de viaje + gate de pestanas por nivel - relevo 2026-10-05
+
+**Que se estaba haciendo.** Cerrar **ADR-085** (tanda **TSK-179**): `fecha_inicio` derivada del texto libre `fechas` con filtro de vigencia en las **2** ramas de listado, y gate de pestanas por nivel en Comunidad y Mi perfil con fuente unica `niveles-data.js`. 4 superficies + 1 migracion + 1 backfill, todo **en working tree** (**commit PENDIENTE**); `api/interacciones.js` **sin desplegar**.
+- **Decision:** `DECISIONS.md` **ADR-085** (`:4917-5117`, D1-D5). El argumento vive alli una sola vez (ADR-084 D1); aqui solo el relevo. El detalle por item esta en `TASKS.md` **TSK-179**.
+- **Que sigue 1 - BLOQUEANTE:** aplicar `db/migrations/044_planes_viaje_fecha_inicio.sql` en Neon (**2** sentencias, ambas `IF NOT EXISTS`) y confirmar la columna en `information_schema.columns`.
+   Sin ella las **2** ramas de listado fallan **42703** y **no hay fallback degradado**. Orden **no invertible**: 044 -> verificar -> dry-run -> `--apply` -> re-ejecutar no-op -> **solo entonces** desplegar `api/interacciones.js`.
+- **Que sigue 2 - backfill:** `db/cleanups/004_backfill_planes_viaje_fecha_inicio.js` esta **entregado y NO ejecutado**, con doble barrera de idempotencia y `dry` por defecto (`--apply` y `--ddmm-aaaa` son opt-in explicito).
+   Con `--ddmm-aaaa` la unica fila actual (`fechas="12-09-2026"`) se parsea a `2026-09-12`, **ya pasado** (hoy es 2026-10-05): ese plan **dejaria de mostrarse**. Coherente con que el viaje no esta vigente, pero que sea **decision consciente** y no un efecto colateral del parseo.
+- **Que sigue 3 - DESVIACION VIGENTE de ADR-002:** los 4 ficheros del encargo **no** cumplen ASCII-safety absoluto: hay bytes > 127 **legitimos** (emojis UTF-8 reales).
+   Se decidio **NO normalizar** (fuera de alcance, riesgo alto) y la verificacion paso a medir **delta de codigo nuevo = 0**, no cero absoluto. Queda **escrita** aqui, no enterrada: la norma sigue vigente y estos 4 ficheros quedan **fuera** de ella.
+- **Que sigue 4 - antipatron ADR-040 vivo (3 `indexOf` por identidad):** `comunidad.html:1136` (`renderChatPerks`, rotula nivel 0) y `comunidad.html:1761` (`renderPandillaCTA`, CTA de fundar **siempre bloqueado**: **bloquea visualmente la funcionalidad de nivel 14 que esta entrega habilita**); `mi-perfil.html:6138` (`cargarCasas`). Reportados por QA, **no corregidos**.
+- **Que sigue 5 - higiene del gate:** limpiar los **fallbacks locales** de `cmNivelActual()` y `pfNivelActual()` ahora que el nucleo es fiable, y el **noveno espejo** de umbrales `NIVELES_LOCAL` / `calcularNivelLocal` de `api/interacciones.js:1795` (preexistente, declarado, **no introducido aqui**). El indice parcial de la 044 es apoyo **parcial**: el `OR fecha_inicio IS NULL` no es sargable.
+- **Riesgo (a):** el filtro de vigencia es **todo o nada**: hasta aplicar la 044, la funcionalidad esta **empeorada** respecto al estado previo, no neutra. Por eso `api/interacciones.js` **no** se despliega antes del paso 1.
+- **Riesgo (b):** si la 044 se aplica y el backfill **no**, la ventana `NULL` es mayoria (D2: `fechas` es texto libre y falla el parseo con frecuencia) y **no se ve ningun plan vencido**. Es el trade-off aceptado de D1, no un fallo: `NULL` significa "fecha por confirmar", no "vencido".
+- **Riesgo (c) - decisiones de producto ya tomadas, y conscientes:** 6 pestanas **abiertas sin gate** (Ranking, Audiovisual, Mercado, Marcas, Gobernanza, Contratos); solo 4 con umbral (Planes 6, Parches 14, Activo Oculto 15, Tabla de Destino 11).
+   Ocultamiento **total** con `display:none`, **sin candado visible** y **nunca borrado del DOM** (ADR-003). La Tienda de Cupones QR queda **fuera de alcance** (0 coincidencias en el repo) y su hueco se deja **sin atributo**: un atributo sin nodo es un selector fantasma, que la skill `templates` prohibe.
 
 ### Misiones desplegables por estado + galeria de perfil en el modal + "Subir material" en Gestion del Museo - relevo 2026-10-04
 

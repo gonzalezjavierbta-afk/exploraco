@@ -357,6 +357,253 @@
 
   window.ExploraCO.CAPACIDADES_POR_NIVEL = CAPACIDADES_POR_NIVEL;
 
+  // -- Level-Gate por umbral (ADR-085) ----------------------
+  // Catalogo de UMBRAL del gate: { clave: nivel_minimo }. Deliberadamente
+  // aparte de CAPACIDADES_POR_NIVEL: ese mapa es 1:1 con los 40 niveles y
+  // se consulta por igualdad de nivel (nivel == clave) al listar los
+  // desbloqueos; el gate necesita UMBRAL (nivel >= X). Los 40 niveles y
+  // moderar_galerias (nivel 15) quedan intactos.
+  var CAPACIDADES_GATE = {
+    wayfarer_activo: 15,
+    facciones_avanzadas: 15
+  };
+  window.ExploraCO.CAPACIDADES_GATE = CAPACIDADES_GATE;
+
+  // Etiquetas legibles del tutorial de desbloqueo. NO son umbrales: solo
+  // texto, para que la clave tecnica no se muestre cruda.
+  var GATE_ETIQUETAS = {
+    wayfarer_activo: 'Wayfarer activo',
+    facciones_avanzadas: 'Facciones avanzadas'
+  };
+
+  var GATE_ATTR_BLOQ = 'data-gate-bloqueado';
+  var GATE_CSS_ID = 'exploraco-gate-css';
+  var GATE_MAPA = {};
+  var _gateAplicando = false;
+  var _gateHookListo = false;
+  var _gateHookPrev = null;
+
+  // Regla CSS del gate. El gate NUNCA escribe style.display: escribe un
+  // atributo y esta hoja lo aplica, para no colisionar con el cache de
+  // display de los switches de pestanas (ej. mi-perfil.html _pfDisp, que
+  // pfAplicarTab reescribe). Una pagina puede sobreescribirla con MAS
+  // especificidad, p. ej. .mi-pestana[data-gate-bloqueado="1"]{...}.
+  function gateInyectarCss() {
+    if (document.getElementById(GATE_CSS_ID)) return;
+    var st = document.createElement('style');
+    st.id = GATE_CSS_ID;
+    st.textContent = '[' + GATE_ATTR_BLOQ + '="1"]{opacity:.45;'
+      + 'cursor:not-allowed;pointer-events:none;filter:grayscale(1);}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  // Nivel vigente del usuario. -1 = sin sesion; 0 = sesion sin datos de
+  // nivel (no gatea nada). Reusa calcularNivel: NO replica la tabla de
+  // umbrales (ADR-053, la UI nunca escribe umbrales).
+  function nivelActual() {
+    var u = window.ExploraCO.usuario;
+    if (!u) return -1;
+    if (u.xp_total !== undefined && u.xp_total !== null && u.xp_total !== '') {
+      var xp = Number(u.xp_total);
+      if (isFinite(xp)) return calcularNivel(xp);
+    }
+    if (u.nivel_visible !== undefined && u.nivel_visible !== null
+        && u.nivel_visible !== '') {
+      var nv = parseInt(u.nivel_visible, 10);
+      if (isFinite(nv)) return nv;
+    }
+    if (u.nivel !== undefined && u.nivel !== null && u.nivel !== '') {
+      var nd = parseInt(u.nivel, 10);
+      if (isFinite(nd)) return nd;
+    }
+    return 0;
+  }
+  window.ExploraCO.nivelActual = nivelActual;
+
+  function gateEsActivo(el) {
+    if (!el) return false;
+    if (el.getAttribute('data-gate-activo') === '1') return true;
+    if (el.getAttribute('aria-selected') === 'true') return true;
+    if (el.classList && (el.classList.contains('activa')
+        || el.classList.contains('active'))) return true;
+    return false;
+  }
+
+  function gateMismoGrupo(a, b) {
+    var ga = a.getAttribute('data-gate-grupo');
+    var gb = b.getAttribute('data-gate-grupo');
+    if (ga || gb) return ga === gb;
+    return a.parentNode === b.parentNode;
+  }
+
+  // Si la pestana activa quedo bloqueada, se cae a la primera visible del
+  // mismo grupo. NO borra ni crea nodos: solo atributos y un click().
+  function gateRedirigir(lista) {
+    for (var g = 0; g < lista.length; g++) {
+      var origen = lista[g];
+      if (!origen.bloqueada || !gateEsActivo(origen.el)) continue;
+      // Idempotencia de la redireccion: si ya se redirigio desde esta
+      // pestana y sigue bloqueada, no se vuelve a pulsar el destino (la
+      // pagina ya cambio de pestana y su propio estado manda). El flag
+      // se rearma al DESBLOQUEAR, para que un gate que se cierra y se
+      // vuelve a cerrar redireccione de nuevo.
+      if (origen.el.getAttribute('data-gate-redirigido') === '1') continue;
+      var destino = null;
+      for (var j = 0; j < lista.length; j++) {
+        var cand = lista[j];
+        if (cand.bloqueada) continue;
+        if (!gateMismoGrupo(cand.el, origen.el)) continue;
+        destino = cand;
+        break;
+      }
+      if (!destino) continue;
+      origen.el.setAttribute('data-gate-redirigido', '1');
+      destino.el.setAttribute('data-gate-redirigido', '1');
+      try { destino.el.click(); } catch (e) {}
+    }
+  }
+
+  // Aplica/retira el gate a todos los [data-nivel-requerido] del documento.
+  // Idempotente (mismo estado en la 2a llamada) y NO destructiva: solo
+  // atributos, nunca crea ni borra nodos (ADR-003).
+  // Devuelve el numero de pestanas bloqueadas tras la pasada.
+  function actualizarPestanasDisponibles() {
+    if (_gateAplicando) return 0;
+    _gateAplicando = true;
+    try {
+      gateInyectarCss();
+      var nivel = nivelActual();
+      // Sin sesion, o con sesion sin datos de nivel: NO se oculta nada.
+      var sinNivel = (nivel < 1);
+      var nodos = document.querySelectorAll('[data-nivel-requerido]');
+      var mapa = {};
+      var lista = [];
+      var bloqueadas = 0;
+      for (var i = 0; i < nodos.length; i++) {
+        var el = nodos[i];
+        var req = parseInt(el.getAttribute('data-nivel-requerido'), 10);
+        if (!isFinite(req) || req < 1) continue;
+        var clave = el.getAttribute('data-gate-clave') || ('nivel_' + req);
+        var bloqueada = (!sinNivel && nivel < req);
+        if (bloqueada) {
+          if (el.getAttribute(GATE_ATTR_BLOQ) !== '1') el.setAttribute(GATE_ATTR_BLOQ, '1');
+        } else if (el.hasAttribute(GATE_ATTR_BLOQ)) {
+          el.removeAttribute(GATE_ATTR_BLOQ);
+        }
+        if (!bloqueada && el.hasAttribute('data-gate-redirigido')) {
+          el.removeAttribute('data-gate-redirigido');
+        }
+        if (!mapa[clave]) {
+          mapa[clave] = { clave: clave, umbral: req, bloqueado: false, elementos: [] };
+        }
+        mapa[clave].elementos.push(el);
+        if (bloqueada) { bloqueadas++; mapa[clave].bloqueado = true; }
+        lista.push({ el: el, clave: clave, bloqueada: bloqueada, umbral: req });
+      }
+      GATE_MAPA = mapa;
+      window.ExploraCO.GATE_MAPA = GATE_MAPA;
+      if (!sinNivel) gateRedirigir(lista);
+      return bloqueadas;
+    } catch (e) {
+      return 0;
+    } finally {
+      _gateAplicando = false;
+    }
+  }
+  window.ExploraCO.actualizarPestanasDisponibles = actualizarPestanasDisponibles;
+
+  // Engancha el gate al hook global SIN pisarlo: las paginas definen
+  // window.onExploraCOUpdate por su cuenta (7 de ellas), asi que se
+  // compone con accessor (defineProperty). Si la pagina reasigna despues,
+  // el setter guarda su funcion y el wrapper la sigue invocando.
+  function gateEngancharHook() {
+    if (_gateHookListo) return;
+    _gateHookListo = true;
+    if (typeof window.onExploraCOUpdate === 'function') {
+      _gateHookPrev = window.onExploraCOUpdate;
+    }
+    var wrapper = function () {
+      try { actualizarPestanasDisponibles(); } catch (e) {}
+      if (typeof _gateHookPrev === 'function') {
+        try { return _gateHookPrev.apply(this, arguments); } catch (e) {}
+      }
+    };
+    try {
+      Object.defineProperty(window, 'onExploraCOUpdate', {
+        configurable: true,
+        enumerable: true,
+        get: function () { return wrapper; },
+        set: function (fn) {
+          _gateHookPrev = (typeof fn === 'function') ? fn : null;
+        }
+      });
+    } catch (e) {
+      // Sin accessor (entorno restringido): se compone una sola vez.
+      window.onExploraCOUpdate = wrapper;
+    }
+  }
+  window.ExploraCO.gateEngancharHook = gateEngancharHook;
+
+  // -- Tutorial de desbloqueo (ADR-085) ----------------------
+  // Persistencia por usuario + modulo. Precedente de llave del repo:
+  // ec_welcome_visto (index.html). Se marca al PRESENTAR, no al cerrar,
+  // para no re-disparar en loop con navegacion rapida.
+  var TUT_VISTO_PREFIJO = 'ec_tut_';
+
+  function tutorialKey(clave) {
+    var u = window.ExploraCO.usuario;
+    if (!u) return null;
+    var uid = u.id || u.auth_id || u.email;
+    if (!uid) return null;
+    return TUT_VISTO_PREFIJO + String(uid) + '_' + String(clave);
+  }
+
+  function tutorialYaVisto(clave) {
+    var k = tutorialKey(clave);
+    if (!k) return true;
+    try { return !!localStorage.getItem(k); } catch (e) { return false; }
+  }
+
+  function tutorialMarcarVisto(clave) {
+    var k = tutorialKey(clave);
+    if (!k) return;
+    try { localStorage.setItem(k, String(Date.now ? Date.now() : 1)); } catch (e) {}
+  }
+
+  // tutorialDesbloqueo(claveModulo[, nivelUmbral]) -> true si se ofrecio.
+  // Disparo B (primera entrada a la pestana) lo llama la pagina; el
+  // Disparo A (cruce de umbral) lo invoca aplicarResultadoXp.
+  function tutorialDesbloqueo(claveModulo, nivelUmbral) {
+    if (!claveModulo) return false;
+    var nivel = nivelActual();
+    if (nivel < 1) return false;
+    var umbral = parseInt(nivelUmbral, 10);
+    if (!isFinite(umbral)) umbral = parseInt(CAPACIDADES_GATE[claveModulo], 10);
+    if (isFinite(umbral) && umbral > 0 && nivel < umbral) return false;
+    if (tutorialYaVisto(claveModulo)) return false;
+    tutorialMarcarVisto(claveModulo);
+    var etiqueta = GATE_ETIQUETAS[claveModulo]
+      || String(claveModulo).replace(/_/g, ' ');
+    var titulo = TITULOS_POR_NIVEL[nivel] || ('Nivel ' + nivel);
+    mostrarToast('\uD83C\uDF89 ' + etiqueta + ' desbloqueado en el Nivel '
+      + nivel + ': ' + titulo, '#FF4A00');
+    return true;
+  }
+  window.ExploraCO.tutorialDesbloqueo = tutorialDesbloqueo;
+
+  // Modulos de gate cuyo umbral se acaba de cruzar entre dos niveles.
+  function gateModulosNuevos(nivelAnterior, nivelNuevo) {
+    var out = [];
+    for (var k in CAPACIDADES_GATE) {
+      if (!Object.prototype.hasOwnProperty.call(CAPACIDADES_GATE, k)) continue;
+      var u2 = parseInt(CAPACIDADES_GATE[k], 10);
+      if (!isFinite(u2) || u2 <= nivelAnterior || u2 > nivelNuevo) continue;
+      out.push({ clave: k, umbral: u2 });
+    }
+    return out;
+  }
+  window.ExploraCO.gateModulosNuevos = gateModulosNuevos;
+
   // ---- Sistema de eras + titulos por nivel (v7: 40 niveles / 5 eras) ----
   // Catalogo local puro (sin BD). Los titulos con tilde o enie usan
   // escapes Unicode para mantener ASCII puro (ADR-002).
@@ -1844,6 +2091,18 @@
         if (eraNva && eraAnt && eraNva.nombre !== eraAnt.nombre) {
           setTimeout(function() { expEra_mostrarModalCambioEra(eraAnt, eraNva); }, 3200);
         }
+        // ADR-085 Disparo A: tutorial del modulo recien desbloqueado al
+        // cruzar un umbral de gate. Se encadena DETRAS del modal de
+        // nivel-up (600ms) y del de cambio de era (3200ms) para no
+        // solaparse; el propio tutorial se muestra por toast.
+        var gateNuevos = gateModulosNuevos(nvlAnt, nvlNvo);
+        for (var gn = 0; gn < gateNuevos.length; gn++) {
+          (function (gItem, gIdx) {
+            setTimeout(function () {
+              tutorialDesbloqueo(gItem.clave, gItem.umbral);
+            }, 4200 + (gIdx * 1800));
+          })(gateNuevos[gn], gn);
+        }
       }
       guardarSesion(window.ExploraCO.usuario);
       actualizarUI();
@@ -2288,6 +2547,13 @@
       // Los botones se actualizan individualmente cuando se interactúa
     });
 
+    // ADR-085: enganche 1 de 2. El gate se evalua ANTES de invocar el
+    // hook de la pagina, para que la UI que se re-renderiza ya vea los
+    // atributos definitivos. Se compone con window.onExploraCOUpdate
+    // (gateEngancharHook) en vez de pisarlo: las 7 paginas que definen
+    // ese hook siguen ejecutandose.
+    try { actualizarPestanasDisponibles(); } catch (e) {}
+
     // Hook para paginas con su propio widget de nivel/insignias (ej.
     // index.html, ver updatePointsUI + window.onExploraCOUpdate ahi).
     // Se usa un hook global en vez de un evento porque este script se
@@ -2334,6 +2600,11 @@
         window.ExploraCO.usuario = merged;
         try { localStorage.setItem(SESSION_KEY, JSON.stringify(merged)); } catch (e) {}
         actualizarUI();
+        // ADR-085 enganche 2 de 2: tras el primer render del refresco.
+        // Al arrancar la pagina el usuario puede venir de localStorage
+        // con XP viejo o vacio; un gate aplicado sin sesion ocultaria de
+        // mas y, sin esta segunda pasada, ya no se repondria.
+        try { actualizarPestanasDisponibles(); } catch (e) {}
       })
       .catch(function () {});
   }
@@ -2345,6 +2616,10 @@
 
     obtenerDeviceId();
     capturarRefUrl();
+    // ADR-085: componer el hook global ANTES de la primera
+    // actualizarUI, para que el gate forme parte de la cadena desde el
+    // primer render. No pisa ninguna definicion previa de la pagina.
+    try { gateEngancharHook(); } catch (e) {}
     cargarSesion();
     actualizarUI();
     refrescarSesion();

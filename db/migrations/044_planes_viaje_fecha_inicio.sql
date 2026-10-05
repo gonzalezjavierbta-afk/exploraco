@@ -1,0 +1,150 @@
+-- ============================================================================
+-- Migration 044: Fecha de inicio (date) de planes de viaje
+-- Fecha: 2026-10-05
+-- Referencias: ADR-002 (ASCII-safe), ADR-006 (validar esquema real antes de
+--   escribir), ADR-008 (gobernanza e idempotencia de esquema / numeracion
+--   consecutiva), ADR-003 (cero borrado logico)
+-- Requiere: 008 (tabla planes_viaje) y el resto de 003-043 aplicado.
+--
+-- QUE HACE
+--   1. planes_viaje.fecha_inicio date NULL: fecha de INICIO del plan de viaje,
+--      normalizada a tipo date para poder comparar y ordenar de forma real.
+--      NO es un timestamp, NO guarda hora y NO reemplaza nada.
+--   2. Indice PARCIAL idx_planes_viaje_activo_fecha sobre (fecha_inicio)
+--      filtrado por WHERE activo = true.
+--
+--   NO SE TOCA planes_viaje.fechas
+--     fechas es TEXT libre con DEFAULT '' y es lo que la aplicacion ya lee y
+--     escribe hoy (api/interacciones.js). Se queda exactamente como esta: esta
+--     migracion NO la renombra, NO la convierte, NO la parsea y NO la borra.
+--     Es una columna ADICIONAL, de uso opcional, para cuando el backend
+--     (api/interacciones.js) empiece a persistirla.
+--
+-- POR QUE NULL Y NO NOT NULL (decision consciente)
+--   La columna arranca vacia a proposito. YA existen filas en planes_viaje, asi
+--   que un NOT NULL sin DEFAULT haria fallar el ALTER sobre ellas; y un NOT
+--   NULL con DEFAULT CURRENT_DATE seria un backfill destructivo: le inventaria
+--   una fecha falsa a cada plan historico ya guardado (y lo congelaria, porque
+--   esa fecha falsa ya no seria distinguible de una fecha real). La
+--   obligatoriedad se valida en la CAPA DE APLICACION (api/interacciones.js,
+--   ramas POST y PATCH de planes), no con una constraint: asi el esquema no
+--   rompe datos historicos y la regla de producto puede evolucionar sin
+--   necesitar un ALTER sobre produccion.
+--
+-- CARACTER DE LA MIGRACION
+--   ADITIVA: SOLO ALTER TABLE planes_viaje ADD COLUMN y un CREATE INDEX. Nada
+--   de DROP, nada de ALTER COLUMN, nada de RENAME, nada de SET NOT NULL, nada
+--   de UPDATE, nada de DELETE. No toca objetos de 003-043.
+--   IDEMPOTENTE (ADR-008): ADD COLUMN IF NOT EXISTS y CREATE INDEX IF NOT
+--   EXISTS. Re-ejecutar el archivo COMPLETO es no-op funcional: ambas
+--   sentencias no hacen nada en la segunda corrida y no hay DROP, constraint ni
+--   UPDATE que puedan fallar.
+--   ASCII-SAFE (ADR-002): cero bytes > 127, cero tildes, cero ene, cero
+--   emojis, cero escapes unicode, cero backticks.
+--   CERO BORRADO LOGICO Y FISICO (ADR-003): no hay DELETE / DROP / TRUNCATE.
+--   SOLO DDL: este archivo NO hace backfill y NO se conecta a produccion.
+--
+-- POR QUE ESTE INDICE
+--   El filtro que la aplicacion va a necesitar es:
+--     WHERE activo = true AND (fecha_inicio IS NULL OR fecha_inicio >= CURRENT_DATE)
+--   El predicado del indice (activo = true) es un SUBCONJUNTO del filtro de la
+--   aplicacion: PostgreSQL puede recorrer el indice parcial y no tiene que leer
+--   los planes dados de baja (activo = false), que son ruido para esta consulta.
+--   Ademas, fecha_inicio ordenado DENTRO de ese subconjunto permite el range
+--   scan sobre el lado fecha_inicio >= CURRENT_DATE.
+--
+--   LIMITE HONESTO (no venderlo de mas): la rama fecha_inicio IS NULL del
+--   filtro NO es sargable. Un OR con IS NULL tiende a degradar el plan hacia un
+--   seq scan sobre el subconjunto activo, y CURRENT_DATE tampoco es una
+--   constante de plan (se evalua en tiempo de ejecucion), asi que no
+--   hay garantia de index scan. Este indice es un APOYO PARCIAL del filtro, no
+--   una garantia: sirve cuando el backend escribe bien fecha_inicio en los
+--   planes nuevos y consulta el rango sin el OR, y es barato mientras tanto.
+--   Si el volumen de planes_viaje activos crece mucho, la alternativa correcta
+--   no es anadir mas indices aqui sino quitar el IS NULL del filtro en la capa
+--   de aplicacion.
+--
+-- BACKFILL PENDIENTE (NO FORMA PARTE DE ESTE ARCHIVO)
+--   NO se ejecuta aqui. NO hay ninguna sentencia UPDATE ejecutable en este
+--   archivo; la referencia de abajo esta COMENTADA a proposito.
+--   El parseo de planes_viaje.fechas (TEXT libre, DEFAULT '', formato variable
+--   y no garantizado) NO es trivial y NO se hace aqui: va en un script aparte,
+--   versionado en db/cleanups/ por @data-migration, con conteo de filas afectadas
+--   antes y despues y validacion manual de una muestra. Ese script es el que
+--   tiene que decidir que filas son parseables y cuales se quedan en NULL.
+--   Referencia comentada (NO correr desde este archivo):
+--     -- UPDATE planes_viaje
+--     --    SET fecha_inicio = <fecha parseada desde el texto de fechas>
+--     --  WHERE fecha_inicio IS NULL
+--     --    AND fechas IS NOT NULL
+--     --    AND btrim(fechas) <> '';
+--   Y el conteo de control que ese script deberia usar antes de correrlo:
+--     -- SELECT count(*) FROM planes_viaje WHERE fecha_inicio IS NULL;
+--   Ninguna sentencia UPDATE de este archivo queda sin comentar: las dos
+--   unicas sentencias ejecutables son el ALTER y el CREATE INDEX.
+--
+-- VERIFICACION
+--   1. ASCII-safe (ADR-002), debe imprimir 0:
+--        node -e "const b=require('fs').readFileSync('db/migrations/044_planes_viaje_fecha_inicio.sql');let n=0;for(const x of b)if(x>127)n++;console.log('bytes>127:',n);"
+--   2. Solo 2 sentencias ejecutables, ambas con IF NOT EXISTS: releer el
+--      archivo y comprobar que no hay DROP, ALTER COLUMN, SET NOT NULL, UPDATE
+--      ni DELETE sin comentar.
+--   3. Sintaxis: este repo NO tiene validador de SQL ni psql/docker local
+--      (verificado por busqueda en scripts/), asi que la sintaxis de este
+--      archivo esta VERIFICADA POR REVISION y por el patron exacto ya aplicado
+--      en 015_epic_prompt.sql, NO contra un motor. Quien lo aplique en el
+--      editor SQL de Neon corre el bloque PREFLIGHT de mas abajo primero.
+--
+-- ORDEN DE APLICACION (NO INVERTIR)
+--   PRIMERO: correr este archivo COMPLETO en el editor SQL de Neon.
+--   LUEGO: desplegar el backend (api/interacciones.js) para que empiece a
+--   leer y escribir fecha_inicio.
+--   Si el backend se despliega antes, la consulta de planes puede pedir una
+--   columna que todavia no existe en Neon y la lectura revienta.
+--   La aplica el OPERADOR HUMANO en el editor SQL de Neon, no un script.
+--
+-- ROLLBACK (emergencia; reversible salvo datos ya escritos en fecha_inicio)
+--   DROP INDEX IF EXISTS idx_planes_viaje_activo_fecha;
+--   ALTER TABLE planes_viaje DROP COLUMN IF EXISTS fecha_inicio;
+--   Sin esta migracion no habria nada que revertir: la columna no existia.
+--   Si el backend ya escribio fechas reales, el DROP COLUMN las pierde: por eso
+--   el orden de aplicacion de arriba es parte de la migracion.
+-- ============================================================================
+
+-- ============================================================================
+-- DDL (UNICA PARTE EJECUTABLE DE ESTE ARCHIVO: 2 SENTENCIAS)
+-- ============================================================================
+
+ALTER TABLE planes_viaje
+  ADD COLUMN IF NOT EXISTS fecha_inicio date;
+
+CREATE INDEX IF NOT EXISTS idx_planes_viaje_activo_fecha
+  ON planes_viaje (fecha_inicio)
+  WHERE activo = true;
+
+-- ============================================================================
+-- PREFLIGHT (SOLO LECTURA; NO forma parte del DDL; NO se ejecuta solo).
+-- Copiar y correr sentencia por sentencia ANTES de aplicar la 044.
+-- ============================================================================
+-- (0.a) Confirmar que planes_viaje existe y que fecha_inicio aun NO existe.
+--       SELECT count(*) FROM information_schema.columns
+--        WHERE table_name = 'planes_viaje' AND column_name = 'fecha_inicio';
+--       Esperado antes de aplicar: 0.
+--       Despues de aplicar: 1 (date, is_nullable = YES).
+--
+-- (0.b) Confirmar que el indice objetivo aun NO existe (esperado: 0).
+--       SELECT count(*) FROM pg_indexes
+--        WHERE indexname = 'idx_planes_viaje_activo_fecha';
+--
+-- (0.c) Foto del estado actual de la columna de texto libre (NO se modifica).
+--       Esta consulta es la que despues alimentara el script de backfill.
+--       SELECT id, destino, fechas FROM planes_viaje
+--        WHERE activo = true ORDER BY creado_en DESC LIMIT 50;
+--
+-- (0.d) POST-APLICACION: la columna existe, es nullable y el indice tambien.
+--       SELECT column_name, data_type, is_nullable
+--         FROM information_schema.columns
+--        WHERE table_name = 'planes_viaje' AND column_name = 'fecha_inicio';
+--       SELECT indexname, indexdef FROM pg_indexes
+--        WHERE indexname = 'idx_planes_viaje_activo_fecha';
+-- ============================================================================

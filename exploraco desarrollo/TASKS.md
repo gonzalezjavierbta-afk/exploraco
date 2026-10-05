@@ -4255,5 +4255,26 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 **Deuda ABIERTA - alcance real de D2:** antes de este cierre `TASKS.md` tenia **323** lineas >400 caracteres y `NEXT.md` **207**; con este pase quedan **314** y **201**, y **el techo no se cumple todavia en el historico**: ~515 lineas de relato sin ADR que lo sostenga y, por D1, el diagnostico es **falta un ADR**, no subir el presupuesto.
 
+## Vigencia de planes de viaje (`fecha_inicio`) + gate de pestanas por nivel - 2026-10-05 (TSK-179 / ADR-085)
+
+**Estado:** CERRADA EN WORKING TREE (2026-10-05); **commit PENDIENTE** (ultimo commit `cb4944c`). `git diff --stat`: `usuario-session.js` +275, `mi-perfil.html` +262, `comunidad.html` +148, `api/interacciones.js` +59, `DECISIONS.md` +218; mas **3 ficheros NUEVOS** (044, 004 y su test). Un solo `api/*` y **sin endpoint nuevo**: **8/8 INTACTO** (ADR-010).
+
+**Alcance:** dos ejes sobre 4 superficies de producto. (1) **Vigencia de planes**: `fecha_inicio date` derivada del texto libre `fechas` y filtro en las **2** ramas de listado. (2) **Gate de pestanas por nivel** en Comunidad y Mi perfil, con `nivelActual()` + `actualizarPestanasDisponibles()` como rutina compartida. Anade 1 migracion y 1 backfill **entregados y NO ejecutados**.
+
+**Decision (fuente unica del argumento):** `DECISIONS.md` **ADR-085** (`:4917-5117`), D1 a D5. Por ADR-084 D1 el argumento vive alli una sola vez; aqui solo estado y medidas.
+
+**Alcance REAL ejecutado (verificado contra los archivos reales, ADR-006):**
+- `comunidad.html`: **3 de 11** `.ctab` con `data-nivel-requerido` (`planes` 6 en `:556`, `pandillas` 14 en `:559`, `wayfarer` 15 en `:560`); las otras **8** quedan abiertas por decision del operador. `#rk-facciones` (`:644`) y `#ao-facciones` (`:745`) a nivel 15. CSS de silo bajo `#community`.
+- `mi-perfil.html`: Tabla de Destino **NUEVA** (nivel 11) sobre la rama de API existente `tipo=tabla_destino`; `PF_TABS` de **8 a 9**; CSS de silo bajo `#profile`.
+- `api/interacciones.js`: filtro D1 en las **2** ramas, helper puro `parseFechaInicioTexto` y derivacion en `plan_crear`. **`fecha_inicio` NO se anadio al SELECT**, para no romper el contrato que consume `comunidad.html`.
+
+**Verificacion (ADR-006, `@qa-auditor`):** Escudo GOLD **5/5**; `node --check` PASS; parser **13/13** vectores; smoke **27/27**; test del backfill **25/25**; `div` 458/458 y 542/542; `button` 104/104; **8/8** handlers en `api/` (R7 intacto); `calcularNivel` unica; `CAPACIDADES_POR_NIVEL` intacta; `_pfDisp` preservado; **0** nodos borrados (ADR-003).
+
+**Bugs preexistentes corregidos de paso:** `cmNivelActual()` rota (`comunidad.html:3350`) y `pfNivelActual()` degradando el `-1` sin sesion a `1` (`mi-perfil.html:5589`). Detalle y pruebas en `BUGS_HISTORICOS.md` **BUG-100** y **BUG-101**.
+
+**DESVIACION DE NORMA [DEUDA]:** ADR-002 (ASCII-safety) **NO se cumple hoy** en los 4 ficheros del encargo: hay bytes > 127 **legitimos** (emojis UTF-8 reales), asi que la verificacion mide **delta de codigo nuevo = 0**, no cero absoluto. Decidido **NO normalizar** (fuera de alcance, riesgo alto). Relevo en `NEXT.md`.
+
+**BLOQUEANTE [PENDIENTE DEL OPERADOR]:** la 044 **NO esta aplicada en Neon**; sin ella las **2** ramas de listado fallan **42703** y **no hay fallback degradado**. Orden obligatorio (no se invierte) y caso de la fila actual, en `NEXT.md` "Que sigue 1" y "Que sigue 2".
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

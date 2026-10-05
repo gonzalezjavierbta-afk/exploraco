@@ -695,6 +695,47 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-v61 .v61-gate-info-t{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:var(--gold);margin-bottom:6px}
 .pf-v61 .v61-gate-info p{font-size:11px;color:rgba(255,255,255,.72);line-height:1.5;margin:0}
 @media (max-width:600px){.pf-v61 .v61-gates{grid-template-columns:repeat(2,1fr)}}
+/* ---- ADR-085: GATE POR NIVEL (regla del atributo) ----
+   El nucleo compartido (usuario-session.js) aplica/retira
+   data-gate-bloqueado="1" en cada [data-nivel-requerido]. El gate NUNCA
+   borra nodos ni escribe style.display: solo oculta por atributo (ADR-003).
+   Scope: #profile, unico padre de la barra de pestanas y de los paneles. */
+#profile [data-gate-bloqueado="1"]{display:none !important}
+/* ---- ADR-014 + ADR-085: TABLA DE DESTINO (senderos de fama) ----
+   Silo atomico: todo estilo nuevo cuelga de .tabla-destino (ADR-004).
+   Los puntos del panel son FAMA (umbrales FAMA_TIERS del backend), no el
+   xp_total de los niveles del perfil: no se mezclan ni se mapean. */
+.tabla-destino{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;margin-top:28px;color:#fff;font-family:'Outfit',sans-serif}
+.tabla-destino,.tabla-destino *{box-sizing:border-box}
+.tabla-destino .td-titulo{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.6);margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+.tabla-destino .td-nota{font-size:10px;color:rgba(255,255,255,.45);line-height:1.5;text-align:center;margin:0 0 12px}
+.tabla-destino .td-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.tabla-destino .td-send{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 8px;display:flex;flex-direction:column;gap:6px;text-align:center}
+.tabla-destino .td-send-nombre{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;line-height:1.15;min-height:32px;display:flex;align-items:center;justify-content:center;gap:5px}
+.tabla-destino .td-send-emoji{font-size:15px}
+.tabla-destino .td-send-desc{font-size:10px;color:rgba(255,255,255,.55);line-height:1.45;margin:0}
+.tabla-destino .td-svg{width:100%;height:auto;display:block}
+.tabla-destino .td-linea{stroke:rgba(255,255,255,.14);stroke-width:2.5}
+.tabla-destino .td-linea.on{stroke:var(--gold)}
+.tabla-destino .td-nodo{fill:rgba(255,255,255,.05);stroke:rgba(255,255,255,.16);stroke-width:1.6}
+.tabla-destino .td-nodo.disp{fill:rgba(255,74,0,.12);stroke:var(--gold);stroke-width:2.5}
+.tabla-destino .td-nodo.on{fill:var(--gold);stroke:var(--gold)}
+.tabla-destino .td-halo{fill:none;stroke:var(--gold);stroke-width:2;animation:tdPulso 1.7s ease-in-out infinite}
+.tabla-destino .td-lock{fill:none;stroke:rgba(255,255,255,.5);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tabla-destino .td-check{fill:none;stroke:#0F1419;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.tabla-destino .td-rango{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.72);letter-spacing:-.3px}
+.tabla-destino .td-rango b{color:var(--gold)}
+.tabla-destino .td-fama{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:11px;color:var(--gold)}
+.tabla-destino .td-meta{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px}
+.tabla-destino .td-estado{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;border-top:1px solid rgba(255,255,255,.07);padding-top:6px}
+.tabla-destino .td-estado.on{color:#22C55E}
+.tabla-destino .td-nd{font-size:9px;color:rgba(255,255,255,.35)}
+.tabla-destino .td-total{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+.tabla-destino .td-total-l{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.7)}
+.tabla-destino .td-total-v{font-family:'Geist','Barlow Condensed',sans-serif;font-weight:900;font-size:18px;color:var(--gold)}
+.tabla-destino .td-cargando,.tabla-destino .td-vacio{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:18px;line-height:1.5}
+@keyframes tdPulso{0%,100%{opacity:.22}50%{opacity:.85}}
+@media (max-width:600px){.tabla-destino .td-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -736,6 +777,10 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <button type="button" class="pf-tab" role="tab" data-tab="mensajes" aria-selected="false" onclick="pfTab('mensajes')">&#x1F4E8; Mensajes</button>
     <button type="button" class="pf-tab" role="tab" data-tab="contratos" aria-selected="false" onclick="pfTab('contratos')">&#x1F4DC; Contratos</button>
     <button type="button" class="pf-tab" role="tab" data-tab="cuenta" aria-selected="false" onclick="pfTab('cuenta')">&#x2699;&#xFE0F; Cuenta</button>
+    <!-- ADR-085: pestana gateada por nivel. Ninguna de las 8 anteriores lleva
+         data-nivel-requerido: son visibles desde nivel 1. Esta exige 11
+         (capacidad organizar_actividad) porque ordena tu especializacion. -->
+    <button type="button" class="pf-tab" role="tab" data-tab="tabla_destino" data-nivel-requerido="11" aria-selected="false" title="Requiere nivel 11" onclick="pfTab('tabla_destino')">&#x1F9ED; Tabla</button>
   </nav>
 
   <!-- HERO -->
@@ -1267,6 +1312,17 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     <button class="pf-btn" onclick="window.location.href='directorio.html'">📍 Explorar</button>
     <button class="pf-btn pf-btn-gold" onclick="editarNombre()">✏️ Editar nombre</button>
     <button class="pf-btn pf-btn-danger" onclick="cerrarSesion()">🚪 Cerrar sesión</button>
+  </div>
+
+  <!-- ADR-014 + ADR-085: TABLA DE DESTINO (senderos de fama), gate nivel 11.
+       El titulo vive DENTRO del panel: asi el atributo del gate oculta el
+       bloque entero sin tocar los divs hermanos que comparten data-tab. -->
+  <div class="tabla-destino" id="pf-tabla-destino" data-tab="tabla_destino" data-nivel-requerido="11">
+    <h3 class="td-titulo">&#x1F9ED; Tabla de Destino</h3>
+    <p class="td-nota">Tus senderos de especializacion progresan en paralelo. Cada uno suma <b>fama</b> con tus acciones reales y define su propio rango.</p>
+    <div id="td-grid" aria-live="polite">
+      <div class="td-cargando">Cargando tu Tabla de Destino&#8230;</div>
+    </div>
   </div>
 
 </div>
@@ -5511,21 +5567,85 @@ function showToast(msg,color){
    Pestanas: las secciones existentes no se movieron, solo llevan data-tab;
    pfAplicarTab recuerda el display original de cada bloque y lo alterna.
    La pestana activa vive en el hash (#clase, #museo...) y por defecto
-   es PERFIL. */
-var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta'];
+   es PERFIL.
+   ADR-085: tabla_destino es la unica pestana con data-nivel-requerido. */
+var PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta','tabla_destino'];
 var PF_TAB_ACTIVO = 'perfil';
+var PF_TAB_SEGURA = 'perfil';
 function pfTabDesdeHash() {
   var h = '';
   try { h = String(window.location.hash || '').replace('#','').toLowerCase(); } catch (e) { h = ''; }
   return PF_TABS.indexOf(h) !== -1 ? h : 'perfil';
 }
+/* ---- ADR-085: GATE POR NIVEL DE PESTANAS ---------------------------
+   Fuente de verdad: el nucleo compartido (usuario-session.js), que expone
+   ExploraCO.nivelActual() y ExploraCO.actualizarPestanasDisponibles(); este
+   ultimo aplica/retira data-gate-bloqueado="1" en cada [data-nivel-requerido]
+   sin borrar nodos (ADR-003). El CSS del atributo vive scopeado en #profile.
+   El nucleo devuelve -1 sin sesion y 0 con sesion sin datos de nivel, y en
+   ambos casos NO oculta nada (ADR-085 D4). Aqui el nivel no se recalcula ni
+   se replica la tabla de umbrales (ADR-040/053): se propaga tal cual, y sin
+   nivel el gate queda inocuo (nada oculto, nada redirigido, nada avisado). */
+function pfNivelActual() {
+  var core = window.ExploraCO;
+  if (core && typeof core.nivelActual === 'function') {
+    try {
+      var n = parseInt(core.nivelActual(), 10);
+      /* -1 (sin sesion) y 0 (sesion sin datos de nivel) se propagan tal
+         cual: degradarlos a 1 rompia la coherencia con el nucleo, que en
+         ese caso no aplica data-gate-bloqueado y aun asi la pagina
+         redirigia y avisaba de un nivel que el visitante no tiene. */
+      if (!isNaN(n)) return n;
+    } catch (e) { /* el nucleo no responde: no hay nivel */ }
+  }
+  /* Sin nucleo no se inventa el nivel con una tabla espejo (ADR-040): el
+     gate no bloquea nada y la pagina se queda como esta. */
+  return -1;
+}
+function pfNivelRequerido(tab) {
+  var btn = document.querySelector('#pf-tabs .pf-tab[data-tab="' + tab + '"]');
+  var panel = document.querySelector('#profile [data-tab="' + tab + '"]');
+  var src = btn || panel;
+  if (!src) return 0;
+  var n = parseInt(src.getAttribute('data-nivel-requerido') || '0', 10);
+  return isNaN(n) ? 0 : n;
+}
+function pfTabBloqueada(tab) {
+  var req = pfNivelRequerido(tab);
+  var act = pfNivelActual();
+  /* Sin nivel no hay nada que comparar y el nucleo tampoco ocultaria: no se
+     bloquea, no se redirige y no se avisa. Un visitante anonimo no tiene
+     nivel, asi que el gate le es inocuo (ADR-085 D4). */
+  if (act < 1) return false;
+  return req > 0 && act < req;
+}
+function pfGatePintar() {
+  /* Unica fuente del atributo: el nucleo compartido. Es idempotente y no
+     borra nodos (ADR-003). Si el nucleo no esta disponible, no se pinta
+     nada: la pagina queda como esta, sin ocultar por cuenta propia. */
+  var core = window.ExploraCO;
+  if (!core || typeof core.actualizarPestanasDisponibles !== 'function') return;
+  try { core.actualizarPestanasDisponibles(); } catch (e) { /* nucleo no responde: inocuo */ }
+}
+/* Deep-link o clic por debajo del nivel: se cae a una pestana visible y se
+   avisa. Nunca se deja la pantalla en un panel que el gate oculta. */
+function pfTabRedirigir(tab) {
+  if (PF_TAB_ACTIVO !== PF_TAB_SEGURA) pfTab(PF_TAB_SEGURA);
+  try { if (('#' + PF_TAB_SEGURA) !== window.location.hash) history.replaceState(null, '', '#' + PF_TAB_SEGURA); }
+  catch (e) { /* replaceState no disponible: el hash queda, el panel ya no */ }
+  showToast('La Tabla de Destino se abre en el nivel ' + pfNivelRequerido(tab) + '.');
+}
 function pfAplicarTab() {
   var tab = PF_TAB_ACTIVO;
+  /* El gate manda: si la pestana activa esta bloqueada, el fallback es la
+     pestana segura. Asi nunca quedan todos los paneles en display:none. */
+  if (PF_TABS.indexOf(tab) === -1 || pfTabBloqueada(tab)) tab = PF_TAB_SEGURA;
   PF_TABS.forEach(function(t){
     var on = (t === tab);
     var nodos = document.querySelectorAll('#profile > [data-tab="' + t + '"]');
     for (var i = 0; i < nodos.length; i++) {
       var el = nodos[i];
+      /* _pfDisp es el cache del display original: se respeta siempre. */
       if (typeof el._pfDisp === 'undefined') el._pfDisp = el.style.display || '';
       el.style.display = on ? el._pfDisp : 'none';
     }
@@ -5534,7 +5654,9 @@ function pfAplicarTab() {
   });
 }
 function pfTab(tab) {
-  tab = PF_TABS.indexOf(tab) !== -1 ? tab : 'perfil';
+  tab = PF_TABS.indexOf(tab) !== -1 ? tab : PF_TAB_SEGURA;
+  pfGatePintar();
+  if (pfTabBloqueada(tab)) { pfTabRedirigir(tab); return; }
   PF_TAB_ACTIVO = tab;
   pfAplicarTab();
   var u = sesion();
@@ -5547,6 +5669,7 @@ function pfTab(tab) {
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();
+  if (tab === 'tabla_destino' && u && u.id) { cargarTablaDestino(); tdTutorialDesbloqueo(); }
   try { if (('#' + tab) !== window.location.hash) history.replaceState(null, '', '#' + tab); }
   catch (e) { window.location.hash = tab; }
 }
@@ -5556,6 +5679,127 @@ function pfIr(tab, targetId) {
   if (targetId === 'pf-facciones' && typeof arbolFaccionAbrir === 'function') arbolFaccionAbrir();
   var el = targetId ? document.getElementById(targetId) : null;
   if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---- ADR-014 + ADR-085: TABLA DE DESTINO (senderos de fama) -------
+   Rama ya existente: GET /api/interacciones?tipo=tabla_destino. Los puntos
+   son FAMA con los umbrales FAMA_TIERS del backend; el gate de la pestana
+   usa el nivel del perfil. Son dos sistemas distintos: se renderiza lo que
+   llega, sin mapear uno sobre otro.
+   Degradacion por campo ausente (tramo marcado, no excepcion) y estado
+   vacio honesto si la rama cae. Nunca lanza. */
+var TD_ESTADO = { cargado: false, cargando: false, tutorial: false };
+function tdNum(n) {
+  var v = Number(n);
+  if (!isFinite(v)) return 'no disponible';
+  return v.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+}
+function tdSvg(sendero) {
+  var s = sendero || {}, i;
+  var nivel = parseInt(s.nivel, 10); if (isNaN(nivel) || nivel < 0) nivel = 0;
+  var total = parseInt(s.total, 10);
+  if (isNaN(total) || total <= 0) total = Math.max(1, nivel);
+  if (total > 8) total = 8; /* cota de maquetacion, no de juego */
+  var W = 220, r = 10, dy = 32, y0 = 20, cx = W / 2;
+  var H = y0 * 2 + (total - 1) * dy, nodos = [];
+  for (i = 0; i < total; i++) nodos.push({ y: y0 + i * dy, on: (i < nivel), disp: (i === nivel) });
+  var out = '<svg class="td-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rango de fama: ' + esc(s.nombre || 'sin nombre') + '">';
+  for (i = 0; i < nodos.length - 1; i++) {
+    out += '<line class="td-linea' + ((nodos[i].on && nodos[i + 1].on) ? ' on' : '') + '" x1="' + cx + '" y1="' + (nodos[i].y + r) + '" x2="' + cx + '" y2="' + (nodos[i + 1].y - r) + '"/>';
+  }
+  for (i = 0; i < nodos.length; i++) {
+    var n = nodos[i];
+    if (n.disp) out += '<circle class="td-halo" cx="' + cx + '" cy="' + n.y + '" r="' + (r + 6) + '"/>';
+    out += '<circle class="td-nodo' + (n.on ? ' on' : (n.disp ? ' disp' : '')) + '" cx="' + cx + '" cy="' + n.y + '" r="' + r + '"/>';
+    if (n.on) out += '<path class="td-check" d="M' + (cx - 6) + ' ' + n.y + 'l4 4 8-8"/>';
+    else if (!n.disp) out += '<g class="td-lock" transform="translate(' + (cx - 6) + ',' + (n.y - 6) + ') scale(0.5)"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></g>';
+  }
+  return out + '</svg>';
+}
+function tdAcciones(acciones) {
+  if (!acciones || typeof acciones !== 'object') return '<div class="td-nd">Acciones no disponibles</div>';
+  var et = { guardados:'guardados', visitas:'visitas', resenas:'resenas', votos:'votos',
+    mapas:'mapas', publicos:'mapas publicos', destinos:'destinos agregados',
+    fotos:'fotos', votos_foto:'votos de foto', albumes_geo:'albumes con gps', videos:'videos' };
+  var out = '';
+  for (var k in et) {
+    if (Object.prototype.hasOwnProperty.call(et, k) && acciones[k] != null)
+      out += '<span class="td-meta">' + et[k] + ': ' + esc(acciones[k]) + '</span>';
+  }
+  return out ? out : '<div class="td-nd">Sin acciones registradas</div>';
+}
+function tdSenderoHtml(s) {
+  s = (s && typeof s === 'object') ? s : {};
+  var rango = (s.sendero && typeof s.sendero === 'object') ? s.sendero : null;
+  var nivel = rango ? (parseInt(rango.nivel, 10) || 0) : 0;
+  var h = '<div class="td-send">';
+  h += '<div class="td-send-nombre">' + (s.emoji ? '<span class="td-send-emoji">' + esc(s.emoji) + '</span>' : '') + esc(s.nombre || 'Sendero') + '</div>';
+  if (s.descripcion) h += '<p class="td-send-desc">' + esc(s.descripcion) + '</p>';
+  h += tdSvg(rango || {});
+  if (rango) {
+    h += '<div class="td-rango"><b>' + esc(rango.nombre || 'Rango') + '</b>'
+      + (rango.total != null ? ' \u00B7 ' + nivel + '/' + (parseInt(rango.total, 10) || 0) : '')
+      + (rango.max != null ? ' \u00B7 hasta ' + tdNum(rango.max) : ' \u00B7 rango maximo') + '</div>';
+  } else {
+    h += '<div class="td-nd">Rango no disponible</div>';
+  }
+  h += '<div class="td-fama">' + tdNum(s.fama) + ' de fama</div>';
+  h += tdAcciones(s.acciones);
+  h += '<div class="td-estado' + (nivel > 0 ? ' on' : '') + '">' + (nivel > 0 ? 'Rango asignado' : 'Sin rango asignado') + '</div>';
+  return h + '</div>';
+}
+function tdTablaHtml(data) {
+  var d = (data && typeof data === 'object') ? data : null;
+  var lista = (d && Array.isArray(d.senderos)) ? d.senderos : null;
+  var h;
+  if (!lista || !lista.length)
+    return '<div class="td-vacio">Aun no hay senderos que mostrar. Tu Tabla de Destino se arma con tus visitas, guardados, resenas, votos y mapas.</div>';
+  h = '<div class="td-grid">';
+  for (var i = 0; i < lista.length; i++) h += tdSenderoHtml(lista[i]);
+  h += '</div><div class="td-total"><span class="td-total-l">Fama total</span>'
+    + (d.fama_total_global != null
+        ? '<span class="td-total-v">' + tdNum(d.fama_total_global) + '</span>'
+        : '<span class="td-nd">no disponible</span>')
+    + '</div>';
+  return h;
+}
+function tdPintar(html) {
+  var g = document.getElementById('td-grid');
+  if (g) g.innerHTML = html;
+}
+function tdVacio(msg) {
+  TD_ESTADO.cargando = false;
+  TD_ESTADO.cargado = false;
+  tdPintar('<div class="td-vacio">' + msg + '</div>');
+}
+function cargarTablaDestino() {
+  if (TD_ESTADO.cargando || TD_ESTADO.cargado) return;
+  var u = sesion();
+  if (!u || !u.id) { tdPintar('<div class="td-vacio">Inicia sesion para ver tu Tabla de Destino.</div>'); return; }
+  TD_ESTADO.cargando = true;
+  fetchConJwt('/api/interacciones?tipo=tabla_destino')
+    .then(function(res){
+      TD_ESTADO.cargando = false;
+      /* fetchConJwt devuelve {} ante fallo de red: no hay excepcion que capturar. */
+      if (!res || res.ok !== true || !res.data || typeof res.data !== 'object')
+        return tdVacio('No pudimos leer tu Tabla de Destino. Vuelve a intentar en un momento.');
+      TD_ESTADO.cargado = true;
+      tdPintar(tdTablaHtml(res.data));
+    })
+    .catch(function(){ tdVacio('No pudimos leer tu Tabla de Destino. Vuelve a intentar en un momento.'); });
+}
+/* Tutorial de desbloqueo (ADR-085): el nucleo lo expone como
+   ExploraCO.tutorialDesbloqueo y persiste el "una vez". Aqui solo se
+   invoca una vez por carga y de forma defensiva: si aun no existe, no
+   deja error en consola. */
+function tdTutorialDesbloqueo() {
+  try {
+    var core = window.ExploraCO;
+    if (!core || typeof core.tutorialDesbloqueo !== 'function') return;
+    if (TD_ESTADO.tutorial) return;
+    TD_ESTADO.tutorial = true;
+    core.tutorialDesbloqueo('tabla_destino');
+  } catch (e) { /* tutorial opcional: fallo silencioso */ }
 }
 
 /* Pasaporte unificado: el checklist de datos vive en renderPasaporte (billetera_mia). */
@@ -5891,7 +6135,14 @@ function cargarCasas(uid) {
     return;
   }
   var actual = u.casa || '';
-  var nivel = XP_LEVELS.indexOf(getLevel(statsU().xp)) + 1;
+  /* El nivel no se recalcula aqui: se propaga el del nucleo (pfNivelActual ->
+     ExploraCO.nivelActual -> calcularNivel), que es la fuente unica
+     (ADR-040/053). Antes se recalculaba con el espejo local XP_LEVELS +
+     getLevel(), y cuando la sesion no trae xp_total la lectura daba 1
+     mientras el gate de pestanas leia el nivel real: Casa y gate se
+     contradecian. Sin nivel (-1) la elegibilidad queda simplemente en false
+     y el resto del panel se degrada en silencio. */
+  var nivel = pfNivelActual();
   var dias = casaDiasRestantes(u);
   var html = '';
   if (actual) {
@@ -6517,9 +6768,19 @@ function albumTrasSubir(r) {
 }
 
 /* ---- INIT ---- */
-window.onExploraCOUpdate = function() { checkGate(); };
+window.onExploraCOUpdate = function() { checkGate(); pfGatePintar(); pfAplicarTab(); };
 PF_TAB_ACTIVO = pfTabDesdeHash();
 checkGate();
+pfGatePintar();
+/* Deep-link a una pestana gateada (ADR-085): cae a una visible y avisa en vez
+   de dejar la pantalla en un panel que el gate oculta.
+   Al llegar directo a la tabla con el gate superado, renderPerfil() ya aplico
+   el panel pero no cargo sus datos (no pasa por pfTab): se pide aqui. */
+if (pfTabBloqueada(PF_TAB_ACTIVO)) pfTabRedirigir(PF_TAB_ACTIVO);
+else if (PF_TAB_ACTIVO === 'tabla_destino') {
+  var _tdSesion = sesion();
+  if (_tdSesion && _tdSesion.id) { cargarTablaDestino(); tdTutorialDesbloqueo(); }
+}
 window.addEventListener('hashchange', function() { pfTab(pfTabDesdeHash()); });
 </script>
   <script src="usuario-session.js"></script>

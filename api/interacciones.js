@@ -5276,6 +5276,32 @@ function contarCompartidosUsuario(sqlFn, usuarioId) {
     });
 }
 
+// ADR-085 D2: parseo tolerante de la PRIMERA fecha de un rango escrito por
+// el usuario en texto libre (planes_viaje.fechas, max 60 chars). Acepta
+// YYYY-MM-DD y separadores equivalentes (/ y .), devuelve 'YYYY-MM-DD'
+// normalizada o null. Funcion pura: NO lanza nunca ante texto raro; ante
+// cualquier cosa no reconocida devuelve null y el llamador sigue (D1 deja
+// ver los planes sin fecha_inicio). No acepta DD/MM/YYYY a proposito: sin
+// year de 4 digitos al inicio el parseo seria ambiguo.
+function parseFechaInicioTexto(texto) {
+  if (texto === undefined || texto === null) return null;
+  var s = String(texto);
+  if (!s) return null;
+  var m = s.match(/(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})/);
+  if (!m) return null;
+  var anio = parseInt(m[1], 10);
+  var mes = parseInt(m[2], 10);
+  var dia = parseInt(m[3], 10);
+  if (anio < 1900 || anio > 9999) return null;
+  if (mes < 1 || mes > 12) return null;
+  if (dia < 1 || dia > 31) return null;
+  var d = new Date(Date.UTC(anio, mes - 1, dia));
+  if (d.getUTCFullYear() !== anio || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia) return null;
+  var mm = mes < 10 ? '0' + String(mes) : String(mes);
+  var dd = dia < 10 ? '0' + String(dia) : String(dia);
+  return String(anio) + '-' + mm + '-' + dd;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -6331,7 +6357,10 @@ module.exports = async function handler(req, res) {
           + ' (SELECT u.nombre FROM usuarios u WHERE u.id = p.creador_id) AS creador_nombre,'
           + ' EXISTS(SELECT 1 FROM planes_miembros pm WHERE pm.plan_id = p.id AND pm.usuario_id = $1) AS unido'
           + ' FROM planes_viaje p'
-          + ' WHERE p.activo = true'
+          // ADR-085 D1: solo se oculta el plan CON fecha comprobable y
+          // vencida. fecha_inicio IS NULL (no parseable o previo a la 044)
+          // se sigue mostrando.
+          + ' WHERE p.activo = true AND (p.fecha_inicio IS NULL OR p.fecha_inicio >= CURRENT_DATE)'
           + ' ORDER BY p.creado_en DESC'
           + ' LIMIT 50',
           [usuarioId]
@@ -6340,12 +6369,17 @@ module.exports = async function handler(req, res) {
       }
 
       // Planes creados por el usuario (para gestion y compartir).
+      // ADR-085 D1 aplicado tambien aqui: mismo predicado que el listado
+      // publico. Si divergieran, un plan vencido seria visible en 'mis
+      // planes' pero invisible en la lista general, y la misma URL de
+      // plan/chat quedaria colgando de una fila que ya no existe.
       if (tipo === 'planes_mios' && usuarioId) {
         var planesMiosRows = await sql(
           'SELECT p.id, p.destino, p.fechas, p.cupos, p.descripcion, p.sala_id, p.creado_en,'
           + ' (SELECT COUNT(*)::int FROM planes_miembros pm WHERE pm.plan_id = p.id) AS miembros_actuales'
           + ' FROM planes_viaje p'
           + ' WHERE p.creador_id = $1 AND p.activo = true'
+          + ' AND (p.fecha_inicio IS NULL OR p.fecha_inicio >= CURRENT_DATE)'
           + ' ORDER BY p.creado_en DESC'
           + ' LIMIT 50',
           [usuarioId]
@@ -9101,10 +9135,27 @@ module.exports = async function handler(req, res) {
           return res.status(400).json({ ok: false, error: 'fechas maximo 60 caracteres' });
         if (planDesc.length > 300)
           return res.status(400).json({ ok: false, error: 'descripcion maximo 300 caracteres' });
+        // ADR-085 D2: fecha_inicio = campo explicito del cliente si viene
+        // (tiene prioridad y, si es invalido, es 400: error de cliente, no
+        // se silencia); si no viene, se deriva del texto libre 'fechas'
+        // tomando la PRIMERA fecha del rango (inicio del viaje). Si el
+        // texto no parsea, fecha_inicio queda NULL y el plan se sigue
+        // viendo en el listado (D1).
+        var planFechaInicioTxt = (body.fecha_inicio === undefined || body.fecha_inicio === null)
+          ? '' : String(body.fecha_inicio).trim();
+        var planFechaInicio = null;
+        if (planFechaInicioTxt) {
+          var mFechas = planFechaInicioTxt.match(/^(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})$/);
+          planFechaInicio = mFechas ? parseFechaInicioTexto(planFechaInicioTxt) : null;
+          if (!planFechaInicio)
+            return res.status(400).json({ ok: false, error: 'fecha_inicio invalida: usa YYYY-MM-DD' });
+        } else {
+          planFechaInicio = parseFechaInicioTexto(planFechas);
+        }
         var planIns = await sql(
-          'INSERT INTO planes_viaje (destino, fechas, cupos, descripcion, creador_id) '
-          + 'VALUES ($1, $2, $3, $4, $5) RETURNING id',
-          [planDestino, planFechas, planCupos, planDesc, usuarioId2]
+          'INSERT INTO planes_viaje (destino, fechas, fecha_inicio, cupos, descripcion, creador_id) '
+          + 'VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+          [planDestino, planFechas, planFechaInicio, planCupos, planDesc, usuarioId2]
         );
 
         // v12 (epic 2026-09-13, migracion 015): el plan nace con su sala

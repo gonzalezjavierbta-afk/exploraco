@@ -79,6 +79,11 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .comm-panels{flex:1;overflow-y:auto}
 .cpanel{display:none;padding:20px 4%;min-height:300px}
 .cpanel.on{display:block}
+/* Level-Gate por nivel (ADR-085): atributo data-nivel-requerido declarado en
+   el nodo, visible/invisible lo decide el nucleo (usuario-session.js) que
+   pone o quita data-gate-bloqueado. Esta pagina NO escribe display.
+   Silo: selector padre UNICO #community (Reset de Silo), nada en :root. */
+#community [data-gate-bloqueado="1"]{display:none !important}
 /* Chat */
 .chat-rooms{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .chat-room{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px}
@@ -548,11 +553,11 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
     <!-- Tabs -->
         <div class="comm-tabs">
       <div class="ctab on" onclick="showCommTab('chat')">💬 Chat</div>
-      <div class="ctab" onclick="showCommTab('planes')">🗺️ Planes</div>
+      <div class="ctab" data-nivel-requerido="6" onclick="showCommTab('planes')">🗺️ Planes</div>
       <div class="ctab" onclick="showCommTab('mapa')">&#x1F5FA; Mapa</div>
       <div class="ctab" onclick="showCommTab('ranking')">🏆 Ranking</div>
-      <div class="ctab" onclick="showCommTab('pandillas')">👥 Parches</div>
-      <div class="ctab" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
+      <div class="ctab" data-nivel-requerido="14" onclick="showCommTab('pandillas')">👥 Parches</div>
+      <div class="ctab" data-nivel-requerido="15" onclick="showCommTab('wayfarer')">🕵️ Activo Oculto</div>
       <div class="ctab" onclick="showCommTab('av')">🎬 Audiovisual</div>
       <div class="ctab" onclick="showCommTab('mercado')">&#x1F6D2; Mercado</div>
       <div class="ctab" onclick="showCommTab('gobernanza')">&#x1F3DB; Gobernanza</div>
@@ -636,7 +641,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
       </div>
       <div class="lb-sub" id="rk-sub">Actualizado en tiempo real · Top 20 viajeros más activos</div>
       <div id="rk-casas" style="display:none"></div>
-      <div id="rk-facciones" style="display:none"></div>
+      <div id="rk-facciones" data-nivel-requerido="15" style="display:none"></div>
       <div id="rk-parches" style="display:none"></div>
       <div id="lb-list"></div>
     </div>
@@ -736,7 +741,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
         </div>
       </div>
       <div id="ao-proponer"></div>
-      <div id="ao-facciones"></div>
+      <div id="ao-facciones" data-nivel-requerido="15"></div>
       <div id="ao-pendientes"></div>
     </div>
 
@@ -837,8 +842,32 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 /* ---- POINTS CONFIG (40 rangos / 5 Eras) ---- */
 /* Espejo de api/usuarios.js NIVELES (curva v7, techo 100000); validado
    por scripts/smoke_niveles_espejos.js.
-   TODO ADR-040/ADR-053: migrar a window.NivelesData.XP_LEVELS
-   (evita la copia; hoy se conserva por costo de red/carga). */
+   DEBT (ADR-040 / ADR-053): esta tabla DUPLICA la curva y la repo prohibe
+   duplicarla. Fuente unica = window.ExploraCO.XP_LEVELS + calcularNivel()
+   (usuario-session.js:30-46). NO se borra en este turno porque ~10 call
+   sites (ver getLevel) leen {min,max,nombre,emoji} y la fuente unica no
+   expone esos campos: borrarla aqui es regresion. Degradacion aplicada:
+getLevel() ya delega el NIVEL en la fuente unica y solo usa este espejo
+    para el objeto con los campos legacy. Deuda a cerrar en un turno propio
+    con smoke de los ~10 call sites.
+
+    MEDIDO 2026-10-05 (H4): getLevel() tiene 4 call sites reales, no ~10
+    (:969 getLevelPct, :1127 renderChatPerks, :1751 renderPandillaCTA,
+    :1959). Ninguno esta en la cadena del Level-Gate: el gate lee el
+    atributo data-gate-bloqueado, que escribe el nucleo. El espejo esta
+    por tanto FUERA de la ruta de decision del gate. MEDIDO 2026-10-05 (2o turno): los 2 indexOf de :1136 (renderChatPerks)
+    y :1761 (renderPandillaCTA) se REPORTARON como bug (indexOf por
+    identidad de objeto, -1 siempre). NO SE REPRODUJO: getLevel() devuelve
+    XP_LEVELS[idx], una referencia del MISMO espejo, asi que indexOf
+    acierta. Barrido de 0 a 101000 XP contra calcularNivel(): 0
+    discrepancias en 101001 muestras, rango 1..40 sin -1. El nivel 0 de
+    renderChatPerks y el -1 de renderPandillaCTA tampoco se observaron.
+    Aun asi ambos call sites se endurecieron para derivar de
+    cmNivelActual() (fuente de verdad), porque el acopio dependia de esa
+    coincidencia de identidad y se romperia en silencio si el espejo se
+    re-materializa. Comportamiento medido tras el cambio: identico en las
+    101001 muestras. Quedan 0 usos de indexOf sobre este espejo en la
+    pagina, y 0 dentro del bloque del gate. */
 var XP_LEVELS = [
   {min:0,nombre:'Caminante Novato',emoji:'\uD83C\uDF31'},
   {min:150,nombre:'Rastreador Local',emoji:'\uD83E\uDDED'},
@@ -929,7 +958,31 @@ function statsU() {
   };
 }
 
-function getLevel(xp) { for(var i=XP_LEVELS.length-1;i>=0;i--) if(xp>=XP_LEVELS[i].min) return XP_LEVELS[i]; return XP_LEVELS[0]; }
+/* DEBT ADR-040/ADR-053: XP_LEVELS (arriba) es un ESPEJO local de la curva de
+   niveles y esta tabla esta prohibida como duplicado. No se borra en este turno:
+   ~10 call sites dependen de sus campos {min,max,nombre,emoji} que la fuente
+   unica no expone igual (riesgo de regresion). Mitigacion aplicada:
+   getLevel() NO decide el nivel con este espejo, delega en la fuente de verdad
+   (window.ExploraCO.calcularNivel, de usuario-session.js) y solo usa el espejo
+   para devolver el objeto con los campos que el resto de la pagina lee.
+   Migracion definitiva: xpEl.progresoNivel() y borrar este espejo. */
+function cmIndiceNivelFuenteUnica(xp) {
+  var core = window.ExploraCO;
+  if (core && typeof core.calcularNivel === 'function') {
+    try {
+      var n = core.calcularNivel(xp);
+      if (typeof n === 'number' && isFinite(n) && n >= 1) return Math.floor(n) - 1;
+    } catch (e) {}
+  }
+  return -1;
+}
+function getLevel(xp) {
+  var x = Number(xp) || 0;
+  var idx = cmIndiceNivelFuenteUnica(x);
+  if (idx >= 0 && idx < XP_LEVELS.length) return XP_LEVELS[idx];
+  for(var i=XP_LEVELS.length-1;i>=0;i--) if(x>=XP_LEVELS[i].min) return XP_LEVELS[i];
+  return XP_LEVELS[0];
+}
 function getLevelPct(xp) {
   var lvl=getLevel(xp); var range=lvl.max-lvl.min;
   if(lvl.max>=99999) return 100;
@@ -942,6 +995,9 @@ function checkGate() {
   var comm = document.getElementById('community');
   if(sesion()) { gate.style.display='none'; comm.style.display='flex'; showCommunity(); }
   else { gate.style.display='flex'; comm.style.display='none'; planChatStopPoll(); updateCommUI(); }
+  // ADR-085: el nivel se recien cuando la sesion cargo (onExploraCOUpdate).
+  // Sin sesion el nucleo no bloquea nada y aqui tampoco se oculta nada.
+  cmAplicarGateNivel();  // alias unico del nucleo (ver :3233)
 }
 function loginGate() {
   if(window.ExploraCO && window.ExploraCO.mostrarLogin) window.ExploraCO.mostrarLogin();
@@ -951,6 +1007,7 @@ function enterWithoutRegister() {
   document.getElementById('gate').style.display='none';
   document.getElementById('community').style.display='flex';
   showCommunity();
+  cmAplicarGateNivel();  // modo demo: el nucleo no recibe evento de sesion aqui
 }
 
 function showCommunity() {
@@ -1085,7 +1142,13 @@ function renderChatPerks() {
   if(!wrap || !grid) return;
   if(!sesion()) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
-  var nivelActual = XP_LEVELS.indexOf(getLevel(statsU().xp)) + 1;
+  /* Degrada de la identidad de objeto: antes era
+     XP_LEVELS.indexOf(getLevel(...)) + 1, que hoy acierta SOLO porque
+     getLevel() devuelve una referencia del mismo espejo (verificado:
+     0 discrepancias en 101001 XP, pero -1 en cuanto el espejo se
+     re-materialice). El nivel sale de la fuente de verdad, igual que
+     cmNivelActual(), y asi el rotulo no depende de esa coincidencia. */
+  var nivelActual = cmNivelActual();
   grid.innerHTML = CHAT_PERKS.map(function(p){
     var nivelReq = chatPerkNivel(p.k, p.nivel);
     var abierto = capC(p.k);
@@ -1709,9 +1772,13 @@ function renderPandillaCTA() {
   var fundar = document.getElementById('pandilla-fundar');
   var retos = document.getElementById('pandilla-retos');
   if(!fundar) return;
+  /* El umbral 14 se compara contra el NIVEL de la fuente de verdad, no
+     contra un indice por identidad de objeto. Mismo gate, misma copia:
+     antes era XP_LEVELS.indexOf(getLevel(...)) >= 13, que dependia de que
+     getLevel() devolviera una referencia del mismo espejo. */
   var lvl = getLevel(statsU().xp);
-  var lvlIdx = XP_LEVELS.indexOf(lvl);
-  if(lvlIdx >= 13) {
+  var nivelUsuario = cmNivelActual();
+  if(nivelUsuario >= 14) {
     fundar.innerHTML = '<div class="pand-card" style="text-align:center">'
       + '<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">Crea tu propio parche</div>'
       + '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:12px">Nivel 14+ · Los fundadores ganan fama con cada miembro</div>'
@@ -1722,7 +1789,7 @@ function renderPandillaCTA() {
   } else {
     fundar.innerHTML = '<div class="pand-card" style="text-align:center">'
       + '<div style="font-size:11px;color:rgba(255,255,255,.4)">Necesitas Nivel 14 (Cartografo de Cine) para fundar un parche.</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">Tu nivel actual: ' + (lvlIdx + 1) + ' · ' + lvl.nombre + '</div>'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">Tu nivel actual: ' + nivelUsuario + ' · ' + lvl.nombre + '</div>'
       + '</div>';
   }
   if(retos) retos.innerHTML = '';
@@ -3164,8 +3231,67 @@ function cargarFaccionesAo() {
     });
 }
 
+/* ---- LEVEL GATE (ADR-085) ----
+   Los umbrales viven como data-nivel-requerido en los nodos. Esta pagina NO
+   escribe display ni borra nodos: solo pide al nucleo compartido que aplique
+   o retire data-gate-bloqueado, y el CSS de silo lo traduce en ocultacion.
+   Sin sesion el nucleo no bloquea nada, y aqui tampoco se oculta nada. */
+function cmCtabDe(tab) {
+  var found = null;
+  document.querySelectorAll('.ctab').forEach(function(t){
+    var oc = t.getAttribute('onclick');
+    if(!found && oc && oc.indexOf(tab) !== -1) found = t;
+  });
+  return found;
+}
+function cmTabBloqueado(tab) {
+  var el = cmCtabDe(tab);
+  return !!(el && el.getAttribute('data-gate-bloqueado') === '1');
+}
+function cmPrimerTabVisible() {
+  var vis = '';
+  document.querySelectorAll('.ctab').forEach(function(t){
+    if(vis) return;
+    if(t.getAttribute('data-gate-bloqueado') === '1') return;
+    var m = (t.getAttribute('onclick') || '').match(/showCommTab\('([^']+)'\)/);
+    if(m) vis = m[1];
+  });
+  return vis || 'chat';
+}
+/* UNICO alias del nucleo en esta pagina (ADR-085, H4 de la auditoria).
+   Contrato: noArguments, idempotente, sin valor de retorno del que la
+   pagina dependa. Delega en window.ExploraCO.actualizarPestanasDisponibles
+   (usuario-session.js:470), la UNICA escritora de data-gate-bloqueado en
+   todo el producto. Esta funcion NO decide umbrales, NO compara niveles y
+   NO escribe display: si el nucleo cambia de contrato, el fallo se ve aqui
+   y en ningun otro sitio, que es el punto de la consolidacion.
+
+   Por que NO se eliminan los 3 call sites aunque el nucleo se auto-ganche
+   (gateEngancharHook, usuario-session.js:519): los tres son momentos que
+   el gancho NO cubre, y no son duplicados del mismo tick.
+     1. checkGate():979        arranque de la pagina Y ventana de sesion.
+     2. enterWithoutRegister() modo demo desde el gate, sin evento de
+                               sesion: el core no reaplica ahi.
+     3. showCommTab():3243     cambio de pestana. VERIFICADO en smoke
+                               (S6-B/S6-C): sin esta llamada el atributo
+                               queda obsoleto cuando el nivel cambia sin
+                               onExploraCOUpdate (XP en vivo, sesion ya
+                               cacheada), y el panel queda invisible.
+   Si el nucleo llegara a cubrir el tab switch, esta llamada y sus 3 call
+   sites sobrarian: ese es el unico criterio para borrarlos. */
+function cmAplicarGateNivel() {
+  var core = window.ExploraCO;
+  if(core && typeof core.actualizarPestanasDisponibles === 'function') {
+    try { core.actualizarPestanasDisponibles(); } catch(e) {}
+  }
+}
+
 /* ---- TAB SWITCHING ---- */
 function showCommTab(tab) {
+  // Re-sincroniza el gate ANTES de decidir: este es el unico momento que
+  // cubre el nivel cambiado sin onExploraCOUpdate (smoke S6-B/S6-C).
+  cmAplicarGateNivel();
+  if(cmTabBloqueado(tab)) tab = cmPrimerTabVisible();
   document.querySelectorAll('.ctab').forEach(function(t){ t.classList.remove('on'); });
   document.querySelectorAll('.cpanel').forEach(function(p){ p.classList.remove('on'); });
   document.querySelectorAll('.ctab').forEach(function(t){
@@ -3236,7 +3362,30 @@ function cmMsg(res) {
   if (typeof res === 'string') return res;
   return res.mensaje || res.error || 'No disponible';
 }
-function cmNivelActual() { var lvl = getLevel(statsU().xp); return XP_LEVELS.indexOf(lvl) + 1; }
+/* BUG: antes hacia XP_LEVELS.indexOf(getLevel(...)) sobre un array de
+   OBJETOS, devolvia 0 siempre (o 1 con el +1) y cualquier gate construido
+   sobre esta funcion ocultaba la comunidad entera. Ahora delega en la
+   fuente unica (usuario-session.js) y degrada a indice real del espejo. */
+function cmNivelActual() {
+  var core = window.ExploraCO;
+  if(core && typeof core.nivelActual === 'function') {
+    try {
+      var n = core.nivelActual();
+      if(typeof n === 'number' && isFinite(n) && n > 0) return n;
+    } catch(e) {}
+  }
+  var xp = statsU().xp;
+  if(core && typeof core.calcularNivel === 'function') {
+    try {
+      var m = core.calcularNivel(xp);
+      if(typeof m === 'number' && isFinite(m) && m > 0) return m;
+    } catch(e) {}
+  }
+  var idx = cmIndiceNivelFuenteUnica(xp);
+  if(idx >= 0) return idx + 1;
+  for(var i=XP_LEVELS.length-1;i>=0;i--) if(xp>=XP_LEVELS[i].min) return i + 1;
+  return 1;
+}
 
 /* ---- Modal simple reutilizable (precio/cantidad/descripcion) ---- */
 var CM_MODAL = { onOk: null };

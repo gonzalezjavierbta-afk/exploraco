@@ -4391,7 +4391,7 @@ el.style.display = on ? el._pfDisp : 'none';
 1. **Retirar solo el contenedor `#pf-cv` y dejar las funciones huérfanas.** Descartada: deja código muerto en el fichero más grande del producto (~379 KB) y contradice la higiene de no arrastrar superficies sin consumidor.
 2. **Retirar la UI y además hacer `DROP COLUMN usuarios.artista_cv`.** Descartada: **destruye datos en producción** y deja a las fichas y al perfil público sin un campo que hoy se escribe; convierte además una decisión de UI en una pérdida de dato irrecuperable.
 3. **Retirar la UI completa (contenedor + funciones + regla CSS) y conservar intacto el contrato `artista_cv`.** Adopta la opción 3.
-4. **Sustituir el módulo por la vista previa del Museo dentro del perfil.** Rechazada como decisión propia: `pf-museo-preview` se movió de la pestaña `museo` a la pestaña `perfil` para que el perfil conserve una superficie de portfolio visible, pero el Museo **no** se sustituye y permanece íntegro en su pestaña. El traslado es **complemento, no reemplazo**.
+4. **Sustituir el módulo por la vista previa del Museo dentro del perfil.** Rechazada como decisión propia: `pf-museo-preview` se movió de la pestana `museo` a la pestana `perfil` para que el perfil conserve una superficie de portfolio visible, pero el Museo **no** se sustituye y permanece íntegro en su pestana. El traslado es **complemento, no reemplazo**.
 
 **Decisión tomada (opción 3):**
 1. **Se elimina de `mi-perfil.html` el módulo en las tres capas que lo componían:** el contenedor `#pf-cv`, las funciones `cargarHojaDeVida()` y `v61GuardarHojaDeVida()`, y la regla CSS `.pf-v61 .v61-cv-obra`.
@@ -4404,7 +4404,7 @@ el.style.display = on ? el._pfDisp : 'none';
 **Impacto / superficies:**
 - **Archivos tocados (2, ambos cliente):** `mi-perfil.html` (`#pf-cv`, `cargarHojaDeVida()`, `v61GuardarHojaDeVida()`, `.pf-v61 .v61-cv-obra`) y `usuario-session.js` (`ExploraCO.miHojaDeVida`, `ExploraCO.guardarHojaDeVida`).
 - **NO se toca:** `api/usuarios.js`, `api/pagina-destino.js`, ningún `.sql`, ningún endpoint (**8/8 INTACTO**, ADR-010), ni el módulo Museo.
-- **Efecto lateral de producto:** `#pf-museo-preview` pasa a la pestaña `perfil` (`data-tab="perfil"`), de modo que el perfil conserva una superficie de portfolio visible tras la retirada.
+- **Efecto lateral de producto:** `#pf-museo-preview` pasa a la pestana `perfil` (`data-tab="perfil"`), de modo que el perfil conserva una superficie de portfolio visible tras la retirada.
 - **Ganancia de espacio:** se quitan del fichero más grande del producto un bloque de UI y dos funciones, en la dirección que exige el criterio de no crecimiento de `mi-perfil.html` (AGENTS.md regla 10).
 
 **Evidencia (ADR-006, verificada contra los archivos reales en este pase, no contra NEXT.md/TASKS.md):**
@@ -4424,7 +4424,7 @@ el.style.display = on ? el._pfDisp : 'none';
 
 **ADRs relacionados:** ADR-003 (Cero Borrado Lógico: por qué el borrado se detiene en la UI y no llega a la columna), ADR-006 (baseline = archivo real: la evidencia de este ADR es el grep sobre los ficheros, no la intención del operador), ADR-010 (presupuesto 8/8: este ADR no crea ni toca endpoint), ADR-077 (agrupación plegable del Museo: el Museo es la superficie que sobrevive y ahora gana el lugar del módulo retirado), ADR-002 (los `.md` de gobernanza admiten UTF-8; el JS cliente retirado ya cumplía ASCII-safety).
 
-## ADR-081: Unificación de los DOS mapas de la pestaña Mapa de Comunidad en UNA sola instancia Leaflet -- `mymapa.js` crea el mapa y el mapa audiovisual lo adopta
+## ADR-081: Unificación de los DOS mapas de la pestana Mapa de Comunidad en UNA sola instancia Leaflet -- `mymapa.js` crea el mapa y el mapa audiovisual lo adopta
 
 **ID:** ADR-081
 **Fecha:** 2026-10-02
@@ -4432,7 +4432,7 @@ el.style.display = on ? el._pfDisp : 'none';
 **Estado:** ACEPTADO -- **implementado en working tree** (`mymapa.js`, `mapa-cultural.js`, `mapa-cultural.css`, `comunidad.html`); **commit PENDIENTE**. Sin migración, sin tocar endpoint, sin datos afectados.
 **Nota de numeración:** el mayor ADR registrado en este documento era **ADR-080** (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 081 es el siguiente consecutivo real.
 
-**Problema / Contexto:** la pestaña Mapa de `comunidad.html` mantenía **DOS instancias de Leaflet en paralelo**: la del módulo "Mis Mapas" (`mymapa.js`) y la de media audiovisual (`initAudiovisualMap`). Dos instancias significa dos capas de teselas, dos controles de zoom, dosdimensionado y dos ciclos de `invalidateSize()`, y -- lo que más se nota -- **dos mapas que el usuario no puede leer como uno solo**: los datos de una fuente no se ven en el contexto de la otra. El operador pidió una sola instancia con ambas fuentes conviviendo.
+**Problema / Contexto:** la pestana Mapa de `comunidad.html` mantenía **DOS instancias de Leaflet en paralelo**: la del módulo "Mis Mapas" (`mymapa.js`) y la de media audiovisual (`initAudiovisualMap`). Dos instancias significa dos capas de teselas, dos controles de zoom, dosdimensionado y dos ciclos de `invalidateSize()`, y -- lo que más se nota -- **dos mapas que el usuario no puede leer como uno solo**: los datos de una fuente no se ven en el contexto de la otra. El operador pidió una sola instancia con ambas fuentes conviviendo.
 
 **Opciones evaluadas:**
 1. **Conservar los dos mapas y sincronizarlos con `sync()` / eventos de movimiento.** Descartada: el problema de negocio no es la vista, es que **son dos superficies cognitivas para un mismo territorio**; además esta opción ya estaba anotada como deuda en TSK-161/ADR-071 y no aporta el resultado pedido.
@@ -4442,8 +4442,8 @@ el.style.display = on ? el._pfDisp : 'none';
 
 **Decisión tomada (opción 3):**
 1. **`mymapa.js` es el creador único.** Construye la instancia sobre `#av-map-container` (senalizado con `data-cm-mapa="1"`) a traves del motor compartido `MapaCultural`; su configuracion declara que la capa multimedia y sus controles viajan por el mismo mapa (`MyMap.setMediaTipos` / `setMediaVista`). En `mymapa.js` **quedan 0 apariciones de `L.map`**: el modulo ya no inicializa Leaflet.
-2. **El contenedor `mm-personal-map` desaparece.** La pestaña Mapa tiene un unico contenedor de mapa.
-3. **`initAudiovisualMap` deja de crear su propio mapa en el camino normal**: adopta la instancia ya viva vía `window.MyMap.getMap()` y retorna, dejando el estado heredado `_avMap` disponible solo para `invalidateSize()`. **Se conserva la rama de respaldo** que crea un mapa propio si el motor compartido no esta listo (`L` ausente o `MyMap.getMap()` falsy), de modo que la pestaña nunca queda sin mapa aunque el modulo compartido falle; esa rama queda **degradacion, no camino normal**, y esta anotada aqui para que no se lea como una violacion de este ADR.
+2. **El contenedor `mm-personal-map` desaparece.** La pestana Mapa tiene un unico contenedor de mapa.
+3. **`initAudiovisualMap` deja de crear su propio mapa en el camino normal**: adopta la instancia ya viva vía `window.MyMap.getMap()` y retorna, dejando el estado heredado `_avMap` disponible solo para `invalidateSize()`. **Se conserva la rama de respaldo** que crea un mapa propio si el motor compartido no esta listo (`L` ausente o `MyMap.getMap()` falsy), de modo que la pestana nunca queda sin mapa aunque el modulo compartido falle; esa rama queda **degradacion, no camino normal**, y esta anotada aqui para que no se lea como una violacion de este ADR.
 4. **Ambas fuentes conviven en el mismo conjunto:** los filtros de tipo de media y los chips de categoria operan sobre el conjunto unico, no sobre dos listas separadas.
 
 **Por qué (justificación):** la unificacion no es una mejora estetica: es una correccion de **modelo mental**. Un mapa con dos fuentes que se ven en un mismo lienzo es informationally distinto de dos mapas que se ven por separado; el segundo obliga al usuario a decidir en que mapa mirar, y con frecuencia no sabe. Al centralizar la instancia en el modulo que ya era el contenedor de "Mis Mapas" se conserva la responsabilidad de cada capa (filtros de media, chips de categoria) sin duplicar la infraestructura de Leaflet, que es la parte que mas falla (dimensionado, teselas, controles). El reparto de responsabilidades queda explicito: **`mymapa.js` crea**, **`mapa-cultural.js` renderiza** y **`initAudiovisualMap` se engancha**.
@@ -4461,7 +4461,7 @@ el.style.display = on ? el._pfDisp : 'none';
 
 **Consecuencias (positivas):** (1) una sola superficie de mapa con dos fuentes que se leen juntas; (2) una sola capa de teselas, un solo control de zoom, un solo `invalidateSize()`; (3) el reparto creador/renderizador/enganche queda explicito y escrito, que es lo que evita que un cuarto modulo vuelva a crear un mapa.
 
-**Consecuencias (negativas / aceptadas):** (a) **queda una rama de respaldo** en `initAudiovisualMap` que crea una segunda instancia si el modulo compartido no esta listo: es una red de seguridad, pero significa que el invariante "una sola instancia" depende de que `MyMap.getMap()` responda, y no de un mecanismo que lo impida. (b) **La dependencia es unidireccional en el codigo y la esta documentada aqui**, no rota: si `mymapa.js` falla, la pestaña puede mostrar dos mapas; conviene que el smoke futuro compruebe la unicidad en el camino normal, no solo en el degradado. (c) Los filtros de media y los chips de categoria **pasan a operar sobre el conjunto**: cualquier ajuste futuro de rendimiento debe hacerse ahi, no por fuente.
+**Consecuencias (negativas / aceptadas):** (a) **queda una rama de respaldo** en `initAudiovisualMap` que crea una segunda instancia si el modulo compartido no esta listo: es una red de seguridad, pero significa que el invariante "una sola instancia" depende de que `MyMap.getMap()` responda, y no de un mecanismo que lo impida. (b) **La dependencia es unidireccional en el codigo y la esta documentada aqui**, no rota: si `mymapa.js` falla, la pestana puede mostrar dos mapas; conviene que el smoke futuro compruebe la unicidad en el camino normal, no solo en el degradado. (c) Los filtros de media y los chips de categoria **pasan a operar sobre el conjunto**: cualquier ajuste futuro de rendimiento debe hacerse ahi, no por fuente.
 
 **Deuda / riesgos [DEUDA]:**
 - (a) **Residuo de identificador:** `mymapa.js:34` conserva `DEFAULTS.contenedor: 'mm-personal-map'`, valor por defecto cuyo elemento **ya no existe** en el documento tras la unificacion. No rompe nada (el contenedor real se senaliza con `data-cm-mapa="1"`), pero es una cadena muerta que conviene limpiar o reorientar a `#av-map-container`.
@@ -4913,3 +4913,205 @@ Otros tres hechos del baseline, los tres determinantes:
 - **ADR-010** (presupuesto 8/8: este ADR no toca `api/*` ni crea endpoint)
 
 R2 (mandato documental) vive en **`AGENTS.md` 3.9**, no en un ADR, y por eso este ADR **no deroga ningun ADR previo**: lo reforma en su alcance.
+
+## ADR-085: Politica de vigencia de planes -- `fecha_inicio IS NULL` **SE MUESTRA** -- y gate de pestanas por nivel con fuente unica `niveles-data.js`: `fecha_inicio date` derivada de `fechas` con parseo tolerante, filtro de planes en SQL, y `nivelActual()` + `actualizarPestanasDisponibles()` como rutina compartida servidor-cliente [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-085
+**Fecha:** 2026-10-05
+**Autor:** Chief Architect (`@architect`), por **confirmacion explicita del operador** emitida en el encargo de este turno.
+**Estado:** **ACEPTADO (2026-10-05).** D1, D3, D4 y D5 son **norma vigente desde este ADR**. **D2 es norma con dependencia declarada**: la columna, el indice y la escritura de `fecha_inicio` las ejecuta `@sql-security` y `@backend-dev` en su propio turno (este ADR **no toca `planes_viaje`**).
+**Numeracion:** verificada con `Select-String -Pattern "^## ADR-0"` sobre `DECISIONS.md` real (ADR-006): el mayor ADR registrado es **ADR-084** (linea 4733) y 085 es el siguiente consecutivo libre. `DECISIONS.md` medido hoy: **779.854 bytes / 4.915 lineas** (ADR-084 cita 759.252 / 4.731 bytes: el fichero crecio con ese ADR, declarado y medido, no estimado).
+**Alcance:** este ADR **escribe unicamente en `DECISIONS.md`**. **NO** edita `api/*`, **NO** edita `mi-perfil.html`, **NO** edita `usuario-session.js`, **NO** edita `niveles-data.js`, **NO** toca `planes_viaje` ni ejecuta la migracion, **NO** implementa codigo. Fija **politica, contrato y riesgo**; la ejecucion es de otros agentes y otros gates.
+
+### Problema / Contexto
+
+Cuatro hechos ya estan decididos por el operador y **este ADR no los re-litiga**, los usa como premisas:
+
+- (P1) `planes_viaje.fechas` es **`TEXT DEFAULT ''`**, texto libre de **max 60 caracteres**, del tipo `"2026-03-15 a 2026-03-20"`. **NO es timestamp.** Postgres **no puede comparar `text` contra `CURRENT_DATE`**, asi que hoy **no existe ningun filtro de vigencia** en la rama `tipo === 'planes'`: se listan los 50 planes `activo = true` mas recientes, termine o no.
+- (P2) Decidido: anadir **`fecha_inicio date` + indice** a `planes_viaje`, y filtrar en SQL en la rama `tipo === 'planes'` de `api/interacciones.js:6327-6337`.
+- (P3) Decidido: dos capacidades nuevas de **nivel 15** (`wayfarer_activo`, `facciones_avanzadas`) en `CAPACIDADES_POR_NIVEL`. El nivel 15 ya esta ocupado por `moderar_galerias` y **no se mueve**. Decidido tambien que las pestanas sin nivel en la matriz quedan **VISIBLES sin gate**, y que solo se ocultan **Planes (6)**, **Parches (14)** y **Activo Oculto (15)**; que **Tabla de Destino** entra como pestana nueva de **nivel 11**.
+- (P4) Decidido: el ocultamiento es **`display: none`, nunca borrado del DOM** (ADR-003).
+
+Lo que este ADR tiene que resolver son **tres huecos reales** que las premisas dejan abiertos:
+
+1. **La politica del plan sin `fecha_inicio`.** La columna nueva arranca **vacia** y hay filas existentes: en algun momento habra planes con `fecha_inicio IS NULL`. La pregunta es si esos planes **se muestran** o **se ocultan**. No hay respuesta en las premisas, y las dos respuestas producen behaviours opuestos e irreversibles en el volumen. **Es la decision mas importante de este ADR.**
+2. **De donde sale `fecha_inicio` al crear un plan.** `plan_crear` (`api/interacciones.js:9084-9105`) hoy inserta `destino, fechas, cupos, descripcion, creador_id`. Si nadie parsea `fechas`, **la columna nueva nunca se escribe y el filtro no filtra nada**: la migracion seria un adorno. Falta definir el alcance del parseo, que se acepta, que pasa con lo no parseable, y si el cliente puede mandar la fecha.
+3. **De donde lee el cliente el nivel.** Con capabilities nuevas y con un gate de pestanas, la pregunta de **fuente de verdad** deja de ser teorica: si el gate lee un umbral de un sitio distinto del que calcula el nivel, el gate miente en silencio y no hay test que lo note.
+
+### Baseline verificado en este turno (ADR-006: archivo real, no memoria)
+
+| Hecho | Medido en | Valor real |
+|---|---|---|
+| Filtro de planes hoy | `api/interacciones.js:6327-6337` | `WHERE p.activo = true ORDER BY p.creado_en DESC LIMIT 50`. **Ninguna mencion a `fecha_inicio` ni a `CURRENT_DATE`** |
+| Insercion de plan | `api/interacciones.js:9084-9105` | `INSERT INTO planes_viaje (destino, fechas, cupos, descripcion, creador_id)`, con `fechas` validado solo por `length > 60` |
+| Migracion de `fecha_inicio` | `db/migrations/044_planes_viaje_fecha_inicio.sql` | **YA EXISTE** (150 lineas, fechada 2026-10-05), aditiva e idempotente, con `idx_planes_viaje_activo_fecha` parcial sobre `activo = true` |
+| Predicado que la 044 asume | `044_planes_viaje_fecha_inicio.sql:49` | `WHERE activo = true AND (fecha_inicio IS NULL OR fecha_inicio >= CURRENT_DATE)` |
+| `CAPACIDADES_POR_NIVEL` | `usuario-session.js:319-356` | Mapa **1:1** `nivel -> string`, **40 entradas**; `15: 'moderar_galerias'` en L330. **No admite dos capacidades en el mismo nivel** |
+| Consumidores de ese mapa | `usuario-session.js:422-426`, `1937-1942` | `desbloqueadas` empuja **el string**; `capacidadesRevocadas` tambien. Un array los rompe |
+| `CAPACIDADES_DETALLE` | `niveles-data.js:72` | Lista de objetos `{clave, nombre, howto, nivel}`: **ya es 1:N por nivel** y es la unica fuente que admite varias capacidades en un mismo umbral |
+| Fuente de verdad de la curva | `niveles-data.js:19` | `NivelesData.XP_LEVELS` (40 rangos), exportada en L416 (`module.exports`) y L419 (`window.NivelesData`) |
+| Calculo de nivel | `usuario-session.js:35` / `:44` | `function calcularNivel(xpTotal)` publicado como `window.ExploraCO.calcularNivel` |
+| `nivelActual()` / `actualizarPestanasDisponibles()` | `usuario-session.js` | **NO EXISTEN**: cero ocurrencias de ambos nombres. Este ADR **crea** el contrato, no lo repara |
+| Enganche `onExploraCOUpdate` | `usuario-session.js:2296-2298` | Ya existe, envuelto en `try/catch`, invocado tras un cambio de XP |
+| Primer render de `refrescarSesion()` | `usuario-session.js:2307-2339` | Hoy fusiona el perfil, persiste en `localStorage` y llama **solo** a `actualizarUI()` (L2336). El gate se engancha **despues** de esa llamada |
+| Pestanas de `mi-perfil.html` | `mi-perfil.html:5515` | `PF_TABS = ['perfil','clase','red','museo','inventario','mensajes','contratos','cuenta']`: **8 entradas**, y es el **unico** array de pestanas del producto (verificado en `mi-perfil.html`, `index.html`, `comunidad.html`) |
+| Deep-link por hash | `mi-perfil.html:5517-5521` | `pfTabDesdeHash()` resuelve contra `PF_TABS` y **cae en `'perfil'`** si el hash no esta |
+| Colision de `display` | `mi-perfil.html:5529-5530` | `if (undefined === el._pfDisp) el._pfDisp = el.style.display \|\| ''` y luego `el.style.display = on ? el._pfDisp : 'none'`: **restaura el valor capturado antes del gate** |
+| Espejos de la curva | 3 ficheros JS | `niveles-data.js` (11 ocurrencias), `usuario-session.js` (21), `api/interacciones.js` (1: `NIVELES_LOCAL`, L1789-1794, que su propio comentario declara espejo de `api/usuarios.js:NIVELES`) |
+| Encoding de este fichero | `DECISIONS.md` | **UTF-8 sin BOM** (`Supresi` + `C3 B3`). Por eso este ADR se escribe en **ASCII puro**, como ADR-080 a ADR-084 |
+
+### Opciones evaluadas
+
+**O1. `fecha_inicio IS NULL` SE MUESTRA** (solo se oculta lo que tiene fecha comprobable en pasado).
+**O2. `fecha_inicio IS NULL` se OCULTA** (solo se muestra lo que se puede probar vigente).
+**O3. Mostrar el plan pero degradado**: se muestra, marcado como "fecha por confirmar", sin_metrics de ocupacion ni CTA de unirse.
+
+Se evaluaron O1 y O3 como una sola politica (la diferencia es de presentacion, no de visibilidad) y O2 como su contrapuesta. **Se descarta O3 como politica aparte** porque no compite con O1: es laPresentacion de O1, y se adopta como tal (ver D1).
+
+**O4. Parseo en SQL** (`split_part`, `to_date`, `EXCEPTION`) frente a **O5. Parseo en JS**, en la funcion serverless, antes del `INSERT`.
+
+**O6. Fuente de verdad = `CAPACIDADES_POR_NIVEL` ampliada a array** frente a **O7. Fuente de verdad = `CAPACIDADES_DETALLE`, sin tocar `CAPACIDADES_POR_NIVEL`**.
+
+**O8. El gate de pestanas vive solo en cliente** frente a **O9. El gate se aplica en servidor y en cliente, con roles separados**.
+
+### Decision tomada
+
+**D1 -- `fecha_inicio IS NULL` SE MUESTRA. Se oculta unicamente el plan cuya fecha comprobable ya paso.**
+
+- **Predicado normativo, y es el mismo que la migracion 044 ya asume** (`044_planes_viaje_fecha_inicio.sql:49`):
+
+  `WHERE activo = true AND (fecha_inicio IS NULL OR fecha_inicio >= CURRENT_DATE)`
+
+- **Por que O1 y no O2, y el argumento que decide:**
+
+  (a) **O2 obliga a reescribir una migracion ya emitida y ya numerada.** El indice parcial `idx_planes_viaje_activo_fecha` esta construido sobre `activo = true` **para ese predicado** (044, L47-54). Elegir O2 no es una preferencia de producto: es borrar el trabajo de la 044 y reescribirla, y `db/migrations/` es consecutivo e idempotente (ADR-008). La decision de datos ya esta tomada y es coherente con la de este ADR; alinear el ADR con ella cuesta cero.
+  (b) **O2 es una politica de datos que todavia no existen.** La 044 arranca vacia **a proposito** y lo explica (L23-32): un `DEFAULT CURRENT_DATE` seria un backfill destructivo que inventaria una fecha falsa a cada plan historico y la congelaria. Consecuencia directa: **en la ventana de transicion `NULL` es mayoria**, porque los planes nuevos se derivan de un `fechas` de texto libre (D2) y fallaran el parseo con frecuencia. Con O2, **la lista de Planes de todos los usuarios se vacia de golpe tras el despliegue**.
+  (c) **Y se seguiria escribiendo en ese hueco.** `plan_crear` exige la mision `mis_chat_mensajero` (nivel 3, L9087-9089), **no el nivel 6**. Con O2 se produciria el peor fallo posible en un directorio: **el usuario crea un plan que nadie puede ver**. Dato escrito, legible por su autor, invisible para todos.
+  (d) **La pregunta real no es "que dato muestro" sino "que hago con lo que no puedo probar".** Y el precedente vigente del repo es inequivoco: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, migraciones aditivas sin `DROP`, y **ADR-003 (Cero Borrado Logico)**. La linea coherente con esa governanza es **no destruir por falta de dato**. O2 es, en el fondo, un borrado logico con su propia forma: esconder porque no sabemos.
+  (e) **El riesgo de O1 es real pero es un defecto de calidad, y esta acotado.** Un plan sin fecha puede ser un plan vencido. Se acota con **tres mitigaciones que no cambian la politica**: la etiqueta "fecha por confirmar" cuando `fecha_inicio IS NULL`, el `fechas` original **siempre visible junto a la fecha parseada**, y el plan **sigue siendo accionable** (unirse, ver sala). Con eso el usuario nunca ve un plan "fantasma": ve un plan cuya fecha no esta confirmada.
+
+- **Tradeoff, escrito sin adornos:** O1 acepta **ruido** (planes viejos visibles) a cambio de **no perder disponibilidad**. O2 acepta **disponibilidad** a cambio de **no perder ruido**. Con `NULL` mayoritario en la transicion, **O2 es un fallo de disponibilidad y O1 un defecto etiquetable**. La comparacion no es simetrica, y por eso no es un empate: se elige O1.
+- **Condicion de revisita, escrita para que no sedifumine:** O2 se reabre **solo** si el operador decide que un plan sin fecha comprobable es ruido. **No es una deuda difusa ni un "ya veremos"**: es una opcion evaluada, con su condicion, y hoy esta cerrada. **Y no se vuelve a discutir por el indice**: si algum dia se elige O2, el filtro pierde la rama `IS NULL` y el indice parcial **sigue sirviendo** para el rango, con lo cual el cambio de politica **no obliga a tocar la migracion** -- lo que hace la decision de hoy barato de revertir.
+- **Lo que D1 NO decide:** el texto `fechas` **no se borra, no se renombra y no se convierte** (044, L16-21). Sigue siendo la fuente de verdad *de lo que el usuario escribio*; `fecha_inicio` es una columna **derivada y opcional**, no una sustitucion. Si divergen, **`fechas` manda** y `fecha_inicio` es una afirmacion no confiable.
+
+**D2 -- `fecha_inicio` se deriva en JS, con parseo tolerante, y el cliente puede mandarla explicita.**
+
+- **O5, no O4.** El parseo va en `plan_crear`, en JS, antes del `INSERT`. Motivos: el `INSERT` de L9104-9107 es **una sola llamada `sql()` con 5 parametros**, y meter `to_date`/`split_part` con `EXCEPTION` en el VALUES lo convierte en codigo que nadie puede probar sin levantar Neon; en JS es una funcion pura, testeable con `node`, ASCII-safe (ADR-002) y sin backticks en serverless. Un parseo que no se puede probar no es un parseo.
+- **Que acepta el parseo** (el **primer** grupo de fecha es siempre el inicio):
+  - `AAAA-MM-DD` a secas;
+  - `AAAA-MM-DD a AAAA-MM-DD`, `AAAA-MM-DD al AAAA-MM-DD`, `AAAA-MM-DD - AAAA-MM-DD` y cualquier separador equivalente;
+  - `DD/MM/AAAA`, `DD-MM-AAAA`, `AAAA/MM/DD`: se normaliza `/` a `-` y se reintenta.
+- **Que devuelve `NULL` sin error**: texto vacio o de espacios; `"a definir"`, `"por confirmar"`, `"TBD"`, `"pronto"`, `"cualquier fecha"`; fechas **incompletas** (solo ano, solo ano-mes); **meses por nombre** ("15 de marzo", "marzo 2026"), que no son parseables sin una tabla de meses en espanol y **no se anaden**: anadir un diccionario de meses es alcance, y sin el, un fallo silencioso peor que un `NULL` honesto.
+- **Regla de reconocimiento, escrita para que no dependa de una regex fragile:** se busca un grupo `\d{4}-\d{1,2}-\d{1,2}` en los **primeros 10 caracteres** del texto normalizado; lo que se encuentra **antes** del grupo se descarta como relleno. Despues se valida que la fecha **exista de verdad** (mes 1-12, dia 1-31 y coherente con el mes) y que **no sea mas antigua que un ano** (sanity: un plan de hace tres anos con `fecha_inicio` parseado es ruido de datos, no un plan vigente).
+- **Lo no parseable NO es un error de validacion.** `plan_crear` **no devuelve 400** por un `fechas` no parseable: el plan se crea con `fecha_inicio = NULL` y el `fechas` original intacto. Motivo: `fechas` es **texto libre por diseno** (60 chars, `DEFAULT ''`), y hacer fallar la creacion por su formato convierte un campo cosmetico en campo obligatorio -- un cambio de producto disfrazado de parseo. La obligatoriedad, si algum dia se quiere, es una regla nueva con su propio ADR; hoy `NULL` es un estado **valido**, no un residuo.
+- **Campo opcional explicito desde el cliente: SI, y es la via preferida.** Se acepta `body.fecha_inicio` en formato **estricto** `AAAA-MM-DD`. **Prioridad:** si viene y es valido, **es la fuente** (manda sobre `fechas`); si no viene, **se deriva de `fechas`** (D2); si viene y es **invalido**, se devuelve **400 explicito**.
+- **Por que los dos tratamientos distintos, que es la parte no obvia:** un campo **tipado** que llega mal es un **bug de cliente** y debe gritar, porque el cliente sabe que lo mando y puede corregirlo; un campo de **texto libre** que no se entiende es **ruido de datos** y no debe bloquear a nadie. La asimetria es deliberada y no es una inconsistencia.
+- **Por que el campo opcional evita retocar lo ya creado:** los planes existentes no se tocan ni se regeneran; la derivacion de `fechas` **rellena lo que se pueda** sin reescribir una sola fila, y el campo explicito sirve para el futuro y para los clientes que ya tienen un date picker. **Ninguna de las dos vias obliga a un backfill** (coherente con 044, L23-32).
+
+**D3 -- Fuente unica del nivel: `niveles-data.js`. El cliente lee `XP_LEVELS` y calcula con `calcularNivel`. Prohibido el noveno espejo.**
+
+- **Fuente de verdad, enunciada sin ambiguedad:**
+  - **La curva (umbrales de los 40 niveles): `window.NivelesData.XP_LEVELS`** (`niveles-data.js:19`, publicada en L419; `module.exports` en L416).
+  - **El calculo: `window.ExploraCO.calcularNivel`** (`usuario-session.js:35`, publicada en L44), que **consume** `XP_LEVELS` y no vuelve a declarar umbrales.
+  - **Regla dura:** un gate **nunca** reimplanta la curva ni el calculo. **Consume.** Si un gate necesita un umbral, lo lee; si necesita un nivel, llama a `calcularNivel`. **Prohibido crear un noveno espejo**, y por "noveno" se entiende esto: la cuenta de hoy son **8**, medida hoy, y estos son los que un nivel tiene que **reconciliar** al anadir `wayfarer_activo` y `facciones_avanzadas`:
+    1. `niveles-data.js:19` `XP_LEVELS` (umbrales; **no cambia**, las capacidades no mueven la curva).
+    2. `niveles-data.js:72` `CAPACIDADES_DETALLE` (ficha de cada capacidad: `clave`, `nombre`, `howto`, `nivel`): **aqui se anaden las 2 nuevas**.
+    3. `usuario-session.js:319` `CAPACIDADES_POR_NIVEL` (mapa 1:1 nivel->capacidad): **NO se toca**, ver la sub-decision de abajo.
+    4. `api/usuarios.js` `NIVELES` (gate de servidor; su espejo local es `api/interacciones.js:1789` `NIVELES_LOCAL`, que se declara espejo suyo en L1783-1784).
+    5. La UI que el comentario de L1785 nombra como sincronizada: **`index.html`, `mi-perfil.html`, `comunidad.html`**.
+  - **El resto de la cuenta (3 de los 8) son los consumidores, no las fuentes**, y se listan para que la cuenta sea auditable: `CAPACIDADES_DETALLE` ya iba como 2, y los indices de `CAPACIDADES_POR_NIVEL` (`usuario-session.js:422-426` y `1937-1942`) y la presentacion de `mi-perfil.html`. **Fuente es una sola; espejo de umbral, tres.**
+- **Hallazgo que condiciona la premisa P3, y es lo mas importante de D3:** `CAPACIDADES_POR_NIVEL` es un mapa **1:1** `nivel -> string` con **40 entradas** (`usuario-session.js:319-356`), y el nivel 15 ya esta ocupado por `moderar_galerias` (L330). **Por lo tanto `wayfarer_activo` y `facciones_avanzadas` NO se pueden registrar como dos entradas mas de ese mapa.** Y tampoco se puede "ampliarlo a array" sin coste: sus dos consumidores empujan **el string** (`desbloqueadas` en L422-426) y leen el string (`capacidadesRevocadas` en L1937-1942); un array los rompe en silencio.
+  - **Decision: se elige O7.** Las 2 capacidades se registran **solo** en `CAPACIDADES_DETALLE` (`niveles-data.js:72`), que **ya es 1:N por nivel** y ya admite varias claves en un mismo umbral. **`CAPACIDADES_POR_NIVEL` no se toca.**
+  - **Por que esto importa mas de lo que parece:** el gate de pestanas no pregunta "que capacidad hay en el nivel 15" sino "**mi nivel es >= 15**". Son condiciones distintas, y `CAPACIDADES_POR_NIVEL` **no puede expresar la segunda** porque su clave es una igualdad, no un umbral. Si el gate se apoyara en ese mapa, el nivel 15 devolveria `moderar_galerias` y las otras dos capacidades **no existirian** para el gate. **Un gate que lee capacidades en vez de umbrales es un gate que miente en silencio**, y no hay test que lo note.
+- **Por que el cliente lee `XP_LEVELS` y no un numero suelto:** el nivel **es una funcion del XP**, y el XP cambia en vivo (`onExploraCOUpdate`, L2296). Un gate que guardara el nivel en el momento del render dejaria de ser correcto en cuanto el usuario ganara XP, y **la sesion en `localStorage` puede venir de otra visita** (el comentario de L2302-2306 lo dice). Se **deriva** en el momento de usarlo, nunca se cachea.
+
+**D4 -- Contrato de la rutina compartida: `nivelActual()` + `actualizarPestanasDisponibles()`, enganchada a los dos puntos que ya existen.**
+
+- **Se CREATE, no se repara:** ninguna de las dos existe (medido). Este ADR fija su **contrato**; el codigo lo escribe otro agente.
+- **`window.ExploraCO.nivelActual()`** -> entero.
+  - Devuelve `calcularNivel(xp_total)` **solo si hay sesion con `xp_total`**. Sin sesion devuelve **`0`** y **nada mas**: **prohibido inventar un nivel**. El caso "no hay sesion" tiene que ser **distinguible** del caso "nivel bajo", porque si no, el gate no puede decidir entre "ocultar por nivel" y "ocultar por falta de sesion" y acaba tratando los dos igual.
+  - **No** recalcula la curva, **no** la re-declara, **no** lee ningun otro sitio (D3). Es la **unica** forma de leer el nivel en el cliente; un gate que haga su propio `calcularNivel` por su cuenta es un noveno espejo reincidente.
+- **`window.ExploraCO.actualizarPestanasDisponibles()`** -> sin argumentos, **idempotente**, sin valor de retorno que importe.
+  - Recorre los `[data-cap-nivel]` presentes en el DOM y **oculta** los de umbral no alcanzado; **nunca borra nada** (ADR-003) y **nunca inserta ni quita botones**.
+  - **No escribe `style.display`** en ningun caso: escribe `data-cap-bloqueada="1"` y delega el ocultado a una regla CSS bajo el selector padre del silo (ADR-004). El motivo esta en D5 y es la razon de ser de esta decision.
+  - **Idempotente de verdad:** llamarla dos veces seguidas no cambia nada, y llamarla **antes** de que exista la sesion no la deja en un estado que no se pueda recuperar. Se llama en la carga y en cada cambio de nivel.
+- **Enganche 1: `window.onExploraCOUpdate`** (`usuario-session.js:2296-2298`, ya existente y ya envuelto en `try/catch`). Es el punto que hace que el gate **reaccione a un cambio de nivel en vivo** y no solo al cargar: sin el, el gate se queda en el estado del primer render.
+- **Enganche 2: primer render de `refrescarSesion()`** (`usuario-session.js:2307-2339`), **despues** de la fusion del perfil y **despues** de `actualizarUI()` (L2336), porque **antes del fetch los datos son de `localStorage` y pueden estar viejos** (el comentario de L2302-2306 lo declara). Sin este enganche, un usuario que subio de nivel en otra pestana o en otra visita **seguiria viendo el gate viejo**, y el defecto es invisible porque el gate "funciona": muestra exactamente lo que mostraba al cargar.
+- **Se aplica en servidor y en cliente (O9), con roles separados y no intercambiables:**
+  - **Servidor = verdad.** El filtro de planes es una **consulta**: que filas devuelve `SELECT` se decide en `api/interacciones.js:6327-6337`. Un filtro en cliente tendria que **traerse los planes vencidos para luego esconderlos**, es decir, pagar la transferencia y el trabajo para tirarlos. Ademas `mi-perfil.html` es un documento publico servido a cualquiera y sus datos de nivel vienen de `localStorage`: un gate en cliente es una **cortesia visual, no un control** (`pfTab()` y `pfAplicarTab()` se pueden invocar desde la consola). Y es el unico sitio donde el volumen se acota.
+  - **Cliente = visibilidad.** Gatea la navegacion y evita el viaje de ida y vuelta a un estado que el servidor no va a servir.
+  - **Regla dura que separa los dos roles:** el cliente **nunca anade filas que el servidor no le dio**. Puede **ocultar**; **solo el servidor puede quitar**.
+  - **Consecuencia asumida:** el gate de cliente y el filtro de servidor **pueden discrepar** durante el primer render (el cliente va con `localStorage`, el servidor con la sesion). La politica es que **manda el servidor** y el cliente se corrige en cuanto llega la respuesta -- es decir, **el peor caso es pestana visible de mas por milisegundos, nunca contenido no autorizado**.
+
+**D5 -- Riesgos de `mi-perfil.html`: el hash y la colision de `display`.**
+
+- **Deep-link por hash (`pfTabDesdeHash()`, `mi-perfil.html:5517-5521`).** Hoy resuelve el hash contra `PF_TABS` y **cae en `'perfil'`** si no esta. **Politica cuando la tab destino esta gateada:** `pfAplicarTab()` **no puede activar un bloque bloqueado**; el hash se **reescribe a la primera tab desbloqueada** con `history.replaceState` (no `pushState`, para no llenar el historial de navegacion que el usuario no pudo hacer) y el usuario ve un aviso de nivel, **no un bloque vacio ni un error**.
+  - **Por que redirigir con aviso y no mostrar el bloque:** un deep-link es una **promesa de que la ruta existe**. Si la promesa no se puede cumplir porque el nivel no da, la respuesta honesta es **redirigir y explicar**; mostrar el bloque a medio ocultar es peor que las dos otras, porque parece un bug. Y el `replaceState` es lo que evita el **bucle de refresh**: sin el, recargar la pagina reintenta la ruta muerta.
+  - El hash **nunca es la autoridad**: la autoridad es `PF_TAB_ACTIVO`, que es lo que `pfAplicarTab()` lee (L5523).
+- **La colision de `display` (`mi-perfil.html:5529-5530`): este es el riesgo real, y es el que puede deshacer el gate sin borrar nada.**
+  - El codigo cachea `_pfDisp` **la primera vez que ve el elemento** y luego hace `el.style.display = on ? el._pfDisp : 'none'`. Si el gate ya puso `display: none`, y el usuario navega a esa tab, `pfAplicarTab()` **restaura `_pfDisp`, que es el valor capturado ANTES del gate, y el gate queda anulado**.
+  - **Lo grave es que es un fallo que no se ve como fallo**: el elemento **sigue en el DOM**, asi que ADR-003 se cumple y el chequeo "no se borro nada" **pasa**, mientras la pestana bloqueada se ve. Es **Cero Borrado Logico mal entendido**: la regla dice "no borres el nodo", no "gana el inline style".
+  - **Mitigacion que este ADR fija, en dos partes:**
+    1. **El gate no escribe `style.display`.** Escribe `data-cap-bloqueada="1"` y el ocultado lo hace una regla CSS de silo bajo el selector padre (ADR-004). **"Ocultar" y "activar" dejan de pelearse por la misma propiedad.**
+    2. **`pfAplicarTab()` cambia su ternario** para que la condicion de restauracion sea "`on` **y** no bloqueado": `on && !bloqueado ? el._pfDisp : 'none'`. Sin esta segunda parte, la primera sola **no basta**, porque el `style.display` inline gana a la regla CSS.
+  - **Efecto combinado:** ocultar y activar dejan de ser operaciones que compiten, el bloqueo **sobrevive a la navegacion entre pestanas**, el elemento **sigue en el DOM**, y un test puede comprobar el bloqueo leyendo `data-cap-bloqueada` **sin depender de `style.display`**, que es un propiedad que siete mecanismos distintos tocan en esta pagina.
+
+### Impacto / superficies (declarado; este turno NO las ejecuta)
+
+- **`exploraco desarrollo/DECISIONS.md`:** **+1 seccion** (este ADR), al final. **Ningun ADR anterior se modifica, no se mueve y no se borra nada** (ADR-003 documental).
+- **`planes_viaje` / `db/migrations/`: NO se toca.** La 044 **ya existe** y ya es coherente con D1. Este ADR **no la ejecuta ni la reescribe**.
+- **`api/interacciones.js`: NO se toca.** El filtro de `tipo === 'planes'` (L6327-6337) y el `INSERT` de `plan_crear` (L9104-9107) son trabajo de `@backend-dev`, con gate propio.
+- **`usuario-session.js` / `niveles-data.js` / `mi-perfil.html`: NO se tocan.** Las 2 capacidades, `nivelActual()`, `actualizarPestanasDisponibles()` y la correccion de `pfAplicarTab()` son de `@admin-dev` y `@frontend-tpl`, con gate propio.
+- **`admin.html`, `index.html`: NO se tocan.**
+- **NO crea endpoint** (`api/*` sigue **8/8 INTACTO**, ADR-010): el filtro de planes es el mismo endpoint con su predicado cambiado.
+
+### Consecuencias
+
+**Positivas:**
+
+1. (D1) El listado de Planes **no se vacia en el despliegue**, que era el fallo de disponibilidad que O2 introducia con `NULL` mayoritario, y se evita el caso "plan creado y no visible por nadie" con un creador de nivel 3.
+2. (D1) La decision **queda alineada con la migracion que ya esta escrita**, asi que no hay trabajo que deshacer ni predicado que mantener en dos versiones.
+3. (D2) `fecha_inicio` **se va a escribir de verdad** en vez de quedar como columna decorativa, y el parseo es una **funcion pura testeable con `node`**, sin levantar Neon.
+4. (D2) El campo opcional explicito da una via **tipada y a futuro** sin obligar a **ningun backfill**, coherente con el `NULL` deliberado de la 044.
+5. (D3) Se cierra la pregunta de donde lee el nivel **por escrito y con nombre de fichero y linea**, y el noveno espejo queda **prohibido por nombre**.
+6. (D3) Descubrir que `CAPACIDADES_POR_NIVEL` es **1:1** y que el gate necesita **umbral, no igualdad**, evita un bug **silencioso y sin test posible**: dos capacidades de nivel 15 invisibles para el gate.
+7. (D4) Un solo contrato (`nivelActual()`) elimina la clase de bug "el gate lee el nivel de otro sitio", y los dos enganches cubren los dos momentos en que el nivel puede quedar viejo (`localStorage` y XP en vivo).
+8. (D5) Separar el ocultado del `inline style` **convierte el bloqueo en algo comprobable**, porque `data-cap-bloqueada` es un atributo que ningun otro mecanismo de la pagina escribe.
+
+**Negativas / aceptadas:**
+
+- (a) **Se acepta ruido**: con D1 habra planes sin fecha visible que en realidad ya pasaron. Se paga a cambio de no perder disponibilidad, y el coste se etiqueta ("fecha por confirmar") en vez de esconderse.
+- (b) **Se acepta una ventana de degradacion** entre el momento en que el gate de cliente se pinta con `localStorage` y la respuesta del servidor. Es de milisegundos y solo puede **mostrar de mas**, nunca autorizar de menos (D4).
+- (c) **Se acepta que `fecha_inicio` y `fechas` puedan divergir**, si un cliente manda un campo explicito que no coincide con su texto. Se resuelve por precedencia (D2: el explicito manda) y por regla de lectura (**si divergen, `fechas` manda como verdad de lo que el usuario escribio**), no por bloque.
+- (d) **Se acepta no parsear meses por nombre** ("15 de marzo"): esos planes quedan en `NULL` y se muestran sin fecha parseada (D1). Es una limitacion, no un fallo, y anadirla seria alcance.
+- (e) **Se acepta que `CAPACIDADES_POR_NIVEL` y `CAPACIDADES_DETALLE` ya no sean equivalentes** como lista de capacidades (el mapa tiene 40 entradas, el detalle tiene mas). La **fuente de verdad de la curva** sigue siendo una sola (D3); lo que se acepta es que **el mapa de 1:1 deje de ser el indice completo de capacidades**, y para que no se convierta en trampasilentosa, **queda prohibido su uso como indice de capacidades por parte de cualquier gate**.
+- (f) **60 lineas es un techo de lectura, no de escritura**: este ADR es mas largo que ADR-084 y eso **cuesta** en el proximo `read`. Se acepta porque las 5 decisiones se leen una vez y las referencian al menos 3 agentes (backend, admin, sql); el coste se paga una vez y se evita en cada turno de implementacion.
+
+### Deuda / riesgos [DEUDA]
+
+- (a) **El inventario de pestanas del encargo NO coincide con el archivo real, y esto NO lo arregla este ADR.** El encargo nombra **Planes (6), Parches (14), Activo Oculto (15), Tabla de Destino (11)** y las visibles **Ranking, Audiovisual, Mercado, Marcas, Gobernanza, Contratos**. Medido hoy: **`PF_TABS` tiene 8 entradas** (`perfil, clase, red, museo, inventario, mensajes, contratos, cuenta`) y es el **unico** array de pestanas del producto; `Ranking`, `Audiovisual`, `Mercado`, `Marcas`, `Gobernanza` y `Tabla de Destino` **no existen como pestanas** en `mi-perfil.html`, `index.html` ni `comunidad.html` (verificado con `Select-String` sobre los tres). **D3 y D5 estan escritos sobre el mecanismo de gate, que es real y medido** (`PF_TABS`, `pfTabDesdeHash`, `pfAplicarTab`); **lo que no esta resuelto es el catalogo de pestanas que se gatea**. Quien implemente **debe confirmar el catalogo contra el archivo real antes de gatear**, porque gatear por nombre una pestana que no existe es un no-op silencioso. **Este ADR no inventa el catalogo ni lo corrige.**
+- (b) **`CAPACIDADES_POR_NIVEL` seguira siendo un espejo de 40 entradas que ya no describe todas las capacidades** (negativa (e)). Mitigacion escrita en el propio ADR (prohibido usarlo como indice), pero **la deuda estructural sigue**: si las capacidades de nivel multiplo crecen, la unica solucion limpia es un **ADR aparte** que migre el mapa a 1:N **con los dos consumidores migrados en el mismo paso** (L422-426 y L1937-1942). **No se hace aqui** porque cambiar la forma de un contrato con dos consumidores es otro encargo.
+- (c) **El filtro de planes no tiene test en este turno.** La predicacion de D1 es un `WHERE` con un `OR ... IS NULL`, y el propio comentario de la 044 (L56-62) avisa de que **esa rama no es sargable**: no hay garantia de index scan, y `CURRENT_DATE` no es constante de plan. Se acepta como **coste de un filtro correcto** y **no** se mitiga inventando un indice mas.
+- (d) **El parseo de D2 no tiene corpus de pruebas.** Las formas aceptadas estan escritas, pero **los `fechas` reales de `planes_viaje` no se han inspeccionado**: si en produccion hay formatos que el riconocimiento rechaza, produiran `NULL` yVisibility de mas (D1), no perdida. La inspeccion del corpus es del turno de `@backend-dev`, y su resultado **no cambia D1** (solo cambia cuantos planes salen sin fecha parseada).
+- (e) **`fecha_inicio` no esta en el `SELECT` de la rama de listado** (`api/interacciones.js:6329`) hoy. Si el gate de cliente quiere distinguir "fecha por confirmar", **necesita que el `SELECT` exponga `fecha_inicio`**, y eso es un cambio de payload **en el mismo endpoint** (ADR-010 intacto, sin endpoint nuevo) que este ADR no ejecuta. **Si no se expone, la mitigacion (e) de D1 se queda en el papel**: se mostraria el plan sin poder etiquetarlo.
+- (f) **Convive con ADR-040 y ADR-053**, que ya trate la "fuente unica" de niveles. Este ADR **no deroga ninguno**: **enmienda su alcance en un punto** (declara que la cuenta de espejos es **8** hoy, la nombra uno por uno, y prohibe el noveno) y **confirma** que la fuente de verdad sigue siendo `niveles-data.js`.
+
+### Verificacion de este ADR
+
+- **Numero:** `Select-String -LiteralPath "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-085"` -> **1 coincidencia**. El mayor ADR previo era **ADR-084** (linea 4733), verificado antes de escribir.
+- **Formato:** cabecera y secciones calcadas de la seccion de ADR-084 (`### Problema / Contexto`, `### Opciones evaluadas`, `### Decision tomada`, `### Impacto / superficies`, `### Consecuencias`, `### Deuda / riesgos [DEUDA]`, `### Verificacion de este ADR`, `ADRs relacionados`), leidas con `Read offset=4733 limit=60` y `offset=4822 limit=60` y `offset=4882 limit=35`: **techo de 60 lineas respetado** (ADR-084 D3), `DECISIONS.md` **no leido entero**.
+- **Baseline (ADR-006) verificado contra el archivo real en este turno**, con `Read` de rango y `Select-String`, no de memoria: la rama `tipo === 'planes'` (`api/interacciones.js:6327-6337`) **no menciona `fecha_inicio` ni `CURRENT_DATE`**; el `INSERT` de `plan_crear` (`L9104-9107`) **no escribe `fecha_inicio`**; **`db/migrations/044_planes_viaje_fecha_inicio.sql` existe** (150 lineas) y su predicado de L49 es el que D1 adopta; `CAPACIDADES_POR_NIVEL` es **1:1 con 40 entradas** y `15: 'moderar_galerias'` en `L330`; **`nivelActual()` y `actualizarPestanasDisponibles()` no existen**; `PF_TABS` tiene **8 entradas** en `mi-perfil.html:5515` y es el unico array de pestanas del producto; el caching de `_pfDisp` esta en `mi-perfil.html:5529-5530`.
+- **Encoding:** `DECISIONS.md` medido como **UTF-8 sin BOM** (`Supresi` + `C3 B3` en la secuencia de bytes, y sin BOM inicial). Este ADR se escribe en **ASCII puro, 0 bytes > 127**, por coherencia con ADR-080 a ADR-084, que ya son ASCII puro en este fichero.
+- **NO verificado en este turno (declarado, no medido):** el **corpus real de `planes_viaje.fechas` en produccion** (deuda (d)), el **numero de filas** con `fecha_inicio IS NULL` tras el despliegue (no se ha ejecutado la 044), y el **plan de explain** del filtro (deuda (c)). Ninguno de los tres cambia una decision de este ADR.
+- **Cierre:** no se ejecuta `npm test` ni nada en `scripts/`; este ADR **no toca codigo**.
+
+**ADRs relacionados:**
+
+- **ADR-084** (fuente unica del relato documental: este ADR cumple D1 -- el argumento vive aqui una vez -- y respeta su D3 con lecturas de <= 60 lineas)
+- **ADR-040** (acordeon de niveles con fuente unica `niveles-data.js`: **confirma** que la fuente de verdad de la curva no se mueve; este ADR **enmienda su alcance** al fijar la cuenta de espejos en 8 y la lista nominal)
+- **ADR-053** (gamificacion v6, multiplicador de nivel y reescalado de umbrales: sus espejos de `NIVELES` son 2 de los 8 que D3 nombra; **no deroga ninguna premisa suya**)
+- **ADR-003** (Cero Borrado Logico: por eso el ocultamiento es `display: none` y nunca borrado, y por eso D5 mide la colision de `style.display` como un fallo **de gate**, no como un borrado)
+- **ADR-004** (Aislamiento Atomico: por eso el ocultado del gate es una regla CSS de silo bajo el selector padre, y no un `style.display` suelto)
+- **ADR-006** (baseline = archivo real: es la regla que obliga a medir `PF_TABS` y `CAPACIDADES_POR_NIVEL` antes de afirmar nada, y la que produce la deuda (a))
+- **ADR-008** (gobernanza e idempotencia de esquema / numeracion consecutiva: por eso D1 se alinea con la 044 ya numerada en vez de reescribirla)
+- **ADR-010** (presupuesto 8/8 de funciones serverless: el filtro de planes es el **mismo** endpoint con otro predicado, sin endpoint nuevo)
