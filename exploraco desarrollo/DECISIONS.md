@@ -4178,7 +4178,7 @@ El informe DESPUES desglosa ademas una capa ADICIONAL, `REFERENCIA-RUTEO.md` (4.
 **ID:** ADR-077
 **Fecha:** 2026-10-02
 **Autor:** Documentacion Specialist (AI-DOS), al cerrar documentalmente la tanda de agrupacion de "Mi perfil"
-**Estado:** ACEPTADO E IMPLEMENTADO EN WORKING TREE (2026-10-02); commit PENDIENTE.
+**Estado:** ACEPTADO E IMPLEMENTADO EN WORKING TREE (2026-10-02); commit PENDIENTE. **AMPLIADO por ENMIENDA 1 (2026-10-04, commit `8315fb0`): el helper pasa de 4 a 5 superficies y el eje de agrupado pasa a ser decision por superficie (Misiones agrupa por ESTADO, no por taxonomia). Donde haya contradiccion, PREVALECE la ENMIENDA 1 al final de este ADR; el texto original se conserva integro como registro de la decision del 2026-10-02.**
 **Nota de numeracion:** el mayor ADR registrado en este documento era ADR-076 (verificado con grep `^## ADR-` sobre el archivo real, ADR-006); 077 es el siguiente consecutivo real.
 
 **Problema / Contexto:** ADR-028 introdujo el panel unico de perfil con pestanas, gobernadas por `PF_TABS` + `pfAplicarTab()` en `mi-perfil.html`. Esa funcion **cachea el `display` original de cada bloque UNA sola vez**:
@@ -4226,6 +4226,31 @@ el.style.display = on ? el._pfDisp : 'none';
 - (c) El commit esta pendiente; si se edita `mi-perfil.html` hay que revisar que los wrappers sigan dentro del grid (la regla se comprueba con grep, no con un test).
 
 **ADRs relacionados:** ADR-028 (panel unico de perfil con `pfAplicarTab()`/`PF_TABS`, el sistema que este ADR acota), ADR-043 (patron anti-regresion de UI anidada, mismo genero: una trampa de composicion de UI elevada a norma), ADR-004 / Regla de Oro 4 (aislamiento atomico del silo `.pf-grupo` bajo `#profile`), ADR-003 / Regla de Oro 3 (los items ocultos permanecen en el DOM), ADR-001 (vanilla JS, sin `details/summary` ni librerias), ADR-002 (ASCII-safe en todo lo nuevo), ADR-006 (baseline = archivo real), ADR-010 (presupuesto 8/8; este ADR no toca `api/*`). Tanda: TASKS.md TSK-171.
+
+**ENMIENDA 1 (2026-10-04) -- APROBADO (decision de producto del operador; commit `8315fb0` en `main`)**
+
+**Motivo.** Este ADR no introduce arquitectura nueva: el commit `8315fb0` **anade una QUINTA superficie** al helper `pfGruposRender()`, que **no se modifico**, y **desvia el eje de agrupado** en esa quinta superficie. El operador pidio agrupar **Misiones por ESTADO** (`Disponibles` / `Completadas` / `Bloqueadas`) y no por el campo `grupo` del payload, porque responde a "**que me falta**" y no a "de que tipo es". Eso contradice el precedente que este mismo ADR consolido -- cada superficie se agrupa por **su taxonomia propia** (`media_type`, `fonte`, `era`) -- asi que se registra como **ENMIENDA** y no como ADR nuevo: no hay arquitectura nueva que decidir.
+
+**Reglas nuevas (VIGENTES).**
+
+1. **Misiones es la QUINTA superficie del helper**, de modo que ADR-077 pasa de **4 a 5 superficies**. Piezas en `mi-perfil.html`: `MISIONES_GRUPOS` (`:1703-1707`), `misionEstado(m)` (`:1713`), `misionGrupoClave(m)` (`:1724`), `misionCardHTML(...)` (`:1726`), `_pfMisionesGrupoAuto` (`:1754`), `pfMisionesAutoAbrirGrupo()` (`:1755`) y la llamada `pfGruposRender('pf-misiones', list, misionGrupoClave, MISIONES_GRUPOS, misionCardHTML)` (`:1796`). **El helper y las 4 superficies previas no se tocan.**
+2. **La desviacion de eje esta ACOTADA a Misiones.** `misionEstado(m)` es la **fuente unica** de la terna `done` / `bloqueada` / `disponible` y la consumen **tanto** la clave de agrupado como la tarjeta, para que agrupar y pintar no puedan discrepar. El campo `grupo` de la API **sigue existiendo y se sigue mostrando** en cada tarjeta (`grupoNombre(m.grupo)`, `:1738`): deja de ser **clave de agrupado**, no de dato.
+3. **El veto de ADR-077 se extiende, no se relaja.** Misiones arranca **plegado** y `pfMisionesAutoAbrirGrupo()` auto-abre el primer grupo con items **una sola vez**, con el mismo mecanismo de bandera (`_pfMisionesGrupoAuto`) que ya usa `pfNivelesAutoAbrirGrupo()`: si el usuario cerro el grupo, un re-render **no lo reabre**.
+4. **Una sola regla CSS nueva, anclada por anfitrion** (`:652`): `#profile #pf-misiones .pf-grupo-body{grid-template-columns:1fr;gap:4px}`. Es necesaria porque `--pf-grupo-col` solo vale `1fr` para `#pf-niveles` (`:648`); sin ella las tarjetas de mision caian en `minmax(160px,1fr)` y se partian en columnas estrechas. El criterio es **identico** al precedente existente `#profile #pf-niveles .pf-grupo-body` y **NO afecta** a Museo / Guardados / Niveles, que conservan su grid multi-columna. Es la **unica** regla CSS anadida y cumple el Aislamiento Atomico (ADR-004).
+5. **La invariante de composicion de este ADR NO se toca.** Los wrappers `.pf-grupo` de Misiones los emite el propio helper (**ninguno lleva `data-tab`**) y cuelgan de `#pf-misiones`, que es el contenedor que reparte los items. `pfAplicarTab()` / `PF_TABS` siguen **sin tocarse** y la composicion sigue siendo comprobable con el grep del ADR.
+
+**Consecuencia tecnica de la desviacion.** El eje de agrupado deja de ser una convencion unica del helper y pasa a ser **una decision por superficie**, con el payload como fuente y la pregunta del usuario como criterio. Volver al eje taxonomico en el futuro, si se quisiera, es cambiar `MISIONES_GRUPOS` + `misionGrupoClave`: no es un rediseno ni toca el helper.
+
+**Estado de la enmienda:** APROBADO e IMPLEMENTADO (2026-10-04, commit `8315fb0`). Regla vigente: `pfGruposRender()` tiene **5 superficies** y el eje se elige por superficie. Donde haya contradiccion, **PREVALECE esta enmienda**. NO se borra el historial: el texto de ADR-077 (2026-10-02) permanece integro como registro de la decision original.
+
+**Evidencia (ADR-006, verificada contra el archivo real en este pase).**
+- `pfGruposRender(gridId, items, claveDe, grupos, itemHTML)` esta en `mi-perfil.html:3208` y su bloque es **IDENTICO** en `d9f2878` y en `8315fb0` (comparado linea a linea sobre el archivo real).
+- Orden de grupos verificado: `Disponibles` -> `Completadas` -> `Bloqueadas` (`:1703-1707`).
+- `#pf-misiones-count` conservado (`:796`) y sigue siendo el contador global de misiones.
+- `scripts/smoke_grupos_perfil.js`: **73 -> 109** comprobaciones (corrido en este pase: `Resumen: 109/109 comprobaciones PASS | FAIL 0`, `exit 0`). Misiones entra como **seccion 8, la ultima del fichero** (`:1217`), para no editar las secciones de Museo / Guardados / Niveles / Albumes.
+- En el diff del smoke las **unicas lineas eliminadas** son la cabecera del docstring y dos listas de nombres del sandbox; **ninguna asercion del contrato generico del helper se relajo**.
+
+**ADRs relacionados:** ADR-077 (este ADR, ENMIENDA 1), ADR-070 (modulo unificado de subida: el mismo commit reubico las fotos de perfil dentro de `#modal-museo-recurso` y devolvio un boton de subida a "Gestion del Museo"), ADR-004 / Regla de Oro 4 (anclaje por anfitrion de la regla CSS de Misiones), ADR-003 / Regla de Oro 3 (los items ocultos siguen en el DOM con `display:none`), ADR-002 (ASCII en todo lo nuevo), ADR-006 (baseline = archivo real), ADR-010 (8/8 intacto: este cambio **no toca `api/*` ni crea endpoint**). Tanda: TASKS.md TSK-177.
 
 ## ADR-078: Permiso total de operacion (`opencode.json` + los 20 agentes) -- la friccion de autorizacion se elimina por configuracion, no por disciplina
 
