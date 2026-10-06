@@ -2,6 +2,8 @@
 
 Documento de relevo tecnico (AI-DOS Cap. 9.4). Debe permitir que cualquier IA continue el proyecto sin depender del historial de chat.
 
+**Estado del sistema de gamificacion:** `GAMIFICACION.md` (medido 2026-10-05) -- desplegado y cableado, hoy integralmente inalcanzable (`sink_slots` = 0, `SUM(xp_gastado_sinks)` = 0.00, `ranking_score_gamma` = 0.0000).
+
 ## GUIA DE LECTURA / INDICE
 
 > Documento de relevo. Para continuar, leer PRIMERO este bloque y la seccion de la

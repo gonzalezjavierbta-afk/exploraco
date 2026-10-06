@@ -4,6 +4,7 @@
 - Version: v1.0
 - Referencia tecnica principal del proyecto (AI-DOS Cap. 9.4)
 - Basado en: pagina-destino.js v9, admin-destinos.js v2, admin.html (baseline aproximado ~7.800 lineas -- ver NEXT.md para el conteo exacto; por ADR-006 este numero es solo referencial, nunca metodo de verificacion)
+- **Gamificacion (XP, progresion, sumideros, rankings, ledger, migraciones y lo inerte):** `GAMIFICACION.md` (medido 2026-10-05). El argumento vive en `DECISIONS.md` ADR-086/ADR-088.
 
 ## 1. Arquitectura general
 

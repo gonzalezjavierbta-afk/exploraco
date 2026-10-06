@@ -2,6 +2,8 @@
 
 Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: ID, Prioridad, Responsable, Estado, Dependencia, Sprint, Detalle t\u00e9cnico y Evidencia f\u00edsica de \u00e9xito.
 
+**Estado del sistema de gamificacion (medido 2026-10-05):** `GAMIFICACION.md` -- 10 secciones con XP, sumideros, rankings, ledger, migraciones y las 9 deudas abiertas de TSK-192.
+
 ## TABLERO ACTIVO / INDICE
 
 > Vista rapida del tablero. Para continuar, revisar aqui las tareas no completadas y

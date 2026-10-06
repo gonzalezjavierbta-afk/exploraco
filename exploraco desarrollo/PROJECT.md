@@ -7,6 +7,8 @@
 - Documento obligatorio del AI-DOS Core (Cap. 9.4). Es el primer documento que debe leer cualquier IA.
 - Identidad: la marca del producto es **LATAWEL** (tagline "What to do?"; descriptor "plataforma de turismo interactivo") desde el 2026-09-30. El repositorio, la carpeta `exploraco desarrollo/` y los identificadores tecnicos conservan el codename `exploraco` (no se renombran). Ver TSK-164 / ADR-073.
 
+- **Gamificacion:** `GAMIFICACION.md` -- casa unica y viva del sistema (XP, progresion, 4 sumideros, 4 rankings, ledger, migraciones 044-050 y lo que sigue inerte). Medido 2026-10-05.
+
 ## 1. Objetivo del proyecto
 ExploraCO es una plataforma web multi-categoria de descubrimiento y promocion de destinos en Colombia (sitios turisticos, hostales, comida y eventos), con paginas dinamicas generadas en servidor, un panel de administracion propio y un modelo de datos flexible basado en JSONB que permite escalar por categoria sin redise\u00f1ar el esquema relacional.
 
