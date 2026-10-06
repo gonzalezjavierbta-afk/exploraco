@@ -494,11 +494,25 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
    (25px gold). El caso null se pinta como frase, nunca como 0 ni como --. */
 .pf-slots .sl-siguiente{font-size:11px;line-height:1.45;color:rgba(255,255,255,.42)}
 .pf-slots .sl-siguiente b{font-size:12.5px;font-weight:800;color:rgba(255,255,255,.62)}
-/* Rotulo NO interactivo de ref_contrato.etiqueta: dice a que se engancharia el
-   slot sin fingir que hay selector. Trazado punteado = hueco declarado. */
+/* Bloque de enganche. Punteado = hueco declarado, solido = ya hay selector
+   (.con-sel). El rotulo sale del motor, nunca de una lista en el cliente. */
 .pf-slots .sl-ref{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.16);border-radius:10px;padding:7px 9px}
 .pf-slots .sl-ref b{color:#fff;font-weight:800}
 .pf-slots .sl-motivo-tec{display:block;margin-top:3px;font-size:10.5px;line-height:1.4;color:rgba(255,255,255,.34)}
+/* Selector de enganche. NATIVO y deliberadamente pequeno: el pool real es de 1
+   a 3 recursos, luego un <select> del sistema es lo unico que se justifica y un
+   widget propio seria mas codigo que opciones tiene. El punteado de .sl-ref se
+   vuelve solido cuando YA hay selector: el hueco dejo de existir y la tarjeta lo
+   dice sin tener que decirlo. */
+.pf-slots .sl-ref.con-sel{border-style:solid;border-color:rgba(255,74,0,.3)}
+.pf-slots .sl-pick-lbl{display:block;margin-top:7px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45)}
+.pf-slots .sl-sel{width:100%;margin-top:4px;padding:7px 28px 7px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,255,.05);border:1px solid rgba(255,74,0,.32);border-radius:9px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23f4c66a' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.pf-slots .sl-sel:hover{border-color:rgba(255,74,0,.55)}
+.pf-slots .sl-sel:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.pf-slots .sl-sel option{background:#151A20;color:#fff}
+/* Una sola opcion ya esta elegida: se nombra y punto. Un desplegable con una
+   unica entrada es ruido que hace dudar de una eleccion que el usuario no tiene. */
+.pf-slots .sl-auto{display:block;margin-top:4px;font-size:12px;font-weight:700;color:#fff}
 @media (max-width:600px){.pf-slots .sl-precio-v{font-size:21px}.pf-slots .sl-grid{grid-template-columns:1fr}}
 .pf-subida{display:flex;align-items:center;gap:12px;justify-content:space-between;background:linear-gradient(135deg,rgba(255,74,0,.16),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.4);border-radius:14px;padding:14px 16px;margin-bottom:18px}
 .pf-subida-txt{display:flex;flex-direction:column;gap:2px}
@@ -2308,11 +2322,20 @@ var PF_SLOT_CLAVE = /^[a-z0-9_]+$/;
 var pfSlotsCat = null;
 var pfSlotsMios = {};
 var pfSlotsSaldoTras = null;
-/* El enganche elegido por sumidero (ref_id). El picker de recursos todavia NO
-   existe, luego este mapa esta vacio y NINGUN sumidero llega a estado listo.
-   Se declara igual porque es lo que va a alimentar el picker, y para que el
-   corte de pfSlotsComprar() sea explicito: sin ref elegido no hay peticion. */
+/* El enganche elegido por sumidero (ref_id). Lo alimenta pfSlotsElegir() desde
+   la lectura de slot_refs: el mapa guarda el UUID VERBATIM que devuelve el
+   servidor, sin reescribir ni normalizar, porque el motor lo castea a uuid. */
 var pfSlotsRefs = {};
+/* La lista cruda de candidatos y el estado de SU LECTURA, que son tres cosas
+   distintas y no se pueden colapsar en una:
+     cargando -> se esta leyendo. No se sabe si hay 0, y decir 0 seria mentir.
+     fallo    -> la rama es session-gated y no respondio. FAIL-CLOSED.
+     listo    -> la respuesta llego y se puede contar.
+   Sin esta separacion, un fallo de red se veria exactamente igual que "no
+   tienes recursos", que es el falso "comprable" que este bloque arregla. */
+var pfSlotsRefsRaw = null;
+var pfSlotsRefsEstado = 'cargando';
+var pfSlotsRefsError = '';
 
 function pfSlotsNum(v) {
   if (v === null || v === undefined || v === '') return null;
@@ -2347,6 +2370,74 @@ function pfSlotsSaldo() {
   if (t !== null) return { valor: t, exacto: true };
   return { valor: null, exacto: false };
 }
+/* El nombre del campo de enganche lo publica el motor en ref_contrato.campo y
+   NO se escribe aqui ni una vez: se lee de a.ref_contrato. Un sumidero que
+   enganche a otra columna llega bien sin tocar este modulo, que es la misma
+   razon por la que aqui no hay ni una clave de sumidero. */
+function pfSlotsCampo(a) {
+  var rc = (a && a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
+  var c = rc && rc.campo ? String(rc.campo) : '';
+  return /^[a-z_][a-z0-9_]*$/.test(c) ? c : '';
+}
+/* Los recursos que YA tienen un slot activo comprado en este sumidero. La lista
+   de slot_mios trae el mismo campo de enganche, luego el cruce es de dato a
+   dato y no de codigo a codigo. */
+function pfSlotsUsados(clave, campo) {
+  var usados = {};
+  var filas = Array.isArray(pfSlotsMios[clave]) ? pfSlotsMios[clave] : [];
+  for (var i = 0; i < filas.length; i++) {
+    var f = filas[i];
+    if (!f || f.activo !== true) continue;
+    var v = f[campo];
+    if (v !== undefined && v !== null && v !== '') usados[String(v)] = true;
+  }
+  return usados;
+}
+/* Candidatos ELEGIBLES de este sumidero: los que publica la rama de lectura,
+   menos los que ya tienen un slot activo. Sin ese filtro, comprar dos veces
+   sobre el mismo recurso se ofrece en el menu y el motor lo cobra: no es un
+   fallo del servidor, es un selector que no se entero de lo que ya paso. Si el
+   usuario suelta ese slot, vuelve a ser elegible, porque la fila queda con
+   activo = false. */
+function pfSlotsCandidatos(a) {
+  var campo = pfSlotsCampo(a);
+  if (!campo || !pfSlotsRefsRaw) return [];
+  var arr = Array.isArray(pfSlotsRefsRaw[a.clave]) ? pfSlotsRefsRaw[a.clave] : [];
+  var usados = pfSlotsUsados(a.clave, campo);
+  var out = [];
+  for (var i = 0; i < arr.length; i++) {
+    var r = arr[i];
+    if (!r || !r[campo]) continue;
+    if (usados[String(r[campo])]) continue;
+    out.push(r);
+  }
+  return out;
+}
+/* El enganche vigente, y se auto-corrige en cada llamada y en un solo sentido:
+   si lo elegido ya no esta entre los candidatos, cae al primero; si no hay
+   ninguno, se vacia. Es lo que hace que el boton que se ve y el corte que
+   impide la peticion no puedan discrepar, porque los dos leen aqui. */
+function pfSlotsElegido(a) {
+  var campo = pfSlotsCampo(a);
+  var cands = pfSlotsCandidatos(a);
+  var el = pfSlotsRefs[a.clave] ? String(pfSlotsRefs[a.clave]) : '';
+  var sigue = false;
+  for (var i = 0; i < cands.length; i++) {
+    if (String(cands[i][campo]) === el) { sigue = true; break; }
+  }
+  if (!sigue) {
+    if (cands.length) { pfSlotsRefs[a.clave] = String(cands[0][campo]); el = pfSlotsRefs[a.clave]; }
+    else { delete pfSlotsRefs[a.clave]; el = ''; }
+  }
+  return el || null;
+}
+/* La etiqueta legible de un candidato. Dos recursos con el mismo nombre no se
+   distinguen en un menu, asi que se suma la ciudad cuando el motor la manda; no
+   se inventa ningun campo, se lee el que vino. */
+function pfSlotsEtiqueta(r) {
+  var t = (r && r.etiqueta) ? String(r.etiqueta) : 'Sin nombre';
+  return (r && r.ciudad) ? t + ' - ' + String(r.ciudad) : t;
+}
 /* Estado de compra de UN sumidero. Fuente unica de verdad: lo pinta la fila y
    lo consulta el handler ANTES de tocar la red, de modo que la guarda y lo que
    se ve son el mismo calculo y no pueden discrepar.
@@ -2357,7 +2448,8 @@ function pfSlotsSaldo() {
    justo lo que esta pasando con el enganche a destinos. */
 function pfSlotsEstado(a) {
   var st = { boton: '', motivo: '', tecnico: '', listo: false, ref: null,
-    etiqueta: '', prox: null, saldo: null, topeH: false, topeA: false };
+    etiqueta: '', prox: null, saldo: null, topeH: false, topeA: false,
+    candidatos: [], elegido: null };
   if (!a || typeof a !== 'object') return st;
   var rc = (a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
   var base = pfSlotsNum(a.costo_base_xp);
@@ -2409,12 +2501,29 @@ function pfSlotsEstado(a) {
     st.motivo = 'Te faltan ' + fmtXp(st.prox - st.saldo.valor) + ' XP para este slot.';
     return st;
   }
-  /* El picker de recursos no existe todavia: el hueco se deja declarado y el
-     boton no se habilita. En cuanto haya ref elegido, esta rama cae sola. */
-  if (!pfSlotsRefs[a.clave]) {
-    st.boton = 'Falta elegir a que se engancha';
-    st.motivo = 'Todavia no puedes ampliarlo: falta elegir ' + (st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso')
-      + ' al que se enganche el slot, y ese selector aun no esta disponible.';
+  /* El enganche, en los tres estados que se distinguen a ojo. La etiqueta la
+     pone el motor, asi que el motivo dice el nombre real de lo que falta en vez
+     de un "no disponible" que no ayuda a nadie. En los tres casos el boton queda
+     deshabilitado: un boton que va a fallar al cobrar es peor que no tenerlo. */
+  var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
+  st.candidatos = pfSlotsCandidatos(a);
+  st.elegido = pfSlotsElegido(a);
+  if (pfSlotsRefsEstado === 'cargando') {
+    st.boton = 'Leyendo ' + etq;
+    st.motivo = 'Estamos mirando que ' + etq + ' tienes para engancharle el slot. Un momento.';
+    return st;
+  }
+  if (pfSlotsRefsEstado === 'fallo') {
+    st.boton = 'No se pudo leer ' + etq;
+    st.motivo = 'No se pudo comprobar que ' + etq + ' tienes, asi que la compra queda cerrada '
+      + 'mientras tanto: sin saber a que se engancha, cobrar seria vender algo que no se puede entregar.';
+    st.tecnico = pfSlotsRefsError;
+    return st;
+  }
+  if (!st.candidatos.length) {
+    st.boton = 'Aun no tienes ' + etq;
+    st.motivo = 'Este slot se engancha a ' + etq + ' y tu cuenta no tiene ninguna activa todavia. '
+      + 'Cuando tengas una, vuelve a esta pestana y aparecera aqui para elegirla.';
     return st;
   }
   st.boton = 'Comprar por ' + fmtXp(st.prox) + ' XP';
@@ -2530,20 +2639,50 @@ function pfSlotsFila(a) {
       + 'Si sueltas el slot y lo recompras, pagas lo que toque en ese momento, no el precio inicial.';
   }
 
-  /* El enganche: ref_contrato.etiqueta es lo que el usuario tiene que LEER, asi
-   que va como rotulo. No es un selector y no finge serlo: no hay dropdown, no
-   hay lista de recursos y no hay forma de elegir todavia. Si no hay soporte, el
-   bloque lo dice sin nombres de tabla ni de campo (eso es jerga tecnica y se
-   queda en el detalle tecnico de abajo, no en el mensaje principal). */
+/* El enganche: ref_contrato.etiqueta es lo que el usuario tiene que LEER, asi
+     que va como rotulo y el texto lo pone el motor. El bloque PASA a ser el
+     selector de verdad cuando la lista llega: tres formas y ninguna mas, porque
+     el pool real es de 1 a 3. Sin soporte se dice sin nombres de tabla ni de
+     campo, que es jerga tecnica y se queda en el detalle de abajo. */
   var refEl = document.getElementById(pfSlotsId(clave, 'ref'));
   if (refEl) {
-    if (!st.ref) refEl.textContent = '';
-    else if (st.ref.comprable !== true) {
+    var etq = st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso';
+    var campo = pfSlotsCampo(a);
+    var selId = pfSlotsId(clave, 'sel');
+    if (!st.ref) {
+      refEl.className = 'sl-ref';
+      refEl.textContent = '';
+    } else if (st.ref.comprable !== true) {
+      refEl.className = 'sl-ref';
       refEl.innerHTML = 'Este sumidero <b>aun no admite Slots</b>: falta a que se '
         + 'engancha y el servidor todavia no puede validarlo.';
+    } else if (pfSlotsRefsEstado === 'cargando') {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>: revisando cuales tienes.';
+    } else if (pfSlotsRefsEstado === 'fallo') {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>: no se pudo revisar cuales tienes, '
+        + 'asi que aqui no se puede ampliar todavia.';
+    } else if (!st.candidatos.length) {
+      refEl.className = 'sl-ref';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>, y ahora mismo no tienes ninguna activa '
+        + 'para engancharle el slot.';
+    } else if (st.candidatos.length === 1) {
+      refEl.className = 'sl-ref con-sel';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>. Ya esta elegida:'
+        + '<span class="sl-auto">' + esc(pfSlotsEtiqueta(st.candidatos[0])) + '</span>';
     } else {
-      refEl.innerHTML = 'Se engancha a <b>' + esc(st.etiqueta) + '</b>. El selector '
-        + 'de recursos aun no esta disponible, asi que todavia no se puede ampliar.';
+      var ops = '';
+      for (var i = 0; i < st.candidatos.length; i++) {
+        var rr = st.candidatos[i];
+        var vv = campo ? String(rr[campo]) : '';
+        ops += '<option value="' + esc(vv) + '"' + (vv === st.elegido ? ' selected' : '') + '>'
+          + esc(pfSlotsEtiqueta(rr)) + '</option>';
+      }
+      refEl.className = 'sl-ref con-sel';
+      refEl.innerHTML = 'Se engancha a <b>' + esc(etq) + '</b>. Elige de ' + st.candidatos.length + ' tuyos.'
+        + '<label class="sl-pick-lbl" for="' + selId + '">Recurso que se va a destacar</label>'
+        + '<select class="sl-sel" id="' + selId + '" data-clave="' + esc(clave) + '">' + ops + '</select>';
     }
   }
 
@@ -2600,6 +2739,20 @@ function pfSlotsPintar() {
       var b = ev.target && ev.target.closest ? ev.target.closest('.sl-btn') : null;
       if (b) pfSlotsComprar(b.getAttribute('data-clave'));
     });
+    /* Un solo delegador para todos los desplegables, registrado junto al de los
+       botones y una sola vez: el contenedor no se recrea, luego cada
+       re-render del selector lo sobrevive sin volver a enganchar nada
+       (ADR-003). El <select> se escribe con el UUID del servidor como value,
+       tal cual, porque eso es lo que viaja en el POST. */
+    document.getElementById('pf-slots-grid').addEventListener('change', function (ev) {
+      var s = ev.target && ev.target.closest ? ev.target.closest('select[data-clave]') : null;
+      if (!s) return;
+      pfSlotsRefs[s.getAttribute('data-clave')] = String(s.value || '');
+      /* No se decide aqui si eso habilita el boton: se anota, se repinta la
+         tarjeta entera y lo decide pfSlotsEstado, que es el mismo calculo que
+         usa el corte de compra. Un solo camino para la verdad. */
+      pfSlotsPintar();
+    });
   }
   var saldo = pfSlotsSaldo();
   var saldoEl = document.getElementById('pf-slots-saldo');
@@ -2631,18 +2784,51 @@ function pfSlotsCargarMios(uid, clave) {
     })
     .catch(function () { pfSlotsMios[clave] = []; return null; });
 }
+/* Lectura de los recursos elegibles. La rama es session-gated: sin sesion
+   responde 401 y sin tabla 409, luego este unico manejador cubre los dos.
+   FAIL-CLOSED: si no llega una respuesta con refs, NO se pintan candidatos. Una
+   lista vacia seria indistinguible de "no tienes recursos" y dejaria el boton
+   apuntando a un ref_id que nadie ha visto. */
+function pfSlotsCargarRefs() {
+  pfSlotsRefsEstado = 'cargando';
+  /* Sin usuario_id: la rama lo toma de la sesion, y mandarlo seria abrir la
+     puerta a que el parametro y la sesion discrepen. */
+  return fetchConJwt('/api/interacciones?tipo=slot_refs')
+    .then(function (res) {
+      if (!res || res.ok !== true || !res.refs || typeof res.refs !== 'object') {
+        pfSlotsRefsRaw = null;
+        pfSlotsRefsEstado = 'fallo';
+        pfSlotsRefsError = (res && res.error) ? String(res.error) : '';
+        return null;
+      }
+      pfSlotsRefsRaw = res.refs;
+      pfSlotsRefsError = '';
+      pfSlotsRefsEstado = 'listo';
+      return null;
+    })
+    .catch(function () {
+      pfSlotsRefsRaw = null;
+      pfSlotsRefsEstado = 'fallo';
+      return null;
+    });
+}
 function pfSlotsCargar(uid) {
   var box = document.getElementById('pf-slots');
   if (!box || !uid) return;
-  return fetchConJwt('/api/interacciones?tipo=slot_catalogo&usuario_id=' + encodeURIComponent(uid))
+  /* Las dos lecturas van en paralelo y la tarjeta se repinta al final, cuando
+     ambas respondieron: pintar el catalogo antes de tener los recursos daria un
+     "comprable" con la lista vacia debajo, que es justo el falso que hay que
+     evitar. La primera pintada, con la lista en curso, ya dice "Leyendo...". */
+  var catP = fetchConJwt('/api/interacciones?tipo=slot_catalogo&usuario_id=' + encodeURIComponent(uid))
     .then(function (res) {
-      if (!res || res.ok !== true) { pfSlotsCat = null; pfSlotsPintar(); return null; }
+      if (!res || res.ok !== true) { pfSlotsCat = null; return null; }
       pfSlotsCat = res;
       pfSlotsPintar();
       var claves = (res.data || []).map(function (a) { return a.clave; });
       if (!claves.length) return null;
       return Promise.all(claves.map(function (c) { return pfSlotsCargarMios(uid, c); }));
-    })
+    });
+  return Promise.all([catP, pfSlotsCargarRefs()])
     .then(function () { pfSlotsPintar(); })
     .catch(function () {});
 }
@@ -2659,8 +2845,8 @@ function pfSlotsMotivo(codigo, res) {
      otros. Se muestra como un caso unico. */
   if (codigo === 'REF_NO_EXISTE_O_SIN_PERMISOS')
     return 'El recurso indicado no existe o no pertenece a tu cuenta';
-  /* El picker aun no existe, luego el motor puede responder esto si alguien
-     fuerza el POST a mano. Se explica igual que en el catalogo. */
+  /* El motor puede responder esto si alguien fuerza el POST a mano sin
+     enganche. Se explica igual que en el catalogo. */
   if (codigo === 'SINK_REFSIN_SOPORTE')
     return 'Este sumidero todavia no es comprable: falta a que se engancha y el servidor no puede validarlo';
   /* El texto que ya llega traducido del servidor manda sobre cualquier etiqueta
@@ -2668,8 +2854,9 @@ function pfSlotsMotivo(codigo, res) {
   return (res && res.error) ? String(res.error)
     : (codigo ? 'No se pudo comprar: ' + codigo : 'No se pudo comprar');
 }
-/* El enganche que se envia. Sin picker no hay nada que elegir, luego devuelve
-   null y el motor responde REF_ID_REQUERIDO; el cliente no lo adivina. */
+/* El enganche que se envia: el UUID VERBATIM de la respuesta, sin reescribir ni
+   normalizar. El motor lo castea a uuid, luego tocarlo aqui lo rompe. Sin
+   eleccion devuelve null y la compra se corta antes de la red. */
 function pfSlotsRef(clave) {
   return pfSlotsRefs[clave] || null;
 }
@@ -2707,7 +2894,12 @@ function pfSlotsComprar(clave) {
       showToast(pfSlotsMotivo((res && res.error) || '', res), '#ef4444');
       if (btn) { btn.disabled = false; btn.textContent = previo; }
     }
-    /* El saldo que baja es el del motor, asi que la verdad se vuelve a leer. */
+    /* Tras comprar se relee TODO, y el orden importa: primero los slots ya
+       comprados (que es lo que deja de ser elegible el recurso que se acaba de
+       comprar) y despues la lista de recursos, en la misma pasada. Si ese
+       recurso era el ultimo, la tarjeta cae sola al estado "aun no tienes" y el
+       boton queda deshabilitado: no queda un boton vivo apuntando a algo que ya
+       se gasto. */
     if (u && u.id) { pfSlotsCargar(u.id); cargarInventario(u.id); }
   }).catch(function () {
     showToast('Error de conexion', '#ef4444');
