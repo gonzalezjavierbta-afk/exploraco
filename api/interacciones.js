@@ -2292,6 +2292,63 @@ var SINK_DIAS_RAMPA = 30;
 // una segunda barrera, no la primera.
 var SINK_CLAVES = ['foto_galeria', 'destacar_evento', 'album_slot', 'portada_destino'];
 
+// FAIL-CLOSED: a que se engancha cada sumidero. Los 4 se enganchan a algo
+// (foto -> foto, evento -> evento, album -> album, portada -> destino) y
+// ninguno es un slot "suelto": por eso ref_id es OBLIGATORIO. Allow-list en
+// CODIGO: el nombre de tabla sale de aqui, nunca del navegador. La clave ya
+// esta contra SINK_CLAVES antes de llegar aqui, y aun asi el fragmento SQL se
+// construye con concatenacion de literales, no con el valor del cliente.
+//
+// Los cuatro campos salen de lo MEDIDO en Neon (information_schema), no de
+// suposiciones:
+//   usuario_fotos: 1 fila. Columnas id, usuario_id, url, activo.
+//   albumes: 11 filas. Columnas id, usuario_id, activo.
+//   destinos: 218 filas y SIN columna de dueno -> no hay a quien pertenezca.
+//   eventos: NO existe ninguna tabla: ningun nombre hace match a %event% ni a
+//     %agenda% en information_schema.tables de public.
+// soporte=false significa que el servidor NO PUEDE validar el enganche, luego
+// RECHAZA la compra en vez de crear una fila huerfana por la que alguien paga
+// 320-800 XP. Preferible no comprable todavia a cobrar por nada.
+var SINK_REF_ORIGEN = {
+  foto_galeria: {
+    tabla: 'usuario_fotos', soporte: true, requiere_pertenencia: true,
+    etiqueta: 'Una foto de tu galeria'
+  },
+  album_slot: {
+    tabla: 'albumes', soporte: true, requiere_pertenencia: true,
+    etiqueta: 'Un album tuyo'
+  },
+  portada_destino: {
+    tabla: 'destinos', soporte: false, requiere_pertenencia: true,
+    etiqueta: 'Un destino',
+    motivo_soporte: 'La tabla destinos no tiene columna de dueno: no se puede'
+      + ' probar que un destino pertenezca al usuario de la sesion'
+  },
+  destacar_evento: {
+    tabla: null, soporte: false, requiere_pertenencia: true,
+    etiqueta: 'Un evento',
+    motivo_soporte: 'No existe tabla de eventos en el esquema: no se puede'
+      + ' probar que un evento exista ni a quien pertenezca'
+  }
+};
+
+// Lo que la UI necesita saber para construir el picker de cada sumidero. Va en
+// la respuesta de TODOS los rechazos y en el catalogo, para que el cliente no
+// tenga que adivinar ni el nombre del campo ni el tipo.
+function sinkRefContrato(clave) {
+  var o = SINK_REF_ORIGEN[clave];
+  if (!o) return null;
+  return {
+    campo: 'ref_id',
+    tipo: 'uuid',
+    tabla_origen: o.tabla,
+    etiqueta: o.etiqueta,
+    requiere_pertenencia: o.requiere_pertenencia,
+    comprable: o.soporte === true,
+    motivo_soporte: o.motivo_soporte || null
+  };
+}
+
 // 503 tipado si falta el esquema de sinks/ranking (046 pendiente). Nunca catch
 // vacio: registra el motivo y responde claro, igual que los otros respondedores.
 function responderSinkAusente(res, e, etiqueta) {
@@ -2327,6 +2384,47 @@ function sinkPrecioCte() {
     + '   * POWER(1 + $3::numeric * k.k_actual, $4::numeric), 2) AS costo,'
     + '  k.k_actual, ka.k_activos, a.slot_max, a.slot_max_activos'
     + ' FROM acc a CROSS JOIN k CROSS JOIN ka'
+    + ')';
+}
+
+// La curva en UNA sola funcion de codigo (ADR-086 seccion 1). La usan
+// costo_proximo (k) y costo_siguiente (k+1) del catalogo: no hay segunda
+// formula, luego los dos numeros que ve la UI salen del mismo lugar. Replica
+// el motor -- ROUND(base * POWER(1+alpha*k, gamma), 2) -- con Math.pow y el
+// red2 global, que es el mismo redondeo a centimos (Math.round y ROUND
+// empatan en positive hacia arriba). PARIDAD MEDIDA contra Neon el 2026-10-05:
+// 4 sumideros x k=0..10 = 44 comparaciones, 0 divergencias centima a centima.
+// Consecuencia: lo que la UI pinta es exactamente lo que el motor cobra.
+function sinkCosto(costoBase, k) {
+  return red2(numXp(costoBase) * Math.pow(1 + SINK_ALPHA * k, SINK_GAMMA));
+}
+
+// La validacion del enganche, DENTRO de la misma sentencia atomica (ADR-055).
+// No es una lectura previa: es la CTE refok, y el UPDATE de usuarios hace
+// CROSS JOIN contra ella, luego un ref que no valia no produce debit ni INSERT
+// de sink_slots aunque llegue valido un microsegundo antes y desaparezca
+// despues. Sin esto habia una ventana entre "comprobar" y "cobrar": es la razon
+// de que el orphan de TSK-184 no reaparezca.
+//
+// $5 llega como $5::uuid. Si fuera NULL el cast da NULL, la comparacion nunca
+// es cierta y existe_mio queda false: el filtro tambien es fail-closed.
+function sinkRefCte(clave) {
+  var o = SINK_REF_ORIGEN[clave];
+  if (!o || !o.soporte) {
+    return ', ref AS ('
+      + ' SELECT false AS soporte, false AS existe_mio'
+      + '), refok AS ('
+      + ' SELECT false AS ok, false AS soporte, false AS existe_mio FROM ref'
+      + ')';
+  }
+  // exists por id Y por dueno. Se consulta id + usuario_id + activo = true:
+  // una foto o un album dado de baja (activo=false) no se puede destacar.
+  return ', ref AS ('
+    + ' SELECT true AS soporte, EXISTS (SELECT 1 FROM ' + o.tabla
+    + '  WHERE id = $5::uuid AND usuario_id = $1::uuid AND activo = true)'
+    + '  AS existe_mio'
+    + '), refok AS ('
+    + ' SELECT soporte AND existe_mio AS ok, soporte, existe_mio FROM ref'
     + ')';
 }
 
@@ -8793,7 +8891,9 @@ module.exports = async function handler(req, res) {
             gamma: SINK_GAMMA,
             formula: 'costo(k) = costo_base_xp * (1 + alpha * k) ^ gamma',
             k: 'historico (COUNT(*) de slots comprados, activos o no)',
-            congelado: 'el precio pagado se congela en la fila comprada'
+            congelado: 'el precio pagado se congela en la fila comprada',
+            costo_siguiente: 'misma curva con k = k_historico + 1; null si'
+              + ' k+1 supera slot_max (ya no hay slot siguiente que comprar)'
           },
           disponible_xp: scSaldo,
           data: scRows.map(function(a) {
@@ -8804,18 +8904,35 @@ module.exports = async function handler(req, res) {
               slot_max: Number(a.slot_max),
               slot_max_activos: Number(a.slot_max_activos),
               alpha: SINK_ALPHA,
-              gamma: SINK_GAMMA
+              gamma: SINK_GAMMA,
+              // FAIL-CLOSED: el picker necesita saber a que se engancha el
+              // slot y si el servidor puede validarlo. Sin este campo la UI
+              // no tenia con que construir el selector y mandaba ref_id null,
+              // que es la fila huerfana de TSK-184.
+              ref_contrato: sinkRefContrato(a.clave)
             };
             if (usuarioId) {
               var k = Number(a.k_historico) || 0;
               var ka2 = Number(a.k_activos) || 0;
+              var kSig = k + 1;
               o.k_historico = k;
               o.k_activos = ka2;
-              o.costo_proximo = red2(numXp(a.costo_base_xp)
-                * Math.pow(1 + SINK_ALPHA * k, SINK_GAMMA));
+              o.costo_proximo = sinkCosto(a.costo_base_xp, k);
               o.slot_index_proximo = k;
+              o.slot_index_siguiente = kSig;
+              // "Y el siguiente costara esto". MISMO helper y MISMO redondeo
+              // que costo_proximo, luego coincide centima a centima con lo
+              // que el motor cobraria al comprar ese k+1. null cuando k+1
+              // supera slot_max: no hay siguiente que comprar y pintar un
+              // precio seria una cifra que el servidor nunca cobra.
+              o.costo_siguiente = kSig <= o.slot_max
+                ? sinkCosto(a.costo_base_xp, kSig) : null;
+              // puede_comprar tambien exige que el enganche sea validable: un
+              // sumidero sin soporte no se puede comprar aunque tenga XP y
+              // hueco, y la UI debe ver el boton muerto desde el catalogo.
               o.puede_comprar = k < o.slot_max && ka2 < o.slot_max_activos
-                && scSaldo !== null && scSaldo >= o.costo_proximo;
+                && scSaldo !== null && scSaldo >= o.costo_proximo
+                && o.ref_contrato !== null && o.ref_contrato.comprable === true;
             }
             return o;
           })
@@ -8880,6 +8997,13 @@ module.exports = async function handler(req, res) {
               slot_max: r.slot_max === null ? null : Number(r.slot_max),
               slot_max_activos: r.slot_max_activos === null ? null : Number(r.slot_max_activos),
               costo_siguiente: r.costo_siguiente === null
+                ? null : red2(numXp(r.costo_siguiente)),
+              // COLISION DE NOMBRE aclarada: aqui 'costo_siguiente' (nombre
+              // heredado de TSK-184) es el precio con k = k_historico, que es
+              // lo mismo que costo_proximo del catalogo. El 'costo_siguiente'
+              // de slot_catalogo es el de k+1. Se publica tambien bajo el
+              // nombre sin ambiguedad para que la UI use uno solo.
+              costo_proximo: r.costo_siguiente === null
                 ? null : red2(numXp(r.costo_siguiente))
             };
           })
@@ -14380,8 +14504,28 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, otorgado: true, xp: xpTotalPub, autor_id: autorPub, tier: tierPub });
       }
 
-      if (!tipo2 || !destinoId2)
-        return res.status(400).json({ ok: false, error: 'tipo y destino_id son requeridos' });
+      // DEFECTO CERRADO 2026-10-05: los 3 POST de sumiderosVivian por DEBAJO
+      // de este portero y eran INALCANZABLES por HTTP. Sin destino_id caia
+      // aqui el 400, y con destino_id caia el 400 de tipo invalido, porque
+      // tiposValidos (CHECK de interacciones.tipo) no los lista. Los sumideros
+      // no son interacciones: no tocan esa tabla y su anclaje va en ref_id
+      // (fail-closed), luego no cuelgan de destino_id ni del CHECK. Sin esta
+      // excepcion el bloque de sumideros de mas abajo nunca se ejecutaba y la
+      // UI recibia 400 aun con sesion, saldo y ref_id validos. La excepcion es
+      // de lista cerrada (los 3 nombres de ADR-086): ningun otro tipo queda
+      // menos protegido que antes.
+      var slEsPostSumidero = tipo2 === 'slot_comprar'
+        || tipo2 === 'slot_baja'
+        || tipo2 === 'slot_rampa_avanzar';
+      // El literal del guard se conserva EXACTO a proposito: smoke_036 lo
+      // comprueba por indexOf para verificar que la rama compartir este antes
+      // que el (A10) y que entre una y otra no haya INSERT en interacciones
+      // (A9). Reescribirlo hacia fallar ambas aserciones sin cambio de
+      // comportamiento.
+      if (!tipo2 || !destinoId2) {
+        if (!slEsPostSumidero)
+          return res.status(400).json({ ok: false, error: 'tipo y destino_id son requeridos' });
+      }
 
       // Validar tipo contra constraint real. Se incluyen los tipos
       // 'quitar_*' que no insertan filas (hacen UPDATE/DELETE sobre
@@ -14389,7 +14533,7 @@ module.exports = async function handler(req, res) {
       // columna tipo -- antes faltaban y el POST los rechazaba con 400,
       // dejando 'quitar_guardado' inalcanzable desde el frontend.
       var tiposValidos = ['resena','guardado','quitar_guardado','visita','quitar_visita','foto','rating'];
-      if (!tiposValidos.includes(tipo2))
+      if (!slEsPostSumidero && !tiposValidos.includes(tipo2))
         return res.status(400).json({ ok: false, error: 'tipo inv\u00e1lido: ' + tipo2 });
 
       // -- Resena --
@@ -15089,20 +15233,64 @@ module.exports = async function handler(req, res) {
             ok: false, error: 'clave invalida',
             claves_validas: SINK_CLAVES
           });
-        var slRef = body.ref_id === undefined || body.ref_id === null
-          ? null : String(body.ref_id).trim().slice(0, 200) || null;
+        // FAIL-CLOSED. Antes: ref_id=null creaba una fila en sink_slots que
+        // no apunta a nada, con los tres topes cobrando en serio -> un cobro
+        // por un servicio inexistente. Los 4 sumideros se enganchan a algo, y
+        // el servidor no acepta un enganche que no puede probar.
+        var slRefCrudo = body.ref_id === undefined || body.ref_id === null
+          ? '' : String(body.ref_id).trim();
+        var slRef = slRefCrudo.slice(0, 200);
+        if (slRef === '')
+          return res.status(400).json({
+            ok: false,
+            code: 'REF_ID_REQUERIDO',
+            error: 'ref_id requerido: falta elegir a que se engancha el slot',
+            clave: slClave,
+            ref_contrato: sinkRefContrato(slClave)
+          });
+        // No se confia en el ref_id del navegador: se exige forma UUID y luego
+        // existencia + dueno contra la tabla del sumidero.
+        if (!MERCADO_UUID_RE.test(slRef))
+          return res.status(400).json({
+            ok: false,
+            code: 'REF_ID_INVALIDO',
+            error: 'ref_id invalido: se espera un UUID del recurso',
+            clave: slClave,
+            ref_contrato: sinkRefContrato(slClave)
+          });
+        // Soporte ausente: se rechaza ANTES de tocar la base de datos. Destacar
+        // evento no tiene tabla de eventos y portada destino no tiene dueno,
+        // luego no hay forma honesta de validar el enganche todavia.
+        var slRefOrigen = SINK_REF_ORIGEN[slClave];
+        if (!slRefOrigen.soporte)
+          return res.status(409).json({
+            ok: false,
+            code: 'SINK_REFSIN_SOPORTE',
+            error: 'Este sumidero todavia no es comprable: falta a que se'
+              + ' engancha y el servidor no puede validarlo',
+            clave: slClave,
+            motivo_soporte: slRefOrigen.motivo_soporte,
+            ref_contrato: sinkRefContrato(slClave)
+          });
         var slSql;
         var slParams;
         try {
           slSql = sinkPrecioCte()
+            + sinkRefCte(slClave)
             + ', debit AS ('
             // B1: se debita xp_gastado_sinks, NUNCA xp_total. El nivel NO se
             // mueve. La fila de usuarios que se toca es la MISMA de antes:
             // coste marginal 0.
+            // refok es la cuarta puerta y va en el MISMO WHERE que las otras
+            // tres (ADR-086 1-bis.3): si el enganche no es del usuario de la
+            // sesion no hay debit, luego no hay INSERT de sink_slots y no hay
+            // fila huerfana. La garantia y el gasto siguen siendo la misma
+            // sentencia.
             + ' UPDATE usuarios u'
             + '  SET xp_gastado_sinks = u.xp_gastado_sinks + p.costo'
-            + ' FROM precio p'
+            + ' FROM precio p, refok r'
             + ' WHERE u.id = $1::uuid'
+            + '  AND r.ok'
             + '  AND p.k_actual  < p.slot_max'
             + '  AND p.k_activos < p.slot_max_activos'
             + '  AND (u.xp_total - u.xp_gastado_sinks) >= p.costo'
@@ -15149,7 +15337,13 @@ module.exports = async function handler(req, res) {
             + '  (SELECT id::text FROM ins) AS slot_id,'
             + '  (SELECT slot_index FROM ins) AS slot_index,'
             + '  (SELECT costo_pagado FROM ins) AS costo_congelado,'
-            + '  (SELECT id FROM led) AS ledger_id';
+            + '  (SELECT id FROM led) AS ledger_id,'
+            // El estado del enganche sale de la MISMA sentencia, no de una
+            // lectura posterior: asi el motivo del rechazo es el de verdad y
+            // no hay carrera entre el rechazo y el diagnostico.
+            + '  (SELECT ok FROM refok) AS ref_ok,'
+            + '  (SELECT soporte FROM refok) AS ref_soporte,'
+            + '  (SELECT existe_mio FROM refok) AS ref_existe_mio';
           slParams = [slUid, slClave, SINK_ALPHA, SINK_GAMMA, slRef];
           var slRes = await sql(slSql, slParams);
         } catch (eSl) {
@@ -15158,6 +15352,42 @@ module.exports = async function handler(req, res) {
         }
         var slR = slRes[0] || {};
         if (!slR.slot_id) {
+          // FAIL-CLOSED PRIMERO. Si el enganche no valio, ese es el motivo
+          // real y los tres topes son ruido: no tiene sentido decir "no te
+          // llega XP" cuando el problema es que el slot no iba a nada. Ademas
+          // el enganche se decidio dentro de la sentencia atomica, luego esto
+          // no es una carrera: ya se sabe que no hubo debit ni INSERT.
+          if (slR.ref_ok === false) {
+            if (slR.ref_soporte === false)
+              return res.status(409).json({
+                ok: false,
+                code: 'SINK_REFSIN_SOPORTE',
+                error: 'Este sumidero todavia no es comprable: falta a que se'
+                  + ' engancha y el servidor no puede validarlo',
+                clave: slClave,
+                ref_id: slRef,
+                motivo_soporte: SINK_REF_ORIGEN[slClave].motivo_soporte,
+                ref_contrato: sinkRefContrato(slClave),
+topes_bloqueados: ['REF_SIN_SOPORTE'],
+                disponible_xp: null,
+                slot_id: null
+              });
+            return res.status(404).json({
+              ok: false,
+              code: 'REF_NO_EXISTE_O_SIN_PERMISOS',
+              // Mismo codigo y mismo texto para "no existe" y "es de otro":
+              // distinguirlo seria un oraculo de enumeracion para averiguar
+              // que recursos tienen otros usuarios.
+              error: 'El recurso indicado no existe o no pertenece a tu'
+                + ' cuenta',
+              clave: slClave,
+              ref_id: slRef,
+              ref_contrato: sinkRefContrato(slClave),
+              topes_bloqueados: ['REF_INVALIDO'],
+              disponible_xp: null,
+              slot_id: null
+            });
+          }
           // Rechazo. El motivo se NOMBRA con una lectura posterior, para no
           // meterla dentro de la sentencia atomica.
           var slD = await sinkDiagnosticar(sql, slUid, slClave);
@@ -15165,9 +15395,12 @@ module.exports = async function handler(req, res) {
           var slSt = slMot.indexOf('XP_INSUFICIENTE') !== -1 ? 402 : 409;
           return res.status(slSt).json({
             ok: false,
+            code: 'TOPES',
             error: slMot[0],
             topes_bloqueados: slMot,
             clave: slClave,
+            ref_id: slRef,
+            ref_contrato: sinkRefContrato(slClave),
             costo_requerido: red2(numXp(slD.costo)),
             disponible_xp: slD.disponible === null
               ? null : red2(numXp(slD.disponible)),
@@ -15183,6 +15416,12 @@ module.exports = async function handler(req, res) {
           slot_id: slR.slot_id,
           clave: slClave,
           ref_id: slRef,
+          // FAIL-CLOSED: el enganche se valido DENTRO de la sentencia atomica
+          // (refok), no con una lectura previa. Que llegue aqui con
+          // ref_validado=true es la garantia de que la fila comprada apunta a
+          // un recurso del usuario de la sesion.
+          ref_validado: slR.ref_ok === true,
+          ref_origen: SINK_REF_ORIGEN[slClave].tabla,
           // PRECIO CONGELADO: lo que se pago, no lo que costaria manana.
           costo_pagado: red2(numXp(slR.costo_congelado)),
           slot_index: Number(slR.slot_index),
