@@ -335,6 +335,37 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     return 'Foto';
   }
 
+  /* Rating de media del popup del mapa (MODO TEXTO, no widget de estrellas).
+     rating_promedio NULL = sin votos, que es el estado NORMAL: devuelve null y
+     el texto cae en "sin valorar". Prohibido devolver 0 / 0.0. */
+  function mdRating(it) {
+    var n = parseFloat(it && it.rating_promedio);
+    if (!isFinite(n) || n <= 0) { return null; }
+    return Math.round(n * 10) / 10;
+  }
+
+  function mdRatingTxt(it) {
+    var r = mdRating(it);
+    return r == null ? 'sin valorar' : r + ' / 5';
+  }
+
+  /* Atributos data-ma-* del popup del mapa. NO se emite data-ma-voto: este
+     archivo no monta el widget interactivo (modo texto, decision del turno),
+     asi que MediaActions.sync() no lo construiria. mi_puntuacion solo se
+     emite si llega valida (1..5): multimedia_mapa no la expone hoy, y ausente
+     es un estado valido (nota propia desconocida), no un error. */
+  function mdMaAttrs(it, fuente, itemId) {
+    var r = mdRating(it);
+    var out = ' data-ma-fuente="' + esc(String(fuente || '')) + '"'
+      + ' data-ma-item="' + esc(String(itemId || '')) + '"'
+      + ' data-ma-votos="' + (parseInt(it && it.votos, 10) || 0) + '"'
+      + ' data-ma-rating="' + (r == null ? '' : String(r)) + '"'
+      + ' data-ma-es-propia="0"';
+    var mp = parseInt(it && it.mi_puntuacion, 10);
+    if (isFinite(mp) && mp >= 1 && mp <= 5) { out += ' data-ma-puntuacion="' + mp + '"'; }
+    return out;
+  }
+
   function mdCapMedia(titulo, autor, votos) {
     var c = titulo || '';
     if (autor) c += ' \u00b7 ' + autor;
@@ -780,8 +811,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       }
       var aph = t.closest('.md-album-photo');
       if (aph) { fotoLightbox(aph.getAttribute('data-url'), aph.getAttribute('data-cap')); return; }
-      var voto = t.closest('[data-mc-votar]');
-      if (voto) { votarMedia(voto.getAttribute('data-mc-votar'), voto.getAttribute('data-mc-fuente'), voto); return; }
+      /* data-mc-votar retirado: el popup voto en 1 toque sin puntuacion y
+         media_voto la exige (400). El popup del mapa va en modo texto; el
+         camino de calificacion vive en MediaActions.calificar(). */
       var gu = t.closest('[data-mc-guardar]');
       if (gu) { guardarMedia(gu.getAttribute('data-mc-fuente'), gu.getAttribute('data-mc-item'), gu); return; }
       var al = t.closest('[data-mc-album]');
@@ -818,8 +850,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       if (!t || !t.closest) return;
       var aph = t.closest('.md-album-photo');
       if (aph) { fotoLightbox(aph.getAttribute('data-url'), aph.getAttribute('data-cap')); return; }
-      var voto = t.closest('[data-mc-votar]');
-      if (voto) { votarMedia(voto.getAttribute('data-mc-votar'), voto.getAttribute('data-mc-fuente'), voto); return; }
+      /* data-mc-votar retirado: el popup voto en 1 toque sin puntuacion y
+         media_voto la exige (400). El popup del mapa va en modo texto; el
+         camino de calificacion vive en MediaActions.calificar(). */
       var gu = t.closest('[data-mc-guardar]');
       if (gu) { guardarMedia(gu.getAttribute('data-mc-fuente'), gu.getAttribute('data-mc-item'), gu); return; }
       var com = t.closest('[data-mc-comments]');
@@ -1719,14 +1752,13 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
             + '<span class="md-thb-ico">' + fotoIcon() + '</span></div>';
         });
         fotosMedia.forEach(function (it) {
+          /* Modo texto (decision del turno): el chip de voto era un boton de
+             1 toque que hacia POST sin puntuacion; media_voto la exige, asi
+             que ese camino hoy rebotaria con 400. Se degrada a contador +
+             promedio, con los data-ma-* para el futuro widget. */
           var itVotos = parseInt(it.votos, 10) || 0;
-          var votoCtrl;
-          if (it.id && it.fuente) {
-            votoCtrl = '<button type="button" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:var(--gold);border:1px solid rgba(255,74,0,.35);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer;line-height:1.4"'
-              + ' data-mc-votar="' + esc(String(it.id)) + '" data-mc-fuente="' + esc(String(it.fuente)) + '">\u2B50 ' + itVotos + '</button>';
-          } else {
-            votoCtrl = '<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.7);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.4">\u2B50 ' + itVotos + '</span>';
-          }
+          var votoCtrl = '<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:var(--gold);border:1px solid rgba(255,74,0,.35);border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.4"'
+            + mdMaAttrs(it, it.fuente, it.id) + '>\u2B50 ' + mdRatingTxt(it) + '</span>';
           html += '<div class="md-thumb" data-url="' + esc(it.media_url) + '" data-cap="' + esc(mdCapMedia(it.media_title, it.autor_nombre, it.votos)) + '">'
             + mdPortadaHTML(it, it.media_title || '')
             + '<span class="md-thb-ico">' + fotoIcon() + '</span>' + votoCtrl + '</div>';
@@ -1742,7 +1774,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
             + '<span class="md-mcard-ico md-mcard-video">\u25B6</span>'
             + '<div class="md-mcard-body"><div class="md-mcard-t">' + esc(it.media_title || 'Video') + '</div>'
             + (it.autor_nombre ? '<div class="md-mcard-a">' + esc(it.autor_nombre) + '</div>' : '')
-            + (it.votos > 0 ? '<div class="md-mcard-v">\u2B50 ' + it.votos + '</div>' : '')
+            + '<div class="md-mcard-v" data-votos="' + (parseInt(it.votos, 10) || 0) + '"'
+            + ' data-ma-fuente="' + esc(String(it.fuente || '')) + '" data-ma-item="' + esc(String(it.id || '')) + '"'
+            + ' data-ma-votos="' + (parseInt(it.votos, 10) || 0) + '" data-ma-es-propia="0"'
+            + ' data-ma-rating="' + (mdRating(it) == null ? '' : String(mdRating(it))) + '">\u2B50 ' + mdRatingTxt(it) + '</div>'
             + '</div><span class="md-mcard-type video">Video</span></div>';
         });
         html += '</div>';
@@ -1874,7 +1909,13 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         html += '<div class="md-meta">Por ' + esc(item.autor_nombre) + '</div>';
       }
 
-      if (item.votos > 0) html += '<div class="md-stars">\u2B50 ' + item.votos + ' votos</div>';
+      /* Modo texto: contador + promedio. rating_promedio NULL -> "sin valorar"
+         (nunca 0 ni 0.0); el item puede no traer votes ni rating. */
+      html += '<div class="md-stars" data-votos="' + (parseInt(item.votos, 10) || 0) + '"'
+        + ' data-ma-fuente="' + esc(String(item.fuente || '')) + '" data-ma-item="' + esc(String(item.media_id || item.id || '')) + '"'
+        + ' data-ma-votos="' + (parseInt(item.votos, 10) || 0) + '" data-ma-es-propia="0"'
+        + ' data-ma-rating="' + (mdRating(item) == null ? '' : String(mdRating(item))) + '">\u2B50 ' + mdRatingTxt(item)
+        + ' \u00B7 ' + (parseInt(item.votos, 10) || 0) + ' votos</div>';
       if (item.ciudad) html += '<div class="md-meta">' + PIN_DEFECTO + ' ' + esc(item.ciudad) + '</div>';
       setTitulo(item.album_titulo || tituloMedia);
 
@@ -1971,36 +2012,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         .catch(function (e) { if (btn) btn.disabled = false; log('guardarMedia', e); });
     }
 
-    function votarMedia(itemId, fuente, btn) {
-      var u = usuarioActual();
-      if (!u || !u.id) { pedirLogin('Inicia sesi\u00f3n para votar'); return; }
-      if (!itemId || !fuente) return;
-      if (btn) btn.disabled = true;
-      var headers = jsonAuthHeaders();
-      fetch(apiPref() + '/api/interacciones?tipo=media_voto', {
-        method: 'POST', headers: headers,
-        body: JSON.stringify({ tipo: 'media_voto', usuario_id: String(u.id), fuente: fuente, item_id: String(itemId) })
-      })
-        .then(function (r) {
-          if (r.status === 401) {
-            if (btn) btn.disabled = false;
-            pedirLogin('Sesi\u00f3n expirada - vuelve a iniciar');
-            return null;
-          }
-          return r.json();
-        })
-        .then(function (d) {
-          if (!d) return;
-          if (btn) btn.disabled = false;
-          if (d && d.ok) {
-            if (btn) btn.textContent = '\u2B50 ' + (d.votos != null ? d.votos : '');
-            toast('Voto registrado', '#16a34a');
-          } else if (d && d.error) {
-            toast(d.error, '#FF4A00');
-          }
-        })
-        .catch(function (e) { if (btn) btn.disabled = false; log('votarMedia', e); });
-    }
+    /* votarMedia() retirado (turno del widget de calificacion): hacia POST
+       media_voto SIN puntuacion y sin accion, o sea un 400 garantizado con el
+       contrato actual (puntuacion 1..5 obligatoria). La calificacion del mapa
+       va por MediaActions.calificar(); este modulo ya solo pinta el dato. */
 
     function openAlbumModal(albumId) {
       if (!albumId) return;
@@ -2042,9 +2057,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
                   + (f.comentarios ? '<span data-ac-btn-count> (' + parseInt(f.comentarios, 10) + ')</span>' : '') + '</button>'
                   + '<div class="md-album-comments" data-comments-for="' + esc(String(f.id)) + '" style="display:none"></div>'
                   + '<button type="button" class="md-album-com-btn" data-mc-guardar="1" data-mc-fuente="album_foto" data-mc-item="' + esc(String(f.id)) + '">\uD83D\uDD16 Guardar</button>'
-                  + '<button type="button" class="md-album-com-btn" data-mc-votar="' + esc(String(f.id)) + '" data-mc-fuente="album_foto">\u2B50 '
-                  + (f.ya_votado ? 'Votado' : ((typeof f.votos === 'number' && f.votos > 0) ? 'Votar \u00b7 ' + f.votos : 'Votar'))
-                  + '</button>';
+                  /* Modo texto (decision del turno): el boton "Votar" del popup hacia POST
+                     sin puntuacion y media_voto la exige, o sea que ese camino
+                     ya no puede funcionar. Se degrada a contador + promedio
+                     con los data-ma-* para un futuro widget. */
+                  + '<span class="md-album-com-btn" data-ma-fuente="album_foto" data-ma-item="' + esc(String(f.id)) + '"'
+                  + ' data-ma-votos="' + (parseInt(f.votos, 10) || 0) + '" data-ma-es-propia="0"'
+                  + ' data-ma-rating="' + (mdRating(f) == null ? '' : String(mdRating(f))) + '">\u2B50 '
+                  + mdRatingTxt(f) + (f.votos ? ' \u00B7 ' + parseInt(f.votos, 10) : '') + '</span>';
               }
               html += '</div>';
             }

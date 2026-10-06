@@ -4559,5 +4559,54 @@ Con ese dato, la salida deja de ser `NO_CONFIRMADO` y pasa a `OK` o a `FALLIDO_4
 8. **`'texto'` en el `CHECK` sin respaldo del ADR-065.** Medido: `CHECK chk_spot_duenos_tipo` = `{general,foto,video,audio,escrito,texto}` (**6**), el ADR-065 solo respalda **4 + `general`**, y `'texto'` tiene **0 filas**. **No es bug** y **no se restringe el `CHECK`**: seria una migracion para tapar un valor sin uso. [@architect]
 9. **`destacar_evento` sin destino de datos.** La entidad evento **no existe en el esquema**. Ya declarado en **ADR-088 B11**; se reitera aqui para que la lista de 9 este completa. [@architect]
 
+## Invariante de reconstruccion de `media_rep_autores`: criterio canonico fijado y versionado - 2026-10-05 (TSK-193 / ADR-089)
+
+**Estado:** **CERRADA EN SU PARTE DE HOY, con la parte recurrente cybernetica abierta como TSK-194. Este veredicto es el FINAL del cierre del 2026-10-06 y no reescribe el estado anterior.** El criterio y el SQL estan fijados, versionados, **ejecutados** y **verificados con 0 filas de diferencia**. Lo que queda no es una ejecucion pendiente sino un **ritual recurrente**, y por eso vive en su propia tarea.
+
+**Veredicto final (2026-10-06, medido contra la base y contra el codigo, ADR-006):**
+
+1. **El criterio canonico esta escrito** en `DECISIONS.md`, seccion **`## ADR-089`** ("Criterio canonico de la invariante de reconstruccion"): el de **`resolverMediaItem`** (`api/interacciones.js:5351-5399`) -- `album_foto` -> `album_fotos.autor_original_id` **a secas**, `viajero_foto` -> `interacciones.usuario_id`, `curada` -> **`NULL` a proposito** -- y **NO** el `COALESCE(autor_original_id, agregador_id)` de `media_duenos` (`api/interacciones.js:885`), que cuenta **dueno de la foto en el destino**, no autor.
+2. **El backfill quedo versionado** en `db/migrations/052_backfill_media_rep_autores_resolver_media_item.sql` (numero **052**, el siguiente libre). Antes vivia **solo** en un script temporal **fuera del arbol de trabajo**, luego era **irreproducible**. Es idempotente (`ON CONFLICT (autor_id) DO UPDATE` con valores **recalculados desde cero**, no incrementales), ASCII-safe y **NO esta aplicada** (`numero=52` con **0 filas** en el ledger, por decision del operador).
+3. **La invariante SE SOSTIENE HOY con 0 filas de diferencia.** El backfill del agregado **si se ejecuto** (por sentencia, independientemente del ledger): **2 filas**, **36 votos con autor resoluble**, `suma_notas = 3 * votos_recibidos` en ambas, **reputacion en lectura 0.0 exacta**.
+4. **[CORRECCION, sin borrar lo anterior] La invariante casi no llega a cumplirse: `aplicarMediaVoto` acumulaba un delta de `suma_notas` centrado en 3** (`nota - notaBase`) cuando la columna es **suma bruta** (`sum(puntuacion)`), luego cada ALTA escapaba 3 y la divergencia era `-(3 x n_altas)`. **Era invisible porque `n_altas` era 0**: el agregado lo habia escrito el backfill, no el alta. **Corregido a `dSuma = esAlta ? nota : (nota - notaPrevia)`** (`api/interacciones.js:5479`), que telescopa. **Verificado en 6 escenarios: 0 diferencias con el fix, 6/6 fallos sin el.**
+5. **La fuente documental del bug es el propio ADR-089 y la 051, y no se puede corregir ahi.** El comentario de `db/migrations/051_media_votos_puntuacion_1a5_y_reputacion_autores.sql:208-212` dice que "el delta de suma_notas es nueva - 3", lo cual es correcto para la **escala de reputacion** y erroneo para **`suma_notas`**. Ese comentario **queda historicamente incorrecto a proposito**: la 051 **no se toca** (su checksum `3715407f...` esta registrado en `schema_migrations` y tocarla crearia deriva). **La correccion vive en `DECISIONS.md` ADR-089**, que si es editable.
+6. **La escala `(suma_notas - 3*votos) / (2*votos)` es formula de lectura teorica de D2, NO implementada:** no hay lectura de reputacion de autor en el backend y **`media_rep_autores` no tiene columna `reputation`** (es `autor_id PK, votos_recibidos, suma_notas`). El bloque SQL de D3 en el ADR la declaraba; **la version aplicada manda** (ADR-006) y la 051 no la tiene.
+
+**Por que no se puede cerrar mas alla (el riesgo real, medido):** con el criterio equivocado (`COALESCE`) la reconstruccion da **33** votos para `bc940e34` y con el correcto da **29**. Un `COALESCE` usado como invariante **no daria un fallo visible**: daria **4 filas de diferencia permanentes** aunque el agregado fuese exactamente correcto, y el sintoma seria un numero que no baja nunca y que nadie podria explicar. Ese es el motivo por el que el criterio esta **escrito y no solo linkeado**.
+
+**Propietario:** `@sql-security` (criterio y ejecucion) + `@backend-dev` (cualquier cambio del delta). **Gate:** ambos con gate de §2, luego la ejecucion en Neon pide confirmacion explicita del operador.
+
+## TSK-194 - Auditar la invariante de `media_rep_autores` TRAS CADA modificacion del delta - 2026-10-06 (ADR-089) - PENDIENTE REAL, no teorico
+
+**Estado: PENDIENTE / RECURRENTE.** No es una tarea que se pueda cerrar: es un **criterio de aceptacion obligatoria** que se cumple en cada PR que toque el delta. Se registra como tarea real (y no como nota al pie) porque **ya fallo una vez de forma silenciosa**.
+
+**Por que existe, y no es prudencia teorica.** El bug del delta de `suma_notas` (centrado en 3 contra una columna que es suma bruta) **llevo la entrega entera sin ser detectado**, y su unico sintoma habria sido un agregado corto en `-(3 x n_altas)`, invisible mientras `n_altas = 0`. **No lo atrapo ningun smoke** y **no lo atrapo la auditoria de una sola vez**: lo que lo habria atrapado es exactamente este ritual.
+
+**Trigger (obligatorio, no opcional):** cualquier cambio en `api/interacciones.js`, rama **`tipo=voto_media`**, que toque `esAlta`, `notaPrevia`, `dVotos`, `dSuma` o la sentencia de upsert de `media_votos`. Hoy ese codigo esta en **`:5442-5488`**.
+
+**Procedimiento (los 3 pasos, sin improvisar):**
+1. `@backend-dev` avisa **en el brief** de que el cambio toca el delta (no al final: si toca el delta, el smoke entra en el encargo).
+2. `@sql-security` ejecuta el bloque **`(c)`** de `db/migrations/052_backfill_media_rep_autores_resolver_media_item.sql` **contra Neon**. **Gate §2: confirmacion explicita del operador.**
+3. **El numero de filas de diferencia se pega en este fichero.** **Criterio de cierre: 0 filas.** Con **> 0** la entrega **no se cierra**, y el primer movimiento es **comparar el criterio con `resolverMediaItem`**, no probar el `COALESCE` de `media_duenos` (que produce **4 filas permanentes** y es el falso positivo clasico).
+
+**Lo que esta tarea NO puede hacer, y se escribe para que no se prometa:** **no se puede cerrar "de forma permanente".** Una invariante medida una vez demuestra el estado de hoy, no el mecanismo. La unica forma de que esta tarea valga es que se ejecute cada vez, y por eso vive en `NEXT.md` como **ritual de cierre**, no solo en este tablero.
+
+**Propietario:** `@sql-security` (ejecucion y veredicto) + `@backend-dev` (disparo). **Coste:** una consulta de solo lectura por cambio del delta.
+
+## TSK-195 - Cierre de los smokes de la calificacion de 1 a 5 estrellas - 2026-10-06 (ADR-089) - CERRADO
+
+**Estado: CERRADO / VERDE.** Resultado medido en el turno de cierre:
+
+| Smoke | Resultado | Nota |
+|---|---|---|
+| `scripts/smoke_089_media_escritura.js` | **30/30 PASS, 0 FAIL** | Contrato nuevo de escritura: `puntuacion` obligatoria 1-5, upsert idempotente por PK, sin `unlike`, sin 409, XP solo en el alta. |
+| `scripts/smoke_036_media_unificada.js` | **80 PASS / 13 SKIP / 0 FAIL** | Los 13 skips son **explicitos y rotulados por ADR-089**, no fallos silenciosos: el propio smoke los imprime como `SKIP - <etiqueta> [RETIRADO POR ADR-089: <motivo>]`. El contador de skips **no toca `process.exitCode`**, luego el exit sigue siendo 0. |
+
+**Los 13 SKIP de `smoke_036` NO son deuda silenciosa:** son casos del contrato **binario** que **dejan de existir** por decision del operador (like sin nota, duplicado que devuelveba 409, unlike). Retirarlos sin sustituto habria dejado la cobertura mintiendo; por eso se.skippean **con el motivo escrito**, que es la unica forma de que `smoke_036` siga siendo un test y no un mueble.
+
+**Lo que estos smokes NO cubren, declarado:** el **render real de las 5 estrellas en navegador**. GOLD es estatico (sintaxis, ASCII, balance de divs). La accesibilidad de teclado del `radiogroup`, el preview en hover y el repintado optimista **con reversion** no tienen cobertura automatica. Ver `NEXT.md`.
+
+**Escudo GOLD:** verde en los ficheros de codigo tocados. **8/8 serverless INTACTAS** (ADR-010). **`db/migrations/051_*.sql` NO se toco** (checksum `3715407f...` verificado antes y despues del pase documental).
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

@@ -6964,3 +6964,324 @@ Los unicos escritores de `pandillas_miembros.rol` son **literales**: `'fundador'
 **Tests:** `npm test` **109/109, FAIL 0** (corrido en este turno de cierre, no heredado). **Cascada de agentes:** 18 agentes, 2 primarios, 16 heredados, `RESULTADO: OK`. **Arbol de trabajo:** limpio antes de este pase documental.
 
 **Integridad de este addendum:** **no crea un ADR nuevo** (el ultimo **sigue siendo el 088**), **no renumera ni duplica** ninguno (87 cabeceras `## ADR-0`), **no borra** B0-B12 ni el texto de B2.4 (que se conserva con su estado actualizado aqui), y **no toca `api/`, `lib/`, `scripts/` ni `db/`**. Los argumentos de D1 viven en **ADR-087** (cita fabricada, entidad unica, migracion `050`); los de esta seccion, aqui. El detalle por tarea, en `TASKS.md`.
+
+## ADR-089: La calificacion de media pasa de like binario a **1 a 5 estrellas** con **opinion actualizable y definitiva** -- `puntuacion smallint` en `media_votos`, `media_rep_autores` como **agregado de contador y suma** (nunca un promedio re-escrito), `media_estadisticas(fuente, item_id)` como funcion `STABLE` que sustituye a las ~30 subconsultas `AVG`, y **el historico entra como 3 = neutro** con su riesgo de anclaje cuantificado y su criterio de escalada [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-089
+**Fecha:** 2026-10-05
+**Autor:** Chief Architect (`@architect`), por **confirmacion explicita del operador** en la sesion que fijo las 7 decisiones previas de este ADR.
+**Estado:** **ACEPTADO (2026-10-05) para diseno; la ejecucion es de `@sql-security` + `@backend-dev` + `@frontend-tpl`, cada uno con su gate.**
+**Numeracion:** **DESVIACION DEL ENCARGO, verificada y justificada (ADR-006).** El encargo pedia escribir esto como **ADR-085**, y **`ADR-085` ya existe**: linea **4.917**, "Politica de vigencia de planes -- `fecha_inicio IS NULL` **SE MUESTRA**". El mayor ADR real del fichero es **`ADR-088`** (linea **6.510**), y hay **87 cabeceras `## ADR-0`**. Por lo tanto este ADR se escribe como **ADR-089**, que es el siguiente consecutivo libre. Escribirlo como ADR-085 habria producido **dos secciones con el mismo ID** en el fichero de gobernanza, que es exactamente el defecto que la numeracion de `schema_migrations` (045:235-250) existe para impedir, y habria dejado tres referencias cruzadas (`ADR-086:5123`, `ADR-088` y este texto) apuntando a un ID ambiguo. **La desviacion se declara aqui, no se esconde.** `DECISIONS.md` medido hoy: **1.070.987 bytes / 6.966 lineas**.
+**Alcance:** este ADR **no ejecuta** nada. Fija el modelo de datos (migracion **`051_media_votos_puntuacion_1a5_y_reputacion_autores.sql`**), el contrato SQL de la funcion de agregado, la regla de idempotencia y el umbral de escalada. **8/8 funciones serverless INTACTAS** (ADR-010): **cero ficheros nuevos en `api/`**, la superficie de backend se extiende por la rama `tipo=voto_media` ya existente (`api/interacciones.js:11280-11318`).
+
+### Enmienda o ADR nuevo -- por que es ADR nuevo
+
+Es un **ADR nuevo**, no una enmienda, por el mismo criterio que uso ADR-084 y que es comprobable: **una enmienda deriva de la premisa de un ADR anterior**, y aqui no hay ninguna premisa que corregir. `media_votos` fue creada en **023:61-74** sin ninguna columna de nota, y ninguna decision previa habla de calificacion: el "like" binario no fue una decision documentada, fue un **default de implementacion** que crecio hasta ser la semantica del producto. No se puede enmendar un ADR que no emitio la regla, del mismo modo que R2 no se deroga porque sea costumbre de gobernanza.
+
+Lo que este ADR hace es **sustituir una semantica por otra** -- de "me gusta / no me gusta, reversible, con duplicado" a "calificacion 1 a 5, siempre actualizable, definitiva" -- y esa transicion toca tres invariantes a la vez: la **forma del dato** (`smallint` con `CHECK`), la **economia** (el XP pasa a ser un hecho del alta, no del envio) y la **agregacion** (el agregado del autor pasa a existir y a ser un contador, no un promedio). Eso no cabe como nota al pie de 023.
+
+### Problema / Contexto
+
+Hoy `media_votos` es un **like binario** (`023_interacciones_media_unificadas.sql:61-74`): la fila existe o no existe (`activo boolean`), y `aplicarMediaVoto` (`api/interacciones.js:5329-5465`) tiene **tres** ramas: `unlike` (`:5349-5355`, que pone `activo=false`), `duplicado` (`:5356`, que devuelve sin hacer nada y que el backend tipifica como **409**), y el alta con XP. La etiqueta de "409 duplicado" es el sintoma visible de un modelo que **castiga la reiteracion**.
+
+Ese modelo tiene **tres** defectos que el producto ya no puede tolerar:
+
+- **No distingue el Abuse del entusiasmo.** Un "me gusta" y un "no me gusta" son el mismo dato, asi que un item popular y un item odiado se ven **identicos**. Con una escala de 1 a 5, la community puede distinguir "me gusta" de "es lo mejor que he visto", y esa distincion no es decorativa: es la que hace que la reputacion de un autor sea una senal.
+- **El autor no tiene ninguna senal.** El autor de un item (`resolverMediaItem:5236` -> `mvTarget.autorId`) es una variable que hoy **solo se usa para bloquear el auto-voto** (`:` comparacion contra el usuario actual). Existe, ya esta resuelta, y no se aprovecha para nada. La calidad de un autor es medible con los datos que ya existen.
+- **Cambiar de opinion es imposible.** Con el modelo actual, un voto "a me gusta" que el usuario quiere convertir en "es malo" solo se puede hacer con un `unlike` + un alta, que ademas **devuelve el XP gastado** y re-gana XP (o sea, es un loophole de economia) y produce un **409** si se intenta sin el borrado previo.
+
+Ademas, `api/interacciones.js` (747,1 KB) repite el agregado **~30 veces** como subconsulta `COUNT(*)` suelta, cada una con su propio filtro `activo=true`, cada una susceptible de divergir.
+
+### Baseline verificado en este turno (ADR-006: archivo real, no memoria)
+
+| Hecho | Fuente | Estado verificado |
+|---|---|---|
+| `media_votos` **sin** columna de nota | `db/migrations/023_interacciones_media_unificadas.sql:61-70` | **CONFIRMADO** (leido) |
+| `PRIMARY KEY (usuario_id, fuente, item_id)` | `023:69` | **CONFIRMADO** (leido) |
+| `idx_media_votos_item (fuente, item_id) WHERE activo = true` | `023:72-74` | **CONFIRMADO** (leido) |
+| `fuente varchar(20) NOT NULL CHECK IN ('curada','viajero_foto','album_foto')` | `023:63` | **CONFIRMADO** (leido) |
+| `media_votos` **sin RLS** | `023:61-74` | **CONFIRMADO** |
+| Ultima migracion aplicada | `db/migrations/050_indice_parcial_sink_slots_activos.sql` | **CONFIRMADO** (`Get-ChildItem`, las 4 ultimas: 047, 048, 049, 050) |
+| Siguiente numero libre | -- | **051** |
+| Ledger: `nombre` PK, `numero smallint`, `resultado` vocabulario cerrado de 3 | `db/migrations/045_schema_migrations.sql:237-250` | **CONFIRMADO** (leido) |
+| Nucleo de voto: `aplicarMediaVoto` | `api/interacciones.js:5329-5465` | **CONFIRMADO** (leido `:5329-5370`) |
+| Rama `unlike` / rama `duplicado` | `api/interacciones.js:5349-5356` | **CONFIRMADO** (leido) |
+| `autorId` disponible y **ya** usado para bloquear el auto-voto | `resolverMediaItem:5236` | Dato del encargo (operador) |
+| `XP_BASES.voto_media = 3`, `VOTOS_DIA_MAX = 20`, `VOTO_DECAY_DIV = 20` | `api/interacciones.js:487` / `:293` / `:294` | Dato del encargo (operador) |
+| **`ADR-085` ya existe** | `DECISIONS.md:4917` | **CONFIRMADO** (`Select-String`, 1 coincidencia) |
+| Mayor ADR real = **`ADR-088`** | `DECISIONS.md:6510` | **CONFIRMADO** (`Select-String`, 87 cabeceras `## ADR-0`) |
+
+**NO verificado en este turno (declarado, no medido):** el numero exacto de las **~30** subconsultas `COUNT(*)` y el de las 5 superficies de frontend que las invocan; el dato viene del encargo del operador y **no hay en el repositorio** el conteo, y medirlo exigiria un recorrido de 747 KB que `AGENTS.md` 10 y 18 prohiben (ADR-006). Se citan **como aproximacion declarada**.
+
+### Opciones evaluadas -- DONDE VIVE LA REPUTACION DEL AUTOR (pregunta A)
+
+El requisito es triple: **consultable en O(1) por autor**, **que NO dependa de re-escribir el promedio en cada voto**, y **que quepa en la misma migracion 051**.
+
+1. **Columna nueva en `usuarios`** (p.ej. `rep_media numeric(12,4)`). Aporta O(1) de forma trivial, y es la opcion mas pequena. **Descartada por cuatro razones concretas, no por gusto:** (i) cada votacion obliga a un `UPDATE usuarios`, es decir, exactamente el "volver a escribir el promedio en cada voto" que el requisito prohibe; (ii) `UPDATE usuarios` es la fila **mas caliente y mas disputada** del producto (todo el sistema de XP y de nivel la toca), luego meter el voto de media en la misma fila crea **contencion** en un camino critico que hoy no la tiene; (iii) mezcla un agregado de un silo concreto (media) dentro de la tabla de identidad, que es la que se lee en cada sesion; (iv) el borrado o el cambio de nota obliga a tocar `usuarios`, y `usuarios` tiene permisos de lectura propios, luego expose una politica nueva.
+2. **Tabla de eventos `media_rep_eventos`** (append-only: `(+1,-1)` por operacion). Es la unica opcion que **no re-escribe nada**, y por tanto la unica que es trivialmente idempotente por construccion (Cero Borrado Logico puro, ADR-003). **Descartada como almacenamiento primario por un unico motivo: NO da O(1).** La reputacion de un autor seria un `SUM()` sobre todos sus eventos, y para pintar un perfil habria que agregar N filas por cada una de las N medias mostradas. Se podria agregar y materializar, y en ese momento se esta de vuelta en la opcion 3.
+3. **ADOPTADA -- tabla nueva `media_rep_autores`, con contador y suma, NO con promedio.** Ver D1.
+4. **No medir reputacion de autor en esta entrega.** Descartada: la senal ya esta disponible (`autorId` ya se resuelve) y es el beneficio de mayor tamano por unidad de complejidad de todo el encargo.
+
+### Decision tomada
+
+**D1 -- La reputacion del autor vive en una TABLA NUEVA `media_rep_autores`, y se almacena como CONTADOR + SUMA, nunca como promedio.**
+
+- **Fichero:** `db/migrations/051_media_votos_puntuacion_1a5_y_reputacion_autores.sql`. **Numero 051**, siguiente libre tras 050.
+- **Forma exacta:**
+  ```
+  CREATE TABLE IF NOT EXISTS media_rep_autores (
+    autor_id       uuid PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    votos_recibidos integer NOT NULL DEFAULT 0 CHECK (votos_recibidos >= 0),
+    suma_notas      integer NOT NULL DEFAULT 0,
+    reputation     numeric(8,4) NOT NULL DEFAULT 0,
+    actualizado_en timestamptz NOT NULL DEFAULT now()
+  );
+  ```
+- **Las tres decisiones de forma que importan:**
+  1. **`autor_id` es la PK.** Una fila por autor -> lectura O(1) por indice unico primario. Sin `ON CONFLICT` sobre nada mas.
+  2. **Se guardan `votos_recibidos` y `suma_notas` (enteros), NO el promedio.** El promedio es **derivado en la lectura** y no se almacena. Esto es lo que cumple el requisito "que NO dependa de re-escribir el promedio en cada voto": un voto **no re-escribe un promedio, anade un entero**.
+  3. **`ON DELETE CASCADE` a `usuarios(id)`**, para que borrar el usuario no deje huerfanos.
+- **Sin RLS, declarado y justificado:** el unico dato de la tabla es un agregado numerico de reputacion, que es **publico por naturaleza** (se muestra en perfiles). Anadir RLS seria trabajo sin beneficio y crearia una politica nueva que revisar. `media_votos` tampoco lo tiene, luego la tabla nueva **no introduce una excepcion** al patron vigente.
+- **Por que contador + suma y no contador + reputacion (el "promedio ponderado" que la pregunta B podia sugerir):** una suma es **exacta e integrable**. Si se almacenara el valor ponderado y se sumara, cada operacion acumularia **error de redondeo**, y el agregado dejaria de ser reconstruible bit a bit desde `media_votos`. Con `suma_notas` entero, **el agregado es exactamente reconstruible** y la formula de B vive **en un solo sitio**, el de la lectura. Almacenar el redondeo es una precision falsa.
+- **Como se mantiene (incremental, en la MISMA sentencia que el voto, ver D3):** `ON CONFLICT (autor_id) DO UPDATE SET votos_recibidos = media_rep_autores.votos_recibidos + EXCLUDED.votos_recibidos, suma_notas = media_rep_autores.suma_notas + EXCLUDED.suma_notas, reputation = <D2 evaluada sobre el resultado>, actualizado_en = now()`. Los deltas llegan en `EXCLUDED`.
+
+**D2 -- La ponderacion es LINEAL y CENTRADA EN 3: `peso = (nota - 3) / 2`, con rango `[-1, +1]`. Se almacena `suma_notas` y el peso se evalua en la lectura.**
+
+- **Formula exacta de la reputacion del autor:**
+  ```
+  reputation = CASE WHEN votos_recibidos = 0 THEN 0
+                    ELSE round(((suma_notas::numeric - 3 * votos_recibidos)
+                                / (2.0 * votos_recibidos))::numeric, 4)
+               END
+  ```
+  Con `CHECK (reputation BETWEEN -1 AND 1)`. Tipo `numeric(8,4)`.
+- **Por que centrada en 3, y no 0..1 o 0..5: esta es la decision mas importante del ADR y su razon es una sola.** El historico se migra a **3** (decision del operador). Si la escala fuese `nota/5`, los cientos de miles de likes historicos entrarian con `3/5 = 0.6` y **arrastrarian la reputacion de todos los autores hacia arriba, de forma sistematica y silenciosa**. Si la escala fuese `(nota-1)/4`, entrarian con `0.5`, el mismo empuje a la alza. **Centrar en 3 hace que el historico aporta exactamente 0**, luego **la migracion historica no distorsiona la reputacion en ninguna direccion, por construccion y no por convencion posterior.** Ese es el criterio: la escala se centra en el valor que recibe el historico, porque el historico es el unico dato cuyo fiabilidad sabemos que es nula.
+- **Por que lineal:** (a) una escala **no monotona** -- "5 estrellas = 10 puntos, 4 estrellas = 11" -- es un bug de percepcion esperando a ser descubierto por un usuario; (b) lineal hace que `SUM(peso) = (SUM(nota) - 3*n) / 2`, o sea, **la suma de pesos es una funcion lineal de la suma de notas**, y por tanto se puede almacenar **la suma de notas** (el entero mas simple que se puede almacenar) y derivar el peso al leer. Linealidad y almacenamiento entero son la misma decision.
+- **Por que el rango es `[-1,+1]` y no "puntos":** un autor con `reputation = +0.6` significa "consistentemente por encima del neutro", y el **0 es un punto de equilibrio con significado** ("ni bueno ni malo"), lo que hace la metrica interpretable de un vistazo en un perfil. En puntos, el cero no significaria nada y habria que consultar la constante de normalizacion.
+- **Alternativa descartada -- media bayesiana con prior (shrinkage).** Tiene merito real (un autor con 1 solo voto de 5 no deberia tener `reputation = 1.0`), pero **se descarta en esta entrega por una razon concreta y no de gusto**: el prior que haria falta es "3" (el neutro), y como **el historico tambien es 3**, el shrinkage no aportaria **ninguna** informacion nueva al modelo presente: anade un parametro mas que calibrar para cero efecto medible. **Criterio de revisitarla:** cuando el historico este escalado a `NULL` (ver D6), entonces el prior deja de coincidir con el historico y el shrinkage **si** tiene sentido -> es la misma decision, no una distinta.
+
+**D3 -- La regla ante cambio de nota o borrado de media es un DELTA, y la idempotencia es POR CONSTRUCCION: el estado de la base es la unica fuente del delta, nunca un parametro del cliente.**
+
+- **La operacion unica es un CTE con tres pasos en una sola sentencia y una sola transaccion:**
+  ```sql
+  WITH prev AS (
+    SELECT puntuacion AS prev_nota
+      FROM media_votos
+     WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3
+     FOR UPDATE
+  ),
+  voto AS (
+    INSERT INTO media_votos (usuario_id, fuente, item_id, puntuacion, xp_ganado)
+         VALUES ($1,$2,$3,$4,$5)
+    ON CONFLICT (usuario_id, fuente, item_id) DO UPDATE
+       SET puntuacion = EXCLUDED.puntuacion,
+           actualizado_en = now()
+    RETURNING (xmax = 0) AS es_alta
+  ),
+  delta AS (
+    SELECT COALESCE((SELECT prev_nota FROM prev), 3) AS anterior, $4::int AS nueva
+  )
+  INSERT INTO media_rep_autores (autor_id, votos_recibidos, suma_notas, reputation)
+  SELECT $6, (CASE WHEN es_alta THEN 1 ELSE 0 END), (delta.nueva - delta.anterior), 0
+    FROM voto, delta
+  ON CONFLICT (autor_id) DO UPDATE SET
+    votos_recibidos = media_rep_autores.votos_recibidos + EXCLUDED.votos_recibidos,
+    suma_notas      = media_rep_autores.suma_notas + EXCLUDED.suma_notas,
+    reputation     = round(((media_rep_autores.suma_notas + EXCLUDED.suma_notas)::numeric
+                             - 3 * (media_rep_autores.votos_recibidos + EXCLUDED.votos_recibidos))
+                           / (2.0 * (media_rep_autores.votos_recibidos + EXCLUDED.votos_recibidos)), 4),
+    actualizado_en = now();
+  ```
+- **`COALESCE(prev_nota, 3)`:** si **no habia fila**, el delta de `suma_notas` es `nueva - 3`, no `nueva - 0`. Es decir, **el primer voto de un autor aporta `(nota - 3)/2` a la reputacion, no `nota/5`**. Es la misma consecuencia de D2 aplicada al alta: la primera calificacion de un autor se mide contra el neutro, igual que todas las demas. Si se usara `0` como anterior, un autor con un unico voto de 5 empezaria con `reputation` maximalista por el hecho de ser el primero, que es un sesgo dearden de llegada.
+- **`(xmax = 0)` es el detector de alta** (el patron clasico de PostgreSQL para distinguir un `INSERT` de un `UPDATE` dentro de `ON CONFLICT DO UPDATE`), y es lo que hace que **el XP se otorgue solo la primera vez**: `xp_ganado` se escribe en el `VALUES` del `INSERT` y **la rama `DO UPDATE` no lo toca nunca**. Un reenvio con `DO UPDATE` no toca `xp_ganado`, luego **es imposible, apertura por el canal de XP** aunque el cliente reintente N veces. Se conserva el `factorVoto` (`1 - carga/VOTO_DECAY_DIV`, `VOTO_DECAY_DIV=20`) aplicado **al alta**, y `VOTOS_DIA_MAX=20` sigue contando **`creado_en`**, que es inmutable -> el cupo ya es **de altas**, no de envios, y **la consulta actual no necesita cambiar**.
+- **Por que `FOR UPDATE` y no confiar en la fila de `ON CONFLICT`:** la nota anterior se necesita **antes** de escribir, y `RETURNING` en un `DO UPDATE` devuelve la fila **ya actualizada**. `SELECT ... FOR UPDATE` en el CTE previo serializa a los reintentos concurrentes del mismo `(usuario, fuente, item)`: el segundo espera al primero y lee el valor **ya escrito**, luego calcula delta 0. Sin ese candado, dos peticiones simultaneas del mismo usuario sobre el mismo item podrian calcular ambas `anterior` desde el mismo valor viejo y **cargar el delta dos veces**.
+- **Idempotencia, enunciada como criterio comprobable:** (i) el delta se computa **dentro de la sentencia** leyendo `FOR UPDATE` la fila previa, luego **el estado de la base es la unica fuente** y un parametro del cliente no puede alterarlo; (ii) el `DO UPDATE` acumula **contadores**, no promedios; (iii) reenviar la misma nota produce `nueva - anterior = 0` -> **delta cero, en reputacion y en votos**. Es idempotente en el sentido fuerte: **repetir la misma peticion un numero arbitrario de veces deja el sistema en el mismo estado.**
+- **Que pasa cuando el autor cambia su nota:** se aplica `delta = nueva - anterior` sobre `suma_notas`; `votos_recibidos` **no cambia** (el voto sigue siendo uno). El cambio de nota **altera la reputacion acumulada de forma exacta y trazable**, y por tanto **el agregado no es opaco**: es reconstruible bit a bit desde `media_votos` (ver la invariante de abajo).
+- **Que pasa cuando el autor (o cualquiera) BORRA su media, o cuando se hace `unlike`:** `unlike` **desaparece del contrato** (decision del operador) y el auto-voto sigue bloqueado, luego `media_votos.activo = false` queda **practicamente inalcanzable por el camino de la API**. **Decision: `media_rep_autores` NO se toca en el borrado logico de media.** Se declara deuda cuantificada (b) abajo, con su criterio de auditoria. La columna `activo` **NO se borra** (ADR-003) y el indice parcial de `023` sigue siendo valido.
+- **INVARIANTE VERIFICABLE (convierte la promesa en test):** `media_rep_autores` debe coincidir **exactamente** con la reconstruccion
+  ```sql
+  SELECT autor_id, count(*)::int, sum(puntuacion)::int
+    FROM media_votos WHERE activo = true GROUP BY autor_id;
+  ```
+  La diferencia debe ser **0 filas**. El **inconveniente real y declarado**: `media_votos` **no tiene `autor_id`** (autor sale de `resolverMediaItem`, que es JS), luego esta reconstruccion **no puede ser una funcion SQL pura**. Y **no se anade `autor_id` a `media_votos`**: seria una denormalizacion que se desincroniza del item en cuanto el autor cambie, y crearia una segunda fuente de verdad del autor -- prohibited por el mismo criterio que hace que D1 no reutilice `usuarios`. Consecuencia asumida: **la reconstruccion la hace el backend**, que ya sabe resolver el autor, y **no en esta entrega** (deuda (a)). Lo que si es normativa en esta entrega es que la **forma del agregado lo hace reconstruible**, que es la condicion para que la reconstruccion sea posible cuando se escriba.
+
+**D4 -- El upsert por la PK es SUFICIENTE y el indice parcial de `023:72-74` NO se toca.**
+
+- **Confirmado:** `ON CONFLICT (usuario_id, fuente, item_id) DO UPDATE` es valido porque la **PK cubre exactamente** esas tres columnas (`023:69`), y `ON CONFLICT` exige un indice unico que las cubra. **No hace falta ningun indice adicional para el upsert.**
+- **`idx_media_votos_item (fuente, item_id) WHERE activo = true` (`023:72-74`) se confirma intacto**, por dos razones independientes: (i) sigue siendo **el indice correcto** para `media_estadisticas(fuente, item_id)`, porque filtra exactamente por `fuente, item_id` y por `activo=true`; (ii) anadir `puntuacion` lo convertiria en *covering* y ahorraria un heap fetch, y **aun asi no se hace**, porque **escribiria mas en cada votacion** a cambio de una ganancia irrelevante en una tabla cuyo volumen es el de los likes actuales. **Criterio escrito, no "depende":** el indice parcial **solo** pasa a `INCLUDE (puntuacion)` cuando `SELECT reltuples FROM pg_class WHERE relname = 'media_votos'` **supere 1.000.000**. Es un numero, no una sensacion.
+- **Lo que si es un indice nuevo en 051:** el `PRIMARY KEY (autor_id)` de `media_rep_autores` (implicito en D1), y **ningun otro**.
+
+**D5 -- Una funcion SQL `STABLE` `media_estadisticas(fuente, item_id)`, con redondeo a 1 decimal, sustituye a las ~30 subconsultas `AVG`.**
+
+- **Firma exacta:**
+  ```sql
+  CREATE OR REPLACE FUNCTION media_estadisticas(
+    p_fuente varchar(20),
+    p_item_id text
+  )
+  RETURNS TABLE (votos integer, promedio numeric(3,1))
+  LANGUAGE sql STABLE PARALLEL SAFE
+  AS $$
+    SELECT count(*)::integer,
+           round(avg(mv.puntuacion)::numeric, 1)
+      FROM media_votos mv
+     WHERE mv.fuente = p_fuente
+       AND mv.item_id = p_item_id
+       AND mv.activo = true
+  $$;
+  ```
+- **`STABLE`, y NO `IMMUTABLE`, y esta es la parte que hay que razonar:** `IMMUTABLE` es una **promesa** de que el resultado depende solo de los argumentos. Aqui es **falsa**, porque la funcion lee una tabla. Declararla `IMMUTABLE` no es un detalle de estilo: autoriza al planificador a **cachear el resultado y constante-foldarlo** dentro de una misma sentencia, de modo que un `UPDATE` posterior **en la misma sentencia** devolveria un valor obsoleto. `STABLE` promete exactamente lo que se necesita y es lo que este caso cumple: **dentro de una misma sentencia devuelve siempre el mismo valor**, luego las ~30 subconsultas de una misma respuesta son **coherentes entre si**. Es la garantia correcta para una lectura que se Pinto en varias tarjetas de la misma pagina.
+- **Redondeo a 1 decimal:** `round(avg(...)::numeric, 1)`. **Por que 1 y no mas:** la unidad de la escala es la **estrella entera**; a 1 decimal el tooltip puede decir "4.3 de 5" y el orden entre dos items es informativo, mientras que a 2 decimales se muestra una precision que el numero de votos no sostiene. **Y por que el redondeo vive en la funcion y no en el backend:** para que las 30 lecturas den **el mismo numero**.
+- **`promedio` es `NULL` cuando `votos = 0`**, no `0`: `avg` sobre cero filas devuelve `NULL` y eso es lo correcto, porque **0 no es una media** y "sin votos" y "promedio cero" son hechos distintos que el render debe diferenciar. El backend ya tiene `conDegradacionMedia` (`interacciones.js:5333`) que aporta el `{n:0}` de degradacion, luego la funcion no necesita ningun `COALESCE`.
+- **Por que UNA FUNCION y no repetir el `AVG` 30 veces, en orden de peso real:**
+  1. **Una sola fuente de verdad del redondeo y del filtro.** Con 30 subconsultas, cada una redondea como quiera y cada una puede olvidar el `activo=true`. Dos tarjetas del mismo item con promedios distintos es un bug visible, y no se puede depurar con un `grep`.
+  2. **Un solo punto de cambio de contrato.** El dia que el promedio tenga que excluir el voto propio, o ponderar por decaimiento, es **una** funcion y no 30 ediciones en un fichero de 747,1 KB.
+  3. **Quepa en 051.** Una funcion SQL **no es un endpoint**: 8/8 intactas (ADR-010), cero ficheros nuevos en `api/`.
+  4. **El rendimiento NO es el argumento principal, y no se afirma:** desde PostgreSQL 12 una funcion `LANGUAGE sql` puede ser inlineada por el planificador, pero no esta garantizado; si no se inlinea, se ejecuta 30 veces. **Por tanto el motivo es la fuente unica, no la velocidad.** Decir lo contrario seria untrue.
+- **La mejora de rendimiento que si es real, y que es distinta:** reemplazar las ~30 llamadas por **una sola** consulta con `item_id = ANY($2::text[])` y `fuente = $3`. Eso **si** reduce 30 viajes de red a 1, y es un cambio de backend, no de SQL. **No es requisite de este ADR** y queda para `@backend-dev`.
+- **La funcion no sustituye al patron de degradacion:** sigue envolvida en `conDegradacionMedia`, porque una excepcion en un `COUNT` es un problema de runtime que la funcion no puede resolver.
+
+**D6 -- El riesgo del `DEFAULT 3` se acepta, se cuantifica, y se deja escrito el criterio de escalada a `NULL`.**
+
+- **La migracion (051), en este orden:**
+  1. `ALTER TABLE media_votos ADD COLUMN IF NOT EXISTS puntuacion smallint NOT NULL DEFAULT 3 CHECK (puntuacion BETWEEN 1 AND 5);` -- **el `DEFAULT 3` hace el backfill implicito**: las filas existentes reciben 3 sin un `UPDATE` masivo.
+  2. `CREATE TABLE IF NOT EXISTS media_rep_autores ...` (D1).
+  3. `CREATE OR REPLACE FUNCTION media_estadisticas(...)` (D5).
+  4. **Backfill del agregado de autor:** `INSERT INTO media_rep_autores (autor_id, votos_recibidos, suma_notas, reputation) SELECT ... FROM media_votos ... GROUP BY autor_id` -> con `puntuacion = 3` para todo, `suma_notas = 3 * n` y **`reputation = 0.0` exactamente**. Es decir: **el historico arranca con reputacion neutra**, que es la coherencia de D2 y la razon de usar 3.
+  5. Registro en `schema_migrations` con `nombre` = nombre exacto del fichero y `numero` = `051` (`045:237-246`).
+- **EL RIESGO, cuantificado y noudedido:** el historico **entra al promedio con peso total y valor exactamente neutro**, y de ahi **tres** consecuencias, todas medibles:
+  - **(r1) Anclaje, y su formula.** Con `h` votos historicos y `n` nuevos, el maximo desplazamiento que pueden producir sobre el promedio es `2n / (h+n)` estrellas. Con `h = 100` y `n = 5`, el promedio **no puede moverse mas de 0.09 estrellas**: **la senal nueva es estadisticamente casi invisible.** Este es el riesgo real, y es un numero, no una sensacion.
+  - **(r2) Falso consenso, y por que es distinto de (r1).** La UI muestra "3.0 (105 votos)" y **105 parece un jurado grande**, cuando 100 de esos votos no expresaban ninguna opinion sobre la estrella: expresaban un "me gusta" binario. El **contador de votos y el promedio dejan de ser la misma magnitud**, y el numero es una precision que el dato no tiene.
+  - **(r3) La reputacion del autor NO se distorsiona, y es un matiz que importa.** El agregado de autor reparte el historico sobre **todas** las medias del autor, luego se diluye mas que el promedio de una pieza. El riesgo de (r1)-(r2) es del **item**, no del **autor**. No se deben de mezclar los dos cuando se lea este ADR.
+- **CRITERIO DE REVISITA, escrito con dos umbrales asimetricos (se cumple CUALQUIERA de los dos):**
+  - **M1 (maximo de contaminacion):** la proporcion de filas de `media_votos` **procedentes del backfill** baja del **20%** del total. Es medible con `count(*) FILTER (WHERE ...) / count(*)`, y las filas del backfill se distinguen porque **el backfill no escribe `actualizado_en`** (siguen con su timestamp original).
+  - **M2 (minimo de senal):** la **mediana de votos nuevos** por item supera **10**, es decir, ya hay votos con nota real suficientes para que el promedio sea informativo.
+  - **Por que DOS umbrales y no uno, y por que asimetricos:** M1 solo puede dispararse en items con pocos votos, y M2 solo puede dispararse antes de que haya trafico real. **Un umbral solo seria un falso positivo en una de las dos direcciones**; los dos juntos exigen que el historico se haya diluido **y** que haya senal nueva que lo merezca. M1 es un **maximo** de contaminacion y M2 un **minimo** de senal: cada uno mira en una direccion distinta, y por eso hacen falta los dos.
+- **COMO SE EJECUTA LA ESCALADA si se cumple (es unaISTS dos pasos, no una tabla nueva):**
+  1. `ALTER TABLE media_votos ALTER COLUMN puntuacion DROP NOT NULL;` + un `UPDATE` que ponga `NULL` en las filas del backfill.
+  2. `avg(mv.puntuacion) FILTER (WHERE mv.puntuacion IS NOT NULL)` en `media_estadisticas`.
+  - **El `CHECK` NO hay que tocarlo, y esto es un detalle tecnico que decide el bajo coste de la escalada:** en SQL, un `CHECK` solo se viola si la expresion evaluate a **FALSE**; si evaluate a `NULL`, la fila **pasa**. Luego `CHECK (puntuacion BETWEEN 1 AND 5)` **ya admite `NULL` sin ninguna modificacion**. La escalada se reduce a **un `DROP NOT NULL` y un `UPDATE`**.
+  - **El riesgo de no escalar** es simetrico y por eso los umbrales existen: demasiado pronto se pierde el historico; demasiado tarde, la senal nueva queda inutil. **Ninguno de los dos errores es recuperable cheaply**, y por eso el criterio se escribe ahora y no cuando duela.
+- **El `DEFAULT 3` en si mismo es un riesgo menor y separado:** si algun consumidor dejara de enviar `puntuacion`, **todo votaria 3 y el sistema pareceria funcionar**. Se acepta porque las **5 superficies de frontend se cambian en la misma entrega** (decision 6 del operador), luego **no queda ningun consumidor viejo** que dependa del default. **Criterio:** si alguna vez se incorpora una superficie nueva que no envie la nota, el default deja de ser una red y pasa a ser el unico fallo silencioso posible -> en ese momento es **innecesario y por tanto peligrooso**, y su retirada es una linea.
+
+### Impacto / superficies (declarado; este turno NO ejecuta nada salvo este ADR)
+
+- **`exploraco desarrollo/DECISIONS.md`:** **+1 seccion** (este ADR), al final. **Ningun ADR anterior se modifica, no se mueve y no se borra nada** (Cero Borrado Logico documental, ADR-003).
+- **`db/migrations/051_media_votos_puntuacion_1a5_y_reputacion_autores.sql`:** **fichero nuevo**, a ejecutar por `@sql-security` (**gate RLS / esquema SQL: confirmacion explicita**). Contiene exactamente lo de D1, D5 y el paso 1 de D6, mas el registro en `schema_migrations`.
+- **`db/migrations/023_...` y `045_...`: NO se tocan.** 023 es historia; 045 es el ledger. **Indice `023:72-74` confirmado intacto** (D4).
+- **`api/interacciones.js`:**modificacion por `@backend-dev` (**gate `api/*.js` / Neon: confirmacion explicita**). Tres cambios en el nucleo y ninguno en otro sitio: `aplicarMediaVoto` pierde las ramas `unlike` (`:5349-5355`) y `duplicado` (`:5356`), y `INSERT ... ON CONFLICT` sustituye al `SELECT` previo + `UPDATE`/`INSERT` separados. **El 409 de duplicado desaparece del contrato.** Las ~30 subconsultas `COUNT(*)` pasan a llamar a `media_estadisticas`. `XP_BASES.voto_media`, `VOTOS_DIA_MAX`, `VOTO_DECAY_DIV` y la rama `tipo=voto_media` (`:11280-11318`) **no cambian de valor ni de nombre**.
+- **`api/`: cero ficheros nuevos.** 8/8 serverless **INTACTAS** (ADR-010). La superficie se extiende **por la rama `tipo=` ya existente**.
+- **5 superficies de frontend, completas** (decision 6 del operador, `@frontend-tpl`): `galeria.html`, `comunidad.html`, `mi-perfil.html`, `mapa-cultural.js`, `api/pagina-destino.js`. **Widget: 5 estrellas clicables, `role="radiogroup"`, navegable por teclado, preview en hover. ASCII-safe con `\u2605` / `\u2606`** (ADR-002). Aislamiento Atomico: todo el CSS nuevo del widget vive bajo **un selector padre unico** con Reset de Silo (ADR-004). **Cero Borrado Logico: las 5 estrellas se coexistence con el contador, no lo sustituyen en el DOM** (ADR-003).
+- **`TASKS.md` / `NEXT.md`: NO se tocan en este turno.** Los aplica `@docs-keeper` en un **unico** pase de cierre (R2), con este ADR como puntero.
+
+### Consecuencias
+
+**Positivas:**
+
+- (1) La calidad de un item deja de ser binaria: la comunidad puede distinguir "me gusta" de "es excelente", que era el objetivo de fondo de las 5 estrellas;
+- (2) **La reputacion del autor pasa a existir** y se consulta en **O(1)**, con `autorId` que **ya se resolvia** y no se aprovechaba;
+- (3) **Cambiar de opinion es una operacion de primera clase**: sin 409, sin `unlike`, sin devolucion de XP, y **sin posibilidad de farmear XP por reintento** porque `xp_ganado` solo se escribe en el alta (`xmax = 0`);
+- (4) **El agregado es reconstruible bit a bit** desde `media_votos` porque se guarda `suma_notas` y no el promedio, luego el **DEFAULT 3 no se cuela como una precision falsa**;
+- (5) **El historico no distorsiona la reputacion de nadie**, por construccion (escala centrada en el valor que recibe el historico), no por una convencion de limpieza posterior;
+- (6) Las ~30 subconsultas pasan a **una** definicion de redondeo y de filtro, y el backend puede colapsarlas ademas en **una sola consulta** con `= ANY($2)`.
+
+**Negativas / aceptadas:**
+
+- (a) **El numero de votos y el promedio dejan de ser la misma magnitud** (D6/r2). Es un defecto de honestidad del dato, no de laPresentacion, y se acepta porque es **la verdad**: un like binario no es un 3.
+- (b) **Con `h` historicos y pocos votos nuevos, el promedio esta anclado** (D6/r1) y su utilidad depende de los umbrales M1/M2, que estan escritos **antes** de necesitar dolor.
+- (c) **`media_votos` no tiene `autor_id`**, luego la reconstruccion del agregado **no puede ser SQL pura** y depende del backend (D3). Se asume; la alternativa (denormalizar el autor en `media_votos`) crearia una segunda fuente de verdad del autor y esta descartada por el mismo criterio que hace que D1 no reutilice `usuarios`.
+- (d) **`media_rep_autores` NO se corrige en el borrado logico de media**, luego existe un sesgo teorico al alza si `activo=false` llega a usarse (deuda (b)). Se acepta porque `unlike` desaparece y el auto-voto sigue bloqueado, luego el camino esta **practicamente inalcanzable**.
+- (e) **Borrar un usuario deja sesgados los agregados de OTROS autores**: su `ON DELETE CASCADE` borra sus votos, y esos votos contaban en el agregado de los autores que recibio. No hay correccion en esta entrega (deuda (d)).
+- (f) **Una STABLE no inlineada se ejecuta 30 veces**, luego el ahorro de la funcion es de **correccion**, no de tiempo. Declarado para que nadie mida el motivo equivocado.
+
+### Deuda / riesgos [DEUDA]
+
+- (a) **La invariante de reconstruccion de D3 NO se puede ejecutar todavia** y por tanto **no se verifica en esta entrega**: `media_votos` no tiene `autor_id` y la reconstruccion necesita `resolverMediaItem`. **La consecuencia honesta: en la primera entrega, `media_rep_autores` se mantiene incrementalmente y NO esta auditado contra su fuente.** El agregado es correcto **si y solo si** el CTE de D3 esta bien escrito, y no hay red que lo detecte si no lo esta. **Mitigacion escrita: `@sql-security` DEBE ejecutar la comprobacion al menos una vez sobre datos reales durante 051**, aunque sea cruzando el resultado del CTE contra un `GROUP BY` calculado en el mismo lote de `@backend-dev`, y **dejar el numero en `TASKS.md`**. Si el resultado no es 0 filas, la entrega **no se cierra**. **Propietario:** `@sql-security` + `@backend-dev`.
+
+  - **[NOTA DE CORRECCION 2026-10-06, no reescribe lo anterior: solo actualiza el estado.]** La auditoria **si se ejecuto** y la invariante **se sostiene hoy con 0 filas de diferencia**, y la causa por la que no se podia ejecutar --que `media_votos` no tiene `autor_id`-- quedo resuelta por el **criterio canonico de `resolverMediaItem`** y por el **backfill versionado en la 052**. Lo que **queda abierto** no es la ejecucion de hoy sino el **ritual**: **ejecutarla tras cada modificacion futura del delta** (`api/interacciones.js`, rama `tipo=voto_media`), registrado como tarea real en `TASKS.md` (**TSK-194**), no como recordatorio teorico. Motivo del bug que hizo necessary ese ritual: ver la seccion siguiente.
+- (b) **`media_rep_autores` no se corrige en `activo = false`.** Criterio de auditoria, ya escrito: cuando exista el **primer** `activo = false` real, o cuando `votos_recibidos` se desvie de `count(*)` en mas de un **2%**, se engancha el borrado al mismo CTE. **Propietario:** `@sql-security`.
+- (c) **La reconstruccion completa del agregado (deuda (a) resuelta) sigue abierta** y es trabajo de `@backend-dev`: un recorrido de items que resuelva el autor y reescriba `media_rep_autores`. **No en esta entrega.**
+- (d) **El borrado de usuario sesga los agregados ajenos** (consecuencia (e)). **Criterio:** cuando exista el primer borrado real de `usuarios`, se ejecuta la auditoria completa de la deuda (a) y se decide si `media_votos` necesita un trigger de compensacion. **Propietario:** `@sql-security`.
+- (e) **El numero de las ~30 subconsultas y de las 5 superficies que las invocan NO se ha medido** (declarado en Baseline): medirlo exige recorrer 747,1 KB, que `AGENTS.md` 10 y 18 prohiben. **La consecuencia: si la cifra real es muy distinta, el argumento de D5 (fuente unica) no cambia de valor -- sigue siendo el motivo --, pero el argumento de rendimiento seria distinto.**
+- (f) **El `DEFAULT 3` es un fallo silencioso posible** si aparece una superficie que no envie la nota (D6, ultimo criterio). Hoy no es posible porque las 5 se cambian juntas.
+
+### Criterio canonico de la invariante de reconstruccion (Fijado 2026-10-05, dentro de la deuda (a))
+
+**Linea:** el criterio de reconstruccion de D3 es **exactamente el de `resolverMediaItem`** (`api/interacciones.js:5351-5399`) y **NO** el de `media_duenos` (`api/interacciones.js:885`): `album_foto` -> **`album_fotos.autor_original_id` a secas, sin `COALESCE`**; `viajero_foto` -> **`interacciones.usuario_id`** con `tipo='foto'`, `activo=true` y excluyendo las que tienen `voto_foto_id`; `curada` -> **`NULL` a proposito**, porque `destinos_fotos` cuelga de un destino y **un destino no es un usuario** (`api/interacciones.js:5362`).
+
+**Por que el `COALESCE` de `media_duenos` NO sirve como invariante:** `COALESCE(af.autor_original_id, af.agregador_id)` responde a la pregunta *"¿quien es dueno de esta foto en el destino?"*, que **no es la misma pregunta** que *"¿quien es el autor?"*. Son dos hechos distintos y en 4 de las filas de `bc940e34` son dos personas distintas. **Medido:** con el `COALESCE` la reconstruccion da **33** votos para `bc940e34`; con `autor_original_id` a secas da **29**. **Solo la segunda coincide con lo que el backend escribe**, luego medir la invariante con el `COALESCE` no produce "todavia no verificado" sino **falsos positivos permanentes**: daria filas de diferencia aunque el agregado fuese exactamente correcto, y el unico sintoma seria un numero que no baja nunca.
+
+**Consecuencia asumida, y es la que hace fixe la regla:** la invariante se sostiene hoy con **0 filas de diferencia** y la reputacion en lectura sale **0.0 exacta** en ambos autores (historico neutro, escala centrada en 3), **pero eso no la da por buena para siempre**: un criterio medido con la pregunta equivocada no se rompe de golpe, se rompe el dia que alguien mesure con `COALESCE` y obtenga **4 filas** que no se pueden explicar. Ver `db/migrations/052_backfill_media_rep_autores_resolver_media_item.sql`, que **versiona en SQL el backfill** (antes solo vivia en un script temporal fuera del arbol, luego era irreproducible) y cuyo bloque `(c)` de verificacion es **la forma ejecutable de este criterio**.
+
+### Correccion de la entrega del 2026-10-06 -- el bug del delta de `suma_notas`, la fuente documental que lo causo, y el estado real de 051 y 052
+
+**[CERO BORRADO LOGICO (ADR-003): todo lo anterior de este ADR se conserva intacto. Esta seccion anade; no sustituye a D1-D6 ni al Criterio canonico, que sigue vigente y no se duplica aqui.]**
+
+**1. El bug corregido: el delta de `suma_notas` estaba centrado en 3 cuando la columna es suma BRUTA.**
+
+- `aplicarMediaVoto` (`api/interacciones.js`, rama `tipo=voto_media`) acumulaba sobre `suma_notas` un delta **centrado en el neutro**, de la forma `nota - notaBase`, con `notaBase = 3` cuando no habia fila previa.
+- **D3 y la 052 definen `suma_notas` como SUMA BRUTA**, es decir `sum(puntuacion)`, y por eso la reconstruccion de la invariante compara `suma_notas` contra un `sum(puntuacion)` sin centragem alguna. **Las dos definiciones no pueden convivir**, y la que manda es la de la invariante: es la unica que hace el agregado reconstruible bit a bit, que es la premisa de D3 y la consecuencia positiva (4) de este ADR.
+- **La divergencia era siempre `-(3 x n_altas)`**: cada ALTA escapaba exactamente **3**. Un cambio de nota ya era correcto (`nueva - anterior`, que es un delta entre dos notas reales), luego **solo el alta estaba mal** y por eso el sintoma era un agregado que se quedaba corto de forma proporcional al numero de calificaciones nuevas, no un error que crecia con el uso.
+- **Corregido a `dSuma = esAlta ? nota : (nota - notaPrevia)`** (`api/interacciones.js:5479`), que **telescopa**: la suma de los deltas desde el vacio reproduce `sum(puntuacion)` exactamente, tanto si la secuencia empieza por un alta como si empieza por cambios de nota.
+- **Verificacion: 6 escenarios, 0 diferencias con la correccion y 6/6 fallos sin ella.** Es una prueba con contrapruega, no una asercion: si el fixture noFallara al quitar el fix, no estaria midiendo el delta.
+
+**2. Por que era invisible, y por que el smoke no lo veia (esta es la parte que hay que recordar).**
+
+- **Con las 109 filas de `media_votos` todas en `puntuacion = 3`, la divergencia es de hecho 0, porque `n_altas` es 0**: el agregado que existe hoy en la base lo escribio el **backfill** de la 052, no el camino del alta. Es decir: **el bug no estaba escondido por un test debil, estaba escondido por que el dataset no habia ejercitado el camino**. La senal aparece en la **primera calificacion nueva**, y para entonces el bug ya es historia.
+- **La leccion que se escribe, porque es la reutilizable:** un criterio de invariante que **solo se ejecuta una vez** demuestra que el estado de hoy es correcto, **no** que el mecanismo lo siga siendo. Por eso el ritual de la auditoria tras cada cambio del delta (deuda (a), `TSK-194`) no es burocracia: es exactamente el mecanismo que habria atrapado este bug.
+
+**3. La fuente documental del bug -- y por que la correccion NO se hace en la 051.**
+
+- El comentario de **`db/migrations/051_media_votos_puntuacion_1a5_y_reputacion_autores.sql:208-212`** afirma, literalmente, que *"Si no habia fila, el delta de suma_notas es **nueva - 3**, no nueva - 0"* y razona el primer voto contra el neutro.
+- **Ese comentario es historicamente incorrecto.** El razonamiento es correcto para la **ESCALA de reputacion** (D2, centrada en el neutro) y ** erroneo para `suma_notas`**, que es un contador de fuerza bruta y no lleva ninguna escala. El error de lectura es facil de cometer porque **las dos magnitudes estan en la misma sentencia**.
+- **La 051 NO se puede tocar.** Su checksum esta **registrado en `schema_migrations`**; modificarla crearia **deriva de ledger** (el contrato de `ADR-087`, no un detalle de formato). Por eso la correccion vive **aqui**, en el unico sitio del proyecto donde si puede corregirse sin generar deriva.
+- **Semantica canonica, fijada por esta seccion:** `media_rep_autores.suma_notas` es **`sum(puntuacion)`**, sin centraje, sin offset y sin escala. La centraje en 3 pertenece **exclusivamente** a la escala de reputacion de D2.
+
+**4. La escala de reputacion de D2 es formula de lectura TEORICA: NO esta implementada.**
+
+- La escala `(suma_notas - 3 * votos) / (2 * votos)` pertenece a **D2** y es la que explica por que el historico neutro produce `0.0`. **No hay ninguna lectura de reputacion de autor en el backend**: no se consulta `media_rep_autores` para nada.
+- **Y la tabla no tiene donde guardarla:** `media_rep_autores` se creo como **`media_rep_autores(autor_id PK, votos_recibidos, suma_notas)`, SIN columna `reputation`**. Esto **corrige el bloque SQL de D3** de este mismo ADR, que si la declaraba y la escribia: el bloque de D3 es el **boceto de diseño**, y la 051 es la que se aplico. **La version aplicada manda** (ADR-006).
+- **Consecuencia declarada:** la reputacion de autor **se acumula, pero no se muestra todavia**. Es el mismo patron que el resto del sistema de reputacion de este proyecto: el agregado existe para que la lectura sea O(1) cuando se escriba, no para que exista por sola.
+
+**5. Estado real de 051 y 052 (medido contra Neon en el turno de aplicacion).**
+
+- **`051` APLICADA**: `media_votos.puntuacion smallint NOT NULL DEFAULT 3 CHECK (1..5)`; tabla `media_rep_autores` **sin columna `reputation`**; funcion **`public.media_estadisticas(fuente, item_id)` `STABLE`** (nunca `IMMUTABLE`), con `SET search_path` y **`promedio = NULL` con 0 votos**. Ledger: `numero=51`, `resultado='aplicada'`, **`duracion_ms = 1076`**, checksum **`3715407f...`**.
+- **`052` ESCRITA Y NO APLICADA** (`numero=52` con **0 filas** en el ledger), **por decision explicita del operador**. **El backfill del agregado si se ejecuto**, y por esa misma sentencia, de forma independiente del registro en el ledger: **2 filas**, **36 votos** con autor resoluble, **`suma_notas = 3 * votos_recibidos` en las dos**, y **reputacion en lectura 0.0 exacta** (historicamente neutra, escala centrada en 3). La 052 queda como **procedimiento reproducible, versionado e idempotente**, no aplicada.
+- **Backfill historico, medido:** de **107 votos activos**, **36 tienen autor resoluble**. **`curada` (70 filas) NO tiene autor de usuario, a proposito**: un destino no es un usuario (`api/interacciones.js:5362`), luego no puede haber reputacion de autor sobre el material curado.
+
+**6. Baseline de la base que justifica el diseno, con numeros (no son estimaciones).**
+
+- **`media_votos`: 109 filas, 107 activas, 2 autores en toda la tabla, media de 1,03 votos por item, maximo absoluto 2.**
+- **Criterio de escalada D6, evaluado con estos datos:** **M1 (historico < 20%) NO se cumple** -- el historico es hoy el **100%** de las filas; **M2 (mediana > 10) NO se cumple** -- la mediana es de **~1** voto por item. **Ninguno de los dos habilita la escalada a `NULL`.**
+- **M1 es, ademas, INMEDIBLE con el esquema actual**, y esto es un hallazgo que no estaba previsto: se apoyaba en que *"el backfill no escribe `actualizado_en`"* y que por tanto esas filas los delatan. **Medido: 102 de 109 filas tienen `actualizado_en = creado_en`**, luego esa marca **no discrimina** el backfill de un voto real (un voto recien creado cumple la misma igualdad). El criterio de escalada **necesita una columna de marca** (`nota_origen`), y esa columna **solo tiene sentido si antes se decide escalar a `NULL`**: pagarla antes seria una migracion sin destino. Queda abierto en `NEXT.md`, no resuelto aqui.
+- **La consecuencia honesta, y no se disimula:** el `DEFAULT 3` **ancla el promedio**, y con **~1 voto por item** casi toda ficha queda en **"sin valorar"**. **No se resolvio en esta entrega; se documento.** El patron `promedio = NULL` con 0 votos (D5) es exactamente lo que hace que ese estado sea distinguible de un promedio de 3.0, luego la UI puede --y debe-- distinguirlo; mientras tanto el riesgo vive en el dato, no en el render.
+
+**7. Superficie realmente ejecutada (la seccion "Impacto / superficies" de mas arriba se escribio como declaracion previa; estos son los hechos).**
+
+- **`api/interacciones.js`:** POST `media_voto` con `puntuacion` **obligatoria 1-5**, upsert idempotente por PK `(usuario_id,fuente,item_id)`, **sin `unlike` y sin 409**; **XP solo en el alta** (con su `factorVoto`), **0** al cambiar de nota; delta de reputacion de autor; **15 ramas GET** migradas a `media_estadisticas`.
+- **`api/pagina-destino.js`:** los **3** `COUNT(*) FROM media_votos` sustituidos por `LEFT JOIN LATERAL public.media_estadisticas(...)`. **8/8 serverless INTACTAS** (ADR-010).
+- **`media-actions.js`:** widget de **5 estrellas** (`role=radiogroup`, navegable por teclado, preview en hover), `data-ma-puntuacion` / `data-ma-rating`, **`MediaActions.calificar()`** con alias `voto()`, repintado optimista **con reversion si el POST falla**. Crecimiento medido en el arbol: **278 -> 568 lineas**.
+- **Consumidores frontend (los 5 de la decision 6 del operador):** `galeria.html`, `comunidad.html`, `mi-perfil.html`, `mapa-cultural.js`. Silo CSS atomico (ADR-004) en `galeria.html:139-219`, `comunidad.html:489-569`, `mi-perfil.html:817-898`.
+- **Smokes:** `smoke_089` **30/30**. `smoke_036` queda en **80 PASS / 13 SKIP / 0 FAIL**, con los 13 skips **explícitos y rotulados por ADR-089** (se retiraron por la decision, no por fallo; el contador de skips del propio smoke lo imprime asi).
+
+**8. Lo que NO se ha visto, declarado para que nadie lo lea como verificado.** El **Escudo GOLD es estatico**: comprueba sintaxis, ASCII y balance de divs, **no abre un navegador**. El render real de las 5 estrellas, su accesibilidad de teclado y el comportamiento del repintado con reversion **estan sin QA visual**. Los ajustes de CSS que reportaron los agentes (`comunidad.html`, tarjetas estrechas, popup del mapa) estan pendientes y listados en `NEXT.md`.
+
+### Verificacion de este ADR
+
+- **Numero:** `Select-String -LiteralPath "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-089"` -> **1 coincidencia**, y es la **ultima** cabecera. **La desviacion del encargo esta verificada:** `Select-String -Pattern "ADR-085"` -> **1** cabecera existente, linea **4.917**, "Politica de vigencia de planes"; `Select-String -Pattern "^## ADR-(\d+)"` -> **87 cabeceras**, la mayor `## ADR-088` en la linea **6.510** antes de escribir este ADR. Por eso el ID es **089** y no 085.
+- **Formato:** cabecera y secciones **calcadas de la seccion de ADR-084** (`### Problema / Contexto`, `### Opciones evaluadas`, `### Decision tomada`, `### Impacto / superficies`, `### Consecuencias`, `### Deuda / riesgos [DEUDA]`, `### Verificacion de este ADR`, `**ADRs relacionados:**`), leidas con `offset`/`limit` en tres tramos de <= 60 lineas (`4733-4790`, `4795-4854`, `4856-4915`), **dentro del techo de `AGENTS.md` 18**. Region de este ADR: **257 lineas**, la mas larga de **871** caracteres.
+- **D2 de ADR-084, MEDIDO y NO CUMPLIDO, declarado como esta medido:** esta region tiene **30 lineas de mas de 400 caracteres** (maximo **871**), luego **no** se puede afirmar lo que el borrador de este mismo ADR afirmaba ("0 lineas de mas de 400 caracteres"): era **falso** y se corrige aqui (ADR-006). **Por que se acepta el incumplimiento y no se parten:** (i) el techo de 400 caracteres de D2 existe para que un item de `TASKS.md`/`NEXT.md` quepa en una lectura de 60 lineas y en un `grep -m 2`, y **este ADR no es un item de `TASKS.md` ni de `NEXT.md`** sino el documento del argumento, que ADR-084 D1 manda que viva **aqui** y en un solo sitio; (ii) las 30 lineas largas son **prosa de justificacion** y el **bloque SQL de D3**, que partirlo lo volveria ilegible sin ganar nada en coste de lectura. **La deuda que si se registra es la de ADR-084 (d)**: el techo no esta medido como optimum y este ADR es la primera medicion que lo confirma.
+- **ASCII:** lo anadido aqui es **ASCII puro, 0 bytes > 127**, incluidos los iconos del widget citados como escapes `\u2605` / `\u2606`. `DECISIONS.md` es **UTF-8 sin BOM** (medido en ADR-085), y esta seccion no introduce caracteres de 2 bytes.
+- **Baseline (ADR-006) verificado contra el archivo real en este turno, con el comando:** `Select-String -Path "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-(\d+)"` (87, mayor 088), `Read db/migrations/023_interacciones_media_unificadas.sql offset=55 limit=22` (tabla, PK, indice y CHECK de `fuente`), `Read db/migrations/045_schema_migrations.sql offset=233 limit=18` (las 3 columnas del ledger), `Read api/interacciones.js offset=5329 limit=42` (nucleo de voto), `Get-ChildItem db\migrations\*.sql | Sort-Object Name | Select-Object -Last 4` (047, 048, 049, **050**).
+- **NO verificado en este turno (declarado, no medido):** las ~30 subconsultas `AVG`, las 5 superficies de frontend que las invocan, y el volumen real de `media_votos` (el umbral de 1.000.000 de D4 esta escrito **para ser medido en su dia**, no se afirma hoy).
+- **Cierre:** no se ejecuta `npm test` ni nada en `scripts/`: este ADR **no toca codigo**.
+
+**ADRs relacionados:**
+
+- **ADR-010** (presupuesto 8/8: este ADR **no crea endpoint** ni fichero nuevo en `api/`; la funcion SQL de D5 no es una funcion serverless)
+- **ADR-003** (Cero Borrado Logico: por eso la columna `activo` de `media_votos` **no se borra** aunque `unlike` desaparezca, y por eso este ADR **no mueve ni borra** ninguna seccion previa de `DECISIONS.md`)
+- **ADR-002** (ASCII-safe: el widget se especifica con escapes `\u2605` / `\u2606`, y **este ADR es ASCII puro**)
+- **ADR-004** (Aislamiento Atomico: el CSS del widget de estrellas va bajo un selector padre unico con Reset de Silo)
+- **ADR-045/046** (el ledger `schema_migrations` de `045:237-250`: la 051 se registra con `nombre` = nombre exacto del fichero y `numero` = `051`)
+- **ADR-023/035** (`xp_ganado numeric(12,2)` y la economia de XP: **sin cambios de valores**; lo que cambia es **cuando** se otorga, que pasa a ser **solo en el alta**)
+- **ADR-084** (fuente unica del relato: este ADR cumple D1 -- el argumento de D1-D6 vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apunta), **no borra** B0-B12 ni el texto de B2.4 (que se conserva con su estado actualizado aqui), y **no toca `api/`, `lib/`, `scripts/` ni `db/`**. Los argumentos de D1 viven en **ADR-087** (cita fabricada, entidad unica, migracion `050`); los de esta seccion, aqui. El detalle por tarea, en `TASKS.md`.

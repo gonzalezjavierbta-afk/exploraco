@@ -814,6 +814,88 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .tabla-destino .td-cargando,.tabla-destino .td-vacio{text-align:center;color:rgba(255,255,255,.3);font-size:11px;padding:18px;line-height:1.5}
 @keyframes tdPulso{0%,100%{opacity:.22}50%{opacity:.85}}
 @media (max-width:600px){.tabla-destino .td-grid{grid-template-columns:repeat(2,1fr)}}
+/* ===== SILO MEDIA-ACTIONS: widget de 5 estrellas (media-actions.js) =====
+   Selector padre UNICO: [data-ma-voto], el contenedor que el JS ya marca y que
+   esta pagina ya emite (#espacio-media-voto, dentro del modal de media).
+   Todo cuelga de ahi: cero reglas sueltas, cero escrituras en :root, cero
+   clases de la pagina tocadas.
+   Los glifos (relleno/contorno) los pone el JS: aqui van color, tamano y estado.
+   Fondo NO supuesto: el glifo apagado hereda currentColor y el encendido usa el
+   --gold que la pagina ya declara, asi se lee igual sobre claro y sobre oscuro.
+   Estados distinguibles SIN depender solo del color: is-on crece (scale 1.14) y
+   lleva halo; is-preview se ve mas chico (scale .86) y mas tenue; is-empty baja
+   el alfa de todo el grupo. */
+[data-ma-voto]{
+  /* RESET DE SILO */
+  box-sizing:border-box;position:static;display:inline-flex;align-items:center;
+  gap:6px;flex-wrap:wrap;max-width:100%;margin:0;font:inherit;color:inherit;
+  cursor:default;-webkit-tap-highlight-color:transparent;
+  transition:opacity .15s ease,box-shadow .15s ease;
+}
+[data-ma-voto] span{box-sizing:border-box;margin:0;padding:0}
+/* el contenedor es el alvo (role=group / radiogroup): puntero, no las estrellas */
+[data-ma-voto].ma-calificable{cursor:pointer}
+[data-ma-voto] .ma-estrellas,[data-ma-voto] [data-ma-estrellas]{
+  display:inline-flex;align-items:center;gap:1px;flex:0 0 auto;max-width:100%;
+  letter-spacing:0;
+}
+[data-ma-voto] .ma-estrella,[data-ma-voto] [data-ma-estrella]{
+  display:inline-block;flex:0 0 auto;font-size:12px;line-height:1;
+  color:inherit;opacity:.34;cursor:default;user-select:none;
+  -webkit-user-select:none;transform-origin:50% 62%;
+  transition:transform .12s ease,opacity .12s ease,color .12s ease;
+}
+/* preview (hover o flechas): mas chico y mas tenue que la nota real */
+[data-ma-voto] .ma-estrella.is-preview{opacity:.6;transform:scale(.86)}
+/* nota real del usuario: gana siempre al preview (mismo peso, va despues) */
+[data-ma-voto] .ma-estrella.is-on{
+  color:var(--gold,#FF4A00);opacity:1;transform:scale(1.14);
+  text-shadow:0 0 6px rgba(255,74,0,.4);
+}
+/* vacio / sin nota puesta: nada encendido y el grupo entero mas apagado */
+[data-ma-voto] .ma-estrellas.is-empty{opacity:.62}
+[data-ma-voto] .ma-estrellas.is-empty .ma-estrella{opacity:.2;transform:scale(.9)}
+/* foco de contenedor: solo con puntero fino (en tactil :hover se queda pegado) */
+@media (hover:hover){
+  [data-ma-voto] .ma-estrellas.is-hover{box-shadow:inset 0 -2px 0 -1px rgba(255,74,0,.55)}
+  [data-ma-voto]:hover .ma-estrellas.is-empty .ma-estrella{opacity:.34}
+}
+@media (hover:none){[data-ma-voto] .ma-estrellas.is-hover{box-shadow:none}}
+/* foco visible de teclado: anillo de acento + halo, legible en claro y oscuro */
+[data-ma-voto] .ma-estrella:focus{outline:none}
+[data-ma-voto] .ma-estrella:focus-visible{
+  outline:2px solid var(--gold,#FF4A00);outline-offset:2px;border-radius:3px;
+  background:rgba(255,74,0,.14);
+}
+/* peticion en vuelo */
+[data-ma-voto].is-busy{opacity:.55;cursor:progress}
+[data-ma-voto].is-busy .ma-estrella{animation:maPulse .9s ease-in-out infinite}
+@keyframes maPulse{0%,100%{opacity:.3}50%{opacity:.85}}
+/* el usuario ya califico: anillo interior, no toca el layout ni el boton vecino */
+[data-ma-voto].ma-valorado{box-shadow:inset 0 0 0 1px rgba(255,74,0,.32)}
+/* media propia: no calificable (aria-disabled lo pone el JS) */
+[data-ma-voto] .ma-estrellas[aria-disabled="true"],[data-ma-voto] .ma-estrella[aria-disabled="true"]{opacity:.35;cursor:not-allowed}
+/* texto de rating: "sin valorar" o el promedio con 1 decimal (nunca 0) */
+[data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{
+  font-size:11px;line-height:1.2;font-weight:600;text-transform:none;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:inherit;opacity:.75;
+}
+[data-ma-voto] .ma-rating-texto[data-sin-votos="1"]{
+  font-weight:400;font-style:italic;opacity:.5;letter-spacing:.2px;
+}
+/* contador de evaluaciones: secundario, no compite con las estrellas.
+   Se engancha al ATRIBUTO porque la vista aporta su propio [data-ma-count]
+   sin clase y el JS lo reutiliza tal cual (no lo reemplaza). */
+[data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{
+  font-size:9px;line-height:1;font-weight:700;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:inherit;opacity:.6;
+  padding:2px 6px;border-radius:20px;
+  background:rgba(127,127,127,.16);border:1px solid rgba(127,127,127,.3);
+}
+@media (prefers-reduced-motion:reduce){
+  [data-ma-voto],[data-ma-voto] .ma-estrella{transition:none;animation:none}
+  [data-ma-voto].is-busy .ma-estrella{opacity:.55}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -1321,7 +1403,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         <div class="pf-museo-preview" id="espacio-media-preview"></div>
       </div>
       <div class="pf-museo-row">
-        <button type="button" class="pf-museo-btn ghost" id="espacio-media-voto" data-ma-voto data-ma-fuente="" data-ma-item="" data-ma-votos="0" data-ma-ya-votado="0" data-ma-es-propia="0" style="display:none;">&#x2764; <span data-ma-count>0</span></button>
+        <button type="button" class="pf-museo-btn ghost" id="espacio-media-voto" data-ma-voto data-ma-fuente="" data-ma-item="" data-ma-votos="0" data-ma-es-propia="0" data-ma-puntuacion="" data-ma-rating="" data-ma-ya-votado="0" style="display:none;">&#x2764; <span data-ma-count>0</span></button>
         <button type="button" class="pf-museo-btn ghost" id="espacio-media-quitar" onclick="misEspacioQuitar()">&#x1F5D1; Quitar guardado</button>
       </div>
       <div class="pf-museo-field">
@@ -3298,6 +3380,16 @@ function misAlbumesToggleVerMas() {
   }
 }
 
+/* Rating de un album (sqlEstadisticasAlbum): NULL = sin votos, que es el
+   estado NORMAL (media de ~1.03 votos/item). Prohibido pintar 0 / 0.0:
+   se muestra "sin valorar". Un album NO es votable (su fuente seria 'album',
+   fuera del CHECK de media_votos), asi que aqui no hay widget: solo texto. */
+function misAlbumRatingTxt(rp) {
+  var n = parseFloat(rp);
+  if (!isFinite(n) || n <= 0) { return 'sin valorar'; }
+  return String(Math.round(n * 10) / 10) + ' / 5';
+}
+
 function misAlbumesPintar(lista) {
   var grid = document.getElementById('mis-albumes-grid');
   if (!grid) return;
@@ -3321,7 +3413,7 @@ function misAlbumesPintar(lista) {
       + (a.lat && a.lng ? '' : '<div style="margin:8px 8px 0;display:inline-block;padding:5px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px dashed rgba(245,158,11,.35);color:#F59E0B;font-size:10px;font-weight:600;">&#x26A0; Sin mapa</div>')
       + '<div style="padding:10px;">'
       + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;color:#fff;">' + esc(a.titulo) + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.4);">' + (a.fotos_count || 0) + ' fotos &#x2022; ' + (a.votos_count || 0) + ' &#x2B50;</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.4);">' + (a.fotos_count || 0) + ' fotos &#x2022; ' + (a.votos_count || 0) + ' &#x2B50; &#x2022; ' + esc(misAlbumRatingTxt(a.rating_promedio)) + '</div>'
       + '</div>';
     card.onclick = function(){ verDetalleAlbum(a.id); };
     grid.appendChild(card);
@@ -3829,15 +3921,34 @@ function misAbrirEspacio(fuente, itemId) {
   var msg = document.getElementById('espacio-media-msg');
   if (msg) { msg.textContent = ''; msg.style.display = 'none'; }
   misEspacioSync(m);
-  /* media_voto NO admite fuente 'album': se oculta el boton. */
+  /* La fuente 'album' (album entero guardado) NO es una fuente valida de
+     media_voto: el CHECK de media_votos solo admite curada | viajero_foto |
+     album_foto. El album SI llega aqui (la 1a rama de mis_guardados_media en
+     api/interacciones.js devuelve fuente='album'), asi que la restriccion NO
+     es codigo muerto: sin ella el POST rebotaria con 400.
+     No hay ruta unlike en el backend: el widget vuelve a ser calificable y
+     data-ma-ya-votado queda como marca legacy tolerante, nunca como boton. */
   var voto = document.getElementById('espacio-media-voto');
   if (voto) {
     voto.style.display = (String(m.fuente || '') === 'album') ? 'none' : '';
     voto.setAttribute('data-ma-fuente', String(m.fuente || ''));
     voto.setAttribute('data-ma-item', String(m.item_id || ''));
     voto.setAttribute('data-ma-votos', String(m.votos || 0));
-    voto.setAttribute('data-ma-ya-votado', m.ya_votado ? '1' : '0');
     voto.setAttribute('data-ma-es-propia', m.es_propia ? '1' : '0');
+    /* mi_puntuacion puede no venir (rama mis_guardados_media sin parche): si
+       falta, NO se emite el atributo y el widget queda en estrellas vacias
+       sin nota propia. Estado valido, no error. */
+    if (m.mi_puntuacion != null && m.mi_puntuacion !== '') {
+      voto.setAttribute('data-ma-puntuacion', String(m.mi_puntuacion));
+      voto.setAttribute('data-ma-ya-votado', '1');
+    } else {
+      voto.removeAttribute('data-ma-puntuacion');
+      voto.setAttribute('data-ma-ya-votado', '0');
+    }
+    /* rating_promedio null (sin votos, el caso normal) -> cadena vacia.
+       Prohibido emitir 0 / '0.0': media_estadisticas lo devuelve NULL. */
+    var rp = parseFloat(m.rating_promedio);
+    voto.setAttribute('data-ma-rating', (isFinite(rp) && rp > 0) ? String(Math.round(rp * 10) / 10) : '');
   }
   modal.classList.add('open');
   if (window.MediaActions) {

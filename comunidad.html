@@ -486,6 +486,87 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 #cm-modal .cm-modal-actions .ok{background:var(--gold);border:1px solid var(--gold);color:var(--black)}
 #cm-modal .cm-modal-actions .ghost{background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.7)}
 #cm-modal .cm-modal-actions .ghost:hover{border-color:var(--gold);color:var(--gold)}
+/* ===== SILO MEDIA-ACTIONS: widget de 5 estrellas (media-actions.js) =====
+   Selector padre UNICO: [data-ma-voto], el contenedor que el JS ya marca y que
+   esta pagina ya emite. Todo cuelga de ahi: cero reglas sueltas, cero
+   escrituras en :root, cero clases de la pagina tocadas.
+   Los glifos (relleno/contorno) los pone el JS: aqui van color, tamano y estado.
+   Fondo NO supuesto: el glifo apagado hereda currentColor y el encendido usa el
+   --gold que la pagina ya declara, asi se lee igual sobre claro y sobre oscuro.
+   Estados distinguibles SIN depender solo del color: is-on crece (scale 1.14) y
+   lleva halo; is-preview se ve mas chico (scale .86) y mas tenue; is-empty baja
+   el alfa de todo el grupo. */
+[data-ma-voto]{
+  /* RESET DE SILO */
+  box-sizing:border-box;position:static;display:inline-flex;align-items:center;
+  gap:6px;flex-wrap:wrap;max-width:100%;margin:0;font:inherit;color:inherit;
+  cursor:default;-webkit-tap-highlight-color:transparent;
+  transition:opacity .15s ease,box-shadow .15s ease;
+}
+[data-ma-voto] span{box-sizing:border-box;margin:0;padding:0}
+/* el contenedor es el alvo (role=group / radiogroup): puntero, no las estrellas */
+[data-ma-voto].ma-calificable{cursor:pointer}
+[data-ma-voto] .ma-estrellas,[data-ma-voto] [data-ma-estrellas]{
+  display:inline-flex;align-items:center;gap:1px;flex:0 0 auto;max-width:100%;
+  letter-spacing:0;
+}
+[data-ma-voto] .ma-estrella,[data-ma-voto] [data-ma-estrella]{
+  display:inline-block;flex:0 0 auto;font-size:12px;line-height:1;
+  color:inherit;opacity:.34;cursor:default;user-select:none;
+  -webkit-user-select:none;transform-origin:50% 62%;
+  transition:transform .12s ease,opacity .12s ease,color .12s ease;
+}
+/* preview (hover o flechas): mas chico y mas tenue que la nota real */
+[data-ma-voto] .ma-estrella.is-preview{opacity:.6;transform:scale(.86)}
+/* nota real del usuario: gana siempre al preview (mismo peso, va despues) */
+[data-ma-voto] .ma-estrella.is-on{
+  color:var(--gold,#FF4A00);opacity:1;transform:scale(1.14);
+  text-shadow:0 0 6px rgba(255,74,0,.4);
+}
+/* vacio / sin nota puesta: nada encendido y el grupo entero mas apagado */
+[data-ma-voto] .ma-estrellas.is-empty{opacity:.62}
+[data-ma-voto] .ma-estrellas.is-empty .ma-estrella{opacity:.2;transform:scale(.9)}
+/* foco de contenedor: solo con puntero fino (en tactil :hover se queda pegado) */
+@media (hover:hover){
+  [data-ma-voto] .ma-estrellas.is-hover{box-shadow:inset 0 -2px 0 -1px rgba(255,74,0,.55)}
+  [data-ma-voto]:hover .ma-estrellas.is-empty .ma-estrella{opacity:.34}
+}
+@media (hover:none){[data-ma-voto] .ma-estrellas.is-hover{box-shadow:none}}
+/* foco visible de teclado: anillo de acento + halo, legible en claro y oscuro */
+[data-ma-voto] .ma-estrella:focus{outline:none}
+[data-ma-voto] .ma-estrella:focus-visible{
+  outline:2px solid var(--gold,#FF4A00);outline-offset:2px;border-radius:3px;
+  background:rgba(255,74,0,.14);
+}
+/* peticion en vuelo */
+[data-ma-voto].is-busy{opacity:.55;cursor:progress}
+[data-ma-voto].is-busy .ma-estrella{animation:maPulse .9s ease-in-out infinite}
+@keyframes maPulse{0%,100%{opacity:.3}50%{opacity:.85}}
+/* el usuario ya califico: anillo interior, no toca el layout ni el boton vecino */
+[data-ma-voto].ma-valorado{box-shadow:inset 0 0 0 1px rgba(255,74,0,.32)}
+/* media propia: no calificable (aria-disabled lo pone el JS) */
+[data-ma-voto] .ma-estrellas[aria-disabled="true"],[data-ma-voto] .ma-estrella[aria-disabled="true"]{opacity:.35;cursor:not-allowed}
+/* texto de rating: "sin valorar" o el promedio con 1 decimal (nunca 0) */
+[data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{
+  font-size:11px;line-height:1.2;font-weight:600;text-transform:none;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:inherit;opacity:.75;
+}
+[data-ma-voto] .ma-rating-texto[data-sin-votos="1"]{
+  font-weight:400;font-style:italic;opacity:.5;letter-spacing:.2px;
+}
+/* contador de evaluaciones: secundario, no compite con las estrellas.
+   Se engancha al ATRIBUTO porque la vista aporta su propio [data-ma-count]
+   sin clase y el JS lo reutiliza tal cual (no lo reemplaza). */
+[data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{
+  font-size:9px;line-height:1;font-weight:700;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:inherit;opacity:.6;
+  padding:2px 6px;border-radius:20px;
+  background:rgba(127,127,127,.16);border:1px solid rgba(127,127,127,.3);
+}
+@media (prefers-reduced-motion:reduce){
+  [data-ma-voto],[data-ma-voto] .ma-estrella{transition:none;animation:none}
+  [data-ma-voto].is-busy .ma-estrella{opacity:.55}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -2560,7 +2641,8 @@ function renderAudiovisualMarkers() {
       + '<div class="av-popup-meta">'
       + '<span class="av-popup-type">' + esc(item.media_type) + '</span>'
       + (autorHTML ? '<span>por ' + autorHTML + '</span>' : '')
-      + (item.votos > 0 ? '<span>&#x2B50; ' + item.votos + '</span>' : '')
+      /* Popup de mapa: superficie minima, solo lectura (escala + calidad). */
+      + (item.votos > 0 ? '<span>&#x2B50; ' + item.votos + avRatingText(item) + '</span>' : '')
       + '</div>';
     if (item.origen === 'album' || item.origen === 'album_grupo') {
       popupHtml += '<div style="margin-top:6px"><a class="av-popup-link" href="#" onclick="abrirAlbumModal(\'' + esc(item.origen_id) + '\');return false">Ver album &#x2192;</a></div>';
@@ -2642,7 +2724,10 @@ function abrirAlbumModal(albumId) {
           + '<div class="av-album-photo-foot">'
           + (f.media_title ? '<div class="av-album-photo-title">' + esc(f.media_title) + '</div>' : '')
           + (f.autor_nombre ? '<div class="av-album-photo-author">' + esc(f.autor_nombre) + '</div>' : '')
-          + '<div class="av-album-photo-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>'
+          /* Modal de albumes: aqui SI hay sitio, el voto lleva widget de 5
+             estrellas. Escala (N) y calidad (promedio) se leen ahi. */
+          + '<div class="av-album-photo-votos">\u2B50 ' + (parseInt(f.votos,10)||0)
+          + avRatingText(f) + '</div>'
           + '</div>';
         if(f.id) {
           grid += '<div class="av-album-actions">' + avActLikeHTML(f) + avActSaveHTML(f) + '</div>'
@@ -2808,14 +2893,52 @@ function albumCardAV(a) {
    No-Duplicidad). Un solo helper genera los data-ma-* que consumen tanto el
    feed como el modal de album; los estados vienen del backend y caen a 0. */
 function avFlag01(v) { return (v === true || v === 1 || v === '1') ? 1 : 0; }
-function avActLikeHTML(f, extraClass) {
+/* Rating de 5 estrellas (contrato api/interacciones.js):
+   - rating_promedio: numero o null. null es el estado NORMAL (sin votos) y se
+     emite como cadena vacia; NUNCA se emite 0 ni 0.0.
+   - mi_puntuacion: entero 1..5 o null, y AUSENTE en las ramas albumes y
+     museo_publico (no conocen sesion). Se trata como ausencia, no como error:
+     se omite el atributo y media-actions.js pinta estrellas vacias. */
+function avRatingStr(v) {
+  var n = parseFloat(v);
+  if (!isFinite(n) || n <= 0) return '';
+  return (Math.round(n * 10) / 10).toFixed(1);
+}
+function avMiNota(v) {
+  var n = parseInt(v, 10);
+  return (n >= 1 && n <= 5) ? n : 0;
+}
+/* Atributos data-ma-* del rating para el contenedor del voto. */
+function avRatingAttrs(f) {
+  var nota = avMiNota(f.mi_puntuacion);
+  return ' data-ma-rating="' + avRatingStr(f.rating_promedio) + '"'
+    + (nota ? ' data-ma-puntuacion="' + nota + '"' : '');
+}
+/* Texto del promedio junto al contador: escala (N) + calidad (promedio). */
+function avRatingText(f) {
+  var r = avRatingStr(f.rating_promedio);
+  return r ? ' \u00b7 ' + r : '';
+}
+function avActLikeHTML(f, extraClass, soloTexto) {
   var votos = parseInt(f.votos, 10) || 0;
-  var ya = avFlag01(f.ya_votado);
+  var nota = avMiNota(f.mi_puntuacion);
+  var ya = nota ? 1 : avFlag01(f.ya_votado);
   var propia = avFlag01(f.es_propia);
+  /* Modo texto (feed denso): ni data-ma-voto ni widget, solo escala + calidad.
+     El voto interactivo vive en la superficie con sitio (modal). */
+  if (soloTexto) {
+    return '<span class="av-act av-act-like' + (ya ? ' on' : '') + ' av-act-solo-texto'
+      + '" data-ma-item="' + esc(String(f.id)) + '" data-ma-fuente="album_foto"'
+      + ' data-ma-votos="' + votos + '" data-ma-es-propia="' + propia + '"' + avRatingAttrs(f) + '">'
+      + '\u2B50 <span data-ma-count>' + votos + '</span>'
+      + (nota ? ' \u00b7 tu nota ' + nota + '/5' : '') + avRatingText(f) + '</span>';
+  }
+  /* El contenedor es <button>, pero NO lleva aria-pressed: el JS lo quita y
+     pasa el control a role="group" con las 5 estrellas como radios. */
   return '<button type="button" class="av-act av-act-like' + (ya ? ' on' : '') + (extraClass ? ' ' + extraClass : '')
     + '" data-ma-voto data-ma-fuente="album_foto" data-ma-item="' + esc(String(f.id))
-    + '" data-ma-votos="' + votos + '" data-ma-ya-votado="' + ya + '" data-ma-es-propia="' + propia
-    + '" aria-pressed="' + (ya ? 'true' : 'false') + '">\u2B50 <span data-ma-count>' + votos + '</span></button>';
+    + '" data-ma-votos="' + votos + '" data-ma-es-propia="' + propia + '"' + avRatingAttrs(f) + '>'
+    + '\u2B50 <span data-ma-count>' + votos + '</span></button>';
 }
 function avActSaveHTML(f, extraClass) {
   var ya = avFlag01(f.ya_guardado);
@@ -2846,6 +2969,13 @@ function avSyncMediaActions(root) {
 function avFeedOrden() {
   return _avOrdenActual === 'populares' ? 'top' : _avOrdenActual;
 }
+/* Indice id -> item del feed ya cargado, para abrir el modal desde el boton
+   "Valorar" sin recargar. Se repuebla en cada cargarFeedAV. */
+var _avFeedById = {};
+function abrirMediaModalRaw(id) {
+  var f = _avFeedById ? _avFeedById[String(id)] : null;
+  if (f) { abrirMediaModal(f); }
+}
 
 function cargarFeedAV() {
   var cont = document.getElementById('av-feed');
@@ -2862,7 +2992,11 @@ function cargarFeedAV() {
         return;
       }
       cont.innerHTML = '';
-      items.forEach(function(f){ cont.appendChild(feedCardAV(f)); });
+      _avFeedById = {};
+      items.forEach(function(f){
+        if (f && f.id != null) _avFeedById[String(f.id)] = f;
+        cont.appendChild(feedCardAV(f));
+      });
       avSyncMediaActions(cont);
     })
     .catch(function(){
@@ -2879,9 +3013,17 @@ function feedCardAV(f) {
     + '<div class="av-feed-meta">' + esc(f.autor_nombre || 'Viajero')
     + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '')
     + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '') + '</div>'
-    + '<div class="av-feed-votos">\u2B50 ' + (parseInt(f.votos,10)||0) + '</div>'
+    /* Feed denso: el voto es INFORMATIVO aqui (contador = escala, promedio =
+       calidad). El widget interactivo de 5 estrellas vive en el modal de la
+       publicacion, al que se llega con un clic en la tarjeta. */
+    + '<div class="av-feed-votos">'
+    + avActLikeHTML(f, '', true)
+    + '</div>'
     + '<div class="av-feed-actions">'
-    + avActLikeHTML(f)
+    /* En el feed el voto es de solo lectura; este boton lleva al modal, que si
+       tiene sitio para las 5 estrellas. El onclick no usa arrow ni ES6. */
+    + '<button type="button" class="av-act av-act-rate" onclick="abrirMediaModalRaw(' + esc(String(f.id)) + ')">'
+    + (avMiNota(f.mi_puntuacion) ? 'Cambiar nota' : 'Valorar') + '</button>'
     + '<button type="button" class="av-act" data-comments-for="' + esc(String(f.id))
     + '" data-comments-fuente="album_foto" onclick="AlbumComments.toggle(this)">\uD83D\uDCAC Comentarios</button>'
     + '<div class="av-feed-comments" data-comments-for="' + esc(String(f.id))

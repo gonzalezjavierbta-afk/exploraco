@@ -3222,7 +3222,9 @@ function derivadosArbolConOrigen(sql, usuarioId, v, out, ent, org, cfg) {
     "SELECT"
     + " (SELECT COUNT(*)::int FROM album_fotos WHERE agregador_id=$1 AND foto_type='audio' AND activo=true) AS n_audio,"
     + " (SELECT COUNT(*)::int FROM album_fotos WHERE agregador_id=$1 AND foto_type='video' AND activo=true) AS n_video,"
-    + " (SELECT COUNT(*)::int FROM media_votos mv JOIN album_fotos af ON af.id::text=mv.item_id"
+    // Progresion (art_grafica): conteo GLOBAL de votos recibidos, no promedio de
+     // un item: media_estadisticas es por (fuente,item) y no aplica.
+     + " (SELECT COUNT(*)::int FROM media_votos mv JOIN album_fotos af ON af.id::text=mv.item_id"
     + "   WHERE mv.fuente='album_foto' AND mv.activo=true AND af.autor_original_id=$1) AS n_votos,"
     + " (SELECT COUNT(*)::int FROM interacciones WHERE usuario_id=$1 AND tipo='resena'"
     + "   AND LENGTH(COALESCE(texto,'')) > 500) AS n_largas",
@@ -3634,7 +3636,9 @@ var MISIONES = [
     gate_nivel: 2,
     check: function(ctx) {
       return ctx.sql(
-        'SELECT COUNT(*)::int AS n FROM media_votos WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
+        // Mision/logrro: conteo GLOBAL de votos del usuario (umbral 20/10), no
+      // promedio por item: media_estadisticas no aplica.
+      'SELECT COUNT(*)::int AS n FROM media_votos WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
         [ctx.usuarioId]
       ).then(function(r){ return !!(r[0] && r[0].n >= 20); })
        .catch(function(){ return false; });
@@ -3650,6 +3654,8 @@ var MISIONES = [
     gate_nivel: 2,
     check: function(ctx) {
       return ctx.sql(
+        // Mision/logrro: conteo GLOBAL de votos recibidos en las fotos del autor
+        // (umbral 10), no promedio por item: media_estadisticas no aplica.
         'SELECT COUNT(*)::int AS n FROM media_votos mv '
         + 'JOIN album_fotos af ON af.id::text = mv.item_id '
         + 'WHERE mv.fuente=\'album_foto\' AND mv.activo=true AND af.autor_original_id=$1',
@@ -3988,6 +3994,8 @@ var LOGROS = [
     emoji: '\u2B50', tier: 'bronce', xp: 20,
     check: function(ctx) {
       return ctx.sql(
+        // Mision/logrro: conteo GLOBAL de votos recibidos en las fotos del autor
+        // (umbral 10), no promedio por item: media_estadisticas no aplica.
         'SELECT COUNT(*)::int AS n FROM media_votos mv '
         + 'JOIN album_fotos af ON af.id::text = mv.item_id '
         + 'WHERE mv.fuente=\'album_foto\' AND mv.activo=true AND af.autor_original_id=$1',
@@ -5202,6 +5210,90 @@ function conDegradacionMedia(promesa, etiqueta, valor) {
   });
 }
 
+// ADR-089: validador de la nota. Devuelve el entero 1-5 o null (rechazo).
+// Rechaza strings con decimales, vacios, booleanos y fuera de rango: el
+// DEFAULT 3 de media_votos NO se usa como red.
+function parsePuntuacionMedia(v) {
+  if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
+  if (typeof v === 'object' || Array.isArray(v)) return null;
+  var s = String(v).trim();
+  if (!/^\d{1,2}$/.test(s)) return null;
+  var n = parseInt(s, 10);
+  return (n >= 1 && n <= 5) ? n : null;
+}
+
+// ADR-089 (migracion 051): FUENTE UNICA del agregado de media.
+// public.media_estadisticas(p_fuente, p_item_id) es STABLE y filtra
+// activo=true POR SI MISMA: aqui NUNCA se repite ese filtro (sesgaria el
+// promedio). Se llama UNA VEZ por respuesta (el planner la cachea dentro de
+// la misma sentencia y mantiene coherentes las ~30 lecturas de un request).
+// promedio llega como STRING (numeric) y es NULL cuando votos=0: NULL
+// significa SIN VOTOS y NUNCA se convierte a 0.
+function parsearPromedioMedia(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+function mediaEstadisticas(sqlFn, fuente, itemId) {
+  var f = String(fuente || '').toLowerCase();
+  var id = String(itemId || '').trim();
+  return sqlFn('SELECT votos, promedio FROM public.media_estadisticas($1, $2)', [f, id])
+    .catch(function(e) {
+      // 42883 = la funcion no existe todavia (051 no aplicada): degrada al
+      // agregado neutro {0, NULL} en vez de tumbar la rama entera.
+      if (e && (e.code === '42P01' || e.code === '42703' || e.code === '42883')) {
+        console.warn('TRACE: media_estadisticas ausente (migracion 051 pendiente); degradado');
+        return [{ votos: 0, promedio: null }];
+      }
+      throw e;
+    })
+    .then(function(r) {
+      var row = (r && r[0]) || {};
+      return { votos: parseInt(row.votos, 10) || 0, promedio: parsearPromedioMedia(row.promedio) };
+    });
+}
+// Agregado de ALBUM: suma de los votos de sus fotos y promedio PONDERADO por
+// votos (cada media_estadisticas ya trae el promedio de 1 decimal de su foto,
+// asi que ponderar por votos reconstruye la media del album sin releer
+// media_votos). NULL cuando el album no tiene votos: NUNCA 0. El ROUND final
+// es solo para igualar la escala numeric(3,1) del resto de la tripleta.
+function sqlEstadisticasAlbum(exprAlbumId, aliasVotos) {
+  var base = ' FROM album_fotos afx'
+    + ' JOIN LATERAL public.media_estadisticas(\'album_foto\', afx.id::text) e ON true'
+    + ' WHERE afx.album_id = ' + exprAlbumId + ' AND afx.activo = true AND afx.visible = true';
+  return ' (SELECT COALESCE(SUM(e.votos), 0)::int' + base + ') AS ' + aliasVotos
+    + ', (SELECT CASE WHEN SUM(e.votos) > 0'
+    + ' THEN ROUND(SUM(e.promedio * e.votos) / SUM(e.votos), 1) ELSE NULL END'
+    + base + ') AS rating_promedio';
+}
+
+// Subconsultas ESCALARES de la tripleta para las ramas GET que ya filtran
+// por item. La funcion STABLE se evalua una vez por (fuente, item_id)
+// distinto dentro de la misma sentencia (volumen real: 109 filas en
+// media_votos, ~1 voto por item), asi que la forma tabular con un
+// GROUP BY daria el mismo resultado sin cambiar el plan. Se conserva el
+// alias de votos que la rama ya expone y se ANADE rating_promedio al lado;
+// nunca se renombra.
+function sqlEstadisticasItem(fuenteLiteral, exprItemId, aliasVotos) {
+  return ' (SELECT e.votos FROM public.media_estadisticas(' + fuenteLiteral + ', ' + exprItemId + ') e) AS ' + aliasVotos
+    + ', (SELECT e.promedio FROM public.media_estadisticas(' + fuenteLiteral + ', ' + exprItemId + ') e) AS rating_promedio';
+}
+// Nota que el usuario de sesion dejo en ese item (null si no ha calificado).
+function mediaMiPuntuacion(sqlFn, usuarioId, fuente, itemId) {
+  if (!usuarioId) return Promise.resolve(null);
+  var f = String(fuente || '').toLowerCase();
+  var id = String(itemId || '').trim();
+  return sqlFn('SELECT puntuacion FROM media_votos WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3 AND activo=true LIMIT 1', [usuarioId, f, id])
+    .then(function(r) {
+      var n = r && r[0] && parseInt(r[0].puntuacion, 10);
+      return isFinite(n) ? n : null;
+    })
+    .catch(function(e) {
+      if (e && (e.code === '42P01' || e.code === '42703')) return null;
+      throw e;
+    });
+}
+
 // v24 (ADR-052): true si el error indica esquema ausente (migracion
 // pendiente). Lo comparten los lectores/escritores de carpetas de guardados
 // para responder 503 SCHEMA_NOT_MIGRATED tipado en vez de degradar en
@@ -5320,40 +5412,82 @@ function puntoDeMedia(sqlFn, target) {
   return Promise.resolve(null);
 }
 
-// Nucleo de voto (like/unlike) sobre media_votos con soft-delete. Devuelve
-// {nuevo, reactivado, duplicado, tope, xp, votos}.
-// duplicado=true solo cuando ya existia un voto ACTIVO (el caller responde
-// 409). Reactivar tras un unlike NO re-paga XP. Tope unificado de 20
-// votos/24h. v27: XP decreciente con la carga reciente (se recarga a full a
-// las 24h). ADR-079: el voto siempre se registra, sin espera previa.
-function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
+// Nucleo de CALIFICACION sobre media_votos (antes like/unlike con
+// soft-delete). Tope unificado de 20 ALTAS/24h. v27: XP decreciente con la
+// carga reciente (se recarga a full a las 24h). ADR-079: la accion siempre se
+// registra, sin espera previa.
+// ADR-089 (Fase B): la calificacion de media es una OPINION ACTUALIZABLE Y
+// DEFINITIVA. Upsert idempotente por PK (usuario_id, fuente, item_id) siempre
+// activo; NO existe unlike ni 409 de duplicado (ya no son posibles). El XP se
+// paga SOLO en el ALTA: cambiar la nota despues actualiza sin XP, lo que
+// cierra el bucle de farming 1->5->1->5. La reputacion del autor se acumula
+// por DELTA idempotente derivado del ESTADO (nunca de un parametro del
+// cliente), asi que reenviar la misma nota N veces da delta 0.
+// Returns {votos, rating_promedio, mi_puntuacion, es_alta, xp, xp_detalle,
+//         xp, tope}.
+function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, puntuacion, target) {
   var f = String(fuente || '').toLowerCase();
   var id = String(itemId || '').trim();
-  function contar() {
-    return conDegradacionMedia(
-      sqlFn('SELECT COUNT(*)::int AS n FROM media_votos WHERE fuente=$1 AND item_id=$2 AND activo=true', [f, id]),
-      'media_votos', [{ n: 0 }]
-    ).then(function(r){ return (r[0] && parseInt(r[0].n, 10)) || 0; });
-  }
+  var nota = parseInt(puntuacion, 10);
   function base(extra) {
-    return contar().then(function(v) {
-      var out = { nuevo: false, reactivado: false, duplicado: false, tope: false, xp: 0, votos: v };
+    return mediaEstadisticas(sqlFn, f, id).then(function(est) {
+      var out = {
+        es_alta: false, tope: false, xp: 0,
+        votos: est.votos, rating_promedio: est.promedio, mi_puntuacion: nota
+      };
       Object.keys(extra || {}).forEach(function(k){ out[k] = extra[k]; });
       return out;
     });
   }
+  // Delta de reputacion del autor. dVotos=1 solo en el alta; dSuma es la
+  // diferencia real de notas. Si ambos son 0 (misma nota reenviada, o
+  // activo=false historico) NO se toca el agregado.
+  function acumularReputacion() {
+    var autorId = (target && target.autorId) ? String(target.autorId) : '';
+    // Delta 0/0 (misma nota reenviada): no se escribe, para no tocar ni el
+    // actualizado_en del agregado en un no-op.
+    if (!autorId || (dVotos === 0 && dSuma === 0)) return Promise.resolve();
+    return conDegradacionMedia(
+      sqlFn('INSERT INTO public.media_rep_autores (autor_id, votos_recibidos, suma_notas) '
+        + 'VALUES ($1,$2,$3) '
+        + 'ON CONFLICT (autor_id) DO UPDATE SET '
+        + 'votos_recibidos = media_rep_autores.votos_recibidos + EXCLUDED.votos_recibidos, '
+        + 'suma_notas = media_rep_autores.suma_notas + EXCLUDED.suma_notas, '
+        + 'actualizado_en = now()', [autorId, dVotos, dSuma]),
+      'media_rep_autores', []
+    );
+  }
+  var dVotos = 0, dSuma = 0;
+  // Estado previo con FOR UPDATE: decide el alta y fija la nota de partida del
+  // delta. Sin bloqueo de fila (no existe todavia) la carrera la resuelve el
+  // ON CONFLICT del upsert; el delta se recalcula con el estado leido.
   return conDegradacionMedia(
-    sqlFn('SELECT activo FROM media_votos WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3 LIMIT 1', [usuarioId, f, id]),
+    sqlFn('SELECT puntuacion, activo FROM media_votos '
+      + 'WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3 FOR UPDATE', [usuarioId, f, id]),
     'media_votos', []
   ).then(function(prev) {
-    if (accion === 'unlike') {
-      if (prev.length && prev[0].activo) {
-        return sqlFn('UPDATE media_votos SET activo=false, actualizado_en=NOW() WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3', [usuarioId, f, id])
-          .then(function(){ return base(); });
-      }
-      return base();
-    }
-    if (prev.length && prev[0].activo) return base({ duplicado: true });
+    var fila = prev[0] || null;
+    var esAlta = !(fila && fila.activo);
+    var notaPrevia = (fila && fila.activo) ? parseInt(fila.puntuacion, 10) : null;
+    if (!isFinite(notaPrevia)) notaPrevia = null;
+    dVotos = esAlta ? 1 : 0;
+    // suma_notas es SUMA BRUTA de puntuacion (ADR-089 D3, tabla en 051 y
+    // backfill 052: sum(r.puntuacion)): un ALTA aporta la nota entera y un
+    // CAMBIO solo la diferencia, para que los deltas teleescopen a
+    // sum(puntuacion) y el agregado nunca diverja de la reconstruccion 052.
+    // Restar 3 (centrado) aqui descuadra esa invariante de forma permanente.
+    dSuma = esAlta ? nota : (nota - notaPrevia);
+    var escribir = function(xpBaseVoto) {
+      return sqlFn('INSERT INTO media_votos (usuario_id, fuente, item_id, puntuacion, xp_ganado, activo) '
+        + 'VALUES ($1,$2,$3,$4,$5,true) '
+        + 'ON CONFLICT (usuario_id, fuente, item_id) DO UPDATE SET '
+        + 'puntuacion = EXCLUDED.puntuacion, activo = true, actualizado_en = NOW()',
+        [usuarioId, f, id, nota, xpBaseVoto])
+        .then(function(){ return acumularReputacion(); });
+    };
+    if (!esAlta) return escribir(0).then(function(){ return base(); });
+    // El tope sigue contando ALTAS (filas creadas en las ultimas 24h): el
+    // upsert nunca mueve creado_en, y cambiar la nota no consume cupo.
     return conDegradacionMedia(
       sqlFn("SELECT COUNT(*)::int AS n, "
         + "COALESCE(SUM(GREATEST(0, 1 - EXTRACT(EPOCH FROM (NOW() - creado_en)) / 86400.0)), 0) AS carga "
@@ -5362,7 +5496,7 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
     ).then(function(cnt) {
       var filaVoto = cnt[0] || {};
       var nVotos = parseInt(filaVoto.n, 10) || 0;
-      if (nVotos >= VOTOS_DIA_MAX) return base({ tope: true });
+      if (nVotos >= VOTOS_DIA_MAX) return base({ tope: true, es_alta: false });
       // Energia ponderada por tiempo: cada voto pesa menos cuanto mas
       // antiguo, asi que la recompensa se recarga sola a full a las 24h.
       var carga = Number(filaVoto.carga);
@@ -5371,68 +5505,69 @@ function aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, accion, target) {
       var factorVoto = 1 - (carga / VOTO_DECAY_DIV);
       if (factorVoto < 0) factorVoto = 0;
       var xpBaseVoto = Math.round(XP_BASES.voto_media * factorVoto * 100) / 100;
-      if (prev.length) {
-        return sqlFn('UPDATE media_votos SET activo=true, actualizado_en=NOW() WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3', [usuarioId, f, id])
-          .then(function(){ return base({ reactivado: true }); });
-      }
-      return sqlFn('INSERT INTO media_votos (usuario_id, fuente, item_id, xp_ganado, activo) VALUES ($1,$2,$3,$4,true)', [usuarioId, f, id, xpBaseVoto])
-        .then(async function() {
-          var ctxVoto = await contextoXpE(sqlFn, usuarioId);
-          // ADR-058: punto geografico del media (destino/album/foto). Sin
-          // punto resoluble el motor deja mult_origen en 1.00.
-          var puntoVoto = await puntoDeMedia(sqlFn, target);
-          var resVoto = await calcularXpAcreditado(sqlFn, xpBaseVoto,
-            ctxVoto.nivel_clase, ctxVoto.clase_id, ctxVoto.tag,
-            { nivel_usuario: ctxVoto.nivel_usuario, usuario_id: usuarioId, punto: puntoVoto });
-          var xpVotoFinal = resVoto.xp_final;
-          await sqlFn('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpVotoFinal, usuarioId]).catch(function(){});
-          await acreditarClaseYCofre(sqlFn, usuarioId, ctxVoto, xpVotoFinal);
-          await registrarXpLedger(sqlFn, Object.assign({
-            usuario_id: usuarioId, accion: 'voto_media', xp_base: xpBaseVoto,
-            mult_nivel: resVoto.m_nivel, mult_stack: resVoto.mult_stack,
-            mult_final: resVoto.mult_global_c, cap_aplicado: resVoto.cap_aplicado,
-            xp_final: xpVotoFinal, contexto: { fuente: f, item_id: id, carga: carga }
-          }, origenLedger(resVoto, (target && target.puntoFuente) || 'media', puntoVoto)));
-          // Regalias pasivas (037): parte del XP base al autor de la media.
-          await acumularRegalia(sqlFn, f, id, XP_BASES.voto_media, usuarioId);
-          return base({ nuevo: true, xp: xpVotoFinal, xp_detalle: armarXpDetalle(xpBaseVoto, resVoto, 0) });
-        });
+      return escribir(xpBaseVoto).then(async function() {
+        var ctxVoto = await contextoXpE(sqlFn, usuarioId);
+        // ADR-058: punto geografico del media (destino/album/foto). Sin
+        // punto resoluble el motor deja mult_origen en 1.00.
+        var puntoVoto = await puntoDeMedia(sqlFn, target);
+        var resVoto = await calcularXpAcreditado(sqlFn, xpBaseVoto,
+          ctxVoto.nivel_clase, ctxVoto.clase_id, ctxVoto.tag,
+          { nivel_usuario: ctxVoto.nivel_usuario, usuario_id: usuarioId, punto: puntoVoto });
+        var xpVotoFinal = resVoto.xp_final;
+        await sqlFn('UPDATE usuarios SET xp_total=xp_total+$1, ultimo_acceso=NOW() WHERE id=$2', [xpVotoFinal, usuarioId]).catch(function(){});
+        await acreditarClaseYCofre(sqlFn, usuarioId, ctxVoto, xpVotoFinal);
+        await registrarXpLedger(sqlFn, Object.assign({
+          usuario_id: usuarioId, accion: 'voto_media', xp_base: xpBaseVoto,
+          mult_nivel: resVoto.m_nivel, mult_stack: resVoto.mult_stack,
+          mult_final: resVoto.mult_global_c, cap_aplicado: resVoto.cap_aplicado,
+          xp_final: xpVotoFinal, contexto: { fuente: f, item_id: id, carga: carga }
+        }, origenLedger(resVoto, (target && target.puntoFuente) || 'media', puntoVoto)));
+        // Regalias pasivas (037): parte del XP base al autor de la media.
+        await acumularRegalia(sqlFn, f, id, XP_BASES.voto_media, usuarioId);
+        return base({ es_alta: true, xp: xpVotoFinal, xp_detalle: armarXpDetalle(xpBaseVoto, resVoto, 0) });
+      });
     });
   });
 }
 
 // Votos + comentarios activos de un item (shape del GET media_interacciones).
+// ADR-089: el conteo de votos sale de public.media_estadisticas (fuente unica
+// del agregado); promedio NULL significa SIN VOTOS, no 0.
 function contarMedia(sqlFn, fuente, itemId) {
   var f = String(fuente || '').toLowerCase();
   var id = String(itemId || '').trim();
-  var votosP = conDegradacionMedia(
-    sqlFn('SELECT COUNT(*)::int AS n FROM media_votos WHERE fuente=$1 AND item_id=$2 AND activo=true', [f, id]),
-    'media_votos', [{ n: 0 }]
-  ).then(function(r){ return (r[0] && parseInt(r[0].n, 10)) || 0; });
+  var votosP = mediaEstadisticas(sqlFn, f, id);
   var comP = conDegradacionMedia(
     sqlFn('SELECT COUNT(*)::int AS n FROM media_comentarios WHERE fuente=$1 AND item_id=$2 AND activo=true', [f, id]),
     'media_comentarios', [{ n: 0 }]
   ).then(function(r){ return (r[0] && parseInt(r[0].n, 10)) || 0; });
   return Promise.all([votosP, comP]).then(function(par) {
-    return { votos: par[0], comentarios: par[1] };
+    return { votos: par[0].votos, rating_promedio: par[0].promedio, comentarios: par[1] };
   });
 }
 
 // Metricas en lote (votos, comentarios, ya_votado, ya_guardado) para un
 // conjunto de items de una misma fuente. Evita el N+1 en galeria_destino.
 function cargarMetricasMedia(sqlFn, usuarioId, fuente, ids) {
-  var out = { votos: {}, comentarios: {}, ya_votado: {}, ya_guardado: {} };
+  var out = { votos: {}, rating_promedio: {}, mi_puntuacion: {}, comentarios: {}, ya_votado: {}, ya_guardado: {} };
   if (!ids || !ids.length) return Promise.resolve(out);
+  // ADR-089: forma TABULAR (unnest + LATERAL) en UNA sentencia por fuente.
+  // Se prefiere al bucle por item porque el planner cachea la funcion STABLE
+  // por (fuente, item_id) y evita N+1 viajes; con ~1 voto por item (109
+  // filas reales en media_votos) es indistinguible de la forma escalar.
   var votosP = conDegradacionMedia(
-    sqlFn('SELECT item_id, COUNT(*)::int AS n FROM media_votos WHERE fuente=$1 AND activo=true AND item_id = ANY($2::text[]) GROUP BY item_id', [fuente, ids]),
+    sqlFn('SELECT x.item_id, e.votos, e.promedio FROM unnest($2::text[]) AS x(item_id) '
+      + 'LEFT JOIN LATERAL public.media_estadisticas($1, x.item_id) e ON true', [fuente, ids]),
     'media_votos', []
   );
   var comP = conDegradacionMedia(
     sqlFn('SELECT item_id, COUNT(*)::int AS n FROM media_comentarios WHERE fuente=$1 AND activo=true AND item_id = ANY($2::text[]) GROUP BY item_id', [fuente, ids]),
     'media_comentarios', []
   );
+  // ya_votado y mi_puntuacion salen del MISMO estado (el voto del usuario):
+  // una sola lectura por fuente en vez de dos.
   var yaVotoP = usuarioId ? conDegradacionMedia(
-    sqlFn('SELECT item_id FROM media_votos WHERE fuente=$1 AND activo=true AND usuario_id=$2 AND item_id = ANY($3::text[])', [fuente, usuarioId, ids]),
+    sqlFn('SELECT item_id, puntuacion FROM media_votos WHERE fuente=$1 AND activo=true AND usuario_id=$2 AND item_id = ANY($3::text[])', [fuente, usuarioId, ids]),
     'media_votos', []
   ) : Promise.resolve([]);
   var yaGuardadoP = usuarioId ? conDegradacionMedia(
@@ -5440,9 +5575,16 @@ function cargarMetricasMedia(sqlFn, usuarioId, fuente, ids) {
     'media_guardados', []
   ) : Promise.resolve([]);
   return Promise.all([votosP, comP, yaVotoP, yaGuardadoP]).then(function(par) {
-    (par[0] || []).forEach(function(r){ out.votos[String(r.item_id)] = parseInt(r.n, 10) || 0; });
+    (par[0] || []).forEach(function(r){
+      out.votos[String(r.item_id)] = parseInt(r.votos, 10) || 0;
+      out.rating_promedio[String(r.item_id)] = parsearPromedioMedia(r.promedio);
+    });
     (par[1] || []).forEach(function(r){ out.comentarios[String(r.item_id)] = parseInt(r.n, 10) || 0; });
-    (par[2] || []).forEach(function(r){ out.ya_votado[String(r.item_id)] = true; });
+    (par[2] || []).forEach(function(r){
+      out.ya_votado[String(r.item_id)] = true;
+      var n = parseInt(r.puntuacion, 10);
+      if (isFinite(n)) out.mi_puntuacion[String(r.item_id)] = n;
+    });
     (par[3] || []).forEach(function(r){ out.ya_guardado[String(r.item_id)] = true; });
     return out;
   });
@@ -5450,15 +5592,22 @@ function cargarMetricasMedia(sqlFn, usuarioId, fuente, ids) {
 
 // Voto de media con el contrato de los alias legacy: valida existencia y
 // self-vote y devuelve un resultado tipificado {status, error, xp, votos}.
+// ADR-089: la calificacion es definitiva -> NO hay 409 de duplicado ni
+// unlike. Los alias legacy (foto_voto/album_voto) no reciben puntuacion del
+// cliente, asi que califican con la NEUTRA explicita 3 declarada aqui (no
+// se apoya en el DEFAULT de la columna, que es un fallo silencioso).
 function registrarVotoMedia(sqlFn, usuarioId, fuente, itemId, noEncontrada) {
   return resolverMediaItem(sqlFn, fuente, itemId).then(function(target) {
     if (!target.ok) return { status: 404, error: noEncontrada || 'Media no encontrada' };
     if (target.autorId && String(target.autorId) === String(usuarioId))
       return { status: 403, error: 'No puedes votar tu propia foto' };
-    return aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, 'like', target).then(function(r) {
+    return aplicarMediaVoto(sqlFn, usuarioId, fuente, itemId, 3, target).then(function(r) {
       if (r.tope) return { status: 429, error: 'Limite de 20 votos por dia alcanzado' };
-      if (r.duplicado) return { status: 409, error: 'Ya votaste esta foto', ya_votado: true };
-      return { status: 200, xp: r.xp, votos: r.votos, ya_votado: true, reactivado: r.reactivado, xp_detalle: r.xp_detalle || undefined };
+      return {
+        status: 200, xp: r.xp, votos: r.votos, ya_votado: true,
+        rating_promedio: r.rating_promedio, mi_puntuacion: r.mi_puntuacion,
+        es_alta: r.es_alta, xp_detalle: r.xp_detalle || undefined
+      };
     });
   });
 }
@@ -5469,7 +5618,12 @@ function completarVotoMedia(sqlFn, usuarioId, r) {
   return repartirXpReferidos(sqlFn, usuarioId, r.xp).then(function() {
     return Promise.all([evaluarMisiones(sqlFn, usuarioId), evaluarLogros(sqlFn, usuarioId)]);
   }).then(function(ml) {
-    return { ok: true, xp: r.xp, votos: r.votos, ya_votado: r.ya_votado, misiones: ml[0], logros: ml[1], xp_detalle: r.xp_detalle || undefined };
+    return {
+      ok: true, xp: r.xp, votos: r.votos, ya_votado: r.ya_votado,
+      // ADR-089: la tripleta viaja en los alias legacy tambien.
+      rating_promedio: r.rating_promedio, mi_puntuacion: r.mi_puntuacion,
+      misiones: ml[0], logros: ml[1], xp_detalle: r.xp_detalle || undefined
+    };
   });
 }
 
@@ -6012,8 +6166,7 @@ module.exports = async function handler(req, res) {
       if (tipo === 'fotos' && destinoId) {
         var fotosRows = await conDegradacionMedia(sql(
           'SELECT f.id, f.texto AS url, f.creado_en, u.nombre AS autor_nombre, '
-          + '(SELECT COUNT(*)::int FROM media_votos mv '
-          + '  WHERE mv.fuente=\'viajero_foto\' AND mv.activo=true AND mv.item_id = f.id::text) AS votos '
+          + sqlEstadisticasItem('\'viajero_foto\'', 'f.id::text', 'votos')
           + 'FROM interacciones f LEFT JOIN usuarios u ON u.id = f.usuario_id '
           + 'WHERE f.destino_id=$1 AND f.tipo=\'foto\' AND f.activo=true '
           + 'AND (f.dims IS NULL OR NOT (f.dims ? \'voto_foto_id\')) '
@@ -6021,15 +6174,24 @@ module.exports = async function handler(req, res) {
           [destinoId]
         ), 'media_votos', []);
         var yaVotoFotos = {};
+        var miPuntoFotos = {};
         if (usuarioId) {
           var misVotosFotos = await conDegradacionMedia(sql(
-            'SELECT item_id AS foto_id FROM media_votos '
+            'SELECT item_id AS foto_id, puntuacion FROM media_votos '
             + 'WHERE usuario_id=$1 AND fuente=\'viajero_foto\' AND activo=true',
             [usuarioId]
           ), 'media_votos', []);
-          misVotosFotos.forEach(function(v){ if (v.foto_id) yaVotoFotos[String(v.foto_id)] = true; });
+          misVotosFotos.forEach(function(v){
+            if (!v.foto_id) return;
+            yaVotoFotos[String(v.foto_id)] = true;
+            var n = parseInt(v.puntuacion, 10);
+            if (isFinite(n)) miPuntoFotos[String(v.foto_id)] = n;
+          });
         }
-        fotosRows.forEach(function(r){ r.ya_votado = !!yaVotoFotos[String(r.id)]; });
+        fotosRows.forEach(function(r){
+          r.ya_votado = !!yaVotoFotos[String(r.id)];
+          r.mi_puntuacion = isFinite(miPuntoFotos[String(r.id)]) ? miPuntoFotos[String(r.id)] : null;
+        });
         return res.status(200).json({ ok: true, data: fotosRows });
       }
 
@@ -6426,8 +6588,7 @@ module.exports = async function handler(req, res) {
         var mpAlbumes = await sql(
           'SELECT a.id, a.titulo, a.tipo, a.portada_url,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id=a.id AND af.activo=true AND af.visible=true) AS total_fotos,'
-          + ' (SELECT COUNT(*)::int FROM album_fotos af2 JOIN media_votos mv ON mv.item_id=af2.id::text'
-          + '   WHERE mv.fuente=\'album_foto\' AND mv.activo=true AND af2.album_id=a.id AND af2.visible=true) AS votos'
+          + sqlEstadisticasAlbum('a.id', 'votos')
           + ' FROM albumes a WHERE a.usuario_id=$1 AND a.activo=true'
           + ' ORDER BY a.creado_en DESC LIMIT 12',
           [mpId]
@@ -6613,13 +6774,14 @@ module.exports = async function handler(req, res) {
         var mrIds = mrRows.map(function(r){ return String(r.id); });
         if (mrIds.length) {
           var mrVotoRows = await conDegradacionMedia(sql(
-            'SELECT item_id, COUNT(*)::int AS n FROM media_votos'
-            + ' WHERE fuente = \'album_foto\' AND activo = true AND item_id = ANY($1::text[])'
-            + ' GROUP BY item_id',
+            'SELECT x.item_id, e.votos, e.promedio FROM unnest($1::text[]) AS x(item_id)'
+            + ' LEFT JOIN LATERAL public.media_estadisticas(\'album_foto\', x.item_id) e ON true',
             [mrIds]
           ), 'media_votos', []);
+          var mrPromedios = {};
           (mrVotoRows || []).forEach(function(v) {
-            mrVotos[String(v.item_id)] = parseInt(v.n, 10) || 0;
+            mrVotos[String(v.item_id)] = parseInt(v.votos, 10) || 0;
+            mrPromedios[String(v.item_id)] = parsearPromedioMedia(v.promedio);
           });
         }
         var mrData = mrRows.map(function(r) {
@@ -6643,6 +6805,7 @@ module.exports = async function handler(req, res) {
             destino_id: r.destino_id || null,
             visible: r.visible === true,
             votos: mrVotos[String(r.id)] || 0,
+            rating_promedio: isFinite(mrPromedios[String(r.id)]) ? mrPromedios[String(r.id)] : null,
             creado_en: r.creado_en,
           };
         });
@@ -6971,7 +7134,7 @@ module.exports = async function handler(req, res) {
         var famaAudiovisual = await conDegradacionMedia(sql(
           'SELECT COALESCE(ROUND(SUM(xp_ganado), 2),0) AS fama, '
           + ' COUNT(*) FILTER (WHERE i.dims->>\'voto_foto_id\' IS NULL)::int AS n_fotos, '
-          + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.usuario_id=$1 AND mv.fuente=\'viajero_foto\' AND mv.activo=true) AS n_votos_foto '
+          + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.usuario_id=$1 AND mv.fuente=\'viajero_foto\' AND mv.activo=true) AS n_votos_foto ' // conteo GLOBAL diagnostico (cuantos votos dio el usuario, no un agregado por item): media_estadisticas es por item y no aplica.
           + ' FROM interacciones i WHERE i.usuario_id=$1 AND i.tipo=\'foto\' AND i.activo=true',
           [usuarioId]
         ), 'media_votos', []);
@@ -7109,9 +7272,7 @@ module.exports = async function handler(req, res) {
           + ' a.lat, a.lng, a.ciudad, a.region, a.portada_url, a.es_top,'
           + ' a.creado_en, u.nombre AS autor_nombre,'
           + ' (SELECT COUNT(*)::int FROM album_fotos af WHERE af.album_id = a.id AND af.activo=true AND af.visible=true) AS fotos_count,'
-          + ' (SELECT COUNT(*)::int FROM album_fotos af2'
-          + '  JOIN media_votos mv ON mv.item_id = af2.id::text'
-          + '  WHERE mv.fuente = \'album_foto\' AND mv.activo = true AND af2.album_id = a.id AND af2.visible=true) AS votos_count'
+          + sqlEstadisticasAlbum('a.id', 'votos_count')
           + ' FROM albumes a'
           + ' LEFT JOIN usuarios u ON u.id = a.usuario_id'
           + albumWhere
@@ -7152,7 +7313,7 @@ module.exports = async function handler(req, res) {
           'SELECT af.id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title, af.media_source,'
           + ' af.autor_original_id, af.agregador_id, af.creado_en,'
           + ' u.nombre AS autor_nombre, __FOTO_URL__ AS autor_avatar, u.id AS usuario_id,'
-          + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
+          + sqlEstadisticasItem('\'album_foto\'', 'af.id::text', 'votos')
           + ' FROM album_fotos af'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
           + ' WHERE af.album_id = $1 AND af.activo = true AND af.visible = true'
@@ -7179,10 +7340,15 @@ module.exports = async function handler(req, res) {
         var yaGuardadoAlbum = {};
         if (usuarioId) {
           var misVotosAlbum = await conDegradacionMedia(sql(
-            'SELECT item_id AS foto_id FROM media_votos WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
+            'SELECT item_id AS foto_id, puntuacion FROM media_votos WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
             [usuarioId]
           ), 'media_votos', []);
-          misVotosAlbum.forEach(function(v){ yaVotoAlbum[String(v.foto_id)] = true; });
+          var miPuntoAlbum = {};
+          misVotosAlbum.forEach(function(v){
+            yaVotoAlbum[String(v.foto_id)] = true;
+            var pn = parseInt(v.puntuacion, 10);
+            if (isFinite(pn)) miPuntoAlbum[String(v.foto_id)] = pn;
+          });
 
           var misGuardadosAlbum = await conDegradacionMedia(sql(
             'SELECT item_id AS foto_id FROM media_guardados WHERE usuario_id=$1 AND fuente=\'album_foto\' AND activo=true',
@@ -7192,6 +7358,7 @@ module.exports = async function handler(req, res) {
         }
         fotosDetRows.forEach(function(r){
           r.ya_votado = !!yaVotoAlbum[String(r.id)];
+          r.mi_puntuacion = isFinite(miPuntoAlbum[String(r.id)]) ? miPuntoAlbum[String(r.id)] : null;
           r.ya_guardado = !!yaGuardadoAlbum[String(r.id)];
           r.es_propia = !!(usuarioId && r.autor_original_id
             && String(r.autor_original_id) === String(usuarioId));
@@ -7230,7 +7397,7 @@ module.exports = async function handler(req, res) {
           'SELECT sub.* FROM ('
           + ' SELECT mg.item_id::text AS id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title,'
           + '  af.creado_en, COALESCE(u.nombre, \'\') AS autor_nombre,'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = mg.item_id AND mv.activo = true) AS votos,'
+          + sqlEstadisticasItem('\'album_foto\'', 'mg.item_id', 'votos') + ','
           + '  \'album_foto\' AS origen_fuente, mg.visible'
           + ' FROM media_guardados mg'
           + ' JOIN album_fotos af ON af.id::text = mg.item_id'
@@ -7241,7 +7408,7 @@ module.exports = async function handler(req, res) {
           + ' UNION ALL'
           + ' SELECT mg.item_id::text, i.texto, NULL::text, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  i.creado_en, COALESCE(u.nombre, \'\'),'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'viajero_foto\' AND mv.item_id = mg.item_id AND mv.activo = true),'
+          + sqlEstadisticasItem('\'viajero_foto\'', 'mg.item_id', 'votos') + ','
           + '  \'viajero_foto\', mg.visible'
           + ' FROM media_guardados mg'
           + ' JOIN interacciones i ON i.id::text = mg.item_id'
@@ -7251,7 +7418,7 @@ module.exports = async function handler(req, res) {
           + ' UNION ALL'
           + ' SELECT mg.item_id::text, df.url, NULL::text, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  df.creado_en, \'\' AS autor_nombre,'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'curada\' AND mv.item_id = mg.item_id AND mv.activo = true),'
+          + sqlEstadisticasItem('\'curada\'', 'mg.item_id', 'votos') + ','
           + '  \'curada\', mg.visible'
           + ' FROM media_guardados mg'
           + ' JOIN destinos_fotos df ON df.id::text = mg.item_id'
@@ -7348,6 +7515,8 @@ module.exports = async function handler(req, res) {
         gdFotos.forEach(function(f) {
           var k = String(f.id);
           f.votos = gdMetCuradaRows.votos[k] || 0;
+          f.rating_promedio = isFinite(gdMetCuradaRows.rating_promedio[k]) ? gdMetCuradaRows.rating_promedio[k] : null;
+          f.mi_puntuacion = isFinite(gdMetCuradaRows.mi_puntuacion[k]) ? gdMetCuradaRows.mi_puntuacion[k] : null;
           f.comentarios = gdMetCuradaRows.comentarios[k] || 0;
           f.ya_votado = !!gdMetCuradaRows.ya_votado[k];
           f.ya_guardado = !!gdMetCuradaRows.ya_guardado[k];
@@ -7380,7 +7549,7 @@ module.exports = async function handler(req, res) {
           + ' a.id AS album_id, a.titulo AS album_titulo, a.ciudad,'
           + ' u.nombre AS autor_nombre, u.id AS autor_id,'
           + ' __FOTO_URL__ AS autor_avatar,'
-          + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
+          + sqlEstadisticasItem('\'album_foto\'', 'af.id::text', 'votos')
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id';
@@ -7437,8 +7606,7 @@ module.exports = async function handler(req, res) {
               sql,
               'SELECT f.id, f.texto AS url, f.usuario_id AS autor_id, f.creado_en,'
               + ' u.nombre AS autor_nombre, __FOTO_URL__ AS autor_avatar,'
-              + ' (SELECT COUNT(*)::int FROM media_votos mv'
-              + '  WHERE mv.fuente=\'viajero_foto\' AND mv.item_id = f.id::text AND mv.activo=true) AS votos'
+              + sqlEstadisticasItem('\'viajero_foto\'', 'f.id::text', 'votos')
               + ' FROM interacciones f LEFT JOIN usuarios u ON u.id = f.usuario_id'
               + ' WHERE f.destino_id=$1 AND f.tipo=\'foto\' AND f.activo=true'
               + ' AND (f.dims IS NULL OR NOT (f.dims ? \'voto_foto_id\'))'
@@ -7463,6 +7631,10 @@ module.exports = async function handler(req, res) {
               var k = String(id);
               return {
                 votos: met.votos[k] || 0,
+                // ADR-089: NULL = sin votos, NUNCA 0. La rama curada (que
+                // entra como objeto plano sin estos mapas) cae a null.
+                rating_promedio: isFinite(met.rating_promedio[k]) ? met.rating_promedio[k] : null,
+                mi_puntuacion: isFinite(met.mi_puntuacion[k]) ? met.mi_puntuacion[k] : null,
                 comentarios: met.comentarios[k] || 0,
                 ya_votado: !!met.ya_votado[k],
                 ya_guardado: !!met.ya_guardado[k],
@@ -7717,7 +7889,7 @@ module.exports = async function handler(req, res) {
           + '  af.autor_original_id::text AS usuario_id, a.id::text AS album_id,'
           + '  \'album\' AS origen, a.id::text AS origen_id, af.id::text AS media_id,'
           + '  \'album_foto\' AS fuente,'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
+          + sqlEstadisticasItem('\'album_foto\'', 'af.id::text', 'votos')
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
@@ -7736,7 +7908,7 @@ module.exports = async function handler(req, res) {
           + '  \'\' AS usuario_nombre, \'\' AS usuario_avatar, NULL::text AS usuario_id, NULL::text AS album_id,'
           + '  \'destino\' AS origen, d.slug AS origen_id, df.id::text AS media_id,'
           + '  \'curada\' AS fuente,'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'curada\' AND mv.item_id = df.id::text AND mv.activo = true) AS votos'
+          + sqlEstadisticasItem('\'curada\'', 'df.id::text', 'votos')
           + ' FROM destinos_fotos df'
           + ' JOIN destinos d ON d.id = df.destino_id'
           + ' WHERE d.lat IS NOT NULL AND d.lng IS NOT NULL AND d.status = \'published\''
@@ -7881,8 +8053,7 @@ module.exports = async function handler(req, res) {
         if (mmDestinoId) {
           mmFotosOficiales = await conDegradacionMedia(sql(
             'SELECT df.id, df.url, df.caption, df.orden,'
-            + ' (SELECT COUNT(*)::int FROM media_votos mv'
-            + '   WHERE mv.fuente = \'curada\' AND mv.item_id = df.id::text AND mv.activo = true) AS votos'
+            + sqlEstadisticasItem('\'curada\'', 'df.id::text', 'votos')
             + ' FROM destinos_fotos df'
             + ' WHERE df.destino_id = $1::uuid'
             + ' ORDER BY votos DESC, df.es_hero DESC NULLS LAST, df.orden ASC NULLS LAST'
@@ -7919,11 +8090,14 @@ module.exports = async function handler(req, res) {
           'SELECT af.id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title, af.media_source,'
           + ' a.titulo AS album_titulo, a.ciudad, a.id AS album_id,'
           + ' u.nombre AS autor_nombre, af.autor_original_id AS autor_id,'
-          + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos,'
+          + sqlEstadisticasItem('\'album_foto\'', 'af.id::text', 'votos') + ','
           + (feedUid
               ? ' COALESCE(af.autor_original_id = $3::uuid, false) AS es_propia,'
                 + ' EXISTS(SELECT 1 FROM media_votos mv2 WHERE mv2.fuente = \'album_foto\' AND mv2.item_id = af.id::text AND mv2.usuario_id = $3::uuid AND mv2.activo = true) AS ya_votado,'
-              : ' false AS es_propia, false AS ya_votado,')
+                // mi_puntuacion sale del MISMO EXISTS: la nota que el usuario
+                // dejo, no un parametro del cliente.
+                + ' (SELECT mvp.puntuacion FROM media_votos mvp WHERE mvp.fuente = \'album_foto\' AND mvp.item_id = af.id::text AND mvp.usuario_id = $3::uuid AND mvp.activo = true LIMIT 1) AS mi_puntuacion,'
+              : ' false AS es_propia, false AS ya_votado, NULL::int AS mi_puntuacion,')
           + ' af.creado_en'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
@@ -7972,26 +8146,53 @@ module.exports = async function handler(req, res) {
         // ALL de 2 ramas: el nombre de columna lo pone la primera (la de
         // album_fotos) y la segunda, que son fotos de viajero sin columna de
         // miniatura, aporta NULL::text en la misma posicion.
+        // autor_id y es_propia (ADR-089, cierre de entrega): las dos ramas
+        // proyectan el autor REAL y la comparacion contra el usuario
+        // solicitado. album_fotos usa COALESCE(af.autor_original_id,
+        // af.agregador_id), que es la MISMA columna que resolverMediaItem
+        // (linea 2810) y que reconstruye media_rep_autores, de modo que
+        // es_propia coincide con el 403 de registrarVotoMedia; el COALESCE
+        // cubre tambien la foto sin autor_original_id (subida al album
+        // propio), donde el propietario es el agregador. La segunda rama
+        // proyecta i.usuario_id, que ya es el filtro de esa rama.
+        // Se anaden AL FINAL de cada SELECT: el ORDER BY y el LIMIT 200
+        // viven fuera del sub, luego el orden de las columnas existentes no
+        // se toca.
         var mfRows = await conDegradacionMedia(queryConMiniaturaFallback(sql,
           'SELECT sub.* FROM ('
           + ' SELECT af.id::text AS id, af.foto_url, __MINIATURA__, af.foto_type, af.media_title,'
           + '  a.id::text AS album_id, a.titulo AS album_titulo, a.ciudad AS ciudad,'
           + '  \'album_foto\' AS fuente, NULL::text AS destino_slug, NULL::text AS destino_nombre,'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos,'
-          + '  af.creado_en'
+          + sqlEstadisticasItem('\'album_foto\'', 'af.id::text', 'votos') + ','
+          + '  af.creado_en,'
+          + '  COALESCE(af.autor_original_id, af.agregador_id) AS autor_id,'
+          + '  COALESCE(af.autor_original_id, af.agregador_id) = $1::uuid AS es_propia'
           + ' FROM album_fotos af JOIN albumes a ON a.id = af.album_id'
           + ' WHERE af.agregador_id = $1::uuid AND af.activo = true AND af.visible = true AND a.activo = true'
           + ' UNION ALL'
           + ' SELECT i.id::text, i.texto, NULL::text, \'foto\' AS foto_type, \'\' AS media_title,'
           + '  NULL::text, NULL::text, d.ciudad,'
           + '  \'viajero_foto\', d.slug, d.nombre,'
-          + '  (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'viajero_foto\' AND mv.item_id = i.id::text AND mv.activo = true), i.creado_en'
+          + sqlEstadisticasItem('\'viajero_foto\'', 'i.id::text', 'votos') + ', i.creado_en,'
+          + '  i.usuario_id, i.usuario_id = $1::uuid'
           + ' FROM interacciones i JOIN destinos d ON d.id = i.destino_id'
           + ' WHERE i.usuario_id = $1::uuid AND i.tipo = \'foto\' AND i.activo = true'
           + '   AND (i.dims IS NULL OR NOT (i.dims ? \'voto_foto_id\'))'
           + ' ) sub ORDER BY sub.creado_en DESC LIMIT 200',
           [mfUsuario]
         ), 'media_votos', []);
+        // NOTA sobre mi_puntuacion: NO se proyecta a proposito, y no es una
+        // falta. usuarioId en este ambito es req.query.usuario_id (linea
+        // 5872), el PERFIL CONSULTADO, no el usuario de sesion: mis_fotos
+        // solo devuelve fotos cuyo autor es ese usuario, y el auto-voto esta
+        // bloqueado con 403, luego el voto propio sobre cualquiera de esas
+        // filas NO puede existir y el campo seria SIEMPRE null. Anadirlo
+        // costaria 2 llamadas a cargarMetricasMedia (una por fuente, porque
+        // el helper toma una sola fuente) para un valor constante null. Para
+        // que fuese util habria que leer el usuario de SESION (verificarSesion
+        // + responderSesion), lo que convierte este lector publico en
+        // autenticado: es un cambio de contrato y una exposicion de dato de
+        // usuario, y por eso se escala al operador en vez de decidirlo aqui.
         return res.status(200).json({ ok: true, data: mfRows });
       }
 
@@ -8070,7 +8271,7 @@ module.exports = async function handler(req, res) {
         var ftRows = await conDegradacionMedia(sql(
           'SELECT af.id, af.foto_url, af.foto_type, af.media_title,'
           + ' u.nombre AS autor_nombre, a.titulo AS album_titulo,'
-          + ' (SELECT COUNT(*)::int FROM media_votos mv WHERE mv.fuente = \'album_foto\' AND mv.item_id = af.id::text AND mv.activo = true) AS votos'
+          + sqlEstadisticasItem('\'album_foto\'', 'af.id::text', 'votos')
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = af.autor_original_id'
@@ -8144,12 +8345,17 @@ module.exports = async function handler(req, res) {
         var miCont = await contarMedia(sql, miFuente, miItem);
         var miYaVotado = false;
         var miYaGuardado = false;
+        var miPuntuacion = null;
         if (usuarioId) {
           var miVoto = await conDegradacionMedia(
-            sql('SELECT 1 AS uno FROM media_votos WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3 AND activo=true LIMIT 1', [usuarioId, miFuente, miItem]),
+            sql('SELECT puntuacion FROM media_votos WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3 AND activo=true LIMIT 1', [usuarioId, miFuente, miItem]),
             'media_votos', []
           );
           miYaVotado = miVoto.length > 0;
+          if (miYaVotado) {
+            var mp = parseInt(miVoto[0].puntuacion, 10);
+            if (isFinite(mp)) miPuntuacion = mp;
+          }
           var miGuard = await conDegradacionMedia(
             sql('SELECT 1 AS uno FROM media_guardados WHERE usuario_id=$1 AND fuente=$2 AND item_id=$3 AND activo=true LIMIT 1', [usuarioId, miFuente, miItem]),
             'media_guardados', []
@@ -8159,6 +8365,8 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           ok: true, fuente: miFuente, item_id: miItem,
           votos: miCont.votos, comentarios: miCont.comentarios,
+          // ADR-089: tripleta completa. NULL = sin votos / sin nota.
+          rating_promedio: miCont.rating_promedio, mi_puntuacion: miPuntuacion,
           ya_votado: miYaVotado, ya_guardado: miYaGuardado,
         });
       }
@@ -11273,10 +11481,13 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(await completarVotoMedia(sql, usuarioId2, avRes));
       }
 
-      // Voto unificado de media (ADR-036 B): {usuario_id, fuente, item_id,
-      // accion: 'like'|'unlike'}. Fuentes curada/viajero_foto/album_foto.
-      // +5 XP la primera vez; reaparecer tras unlike NO re-paga XP; tope
-      // unificado de 20 votos/24h.
+      // Calificacion unificada de media (ADR-036 B + ADR-089): {usuario_id,
+      // fuente, item_id, puntuacion}. Fuentes curada/viajero_foto/album_foto.
+      // +5 XP SOLO en el alta (primer voto o reactivacion); cambiar la nota
+      // despues actualiza sin XP. Tope unificado de 20 ALTAS/24h.
+      // CONTRATO ROTO (migra a frontend): el campo accion desaparece (ya no
+      // hay unlike) y puntuacion es OBLIGATORIA e entera 1-5. El DEFAULT 3 de
+      // la columna no se usa como red: si el cliente no la manda, 400.
       if (tipo2 === 'media_voto') {
         if (!usuarioId2)
           return res.status(400).json({ ok: false, error: 'usuario_id requerido' });
@@ -11286,32 +11497,40 @@ module.exports = async function handler(req, res) {
         if (!mvSesion.ok) return responderSesion(res, mvSesion.razon);
         var mvFuente = String(body.fuente || '').toLowerCase();
         var mvItem = String(body.item_id || '').trim();
-        var mvAccion = String(body.accion || 'like').toLowerCase();
         if (!mediaFuenteValida(mvFuente))
           return res.status(400).json({ ok: false, error: 'fuente invalida (curada|viajero_foto|album_foto)' });
         if (!MEDIA_ITEM_RE.test(mvItem))
           return res.status(400).json({ ok: false, error: 'item_id invalido' });
-        if (mvAccion !== 'like' && mvAccion !== 'unlike')
-          return res.status(400).json({ ok: false, error: 'accion debe ser like o unlike' });
+        // ADR-089: puntuacion se VALIDA (no se hereda el DEFAULT 3, que es
+        // un fallo silencioso: votaria 3 y pareceria que funciona).
+        var mvPunto = parsePuntuacionMedia(body.puntuacion);
+        if (mvPunto === null)
+          return res.status(400).json({ ok: false, error: 'puntuacion invalida (entero 1-5)' });
 
         var mvTarget = await resolverMediaItem(sql, mvFuente, mvItem);
         if (!mvTarget.ok)
           return res.status(404).json({ ok: false, error: 'Media no encontrada' });
-        if (mvAccion === 'like' && mvTarget.autorId && String(mvTarget.autorId) === String(usuarioId2))
-          return res.status(403).json({ ok: false, error: 'No puedes votar tu propia foto' });
+        // Auto-calificacion bloqueada (fraude de reputacion): la calificacion
+        // no es un like, pero el autor no se califica a si mismo.
+        if (mvTarget.autorId && String(mvTarget.autorId) === String(usuarioId2))
+          return res.status(403).json({ ok: false, error: 'No puedes calificar tu propia foto' });
 
-        var mvRes = await aplicarMediaVoto(sql, usuarioId2, mvFuente, mvItem, mvAccion, mvTarget);
+        var mvRes = await aplicarMediaVoto(sql, usuarioId2, mvFuente, mvItem, mvPunto, mvTarget);
         if (mvRes.tope)
           return res.status(429).json({ ok: false, error: 'Limite de 20 votos por dia alcanzado' });
-        if (mvAccion === 'like' && mvRes.duplicado)
-          return res.status(409).json({ ok: false, error: 'Ya votaste esta media', ya_votado: true });
 
         var mvMisiones = await evaluarMisiones(sql, usuarioId2);
         var mvLogros = await evaluarLogros(sql, usuarioId2);
         if (mvRes.xp > 0) await repartirXpReferidos(sql, usuarioId2, mvRes.xp);
         return res.status(200).json({
-          ok: true, xp: mvRes.xp, votos: mvRes.votos,
-          ya_votado: mvAccion === 'like', reactivado: mvRes.reactivado || undefined,
+          ok: true, xp: mvRes.xp,
+          votos: mvRes.votos, total_votos: mvRes.votos,
+          // NULL = sin votos todavia; NUNCA se sustituye por 0.
+          rating_promedio: mvRes.rating_promedio,
+          promedio: mvRes.rating_promedio,
+          mi_puntuacion: mvRes.mi_puntuacion,
+          // La calificacion es definitiva: siempre hay voto tras responder.
+          ya_votado: true, es_alta: mvRes.es_alta,
           xp_detalle: mvRes.xp_detalle || undefined,
           misiones: mvMisiones, logros: mvLogros,
         });

@@ -136,6 +136,87 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .g-album-photo .g-media{min-height:0}
 .g-album-photo-body{padding:12px 14px}
 @media (max-width:600px){.g-modal{padding:8px}.g-modal-body{padding:12px}}
+/* ===== SILO MEDIA-ACTIONS: widget de 5 estrellas (media-actions.js) =====
+   Selector padre UNICO: [data-ma-voto], el contenedor que el JS ya marca y que
+   esta pagina ya emite. Todo cuelga de ahi: cero reglas sueltas, cero
+   escrituras en :root, cero clases de la pagina tocadas.
+   Los glifos (relleno/contorno) los pone el JS: aqui van color, tamano y estado.
+   Fondo NO supuesto: el glifo apagado hereda currentColor y el encendido usa el
+   --gold que la pagina ya declara, asi se lee igual sobre claro y sobre oscuro.
+   Estados distinguibles SIN depender solo del color: is-on crece (scale 1.14) y
+   lleva halo; is-preview se ve mas chico (scale .86) y mas tenue; is-empty baja
+   el alfa de todo el grupo. */
+[data-ma-voto]{
+  /* RESET DE SILO */
+  box-sizing:border-box;position:static;display:inline-flex;align-items:center;
+  gap:6px;flex-wrap:wrap;max-width:100%;margin:0;font:inherit;color:inherit;
+  cursor:default;-webkit-tap-highlight-color:transparent;
+  transition:opacity .15s ease,box-shadow .15s ease;
+}
+[data-ma-voto] span{box-sizing:border-box;margin:0;padding:0}
+/* el contenedor es el alvo (role=group / radiogroup): puntero, no las estrellas */
+[data-ma-voto].ma-calificable{cursor:pointer}
+[data-ma-voto] .ma-estrellas,[data-ma-voto] [data-ma-estrellas]{
+  display:inline-flex;align-items:center;gap:1px;flex:0 0 auto;max-width:100%;
+  letter-spacing:0;
+}
+[data-ma-voto] .ma-estrella,[data-ma-voto] [data-ma-estrella]{
+  display:inline-block;flex:0 0 auto;font-size:12px;line-height:1;
+  color:inherit;opacity:.34;cursor:default;user-select:none;
+  -webkit-user-select:none;transform-origin:50% 62%;
+  transition:transform .12s ease,opacity .12s ease,color .12s ease;
+}
+/* preview (hover o flechas): mas chico y mas tenue que la nota real */
+[data-ma-voto] .ma-estrella.is-preview{opacity:.6;transform:scale(.86)}
+/* nota real del usuario: gana siempre al preview (mismo peso, va despues) */
+[data-ma-voto] .ma-estrella.is-on{
+  color:var(--gold,#FF4A00);opacity:1;transform:scale(1.14);
+  text-shadow:0 0 6px rgba(255,74,0,.4);
+}
+/* vacio / sin nota puesta: nada encendido y el grupo entero mas apagado */
+[data-ma-voto] .ma-estrellas.is-empty{opacity:.62}
+[data-ma-voto] .ma-estrellas.is-empty .ma-estrella{opacity:.2;transform:scale(.9)}
+/* foco de contenedor: solo con puntero fino (en tactil :hover se queda pegado) */
+@media (hover:hover){
+  [data-ma-voto] .ma-estrellas.is-hover{box-shadow:inset 0 -2px 0 -1px rgba(255,74,0,.55)}
+  [data-ma-voto]:hover .ma-estrellas.is-empty .ma-estrella{opacity:.34}
+}
+@media (hover:none){[data-ma-voto] .ma-estrellas.is-hover{box-shadow:none}}
+/* foco visible de teclado: anillo de acento + halo, legible en claro y oscuro */
+[data-ma-voto] .ma-estrella:focus{outline:none}
+[data-ma-voto] .ma-estrella:focus-visible{
+  outline:2px solid var(--gold,#FF4A00);outline-offset:2px;border-radius:3px;
+  background:rgba(255,74,0,.14);
+}
+/* peticion en vuelo */
+[data-ma-voto].is-busy{opacity:.55;cursor:progress}
+[data-ma-voto].is-busy .ma-estrella{animation:maPulse .9s ease-in-out infinite}
+@keyframes maPulse{0%,100%{opacity:.3}50%{opacity:.85}}
+/* el usuario ya califico: anillo interior, no toca el layout ni el boton vecino */
+[data-ma-voto].ma-valorado{box-shadow:inset 0 0 0 1px rgba(255,74,0,.32)}
+/* media propia: no calificable (aria-disabled lo pone el JS) */
+[data-ma-voto] .ma-estrellas[aria-disabled="true"],[data-ma-voto] .ma-estrella[aria-disabled="true"]{opacity:.35;cursor:not-allowed}
+/* texto de rating: "sin valorar" o el promedio con 1 decimal (nunca 0) */
+[data-ma-voto] .ma-rating-texto,[data-ma-voto] [data-ma-rating-texto]{
+  font-size:11px;line-height:1.2;font-weight:600;text-transform:none;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:inherit;opacity:.75;
+}
+[data-ma-voto] .ma-rating-texto[data-sin-votos="1"]{
+  font-weight:400;font-style:italic;opacity:.5;letter-spacing:.2px;
+}
+/* contador de evaluaciones: secundario, no compite con las estrellas.
+   Se engancha al ATRIBUTO porque la vista aporta su propio [data-ma-count]
+   sin clase y el JS lo reutiliza tal cual (no lo reemplaza). */
+[data-ma-voto] [data-ma-count],[data-ma-voto] .ma-votos-num{
+  font-size:9px;line-height:1;font-weight:700;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:inherit;opacity:.6;
+  padding:2px 6px;border-radius:20px;
+  background:rgba(127,127,127,.16);border:1px solid rgba(127,127,127,.3);
+}
+@media (prefers-reduced-motion:reduce){
+  [data-ma-voto],[data-ma-voto] .ma-estrella{transition:none;animation:none}
+  [data-ma-voto].is-busy .ma-estrella{opacity:.55}
+}
 </style>
 
 <link rel="icon" href="/assets/brand/favicon/favicon.ico">
@@ -473,10 +554,35 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       + (f.album_titulo ? ' \u00b7 ' + esc(f.album_titulo) : '')
       + (f.ciudad ? ' \u00b7 ' + esc(f.ciudad) : '') + '</div>'
       + '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(f.votos, 10) || 0) + '</span>'
+      + '<span class="g-stat">' + esc(gRatingTexto(f)) + '</span>'
       + '<span class="g-stat">' + (parseInt(f.comentarios, 10) || 0) + ' comentarios</span></div>'
       + '</div>';
     card.addEventListener('click', function () { gOpenMedia(f.id, f); });
     return card;
+  }
+
+  /* ---- rating de 5 estrellas: la vista solo pasa datos -----------------
+     MediaActions.sync() construye el DOM del widget (estrellas, glifos y
+     clases de estado) leyendo estos data-ma-*: aqui no se pinta nada.
+     rating_promedio null / 0 / ausente => data-ma-rating="" y el JS escribe
+     "sin valorar". Prohibido emitir 0 o 0.0 como rating. */
+  function gRatingNum(f) {
+    var r = parseFloat(f && f.rating_promedio);
+    return (isFinite(r) && r > 0) ? (Math.round(r * 10) / 10) : null;
+  }
+
+  function gRatingAttrs(f) {
+    var r = gRatingNum(f);
+    var h = ' data-ma-rating="' + (r === null ? '' : String(r)) + '"';
+    var p = parseInt(f && f.mi_puntuacion, 10);
+    if (isFinite(p) && p >= 1 && p <= 5) { h += ' data-ma-puntuacion="' + p + '"'; }
+    return h;
+  }
+
+  /* texto legible para las lineas de stats (la tarjeta no es contenedor) */
+  function gRatingTexto(f) {
+    var r = gRatingNum(f);
+    return r === null ? 'sin valorar' : String(r);
   }
 
   function gItemToFoto(it) {
@@ -492,6 +598,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       ciudad: '',
       votos: it.votos,
       comentarios: it.comentarios,
+      rating_promedio: it.rating_promedio,
+      mi_puntuacion: it.mi_puntuacion,
       fuente: it.fuente || (it.origen === 'curada' ? 'curada' : 'album_foto'),
       id_origen: it.id_origen,
       ya_votado: it.ya_votado,
@@ -512,6 +620,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       + '<div class="g-card-meta">' + esc(meta) + (it.album_titulo ? ' \u00b7 ' + esc(it.album_titulo) : '') + '</div>';
     if (votable) {
       html += '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(it.votos, 10) || 0) + '</span>'
+        + '<span class="g-stat">' + esc(gRatingTexto(it)) + '</span>'
         + '<span class="g-stat">' + (parseInt(it.comentarios, 10) || 0) + ' comentarios</span>'
         + (it.es_propia ? '<span class="g-stat">Tu foto</span>' : '') + '</div>';
     }
@@ -532,6 +641,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       out.push({
         origen: 'curada', id_origen: f.id, fuente: 'curada', tipo_voto: 'media', url: f.url,
         caption: f.caption || '', votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
+        rating_promedio: f.rating_promedio, mi_puntuacion: f.mi_puntuacion,
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: false,
         autor_id: null, autor_nombre: null, album_id: null, album_titulo: null,
         foto_type: 'foto',
@@ -544,6 +654,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         url: f.foto_url || f.url,
         caption: f.media_title || f.caption || '',
         votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
+        rating_promedio: f.rating_promedio, mi_puntuacion: f.mi_puntuacion,
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: !!f.es_propia,
         autor_id: f.autor_id || null, autor_nombre: f.autor_nombre || null,
         album_id: null, album_titulo: null,
@@ -555,6 +666,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       out.push({
         origen: 'album', id_origen: f.id, fuente: 'album_foto', tipo_voto: 'media', url: f.foto_url,
         caption: f.media_title || '', votos: parseInt(f.votos, 10) || 0, comentarios: parseInt(f.comentarios, 10) || 0,
+        rating_promedio: f.rating_promedio, mi_puntuacion: f.mi_puntuacion,
         ya_votado: !!f.ya_votado, ya_guardado: false, es_propia: !!f.es_propia,
         autor_id: f.autor_id || null, autor_nombre: f.autor_nombre || null,
         album_id: f.album_id || null, album_titulo: f.album_titulo || null,
@@ -576,7 +688,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
         a = {
           id: it.album_id, titulo: it.album_titulo || 'Album',
           autor_nombre: it.autor_nombre || null, ciudad: '',
-          portada_url: it.url || '', votos_count: 0, fotos_count: 0, _top: -1
+          portada_url: it.url || '', votos_count: 0, fotos_count: 0, _top: -1,
+          rating_promedio: null, _rp_suma: 0, _rp_pesos: 0
         };
         mapa[key] = a;
         orden.push(a);
@@ -584,6 +697,14 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       var v = parseInt(it.votos, 10) || 0;
       a.fotos_count += 1;
       a.votos_count += v;
+      /* promedio del album = media PONDERADA por votos de sus fotos, para que
+         sea comparable con el rating_promedio de cada media. Sin votos: null. */
+      var rp = gRatingNum(it);
+      if (rp !== null && v > 0) {
+        a._rp_suma += rp * v;
+        a._rp_pesos += v;
+        a.rating_promedio = Math.round((a._rp_suma / a._rp_pesos) * 10) / 10;
+      }
       if (v > a._top) { a._top = v; a.portada_url = it.url || a.portada_url; }
     });
     return orden;
@@ -622,7 +743,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       + '<div class="g-album-body">'
       + '<div class="g-album-title">' + esc(a.titulo || 'Album') + '</div>'
       + '<div class="g-album-meta">' + esc(a.autor_nombre || 'Viajero') + (a.ciudad ? ' \u00b7 ' + esc(a.ciudad) : '') + '</div>'
-      + '<div class="g-album-stats">\u2B50 ' + (parseInt(a.votos_count, 10) || 0) + ' votos \u00b7 ' + (parseInt(a.fotos_count, 10) || 0) + ' fotos</div>'
+      + '<div class="g-album-stats">\u2B50 ' + (parseInt(a.votos_count, 10) || 0) + ' votos \u00b7 ' + (parseInt(a.fotos_count, 10) || 0) + ' fotos'
+      + ' \u00b7 ' + esc(gRatingTexto(a)) + '</div>'
       + '</div>';
     card.addEventListener('click', function () { gOpenAlbum(a.id); });
     return card;
@@ -632,14 +754,18 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
     var st = G.media || {};
     var h = '<div class="g-detail-actions">';
     if (st.votoItem) {
-      h += '<button type="button" class="g-act' + (st.ya_votado ? ' on' : '') + '" id="g-act-vote"'
-        + ' data-ma-voto data-ma-fuente="' + esc(st.votoFuente || 'album_foto') + '"'
+      /* El contenedor del voto es un div, no un button: el widget mete dentro
+       un radiogroup con tabindex y dentro de un button los hijos no serian
+       focables. sync() le pone role="group"; aqui no se pinta aria-pressed.
+       El estado "valorado" lo aporta la clase .ma-valorado del silo, no .g-act.on. */
+      h += '<div class="g-act" id="g-act-vote" data-ma-voto'
+        + ' data-ma-fuente="' + esc(st.votoFuente || 'album_foto') + '"'
         + ' data-ma-item="' + esc(String(st.votoItem)) + '"'
         + ' data-ma-votos="' + (parseInt(st.votos, 10) || 0) + '"'
         + ' data-ma-ya-votado="' + (st.ya_votado ? '1' : '0') + '"'
         + ' data-ma-es-propia="' + (st.es_propia ? '1' : '0') + '"'
-        + (st.es_propia ? ' disabled' : '')
-        + '>\u2B50 <span id="g-act-vote-n" data-ma-count>' + (parseInt(st.votos, 10) || 0) + '</span></button>';
+        + gRatingAttrs(st)
+        + '><span class="ma-votos-num" id="g-act-vote-n" data-ma-count>' + (parseInt(st.votos, 10) || 0) + '</span></div>';
     }
     if (!(st.saveFuente === 'album' && st.es_propio_album)) {
       h += '<button type="button" class="g-act' + (st.ya_guardado ? ' on' : '') + '" id="g-act-save"'
@@ -698,6 +824,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
       saveFuente: fuente, saveItem: itemId,
       shareFuente: fuente, shareItem: itemId,
       votos: parseInt(f.votos, 10) || 0,
+      rating_promedio: f.rating_promedio,
+      mi_puntuacion: f.mi_puntuacion,
       ya_votado: !!f.ya_votado, ya_guardado: !!f.ya_guardado,
       es_propia: !!f.es_propia,
       caption: f.media_title || ''
@@ -742,6 +870,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
           saveFuente: 'album', saveItem: String(albumId),
           shareFuente: 'album_foto', shareItem: portada ? String(portada.id) : '',
           votos: portada ? (parseInt(portada.votos, 10) || 0) : 0,
+          rating_promedio: portada ? portada.rating_promedio : null,
+          mi_puntuacion: portada ? portada.mi_puntuacion : null,
           ya_votado: portada ? !!portada.ya_votado : false,
           ya_guardado: !!album.ya_guardado_album,
           es_propia: false,
@@ -767,6 +897,15 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
               + '<div class="g-card-meta">' + esc(f.autor_nombre || 'Viajero') + '</div>'
               + '<div class="g-card-stats"><span class="g-stat">\u2B50 ' + (parseInt(f.votos, 10) || 0) + '</span>'
               + '<span class="g-stat">' + (parseInt(f.comentarios, 10) || 0) + ' comentarios</span></div>'
+              /* cada foto del album es calificable; fuente album_foto (unica
+                 valida para fotos de album en el CHECK de la BD). El widget lo
+                 pinta MediaActions.sync() desde el bind delegado del modal. */
+              + '<div class="g-act" data-ma-voto data-ma-fuente="album_foto"'
+              + ' data-ma-item="' + esc(String(f.id)) + '"'
+              + ' data-ma-votos="' + (parseInt(f.votos, 10) || 0) + '"'
+              + ' data-ma-es-propia="' + (f.es_propia ? '1' : '0') + '"'
+              + gRatingAttrs(f)
+              + '><span class="ma-votos-num" data-ma-count>' + (parseInt(f.votos, 10) || 0) + '</span></div>'
               + '<div class="g-comments" id="g-ac-' + esc(f.id) + '"></div>'
               + '</div></div>';
           });

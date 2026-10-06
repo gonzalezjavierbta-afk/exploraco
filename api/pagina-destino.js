@@ -102,6 +102,30 @@ function safeArr(v) {
   return Array.isArray(r) ? r : [];
 }
 
+// ADR-089 (migracion 051): calificacion de 1 a 5 estrellas de las medias.
+// FUENTE UNICA del promedio = public.media_estadisticas(fuente, item_id):
+// es STABLE, filtra activo = true POR SI MISMA (repetirlo aqui sesgaria el
+// promedio) y es la UNICA que redondea a 1 decimal (esta capa no redondea).
+// promedio llega como STRING (numeric) y es NULL cuando no hay votos:
+// NULL = SIN VOTOS y NUNCA se pinta como 0 (un rating de 0 no existe).
+// Fuentes admitidas: solo las 3 del CHECK de la BD.
+var MEDIA_FUENTES = { curada:1, viajero_foto:1, album_foto:1 };
+// LEFT JOIN LATERAL a la funcion STABLE: la tripleta expuesta son las columnas
+// e.votos (contador, escala) y e.promedio (rating_promedio, calidad). El alias
+// de votos que cada consulta ya exponia NO se renombra.
+function mediaEstadJoin(fuente, exprItemId) {
+  return " LEFT JOIN LATERAL public.media_estadisticas('" + fuente + "', " + exprItemId + ") e ON true";
+}
+function parseMediaPromedio(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  // CHECK 1..5: el promedio nunca es <= 0. Se rechaza igual (mismo criterio
+  // que media-actions.js promedio() y galeria.html gRatingNum) para que un 0
+  // jamas llegue al DOM, ni como numero ni como atributo vacio.
+  if (!isFinite(n) || n <= 0) return null;
+  return n;
+}
+
 // Limpiar emojis de un string para uso seguro en JS del servidor
 function money(n) {
   if (!n) return '';
@@ -768,11 +792,15 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // tanto al hero (top por fuente) como a la galeria (merge global).
   function comUrl(x) { return (x && x.url) ? String(x.url).trim() : ''; }
   function comVotos(x) { var v = parseInt(x && x.votos, 10); return isNaN(v) ? 0 : v; }
+  // rating_promedio viaja con el item. NULL = SIN VOTOS (no es 0): se
+  // conserva como null y solo se pinta si hay numero (ver fmtMediaRating).
+  function comRating(x) { return parseMediaPromedio(x && x.rating_promedio); }
   function ordenaComunidad(arr) {
     return (arr || []).map(function(x){
       return {
         url: comUrl(x),
         votos: comVotos(x),
+        rating: comRating(x),
         // foto_type/ media_type: el hero solo promueve FOTOS (nunca un
         // video/audio con votos) a imagen principal.
         tipo: String((x && (x.foto_type || x.media_type)) || 'foto')
@@ -792,25 +820,28 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // de dedupe y luego la comunidad; orden final votos DESC (empate: orden
   // de insercion). Evita duplicar la logica entre ambas secciones.
   var mediaVotosPorUrl = {};
+  var mediaRatingPorUrl = {};
   (fotos || []).forEach(function(f){
     var u = (f && f.url) ? String(f.url).trim() : '';
     if (!u || mediaVotosPorUrl[u] !== undefined) return;
     var v = parseInt(f && f.votos, 10);
     mediaVotosPorUrl[u] = isNaN(v) ? 0 : v;
+    mediaRatingPorUrl[u] = comRating(f);
   });
   var mediaRank = [];
   var mediaRankVistos = {};
-  function mediaRankAdd(url, votos, prio, tipo, fuente) {
+  function mediaRankAdd(url, votos, prio, tipo, fuente, rating) {
     var u = String(url || '').trim();
     if (!u || mediaRankVistos[u]) return;
     mediaRankVistos[u] = true;
     mediaRank.push({
       url: u, votos: parseInt(votos, 10) || 0, prio: prio,
+      rating: parseMediaPromedio(rating),
       tipo: tipo || 'foto', fuente: fuente || 'espacio'
     });
   }
-  galAll.forEach(function(u, i){ mediaRankAdd(u, mediaVotosPorUrl[u] || 0, i, 'foto', 'espacio'); });
-  comunidadMerge.forEach(function(x, i){ mediaRankAdd(x.url, x.votos || 0, 1000 + i, x.tipo || 'foto', 'comunidad'); });
+  galAll.forEach(function(u, i){ mediaRankAdd(u, mediaVotosPorUrl[u] || 0, i, 'foto', 'espacio', mediaRatingPorUrl[u]); });
+  comunidadMerge.forEach(function(x, i){ mediaRankAdd(x.url, x.votos || 0, 1000 + i, x.tipo || 'foto', 'comunidad', x.rating); });
   mediaRank.sort(function(a, b){ return (b.votos - a.votos) || (a.prio - b.prio); });
 
   // -- HERO: imagen principal + 3 miniaturas ---------------------------
@@ -870,7 +901,12 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   // el script de la pagina) en vez de la URL cruda, para no inyectar datos
   // en el onclick.
   var heroThumbs = heroThumbsList.map(function(u, i){
-    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')" onclick="irAFotoGaleria(HERO_FOTOS['+(i+1)+'])"></div>';
+    // Mismos atributos de rating que la galeria (mismo item del ranking
+    // unico): el hero no pintaba contador de votos, asi que aqui solo se
+    // anade el dato, sin cambiar el aspecto ni quitar nada.
+    return '<div class="pth" style="background-image:url(\''+esc(u)+'\')"'
+      + mediaRatingAttrs(mediaRankByUrl(u))
+      + ' onclick="irAFotoGaleria(HERO_FOTOS['+(i+1)+'])"></div>';
   }).join('');
 
   // -- HQI: chips de informacion rapida bajo el titulo (TSK-013 Hero) --
@@ -1656,9 +1692,43 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   var galLightbox = galMerge.slice(0, 1 + GAL_THUMBS_MAX).map(function(x){ return x.url; });
   // URL base del visor de galeria para el deep-link de cada foto.
   var galeriaUrl = d.slug ? '/galeria.html?destino=' + encodeURIComponent(d.slug) : '/galeria.html';
+  // RATING 1-5 ESTRELLAS (ADR-089 / migracion 051). El dato viene de
+  // public.media_estadisticas() en los 3 SELECT del handler (curada,
+  // viajero_foto, album_foto). Se expone COMO ATRIBUTO DATA en los nodos que
+  // la ficha ya pintaba para cada media: el contador de escala
+  // (data-media-votos) y el promedio de calidad (data-media-rating), nunca se
+  // quita el contador.
+  // ESTADO NORMAL = SIN VOTOS: rating_promedio llega NULL y sale SIEMPRE como
+  // data-media-rating="" (string vacio). Prohibido emitir 0, "0" o "0.0":
+  // un rating de 0 estrellas no existe (media ~1.03 votos/item).
+  // Cero cambios visuales: si el campo no llega, el HTML es identico al de
+  // antes (degradacion condicional). No se re-redondea nada: el promedio ya
+  // viene redondeado a numeric(3,1) por la funcion STABLE; toFixed(1) solo
+  // lo formatea al escala de la BD.
+  function mediaRatingAttrs(x) {
+    var r = parseMediaPromedio(x && x.rating);
+    var v = parseInt(x && x.votos, 10);
+    if (isNaN(v)) v = 0;
+    return ' data-media-votos="' + v + '"'
+      + ' data-media-rating="' + (r === null ? '' : r.toFixed(1)) + '"';
+  }
+  // Busca el item del ranking unico (curadas + comunidad) por URL: sirve para
+  // colgar los atributos de rating tambien del hero, que solo guarda URLs.
+  function mediaRankByUrl(u) {
+    var k = String(u || '').trim();
+    for (var i = 0; i < mediaRank.length; i++) {
+      if (mediaRank[i].url === k) return mediaRank[i];
+    }
+    return null;
+  }
+  var galMainItem = galMerge[0] || null;
   var galCuradaHTML = hayGaleriaCurada
-    ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')" onclick="irAFotoGaleria(GAL_FOTOS[0])"></div>'
-      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')" onclick="irAFotoGaleria(GAL_FOTOS['+(i+1)+'])"></div>'; }).join('')+'</div>'
+    ? '<div class="gal-main" style="background-image:url(\''+esc(galBig)+'\')"'
+      + mediaRatingAttrs(galMainItem)
+      + ' onclick="irAFotoGaleria(GAL_FOTOS[0])"></div>'
+      + '<div class="gal-thumbs">'+galThumbsList.map(function(u,i){ return '<div class="gal-i" style="background-image:url(\''+esc(u)+'\')"'
+        + mediaRatingAttrs(mediaRankByUrl(u))
+        + ' onclick="irAFotoGaleria(GAL_FOTOS['+(i+1)+'])"></div>'; }).join('')+'</div>'
       + btnGaleriaAmpliada
     : '';
   var secGaleria = '<section class="ssec bwarm" id="galeria">'
@@ -2734,10 +2804,10 @@ module.exports = async function handler(req, res) {
     try {
       fotosRows = await sql(
         'SELECT df.url, df.caption,'
-        + ' (SELECT COUNT(*)::int FROM media_votos mv'
-        + '   WHERE mv.fuente = \'curada\' AND mv.activo = true'
-        + '     AND mv.item_id = df.id::text) AS votos'
-        + ' FROM destinos_fotos df WHERE df.destino_id=$1'
+        + ' e.votos AS votos, e.promedio AS rating_promedio'
+        + ' FROM destinos_fotos df'
+        + mediaEstadJoin('curada', 'df.id::text')
+        + ' WHERE df.destino_id=$1'
         + ' ORDER BY df.orden ASC NULLS LAST, df.es_hero DESC LIMIT 200',
         [d.id]
       );
@@ -2759,10 +2829,9 @@ module.exports = async function handler(req, res) {
       fotosViajeros = await sql(
         'SELECT i.id, i.texto AS url, i.usuario_id AS autor_id, i.creado_en,'
         + ' u.nombre AS autor_nombre,'
-        + ' (SELECT COUNT(*)::int FROM media_votos mv'
-        + '   WHERE mv.fuente=\'viajero_foto\' AND mv.activo=true'
-        + '     AND mv.item_id = i.id::text) AS votos'
+        + ' e.votos AS votos, e.promedio AS rating_promedio'
         + ' FROM interacciones i LEFT JOIN usuarios u ON u.id = i.usuario_id'
+        + mediaEstadJoin('viajero_foto', 'i.id::text')
         + ' WHERE i.destino_id=$1 AND i.tipo=\'foto\' AND i.activo=true'
         + '   AND (i.dims IS NULL OR NOT (i.dims ? \'voto_foto_id\'))'
         + ' ORDER BY votos DESC, i.creado_en DESC LIMIT 12',
@@ -2780,12 +2849,16 @@ module.exports = async function handler(req, res) {
           + ' a.id AS album_id, a.titulo AS album_titulo,'
           + ' COALESCE(af.autor_original_id, af.agregador_id) AS autor_id,'
           + ' u.nombre AS autor_nombre,'
-          + ' (SELECT COUNT(*)::int FROM media_votos mv'
-          + '   WHERE mv.fuente=\'album_foto\' AND mv.activo=true'
-          + '     AND mv.item_id = af.id::text) AS votos'
+          + ' e.votos AS votos, e.promedio AS rating_promedio'
           + ' FROM album_fotos af'
           + ' JOIN albumes a ON a.id = af.album_id'
           + ' LEFT JOIN usuarios u ON u.id = COALESCE(af.autor_original_id, af.agregador_id)'
+          // Esta fila es una FOTO de album (af.id), no el album: el promedio es
+          // el de la foto, el de la funcion STABLE. No hay agregado por album
+          // aqui, asi que no se reimplementa el criterio ponderado por votos de
+          // sqlEstadisticasAlbum (api/interacciones.js): el promedio de album
+          // se hereda de ahi cuando lo pintan galeria.html / el panel.
+          + mediaEstadJoin('album_foto', 'af.id::text')
           + ' WHERE af.activo=true AND af.visible=true AND a.activo=true AND a.lat IS NOT NULL AND a.lng IS NOT NULL'
           + '   AND ABS(a.lat-$1) < 0.01 AND ABS(a.lng-$2) < 0.01'
           + ' ORDER BY votos DESC, af.creado_en DESC LIMIT 12',

@@ -222,6 +222,8 @@ El detalle tecnico consolidado del sistema de gamificacion y del apartado social
 
 El documento `ExploraCO_Gamificacion_v4_Plan_Maestro.md` queda como referencia HISTORICA (solo lectura); el v5 lo supersede.
 
+- **Calificacion de media de 1 a 5 estrellas (ADR-089, 2026-10-06):** el like binario de `media_votos` pasa a `puntuacion smallint 1..5` con **opinion actualizable y definitiva** (sin `unlike`, sin 409), **histórico en 3 = neutro**, migracion **051 aplicada** y **052 escrita y no aplicada**; `media_rep_autores` acumula **contadores y suma, nunca el promedio**, y su reputacion de autor **aún no tiene lectura en la UI**. Cerrado en codigo y en smokes (`smoke_089` 30/30; `smoke_036` 80 PASS / 13 SKIP / 0 FAIL).
+
 ## 5. Responsables (Capability Contract - AI Kernel)
 
 Segun el Capability Contract de AI-DOS (Cap. 2.3 y Cap. 6.5), las capacidades requeridas en este proyecto se asignan por rol; la IA que implementa cada rol puede cambiar sin alterar el framework.

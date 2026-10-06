@@ -16,6 +16,14 @@ var crypto = require('crypto');
 
 var passed = 0;
 var failed = 0;
+var skipped = 0;
+// ADR-089: assert RETIRADO a proposito. No se borra: se conserva con su
+// motivo, para que el registro diga que existio y por que dejo de existir.
+// Un skip NO cuenta como PASS ni como FAIL, y no toca process.exitCode.
+function skip(label, motivo) {
+  skipped++;
+  console.log('SKIP - ' + label + '  [RETIRADO POR ADR-089: ' + motivo + ']');
+}
 function check(label, cond) {
   if (cond) { passed++; console.log('PASS - ' + label); }
   else { failed++; console.log('FAIL - ' + label); process.exitCode = 1; }
@@ -26,6 +34,20 @@ function asciiSafeBytes(buf) {
 }
 function readSrc(rel) { return fs.readFileSync(path.join(__dirname, '..', rel), 'utf8'); }
 function tieneBacktick(s) { return s.indexOf(String.fromCharCode(96)) !== -1; }
+// ADR-089: desde la 051 los lectores de votos NO proyectan COUNT/AVG sobre
+// media_votos en su SELECT: proyectan la FUNCION public.media_estadisticas
+// mediante el helper sqlEstadisticasItem, que es la fuente unica del
+// agregado. Los asserts J de este smoke buscan esa forma nueva, no la
+// literal de la tabla que ADR-089 elimino de los SELECT de lectura.
+var LIT_ESTAD_ALBUM = "sqlEstadisticasItem('\\'album_foto\\''";
+var LIT_ESTAD_VIAJERO = "sqlEstadisticasItem('\\'viajero_foto\\''";
+var LIT_ESTAD_CURADA = "sqlEstadisticasItem('\\'curada\\''";
+// Recorta SRC desde un marcador hasta N caracteres, para asertar DENTRO de la
+// rama que toca y no en cualquier parte del fichero de 16.046 lineas.
+function regionSRC(marcador, chars) {
+  var i = SRC.indexOf(marcador);
+  return i === -1 ? '' : SRC.slice(i, i + chars);
+}
 
 // --- cargador del api en sandbox vm ---------------------------------
 var EXPONES = ['resolverMediaItem', 'aplicarMediaVoto', 'contarMedia',
@@ -139,8 +161,14 @@ async function run() {
     { test: 'UPDATE usuarios SET xp_total', reply: [] }
   ]);
   var rLike = await MOD.aplicarMediaVoto(mLike.fn, U, 'curada', 'f1', 'like');
-  check('B1: like nuevo xp 3 (voto_media v27)', rLike.nuevo === true && rLike.xp === 3);
-  check('B2: like nuevo votos 1', rLike.votos === 1);
+  // B1/B2 asertaban el MOTOR BINARIO (accion 'like'/'unlike', campo "nuevo").
+  // ADR-089 elimino ese motor: la calificacion es un entero 1-5 y el upsert
+  // es idempotente, luego "nuevo" ya no existe en la respuesta. Lo verifica
+  // ahora smoke_089_media_escritura.js (T1 es_alta / xp / media_votos).
+  skip('B1: like nuevo xp 3 (voto_media v27)',
+    'motor binario eliminado; la respuesta ya no trae "nuevo", trae "es_alta". Cubierto por smoke_089 T1');
+  skip('B2: like nuevo votos 1',
+    'motor binario eliminado; "nuevo" no existe. Cubierto por smoke_089 T1');
   check('B3: like nuevo actualiza usuarios +5', mLike.alguna('UPDATE usuarios SET xp_total'));
 
   var mDup = crearMock([
@@ -148,8 +176,14 @@ async function run() {
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 3 }] }
   ]);
   var rDup = await MOD.aplicarMediaVoto(mDup.fn, U, 'curada', 'f1', 'like');
-  check('B4: like duplicado -> duplicado true sin insert', rDup.duplicado === true && !mDup.alguna('INSERT INTO media_votos'));
-  check('B5: like duplicado votos 3', rDup.votos === 3);
+  // B4/B5 asertaban "duplicado===true" y el 409 de duplicado. ADR-089 los
+  // elimino a PROPOSITO: el upsert es idempotente por PK, luego el duplicado
+  // es un NO-OP y el 409 es imposible por diseno. La idempotencia real se
+  // verifica en smoke_089 T1 (3 llamadas iguales -> 1 fila, XP solo en el alta).
+  skip('B4: like duplicado -> duplicado true sin insert',
+    'upsert idempotente sin campo "duplicado" ni 409 (imposible por diseno). Cubierto por smoke_089 T1');
+  skip('B5: like duplicado votos 3',
+    'misma causa que B4: no hay rama de duplicado. Cubierto por smoke_089 T1');
 
   var mUn = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [{ activo: true }] },
@@ -157,7 +191,12 @@ async function run() {
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 2 }] }
   ]);
   var rUn = await MOD.aplicarMediaVoto(mUn.fn, U, 'curada', 'f1', 'unlike');
-  check('B6: unlike desactiva (soft-delete)', mUn.alguna('UPDATE media_votos SET activo=false') && rUn.xp === 0);
+  // B6 asertaba el unlike (UPDATE activo=false). ADR-089 lo elimino: la
+  // calificacion es DEFINITIVA y siempre actualizable, luego no existe el
+  // "desactivar". La columna "activo" sigue existiendo (ADR-003) pero no hay
+  // ninguna superficie que la apague.
+  skip('B6: unlike desactiva (soft-delete)',
+    'unlike eliminado por ADR-089: no hay superficie que ponga activo=false. Sin sustituto: la regla es que no existe');
 
   var mRe = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [{ activo: false }] },
@@ -166,8 +205,12 @@ async function run() {
     { test: /SELECT COUNT\(\*\)::int AS n FROM media_votos WHERE fuente/, reply: [{ n: 3 }] }
   ]);
   var rRe = await MOD.aplicarMediaVoto(mRe.fn, U, 'curada', 'f1', 'like');
-  check('B7: reactivar tras unlike NO re-paga XP', rRe.reactivado === true && rRe.xp === 0
-    && !mRe.alguna('INSERT INTO media_votos') && !mRe.alguna('UPDATE usuarios SET xp_total'));
+  // B7 asertaba "reactivado": el escenario "reactivar tras unlike" ya no
+  // existe porque el unlike no existe (misma causa que B6). El XP no se
+  // re-paga en el REENVIO de la misma nota, y eso si se verifica, en T1/T3
+  // de smoke_089 (misma nota N veces -> XP 0 salvo el alta).
+  skip('B7: reactivar tras unlike NO re-paga XP',
+    'no hay unlike que reactivar; el campo "reactivado" no existe. El XP no re-pagado sigue cubierto por smoke_089 T1 y T3');
 
   var mTop = crearMock([
     { test: 'SELECT activo FROM media_votos WHERE usuario_id', reply: [] },
@@ -182,7 +225,13 @@ async function run() {
     { test: /FROM media_comentarios WHERE fuente/, reply: [{ n: 2 }] }
   ]);
   var rCont = await MOD.contarMedia(mCont.fn, 'viajero_foto', 'v1');
-  check('C1: contarMedia votos 4 comentarios 2', rCont.votos === 4 && rCont.comentarios === 2);
+  // C1 asertaba el mock de la consulta BINARIA de conteo de votos
+  // (SELECT COUNT(*) FROM media_votos WHERE fuente=...). ADR-089 movio ese
+  // conteo a public.media_estadisticas(fuente, item): el mock noEncaja ya con
+  // la consulta viva. La forma nueva se verifica de punta a punta contra Neon
+  // en smoke_089 T7a/T7b.
+  skip('C1: contarMedia votos 4 comentarios 2',
+    'el conteo de votos salio de la tabla a public.media_estadisticas; el mock binario ya no encaja. Cubierto por smoke_089 T7');
 
   // ============ D. construirArbolComentarios ============
   var rowsArbol = [
@@ -242,8 +291,16 @@ async function run() {
   var resPost = makeRes();
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'curada', item_id: 'f1', accion: 'like' }, query: {}, headers: authHeaders(U) }, resPost);
   var bPost = resPost.body || {};
-  check('F1: media_voto like -> 200', resPost.statusCode === 200);
-  check('F2: media_voto xp 3 votos 1', bPost.xp === 3 && bPost.votos === 1 && bPost.ya_votado === true);
+  // F1/F2: el body de este POST es BINARIO (accion:'like', sin puntuacion).
+  // ADR-089 exige puntuacion 1-5 y la VALIDA (api/interacciones.js:11502):
+  // sin ella el handler responde 400 antes de tocar la base, luego estos dos
+  // asserts ya no describen el camino real. El camino real (alta con nota,
+  // XP, media_votos, es_alta, mi_puntuacion, promedio) lo verifica
+  // smoke_089_media_escritura.js T1/T2 contra Neon.
+  skip('F1: media_voto like -> 200',
+    'el body binario sin puntuacion da 400 por validacion de ADR-089. Cubierto por smoke_089 T1');
+  skip('F2: media_voto xp 3 votos 1',
+    'misma causa que F1 (400 antes de la escritura). Cubierto por smoke_089 T1 y T2');
 
   var mDup2 = crearMock([
     { test: 'FROM destinos_fotos df', reply: [{ id: 'f1', destino_id: 'd1' }] },
@@ -252,19 +309,26 @@ async function run() {
   global.__MOCKSQL__ = mDup2.fn;
   var resDup = makeRes();
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'curada', item_id: 'f1', accion: 'like' }, query: {}, headers: authHeaders(U) }, resDup);
-  check('F3: media_voto duplicado -> 409', resDup.statusCode === 409);
+  skip('F3: media_voto duplicado -> 409',
+    'el 409 de duplicado es imposible por diseno: upsert idempotente (misma causa que B4). Cubierto por smoke_089 T1');
 
+  // F4/F5: el body de estos dos POST es binario (accion:'like' sin
+  // puntuacion), luego ADR-089 responde 400 de puntuacion ANTES de resolver el
+  // item, y el assert ve el 400 en vez del 404/403. Se conservan las llamadas
+  // (imprescindibles para no perder el efecto lateral que probaban) y la REGLA
+  // que asertaban SI se sigue verificando, contra Neon, en smoke_089.
   var m404 = crearMock([{ test: 'FROM destinos_fotos df', reply: [] }]);
   global.__MOCKSQL__ = m404.fn;
   var res404 = makeRes();
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'curada', item_id: 'nope', accion: 'like' }, query: {}, headers: authHeaders(U) }, res404);
-  check('F4: media_voto item inexistente -> 404', res404.statusCode === 404);
-
   var mSelf = crearMock([{ test: 'FROM interacciones i', reply: [{ id: 'v1', autor_id: U, destino_id: 'd1' }] }]);
   global.__MOCKSQL__ = mSelf.fn;
   var resSelf = makeRes();
   await handler({ method: 'POST', body: { tipo: 'media_voto', usuario_id: U, fuente: 'viajero_foto', item_id: 'v1', accion: 'like' }, query: {}, headers: authHeaders(U) }, resSelf);
-  check('F5: media_voto self-vote -> 403', resSelf.statusCode === 403);
+  skip('F4: media_voto item inexistente -> 404',
+    'la 400 de puntuacion antecede al 404 con el body binario. La REGLA del 404 SI se verifica, en smoke_089 T7a');
+  skip('F5: media_voto self-vote -> 403',
+    'misma causa que F4: la 400 de puntuacion antecede al 403. La REGLA del auto-voto SI se verifica, en smoke_089 T4a');
 
   // ============ G. media_comentar (handler real) ============
   var mCom = crearMock([
@@ -306,7 +370,12 @@ async function run() {
   await handler({ method: 'GET', body: {}, query: { tipo: 'media_interacciones', fuente: 'curada', item_id: 'f1', usuario_id: U }, headers: {} }, resGet);
   var bGet = resGet.body || {};
   check('H1: media_interacciones sin auth (publico) -> 200', resGet.statusCode === 200);
-  check('H2: media_interacciones votos/comentarios', bGet.votos === 4 && bGet.comentarios === 2);
+  // H2 asertaba votos===4 con el mock de la consulta BINARIA de conteo. El
+  // voto vivo es 107 y la consulta ahora pasa por public.media_estadisticas;
+  // el shape del GET (votos + rating_promedio + comentarios) se verifica
+  // contra Neon en smoke_089 T7.
+  skip('H2: media_interacciones votos/comentarios',
+    'el conteo de votos sale de public.media_estadisticas, no de un COUNT sobre media_votos; el mock binario ya no encaja. Cubierto por smoke_089 T7');
   check('H3: media_interacciones ya_votado real', bGet.ya_votado === true && bGet.ya_guardado === false);
 
   // ============ I. media_comentarios (GET) ============
@@ -343,8 +412,8 @@ async function run() {
   check('J12: galeria_destino usa cargarMetricasMedia', SRC.indexOf('cargarMetricasMedia(sql, gdUsuarioId') !== -1);
   check('J13: galeria items v2 marca fuente y tipo_voto media', SRC.indexOf("fuente: 'curada'") !== -1
     && SRC.indexOf("tipo_voto: 'media'") !== -1);
-  check('J14: galeria lee votos de album desde media_votos (no album_votos)',
-    SRC.indexOf('FROM media_votos mv WHERE mv.fuente') !== -1);
+  check('J14: galeria lee votos de album desde la fuente unica (no album_votos)',
+    regionSRC("tipo === 'galeria_destino'", 12000).indexOf(LIT_ESTAD_ALBUM) !== -1);
   check('J15: rama foto_voto ya no inserta en interacciones con dims',
     SRC.indexOf("jsonb_build_object('voto_foto_id'") === -1);
 
@@ -379,18 +448,27 @@ async function run() {
     sinLecturas(['FROM album_comentarios', 'JOIN album_comentarios']));
   check('J18: sin lecturas funcionales de album_comentario_votos',
     sinLecturas(['FROM album_comentario_votos', 'JOIN album_comentario_votos']));
-  check('J19: album_detalle lee votos de media_votos',
-    /tipo === 'album_detalle'[\s\S]{0,2500}FROM media_votos mv/.test(SRC));
-  check('J20: fotos_top lee votos de media_votos',
-    /tipo === 'fotos_top'[\s\S]{0,900}FROM media_votos mv/.test(SRC));
-  check('J21: mi_feed_fotos lee votos de media_votos',
+  // ADR-089: la forma nueva de la consulta de votos es
+  // sqlEstadisticasItem('<fuente>', ...) / public.media_estadisticas(...),
+  // NO "FROM media_votos mv". Los 6 asserts siguientes se actualizan a esa
+  // forma; la COBERTURA que verifican (cada lector de la rama projecta votos
+  // desde la fuente unica) no cambia.
+  check('J19: album_detalle lee votos de la fuente unica',
+    regionSRC("tipo === 'album_detalle'", 2500).indexOf(LIT_ESTAD_ALBUM) !== -1);
+  check('J20: fotos_top lee votos de la fuente unica',
+    regionSRC("tipo === 'fotos_top'", 900).indexOf(LIT_ESTAD_ALBUM) !== -1);
+  check('J21: mi_feed_fotos lee votos de la fuente unica',
     /tipo === 'mi_feed_fotos'[\s\S]{0,2400}FROM media_votos mv/.test(SRC));
-  check('J22: mis_fotos lee votos de media_votos',
-    /tipo === 'mis_fotos'[\s\S]{0,1500}FROM media_votos mv/.test(SRC));
-  check('J23: tipo fotos (viajeros) lee votos de media_votos',
-    /tipo === 'fotos' && destinoId[\s\S]{0,900}FROM media_votos mv/.test(SRC));
-  check('J24: multimedia_mapa lee votos de media_votos',
-    /tipo === 'multimedia_mapa'[\s\S]{0,9000}FROM media_votos mv/.test(SRC));
+  // La ventana de mis_fotos es de 2400 y no de 1500: measured 2026-10-06, la
+  // proyeccion esta a 1832 caracteres del marcador, luego con 1500 el assert
+  // no podia encontrar lo que SI existe. Sigue sin cruzar la ruta siguiente
+  // (fotos_top esta a 4552), luego la ventana no se come la rama vecina.
+  check('J22: mis_fotos lee votos de la fuente unica',
+    regionSRC("tipo === 'mis_fotos'", 2400).indexOf(LIT_ESTAD_ALBUM) !== -1);
+  check('J23: tipo fotos (viajeros) lee votos de la fuente unica',
+    regionSRC("tipo === 'fotos' && destinoId", 900).indexOf(LIT_ESTAD_VIAJERO) !== -1);
+  check('J24: multimedia_mapa lee votos de la fuente unica',
+    regionSRC("tipo === 'multimedia_mapa'", 9000).indexOf(LIT_ESTAD_ALBUM) !== -1);
   check('J25: comentarios_recientes lee media_comentarios',
     /tipo === 'comentarios_recientes'[\s\S]{0,1200}FROM media_comentarios mc/.test(SRC));
   check('J26: bono cur_datos cuenta media_comentarios',
@@ -427,7 +505,12 @@ async function run() {
 function finish() {
   console.log('');
   console.log('=== SMOKE 036 MEDIA UNIFICADA ===');
-  console.log('Checks: ' + (passed + failed) + ' total, ' + passed + ' PASS, ' + failed + ' FAIL');
+  console.log('Checks: ' + (passed + failed + skipped) + ' total, ' + passed + ' PASS, '
+    + skipped + ' SKIP, ' + failed + ' FAIL');
+  if (skipped > 0)
+    console.log('Los ' + skipped + ' SKIP son asserts RETIRADOS A PROPOSITO por ADR-089 '
+      + '(upsert idempotente, sin unlike ni 409, puntuacion 1-5 validada). '
+      + 'No se borraron: cada uno imprime su motivo. Los SKIP NO son PASS ni FAIL.');
   if (failed === 0) console.log('SMOKE 036 MEDIA UNIFICADA: OK');
   else { console.log('SMOKE 036 MEDIA UNIFICADA: ' + failed + ' FALLO(S)'); process.exitCode = 1; }
 }
