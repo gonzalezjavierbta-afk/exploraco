@@ -436,6 +436,70 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .pf-gal-btn{flex:1;border:none;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;font-size:10px;font-weight:700;padding:5px 4px;cursor:pointer}
 .pf-gal-btn.danger{background:rgba(239,68,68,.85)}
 .pf-gal-vacio{color:rgba(255,255,255,.4);font-size:12.5px}
+/* ---- SUMIDEROS DE XP: slots de contenido (ADR-086 / TSK-184) --------------
+   Silo atomico: TODO lo nuevo cuelga de .pf-slots (ADR-004 / Regla de Oro 4).
+   Reset de silo explicito abajo (* y box-sizing) para que nada se herede del
+   exterior. Ninguna regla se declara en la capa global de variables.
+   El precio que se pinta es el del PROXIMO slot (costo_proximo, que calcula el
+   motor), NO costo_base_xp: comprar sube el historial k de ese sumidero y con
+   el sube el siguiente precio, y el usuario tiene que ver esa subida antes de
+   pagar, no despues. El k+1 (costo_siguiente) se pinta DEBAJO de ese precio y
+   deliberadamente pequeno: es informacion secundaria, no una tercera cifra que
+   compita con la principal. Si llega null es que no hay proximo slot, y eso se
+   dice con palabras, nunca con 0 ni con un guion ambiguo. */
+.pf-slots{box-sizing:border-box;width:100%;margin-bottom:28px;display:flex;flex-direction:column;gap:14px}
+.pf-slots *,.pf-slots *::before,.pf-slots *::after{box-sizing:border-box}
+.pf-slots p{margin:0}
+.pf-slots .sl-err{font-size:11.5px;color:#fca5a5;line-height:1.45}
+.pf-slots .sl-vacio{font-size:12.5px;color:rgba(255,255,255,.4)}
+.pf-slots .sl-curva{font-size:11px;line-height:1.55;color:rgba(255,255,255,.5);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:9px 11px}
+.pf-slots .sl-curva code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--gold);word-break:break-word}
+.pf-slots .sl-saldo{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px}
+.pf-slots .sl-saldo-k{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.pf-slots .sl-saldo-v{font-size:19px;font-weight:900;color:#fff}
+.pf-slots .sl-saldo-av{font-size:11px;color:#fcd34d}
+.pf-slots .sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pf-slots .sl-card{background:linear-gradient(150deg,rgba(255,74,0,.13),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.32);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:9px}
+.pf-slots .sl-card.bloqueada{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.02)}
+.pf-slots .sl-n{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#fff}
+.pf-slots .sl-topes{display:flex;flex-wrap:wrap;gap:5px}
+.pf-slots .sl-top{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:2px 8px}
+.pf-slots .sl-top.limite{color:#fca5a5;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1)}
+.pf-slots .sl-precio{display:flex;flex-direction:column;gap:3px}
+.pf-slots .sl-precio-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5)}
+.pf-slots .sl-precio-v{font-size:25px;font-weight:900;color:var(--gold);line-height:1}
+.pf-slots .sl-precio-base{font-size:11px;color:rgba(255,255,255,.4)}
+.pf-slots .sl-bars{display:flex;flex-direction:column;gap:5px}
+.pf-slots .sl-bar{display:flex;align-items:center;gap:7px;font-size:9.5px;color:rgba(255,255,255,.45)}
+.pf-slots .sl-bar span{flex:0 0 38px;text-transform:uppercase;letter-spacing:.5px}
+.pf-slots .sl-bar i{display:block;height:7px;border-radius:999px;min-width:3px}
+.pf-slots .sl-bar.base i{background:rgba(255,255,255,.22)}
+.pf-slots .sl-bar.prox i{background:linear-gradient(90deg,#FF4A00,#f4c66a)}
+.pf-slots .sl-crece{font-size:11.5px;line-height:1.5;color:#fcd34d}
+.pf-slots .sl-crece b{color:#fff}
+.pf-slots .sl-hielo{font-size:11px;line-height:1.5;color:rgba(255,255,255,.5)}
+.pf-slots .sl-hielo b{color:var(--gold)}
+.pf-slots .sl-mios-l{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px}
+.pf-slots .sl-chip{font-size:10.5px;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.7);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:3px 9px}
+.pf-slots .sl-chip.pagado{color:var(--gold);border-color:rgba(255,74,0,.35)}
+.pf-slots .sl-chip.soltado{color:rgba(255,255,255,.35);text-decoration:line-through}
+.pf-slots .sl-cta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:auto}
+.pf-slots .sl-btn{background:var(--gold);color:#0F1419;border:none;border-radius:10px;padding:9px 15px;font-family:Outfit,sans-serif;font-size:12.5px;font-weight:800;cursor:pointer}
+.pf-slots .sl-btn:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.35);cursor:not-allowed}
+.pf-slots .sl-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.pf-slots .sl-motivo{font-size:11px;line-height:1.45;color:#fca5a5}
+.pf-slots .sl-motivo.limite{color:rgba(255,255,255,.45)}
+/* El k+1 va DEBAJO del precio actual y deliberadamente pequeno: es
+   informacion secundaria, no una tercera cifra que compita con la principal
+   (25px gold). El caso null se pinta como frase, nunca como 0 ni como --. */
+.pf-slots .sl-siguiente{font-size:11px;line-height:1.45;color:rgba(255,255,255,.42)}
+.pf-slots .sl-siguiente b{font-size:12.5px;font-weight:800;color:rgba(255,255,255,.62)}
+/* Rotulo NO interactivo de ref_contrato.etiqueta: dice a que se engancharia el
+   slot sin fingir que hay selector. Trazado punteado = hueco declarado. */
+.pf-slots .sl-ref{font-size:11px;line-height:1.5;color:rgba(255,255,255,.55);background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.16);border-radius:10px;padding:7px 9px}
+.pf-slots .sl-ref b{color:#fff;font-weight:800}
+.pf-slots .sl-motivo-tec{display:block;margin-top:3px;font-size:10.5px;line-height:1.4;color:rgba(255,255,255,.34)}
+@media (max-width:600px){.pf-slots .sl-precio-v{font-size:21px}.pf-slots .sl-grid{grid-template-columns:1fr}}
 .pf-subida{display:flex;align-items:center;gap:12px;justify-content:space-between;background:linear-gradient(135deg,rgba(255,74,0,.16),rgba(255,255,255,.03));border:1px solid rgba(255,74,0,.4);border-radius:14px;padding:14px 16px;margin-bottom:18px}
 .pf-subida-txt{display:flex;flex-direction:column;gap:2px}
 .pf-subida-txt strong{font-size:15px;color:#fff}
@@ -846,9 +910,24 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   <div class="pf-counter" id="pf-trofeos-count" data-tab="museo">0 / 19</div>
   <div class="trofeo-grid" id="pf-trofeos" data-tab="museo"></div>
 
-  <!-- XP DISPONIBLE + BONO DE REFERIDO (Gamificacion v4). El catalogo de la
-       tienda se retiro en T5: la pestana Inventario lista solo lo poseido. -->
-  <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP disponibles</div>
+  <!-- XP TOTAL = REPUTACION, NO SALDO (ADR-018). Este numero NO baja al comprar:
+       el motor debita xp_gastado_sinks, no xp_total, asi que llamarlo
+       "disponible" miente en cuanto el usuario compra un sumidero. Se rotula
+       como lo que es. El disponible real (xp_total - xp_gastado_sinks) lo manda
+       el motor en slot_catalogo y se pinta en la seccion de sumideros. -->
+  <div class="pf-counter" id="pf-xp-balance" data-tab="inventario">0 XP de reputacion</div>
+
+  <!-- SUMIDEROS DE XP (ADR-086 / TSK-184). Vive aqui, y no en otra pagina,
+       porque este es el unico sitio donde el usuario ya ve su XP.
+       El precio de cada slot NO es fijo: es costo(k) = costo_base_xp *
+       (1 + alpha*k)^gamma sobre SU historial en ese sumidero, asi que el
+       modulo pinta el precio del PROXIMO slot, el del SIGUIENTE (k+1) y explica
+       el crecimiento antes de cobrar. Todos esos numeros los calcula el motor:
+       aqui no se calcula la curva. Un sumidero sin soporte de enganche sigue
+       VISIBLE, con su motivo, porque esconderlo seria peor. Todo el CSS nuevo
+       cuelga del silo .pf-slots (ADR-004). -->
+  <div class="pf-section-title" data-tab="inventario">&#x1F6D2; Ampliar tu contenido</div>
+  <div class="pf-slots" id="pf-slots" data-tab="inventario" aria-live="polite"></div>
   <!-- Bono de bienvenida por referido (tarjeta destacada, oculta por defecto) -->
   <div class="pf-bono" id="pf-bono" data-tab="inventario" style="display:none"></div>
 
@@ -1530,6 +1609,8 @@ function renderPerfil() {
   cargarCromos(u.id);
   cargarBonoReferido(u.id);
   cargarMisRegalias(u.id);
+  /* Sumideros de XP (ADR-086 / TSK-184): viven junto al XP disponible. */
+  pfSlotsCargar(u.id);
   if (window.Mercado) Mercado.cargarMi();
 
   /* mis albumes (ADR-017) */
@@ -2204,6 +2285,436 @@ function comprarConsumible(clave, btn) {
     });
 }
 
+/* ---- SUMIDEROS DE XP: slots de contenido (ADR-086 / TSK-184) ----------------
+   El precio NO es fijo. El motor cobra
+     costo(k) = costo_base_xp * (1 + alpha * k) ^ gamma
+   con k = historial del usuario ESE sumidero (slots comprados, activos o no), y
+   comprar sube k. Por eso este modulo:
+     - pinta el precio del PROXIMO slot (costo_proximo, calculado por el motor),
+       nunca costo_base_xp presentado como si fuera el precio;
+     - ensena la curva y el k real del usuario ANTES del boton de pagar;
+     - recuerda que el precio pagado queda congelado en la fila comprada, asi que
+       soltar y recomprar NO vuelve al precio inicial.
+
+   ADR-003: cada tarjeta se crea UNA vez con su esqueleto fijo y se actualiza por
+   id. Cambiar de pestana o refrescar no borra ni un nodo. La unica lista que se
+   reescribe es la de slots ya comprados, que no lleva ids.
+   ADR-002: cero bytes > 127 y cero backticks en este bloque.
+   El disponible NO se calcula aqui: el motor es la unica verdad del saldo.
+   Ningun estado se inventa tampoco: si el motor no manda disponible_xp, no se
+   pinta saldo, porque xp_total NO baja al comprar (ADR-018) y usarlo como
+   saldo seria una cifra que miente en cuanto el usuario compre. */
+var PF_SLOT_CLAVE = /^[a-z0-9_]+$/;
+var pfSlotsCat = null;
+var pfSlotsMios = {};
+var pfSlotsSaldoTras = null;
+/* El enganche elegido por sumidero (ref_id). El picker de recursos todavia NO
+   existe, luego este mapa esta vacio y NINGUN sumidero llega a estado listo.
+   Se declara igual porque es lo que va a alimentar el picker, y para que el
+   corte de pfSlotsComprar() sea explicito: sin ref elegido no hay peticion. */
+var pfSlotsRefs = {};
+
+function pfSlotsNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+function pfSlotsId(clave, sufijo) {
+  return 'pf-slot-' + (PF_SLOT_CLAVE.test(String(clave)) ? String(clave) : 'x') + '-' + sufijo;
+}
+function pfSlotsTxt(id, texto) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = texto;
+}
+function pfSlotsBar(clave, sufijo, valor, max) {
+  var el = document.getElementById(pfSlotsId(clave, sufijo));
+  if (!el) return;
+  var pct = Math.max(0, Math.min(100, Math.round(((valor || 0) / max) * 100)));
+  el.style.width = pct + '%';
+}
+/* El disponible, en dos niveles y sin inventar nada:
+   1) disponible_xp del catalogo (slot_catalogo): lo calcula el motor en SQL
+      como xp_total - xp_gastado_sinks y ya descuenta lo gastado en sumideros.
+      Si llega como numero, manda.
+   2) disponible_restante que devuelve la compra: tambien del motor.
+   NO se cae a sesion().xp_total como antes: ese numero es reputacion y NO baja
+   al comprar, asi que usarlo como saldo congelaria la cifra para siempre.
+   Si ninguno de los dos llega, no hay saldo que pintar (null). */
+function pfSlotsSaldo() {
+  var d = pfSlotsNum(pfSlotsCat && pfSlotsCat.disponible_xp);
+  if (d !== null) return { valor: d, exacto: true };
+  var t = pfSlotsNum(pfSlotsSaldoTras);
+  if (t !== null) return { valor: t, exacto: true };
+  return { valor: null, exacto: false };
+}
+/* Estado de compra de UN sumidero. Fuente unica de verdad: lo pinta la fila y
+   lo consulta el handler ANTES de tocar la red, de modo que la guarda y lo que
+   se ve son el mismo calculo y no pueden discrepar.
+   Regla dura: aqui NO se enumera ningun sumidero, ni su clave, ni el nombre del
+   campo de enganche. Todo se lee de lo que manda el motor (puede_comprar,
+   ref_contrato.comprable, ref_contrato.motivo_soporte, topes, disponible_xp),
+   luego un sumidero puede volverse comprable sin tocar una linea de aqui, que es
+   justo lo que esta pasando con el enganche a destinos. */
+function pfSlotsEstado(a) {
+  var st = { boton: '', motivo: '', tecnico: '', listo: false, ref: null,
+    etiqueta: '', prox: null, saldo: null, topeH: false, topeA: false };
+  if (!a || typeof a !== 'object') return st;
+  var rc = (a.ref_contrato && typeof a.ref_contrato === 'object') ? a.ref_contrato : null;
+  var base = pfSlotsNum(a.costo_base_xp);
+  var k = pfSlotsNum(a.k_historico);
+  var ka = pfSlotsNum(a.k_activos);
+  var sMax = pfSlotsNum(a.slot_max);
+  var sMaxA = pfSlotsNum(a.slot_max_activos);
+  st.ref = rc;
+  st.etiqueta = (rc && rc.etiqueta) ? String(rc.etiqueta) : '';
+  st.prox = pfSlotsNum(a.costo_proximo);
+  st.saldo = pfSlotsSaldo();
+  st.base = base;
+  st.k = k;
+  st.ka = ka;
+  st.sMax = sMax;
+  st.sMaxA = sMaxA;
+  /* Sin sesion no hay k, ni topes, ni precio: solo se ofrece entrar. */
+  if (k === null || ka === null || st.prox === null) {
+    st.boton = 'Inicia sesion';
+    st.motivo = 'Entra con tu cuenta para ver cuanto costaria ampliar este sumidero.';
+    return st;
+  }
+  st.topeH = sMax !== null && k >= sMax;
+  st.topeA = sMaxA !== null && ka >= sMaxA;
+  st.alcanza = st.saldo.valor === null || st.saldo.valor >= st.prox;
+  /* Sin soporte el motor RECHAZA la compra. Eso no es un error de la pagina ni
+     un fallo de red: es un sumidero todavia no comprable, y se muestra como tal.
+     El tecnico (motivo_soporte) queda como detalle, nunca como el mensaje. */
+  if (!rc || rc.comprable !== true) {
+    st.boton = 'No comprable todavia';
+    st.motivo = 'Este sumidero todavia no se puede ampliar: falta saber a que se '
+      + 'engancha y el servidor no puede comprobarlo, asi que cobrar por el crearia '
+      + 'una fila que no apunta a nada.';
+    st.tecnico = (rc && rc.motivo_soporte) ? String(rc.motivo_soporte) : '';
+    return st;
+  }
+  if (st.topeH) {
+    st.boton = 'Tope historico alcanzado';
+    st.motivo = 'Llegaste al tope historico de este sumidero.';
+    return st;
+  }
+  if (st.topeA) {
+    st.boton = 'Tope de activos alcanzado';
+    st.motivo = 'Llegaste al tope de slots activos. Suelta uno para seguir.';
+    return st;
+  }
+  if (!st.alcanza) {
+    st.boton = 'XP insuficiente';
+    st.motivo = 'Te faltan ' + fmtXp(st.prox - st.saldo.valor) + ' XP para este slot.';
+    return st;
+  }
+  /* El picker de recursos no existe todavia: el hueco se deja declarado y el
+     boton no se habilita. En cuanto haya ref elegido, esta rama cae sola. */
+  if (!pfSlotsRefs[a.clave]) {
+    st.boton = 'Falta elegir a que se engancha';
+    st.motivo = 'Todavia no puedes ampliarlo: falta elegir ' + (st.etiqueta ? st.etiqueta.toLowerCase() : 'el recurso')
+      + ' al que se enganche el slot, y ese selector aun no esta disponible.';
+    return st;
+  }
+  st.boton = 'Comprar por ' + fmtXp(st.prox) + ' XP';
+  /* puede_comprar del motor manda sobre cualquier derivacion local: si el
+     servidor dice que no, aqui no se pinta un boton vivo. */
+  st.listo = a.puede_comprar !== false;
+  if (!st.listo) st.motivo = 'El motor todavia no habilita esta compra.';
+  return st;
+}
+function pfSlotsEsqueleto(clave) {
+  return '<div class="sl-card" id="' + pfSlotsId(clave, 'card') + '">'
+    + '<div class="sl-n" id="' + pfSlotsId(clave, 'n') + '"></div>'
+    + '<div class="sl-topes">'
+      + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-h') + '"></span>'
+      + '<span class="sl-top" id="' + pfSlotsId(clave, 'top-a') + '"></span>'
+    + '</div>'
+    + '<div class="sl-precio">'
+      + '<div class="sl-precio-lbl">Lo que pagas ahora</div>'
+      + '<div class="sl-precio-v" id="' + pfSlotsId(clave, 'px') + '"></div>'
+      + '<div class="sl-precio-base" id="' + pfSlotsId(clave, 'base') + '"></div>'
+      + '<div class="sl-siguiente" id="' + pfSlotsId(clave, 'sig') + '"></div>'
+    + '</div>'
+    + '<div class="sl-bars">'
+      + '<div class="sl-bar base"><span>Inicial</span><i id="' + pfSlotsId(clave, 'bar-b') + '"></i></div>'
+      + '<div class="sl-bar prox"><span>Ahora</span><i id="' + pfSlotsId(clave, 'bar-p') + '"></i></div>'
+    + '</div>'
+    + '<div class="sl-crece" id="' + pfSlotsId(clave, 'crece') + '"></div>'
+    + '<div class="sl-hielo" id="' + pfSlotsId(clave, 'hielo') + '"></div>'
+    + '<div class="sl-ref" id="' + pfSlotsId(clave, 'ref') + '"></div>'
+    + '<div class="sl-mios" id="' + pfSlotsId(clave, 'mios') + '"></div>'
+    + '<div class="sl-cta">'
+      + '<button type="button" class="sl-btn" id="' + pfSlotsId(clave, 'btn') + '" data-clave="' + esc(clave) + '">Comprar</button>'
+      + '<span class="sl-motivo" id="' + pfSlotsId(clave, 'motivo') + '"></span>'
+    + '</div>'
+    + '</div>';
+}
+function pfSlotsFila(a) {
+  var clave = a.clave;
+  var st = pfSlotsEstado(a);
+  var base = st.base;
+  var k = st.k;
+  var prox = st.prox;
+
+  pfSlotsTxt(pfSlotsId(clave, 'n'), a.etiqueta || clave);
+
+  var th = document.getElementById(pfSlotsId(clave, 'top-h'));
+  if (th) {
+    th.textContent = st.sMax === null || k === null ? 'Slots: sin tope'
+      : 'Slots: ' + k + ' de ' + st.sMax;
+    th.className = 'sl-top' + (st.topeH ? ' limite' : '');
+  }
+  var ta = document.getElementById(pfSlotsId(clave, 'top-a'));
+  if (ta) {
+    ta.textContent = st.sMaxA === null || st.ka === null ? 'Activos: sin tope'
+      : 'Activos: ' + st.ka + ' de ' + st.sMaxA;
+    ta.className = 'sl-top' + (st.topeA ? ' limite' : '');
+  }
+
+  var topeH = st.topeH;
+  var topeA = st.topeA;
+
+  pfSlotsTxt(pfSlotsId(clave, 'px'), prox === null ? 'Inicia sesion' : fmtXp(prox) + ' XP');
+
+  var baseEl = document.getElementById(pfSlotsId(clave, 'base'));
+  if (baseEl) {
+    baseEl.innerHTML = base === null ? ''
+      : 'Precio inicial <s>' + fmtXp(base) + ' XP</s>'
+        + (k !== null && k > 0 ? ' (ya no es el que pagas)' : ' (este es el que pagas)');
+  }
+
+  /* El k+1, DEBAJO del precio actual y en pequeno (jerarquia: 25px gold el
+     actual, ~12px apagado el siguiente). Los tres casos se distinguen:
+       - undefined -> el catalogo no trae el campo: no se inventa nada.
+       - null      -> el motor dice que k+1 supera slot_max: NO hay proximo, y
+                      se dice con palabras. Nunca 0, NaN ni un "--" ambiguo.
+       - numero    -> el precio real del slot k+1, tal cual lo manda. */
+  var sigEl = document.getElementById(pfSlotsId(clave, 'sig'));
+  if (sigEl) {
+    if (a.costo_siguiente === undefined) sigEl.textContent = '';
+    else {
+      var sig = pfSlotsNum(a.costo_siguiente);
+      sigEl.textContent = sig === null ? 'No hay proximo slot en este sumidero.'
+        : 'El siguiente costara ' + fmtXp(sig) + ' XP.';
+    }
+  }
+
+  var max = Math.max(base || 0, prox || 0) || 1;
+  pfSlotsBar(clave, 'bar-b', base || 0, max);
+  pfSlotsBar(clave, 'bar-p', prox || 0, max);
+
+  /* La explicacion del crecimiento va ANTES del boton: el usuario tiene que ver
+     por que paga mas que el precio inicial antes de confirmar. Los numeros son
+     del motor; aqui solo se hace el porcentaje de comparacion. */
+  var creEl = document.getElementById(pfSlotsId(clave, 'crece'));
+  if (creEl) {
+    creEl.innerHTML = '';
+    if (k === null) {
+      creEl.textContent = 'Entra con sesion para ver cuanto costaria tu proximo slot.';
+    } else if (base !== null && prox !== null && base > 0 && prox > base) {
+      var subida = Math.round(((prox - base) / base) * 100);
+      creEl.innerHTML = 'Este slot <b>ya no cuesta el precio inicial</b>: +' + subida
+        + '% porque tu historial en este sumidero va en <b>k = ' + k + '</b>.';
+    } else if (k > 0) {
+      creEl.innerHTML = 'Historial en este sumidero: <b>k = ' + k + '</b>.';
+    } else {
+      creEl.innerHTML = 'Primer slot en este sumidero (<b>k = 0</b>): pagas el precio inicial.';
+    }
+  }
+
+  var hEl = document.getElementById(pfSlotsId(clave, 'hielo'));
+  if (hEl) {
+    hEl.innerHTML = 'Lo que pagues aqui queda <b>congelado</b> en su fila y no sube despues. '
+      + 'Si sueltas el slot y lo recompras, pagas lo que toque en ese momento, no el precio inicial.';
+  }
+
+  /* El enganche: ref_contrato.etiqueta es lo que el usuario tiene que LEER, asi
+   que va como rotulo. No es un selector y no finge serlo: no hay dropdown, no
+   hay lista de recursos y no hay forma de elegir todavia. Si no hay soporte, el
+   bloque lo dice sin nombres de tabla ni de campo (eso es jerga tecnica y se
+   queda en el detalle tecnico de abajo, no en el mensaje principal). */
+  var refEl = document.getElementById(pfSlotsId(clave, 'ref'));
+  if (refEl) {
+    if (!st.ref) refEl.textContent = '';
+    else if (st.ref.comprable !== true) {
+      refEl.innerHTML = 'Este sumidero <b>aun no admite Slots</b>: falta a que se '
+        + 'engancha y el servidor todavia no puede validarlo.';
+    } else {
+      refEl.innerHTML = 'Se engancha a <b>' + esc(st.etiqueta) + '</b>. El selector '
+        + 'de recursos aun no esta disponible, asi que todavia no se puede ampliar.';
+    }
+  }
+
+  var mEl = document.getElementById(pfSlotsId(clave, 'mios'));
+  if (mEl) {
+    var filas = Array.isArray(pfSlotsMios[clave]) ? pfSlotsMios[clave] : [];
+    var chips = filas.map(function (f) {
+      var pagado = pfSlotsNum(f.costo_pagado);
+      return '<span class="sl-chip ' + (f.activo === true ? 'pagado' : 'soltado') + '">slot '
+        + esc(String(f.slot_index)) + ' - ' + fmtXp(pagado === null ? 0 : pagado) + ' XP</span>';
+    });
+    mEl.innerHTML = '<div class="sl-mios-l">Ya comprados (precio congelado)'
+      + (chips.length ? chips.join('') : '<span class="sl-chip">ninguno todavia</span>') + '</div>';
+  }
+
+  /* El boton se desactiva con disabled Y con la etiqueta que explica por que.
+     El atributo es pintura: la garantia de que no sale una peticion esta en
+     pfSlotsComprar(), que vuelve a calcular este mismo estado y corta. */
+  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
+  if (btn) {
+    btn.disabled = !st.listo;
+    btn.textContent = st.boton;
+  }
+  var motivo = document.getElementById(pfSlotsId(clave, 'motivo'));
+  if (motivo) {
+    motivo.innerHTML = st.motivo ? esc(st.motivo) : '';
+    if (st.tecnico) motivo.innerHTML += '<span class="sl-motivo-tec">' + esc(st.tecnico) + '</span>';
+    motivo.className = 'sl-motivo' + (topeH || topeA ? ' limite' : '');
+  }
+  var card = document.getElementById(pfSlotsId(clave, 'card'));
+  if (card) card.className = 'sl-card' + (st.listo ? '' : ' bloqueada');
+}
+function pfSlotsPintar() {
+  var box = document.getElementById('pf-slots');
+  if (!box) return;
+  var cat = pfSlotsCat;
+  /* Un catalogo de 0 sumideros NO es "no tienes slots": es un fallo de lectura y
+     tiene que verse, no quedarse en blanco. */
+  if (!cat || cat.ok !== true || !Array.isArray(cat.data) || !cat.data.length) {
+    box.innerHTML = '<div class="sl-err">No se pudo leer el catalogo de sumideros. Recarga la pagina.</div>';
+    return;
+  }
+  if (!document.getElementById('pf-slots-grid')) {
+    var curva = cat.curva || {};
+    box.innerHTML = '<div class="sl-curva">'
+      + '<div class="sl-saldo"><span class="sl-saldo-k">Disponible</span>'
+      + '<span class="sl-saldo-v" id="pf-slots-saldo">lo confirma el motor</span>'
+      + '<span class="sl-saldo-av" id="pf-slots-aviso"></span></div>'
+      + (curva.formula ? '<div>Crecimiento del precio: <code>' + esc(curva.formula) + '</code></div>' : '')
+      + (curva.k ? '<div>k = ' + esc(curva.k) + '</div>' : '')
+      + (curva.congelado ? '<div>' + esc(curva.congelado) + '</div>' : '')
+      + '</div><div class="sl-grid" id="pf-slots-grid"></div>';
+    document.getElementById('pf-slots-grid').addEventListener('click', function (ev) {
+      var b = ev.target && ev.target.closest ? ev.target.closest('.sl-btn') : null;
+      if (b) pfSlotsComprar(b.getAttribute('data-clave'));
+    });
+  }
+  var saldo = pfSlotsSaldo();
+  var saldoEl = document.getElementById('pf-slots-saldo');
+  if (saldoEl) {
+    /* Solo disponible_xp del motor (o el disponible_restante que devuelve la
+       compra). Sin numero no se pinta nada: xp_total NO baja al comprar, asi que
+       usarlo aqui seria un saldo congelado que miente. */
+    saldoEl.textContent = saldo.valor === null
+      ? 'el motor lo confirma al cobrar'
+      : fmtXp(saldo.valor) + ' XP';
+  }
+  var avEl = document.getElementById('pf-slots-aviso');
+  if (avEl) {
+    avEl.textContent = saldo.valor === null
+      ? '(aun no llega del motor)' : '';
+  }
+  cat.data.forEach(function (a) {
+    if (!document.getElementById(pfSlotsId(a.clave, 'card')))
+      document.getElementById('pf-slots-grid').insertAdjacentHTML('beforeend', pfSlotsEsqueleto(a.clave));
+    pfSlotsFila(a);
+  });
+}
+function pfSlotsCargarMios(uid, clave) {
+  return fetchConJwt('/api/interacciones?tipo=slot_mios&usuario_id='
+    + encodeURIComponent(uid) + '&clave=' + encodeURIComponent(clave))
+    .then(function (res) {
+      pfSlotsMios[clave] = (res && res.ok === true && Array.isArray(res.data)) ? res.data : [];
+      return null;
+    })
+    .catch(function () { pfSlotsMios[clave] = []; return null; });
+}
+function pfSlotsCargar(uid) {
+  var box = document.getElementById('pf-slots');
+  if (!box || !uid) return;
+  return fetchConJwt('/api/interacciones?tipo=slot_catalogo&usuario_id=' + encodeURIComponent(uid))
+    .then(function (res) {
+      if (!res || res.ok !== true) { pfSlotsCat = null; pfSlotsPintar(); return null; }
+      pfSlotsCat = res;
+      pfSlotsPintar();
+      var claves = (res.data || []).map(function (a) { return a.clave; });
+      if (!claves.length) return null;
+      return Promise.all(claves.map(function (c) { return pfSlotsCargarMios(uid, c); }));
+    })
+    .then(function () { pfSlotsPintar(); })
+    .catch(function () {});
+}
+function pfSlotsMotivo(codigo, res) {
+  var extra = res && res.costo_requerido !== undefined && res.costo_requerido !== null
+    ? ' (' + fmtXp(pfSlotsNum(res.costo_requerido) || 0) + ' XP)' : '';
+  if (codigo === 'XP_INSUFICIENTE') return 'XP insuficiente' + extra;
+  if (codigo === 'TOPE_HISTORICO') return 'Alcanzaste el tope historico de este sumidero';
+  if (codigo === 'TOPE_ACTIVOS') return 'Alcanzaste el tope de slots activos';
+  if (codigo === 'SINK_INEXISTENTE') return 'Ese slot ya no existe en el catalogo';
+  if (codigo === 'SINK_INACTIVO') return 'Ese slot esta desactivado';
+  /* REF_NO_EXISTE_O_SIN_PERMISOS es el MISMO codigo para inexistente y ajeno a
+     proposito: distinguirlos seria un oraculo para enumerar que recursos tienen
+     otros. Se muestra como un caso unico. */
+  if (codigo === 'REF_NO_EXISTE_O_SIN_PERMISOS')
+    return 'El recurso indicado no existe o no pertenece a tu cuenta';
+  /* El picker aun no existe, luego el motor puede responder esto si alguien
+     fuerza el POST a mano. Se explica igual que en el catalogo. */
+  if (codigo === 'SINK_REFSIN_SOPORTE')
+    return 'Este sumidero todavia no es comprable: falta a que se engancha y el servidor no puede validarlo';
+  /* El texto que ya llega traducido del servidor manda sobre cualquier etiqueta
+     propia: el codigo es para maquinas, el error es para el usuario. */
+  return (res && res.error) ? String(res.error)
+    : (codigo ? 'No se pudo comprar: ' + codigo : 'No se pudo comprar');
+}
+/* El enganche que se envia. Sin picker no hay nada que elegir, luego devuelve
+   null y el motor responde REF_ID_REQUERIDO; el cliente no lo adivina. */
+function pfSlotsRef(clave) {
+  return pfSlotsRefs[clave] || null;
+}
+function pfSlotsComprar(clave) {
+  /* CORTE ANTES DE LA RED. No es una mejora de estilo: un boton que parece
+     apagado pero sigue llamando al servidor es un fallo, porque alguien paga por
+     un slot que el motor va a rechazar o, peor, que no sabe a que engancharse.
+     Se recalcula el estado con la MISMA funcion que pinta la tarjeta, de modo que
+     guarda y pantalla no pueden discrepar, y se sale sin fetch. Se avisa con el
+     motivo real para que el usuario sepa por que no pasa nada. */
+  var fila = null;
+  var lista = (pfSlotsCat && Array.isArray(pfSlotsCat.data)) ? pfSlotsCat.data : [];
+  for (var i = 0; i < lista.length; i++) {
+    if (lista[i] && lista[i].clave === clave) { fila = lista[i]; break; }
+  }
+  var st = pfSlotsEstado(fila);
+  if (!st.listo) {
+    showToast(st.motivo || 'Esta compra no esta disponible todavia.', '#fcd34d');
+    return null;
+  }
+  var btn = document.getElementById(pfSlotsId(clave, 'btn'));
+  var previo = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Comprando...'; }
+  return fetchConJwt('/api/interacciones', {
+    method: 'POST',
+    body: JSON.stringify({ tipo: 'slot_comprar', clave: clave, ref_id: pfSlotsRef(clave) })
+  }).then(function (res) {
+    var u = sesion();
+    if (res && res.ok === true) {
+      var pagado = pfSlotsNum(res.costo_pagado);
+      pfSlotsSaldoTras = pfSlotsNum(res.disponible_restante);
+      showToast('Slot comprado. Precio congelado: '
+        + (pagado === null ? 'confirmado' : fmtXp(pagado) + ' XP'));
+    } else {
+      showToast(pfSlotsMotivo((res && res.error) || '', res), '#ef4444');
+      if (btn) { btn.disabled = false; btn.textContent = previo; }
+    }
+    /* El saldo que baja es el del motor, asi que la verdad se vuelve a leer. */
+    if (u && u.id) { pfSlotsCargar(u.id); cargarInventario(u.id); }
+  }).catch(function () {
+    showToast('Error de conexion', '#ef4444');
+    if (btn) { btn.disabled = false; btn.textContent = previo; }
+  });
+}
+
 /* ---- MI INVENTARIO (Gamificacion v4) ---- */
 function cargarInventario(uid) {
   var el = document.getElementById('pf-inventario');
@@ -2214,7 +2725,7 @@ function cargarInventario(uid) {
     .then(function(r){ return r.json(); })
     .then(function(res){
       var data = (res && res.data) || {};
-      if(data.xp_total != null && balance) balance.textContent = fmtXp(data.xp_total) + ' XP disponibles';
+      if(data.xp_total != null && balance) balance.textContent = fmtXp(data.xp_total) + ' XP de reputacion';
       var consumibles = data.consumibles || {};
       var claves = Object.keys(consumibles).filter(function(k){
         var item = consumibles[k] || {};
@@ -5665,7 +6176,7 @@ function pfTab(tab) {
   if (tab === 'clase' && u && u.id) { cargarCasas(u.id); cargarArbolClases(u.id); }
   if (tab === 'red' && u && u.id) cargarMiRed(u.id);
   if (tab === 'museo' && u && u.id) { cargarMuseoPreview(u.id); museoRefrescar(); }
-  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
+  if (tab === 'inventario' && u && u.id) { cargarInventario(u.id); pfSlotsCargar(u.id); cargarCromos(u.id); cargarBonoReferido(u.id); cargarMisRegalias(u.id); if (window.Mercado) Mercado.cargarMi(); cargarCartas(u.id); cargarMercadoCartas(); cargarMoneda(u.id); }
   if (tab === 'mensajes' && u && u.id) cargarMensajes(u.id);
   if (tab === 'contratos' && u && u.id) cargarContratos(u.id);
   if (tab === 'cuenta' && u) renderCuentaPanel();

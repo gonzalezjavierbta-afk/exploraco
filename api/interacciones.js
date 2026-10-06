@@ -2303,29 +2303,44 @@ var SINK_CLAVES = ['foto_galeria', 'destacar_evento', 'album_slot', 'portada_des
 // suposiciones:
 //   usuario_fotos: 1 fila. Columnas id, usuario_id, url, activo.
 //   albumes: 11 filas. Columnas id, usuario_id, activo.
-//   destinos: 218 filas y SIN columna de dueno -> no hay a quien pertenezca.
+//   spot_duenos: 4 filas (MEDIDO 2026-10-05). Columnas destino_id, usuario_id,
+//     votos, calculado_en, activo, tipo_medio. PK COMPUESTA (destino_id,
+//     tipo_medio): NO tiene columna id, luego la columna de enganche se
+//     declara por sumidero en el campo columna. Es la tabla duena-destino de la
+//     plataforma: destinos (218 filas) es catalogo (slug, telefono, web,
+//     booking) y por diseno NO tiene dueno.
 //   eventos: NO existe ninguna tabla: ningun nombre hace match a %event% ni a
-//     %agenda% en information_schema.tables de public.
+//     %agenda% en information_schema.tables de public. Lo unico con esa
+//     forma semantica es cartas_catalogo.es_evento (un booleano), que NO se
+//     cablea aqui: es anotacion de futuro, no un enganche.
 // soporte=false significa que el servidor NO PUEDE validar el enganche, luego
 // RECHAZA la compra en vez de crear una fila huerfana por la que alguien paga
 // 320-800 XP. Preferible no comprable todavia a cobrar por nada.
+// NOTA DE ALCANCE (portada_destino): spot_duenos tiene 4 filas, las 4 con
+// activo=true, pero de UN SOLO usuario (1 usuario_id distinto). El sumidero
+// esta desbloqueado y correcto, pero solo 1 usuario del universo puede
+// comprarlo hoy. No es un defecto del codigo: es el tamano del dato.
 var SINK_REF_ORIGEN = {
   foto_galeria: {
-    tabla: 'usuario_fotos', soporte: true, requiere_pertenencia: true,
+    tabla: 'usuario_fotos', columna: 'id',
+    soporte: true, requiere_pertenencia: true,
     etiqueta: 'Una foto de tu galeria'
   },
   album_slot: {
-    tabla: 'albumes', soporte: true, requiere_pertenencia: true,
+    tabla: 'albumes', columna: 'id',
+    soporte: true, requiere_pertenencia: true,
     etiqueta: 'Un album tuyo'
   },
   portada_destino: {
-    tabla: 'destinos', soporte: false, requiere_pertenencia: true,
-    etiqueta: 'Un destino',
-    motivo_soporte: 'La tabla destinos no tiene columna de dueno: no se puede'
-      + ' probar que un destino pertenezca al usuario de la sesion'
+    // El enganche es el PAR (destino_id, usuario_id) con activo=true. Un
+    // destino del catalogo que el usuario no posee falla por existe_mio, que
+    // va en el MISMO WHERE del debit (refok): no hay lectura previa.
+    tabla: 'spot_duenos', columna: 'destino_id',
+    soporte: true, requiere_pertenencia: true,
+    etiqueta: 'Uno de tus destinos'
   },
   destacar_evento: {
-    tabla: null, soporte: false, requiere_pertenencia: true,
+    tabla: null, columna: null, soporte: false, requiere_pertenencia: true,
     etiqueta: 'Un evento',
     motivo_soporte: 'No existe tabla de eventos en el esquema: no se puede'
       + ' probar que un evento exista ni a quien pertenezca'
@@ -2342,6 +2357,7 @@ function sinkRefContrato(clave) {
     campo: 'ref_id',
     tipo: 'uuid',
     tabla_origen: o.tabla,
+    columna_origen: o.columna,
     etiqueta: o.etiqueta,
     requiere_pertenencia: o.requiere_pertenencia,
     comprable: o.soporte === true,
@@ -2417,11 +2433,14 @@ function sinkRefCte(clave) {
       + ' SELECT false AS ok, false AS soporte, false AS existe_mio FROM ref'
       + ')';
   }
-  // exists por id Y por dueno. Se consulta id + usuario_id + activo = true:
-  // una foto o un album dado de baja (activo=false) no se puede destacar.
+  // exists por id Y por dueno. Se consulta la columna de enganche + usuario_id +
+  // activo = true: una foto, un album o un destino dado de baja (activo=false)
+  // no se puede destacar. La columna sale de la allow-list de CODIGO de
+  // SINK_REF_ORIGEN, nunca del navegador: es un nombre de columna, igual que
+  // la tabla, y se concatena como LITERAL.
   return ', ref AS ('
     + ' SELECT true AS soporte, EXISTS (SELECT 1 FROM ' + o.tabla
-    + '  WHERE id = $5::uuid AND usuario_id = $1::uuid AND activo = true)'
+    + '  WHERE ' + o.columna + ' = $5::uuid AND usuario_id = $1::uuid AND activo = true)'
     + '  AS existe_mio'
     + '), refok AS ('
     + ' SELECT soporte AND existe_mio AS ok, soporte, existe_mio FROM ref'
@@ -15259,8 +15278,10 @@ module.exports = async function handler(req, res) {
             ref_contrato: sinkRefContrato(slClave)
           });
         // Soporte ausente: se rechaza ANTES de tocar la base de datos. Destacar
-        // evento no tiene tabla de eventos y portada destino no tiene dueno,
-        // luego no hay forma honesta de validar el enganche todavia.
+        // evento no tiene tabla de eventos en el esquema, luego no hay forma
+        // honesta de validar el enganche todavia. Sigue VISIBLE en el catalogo
+        // con su motivo_soporte: esconder un sumidero que el usuario leyo en
+        // el diseno seria peor que mostrarlo no comprable.
         var slRefOrigen = SINK_REF_ORIGEN[slClave];
         if (!slRefOrigen.soporte)
           return res.status(409).json({
