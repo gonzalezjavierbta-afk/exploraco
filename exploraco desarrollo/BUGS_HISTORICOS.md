@@ -1916,3 +1916,67 @@ El contexto de relevo de la sesion express reportaba como "bug nuevo" una "regre
 
 **Estado:** **ABIERTA como deuda (2026-10-05).** Decision relacionada: `DECISIONS.md` **ADR-086** addendum A, puntos **A3** y **A4**.
 
+
+## BUG-111: `responderParcheAusente()` responde 503 `SCHEMA_NOT_MIGRATED` con un mensaje que **nombra la migracion equivocada** -- dice "039" cuando la causa real es la `047`
+
+**Severidad:** BAJA de impacto, **ALTA de coste de diagnostico**. No corrompe datos ni degrada la funcionalidad: la migracion que falta esta aplicada. Lo que falla es **la orientacion al que va a depurar**.
+
+**Contexto:** detectado el 2026-10-05 al cerrar documentalmente la tanda de la economia (migracion **`047_parche_upgrades_usuario_inversor.sql`, atribucion del inversor). Tanda: `DECISIONS.md` **ADR-088** punto B6, `TASKS.md` **TSK-184**/**TSK-185**.
+
+**El defecto, medido en el archivo real.** `api/interacciones.js:2567-2575` define:
+
+```
+function responderParcheAusente(res, e, etiqueta) {
+  console.warn('[parche] ' + etiqueta + ' ausente (migracion 039 pendiente): ' + ...);
+  return res.status(503).json({
+    ok: false,
+    error: 'Parche no disponible (migracion 039 pendiente)',
+    code: 'SCHEMA_NOT_MIGRATED'
+  });
+}
+```
+
+Y se invoca en `api/interacciones.js:13625` con la etiqueta `parche_upgrade_invertir`.
+
+**Por que el numero es FALSO.** La causa real de que esa rama entre en el 503 es la columna **`parche_upgrades.usuario_id`**, que es exactamente lo que anade la **`047`**. El mensaje dice **`039`**.
+
+**La 039 no tiene nada que ver.** `039_gig_economy_p2p.sql` creo `parche_upgrades` (y de ahi `idx_parche_upgrades_ciudad_vigencia`), pero **no** creo `usuario_id` y **no** es la migracion que falta. Un developer que lea el 503 va a buscar **una migracion 039 que ya esta aplicada** (`schema_migrations`: `039` no figura como pendiente; lo que esta en juego es la `047`) y va a perder tiempo, o peor, va a **re-aplicar la 039** esperando un efecto que no existe.
+
+**Estado real medido (2026-10-05), que es lo que hace que esto sea un bug de mensaje y no de esquema:** `schema_migrations` tiene **`047` con `resultado='aplicada'`** (433 ms, `2026-10-05T22:36:50Z`), y `parche_upgrades.usuario_id` **existe** (uuid, nullable, con FK a `usuarios(id)`). Es decir, **la rama no deberia entrar en el 503 en produccion**; si lo hiciera seria por otra causa, y el mensaje seguira senalando la migracion equivocada. Un 503 aqui es **mas una pista falsa que un diagnostico**.
+
+**Correccion propuesta -- es EL TEXTO, NO EL NUMERO.** Dos opciones, ambas en `api/`, **ninguna aplicada en este pase** (es codigo, y este cierre es documental):
+
+1. **Recomendada -- sacar el numero del mensaje.** Decir **que** falta, no **que migracion** lo declaro: `'Parche no disponible (esquema de upgrades de parche incompleto)'`. Con eso el 503 **no puede mentir** aunque la migracion que lo declare cambie, que es exactamente lo que ha pasado. Es la opcion que **sobrevive al proximo cambio de esquema**.
+2. **Menor -- corregir el numero a `047`.** Arregla **este** caso y **crea la misma trampa dentro de unos dias**: en cuanto la **`049`** (la que hizo el `SET NOT NULL` **real**, ya aplicada) sea la que falte, el mensaje volvera a mentir. **No recomendado por si mismo.**
+   - **[ACTUALIZACION 2026-10-05, medido]** este parrafo describia a la `048` como "la `NOT NULL`, escrita en disco y **todavia no aplicada**". **Las dos partes eran falsas:** (a) la `048` **si esta aplicada** (`resultado='aplicada'`, **282 ms**), y (b) **nunca hizo `SET NOT NULL`**: impone un `CHECK (usuario_id IS NOT NULL)`. **El `NOT NULL` real lo hizo la `049`** (`is_nullable = **NO**`, **308 ms**). El numero de este bug es, por asi decirlo, **el mismo bug que BUG-112/S12**: un mensaje que describe el estado con un numero que no lo describe.
+
+**La leccion de por que el TEXTO es la correccion (y por que no un numero mejor):** *un mensaje de error que **nombra una causa por su numero** caduca en cuanto el esquema cambia, y caduca **en silencio**: sigue siendo un `503` perfectamente valido mientras apunta a la migracion equivocada.* Decir **que** falta --no **quien** lo declaro-- es la unica forma de que el mensaje **no pueda mentir**. Un `503` que dice "esquema de upgrades de parche incompleto" es **falso-positive-safe**: si el esquema esta completo, el mensaje no aparece; si aparece, el esquema esta incompleto **-sea cual sea la migracion que falte**.
+
+**Por que NO se corrige en este pase.** El cierre documental de este mandato toca **solo** `exploraco desarrollo/*.md` y la nota de estado de la `047`. `api/` **no se escribe** en este encargo (R2, un unico pase documental), y meter un fix de codigo en el pase de cierre seria saltarse el gate de `@backend-dev` y el Escudo GOLD. **Queda ABIERTO** con la correccion escrita, para que `@backend-dev` la aplique en su propio encargo.
+
+**Lo que este bug NO es.** No es un fallo de la economia, no es la `047` sin aplicar, y **no** invalida la atribucion del inversor: el motor funciona y el defecto real -- la inflacion de la `SUM` por miembro -- esta corregido y medido (`DECISIONS.md` **ADR-088** B4.1/B4.2). **El numero equivocado en un mensaje es una deuda de ergonomia de diagnostico, y se registra como tal.**
+
+---
+
+## BUG-112: Los TRES POST de sumideros (`slot_comprar`, `slot_baja`, `slot_rampa_avanzar`) estaban **MUERTOS desde su creacion** -- dos porteros los rechazaban **antes** del bloque funcional, y el sintimo era **indistinguible** del de una regla de negocio
+
+**Severidad:** **ALTA de impacto funcional** (ningun usuario podia comprar un sumidero, y el sistema **parecia** funcionar) y **ALTA de coste de diagnostico** (produjo una hipotesis falsa que se creyo durante una sesion entera). **Estado: CERRADO** (reparado con lista cerrada de los 3 nombres; verificado en produccion).
+
+**Contexto:** detectado y medido el 2026-10-05 al cerrar documentalmente la tanda de los sumideros. Encargado en `DECISIONS.md` **ADR-088 §B8**.
+
+**El defecto, medido.** Los tres POST **nunca se ejecutaron con exito desde que se crearon**. No estaban a medias ni parcialmente: estaban **muertos por el portero**, porque **dos guard los mataban antes de llegar al bloque funcional**:
+
+1. Un guard exigia **`destino_id`**, que los sumideros **no llevan**: es un campo de destino, no de sumidero.
+2. Otro guard exigia una **lista cerrada de tipos validos** que **no incluia** los tres nombres nuevos.
+
+El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el punto en que el usuario ya habia superado todo lo que el sistema podia justificar.
+
+**Por que nadie lo noto (esta es la parte instructiva).** Los **0 filas en `sink_slots`** se explicaban en la sesion por una hipotesis de **"slots huerfanos"**. **Era falsa.** Los 0 filas se explicaban por **la puerta mal puesta**: si el portero no deja pasar a nadie, la tabla esta vacia y el sistema **parece** coherente. **Y el `400` de portero es indistinguible del `400` de saldo:** ambos son `400`, ambos llegan con sesion valida, y ninguno dice **quien** tiene el error. **El sintoma de un bug de cableado puede parecerse exactamente al de una regla de negocio**, y por eso la hypotesis reasonable (slots huerfanos / saldo insuficiente) era la **equivocada** y la evidentemente absurda (mi puerta esta mal) era la **cierta**.
+
+**La leccion, escrita para que sobreviva al bug:** *ante un `400` unexplained que persiste, la primera pregunta **no** es de reglas de negocio: es **si la puerta acepta el caso que dice aceptar**.* Esa pregunta, hecha al principio, habria desmentido la hipotesis falsa antes de formularla.
+
+**Reparacion:** lista cerrada con los **3** nombres de los sumideros en el guard. Verificado por HTTP en produccion el 2026-10-05: `?tipo=slot_catalogo` responde **200** y expone **3 de 4** sumideros como `comprable = true` (`foto_galeria`, `album_slot`, `portada_destino`), con `destacar_evento` **no comprable y con `motivo_soporte` explicito** (que es lo correcto: esa tabla no existe).
+
+**NOTA DE TESTS (atadura que hay que conocer).** `smoke_036` comprueba el **literal del guard** por `indexOf`, es decir, **verifica el texto del guard y no su comportamiento**. Por tanto **el literal debe conservarse EXACTO**: reescribirlo deja el smoke **en rojo aunque el codigo este bien**. Se acepta la atadura a proposito -- un guard reescrito es un guard que hay que volver a mirar -- pero conviene saberlo para no "arreglar" el smoke rompiendo el codigo, ni al reves.
+
+**Lo que este bug NO es.** No es un fallo del motor de sumideros (que funciona: `costo_siguiente` medido con **0 divergencias centima a centima** en 44 comparaciones), no es un fallo de saldo, no es la hipotesis de slots huerfanos, y **no** es deuda de UI (el boton no comprable de la UI **se corta antes de cualquier `fetch`**, medido: 3 clics -> **0, 0, 0** peticiones, que es exactamente el comportamiento correcto). **Es deuda de cableado: un `400` de un portero mal escrito que jamas se ejecuto.**

@@ -4308,6 +4308,11 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - Los **11 puntos de gasto del clamp del XP disponible declarados en el ADR pero SIN implementar**.
 - El **escritor de la rampa de 30 dias** quedo **promovido a script de mantenimiento**, no cableado.
 
+**CORRECCION DE ESTE BLOQUE [2026-10-05, medido, NO se borra el texto anterior porque es el registro de lo que se creia entonces -- Cero Borrado Logico]:** las 4 lineas anteriores **estan superadas por el estado real**, y **2 de ellas eran falsas**:
+- **"045 NO escrita y NO aplicada"** -> **FALSO, y ademas es la misma falsedad de una generacion antes.** Hoy hay **6 migraciones aplicadas** (`044`-`049`), **0 fallidas**. Ninguna de las cuatro cosas listadas como "NO hechas" **sigue sin hacer**: el ranking compuesto y los sinks **estan escritos y desplegados** (`lib/score.js` + `api/interacciones.js`), la **UI de sinks esta hecha y commiteada** (`mi-perfil.html` pestana **Inventario**, `+516/-5`, commit `b2f9cf1`) y el gate de pestanas se resolvio con la fuente unica `niveles-data.js` de ADR-085.
+- **"Los 11 puntos de gasto del clamp SIN implementar"** -> **FALSO, y es la premisa mas cara de esta sesion.** El clamp **SI esta implementado y desplegado**: medido en `api/interacciones.js`, la expresion `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)` aparece en **14 sitios** (p.ej. `:1200`, `:1209`, `:2475`). **No son 11:** el numero del ADR (11) es una especificacion de diseño y **14** es el conteo de sitios reales, asi que **la cifra no se reconcilia y no debe reconciliarse** -- lo que se cierra es el **estado**, no el conteo. **Que "no implementado" significaba "el disponible puede quedarse negativo"**, y **no puede**: lo que **si** quedo abierto es el **punto 12**, `tithe_parche`, que **no** tiene el guard (ADR-088 §B2.4 y §B12).
+- **El "escritor de la rampa de 30 dias"** sigue promoted a script de mantenimiento: este punto **NO se corrige**, continua vigente.
+
 ## Despliegue de `api/interacciones.js` y verificacion en produccion del listado de planes - 2026-10-05 (TSK-181)
 
 **Estado:** CERRADA (2026-10-05) **por desmentir su propia premisa**. Su bloqueante --"desplegar `api/interacciones.js`"-- **era falso**: el codigo **ya estaba desplegado**. No hubo despliegue. Ver el bloque de correccion de premisa mas abajo.
@@ -4371,7 +4376,22 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ## Ranking compuesto y los 4 XP sinks en codigo + UI de sinks y leaderboard - 2026-10-05 (TSK-184 / ADR-086)
 
-**Estado:** PENDIENTE. **0 lineas de codigo de economia escritas en esta sesion.** El diseno esta **completo y aprobado** en `DECISIONS.md` **ADR-086**; aqui solo el alcance pendiente.
+**Estado:** **CERRADA (2026-10-05)** -- **hecha y desplegada**. Los **3 bloques** estan implementados y **verificados por HTTP en produccion**. El argumento vive **una sola vez** en `DECISIONS.md` **ADR-086** + **ADR-088** (addendum B); aqui solo el estado y las medidas.
+
+**Que se entrego, con la medida:**
+- **(1) Ranking compuesto en query:** los **4 rankings** (`leaderboard`, `faccion_ranking`, `casa_ranking` y **`pandilla_ranking`**, el cuarto) comparten **una sola aritmetica** via el motor **`lib/score.js`**, calculado **EN QUERY** (CTE **no correlacionada**, `COALESCE` explicito). **No se creo `score_cache`.** Motores fuera de `api/` por el limite **8/8** (`DECISIONS.md` **ADR-088** B3).
+- **(2) Las 4 ramas de los XP sinks:** compra atomica con CTE (patron ADR-055, sin `FOR UPDATE`), debito de `xp_gastado_sinks` con `es_exento = true`, slots con **doble tope** y **precio congelado por fila** (`alpha_aplicado`, `gamma_aplicado`, `slot_index`).
+- **(3) UI:** leaderboard compuesto, superficie de los 4 sinks y gate de pestanas.
+
+**VERIFICACION POR HTTP (2026-10-05, `https://exploraco.vercel.app`):** `slot_catalogo` **200** con los **4 sumideros** y `curva.alpha = 0.2`, `gamma = 2`; `slot_rampa` **200**; `planes` **200**. Los **3 topes de compra** quedan **validados en produccion**: **historico** (`k = COUNT(*) < slot_max`), **activos** (`k_activos < slot_max_activos`) y **disponible** (`GREATEST(xp_total - COALESCE(xp_gastado_sinks,0),0) >= costo`). **Ojo con `SALDO_TOPE = 2000`: NO es un tope de compra**, es el tope del **termino de saldo dentro del ranking** (`gamificacion_config.ranking_saldo_tope`); ver **ADR-088** B1.4.
+
+**PRUEBA DE LA ATRIBUCION DEL INVERSOR (medida):** pandilla de **50** miembros, **1** parche de **100** pts -- codigo **nuevo** = **200,00** (**1** conteo) vs codigo **viejo** = **10.000,00** (**50** conteos), **delta 9.800,00**. Conductor nuevo `pu.usuario_id` (migracion **`047`**, **aplicada**: 433 ms, `2026-10-05T22:36:50Z`). **`DISTINCT ON` NO arreglaba este defecto**: no multiplicaba filas, **inflaba una `SUM`**. Ver **ADR-088** B4.1/B4.2.
+
+**Invariante que se respetó (no negociable, ADR-018):** **`xp_total` no se toca** en el ranking ni en los sinks. Los sinks **debitan `xp_gastado_sinks`**, nunca `xp_total`. **Consecuencia deliberada, NO un bug:** `billetera_mia` y los perfiles publicos muestran **`xp_total` crudo sin restar**, porque `xp_total` es la **reputacion**, no un saldo. **No lo "corrijas"** -- ver **ADR-088** B2.5.
+
+**DEUDA ABIERTA [no cerrar]:** **`rol_factor`** -- el `CASE` de rol (`fundador` x1.0 / `oficial` x0.6 / resto x0.3) esta bien implementado y coincide con el ADR, pero el valor `'oficial'` **se lee en varios sitios y ningun codigo lo escribe**, y **`pandillas_miembros` tiene 0 filas** (medido, sobre `usuarios = 10`): hoy el `CASE` **no tiene con que comparar y es inocuo**, y pasara a activo en cuanto exista la primera fila. Ver **ADR-088** B4.4.
+
+**Lo que NO se cerro aqui:** la **`048`** (`NOT NULL` sobre `parche_upgrades.usuario_id`) esta **escrita en disco y NO aplicada** (medido: `is_nullable = YES`); es paso manual del operador (gate `@data-migration`).
 
 **Alcance (3 bloques de trabajo reales):**
 - **(1) Ranking compuesto en query:** `Score = XP_Total + (0.50 * Saldo) + Fama_Parche`, con `SALDO_TOPE = 2000` **global** y el score calculado **EN QUERY** (CTE agregada **no correlacionada**, con `COALESCE` explicito: sin el devolvia posiciones arbitrarias en silencio, uno de los bloqueantes de la ronda 2). **No se crea `score_cache`.**
@@ -4384,7 +4404,21 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 
 ## 11 puntos de gasto del clamp del XP disponible - 2026-10-05 (TSK-185 / ADR-086)
 
-**Estado:** PENDIENTE. **Declarados y DISENADOS en el ADR, NO implementados** (0 lineas). Se separan de **TSK-184** porque son un bloque **distinto**: endurecer el **gasto** de XP ya existente, no construir la economia nueva.
+**Estado:** **CERRADA (2026-10-05)** -- **11 de 11 puntos implementados y desplegados**. Criterio de cierre cumplido: **11 de 11 o ninguno**, y fueron **11 de 11**. El argumento vive **una sola vez** en `DECISIONS.md` **ADR-088** B2; aqui solo el estado.
+
+**Que se aplico:** el clamp `GREATEST(xp_total - xp_gastado_sinks - <gasto>, 0)`, cuya forma en SQL es `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= <coste>`, cableado en los **11 puntos de gasto**.
+
+**Por que era obligatorio (no era estilo):** `xp_total` era el **unico saldo gastable**; la `046` introdujo `xp_gastado_sinks` y los 11 puntos **lo ignoraban**, restando **dos veces** del mismo numero. **No es teorico:** con disponible crudo **-100** la compra **pasaba**; ahora **se ve 0 y RECHAZA**.
+
+**El borde, escrito para que nadie lo lea mal:** disponible exactamente **0** tambien **RECHAZA**, porque el clamp se compara contra el **`coste`**, nunca contra 0. **`>= 0` en pantalla no es "puedo comprar".** El criterio correcto de UI es `disponible >= costo del proximo slot`, y ese costo **no es constante**: es `costo_base_xp * (1 + alpha * k)^gamma`.
+
+**TRAMPA 1 -- las lineas del ADR estaban CADUCAS [metodo, no anecdota]:** el ADR declaraba `usuarios.js:1475/1569/1662` e `interacciones.js:1185/9490/...`, con un **drift monotonico de hasta +406 lineas**. Se localizaron **POR FORMULA, no por linea** (la sentencia que cumple el patron), y en 11 de 11 la formula era unica. **Regla que queda:** *cualquier referencia de linea en la gobernanza es una **FOTO**, no una direccion.* Ver **ADR-088** B2.3.
+
+**TRAMPA 2 -- hay un PUNTO 12 que el ADR NO cuenta [DEUDA ABIERTA, NO cerrada]:** **`tithe_parche`** (`api/interacciones.js:4229`, `INSERT` en `:4263`, `accion='tithe_parche'`, `is_exento=true`) hace `SET xp_total = GREATEST(0, xp_total - $1)` **sin ningun guard** y **no lee `xp_gastado_sinks`**. Puede hundir el disponible a negativo: **1000** total, **800** en sumideros, diezmo **500** -> **`-300`**. **NO se toco, y es decision:** el diezmo es una **ofrenda voluntaria**, luego acotarlo es una **decision de producto**, no de codigo. **Queda abierto, no cerrado** (ver **ADR-088** B2.4 y B6).
+
+**TRAMPA 3 -- `billetera_mia` y los perfiles publicos muestran `xp_total` sin restar [NO ES UN BUG]:** es **correcto**: `xp_total` es la **reputacion** (ADR-018), no un saldo. Restarlo **deformaria la reputacion y degradaria el nivel ya alcanzado**. **No lo "corrijas"** -- ver **ADR-088** B2.5 y **TSK-184**.
+
+**Que sigue abierto de esta tarea:** solo la **TRAMPA 2** (`tithe_parche`), por la razon de producto escrita arriba.
 
 **Alcance:** los **11 puntos** donde el clamp del XP disponible se gasta y **todavia no esta cableado** a la regla unica del ADR. Cada uno es un **punto de ruptura silencioso** si se cablea la regla nueva a medias: el clamp queda en un valor por defecto y el gasto **no se ve en ningun sitio**.
 

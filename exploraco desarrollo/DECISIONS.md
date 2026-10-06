@@ -5922,7 +5922,7 @@ Las **3 diferencias** con la version descartada son las que la hacen viable:
 2. **La agregacion ocurre una vez por peticion**, no una vez por usuarioorderado: las 4 vistas **comparten la misma CTE**, luego el ranking de facciones y el de casas **no duplican el trabajo** (antes cada una recalculaba sus propias).
 3. **El coste se paga una vez y se degrada por parametro, no por codigo**: con `ranking_score_gamma = 0` el score es **identico a `xp_total`** y la consulta puede seguir usando el camino plano (indice sobre `xp_total`, sin los 3 agregados), que es **exactamente el estado de hoy**.
 
-**El numero honesto del coste, y por que es aceptable:** el coste real son **3 scans agregados por peticion de ranking** (moneda_ledger, el agregado de parches, y el de gobernanza), mas el scan de `usuarios` que ya existia. En la practica eso es **1 CTE con 3 sub-escaneos sobre tablas indexadas, en el servidor Postgres de Neon, sin往返 de red por usuario**. El riesgo **no es el volumen de filas** (el catalogo de XP ya lo hace por evento: `xp_ledger` se consulta en cada interaccion y el sistema aguanta), es el **timeout en el endpoint mas caliente del producto**. Y por eso la mitigacion es una **degradacion explicita**, no una cache:
+**El numero honesto del coste, y por que es aceptable:** el coste real son **3 scans agregados por peticion de ranking** (moneda_ledger, el agregado de parches, y el de gobernanza), mas el scan de `usuarios` que ya existia. En la practica eso es **1 CTE con 3 sub-escaneos sobre tablas indexadas, en el servidor Postgres de Neon, sin ida y vuelta de red por usuario**. El riesgo **no es el volumen de filas** (el catalogo de XP ya lo hace por evento: `xp_ledger` se consulta en cada interaccion y el sistema aguanta), es el **timeout en el endpoint mas caliente del producto**. Y por eso la mitigacion es una **degradacion explicita**, no una cache:
 
 **Degradacion explicita y cableada (la parte que hace que esto no sea "un mecanismo que no puedo cablear").** El ranking se implementa con **el patron de degradacion que el propio archivo ya usa** (`usuarios.js:1185-1189` ya reintenta con `frSql(null)` ante `42703`, y `:1263-1268` ya degrada `casa_ranking` escalonada ante `42P01`/`42703`):
 
@@ -5996,6 +5996,50 @@ LEAST(
 - **El `999999999` del `LEAST` exterior** es un techo de seguridad que solo existe para que el `LEAST` interno sea un `LEAST` de dos valores comparables cuando la fila de config **aun no existe** (`045` sin aplicar). En ese caso el termino queda sin tope, y la degradacion de `ranking_score_gamma = 0` (§4, decision D) es lo que evita que ese estado llegue a pantalla. Es una guarda, no el comportamiento normal.
 
 **El `activo = true` que la version anterior ponia en el ledger desaparece, y hay que decir por que.** `moneda_ledger` es **append-only** (`040:214-223`) y **no tiene columna `activo`**: filtrar por `activo = true` seria un **42703**, y ademas conceptualmente incorrecto (un ledger no se da de baja, se compensa con un `delta` de compensacion -- invariante 5 de la parte 1). El "respeto por ADR-003" que la version anterior atribuia a ese filtro era **falso**: `moneda_ledger` no es una tabla con borrado logico, es un libro. Si una moneda se desactiva, lo que se hace es `UPDATE moneda_acciones.activo = false` para **dejar de emitir**, no para reescribir el historico.
+
+### Addendum ADR-086-A (2026-10-05): las 4 correcciones medidas en Neon (read-only) a la seccion 4 -- atribucion por INVERSOR, el techo de gamma es 1.0, `rol_factor` 0.6 declarado sin escritor, y el FROM elidido de la `Fama_Parche`
+
+Las 4 correcciones de abajo salen de una medicion **read-only sobre el esquema EN DISCO** (`information_schema` + conteos) el 2026-10-05, no de una lectura del historial de este ADR. **No se reescribe la seccion 4**: se le anade lo que estaba elidido y lo que estaba mal, y cada punto cita la linea donde el ADR original **ya decia lo correcto**, para que la correccion sea auditable contra el texto y no contra este addendum.
+
+**1. ATRIBUCION POR INVERSOR (defecto corregido en DISENO, todavia NO en codigo).**
+
+El `FROM` del sub-select de fama estaba **ELIDIDO** en este ADR -- `FROM ...` (`:5900`) -- y lo reconstruyo el implementador al cablearlo. En esa reconstruccion el scoping se hizo por **`pm.pandilla_id`** (el miembro), luego el `SUM(puntos_invertidos)` del parche se acredita **completo a CADA miembro de ese parche**. **Consecuencia:** una pandilla de 50 miembros cobra **50 veces** el mismo termino que una de 1 miembro. Y **no es multiplicacion de filas**: eso lo resuelve el `DISTINCT ON (u.id)` de `:5917`, que ya esta cableado. Es **inflacion de una `SUMA` DENTRO del propio `SUM` del termino**: un error aritmetico que el `DISTINCT ON` no puede ver, porque produce **una fila por usuario** -- solo que con el numero equivocado.
+
+- **MEDIDO:** `parche_upgrades` tiene FK `(parche_id) REFERENCES pandillas(id)` y **NO tiene columna `usuario_id`**. El dato del inversor **ya existe en el momento de la compra**: el campo `puiUid` **ya esta en scope** en `api/interacciones.js:13131` y **ya se pasa al `INSERT`** (unico escritor, ~`:13158` / `:13488`). Es decir: **la atribucion es posible desde el principio y lo que faltaba era persistirla, no obtenerla**.
+- **MECANISMO ACORDADO (migracion `047`, [PENDIENTE -- se esta redactando en paralelo y AUN NO esta escrita en disco]):** anade `usuario_id uuid NULL REFERENCES usuarios(id)`. **NULLABLE a proposito**, y es justamente lo que hace la migracion **aditiva**: con `NOT NULL` habria que rellenar toda la tabla en una sola sentencia y se romperia el `INSERT` actual entre el momento del `ALTER` y el del deploy. El `INSERT` pasa `puiUid`, y el agregado se resuelve por **`pu.usuario_id`**.
+- **DICCAMEN sobre las filas con `usuario_id IS NULL`: se EXCLUYEN del termino de fama, NO se redistribuyen.** Redistribuir seria **reincidir en el defecto**: volver a colgar el total del parche de la pertenencia, que es exactamente el multiplicador por `num_miembros` que este addendum elimina. Un verificador de `$0` en `scripts/` hace **fallar la suite** si aparece una fila `NULL`: un fallo puntual de escritura queda visible de inmediato en vez de convertirse en fama inflada y silenciosa.
+- **BACKFILL: NO PROCEDE, y no es una omision.** Un backfill es una **transformacion sobre filas historicas**, y `parche_upgrades` tiene **0 filas medidas**, luego **el conjunto a transformar es vacio**. En el caso "nunca ha tenido filas", el `NULL` es el estado por construccion y el `DEFAULT` aplica a toda fila futura. En el caso "tuviera filas historicas", haria falta backfill **y ademas seria irrecuperable desde la fila**: un `NULL` **no tiene testigo** -- no hay columna de la que deducir quien compro el upgrade, y la reconstruccion solo seria posible **desde `xp_ledger`** (el gasto de XP es el hecho economico que si quedo registrado), nunca desde `parche_upgrades`.
+- **ADR-003 (Cero Borrado Logico) es irrelevante aqui:** anadir una columna **no borra nada**, y `parche_upgrades` **no tiene columna `activo`** que preservar. ADR-003 gobierna el borrado logico de entidades; aqui hay una **columna que se anade**, que es la operacion opuesta.
+
+**2. CORRECCION DE gamma: SU TECHO ES 1.0, NO 2.0.**
+
+- **MEDIDO:** `gamificacion_config` es un **KV** (columnas `clave` / `valor`), luego **gamma NO es una columna** sino una fila: `ranking_score_gamma = 0.0000` y `ranking_score_gamma_inicio = 0.0000`, y la **descripcion de la clave dice literalmente "1.0 = score completo"**. El escritor hace `SET valor = 1.0000` (`api/interacciones.js:15176`): el tope de `1.0` esta **en el dato**, no solo en la prosa.
+- **El ADR ya lo decia, en los dos sitios donde importa:** `w(t) = GREATEST(0.0, LEAST(1.0, t))` (`:5767`) y "el peso ya aplicado, en `[0,1]`" (`:5778`). El `2.0` que circula como si fuera gamma es el **peso del COMPONENTE inversion dentro de la `Fama_Parche`** (`api/usuarios.js:254`): una constante de la seccion 4, sin relacion con la rampa. **Corregir cualquier lectura que diga que gamma llega a 2.0** -- `2.0` y `gamma` son numeros de dos sitios distintos del sistema, y confundirlos cambia el techo del ranking compuesto de `2x` a `1x`.
+
+**3. `rol_factor`: el 0.6 ("oficial") HOY ES INALCANZABLE.**
+
+- **MEDIDO:** `'oficial'` se **LEE** como rol valido en `api/interacciones.js:1318`, `:12252`, `:13426`, pero **NINGUN codigo lo ESCRIBE**. Los **unicos escritores** de rol son `'fundador'` (`:11843`) y `'miembro'` (`:11895`). El otro `'oficial'` del repo -- `api/usuarios.js:1596` -- escribe en **`casa_roles`**, que es **otra tabla y otro factor** (`api/usuarios.js:254`), y no alimenta `rol_factor`.
+- **Luego la escala real de `rol_factor` es binaria (1.0 / 0.3)** hasta que exista un escritor de `'oficial'`: fundador `x1.0`, miembro `x0.3`. El `0.6` de la tabla de `:5738` es una **intencion documentada sin ningun camino de escritura que la pueda alcanzar**.
+- **DECISION: se deja el `CASE` fundador 1.0 / oficial 0.6 / resto 0.3 SIN TOCAR.** Con `pandillas_miembros` en **0 filas** el termino entero es `0`, luego el `ELSE 0.3` es **inocuo hoy**; degradarlo a un valor neutro (0.0) **tiraria una intencion documentada sin evidencia**. Se **marca `0.6` como "declarado, sin escritor"** y **NO se trata como dato verificado**: es una rama del `CASE` cuya existencia **no es un hecho del esquema**, y por eso se corrige la etiqueta, no el codigo.
+
+**4. EL `FROM` ELIDIDO, RELLENADO con el scoping correcto (`pu.usuario_id` frente a `pm.pandilla_id`).**
+
+Este es el texto que sustituye el `FROM ...` de `:5900`. Se deja constancia de que el `FROM` original **estaba elidido en el ADR** y **fue reconstruido por el implementador**, que lo acoto por `pm.pandilla_id` (punto 1). **El defecto estaba en el `FROM`, no en el diseno:** la seccion 4 ya afirma que los puntos invertidos son **"esfuerzo demostrado"** (`:5740`), y esa frase **solo es cierta con atribucion por inversor** -- el esfuerzo es de quien pago, no de todos los que estaban en el grupo cuando se cobro.
+
+```sql
+-- Sustituye al `FROM ...` de :5900. El scoping es POR INVERSOR (pu.usuario_id):
+-- pm.pandilla_id sirve para ENCONTRAR los parches del usuario, nunca para
+-- acreditar el gasto de otro miembro.
+FROM pandillas_miembros pm
+JOIN parche_upgrades pu
+  ON  pu.parche_id   = pm.pandilla_id
+  AND pu.usuario_id  = pm.usuario_id  -- atribucion por INVERSOR (PENDIENTE: columna de la 047)
+  AND pu.activo_hasta > now()        -- upgrades vigentes, como en :5740
+```
+
+El `pu.usuario_id = pm.usuario_id` es **todo el arreglo**: conserva el `GROUP BY pm.usuario_id` (una fila por usuario, que es lo que el `DISTINCT ON` de `:5917` espera) y **sustituye el credito por pertenencia por credito por compra**. Las filas con `usuario_id IS NULL` **no entran en el `JOIN`**, luego quedan **excluidas** del termino en vez de redistribuidas, que es el dictamen del punto 1.
+
+**PENDIENTE cuando exista la `047` en disco:** sustituir la linea comentada por la columna real, anadir el verificador de `$0` al `scripts/` de produccion y cerrar el punto 1 con su evidencia. Hasta entonces, **este addendum documenta el defecto en el diseno y el mecanismo acord, y el defecto NO esta corregido en codigo**.
 
 ### 5. Umbrales de las Eras para el level-gate (TSK-179, hoy 3 de 11)
 
@@ -6368,4 +6412,338 @@ D1 acoto la higiene documental **entre documentos de gobernanza** (`TASKS.md`, `
 
 **Lo que este ADR declara expresamente:** **no reabre la decision 6 de ADR-055.** Si alguna vez se quisiera `FOR UPDATE` o una transaccion explicita para compra atomica, es **un ADR nuevo** (y habria que resolver antes el limite de `sql.transaction()` de D5).
 
+### D7 -- El checksum es de BYTES, y por eso es **sensible a los fines de linea**: la deriva se puede fabricar sin escribir una linea de SQL [ANADIDO 2026-10-05, tras incidente medido]
+
+D4 decidio que la deriva la detecta el script y que el checksum almacenado nunca se sobrescribe. Esta seccion **no cambia D4**: lo completa, porque el fallo que se midio **no es un fallo del script ni del runner**, sino una propiedad del **entorno**.
+
+**El hecho medido.** Los checksums de `schema_migrations` se comparan **byte a byte**, luego un solo byte distinto es deriva. Y los bytes de un `.sql` incluyen sus **fines de linea**. En una maquina con `core.autocrlf = true` (medido en **esta** maquina: `git config core.autocrlf` = `true`), un `git checkout` puede **reescribir** un `.sql` de LF a **CRLF**. Los 129 saltos de linea de la `047` pasaron a **129 CRLF**, y su sha256 en disco paso de **`b1f484ec0b98b0ae`** a **`1aa1732404fe60fe`**. **La migracion estaba intacta y correctamente aplicada: no se escribio ni una linea del SQL.** Y aun asi la puerta de predecesora de D2 la reportaria como **DERIVA**.
+
+**Por que esto es una NORMA y no un anecdotario.** El hallazgo general es: **en cualquier maquina Windows, sin `.gitattributes`, TODA migracion ya aplicada que pase por un checkout produce un falso positivo de deriva, para siempre.** No es una migracion fragil ni un fichero exceptional: es la combinacion de tres hechos ordinarios -- checksum byte a byte (D4), `core.autocrlf` activo por defecto en Windows, y `.sql` guardados en LF. Un proyecto con esta arquitectura y sin la regla tiene un fallo **latente y permanente**, no uno pendiente de que aparezca.
+
+**La auditoria que lo midio (se ejecuto; no es hipotetica).** Contraste sha256 de disco contra `schema_migrations.checksum` para las 6 migraciones:
+
+| Migracion | sha256 disco (16) | ledger (16) | Veredicto |
+|---|---|---|---|
+| `044_planes_viaje_fecha_inicio.sql` | `6428b0706e523a37` | `6428b0706e523a37` | MATCH |
+| `045_schema_migrations.sql` | `6f54f2fb99b36abd` | `6f54f2fb99b36abd` | MATCH |
+| `046_market_multimoneda_sinks.sql` | `88bee5ff758b1964` | `88bee5ff758b1964` | MATCH |
+| `047_parche_upgrades_usuario_inversor.sql` | `b1f484ec0b98b0ae` | `b1f484ec0b98b0ae` | MATCH |
+| `048_parche_upgrades_usuario_id_obligatorio.sql` | `48aa9505223e7521` | `48aa9505223e7521` | MATCH |
+| `049_parche_upgrades_usuario_id_set_not_null.sql` | `f59a704ec3248517` | `f59a704ec3248517` | MATCH |
+
+**Resultado: 6 de 6 coinciden, 0 CRLF en las 6, 0 fallidas.** La `047` es hoy **byte identica** a la aplicada: sha256 `b1f484ec0b98b0ae7b9d8ab1059defe658e3f61ca47d81f73bcf8816a3fe30af`, **7.803 bytes, 129 LF, 0 CRLF**. La auditoria **descarto** la hipotesis de que hubiera otras migraciones afectadas: la `047` estaba sola.
+
+**La solucion aplicada (ya commiteada).** `.gitattributes` fijando `eol=lf` en las rutas cuyo checksum queda registrado, mas `working-tree-encoding=ascii`:
+
+```
+db/migrations/*.sql text eol=lf
+db/cleanups/*.js   text eol=lf
+db/migrations/*.sql text working-tree-encoding=ascii
+db/cleanups/*.js   text working-tree-encoding=ascii
+```
+
+Se eligio **`.gitattributes` y no "volver a copiar el checksum"** por una razon de principio: D4 prohibe sobrescribir el checksum porque el checksum es **la evidencia**. Si ante una falsa deriva se reescribiera el checksum para "arreglarla", se habria **destruido la unica prueba** de que el fichero en disco es el que se aplico, y el fallo volveria a ser invisible, que es justo lo que D4 vino a impedir. **La deriva falsa se corrige en el ENTORNO; nunca en la EVIDENCIA.**
+
+**TRAMPA DE SEGUNDO ORDEN, medida y verificada, porque nadie debe volver a descubrirla:** con `core.autocrlf=true`, `git checkout` **NO reescribe** un fichero que git cree correcto -- normaliza al comparar, ve que "ya coincide" y **deja los CRLF puestos**. O sea: **rehacer checkout NO arregla nada**, y es tentador creer que si, porque el comando no falla. **Si lo que hay que forzar es la REESCRITURA, hay que BORRAR el fichero y traerlo de nuevo.** Sin este dato, el remedio se aplica, no produce efecto, y se diagnostica como "el `.gitattributes` no funciona".
+
+**La regla que queda (lo unico que hay que recordar de esta seccion):** *ante una deriva de checksum, **contar primero los CRLF del fichero**. Si hay CRLF y el contenido es identico, **es esto**.* El conteo se hace con un comando **binario**, no leyendo el fichero entero: un `.sql` de migracion debe estar en LF por definicion, y un recuento de bytes es la medicion honesta. **Cero Borrado Logico (Regla de Oro 3) no se opone a nada de esto**: aqui no se borra ninguna migracion ni ninguna fila; lo que se revierte es una **reescritura de bytes que nadie pidio**.
+
+**Lo que NO se hace, y por que.** (a) **No se "normaliza" el checksum a version sin CR**: romperia la correspondencia con el byte realmente aplicado. (b) **No se exime a ninguna ruta `.sql`**: la excepcion por ruta es la unica que no deja un agujero. (c) **No se reescribe la `047`**: ya es byte identica. Lo que **si** se hizo en un pase anterior fue **anadir una nota de estado a su cabecera**, lo cual **si cambia el checksum**, y por eso **se revirtio**. **El fichero aplicado debe ser byte identico para siempre**: una nota de estado es informacion del historial y de `schema_migrations`, no del SQL que se ejecuto.
+
 ---
+
+---
+
+## ADR-088: Addendum B del ADR-086 -- tres premisas que la seccion 4 asumio y el esquema desmiente; el clamp del XP disponible y sus 3 trampas; el motor compartido en `lib/` como razon del limite 8/8; y el cuarto ranking con atribucion del inversor
+
+**ID:** ADR-088
+**Fecha:** 2026-10-05
+**Autor:** Chief Architect (`@architect`) por dictamen, cerrado documentalmente por `@docs-keeper`
+**Estado:** **RATIFICADO** -- el operador ratifico expresamente el motor compartido en `lib/` y la atribucion por inversor. Las tres correcciones de la seccion 4 son **medidas**, no interpretables.
+
+**Relacion:** ADR-086 (Capa 2, seccion 4), ADR-010 (presupuesto 8/8), ADR-018 (`xp_total` es reputacion, no saldo), ADR-006 (el baseline es el esquema real medido), ADR-008 (gobernanza e idempotencia de esquema), ADR-084 (el argumento vive una vez). Tareas: `TASKS.md` TSK-184, TSK-185. Bugs: `BUGS_HISTORICOS.md` BUG-109 (precedente), BUG-111 (nuevo, este addendum).
+
+**Naturaleza de este addendum.** ADR-086 **no se reescribe**. Este documento es el **addendum B**: corrige, ratifica y cierra lo que la seccion 4 del ADR-086 dejo abierto o escribio sin medir. Quien lea la seccion 4 **debe leer este addendum despues**, porque el primero se escribio **sin leer el esquema real** y el segundo se escribio **midiendo el esquema real**.
+
+### B0. La leccion que sobrevive a las tres correcciones (esto es lo que hay que leer primero)
+
+**El patron, medido, no supuesto.** La seccion 4 del ADR-086 **se redacto sin abrir el esquema**, y por eso acumula afirmaciones que `information_schema` desmiente una por una. No es un error de redaccion: es un **error de procedimiento**, y el procedimiento es lo que hay que cambiar.
+
+**La regla que sale de ahi, y que es mas duradera que las tres correcciones concretas:**
+
+> **Una afirmacion sobre el esquema que no venga de una medicion de `information_schema` o `pg_indexes` es una HIPOTESIS, y se marca como tal.** Si se redacta sin marcarlo, hereda la apariencia de un hecho y es exactamente lo que produce un `42703` tres sesiones despues -- el mismo fallo que BUG-103.
+
+La prueba de que la regla tiene valor retroactivo y no es solo una excusa para este ADR: **la primera premisa que se corrige aqui (`moneda_cuentas.activo`) ya habia sido corregida en un addendum anterior, con su propio BUG (BUG-109).** Es decir, **el patron ya se habia manifested una vez** y lo que faltaba era convertirlo en norma. Este addendum lo hace.
+
+**El criterio operativo, medido en esta tanda:** los tres puntos que se corrigen abajo son los tres que un `information_schema` sobre `public` **desmiente en una sola consulta**. Si una seccion de un ADR afirma una columna, el nombre de la columna debe aparecer en la salida de esa consulta. Si no aparece, **no existe**, por bien escrita que este la frase.
+
+### B1. Las TRES premisas falsas de la seccion 4 (medidas, no interpretables)
+
+Consulta de verificacion, una sola, sobre `information_schema.columns` filtrando `column_name IN ('tipo_efecto','activo','alpha','gamma','rol_factor')` en `table_schema='public'`: **`tipo_efecto` no aparece en NINGUNA tabla del esquema. `alpha` y `gamma` no aparecen en NINGUNA tabla.** Las 38 filas que devuelven la consulta son `activo boolean`, y ninguna es de `moneda_cuentas`, de `sink_acciones` ni de nada del sistema de sinks.
+
+#### B1.1. `tipo_efecto` -- NO EXISTE. El efecto real lo decide la RAMA DE CODIGO.
+
+La seccion 4 asumio una columna `tipo_efecto` para distinguir que efecto produce cada accion de sumidero. **Medido: `tipo_efecto` no existe en ninguna tabla de `public`.**
+
+**Por que el diseno sigue siendo correcto sin la columna.** El efecto de una compra **no es un dato del purchase, es el hecho de que se ejecuto una rama de codigo distinta**: comprar un slot (`slot_comprar`) escribe `sink_slots` con `alpha_aplicado`/`gamma_aplicado`/`slot_index`; bajarlo (`slot_bajar`) escribe `activo = false`; y asi para cada rama. El efecto es, por construccion, **la propia forma de la sentencia**, luego la unica fuente posible de verdad es **la rama que se ejecuto**. Una columna `tipo_efecto` habria sido una **segunda copia de un dato que ya esta implicito en el `INSERT`**, es decir, el patron que ADR-086 se prohibe a si mismo.
+
+**Como queda el modelo, entonces:** el "tipo de efecto" **es la rama de codigo**, y su rastro durable es la fila que la rama escribe (`sink_slots` para compra, con su `alpha_aplicado`/`gamma_aplicado`; `activo=false` para baja). **No hay nada que anadir al esquema y no se anade.**
+
+#### B1.2. `moneda_cuentas.activo` -- eliminada del diseno. YA CORREGIDA antes; aqui NO se duplica el argumento.
+
+**Esta premisa YA fue corregida** y con razon propia, **en la seccion 4 del propio ADR-086** (bloque "CORRECCION 2026-10-05"), con su bug (**BUG-109**). El texto de la correccion sigue vigente y **no se reescribe aqui**: lo unico que se hace en este addendum es **apuntar a el** y **confirmar que la medida lo respalda**.
+
+**Confirmacion medida (esta es la parte nueva):** `moneda_cuentas.activo` **sigue sin existir** en Neon. El `CREATE TABLE` de la `040` declara exactamente `usuario_id`, `saldo` y `actualizado_en`, y el filtro sobre `table_schema='public'` **no devuelve ninguna fila de `moneda_cuentas`**. La eliminacion del diseno **esta firme**, no pendiente.
+
+**Y por que no se re-abre (lo que ya decidio el dictamen anterior, y aqui no se toca):** (a) crearia un **segundo estado durmiente** -- una cuenta "desactivada" que seguiria sumando en el ranking, o sea deriva silenciosa; (b) es **redundante**: con la PK reclaveada a `(usuario_id, moneda)` hay exactamente una fila por par, luego `SUM(saldo)` **ya es** el saldo activo.
+
+#### B1.3. `alpha` y `gamma` como COLUMNAS de `sink_acciones` -- no existen. Son CONSTANTES DE CODIGO. Y aqui hay que separar dos cosas que el ADR confunde.
+
+**Medido, `sink_acciones` tiene 7 columnas y ninguna es `alpha` ni `gamma`:** `clave`, `etiqueta`, `costo_base_xp`, `slot_max`, `slot_max_activos`, `activo`, `creado_en`.
+
+**Que son realmente, medido en el codigo:** `api/interacciones.js:2285-2286` las declara como constantes de JS, con el comentario de que **NO son** lo que el ADR pedia literalmente:
+
+- `SINK_ALPHA = 0.20` y `SINK_GAMMA = 2.00`, en el modulo de los 4 sumideros.
+- La formula que la UI publica es `costo(k) = costo_base_xp * (1 + alpha * k) ^ gamma`, y el endpoint `slot_catalogo` la devuelve en `curva` (`curva.alpha = 0.2`, `curva.gamma = 2`), que es **exactamente lo que se midio por HTTP en produccion**.
+
+**Y aqui esta la distincion que el ADR-086 se salta, que es la parte que hay que escribir:** hay **DOS** mecanismos distintos con nombres parecidos, y confundirlos es la raiz del error.
+
+| Mecanismo | Donde vive | Que es | Medido en Neon |
+|---|---|---|---|
+| **Curva de los 4 sumideros** (`alpha`, `gamma`) | **Constantes de codigo**: `SINK_ALPHA`, `SINK_GAMMA` (`interacciones.js:2285-2286`) | **Constantes de JS**, leidas y enviadas a SQL como parametros `$3`/`$4` | **No aparece** en ninguna columna de `sink_acciones` |
+| **Score del ranking** (`gamma`, `TOPE`) | **Filas de `gamificacion_config`**, leidas por `lib/score.js` (`SCORE_GAMMA_CLAVE = 'ranking_score_gamma'`, `SCORE_TOPE_CLAVE = 'ranking_saldo_tope'`) | **Dato de configuracion**, no constante | `ranking_score_gamma = **0.0000**`, `ranking_saldo_tope = **2000.0000**` |
+
+**La leccion de este punto es mas precisa que "no existen":** la premisa del ADR era falsa **en la forma** (no son columnas) pero el diseno la convertia ademas en algo peor (**constantes de codigo cuando el mecanismo de rampa ya existia y era admin-gated**). La curva de los sumideros **si** quedo congelada en constantes -- y eso es una decision consciente, no un descuido, porque su forma `costo(k) = base * (1 + alpha*k)^gamma` es la que se publico y se valido por HTTP. Lo que **no** debe hacer el proximo es **leer `gamma` del ranking y `gamma` de la curva y creer que son el mismo numero**: miden cosas distintas y hoy valen cosas distintas (**0.0000** uno, **2.00** el otro).
+
+#### B1.4. La cuarta correccion, que NO es una de las tres: `SALDO_TOPE = 2000` NO es un tope de compra.
+
+**Esto es lo que la seccion 4 se equivoca de verdad, y por eso va aparte.** `SALDO_TOPE`/`TOPE` es **el tope del TERMINO DE SALDO dentro del ranking** (`gamificacion_config.ranking_saldo_tope`, medido = **2000.0000**). Es decir: acota **cuanto saldo puede aportar la formula** `Score = xp_total + gamma * (0.50 * LEAST(saldo, TOPE) + Fama_Parche)`. **No limita ninguna compra.**
+
+**Los TRES topes reales de compra, que son los que valen, y los tres validados en produccion:**
+
+| # | Tope | Que acota | Donde vive |
+|---|---|---|---|
+| 1 | **Historico** | `k = COUNT(*) < slot_max` | **slots ya comprados historicamente** por el usuario en ese sumidero (drenaje) |
+| 2 | **Activos** | `k_activos = COUNT(*) WHERE activo < slot_max_activos` | **slots vivos** a la vez, por sumidero |
+| 3 | **Disponible** | `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= costo` | **el XP que le queda al usuario** |
+
+Los tres estan **validados en produccion** por HTTP el 2026-10-05: `slot_catalogo` **200** devuelve `slot_max` y `slot_max_activos` por sumidero y **expone los topes ya resueltos** como motivos (`TOPE_HISTORICO`, `TOPE_ACTIVOS`, `XP_INSUFICIENTE`), y `slot_rampa` **200** devuelve el precio real del proximo slot. El `SLOT` de compra **no** tiene un cuarto tope escondido: si `slot_max` es `NULL`, el sumidero no tiene tope historico y por eso no lo reporta.
+
+**Por que importa la distincion.** `SALDO_TOPE = 2000` con `beta = 0.50` produce un termino de saldo de **1000 puntos como maximo absoluto**, y por si solo acota **cuanto pesa la moneda en el ranking**. Si alguien lo lee como "tope de compra", creera que un usuario no puede gastar mas de 2000 en sumideros, y **eso no es una regla del sistema**: el gasto real lo acotan los topes 1-3. La seccion 4 lo llamo "el tope", en singular, y de ahi sale toda la confusion.
+
+### B2. TSK-185 -- el clamp del XP disponible y sus TRES trampas
+
+**Estado: CERRADO e implementado en los 11 puntos de gasto.** El resto de este addendum (B3-B6) queda en **ratificado** o en **deuda declarada**.
+
+#### B2.1. Por que era OBLIGATORIO (no era una mejora de estilo)
+
+El measurable: **`xp_total` era el unico saldo gastable.** La migracion `046` introduce **`usuarios.xp_gastado_sinks`**, un **contador de gasto** (solo crece, ADR-018: `xp_total` es la reputacion y no se toca). Y los **11 puntos de gasto** lo **ignoraban**: restaban **dos veces del mismo numero**, porque elAvailable se computaba sobre `xp_total` como si `xp_gastado_sinks` no existiera.
+
+**El clamp aplicado es `GREATEST(xp_total - xp_gastado_sinks - <gasto>, 0)`**, y su forma exacta en el SQL es `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= <coste>`. El `COALESCE` esta a proposito: `xp_gastado_sinks` es `NOT NULL DEFAULT 0` en la `046`, pero el `COALESCE` protege contra el `42703` de una `046` no aplicada -- degrada a "no he gastado" en vez de romper.
+
+**Y no es teorico.** Con el disponible crudo **-100**, la compra **pasaba** (el guard comparaba el numero sin acotar contra el gasto ya realizado). Con el clamp, **se ve 0 y RECHAZA**. Ese es el antes/despues medido, y por eso no es una mejora de estilo: **es el cierre de un agujero por el que se gastaba dos veces el mismo XP.**
+
+#### B2.2. El borde que hay que escribir para que nadie lo lea mal: disponible 0 tambien RECHAZA
+
+**El clamp se compara contra el `coste`, nunca contra 0.** Por tanto:
+
+```
+disponible = 0   ->   0 >= costo   ->   RECHAZA   (porque costo > 0)
+```
+
+**"`>= 0` en pantalla no es "puedo comprar"."** Es la formulacion del fallo: si la UI muestra el disponible como `0` y el boton se pinta como habilitado porque "hay saldo suficiente" (0 >= 0), **el boton miente**. El criterio correcto de UI es `disponible >= costo del proximo slot`, y ese `costo` **no es constante**: es `costo_base_xp * (1 + alpha * k)^gamma`, o sea el precio real del proximo slot, que es lo que `slot_rampa` ya devuelve.
+
+#### B2.3. TRAMPA 1 -- las lineas del ADR estaban CADUCADAS, y eso es un METODO, no un anécdota
+
+**El ADR declaraba posiciones de linea concretas** (`usuarios.js:1475/1569/1662`, `interacciones.js:1185/9490/...`). Esas referencias **ya no apuntan a nada**: el drift fue **monotonico** y llego a **+406 lineas** en `interacciones.js`. Localizar por linea habria ledo el sitio equivocado en 11 de 11 puntos.
+
+**Como se localizo de verdad: por FORMULA, no por linea.** Para cada uno de los 11 puntos se localizo la **sentencia que cumple el patron** (`GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0) >= ...`, o el `SET xp_gastado_sinks = ...`, o el `xp_total, COALESCE(xp_gastado_sinks, 0) AS xp_gastado_sinks`), y se confirmo que era el unico sitio que la satisfacia. La formula es estable; la linea no.
+
+**El metodo, escrito para que lo use el proximo (esta es la parte que hay que conservar):**
+
+> **Cualquier referencia de linea en la gobernanza es una FOTO, no una direccion.** Es valida el dia en que se escribio y no garantiza nada despues. Para localizar, **usa la FORMULA o el PATRON** (la sentencia que tiene que ser), y **verifica contra el archivo real** (ADR-006). Si una referencia de linea escritica para una decision, la decision es fragil por construccion: reescribela en forma de patron, o dejala marcada como "foto, verificar".
+
+Esto **no es hipotetico en este repo**, y no es una hipotesis de esta tanda: el drift ya se manifesto **una vez** (esta misma tarea, +406 lineas) y el caso de `NEXT.md`/`TASKS.md` citando migraciones desfasadas es **el mismo patron**.
+
+#### B2.4. TRAMPA 2 -- hay un PUNTO 12 que el ADR NO cuenta: `tithe_parche`. DEUDA ABIERTA, deliberadamente NO cerrada.
+
+**Medido: existe un duodécimo punto de gasto que el ADR no cuenta.** `tithe_parche` (`api/interacciones.js:4229` y el `INSERT` en `:4263`, con `accion='tithe_parche'`, `is_exento=true`) hace:
+
+```
+SET xp_total = GREATEST(0, xp_total - $1)     -- sin ningun guard previo
+```
+
+**El problema, medido:** ese `SET` **no lee `xp_gastado_sinks` en absoluto**. Es decir, **decrece `xp_total` -- la reputacion, que ADR-018 declara inmutable -- y no pasa por el contador de gasto de los sinks.** Y como **no resta de `xp_gastado_sinks`**, el disponible **baja dos veces** por la via contraria a la de los 11 puntos: `xp_total` baja, y `xp_gastado_sinks` no sube, luego `xp_total - xp_gastado_sinks` **cae** sin que el clamp lo absorbiera.
+
+**El caso numerico que lo hace real, no teorico:** `xp_total` = **1000**, `xp_gastado_sinks` = **800**, diezmo = **500** ->
+`xp_total` pasa a **500** (`GREATEST(0, 1000-500)`), y el disponible real es `500 - 800` = **-300**. **Disponible negativo.** Con el clamp de los 11 puntos, un disponible negativo se veria como **0**; aqui **el clamp no esta**, porque el punto no se cableo.
+
+**NO SE TOCO, y esa es la decision.** Acotar `tithe_parche` es una **decision de producto**, no de codigo: el diezmo es una **ofrenda voluntaria** -- su natureza es que el usuario **dona** sin contraprestacion, y un guard que lo bloquee cuando el disponible es negativo convertiria una ofrenda en un cobro condicional. **El arquitecto no tiene derecho a decidir eso.** Queda como **deuda ABIERTA**, no como cerrada, y **no se marca como tratada** en ningun sitio para que el proximo no lo lea como resuelto.
+
+#### B2.5. TRAMPA 3 -- `billetera_mia` y los perfiles publicos muestran `xp_total` sin restar. NO ES UN BUG. NO LO "CORRIJAS".
+
+**Medido: hay superficies que muestran `xp_total` crudo, sin restar `xp_gastado_sinks`.** `billetera_mia` y los perfiles publicos son dos de ellas.
+
+**Es correcto, y el motivo es `xp_total` es la REPUTACION, no un saldo.** ADR-018 lo fija: `xp_total` es **la moneda unica de progreso** y es **inmutable en la direccion del gasto** -- el gasto de los sinks va a `xp_gastado_sinks`, nunca a `xp_total`. Un perfil publico que muestra `xp_total` esta mostrando **la reputacion acumulada**, que es un hecho historico y no un saldo disponible. Si se le restara el gasto, el perfil **deformaria la reputacion** y, con ella, el significado de ADR-018.
+
+**Se deja escrito explicitamente porque el proximo que lo vea lo va a leer como bug, y lo va a "arreglar".** La deformacion concreta que haria: un usuario que gasto 800 de 1000 veria **200** en su perfil publico, y su nivel -- que se calcula desde `xp_total` -- bajaria. **El gasto de un sumidero no puede borrar el nivel que el usuario ya alcanzo.** Ese es el invariante. La distincion que hay que tener: **`xp_total` es reputacion (se muestra crudo), `xp_total - xp_gastado_sinks` es saldo gastable (se muestra solo donde se gasta).** No son dos lecturas del mismo numero, son dos numeros con dos consumidores distintos.
+
+### B3. El motor compartido en `lib/score.js` -- por que vive FUERA de `api/`, y por que eso es la RAZON del limite 8/8
+
+**Ratificado por el operador.** El motor de score de los **4 rankings** vive en **`lib/score.js`** (171 lineas, ASCII-safe estricto: 0 bytes > 127, 0 backticks, CommonJS). No en `api/`.
+
+**La razon, y es una sola, medida:** los **8/8 endpoints estan agotados** (Vercel Hobby, ADR-010). **Un modulo compartido no puede ser un endpoint.** Un noveno fichero en `api/` seria una novena funcion serverless, y el presupuesto no da una novena. `lib/score.js` **no es un endpoint**: es una libreria que `api/usuarios.js` (leaderboard, faccion_ranking, casa_ranking) y `api/interacciones.js` (pandilla_ranking) la `requirean`.
+
+**Verificado que Vercel la empaqueta sin gastar funcion:** el modulo entra en el bundle de cada funcion por **trazado de dependencias** (`nft`, Node File Trace), no por ser un fichero de `api/`. Es el mismo mecanismo que ya hacia falta para cualquier `require` interno, y **no consume funcion**. Esto esta **verificado, no supuesto**.
+
+**Este es el punto que hay que entender, porque es mas fuerte que "lo pusimos en lib por limpieza":** el limite de 8/8 **no es un recorte administrativo, es una restriccion estructural que dicta la forma del codigo**. Y aqui se ve el coste real: si el motor estuviera **dentro de `api/usuarios.js`**, `api/interacciones.js` no podria compartirlo sin copiarlo. Y si se copia, **los 4 rankings dejan de ser comparables entre si** -- exactamente el fallo que ADR-086 prohibe. El limite de 8/8 no es solo "no puedes crear mas endpoints": **es "no puedes crear un endpoint que sea una libreria", y por eso las librerias tienen que vivir fuera.** Esta es **la razon por la que existe el limite de 8/8**, en su lectura util.
+
+**El invariante que queda escrito:** **UNA aritmetica de score, cuatro rankings.** Si este modulo se duplica dentro de un `api/*.js`, los cuatro rankings dejan de ser comparables. La duplicacion esta prohibida por el mismo motivo que la mezcla de `api/`.
+
+### B4. El cuarto ranking (`tipo=pandilla_ranking`) y la atribucion del inversor
+
+**Completado, reutilizando el motor compartido de B3.** `api/interacciones.js:8264` abre la rama `tipo=pandilla_ranking`, y su score sale de `lib/score.js` como los otros tres -- **no hay una cuarta aritmetica**.
+
+**Degradacion en 3 escalones, y el orden importa.** La rama degrada en **3 escalones** (`sqlConDegradacion`) sobre las 2 consultas que necesita (`pandilla_ranking`, `pandilla_ranking/top`). Lo que **no** hace es degradar a un score distinto: si falta el esquema degrada a **XP puro**, que es el estado declarado del motor (`gamma` ausente = `0.0000` = el score degrada a XP puro). Un ranking que degrada a "otro ranking" es peor que uno que degrada a "no hay ranking".
+
+**`DISTINCT ON (u.id)` ANTES de `PARTITION BY`.** El motor garantiza **1 fila por usuario antes de cualquier particion**, y lo cablea de forma explicita (`SELECT DISTINCT ON (u.id)`) y no heredada. La razon de que el orden sea obligatorio: `DISTINCT ON` y `PARTITION BY` actuan sobre la misma relacion, y si el `DISTINCT ON` llega **despues** de la particion, la particion **ya ha repartido** filas duplicadas en grupos que no distinguian usuario, luego la garantia se pierde. **Antes de particionar, no despues.**
+
+#### B4.1. La atribucion por inversor, y la medicion que la justifica
+
+**El defecto que se corrige, medido, no descrito.** El motor acreditaba el **total** del parche a **cada miembro** de la pandilla. Con `pm.pandilla_id` como conductor, una pandilla de **50** miembros con **1** parche de **100** puntos daba:
+
+| Conductor | Codigo | Acreditado por miembro | Conteo |
+|---|---|---|---|
+| **Viejo** (`pm.pandilla_id`) | 50 miembros | **10.000,00** | **50** conteos del total |
+| **Nuevo** (`pu.usuario_id`) | 1 inversor | **200,00** | **1** conteo |
+| | | **delta = 9.800,00** | |
+
+**La cifra que hay que retener es el delta: 9.800,00 puntos de fama por parche**, y la razon de que el defecto fuera **invisible**: el numero de **conteos** (50 vs 1) es lo que delata el defecto, y con `gamma = 0.0000` ese delta **no aparece en el score de nadie** (ver B4.3).
+
+#### B4.2. `DISTINCT ON` NO arregla este defecto -- y esa distincion es la trampa conceptual del caso
+
+**Esta es la distincion que hay que escribir, porque es la que mas confunde:** `DISTINCT ON` y la inflacion de una `SUM` **son dos defectos distintos**, y el `DISTINCT ON` solo arregla el primero.
+
+| | Que es | Lo arregla | Lo detecta |
+|---|---|---|---|
+| **Multiplicacion de filas** | El `JOIN` **emite varias filas** del mismo usuario, y un `GROUP BY` posterior las cuenta todas | **`DISTINCT ON`** (y `GROUP BY` por usuario) | El conteo de filas |
+| **Inflacion de una `SUM`** | Una sola fila, pero **la `SUM` de dentro ya venia inflada** porque el valor se acreditó a cada miembro **antes** de agregar | **NINGUN `DISTINCT ON`.** Hay que **cambiar el conductor** (`pu.usuario_id`) | **Solo** la comparacion de **magnitudes** (10.000 vs 200) |
+
+**Por que `DISTINCT ON` no lo arregla, en una frase:** `DISTINCT ON` **no multiplicaba filas** en este defecto -- habia **una fila por miembro y el defecto estaba en la `SUM` de cada una**. El `DISTINCT ON` habria dejado el resultado **exactamente igual**: una fila por usuario, con la `SUM` inflada dentro. **Es decir: el `DISTINCT ON` no solo no lo arregla, es que es ortogonal a el**, y por eso el sintoma -- un score que " sale enorme" -- no lo delata ningun test que mire formas de fila.
+
+**Y por que el motor lo resuelve por la forma y no solo por el conductor.** Los 3 componentes de `Fama_Parche` **se pre-agregan POR USUARIO y despues se suman**, y **no** se unen en un unico agregado a proposito: su producto cartesiano multiplicaria los valores (n upgrades x m votos x k pandillas) e inflaria la fama **sin que ningun error lo delate**. **Esa forma da 1 fila por usuario SIN depender del `DISTINCT ON` exterior**, que -- como se acaba de ver -- solo protege la multiplicacion de filas, nunca una suma inflada. **Es decir: la garantia real la da la forma de la consulta, y el `DISTINCT ON` la hace explicita y redundante a proposito** (decision del ADR: cablearlo igual, porque el dia que alguien reescriba el pre-agregado, la garantia sigue ahi).
+
+#### B4.3. Por que el defecto estaba LATENTE, y no vivo: `gamma = 0.0000`
+
+**Medido: `gamificacion_config.ranking_score_gamma = 0.0000`, con techo 1.0.** Y la formula del score es `Score_ranking = xp_total + gamma * (0.50 * LEAST(saldo, TOPE) + Fama_Parche)`.
+
+**Con `gamma = 0.0000`, el termino de parche NO PESA HOY.** Multiplicado por 0, el delta de 9.800,00 puntos de fama **no aparece en el score de nadie**. Por eso el defecto era **latente y no vivo**: existia, era correcto diagnosticarlo, y **no se manifestaba** en produccion. **Un defecto latente no es un defecto inocuo**: es un defecto que **esta a un parametro de distancia de ser visible**, y el parametro lo mueve el admin.
+
+**La rampa (admin-gated) es el gate que controla la ventana.** El termino compuesto entra por `gamma`, y `gamma` **no es codigo**: es la fila `gamificacion_config.ranking_score_gamma`, que la rampa mueve y que es **admin-gated**. Es decir, **la ventana de exposicion la controla el admin, no el deploy**. Por eso el defecto **no se cerro por estar "invisible hoy"**: se cerro porque un dia el admin mueve `gamma` y, si el defecto siguiera vivo, el ranking **se multiplica**.
+
+**Y una aclaracion de numero, porque es la confusion mas probable:** el **"2.0"** que aparece en la formula de `Fama_Parche` (`+ 2.0 * SUM(puntos_invertidos ...)`) es el **peso del COMPONENTE dentro de `Fama_Parche`**, o sea el multiplicador de coste-de-demostracion (x1 fama acumulada, x2 invertir, x3 conseguir consensus). **NO es el valor de `gamma`.** `gamma` esta en `gamificacion_config` y hoy vale **0.0000**. Confundir el "2.0 del ADR" con `gamma` lleva a creer que el termino de parche pesa hoy, y **no pesa**.
+
+#### B4.4. `rol_factor` -- medido, y con una correccion a la premisa que lo describia
+
+**Medido en `lib/score.js`:** el factor por rol **es un `CASE` de TRES valores, no binario**:
+
+```
+CASE pm.rol WHEN 'fundador' THEN 1.0 WHEN 'oficial' THEN 0.6 ELSE 0.3 END
+```
+
+Es decir **`fundador` x1.0, `oficial` x0.6, resto x0.3** -- que es **exactamente lo que dice la seccion 4 del ADR-086**. **El `rol_factor` de 3 valores esta correctamente implementado y coincide con el diseno; no hay ninguna desviacion que corregir aqui.** (Se deja escrito porque la premisa inicial de este encargo lo describia como binario 1.0/0.3, y quien lo lea tiene que saber que la version de 3 valores es la correcta y la que esta en el codigo.)
+
+**La deuda abierta, que es otra cosa:** el valor `'oficial'` del `CASE` **se lee en varios sitios** (el `CASE` del score, y los gates de rol `'fundador'/'oficial'` de proponer, crear reto e invertir en un parche) y **ningun codigo lo escribe**: `pandillas_miembros` tiene **0 filas** en Neon. **Medido: `pandillas_miembros = 0` sobre `usuarios = 10`.**
+
+**Consecuencia honesta, y hay que decirla sin adornarla:** hoy el `CASE` **no tiene con que comparar** y por tanto **es inocuo** -- no calcula mal, calcula sobre una tabla vacia. **Y por eso no es una urgencia:** no hay ningun dato que el valor `'oficial'` este equivocando. **Lo que si es deuda, y es real:** el valor esta cableado en el codigo y en el `CHECK` del esquema** (`rol IN ('fundador','oficial','miembro')`, migracion `010`), y **no existe ningun camino de escritura** que produzca una fila con `'oficial'`. En cuanto exista la primera fila de `pandillas_miembros`, el `CASE` empezara a **pesar de verdad** y el rol huerfano pasara de inocuo a activo. **Se deja abierto a proposito: no se anade ninguna tabla ni ninguna escritura que no se hayan pedido.**
+
+### B5. Lo que este addendum NO abre (y por que, escrito para que el proximo no lo re-dispate)
+
+1. **La `048` (`NOT NULL` sobre `parche_upgrades.usuario_id`) NO esta aplicada.** Esta en disco (`db/migrations/048_parche_upgrades_usuario_id_obligatorio.sql`, 19.067 bytes) pero **medido: `is_nullable = YES`**, luego el cambio no esta. **El que la aplica es un paso manual del operador** (gate `@data-migration`), y **este addendum no la da por aplicada**.
+2. **La `046` sigue sin ser confirmable por HTTP.** Sus tablas estan **vacias** y **no hay endpoint observador** (`TSK-187`, abierto). Esto no se corrige inventando un endpoint -- el presupuesto 8/8 no lo permite, y un endpoint solo para observar seria la novena funcion.
+3. **La economia sigue sin ejercitarse.** `sink_slots = 0`, `parche_upgrades = 0`, `pandillas_miembros = 0`, `usuarios` con `xp_gastado_sinks > 0` = **0**, sobre `usuarios = 10`. El sistema esta **desplegado ycorrecto**, y **sin uso**. Eso no es un fallo de este addendum: es el estado de partida medido, y **declararlo es preferible a fingir que hay traccion**.
+4. **No se reescribe la seccion 4 del ADR-086.** Este addendum la **corrige y la remata**, no la borra. ADR-003 (Cero Borrado Logico) y ADR-084 (el argumento vive una vez) aplican tambien a las decisiones: una correccion se **anade y se apunta**, no se reescribe el original.
+
+### B6. Deuda que este addendum deja ABIERTA (3, y son 3 a proposito)
+
+| # | Deuda | Por que no se cierra | Donde |
+|---|---|---|---|
+| 1 | **`tithe_parche` (punto 12 sin guard, hunde el disponible)** | Es una **decision de producto**: el diezmo es una ofrenda voluntaria, y un guard que lo bloquee con disponible negativo convierte una ofrenda en un cobro condicional. **No es decision del arquitecto.** | `TASKS.md` TSK-185 (deuda), este addendum B2.4 |
+| 2 | **`rol_factor` / rol `'oficial'` huerfano** | `pandillas_miembros` tiene **0 filas** y **ningun codigo escribe `'oficial'`**: el `CASE` hoy **es inocuo** (calcula sobre vacio). No se anade una tabla ni una escritura que no se hayan pedido; el rol huerfano pasa a activo en cuanto exista la primera fila. | `TASKS.md` TSK-184 (deuda), este addendum B4.4 |
+| 3 | **El 503 que dice "039" cuando la causa real es la `047`** | **NO se corrige en este pase** porque es `api/`, y este cierre es documental. Un developer que lea el mensaje ira a buscar una migracion `039` que **no tiene nada que ver**. La correccion es **el texto**, no el numero de migracion. | `BUGS_HISTORICOS.md` BUG-111 |
+
+**B6-bis. La EVIDENCIA medida de las deudas 1 y 2 [2026-10-05, segunda medicion; anade coordenadas, NO repite el argumento].** Los argumentos estan arriba; aqui va **donde estan exactamente las lineas**, porque una deuda sin coordenadas no se puede auditar ni cerrar.
+
+**Deuda 1 -- `tithe_parche` sin guard. Medido en `api/interacciones.js:4367`:**
+
+```
+UPDATE usuarios SET xp_total = GREATEST(0, xp_total - $1::numeric)
+```
+
+Tres hechos medidos, y los tres importan: (a) **no hay `WHERE` de saldo** -- la sentencia **no lee `xp_gastado_sinks`** en ningun punto de su camino, a diferencia de los **14** puntos de gasto del clamp (§B2), luego **no puede evitar que el disponible se hunda**; (b) **`GREATEST(0, ...)` acota `xp_total`, NO el disponible**: con `xp_total = 1000`, `xp_gastado_sinks = 800` y diezmo **500**, queda `xp_total = 500` y disponible = **500 - 800 = -300**; (c) **`PARCHE_TITHE_MAX` (`:4361`) acota el PORCENTAJE, no el saldo** -- no hay ningun guard sobre el monto. **Lo que acota el porcentaje y lo que acota la cantidad son dos cosas distintas**, y confundirlas es lo que hace este punto invisible. **NO se acota, y el motivo es de producto, no de codigo:** el diezmo es una **ofrenda voluntaria**, asi que un guard que lo rechace por saldo convierte una donacion en un cobro. Acotarlo es **una decision de negocio que no es de este cierre**. Lo que **si** es de este cierre es **dejarlo escrito y medido**, que es lo que hace esta linea.
+
+**Deuda 2 -- `rol_factor` / `'oficial'`. Medido, y la escala es lo que menos importa:**
+
+- **La escala es ternaria y es correcta**, medida en `lib/score.js:64-65`: `CASE pm.rol WHEN 'fundador' THEN 1.0 WHEN 'oficial' THEN 0.6 ELSE 0.3 END`. **Coincide con ADR-086 seccion 4**, luego **la escala NO es la deuda** y no se toca.
+- **La deuda real es que la rama `'oficial'` es INALCANZABLE por escritura.** Los unicos dos `INSERT` en `pandillas_miembros` escriben **`'fundador'`** (`:12415`) y **`'miembro'`** (`:12467`). **Ningun codigo del repositorio escribe `'oficial'`**, y sin embargo **se lee** en dos sitios: el `CASE` de arriba y el gate de autorizacion `interacciones.js:1331` (`if (rol !== 'fundador' && rol !== 'oficial')`).
+- **La consecuencia medida:** como solo se escriben `'fundador'` y `'miembro'`, y `'miembro'` cae en el `ELSE`, **el ternario se comporta hoy como un binario** (`fundador` 1.0 / resto 0.3). **El codigo es ternario; los datos lo hacen binario.** Por eso **`pandillas_miembros` = 0 filas** importa mas de lo que parece: **mientras este vacia, la rama de 0.6 no es "inutil", es INALCANZABLE**, y un `CASE` con una rama que ningun dato puede tomar es codigo que **nadie puede probar**.
+
+**Lo que NO se hace, escrito para que el proximo no lo re-dispate:** **no se anade una tercera escritura de `'oficial'`** solo para que la rama se ejercite. Fabricar el rol para dar verde a un `CASE` es **instrumentar el dato para que el codigo parezca completo**, y ademas seria una **decision de producto** (¿quien es "oficial" y como se promueve?). **Es el mismo razon que B5 aplica a los sumideros:** no se cierra un hueco creando el artefacto que lo haria parecer cerrado.
+
+### B8. Los TRES POST de sumideros estaban **MUERTOS** desde su creacion -- y por que el sintimo fue **indistinguible** del sintimo de una regla de negocio
+
+Este bloque cierra, con medicion, el alcance de los sumideros. Es la parte de este addendum que **mas trabajo ahorra al proximo**, porque el fallo era invisible por construccion.
+
+**El hecho medido.** Los tres POST -- `slot_comprar`, `slot_baja` y `slot_rampa_avanzar` -- **nunca se ejecutaron con exito desde que se crearon**. No estaban "a medias": estaban **muertos por el portero, antes de entrar al bloque funcional**. Dos guard los mataban:
+
+1. Uno exigia **`destino_id`**, que los sumideros **no llevan** (es un campo de destino, no de sumidero).
+2. Otro exigia una **lista cerrada de tipos validos** que **no incluia** los tres nombres nuevos.
+
+El `400` salia **con sesion, saldo y `ref_id` validos**. Y esa es la parte importante: **los 0 filas en `sink_slots` NO se explicaban por la hipotesis de "slots huerfanos" que se formulo en la sesion.** Se explicaban porque **la puerta estaba mal**, y la hipotesis que circulaba era **falsa**. La hipotesis correcta era mas simple y mas indigna: **nadie podia comprar porque el portero no dejaba pasar a nadie.**
+
+**La leccion duradera, que sobrevive al bug (esta es la que hay que guardar):** *un `400` de validacion que significa "mi puerta esta mal" y otro que significa "no te alcanza el saldo" son **indistinguibles desde fuera**. El sintoma de un bug de cableado puede parecerse **exactamente** al de una regla de negocio.* Ambos son `400`, ambos llegan con sesion valida, ambos dicen "algo no esta bien" y ninguno dice **quien** tiene el error. **Cuando un `400` unexplained persiste, la primera pregunta NO es de reglas de negocio: es si la puerta acepta el caso que dice aceptar.** Esa pregunta, hecha antes, habria ahorrado la hipotesis falsa entera.
+
+**Reparado** con **lista cerrada de los 3 nombres** en el guard, verificada en produccion (ver el estado final medido en `NEXT.md`).
+
+**NOTA DE TESTS, porque es una trampa de instrumentacion y no de producto:** `smoke_036` comprueba el **literal del guard** por `indexOf`. Es decir, el smoke **verifica el texto, no el comportamiento**, asi que **el literal debe conservarse EXACTO**: reescribirlo deja el smoke en **rojo aunque el codigo este bien**. Se acepta esa atadura a proposito (un guard reescrito es un guard que hay que volver a mirar), pero hay que saber que existe para no "arreglar" el smoke rompiendo el codigo, ni al reves.
+
+### B9. `spot_duenos` **NO tiene columna `id`**: la identidad es compuesta, y un CTE generico con `WHERE id = $5` habria dado 500, no 409
+
+**Medido en Neon.** `spot_duenos` tiene las columnas `destino_id uuid`, `usuario_id uuid`, `votos integer`, `calculado_en timestamptz`, `activo boolean`, `tipo_medio varchar`, y su clave primaria es **`PRIMARY KEY (destino_id, tipo_medio)`**. **No existe columna `id`.** Comprobado en `pg_constraint`: `spot_duenos_pkey` = `PRIMARY KEY (destino_id, tipo_medio)`.
+
+**Por que esto casi sale como un 500.** El CTE generico de validacion de `ref_id` **hardcodeaba `WHERE id = $5`**. La correccion "cambiar el nombre de la tabla" habria producido **`42703` (columna inexistente) = un 500**, no el `409` limpio que se buscaba. O sea: el arreglo obvio **empeora el fallo visible**, porque convierte un error de negocio bien tipado en un error de servidor. **Ese es el motivo de la regla de abajo, y no la elegancia.**
+
+**La regla (es la que sobrevive):** ***cualquier tabla nueva que se conecte a un CTE generico debe declarar su columna de identidad.*** Si no la declara, el fallo no sale como `409` de negocio: sale como `500` de sintaxis, que es un bug de plataforma disfrazado de bug de logica. Se resolvio con un campo **`columna` por sumidero, en allow-list de codigo**, concatenado como **literal** y **nunca desde el navegador**. Medido en produccion: `portada_destino` expone `columna_origen = destino_id` y `foto_galeria`/`album_slot` exponen `columna_origen = id`.
+
+### B10. `portada_destino` esta **desbloqueado y funcional, pero hoy es un sumidero de UN SOLO usuario** -- fallo de expectativa, no de logica
+
+**Medido en Neon.** `spot_duenos` tiene **4 filas, las 4 con `activo = true`**, pero solo **1 `usuario_id` distinto** y **2 `destino_id`**. Los `destino_id` son UUID y resuelven a los slugs **`hostal-r10-bogota`** y **`monserrate`**, cada uno con `tipo_medio` `general` y `foto`.
+
+**Lo que esto significa, escrito sin adornos.** El sumidero **funciona**: esta desbloqueado, comprable y con su `ref_id` validado. Pero **el 100% de su poblacion posible hoy es de una sola persona**. **Un control que se ve disponible para todos y solo funciona para uno es un fallo de EXPECTATIVA, no de logica** -- y por eso se documenta como **NOTA DE ALCANCE** en el codigo, no como limitacion silenciosa: el que lo vea tiene que saber que "comprable" y "util para ti" no son la misma cosa.
+
+**Y la parte que evita una conclusion equivocada:** poblarlo **NO es deuda de backend**. Es **trabajo de ingestion**. El codigo esta bien; lo que falta son filas, y las filas las pone otro proceso. Confundir "el sumidero no sirve" con "el sumidero no esta cableado" lleva a reescribir codigo correcto.
+
+### B11. `destacar_evento` **no tiene destino de datos**: la entidad evento **no existe en el esquema**
+
+**Medido.** Las unicas columnas que contienen "evento"/"agenda" en el esquema de la aplicacion son **`destinos_detalles.eventos_hostal` (texto)**, **`cartas_catalogo.es_evento` (un booleano)** y **`xp_historial.tipo_evento`**. Las unicas tablas que casan `%agenda%` / `%event%` / `%calendar%` son **de PostgreSQL mismo**: `pg_event_trigger` y `pg_wait_events`. **No existe la entidad evento.**
+
+**Por que eso NO es un bug de este sumidero.** Crear la entidad evento es **un producto entero** (esquema, ingesta, ciclo de vida, caducidad -- el propio catalogo ya le asigna precio **volatile** porque "el valor se consume, no se acumula"). Y la skill que lo alimentaba, **`ingest-eventos`, esta despublicada** (retirada el 2026-10-01; sus prompts quedaron conservados en `.opencode/prompts/`).
+
+**Decision: el sumidero SIGUE VISIBLE en el catalogo, no comprable, con `motivo_soporte`.** El motivo, medido en produccion, es literal: *"No existe tabla de eventos en el esquema: no se puede probar que un evento exista ni a quien pertenezca"*. **Ocultarlo seria ocultar un sumidero que el usuario leyo en el diseno**, y un catalogo que crece al esconderse duele mas al usuario que un catalogo que explica por que algo no esta disponible. **Anotado, no cableado:** `cartas_catalogo.es_evento` es hoy lo mas cercano a "esto es un evento" que existe, y **no** es un destino de datos para este sumidero.
+
+### B12. La trampa del `is_nullable`: el CHECK de la `048` cerraba el negocio pero **no el esquema**, y el esquema es lo que se lee (ADR-006)
+
+**Medido.** La `048` **no hizo `SET NOT NULL`**: impuso **`CHECK (usuario_id IS NOT NULL)`**. El invariante de escritura quedaba cerrado, pero `information_schema.is_nullable` seguia en **`YES`**. Es decir: **la base de datos era correcta y su DESCRIPCION era falsa.** El CHECK sigue vivo --medido: `chk_parche_upgrades_usuario_id_notnull` existe en `parche_upgrades`, y la cabecera de la `049` lo declara **conservado a proposito**-- mientras `is_nullable` era `YES`.
+
+**La consecuencia real, ya materializada en esta sesion (y este es el motivo de peso para escribirlo):** un agente midio `is_nullable = YES`, concluyo que la `048` **no estaba aplicada**, y **estuvo a punto de reejecutarla**. Como el runner toma el camino `UPDATE` en una migracion ya registrada, eso habria **sobrescrito `aplicada_en`** y **perdido la evidencia de aplicacion**. **Un falso positivo de "no aplicada" casi costo la evidencia de una migracion que si estaba aplicada.** Y el sintoma habria sido peor que el error: una migracion reejecutada parece una migracion aplicada, asi que el sistema habria parecido sano mientras el historico miente.
+
+**La `049` hizo el `SET NOT NULL` real. Medido:** `parche_upgrades.usuario_id` -> `is_nullable = **NO**`, y el rechazo paso de **`23514 check_violation`** a **`23502 not_null_violation`**. Los **5 CHECK** de la `049` exigen que `spot_duenos` **no** sea su objeto: la `049` toca **solo** `parche_upgrades` (medido: `spot_duenos` **no aparece** en el fichero), y el `NOT NULL` de `spot_duenos.usuario_id` es de la `046`.
+
+**La leccion, que es una regla de ADR-006:** ***el esquema debe poder leerse como la verdad.*** Una columna declarada nullable mientras el negocio la exige es **una segunda fuente de verdad**, y se lee como "la migracion no corrio". Cerrar el invariante **en el motor** sin cerrarlo **en el esquema** no es cerrar el invariante: es dejar dos verdades y esperar a que alguien lea la equivocada. **El `NOT NULL` real y el `CHECK` no son dos capas de defensa: son la misma capa, y la que se puede leer es la que cuenta.**
+
+### B7. Declaracion de integridad (para que el proximo no la lea de memoria)
+
+- **Este addendum no reescribe ningun ADR previo.** El ultimo ADR antes de este era el **`ADR-087`**, y este es el **`ADR-088`**: **numero nuevo, ninguno duplicado, ninguno renumerado.**
+- **El checksum de la `047` en `schema_migrations` NO se toco** (ADR-003). La **nota de estado** que se anadio a la cabecera de la `047` **si cambia el sha256 en disco** (`scripts/apply_sql_file.js` lo calcula sobre los bytes crudos, sin normalizar comentarios), luego el portero reportara **DERIVA** frente a esa fila. **Es una consecuencia declarada, no un descuido**, y la nota misma lo dice dentro del fichero. Quien vea esa deriva **no debe "arreglarla"**: la deriva **es** la nota.
+- **La `047` se aplico con su cuerpo original.** La nota es **un comentario**, no una sentencia: el fichero sigue siendo **aditivo e idempotente**, con **0 bytes > 127** (ASCII-safe, ADR-002).
+- **El detalle por tarea vive en `TASKS.md`; el detalle del estado de produccion, en `NEXT.md`.** Este addendum es el **argumento** (ADR-084 D1) y no se duplica.
