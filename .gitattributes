@@ -1,0 +1,12 @@
+# Los checksums de db/migrations/ se registran en schema_migrations y el runner
+# los compara byte a byte (ADR-087). Si git reescribe LF -> CRLF, una migracion
+# YA APLICADA e intacta aparece con DERIVA y la puerta de predecesora la
+# rechaza. Medido el 2026-10-05: la 047 paso de b1f484ec a 1aa17324 solo por
+# tener 129 CRLF, sin que nadie escribiera una linea del SQL.
+# Fijamos LF en las rutas cuyo checksum queda registrado.
+db/migrations/*.sql text eol=lf
+db/cleanups/*.js   text eol=lf
+
+# ASCII en codigo (ADR-002) y en las migraciones, que van a Neon.
+db/migrations/*.sql text working-tree-encoding=ascii
+db/cleanups/*.js   text working-tree-encoding=ascii
