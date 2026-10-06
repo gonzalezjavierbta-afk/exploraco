@@ -2335,7 +2335,13 @@ var SINK_REF_ORIGEN = {
     // El enganche es el PAR (destino_id, usuario_id) con activo=true. Un
     // destino del catalogo que el usuario no posee falla por existe_mio, que
     // va en el MISMO WHERE del debit (refok): no hay lectura previa.
+    // filtro_tipo: la PK es COMPUESTA (destino_id, tipo_medio) con 6 medios
+    // permitidos (general, foto, video, audio, escrito, texto). Sin este
+    // filtro pertenecer CUALQUIER medio de un destino compra la PORTADA de
+    // ese destino, que es el extremo 'general'. Va en el MISMO EXISTS, no en
+    // una segunda consulta: separar la comprobacion abre una carrera.
     tabla: 'spot_duenos', columna: 'destino_id',
+    filtro_tipo: " AND tipo_medio = 'general'",
     soporte: true, requiere_pertenencia: true,
     etiqueta: 'Uno de tus destinos'
   },
@@ -2440,11 +2446,29 @@ function sinkRefCte(clave) {
   // la tabla, y se concatena como LITERAL.
   return ', ref AS ('
     + ' SELECT true AS soporte, EXISTS (SELECT 1 FROM ' + o.tabla
-    + '  WHERE ' + o.columna + ' = $5::uuid AND usuario_id = $1::uuid AND activo = true)'
+    + '  WHERE ' + o.columna + ' = $5::uuid AND usuario_id = $1::uuid AND activo = true'
+    + (o.filtro_tipo || '') + ')'
     + '  AS existe_mio'
     + '), refok AS ('
     + ' SELECT soporte AND existe_mio AS ok, soporte, existe_mio FROM ref'
     + ')';
+}
+
+// Etiqueta legible para una foto de usuario_fotos. MEDIDO: la tabla NO tiene
+// columna de titulo ni caption, luego lo unico legible sin escribir en la
+// base es el nombre de archivo de la url. Se recorta a 60 caracteres porque
+// es texto de UI, no un dato. decodeURIComponent puede lanzar (percent
+// invalido): degrade, nunca rompa la rama.
+function etiquetaArchivo(url, orden) {
+  var base = String(url || '');
+  var corte = base.split('?')[0].split('#')[0];
+  var partes = corte.split('/');
+  var nombre = partes.length ? partes[partes.length - 1] : '';
+  try { nombre = decodeURIComponent(nombre); } catch (eDec) { nombre = base; }
+  nombre = String(nombre || '').trim();
+  if (nombre.length > 60) nombre = nombre.slice(0, 60);
+  if (!nombre) nombre = 'Foto ' + (Number(orden) || 0);
+  return nombre;
 }
 
 // Que topes bloquean una compra que no se puede hacer. Es una LECTURA
@@ -4346,6 +4370,26 @@ function aplicarFamaPandilla(sql, usuarioId, xpGanado) {
 // accion='tithe_parche' es_exento=true. BEST-EFFORT TOTAL: nunca lanza ni
 // bloquea; si la 041 no esta aplicada (tithe_pct ausente) degrada con warn.
 // No emite moneda nueva: es un flujo sobre XP ya acreditado (ADR-018/5.5).
+//
+// DISPONIBLE REAL (no el xp_total bruto): ADR-018 dice que xp_total es
+// reputacion y NUNCA baja al comprar: el motor debita xp_gastado_sinks. Un
+// GREATEST(0, xp_total - monto) limita contra xp_total BRUTO, que no es el
+// disponible: con xp_total=1000, xp_gastado_sinks=800 y diezmo 500 la
+// aritmetica deja -300 y el GREATEST lo convierte en 0, luego la treasury
+// cobraba 500 de un usuario que solo tenia 200.
+//
+// RECHAZA, NO COBRA PARCIAL: si el disponible no cubre el diezmo COMPLETO no
+// se cobra una fraccion. Un diezmo del 60% es un diezmo del 100% mal
+// formado y dejaria un pago parcial que nadie pidio. La oferta sigue siendo
+// voluntaria: aqui no se toca el porcentaje ni PARCHE_TITHE_MAX, solo se
+// impide que el debito exceda lo disponible.
+//
+// ATOMICA Y FAIL-CLOSED: el guard (CTE g) va en la MISMA sentencia que los dos
+// UPDATE. Sin fila en g (usuario inexistente, o el disponible no se puede
+// calcular) el COALESCE da -1 y ningun UPDATE dispara: cobrar es lo que
+// necesita prueba, no la excepcion. t (la treasury) queda condicionada a que
+// d SIEMPRE haya disparado, porque si no un diezmo rechazado en el debito
+// igual acreditaba fama a la pandilla.
 function aplicarTitheParche(sql, usuarioId, xpFinal) {
   var xp = numXp(xpFinal);
   if (!usuarioId || !(xp > 0)) return Promise.resolve(false);
@@ -4363,19 +4407,39 @@ function aplicarTitheParche(sql, usuarioId, xpFinal) {
     if (!(monto > 0)) return false;
     var pandillaId = rows[0].pandilla_id;
     return sql(
-      'WITH d AS ('
-      + ' UPDATE usuarios SET xp_total = GREATEST(0, xp_total - $1::numeric)'
-      + ' WHERE id=$2::uuid RETURNING xp_total'
+      'WITH g AS ('
+      + ' SELECT COALESCE(GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0), -1)'
+      + '   AS disp FROM usuarios WHERE id=$2::uuid'
+      + '), d AS ('
+      + ' UPDATE usuarios u SET xp_total = GREATEST(0, u.xp_total - $1::numeric)'
+      + ' FROM g WHERE u.id=$2::uuid AND g.disp >= $1::numeric'
+      + ' RETURNING u.xp_total'
       + '), t AS ('
       + ' UPDATE pandillas SET fama_total = fama_total + $1::numeric'
-      + ' WHERE id=$3::uuid RETURNING id'
+      + ' WHERE id=$3::uuid AND EXISTS (SELECT 1 FROM d)'
+      + ' RETURNING id'
       + ')'
       + ' SELECT (SELECT xp_total FROM d) AS xp_post,'
-      + ' (SELECT id::text FROM t) AS pandilla_id',
+      + ' (SELECT id::text FROM t) AS pandilla_id,'
+      + ' COALESCE((SELECT disp FROM g), -1) AS disp_guard',
       [monto, usuarioId, pandillaId]
     ).then(function(r) {
-      var aplicado = !!(r && r[0] && r[0].pandilla_id);
-      if (!aplicado) return false;
+      var fila = r && r[0] ? r[0] : null;
+      var aplicado = !!(fila && fila.pandilla_id);
+      if (!aplicado) {
+        // Rechazo con el FALTANTE NOMBRADO, no un motivo generico: el logger
+        // es el canal observable de este camino (la funcion es best-effort y
+        // no tiene res; ver el reporte de 1c). dispon = -1 significa que el
+        // disponible no se pudo calcular, que tambien es un rechazo.
+        var disp = numXp(fila ? fila.disp_guard : -1);
+        var falta = red2(Math.max(0, monto - Math.max(0, disp)));
+        console.warn('[tithe] RECHAZADO (sin cargo parcial): monto=' + monto
+          + ' disponible=' + (fila ? disp : 'null')
+          + ' faltante=' + falta
+          + (disp < 0 ? ' (disponible no calculable: fail-closed)' : '')
+          + ' pandilla=' + pandillaId + ' usuario=' + usuarioId);
+        return false;
+      }
       return registrarXpLedger(sql, {
         usuario_id: usuarioId, accion: 'tithe_parche', xp_base: monto,
         mult_nivel: 1, mult_stack: 1, mult_final: 1, cap_aplicado: 'ninguno',
@@ -8897,8 +8961,12 @@ module.exports = async function handler(req, res) {
         var scSaldo = null;
         if (usuarioId) {
           var scU = await sql(
-            'SELECT (xp_total - xp_gastado_sinks) AS disponible FROM usuarios'
-            + ' WHERE id = $1::uuid',
+            // GREATEST(...,0): el disponible EXPUESTO nunca es negativo. Un saldo
+            // crudo negativo (xp_gastado_sinks > xp_total por tithe_parche o por
+            // gasto previo) se lee como "me deben XP" cuando significa "no
+            // queda nada". Misma forma canonica que sinkDiagnosticar.
+            'SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)'
+            + ' AS disponible FROM usuarios WHERE id = $1::uuid',
             [usuarioId]
           );
           scSaldo = scU.length ? red2(numXp(scU[0].disponible)) : null;
@@ -8990,8 +9058,9 @@ module.exports = async function handler(req, res) {
           return responderSinkAusente(res, eSm, 'slot_mios');
         }
         var smSaldo = await sql(
-          'SELECT (xp_total - xp_gastado_sinks) AS disponible FROM usuarios'
-          + ' WHERE id = $1::uuid',
+          // GREATEST(...,0): ver la nota del mismo clamp en slot_catalogo.
+          'SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)'
+          + ' AS disponible FROM usuarios WHERE id = $1::uuid',
           [usuarioId]
         );
         return res.status(200).json({
@@ -9026,6 +9095,155 @@ module.exports = async function handler(req, res) {
                 ? null : red2(numXp(r.costo_siguiente))
             };
           })
+        });
+      }
+
+      // Fuente de datos del PICKER de sumideros: que ref_id puede elegir
+      // ESTE usuario para cada sumidero comprable. Sin esta rama los hooks del
+      // frontend (pfSlotsRefs / pfSlotsRef) no tienen de donde leer y un
+      // sumidero comprable es un boton que no puede funcionar.
+      //
+      // Solo lectura. NO es una segunda validacion de compra: la garantia la
+      // sigue llevando el EXISTS de refok DENTRO de la sentencia de debit. Aca
+      // solo se listan candidatos para que el cliente no tenga que inventarse
+      // ids.
+      //
+      // REGLAS DE SEGURIDAD (4, sin excepcion):
+      //  1. Cada consulta filtra por usuario_id = $1 EN LA MISMA CONSULTA. Es
+      //     lo UNICO que protege: MEDIDO 2026-10-05 en Neon, relrowsecurity es
+      //     FALSE en usuario_fotos, albumes, spot_duenos y destinos, luego no
+      //     hay RLS que actue por detras y este filtro es la frontera real.
+      //     Una lista de recursos ajenos seria fuga de datos, no un bug de
+      //     estilo.
+      //  2. Sin oraculo de enumeracion: solo se listan recursos PROPIOS, asi
+      //     que no hay nada que enumerar. Cero conteos globales, cero "hay N
+      //     disponibles", cero paginas de totas. El unico numero publicado es
+      //     el total de la lista propia del usuario.
+      //  3. Solo lectura: ni INSERT ni UPDATE en esta rama.
+      //  4. RLS: al estar desactivado, no se desactiva ni se saltea nada; el
+      //     filtrado es el del punto 1.
+      //
+      // El ref_id devuelto es EXACTAMENTE el que acepta slot_comprar, porque
+      // ambos salen de SINK_REF_ORIGEN: tabla y columna de enganche. Para
+      // portada_destino la columna es destino_id, que slot_comprar castea a
+      // $5::uuid (ver sinkRefCte): lo que se devuelve es el UUID, NO el slug.
+      if (tipo === 'slot_refs') {
+        var srwSes = usuarioDeSesion(req);
+        if (!srwSes.ok) return responderSesion(res, srwSes.razon);
+        var srwUid = srwSes.usuario_id;
+        var srwSaldo;
+        try {
+          srwSaldo = await sql(
+            'SELECT GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)'
+            + ' AS disponible FROM usuarios WHERE id = $1::uuid',
+            [srwUid]
+          );
+        } catch (eSrSal) {
+          if (!esEsquemaFaltante(eSrSal)) throw eSrSal;
+          return responderSinkAusente(res, eSrSal, 'slot_refs');
+        }
+        var porClave = {};
+        // Solo las claves comprables (comprable===true). destacar_evento no
+        // se lista: soporte=false, luego no hay de donde leer un ref_id sin
+        // inventarlo, y un picker con una clave que el motor rechaza es peor
+        // que una clave ausente.
+        var srwOrden = SINK_CLAVES.filter(function(c) {
+          var ct = sinkRefContrato(c);
+          return !!(ct && ct.comprable);
+        });
+        try {
+          // 1) foto_galeria -> usuario_fotos del usuario. MEDIDO: no tiene
+          //    columna de titulo ni caption (id, usuario_id, url, orden,
+          //    es_principal, peso_bytes, activo, creado_en): la etiqueta sale
+          //    del nombre de archivo de la url, que es lo unico legible que
+          //    existe sin escribir en la base.
+          var srwFotos = await sql(
+            'SELECT id::text AS ref_id, url, orden, es_principal, creado_en'
+            + ' FROM usuario_fotos'
+            + ' WHERE usuario_id = $1::uuid AND activo = true'
+            + ' ORDER BY es_principal DESC, orden, creado_en',
+            [srwUid]
+          );
+          porClave.foto_galeria = srwFotos.map(function(f) {
+            return {
+              ref_id: f.ref_id,
+              etiqueta: etiquetaArchivo(f.url, f.orden),
+              es_principal: f.es_principal === true,
+              creado_en: f.creado_en
+            };
+          });
+        } catch (eSrF) {
+          if (!esEsquemaFaltante(eSrF)) throw eSrF;
+          return responderSinkAusente(res, eSrF, 'slot_refs.foto_galeria');
+        }
+        try {
+          // 2) album_slot -> albumes del usuario. MEDIDO max 3 por usuario.
+          var srwAlb = await sql(
+            'SELECT id::text AS ref_id, titulo, ciudad, creado_en'
+            + ' FROM albumes'
+            + ' WHERE usuario_id = $1::uuid AND activo = true'
+            + ' ORDER BY creado_en',
+            [srwUid]
+          );
+          porClave.album_slot = srwAlb.map(function(a) {
+            return {
+              ref_id: a.ref_id,
+              etiqueta: String(a.titulo || 'Album'),
+              ciudad: a.ciudad || null,
+              creado_en: a.creado_en
+            };
+          });
+        } catch (eSrA) {
+          if (!esEsquemaFaltante(eSrA)) throw eSrA;
+          return responderSinkAusente(res, eSrA, 'slot_refs.album_slot');
+        }
+        try {
+          // 3) portada_destino -> spot_duenos del usuario. tipo_medio='general'
+          //    es el MISMO filtro que exige el EXISTS de compra (1d): si esta
+          //    rama ofreciera un destino por su fila 'foto', el picker
+          //    presentaria una opcion que el motor de cobro va a rechazar.
+          //    MEDIDO max 2 por usuario. El nombre se resuelve por destinos,
+          //    que es catalogo de lectura y no tiene dueno: JOIN, no filtre.
+          var srwDest = await sql(
+            'SELECT sd.destino_id::text AS ref_id, d.nombre, d.slug,'
+            + '  d.ciudad, sd.calculado_en'
+            + ' FROM spot_duenos sd JOIN destinos d ON d.id = sd.destino_id'
+            + ' WHERE sd.usuario_id = $1::uuid'
+            + '  AND sd.activo = true AND sd.tipo_medio = \'general\''
+            + ' ORDER BY sd.calculado_en',
+            [srwUid]
+          );
+          porClave.portada_destino = srwDest.map(function(p) {
+            return {
+              ref_id: p.ref_id,
+              etiqueta: String(p.nombre || 'Destino'),
+              slug: p.slug || null,
+              ciudad: p.ciudad || null,
+              calculado_en: p.calculado_en
+            };
+          });
+        } catch (eSrD) {
+          if (!esEsquemaFaltante(eSrD)) throw eSrD;
+          return responderSinkAusente(res, eSrD, 'slot_refs.portada_destino');
+        }
+        var srwSaldoVal = srwSaldo.length ? red2(numXp(srwSaldo[0].disponible)) : null;
+        return res.status(200).json({
+          ok: true,
+          usuario_id: srwUid,
+          disponible_xp: srwSaldoVal,
+          claves: srwOrden,
+          refs: porClave,
+          // El total es de la lista PROPIA, luego no revela el tamano de
+          // ninguna tabla. Es el conteo que el cliente ya puede hacer
+          // recorriendo refs[clave].
+          total: porClave.foto_galeria.length
+            + porClave.album_slot.length
+            + porClave.portada_destino.length,
+          ref_contrato: {
+            campo: 'ref_id',
+            tipo: 'uuid',
+            slot_comprar_tipo: 'slot_comprar'
+          }
         });
       }
 
@@ -15315,7 +15533,13 @@ module.exports = async function handler(req, res) {
             + '  AND p.k_actual  < p.slot_max'
             + '  AND p.k_activos < p.slot_max_activos'
             + '  AND (u.xp_total - u.xp_gastado_sinks) >= p.costo'
-            + ' RETURNING (u.xp_total - u.xp_gastado_sinks) AS disponible_restante,'
+            // El GUARD de arriba queda CRUDO a proposito: compara contra el
+            // coste y un disponible negativo lo rechaza igual que uno menor,
+            // luego el clamp no altera quien compra. El clamp es solo del
+            // NUMERO que sale en el JSON: el disponible restante publicado
+            // nunca puede ser negativo.
+            + ' RETURNING GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0)'
+            + '  AS disponible_restante,'
             + '  u.xp_total AS xp_total, u.xp_gastado_sinks, p.costo,'
             + '  p.k_actual, p.k_activos, p.slot_max, p.slot_max_activos'
             + '), ins AS ('
