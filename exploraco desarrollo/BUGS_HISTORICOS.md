@@ -1980,3 +1980,79 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **NOTA DE TESTS (atadura que hay que conocer).** `smoke_036` comprueba el **literal del guard** por `indexOf`, es decir, **verifica el texto del guard y no su comportamiento**. Por tanto **el literal debe conservarse EXACTO**: reescribirlo deja el smoke **en rojo aunque el codigo este bien**. Se acepta la atadura a proposito -- un guard reescrito es un guard que hay que volver a mirar -- pero conviene saberlo para no "arreglar" el smoke rompiendo el codigo, ni al reves.
 
 **Lo que este bug NO es.** No es un fallo del motor de sumideros (que funciona: `costo_siguiente` medido con **0 divergencias centima a centima** en 44 comparaciones), no es un fallo de saldo, no es la hipotesis de slots huerfanos, y **no** es deuda de UI (el boton no comprable de la UI **se corta antes de cualquier `fetch`**, medido: 3 clics -> **0, 0, 0** peticiones, que es exactamente el comportamiento correcto). **Es deuda de cableado: un `400` de un portero mal escrito que jamas se ejecuto.**
+
+## BUG-113: `slot_catalogo` y `slot_mios` publicaban el disponible **crudo y sin `COALESCE`** -- un saldo que no era un saldo
+
+**Severidad:** MEDIA (no cobraba de mas: la compra si fallaba, pero **la pantalla mentia**). **Estado: CERRADO** (verificado en produccion, `?tipo=slot_catalogo` y `?tipo=slot_mios` **200**).
+
+**Contexto:** detectado y medido el 2026-10-05 al cerrar la tanda de sumideros. Encargado en `DECISIONS.md` **ADR-088 C1 (a)**.
+
+**El defecto, medido.** Las dos ramas de solo-lectura del catalogo de slots exponian el disponible como `xp_total - xp_gastado_sinks`, **sin acotar** y **sin `COALESCE`**. Dos consecuencias, y las dos importan: (a) un gasto ya realizado podia dejar el disponible **negativo**, que en pantalla se lee como "me deben XP" cuando significa **"no queda nada"**; (b) con `xp_gastado_sinks` a `NULL`, la expresion no devolvia un numero malo, devolvia **`NULL`**, y un disponible que **no es numero** no se puede comparar con un coste.
+
+**Por que es un bug y no una inconsistencia menor.** El resto del sistema **gasta contra saldo acotado** (los 11 puntos del clamp). **La misma pantalla que invita a comprar mostraba un numero con el que la compra iba a fallar**, y el usuario no tenia forma de saber cual de los dos era el bueno.
+
+**Reparacion:** `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)` en ambas ramas -- **la misma forma canonica** que el clamp de los puntos de gasto.
+
+**Lo que este bug NO es.** No es un fallo de cobro (el guard de cada punto de gasto ya acotaba), ni un error de `xp_total` (que es reputacion, ADR-018, y no baja al comprar), ni deuda de `slot_rampa`/`slot_catalogo` en su logica de precio. **Y no es lo mismo que el clamp de `disponible_restante` (C1 b), que SI se documento como defensa inalcanzable y NO se conto como bug corregido:** aqui el numero **salia** al cliente y por tanto **si se podia ver**.
+
+## BUG-114: `tithe_parche` acreditaba fama a la pandilla **aunque el diezmo se hubiera rechazado** -- y el bug solo existia **despues** de arreglar el disponible
+
+**Severidad:** **ALTA de impacto economico**: la pandilla cobraba fama por un diezmo que el usuario **no habia pagado**. **Estado: CERRADO** (verificado con `ROLLBACK`).
+
+**Contexto:** detectado el 2026-10-05 al cerrar la TRAMPA 2 que el propio `ADR-088` B2.4 dejo abierta. Encargado en **ADR-088 C2**.
+
+**El defecto, y por que el orden de los hechos es la parte instructiva.** El debito (`d`) y la acreditacion a la tesoreria de pandilla (`t`) disparaban **siempre juntos**, sin ninguna dependencia entre ellos. Se puso el guard al debito del diezmo (`xp_gastado_sinks` + disponible real, que antes se ignoraba). **Al condicionar `d`, `t` se quedo sin atar:** si no se le exigia que el debito **hubiera ocurrido**, **un diezmo RECHAZADO igual acreditaba fama a la pandilla**. Es decir: **la pandilla cobaba un diezmo que el usuario no habia pagado.**
+
+**La leccion, escrita porque es mas util que el bug:** *cada vez que se anade una precondicion a la mitad de un par que se movia junto, la otra mitad deja de estar garantizada.* Un bug **imposible** antes del guard se hace **posible** por el guard. **La atadura no se rompe cuando se le quitan cosas: se rompe cuando se le anaden.**
+
+**Reparacion:** la acreditacion queda condicionada a que el debito **SIEMPRE** haya disparado (`... AND EXISTS (SELECT 1 FROM d)`), dentro de la **misma sentencia** -- que es el unico sitio donde eso es garantizable.
+
+**Comportamiento final medido, con `ROLLBACK`:** disponible **4900** / monto **500** -> **cobra** (500 movidos, fama +500) · disponible **200** / monto **500** -> **rechaza** (**0 movidos**, fama 0, `faltante=300` nombrado en el log) · `xp_total=1000`, `xp_gastado_sinks=800`, monto **500** -> **rechaza** (**0 movidos**; era el caso que daba **-300**) · usuario inexistente -> `disp_guard = -1`, **0 movidos**, **fail-closed**.
+
+**Lo que este bug NO es, y es importante que quede escrito.** No es un fallo del calculo del diezmo (el **porcentaje** no se toco) ni de su naturaleza (**voluntaria**: **no se capea la ofrenda, se impide que el debito exceda el disponible**). Y **no es una regression de la UI**: `aplicarTitheParche` es **BEST-EFFORT TOTAL** (ADR-066), **no recibe `res`**, luego **no hay canal a la UI** y el faltante se nombra **en el log**. **Avisar el faltante a la UI exigiria otro sumidero: es una feature de producto, no una correccion** (deuda en `TASKS.md` TSK-192).
+
+## BUG-115: `portada_destino` compra **sin `tipo_medio`**: pertenecer a **cualquier medio de un destino** compraba la portada de ese destino
+
+**Severidad:** **ALTA de seguridad/autorizacion** (un usuario con un recurso de media menor compraba un recurso de otro nivel). **Estado: CERRADO** (verificado con `ROLLBACK`).
+
+**Contexto:** detectado y medido el 2026-10-05. Encargado en **ADR-088 C3**.
+
+**El defecto, medido.** La compra validaba `destino_id = $5::uuid` **ignorando `tipo_medio`**. Como la PK de `spot_duenos` es **compuesta** (`(destino_id, tipo_medio)`), pertenecer a **cualquier** medio de un destino bastaba para comprar **la portada** de ese destino. Con las **4 filas reales** (`general` = 2, `foto` = 2), un usuario con **solo `foto`** pasaba el guard. **Portada == `general`**: es el extremo de todo el destino, no un medio mas.
+
+**Reparacion, y por que en la misma sentencia:** el `EXISTS` ahora exige `tipo_medio = 'general'`, **en la sentencia atomica** que valida y cobra. **Separar la comprobacion en una segunda consulta abriria una carrera** entre "comprobar que es dueno" y "cobrar".
+
+**Medido, con `ROLLBACK`:** (i) solo `foto` -> **`ok = false`** · (ii) solo `general` -> **`ok = true`** · (iii) `general` de **otro** usuario -> **`ok = false`** · (iv) `general` + `foto` -> **`ok = true`** · (v) sin fila -> **`ok = false`**.
+
+**Lo que este bug NO es, y por que el alcance es de UN solo sitio.** No hay "segundo caso" que arreglar en otro sumidero: `albumes` tiene PK `id` y `usuario_fotos` tiene PK `id`, y **ninguna de las dos tiene `tipo_medio`**. **El filtro por tipo solo aplica a `spot_duenos`.** Y no es un fallo de RLS: es un `EXISTS` incompleto. (Con RLS desactivado, ademas, el filtro de sesion es la **unica** frontera: ver **ADR-088 C5**.)
+
+## BUG-116: `uq_sink_slot` era un `UNIQUE` que **no unificaba nada util** y ademas **rechazaba la compra legitima**
+
+**Severidad:** MEDIA de integridad (no cobraba de mas, pero **una restriccion llamada "uq" prometia una garantia que no existia**). **Estado: CERRADO** (migracion `050` aplicada y medida en Neon).
+
+**Contexto:** detectado y medido el 2026-10-05 antes de delegar la `050`. Encargado en `DECISIONS.md` **ADR-087 A3**.
+
+**El defecto, medido.** La `046` declaro `uq_sink_slot UNIQUE (usuario_id, clave_accion, ref_id, creado_en)`. La cuarta columna es `creado_en`, cuyo `DEFAULT now()` es **un timestamp DE TRANSACCION** (estable dentro de la transaccion). **Dos insertions legitimas del mismo enganche en la MISMA transaccion comparten `creado_en` al segundo**, luego la restriccion las rechaza con **SQLSTATE 23505**.
+
+**El hallazgo, en la forma que lo hace entendible: la restriccion no cubria el doble cobro y si rechazaba la compra valida.** Es **peor que inerte**: no hacia su trabajo y ademas estorbaba el caso bueno. Una "garantia" que solo produce falsos rechazos es exactamente el objeto que la gobernanza prohibe dejar.
+
+**Reparacion:** la **`050`** la **sustituye** (no se apila encima) por un indice **UNICO PARCIAL** `(usuario_id, clave_accion, ref_id) WHERE activo = true`. **Parcial y no total** porque `slot_baja` **no devuelve XP** (`xp_devuelto: 0`): con unicidad total, quien pagara un recurso, lo diera de baja y quisiera volver a pagarlo recibiria `23505` en una operacion **legitima y ya cobrada**. Con el parcial, **dar de baja libera**.
+
+**Medido en Neon:** `uq_sink_slot` **ausente** de `pg_constraint` **y** de `pg_indexes`; `uq_sink_slots_activo` **presente** con predicado `WHERE (activo = true)`; doble slot activo sobre el mismo `(usuario, clave, ref_id)` -> **`23505`**; baja y recompra -> **3/3 aceptada**. Fichero **ASCII-safe** (**0 bytes > 127**, **0 CR**, **241 LF**) e **idempotente**.
+
+**Lo que este bug NO es.** No es un agujero de precio: el ciclo barato "dar de baja y recomprar al precio de k bajo" **es imposible**, porque el `k` que fija el precio lo asigna un contador que mira **todas** las filas, no solo las activas, y `slot_baja` **deja la fila**. Por eso la `050` **no toca ni el precio ni la asignacion de `slot_index`**: son economia de producto, no esquema.
+
+## BUG-117: una cita de ADR **fabricada** en un encargo (`"ADR-3582"`) -- el fallo mas peligroso de un pase documental, porque no rompe nada: se propaga como verdad
+
+**Severidad:** **ALTA de integridad de la gobernanza** (una decision inexistente queda citada con forma de decision real). **Estado: CERRADO / DESMENTIDO.** **La cita NUNCA llego a escribirse en ningun documento.**
+
+**Contexto:** detectado el 2026-10-05 en el propio turno de cierre documental, al medir el encargo antes de documentar. Encargado en `DECISIONS.md` **ADR-087 A1**.
+
+**El defecto, medido.** El encargo afirmaba que "`ADR-3582` documenta `spot_duenos` como la tabla del 'Dueno del Spot' multi-media de `spot_dividendo`". Medido: **`Select-String "3582" DECISIONS.md` -> 0 coincidencias.** La cadena "3582" **no aparece** en el documento. Lo que existe es una **linea** (3578 la decision, 3582 su impacto) **dentro del `ADR-065`**. Hay **87** cabeceras de ADR y la ultima es el **`ADR-088`**.
+
+**Por que la cita era tan plausible -- y esa es la parte instructiva.** Casi todo lo que afirmaba era **verdad**: el `ADR-065` documenta `spot_duenos`, el bloque "Dueno del Spot" multi-media es real, y `spot_dividendo` **parecia** singular. **Lo unico falso era el numero**, y por eso el identificador fabricado **tenia la forma de uno valido**: un numero de linea pegado al prefijo `ADR-` produce algo indistinguible de una cita correcta. Ademas, la tabla real es **`spot_dividendos`** (plural): **`spot_dividendo` no existe**.
+
+**Por que NO llego a escribirse (esta parte tambien es el procedimiento).** El cierre documental verifico el encargo **contra el fichero** antes de escribir nada, en vez de escribir y luego corregir. Una cita inventada en el documento de gobernanza es el peor fallo posible de un pase, porque **no falla: se lee como verdad y se propaga**. Y corregirla despues es mas caro que no escribirla.
+
+**La regla que queda:** *un identificador de decision **no se valida por su forma, se valida contra la lista de decisiones**.* Si un `ADR-NNNN` no aparece como cabecera, **no se corrige "a ojo"**: se busca la seccion que contiene el hecho y se cita esa, **con la cita textual copiada literal del fichero** (ADR-006). Y es la misma regla hermana de **B2.3**: *una linea es una foto, no una direccion* -- aqui la foto se confundio con la direccion.
+
+**Lo que este bug NO es.** No es un error de `DECISIONS.md` (el documento estaba y esta correcto), no es un ADR perdido ni renumerado, y **no hay nada que "arreglar" en codigo**. Es un fallo de **procedimiento de verificacion**, que es donde queda la leccion.

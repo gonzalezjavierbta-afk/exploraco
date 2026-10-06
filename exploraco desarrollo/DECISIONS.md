@@ -6454,6 +6454,59 @@ Se eligio **`.gitattributes` y no "volver a copiar el checksum"** por una razon 
 
 ---
 
+## Addendum A del ADR-087 (2026-10-05) -- una cita FABRICADA, `spot_duenos` como entidad unica, y la migracion `050`
+
+**Este addendum no reescribe el ADR-087 ni ninguna de sus decisiones (D1-D7). Anade tres hechos medidos, y su unico proposito es que el proximo no los vuelva a derivar del brief.** El detalle por tarea vive en `TASKS.md` (TSK-191/TSK-192); el estado de produccion, en `NEXT.md` (ADR-084 D1).
+
+### A1. `ADR-3582` **NO EXISTE**: era un NUMERO DE LINEA, no un ADR. La cita correcta es **ADR-065**, y la tabla real es `spot_dividendos` (**plural**)
+
+**Medido en este turno, contra el fichero, no contra el encargo.** `Select-String "3582" DECISIONS.md` -> **0 coincidencias**: la cadena "3582" **no aparece** en el documento. Lo que existe es una **linea** (3578 la decision, 3582 su impacto) que cae dentro del **`ADR-065`**. Hay **87 cabeceras `## ADR-0`** y la ultima es el **`ADR-088`**.
+
+**Por que se fabrico una cita plausible (esta es la parte instructiva).** El brief afirmaba que "ADR-3582 documenta `spot_duenos` como tabla del 'Dueno del Spot' multi-media de `spot_dividendo`". Casi todo lo que afirmaba es **verdad**: el `ADR-065` documenta `spot_duenos`, el bloque "Dueno del Spot" multi-media es real, y `spot_dividendo` **parecia** singular. **Lo unico falso era el numero**, y por eso la cita era **indistinguible de una correcta**: un numero de linea (**3582**) pegado al prefijo `ADR-` produce un identificador con la **forma** de un ADR valido. **Un identificador de decision no se valida por su forma: se valida contra la lista de decisiones.** Una cita inventada en el documento de gobernanza es el peor fallo posible de un pase documental, porque es la unica que **se propaga como verdad** a quien la lea sin medir.
+
+**La cita correcta, textual, de `DECISIONS.md:3578` (`ADR-065`, "Decision tomada"):**
+
+> Se calculan, bajo demanda (patron ADR-014, igual que el lider actual), un dueno `general` y un dueno por cada `tipo_medio` en `('foto','video','audio','escrito')`. El calculo reutiliza los votos de media (`media_votos`) y de resenas (`resenas.votos_utiles`) segun el tipo. El dividendo es 10% de XP sobre interacciones AJENAS en el spot, registrado en `spot_dividendos` (ledger append-only, idempotente por interaccion). Tabla de cache opcional `spot_duenos` (migracion 040).
+
+**Las dos correcciones de fondo, ambas medidas:** (a) la entidad citada es el **`ADR-065`**, no un "3582"; (b) la tabla del ledger es **`spot_dividendos`** (plural) y **`spot_dividendo` no existe**. `spot_dividendos` esta en Neon con **0 filas**, y su escritura real esta en `api/interacciones.js` (`INSERT INTO spot_dividendos`, cerca de la linea **1200** -- foto del 2026-10-05, ver ADR-088 B2.3).
+
+**La regla que queda, escrita para el proximo:** *cuando un encargo traiga un identificador de decision, se comprueba contra las cabeceras reales antes de citarlo; un `ADR-NNNN` que no aparece en el documento no se corrige "a ojo", se busca la seccion que contiene el hecho y se cita esa.* Y al reves: **una cita textual se copia literal del fichero**, nunca de memoria ni del resumen de otro documento (ADR-006). Regla hermana, ya escrita en B2.3: *una referencia de linea es una FOTO, no una direccion* -- y esta vez la foto se confundio con la direccion.
+
+### A2. `spot_duenos` es **UNA entidad**: el "solapamiento" temido **no existe**. Lo que queda es coherencia de cache, no colision de dominio
+
+**Medido en Neon (`information_schema` + `pg_constraint`), 2026-10-05.** Columnas: `destino_id uuid NN`, `tipo_medio varchar(10) NN`, `usuario_id uuid NN`, `votos int NN DEFAULT 0`, `calculado_en timestamptz`, `activo bool NN DEFAULT true`. **PK compuesta `(destino_id, tipo_medio)`**, **0 uniques adicionales**. FKs: `destino_id -> destinos(id)`, `usuario_id -> usuarios(id)`. **Datos: 4 filas, las 4 con `activo = true`, 1 solo `usuario_id` distinto**; reparto real **`general` = 2** y **`foto` = 2**, y los otros 4 valores del `CHECK` con **0 filas**.
+
+**Que se desmentia.** La tanda vine con el temor de un solapamiento entre "la tabla del dueno del spot" y "la tabla del spot", que habria obligado a arbitrar cual manda. **Era falso: son la misma fila.** `spot_dividendos` es el **ledger** (append-only, idempotente por interaccion) y `spot_duenos` es la **cache** de la resolucion. **No hay colision de entidades y no hay nada que arbitrar.**
+
+**La deuda que queda NO es de dominio: es de coherencia de cache, y se registra como tal (no como colision).** El `ADR-065` dice "calculo **bajo demanda**" (patron ADR-014) y la tabla es cache. El codigo corre **las dos vias a la vez**: resuelve bajo demanda (`api/interacciones.js:838-968`) **y ademas** escribe la cache (mismo fichero, cerca de la linea **1001**, `INSERT INTO spot_duenos`), como el propio ADR-065 ordena. **Degradacion independiente:** si la cache falla, la resolucion sigue sirviendo el valor bajo demanda y solo se pierde la aceleracion (el codigo lo declara con `warn`). **El riesgo real no es una colision de nombres: es que las dos vias se desincronicen y la cache afirme un dueno que el calculo bajo demanda ya no sostiene.** Se registra como riesgo de coherencia de cache.
+
+**Una discrepancia medida entre el ADR y el `CHECK`, porque el proximo la va a ver y va a pensar que hay un bug:** el `ADR-065` nombra **4** tipos (`foto`, `video`, `audio`, `escrito`) + `general`; el `CHECK chk_spot_duenos_tipo` tiene **6** (`general`, `foto`, `video`, `audio`, `escrito`, **`texto`**). **`'texto'` es el unico valor del `CHECK` que el ADR-065 no respalda, y tiene 0 filas.** El `CHECK` lo creo la **`040`** (no la `046`, que tiene **0 menciones** de `spot`). **No es un bug del esquema:** un `CHECK` mas ancho que el dominio no rompe nada ni bloquea escrituras; es un **valor permitido que hoy nadie emite**. **No se "corrige" restricting el `CHECK`:** seria una migracion para tapar un valor sin uso, y paga el precio de un esquema mas estrecho que la realidad. Deuda de producto, no de esquema.
+
+### A3. Migracion `050`: el `UNIQUE` viejo prometia una unicidad que **no tenia**, y rechazaba la compra legitima
+
+**Que estaba mal, medido en el esquema.** La `046` declaro `uq_sink_slot UNIQUE (usuario_id, clave_accion, ref_id, creado_en)`. Su nombre promete "un slot por recurso" y su contenido **no promete eso**: la cuarta columna es `creado_en`, cuyo `DEFAULT now()` es **un timestamp DE TRANSACCION** (estable dentro de la transaccion). Dos insertions legitimas del mismo enganche **en la misma transaccion** comparten `creado_en` al segundo, luego la restriccion las rechaza con **SQLSTATE 23505**.
+
+**El hallazgo, escrito en la forma que lo hace entendible: la restriccion no cubria el doble cobro y si rechazaba la compra valida.** Es **peor que inerte**: no hacia su trabajo y ademas estorbaba el caso bueno. Es exactamente la clase de objeto que D4 prohibe dejar -- una "garantia" que solo produce falsos rechazos -- y la razon de que la `050` la **sustituya** en vez de apilarse encima.
+
+**La `050` aplicada, `db/migrations/050_indice_parcial_sink_slots_activos.sql`:**
+
+```sql
+ALTER TABLE public.sink_slots DROP CONSTRAINT IF EXISTS uq_sink_slot;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sink_slots_activo
+  ON public.sink_slots (usuario_id, clave_accion, ref_id)
+  WHERE activo = true;
+```
+
+**Por que PARCIAL y no total -- y por que esto es economia, no esquema.** `slot_baja` pone `activo = false` **sin devolver XP** (`xp_devuelto: 0`, literal en el codigo): dar de baja **no devuelve lo pagado**. Con unicidad **total**, quien pagara un recurso, lo diera de baja y quisiera volver a pagarlo recibiria `23505` en una operacion que el negocio considera legitima **y por la que ya cobro antes**. Con el indice **parcial**, dar de baja **libera** la combinacion y recomprar entra; la unicidad sigue guarneciendo lo que de verdad es invalido, que es **dos plazas vivas sobre el mismo enganche**.
+
+**Medido en Neon tras aplicar (2026-10-05):** `schema_migrations` = **48 filas**, **7 con `resultado = 'aplicada'`**, **0 fallidas**. `sink_slots` = **0 filas**, **0 huerfanos**, `SUM(xp_gastado_sinks)` = **`0.00`**. `uq_sink_slot` = **0** en `pg_constraint` **y** **0** en `pg_indexes`; `uq_sink_slots_activo` = **1**, con su predicado `WHERE (activo = true)`. Pruebas con `ROLLBACK`: doble slot activo sobre el mismo `(usuario, clave, ref_id)` -> **`23505`**; baja y recompra -> **3/3 aceptada**. Fichero **ASCII-safe** (**0 bytes > 127**, **0 CR**, **241 LF**) e **idempotente**: 2a ejecucion **4/4 OK**, ledger **48 filas antes y despues**.
+
+**El agujero que NO existe, medido antes de delegar, porque es el economico temible:** `slot_index` lo asigna la CTE que cuenta **TODAS** las filas (cerca de la linea **2398** de `api/interacciones.js`), no solo las activas. `slot_baja` **deja la fila**, luego ese contador **no baja** y recomprar cuesta `k+1`, nunca menos. **El ciclo barato "dar de baja y recomprar al precio de k bajo" es imposible**, y por eso la `050` **no toca ni la asignacion de `slot_index` ni la curva de precio**: son economia de producto (ADR-086), no esquema. La CTE que si filtra por activos alimenta **unicamente el guard de capacidad**, y esa separacion es intencionada: son dos preguntas distintas ("a que precio entro el siguiente" vs "cuantas plazas vivas quedan") y una sola CTE las contaminaria.
+
+---
+
+---
+
 ## ADR-088: Addendum B del ADR-086 -- tres premisas que la seccion 4 asumio y el esquema desmiente; el clamp del XP disponible y sus 3 trampas; el motor compartido en `lib/` como razon del limite 8/8; y el cuarto ranking con atribucion del inversor
 
 **ID:** ADR-088
@@ -6535,6 +6588,8 @@ Los tres estan **validados en produccion** por HTTP el 2026-10-05: `slot_catalog
 
 **Estado: CERRADO e implementado en los 11 puntos de gasto.** El resto de este addendum (B3-B6) queda en **ratificado** o en **deuda declarada**.
 
+> **[ANADIDO 2026-10-05, addendum C0 -- LA UNIDAD, QUE ESTA CORREGIDA.]** Los "11 puntos de gasto" de B2 son **11 SENTENCIAS de negocio**, y esa cifra **es correcta**. Lo que era incorrecto era confrontarla con un conteo de **lineas**: `api/interacciones.js` tiene **13 lineas de guard** agrupadas en **8 sentencias** (el guard aparece **dos veces** por sentencia, en el CTE de comprobacion y en el de debito) y **5 lineas mas de exposicion** que no son guard; `api/usuarios.js` tiene **3 guards ejecutables** mas **2 lineas de comentario**. Medido y con la tabla de las 11 en **C0**. *Una linea es una foto, no una unidad: B2.3 ya lo avisaba, y aqui queda con el numero.*
+
 #### B2.1. Por que era OBLIGATORIO (no era una mejora de estilo)
 
 El measurable: **`xp_total` era el unico saldo gastable.** La migracion `046` introduce **`usuarios.xp_gastado_sinks`**, un **contador de gasto** (solo crece, ADR-018: `xp_total` es la reputacion y no se toca). Y los **11 puntos de gasto** lo **ignoraban**: restaban **dos veces del mismo numero**, porque elAvailable se computaba sobre `xp_total` como si `xp_gastado_sinks` no existiera.
@@ -6579,6 +6634,8 @@ SET xp_total = GREATEST(0, xp_total - $1)     -- sin ningun guard previo
 `xp_total` pasa a **500** (`GREATEST(0, 1000-500)`), y el disponible real es `500 - 800` = **-300**. **Disponible negativo.** Con el clamp de los 11 puntos, un disponible negativo se veria como **0**; aqui **el clamp no esta**, porque el punto no se cableo.
 
 **NO SE TOCO, y esa es la decision.** Acotar `tithe_parche` es una **decision de producto**, no de codigo: el diezmo es una **ofrenda voluntaria** -- su natureza es que el usuario **dona** sin contraprestacion, y un guard que lo bloquee cuando el disponible es negativo convertiria una ofrenda en un cobro condicional. **El arquitecto no tiene derecho a decidir eso.** Queda como **deuda ABIERTA**, no como cerrada, y **no se marca como tratada** en ningun sitio para que el proximo no lo lea como resuelto.
+
+> **[ACTUALIZADO 2026-10-05, addendum C2 -- ESTA DEUDA SI SE CERRO, y el hallazgo real fue OTRO.]** El texto anterior **se conserva** (Cero Borrado Logico) pero **su estado ya no es el de arriba**: `tithe_parche` **SI se corrigio**, y la TRAMPA 2 **queda cerrada**. Dos cosas, ambas medidas: (a) el `SET` ahora **lee `xp_gastado_sinks`** y el guard va **en el mismo `UPDATE`**; (b) **al conditioner el debito aparecio el bug mas grave de la tanda**: la acreditacion a la tesoreria de pandilla **no estaba atada** al debito, luego **un diezmo rechazado igual acreditaba fama**. Cerrado con `EXISTS (SELECT 1 FROM d)`. **Lo que NO se toco sigue en pie: el porcentaje (`PARCHE_TITHE_MAX`) y la semantica voluntaria** -- no se capea la ofrenda, se impide que el debito exceda el disponible. Ver **C2**. El nombre "punto 12" queda como historia: el clamp lo cubre hoy como parte de su propio guard.
 
 #### B2.5. TRAMPA 3 -- `billetera_mia` y los perfiles publicos muestran `xp_total` sin restar. NO ES UN BUG. NO LO "CORRIJAS".
 
@@ -6747,3 +6804,163 @@ El `400` salia **con sesion, saldo y `ref_id` validos**. Y esa es la parte impor
 - **El checksum de la `047` en `schema_migrations` NO se toco** (ADR-003). La **nota de estado** que se anadio a la cabecera de la `047` **si cambia el sha256 en disco** (`scripts/apply_sql_file.js` lo calcula sobre los bytes crudos, sin normalizar comentarios), luego el portero reportara **DERIVA** frente a esa fila. **Es una consecuencia declarada, no un descuido**, y la nota misma lo dice dentro del fichero. Quien vea esa deriva **no debe "arreglarla"**: la deriva **es** la nota.
 - **La `047` se aplico con su cuerpo original.** La nota es **un comentario**, no una sentencia: el fichero sigue siendo **aditivo e idempotente**, con **0 bytes > 127** (ASCII-safe, ADR-002).
 - **El detalle por tarea vive en `TASKS.md`; el detalle del estado de produccion, en `NEXT.md`.** Este addendum es el **argumento** (ADR-084 D1) y no se duplica.
+
+## Addendum C del ADR-088 (2026-10-05) -- las unidades del clamp, cuatro huecos de "disponible", el eslabon que faltaba (`slot_refs`), y por que `'oficial'` no se arregla escribiendo
+
+**Alcance de este addendum: cierra la TRAMPA 2 de B2 (que queda escrita como estaba, con su estado actualizado), corrige la UNIDAD con la que B2 cuenta, y anade lo que la tanda del 2026-10-05 midio.** No reescribe B0-B12, no crea un ADR nuevo (el ultimo **sigue siendo el 088**) y no mueve nada (ADR-003).
+
+### C0. El "11 vs 14" era un conflicto FALSO: los **11** son SENTENCIAS, y una linea es una foto
+
+**Medido hoy, por patron y no por linea.** El patron `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)` aparece en **`api/interacciones.js` en 13 lineas de guard**, agrupadas en **8 sentencias**, y en **`api/usuarios.js` en 3 guards ejecutables** mas **2 lineas de comentario**. El "17 lineas con `api/usuarios.js`" que circulaba era erroneous: son **5** lineas, de las cuales **2 son comentarios** (`625` y `1675`, ambos con la forma `// guard WHERE GREATEST(...)`).
+
+**Por que 13 lineas son 8 sentencias: el guard aparece DOS VEZES por sentencia.** Leido el SQL, la forma es systematico: un CTE de **comprobacion** (`ok_saldo`, `ok_xp`, `puede`) y un CTE de **debito** (`debit`, `cobro`) repiten el mismo par de invariantes (`xp_total >= $n`, que protege la columna de reputacion ADR-018, **y** el disponible acotado a 0, que es el saldo real). **Una linea es la asercion del guard, no una unidad de negocio.** Sumando las **5 lineas de exposicion** que usan el mismo patron pero **no** son guard (`2499`, `4411`, `8968`, `9062`, `9137`), `interacciones.js` tiene **18** lineas con el patron y **8** statements de gasto.
+
+**Las 11 sentencias de negocio, con su coste. Esta tabla es la que cierra la deuda del "11":**
+
+| # | Sentencia (fichero) | Parametro | Coste |
+|---|---|---|---|
+| 1 | Cobro de `spot_dividendos` (`interacciones.js`, CTE `ok_saldo`/`debit`) | `$7` | 7 |
+| 2 | Crear sala de DM (`chat_salas`, CTE `puede`/`cobro`) | `20` fijo | 20 |
+| 3 | Consumible desde tienda (`capacidades->consumibles`) | `$1` | precio |
+| 4 | Mercado: compra de oferta de carta (`cartas_ofertas`) | `$4` | precio |
+| 5 | Mercado: compra de moneda (`moneda_mercado`) | `$3` | precio |
+| 6 | Mercado: compra de consumible en oferta (`mercado_ofertas`) | `$4` | precio |
+| 7 | Mercado: produccion de consumible | `$1` | precio |
+| 8 | Contrato P2P (`contratos_p2p`) | `$2` | recompensa |
+| 9 | `/api/usuarios.js`: fundirse a faccion | `COSTO_FACCION` | 800 |
+| 10 | `/api/usuarios.js`: fundirse a casa | `COSTO_CASA` | 500 |
+| 11 | `/api/usuarios.js`: comprar clase | `COSTO_CLASE` | 500 |
+
+**Lo que B2.3 ya advertia, y aqui se confirma con numero:** *una linea es una foto, no una unidad*. B2 decia "11 puntos de gasto" y **eso es correcto**; lo que no era correcto era confrontarlo con un conteo de lineas. **La correccion que queda escrita en B2 es esta: los 11 puntos son 11 SENTENCIAS; el numero de lineas es N (13 en `interacciones.js`, 3 en `usuarios.js`, mas 5 lineas de exposicion que no son guard); y una linea, por si sola, no cuenta nada.**
+
+### C1. Cuatro huecos de "disponible", y **que clase de cosa es cada uno**
+
+La forma canonica es `GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)`. B2 la instauro en los puntos de **gasto**. Los 4 huecos de esta seccion son de otra clase: **lectura, exposicion y autorizacion**. Se separan porque **no admiten el mismo juicio**, y escribirlos todos como "bug corregido" seria untrue.
+
+**(a) `slot_catalogo` y `slot_mios`: CORRECCION REAL DE BUG.** Publicaban el disponible **crudo**, y ademas **ninguno de los dos tenia `COALESCE`**. La consecuencia medida de la falta de `COALESCE`: con `xp_gastado_sinks` a `NULL`, la expresion no daba un numero malo, daba **`NULL`** -- y un disponible que no es numero no se puede comparar con un coste. La forma antes/despues:
+
+```
+ANTES   (xp_total - xp_gastado_sinks)                    -- crudo, y NULL si gastado es NULL
+DESPUES GREATEST(xp_total - COALESCE(xp_gastado_sinks, 0), 0)   -- saldo, nunca negativo, nunca NULL
+```
+
+Que se le llame "correccion de bug" y no "consistencia": **mostraba saldo, potentiellement negativo, donde el resto del sistema gastaba contra saldo acotado.** La misma pantalla que invitaba a comprar mostraba un numero con el que la compra iba a fallar.
+
+**(b) `disponible_restante`: NO es un bug corregido. Es defensa en profundidad INALCANZABLE por construccion, y se queda escrita como tal.** El `RETURNING` publica `GREATEST(u.xp_total - COALESCE(u.xp_gastado_sinks, 0), 0)` y el guard de la **misma** sentencia (`:15533-15534`) exige `p.k_actual < p.slot_max`, `p.k_activos < p.slot_max_activos` y el disponible **>= costo** *antes* del debito. **Despues de un debito que solo ocurre si el disponible cubria el coste, el restante es `>= 0` por construccion.** Medido: disponible **800** contra coste **320** -> el debito devuelve **0 filas** (no se compra, y el `RETURNING` no se publica); en la frontera `disponible == costo == 320` -> `"0.00"`. **Clampar un numero que ya es no negativo no arregla nada: hace imposible que el futuroezi un guard nuevo forgets el clamp.** Se deja, y se documenta como inalcanzable, para que el proximo que lo lea **no lo "arregle" ni lo cuente como cerr**.
+
+**(c) `tithe_parche`: correccion real, y la mas grave de la tanda. Ver C2.**
+
+**(d) `portada_destino`: correccion de seguridad. Ver C3.**
+
+### C2. `tithe_parche`: el bug no era el disponible negativo, era que **la acreditacion estaba DESACOPLADA del debito**
+
+B2.4 abrio esta deuda ("punto 12 que el ADR no cuenta") y la dejo **abierta a proposito**. **Esta seccion la cierra, y explica por que el hallazgo real era mas grave que el que se buscaba.**
+
+**El bug de disponible (el que se buscaba), medido.** El `SET` era `SET xp_total = GREATEST(0, xp_total - $1)`, **sin guard y sin leer `xp_gastado_sinks`**: con `xp_total = 1000`, `xp_gastado_sinks = 800` y diezmo `500` la aritmetica dejaba **-300** de disponible real. Corregido: la CTE `g` **si lee `xp_gastado_sinks`** y el guard queda **en el mismo `UPDATE`**.
+
+**El bug que aparecio al corregirlo, y que es el mas grave de la tanda.** El debito (`d`) y la acreditacion a la tesoreria de pandilla (`t`) disparaban **siempre juntos**. Al condicionar `d` al guard, **si no se ataba `t` a `d`, un diezmo RECHAZADO en el debito igual acreditaba fama a la pandilla**: es decir, **la pandilla cobraba un diezmo que el usuario no habia pagado.** **No era un desajuste de contabilidad, era una transferencia de valor en la direccion equivocada, y solo se hacia visible cuando el guard existe.** La atadura correcta es `UPDATE pandillas ... WHERE id = $3 AND EXISTS (SELECT 1 FROM d)`. **La leccion, escrita para que no se repita:** *cada vez que se anade una precondicion a la mitad de un par que se movia junto, la otra mitad deja de estar garantizada. Un guard que se activa puede abrir una divergencia que antes era imposible.*
+
+**Comportamiento final medido, con `ROLLBACK`:**
+
+| Escenario | Resultado | Movidos | Fama |
+|---|---|---|---|
+| disponible **4900**, monto **500** | **cobra** | 500 | +500 |
+| disponible **200**, monto **500** | **rechaza** | **0** | 0 (`faltante=300` en log) |
+| `xp_total=1000`, `xp_gastado_sinks=800`, monto **500** | **rechaza** | **0** | 0 (`faltante=300`) -- **este era el caso que daba -300** |
+| usuario inexistente | `disp_guard = -1` | **0** | 0 (**fail-closed**) |
+
+**El encargo de "naming the faltante para the UI" era IMPOSIBLE, y no se forzo.** `aplicarTitheParche` es **BEST-EFFORT TOTAL** (ADR-066): **no recibe `res`**, y su unico llamante **descarta el valor de retorno**. **No hay canal a la UI**: lanzar habria roto la accion principal -- una **resena** fallaria porque la **tesoreria de la pandilla** esta corta, que es un fallo del subsistema de fama que no tiene relacion con el fallo de la resena. **La UI no puede recibir este dato sin abrir un sumidero nuevo, y abrir un sumidero para reportar un rechazo es una feature de producto, no una correccion.** **Decision:** el faltante queda nombrado en el **log**, que si es observable (`[tithe] RECHAZADO ... faltante=300`). Deuda de producto registrada en C7.
+
+**Lo que NO se toco, deliberadamente, y por que.** (a) `PARCHE_TITHE_MAX` **no se toco**: acota el **porcentaje**, no el monto. (b) La semantica **voluntaria** del diezmo **no se toco**: **no se capea la ofrenda, se impide que el debito exceda el disponible**, y si el disponible no cubre el diezmo **completo** no se cobra una fraccion ("un diezmo del 60% es un diezmo del 100% mal formado").
+
+### C3. `portada_destino`: el `tipo_medio` era un **agujero de autorizacion**, no un detalle de filtro
+
+**El defecto, medido.** La compra validaba `destino_id = $5::uuid` **ignorando `tipo_medio`**. Como la PK de `spot_duenos` es **compuesta** (`(destino_id, tipo_medio)`), pertenecer **CUALQUIER medio de un destino** compra la portada de ese destino: con las **4 filas reales** (`general` = 2, `foto` = 2), un usuario con **solo `foto`** pasaba el guard y Podia comprar la portada. **Portada == `general`**: es el extremo de todo el destino, no un medio mas.
+
+**La correccion va en el MISMO `EXISTS`, no en una segunda consulta.** Separar la comprobacion abriria una carrera entre "comprobar que es dueno" y "comprar" (el `UPDATE` podria corre entre las dos). El filtro se declara como parte del descriptor del sumidero (`filtro_tipo`) y se inyecta **en la sentencia unica** que valida y cobra.
+
+**Medido, con `ROLLBACK`:**
+
+| Escenario | `ok` |
+|---|---|
+| (i) solo `foto` | **`false`** |
+| (ii) solo `general` | **`true`** |
+| (iii) `general` de **otro** usuario | **`false`** |
+| (iv) `general` + `foto` | **`true`** |
+| (v) sin fila | **`false`** |
+
+**Por que no hay un "segundo caso" que arreglar en otro sitio:** `albumes` tiene PK `id` y `usuario_fotos` tiene PK `id`, y **ninguna de las dos tiene `tipo_medio`**. **El filtro por tipo solo aplica a `spot_duenos`**, y por eso la correccion es de un solo sitio y no un patron a extender.
+
+### C4. `?tipo=slot_refs`: el eslabon que faltaba entre "tengo recursos" y "puedo comprar el slot"
+
+**Por que existia, que es lo que la hace no trivial.** Tres de los cuatro sumideros son comprables y **no habia ninguna forma de obtener el `ref_id`**: el boton de compra **no podia funcionar nunca**, y el sintomo (boton que no hace nada) es indistinguible del de "no tienes saldo". **Un endpoint nuevo habria sido imposible** (8/8 serverless agotadas, ADR-010): `slot_refs` es una **rama mas** de `interacciones.js`.
+
+**El contrato, y por que cada decision es una decision:**
+
+- **Exige sesion, siempre.** Sin sesion -> **`401 SESION_REQUERIDA`**; token invalido -> **`401 SESION_INVALIDA`**. **Nunca una lista vacia**: "no tienes nada" y "no se pudo saber" deben ser distinguibles, y una lista vacia los confunde.
+- **Las 3 ramas filtran `usuario_id = $1` EN LA MISMA sentencia.** No hay un `WHERE` en JavaScript sobre un array: una lista filtrada en el cliente es una lista que ya cruzo la frontera (ver C5).
+- **`portada_destino` exige `activo = true AND tipo_medio = 'general'`** y resuelve el nombre via `destinos`, coherente con C3.
+- **El `ref_id` va `verbatim` al POST.** La compra compara `destino_id = $5::uuid`, luego lo que viaja es el **UUID**, nunca un slug: el cliente no traduce identificadores.
+- **Sin paginacion**, justificado por el numero medido: los topes por usuario son **`usuario_fotos` 1**, **`albumes` 3**, **`spot_duenos general` 2**.
+
+**El picker (`mi-perfil.html`), 6 estados, todos verificados con `fetch` interceptado:**
+
+| # | Estado | Comportamiento | Por que |
+|---|---|---|---|
+| 1 | Sin elegibles | boton **deshabilitado** con motivo que **nombra el recurso** | 0 POST: no se intenta lo que no se puede |
+| 2 | Exactamente **1** | **autoseleccionado, sin `<select>`** | un desplegable de una opcion es ruido |
+| 3 | Varios | `<select>` nativo; el POST manda el `ref_id` **verbatim** | el selector existe solo cuando hay decision |
+| 4 | **`slot_refs` falla o 401** | **FAIL-CLOSED: los 3 botones comprables se deshabilitan** | 3 clics -> **0 peticiones**. **Este es el estado que evita el "comprable" falso** |
+| 5 | Cargando | **"revisando cuales tienes"** | **nunca** "0 recursos" mientras no se sabe |
+| 6 | Tras comprar | el recurso deja de ser elegible, se refresca; si era el ultimo, cae al estado 1 | la lista no puede quedar obsoleta ydhoy |
+
+**Invariantes verificados sobre el fichero:** **0 literales de clave de sumidero** en `mi-perfil.html` (**0 en el fichero entero**), **0 `<img>`** en el bloque del picker (a proposito: evita el ADR-008), **0 backticks**, identidad de nodos **estable tras 2 renders** (ADR-003).
+
+**Una observacion de arquitectura, escrita porque el proximo la va a leer como un bug.** `fetchConJwt` **nunca rechaza** (devuelve `{}` en error), luego el `.catch()` del picker es, hoy, **codigo casi muerto**. **Se deja por seguridad, no por necesidad**: el dia que `fetchConJwt` cambie su contrato, ese `.catch()` es lo que impide que un fallo se convierta en un "no tienes nada" silencioso. **Un catch que hoy no se ejecuta no es codigo muerto: es un contrato.**
+
+### C5. RLS DESACTIVADO: en toda lectura por `usuario_id`, el filtro de sesion es la **UNICA** frontera
+
+**Medido en Neon:** `relrowsecurity = false` y `relforcerowsecurity = false` en **`usuario_fotos`, `albumes`, `spot_duenos`, `destinos`, `usuarios`** (0 tablas de ese conjunto con RLS activo). Es coherente con **ADR-087 D1**, que es revocable y explica por que activarlo sin `FORCE` daria **seguridad falsa** (el RLS no aplica al propietario, que es el rol del runner).
+
+**La consecuencia, que se escribe como norma y no como nota al pie:** en `slot_refs` **y en cualquier lectura por `usuario_id`**, **`usuario_id = $1` es la unica frontera real, no una segunda capa.** No hay RLS de respaldo que pueda atrapar un `WHERE` olvidado, ni una politica que limite el alcance de un `SELECT`. **El unico patron aceptable es: el filtro va en la MISMA sentencia que la lectura, y el `usuario_id` viene del token de sesion, nunca de un parametro del cliente.** Si alguna vez hace falta una segunda capa, la segunda capa es **validar en el codigo que el filtro esta**, porque en el esquema **no esta**.
+
+### C6. `'oficial'` es INALCANZABLE en la escala de fama, y **no se arregla escribiendo**
+
+**Medido.** El `CASE` de fama esta en el motor compartido (`lib/score.js`, cerca de la linea **64**) y lee **`pandillas_miembros pm`** (`pm.rol`, cerca de la **68**): `fundador` x1.0, `oficial` x0.6, resto x0.3. **`rol_factor` no existe como columna ni como simbolo**: solo aparece en un **comentario** (`:36`).
+
+**Los dos dominios con un rol `'oficial'` que NO son el mismo dominio:**
+
+| tabla | columna | valores reales | consumidores |
+|---|---|---|---|
+| `pandillas_miembros` | `rol varchar(20)` | **0 filas en la tabla** | el `CASE` de fama (el motor compartido) |
+| `casa_roles` | `rol text` | **`lider` (2)** | gates en `interacciones.js` |
+
+Los unicos escritores de `pandillas_miembros.rol` son **literales**: `'fundador'` y `'miembro'`. Y el `CHECK` de la `010` **ya admite `'oficial'`**, luego **el esquema no bloquea nada**. `usuarios` **no tiene columna `rol`**.
+
+**Conclusion medida: `'oficial'` NO es alcanzable hoy en la escala de fama.** Se escribe **solo en `casa_roles`**, que es otra tabla con otro vocabulario (`lider`/`oficial`/`mariscal`/`miembro` frente a `fundador`/`oficial`/`miembro`). Y como `pandillas_miembros` tiene **0 filas**, la ternaria **se comporta hoy como binaria**.
+
+**La decision que se toma, y por que no se toma la otra.** **No se anade el escritor**, y no se anade el escritor porque **la pregunta esta mal planteada**: un `'oficial'` a 0.6 **no pertenece al dominio de la fama**, que es la fama de **pandillas** (`fundador`/`miembro`). El **valor 0.6 sigue siendo correcto** en la seccion 4 del ADR-086 -- lo que no existe hoy es una **poblacion** a la que aplicar. **Si producto quiere el 0.6, es un concepto nuevo (un rol dentro de la escala de fama, con su escritura y su regulacion), no un escritor que falte.** Se registra como **deuda de producto** con esta formulacion, para que el proximo no lo lea como "un `INSERT` pendiente" y lo "complete" con una fila suelta que no representa a nadie.
+
+### C7. Deuda que este addendum deja ABIERTA (9, cada una con su medicion y su tipo)
+
+1. **`slot_max` es cuota de POR VIDA y `baja` NO la devuelve.** El guard es `p.k_actual < p.slot_max` (cerca de la linea **15533**): `k_actual` es el historico. **Comprar y cancelar QUEMA cuota**: XP gastado, `xp_devuelto: 0` explicito, y la portada queda **cerrada de por vida**. **Decision de producto: historico o activos. NO lo decide la implementacion.**
+2. **`ref_id` es nullable** en `sink_slots` (`046`, cerca de la linea **156**) y los `NULL` **no colisionan**, luego el indice parcial no los cubre. **Hoy es inocuo** porque el `ref_id` se valida antes del `INSERT`; se documenta **por si el contrato del sumidero cambia** y empieza a admitirse "enganche sin recurso".
+3. **El faltante del diezmo solo llega al log** (C2). Necesita otro sumidero. **Decision de producto.**
+4. **`'oficial'` inalcanzable** en la escala de fama (C6). **Decision de producto, y no es un escritor que falte.**
+5. **`portada_destino` con 1 solo usuario**: 4 filas de `spot_duenos`, **1 `usuario_id`**. **Deuda de datos**, no de codigo: poblarla es trabajo de ingestion.
+6. **El pool del picker es de 1**: `usuario_fotos` tiene **1 fila** en todo el universo y `spot_duenos general` **1 dueno** (2 filas, 2 destinos). El picker es correcto y **ofrece poco**.
+7. **`spot_duenos`: cache y bajo demanda en paralelo** (ADR-087 A2). **Riesgo de coherencia**, no colision de entidades.
+8. **`'texto'` en el `CHECK` sin respaldo del ADR-065** y con **0 filas** (ADR-087 A2). **No es bug**: no se restringe el `CHECK` para tapar un valor sin uso.
+9. **`destacar_evento` sin destino de datos**: la entidad evento no existe en el esquema. Ya declarado en **B11**.
+
+### C8. Estado final medido de la tanda, y declaracion de integridad
+
+**Commits de la sesion (9):** `e027a5f`, `c4f5a28`, `cb9accd`, `6e1944d`, `b2f9cf1`, `61cbd66`, `e9f35c6`, `72320e9`, `842ba9a`.
+
+**Produccion:** `slot_catalogo` **200** · `slot_rampa` **200** · `planes` **200** · **`slot_refs` 401 sin sesion** · **3 de 4** sumideros comprables.
+
+**Neon:** **7** migraciones aplicadas · **0** fallidas · **48** filas en el ledger · `sink_slots` **0 filas** · **0** huerfanos · `SUM(xp_gastado_sinks)` **`0.00`** · `uq_sink_slots_activo` presente · `uq_sink_slot` ausente.
+
+**Tests:** `npm test` **109/109, FAIL 0** (corrido en este turno de cierre, no heredado). **Cascada de agentes:** 18 agentes, 2 primarios, 16 heredados, `RESULTADO: OK`. **Arbol de trabajo:** limpio antes de este pase documental.
+
+**Integridad de este addendum:** **no crea un ADR nuevo** (el ultimo **sigue siendo el 088**), **no renumera ni duplica** ninguno (87 cabeceras `## ADR-0`), **no borra** B0-B12 ni el texto de B2.4 (que se conserva con su estado actualizado aqui), y **no toca `api/`, `lib/`, `scripts/` ni `db/`**. Los argumentos de D1 viven en **ADR-087** (cita fabricada, entidad unica, migracion `050`); los de esta seccion, aqui. El detalle por tarea, en `TASKS.md`.
