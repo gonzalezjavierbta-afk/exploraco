@@ -2056,3 +2056,15 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **La regla que queda:** *un identificador de decision **no se valida por su forma, se valida contra la lista de decisiones**.* Si un `ADR-NNNN` no aparece como cabecera, **no se corrige "a ojo"**: se busca la seccion que contiene el hecho y se cita esa, **con la cita textual copiada literal del fichero** (ADR-006). Y es la misma regla hermana de **B2.3**: *una linea es una foto, no una direccion* -- aqui la foto se confundio con la direccion.
 
 **Lo que este bug NO es.** No es un error de `DECISIONS.md` (el documento estaba y esta correcto), no es un ADR perdido ni renumerado, y **no hay nada que "arreglar" en codigo**. Es un fallo de **procedimiento de verificacion**, que es donde queda la leccion.
+
+## BUG-118: `smoke_grupos_perfil.js` reporta `misAlbumRatingTxt is not defined` en la zona "Mis Álbumes" de `mi-perfil.html` -- FAIL **PRE-EXISTENTE**, no regresion de TSK-197
+
+**Severidad:** **BAJA / de instrumentacion** (el render real en navegador funciona; el fallo es del arnes o de su ejecucion). **Estado: ABIERTO / PENDIENTE.** **NO corregido.**
+
+**Contexto:** detectado el 2026-10-07 durante la verificacion de **TSK-197** (campo `desc` en las misiones). Round-trip `git stash`: contra **HEAD** el smoke marca **64/65**, **identico** con y sin los cambios de TSK-197. Por tanto **no es regresion**: es una **deuda previa**.
+
+**El sintoma, medido.** `scripts/smoke_grupos_perfil.js` ejecuta **64/65** y su **unico FAIL** es `misAlbumRatingTxt is not defined`, en la superficie "Mis Álbumes". El simbolo **si esta definido** en el archivo real: `function misAlbumRatingTxt(rp)` en `mi-perfil.html:3393`, invocado desde `misAlbumesPintar` en `mi-perfil.html:3422`. El fallo aparece **solo bajo el arnes**: el round-trip demuestra que el archivo de HEAD lo dispara igual.
+
+**Lo que NO se hizo:** **no se corrigio** y **no se aislo la causa raiz** (se desconoce si es el orden de los scripts inline extraidos, un error previo que aborta la ejecucion dentro del `vm`, o el alcance del `function` al ejecutar los bloques por separado). Lo que queda **afirmado y medido** es solo: (a) el FAIL existe; (b) es pre-existente; (c) el simbolo esta definido en el archivo real. **No se fabrica una causa que no se midio.**
+
+**Deuda:** quien lo aborde debe **primero reproducir el FAIL contra HEAD** y **aislar si es defecto del arnes o del archivo**. Si es del arnes, la leccion es hermana de **BUG-098** (*producto correcto, instrumentacion incorrecta*).

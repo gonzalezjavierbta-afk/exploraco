@@ -99,6 +99,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 .nivel-mis-name{font-size:10px;font-weight:700;color:#fff}
 .nivel-mis-xp{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:900;color:var(--gold);flex-shrink:0}
 .nivel-mis-meta{font-size:9px;color:rgba(255,255,255,.4);line-height:1.4;margin-top:2px}
+.nivel-mis-desc{font-size:9px;color:rgba(255,255,255,.5);line-height:1.4;margin-top:3px;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 @media (prefers-reduced-motion: reduce){.nivel-item.expanded .nivel-detail{animation:none}.nivel-caret{transition:none}}
 /* BADGES */
 .badges-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:28px}
@@ -112,11 +113,12 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #pf-misiones .mis-card{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px}
 #pf-misiones .mis-card.done{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
 #pf-misiones .mis-emoji{font-size:13px;line-height:1;flex-shrink:0}
-#pf-misiones .mis-body{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden}
+#pf-misiones .mis-body{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;row-gap:2px;overflow:hidden}
 #pf-misiones .mis-nombre{flex:1 1 auto;min-width:0;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #pf-misiones .mis-meta{flex:0 0 auto;max-width:46%;min-width:0;font-size:9px;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #pf-misiones .mis-lock{flex-shrink:0;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;color:rgba(255,255,255,.42)}
 #pf-misiones .mis-xp{flex-shrink:0;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap}
+#pf-misiones .mis-desc{flex:0 0 100%;min-width:0;font-size:10px;color:rgba(255,255,255,.5);line-height:1.35;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 /* TROFEOS / LOGROS */
 .trofeo-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;text-align:center}
 .trofeo-card.earned{border-color:rgba(255,74,0,.3);background:rgba(255,74,0,.06)}
@@ -1772,10 +1774,12 @@ function nivelMisionesHTML(nivel) {
     var estadoCls = done ? 'estado-completada' : (bloqueada ? 'estado-bloqueada' : 'estado-pendiente');
     var estadoTxt = done ? 'Completada' : (bloqueada ? 'Bloqueada' : 'Pendiente');
     var reqsTxt = reqs.length ? ' \u00B7 Requiere: ' + reqs.map(function(r){ return _misNombres[r] || r; }).join(', ') : '';
+    var descTxt = m.desc ? '<div class="nivel-mis-desc">' + esc(m.desc) + '</div>' : '';
     return '<div class="nivel-mis ' + estadoCls + '">'
       + '<div class="nivel-mis-top"><span class="nivel-mis-name">' + esc(m.nombre || m.id) + '</span>'
       + '<span class="nivel-mis-xp">+' + fmtXp(m.xp) + ' XP</span></div>'
       + '<div class="nivel-mis-meta">' + esc(grupoNombre(m.grupo)) + ' \u00B7 ' + estadoTxt + reqsTxt + '</div>'
+      + descTxt
       + '</div>';
   }).join('') + '</div>';
 }
@@ -1970,11 +1974,13 @@ function misionCardHTML(m) {
   /* Agrupar por estado NO borra el grupo legible: sigue en la meta. */
   var metaTxt = grupoNombre(m.grupo) + ' \u00B7 ' + e.txt;
   var nombreTxt = m.nombre || m.id || '';
+  var descTxt = m.desc ? '<div class="mis-desc">'+esc(m.desc)+'</div>' : '';
   return '<div class="mis-card'+(e.done?' done':'')+'">'
     +'<div class="mis-emoji">'+e.icono+'</div>'
     +'<div class="mis-body">'
     +'<div class="mis-nombre" title="'+esc(nombreTxt)+'">'+esc(nombreTxt)+'</div>'
     +'<div class="mis-meta">'+esc(metaTxt)+'</div>'
+    +descTxt
     +'</div>'
     +reqsTxt
     +'<div class="mis-xp">+'+fmtXp(m.xp)+' XP</div>'

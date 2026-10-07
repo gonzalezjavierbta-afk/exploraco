@@ -174,6 +174,7 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - [Historico (sesiones del 2026-09-15 y anteriores; TSK-104 y previas) - ver NEXT_ARCHIVO.md](NEXT_ARCHIVO.md)
 
 ## Completado reciente
+- Working tree **2026-10-07** (TSK-197, pase documental único R2, 8ª tanda; **2 ficheros SIN commit**): **la descripción de misión ya se explica al usuario.** Se añadió el campo `desc` ("qué hacer") a las **41 misiones** del catálogo `MISIONES` de `api/interacciones.js` (+41 líneas, 1 por misión; `entregarCatalogo` ya lo enviaba). `mi-perfil.html` renderiza `m.desc` como **2ª línea** en las tarjetas (`.mis-desc`, silo `#pf-misiones`, `:1977`) y en el acordeón de Niveles (`.nivel-mis-desc`, `:1777`), **condicional** (si `desc` es null no pinta). Verificación: `node --check` PASS; ASCII **0 bytes >127**; divs **570/570**; catálogo **ids 41 / desc 41**; `smoke_niveles_data` **31/31**; `smoke_test_perfil_progreso` OK; `smoke_grupos_perfil` **64/65** con **1 FAIL pre-existente** (`misAlbumRatingTxt`) confirmado en HEAD por `git stash` -> **BUG-118 PENDIENTE**. **Sin ADR, sin migración, 8/8 Vercel INTACTO.** Detalle en `TASKS.md` TSK-197.
 - Cierre documental **2026-10-07** (TSK-196, pase documental único R2; 6 ficheros en working tree sin commit): **reparado el filtro del mapa cultural.** `mapa-cultural.js` **v1.4.0 -> v1.4.1** pasa a ser la **fuente única de verdad del estado de filtros** (slider a **paso 0.2**, contrato `toggleFilter`/`isFilterOn`/`setMediaSoloMio`/`getState()` ampliado, `ratingMinPrevio`); **desacople Directorio -> Medios** (`enableMediaOnAll` queda **inerte**); **persistencia silenciosa por página** (`mapa_filtros_home_v1` / `mapa_filtros_comunidad_v1`) con **gate de sesión** en la restauración de `mediaSoloMio`; UX de **doble zona** (cuerpo alterna filtro / caret abre menú) en `index.html` y `comunidad.html`; corregido el **bug de la vista de álbumes** (D2) y la coherencia del slider/etiquetas. Verificación: `smoke_mapa_cultural` **248 PASS / 0 FAIL**; GOLD verde; divs **367/367** y **458/458**; `verificar-capa-gratis` **OK**. Coste **$0.0219** (13 sesiones, `cache_read` 95.35%). **Sin ADR nuevo.** **Residuo BAJO:** 2 shims muertos en `index-api-connector.js`. Detalle en `TASKS.md` TSK-196.
 - Cierre documental **2026-10-04** (TSK-177 + **ADR-077 ENMIENDA 1**, commit **`8315fb0`** en `main`; pase documental unico R2 al cierre y **despues** del push, por indicacion del operador): **la galeria de perfil sale del cuerpo de la pagina, Misiones pasa a desplegable por ESTADO y "Gestion del Museo" recupera la subida de material.**
 - **Decision:** `DECISIONS.md` **ADR-077 ENMIENDA 1** -- Misiones es la **5.a superficie** de `pfGruposRender()` y el eje pasa a ser por ESTADO; **NO es un ADR nuevo**. Reintroduce, con `id` distinto y por peticion del operador, la capacidad que TSK-160 habia retirado.
@@ -239,6 +240,24 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### WORKING TREE 2026-10-07 (pase documental único R2, 8ª tanda) - Descripción de misión visible en Mi Perfil (TSK-197)
+
+**Qué se estaba haciendo:** que las tarjetas de misión del perfil expliquen **qué hacer**. Los logros ya mostraban descripción (`.bg-desc`); las misiones no. El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-197**; aquí solo hay estado y siguientes pasos. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (cambio aditivo de datos + render, no arquitectura).
+
+**Lo que quedó (en working tree, sin commit):**
+- **`api/interacciones.js` (+41/-0):** campo `desc` en las **41 misiones** del catálogo `MISIONES` (~L3355-3877), una línea por misión. **`entregarCatalogo` ya lo proyectaba: sin cambios.**
+- **`mi-perfil.html` (+7/-1):** `misionCardHTML` pinta `m.desc` como **2ª línea** (`.mis-desc`, silo `#pf-misiones`, `:1977`); `nivelMisionesHTML` lo pinta en el acordeón de Niveles (`.nivel-mis-desc`, `:1777`). **Condicional:** `desc` null -> ni fila ni atributo. CSS con **Aislamiento Atómico** (ADR-004).
+
+**Verificación (ADR-006):** `node --check` PASS; ASCII **0 bytes >127** y **0 backticks** en `api/interacciones.js`; divs **570/570** (diff 0); catálogo **ids 41 / desc 41**; `smoke_niveles_data` **31/31**; `smoke_test_perfil_progreso` OK; `smoke_grupos_perfil` **64/65**. **`api/*`: 8/8 INTACTO**; sin migraciones; sin endpoint nuevo.
+
+**Qué sigue:**
+1. **(a) Commit + push** de `api/interacciones.js`, `mi-perfil.html` y los docs de este pase. Único pendiente obligatorio.
+2. **(b) QA visual en navegador** de las tarjetas de misión y del acordeón de Niveles: confirmar que la 2ª línea se lee y que el truncado CSS a 2 líneas no corta la instrucción de forma confusa.
+3. **(c) BUG-118 PENDIENTE (independiente, no se arregla aquí):** el único FAIL de `smoke_grupos_perfil` (`misAlbumRatingTxt is not defined`, zona "Mis Álbumes") es **pre-existente**, confirmado contra HEAD por round-trip `git stash`.
+
+**Riesgos activos:**
+- **La descripción es contenido curado a mano en el backend:** si una futura misión se añade sin `desc`, el render **degrada en silencio** (no pinta fila) — aceptable por diseño, pero el catálogo debe mantener el 100% cubierto.
 
 ### SESIÓN 2026-10-07 (pase documental único R2, 7ª tanda) - Reparación del filtro del mapa cultural (TSK-196)
 

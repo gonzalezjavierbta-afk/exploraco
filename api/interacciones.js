@@ -3356,12 +3356,14 @@ var MISIONES = [
   {
     id: 'mis_primer_guardado', grupo: 'general', requiere: [],
     nombre: 'Primer lugar guardado', xp: 15,
+    desc: 'Guarda tu primer destino en Tu Mapa para iniciar tu colecci\u00f3n.',
     rama: 'exp_rutas', puntos_rama: 20,
     check: function(ctx) { return Promise.resolve(ctx.totalGuardados >= 1); },
   },
   {
     id: 'mis_primera_resena', grupo: 'general', requiere: [],
     nombre: 'Primera rese\u00f1a sustancial', xp: 20,
+    desc: 'Escribe una rese\u00f1a de un destino visitado que sume al menos 25 XP de calidad.',
     check: function(ctx) {
       return ctx.sql(
         'SELECT id FROM interacciones WHERE usuario_id=$1 AND tipo=\'resena\' AND xp_ganado>=25 LIMIT 1',
@@ -3372,12 +3374,14 @@ var MISIONES = [
   {
     id: 'mis_primera_visita', grupo: 'general', requiere: [],
     nombre: 'Primera visita confirmada', xp: 15,
+    desc: 'Confirma tu primera visita a un destino para validar que estuviste all\u00ed.',
     rama: 'exp_rutas', puntos_rama: 25,
     check: function(ctx) { return ctx.visitasActivas.then(function(n){ return n >= 1; }); },
   },
   {
     id: 'mis_explorador_bogota', grupo: 'ciudad', requiere: ['mis_primer_guardado'],
     nombre: 'Explorador de Bogota', xp: 40,
+    desc: 'Guarda 5 destinos de Bogota en Tu Mapa para convertirte en Explorador.',
     rama: 'exp_ciudades', puntos_rama: 30,
     check: function(ctx) {
       return ctx.sql(
@@ -3393,6 +3397,7 @@ var MISIONES = [
     id: 'mis_organizador_bogota', grupo: 'ciudad',
     requiere: ['mis_explorador_bogota', 'mis_primera_resena'],
     nombre: 'Organizador de Bogota', xp: 100, desbloquea: 'organizar_actividad',
+    desc: 'Alcanza 300 XP y guarda 8 destinos de Bogota para desbloquear Organizar actividad.',
     check: function(ctx) {
       if (ctx.xpTotal < 300) return Promise.resolve(false);
       return ctx.sql(
@@ -3405,6 +3410,7 @@ var MISIONES = [
   {
     id: 'mis_nomada_digital', grupo: 'categoria', requiere: ['mis_primer_guardado'],
     nombre: 'N\u00f3mada digital', xp: 30,
+    desc: 'Guarda 3 hostales que ofrezcan coworking para trabajar mientras viajas.',
     rama: 'exp_rutas', puntos_rama: 20,
     check: function(ctx) {
       return ctx.sql(
@@ -3424,6 +3430,7 @@ var MISIONES = [
     id: 'mis_own_spot_bogota', grupo: 'ciudad',
     requiere: ['mis_organizador_bogota', 'mis_primera_resena'],
     nombre: 'Dueno del Spot en Bogota', xp: 75,
+    desc: 'Logra que una de tus rese\u00f1as en Bogota sea la m\u00e1s votada de su destino.',
     rama: 'cur_critico', puntos_rama: 50,
     check: function(ctx) {
       return esLiderDeCiudad(ctx.sql, ctx.usuarioId, 'Bogota');
@@ -3434,6 +3441,7 @@ var MISIONES = [
     // mapa tematico publico con al menos 5 destinos (spec mapas 2026-09-05).
     id: 'mis_gran_arquitecto', grupo: 'general', requiere: [],
     nombre: 'Gran Arquitecto', xp: 50,
+    desc: 'Crea un mapa tem\u00e1tico p\u00fablico con al menos 5 destinos de Tu Mapa.',
     rama: 'cur_guia', puntos_rama: 50,
     check: function(ctx) {
       return ctx.sql(
@@ -3453,6 +3461,7 @@ var MISIONES = [
     // incluya itinerario[] en tags (categoria sitio/naturaleza).
     id: 'mis_itinerario_perfeccion', grupo: 'categoria', requiere: ['mis_primera_visita'],
     nombre: 'Itinerario en perfecto orden', xp: 60,
+    desc: 'Confirma visitas a 4 destinos distintos que incluyan itinerario en su ficha.',
     rama: 'exp_naturaleza', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql(
@@ -3474,6 +3483,7 @@ var MISIONES = [
   {
     id: 'mis_fotografo', grupo: 'general', requiere: ['mis_primera_resena'],
     nombre: 'Fot\u00f3grafo de publicaciones', xp: 20, desbloquea: 'subir_fotos',
+    desc: 'Alcanza 100 XP para desbloquear la subida de fotos en tus publicaciones.',
     check: function(ctx) {
       return Promise.resolve(ctx.xpTotal >= 100);
     },
@@ -3483,6 +3493,7 @@ var MISIONES = [
     // (album_fotos.foto_type='video'). Sin DDL: progreso_misiones es jsonb.
     id: 'mis_videografo', grupo: 'fotos', requiere: [],
     nombre: 'Cronicas en Movimiento', xp: 15,
+    desc: 'Sube tu primer video a un \u00e1lbum del Museo para narrar tus cr\u00f3nicas.',
     gate_nivel: 2,
     check: function(ctx) {
       return ctx.sql(
@@ -3498,6 +3509,7 @@ var MISIONES = [
     // (album_fotos.foto_type='audio'). Sin DDL.
     id: 'mis_sonidista', grupo: 'fotos', requiere: [],
     nombre: 'Ecos y Relatos', xp: 15,
+    desc: 'Sube tu primer audio a un \u00e1lbum del Museo para compartir una historia sonora.',
     gate_nivel: 2,
     check: function(ctx) {
       return ctx.sql(
@@ -3511,6 +3523,7 @@ var MISIONES = [
   {
     id: 'mis_chat_mensajero', grupo: 'general', requiere: ['mis_primera_resena'],
     nombre: 'Primer mensaje en la comunidad', xp: 25, desbloquea: 'chat',
+    desc: 'Alcanza 250 XP para desbloquear el chat de la comunidad.',
     check: function(ctx) {
       return Promise.resolve(ctx.xpTotal >= 250);
     },
@@ -3518,6 +3531,7 @@ var MISIONES = [
   {
     id: 'mis_chat_moderador', grupo: 'general', requiere: ['mis_chat_mensajero'],
     nombre: 'Moderador de chat', xp: 30, desbloquea: 'moderador_chat',
+    desc: 'Alcanza 450 XP para desbloquear las herramientas de moderaci\u00f3n del chat.',
     check: function(ctx) {
       return Promise.resolve(ctx.xpTotal >= 450);
     },
@@ -3525,6 +3539,7 @@ var MISIONES = [
   {
     id: 'mis_chat_creador', grupo: 'general', requiere: ['mis_chat_moderador'],
     nombre: 'Creador de salas', xp: 40, desbloquea: 'crear_chat',
+    desc: 'Alcanza 700 XP para desbloquear la creaci\u00f3n de salas de chat.',
     check: function(ctx) {
       return Promise.resolve(ctx.xpTotal >= 700);
     },
@@ -3537,6 +3552,7 @@ var MISIONES = [
   {
     id: 'mis_chat_activo', grupo: 'general', requiere: ['mis_chat_mensajero'],
     nombre: 'Conversador activo', xp: 20,
+    desc: 'Env\u00eda 10 mensajes en el chat para mantener viva la conversaci\u00f3n.',
     rama: 'cur_datos', puntos_rama: 20,
     check: function(ctx) {
       return ctx.sql(
@@ -3549,6 +3565,7 @@ var MISIONES = [
   {
     id: 'mis_plan_creador', grupo: 'general', requiere: ['mis_chat_mensajero'],
     nombre: 'Creador de planes', xp: 10,
+    desc: 'Crea tu primer plan de viaje y convoca a otros viajeros a unirse.',
     rama: 'cre_planes', puntos_rama: 25,
     check: function(ctx) {
       return ctx.sql(
@@ -3561,6 +3578,7 @@ var MISIONES = [
   {
     id: 'mis_plan_unido', grupo: 'general', requiere: [],
     nombre: 'Viajero en grupo', xp: 10,
+    desc: '\u00danete a un plan de viaje de la comunidad para viajar en grupo.',
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(*)::int AS n FROM planes_miembros WHERE usuario_id=$1',
@@ -3575,6 +3593,7 @@ var MISIONES = [
     grupo: 'fotos',
     requiere: [],
     nombre: 'Primera foto social',
+    desc: 'Comparte tu primera foto en un \u00e1lbum social del Museo.',
     xp: 15,
     gate_nivel: 2,
     check: function(ctx) {
@@ -3589,6 +3608,7 @@ var MISIONES = [
     grupo: 'fotos',
     requiere: ['mis_primera_foto_social'],
     nombre: 'Creador de albumes',
+    desc: 'Crea tu primer \u00e1lbum de fotos para agrupar tus recuerdos de viaje.',
     xp: 20,
     gate_nivel: 2,
     check: function(ctx) {
@@ -3603,6 +3623,7 @@ var MISIONES = [
     grupo: 'fotos',
     requiere: ['mis_creador_album'],
     nombre: 'Curador de albumes',
+    desc: 'Crea y manten 5 \u00e1lbumes de fotos activos en tu perfil.',
     xp: 40,
     rama: 'cur_colecciones', puntos_rama: 40,
     gate_nivel: 2,
@@ -3618,6 +3639,7 @@ var MISIONES = [
     grupo: 'fotos',
     requiere: ['mis_primera_foto_social'],
     nombre: 'Fotografo social',
+    desc: 'Comparte 10 fotos en \u00e1lbumes sociales del Museo.',
     xp: 30,
     gate_nivel: 2,
     check: function(ctx) {
@@ -3632,6 +3654,7 @@ var MISIONES = [
     grupo: 'fotos',
     requiere: ['mis_fotografo_social'],
     nombre: 'Cazador de recompensas',
+    desc: 'Reparte 20 votos entre las fotos de otros viajeros en el Museo.',
     xp: 25,
     gate_nivel: 2,
     check: function(ctx) {
@@ -3649,6 +3672,7 @@ var MISIONES = [
     grupo: 'fotos',
     requiere: ['mis_fotografo_social'],
     nombre: 'Favorito del pueblo',
+    desc: 'Consigue que tus fotos del Museo reciban 10 votos de la comunidad.',
     xp: 50,
     rama: 'art_grafica', puntos_rama: 50,
     gate_nivel: 2,
@@ -3671,6 +3695,7 @@ var MISIONES = [
   {
     id: 'mis_primera_vocacion_artista', grupo: 'artista', requiere: [],
     nombre: 'Primera vocacion artistica', xp: 25,
+    desc: 'Activa tu primera vocaci\u00f3n art\u00edstica para abrir tu camino creativo.',
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
         .then(function(r) {
@@ -3683,6 +3708,7 @@ var MISIONES = [
   {
     id: 'mis_camino_musica', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino de la musica', xp: 40,
+    desc: 'Activa la vocaci\u00f3n de m\u00fasico para abrir el camino de la m\u00fasica.',
     rama: 'art_musica', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
@@ -3693,6 +3719,7 @@ var MISIONES = [
   {
     id: 'mis_camino_cine', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino del cine', xp: 40,
+    desc: 'Activa la vocaci\u00f3n de cine para abrir el camino del cine.',
     rama: 'art_cine', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
@@ -3703,6 +3730,7 @@ var MISIONES = [
   {
     id: 'mis_camino_arte', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino del arte', xp: 40,
+    desc: 'Activa la vocaci\u00f3n de artista gr\u00e1fico para abrir el camino del arte.',
     rama: 'art_grafica', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
@@ -3713,6 +3741,7 @@ var MISIONES = [
   {
     id: 'mis_camino_escritor', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Camino del escritor', xp: 40,
+    desc: 'Activa la vocaci\u00f3n de escritor para abrir el camino de la literatura.',
     rama: 'art_literatura', puntos_rama: 40,
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
@@ -3723,6 +3752,7 @@ var MISIONES = [
   {
     id: 'mis_poliglota_artista', grupo: 'artista', requiere: ['mis_primera_vocacion_artista'],
     nombre: 'Poliglota del arte', xp: 60,
+    desc: 'Activa al menos 2 vocaciones art\u00edsticas para volverte poliglota del arte.',
     check: function(ctx) {
       return ctx.sql('SELECT vocaciones FROM usuarios WHERE id=$1', [ctx.usuarioId])
         .then(function(r) {
@@ -3745,6 +3775,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_foto', grupo: 'perfil', requiere: [],
     nombre: 'Ponle cara al viajero', xp: 10,
+    desc: 'Sube una foto de perfil o avatar para que la comunidad te reconozca.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "COALESCE(foto_url,'') <> '' OR COALESCE(avatar_url,'') <> ''");
     },
@@ -3752,6 +3783,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_bio', grupo: 'perfil', requiere: [],
     nombre: 'Cuenta tu historia', xp: 15,
+    desc: 'Escribe una biograf\u00eda de al menos 40 caracteres en tu perfil.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "LENGTH(COALESCE(bio,'')) >= 40");
     },
@@ -3759,6 +3791,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_ciudad', grupo: 'perfil', requiere: [],
     nombre: 'Tu punto de partida', xp: 10,
+    desc: 'Indica tu ciudad y tu pa\u00eds base en tu perfil.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "ciudad_base IS NOT NULL AND pais_base IS NOT NULL");
     },
@@ -3766,6 +3799,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_intereses', grupo: 'perfil', requiere: [],
     nombre: 'Que te mueve', xp: 15,
+    desc: 'Elige al menos 3 intereses para personalizar tus recomendaciones.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "jsonb_array_length(COALESCE(intereses,'[]'::jsonb)) >= 3");
     },
@@ -3773,6 +3807,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_email', grupo: 'perfil', requiere: [],
     nombre: 'Viajero verificado', xp: 30,
+    desc: 'Verifica tu correo electr\u00f3nico para completar tu cuenta.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "email_verificado = true");
     },
@@ -3780,6 +3815,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_casa', grupo: 'perfil', requiere: [],
     nombre: 'Jura tu Casa', xp: 20,
+    desc: 'Elige tu Casa para unirte a una de las facciones del juego.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "casa IS NOT NULL");
     },
@@ -3787,6 +3823,7 @@ var MISIONES = [
   {
     id: 'mis_perfil_faccion', grupo: 'perfil', requiere: [],
     nombre: 'Elige tu oficio', xp: 20,
+    desc: 'Elige tu oficio o facci\u00f3n dentro de la Casa que escogiste.',
     check: function(ctx) {
       return misionPerfilFlag(ctx, "faccion IS NOT NULL");
     },
@@ -3798,6 +3835,7 @@ var MISIONES = [
                'mis_perfil_intereses', 'mis_perfil_email', 'mis_perfil_casa',
                'mis_perfil_faccion'],
     nombre: 'Pasaporte sellado', xp: 30,
+    desc: 'Completa las 7 misiones de perfil para sellar tu pasaporte de viajero.',
     check: function(ctx) { return Promise.resolve(true); },
   },
   // -- Compartir media (ADR-036 B, v19) --------------------------------
@@ -3806,6 +3844,7 @@ var MISIONES = [
   {
     id: 'mis_primer_compartido', grupo: 'general', requiere: [],
     nombre: 'Primer compartido', xp: 15,
+    desc: 'Comparte por primera vez un lugar o una foto con la comunidad.',
     rama: 'exp_rutas', puntos_rama: 20,
     check: function(ctx) {
       return contarCompartidosUsuario(ctx.sql, ctx.usuarioId).then(function(n){ return n >= 1; });
@@ -3814,6 +3853,7 @@ var MISIONES = [
   {
     id: 'mis_voz_comunidad', grupo: 'general', requiere: ['mis_primer_compartido'],
     nombre: 'Voz de la comunidad', xp: 40,
+    desc: 'Comparte 10 contenidos distintos para que tu voz llegue a la comunidad.',
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(DISTINCT (fuente || \':\' || item_id))::int AS n FROM media_compartidos WHERE usuario_id=$1',
@@ -3825,6 +3865,7 @@ var MISIONES = [
   {
     id: 'mis_embajador_destinos', grupo: 'general', requiere: ['mis_voz_comunidad'],
     nombre: 'Embajador de destinos', xp: 75,
+    desc: 'Comparte contenido de 10 destinos distintos con la comunidad.',
     check: function(ctx) {
       return ctx.sql(
         'SELECT COUNT(DISTINCT destino_id)::int AS n FROM media_compartidos WHERE usuario_id=$1 AND destino_id IS NOT NULL',

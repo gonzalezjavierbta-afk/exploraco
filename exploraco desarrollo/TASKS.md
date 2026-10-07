@@ -4655,5 +4655,38 @@ Con ese dato, la salida deja de ser `NO_CONFIRMADO` y pasa a `OK` o a `FALLIDO_4
 
 En `index-api-connector.js` quedan los shims `window.setMapaMediaSoloMio` (`:502`) y `window.setMapaMediaVista` (`:529`) sin ningún `onclick` que los invoque: **código muerto inofensivo**, se conservan a propósito.
 
+## TSK-197 - Campo `desc` en las 41 misiones del catalogo + render condicional de la descripcion en Mi Perfil - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+
+**Estado: CERRADO EN WORKING TREE (sin commit).** Cambio **aditivo de datos + render**. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (no es arquitectura nueva). **Sin endpoint nuevo y sin migracion: presupuesto Vercel 8/8 INTACTO** (ADR-010).
+
+### Que se estaba haciendo
+
+Las tarjetas de mision de "Mi perfil" **no mostraban descripcion**, asi que el usuario no sabia que hacer. Los **logros ya la mostraban** (`.bg-desc`); las misiones no.
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **`api/interacciones.js` (+41/-0):** se anadio el campo `desc` (la instruccion de "que hacer") a las **41 misiones** del catalogo `MISIONES` (bloque ~L3355-3877). **Una linea `desc:` por mision** = **41 inserciones exactas** (`git diff --numstat` = **41/0**). La proyeccion en `entregarCatalogo` (~L5163) **ya enviaba** `desc`; **NO se toco**.
+2. **`mi-perfil.html` (+7/-1):** `misionCardHTML` renderiza `m.desc` como **2.a linea** (clase `.mis-desc`, silo CSS `#pf-misiones`, `:1977`) y `nivelMisionesHTML` lo muestra en el acordeon de Niveles (clase `.nivel-mis-desc`, `:1777`). **Render CONDICIONAL:** si `desc` es null **no se pinta ni la fila ni el atributo**. CSS con **Aislamiento Atomico** (ADR-004): `.mis-desc` anclada bajo `#pf-misiones` (`:121`) y `.nivel-mis-desc` (`:102`).
+
+### Verificacion (medida en el turno de cierre)
+
+| Prueba | Resultado |
+|---|---|
+| `node --check api/interacciones.js` | **PASS** |
+| ASCII-safety `api/interacciones.js` | **0 bytes > 127**, **0 backticks** |
+| Balance `<div>` `mi-perfil.html` | **570 / 570**, diff **0** |
+| Catalogo `MISIONES` | **ids = 41**, **desc = 41** |
+| `scripts/smoke_niveles_data.js` | **31/31 PASS** |
+| `scripts/smoke_test_perfil_progreso.js` | **OK** (catalogo n=41, sin ids duplicados) |
+| `scripts/smoke_grupos_perfil.js` | **64/65** - unico FAIL `misAlbumRatingTxt is not defined` (**PRE-EXISTENTE**, ver BUG-118) |
+
+**FAIL pre-existente (ADR-006).** El unico fallo de `smoke_grupos_perfil.js` (`misAlbumRatingTxt is not defined`) se confirmo **PRE-EXISTENTE en HEAD** por round-trip `git stash`: contra HEAD marca **64/65 identico**. **No es regresion de esta tanda** y **NO se corrige aqui**; queda como **BUG-118** (independiente, PENDIENTE, zona "Mis Albumes" de `mi-perfil.html`).
+
+**Presupuesto Vercel:** **8/8 funciones serverless INTACTAS** (sin endpoint nuevo); **sin migraciones**.
+
+### Archivos tocados
+
+`api/interacciones.js` · `mi-perfil.html`. Ambos en **working tree, SIN commitear** al cierre de este pase documental.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
