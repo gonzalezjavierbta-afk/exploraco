@@ -18,10 +18,12 @@
 //      numero, resultado, checksum (sha256 de los bytes en disco),
 //      aplicada_en, duracion_ms y notas. Solo con INSERT cuando no habia fila.
 //   b) RECHAZA el fichero si algun .sql con numero MENOR esta en disco y no
-//      tiene fila, o si el numero N-1 no existe en disco con fila valida.
-//      La unidad de comparacion es el FICHERO QUE ESTA EN DISCO, no un rango
-//      inventado: 001 y 002 no existen, luego no son predecesoras de nadie y
-//      su ausencia no invalida 003.
+//      tiene fila, o si el MAYOR de esos predecesores PRESENTES en disco no
+//      tiene fila valida. La unidad de comparacion es el FICHERO QUE ESTA EN
+//      DISCO, no un rango inventado: 001 y 002 no existen, luego no son
+//      predecesoras de nadie y su ausencia no invalida 003. Un hueco
+//      deliberado (fichero reubicado fuera del scan, p.ej. a documental/) no
+//      bloquea a su sucesor: lo que debe tener fila es el ultimo real.
 //   c) Detecta DERIVA (sha256 de disco distinto del checksum de la fila) y la
 //      REPORTA. Nunca sobrescribe el checksum de una fila existente (ADR-003:
 //      eso borraria la unica evidencia). La correccion es una migracion nueva.
@@ -268,7 +270,8 @@ async function main() {
   SUM.predecesores = pred;
   log('PREDECESORES: ' + pred.total + ' .sql en disco con numero menor, ' +
       pred.con_fila + ' con fila, ' + pred.sin_fila.length + ' sin fila.');
-  log('N-1 (' + (num - 1) + ') presente y con fila valida: ' + pred.n_menos_1_ok);
+  log('N-1 efectivo (' + (pred.n_menos_1 || 'ninguno') + ') presente y con fila valida: ' +
+      pred.n_menos_1_ok);
 
   if (pred.bloqueos.length > 0) {
     err('RECHAZO - puerta del predecesor (contrato b).');
@@ -279,7 +282,8 @@ async function main() {
       err('  FILA fallida (no sirve como predecesor): ' + n);
     });
     if (!pred.n_menos_1_ok) {
-      err('  N-1 = ' + (num - 1) + ' no existe en db/migrations/ o no tiene fila con');
+      err('  N-1 efectivo = ' + (pred.n_menos_1 || 'ninguno') +
+          ' no existe en db/migrations/ o no tiene fila con');
       err('  resultado aplicado/historico_no_verificado.');
     }
     err('  Que hacer: aplicar primero las que faltan, en orden ascendente, con este');
@@ -505,8 +509,9 @@ function escanDeriva(porNombre) {
 }
 
 // Puerta del predecesor. Todo .sql con numero menor que el del fichero que se
-// va a aplicar tiene que tener fila con resultado que sirva. Y N-1 tiene que
-// existir en disco con esa misma fila valida.
+// va a aplicar tiene que tener fila con resultado que sirva. Y el MAYOR de los
+// predecesores PRESENTES en disco tiene que tener esa misma fila valida: un
+// hueco deliberado (fichero reubicado fuera del scan) no bloquea al sucesor.
 function revisarPredecesores(numero, porNombre) {
   var enDisco = migracionesEnDisco();
   var sinFila = [];
@@ -520,10 +525,11 @@ function revisarPredecesores(numero, porNombre) {
     if (num === null) return;
     if (num >= numero) return;
     total++;
-    // N-1 se marca aqui pero NO se salta el conteo: si ademas esta sin fila,
-    // tiene que aparecer en sin_fila. Si no, el informe affirmaria que todos
-    // los predecesores tienen fila justo cuando el que falta es el mas grave.
-    if (num === numero - 1) { nombrePrev = n; }
+    // N-1 EFECTIVO = el mayor predecesor PRESENTE en disco. enDisco va ordenado
+    // ascendente, asi que cada asignacion deja el ultimo (el mayor) visto. NO se
+    // salta el conteo: si ademas esta sin fila, aparece en sin_fila igual. Un
+    // hueco deliberado (numero - 1 reubicado fuera del scan) no bloquea.
+    nombrePrev = n;
     var f = porNombre[n];
     if (!f) { sinFila.push(n); return; }
     if (PREDE_SIREN.indexOf(String(f.resultado)) === -1) {
@@ -543,7 +549,8 @@ function revisarPredecesores(numero, porNombre) {
   sinFila.forEach(function (n) { bloqueos.push('sin fila: ' + n); });
   fallidas.forEach(function (n) { bloqueos.push('fila fallida: ' + n); });
   if (!prevOk) {
-    bloqueos.push('N-1 (' + (numero - 1) + ') no existe en disco o no tiene fila valida');
+    bloqueos.push('N-1 efectivo (' + (nombrePrev || 'ninguno') +
+      ') no existe en disco o no tiene fila valida');
   }
 
   return {
@@ -832,9 +839,15 @@ function arrancar() {
 // Windows eso dispara "Assertion failed: handle->flags & UV_HANDLE_CLOSING"
 // (medido el 2026-10-05 en db/cleanups/005). El tope de 5 s es la red de
 // seguridad para que el proceso no se quede vivo, no la via normal.
-arrancar().then(function () {}, function () {});
-
-var tope = setTimeout(function () { process.exit(CODIGO); }, 5000);
-tope.unref();
+//
+// La red se arma DESPUES de terminar, no al arrancar. Armarla al principio
+// mataba a mitad de camino cualquier migracion que tardase mas de 5 s, con
+// process.exit(CODIGO=0) y sin fila en el ledger: medido con la 053 (24
+// sentencias), que quedo a medias. Aqui solo sirve para forzar el cierre si un
+// socket HTTP de undici mantiene vivo el bucle despues del informe.
+arrancar().then(function () {
+  var tope = setTimeout(function () { process.exit(CODIGO); }, 5000);
+  tope.unref();
+}, function () {});
 
 process.on('exit', function () { process.exitCode = CODIGO; });

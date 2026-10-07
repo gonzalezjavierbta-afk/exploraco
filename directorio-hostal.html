@@ -299,6 +299,7 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
   </div>
 </div>
 
+<script src="/busqueda.js?v=1"></script>
 <script>
 /* PL data injected from index */
 const PL=[{"id": 1, "slug": "hostal-casa-medina", "name": "Hostal Casa Medina", "cat": "hostal", "city": "Bogot\u00e1", "region": "Cundinamarca", "rating": 4.8, "rev": 42, "price": "Desde $45.000", "emoji": "\ud83c\udfe8", "hero_bg": "linear-gradient(135deg,#1a3a5c,#2a4a7c)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1590739225287-bd31519780d4?w=600&q=75", "cap": "Fachada colonial"}]}, {"id": 2, "slug": "el-cielo-restaurante", "name": "El Cielo Restaurante", "cat": "comida", "city": "Medell\u00edn", "region": "Antioquia", "rating": 4.9, "rev": 178, "price": "Desde $280.000", "emoji": "\ud83c\udf7d\ufe0f", "hero_bg": "linear-gradient(135deg,#3a1a0a,#4a2a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=75", "cap": "Gastronom\u00eda"}]}, {"id": 3, "slug": "ciudad-perdida", "name": "Ciudad Perdida", "cat": "sitio", "city": "Sierra Nevada", "region": "Magdalena", "rating": 5.0, "rev": 312, "price": "Desde $1.400.000", "emoji": "\ud83c\udfd4\ufe0f", "hero_bg": "linear-gradient(135deg,#0a2a1a,#1a3a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=75", "cap": "Selva"}]}, {"id": 4, "slug": "feria-de-las-flores", "name": "Feria de las Flores", "cat": "evento", "city": "Medell\u00edn", "region": "Antioquia", "rating": 4.9, "rev": 891, "price": "Entrada gratuita", "emoji": "\ud83c\udf89", "hero_bg": "linear-gradient(135deg,#1a051a,#3a1a3a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75", "cap": "Feria"}]}, {"id": 5, "slug": "hostal-walled-city", "name": "Hostal Walled City", "cat": "hostal", "city": "Cartagena", "region": "Bol\u00edvar", "rating": 4.7, "rev": 203, "price": "Desde $80.000", "emoji": "\ud83c\udff0", "hero_bg": "linear-gradient(135deg,#3a2a1a,#4a3a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=600&q=75", "cap": "Cartagena"}]}, {"id": 6, "slug": "la-puerta-grande", "name": "La Puerta Grande", "cat": "comida", "city": "Cartagena", "region": "Bol\u00edvar", "rating": 4.6, "rev": 156, "price": "Desde $35.000", "emoji": "\ud83e\udd9e", "hero_bg": "linear-gradient(135deg,#3a0a0a,#4a1a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=75", "cap": "Mariscos"}]}, {"id": 7, "slug": "valle-del-cocora", "name": "Valle del Cocora", "cat": "sitio", "city": "Salento", "region": "Quind\u00edo", "rating": 4.9, "rev": 540, "price": "Entrada libre", "emoji": "\ud83c\udf34", "hero_bg": "linear-gradient(135deg,#0a2a0a,#1a3a1a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=600&q=75", "cap": "Palmas"}]}, {"id": 8, "slug": "carnaval-barranquilla", "name": "Carnaval de Barranquilla", "cat": "evento", "city": "Barranquilla", "region": "Atl\u00e1ntico", "rating": 4.8, "rev": 623, "price": "Palcos desde $200.000", "emoji": "\ud83d\udc83", "hero_bg": "linear-gradient(135deg,#1a051a,#2a0a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=75", "cap": "Carnaval"}]}, {"id": 9, "slug": "cano-cristales", "name": "Ca\u00f1o Cristales", "cat": "sitio", "city": "La Macarena", "region": "Meta", "rating": 5.0, "rev": 287, "price": "Desde $1.800.000", "emoji": "\ud83c\udf08", "hero_bg": "linear-gradient(135deg,#0a2a3a,#0a1a2a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1535530992830-e25d07cfa780?w=600&q=75", "cap": "R\u00edo"}]}, {"id": 10, "slug": "cafe-quindio-boutique", "name": "Caf\u00e9 Quind\u00edo Boutique", "cat": "hostal", "city": "Montenegro", "region": "Quind\u00edo", "rating": 4.8, "rev": 119, "price": "Desde $350.000", "emoji": "\u2615", "hero_bg": "linear-gradient(135deg,#2a1a0a,#3a2a0a)", "photos": [{"type": "photo", "url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=75", "cap": "Caf\u00e9"}]},
@@ -482,14 +483,44 @@ var fCity='',fRegion='',fRating=0,fPrice='',fSearch='',fSort='featured',curPage=
 var mmSaved=[];
 try{mmSaved=JSON.parse(localStorage.getItem('mm_saved')||'[]');}catch(e){}
 
+/* F2: busqueda normalizada + cerca de ti (motor /busqueda.js) */
+var EB=(typeof window!=='undefined'&&window.ExploraBusqueda)?window.ExploraBusqueda:null;
+var fSearchTokens=[],fCerca=null,geoDist={},fGeoSort=false;
+function nbNorm(v){return EB?EB.normGeo(v):String(v==null?'':v).toLowerCase();}
+function nbTokens(v){if(EB&&EB.normTokens)return EB.normTokens(v);var tr=String(v==null?'':v).toLowerCase().split(/\s+/);return tr.filter(function(t){return t;});}
+function nbHasGeo(){if(!fCerca)return false;for(var k in geoDist){if(Object.prototype.hasOwnProperty.call(geoDist,k))return true;}return false;}
+function nbComputeGeo(list){
+  geoDist={};
+  if(!fCerca||!EB||!EB.tieneCoordsValidas||!EB.haversineMetros)return;
+  (list||[]).forEach(function(p){
+    var la=Number(p.lat),ln=Number(p.lng);
+    if(EB.tieneCoordsValidas(la,ln)){geoDist[p.id]=EB.haversineMetros(fCerca.lat,fCerca.lng,la,ln);}
+  });
+}
+function nbNearBadge(){
+  var el=document.getElementById('dir-near');
+  if(!el){
+    var host=document.getElementById('dir-count')||document.getElementById('dir-grid');
+    el=document.createElement('div');el.id='dir-near';
+    el.style.cssText='display:none;font-size:12px;color:#666;margin:0 0 10px;text-align:center;';
+    if(host&&host.parentNode){host.parentNode.insertBefore(el,host);}else{document.body.appendChild(el);}
+  }
+  if(fCerca&&nbHasGeo()){el.textContent='Cerca de ti';el.style.display='block';}
+  else{el.style.display='none';}
+}
+
 (function(){
   var p=new URLSearchParams(window.location.search);
   var q=p.get('q');if(q){fSearch=q;var el=document.getElementById('dir-search');if(el)el.value=q;}
+  var c=p.get('cerca_de');if(c&&EB&&EB.parseParLatLng){fCerca=EB.parseParLatLng(c);}
+  var o=p.get('orden');
+  if(o==='distancia'){fGeoSort=true;}else if(!o&&fCerca){fGeoSort=true;}
 })();
+var nbSortInit=(document.getElementById('dir-sort')||{}).value||'featured';
 
 function applyFilters(){
   var s=document.getElementById('dir-search'),so=document.getElementById('dir-sort');
-  if(s)fSearch=s.value.toLowerCase();if(so)fSort=so.value;
+  if(s)fSearch=s.value;if(so){fSort=so.value;if(so.value!==nbSortInit)fGeoSort=false;}
   fCity=(document.getElementById('filt-city')||{}).value||'';
   fRegion=(document.getElementById('filt-region')||{}).value||'';
   fTipo=(document.getElementById('filt-tipo')||{}).value||'';
@@ -498,13 +529,14 @@ function applyFilters(){
   curPage=1;renderDir();updateChips();
 }
 function getFiltered() {
+  fSearchTokens=nbTokens(fSearch);nbComputeGeo(PLACES);nbNearBadge();
   return PLACES.filter(function(p){
     if(fCity&&p.city!==fCity)return false;
     if(fRegion&&p.region!==fRegion)return false;
     if(fRating&&p.rating<fRating)return false;
     if(fPrice==='gratis'&&!p.price.toLowerCase().match(/grat|libre/))return false;
     if(fPrice==='low'&&p.price.toLowerCase().match(/grat|libre/))return false;
-    if(fSearch&&p.name.toLowerCase().indexOf(fSearch)<0&&(p.city||'').toLowerCase().indexOf(fSearch)<0&&(p.region||'').toLowerCase().indexOf(fSearch)<0)return false;
+    if(fSearchTokens.length){var hay=nbNorm(p.name)+' '+nbNorm(p.city||'')+' '+nbNorm(p.region||'')+' '+nbNorm(p.barrio||'');for(var qi=0;qi<fSearchTokens.length;qi++){if(hay.indexOf(fSearchTokens[qi])<0)return false;}}
     if(fTipo&&(!p.etiquetas||p.etiquetas.indexOf(fTipo)===-1))return false;
     for(var ti=0;ti<fTags.length;ti++){if(!p.etiquetas||p.etiquetas.indexOf(fTags[ti])===-1)return false;}
     return true;
@@ -523,6 +555,7 @@ function getFiltered() {
 }
 function sorted(list){
   return list.slice().sort(function(a,b){
+    if(fGeoSort&&nbHasGeo()){var da=geoDist[a.id],db=geoDist[b.id],ha=(da===undefined),hb=(db===undefined);if(ha&&!hb)return 1;if(!ha&&hb)return -1;if(!ha&&!hb&&da!==db)return da-db;return b.rating-a.rating;}
     if(fSort==='featured'){var af=FEAT.indexOf(a.id)!==-1,bf=FEAT.indexOf(b.id)!==-1;if(af&&!bf)return -1;if(!af&&bf)return 1;return b.rating-a.rating;}
     if(fSort==='rating')return b.rating-a.rating;
     if(fSort==='reviews')return(b.rev||0)-(a.rev||0);

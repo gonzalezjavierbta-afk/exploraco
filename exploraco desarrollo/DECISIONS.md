@@ -6503,6 +6503,54 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_sink_slots_activo
 
 **El agujero que NO existe, medido antes de delegar, porque es el economico temible:** `slot_index` lo asigna la CTE que cuenta **TODAS** las filas (cerca de la linea **2398** de `api/interacciones.js`), no solo las activas. `slot_baja` **deja la fila**, luego ese contador **no baja** y recomprar cuesta `k+1`, nunca menos. **El ciclo barato "dar de baja y recomprar al precio de k bajo" es imposible**, y por eso la `050` **no toca ni la asignacion de `slot_index` ni la curva de precio**: son economia de producto (ADR-086), no esquema. La CTE que si filtra por activos alimenta **unicamente el guard de capacidad**, y esa separacion es intencionada: son dos preguntas distintas ("a que precio entro el siguiente" vs "cuantas plazas vivas quedan") y una sola CTE las contaminaria.
 
+### Addendum A del ADR-087 (2026-10-07) -- la puerta del predecesor pasa de exigir el fichero literal N-1 al MAYOR predecesor PRESENTE EN DISCO, y el tope de 5 s se arma TRAS terminar (no al arrancar) [aditivo; NO deroga D1, D3-D6]
+
+**ID:** Addendum A de ADR-087
+**Fecha:** 2026-10-07
+**Autor:** Chief Architect (`@architect`), por **confirmacion explicita del operador**. Los dos cambios de codigo los aplico `@data-migration`.
+**Estado:** **ACEPTADO (2026-10-07).** Addendum **aditivo y fechado**: **NO modifica el cuerpo original del ADR-087**; lo enmienda aqui.
+**Alcance:** `scripts/apply_sql_file.js` (secciones ~20-26, ~507-564 y ~837-849). **NO se edita `db/migrations/045_schema_migrations.sql`** (su contrato de 6 decisiones y su vocabulario cerrado de resultados siguen **intactos**).
+
+#### Hecho que lo dispara (evidencia, ADR-006)
+
+- La migracion `052_backfill_media_rep_autores_resolver_media_item.sql` fue cerrada por el operador como **"verificada-no-necesaria, NO aplicada al ledger"**: su propia cabecera prohibe fabricar una fila 52. El ledger **NO tiene fila 52, a proposito**.
+- El fichero **052 se reubico a `db/migrations/documental/`** (decision del operador) para que el runner dejara de contarlo como predecesor en disco. **CONFIRMADO en este turno:** existe `db/migrations/documental/052_backfill_media_rep_autores_resolver_media_item.sql` y **ya no existe** ningun `db/migrations/052_*.sql`.
+- Pese a la reubicacion, la puerta **seguia bloqueando**: exigia que existiera el fichero literal `numero-1` (052), ya ausente. Con un **hueco declarado**, la condicion de ADR-087 D2 era **imposible por diseno**.
+- Tras aplicar la `053` (`053_busqueda_normalizada.sql`), el ledger pasa de **`max=51` a `max=53`**: la 52 **sigue sin fila** a proposito (**verificado en Neon vivo:** `max=53`, `53='aplicada'`, `fila_52=0`).
+
+#### Cambio 1 -- N-1 literal -> MAYOR predecesor PRESENTE EN DISCO
+
+- **Antes (D2 original):** "el numero **N-1 debe existir**".
+- **Ahora:** la puerta exige que **todo `.sql` con numero menor que N presente en disco** tenga fila valida (`aplicada` o `historico_no_verificado`) **y** que el **MAYOR predecesor PRESENTE EN DISCO** (el "**N-1 efectivo**") tenga fila valida. `fallida` **NO** cuenta.
+- **Justificacion:** con un hueco deliberado (052 reubicado fuera del scan), "el literal N-1 debe existir" es **insatisfacible** sin fabricar una migracion que el operador prohibio. El **espiritu de D2** -- que **ningun predecesor quede sin comprobar** -- se **preserva**: se comprueba el mayor que existe.
+- **Implementado en:** `scripts/apply_sql_file.js:515-565` (`revisarPredecesores`: "N-1 efectivo = el mayor predecesor PRESENTE en disco"), y documentado en `scripts/apply_sql_file.js:20-26`.
+
+#### Cambio 2 -- el tope de 5 s se arma TRAS terminar
+
+- **Antes:** el `setTimeout(...,5000)` se armaba **al ARRANCAR**. Una migracion que tardara >5 s moria con `process.exit(0)` (CODIGO=0) **SIN registrar fila `failida`**: el ledger leia **exito** donde hubo **corte**.
+- **Ahora:** la red se arma **DENTRO del `.then()` de `arrancar()`** (`scripts/apply_sql_file.js:837-851`), **tras** el informe. Solo fuerza el cierre si un socket HTTP de undici mantiene vivo el bucle; **no puede** matar una migracion larga sin dejar rastro.
+- **Justificacion:** un tope que mata sin dejar `failida` convierte un **fallo** en un **falso exito** del ledger, que es exactamente lo contrario de lo que ADR-087 **D3** existe para garantizar. **Caso medido:** la 053 (24 sentencias) quedo a medias por el tope armado al arranque.
+
+#### Relacion con D2 de ADR-087 y limite del alcance
+
+- **D2 cambia SOLO en su clausula "el numero N-1 debe existir"**, sustituida por "el **MAYOR predecesor PRESENTE EN DISCO**". El resto de D2 (unidad = **fichero en disco**, no rango; `fallida` **no** cuenta; parsing del prefijo de 3 caracteres) queda **INTACTO**.
+- **D1, D3, D4, D5 y D6 NO cambian.** El contrato de `db/migrations/045_schema_migrations.sql` (columnas y vocabulario cerrado de resultados) **NO se toca**.
+- **Limite:** esto **NO autoriza huecos arbitrarios.** Solo reconoce un hueco **DECLARADO por el operador y reubicado fuera del scan**; si un `.sql` sigue en `db/migrations/` y le falta fila, la puerta lo **sigue bloqueando** (`sin_fila`).
+
+#### Verificacion de este Addendum
+
+- **Evidencia de archivo (ADR-006):** `Test-Path db/migrations/documental/052_backfill_media_rep_autores_resolver_media_item.sql` -> **True**; `Get-ChildItem db/migrations -Filter "052*.sql"` -> **0**; `Get-ChildItem db/migrations -Filter "053*.sql"` -> `053_busqueda_normalizada.sql`.
+- **Codigo:** `Select-String scripts/apply_sql_file.js -Pattern "MAYOR de esos predecesores PRESENTES"` -> presente (`:21-25`/`:515-565`); `Read scripts/apply_sql_file.js:837-851` -> tope armado en el `.then()` de `arrancar()` con `tope.unref()`.
+- **ASCII:** lo anadido aqui es **ASCII puro, 0 bytes > 127**; **0 backticks** en `scripts/*.js` (los de este texto son marcas markdown).
+- **Sin tocar:** cuerpo original del ADR-087, `db/migrations/045_schema_migrations.sql`, `TASKS.md` y `NEXT.md`.
+
+**ADRs relacionados:**
+
+- **ADR-087** (el addendum enmienda **solo** su D2; D1/D3/D4/D5/D6 y el contrato de `045` intactos).
+- **ADR-003** (Cero Borrado Logico: el hueco de la 52 **se declara**, no se rellena; no se fabrica fila).
+- **ADR-006** (el baseline es el archivo real: la reubicacion de la 052 y el tope re-armado se comprobaron por `Test-Path`/`Select-String`).
+- **ADR-084** (fuente unica del relato: este argumento vive **una sola vez, aqui**; `TASKS.md`/`NEXT.md` apuntan, en el pase de cierre de `@docs-keeper`).
+
 ---
 
 ---
@@ -7285,3 +7333,214 @@ El requisito es triple: **consultable en O(1) por autor**, **que NO dependa de r
 - **ADR-045/046** (el ledger `schema_migrations` de `045:237-250`: la 051 se registra con `nombre` = nombre exacto del fichero y `numero` = `051`)
 - **ADR-023/035** (`xp_ganado numeric(12,2)` y la economia de XP: **sin cambios de valores**; lo que cambia es **cuando** se otorga, que pasa a ser **solo en el alta**)
 - **ADR-084** (fuente unica del relato: este ADR cumple D1 -- el argumento de D1-D6 vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apunta), **no borra** B0-B12 ni el texto de B2.4 (que se conserva con su estado actualizado aqui), y **no toca `api/`, `lib/`, `scripts/` ni `db/`**. Los argumentos de D1 viven en **ADR-087** (cita fabricada, entidad unica, migracion `050`); los de esta seccion, aqui. El detalle por tarea, en `TASKS.md`.
+
+---
+
+## ADR-090: Sistema de busqueda unificado LATAWEL -- motor compartido unico `busqueda.js` (normalizacion + trigramas + ranking + sinonimos + parsing), columnas normalizadas en `destinos` con indices btree/GIN (migraciones 053/054), un contrato de query params sobre `api/destinos.js`/`api/utilidades.js`, y CERO funciones serverless nuevas [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-090
+**Fecha:** 2026-10-07
+**Autor:** Chief Architect (`@architect`), por **confirmacion explicita del operador** en la Fase 0 (T1) del plan de busqueda unificada. Las cuatro decisiones de ALCANCE las fija el operador y este ADR **NO las reabre**: (i) GPS del navegador con permiso + fallback; (ii) "red social" por **co-ocurrencia + guardados + arbol de referidos**, con la tabla de follows en **plan separado**; (iii) alcance "tipo Google" = reglas + sugerencias + pliegue de tildes/mayusculas + tolerancia a typos + sinonimos + parsing de lenguaje natural; (iv) normalizacion por **columnas + indices en `destinos`**, sin extensiones.
+**Estado:** **ACEPTADO (2026-10-07).** Esta version integra las condiciones 1-3 del veredicto **`SOLICITA CAMBIOS`** de `@architect-review` y quedo **validada y ACEPTADA por `@architect-review`** (ver `### Verificacion de este ADR`). La ejecucion, tras la aceptacion, es de `@sql-security` (migraciones 053 y 054) + `@backend-dev` (`api/destinos.js`, `api/utilidades.js`, `busqueda.js`) + `@frontend-tpl` (index.html + los 4 directorios), **cada uno con su gate** (`AGENTS.md` seccion 2).
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-089`** (linea **6968**, "calificacion de media 1 a 5 estrellas"); no existia ningun `ADR-090`. Este ADR se escribe como **090**, el siguiente consecutivo libre. `DECISIONS.md` medido hoy: **1.125.083 bytes / 7.287 lineas** (el dato de `AGENTS.md` -- 741,5 KB / 4.731 lineas -- esta **desactualizado**; se declara aqui, no se oculta).
+**Alcance:** este ADR **no ejecuta** nada. Fija el modelo de datos (migraciones **053** y **054**), el motor compartido, el contrato de parametros, la formula de ranking y las degradaciones. **8/8 funciones serverless INTACTAS (ADR-010):** **cero ficheros nuevos en `api/`**; el buscador se extiende DENTRO de `api/destinos.js` y `api/utilidades.js` por query params. El motor `busqueda.js` vive **fuera de `api/`** (no es endpoint; es un asset estatico dual, ver D4), exactamente por la razon que ADR-086 uso para `lib/score.js`.
+
+### Por que es un ADR nuevo y no una enmienda
+
+No hay **ninguna premisa** que corregir: la busqueda nunca fue objeto de un ADR. Los cuatro buscadores que hoy existen son **cuatro defaults de implementacion** que crecieron por separado, no una decision documentada. No se puede enmendar un ADR que no emitio la regla (mismo criterio que ADR-089 declaro). Lo que este ADR hace es **crear el primer contrato** de la busqueda y **unificar cuatro implementaciones divergentes en una**.
+
+### Problema / Contexto
+
+Hoy hay **cuatro buscadores desincronizados y sin logica comun**, cada uno con su propia definicion de "coincidir":
+
+1. **`index.html`** (hero `#sinp` -> `renderDropdown`, y seccion Destacados -> `destSearch`/`renderDest`): filtra un array local `PL` con `toLowerCase().indexOf`, **sin pliegue de tildes, sin ranking, sin geo**. Al pulsar Enter hace `location.href='/buscar?q='` (`index.html:1587`).
+2. **`directorio-hostal|comida|sitio|evento.html`**: `applyFilters()` con `p.name.toLowerCase().indexOf(fSearch)`, **sin tildes, sin relevancia** (`directorio-hostal.html:507`).
+3. **`api/utilidades.js`** (`tipo=buscar`, pagina SSR `/buscar`): SQL `ILIKE` sobre `nombre/ciudad/region/barrio/tags::text`, `ORDER BY rating DESC NULLS LAST LIMIT 30` (`api/utilidades.js:422-433`). Sin pliegue, sin ranking multi-palabra, sin geo, sin sugerencias.
+4. **`api/destinos.js`** (`?q=`): SQL `ILIKE` sobre `nombre/lead/ciudad/descripcion` (`api/destinos.js:153-161`). Sin tildes ni ranking.
+
+Los cuatro fallan en lo mismo: **`ILIKE` no pliega tildes** (buscar `Bogota` no casa con `Bogot\u00e1`), no tolera un typo ("cartagenaa"), no entiende multi-palabra ("hostal barato centro"), no ordena por relevancia y no usa la geo que el producto **ya tiene** (`destinos.lat/lng`, `geo_ciudades`), ni las senales sociales que **ya existen** (`interacciones`, `guardados_*`, `usuarios.referido_por`).
+
+### Baseline verificado en este turno (ADR-006: archivo real, no memoria)
+
+| Hecho | Fuente | Estado |
+|---|---|---|
+| Ultimo ADR real = **089**, siguiente libre = **090** | `DECISIONS.md:6968` (`Select-String "^## ADR-0"`) | **CONFIRMADO** |
+| Ultima migracion aplicable = **052**; siguiente libre = **053** | `db/migrations/` (`Get-ChildItem`, ultimas: 049, 050, 051, **052**) | **CONFIRMADO** |
+| `api/utilidades.js?tipo=buscar` usa `ILIKE` + `ORDER BY rating LIMIT 30` | `api/utilidades.js:422-433` | **CONFIRMADO** (leido) |
+| `api/destinos.js?q=` usa `ILIKE` sobre 4 columnas | `api/destinos.js:153-161` | **CONFIRMADO** (leido) |
+| `directorio-hostal.html` filtra por `toLowerCase().indexOf` | `directorio-hostal.html:490-507` | **CONFIRMADO** (leido) |
+| `index.html` hero local, Enter -> `/buscar?q=` | `index.html:1539-1587`, `:1661` | **CONFIRMADO** (leido) |
+| `normGeo` + `sqlNormGeo` canonicos (ADR-058) en `api/interacciones.js` | `api/interacciones.js:325-349` | **CONFIRMADO** (leido) |
+| `ALIAS_CIUDAD`, `normGeoAlias`, `sqlAliasCiudad`, `sqlCoordsCiudadSub` | `api/interacciones.js:355-402` | **CONFIRMADO** (leido) |
+| `haversineMetros`, `tieneCoordsValidas` (0,0 = invalido) | `api/interacciones.js:308-316`, `:447-450` | **CONFIRMADO** (leido) |
+| `blNorm` = lowercase + NFD + strip `[\u0300-\u036f]` (precedente "sin tildes") | `api/utilidades.js:723-727` | **CONFIRMADO** (leido) |
+| `geo_ciudades` tiene `nombre_normalizado`, `departamento_normalizado`, `es_capital`, `cod_mpio`, `activo` + `idx_geo_ciudades_norm` | `db/migrations/038_origen_lejania.sql:124-146` | **CONFIRMADO** (leido) |
+| Motor compartido fuera de `api/` (`lib/score.js`) requerido por 2 endpoints | `lib/score.js`; `api/interacciones.js:202`, `api/usuarios.js:241` | **CONFIRMADO** (leido) |
+| `destinos` tiene `lat/lng/ciudad/region/barrio/zona/tags` | `BLUEPRINT.md:56-57` | **CONFIRMADO** |
+| `interacciones.tipo` = `resena/guardado/visita/foto/rating`; `guardados_carpetas` (030) y `guardados_album` (032) | `BLUEPRINT.md:71-72`; `db/migrations/032:247-251` | **CONFIRMADO** |
+| `usuarios.referido_por` self-FK (arbol de referidos, ADR-027) | `db/migrations/016_multinivel_crowdsourcing.sql:54` | **CONFIRMADO** |
+| **NO hay** tabla de follows/amigos, **NO hay** PostGIS, **NO hay** `pg_trgm`/`unaccent`/`fuzzystrmatch` | `Select-String "sinonimo|follow|amigos"` sin tablas; encargo del operador | **CONFIRMADO** / declarado |
+
+**NO verificado en este turno (declarado):** el volumen real de `destinos` (relevante solo para dimensionar los indices, no para el diseno) y el numero exacto de filas de `geo_ciudades` (el encargo dice 1.122; no se midio).
+
+### Opciones evaluadas -- como tolerar typos SIN extensiones
+
+El operador fijo "sin extensiones". Eso descarta de entrada `pg_trgm` (GIN `gin_trgm_ops`) y `fuzzystrmatch` (`levenshtein`/`dmetaphone`): **ambas son extensiones**. Quedan:
+
+1. **`pg_trgm` nativo.** La mejor herramienta, la mas rapida, una linea de DDL. **Descartada** por la decision explicita del operador y por el precedente del repo: ADR-058 ya **emulo `unaccent`** con `translate`+`regexp_replace` en vez de habilitar la extension (`api/interacciones.js:334-338`). Habilitar una extension para el buscador romperia esa convencion y anadiria un paso manual e irreversible en Neon.
+2. **Emulacion propia por n-gramas almacenados (ADOPCION, ver D1).** Una columna `text[]` con los trigramas normalizados + **GIN de array** (operador `&&` de solapamiento) + similitud por proporcion de interseccion. **Solo usa operadores y tipos del core de PostgreSQL** (`text[]`, GIN, `unnest`, `INTERSECT`, `cardinality`): cero extensiones, indexable, y coherente con la convencion de ADR-058.
+3. **`levenshtein` propio (PL/pgSQL, programacion dinamica) sobre el conjunto candidato.** **Descartada por coste:** no es indexable, obliga a calcular O(n*m) por fila y por token; con `LIMIT 30` sin indice se degrada a un escaneo completo. La emulacion por n-gramas obtiene tolerancia comparable pagando **GIN**, no CPU.
+
+### Opciones evaluadas -- donde vive el normalizador
+
+1. **Duplicar `normGeo` en cada superficie (statu quo).** Es la causa raiz del problema: cuatro definiciones de "coincidir". **Descartada** (Regla de No-Duplicidad).
+2. **Servidor unico + cliente sin buscar.** Elimina el normalizador de cliente, pero obliga a 4 directorios a un `fetch` por tecla y deja sin pliegue el fallback offline del hero. **Descartada** por coste de red y por UX del hero.
+3. **Un unico fichero dual (ADOPCION, ver D4).** `busqueda.js` en la raiz, escrito UMD-lite: `window.ExploraBusqueda` en navegador y `module.exports` en CommonJS. Servidor lo `require`, las 5 superficies lo cargan con `<script src="/busqueda.js">`. **Una sola implementacion** de normalizacion, trigramas, parsing y ranking, sin build tools (ADR-001).
+
+### Decisiones tomadas
+
+**D1 -- La tolerancia a typos se emula con una columna `text[]` de trigramas normalizados + indice GIN de array (operador `&&`), no con `pg_trgm` ni con Levenshtein.** `busqueda.js` expone `trigramas(s)` (JS) y la migracion 053 una funcion `exploraco_trgm(text) returns text[]` (SQL, `IMMUTABLE`) que produce **exactamente** el mismo array: normaliza con `exploraco_norm`, paddea `'  ' + s + ' '` y emite las ventanas deslizantes de 3 caracteres, unicas y ordenadas. **Sonda POR TOKEN (correccion de la condicion 2):** la consulta NO usa una union `search_trgm && t_1 OR search_trgm && t_2` -- esa forma aceptaria una fila que coincide con UN SOLO token y rompe la semantica AND de D8. Se usa **una condicion de solapamiento POR TOKEN combinadas con AND** (`search_trgm && t_1 AND search_trgm && t_2 AND ...`); cada `t_i` es el array de trigramas de un token normalizado, y con GIN cada `&&` descarta el universo por separado. Luego `sim = |a INTERSECT q| / |q|` (recall-oriented), agregada por token con `min`/`avg` segun D8. **Umbral de similitud = constante CALIBRABLE, no hardcode:** default `UMBRAL_SIM_LARGO = 0.34` para queries de **5+ chars** y `UMBRAL_SIM_CORTO = 0.5` para queries de **1-4 chars** (las cadenas cortas generan pocos trigramas y un `sim` inflado; por eso el umbral alto). Ambos viven como **constantes nombradas en `busqueda.js`** (objeto `BUSQ_UMBRALES` o equivalente), nunca como literales dispersos. **Volumetria NO medida (declarado):** el numero real de filas de `destinos`/`interacciones` **no se ha medido**; `0.34`/`0.5` son defaults razonables que se **calibran con `EXPLAIN ANALYZE` DESPUES de aplicar la 053, registrando fecha, plan y umbral ajustado** (ver `### Paridad, calibracion y seguimiento`). **Justificacion:** cero extensiones (decision del operador), indexable por core, y consistente con la emulacion de `unaccent` de ADR-058. **Alternativa descartada:** `pg_trgm` (extension) y Levenshtein PL/pgSQL (no indexable).
+
+**D2 -- Forma exacta de las columnas normalizadas en `destinos`.** La migracion 053 anade **6 columnas** `TEXT` (nullable en la primera pasada para permitir backfill sin locks largos):
+
+| Columna | Origen | Funcion |
+|---|---|---|
+| `nombre_norm` | `nombre` | prefijo/contiene de maxima prioridad |
+| `ciudad_norm` | `ciudad` | match de zona |
+| `region_norm` | `region` | match de zona |
+| `barrio_norm` | `barrio` | match de zona |
+| `tags_norm` | **TODOS** los valores textuales de `tags` (jsonb), **SIN deny-list en el trigger ni en el backfill de la migracion 053** (la deny-list se aplica en `busqueda.js` en TIEMPO DE CONSULTA, ver abajo) | match de subcategoria/cocina/etc. |
+| `search_norm` | `nombre + ' ' + ciudad + ' ' + region + ' ' + barrio + ' ' + tags_norm` | blob FTS y fuente de trigramas |
+| `search_trgm` | `exploraco_trgm(search_norm)` | tolerancia a typos (D1) |
+
+La **materializacion es por trigger `trg_destinos_busqueda_norm` `BEFORE INSERT OR UPDATE OF nombre,ciudad,region,barrio,tags`**, no por columna generada. **Razon:** `tags_norm` requiere agregar `jsonb` (`jsonb_each_text`), que no es expresable como `GENERATED ... STORED` sin una funcion de apoyo recursiva; **un solo trigger = un solo camino de codigo**, y no se puede olvidar como se olvidaria un `UPDATE` de aplicacion. **No-Duplicidad (condicion 1):** el normalizador canonico es **`exploraco_norm(text)`** (migracion 053, `IMMUTABLE`), funcion **UNICA** con semantica **NFD-equivalente** (`lower` + descomposicion + eliminacion de diacriticos `[\u0300-\u036f]` + `regexp_replace` a `[a-z0-9 ]` + colapso de espacios). Su pliegue de acentos latinos es **MAS AMPLIO** que el `translate` de `sqlNormGeo` (`api/interacciones.js:325-349`), que hoy solo cubre `a/e/i/o/u` + `u` con dieresis + enie en ambas cajas: `exploraco_norm` se rige por la misma semantica de `blNorm` (`api/utilidades.js:723-727`) y pliega todo el rango de diacriticos latinos, no una lista cerrada de 7 letras. `normGeo` de `busqueda.js` es su espejo JS; `sqlNormGeo` de `api/interacciones.js` queda como **copia divergente DOCUMENTADA y acotada por el smoke de paridad** (ver `### Paridad, calibracion y seguimiento`), que se elimina en el follow-up ahi descrito -- NUNCA se fomenta. **Deny-list de `tags_norm` -- se aplica en TIEMPO DE CONSULTA, NO en la 053 (decision del operador):** `tags_norm` materializa **TODOS** los valores textuales de `tags`, **SIN deny-list en el trigger ni en el backfill de la migracion 053** (el trigger y el backfill copian el `jsonb_each_text` completo, sin filtrar). La **deny-list de claves ruido** vive en **`busqueda.js`** y se aplica **en TIEMPO DE CONSULTA**; es el **UNICO origen** de la lista y **no existe doble capa** (no hay copia en la 053). Criterio de la lista (aplicado al consultar, no al materializar): (i) **URLs** (claves o valores que empiecen por `http://`, `https://`, `www.` o contengan `/`); (ii) **ids internos** (claves terminadas en `_id`/`id`, o valores puramente numericos/UUID); (iii) **claves no buscables** (p. ej. `emoji`, `icono`, `color`, `mapa`, `lat`, `lng`, `orden`, `peso`); (iv) **valores vacios o de solo signos**. **Razon:** `tags` es un jsonb heterogeneo; indexar ids o URLs degradaria `search_norm` sin aportar recall, pero eso no obliga a "quemar" la lista en el esquema: se filtra al consultar para no exigir una migracion nueva cada vez que la lista cambie. **Alternativa descartada:** columnas generadas (el `tags` lo impide) y actualizacion desde la aplicacion (los seeds masivos y `publicar-lugar.js` la saltarian). El backfill de la 053 recalcula todas las filas existentes con `WHERE search_norm IS NULL`, idempotente (ADR-008).
+
+**D3 -- Indices (btree para prefijo, GIN para trigramas, GIN para multi-palabra, btree para bbox geo, btree compuesto categoria+rating).** Todos **parciales `WHERE status='published'`** (la busqueda publica nunca sale de ese estado), lo que reduce tamano:
+
+- `idx_destinos_nombre_norm_prefix ON destinos (nombre_norm text_pattern_ops) WHERE status='published'` -- sirve `LIKE 'q%'` (prefijo) bajo cualquier collation.
+- `idx_destinos_ciudad_norm ON destinos (ciudad_norm text_pattern_ops) WHERE status='published'`.
+- `idx_destinos_search_trgm ON destinos USING gin (search_trgm) WHERE status='published'` -- operador `&&` (D1).
+- `idx_destinos_search_fts ON destinos USING gin (to_tsvector('simple', search_norm)) WHERE status='published'` -- multi-palabra con config `simple` (core, sin extensiones; `spanish` no aporta aqui y acentuaria de forma distinta a `normGeo`).
+- `idx_destinos_geo_bbox ON destinos (lat, lng) WHERE lat IS NOT NULL AND lng IS NOT NULL AND status='published'` -- **prefiltro de caja** para `cerca_de` (ver D9); sin PostGIS no hay indice geoespacial, pero el bbox reduce el conjunto antes del Haversine.
+- `idx_destinos_categoria_rating ON destinos (categoria_slug, rating DESC NULLS LAST) WHERE status='published'` -- **nuevo (condicion 3):** sirve el patron exacto de los **4 directorios** (filtrar por `categoria_slug` y ordenar por `rating`), que hoy no tiene indice compuesto y degrada a filtro+sort.
+
+**Indice de join social `interacciones (usuario_id, destino_id, activo)` -- DECISION (condicion 3):** **NO se crea en la migracion 053; se registra como follow-up de Wave 2.** Justificacion: su unico consumidor es `recomendar` (D10), **diferido a Wave 2** por decision del operador; crear un indice que Wave 1 no lee es coste de escritura sin retorno. Es **barato de anadir** cuando Wave 2 lo pida (una linea, `CREATE INDEX ... ON interacciones (usuario_id, destino_id, activo) WHERE activo=true`) y util para el join de co-ocurrencia; queda anotado en `### Paridad, calibracion y seguimiento`.
+
+**D4 -- El motor es `busqueda.js` (raiz, UMD-lite), implementacion UNICA compartida por servidor y cliente.** Exporta: `normGeo`, `normGeoAlias`/`ALIAS_CIUDAD`, `trigramas`, `sqlNormGeo`/`sqlTrgmExpr` (**WRAPPERS de `exploraco_norm(expr)`**, NO fragmentos SQL con `translate` propio), `parseNL`, `rankScore` y `parseParLatLng` (validado con la semantica de `tieneCoordsValidas`: `lat/lng` finitos y distintos de 0). **No-Duplicidad (condicion 1, cierre):** `sqlNormGeo(expr)` emite en SQL la invocacion **`exploraco_norm(expr)`** (migracion 053, `IMMUTABLE`) y `sqlTrgmExpr(expr)` se apoya en la **MISMA** `exploraco_norm` (normaliza con ella y encadena `exploraco_trgm`), de modo que **cliente (`normGeo` JS), servidor (`sqlNormGeo`) y esquema (`exploraco_norm`) comparten UNA sola definicion** de normalizacion. La unica copia divergente viva es la de `api/interacciones.js` (ADR-058), acotada por el smoke de paridad y eliminada en el follow-up de `### Paridad, calibracion y seguimiento`. **Servidor:** `api/destinos.js` y `api/utilidades.js` hacen `var BUSQ = require('../busqueda.js')`. **Cliente:** las 5 superficies cargan `<script src="/busqueda.js">` y usan `window.ExploraBusqueda`. **Razon:** ADR-086 ya fijo el patron de motor unico fuera de `api/` (`lib/score.js`) y advirtio que duplicarlo rompe la comparabilidad; aqui el invariante es mas fuerte -- **dos normalizadores distintos = dos busquedas distintas**. `busqueda.js` va en la **raiz y no en `lib/`** porque debe servirse como asset estatico publico al navegador; `lib/` queda para motores server-only. **Deuda declarada (follow-up, condicion 1):** hoy `api/interacciones.js` conserva su propia copia de `normGeo`/`sqlNormGeo` (ADR-058); la extraccion a `busqueda.js` es un follow-up de `@backend-dev` **con el smoke de paridad `scripts/smoke_busqueda_parity.js` en el interin** (ver `### Paridad, calibracion y seguimiento`), **disparado por cualquier migracion que toque `geo_ciudades`/normalizacion o a mas tardar en el cierre de Wave 1**, porque tocar ese fichero de 833 KB no debe bloquear la Fase 0. **Alternativa descartada:** duplicar (Regla de No-Duplicidad) o cliente sin buscar (opcion 2 arriba).
+
+**D5 -- Los sinonimos viven en una TABLA NUEVA `busqueda_sinonimos`, no en `tags` ni en codigo.** Migracion **054**: `id bigserial PK`, `termino_norm text NOT NULL` (normalizado con `exploraco_norm`), `canonico_norm text NOT NULL`, `tipo varchar(20) NOT NULL DEFAULT 'termino' CHECK (tipo IN ('termino','categoria','zona','precio'))`, `peso numeric(4,2) NOT NULL DEFAULT 1.00`, `activo boolean NOT NULL DEFAULT true`, `creado_en timestamptz NOT NULL DEFAULT now()`, con **indice unico parcial `uq_busqueda_sinonimos_termino ON busqueda_sinonimos (termino_norm) WHERE activo=true`** (idempotencia de carga) e indice `idx_busqueda_sinonimos_canonico (canonico_norm)`. La expansion de sinonimos ocurre en el servidor: por cada token libre se busca `termino_norm` y, si existe, se **anade** `canonico_norm` como token alternativo (nunca se reemplaza el original). Seed inicial idempotente en la propia 054 (p. ej. `bogota d c -> bogota`, `cafe -> cafeteria`, `hospedaje -> hostal`). **Razon:** administrable sin deploy, consultable con la MISMA normalizacion, y global. **Alternativas descartadas:** JSON en `tags` (seria sinonimo **por destino**, no global, y no se podria ampliar sin tocar fichas) y catalogo en codigo (cada sinonimo nuevo exigiria un deploy).
+
+**D6 -- El parsing de lenguaje natural vive en `busqueda.js` (`parseNL`), es del lado servidor, data-driven y nunca lanza.** `parseNL(qNorm)` separa `q` en tokens y clasifica cada uno contra tres lexicos: (a) **categoria**: mapa de terminos y subcategorias contra `categoria_slug` (`hostal/hospedaje/alojamiento -> hostal`; `comer/restaurante -> comida`; `museo/parque/lugar -> sitio`; `concierto/festival -> evento`) + las subcategorias de `CATEGORY_TAG_LISTS` (BLUEPRINT seccion 4); (b) **zona**: match contra `geo_ciudades.nombre_normalizado` aplicando `ALIAS_CIUDAD` (reusa el matcher de ADR-058); (c) **precio**: `barato/economico` -> `precio_desde <= umbral_bajo`, `caro/lujo` -> `precio_desde >= umbral_alto`. Los tokens consumidos por (a)-(c) se convierten en filtros estructurados; los no reconocidos **permanecen como texto libre** (no hay fallo: el parser degrada al token crudo). El lexico vive como **datos en `busqueda.js`** (categorias/subcategorias ya son listas cerradas del repo); `busqueda_sinonimos` (D5) se consulta aparte para los sinonimos administrables. **Razon:** un parser en codigo compartido, sin dependencias externas y sin NLP pesado, es suficiente para "tipo Google" en el alcance de 4 categorias; y al vivir en `busqueda.js` el mismo parser puede usarse en `/buscar` y en los directorios.
+
+**D7 -- Contrato de query params del buscador, sobre los dos endpoints EXISTENTES.** Sin endpoint nuevo (8/8, ADR-010):
+
+| Param | Tipo/valores | Default | Semantica |
+|---|---|---|---|
+| `q` | texto, <= 80 chars, `%`/`_` escapados | -- | consulta; se normaliza con `normGeo` en servidor |
+| `cerca_de` | `lat,lng` | -- | centro de proximidad; se valida con `tieneCoordsValidas` |
+| `radio_km` | numero 1..500 | 50 | radio para el Haversine y el bbox |
+| `orden` | `relevancia`\|`distancia`\|`rating` | `relevancia` | criterio de orden (D8/D9) |
+| `sugerir` | `1` | -- | **WAVE 1** -- modo autocompletado: devuelve `sugerencias[]`, ignora filtros salvo `q` |
+| `recomendar` | `1` | -- | **WAVE 2** -- modo co-ocurrencia/recomendacion (D10), excluye `semilla`; en Wave 1 el endpoint lo **ignora** |
+| `semilla` | uuid de destino | -- | **WAVE 2** -- ancla de `recomendar`; en Wave 1 el endpoint lo **ignora** |
+| `categoria`,`ciudad`,`destacados`,`limit`,`offset`,`modo` | ya existentes | -- | **compatibilidad total**: no se renombra ni se rompe ninguno |
+
+**Alcance Wave 1 (MVP, decision del operador):** la Wave 1 implementa SOLO `q`, `cerca_de`, `radio_km`, `orden` y `sugerir`. `recomendar`/`semilla` **permanecen en el contrato** (la firma no cambia) pero se marcan **WAVE 2**; en Wave 1 el endpoint **los ignora** (degradacion a busqueda normal). **Perdida de presedencia:** `sugerir=1` > `recomendar=1` (Wave 2) > busqueda normal. **Degradacion del contrato:** `orden=distancia` sin `cerca_de` -> cae a `relevancia`; `cerca_de` invalido o `0,0` -> se ignora, `dist_m=null`; `q` vacio y sin `cerca_de` -> se comporta como el listado actual (regresion cero). `api/utilidades.js?tipo=buscar` conserva su forma de respuesta SSR y **delega** en las mismas piezas de SQL/ranking, para que `/buscar` y `api/destinos.js?q=` devuelvan el MISMO orden.
+
+**D8 -- Formula de ranking (pesos en un unico catalogo de `busqueda.js`).** El score es una suma ponderada determinista; el match se calcula por token y, para multi-palabra, se agrega con semantica **AND** (cada token debe casar por alguna via):
+
+```
+score = 3.0 * match_score
+      + 1.5 * pop_score
+      + 2.5 * geo_score
+      + 1.0 * social_score
+      + 0.5 * boost_destacado
+```
+
+- `match_score` (por token, max sobre campos; media ponderada de tokens): `nombre_norm` exacto = 1.00; prefijo `nombre_norm` = 0.90; prefijo en frontera de palabra = 0.75; contiene = 0.55; similitud de trigramas = `0.40 * sim` (sim = `|a INTERSECT q| / |q|`); `tags_norm` = 0.35; `ciudad_norm`/`region_norm`/`barrio_norm` exacto = 0.50, prefijo = 0.40.
+- `pop_score` = `0.6 * (LEAST(rating,5)/5) + 0.4 * LEAST(ln(1 + total_resenas)/ln(1001), 1)` (NULL-safe con `COALESCE`).
+- `geo_score` = `exp(-dist_m / (radio_km * 1000))` si hay coords validas; si no, 0.
+- `social_score` = co-ocurrencia normalizada (D10) en modo `recomendar`; 0 en busqueda normal.
+- `boost_destacado` = 0.5 si `destacado=true`.
+
+**Desempate determinista:** `score DESC, rating DESC NULLS LAST, total_resenas DESC NULLS LAST, actualizado_en DESC NULLS LAST, id ASC`. Con `orden=distancia`: `dist_m ASC NULLS LAST` primero y luego el mismo desempate. Con `orden=rating`: `rating DESC NULLS LAST, total_resenas DESC NULLS LAST`. Los pesos viven en **una sola tabla de constantes en `busqueda.js` y son CONSTANTES v1 DEFINITIVAS (decision del operador): NO son administrables en BD por ahora.** Se retira el follow-up de "pesos administrables"; si algun dia se necesita configuracion en BD, sera un **ADR nuevo**, no una nota al pie.
+
+**D9 -- La geo reusa el Haversine y las coords de `destinos`; se implementa como bbox + refinamiento, sin PostGIS.** Con `cerca_de` valido, el SQL (i) **prefiltra por caja** con `idx_destinos_geo_bbox` (`lat BETWEEN :lat_min AND :lat_max AND lng BETWEEN :lng_min AND :lng_max`, derivadas de `radio_km`), y (ii) calcula la distancia real con la **misma formula Haversine** de `haversineMetros` (radio terrestre identico), devuelta como `dist_m` en el payload. Se excluyen `lat/lng` nulas o `0,0` con la semantica de `tieneCoordsValidas`. El GPS llega del navegador (`navigator.geolocation`, con permiso) y se envia como `cerca_de=lat,lng`; **el fallback** es el centroide de la ciudad detectada por `sqlCoordsCiudadSub`/`buscarCoordsCiudad` (alias de ciudades de ADR-058). **Razon:** no hay PostGIS ni `earthdistance`; el bbox+btree es la unica forma indexable de acotar, y el Haversine en SQL evita traer todo a JS.
+
+**D10 -- Las senales sociales se usan por CO-OCURRENCIA, guardados y arbol de referidos; la tabla de follows queda FUERA (plan separado). [WAVE 2 -- disenado aqui, NO se implementa en Wave 1.]** En modo `recomendar=1`:
+- **Co-ocurrencia (base):** `interacciones i1 JOIN interacciones i2 ON i2.usuario_id=i1.usuario_id AND i2.destino_id<>i1.destino_id WHERE i1.destino_id=$semilla AND i1.activo AND i2.activo AND i1.tipo IN ('visita','guardado','rating','resena')` agrupado por `i2.destino_id: COUNT(DISTINCT i2.usuario_id)` -> "quienes vieron/guardaron X tambien Y". Sin sesion, es **global** (no personalizado).
+- **Guardados:** `interacciones.tipo='guardado'` con `activo=true` (los `guardados_carpetas`/`guardados_album` de las migraciones 030/032 son de media y **no** se mezclan con destino).
+- **Arbol de referidos (extension declarada):** CTE recursiva sobre `usuarios.referido_por` (hasta 5 niveles, ADR-027) para ponderar destinos tocados por la red del usuario de sesion; **opcional en v1**, activado solo con sesion.
+- **FUERA DE ESTE ADR:** la creacion de una tabla de follows/amigos se menciona como **follow-up en plan separado**; este ADR **no la disena ni la asume**.
+
+**D11 -- Degradaciones explicitas (nunca una busqueda rota, siempre una respuesta).** Se reusa `sqlConDegradacion`/`esFalloEsquema` de `lib/score.js` para el reintento por codigo:
+
+- **Migracion 053 ausente** (`42703` columna inexistente): reintento automatico a la **consulta `ILIKE` legacy actual** -> la busqueda nunca deja de responder, solo pierde pliegue/ranking.
+- **Sin GPS / `cerca_de` invalido:** `geo_score=0`, `dist_m=null`; `orden=distancia` -> `relevancia`.
+- **Sin sesion:** `recomendar` es global (co-ocurrencia agregada); nada personalizado.
+- **Sin `geo_ciudades`:** los tokens de zona quedan como texto libre; sin error.
+- **Sin guardados / sin interacciones:** `social_score=0`; el ranking cae a match+pop.
+- **Sin filas en `busqueda_sinonimos`:** los tokens se usan tal cual.
+- **Cliente sin JS o `busqueda.js` no cargado:** `index.html` conserva el filtro local `PL` como ultimo recurso (sin pliegue); es degradacion de UI, no de servidor.
+
+**D12 -- Superficies y su cambio (5 superficies, un solo motor). [WAVE 1 = `index.html` + los 4 `directorio-*.html` + `api/utilidades.js?tipo=buscar`.]**
+- **`index.html`:** el hero (`#sinp`) y `renderDropdown` llaman a `api/destinos.js?q=...&sugerir=1` (debounce ~150 ms) y usan `ExploraBusqueda.normGeo` para el filtro local de respaldo; `destSearch`/`renderDest` pasan a ordenar por el mismo `rankScore`. Enter sigue a `/buscar?q=`.
+- **Los 4 `directorio-*.html`:** `applyFilters()` mantiene los facetas no-textuales (ciudad/region/rating/precio/tipo/tags) **locales** y delega el texto (`fSearch`) al **mismo ranking** via `ExploraBusqueda` (y, opcionalmente, `api/destinos.js?q=`), sin `toLowerCase().indexOf`.
+- **`api/utilidades.js?tipo=buscar` y `api/destinos.js?q=`:** ambas ramas usan las piezas SQL de `busqueda.js` (normalizacion, `search_trgm`, ranking) y el mismo desempate. **`api/destinos.js` es WAVE 1 solo en la parte que `index.html` consume (`q`, `cerca_de`, `radio_km`, `orden`, `sugerir`); su parte social (`recomendar`/`semilla`) queda WAVE 2** (D7/D10). Si en el cierre de Wave 1 `index.html` no consumiera `api/destinos.js?q=`, esa rama pasa integra a Wave 1 solo por decision explicita, no por inercia.
+
+### Paridad, calibracion y seguimiento [SEGUIMIENTO / DEUDA]
+
+**Paridad del normalizador (condicion 1, OBLIGATORIA).** Antes de desplegar la migracion 053 se ejecuta un **smoke de paridad** propuesto `scripts/smoke_busqueda_parity.js` (reusa el patron de `scripts/smoke_origen_factor_parity.js`, ADR-058). Corpus de bordes obligatorio: acentos latinos, enie, mayusculas, espacios multiples y signos; afirma fila a fila `exploraco_norm(x) == normGeo(x)` contra la base. **Si el smoke FALLA, la migracion 053 NO se despliega** (la divergencia `sqlNormGeo` vs `exploraco_norm` queda documentada y acotada por el smoke, nunca oculta). Sin smoke verde no hay 053.
+
+**Follow-up obligatorio -- migrar `sqlNormGeo` -> `exploraco_norm` (condicion 1).** En ESTA entrega **NO se refactoriza `api/interacciones.js`** (motor de 833 KB, fuera de alcance). Tarea de SEGUIMIENTO explicita para `@backend-dev`: sustituir `normGeo`/`sqlNormGeo` de `api/interacciones.js` por `exploraco_norm` + `busqueda.js` y eliminar la copia divergente. **Fecha/condicion de disparo concreta:** cada vez que se despliegue una migracion que toque `geo_ciudades` o la normalizacion, **o a mas tardar en el cierre de Wave 1**. El smoke de paridad es la precondicion de ese cambio.
+
+**Calibracion de umbrales (condicion 2).** La volumetria real de `destinos`/`interacciones` **NO esta medida**. Tras aplicar la 053 y su backfill se corre `EXPLAIN ANALYZE` sobre una consulta `search_trgm && ...` representativa; si el plan lo exige se ajustan `UMBRAL_SIM_LARGO`/`UMBRAL_SIM_CORTO` y se **registra en esta misma seccion la fecha, el plan y el umbral ajustado**. Mientras no exista esa medicion, `0.34`/`0.5` son **defaults declarados, no valores validados**.
+
+**Indice de join social diferido (condicion 3).** `interacciones (usuario_id, destino_id, activo)` **no se crea en la 053**; se registra como **follow-up de Wave 2** (su unico consumidor, `recomendar`, esta diferido). Barato de anadir cuando Wave 2 lo pida.
+
+### Impacto / superficies
+
+- **Migraciones (2):** `db/migrations/053_busqueda_normalizada.sql` (funciones `exploraco_norm`/`exploraco_trgm`, 6 columnas, trigger, backfill, **6 indices** -- los 5 originales + `idx_destinos_categoria_rating`; **SIN deny-list**: materializa todos los valores de `tags`, la deny-list vive en `busqueda.js` en tiempo de consulta) y `db/migrations/054_busqueda_sinonimos.sql` (tabla + seed + indices). Ambas **aditivas e idempotentes** (ADR-008), aplicadas **manualmente en Neon ANTES del deploy** (patron BUG-021). **Despliegue de la 053 condicionado al smoke de paridad verde** (ver `### Paridad, calibracion y seguimiento`).
+- **Codigo backend (3 ficheros):** `busqueda.js` (nuevo, **fuera de `api/`**, con las constantes `UMBRAL_SIM_LARGO`/`UMBRAL_SIM_CORTO`), `api/destinos.js` (**Wave 1:** `q`/`cerca_de`/`radio_km`/`orden`/`sugerir`; `recomendar`/`semilla` = **Wave 2**), `api/utilidades.js` (rama `tipo=buscar` alineada). **Cero endpoints nuevos.**
+- **Frontend (5 ficheros):** `index.html` + 4 `directorio-*.html`.
+- **Tags JSONB:** **sin cambios de forma**; `tags_norm` es una **vista materializada de lectura**, nunca se escribe a `tags` (Cero Borrado Logico, ADR-003). Cualquier escritura a `tags` sigue siendo merge (`COALESCE(tags,'{}') || $n::jsonb`).
+- **ASCII-safe (ADR-002):** todo lo nuevo en `api/*.js` y `busqueda.js` es ASCII puro; los diacriticos se referencian por rango (`\u0300-\u036f`), jamas como bytes > 127.
+
+### Consecuencias
+
+- **Positivas:** una sola definicion de "coincidir"; pliegue de tildes y mayusculas consistente cliente/servidor; tolerancia a typos sin extensiones; ranking explicable; geo y senales sociales que ya existian puestas a trabajar; cero presupuesto de funciones consumido.
+- **Negativas / costes:** dos migraciones con backfill (bloqueo de escritura acotado, mitigado por columnas nullable + trigger + segunda pasada); un asset JS nuevo en la raiz; la emulacion de trigramas es **menos precisa** que `pg_trgm` real (se declara como limite, no como equivalencia).
+
+### Deuda / riesgos [DEUDA]
+
+- **Condicion 1:** extraer `normGeo`/`sqlNormGeo` de `api/interacciones.js` a `busqueda.js` para eliminar la ultima copia divergente (follow-up `@backend-dev`, precondicion = smoke de paridad verde, disparo = migracion que toque `geo_ciudades`/normalizacion o cierre de Wave 1). Detalle en `### Paridad, calibracion y seguimiento`.
+- **Condicion 2:** `UMBRAL_SIM_LARGO`/`UMBRAL_SIM_CORTO` son defaults hasta que `EXPLAIN ANALYZE` (post-053) los valide; el resultado se registra en este ADR.
+- **Condicion 3:** indice de join social `interacciones (usuario_id, destino_id, activo)` **diferido a Wave 2** (consumidor `recomendar` diferido).
+- **Pesos del ranking:** son **constantes v1 definitivas**, NO administrables; retirado el follow-up (si hiciera falta config en BD, ADR nuevo).
+- **Personalizacion por sesion en `recomendar`** (arbol de referidos) queda **opcional v1**, dentro del bloque Wave 2.
+- La tabla de follows/amigos es **plan separado**, fuera de este ADR.
+- La emulacion de trigramas no iguala `pg_trgm`: si el volumen crece al punto de que `sim` deje de ser suficiente, la escalada natural es revisar la restriccion "sin extensiones" (no decidirla aqui).
+- **Estado:** este ADR esta **ACEPTADO** (2026-10-07) tras la validacion de `@architect-review`.
+
+### Verificacion de este ADR
+
+- **Numero:** `Select-String -LiteralPath "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-090"` -> **1 coincidencia**, la ultima cabecera. Antes de escribir: `Select-String "^## ADR-0"` -> mayor **`ADR-089`** (linea **6968**). Por eso el ID es **090**.
+- **Formato:** cabecera y secciones calcadas de **ADR-089** (`**ID:**`, `**Fecha:**`, `**Autor:**`, `**Estado:**`, `**Numeracion:**`, `**Alcance:**`, `### Problema / Contexto`, `### Opciones evaluadas`, `### Decisiones tomadas` (D1..D12), `### Paridad, calibracion y seguimiento`, `### Impacto / superficies`, `### Consecuencias`, `### Deuda / riesgos`, `### Verificacion de este ADR`, `**ADRs relacionados:**`).
+- **Baseline (ADR-006):** verificado con `Select-String`/`Read` acotado sobre `DECISIONS.md`, `api/interacciones.js:305-459`, `api/utilidades.js:418-447`, `api/destinos.js:111-185`, `lib/score.js`, `db/migrations/038_origen_lejania.sql:124-146`, `db/migrations/016:54`, `BLUEPRINT.md:54-57`, `:247-275`, `:371-398`. **Ningun fichero > 150 KB se leyo completo** (techo `AGENTS.md` 10/18).
+- **ASCII:** lo anadido aqui es **ASCII puro, 0 bytes > 127**, 0 backticks en `api/*.js`/`busqueda.js` (los que aparecen en este ADR son marcas markdown del propio documento).
+- **Cierre:** no se ejecuta `npm test` ni nada en `scripts/`: este ADR **no toca codigo**.
+- **Condiciones del veredicto (esta revision):** (1) No-Duplicidad -- `exploraco_norm` canonico + smoke de paridad `scripts/smoke_busqueda_parity.js` obligatorio + follow-up con disparo y divergencia acotada; (2) typos -- sonda `&&` POR TOKEN (AND, no OR) + umbral calibrable (`UMBRAL_SIM_LARGO`/`UMBRAL_SIM_CORTO`) + calibracion `EXPLAIN ANALYZE` registrada; (3) indices -- `idx_destinos_categoria_rating` agregado y join social diferido a Wave 2. Decisiones del operador: pesos v1 no administrables (D8), deny-list de `tags_norm` aplicada en `busqueda.js` en tiempo de consulta (D2), `recomendar` a Wave 2 (D7/D10/D12), superficies Wave 1 fijadas (D12).
+- **Estado:** **ACEPTADO (2026-10-07)** -- validado por `@architect-review` (ver `### Verificacion de este ADR`).
+- **Revision de arquitectura:** APRUEBA -- 2026-10-07 -- @architect-review. Verificado sobre el archivo real (ADR-006): rango `7339-7546` (**rango ACTUALIZADO en T22, 2026-10-07**: el ancla citaba el previo `7291-7497`, desfasado al crecer el fichero; recalculado contra el archivo real con `^## ADR-090` = 7339 y total = 7546 lineas), cabecera `^## ADR-090` = 1 coincidencia, 0 bytes >127, deny-list NO asociada a la 053 y `sqlNormGeo`/`sqlTrgmExpr` declarados wrapper de `exploraco_norm`.
+
+**ADRs relacionados:**
+
+- **ADR-010 / ADR-001** (presupuesto 8/8: este ADR **no crea endpoint** ni fichero en `api/`; `busqueda.js` vive fuera, como `lib/score.js`).
+- **ADR-058** (multiplicador de origen: de aqui se **reusan** `normGeo`/`sqlNormGeo`, `ALIAS_CIUDAD`, `sqlAliasCiudad`, `sqlCoordsCiudadSub`, `haversineMetros` y `geo_ciudades`; la emulacion de `unaccent` es el precedente directo de D1).
+- **ADR-003** (Cero Borrado Logico: `tags` **no se reescribe**; `busqueda_sinonimos` usa `activo`; `tags_norm` es lectura derivada).
+- **ADR-002** (ASCII-safe: diacriticos por rango Unicode).
+- **ADR-004** (Aislamiento Atomico: cualquier CSS nuevo de las superficies de busqueda vive bajo su selector padre unico).
+- **ADR-086 / ADR-088** (motor compartido fuera de `api/` -- `lib/score.js` -- como razon del limite 8/8; `busqueda.js` sigue el mismo patron; `sqlConDegradacion` se reutiliza en D11).
+- **ADR-027** (arbol de referidos `usuarios.referido_por` reusado en D10).
+- **ADR-034** (las senales de `interacciones`/media y `guardados_*`; los guardados de media y los de destino no se mezclan).
+- **ADR-084** (fuente unica del relato: el argumento de D1-D12 vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apuntan).

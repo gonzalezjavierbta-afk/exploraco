@@ -9,6 +9,9 @@
 const { neon } = require('@neondatabase/serverless');
 const { handleUpload } = require('@vercel/blob/client');
 const crypto = require('crypto');
+// ADR-090 D4/D12: motor UNICO de busqueda compartido con api/destinos.js.
+const BUSQ = require('../busqueda.js');
+const { esFalloEsquema } = require('../lib/score.js');
 
 var BASE = process.env.SITE_BASE_URL || 'https://latawel.com';
 var OG_IMAGE = process.env.OG_IMAGE_URL || (BASE + '/assets/brand/og/latawel-og-1200x630.png');
@@ -422,16 +425,47 @@ module.exports = async function handler(req, res) {
   if (tipo === 'buscar') {
     try {
       var qRaw = String(req.query.q || req.query.query || '').trim().slice(0, 80);
-      var qLike = qRaw.replace(/[\\%_]/g, function(c){ return '\\' + c; });
-      var bRows = [];
-      if (qLike) {
-        bRows = await sql(
+      var cercaRaw = req.query.cerca_de || null;
+      var radioKm = BUSQ.clampRadio(req.query.radio_km);
+      var buscaTokens = BUSQ.normTokens(qRaw);
+      var buscaCerca = BUSQ.parseParLatLng(cercaRaw);
+      // Orden (D8/D12): si llega cerca_de y no llega orden, distancia por
+      // defecto; orden=distancia sin coords validas degrada a relevancia (D11).
+      var ordenRaw = req.query.orden || null;
+      var ordenEfectivo = BUSQ.normalizarOrden(ordenRaw);
+      if (!ordenRaw && buscaCerca) ordenEfectivo = 'distancia';
+      var usaMotor = buscaTokens.length > 0 || !!buscaCerca;
+      // Legacy ILIKE (D11): comportamiento previo, tambien usado si el motor
+      // no esta disponible (053 ausente -> SQLSTATE 42703/42P01).
+      function buscaLegacy() {
+        var qLike = qRaw.replace(/[\\%_]/g, function(c){ return '\\' + c; });
+        return sql(
           'SELECT id, slug, nombre, ciudad, region, barrio, foto_hero, hero_bg, emoji, rating, total_resenas, precio_desde, categoria_slug ' +
           'FROM destinos WHERE status=\'published\' AND ' +
           '(nombre ILIKE $1 OR ciudad ILIKE $1 OR region ILIKE $1 OR barrio ILIKE $1 OR tags::text ILIKE $1) ' +
           'ORDER BY rating DESC NULLS LAST LIMIT 30',
           ['%' + qLike + '%']
         );
+      }
+      var bRows = [];
+      if (usaMotor) {
+        // Mismo motor y MISMO orden que /api/destinos?q= (ADR-090 D8/D12).
+        var bSel = 'SELECT id, slug, nombre, ciudad, region, barrio, foto_hero, hero_bg, emoji, rating, total_resenas, precio_desde, categoria_slug';
+        var bBusq = BUSQ.buildBusqueda({ q: qRaw, cerca_de: cercaRaw, radio_km: radioKm, orden: ordenEfectivo });
+        var bConds = ["d.status = 'published'", "d.categoria_slug != 'blog'"].concat(bBusq.conds);
+        var bWhere = bConds.join(' AND ');
+        var bParams = bBusq.params;
+        var bDistSel = bBusq.distSql ? (', ' + bBusq.distSql + ' AS dist_m') : '';
+        var bSql = bSel + bDistSel + ' FROM destinos d WHERE ' + bWhere
+          + ' ORDER BY ' + bBusq.orderSql + ' LIMIT $' + (bParams.length + 1);
+        try {
+          bRows = await sql(bSql, bParams.concat([30]));
+        } catch (eBusq) {
+          if (!esFalloEsquema(eBusq)) throw eBusq;
+          bRows = await buscaLegacy();
+        }
+      } else if (qRaw) {
+        bRows = await buscaLegacy();
       }
       var catsB = {
         hostal:{ label:'Hospedaje', tbg:'#DBEAFE', tc:'#1e3a8a', emoji:'\ud83c\udfe8' },
@@ -475,15 +509,20 @@ module.exports = async function handler(req, res) {
       }
       var qEsc = bxe(qRaw);
       var ogTitle = qRaw ? 'Buscar: ' + qEsc + ' | LATAWEL' : 'Buscar | LATAWEL';
-      var hTitulo = qRaw ? 'Resultados para "' + qEsc + '"' : 'Buscar en LATAWEL';
-      var hSub = qRaw
-        ? (bRows.length ? bRows.length + ' resultado(s)' : 'Sin resultados')
-        : 'Escribe una ciudad, un nombre, una region o una actividad.';
-      var hBody = qRaw
-        ? (bRows.length
-            ? '<div class="bgrid">' + cards + '</div>'
-            : '<div class="bempty">No encontramos nada para "' + qEsc + '". Prueba con otra palabra o revisa el <a href="/directorio-sitio.html">directorio</a>.</div>')
-        : '<div class="bempty">Busca por nombre, ciudad, region, barrio o actividad.</div>';
+      var hayResultados = bRows.length > 0;
+      var hTitulo = buscaCerca
+        ? (qRaw ? 'Resultados para "' + qEsc + '" cerca de ti' : 'Lugares cerca de ti')
+        : (qRaw ? 'Resultados para "' + qEsc + '"' : 'Buscar en LATAWEL');
+      var hSub = buscaCerca
+        ? (hayResultados ? bRows.length + ' resultado(s) cerca de ti' : 'Sin resultados cerca de ti')
+        : (qRaw
+            ? (hayResultados ? bRows.length + ' resultado(s)' : 'Sin resultados')
+            : 'Escribe una ciudad, un nombre, una region o una actividad.');
+      var hBody = hayResultados
+        ? '<div class="bgrid">' + cards + '</div>'
+        : (qRaw
+            ? '<div class="bempty">No encontramos nada para "' + qEsc + '". Prueba con otra palabra o revisa el <a href="/directorio-sitio.html">directorio</a>.</div>'
+            : '<div class="bempty">Busca por nombre, ciudad, region, barrio o actividad.</div>');
       var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
         + '<meta charset="UTF-8">\n'
         + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -496,10 +535,10 @@ module.exports = async function handler(req, res) {
         + '<meta property="og:site_name" content="LATAWEL">\n'
         + '<meta property="og:title" content="' + ogTitle + '">\n'
         + '<meta property="og:type" content="website">\n'
-        + '<meta property="og:url" content="' + BASE + '/buscar?q=' + encodeURIComponent(qRaw) + '">\n'
+        + '<meta property="og:url" content="' + BASE + '/buscar' + (qRaw ? '?q=' + encodeURIComponent(qRaw) : '') + '">\n'
         + '<meta property="og:image" content="' + OG_IMAGE + '">\n'
-        + '<meta name="robots" content="index, follow">\n'
-        + '<link rel="canonical" href="' + BASE + '/buscar?q=' + encodeURIComponent(qRaw) + '">\n'
+        + '<meta name="robots" content="' + (qRaw ? 'noindex, follow' : 'index, follow') + '">\n'
+        + '<link rel="canonical" href="' + BASE + '/buscar">\n'
         + '<style>'
         + 'body{font-family:\'Outfit\',Arial,sans-serif;margin:0;background:#E5E7EB;color:#0F1419}'
         + '.btop{background:#0F1419;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}'

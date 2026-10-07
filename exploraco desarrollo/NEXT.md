@@ -241,6 +241,27 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-07 (pase documental único R2, 9ª tanda) - Buscador unificado Wave 1 (ADR-090)
+
+**Qué se estaba haciendo:** entregar la **Wave 1 del buscador unificado** (`DECISIONS.md` **ADR-090**, Estado **ACEPTADO** tras el veredicto `APRUEBA -- 2026-10-07 -- @architect-review`): normalizar la busqueda por columnas en `destinos` (migracion 053), un motor compartido `busqueda.js` y un contrato de query params sobre `api/destinos.js`/`api/utilidades.js`, **sin endpoints nuevos**. El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-198** y en `DECISIONS.md` **ADR-090**; aquí solo hay estado y siguientes pasos.
+
+**Lo que quedó entregado (en working tree, sin commit):**
+- **Migracion 053 APLICADA** en Neon (`db/migrations/053_busqueda_normalizada.sql`): `schema_migrations` **max=53**, `aplicada`, **50 filas**; **7 columnas `*_norm`** + `search_trgm`; `exploraco_norm`/`exploraco_trgm` (**IMMUTABLE**); trigger `trg_destinos_busqueda_norm`; **6 indices**; **backfill 219 filas**; smoke de paridad **51/51**.
+- **`busqueda.js`** (raiz, UMD-lite) como motor compartido; **`api/destinos.js`** (`q` normalizado con tildes/mayusculas, ranking D8, `cerca_de`+`radio_km`, `sugerir=1`); **`api/utilidades.js`** (`/buscar` SSR con el mismo orden, `orden=distancia|rating`, noindex en resultados); **`index.html`** (dropdown de sugerencias con debounce/teclado + GPS con fallback a ciudad manual); **4 `directorio-*.html`** (match normalizado multi-token + "cerca de ti").
+- **Runner `apply_sql_file.js` corregido** (Addendum A de ADR-087). **052 reubicado** a `db/migrations/documental/` (0 filas para el 52, intacto). **`api/*`: 8/8 INTACTO**; sin endpoint nuevo.
+- **`db/cleanups/006_rollback_053_busqueda_normalizada.sql`:** ENTREGA FORMAL de Wave 1 (evidencia del incidente del ledger y del rollback aplicado en T3b); **rollback versionado de la 053, IDEMPOTENTE**; queda en el repo y **NO debe borrarse** (Cero Borrado Logico, ADR-003).
+
+**Qué sigue:**
+1. **(a) Commit + push** de la Wave 1 y de los docs de este pase. Único pendiente obligatorio.
+2. **(b) Wave 2 (NO hecha):** migracion **054** (diccionario de sinonimos), tolerancia a typos (trigramas), parsing de lenguaje natural y recomendaciones sociales (co-ocurrencia + guardados + referidos).
+3. **(c) Follow-up ADR-090 (condicion 1):** extraer `normGeo` de `api/interacciones.js` a `busqueda.js`.
+4. **(d) Bug separado BUG-118 (PENDIENTE, no de esta tanda):** `misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html` (linea 180); preexistente (ultimo commit del inline 2026-10-04).
+
+**Riesgos activos:**
+- **La Wave 1 no cubre sinonimos ni typos:** el alcance "tipo Google" queda a medias hasta la 054; el ranking D8 y los umbrales son constantes v1 (no administrables).
+- **`normGeo` sigue duplicado** en `api/interacciones.js` hasta ejecutar el follow-up (condicion 1 de ADR-090): la divergencia esta acotada por el smoke de paridad, no eliminada.
+- **SEO de `/buscar`:** `noindex,follow` en resultados e `index,follow` en la landing es una decision de producto; cambiarla es gate de `@seo-dev`.
+
 ### WORKING TREE 2026-10-07 (pase documental único R2, 8ª tanda) - Descripción de misión visible en Mi Perfil (TSK-197)
 
 **Qué se estaba haciendo:** que las tarjetas de misión del perfil expliquen **qué hacer**. Los logros ya mostraban descripción (`.bg-desc`); las misiones no. El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-197**; aquí solo hay estado y siguientes pasos. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (cambio aditivo de datos + render, no arquitectura).

@@ -241,6 +241,16 @@ textarea.wrinp{resize:vertical;min-height:88px}
 .ddlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.28);padding:10px 18px 4px}
 .ddi{display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer;transition:background .12s;border:none;background:none;width:100%;text-align:left;font-family:'Outfit',sans-serif}
 .ddi:hover{background:rgba(255,255,255,.07)}
+.ddi.on{background:rgba(255,255,255,.12)}
+.hdd-empty{padding:16px;text-align:center;font-size:12px;color:rgba(255,255,255,.3)}
+.sgeorow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;min-height:24px}
+.sgeo{display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:5px 12px;font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;color:rgba(255,255,255,.8);cursor:pointer;transition:all .15s}
+.sgeo:hover{background:rgba(255,255,255,.12);border-color:var(--gold);color:#fff}
+.sgeo.on{background:var(--gold);border-color:var(--gold);color:#fff}
+.sgeo:disabled{opacity:.55;cursor:default}
+.sgeo-ciudad{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.22);border-radius:3px;padding:5px 10px;font-family:'Outfit',sans-serif;font-size:11px;color:#fff;outline:none;max-width:160px}
+.sgeo-ciudad:focus{border-color:var(--gold)}
+.sgeost{font-size:10px;color:rgba(255,255,255,.5)}
 .ddt{width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
 .hcats{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
 .hcat{display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.35);font-size:9px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .15s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -1071,11 +1081,16 @@ textarea.wrinp{resize:vertical;min-height:88px}
     <div class="swrap">
       <div class="sbox">
         <span class="sico">🔍</span>
-        <input id="sinp" type="text" autocomplete="off" placeholder="Ciudad Perdida, hostal en Cartagena, Feria de las Flores…">
-        <button class="scl" id="scl" onclick="clrS()">✕</button>
-        <button class="sbtn" onclick="goBuscar()">Buscar ahora</button>
+        <input id="sinp" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="hddi" placeholder="Ciudad Perdida, hostal en Cartagena, Feria de las Flores…">
+        <button class="scl" id="scl" type="button" onclick="clrS()">✕</button>
+        <button class="sbtn" type="button" onclick="goBuscar()">Buscar ahora</button>
       </div>
-      <div class="hdd" id="hdd"><div id="hddi"></div></div>
+      <div class="sgeorow">
+        <button class="sgeo" id="sgeo" type="button" onclick="usarCercaDeMi()" aria-label="Buscar cerca de mi ubicacion">&#128205; Cerca de ti</button>
+        <input class="sgeo-ciudad" id="sgeo-ciudad" type="text" autocomplete="off" placeholder="o escribe tu ciudad" aria-label="Escribir ciudad" style="display:none">
+        <span class="sgeost" id="sgeost" role="status" aria-live="polite"></span>
+      </div>
+      <div class="hdd" id="hdd"><div id="hddi" role="listbox" aria-label="Sugerencias de busqueda"></div></div>
     </div>
     <div class="hcats" id="hcats">
       <div class="hcat" data-cat="hostal">🏨 Hospedajes</div>
@@ -1374,6 +1389,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <!-- Comunidad y planes: ver comunidad.html -->
 
 
+<script src="/busqueda.js?v=1"></script>
 <script>
 /* ── DATA ── */
 const PL=[];
@@ -1507,6 +1523,133 @@ var sinp  = document.getElementById('sinp');
 var scl   = document.getElementById('scl');
 var hdd   = document.getElementById('hdd');
 var hddi  = document.getElementById('hddi');
+
+/* -- MOTOR DE BUSQUEDA (ADR-090) --
+   Normaliza via el motor compartido (window.ExploraBusqueda.normGeo):
+   insensible a mayusculas Y tildes. Fallback si el motor no cargo. */
+function normTxt(s) {
+  var m = (typeof window !== 'undefined') ? window.ExploraBusqueda : null;
+  if(m && typeof m.normGeo === 'function') return m.normGeo(s);
+  return String(s == null ? '' : s).toLowerCase();
+}
+
+/* Geo (T15): coords de GPS persistidas y ciudad manual/perfil. */
+var GEO_KEY = 'explora_geo';
+var CIUDAD_KEY = 'explora_ciudad';
+function leerGeo() {
+  try {
+    var raw = sessionStorage.getItem(GEO_KEY) || localStorage.getItem(GEO_KEY);
+    if(!raw) return null;
+    var g = JSON.parse(raw);
+    return (g && typeof g.lat === 'number' && typeof g.lng === 'number') ? g : null;
+  } catch(e) { return null; }
+}
+function guardarGeo(g) {
+  var raw = JSON.stringify(g);
+  try { sessionStorage.setItem(GEO_KEY, raw); } catch(e) {}
+  try { localStorage.setItem(GEO_KEY, raw); } catch(e) {}
+}
+function leerCiudad() {
+  try { return localStorage.getItem(CIUDAD_KEY) || ''; } catch(e) { return ''; }
+}
+function guardarCiudad(c) {
+  try { if(c) localStorage.setItem(CIUDAD_KEY, c); else localStorage.removeItem(CIUDAD_KEY); } catch(e) {}
+}
+function ciudadDePerfil() {
+  var u = (window.ExploraCO && window.ExploraCO.usuario) || null;
+  if(!u) return '';
+  return u.ciudad || u.city || (u.perfil && (u.perfil.ciudad || u.perfil.city)) || '';
+}
+/* Sufijo de query comun a sugerencias y busqueda: GPS tiene prioridad. */
+function geoQuerySuffix() {
+  var g = leerGeo();
+  if(g) return '&cerca_de=' + encodeURIComponent(g.lat + ',' + g.lng) + '&orden=distancia';
+  var c = leerCiudad() || ciudadDePerfil();
+  if(c) return '&ciudad=' + encodeURIComponent(c);
+  return '';
+}
+
+/* Estado del dropdown de sugerencias (T14) */
+var ddTimer = null, ddSeq = 0, ddItems = [], ddIdx = -1;
+function setAria() {
+  if(!sinp) return;
+  var open = !!(hdd && hdd.classList.contains('open'));
+  sinp.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if(ddIdx < 0) sinp.removeAttribute('aria-activedescendant');
+}
+function ddHighlight() {
+  if(!hddi) return;
+  var opts = hddi.querySelectorAll('.ddi');
+  for(var i = 0; i < opts.length; i++) {
+    var on = (i === ddIdx);
+    opts[i].classList.toggle('on', on);
+    opts[i].setAttribute('aria-selected', on ? 'true' : 'false');
+    if(on && opts[i].scrollIntoView) opts[i].scrollIntoView({block:'nearest'});
+  }
+  if(sinp) {
+    if(ddIdx >= 0) sinp.setAttribute('aria-activedescendant', 'dd-opt-' + ddIdx);
+    else sinp.removeAttribute('aria-activedescendant');
+  }
+}
+function ddHover(i) { if(ddIdx === i) return; ddIdx = i; ddHighlight(); }
+function normalizarItem(p) {
+  var ct = CATS[p.cat] || {label:'Lugar'};
+  return {
+    name: p.name || p.nombre || '', city: p.city || p.ciudad || '',
+    cat: p.cat || 'sitio',
+    rating: (typeof p.rating === 'number') ? p.rating : 0,
+    hero_bg: p.hero_bg || ct.bg || '#333', emoji: p.emoji || ct.emoji || ''
+  };
+}
+/* Pinta la lista reusando el marcado .ddi ya existente. */
+function pintarDropdown(items, lbl, q) {
+  if(!hddi) return;
+  ddItems = items.slice(0, 8); ddIdx = -1;
+  if(!ddItems.length) {
+    hddi.innerHTML = '<div class="hdd-empty">Sin resultados para "' + esc(q) + '"</div>';
+    if(hdd) hdd.classList.add('open');
+    setAria();
+    return;
+  }
+  var html = '<div style="padding:7px 0"><div class="ddlbl">' + lbl + '</div>';
+  for(var i = 0; i < ddItems.length; i++) {
+    var p = ddItems[i];
+    var ct = CATS[p.cat] || {label:'Lugar'};
+    html += '<button type="button" class="ddi" role="option" id="dd-opt-' + i + '" aria-selected="false"'
+      + ' onmouseenter="ddHover(' + i + ')"'
+      + ' onclick="pickPlace(\'' + p.name.replace(/'/g, "\\'") + '\')">'
+      + '<div class="ddt" style="background:' + p.hero_bg + '">' + p.emoji + '</div>'
+      + '<div><div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85)">' + p.name + '</div>'
+      + '<div style="font-size:10px;color:rgba(255,255,255,.35)">' + ct.label
+      + (p.city ? ' \u00b7 ' + p.city : '') + (p.rating ? ' \u00b7 \u2605' + p.rating : '') + '</div></div>'
+      + '</button>';
+  }
+  html += '</div>';
+  hddi.innerHTML = html;
+  if(hdd) hdd.classList.add('open');
+  setAria();
+}
+/* Sugerencias servidor con debounce (~180 ms) y token anti-obsoletas. */
+function pedirSugerencias(q) {
+  var seq = ++ddSeq;
+  var url = '/api/destinos?sugerir=1&q=' + encodeURIComponent(q)
+    + '&limit=8' + geoQuerySuffix();
+  fetch(url, {headers:{'Accept':'application/json'}})
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if(seq !== ddSeq) return;                     /* respuesta obsoleta */
+      if(!sinp || sinp.value !== q) return;         /* el texto cambio */
+      if(!data || !data.sugerencias || !data.sugerencias.length) return; /* fallback local */
+      pintarDropdown(data.sugerencias.map(normalizarItem), 'Resultados', q);
+    })
+    .catch(function() { /* fallback: se mantiene el filtrado local */ });
+}
+function agendarSugerencias(q) {
+  if(ddTimer) { clearTimeout(ddTimer); ddTimer = null; }
+  if(!q || q.length < 2) return;
+  ddTimer = setTimeout(function() { pedirSugerencias(q); }, 180);
+}
+
 if(sinp) {
   sinp.addEventListener('input', function(e){
     searchQ    = e.target.value;
@@ -1514,6 +1657,7 @@ if(sinp) {
     if(scl) scl.classList.toggle('vis', searchQ.length > 0);
     renderDropdown(searchQ);
     if(hdd) hdd.classList.add('open');
+    setAria();
     renderDest();
     var di = document.getElementById('dest-input');
     if(di) di.value = searchQ;
@@ -1521,6 +1665,31 @@ if(sinp) {
   sinp.addEventListener('focus', function(){
     renderDropdown(searchQ);
     if(hdd) hdd.classList.add('open');
+    setAria();
+  });
+  sinp.addEventListener('keydown', function(e){
+    if(!hdd || !hdd.classList.contains('open')) return;
+    var n = ddItems.length;
+    if(e.key === 'ArrowDown') {
+      if(!n) return;
+      e.preventDefault();
+      ddIdx = (ddIdx + 1) % n;
+      ddHighlight();
+    } else if(e.key === 'ArrowUp') {
+      if(!n) return;
+      e.preventDefault();
+      ddIdx = (ddIdx - 1 + n) % n;
+      ddHighlight();
+    } else if(e.key === 'Enter') {
+      e.preventDefault();
+      if(ddIdx >= 0 && ddItems[ddIdx]) pickPlace(ddItems[ddIdx].name);
+      else goBuscar();
+    } else if(e.key === 'Escape') {
+      if(hdd) hdd.classList.remove('open');
+      ddIdx = -1;
+      ddHighlight();
+      setAria();
+    }
   });
 }
 if(scl) scl.addEventListener('click', function(){
@@ -1528,40 +1697,27 @@ if(scl) scl.addEventListener('click', function(){
   if(sinp) sinp.value = '';
   scl.classList.remove('vis');
   if(hdd) hdd.classList.remove('open');
+  ddItems = []; ddIdx = -1; setAria();
   renderDest();
   if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDestinos();
 });
 document.addEventListener('click', function(e){
   var sw = document.querySelector('.swrap');
-  if(sw && !sw.contains(e.target) && hdd) hdd.classList.remove('open');
+  if(sw && !sw.contains(e.target) && hdd) { hdd.classList.remove('open'); setAria(); }
 });
 
 function renderDropdown(q) {
   if(!hddi) return;
+  var nq = normTxt(q);
   var res = q
     ? PL.filter(function(p){
-        return p.name.toLowerCase().indexOf(q.toLowerCase())>-1
-            || p.city.toLowerCase().indexOf(q.toLowerCase())>-1;
+        return normTxt(p.name).indexOf(nq)>-1
+            || normTxt(p.city).indexOf(nq)>-1;
       })
     : PL.slice(0,5);
-  var lbl = q ? 'Resultados' : '🔥 Tendencias';
-  if(!res.length){
-    hddi.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:rgba(255,255,255,.3)">Sin resultados para "'+q+'"</div>';
-    return;
-  }
-  var html='<div style="padding:7px 0"><div class="ddlbl">'+lbl+'</div>';
-  var shown=res.slice(0,6);
-  for(var i=0;i<shown.length;i++){
-    var p=shown[i];
-    var ct=CATS[p.cat]||{label:'Lugar'};
-    html+='<button class="ddi" onclick="pickPlace(\''+p.name.replace(/'/g,"\\'")+'\')">'
-      +'<div class="ddt" style="background:'+p.hero_bg+'">'+p.emoji+'</div>'
-      +'<div><div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85)">'+p.name+'</div>'
-      +'<div style="font-size:10px;color:rgba(255,255,255,.35)">'+ct.label+' · '+p.city+' · ⭐'+p.rating+'</div></div>'
-      +'</button>';
-  }
-  html+='</div>';
-  hddi.innerHTML=html;
+  var lbl = q ? 'Resultados' : '\uD83D\uDD25 Tendencias';
+  pintarDropdown(res.map(normalizarItem), lbl, q);
+  agendarSugerencias(q);
 }
 
 function pickPlace(name){
@@ -1569,6 +1725,7 @@ function pickPlace(name){
   if(sinp) sinp.value=name;
   if(scl) scl.classList.add('vis');
   if(hdd) hdd.classList.remove('open');
+  ddItems=[]; ddIdx=-1; setAria();
   renderDest();
   var recs=document.getElementById('recs');
   if(recs) recs.scrollIntoView({behavior:'smooth'});
@@ -1584,10 +1741,61 @@ if(typeof window.ExploraReloadDestinos === 'function') window.ExploraReloadDesti
 }
 function goBuscar(){
 var q=(sinp&&sinp.value)?sinp.value.trim():'';
-if(q){ location.href='/buscar?q='+encodeURIComponent(q); return; }
+if(q){ location.href='/buscar?q='+encodeURIComponent(q)+geoQuerySuffix(); return; }
 var recs=document.getElementById('recs');
 if(recs) recs.scrollIntoView({behavior:'smooth'});
 }
+
+/* -- GEOLOCALIZACION (T15) --
+   Jamas bloquea la escritura ni el envio: si falla, ofrece ciudad manual.
+   El GPS es opcional y persistido; el formulario siempre responde. */
+function usarCercaDeMi() {
+  var st = document.getElementById('sgeost');
+  var inCiudad = document.getElementById('sgeo-ciudad');
+  var btn = document.getElementById('sgeo');
+  if(!navigator.geolocation) { mostrarCiudadManual('GPS no disponible'); return; }
+  if(btn) btn.disabled = true;
+  if(st) st.textContent = 'Ubicando\u2026';
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      guardarGeo({lat: pos.coords.latitude, lng: pos.coords.longitude});
+      if(btn) { btn.disabled = false; btn.classList.add('on'); }
+      if(st) st.textContent = 'Usando tu ubicacion';
+      if(inCiudad) inCiudad.style.display = 'none';
+      if(sinp && sinp.value) renderDropdown(sinp.value);
+      renderDest();
+    },
+    function() {
+      if(btn) { btn.disabled = false; btn.classList.remove('on'); }
+      mostrarCiudadManual('Sin GPS: escribe tu ciudad');
+    },
+    {enableHighAccuracy:false, timeout:8000, maximumAge:600000}
+  );
+}
+function mostrarCiudadManual(msg) {
+  var inCiudad = document.getElementById('sgeo-ciudad');
+  var st = document.getElementById('sgeost');
+  if(st) st.textContent = msg || '';
+  if(inCiudad) {
+    inCiudad.style.display = 'inline-block';
+    if(!inCiudad.value) inCiudad.value = leerCiudad() || ciudadDePerfil() || '';
+  }
+}
+/* Input manual de ciudad: persiste y NUNCA bloquea el formulario. */
+function initGeoCerca() {
+  var inCiudad = document.getElementById('sgeo-ciudad');
+  if(!inCiudad) return;
+  var base = leerCiudad() || ciudadDePerfil();
+  if(base) inCiudad.value = base;
+  inCiudad.addEventListener('change', function(e) { guardarCiudad(e.target.value.trim()); });
+  inCiudad.addEventListener('keydown', function(e) {
+    if(e.key === 'Enter') { e.preventDefault(); guardarCiudad(e.target.value.trim()); }
+  });
+  var btn = document.getElementById('sgeo');
+  if(btn && leerGeo()) btn.classList.add('on');
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initGeoCerca);
+else initGeoCerca();
 
 /* ── CATEGORY FILTERS ── */
 function syncAll(cat) {
@@ -1657,8 +1865,8 @@ var DEST_LIMIT = 8;  /* 2 rows × 4 cols on homepage */
 
 function destFiltered() {
   return PL.filter(function(p){
-    var q = destSearch.toLowerCase();
-    var qOk = !q || p.name.toLowerCase().indexOf(q)>-1 || p.city.toLowerCase().indexOf(q)>-1;
+    var q = normTxt(destSearch);
+    var qOk = !q || normTxt(p.name).indexOf(q)>-1 || normTxt(p.city).indexOf(q)>-1;
     // El directorio arranca en 'all' (Todos): la búsqueda del hero muestra
     // matches de cualquier categoría y los pills de categoría SIEMPRE
     // refinan (con o sin texto).

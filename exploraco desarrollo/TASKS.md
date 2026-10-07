@@ -4688,5 +4688,56 @@ Las tarjetas de mision de "Mi perfil" **no mostraban descripcion**, asi que el u
 
 `api/interacciones.js` · `mi-perfil.html`. Ambos en **working tree, SIN commitear** al cierre de este pase documental.
 
+## TSK-198 - Buscador unificado Wave 1 (ADR-090): migracion 053 + motor `busqueda.js` + busqueda normalizada en `api/destinos.js`/`api/utilidades.js` + dropdown en `index.html` + "cerca de ti" en los 4 directorios - 2026-10-07 - CERRADO EN WORKING TREE (sin commit)
+
+**Estado: CERRADO EN WORKING TREE (sin commit).** Decision de arquitectura: `DECISIONS.md` **ADR-090** (Estado **ACEPTADO**; veredicto `APRUEBA -- 2026-10-07 -- @architect-review`). **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010); el motor `busqueda.js` vive en la **raiz** (asset dual UMD-lite), como `lib/score.js` en ADR-086.
+
+### Que se estaba haciendo
+
+Unificar los cuatro buscadores divergentes en **una** implementacion con **normalizacion por columnas** en `destinos` (migracion 053), un **motor compartido** y un **contrato de query params**, sin crear endpoints.
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **Migracion 053 APLICADA en Neon** (`db/migrations/053_busqueda_normalizada.sql`; nombre REAL en disco, verificado ADR-006): `schema_migrations` **max=53**, `resultado='aplicada'`, **50 filas**. Anade **7 columnas `*_norm`** + `search_trgm`, funciones **`exploraco_norm`/`exploraco_trgm` (IMMUTABLE)**, trigger **`trg_destinos_busqueda_norm`** y **6 indices**; **backfill 219 filas**; smoke de paridad **51/51** (`scripts/smoke_busqueda_parity.js`).
+2. **Runner `scripts/apply_sql_file.js` corregido** (Addendum A de ADR-087): N-1 = **mayor predecesor PRESENTE en disco** y tope de 5 s **armado TRAS terminar**; cita de rango `:515-565`.
+3. **Fichero documental 052 reubicado** a `db/migrations/documental/052_backfill_media_rep_autores_resolver_media_item.sql` (decision del operador): **0 filas** para el numero 52 en el ledger, fichero **intacto** (Cero Borrado Logico, ADR-003).
+4. **Motor compartido `busqueda.js`** (raiz, UMD-lite), consumido por backend y cliente.
+5. **`api/destinos.js`:** `q` normalizado (tildes/mayusculas), ranking **D8**, `cerca_de`+`radio_km`, `sugerir=1`.
+6. **`api/utilidades.js`:** `/buscar` SSR con el **mismo orden** de ranking, `orden=distancia|rating`, **`noindex` en resultados**.
+7. **`index.html`:** dropdown de sugerencias con **debounce/teclado**, **GPS con fallback a ciudad manual**.
+8. **4 `directorio-*.html`** (comida/evento/hostal/sitio): match **normalizado multi-token** + **"cerca de ti"**.
+
+### Diferido a Wave 2 (NO hecho en esta tanda)
+
+- Migracion **054** (diccionario de sinonimos), tolerancia a typos (trigramas), parsing de lenguaje natural y recomendaciones sociales (co-ocurrencia + guardados + referidos).
+- **Follow-up (condicion 1 de ADR-090):** extraer `normGeo` de `api/interacciones.js` a `busqueda.js`.
+
+### Gate / decision de producto
+
+- SEO de `/buscar`: **`noindex,follow` en resultados** e **`index,follow` en la landing**.
+- **Follows** (tabla + UI de seguir) queda en **plan separado** (fuera de ADR-090).
+
+### Verificacion (medida en el turno de cierre)
+
+| Prueba | Resultado |
+|---|---|
+| Migracion 053 en `schema_migrations` | **max=53**, `aplicada`, **50 filas** |
+| Backfill columnas `*_norm` | **219 filas** |
+| `scripts/smoke_busqueda_parity.js` | **51/51 PASS** |
+| Funciones / trigger / indices | `exploraco_norm`+`exploraco_trgm` **IMMUTABLE**; `trg_destinos_busqueda_norm`; **6 indices** |
+| Presupuesto Vercel | **8/8 INTACTO** (sin endpoint nuevo) |
+
+### Bug aparte (NO de esta tanda) - BUG-118
+
+`npm run test` falla en `scripts/smoke_grupos_perfil.js` -> `ReferenceError: misAlbumRatingTxt is not defined` en el inline de `mi-perfil.html` (linea 180). **PRE-EXISTENTE** (ultimo commit del inline 2026-10-04); ya registrado como **BUG-118** y se arregla en **tanda separada**.
+
+### Archivos tocados
+
+`busqueda.js` (nuevo) · `api/destinos.js` · `api/utilidades.js` · `index.html` · `directorio-comida.html` · `directorio-evento.html` · `directorio-hostal.html` · `directorio-sitio.html` · `scripts/apply_sql_file.js` · `db/migrations/053_busqueda_normalizada.sql` (nuevo) · `db/migrations/documental/052_...sql` (reubicado) · `db/cleanups/006_rollback_053_busqueda_normalizada.sql` (nuevo) · `scripts/smoke_busqueda_parity.js` (nuevo). En **working tree, SIN commitear** al cierre de este pase documental.
+
+### Entrega formal - Rollback versionado de la 053
+
+`db/cleanups/006_rollback_053_busqueda_normalizada.sql` (2462 bytes) queda registrado como **ENTREGA FORMAL de Wave 1** (evidencia del incidente del ledger y del rollback aplicado durante T3b). Es el **procedimiento de rollback versionado de la migracion 053**, **IDEMPOTENTE**; **NO debe borrarse** (Cero Borrado Logico, ADR-003): es la via de reversion oficial de la 053.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
