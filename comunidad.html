@@ -319,6 +319,20 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 #cpanel-mapa .mapa-filters .mf-drop-btn:hover{border-color:var(--gold);color:var(--gold)}
 #cpanel-mapa .mapa-filters .mf-drop-btn[aria-expanded="true"]{border-color:var(--gold);background:rgba(255,74,0,.22);color:var(--gold)}
 #cpanel-mapa .mapa-filters .mf-drop-ic{font-size:12px;line-height:1}
+/* Doble zona: cuerpo alterna el filtro (data-mf-switch), caret abre el menu
+   (data-mf-toggle). Dos botones HERMANOS, no un span anidado: ambos gestos
+   son alcanzables por teclado. Se leen como una sola pildora: gap 0, radio
+   compartido y borde de 1px entre ambos. */
+#cpanel-mapa .mapa-filters .mf-drop-caret{gap:0;padding:6px 9px;min-width:24px;justify-content:center;border-radius:0 999px 999px 0}
+#cpanel-mapa .mapa-filters .mf-drop-main{border-right-width:0;border-radius:999px 0 0 999px;padding-right:12px}
+#cpanel-mapa .mapa-filters .mf-caret{font-size:9px;line-height:1;opacity:.7;transition:transform .18s}
+#cpanel-mapa .mapa-filters .mf-drop-btn[aria-expanded="true"] .mf-caret{transform:rotate(180deg)}
+/* CASCADA DETERMINISTA: abierto (data-mf-open, puesto por mmSetDrop) gana sobre
+   encendido. Se resuelve por ESPECIFICIDAD, no por orden de fuente: el
+   selector de abajo suma mas clases+atributos que [aria-pressed="true"]. */
+#cpanel-mapa .mapa-filters .mf-drop-btn[aria-pressed="true"]{border-color:var(--gold);background:rgba(255,74,0,.22);color:var(--gold)}
+#cpanel-mapa .mapa-filters .mf-drop[data-mf-open="true"] .mf-drop-btn[aria-pressed="true"]{border-color:var(--gold);background:rgba(15,20,25,.85);color:#fff}
+#cpanel-mapa .mapa-filters .mf-drop[data-mf-open="true"] .mf-drop-caret[aria-expanded="true"]{background:rgba(255,74,0,.22);color:var(--gold)}
 /* Panel colapsable: nunca se elimina del DOM, solo se oculta (ADR-003). */
 #cpanel-mapa .mapa-filters .mf-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:900;display:flex;flex-direction:column;gap:4px;min-width:174px;padding:6px;border-radius:12px;background:rgba(10,16,25,.97);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 26px rgba(0,0,0,.5)}
 #cpanel-mapa .mapa-filters .mf-panel[hidden]{display:none}
@@ -354,6 +368,8 @@ nav{background:var(--black);border-bottom:3px solid var(--gold);height:52px;disp
 @media(max-width:360px){
   #cpanel-mapa .mapa-filters{gap:6px}
   #cpanel-mapa .mapa-filters .mf-drop-btn{padding:6px 9px}
+  #cpanel-mapa .mapa-filters .mf-drop-main{padding-right:8px}
+  #cpanel-mapa .mapa-filters .mf-drop-caret{padding-left:6px;padding-right:7px;min-width:21px}
   #cpanel-mapa .mapa-filters .mf-drop-label{display:none}
   #cpanel-mapa .mapa-filters .mf-btn{padding:6px 10px}
   #cpanel-mapa .mapa-filters .mf-panel{min-width:156px}
@@ -741,7 +757,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
         <div class="mmx-editbar" id="mm-personal-editbar" style="display:none"></div>
         <div class="mapa-filters">
           <div class="mmx-cats mf-drop" id="mm-personal-cats">
-            <button type="button" class="mf-drop-btn" data-mf-toggle="dir" aria-expanded="false" aria-controls="mf-panel-dir" aria-label="Directorio: filtrar por categoria"><span class="mf-drop-ic" aria-hidden="true">&#x1F4C1;</span><span class="mf-drop-label" data-mf-label="dir">Directorio</span></button>
+            <button type="button" class="mf-drop-btn mf-drop-main" data-mf-switch="cat" aria-pressed="false" aria-label="Directorio: filtrar por categoria"><span class="mf-drop-ic" aria-hidden="true">&#x1F4C1;</span><span class="mf-drop-label" data-mf-label="dir">Directorio</span></button><button type="button" class="mf-drop-btn mf-drop-caret" data-mf-toggle="dir" aria-expanded="false" aria-controls="mf-panel-dir" aria-label="Menu de directorio"><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
             <div class="mf-panel" id="mf-panel-dir" data-mf-panel="dir" hidden>
               <button type="button" class="mf-item mmx-cbtn on" data-cat="all">Todos</button>
               <button type="button" class="mf-item mmx-cbtn" data-cat="hostal">&#x1F3E8; Hospedaje</button>
@@ -752,7 +768,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
             <button type="button" class="mf-btn mf-free mmx-cbtn" data-cat="visitados" aria-label="Solo destinos visitados">&#x2713; Visitados</button>
           </div>
           <div class="mf-drop" id="mm-personal-media">
-            <button type="button" class="mf-drop-btn" data-mf-toggle="med" aria-expanded="false" aria-controls="mf-panel-med" aria-label="Medios: filtrar fotos, videos, audio y albumes"><span class="mf-drop-ic" aria-hidden="true">&#x1F4F7;</span><span class="mf-drop-label" data-mf-label="med">Medios</span></button>
+            <button type="button" class="mf-drop-btn mf-drop-main" data-mf-switch="media" aria-pressed="false" aria-label="Medios: filtrar fotos, videos, audio y albumes"><span class="mf-drop-ic" aria-hidden="true">&#x1F4F7;</span><span class="mf-drop-label" data-mf-label="med">Medios</span></button><button type="button" class="mf-drop-btn mf-drop-caret" data-mf-toggle="med" aria-expanded="false" aria-controls="mf-panel-med" aria-label="Menu de medios"><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
             <div class="mf-panel" id="mf-panel-med" data-mf-panel="med" hidden>
               <button type="button" class="mf-item" data-media="all">Todos</button>
               <button type="button" class="mf-item" data-media="foto">&#x1F4F7; Fotos</button>
@@ -762,9 +778,9 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
             </div>
           </div>
           <div class="mf-drop mf-drop-punt">
-            <button type="button" class="mf-drop-btn" data-mf-toggle="punt" aria-expanded="false" aria-controls="mf-panel-punt" aria-label="Puntaje: filtrar por calificacion"><span class="mf-drop-ic" aria-hidden="true">&#x2B50;</span><span class="mf-drop-label" data-mf-label="punt">Puntaje</span></button>
+            <button type="button" class="mf-drop-btn mf-drop-main" data-mf-switch="rating" aria-pressed="false" aria-label="Puntaje: filtrar por calificacion"><span class="mf-drop-ic" aria-hidden="true">&#x2B50;</span><span class="mf-drop-label" data-mf-label="punt">Puntaje</span></button><button type="button" class="mf-drop-btn mf-drop-caret" data-mf-toggle="punt" aria-expanded="false" aria-controls="mf-panel-punt" aria-label="Menu de puntaje"><span class="mf-caret" aria-hidden="true">&#9662;</span></button>
             <div class="mf-panel mf-panel-punt" id="mf-panel-punt" data-mf-panel="punt" hidden>
-              <div class="mf-range-wrap"><input type="range" id="mf-rating" class="mf-range" min="0" max="5" step="0.5" value="0" orient="vertical" aria-label="Puntaje minimo del lugar"><span class="mf-range-scale" aria-hidden="true"><span>5</span><span>0</span></span></div>
+              <div class="mf-range-wrap"><input type="range" id="mf-rating" class="mf-range" min="0" max="5" step="0.2" value="0" orient="vertical" aria-label="Puntaje minimo del lugar"><span class="mf-range-scale" aria-hidden="true"><span>5</span><span>0</span></span></div>
               <output class="mf-range-out" data-mf-rating-out>Todos</output>
             </div>
           </div>
@@ -906,9 +922,9 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
-<script src="mapa-cultural.js?v=14"></script>
+<script src="mapa-cultural.js?v=15"></script>
 <script src="media-actions.js"></script>
-<script src="mymapa.js?v=7"></script>
+<script src="mymapa.js?v=8"></script>
 <script src="mercado.js?v=2"></script>
 <script>
 /* =============================================================
@@ -2350,21 +2366,57 @@ function mmFiltrosBar() {
   return document.querySelector('#cpanel-mapa .mapa-filters');
 }
 
+// Solo los botones con data-mf-toggle (el caret) gobiernan el menu: el
+// cuerpo del filtro tiene data-mf-switch y NO lleva aria-controls.
 function mmDropBtns() {
   var bar = mmFiltrosBar();
   if (!bar) return [];
-  return bar.querySelectorAll('.mf-drop-btn');
+  return bar.querySelectorAll('.mf-drop-caret[data-mf-toggle]');
 }
 
-// Abre/cierra un desplegable: aria-expanded + hidden del panel.
+// La INSTANCIA que creo MyMap (MyMap.getMC), nunca la facade estatica.
+function mmInst() {
+  return window.MyMap && typeof window.MyMap.getMC === 'function' ? window.MyMap.getMC() : null;
+}
+
+// Abre/cierra un desplegable: aria-expanded + hidden del panel. Marca
+// data-mf-open en el .mf-drop para que la cascada CSS resuelva el choque
+// visual con aria-pressed del cuerpo por especificidad (no por orden).
 function mmSetDrop(btn, open) {
   if (!btn) return;
   var id = btn.getAttribute('aria-controls');
   var panel = id ? document.getElementById(id) : null;
   btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  var wrap = btn.closest ? btn.closest('.mf-drop') : null;
+  if (wrap) {
+    if (open) wrap.setAttribute('data-mf-open', 'true');
+    else wrap.removeAttribute('data-mf-open');
+  }
   if (!panel) return;
   if (open) panel.removeAttribute('hidden');
   else panel.setAttribute('hidden', '');
+}
+
+// Un clic en el cuerpo alterna el filtro del MOTOR (no logica propia del host).
+function mmSwitchFilter(btn) {
+  var inst = mmInst();
+  var canal = btn.getAttribute('data-mf-switch');
+  if (!canal || !inst || typeof inst.toggleFilter !== 'function') return;
+  inst.toggleFilter(canal);
+  mmSyncPress();
+  if (typeof inst.getState === 'function') mmSyncLabels(inst.getState());
+}
+
+// aria-pressed de los cuerpos = isFilterOn(canal) del motor.
+function mmSyncPress() {
+  var bar = mmFiltrosBar();
+  var inst = mmInst();
+  if (!bar || !inst || typeof inst.isFilterOn !== 'function') return;
+  var bs = bar.querySelectorAll('[data-mf-switch]');
+  for (var i = 0; i < bs.length; i++) {
+    var on = inst.isFilterOn(bs[i].getAttribute('data-mf-switch'));
+    bs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
 }
 
 // Uno a la vez: cierra todos menos el indicado (null = cerrar todos).
@@ -2428,37 +2480,59 @@ function mmSyncLabels(snap) {
   mmWriteText('#cpanel-mapa [data-mf-rating-out]', punt);
 }
 
+// El umbral vive en el MOTOR: el input lo refleja (si no, el thumb queda en 0
+// con la etiqueta en 3.4). No se patea si el usuario tiene el foco en el.
+function mmSyncRatingInput() {
+  var input = document.getElementById('mf-rating');
+  var inst = mmInst();
+  if (!input || !inst || typeof inst.getRatingMin !== 'function') return;
+  if (typeof document !== 'undefined' && document.activeElement === input) return;
+  var v = parseFloat(inst.getRatingMin());
+  if (isNaN(v) || String(v) === input.value) return;
+  input.value = String(v);
+}
+
 // Deslizador de puntaje -> setRatingMin de la INSTANCIA del motor (0 = Todos).
+// Se re-sincroniza con el snapshot COMPLETO: un parcial borraria las etiquetas
+// de Directorio y Medios.
 function mmApplyRating() {
   var input = document.getElementById('mf-rating');
   if (!input) return;
-  var inst = window.MyMap && typeof window.MyMap.getMC === 'function' ? window.MyMap.getMC() : null;
+  var inst = mmInst();
+  var v = parseFloat(input.value) || 0;
   if (inst && typeof inst.setRatingMin === 'function') inst.setRatingMin(input.value);
-  mmSyncLabels({ ratingMin: parseFloat(input.value) || 0 });
+  var snap = (inst && typeof inst.getState === 'function') ? inst.getState() : null;
+  if (!snap) snap = {};
+  snap.ratingMin = v;
+  mmSyncLabels(snap);
 }
 
 // El motor mantiene los valores: el host solo sigue el texto. Se engancha a
 // la INSTANCIA que creo MyMap (MyMap.getMC), nunca a la facade estatica de
 // MapaCultural: esa crearia una instancia por defecto con otro mapa.
 function mmBindFiltrosInstancia() {
-  var inst = window.MyMap && typeof window.MyMap.getMC === 'function' ? window.MyMap.getMC() : null;
+  var inst = mmInst();
   if (!inst) return false;
   mmSyncLabels(typeof inst.getState === 'function' ? inst.getState() : null);
+  mmSyncRatingInput();
   if (mmFiltrosCbBound) return true;
   if (typeof inst.onFilterChange !== 'function') return true;
   mmFiltrosCbBound = true;
-  inst.onFilterChange(function (snap) { mmSyncLabels(snap); });
+  inst.onFilterChange(function (snap) { mmSyncLabels(snap); mmSyncPress(); mmSyncRatingInput(); });
   return true;
 }
 
 function initMapaFiltrosMapa() {
   var bar = mmFiltrosBar();
   if (!bar) return;
-  var btns = bar.querySelectorAll('.mf-drop-btn');
+  var btns = bar.querySelectorAll('.mf-drop-caret[data-mf-toggle]');
   // Arranque en cerrado: los 3 paneles empiezan colapsados (Puntaje incluido).
   for (var i = 0; i < btns.length; i++) mmSetDrop(btns[i], false);
-  mmSyncLabels(null);
+  var mmI0 = mmInst();
+  mmSyncLabels(mmI0 && typeof mmI0.getState === 'function' ? mmI0.getState() : null);
   mmBindFiltrosInstancia();
+  mmSyncPress();
+  mmSyncRatingInput();
 
   var input = document.getElementById('mf-rating');
   if (input && !input.__mmFiltroBound) {
@@ -2472,7 +2546,13 @@ function initMapaFiltrosMapa() {
   mmFiltrosDropsBound = true;
 
   bar.addEventListener('click', function (e) {
-    var b = (e.target && e.target.closest) ? e.target.closest('.mf-drop-btn') : null;
+    var t = e.target;
+    if (!t || !t.closest) return;
+    // 1) Cuerpo del filtro: alterna el canal en el MOTOR, sin abrir el menu.
+    var sw = t.closest('[data-mf-switch]');
+    if (sw && bar.contains(sw)) { mmSwitchFilter(sw); return; }
+    // 2) Caret: abre/cierra SOLO el menu.
+    var b = t.closest('.mf-drop-caret[data-mf-toggle]');
     if (!b || !bar.contains(b)) return;
     var wasOpen = b.getAttribute('aria-expanded') === 'true';
     mmCloseDrops(b);

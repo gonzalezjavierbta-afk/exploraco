@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.3.0. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.4.1. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -13,6 +13,7 @@ create(opts)  -> instancia (multi-instancia por pagina)
       init(opts)    -> instancia default; idempotente
       refresh, setPlaces, setMedia, setMediaEnabled, setMediaTypes,
       setRatingMin, getRatingMin, setMediaVista, getMediaVista,
+      setMediaSoloMio, toggleFilter, isFilterOn,
       getMap, openDrawer, closeDrawer,
       normalizePlace, normalizeMedia, esc, starHtml,
       photoPlaceholderHTML, haversineKm
@@ -22,14 +23,62 @@ create(opts)  -> instancia (multi-instancia por pagina)
    Instancia:
       { init, refresh, destroy, setPlaces, setMedia, setMediaEnabled,
         setMediaTypes, setRatingMin, getRatingMin, setMediaVista,
-        getMediaVista, onFilterChange, getState, getMap, openDrawer,
+        getMediaVista, setMediaSoloMio, toggleFilter, isFilterOn,
+        onFilterChange, getState, getMap, openDrawer,
         closeDrawer, geolocate, resetColombia, fitBounds }
+
+   1.4.1
+     - Bump FUNCIONAL de patch: el gate de sesion de mediaSoloMio se aplica
+       tambien al RESTAURAR la preferencia persistida, no solo al activarla.
+       1.4.0 lo aplicaba solo en setMediaSoloMio, asi que restoreFiltro
+       devolvia el 'true' guardado sin mirar la sesion: al cerrar sesion el
+       filtro "solo mi media" quedaba encendido y misrepresentationado, porque
+       el anfitrion consulta la capa publica (su uid es null) y ese alcance no
+       tiene nada que satisfacer. El filtro mentiroso es peor que el filtro
+       apagado. Ahora restoreFiltro exige sesion para dejar el flag en true.
+     - Solo se descarta el VALOR, nunca la PREFERENCIA: la clave de
+       localStorage se conserva intacta y el anfitrion puede volver a encender
+       el filtro con setMediaSoloMio cuando haya sesion.
+     - La restauracion sigue siendo ESTRICTAMENTE silenciosa, ahora tambien en
+       esta rama: sin DOM, sin red, sin avisos ni callbacks. Descartar un valor
+       no es una accion de usuario, asi que NO se pide login al arrancar; el
+       aviso le corresponde al activate (setMediaSoloMio), que si lo es.
+
+   1.4.0
+     - setRatingMin cuantiza a DECIMAS (Math.round(n*5)/5, paso 0.2) para
+       que el anfitrion pueda fijar umbrales finos; el clamp 0..5 se mantiene
+       y las etiquetas siguen tolerando decimales.
+     - toggleFilter(canal) / isFilterOn(canal): alternancia de un clic sobre
+       los tres canales de filtro ('cat', 'media', 'rating') sin depender del
+       marcado del anfitrion. Ambos devuelven el estado de filtro vigente.
+     - Desacopla Directorio de Medios: filterPins ya no enciende la capa
+       media al elegir 'all'. La opcion enableMediaOnAll se conserva
+       declarada por contrato, pero su efecto pasa a ser exactamente cero.
+     - Nueva opcion mediaSoloMio y metodo setMediaSoloMio(v): alcance de la
+        capa de medios al contenido propio, con gate de sesion al ACTIVAR y
+        tambien al RESTAURAR la preferencia (silencioso, sin pedirLogin).
+     - Nueva opcion persistKey: guarda y restaura el snapshot de filtro en
+       localStorage. Es una PREFERENCIA, no un dato de usuario: el motor no
+       depende de la sesion para persistir y nunca borra la clave.
 
 
    Opciones index-compatibles (default = comportamiento comunidad):
-     enableMediaOnAll (false): al seleccionar la categoria 'all' por clic
-       de usuario se enciende la capa media (equivalente al index).
+     enableMediaOnAll (false): OPCION CONSERVADA PERO INERTE. Antes encendia
+       la capa media al elegir 'all' por clic de usuario, lo que ataba el
+       Directorio a los Medios (elegir categoria movia la multimedia). Esa
+       dependencia se sustituyo por la API explicita toggleFilter('media'):
+       cada canal se enciende y apaga por su cuenta. Se mantiene declarada
+       para no romper el contrato de los anfitriones que la pasan; el motor
+       NO la lee para nada y su default sigue en false.
      mediaEnabled (false): estado inicial de la capa media.
+     mediaSoloMio (false): estado inicial del alcance "solo mi media"
+       (st.mediaSoloMio). Es un flag de estado que el anfitrion aplica a su
+       capa; pedir activarlo sin sesion se rechaza con pedirLogin.
+     persistKey (null): clave de localStorage donde el motor guarda el
+       snapshot de filtro (activeCat, mediaEnabled, mediaTypes, mediaVista,
+       ratingMin, mediaSoloMio) en cada cambio y lo restaura al arrancar.
+       null = no persistir nada. Solo PREFERENCIAS: nunca se borra al cerrar
+       sesion y la persistencia no depende de usuarioActual().
      mediaFilter (null): null/undefined usa filterMediaDefault (estricto,
        comunidad); false desactiva el filtro y usa TODA la media (index,
        que pinta toda la capa). La seccion multimedia del drawer usa
@@ -60,7 +109,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 (function () {
   'use strict';
 
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.1';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -623,7 +672,13 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       onToggleSave: null,
       mediaFilter: null,
       mediaEnabled: false,
+      // Declarada por contrato con los anfitriones que la pasan, pero INERTE:
+      // el acoplamiento Directorio -> Medios se sustituyo por toggleFilter.
       enableMediaOnAll: false,
+      // Alcance de la capa de medios al contenido propio y clave de
+      // localStorage donde se persiste el snapshot de filtro (null = no).
+      mediaSoloMio: false,
+      persistKey: null,
       clusterLinksNavigate: false,
       mediaPhotoIcon: null,
       cargarAlbumOficial: null,
@@ -650,8 +705,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
   }
 
   function createInstance(opts) {
+    // Las opciones se resuelven antes del estado porque mediaSoloMio nace
+    // leyendo su default declarado.
+    var OPT = mergeOptions(baseOptions(), opts || {});
     var st = {
-      options: mergeOptions(baseOptions(), opts || {}),
+      options: OPT,
       map: null,
       clusterLayer: null,
       mediaLayer: null,
@@ -661,17 +719,29 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       media: [],
       mediaEnabled: false,
       mediaTypes: { foto: false, video: false, audio: false },
+      // Alcance de la capa de medios al contenido propio. No se deriva de la
+      // sesion en el arranque: nace de la opcion y el gate lo aplica
+      // setMediaSoloMio al ACTIVARLO.
+      mediaSoloMio: !!OPT.mediaSoloMio,
       userPos: null,
       activeId: null,
       activeCat: 'all',
-      // Filtro de puntaje minimo (0-5, paso 0.5). 0 = sin filtro; por encima
+      // Filtro de puntaje minimo (0-5, paso 0.2). 0 = sin filtro; por encima
       // de 0 los destinos sin resenas (rating 0) quedan ocultos.
       ratingMin: 0,
+      // Ultimo umbral NO-CERO pedido: es la memoria que permite al toggle de
+      // un clic alternar entre 0 y "lo mismo que antes" en vez de tener que
+      // recorrer la escala. Solo se escribe con valores > 0.
+      ratingMinPrevio: 0,
       // Vista de la capa de media: 'sueltos' (foto/video/audio) o 'albumes'
       // (grupos destino_album / album_grupo). La vista 'albumes' se enciende
       // con data-media="albumes" en la raiz mediaControls.
       mediaVista: 'sueltos',
       filterCbs: [],
+      // Marca de que persistKey entrego una preferencia utilizable: el
+      // estado inicial de la capa lo respeta y no lo pisa con el default
+      // de la opcion mediaEnabled.
+      filtroRestaurado: false,
       initialized: false,
       drawerEl: null,
       contentEl: null,
@@ -687,6 +757,14 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     };
 
     /* ---------- accesos de sesion / red ---------- */
+
+    // La preferencia persistida se lee aqui, con el estado recien creado y
+    // ANTES de cualquier init: asi el anfitrion ya ve el filtro restaurado
+    // aunque todavia no haya mapa (carga lazy de index.html) y la capa nunca
+    // arranca en un estado que contradiga lo guardado. restoreFiltro no
+    // toca el DOM, ni la red, ni dispara callbacks, asi que es seguro
+    // consumirlo sin mapa montado.
+    restoreFiltro();
 
     function usuarioActual() {
       var o = st.options;
@@ -1247,6 +1325,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       renderList(st.activeCat);
     }
 
+    // Directorio y Medios son canales INDEPENDIENTES: elegir categoria ya no
+    // enciende la capa de medios (el acoplamiento que sustituya la API
+    // toggleFilter). Por eso fromUser se conserva en la firma pero no altera
+    // nada mas que el refresco de pines, lista y etiquetas.
     function filterPins(cat, fromUser) {
       st.activeCat = cat;
       if (!st.map) return;
@@ -1255,16 +1337,6 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       renderList(cat);
       syncFiltroLabels();
       fireFilterChange();
-      // Index-compat: al seleccionar "Todo" con clic de usuario se enciende
-      // la capa media (equivalente a index L2309-2318). Se delega en
-      // setMediaEnabled(true), que ademas rellena los tipos foto/video/audio
-      // cuando estan todos apagados (si no, renderMedia los descartaria por
-      // st.mediaTypes). No se aplica en los refresh internos para conservar
-      // el arranque apagado.
-      if (fromUser && cat === 'all' && st.options.enableMediaOnAll) {
-        if (!st.mediaEnabled || mediaTiposActivos() === 0) setMediaEnabled(true);
-        else renderMedia();
-      }
     }
 
     /* ---------- etiquetas de filtro, ratingMin y vista de albumes ---------- */
@@ -1289,6 +1361,8 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     }
 
     // 0 = "Todos" (sin filtro); por encima de 0, el valor con estrella ASCII.
+    // El umbral ya no es entero (paso 0.2): se imprime el decimal tal cual
+    // sale de la cuantizacion, sin truncarlo ni asumir enteros.
     function filtroPuntajeLabel() {
       if (!(st.ratingMin > 0)) return 'Todos';
       return st.ratingMin + '\u2605';
@@ -1334,6 +1408,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       }
     }
 
+    // Snapshot plano y Serializable: es a la vez lo que ven los oyentes de
+    // onFilterChange y lo que se guarda en localStorage con persistKey. No
+    // contiene funciones ni referencias al mapa.
     function filtroSnapshot() {
       return {
         activeCat: st.activeCat,
@@ -1342,12 +1419,31 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         mediaTypes: {
           foto: st.mediaTypes.foto, video: st.mediaTypes.video, audio: st.mediaTypes.audio
         },
-        mediaVista: st.mediaVista
+        mediaVista: st.mediaVista,
+        mediaSoloMio: st.mediaSoloMio
       };
+    }
+
+    // PERSISTENCIA DE PREFERENCIA (opt-in con persistKey). Es deliberadamente
+    // ciega a la sesion: son preferencias de visualizacion, no datos de
+    // usuario, asi que no se limpian al cerrar sesion ni se validan contra
+    // usuarioActual(). Sin clave no se toca localStorage en absoluto, y todo
+    // va en try/catch porque en modo privado puede lanzar (ADR-002/ADR-008:
+    // una preferencia no puede tumbar el mapa).
+    function persistFiltro() {
+      var key = st.options.persistKey;
+      if (typeof key !== 'string' || !key) return;
+      try {
+        if (typeof localStorage === 'undefined') return;
+        localStorage.setItem(key, JSON.stringify(filtroSnapshot()));
+      } catch (e) { log('persist setItem', e); }
     }
 
     // Hook para que el anfitrion reaccione a cualquier cambio de filtro.
     function fireFilterChange() {
+      // Se guarda ANTES del early return: la preferencia debe sobrevivir
+      // aunque la pagina no haya registrado ningun oyente.
+      persistFiltro();
       if (!st.filterCbs.length) return;
       var snap = filtroSnapshot();
       for (var i = 0; i < st.filterCbs.length; i++) {
@@ -1372,20 +1468,76 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       fireFilterChange();
     }
 
-    // Filtro de puntaje: 0-5, paso 0.5. Acepta number, string o el propio
-    // input del anfitrion (si trae .value, ademas dispara el filtrado).
+    // Filtro de puntaje: 0-5, paso 0.2 (DECIMAS). Acepta number, string o el
+    // propio input del anfitrion (si trae .value, ademas dispara el filtrado).
+    // Con paso 0.5 el anfitrion no podia ofrecer umbrales intermedios (3.3 se
+    // convertia en 3.5 y ocultaba destinos validos); Math.round(n*5)/5 mantiene
+    // el clamp 0..5 y cierra el error de coma flotante a una sola cifra.
     function setRatingMin(v) {
       if (v && typeof v === 'object' && 'value' in v) v = v.value;
       var n = parseFloat(v);
       if (isNaN(n) || !isFinite(n)) n = 0;
       if (n < 0) n = 0;
       if (n > 5) n = 5;
-      st.ratingMin = Math.round(n * 2) / 2;
+      st.ratingMin = Math.round(n * 5) / 5;
+      // Memoria del ultimo umbral real: 0 significa "sin filtro" y no debe
+      // borrar el valor al que el toggle quiere volver.
+      if (st.ratingMin > 0) st.ratingMinPrevio = st.ratingMin;
       applyFilters();
       return st.ratingMin;
     }
 
     function getRatingMin() { return st.ratingMin; }
+
+    // RESTAURACION de la preferencia (persistKey). ESTRICTAMENTE silenciosa:
+    // no escribe en el DOM, no muestra notas, no lanza red y no dispara
+    // onMediaVistaChange (por eso mediaVista se asigna en vez de pasar por
+    // setMediaVista: un fetch espurio en el arranque es un bug visible).
+    // Un JSON corrupto o con forma inesperada se ignora y se arranca con los
+    // defaults: una preferencia nunca puede impedir abrir el mapa.
+    function restoreFiltro() {
+      var key = st.options.persistKey;
+      if (typeof key !== 'string' || !key) return false;
+      var raw = null;
+      try {
+        if (typeof localStorage === 'undefined') return false;
+        raw = localStorage.getItem(key);
+      } catch (e) { log('persist getItem', e); return false; }
+      if (!raw) return false;
+      var d = null;
+      try { d = JSON.parse(raw); } catch (e) { return false; }
+      if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+
+      if (typeof d.activeCat === 'string' && d.activeCat) st.activeCat = d.activeCat;
+      if (typeof d.mediaEnabled === 'boolean') st.mediaEnabled = d.mediaEnabled;
+      if (d.mediaTypes && typeof d.mediaTypes === 'object' && !Array.isArray(d.mediaTypes)) {
+        for (var k in d.mediaTypes) {
+          if (has(st.mediaTypes, k)) st.mediaTypes[k] = !!d.mediaTypes[k];
+        }
+      }
+      if (d.mediaVista === 'albumes' || d.mediaVista === 'sueltos') st.mediaVista = d.mediaVista;
+      var r = parseFloat(d.ratingMin);
+      if (!isNaN(r) && isFinite(r)) {
+        if (r < 0) r = 0;
+        if (r > 5) r = 5;
+        st.ratingMin = Math.round(r * 5) / 5;
+        if (st.ratingMin > 0) st.ratingMinPrevio = st.ratingMin;
+      }
+      // GATE DE SESION tambien al RESTAURAR, igual que al activar. "Solo mi
+      // media" sin sesion es un valor que el estado no puede sostener: el
+      // anfitrion consulta la capa publica (su uid es null), asi que restaurar
+      // el true dejaba el filtro mentirosamente encendido. Solo se descarta el
+      // valor, nunca la preferencia: la clave se conserva intacta y el
+      // anfitrion puede volver a encenderlo con setMediaSoloMio.
+      // AQUI NO SE AVISA con pedirLogin, a diferencia de setMediaSoloMio: el
+      // restore es silencioso por contrato (sin DOM, sin red, sin avisos ni
+      // callbacks) y un aviso al arrancar seria un bug visible; el aviso le
+      // corresponde al activate, que si es una accion de usuario. NO
+      // "simplificar" esto a una asignacion directa.
+      st.mediaSoloMio = (d.mediaSoloMio === true) && !!usuarioActual();
+      st.filtroRestaurado = true;
+      return true;
+    }
 
     // Vista de la capa de media: 'albumes' enciende la vista de albumes
     // (migracion de toggleVistaAlbumes de mymapa.js); cualquier otro valor la
@@ -1409,6 +1561,60 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     }
 
     function getMediaVista() { return st.mediaVista; }
+
+    // ALCANCE PROPIO de la capa de medios. El flag en si lo aplica el
+    // anfitrion (el motor no conoce la forma del item ni como se consulta el
+    // contenido del usuario), pero el gate de sesion vive aqui: pedir "mi
+    // media" sin sesion no tiene sentido y se avisa con pedirLogin en vez de
+    // dejar un toggle encendido que nadie puede satisfacer. Desactivar
+    // siempre funciona.
+    function setMediaSoloMio(v) {
+      var want = !!v;
+      if (want && !usuarioActual()) {
+        pedirLogin('Inicia sesion para ver solo tu media.');
+        return st.mediaSoloMio;
+      }
+      st.mediaSoloMio = want;
+      renderMedia();
+      syncFiltroLabels();
+      fireFilterChange();
+      return st.mediaSoloMio;
+    }
+
+    function getMediaSoloMio() { return st.mediaSoloMio; }
+
+    // TOGGLE DE UN CLIC por canal. Devuelve el snapshot para que el boton
+    // pueda pintar su propio estado sin una segunda llamada. Cada canal es
+    // independiente: por eso este metodo EXISTE y en su lugar esta el
+    // acoplamiento que hacia que elegir categoria encendiera los medios.
+    // Un canal desconocido no cambia nada y devuelve el snapshot; nunca lanza.
+    function toggleFilter(canal) {
+      if (canal === 'cat') {
+        var c = st.activeCat;
+        if (c && c !== 'all' && c !== 'off') filterPins('off', true);
+        else filterPins('all', true);
+      } else if (canal === 'media') {
+        // Al apagar NO se borran los tipos elegidos: reencender recupera
+        // exactamente la combinacion previa en vez de perderla.
+        setMediaEnabled(!st.mediaEnabled);
+      } else if (canal === 'rating') {
+        // Sin umbral previo no hay nada que recuperar, asi que el primer
+        // clic sobre 'rating' es un no-op en vez de inventarse un valor.
+        if (st.ratingMin > 0) setRatingMin(0);
+        else if (st.ratingMinPrevio > 0) setRatingMin(st.ratingMinPrevio);
+      } else {
+        return filtroSnapshot();
+      }
+      return filtroSnapshot();
+    }
+
+    // Estado on/off de un canal, para marcar el boton sin mutar nada.
+    function isFilterOn(canal) {
+      if (canal === 'cat') return !!(st.activeCat && st.activeCat !== 'all' && st.activeCat !== 'off');
+      if (canal === 'media') return !!st.mediaEnabled;
+      if (canal === 'rating') return st.ratingMin > 0;
+      return false;
+    }
 
     function showNote(msg) {
       if (!st.options.note || typeof document === 'undefined') return;
@@ -2138,7 +2344,9 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         activeId: st.activeId,
         activeCat: st.activeCat,
         ratingMin: st.ratingMin,
+        ratingMinPrevio: st.ratingMinPrevio,
         mediaVista: st.mediaVista,
+        mediaSoloMio: st.mediaSoloMio,
         visible: st.visible.slice(),
         map: st.map,
         clusterPx: st.options.clusterPx
@@ -2189,7 +2397,13 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         // APAGADA). Si arranca ENCENDIDA se rellenan los tipos, igual que
         // hace setMediaEnabled(true): sin esto renderMedia los descartaria
         // porque mediaTypes nacen en false.
-        st.mediaEnabled = !!o.mediaEnabled;
+        // Si la preferencia guardada se restauro antes (createInstance), el estado
+        // inicial de la capa lo respeta: el default de la opcion mediaEnabled
+        // NO puede pisar un 'true' ya guardado. La coherencia de tipos
+        // (foto/video/audio) la resuelve el relleno de abajo, igual que en
+        // setMediaEnabled(true), y mediaVista llega ya asignada desde
+        // restoreFiltro sin pasar por setMediaVista (nada de fetch espurio).
+        if (!st.filtroRestaurado) st.mediaEnabled = !!o.mediaEnabled;
         if (st.mediaEnabled && mediaTiposActivos() === 0) {
           st.mediaTypes.foto = true;
           st.mediaTypes.video = true;
@@ -2226,8 +2440,19 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       getRatingMin: getRatingMin,
       setMediaVista: setMediaVista,
       getMediaVista: getMediaVista,
+      setMediaSoloMio: setMediaSoloMio,
+      getMediaSoloMio: getMediaSoloMio,
+      toggleFilter: toggleFilter,
+      isFilterOn: isFilterOn,
       onFilterChange: onFilterChange,
       getMap: function () { return st.map; },
+      // filtroSnapshot() es parte del contrato v1.4.0 junto a getState():
+      // es el shape plano (y serializable) que ya reciben los oyentes de
+      // onFilterChange y lo que se guarda con persistKey. Se expone por la
+      // misma razon que getState: los anfitriones necesitan leer el estado de
+      // filtro sin depender de un callback. Es aditivo, no cambia el
+      // comportamiento de nada que ya existia.
+      filtroSnapshot: filtroSnapshot,
       getState: getState,
       openDrawer: openDrawer,
       closeDrawer: closeDrawer,
@@ -2263,6 +2488,21 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     getRatingMin: function () { return defaultInst().getRatingMin(); },
     setMediaVista: function (v) { return defaultInst().setMediaVista(v); },
     getMediaVista: function () { return defaultInst().getMediaVista(); },
+    setMediaSoloMio: function (v) { return defaultInst().setMediaSoloMio(v); },
+    getMediaSoloMio: function () { return defaultInst().getMediaSoloMio(); },
+    // getState() tambien vive en la facade por el mismo motivo que el resto de
+    // la API: los anfitriones (mymapa.js, index-api-connector.js) arman sus
+    // queries desde el estado del motor y antes tenian que leer por
+    // window.mcMapa, que NO existe igual en todos los anfitriones (en
+    // comunidad.html la instancia la crea mymapa.js, no el inline).
+    // Delega en la instancia con el MISMO patron del resto (defaultInst()) y
+    // no duplica la logica: getState() ya devuelve un objeto NUEVO con places,
+    // media, visible y mediaTypes por copia, asi que dos llamadas seguidas no
+    // comparten ninguna referencia mutable y el anfitrion puede mutar lo que
+    // reciba sin pisar el estado interno.
+    getState: function () { return defaultInst().getState(); },
+    toggleFilter: function (c) { return defaultInst().toggleFilter(c); },
+    isFilterOn: function (c) { return defaultInst().isFilterOn(c); },
     onFilterChange: function (cb) { return defaultInst().onFilterChange(cb); },
     getMap: function () { return defaultInst().getMap(); },
     openDrawer: function (p) { return defaultInst().openDrawer(p); },

@@ -58,14 +58,27 @@
   // mapa-cultural.js (window.MapaCultural). Reemplaza el Leaflet propio.
   var mc = null;
 
-  // Cache del fetch unico de multimedia_mapa (endpoint existente) y
-  // banderas de carga / interaccion del usuario con el toggle Media.
-  var MEDIA_CACHE = null;
+  // Cache del fetch unico de multimedia_mapa (endpoint existente) y bandera
+  // de carga. La VISTA de la capa y el alcance propio NO viven aqui: los lleva
+  // el motor compartido (window.MapaCultural), unica fuente de verdad y, con
+  // persistKey, persistidos. Solo se apunta de que VISTA se cargo la cache,
+  // porque la query de la vista de albumes es distinta y la cache de 'sueltos'
+  // no le sirve.
+  var MEDIA_CACHE = null;       // items ya cargados (null = hay que pedir)
+  var MEDIA_CACHE_VISTA = null; // vista ('sueltos'|'albumes') de esa cache
   var MEDIA_CARGANDO = false;
-  var MEDIA_USER_TOUCHED = false;
-  // Vista de la capa de media: 'sueltos' (fotos/videos/audio, actual) o
-  // 'albumes' (grupos: album_grupo propios y destino_album).
-  var MEDIA_VISTA = 'sueltos';
+  // Clave de preferencia PROPIA de este mapa: el home y comunidad son mapas de
+  // escalas distintas, asi que el filtro no debe pegarse entre los dos.
+  var PERSIST_KEY = 'mapa_filtros_comunidad_v1';
+  // Derivadas del MOTOR, no paralelas. MEDIA_TOCADO pasa a true cuando
+  // onFilterChange entrega un cambio de filtro que NO provoco este modulo
+  // (o sea, una eleccion del usuario o de la pagina) y desde ahi este modulo
+  // deja de forzar el encendido automatico de la capa. MEDIA_PROG marca el
+  // cambio en curso como propio y MEDIA_FIRMA guarda la ultima firma vista
+  // para no contar dos veces el mismo cambio.
+  var MEDIA_TOCADO = false;
+  var MEDIA_PROG = false;
+  var MEDIA_FIRMA = '';
 
   // Set de media guardada por el usuario con claves "fuente:item_id"
   // (contrato del backend: fuente album_foto|curada y media_id). Lo puebla
@@ -175,6 +188,51 @@
     return S.unificado;
   }
 
+  // Vista de la capa segun el MOTOR (unica fuente de verdad): 'sueltos'
+  // (fotos/videos/audio) o 'albumes' (grupos album_grupo / destino_album).
+  // Si el motor aun no esta listo se cae a su default, 'sueltos'.
+  function vistaMotor() {
+    var m = ensureMC();
+    if (m && typeof m.getMediaVista === 'function') {
+      try { return (m.getMediaVista() === 'albumes') ? 'albumes' : 'sueltos'; }
+      catch (e) { logWarn('getMediaVista', e); }
+    }
+    return 'sueltos';
+  }
+
+  // Firma de los campos de filtro que SYMPLEN en una decision de la capa.
+  // Sirve para no contar dos veces el mismo cambio en onFilterChange.
+  function firmaFiltro(s) {
+    if (!s) return '';
+    var t = s.mediaTypes || {};
+    return (s.mediaEnabled ? '1' : '0')
+      + (t.foto ? 'f' : '') + (t.video ? 'v' : '') + (t.audio ? 'a' : '')
+      + '|' + String(s.mediaVista || '')
+      + '|' + (s.mediaSoloMio ? 'm' : '');
+  }
+
+  // Marca el cambio como PROPIO mientras se ejecuta: el oyente de
+  // onFilterChange no lo cuenta como eleccion del usuario. El motor dispara
+  // los oyentes de forma sincrona dentro del metodo, asi que el flag cubre
+  // exactamente la llamada.
+  function propio(fn) {
+    MEDIA_PROG = true;
+    try { return fn(); } finally { MEDIA_PROG = false; }
+  }
+
+  // El motor restaura su preferencia (persistKey) en su propia creacion y lo
+  // hace EN SILENCIO: si hay algo guardado, esa es la decision del usuario y
+  // este modulo no enciende nada por encima.
+  function hayPreferenciaGuardada() {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      var raw = localStorage.getItem(PERSIST_KEY);
+      if (!raw) return false;
+      var d = JSON.parse(raw);
+      return !!(d && typeof d === 'object' && !Array.isArray(d));
+    } catch (e) { return false; }
+  }
+
   // Crea (una sola vez) la instancia del Mapa Cultural sobre el
   // contenedor de MyMap. list:null porque MyMap conserva su lista
   // textual; drawer:true porque el modulo crea su propio panel.
@@ -189,6 +247,9 @@
       list: null,
       drawer: true,
       apiBase: api(),
+      // Preferencia propia de este mapa: NO comparte clave con el home porque
+      // son mapas de escalas distintas (el filtro no debe pegarse entre ellos).
+      persistKey: PERSIST_KEY,
       mediaFilter: S.unificado ? false : filterMisMapa,
       // Barra de categorias que aporta comunidad.html. Se pasa el ELEMENTO
       // (no un string) para no depender del parseo de selector: el motor
@@ -200,16 +261,27 @@
       mediaControls: document.getElementById('mm-personal-media'),
       // Los items de medios del panel son .mf-item (NO .mf-btn, que es la
       // pildora de los botones libres): sin este selector el motor no los
-      // encuentra y la vista de albumes queda sin reflejar.
-      mediaBtnSelector: '.mf-item[data-media]',
+      // encuentra y la vista de albumes queda sin reflejar. El toggle que
+      // este modulo genera en modo clasico usa .mmx-mbtn.
+      mediaBtnSelector: '.mf-item[data-media],.mmx-mbtn[data-media]',
       // La barra completa: aqui viven la etiqueta y el <output> de
       // Puntaje, que no estan dentro de las raices de categorias ni medios.
       filterRoot: document.querySelector('#cpanel-mapa .mapa-filters'),
+      // Toda decision de filtro pasa por el motor. Lo que llega aqui y este
+      // modulo no provoco es eleccion del usuario (o de la pagina): desde ese
+      // momento la capa deja de encenderse por defecto. Derivado del motor,
+      // no un flag paralelo escrito a mano.
+      onFilterChange: function (snap) {
+        var firma = firmaFiltro(snap);
+        if (firma === MEDIA_FIRMA) return;
+        MEDIA_FIRMA = firma;
+        if (!MEDIA_PROG) MEDIA_TOCADO = true;
+      },
       // El motor decide la vista (item [data-media="albumes"]) y aqui cambia
       // la query del fetch de esta pagina, que sigue siendo su unico
-      // escritor de la capa multimedia.
-      onMediaVistaChange: function (vista) {
-        MEDIA_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
+      // escritor de la capa multimedia. No hay estado paralelo de vista: se
+      // lee del motor (vistaMotor) cuando hace falta armar la query.
+      onMediaVistaChange: function () {
         MEDIA_CACHE = null;
         sincronizarToggleMedia();
         recargarMedia();
@@ -354,10 +426,15 @@
   }
 
   // Aplica la lista final al motor y libera el flag de carga en un solo
-  // sitio (exito, fallo propio o ausencia de sesion).
-  function aplicarMedia(lista) {
+  // sitio (exito, fallo propio o ausencia de sesion). La vista se anota AQUI,
+  // con los datos que se guardan, no al pedir: si una respuesta llega
+  // tarde (el usuario cambio de vista durante el vuelo) la cache sigue
+  // describiendo lo que contiene y por eso no se sirve como si fuera de la
+  // vista pedida.
+  function aplicarMedia(lista, vista) {
     MEDIA_CARGANDO = false;
     MEDIA_CACHE = lista || [];
+    MEDIA_CACHE_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
     var mm = ensureMC();
     if (mm) mm.setMedia(MEDIA_CACHE);
     medirMediaActiva();
@@ -365,13 +442,17 @@
   }
 
   // Capa de media: fetch publico + (con sesion) fetch scope=mio firmado
-  // con Authorization: Bearer. scope=mio exige sesion (400
-  // SESION_REQUERIDA sin header) y el uuid del dueno se deriva de ella.
-  // Si el fetch propio falla, se conserva la lista publica sin romper.
-  function recargarMedia() {
+  // con Authorization: Bearer. La VISTA sale del MOTOR, no de un flag propio:
+  // sin ella la query nunca lleva &vista=albumes y las filas album_grupo no
+  // llegan nunca. La cache es por vista (la de 'sueltos' no sirve para
+  // 'albumes'). scope=mio exige sesion (400 SESION_REQUERIDA sin header) y el
+  // uuid del dueno se deriva de ella. Si el fetch propio falla, se conserva
+  // la lista publica sin romper.
+  function recargarMedia(forzar) {
     var m = ensureMC();
     if (!m) return;
-    if (MEDIA_CACHE) {
+    var vista = vistaMotor();
+    if (MEDIA_CACHE && !forzar && MEDIA_CACHE_VISTA === vista) {
       m.setMedia(MEDIA_CACHE);
       medirMediaActiva();
       if (typeof m.refresh === 'function') m.refresh();
@@ -379,23 +460,23 @@
     }
     if (MEDIA_CARGANDO) return;
     MEDIA_CARGANDO = true;
-    var vistaQ = (MEDIA_VISTA === 'albumes') ? '&vista=albumes' : '';
+    var vistaQ = (vista === 'albumes') ? '&vista=albumes' : '';
     fetch(api() + '/api/interacciones?tipo=multimedia_mapa' + vistaQ)
       .then(leerJson)
       .then(function (d) {
         var publicos = (d && d.ok && d.data) ? d.data : [];
         var u = usuario();
-        if (!u || !u.id) { aplicarMedia(publicos); return null; }
+        if (!u || !u.id) { aplicarMedia(publicos, vista); return null; }
         return fetch(api() + '/api/interacciones?tipo=multimedia_mapa&scope=mio' + vistaQ,
           { headers: authHeaders() })
           .then(leerJson)
           .then(function (p) {
             var propios = (p && p.ok && p.data) ? p.data : [];
-            aplicarMedia(mergeMediaPropia(publicos, propios));
+            aplicarMedia(mergeMediaPropia(publicos, propios), vista);
           })
           .catch(function (e) {
             logWarn('media propia', e);
-            aplicarMedia(publicos);
+            aplicarMedia(publicos, vista);
           });
       })
       .catch(function (e) {
@@ -405,7 +486,9 @@
   }
 
   // Enciende el maestro por defecto si el mapa activo tiene media y el
-  // usuario aun no ha tocado el toggle en esta sesion.
+  // usuario no ha elegido todavia: no hay decision tomada en esta sesion
+  // (MEDIA_TOCADO, derivada de onFilterChange) ni preferencia guardada por el
+  // motor (persistKey). Nunca se pisa una eleccion ya hecha.
   function medirMediaActiva() {
     var m = ensureMC();
     if (!m) return;
@@ -434,8 +517,8 @@
     // sin importar el estado previo: setMediaEnabled(true) rellena los
     // tipos (foto/video/audio) si estan en cero y vuelve a renderizar,
     // de modo que la capa no queda "marcada pero vacia".
-    if (hay && !MEDIA_USER_TOUCHED) {
-      m.setMediaEnabled(true);
+    if (hay && !MEDIA_TOCADO && !hayPreferenciaGuardada()) {
+      propio(function () { m.setMediaEnabled(true); });
       if (typeof m.refresh === 'function') m.refresh();
     }
     sincronizarToggleMedia();
@@ -446,7 +529,9 @@
     // desplegable que trae la pagina (#mm-personal-media), y los engancha
     // el motor con mediaControls. No se crea el toggle duplicado .mmx-media
     // para no tener dos superficies de estado sobre la misma capa. En modo
-    // clasico se conserva tal cual.
+    // clasico se conserva tal cual: la caja que se genera aqui es la MISMA
+    // que el motor recibe en mediaControls, asi que el motor es el unico que
+    // engancha sus clicks y el unico dueno del estado.
     if (S.unificado) return;
     var existente = document.getElementById('mm-personal-media');
     if (existente) { existente.style.display = ''; return; }
@@ -456,54 +541,50 @@
     var box = document.createElement('div');
     box.id = 'mm-personal-media';
     box.className = 'mmx-media';
+    // CONTRATO UNICO de markup: el item de VISTA de albumes es
+    // data-media="albumes" (el mismo que usa el HTML de index.html y de
+    // comunidad.html y el que engancha el motor). Los demas items son tipos
+    // de media y usan data-media. El motor (mediaControls) es quien engancha
+    // los clicks de esta caja, asi que aqui no se pone un segundo manejador
+    // (dos manejadores alternarian el mismo filtro dos veces y se cancelarian).
     box.innerHTML = '<span class="mmx-media-lbl">Media</span>'
       + '<button type="button" class="mmx-mbtn" data-media="all">Todo</button>'
       + '<button type="button" class="mmx-mbtn" data-media="foto">Fotos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="video">Videos</button>'
       + '<button type="button" class="mmx-mbtn" data-media="audio">Audios</button>'
-      + '<button type="button" class="mmx-mbtn" data-vista="albumes">&#x1F4DA; &#xC1;lbumes</button>';
+      + '<button type="button" class="mmx-mbtn" data-media="albumes">&#x1F4DA; &#xC1;lbumes</button>';
     if (head && head.parentNode === card) card.insertBefore(box, head.nextSibling);
     else card.appendChild(box);
-    box.addEventListener('click', function (e) {
-      var bv = (e.target && e.target.closest) ? e.target.closest('[data-vista]') : null;
-      if (bv) {
-        MEDIA_VISTA = (MEDIA_VISTA === 'albumes') ? 'sueltos' : 'albumes';
-        MEDIA_CACHE = null;
-        sincronizarToggleMedia();
-        recargarMedia();
-        return;
-      }
-      var b = (e.target && e.target.closest) ? e.target.closest('[data-media]') : null;
-      if (!b) return;
-      var m = ensureMC();
-      if (!m) return;
-      MEDIA_USER_TOUCHED = true;
-      var tipo = b.getAttribute('data-media');
-      if (tipo === 'all') {
-        m.setMediaEnabled(!m.getState().mediaEnabled);
-      } else {
-        var activos = m.getState().mediaTypes;
-        var nt = {};
-        nt[tipo] = !activos[tipo];
-        m.setMediaTypes(nt);
-      }
-      sincronizarToggleMedia();
-    });
   }
 
+  // Pinta el estado de los controles de media LEYENDOLO DEL MOTOR. El item
+  // data-media="albumes" es una VISTA, no un tipo: se enciende con el estado
+  // de vista del motor (mediaVista) y nunca con mediaTypes['albumes'], que no
+  // existe y por eso lo apagaba siempre. Se acepta tambien data-vista (el
+  // atributo que el markup genero antes) para no romper si aparece en algun
+  // lado, pero el valor de los dos es el mismo estado del motor.
   function sincronizarToggleMedia() {
     var box = document.getElementById('mm-personal-media');
     if (!box) return;
     var m = ensureMC();
-    var estado = m ? m.getState() : { mediaEnabled: false, mediaTypes: {} };
-    var btns = box.querySelectorAll('[data-media]');
+    var estado = (m && typeof m.getState === 'function')
+      ? m.getState()
+      : { mediaEnabled: false, mediaTypes: {}, mediaVista: 'sueltos' };
+    var esAlbumes = (estado.mediaVista === 'albumes');
+    var btns = box.querySelectorAll('[data-media],[data-vista]');
     for (var i = 0; i < btns.length; i++) {
-      var t = btns[i].getAttribute('data-media');
-      var on = (t === 'all') ? !!estado.mediaEnabled : !!(estado.mediaTypes && estado.mediaTypes[t]);
-      btns[i].classList.toggle('on', on);
+      var b = btns[i];
+      if (!b.classList) continue;
+      var t = b.getAttribute('data-media');
+      if (t != null) {
+        if (t === 'all') b.classList.toggle('on', !!estado.mediaEnabled);
+        else if (t === 'albumes') b.classList.toggle('on', esAlbumes);
+        else b.classList.toggle('on', !!(estado.mediaTypes && estado.mediaTypes[t]));
+        continue;
+      }
+      var v = b.getAttribute('data-vista');
+      if (v != null) b.classList.toggle('on', esAlbumes && v === 'albumes');
     }
-    var bv = box.querySelector('[data-vista]');
-    if (bv) bv.classList.toggle('on', MEDIA_VISTA === 'albumes');
   }
 
   /* ---------- render: pills / editbar / lista ---------- */
@@ -927,7 +1008,8 @@
   function setMediaTipos(obj) {
     var m = ensureMC();
     if (!m || !obj) return false;
-    MEDIA_USER_TOUCHED = true;
+    // Decision de la pagina/usuario: no se marca como propia, asi que el
+    // oyente de onFilterChange la cuenta y la capa deja de encenderse sola.
     m.setMediaTypes(obj);
     sincronizarToggleMedia();
     return true;
@@ -935,25 +1017,19 @@
 
   // Vista de la capa: 'sueltos' (media individual) o 'albumes' (grupos).
   // El estado lo lleva el motor compartido (item [data-media="albumes"] del
-  // panel); aqui solo se delega y el reload de la capa llega solo por
-  // onMediaVistaChange. La query del endpoint existente sigue cambiando
-  // aqui, que es lo unico que este modulo hace con la vista.
+  // panel); aqui solo se delega. El reload de la capa llega por
+  // onMediaVistaChange, que vuelve a armar la query desde el motor.
   function setMediaVista(vista) {
     var m = ensureMC();
-    if (m && typeof m.setMediaVista === 'function') return m.setMediaVista(vista);
-    MEDIA_VISTA = (vista === 'albumes') ? 'albumes' : 'sueltos';
-    MEDIA_CACHE = null;
-    recargarMedia();
-    return MEDIA_VISTA;
+    if (!m || typeof m.setMediaVista !== 'function') return null;
+    return m.setMediaVista(vista === 'albumes' ? 'albumes' : 'sueltos');
   }
 
   // Relanza la carga de la capa multimedia (misma fuente que usa el mapa).
+  // La cache es por vista: si la vista del motor cambio, no se sirve la de
+  // 'sueltos' y se vuelve a pedir (&vista=albumes).
   function refrescarMedia() {
     if (!ensureMC()) return false;
-    if (MEDIA_VISTA === 'albumes' && MEDIA_CACHE) {
-      // La vista de albumes cambia la query: no se sirve la cache de sueltos.
-      MEDIA_CACHE = null;
-    }
     recargarMedia();
     return true;
   }

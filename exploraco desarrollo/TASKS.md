@@ -4608,5 +4608,52 @@ Con ese dato, la salida deja de ser `NO_CONFIRMADO` y pasa a `OK` o a `FALLIDO_4
 
 **Escudo GOLD:** verde en los ficheros de codigo tocados. **8/8 serverless INTACTAS** (ADR-010). **`db/migrations/051_*.sql` NO se toco** (checksum `3715407f...` verificado antes y despues del pase documental).
 
+## TSK-196 - Reparación del filtro del mapa cultural (paso 0.2, doble zona, desacoplamiento Directorio/Medios y persistencia por página) - 2026-10-07 - CERRADO (sin ADR nuevo)
+
+**Estado: CERRADO / VERDE.** Tanda de reparación del filtro del mapa cultural. `mapa-cultural.js` queda como **fuente única de verdad del estado de filtros**. **Sin ADR nuevo** (es corrección de comportamiento y contrato interno, no arquitectura nueva); **`DECISIONS.md` NO se tocó**.
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **Motor `mapa-cultural.js` v1.4.0 -> v1.4.1** (`VERSION = '1.4.1'`, `:112`):
+   - **Slider de puntuación a paso 0.2:** `setRatingMin` cuantiza con `Math.round(n*5)/5`; los sliders del HTML pasaron de `step="0.5"` a `step="0.2"`.
+   - **Contrato público ampliado:** `toggleFilter(canal)` -> snapshot (`'cat'`|`'media'`|`'rating'`), `isFilterOn(canal)` -> bool, `setMediaSoloMio(v)`/`getMediaSoloMio()`, `persistKey`, y `getState()` ampliado con `mediaSoloMio` y `ratingMinPrevio`.
+   - **`ratingMinPrevio`:** memoriza el umbral para el on/off del filtro de puntuación (`setRatingMin` guarda el previo cuando `ratingMin > 0`).
+   - **Desacoplamiento Directorio -> Medios:** activar la categoría "Todos" de Directorio ya **NO** enciende la capa de Medios. La opción `enableMediaOnAll` (causa del acoplamiento) queda **inerte** y su uso se eliminó de `index.html`; la dependencia se sustituyó por la API explícita `toggleFilter('media')`.
+   - **Persistencia por página:** una clave de `localStorage` por host - `mapa_filtros_home_v1` (`index.html`, `:2403`) y `mapa_filtros_comunidad_v1` (`mymapa.js`, `:72`). Restauración **silenciosa** (sin avisos, sin DOM, sin fetch).
+   - **Gate de sesión en la restauración:** `restoreFiltro` exige `usuarioActual()` antes de restaurar `mediaSoloMio` (`st.mediaSoloMio = (d.mediaSoloMio === true) && !!usuarioActual();`). Cierra un fallo real: al cerrar sesión y recargar, el filtro aparecía "encendido" consultando la capa pública (filtro mal representado). `mediaSoloMio` es el **ÚNICO** campo del snapshot con dependencia de sesión; los otros 5 (`activeCat`, `mediaEnabled`, `mediaTypes`, `mediaVista`, `ratingMin`) son preferencias de visualización.
+
+2. **Hosts JS sin estado paralelo:** `mymapa.js` e `index-api-connector.js` leen del motor vía `window.MapaCultural.getState()` (`mymapa.js:571`); los globals `MEDIA_VISTA`/`MEDIA_USER_TOUCHED`/`MAPA_MEDIA_VISTA`/`MAPA_MEDIA_SOLO_MIO` se eliminaron como fuente de decisión.
+
+3. **HTML `index.html` y `comunidad.html`: UX de doble zona por barra de filtros.** Cada desplegable se partió en dos botones hermanos: cuerpo (`.mf-drop-main`, `data-mf-switch="cat|media|rating"`, `aria-pressed`) que alterna el filtro **sin** abrir el menú, y caret (`.mf-drop-caret`, `data-mf-toggle`, `aria-expanded`/`aria-controls`) que abre el menú. Permite encender/apagar un filtro con un clic directo.
+
+4. **Bug de la vista de álbumes (D2):** el filtro de álbumes no mostraba álbumes. Dos causas: en `index.html` faltaba la recarga del fetch con `&vista=albumes`; en `comunidad.html` `sincronizarToggleMedia` leía `mediaTypes['albumes']` (undefined) y apagaba el botón. Ambas corregidas. **`api/interacciones.js` NO se tocó** (ya soportaba `&vista=albumes`).
+
+5. **"Solo mío" en comunidad:** era un ítem decorativo (el mapa de comunidad ya pide `scope=mio` incondicional con sesión; es un mapa personal por diseño). Se **retiró** de `comunidad.html` (ítem, CSS, funciones y ramas de clic). En `index.html` permanece como ítem del panel de Medios con `data-media-scope="mio"` (`index.html:1139`, `:2567`).
+
+6. **Coherencia UI:** el slider no reflejaba el umbral restaurado -> nuevas `mfSyncRatingInput`/`mmSyncRatingInput`, con origen en el motor, con guard de foco. Y `mfSyncLabels`/`mmSyncLabels` con snapshot parcial borraban las etiquetas de Directorio/Medios al mover el slider -> ahora pasan `getState()` completo.
+
+7. **Cache-bust:** `mapa-cultural.js?v=15` (`index.html:974`, `comunidad.html:925`) por el bump 1.4.1; `mymapa.js?v=8` (`comunidad.html:927`); `index-api-connector.js?v=4` (`index.html:4447`).
+
+### Verificación (medida en el turno de cierre)
+
+| Prueba | Resultado |
+|---|---|
+| `node scripts/smoke_mapa_cultural.js` | **248 PASS / 0 FAIL, exit 0** |
+| Escudo GOLD `node --check` (3 JS + bloques inline de ambos HTML) | PASS |
+| ASCII-safety sobre el diff | **0 bytes no-ASCII** |
+| Balance `<div>` (`express_check`) | index **367/367**, comunidad **458/458** |
+| Pares de botones del bloque `.mapa-filters` (`data-mf-switch` + `data-mf-toggle`) | **17** en ambas |
+| `node scripts/ejecucion/verificar-capa-gratis.js` | **RESULTADO: OK** - capa gratuita intacta, 6/6 checks |
+
+**Coste de la tanda:** 13 sesiones, **$0.0219**; `cache_read` = **95.35%**.
+
+### Archivos tocados
+
+`mapa-cultural.js` · `mymapa.js` · `index-api-connector.js` · `index.html` · `comunidad.html` · `scripts/smoke_mapa_cultural.js`. Todos en **working tree, sin commit** al cierre de este pase documental. **`api/*`: 8/8 INTACTO** (ADR-010); sin migraciones; sin endpoint nuevo.
+
+### Residuo conocido (BAJO, no bloqueante)
+
+En `index-api-connector.js` quedan los shims `window.setMapaMediaSoloMio` (`:502`) y `window.setMapaMediaVista` (`:529`) sin ningún `onclick` que los invoque: **código muerto inofensivo**, se conservan a propósito.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].

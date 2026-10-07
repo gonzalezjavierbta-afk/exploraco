@@ -170,14 +170,14 @@
   // Reemplazar array sin romper la referencia (mutacion in-place).
   // IMPORTANTE: recibe el ARRAY REAL por referencia (ej. PL, no
   // 'PL' como string). PL/MAPA_PLACES/AGENDA_EVENTS estan declarados
-  // con `const` en index.html -- las declaraciones `const`/`let` de
+  // con const/let en index.html -- las declaraciones const/let de
   // nivel superior en un <script> NO se exponen como propiedades de
-  // `window` (solo `var` y las funciones si lo hacen). Buscar por
-  // `window[name]` con esos tres arrays SIEMPRE fallaba el chequeo
-  // `typeof window[name] !== 'undefined'` y terminaba creando una
-  // propiedad `window.PL`/`window.MAPA_PLACES`/`window.AGENDA_EVENTS`
+  // window (solo var y las funciones si lo hacen). Buscar por
+  // window[name] con esos tres arrays SIEMPRE fallaba el chequeo
+  // typeof window[name] !== 'undefined' y terminaba creando una
+  // propiedad window.PL / window.MAPA_PLACES / window.AGENDA_EVENTS
   // nueva y desconectada -- que nada mas en la pagina lee -- mientras
-  // el `const PL`/`const MAPA_PLACES`/`const AGENDA_EVENTS` real (el
+  // el const PL / const MAPA_PLACES / const AGENDA_EVENTS real (el
   // que usan renderDest()/refreshMapaMarkers()/renderAgenda()) se
   // quedaba vacio para siempre. Por eso el log mostraba "PL:95" pero
   // la grilla y el mapa nunca se poblaban (ver BUGS_HISTORICOS.md
@@ -273,14 +273,14 @@
     if (typeof MAPA_PLACES !== 'undefined') replArr(MAPA_PLACES, nuevoMapa);
 
     // 3b. MAPA_MEDIA[] - multimedia del mapa cultural del endpoint
-    //     GET /api/interacciones?tipo=multimedia_mapa
-    //     Por defecto la capa es PUBLICA: se llama SIN usuario_id (trae
-    //     albumes + destinos con fotos + albumes curados de destino
-    //     origen='destino_album'). Solo cuando el toggle "Solo mio" esta
-    //     activo (window.MAPA_MEDIA_SOLO_MIO === true) se envia
-    //     scope=mio&usuario_id=<id> para restringir la capa al contenido
-    //     propio (albumes propios + destinos con interaccion).
-    cargarMapaMedia();
+    //     GET /api/interacciones?tipo=multimedia_mapa. La CONSULTA de esta
+    //     capa se hace en el paso 8, DESPUES de que exista el motor: la query
+    //     se arma con el estado real del filtro (vista 'sueltos'|'albumes' y
+    //     alcance propio) que el motor restaura de localStorage, y para leerlo
+    //     el motor tiene que estar creado. Por defecto la capa es PUBLICA: se
+    //     llama SIN usuario_id (trae albumes + destinos con fotos + albumes
+    //     curados de destino origen='destino_album'). Solo con el alcance
+    //     propio activo Y sesion se envia scope=mio&usuario_id=<id>.
 
     // 4. DEST_FEATURED_IDS[]
     var featIds = nuevoPL
@@ -347,28 +347,86 @@
     // su contenedor antes de pintar, asi que repetir la llamada no
     // duplica items.
     if (typeof renderMyMap === 'function') renderMyMap();
+
+    // 8. CAPA MULTIMEDIA (MAPA_MEDIA[]): se consulta con el motor ya
+    //    inicializado (initMapaSection, mas arriba), para que la query salga
+    //    del estado real que el motor restauro de localStorage: el PRIMER
+    //    fetch ya lleva la vista y el alcance correctos, una sola descarga y
+    //    sin parpadeo de capa vacia.
+    cargarMapaMedia();
   }
 
   // -- MAPA_MEDIA: capa de multimedia del mapa cultural -----------------
-  // Estado del toggle "Solo mio". Default: capa publica (false).
-  if (typeof window.MAPA_MEDIA_SOLO_MIO === 'undefined') {
-    window.MAPA_MEDIA_SOLO_MIO = false;
-  }
-  // Vista de la capa: 'sueltos' (fotos/videos/audio individuales, actual)
-  // o 'albumes' (grupos de album: album_grupo de usuarios y destino_album).
-  if (typeof window.MAPA_MEDIA_VISTA === 'undefined') {
-    window.MAPA_MEDIA_VISTA = 'sueltos';
+  // FUENTE UNICA DEL FILTRO: el motor (mapa-cultural.js). Los antiguos
+  // globals MAPA_MEDIA_VISTA y MAPA_MEDIA_SOLO_MIO se eliminaron: eran una
+  // segunda fuente de verdad paralela al motor y por eso la vista de albumes
+  // (y el alcance propio) nunca llegaban a la query de este fetch.
+  var MEDIA_FIRMA = null;  // firma de la query ya pedida
+  var MEDIA_PIDIDA = false;// esa query esta en vuelo
+  var MEDIA_LISTO = false; // la ultima query respondio bien
+  var MEDIA_TOKEN = 0;     // descarta respuestas obsoletas
+  var MEDIA_SUB = null;    // instancia del motor ya escuchada
+
+  // Instancia del motor que creo index.html con MapaCultural.init: es la
+  // MISMA que devuelve la facade estatica, asi que se puede leer por
+  // cualquiera de las dos sin crear un segundo mapa.
+  function motorMedia() {
+    return window.mcMapa || window.MapaCultural || null;
   }
 
-  function cargarMapaMedia() {
-    var soloMio = (window.MAPA_MEDIA_SOLO_MIO === true);
+  // Estado real del filtro de la capa: 'sueltos'|'albumes' y alcance propio.
+  // Si el motor no esta disponible se cae a los defaults suyos (capa publica,
+  // media suelta), que es lo que se piden sin filtro.
+  function filtroMedia() {
+    var f = { vista: 'sueltos', soloMio: false };
+    var MC = motorMedia();
+    if (!MC) return f;
+    try {
+      if (typeof MC.getMediaVista === 'function' && MC.getMediaVista() === 'albumes') f.vista = 'albumes';
+      if (typeof MC.getMediaSoloMio === 'function' && MC.getMediaSoloMio() === true) f.soloMio = true;
+    } catch (e) { console.warn('[index-api] filtro multimedia:', e.message); }
+    return f;
+  }
+
+  // Recarga de la capa cuando el filtro del motor cambia. Idempotente: una
+  // sola suscripcion por instancia. Solo vuelve a pedir si cambia la FIRMA de
+  // la query (vista o alcance): mover el puntaje o la categoria no vuelve a
+  // descargar la misma capa.
+  function suscribirFiltroMedia() {
+    var MC = motorMedia();
+    if (!MC || typeof MC.onFilterChange !== 'function') return;
+    if (MEDIA_SUB === MC) return;
+    MEDIA_SUB = MC;
+    try {
+      MC.onFilterChange(function () { cargarMapaMedia(); });
+    } catch (e) {
+      console.warn('[index-api] onFilterChange:', e.message);
+      MEDIA_SUB = null;
+    }
+  }
+
+  // Carga (o recarga) la capa de multimedia. La query se arma SIEMPRE con el
+  // estado del motor: &vista=albumes para la vista de grupos y
+  // &scope=mio&usuario_id= para el alcance propio. forzar=true ignora la
+  // deduplicacion por firma (recarga manual).
+  function cargarMapaMedia(forzar) {
+    suscribirFiltroMedia();
+    var f = filtroMedia();
     var uid = (window.ExploraCO && window.ExploraCO.usuario && window.ExploraCO.usuario.id)
-      ? String(window.ExploraCO.usuario.id) : null;
+      ? String(window.ExploraCO.usuario.id) : '';
+    var soloMio = (f.soloMio && !!uid);
+    // Firma de lo que pide esta consulta: si no cambio, la capa ya esta.
+    var firma = f.vista + '|' + (soloMio ? ('mio:' + uid) : 'publico');
+    if (!forzar && firma === MEDIA_FIRMA && (MEDIA_LISTO || MEDIA_PIDIDA)) return;
+    MEDIA_FIRMA = firma;
+    MEDIA_PIDIDA = true;
+    MEDIA_LISTO = false;
+    var tok = ++MEDIA_TOKEN;
     var mediaUrl = '/api/interacciones?tipo=multimedia_mapa';
     // Vista de albumes: pide las filas agrupadas (album_grupo/destino_album).
-    if (window.MAPA_MEDIA_VISTA === 'albumes') mediaUrl += '&vista=albumes';
-    // Solo con el toggle activo Y sesion se restringe el scope.
-    if (soloMio && uid) {
+    if (f.vista === 'albumes') mediaUrl += '&vista=albumes';
+    // Solo con el alcance propio activo Y sesion se restringe el scope.
+    if (soloMio) {
       mediaUrl += '&scope=mio&usuario_id=' + encodeURIComponent(uid);
     }
     mediaUrl += '&_t=' + Date.now();
@@ -380,10 +438,14 @@
     fetch(mediaUrl, { headers: authHeaders })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (tok !== MEDIA_TOKEN) return; // respuesta obsoleta: otra vista ya pidio
+        MEDIA_PIDIDA = false;
         if (!d.ok || !d.data) {
+          // Sin exito la capa sigue SIN_LISTO: el siguiente ciclo la reintenta.
           console.warn('[index-api] Sin multimedia de mapa:', d.error || 'vacio');
           return;
         }
+        MEDIA_LISTO = true;
         var nuevoMedia = d.data.filter(function (m) {
           return m.media_url
             && m.lat != null && m.lat !== 0
@@ -394,9 +456,13 @@
         // antes de que llegue la respuesta, la capa queda vacia hasta la
         // siguiente interaccion (auditoria QA -> hallazgo M1).
         if (typeof refreshMapaMarkers === 'function') { try { refreshMapaMarkers(); } catch (e) { console.warn('[index-api] refresh tras multimedia:', e.message); } }
-        console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length + (soloMio ? ' (solo mio)' : ' (publico)'));
+        console.log('[index-api] MAPA_MEDIA:' + nuevoMedia.length
+          + ' | vista:' + f.vista + (soloMio ? ' (solo mio)' : ' (publico)'));
       })
-      .catch(function (e) { console.warn('[index-api] Error multimedia mapa:', e.message); });
+      .catch(function (e) {
+        if (tok === MEDIA_TOKEN) { MEDIA_PIDIDA = false; MEDIA_LISTO = false; }
+        console.warn('[index-api] Error multimedia mapa:', e.message);
+      });
   }
 
   // -- ALBUM OFICIAL (TSK-111 Fase 4): fotos curadas de un destino ------
@@ -431,26 +497,54 @@
   // Expuesto al index.html (inline): el IIFE oculta el resto del modulo.
   window.cargarAlbumOficialDestino = cargarAlbumOficialDestino;
 
-  // Toggle "Solo mio": actualiza el flag global y recarga la capa.
+  // Toggle "Solo mio": delega el estado en el MOTOR (que ademas aplica el
+  // gate de sesion) y recarga la capa solo si el valor EFECTIVO cambio.
   window.setMapaMediaSoloMio = function (valor) {
-    window.MAPA_MEDIA_SOLO_MIO = (valor === true || valor === 'true');
-    cargarMapaMedia();
-    return window.MAPA_MEDIA_SOLO_MIO;
+    var MC = motorMedia();
+    var want = (valor === true || valor === 'true');
+    var antes = filtroMedia().soloMio;
+    var eff = want;
+    if (MC && typeof MC.setMediaSoloMio === 'function') {
+      try { eff = MC.setMediaSoloMio(want) === true; }
+      catch (e) { console.warn('[index-api] setMediaSoloMio:', e.message); eff = antes; }
+    }
+    // El onclick del markup alterna la clase del boton por su cuenta: se
+    // repinta con el valor EFECTIVO, para que sin sesion no quede encendido
+    // un filtro que nadie puede satisfacer. Se cubren las dos formas del
+    // markup: id="mm-solo-mio" (pildora libre) y el item del panel
+    // [data-media-scope="mio"].
+    var btn = document.getElementById('mm-solo-mio')
+      || document.querySelector('[data-media-scope="mio"]');
+    if (btn && btn.classList) {
+      btn.classList.toggle('on', eff);
+      if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', eff ? 'true' : 'false');
+    }
+    if (eff !== antes) cargarMapaMedia();
+    return eff;
   };
 
-  // Conmutador de vista Sueltos/Albumes: invierte el estado global,
-  // sincroniza el boton y recarga la capa con el nuevo parametro.
+  // Conmutador de vista Sueltos/Albumes: lee la vista del MOTOR y la invierte
+  // (o aplica la explicita) via setMediaVista; despues recarga la capa. No
+  // invierte ningun global propio: el boton se pinta con el valor efectivo.
   window.setMapaMediaVista = function (btn, vista) {
-    var nueva = (window.MAPA_MEDIA_VISTA === 'albumes') ? 'sueltos' : 'albumes';
-    window.MAPA_MEDIA_VISTA = nueva;
-    if (btn && btn.classList) btn.classList.toggle('on', nueva === 'albumes');
+    var MC = motorMedia();
+    var pedida = (typeof vista === 'string' && vista)
+      ? (vista === 'albumes' ? 'albumes' : 'sueltos') : null;
+    var nueva = pedida || (filtroMedia().vista === 'albumes' ? 'sueltos' : 'albumes');
+    var eff = nueva;
+    if (MC && typeof MC.setMediaVista === 'function') {
+      try { eff = MC.setMediaVista(nueva); }
+      catch (e) { console.warn('[index-api] setMediaVista:', e.message); }
+    }
+    if (btn && btn.classList) btn.classList.toggle('on', eff === 'albumes');
+    // El motor ya aviso por onFilterChange; la firma evita el doble fetch.
     cargarMapaMedia();
-    return window.MAPA_MEDIA_VISTA;
+    return eff;
   };
 
-  // Recarga manual de la capa con el scope actual.
+  // Recarga manual de la capa con el estado actual del motor.
   window.refreshMapaMedia = function () {
-    cargarMapaMedia();
+    cargarMapaMedia(true);
   };
 
   function loadAndRender() {

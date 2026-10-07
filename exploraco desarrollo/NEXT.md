@@ -174,6 +174,7 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - [Historico (sesiones del 2026-09-15 y anteriores; TSK-104 y previas) - ver NEXT_ARCHIVO.md](NEXT_ARCHIVO.md)
 
 ## Completado reciente
+- Cierre documental **2026-10-07** (TSK-196, pase documental único R2; 6 ficheros en working tree sin commit): **reparado el filtro del mapa cultural.** `mapa-cultural.js` **v1.4.0 -> v1.4.1** pasa a ser la **fuente única de verdad del estado de filtros** (slider a **paso 0.2**, contrato `toggleFilter`/`isFilterOn`/`setMediaSoloMio`/`getState()` ampliado, `ratingMinPrevio`); **desacople Directorio -> Medios** (`enableMediaOnAll` queda **inerte**); **persistencia silenciosa por página** (`mapa_filtros_home_v1` / `mapa_filtros_comunidad_v1`) con **gate de sesión** en la restauración de `mediaSoloMio`; UX de **doble zona** (cuerpo alterna filtro / caret abre menú) en `index.html` y `comunidad.html`; corregido el **bug de la vista de álbumes** (D2) y la coherencia del slider/etiquetas. Verificación: `smoke_mapa_cultural` **248 PASS / 0 FAIL**; GOLD verde; divs **367/367** y **458/458**; `verificar-capa-gratis` **OK**. Coste **$0.0219** (13 sesiones, `cache_read` 95.35%). **Sin ADR nuevo.** **Residuo BAJO:** 2 shims muertos en `index-api-connector.js`. Detalle en `TASKS.md` TSK-196.
 - Cierre documental **2026-10-04** (TSK-177 + **ADR-077 ENMIENDA 1**, commit **`8315fb0`** en `main`; pase documental unico R2 al cierre y **despues** del push, por indicacion del operador): **la galeria de perfil sale del cuerpo de la pagina, Misiones pasa a desplegable por ESTADO y "Gestion del Museo" recupera la subida de material.**
 - **Decision:** `DECISIONS.md` **ADR-077 ENMIENDA 1** -- Misiones es la **5.a superficie** de `pfGruposRender()` y el eje pasa a ser por ESTADO; **NO es un ADR nuevo**. Reintroduce, con `id` distinto y por peticion del operador, la capacidad que TSK-160 habia retirado.
 - **Verificacion (ADR-006):** `npm test` EXIT 0 (22 pasos, 0 FAIL); `smoke_grupos_perfil.js` 73 -> 109 (109/109 PASS); `smoke_042` 30 -> 45; divs 526/526; residuos = 0; ASCII 0 bytes > 127; **8/8 endpoints INTACTO**, sin endpoint nuevo ni migracion.
@@ -238,6 +239,30 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 - ADR-017: Albums Fotograficos (2026-09-09) - Sistema completo de albumes, gamificacion y mapa audiovisual
 
 ## Que se estaba haciendo
+
+### SESIÓN 2026-10-07 (pase documental único R2, 7ª tanda) - Reparación del filtro del mapa cultural (TSK-196)
+
+**Qué se estaba haciendo:** reparar el filtro del mapa cultural. El detalle de ejecución (alcance, archivos y verificación medida) vive **una sola vez** en `TASKS.md` **TSK-196**; aquí solo hay estado y siguientes pasos. **Sin ADR nuevo** y **`DECISIONS.md` sin tocar** (corrección de comportamiento y contrato interno, no arquitectura nueva).
+
+**Lo que quedó cerrado (ADR-006, contra el archivo real):**
+- **`mapa-cultural.js` v1.4.1** (`VERSION = '1.4.1'`, `:112`) = **fuente única de verdad del estado de filtros**: slider a **paso 0.2** (`setRatingMin` con `Math.round(n*5)/5`), contrato público `toggleFilter(canal)`/`isFilterOn(canal)`/`setMediaSoloMio`/`getMediaSoloMio`/`persistKey`, `getState()` ampliado (`mediaSoloMio`, `ratingMinPrevio`).
+- **Desacople Directorio -> Medios:** `enableMediaOnAll` queda **inerte** y su uso se eliminó de `index.html`; la dependencia es ahora `toggleFilter('media')`.
+- **Persistencia por página + gate de sesión:** `mapa_filtros_home_v1` (`index.html:2403`) y `mapa_filtros_comunidad_v1` (`mymapa.js:72`), restauración **silenciosa**; `restoreFiltro` exige `usuarioActual()` para `mediaSoloMio` (cierra el filtro "encendido" tras cerrar sesión). Los otros 5 campos son solo preferencias de visualización.
+- **Hosts sin estado paralelo:** `mymapa.js`/`index-api-connector.js` leen `window.MapaCultural.getState()`; globals `MEDIA_VISTA`/`MEDIA_USER_TOUCHED`/`MAPA_MEDIA_VISTA`/`MAPA_MEDIA_SOLO_MIO` retirados como fuente de decisión.
+- **Doble zona en `index.html` y `comunidad.html`:** cuerpo (`.mf-drop-main`) alterna el filtro sin abrir menú / caret (`.mf-drop-caret`) abre el menú.
+- **Bug D2 de álbumes** corregido (faltaba `&vista=albumes` en index; `sincronizarToggleMedia` leía undefined en comunidad); **`api/interacciones.js` NO se tocó** (ya soportaba `&vista=albumes`). **"Solo mío" retirado de `comunidad.html`** (era decorativo; el mapa ya pide `scope=mio` con sesión).
+
+**Verificación (ADR-006):** `smoke_mapa_cultural` **248 PASS / 0 FAIL** (exit 0); Escudo GOLD verde (3 JS + bloques inline, ASCII 0 bytes no-ASCII); divs **index 367/367 / comunidad 458/458** (`express_check`); pares de botones `.mapa-filters` **17/17**; `verificar-capa-gratis` **RESULTADO: OK** (6/6). Coste **$0.0219** (13 sesiones, `cache_read` 95.35%). **`api/*`: 8/8 INTACTO**; sin migraciones; sin endpoint nuevo.
+
+**Qué sigue:**
+1. **(a) Commit + push de los 6 ficheros** (`mapa-cultural.js`, `mymapa.js`, `index-api-connector.js`, `index.html`, `comunidad.html`, `scripts/smoke_mapa_cultural.js`) y de los docs de este pase. Es el único pendiente obligatorio; el cache-bust `?v=15/?v=8/?v=4` ya está escrito y solo llega a producción con el push.
+2. **(b) QA visual en navegador del mapa cultural** (index y comunidad): doble zona de filtros, apertura del menú por caret, encender/apagar con un clic, restauración silenciosa al recargar y el **gate de sesión de `mediaSoloMio`** (cerrar sesión y recargar no debe dejar la capa pública con el filtro "encendido").
+3. **(c) Residuo BAJO (no bloqueante, no requiere acción):** los shims `window.setMapaMediaSoloMio` (`index-api-connector.js:502`) y `window.setMapaMediaVista` (`:529`) quedan sin `onclick`; son **código muerto inofensivo conservado a propósito**.
+
+**Riesgos activos:**
+- **El gate de sesión es la única frontera** de `mediaSoloMio`: es un estado de UI, no una autorización; la autorización real de `scope=mio` sigue en el backend. Un cambio futuro que relaje `usuarioActual()` en la restauración reviviría el filtro mal representado.
+- **La persistencia es por página y por host:** `mapa_filtros_home_v1` y `mapa_filtros_comunidad_v1` no se comparten; un cambio de clave sin migrar el valor anterior descarta preferencias previas (aceptado: son preferencias de visualización).
+- **El backend no forma parte de esta tanda:** la vista de álbumes se corrigió en el cliente; si `&vista=albumes` cambiara de contrato, el bug D2 volvería.
 
 ### SESION 2026-10-06 (pase documental unico R2, 6a tanda) - Cierre de ADR-089: calificacion de media de like binario a 1 a 5 estrellas
 
