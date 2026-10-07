@@ -922,7 +922,7 @@ a.mmx-item:hover{border-color:rgba(255,74,0,.4);color:var(--gold)}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
-<script src="mapa-cultural.js?v=15"></script>
+<script src="mapa-cultural.js?v=16"></script>
 <script src="media-actions.js"></script>
 <script src="mymapa.js?v=8"></script>
 <script src="mercado.js?v=2"></script>
@@ -2467,11 +2467,13 @@ function mmSyncLabels(snap) {
     try { dir = window.MapaCultural.mdCatLabel(cat) || cat; } catch (e) { dir = cat; }
   }
   var med = 'Todos';
-  if (s.mediaVista === 'albumes') med = '\u00c1lbumes';
-  else if (s.mediaEnabled) {
-    var t = s.mediaTypes || {};
-    var n = (t.foto ? 1 : 0) + (t.video ? 1 : 0) + (t.audio ? 1 : 0);
-    med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
+  if (s.mediaEnabled) {
+    if (s.mediaVista === 'albumes') med = '\u00c1lbumes';
+    else {
+      var t = s.mediaTypes || {};
+      var n = (t.foto ? 1 : 0) + (t.video ? 1 : 0) + (t.audio ? 1 : 0);
+      med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
+    }
   }
   var punt = mmRatingText(s.ratingMin || 0);
   mmWriteText('#cpanel-mapa [data-mf-label="dir"]', dir);

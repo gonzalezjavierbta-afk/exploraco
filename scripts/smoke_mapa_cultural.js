@@ -36,9 +36,12 @@ check('API: window.MapaCultural expuesto', !!MC);
 // mediaSoloMio se aplico tambien al RESTAURAR la preferencia persistida
 // (antes solo se comprobaba al activar), asi que la restauracion sin
 // sesion cae a false en vez de dejar el filtro mentirosamente encendido.
-// Si el motor vuelve a 1.4.0 o sube de 1.4.1, el smoke debe detectar la
+// 1.4.2 es un bump FUNCIONAL de patch: el toggle rapido de Directorio pasa a
+// ser un ver/no-ver real (syncCatBtns reconcilia los chips con activeCat) y
+// en Medios etiqueta/chips se derivan de mediaEnabled.
+// Si el motor vuelve a 1.4.1 o sube de 1.4.2, el smoke debe detectar la
 // regresion.
-check('API: version 1.4.1', MC && MC.version === '1.4.1');
+check('API: version 1.4.2', MC && MC.version === '1.4.2');
 ['create', 'init', 'refresh', 'setPlaces', 'setMedia', 'setMediaEnabled',
  'setMediaTypes', 'getMap', 'getState', 'openDrawer', 'closeDrawer', 'normalizePlace',
  'normalizeMedia', 'esc', 'starHtml', 'photoPlaceholderHTML', 'haversineKm']
@@ -705,12 +708,12 @@ check('independencia: toggleFilter(cat) NO toca mediaTypes',
   && indTrasCat.mediaTypes.video === indBase.mediaTypes.video
   && indTrasCat.mediaTypes.audio === indBase.mediaTypes.audio);
 check('independencia: toggleFilter(cat) NO toca mediaVista', indTrasCat.mediaVista === indBase.mediaVista);
-indInst.toggleFilter('cat'); // off -> all
-check('independencia: toggleFilter(cat) de vuelta rehabilita la categoria', indInst.getState().activeCat === 'all');
-// Ahora al reves: el canal de medios gira con la categoria activa. Se limpia
-// 'on' del boton porque el primer clic lo dejo marcado y el handler alterna.
-btnIndHostal.classList.remove('on');
-clickInd({ target: btnIndHostal });
+indInst.toggleFilter('cat'); // off -> memoria: restaura la categoria previa
+check('independencia: toggleFilter(cat) de vuelta restaura la categoria previa (hostal)', indInst.getState().activeCat === 'hostal');
+// La categoria concreta (hostal) ya quedo activa al restaurar la memoria del
+// toggle, asi que NO se re-pulsa el chip: con el nuevo bindCategories un clic
+// sobre el chip ya activo lo apagaria. indCatFija es el punto de partida de la
+// prueba de independencia del canal de medios.
 var indCatFija = indInst.getState();
 var snapMedia = indInst.toggleFilter('media');
 check('independencia: toggleFilter(media) apaga la capa', snapMedia.mediaEnabled === false);
@@ -1249,5 +1252,169 @@ check('instancia: filtroSnapshot() coincide con getState()',
   && JSON.stringify(fsnap.mediaTypes) === JSON.stringify(facadeSt.mediaTypes));
 check('instancia: filtroSnapshot() es serializable (se puede persistir)',
   typeof JSON.stringify(fsnap) === 'string' && JSON.parse(JSON.stringify(fsnap)).mediaSoloMio === fsnap.mediaSoloMio);
+
+// =====================================================================
+// (28) DIRECTORIO como ver/no-ver + syncCatBtns (fuente unica del DOM)
+// El bug: el item del panel decidia por el DOM (.on) mientras el toggle
+// rapido iba al motor, y NADA reconciliaba los chips [data-cat] con
+// activeCat. Ahora activeCat es la unica fuente: toggleFilter('cat') oculta
+// si algo se ve y restaura la categoria previa (activeCatPrevio) si esta
+// oculto; syncCatBtns marca exactamente el chip activo (o ninguno en 'off').
+// =====================================================================
+function mkCatChip(cat) {
+  var el = mkEl('');
+  el.getAttribute = function (n) { return (n === 'data-cat') ? cat : null; };
+  el.closest = function (s) { return (s === '[data-cat]') ? this : null; };
+  return el;
+}
+function countOn(chips) {
+  var n = 0;
+  for (var ci = 0; ci < chips.length; ci++) { if (chips[ci].classList.contains('on')) n++; }
+  return n;
+}
+groups.length = 0;
+var chipAllD = mkCatChip('all');
+var chipHostalD = mkCatChip('hostal');
+var catsRootD = mkEl('mc-cats-ver');
+catsRootD._on = [chipAllD, chipHostalD];
+var dInst = MC2.create({ map: 'mm-personal-map', categories: catsRootD, mediaFilter: false });
+dInst.setPlaces([
+  MC.normalizePlace({ slug: 'vv-hostal', cat: 'hostal', lat: 4.60, lng: -74.10, rating: 4 }),
+  MC.normalizePlace({ slug: 'vv-comida', cat: 'comida', lat: 4.70, lng: -74.20, rating: 4 })
+]);
+check('ver/no-ver dir: init marca SOLO el chip all y activeCat all',
+  dInst.getState().activeCat === 'all' && chipAllD.classList.contains('on') && !chipHostalD.classList.contains('on'));
+check('ver/no-ver dir: isFilterOn(cat) true con all', dInst.isFilterOn('cat') === true);
+check('ver/no-ver dir: antes del toggle los 2 pines visibles', dInst.getState().visible.length === 2);
+var dOff = dInst.toggleFilter('cat');
+check('ver/no-ver dir: toggle desde all -> off y oculta los pines',
+  dOff.activeCat === 'off' && dInst.getState().visible.length === 0);
+check('ver/no-ver dir: isFilterOn(cat) false con off y ningun chip encendido',
+  dInst.isFilterOn('cat') === false && countOn([chipAllD, chipHostalD]) === 0);
+var dAll = dInst.toggleFilter('cat');
+check('ver/no-ver dir: segundo toggle recupera all (no hay previa distinta)',
+  dAll.activeCat === 'all' && dInst.getState().visible.length === 2
+  && chipAllD.classList.contains('on') && countOn([chipAllD, chipHostalD]) === 1);
+// Desde un slug concreto el toggle oculta y luego recupera ESE slug.
+var clickD2 = catsRootD.__handlers.click;
+clickD2({ target: chipHostalD });
+check('ver/no-ver dir: clic en chip hostal -> hostal, chip coherente y 1 pin visible',
+  dInst.getState().activeCat === 'hostal' && chipHostalD.classList.contains('on')
+  && !chipAllD.classList.contains('on') && dInst.isFilterOn('cat') === true
+  && dInst.getState().visible.length === 1);
+var dOffSlug = dInst.toggleFilter('cat');
+check('ver/no-ver dir: toggle desde slug -> off (sin chip stale)',
+  dOffSlug.activeCat === 'off' && countOn([chipAllD, chipHostalD]) === 0);
+var dPrevSlug = dInst.toggleFilter('cat');
+check('ver/no-ver dir: segundo toggle recupera ESE slug (hostal)',
+  dPrevSlug.activeCat === 'hostal' && dInst.getState().activeCatPrevio === 'hostal'
+  && chipHostalD.classList.contains('on') && countOn([chipAllD, chipHostalD]) === 1);
+// bindCategories decide desde activeCat (no desde el .on del DOM).
+var clickD3 = catsRootD.__handlers.click;
+clickD3({ target: chipAllD }); // hostal activo -> all
+check('ver/no-ver dir: clic en chip all cambia de hostal a all', dInst.getState().activeCat === 'all');
+clickD3({ target: chipAllD }); // all activo -> off
+check('ver/no-ver dir: clic en el chip ACTIVO -> off', dInst.getState().activeCat === 'off');
+clickD3({ target: chipAllD }); // off -> all
+check('ver/no-ver dir: clic en chip all estando off -> all',
+  dInst.getState().activeCat === 'all' && chipAllD.classList.contains('on'));
+// syncCatBtns tras RESTAURAR la preferencia persistida: el init reconcilia
+// los chips con la categoria guardada (sin tocar el HTML por eso).
+var lsCat = mkLS();
+lsCat.setItem('mc_smoke_cat_restore', JSON.stringify({
+  activeCat: 'hostal', ratingMin: 0, mediaEnabled: false,
+  mediaTypes: { foto: false, video: false, audio: false },
+  mediaVista: 'sueltos', mediaSoloMio: false
+}));
+var MC5 = mkSand3(lsCat);
+groups.length = 0;
+var chipAllR = mkCatChip('all');
+var chipHostalR = mkCatChip('hostal');
+var catsRootR = mkEl('mc-cats-restore');
+catsRootR._on = [chipAllR, chipHostalR];
+var restCat = MC5.create({ map: 'mm-personal-map', categories: catsRootR, mediaFilter: false, persistKey: 'mc_smoke_cat_restore' });
+check('ver/no-ver dir: la restauracion persistida deja el chip coherente (hostal on)',
+  restCat.getState().activeCat === 'hostal' && chipHostalR.classList.contains('on') && !chipAllR.classList.contains('on'));
+
+// =====================================================================
+// (29) MEDIOS: una sola fuente (mediaEnabled) y MISMO estado en los dos
+// caminos ("Todos" del panel y toggleFilter('media')). Con la capa oculta
+// ningun chip/etiqueta se ve encendido; "Todos" NO reescribe mediaVista.
+// =====================================================================
+function mkMediaChip(tipo) {
+  var el = mkEl('');
+  el.getAttribute = function (n) { return (n === 'data-media') ? tipo : null; };
+  el.closest = function (s) { return (s === '[data-media]') ? this : null; };
+  return el;
+}
+function mkMediaRootM(chips) {
+  var r = mkEl('mc-media');
+  r._on = chips;
+  r.querySelector = function (sel) {
+    if (sel === '[data-media="all"]') {
+      for (var mi = 0; mi < chips.length; mi++) {
+        if (chips[mi].getAttribute('data-media') === 'all') return chips[mi];
+      }
+    }
+    return null;
+  };
+  r.querySelectorAll = function (sel) {
+    if (sel === '.mf-btn[data-media]') return chips;
+    return [];
+  };
+  r.contains = function () { return true; };
+  return r;
+}
+function mkMediaLabelRoot() {
+  var lbl = { textContent: '' };
+  return { _lbl: lbl, querySelectorAll: function (sel) { return (sel === '[data-mf-label="med"]') ? [lbl] : []; } };
+}
+function mkMediaChips() {
+  return [mkMediaChip('all'), mkMediaChip('foto'), mkMediaChip('video'), mkMediaChip('audio'), mkMediaChip('albumes')];
+}
+function chipsAllOff(chips) { return countOn(chips) === 0; }
+
+// Camino A: API del motor. Camino B: clic en el item all del panel.
+groups.length = 0;
+var chipsA = mkMediaChips();
+var rootA = mkMediaRootM(chipsA);
+var lblA = mkMediaLabelRoot();
+var pathA = MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaEnabled: true, mediaControls: rootA, filterRoot: lblA });
+pathA.setMediaVista('albumes');
+var aAntes = pathA.getState();
+check('medios: punto de partida comun (capa on, vista albumes)', aAntes.mediaEnabled === true && aAntes.mediaVista === 'albumes');
+pathA.toggleFilter('media');
+var aOff = pathA.getState();
+check('medios via API: toggleFilter(media) apaga y conserva la vista',
+  aOff.mediaEnabled === false && aOff.mediaVista === 'albumes');
+check('medios via API: con la capa oculta NINGUN chip encendido', chipsAllOff(chipsA));
+check('medios via API: con la capa oculta la etiqueta NO dice Albumes', lblA._lbl.textContent === 'Todos');
+
+groups.length = 0;
+var chipsB = mkMediaChips();
+var rootB = mkMediaRootM(chipsB);
+var lblB = mkMediaLabelRoot();
+var pathB = MC2.create({ map: 'mm-personal-map', mediaFilter: false, mediaEnabled: true, mediaControls: rootB, filterRoot: lblB });
+pathB.setMediaVista('albumes');
+var clickM = rootB.__handlers.click;
+clickM({ target: chipsB[0] }); // data-media="all"
+var bOff = pathB.getState();
+check('medios via panel: el item all deja EXACTAMENTE el mismo estado que la API',
+  bOff.mediaEnabled === aOff.mediaEnabled && bOff.mediaVista === aOff.mediaVista
+  && bOff.mediaEnabled === false && bOff.mediaVista === 'albumes');
+check('medios via panel: con la capa oculta NINGUN chip encendido', chipsAllOff(chipsB));
+check('medios via panel: la etiqueta NO dice Albumes', lblB._lbl.textContent === 'Todos');
+// Reencender por ambos caminos vuelve al MISMO estado (capa on, vista albumes).
+pathA.toggleFilter('media');
+clickM({ target: chipsB[0] });
+var aOn = pathA.getState();
+var bOn = pathB.getState();
+check('medios: reencender por API y por panel da el mismo estado',
+  aOn.mediaEnabled === true && bOn.mediaEnabled === true
+  && aOn.mediaVista === bOn.mediaVista && aOn.mediaVista === 'albumes');
+check('medios: con la capa on la etiqueta de ambos caminos dice Albumes',
+  lblA._lbl.textContent === '\u00c1lbumes' && lblB._lbl.textContent === '\u00c1lbumes');
+check('medios: isFilterOn(media) sigue a mediaEnabled',
+  pathA.isFilterOn('media') === true && pathB.isFilterOn('media') === true);
 
 console.log(process.exitCode ? 'SMOKE MAPA CULTURAL: FAIL' : 'SMOKE MAPA CULTURAL: OK');

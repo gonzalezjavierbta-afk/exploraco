@@ -971,7 +971,7 @@ textarea.wrinp{resize:vertical;min-height:88px}
 <script src="agenda-shared.js"></script>
 <script src="mapa-tiles.js?v=1"></script>
 <script src="media-embed.js?v=1"></script>
-<script src="mapa-cultural.js?v=15"></script>
+<script src="mapa-cultural.js?v=16"></script>
 <script src="mapa-fullscreen.js?v=1"></script>
 <style>
 /* ec-welcome overlay: onboarding de primer acceso. Prefijo wl- exclusivo. */
@@ -2618,11 +2618,13 @@ function mfSyncLabels(snap) {
     try { dir = window.MapaCultural.mdCatLabel(cat) || cat; } catch(e){ dir = cat; }
   }
   var med = 'Todos';
-  if(s.mediaVista === 'albumes') med = '\u00c1lbumes';
-  else if(s.mediaEnabled) {
-    var t = s.mediaTypes || {};
-    var n = (t.foto?1:0) + (t.video?1:0) + (t.audio?1:0);
-    med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
+  if(s.mediaEnabled) {
+    if(s.mediaVista === 'albumes') med = '\u00c1lbumes';
+    else {
+      var t = s.mediaTypes || {};
+      var n = (t.foto?1:0) + (t.video?1:0) + (t.audio?1:0);
+      med = (n !== 1) ? 'Todo' : (t.foto ? 'Fotos' : (t.video ? 'Videos' : 'Audios'));
+    }
   }
   // El alcance propio se refleja en la etiqueta "med" (escape \u00ed).
   if(s.mediaSoloMio) med = (med === 'Todos') ? 'S\u00f3lo m\u00edo' : ('M\u00edo \u00b7 ' + med);

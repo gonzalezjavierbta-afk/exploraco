@@ -1,6 +1,6 @@
 /* =============================================================
    mapa-cultural.js -- Motor compartido del Mapa Cultural LATAWEL
-   Version 1.4.1. IIFE, ASCII-safe estricto, sin backticks.
+   Version 1.4.2. IIFE, ASCII-safe estricto, sin backticks.
 
    Porta a un modulo reusable el motor del mapa de index.html
    (pines, clustering por proximidad, capa multimedia y drawer
@@ -27,6 +27,28 @@ create(opts)  -> instancia (multi-instancia por pagina)
         onFilterChange, getState, getMap, openDrawer,
         closeDrawer, geolocate, resetColombia, fitBounds }
 
+   1.4.2
+     - Fix de coherencia del toggle rapido de Directorio: pasa a ser un
+       ver/no-ver REAL. Habia DOS fuentes de verdad -- activeCat en el motor
+       y el marcado de los chips en el DOM -- que nunca se sincronizaban:
+       apagar el filtro no limpiaba el chip y "Todos" podia quedar resaltado
+       sin que el motor lo supiera (panel stale). Ahora el estado manda: el
+       DOM refleja al motor, nunca lo decide.
+     - toggleFilter('cat') mapea 'all'->'off' (ocultar) y 'off'->restaura la
+       categoria previa guardada en activeCatPrevio (memoria de runtime,
+       homologa de ratingMinPrevio; NO se persiste). isFilterOn('cat') sigue
+       siendo activeCat !== 'off', asi que 'all' cuenta como "viendo".
+     - Nueva syncCatBtns(): reconcilia los chips [data-cat] con activeCat en
+       CADA cambio y limpia el panel stale; bindCategories ahora decide desde
+       el estado del motor y no desde el marcado del DOM.
+     - En Medios, el toggle rapido y el item "Todos" quedan alineados: la
+       etiqueta y los chips se derivan de mediaEnabled (filtroMediaLabel /
+       syncMediaBtns), de modo que lo mostrado es lo que el motor tiene
+       encendido y no una copia desincronizada del marcado.
+     - El shape de persistencia NO cambia: filtroSnapshot sigue con sus 6
+       llaves y activeCatPrevio solo se expone en getState(), nunca en
+       localStorage.
+
    1.4.1
      - Bump FUNCIONAL de patch: el gate de sesion de mediaSoloMio se aplica
        tambien al RESTAURAR la preferencia persistida, no solo al activarla.
@@ -51,6 +73,12 @@ create(opts)  -> instancia (multi-instancia por pagina)
      - toggleFilter(canal) / isFilterOn(canal): alternancia de un clic sobre
        los tres canales de filtro ('cat', 'media', 'rating') sin depender del
        marcado del anfitrion. Ambos devuelven el estado de filtro vigente.
+     - Directorio como ver/no-ver: activeCat vive en {'off','all','<slug>'};
+       'off' = no se ve nada e isFilterOn('cat') = (activeCat !== 'off'), asi
+       que 'all' cuenta como "viendo". toggleFilter('cat') oculta si algo se
+       ve y, si esta oculto, restaura la categoria previa (memoria
+       activeCatPrevio, homologa de ratingMinPrevio). Los chips [data-cat] se
+       reconcilian en CADA cambio con syncCatBtns(): el DOM no decide estado.
      - Desacopla Directorio de Medios: filterPins ya no enciende la capa
        media al elegir 'all'. La opcion enableMediaOnAll se conserva
        declarada por contrato, pero su efecto pasa a ser exactamente cero.
@@ -109,7 +137,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 (function () {
   'use strict';
 
-  var VERSION = '1.4.1';
+  var VERSION = '1.4.2';
 
   // Paleta de pines por categoria (paridad con index-api-connector.js
   // y refreshMapaMarkers de index.html).
@@ -726,6 +754,10 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       userPos: null,
       activeId: null,
       activeCat: 'all',
+      // Memoria de la ultima categoria VISIBLE (distinta de 'off'): es lo que
+      // permite al toggle de un clic alternar 'off' <-> categoria anterior en
+      // vez de caer siempre a 'all'. Homologo de ratingMinPrevio.
+      activeCatPrevio: 'all',
       // Filtro de puntaje minimo (0-5, paso 0.2). 0 = sin filtro; por encima
       // de 0 los destinos sin resenas (rating 0) quedan ocultos.
       ratingMin: 0,
@@ -1331,6 +1363,12 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     // nada mas que el refresco de pines, lista y etiquetas.
     function filterPins(cat, fromUser) {
       st.activeCat = cat;
+      // La memoria solo se escribe con categorias VISIBLES: pasar a 'off' no
+      // puede borrar la categoria a la que el toggle quiere volver.
+      if (cat !== 'off') st.activeCatPrevio = cat;
+      // El DOM no decide estado: los chips [data-cat] se reconcilian con
+      // activeCat en CADA cambio (toggle rapido, clic de chip, restauracion).
+      syncCatBtns();
       if (!st.map) return;
       st.visible = placesForCat(cat);
       recluster();
@@ -1352,8 +1390,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     }
 
     function filtroMediaLabel() {
-      if (st.mediaVista === 'albumes') return '\u00c1lbumes';
+      // La etiqueta deriva PRIMERO de mediaEnabled: con la capa apagada no
+      // puede decir 'Albumes' aunque mediaVista siga en 'albumes' (esa vista
+      // se conserva para reencender, pero con la capa OCULTA no se muestra).
       if (!st.mediaEnabled) return 'Todos';
+      if (st.mediaVista === 'albumes') return '\u00c1lbumes';
       if (mediaTiposActivos() !== 1) return 'Todo';
       if (st.mediaTypes.foto) return 'Fotos';
       if (st.mediaTypes.video) return 'Videos';
@@ -1508,7 +1549,12 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       try { d = JSON.parse(raw); } catch (e) { return false; }
       if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
 
-      if (typeof d.activeCat === 'string' && d.activeCat) st.activeCat = d.activeCat;
+      if (typeof d.activeCat === 'string' && d.activeCat) {
+        st.activeCat = d.activeCat;
+        // La memoria solo recuerda categorias VISIBLES: una preferencia
+        // guardada en 'off' no debe dejar sin restaurar la categoria anterior.
+        if (d.activeCat !== 'off') st.activeCatPrevio = d.activeCat;
+      }
       if (typeof d.mediaEnabled === 'boolean') st.mediaEnabled = d.mediaEnabled;
       if (d.mediaTypes && typeof d.mediaTypes === 'object' && !Array.isArray(d.mediaTypes)) {
         for (var k in d.mediaTypes) {
@@ -1590,9 +1636,11 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
     // Un canal desconocido no cambia nada y devuelve el snapshot; nunca lanza.
     function toggleFilter(canal) {
       if (canal === 'cat') {
-        var c = st.activeCat;
-        if (c && c !== 'all' && c !== 'off') filterPins('off', true);
-        else filterPins('all', true);
+        // Ver/no-ver rapido: si algo se ve (categoria o 'all') -> ocultar; si
+        // esta oculto -> restaurar la categoria previa (memoria activeCatPrevio;
+        // sin previa, 'all'). 'all' cuenta como "viendo".
+        if (st.activeCat !== 'off') filterPins('off', true);
+        else filterPins(st.activeCatPrevio || 'all', true);
       } else if (canal === 'media') {
         // Al apagar NO se borran los tipos elegidos: reencender recupera
         // exactamente la combinacion previa en vez de perderla.
@@ -1610,7 +1658,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
     // Estado on/off de un canal, para marcar el boton sin mutar nada.
     function isFilterOn(canal) {
-      if (canal === 'cat') return !!(st.activeCat && st.activeCat !== 'all' && st.activeCat !== 'off');
+      if (canal === 'cat') return st.activeCat !== 'off';
       if (canal === 'media') return !!st.mediaEnabled;
       if (canal === 'rating') return st.ratingMin > 0;
       return false;
@@ -1771,17 +1819,22 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
 
     function syncMediaBtns() {
       if (!st.mediaRoot) return;
+      // Registro visual VERAZ: con mediaEnabled=false NINGUN chip queda
+      // encendido (ni de tipo ni de vista); con true, los chips de tipo y de
+      // vista derivan de mediaTypes/mediaVista. Todo sale de la unica fuente
+      // de verdad (mediaEnabled).
+      var base = !!st.mediaEnabled;
       var btnAll = st.mediaRoot.querySelector('[data-media="all"]');
-      if (btnAll) btnAll.classList.toggle('on', st.mediaEnabled);
+      if (btnAll) btnAll.classList.toggle('on', base);
       var btns = mediaBtns();
       for (var i = 0; i < btns.length; i++) {
         var t = btns[i].getAttribute('data-media');
         if (t === 'all') continue;
         if (t === 'albumes') {
-          btns[i].classList.toggle('on', st.mediaVista === 'albumes');
+          btns[i].classList.toggle('on', base && st.mediaVista === 'albumes');
           continue;
         }
-        btns[i].classList.toggle('on', st.mediaTypes[t] === true);
+        btns[i].classList.toggle('on', base && st.mediaTypes[t] === true);
       }
     }
 
@@ -1850,10 +1903,17 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
           setMediaVista(st.mediaVista === 'albumes' ? 'sueltos' : 'albumes');
           return;
         }
-        setMediaVista('sueltos');
         if (tipo === 'all') {
+          // DECISION: el item "Todos" de medios toca SOLO la capa global
+          // (mediaEnabled) y NO reescribe mediaVista. toggleFilter('media') y
+          // este item deben producir el MISMO estado para la misma situacion
+          // (es el homologo de los filtros), asi que ninguno resetea la vista
+          // elegida; reencender conserva 'albumes'.
           setMediaEnabled(!st.mediaEnabled);
         } else {
+          // Un chip de TIPO si vuelve a la vista 'sueltos': pedir fotos o
+          // videos deja de mostrar albumes y enciende/ apaga ese tipo.
+          setMediaVista('sueltos');
           var nt = {};
           nt[tipo] = !st.mediaTypes[tipo];
           setMediaTypes(nt);
@@ -1864,21 +1924,38 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
       syncFiltroLabels();
     }
 
+    // Homologa de syncMediaBtns para el Directorio: marca '.on' en los chips
+    // [data-cat] segun el estado del MOTOR (activeCat), no segun el DOM. 'all'
+    // -> chip all; slug/visitados -> ese chip; 'off' -> ninguno. Se invoca en
+    // init y en cada cambio de activeCat, y es lo que elimina el chip stale.
+    function syncCatBtns() {
+      if (!st.catRoot || !st.catRoot.querySelectorAll) return;
+      var btns = st.catRoot.querySelectorAll('[data-cat]');
+      for (var i = 0; i < btns.length; i++) {
+        var v = btns[i].getAttribute('data-cat');
+        btns[i].classList.toggle('on', st.activeCat !== 'off' && v === st.activeCat);
+      }
+    }
+
     function bindCategories() {
       if (st.catRoot || typeof document === 'undefined') return;
       var root = st.options.categories;
       root = (typeof root === 'string') ? document.querySelector(root) : root;
       if (!root) return;
       st.catRoot = root;
+      // Init: reconcilia los chips [data-cat] con activeCat. Al correr aqui
+      // corrige de paso el '.on' inicial desincronizado del markup y deja
+      // coherentes los chips tras una restauracion persistida.
+      syncCatBtns();
       root.addEventListener('click', function (e) {
         var b = (e.target && e.target.closest) ? e.target.closest('[data-cat]') : null;
         if (!b) return;
-        var ya = b.classList.contains('on');
-        var all = root.querySelectorAll('[data-cat]');
-        for (var i = 0; i < all.length; i++) all[i].classList.remove('on');
-        if (ya) { filterPins('off', true); return; }
-        b.classList.add('on');
-        filterPins(b.getAttribute('data-cat'), true);
+        // El DOM NO decide estado: se decide desde activeCat (fuente unica).
+        // Clic en el chip ya activo -> 'off'; en otro (incluido 'all') -> ese.
+        var cat = b.getAttribute('data-cat');
+        if (st.activeCat === cat) filterPins('off', true);
+        else filterPins(cat, true);
+        syncCatBtns();
       });
     }
 
@@ -2343,6 +2420,7 @@ mediaOnePinPerDestino (true): true dibuja UN pin por destino en la
         mediaFiltered: mediaItems(),
         activeId: st.activeId,
         activeCat: st.activeCat,
+        activeCatPrevio: st.activeCatPrevio,
         ratingMin: st.ratingMin,
         ratingMinPrevio: st.ratingMinPrevio,
         mediaVista: st.mediaVista,
