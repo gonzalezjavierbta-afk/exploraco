@@ -506,6 +506,27 @@ var ORIGEN_KM_EXTRAJERO_DEFAULT = 3000;
 var ORIGEN_KM_LOCAL_DEFAULT = 25;
 var ORIGEN_MIN_DIAS_CUENTA_DEFAULT = 7;
 
+// ADR-091: POZO DE XP de los destinos reclamables. Mismas reglas que los
+// caps: el default es CODIGO (fallback y valor semilla), nunca una segunda
+// fuente. Los tres son configurables por gamificacion_config; sin la clave,
+// el motor degrada a estas constantes.
+//   - XP_POZO_TOPE_DESTINO_DEFAULT: tope del pasivo reputacional por destino
+//     (el sobrante se pierde; el pozo es reputacion, no transferencia).
+//   - XP_POZO_TTL_DIAS_DEFAULT: auto-expiracion PEREZOSA. Si el pozo lleva mas
+//     de TTL sin tocarse se resetea a 0 ANTES de sumar, para que el pasivo no
+//     crezca sin limite en destinos populares.
+//   - RECLAMACION_COOLDOWN_HORAS_DEFAULT: cooldown anti-abuso entre solicitudes
+//     de reclamation del mismo solicitante.
+var XP_POZO_TOPE_DESTINO_DEFAULT = 120.00;
+var XP_POZO_TTL_DIAS_DEFAULT = 30;
+var RECLAMACION_COOLDOWN_HORAS_DEFAULT = 24;
+
+// ADR-091 Fase 1: unica whitelist de recurso_tipo HABILITADA. La tabla
+// reclamaciones_propiedad ya admite album_foto y usuario_foto, pero el gate
+// de esas llega en Fase 2; mientras tanto se rechazan (no se aceptan en
+// silencio). El valor 'media' del brief original NO existe.
+var RECLAMACION_RECURSO_TIPOS = ['destino'];
+
 // M_nivel(N) = 1.0 + ((N-1)/39) * (m_nivel_max - 1.0). Con el default
 // m_nivel_max = 3.0 el paso es 2.0/39 (formula congelada del ADR-053,
 // reescalada a 40 niveles en el RELEASE 2026-09-23).
@@ -547,7 +568,11 @@ async function leerConfigGamificacion(sql) {
     origenKmNomada: ORIGEN_KM_NOMADA_DEFAULT,
     origenKmExtranjero: ORIGEN_KM_EXTRAJERO_DEFAULT,
     origenKmLocal: ORIGEN_KM_LOCAL_DEFAULT,
-    origenMinDiasCuenta: ORIGEN_MIN_DIAS_CUENTA_DEFAULT
+    origenMinDiasCuenta: ORIGEN_MIN_DIAS_CUENTA_DEFAULT,
+    // ADR-091: pozo de XP reclamable y cooldown de reclamation.
+    xpPozoTopeDestino: XP_POZO_TOPE_DESTINO_DEFAULT,
+    xpPozoTtlDias: XP_POZO_TTL_DIAS_DEFAULT,
+    reclamacionCooldownHoras: RECLAMACION_COOLDOWN_HORAS_DEFAULT
   };
   try {
     var rows = await sql('SELECT clave, valor FROM gamificacion_config');
@@ -564,6 +589,10 @@ async function leerConfigGamificacion(sql) {
       else if (r.clave === 'origen_km_extranjero' && v > 0) cfg.origenKmExtranjero = v;
       else if (r.clave === 'origen_km_local' && v > 0) cfg.origenKmLocal = v;
       else if (r.clave === 'origen_min_dias_cuenta' && v > 0) cfg.origenMinDiasCuenta = v;
+      // ADR-091: claves del pozo de XP reclamable.
+      else if (r.clave === 'xp_pozo_tope_destino' && v > 0) cfg.xpPozoTopeDestino = v;
+      else if (r.clave === 'xp_pozo_ttl_dias' && v > 0) cfg.xpPozoTtlDias = v;
+      else if (r.clave === 'reclamacion_cooldown_horas' && v > 0) cfg.reclamacionCooldownHoras = v;
     });
   } catch (eCfg) {
     if (eCfg && (eCfg.code === '42P01' || eCfg.code === '42703')) {
@@ -825,13 +854,108 @@ async function resolverDuenosSpot(sql, destinoId) {
     general: null,
     por_tipo: { general: null, foto: null, video: null, audio: null, escrito: null },
     votos_total: 0,
-    fuente_error: null
+    fuente_error: null,
+    // ADR-091: false = NO se pudo leer destinos.dueno_id. Nadie debe asumir
+    // que no hay dueno declarado cuando esto es false (ver el gate del pozo).
+    dueno_declarado: false,
+    dueno_declarado_legible: false
   };
   var did = String(destinoId || '').trim();
   if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(did))
     return vacio;
 
   try {
+    // ADR-091: DUENO DECLARADO (destinos.dueno_id, puesto por un reclamo
+    // APROBADO) GANA al dueno derivado por votos, y el derivado por votos
+    // SOLO se consulta si dueno_id IS NULL. Sin esta precedencia, al aprobar
+    // un reclamo la siguiente cachearDuenosSpot reescribia el dueno derivado
+    // y la UI volvia al dueno por votos, deshaciendo la feature.
+    // NO cambia el CONTRATO de retorno (general, por_tipo, votos_total,
+    // fuente_error): cambia la RESOLUCION. Los consumidores
+    // (api/pagina-destino.js y api/admin.js) siguen leyendo igual.
+    var declUid = null;
+    var declLegible = false;
+    try {
+      var rDecl = await sql(
+        'SELECT dueno_id FROM destinos WHERE id=$1::uuid LIMIT 1',
+        [did]
+      );
+      declLegible = true;
+      if (rDecl.length && rDecl[0] && rDecl[0].dueno_id) declUid = String(rDecl[0].dueno_id);
+    } catch (eDecl) {
+      if (!esEsquemaFaltante(eDecl)) throw eDecl;
+      console.warn('[spot_duenos] dueno_id no leido (ADR-091 pendiente?): ' + (eDecl && eDecl.code));
+    }
+
+    if (declUid) {
+      // Votos APOYOS del dueno declarado, por tipo de medio (mismas fuentes
+      // reales de votos que la rama derivada). Best-effort: si la lectura
+      // falla se degrada a 0 sin tumbar la resolucion.
+      var declPorTipo = { general: null, foto: null, video: null, audio: null, escrito: null };
+      var declVotosTotal = 0;
+      try {
+        var rDeclV = await sql(
+          'SELECT tipo_medio, SUM(v)::int AS votos FROM ('
+          + ' SELECT af.foto_type AS tipo_medio,'
+          + '   COUNT(*) AS v'
+          + ' FROM media_votos mv'
+          + ' JOIN album_fotos af ON af.id::text = mv.item_id'
+          + ' JOIN destinos_fotos df ON df.url = af.foto_url AND df.destino_id = $1::uuid'
+          + ' WHERE mv.fuente = \'album_foto\' AND mv.activo = true AND af.activo = true'
+          + '   AND af.foto_type IN (\'foto\',\'video\',\'audio\')'
+          + '   AND COALESCE(af.autor_original_id, af.agregador_id) = $2::uuid'
+          + ' GROUP BY af.foto_type'
+          + ' UNION ALL'
+          + ' SELECT \'foto\' AS tipo_medio, COUNT(*) AS v'
+          + ' FROM media_votos mv'
+          + ' JOIN interacciones i ON i.id::text = mv.item_id'
+          + ' WHERE mv.fuente = \'viajero_foto\' AND mv.activo = true'
+          + '   AND i.tipo = \'foto\' AND i.activo = true AND i.destino_id = $1::uuid'
+          + '   AND i.usuario_id = $2::uuid'
+          + ' GROUP BY i.usuario_id'
+          + ' UNION ALL'
+          + ' SELECT \'escrito\' AS tipo_medio, SUM(i.votos_utiles) AS v'
+          + ' FROM interacciones i'
+          + ' WHERE i.destino_id = $1::uuid AND i.tipo = \'resena\''
+          + '   AND i.activo = true AND i.votos_utiles > 0 AND i.usuario_id = $2::uuid'
+          + ' GROUP BY i.usuario_id'
+          + ' ) t GROUP BY tipo_medio',
+          [did, declUid]
+        );
+        (rDeclV || []).forEach(function(row) {
+          var tm = String(row.tipo_medio || '').toLowerCase();
+          var n = parseInt(row.votos, 10) || 0;
+          if (!n) return;
+          declPorTipo[tm] = n;
+          declVotosTotal += n;
+        });
+      } catch (eDV) {
+        if (!esEsquemaFaltante(eDV)) throw eDV;
+        console.warn('[spot_duenos] votos del dueno declarado no leidos: ' + (eDV && eDV.code));
+      }
+      var declGeneral = { usuario_id: declUid, votos: declVotosTotal, tipo_medio: 'general' };
+      ['foto', 'video', 'audio', 'escrito'].forEach(function(tm) {
+        declPorTipo[tm] = {
+          usuario_id: declUid,
+          votos: declPorTipo[tm] || 0,
+          tipo_medio: tm
+        };
+      });
+      declPorTipo.general = declGeneral;
+      var resDecl = {
+        general: declGeneral,
+        por_tipo: declPorTipo,
+        votos_total: declVotosTotal,
+        fuente_error: null,
+        dueno_declarado: true,
+        dueno_declarado_legible: true
+      };
+      // La cache se escribe con el DECLARADO: si alguien lee la cache, ve lo
+      // mismo que la resolucion en vivo.
+      await cachearDuenosSpot(sql, did, resDecl);
+      return resDecl;
+    }
+
     // 1) Resenas: dueno 'escrito' por autor con mas votos_utiles.
     var escrito = null;
     try {
@@ -949,7 +1073,10 @@ async function resolverDuenosSpot(sql, destinoId) {
       general: general,
       por_tipo: porTipo,
       votos_total: general ? general.votos : 0,
-      fuente_error: null
+      fuente_error: null,
+      // ADR-091: dueno_id leido y era NULL (o la columna no esta todavia).
+      dueno_declarado: false,
+      dueno_declarado_legible: declLegible
     };
 
     // 4) Cache best-effort en spot_duenos (migracion 040). Nunca rompe la
@@ -1097,12 +1224,38 @@ async function aplicarDividendoSpot(sql, ctx) {
       candId = String(tipoDueno.usuario_id);
       candTipo = tipoMedio;
     }
-    if (!candId) return { aplicado: false, motivo: 'sin_dueno', monto: 0, monto_descontado: 0 };
-    if (candId === autorId) return { aplicado: false, motivo: 'autor_es_dueno', monto: 0, monto_descontado: 0 };
+    // ADR-091: las 3 guardas del dueno se resuelven ANTES de decidir el motivo
+    // para poder acumular el pozo en UN UNICO punto (mas abajo). Se ABREVIAN en
+    // el MISMO orden y con la MISMA semantica de siempre; los 3 return
+    // siguientes conservan su motivo y su cuerpo integros.
+    var rpsAutorEsDueno = !!(candId && candId === autorId);
+    var rpsUrows = [];
+    if (candId && !rpsAutorEsDueno) {
+      rpsUrows = await sql('SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [candId]);
+    }
+    var rpsBeneficiarioAusente = !!(candId && !rpsAutorEsDueno && !rpsUrows.length);
+    var nivelBen = (!rpsBeneficiarioAusente && rpsUrows.length)
+      ? calcularNivelLocal(numXp(rpsUrows[0].xp_total)).nivel : 0;
 
-    var uRows = await sql('SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1', [candId]);
-    if (!uRows.length) return { aplicado: false, motivo: 'beneficiario_ausente', monto: 0, monto_descontado: 0 };
-    var nivelBen = calcularNivelLocal(numXp(uRows[0].xp_total)).nivel;
+    // ADR-091: POZO DE XP RECLAMABLE. UNICA llamada por interaccion y UNICO
+    // punto de entrada del repositorio (los 13 call-sites de esta funcion no
+    // cambian). Solo se intenta en los 2 motivos huerfanos: sin_dueno y
+    // beneficiario_ausente (este ultimo es el mas huerfano: hay dueno
+    // derivado pero su fila en usuarios no existe, y tambien pierde el 10%).
+    // Los 3 gates reales (resolutor sin error, dueno declarado legible, solo
+    // estos 2 motivos) viven dentro de acumularPozoReclamable. Nunca lanza.
+    if (!candId || rpsBeneficiarioAusente) {
+      await acumularPozoReclamable(sql, {
+        destino_id: destinoId,
+        autor_id: autorId,
+        xp_bruto_base: xpBrutoBase,
+        resolucion: d
+      });
+    }
+
+    if (!candId) return { aplicado: false, motivo: 'sin_dueno', monto: 0, monto_descontado: 0 };
+    if (rpsAutorEsDueno) return { aplicado: false, motivo: 'autor_es_dueno', monto: 0, monto_descontado: 0 };
+    if (rpsBeneficiarioAusente) return { aplicado: false, motivo: 'beneficiario_ausente', monto: 0, monto_descontado: 0 };
 
     // 2) Elegibilidad por nivel (GENERAL >= 25; POR TIPO >= 20).
     var beneficiarioId = null;
@@ -1247,6 +1400,96 @@ async function aplicarDividendoSpot(sql, ctx) {
     }
     console.warn('[spot] dividendo no aplicado: ' + (eDiv && eDiv.message));
     return { aplicado: false, motivo: 'error', monto: 0, monto_descontado: 0 };
+  }
+}
+
+// =====================================================================
+// ADR-091: POZO DE XP REclamable (Fase 1). El 10% de dividendo que un
+// destinoSIN DUENO (o con dueno derivado cuya fila en usuarios no existe)
+// perderia NO se queda en el limbo: se custodia como REPUTACION en
+// destinos.xp_pozo_acumulado, y el futuro dueno lo reclama al resolver su
+// solicitud de propiedad.
+// REGLA DE ORO DEL ENCARGO: el pozo es UNICA fuente de acumulacion y el UNICO
+// punto de entrada es la llamada interna de aplicarDividendoSpot. Los 12
+// call-sites de aplicarDividendoSpot NO cambian.
+// TRES GATES, en este orden (el (a) es el MAS IMPORTANTE de todo el ADR):
+//   (a) d.fuente_error === null: el resolutor NO fallo. Sin este gate, un
+//       error transitorio de esquema o de red haria que sin_dueno se
+//       disparase POR FALSO y el pozo acumularia como si el destino no
+//       tuviera dueno. Un solo false positivo contamination el pasivo.
+//   (b) d.dueno_declarado_legible === true: se pudo leer destinos.dueno_id. Si
+//       la columna no existe todavia (migracion pendiente) NO se puede
+//       afirmar que el destino no tiene dueno declarado -> no se acumula.
+//   (c) solo los 2 motivos realmente huerfanos, que son ademas los que
+//       pierden el 10%: sin_dueno y beneficiario_ausente. NUNCA en inactivo,
+//       sin_destino, autor_es_dueno, nivel_insuficiente, monto_cero,
+//       idempotente, saldo_insuficiente, schema ni error.
+// El pozo es REPUTACION, NO transferencia: NO se descuenta nada al autor de la
+// interaccion; solo se incrementa xp_pozo_acumulado.
+// NUNCA lanza: todo en try/catch devolviendo {acumulado, motivo}, igual que
+// aplicarDividendoSpot. Motivos: no_aplica, ok, ya_reclamado, schema, error.
+async function acumularPozoReclamable(sql, ctx) {
+  var no = { acumulado: false, motivo: 'no_aplica' };
+  var c = ctx || {};
+  var destinoId = c.destino_id ? String(c.destino_id).trim() : '';
+  var d = c.resolucion || null;
+  // Gate (a): el resolutor NO fallo. Estricto: si el campo no existe, no se
+  // acumula (failsafe hacia la no-accumULacion).
+  if (!d || d.fuente_error !== null) return no;
+  // Gate (b): el dueno declarado se pudo leer (columna presente).
+  if (d.dueno_declarado_legible !== true) return no;
+  if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(destinoId))
+    return no;
+
+  try {
+    // El incremento es el MISMO 10% que se habria pagado (misma matematica del
+    // dividendo, con su propio techo legal), para que el recibo sea fiel.
+    var xpBase = numXp(c.xp_bruto_base);
+    if (!(xpBase > 0)) return no;
+    var incremento = red2ConTopeSpin(xpBase * DIVIDENDO_SPOT_PCT, xpBase);
+    if (!(incremento > 0)) return no;
+
+    var cfg = await leerConfigGamificacion(sql);
+    var topeCfg = numXp(cfg.xpPozoTopeDestino);
+    var tope = topeCfg > 0 ? red2(topeCfg) : XP_POZO_TOPE_DESTINO_DEFAULT;
+    var ttlCfg = numXp(cfg.xpPozoTtlDias);
+    var ttlDias = ttlCfg > 0 ? Math.round(ttlCfg) : XP_POZO_TTL_DIAS_DEFAULT;
+
+    // UNA sola sentencia UPDATE. Las columnas condicionadas van en el propio
+    // WHERE: es el guard natural anti-doble-posesion (si otro reclamo ya
+    // aprobo, dueno_id deja de ser NULL y la sentencia no actualiza nada).
+    // Auto-expiracion PEREZOSA: si pozo_actualizado_en es mas viejo que el
+    // TTL (o es NULL) el saldo se resetea a 0 ANTES de sumar. Tope con LEAST:
+    // el saldo FINAL se limita y el sobrante se pierde (no se guarda en otro
+    // sitio, por diseno: el pozo es una senal de reputacion, no un saldo).
+    var filas = await sql(
+      'UPDATE destinos SET'
+      + ' xp_pozo_acumulado = LEAST($2::numeric,'
+      + '   CASE WHEN pozo_actualizado_en IS NULL'
+      + '     OR pozo_actualizado_en < NOW() - ($3::int * INTERVAL \'1 day\')'
+      + '   THEN $4::numeric'
+      + '   ELSE COALESCE(xp_pozo_acumulado, 0) + $4::numeric END),'
+      + ' pozo_actualizado_en = NOW()'
+      + ' WHERE id=$1::uuid AND es_reclamable = TRUE AND dueno_id IS NULL'
+      + ' RETURNING xp_pozo_acumulado',
+      [destinoId, red2(tope), ttlDias, incremento]
+    );
+    var rPozo = (filas || [])[0] || null;
+    if (!rPozo) return { acumulado: false, motivo: 'ya_reclamado' };
+    return {
+      acumulado: true,
+      motivo: 'ok',
+      destino_id: destinoId,
+      incremento: incremento,
+      xp_pozo: red2(numXp(rPozo.xp_pozo_acumulado))
+    };
+  } catch (eP) {
+    if (esEsquemaFaltante(eP)) {
+      console.warn('[spot_pozo] no acumulado (ADR-091 pendiente): ' + (eP && eP.code));
+      return { acumulado: false, motivo: 'schema' };
+    }
+    console.warn('[spot_pozo] no acumulado: ' + (eP && eP.message));
+    return { acumulado: false, motivo: 'error' };
   }
 }
 
@@ -5899,6 +6142,43 @@ module.exports = async function handler(req, res) {
       var destinoId= req.query.destino_id || null;
       var usuarioId= req.query.usuario_id || null;
 
+      // ADR-091: estado de reclamacion de un destino. Lectura MINIMA para que
+      // el frontend decida si pinta el boton de reclamo. DEVUELVE SOLO lo no
+      // sensible: ni el dueno_id, ni ningun dato del dueno, y el POZO DE XP
+      // NO es publico. Degrada en SILENCIO si la migracion todavia no esta
+      // aplicada (esEsquemaFaltante): el boton simplemente no aparece.
+      if (tipo === 'reclamacion_estado') {
+        if (!destinoId)
+          return res.status(400).json({ ok: false, error: 'destino_id requerido' });
+        var reDestinoId = String(destinoId).trim();
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(reDestinoId))
+          return res.status(400).json({ ok: false, error: 'DESTINO_INVALIDO' });
+        try {
+          var reFilas = await sql(
+            'SELECT es_reclamable, estado_reclamacion, (dueno_id IS NOT NULL) AS tiene_dueno'
+            + ' FROM destinos WHERE id=$1::uuid LIMIT 1',
+            [reDestinoId]
+          );
+          if (!reFilas.length)
+            return res.status(404).json({ ok: false, error: 'DESTINO_NO_ENCONTRADO' });
+          return res.json({
+            ok: true,
+            data: {
+              es_reclamable: reFilas[0].es_reclamable === true,
+              estado_reclamacion: String(reFilas[0].estado_reclamacion || 'disponible'),
+              tiene_dueno: reFilas[0].tiene_dueno === true
+            }
+          });
+        } catch (eRe) {
+          if (!esEsquemaFaltante(eRe)) throw eRe;
+          console.warn('[reclamacion] estado no leido (ADR-091 pendiente): ' + (eRe && eRe.code));
+          return res.json({
+            ok: true,
+            data: { es_reclamable: false, estado_reclamacion: 'no_disponible', tiene_dueno: true }
+          });
+        }
+      }
+
       // Entrega 016 (Wayfarer): nonce anti-replay para checkins
       // geolocalizados (ADR-025). GET segun la matriz del contrato; el
       // nonce es de un solo uso y expira en 2 minutos.
@@ -9527,6 +9807,180 @@ module.exports = async function handler(req, res) {
       var tipo2     = body.tipo || req.query.tipo;
       var destinoId2= body.destino_id;
       var usuarioId2= body.usuario_id || null;
+
+      // ============ ADR-091: RECLAMACION DE PROPIEDAD DE UN DESTINO ============
+      // Fase 1: recurso_tipo='destino' UNICAMENTE. La tabla
+      // reclamaciones_propiedad ya admite album_foto y usuario_foto, pero el
+      // gate de esas llega en Fase 2 y aqui se rechazan explicitamente (no se
+      // aceptan en silencio). El valor 'media' del brief original NO existe.
+      if (tipo2 === 'reclamar_propiedad_solicitar') {
+        // BUG-061: el usuario NUNCA se confia al body. La sesion firmada es la
+        // unica fuente de identidad (patron del resto de ramas POST).
+        if (!usuarioId2)
+          return res.status(401).json({ ok: false, error: 'SESION_REQUERIDA' });
+        var rpSes = validarSesion(req, usuarioId2);
+        if (!rpSes.ok) return responderSesion(res, rpSes.razon);
+        // El id de sesion debe ser un uuid: evita que un $1::uuid reviente con
+        // 22P02 y acabe en el 500 global (que devuelve el mensaje crudo).
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(usuarioId2)))
+          return res.status(400).json({ ok: false, error: 'USUARIO_ID_INVALIDO' });
+
+        // -- Whitelist estricta de recurso_tipo (Fase 1) ----------------
+        var rpTipo = String(body.recurso_tipo || '').trim().toLowerCase();
+        if (!rpTipo)
+          return res.status(400).json({ ok: false, error: 'recurso_tipo requerido' });
+        if (rpTipo === 'media')
+          return res.status(400).json({
+            ok: false,
+            error: 'TIPO_NO_EXISTE',
+            detalle: "'media' no es un recurso de reclamation; use 'destino'",
+            tipos_validos: RECLAMACION_RECURSO_TIPOS
+          });
+        if (RECLAMACION_RECURSO_TIPOS.indexOf(rpTipo) === -1)
+          return res.status(409).json({
+            ok: false,
+            error: 'RECLAMACION_FASE_2',
+            detalle: 'La reclamation de ' + rpTipo + ' todavia no esta habilitada',
+            tipos_validos: RECLAMACION_RECURSO_TIPOS
+          });
+
+        // -- Validacion de entradas (400 tipado, sin filtrar SQL ni HTML) -
+        var rpId = String(body.recurso_id || '').trim();
+        if (!rpId)
+          return res.status(400).json({ ok: false, error: 'recurso_id requerido' });
+        if (rpId.length > 64)
+          return res.status(400).json({ ok: false, error: 'recurso_id demasiado largo' });
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(rpId))
+          return res.status(400).json({ ok: false, error: 'DESTINO_INVALIDO' });
+
+        var rpPrueba = String(body.prueba_url || '').trim();
+        if (!rpPrueba)
+          return res.status(400).json({ ok: false, error: 'prueba_url requerido' });
+        if (rpPrueba.length > 500)
+          return res.status(400).json({ ok: false, error: 'prueba_url demasiado larga' });
+        if (!/^https?:\/\/[^\s]+$/i.test(rpPrueba))
+          return res.status(400).json({ ok: false, error: 'PRUEBA_URL_INVALIDA' });
+
+        var rpNota = String(body.nota_solicitante || '').trim();
+        if (rpNota.length > 1000)
+          return res.status(400).json({ ok: false, error: 'nota_solicitante demasiado larga' });
+
+        // -- Nivel DERIVADO sobre usuarios.xp_total (calcularNivelLocal): el
+        // nivel nunca es una columna (ADR-035). Ademas exige que la fila exista.
+        var rpUsr = await sql(
+          'SELECT xp_total FROM usuarios WHERE id=$1::uuid LIMIT 1',
+          [String(usuarioId2)]
+        );
+        if (!rpUsr.length)
+          return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+        var rpNivel = calcularNivelLocal(numXp(rpUsr[0].xp_total)).nivel;
+        if (!(rpNivel >= 1))
+          return res.status(403).json({ ok: false, error: 'NIVEL_INSUFICIENTE' });
+
+        // -- Anti-abuso 1: cooldown entre solicitudes del MISMO solicitante
+        // (por defecto 24 h, parametrizable por gamificacion_config).
+        var rpCfg = await leerConfigGamificacion(sql);
+        var rpCdCfg = numXp(rpCfg.reclamacionCooldownHoras);
+        var rpCooldownH = rpCdCfg > 0 ? Math.round(rpCdCfg) : RECLAMACION_COOLDOWN_HORAS_DEFAULT;
+        var rpPrev = await sql(
+          'SELECT creado_en FROM reclamaciones_propiedad'
+          + ' WHERE solicitante_id=$1::uuid ORDER BY creado_en DESC LIMIT 1',
+          [String(usuarioId2)]
+        );
+        if (rpPrev.length && rpPrev[0].creado_en) {
+          var rpT = Date.parse(rpPrev[0].creado_en);
+          if (!isNaN(rpT)) {
+            var rpFaltan = Math.ceil((rpCooldownH * 3600 * 1000 - (Date.now() - rpT)) / 1000);
+            if (rpFaltan > 0)
+              return res.status(429).json({
+                ok: false,
+                error: 'RECLAMACION_EN_COOLDOWN',
+                faltan_segundos: rpFaltan,
+                cooldown_horas: rpCooldownH
+              });
+          }
+        }
+
+        // -- INSERT de la solicitud + UPDATE del recurso en la MISMA sentencia
+        // (CTE): el UPDATE RECLAMA el recurso condicionalmente y el INSERT solo
+        // ocurre si el UPDATE elimino fila, asi que NUNCA puede quedar un
+        // recurso 'en_revision' sin solicitud (si el INSERT falla, la sentencia
+        // entera revierte). Anti-abuso 2: el indice UNICO PARCIAL
+        // uq_reclamaciones_recurso_pendiente (recurso_tipo, recurso_id) WHERE
+        // estado='pendiente' (migracion 055) garantiza UNA sola solicitud
+        // PENDIENTE por recurso. Se usa ON CONFLICT con ESE predicado (no otro:
+        // el indice es parcial) y se conserva la captura del 23505, que sigue
+        // pudiendo saltar si dos sentencias compiten de verdad.
+        // Los estados literales son los del CHECK de la 055:
+        // estado IN ('pendiente','aprobada','rechazada') y estado_reclamacion
+        // IN ('disponible','en_revision','reclamado','rechazado').
+        var rpRes;
+        try {
+          rpRes = await sql(
+            'WITH up AS ('
+            + ' UPDATE destinos SET estado_reclamacion=\'en_revision\''
+            + ' WHERE id=$1::uuid AND es_reclamable = TRUE AND dueno_id IS NULL'
+            + '   AND estado_reclamacion IN (\'disponible\',\'en_revision\')'
+            + ' RETURNING id, xp_pozo_acumulado'
+            + '), ins AS ('
+            + ' INSERT INTO reclamaciones_propiedad'
+            + '  (solicitante_id, recurso_tipo, recurso_id, prueba_url,'
+            + '   nota_solicitante, estado, xp_pozo_capturado)'
+            + ' SELECT $2::uuid, $3, $4, $5, $6, \'pendiente\','
+            + '   COALESCE(up.xp_pozo_acumulado, 0)'
+            + ' FROM up'
+            + ' ON CONFLICT (recurso_tipo, recurso_id) WHERE estado = \'pendiente\''
+            + ' DO NOTHING'
+            + ' RETURNING id, xp_pozo_capturado'
+            + ')'
+            + ' SELECT (SELECT id::text FROM ins) AS reclamo_id,'
+            + ' (SELECT xp_pozo_capturado FROM ins) AS pozo,'
+            + ' (SELECT id::text FROM up) AS destino_actualizado',
+            [rpId, String(usuarioId2), rpTipo, rpId, rpPrueba, rpNota || null]
+          );
+        } catch (eRp) {
+          if (eRp && eRp.code === '23505')
+            return res.status(409).json({
+              ok: false, error: 'YA_HAY_SOLICITUD_PENDIENTE'
+            });
+          if (esEsquemaFaltante(eRp))
+            return res.status(503).json({
+              ok: false,
+              error: 'Esquema de base de datos pendiente de migracion',
+              code: 'SCHEMA_NOT_MIGRATED'
+            });
+          throw eRp;
+        }
+        var rpRow = (rpRes || [])[0] || {};
+        // up reclama el recurso y el indice unico rechaza el INSERT = ya hay
+        // una solicitud PENDIENTE sobre ese mismo recurso.
+        if (!rpRow.reclamo_id && rpRow.destino_actualizado)
+          return res.status(409).json({
+            ok: false, error: 'YA_HAY_SOLICITUD_PENDIENTE'
+          });
+        if (!rpRow.reclamo_id)
+          return res.status(409).json({
+            ok: false,
+            error: 'NO_RECLAMABLE',
+            detalle: 'El destino ya tiene dueno, no es reclamable, o su estado no lo admite'
+          });
+
+        // NO se calcula NI se aplica aqui el bono de bienvenida: el XP se
+        // entrega al RESOLVER la solicitud (rama de admin, Fase 2). Aqui solo
+        // se captura el pozo actual como RECIBO del solicitante.
+        return res.json({
+          ok: true,
+          data: {
+            reclamo_id: String(rpRow.reclamo_id),
+            recurso_tipo: rpTipo,
+            recurso_id: rpId,
+            estado: 'pendiente',
+            destino_estado: 'en_revision',
+            xp_pozo_capturado: red2(numXp(rpRow.pozo)),
+            creado_en: new Date().toISOString()
+          }
+        });
+      }
 
       // ============ ENTREGA 016: WAYFARER ACTIVO OCULTO ============
       // Crowdsourcing geoespacial (migracion 016): cualquier usuario con

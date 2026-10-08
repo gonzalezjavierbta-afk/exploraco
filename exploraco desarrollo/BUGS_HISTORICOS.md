@@ -2074,3 +2074,47 @@ El `400` se emitia **con sesion, saldo y `ref_id` validos** -- es decir, en el p
 **FIX (solo arnes):** `scripts/smoke_grupos_perfil.js:806-809` anade `'misAlbumRatingTxt'` al array `nombres`. **No se toco `mi-perfil.html`: el producto quedo INTACTO.** Es el mismo patron de la familia **BUG-098** (*producto correcto, instrumentacion incorrecta*).
 
 **RESULTADO medido (ADR-006):** `node scripts/smoke_grupos_perfil.js` = **109/109 PASS, FAIL 0** (el contaje previo **64/65 estaba TRUNCADO**: al desbloquear las secciones 6-8 corren ~44 aserciones que antes no se ejecutaban, todas PASS). `npm run test` = **VERDE**; `node --check` **OK**; **ASCII-safe (0 bytes > 127)**. El producto (`mi-perfil.html`) no se modifico. Detalle de ejecucion en `TASKS.md` **TSK-200**.
+
+## BUG-119: `smoke_auditoria_pagina_destino.js` reporta **9 FAIL** en la galería unificada (lightbox `lb-*`) y en el hero -- **PRE-EXISTENTES**, sin relación con ADR-091
+
+**Severidad:** **BAJA / de instrumentación vs producto** (posible desalineación del smoke con el markup actual de `buildHTML()`; no bloquea). **Estado: ABIERTO (deuda registrada, NO arreglado en esta tanda).**
+
+**Contexto:** detectado el 2026-10-08 durante la verificación local de **ADR-091 / TSK-201**. La feature **añadió código, no lo quitó** y sus 7 controles QA (incl. `buildHTML()`) pasaron: **0 fallos nuevos**. Estos 9 son **preexistentes** y **no constaban** en este documento.
+
+**El síntoma, medido (reproducido corriendo el smoke en este turno).** El smoke marca **9 FAIL**, en dos bloques: (1) **lightbox (5):** `lbHTML VISIBLE (2+ fotos)`, `gal-thumbs tiene onclick abrirLightbox`, `lb-bg presente`, `lb-close presente`, `lb-prev + lb-next presentes`; (2) **hero (4):** `hero: HERO_ALL[0] = seleccion del usuario`, `miniatura 1 = mejor foto del espacio (curada)`, `miniaturas 2-3 = mejores de comunidad`, `exactamente 3 miniaturas` (`len=0`). Nota: el propio smoke declara (`smoke_auditoria_pagina_destino.js:115-116`) que el `#lb` se monta con galería curada o miniaturas del hero y que **ya no existe `<section id="fotos">`**, lo que apunta a que el arnés quedó **desalineado** con el markup posterior (familia **BUG-098**, producto correcto / instrumentación incorrecta), **no medido a fondo en este pase**.
+
+**Qué NO se hizo:** **no se corrigió** ni se aisló la causa raíz. Queda afirmado y medido **solo**: (a) los 9 FAIL existen; (b) son **preexistentes** (ajenos a ADR-091: la feature añadió 0 a estos puntos y sus controles dieron 0 regresiones); (c) el smoke declara que el `#lb` se monta por otra vía. **No se fabrica la causa.**
+
+**Deuda:** quien lo aborde debe **reproducir contra HEAD** y decidir si es **arnés desalineado** o **regresión real de `buildHTML()`**; hasta entonces, el smoke sigue siendo un gate **con ruido conocido**.
+
+## BUG-120: `admin.html` conserva **7770 bytes > 127** (deuda **preexistente** de ADR-002) -- la feature ADR-091 añadió **0**
+
+**Severidad:** **BAJA / deuda documental de ASCII-safe** (no rompe runtime; `admin.html` no es `api/*.js`). **Estado: ABIERTO (deuda conocida, NO arreglada).**
+
+**Contexto:** medido el 2026-10-08 en el cierre de **ADR-091 / TSK-201**, al auditar ASCII-safety. El conteo real: **`[System.IO.File]::ReadAllBytes('admin.html')` -> 7770 bytes > 127**. Es **deuda preexistente** en líneas que **NO son de esta feature** (la feature añadió **0 bytes > 127**; su propio código nuevo quedó limpio).
+
+**Lo que NO es:** **no es un fallo de la tanda ADR-091** ni una regresión: el mandato **ADR-002** de "cero bytes > 127" se exige históricamente a `api/*.js` y assets generados; `admin.html` acumula tildes/emoji directos de tareas anteriores. Se registra como **deuda conocida** para que no se confunda con un fallo del reclamo de propiedad.
+
+**Deuda:** si se decide sanear `admin.html`, hacerlo como tanda propia de ASCII-safety (mapear cada byte > 127 a `\uXXXX`), no como parte de ADR-091.
+
+## BUG-121: la tabla **`admin_usuarios` NO EXISTE** -- la moderación degrada a `resuelto_por = 'admin_secret'` y el UUID del admin se pide por prompt (deuda de trazabilidad)
+
+**Severidad:** **MEDIA / de trazabilidad** (funciona, pero no se puede atribuir quién moderó). **Estado: ABIERTO (deuda declarada; ADR-091 ya la menciona como R1).**
+
+**Contexto:** verificado el 2026-10-08 (`Select-String` sobre `db/migrations/*.sql` y `api/*.js`): la **única** aparición de `admin_usuarios` es un comentario de `db/migrations/055_reclamacion_propiedad_destinos.sql:56` que declara que la 055 **NO crea** esa tabla porque fue **verificada ausente**. `api/admin.js` autentica **solo** por `process.env.ADMIN_SECRET` y **no sabe qué admin es**.
+
+**Consecuencia, medida:** para la moderación de reclamos (ADR-091), `resuelto_por` no puede tomar el UUID real del moderador y **degrada a `'admin_secret'`**; el panel de `admin.html` **pide el UUID del admin por prompt** para poder dejarlo en el registro.
+
+**Lo que NO es:** no es un bug de ADR-091 (el ADR lo **declara** como riesgo **R1** y elige degradar de forma honesta en vez de inventar un id). Es una **ausencia de esquema** que solo se cierra creando la tabla (o un mecanismo de identidad de admin) en una tanda futura.
+
+## BUG-122: off-by-one documental -- los comentarios dicen "**13 call-sites**" de `aplicarDividendoSpot` cuando el conteo real es **12**
+
+**Severidad:** **BAJA / documental** (un comentario; cero efecto funcional). **Estado: PARCIALMENTE RESUELTO (2026-10-08).**
+
+**Contexto:** detectado en el cierre de **ADR-091 / TSK-201**. Conteo real verificado (ADR-006) sobre `api/interacciones.js`: **12** invocaciones `await aplicarDividendoSpot(sql, {` (`:11240`, `:11512`, `:11900`, `:13742`, `:15606`, `:15615`, `:15731`, `:15740`, `:15987`, `:15995`, `:16121`, `:16129`), **no 13**. La cifra "13" aparecía en 4 lugares.
+
+**Lo resuelto en este pase:** corregido el **número** en el comentario `api/interacciones.js:1413` ("Los **12**"). Cambio **solo de comentario**, ASCII-safe, sin tocar lógica.
+
+**Lo que queda (NO tocado, `SIN_CONFIRMAR` si es typo o incluye un call-site externo):** `api/interacciones.js:1241` (comentario de la feature) y el **título/cuerpo de `ADR-091`** (`DECISIONS.md:7622` y `:7690`, "cero cambios en los 13 call-sites"). El ADR **no se reescribe** en este pase (R2: solo estado). **Deuda:** decidir en un pase documental si se unifica la cifra a **12** en esos 3 puntos (el ADR requeriría autorización explícita del operador, por ser texto de decisión).
+
+**LECCIÓN:** los conteos citados en comentarios y ADRs deben **medirse contra el archivo real** (ADR-006); "el número que se repite en 4 sitios" no es más verdadero por repetido (familia **BUG-117**, cifras/citas no verificadas que se propagan como verdad).

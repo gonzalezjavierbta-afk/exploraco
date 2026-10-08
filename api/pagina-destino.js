@@ -525,7 +525,33 @@ var CSS = "@import url('https://fonts.googleapis.com/css2?family=Barlow+Condense
 +".gratis-name{font-size:12px;font-weight:700;color:var(--black)}"
 +".gratis-desc{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5}"
 +".contexto-box{background:var(--bg);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:14px 16px;margin-top:10px}"
-+".contexto-text{font-size:12px;color:#444;line-height:1.7}";
++".contexto-text{font-size:12px;color:#444;line-height:1.7}"
+// SILO .pdrecl (ADR-004): TODO el CSS de la reclamacion de propiedad cuelga
+// del selector padre unico .pdrecl, con Reset de Silo (position/size neutrales,
+// sin variables globales ni :root, colores literales para no depender del
+// Maestro). El modal se inyecta por JS con class="pdrecl" en el body. Cada
+// regla queda como descendiente de .pdrecl: nada de este bloque es suelto.
++".pdrecl{position:fixed;inset:0;z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;background:rgba(15,20,25,.9);font-family:'Outfit',sans-serif;font-size:14px;font-weight:400;line-height:1.5;letter-spacing:normal;text-align:left;color:#1A1A1A;margin:0}"
++".pdrecl.on{display:flex}"
++".pdrecl .pdrecl-box{background:#FFFFFF;border:1px solid #E5E7EB;border-left:3px solid #FF4A00;border-radius:12px;width:100%;max-width:520px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden;margin:auto;padding:0}"
++".pdrecl .pdrecl-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #E5E7EB;background:#FBF8F2}"
++".pdrecl .pdrecl-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.2px;color:#FF4A00;margin:0;padding:0}"
++".pdrecl .pdrecl-close{background:transparent;border:1px solid #E5E7EB;border-radius:6px;width:32px;height:32px;padding:0;color:#888888;font-size:18px;line-height:1;cursor:pointer;transition:all .15s;font-family:inherit}"
++".pdrecl .pdrecl-close:hover{border-color:#FF4A00;color:#FF4A00}"
++".pdrecl .pdrecl-body{padding:18px}"
++".pdrecl .pdrecl-intro{font-size:13px;color:#444444;margin:0 0 16px}"
++".pdrecl .pdrecl-field{display:block;margin:0 0 16px}"
++".pdrecl .pdrecl-label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#0F1419;margin:0 0 4px}"
++".pdrecl .pdrecl-tag{font-weight:700;letter-spacing:0;text-transform:none;color:#888888}"
++".pdrecl .pdrecl-hint{display:block;font-size:11px;color:#888888;margin:0 0 8px;line-height:1.5}"
++".pdrecl .pdrecl-input{width:100%;display:block;padding:10px 12px;border:1px solid #E5E7EB;border-radius:6px;background:#FFFFFF;font-family:inherit;font-size:13px;line-height:1.5;color:#1A1A1A;margin:0}"
++".pdrecl .pdrecl-input:focus{outline:none;border-color:#FF4A00}"
++".pdrecl .pdrecl-text{min-height:78px;resize:vertical}"
++".pdrecl .pdrecl-actions{display:flex;gap:10px;justify-content:flex-end;margin:18px 0 0}"
++".pdrecl .pdrecl-cancel,.pdrecl .pdrecl-submit{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;border-radius:3px;cursor:pointer}"
++".pdrecl .pdrecl-cancel{background:transparent;border:1px solid #E5E7EB;color:#888888}"
++".pdrecl .pdrecl-submit{background:#FF4A00;border:1px solid #FF4A00;color:#FFFFFF}"
++".pdrecl .pdrecl-submit:disabled{opacity:.5;cursor:default}";
 
 // -- COMPARADOR DE LUGARES SIMILARES (TSK-017) ------------------------
 // Top 3 hermanos de la misma categoria raiz, rankeados por overlap de
@@ -2396,6 +2422,13 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
   if (d.lat && d.lng) hctarRow2.push('<button class="hobtn" onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination='+esc(d.lat)+','+esc(d.lng)+'\',\'_blank\')">\uD83D\uDDFA Como llegar</button>');
   hctarRow2.push('<button class="hobtn" id="btn-guardar" onclick="abrirPopoverGuardar()">\u2661 Guardar</button>');
   hctarRow2.push('<button class="hobtn" id="btn-visitado" onclick="marcarVisitadoBtn(this)">\u2713 Estuve aqui</button>');
+  // ADR-091 (reclamacion de propiedad): se emite SIEMPRE para que la fila 2
+  // no quede desbalanceada, pero NACE OCULTO (display:none en el atributo).
+  // Solo initReclamo() lo revela si GET reclamation_estado responde
+  // es_reclamable:true; si el GET falla el boton sigue oculto (degradacion
+  // silenciosa, patron initSpotDuenos). La clase propia pd-recl permite
+  // ocultarlo sin tocar .hobtn.
+  hctarRow2.push('<button class="hobtn pd-recl" id="btn-reclamar" style="display:none" onclick="abrirModalReclamo()">\u00bfEres creador o due\u00f1o oficial del punto?</button>');
   // Rebranding LATAWEL: og:image absoluta. Si el destino tiene hero propio se
   // respeta (absolutizandolo contra BASE); si no, se usa la imagen OG oficial.
   // Se mira la foto REAL (d.foto_hero/d.foto), no el fallback Unsplash.
@@ -2757,6 +2790,139 @@ function buildHTML(d, det, fotos, resenas, autor, relacionados, dimsAvg, spotLid
     + '  }).catch(function(e){console.warn("[spot_duenos]",e&&e.message);});\n'
     + '}\n'
     + 'initSpotDuenos();\n'
+    // ADR-091: RECLAMACION DE PROPIEDAD DEL PUNTO. El boton se emite OCULTO
+    // en el HTML (style="display:none"); este bloque solo lo revela si GET
+    // /api/interacciones?tipo=reclamacion_estado responde es_reclamable:true.
+    // Si la llamada falla (403, 503 SCHEMA_NOT_MIGRATED, sin red) el boton
+    // sigue oculto y la pagina NO se rompe: mismo patron que initSpotDuenos.
+    + 'function rcToast(msg,color){\n'
+    + '  var f=(window.ExploraCO&&typeof window.ExploraCO.mostrarToast==="function")?window.ExploraCO.mostrarToast:null;\n'
+    + '  if(f){try{f(msg,color);return;}catch(e){}}\n'
+    + '  if(typeof alert==="function")alert(msg);\n'
+    + '}\n'
+    + 'function rcCerrar(){\n'
+    + '  var m=document.getElementById("pdrecl-modal");\n'
+    + '  if(m)m.classList.remove("on");\n'
+    + '}\n'
+    + 'function rcAbrir(){\n'
+    + '  var m=document.getElementById("pdrecl-modal");\n'
+    + '  if(!m){rcMontarModal();m=document.getElementById("pdrecl-modal");}\n'
+    + '  if(!m)return;\n'
+    + '  var u=document.getElementById("pdrecl-url");\n'
+    + '  var n=document.getElementById("pdrecl-nota");\n'
+    + '  if(u)u.value="";\n'
+    + '  if(n)n.value="";\n'
+    + '  m.classList.add("on");\n'
+    + '}\n'
+    // Gateo de sesion: mismo helper del repo (ExploraCO.mostrarLogin ==
+    // mostrarModalLogin de usuario-session.js:1771). Ese helper NO acepta
+    // callback, asi que ademas se espera la sesion en segundo plano y se
+    // abre el modal en cuanto exista. Si nunca aparece, se abandona solo.
+    + 'var rcGate=null;\n'
+    + 'function rcLogin(){\n'
+    + '  if(rcGate)return;\n'
+    + '  var f=(window.ExploraCO&&typeof window.ExploraCO.mostrarLogin==="function")?window.ExploraCO.mostrarLogin:window.mostrarModalLogin;\n'
+    + '  if(typeof f==="function"){try{f("Inicia sesi\u00f3n para reclamar la propiedad de este punto");}catch(e){}}\n'
+    + '  var n=0;\n'
+    + '  rcGate=setInterval(function(){\n'
+    + '    n++;\n'
+    + '    if(window.ExploraCO&&window.ExploraCO.usuario){clearInterval(rcGate);rcGate=null;rcAbrir();return;}\n'
+    + '    if(n>=60){clearInterval(rcGate);rcGate=null;}\n'
+    + '  },1000);\n'
+    + '}\n'
+    + 'function abrirModalReclamo(){\n'
+    + '  if(window.ExploraCO&&window.ExploraCO.usuario){rcAbrir();return;}\n'
+    + '  rcLogin();\n'
+    + '}\n'
+    // Modal: se inyecta por JS en el body (patron galeria.html:327-333 con
+    // el silo .pdrecl). Cierre por boton, Cancelar, backdrop e Escape.
+    + 'function rcMontarModal(){\n'
+    + '  if(document.getElementById("pdrecl-modal"))return;\n'
+    + '  var w=document.createElement("div");\n'
+    + '  w.className="pdrecl";\n'
+    + '  w.id="pdrecl-modal";\n'
+    + '  w.innerHTML=\'<div class="pdrecl-box">\'\n'
+    + '    +\'<div class="pdrecl-bar"><div class="pdrecl-title">Reclamar propiedad</div>\'\n'
+    + '    +\'<button class="pdrecl-close" type="button" aria-label="Cerrar">\u00D7</button></div>\'\n'
+    + '    +\'<div class="pdrecl-body">\'\n'
+    + '    +\'<p class="pdrecl-intro">\u00bfEres creador o due\u00f1o oficial del punto? Cu\u00e9ntanos qui\u00e9n eres y el equipo de LATAWEL lo verifica.</p>\'\n'
+    + '    +\'<label class="pdrecl-field"><span class="pdrecl-label">URL de prueba de propiedad <span class="pdrecl-tag">(obligatorio)</span></span>\'\n'
+    + '    +\'<span class="pdrecl-hint">Un enlace p\u00fablico donde se vea que el punto es tuyo: Instagram oficial, perfil de Spotify, tu sitio web o un documento. Debe empezar por http:// o https://</span>\'\n'
+    + '    +\'<input class="pdrecl-input" id="pdrecl-url" type="text" maxlength="500" placeholder="https://instagram.com/tu-punto"></label>\'\n'
+    + '    +\'<label class="pdrecl-field"><span class="pdrecl-label">Nota aclaratoria <span class="pdrecl-tag">(opcional)</span></span>\'\n'
+    + '    +\'<span class="pdrecl-hint">A\u00f1ade lo que nos ayude a verificar: nombre del negocio o del proyecto y como nos encontraste.</span>\'\n'
+    + '    +\'<textarea class="pdrecl-input pdrecl-text" id="pdrecl-nota" maxlength="1000" placeholder="Opcional"></textarea></label>\'\n'
+    + '    +\'<div class="pdrecl-actions"><button class="pdrecl-cancel" type="button">Cancelar</button>\'\n'
+    + '    +\'<button class="pdrecl-submit" id="pdrecl-send" type="button">Enviar solicitud</button></div>\'\n'
+    + '    +\'</div></div>\';\n'
+    + '  document.body.appendChild(w);\n'
+    + '  var cl=w.querySelector(".pdrecl-close");\n'
+    + '  if(cl)cl.onclick=rcCerrar;\n'
+    + '  var ca=w.querySelector(".pdrecl-cancel");\n'
+    + '  if(ca)ca.onclick=rcCerrar;\n'
+    + '  var se=w.querySelector("#pdrecl-send");\n'
+    + '  if(se)se.onclick=rcEnviar;\n'
+    + '  w.addEventListener("click",function(e){if(e.target===this)rcCerrar();});\n'
+    + '  if(!window.__pdreclEsc){\n'
+    + '    window.__pdreclEsc=1;\n'
+    + '    document.addEventListener("keydown",function(e){if(e.key==="Escape")rcCerrar();});\n'
+    + '  }\n'
+    + '}\n'
+    // Mensajes por CODIGO de respuesta (contrato real de api/interacciones.js
+    // rama reclamar_propiedad_solicitar): 400 validacion, 401 sesion,
+    // 403 nivel, 409 ya pendiente / no reclamable, 429 cooldown,
+    // 503 SCHEMA_NOT_MIGRATED.
+    + 'function rcMensaje(s,j){\n'
+    + '  var e=(j&&j.error)||"";\n'
+    + '  if(s===401||e==="SESION_REQUERIDA")return "Tu sesi\u00f3n expir\u00f3. Vuelve a iniciar sesi\u00f3n.";\n'
+    + '  if(s===400)return (e==="PRUEBA_URL_INVALIDA"||e==="prueba_url requerido")?"Revisa la URL de prueba: debe empezar por http:// o https:// y tener menos de 500 caracteres.":("Revisa el formulario: "+(e||"faltan datos"));\n'
+    + '  if(s===403)return (e==="NIVEL_INSUFICIENTE")?"Necesitas al menos nivel 1 para reclamar un punto.":"Ahora mismo no puedes reclamar este punto.";\n'
+    + '  if(s===409)return (e==="YA_HAY_SOLICITUD_PENDIENTE")?"Ya hay una solicitud pendiente sobre este punto.":((e==="NO_RECLAMABLE")?"Este punto ya tiene due\u00f1o o no admite m\u00e1s solicitudes.":("Ahora no se puede reclamar: "+(e||"conflicto")));\n'
+    + '  if(s===429)return (e==="RECLAMACION_EN_COOLDOWN")?"Ya enviaste una solicitud hace poco. Espera unas horas antes de volver a intentarlo.":"Demasiados intentos seguidos. Espera un momento.";\n'
+    + '  if(s===503||(j&&j.code==="SCHEMA_NOT_MIGRATED"))return "La reclamaci\u00f3n todav\u00eda no est\u00e1 disponible. Int\u00e9ntalo m\u00e1s tarde.";\n'
+    + '  return "No pudimos registrar la solicitud. Int\u00e9ntalo de nuevo.";\n'
+    + '}\n'
+    + 'function rcEnviar(){\n'
+    + '  var uEl=document.getElementById("pdrecl-url");\n'
+    + '  var nEl=document.getElementById("pdrecl-nota");\n'
+    + '  var btn=document.getElementById("pdrecl-send");\n'
+    + '  var url=uEl?String(uEl.value||"").trim():"";\n'
+    + '  var nota=nEl?String(nEl.value||"").trim():"";\n'
+    + '  if(!url){rcToast("Escribe la URL de prueba de propiedad.","#EF4444");return;}\n'
+    + '  var low=url.toLowerCase();\n'
+    + '  if((low.indexOf("http://")!==0&&low.indexOf("https://")!==0)||low.indexOf(" ")>-1){rcToast("La URL de prueba debe empezar por http:// o https:// y no puede traer espacios.","#EF4444");return;}\n'
+    + '  var hd={"Content-Type":"application/json"};\n'
+    + '  try{\n'
+    + '    if(window.ExploraCO&&typeof window.ExploraCO.authHeaders==="function"){\n'
+    + '      var ah=window.ExploraCO.authHeaders()||{};\n'
+    + '      if(ah.Authorization)hd.Authorization=ah.Authorization;\n'
+    + '    }\n'
+    + '  }catch(e){}\n'
+    + '  if(btn){btn.disabled=true;btn.textContent="Enviando...";}\n'
+    + '  fetch("/api/interacciones",{method:"POST",headers:hd,body:JSON.stringify({tipo:"reclamar_propiedad_solicitar",recurso_tipo:"destino",recurso_id:DID,prueba_url:url,nota_solicitante:nota})})\n'
+    + '  .then(function(r){return r.json().catch(function(){return null;}).then(function(j){return {s:r.status,j:j};});})\n'
+    + '  .then(function(res){\n'
+    + '    if(btn){btn.disabled=false;btn.textContent="Enviar solicitud";}\n'
+    + '    if(res.s>=200&&res.s<300&&res.j&&res.j.ok){rcCerrar();rcToast("Solicitud enviada. La revisamos y te avisamos por correo.","#22C55E");return;}\n'
+    + '    rcCerrar();\n'
+    + '    rcToast(rcMensaje(res.s,res.j),"#EF4444");\n'
+    + '  })\n'
+    + '  .catch(function(e){\n'
+    + '    if(btn){btn.disabled=false;btn.textContent="Enviar solicitud";}\n'
+    + '    console.warn("[reclamar_propiedad]",e&&e.message);\n'
+    + '    rcCerrar();\n'
+    + '    rcToast("No pudimos enviar la solicitud. Revisa tu conexi\u00f3n.","#EF4444");\n'
+    + '  });\n'
+    + '}\n'
+    + 'function initReclamo(){\n'
+    + '  var btn=document.getElementById("btn-reclamar");\n'
+    + '  if(!btn)return;\n'
+    + '  fetch("/api/interacciones?tipo=reclamacion_estado&destino_id="+encodeURIComponent(DID)).then(function(r){return r.json().catch(function(){return null;});}).then(function(res){\n'
+    + '    if(!res||!res.ok||!res.data)return;\n'
+    + '    if(res.data.es_reclamable===true)btn.style.display="";\n'
+    + '  }).catch(function(e){console.warn("[reclamacion_estado]",e&&e.message);});\n'
+    + '}\n'
+    + 'initReclamo();\n'
     // TSK-111 (CAMBIO 7A): modulo "Fotos de viajeros" RETIRADO de la ficha.
     // Se eliminaron galEsc/FP_URLS/fpCaps/loadFotos/subirFoto/votarFoto y el
     // popover Guardar-en-album (cerrarAlbumPopover/abrirAlbumPopover/

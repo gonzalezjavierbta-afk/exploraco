@@ -59,6 +59,14 @@
 //   api/interacciones.js:6376  if (tipo === 'planes_mios') -> SELECT ... :6382
 //   api/utilidades.js:769      if (tipo === 'diagnostico') (salud de plataforma)
 // Unico fichero que consulta planes_viaje en todo api/: interacciones.js
+//
+// 055 (ADR-091), tres consumidores, deducidos del codigo real:
+//   api/interacciones.js:6150  if (tipo === 'reclamacion_estado')
+//                                          -> SELECT ... :6157 (exige destino_id)
+//   api/interacciones.js:9816  if (tipo2 === 'reclamar_propiedad_solicitar')
+//                                          -> CTE up+ins :9919, ON CONFLICT :9932
+//   api/admin.js:1879          recurso === 'reclamaciones'
+//                                          -> SELECT ... :1903 (exige auth)
 // ---------------------------------------------------------------------------
 const MAPEO = {
   planes_viaje: {
@@ -110,6 +118,119 @@ const MAPEO = {
       'distingue entonces "filtro desplegado" de "filtro ausente" siempre que el filtro ' +
       'oculte al menos una fila; si no oculta ninguna, ambos conteos coinciden y el ' +
       'dato no discrimina (INDETERMINADO), que es la respuesta honesta.',
+  },
+
+  // ---------------------------------------------------------------------------
+  // CLAVE 'reclamacion_propiedad' en SINGULAR, no 'reclamaciones_propiedad'.
+  // El resolutor de main() empareja la CLAVE contra el nombre del fichero por
+  // substring (nombre.indexOf(k.toLowerCase()) !== -1), asi que la clave tiene
+  // que ser un trozo LITERAL de 055_reclamacion_propiedad_destinos.sql. El
+  // nombre real de la tabla, en plural, va en el campo tabla, que es el que se
+  // imprime. El emparejado es el primero que gana y ningun otro nombre de
+  // migracion del repo contiene este trozo.
+  // ---------------------------------------------------------------------------
+  reclamacion_propiedad: {
+    migracion: '055_reclamacion_propiedad_destinos.sql',
+    tabla: 'reclamaciones_propiedad',
+    // El arnes solo construye BASE + ruta + '?tipo=' + tipo, metodo GET y sin
+    // cabeceras. Los tres consumidores de la 055 se declaran, no se sondean:
+    // ninguno responde a esa forma de peticion (ver tipos y explained).
+    funcion: 'api/interacciones.js + api/admin.js',
+    metodo: 'GET+POST',
+    ruta: '/api/interacciones',
+    tipos: [
+      {
+        tipo: 'reclamacion_estado',  // GET solo lectura, boton de reclamo
+        lineaRama: 6150,
+        lineaSelect: 6157,           // SELECT es_reclamable, estado_reclamacion, dueno_id
+        sondeable: true,
+        metodo: 'GET',
+        forma: 'objeto',             // data es un OBJETO, no un listado
+        // destino_id REAL: la rama responde 400 sin el (:6152) y la sonda no
+        // inventa ids. La consulta NO menciona columnas de la 055 a proposito:
+        // asi corre aunque la migracion no este aplicada y es la PROPIA rama
+        // la que revela el esquema (degrada en silencio si falta, :6172-6178).
+        params: function () {
+          return leerDestinoIdReal().then(function (id) {
+            return id ? { destino_id: id } : null;
+          });
+        },
+        // La degradacion silenciosa devuelve 200 ok:true con
+        // estado_reclamacion='no_disponible': eso es una senal de migracion,
+        // no un exito. Y un 400 con la firma del despacho generico
+        // ('insuficientes', api/interacciones.js:9801) significa que el
+        // backend desplegado NO tiene la rama: la 055 no esta en el codigo.
+        senal: {
+          campo: 'estado_reclamacion',
+          degradado: 'no_disponible',
+          ramaAusente: ['insuficientes'],
+        },
+      },
+      {
+        tipo: 'reclamar_propiedad_solicitar', // POST, escribe la solicitud
+        lineaRama: 9816,
+        lineaSelect: 9919,           // CTE up+ins; ON CONFLICT (recurso_tipo, recurso_id)
+                                    // WHERE estado='pendiente' en :9932
+        sondeable: false,
+        metodo: 'POST',
+        notaSonda: 'POST y exige sesion firmada (validarSesion :9821); sin ' +
+                   'credencial de sesion no hay sonda honesta por HTTP. Su ' +
+                   'ON CONFLICT se prueba contra la BD en ' +
+                   'scripts/smoke_055_indice_unico_reclamacion.js',
+      },
+      {
+        tipo: 'reclamaciones',       // cola de moderacion, NO vive en esta ruta
+        ruta: '/api/admin?recurso=reclamaciones', // ruta propia del admin
+        lineaRama: 1879,             // api/admin.js (fichero distinto)
+        lineaSelect: 1903,
+        sondeable: true,
+        metodo: 'GET',
+        forma: 'lista',
+        // Recibe el Bearer desde la MISMA fuente y con el MISMO fallback que
+        // api/admin.js:87-90. El secreto NUNCA se imprime.
+        cabeceras: function () {
+          return { Authorization: 'Bearer ' + secretoAdmin() };
+        },
+      },
+    ],
+    // Columna que la 055 anade. Solo descriptiva, como en la 044: la rama que
+    // la lee esta en es_reclamable, estado_reclamacion y dueno_id, las tres.
+    columnaEsperada: 'es_reclamable',
+
+    // ---- LAS DOS CONSULTAS QUE DISCRIMINAN -------------------------------
+    // consulta_antes NO puede mencionar ninguna columna de la 055: si la
+    // mencionara fallaria con 42703 en vez de contar filas.
+    // La 055 no oculta filas de ningun listado (no toca un WHERE de listado),
+    // asi que el par no mide "cuanto devuelve el listado": mide la poblacion
+    // que el CAMINO DE RECLAMO acepta, con el WHERE exacto del UPDATE de la CTE
+    // (api/interacciones.js:9922-9923). Es el conjunto sobre el que la
+    // migracion promesse proteger.
+    consulta_antes:
+      'SELECT count(*)::int AS n FROM destinos',
+    consulta_despues:
+      'SELECT count(*)::int AS n FROM destinos d'
+      + ' WHERE d.es_reclamable = TRUE AND d.dueno_id IS NULL'
+      + ' AND d.estado_reclamacion IN (\'disponible\',\'en_revision\')',
+    explained:
+      'La 055 anade a public.destinos las cinco columnas de propiedad y pozo ' +
+      '(es_reclamable, dueno_id, xp_pozo_acumulado, estado_reclamacion, ' +
+      'pozo_actualizado_en) y crea public.reclamaciones_propiedad con el indice ' +
+      'unico parcial uq_reclamaciones_recurso_pendiente. El par de conteos compara ' +
+      'la poblacion total de destinos con la que el camino de reclamo acepta ' +
+      '(es_reclamable y dueno_id IS NULL y estado disponible o en_revision); si ' +
+      'los DEFAULT de la 055 dejan es_reclamable=true y dueno_id NULL en todas ' +
+      'las filas, ambos conteos coinciden y el par NO discrimina (INDETERMINADO). ' +
+      'Por eso la senal decisiva aqui es la SONDA de reclamacion_estado: la rama ' +
+      '(a) api/interacciones.js:6150 con SELECT en :6157 responde 200 con las ' +
+      'columnas nuevas, o degrada en silencio (esEsquemaFaltante :6172-6178 -> ' +
+      'estado_reclamacion=no_disponible si el esquema falta), o si el backend ' +
+      'desplegado no tiene la rama el despacho GET cae al generico Parametros ' +
+      'insuficientes (:9801). La sonda pasa un destino_id REAL leido de la BD, ' +
+      'nunca inventado. La rama (b) POST reclamar_propiedad_solicitar :9816 ' +
+      'exige sesion firmada (:9821) y no se sondea por HTTP; su ON CONFLICT se ' +
+      'prueba contra la BD en el smoke de la 055. La rama (c) recurso ' +
+      'reclamaciones api/admin.js:1879 se sondea con el Bearer de ADMIN_SECRET, ' +
+      'sin imprimirlo.',
   },
 };
 
@@ -225,6 +346,57 @@ async function consultarNeon(sqlTexto) {
   }
 }
 
+// Igual que consultarNeon pero devuelve la PRIMERA FILA cruda, no un conteo.
+// La usa la sonda de reclamacion_estado para leer un destino_id REAL. Mismas
+// garantias: solo SELECT/WITH, DATABASE_URL en memoria, ni URL ni SQL impresos.
+async function consultarNeonFila(sqlTexto) {
+  const malo = validarReadOnly(sqlTexto);
+  if (malo) return { ok: false, fila: null, motivo: 'consulta rechazada: ' + malo };
+
+  try { require('./load_env_local')(); }
+  catch (e) { return { ok: false, fila: null, motivo: 'no se pudo leer .env.local' }; }
+
+  const url = urlValida(process.env.DATABASE_URL);
+  if (!url) {
+    return { ok: false, fila: null, motivo: 'sin DATABASE_URL valida en .env.local' };
+  }
+
+  let neon = null;
+  try { neon = require('@neondatabase/serverless').neon; }
+  catch (e) { neon = null; }
+  if (!neon) {
+    return { ok: false, fila: null, motivo: '@neondatabase/serverless no esta instalado' };
+  }
+
+  try {
+    const filas = await neon(url)(String(sqlTexto), []);
+    const arr = Array.isArray(filas) ? filas : [];
+    if (!arr.length) return { ok: false, fila: null, motivo: 'Neon devolvio 0 filas' };
+    return { ok: true, fila: arr[0], motivo: '' };
+  } catch (e) {
+    const codigo = (e && e.code) ? String(e.code) : 'error';
+    return { ok: false, fila: null, motivo: 'Neon respondio ' + limpiar(codigo) };
+  }
+}
+
+// destino_id REAL para la sonda de reclamacion_estado. La consulta NO menciona
+// ninguna columna de la 055: si la migracion no estuviera aplicada, esta
+// consulta seguiria corriendo y es la rama sondeada la que revelaria el
+// esquema (degradacion silenciosa), que es justo lo que se quiere medir.
+function leerDestinoIdReal() {
+  return consultarNeonFila('SELECT id::text AS id FROM destinos ORDER BY id LIMIT 1')
+    .then(function (r) {
+      return (r.ok && r.fila && r.fila.id) ? String(r.fila.id) : null;
+    });
+}
+
+// Secreto de admin: MISMA fuente y MISMO fallback que api/admin.js:87-90
+// (process.env.ADMIN_SECRET || 'exploraco12345'). Se usa en memoria para
+// construir la cabecera Bearer y NUNCA se imprime.
+function secretoAdmin() {
+  return process.env.ADMIN_SECRET || 'exploraco12345';
+}
+
 // ---------------------------------------------------------------------------
 // LOGICA DE DECISION (el corazon del script).
 //
@@ -295,14 +467,19 @@ function decidir(viejo, nuevo, prod) {
 // ---------------------------------------------------------------------------
 // Sonda HTTP. GET sin efectos. Devuelve siempre un estado clasificado.
 // ---------------------------------------------------------------------------
-async function pedir(base, ruta, cabeceras) {
+async function pedir(base, ruta, cabeceras, metodo, cuerpo) {
   const g = techo(TIMEOUT_MS);
   try {
-    const r = await fetch(base + ruta, {
-      method: 'GET',
-      headers: cabeceras || {},
-      signal: g.signal,
-    });
+    // metodo y cuerpo son OPT-IN: sin ellos la llamada queda identica a antes
+    // (GET, sin cuerpo), que es lo que la 044 necesita y ya daba verde.
+    const cab = Object.assign({}, cabeceras || {});
+    const op = { method: metodo || 'GET', headers: cab, signal: g.signal };
+    if (cuerpo !== undefined && cuerpo !== null) {
+      op.body = (typeof cuerpo === 'string') ? cuerpo : JSON.stringify(cuerpo);
+      const tieneCt = Object.keys(cab).some(function (k) { return k.toLowerCase() === 'content-type'; });
+      if (!tieneCt) cab['Content-Type'] = 'application/json';
+    }
+    const r = await fetch(base + ruta, op);
     let json = null;
     let crudo = '';
     try {
@@ -347,7 +524,7 @@ function crudoDe(r) { return limpiar(r.cuerpo || ''); }
 //   FALLIDO_42703  el backend pide una columna ausente -> migracion no desplegada
 //   ERROR_5XX / ERROR_4XX                           -> fallo de la peticion
 //   OK             el listado respondio con data     -> filas comparables
-function clasificar(r) {
+function clasificar(r, forma) {
   if (!r.alcanzable) {
     return {
       estado: 'SIN_VERIFICAR',
@@ -387,6 +564,22 @@ function clasificar(r) {
       razon: 'HTTP ' + r.status + ' pero sin ok:true: ' + limpiar((b && b.error) || 'sin cuerpo'),
     };
   }
+  if (forma === 'objeto') {
+    // Ramas como reclamacion_estado devuelven data como OBJETO, no listado.
+    if (!b.data || typeof b.data !== 'object' || Array.isArray(b.data)) {
+      return {
+        estado: 'ERROR_5XX',
+        ok: false,
+        razon: 'ok:true pero data no es un objeto: la forma de la respuesta cambio.',
+      };
+    }
+    return {
+      estado: 'OK',
+      ok: true,
+      razon: 'Respuesta correcta (data es un objeto con ' +
+             Object.keys(b.data).length + ' campo(s)).',
+    };
+  }
   if (!Array.isArray(b.data)) {
     return {
       estado: 'ERROR_5XX',
@@ -402,6 +595,80 @@ function clasificar(r) {
     razon: 'Listado correcto, ' + b.data.length + ' fila(s). Un array vacio es ' +
            'correcto: ningun plan vigente (el filtro de la 044 oculta los vencidos).',
   };
+}
+
+// Construye la URL de la sonda. OPT-IN por tipo:
+//   - si el tipo declara ruta propia, se usa tal cual (admin) y NO se le anade
+//     'tipo': su ruta ya trae el recurso;
+//   - si no, se anade 'tipo' como siempre (comportamiento historico);
+//   - params: objeto de query extra (puede traer el destino_id real).
+function construirRuta(t, m, params) {
+  const base = t.ruta || m.ruta;
+  const partes = [];
+  if (!t.ruta) partes.push('tipo=' + encodeURIComponent(t.tipo));
+  if (params) {
+    Object.keys(params).forEach(function (k) {
+      if (params[k] === undefined || params[k] === null) return;
+      partes.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+    });
+  }
+  if (!partes.length) return base;
+  const sep = (base.indexOf('?') === -1) ? '?' : '&';
+  return base + sep + partes.join('&');
+}
+
+// Interpreta la respuesta de UNA sonda con senal declarada como veredicto de
+// migracion. Devuelve null si no es interpretable (se sigue con los conteos).
+// Tres desenlaces, todos REALES:
+//   (i)   200 ok:true, campo != valor degradado -> migracion VIVA.
+//   (ii)  200 ok:true, campo == valor degradado -> esquema ausente (la rama
+//         degrada en silencio). La sonda SI respondio: resultado valido.
+//   (iii) 400 con la firma de rama ausente -> el backend desplegado no tiene la
+//         rama: la migracion no esta en el CODIGO (aunque este en la BD).
+function veredictoSenal(principal) {
+  if (!principal || !principal.senal) return null;
+  const s = principal.senal;
+  const r = principal.r || {};
+  const b = (r.json && typeof r.json === 'object') ? r.json : null;
+
+  if (principal.estado === 'OK' && s.campo) {
+    const data = (b && b.data && typeof b.data === 'object') ? b.data : null;
+    const val = data ? data[s.campo] : undefined;
+    if (String(val) === String(s.degradado)) {
+      return {
+        estado: 'NO APLICADA EN BASE',
+        codigo: 1,
+        razon: 'la rama responde 200 pero degrada en silencio: ' + s.campo + '=' +
+               s.degradado + '. El esquema de la migracion NO existe en la base ' +
+               '(esEsquemaFaltante). Aplicar la migracion en Neon y re-desplegar.',
+      };
+    }
+    return {
+      estado: 'OK CONFIRMADO',
+      codigo: 0,
+      razon: 'la rama responde 200 y devuelve ' + s.campo + '=' + String(val) +
+             ', distinto del valor degradado ' + s.degradado + ': las columnas ' +
+             'de la migracion existen y el backend desplegado las lee. La ' +
+             'migracion esta VIVA en produccion.',
+    };
+  }
+
+  if (principal.estado === 'ERROR_4XX' && Array.isArray(s.ramaAusente)) {
+    const err = String((b && (b.error || b.detalle)) || '');
+    for (const frag of s.ramaAusente) {
+      if (err.indexOf(frag) !== -1) {
+        return {
+          estado: 'NO APLICADA EN CODIGO',
+          codigo: 1,
+          razon: 'la rama no existe en el backend desplegado: HTTP ' + r.status +
+                 ' "' + limpiar(err) + '". Esa firma es el despacho generico SIN ' +
+                 'esta rama. La base puede tener la migracion, pero el codigo que ' +
+                 'la consume NO esta desplegado: falta desplegar api/.',
+        };
+      }
+    }
+  }
+  return null;
 }
 
 function check(label, cond, extra) {
@@ -475,12 +742,32 @@ async function main(argv) {
   const resultados = [];
   const sondeables = m.tipos.filter(function (t) { return t.sondeable; });
   for (const t of sondeables) {
-    const ruta = m.ruta + '?tipo=' + encodeURIComponent(t.tipo);
-    const r = await pedir(BASE, ruta, {});
-    const c = clasificar(r);
+    // params/cabeceras OPT-IN por tipo; pueden ser objeto o funcion (async).
+    let params = (typeof t.params === 'function') ? await t.params() : t.params;
+    let cabeceras = (typeof t.cabeceras === 'function') ? await t.cabeceras() : t.cabeceras;
+    const metodo = t.metodo || 'GET';
+
+    // Si el tipo declaro params pero no se pudieron resolver (p.ej. un
+    // destino_id REAL que no se pudo leer de la BD), la sonda NO se inventa:
+    // se declara SIN_VERIFICAR, distinto de "respondio y dijo no_disponible".
+    if (t.params !== undefined && (params === null || params === undefined)) {
+      const razon = 'no se pudo resolver un parametro real de la sonda (destino_id): la BD no respondio.';
+      resultados.push({ tipo: t.tipo, lineaRama: t.lineaRama, lineaSelect: t.lineaSelect,
+        estado: 'SIN_VERIFICAR', filas: null, senal: t.senal,
+        r: { alcanzable: false, status: 0, json: null, cuerpo: '', motivo: 'param no resuelto' },
+        razon: razon });
+      check(metodo + ' tipo=' + t.tipo + ' [SIN_VERIFICAR]', false,
+        'linea=' + t.lineaRama + ' select=' + t.lineaSelect + ' | ' + razon);
+      continue;
+    }
+
+    const ruta = construirRuta(t, m, params);
+    const r = await pedir(BASE, ruta, cabeceras, metodo, t.cuerpo);
+    const c = clasificar(r, t.forma);
     const filas = (r.json && Array.isArray(r.json.data)) ? r.json.data.length : null;
-    resultados.push({ tipo: t.tipo, lineaRama: t.lineaRama, lineaSelect: t.lineaSelect, estado: c.estado, filas: filas, r: r, razon: c.razon });
-    check('GET tipo=' + t.tipo + ' [' + c.estado + ']',
+    resultados.push({ tipo: t.tipo, lineaRama: t.lineaRama, lineaSelect: t.lineaSelect,
+      estado: c.estado, filas: filas, senal: t.senal, r: r, razon: c.razon });
+    check(metodo + ' tipo=' + t.tipo + ' [' + c.estado + ']',
       c.ok,
       'linea=' + t.lineaRama + ' select=' + t.lineaSelect +
       ' http=' + (r.alcanzable ? r.status : 'sin-respuesta') +
@@ -495,7 +782,7 @@ async function main(argv) {
   // que existen y por que no se cubrieron.
   for (const t of m.tipos) {
     if (t.sondeable) continue;
-    console.log('INFO - tipo=' + t.tipo + ' no sondeado (exige usuario_id).' +
+    console.log('INFO - tipo=' + t.tipo + ' no sondeado (' + (t.notaSonda || 'exige usuario_id') + ').' +
                 ' Rama en linea ' + t.lineaRama + ', select en ' + t.lineaSelect + '.');
   }
 
@@ -553,6 +840,9 @@ async function main(argv) {
   tresCifras();
 
   let estado, veredicto, codigo;
+  // Se calcula UNA vez: si la sonda principal trae senal declarada, su
+  // respuesta ya es evidencia directa y manda sobre los conteos degenerados.
+  const senalVeredicto = principal ? veredictoSenal(principal) : null;
 
   if (!resultados.length || !principal) {
     estado = 'SIN_VERIFICAR';
@@ -574,6 +864,13 @@ async function main(argv) {
                 'desplegado lee ' + m.columnaEsperada + ' y la base responde que no existe. ' +
                 'Aplicar la migracion en Neon; desplegar el backend NO basta.';
     codigo = 1;
+  } else if (senalVeredicto) {
+    // Sonda con senal declarada: su respuesta ES evidencia directa de la
+    // migracion (viva, o esquema ausente, o rama ausente del backend), asi que
+    // manda sobre los conteos, que en la 055 son degenerados (219 === 219).
+    estado = senalVeredicto.estado;
+    veredicto = senalVeredicto.estado + ' - ' + senalVeredicto.razon;
+    codigo = senalVeredicto.codigo;
   } else if (fallos.length > 0) {
     estado = principal.estado;
     veredicto = 'FALLO - ' + principal.estado + ' en ' + m.ruta + '. Diagnostico de ' +
@@ -607,7 +904,8 @@ async function main(argv) {
   console.log('   endpoint   : ' + m.metodo + ' ' + m.ruta);
   console.log('   sonda      : tipo=' + (principal ? principal.tipo : 'n/d') +
               ' rama=' + (principal ? principal.lineaRama : 'n/d') +
-              ' select=' + (principal ? principal.lineaSelect : 'n/d'));
+              ' select=' + (principal ? principal.lineaSelect : 'n/d') +
+              ' senal=' + (principal && principal.senal ? principal.senal.campo : 'no'));
   console.log('   estados    : ' + (resultados.length
     ? resultados.map(function (x) { return x.tipo + '=' + x.estado; }).join(', ')
     : 'sin sondas'));
@@ -622,8 +920,11 @@ module.exports = {
   decidir: decidir,
   clasificar: clasificar,
   consultarNeon: consultarNeon,
+  consultarNeonFila: consultarNeonFila,
   validarReadOnly: validarReadOnly,
   urlValida: urlValida,
+  construirRuta: construirRuta,
+  veredictoSenal: veredictoSenal,
   main: main,
   MAPEO: MAPEO,
 };

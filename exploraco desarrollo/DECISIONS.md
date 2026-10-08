@@ -7618,3 +7618,347 @@ Los tokens consumidos por categoria/zona/precio pasan a `filtros`; los no recono
 - **ADR-027** (arbol de referidos `usuarios.referido_por` reusado en D10).
 - **ADR-034** (las senales de `interacciones`/media y `guardados_*`; los guardados de media y los de destino no se mezclan).
 - **ADR-084** (fuente unica del relato: el argumento de D1-D12 vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apuntan).
+
+## ADR-091: Reclamacion de propiedad de destinos con **pozo de XP** y **bono 1.5x** -- acumulacion en la rama `sin_dueno` de `aplicarDividendoSpot` (CERO cambios en los 13 call-sites), el pozo como **REPUTACION creada** (no se descuenta del autor), acreditacion **PLANA** en `xp_ledger` (fuera del motor de multiplicadores) y pago + ledger + cierre en **UNA sola CTE** con `UPDATE ... WHERE estado='pendiente' RETURNING` como claim atomico [NO deroga ninguna premisa de ADR previos]
+
+**ID:** ADR-091
+**Fecha:** 2026-10-08
+**Autor:** Chief Architect (`@architect`). Las decisiones **D1-D5**, los parametros (multiplicador, tope, cooldown) y el descarte de la doble aprobacion **son decisiones del operador ya tomadas y NO se reabren aqui**: este ADR las **redacta como tales**, no las re-litiga.
+**Estado:** **ACEPTADO E IMPLEMENTADO (2026-10-08).** *Cierre de implementacion (pase unico R2, `@docs-keeper`; solo estado, SIN rediseno):* migracion **055 APLICADA EN NEON** (5 columnas en `destinos` + tabla `reclamaciones_propiedad` 14 col / 6 constraints + 5 indices incl. `uq_reclamaciones_recurso_pendiente`) y codigo **IMPLEMENTADO Y VERIFICADO LOCAL** en working tree (`api/interacciones.js`, `api/admin.js`, `api/pagina-destino.js`, `admin.html`; Escudo GOLD **7/7**, `smoke_055` **24/24**), **PENDIENTE DE DESPLIEGUE** en `exploraco.vercel.app` (`scripts/verificar_migraciones_prod.js` emite `NO APLICADA EN CODIGO`). **Veredicto de `@architect-review`: SIN_CONFIRMAR** (no consta en este pase). Deudas registradas: **BUG-119/120/121/122**. Detalle de cierre en `TASKS.md` **TSK-201** y relevo en `NEXT.md`. Este ADR **no ejecuta nada**: fija modelo de datos (migracion **055**), punto de insercion, motor de acreditacion, contrato atomico y los **5 controles anti-abuso**. Revision de arquitectura pendiente de `@architect-review` (`AGENTS.md` seccion 2, gate de arquitectura). Ejecucion futura: `@sql-security` (055) + `@backend-dev` (`api/interacciones.js`, `api/admin.js`), cada uno con su gate.
+**Numeracion (ADR-006, verificado contra el archivo real):** el mayor ADR del fichero era **`ADR-090`** (linea **7339**, "sistema de busqueda unificado LATAWEL"); no existia ningun `ADR-091`. Este ADR se escribe como **091**, el siguiente consecutivo libre. `DECISIONS.md` medido hoy: **1.155,2 KB / 7.620 lineas** antes de esta entrega (el dato de `AGENTS.md` -- 741,5 KB / 4.731 lineas -- esta **desactualizado**; se declara aqui, no se oculta).
+**Alcance:** este ADR **no ejecuta** nada y **no toca `TASKS.md` ni `NEXT.md`** (eso es el pase de cierre de R2, delegado a `@docs-keeper`, ADR-084). **8/8 funciones serverless INTACTAS (ADR-010):** **cero ficheros nuevos en `api/`** y **cero endpoints nuevos**. Las acciones publicas se extienden como **query params de `api/interacciones.js`** (ya existente) y la moderacion como **`?recurso=` de `api/admin.js`** (ya existente). No se reescribe ningun `tags` (ADR-003). No se toca el motor de XP existente.
+
+### Por que es un ADR nuevo y no una enmienda
+
+Ningun ADR previo emitio la regla "que se hace con el 10% del dividendo spot cuando el destino **no tiene dueno**". Ese caso existe en el codigo desde la migracion **040** (`spot_duenos` es una CACHE derivada por votos, sin columna `id` y sin dueno propio) y es un **efecto colateral no decidido**, no una decision. No hay premisa que corregir, luego no hay nada que enmendar (mismo criterio que ADR-089 y ADR-090 declararon). Lo que este ADR hace es **crear el primer contrato del reclamo de propiedad** y, de paso, **dar destino al XP hoy perdido**.
+
+### Problema / Contexto
+
+El dividendo spot reparte hoy el **10%** del XP bruto de una interaccion al autor de un recurso, a un **dueno DERIVADO por votos**. La rama de fallo es explicita y terminal:
+
+```
+interacciones.js:1100  if (!candId) return { aplicado: false, motivo: 'sin_dueno', monto: 0, monto_descontado: 0 };
+interacciones.js:1101  if (candId === autorId) return { aplicado: false, motivo: 'autor_es_dueno', ... };
+```
+
+Cuando el recurso no tiene dueno, el `return` ocurre **antes de cualquier escritura**: el 10% **se pierde** y `monto` es `0`. Ese es el hueco, y es el activo que este ADR convierte en mecanismo.
+
+La tabla `destinos` **no tiene ninguna columna de propiedad** (verificado: cero coincidencias de `destinos ADD COLUMN IF NOT EXISTS dueno|owner|propiet` en todas las migraciones; el unico `creador_id` del esquema es de `regiones`/comunidades, migracion **008**). El "dueno" real es `spot_duenos` (**040**, PK compuesta `(destino_id, tipo_medio)`, **CACHE derivada por votos**, sin columna `id` y sin dueno propio). Consecuencia: **un destino no tiene dueno por diseno hasta que los votos lo producen**, y en esa ventana el 10% se destruye en cada visita, rating, resena, foto o guardado.
+
+Ese 10% perdido es la unica "moneda" que el sistema genera y **no reparte**. La pregunta de arquitectura no es "como distribuir mas XP", sino: **si queda libre al autor, se tira, o se convierte en reputacion reclamable?** Este ADR elige la tercera y la acota duro.
+
+### Baseline verificado en este turno (ADR-006: archivo real, no memoria)
+
+| Hecho | Fuente | Estado |
+|---|---|---|
+| `DIVIDENDO_SPOT_PCT = 0.10` y `DIVIDENDO_SPOT_TOPE_PCT = 0.50` | `api/interacciones.js:783`, `:784` | **CONFIRMADO** (leido) |
+| `red2(v)` half-up a 2 decimales; `numXp(v)` normaliza el string de Neon | `api/interacciones.js:438`, `:439` | **CONFIRMADO** (leido) |
+| Catalogo `XP_BASES` (visita 60, rating 5, guardado 3, resena_larga 30, resena_corta 10, foto_viajero 30) | `api/interacciones.js:455` (declarado como `var XP_BASES`) | **CONFIRMADO** (leido) |
+| `aplicarDividendoSpot(sql, ctx)` | `api/interacciones.js:1060` | **CONFIRMADO** (leido) |
+| Rama `sin_dueno` = `return` terminal, `monto: 0`, **cero escrituras** | `api/interacciones.js:1100` | **CONFIRMADO** (leido) |
+| `registrarXpLedger(sql, datos)` | `api/interacciones.js:1515` | **CONFIRMADO** (leido) |
+| `calcularNivelLocal(xpTotal)`: el nivel es SIEMPRE derivado | `api/interacciones.js:1802` | **CONFIRMADO** |
+| `esEsquemaFaltante(e)` (`42P01` / `42703`) -- **el nombre real es `esEsquemaFaltante`, NO `isEsquemaFaltante`** | `api/interacciones.js:5325` (ADR-052); patron inline equivalente en `:569` | **CONFIRMADO** (leido) |
+| `verificarSesion(req)` / `validarSesion(req, usuarioIdEsperado)`; **BUG-061**: el usuario NUNCA se confia al body | `api/interacciones.js:4558`, `:4586` | **CONFIRMADO** |
+| `destinos` **sin columna de propiedad** | `db/migrations/*.sql` (0 coincidencias de `destinos ADD COLUMN ... dueno/owner/propiet`) | **CONFIRMADO** |
+| `spot_duenos` es CACHE `(destino_id, tipo_medio)`, calculo canonico por votos | `db/migrations/040_gobernanza_cartas_moneda.sql:325-348` | **CONFIRMADO** (leido) |
+| CHECK vigente: `monto_descontado >= 0 AND monto_descontado <= xp_bruto_base * 0.50` | `db/migrations/040_gobernanza_cartas_moneda.sql:366` | **CONFIRMADO** (leido) |
+| Patron de credito plano en ledger: `mult_*=1`, `cap_aplicado='ninguno'`, `bonos_planos=0`, `es_exento=true` | `api/interacciones.js:1230` (`spot_dividendo_credito`) | **CONFIRMADO** |
+| Defaults de parametros de gamificacion en codigo (`CAP_*_DEFAULT`, `FACTOR_ORIGEN_*_DEFAULT`) | `api/interacciones.js:493-503` | **CONFIRMADO** (leido) |
+| `api/interacciones.js` mide **832,7 KB / 16.074 lineas** | `Get-Item` / `Get-Content` | **CONFIRMADO** |
+| Siguiente migracion libre = **055** (existen 053 y 054; **no existe 052**) | `Get-ChildItem db\migrations` (ultimas: 050, 051, **053, 054**) | **CONFIRMADO** |
+| `api/admin.js` autentica SOLO por `process.env.ADMIN_SECRET`; **no sabe que admin es** | `api/admin.js:79` (`auth`), `:81`, `:85` | **CONFIRMADO** (leido) |
+| `gamificacion_config` ya es parametro de admin alcanzable por `?recurso=` | `api/admin.js:1755` | **CONFIRMADO** |
+| Unico premio XP en admin **fuera de `xp_ledger`**: `UPDATE usuarios SET xp_total=xp_total+50` (doble pago concurrente) | `api/admin.js:984` (rama), `:1015` (UPDATE) | **CONFIRMADO** -- **anti-patron, NO se copia** |
+| `interacciones` usa **`creado_en`**, NO `created_at` ni `creado_at` | `api/interacciones.js:129` (comentario de contrato) | **CONFIRMADO** |
+
+### Opciones evaluadas
+
+| # | Opcion | Veredicto |
+|---|---|---|
+| O1 | Crear una columna de dueno en `destinos` y cobrar el dividendo desde el dia 1 | **Descartada.** Es el modelo correcto a largo plazo pero mezcla dos problemas (propiedad real vs. XP perdido), altera `spot_duenos` y el reparto vigente. Este ADR no toca el dividendo (D1). |
+| O2 | Transferir el 10% a un fondo comun de la plataforma (tesoreria) | **Descartada.** No crea incentivo para reclamar, no genera retencion y no es trazable por recurso. Ademas el CHECK de **040:366** (tope 50% del base por fila) limita el diseno de la acumulacion. |
+| O3 | Acumular el 10% en un **pozo por recurso** y pagarlo al reclamante aprobado | **ELEGIDA.** Cierra el hueco (el 10% deja de perderse), crea un incentivo real para reclamar propiedad y es local por recurso. |
+| O4 | Pagar el 10% al reclamante **sin moderacion** (autoservicio) | **Descartada.** Sin moderacion, un usuario puede reclamar destinos ajenos por el solo hecho de haber inflado el pozo. |
+| O5 | Doble aprobacion (admin + dueno) | **Descartada por el operador.** Sin identidad de admin (`auth()` solo conoce el secret), la segunda firma no cierra el hueco real, que es la **irreversibilidad** del XP: solo anade friccion. Se suprime en favor de una sola aprobacion atomica + **revertimiento condicionado** (409 si el recurso recibio interacciones posteriores). |
+| O6 | Colocar el bono dentro del motor `calcularXpAcreditado` (multiplicadores y caps) | **Descartada (D3).** Un bono de reputacion no es una regla de nivel ni de origen: hacerlo pasar por caps lo deja en manos de multiplicadores ajenos y hace la auditoria del saldo imposible de reconstruir. Se acredita **PLANO**. |
+| O7 | Usar la tabla de parametros existente en vez de constantes fijas | **ELEGIDA.** `gamificacion_config` ya es alcanzable en `api/admin.js:1755`; el operador fijo multiplicador, tope y cooldown como **dinamicos** con default en codigo (mismo patron que `CAP_*_DEFAULT` en `:493-503`). |
+| O8 | Recalcular el pozo leyendo `xp_ledger` en vez de acumular | **Descartada.** Depende de que las filas de ledger **preexistentes** lleven `contexto.recurso_id`, cosa **no verificada** y no assumible (ADR-006). Un acumulador explicito no hereda ese supuesto. |
+
+### Decisiones tomadas (D1-D5 son del OPERADOR; se redactan, no se re-litigan)
+
+**D1 -- El pozo se acumula SOLO cuando NO hay dueno; el dividendo vigente NO se toca (DECISION DEL OPERADOR).** El punto de insercion es **una sola linea efectiva** dentro de `aplicarDividendoSpot`, en la rama `motivo === 'sin_dueno'` (`:1100`), **antes** del `return`. Consecuencias: **cero cambios en los 13 call-sites**, cero cambios en el contrato de retorno, y **el pozo y el dividendo nunca coexisten** -- son ramas mutuamente excluyentes del mismo `if`, no dos ramas que puedan solaparse. La condicion de entrada es "`candId` es falso", es decir, la **misma** que hoy produce `sin_dueno`; no se re-evalua el dueno, no se relanza el reparto. La idempotencia del aporte la da `ON CONFLICT ... DO UPDATE` con guarda de reejecucion (ver la migracion 055), que es el mismo dominio de idempotencia que el dividendo actual.
+
+**D2 -- El pozo es REPUTACION, no transferencia: NO se descuenta del autor (DECISION DEL OPERADOR).** En la rama `sin_dueno` no hay escritura sobre el autor: el XP bruto se registra en el pozo y sigue perteneciendo al autor en `usuarios.xp_total` y en el ledger. Al aprobar se **emite XP nuevo** al solicitante. **Esto es creacion de XP en la economia y el operador lo ha aceptado de forma explicita y consciente.** La magnitud esta acotada por tres topes, ninguno opcional: el multiplicador, el tope absoluto en XP y el saldo disponible (ver control (e)). El contraste con el dividendo es deliberado y es la decision mas profunda del ADR: el dividendo es una **transferencia** (el autor pierde 10%), el pozo es una **emision** (nadie pierde). La razon es que en `sin_dueno` **no hay dueno a quien casi-transferirle**: el unico destinatario real de ese 10% sigue siendo el propio autor, y descontarselo a un tercero --incluido el propio solicitante-- es exactamente el bucle de auto-abuso que el control (a) cierra.
+
+**D3 -- El bono se acredita PLANO, FUERA del motor de multiplicadores (DECISION DEL OPERADOR).** Se **reescribe** el precedente de `spot_dividendo_credito` (`api/interacciones.js:1230`), no se copia: `mult_nivel = mult_stack = mult_final = 1`, `cap_aplicado = 'ninguno'`, `bonos_planos = 0`, `es_exento = true`, y una **accion de ledger propia**. Valores concretos a escribir en `xp_ledger` (13 columnas, `registrarXpLedger` en `:1515`):
+
+| Columna | Valor |
+|---|---|
+| `accion` | `pozo_destino_bonificacion` |
+| `xp_base` | `xp_bienvenida` (el monto emitido integro) |
+| `mult_nivel` / `mult_stack` / `mult_final` | `1` |
+| `cap_aplicado` | `'ninguno'` |
+| `bonos_planos` | `0` |
+| `es_exento` | `true` |
+| `origen_tier` | `'pozo_destino'` (mismo precedente textual; ver R7) |
+| `contexto` (jsonb) | `{"recurso_tipo":"destino","recurso_id":"<uuid>","solicitud_id":"<uuid>","pozo_bruto":<n>,"multiplicador":1.5,"accion":"aprobacion_admin"}` |
+
+**D4 -- Pago al solicitante, insercion en `xp_ledger` y cierre de la solicitud van en LA MISMA CTE, con `UPDATE ... WHERE estado='pendiente' RETURNING` como claim (DECISION DEL OPERADOR).** El claim atomico es la **unica** garantia de "una sola aprobacion efectiva" y por eso el control (c) se cumple **en la base de datos**, no en JS. Esqueleto (tagged template parametrizado, sin interpolar valores):
+
+```sql
+WITH claim AS (
+  UPDATE destino_reclamaciones
+     SET estado='aprobada', xp_bienvenida=$4::numeric, resuelto_en=NOW(), resuelto_por=$5::uuid
+   WHERE id=$1::uuid AND estado='pendiente'
+   RETURNING id, solicitante_id, xp_pozo_capturado, recurso_tipo, recurso_id
+),
+pozo AS (
+  UPDATE xp_pozo_destinos
+     SET xp_bruto_acumulado=0, capturado_por=claim.id, actualizado_en=NOW()
+    FROM claim
+   WHERE xp_pozo_destinos.destino_id=claim.recurso_id
+     AND xp_pozo_destinos.capturado_por IS NULL
+   RETURNING claim.id
+),
+ledger AS (
+  INSERT INTO xp_ledger
+    (usuario_id, accion, xp_base, mult_nivel, mult_stack, mult_final,
+     cap_aplicado, bonos_planos, xp_final, es_exento, mult_origen,
+     origen_tier, contexto)
+  SELECT claim.solicitante_id, 'pozo_destino_bonificacion', $4::numeric, 1, 1, 1,
+         'ninguno', 0, $4::numeric, true, 1,
+         'pozo_destino',
+         jsonb_build_object('recurso_tipo', claim.recurso_tipo,
+                            'recurso_id', claim.recurso_id::text,
+                            'solicitud_id', claim.id::text,
+                            'pozo_bruto', claim.xp_pozo_capturado,
+                            'multiplicador', $6::numeric)
+    FROM claim
+   WHERE EXISTS (SELECT 1 FROM pozo)
+  RETURNING id
+)
+UPDATE usuarios SET xp_total = xp_total + $4::numeric
+ WHERE id = (SELECT claim.solicitante_id FROM claim WHERE EXISTS (SELECT 1 FROM ledger))
+RETURNING id;
+```
+
+**Invariante de la cadena (esto es lo que hace que D4 sea a prueba de carreras):** `ledger` exige `EXISTS (SELECT 1 FROM pozo)` y el pago final exige `EXISTS (SELECT 1 FROM ledger)`. Si el claim no devuelve filas, o si el pozo ya estaba capturado (`capturado_por IS NOT NULL`), **la cadena entera se auto-desactiva** y el handler devuelve `{ aplicado:false, motivo:'idempotente' }` con **HTTP 200**: un **no-op idempotente, nunca un 500** ni un pago parcial. El orden importa y es el inverso del habitual: se paga **ultimo**, y solo si el ledger existe. Una sentencia es atomica completa en una transaccion de Neon, asi que no existe estado intermedio observable.
+
+**D5 -- Se guardan DOS columnas, con significado distinto (DECISION DEL OPERADOR).**
+
+| Columna | Tabla | Semantica | Que quiere decir |
+|---|---|---|---|
+| `xp_pozo_capturado` | `destino_reclamaciones` | **recibo**, snapshot al abrir la solicitud | "cuanto habia cuando reclame" -- congelado, nunca se recalcula |
+| `xp_bienvenida` | `destino_reclamaciones` | **verdad pagada**, monto realmente acreditado | "cuanto se le pago de verdad" -- lo fija el motor con topes |
+
+No es duplicacion: el segundo **puede ser menor** que el primero (tope, saldo, techo) y esa diferencia es justamente la que hace auditable el pago. Es el mismo criterio de ADR-089: contador y suma como agregado, **nunca un promedio re-escrito**.
+
+**D6 -- La aritmetica del bono, explicitada para eliminar la ambiguedad entre "15%" y "1.5x".** Las dos cifras del encargo son consistentes y su unica lectura coherente es esta:
+
+```
+pozo_bruto     = SUM(xp_base) de las interacciones CONTRIBUYENTES (100% del XP bruto)
+bono_base      = pozo_bruto * DIVIDENDO_SPOT_PCT  (0.10)  <- el XP que hoy se pierde, ni uno mas
+xp_bienvenida  = bono_base * MULT_BONO_POZO (1.5) = pozo_bruto * 0.15  <- el ~15% del XP bruto acumulado
+```
+
+`MULT_BONO_POZO = 1.5` (dinamico, default 1.5) y `DIVIDENDO_SPOT_PCT = 0.10` (constante vigente, `:783`) dan exactamente el ~15% del XP bruto acumulado que el operador especifico, **sin redondeo magico**: `xp_bienvenida = red2(pozo_bruto * 0.10 * MULT_BONO_POZO)` con `red2` de `:438`. Se reutiliza la constante vigente en vez de duplicar el `0.10`.
+
+**D7 -- Tope y cooldown son DINAMICOS, leidos de `gamificacion_config`, con default en codigo (DECISION DEL OPERADOR).** Tres claves nuevas, mismo contenedor y mismo camino que ya existen (`admin.js:1755`; defaults en `:493-503`):
+
+| Clave | Default | Proposito |
+|---|---|---|
+| `MULT_BONO_POZO` | `1.5` | multiplicador del bono (D6) |
+| `TOPE_BONO_POZO_XP` | `500.0` | tope absoluto por aprobacion |
+| `COOLDOWN_RECLAMACION_HORAS` | `168` (7 dias) | cooldown entre reclamos del mismo usuario (control (d)) |
+
+Lectura por el patron ya existente: config si la tabla existe y trae la clave; si no, default en codigo con `warn`. Degradacion por `esEsquemaFaltante` (`:5325`) si falta la tabla. **Cero filas nuevas, cero endpoint nuevo**: se reusa `?recurso=gamificacion_config` de `admin.js`.
+
+**D8 -- `recurso_tipo` se admite en el CHECK desde el dia 1 con 3 valores: `destino`, `album_foto`, `usuario_foto`.** El valor `media` del brief original **se descarta**: no corresponde a ninguna tabla. En la **Fase 1 el backend solo acepta `destino`** en la whitelist, aunque el CHECK ya admita los tres (un CHECK que admite mas de lo que el codigo usa no es deuda, es el costo cero de no rehacer la migracion en la Fase 2). **Fase 1 = solo `destinos`. Fase 2 = `album_fotos` y `usuario_fotos`**, y el caso "artista sin cuenta previa" es exactamente `album_fotos.autor_original_id IS NULL`: la Fase 2 no necesita una regla nueva, solo la generalizacion de la Fase 1.
+
+**D9 -- El pozo NO es publico.** Lo ven **solo el solicitante** (su propio `xp_pozo_capturado` y su cooldown) y el **admin** (agregado, para decidir). No hay endpoint ni campo publico que exponga el saldo del pozo de un destino: hacerlo revela el saldo de una recompensa y abre la puerta al *reward-farming* dirigido. La UI publica muestra, como maximo, "este destino no tiene dueno" y un boton de reclamo, **nunca el numero**.
+
+**D10 -- Moderacion: una sola aprobacion, atomica, con `admin_usuario_id` trazable y revertimiento condicionado (DECISION DEL OPERADOR).** `resuelto_por` es el `usuario_id` del admin que aprueba. Como `auth()` (`admin.js:79`) **solo** conoce `process.env.ADMIN_SECRET` y no sabe quien es, la trazabilidad exige una identidad de admin: se crea `admin_usuarios (usuario_id uuid PK REFERENCES usuarios(id), activo boolean NOT NULL DEFAULT true, creado_en timestamptz)` y el endpoint de moderacion exige la cabecera `X-Admin-Usuario-Id`, validada **fail-closed**: si `admin_usuarios` no esta migrada, responde `503 SCHEMA_NOT_MIGRATED` via `esEsquemaFaltante`; si el id no existe o esta inactivo, responde `403`. **Nunca `NULL` silencioso**: la irreversibilidad del XP exige saber quien la ordeno.
+
+**D11 -- Revertimiento: solo procede si el recurso NO recibio interacciones desde la aprobacion; en otro caso `409`.** Comando de una sola CTE que: (1) reclama la solicitud con `UPDATE ... WHERE estado='aprobada' AND EXISTS (SELECT 1 FROM interacciones WHERE destino_id=$1 AND activo=true AND creado_en > resuelto_en)` **falsy**; si es truthy, `409` y nada cambia; (2) debita `xp_bienvenida` al solicitante y escribe la fila de ledger espejo `accion='pozo_destino_bonificacion_reversion'` con `xp_base` **negativo**, el mismo `contexto` y el mismo `solicitud_id`; (3) pone `estado='revertida'`. **Se admite que el revertimiento no puede deshacer XP ya gastado en sinks** (`xp_total - xp_gastado_sinks`, ADR-018): es la asimetria que hace que D10 exija una identidad y por la que **la doble aprobacion se descarto**. El problema no es la friccion, es la **irreversibilidad**, y un segundo aprobador tampoco la deshace. El nombre `creado_en` (NO `creado_at`) es obligatorio: es el nombre real de la columna (`interacciones.js:129`).
+
+**D12 -- El patron de premio XP de `admin.js` NO se copia.** `api/admin.js:1015` hace `UPDATE usuarios SET xp_total=xp_total+50` **fuera de `xp_ledger`** y decide el estado **en JS** (rama `:984`): dos aprobaciones concurrentes pagan dos veces y el saldo no es reconstruible desde el ledger. Este ADR lo declara **anti-patron** y por eso el pago va **dentro** de la CTE (D4), con el ledger como parte obligatoria de la cadena.
+
+### Modelo de datos (migracion 055, la siguiente libre)
+
+**055 UNICA, reejecutable** (`CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS` + `INSERT ... ON CONFLICT DO NOTHING` para los defaults). Tres tablas y un indice unico parcial. `spot_duenos` y `spot_dividendos` **NO se tocan** (D1), y el pozo **nunca** escribe en `spot_dividendos`, precisamente para no chocar con su CHECK `monto_descontado <= xp_bruto_base * 0.50` (`040:366`).
+
+**(1) `destino_reclamaciones`** -- la solicitud, el recibo (D5) y la verdad pagada (D5).
+
+```sql
+CREATE TABLE IF NOT EXISTS destino_reclamaciones (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recurso_tipo        text NOT NULL,
+  recurso_id          uuid NOT NULL,
+  solicitante_id      uuid NOT NULL REFERENCES usuarios(id),
+  estado              text NOT NULL DEFAULT 'pendiente',
+  xp_pozo_capturado   numeric(12,2) NOT NULL DEFAULT 0,
+  xp_bienvenida       numeric(12,2),
+  motivo              text,
+  creado_en           timestamptz NOT NULL DEFAULT now(),
+  resuelto_en         timestamptz,
+  resuelto_por        uuid REFERENCES admin_usuarios(usuario_id),
+  CONSTRAINT chk_reclam_recurso_tipo
+    CHECK (recurso_tipo IN ('destino','album_foto','usuario_foto')),
+  CONSTRAINT chk_reclam_estado
+    CHECK (estado IN ('pendiente','aprobada','rechazada','revertida')),
+  CONSTRAINT chk_reclam_pozo  CHECK (xp_pozo_capturado >= 0),
+  CONSTRAINT chk_reclam_bono  CHECK (xp_bienvenida IS NULL OR xp_bienvenida >= 0)
+);
+```
+
+**Indices -- el parcial es el control (b), no una optimizacion:**
+
+```sql
+-- (b) UNA sola solicitud ABIERTA por recurso. Es la garantia, no un indice de rendimiento.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reclam_abierta_por_recurso
+  ON destino_reclamaciones (recurso_tipo, recurso_id) WHERE estado = 'pendiente';
+-- (d) cooldown: indice por solicitante, en orden de tiempo descendente.
+CREATE INDEX IF NOT EXISTS idx_reclam_solicitante
+  ON destino_reclamaciones (solicitante_id, estado, creado_en DESC);
+```
+
+El indice es **UNICO PARCIAL** y por eso el control (b) no depende de una validacion en JS: si dos solicitudes abiertas compiten, la segunda viola el indice y la transaccion entera falla. Es el mismo patron de "garantia en la base, no en el codigo" que el claim de D4 y que el `ON CONFLICT DO NOTHING` que ya usa el dividendo.
+
+**(2) `xp_pozo_destinos`** -- cabecera del pozo por recurso, con el **claim** del pozo.
+
+```sql
+CREATE TABLE IF NOT EXISTS xp_pozo_destinos (
+  destino_id                uuid PRIMARY KEY REFERENCES destinos(id) ON DELETE CASCADE,
+  xp_bruto_acumulado        numeric(12,2) NOT NULL DEFAULT 0,
+  interacciones_contadas    integer NOT NULL DEFAULT 0,
+  ultimo_aporte_interaccion uuid,
+  capturado_por             uuid REFERENCES destino_reclamaciones(id),
+  actualizado_en            timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT chk_pozo_bruto   CHECK (xp_bruto_acumulado >= 0),
+  CONSTRAINT chk_pozo_cuenta  CHECK (interacciones_contadas >= 0)
+);
+```
+
+`ON DELETE CASCADE` es coherente con ADR-003 **en el caso de borrado fisico del recurso**, que es el unico motivo legitimo para que un pozo desaparezca: si el destino deja de existir, su pozo no tiene a quien pertenece. Para todo lo demas (ocultar, moderar, pausar) se usa `activo` o `estado`, nunca el borrado.
+
+**(3) `xp_pozo_aportes`** -- agregado **por contribuyente**. Es la pieza que hace el control (a) **exacto** en vez de aproximado.
+
+```sql
+CREATE TABLE IF NOT EXISTS xp_pozo_aportes (
+  destino_id     uuid NOT NULL REFERENCES destinos(id) ON DELETE CASCADE,
+  usuario_id     uuid NOT NULL REFERENCES usuarios(id),
+  xp_bruto       numeric(12,2) NOT NULL DEFAULT 0,
+  aportes        integer NOT NULL DEFAULT 0,
+  activo         boolean NOT NULL DEFAULT true,
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (destino_id, usuario_id),
+  CONSTRAINT chk_aporte_bruto  CHECK (xp_bruto >= 0),
+  CONSTRAINT chk_aporte_cuenta CHECK (aportes >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_aportes_por_usuario
+  ON xp_pozo_aportes (destino_id, usuario_id) WHERE activo = true;
+```
+
+El grano es **por contribuyente, no por interaccion**: el volumen queda acotado por usuarios y no por interacciones, y el reset tras la aprobacion es `UPDATE ... SET xp_bruto=0, aportes=0 WHERE destino_id=$1 AND activo=true` (**cero filas borradas**, ADR-003), tras lo cual el mismo destino puede volver a acumular sobre las mismas filas.
+
+**Por que `xp_pozo_aportes` y no solo `xp_pozo_destinos`:** sin el desglose por contribuyente, el control (a) "excluir al solicitante" seria **imposible de evaluar exactamente** (el agregado ya perdio de quien es el XP) y solo quedaria la via de **restar** a posteriori, que es un parche. Con el desglose, el pozo reclamable se lee como una resta simple y honesta: `SUM(xp_bruto) WHERE destino_id=$1 AND usuario_id <> $2 AND activo=true`. El agregado de cabecera `xp_bruto_acumulado` es la lectura de **mostrar** (barata, sin la resta) y la lectura de **pagar** es la del desglose. Es deliberado: mostrar y pagar pueden diferir, y la diferencia es exactamente lo que el solicitante se ha autoexcluido.
+
+**Aporte idempotente (el guard de D1).** El `INSERT ... ON CONFLICT DO UPDATE` acumula, protegido contra la reejecucion de la misma interaccion:
+
+```sql
+INSERT INTO xp_pozo_destinos
+  (destino_id, xp_bruto_acumulado, interacciones_contadas, ultimo_aporte_interaccion, actualizado_en)
+VALUES ($1::uuid, $2::numeric, 1, $3::uuid, now())
+ON CONFLICT (destino_id) DO UPDATE
+   SET xp_bruto_acumulado        = xp_pozo_destinos.xp_bruto_acumulado + EXCLUDED.xp_bruto_acumulado,
+       interacciones_contadas    = xp_pozo_destinos.interacciones_contadas + 1,
+       ultimo_aporte_interaccion = EXCLUDED.ultimo_aporte_interaccion,
+       actualizado_en            = now()
+ WHERE xp_pozo_destinos.ultimo_aporte_interaccion IS DISTINCT FROM EXCLUDED.ultimo_aporte_interaccion;
+```
+
+La fila `WHERE` del `DO UPDATE` es lo que convierte el upsert en idempotente **por interaccion**: una reejecucion con el mismo `ultimo_aporte_interaccion` no actualiza la fila. El patron se aplica identico en `xp_pozo_aportes`. Todos los identificadores van sin tildes por ADR-002.
+
+### Control de abuso (normativo: esta seccion es el ADR, no un extra)
+
+Estos cinco controles son **vinculantes**. Si alguno se cae, la mecanica se cierra o se vuelve a discutir.
+
+**(a) El pozo EXCLUYE las interacciones generadas por el propio solicitante.** No es una validacion al abrir la solicitud: es una **exclusion estructural del calculo**, resuelta por el desglose por contribuyente. Al capturar, `xp_pozo_capturado = SUM(xp_bruto) FROM xp_pozo_aportes WHERE destino_id=$1 AND usuario_id <> $2 AND activo=true`. Consecuencia economica: el solicitante no puede **engordar su propio bono** -- la interaccion que el mismo aporta al pozo no vuelve a su bolsillo. Sin este control, un unico usuario con una cuenta mas activa puede reclamar cualquier destino. La exclusion es **exacta, no aproximada**: es el motivo de existir de `xp_pozo_aportes`.
+
+**(b) UNA sola solicitud ABIERTA por recurso**, garantizada por el indice **UNICO PARCIAL** `idx_reclam_abierta_por_recurso (recurso_tipo, recurso_id) WHERE estado='pendiente'`. Es una garantia de la base: si dos solicitudes abiertas compiten, la segunda viola el indice y **toda la transaccion falla**, sin dejar rastro a medias. El `409` del handler es solo la traduccion de esa violacion; la garantia no esta en el handler. Es reutilizable: al reabrir (`rechazada` -> `pendiente`) se crea una fila nueva, nunca se resucita la vieja.
+
+**(c) UNA sola aprobacion efectiva**, garantizada por el claim atomico `UPDATE ... WHERE estado='pendiente' RETURNING` (D4) y reforzada por el segundo claim `capturado_por IS NULL` sobre el pozo. **La garantia vive en la CTE, no en un `if` de JS**: un check en JS es exactamente el fallo que vive hoy en `admin.js:984` (D12). Si el claim no devuelve filas, el resultado es un **no-op idempotente con HTTP 200**, nunca un 500 ni un pago parcial. Y al revertir, el paso `'aprobada'` -> `'revertida'` cierra el camino para un segundo cobro.
+
+**(d) COOLDOWN parametrizable entre reclamos del mismo usuario**, con `COOLDOWN_RECLAMACION_HORAS` (default `168` = 7 dias) leido de `gamificacion_config` (D7). Se evalua contra la ultima solicitud **resuelta** (aprobada o rechazada) del mismo solicitante, usando el indice `idx_reclam_solicitante`. Al ser un parametro, el operador puede bajarlo a 0 para una campana o subirlo sin desplegar. **Debilidad declarada:** el cooldown es un control de solicitudes, no de dinero -- dos solicitudes del mismo usuario en el mismo instante pueden pasar ambas la lectura. Se acepta conscientemente porque (a) el indice unico parcial ya bloquea el caso paralelo grave (dos recursos distintos abiertos a la vez), (b) (c) sigue garantizando un solo cobro por recurso y (c) el pozo esta acotado por (e). **No se presenta como garantia de deduplicacion estricta.**
+
+**(e) El tope del bono es PARAMETRIZABLE y se valida contra el saldo disponible, sin exceder nunca `pozo * 1.5`.** El monto se calcula en este orden, y el orden es normativo:
+
+```
+1)   xp_bienvenida = red2( xp_pozo_capturado * DIVIDENDO_SPOT_PCT * MULT_BONO_POZO )  -- 0.10 * 1.5 = 0.15
+2)   xp_bienvenida = min( xp_bienvenida, TOPE_BONO_POZO_XP )                          -- tope absoluto
+3)   xp_bienvenida = min( xp_bienvenida, saldo_disponible_usuario )                   -- no acreditar saldo que no existe
+4)   xp_bienvenida = min( xp_bienvenida, xp_pozo_capturado * 1.5 )                    -- techo DURO del contrato
+4b)  si xp_bienvenida <= 0 -> no-op: motivo='monto_cero', la solicitud se cierra como
+     'rechazada' y el pozo NO se captura
+```
+
+El paso **4** es un **techo duro**: aunque un parametro futuro, un error de operacion o un valor de `gamificacion_config` corrupto pusieran `MULT_BONO_POZO` en 500, el pago **no puede** superar `pozo * 1.5`. Es la unica linea que convierte "el bono es 1.5x" de una convencion en un invariante. Los pasos 2 y 3 hacen que la **diferencia entre `xp_pozo_capturado` y `xp_bienvenida`** sea siempre explicable (tope, saldo o techo), y por eso ambas columnas conviven (D5). El paso 3 evita el caso "el bono prometia 500, el usuario tenia 60 de saldo y le dijimos 500". Si el paso 4b se activa, el pozo **no** se consume: la solicitud se resuelve `rechazada` y el recurso puede volver a ser reclamado cuando el pozo crezca.
+
+### Impacto / superficies
+
+| Superficie | Cambio | Riesgo |
+|---|---|---|
+| `api/interacciones.js` (16.074 lineas) | **+1 rama** en `aplicarDividendoSpot` (~:1100) que acumula en el pozo antes del `return` de `sin_dueno`; **+2 helpers** de aporte idempotente; **+3 acciones** por query param (`reclamar_destino`, `mi_reclamacion`, `estado_pozo`); lectura de `gamificacion_config` con defaults | **BAJO** en el hot path (un upsert mas en la rama que hoy no hace nada), **MEDIO** en superficie: 16.074 lineas es el fichero mas grande del repo y exige lectura por rango (techo de 150 KB de `AGENTS.md` 10/18) |
+| `api/admin.js` | **+1 recurso** `?recurso=reclamacion_destino` con `&accion=aprobar|rechazar|revertir`, identico en forma al `?recurso=gamificacion_config` de `:1755` | **MEDIO**: exige `admin_usuarios` migrado o responde 503 |
+| `xp_pozo_destinos` / `xp_pozo_aportes` | 2 tablas nuevas, escritura en **cada interaccion sin dueno** | **MEDIO**: son las unicas escrituras nuevas en el hot path; el grano por contribuyente acota el volumen |
+| `destino_reclamaciones` | 1 tabla nueva, escritura por solicitud y por moderacion | **BAJO** |
+| `spot_duenos` / `spot_dividendos` | **SIN CAMBIOS** (D1) | **NULO** |
+| Motor de XP (`calcularXpAcreditado`, `calcularNivelLocal`) | **SIN CAMBIOS** -- el bono entra por el ledger plano (D3) | **NULO** |
+| `xp_ledger` | **+1 accion** (`pozo_destino_bonificacion`) y **+1 espejo** de reversion | **BAJO**, y es un **activo**: hace el pago reconstruible |
+| `usuarios.xp_total` | acreditado **dentro** de la misma CTE | **MEDIO**: es la unica via de pago y es atomica |
+| **Endpoints nuevos** | **0** | 8/8 intactas (ADR-010) |
+| Ficheros nuevos en `api/` | **0** | ADR-010 / ADR-001 |
+
+**Fases.** **Fase 1 = solo `destino`** (whitelist del backend = `['destino']`, aunque el CHECK admita tres, D8). **Fase 2 = `album_foto` y `usuario_foto`**, y alli el caso "artista sin cuenta previa" es exactamente `album_fotos.autor_original_id IS NULL`. La generalizacion es de codigo (whitelist y helper de recurso), no de esquema: la 055 ya admite los tres valores para que la Fase 2 no requiera migracion.
+
+### Consecuencias
+
+- **Positivas:** el 10% que hoy se destruye en cada interaccion sobre un recurso sin dueno deja de perderse; aparece un incentivo real y trazable para reclamar recursos huerfanos; el pago es **reconstruible** desde `xp_ledger` (a diferencia del premio de `admin.js:1015`); el administrador tiene un dato nuevo y accionable: **"este destino genera N XP y nadie lo reclama"**.
+- **Negativas / aceptadas:** se **crea XP** en la economia (D2, decision consciente del operador); aparece un vector de **autocreacion de dueno** que los controles (a) y (b) acotan; el revertimiento **no puede deshacer XP ya gastado** en sinks (asimetria declarada en D11); la superficie en `interacciones.js` crece en el fichero mas grande del repo.
+- **Umbral de honestidad:** este ADR **no arregla la propiedad de recursos**. `destinos` sigue sin columna de dueno y `spot_duenos` sigue siendo una CACHE por votos. Lo unico que se crea es un **camino de predicacion economicamente incentivado** hacia ella. Si el sistema necesita duenos reales, es O1 y merece su propio ADR, no una extension de este.
+
+### Deuda / riesgos
+
+- **R1 -- Identidad de admin.** `admin_usuarios` es la unica via de que `resuelto_por` sea real. Sin esa migracion la moderacion **no puede funcionar** (403/503), y el operador debe crearla antes de la Fase 1. **Deuda declarada, no oculta.**
+- **R2 -- Cooldown best-effort** (control (d)): ventana de carrera pequena y documentada. Se cierra cuando exista un `advisory lock` por solicitante; **no** se acepta cerrarla con un `if` en JS.
+- **R3 -- Volumen de escrituras.** Cada interaccion sin dueno escribe 2 filas. Se **debe** medir tras el despliegue (`EXPLAIN` mas conteo por `accion` en `xp_ledger`) y, si el volumen lo justifica, **batchear el aporte por interaccion y no por accion**. No se optimiza antes de medir.
+- **R4 -- Reversibilidad parcial.** El revertimiento puede llevar `xp_total` por debajo de `xp_gastado_sinks`. Se acepta (el nivel es derivado, ADR-018) y se documenta el saldo negativo como evento observable para que `@docs-keeper` lo registre en `BUGS_HISTORICOS.md` si ocurre.
+- **R5 -- Dos fuentes de verdad en el monto.** `xp_pozo_destinos.xp_bruto_acumulado` (mostrar) y `SUM(xp_pozo_aportes)` (pagar) **pueden divergir** si falla una escritura de las dos. Se mitiga con el **mismo `ultimo_aporte_interaccion`** como guarda en ambas y con un script de conciliacion en `scripts/`, reejecutable. **Deuda real, con mitigacion parcial.**
+- **R6 -- El revertimiento de la 055.** El revertimiento del XP **no es automatico** si la solicitud ya fue aprobada y el recurso recibio interacciones: devuelve 409 por diseno (D11). Quien opere la moderacion debe leer el 409 como "el mundo ya avanzo", no como un fallo.
+- **R7 -- Formato de `origen_tier`.** El valor `'pozo_destino'` debe existir en el dominio de `origen_tier` del ledger; si la columna tiene CHECK propio, la 055 lo extiende. **Pendiente de verificar al aplicar la 055** (no se afirma aqui lo que no se ha leido).
+
+### Verificacion de este ADR
+
+- **Numero:** `Select-String -LiteralPath "exploraco desarrollo\DECISIONS.md" -Pattern "^## ADR-091"` -> **1 coincidencia**, la ultima cabecera. Antes de escribir: `Select-String "^## ADR-"` -> mayor **`ADR-090`** (linea **7339**). Por eso el ID es **091**.
+- **Formato:** cabecera y secciones calcadas de **ADR-090** (`**ID:**`, `**Fecha:**`, `**Autor:**`, `**Estado:**`, `**Numeracion:**`, `**Alcance:**`, `### Por que es un ADR nuevo`, `### Problema / Contexto`, `### Baseline verificado`, `### Opciones evaluadas`, `### Decisiones tomadas`, `### Modelo de datos`, `### Control de abuso`, `### Impacto / superficies`, `### Consecuencias`, `### Deuda / riesgos`, `### Verificacion de este ADR`, `**ADRs relacionados:**`).
+- **Baseline (ADR-006):** verificado con `Select-String` y `Read` acotado sobre `DECISIONS.md` (cabeceras y ultimas ~50 lineas), `api/interacciones.js` (`:129`, `:438-439`, `:455`, `:493-507`, `:569`, `:783-784`, `:1060`, `:1096-1113`, `:1230`, `:1448`, `:1515`, `:1802`, `:4558`, `:4586`, `:5325`), `api/admin.js` (`:79-85`, `:984`, `:1015`, `:1755`), `db/migrations/040_gobernanza_cartas_moneda.sql` (`:325-348`, `:366`), `db/migrations/014` y `019`, y el listado de `db/migrations`. **Ningun fichero > 150 KB se leyo completo** (techo `AGENTS.md` 10/18).
+- **Correcciones al contexto de partida (declaradas, no silenciadas):** (i) el helper se llama **`esEsquemaFaltante`**, no `isEsquemaFaltante` (`:5325`); (ii) la columna de fecha de `interacciones` es **`creado_en`**, no `creado_at` ni `created_at` (`:129`); (iii) `XP_BASES`, `DIVIDENDO_SPOT_PCT` y los `CAP_*_DEFAULT` estan declarados con **`var`**, no `const`; (iv) el UPDATE del anti-patron de admin esta en **`:1015`** (el rango `1003-1019` citado lo contiene, pero la cifra exacta es 1015); (v) **no existe la migracion 052**; la siguiente libre es **055**.
+- **ASCII:** lo anadido aqui es **ASCII puro, 0 bytes > 127**, 0 backticks en `api/*.js` (los que aparecen son marcas markdown del propio documento). Identificadores, columnas, rutas y SQL van **sin tildes** (ADR-002).
+- **Sin codigo:** este ADR **no ejecuta** `npm test` ni nada en `scripts/`, **no implementa** la migracion ni el backend, y **no escribe** en `TASKS.md` ni `NEXT.md` (R2: pase de cierre aparte, `@docs-keeper`).
+- **Integridad del fichero:** la escritura se hizo sobre `DECISIONS.md` **unico**; ningun otro fichero fue modificado. Se verifico la integridad de codificacion (UTF-8 sin BOM) tras la escritura.
+- **Fuente unica (ADR-084):** el argumento de D1-D12 y de los controles (a)-(e) vive **una sola vez, aqui**.
+- **Estado:** **PROPUESTO (2026-10-08)** -- pendiente de veredicto de `@architect-review`. **D1-D5 son decisiones ya tomadas por el operador**: una revision puede pedir que se redacten mas claro, **no que se re-litiguen**.
+
+**ADRs relacionados:**
+
+- **ADR-018** (el nivel es **DERIVADO** con `calcularNivelLocal(xpTotal)`, nunca una columna; `xp_total - xp_gastado_sinks`): es el motivo de que D3 acredite **plano** y de que el revertimiento (D11) pueda dejar `xp_total` por debajo de lo gastado.
+- **ADR-010 / ADR-001** (presupuesto 8/8: este ADR **no crea endpoint** ni fichero en `api/`; las acciones son query params de `interacciones.js` y recursos de `admin.js`).
+- **ADR-003** (Cero Borrado Logico): el reset del pozo es `UPDATE ... SET xp_bruto=0`, **no** un borrado de filas de `xp_pozo_aportes`; la unica excepcion es el `ON DELETE CASCADE` por recurso que deja de existir fisicamente.
+- **ADR-002** (ASCII-safe): identificadores, columnas, rutas y SQL sin tildes; escapes `\uXXXX` en cualquier codigo derivado.
+- **ADR-058** (parametros de gamificacion y multiplicadores de origen): de aqui se **reusa** el patron `gamificacion_config` con `CAP_*_DEFAULT` y `FACTOR_ORIGEN_*_DEFAULT` (`interacciones.js:493-503`), y se **delega** en el motor todo lo que el motor sabe (los multiplicadores), dejandolo fuera del bono (D3).
+- **ADR-089** (agregado de contador y suma, **nunca un promedio re-escrito**): es el **precedente directo** de `xp_pozo_aportes` (agregado por contribuyente) y de las dos columnas de D5.
+- **ADR-040** (gobernanza de cartas y moneda: `spot_duenos` como CACHE `(destino_id, tipo_medio)` y el CHECK `monto_descontado <= xp_bruto_base * 0.50` en `:366`): de aqui viene el hecho de que `sin_dueno` sea posible por diseno y de que el pozo **no** escriba en `spot_dividendos`.
+- **ADR-052** (`esEsquemaFaltante`, `interacciones.js:5325`): es el mecanismo de degradacion que D7 y D10 reusan para las 3 claves nuevas y para `admin_usuarios`.
+- **ADR-034** (las senales de `interacciones` y `guardados_*`): el pozo se alimenta de las interacciones ya contabilizadas por XP, sin crear una senal nueva ni mezclarla con los guardados de media.
+- **ADR-084** (fuente unica del relato: el argumento de D1-D12 y de los controles vive **una sola vez, aqui**; `TASKS.md` y `NEXT.md` apuntan).

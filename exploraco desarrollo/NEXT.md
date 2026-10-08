@@ -242,6 +242,25 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-08 (pase documental único R2, 14ª tanda) - Reclamo de propiedad de destinos (ADR-091): implementado y verificado local, PENDIENTE DE DESPLIEGUE
+
+**Qué se estaba haciendo:** cerrar el ciclo documental de la feature **ADR-091** (reclamo de propiedad de destinos con **pozo de XP** y **bono 1.5x**). El ADR ya estaba redactado; **NO se re-litiga ni se rediseña**: este pase solo **registra estado y deudas** (R2, ADR-084). El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-201**; aquí solo hay estado y siguientes pasos.
+
+**Lo que quedó entregado (working tree, SIN commit; NO desplegado):**
+- **Migración `055_reclamacion_propiedad_destinos.sql` CREADA Y APLICADA EN NEON:** 5 columnas en `destinos` + tabla `reclamaciones_propiedad` (14 columnas, 6 constraints) + 5 índices, incluido el **UNIQUE parcial `uq_reclamaciones_recurso_pendiente`**.
+- **Código implementado y verificado local:** ramas en `api/interacciones.js` (GET `reclamacion_estado` `:6150`; POST `reclamar_propiedad_solicitar` `:9816`; `acumularPozoReclamable` `:1431`; precedencia de dueño declarado en `resolverDuenosSpot` `:852`), `api/admin.js` (`?recurso=reclamaciones` `:1879`) y `api/pagina-destino.js` (botón + modal + silo CSS `.pdrecl`). Panel de moderación en `admin.html` (sub-tab, cola, aprobar/rechazar/revertir, badge en la nav, prompt de UUID del admin, mini-formulario de motivo de rechazo). Pago 1.5x **idempotente** en **UNA sola CTE** con `UPDATE ... WHERE estado='pendiente' RETURNING`.
+- **Verificación (ADR-006):** Escudo GOLD **7/7** (`node --check` 5/5, ASCII 0 bytes >127 en el código nuevo, balance de divs sin regresión, contrato entre las 4 capas cuadrado, pago idempotente, 0 fallos nuevos en `buildHTML()`); `scripts/smoke_055_indice_unico_reclamacion.js` **24/24 OK**; **8/8 endpoints INTACTO**.
+
+**Qué sigue (acción concreta, en orden):**
+1. **Desplegar** `api/interacciones.js` + `api/admin.js` (con sus gates de §2: `@backend-dev`, precedidos de Escudo GOLD). El front de la ficha (`api/pagina-destino.js`) y `admin.html` viajan en el mismo release.
+2. **Re-ejecutar** `node scripts/verificar_migraciones_prod.js` para la **055**: debe pasar de **`NO APLICADA EN CODIGO`** a **`OK CONFIRMADO`**.
+3. **Después: Fase 2** del reclamo — `album_foto` y `usuario_foto` (caso "artista sin cuenta previa", `album_fotos.autor_original_id IS NULL`). La tabla ya admite los 3 `recurso_tipo`; el backend solo acepta `destino` en Fase 1.
+
+**Riesgos activos:**
+- **La feature está a medio camino entre BD y código:** la migración está aplicada en Neon pero el código **no está desplegado**; hasta el deploy, el mecanismo no tiene efecto en producción (`verificar_migraciones_prod.js` = `NO APLICADA EN CODIGO`). **Estado PENDIENTE, no fallo.**
+- **Trazabilidad del moderador degradada:** `admin_usuarios` NO existe, luego `resuelto_por` cae a `'admin_secret'` y el admin declara su UUID por prompt (deuda abierta, ADR-091 R1; ver **BUG-121**).
+- **Deudas preexistentes registradas:** 9 FAIL de `smoke_auditoria_pagina_destino.js` (**BUG-119**), 7770 bytes >127 en `admin.html` ajenos a la feature (**BUG-120**), off-by-one "13 call-sites" (**BUG-122**). Ninguna es regresión de esta tanda.
+
 ### WORKING TREE 2026-10-07 (pase documental único R2, 13ª tanda) - TSK-173 D+E: saneado de BOM y ASCII-safety (sin commit)
 
 **Qué se estaba haciendo:** ejecutar las categorías **D (BOM UTF-8)** y **E (ASCII-safety)** del inventario de **`TASKS.md` TSK-173**, y **corregir el inventario** con lo medido (ADR-006). El detalle de ejecución vive **una sola vez** en **`TASKS.md` TSK-173** (sección 5); aquí solo hay estado y siguientes pasos.

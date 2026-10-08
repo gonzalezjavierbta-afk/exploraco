@@ -356,6 +356,11 @@
 .mod-card-meta{font-size:11px;color:var(--muted);margin-bottom:5px}
 .mod-card-desc{font-size:11px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .mod-card-footer{padding:8px 14px;border-top:1px solid var(--border);background:var(--bg2);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* Mini-formulario inline de rechazo de reclamaciones. Silo ADR-004 bajo el
+   selector padre del panel, nunca en :root. ADR-003: el nodo vive en el DOM;
+   el estado oculto lo controla display, no un borrado. */
+#mod-reclamaciones-panel .reclam-rechazo-box{display:none;width:100%;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+#mod-reclamaciones-panel .reclam-rechazo-box textarea{flex:1;min-width:200px;min-height:52px;resize:vertical;font-family:'Outfit',sans-serif;font-size:12px;line-height:1.4;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--white);color:var(--text)}
 .mod-status-tag{font-size:9px;font-weight:800;padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px;margin-left:auto;white-space:nowrap}
 .mod-st-pending{background:#FFFBEB;color:#92400E}
 .mod-st-published{background:#F0FDF4;color:#166634}
@@ -1969,6 +1974,7 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
   <div style="display:flex;gap:0;border-bottom:2px solid var(--border);background:var(--white);flex-shrink:0">
     <div class="mod-subtab active" data-mod-tab="solicitudes" onclick="showModSubTab('solicitudes')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">&#128203; Solicitudes</div>
     <div class="mod-subtab" data-mod-tab="activos-ocultos" onclick="showModSubTab('activos-ocultos')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">&#127917; Activos Ocultos</div>
+    <div class="mod-subtab" data-mod-tab="reclamaciones" onclick="showModSubTab('reclamaciones')" style="padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">&#127968; Reclamaciones</div>
   </div>
 
   <div style="padding:14px 28px;background:var(--white);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0" id="mod-solicitudes-filters">
@@ -1984,6 +1990,20 @@ body{display:flex;flex-direction:column;font-family:'Outfit',sans-serif}
       <span id="ao-status" style="font-size:12px;color:var(--muted)"></span>
     </div>
     <div id="ao-lista" style="display:flex;flex-direction:column;gap:12px"></div>
+  </div>
+
+  <!-- Panel: Reclamaciones de propiedad (ADR-091). Cero Borrado Logico: el panel
+       vive en el DOM siempre, solo se oculta con display:none. -->
+  <div id="mod-reclamaciones-panel" style="display:none;flex:1;overflow-y:auto">
+    <div id="reclam-filters" style="padding:14px 28px;background:var(--white);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;align-items:center">
+      <button class="mod-filter-btn active" data-reclam-estado="pendiente" onclick="setReclamEstado('pendiente',this)">&#9203; Pendientes</button>
+      <button class="mod-filter-btn" data-reclam-estado="aprobada" onclick="setReclamEstado('aprobada',this)">&#9989; Aprobadas</button>
+      <button class="mod-filter-btn" data-reclam-estado="rechazada" onclick="setReclamEstado('rechazada',this)">&#10060; Rechazadas</button>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="loadReclamaciones()">&#8635; Actualizar</button>
+      <span id="reclam-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="reclam-lista" style="padding:20px 28px;display:flex;flex-direction:column;gap:12px"></div>
+    <div class="mod-pagination" id="reclam-paginacion"></div>
   </div>
 
   <div style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:10px" id="mod-lista">
@@ -7335,9 +7355,9 @@ async function loadPendientes() {
     var data = await resp.json();
     if(!data.ok) throw new Error(data.error || 'Error al cargar');
 
-    // Actualizar badge en nav
+    // Actualizar badge en nav (solicitudes + reclamaciones pendientes)
     if(_modFilter === 'draft') {
-      _updatePendingBadge(data.total);
+      _refreshPendingBadge(data.total);
     }
 
     if(!data.items || data.items.length === 0) {
@@ -7492,11 +7512,33 @@ function _updatePendingBadge(n) {
   }
 }
 
+/* Numero de reclamaciones pendientes, o null si la cola no se pudo leer.
+   null = "no sumar", nunca "poner a cero": una cola ilegible no debe borrar el
+   recuento de solicitudes ni romper la nav. El endpoint devuelve total de la
+   pagina, por eso se pide con limit=200 (tope del backend) y se cuenta el array. */
+async function _reclamPendientesTotal() {
+  try {
+    var resp = await fetch('/api/admin?recurso=reclamaciones&estado=pendiente&limit=200', { headers: _adminHeaders() });
+    var data = await resp.json();
+    if (data && data.ok && Array.isArray(data.data)) return data.data.length;
+  } catch (e) {}
+  return null;
+}
+
+/* #badge-pending = solicitudes en borrador + reclamaciones pendientes.
+   Si la cola de reclamaciones falla, se pinta solo el numero de solicitudes. */
+async function _refreshPendingBadge(solicitudesTotal) {
+  var n = Number(solicitudesTotal);
+  if (!isFinite(n) || n < 0) n = 0;
+  var extra = await _reclamPendientesTotal();
+  _updatePendingBadge(n + (extra == null ? 0 : extra));
+}
+
 async function _checkPendingBadge() {
   try {
     var resp = await fetch('/api/admin?recurso=solicitudes&status=draft&limit=1', { headers: _adminHeaders() });
     var data = await resp.json();
-    if(data.ok) _updatePendingBadge(data.total);
+    if(data.ok) _refreshPendingBadge(data.total);
   } catch(e) {}
 }
 
@@ -7521,6 +7563,7 @@ function showModSubTab(tab) {
 
   var solicitudesPanel = document.getElementById('mod-solicitudes-filters');
   var ocultosPanel = document.getElementById('mod-activos-ocultos-panel');
+  var reclamPanel = document.getElementById('mod-reclamaciones-panel');
   var modLista = document.getElementById('mod-lista');
   var modPag = document.getElementById('mod-paginacion');
 
@@ -7530,12 +7573,451 @@ function showModSubTab(tab) {
     if (modLista) modLista.style.display = 'none';
     if (modPag) modPag.style.display = 'none';
     adminCargarActivosOcultos();
+  } else if (tab === 'reclamaciones') {
+    if (solicitudesPanel) solicitudesPanel.style.display = 'none';
+    if (ocultosPanel) ocultosPanel.style.display = 'none';
+    if (reclamPanel) reclamPanel.style.display = '';
+    if (modLista) modLista.style.display = 'none';
+    if (modPag) modPag.style.display = 'none';
+    /* setModFilter() limpia .active de TODOS los .mod-filter-btn: se restituye
+       el del estado vigente para que el filtro siga leyendose. */
+    var rbtn = document.querySelector('[data-reclam-estado="' + _reclamEstado + '"]');
+    if (rbtn) rbtn.classList.add('active');
+    loadReclamaciones();
   } else {
     if (solicitudesPanel) solicitudesPanel.style.display = '';
     if (ocultosPanel) ocultosPanel.style.display = 'none';
+    if (reclamPanel) reclamPanel.style.display = 'none';
     if (modLista) modLista.style.display = '';
     if (modPag) modPag.style.display = '';
     loadPendientes();
+  }
+}
+
+/* ------------------------------------------------------------------
+   MODERACION - Reclamaciones de propiedad (ADR-091)
+   GET  /api/admin?recurso=reclamaciones&estado=pendiente|aprobada|rechazada
+        &limit=&offset=
+   POST /api/admin?recurso=reclamaciones
+        { accion: aprobar|rechazar|revertir, id, motivo_rechazo, admin_usuario_id }
+   ------------------------------------------------------------------ */
+
+var _reclamEstado = 'pendiente';
+var _reclamLimite = 20;
+var _reclamOffset = 0;
+var _reclamCache  = {};
+
+/* Valida FORMA de UUID (8-4-4-4-12). Devuelve el valor normalizado o '' si no
+   la tiene; una cadena que no sea UUID nunca se guarda como identidad. */
+function _reclamIdValido(v) {
+  v = String(v == null ? '' : v).trim();
+  var re = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return re.test(v) ? v : '';
+}
+
+/* Identidad del admin: este panel solo tiene ADMIN_SECRET, no hay token de
+   usuario. Si el operador deja un UUID en localStorage('admin_usuario_id')
+   se envia y la trazabilidad es real; si no, el campo se OMITE y el backend
+   degrada a 'admin_secret' (no es error ni 403). */
+function _reclamAdminUsuarioId() {
+  var v = '';
+  try { v = localStorage.getItem('admin_usuario_id') || ''; } catch (e) {}
+  return _reclamIdValido(v);
+}
+
+/* Pide el UUID del admin UNA vez por carga, cuando aun no hay identidad valida.
+   No existe pantalla que configure admin_secret, asi que el gancho es la propia
+   cola de reclamaciones (donde el id se usa). NO es bloqueo: cancelar, o dejar
+   un valor sin forma de UUID, no guarda nada y el backend degrada a
+   'admin_secret' igual que hoy. Si ya hay uno valido, no se vuelve a pedir. */
+var _reclamIdSolicitado = false;
+function _reclamEnsureAdminId() {
+  var actual = _reclamAdminUsuarioId();
+  if (actual) return actual;
+  if (_reclamIdSolicitado) return '';
+  _reclamIdSolicitado = true;
+  var resp = null;
+  try {
+    resp = window.prompt('Tu UUID de admin (trazabilidad de quien aprueba el pago de XP). '
+      + 'Vacio o sin forma de UUID = se registra como admin_secret:', '');
+  } catch (e) { resp = null; }
+  if (resp === null) return '';
+  var v = _reclamIdValido(resp);
+  if (!v) {
+    if (String(resp).trim())
+      showAdminToast('UUID invalido (forma 8-4-4-4-12): no se guardo. La traza queda como admin_secret.', 'error');
+    return '';
+  }
+  try { localStorage.setItem('admin_usuario_id', v); } catch (e) {}
+  return v;
+}
+
+function _reclamNum(n) {
+  var v = Number(n);
+  if (!isFinite(v)) return '0';
+  return v.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+}
+
+function _reclamFecha(s) {
+  if (!s) return '--';
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return '--';
+  return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })
+       + ' ' + d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' });
+}
+
+function _reclamVacio(titulo, sub, icono) {
+  return '<div class="mod-empty"><div class="mod-empty-icon">' + (icono || '\uD83D\uDCC7') + '</div>'
+    + '<div style="font-size:13px;font-weight:600;margin-bottom:4px">' + escH(titulo) + '</div>'
+    + (sub ? '<div style="font-size:11px">' + escH(sub) + '</div>' : '')
+    + '</div>';
+}
+
+function _reclamAviso(titulo, sub) {
+  return '<div class="mod-empty"><div class="mod-empty-icon">\u26A0\uFE0F</div>'
+    + '<div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:4px">' + escH(titulo) + '</div>'
+    + '<div style="font-size:11px;color:var(--muted);max-width:540px;margin:0 auto">' + escH(sub) + '</div>'
+    + '</div>';
+}
+
+function setReclamEstado(estado, btn) {
+  _reclamEstado = (estado === 'aprobada' || estado === 'rechazada') ? estado : 'pendiente';
+  _reclamOffset = 0;
+  var btns = document.querySelectorAll('[data-reclam-estado]');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  if (btn) btn.classList.add('active');
+  loadReclamaciones();
+}
+
+async function loadReclamaciones() {
+  var lista  = document.getElementById('reclam-lista');
+  var status = document.getElementById('reclam-status');
+  var pag    = document.getElementById('reclam-paginacion');
+  if (!lista) return;
+
+  /* Identidad del admin: si no hay UUID valido guardado, se pide una vez (no
+     bloquea; cancelar o un valor invalido deja la traza en 'admin_secret'). */
+  _reclamEnsureAdminId();
+
+  lista.innerHTML = _reclamVacio('Cargando reclamaciones...', '', '\u23F3');
+  if (status) status.textContent = 'Cargando...';
+
+  try {
+    var url = '/api/admin?recurso=reclamaciones&estado=' + encodeURIComponent(_reclamEstado)
+            + '&limit=' + _reclamLimite + '&offset=' + _reclamOffset;
+    var resp = await fetch(url, { headers: _adminHeaders() });
+    var data = null;
+    try { data = await resp.json(); } catch (e) { data = null; }
+
+    if (resp.status === 401 || resp.status === 403) {
+      lista.innerHTML = _reclamAviso('Sin autorizacion (HTTP ' + resp.status + ')',
+        'Las cabeceras admin no fueron aceptadas. Revisa admin_secret en este navegador.');
+      if (status) status.textContent = '';
+      if (pag) pag.innerHTML = '';
+      return;
+    }
+    if (resp.status === 503 && data && data.error === 'SCHEMA_NOT_MIGRATED') {
+      lista.innerHTML = _reclamAviso('Esquema no migrado (503)',
+        data.detalle || 'Aplica la migracion de reclamaciones_propiedad en Neon para habilitar este panel.');
+      if (status) status.textContent = '';
+      if (pag) pag.innerHTML = '';
+      return;
+    }
+    if (!resp.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + resp.status));
+
+    var items = Array.isArray(data.data) ? data.data : [];
+
+    if (!items.length) {
+      var msgs = {
+        pendiente: ['Sin reclamaciones pendientes',
+          'Apareceran aqui cuando un usuario reclame la propiedad de un recurso.'],
+        aprobada:  ['Sin reclamaciones aprobadas', 'Todavia no hay aprobaciones en el historial.'],
+        rechazada: ['Sin reclamaciones rechazadas', 'Todavia no hay rechazos en el historial.']
+      };
+      var m = msgs[_reclamEstado] || msgs.pendiente;
+      lista.innerHTML = _reclamVacio(m[0], m[1]);
+      if (pag) pag.innerHTML = '';
+      if (status) status.textContent = 'Sin resultados.';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < items.length; i++) {
+      _reclamCache[String(items[i].id)] = items[i];
+      html += _renderReclamCard(items[i]);
+    }
+    lista.innerHTML = html;
+
+    /* El backend devuelve total de la PAGINA, no el total global: se avanza
+       solo si la pagina vino llena (ventana de 20). */
+    if (pag) {
+      var ph = '';
+      if (_reclamOffset > 0)
+        ph += '<button class="mod-page-btn" onclick="_reclamGo(' + (_reclamOffset - _reclamLimite) + ')">\u00AB Anterior</button>';
+      ph += '<span style="font-size:11px;color:var(--muted);padding:0 8px">'
+          + (_reclamOffset + 1) + '-' + (_reclamOffset + items.length) + '</span>';
+      if (items.length >= _reclamLimite)
+        ph += '<button class="mod-page-btn" onclick="_reclamGo(' + (_reclamOffset + _reclamLimite) + ')">Siguiente \u00BB</button>';
+      pag.innerHTML = ph;
+    }
+    if (status) status.textContent = items.length + ' en ' + _reclamEstado + '.';
+  } catch (err) {
+    lista.innerHTML = _reclamAviso('Error al cargar', (err && err.message) ? err.message : 'fallo de red');
+    if (status) status.textContent = '';
+  }
+}
+
+function _reclamGo(off) {
+  _reclamOffset = Math.max(0, parseInt(off, 10) || 0);
+  loadReclamaciones();
+}
+
+function _reclamBotones(r) {
+  var id = String(r.id || '');
+  var st = r.estado;
+  var b = '';
+  if (st === 'pendiente') {
+    b += '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;cursor:pointer"'
+      +  ' onclick="moderarReclamacion(\'' + escH(id) + '\',\'aprobar\')">\u2705 Aprobar</button>';
+    b += '<button class="btn btn-danger btn-sm"'
+      +  ' onclick="_reclamMostrarRechazo(\'' + escH(id) + '\')">\u274C Rechazar</button>';
+  } else if (st === 'aprobada' && !r.revertido_en) {
+    b += '<button class="btn btn-ghost btn-sm"'
+      +  ' onclick="moderarReclamacion(\'' + escH(id) + '\',\'revertir\')">\u21BA Revertir</button>';
+  }
+  b += '<button class="btn btn-ghost btn-sm" onclick="loadReclamaciones()">\u21BB Recargar</button>';
+  /* Mini-formulario inline de rechazo. ADR-003: vive SIEMPRE en el DOM dentro
+     del footer de la tarjeta y solo se oculta por display; al re-renderizar la
+     tarjeta (_reclamRestore/_reclamUpdateInSitu) se regenera cerrado. */
+  b += '<div class="reclam-rechazo-box" id="reclam-rechazo-' + escH(id) + '">'
+    +    '<textarea id="reclam-motivo-' + escH(id) + '" maxlength="500"'
+    +    ' placeholder="Motivo del rechazo (opcional, max. 500 caracteres)"></textarea>'
+    +    '<button class="btn btn-danger btn-sm"'
+    +    ' onclick="_reclamConfirmarRechazo(\'' + escH(id) + '\')">Confirmar rechazo</button>'
+    +    '<button class="btn btn-ghost btn-sm"'
+    +    ' onclick="_reclamOcultarRechazo(\'' + escH(id) + '\')">Cancelar</button>'
+    +  '</div>';
+  return b;
+}
+
+/* Abre el mini-formulario inline de rechazo (sin window.prompt: bloqueante y
+   sin multilinea). Solo alterna display; el nodo permanece en el DOM. */
+function _reclamMostrarRechazo(id) {
+  id = String(id || '');
+  var box = document.getElementById('reclam-rechazo-' + id);
+  if (box) box.style.display = 'flex';
+  var ta = document.getElementById('reclam-motivo-' + id);
+  if (ta) { try { ta.focus(); } catch (e) {} }
+}
+
+function _reclamOcultarRechazo(id) {
+  id = String(id || '');
+  var box = document.getElementById('reclam-rechazo-' + id);
+  if (box) box.style.display = 'none';
+  var ta = document.getElementById('reclam-motivo-' + id);
+  if (ta) ta.value = '';
+}
+
+function _reclamConfirmarRechazo(id) {
+  id = String(id || '');
+  var ta = document.getElementById('reclam-motivo-' + id);
+  var motivo = ta ? String(ta.value || '').trim() : '';
+  _reclamOcultarRechazo(id);
+  moderarReclamacion(id, 'rechazar', motivo);
+}
+
+function _renderReclamCard(r) {
+  var id = String(r.id || '');
+  var st = (r.estado === 'aprobada' || r.estado === 'rechazada') ? r.estado : 'pendiente';
+  var stCard = { pendiente:'pending', aprobada:'published', rechazada:'rejected' };
+  var stCls  = { pendiente:'mod-st-pending', aprobada:'mod-st-published', rechazada:'mod-st-rejected' };
+  var stTxt  = { pendiente:'\u23F3 Pendiente', aprobada:'\u2705 Aprobada', rechazada:'\u274C Rechazada' };
+
+  var solicitante = r.solicitante_nombre ? escH(r.solicitante_nombre) : 'Solicitante eliminado';
+  var tipo = escH(r.recurso_tipo || 'recurso');
+  var rid  = escH(r.recurso_id || '--');
+  var peso = '<span style="font-weight:700">Recurso:</span> ' + tipo + ' / ' + rid;
+  if (r.recurso_slug)
+    peso += ' (<a href="/' + escH(r.recurso_slug) + '.html" target="_blank" rel="noopener">'
+          + escH(r.recurso_nombre || r.recurso_slug) + '</a>';
+  else if (r.recurso_nombre)
+    peso += ' (' + escH(r.recurso_nombre);
+  if (r.recurso_slug || r.recurso_nombre) peso += ')';
+  if (r.recurso_ciudad) peso += ' &middot; ' + escH(r.recurso_ciudad);
+
+  /* Silent Fallback del enlace: solo es clicable si es http(s); un valor
+     raro (o un javascript: inyectado) se pinta como texto plano. */
+  var prueba = '<span style="color:var(--muted)">Sin URL de prueba</span>';
+  var u = String(r.prueba_url || '').trim();
+  if (/^https?:\/\//i.test(u)) {
+    prueba = '<a href="' + escH(u) + '" target="_blank" rel="noopener noreferrer"'
+           + ' style="color:var(--green);font-weight:600;word-break:break-all">'
+           + escH(u.length > 72 ? (u.slice(0, 72) + '...') : u) + '</a>';
+  } else if (u) {
+    prueba = '<span style="color:var(--muted)">' + escH(u) + '</span>';
+  }
+
+  var capt = Number(r.xp_pozo_capturado) || 0;
+  var act  = Number(r.pozo_actual) || 0;
+  var delta = act - capt;
+  var deltaHtml = delta === 0 ? '' : ' <span style="font-weight:700;color:'
+                + (delta > 0 ? 'var(--green)' : 'var(--red)') + '">('
+                + (delta > 0 ? '+' : '') + _reclamNum(delta) + ')</span>';
+
+  var nota = r.nota_solicitante ? escH(r.nota_solicitante) : '<span style="color:var(--muted)">Sin nota</span>';
+  var extra = '';
+  if (r.xp_bienvenida)
+    extra += '<div><span style="font-weight:700">Bono pagado:</span> ' + _reclamNum(r.xp_bienvenida) + ' XP</div>';
+  if (r.estado_reclamacion)
+    extra += '<div><span style="font-weight:700">Estado del recurso:</span> ' + escH(r.estado_reclamacion)
+           + (r.es_reclamable ? ' (reclamable)' : ' (ya no reclamable)') + '</div>';
+  if (r.motivo_rechazo)
+    extra += '<div style="color:var(--red)"><span style="font-weight:700">Motivo del rechazo:</span> '
+           + escH(r.motivo_rechazo) + '</div>';
+  if (r.revertido_en)
+    extra += '<div style="color:var(--muted)"><span style="font-weight:700">Revertida:</span> '
+           + escH(_reclamFecha(r.revertido_en)) + '</div>';
+
+  return '<div class="mod-card ' + stCard[st] + '" id="reclam-card-' + escH(id) + '">'
+    + '<div class="mod-card-body"><div class="mod-card-info">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px">'
+        + '<div class="mod-card-name">Solicitud de ' + solicitante + '</div>'
+        + '<span class="mod-status-tag ' + stCls[st] + '">' + stTxt[st] + '</span>'
+      + '</div>'
+      + '<div class="mod-card-meta">' + peso + ' &nbsp;&middot;&nbsp; \uD83D\uDCCC '
+        + escH(_reclamFecha(r.creado_en))
+        + (r.resuelto_en ? ' &nbsp;&middot;&nbsp; resuelta ' + escH(_reclamFecha(r.resuelto_en)) : '')
+        + '</div>'
+      + '<div style="font-size:11px;line-height:1.6;margin-top:6px">'
+        + '<div><span style="font-weight:700">Prueba:</span> ' + prueba + '</div>'
+        + '<div><span style="font-weight:700">Nota:</span> ' + nota + '</div>'
+        + '<div><span style="font-weight:700">Pozo capturado:</span> ' + _reclamNum(capt) + ' XP'
+        + ' &nbsp;&middot;&nbsp; <span style="font-weight:700">Pozo actual:</span> ' + _reclamNum(act) + ' XP'
+        + deltaHtml + '</div>'
+        + extra
+      + '</div>'
+    + '</div></div>'
+    + '<div class="mod-card-footer" id="reclam-foot-' + escH(id) + '">' + _reclamBotones(r) + '</div>'
+  + '</div>';
+}
+
+/* Restauracion del footer tras un fallo de red o de codigo (no de estado):
+   repinta los botones desde la cache local, sin recargar la cola. */
+function _reclamRestore(id, card, foot) {
+  if (card) card.style.opacity = '';
+  var it = _reclamCache[id];
+  if (foot && it) foot.innerHTML = _reclamBotones(it);
+}
+
+/* Update en sitio: tras un 200 la tarjeta se re-renderiza sola con el estado
+   nuevo; si la fila salio de la cache (otro filtro), se recarga la cola. */
+function _reclamUpdateInSitu(id, accion, d) {
+  var it = _reclamCache[id];
+  if (!it) { loadReclamaciones(); return; }
+  var ahora = new Date().toISOString();
+  if (accion === 'aprobar') {
+    it.estado = 'aprobada';
+    it.xp_bienvenida = Number(d.xp_bienvenida) || 0;
+    it.estado_reclamacion = 'reclamado';
+    it.es_reclamable = false;
+    it.pozo_actual = 0;
+    it.resuelto_en = ahora;
+  } else if (accion === 'rechazar') {
+    it.estado = 'rechazada';
+    it.motivo_rechazo = (d.motivo_rechazo != null) ? d.motivo_rechazo : (it.motivo_rechazo || '');
+    it.estado_reclamacion = 'disponible';
+    it.es_reclamable = true;
+    it.resuelto_en = ahora;
+  } else if (accion === 'revertir') {
+    it.revertido_en = ahora;
+    it.estado_reclamacion = 'disponible';
+    it.es_reclamable = true;
+  }
+  var card = document.getElementById('reclam-card-' + id);
+  var holder = document.createElement('div');
+  holder.innerHTML = _renderReclamCard(it);
+  var nuevo = holder.firstChild;
+  if (card && nuevo && card.parentNode) card.parentNode.replaceChild(nuevo, card);
+}
+
+async function moderarReclamacion(id, accion, motivoInline) {
+  id = String(id || '');
+  if (!id) return;
+
+  /* El motivo del rechazo llega del mini-formulario inline
+     (_reclamConfirmarRechazo); ya NO se usa window.prompt (bloqueante y sin
+     multilinea). Si se invoca sin motivo, se envia vacio y el backend lo admite. */
+  var motivo = '';
+  if (accion === 'rechazar') {
+    motivo = (motivoInline == null) ? '' : String(motivoInline).slice(0, 500);
+  }
+  if (accion === 'revertir' &&
+      !window.confirm('Revertir la aprobacion? Se debita el bono de bienvenida y el recurso vuelve a ser reclamable.')) return;
+
+  var card = document.getElementById('reclam-card-' + id);
+  var foot = document.getElementById('reclam-foot-' + id);
+  if (card) card.style.opacity = '.5';
+  if (foot) foot.innerHTML = '<span style="font-size:11px;color:var(--muted)">Procesando ' + escH(accion) + '...</span>';
+
+  try {
+    var body = { accion: accion, id: id, reclamacion_id: id, motivo_rechazo: motivo };
+    var admId = _reclamAdminUsuarioId();
+    if (admId) body.admin_usuario_id = admId;
+
+    var resp = await fetch('/api/admin?recurso=reclamaciones', {
+      method: 'POST',
+      headers: _adminHeaders(),
+      body: JSON.stringify(body)
+    });
+    var data = null;
+    try { data = await resp.json(); } catch (e) { data = null; }
+
+    if (resp.status === 401 || resp.status === 403) {
+      showAdminToast('Sin autorizacion (HTTP ' + resp.status + '): revisa admin_secret.', 'error');
+      _reclamRestore(id, card, foot);
+      return;
+    }
+    if (resp.status === 503 && data && data.error === 'SCHEMA_NOT_MIGRATED') {
+      showAdminToast('Esquema no migrado: aplica la migracion de reclamaciones en Neon.', 'error');
+      _reclamRestore(id, card, foot);
+      return;
+    }
+    if (resp.status === 400) {
+      showAdminToast('400 ' + ((data && (data.detalle || data.error)) || 'validacion'), 'error');
+      _reclamRestore(id, card, foot);
+      return;
+    }
+    if (resp.status === 409) {
+      showAdminToast('409 ' + ((data && data.error) || 'conflicto') + ': '
+        + ((data && data.detalle) || 'no se puede aplicar'), 'error');
+      loadReclamaciones();
+      return;
+    }
+    if (resp.status === 404) {
+      showAdminToast('La reclamacion ya no existe', 'error');
+      loadReclamaciones();
+      return;
+    }
+    if (!resp.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + resp.status));
+
+    var d = (data && data.data) ? data.data : {};
+    /* sin_cambios es IDEMPOTENCIA, no fallo: la peticion ya estaba resuelta
+       y el backend no vuelve a pagar. */
+    if (d.sin_cambios) {
+      showAdminToast('La reclamacion ya estaba resuelta: no hubo cambios ni pago.', '');
+    } else if (accion === 'aprobar') {
+      showAdminToast('Reclamacion aprobada. Bono: ' + _reclamNum(d.xp_bienvenida)
+        + ' XP (pozo ' + _reclamNum(d.pozo_origen) + ' x ' + (d.multiplicador || 1.5)
+        + ', tope ' + _reclamNum(d.cap) + ').', 'success');
+    } else if (accion === 'rechazar') {
+      showAdminToast('Reclamacion rechazada' + (motivo ? ' con motivo guardado.' : '.'), '');
+    } else if (accion === 'revertir') {
+      showAdminToast('Aprobacion revertida: ' + _reclamNum(d.xp_revertido) + ' XP debitados.', 'success');
+    }
+    _reclamUpdateInSitu(id, accion, d);
+  } catch (err) {
+    showAdminToast('Error al moderar: ' + ((err && err.message) ? err.message : 'fallo de red'), 'error');
+    _reclamRestore(id, card, foot);
   }
 }
 

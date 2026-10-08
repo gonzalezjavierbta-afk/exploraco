@@ -14,6 +14,14 @@
 //     degrada 42P01 si la migracion 031 no corrio. Desde v6 (ADR-058)
 //     agrega de forma ADITIVA distribucion_origen, mult_origen_stats,
 //     config_origen y alertas_origen (degrada 42703 si la 038 no corrio)
+//   reclamaciones -> moderacion de reclamaciones de propiedad (ADR-091):
+//     GET lista paginada con el pozo ACTUAL del recurso; POST accion
+//     aprobar|rechazar|revertir. El pago del bono plano 1.5x se liquida en
+//     UNA sola sentencia CTE cuyo claim es
+//     UPDATE ... WHERE id=$1 AND estado='pendiente' RETURNING ..., de modo
+//     que un segundo aprobar devuelve 0 filas (sin_cambios) y no puede pagar
+//     dos veces. Idem para revertir y rechazar. Degrada 503
+//     SCHEMA_NOT_MIGRATED (42P01/42703) si la migracion no corrio.
 //   mercado      -> Mercado de Emprendedores (migracion 034): normas por Casa
 //     (mercado_config_lista / mercado_config_editar) y moderacion de ofertas
 //     (mercado_ofertas_lista / mercado_ofertas_moderar). La moderacion NO
@@ -1844,9 +1852,301 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // == RECLAMACIONES DE PROPIEDAD (ADR-091) ==============================
+  // Rama NUEVA ?recurso=reclamaciones. Moderacion de reclamaciones de
+  // propiedad con liquidacion del bono plano 1.5x sobre el pozo de XP del
+  // recurso (migracion paralela: tabla reclamaciones_propiedad + columnas
+  // de destinos). Degradacion 503 SCHEMA_NOT_MIGRATED si no esta aplicada.
+  //
+  // ATOMICIDAD DEL PAGO (aprobada en revision, NO re-disenar): TODO el pago
+  // vive en UNA sola sentencia con CTE. El claim
+  //   UPDATE ... SET estado='aprobada' WHERE id=$1 AND estado='pendiente'
+  //   RETURNING ...
+  // es atomico en READ COMMITTED (default de Postgres; el repo no usa
+  // BEGIN transaccional ni SERIALIZABLE): T1 bloquea la fila, T2 espera y
+  // al commit de T1 Postgres reevalua el WHERE (EvalPlanQual) y devuelve 0
+  // filas -> respuesta sin_cambios. NO anadir FOR UPDATE (redundante) ni
+  // SERIALIZABLE. Las demas CTE (credito, ledger, recurso, duenos) leen de
+  // "claim": con 0 filas no creditan ni escriben nada -> pago unico
+  // garantizado por el motor, no por JS.
+  // NO llamar registrarXpLedger de interacciones.js: es best-effort y nunca
+  // revierte, asi que el pago quedaria sin rastro en xp_ledger. Aqui el
+  // INSERT va DENTRO de la CTE (mismo precedente atomico de una sola
+  // sentencia en interacciones.js).
+  // NO copiar el patron de activo_oculto_moderar: ese comprueba el estado en
+  // JS y paga con UPDATE usuarios suelto FUERA de xp_ledger (puede pagar dos
+  // veces). Aqui el unico que decide es el claim.
+  if (recurso === 'reclamaciones') {
+    if (!auth(req)) return res.status(401).json({ ok:false, error:'No autorizado' });
+
+    var RECLAM_ESTADOS  = ['pendiente','aprobada','rechazada'];
+    var RECLAM_ACCIONES = ['aprobar','rechazar','revertir'];
+    var RECLAM_MULT_BIENVENIDA = 1.5;
+    // Tope PARAMETRIZADO del bono (precedente gamificacion_config): default
+    // en codigo + override por clave. Si gamificacion_config no existe
+    // (42P01) se degrada al default sin error.
+    var CAP_RECLAM_BIENVENIDA_DEFAULT = 500;
+    var UUID_RE_RECLAM = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+    try {
+      // --- GET: cola de moderacion (LEFT JOIN en pool por recurso_tipo) --
+      if (req.method === 'GET') {
+        var estRec = String(req.query.estado == null ? 'pendiente' : req.query.estado).trim().toLowerCase();
+        if (!estRec) estRec = 'pendiente';
+        if (RECLAM_ESTADOS.indexOf(estRec) < 0)
+          return res.status(400).json({ ok:false, error:'ESTADO_INVALIDO',
+            detalle:'estado debe ser pendiente|aprobada|rechazada' });
+        // Lo mas viejo primero en la cola; en el historico, lo mas reciente.
+        var ordenRec = (estRec === 'pendiente') ? 'ASC' : 'DESC';
+        var limRec  = Math.min(parseInt(req.query.limit)  || 50, 200);
+        var offRec  = Math.max(parseInt(req.query.offset) || 0, 0);
+        var filasRec = await sql(
+          'SELECT r.id, r.recurso_tipo, r.recurso_id, r.prueba_url, r.nota_solicitante,'
+          + ' r.estado, r.xp_pozo_capturado, r.xp_bienvenida, r.resuelto_por,'
+          + ' r.motivo_rechazo, r.revertido_en, r.creado_en, r.resuelto_en,'
+          + ' u.nombre AS solicitante_nombre,'
+          + ' d.nombre AS recurso_nombre, d.slug AS recurso_slug, d.ciudad AS recurso_ciudad,'
+          + ' d.estado_reclamacion, d.es_reclamable, d.dueno_id,'
+          + ' d.xp_pozo_acumulado AS pozo_actual'
+          + ' FROM reclamaciones_propiedad r'
+          + ' LEFT JOIN usuarios u ON u.id = r.solicitante_id'
+          + ' LEFT JOIN destinos d ON r.recurso_tipo = \'destino\' AND d.id::text = r.recurso_id'
+          + ' WHERE r.estado = $1'
+          + ' ORDER BY r.creado_en ' + ordenRec + ' LIMIT $2 OFFSET $3',
+          [estRec, limRec, offRec]
+        );
+        var dataRec = filasRec.map(function (f) {
+          return {
+            id: f.id, recurso_tipo: f.recurso_tipo, recurso_id: f.recurso_id,
+            recurso_nombre: f.recurso_nombre, recurso_slug: f.recurso_slug,
+            recurso_ciudad: f.recurso_ciudad, solicitante_nombre: f.solicitante_nombre,
+            prueba_url: f.prueba_url, nota_solicitante: f.nota_solicitante,
+            estado: f.estado,
+            xp_pozo_capturado: numXp(f.xp_pozo_capturado),
+            pozo_actual: numXp(f.pozo_actual),
+            xp_bienvenida: numXp(f.xp_bienvenida),
+            resuelto_por: f.resuelto_por, motivo_rechazo: f.motivo_rechazo,
+            revertido_en: f.revertido_en, creado_en: f.creado_en, resuelto_en: f.resuelto_en,
+            estado_reclamacion: f.estado_reclamacion, es_reclamable: f.es_reclamable,
+            dueno_id: f.dueno_id
+          };
+        });
+        return res.status(200).json({ ok:true, data:dataRec, total:dataRec.length });
+      }
+
+      if (req.method !== 'POST') return res.status(405).end();
+
+      // --- Validacion de la accion y del id ------------------------------
+      var accRec = String(body.accion == null ? '' : body.accion).trim().toLowerCase();
+      if (RECLAM_ACCIONES.indexOf(accRec) < 0)
+        return res.status(400).json({ ok:false, error:'ACCION_INVALIDA',
+          detalle:'accion debe ser aprobar|rechazar|revertir' });
+      var idRec = String(body.id == null ? '' : body.id).trim();
+      if (!UUID_RE_RECLAM.test(idRec))
+        return res.status(400).json({ ok:false, error:'ID_INVALIDO' });
+
+      // --- Identity of the admin (degradar hacia adelante) --------------
+      // LIMITACION CONOCIDA y asumida del modelo admin.js: el unico control
+      // real es ADMIN_SECRET, no hay token de usuario ni tabla de admins. Se
+      // registra body.admin_usuario_id si viene y el usuario existe; si no,
+      // se registra 'admin_secret'. NUNCA 403/503 por falta de identidad:
+      // bloquear la moderacion entera seria peor que la limitacion.
+      var resPor = 'admin_secret';
+      var admId = String(body.admin_usuario_id == null ? '' : body.admin_usuario_id).trim();
+      if (UUID_RE_RECLAM.test(admId)) {
+        try {
+          var filaAdm = await sql('SELECT id FROM usuarios WHERE id=$1::uuid LIMIT 1', [admId]);
+          if (filaAdm.length) resPor = admId;
+        } catch (eAdm) {
+          if (!esquemaAusente(eAdm))
+            console.warn('[admin reclamaciones] admin_usuario_id no verificado: ' + (eAdm && eAdm.code));
+        }
+      }
+
+      // --- Tope del bono: override en gamificacion_config o default -----
+      var capRec = CAP_RECLAM_BIENVENIDA_DEFAULT;
+      try {
+        var filaCap = await sql('SELECT valor FROM gamificacion_config WHERE clave=$1 LIMIT 1',
+          ['cap_reclamacion_bienvenida_xp']);
+        var vCap = numXp(filaCap.length ? filaCap[0].valor : 0);
+        if (vCap > 0) capRec = vCap;
+      } catch (eCap) {
+        if (!esquemaAusente(eCap))
+          console.warn('[admin reclamaciones] cap no leido: ' + (eCap && eCap.code));
+      }
+
+      // --- APROBAR: claim atomico + pago 1.5x en UNA sentencia ---------
+      if (accRec === 'aprobar') {
+        // El pozo se lee ANTES del claim (el claim lo pone a 0 en la misma
+        // sentencia). El corte por cap solo puede BAJAR el valor, asi que
+        // xp_bienvenida nunca supera pozo_actual * 1.5.
+        var preApr = await sql(
+          'SELECT recurso_tipo, recurso_id, xp_pozo_capturado'
+          + ' FROM reclamaciones_propiedad WHERE id=$1::uuid LIMIT 1', [idRec]);
+        if (!preApr.length) return res.status(404).json({ ok:false, error:'RECLAMACION_NO_ENCONTRADA' });
+        var pozoApr = numXp(preApr[0].xp_pozo_capturado);
+        if (preApr[0].recurso_tipo === 'destino') {
+          var fPozo = await sql('SELECT xp_pozo_acumulado FROM destinos WHERE id::text=$1 LIMIT 1',
+            [String(preApr[0].recurso_id)]);
+          if (fPozo.length) pozoApr = numXp(fPozo[0].xp_pozo_acumulado);
+        }
+        var xpApr = red2(pozoApr * RECLAM_MULT_BIENVENIDA);
+        if (xpApr > capRec) xpApr = red2(capRec);
+        if (xpApr < 0) xpApr = 0;
+
+        // Bono PLANO (mismo precedente que spot_dividendo_credito):
+        // mult_nivel=1, mult_stack=1, mult_final=1, cap_aplicado='ninguno',
+        // bonos_planos=0, es_exento=true. NO pasa por el motor de mults.
+        var rApr = await sql(
+          'WITH claim AS ('
+          + ' UPDATE reclamaciones_propiedad SET estado=\'aprobada\', xp_bienvenida=$2::numeric,'
+          + '  resuelto_por=$3, resuelto_en=NOW()'
+          + ' WHERE id=$1::uuid AND estado=\'pendiente\''
+          + ' RETURNING solicitante_id, recurso_tipo, recurso_id, xp_bienvenida'
+          + '), credito AS ('
+          + ' UPDATE usuarios u SET xp_total = u.xp_total + c.xp_bienvenida'
+          + ' FROM claim c WHERE u.id = c.solicitante_id RETURNING u.id'
+          + '), ledger AS ('
+          + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
+          + '  mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, mult_origen,'
+          + '  origen_tier, contexto)'
+          + ' SELECT c.solicitante_id, \'reclamacion_bienvenida_1.5x\', c.xp_bienvenida,'
+          + '  1, 1, 1, \'ninguno\', 0, c.xp_bienvenida, true, \'reclamacion_propiedad\', \'reclamacion\','
+          + '  jsonb_build_object(\'reclamacion_id\', $1::uuid, \'recurso_tipo\', c.recurso_tipo,'
+          + '   \'recurso_id\', c.recurso_id, \'pozo_origen\', $4::numeric)'
+          + ' FROM claim c RETURNING id'
+          + '), recurso AS ('
+          + ' UPDATE destinos d SET dueno_id=c.solicitante_id, estado_reclamacion=\'reclamado\','
+          + '  es_reclamable=FALSE, xp_pozo_acumulado=0, pozo_actualizado_en=NOW()'
+          + ' FROM claim c WHERE c.recurso_tipo=\'destino\' AND d.id::text=c.recurso_id RETURNING d.id'
+          + '), duenos AS ('
+          + ' UPDATE spot_duenos sd SET activo=FALSE'
+          + ' FROM claim c WHERE c.recurso_tipo=\'destino\' AND sd.destino_id::text=c.recurso_id'
+          + ' RETURNING sd.destino_id'
+          + ')'
+          + ' SELECT (SELECT COUNT(*)::int FROM claim) AS reclamado,'
+          + ' (SELECT COUNT(*)::int FROM credito) AS acreditado,'
+          + ' (SELECT COUNT(*)::int FROM ledger) AS ledger_filas,'
+          + ' (SELECT COUNT(*)::int FROM recurso) AS recurso_filas,'
+          + ' (SELECT COUNT(*)::int FROM duenos) AS duenos_off',
+          [idRec, xpApr, resPor, red2(pozoApr)]
+        );
+        var outApr = (rApr && rApr[0]) ? rApr[0] : {};
+        // 0 filas del claim = ya resuelta: IDEMPOTENTE, nunca 500 ni doble pago.
+        if (!outApr.reclamado)
+          return res.status(200).json({ ok:true, data:{ sin_cambios:true, xp_bienvenida:0 } });
+        return res.status(200).json({ ok:true, data:{
+          id: idRec, estado: 'aprobada', xp_bienvenida: red2(xpApr),
+          pozo_origen: red2(pozoApr), multiplicador: RECLAM_MULT_BIENVENIDA, cap: capRec,
+          resuelto_por: resPor, acreditado: !!outApr.acreditado,
+          ledger_filas: outApr.ledger_filas, recurso_filas: outApr.recurso_filas,
+          duenos_desactivados: outApr.duenos_off
+        } });
+      }
+
+      // --- RECHAZAR: claim atomico a 'rechazada', sin pago, libera -----
+      if (accRec === 'rechazar') {
+        var motRec = String(body.motivo_rechazo == null ? '' : body.motivo_rechazo).trim();
+        var rRech = await sql(
+          'WITH claim AS ('
+          + ' UPDATE reclamaciones_propiedad SET estado=\'rechazada\', motivo_rechazo=$3,'
+          + '  resuelto_por=$2, resuelto_en=NOW()'
+          + ' WHERE id=$1::uuid AND estado=\'pendiente\''
+          + ' RETURNING id, solicitante_id, recurso_tipo, recurso_id'
+          + '), liberar AS ('
+          + ' UPDATE destinos d SET estado_reclamacion=\'disponible\', es_reclamable=TRUE'
+          + ' FROM claim c WHERE c.recurso_tipo=\'destino\' AND d.id::text=c.recurso_id'
+          + '  AND d.estado_reclamacion=\'en_revision\' RETURNING d.id'
+          + ')'
+          + ' SELECT (SELECT COUNT(*)::int FROM claim) AS rechazadas,'
+          + ' (SELECT COUNT(*)::int FROM liberar) AS liberadas',
+          [idRec, resPor, motRec]
+        );
+        var outRech = (rRech && rRech[0]) ? rRech[0] : {};
+        if (!outRech.rechazadas)
+          return res.status(200).json({ ok:true, data:{ sin_cambios:true } });
+        return res.status(200).json({ ok:true, data:{
+          id: idRec, estado: 'rechazada', motivo_rechazo: motRec, resuelto_por: resPor,
+          recurso_liberado: outRech.liberadas
+        } });
+      }
+
+      // --- REVERTIR: reclamacion YA aprobada ---------------------------
+      // Mecanismo que protege el pago irreversible: exige que el recurso no
+      // haya recibido interacciones desde la aprobacion (409 si las hay).
+      // NO borra el rastro del xp_ledger: escribe una fila compensatoria
+      // (trazabilidad por encima del saldo).
+      var preRev = await sql(
+        'SELECT estado, revertido_en, xp_bienvenida, recurso_tipo, recurso_id, resuelto_en'
+        + ' FROM reclamaciones_propiedad WHERE id=$1::uuid LIMIT 1', [idRec]);
+      if (!preRev.length) return res.status(404).json({ ok:false, error:'RECLAMACION_NO_ENCONTRADA' });
+      if (preRev[0].estado !== 'aprobada' || preRev[0].revertido_en)
+        return res.status(409).json({ ok:false, error:'RECLAMACION_NO_APROBADA',
+          detalle:'Solo se revierten reclamaciones aprobadas y no revertidas.' });
+      if (preRev[0].recurso_tipo === 'destino') {
+        var fInt = await sql(
+          'SELECT COUNT(*)::int AS n FROM interacciones'
+          + ' WHERE destino_id::text=$1 AND creado_en > $2',
+          [String(preRev[0].recurso_id), preRev[0].resuelto_en]);
+        if (fInt.length && fInt[0].n > 0) {
+          return res.status(409).json({ ok:false, error:'RECLAMACION_TIENE_INTERACCIONES',
+            detalle:'El recurso recibio ' + fInt[0].n + ' interaccion(es) despues de la aprobacion; revertir dejaria el saldo y el contenido incoherentes.' });
+        }
+      }
+      var rRev = await sql(
+        'WITH claim AS ('
+        + ' UPDATE reclamaciones_propiedad SET revertido_en=NOW()'
+        + ' WHERE id=$1::uuid AND estado=\'aprobada\' AND revertido_en IS NULL'
+        + ' RETURNING solicitante_id, recurso_tipo, recurso_id, xp_bienvenida'
+        + '), debito AS ('
+        + ' UPDATE usuarios u SET xp_total = GREATEST(u.xp_total - c.xp_bienvenida, 0)'
+        + ' FROM claim c WHERE u.id = c.solicitante_id RETURNING u.id'
+        + '), ledger AS ('
+        + ' INSERT INTO xp_ledger (usuario_id, accion, xp_base, mult_nivel, mult_stack,'
+        + '  mult_final, cap_aplicado, bonos_planos, xp_final, es_exento, mult_origen,'
+        + '  origen_tier, contexto)'
+        + ' SELECT c.solicitante_id, \'reclamacion_bienvenida_reversion\', -c.xp_bienvenida,'
+        + '  1, 1, 1, \'ninguno\', 0, -c.xp_bienvenida, true, \'reclamacion_propiedad\', \'reclamacion\','
+        + '  jsonb_build_object(\'reclamacion_id\', $1::uuid, \'recurso_tipo\', c.recurso_tipo,'
+        + '   \'recurso_id\', c.recurso_id, \'revierte\', \'reclamacion_bienvenida_1.5x\')'
+        + ' FROM claim c RETURNING id'
+        + '), recurso AS ('
+        + ' UPDATE destinos d SET dueno_id=NULL, estado_reclamacion=\'disponible\','
+        + '  es_reclamable=TRUE, pozo_actualizado_en=NOW()'
+        + ' FROM claim c WHERE c.recurso_tipo=\'destino\' AND d.id::text=c.recurso_id RETURNING d.id'
+        + ')'
+        + ' SELECT (SELECT COUNT(*)::int FROM claim) AS revertidas,'
+        + ' (SELECT COUNT(*)::int FROM debito) AS debitado,'
+        + ' (SELECT COUNT(*)::int FROM ledger) AS ledger_filas,'
+        + ' (SELECT COUNT(*)::int FROM recurso) AS recurso_filas',
+        [idRec]
+      );
+      var outRev = (rRev && rRev[0]) ? rRev[0] : {};
+      if (!outRev.revertidas)
+        return res.status(200).json({ ok:true, data:{ sin_cambios:true } });
+      return res.status(200).json({ ok:true, data:{
+        id: idRec, revertido: true, xp_revertido: red2(preRev[0].xp_bienvenida),
+        debitado: !!outRev.debitado, ledger_filas: outRev.ledger_filas,
+        recurso_filas: outRev.recurso_filas
+      } });
+    } catch (eRec) {
+      if (esquemaAusente(eRec))
+        return res.status(503).json({ ok:false, error:'SCHEMA_NOT_MIGRATED',
+          detalle:'Aplica la migracion de reclamaciones_propiedad (ADR-091) y las columnas de destinos (es_reclamable, dueno_id, xp_pozo_acumulado, estado_reclamacion, pozo_actualizado_en) en Neon.' });
+      if (eRec && eRec.code === '23505')
+        return res.status(409).json({ ok:false, error:'CONFLICTO_UNICO',
+          detalle: (eRec && eRec.message) || 'Violacion de indice unico' });
+      if (eRec && (eRec.code === '22P02' || eRec.code === '22007'))
+        return res.status(400).json({ ok:false, error:'PARAMETRO_INVALIDO',
+          detalle: (eRec && eRec.message) || 'Parametro invalido' });
+      console.warn('[admin reclamaciones] error: ' + (eRec && eRec.code) + ' ' + (eRec && eRec.message));
+      return res.status(500).json({ ok:false, error:'Error interno' });
+    }
+  }
+
   // == Sin recurso reconocido =============================================
   return res.status(400).json({
     ok: false,
-    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado|gamificacion_config|cartas|gobernanza|marcas_spots',
+    error: 'recurso inv\u00e1lido. Usa ?recurso=solicitudes|resenas|destacado|notificaciones|consumibles|activos_ocultos|salud_red|mercado|gamificacion_config|cartas|gobernanza|marcas_spots|reclamaciones',
   });
 };

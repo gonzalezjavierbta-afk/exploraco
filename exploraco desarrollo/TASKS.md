@@ -4850,5 +4850,48 @@ Cerrar el **unico FAIL** que mantenia `npm run test` en rojo (BUG-118), un fallo
 
 `scripts/smoke_grupos_perfil.js`. En **working tree, SIN commitear** al cierre de este pase documental. **`mi-perfil.html` y `api/*` sin tocar.**
 
+## TSK-201 - Reclamacion de propiedad de destinos con **pozo de XP** y **bono 1.5x** (ADR-091) - 2026-10-08 - IMPLEMENTADO / VERIFICADO LOCAL / **PENDIENTE DE DESPLIEGUE**
+
+**Estado: IMPLEMENTADO Y VERIFICADO LOCAL; NO DESPLEGADO.** Decision de arquitectura: `DECISIONS.md` **ADR-091** (Estado actualizado a **ACEPTADO E IMPLEMENTADO** en este pase; rango `L7622-7964`). **Cero funciones serverless nuevas: presupuesto Vercel 8/8 INTACTO** (ADR-010): las acciones se extienden como query params de `api/interacciones.js` y la moderacion como `?recurso=` de `api/admin.js`. **Cero Borrado Logico** (ADR-003). **El codigo NO esta desplegado en `exploraco.vercel.app`:** el verificador `scripts/verificar_migraciones_prod.js` emite `NO APLICADA EN CODIGO`; esto es un **estado de despliegue PENDIENTE, no un fallo**.
+
+### Que se estaba haciendo
+
+Dar destino al **10% del dividendo spot** que hoy se pierde en la rama `sin_dueno` de `aplicarDividendoSpot`: acumularlo como **pozo reclamable** (`destinos.xp_pozo_acumulado`, REPUTACION creada, no se descuenta del autor) y pagarlo con **bono 1.5x** al futuro dueno cuando resuelve su **solicitud de propiedad**, con moderacion admin.
+
+### Alcance ejecutado (real, no el plan original)
+
+1. **Migracion `db/migrations/055_reclamacion_propiedad_destinos.sql` CREADA Y APLICADA EN NEON** (verificado por `apply_sql_file.js` y consultas directas): **5 columnas** en `destinos` (`es_reclamable`, `dueno_id`, `xp_pozo_acumulado`, `estado_reclamacion`, `pozo_actualizado_en`) + tabla **`reclamaciones_propiedad`** (**14 columnas**, **6 constraints**), **5 indices**, incluido el **UNIQUE parcial `uq_reclamaciones_recurso_pendiente`**. Confirmado que **NO crea `admin_usuarios`** (verificada ausente; ver deuda 3).
+2. **`api/interacciones.js`** (ramas nuevas): GET `reclamacion_estado` (`:6150`), POST `reclamar_propiedad_solicitar` (`:9816`), funcion `acumularPozoReclamable` (`:1431`) y precedencia de dueno declarado en `resolverDuenosSpot` (`:852`). El pozo se acumula SOLO en las ramas huerfanas dentro de `aplicarDividendoSpot`; los call-sites NO cambian.
+3. **`api/admin.js`:** recurso `reclamaciones` (`:1879`; bloque `:1855-2139`) para moderacion (aprobar/rechazar/revertir).
+4. **`api/pagina-destino.js`:** boton + modal + silo CSS `.pdrecl` (ADR-004) en `buildHTML()`.
+5. **`admin.html`:** sub-tab, cola de moderacion, aprobar/rechazar/revertir, badge sumado en la nav, prompt de UUID del admin y **mini-formulario de motivo de rechazo** (`#mod-reclamaciones-panel`).
+6. **Pago 1.5x IDEMPOTENTE** en **UNA sola CTE** con `UPDATE ... WHERE estado='pendiente' RETURNING` como claim atomico; todas las CTE parten de `FROM claim`; **unico `UPDATE usuarios`** dentro de la CTE.
+
+### Verificacion (medida en el turno de cierre)
+
+| Prueba | Resultado |
+|---|---|
+| Escudo GOLD (@qa-auditor) | **7/7**: `node --check` **5/5**; ASCII **0 bytes >127** en el codigo nuevo; balance de divs **sin regresion**; contrato entre las 4 capas cuadra; pago 1.5x idempotente (claim `WHERE estado='pendiente' RETURNING`); smoke `buildHTML()` **0 fallos nuevos** |
+| Migracion 055 en Neon | **APLICADA**: 5 columnas + tabla 14 col / 6 constraints + 5 indices (incl. `uq_reclamaciones_recurso_pendiente`) |
+| `scripts/smoke_055_indice_unico_reclamacion.js` | **24/24 OK** (prueba el `23505` real y el `ON CONFLICT DO NOTHING` de produccion) |
+| `scripts/verificar_migraciones_prod.js` | ampliado con params/cabeceras por tipo; emite **`NO APLICADA EN CODIGO`** (codigo aun no desplegado) |
+| Presupuesto Vercel | **8/8 INTACTO** (sin endpoint nuevo) |
+
+### Deudas / follow-ups (NO bloquean)
+
+1. **Off-by-one documental en comentarios (nit).** `api/interacciones.js:1413` decia "Los 13 call-sites de aplicarDividendoSpot"; el conteo real es **12** (verificado por conteo de `await aplicarDividendoSpot(sql, {` en WORK y HEAD). **CORREGIDO en este pase SOLO el numero** (`:1413` -> 12). Quedan con la misma cifra **`api/interacciones.js:1241`** (comentario de la feature) y el **titulo/cuerpo de `ADR-091`** (`DECISIONS.md:7622`, `:7690`): **NO tocados** (el ADR no se reescribe en este pase). Ver **BUG-122**.
+2. **Deuda preexistente ADR-002 en `admin.html`:** **7770 bytes > 127** en lineas que **NO son de esta feature** (la feature anadio **0**). Deuda conocida, **NO fallo de la tanda**. Ver **BUG-120**.
+3. **Tabla `admin_usuarios` NO EXISTE** (solo se menciona en la 055 como verificada ausente): por eso `resuelto_por` degrada a `'admin_secret'` y el admin declara su UUID via prompt. **Deuda de trazabilidad abierta** (el ADR-091 ya la menciona como **R1**). Ver **BUG-121**.
+4. **9 fallos preexistentes** en `scripts/smoke_auditoria_pagina_destino.js` (lightbox `lb-*` y hero): **NO constaban** en `BUGS_HISTORICOS.md`; se registran en **BUG-119**. Reproducidos corriendo el smoke: `lbHTML VISIBLE`, `gal-thumbs onclick abrirLightbox`, `lb-bg`, `lb-close`, `lb-prev + lb-next`, y 4 del hero (`HERO_ALL[0]`, miniatura 1, miniaturas 2-3, exactamente 3 miniaturas).
+5. **Fase 2 pendiente:** `album_foto` y `usuario_foto` (caso "artista sin cuenta previa" = `album_fotos.autor_original_id IS NULL`). La tabla `reclamaciones_propiedad` ya admite los **3 `recurso_tipo`**; el backend solo acepta **`destino`** en Fase 1.
+
+### Bug aparte (NO de esta tanda) - BUG-119 / BUG-120 / BUG-121 / BUG-122
+
+Registrados en `BUGS_HISTORICOS.md` en este mismo pase. **Ninguno es regresion de esta feature** (los 9 FAIL del smoke y los 7770 bytes >127 son preexistentes; `admin_usuarios` ausente es deuda de esquema; el off-by-one es documental).
+
+### Archivos tocados
+
+Codigo (working tree, SIN commit; **NO desplegado**): `db/migrations/055_reclamacion_propiedad_destinos.sql` (nuevo) · `api/interacciones.js` · `api/admin.js` · `api/pagina-destino.js` · `admin.html` · `scripts/verificar_migraciones_prod.js` · `scripts/smoke_055_indice_unico_reclamacion.js` (nuevo). Documentacion (este pase): `exploraco desarrollo/TASKS.md` · `NEXT.md` · `DECISIONS.md` · `BUGS_HISTORICOS.md`.
+
 ## Regla de actualizacion
 Toda tarea completada debe reflejarse aqui (cambio de Estado) y su cierre debe registrarse en NEXT.md como parte del ciclo documental (AI-DOS Cap. 9.9)[cite: 1]. Nueva tarea -> Modificar proyecto -> Actualizar documento -> Continuar Sprint[cite: 1].
