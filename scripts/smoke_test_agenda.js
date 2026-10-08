@@ -29,7 +29,7 @@ function D(y, m, d) { return new Date(y, m - 1, d); }
 
 check('AgendaUtil expuesto', !!AU && typeof AU.evActiveOn === 'function');
 
-// ── Multidia: activo todos los dias del rango ──
+// -- Multidia: activo todos los dias del rango --
 const mesPatrimonio = apiEv('2026-09-01', '2026-09-30');
 check('antes del inicio = false', AU.evActiveOn(mesPatrimonio, D(2026, 8, 31)) === false);
 check('dia de inicio = true', AU.evActiveOn(mesPatrimonio, D(2026, 9, 1)) === true);
@@ -37,7 +37,7 @@ check('dia intermedio = true', AU.evActiveOn(mesPatrimonio, D(2026, 9, 15)) === 
 check('dia de fin (incluido) = true', AU.evActiveOn(mesPatrimonio, D(2026, 9, 30)) === true);
 check('despues del fin = false', AU.evActiveOn(mesPatrimonio, D(2026, 10, 1)) === false);
 
-// ── Meses activos (cruza de mes) ──
+// -- Meses activos (cruza de mes) --
 const ulibro = apiEv('2026-08-28', '2026-09-06');
 const meses = AU.evActiveMonths(ulibro);
 check('cruza de mes: Ago+Sep', meses.length === 2 && meses.indexOf('Ago') !== -1 && meses.indexOf('Sep') !== -1);
@@ -46,12 +46,12 @@ const unDia = apiEv('2026-09-09');
 const meses1 = AU.evActiveMonths(unDia);
 check('evento 1 dia: un solo mes', meses1.length === 1 && meses1[0] === 'Sep');
 
-// ── Texto de rango ──
+// -- Texto de rango --
 check('rango 1 dia: "12 Sep"', AU.evRangeText(apiEv('2026-09-12')) === '12 Sep');
 check('rango mismo mes: "12-13 Sep"', AU.evRangeText(apiEv('2026-09-12', '2026-09-13')) === '12-13 Sep');
 check('rango cruce mes: "28 Ago - 6 Sep"', AU.evRangeText(apiEv('2026-08-28', '2026-09-06')) === '28 Ago - 6 Sep');
 
-// ── Eventos hardcodeados recurrentes (day/month[/dayEnd/monthEnd]) ──
+// -- Eventos hardcodeados recurrentes (day/month[/dayEnd/monthEnd]) --
 const carnaval = { day: 14, month: 'Feb', dayEnd: 17, monthEnd: 'Feb' };
 check('recurrente: activo el dia 16 feb', AU.evActiveOn(carnaval, D(2026, 2, 16)) === true);
 check('recurrente: no activo el 18 feb', AU.evActiveOn(carnaval, D(2026, 2, 18)) === false);
@@ -59,7 +59,7 @@ check('recurrente: rango "14-17 Feb"', AU.evRangeText(carnaval) === '14-17 Feb')
 const festiFlores = { day: 1, month: 'Ago', dayEnd: 10, monthEnd: 'Ago' };
 check('recurrente: cruce mismo mes activo', AU.evActiveOn(festiFlores, D(2026, 8, 5)) === true);
 
-// ── Deteccion de categoria ──
+// -- Deteccion de categoria --
 function catDe(nombre) { return AU.detectEventCat(nombre, {}); }
 check('cultura: Feria del Libro', catDe('Ulibro 2026: Feria del Libro de Bucaramanga') === 'cultura');
 check('cultura: Mes del Patrimonio', catDe('Mes del Patrimonio 2026: Memoria que construye futuro') === 'cultura');

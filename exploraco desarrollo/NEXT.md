@@ -242,6 +242,22 @@ Para continuar, leer primero este bloque y la seccion de la sesion mas reciente 
 
 ## Que se estaba haciendo
 
+### WORKING TREE 2026-10-07 (pase documental único R2, 13ª tanda) - TSK-173 D+E: saneado de BOM y ASCII-safety (sin commit)
+
+**Qué se estaba haciendo:** ejecutar las categorías **D (BOM UTF-8)** y **E (ASCII-safety)** del inventario de **`TASKS.md` TSK-173**, y **corregir el inventario** con lo medido (ADR-006). El detalle de ejecución vive **una sola vez** en **`TASKS.md` TSK-173** (sección 5); aquí solo hay estado y siguientes pasos.
+
+**Lo que quedó entregado (working tree, SIN commit):**
+- **D (5 ficheros):** BOM UTF-8 de 3 bytes suprimido en los 5 `scripts/load-*-api.js` (`load-bellagio`, `load-bogota`, `load-cafe-cinema`, `load-klandestino`, `load-quiebracanto`; cada uno **-3 B**: 3336→3333, 3688→3685, 3345→3342, 3345→3342, 3348→3345).
+- **E (2 ficheros):** `scripts/insert-eventos-bogota.js` pasa tildes/emojis a escapes `\uXXXX`; `scripts/smoke_test_agenda.js` cambia U+2500 por `-` en comentarios. `node --check` OK; **bytes>127 = 0** en los 7 ficheros tocados.
+- **Verificación (ADR-006):** `node scripts/express_check.js` → **PASS 721 / FAIL 26 → PASS 728 / FAIL 19** (baja exacta de **7** = 5 BOM + 2 E).
+
+**Qué sigue (pendiente, NO se decide aquí):**
+1. **Los 19 FAIL restantes son A/B/C** (falso positivo del checker + backticks en comentarios + template literals de estilo). Su arreglo correcto es cambiar la **REGLA** de `scripts/express_check.js` (**ADR del checker**), no sanear fichero a fichero; **no se decide en este pase**.
+2. **Hallazgo nuevo:** `scripts/test-fase1.js` (**bytes>127=661 + backticks=66**) **no estaba** ubicado en el inventario A/B/C; queda como **pendiente del bloque futuro (ADR del checker)**.
+3. **Corrección de inventario (ADR-006):** `insert-eventos-bogota.js` **NO tenía mojibake** —sus bytes eran `42 6F 67 6F 74 C3 A1` = UTF-8 **válido**. El inventario lo declaraba "único FAIL con consecuencia de producto / escribe texto corrupto en Neon": **era incorrecto, no hubo corrupción de datos**. Era un falso positivo más del checker, que cuenta cualquier byte>127.
+
+**Riesgos activos:** ninguno nuevo. **NO toca Vercel (8/8 INTACTO) ni migraciones ni ADR.**
+
 ### WORKING TREE 2026-10-07 (pase documental único R2, 12ª tanda) - Cierre de BUG-118 (arnés de `smoke_grupos_perfil.js`)
 
 **Qué se estaba haciendo:** cerrar el **único FAIL** que mantenía `npm run test` en rojo. **Causa raíz = defecto del ARNÉS, no del producto.** El detalle de ejecución vive **una sola vez** en `TASKS.md` **TSK-200** y en `BUGS_HISTORICOS.md` **BUG-118**; aquí solo hay estado y siguientes pasos.

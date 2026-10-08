@@ -1,4 +1,4 @@
-﻿// scripts/load-bogota-api.js
+// scripts/load-bogota-api.js
 // Carga la pagina dinamica bogota.html a traves de la API de admin
 // de produccion (/api/admin-destinos), enviando el MISMO payload que
 // genera admin.html (_placeToAPI/_buildTagsObj) para la categoria sitio.

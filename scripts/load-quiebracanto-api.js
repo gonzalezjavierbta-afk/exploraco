@@ -1,4 +1,4 @@
-﻿// scripts/load-quiebracanto-api.js
+// scripts/load-quiebracanto-api.js
 // Carga la pagina dinamica candelario.html a traves de la API de admin
 // de produccion (/api/admin-destinos), enviando el MISMO payload que
 // genera admin.html para la categoria sitio.

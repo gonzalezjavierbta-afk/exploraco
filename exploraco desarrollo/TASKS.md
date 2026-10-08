@@ -4035,6 +4035,7 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 ### TSK-173: Inventario y plan de saneado de los 26 FAIL globales de `express_check.js` [PENDIENTE]
 
 - **Estado:** PENDIENTE / **inventario YA DONE y medido** (el alcance de esta entrada es el inventario, el diagnostico del timeout, la criticidad y el plan; el **arrelo de los 26 FAIL sigue entero y sin empezar**).
+- **Estado (ACTUALIZACION 2026-10-07):** **D (BOM) y E (ASCII-safety) EJECUTADAS EN WORKING TREE (sin commit)** y verificadas: `express_check` **PASS 721 / FAIL 26 -> PASS 728 / FAIL 19** (baja exacta de 7 = 5 BOM + 2 E). **A/B/C siguen PENDIENTES de ADR** (el arreglo real es la REGLA del checker, no sanear ficheros). Detalle en "#### 5) Actualizacion 2026-10-07".
 - **Prioridad:** Media. No rompe el gate de despliegue (ver "Criticidad"), pero mientras siga rojo `express_check.js` **no sirve de puerta de calidad**: da 26 FAIL permanentes y eso entrena al equipo a ignorar el rojo.
 - **Fecha:** 2026-10-02.
 - **Origen:** deuda (b) y (c) de **TSK-172** (`express_check.js`: 26 FAIL + timeout de 120 s), extraidas a tarea propia porque son deuda viva **sin dueño**. El inventario de abajo se obtuvo **ejecutando el script**, no heredado de la sesion anterior (ADR-006).
@@ -4110,6 +4111,34 @@ Tablero operativo del proyecto (AI-DOS Cap. 9.4)[cite: 1]. Cada tarea incluye: I
 - **Fuera de alcance (explicito):** arreglar los 26 FAIL; borrar `test-fase1.js`; tocar `api/*` (ADR-010: **8/8 INTACTO**); cualquier cambio en produccion o en la BD.
 - **Dependencias:** ninguna. Arranca en frio.
 - **Riesgo de la tarea:** el riesgo real no es sanear el codigo, es **malDiagnosticar**: tratar los 6 falsos positivos como deuda real y "arreglar" instrumentacion que funciona (el precedente de BUG-098: *producto correcto, instrumentacion incorrecta*).
+
+#### 5) Actualizacion 2026-10-07 - Ejecucion de D (BOM) y E (ASCII-safety) en WORKING TREE, SIN COMMIT
+
+> Pase documental **unico (R2)**, modo express. **NO commiteado.** Toca **solo `scripts/*.js`** (7 ficheros);
+> **NO toca `api/*` (8/8 INTACTO, ADR-010)**, **sin migraciones**, **sin cambios en produccion ni en la BD**.
+> **Sin ADR nuevo:** A/B/C (que si requeririan cambiar la REGLA del checker) quedan **pendientes de ADR** y NO se deciden aqui.
+
+- **Estado de D+E:** **EJECUTADAS EN WORKING TREE (sin commit)** al 2026-10-07. A/B/C **NO ejecutadas**; F y G fuera de esta tanda.
+- **Verificacion global (ADR-006, medida):** `node scripts/express_check.js` -> **ANTES PASS 721 / FAIL 26** -> **DESPUES PASS 728 / FAIL 19 (omitidos 0)**. La bajada es exactamente **7** = **5 BOM (D) + 2 E**, y el FAIL global pasa de 26 a 19.
+- **D) BOM UTF-8 suprimido (5 ficheros):** `scripts/load-bellagio-api.js` (**3336 -> 3333 B**), `scripts/load-bogota-api.js` (**3688 -> 3685**), `scripts/load-cafe-cinema-api.js` (**3345 -> 3342**), `scripts/load-klandestino-api.js` (**3345 -> 3342**), `scripts/load-quiebracanto-api.js` (**3348 -> 3345**). Los 5 pasan `node --check` OK y ya **no** llevan `EF BB BF` en offset 0 (verificado byte a byte: los 5 dan `BOM=False` y la longitud cae exactamente 3 B).
+- **E) ASCII-safety (2 ficheros):** `scripts/insert-eventos-bogota.js` (tildes/emojis -> escapes `\uXXXX`; p.ej. `Bogot\u00e1`, `v\u00edctimas`, y el emoji como par subrogado `\ud83c\udfb5`) y `scripts/smoke_test_agenda.js` (U+2500 -> `-` en comentarios; lineas 32, 40, 49, 54, 62). `node --check` OK; **bytes>127 = 0** en los 7 ficheros tocados.
+
+**CORRECCION AL INVENTARIO (ADR-006) - el grupo E "con impacto en DATOS" era FALSO:**
+
+- La afirmacion del punto **1-E** (arriba) que dice que `scripts/insert-eventos-bogota.js` era "el unico FAIL con consecuencia de producto" y que "si ese script se ejecuta, escribe texto corrupto en Neon" es **INCORRECTA y queda corregida aqui**. Se conserva el texto original por Cero Borrado Logico (Regla de Oro 3).
+- **Medido byte a byte:** el fichero **NO tenia mojibake**. Los bytes eran `42 6F 67 6F 74 C3 A1` = **UTF-8 VALIDO** de `Bogot` + `a` acentuada; el mojibake real habria sido `C3 83 C2 A1`. Por tanto **no habia corrupcion de datos ni impacto de producto**: el texto acentuado era correcto y legible.
+- **Causa real del FAIL:** `express_check.js` cuenta **cualquier** byte>127 (`buf.toString('latin1')` en su barrido ASCII), de modo que una **tilde UTF-8 valida tambien falla**. El "FAIL con consecuencia de producto" era, en realidad, un **falso positivo mas del checker** (misma familia que el grupo A): el fichero ya cumplia ADR-002 en su **valor emitido**, pero el checker mide el **byte del fuente**. Igual que en A, la salida correcta no es "arreglar el dato" sino decidir la **regla del checker**.
+
+**HALLAZGO NUEVO - `scripts/test-fase1.js` no estaba ubicado en el inventario A/B/C original:**
+
+- `scripts/test-fase1.js` da **bytes>127 = 661 + backticks = 66** (lineas 10, 13, 16, 22, 31): el fichero mas ruidoso y el unico con las **tres** comprobaciones a la vez (el grupo G del punto 1 ya lo citaba; se confirma medido en este pase). **NO estaba en el recuento A/B/C** y por eso el inventario original no lo ubicaba con claridad.
+- **Se anota como PENDIENTE del bloque futuro (el ADR del checker)**, no de esta tanda: comparte con A/B/C la misma decision (regla del checker + alcance de backticks/bytes) y ademas es el candidato a **borrado o archivo** que el punto 1-G ya pedia decidir con el operador.
+
+**QUEDA PENDIENTE (19 FAIL) - categorias A/B/C y el ADR del checker:**
+
+- Los **19 FAIL** restantes son las categorias **A (falso positivo del checker), B (backticks en comentarios) y C (template literals de estilo)**, mas F (doble escape real), G (`test-fase1.js`) y el mixto `api/utilidades.js`.
+- El arreglo correcto de A/B/C **NO es tocar los ficheros**: es cambiar la **REGLA** de `scripts/express_check.js` (distinguir el **doble-escape estructural** -- generadores de escapes -- y acotar el **alcance de backticks/bytes** al runtime serverless de ADR-002). TSK-173 ya califica ese cambio de codigo como **ADR**; **no se decide aqui**.
+- **`node scripts/express_check.js` sigue en `exit 1` con 19 FAIL:** la deuda no bloquea produccion (no esta en `npm test`, punto 3), pero mientras siga roja **no sirve como puerta de calidad**. Registrar y decidir la regla es el siguiente paso, distinto de "sanear fichero a fichero".
 
 ## Prioridad SANEADO DE UI DEL PERFIL Y DE COMUNIDAD - 2026-10-02 (TSK-174 / ADR-080 / ADR-081)
 
